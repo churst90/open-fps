@@ -4,6 +4,7 @@ from map import Map
 from chat import Chat
 import json
 
+
 class ClientHandler:
 
   def __init__(self, user_accounts, key, players, maps):
@@ -25,9 +26,9 @@ class ClientHandler:
     }
 
   def move(self, data):
-    # Update the player's position on the map
-    player = next(p for p in players if p["username"] == data["username"])
-    player["map"] = data["map"]
+    # Update thetplayer's position on the map
+    player=self.players[data["username"]][0]
+    #layer["map"] = data["map"]
     player["x"] = data["x"]
     player["y"] = data["y"]
     player["z"] = data["z"]
@@ -35,16 +36,16 @@ class ClientHandler:
     update_message = {
     "type": "move",
     "username": data["username"],
-    "map": data["map"],
     "x": data["x"],
     "y": data["y"],
     "z": data["z"],
     }
     # Get the list of players on the same map as the moving player
-    recipients = [p for p in players if p["map"] == data["map"]]
-
+    recipients = self.players
     # Send the update message to the recipients
-    broadcast_update(update_message, recipients)
+    print(update_message) 
+    print(recipients)
+    self.broadcast_update(update_message, recipients)
 #    else:
 #      logger.error("Received data has an unknown type: %s", data["type"])
 
@@ -141,3 +142,10 @@ class ClientHandler:
 
       # Print out the decrypted username and password
       print(f"Username: {decrypted_username}, Password: {decrypted_password}")
+      
+  def broadcast_update(self,message,recipients):
+    for recipient in recipients.values():
+      # Encode the message as a bytes object
+      data = json.dumps(message).encode()
+      # Send the message to the recipient using the socket's `sendall()` method
+      recipient[1].sendall(data)

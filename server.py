@@ -91,19 +91,11 @@ def send_data(client_socket, message):
   client_socket.sendall(data)
 
 def receive_data(client_socket):
-
   while True:
     try:
-      client_socket.settimeout(1)
-      # Send a keep-alive message to the client every second
-      client_socket.sendall(json.dumps({"type": "keep_alive"}).encode())
-      # Wait for a response from the client
       data = client_socket.recv(1024)
       data = json.loads(data)
-      if data["type"] == "keep_alive":
-        # If the client responds with a keep-alive message, reset the timer
-        continue
-    except socket.timeout:
+    except:
       # If a timeout occurs, the client has not responded in time
       # Remove the player from the players dictionary
       del players[data["username"]]
@@ -111,11 +103,7 @@ def receive_data(client_socket):
       client_socket.close()
       print("The client has stopped responding. the connection has been reset")
       break
-
-    # Verify the authentication token
-    if verify_auth_token(data["auth_token"], data["username"], data["type"]):
-      # Proceed with the requested action if the token is valid
-      for message_type, message_handler in client_handler.messageTypes.items():
+    for message_type, message_handler in client_handler.messageTypes.items():
         if data["type"] == message_type:
           # Call the message handler function with the data and client socket if the message type matches "login" or "logout"
           if message_type in ["login", "logout"]:
@@ -124,9 +112,9 @@ def receive_data(client_socket):
           else:
             message_handler(data)
           break
-        else:
-          # Reject the request and ask the client to authenticate again if the token is invalid
-          client_socket.sendall(json.dumps({"type": "error", "message": "Try again"}).encode())
+        
+
+          
 
 def main(host, port):
 
