@@ -30,6 +30,7 @@ f = Fernet(key)
 user_accounts = {}
 # Dictionary to store all created maps
 maps = {}
+# dictionary to store all players on the game
 players = {}
 client_handler = ClientHandler(user_accounts, f, players, maps)
 logger.info("Open Life FPS game server, version 1.0")
@@ -97,11 +98,7 @@ def receive_data(client_socket):
       data = json.loads(data)
     except:
       # If a timeout occurs, the client has not responded in time
-      # Remove the player from the players dictionary
-      del players[data["username"]]
-      print("Player removed from the players list")
-      client_socket.close()
-      print("The client has stopped responding. the connection has been reset")
+      client_handler.logout()
       break
     for message_type, message_handler in client_handler.messageTypes.items():
         if data["type"] == message_type:
@@ -112,9 +109,6 @@ def receive_data(client_socket):
           else:
             message_handler(data)
           break
-        
-
-          
 
 def main(host, port):
 

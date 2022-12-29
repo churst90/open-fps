@@ -1,9 +1,9 @@
+import math
 import base64
 from cryptography.fernet import Fernet
 from map import Map
 from chat import Chat
 import json
-
 
 class ClientHandler:
 
@@ -14,21 +14,44 @@ class ClientHandler:
     self.maps = maps
     self.messageTypes = {
     "move": self.move,
+    "turn": self.turn,
 #    "chat": self.chat,
 #    "create_account": self.create_account,
 #    "create_map": self.create_map,
     "login": self.login,
     "logout": self.logout
-#    "add_map_obj": self.add_obje,
-#    "remove_map_obj": self.remove_obj,
-#    "pvp_status": self.pvp_status,
-#    "attack": self.attack
     }
 
+  def turn(self, data):
+    self.direction = data["value"]
+
   def move(self, data):
-    # Update thetplayer's position on the map
     player=self.players[data["username"]][0]
-    #layer["map"] = data["map"]
+    # determine the type of move and move based on the direction
+    if data["value"] == "left":
+      dx = math.cos(math.radians(data["direction"]))*1
+      dy = math.sin(math.radians(data["direction"]))*1
+      # Increment the values of x and y by the calculated amounts
+      player["x"] -= dx
+      player["y"] += dy
+    elif data["value"] == "right":
+      dx = math.cos(math.radians(data["direction"]))*1
+      dy = math.sin(math.radians(data["direction"]))*1
+      player["x"] += dx
+      player["y"] += dy
+    elif data["value"] == "forward":
+      data["x"] += math.sin(math.radians(data["direction"]))
+      data["y"] += math.cos(math.radians(data["direction"]))
+    elif data["value"] == "backward":
+      data["x"] -= math.sin(math.radians(data["direction"]))
+      data["y"] -= math.cos(math.radians(data["direction"]))
+    elif data["value"] == "up":
+      data["z"] += 1
+    elif data["value"] == "down":
+      data["z"] -= 1
+    # Update the player's position on the map
+
+    # player["map"] = data["map"]
     player["x"] = data["x"]
     player["y"] = data["y"]
     player["z"] = data["z"]

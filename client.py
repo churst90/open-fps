@@ -65,92 +65,37 @@ def receive_data():
 def handle_input(key):
         print("handle input")
         if key == pygame.K_LEFT:
-          # Decrement the player's x coordinate
-          player.x -= 1
-          # create the move message
-          message = {
-          "type": "move",
-          "username":player.username,
-          "x": player.x,
-          "y": player.y,
-          "z": player.z
-          }
-          #send the message to the server
-          send_data(message)
+          # send a move left message to the server
+          send_data(player.move("left"))
         # Check if the user pressed the right arrow key
         elif key == pygame.K_RIGHT:
-          # Increment the player's x coordinate
-          player.x += 1
-          # create the move message
-          message = {
-          "type": "move",
-          "username":player.username,
-          "x": player.x,
-          "y": player.y,
-          "z": player.z
-          }
-          #send the message to the server
-          send_data(message)
+          # send a move rightt message to the server
+          send_data(player.move("right"))
         # Check if the user pressed the up arrow key
         elif key == pygame.K_UP:
-          # Increment the player's y coordinate
-          player.y += 1
+          # send a move forward message to the server
+          send_data(player.move("forward"))
           # create the move message
-          message = {
-          "type": "move",
-                    "username":player.username,
-          "x": player.x,
-          "y": player.y,
-          "z": player.z
-          }
-          #send the message to the server
-          send_data(message)
         # Check if the user pressed the down arrow key
         elif key == pygame.K_DOWN:
-          # decrement the player's y coordinate
-          player.y -= 1
-          # create the move message
-          message = {
-          "type": "move",
-          "username":player.username,
-          "x": player.x,
-          "y": player.y,
-          "z": player.z
-          }
-          #send the message to the server
-          send_data(message)
+          # send a move backward message to the server
+          send_data(player.move("backward"))
         # Check if the user pressed the page up key
         elif key == pygame.K_PAGEUP:
-          # Increment the player's z coordinate
-          player.z += 1
-          # create the move message
-          message = {
-          "type": "move",
-          "username":player.username,
-          "x": player.x,
-          "y": player.y,
-          "z": player.z
-          }
-          #send the message to the server
-          send_data(message)
+          # send a move up message to the server
+          send_data(          player.move("up"))
         # Check if the user pressed the page down key
         elif key == pygame.K_PAGEDOWN:
-          # Decrement the player's z coordinate
-          player.z -= 1
-          # create the move message
-          message = {
-          "type": "move",
-          "username":player.username,
-          "x": player.x,
-          "y": player.y,
-          "z": player.z
-          }
-          #send the message to the server
-          send_data(message)
+          # send a move down message to the server
+          send_data(player.move("down"))
         # Check if the user pressed the "c" key
         elif key == pygame.K_c:
           # Read out the player's current coordinates
           tts.output(f"{player.x}, {player.y}, {player.z}")
+        if key == pygame.K_e:
+          send_data(player.turn(45))
+        if key == pygame.K_q:
+          send_data(player.turn(45))
         if key == pygame.K_z:
           pass
 
