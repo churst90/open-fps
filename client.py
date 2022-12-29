@@ -61,43 +61,196 @@ def receive_data():
       print(data)
       tts.output("something went wrong" + str(e)            )
   server_socket.close()
+
+def create_account():
+  # Set the window size and title
+  window = pygame.display.set_mode((300, 200))
+  pygame.display.set_caption("Create Account")
+
+  # Set the font and font size for the text input fields
+  font = pygame.font.Font(None, 32)
+
+  # Create the text input fields
+  username_field = pygame.Rect(10, 10, 280, 32)
+  password_field = pygame.Rect(10, 50, 280, 32)
+  ok_button = pygame.Rect(10, 90, 100, 32)
+  cancel_button = pygame.Rect(180, 90, 100, 32)
+
+  # Set the initial focus to the username field
+  active_field = "username"
+
+  # Set the initial values for the username and password variables
+  username = ""
+  password = ""
+
+  # Set the field names for the text input fields
+  field_names = {
+      "username": "Username",
+      "password": "Password",
+      "ok": "OK",
+      "cancel": "Cancel"
+  }
+
+  # Set the current field name to be spoken
+  current_field_name = field_names[active_field]
+  tts.output(f"{current_field_name}")
+
+  # Run the game loop
+  while True:
+    # Handle events
+    for event in pygame.event.get():
+      # Quit the game when the user closes the window
+      if event.type == pygame.QUIT:
+        pygame.quit()
+        sys.exit()
+      # Handle key down events
+      elif event.type == pygame.KEYDOWN:
+        # Check if the user pressed the tab key
+        if event.key == pygame.K_TAB:
+          # Set the focus to the next field
+          if active_field == "username":
+            active_field = "password"
+            # Set the current field name to be spoken
+            current_field_name = field_names[active_field]
+            tts.output(f"{current_field_name}: {password}")
+          elif active_field == "password":
+            active_field = "ok"
+            # Set the current field name to be spoken
+            current_field_name = field_names[active_field]
+            tts.output(f"{current_field_name}")
+          elif active_field == "ok":
+            active_field = "cancel"
+            # Set the current field name to be spoken
+            current_field_name = field_names[active_field]
+            tts.output(f"{current_field_name}")
+          elif active_field == "cancel":
+            active_field = "username"
+            # Set the current field name to be spoken
+            current_field_name = field_names[active_field]
+            tts.output(f"{current_field_name}: {username}")
+          # Check if the user pressed the backspace key
+          elif event.key == pygame.K_BACKSPACE:
+            # Delete the last character from the current field
+            if active_field == "username":
+              username = username[:-1]
+            elif active_field == "password":
+              password = password[:-1]
+          # Check if the user pressed the enter key
+          elif event.key == pygame.K_RETURN:
+            # Check if the user is creating an account
+            if active_field == "ok":
+              # Send a create account request to the server
+              message = {
+              "type": "create_account",
+              "username": username,
+              "password": password
+              }
+              send_data(message)
+            # Check if the user is canceling the create account process
+            elif active_field == "cancel":
+              startMenu()
+          # Check if the user pressed any other key
+          elif len(event.unicode) > 0:
+            # Add the character to the current field
+            if active_field == "username":
+              username += event.unicode
+            elif active_field == "password":
+              password += event.unicode
+
+  # Clear the screen
+  window.fill((0, 0, 0))
+
+  # Render the username field
+  if active_field == "username":
+    username_field_surface = font.render(username, True, (255, 255, 255))
+    window.blit(username_field_surface, (100, 100))
+  else:
+    username_field_surface = font.render(username, True, (200, 200, 200))
+    window.blit(username_field_surface, (100, 100))
+
+  # Render the password field
+  if active_field == "password":
+    password_field_surface = font.render(password, True, (255, 255, 255))
+    window.blit(password_field_surface, (100, 200))
+  else:
+    password_field_surface = font.render(password, True, (200, 200, 200))
+    window.blit(password_field_surface, (100, 200))
+
+  # Render the ok button
+  if active_field == "ok":
+    ok_button_surface = font.render("OK", True, (255, 255, 255))
+    window.blit(ok_button_surface, (100, 300))
+  else:
+    ok_button_surface = font.render("OK", True, (200, 200, 200))
+    window.blit(ok_button_surface, (100, 300))
+
+  # Render the cancel button
+  if active_field == "cancel":
+    cancel_button_surface = font.render("Cancel", True, (255, 255, 255))
+    window.blit(cancel_button_surface, (200, 300))
+  else:
+    cancel_button_surface = font.render("Cancel", True, (200, 200, 200))
+    window.blit(cancel_button_surface, (200, 300))
+
+  # Update the display
+  pygame.display.update()
+
+def login():
+  tts.output("Logging in...")
+  message = {
+  "type": "login",
+  "auth_token": player.auth_token,
+  "username": "admin",
+  "password": "admin",
+  }
+  player.username="admin"
+  try:
+    server_socket.connect(("localhost", 33288))
+  except socket.error:
+    tts.output("Server is unavailable. Retrying...")
+    login()
+  # Create a thread to continuously receive data from the server
+  receive_data_thread = threading.Thread(target=receive_data)
+  receive_data_thread.start()
+  send_data(message)
+
 # Function to handle user input from the keyboard
 def handle_input(key):
-        print("handle input")
-        if key == pygame.K_LEFT:
-          # send a move left message to the server
-          send_data(player.move("left"))
-        # Check if the user pressed the right arrow key
-        elif key == pygame.K_RIGHT:
-          # send a move rightt message to the server
-          send_data(player.move("right"))
-        # Check if the user pressed the up arrow key
-        elif key == pygame.K_UP:
-          # send a move forward message to the server
-          send_data(player.move("forward"))
-          # create the move message
-        # Check if the user pressed the down arrow key
-        elif key == pygame.K_DOWN:
-          # send a move backward message to the server
-          send_data(player.move("backward"))
-        # Check if the user pressed the page up key
-        elif key == pygame.K_PAGEUP:
-          # send a move up message to the server
-          send_data(          player.move("up"))
-        # Check if the user pressed the page down key
-        elif key == pygame.K_PAGEDOWN:
-          # send a move down message to the server
-          send_data(player.move("down"))
-        # Check if the user pressed the "c" key
-        elif key == pygame.K_c:
-          # Read out the player's current coordinates
-          tts.output(f"{player.x}, {player.y}, {player.z}")
-        if key == pygame.K_e:
-          send_data(player.turn(45))
-        if key == pygame.K_q:
-          send_data(player.turn(45))
-        if key == pygame.K_z:
-          pass
+  print("handle input")
+  if key == pygame.K_LEFT:
+    # send a move left message to the server
+    send_data(player.move("left"))
+  # Check if the user pressed the right arrow key
+  elif key == pygame.K_RIGHT:
+    # send a move rightt message to the server
+    send_data(player.move("right"))
+  # Check if the user pressed the up arrow key
+  elif key == pygame.K_UP:
+    # send a move forward message to the server
+    send_data(player.move("forward"))
+    # create the move message
+  # Check if the user pressed the down arrow key
+  elif key == pygame.K_DOWN:
+    # send a move backward message to the server
+    send_data(player.move("backward"))
+  # Check if the user pressed the page up key
+  elif key == pygame.K_PAGEUP:
+    # send a move up message to the server
+    send_data(          player.move("up"))
+  # Check if the user pressed the page down key
+  elif key == pygame.K_PAGEDOWN:
+    # send a move down message to the server
+    send_data(player.move("down"))
+  # Check if the user pressed the "c" key
+  elif key == pygame.K_c:
+    # Read out the player's current coordinates
+    tts.output(f"{player.x}, {player.y}, {player.z}")
+  if key == pygame.K_e:
+    send_data(player.turn(45))
+  if key == pygame.K_q:
+    send_data(player.turn(45))
+  if key == pygame.K_z:
+    pass
 
 def startMenu():
   clock = pygame.time.Clock()
@@ -127,21 +280,9 @@ def startMenu():
           break
         elif event.key == pygame.K_RETURN:
           if options[selection] == "Create account":
-            pass
+            create_account()
           elif options[selection] == "Log in":
-            tts.output("connecting to server")
-            message = {
-            "type": "login",
-            "auth_token": player.auth_token,
-            "username": "admin",
-            "password": "admin",
-            }
-            player.username="admin"
-            server_socket.connect(("localhost", 33288))
-            # Create a thread to continuously receive data from the server
-            receive_data_thread = threading.Thread(target=receive_data)
-            receive_data_thread.start()
-            send_data(message)
+            login()
             break
           elif options[selection] == "Exit":
             pygame.quit()

@@ -29,16 +29,16 @@ class ClientHandler:
     player=self.players[data["username"]][0]
     # determine the type of move and move based on the direction
     if data["value"] == "left":
-      dx = math.cos(math.radians(data["direction"]))*1
-      dy = math.sin(math.radians(data["direction"]))*1
-      # Increment the values of x and y by the calculated amounts
-      player["x"] -= dx
-      player["y"] += dy
+      dx = math.cos(math.radians(self.direction))*1
+      dy = math.sin(math.radians(self.direction))*1
+      # decrement the values of x and y by the calculated amounts
+      player["x"] -= dy
+      player["y"] += dx
     elif data["value"] == "right":
       dx = math.cos(math.radians(data["direction"]))*1
       dy = math.sin(math.radians(data["direction"]))*1
-      player["x"] += dx
-      player["y"] += dy
+      player["x"] += dy
+      player["y"] += dx
     elif data["value"] == "forward":
       data["x"] += math.sin(math.radians(data["direction"]))
       data["y"] += math.cos(math.radians(data["direction"]))
