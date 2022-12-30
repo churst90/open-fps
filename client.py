@@ -157,42 +157,30 @@ def create_account():
             elif active_field == "password":
               password += event.unicode
 
-  # Clear the screen
+# Clear the window
   window.fill((0, 0, 0))
 
-  # Render the username field
-  if active_field == "username":
-    username_field_surface = font.render(username, True, (255, 255, 255))
-    window.blit(username_field_surface, (100, 100))
-  else:
-    username_field_surface = font.render(username, True, (200, 200, 200))
-    window.blit(username_field_surface, (100, 100))
+  # Render the text input fields
+  pygame.draw.rect(window, (255, 255, 255), username_field)
+  pygame.draw.rect(window, (255, 255, 255), password_field)
 
-  # Render the password field
-  if active_field == "password":
-    password_field_surface = font.render(password, True, (255, 255, 255))
-    window.blit(password_field_surface, (100, 200))
-  else:
-    password_field_surface = font.render(password, True, (200, 200, 200))
-    window.blit(password_field_surface, (100, 200))
+  # Render the buttons
+  pygame.draw.rect(window, (0, 255, 0), ok_button)
+  pygame.draw.rect(window, (255, 0, 0), cancel_button)
 
-  # Render the ok button
-  if active_field == "ok":
-    ok_button_surface = font.render("OK", True, (255, 255, 255))
-    window.blit(ok_button_surface, (100, 300))
-  else:
-    ok_button_surface = font.render("OK", True, (200, 200, 200))
-    window.blit(ok_button_surface, (100, 300))
+  # Render the text for the text input fields and buttons
+  username_text = font.render(username, True, (0, 0, 0))
+  password_text = font.render(password, True, (0, 0, 0))
+  ok_text = font.render(field_names["ok"], True, (255, 255, 255))
+  cancel_text = font.render(field_names["cancel"], True, (255, 255, 255))
 
-  # Render the cancel button
-  if active_field == "cancel":
-    cancel_button_surface = font.render("Cancel", True, (255, 255, 255))
-    window.blit(cancel_button_surface, (200, 300))
-  else:
-    cancel_button_surface = font.render("Cancel", True, (200, 200, 200))
-    window.blit(cancel_button_surface, (200, 300))
+  # Blit the text to the window
+  window.blit(username_text, (15, 15))
+  window.blit(password_text, (15, 55))
+  window.blit(ok_text, (15, 95))
+  window.blit(cancel_text, (185, 95))
 
-  # Update the display
+  # Update the window
   pygame.display.update()
 
 def login():

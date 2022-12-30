@@ -29,8 +29,8 @@ class ClientHandler:
     player=self.players[data["username"]][0]
     # determine the type of move and move based on the direction
     if data["value"] == "left":
-      dx = math.cos(math.radians(self.direction))*1
-      dy = math.sin(math.radians(self.direction))*1
+      dx = math.cos(math.radians(data["direction"]))*1
+      dy = math.sin(math.radians(data["direction"]))*1
       # decrement the values of x and y by the calculated amounts
       player["x"] -= dy
       player["y"] += dx
