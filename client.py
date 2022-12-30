@@ -80,15 +80,15 @@ def create_account():
   active_field = "username"
 
   # Set the initial values for the username and password variables
-  username = ""
-  password = ""
+  username = "Player"
+  password = "password"
 
   # Set the field names for the text input fields
   field_names = {
-      "username": "Username",
-      "password": "Password",
-      "ok": "OK",
-      "cancel": "Cancel"
+      "username": "Username: edit",
+      "password": "Password: edit",
+      "ok": "OK button",
+      "cancel": "Cancel button"
   }
 
   # Set the current field name to be spoken
@@ -112,7 +112,7 @@ def create_account():
             active_field = "password"
             # Set the current field name to be spoken
             current_field_name = field_names[active_field]
-            tts.output(f"{current_field_name}: {password}")
+            tts.output(f"{current_field_name} {password}")
           elif active_field == "password":
             active_field = "ok"
             # Set the current field name to be spoken
@@ -127,7 +127,7 @@ def create_account():
             active_field = "username"
             # Set the current field name to be spoken
             current_field_name = field_names[active_field]
-            tts.output(f"{current_field_name}: {username}")
+            tts.output(f"{current_field_name} {username}")
           # Check if the user pressed the backspace key
           elif event.key == pygame.K_BACKSPACE:
             # Delete the last character from the current field
