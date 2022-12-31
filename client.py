@@ -50,6 +50,9 @@ def receive_data():
       elif data["type"] == "menu":
         pass
       elif data["type"] == "move":
+        player.x = data["x"]
+        player.y = data["y"]
+        player.z = data["z"]
         tts.output(F"{data['username']} is now at position {data['x']}, {data['y']}, {data['z']}")
       elif data["type"] == "error":
         error = data["error"]

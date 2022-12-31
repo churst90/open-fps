@@ -4,6 +4,7 @@ class Player:
   def __init__(self, username):
     self.username = username
     self.auth_token = None
+    self.map = None
     self.x = 0
     self.y = 0
     self.z = 0
@@ -86,7 +87,8 @@ class Player:
       # create the move message
       message = {
       "type": "move",
-     "auth_token": self.auth_token,
+      "auth_token": self.auth_token,
+      "map": self.map,
       "username": self.username,
       "direction": self.direction,
       "value": "down",

@@ -4,6 +4,7 @@ from cryptography.fernet import Fernet
 from map import Map
 from chat import Chat
 import json
+from collision import Collision
 
 class ClientHandler:
 
@@ -44,20 +45,31 @@ class ClientHandler:
     self.broadcast_update(update_message, recipients)
 
   def move(self, data):
+    # Check if the proposed movement will collide with a wall or the edge of the map
+#    collision = Collision(self.maps[data["map"]])
+#    if collision.check_wall_collision(data["x"], data["y"], data["z"]) or collision.check_boundary_collision(data["x"], data["y"], data["z"]):
+      # If there is a collision, send an error message to the player
+#      error_message = {
+#      "type": "error",
+#      "error": "You cannot move to that location because it is a wall or outside the boundaries of the map."
+#      }
+#      send_data(self.players[data["username"]][1], error_message)
+#      return
+
     player=self.players[data["username"]][0]
     # determine the type of move and move based on the direction
     if data["value"] == "left":
-      player["x"] -= math.cos(data["direction"])
-      player["y"] -= math.sin(data["direction"])
+      player["x"] -= round(math.cos(math.radians(data["direction"])))
+      player["y"] -= round(math.sin(math.radians(data["direction"])))
     elif data["value"] == "right":
-      player["x"] += math.cos(data["direction"])
-      player["y"] += math.sin(data["direction"])
+      player["x"] += round(math.cos(math.radians(data["direction"])))
+      player["y"] += round(math.sin(math.radians(data["direction"])))
     elif data["value"] == "forward":
-      player["x"] += math.sin(data["direction"])
-      player["y"] += math.cos(data["direction"])
+      player["x"] += round(math.sin(math.radians(data["direction"])))
+      player["y"] += round(math.cos(math.radians(data["direction"])))
     elif data["value"] == "backward":
-      player["x"] -= math.sin(data["direction"])
-      player["y"] -= math.cos(data["direction"])
+      player["x"] -= round(math.sin(math.radians(data["direction"])))
+      player["y"] -= round(math.cos(math.radians(data["direction"])))
     elif data["value"] == "up":
       player["z"] += 1
     elif data["value"] == "down":
@@ -87,11 +99,11 @@ class ClientHandler:
       data["x"] = 0
       data["y"] = 0
       data["z"] = 0
-      data["current_zone"] = None
-      data["current_map"] = None
+      data["zone"] = None
+      data["map"] = "Main"
       # Add the player data and client socket as a tuple to the players dictionary
       self.players[data["username"]] = (data, client_socket)
-      print("Player added to the players list")
+      print(f'{data["username"]} added to the players list')
 #      message = "Server: user came online"
 #      Chat.send_global_message(message)
 
