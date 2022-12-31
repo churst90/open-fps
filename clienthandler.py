@@ -47,33 +47,28 @@ class ClientHandler:
     player=self.players[data["username"]][0]
     # determine the type of move and move based on the direction
     if data["value"] == "left":
-      data["x"] -= math.cos(data["direction"])
-      data["y"] -= math.sin(data["direction"])
+      player["x"] -= math.cos(data["direction"])
+      player["y"] -= math.sin(data["direction"])
     elif data["value"] == "right":
-      data["x"] += math.cos(data["direction"])
-      data["y"] += math.sin(data["direction"])
+      player["x"] += math.cos(data["direction"])
+      player["y"] += math.sin(data["direction"])
     elif data["value"] == "forward":
-      data["x"] += math.sin(data["direction"])
-      data["y"] += math.cos(data["direction"])
+      player["x"] += math.sin(data["direction"])
+      player["y"] += math.cos(data["direction"])
     elif data["value"] == "backward":
-      data["x"] -= math.sin(data["direction"])
-      data["y"] -= math.cos(data["direction"])
+      player["x"] -= math.sin(data["direction"])
+      player["y"] -= math.cos(data["direction"])
     elif data["value"] == "up":
-      data["z"] += 1
+      player["z"] += 1
     elif data["value"] == "down":
-      data["z"] -= 1
-    # Update the player's position on the map
-    # player["map"] = data["map"]
-#    self.players[data["username"]][0]["x"] = data["x"]
-#    self.players[data["username"]][0]["y"] = data["y"]
-#    self.players[data["username"]][0]["z"] = data["z"]
+      player["z"] -= 1
     # Construct the update message
     update_message = {
     "type": "move",
     "username": data["username"],
-    "x": data["x"],
-    "y": data["y"],
-    "z": data["z"]
+    "x": player["x"],
+    "y": player["y"],
+    "z": player["z"]
     }
     # Get the list of players on the same map as the moving player
     recipients = self.players
