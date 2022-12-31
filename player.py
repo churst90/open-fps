@@ -7,6 +7,7 @@ class Player:
     self.x = 0
     self.y = 0
     self.z = 0
+    self.zone = "unknown area"
     self.direction = 0
     self.health = 10000
     self.energy = 10000
@@ -85,6 +86,7 @@ class Player:
       # create the move message
       message = {
       "type": "move",
+     "auth_token": self.auth_token,
       "username": self.username,
       "direction": self.direction,
       "value": "down",
@@ -95,12 +97,13 @@ class Player:
       #send the message to the server
       return message
 
-  def turn(self, degrees):
+  def turn(self, direction):
       # create the turn message
       message = {
       "type": "turn",
       "username": self.username,
-      "value": degrees
+      "value": direction,
+      "direction": 0
       }
       #send the message to the server
       return message

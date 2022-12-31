@@ -23,45 +23,57 @@ class ClientHandler:
     }
 
   def turn(self, data):
-    self.direction = data["value"]
+    if data["value"] == "left":
+      self.players[data["username"]][0]["direction"]-=45
+      if self.players[data["username"]][0]["direction"] < 0:
+        self.players[data["username"]][0]["direction"] = 315
+    if data["value"] == "right":
+      self.players[data["username"]][0]["direction"]+=45
+      if self.players[data["username"]][0]["direction"] > 359:
+        self.players[data["username"]][0]["direction"] = 0
+
+    # Construct the update message
+    update_message = {
+      "type": "turn",
+      "username": data["username"],
+      "direction": self.players[data["username"]][0]["direction"]
+    }
+    # Get the list of players on the same map as the turning player
+    recipients = self.players
+    # Send the update message to the recipients
+    self.broadcast_update(update_message, recipients)
 
   def move(self, data):
     player=self.players[data["username"]][0]
     # determine the type of move and move based on the direction
     if data["value"] == "left":
-      dx = math.cos(math.radians(data["direction"]))*1
-      dy = math.sin(math.radians(data["direction"]))*1
-      # decrement the values of x and y by the calculated amounts
-      player["x"] -= dy
-      player["y"] += dx
+      data["x"] -= math.cos(data["direction"])
+      data["y"] -= math.sin(data["direction"])
     elif data["value"] == "right":
-      dx = math.cos(math.radians(data["direction"]))*1
-      dy = math.sin(math.radians(data["direction"]))*1
-      player["x"] += dy
-      player["y"] += dx
+      data["x"] += math.cos(data["direction"])
+      data["y"] += math.sin(data["direction"])
     elif data["value"] == "forward":
-      data["x"] += math.sin(math.radians(data["direction"]))
-      data["y"] += math.cos(math.radians(data["direction"]))
+      data["x"] += math.sin(data["direction"])
+      data["y"] += math.cos(data["direction"])
     elif data["value"] == "backward":
-      data["x"] -= math.sin(math.radians(data["direction"]))
-      data["y"] -= math.cos(math.radians(data["direction"]))
+      data["x"] -= math.sin(data["direction"])
+      data["y"] -= math.cos(data["direction"])
     elif data["value"] == "up":
       data["z"] += 1
     elif data["value"] == "down":
       data["z"] -= 1
     # Update the player's position on the map
-
     # player["map"] = data["map"]
-    player["x"] = data["x"]
-    player["y"] = data["y"]
-    player["z"] = data["z"]
+#    self.players[data["username"]][0]["x"] = data["x"]
+#    self.players[data["username"]][0]["y"] = data["y"]
+#    self.players[data["username"]][0]["z"] = data["z"]
     # Construct the update message
     update_message = {
     "type": "move",
     "username": data["username"],
     "x": data["x"],
     "y": data["y"],
-    "z": data["z"],
+    "z": data["z"]
     }
     # Get the list of players on the same map as the moving player
     recipients = self.players
@@ -76,6 +88,12 @@ class ClientHandler:
     print("login function called")
     # Check if the user account exists
     if self.check_user_account(data["username"], data["password"]):
+      data["direction"] = 0
+      data["x"] = 0
+      data["y"] = 0
+      data["z"] = 0
+      data["current_zone"] = None
+      data["current_map"] = None
       # Add the player data and client socket as a tuple to the players dictionary
       self.players[data["username"]] = (data, client_socket)
       print("Player added to the players list")

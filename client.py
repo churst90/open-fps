@@ -54,6 +54,9 @@ def receive_data():
       elif data["type"] == "error":
         error = data["error"]
         tts.output("type error message")
+      elif data["type"] == "turn":
+        player.direction = data["direction"]
+        tts.output(f"{player.direction} degrees")
       else:
         tts.output("received data has an unknown type")
     except Exception as e:
@@ -234,11 +237,17 @@ def handle_input(key):
     # Read out the player's current coordinates
     tts.output(f"{player.x}, {player.y}, {player.z}")
   if key == pygame.K_e:
-    send_data(player.turn(45))
+    send_data(player.turn("right"))
   if key == pygame.K_q:
-    send_data(player.turn(45))
+    send_data(player.turn("left"))
   if key == pygame.K_z:
-    pass
+    tts.output(f"current location: {player.zone}")
+  if key == pygame.K_h:
+    tts.output(f"{player.health} health")
+  if key == pygame.K_j:
+    tts.output(f"{player.energy} energy")
+  if key == pygame.K_f:
+    tts.output(f"facing {player.direction} degrees")
 
 def startMenu():
   clock = pygame.time.Clock()
@@ -284,10 +293,12 @@ def main():
   # Initialize Pygame and setup the main window
   def gameWindow():
     pygame.init()
+    game_name = "Open FPS"
+    game_version = 0.0
     window_width = 800  
     window_height = 600
     window = pygame.display.set_mode((window_width, window_height))
-    pygame.display.set_caption("Open Life version 1.0")
+    pygame.display.set_caption(f"{game_name} {game_version}")
 
   gameWindow()
 
