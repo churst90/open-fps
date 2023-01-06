@@ -5,6 +5,7 @@ from map import Map
 from chat import Chat
 import json
 from collision import Collision
+from player import Player
 
 class ClientHandler:
 
@@ -16,6 +17,7 @@ class ClientHandler:
     self.messageTypes = {
     "move": self.move,
     "turn": self.turn,
+    "check_zone": self.check_zone,
 #    "chat": self.chat,
 #    "create_account": self.create_account,
 #    "create_map": self.create_map,
@@ -24,89 +26,152 @@ class ClientHandler:
     }
 
   def turn(self, data):
+    # Initialize the pitch and yaw angles to 0
+    pitch = 0
+    yaw = 0
+
+    # Get the current yaw and pitch angles of the player
+    player, client_socket = self.players[data["username"]]
+    yaw = data["yaw"]
+    pitch = data["pitch"]
+
     if data["value"] == "left":
-      self.players[data["username"]][0]["direction"]-=45
-      if self.players[data["username"]][0]["direction"] < 0:
-        self.players[data["username"]][0]["direction"] = 315
+      # decrement the yaw angle by 45 degrees
+      yaw = (yaw - 45) % 360
     if data["value"] == "right":
-      self.players[data["username"]][0]["direction"]+=45
-      if self.players[data["username"]][0]["direction"] > 359:
-        self.players[data["username"]][0]["direction"] = 0
+      # Increment the yaw angle by 45 degrees
+      yaw = (yaw + 45) % 360
+    if data["value"] == "up":
+      # Increment the pitch angle by 45 degrees
+      pitch = min(90, pitch + 45)
+    if data["value"] == "down":
+      # Decrement the pitch angle by 45 degrees
+      pitch = max(-90, pitch - 45)
+
+    # Convert the pitch and yaw angles from degrees to radians
+    pitch = math.radians(pitch)
+    yaw = math.radians(yaw)
+
+    # Calculate the x, y, and z components of the direction vector
+    dx = math.cos(pitch) * math.cos(yaw)
+    dy = math.cos(pitch) * math.sin(yaw)
+    dz = math.sin(pitch)
+
+    # Update the player's direction, yaw, and pitch angles
+    player.direction = (dx, dy, dz)
+    player.yaw = yaw
+    player.pitch = pitch
 
     # Construct the update message
     update_message = {
       "type": "turn",
       "username": data["username"],
-      "direction": self.players[data["username"]][0]["direction"]
+      "direction": player.direction,
+      "yaw": yaw*180/math.pi,
+      "pitch": pitch*180/math.pi
     }
-    # Get the list of players on the same map as the turning player
-    recipients = self.players
-    # Send the update message to the recipients
-    self.broadcast_update(update_message, recipients)
+    # send the updated direction back to the player
+    client_socket.sendall(json.dumps(update_message).encode())
+#    self.players[data["username"]][1].sendall(json.dumps(update_message).encode())
 
   def move(self, data):
     # Check if the proposed movement will collide with a wall or the edge of the map
-#    collision = Collision(self.maps[data["map"]])
-#    if collision.check_wall_collision(data["x"], data["y"], data["z"]) or collision.check_boundary_collision(data["x"], data["y"], data["z"]):
-      # If there is a collision, send an error message to the player
-#      error_message = {
-#      "type": "error",
-#      "error": "You cannot move to that location because it is a wall or outside the boundaries of the map."
-#      }
-#      send_data(self.players[data["username"]][1], error_message)
-#      return
-
-    player=self.players[data["username"]][0]
-    # determine the type of move and move based on the direction
+    collision = Collision(self.maps[data["map"]])
+    # Calculate the new x, y, and z values based on the direction vector and the type of move
+    x = data["x"]
+    y = data["y"]
+    z = data["z"]
     if data["value"] == "left":
-      player["x"] -= round(math.cos(math.radians(data["direction"])))
-      player["y"] -= round(math.sin(math.radians(data["direction"])))
+      x -= round(data["direction"][0])
+      y -= round(data["direction"][1])
+      z -= round(data["direction"][2])
     elif data["value"] == "right":
-      player["x"] += round(math.cos(math.radians(data["direction"])))
-      player["y"] += round(math.sin(math.radians(data["direction"])))
+      x += round(data["direction"][0])
+      y += round(data["direction"][1])
+      z += round(data["direction"][2])
     elif data["value"] == "forward":
-      player["x"] += round(math.sin(math.radians(data["direction"])))
-      player["y"] += round(math.cos(math.radians(data["direction"])))
+      x += round(data["direction"][0])
+      y += round(data["direction"][1])
+      z += round(data["direction"][2])
     elif data["value"] == "backward":
-      player["x"] -= round(math.sin(math.radians(data["direction"])))
-      player["y"] -= round(math.cos(math.radians(data["direction"])))
-    elif data["value"] == "up":
-      player["z"] += 1
-    elif data["value"] == "down":
-      player["z"] -= 1
+      x -= round(data["direction"][0])
+      y -= round(data["direction"][1])
+      z -= round(data["direction"][2])
+    else:
+      self.send_data(self.players[data["username"]][1], {"type": "error","error":"invalid move"})
+      return
+
+    if collision.check_boundary_collision(x, y, z):
+      # If there is a collision, send an error message to the player
+      error_message = {
+      "type": "error",
+      "error": "edge of the map"
+      }
+      self.send_data(self.players[data["username"]][1], error_message)
+      return
+    elif collision.check_wall_collision(x, y, z):
+      error_message = {
+      "type": "error",
+      "error": "wall"
+      }
+      self.send_data(self.players[data["username"]][1], error_message)
+      return
+
+    # Update the player's position
+    player = self.players[data["username"]][0]
+    player.x = x
+    player.y = y
+    player.z = z
+
     # Construct the update message
     update_message = {
     "type": "move",
     "username": data["username"],
-    "x": player["x"],
-    "y": player["y"],
-    "z": player["z"]
+    "x": x,
+    "y": y,
+    "z": z,
     }
-    # Get the list of players on the same map as the moving player
-    recipients = self.players
-    # Send the update message to the recipients
-    print(update_message) 
-    print(recipients)
-    self.broadcast_update(update_message, recipients)
-#    else:
-#      logger.error("Received data has an unknown type: %s", data["type"])
+    # Send the update message to all other players in the same map
+    for player in self.maps[data["map"]].players.values():
+#      print(f"{player}")
+      client_socket = player[1]
+#      if username != data["username"]:
+      client_socket.sendall(json.dumps(update_message).encode())
+#      else:
+#        logger.error("Received data has an unknown type: %s", data["type"])
+      return
 
   def login(self, data, client_socket):
     print("login function called")
     # Check if the user account exists
     if self.check_user_account(data["username"], data["password"]):
-      data["direction"] = 0
-      data["x"] = 0
-      data["y"] = 0
-      data["z"] = 0
-      data["zone"] = None
-      data["map"] = "Main"
-      # Add the player data and client socket as a tuple to the players dictionary
-      self.players[data["username"]] = (data, client_socket)
+      initial_data = {
+      "username": data["username"],
+      "direction": (0,0,0),
+      "x": 0,
+      "y": 0,
+      "z": 0,
+      "map": "Main",
+      "zone": None
+      }
+      player = Player(data["username"])
+      player.username = initial_data["username"]
+      player.direction = initial_data["direction"]
+      player.x = initial_data["x"]
+      player.y = initial_data["y"]
+      player.z = initial_data["z"]
+      player.zone = initial_data["zone"]
+      player.map = initial_data["map"]
+      # Add the player object and client socket as a tuple to the players dictionary
+      self.players[data["username"]] = (player, client_socket)
       print(f'{data["username"]} added to the players list')
+      # add the player to the main map
+      self.maps[initial_data["map"]].players[data["username"]] = self.players[data["username"]]
+      print(f'{initial_data["username"]} added to the main map. {self.maps["Main"].players}')
 #      message = "Server: user came online"
 #      Chat.send_global_message(message)
-
+      initial_data["type"] = "login_ok"
+      client_socket.sendall(json.dumps(initial_data).encode())
       # Generate an authentication token for the client
       auth_token = self.f.encrypt(f"{data['username']}:login".encode())
       auth_token = base64.b64encode(auth_token).decode()
@@ -197,3 +262,40 @@ class ClientHandler:
       data = json.dumps(message).encode()
       # Send the message to the recipient using the socket's `sendall()` method
       recipient[1].sendall(data)
+
+  def send_data(self, client_socket, message):
+    # Serialize the data as JSON
+    data = json.dumps(message, ensure_ascii=False)
+
+    # Encode the JSON string as a bytes object
+    data = data.encode("utf-8")
+
+    # Send the data to the client
+    client_socket.sendall(data)
+
+  def check_zone(self, data):
+    # Get the player's x, y, and z coordinates
+    x = data["x"]
+    y = data["y"]
+    z = data["z"]
+
+    # Get the map object for the player's current map
+    map = self.maps[data["map"]]
+
+    # Iterate over the zones in the map
+    for zone in map.zones:
+      # Check if the player's coordinates are within the bounds of the current zone
+      if x >= zone["min_x"] and x <= zone["max_x"] and y >= zone["min_y"] and y <= zone["max_y"] and z >= zone["min_z"] and z <= zone["max_z"]:
+        # If they are, return the name of the zone
+        message = {
+        "type": "zone",
+        "zone": zone["name"]
+        }
+        return self.players[data["username"]][1].sendall(json.dumps(message).encode())
+
+    # If the player is not in any of the zones, return "unknown area"
+    message = {
+    "type": "zone",
+    "zone": "Unknown area"
+    }
+    return self.players[data["username"]][1].sendall(json.dumps(message).encode())

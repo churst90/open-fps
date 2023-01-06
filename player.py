@@ -9,6 +9,8 @@ class Player:
     self.y = 0
     self.z = 0
     self.zone = "unknown area"
+    self.yaw = 0
+    self.pitch = 0
     self.direction = 0
     self.health = 10000
     self.energy = 10000
@@ -22,6 +24,7 @@ class Player:
       # create the move message
       message = {
       "type": "move",
+      "map": self.map,
       "username": self.username,
       "direction": self.direction,
       "value": "left",
@@ -35,6 +38,7 @@ class Player:
       # create the move message
       message = {
       "type": "move",
+      "map": self.map,
       "username": self.username,
       "direction": self.direction,
       "value": "right",
@@ -48,6 +52,7 @@ class Player:
       # create the move message
       message = {
       "type": "move",
+      "map": self.map,
       "username": self.username,
       "direction": self.direction,
       "value": "backward",
@@ -61,6 +66,7 @@ class Player:
       # create the move message
       message = {
       "type": "move",
+      "map": self.map,
       "username": self.username,
       "direction": self.direction,
       "value": "forward",
@@ -74,6 +80,7 @@ class Player:
       # create the move message
       message = {
       "type": "move",
+      "map": self.map,
       "username": self.username,
       "direction": self.direction,
       "value": "up",
@@ -87,7 +94,6 @@ class Player:
       # create the move message
       message = {
       "type": "move",
-      "auth_token": self.auth_token,
       "map": self.map,
       "username": self.username,
       "direction": self.direction,
@@ -103,9 +109,12 @@ class Player:
       # create the turn message
       message = {
       "type": "turn",
+      "map": self.map,
       "username": self.username,
       "value": direction,
-      "direction": 0
+      "direction": self.direction,
+      "yaw": self.yaw,
+      "pitch": self.pitch
       }
       #send the message to the server
       return message

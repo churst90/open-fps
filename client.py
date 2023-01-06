@@ -38,25 +38,34 @@ def receive_data():
       data = server_socket.recv(1024)
       # Deserialize the data from JSON format
       data = json.loads(data)
-      # Check if the received data is a keep-alive message
+
       if data["type"] == "keep_alive":
         # Send a response to the server acknowledging the keep-alive message
         message = {"type": "keep_alive"}
-        send_data(message)
+#        send_data(message)
       elif data["type"] == "auth_token":
         player.auth_token = data["auth_token"]
         tts.output("authentication token received")
         player.logged_in=1
       elif data["type"] == "menu":
         pass
+      elif data["type"] == "zone":
+#        player.zone == data["zone"]
+        tts.output(f'{data["zone"]}')
       elif data["type"] == "move":
         player.x = data["x"]
         player.y = data["y"]
         player.z = data["z"]
-        tts.output(F"{data['username']} is now at position {data['x']}, {data['y']}, {data['z']}")
+        tts.output(F"{data['username']}: {data['x']}, {data['y']}, {data['z']}")
+      elif data["type"] == "login_ok":
+        player.username = data["username"]
+        player.map = data["map"]
+        player.direction = data["direction"]
+        player.zone = data["zone"]
+        tts.output(f'you are on {data["map"]} at {data["x"]}, {data["y"]}, {data["z"]}')
       elif data["type"] == "error":
         error = data["error"]
-        tts.output("type error message")
+        tts.output(f"{error}")
       elif data["type"] == "turn":
         player.direction = data["direction"]
         tts.output(f"{player.direction} degrees")
@@ -244,7 +253,15 @@ def handle_input(key):
   if key == pygame.K_q:
     send_data(player.turn("left"))
   if key == pygame.K_z:
-    tts.output(f"current location: {player.zone}")
+    message = {
+    "type": "check_zone",
+    "username": player.username,
+    "x": player.x,
+    "y": player.y,
+    "z": player.z,
+    "map": player.map
+    }
+    send_data(message)
   if key == pygame.K_h:
     tts.output(f"{player.health} health")
   if key == pygame.K_j:

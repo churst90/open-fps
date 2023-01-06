@@ -9,7 +9,7 @@ class Map:
     self.max_y = max_y
     self.min_z = min_z
     self.max_z = max_z
-    self.players = []
+    self.players = {}
     self.tiles=[]
     self.zones = []
     self.items = []

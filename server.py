@@ -81,15 +81,6 @@ def verify_auth_token(token, username, action):
   # Return True if the username and action match the expected values
   return stored_username == username and stored_action == action
 
-def send_data(client_socket, message):
-  # Serialize the data as JSON
-  data = json.dumps(message, ensure_ascii=False)
-
-  # Encode the JSON string as a bytes object
-  data = data.encode("utf-8")
-
-  # Send the data to the client
-  client_socket.sendall(data)
 
 def receive_data(client_socket):
   while True:
