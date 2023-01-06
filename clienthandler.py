@@ -26,10 +26,6 @@ class ClientHandler:
     }
 
   def turn(self, data):
-    # Initialize the pitch and yaw angles to 0
-    pitch = 0
-    yaw = 0
-
     # Get the current yaw and pitch angles of the player
     player, client_socket = self.players[data["username"]]
     yaw = data["yaw"]
@@ -37,10 +33,10 @@ class ClientHandler:
 
     if data["value"] == "left":
       # decrement the yaw angle by 45 degrees
-      yaw = (yaw - 45) % 360
+      yaw -= (yaw - 45) % 360
     if data["value"] == "right":
       # Increment the yaw angle by 45 degrees
-      yaw = (yaw + 45) % 360
+      yaw += (yaw + 45) % 360
     if data["value"] == "up":
       # Increment the pitch angle by 45 degrees
       pitch = min(90, pitch + 45)
@@ -67,12 +63,11 @@ class ClientHandler:
       "type": "turn",
       "username": data["username"],
       "direction": player.direction,
-      "yaw": yaw*180/math.pi,
-      "pitch": pitch*180/math.pi
-    }
+      "player.yaw": yaw*180/math.pi,
+      "pitch": player.pitch*180/math.pi
+      }
     # send the updated direction back to the player
     client_socket.sendall(json.dumps(update_message).encode())
-#    self.players[data["username"]][1].sendall(json.dumps(update_message).encode())
 
   def move(self, data):
     # Check if the proposed movement will collide with a wall or the edge of the map
@@ -118,7 +113,7 @@ class ClientHandler:
       return
 
     # Update the player's position
-    player = self.players[data["username"]][0]
+    player, client_socket = self.players[data["username"]]
     player.x = x
     player.y = y
     player.z = z
@@ -132,14 +127,12 @@ class ClientHandler:
     "z": z,
     }
     # Send the update message to all other players in the same map
-    for player in self.maps[data["map"]].players.values():
-#      print(f"{player}")
-      client_socket = player[1]
-#      if username != data["username"]:
-      client_socket.sendall(json.dumps(update_message).encode())
-#      else:
-#        logger.error("Received data has an unknown type: %s", data["type"])
-      return
+    for username, (player, socket) in self.players.items():
+      if player.map == data["map"] and username != data["username"]:
+        socket.sendall(json.dumps(update_message).encode())
+    # Send the update message to the player that moved
+    self.send_data(client_socket, update_message)
+    return
 
   def login(self, data, client_socket):
     print("login function called")

@@ -68,6 +68,8 @@ def receive_data():
         tts.output(f"{error}")
       elif data["type"] == "turn":
         player.direction = data["direction"]
+        player.yaw = data["yaw"]
+        player.pitch = data["pitch"]
         tts.output(f"{player.direction} degrees")
       else:
         tts.output("received data has an unknown type")
