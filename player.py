@@ -12,6 +12,7 @@ class Player:
     self.yaw = 0
     self.pitch = 0
     self.direction = 0
+    self.facing = None,
     self.health = 10000
     self.energy = 10000
     self.pvp_status = False

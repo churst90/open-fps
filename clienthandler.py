@@ -63,8 +63,9 @@ class ClientHandler:
       "type": "turn",
       "username": data["username"],
       "direction": player.direction,
-      "player.yaw": yaw*180/math.pi,
-      "pitch": player.pitch*180/math.pi
+      "facing": self.get_cardinal_direction(player.direction),
+      "yaw": yaw*180/math.pi,
+      "pitch": pitch*180/math.pi
       }
     # send the updated direction back to the player
     client_socket.sendall(json.dumps(update_message).encode())
@@ -292,3 +293,41 @@ class ClientHandler:
     "zone": "Unknown area"
     }
     return self.players[data["username"]][1].sendall(json.dumps(message).encode())
+
+  def get_cardinal_direction(self, direction):
+    # Convert the direction tuple into separate x, y, and z variables
+    x, y, z = direction
+
+    # Initialize the cardinal direction string to "north"
+    cardinal_direction = "north"
+
+    # Check the x and y values to determine the cardinal direction
+    if x > 0 and y > 0:
+        cardinal_direction = "north east"
+    elif x < 0 and y > 0:
+        cardinal_direction = "north west"
+    elif x > 0 and y < 0:
+        cardinal_direction = "south east"
+    elif x < 0 and y < 0:
+        cardinal_direction = "south west"
+    elif x > 0:
+        cardinal_direction = "east"
+    elif x < 0:
+        cardinal_direction = "west"
+    elif y > 0:
+        cardinal_direction = "north"
+    elif y < 0:
+        cardinal_direction = "south"
+
+    # Check the z value to determine the vertical direction
+    if z > 0.5:
+        cardinal_direction += ", up"
+    elif z > 0:
+        cardinal_direction += ", half up"
+    elif z < -0.5:
+        cardinal_direction += ", down"
+    elif z < 0:
+        cardinal_direction += ", half down"
+    else:
+        cardinal_direction += ", straight ahead"
+    return cardinal_direction

@@ -49,6 +49,8 @@ def receive_data():
         player.logged_in=1
       elif data["type"] == "menu":
         pass
+      elif data["type"] == "facing":
+        tts.output(f'{data["facing"]}')
       elif data["type"] == "zone":
 #        player.zone == data["zone"]
         tts.output(f'{data["zone"]}')
@@ -70,7 +72,8 @@ def receive_data():
         player.direction = data["direction"]
         player.yaw = data["yaw"]
         player.pitch = data["pitch"]
-        tts.output(f"{player.direction} degrees")
+        player.facing = data["facing"]
+        tts.output(f"{player.facing}")
       else:
         tts.output("received data has an unknown type")
     except Exception as e:
@@ -269,8 +272,7 @@ def handle_input(key):
   if key == pygame.K_j:
     tts.output(f"{player.energy} energy")
   if key == pygame.K_f:
-    tts.output(f"facing {player.direction} degrees")
-
+    tts.output(f"{player.facing}")
 def startMenu():
   clock = pygame.time.Clock()
   tts.output("Welcome to Open Life. Please make a selection:")
