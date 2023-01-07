@@ -42,9 +42,6 @@ logger.info("All suggestions and comments are welcome")
 main_map = client_handler.create_map("Main", 0, 100, 0, 100, 0, 10)
 initial_tile = main_map.addTile(0, 100, 0, 100, 0, 0, "grass", False)
 initial_zone = main_map.addZone("yard", 0, 100, 0, 100, 0, 0)
-
-chat = Chat()
-
 ai = AI("enemy", "soldier", 0, 10, 0, 10, 0, 0, 5, 1000, 100)
 main_map.addAI(ai)
 item = Item("credit pack", "100 credit pack", None)
@@ -52,15 +49,6 @@ main_map.addItem(item, 3, 2, 0)
 
 # add the default administrator account
 client_handler.create_user_account("admin", "admin")
-
-# Define the broadcast message function which sends messages to those who they correspond to
-def broadcast_update(message, recipients):
-  for recipient in recipients:
-    # Encode the message as a bytes object
-    data = json.dumps(message).encode()
-
-    # Send the message to the recipient using the socket's `sendall()` method
-    recipient.sendall(data)
 
 def verify_auth_token(token, username, action):
   print("verify auth token function executed")
@@ -84,12 +72,14 @@ def verify_auth_token(token, username, action):
 
 def receive_data(client_socket):
   while True:
+    if client_socket.fileno == -1:
+      break
     try:
       data = client_socket.recv(1024)
       data = json.loads(data)
     except:
       # If a timeout occurs, the client has not responded in time
-      client_handler.logout()
+      client_handler.logout(data, client_socket)
       break
     for message_type, message_handler in client_handler.messageTypes.items():
         if data["type"] == message_type:
@@ -118,10 +108,18 @@ def main(host, port):
     
       # Check if the command is "exit"
       if command == "exit":
-        # Close the socket and break out of the loop
+        # disconnect all players before closing the server socket
+        print("disconnecting all players...")
+        for player in players.keys():
+          for data in players.values():
+            client_handler.logout(player, data[1])
+        print("removing all players from the players list")
+        players.clear()
         print("Shutting down the server...")
         sock.close()
+        sys.exit()
         break
+
       if command == "list players":
         print(client_handler.listPlayers())
         continue
@@ -137,13 +135,17 @@ def main(host, port):
   # Start a new thread to handle user input
   threading.Thread(target=user_input).start()
 
-  # Continuously check for incoming connections in a separate thread
+  # Continuously check for incoming connections
   while True:
     # Accept an incoming connection
-    client_sock, addr = sock.accept()
-    print(f"Accepted connection from {addr}")
-    receive_thread = threading.Thread(target=receive_data, args=(client_sock,))
-    receive_thread.start()
+    try:
+      client_sock, addr = sock.accept()
+      print(f"Accepted connection from {addr}")
+      receive_thread = threading.Thread(target=receive_data, args=(client_sock,))
+      receive_thread.start()
+    except:
+      print("Server no longer accepting connections")
+      break
 
 if __name__ == '__main__':
   main(args.host, args.port)

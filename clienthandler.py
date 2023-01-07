@@ -10,21 +10,22 @@ from player import Player
 class ClientHandler:
 
   def __init__(self, user_accounts, key, players, maps):
+    self.receive_thread = None
     self.f = key
     self.user_accounts = user_accounts
     self.players = players
     self.maps = maps
+    self.chat = Chat()
     self.messageTypes = {
     "move": self.move,
     "turn": self.turn,
     "check_zone": self.check_zone,
     "chat": self.send_chat,
-#    "create_account": self.create_account,
-#    "create_map": self.create_map,
+    "create_account": self.create_user_account,
+    "create_map": self.create_map,
     "login": self.login,
     "logout": self.logout
     }
-    self.chat = Chat()
 
   def turn(self, data):
     # Get the current yaw and pitch angles of the player
@@ -68,8 +69,8 @@ class ClientHandler:
       "yaw": yaw*180/math.pi,
       "pitch": pitch*180/math.pi
       }
-    # send the updated direction back to the player
-    client_socket.sendall(json.dumps(update_message).encode())
+    # Send the update message to all players in the same map
+    self.broadcast_update(update_message, self.maps[data["map"]].players)
 
   def move(self, data):
     # Check if the proposed movement will collide with a wall or the edge of the map
@@ -128,12 +129,8 @@ class ClientHandler:
     "y": y,
     "z": z,
     }
-    # Send the update message to all other players in the same map
-    for username, (player, socket) in self.players.items():
-      if player.map == data["map"] and username != data["username"]:
-        socket.sendall(json.dumps(update_message).encode())
-    # Send the update message to the player that moved
-    self.send_data(client_socket, update_message)
+    # Send the update message to all players in the same map
+    self.broadcast_update(update_message, self.maps[data["map"]].players)
     return
 
   def login(self, data, client_socket):
@@ -184,13 +181,11 @@ class ClientHandler:
       # Send a message back to the client that the account doesn't exist
       client_socket.sendall(json.dumps({"type": "error", "message": "The account does not exist"}).encode())
 
-  def logout(self, data, client_socket):
+  def logout(self, player, client_socket):
     # Remove the player from the list of players and send a goodbye message
-    players.remove(data["username"])
-    chat.send_global_message("Server", f"{data['username']} has left the game")
+    self.chat.send_global_message("Server", f"{player} has left the game")
     # Close the client socket and clean up
     client_socket.close()
-    thread.join()
 
   # Function to add a user account to the dictionary
   def create_user_account(self, username, password):
