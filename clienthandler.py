@@ -164,11 +164,14 @@ class ClientHandler:
       print(f'{data["username"]} added to the players list')
       # add the player to the main map
       self.maps[initial_data["map"]].players[data["username"]] = self.players[data["username"]]
-      print(f'{initial_data["username"]} added to the main map. {self.maps["Main"].players}')
+      print(f'{initial_data["username"]} added to the {initial_data["map"]} map')
       message = f'{data["username"]} came online'
       sender = "server"
       self.chat.send_global_message(sender, message)
-      print(self.chat.get_global_messages())
+      last_message = self.chat.global_messages[-1]
+      sender = last_message["sender"]
+      text = last_message["message"]
+      print(f"{sender}: {text}")
       initial_data["type"] = "login_ok"
       client_socket.sendall(json.dumps(initial_data).encode())
       # Generate an authentication token for the client
@@ -342,13 +345,10 @@ class ClientHandler:
     chat_type = data["chat"]
     message = data["message"]
 
-    # Get the Chat object from the maps dictionary
-    chat = self.maps[data["map"]].chat
-
     # Send the message to the appropriate message list using the Chat object
     if chat_type == "global":
         chat.send_global_message(data["username"], message)
-    elif chat_type == "map":
+    elif chat_type == "local":
         chat.send_map_message(data["map"], data["username"], message)
     elif chat_type == "private":
         chat.send_private_message(data["username"], data["recipient"], message)
