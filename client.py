@@ -27,7 +27,10 @@ def send_data(message):
   data = data.encode("utf-8")
 
   # Send the data to the server
-  server_socket.sendall(data)
+  try:
+    server_socket.sendall(data)
+  except:
+    tts.output("Can't send data")
 
 # Function to receive data from the server
 def receive_data():
@@ -76,32 +79,22 @@ def receive_data():
         tts.output(f"{player.facing}")
       else:
         tts.output("received data has an unknown type")
-    except Exception as e:
-      print(e)
-      print(data)
-      tts.output("something went wrong" + str(e)            )
-  server_socket.close()
+    except:
+      player.logged_in=0
+      tts.output("lost connection to the server")
+      server_socket.close()
+      startMenu()
+      break
 
 def create_account():
-  # Set the window size and title
-  window = pygame.display.set_mode((300, 200))
-  pygame.display.set_caption("Create Account")
-
-  # Set the font and font size for the text input fields
-  font = pygame.font.Font(None, 32)
-
-  # Create the text input fields
-  username_field = pygame.Rect(10, 10, 280, 32)
-  password_field = pygame.Rect(10, 50, 280, 32)
-  ok_button = pygame.Rect(10, 90, 100, 32)
-  cancel_button = pygame.Rect(180, 90, 100, 32)
+  clock = pygame.time.Clock()
+  tts.output("To create an account, enter your desired username and password and press ok. You'll be logged in automatically.")
+  # Set the initial values for the username and password variables
+  username = ""
+  password = ""
 
   # Set the initial focus to the username field
   active_field = "username"
-
-  # Set the initial values for the username and password variables
-  username = "Player"
-  password = "password"
 
   # Set the field names for the text input fields
   field_names = {
@@ -115,8 +108,9 @@ def create_account():
   current_field_name = field_names[active_field]
   tts.output(f"{current_field_name}")
 
-  # Run the game loop
+  # Run the create account loop
   while True:
+    clock.tick(60)
     # Handle events
     for event in pygame.event.get():
       # Quit the game when the user closes the window
@@ -148,60 +142,34 @@ def create_account():
             # Set the current field name to be spoken
             current_field_name = field_names[active_field]
             tts.output(f"{current_field_name} {username}")
-          # Check if the user pressed the backspace key
-          elif event.key == pygame.K_BACKSPACE:
-            # Delete the last character from the current field
-            if active_field == "username":
-              username = username[:-1]
-            elif active_field == "password":
-              password = password[:-1]
-          # Check if the user pressed the enter key
-          elif event.key == pygame.K_RETURN:
-            # Check if the user is creating an account
-            if active_field == "ok":
-              # Send a create account request to the server
-              message = {
-              "type": "create_account",
-              "username": username,
-              "password": password
-              }
-              send_data(message)
-            # Check if the user is canceling the create account process
-            elif active_field == "cancel":
-              startMenu()
-          # Check if the user pressed any other key
-          elif len(event.unicode) > 0:
-            # Add the character to the current field
-            if active_field == "username":
-              username += event.unicode
-            elif active_field == "password":
-              password += event.unicode
-
-# Clear the window
-  window.fill((0, 0, 0))
-
-  # Render the text input fields
-  pygame.draw.rect(window, (255, 255, 255), username_field)
-  pygame.draw.rect(window, (255, 255, 255), password_field)
-
-  # Render the buttons
-  pygame.draw.rect(window, (0, 255, 0), ok_button)
-  pygame.draw.rect(window, (255, 0, 0), cancel_button)
-
-  # Render the text for the text input fields and buttons
-  username_text = font.render(username, True, (0, 0, 0))
-  password_text = font.render(password, True, (0, 0, 0))
-  ok_text = font.render(field_names["ok"], True, (255, 255, 255))
-  cancel_text = font.render(field_names["cancel"], True, (255, 255, 255))
-
-  # Blit the text to the window
-  window.blit(username_text, (15, 15))
-  window.blit(password_text, (15, 55))
-  window.blit(ok_text, (15, 95))
-  window.blit(cancel_text, (185, 95))
-
-  # Update the window
-  pygame.display.update()
+        # Check if the user pressed the backspace key
+        elif event.key == pygame.K_BACKSPACE:
+          # Delete the last character from the current field
+          if active_field == "username":
+            username = username[:-1]
+          elif active_field == "password":
+            password = password[:-1]
+        # Check if the user pressed the enter key
+        elif event.key == pygame.K_RETURN:
+          # Check if the user is creating an account
+          if active_field == "ok":
+            # Send a create account request to the server
+            message = {
+            "type": "create_account",
+            "username": username,
+            "password": password
+            }
+            send_data(message)
+          # Check if the user is canceling the create account process
+          elif active_field == "cancel":
+            startMenu()
+        # Check if the user pressed any other key
+        elif len(event.unicode) > 0:
+          # Add the character to the current field
+          if active_field == "username":
+            username += event.unicode
+          elif active_field == "password":
+            password += event.unicode
 
 def login():
   tts.output("Logging in...")
@@ -325,9 +293,6 @@ def main():
     pygame.display.set_caption(f"{game_name} {game_version}")
 
   gameWindow()
-
-  # speak the welcome message
-  tts.output("Welcome to open life. Please make a selection")
 
   # show the startup menu
   startMenu()
