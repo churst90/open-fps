@@ -18,12 +18,13 @@ class ClientHandler:
     "move": self.move,
     "turn": self.turn,
     "check_zone": self.check_zone,
-#    "chat": self.chat,
+    "chat": self.send_chat,
 #    "create_account": self.create_account,
 #    "create_map": self.create_map,
     "login": self.login,
     "logout": self.logout
     }
+    self.chat = Chat()
 
   def turn(self, data):
     # Get the current yaw and pitch angles of the player
@@ -142,6 +143,7 @@ class ClientHandler:
       initial_data = {
       "username": data["username"],
       "direction": (0,0,0),
+      "facing": self.get_cardinal_direction((0,0,0)),
       "x": 0,
       "y": 0,
       "z": 0,
@@ -151,6 +153,7 @@ class ClientHandler:
       player = Player(data["username"])
       player.username = initial_data["username"]
       player.direction = initial_data["direction"]
+      player.facing = initial_data["facing"]
       player.x = initial_data["x"]
       player.y = initial_data["y"]
       player.z = initial_data["z"]
@@ -162,8 +165,10 @@ class ClientHandler:
       # add the player to the main map
       self.maps[initial_data["map"]].players[data["username"]] = self.players[data["username"]]
       print(f'{initial_data["username"]} added to the main map. {self.maps["Main"].players}')
-#      message = "Server: user came online"
-#      Chat.send_global_message(message)
+      message = f'{data["username"]} came online'
+      sender = "server"
+      self.chat.send_global_message(sender, message)
+      print(self.chat.get_global_messages())
       initial_data["type"] = "login_ok"
       client_socket.sendall(json.dumps(initial_data).encode())
       # Generate an authentication token for the client
@@ -331,3 +336,19 @@ class ClientHandler:
     else:
         cardinal_direction += ", straight ahead"
     return cardinal_direction
+
+  def send_chat(self, data):
+    # Get the chat type and message from the data dictionary
+    chat_type = data["chat"]
+    message = data["message"]
+
+    # Get the Chat object from the maps dictionary
+    chat = self.maps[data["map"]].chat
+
+    # Send the message to the appropriate message list using the Chat object
+    if chat_type == "global":
+        chat.send_global_message(data["username"], message)
+    elif chat_type == "map":
+        chat.send_map_message(data["map"], data["username"], message)
+    elif chat_type == "private":
+        chat.send_private_message(data["username"], data["recipient"], message)
