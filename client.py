@@ -10,13 +10,13 @@ from player import Player
 
  # set the main variables
 chats = Chat()
-global_messages = []
-map_messages = []
-private_messages = []
 player = Player("Player1")
 player.logged_in=0
 tts = accessible_output2.outputs.auto.Auto()
+
+# create the socket object
 server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
 
 def send_data(message):
   data = message
@@ -100,7 +100,7 @@ def create_account():
   field_names = {
       "username": "Username: edit",
       "password": "Password: edit",
-      "ok": "OK button",
+      "create_account": "Create Account button",
       "cancel": "Cancel button"
   }
 
@@ -128,11 +128,11 @@ def create_account():
             current_field_name = field_names[active_field]
             tts.output(f"{current_field_name} {password}")
           elif active_field == "password":
-            active_field = "ok"
+            active_field = "create_account"
             # Set the current field name to be spoken
             current_field_name = field_names[active_field]
             tts.output(f"{current_field_name}")
-          elif active_field == "ok":
+          elif active_field == "create_account":
             active_field = "cancel"
             # Set the current field name to be spoken
             current_field_name = field_names[active_field]
@@ -171,24 +171,99 @@ def create_account():
           elif active_field == "password":
             password += event.unicode
 
-def login():
-  tts.output("Logging in...")
-  message = {
-  "type": "login",
-  "auth_token": player.auth_token,
-  "username": "admin",
-  "password": "admin",
+def login(server_socket):
+  clock = pygame.time.Clock()
+  tts.output("Please enter your username and password and select login")
+  # Set the initial values for the username and password variables
+  username = ""
+  password = ""
+
+  # Set the initial focus to the username field
+  active_field = "username"
+
+  # Set the field names for the text input fields
+  field_names = {
+      "username": "Username: edit",
+      "password": "Password: edit",
+      "login": "Login button",
+      "cancel": "Cancel button"
   }
-  player.username="admin"
-  try:
-    server_socket.connect(("localhost", 33288))
-  except socket.error:
-    tts.output("Server is unavailable. Retrying...")
-    login()
-  # Create a thread to continuously receive data from the server
-  receive_data_thread = threading.Thread(target=receive_data)
-  receive_data_thread.start()
-  send_data(message)
+
+  # Set the current field name to be spoken
+  current_field_name = field_names[active_field]
+  tts.output(f"{current_field_name}")
+
+  # Run the create account loop
+  while True:
+    clock.tick(60)
+    # Handle events
+    for event in pygame.event.get():
+      # Quit the game when the user closes the window
+      if event.type == pygame.QUIT:
+        pygame.quit()
+        sys.exit()
+      # Handle key down events
+      elif event.type == pygame.KEYDOWN:
+        # Check if the user pressed the tab key
+        if event.key == pygame.K_TAB:
+          # Set the focus to the next field
+          if active_field == "username":
+            active_field = "password"
+            # Set the current field name to be spoken
+            current_field_name = field_names[active_field]
+            tts.output(f"{current_field_name} {password}")
+          elif active_field == "password":
+            active_field = "login"
+            # Set the current field name to be spoken
+            current_field_name = field_names[active_field]
+            tts.output(f"{current_field_name}")
+          elif active_field == "login":
+            active_field = "cancel"
+            # Set the current field name to be spoken
+            current_field_name = field_names[active_field]
+            tts.output(f"{current_field_name}")
+          elif active_field == "cancel":
+            active_field = "username"
+            # Set the current field name to be spoken
+            current_field_name = field_names[active_field]
+            tts.output(f"{current_field_name} {username}")
+        # Check if the user pressed the backspace key
+        elif event.key == pygame.K_BACKSPACE:
+          # Delete the last character from the current field
+          if active_field == "username":
+            username = username[:-1]
+          elif active_field == "password":
+            password = password[:-1]
+        # Check if the user pressed the enter key
+        elif event.key == pygame.K_RETURN:
+          # Check if the user is logging in
+          if active_field == "Login":
+            message = {
+            "type": "login",
+            "auth_token": player.auth_token,
+            "username": "admin",
+            "password": "admin",
+            }
+            tts.output("trying to connect to the server")
+            try:
+              server_socket.connect(("localhost", 33288))
+              # Send a login request to the server
+              send_data(message)
+              # Create a thread to continuously receive data from the server
+              receive_data_thread = threading.Thread(target=receive_data)
+              receive_data_thread.start()
+            except socket.error:
+              tts.output("Server is down. Can't log in right now.")
+          # Check if the user is canceling the login process
+          elif active_field == "cancel":
+            startMenu()
+        # Check if the user pressed any other key
+        elif len(event.unicode) > 0:
+          # Add the character to the current field
+          if active_field == "username":
+            username += event.unicode
+          elif active_field == "password":
+            password += event.unicode
 
 # Function to handle user input from the keyboard
 def handle_input(key):
@@ -271,7 +346,7 @@ def startMenu():
           if options[selection] == "Create account":
             create_account()
           elif options[selection] == "Log in":
-            login()
+            login(server_socket)
             break
           elif options[selection] == "Exit":
             pygame.quit()
