@@ -264,56 +264,64 @@ def login():
             password += event.unicode
 
 # Function to handle user input from the keyboard
-def handle_input(key):
+def handle_input():
   print("handle input")
-  if key == pygame.K_LEFT:
-    # send a move left message to the server
-    send_data(player.move("left"))
-  # Check if the user pressed the right arrow key
-  elif key == pygame.K_RIGHT:
-    # send a move rightt message to the server
-    send_data(player.move("right"))
-  # Check if the user pressed the up arrow key
-  elif key == pygame.K_UP:
-    # send a move forward message to the server
-    send_data(player.move("forward"))
-    # create the move message
-  # Check if the user pressed the down arrow key
-  elif key == pygame.K_DOWN:
-    # send a move backward message to the server
-    send_data(player.move("backward"))
-  # Check if the user pressed the page up key
-  elif key == pygame.K_PAGEUP:
-    # send a move up message to the server
-    send_data(          player.move("up"))
-  # Check if the user pressed the page down key
-  elif key == pygame.K_PAGEDOWN:
-    # send a move down message to the server
-    send_data(player.move("down"))
-  # Check if the user pressed the "c" key
-  elif key == pygame.K_c:
-    # Read out the player's current coordinates
-    tts.output(f"{player.x}, {player.y}, {player.z}")
-  elif key == pygame.K_e:
-    send_data(player.turn("right"))
-  elif key == pygame.K_q:
-    send_data(player.turn("left"))
-  elif key == pygame.K_z:
-    message = {
-    "type": "check_zone",
-    "username": player.username,
-    "x": player.x,
-    "y": player.y,
-    "z": player.z,
-    "map": player.map
-    }
-    send_data(message)
-  elif key == pygame.K_h:
-    tts.output(f"{player.health} health")
-  elif key == pygame.K_j:
-    tts.output(f"{player.energy} energy")
-  elif key == pygame.K_f:
-    tts.output(f"{player.facing}")
+  while True:
+    for event in pygame.event.get():
+      if event.type == pygame.QUIT:
+        pygame.quit()
+        sys.exit()
+        break
+      # Handle key down events
+      elif event.type == pygame.KEYDOWN:
+        if event.key == pygame.K_LEFT:
+          # send a move left message to the server
+          send_data(player.move("left"))
+        # Check if the user pressed the right arrow key
+        elif event.key == pygame.K_RIGHT:
+          # send a move rightt message to the server
+          send_data(player.move("right"))
+        # Check if the user pressed the up arrow key
+        elif event.key == pygame.K_UP:
+          # send a move forward message to the server
+          send_data(player.move("forward"))
+          # create the move message
+        # Check if the user pressed the down arrow key
+        elif event.key == pygame.K_DOWN:
+          # send a move backward message to the server
+          send_data(player.move("backward"))
+        # Check if the user pressed the page up key
+        elif event.key == pygame.K_PAGEUP:
+          # send a move up message to the server
+          send_data(          player.move("up"))
+        # Check if the user pressed the page down key
+        elif event.key == pygame.K_PAGEDOWN:
+          # send a move down message to the server
+          send_data(player.move("down"))
+        # Check if the user pressed the "c" key
+        elif event.key == pygame.K_c:
+          # Read out the player's current coordinates
+          tts.output(f"{player.x}, {player.y}, {player.z}")
+        elif event.key == pygame.K_e:
+          send_data(player.turn("right"))
+        elif event.key == pygame.K_q:
+          send_data(player.turn("left"))
+        elif event.key == pygame.K_z:
+          message = {
+          "type": "check_zone",
+          "username": player.username,
+          "x": player.x,
+          "y": player.y,
+          "z": player.z,
+          "map": player.map
+          }
+          send_data(message)
+        elif event.key == pygame.K_h:
+          tts.output(f"{player.health} health")
+        elif event.key == pygame.K_j:
+          tts.output(f"{player.energy} energy")
+        elif event.key == pygame.K_f:
+          tts.output(f"{player.facing}")
 
 def startMenu():
   clock = pygame.time.Clock()
@@ -328,7 +336,7 @@ def startMenu():
     for event in pygame.event.get():
       if event.type == pygame.KEYDOWN:
         if player.logged_in==1:
-          handle_input(event.key)
+          handle_input()
           break
         elif event.key == pygame.K_DOWN:
           print(player.logged_in)
