@@ -3,6 +3,7 @@ from chat import Chat
 class Player:
   def __init__(self, username):
     self.username = username
+    self.logged_in = 0
     self.auth_token = None
     self.map = None
     self.x = 0

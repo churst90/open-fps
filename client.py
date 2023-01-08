@@ -1,3 +1,4 @@
+from connection import Connection
 # import openal
 import json
 import threading
@@ -10,13 +11,9 @@ from player import Player
 
  # set the main variables
 chats = Chat()
-player = Player("Player1")
-player.logged_in=0
+player = Player("player")
 tts = accessible_output2.outputs.auto.Auto()
-
-# create the socket object
-server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-
+connection = Connection("localhost", 33288)
 
 def send_data(message):
   data = message
@@ -28,7 +25,7 @@ def send_data(message):
 
   # Send the data to the server
   try:
-    server_socket.sendall(data)
+    connection.server_socket.sendall(data)
   except:
     tts.output("Can't send data")
 
@@ -38,7 +35,7 @@ def receive_data():
   while True:
     try:
       # Receive data from the server
-      data = server_socket.recv(1024)
+      data = connection.server_socket.recv(1024)
       # Deserialize the data from JSON format
       data = json.loads(data)
 
@@ -171,7 +168,7 @@ def create_account():
           elif active_field == "password":
             password += event.unicode
 
-def login(server_socket):
+def login():
   clock = pygame.time.Clock()
   tts.output("Please enter your username and password and select login")
   # Set the initial values for the username and password variables
@@ -188,7 +185,6 @@ def login(server_socket):
       "login": "Login button",
       "cancel": "Cancel button"
   }
-
   # Set the current field name to be spoken
   current_field_name = field_names[active_field]
   tts.output(f"{current_field_name}")
@@ -237,23 +233,25 @@ def login(server_socket):
         # Check if the user pressed the enter key
         elif event.key == pygame.K_RETURN:
           # Check if the user is logging in
-          if active_field == "Login":
+          if active_field == "login":
             message = {
             "type": "login",
             "auth_token": player.auth_token,
-            "username": "admin",
-            "password": "admin",
+            "username": username,
+            "password": password
             }
             tts.output("trying to connect to the server")
             try:
-              server_socket.connect(("localhost", 33288))
               # Send a login request to the server
+              connection.connect()
               send_data(message)
               # Create a thread to continuously receive data from the server
               receive_data_thread = threading.Thread(target=receive_data)
               receive_data_thread.start()
+              return
             except socket.error:
               tts.output("Server is down. Can't log in right now.")
+              connection.disconnect()
           # Check if the user is canceling the login process
           elif active_field == "cancel":
             startMenu()
@@ -296,11 +294,11 @@ def handle_input(key):
   elif key == pygame.K_c:
     # Read out the player's current coordinates
     tts.output(f"{player.x}, {player.y}, {player.z}")
-  if key == pygame.K_e:
+  elif key == pygame.K_e:
     send_data(player.turn("right"))
-  if key == pygame.K_q:
+  elif key == pygame.K_q:
     send_data(player.turn("left"))
-  if key == pygame.K_z:
+  elif key == pygame.K_z:
     message = {
     "type": "check_zone",
     "username": player.username,
@@ -310,12 +308,13 @@ def handle_input(key):
     "map": player.map
     }
     send_data(message)
-  if key == pygame.K_h:
+  elif key == pygame.K_h:
     tts.output(f"{player.health} health")
-  if key == pygame.K_j:
+  elif key == pygame.K_j:
     tts.output(f"{player.energy} energy")
-  if key == pygame.K_f:
+  elif key == pygame.K_f:
     tts.output(f"{player.facing}")
+
 def startMenu():
   clock = pygame.time.Clock()
   tts.output("Welcome to Open Life. Please make a selection:")
@@ -346,7 +345,7 @@ def startMenu():
           if options[selection] == "Create account":
             create_account()
           elif options[selection] == "Log in":
-            login(server_socket)
+            login()
             break
           elif options[selection] == "Exit":
             pygame.quit()
@@ -371,6 +370,7 @@ def main():
 
   # show the startup menu
   startMenu()
+
   # Update the game window
   pygame.display.update()
 
