@@ -35,10 +35,10 @@ class ClientHandler:
 
     if data["value"] == "left":
       # decrement the yaw angle by 45 degrees
-      yaw -= (yaw - 45) % 360
+      yaw = (yaw-45) % 360
     if data["value"] == "right":
       # Increment the yaw angle by 45 degrees
-      yaw += (yaw + 45) % 360
+      yaw = (yaw + 45) % 360
     if data["value"] == "up":
       # Increment the pitch angle by 45 degrees
       pitch = min(90, pitch + 45)
@@ -181,11 +181,13 @@ class ClientHandler:
       # Send a message back to the client that the account doesn't exist
       client_socket.sendall(json.dumps({"type": "error", "message": "The account does not exist"}).encode())
 
-  def logout(self, player, client_socket):
-    # Remove the player from the list of players and send a goodbye message
-    self.chat.send_global_message("Server", f"{player} has left the game")
+  def logout(self, data, client_socket):
+    print("logout method called")
+    del self.players[data["username"]]
+    print("player removed from the player's list")
     # Close the client socket and clean up
     client_socket.close()
+    self.chat.send_global_message("Server", f'{data["username"]} has left the game')
 
   # Function to add a user account to the dictionary
   def create_user_account(self, username, password):

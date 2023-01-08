@@ -79,7 +79,7 @@ def receive_data():
     except:
       player.logged_in=0
       tts.output("lost connection to the server")
-      server_socket.close()
+      connection.disconnect()
       startMenu()
       break
 
@@ -265,10 +265,18 @@ def login():
 
 # Function to handle user input from the keyboard
 def handle_input():
+  clock = pygame.time.Clock()
   print("handle input")
   while True:
+    clock.tick(60)
     for event in pygame.event.get():
       if event.type == pygame.QUIT:
+        message = {
+        "type": "logout",
+        "username": player.username
+        }
+        send_data(message)
+        connection.disconnect()
         pygame.quit()
         sys.exit()
         break

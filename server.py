@@ -79,7 +79,6 @@ def receive_data(client_socket):
       data = json.loads(data)
     except:
       # If a timeout occurs, the client has not responded in time
-      client_handler.logout(data, client_socket)
       break
     for message_type, message_handler in client_handler.messageTypes.items():
         if data["type"] == message_type:
@@ -112,7 +111,7 @@ def main(host, port):
         print("disconnecting all players...")
         for player in players.keys():
           for data in players.values():
-            client_handler.logout(player, data[1])
+            data[1].close()
         print("removing all players from the players list")
         players.clear()
         print("Shutting down the server...")
