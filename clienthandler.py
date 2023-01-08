@@ -300,41 +300,30 @@ class ClientHandler:
     return self.players[data["username"]][1].sendall(json.dumps(message).encode())
 
   def get_cardinal_direction(self, direction):
-    # Convert the direction tuple into separate x, y, and z variables
-    x, y, z = direction
-
-    # Initialize the cardinal direction string to "north"
+    # Calculate the yaw angle in degrees
+    yaw = math.atan2(direction[1], direction[0])
+    yaw = math.degrees(yaw)
     cardinal_direction = "north"
+    # Normalize the yaw angle to a value within 360 degrees
+    yaw = (yaw + 360) % 360
 
-    # Check the x and y values to determine the cardinal direction
-    if x > 0 and y > 0:
-        cardinal_direction = "north east"
-    elif x < 0 and y > 0:
-        cardinal_direction = "north west"
-    elif x > 0 and y < 0:
-        cardinal_direction = "south east"
-    elif x < 0 and y < 0:
-        cardinal_direction = "south west"
-    elif x > 0:
-        cardinal_direction = "east"
-    elif x < 0:
-        cardinal_direction = "west"
-    elif y > 0:
-        cardinal_direction = "north"
-    elif y < 0:
-        cardinal_direction = "south"
-
-    # Check the z value to determine the vertical direction
-    if z > 0.5:
-        cardinal_direction += ", up"
-    elif z > 0:
-        cardinal_direction += ", half up"
-    elif z < -0.5:
-        cardinal_direction += ", down"
-    elif z < 0:
-        cardinal_direction += ", half down"
-    else:
-        cardinal_direction += ", straight ahead"
+    # Check the yaw angle and return the appropriate cardinal direction
+    if yaw >= 337.5 or yaw < 22.5:
+      cardinal_direction = "north"
+    elif yaw >= 22.5 and yaw < 67.5:
+      cardinal_direction = "north east"
+    elif yaw >= 67.5 and yaw < 112.5:
+      cardinal_direction = "east"
+    elif yaw >= 112.5 and yaw < 157.5:
+      cardinal_direction = "south east"
+    elif yaw >= 157.5 and yaw < 202.5:
+      cardinal_direction = "south"
+    elif yaw >= 202.5 and yaw < 247.5:
+      cardinal_direction = "south west"
+    elif yaw >= 247.5 and yaw < 292.5:
+      cardinal_direction = "west"
+    elif yaw >= 292.5 and yaw < 337.5:
+      cardinal_direction = "north west"
     return cardinal_direction
 
   def send_chat(self, data):

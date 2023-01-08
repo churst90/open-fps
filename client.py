@@ -36,6 +36,7 @@ def receive_data():
     try:
       # Receive data from the server
       data = connection.server_socket.recv(1024)
+
       # Deserialize the data from JSON format
       data = json.loads(data)
 
