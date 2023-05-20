@@ -32,7 +32,6 @@ class Server:
         await self.server.start_serving()
 
     async def handle_client(self, reader, writer):
-        print("handle client data method called")
         addr = writer.get_extra_info("peername")
         client_socket = writer.get_extra_info("socket")
 
@@ -43,8 +42,11 @@ class Server:
                 if not data:
                     break
                 data = pickle.loads(data)
+                print("Adding data to message queue:", data)
                 await self.message_queue.put((data, client_socket))
                 await self.process_received_data()
+                print("Message queue size:", self.message_queue.qsize())
+
             except asyncio.CancelledError:
                 break
 
@@ -58,16 +60,24 @@ class Server:
             await asyncio.sleep(0)  # Allow other tasks to run during the sending process
 
     async def process_received_data(self):
-        while not await self.message_queue.empty():
-            data, client_socket = self.message_queue.get()
-            for message_type, message_handler in self.messageTypes.items():
-                if data["type"] == message_type:
-                    if message_type in ["create_account", "login", "logout"]:
-                        await message_handler(data, client_socket)
-                    else:
-                        await message_handler(data)
+        print("process received data method called")
+        print("Message queue size:", self.message_queue.qsize())
+
+        while not self.message_queue.empty():
+            print("while loop executed")
+            data, client_socket = await self.message_queue.get()
+            print("Received data:", data)
+
+            message_type = data["type"]
+            if message_type in self.messageTypes:
+                message_handler = self.messageTypes[message_type]
+                if message_type in ["create_account", "login", "logout"]:
+                    await message_handler(data, client_socket)
+                    print("Calling message handler:", message_type)
                 else:
-                    await self.send({"type": "error", "message": "Invalid message type"}, [client_socket, None])
+                    message_handler(data)
+            else:
+                await self.send({"type": "error", "message": "Invalid message type"}, [client_socket, None])
 
     async def close(self):
         if self.server:
@@ -104,7 +114,6 @@ class Server:
 
     async def login(self, data, client_socket):
         print("login method executed")
-        # Check if the user account exists
         if self.check_credentials(data["username"], data["password"]):
             print("user authorized. creating the user object")
             player = Player(data["username"])
@@ -113,17 +122,7 @@ class Server:
                 setattr(player, field, value)
             self.online_players[data["username"]] = (player, client_socket)
 
-            message = {
-                "type": "login_ok",
-                "direction": player.direction,
-                "position": player.position,
-                "pitch": player.pitch,
-                "yaw": player.yaw,
-                "map": player.map,
-                "zone": player.zone,
-                "health": player.health,
-                "energy": player.energy
-            }
+            message = {"type": "ok", "direction": player.direction, "position": player.position, "pitch": player.pitch, "yaw": player.yaw, "map": player.map, "zone": player.zone, "health": player.health, "energy": player.energy}
             await self.send(message, [client_socket, None])
 
             message = {
@@ -149,7 +148,7 @@ class Server:
             await self.send({"type": "error", "message": "That chosen username already exists, please choose another one."}, [client_socket, None])
         else:
             print("username does not exist. Creating it now")
-            encrypted_password = self.encryptPassword(data["password"])
+            encrypted_password = self.encrypt_password(data["password"])
             print("password encrypted")
             initial_data = {"username": data["username"], "password": encrypted_password, "position": [0, 0, 0], "map": self.maps["Main"], "direction": [0, 1, 0], "pitch": 0, "yaw": 0, "zone": "None"}
             print("creating the player object")
@@ -170,18 +169,16 @@ class Server:
 
     def check_credentials(self, username, password):
         print("check credentials method executed")
-        # Iterate through the user accounts
-        for stored_username, account_data in self.user_accounts.items():
-            if stored_username == username:
-                print("usernames match, continuing...")
-                # Decrypt the stored password and compare with the encrypted provided password
-                decrypted_password = self.key.decrypt(account_data["password"].encode()).decode()
-                encrypted_password = self.encryptPassword(password)
-                if decrypted_password == encrypted_password:
-                    print("password match, continuing...")
-                    return True  # Return True if both username and password match
-        print("no matching account was found")
-        return False  # Return False if no matching account is found
+        # Check if the username exists in the user accounts
+        if username in self.user_accounts:
+            print("username matches")
+            stored_password = self.user_accounts[username]["password"]
+            decrypted_stored_password = self.decrypt_password(stored_password)
+
+            if decrypted_stored_password == password:
+                print("Passwords match, continuing...")
+                return True
+        return False
 
     async def create_map(self, name, size):
         if name not in self.maps.keys():
@@ -215,7 +212,11 @@ class Server:
             destination_socket_list = self.dict_to_list(self.online_players[recipient], 1)
             self.send(message, destination_socket_list)
 
-    def encryptPassword(self, password):
+    def decrypt_password(self, encrypted_password):
+        decrypted_password = self.key.decrypt(encrypted_password.encode()).decode()
+        return decrypted_password
+
+    def encrypt_password(self, password):
         encrypted_password = self.key.encrypt(password.encode()).decode()
         return encrypted_password
 

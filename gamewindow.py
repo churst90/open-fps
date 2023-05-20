@@ -8,6 +8,7 @@ class GameWindow:
   K_RETURN = pygame.K_RETURN
   K_TAB = pygame.K_TAB
   K_BACKSPACE = pygame.K_BACKSPACE
+
   def __init__(self, width, height, title, screen_manager):
     self.screen_manager = screen_manager
     self.width = width
@@ -23,6 +24,7 @@ class GameWindow:
   def update(self):
     if self.screen_manager.active_screen:
       pygame.display.update()
+      self.clock.tick(60)
 
   def close(self):
     pygame.quit()
@@ -54,14 +56,14 @@ class GameWindow:
   def get_clock(self):
     return self.clock
 
-  def get_text_input(self):
-    events = pygame.event.get(pygame.KEYDOWN)
+  def get_text_input(self, events):
     for event in events:
-      if event.key == pygame.K_BACKSPACE:
-        self.text_input = self.text_input[:-1]
-      elif event.key == pygame.K_RETURN:
-        return self.text_input
-      elif event.key < 256:
-        character = chr(event.key)
-        self.text_input += character
+      if event.type == pygame.KEYDOWN:
+        if event.key == pygame.K_BACKSPACE:
+          self.text_input = self.text_input[:-1]
+#        elif event.key == pygame.K_RETURN:
+#          return self.text_input
+        elif event.key < 256 and event.unicode.isprintable():
+          character = event.unicode
+          self.text_input += character
     return self.text_input
