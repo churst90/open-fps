@@ -1,32 +1,41 @@
-# module for reading and writing game data to disk
-
-import base64
-from cryptography.fernet import Fernet
+import pickle
 
 class Data:
-    def __init__(self):
-        pass
+    def __init__(self, key):
+        self.f = key
 
-    # encrypt the dictionary and write it to disk
-    def export(self, dictionary):
-        # encrypt the dictionary
-        encrypted_dict = encrypt(dictionary)
+    def export(self, dictionary, filename):
+        obj = pickle.dumps(dictionary, protocol=pickle.HIGHEST_PROTOCOL)
+        print("file serialized")
 
-        # convert the dictionary to bytes
-        bytes_dict = convert_to_bytes(encrypted_dict)
+        encrypted_obj = self.f.encrypt(obj)
+        print("file encrypted.")
 
-        # write the bytes to a file with the name of the dictionary
-        with open(dictionary + '.dat', 'wb') as f:
-            f.write(bytes_dict)
+        with open(filename + '.dat', 'wb') as f:
+            f.write(encrypted_obj)
+            print("wrote file to disk")
 
-    # Load a dictionary from disk and decrypt it
     def load(self, dictionary):
-        # read the file
-        with open(dictionary + '.dat', 'rb') as f:
-            bytes_dict = f.read()
+        try:
+            # read the file
+            with open(dictionary + '.dat', 'rb') as f:
+                bytes_dict = f.read()
+                print("file loaded")
+        except FileNotFoundError:
+            print("file not found")
+            return {}
 
-        # decrypt the bytes
-        decrypted_dict = decrypt(bytes_dict)
+        try:
+            # decrypt the bytes
+            decrypted_bytes = self.f.decrypt(bytes_dict)
+            print("File decrypted")
+        except:
+            # If the token is invalid, return False
+            print("Token is invalid")
+            return False
 
-        # return the decrypted dictionary
-        return decrypted_dict
+        # convert the decrypted bytes to a pickle object
+        decrypted_obj = pickle.loads(decrypted_bytes)
+
+        # return the decrypted object
+        return decrypted_obj

@@ -1,150 +1,389 @@
-import sys
-import json
-import socket
-import threading
-import logging
+# Standard library imports
 import argparse
-import base64
+import pickle
 from cryptography.fernet import Fernet
-from keymanager import KeyManager
-from collision import Collision
+import base64
+import os
+
+# Third party library imports
+import asyncio
+import logging
+
+# Disable asyncio debug mode
+os.environ["PYTHONASYNCIODEBUG"] = "0"
+
+# Project specific imports
+from securitymanager import SecurityManager as sm
+from data import Data
 from map import Map
-from chat import Chat
+from collision import Collision
+from player import Player
 from ai import AI
 from items import Item
-from clienthandler import ClientHandler
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-key_manager = KeyManager("key.bin")
-# Use the argparse module to parse command-line arguments
-parser = argparse.ArgumentParser()
-parser.add_argument("--host", type=str, default="localhost")
-parser.add_argument("--port", type=int, default=33288)
-args = parser.parse_args()
 
-# Generate a key for encryption
-key = Fernet.generate_key()
-f = Fernet(key)
+class Server:
 
-# Create an empty dictionary to store user accounts
-user_accounts = {}
-# Dictionary to store all created maps
-maps = {}
-# dictionary to store all players on the game
-players = {}
-client_handler = ClientHandler(user_accounts, f, players, maps)
-logger.info("Open Life FPS game server, version 1.0")
-logger.info("Developed and maintained by Cody Hurst, codythurst@gmail.com")
-logger.info("This game was written with the assistance of Open AI's chat bot: http://chat.openai.com")
-logger.info("All suggestions and comments are welcome")
+    async def accept_connections(self):
+        print("accept connections method called")
+        self.server = await asyncio.start_server(self.handle_client, self.host, self.port)
+        print(f"Listening for incoming connections on {host}:{port}")
 
-# Create the "Main" map and add a grass tile and zone to it
-main_map = client_handler.create_map("Main", 0, 100, 0, 100, 0, 10)
-initial_tile = main_map.addTile(0, 100, 0, 100, 0, 0, "grass", False)
-initial_zone = main_map.addZone("yard", 0, 100, 0, 100, 0, 0)
-ai = AI("enemy", "soldier", 0, 10, 0, 10, 0, 0, 5, 1000, 100)
-main_map.addAI(ai)
-item = Item("credit pack", "100 credit pack", None)
-main_map.addItem(item, 3, 2, 0)
+#        async with self.server:
+        await self.server.start_serving()
 
-# add the default administrator account
-client_handler.create_user_account("admin", "admin")
+    async def handle_client(self, reader, writer):
+        print("handle client data method called")
+        addr = writer.get_extra_info("peername")
+        client_socket = writer.get_extra_info("socket")
 
-def verify_auth_token(token, username, action):
-  print("verify auth token function executed")
-  # Return True if the action is "login"
-  if action == "login":
-    print("the action login returned true, so skipping the verification for now...")
-    return True
-  print("verifying your request...")
-  # Decode the base64-encoded token into a bytes object
-  token = base64.b64decode(token)
-  print("token decoded")
-  # Decrypt the token using the Fernet instance
-  message = f.decrypt(token).decode()
-  print("token decrypted")
-  # Split the message into the username and action
-  stored_username, stored_action = message.split(":")
+        print(f"Accepted connection from {addr}")
+        while True:
+            try:
+                data = await reader.read(1024)
+                if not data:
+                    break
+                data = pickle.loads(data)
+                await self.message_queue.put((data, client_socket))
+                await self.process_received_data()
+            except asyncio.CancelledError:
+                break
 
-  # Return True if the username and action match the expected values
-  return stored_username == username and stored_action == action
+        print(f"Connection closed: {addr}")
 
+    async def send(self, data, recipients):
+        serialized_data = pickle.dumps(data)
 
-def receive_data(client_socket):
-  while True:
-    if client_socket.fileno == -1:
-      break
-    try:
-      data = client_socket.recv(1024)
-      data = json.loads(data)
-    except:
-      # If a timeout occurs, the client has not responded in time
-      break
-    for message_type, message_handler in client_handler.messageTypes.items():
-        if data["type"] == message_type:
-          # Call the message handler function with the data and client socket if the message type matches "login" or "logout"
-          if message_type in ["login", "logout"]:
-            message_handler(data, client_socket)
-            # Call the message handler function with just the data if the message type is not "login" or "logout"
-          else:
-            message_handler(data)
-          break
+        for recipient in recipients:
+            recipient[0].write(serialized_data)
+            await asyncio.sleep(0)  # Allow other tasks to run during the sending process
 
-def main(host, port):
+    async def process_received_data(self):
+        while not await self.message_queue.empty():
+            data, client_socket = self.message_queue.get()
+            for message_type, message_handler in self.messageTypes.items():
+                if data["type"] == message_type:
+                    if message_type in ["create_account", "login", "logout"]:
+                        await message_handler(data, client_socket)
+                    else:
+                        await message_handler(data)
+                else:
+                    await self.send({"type": "error", "message": "Invalid message type"}, [client_socket, None])
 
-  # Create a TCP socket
-  sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-  # Bind the socket to the given host and port
-  sock.bind((host, port))
-  # Listen for incoming connections
-  sock.listen()
-  logger.info("Listening for incoming connections on %s:%s", args.host, args.port)
+    async def close(self):
+        if self.server:
+            self.server.close()
+            await self.server.wait_closed()
+            self.server = None
 
-  def user_input():
-    # Continuously check for keyboard input to accept commands
-    while True:
-      command = input("\n server> ")
-    
-      # Check if the command is "exit"
-      if command == "exit":
-        # disconnect all players before closing the server socket
-        print("disconnecting all players...")
-        for player in players.keys():
-          for data in players.values():
-            data[1].close()
-        print("removing all players from the players list")
-        players.clear()
+    async def turn(self, data):
+        username = data["username"]
+        direction = data["direction"]
+
+        # Check if the player is online
+        if username in self.online_players:
+            player, client_socket = self.online_players[username]
+
+            # Call the turn method of the player object
+            player.turn(direction)
+
+            response = {"type": "turn", "username": username, "direction": direction}
+            await self.send(response, [(client_socket, None)])
+
+    async def move(self, data):
+        username = data["username"]
+        move_data = data["move"]
+
+        if username in self.online_players:
+            player, client_socket = self.online_players[username]
+            response = player.move(move_data)
+
+            await self.send(response, [(client_socket, None)])
+        else:
+            response = {"type": "error", "message": "Player not found"}
+            await self.send(response, [(client_socket, None)])
+
+    async def login(self, data, client_socket):
+        print("login method executed")
+        # Check if the user account exists
+        if self.check_credentials(data["username"], data["password"]):
+            print("user authorized. creating the user object")
+            player = Player(data["username"])
+            player_data = self.user_accounts[data["username"]]
+            for field, value in player_data.items():
+                setattr(player, field, value)
+            self.online_players[data["username"]] = (player, client_socket)
+
+            message = {
+                "type": "login_ok",
+                "direction": player.direction,
+                "position": player.position,
+                "pitch": player.pitch,
+                "yaw": player.yaw,
+                "map": player.map,
+                "zone": player.zone,
+                "health": player.health,
+                "energy": player.energy
+            }
+            await self.send(message, [client_socket, None])
+
+            message = {
+                "scope": "global",
+                "username": data["username"],
+                "message": f'Server: {data["username"]} came online.'
+            }
+            await self.send_chat(message)
+
+        else:
+            await self.send({"type": "error", "message": "The account does not exist"}, [(client_socket, None)])
+
+    async def logout(self, data, client_socket):
+        print("logout method called")
+        await client_socket.close()
+        del self.online_players[data["username"]]
+        print("player removed from the player's list")
+        await self.send_chat({"type": "chat", "scope": "global", "message": f'Server: {data["username"]} has logged out'})
+
+    async def create_user_account(self, data, client_socket):
+        if data["username"] in self.user_accounts:
+            print("username already exists")
+            await self.send({"type": "error", "message": "That chosen username already exists, please choose another one."}, [client_socket, None])
+        else:
+            print("username does not exist. Creating it now")
+            encrypted_password = self.encryptPassword(data["password"])
+            print("password encrypted")
+            initial_data = {"username": data["username"], "password": encrypted_password, "position": [0, 0, 0], "map": self.maps["Main"], "direction": [0, 1, 0], "pitch": 0, "yaw": 0, "zone": "None"}
+            print("creating the player object")
+            player = Player()
+            print("setting the object attributes equal to the stored values")
+            for field, value in initial_data.items():
+                setattr(player, field, value)
+            print("adding the user to the online players dictionary")
+            self.online_players[data["username"]] = (player, client_socket)
+            print("copying the new user to the user accounts dictionary")
+            self.user_accounts[data["username"]] = player
+            print("exporting the users")
+            self.data.export(self.user_accounts, "users")
+            if client_socket is not None:
+                await self.send({"type": "ok", "state": player_data}, [client_socket, None])
+            else:
+                print(f'{data["username"]} created successfully')
+
+    def check_credentials(self, username, password):
+        print("check credentials method executed")
+        # Iterate through the user accounts
+        for stored_username, account_data in self.user_accounts.items():
+            if stored_username == username:
+                print("usernames match, continuing...")
+                # Decrypt the stored password and compare with the encrypted provided password
+                decrypted_password = self.key.decrypt(account_data["password"].encode()).decode()
+                encrypted_password = self.encryptPassword(password)
+                if decrypted_password == encrypted_password:
+                    print("password match, continuing...")
+                    return True  # Return True if both username and password match
+        print("no matching account was found")
+        return False  # Return False if no matching account is found
+
+    async def create_map(self, name, size):
+        if name not in self.maps.keys():
+            map_name = name
+            map_size = size
+            map = Map(map_name)
+            map.set_size(map_size)
+            self.maps[name] = map
+# await self.send_chat({"type": "ok", "map": self.online_players[data["username"]].map, "position": self.online_players[data["username"]].get_position(), "direction": self.online_players[data["username"]].get_direction()})
+
+    def check_zone(self, data):
+        player, client_socket = self.online_players[data["username"]]
+        zone_name = player.get_zone()
+        response = {"type": "zone", "zone": zone_name}
+        self.send(response, [client_socket, None])
+
+    def send_chat(self, data):
+        scope = data["scope"]
+        if scope == "global":
+            message = {"type": "chat", "scope": "global", "message": data["message"]}
+            destination_socket_list = self.dict_to_list(self.online_players, 1)
+            self.send(message, destination_socket_list)
+        elif scope == "map":
+            map_name = data["map"]
+            message = {"type": "chat", "scope": "map", "message": data["message"]}
+            destination_socket_list = self.dict_to_list(self.maps[map_name].players, 1)
+            self.send(message, destination_socket_list)
+        elif scope == "private":
+            recipient = data["recipient"]
+            message = {"type": "chat", "scope": "private", "message": data["message"]}
+            destination_socket_list = self.dict_to_list(self.online_players[recipient], 1)
+            self.send(message, destination_socket_list)
+
+    def encryptPassword(self, password):
+        encrypted_password = self.key.encrypt(password.encode()).decode()
+        return encrypted_password
+
+    def configure_logger(self):
+        logger = logging.getLogger(__name__)
+        logger.setLevel(logging.INFO)
+        # Create a stream handler and set its level
+        stream_handler = logging.StreamHandler()
+        stream_handler.setLevel(logging.INFO)
+
+        # Create a formatter and add it to the stream handler
+        formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+        stream_handler.setFormatter(formatter)
+
+        # Add the stream handler to the logger
+        logger.addHandler(stream_handler)
+
+        # Configure the root logger to propagate messages to the stream handler
+        logging.getLogger().addHandler(stream_handler)
+        logging.getLogger().setLevel(logging.INFO)
+
+        return logger
+
+    def dict_to_list(self, src_dict, value_index):
+        destination_list = []
+        for i in src_dict.values():
+            destination_list.append(i[value_index])
+        return destination_list
+
+    def __init__(self, host, port):
+        self.host = host
+        self.port = port
+        self.sm = sm("security.key")
+#        self.sm.generate_key()
+#        self.sm.save_key()
+        self.sm.load_key()
+        self.key = self.sm.get_key()
+        self.data = Data(self.key)
+        self.logger = self.configure_logger()
+        self.listen_task = None
+        self.user_input_task = None
+        self.shutdown_event = asyncio.Event()
+        self.online_players = {}
+        self.user_accounts = {}
+        self.message_queue = asyncio.Queue()
+        self.messageTypes = {"move": self.move, "turn": self.turn, "check_zone": self.check_zone, "chat": self.send_chat, "create_account": self.create_user_account, "create_map": self.create_map, "login": self.login, "logout": self.logout}
+
+    async def start(self):
+        await self.initialize()
+
+        self.server = await asyncio.start_server(
+            self.handle_client, host=self.host, port=self.port
+        )
+        print(f"Listening for incoming connections on {self.host}:{self.port}")
+
+        loop = asyncio.get_event_loop()
+        self.listen_task = loop.create_task(self.server.serve_forever())
+        self.user_input_task = loop.create_task(self.user_input())
+
+        try:
+            await asyncio.gather(self.listen_task, self.user_input_task, self.shutdown_event.wait())
+        except asyncio.CancelledError:
+            pass
+
+    async def listen_for_connections(self):
+        await self.accept_connections()
+
+    async def initialize(self):
+        print("Open Life FPS game server, version 1.0")
+        print("Developed and maintained by Cody Hurst, codythurst@gmail.com")
+        print("This game was written with the assistance of Open AI's chat bot: http://chat.openai.com")
+        print("All suggestions and comments are welcome")
+
+        print("Loading maps database")
+        try:
+            self.maps = self.data.load("maps")
+            if self.maps == {}:
+                print("No maps found. Creating the default map")
+                await self.create_map("Main", (0, 100, 0, 100, 0, 10))
+# map creation code here
+                self.data.export(self.maps, "maps")
+                print("Maps exported successfully.")
+            else:
+                print("Maps loaded successfully")
+        except TypeError:
+            raise TypeError("The maps variable is not serializable. It has a data type of " + str(type(self.maps)))
+
+        print("Loading users database...")
+        try:
+            self.user_accounts = self.data.load("users")
+            if self.user_accounts == {}:
+                print("No user database found. Creating the default admin account...")
+                await self.create_user_account({"username": "admin", "password": "admin"}, None)
+                print("admin created successfully")
+                self.user_accounts = self.data.load("users")
+                print("Loaded users into memory")
+            else:
+                print("Users loaded successfully")
+        except TypeError:
+            raise TypeError("The users variable is not serializable. It has a data type of " + str(type(self.user_accounts)))
+
+    async def shutdown(self):
         print("Shutting down the server...")
-        sock.close()
-        sys.exit()
-        break
 
-      if command == "list players":
-        print(client_handler.listPlayers())
-        continue
-      if command == "list maps":
-        print(client_handler.listMaps())
-        continue
-      if command == "list users":
-        print(client_handler.listUsers())
-        continue
-      else:
-        print("That command is not supported.")
+        if self.listen_task:
+            self.listen_task.cancel()
 
-  # Start a new thread to handle user input
-  threading.Thread(target=user_input).start()
+        if self.user_input_task:
+            self.user_input_task.cancel()
 
-  # Continuously check for incoming connections
-  while True:
-    # Accept an incoming connection
+        await self.server.wait_closed()
+        self.shutdown_event.set()
+
+    async def exit(self):
+        print("Disconnecting all players...")
+        if isinstance(self.online_players, dict):
+            for data in self.online_players.values():
+                data[1].close()
+        print("Removing all players from the players list...")
+        self.online_players.clear()
+        await self.shutdown()
+
+    async def user_input(self):
+        print("user input method executed")
+        loop = asyncio.get_event_loop()
+        while True:
+            command = await loop.run_in_executor(None, input, "\nserver> ")
+            if command == "exit":
+                await self.exit()
+                break
+            elif command == "list players":
+                print(self.online_players)
+            elif command == "list maps":
+                if self.maps:
+                    for mapname in self.maps.keys():
+                        print(mapname)
+                else:
+                    print("No maps found.")
+            elif command == "list users":
+                if self.user_accounts:
+                    for username in self.user_accounts.keys():
+                        print(username)
+                else:
+                    print("No user accounts found.")
+            elif command == "list items":
+                try:
+                    print(self.maps)
+                except:
+                    print("Couldn't load the dictionary")
+            else:
+                print("That command is not supported.")
+
+async def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--host", type=str, default="localhost")
+    parser.add_argument("--port", type=int, default=33288)
+    args = parser.parse_args()
+
+    server_instance = Server(args.host, args.port)
+    
+    loop = asyncio.get_event_loop()
+
     try:
-      client_sock, addr = sock.accept()
-      print(f"Accepted connection from {addr}")
-      receive_thread = threading.Thread(target=receive_data, args=(client_sock,))
-      receive_thread.start()
-    except:
-      print("Server no longer accepting connections")
-      break
+        await server_instance.start()
+    except KeyboardInterrupt:
+        await server_instance.exit()
+#    finally:
+#        loop.close()
 
 if __name__ == '__main__':
-  main(args.host, args.port)
+    asyncio.run(main())

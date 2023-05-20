@@ -3,6 +3,4 @@ class Item:
     self.name = name
     self.description = description
     self.effects = effects
-    self.x = None
-    self.y = None
-    self.z = None
+    self.location = None
