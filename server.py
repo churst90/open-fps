@@ -33,7 +33,7 @@ class Server:
 
     async def handle_client(self, reader, writer):
         addr = writer.get_extra_info("peername")
-        client_socket = writer.get_extra_info("socket")
+        client_socket = writer
 
         print(f"Accepted connection from {addr}")
         while True:
@@ -52,12 +52,14 @@ class Server:
 
         print(f"Connection closed: {addr}")
 
-    async def send(self, data, recipients):
-        serialized_data = pickle.dumps(data)
+    async def send(self, message, client_sockets):
+        if not isinstance(client_sockets, list):
+            client_sockets = [client_sockets]
 
-        for recipient in recipients:
-            recipient[0].write(serialized_data)
-            await asyncio.sleep(0)  # Allow other tasks to run during the sending process
+        for client_socket in client_sockets:
+            msg = pickle.dumps(message)
+            client_socket.write(msg)
+            await client_socket.drain()
 
     async def process_received_data(self):
         print("process received data method called")
@@ -77,7 +79,7 @@ class Server:
                 else:
                     message_handler(data)
             else:
-                await self.send({"type": "error", "message": "Invalid message type"}, [client_socket, None])
+                await self.send({"type": "error", "message": "Invalid message type"}, [client_socket])
 
     async def close(self):
         if self.server:
@@ -97,7 +99,7 @@ class Server:
             player.turn(direction)
 
             response = {"type": "turn", "username": username, "direction": direction}
-            await self.send(response, [(client_socket, None)])
+            await self.send(response, [(client_socket)])
 
     async def move(self, data):
         username = data["username"]
@@ -107,23 +109,27 @@ class Server:
             player, client_socket = self.online_players[username]
             response = player.move(move_data)
 
-            await self.send(response, [(client_socket, None)])
+            await self.send(response, [client_socket])
         else:
             response = {"type": "error", "message": "Player not found"}
-            await self.send(response, [(client_socket, None)])
+            await self.send(response, [client_socket])
 
     async def login(self, data, client_socket):
         print("login method executed")
         if self.check_credentials(data["username"], data["password"]):
             print("user authorized. creating the user object")
-            player = Player(data["username"])
-            player_data = self.user_accounts[data["username"]]
-            for field, value in player_data.items():
-                setattr(player, field, value)
+            player = self.user_accounts[data["username"]]
+            print("Player object created")
+#            player_data = self.user_accounts[data["username"]]
+#            print("player state retrieved from the users database")
+#            for field, value in player_data.items():
+#                print(field)
+#                setattr(player, field, value)
             self.online_players[data["username"]] = (player, client_socket)
+            print("user object added to the online players dictionary")
 
             message = {"type": "ok", "direction": player.direction, "position": player.position, "pitch": player.pitch, "yaw": player.yaw, "map": player.map, "zone": player.zone, "health": player.health, "energy": player.energy}
-            await self.send(message, [client_socket, None])
+            await self.send(message, [client_socket])
 
             message = {
                 "scope": "global",
@@ -133,7 +139,7 @@ class Server:
             await self.send_chat(message)
 
         else:
-            await self.send({"type": "error", "message": "The account does not exist"}, [(client_socket, None)])
+            await self.send({"type": "error", "message": "The account does not exist"}, [client_socket])
 
     async def logout(self, data, client_socket):
         print("logout method called")
@@ -145,25 +151,25 @@ class Server:
     async def create_user_account(self, data, client_socket):
         if data["username"] in self.user_accounts:
             print("username already exists")
-            await self.send({"type": "error", "message": "That chosen username already exists, please choose another one."}, [client_socket, None])
+            await self.send({"type": "error", "message": "That chosen username already exists, please choose another one."}, [client_socket])
         else:
             print("username does not exist. Creating it now")
             encrypted_password = self.encrypt_password(data["password"])
             print("password encrypted")
-            initial_data = {"username": data["username"], "password": encrypted_password, "position": [0, 0, 0], "map": self.maps["Main"], "direction": [0, 1, 0], "pitch": 0, "yaw": 0, "zone": "None"}
-            print("creating the player object")
             player = Player()
-            print("setting the object attributes equal to the stored values")
-            for field, value in initial_data.items():
-                setattr(player, field, value)
-            print("adding the user to the online players dictionary")
-            self.online_players[data["username"]] = (player, client_socket)
+            print("created the player object")
+            player.username = data["username"]
+            player.password = encrypted_password
             print("copying the new user to the user accounts dictionary")
             self.user_accounts[data["username"]] = player
+            print("removing the password attribute from the player")
+
+            print("adding the user to the online players dictionary")
+            self.online_players[data["username"]] = (player, client_socket)
             print("exporting the users")
             self.data.export(self.user_accounts, "users")
             if client_socket is not None:
-                await self.send({"type": "ok", "state": player_data}, [client_socket, None])
+                await self.send({"type": "ok", "state": player}, [client_socket])
             else:
                 print(f'{data["username"]} created successfully')
 
@@ -172,8 +178,11 @@ class Server:
         # Check if the username exists in the user accounts
         if username in self.user_accounts:
             print("username matches")
-            stored_password = self.user_accounts[username]["password"]
+            print(f"Debug: {vars(self.user_accounts[username])}")  # add this line
+            stored_password = self.user_accounts[username].password
+            print("stored password: " + stored_password)
             decrypted_stored_password = self.decrypt_password(stored_password)
+            print("Decrypted stored password: " + decrypted_stored_password)
 
             if decrypted_stored_password == password:
                 print("Passwords match, continuing...")
@@ -193,24 +202,24 @@ class Server:
         player, client_socket = self.online_players[data["username"]]
         zone_name = player.get_zone()
         response = {"type": "zone", "zone": zone_name}
-        self.send(response, [client_socket, None])
+        self.send(response, [client_socket])
 
-    def send_chat(self, data):
+    async def send_chat(self, data):
         scope = data["scope"]
         if scope == "global":
             message = {"type": "chat", "scope": "global", "message": data["message"]}
             destination_socket_list = self.dict_to_list(self.online_players, 1)
-            self.send(message, destination_socket_list)
+            await self.send(message, destination_socket_list)
         elif scope == "map":
             map_name = data["map"]
             message = {"type": "chat", "scope": "map", "message": data["message"]}
             destination_socket_list = self.dict_to_list(self.maps[map_name].players, 1)
-            self.send(message, destination_socket_list)
+            await self.send(message, destination_socket_list)
         elif scope == "private":
             recipient = data["recipient"]
             message = {"type": "chat", "scope": "private", "message": data["message"]}
             destination_socket_list = self.dict_to_list(self.online_players[recipient], 1)
-            self.send(message, destination_socket_list)
+            await self.send(message, destination_socket_list)
 
     def decrypt_password(self, encrypted_password):
         decrypted_password = self.key.decrypt(encrypted_password.encode()).decode()

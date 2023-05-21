@@ -4,6 +4,7 @@ from collision import Collision
 class Player:
     def __init__(self):
         self.username = ""
+        self.password = ""
         self.logged_in = 0
         self.map = {}
         self.position = []
