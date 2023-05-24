@@ -1,13 +1,15 @@
 import pygame
 
 class GameWindow:
-  # Define key constants as class attributes
   KEYDOWN = pygame.KEYDOWN
-  K_UP = pygame.K_UP
-  K_DOWN = pygame.K_DOWN
+  KEYUP = pygame.KEYUP
   K_RETURN = pygame.K_RETURN
   K_TAB = pygame.K_TAB
   K_BACKSPACE = pygame.K_BACKSPACE
+  K_LEFT = pygame.K_LEFT
+  K_RIGHT = pygame.K_RIGHT
+  K_DOWN = pygame.K_DOWN
+  K_UP = pygame.K_UP
 
   def __init__(self, width, height, title, screen_manager):
     self.screen_manager = screen_manager
@@ -22,7 +24,7 @@ class GameWindow:
     self.text_input = ""
 
   def update(self):
-    if self.screen_manager.active_screen:
+    if self.screen_manager.get_current_screen():
       pygame.display.update()
       self.clock.tick(60)
 
@@ -44,26 +46,26 @@ class GameWindow:
     text_surface = font.render(text, True, color)
     self.window.blit(text_surface, (x, y))
 
-  def handle_events(self):
-    events = pygame.event.get()
-    if pygame.QUIT in [event.type for event in events]:
-      return [pygame.event.Event(pygame.QUIT)]  # Return a list with a single quit event
-    return events
-
   def get_size(self):
     return self.width, self.height
 
   def get_clock(self):
     return self.clock
 
-  def get_text_input(self, events):
+  def handle_events(self):
+    game_events = []
+    text_events = []
+
+    events = pygame.event.get()
+
     for event in events:
-      if event.type == pygame.KEYDOWN:
+      if event.type == pygame.QUIT:
+        game_events.append(event)
+      elif event.type == pygame.KEYDOWN or event.type == pygame.KEYUP:
+        game_events.append(event)
         if event.key == pygame.K_BACKSPACE:
-          self.text_input = self.text_input[:-1]
-#        elif event.key == pygame.K_RETURN:
-#          return self.text_input
+          game_events.append(event)
         elif event.key < 256 and event.unicode.isprintable():
-          character = event.unicode
-          self.text_input += character
-    return self.text_input
+          text_events.append(str(event.unicode))  # Convert character to string
+
+    return {"game": game_events, "text": text_events}

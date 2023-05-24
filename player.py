@@ -6,7 +6,6 @@ class Player:
         self.username = ""
         self.password = ""
         self.logged_in = 0
-        self.map = {}
         self.position = []
         self.zone = ""
         self.yaw = 0
@@ -114,10 +113,14 @@ class Player:
         self.username = username
 
     def set_map(self, map_dict, map_name):
-        self.map = map_dict[map_name].name
+        if map_name in map_dict:
+            self.map = map_dict[map_name].name
 
     def set_login(self, login):
         self.logged_in = login
+
+    def set_password(self, password):
+        self.password = password
 
     def get_zone(self):
         return self.zone

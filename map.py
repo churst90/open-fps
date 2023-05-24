@@ -87,10 +87,44 @@ class Map:
     self.map_size = size
 
   def is_within_single_bounds(self, x, y, z):
-      min_x, max_x, min_y, max_y, min_z, max_z = self.map_size
-      return (
-        min_x <= x <= max_x and min_y <= y <= max_y and min_z <= z <= max_z)
+    min_x, max_x, min_y, max_y, min_z, max_z = self.map_size
+    return (min_x <= x <= max_x and min_y <= y <= max_y and min_z <= z <= max_z)
 
   def is_within_range_bounds(self, min_x, max_x, min_y, max_y, min_z, max_z):
     min_x_map, max_x_map, min_y_map, max_y_map, min_z_map, max_z_map = self.map_size
     return ( min_x_map <= min_x <= max_x <= max_x_map and min_y_map <= min_y <= max_y <= max_y_map and min_z_map <= min_z <= max_z <= max_z_map)
+
+  def simplify_map(self, condition=None):
+    simplified_map = {
+      'name': self.name,
+      'map_size': self.map_size,
+      'tiles': self.tiles,
+      'zones': self.zones,
+      'items': self.items,
+      'ai': {key: vars(ai) for key, ai in self.ai.items()},
+      'players': {},
+        }
+
+    for key, player in self.players.items():
+      player_dict = vars(player)
+      del player_dict['client_socket']
+      del player_dict['inventory']
+      simplified_map['players'][key] = player_dict
+
+    if condition == 'player_joined':
+      # Send update to client about the new player
+      pass
+    elif condition == 'player_left':
+      # Send update to client about the player who left
+      pass
+    elif condition == 'player_changed_map':
+      # Send the new simplified map to the client
+      pass
+    elif condition == 'items_changed':
+      # Send update to client about the items
+      pass
+    elif condition == 'ai_changed':
+      # Send update to client about the AI
+      pass
+
+    return simplified_map

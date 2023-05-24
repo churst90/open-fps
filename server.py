@@ -9,9 +9,6 @@ import os
 import asyncio
 import logging
 
-# Disable asyncio debug mode
-os.environ["PYTHONASYNCIODEBUG"] = "0"
-
 # Project specific imports
 from securitymanager import SecurityManager as sm
 from data import Data
@@ -118,17 +115,15 @@ class Server:
         print("login method executed")
         if self.check_credentials(data["username"], data["password"]):
             print("user authorized. creating the user object")
-            player = self.user_accounts[data["username"]]
-            print("Player object created")
-#            player_data = self.user_accounts[data["username"]]
-#            print("player state retrieved from the users database")
-#            for field, value in player_data.items():
-#                print(field)
-#                setattr(player, field, value)
+            player = Player()
+            player_dict = self.user_accounts[data["username"]]
+            for key, value in player_dict.items():
+                setattr(player, key, value)
+                player.set_login(True)
             self.online_players[data["username"]] = (player, client_socket)
             print("user object added to the online players dictionary")
 
-            message = {"type": "ok", "direction": player.direction, "position": player.position, "pitch": player.pitch, "yaw": player.yaw, "map": player.map, "zone": player.zone, "health": player.health, "energy": player.energy}
+            message = {"type": "login_ok", "player_state": vars(player)}
             await self.send(message, [client_socket])
 
             message = {
@@ -157,19 +152,19 @@ class Server:
             encrypted_password = self.encrypt_password(data["password"])
             print("password encrypted")
             player = Player()
-            print("created the player object")
-            player.username = data["username"]
-            player.password = encrypted_password
+            player.set_username(data["username"])
+            player.set_password(encrypted_password)
+            player.set_map(self.maps, "Main")
             print("copying the new user to the user accounts dictionary")
-            self.user_accounts[data["username"]] = player
+            self.user_accounts[data["username"]] = vars(player)
             print("removing the password attribute from the player")
-
+#             del player.password
             print("adding the user to the online players dictionary")
             self.online_players[data["username"]] = (player, client_socket)
             print("exporting the users")
             self.data.export(self.user_accounts, "users")
             if client_socket is not None:
-                await self.send({"type": "ok", "state": player}, [client_socket])
+                await self.send({"type": "create_account_ok", "state": player}, [client_socket])
             else:
                 print(f'{data["username"]} created successfully')
 
@@ -178,8 +173,7 @@ class Server:
         # Check if the username exists in the user accounts
         if username in self.user_accounts:
             print("username matches")
-            print(f"Debug: {vars(self.user_accounts[username])}")  # add this line
-            stored_password = self.user_accounts[username].password
+            stored_password = self.user_accounts[username]["password"]
             print("stored password: " + stored_password)
             decrypted_stored_password = self.decrypt_password(stored_password)
             print("Decrypted stored password: " + decrypted_stored_password)
@@ -349,7 +343,6 @@ class Server:
         await self.shutdown()
 
     async def user_input(self):
-        print("user input method executed")
         loop = asyncio.get_event_loop()
         while True:
             command = await loop.run_in_executor(None, input, "\nserver> ")
