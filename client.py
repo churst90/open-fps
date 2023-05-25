@@ -121,8 +121,6 @@ class Client:
 
         username_field = TextField()
         password_field = TextField()
-        username = username_field.get_text()
-        password = password_field.get_text()
 
         self.tts.speak("To login, please enter your username and password. Use tab and enter to navigate to and activate the buttons.")
 
@@ -139,59 +137,58 @@ class Client:
 
         while True:
             events = self.login_screen.handle_events()
-            for event in events["game"]:
-                if event.type == self.login_screen.KEYDOWN:
-                    if event.key == self.login_screen.K_TAB:
-                        if active_field == "username":
-                            active_field = "password"
-                            current_field_name = field_names[active_field]
-                            self.tts.speak(f"{current_field_name} {password}")
-                        elif active_field == "password":
-                            active_field = "login"
-                            current_field_name = field_names[active_field]
-                            self.tts.speak(f"{current_field_name}")
-                        elif active_field == "login":
-                            active_field = "cancel"
-                            current_field_name = field_names[active_field]
-                            self.tts.speak(f"{current_field_name}")
-                        elif active_field == "cancel":
-                            active_field = "username"
-                            current_field_name = field_names[active_field]
-                            self.tts.speak(f"{current_field_name} {username}")
+            if "KEYDOWN" in events:
+                event = events["KEYDOWN"]            
+                if event == self.login_screen.K_TAB:
+                    if active_field == "username":
+                        active_field = "password"
+                        current_field_name = field_names[active_field]
+                        self.tts.speak(f"{current_field_name} {password_field.get_text()}")
+                    elif active_field == "password":
+                        active_field = "login"
+                        current_field_name = field_names[active_field]
+                        self.tts.speak(f"{current_field_name}")
+                    elif active_field == "login":
+                        active_field = "cancel"
+                        current_field_name = field_names[active_field]
+                        self.tts.speak(f"{current_field_name}")
+                    elif active_field == "cancel":
+                        active_field = "username"
+                        current_field_name = field_names[active_field]
+                        self.tts.speak(f"{current_field_name} {username_field.get_text()}")
 
-                    elif event.key == self.login_screen.K_RETURN:
-                        if active_field == "login":
-                            self.tts.speak("Trying to log in...")
-                            username = username_field.get_text()
-                            password = password_field.get_text()
-                            try:
-                                login_message = {"type": "login", "username": username, "password": password}
-                                await self.send(login_message)
-                                await self.login_event.wait()
-                                self.screen_manager.pop_screen()
-                                self.screen_manager.remove_screen("login_screen")
-                                self.login_event.clear()
-                                self.screen_manager.push_screen("main_window")
-                                return
-                            except:
-                                self.tts.speak("There was an error logging into the server")
-                        elif active_field == "cancel":
+                elif event == self.login_screen.K_RETURN:
+                    if active_field == "login":
+                        self.tts.speak("Trying to log in...")
+                        try:
+                            login_message = {"type": "login", "username": username_field.get_text(), "password": password_field.get_text()}
+                            await self.send(login_message)
+                            await self.login_event.wait()
                             self.screen_manager.pop_screen()
                             self.screen_manager.remove_screen("login_screen")
+                            self.login_event.clear()
+                            self.screen_manager.push_screen("main_window")
                             return
+                        except:
+                            self.tts.speak("There was an error logging into the server")
+                    elif active_field == "cancel":
+                        self.screen_manager.pop_screen()
+                        self.screen_manager.remove_screen("login_screen")
+                        return
 
-                    elif event.key == self.login_screen.K_BACKSPACE:
-                        if active_field == "username":
-                            username_field.backspace()
-                        elif active_field == "password":
-                            password_field.backspace()
+                elif event == self.login_screen.K_BACKSPACE:
+                    if active_field == "username":
+                        username_field.backspace()
+                    elif active_field == "password":
+                        password_field.backspace()
 
-            for char in events["text"]:
-                print(f"Handling character: {char}")
-                if active_field == "username":
-                    username_field.append(char)
-                elif active_field == "password":
-                    password_field.append(char)
+            if "CHAR" in events:
+                for char in events["CHAR"]:
+                    print(f"Handling character: {char}")
+                    if active_field == "username":
+                        username_field.append(char)
+                    elif active_field == "password":
+                        password_field.append(char)
 
     def error_message(self, data):
         self.error_messages.append(data["message"])

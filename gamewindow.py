@@ -52,6 +52,7 @@ class GameWindow:
   def get_clock(self):
     return self.clock
 
+  """
   def handle_events(self):
     game_events = []
     text_events = []
@@ -69,3 +70,28 @@ class GameWindow:
           text_events.append(str(event.unicode))  # Convert character to string
 
     return {"game": game_events, "text": text_events}
+  """
+
+  def handle_events(self):
+    events_dict = {}
+
+    for event in pygame.event.get():
+      if event.type == pygame.QUIT:
+        events_dict["QUIT"] = event
+      elif event.type == pygame.KEYDOWN:
+        if event.key == pygame.K_DOWN:
+          events_dict["KEYDOWN"] = pygame.K_DOWN
+        elif event.key == pygame.K_UP:
+          events_dict["KEYDOWN"] = pygame.K_UP
+        elif event.key == pygame.K_BACKSPACE:
+          events_dict["KEYDOWN"] = pygame.K_BACKSPACE
+        elif event.key == pygame.K_RETURN:
+          events_dict["KEYDOWN"] = pygame.K_RETURN
+        elif event.key == pygame.K_TAB:
+          events_dict["KEYDOWN"] = pygame.K_TAB
+        elif event.key < 256 and event.unicode.isprintable():
+          events_dict["CHAR"] = str(event.unicode)
+#      elif event.type == pygame.KEYUP:
+#        events_dict["KEYUP"] = event
+
+    return events_dict

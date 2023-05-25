@@ -16,14 +16,17 @@ class Menu:
         self.screen_manager.push_screen("main_menu")
         while True:
             events = menu_screen.handle_events()
-            game_events = events["game"]
-            for event in game_events:
-                if event.type == menu_screen.KEYDOWN:
-                    if event.key == menu_screen.K_UP:
-                        self.selected = max(self.selected - 1, 0)
-                        self.tts.speak(self.options[self.selected])
-                    elif event.key == menu_screen.K_DOWN:
-                        self.selected = min(self.selected + 1, len(self.options) - 1)
-                        self.tts.speak(self.options[self.selected])
-                    elif event.key == menu_screen.K_RETURN:
-                        return self.options[self.selected]
+
+            if "QUIT" in events:
+                return
+
+            if "KEYDOWN" in events:
+                event = events["KEYDOWN"]
+                if event == menu_screen.K_UP:
+                    self.selected = max(self.selected - 1, 0)
+                    self.tts.speak(self.options[self.selected])
+                elif event == menu_screen.K_DOWN:
+                    self.selected = min(self.selected + 1, len(self.options) - 1)
+                    self.tts.speak(self.options[self.selected])
+                elif event == menu_screen.K_RETURN:
+                    return self.options[self.selected]
