@@ -5,7 +5,6 @@ import pickle
 # Project specific imports
 from menu import Menu
 from gamewindow import GameWindow
-from player import Player
 from screenmanager import ScreenManager
 from speechmanager import SpeechManager
 from textfield import TextField
@@ -54,16 +53,19 @@ class Client:
         self.create_account_screen = GameWindow(600, 600, "Create account dialog", self.screen_manager)
         self.screen_manager.add_screen(self.create_account_screen, "create_account_screen")
         self.screen_manager.push_screen("create_account_screen")
+        self.create_account_screen.set_background((175, 175, 175))
 
-        self.tts.speak("To create a new character, select a username and password and press enter on 'create account'")
+        username_field = TextField()
+        password_field = TextField()
 
-        username = ""
-        password = ""
+        self.tts.speak("To create an account, please enter your username and password. Use tab and enter to navigate to and activate the buttons.")
+
         active_field = "username"
+    
         field_names = {
             "username": "Username: edit",
             "password": "Password: edit",
-            "create_account": "Create Account button",
+            "create_account": "create_account button",
             "cancel": "Cancel button"
         }
         current_field_name = field_names[active_field]
@@ -71,47 +73,59 @@ class Client:
 
         while True:
             events = self.create_account_screen.handle_events()
-            for event in events:
-                if event.type == create_account_screen.KEYDOWN:
-                    if event.key == create_account_screen.K_TAB:
-                        if active_field == "username":
-                            active_field = "password"
-                            current_field_name = field_names[active_field]
-                            self.tts.speak(f"{current_field_name} {password}")
-                        elif active_field == "password":
-                            active_field = "create_account"
-                            current_field_name = field_names[active_field]
-                            self.tts.speak(f"{current_field_name}")
-                        elif active_field == "create_account":
-                            active_field = "cancel"
-                            current_field_name = field_names[active_field]
-                            self.tts.speak(f"{current_field_name}")
-                        elif active_field == "cancel":
-                            active_field = "username"
-                            current_field_name = field_names[active_field]
-                            self.tts.speak(f"{current_field_name}, {username}")
+            if "KEYDOWN" in events:
+                event = events["KEYDOWN"]            
+                if event == self.create_account_screen.K_TAB:
+                    if active_field == "username":
+                        active_field = "password"
+                        current_field_name = field_names[active_field]
+                        self.tts.speak(f"{current_field_name} {password_field.get_text()}")
+                    elif active_field == "password":
+                        active_field = "create_account"
+                        current_field_name = field_names[active_field]
+                        self.tts.speak(f"{current_field_name}")
+                    elif active_field == "create_account":
+                        active_field = "cancel"
+                        current_field_name = field_names[active_field]
+                        self.tts.speak(f"{current_field_name}")
+                    elif active_field == "cancel":
+                        active_field = "username"
+                        current_field_name = field_names[active_field]
+                        self.tts.speak(f"{current_field_name} {username_field.get_text()}")
 
-                    elif event.key == create_account_screen.K_BACKSPACE:
-                        # Handle backspace key press
-                        if active_field == "username":
-                            username = username[:-1]
-                        elif active_field == "password":
-                            password = password[:-1]
-                    elif event.key == create_account_screen.K_RETURN:
-                        # Handle return key press
-                        if active_field == "create_account":
-                            self.tts.speak("Creating account...")
-                            self.screen_manager.pop_screen()
-                            # Add your create account logic here
-
-                        elif active_field == "cancel":
+                elif event == self.create_account_screen.K_RETURN:
+                    if active_field == "create_account":
+                        self.tts.speak("Trying to create a new character...")
+                        try:
+                            create_account_message = {"type": "create_account", "username": username_field.get_text(), "password": password_field.get_text()}
+                            await self.send(create_account_message)
+#                            await self.create_account_event.wait()
                             self.screen_manager.pop_screen()
                             self.screen_manager.remove_screen("create_account_screen")
+#                            self.create_account_event.clear()
+                            return
+                        except:
+                            self.tts.speak("There was an error creating a new account")
+                    elif active_field == "cancel":
+                        self.screen_manager.pop_screen()
+                        self.screen_manager.remove_screen("create_account_screen")
+                        return
 
+                elif event == self.create_account_screen.K_BACKSPACE:
                     if active_field == "username":
-                        username = create_account_screen.get_text_input(events)
+                        username_field.backspace()
                     elif active_field == "password":
-                        password = create_account_screen.get_text_input(events)
+                        password_field.backspace()
+
+            if "CHAR" in events:
+                for char in events["CHAR"]:
+                    if active_field == "username":
+                        username_field.append(char)
+                    elif active_field == "password":
+                        password_field.append(char)
+
+            self.screen_manager.update()
+            self.create_account_screen.update()
 
     async def login(self):
         self.login_screen = GameWindow(600, 600, "Login dialog", self.screen_manager)
@@ -165,9 +179,11 @@ class Client:
                             await self.send(login_message)
                             await self.login_event.wait()
                             self.screen_manager.pop_screen()
+                            self.screen_manager.pop_screen()
+                            self.screen_manager.remove_screen("main_menu")
                             self.screen_manager.remove_screen("login_screen")
-                            self.login_event.clear()
                             self.screen_manager.push_screen("main_window")
+                            self.login_event.clear()
                             return
                         except:
                             self.tts.speak("There was an error logging into the server")
@@ -184,14 +200,17 @@ class Client:
 
             if "CHAR" in events:
                 for char in events["CHAR"]:
-                    print(f"Handling character: {char}")
                     if active_field == "username":
                         username_field.append(char)
                     elif active_field == "password":
                         password_field.append(char)
 
+            self.screen_manager.update()
+            self.login_screen.update()
+
     def error_message(self, data):
         self.error_messages.append(data["message"])
+        self.tts.speak(data["message"])
 
     def chat(self, data):
         if data["scope"] == "private":
@@ -202,43 +221,35 @@ class Client:
             self.tts.speak(data["message"])
         if data["scope"] == "global":
             self.global_messages.append(data["message"])
+            print(data["message"])
             self.tts.speak(data["message"])
 
     def load_player(self, data):
         print("player load method called")
         self.tts.speak("player load method called")
-        if "player_state" not in data:
-            print("'player_state' not found in data")
-            return
-        elif not isinstance(data["player_state"], dict):
-            print("'player_state' is not a dictionary")
-            return
-        for key, value in data["player_state"].items():
-            if hasattr(self.player, key):
-                setattr(self.player, key, value)
-        print(f'You are now logged in. You are on {data["map"]}')
-        self.tts.speak(f'You are now logged in. You are on {data["map"]}')
+        self.player = data["player_state"]
+        self.map = data["map_state"]
+        print(f'You are now logged in on map {data["player_state"]["current_map"]}.')
+        self.tts.speak(f'You are now logged in on map {data["player_state"]["current_map"]}.')
         self.login_event.set()
-        for attr, value in vars(self.player).items():
-            print(f"{attr}: {value}")
 
     def __init__(self, host, port):
         self.login_event = asyncio.Event()
         self.screen_manager = ScreenManager()
-        self.player = Player()
+        self.player = {"logged_in": False}
+        self.map = {}
         self.tts = SpeechManager()
         self.host = host
         self.port = port
         self.private_messages = {}
         self.map_messages = {}
-        self.global_messages = {}
-        self.error_messages = {}
-        self.main_window = GameWindow(1200, 800, "Open FPS", self.screen_manager)
-        self.screen_manager.add_screen(self.main_window, 'main_window')
-        self.screen_manager.push_screen("main_window")
-        self.main_window.set_background((0, 50, 200))
-        self.login_screen = GameWindow(600, 600, "Login dialog", self.screen_manager)
-        self.create_account_screen = GameWindow(600, 600, "Create account dialog", self.screen_manager)
+        self.global_messages = []
+        self.error_messages = []
+        self.main_window = None
+        self.login_screen = None
+#        self.login_screen = GameWindow(600, 600, "Login dialog", self.screen_manager)
+        self.create_account_screen = None
+#        self.create_account_screen = GameWindow(600, 600, "Create account dialog", self.screen_manager)
         self.message_types = {
         "login_ok": self.load_player,
 #        "create_account_ok": ,
@@ -246,25 +257,25 @@ class Client:
 #        "change_map_ok": ,
 #        "move_ok": ,
 #        "turn_ok": ,
-#        "chat": ,
-#        "error": self.tts.speak(error)
+        "chat": self.chat,
+        "error": self.error_message
         }
 
     async def start(self):
+        self.main_window = GameWindow(1200, 800, "Open FPS", self.screen_manager)
+        self.main_window.set_background((0, 255, 0))
+        self.screen_manager.add_screen(self.main_window, "main_window")
+        self.screen_manager.push_screen("main_window")
 
         running = True
         while running:
-
-            if not self.player.logged_in:
+            if not self.player["logged_in"]:
                 self.main_menu_options = ["Create account", "Login", "About", "Exit"]
                 self.main_menu  = Menu(self.main_menu_options, "Main menu", "main_menu", self.screen_manager)
                 selected_option = await self.main_menu.create()
                 if selected_option == "Create account":
-                    self.screen_manager.pop_screen()
-                    self.screen_manager.push_screen('create_account_screen')
                     await self.create_account()
                 elif selected_option == "Login":
-                    self.screen_manager.pop_screen()
                     await self.login()
                 elif selected_option == "About":
                     self.tts.speak("Open fps by Cody Hurst. This game is a beta and should be treated as such.")
@@ -276,7 +287,7 @@ class Client:
                 self.tts.speak("ready for game input")
 
             self.screen_manager.update()
-#            self.main_window.update()
+            self.main_window.update()
 
 async def main():
     loop = asyncio.get_event_loop()

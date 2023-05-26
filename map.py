@@ -95,6 +95,7 @@ class Map:
     return ( min_x_map <= min_x <= max_x <= max_x_map and min_y_map <= min_y <= max_y <= max_y_map and min_z_map <= min_z <= max_z <= max_z_map)
 
   def simplify_map(self, condition=None):
+    print(self.players)
     simplified_map = {
       'name': self.name,
       'map_size': self.map_size,
@@ -102,14 +103,10 @@ class Map:
       'zones': self.zones,
       'items': self.items,
       'ai': {key: vars(ai) for key, ai in self.ai.items()},
-      'players': {},
-        }
-
-    for key, player in self.players.items():
-      player_dict = vars(player)
-      del player_dict['client_socket']
-      del player_dict['inventory']
-      simplified_map['players'][key] = player_dict
+      'players': {
+          key: {attr: value for attr, value in vars(player_tuple[0]).items() if attr != 'inventory'}
+          for key, player_tuple in self.players.items()
+      }, }
 
     if condition == 'player_joined':
       # Send update to client about the new player
@@ -119,7 +116,7 @@ class Map:
       pass
     elif condition == 'player_changed_map':
       # Send the new simplified map to the client
-      pass
+      return simplified_map
     elif condition == 'items_changed':
       # Send update to client about the items
       pass

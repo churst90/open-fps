@@ -39,10 +39,8 @@ class Server:
                 if not data:
                     break
                 data = pickle.loads(data)
-                print("Adding data to message queue:", data)
                 await self.message_queue.put((data, client_socket))
                 await self.process_received_data()
-                print("Message queue size:", self.message_queue.qsize())
 
             except asyncio.CancelledError:
                 break
@@ -59,20 +57,14 @@ class Server:
             await client_socket.drain()
 
     async def process_received_data(self):
-        print("process received data method called")
-        print("Message queue size:", self.message_queue.qsize())
-
         while not self.message_queue.empty():
-            print("while loop executed")
             data, client_socket = await self.message_queue.get()
-            print("Received data:", data)
 
             message_type = data["type"]
             if message_type in self.messageTypes:
                 message_handler = self.messageTypes[message_type]
                 if message_type in ["create_account", "login", "logout"]:
                     await message_handler(data, client_socket)
-                    print("Calling message handler:", message_type)
                 else:
                     message_handler(data)
             else:
@@ -112,18 +104,17 @@ class Server:
             await self.send(response, [client_socket])
 
     async def login(self, data, client_socket):
-        print("login method executed")
         if self.check_credentials(data["username"], data["password"]):
-            print("user authorized. creating the user object")
             player = Player()
             player_dict = self.user_accounts[data["username"]]
             for key, value in player_dict.items():
                 setattr(player, key, value)
                 player.set_login(True)
             self.online_players[data["username"]] = (player, client_socket)
-            print("user object added to the online players dictionary")
 
-            message = {"type": "login_ok", "player_state": vars(player)}
+            self.maps["Main"].players[data["username"]] = (player, client_socket)
+
+            message = {"type": "login_ok", "player_state": vars(player), "map_state": self.maps[player.current_map].simplify_map("player_changed_map")}
             await self.send(message, [client_socket])
 
             message = {
@@ -154,32 +145,30 @@ class Server:
             player = Player()
             player.set_username(data["username"])
             player.set_password(encrypted_password)
-            player.set_map(self.maps, "Main")
+            player.set_map("Main")
             print("copying the new user to the user accounts dictionary")
             self.user_accounts[data["username"]] = vars(player)
-            print("removing the password attribute from the player")
+#            print("removing the password attribute from the player")
 #             del player.password
             print("adding the user to the online players dictionary")
             self.online_players[data["username"]] = (player, client_socket)
+
+            self.maps["Main"].players = self.online_players[data["username"]]
+
             print("exporting the users")
             self.data.export(self.user_accounts, "users")
             if client_socket is not None:
-                await self.send({"type": "create_account_ok", "state": player}, [client_socket])
+                await self.send({"type": "create_account_ok", "state": vars(player)}, [client_socket])
             else:
                 print(f'{data["username"]} created successfully')
 
     def check_credentials(self, username, password):
-        print("check credentials method executed")
-        # Check if the username exists in the user accounts
+
         if username in self.user_accounts:
-            print("username matches")
             stored_password = self.user_accounts[username]["password"]
-            print("stored password: " + stored_password)
             decrypted_stored_password = self.decrypt_password(stored_password)
-            print("Decrypted stored password: " + decrypted_stored_password)
 
             if decrypted_stored_password == password:
-                print("Passwords match, continuing...")
                 return True
         return False
 
@@ -200,10 +189,12 @@ class Server:
 
     async def send_chat(self, data):
         scope = data["scope"]
+
         if scope == "global":
             message = {"type": "chat", "scope": "global", "message": data["message"]}
             destination_socket_list = self.dict_to_list(self.online_players, 1)
             await self.send(message, destination_socket_list)
+            print(data["message"])
         elif scope == "map":
             map_name = data["map"]
             message = {"type": "chat", "scope": "map", "message": data["message"]}
@@ -212,7 +203,9 @@ class Server:
         elif scope == "private":
             recipient = data["recipient"]
             message = {"type": "chat", "scope": "private", "message": data["message"]}
-            destination_socket_list = self.dict_to_list(self.online_players[recipient], 1)
+            destination_socket_list = []
+            if recipient in self.online_players:
+                destination_socket_list.append(self.online_players[recipient][1]) # Adding client socket
             await self.send(message, destination_socket_list)
 
     def decrypt_password(self, encrypted_password):

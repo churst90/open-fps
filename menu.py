@@ -12,8 +12,9 @@ class Menu:
 
     async def create(self):
         menu_screen = gw(300, 500, self.title, self.screen_manager)
+        menu_screen.set_background((175, 175, 175))
         self.screen_manager.add_screen(menu_screen, self.screen_id)
-        self.screen_manager.push_screen("main_menu")
+        self.screen_manager.push_screen(self.screen_id)
         while True:
             events = menu_screen.handle_events()
 
@@ -30,3 +31,7 @@ class Menu:
                     self.tts.speak(self.options[self.selected])
                 elif event == menu_screen.K_RETURN:
                     return self.options[self.selected]
+
+            self.screen_manager.update()
+            menu_screen.update()
+        self.screen_manager.pop_screen()
