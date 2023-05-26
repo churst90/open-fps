@@ -31,7 +31,7 @@ class Menu:
                     self.tts.speak(self.options[self.selected])
                 elif event == menu_screen.K_RETURN:
                     return self.options[self.selected]
+                    self.screen_manager.pop_screen()
 
             self.screen_manager.update()
             menu_screen.update()
-        self.screen_manager.pop_screen()

@@ -13,6 +13,7 @@ class Client:
 
     async def connect(self):
         try:
+            self.tts.speak("Connecting to server...")
             self.reader, self.writer = await asyncio.open_connection(self.host, self.port)
             self.receive_task = asyncio.create_task(self.receive())
             self.tts.speak(f"Successfully connected to {self.host}:{self.port}")
@@ -29,6 +30,7 @@ class Client:
         self.receive_task.cancel()
         await self.writer.close()
         await self.writer.wait_closed()
+        self.tts.speak("Disconnected from server.")
 
     async def send(self, data):
         serialized_data = pickle.dumps(data)
@@ -173,16 +175,15 @@ class Client:
 
                 elif event == self.login_screen.K_RETURN:
                     if active_field == "login":
-                        self.tts.speak("Trying to log in...")
                         try:
+                            await self.connect()
                             login_message = {"type": "login", "username": username_field.get_text(), "password": password_field.get_text()}
                             await self.send(login_message)
                             await self.login_event.wait()
                             self.screen_manager.pop_screen()
                             self.screen_manager.pop_screen()
-                            self.screen_manager.remove_screen("main_menu")
                             self.screen_manager.remove_screen("login_screen")
-                            self.screen_manager.push_screen("main_window")
+#                            self.screen_manager.push_screen("main_window")
                             self.login_event.clear()
                             return
                         except:
@@ -281,6 +282,7 @@ class Client:
                     self.tts.speak("Open fps by Cody Hurst. This game is a beta and should be treated as such.")
                 elif selected_option == "Exit":
                     self.screen_manager.pop_screen()
+
                     running = False
                     await asyncio.sleep(0)
             else:
@@ -293,9 +295,7 @@ async def main():
     loop = asyncio.get_event_loop()
     client = Client("localhost", 33288)
     try:
-        await client.connect()
         await client.start()
-#        await asyncio.gather(client.start(), client.connect())
     except KeyboardInterrupt:
         pass
 
