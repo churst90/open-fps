@@ -55,7 +55,7 @@ class User:
 
             self.maps["Main"].players[data["username"]] = (player, client_socket)
 
-            message = {"type": "login_ok", "player_state": vars(player), "map_state": self.maps[player.current_map].simplify_map("player_changed_map")}
+            message = {"type": "login_ok", "player_state": player.to_dict(), "map_state": self.maps[player.current_map].simplify_map("player_changed_map")}
             await self.network.send(message, [client_socket])
 
             message = {
@@ -114,8 +114,10 @@ class User:
             new_player = Player()
             new_player.init_user(data["username"], salted_hashed_password)
 
+            # Convert the new Player instance to a dictionary before storing
             print("copying the new user to the user accounts dictionary")
-            self.user_accounts[data["username"]] = vars(new_player)
+            self.user_accounts[data["username"]] = new_player.to_dict()
+
             print("adding the user to the online players dictionary")
             self.online_players[data["username"]] = (new_player, client_socket)
 

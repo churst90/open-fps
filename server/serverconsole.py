@@ -8,6 +8,15 @@ class ServerConsole:
         self.maps = maps
         self.user_accounts = users
 
+    def update_maps(self, maps):
+        self.maps = maps
+
+    def update_users(self, users):
+        self.user_accounts = users
+
+    def update_online_players(self, online_players):
+        self.online_players = online_players
+
     async def user_input(self):
         loop = asyncio.get_event_loop()
         while True:

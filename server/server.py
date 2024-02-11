@@ -1,5 +1,6 @@
 # Standard library imports
 import argparse
+import subprocess
 import os
 
 # Third party library imports
@@ -14,11 +15,21 @@ from securitymanager import SecurityManager as sm
 from data import Data
 from chat import Chat
 
+def generate_self_signed_cert(cert_file='cert.pem', key_file='key.pem'):
+    if not os.path.exists(cert_file) or not os.path.exists(key_file):
+        subprocess.run([
+            'openssl', 'req', '-x509', '-newkey', 'rsa:4096',
+            '-keyout', key_file, '-out', cert_file,
+            '-days', '365', '-nodes', '-subj', '/CN=localhost'
+        ], check=True)
+
 class Server:
 
     def __init__(self, host, port):
         self.host = host
         self.port = port
+        # Ensure SSL certificate is ready
+        self.ensure_ssl_certificate()
         self.sm = sm("security.key")
 #        self.sm.generate_key()
 #        self.sm.save_key()
@@ -36,6 +47,14 @@ class Server:
         self.network = Network(host, port, self.message_queue, self.process_message)
         self.server_handler = ServerHandler(self.online_players, self.user_accounts, self.maps, self.data, self.key, self.network, self.chat)
         self.console = ServerConsole(self.online_players, self.maps, self.user_accounts)
+
+    def ensure_ssl_certificate(self, cert_file='cert.pem', key_file='key.pem'):
+        if not os.path.exists(cert_file) or not os.path.exists(key_file):
+            subprocess.run([
+                'openssl', 'req', '-x509', '-newkey', 'rsa:4096',
+                '-keyout', key_file, '-out', cert_file,
+                '-days', '365', '-nodes', '-subj', '/CN=localhost'
+            ], check=True)
 
     async def process_message(self, data, client_socket):
         # Call the appropriate method from ServerHandler based on message type

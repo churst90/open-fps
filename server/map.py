@@ -102,3 +102,26 @@ class Map:
                map_min_y <= min_y <= max_y <= map_max_y and \
                map_min_z <= min_z <= max_z <= map_max_z
 
+    @classmethod
+    def from_dict(cls, data):
+        map_instance = cls(data['name'])
+        map_instance.map_size = data['map_size']
+        map_instance.players = data['players']
+        map_instance.tiles = data['tiles']
+        map_instance.zones = data['zones']
+        map_instance.items = data['items']
+        # Handle AI objects separately if they have a specific structure
+        map_instance.ai = {key: AI.from_dict(ai_data) for key, ai_data in data['ai'].items()}
+        return map_instance
+
+    def to_dict(self):
+        return {
+            "name": self.name,
+            "map_size": self.map_size,
+            "players": list(self.players.keys()),  # Assuming player names or IDs
+            "tiles": self.tiles,
+            "zones": self.zones,
+            "items": self.items,
+            "ai": [ai.to_dict() for ai in self.ai.values()],  # Assuming AI has a to_dict method
+            # Exclude event_listeners from serialization
+        }

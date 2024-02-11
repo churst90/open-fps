@@ -1,5 +1,6 @@
 import math
 from collision import Collision
+import base64
 
 class Player:
     def __init__(self):
@@ -168,3 +169,51 @@ class Player:
         self.yaw = 0
         self.health = 10000
         self.energy = 10000
+
+    @staticmethod
+    def bytes_to_str(bytes_data):
+        return base64.b64encode(bytes_data).decode('utf-8')
+
+    @staticmethod
+    def str_to_bytes(str_data):
+        return base64.b64decode(str_data.encode('utf-8'))
+
+    @classmethod
+    def from_dict(cls, data):
+        player = cls()
+        player.username = data['username']
+        player.password = cls.str_to_bytes(data['password'])
+        player.logged_in = data['logged_in']
+        player.position = data['position']
+        player.current_map = data['current_map']
+        player.zone = data['zone']
+        player.yaw = data['yaw']
+        player.pitch = data['pitch']
+        player.direction = data['direction']
+        player.health = data['health']
+        player.energy = data['energy']
+        player.pvp_status = data['pvp_status']
+        player.rank = data['rank']
+        player.inventory = data['inventory']
+        return player
+
+    def to_dict(self):
+        # Check if password is in bytes, and convert if necessary
+        password_encoded = self.password if isinstance(self.password, str) \
+            else Player.bytes_to_str(self.password)
+        return {
+            "username": self.username,
+            "password": password_encoded,  # Be cautious about storing or exposing passwords
+            "logged_in": self.logged_in,
+            "position": self.position,
+            "current_map": self.current_map,
+            "zone": self.zone,
+            "yaw": self.yaw,
+            "pitch": self.pitch,
+            "direction": self.direction,
+            "health": self.health,
+            "energy": self.energy,
+            "pvp_status": self.pvp_status,
+            "rank": self.rank,
+            "inventory": self.inventory,
+        }
