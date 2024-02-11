@@ -1,5 +1,4 @@
 from accessible_output2 import outputs
-
 class SpeechManager:
   def __init__(self):
     pass

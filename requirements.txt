@@ -5,7 +5,6 @@ libloader==0.21
 logger==1.4
 platform-utils==1.5.1
 pycparser==2.21
-pygame==2.4.0
 PyOpenAL==0.7.11a1
 pywin32==306
 winpaths==0.2
