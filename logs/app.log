@@ -1,0 +1,30 @@
+2024-02-12 14:18:00,883 - server - INFO - My FPS Game Server version X.Y
+2024-02-12 14:18:00,885 - server - INFO - Developed and maintained by Developer Name. https://Mywebsite.com/
+2024-02-12 14:18:00,885 - server - INFO - All suggestions and comments are welcome
+2024-02-12 14:18:00,885 - server - INFO - Loading maps database
+2024-02-12 14:18:00,920 - server - INFO - Maps loaded successfully
+2024-02-12 14:18:00,921 - server - INFO - Loading users database...
+2024-02-12 14:18:00,922 - server - INFO - Users loaded successfully
+2024-02-12 14:18:00,923 - server - DEBUG - Initialization complete.
+2024-02-12 14:18:00,923 - server - INFO - Server started. Listening on localhost:33288
+2024-02-12 14:18:00,923 - server - DEBUG - Console ready...
+2024-02-12 14:18:42,474 - server - INFO - No longer accepting user input
+2024-02-12 14:18:42,475 - server - INFO - No longer accepting incoming connections
+2024-02-12 14:18:42,476 - server - INFO - Shutting down the server...
+2024-02-12 14:18:42,476 - server - INFO - Server successfully shut down
+2024-02-12 18:22:32,909 - server - INFO - My FPS Game Server version X.Y
+2024-02-12 18:22:32,909 - server - INFO - Developed and maintained by Developer Name. https://Mywebsite.com/
+2024-02-12 18:22:32,909 - server - INFO - All suggestions and comments are welcome
+2024-02-12 18:22:32,909 - server - INFO - Loading maps database
+2024-02-12 18:22:32,956 - server - INFO - Maps loaded successfully
+2024-02-12 18:22:32,956 - server - INFO - Loading users database...
+2024-02-12 18:22:32,964 - server - INFO - Users loaded successfully
+2024-02-12 18:22:32,965 - server - DEBUG - Initialization complete.
+2024-02-12 18:22:32,966 - server - INFO - Server started. Listening on localhost:33288
+2024-02-12 18:22:32,966 - server - DEBUG - Console ready...
+2024-02-12 18:22:40,472 - server - INFO - No online users found.
+2024-02-12 18:22:44,890 - server - INFO - No maps found.
+2024-02-12 18:22:56,869 - server - INFO - No longer accepting user input
+2024-02-12 18:22:56,870 - server - INFO - No longer accepting incoming connections
+2024-02-12 18:22:56,871 - server - INFO - Shutting down the server...
+2024-02-12 18:22:56,871 - server - INFO - Server successfully shut down

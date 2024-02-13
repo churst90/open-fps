@@ -3,10 +3,11 @@ import asyncio
 
 class ServerConsole:
 
-    def __init__(self, players, maps, users):
+    def __init__(self, players, maps, users, custom_logger):
         self.online_players = players
         self.maps = maps
         self.user_accounts = users
+        self.logger = custom_logger
 
     def update_maps(self, maps):
         self.maps = maps
@@ -24,30 +25,30 @@ class ServerConsole:
             if command == "exit":
                 break
             if command == "":
-                print("")
+                self.logger.info("")
             elif command == "list players":
                 if self.online_players:
                     for playername in self.online_players.keys():
-                        print(playername)
+                        self.logger.info(playername)
                 else:
-                    print("No online users found.")
+                    self.logger.info("No online users found.")
             elif command == "list maps":
                 if self.maps:
                     for mapname in self.maps.keys():
-                        print(mapname)
+                        self.logger.info(mapname)
                 else:
-                    print("No maps found.")
+                    self.logger.info("No maps found.")
             elif command == "list users":
                 if self.user_accounts:
                     for username in self.user_accounts.keys():
-                        print(username)
+                        self.logger.info(username)
                 else:
-                    print("No user accounts found.")
+                    self.logger.info("No user accounts found.")
             elif command == "list items":
                 try:
-                    print(self.maps)
+                    self.logger.info(self.maps)
                 except:
-                    print("Couldn't load the dictionary")
+                    self.logger.info("Couldn't load the dictionary")
             else:
-                print("Invalid command")
+                self.logger.info("Invalid command")
 

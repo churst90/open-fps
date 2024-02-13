@@ -3,8 +3,63 @@ import random
 import json
 
 # Project specific imports
-from ai import AI
-from items import Item
+from .ai import AI
+from .items import Item
+
+class MapRegistry:
+    _instances = {}  # For storing Map instances for runtime use
+    _client_data = {}  # For storing JSON-friendly map data for client transmission
+
+    @classmethod
+    def notify_map_updated(cls, name):
+        if name in cls._instances:
+            cls.update_map_data(name)
+
+    @classmethod
+    def create_map(cls, name, size):
+        if name in cls._instances:
+            raise ValueError(f"A map with the name '{name}' already exists.")
+        # Create and store the Map instance
+        map_instance = Map(name)
+        map_instance.set_size(size)
+        cls._instances[name] = map_instance
+        # Also store its serialized form for clients and persistence
+        cls._client_data[name] = map_instance.to_dict()
+        return cls._client_data[name]
+
+    @classmethod
+    def update_map_data(cls, name):
+        """Refresh the serialized form of a map after changes."""
+        if name in cls._instances:
+            cls._client_data[name] = cls._instances[name].to_dict()
+        else:
+            raise ValueError(f"Map '{name}' not found for update.")
+
+    @classmethod
+    def get_map_data_for_client(cls, name):
+        """Retrieve the JSON-friendly data for a specific map."""
+        return cls._client_data.get(name, "Error: Map not found.")
+
+    @classmethod
+    def get_all_serialized_maps(cls):
+        """Returns the entire dictionary of serialized maps for persistence."""
+        return cls._client_data
+
+    @classmethod
+    def save_maps_to_disk(cls, filepath):
+        """Saves all maps to disk in a JSON format."""
+        with open(filepath, 'w') as file:
+            json.dump(cls.get_all_serialized_maps(), file, indent=4)
+
+    @classmethod
+    def load_maps_from_disk(cls, filepath):
+        """Loads maps from a disk file and reconstructs the registry."""
+        with open(filepath, 'r') as file:
+            loaded_maps = json.load(file)
+            for name, map_data in loaded_maps.items():
+                map_instance = Map.from_dict(map_data)
+                cls._instances[name] = map_instance
+                cls._client_data[name] = map_data  # Assume map_data is already in the correct format
 
 class Map:
     def __init__(self, name):
@@ -22,6 +77,17 @@ class Map:
         self.event_listeners = {
             'change': []
         }
+
+        MapRegistry.notify_map_updated(self._name)
+
+    @property
+    def name(self):
+        return self._name
+
+    @name.setter
+    def name(self, value):
+        self._name = value
+        MapRegistry.notify_map_updated(self._name)
 
     def on(self, event_name, listener):
         if event_name not in self.event_listeners:
@@ -114,6 +180,7 @@ class Map:
         map_instance.ai = {key: AI.from_dict(ai_data) for key, ai_data in data['ai'].items()}
         return map_instance
 
+    @classmethod
     def to_dict(self):
         return {
             "name": self.name,

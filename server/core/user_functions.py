@@ -1,14 +1,14 @@
 # third party imports
 import hashlib
 import os
-import logging
 
 # Project specific imports
-from player import Player
+from .modules.player import Player
+from .events.event_dispatcher import EventDispatcher
 
 class User:
 
-    def __init__(self, players, users, maps, network, key, data, chat):
+    def __init__(self, players, users, maps, network, key, data, chat, custom_logger):
         self.online_players = players
         self.user_accounts = users
         self.maps = maps
@@ -16,6 +16,7 @@ class User:
         self.key = key
         self.data = data
         self.chat = chat
+        self.logger = custom_logger
 
     async def turn(self, data):
         username = data["username"]
@@ -73,7 +74,7 @@ class User:
 
         # Check if the user is actually online before proceeding
         if username not in self.online_players:
-            print(f"User {username} is not online.")
+            self.logger.info(f"User {username} is not online.")
             return
 
         # Close the client socket properly
@@ -82,7 +83,7 @@ class User:
                 client_socket.close()
                 await client_socket.wait_closed()
         except Exception as e:
-            print(f"Error closing connection for user {username}: {e}")
+            self.logger.info(f"Error closing connection for user {username}: {e}")
 
         # Remove the player from their current map
         current_map = self.online_players[username][0].current_map
@@ -102,23 +103,23 @@ class User:
 
         # Log out the user by removing their details from the online_players dictionary
         del self.online_players[username]
-        print(f"User {username} has been logged out successfully.")
+        self.logger.info(f"User {username} has been logged out successfully.")
     
     async def create_user_account(self, data, client_socket):
         if data["username"] in self.user_accounts:
-            print("username already exists")
+            self.logger.info("username already exists")
             await self.network.send({"type": "error", "message": "That chosen username already exists, please choose another one."}, [client_socket])
         else:
-            print("username does not exist. Creating it now")
+            self.logger.info("username does not exist. Creating it now")
             salted_hashed_password = self.hash_password(data["password"])
             new_player = Player()
             new_player.init_user(data["username"], salted_hashed_password)
 
             # Convert the new Player instance to a dictionary before storing
-            print("copying the new user to the user accounts dictionary")
+            self.logger.debug("copying the new user to the user accounts dictionary")
             self.user_accounts[data["username"]] = new_player.to_dict()
 
-            print("adding the user to the online players dictionary")
+            self.logger.debug("adding the user to the online players dictionary")
             self.online_players[data["username"]] = (new_player, client_socket)
 
             # Place the player on the map specified in their Player object.
@@ -128,12 +129,12 @@ class User:
             else:
                 pass
 
-            print("exporting the users")
+            self.logger.debug("exporting the users")
             self.data.export(self.user_accounts, "users")
             if client_socket is not None:
                 await self.network.send({"type": "create_account_ok", "state": vars(new_player)}, [client_socket])
             else:
-                print(f'{data["username"]} created successfully')
+                self.logger.info(f'{data["username"]} created successfully')
 
     def check_credentials(self, username, password):
 

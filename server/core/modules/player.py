@@ -1,6 +1,11 @@
+# standard imports
 import math
-from collision import Collision
 import base64
+
+# project specific imports
+from .collision import Collision
+from ..events.event_dispatcher import EventDispatcher
+from ..events.player_movement import PlayerMovement
 
 class Player:
     def __init__(self):

@@ -5,15 +5,16 @@ import os
 
 # Third party library imports
 import asyncio
-import logging
 
 # Project specific imports
-from serverconsole import ServerConsole
-from connection import Network
-from serverhandler import ServerHandler
-from securitymanager import SecurityManager as sm
-from data import Data
-from chat import Chat
+from core.custom_logger import CustomLogger
+from core.server_console import ServerConsole
+from core.network import Network
+from core.server_handler import ServerHandler
+from core.security.security_manager import SecurityManager as sm
+from core.data import Data
+from core.modules.chat import Chat
+from core.events.event_dispatcher import EventDispatcher
 
 def generate_self_signed_cert(cert_file='cert.pem', key_file='key.pem'):
     if not os.path.exists(cert_file) or not os.path.exists(key_file):
@@ -26,6 +27,10 @@ def generate_self_signed_cert(cert_file='cert.pem', key_file='key.pem'):
 class Server:
 
     def __init__(self, host, port):
+        self.version = "version X.Y"
+        self.dev_name = "Developer Name"
+        self.server_name = "My FPS Game Server"
+        self.website = "https://Mywebsite.com/"
         self.host = host
         self.port = port
         # Ensure SSL certificate is ready
@@ -45,8 +50,10 @@ class Server:
         self.message_queue = asyncio.Queue()
         self.chat = Chat()
         self.network = Network(host, port, self.message_queue, self.process_message)
-        self.server_handler = ServerHandler(self.online_players, self.user_accounts, self.maps, self.data, self.key, self.network, self.chat)
-        self.console = ServerConsole(self.online_players, self.maps, self.user_accounts)
+        self.logger = CustomLogger('server', debug_mode=True)
+        self.event_dispatcher = EventDispatcher(self.network, self.maps)
+        self.server_handler = ServerHandler(self.online_players, self.user_accounts, self.maps, self.data, self.key, self.network, self.chat, self.event_dispatcher, self.logger)
+        self.console = ServerConsole(self.online_players, self.maps, self.user_accounts, self.logger)
 
     def ensure_ssl_certificate(self, cert_file='cert.pem', key_file='key.pem'):
         if not os.path.exists(cert_file) or not os.path.exists(key_file):
@@ -68,21 +75,21 @@ class Server:
 
         else:
             # Handle unknown message type or pass to a default handler
-            print(f"Unknown message type: {message_type}")
+            self.logger.info(f"Unknown message type: {message_type}")
 
     async def start(self):
         try:
             # Initialization tasks before starting the server
             await self.initialize()
-            print("Initialization complete.")
+            self.logger.debug("Initialization complete.")
 
             # Start accepting connections
             self.listen_task = asyncio.create_task(self.network.accept_connections())
-            print(f"Server started and listening on {self.host}:{self.port}")
+            self.logger.info(f"Server started. Listening on {self.host}:{self.port}")
 
             # Start user input listener
             self.user_input_task = asyncio.create_task(self.console.user_input())
-            print("Console ready...")
+            self.logger.debug("Console ready...")
 
             # Wait for the network listening task and user input task to complete
             # If either task finishes, this will return.
@@ -93,20 +100,20 @@ class Server:
 
             # If the network task is done, the server was stopped, possibly due to an error
             if self.listen_task in done:
-                print("Server stopped listening for connections.")
+                self.logger.info("Server stopped listening for connections.")
                 # Optionally handle the error if the task didn't finish cleanly
                 if self.listen_task.exception() is not None:
                     error = self.listen_task.exception()
-                    print(f"Server listening task stopped with an error: {error}")
-                    logging.error("Server encountered an error", exc_info=error)
+                    self.logger.info(f"Server listening task stopped with an error: {error}")
+                    self.logger.info("Server encountered an error", exc_info=error)
 
             # If the user input task is done, the admin might have issued a shutdown
             if self.user_input_task in done:
-                print("No longer accepting user input")
+                self.logger.info("No longer accepting user input")
                 # If the server is still listening, shut it down
                 if not self.listen_task.done():
                     self.listen_task.cancel()
-                    print("No longer accepting incoming connections")
+                    self.logger.info("No longer accepting incoming connections")
 
             # Clean up any pending tasks
             for task in pending:
@@ -114,44 +121,42 @@ class Server:
 
         except Exception as e:
             logging.exception("An unexpected error occurred in the server's start method:", exc_info=e)
-            print(f"An unexpected error occurred: {e}")
+            self.logger.info(f"An unexpected error occurred: {e}")
 
         finally:
             # Clean up and close down the server properly
             await self.shutdown()
-            print("Server successfully shut down")
+            self.logger.info("Server successfully shut down")
 
     async def initialize(self):
-        print("Open Life FPS game server")
-        print("Developed and maintained by Cody Hurst, https://CodyHurst.com")
-        print("All suggestions and comments are welcome")
+        self.logger.info(f"{self.server_name} {self.version}")
+        self.logger.info(f"Developed and maintained by {self.dev_name}. {self.website}")
+        self.logger.info("All suggestions and comments are welcome")
 
-        print("Loading maps database")
+        self.logger.info("Loading maps database")
         try:
             self.maps = self.data.load("maps")
             if self.maps == {}:
-                print("No maps found. Creating the default map")
+                self.logger.info("No maps found. Creating the default map")
                 await self.server_handler.create_map("Main", (0, 100, 0, 100, 0, 10))
-#                self.data.export(self.maps, "maps")
-#                print("Maps exported successfully.")
             else:
-                print("Maps loaded successfully")
+                self.logger.info("Maps loaded successfully")
         except TypeError:
             raise TypeError("The maps variable is not serializable. It has a data type of " + str(type(self.maps)))
 
-        print("Loading users database...")
+        self.logger.info("Loading users database...")
         try:
             self.user_accounts = self.data.load("users")
             if self.user_accounts == {}:
-                print("No user database found. Creating the default admin account...")
+                self.logger.info("No user database found. Creating the default admin account...")
                 await self.server_handler.user.create_user_account({"username": "admin", "password": "admin"}, None)
             else:
-                print("Users loaded successfully")
+                self.logger.info("Users loaded successfully")
         except TypeError:
             raise TypeError("The users variable is not serializable. It has a data type of " + str(type(self.user_accounts)))
 
     async def shutdown(self):
-        print("Shutting down the server...")
+        self.logger.info("Shutting down the server...")
 
         # Cancel the network task if it's running
         if self.listen_task and not self.listen_task.done():
@@ -168,11 +173,11 @@ class Server:
         self.shutdown_event.set()
 
     async def exit(self):
-        print("Disconnecting all players...")
+        self.logger.info("Disconnecting all players...")
         if isinstance(self.online_players, dict):
             for data in self.online_players.values():
                 data[1].close()
-        print("Removing all players from the players list...")
+        self.logger.debug("Removing all players from the players list...")
         self.online_players.clear()
         await self.shutdown()
 

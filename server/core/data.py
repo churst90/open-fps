@@ -1,6 +1,9 @@
-from player import Player
-from map import Map
+# standard imports
 import json
+
+# project specific imports
+from .modules.player import Player
+from .modules.map_manager import Map, MapRegistry
 
 class Data:
     def __init__(self, key):
