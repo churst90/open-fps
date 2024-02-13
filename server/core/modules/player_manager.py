@@ -43,7 +43,7 @@ class PlayerRegistry:
             del cls._instances[username]
 
 class Player:
-    def __init__(self, username, password, position=(0, 0, 0), current_map="Main", event_dispatcher):
+    def __init__(self, username, password, event_dispatcher):
         self.username = username
         self.password = base64.b64encode(password.encode()).decode()  # Consider using a more secure hash function
         self.logged_in = True

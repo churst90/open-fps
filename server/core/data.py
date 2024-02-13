@@ -2,7 +2,7 @@
 import json
 
 # project specific imports
-from .modules.player import Player
+from .modules.player_manager import Player, PlayerRegistry
 from .modules.map_manager import Map, MapRegistry
 
 class Data:

@@ -3,7 +3,7 @@ import hashlib
 import os
 
 # Project specific imports
-from .modules.player import Player
+from .modules.player_manager import Player, PlayerRegistry
 from .events.event_dispatcher import EventDispatcher
 
 class User:

@@ -28,3 +28,19 @@
 2024-02-12 18:22:56,870 - server - INFO - No longer accepting incoming connections
 2024-02-12 18:22:56,871 - server - INFO - Shutting down the server...
 2024-02-12 18:22:56,871 - server - INFO - Server successfully shut down
+2024-02-12 22:19:38,752 - server - INFO - My FPS Game Server version X.Y
+2024-02-12 22:19:38,752 - server - INFO - Developed and maintained by Developer Name. https://Mywebsite.com/
+2024-02-12 22:19:38,752 - server - INFO - All suggestions and comments are welcome
+2024-02-12 22:19:38,753 - server - INFO - Loading maps database
+2024-02-12 22:19:38,794 - server - INFO - Maps loaded successfully
+2024-02-12 22:19:38,794 - server - INFO - Loading users database...
+2024-02-12 22:19:38,804 - server - INFO - Users loaded successfully
+2024-02-12 22:19:38,805 - server - DEBUG - Initialization complete.
+2024-02-12 22:19:38,805 - server - INFO - Server started. Listening on localhost:33288
+2024-02-12 22:19:38,805 - server - DEBUG - Console ready...
+2024-02-12 22:20:21,890 - server - INFO - No online users found.
+2024-02-12 22:20:26,247 - server - INFO - No user accounts found.
+2024-02-12 22:20:31,843 - server - INFO - No longer accepting user input
+2024-02-12 22:20:31,843 - server - INFO - No longer accepting incoming connections
+2024-02-12 22:20:31,844 - server - INFO - Shutting down the server...
+2024-02-12 22:20:31,844 - server - INFO - Server successfully shut down
