@@ -12,9 +12,9 @@ from core.server_console import ServerConsole
 from core.network import Network
 from core.server_handler import ServerHandler
 from core.security.security_manager import SecurityManager as sm
-from core.data import Data
-from core.modules.chat import Chat
 from core.events.event_dispatcher import EventDispatcher
+from core.modules.map_manager import MapRegistry
+from core.modules.user_manager import UserRegistry
 
 def generate_self_signed_cert(cert_file='cert.pem', key_file='key.pem'):
     if not os.path.exists(cert_file) or not os.path.exists(key_file):
@@ -38,22 +38,20 @@ class Server:
         self.sm = sm("security.key")
 #        self.sm.generate_key()
 #        self.sm.save_key()
-        self.sm.load_key()
-        self.key = self.sm.get_key()
-        self.data = Data(self.key)
+#        self.sm.load_key()
+#        self.key = self.sm.get_key()
+#        self.data = Data()
         self.listen_task = None
         self.user_input_task = None
         self.shutdown_event = asyncio.Event()
-        self.online_players = {}
-        self.user_accounts = {}
-        self.maps = {}
         self.message_queue = asyncio.Queue()
-        self.chat = Chat()
         self.network = Network(host, port, self.message_queue, self.process_message)
+        self.user_reg = UserRegistry()
+        self.map_reg = MapRegistry()
         self.logger = CustomLogger('server', debug_mode=True)
-        self.event_dispatcher = EventDispatcher(self.network, self.maps)
-        self.server_handler = ServerHandler(self.online_players, self.user_accounts, self.maps, self.data, self.key, self.network, self.chat, self.event_dispatcher, self.logger)
-        self.console = ServerConsole(self.online_players, self.maps, self.user_accounts, self.logger)
+        self.event_dispatcher = EventDispatcher.get_instance()
+        self.server_handler = ServerHandler(self.user_reg, self.map_reg, self.network, self.event_dispatcher, self.logger)
+        self.console = ServerConsole(self.user_reg._users, self.map_reg._client_data, self.logger)
 
     def ensure_ssl_certificate(self, cert_file='cert.pem', key_file='key.pem'):
         if not os.path.exists(cert_file) or not os.path.exists(key_file):
@@ -72,7 +70,6 @@ class Server:
         elif hasattr(self.server_handler, message_type):
             server_handler_method = getattr(self.server_handler, message_type)
             await server_handler_method(data, client_socket)
-
         else:
             # Handle unknown message type or pass to a default handler
             self.logger.info(f"Unknown message type: {message_type}")
@@ -120,7 +117,7 @@ class Server:
                 task.cancel()
 
         except Exception as e:
-            logging.exception("An unexpected error occurred in the server's start method:", exc_info=e)
+#            print("An unexpected error occurred in the server's start method:", exc_info=e)
             self.logger.info(f"An unexpected error occurred: {e}")
 
         finally:
@@ -133,27 +130,11 @@ class Server:
         self.logger.info(f"Developed and maintained by {self.dev_name}. {self.website}")
         self.logger.info("All suggestions and comments are welcome")
 
-        self.logger.info("Loading maps database")
-        try:
-            self.maps = self.data.load("maps")
-            if self.maps == {}:
-                self.logger.info("No maps found. Creating the default map")
-                await self.server_handler.create_map("Main", (0, 100, 0, 100, 0, 10))
-            else:
-                self.logger.info("Maps loaded successfully")
-        except TypeError:
-            raise TypeError("The maps variable is not serializable. It has a data type of " + str(type(self.maps)))
+        self.logger.info("Loading maps .....")
+        await self.map_reg.load_maps()
 
-        self.logger.info("Loading users database...")
-        try:
-            self.user_accounts = self.data.load("users")
-            if self.user_accounts == {}:
-                self.logger.info("No user database found. Creating the default admin account...")
-                await self.server_handler.user.create_user_account({"username": "admin", "password": "admin"}, None)
-            else:
-                self.logger.info("Users loaded successfully")
-        except TypeError:
-            raise TypeError("The users variable is not serializable. It has a data type of " + str(type(self.user_accounts)))
+        self.logger.info("Loading users .....")
+        await self.user_reg.load_users()
 
     async def shutdown(self):
         self.logger.info("Shutting down the server...")

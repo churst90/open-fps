@@ -3,10 +3,9 @@ import asyncio
 
 class ServerConsole:
 
-    def __init__(self, players, maps, users, custom_logger):
-        self.online_players = players
+    def __init__(self, users, maps, custom_logger):
+        self.users = users
         self.maps = maps
-        self.user_accounts = users
         self.logger = custom_logger
 
     def update_maps(self, maps):

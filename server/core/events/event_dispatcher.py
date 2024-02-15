@@ -1,35 +1,53 @@
 import asyncio
+import json
 
 class EventDispatcher:
-    def __init__(self, network, maps):
-        self.network = network
-        self.maps = maps
-        # Adjusting for map-wide subscriptions
-        self.listeners = {map_name: {} for map_name in maps.keys()}
+    _instance = None  # Class variable to hold the singleton instance
 
-    def subscribe(self, map_name, event_type, listener):
-        if map_name not in self.listeners:
-            self.listeners[map_name] = {}
-        if event_type not in self.listeners[map_name]:
-            self.listeners[map_name][event_type] = []
-        self.listeners[map_name][event_type].append(listener)
+    @classmethod
+    def get_instance(cls):
+        """
+        A class method to get the singleton instance of EventDispatcher.
+        If the instance doesn't exist, it creates it.
+        """
+        if cls._instance is None:
+            cls._instance = cls()
+        return cls._instance
 
-    async def dispatch(self, map_name, event_type, data):
-        # Broadcast to all listeners of the specific map and event type
-        for listener in self.listeners.get(map_name, {}).get(event_type, []):
-            await listener.handle_event(event_type, data)
+    def __init__(self):
+        """
+        Constructor is private to prevent direct instantiation.
+        """
+        if EventDispatcher._instance is not None:
+            raise RuntimeError("Use get_instance() method to get an instance of this class.")
+        self.listeners = {}
 
-    async def broadcast_to_map(self, map_name, event_data):
-        message = json.dumps(event_data)
-        disconnected_players = []
-        for player_id, player in self.maps[map_name].players.items():
-            try:
-                if player.network.writer is not None:
-                    await self.network.send(message, player.network.writer)
-            except Exception as e:
-                print(f"Error sending message to player {player_id}: {e}")
-                disconnected_players.append(player_id)
-        # Optionally handle disconnected players
-        for player_id in disconnected_players:
-            # Remove from map, notify others, etc.
-            pass
+    def subscribe(self, event_type, listener):
+        """
+        Subscribe a listener to a specific type of event.
+        """
+        if event_type not in self.listeners:
+            self.listeners[event_type] = []
+        self.listeners[event_type].append(listener)
+
+    async def dispatch(self, event_type, data):
+        """
+        Dispatch an event to all subscribed listeners.
+        """
+        for listener in self.listeners.get(event_type, []):
+            # Ensure that the listener can handle the event asynchronously
+            if asyncio.iscoroutinefunction(listener):
+                await listener(data)
+            else:
+                listener(data)
+
+    def emit(self, event_type, data):
+        """
+        Schedule the dispatch coroutine on the existing asyncio event loop.
+        This method allows for the dispatching of events from synchronous code.
+        """
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            loop.create_task(self.dispatch(event_type, data))
+        else:
+            asyncio.run(self.dispatch(event_type, data))
