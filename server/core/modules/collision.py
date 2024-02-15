@@ -1,26 +1,24 @@
 class Collision:
-  def __init__(self, map):
-    self.map = map
+    def __init__(self, game_map):
+        self.game_map = game_map
 
-  # Method to check if a player's proposed movement will collide with a wall
-  def check_wall_collision(self, x, y, z):
-    # Check if the proposed coordinates are within the bounds of the map
-    if x < self.map.min_x or x > self.map.max_x or y < self.map.min_y or y > self.map.max_y or z < self.map.min_z or z > self.map.max_z:
-      return True
+    def is_move_valid(self, x, y, z):
+        # Check if the target position is within map boundaries
+        if not self.check_boundary_collision(x, y, z):
+            return False  # Movement outside the map boundaries is not allowed
+        
+        # Check if the target position is walkable (not an obstacle)
+        if not self.game_map.is_position_walkable(x, y, z):
+            return False  # Movement into obstacles is not allowed
 
-    # Check if the proposed coordinates correspond to a wall tile
-    for tile in self.map.tiles:
-      if tile["x"] == x and tile["y"] == y and tile["z"] == z and tile["wall"]:
+        # If no collisions were detected, the move is valid
         return True
 
-    # If no collisions were detected, return False
-    return False
+    def check_boundary_collision(self, x, y, z):
+        # Assuming the game_map object has attributes defining its boundaries
+        return (0 <= x < self.game_map.width and
+                0 <= y < self.game_map.height and
+                0 <= z < self.game_map.depth)
 
-  # Method to check if a player's proposed movement will take them outside the boundaries of the map
-  def check_boundary_collision(self, x, y, z):
-    # Check if the proposed coordinates are within the bounds of the map
-    if x < self.map.min_x or x > self.map.max_x or y < self.map.min_y or y > self.map.max_y or z < self.map.min_z or z > self.map.max_z:
-      return True
-
-    # If the proposed coordinates are within the bounds of the map, return False
-    return False
+    # This method assumes a simple method on the map to check if a position is walkable
+    # It abstracts away the specifics of how the map's data is structured

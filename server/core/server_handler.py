@@ -7,6 +7,15 @@ class ServerHandler:
         self.event_dispatcher = event_dispatcher
         self.logger = custom_logger
 
+    async def move(self, data, client_socket):
+        # Assuming data contains {"username": "player1", "position": "forward", "speed": 1}
+        username = data['username']
+        direction = data['direction']
+        speed = data['speed']
+
+        # Dispatch the event to the UserActions handler
+        await self.event_dispatcher.dispatch("move", {"username": username, "direction": position, "speed": speed})
+
     def create_map(self, name, size):
         if name not in self.maps:
             new_map = Map(name)
