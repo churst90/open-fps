@@ -63,6 +63,7 @@ class MapRegistry:
         if maps_data:
             for name, map_dict in maps_data.items():
                 cls._instances[name] = Map.from_dict(map_dict)
+                cls._client_data[name] = maps_data
         else:
             print("No maps data found or failed to load. Creating the default map.")
             await MapRegistry.create_map("Main", (10, 10, 10))

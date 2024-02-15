@@ -813,3 +813,218 @@
 2024-02-15 06:17:28,115 - server - INFO - No longer accepting incoming connections
 2024-02-15 06:17:28,116 - server - INFO - Shutting down the server...
 2024-02-15 06:17:28,116 - server - INFO - Server successfully shut down
+2024-02-15 13:45:06,323 - server - INFO - My FPS Game Server version X.Y
+2024-02-15 13:45:06,324 - server - INFO - Developed and maintained by Developer Name. https://Mywebsite.com/
+2024-02-15 13:45:06,324 - server - INFO - All suggestions and comments are welcome
+2024-02-15 13:45:06,324 - server - INFO - Loading maps .....
+2024-02-15 13:45:06,326 - server - INFO - Loading users .....
+2024-02-15 13:45:06,331 - server - DEBUG - Initialization complete.
+2024-02-15 13:45:06,331 - server - INFO - Server started. Listening on localhost:33288
+2024-02-15 13:45:06,331 - server - DEBUG - Console ready...
+2024-02-15 13:45:11,892 - server - INFO - No user accounts found.
+2024-02-15 13:45:20,401 - server - INFO - Main
+2024-02-15 13:45:41,023 - server - INFO - No longer accepting user input
+2024-02-15 13:45:41,023 - server - INFO - No longer accepting incoming connections
+2024-02-15 13:45:41,024 - server - INFO - Shutting down the server...
+2024-02-15 13:45:41,024 - server - INFO - Server successfully shut down
+2024-02-15 13:51:46,223 - server - INFO - My FPS Game Server version X.Y
+2024-02-15 13:51:46,223 - server - INFO - Developed and maintained by Developer Name. https://Mywebsite.com/
+2024-02-15 13:51:46,223 - server - INFO - All suggestions and comments are welcome
+2024-02-15 13:51:46,223 - server - INFO - Loading maps .....
+2024-02-15 13:51:46,226 - server - INFO - Loading users .....
+2024-02-15 13:51:46,226 - server - DEBUG - Initialization complete.
+2024-02-15 13:51:46,226 - server - INFO - Server started. Listening on localhost:33288
+2024-02-15 13:51:46,227 - server - DEBUG - Console ready...
+2024-02-15 13:51:49,675 - server - INFO - No user accounts found.
+2024-02-15 13:52:01,977 - server - INFO - Main
+2024-02-15 13:56:16,034 - server - INFO - Main
+2024-02-15 13:56:17,367 - server - INFO - No longer accepting user input
+2024-02-15 13:56:17,367 - server - INFO - No longer accepting incoming connections
+2024-02-15 13:56:17,368 - server - INFO - Shutting down the server...
+2024-02-15 13:56:17,368 - server - INFO - Server successfully shut down
+2024-02-15 13:56:18,884 - server - INFO - My FPS Game Server version X.Y
+2024-02-15 13:56:18,885 - server - INFO - Developed and maintained by Developer Name. https://Mywebsite.com/
+2024-02-15 13:56:18,885 - server - INFO - All suggestions and comments are welcome
+2024-02-15 13:56:18,885 - server - INFO - Loading maps .....
+2024-02-15 13:56:18,886 - server - INFO - Loading users .....
+2024-02-15 13:56:18,887 - server - DEBUG - Initialization complete.
+2024-02-15 13:56:18,888 - server - INFO - Server started. Listening on localhost:33288
+2024-02-15 13:56:18,888 - server - DEBUG - Console ready...
+2024-02-15 13:56:22,503 - server - INFO - No maps found.
+2024-02-15 13:56:29,701 - server - INFO - No user accounts found.
+2024-02-15 14:00:16,148 - server - INFO - No user accounts found.
+2024-02-15 14:00:17,365 - server - INFO - No longer accepting user input
+2024-02-15 14:00:17,365 - server - INFO - No longer accepting incoming connections
+2024-02-15 14:00:17,366 - server - INFO - Shutting down the server...
+2024-02-15 14:00:17,366 - server - INFO - Server successfully shut down
+2024-02-15 14:00:18,510 - server - INFO - My FPS Game Server version X.Y
+2024-02-15 14:00:18,510 - server - INFO - Developed and maintained by Developer Name. https://Mywebsite.com/
+2024-02-15 14:00:18,510 - server - INFO - All suggestions and comments are welcome
+2024-02-15 14:00:18,511 - server - INFO - Loading maps .....
+2024-02-15 14:00:18,513 - server - INFO - Loading users .....
+2024-02-15 14:00:18,513 - server - DEBUG - Initialization complete.
+2024-02-15 14:00:18,513 - server - INFO - Server started. Listening on localhost:33288
+2024-02-15 14:00:18,516 - server - DEBUG - Console ready...
+2024-02-15 14:00:23,320 - server - INFO - No maps found.
+2024-02-15 14:03:06,100 - server - INFO - No maps found.
+2024-02-15 14:03:07,178 - server - INFO - No longer accepting user input
+2024-02-15 14:03:07,178 - server - INFO - No longer accepting incoming connections
+2024-02-15 14:03:07,178 - server - INFO - Shutting down the server...
+2024-02-15 14:03:07,178 - server - INFO - Server successfully shut down
+2024-02-15 14:03:08,395 - server - INFO - My FPS Game Server version X.Y
+2024-02-15 14:03:08,395 - server - INFO - Developed and maintained by Developer Name. https://Mywebsite.com/
+2024-02-15 14:03:08,396 - server - INFO - All suggestions and comments are welcome
+2024-02-15 14:03:08,396 - server - INFO - Loading maps .....
+2024-02-15 14:03:08,397 - server - INFO - Loading users .....
+2024-02-15 14:03:08,398 - server - DEBUG - Initialization complete.
+2024-02-15 14:03:08,398 - server - INFO - Server started. Listening on localhost:33288
+2024-02-15 14:03:08,398 - server - DEBUG - Console ready...
+2024-02-15 14:03:11,779 - server - INFO - No maps found.
+2024-02-15 14:03:17,059 - server - INFO - No longer accepting user input
+2024-02-15 14:03:17,059 - server - INFO - No longer accepting incoming connections
+2024-02-15 14:03:17,059 - server - INFO - Shutting down the server...
+2024-02-15 14:03:17,060 - server - INFO - Server successfully shut down
+2024-02-15 14:07:25,162 - server - INFO - My FPS Game Server version X.Y
+2024-02-15 14:07:25,163 - server - INFO - Developed and maintained by Developer Name. https://Mywebsite.com/
+2024-02-15 14:07:25,163 - server - INFO - All suggestions and comments are welcome
+2024-02-15 14:07:25,163 - server - INFO - Loading maps .....
+2024-02-15 14:07:25,164 - server - INFO - An unexpected error occurred: name 'map_data' is not defined
+2024-02-15 14:07:25,164 - server - INFO - Shutting down the server...
+2024-02-15 14:07:25,165 - server - INFO - Server successfully shut down
+2024-02-15 14:08:15,208 - server - INFO - My FPS Game Server version X.Y
+2024-02-15 14:08:15,208 - server - INFO - Developed and maintained by Developer Name. https://Mywebsite.com/
+2024-02-15 14:08:15,208 - server - INFO - All suggestions and comments are welcome
+2024-02-15 14:08:15,209 - server - INFO - Loading maps .....
+2024-02-15 14:08:15,210 - server - INFO - An unexpected error occurred: name 'map_data' is not defined
+2024-02-15 14:08:15,210 - server - INFO - Shutting down the server...
+2024-02-15 14:08:15,210 - server - INFO - Server successfully shut down
+2024-02-15 14:09:16,572 - server - INFO - My FPS Game Server version X.Y
+2024-02-15 14:09:16,572 - server - INFO - Developed and maintained by Developer Name. https://Mywebsite.com/
+2024-02-15 14:09:16,572 - server - INFO - All suggestions and comments are welcome
+2024-02-15 14:09:16,573 - server - INFO - Loading maps .....
+2024-02-15 14:09:16,574 - server - INFO - An unexpected error occurred: name 'map_data' is not defined
+2024-02-15 14:09:16,574 - server - INFO - Shutting down the server...
+2024-02-15 14:09:16,575 - server - INFO - Server successfully shut down
+2024-02-15 14:09:46,622 - server - INFO - My FPS Game Server version X.Y
+2024-02-15 14:09:46,623 - server - INFO - Developed and maintained by Developer Name. https://Mywebsite.com/
+2024-02-15 14:09:46,623 - server - INFO - All suggestions and comments are welcome
+2024-02-15 14:09:46,623 - server - INFO - Loading maps .....
+2024-02-15 14:09:46,625 - server - INFO - An unexpected error occurred: 'dict' object has no attribute 'to_dict'
+2024-02-15 14:09:46,626 - server - INFO - Shutting down the server...
+2024-02-15 14:09:46,626 - server - INFO - Server successfully shut down
+2024-02-15 14:10:49,889 - server - INFO - My FPS Game Server version X.Y
+2024-02-15 14:10:49,890 - server - INFO - Developed and maintained by Developer Name. https://Mywebsite.com/
+2024-02-15 14:10:49,890 - server - INFO - All suggestions and comments are welcome
+2024-02-15 14:10:49,890 - server - INFO - Loading maps .....
+2024-02-15 14:10:49,892 - server - INFO - Loading users .....
+2024-02-15 14:10:49,892 - server - DEBUG - Initialization complete.
+2024-02-15 14:10:49,893 - server - INFO - Server started. Listening on localhost:33288
+2024-02-15 14:10:49,893 - server - DEBUG - Console ready...
+2024-02-15 14:11:03,080 - server - INFO - ('Main', {'Main': {'map_name': 'Main', 'map_size': [10, 10, 10], 'players': [], 'tiles': {}, 'zones': {}, 'items': {}, 'ai': []}})
+2024-02-15 14:11:12,032 - server - INFO - No user accounts found.
+2024-02-15 14:11:16,661 - server - INFO - No longer accepting user input
+2024-02-15 14:11:16,662 - server - INFO - No longer accepting incoming connections
+2024-02-15 14:11:16,662 - server - INFO - Shutting down the server...
+2024-02-15 14:11:16,662 - server - INFO - Server successfully shut down
+2024-02-15 14:13:48,312 - server - INFO - My FPS Game Server version X.Y
+2024-02-15 14:13:48,313 - server - INFO - Developed and maintained by Developer Name. https://Mywebsite.com/
+2024-02-15 14:13:48,313 - server - INFO - All suggestions and comments are welcome
+2024-02-15 14:13:48,313 - server - INFO - Loading maps .....
+2024-02-15 14:13:48,314 - server - INFO - Loading users .....
+2024-02-15 14:13:48,315 - server - INFO - An unexpected error occurred: name 'users_data' is not defined
+2024-02-15 14:13:48,315 - server - INFO - Shutting down the server...
+2024-02-15 14:13:48,315 - server - INFO - Server successfully shut down
+2024-02-15 14:14:18,959 - server - INFO - My FPS Game Server version X.Y
+2024-02-15 14:14:18,959 - server - INFO - Developed and maintained by Developer Name. https://Mywebsite.com/
+2024-02-15 14:14:18,960 - server - INFO - All suggestions and comments are welcome
+2024-02-15 14:14:18,960 - server - INFO - Loading maps .....
+2024-02-15 14:14:18,961 - server - INFO - Loading users .....
+2024-02-15 14:14:18,962 - server - DEBUG - Initialization complete.
+2024-02-15 14:14:18,962 - server - INFO - Server started. Listening on localhost:33288
+2024-02-15 14:14:18,962 - server - DEBUG - Console ready...
+2024-02-15 14:14:23,731 - server - INFO - admin
+2024-02-15 14:14:29,100 - server - INFO - ('Main', {'Main': {'map_name': 'Main', 'map_size': [10, 10, 10], 'players': [], 'tiles': {}, 'zones': {}, 'items': {}, 'ai': []}})
+2024-02-15 14:14:45,085 - server - INFO - No longer accepting user input
+2024-02-15 14:14:45,086 - server - INFO - No longer accepting incoming connections
+2024-02-15 14:14:45,086 - server - INFO - Shutting down the server...
+2024-02-15 14:14:45,088 - server - INFO - Server successfully shut down
+2024-02-15 14:15:16,839 - server - INFO - My FPS Game Server version X.Y
+2024-02-15 14:15:16,839 - server - INFO - Developed and maintained by Developer Name. https://Mywebsite.com/
+2024-02-15 14:15:16,840 - server - INFO - All suggestions and comments are welcome
+2024-02-15 14:15:16,840 - server - INFO - Loading maps .....
+2024-02-15 14:15:16,841 - server - INFO - Loading users .....
+2024-02-15 14:15:17,029 - server - DEBUG - Initialization complete.
+2024-02-15 14:15:17,030 - server - INFO - Server started. Listening on localhost:33288
+2024-02-15 14:15:17,030 - server - DEBUG - Console ready...
+2024-02-15 14:15:48,232 - server - INFO - admin
+2024-02-15 14:15:52,437 - server - INFO - ('Main', {'map_name': 'Main', 'map_size': (10, 10, 10), 'players': [], 'tiles': {}, 'zones': {}, 'items': {}, 'ai': []})
+2024-02-15 14:15:56,537 - server - INFO - No longer accepting user input
+2024-02-15 14:15:56,537 - server - INFO - No longer accepting incoming connections
+2024-02-15 14:15:56,539 - server - INFO - Shutting down the server...
+2024-02-15 14:15:56,539 - server - INFO - Server successfully shut down
+2024-02-15 14:15:58,961 - server - INFO - My FPS Game Server version X.Y
+2024-02-15 14:15:58,961 - server - INFO - Developed and maintained by Developer Name. https://Mywebsite.com/
+2024-02-15 14:15:58,961 - server - INFO - All suggestions and comments are welcome
+2024-02-15 14:15:58,961 - server - INFO - Loading maps .....
+2024-02-15 14:15:58,962 - server - INFO - Loading users .....
+2024-02-15 14:15:59,154 - server - DEBUG - Initialization complete.
+2024-02-15 14:15:59,154 - server - INFO - Server started. Listening on localhost:33288
+2024-02-15 14:15:59,155 - server - DEBUG - Console ready...
+2024-02-15 14:16:01,369 - server - INFO - admin
+2024-02-15 14:16:05,794 - server - INFO - Invalid command
+2024-02-15 14:16:10,907 - server - INFO - ('Main', {'map_name': 'Main', 'map_size': (10, 10, 10), 'players': [], 'tiles': {}, 'zones': {}, 'items': {}, 'ai': []})
+2024-02-15 14:16:39,351 - server - INFO - No longer accepting user input
+2024-02-15 14:16:39,352 - server - INFO - No longer accepting incoming connections
+2024-02-15 14:16:39,353 - server - INFO - Shutting down the server...
+2024-02-15 14:16:39,353 - server - INFO - Server successfully shut down
+2024-02-15 14:16:41,342 - server - INFO - My FPS Game Server version X.Y
+2024-02-15 14:16:41,342 - server - INFO - Developed and maintained by Developer Name. https://Mywebsite.com/
+2024-02-15 14:16:41,342 - server - INFO - All suggestions and comments are welcome
+2024-02-15 14:16:41,342 - server - INFO - Loading maps .....
+2024-02-15 14:16:41,347 - server - INFO - Loading users .....
+2024-02-15 14:16:41,350 - server - DEBUG - Initialization complete.
+2024-02-15 14:16:41,351 - server - INFO - Server started. Listening on localhost:33288
+2024-02-15 14:16:41,351 - server - DEBUG - Console ready...
+2024-02-15 14:16:47,062 - server - INFO - ('Main', {'Main': {'map_name': 'Main', 'map_size': [10, 10, 10], 'players': [], 'tiles': {}, 'zones': {}, 'items': {}, 'ai': []}})
+2024-02-15 14:16:51,887 - server - INFO - admin
+2024-02-15 14:23:15,263 - server - INFO - admin
+2024-02-15 14:23:17,126 - server - INFO - No longer accepting user input
+2024-02-15 14:23:17,127 - server - INFO - No longer accepting incoming connections
+2024-02-15 14:23:17,127 - server - INFO - Shutting down the server...
+2024-02-15 14:23:17,128 - server - INFO - Server successfully shut down
+2024-02-15 14:23:18,603 - server - INFO - My FPS Game Server version X.Y
+2024-02-15 14:23:18,603 - server - INFO - Developed and maintained by Developer Name. https://Mywebsite.com/
+2024-02-15 14:23:18,603 - server - INFO - All suggestions and comments are welcome
+2024-02-15 14:23:18,603 - server - INFO - Loading maps .....
+2024-02-15 14:23:18,604 - server - INFO - Loading users .....
+2024-02-15 14:23:18,606 - server - DEBUG - Initialization complete.
+2024-02-15 14:23:18,606 - server - INFO - Server started. Listening on localhost:33288
+2024-02-15 14:23:18,606 - server - DEBUG - Console ready...
+2024-02-15 14:24:19,479 - server - INFO - No longer accepting user input
+2024-02-15 14:24:19,480 - server - INFO - No longer accepting incoming connections
+2024-02-15 14:24:19,480 - server - INFO - Shutting down the server...
+2024-02-15 14:24:19,481 - server - INFO - Server successfully shut down
+2024-02-15 14:24:33,784 - server - INFO - My FPS Game Server version X.Y
+2024-02-15 14:24:33,785 - server - INFO - Developed and maintained by Developer Name. https://Mywebsite.com/
+2024-02-15 14:24:33,785 - server - INFO - All suggestions and comments are welcome
+2024-02-15 14:24:33,785 - server - INFO - Loading maps .....
+2024-02-15 14:24:33,787 - server - INFO - Loading users .....
+2024-02-15 14:24:33,787 - server - DEBUG - Initialization complete.
+2024-02-15 14:24:33,787 - server - INFO - Server started. Listening on localhost:33288
+2024-02-15 14:24:33,787 - server - DEBUG - Console ready...
+2024-02-15 14:27:55,625 - server - INFO - No longer accepting user input
+2024-02-15 14:27:55,627 - server - INFO - No longer accepting incoming connections
+2024-02-15 14:27:55,627 - server - INFO - Shutting down the server...
+2024-02-15 14:27:55,629 - server - INFO - Server successfully shut down
+2024-02-15 14:28:23,265 - server - INFO - My FPS Game Server version X.Y
+2024-02-15 14:28:23,265 - server - INFO - Developed and maintained by Developer Name. https://Mywebsite.com/
+2024-02-15 14:28:23,265 - server - INFO - All suggestions and comments are welcome
+2024-02-15 14:28:23,265 - server - INFO - Loading maps .....
+2024-02-15 14:28:23,268 - server - INFO - Loading users .....
+2024-02-15 14:28:23,269 - server - DEBUG - Initialization complete.
+2024-02-15 14:28:23,269 - server - INFO - Server started. Listening on localhost:33288
+2024-02-15 14:28:23,269 - server - DEBUG - Console ready...
+2024-02-15 14:29:45,490 - server - INFO - No longer accepting user input
+2024-02-15 14:29:45,491 - server - INFO - No longer accepting incoming connections
+2024-02-15 14:29:45,491 - server - INFO - Shutting down the server...
+2024-02-15 14:29:45,492 - server - INFO - Server successfully shut down

@@ -17,7 +17,7 @@ class UserRegistry:
     @classmethod
     async def create_user(cls, username, password):
         # Check if username already exists in the registry
-        if username in UserRegistry._users:
+        if username in cls._users:
             raise ValueError("Username already exists")
 
         # Create a new player instance using cls to support subclassing
@@ -29,9 +29,10 @@ class UserRegistry:
         await user.set_position((0, 0, 0))
         await user.set_pitch(90)
         await user.set_yaw(0)
-        # Set other properties as needed
+    
         # Add the user to the registry
-        UserRegistry._users[username] = user.to_dict()
+        cls._users[username] = user.to_dict()
+        cls._instances[username] = user  # Add this line to add the instance
 
     @classmethod
     async def load_users(cls):
@@ -39,6 +40,7 @@ class UserRegistry:
         if user_data:
             for name, user_dict in user_data.items():
                 cls._instances[name] = User.from_dict(user_dict, cls._event_dispatcher)
+                cls._users[name] = user_data
         else:
             print("No user data found or failed to load. Creating the default admin user.")
             await UserRegistry.create_user("admin", "admin")
@@ -58,6 +60,10 @@ class UserRegistry:
             cls._users[username] = cls._instances[username].to_dict()
             cls.save_users()
             del cls._instances[username]
+
+    @classmethod
+    def get_all_users(self):
+        return self._users
 
 class User:
     def __init__(self, event_dispatcher):
