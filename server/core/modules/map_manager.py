@@ -54,7 +54,7 @@ class MapRegistry:
 
     @classmethod
     def save_maps(cls):
-        cls._data.export("maps")
+        cls._data.export(cls._client_data, "maps")
         print("Maps saved successfully")
 
     @classmethod
@@ -198,7 +198,7 @@ class Map:
         map_instance.zones = data['zones']
         map_instance.items = data['items']
         # Handle AI objects separately if they have a specific structure
-        map_instance.ai = {key: AI.from_dict(ai_data) for key, ai_data in data['ai'].items()}
+#        map_instance.ai = {key: AI.from_dict(ai_data) for key, ai_data in data['ai'].items()}
         return map_instance
 
     def to_dict(self):

@@ -3,9 +3,11 @@ import asyncio
 
 class ServerConsole:
 
-    def __init__(self, user_dict, maps, custom_logger):
-        self.users = user_dict
-        self.maps = maps
+    def __init__(self, user_reg, map_reg, custom_logger):
+        self.user_reg = user_reg
+        self.users = self.user_reg._instances
+        self.map_reg = map_reg
+        self.maps = self.map_reg._instances
         self.logger = custom_logger
 
     async def user_input(self):
@@ -25,8 +27,8 @@ class ServerConsole:
                     self.logger.info("No online users found.")
             elif command == "list maps":
                 if self.maps:
-                    for mapname in self.maps.keys():
-                        self.logger.info(mapname)
+                    for mapname, mapobj in self.maps.items():
+                        self.logger.info(mapname)  # Assuming mapname is still the key
                 else:
                     self.logger.info("No maps found.")
             elif command == "list users":
@@ -35,6 +37,10 @@ class ServerConsole:
                         self.logger.info(username)
                 else:
                     self.logger.info("No user accounts found.")
+            elif command == "backup maps":
+                self.map_reg.save_maps()
+            elif command == "backup users":
+                self.user_reg.save_users()
             else:
                 self.logger.info("Invalid command")
 

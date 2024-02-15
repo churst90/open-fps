@@ -51,7 +51,7 @@ class Server:
         self.logger = CustomLogger('server', debug_mode=True)
         self.event_dispatcher = EventDispatcher.get_instance()
         self.server_handler = ServerHandler(self.user_reg, self.map_reg, self.network, self.event_dispatcher, self.logger)
-        self.console = ServerConsole(self.user_reg._users, self.map_reg._client_data, self.logger)
+        self.console = ServerConsole(self.user_reg, self.map_reg, self.logger)
 
     def ensure_ssl_certificate(self, cert_file='cert.pem', key_file='key.pem'):
         if not os.path.exists(cert_file) or not os.path.exists(key_file):

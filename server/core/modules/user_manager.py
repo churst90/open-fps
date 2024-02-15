@@ -38,15 +38,15 @@ class UserRegistry:
         user_data = cls._data.load("users")
         if user_data:
             for name, user_dict in user_data.items():
-                cls._instances[name] = User.from_dict(user_dict)
+                cls._instances[name] = User.from_dict(user_dict, cls._event_dispatcher)
         else:
             print("No user data found or failed to load. Creating the default admin user.")
             await UserRegistry.create_user("admin", "admin")
 
     @classmethod
-    def save_users(cls, filepath='players.json'):
-        with open(filepath, 'w') as file:
-            json.dump(cls._users, file, indent=4)
+    def save_users(cls):
+        cls._data.export(cls._users, "users")
+        print("Users saved successfully")
 
     @classmethod
     def register_user(cls, username, player_obj):
@@ -137,8 +137,10 @@ class User:
         }
 
     @classmethod
-    def from_dict(cls, data):
-        user_instance = cls(data['username'], data['password'])
+    def from_dict(cls, data, event_dispatcher):
+        user_instance = cls(event_dispatcher)
+        user_instance.username = data['username']
+        user_instance.password = data['username']
         user_instance.health = data['health']
         user_instance.energy = data['energy']
         user_instance.inventory = data['inventory']
