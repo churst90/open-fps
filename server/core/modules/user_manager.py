@@ -7,6 +7,7 @@ import asyncio
 # project specific imports
 from core.events.event_dispatcher import EventDispatcher
 from core.data import Data
+from .position import Position
 
 class UserRegistry:
     _users = {}  # Persistent dictionary of player data
@@ -22,13 +23,13 @@ class UserRegistry:
 
         # Create a new player instance using cls to support subclassing
         user = User(cls._event_dispatcher)
-        user.set_username(username)
-        await user.set_password(password)
-        await user.set_health(10000)
-        await user.set_energy(10000)
-        await user.set_position((0, 0, 0))
-        await user.set_pitch(90)
-        await user.set_yaw(0)
+        user.update_username(username)
+        await user.update_password(password)
+        await user.update_health(10000)
+        await user.update_energy(10000)
+        await user.update_position((0, 0, 0))
+        await user.update_pitch(90)
+        await user.update_yaw(0)
     
         # Add the user to the registry
         cls._users[username] = user.to_dict()
@@ -36,6 +37,7 @@ class UserRegistry:
 
     @classmethod
     async def load_users(cls):
+        data = await cls._data.async_init()
         user_data = cls._data.load("users")
         if user_data:
             for name, user_dict in user_data.items():
@@ -70,7 +72,7 @@ class User:
         self.username = ""
         self.password = ""
         self.logged_in = True
-        self.position = ()
+        self.position = Position()
         self.yaw = 0
         self.pitch = 0
         self.health = 0
@@ -78,54 +80,39 @@ class User:
         self.inventory = {}
         self.event_dispatcher = event_dispatcher
 
-    def move(self, direction, distance=1):
-        x, y, z = self._position  # Corrected to unpack the current position
-        dx, dy = 0, 0
-        if direction == "forward":
-            dx, dy = math.sin(math.radians(self.yaw)), math.cos(math.radians(self.yaw))
-        elif direction == "backward":
-            dx, dy = -math.sin(math.radians(self.yaw)), -math.cos(math.radians(self.yaw))
-        elif direction == "right":
-            dx, dy = math.cos(math.radians(self.yaw)), -math.sin(math.radians(self.yaw))
-        elif direction == "left":
-            dx, dy = -math.cos(math.radians(self.yaw)), math.sin(math.radians(self.yaw))
+    async def move(self, direction, distance=1):
+        # Calculate new position based on direction and distance
+        # Emit 'user_moved' event with new position data
+        pass
+#    async def turn(self, yaw_delta=0, pitch_delta=0):
+        # Update yaw and pitch based on deltas
+#        self.event_dispatcher.dispatch({"message_type":"position_update","position":})
 
-        new_position = (x + dx * distance, y + dy * distance, z)
-        self.set_position(new_position)
+    # Add methods for health and energy updates
 
-    def turn(self, yaw_delta=0, pitch_delta=0):
-        new_yaw = self.yaw + yaw_delta
-        self.set_yaw(new_yaw)
+    async def update_position(self, position):
+        pass
 
-        new_pitch = self.pitch + pitch_delta
-        self.set_pitch(new_pitch)
+    async def update_health(self, change):
+        # Update health and emit event
+        pass
 
-    # setter methods since you can't use asyncio on decorator setters
+    async def update_energy(self, change):
+        # Update energy and emit event
+        pass
 
-    async def set_position(self, position):
-        self.position = position
-        await self.event_dispatcher.dispatch("PlayerPositionChanged", {"username": self.username, "position": self.position})
-
-    async def set_health(self, health):
-        self._health = max(0, health)  # Assuming _health is the correct attribute
-        await self.event_dispatcher.dispatch("PlayerHealthChanged", {"username": self.username, "health": self.health})
-
-    async def set_energy(self, energy):
-        self.energy = energy
-        await self.event_dispatcher.dispatch("PlayerEnergyChanged", {"username": self.username, "energy": self.energy})
-
-    async def set_pitch(self, pitch):
+    async def update_pitch(self, pitch):
         self.pitch = pitch
         await self.event_dispatcher.dispatch("PlayerPitchChanged", {"username": self.username, "pitch": self.pitch})
 
-    async def set_yaw(self, yaw):
+    async def update_yaw(self, yaw):
         self.yaw = yaw
         await self.event_dispatcher.dispatch("PlayerYawChanged", {"username": self.username, "yaw": self.yaw})
 
-    def set_username(self, username):
+    def update_username(self, username):
         self.username = username
 
-    async def set_password(self, password):
+    async def update_password(self, password):
         hashed_password = await asyncio.to_thread(bcrypt.hashpw, password.encode('utf-8'), bcrypt.gensalt())
         # Store the hashed password rather than the plain one
         self.password = hashed_password.decode('utf-8')

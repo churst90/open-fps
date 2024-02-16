@@ -5,8 +5,11 @@ from core.security.security_manager import SecurityManager as sm
 
 class Data:
     def __init__(self):
-        self.sm = sm("security.key")
-        self.sm.load_key()
+        self.f = None
+
+    async def async_init(self):
+        self.sm = sm.get_instance("security.key")
+        await self.sm.load_key()  # Ensure the key is loaded asynchronously
         self.f = self.sm.get_key()
 
     def export(self, data_dict, filename):

@@ -27,8 +27,8 @@ class ServerConsole:
                     self.logger.info("No online users found.")
             elif command == "list maps":
                 if self.maps:
-                    for mapname in self.maps.items():
-                        self.logger.info(mapname)  # Assuming mapname is still the key
+                    for mapname, mapobj in self.maps.items():
+                        self.logger.info(mapname)
                 else:
                     self.logger.info("No maps found.")
             elif command == "list users":

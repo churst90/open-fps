@@ -1,31 +1,18 @@
-# Standard library imports
+# server.py
 import argparse
 import subprocess
 import os
-
-# Third party library imports
 import asyncio
-
-# Project specific imports
 from core.custom_logger import CustomLogger
 from core.server_console import ServerConsole
 from core.network import Network
 from core.server_handler import ServerHandler
-from core.security.security_manager import SecurityManager as sm
+from core.security.security_manager import SecurityManager
 from core.events.event_dispatcher import EventDispatcher
 from core.modules.map_manager import MapRegistry
 from core.modules.user_manager import UserRegistry
 
-def generate_self_signed_cert(cert_file='cert.pem', key_file='key.pem'):
-    if not os.path.exists(cert_file) or not os.path.exists(key_file):
-        subprocess.run([
-            'openssl', 'req', '-x509', '-newkey', 'rsa:4096',
-            '-keyout', key_file, '-out', cert_file,
-            '-days', '365', '-nodes', '-subj', '/CN=localhost'
-        ], check=True)
-
 class Server:
-
     def __init__(self, host, port):
         self.version = "version X.Y"
         self.dev_name = "Developer Name"
@@ -33,149 +20,73 @@ class Server:
         self.website = "https://Mywebsite.com/"
         self.host = host
         self.port = port
-        # Ensure SSL certificate is ready
-        self.ensure_ssl_certificate()
-        self.sm = sm("security.key")
-#        self.sm.generate_key()
-#        self.sm.save_key()
-#        self.sm.load_key()
-#        self.key = self.sm.get_key()
-#        self.data = Data()
-        self.listen_task = None
-        self.user_input_task = None
-        self.shutdown_event = asyncio.Event()
-        self.message_queue = asyncio.Queue()
-        self.network = Network(host, port, self.message_queue, self.process_message)
+        self.logger = CustomLogger('server', debug_mode=True)
+        self.network = Network(host, port, asyncio.Queue(), self.process_message)
         self.user_reg = UserRegistry()
         self.map_reg = MapRegistry()
-        self.logger = CustomLogger('server', debug_mode=True)
         self.event_dispatcher = EventDispatcher.get_instance()
         self.server_handler = ServerHandler(self.user_reg, self.map_reg, self.network, self.event_dispatcher, self.logger)
         self.console = ServerConsole(self.user_reg, self.map_reg, self.logger)
+        self.listen_task = None
+        self.user_input_task = None
+        self.shutdown_event = asyncio.Event()
+        self.security_manager = SecurityManager.get_instance("security.key")
 
-    def ensure_ssl_certificate(self, cert_file='cert.pem', key_file='key.pem'):
+    async def ensure_ssl_certificate(self, cert_file='cert.pem', key_file='key.pem'):
         if not os.path.exists(cert_file) or not os.path.exists(key_file):
-            subprocess.run([
-                'openssl', 'req', '-x509', '-newkey', 'rsa:4096',
-                '-keyout', key_file, '-out', cert_file,
-                '-days', '365', '-nodes', '-subj', '/CN=localhost'
-            ], check=True)
+            subprocess.run(['openssl', 'req', '-x509', '-newkey', 'rsa:4096', '-keyout', key_file, '-out', cert_file, '-days', '365', '-nodes', '-subj', '/CN=localhost'], check=True)
 
     async def process_message(self, data, client_socket):
-        # Call the appropriate method from ServerHandler based on message type
         message_type = data.get('type')
-        if hasattr(self.server_handler.user, message_type):
-            server_handler_method = getattr(self.server_handler.user, message_type)
-            await server_handler_method(data, client_socket)
-        elif hasattr(self.server_handler, message_type):
-            server_handler_method = getattr(self.server_handler, message_type)
-            await server_handler_method(data, client_socket)
+        handler = getattr(self.server_handler, message_type, None)
+        if handler:
+            await handler(data, client_socket)
         else:
-            # Handle unknown message type or pass to a default handler
             self.logger.info(f"Unknown message type: {message_type}")
 
-    async def start(self):
-        try:
-            # Initialization tasks before starting the server
-            await self.initialize()
-            self.logger.debug("Initialization complete.")
-
-            # Start accepting connections
-            self.listen_task = asyncio.create_task(self.network.accept_connections())
-            self.logger.info(f"Server started. Listening on {self.host}:{self.port}")
-
-            # Start user input listener
-            self.user_input_task = asyncio.create_task(self.console.user_input())
-            self.logger.debug("Console ready...")
-
-            # Wait for the network listening task and user input task to complete
-            # If either task finishes, this will return.
-            done, pending = await asyncio.wait(
-                {self.listen_task, self.user_input_task},
-                return_when=asyncio.FIRST_COMPLETED
-            )
-
-            # If the network task is done, the server was stopped, possibly due to an error
-            if self.listen_task in done:
-                self.logger.info("Server stopped listening for connections.")
-                # Optionally handle the error if the task didn't finish cleanly
-                if self.listen_task.exception() is not None:
-                    error = self.listen_task.exception()
-                    self.logger.info(f"Server listening task stopped with an error: {error}")
-                    self.logger.info("Server encountered an error", exc_info=error)
-
-            # If the user input task is done, the admin might have issued a shutdown
-            if self.user_input_task in done:
-                self.logger.info("No longer accepting user input")
-                # If the server is still listening, shut it down
-                if not self.listen_task.done():
-                    self.listen_task.cancel()
-                    self.logger.info("No longer accepting incoming connections")
-
-            # Clean up any pending tasks
-            for task in pending:
-                task.cancel()
-
-        except Exception as e:
-#            print("An unexpected error occurred in the server's start method:", exc_info=e)
-            self.logger.info(f"An unexpected error occurred: {e}")
-
-        finally:
-            # Clean up and close down the server properly
-            await self.shutdown()
-            self.logger.info("Server successfully shut down")
+    async def setup_security(self):
+        self.logger.info("Setting up the security manager ...")
+        await self.security_manager.load_key()
+        self.security_manager.start_key_rotation(30)
 
     async def initialize(self):
         self.logger.info(f"{self.server_name} {self.version}")
         self.logger.info(f"Developed and maintained by {self.dev_name}. {self.website}")
         self.logger.info("All suggestions and comments are welcome")
-
-        self.logger.info("Loading maps .....")
+        await self.setup_security()
+        self.logger.info("Loading maps ...")
         await self.map_reg.load_maps()
-
-        self.logger.info("Loading users .....")
+        self.logger.info("Loading users ...")
         await self.user_reg.load_users()
+
+    async def start(self):
+        await self.ensure_ssl_certificate()
+        await self.initialize()
+        self.listen_task = asyncio.create_task(self.network.accept_connections())
+        self.user_input_task = asyncio.create_task(self.console.user_input())
+        await asyncio.wait([self.listen_task, self.user_input_task], return_when=asyncio.FIRST_COMPLETED)
 
     async def shutdown(self):
         self.logger.info("Shutting down the server...")
-
-        # Cancel the network task if it's running
-        if self.listen_task and not self.listen_task.done():
-            self.listen_task.cancel()
-            await asyncio.wait([self.listen_task])  # Wait for the task cancellation to complete
-
-        # Cancel the user input task if it's running
-        if self.user_input_task and not self.user_input_task.done():
-            self.user_input_task.cancel()
-            await asyncio.wait([self.user_input_task])  # Wait for the task cancellation to complete
-
-        # Close the network
+        tasks = [self.listen_task, self.user_input_task]
+        for task in tasks:
+            if task and not task.done():
+                task.cancel()
+                await task
+        await self.security_manager.stop_key_rotation()
         await self.network.close()
         self.shutdown_event.set()
-
-    async def exit(self):
-        self.logger.info("Disconnecting all players...")
-        if isinstance(self.online_players, dict):
-            for data in self.online_players.values():
-                data[1].close()
-        self.logger.debug("Removing all players from the players list...")
-        self.online_players.clear()
-        await self.shutdown()
 
 async def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--host", type=str, default="localhost")
     parser.add_argument("--port", type=int, default=33288)
     args = parser.parse_args()
-
-    server_instance = Server(args.host, args.port)
-    
-    loop = asyncio.get_event_loop()
-
+    server = Server(args.host, args.port)
     try:
-        await server_instance.start()
+        await server.start()
     except KeyboardInterrupt:
-        await server_instance.exit()
+        await server.shutdown()
 
 if __name__ == '__main__':
     asyncio.run(main())

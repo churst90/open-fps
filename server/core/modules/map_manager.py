@@ -59,6 +59,7 @@ class MapRegistry:
 
     @classmethod
     async def load_maps(cls):
+        data = await cls._data.async_init()
         maps_data = cls._data.load("maps")
         if maps_data:
             for name, map_dict in maps_data.items():

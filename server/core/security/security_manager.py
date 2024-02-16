@@ -1,48 +1,81 @@
-# standard imports
-import threading
+import asyncio
+import os
 import time
 from cryptography.fernet import Fernet
+from datetime import datetime, timedelta
 
 class SecurityManager:
-    def __init__(self, key_file):
-        self.key_file = key_file
-        self.key = None
-        self.key_rotation_thread = None
+    _instance = None
 
-    def generate_key(self):
-        # Generate a new key
+    def __new__(cls, key_file=None):
+        if cls._instance is None:
+            cls._instance = super(SecurityManager, cls).__new__(cls)
+            cls._instance.key_file = key_file
+            cls._instance.key = None
+            cls._instance.last_rotation = None
+            cls._instance.rotation_task = None  # Initialize the rotation task reference
+        return cls._instance
+
+    @staticmethod
+    def get_instance(key_file=None):
+        if SecurityManager._instance is None:
+            SecurityManager(key_file)
+        return SecurityManager._instance
+
+    async def generate_key(self):
         self.key = Fernet.generate_key()
 
-    def save_key(self):
-        # Save the key to a file on disk
+    async def save_key(self):
         with open(self.key_file, "wb") as f:
             f.write(self.key)
 
-    def load_key(self):
-        with open(self.key_file, "rb") as f:
-            self.key = f.read()
+    async def load_key(self):
+        if os.path.exists(self.key_file):
+            with open(self.key_file, "rb") as f:
+                self.key = f.read()
+            self.last_rotation = datetime.fromtimestamp(os.path.getmtime(self.key_file))
+        else:
+            await self.generate_key()
+            await self.save_key()
+            self.last_rotation = datetime.now()
 
-    def rotate_key(self, interval):
-        # Rotate the key every `interval` days
+    async def rotate_key(self, interval):
         while True:
-            # Generate a new key
-            self.generate_key()
-
-            # Save the key to a file on disk
-            self.save_key()
-
-            # Wait for the specified interval before rotating the key again
-            time.sleep(interval * 24 * 60 * 60)
+            now = datetime.now()
+            if self.last_rotation is None or now - self.last_rotation >= timedelta(days=interval):
+                await self.generate_key()
+                await self.save_key()
+                self.last_rotation = now
+            await asyncio.sleep(24 * 60 * 60)  # Check once a day
 
     def start_key_rotation(self, interval):
-        # Start the key rotation thread
-        self.key_rotation_thread = threading.Thread(target=self.rotate_key, args=(interval,))
-        self.key_rotation_thread.start()
+        self.rotation_task = asyncio.create_task(self.rotate_key(interval))
 
-    def stopKeyRotation(self):
-        # Stop the key rotation thread
-        if self.key_rotation_thread is not None:
-            self.key_rotation_thread.join()
+    async def stop_key_rotation(self):
+        if self.rotation_task and not self.rotation_task.done():
+            self.rotation_task.cancel()
+            try:
+                # Wait for the task cancellation to complete, if necessary
+                await self.rotation_task
+            except asyncio.CancelledError:
+                # Handle the cancellation error
+                print("Key rotation task cancelled.")
+            finally:
+                self.rotation_task = None  # Reset the task reference
 
     def get_key(self):
         return Fernet(self.key)
+
+# Example of using the SecurityManager in an async environment
+async def main():
+    key_file = 'path/to/key.file'
+
+    # Example usage of the key for encryption/decryption
+    fernet = manager.get_key()
+    encrypted_data = fernet.encrypt(b"Secret data")
+    decrypted_data = fernet.decrypt(encrypted_data)
+    print(decrypted_data)
+
+# Run the main function in an asyncio event loop
+if __name__ == '__main__':
+    asyncio.run(main())
