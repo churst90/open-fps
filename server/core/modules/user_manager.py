@@ -7,13 +7,42 @@ import asyncio
 # project specific imports
 from core.events.event_dispatcher import EventDispatcher
 from core.data import Data
-from .position import Position
 
 class UserRegistry:
     _users = {}  # Persistent dictionary of player data
     _instances = {}  # Runtime instances of logged-in players
     _event_dispatcher = EventDispatcher.get_instance()
     _data = Data()
+
+    @classmethod
+    async def login(cls, username, password):
+        # first insure the password is hashed if necessary
+        if username in _users.keys():
+            if password == username[password]:
+                UserRegistry.register_user(username)
+                # dispatch an event to let other players and maps know the user is online
+                return cls._users[username]
+            else:
+                pass
+                # dispatch an event message indicating an incorrect password
+        else:
+            pass
+            # dispatch a message stating the username doesn't exist
+
+    @classmethod
+    async def logout(cls, username):
+        # Check if the user is actually online before proceeding
+        if _user[username][logged_in] == True:
+            self.user_reg.deregister_user(username)
+            # dispatch an event the user went offline
+
+    @classmethod
+    def get_user_instance(cls, username):
+        # Check if the username exists in the _instances dictionary
+        if username in cls._instances:
+            return cls._instances[username]
+        else:
+            return None
 
     @classmethod
     async def create_user(cls, username, password):
@@ -28,24 +57,25 @@ class UserRegistry:
         await user.update_health(10000)
         await user.update_energy(10000)
         await user.update_position((0, 0, 0))
-        await user.update_pitch(90)
+        await user.update_pitch(0)
         await user.update_yaw(0)
-    
+
         # Add the user to the registry
         cls._users[username] = user.to_dict()
-        cls._instances[username] = user  # Add this line to add the instance
 
     @classmethod
     async def load_users(cls):
         data = await cls._data.async_init()
+        print("Attempting to load users.dat from disk ...")
         user_data = cls._data.load("users")
         if user_data:
-            for name, user_dict in user_data.items():
-                cls._instances[name] = User.from_dict(user_dict, cls._event_dispatcher)
-                cls._users[name] = user_data
+            print("users.dat loaded successfully")
+            # Directly load user data into _users without instantiating User objects
+            cls._users = user_data
         else:
-            print("No user data found or failed to load. Creating the default admin user.")
+            print("Creating the default admin user.")
             await UserRegistry.create_user("admin", "admin")
+            print("Default admin user created successfully")
 
     @classmethod
     def save_users(cls):
@@ -54,14 +84,24 @@ class UserRegistry:
 
     @classmethod
     def register_user(cls, username, player_obj):
-        cls._instances[username] = player_obj
+        if username in cls._users:
+            player_obj.update_login_status(True)
+            cls._instances[username] = player_obj
+            # Immediately reflect this change in _users dictionary
+            cls._users[username]['logged_in'] = True
+        else:
+            print(f"Error: {username} not found for registration.")
 
     @classmethod
     def deregister_user(cls, username):
         if username in cls._instances:
+            # Update the login status to False
+            cls._instances[username].update_login_status(False)
+            # Save the updated user data
             cls._users[username] = cls._instances[username].to_dict()
             cls.save_users()
-            del cls._instances[username]
+        else:
+            print(f"Error: {username} not found in instances for deregistration.")
 
     @classmethod
     def get_all_users(self):
@@ -71,8 +111,8 @@ class User:
     def __init__(self, event_dispatcher):
         self.username = ""
         self.password = ""
-        self.logged_in = True
-        self.position = Position()
+        self.logged_in = False
+        self.position = ()
         self.yaw = 0
         self.pitch = 0
         self.health = 0
@@ -81,25 +121,45 @@ class User:
         self.event_dispatcher = event_dispatcher
 
     async def move(self, direction, distance=1):
-        # Calculate new position based on direction and distance
-        # Emit 'user_moved' event with new position data
-        pass
+        if direction == "forward":
+            self.position.move_forward(distance)
+            await self.event_dispatcher.dispatch({"message_type": "update_position", "position": self.position})  
+        elif direction == "backward":
+            self.position.move_backward(distance)
+            await self.event_dispatcher.dispatch({"message_type": "update_position", "position": self.position})  
+        elif direction == "left":
+            self.position.move_left(distance)
+            await self.event_dispatcher.dispatch({"message_type": "update_position", "position": self.position})  
+        elif direction == "right":
+            self.position.move_right(distance)
+            await self.event_dispatcher.dispatch({"message_type": "update_position", "position": self.position})  
+        elif direction == "up":
+            self.position.move_up(distance)
+            await self.event_dispatcher.dispatch({"message_type": "update_position", "position": self.position})  
+        elif direction == "down":
+            self.position.move_down(distance)
+            await self.event_dispatcher.dispatch({"message_type": "update_position", "position": self.position})  
+
+        # compose the event message
+        new_position_data = {"type": "position_update", "username": self.username, "new_position": self.position.to_dict()}
+
 #    async def turn(self, yaw_delta=0, pitch_delta=0):
         # Update yaw and pitch based on deltas
 #        self.event_dispatcher.dispatch({"message_type":"position_update","position":})
 
     # Add methods for health and energy updates
 
+    def update_login_status(self, status):
+        self.logged_in = status
+
     async def update_position(self, position):
-        pass
+        self.position = position
 
-    async def update_health(self, change):
-        # Update health and emit event
-        pass
+    async def update_health(self, health):
+        self.health = health
 
-    async def update_energy(self, change):
-        # Update energy and emit event
-        pass
+    async def update_energy(self, energy):
+        self.energy = energy
 
     async def update_pitch(self, pitch):
         self.pitch = pitch
@@ -133,10 +193,14 @@ class User:
     def from_dict(cls, data, event_dispatcher):
         user_instance = cls(event_dispatcher)
         user_instance.username = data['username']
-        user_instance.password = data['username']
+        user_instance.password = data['password']
         user_instance.health = data['health']
         user_instance.energy = data['energy']
         user_instance.inventory = data['inventory']
         user_instance.yaw = data['yaw']
         user_instance.pitch = data['pitch']
         return user_instance
+
+    def synchronize_with_registry(self):
+        # Assuming UserRegistry is accessible and cls._users can be updated
+        UserRegistry.update_user_data(self.username, self.to_dict())

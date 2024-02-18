@@ -4,8 +4,10 @@ import json
 import asyncio
 
 # Project specific imports
-from .ai import AI
-from .items import Item
+from .ai_manager import AI
+from .item import Item
+from .tile import Tile
+from .zone import Zone
 from core.events.event_dispatcher import EventDispatcher
 from core.data import Data
 
@@ -26,15 +28,13 @@ class MapRegistry:
             print("Map already exists")
             raise ValueError(f"A map with the name '{name}' already exists.")
         # Create a new Map instance using the provided event dispatcher
-        print("Creating map...")
         new_map = Map(cls._event_dispatcher)
         new_map.set_map_name(name)
         new_map.set_map_size(size)
-        print(f"{new_map.map_name} created successfully with dimensions of {new_map.map_size}")
-        # Register the new map instance and its dictionary representation
+        print(f"Default {new_map.map_name} map created successfully with dimensions {new_map.map_size}")
+        # Create the new map instance and its dictionary representation
         cls._instances[name] = new_map
         cls._client_data[name] = new_map.to_dict()
-        print("Map registered successfully.")
         return cls._client_data[name]
 
     @classmethod
@@ -53,6 +53,10 @@ class MapRegistry:
         return cls._client_data
 
     @classmethod
+    def get_map_instance(cls, name):
+        return cls._instances.get(name, None)
+
+    @classmethod
     def save_maps(cls):
         cls._data.export(cls._client_data, "maps")
         print("Maps saved successfully")
@@ -60,13 +64,15 @@ class MapRegistry:
     @classmethod
     async def load_maps(cls):
         data = await cls._data.async_init()
+        print("Attempting to load maps.dat from disk ...")
         maps_data = cls._data.load("maps")
         if maps_data:
+            print("maps.dat loaded successfully")
             for name, map_dict in maps_data.items():
                 cls._instances[name] = Map.from_dict(map_dict)
                 cls._client_data[name] = maps_data
         else:
-            print("No maps data found or failed to load. Creating the default map.")
+            print("Creating the default map.")
             await MapRegistry.create_map("Main", (10, 10, 10))
 
 class Map:
@@ -96,49 +102,116 @@ class Map:
         for listener in self.event_listeners.get(event_name, []):
             listener(data)
 
-    async def add_tile(self, name, tile_size, tile_type, wall):
-        if not self.is_within_range_bounds(*tile_size):
+    async def add_tile(self, tile_position, tile_type, is_wall):
+        # Assuming tile_position is a tuple (x, y, z)
+        # First, check if the tile position is within the map's boundaries
+        if not self.is_within_range_bounds(*tile_position):
             raise ValueError("Tile coordinates are out of map bounds")
-        tile_key = f"tile{self.tile_counter}"
-        self.tile_counter += 1
-        tile = {"name": name, "size": tile_size, "type": tile_type, "wall": wall}
-        self.tiles[tile_key] = tile
-        # Emitting event through dispatcher
-        await self.event_dispatcher.dispatch('tile_added', {'map': self.map_name, 'tile_key': tile_key, 'tile': tile})
+        
+        # Create a new Tile instance
+        new_tile = Tile(tile_position, tile_type, is_wall)
+        
+        # Assuming you have a way to index or store tiles, for example using their position as a key
+        tile_key = f"{tile_position}"  # Converts position tuple to string as a simple key
+        self.tiles[tile_key] = new_tile
+        
+        # Optionally, if you're keeping a counter or need to emit events
+        self.tile_counter += 1  # Update your tile counter if you're using one
+        # Emitting event through dispatcher - adjust the dispatched data as needed
+        await self.event_dispatcher.dispatch('tile_added', {
+            'map': self.map_name, 
+            'tile_key': tile_key, 
+            'tile': new_tile.to_dict()  # Use to_dict() to serialize the tile for the event
+        })
 
     async def remove_tile(self, tile_key):
+        # Check if the tile exists in the map
         if tile_key in self.tiles:
+            # Remove the tile from the map using its unique key
             del self.tiles[tile_key]
-            # Emitting event through dispatcher
-            await self.event_dispatcher.dispatch('tile_removed', {'map': self.map_name, 'tile_key': tile_key})
 
-    async def add_zone(self, text, zone_size):
-        if not self.is_within_range_bounds(*zone_size):
-            raise ValueError("Zone coordinates are out of map bounds")
-        zone_key = f"zone{self.zone_counter:02d}"
-        self.zone_counter += 1
-        zone = {"text": text, "size": zone_size}
-        self.zones[zone_key] = zone
-        await self.event_dispatcher.dispatch('zone_added', {'map': self.map_name, 'zone_key': zone_key, 'zone': zone})
+            # Emit an event through the dispatcher indicating that the tile has been removed
+            await self.event_dispatcher.dispatch('tile_removed', {
+                'map': self.map_name,
+                'tile_key': tile_key  # Dispatching the unique key of the removed tile
+            })
+        else:
+            # Optionally handle the case where the tile_key does not exist (e.g., logging or error handling)
+            print(f"Tile with key {tile_key} not found in the map.")
+
+    async def add_zone(self, zone_position, zone_type):
+        # Assuming zone_position is a tuple (x, y, z)
+        # First, check if the zone position is within the map's boundaries
+        if not self.is_within_range_bounds(*zone_position):
+            raise ValueError("zone coordinates are out of map bounds")
+        
+        # Create a new zone instance
+        new_zone = zone(zone_position, zone_type)
+        
+        # Assuming you have a way to index or store zones, for example using their position as a key
+        zone_key = f"{zone_position}"  # Converts position tuple to string as a simple key
+        self.zones[zone_key] = new_zone
+        
+        # Optionally, if you're keeping a counter or need to emit events
+        self.zone_counter += 1  # Update your zone counter if you're using one
+        # Emitting event through dispatcher - adjust the dispatched data as needed
+        await self.event_dispatcher.dispatch('zone_added', {
+            'map': self.map_name, 
+            'zone_key': zone_key, 
+            'zone': new_zone.to_dict()  # Use to_dict() to serialize the zone for the event
+        })
 
     async def remove_zone(self, zone_key):
+        # Check if the zone exists in the map
         if zone_key in self.zones:
+            # Remove the zone from the map using its unique key
             del self.zones[zone_key]
-            await self.event_dispatcher.dispatch('zone_removed', {'map': self.map_name, 'zone_key': zone_key})
 
-    async def add_item(self, item_name, item_location):
-        if not self.is_within_single_bounds(*item_location):
-            raise ValueError("Item coordinates are out of map bounds")
-        item_key = f"item{self.item_counter:02d}"
-        self.item_counter += 1
-        item = {"name": item_name, "location": item_location}
-        self.items[item_key] = item
-        await self.event_dispatcher.dispatch('item_added', {'map': self.map_name, 'item_key': item_key, 'item': item})
+            # Emit an event through the dispatcher indicating that the zone has been removed
+            await self.event_dispatcher.dispatch('zone_removed', {
+                'map': self.map_name,
+                'zone_key': zone_key  # Dispatching the unique key of the removed zone
+            })
+        else:
+            # Optionally handle the case where the zone_key does not exist (e.g., logging or error handling)
+            print(f"zone with key {zone_key} not found in the map.")
+
+    async def add_item(self, item_position, item_type):
+        # Assuming item_position is a tuple (x, y, z)
+        # First, check if the item position is within the map's boundaries
+        if not self.is_within_range_bounds(*item_position):
+            raise ValueError("item coordinates are out of map bounds")
+        
+        # Create a new item instance
+        new_item = item(item_position, item_type)
+        
+        # Assuming you have a way to index or store items, for example using their position as a key
+        item_key = f"{item_position}"  # Converts position tuple to string as a simple key
+        self.items[item_key] = new_item
+        
+        # Optionally, if you're keeping a counter or need to emit events
+        self.item_counter += 1  # Update your item counter if you're using one
+        # Emitting event through dispatcher - adjust the dispatched data as needed
+        await self.event_dispatcher.dispatch('item_added', {
+            'map': self.map_name, 
+            'item_key': item_key, 
+            'item': new_item.to_dict()  # Use to_dict() to serialize the item for the event
+        })
 
     async def remove_item(self, item_key):
+        # Check if the item exists in the map
         if item_key in self.items:
+            # Remove the item from the map using its unique key
             del self.items[item_key]
-            await self.event_dispatcher.dispatch('item_removed', {'map': self.map_name, 'item_key': item_key})
+
+            # Emit an event through the dispatcher indicating that the item has been removed
+            await self.event_dispatcher.dispatch('item_removed', {
+                'map': self.map_name,
+                'item_key': item_key  # Dispatching the unique key of the removed item
+            })
+        else:
+            # Optionally handle the case where the item_key does not exist (e.g., logging or error handling)
+            print(f"item with key {item_key} not found in the map.")
 
     async def add_ai(self, ai_name, ai_type, ai_position):
         if not self.is_within_single_bounds(*ai_position):

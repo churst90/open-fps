@@ -1,10 +1,12 @@
 import math
+from core.events.event_handler import EventHandler
 
 class UserActions(EventHandler):
     def __init__(self, network, user_registry, map_registry, event_dispatcher):
         super().__init__(network, event_dispatcher)
         self.user_registry = user_registry
         self.map_registry = map_registry
+        self.network = network
 
     async def move(self, username, direction, distance=1):
         user = self.user_registry.get_user(username)

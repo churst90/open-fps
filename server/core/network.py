@@ -7,6 +7,20 @@ from collections import defaultdict
 from datetime import datetime, timedelta
 
 class Network:
+    _instance = None
+
+    def __new__(cls, *args, **kwargs):
+        if cls._instance is None:
+            cls._instance = super(Network, cls).__new__(cls)
+            # Initialize instance.
+        return cls._instance
+
+    @classmethod
+    def get_instance(cls, host, port, message_queue, message_handler, ssl_cert_file='cert.pem', ssl_key_file='key.pem'):
+        if cls._instance is None:
+            cls._instance = cls(host, port, message_queue, message_handler, ssl_cert_file, ssl_key_file)
+        return cls._instance
+
     def __init__(self, host, port, message_queue, message_handler, ssl_cert_file='cert.pem', ssl_key_file='key.pem'):
         self.host = host
         self.port = port
@@ -20,9 +34,16 @@ class Network:
         self.ssl_context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
         self.ssl_context.load_cert_chain(certfile=ssl_cert_file, keyfile=ssl_key_file)
 
+    def start_listening(self):
+        print("start listening method called")
+        self.listen_task = asyncio.create_task(self.accept_connections())
+
     async def accept_connections(self):
-        self.server = await asyncio.start_server(self.handle_client, self.host, self.port, ssl=self.ssl_context)
-        self.logger.info(f"Listening for incoming connections on {self.host}:{self.port} with SSL/TLS encryption")
+        try:
+            self.server = await asyncio.start_server(self.handle_client, self.host, self.port, ssl=self.ssl_context)
+            print(f"Listening for incoming connections on {self.host}:{self.port} with SSL/TLS encryption")
+        except Exception as e:
+            print(f"Failed to start server: {e}")
         async with self.server:
             await self.server.serve_forever()
 
@@ -43,7 +64,7 @@ class Network:
                 self.connection_attempts[addr[0]] = 1
         self.last_connection_attempt[addr[0]] = now
 
-        self.logger.info(f"Accepted connection from {addr} with SSL/TLS encryption")
+        print(f"Accepted connection from {addr} with SSL/TLS encryption")
         # Track connections initially by address
         self.connections[addr] = (reader, writer)
         username = None
@@ -60,7 +81,7 @@ class Network:
                     self.connections[username] = self.connections.pop(addr)
                 await self.message_queue.put((data, writer))
         except asyncio.CancelledError:
-            self.logger.info("Connection handling cancelled")
+            print("Connection handling cancelled")
         except Exception as e:
             self.logger.exception("An unexpected error occurred:", exc_info=e)
         finally:
@@ -69,7 +90,7 @@ class Network:
             remove_key = username if username in self.connections else addr
             if remove_key in self.connections:
                 del self.connections[remove_key]
-            self.logger.info(f"Connection closed for {remove_key}")
+            print(f"Connection closed for {remove_key}")
 
     async def send(self, message, client_sockets):
         if not isinstance(client_sockets, list):
@@ -98,7 +119,7 @@ class Network:
             await self.message_handler(data, writer)
 
     async def close(self):
-        self.logger.info("Closing server and all client connections")
+        print("Closing server and all client connections")
         for reader, writer in self.connections.values():
             writer.close()
             await writer.wait_closed()

@@ -34,6 +34,7 @@ class Data:
             decrypted_data = self.f.decrypt(encrypted_data)
             # Convert JSON bytes back to a dictionary
             return json.loads(decrypted_data.decode('utf-8'))
+            print("JSON converted to dictionary and returned .....")
         except FileNotFoundError:
             print(f"File {filename}.dat not found.")
             return None
