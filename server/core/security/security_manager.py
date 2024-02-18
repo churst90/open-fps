@@ -30,12 +30,16 @@ class SecurityManager:
             f.write(self.key)
 
     async def load_key(self):
+        print("Attempting to load encryption key .....")
         if os.path.exists(self.key_file):
             with open(self.key_file, "rb") as f:
                 self.key = f.read()
+                print("Encryption key loaded .....")
             self.last_rotation = datetime.fromtimestamp(os.path.getmtime(self.key_file))
         else:
+            print("No encryption key was found. Generating a new one .....")
             await self.generate_key()
+            print("Saving encryption key to disk .....")
             await self.save_key()
             self.last_rotation = datetime.now()
 
