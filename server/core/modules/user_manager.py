@@ -149,6 +149,9 @@ class User:
 
     # Add methods for health and energy updates
 
+    def get_position(self):
+        return self.position
+
     def update_login_status(self, status):
         self.logged_in = status
 

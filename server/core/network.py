@@ -34,6 +34,7 @@ class Network:
         self.ssl_context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
         self.ssl_context.load_cert_chain(certfile='cert.pem', keyfile='key.pem')
         self.shutdown_event = shutdown_event
+        self.connections_lock = asyncio.Lock()  # Add a lock for managing connections
 
     async def start(self):
         self.listen_task = asyncio.create_task(self.accept_connections())
@@ -76,22 +77,26 @@ class Network:
         addr = writer.get_extra_info("peername")
         now = datetime.now()
 
-        # Rate limiting: Allow only 3 attempts per minute per IP
-        if addr[0] in self.last_connection_attempt:
-            if now - self.last_connection_attempt[addr[0]] < timedelta(minutes=1):
-                self.connection_attempts[addr[0]] += 1
-                if self.connection_attempts[addr[0]] > 3:
-                    writer.close()
-                    await writer.wait_closed()
-                    self.logger.warning(f"Rate limit exceeded for {addr}")
-                    return
-            else:
-                self.connection_attempts[addr[0]] = 1
-        self.last_connection_attempt[addr[0]] = now
+        async with self.connections_lock:
+            # Rate limiting: Allow only 3 attempts per minute per IP
+            if addr[0] in self.last_connection_attempt:
+                if now - self.last_connection_attempt[addr[0]] < timedelta(minutes=1):
+                    self.connection_attempts[addr[0]] += 1
+                    if self.connection_attempts[addr[0]] > 3:
+                        writer.close()
+                        await writer.wait_closed()
+                        self.logger.warning(f"Rate limit exceeded for {addr}")
+                        return
+                else:
+                    self.connection_attempts[addr[0]] = 1
+            self.last_connection_attempt[addr[0]] = now
 
-        print(f"Accepted connection from {addr} with SSL/TLS encryption")
-        # Track connections initially by address
-        self.connections[addr] = (reader, writer)
+            # Initial connection logging
+            print(f"Accepted connection from {addr} with SSL/TLS encryption")
+        
+            # Track connections initially by address
+            self.connections[addr] = (reader, writer)
+
         username = None
 
         try:
@@ -100,22 +105,26 @@ class Network:
                 if not data:
                     break
                 data = json.loads(data.decode('utf-8'))
-                username = data.get('username')
-                if username:
-                    # Once username is known, use it as the main key and remove the address-based entry
-                    self.connections[username] = self.connections.pop(addr)
+            
+                async with self.connections_lock:
+                    username = data.get('username')
+                    if username:
+                        # Once username is known, use it as the main key and remove the address-based entry
+                        self.connections[username] = self.connections.pop(addr)
+
                 await self.message_queue.put((data, writer))
         except asyncio.CancelledError:
             print("Connection handling cancelled")
         except Exception as e:
             self.logger.exception("An unexpected error occurred:", exc_info=e)
         finally:
-            writer.close()
-            await writer.wait_closed()
-            remove_key = username if username in self.connections else addr
-            if remove_key in self.connections:
-                del self.connections[remove_key]
-            print(f"Connection closed for {remove_key}")
+            async with self.connections_lock:
+                writer.close()
+                await writer.wait_closed()
+                remove_key = username if username and username in self.connections else addr
+                if remove_key in self.connections:
+                    del self.connections[remove_key]
+                print(f"Connection closed for {remove_key}")
 
     async def send(self, message, client_sockets):
         if not isinstance(client_sockets, list):
@@ -157,3 +166,7 @@ class Network:
             writer = self.connections[username][1]
             writer.close()
             del self.connections[username]
+
+    async def get_writer(self, username):
+        async with self.connections_lock:
+            return self.connections.get(username, None)[1] if username in self.connections else None

@@ -83,8 +83,8 @@ class ServerConsole:
 
     async def stop(self):
         if self.user_input_task:
-            self.user_input_task.cancel()
             try:
-                await self.user_input_task
+#                await self.user_input_task
+                self.user_input_task.cancel()
             except asyncio.CancelledError:
                 print("User input task stopped.")

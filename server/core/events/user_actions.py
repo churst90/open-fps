@@ -39,11 +39,13 @@ class UserActions(EventHandler):
     
         # Check for wall and boundary collisions
         if collision_detector.check_wall_collision(new_x, new_y, new_z) or collision_detector.check_boundary_collision(new_x, new_y, new_z):
-            # Handle collision (e.g., notify user, cancel movement)
-            await self.network.send_update(username, {"type": "collision", "message": "Movement blocked."})
-            return
+            # don't send anything for now
+            pass
 
         # If no collision, update user's position and notify
-        user.set_position((new_x, new_y, new_z))
-        await self.network.send_update(username, {"type": "position_update", "new_position": (new_x, new_y, new_z)})
-        await self.event_dispatcher.dispatch("PlayerPositionChanged", {"username": username, "new_position": (new_x, new_y, new_z)})
+        user.update_position((new_x, new_y, new_z))
+        writer = await self.network.get_writer(username)
+        if writer:
+            # Constructing a message payload
+            message = {"message_type": "user_action_result", "action_type": "move", "position_update": user.get_position()}
+            await self.network.send(message, writer)

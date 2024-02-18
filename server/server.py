@@ -34,9 +34,9 @@ class Server:
 
     async def ensure_ssl_certificate(self, cert_file='cert.pem', key_file='key.pem'):
         if not os.path.exists(cert_file) or not os.path.exists(key_file):
-            self.logger.debug_1("Neither a certificate nor a key were found. Generating a self signed certificate now .....")
+            print("Neither a certificate nor a key were found. Generating a self signed certificate now .....")
             subprocess.run(['openssl', 'req', '-x509', '-newkey', 'rsa:4096', '-keyout', key_file, '-out', cert_file, '-days', '365', '-nodes', '-subj', '/CN=localhost'], check=True)
-            self.logger.debug_1("Certificate and key pair generated successfully")
+            print("Certificate and key pair generated successfully")
 
     async def process_message(self, data, client_socket):
         message_type = data.get('type')
@@ -78,6 +78,7 @@ class Server:
         if self.network:
             await self.network.close()
         print("Server shutdown complete.")
+        self.shutdown_event.set()
 
 async def main():
     parser = argparse.ArgumentParser()
@@ -91,8 +92,5 @@ async def main():
     # Wait for the shutdown event to be set before proceeding to shutdown
     await server.shutdown_event.wait()
     
-    # Once the shutdown event is set, proceed to shutdown the server
-    await server.shutdown()
-
 if __name__ == '__main__':
     asyncio.run(main())
