@@ -64,32 +64,19 @@ class Server:
         await self.map_reg.load_maps()
         await self.user_reg.load_users()
         self.network = Network.get_instance(self.host, self.port, asyncio.Queue(), self.process_message, self.shutdown_event)
+        await self.network.start()
         self.console = ServerConsole.get_instance(self, self.user_reg, self.map_reg, self.logger, self.shutdown_event)
-        self.listen_task = asyncio.create_task(self.network.accept_connections())
         self.console.start()
-        await asyncio.wait([self.listen_task], return_when=asyncio.FIRST_COMPLETED)
 
     async def shutdown(self):
         print("Shutting down the server...")
         # Stop key rotation first
         await self.security_manager.stop_key_rotation()
-
-        # Cancel and await the network listening task
-        if self.listen_task:
-            self.listen_task.cancel()
-            try:
-                await self.listen_task
-            except asyncio.CancelledError:
-                print("Network listen task cancelled.")
-
-        # Now, stop the ServerConsole's user input handling
+        await self.network.stop()
         if self.console:
             await self.console.stop()
-
-        # Ensure to close network connections properly
         if self.network:
             await self.network.close()
-
         self.shutdown_event.set()
         print("Server shutdown complete.")
 
@@ -99,10 +86,14 @@ async def main():
     parser.add_argument("--port", type=int, default=33288)
     args = parser.parse_args()
     server = Server(args.host, args.port)
-    try:
-        await server.start()
-    except KeyboardInterrupt:
-        await server.shutdown()
+    
+    await server.start()  # Start the server
+    
+    # Wait for the shutdown event to be set before proceeding to shutdown
+    await server.shutdown_event.wait()
+    
+    # Once the shutdown event is set, proceed to shutdown the server
+    await server.shutdown()
 
 if __name__ == '__main__':
     asyncio.run(main())

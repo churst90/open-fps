@@ -35,9 +35,18 @@ class Network:
         self.ssl_context.load_cert_chain(certfile='cert.pem', keyfile='key.pem')
         self.shutdown_event = shutdown_event
 
-    async def start_listening(self):
+    async def start(self):
         self.listen_task = asyncio.create_task(self.accept_connections())
 #        await asyncio.wait([self.listen_task], return_when=asyncio.FIRST_COMPLETED)
+
+    async def stop(self):
+        if self.listen_task:
+            self.listen_task.cancel()  # Cancel the listening task
+            try:
+                await self.listen_task  # Wait for the task to be cancelled
+            except asyncio.CancelledError:
+                print("Network listening task cancelled.")
+            self.listen_task = None  # Reset the task attribute
 
     async def accept_connections(self):
         # Start the server outside of the while loop to ensure it's created only once
