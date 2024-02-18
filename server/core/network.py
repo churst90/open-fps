@@ -18,7 +18,7 @@ class Network:
     @classmethod
     def get_instance(cls, host, port, message_queue, message_handler, shutdown_event, ssl_cert_file='cert.pem', ssl_key_file='key.pem'):
         if cls._instance is None:
-            cls._instance = cls(host, port, message_queue, message_handler, ssl_cert_file, ssl_key_file)
+            cls._instance = cls(host, port, message_queue, message_handler, shutdown_event, ssl_cert_file, ssl_key_file)
         return cls._instance
 
     def __init__(self, host, port, message_queue, message_handler, shutdown_event, ssl_cert_file='cert.pem', ssl_key_file='key.pem'):

@@ -77,7 +77,6 @@ class Server:
             await self.console.stop()
         if self.network:
             await self.network.close()
-        self.shutdown_event.set()
         print("Server shutdown complete.")
 
 async def main():
