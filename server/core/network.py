@@ -21,7 +21,7 @@ class Network:
             cls._instance = cls(host, port, message_queue, message_handler, ssl_cert_file, ssl_key_file)
         return cls._instance
 
-    def __init__(self, host, port, message_queue, message_handler, ssl_cert_file='cert.pem', ssl_key_file='key.pem'):
+    def __init__(self, host, port, message_queue, message_handler, shutdown_event, ssl_cert_file='cert.pem', ssl_key_file='key.pem'):
         self.host = host
         self.port = port
         self.message_queue = message_queue
@@ -32,20 +32,36 @@ class Network:
         self.connection_attempts = defaultdict(int)  # Track connection attempts by IP
         self.last_connection_attempt = {}  # Timestamp of the last connection attempt by IP
         self.ssl_context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
-        self.ssl_context.load_cert_chain(certfile=ssl_cert_file, keyfile=ssl_key_file)
+        self.ssl_context.load_cert_chain(certfile='cert.pem', keyfile='key.pem')
+        self.shutdown_event = shutdown_event
 
-    def start_listening(self):
-        print("start listening method called")
+    async def start_listening(self):
         self.listen_task = asyncio.create_task(self.accept_connections())
+#        await asyncio.wait([self.listen_task], return_when=asyncio.FIRST_COMPLETED)
 
     async def accept_connections(self):
+        # Start the server outside of the while loop to ensure it's created only once
         try:
-            self.server = await asyncio.start_server(self.handle_client, self.host, self.port, ssl=self.ssl_context)
+            self.server = await asyncio.start_server(
+                self.handle_client, self.host, self.port, ssl=self.ssl_context
+            )
             print(f"Listening for incoming connections on {self.host}:{self.port} with SSL/TLS encryption")
+            async with self.server:
+                # Instead of a while loop checking the event, use serve_forever
+                # and wait for the shutdown_event in a separate task.
+                server_task = asyncio.create_task(self.server.serve_forever())
+            
+                # Wait for the shutdown_event to be set before stopping the server.
+                await self.shutdown_event.wait()
+            
+                # Once shutdown_event is set, we cancel the server task.
+                server_task.cancel()
+                try:
+                    await server_task  # Attempt to await the task to catch any cancellation
+                except asyncio.CancelledError:
+                    print("Server has stopped accepting new connections.")
         except Exception as e:
             print(f"Failed to start server: {e}")
-        async with self.server:
-            await self.server.serve_forever()
 
     async def handle_client(self, reader, writer):
         addr = writer.get_extra_info("peername")

@@ -19,7 +19,7 @@ class SecurityManager:
     @staticmethod
     def get_instance(key_file=None):
         if SecurityManager._instance is None:
-            SecurityManager(key_file)
+            SecurityManager._instance = SecurityManager(key_file)  # Correctly assign the new instance
         return SecurityManager._instance
 
     async def generate_key(self):
@@ -41,41 +41,36 @@ class SecurityManager:
 
     async def rotate_key(self, interval):
         while True:
-            now = datetime.now()
-            if self.last_rotation is None or now - self.last_rotation >= timedelta(days=interval):
-                await self.generate_key()
-                await self.save_key()
-                self.last_rotation = now
-            await asyncio.sleep(24 * 60 * 60)  # Check once a day
+            try:
+                now = datetime.now()
+                if self.last_rotation is None or now - self.last_rotation >= timedelta(days=interval):
+                    await self.generate_key()
+                    await self.save_key()
+                    self.last_rotation = now
+                await asyncio.sleep(24 * 60 * 60)  # Sleep for a day
+            except asyncio.CancelledError:
+                print("Key rotation task was cancelled.")
+                break  # Break out of the loop to allow task to finish
 
-    def start_key_rotation(self, interval):
-        self.rotation_task = asyncio.create_task(self.rotate_key(interval))
+    async def start_key_rotation(self, interval):
+        try:
+            self.rotation_task = asyncio.create_task(self.rotate_key(interval))
+        except asyncio.CancelledError:
+            print("Key rotation task canceled")
 
     async def stop_key_rotation(self):
         if self.rotation_task and not self.rotation_task.done():
-            self.rotation_task.cancel()
             try:
                 # Wait for the task cancellation to complete, if necessary
+                self.rotation_task.cancel()
                 await self.rotation_task
             except asyncio.CancelledError:
                 # Handle the cancellation error
                 print("Key rotation task cancelled.")
             finally:
                 self.rotation_task = None  # Reset the task reference
-
+    
     def get_key(self):
         return Fernet(self.key)
 
-# Example of using the SecurityManager in an async environment
-async def main():
-    key_file = 'path/to/key.file'
 
-    # Example usage of the key for encryption/decryption
-    fernet = manager.get_key()
-    encrypted_data = fernet.encrypt(b"Secret data")
-    decrypted_data = fernet.decrypt(encrypted_data)
-    print(decrypted_data)
-
-# Run the main function in an asyncio event loop
-if __name__ == '__main__':
-    asyncio.run(main())

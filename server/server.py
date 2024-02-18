@@ -47,9 +47,10 @@ class Server:
             self.logger.info(f"Unknown message type: {message_type}")
 
     async def setup_security(self):
-        self.logger.debug_1("Setting up the security manager ...")
+        print("Setting up the security manager ...")
+        self.security_manager.get_instance("security.key")
         await self.security_manager.load_key()
-        self.security_manager.start_key_rotation(30)
+        await self.security_manager.start_key_rotation(30)
 
 #    async def initialize(self):
 
@@ -62,22 +63,35 @@ class Server:
         await self.setup_security()
         await self.map_reg.load_maps()
         await self.user_reg.load_users()
-        self.network = Network.get_instance(self.host, self.port, asyncio.Queue(), self.process_message)
-        self.console = ServerConsole.get_instance(self, self.user_reg, self.map_reg, self.logger)
+        self.network = Network.get_instance(self.host, self.port, asyncio.Queue(), self.process_message, self.shutdown_event)
+        self.console = ServerConsole.get_instance(self, self.user_reg, self.map_reg, self.logger, self.shutdown_event)
         self.listen_task = asyncio.create_task(self.network.accept_connections())
-        self.user_input_task = asyncio.create_task(self.console.user_input())
-        await asyncio.wait([self.listen_task, self.user_input_task], return_when=asyncio.FIRST_COMPLETED)
+        self.console.start()
+        await asyncio.wait([self.listen_task], return_when=asyncio.FIRST_COMPLETED)
 
     async def shutdown(self):
-        self.logger.info("Shutting down the server...")  # Use logger instead of print
-        tasks = [self.listen_task, self.user_input_task]
-        for task in tasks:
-            if task and not task.done():
-                task.cancel()
-                await task
+        print("Shutting down the server...")
+        # Stop key rotation first
         await self.security_manager.stop_key_rotation()
-        await self.network.close()
+
+        # Cancel and await the network listening task
+        if self.listen_task:
+            self.listen_task.cancel()
+            try:
+                await self.listen_task
+            except asyncio.CancelledError:
+                print("Network listen task cancelled.")
+
+        # Now, stop the ServerConsole's user input handling
+        if self.console:
+            await self.console.stop()
+
+        # Ensure to close network connections properly
+        if self.network:
+            await self.network.close()
+
         self.shutdown_event.set()
+        print("Server shutdown complete.")
 
 async def main():
     parser = argparse.ArgumentParser()
