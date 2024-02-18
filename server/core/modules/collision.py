@@ -3,22 +3,19 @@ class Collision:
         self.game_map = game_map
 
     def is_move_valid(self, x, y, z):
-        # Check if the target position is within map boundaries
-        if not self.check_boundary_collision(x, y, z):
-            return False  # Movement outside the map boundaries is not allowed
-        
-        # Check if the target position is walkable (not an obstacle)
-        if not self.game_map.is_position_walkable(x, y, z):
-            return False  # Movement into obstacles is not allowed
+        """Determine if a move to a new position is valid."""
+        if not self._is_within_boundaries(x, y, z):
+            return False, "Out of bounds"
 
-        # If no collisions were detected, the move is valid
-        return True
+        if not self._is_position_walkable(x, y, z):
+            return False, "Blocked by obstacle"
 
-    def check_boundary_collision(self, x, y, z):
-        # Assuming the game_map object has attributes defining its boundaries
-        return (0 <= x < self.game_map.width and
-                0 <= y < self.game_map.height and
-                0 <= z < self.game_map.depth)
+        return True, "Move valid"
 
-    # This method assumes a simple method on the map to check if a position is walkable
-    # It abstracts away the specifics of how the map's data is structured
+    def _is_within_boundaries(self, x, y, z):
+        """Check if the target position is within map boundaries."""
+        return 0 <= x < self.game_map.width and 0 <= y < self.game_map.height and 0 <= z < self.game_map.depth
+
+    def _is_position_walkable(self, x, y, z):
+        """Check if the target position is walkable (not an obstacle)."""
+        return self.game_map.is_position_walkable(x, y, z)
