@@ -1,51 +1,56 @@
 from .modules.map_manager import MapRegistry
 from .modules.user_manager import UserRegistry
-from .events.user_actions import UserActions
-# from .events.map_actions import MapActions
+from .events.user_handler import UserHandler
+from .events.map_handler import MapHandler
 
 class ServerHandler:
-    def __init__(self, user_reg, map_reg, network, event_dispatcher, custom_logger):
+    def __init__(self, user_reg, map_reg, event_dispatcher, custom_logger):
         self.user_reg = user_reg
         self.map_reg = map_reg
         self.event_dispatcher = event_dispatcher
-        self.network = network
-#        self.map_actions = MapActions(self.network, self.map_reg, self.user_reg, self.event_dispatcher)
-        self.user_actions = UserActions(self.network, self.map_reg, self.user_reg, self.event_dispatcher)
+        self.map_handler = MapHandler(self.user_reg, self.map_reg, self.event_dispatcher)
+        self.user_handler = UserHandler(self.user_reg, self.map_reg, self.event_dispatcher)
 
-    async def handle_login(self, data, client_socket):
-        # Assume login and account creation are handled here.
-        username = data.get('username')
-        password = data.get('password')
-        await self.user_reg.login({'username': username, 'password': password}, client_socket)
+    async def handle_login(self, data):
+#        username = data.get('username')
+#        password = data.get('password')
+        await self.user_handler.authenticate_user(data)
 
-    async def user_action(self, data, client_socket):
+    async def user_handler(self, data):
         username = data.get("username")
         action_type = data.get("action_type")
-        direction = data.get('direction', '')  # Defaulting to empty string if not provided
-        distance = data.get('distance', 1)  # Defaulting to 1 if not provided
-
-        # Ensure the action can be performed
-        if hasattr(self.user_actions, action_type):
-            method = getattr(self.user_actions, action_type, None)
-            if method and callable(method):
-                await method(username, direction, distance)
-            else:
-                await self.network.send({"message_type": "error", "error_message": "That action is not supported"}, client_socket)
+        if action_type == "move":
+            direction = data.get("direction")
+            distance = data.get("distance")
+            self.user_handler.move(username, direction, distance)
+        elif action_type == "turn":
+            direction = data.get("direction")
+            self.user_handler.turn(username, direction)
+        elif action_type == "jump":
+            self.user_handler.jump(username)
         else:
-            await self.network.send({"message_type": "error", "error_message": "Action type not found"}, client_socket)
+            # dispatch an error message
+            pass
 
-    async def handle_map_action(self, data, client_socket):
-        map_name = data.get("map_name")
+    async def handle_map_handler(self, data):
+        username = data.get("username")
         action_type = data.get("action_type")
-        # Additional arguments could be extracted here as needed
-
-        # Verify that the action can be performed by checking if the method exists in MapActions
-        if hasattr(self.map_actions, action_type):
-            method = getattr(self.map_actions, action_type, None)
-            if method and callable(method):
-                # Call the method dynamically. Adjust arguments as necessary for your map action methods
-                await method(map_name, **data)  # Passing map_name and other data as arguments
-            else:
-                await self.network.send({"message_type": "error", "error_message": "That action is not supported"}, client_socket)
+        map_name = data.get("map_name")
+        if action_type == "create_map":
+            map_size = data.get("map_size")
+            self.map_handler.create_map(map_name, map_size)
+        elif action_type == "join_map":
+            self.map_handler.join_map(map_name)
+        elif action_type == "remove_map":
+            self.map_handler.remove_map(map_name)
+        elif action_type == "add_tile":
+            tile_name = data.get("tile_name")
+            tile_size = data.get("tile_size")
+            self.map_handler.add_tile(map_name, tile_type, tile_size)
+        elif action_type == "add_zone":
+            zone_name = data.get("zone_name")
+            zone_size = data.get("zone_size")
+            self.map_handler.add_zone(map_name, zone_name, zone_size)
         else:
-            await self.network.send({"message_type": "error", "error_message": "Action type not found"}, client_socket)
+            # dispatch a message for invalid map action
+            pass

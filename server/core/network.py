@@ -1,6 +1,7 @@
 # Standard library imports
 import json
 import asyncio
+from asyncio import Lock
 import logging
 import ssl
 from collections import defaultdict
@@ -22,6 +23,7 @@ class Network:
         return cls._instance
 
     def __init__(self, host, port, message_queue, message_handler, shutdown_event, ssl_cert_file='cert.pem', ssl_key_file='key.pem'):
+        _lock = Lock()
         self.host = host
         self.port = port
         self.message_queue = message_queue
@@ -93,7 +95,7 @@ class Network:
 
             # Initial connection logging
             print(f"Accepted connection from {addr} with SSL/TLS encryption")
-        
+
             # Track connections initially by address
             self.connections[addr] = (reader, writer)
 
@@ -105,14 +107,14 @@ class Network:
                 if not data:
                     break
                 data = json.loads(data.decode('utf-8'))
-            
                 async with self.connections_lock:
                     username = data.get('username')
                     if username:
                         # Once username is known, use it as the main key and remove the address-based entry
                         self.connections[username] = self.connections.pop(addr)
 
-                await self.message_queue.put((data, writer))
+                await self.message_queue.put((data))
+                print("data added to message queue")
         except asyncio.CancelledError:
             print("Connection handling cancelled")
         except Exception as e:
@@ -154,18 +156,20 @@ class Network:
 
     async def close(self):
         print("Closing server and all client connections")
-        for reader, writer in self.connections.values():
-            writer.close()
-            await writer.wait_closed()
+        async with cls._lock:
+            for reader, writer in self.connections.values():
+                writer.close()
+                await writer.wait_closed()
         if self.server:
             self.server.close()
             await self.server.wait_closed()
 
-    def disconnect_client(self, username):
-        if username in self.connections:
-            writer = self.connections[username][1]
-            writer.close()
-            del self.connections[username]
+    async def disconnect_client(self, username):
+        async with cls._lock:
+            if username in self.connections:
+                writer = self.connections[username][1]
+                writer.close()
+                del self.connections[username]
 
     async def get_writer(self, username):
         async with self.connections_lock:

@@ -1,87 +1,73 @@
-# third party imports
 import asyncio
-import pygame
+import tkinter as tk
 import logging
 
-# Project imports
-from screenmanager import ScreenManager
-from gamewindow import GameWindow
-from clienthandler import ClientHandler
-from connection import Network
-from speechmanager import SpeechManager
-
-# Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-logger = logging.getLogger("client")
+from speech_manager import SpeechManager
+from network import Network
+from login_dialog import LoginDialog
+from create_account_dialog import CreateAccountDialog
+from client_handler import ClientHandler
 
 class Client:
     def __init__(self, host, port):
         self.host = host
         self.port = port
+        self.root = tk.Tk()
+        self.root.title("Open FPS client")
         self.tts = SpeechManager()
-        self.logger = logger
-        self.screen_manager = ScreenManager()
+        self.logger = logging.getLogger("client")
         self.network = Network(self.logger)
-        self.client_handler = ClientHandler(self.screen_manager, self.network, self.tts)
-        self.initialize_pygame()
+        self.network.set_host(host)
+        self.network.set_port(port)
+        self.client_handler = ClientHandler(self.network)
+        self.initialize_tkinter()
+#        asyncio.run(self.client_handler.start_processing())
 
-    def initialize_pygame(self):
-        pygame.init()
-        self.main_window = GameWindow(1200, 800, "Open FPS", self.screen_manager)
-        self.screen_manager.add_screen(self.main_window, "main_window")
-        self.screen_manager.push_screen("main_window")
+    def initialize_tkinter(self):
+        self.root.geometry("1200x800")
+        self.setup_startup_menu()
 
-    async def start(self):
-        running = True
-        task = None
-        modal_active = False  # Flag to indicate if a modal window is active
+    def setup_startup_menu(self):
+        self.startup_frame = tk.Frame(self.root)
+        self.menu_listbox = tk.Listbox(self.startup_frame, height=4, exportselection=0, activestyle='dotbox')
+        options = ["Login", "Create Account", "Exit"]
+        for option in options:
+            self.menu_listbox.insert(tk.END, option)
+        self.menu_listbox.pack(pady=20)
+        self.menu_listbox.bind('<Return>', self.on_menu_select)
+        self.menu_listbox.bind('<<ListboxSelect>>', self.on_menu_focus)
+        self.menu_listbox.focus_set()
+        self.startup_frame.pack()
 
-        while running:
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    running = False
+    def on_menu_select(self, event=None):
+        selection = self.menu_listbox.get(self.menu_listbox.curselection())
+        if selection == "Login":
+            self.show_login_dialog()
+        elif selection == "Create Account":
+            self.show_create_account_dialog()
+        elif selection == "Exit":
+            self.root.quit()
 
-            if not self.client_handler.player["logged_in"] and not modal_active:
-                # Show the startup menu
-                selected_option = await self.client_handler.main_menu()
+    def on_menu_focus(self, event=None):
+        selection = self.menu_listbox.get(self.menu_listbox.curselection())
+        self.tts.speak(selection)
 
-                if selected_option == "Create account":
-                    if task is not None:
-                        task.cancel()
-                    task = asyncio.create_task(self.client_handler.create_account(self.host, self.port))
-                    modal_active = True
+    def show_login_dialog(self):
+        self.startup_frame.pack_forget()  # Hide the startup menu
+        LoginDialog(self.root, self.tts, self.show_startup_menu_again, self.client_handler)
 
-                elif selected_option == "Login":
-                    if task is not None:
-                        task.cancel()
-                    task = asyncio.create_task(self.client_handler.login(self.host, self.port))
-                    modal_active = True
+    def show_create_account_dialog(self):
+        self.startup_frame.pack_forget()  # Hide the startup menu
+        self.tts.speak("Create account dialog opened.")
+        CreateAccountDialog(self.root, self.tts, self.show_startup_menu_again)
 
-                elif selected_option == "Exit":
-                    running = False
+    def show_startup_menu_again(self):
+        self.startup_frame.pack()  # Re-show the startup menu when login dialog is closed or cancelled
 
-            if modal_active and task:
-                try:
-                    await asyncio.wait_for(task, timeout=0.01)
-                except asyncio.TimeoutError:
-                    pass  # The task is still running
-                except asyncio.CancelledError:
-                    modal_active = False  # Reset the flag when the task is cancelled
-
-            self.screen_manager.update()
-            self.main_window.update()
-
-        if task and not task.done():
-            task.cancel()
-        pygame.quit()
+    def main(self):
+        self.root.mainloop()
 
 if __name__ == '__main__':
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     client = Client("localhost", 33288)
-    loop = asyncio.get_event_loop()  # Create a new event loop
-
-    try:
-        loop.run_until_complete(client.start())  # Run the client start coroutine
-    except Exception as e:
-        logging.error(f"An error occurred: {e}")
-    finally:
-        loop.close()  # Close the loop only when everything is done
+    client.main()

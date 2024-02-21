@@ -15,15 +15,30 @@ class Network:
         self.retry_limit = 3
         self.retry_delay = 1  # Initial delay in seconds
         self.max_retry_delay = 60  # Maximum delay in seconds
+        self.message_queue = asyncio.Queue()
+        self.is_connected = False
+
+    async def get_next_message(self):
+        return await self.message_queue.get()
+
+    async def handle_incoming_messages(self):
+        while True:
+            try:
+                data = await self.receive()
+                await self.message_queue.put(data)
+            except Exception as e:
+                self.logger.error(f"Error handling incoming message: {e}")
+                break
 
     async def connect(self):
         attempt_count = 0
         delay = self.retry_delay
         while attempt_count < self.retry_limit:
             try:
-                self.reader, self.writer = await asyncio.wait_for(
-                    asyncio.open_connection(self.host, self.port, ssl=self.ssl_context), timeout=10.0)
-                self.logger.info(f"Connected to the server at {self.host}:{self.port} with encryption")
+                print(f"Address: {self.host} and port {self.port}")
+                self.reader, self.writer = await asyncio.wait_for(asyncio.open_connection(self.host, self.port, ssl=self.ssl_context), timeout=10.0)
+#                print(f"Connected to the server at {self.host}:{self.port} with encryption")
+                self.is_connected = True
                 return
             except (asyncio.TimeoutError, ConnectionRefusedError) as e:
                 self.logger.warning(f"Connection attempt {attempt_count + 1} to {self.host}:{self.port} failed: {e}")
@@ -41,6 +56,7 @@ class Network:
                 self.writer.close()
                 await self.writer.wait_closed()
                 self.logger.info("Disconnected from the server")
+                self.is_connected = False
             except Exception as e:
                 self.logger.error(f"Error occurred while disconnecting: {e}")
 

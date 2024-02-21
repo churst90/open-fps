@@ -1,13 +1,14 @@
+import bcrypt
 import math
 import json
 from core.events.event_handler import EventHandler
+from core.events.event_dispatcher import EventDispatcher
 
-class UserActions(EventHandler):
-    def __init__(self, network, user_registry, map_registry, event_dispatcher):
-        super().__init__(network, event_dispatcher)
-        self.user_registry = user_registry
-        self.map_registry = map_registry
-        self.network = network
+class UserHandler(EventHandler):
+    def __init__(self, user_reg, map_reg, event_dispatcher):
+        super().__init__(event_dispatcher)
+        self.user_reg = user_reg
+        self.map_reg = map_reg
 
     @staticmethod
     def calculate_movement_vector(direction, distance, yaw, pitch):
@@ -37,8 +38,34 @@ class UserActions(EventHandler):
         elif direction == "down":
             return 0, -distance, 0
 
-    async def move(self, username, direction, distance=1):
-        user = self.user_registry.get_user_instance(username)  # Ensure correct method is called
+    async def authenticate_user(self, data):
+        action = data.get('action')
+        username = data.get('username')
+        password = data.get('password')
+
+        if action == 'login':
+            users = self.user_reg._users
+            if username in users.keys():
+                stored_hashed_password = users[username]['password'].encode('utf-8')
+                if bcrypt.checkpw(password.encode('utf-8'), stored_hashed_password):
+                    player_obj = self.user_reg.get_user_instance(username)
+                    await self.user_reg.register_user(username, player_obj)
+                    await self.emit_event("handle_login", users[username])
+                else:
+                    # Dispatch an event message indicating an incorrect password
+                    await self.emit_event("handle_login", {"message_type": "handle_login", "error": "password issue"})
+            else:
+                # Dispatch a message stating the username doesn't exist
+                await self.emit_event("handle_login", {"message_type": "handle_login", "error": "username issue"})
+
+        if action == 'logout':
+            # Check if the user is actually online before proceeding
+            if await self.user_reg.get_all_users()[username][logged_in] == True:
+                self.user_reg.deregister_user(username)
+                # dispatch an event the user went offline
+
+    async def move(self, username, direction, distance):
+        user = self.user_reg.get_user_instance(username)  # Ensure correct method is called
         if not user:
             return  # User not found
 
@@ -51,7 +78,7 @@ class UserActions(EventHandler):
         new_z = user.position[2] + dz
 
         # Implement collision detection and validation
-        map_instance = self.map_registry.get_map(user.current_map)
+        map_instance = self.map_reg.get_map(user.current_map)
         # Assuming Collision class exists and has been properly integrated
         collision_detector = Collision(map_instance)
         if not collision_detector.is_move_valid(new_x, new_y, new_z):
@@ -64,7 +91,7 @@ class UserActions(EventHandler):
         await self._notify_user(username, "Move successful", new_position=(new_x, new_y, new_z), success=True)
 
     async def turn(self, username, turn_direction):
-        user = self.user_registry.get_user_instance(username)  # Ensure correct method is called
+        user = self.user_reg.get_user_instance(username)  # Ensure correct method is called
         if not user:
             await self._notify_user(username, "User not found", success=False)
             return
@@ -84,6 +111,8 @@ class UserActions(EventHandler):
         await self._notify_user(username, "Turn successful", orientation_update={"yaw": user.yaw, "pitch": user.pitch}, success=True)
 
     async def _notify_user(self, username, message, new_position=None, orientation_update=None, success=True):
+        """
+        this code will need to be replaced with different code since all dispatches will be done through the dispatcher which has access to the network object
         writer = await self.network.get_writer(username)
         if writer:
             payload = {"message_type": "user_action_result", "action_type": "update", "success": success, "message": message}
@@ -92,3 +121,5 @@ class UserActions(EventHandler):
             if orientation_update:
                 payload["orientation_update"] = orientation_update
             await self.network.send(json.dumps(payload), writer)
+        """
+        pass

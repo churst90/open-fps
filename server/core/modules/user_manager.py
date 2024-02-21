@@ -3,44 +3,40 @@ import base64
 import json
 import bcrypt
 import asyncio
+from asyncio import Lock
 
 # project specific imports
 from core.events.event_dispatcher import EventDispatcher
 from core.data import Data
 
 class UserRegistry:
+    _lock = Lock()
     _users = {}  # Persistent dictionary of player data
     _instances = {}  # Runtime instances of logged-in players
     _event_dispatcher = EventDispatcher.get_instance()
     _data = Data()
 
     @classmethod
-    async def login(cls, username, password):
-        # first insure the password is hashed if necessary
-        if username in _users.keys():
-            if password == username[password]:
-                UserRegistry.register_user(username)
-                # dispatch an event to let other players and maps know the user is online
-                return cls._users[username]
-            else:
-                pass
-                # dispatch an event message indicating an incorrect password
+    def update_user_data(cls, username, user_data):
+        # Check if the user exists in the registry
+        if username in cls._users:
+            # Update the user's data with the latest state
+            cls._users[username] = user_data
         else:
-            pass
-            # dispatch a message stating the username doesn't exist
-
-    @classmethod
-    async def logout(cls, username):
-        # Check if the user is actually online before proceeding
-        if _user[username][logged_in] == True:
-            self.user_reg.deregister_user(username)
-            # dispatch an event the user went offline
+            print(f"Error: Attempt to synchronize data for non-existent user {username}.")
 
     @classmethod
     def get_user_instance(cls, username):
         # Check if the username exists in the _instances dictionary
         if username in cls._instances:
             return cls._instances[username]
+        # If not found in _instances but exists in _users, create a new instance and return it.
+        elif username in cls._users:
+            user_data = cls._users[username]
+            user_instance = User.from_dict(user_data, cls._event_dispatcher)
+            # Optionally set logged_in here if this method is used post-authentication.
+            # user_instance.logged_in = True
+            return user_instance
         else:
             return None
 
@@ -52,7 +48,7 @@ class UserRegistry:
 
         # Create a new player instance using cls to support subclassing
         user = User(cls._event_dispatcher)
-        user.update_username(username)
+        await user.update_username(username)
         await user.update_password(password)
         await user.update_health(10000)
         await user.update_energy(10000)
@@ -65,38 +61,40 @@ class UserRegistry:
 
     @classmethod
     async def load_users(cls):
-        data = await cls._data.async_init()
-        print("Attempting to load users.dat from disk ...")
-        user_data = cls._data.load("users")
-        if user_data:
-            print("users.dat loaded successfully")
-            # Directly load user data into _users without instantiating User objects
-            cls._users = user_data
-        else:
-            print("Creating the default admin user.")
-            await UserRegistry.create_user("admin", "admin")
-            print("Default admin user created successfully")
+        async with cls._lock:
+            data = await cls._data.async_init()
+            print("Attempting to load users.dat from disk ...")
+            user_data = await cls._data.load("users")
+            if user_data:
+                print("users.dat loaded successfully")
+                # Directly load user data into _users without instantiating User objects
+                cls._users = user_data
+            else:
+                print("Creating the default admin user.")
+                await cls.create_user("admin", "admin")
+                print("Default admin user created successfully")
 
     @classmethod
-    def save_users(cls):
-        cls._data.export(cls._users, "users")
+    async def save_users(cls):
+        async with cls._lock:
+            await cls._data.export(cls._users, "users")
         print("Users saved successfully")
 
     @classmethod
-    def register_user(cls, username, player_obj):
-        if username in cls._users:
-            player_obj.update_login_status(True)
+    async def register_user(cls, username, player_obj):
+        if username in cls._users.keys():
             cls._instances[username] = player_obj
+            cls._instances[username].logged_in = True
             # Immediately reflect this change in _users dictionary
             cls._users[username]['logged_in'] = True
         else:
             print(f"Error: {username} not found for registration.")
 
     @classmethod
-    def deregister_user(cls, username):
+    async def deregister_user(cls, username):
         if username in cls._instances:
             # Update the login status to False
-            cls._instances[username].update_login_status(False)
+            await cls._instances[username].update_login_status(False)
             # Save the updated user data
             cls._users[username] = cls._instances[username].to_dict()
             cls.save_users()
@@ -104,8 +102,8 @@ class UserRegistry:
             print(f"Error: {username} not found in instances for deregistration.")
 
     @classmethod
-    def get_all_users(self):
-        return self._users
+    async def get_all_users(cls):
+        return cls._users
 
 class User:
     def __init__(self, event_dispatcher):
@@ -152,7 +150,7 @@ class User:
     def get_position(self):
         return self.position
 
-    def update_login_status(self, status):
+    async def update_login_status(self, status):
         self.logged_in = status
 
     async def update_position(self, position):
@@ -172,7 +170,7 @@ class User:
         self.yaw = yaw
         await self.event_dispatcher.dispatch("PlayerYawChanged", {"username": self.username, "yaw": self.yaw})
 
-    def update_username(self, username):
+    async def update_username(self, username):
         self.username = username
 
     async def update_password(self, password):
@@ -184,6 +182,7 @@ class User:
         return {
             "username": self.username,
             "password": self.password,
+            "logged_in": self.logged_in,
             "position": self.position,
             "yaw": self.yaw,
             "pitch": self.pitch,
@@ -197,6 +196,7 @@ class User:
         user_instance = cls(event_dispatcher)
         user_instance.username = data['username']
         user_instance.password = data['password']
+        user_instance.logged_in = data['logged_in']
         user_instance.health = data['health']
         user_instance.energy = data['energy']
         user_instance.inventory = data['inventory']
@@ -205,5 +205,5 @@ class User:
         return user_instance
 
     def synchronize_with_registry(self):
-        # Assuming UserRegistry is accessible and cls._users can be updated
+        # Update the user data in UserRegistry with the latest state from this User instance
         UserRegistry.update_user_data(self.username, self.to_dict())

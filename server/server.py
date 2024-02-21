@@ -11,6 +11,7 @@ from core.security.security_manager import SecurityManager
 from core.events.event_dispatcher import EventDispatcher
 from core.modules.map_manager import MapRegistry
 from core.modules.user_manager import UserRegistry
+from core.data import Data
 
 class Server:
     def __init__(self, host, port):
@@ -20,17 +21,16 @@ class Server:
         self.website = "https://codyhurst.com/"
         self.host = host
         self.port = port
-        self.logger = CustomLogger('server', debug_mode=True)
+        self.logger = CustomLogger('server', debug_mode = False)
         self.network = None
         self.user_reg = UserRegistry()
         self.map_reg = MapRegistry()
-        self.event_dispatcher = EventDispatcher.get_instance()
-        self.server_handler = ServerHandler(self.user_reg, self.map_reg, self.network, self.event_dispatcher, self.logger)
+        self.event_dispatcher = EventDispatcher.get_instance(self.network)
+        self.server_handler = ServerHandler(self.user_reg, self.map_reg, self.event_dispatcher, self.logger)
         self.console = None
-        self.listen_task = None
-        self.user_input_task = None
         self.shutdown_event = asyncio.Event()
-        self.security_manager = SecurityManager.get_instance("security.key")
+        self.security_manager = SecurityManager('security.key')
+        self.data = None
 
     async def ensure_ssl_certificate(self, cert_file='cert.pem', key_file='key.pem'):
         if not os.path.exists(cert_file) or not os.path.exists(key_file):
@@ -38,11 +38,16 @@ class Server:
             subprocess.run(['openssl', 'req', '-x509', '-newkey', 'rsa:4096', '-keyout', key_file, '-out', cert_file, '-days', '365', '-nodes', '-subj', '/CN=localhost'], check=True)
             print("Certificate and key pair generated successfully")
 
-    async def process_message(self, data, client_socket):
-        message_type = data.get('type')
-        handler = getattr(self.server_handler, message_type, None)
+    async def process_message_queue(self):
+        while not self.shutdown_event.is_set():
+            data = await self.network.message_queue.get()
+            await self.process_message(data)
+
+    async def process_message(self, data):
+        message_type = data.get('message_type')
+        handler = getattr(self.server_handler, message_type, message_type)
         if handler:
-            await handler(data, client_socket)
+            await handler(data)
         else:
             self.logger.info(f"Unknown message type: {message_type}")
 
@@ -51,8 +56,6 @@ class Server:
         self.security_manager.get_instance("security.key")
         await self.security_manager.load_key()
         await self.security_manager.start_key_rotation(30)
-
-#    async def initialize(self):
 
     async def start(self):
         await self.ensure_ssl_certificate()
@@ -65,6 +68,7 @@ class Server:
         await self.user_reg.load_users()
         self.network = Network.get_instance(self.host, self.port, asyncio.Queue(), self.process_message, self.shutdown_event)
         await self.network.start()
+        asyncio.create_task(self.process_message_queue())
         self.console = ServerConsole.get_instance(self, self.user_reg, self.map_reg, self.logger, self.shutdown_event)
         self.console.start()
 

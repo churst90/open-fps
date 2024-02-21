@@ -1,5 +1,8 @@
+import uuid
+
 class Zone:
     def __init__(self, zone_position, zone_type):
+        self.zone_key = str(uuid.uuid4())  # Generate a unique identifier
         self.zone_position = zone_position  # Assuming zone_position is a tuple (x, y, z)
         self.zone_type = zone_type  # Could be an enum, string, or numeric identifier
 
@@ -14,6 +17,7 @@ class Zone:
 
     def to_dict(self):
         return {
+            "zone_key": self.zone_key,
             "zone_position": self.zone_position,
             "zone_type": self.zone_type
         }
