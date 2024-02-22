@@ -52,31 +52,7 @@ class Network:
             for _, writer in self.connections.values():
                 writer.close()
         self.connections.clear()
-    """
-    async def accept_connections(self):
-        # Start the server outside of the while loop to ensure it's created only once
-        try:
-            self.server = await asyncio.start_server(
-                self.handle_client, self.host, self.port, ssl=self.ssl_context
-            )
-            print(f"Listening for incoming connections on {self.host}:{self.port} with SSL/TLS encryption")
-            async with self.server:
-                # Instead of a while loop checking the event, use serve_forever
-                # and wait for the shutdown_event in a separate task.
-                server_task = asyncio.create_task(self.server.serve_forever())
-            
-                # Wait for the shutdown_event to be set before stopping the server.
-                await self.shutdown_event.wait()
-            
-                # Once shutdown_event is set, we cancel the server task.
-                server_task.cancel()
-                try:
-                    await server_task  # Attempt to await the task to catch any cancellation
-                except asyncio.CancelledError:
-                    print("Server has stopped accepting new connections.")
-        except Exception as e:
-            print(f"Failed to start server: {e}")
-    """
+
     async def handle_client(self, reader, writer):
         addr = writer.get_extra_info("peername")
         self.logger.info(f"Accepted connection from {addr}")
@@ -126,19 +102,7 @@ class Network:
                 self.logger.warning("Received data from an unknown connection.")
                 continue
             await self.message_handler(data, writer)
-    """
-    async def close(self):
-        print("Closing server and all client connections")
-        async with Network._lock:
-            for reader, writer in self.connections.values():
-                writer.close()
-                await writer.wait_closed()
-            if self.connections.values() == {}:
-                pass
-        if self.server:
-            self.server.close()
-            await self.server.wait_closed()
-    """
+
     async def disconnect_client(self, username):
         async with Network._lock:
             if username in self.connections:

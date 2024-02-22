@@ -1,36 +1,52 @@
 class ChatHandler(EventHandler):
 
-    def __init__(self, network, event_dispatcher):
+    def __init__(self, user_registry, map_registry, event_dispatcher):
         super().__init__(event_dispatcher)
-        self.network = network
+        self.user_registry = user_registry
+        self.map_registry = map_registry
+        self.event_dispatcher = event_dispatcher
+        self.event_dispatcher.subscribe("chat_message", self.handle_chat_message)
 
-    async def handle_chat(self, data):
-        from_user = data.get('from')
-        to = data.get('to')
-        scope = data.get('scope')
-        message = data.get('message')
+    async def handle_chat_message(self, data):
+        message_type = data.get("type")
+        if message_type == "private":
+            await self.handle_private_message(data)
+        elif message_type == "map":
+            await self.handle_map_message(data)
+        elif message_type == "global":
+            await self.handle_global_message(data)
 
-        # Handle private chat
-        if scope == 'private_chat':
-            await self.handle_private_chat(from_user, to, message)
-        
-        # For map and global chats, emit events to be handled appropriately
-        if scope in ['map', 'global']:
-            event_name = f"{scope}_chat"
-            self.emit_event(event_name, {
-                "message_type": "chat_message",
-                "scope": scope,
-                "from": from_user,
-                "to": to,
-                "message": message
+    async def handle_private_message(self, data):
+        sender = data.get("sender")
+        recipient = data.get("recipient")
+        message = data.get("message")
+
+        await self.emit_event("private_chat", {
+            "scope": "private",
+            "from": sender,
+            "to": recipient,
+            "message": message
             })
 
-    async def handle_private_chat(self, from_user, to, message):
-        to_writer = await self.network.get_writer(to)
-        from_writer = await self.network.get_writer(from_user)
-        if to_writer and from_writer:
-            await self.network.send({"message_type": "chat_message", "from": from_user, "message": message}, [to_writer])
-            # Optionally echo back to the sender if needed
-            # await self.network.send({"message_type": "chat_message", "from": from_user, "message": message}, [from_writer])
-        else:
-            print(f"Cannot send private message. User {to} or {from_user} not connected.")
+    async def handle_map_message(self, data):
+        sender = data.get("sender")
+        map_name = data.get("map_name")
+        message = data.get("message")
+
+        await self.emit_event("map_chat", {
+            "scope": "map",
+            "from": sender,
+            "to": map_name,
+            "message": message
+                })
+
+    async def handle_global_message(self, data):
+        sender = data.get("sender")
+        message = data.get("message")
+
+        await self.emit_event("global_chat", {
+            "type": "global",
+            "from": sender,
+            "message": message
+            })
+

@@ -64,10 +64,13 @@ class UserHandler(EventHandler):
                 self.user_reg.deregister_user(username)
                 # dispatch an event the user went offline
 
-    async def move(self, username, direction, distance):
-        user = self.user_reg.get_user_instance(username)  # Ensure correct method is called
+    async def move(self, data):
+        username = data.get('username')
+        direction = data.get('direction')
+        distance = data.get('distance')
+        user = self.user_reg.get_user_instance(username)
         if not user:
-            return  # User not found
+            await self.emit_event("user_move", {"message_type": "user_action", "username": username, "error": "User not found"})
 
         # Calculate the movement vector based on the user's current orientation
         dx, dy, dz = self.calculate_movement_vector(direction, distance, user.yaw, user.pitch)
@@ -82,18 +85,19 @@ class UserHandler(EventHandler):
         # Assuming Collision class exists and has been properly integrated
         collision_detector = Collision(map_instance)
         if not collision_detector.is_move_valid(new_x, new_y, new_z):
-            await self._notify_user(username, "Movement blocked by obstacle", success=False)
-            return
+            await self.emit_event("user_move", {"message_type": "user_move", "username": username, "error": "can't move there"})
 
         # Update user's position
         user.update_position((new_x, new_y, new_z))
         # Notify user of successful movement
-        await self._notify_user(username, "Move successful", new_position=(new_x, new_y, new_z), success=True)
+        await self._emit_event("user_move", {"message_type": "user_move", "direction": direction, "distance": distance})
 
-    async def turn(self, username, turn_direction):
-        user = self.user_reg.get_user_instance(username)  # Ensure correct method is called
+    async def turn(self, data):
+        username = data.get('username')
+        turn_direction = data.get('turn_direction')
+        user = self.user_reg.get_user_instance(username)
         if not user:
-            await self._notify_user(username, "User not found", success=False)
+            await self.emit_event("user_turn", {"message_type": "user_turn", "error": "user not found"})
             return
 
         # Adjust yaw and pitch based on turn direction
@@ -108,18 +112,4 @@ class UserHandler(EventHandler):
             user.pitch = max(min(user.pitch - pitch_step, -90), -90)
 
         # Notify user of their new orientation
-        await self._notify_user(username, "Turn successful", orientation_update={"yaw": user.yaw, "pitch": user.pitch}, success=True)
-
-    async def _notify_user(self, username, message, new_position=None, orientation_update=None, success=True):
-        """
-        this code will need to be replaced with different code since all dispatches will be done through the dispatcher which has access to the network object
-        writer = await self.network.get_writer(username)
-        if writer:
-            payload = {"message_type": "user_action_result", "action_type": "update", "success": success, "message": message}
-            if new_position:
-                payload["new_position"] = new_position
-            if orientation_update:
-                payload["orientation_update"] = orientation_update
-            await self.network.send(json.dumps(payload), writer)
-        """
-        pass
+        await self.emit_event("user_turn", {"message_type": "user_turn", "username": username, "pitch": user.pitch, "yaw": user.yaw})

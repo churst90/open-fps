@@ -21,10 +21,10 @@ class Client:
         self.network.set_port(port)
         self.client_handler = ClientHandler(self.network)
         self.initialize_tkinter()
-#        asyncio.run(self.client_handler.start_processing())
 
     def initialize_tkinter(self):
-        self.root.geometry("1200x800")
+        self.root.geometry("500x400")
+        self.root.configure(bg='dark blue')
         self.setup_startup_menu()
 
     def setup_startup_menu(self):
