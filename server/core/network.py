@@ -8,6 +8,7 @@ from collections import defaultdict
 from datetime import datetime, timedelta
 
 class Network:
+    _lock = Lock()
     _instance = None
 
     def __new__(cls, *args, **kwargs):
@@ -23,7 +24,6 @@ class Network:
         return cls._instance
 
     def __init__(self, host, port, message_queue, message_handler, shutdown_event, ssl_cert_file='cert.pem', ssl_key_file='key.pem'):
-        _lock = Lock()
         self.host = host
         self.port = port
         self.message_queue = message_queue
@@ -39,18 +39,20 @@ class Network:
         self.connections_lock = asyncio.Lock()  # Add a lock for managing connections
 
     async def start(self):
-        self.listen_task = asyncio.create_task(self.accept_connections())
-#        await asyncio.wait([self.listen_task], return_when=asyncio.FIRST_COMPLETED)
+        self.server = await asyncio.start_server(
+            self.handle_client, self.host, self.port, ssl=self.ssl_context
+        )
+        print(f"Listening for incoming connections on {self.host}:{self.port} with SSL/TLS encryption")
+        asyncio.create_task(self.server.serve_forever())
 
     async def stop(self):
-        if self.listen_task:
-            self.listen_task.cancel()  # Cancel the listening task
-            try:
-                await self.listen_task  # Wait for the task to be cancelled
-            except asyncio.CancelledError:
-                print("Network listening task cancelled.")
-            self.listen_task = None  # Reset the task attribute
-
+        self.server.close()
+        await self.server.wait_closed()
+        async with self.connections_lock:
+            for _, writer in self.connections.values():
+                writer.close()
+        self.connections.clear()
+    """
     async def accept_connections(self):
         # Start the server outside of the while loop to ensure it's created only once
         try:
@@ -74,59 +76,30 @@ class Network:
                     print("Server has stopped accepting new connections.")
         except Exception as e:
             print(f"Failed to start server: {e}")
-
+    """
     async def handle_client(self, reader, writer):
         addr = writer.get_extra_info("peername")
-        now = datetime.now()
+        self.logger.info(f"Accepted connection from {addr}")
 
         async with self.connections_lock:
-            # Rate limiting: Allow only 3 attempts per minute per IP
-            if addr[0] in self.last_connection_attempt:
-                if now - self.last_connection_attempt[addr[0]] < timedelta(minutes=1):
-                    self.connection_attempts[addr[0]] += 1
-                    if self.connection_attempts[addr[0]] > 3:
-                        writer.close()
-                        await writer.wait_closed()
-                        self.logger.warning(f"Rate limit exceeded for {addr}")
-                        return
-                else:
-                    self.connection_attempts[addr[0]] = 1
-            self.last_connection_attempt[addr[0]] = now
-
-            # Initial connection logging
-            print(f"Accepted connection from {addr} with SSL/TLS encryption")
-
-            # Track connections initially by address
             self.connections[addr] = (reader, writer)
 
-        username = None
-
         try:
-            while True:
+            while not reader.at_eof():
                 data = await reader.read(1024)
-                if not data:
-                    break
-                data = json.loads(data.decode('utf-8'))
-                async with self.connections_lock:
-                    username = data.get('username')
-                    if username:
-                        # Once username is known, use it as the main key and remove the address-based entry
-                        self.connections[username] = self.connections.pop(addr)
-
-                await self.message_queue.put((data))
-                print("data added to message queue")
+                if data:
+                    message = json.loads(data.decode('utf-8'))
+                    await self.message_queue.put(message)
         except asyncio.CancelledError:
-            print("Connection handling cancelled")
-        except Exception as e:
-            self.logger.exception("An unexpected error occurred:", exc_info=e)
+            self.logger.info("Connection handling cancelled")
+        except (OSError, ConnectionResetError) as e:
+            self.logger.warning(f"Network error with {addr}: {e}")
         finally:
             async with self.connections_lock:
                 writer.close()
-                await writer.wait_closed()
-                remove_key = username if username and username in self.connections else addr
-                if remove_key in self.connections:
-                    del self.connections[remove_key]
-                print(f"Connection closed for {remove_key}")
+                if addr in self.connections:
+                    del self.connections[addr]
+            self.logger.info(f"Connection closed for {addr}")
 
     async def send(self, message, client_sockets):
         if not isinstance(client_sockets, list):
@@ -153,19 +126,21 @@ class Network:
                 self.logger.warning("Received data from an unknown connection.")
                 continue
             await self.message_handler(data, writer)
-
+    """
     async def close(self):
         print("Closing server and all client connections")
-        async with cls._lock:
+        async with Network._lock:
             for reader, writer in self.connections.values():
                 writer.close()
                 await writer.wait_closed()
+            if self.connections.values() == {}:
+                pass
         if self.server:
             self.server.close()
             await self.server.wait_closed()
-
+    """
     async def disconnect_client(self, username):
-        async with cls._lock:
+        async with Network._lock:
             if username in self.connections:
                 writer = self.connections[username][1]
                 writer.close()

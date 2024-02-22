@@ -25,7 +25,7 @@ class SecurityManager:
     async def generate_key(self):
         self.key = Fernet.generate_key()
 
-    async def save_key(self):
+    def save_key(self):
         with open(self.key_file, "wb") as f:
             f.write(self.key)
 

@@ -12,7 +12,7 @@ class Data:
         await self.sm.load_key()  # Ensure the key is loaded asynchronously
         self.f = self.sm.get_key()
 
-    async def export(self, data_dict, filename):
+    def export(self, data_dict, filename):
         try:
             # Convert dictionary to JSON and encode to bytes
             json_data = json.dumps(data_dict).encode('utf-8')
@@ -25,7 +25,7 @@ class Data:
         except Exception as e:
             print(f"Error saving data to {filename}.dat: {e}")
 
-    async def load(self, filename):
+    def load(self, filename):
         try:
             # Read encrypted data from disk
             with open(f"{filename}.dat", 'rb') as file:

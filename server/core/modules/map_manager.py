@@ -76,7 +76,7 @@ class MapRegistry:
     @classmethod
     async def save_maps(cls):
         async with cls._lock:
-            await cls._data.export(cls._client_data, "maps")
+            await asyncio.to_thread(cls._data.export, cls._client_data, "maps")
         print("Maps saved successfully")
 
     @classmethod
@@ -84,7 +84,7 @@ class MapRegistry:
         async with cls._lock:
             data = await cls._data.async_init()
             print("Attempting to load maps.dat from disk ...")
-            maps_data = await cls._data.load("maps")  # Correct await usage
+            maps_data = await asyncio.to_thread(cls._data.load, "maps")
             if maps_data:
                 print("maps.dat loaded successfully")
                 for name, map_dict in maps_data.items():

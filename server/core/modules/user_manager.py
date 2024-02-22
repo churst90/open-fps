@@ -64,7 +64,7 @@ class UserRegistry:
         async with cls._lock:
             data = await cls._data.async_init()
             print("Attempting to load users.dat from disk ...")
-            user_data = await cls._data.load("users")
+            user_data = cls._data.load("users")
             if user_data:
                 print("users.dat loaded successfully")
                 # Directly load user data into _users without instantiating User objects
@@ -77,7 +77,7 @@ class UserRegistry:
     @classmethod
     async def save_users(cls):
         async with cls._lock:
-            await cls._data.export(cls._users, "users")
+            cls._data.export, cls._users("users")
         print("Users saved successfully")
 
     @classmethod

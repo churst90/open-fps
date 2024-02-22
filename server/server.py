@@ -32,7 +32,7 @@ class Server:
         self.security_manager = SecurityManager('security.key')
         self.data = None
 
-    async def ensure_ssl_certificate(self, cert_file='cert.pem', key_file='key.pem'):
+    def ensure_ssl_certificate(self, cert_file='cert.pem', key_file='key.pem'):
         if not os.path.exists(cert_file) or not os.path.exists(key_file):
             print("Neither a certificate nor a key were found. Generating a self signed certificate now .....")
             subprocess.run(['openssl', 'req', '-x509', '-newkey', 'rsa:4096', '-keyout', key_file, '-out', cert_file, '-days', '365', '-nodes', '-subj', '/CN=localhost'], check=True)
@@ -58,7 +58,7 @@ class Server:
         await self.security_manager.start_key_rotation(30)
 
     async def start(self):
-        await self.ensure_ssl_certificate()
+        await asyncio.to_thread(self.ensure_ssl_certificate)
         print("Initializing server ...")
         print(f"{self.server_name} {self.version}")
         print(f"Developed and maintained by {self.dev_name}. {self.website}")
@@ -79,8 +79,6 @@ class Server:
         await self.network.stop()
         if self.console:
             await self.console.stop()
-        if self.network:
-            await self.network.close()
         print("Server shutdown complete.")
         self.shutdown_event.set()
 
