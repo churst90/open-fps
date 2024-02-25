@@ -77,7 +77,7 @@ class UserRegistry:
     @classmethod
     async def save_users(cls):
         async with cls._lock:
-            cls._data.export, cls._users("users")
+            await asyncio.to_thread(cls._data.export, cls._users, "users")
         print("Users saved successfully")
 
     @classmethod

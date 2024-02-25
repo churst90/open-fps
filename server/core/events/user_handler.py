@@ -3,6 +3,7 @@ import math
 import json
 from core.events.event_handler import EventHandler
 from core.events.event_dispatcher import EventDispatcher
+from core.modules.collision import Collision
 
 class UserHandler(EventHandler):
     def __init__(self, user_reg, map_reg, event_dispatcher):
@@ -75,22 +76,23 @@ class UserHandler(EventHandler):
         # Calculate the movement vector based on the user's current orientation
         dx, dy, dz = self.calculate_movement_vector(direction, distance, user.yaw, user.pitch)
 
-        # Proposed new position based on the calculated movement vector
-        new_x = user.position[0] + dx
-        new_y = user.position[1] + dy
-        new_z = user.position[2] + dz
+        new_position = (user.position[0] + dx, user.position[1] + dy, user.position[2] + dz)
 
         # Implement collision detection and validation
         map_instance = self.map_reg.get_map(user.current_map)
-        # Assuming Collision class exists and has been properly integrated
-        collision_detector = Collision(map_instance)
-        if not collision_detector.is_move_valid(new_x, new_y, new_z):
-            await self.emit_event("user_move", {"message_type": "user_move", "username": username, "error": "can't move there"})
 
-        # Update user's position
-        user.update_position((new_x, new_y, new_z))
-        # Notify user of successful movement
-        await self._emit_event("user_move", {"message_type": "user_move", "direction": direction, "distance": distance})
+        # Ensure map_instance is valid
+        if not map_instance:
+            await self.emit_event("user_move", {"message_type": "user_action", "username": username, "error": "Map instance not found"})
+            return
+
+        valid_move, message = Collision.is_move_valid(map_instance, new_position, username)
+    
+        if valid_move:
+            user.update_position(new_position)  # Update position only on valid move
+            await self.emit_event("user_move", {"message_type": "user_move", "username": username, "position": new_position})
+        else:
+            await self.emit_event("user_move", {"message_type": "user_move", "username": username, "error": message})
 
     async def turn(self, data):
         username = data.get('username')
