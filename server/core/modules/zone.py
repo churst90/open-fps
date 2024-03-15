@@ -1,10 +1,14 @@
 import uuid
 
 class Zone:
-    def __init__(self, zone_position, zone_type):
+    def __init__(self, zone_label, zone_position, zone_type):
         self.zone_key = str(uuid.uuid4())  # Generate a unique identifier
-        self.zone_position = zone_position  # Assuming zone_position is a tuple (x, y, z)
-        self.zone_type = zone_type  # Could be an enum, string, or numeric identifier
+        self.zone_label = zone_label
+        self.zone_position = zone_position
+        self.zone_type = zone_type
+
+    def update_zone_label(self, label):
+        self.zone_label = label
 
     def update_zone_position(self, new_position):
         self.zone_position = new_position
@@ -18,6 +22,7 @@ class Zone:
     def to_dict(self):
         return {
             "zone_key": self.zone_key,
+            "zone_label": self.zone_label,
             "zone_position": self.zone_position,
             "zone_type": self.zone_type
         }

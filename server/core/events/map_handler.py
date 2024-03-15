@@ -4,80 +4,86 @@ from core.modules.tile import Tile
 from core.modules.zone import Zone
 
 class MapHandler(EventHandler):
-    def __init__(self, user_registry, map_registry, event_dispatcher):
+    def __init__(self, map_registry, event_dispatcher):
         super().__init__(event_dispatcher)
-        self.user_reg = user_registry
         self.map_reg = map_registry
+        self.event_dispatcher.subscribe_internal("user_registered", self.handle_user_registered)
+        self.event_dispatcher.subscribe_internal("user_deregistered", self.handle_user_deregistered)
 
-    async def add_tile(self, map_name, tile_position, tile_type, is_wall):
-        map_instance = self.map_reg.get_map_instance(map_name)
+    async def handle_user_registered(self, event_data):
+        username = event_data["username"]
+        current_map = event_data["current_map"]
+        user_instance = event_data["user_instance"]
+        # Logic to add the user to the map
+        map_instance = await self.map_reg.get_map_instance(current_map)
+        if map_instance:
+            await map_instance.add_user(username, user_instance)
+
+    async def handle_user_deregistered(self, event_data):
+        username = event_data["username"]
+        current_map = event_data["current_map"]
+        # Logic to remove the user from the map
+        map_instance = await self.map_reg.get_map_instance(current_map)
+        if map_instance:
+            await map_instance.remove_user(username)
+
+    async def handle_add_tile(self, event_data):
+        map_name = event_data['map_name']
+        map_instance = await self.map_reg.get_map_instance(map_name)
         if not map_instance:
             print(f"Map {map_name} not found.")
             return
 
-        new_tile = Tile(tile_position, tile_type, is_wall)
-        tile_key = new_tile.tile_key  # Use the generated UUID as the key
-        map_instance.tiles[tile_key] = new_tile
-        map_instance.mark_changed("tiles", tile_key)
+        tile_data = {
+            'tile_position': event_data['tile_position'],
+            'tile_type': event_data['tile_type'],
+            'is_wall': event_data['is_wall']
+        }
+        map_instance = await self.map_reg.get_map_instance(map_name)
+        await map_instance.add_tile(tile_data)
 
-        self.map_reg.selectively_sync_map(map_name)
-
-        self.emit_event("add_tile", {
-            "tile_key": tile_key,
-            "tile": new_tile.to_dict()
-        })
-
-    async def remove_tile(self, map_name, tile_key):
-        map_instance = self.map_reg.get_map_instance(map_name)
+    async def handle_remove_tile(self, event_data):
+        map_name = event_data['map_name']
+        map_instance = await self.map_reg.get_map_instance(map_name)
         if not map_instance:
             print(f"Map {map_name} not found.")
             return
 
-        if tile_key in map_instance.tiles:
-            del map_instance.tiles[tile_key]
-            map_instance.mark_changed("tiles", tile_key)
+        tile_data = {
+        'tile_key': event_data['tile_key']
+        }
 
-            self.map_reg.selectively_sync_map(map_name)
+        await self.map_instance.remove_tile(tile_data)
 
-            self.emit_event("remove_tile", {
-                "tile_key": tile_key
-            })
-
-    async def add_zone(self, map_name, zone_position, zone_type):
-        map_instance = self.map_reg.get_map_instance(map_name)
+    async def handle_add_zone(self, event_data):
+        map_name = event_data['map_name']
+        map_instance = await self.map_reg.get_map_instance(map_name)
         if not map_instance:
             print(f"Map {map_name} not found.")
             return
 
-        new_zone = Zone(zone_position, zone_type)
-        zone_key = new_zone.zone_key  # Use the generated UUID as the key
-        map_instance.zones[zone_key] = new_zone
-        map_instance.mark_changed("zones", zone_key)
-
-        self.map_reg.selectively_sync_map(map_name)
-
-        self.emit_event("add_zone", {
-            "zone_key": zone_key,
-            "zone": new_zone.to_dict()
-        })
-
-    async def remove_zone(self, map_name, zone_key):
+        zone_data = {
+            'zone_label': event_data['zone_label'],
+            'zone_position': event_data['zone_position'],
+            'zone_type': event_data['zone_type']
+        }
         map_instance = self.map_reg.get_map_instance(map_name)
+        await map_instance.add_zone(zone_data)
+
+    async def handle_remove_zone(self, event_data):
+        map_name = event_data['map_name']
+        map_instance = await self.map_reg.get_map_instance(map_name)
         if not map_instance:
             print(f"Map {map_name} not found.")
             return
 
-        if zone_key in map_instance.zones:
-            del map_instance.zones[zone_key]
-            map_instance.mark_changed("zones", zone_key)
+        zone_data = {
+        'zone_key': event_data['zone_key']
+        }
+        map_instance = self.map_reg.get_map_instance(map_name)
+        await map_instance.remove_zone(zone_data)
 
-            self.map_reg.selectively_sync_map(map_name)
-
-            self.emit_event("remove_zone", {
-                "zone_key": zone_key
-            })
-
-    async def create_map(self, data):
+    async def handle_create_map(self, data):
         username = data.get("username")
         map_name = data.get("map_name")
         map_size = data.get("map_size")
@@ -89,5 +95,5 @@ class MapHandler(EventHandler):
             # Optionally emit an event about the map change
             self.emit_event("user_map_changed", {"username": username, "map_name": map_name})
 
-    async def remove_map(self, map_name):
+    async def handle_remove_map(self, map_name):
         await self.map_reg.remove_map(map_name)

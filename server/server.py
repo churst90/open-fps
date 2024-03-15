@@ -11,7 +11,8 @@ from core.security.security_manager import SecurityManager
 from core.events.event_dispatcher import EventDispatcher
 from core.modules.map_manager import MapRegistry
 from core.modules.user_manager import UserRegistry
-from core.data import Data
+from core.events.user_handler import UserHandler
+from core.events.map_handler import MapHandler
 
 class Server:
     def __init__(self, host, port):
@@ -23,14 +24,15 @@ class Server:
         self.port = port
         self.logger = CustomLogger('server', debug_mode = False)
         self.network = None
-        self.user_reg = UserRegistry()
-        self.map_reg = MapRegistry()
-        self.event_dispatcher = EventDispatcher.get_instance(self.network)
-        self.server_handler = ServerHandler(self.user_reg, self.map_reg, self.event_dispatcher, self.logger)
+        self.user_reg = None
+        self.map_reg = None
+        self.event_dispatcher = None
+        self.server_handler = None
         self.console = None
         self.shutdown_event = asyncio.Event()
         self.security_manager = SecurityManager('security.key')
-        self.data = None
+        self.user_handler = None
+        self.map_handler = None
 
     def ensure_ssl_certificate(self, cert_file='cert.pem', key_file='key.pem'):
         if not os.path.exists(cert_file) or not os.path.exists(key_file):
@@ -64,11 +66,18 @@ class Server:
         print(f"Developed and maintained by {self.dev_name}. {self.website}")
         print("Type 'help' for a list of available commands")
         await self.setup_security()
-        await self.map_reg.load_maps()
-        await self.user_reg.load_users()
         self.network = Network.get_instance(self.host, self.port, asyncio.Queue(), self.process_message, self.shutdown_event)
         await self.network.start()
         asyncio.create_task(self.process_message_queue())
+        self.event_dispatcher = EventDispatcher.get_instance(network=self.network)
+        self.user_reg = UserRegistry(self.event_dispatcher)
+        self.map_reg = MapRegistry(self.event_dispatcher)
+        self.user_handler = UserHandler(self.user_reg, self.map_reg, self.event_dispatcher)
+        self.map_handler = MapHandler(self.map_reg, self.event_dispatcher)
+        await self.map_reg.load_maps()
+        await self.user_reg.load_users()
+        self.server_handler = ServerHandler(self.user_reg, self.map_reg, self.event_dispatcher, self.logger)
+        await self.event_dispatcher.update_network(self.network)
         self.console = ServerConsole.get_instance(self, self.user_reg, self.map_reg, self.logger, self.shutdown_event)
         self.console.start()
 

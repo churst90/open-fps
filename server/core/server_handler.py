@@ -8,15 +8,16 @@ class ServerHandler:
         self.user_reg = user_reg
         self.map_reg = map_reg
         self.event_dispatcher = event_dispatcher
-        self.map_handler = MapHandler(self.user_reg, self.map_reg, self.event_dispatcher)
+        self.map_handler = MapHandler(self.map_reg, self.event_dispatcher)
         self.user_handler = UserHandler(self.user_reg, self.map_reg, self.event_dispatcher)
 
     async def handle_login(self, data):
-#        username = data.get('username')
-#        password = data.get('password')
         await self.user_handler.authenticate_user(data)
 
-    async def user_handler(self, data):
+    async def handle_create_account(self):
+        await self.user_handler.create_account(data)
+
+    async def handle_user_action(self, data):
         username = data.get("username")
         action_type = data.get("action_type")
         if action_type == "move":
@@ -32,7 +33,7 @@ class ServerHandler:
             # dispatch an error message
             pass
 
-    async def handle_map_handler(self, data):
+    async def handle_map_action(self, data):
         username = data.get("username")
         action_type = data.get("action_type")
         map_name = data.get("map_name")

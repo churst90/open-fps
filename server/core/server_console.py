@@ -39,7 +39,7 @@ class ServerConsole:
             self.logger.info("")
         elif command == "list players":
             self.users = await self.user_reg.get_all_users()
-            online_users = [username for username, user_info in self.users.items() if user_info.get('logged_in')]
+            online_users = [username for username, user_instance in self.users.items() if user_instance.logged_in]
             if online_users:
                 self.logger.info("\nList of online users:\n" + "\n".join(online_users))
             else:
@@ -59,9 +59,9 @@ class ServerConsole:
             else:
                 self.logger.info("No user accounts found.")
         elif command == "backup maps":
-            await self.map_reg.save_maps()
+            await self.map_reg.save_all_maps()
         elif command == "backup users":
-            await self.user_reg.save_users()
+            await self.user_reg.save_all_users()
         elif command == "help":
             print("Available server commands:\n"
               "'list users': Lists all users registered with the game, both online and offline.\n"

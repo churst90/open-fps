@@ -33,6 +33,7 @@ class Network:
         self.connections = {}  # Key: username, Value: (reader, writer)
         self.connection_attempts = defaultdict(int)  # Track connection attempts by IP
         self.last_connection_attempt = {}  # Timestamp of the last connection attempt by IP
+        self.banned_ips = set()
         self.ssl_context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
         self.ssl_context.load_cert_chain(certfile='cert.pem', keyfile='key.pem')
         self.shutdown_event = shutdown_event
@@ -40,7 +41,7 @@ class Network:
 
     async def start(self):
         self.server = await asyncio.start_server(
-            self.handle_client, self.host, self.port, ssl=self.ssl_context
+            self.handle_client, self.host, self.port
         )
         print(f"Listening for incoming connections on {self.host}:{self.port} with SSL/TLS encryption")
         asyncio.create_task(self.server.serve_forever())
@@ -55,40 +56,68 @@ class Network:
 
     async def handle_client(self, reader, writer):
         addr = writer.get_extra_info("peername")
-        self.logger.info(f"Accepted connection from {addr}")
+        print(f"Accepted connection from {addr}")
+        ip = addr[0]
+        if ip in self.banned_ips:
+            print(f"Rejected connection from banned IP: {ip}")
+            writer.close()  # Close the connection
+            return
 
-        async with self.connections_lock:
-            self.connections[addr] = (reader, writer)
+        # Track connection attempts
+        self.connection_attempts[ip] += 1
+        if self.connection_attempts[ip] > MAX_CONNECTION_ATTEMPTS:
+            self.ban_ip(ip)
+            print(f"Connection attempt limit exceeded. Banned IP: {ip}")
+            writer.close()
+            return
+
+        # Reset connection attempts count after successful connection
+        self.connection_attempts[ip] = 0
 
         try:
             while not reader.at_eof():
                 data = await reader.read(1024)
                 if data:
                     message = json.loads(data.decode('utf-8'))
+                    username = message.get('username')
+                    async with self.connections_lock:
+                        self.connections[username] = (reader, writer, addr)
                     await self.message_queue.put(message)
         except asyncio.CancelledError:
-            self.logger.info("Connection handling cancelled")
+            print("Connection handling cancelled")
         except (OSError, ConnectionResetError) as e:
-            self.logger.warning(f"Network error with {addr}: {e}")
+            print(f"Network error with {addr}: {e}")
         finally:
             async with self.connections_lock:
+                for username, conn_writer in self.connections.items():
+                    if conn_writer == writer:
+                        del self.connections[username]
+                        break
                 writer.close()
-                if addr in self.connections:
-                    del self.connections[addr]
-            self.logger.info(f"Connection closed for {addr}")
+            print(f"Connection closed for {addr}")
 
-    async def send(self, message, client_sockets):
-        if not isinstance(client_sockets, list):
-            client_sockets = [client_sockets]
-
-        data = json.dumps(message)
-        for client_socket in client_sockets:
-            if client_socket and not client_socket.is_closing():
+    async def send_to_writers(self, writers, data):
+        """Send data to multiple writers."""
+        encoded_data = json.dumps(data).encode('utf-8')
+        for writer in writers:
+            if writer and not writer.is_closing():
                 try:
-                    client_socket.write(data.encode('utf-8'))
-                    await client_socket.drain()
+                    writer.write(encoded_data)
+                    await writer.drain()
                 except Exception as e:
-                    self.logger.exception(f"Failed to send message to {client_socket.get_extra_info('peername')}: {e}")
+                    self.logger.exception(f"Failed to send message to a client: {e}")
+
+    async def send(self, message, client_writer):
+        if client_writer is None or client_writer.is_closing():
+            self.logger.error("Attempted to send a message to a closed or nonexistent connection.")
+            return
+        data = json.dumps(message)
+        try:
+            client_writer.write(data.encode('utf-8'))
+            await client_writer.drain()
+            print("data sent to client")
+        except Exception as e:
+            self.logger.exception(f"Failed to send message to {client_writer.get_extra_info('peername')}: {e}")
 
     async def process_received_data(self):
         while not self.message_queue.empty():
@@ -110,6 +139,39 @@ class Network:
                 writer.close()
                 del self.connections[username]
 
+    async def get_writers_by_usernames(self, usernames):
+        async with self.connections_lock:
+            return [writer for username, (reader, writer) in self.connections.items() if username in usernames]
+
+    async def get_all_writers(self):
+        async with self.connections_lock:
+            return [client['writer'] for client in self.connections.values()]
+
+    async def get_writers_by_map(self, usernames):
+        async with self.connections_lock:
+            return [self.get_writer_by_username(username) for username in usernames if username in self.connections]
+
+    async def get_private_writers(self, sender_id, recipient_id):
+        async with self.connections_lock:
+            sender_writer = self.connections.get(sender_id, {}).get('writer')
+            recipient_writer = self.connections.get(recipient_id, {}).get('writer')
+            return [sender_writer, recipient_writer]
+
     async def get_writer(self, username):
         async with self.connections_lock:
-            return self.connections.get(username, None)[1] if username in self.connections else None
+            connection_tuple = self.connections.get(username)
+        if connection_tuple is not None:
+            # Assuming connection_tuple is a tuple where the writer is the second element
+            _, writer = connection_tuple
+            return writer
+        else:
+            # Username not found in connections, or connections tuple is malformed
+            return None
+
+    def ban_ip(self, ip):
+        self.banned_ips.add(ip)
+        print(f"Banned IP: {ip}")
+
+    def unban_ip(self, ip):
+        self.banned_ips.discard(ip)
+        print(f"Unbanned IP: {ip}")

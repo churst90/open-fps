@@ -1,104 +1,116 @@
 # standard imports
 import random
+from pathlib import Path
 import json
 import asyncio
 from asyncio import Lock
+import aiofiles  # Import aiofiles for async file operations
 
-# Project specific imports
-from core.events.event_dispatcher import EventDispatcher
-from core.data import Data
+# project specific imports
+from core.modules.tile import Tile
+from core.modules.zone import Zone
 
 class MapRegistry:
-    _lock = Lock()
-    _instances = {}  # For storing Map instance objects for runtime use
-    _client_data = {}  # For storing instance changes in dictionary-friendly map data for client transmission
-    _event_dispatcher = EventDispatcher.get_instance()
-    _data = Data()
+    def __init__(self, event_dispatcher):
+        self.lock = Lock()
+        self.instances = {}  # For storing Map instance objects for runtime use
+        self.event_dispatcher = event_dispatcher
+        self.maps_path = Path('maps')  # Define the maps directory path
+#        self.map_handler = None
 
-    @classmethod
-    async def selectively_sync_map(cls, name):
-        async with cls._lock:
-            if name not in cls._instances:
-                print(f"Error: Map '{name}' not found.")
-                return
+    async def assign_user_to_map(self, username, map_name):
+        await self.event_dispatcher.update_user_map(username, map_name, action="add")
 
-            map_instance = cls._instances[name]
-            map_data = cls._client_data.get(name, {})
-        
-            for element_type, keys in map_instance.changed_elements.items():
-                for key in keys:
-                    if element_type == "tiles":
-                        map_data["tiles"][key] = map_instance.tiles[key].to_dict()
+    async def remove_user_from_map(self, username, map_name):
+        await self.event_dispatcher.update_user_map(username, map_name, action="remove")
 
-                    # Add similar handling for zones, items, and AI
+#    def set_handler(self, handler):
+#        self.map_handler = handler
 
-            map_instance.changed_elements = {k: set() for k in map_instance.changed_elements.keys()}
-            cls._client_data[name] = map_data
-
-    @classmethod
-    async def create_map(cls, name, size):
-        if name in cls._instances:
+    async def create_map(self, name, size):
+        if name in self.instances:
             print("Map already exists")
             raise ValueError(f"A map with the name '{name}' already exists.")
         # Create a new Map instance using the provided event dispatcher
-        new_map = Map(cls._event_dispatcher)
+        new_map = Map(self.event_dispatcher, self)
         new_map.set_map_name(name)
         new_map.set_map_size(size)
         print(f"Default {new_map.map_name} map created successfully with dimensions {new_map.map_size}")
-        # Create the new map instance and its dictionary representation
-        cls._instances[name] = new_map
-        cls._client_data[name] = new_map.to_dict()
-        return cls._client_data[name]
+        # Create the new map instance
+        self.instances[name] = new_map
+        self.event_dispatcher.dispatch("chat", {"message": f"Server: {new_map} map was just created."})
+        try:
+            await self.save_map(new_map.get_map_name())
+        except Exception as e:
+            print(f"Error saving map: {e}")
 
-    @classmethod
-    async def update_map_data(cls, name):
-        async with cls._lock:
-            if name in cls._instances:
-                cls._client_data[name] = cls._instances[name].to_dict()
-            else:
-                raise ValueError(f"Map '{name}' not found for update.")
+    async def get_map_instance(self, name):
+#        async with self.lock:
+        return (self.instances[name], "Error: Map not found.")
 
-    @classmethod
-    async def get_map(cls, name):
-        async with cls._lock:
-            return cls._client_data.get(name, "Error: Map not found.")
+    async def get_all_maps(self):
+#        async with self.lock:
+        return self.instances
 
-    @classmethod
-    async def get_all_maps(cls):
-        async with cls._lock:
-            return cls._client_data
+    async def save_map(self, name):
+        if name not in self.instances:
+            print(f"Map '{name}' does not exist.")
+            return
+        map_instance = self.instances[name]
+        map_data = map_instance.to_dict()
+        self.maps_path.mkdir(parents=True, exist_ok=True)
+        try:
+            async with aiofiles.open(self.maps_path / f'{name}.map', 'w') as file:
+                await file.write(json.dumps(map_data))
+            print(f"Map '{name}' saved successfully.")
+        except Exception as e:
+            print(f"Failed to save map {name}: {e}")
 
-    @classmethod
-    async def get_map_instance(cls, name):
-        async with cls._lock:
-            return cls._instances.get(name, None)
+    async def save_all_maps(self):
+        for map_name in self.instances.keys():  # Iterating through keys of self.instances
+            await self.save_map(map_name)  # map_name is a string
 
-    @classmethod
-    async def save_maps(cls):
-        async with cls._lock:
-            await asyncio.to_thread(cls._data.export, cls._client_data, "maps")
-        print("Maps saved successfully")
+    async def load_maps(self):
+        async with self.lock:
+            if not self.maps_path.exists():
+                self.maps_path.mkdir(parents=True, exist_ok=True)
+                print("No maps directory found. Created 'maps' directory.")
+                await self.create_map("Main", (0, 10, 0, 10, 0, 10))
+                self.instances["Main"].setup_event_subscriptions()
+                print(f"Subscriptions added for Main")
+                tile_data = {
+                    "map_name": "Main",
+                    "tile_position": (0, 10, 0, 10, 0, 0),
+                    "tile_type": "grass",
+                    "is_wall": False  # Example property for tile
+                    }
 
-    @classmethod
-    async def load_maps(cls):
-        async with cls._lock:
-            data = await cls._data.async_init()
-            print("Attempting to load maps.dat from disk ...")
-            maps_data = await asyncio.to_thread(cls._data.load, "maps")
-            if maps_data:
-                print("maps.dat loaded successfully")
-                for name, map_dict in maps_data.items():
-                    cls._instances[name] = Map.from_dict(map_dict)
-                    cls._client_data[name] = map_dict
-            else:
-                print("Creating the default map.")
-                await cls.create_map("Main", (10, 10, 10))
+                zone_data = {
+                    "map_name": "Main",
+                    "zone_label": "Main area",
+                    "zone_position": (0, 10, 0, 10, 0, 0),
+                    "zone_type": "grass"
+                    }
+
+                await self.event_dispatcher.dispatch('add_tile', tile_data)
+                await self.event_dispatcher.dispatch('add_zone', zone_data)
+
+                await self.save_map("Main")
+                return
+            for map_file in self.maps_path.glob('*.map'):
+                map_name = map_file.stem
+                async with aiofiles.open(map_file, 'r') as file:
+                    map_data = json.loads(await file.read())
+                self.instances[map_name] = Map.from_dict(map_data, self.event_dispatcher)
+                print(f"Map '{map_name}' loaded successfully.")
+                self.instances[map_name].setup_event_subscriptions()
+                print(f"Subscriptions added for '{map_name}")
 
 class Map:
-    def __init__(self, event_dispatcher):
+    def __init__(self, event_dispatcher, map_registry):
         self.map_name = ""
         self.map_size = ()
-        self.players = {}
+        self.users = {}
         self.tiles = {}
         self.zones = {}
         self.items = {}
@@ -108,11 +120,20 @@ class Map:
             'change': []
         }
         self.changed_elements = {"tiles": set(), "zones": set(), "items": set(), "ai": set()}
+        self.weather = {"type": "clear", "intensity": 0, "duration": 0}
+        self.map_registry = map_registry
 
-    def mark_changed(self, element_type, key):
-        """Mark an element as changed to be selectively synchronized."""
-        if element_type in self.changed_elements:
-            self.changed_elements[element_type].add(key)
+    def setup_event_subscriptions(self):
+        self.event_dispatcher.subscribe_internal('add_tile', self.add_tile)
+        self.event_dispatcher.subscribe_internal('remove_tile', self.map_name)
+        self.event_dispatcher.subscribe_internal('add_zone', self.add_zone)
+        self.event_dispatcher.subscribe_internal('remove_zone', self.map_name)
+        self.event_dispatcher.subscribe_internal('add_user', self.add_user)
+        self.event_dispatcher.subscribe_internal('remove_user', self.map_name)
+
+    def update_weather(self, new_weather):
+        self.weather = new_weather
+#        self.event_dispatcher.dispatch('weather_change', {'map': self.map_name, 'weather': self.weather})
 
     def on(self, event_name, listener):
         if event_name not in self.event_listeners:
@@ -125,13 +146,9 @@ class Map:
 
     def set_map_name(self, name):
         self.map_name = name
-        # You might want to dispatch an event here
-        # self.event_dispatcher.dispatch('set_map_name', {'map': self.map_name})
 
     def set_map_size(self, size):
         self.map_size = size
-        # Similarly, dispatch an event if needed
-        # self.event_dispatcher.dispatch('set_map_size', {'map': self.map_name, 'size': self.map_size})
 
     def is_within_single_bounds(self, x, y, z):
         min_x, max_x, min_y, max_y, min_z, max_z = self.map_size
@@ -144,25 +161,89 @@ class Map:
                map_min_z <= min_z <= max_z <= map_max_z
 
     @classmethod
-    def from_dict(cls, data):
-        map_instance = cls(data['map_name'])
+    def from_dict(cls, data, event_dispatcher):
+        map_instance = cls(event_dispatcher, MapRegistry)
+        map_instance.map_name = data['map_name']
         map_instance.map_size = data['map_size']
-        map_instance.players = data['players']
-        map_instance.tiles = data['tiles']
-        map_instance.zones = data['zones']
-        map_instance.items = data['items']
-        # Handle AI objects separately if they have a specific structure
-#        map_instance.ai = {key: AI.from_dict(ai_data) for key, ai_data in data['ai'].items()}
+        map_instance.tiles = data.get('tiles', {})
+        map_instance.zones = data.get('zones', {})
         return map_instance
 
     def to_dict(self):
         return {
             "map_name": self.map_name,
             "map_size": self.map_size,
-            "players": list(self.players.keys()),  # Assuming player names or IDs
             "tiles": self.tiles,
             "zones": self.zones,
-            "items": self.items,
-            "ai": [ai.to_dict() for ai in self.ai.values()],  # Assuming AI has a to_dict method
-            # Exclude event_listeners from serialization
         }
+
+    def get_map_name(self):
+        return self.map_name
+
+    def add_tile(self, event_data):
+        # Extract necessary data from event_data
+        tile_position = event_data.get('tile_position')
+        tile_type = event_data.get('tile_type')
+        is_wall = event_data.get('is_wall')
+
+        # Create a new Tile instance
+        new_tile = Tile(tile_position, tile_type, is_wall)
+        
+        # Add the new tile to the tiles dictionary using its unique key
+        self.tiles[new_tile.tile_key] = new_tile.to_dict()
+        print("tile added")
+
+    def remove_tile(self, event_data):
+        tile_key = event_data['tile_key']
+        if tile_key in self.tiles:
+            del self.tiles[tile_key]
+            print(f"Tile removed from {self.map_name}: {tile_key}")
+
+    def add_zone(self, event_data):
+        if event_data:
+            zone_label = event_data['zone_label']
+            zone_position = event_data.get('zone_position')
+            zone_type = event_data.get('zone_type')
+            new_zone = Zone(zone_label, zone_position, zone_type)
+            self.zones[new_zone.zone_key] = new_zone.to_dict()
+            print("zone added")
+        else:
+            print(f"Invalid zone type: {zone_type}")
+
+    def remove_zone(self, event_data):
+        zone_key = event_data['zone_key']
+        # Remove the zone if it exists
+        if zone_key in self.zones:
+            del self.zones[zone_key]
+            print(f"Zone {zone_key} removed from {self.map_name}.")
+        else:
+            print(f"Zone {zone_key} not found in {self.map_name}.")
+
+    def add_user(self, event_data):
+        username = event_data.get('username')
+        user_instance = event_data.get('user_instance')
+        # Add the user instance to the players dictionary under the username key
+        self.users[username] = user_instance
+        print(f"User {username} added to map {self.map_name}")
+        self.assign_user_to_map(username, self.map_name)
+        print("user added to the user map pairing dictionary in the event dispatcher")
+
+    def remove_user(self, event_data):
+        username = event_data.get('username')
+        # Remove the user instance from the players dictionary using the username key
+        if username in self.users:
+            del self.users[username]
+            print(f"User {username} removed from map {self.map_name}")
+            self.remove_user_to_map(username, self.map_name)
+            print("user removed from the user map pairing dictionary in the event dispatcher")
+        else:
+            print(f"User {username} not found on map {self.map_name}")
+
+    async def add_item(self, event_data):
+        item_key = event_data.get('item_key')
+        item_data = event_data
+        self.items[item_key] = item_data
+
+    async def remove_item(self, event_data):
+        item_key = event_data.get('item_key')
+        del self.items[item_key]

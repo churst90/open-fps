@@ -40,8 +40,7 @@ class LoginDialog:
     def on_login(self):
         username = self.username_entry.get()
         password = self.password_entry.get()
-        asyncio.run(self.client_handler.handle_login(username, password))
-
+        asyncio.run_coroutine_threadsafe(self.client_handler.handle_login(username, password), self.client_handler.loop)
         self.dialog.destroy()
         self.on_cancel()  # Re-show the startup menu after login attempt
 
