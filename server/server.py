@@ -13,15 +13,16 @@ from core.modules.map_manager import MapRegistry
 from core.modules.user_manager import UserRegistry
 from core.events.user_handler import UserHandler
 from core.events.map_handler import MapHandler
+from core.server_constants import DEFAULT_HOST, DEFAULT_PORT, VERSION, DEVELOPER_NAME, SERVER_NAME, WEBSITE_URL
 
 class Server:
     def __init__(self, host, port):
-        self.version = "version 1.0 Alpha"
-        self.dev_name = "Cody Hurst"
-        self.server_name = "Open FPS Game Server"
-        self.website = "https://codyhurst.com/"
-        self.host = host
-        self.port = port
+        self.version = VERSION
+        self.dev_name = DEVELOPER_NAME
+        self.server_name = SERVER_NAME
+        self.website = WEBSITE_URL
+        self.host = DEFAULT_HOST
+        self.port = DEFAULT_PORT
         self.logger = CustomLogger('server', debug_mode = False)
         self.network = None
         self.user_reg = None
@@ -33,12 +34,6 @@ class Server:
         self.security_manager = SecurityManager('security.key')
         self.user_handler = None
         self.map_handler = None
-
-    def ensure_ssl_certificate(self, cert_file='cert.pem', key_file='key.pem'):
-        if not os.path.exists(cert_file) or not os.path.exists(key_file):
-            print("Neither a certificate nor a key were found. Generating a self signed certificate now .....")
-            subprocess.run(['openssl', 'req', '-x509', '-newkey', 'rsa:4096', '-keyout', key_file, '-out', cert_file, '-days', '365', '-nodes', '-subj', '/CN=localhost'], check=True)
-            print("Certificate and key pair generated successfully")
 
     async def process_message_queue(self):
         while not self.shutdown_event.is_set():
@@ -58,9 +53,9 @@ class Server:
         self.security_manager.get_instance("security.key")
         await self.security_manager.load_key()
         await self.security_manager.start_key_rotation(30)
+        await self.security_manager.ensure_ssl_certificate()
 
     async def start(self):
-        await asyncio.to_thread(self.ensure_ssl_certificate)
         print("Initializing server ...")
         print(f"{self.server_name} {self.version}")
         print(f"Developed and maintained by {self.dev_name}. {self.website}")
@@ -93,8 +88,8 @@ class Server:
 
 async def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--host", type=str, default="localhost")
-    parser.add_argument("--port", type=int, default=33288)
+    parser.add_argument("--host", type=str, default=DEFAULT_HOST)
+    parser.add_argument("--port", type=int, default=DEFAULT_PORT)
     args = parser.parse_args()
     server = Server(args.host, args.port)
     

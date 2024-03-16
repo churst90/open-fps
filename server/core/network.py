@@ -6,6 +6,7 @@ import logging
 import ssl
 from collections import defaultdict
 from datetime import datetime, timedelta
+import os
 
 class Network:
     _lock = Lock()
@@ -35,7 +36,9 @@ class Network:
         self.last_connection_attempt = {}  # Timestamp of the last connection attempt by IP
         self.banned_ips = set()
         self.ssl_context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
-        self.ssl_context.load_cert_chain(certfile='cert.pem', keyfile='key.pem')
+        cert_path = os.path.join(os.path.dirname(__file__), 'security', 'cert.pem')
+        key_path = os.path.join(os.path.dirname(__file__), 'security', 'key.pem')
+        self.ssl_context.load_cert_chain(certfile=cert_path, keyfile=key_path)
         self.shutdown_event = shutdown_event
         self.connections_lock = asyncio.Lock()  # Add a lock for managing connections
 

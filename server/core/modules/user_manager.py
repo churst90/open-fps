@@ -8,9 +8,13 @@ from pathlib import Path
 import aiofiles  # Import aiofiles for async file operations
 
 from core.modules.role_manager import RoleManager
+from core.modules.rank_manager import RankManager
+from core.modules.achievement_manager import AchievementManager
 
 class UserRegistry:
     def __init__(self, event_dispatcher):
+        self.rank_manager = RankManager()
+        self.achievement_manager = AchievementManager()
         self.instances = {}  # Runtime instances of logged-in players
         self.users_path = Path('users')  # Directory for user files
         self.event_dispatcher = event_dispatcher
@@ -142,8 +146,20 @@ class User:
 
     async def setup_subscriptions(self):
         await self.event_dispatcher.subscribe_client('add_tile', self.username)
+        await self.event_dispatcher.subscribe_client('remove_tile', self.username)
         await self.event_dispatcher.subscribe_client('add_zone', self.username)
-#        await self.event_dispatcher.subscribe_client('user_moved', self.username)
+        await self.event_dispatcher.subscribe_client('remove_zone', self.username)
+        await self.event_dispatcher.subscribe_client('user_move', self.username)
+        await self.event_dispatcher.subscribe_client('user_turn', self.username)
+        await self.event_dispatcher.subscribe_client('global_chat', self.username)
+        await self.event_dispatcher.subscribe_client('map_chat', self.username)
+        await self.event_dispatcher.subscribe_client('private_chat', self.username)
+
+    def get_username(self):
+        return self.username
+
+    def get_password(self):
+        return self.password
 
     def get_position(self):
         return self.position
