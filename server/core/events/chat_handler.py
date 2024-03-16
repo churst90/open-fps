@@ -1,11 +1,9 @@
-class ChatHandler(EventHandler):
-
-    def __init__(self, user_registry, map_registry, event_dispatcher):
-        super().__init__(event_dispatcher)
+class ChatHandler:
+    def __init__(self, event_dispatcher, user_registry, map_registry):
+        self.event_dispatcher = event_dispatcher
         self.user_registry = user_registry
         self.map_registry = map_registry
-        self.event_dispatcher = event_dispatcher
-        self.event_dispatcher.subscribe("chat_message", self.handle_chat_message)
+        self.event_dispatcher.subscribe_internal('chat_message', self.handle_chat_message)
 
     async def handle_chat_message(self, data):
         message_type = data.get("type")
@@ -17,36 +15,13 @@ class ChatHandler(EventHandler):
             await self.handle_global_message(data)
 
     async def handle_private_message(self, data):
-        sender = data.get("sender")
-        recipient = data.get("recipient")
-        message = data.get("message")
-
-        await self.emit_event("private_chat", {
-            "scope": "private",
-            "from": sender,
-            "to": recipient,
-            "message": message
-            })
+        # Implementation for handling private messages
+        pass
 
     async def handle_map_message(self, data):
-        sender = data.get("sender")
-        map_name = data.get("map_name")
-        message = data.get("message")
-
-        await self.emit_event("map_chat", {
-            "scope": "map",
-            "from": sender,
-            "to": map_name,
-            "message": message
-                })
+        # Implementation for handling map-specific messages
+        pass
 
     async def handle_global_message(self, data):
-        sender = data.get("sender")
-        message = data.get("message")
-
-        await self.emit_event("global_chat", {
-            "type": "global",
-            "from": sender,
-            "message": message
-            })
-
+        # Implementation for handling global messages
+        pass

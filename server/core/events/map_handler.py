@@ -84,15 +84,14 @@ class MapHandler(EventHandler):
         await map_instance.remove_zone(zone_data)
 
     async def handle_create_map(self, data):
-        username = data.get("username")
-        map_name = data.get("map_name")
-        map_size = data.get("map_size")
-        await self.map_reg.create_map(map_name, map_size)
+        await self.map_reg.create_map(data)
         user_instance = self.user_reg.get_user_instance(username)
         if user_instance:
             # Update user's current map
-            user_instance.current_map = map_name
-            # Optionally emit an event about the map change
+            user_instance.update_current_map(map_name)
+            # add the user to the new map's users dictionary
+            self.instances.add_user(username, user_instance)
+            # dispatch a message back to the user with the new map data they just created
             self.emit_event("user_map_changed", {"username": username, "map_name": map_name})
 
     async def handle_remove_map(self, map_name):

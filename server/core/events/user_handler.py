@@ -1,9 +1,12 @@
 import bcrypt
 import math
 import json
+
+# project specific imports
 from core.events.event_handler import EventHandler
 from core.events.event_dispatcher import EventDispatcher
 from core.modules.collision import Collision
+from core.events.user_movement import UserMovement
 
 class UserHandler(EventHandler):
     def __init__(self, user_reg, map_reg, event_dispatcher):
@@ -70,10 +73,10 @@ class UserHandler(EventHandler):
             },
             scope = "private", recipient = username)
 
-    async def move_user(self, username, direction, distance):
+    async def handle_user_move(self, username, direction, distance):
         user = self.user_reg.get_user_instance(username)
         if user:
-            dx, dy, dz = await self.calculate_movement_vector(direction, distance, user.yaw, user.pitch)
+            dx, dy, dz = await UserMovement.calculate_movement_vector(direction, distance, user.yaw, user.pitch)
             new_position = (user.position[0] + dx, user.position[1] + dy, user.position[2] + dz)
 
             map_instance = self.map_reg.get_map(user.current_map)  # Ensure you get the map instance

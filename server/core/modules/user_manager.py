@@ -7,6 +7,8 @@ from asyncio import Lock
 from pathlib import Path
 import aiofiles  # Import aiofiles for async file operations
 
+from core.modules.role_manager import RoleManager
+
 class UserRegistry:
     def __init__(self, event_dispatcher):
         self.instances = {}  # Runtime instances of logged-in players
@@ -17,11 +19,27 @@ class UserRegistry:
     def set_handler(self, handler):
         self.user_handler = handler
 
+    async def change_user_role(self, admin_username, target_username, new_role):
+        admin_user = self.get_user_instance(admin_username)
+        if not admin_user or not admin_user.check_permission('change_role'):
+            print("Insufficient permissions to change roles.")
+            return
+
+        role_manager = RoleManager.get_instance()
+        # Remove from all current roles (optional, depends on how you want to manage roles)
+        current_roles = list(role_manager.user_roles.get(target_username, []))
+        for role in current_roles:
+            role_manager.remove_role_from_user(role, target_username)
+
+        # Assign the new role
+        role_manager.assign_role_to_user(new_role, target_username)
+        print(f"User {target_username}'s role changed to {new_role} by {admin_username}.")
+
     async def get_user_instance(self, username):
         if username in self.instances:
             return self.instances[username]
 
-    async def create_user(self, username, password):
+    async def create_user(self, username, password, role='player'):
         user_file = self.users_path / f"{username}.usr"
         if user_file.exists():
             raise ValueError("Username already exists")
@@ -30,8 +48,13 @@ class UserRegistry:
 
         # Create and configure the user
         user = User(self.event_dispatcher)
-        user.update_username(username)
-        await user.update_password(password)
+        # set the username and password in the new user object instance
+        user.set_username(username)
+        await user.set_password(password)
+
+        # Assign default role
+        role_manager = RoleManager.get_instance()
+        role_manager.assign_role_to_user(role, username)
 
         # Save the new user to disk
         await self.save_user(user)
@@ -50,7 +73,7 @@ class UserRegistry:
 
         if not any(self.users_path.iterdir()):  # If the directory is empty, create default admin
             print("No users found, creating default admin user.")
-            await self.create_user("admin", "adminpassword")  # Replace "adminpassword" with a secure default password
+            await self.create_user("admin", "adminpassword", role = "developer")
 
         for user_file in self.users_path.glob("*.usr"):
             async with aiofiles.open(user_file, 'r') as file:
@@ -95,6 +118,7 @@ class UserRegistry:
 
 class User:
     def __init__(self, event_dispatcher):
+        # User instance features and atributes
         self.username = ""
         self.password = ""
         self.current_map = ""
@@ -106,7 +130,15 @@ class User:
         self.health = 10000
         self.energy = 10000
         self.inventory = {}
+        # other components
         self.event_dispatcher = event_dispatcher
+
+    def check_permission(self, permission):
+        role_manager = RoleManager.get_instance()
+        for role in role_manager.user_roles.get(self.username, []):
+            if permission in role_manager.get_permissions(role):
+                return True
+        return False
 
     async def setup_subscriptions(self):
         await self.event_dispatcher.subscribe_client('add_tile', self.username)
@@ -134,33 +166,33 @@ class User:
     def get_energy(self):
         return self.energy
 
-    def update_login_status(self, status):
+    def set_login_status(self, status):
         self.logged_in = status
 
-    def update_position(self, position):
+    def set_position(self, position):
         self.position = position
 
-    def update_health(self, health):
+    def set_health(self, health):
         self.health = health
 
-    def update_energy(self, energy):
+    def set_energy(self, energy):
         self.energy = energy
 
-    def update_pitch(self, pitch):
+    def set_pitch(self, pitch):
         self.pitch = pitch
 
-    def update_yaw(self, yaw):
+    def set_yaw(self, yaw):
         self.yaw = yaw
 
-    def update_username(self, username):
+    def set_username(self, username):
         self.username = username
 
-    async def update_password(self, password):
+    async def set_password(self, password):
         hashed_password = await asyncio.to_thread(bcrypt.hashpw, password.encode('utf-8'), bcrypt.gensalt())
         # Store the hashed password rather than the plain one
         self.password = hashed_password.decode('utf-8')
 
-    def update_current_map(self, map):
+    def set_current_map(self, map):
         self.current_map = map
 
     def to_dict(self):
