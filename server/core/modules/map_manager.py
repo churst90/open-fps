@@ -124,7 +124,7 @@ class MapRegistry:
                     map_data = json.loads(await file.read())
                 self.instances[map_name] = Map.from_dict(map_data, self.event_dispatcher)
                 print(f"Map '{map_name}' loaded successfully.")
-                self.instances[map_name].setup_event_subscriptions()
+                await self.instances[map_name].setup_subscriptions()
                 print(f"Subscriptions added for '{map_name}")
 
 class Map:
