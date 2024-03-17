@@ -42,11 +42,8 @@ class Server:
 
     async def process_message(self, data):
         message_type = data.get('message_type')
-        handler = getattr(self.server_handler, message_type, message_type)
-        if handler:
-            await handler(data)
-        else:
-            self.logger.info(f"Unknown message type: {message_type}")
+        # Directly dispatch the event to the appropriate listeners
+        await self.event_dispatcher.dispatch(message_type, data)
 
     async def setup_security(self):
         print("Setting up the security manager ...")
@@ -54,6 +51,34 @@ class Server:
         await self.security_manager.load_key()
         await self.security_manager.start_key_rotation(30)
         await self.security_manager.ensure_ssl_certificate()
+
+    def setup_permission_checks(self, event_dispatcher, user_registry):
+        async def on_permission_check(event_data):
+            username = event_data['username']
+            permission = event_data['permission']
+            follow_up_event = event_data['follow_up_event']
+            follow_up_event_data = event_data['event_data']  # Original event data for the follow-up action
+            follow_up_event_scope = event_data.get('scope', 'global')  # Default to 'global' if not specified
+
+            user = await user_registry.get_user_instance(username)
+            if user and user.has_permission(permission):
+                # Permission granted, proceed with the original action.
+                # Now we include the scope in the dispatch call.
+                if follow_up_event_scope == 'global':
+                    await event_dispatcher.dispatch_global(follow_up_event, follow_up_event_data)
+                elif follow_up_event_scope == 'map':
+                    # Assuming 'map_id' is part of the event_data for map-specific actions
+                    await event_dispatcher.dispatch_map_specific(follow_up_event_data['map_id'], follow_up_event, follow_up_event_data)
+                elif follow_up_event_scope == 'private':
+                    await event_dispatcher.dispatch_private(username, follow_up_event, follow_up_event_data)
+            else:
+                # Permission denied, handle accordingly.
+                await event_dispatcher.dispatch_private(username, permission, {
+                    'message_type': "failed",
+                    'error': 'Permission denied'
+                })
+
+        event_dispatcher.subscribe_internal("check_permission", on_permission_check)
 
     async def start(self):
         print("Initializing server ...")
@@ -67,10 +92,11 @@ class Server:
         self.event_dispatcher = EventDispatcher.get_instance(network=self.network)
         self.user_reg = UserRegistry(self.event_dispatcher)
         self.map_reg = MapRegistry(self.event_dispatcher)
+        self.setup_permission_checks(self.event_dispatcher, self.user_reg)
         self.user_handler = UserHandler(self.user_reg, self.map_reg, self.event_dispatcher)
         self.map_handler = MapHandler(self.map_reg, self.event_dispatcher)
-        await self.map_reg.load_maps()
         await self.user_reg.load_users()
+        await self.map_reg.load_maps()
         self.server_handler = ServerHandler(self.user_reg, self.map_reg, self.event_dispatcher, self.logger)
         await self.event_dispatcher.update_network(self.network)
         self.console = ServerConsole.get_instance(self, self.user_reg, self.map_reg, self.logger, self.shutdown_event)

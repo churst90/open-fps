@@ -23,6 +23,10 @@ class UserRegistry:
     def set_handler(self, handler):
         self.user_handler = handler
 
+    async def setup_subscriptions(self):
+        await self.event_dispatcher.subscribe_internal("register_user", self.register_user)
+        await self.event_dispatcher.subscribe_internal("deregister_user", self.deregister_user)
+
     async def change_user_role(self, admin_username, target_username, new_role):
         admin_user = self.get_user_instance(admin_username)
         if not admin_user or not admin_user.check_permission('change_role'):
@@ -52,6 +56,7 @@ class UserRegistry:
 
         # Create and configure the user
         user = User(self.event_dispatcher)
+
         # set the username and password in the new user object instance
         user.set_username(username)
         await user.set_password(password)
@@ -96,30 +101,48 @@ class UserRegistry:
         for username, user_instance in self.instances.items():
             await self.save_user(user_instance)
 
-    async def register_user(self, username, user_instance):
+    async def register_user(self, event_data):
+        # Extract the variables from the event data
+        username = event_data['username']
+        user_instance = event_data['user_instance']
+
         if username not in self.instances:
             self.instances[username] = user_instance
+
             # Emit an event indicating the user has been registered
-            await self.event_dispatcher.dispatch("user_registered", {"username": username, "current_map": user_instance.current_map, "user_instance": user_instance})
+            await self.event_dispatcher.dispatch("user_registered", {
+                "username": username,
+                "current_map": user_instance.current_map,
+                "user_instance": user_instance
+            })
+
         else:
             # Handle already registered user
             pass
 
-    async def deregister_user(self, username):
+    async def deregister_user(self, event_data):
+        # Extract the username from the event data
+        username = event_data['username']
         if username in self.instances:
             user_instance = self.instances[username]
             user_instance.logged_in = False
+
             # Emit an event indicating the user has been deregistered
-            await self.event_dispatcher.dispatch("user_deregistered", {"username": username, "current_map": user_instance.current_map})
+            await self.event_dispatcher.dispatch("user_deregistered", {
+                "username": username,
+                "current_map": user_instance.current_map
+            })
             # Save the user's state after deregistering
             await self.save_user(user_instance)
         else:
             # Handle user not found scenario
             pass
 
+    # Method that returns the self.instances dictionary for user objects
     async def get_all_users(self):
         return self.instances
 
+# User class for creating individual user objects
 class User:
     def __init__(self, event_dispatcher):
         # User instance features and atributes
@@ -137,14 +160,15 @@ class User:
         # other components
         self.event_dispatcher = event_dispatcher
 
-    def check_permission(self, permission):
+    def has_permission(self, permission):
         role_manager = RoleManager.get_instance()
-        for role in role_manager.user_roles.get(self.username, []):
-            if permission in role_manager.get_permissions(role):
-                return True
-        return False
+        return role_manager.has_permission(self.username, permission)
 
     async def setup_subscriptions(self):
+        await self.event_dispatcher.subscribe_client('handle_login', self.username)
+        await self.event_dispatcher.subscribe_client('handle_logout', self.username)
+        await self.event_dispatcher.subscribe_client('user_registered', self.username)
+        await self.event_dispatcher.subscribe_client('user_deregistered', self.username)
         await self.event_dispatcher.subscribe_client('add_tile', self.username)
         await self.event_dispatcher.subscribe_client('remove_tile', self.username)
         await self.event_dispatcher.subscribe_client('add_zone', self.username)

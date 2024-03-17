@@ -12,38 +12,27 @@ class RoleManager:
         if RoleManager._instance is not None:
             raise ValueError("Access the instance through `get_instance()` method.")
         self.roles = {}
-        self.user_roles = {}  # Tracks users by their roles
+        self.user_roles = {}  # Tracks roles by user for efficient lookup
 
     def initialize_roles(self):
-        # Initialize roles with empty lists for permissions and users
         self.roles = {
-            'developer': {"permissions": ["manage_users", "change_map", "immune_to_health_changes", "all"], "users": set()},
-            'admin': {"permissions": ["manage_users", "change_map"], "users": set()},
-            'player': {"permissions": [], "users": set()}
+            'developer': {"permissions": ["add_tile", "remove_tile", "add_zone", "remove_zone", "create_map", "remove_map"]},
+            'admin': {"permissions": []},
+            'player': {"permissions": []}
         }
+        # Initialize user_roles as empty; will be filled as users are assigned roles
+        self.user_roles = {}
 
     def assign_role_to_user(self, role_name, username):
         if role_name in self.roles:
-            self.roles[role_name]["users"].add(username)
-            # Optionally, track roles per user if needed
-            if username not in self.user_roles:
-                self.user_roles[username] = set()
-            self.user_roles[username].add(role_name)
-        else:
-            print(f"Role {role_name} does not exist.")
+            self.user_roles[username] = role_name  # Assuming each user can only have one role
 
-    def remove_role_from_user(self, role_name, username):
-        if role_name in self.roles and username in self.roles[role_name]["users"]:
-            self.roles[role_name]["users"].remove(username)
-            if username in self.user_roles:
-                self.user_roles[username].discard(role_name)
+    def remove_role_from_user(self, username):
+        if username in self.user_roles:
+            del self.user_roles[username]
 
-    def get_users_by_role(self, role_name):
-        if role_name in self.roles:
-            return self.roles[role_name]["users"]
-        return set()  # Return an empty set if the role does not exist
-
-    def get_permissions(self, role_name):
-        if role_name in self.roles:
-            return self.roles[role_name]["permissions"]
-        return []
+    def has_permission(self, username, permission):
+        role_name = self.user_roles.get(username)
+        if role_name and permission in self.roles.get(role_name, {}).get("permissions", []):
+            return True
+        return False
