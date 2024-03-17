@@ -15,6 +15,8 @@ class MapHandler(EventHandler):
         self.event_dispatcher.subscribe_internal("handle_remove_tile", self.handle_remove_tile)
         self.event_dispatcher.subscribe_internal("handle_add_zone", self.handle_add_zone)
         self.event_dispatcher.subscribe_internal("handle_remove_zone", self.handle_remove_zone)
+        self.event_dispatcher.subscribe_internal("handle_join_map", self.handle_join_map)
+        self.event_dispatcher.subscribe_internal("handle_leave_map", self.handle_leave_map)
 
     async def handle_user_registered(self, event_data):
         username = event_data["username"]
@@ -34,9 +36,10 @@ class MapHandler(EventHandler):
             await map_instance.remove_user(username)
 
     async def handle_add_tile(self, event_data):
-        username = event_data['username']  # Ensure username is part of the event data
+        username = event_data['username']
+
         # Dispatch permission check event
-        await self.event_dispatcher.dispatch("permission_check", {
+        await self.event_dispatcher.dispatch("check_permission", {
             'username': event_data['username'],
             'map_id': event_data['map_name'],
             'permission': 'add_tile',
@@ -52,7 +55,7 @@ class MapHandler(EventHandler):
         username = event_data['username']  # Ensure username is part of the event data
 
         # Dispatch permission check event
-        await self.event_dispatcher.dispatch("permission_check", {
+        await self.event_dispatcher.dispatch("check_permission", {
             'username': username,
             'permission': PERMISSION_REMOVE_TILE,
             'follow_up_event': 'remove_tile',
@@ -63,7 +66,7 @@ class MapHandler(EventHandler):
 
     async def handle_add_zone(self, event_data):
         # Dispatch permission check event before attempting to add the zone
-        await self.event_dispatcher.dispatch("permission_check", {
+        await self.event_dispatcher.dispatch("check_permission", {
             'username': event_data['username'],
             'map_id': event_data['map_name'],  # Assuming map_name is part of the event data
             'permission': 'add_zone',  # Permission needed to add a zone
@@ -73,13 +76,12 @@ class MapHandler(EventHandler):
         })
 
     async def handle_remove_zone(self, event_data):
-        # Similar structure to handle_remove_tile
         map_name = event_data['map_name']
         zone_key = event_data['zone_key']
         username = event_data['username']  # Ensure username is part of the event data
 
         # Dispatch permission check event
-        await self.event_dispatcher.dispatch("permission_check", {
+        await self.event_dispatcher.dispatch("check_permission", {
             'username': username,
             'permission': PERMISSION_REMOVE_ZONE,
             'follow_up_event': 'confirmed_remove_zone',
@@ -100,3 +102,12 @@ class MapHandler(EventHandler):
 
     async def handle_remove_map(self, map_name):
         await self.map_reg.remove_map(map_name)
+
+    async def handle_join_map(self, event_data):
+        map_name = event_data['map_name']
+        self.instances[map_name].add_user(event_data)
+
+    async def handle_leave_map(self, event_data):
+        username = event_data['username']
+        map_name = event_data['map_name']
+        self.instances[map_name].remove_user(event_data)

@@ -57,26 +57,21 @@ class Server:
             username = event_data['username']
             permission = event_data['permission']
             follow_up_event = event_data['follow_up_event']
-            follow_up_event_data = event_data['event_data']  # Original event data for the follow-up action
-            follow_up_event_scope = event_data.get('scope', 'global')  # Default to 'global' if not specified
+            follow_up_event_data = event_data['event_data']
+            follow_up_event_scope = event_data.get('scope')
 
             user = await user_registry.get_user_instance(username)
+
             if user and user.has_permission(permission):
-                # Permission granted, proceed with the original action.
-                # Now we include the scope in the dispatch call.
-                if follow_up_event_scope == 'global':
-                    await event_dispatcher.dispatch_global(follow_up_event, follow_up_event_data)
-                elif follow_up_event_scope == 'map':
-                    # Assuming 'map_id' is part of the event_data for map-specific actions
-                    await event_dispatcher.dispatch_map_specific(follow_up_event_data['map_id'], follow_up_event, follow_up_event_data)
-                elif follow_up_event_scope == 'private':
-                    await event_dispatcher.dispatch_private(username, follow_up_event, follow_up_event_data)
+                await event_dispatcher.dispatch(follow_up_event, follow_up_event_data, scope=follow_up_event_scope, recipient_username=username if follow_up_event_scope == 'private' else None)
+
             else:
                 # Permission denied, handle accordingly.
-                await event_dispatcher.dispatch_private(username, permission, {
+                # Dispatch a permission denied event directly using the dispatch method, suitable for private scope.
+                await event_dispatcher.dispatch("permission_denied", {
                     'message_type': "failed",
                     'error': 'Permission denied'
-                })
+                }, scope='private', recipient_username=username)
 
         event_dispatcher.subscribe_internal("check_permission", on_permission_check)
 

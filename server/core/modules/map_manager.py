@@ -16,7 +16,6 @@ class MapRegistry:
         self.instances = {}  # For storing Map instance objects for runtime use
         self.event_dispatcher = event_dispatcher
         self.maps_path = Path('maps')  # Define the maps directory path
-#        self.map_handler = None
 
     async def assign_user_to_map(self, username, map_name):
         await self.event_dispatcher.update_user_map(username, map_name, action="add")
@@ -24,16 +23,24 @@ class MapRegistry:
     async def remove_user_from_map(self, username, map_name):
         await self.event_dispatcher.update_user_map(username, map_name, action="remove")
 
-#    def set_handler(self, handler):
-#        self.map_handler = handler
-
     async def create_map(self, data):
+        # Extract the values from the incoming data
         username = data.get('username')
         map_name = data.get('map_name')
         map_size = data.get('map_size')
         start_position = data.get('start_position')
+
+        # check to see if the map being created already exists
         if map_name in self.instances:
-            await self.dispatcher.dispatch("create_map", {"message_type": "create_map_failed"}, scope = "private", recipient = username)
+
+           # Dispatch an error back to the user
+            await self.dispatcher.dispatch("handle_create_map", {
+                "message_type": "create_map_failed",
+                "username": username
+            },
+            scope = "private", recipient = username)
+            return
+
         # Create a new Map instance using the provided event dispatcher
         new_map = Map(self.event_dispatcher, self)
         new_map.set_map_name(map_name)
@@ -41,17 +48,21 @@ class MapRegistry:
         new_map.set_start_position(start_position)
         await new_map.add_owner(username)
         print(f"Default {new_map.map_name} map created successfully with dimensions {new_map.map_size}")
+
         # add the map instances to the instances dictionary
         self.instances[map_name] = new_map
-#        await self.event_dispatcher.dispatch("global_chat", {"message": f"Server: {map_name} map was just created."})
+        await self.event_dispatcher.dispatch("global_chat", {
+            "message": f"Server: {map_name} map was just created by {username}."
+        })
         try:
             await self.save_map(map_name)
         except Exception as e:
             print(f"Error saving map: {e}")
 
     async def get_map_instance(self, name):
-#        async with self.lock:
-        return (self.instances[name], "Error: Map not found.")
+        async with self.lock:
+            map_instance = self.instances[name]
+            return map_instance
 
     async def get_all_maps(self):
 #        async with self.lock:
@@ -61,6 +72,7 @@ class MapRegistry:
         if name not in self.instances:
             print(f"Map '{name}' does not exist.")
             return
+
         map_instance = self.instances[name]
         map_data = map_instance.to_dict()
         self.maps_path.mkdir(parents=True, exist_ok=True)
@@ -72,8 +84,9 @@ class MapRegistry:
             print(f"Failed to save map {name}: {e}")
 
     async def save_all_maps(self):
-        for map_name in self.instances.keys():  # Iterating through keys of self.instances
-            await self.save_map(map_name)  # map_name is a string
+        async with self.lock:
+            for map_name in self.instances.keys():  # Iterating through keys of self.instances
+                await self.save_map(map_name)  # map_name is a string
 
     async def load_maps(self):
         async with self.lock:
@@ -83,8 +96,9 @@ class MapRegistry:
                 # initial map data
                 data = {'username': 'admin', "map_name": "Main", "map_size": (0, 10, 0, 10, 0, 10), "start_position": (0, 0, 0)}
                 await self.create_map(data)
-                self.instances["Main"].setup_event_subscriptions()
+                await self.instances["Main"].setup_subscriptions()
                 tile_data = {
+                    "username": "admin",
                     "map_name": "Main",
                     "tile_position": (0, 10, 0, 10, 0, 0),
                     "tile_type": "grass",
@@ -92,15 +106,15 @@ class MapRegistry:
                     }
 
                 zone_data = {
+                    "username": "admin",
                     "map_name": "Main",
                     "zone_label": "Main area",
                     "zone_position": (0, 10, 0, 10, 0, 0),
                     "zone_type": "grass"
                     }
 
-                await self.event_dispatcher.dispatch('add_tile', tile_data)
-                await self.event_dispatcher.dispatch('add_zone', zone_data)
-                print(f"Subscriptions added for Main")
+                await self.event_dispatcher.dispatch('handle_add_tile', tile_data)
+                await self.event_dispatcher.dispatch('handle_add_zone', zone_data)
 
                 await self.save_map("Main")
                 return
@@ -126,25 +140,32 @@ class Map:
         self.items = {}
         self.ai = {}
         self.weather = {"type": "clear", "intensity": 0, "duration": 0}
+        self.is_public = True
 
         # Required components
         self.event_dispatcher = event_dispatcher
         self.map_registry = map_registry
 
-    def setup_event_subscriptions(self):
-        self.event_dispatcher.subscribe_internal('add_tile', self.add_tile)
-        self.event_dispatcher.subscribe_internal('remove_tile', self.map_name)
-        self.event_dispatcher.subscribe_internal('add_zone', self.add_zone)
-        self.event_dispatcher.subscribe_internal('remove_zone', self.map_name)
-        self.event_dispatcher.subscribe_internal('add_user', self.add_user)
-        self.event_dispatcher.subscribe_internal('remove_user', self.map_name)
+    async def setup_subscriptions(self):
+        self.event_dispatcher.subscribe_internal("add_tile", self.add_tile)
+        self.event_dispatcher.subscribe_internal("remove_tile", self.remove_tile)
+        self.event_dispatcher.subscribe_internal("add_zone", self.add_zone)
+        self.event_dispatcher.subscribe_internal("remove_zone", self.remove_zone)
+        self.event_dispatcher.subscribe_internal("join_map", self.join_map)
+        self.event_dispatcher.subscribe_internal("leave_map", self.leave_map)
 
-    def update_weather(self, new_weather):
+    async def update_weather(self, new_weather):
         self.weather = new_weather
         self.event_dispatcher.dispatch('weather_change', {'weather': self.weather}, scope = "map", map_id = self.map_name)
 
     def set_start_position(self, position):
         self.start_position = position
+
+    def set_is_public(self):
+        if self.is_public:
+            self.is_public = False
+        else:
+            self.is_public = True
 
     def set_map_name(self, name):
         self.map_name = name
@@ -186,7 +207,7 @@ class Map:
     def get_map_name(self):
         return self.map_name
 
-    def add_tile(self, event_data):
+    async def add_tile(self, event_data):
         # Extract necessary data from event_data
         tile_position = event_data.get('tile_position')
         tile_type = event_data.get('tile_type')
@@ -199,13 +220,13 @@ class Map:
         self.tiles[new_tile.tile_key] = new_tile.to_dict()
         print("tile added")
 
-    def remove_tile(self, event_data):
+    async def remove_tile(self, event_data):
         tile_key = event_data['tile_key']
         if tile_key in self.tiles:
             del self.tiles[tile_key]
             print(f"Tile removed from {self.map_name}: {tile_key}")
 
-    def add_zone(self, event_data):
+    async def add_zone(self, event_data):
         if event_data:
             zone_label = event_data['zone_label']
             zone_position = event_data.get('zone_position')
@@ -216,7 +237,7 @@ class Map:
         else:
             print(f"Invalid zone type: {zone_type}")
 
-    def remove_zone(self, event_data):
+    async def remove_zone(self, event_data):
         zone_key = event_data['zone_key']
         # Remove the zone if it exists
         if zone_key in self.zones:
@@ -225,7 +246,7 @@ class Map:
         else:
             print(f"Zone {zone_key} not found in {self.map_name}.")
 
-    def add_user(self, event_data):
+    async def join_map(self, event_data):
         username = event_data.get('username')
         user_instance = event_data.get('user_instance')
         # check the user's current position in comparison to map boundaries
@@ -233,17 +254,18 @@ class Map:
             # Add the user instance to the players dictionary under the username key
             self.users[username] = user_instance
             print(f"User {username} added to map {self.map_name}")
-        self.map_registry.assign_user_to_map(username, self.map_name)
-        print("user added to the user map pairing dictionary in the event dispatcher")
 
-    def remove_user(self, event_data):
+        # Update the event dispatcher user to map record
+        await self.map_registry.assign_user_to_map(username, self.map_name)
+
+    async def leave_map(self, event_data):
         username = event_data.get('username')
+
         # Remove the user instance from the players dictionary using the username key
         if username in self.users:
             del self.users[username]
-            print(f"User {username} removed from map {self.map_name}")
-            self.remove_user_to_map(username, self.map_name)
-            print("user removed from the user map pairing dictionary in the event dispatcher")
+
+            await self.map_registry.remove_user_to_map(username, self.map_name)
         else:
             print(f"User {username} not found on map {self.map_name}")
 

@@ -35,7 +35,7 @@ class EventDispatcher:
     async def notify_listeners(self, event_type, data):
         # Notify internal listeners
         for listener in self.internal_listeners.get(event_type, []):
-            listener(data)  # Assuming internal listeners are synchronous for simplicity
+            await listener(data)  # Assuming internal listeners are synchronous for simplicity
 
         # Notify client listeners
         if event_type in self.client_listeners:
@@ -68,7 +68,7 @@ class EventDispatcher:
 
     # Dispatch private messages to a specific client
     async def dispatch_private(self, recipient_username, data):
-        writer = self.network.get_writer_by_username(recipient_username)
+        writer = await self.network.get_writer(recipient_username)
         if writer:
             await self.network.send_to_writers([writer], data)
 

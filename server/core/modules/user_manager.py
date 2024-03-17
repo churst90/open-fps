@@ -43,11 +43,12 @@ class UserRegistry:
         role_manager.assign_role_to_user(new_role, target_username)
         print(f"User {target_username}'s role changed to {new_role} by {admin_username}.")
 
+
     async def get_user_instance(self, username):
         if username in self.instances:
             return self.instances[username]
 
-    async def create_user(self, username, password, role='player'):
+    async def create_user(self, username, password, role = 'player'):
         user_file = self.users_path / f"{username}.usr"
         if user_file.exists():
             raise ValueError("Username already exists")
