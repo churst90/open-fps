@@ -13,19 +13,108 @@ from core.modules.achievement_manager import AchievementManager
 
 class UserRegistry:
     def __init__(self, event_dispatcher):
+        self.lock = Lock()
         self.rank_manager = RankManager()
         self.achievement_manager = AchievementManager()
         self.instances = {}  # Runtime instances of logged-in players
         self.users_path = Path('users')  # Directory for user files
         self.event_dispatcher = event_dispatcher
-        self.user_handler = None
+        self.setup_subscriptions()
+        self.users_path = Path('users')
 
-    def set_handler(self, handler):
-        self.user_handler = handler
+    def setup_subscriptions(self):
+        print("user registry subscriptions set up")
+        self.event_dispatcher.subscribe_internal("user_account_login_request", self.handle_login)
+        self.event_dispatcher.subscribe_internal("user_account_logout_request", self.handle_logout)
+        self.event_dispatcher.subscribe_internal("user_account_create_request", self.create_user)
+        self.event_dispatcher.subscribe_internal("user_account_delete_request", self.delete_user)
 
-    async def setup_subscriptions(self):
-        await self.event_dispatcher.subscribe_internal("register_user", self.register_user)
-        await self.event_dispatcher.subscribe_internal("deregister_user", self.deregister_user)
+    async def create_user(self, event_data):
+        print("create user method called")
+        username = event_data['username']
+        password = event_data['password']
+        role = event_data['role']
+        print("Event data stored in local variables")
+
+        user_file = self.users_path / f"{username}.usr"
+        if user_file.exists():
+            print("That user name already exists")
+            raise ValueError("Username already exists")
+
+        # Make sure the users directory exists
+        self.users_path.mkdir(parents=True, exist_ok=True)  # Ensure user directory exists
+
+        # Create and configure the user
+        user = User(self.event_dispatcher)
+        print("Created the user instance")
+
+        # set the username and password in the new user object instance
+        user.set_username(username)
+        await user.set_password(password)
+        print("Stored the username and password in the user instance")
+
+        role_manager = RoleManager.get_instance()
+        role_manager.assign_role_to_user(role, username)
+        print("Retrieved the role instance and assigned the developer role to the default admin account")
+
+        # Save the new user to disk
+        await self.save_user(user)
+        print("user saved to disk")
+
+    async def delete_user(self, username):
+        pass
+
+    async def handle_login(self, event_data):
+        username = event_data['username']
+        password = event_data['password']
+
+        user = await self.load_user(username)
+        if user is None:
+            await self.event_dispatcher.dispatch("user_account_login_failed", {
+                "message_type": "login_failed",
+                "username": username,
+                "message": "User does not exist"
+            })
+            return
+
+            stored_hashed_password = user.get_password()
+
+            # compare and validate passwords
+            stored_hashed_password = user.get_password().encode('utf-8')
+            if bcrypt.checkpw(password.encode('utf-8'), stored_hashed_password):
+                user.set_login_status(True)
+
+                await self.event_dispatcher.dispatch("user_account_login_ok", {
+                    "username": username,
+                    "user_instance": user
+                })
+        else:
+            await self.event_dispatcher.dispatch("user_account_login_failed", {
+                "message_type": "login_failed",
+                "username": username,
+                "message": "invalid credentials"
+            })
+
+    async def handle_logout(self, event_data):
+        username = event_data['username']
+
+        # Perform logout logic, e.g., marking the user as logged out
+        user = await self.get_user_instance(username)
+
+        if user:
+            user.set_login_status(False)
+
+            # dispatch a message for the map listener to see and add the user to their map
+            await self.event_dispatcher.dispatch("user_account_logout_ok", {
+                "username": username,
+                "user_instance": user
+            })
+        else:
+            await self.event_dispatcher.dispatch("user_account_logout_failed", {
+                "message_type": "logout_failed",
+                "username": username,
+                "message": "User not found"
+            })
 
     async def change_user_role(self, admin_username, target_username, new_role):
         admin_user = self.get_user_instance(admin_username)
@@ -43,53 +132,14 @@ class UserRegistry:
         role_manager.assign_role_to_user(new_role, target_username)
         print(f"User {target_username}'s role changed to {new_role} by {admin_username}.")
 
-
-    async def get_user_instance(self, username):
-        if username in self.instances:
-            return self.instances[username]
-
-    async def create_user(self, username, password, role = 'player'):
-        user_file = self.users_path / f"{username}.usr"
-        if user_file.exists():
-            raise ValueError("Username already exists")
-
-        self.users_path.mkdir(parents=True, exist_ok=True)  # Ensure user directory exists
-
-        # Create and configure the user
-        user = User(self.event_dispatcher)
-
-        # set the username and password in the new user object instance
-        user.set_username(username)
-        await user.set_password(password)
-
-        # Assign default role
-        role_manager = RoleManager.get_instance()
-        role_manager.assign_role_to_user(role, username)
-
-        # Save the new user to disk
-        await self.save_user(user)
-
     async def load_user(self, username):
         user_file_path = self.users_path / f"{username}.usr"
         if user_file_path.exists():
             async with aiofiles.open(user_file_path, 'r') as file:
                 user_data = json.loads(await file.read())
-                return User.from_dict(user_data, self.event_dispatcher)
+                return User.from_dict(user_data)
         else:
             return None
-
-    async def load_users(self):
-        self.users_path.mkdir(parents=True, exist_ok=True)  # Ensure user directory exists
-
-        if not any(self.users_path.iterdir()):  # If the directory is empty, create default admin
-            print("No users found, creating default admin user.")
-            await self.create_user("admin", "adminpassword", role = "developer")
-
-        for user_file in self.users_path.glob("*.usr"):
-            async with aiofiles.open(user_file, 'r') as file:
-                user_data = json.loads(await file.read())
-                username = user_file.stem
-                self.instances[username] = User.from_dict(user_data, self.event_dispatcher)
 
     async def save_user(self, user_instance):
         user_file_path = self.users_path / f"{user_instance.username}.usr"
@@ -102,44 +152,11 @@ class UserRegistry:
         for username, user_instance in self.instances.items():
             await self.save_user(user_instance)
 
-    async def register_user(self, event_data):
-        # Extract the variables from the event data
-        username = event_data['username']
-        user_instance = event_data['user_instance']
-
-        if username not in self.instances:
-            self.instances[username] = user_instance
-
-            # Emit an event indicating the user has been registered
-            await self.event_dispatcher.dispatch("user_registered", {
-                "username": username,
-                "current_map": user_instance.current_map,
-                "user_instance": user_instance
-            })
-
-        else:
-            # Handle already registered user
-            pass
-
-    async def deregister_user(self, event_data):
-        # Extract the username from the event data
-        username = event_data['username']
-        if username in self.instances:
-            user_instance = self.instances[username]
-            user_instance.logged_in = False
-
-            # Emit an event indicating the user has been deregistered
-            await self.event_dispatcher.dispatch("user_deregistered", {
-                "username": username,
-                "current_map": user_instance.current_map
-            })
-            # Save the user's state after deregistering
-            await self.save_user(user_instance)
-        else:
-            # Handle user not found scenario
-            pass
-
     # Method that returns the self.instances dictionary for user objects
+    async def get_user_instance(self, username):
+        if username in self.instances:
+            return self.instances[username]
+
     async def get_all_users(self):
         return self.instances
 
@@ -158,27 +175,31 @@ class User:
         self.health = 10000
         self.energy = 10000
         self.inventory = {}
-        # other components
+
+
         self.event_dispatcher = event_dispatcher
+        self.setup_subscriptions()
 
     def has_permission(self, permission):
+        print("user has permission method called")
         role_manager = RoleManager.get_instance()
         return role_manager.has_permission(self.username, permission)
 
-    async def setup_subscriptions(self):
-        await self.event_dispatcher.subscribe_client('handle_login', self.username)
-        await self.event_dispatcher.subscribe_client('handle_logout', self.username)
-        await self.event_dispatcher.subscribe_client('user_registered', self.username)
-        await self.event_dispatcher.subscribe_client('user_deregistered', self.username)
-        await self.event_dispatcher.subscribe_client('add_tile', self.username)
-        await self.event_dispatcher.subscribe_client('remove_tile', self.username)
-        await self.event_dispatcher.subscribe_client('add_zone', self.username)
-        await self.event_dispatcher.subscribe_client('remove_zone', self.username)
-        await self.event_dispatcher.subscribe_client('user_move', self.username)
-        await self.event_dispatcher.subscribe_client('user_turn', self.username)
-        await self.event_dispatcher.subscribe_client('global_chat', self.username)
-        await self.event_dispatcher.subscribe_client('map_chat', self.username)
-        await self.event_dispatcher.subscribe_client('private_chat', self.username)
+    def setup_subscriptions(self):
+        print("setting up user instance subscriptions")
+        self.event_dispatcher.subscribe_client('handle_login', self.username)
+        self.event_dispatcher.subscribe_client('handle_logout', self.username)
+        self.event_dispatcher.subscribe_client('user_registered', self.username)
+        self.event_dispatcher.subscribe_client('user_deregistered', self.username)
+        self.event_dispatcher.subscribe_client('add_tile', self.username)
+        self.event_dispatcher.subscribe_client('remove_tile', self.username)
+        self.event_dispatcher.subscribe_client('add_zone', self.username)
+        self.event_dispatcher.subscribe_client('remove_zone', self.username)
+        self.event_dispatcher.subscribe_client('user_move', self.username)
+        self.event_dispatcher.subscribe_client('user_turn', self.username)
+        self.event_dispatcher.subscribe_client('global_chat', self.username)
+        self.event_dispatcher.subscribe_client('map_chat', self.username)
+        self.event_dispatcher.subscribe_client('private_chat', self.username)
 
     def get_username(self):
         return self.username

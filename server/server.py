@@ -1,12 +1,14 @@
 # server.py
 import argparse
-import subprocess
-import os
 import asyncio
+import os
+from pathlib import Path
+import subprocess
+
+
 from core.custom_logger import CustomLogger
 from core.server_console import ServerConsole
 from core.network import Network
-from core.server_handler import ServerHandler
 from core.security.security_manager import SecurityManager
 from core.events.event_dispatcher import EventDispatcher
 from core.modules.map_manager import MapRegistry
@@ -28,7 +30,6 @@ class Server:
         self.user_reg = None
         self.map_reg = None
         self.event_dispatcher = None
-        self.server_handler = None
         self.console = None
         self.shutdown_event = asyncio.Event()
         self.security_manager = SecurityManager('security.key')
@@ -54,6 +55,7 @@ class Server:
 
     def setup_permission_checks(self, event_dispatcher, user_registry):
         async def on_permission_check(event_data):
+            print("checking permission")
             username = event_data['username']
             permission = event_data['permission']
             follow_up_event = event_data['follow_up_event']
@@ -63,6 +65,7 @@ class Server:
             user = await user_registry.get_user_instance(username)
 
             if user and user.has_permission(permission):
+                print("user permission check succeeded")
                 await event_dispatcher.dispatch(follow_up_event, follow_up_event_data, scope=follow_up_event_scope, recipient_username=username if follow_up_event_scope == 'private' else None)
 
             else:
@@ -81,21 +84,58 @@ class Server:
         print(f"Developed and maintained by {self.dev_name}. {self.website}")
         print("Type 'help' for a list of available commands")
         await self.setup_security()
+
+        # configure the network object
         self.network = Network.get_instance(self.host, self.port, asyncio.Queue(), self.process_message, self.shutdown_event)
         await self.network.start()
         asyncio.create_task(self.process_message_queue())
+
+        # setup the event dispatcher
         self.event_dispatcher = EventDispatcher.get_instance(network=self.network)
+        await self.event_dispatcher.update_network(self.network)
+
+        # setup the registries
         self.user_reg = UserRegistry(self.event_dispatcher)
         self.map_reg = MapRegistry(self.event_dispatcher)
-        self.setup_permission_checks(self.event_dispatcher, self.user_reg)
+
+        # setup the handlers
         self.user_handler = UserHandler(self.user_reg, self.map_reg, self.event_dispatcher)
         self.map_handler = MapHandler(self.map_reg, self.event_dispatcher)
-        await self.user_reg.load_users()
-        await self.map_reg.load_maps()
-        self.server_handler = ServerHandler(self.user_reg, self.map_reg, self.event_dispatcher, self.logger)
-        await self.event_dispatcher.update_network(self.network)
+        self.setup_permission_checks(self.event_dispatcher, self.user_reg)
+        await self.setup_initial_assets()
+        await self.map_reg.load_all_maps()
         self.console = ServerConsole.get_instance(self, self.user_reg, self.map_reg, self.logger, self.shutdown_event)
         self.console.start()
+
+    async def setup_initial_assets(self):
+        # Ensure users and maps directories exist
+        users_path = Path('users')
+        maps_path = Path('maps')
+        users_path.mkdir(exist_ok=True)
+        maps_path.mkdir(exist_ok=True)
+
+        # Check if users directory is empty (meaning no users have been created)
+        if not any(users_path.iterdir()):
+            # Create the initial admin user
+            initial_user_data = {
+                "username": "admin",
+                "password": "adminpass",
+                "role": "developer"
+            }
+            await self.user_reg.create_user(initial_user_data)
+            print("Default admin user created.")
+
+        # Check if maps directory is empty (meaning no maps have been created)
+        if not any(maps_path.iterdir()):
+            # Create the initial main map
+            initial_map_data = {
+                "username": "admin",
+                "map_name": "Main",
+                "map_size": (0, 10, 0, 10, 0, 10),
+                "start_position": (0, 0, 0)
+            }
+            await self.map_reg.create_map(initial_map_data)
+            print("Default Main map created.")
 
     async def shutdown(self):
         print("Shutting down the server...")

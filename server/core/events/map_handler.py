@@ -91,12 +91,13 @@ class MapHandler(EventHandler):
         })
 
     async def handle_create_map(self, event_data):
+        print("handle create map method called")
         # Dispatch permission check event before attempting to create the map
-        await self.event_dispatcher.dispatch("permission_check", {
+        await self.event_dispatcher.dispatch("check_permission", {
             'username': event_data['username'],
             'permission': 'create_map',  # Permission needed to create a map
             'follow_up_event': 'create_map',  # Custom event to trigger upon successful permission check
-            'scope': 'global',  # This action isn't specific to any particular map
+            'scope': 'global',
             'event_data': event_data  # Passing the original event data for further processing upon permission grant
         })
 

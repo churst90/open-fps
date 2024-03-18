@@ -23,22 +23,21 @@ class MapRegistry:
     async def remove_user_from_map(self, username, map_name):
         await self.event_dispatcher.update_user_map(username, map_name, action="remove")
 
-    async def create_map(self, data):
-        # Extract the values from the incoming data
-        username = data.get('username')
-        map_name = data.get('map_name')
-        map_size = data.get('map_size')
-        start_position = data.get('start_position')
+    async def create_map(self, event_data):
+        # Extract the values from the incoming event_data
+        username = event_data['username']
+        map_name = event_data['map_name']
+        map_size = event_data['map_size']
+        start_position = event_data['start_position']
 
         # check to see if the map being created already exists
         if map_name in self.instances:
-
            # Dispatch an error back to the user
-            await self.dispatcher.dispatch("handle_create_map", {
+            await self.dispatcher.dispatch("map_create_failed", {
                 "message_type": "create_map_failed",
-                "username": username
-            },
-            scope = "private", recipient = username)
+                "username": username,
+                "message": "That map name already exists, please try again"
+            })
             return
 
         # Create a new Map instance using the provided event dispatcher
@@ -47,26 +46,77 @@ class MapRegistry:
         new_map.set_map_size(map_size)
         new_map.set_start_position(start_position)
         await new_map.add_owner(username)
+
         print(f"Default {new_map.map_name} map created successfully with dimensions {new_map.map_size}")
 
-        # add the map instances to the instances dictionary
+        # add the map instance to the instances dictionary
         self.instances[map_name] = new_map
-        await self.event_dispatcher.dispatch("global_chat", {
-            "message": f"Server: {map_name} map was just created by {username}."
-        })
+        await self.instances[map_name].setup_subscriptions()
+
         try:
             await self.save_map(map_name)
         except Exception as e:
             print(f"Error saving map: {e}")
 
+        await self.event_dispatcher.dispatch("global_chat", {
+            "username": "server",
+            "message": f"{map_name} map was just created by {username}."
+        })
+
     async def get_map_instance(self, name):
-        async with self.lock:
-            map_instance = self.instances[name]
-            return map_instance
+        map_instance = self.instances[name]
+        return map_instance
 
     async def get_all_maps(self):
 #        async with self.lock:
         return self.instances
+
+    async def load_map(self, map_name):
+        map_file_path = self.maps_path / f"{map_name}.map"
+        
+        # Check if the map file exists
+        if not map_file_path.exists():
+            print(f"Map file for '{map_name}' does not exist.")
+            return None
+        
+        # Read the map file
+        try:
+            async with aiofiles.open(map_file_path, 'r') as file:
+                map_data = json.loads(await file.read())
+                
+                # Instantiate the Map object from the map data
+                map_instance = Map.from_dict(map_data, self.event_dispatcher)
+                
+                # Optionally cache the loaded map for quick access later
+                self.instances[map_name] = map_instance
+                
+                return map_instance
+        except Exception as e:
+            print(f"Failed to load map '{map_name}': {e}")
+            return None
+
+    async def load_all_maps(self):
+        # Ensure the maps directory exists
+        self.maps_path.mkdir(exist_ok=True)
+        
+        # Iterate through all .map files in the maps directory
+        for map_file in self.maps_path.glob("*.map"):
+            map_name = map_file.stem  # Extract the map name from the file name (without the .map extension)
+            
+            try:
+                # Open the map file asynchronously
+                async with aiofiles.open(map_file, mode='r') as file:
+                    map_data = await file.read()
+                    map_data_json = json.loads(map_data)
+                    
+                    # Instantiate the Map object from the loaded data
+                    # Ensure your Map class has a corresponding method to handle this.
+                    map_instance = Map.from_dict(map_data_json, self.event_dispatcher)
+                    
+                    # Store the map instance in the instances dictionary
+                    self.instances[map_name] = map_instance
+            except Exception as e:
+                print(f"Failed to load map '{map_name}': {e}")
 
     async def save_map(self, name):
         if name not in self.instances:
@@ -82,50 +132,6 @@ class MapRegistry:
             print(f"Map '{name}' saved successfully.")
         except Exception as e:
             print(f"Failed to save map {name}: {e}")
-
-    async def save_all_maps(self):
-        async with self.lock:
-            for map_name in self.instances.keys():  # Iterating through keys of self.instances
-                await self.save_map(map_name)  # map_name is a string
-
-    async def load_maps(self):
-        async with self.lock:
-            if not self.maps_path.exists():
-                self.maps_path.mkdir(parents=True, exist_ok=True)
-                print("No maps directory found. Created 'maps' directory.")
-                # initial map data
-                data = {'username': 'admin', "map_name": "Main", "map_size": (0, 10, 0, 10, 0, 10), "start_position": (0, 0, 0)}
-                await self.create_map(data)
-                await self.instances["Main"].setup_subscriptions()
-                tile_data = {
-                    "username": "admin",
-                    "map_name": "Main",
-                    "tile_position": (0, 10, 0, 10, 0, 0),
-                    "tile_type": "grass",
-                    "is_wall": False  # Example property for tile
-                    }
-
-                zone_data = {
-                    "username": "admin",
-                    "map_name": "Main",
-                    "zone_label": "Main area",
-                    "zone_position": (0, 10, 0, 10, 0, 0),
-                    "zone_type": "grass"
-                    }
-
-                await self.event_dispatcher.dispatch('handle_add_tile', tile_data)
-                await self.event_dispatcher.dispatch('handle_add_zone', zone_data)
-
-                await self.save_map("Main")
-                return
-            for map_file in self.maps_path.glob('*.map'):
-                map_name = map_file.stem
-                async with aiofiles.open(map_file, 'r') as file:
-                    map_data = json.loads(await file.read())
-                self.instances[map_name] = Map.from_dict(map_data, self.event_dispatcher)
-                print(f"Map '{map_name}' loaded successfully.")
-                await self.instances[map_name].setup_subscriptions()
-                print(f"Subscriptions added for '{map_name}")
 
 class Map:
     def __init__(self, event_dispatcher, map_registry):
@@ -147,12 +153,15 @@ class Map:
         self.map_registry = map_registry
 
     async def setup_subscriptions(self):
+        print(f"subscriptions setup for {self.map_name}")
         self.event_dispatcher.subscribe_internal("add_tile", self.add_tile)
         self.event_dispatcher.subscribe_internal("remove_tile", self.remove_tile)
         self.event_dispatcher.subscribe_internal("add_zone", self.add_zone)
         self.event_dispatcher.subscribe_internal("remove_zone", self.remove_zone)
         self.event_dispatcher.subscribe_internal("join_map", self.join_map)
         self.event_dispatcher.subscribe_internal("leave_map", self.leave_map)
+        self.event_dispatcher.subscribe_internal("user_account_login_ok", self.join_map)
+        self.event_dispatcher.subscribe_internal("user_account_logout_ok", self.leave_map)
 
     async def update_weather(self, new_weather):
         self.weather = new_weather
@@ -247,16 +256,37 @@ class Map:
             print(f"Zone {zone_key} not found in {self.map_name}.")
 
     async def join_map(self, event_data):
-        username = event_data.get('username')
-        user_instance = event_data.get('user_instance')
+        print("join map method called")
+        username = event_data['username']
+        current_map = event_data['current_map']
+        user_instance = event_data['user_instance']
+        position = user_instance.get_position()
+        logged_in = event_data['logged_in']
+        user_data = user_instance.to_dict()
+        map_data = self.instances[current_map].to_dict()
+
         # check the user's current position in comparison to map boundaries
-        if user_instance.get_position() in self.is_within_single_bounds():
+        if position in self.is_within_single_bounds():
             # Add the user instance to the players dictionary under the username key
             self.users[username] = user_instance
             print(f"User {username} added to map {self.map_name}")
 
         # Update the event dispatcher user to map record
         await self.map_registry.assign_user_to_map(username, self.map_name)
+
+        if logged_in:
+            await self.event_dispatcher.dispatch("user_data_update", {
+                "message_type": "user_data",
+                "username": username,
+                "user_data": user_data,
+                "map_data": map_data
+            })
+        else:
+            await self.event_dispatcher.dispatch("user_data_update", {
+                "message_type": "user_data",
+                "username": username,
+                "map_data": map_data
+            })
 
     async def leave_map(self, event_data):
         username = event_data.get('username')
