@@ -1,23 +1,46 @@
-import bcrypt
 import math
 import json
 
 # project specific imports
-from core.events.event_handler import EventHandler
-from core.events.event_dispatcher import EventDispatcher
-from core.modules.collision import Collision
-from core.events.user_movement import UserMovement
+from include.event_dispatcher import EventDispatcher
+from include.managers.collision_manager import Collision
+from include.event_handlers.user_movement import UserMovement
 
-class UserHandler(EventHandler):
-    def __init__(self, user_reg, map_reg, event_dispatcher):
-        super().__init__(event_dispatcher)
-        self.user_reg = user_reg
-        self.map_reg = map_reg
-        self.event_dispatcher.subscribe_internal('handle_user_move', self.handle_user_move)
-        self.event_dispatcher.subscribe_internal('handle_user_turn', self.handle_user_turn)
+class UserHandler:
+    def __init__(self, event_dispatcher, user_service):
+        self.user_service = user_service
+        self.event_dispatcher = event_dispatcher
+        self.setup_subscriptions()
+
+    def setup_subscriptions(self):
+        self.event_dispatcher.subscribe_internal('user_move', self.handle_user_move)
+        self.event_dispatcher.subscribe_internal('user_turn', self.handle_user_turn)
+        self.event_dispatcher.subscribe_internal('user_account_create_ok', self.send_initial_data)
+        self.event_dispatcher.subscribe_internal('user_account_login_request', self.handle_login)
+        self.event_dispatcher.subscribe_internal('user_account_logout_request', self.handle_logout)
+
+    async def handle_login(self):
+        pass
+
+    async def handle_logout(self):
+        pass
+
+    async def send_initial_data(self, event_data):
+        username = event_data['username']
+
+        user_data = self.user_reg.get_user_instance(username).to_dict()
+
+        await self.event_dispatcher.dispatch('user_data_response', {
+            "username": username,
+            "user_data": user_data
+        },
+        scope = "private", recipient = username)
 
     # method for controling the user's movement (forward, backward, left and right)
-    async def handle_user_move(self, username, direction, distance):
+    async def handle_user_move(self, event_data):
+        username = event_data['username']
+        direction = event_data['direction']
+        distance = event_data['distance']
 
         # get the instance of the user
         user = self.user_reg.get_user_instance(username)

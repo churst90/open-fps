@@ -5,17 +5,19 @@ import os
 from pathlib import Path
 import subprocess
 
-
-from core.custom_logger import CustomLogger
-from core.server_console import ServerConsole
-from core.network import Network
-from core.security.security_manager import SecurityManager
-from core.events.event_dispatcher import EventDispatcher
-from core.modules.map_manager import MapRegistry
-from core.modules.user_manager import UserRegistry
-from core.events.user_handler import UserHandler
-from core.events.map_handler import MapHandler
-from core.server_constants import DEFAULT_HOST, DEFAULT_PORT, VERSION, DEVELOPER_NAME, SERVER_NAME, WEBSITE_URL
+from include.custom_logger import CustomLogger
+from include.server_console import ServerConsole
+from include.network import Network
+from include.security.security_manager import SecurityManager
+from include.event_dispatcher import EventDispatcher
+from include.registries.map_registry import MapRegistry
+from include.registries.user_registry import UserRegistry
+from include.event_handlers.user_handler import UserHandler
+from include.event_handlers.map_handler import MapHandler
+from include.servicers.user_service import UserService
+from include.servicers.map_service import MapService
+from include.managers.role_manager import RoleManager
+from include.server_constants import DEFAULT_HOST, DEFAULT_PORT, VERSION, DEVELOPER_NAME, SERVER_NAME, WEBSITE_URL
 
 class Server:
     def __init__(self, host, port):
@@ -35,6 +37,9 @@ class Server:
         self.security_manager = SecurityManager('security.key')
         self.user_handler = None
         self.map_handler = None
+        self.user_service = None
+        self.map_service = None
+        self.role_manager = RoleManager()
 
     async def process_message_queue(self):
         while not self.shutdown_event.is_set():
@@ -94,16 +99,26 @@ class Server:
         self.event_dispatcher = EventDispatcher.get_instance(network=self.network)
         await self.event_dispatcher.update_network(self.network)
 
+        # Setup the role manager
+        self.role_manager.get_instance()
+
         # setup the registries
-        self.user_reg = UserRegistry(self.event_dispatcher)
-        self.map_reg = MapRegistry(self.event_dispatcher)
+        self.user_reg = UserRegistry()
+        self.map_reg = MapRegistry()
+
+        # Setup the servicers
+        self.user_service = UserService(self.user_reg, self.map_reg)
+        self.map_service = MapService(self.map_reg, self.event_dispatcher, self.role_manager)
+        self.user_service = (self.user_reg, self.map_reg)
+        self.map_service = (self.map_reg, self.event_dispatcher, self.role_manager)
 
         # setup the handlers
-        self.user_handler = UserHandler(self.user_reg, self.map_reg, self.event_dispatcher)
-        self.map_handler = MapHandler(self.map_reg, self.event_dispatcher)
+        self.user_handler = UserHandler(self.event_dispatcher, self.user_service)
+        self.map_handler = MapHandler(self.event_dispatcher, self.map_service)
+
         self.setup_permission_checks(self.event_dispatcher, self.user_reg)
-        await self.setup_initial_assets()
         await self.map_reg.load_all_maps()
+        await self.setup_initial_assets()
         self.console = ServerConsole.get_instance(self, self.user_reg, self.map_reg, self.logger, self.shutdown_event)
         self.console.start()
 
@@ -116,6 +131,7 @@ class Server:
 
         # Check if users directory is empty (meaning no users have been created)
         if not any(users_path.iterdir()):
+            print("No user data was found. Creating the default admin account with developer priviledges ...")
             # Create the initial admin user
             initial_user_data = {
                 "username": "admin",
@@ -123,10 +139,12 @@ class Server:
                 "role": "developer"
             }
             await self.user_reg.create_user(initial_user_data)
-            print("Default admin user created.")
+            print("Default 'admin' user created. The default password is 'adminpassword'. Please change this for security.")
 
         # Check if maps directory is empty (meaning no maps have been created)
         if not any(maps_path.iterdir()):
+            print("No maps were found. Creating a default map ...")
+
             # Create the initial main map
             initial_map_data = {
                 "username": "admin",
@@ -135,7 +153,7 @@ class Server:
                 "start_position": (0, 0, 0)
             }
             await self.map_reg.create_map(initial_map_data)
-            print("Default Main map created.")
+            print("Done initializing the server. The console does not have priviledge restrictions. Type 'help' at any time for a list of all available commands. GG!")
 
     async def shutdown(self):
         print("Shutting down the server...")
