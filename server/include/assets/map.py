@@ -1,3 +1,6 @@
+from include.assets.tile import Tile
+from include.assets.zone import Zone
+
 class Map:
     def __init__(self):
         # map features and attributes
@@ -71,10 +74,10 @@ class Map:
         map_instance = cls()
         map_instance.map_name = data['map_name']
         map_instance.map_size = data['map_size']
-        map_instance.start_position = data.get('start_position')
-        map_instance.owners = data.get('owners', [])
-        map_instance.tiles = data.get('tiles', {})
-        map_instance.zones = data.get('zones', {})
+        map_instance.start_position = data['start_position']
+        map_instance.owners = data['owners']
+        map_instance.tiles = {tile_key: Tile.from_dict(tile_data) for tile_key, tile_data in data.get('tiles', {}).items()}
+        map_instance.zones = {zone_key: Zone.from_dict(zone_data) for zone_key, zone_data in data.get('zones', {}).items()}
         return map_instance
 
     def to_dict(self):
@@ -83,8 +86,8 @@ class Map:
             "map_size": self.map_size,
             "start_position": self.start_position,
             "owners": self.owners,
-            "tiles": self.tiles,
-            "zones": self.zones,
+            "tiles": {tile_key: tile.to_dict() for tile_key, tile in self.tiles.items()},
+            "zones": {zone_key: zone.to_dict() for zone_key, zone in self.zones.items()}
         }
 
     def get_map_name(self):
@@ -101,11 +104,11 @@ class Map:
             new_tile = Tile(tile_position, tile_type, is_wall)
 
             # Add the new tile to the tiles dictionary using its unique key
-            self.tiles[new_tile.tile_key] = new_tile.to_dict()
+            self.tiles[new_tile.tile_key] = new_tile
             print("tile added")
             return
-        except:
-            print("The tile couldn't be added to the map")
+        except Exception as e:
+            print(f"The tile couldn't be added to the map: {e}")
             return False
 
     async def remove_tile(self, key):
@@ -121,14 +124,15 @@ class Map:
     async def add_zone(self, new_zone_data):
         zone_label = new_zone_data['zone_label']
         zone_position = new_zone_data['zone_position']
-        zone_type = new_zone_data['zone_type']
+        is_safe = new_zone_data['is_safe']
+        is_hazard = new_zone_data['is_hazard']
 
         try:
-            new_zone = Zone(zone_label, zone_position, zone_type)
-            self.zones[new_zone.zone_key] = new_zone.to_dict()
+            new_zone = Zone(zone_label, zone_position, is_safe, is_hazard)
+            self.zones[new_zone.zone_key] = new_zone
             return
-        except:
-            print("Couldn't add the zone to the map")
+        except Exception as e:
+            print(f"Couldn't add the zone to the map: {e}")
             return False
 
     async def remove_zone(self, key):
@@ -153,8 +157,10 @@ class Map:
             self.users[username] = user_instance
             return
         else:
-            print("User couldn't be added to the map")
-            return False
+            user_instance.set_position(self.start_position)
+            # Add the user instance to the users dictionary
+            self.users[username] = user_instance
+            return
 
     async def leave_map(self, current_username):
         username = current_username

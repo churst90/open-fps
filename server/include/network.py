@@ -19,9 +19,9 @@ class Network:
         return cls._instance
 
     @classmethod
-    def get_instance(cls, host, port, message_queue, message_handler, shutdown_event, ssl_cert_file='cert.pem', ssl_key_file='key.pem'):
+    def get_instance(cls, host, port, message_queue, message_handler, shutdown_event, ssl_cert_file='keys/cert.pem', ssl_key_file='keys/key.pem'):
         if cls._instance is None:
-            cls._instance = cls(host, port, message_queue, message_handler, shutdown_event, ssl_cert_file, ssl_key_file)
+            cls._instance = cls(host, port, message_queue, message_handler, shutdown_event, 'keys/cert.pem', 'keys/key.pem')
         return cls._instance
 
     def __init__(self, host, port, message_queue, message_handler, shutdown_event, ssl_cert_file='cert.pem', ssl_key_file='key.pem'):
@@ -36,8 +36,8 @@ class Network:
         self.last_connection_attempt = {}  # Timestamp of the last connection attempt by IP
         self.banned_ips = set()
         self.ssl_context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
-        cert_path = os.path.join(os.path.dirname(__file__), 'security', 'cert.pem')
-        key_path = os.path.join(os.path.dirname(__file__), 'security', 'key.pem')
+        cert_path = os.path.join(os.path.dirname(__file__), 'keys', 'cert.pem')
+        key_path = os.path.join(os.path.dirname(__file__), 'keys', 'key.pem')
         self.ssl_context.load_cert_chain(certfile=cert_path, keyfile=key_path)
         self.shutdown_event = shutdown_event
         self.connections_lock = asyncio.Lock()  # Add a lock for managing connections

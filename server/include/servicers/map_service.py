@@ -34,9 +34,9 @@ class MapService:
 
     async def _add_tile_impl(self, map_name, tile_data):
         try:
-            map_instance = self.map_reg.get_map_instance(map_name)
+            map_instance = await self.map_reg.get_map_instance(map_name)
             if map_instance:
-                map_instance.add_tile(tile_data)
+                await map_instance.add_tile(tile_data)
                 return True
         except Exception as e:
             # Log the error or handle it as needed
@@ -55,13 +55,13 @@ class MapService:
             # You could log or raise an exception here if needed
             return False
 
-        return True
+        return
 
     async def _add_zone_impl(self, map_name, zone_data):
         try:
-            map_instance = self.map_reg.get_map_instance(map_name)
+            map_instance = await self.map_reg.get_map_instance(map_name)
             if map_instance:
-                map_instance.add_zone(zone_data)
+                await map_instance.add_zone(zone_data)
                 return True
         except Exception as e:
             # Log the error or handle it as needed
@@ -84,9 +84,9 @@ class MapService:
 
     async def _join_map_impl(self, map_name, user_data):
         try:
-            map_instance = self.map_reg.get_map_instance(map_name)
+            map_instance = await self.map_reg.get_map_instance(map_name)
             if map_instance:
-                map_instance.join_map(user_data)
+                await map_instance.join_map(user_data)
                 return True
         except Exception as e:
             # Log the error or handle it as needed
@@ -109,16 +109,19 @@ class MapService:
 
     async def _leave_map_impl(self, map_name, user_data):
         try:
-            map_instance = self.map_reg.get_map_instance(map_name)
+            map_instance = await self.map_reg.get_map_instance(map_name)
             if map_instance:
-                map_instance.leave_map(user_data)
+                await map_instance.leave_map(user_data)
                 return True
         except Exception as e:
             # Log the error or handle it as needed
             print(f"Error removing user from {map_name}: {e}")
         return False
 
-    async def create_map(self, map_name, username, map_data):
+    async def create_map(self, map_data):
+        username = map_data['username']
+        map_name = map_data['map_name']
+
         # Check permission first
         if not self.role_manager.has_permission(username, 'create_map'):
             # Using exceptions for exceptional conditions (e.g., lack of permission)
@@ -127,7 +130,6 @@ class MapService:
         # If permission granted, attempt to create the map
         success = await self._create_map_impl(map_name, username, map_data)
         if not success:
-            # You could log or raise an exception here if needed
             return False
 
         return True
@@ -180,9 +182,9 @@ class MapService:
 
     async def _add_owner_impl(self, map_name, username):
         try:
-            map_instance = self.map_reg.get_map_instance(map_name)
+            map_instance = await self.map_reg.get_map_instance(map_name)
             if map_instance:
-                map_instance.add_owner(username)
+                await map_instance.add_owner(username)
                 return True
         except Exception as e:
             # Log the error or handle it as needed
@@ -205,9 +207,9 @@ class MapService:
 
     async def _remove_owner_impl(self, map_name, username):
         try:
-            map_instance = self.map_reg.get_map_instance(map_name)
+            map_instance = await self.map_reg.get_map_instance(map_name)
             if map_instance:
-                map_instance.remove_owner(username)
+                await map_instance.remove_owner(username)
                 return True
         except Exception as e:
             # Log the error or handle it as needed

@@ -8,10 +8,10 @@ class Tile:
         self.is_wall = is_wall  # Boolean indicating if the tile blocks movement
         tile_types = ["air", "brick", "concrete", "cement", "dirt", "grass", "glass", "ice", "leaves", "mud", "wood", "water"]
 
-    def update_tile_position(self, new_position):
+    def set_tile_position(self, new_position):
         self.tile_position = new_position
 
-    def update_tile_type(self, new_type):
+    def set_tile_type(self, new_type):
         if new_type in tile_types:
             self.tile_type = new_type
         else:
@@ -27,3 +27,11 @@ class Tile:
             "tile_type": self.tile_type,
             "is_wall": self.is_wall
         }
+
+    @classmethod
+    def from_dict(cls, data):
+        return cls(
+            tile_position=data['tile_position'],
+            tile_type=data['tile_type'],
+            is_wall=data['is_wall']
+        )

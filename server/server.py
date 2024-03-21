@@ -8,7 +8,7 @@ import subprocess
 from include.custom_logger import CustomLogger
 from include.server_console import ServerConsole
 from include.network import Network
-from include.security.security_manager import SecurityManager
+from include.managers.security_manager import SecurityManager
 from include.event_dispatcher import EventDispatcher
 from include.registries.map_registry import MapRegistry
 from include.registries.user_registry import UserRegistry
@@ -34,12 +34,12 @@ class Server:
         self.event_dispatcher = None
         self.console = None
         self.shutdown_event = asyncio.Event()
-        self.security_manager = SecurityManager('security.key')
+        self.security_manager = SecurityManager('../keys/security.key')
         self.user_handler = None
         self.map_handler = None
         self.user_service = None
         self.map_service = None
-        self.role_manager = RoleManager()
+        self.role_manager = RoleManager.get_instance()
 
     async def process_message_queue(self):
         while not self.shutdown_event.is_set():
@@ -99,9 +99,6 @@ class Server:
         self.event_dispatcher = EventDispatcher.get_instance(network=self.network)
         await self.event_dispatcher.update_network(self.network)
 
-        # Setup the role manager
-        self.role_manager.get_instance()
-
         # setup the registries
         self.user_reg = UserRegistry()
         self.map_reg = MapRegistry()
@@ -109,11 +106,9 @@ class Server:
         # Setup the servicers
         self.user_service = UserService(self.user_reg, self.map_reg)
         self.map_service = MapService(self.map_reg, self.event_dispatcher, self.role_manager)
-        self.user_service = (self.user_reg, self.map_reg)
-        self.map_service = (self.map_reg, self.event_dispatcher, self.role_manager)
 
         # setup the handlers
-        self.user_handler = UserHandler(self.event_dispatcher, self.user_service)
+        self.user_handler = UserHandler(self.event_dispatcher, self.user_service, self.role_manager)
         self.map_handler = MapHandler(self.event_dispatcher, self.map_service)
 
         self.setup_permission_checks(self.event_dispatcher, self.user_reg)
@@ -133,26 +128,43 @@ class Server:
         if not any(users_path.iterdir()):
             print("No user data was found. Creating the default admin account with developer priviledges ...")
             # Create the initial admin user
-            initial_user_data = {
+            await self.event_dispatcher.dispatch("user_account_create_request", {
                 "username": "admin",
                 "password": "adminpass",
                 "role": "developer"
-            }
-            await self.user_reg.create_user(initial_user_data)
+            })
             print("Default 'admin' user created. The default password is 'adminpassword'. Please change this for security.")
 
         # Check if maps directory is empty (meaning no maps have been created)
         if not any(maps_path.iterdir()):
             print("No maps were found. Creating a default map ...")
 
-            # Create the initial main map
-            initial_map_data = {
+            await self.event_dispatcher.dispatch("map_create_request", {
                 "username": "admin",
                 "map_name": "Main",
                 "map_size": (0, 10, 0, 10, 0, 10),
                 "start_position": (0, 0, 0)
-            }
-            await self.map_reg.create_map(initial_map_data)
+            })
+
+            # Add a tile to the main map
+            await self.event_dispatcher.dispatch("map_tile_add_request", {
+                "username": "admin",
+                "map_name": "Main",
+                "tile_position": (0, 10, 0, 10, 0, 0),
+                "tile_type": "grass",
+                "is_wall": False
+            })
+
+            # Add a zone to the main map
+            await self.event_dispatcher.dispatch("map_zone_add_request", {
+                "username": "admin",
+                "map_name": "Main",
+                "zone_position": (0, 10, 0, 10, 0, 0),
+                "zone_label": "main area",
+                "is_safe": True,
+                "is_hazard": False
+            })
+
             print("Done initializing the server. The console does not have priviledge restrictions. Type 'help' at any time for a list of all available commands. GG!")
 
     async def shutdown(self):

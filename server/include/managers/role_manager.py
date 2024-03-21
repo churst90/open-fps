@@ -34,6 +34,8 @@ class RoleManager:
     def has_permission(self, username, permission):
         print("has permission method called in role manager")
         role_name = self.user_roles.get(username)
-        if role_name and permission in self.roles.get(role_name, {}).get("permissions", []):
-            return True
+        if role_name:
+            role = self.roles.get(role_name)
+            if role and permission in role.get("permissions", []):
+                return True
         return False

@@ -7,7 +7,7 @@ from asyncio import Lock
 from pathlib import Path
 import aiofiles  # Import aiofiles for async file operations
 
-from include.managers.role_manager import RoleManager
+# from include.managers.role_manager import RoleManager
 from include.managers.rank_manager import RankManager
 from include.managers.achievement_manager import AchievementManager
 from include.assets.user import User
@@ -18,12 +18,13 @@ class UserRegistry:
         self.rank_manager = RankManager()
         self.achievement_manager = AchievementManager()
         self.instances = {}  # Runtime instances of logged-in players
-        self.users_path = Path('users')
+        self.users_path = Path.cwd() / 'users'
 
-    async def create_user(self, event_data):
+    async def create_account(self, event_data, role_manager):
         username = event_data['username']
         password = event_data['password']
         role = event_data['role']
+        role_manager = role_manager
 
         user_file = self.users_path / f"{username}.usr"
         if user_file.exists():
@@ -40,7 +41,6 @@ class UserRegistry:
         user.set_username(username)
         await user.set_password(password)
 
-        role_manager = RoleManager.get_instance()
         role_manager.assign_role_to_user(role, username)
 
         # Save the new user to disk

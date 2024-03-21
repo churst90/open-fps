@@ -7,15 +7,16 @@ from include.managers.collision_manager import Collision
 from include.event_handlers.user_movement import UserMovement
 
 class UserHandler:
-    def __init__(self, event_dispatcher, user_service):
+    def __init__(self, event_dispatcher, user_service, role_manager):
         self.user_service = user_service
         self.event_dispatcher = event_dispatcher
         self.setup_subscriptions()
+        self.role_manager= role_manager
 
     def setup_subscriptions(self):
         self.event_dispatcher.subscribe_internal('user_move', self.handle_user_move)
         self.event_dispatcher.subscribe_internal('user_turn', self.handle_user_turn)
-        self.event_dispatcher.subscribe_internal('user_account_create_ok', self.send_initial_data)
+        self.event_dispatcher.subscribe_internal('user_account_create_request', self.handle_create_account)
         self.event_dispatcher.subscribe_internal('user_account_login_request', self.handle_login)
         self.event_dispatcher.subscribe_internal('user_account_logout_request', self.handle_logout)
 
@@ -24,17 +25,6 @@ class UserHandler:
 
     async def handle_logout(self):
         pass
-
-    async def send_initial_data(self, event_data):
-        username = event_data['username']
-
-        user_data = self.user_reg.get_user_instance(username).to_dict()
-
-        await self.event_dispatcher.dispatch('user_data_response', {
-            "username": username,
-            "user_data": user_data
-        },
-        scope = "private", recipient = username)
 
     # method for controling the user's movement (forward, backward, left and right)
     async def handle_user_move(self, event_data):
@@ -120,3 +110,33 @@ class UserHandler:
             "yaw": user.yaw
         },
         scope = "map", map_id = map_name)
+
+    async def handle_create_account(self, event_data):
+        # Extract data from the event
+        username = event_data['username']
+
+        try:
+            # Call the UserService to create the account
+            success = await self.user_service.create_account(event_data, self.role_manager)
+
+            # If the account is successfully created, dispatch a success event
+            if success:
+                await self.event_dispatcher.dispatch('user_account_create_ok', {
+                    'username': username,
+                    'message': 'Account successfully created.'
+                })
+            else:
+                await self.event_dispatcher.dispatch('user_account_create_fail', {
+                    'username': username,
+                    'message': "Couldn't create account. Username may already exist."
+                })
+
+        except Exception as e:
+            # Log the exception
+            print(f"Error creating account for {username}: {str(e)}")
+
+            # Dispatch a failure event
+            await self.event_dispatcher.dispatch('user_account_create_fail', {
+                'username': username,
+                'message': "Couldn't create account due to an internal error."
+            })

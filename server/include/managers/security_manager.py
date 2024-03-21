@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 class SecurityManager:
     _instance = None
 
-    def __new__(cls, key_file_path='security.key'):
+    def __new__(cls, key_file_path='keys/security.key'):
         if cls._instance is None:
             cls._instance = super(SecurityManager, cls).__new__(cls)
             cls._instance.initialize(key_file_path)
