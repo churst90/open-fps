@@ -49,20 +49,37 @@ class UserRegistry:
     async def remove_user(self, username):
         pass
 
-    async def login(self, event_data):
-        username = event_data['username']
-        password = event_data['password']
-
+    async def authenticate_user(self, username, password):
         user = await self.load_user(username)
-        if user is None:
-            return False
-
-            stored_hashed_password = user.get_password()
-
-            # compare and validate passwords
-            stored_hashed_password = user.get_password().encode('utf-8')
+        if user:
+            stored_hashed_password = user.password.encode('utf-8')
             if bcrypt.checkpw(password.encode('utf-8'), stored_hashed_password):
                 user.set_login_status(True)
+                self.instances[username] = user
+                user_data = user.to_dict()
+                return user_data
+        return False
+
+    async def deauthenticate_user(self, username):
+        # Try to retrieve the user instance. If it doesn't exist, return immediately.
+        user_instance = await self.get_user_instance(username)
+        if not user_instance:
+            print(f"User {username} not found for deauthentication.")
+            return False
+
+        # Update the user's logged-in status to False.
+        user_instance.set_login_status(False)
+
+        try:
+            await self.save_user(user_instance)
+        except Exception as e:
+            print(f"Failed to save user {username} state during deauthentication: {e}")
+
+        if username in self.instances:
+            del self.instances[username]
+        
+        print(f"User {username} deauthenticated successfully.")
+        return True
 
     async def change_user_role(self, admin_username, target_username, new_role):
         admin_user = self.get_user_instance(admin_username)

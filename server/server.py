@@ -104,7 +104,7 @@ class Server:
         self.map_reg = MapRegistry()
 
         # Setup the servicers
-        self.user_service = UserService(self.user_reg, self.map_reg)
+        self.user_service = UserService(self.user_reg, self.map_reg, self.event_dispatcher)
         self.map_service = MapService(self.map_reg, self.event_dispatcher, self.role_manager)
 
         # setup the handlers

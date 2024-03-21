@@ -14,102 +14,97 @@ class UserHandler:
         self.role_manager= role_manager
 
     def setup_subscriptions(self):
-        self.event_dispatcher.subscribe_internal('user_move', self.handle_user_move)
-        self.event_dispatcher.subscribe_internal('user_turn', self.handle_user_turn)
+        self.event_dispatcher.subscribe_internal('user_move_request', self.handle_user_move)
+        self.event_dispatcher.subscribe_internal('user_turn_request', self.handle_user_turn)
         self.event_dispatcher.subscribe_internal('user_account_create_request', self.handle_create_account)
         self.event_dispatcher.subscribe_internal('user_account_login_request', self.handle_login)
         self.event_dispatcher.subscribe_internal('user_account_logout_request', self.handle_logout)
 
-    async def handle_login(self):
-        pass
+    async def handle_login(self, event_data):
+        username = event_data['username']
+        password = event_data['password']
+        user_data = await self.user_service.login(username, password)
+        if user_data:
+            await self.event_dispatcher.dispatch('user_login_ok', {
+                "message_type": "user_login_ok",
+                'username': username,
+                "user_data": user_data
+            }, scope="private", user_id=username)
+        else:
+            await self.event_dispatcher.dispatch('user_login_fail', {
+                "message_type": "user_login_fail",
+                'username': username,
+                'message': "Authentication failed"
+            }, scope="private", user_id=username)
 
-    async def handle_logout(self):
-        pass
+    async def handle_logout(self, event_data):
+        # Extract the username from the event data
+        username = event_data.get('username')
+        map_name = event_data.get('map_name')
 
-    # method for controling the user's movement (forward, backward, left and right)
+        # Check if the username is provided
+        if not username:
+            return
+
+        # Attempt to log the user out via the UserService
+        success = await self.user_service.logout(username, map_name)
+        if success:
+            # If logout is successful, dispatch a success event
+            await self.event_dispatcher.dispatch("user_logout_ok", {
+                "message_type": "user_logout_ok",
+                "username": username,
+            }, scope="private", user_id=username)
+
+        else:
+            # If logout fails, dispatch a failure event
+            await self.event_dispatcher.dispatch("user_logout_fail", {
+                "message_type": "user_logout_fail",
+                "username": username,
+                "messahge": "Logout failed. User might not be logged in."
+            }, scope="private", user_id = username)
+
     async def handle_user_move(self, event_data):
         username = event_data['username']
+        map_name = event_data['map_name']
         direction = event_data['direction']
         distance = event_data['distance']
 
-        # get the instance of the user
-        user = self.user_reg.get_user_instance(username)
+        success, result = await self.user_service.move_user(username, direction, distance)
 
-        if user:
-            # calculate the move to see if it is valid
-            dx, dy, dz = await UserMovement.calculate_movement_vector(direction, distance, user.yaw, user.pitch)
+        if success:
+            # Dispatch success event with new position
+            await self.event_dispatcher.dispatch("user_move_ok", {
+                "message_type": "user_move_ok",
+                "username": username,
+                "position": result  # new position
+            }, scope = "map", map_id = map_name)
+        else:
+            # Dispatch failure event, possibly with error message
+            await self.event_dispatcher.dispatch("user_move_failed", {
+        "message_type": "user_move_fail",
+                "username": username
+            }, scope = "private", user_id = username)
 
-            # if the move was valid, store the values in a new position tuple
-            new_position = (user.position[0] + dx, user.position[1] + dy, user.position[2] + dz)
+    async def handle_user_turn(self, event_data):
+        username = event_data.get('username')
+        turn_direction = event_data.get('turn_direction')
 
-            # get the map instance of the user
-            map_instance = self.map_reg.get_map(user.current_map)
+        success, result = await self.user_service.turn_user(username, turn_direction)
 
-            # Check if map_instance is valid before checking valid_move
-            if map_instance:
-                # Now perform a collision check
-                valid_move, message = Collision.is_move_valid(map_instance, new_position, username)
-
-                if valid_move:
-                    # use the setter function of the user instance to update the position coordinates of the user
-                    user.set_position(new_position)
-
-                    # Dispatch a message back to the user with their updated coordinates
-                    await self.event_dispatcher.dispatch("user_move", {
-                        "message_type": "user_move_ok",
-                    "username": username,
-                    "position": new_position
-                },
-                scope = "map", map_id = map_instance.get_map_name())
-                else:
-                    await self.event_dispatch.dispatch("user_move", {
-                        "message_type": "user_move_failed",
-                        "username": username,
-                        "error": message
-                    },
-                    scope = "map", map_id = map_instance.get_map_name())
-            else:
-                await self.event_dispatcher.dispatch("user_move", {
-                    "message_type": "user_move_failed",
-                    "username": username,
-                    "error": "Invalid map instance"
-                },
-                scope = "map", map_id = map_instance.get_map_name())
-
-    # Method for calculating the turn direction of a user
-    async def handle_user_turn(self, data):
-        # Extract the data from the incoming data dictionary
-        username = data.get('username')
-        map_name = data.get('map_name')
-        turn_direction = data.get('turn_direction')
-
-        # Get the instance of the user
-        user = self.user_reg.get_user_instance(username)
-        if not user:
-            await self.event_dispatcher("user_turn", {"message_type": "user_turn", "error": "user not found"}, scope = "private", recipient = username)
-            return
-
-        # Define steps for turning
-        yaw_step, pitch_step = 1, 1
-
-        # adjust the yaw and pitch based on the turn direction
-        if turn_direction == "left":
-            user.yaw = (user.yaw - yaw_step) % 360
-        elif turn_direction == "right":
-            user.yaw = (user.yaw + yaw_step) % 360
-        elif turn_direction == "up":
-            user.pitch = max(min(user.pitch + pitch_step, 90), -90)
-        elif turn_direction == "down":
-            user.pitch = max(min(user.pitch - pitch_step, -90), -90)
-
-        # dispatch a message to the user about their new facing direction
-        await self.event_dispatcher.dispatch("user_turn", {
-            "message_type": "user_turn",
-            "username": username,
-            "pitch": user.pitch,
-            "yaw": user.yaw
-        },
-        scope = "map", map_id = map_name)
+        if success:
+            # Dispatch event to update client with new orientation
+            await self.event_dispatcher.dispatch("user_turn_ok", {
+                "message_type": "user_turn_ok",
+                "username": username,
+                "yaw": result[0],
+                "pitch": result[1]
+            })
+        else:
+            # Dispatch failure event, possibly with error message
+            await self.event_dispatcher.dispatch("user_turn_fail", {
+                "message_type": "user_turn_fail",
+                "username": username
+            }, scope = "private", user_id = username)
 
     async def handle_create_account(self, event_data):
         # Extract data from the event
@@ -122,14 +117,16 @@ class UserHandler:
             # If the account is successfully created, dispatch a success event
             if success:
                 await self.event_dispatcher.dispatch('user_account_create_ok', {
+        "message_type": "user_account_create_ok",
                     'username': username,
                     'message': 'Account successfully created.'
-                })
+                }, scope = "private", user_id = username)
             else:
                 await self.event_dispatcher.dispatch('user_account_create_fail', {
+        "message_type": "user_account_create_fail",
                     'username': username,
                     'message': "Couldn't create account. Username may already exist."
-                })
+                }, scope = "private", user_id = username)
 
         except Exception as e:
             # Log the exception
@@ -137,6 +134,7 @@ class UserHandler:
 
             # Dispatch a failure event
             await self.event_dispatcher.dispatch('user_account_create_fail', {
+        "message_type": "user_account_create_fail",
                 'username': username,
                 'message': "Couldn't create account due to an internal error."
-            })
+            }, scope = "private", user_id = username)

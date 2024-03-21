@@ -43,7 +43,7 @@ class EventDispatcher:
             await self.network.send_to_writers(writers, data)
 
     # Public method to dispatch events both internally and to clients
-    async def dispatch(self, event_type, data, scope="global", map_id=None, recipient_username=None):
+    async def dispatch(self, event_type, data, scope="global", map_id=None, user_id=None):
         # Notify local server components
         await self.notify_listeners(event_type, data)
 
@@ -52,8 +52,8 @@ class EventDispatcher:
             await self.dispatch_global(data)
         elif scope == "map" and map_id:
             await self.dispatch_map_specific(map_id, data)
-        elif scope == "private" and recipient_username:
-            await self.dispatch_private(recipient_username, data)
+        elif scope == "private" and user_id:
+            await self.dispatch_private(user_id, data)
 
     # Dispatch global events to all connected clients
     async def dispatch_global(self, data):
@@ -67,8 +67,8 @@ class EventDispatcher:
         await self.network.send_to_writers(writers, data)
 
     # Dispatch private messages to a specific client
-    async def dispatch_private(self, recipient_username, data):
-        writer = await self.network.get_writer(recipient_username)
+    async def dispatch_private(self, user_id, data):
+        writer = await self.network.get_writer(user_id)
         if writer:
             await self.network.send_to_writers([writer], data)
 
