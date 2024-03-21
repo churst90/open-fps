@@ -19,10 +19,10 @@ class SecurityManager:
 
     def initialize(self, key_file_path):
         # Set up file paths for the encryption key, certificate, and private key
-        security_dir = os.path.dirname(__file__)
-        self.key_file_path = os.path.join(security_dir, key_file_path)
-        self.cert_file = os.path.join(security_dir, 'cert.pem')
-        self.key_file = os.path.join(security_dir, 'key.pem')
+        base_dir = os.path.join(os.path.dirname(__file__), '../keys')
+        self.key_file_path = os.path.join(base_dir, key_file_path)
+        self.cert_file = os.path.join(base_dir, 'cert.pem')
+        self.key_file = os.path.join(base_dir, 'key.pem')
 
         # Initialize encryption key and rotation task variables
         self.key = None
