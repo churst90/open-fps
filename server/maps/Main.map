@@ -1,0 +1,7 @@
+map_name:Main
+tile:0:10:0:10:0:0:grass:False
+tile:5:7:5:7:0:0:concrete:False
+zone:0:10:0:10:0:0:main area:True:False
+map_size:0:10:0:10:0:10
+start_position:0:0:0
+owner:admin
