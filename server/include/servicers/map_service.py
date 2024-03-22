@@ -13,7 +13,7 @@ class MapService:
         if action == "remove":
             await self.event_dispatcher.update_user_map(username, map_name, action)
 
-    def validate_move(self, map_name, new_position):
+    async def validate_move(self, map_name, new_position):
         # Logic to check if the move is valid within the specified map
         map_instance = self.map_registry.get_map(map_name)
         return map_instance.validate_move(new_position)
@@ -67,7 +67,7 @@ class MapService:
         zone_min_x, zone_min_y, zone_min_z, zone_max_x, zone_max_y, zone_max_z = zone_data['position']
 
         if not CollisionManager.is_within_range_bounds(map_instance.map_size, zone_min_x, zone_min_y, zone_min_z, zone_max_x, zone_max_y, zone_max_z):
-        return False
+            return False
 
         # If permission granted, attempt to add the zone
         success = await self._add_zone_impl(map_name, zone_data)
@@ -94,10 +94,10 @@ class MapService:
             # Using exceptions for exceptional conditions (e.g., lack of permission)
             raise PermissionError(f"Permission denied for adding users.")
 
-    map_instance = await self.map_reg.get_map_instance(map_name)
-    if not map_instance:
-        print(f"Map {map_name} not found.")
-        return False
+        map_instance = await self.map_reg.get_map_instance(map_name)
+        if not map_instance:
+            print(f"Map {map_name} not found.")
+            return False
 
         position = user_data.get_position()
         if not CollisionManager.is_within_single_bounds(map_instance.map_size, *position):
