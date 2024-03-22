@@ -1,3 +1,5 @@
+from include.managers.collision_manager import CollisionManager
+
 class MapService:
 
     def __init__(self, map_registry, event_dispatcher, role_manager):
@@ -29,7 +31,7 @@ class MapService:
             return False
 
         # Assuming tile_data includes min and max x, y, z coordinates for the tile
-        tile_min_x, tile_min_y, tile_min_z, tile_max_x, tile_max_y, tile_max_z = tile_data['position']
+        tile_min_x, tile_min_y, tile_min_z, tile_max_x, tile_max_y, tile_max_z = tile_data['tile_position']
 
         if not CollisionManager.is_within_range_bounds(map_instance.map_size, tile_min_x, tile_min_y, tile_min_z, tile_max_x, tile_max_y, tile_max_z):
             return False
@@ -64,7 +66,7 @@ class MapService:
             return False
 
         # Assuming zone_data includes min and max x, y, z coordinates for the zone
-        zone_min_x, zone_min_y, zone_min_z, zone_max_x, zone_max_y, zone_max_z = zone_data['position']
+        zone_min_x, zone_min_y, zone_min_z, zone_max_x, zone_max_y, zone_max_z = zone_data['zone_position']
 
         if not CollisionManager.is_within_range_bounds(map_instance.map_size, zone_min_x, zone_min_y, zone_min_z, zone_max_x, zone_max_y, zone_max_z):
             return False
