@@ -3,7 +3,6 @@ import json
 
 # project specific imports
 from include.event_dispatcher import EventDispatcher
-from include.managers.collision_manager import Collision
 from include.event_handlers.user_movement import UserMovement
 
 class UserHandler:

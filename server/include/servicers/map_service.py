@@ -24,6 +24,16 @@ class MapService:
             # Using exceptions for exceptional conditions (e.g., lack of permission)
             raise PermissionError(f"Permission denied for adding tiles on {map_name}.")
 
+        map_instance = await self.map_reg.get_map_instance(map_name)
+        if not map_instance:
+            return False
+
+        # Assuming tile_data includes min and max x, y, z coordinates for the tile
+        tile_min_x, tile_min_y, tile_min_z, tile_max_x, tile_max_y, tile_max_z = tile_data['position']
+
+        if not CollisionManager.is_within_range_bounds(map_instance.map_size, tile_min_x, tile_min_y, tile_min_z, tile_max_x, tile_max_y, tile_max_z):
+            return False
+
         # If permission granted, attempt to add the tile
         success = await self._add_tile_impl(map_name, tile_data)
         if not success:
@@ -48,6 +58,16 @@ class MapService:
         if not self.role_manager.has_permission(username, 'add_zone'):
             # Using exceptions for exceptional conditions (e.g., lack of permission)
             raise PermissionError(f"Permission denied for adding zones on {map_name}.")
+
+        map_instance = await self.map_reg.get_map_instance(map_name)
+        if not map_instance:
+            return False
+
+        # Assuming zone_data includes min and max x, y, z coordinates for the zone
+        zone_min_x, zone_min_y, zone_min_z, zone_max_x, zone_max_y, zone_max_z = zone_data['position']
+
+        if not CollisionManager.is_within_range_bounds(map_instance.map_size, zone_min_x, zone_min_y, zone_min_z, zone_max_x, zone_max_y, zone_max_z):
+        return False
 
         # If permission granted, attempt to add the zone
         success = await self._add_zone_impl(map_name, zone_data)
@@ -74,7 +94,16 @@ class MapService:
             # Using exceptions for exceptional conditions (e.g., lack of permission)
             raise PermissionError(f"Permission denied for adding users.")
 
-        # If permission granted, attempt to add the zone
+    map_instance = await self.map_reg.get_map_instance(map_name)
+    if not map_instance:
+        print(f"Map {map_name} not found.")
+        return False
+
+        position = user_data.get_position()
+        if not CollisionManager.is_within_single_bounds(map_instance.map_size, *position):
+            return False
+
+        # If permission granted, attempt to join the user to the map
         success = await self._join_map_impl(map_name, user_data)
         if not success:
             # You could log or raise an exception here if needed

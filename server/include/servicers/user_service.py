@@ -1,3 +1,6 @@
+from include.event_handlers.user_movement import UserMovement
+from include.managers.collision_manager import CollisionManager
+
 class UserService:
     def __init__(self, user_registry, map_registry, event_dispatcher):
         self.user_registry = user_registry
@@ -48,12 +51,11 @@ class UserService:
         if not user:
             return False
 
-        # Calculate new position (you might already have logic in UserMovement)
-        new_position = calculate_new_position(user.position, direction, distance, user.yaw, user.pitch)
+        new_position = UserMovement.calculate_new_position(user.position, direction, distance, user.yaw, user.pitch)
 
         # Perform collision check (using Collision module and possibly MapService)
         map_instance = await self.map_registry.get_map(user.current_map)
-        valid_move, message = Collision.is_move_valid(map_instance, new_position, username)
+        valid_move = CollisionManager.is_move_valid(map_instance, new_position, username)
 
         if valid_move:
             # Update user position
@@ -64,6 +66,9 @@ class UserService:
             return False
 
     async def turn_user(self, username, turn_direction):
+        yaw_step = 1
+        pitch_step = 1
+
         user = await self.user_registry.get_user_instance(username)
         if not user:
             return False

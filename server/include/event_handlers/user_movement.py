@@ -1,7 +1,7 @@
 class UserMovement:
 
     @classmethod
-    async def calculate_movement_vector(cls, direction, distance, yaw, pitch):
+    def calculate_movement_vector(cls, direction, distance, yaw, pitch):
         # Convert angles from degrees to radians
         yaw_radians = math.radians(yaw)
         pitch_radians = math.radians(-pitch)  # Inverting pitch for intuitive controls

@@ -5,7 +5,7 @@ class Map:
     def __init__(self):
         # map features and attributes
         self.map_name = ""
-        self.map_size = ()
+        self.map_size = (0, 0, 0, 0, 0, 0)
         self.start_position = ()
         self.users = {}
         self.owners = []
@@ -16,7 +16,7 @@ class Map:
         self.weather = {"type": "clear", "intensity": 0, "duration": 0}
         self.is_public = True
 
-    async def update_weather(self, new_weather):
+    async def set_weather(self, new_weather):
         try:
             self.weather = new_weather
             return
@@ -58,16 +58,6 @@ class Map:
         except:
             print("could not set map size")
             return False
-
-    def is_within_single_bounds(self, x, y, z):
-        min_x, max_x, min_y, max_y, min_z, max_z = self.map_size
-        return min_x <= x <= max_x and min_y <= y <= max_y and min_z <= z <= max_z
-
-    def is_within_range_bounds(self, min_x, max_x, min_y, max_y, min_z, max_z):
-        map_min_x, map_max_x, map_min_y, map_max_y, map_min_z, map_max_z = self.map_size
-        return map_min_x <= min_x <= max_x <= map_max_x and \
-               map_min_y <= min_y <= max_y <= map_max_y and \
-               map_min_z <= min_z <= max_z <= map_max_z
 
     @classmethod
     def from_dict(cls, data):
@@ -151,16 +141,9 @@ class Map:
         user_instance = new_user_instance
         position = user_instance.get_position()
 
-        # check the user's current position in comparison to map boundaries
-        if position in self.is_within_single_bounds():
-            # Add the user instance to the users dictionary
-            self.users[username] = user_instance
-            return
-        else:
-            user_instance.set_position(self.start_position)
-            # Add the user instance to the users dictionary
-            self.users[username] = user_instance
-            return
+        # Add the user instance to the users dictionary
+        self.users[username] = user_instance
+        return
 
     async def leave_map(self, current_username):
         username = current_username
