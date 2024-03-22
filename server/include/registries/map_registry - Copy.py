@@ -10,7 +10,6 @@ import aiofiles  # Import aiofiles for async file operations
 from include.assets.tile import Tile
 from include.assets.zone import Zone
 from include.assets.map import Map
-from include.registries.map_parser import MapParser
 
 class MapRegistry:
     def __init__(self):
@@ -74,23 +73,19 @@ class MapRegistry:
             print(f"Map file for '{map_name}' does not exist.")
             return False
         
-        # Read the map file using the custom format
+        # Read the map file
         try:
             async with aiofiles.open(map_file_path, 'r') as file:
-                custom_format_str = await file.read()
+                map_data = json.loads(await file.read())
 
-                # Use MapParser to convert custom format string to map_data dict
-                map_data = MapParser.parse_custom_map_format_to_dict(custom_format_str)
-                
-                # Instantiate the Map object from the map_data dict
+                # Instantiate the Map object from the map data
                 map_instance = Map.from_dict(map_data)
                 
                 # Add the map instance to the instances dictionary
                 self.instances[map_name] = map_instance
                 
                 return map_instance
-        except Exception as e:
-            print(f"Failed to load map '{map_name}': {e}")
+        except:
             return False
 
     async def load_all_maps(self):
@@ -104,11 +99,10 @@ class MapRegistry:
             print(f"Loading map: {map_name}")
             try:
                 async with aiofiles.open(map_file, mode='r') as file:
-                    custom_format_str = await file.read()
-                    # Parse the custom format string to a dict
-                    map_data_dict = MapParser.parse_custom_map_format_to_dict(custom_format_str)
+                    map_data = await file.read()
+                    map_data_json = json.loads(map_data)
 
-                    map_instance = Map.from_dict(map_data_dict)
+                    map_instance = Map.from_dict(map_data_json)
                     self.instances[map_name] = map_instance
                     print(f"Loaded map '{map_name}' successfully.")
             except Exception as e:
@@ -122,15 +116,11 @@ class MapRegistry:
         map_data = map_instance.to_dict()
         self.maps_path.mkdir(parents=True, exist_ok=True)
 
-        # Convert map_data dict to custom format string using MapParser
-        custom_format_str = MapParser.convert_dict_to_custom_map_format(map_data)
-
         try:
             async with aiofiles.open(self.maps_path / f'{name}.map', 'w') as file:
-                await file.write(custom_format_str)
+                await file.write(json.dumps(map_data))
             print(f"Map '{name}' saved successfully.")
-        except Exception as e:
-            print(f"Failed to save map '{name}': {e}")
+        except :
             return False
 
     async def save_all_maps(self):
@@ -140,15 +130,13 @@ class MapRegistry:
         # Acquire the lock to ensure thread safety
         async with self.lock:
             for map_name, map_instance in self.instances.items():
-                map_data_dict = map_instance.to_dict()  # Serialize the map instance to a dictionary
-                custom_format_str = MapParser.convert_dict_to_custom_map_format(map_data_dict)
-                
+                map_data = map_instance.to_dict()  # Serialize the map instance to a dictionary
                 map_file_path = self.maps_path / f'{map_name}.map'  # Define the file path
 
                 try:
-                    # Open the file asynchronously and write the custom format string
+                    # Open the file asynchronously and write the serialized data
                     async with aiofiles.open(map_file_path, 'w') as file:
-                        await file.write(custom_format_str)
+                        await file.write(json.dumps(map_data))
                     print(f"Map '{map_name}' saved successfully.")
                 except Exception as e:
                     print(f"Failed to save map '{map_name}': {e}")
