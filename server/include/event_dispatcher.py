@@ -1,87 +1,58 @@
-import asyncio
 from collections import defaultdict
 
 class EventDispatcher:
     _instance = None
 
     @classmethod
-    def get_instance(cls, network=None):
+    def get_instance(cls, network=None, logger=None):
+        """Get the singleton instance of the EventDispatcher."""
         if cls._instance is None:
-            cls._instance = cls(network)
+            cls._instance = cls(network, logger)
         return cls._instance
 
-    def __init__(self, network):
+    def __init__(self, network, logger):
+        """Initialize the EventDispatcher."""
         if EventDispatcher._instance is not None:
-            raise RuntimeError("Use get_instance() method to get an instance of this class.")
-        self.internal_listeners = defaultdict(list)  # For server components
-        self.client_listeners = defaultdict(list)  # For client-specific events
-        self.user_to_map = {}
+            raise RuntimeError("Use get_instance() to access the EventDispatcher.")
+        
+        self.listeners = defaultdict(list)
         self.network = network
+        self.logger = logger
 
-    def subscribe_internal(self, event_type, listener):
-        self.internal_listeners[event_type].append(listener)
+    def subscribe(self, event_type, listener):
+        """Subscribe a listener to an event type."""
+        self.listeners[event_type].append(listener)
+        self.logger.debug(f"Listener added for event: {event_type}. Total listeners: {len(self.listeners[event_type])}")
 
-    def unsubscribe_internal(self, event_type, listener):
-        if listener in self.internal_listeners[event_type]:
-            self.internal_listeners[event_type].remove(listener)
+    def unsubscribe(self, event_type, listener):
+        """Unsubscribe a listener from an event type."""
+        if listener in self.listeners[event_type]:
+            self.listeners[event_type].remove(listener)
+            self.logger.debug(f"Listener removed for event: {event_type}. Remaining listeners: {len(self.listeners[event_type])}")
+        else:
+            self.logger.warning(f"Attempted to unsubscribe a listener that is not registered for event: {event_type}")
 
-    def subscribe_client(self, event_type, username):
-        self.client_listeners[event_type].append(username)
+    async def dispatch(self, event_type, data):
+        """Dispatch an event to all relevant listeners."""
+        self.logger.info(f"Dispatching event: {event_type} with data: {data}")
 
-    def unsubscribe_client(self, event_type, username):
-        if username in self.client_listeners[event_type]:
-            self.client_listeners[event_type].remove(username)
+        # Notify local listeners
+        for listener in self.listeners.get(event_type, []):
+            try:
+                await listener(data)  # Assumes all listeners are async
+                self.logger.debug(f"Listener for event: {event_type} successfully notified.")
+            except Exception as e:
+                self.logger.exception(f"Error while notifying listener for event: {event_type}")
 
-    async def notify_listeners(self, event_type, data):
-        # Notify internal listeners
-        for listener in self.internal_listeners.get(event_type, []):
-            await listener(data)  # Assuming internal listeners are synchronous for simplicity
-
-        # Notify client listeners
-        if event_type in self.client_listeners:
-            writers = await self.network.get_writers_by_usernames(self.client_listeners[event_type])
-            await self.network.send_to_writers(writers, data)
-
-    # Public method to dispatch events both internally and to clients
-    async def dispatch(self, event_type, data, scope="global", map_id=None, user_id=None):
-        # Notify local server components
-        await self.notify_listeners(event_type, data)
-
-        # Determine the scope and dispatch to clients accordingly
-        if scope == "global":
-            await self.dispatch_global(data)
-        elif scope == "map" and map_id:
-            await self.dispatch_map_specific(map_id, data)
-        elif scope == "private" and user_id:
-            await self.dispatch_private(user_id, data)
-
-    # Dispatch global events to all connected clients
-    async def dispatch_global(self, data):
-        writers = await self.network.get_all_writers()
-        await self.network.send_to_writers(writers, data)
-
-    # Dispatch map-specific events to clients on a particular map
-    async def dispatch_map_specific(self, map_id, data):
-        usernames = self.get_usernames_by_map(map_id)
-        writers = await self.network.get_writers_by_usernames(usernames)
-        await self.network.send_to_writers(writers, data)
-
-    # Dispatch private messages to a specific client
-    async def dispatch_private(self, user_id, data):
-        writer = await self.network.get_writer(user_id)
-        if writer:
-            await self.network.send_to_writers([writer], data)
-
-    async def update_user_map(self, username, map_id=None, action="add"):
-        if action == "add" and map_id is not None:
-            self.user_to_map[username] = map_id
-        elif action == "remove":
-            if username in self.user_to_map:
-                del self.user_to_map[username]
+        # Optionally, send to clients if necessary
+        if self.network and hasattr(self.network, 'client_listeners') and event_type in self.network.client_listeners:
+            try:
+                await self.network.send_to_clients(event_type, data)
+                self.logger.debug(f"Event: {event_type} dispatched to clients.")
+            except Exception as e:
+                self.logger.exception(f"Error while dispatching event: {event_type} to clients.")
 
     async def update_network(self, network):
+        """Update the network instance for dispatching client events."""
         self.network = network
-
-    def get_usernames_by_map(self, map_id):
-        # Assuming `user_to_map` is now structured as map_id -> [usernames]
-        return self.user_to_map.get(map_id, [])
+        self.logger.info("Network instance updated in EventDispatcher.")

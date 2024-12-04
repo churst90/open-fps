@@ -1,13 +1,24 @@
 import logging
-from logging.handlers import RotatingFileHandler
 import os
+import json
+from logging.handlers import RotatingFileHandler
+
+class JSONFormatter(logging.Formatter):
+    def format(self, record):
+        log_record = {
+            "time": self.formatTime(record),
+            "level": record.levelname,
+            "name": record.name,
+            "message": record.getMessage()
+        }
+        return json.dumps(log_record)
 
 class CustomLogger:
     def __init__(self, name, debug_mode=False, log_file='app.log', debug_level=0):
         self.logger = logging.getLogger(name)
         self.debug_mode = debug_mode
         self.log_file = log_file
-        self.debug_level = debug_level  # Add debug level attribute
+        self.debug_level = debug_level
         self.setup_logger()
 
     def setup_logger(self):
@@ -25,32 +36,36 @@ class CustomLogger:
         console_handler.setLevel(logging.DEBUG)
 
         # Create formatter and add it to the handlers
-        formatter = logging.Formatter('%(name)s - %(message)s')
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
         file_handler.setFormatter(formatter)
         console_handler.setFormatter(formatter)
+
+        # Optional JSON formatter for structured logging
+        json_handler = RotatingFileHandler(f'logs/{self.log_file}.json', maxBytes=1048576, backupCount=5)
+        json_handler.setFormatter(JSONFormatter())
+        json_handler.setLevel(logging.DEBUG)
 
         # Add the handlers to the logger
         self.logger.addHandler(file_handler)
         self.logger.addHandler(console_handler)
+        self.logger.addHandler(json_handler)
 
-    def set_debug_level(self, level: int):
-        """Sets the current debug level for the logger."""
-        self.debug_level = level
+    def set_log_level(self, level: int):
+        """Dynamically set the logger's log level."""
+        self.logger.setLevel(level)
+
+    def info_with_context(self, msg, context=None):
+        """Logs a message with additional context."""
+        self.logger.info(msg, extra={'context': context})
 
     def log_at_level(self, level, msg):
         """Logs a message at a specific debug level."""
         if level <= self.debug_level:
             self.logger.debug(f"DEBUG{level}: {msg}")
 
-    def debug_1(self, msg):
-        """Logs a debug level 1 message."""
-        self.log_at_level(1, msg)
-
-    def debug_2(self, msg):
-        """Logs a debug level 2 message."""
-        self.log_at_level(2, msg)
-
-    # You can add more debug level methods as needed
+    def exception(self, msg):
+        """Logs an exception with traceback."""
+        self.logger.exception(msg)
 
     def toggle_debug_mode(self, enable: bool):
         """Enables or disables debug mode."""
@@ -65,3 +80,19 @@ class CustomLogger:
     def debug(self, msg):
         """Logs a message with level DEBUG."""
         self.logger.debug(msg)
+
+    def warning(self, msg):
+        """Logs a message with level WARNING."""
+        self.logger.warning(msg)
+
+    def error(self, msg):
+        """Logs a message with level ERROR."""
+        self.logger.error(msg)
+
+    def critical(self, msg):
+        """Logs a message with level CRITICAL."""
+        self.logger.critical(msg)
+
+def get_logger(name, debug_mode=False):
+    """Convenience function to get a preconfigured CustomLogger instance."""
+    return CustomLogger(name, debug_mode)

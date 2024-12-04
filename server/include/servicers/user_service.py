@@ -1,99 +1,84 @@
 from include.event_handlers.user_movement import UserMovement
 from include.managers.collision_manager import CollisionManager
+from include.custom_logger import get_logger
 
 class UserService:
-    def __init__(self, user_registry, map_registry, event_dispatcher):
+    def __init__(self, user_registry, map_registry, event_dispatcher, logger=None):
         self.user_registry = user_registry
         self.map_registry = map_registry
         self.event_dispatcher = event_dispatcher
+        self.logger = logger or get_logger('user_service', debug_mode=True)
+        self.setup_event_subscriptions()
 
-    async def login(self, username, password):
-        user_instance = await self.user_registry.get_user_instance(username)
-        map_name = user_instance.get_current_map()
+    def setup_event_subscriptions(self):
+        """Subscribe to all necessary user-related events."""
+        self.logger.debug("Setting up event subscriptions for UserService.")
+        self.event_dispatcher.subscribe('user_account_create_request', self.create_account)
+        self.event_dispatcher.subscribe('user_account_login_request', self.login)
+        self.event_dispatcher.subscribe('user_account_logout_request', self.logout)
+        self.event_dispatcher.subscribe('user_move_request', self.move_user)
+        self.event_dispatcher.subscribe('user_turn_request', self.turn_user)
 
+    async def create_account(self, event_data):
+        """Handle account creation."""
+        username = event_data['username']
+        self.logger.info(f"Received account creation request for username: {username}")
+        success = await self.user_registry.create_account(event_data)
+        if success:
+            self.logger.info(f"Account created successfully for username: {username}")
+            await self.event_dispatcher.dispatch('user_account_create_ok', {'username': username})
+        else:
+            self.logger.warning(f"Failed to create account for username: {username}")
+            await self.event_dispatcher.dispatch('user_account_create_fail', {'username': username})
+
+    async def login(self, event_data):
+        """Handle user login."""
+        username = event_data['username']
+        self.logger.info(f"Received login request for username: {username}")
+        password = event_data['password']
         user_data = await self.user_registry.authenticate_user(username, password)
         if user_data:
-            map_instance = await self.map_registry.get_map_instance(map_name)
-            map_instance.join_map(username, user_instance)
-            await self.update_event_dispatcher_user_to_map(username, map_name, "add")
-            return user_data
+            self.logger.info(f"Login successful for username: {username}")
+            await self.event_dispatcher.dispatch('user_login_ok', {'username': username, 'user_data': user_data})
+        else:
+            self.logger.warning(f"Login failed for username: {username}")
+            await self.event_dispatcher.dispatch('user_login_fail', {'username': username, 'message': 'Authentication failed'})
 
-    async def logout(self, username, map_name):
-        map_instance = await self.map_registry.get_map_instance(map_name)
-        map_instance.leave_map(username)
-
-        # Call the deauthenticate_user method of the user_registry to log the user out
+    async def logout(self, event_data):
+        """Handle user logout."""
+        username = event_data['username']
+        self.logger.info(f"Received logout request for username: {username}")
         success = await self.user_registry.deauthenticate_user(username)
         if success:
-            await self.update_event_dispatcher_user_to_map(username, map_name, "remove")
-            return
+            self.logger.info(f"Logout successful for username: {username}")
+            await self.event_dispatcher.dispatch('user_logout_ok', {'username': username})
         else:
-            return False
+            self.logger.warning(f"Logout failed for username: {username}")
+            await self.event_dispatcher.dispatch('user_logout_fail', {'username': username, 'message': 'Logout failed'})
 
-    async def create_account(self, event_data, role_manager):
-        success = await self._create_account_impl(event_data, role_manager)
-        if not success:
-            return False
-
-        return
-
-    async def _create_account_impl(self, new_user_data, role_manager):
-        try:
-            await self.user_registry.create_account(new_user_data, role_manager)
-            return True
-        except Exception as e:
-            # Log the error or handle it as needed
-            print(f"Error creating new user account.")
-        return False
-
-    async def move_user(self, username, direction, distance):
-        user = await self.user_registry.get_user_instance(username)
-        if not user:
-            return False
-
-        new_position = UserMovement.calculate_new_position(user.position, direction, distance, user.yaw, user.pitch)
-
-        # Perform collision check (using Collision module and possibly MapService)
-        map_instance = await self.map_registry.get_map(user.current_map)
-        valid_move = CollisionManager.is_move_valid(map_instance, new_position, username)
-
-        if valid_move:
-            # Update user position
-            user.set_position(new_position)
-            # Notify success
-            return new_position
+    async def move_user(self, event_data):
+        """Handle user movement."""
+        username = event_data['username']
+        direction = event_data['direction']
+        distance = event_data['distance']
+        self.logger.info(f"Received move request for username: {username}, direction: {direction}, distance: {distance}")
+        success, position = await self.user_registry.move_user(username, direction, distance)
+        if success:
+            self.logger.info(f"Movement successful for username: {username}, new position: {position}")
+            await self.event_dispatcher.dispatch('user_move_ok', {'username': username, 'position': position})
         else:
-            return False
+            self.logger.warning(f"Movement failed for username: {username}")
+            await self.event_dispatcher.dispatch('user_move_fail', {'username': username})
 
-    async def turn_user(self, username, turn_direction):
-        yaw_step = 1
-        pitch_step = 1
-
-        user = await self.user_registry.get_user_instance(username)
-        if not user:
-            return False
-
-        if turn_direction == "left":
-            user.yaw = (user.yaw - yaw_step) % 360
-        elif turn_direction == "right":
-            user.yaw = (user.yaw + yaw_step) % 360
-        elif turn_direction == "up":
-            user.pitch = max(min(user.pitch + pitch_step, 90), -90)
-        elif turn_direction == "down":
-            user.pitch = max(min(user.pitch - pitch_step, -90), 90)
+    async def turn_user(self, event_data):
+        """Handle user turning."""
+        username = event_data['username']
+        turn_direction = event_data['turn_direction']
+        self.logger.info(f"Received turn request for username: {username}, turn direction: {turn_direction}")
+        success, result = await self.user_registry.turn_user(username, turn_direction)
+        if success:
+            self.logger.info(f"Turn successful for username: {username}, new yaw: {result[0]}, pitch: {result[1]}")
+            await self.event_dispatcher.dispatch('user_turn_ok', {'username': username, 'yaw': result[0], 'pitch': result[1]})
         else:
-            return False
-
-        # Assuming pitch is limited to [-90, 90] and yaw [0, 360)
-        user.pitch = max(-90, min(90, user.pitch))
-        user.yaw %= 360
-
-        return (user.yaw, user.pitch)
-
-    async def update_event_dispatcher_user_to_map(self, username, map_name, action):
-        # this method updates the dictionary in event dispatcher for user to map mappings
-
-        if action == "add":
-            await self.event_dispatcher.update_user_map(username, map_name, action)
-        if action == "remove":
-            await self.event_dispatcher.update_user_map(username, map_name, action)
+            self.logger.warning(f"Turn failed for username: {username}")
+            await self.event_dispatcher.dispatch('user_turn_fail', {'username': username})

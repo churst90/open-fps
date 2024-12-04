@@ -1,126 +1,124 @@
-import math
-import base64
-import json
-import bcrypt
 import asyncio
-from asyncio import Lock
+import bcrypt
+import json
 from pathlib import Path
-import aiofiles  # Import aiofiles for async file operations
-
-# from include.managers.role_manager import RoleManager
-from include.managers.rank_manager import RankManager
-from include.managers.achievement_manager import AchievementManager
+import aiofiles
+from include.custom_logger import get_logger
 from include.assets.user import User
 
 class UserRegistry:
-    def __init__(self):
-        self.lock = Lock()
-        self.rank_manager = RankManager()
-        self.achievement_manager = AchievementManager()
-        self.instances = {}  # Runtime instances of logged-in players
-        self.users_path = Path.cwd() / 'users'
+    def __init__(self, logger=None):
+        self.users = {}  # Cache of user instances
+        self.lock = asyncio.Lock()
+        self.users_path = Path('users')
+        self.logger = logger or get_logger('user_registry', debug_mode=True)
 
-    async def create_account(self, event_data, role_manager):
+    def get_all_usernames(self):
+        """Return a list of all usernames currently loaded in memory."""
+        try:
+            usernames = list(self.users.keys())
+            self.logger.info(f"Retrieved list of all usernames: {usernames}")
+            return usernames
+        except Exception as e:
+            self.logger.exception("Failed to retrieve usernames.")
+            return []
+
+    def get_logged_in_usernames(self):
+        """Return a list of usernames for currently logged-in users."""
+        try:
+            logged_in_users = [username for username, user in self.users.items() if user.logged_in]
+            self.logger.info(f"Retrieved list of logged-in users: {logged_in_users}")
+            return logged_in_users
+        except Exception as e:
+            self.logger.exception("Failed to retrieve logged-in usernames.")
+            return []
+
+    async def create_account(self, event_data):
+        """Create a new user account."""
         username = event_data['username']
         password = event_data['password']
         role = event_data['role']
-        role_manager = role_manager
-
+    
         user_file = self.users_path / f"{username}.usr"
+
+        # Check if the user already exists
         if user_file.exists():
-            print("That user name already exists")
-            raise ValueError("Username already exists")
-
-        # Make sure the users directory exists
-        self.users_path.mkdir(parents=True, exist_ok=True)  # Ensure user directory exists
-
-        # Create and configure the user
-        user = User()
-
-        # set the username and password in the new user object instance
-        user.set_username(username)
-        await user.set_password(password)
-
-        role_manager.assign_role_to_user(role, username)
-
-        # Save the new user to disk
-        await self.save_user(user)
-
-    async def remove_user(self, username):
-        pass
-
-    async def authenticate_user(self, username, password):
-        user = await self.load_user(username)
-        if user:
-            stored_hashed_password = user.password.encode('utf-8')
-            if bcrypt.checkpw(password.encode('utf-8'), stored_hashed_password):
-                user.set_login_status(True)
-                self.instances[username] = user
-                user_data = user.to_dict()
-                return user_data
-        return False
-
-    async def deauthenticate_user(self, username):
-        # Try to retrieve the user instance. If it doesn't exist, return immediately.
-        user_instance = await self.get_user_instance(username)
-        if not user_instance:
-            print(f"User {username} not found for deauthentication.")
+            self.logger.warning(f"User creation failed: Username '{username}' already exists.")
             return False
 
-        # Update the user's logged-in status to False.
-        user_instance.set_login_status(False)
+        # Ensure the users directory exists
+        self.users_path.mkdir(parents=True, exist_ok=True)
 
         try:
-            await self.save_user(user_instance)
+            # Create a new User instance and set its properties
+            user = User()  # Create an empty user instance
+            user.username = username  # Use the property setter
+            await user.set_password(password)
+            user.current_map = "Main"
+            user.role = role  # Assign the role
+
+            # Save the user to the file system
+            await self.save_user(user)
+            self.logger.info(f"Account created successfully for username: {username}")
+            return True
         except Exception as e:
-            print(f"Failed to save user {username} state during deauthentication: {e}")
+            self.logger.exception(f"Error while creating account for username '{username}': {e}")
+            return False
 
-        if username in self.instances:
-            del self.instances[username]
-        
-        print(f"User {username} deauthenticated successfully.")
-        return True
+    async def authenticate_user(self, username, password):
+        """Authenticate a user by username and password."""
+        try:
+            user = await self.load_user(username)
+            if user and await user.check_password(password):
+                self.users[username] = user
+                self.logger.info(f"User '{username}' authenticated successfully.")
+                return user.to_dict()
+            self.logger.warning(f"Authentication failed for username: {username}")
+        except Exception as e:
+            self.logger.exception(f"Error authenticating user '{username}': {e}")
+        return None
 
-    async def change_user_role(self, admin_username, target_username, new_role):
-        admin_user = self.get_user_instance(admin_username)
-        if not admin_user or not admin_user.check_permission('change_role'):
-            print("Insufficient permissions to change roles.")
-            return
-
-        role_manager = RoleManager.get_instance()
-        # Remove from all current roles (optional, depends on how you want to manage roles)
-        current_roles = list(role_manager.user_roles.get(target_username, []))
-        for role in current_roles:
-            role_manager.remove_role_from_user(role, target_username)
-
-        # Assign the new role
-        role_manager.assign_role_to_user(new_role, target_username)
-        print(f"User {target_username}'s role changed to {new_role} by {admin_username}.")
+    async def deauthenticate_user(self, username):
+        """Log out and deauthenticate a user."""
+        async with self.lock:
+            if username in self.users:
+                user = self.users[username]
+                user.logged_in = False
+                await self.save_user(user)
+                del self.users[username]
+                self.logger.info(f"User '{username}' deauthenticated successfully.")
+                return True
+        self.logger.warning(f"Deauthentication failed: User '{username}' not found.")
+        return False
 
     async def load_user(self, username):
-        user_file_path = self.users_path / f"{username}.usr"
-        if user_file_path.exists():
-            async with aiofiles.open(user_file_path, 'r') as file:
-                user_data = json.loads(await file.read())
-                return User.from_dict(user_data)
+        """Load a user from the file system."""
+        user_file = self.users_path / f"{username}.usr"
+        if user_file.exists():
+            try:
+                async with aiofiles.open(user_file, 'r') as f:
+                    user_data = json.loads(await f.read())
+                    self.logger.debug(f"User '{username}' loaded successfully.")
+                    return User.from_dict(user_data)
+            except Exception as e:
+                self.logger.exception(f"Error loading user '{username}': {e}")
         else:
-            return None
+            self.logger.warning(f"User file for '{username}' does not exist.")
+        return None
 
-    async def save_user(self, user_instance):
-        user_file_path = self.users_path / f"{user_instance.username}.usr"
-        user_data = user_instance.to_dict()
-        async with aiofiles.open(user_file_path, 'w') as file:
-            await file.write(json.dumps(user_data))
-        print(f"User {user_instance.username} saved successfully.")
+    async def save_user(self, user):
+        """Save a user to the file system."""
+        user_file = self.users_path / f"{user.username}.usr"
+        try:
+            async with aiofiles.open(user_file, 'w') as f:
+                await f.write(json.dumps(user.to_dict()))
+            self.logger.debug(f"User '{user.username}' saved successfully.")
+        except Exception as e:
+            self.logger.exception(f"Error saving user '{user.username}': {e}")
 
     async def save_all_users(self):
-        for username, user_instance in self.instances.items():
-            await self.save_user(user_instance)
-
-    # Method that returns the self.instances dictionary for user objects
-    async def get_user_instance(self, username):
-        if username in self.instances:
-            return self.instances[username]
-
-    async def get_all_users(self):
-        return self.instances
+        """Save all users currently in memory to disk."""
+        async with self.lock:
+            for user in self.users.values():
+                await self.save_user(user)
+            self.logger.info("All users in memory saved successfully.")

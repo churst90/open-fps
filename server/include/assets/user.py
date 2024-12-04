@@ -1,156 +1,140 @@
 import asyncio
 import bcrypt
 
-# User class for creating individual user objects
+
 class User:
     def __init__(self):
-        # User instance features and atributes
-        self.username = ""
-        self.password = ""
-        self.current_map = ""
-        self.current_zone = ""
-        self.logged_in = False
-        self.position = ()
-        self.yaw = 0
-        self.pitch = 0
-        self.health = 10000
-        self.energy = 10000
+        self._username = ""
+        self._password = ""
+        self._current_map = ""
+        self._current_zone = ""
+        self._logged_in = False
+        self._position = ()
+        self._yaw = 0
+        self._pitch = 0
+        self._health = 10000
+        self._energy = 10000
         self.inventory = {}
 
-    def get_username(self):
-        try:
-            return self.username
-        except Exception as E:
-            print(f"could not retrieve the user's username: {E}")
-            return False
+    @property
+    def username(self):
+        return self._username
 
-    def get_password(self):
-        try:
-            return self.password
-        except Exception as E:
-            print(f"Couldn't retrieve the user's password: {E}")
-            return False
+    @username.setter
+    def username(self, value):
+        if isinstance(value, str):
+            self._username = value
+        else:
+            raise ValueError("Username must be a string.")
 
-    def get_position(self):
-        try:
-            return self.position
-        except Exception as E:
-            print(f"Couldn't retrieve the user's position: {E}")
-            return False
+    @property
+    def password(self):
+        # Return the hashed password
+        return self._password
 
-    def get_current_map(self):
-        try:
-            return self.current_map
-        except Exception as E:
-            print("Couldn't retrieve the users's current map: {E}")
-            return False
+    async def set_password(self, raw_password):
+        """Hashes the password and sets it."""
+        if isinstance(raw_password, str):
+            hashed_password = await asyncio.to_thread(
+                bcrypt.hashpw, raw_password.encode("utf-8"), bcrypt.gensalt()
+            )
+            self._password = hashed_password.decode("utf-8")
+        else:
+            raise ValueError("Password must be a string.")
 
-    def get_pitch(self):
-        try:
-            return self.pitch
-        except Exception as E:
-            print(f"Couldn't retrieve the user's pitch: {E}")
-            return False
+    def check_password(self, raw_password):
+        """Verifies the password against the hashed value."""
+        if self._password:
+            return bcrypt.checkpw(raw_password.encode("utf-8"), self._password.encode("utf-8"))
+        return False
 
-    def get_yaw(self):
-        try:
-            return self.yaw
-        except Exception as E:
-            print(f"Couldn't retrieve the user's yaw: {E}")
-            return False
+    @property
+    def position(self):
+        return self._position
 
-    def get_current_zone(self):
-        try:
-            return self.current_zone
-        except Exception as E:
-            print(f"Couldn't retrieve the user's current zone: {E}")
-            return False
+    @position.setter
+    def position(self, value):
+        if isinstance(value, tuple):
+            self._position = value
+        else:
+            raise ValueError("Position must be a tuple.")
 
-    def get_health(self):
-        try:
-            return self.health
-        except Exception as E:
-            print(f"Couldn't retrieve the user's health: {E}")
-            return False
+    @property
+    def current_map(self):
+        return self._current_map
 
-    def get_energy(self):
-        try:
-            return self.energy
-        except Exception as E:
-            print(f"Couldn't retrieve the user's energy: {E}")
-            return False
+    @current_map.setter
+    def current_map(self, value):
+        if isinstance(value, str):
+            self._current_map = value
+        else:
+            raise ValueError("Current map must be a string.")
 
-    def set_login_status(self, status):
-        try:
-            self.logged_in = status
-            return
-        except Exception as E:
-            print(f"Couldn't set the user's status: {E}")
-            return False
+    @property
+    def current_zone(self):
+        return self._current_zone
 
-    def set_position(self, position):
-        try:
-            self.position = position
-            return
-        except Exception as E:
-            print(f"Couldn't set the user's position: {E}")
-            return False
+    @current_zone.setter
+    def current_zone(self, value):
+        if isinstance(value, str):
+            self._current_zone = value
+        else:
+            raise ValueError("Current zone must be a string.")
 
-    def set_health(self, health):
-        try:
-            self.health = health
-        except Exception as E:
-            print(f"Couldn't set the user's health: {E}")
-            return False
+    @property
+    def logged_in(self):
+        return self._logged_in
 
-    def set_energy(self, energy):
-        try:
-            self.energy = energy
-            return
-        except Exception as E:
-            print(f"Couldn't set the user's energy: {E}")
-            return False
+    @logged_in.setter
+    def logged_in(self, value):
+        if isinstance(value, bool):
+            self._logged_in = value
+        else:
+            raise ValueError("Logged-in status must be a boolean.")
 
-    def set_pitch(self, pitch):
-        try:
-            self.pitch = pitch
-            return
-        except Exception as E:
-            print(f"Couldn't set the user's pitch: {E}")
-            return False
+    @property
+    def yaw(self):
+        return self._yaw
 
-    def set_yaw(self, yaw):
-        try:
-            self.yaw = yaw
-        except Exception as E:
-            print(f"Couldn't set the user's yaw: {E}")
-            return False
+    @yaw.setter
+    def yaw(self, value):
+        if isinstance(value, (int, float)):
+            self._yaw = value
+        else:
+            raise ValueError("Yaw must be a number.")
 
-    def set_username(self, username):
-        try:
-            self.username = username
-            return
-        except Exception as E:
-            print(f"Couldn't set the user's username: {E}")
-            return False
+    @property
+    def pitch(self):
+        return self._pitch
 
-    async def set_password(self, password):
-        try:
-            hashed_password = await asyncio.to_thread(bcrypt.hashpw, password.encode('utf-8'), bcrypt.gensalt())
-            # Store the hashed password rather than the plain one
-            self.password = hashed_password.decode('utf-8')
-            return
-        except Exception as E:
-            print(f"Couldn't set the user's password: {E}")
-            return False
+    @pitch.setter
+    def pitch(self, value):
+        if isinstance(value, (int, float)):
+            self._pitch = value
+        else:
+            raise ValueError("Pitch must be a number.")
 
-    def set_current_map(self, map):
-        try:
-            self.current_map = map
-            return
-        except Exception as E:
-            print(f"Couldn't set the user's current map: {E}")
-            return False
+    @property
+    def health(self):
+        return self._health
+
+    @health.setter
+    def health(self, value):
+        if isinstance(value, int) and 0 <= value <= 10000:
+            self._health = value
+        else:
+            raise ValueError("Health must be an integer between 0 and 10000.")
+
+    @property
+    def energy(self):
+        return self._energy
+
+    @energy.setter
+    def energy(self, value):
+        if isinstance(value, int) and 0 <= value <= 10000:
+            self._energy = value
+        else:
+            raise ValueError("Energy must be an integer between 0 and 10000.")
 
     def to_dict(self):
         try:
@@ -166,24 +150,24 @@ class User:
                 "energy": self.energy,
                 "inventory": self.inventory,
             }
-        except Exception as E:
-            print(f"Couldn't convert the user dictionary to a class instance: {E}")
+        except Exception as e:
+            print(f"Couldn't convert the user dictionary to a class instance: {e}")
             return False
 
     @classmethod
-    def from_dict(cls, data, event_dispatcher):
+    def from_dict(cls, data):
         try:
             user_instance = cls()
-            user_instance.username = data['username']
-            user_instance.password = data['password']
-            user_instance.current_map =  data['current_map']
-            user_instance.logged_in = data['logged_in']
-            user_instance.health = data['health']
-            user_instance.energy = data['energy']
-            user_instance.inventory = data['inventory']
-            user_instance.yaw = data['yaw']
-            user_instance.pitch = data['pitch']
+            user_instance.username = data["username"]
+            user_instance._password = data["password"]  # Direct assignment, as password is hashed
+            user_instance.current_map = data["current_map"]
+            user_instance.logged_in = data["logged_in"]
+            user_instance.health = data["health"]
+            user_instance.energy = data["energy"]
+            user_instance.inventory = data["inventory"]
+            user_instance.yaw = data["yaw"]
+            user_instance.pitch = data["pitch"]
             return user_instance
-        except Exception as E:
-            print(f"Couldn't convert the user class instance to a dictionary: {E}")
+        except Exception as e:
+            print(f"Couldn't convert the user class instance to a dictionary: {e}")
             return False

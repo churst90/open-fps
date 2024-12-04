@@ -1,7 +1,11 @@
 map_name:Main
-tile:0:10:0:10:0:0:grass:False
-tile:5:7:5:7:0:0:concrete:False
-zone:0:10:0:10:0:0:main area:True:False
+tile:0:0:0:1:1:1:grass:False
+tile:1:1:0:2:2:1:dirt:False
+tile:2:2:0:3:3:1:brick:True
 map_size:0:10:0:10:0:10
 start_position:0:0:0
-owner:admin
+owner:a
+owner:d
+owner:m
+owner:i
+owner:n

@@ -1,154 +1,180 @@
-# standard imports
-import random
-from pathlib import Path
 import json
+import aiofiles
 import asyncio
-from asyncio import Lock
-import aiofiles  # Import aiofiles for async file operations
-
-# project specific imports
-from include.assets.tile import Tile
-from include.assets.zone import Zone
-from include.assets.map import Map
-from include.registries.map_parser import MapParser
+from pathlib import Path
+from .map_parser import MapParser
+from ..assets.map import Map
+from include.custom_logger import get_logger
 
 class MapRegistry:
-    def __init__(self):
-        self.lock = Lock()
-        self.instances = {}  # For storing Map instance objects for runtime use
-        self.maps_path = Path.cwd() / 'maps'
+    def __init__(self, logger=None):
+        self.logger = logger or get_logger("map_registry", debug_mode=True)
+        self._maps = {}  # Cache of map instances
+        self._lock = asyncio.Lock()
+        self._maps_path = Path("maps")
+
+    @property
+    def maps(self):
+        """Return all map instances."""
+        return self._maps
+
+    async def add_tile(self, map_name, tile_data):
+        """Add a tile to the specified map."""
+        if map_name in self._maps:
+            try:
+                map_instance = self._maps[map_name]
+                await map_instance.add_tile(tile_data)
+                await self.save_map(map_name)  # Save the map after modifying
+                self.logger.info(f"Tile added to map '{map_name}' successfully.")
+                return True
+            except Exception as e:
+                self.logger.exception(f"Failed to add tile to map '{map_name}': {e}")
+                return False
+        else:
+            self.logger.warning(f"Map '{map_name}' does not exist.")
+        return False
+
+    async def remove_tile(self, map_name, tile_key):
+        """Remove a tile from the specified map."""
+        if map_name in self._maps:
+            try:
+                map_instance = self._maps[map_name]
+                success = await map_instance.remove_tile(tile_key)
+                if success:
+                    await self.save_map(map_name)  # Save the map after modifying
+                    self.logger.info(f"Tile '{tile_key}' removed from map '{map_name}' successfully.")
+                    return True
+                else:
+                    self.logger.warning(f"Failed to remove tile '{tile_key}' from map '{map_name}'.")
+                    return False
+            except Exception as e:
+                self.logger.exception(f"Failed to remove tile from map '{map_name}': {e}")
+                return False
+        else:
+            self.logger.warning(f"Map '{map_name}' does not exist.")
+            return False
+
+    def get_all_map_names(self):
+        """Return a list of all map names currently loaded in memory."""
+        try:
+            map_names = list(self._maps.keys())
+            self.logger.info(f"Retrieved list of all map names: {map_names}")
+            return map_names
+        except Exception as e:
+            self.logger.exception("Failed to retrieve map names.")
+            return []
 
     async def create_map(self, event_data):
-        # Extract the values from the incoming event_data
-        username = event_data['username']
-        map_name = event_data['map_name']
-        map_size = event_data['map_size']
-        start_position = event_data['start_position']
+        """Create a new map."""
+        map_name = event_data.get("map_name")
+        if not map_name:
+            self.logger.warning("Map creation failed: Map name is missing.")
+            return False
 
-        # check to see if the map being created already exists
-        if map_name in self.instances:
+        if map_name in self._maps:
+            self.logger.warning(f"Map creation failed: Map '{map_name}' already exists.")
             return False
 
         try:
-            new_map = Map()
-            new_map.set_map_name(map_name)
-            new_map.set_map_size(map_size)
-            new_map.set_start_position(start_position)
-            await new_map.add_owner(username)
-
-            # store the instance in the instances variable
-            self.instances[map_name] = new_map
-
+            map_instance = Map.from_dict(event_data)
+            self._maps[map_name] = map_instance
             await self.save_map(map_name)
-            return
-        except:
+            self.logger.info(f"Map '{map_name}' created successfully.")
+            return True
+        except Exception as e:
+            self.logger.exception(f"Failed to create map '{map_name}': {e}")
             return False
 
     async def remove_map(self, map_name):
-        if map_name in self.instances:
-            del self.instances[map_name]
-            return
-        else:
-            return False
-
-    async def get_map_instance(self, name):
-        try:
-            async with self.lock:
-                map_instance = self.instances[name]
-                return map_instance
-        except:
-            return False
-
-    async def get_all_maps(self):
-        try:
-            async with self.lock:
-                return self.instances
-        except:
+        """Remove a map."""
+        async with self._lock:
+            if map_name in self._maps:
+                try:
+                    del self._maps[map_name]
+                    map_file = self._maps_path / f"{map_name}.map"
+                    if map_file.exists():
+                        await aiofiles.os.remove(map_file)
+                    self.logger.info(f"Map '{map_name}' removed successfully.")
+                    return True
+                except Exception as e:
+                    self.logger.exception(f"Failed to remove map '{map_name}': {e}")
+                    return False
+            self.logger.warning(f"Map '{map_name}' does not exist.")
             return False
 
     async def load_map(self, map_name):
-        map_file_path = self.maps_path / f"{map_name}.map"
-        
-        # Check if the map file exists
-        if not map_file_path.exists():
-            print(f"Map file for '{map_name}' does not exist.")
-            return False
-        
-        # Read the map file using the custom format
-        try:
-            async with aiofiles.open(map_file_path, 'r') as file:
-                custom_format_str = await file.read()
+        """Load a map from the file system using MapParser."""
+        map_file = self._maps_path / f"{map_name}.map"
+        if map_file.exists():
+            async with aiofiles.open(map_file, "r") as f:
+                map_data = await f.read()
 
-                # Use MapParser to convert custom format string to map_data dict
-                map_data = MapParser.parse_custom_map_format_to_dict(custom_format_str)
-                
-                # Instantiate the Map object from the map_data dict
-                map_instance = Map.from_dict(map_data)
-                
-                # Add the map instance to the instances dictionary
-                self.instances[map_name] = map_instance
-                
-                return map_instance
-        except Exception as e:
-            print(f"Failed to load map '{map_name}': {e}")
-            return False
-
-    async def load_all_maps(self):
-        print("Loading maps ...")
-        self.maps_path.mkdir(exist_ok=True)
-
-        map_files = list(self.maps_path.glob("*.map"))
-        print(f"Found {len(map_files)} map files.")
-        for map_file in map_files:
-            map_name = map_file.stem
-            print(f"Loading map: {map_name}")
-            try:
-                async with aiofiles.open(map_file, mode='r') as file:
-                    custom_format_str = await file.read()
-                    # Parse the custom format string to a dict
-                    map_data_dict = MapParser.parse_custom_map_format_to_dict(custom_format_str)
-
-                    map_instance = Map.from_dict(map_data_dict)
-                    self.instances[map_name] = map_instance
-                    print(f"Loaded map '{map_name}' successfully.")
-            except Exception as e:
-                print(f"Failed to load map '{map_name}': {e}")
-
-    async def save_map(self, name):
-        if name not in self.instances:
-            return False
-
-        map_instance = self.instances[name]
-        map_data = map_instance.to_dict()
-        self.maps_path.mkdir(parents=True, exist_ok=True)
-
-        # Convert map_data dict to custom format string using MapParser
-        custom_format_str = MapParser.convert_dict_to_custom_map_format(map_data)
-
-        try:
-            async with aiofiles.open(self.maps_path / f'{name}.map', 'w') as file:
-                await file.write(custom_format_str)
-            print(f"Map '{name}' saved successfully.")
-        except Exception as e:
-            print(f"Failed to save map '{name}': {e}")
-            return False
-
-    async def save_all_maps(self):
-        # Ensure the maps directory exists
-        self.maps_path.mkdir(parents=True, exist_ok=True)
-    
-        # Acquire the lock to ensure thread safety
-        async with self.lock:
-            for map_name, map_instance in self.instances.items():
-                map_data_dict = map_instance.to_dict()  # Serialize the map instance to a dictionary
-                custom_format_str = MapParser.convert_dict_to_custom_map_format(map_data_dict)
-                
-                map_file_path = self.maps_path / f'{map_name}.map'  # Define the file path
+                if not map_data.strip():
+                    self.logger.warning(f"Skipping empty map file: {map_file}")
+                    return None
 
                 try:
-                    # Open the file asynchronously and write the custom format string
-                    async with aiofiles.open(map_file_path, 'w') as file:
-                        await file.write(custom_format_str)
-                    print(f"Map '{map_name}' saved successfully.")
+                    parsed_map = MapParser.parse_custom_map_format_to_dict(map_data)
+                    map_instance = Map.from_dict(parsed_map)
+                    self._maps[map_name] = map_instance
+                    self.logger.info(f"Map '{map_name}' loaded successfully.")
+                    return map_instance
                 except Exception as e:
-                    print(f"Failed to save map '{map_name}': {e}")
+                    self.logger.exception(f"Failed to load map '{map_name}': {e}")
+                    return None
+        self.logger.warning(f"Map file '{map_file}' not found.")
+        return None
+
+    async def save_map(self, map_name):
+        """Save a map to the file system using MapParser."""
+        if map_name in self._maps:
+            try:
+                map_instance = self._maps[map_name]
+                map_file = self._maps_path / f"{map_name}.map"
+                map_dict = map_instance.to_dict()
+                custom_map_format = MapParser.convert_dict_to_custom_map_format(map_dict)
+
+                async with aiofiles.open(map_file, "w") as f:
+                    await f.write(custom_map_format)
+                self.logger.info(f"Map '{map_name}' saved successfully.")
+            except Exception as e:
+                self.logger.exception(f"Failed to save map '{map_name}': {e}")
+
+    async def load_all_maps(self):
+        """Load all maps from disk into memory using MapParser."""
+        async with self._lock:
+            try:
+                self._maps_path.mkdir(exist_ok=True)
+                map_files = list(self._maps_path.glob("*.map"))
+
+                if not map_files:
+                    self.logger.warning("No map files found.")
+                    return
+
+                for map_file in map_files:
+                    async with aiofiles.open(map_file, "r") as f:
+                        map_data = await f.read()
+
+                        if not map_data.strip():
+                            self.logger.warning(f"Skipping empty map file: {map_file}")
+                            continue
+
+                        try:
+                            parsed_map = MapParser.parse_custom_map_format_to_dict(map_data)
+                            map_name = map_file.stem
+                            self._maps[map_name] = Map.from_dict(parsed_map)
+                            self.logger.info(f"Loaded map '{map_name}' successfully.")
+                        except Exception as e:
+                            self.logger.exception(f"Failed to load map '{map_file}': {e}")
+            except Exception as e:
+                self.logger.exception("Error while loading all maps.")
+
+    async def save_all_maps(self):
+        """Save all maps currently in memory to disk."""
+        async with self._lock:
+            try:
+                for map_name in self._maps:
+                    await self.save_map(map_name)
+                self.logger.info("All maps saved successfully.")
+            except Exception as e:
+                self.logger.exception("Error while saving all maps.")
