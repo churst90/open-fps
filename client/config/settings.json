@@ -1,0 +1,20 @@
+{
+  "speech": {
+    "rate": 300,
+    "volume": 1.0,
+    "voice": ""
+  },
+  "audio": {
+    "volume": 1.0,
+    "music_volume": 0.8,
+    "environment_volume": 1.0,
+    "tiles_volume": 1.0,
+    "effects_volume": 1.0,
+    "doppler_factor": 1.0,
+    "rolloff_factor": 1.0,
+    "ref_distance": 1.0,
+    "max_distance": 50.0,
+    "use_efx": false,
+    "reverb_preset": "generic"
+  }
+}

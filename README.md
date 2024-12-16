@@ -1,242 +1,104 @@
-# Game Server Documentation
+# Open Audio Game Server and Client
 
-Welcome to the Game Server project! This server is designed to power a multiplayer game, supporting dynamic map creation, user management, and event-driven architecture. The server integrates features like security management, real-time map updates, and accessibility for various game elements.
+## Overview
+This project is a work-in-progress server and corresponding client for a fully-audio-based game. The server aims to provide a robust backend for:
+- User authentication and session management (via JWT)
+- Role-based permissions and access control
+- Map management (maps, tiles, zones, physics)
+- Movement and interaction within a 3D environment represented entirely by data and audio cues
+- Communication channels (chat systems: private, map-level, global, and server announcements)
+- Integration with AI entities
+- Physics systems for entities and maps
+- Security enhancements (SSL/TLS via a self-signed certificate if none provided, token-based auth, and role-based authorization)
 
-## Table of Contents
+The code is structured into multiple directories and services, each responsible for a particular domain of the server.
 
-- [Features](#features)
-- [Setup](#setup)
-  - [Requirements](#requirements)
-  - [Installation](#installation)
-  - [Running the Server](#running-the-server)
-- [Architecture Overview](#architecture-overview)
-  - [Core Components](#core-components)
-  - [Event-Driven Design](#event-driven-design)
-- [Key Functionalities](#key-functionalities)
-  - [Map Management](#map-management)
-  - [Tile and Zone Management](#tile-and-zone-management)
-  - [User Management](#user-management)
-  - [Security](#security)
-- [Default Configuration](#default-configuration)
-- [Development Guide](#development-guide)
-- [Contributing](#contributing)
-- [License](#license)
+## Current Capabilities
 
----
+### Server-Side
+- **User Management**:  
+  - Create user accounts (`user_account_create_request`)
+  - Login/Logout with JWT-based authentication (`user_account_login_request`, `user_account_logout_request`)
+  - Roles and Permissions: "developer", "player", "moderator", etc. to govern who can create maps, spawn AI, etc.
 
-## Features
+- **Maps, Tiles, Zones**:  
+  - Create, remove, and modify maps (`map_create_request`, `map_remove_request`)
+  - Add/remove tiles and zones (`map_tile_add_request`, `map_tile_remove_request`, `map_zone_add_request`, `map_zone_remove_request`)
+  - Join/leave maps (`map_join_request`, `map_leave_request`)
+  - Update map physics settings (`map_physics_update_request`)
 
-- **Dynamic Map Management**:
-  - Create, load, update, and save maps.
-  - Support for tiles and zones as dictionaries for efficient access and manipulation.
+- **Movement and Orientation**:  
+  - Move within a map (`user_move_request`)
+  - Turn orientation (`user_turn_request`)
+  - Jump action (`user_jump_request`)
 
-- **User Management**:
-  - Create, delete, and authenticate users with different roles (e.g., admin, player).
+- **Chat and Communication**:  
+  - Send private, map-level, global, or server messages (`chat_message`)
 
-- **Event-Driven Architecture**:
-  - Modular, scalable design for handling various game events like tile additions, map updates, and user actions.
+- **AI Management**:  
+  - Spawn, remove, move, and update AI entities if you have permissions (`ai_spawn_request`, `ai_remove_request`, `ai_move_request`, `ai_update_health_request`)
 
-- **Secure Communication**:
-  - Implements SSL encryption and key rotation for secure networking.
+- **Collision and Physics**:  
+  - Collision checks via `collision_manager`
+  - Physics can be configured per map, including gravity and friction
+  - Tiles, zones, and user positions can use floating-point coordinates to allow finer movement granularity
 
-- **Customizable Default Assets**:
-  - Preload default maps, tiles, and zones during server initialization.
+- **Security**:  
+  - SSL/TLS via `SSLManager` and `SecurityManager`
+  - Self-signed certificate creation on startup if none found
+  - JWT-based authentication and token validation
+  - Role-based authorization integrated with `RoleManager`
 
-- **Real-Time Networking**:
-  - Supports real-time event dispatching and message processing.
+- **Logging and Persistence**:  
+  - Chat logs are stored per category (global, map-specific, server, private)
+  - Users, maps, AI, and items are stored on the filesystem by default
+  - Potential integration with a database if desired (some repository interfaces are available)
 
----
+### Client-Side (WIP)
+- A reference client skeleton in Tkinter and audio with pyOpenAL and NVDA-based TTS is outlined in the code base.
+- The client can:
+  - Connect to the server via SSL/TLS if enabled
+  - Send JSON messages to the server according to the message schema
+  - Login, create accounts, join maps, and move around
+  - Issue chat messages and receive updates from the server
+  - Eventually reflect map state changes, player movements, sounds, and so forth
+- Currently, the client code is incomplete and serves more as a reference. It shows how you'd integrate menu navigation, TTS output, and openal-based audio.
 
-## Setup
+## What Works and What Doesn’t
+- **Works**:
+  - You can start the server, and it will generate a self-signed certificate if none found.
+  - You can create users, log in, and receive JWT tokens.
+  - You can create a default map (like "Main") on server startup if none exists.
+  - Map joining, leaving, and basic movement requests are handled.
+  - Chat messages can be sent to the server, which logs them and would broadcast to relevant clients.
+  
+- **In Progress**:
+  - Client accessibility features (NVDA speech) are partially implemented but may require adjustments.
+  - The client’s UI, event handling, and integration with server messages are not fully tested or completed.
+  - Enhanced physics and environmental interactions (e.g., more complex physics beyond gravity, sophisticated AI logic) are placeholders or simplified.
 
-### Requirements
+- **To Do/Not Implemented**:
+  - Advanced item interactions and crafting logic is stubbed but not fully fleshed out.
+  - Detailed database integration for persistent storage beyond file-based storage.
+  - Additional permissions and role granularity. The `roles.json` and `user_roles.json` can be extended.
+  - Better synchronization to ensure race-free state updates if the server gets heavily concurrent.
+  - More robust error handling and recovery in both server and client code.
 
-- Python 3.9+
-- Required libraries (can be installed via `requirements.txt`):
-  - `aiofiles`
-  - `asyncio`
-  - `uuid`
-  - Custom modules (e.g., `include.custom_logger`, `include.event_dispatcher`)
+## How to Run the Server
+1. Ensure Python 3.9+ installed.
+2. `pip install -r requirements.txt` (requirements not fully specified here, but you’d need libraries for async, JWT, etc.)
+3. Run `python server.py` or `python main.py` depending on your entry point.
+4. On first run, a self-signed certificate is generated if none found.
+5. Server starts and listens on `localhost:33288` by default (changeable in `main.py`).
+6. Use a client (or a tool like `openssl s_client` or `wscat` if using TLS) to connect and send JSON messages as outlined.
 
-### Installation
-
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/your-repo/game-server.git
-   cd game-server
-   ```
-
-2. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-3. Set up the directory structure:
-   - Ensure the following directories exist:
-     - `maps/`: For storing map files.
-     - `users/`: For storing user data.
-
-4. Configure the server:
-   - Edit `include/server_constants.py` to adjust server configurations like default host, port, and other constants.
-
----
-
-### Running the Server
-
-To start the server:
-
-```bash
-python server.py --host <your-host> --port <your-port>
-```
-
-Example:
-```bash
-python server.py --host 127.0.0.1 --port 5000
-```
-
-The server logs will indicate its status, including initialized components, loaded assets, and any errors.
-
----
-
-## Architecture Overview
-
-### Core Components
-
-1. **Server**:
-   - Entry point for the application.
-   - Handles initialization, setup, and shutdown.
-
-2. **MapRegistry**:
-   - Manages map loading, saving, and modification.
-   - Supports efficient tile and zone management using dictionaries.
-
-3. **MapService**:
-   - Processes map-related events such as creation, tile addition/removal, and user interactions with maps.
-
-4. **UserRegistry**:
-   - Manages user authentication and account information.
-
-5. **EventDispatcher**:
-   - Implements an event-driven model for handling game actions in real-time.
-
-6. **Network**:
-   - Handles client-server communication with message queues and event dispatching.
-
-7. **SecurityManager**:
-   - Ensures secure communication using SSL certificates and key rotation.
-
-### Event-Driven Design
-
-The server leverages an event-driven model where components subscribe to specific events. For example:
-- A `map_create_request` triggers the creation of a new map in `MapRegistry`.
-- A `map_tile_add_request` updates a map's tiles dynamically.
-
-This design ensures flexibility and scalability for new features.
-
----
-
-## Key Functionalities
-
-### Map Management
-
-- **Create a Map**:
-  - Use the `map_create_request` event to create a new map with customizable properties like size, start position, and tiles.
-
-- **Load and Save Maps**:
-  - Maps are stored in a custom format and can be serialized/deserialized using the `MapParser`.
-
-- **Default Map Setup**:
-  - During initialization, a default map (`Main`) is created with predefined tiles and zones.
-
-### Tile and Zone Management
-
-- **Tiles**:
-  - Represent areas of the map with properties like position, type, and wall status.
-  - Stored as a dictionary for fast access and updates.
-
-- **Zones**:
-  - Define areas of interest within maps (e.g., safe zones, hazards).
-  - Managed similarly to tiles, using dictionaries.
-
-### User Management
-
-- **Account Creation**:
-  - Default admin account is created during the first run if no user data exists.
-  - Additional users can be added via `user_account_create_request`.
-
-- **User Roles**:
-  - Support for different roles, such as admin, player, and developer.
-
-### Security
-
-- **SSL Encryption**:
-  - All communication is encrypted using SSL certificates.
-
-- **Key Rotation**:
-  - Automatically rotates keys periodically to enhance security.
-
----
-
-## Default Configuration
-
-During the first run:
-- A default map (`Main`) is created with the following properties:
-  - Size: `(0, 10, 0, 10, 0, 10)`
-  - Start Position: `(0, 0, 0)`
-  - Owners: `admin`
-  - Tiles:
-    ```python
-    {
-        "uuid1": {"tile_position": (0, 0, 0, 1, 1, 1), "tile_type": "grass", "is_wall": False},
-        "uuid2": {"tile_position": (1, 1, 0, 2, 2, 1), "tile_type": "dirt", "is_wall": False},
-        "uuid3": {"tile_position": (2, 2, 0, 3, 3, 1), "tile_type": "brick", "is_wall": True}
+## How to Interact With the Server
+- All communication is via JSON lines. Each message:
+  ```json
+  {
+    "client_id": "your_unique_id",
+    "message": {
+      "message_type": "<some_request_type>",
+      ... additional fields ...
     }
-    ```
-
-- Default admin credentials:
-  - Username: `admin`
-  - Password: `adminpass`
-
----
-
-## Development Guide
-
-### Adding New Events
-
-1. Define a new event type (e.g., `map_update_request`).
-2. Subscribe to the event in the appropriate service (e.g., `MapService`):
-   ```python
-   self.event_dispatcher.subscribe('map_update_request', self.update_map)
-   ```
-3. Implement the event handler:
-   ```python
-   async def update_map(self, event_data):
-       # Handle the map update logic here
-       pass
-   ```
-
-### Adding New Features
-
-- Follow the modular architecture:
-  - Use registries for resource management (e.g., maps, users).
-  - Use services for event handling and business logic.
-  - Use the event dispatcher for communication between components.
-
----
-
-## Contributing
-
-Contributions are welcome! To contribute:
-1. Fork the repository.
-2. Create a new branch for your feature or bug fix.
-3. Submit a pull request with a clear description of your changes.
-
----
-
-## License
-
-This project is licensed under the [MIT License](LICENSE).
-
----
-
-Feel free to extend this `README.md` as you add more features to the game server!
+  }

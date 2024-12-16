@@ -1,3 +1,17 @@
 {
-    "admin": "developer"
+  "developer": {
+    "permissions": [
+      "create_map", "remove_map", "add_tile", "remove_tile", "add_zone", "remove_zone",
+      "assign_role", "spawn_ai", "remove_ai", "modify_physics", "move_player", "broadcast_message"
+    ]
+  },
+  "moderator": {
+    "permissions": [
+      "create_map", "remove_map", "add_tile", "remove_tile", "add_zone", "remove_zone",
+      "spawn_ai", "remove_ai", "move_player", "broadcast_message"
+    ]
+  },
+  "player": {
+    "permissions": []
+  }
 }
