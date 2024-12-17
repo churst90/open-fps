@@ -1,3 +1,4 @@
+# infrastructure/storage/map_parser.py
 import uuid
 
 class MapParser:

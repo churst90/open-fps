@@ -1,3 +1,4 @@
+# domain/maps/map.py
 from typing import Dict, Tuple
 from .tile import Tile
 from .zone import Zone

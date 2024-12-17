@@ -1,0 +1,35 @@
+{
+    "server": {
+        "name": "My Awesome Audio Game Server",
+        "developer": "John Doe",
+        "website": "https://example.com",
+        "version": "1.0.0"
+    },
+    "network": {
+        "host": "localhost",
+        "port": 33288,
+        "ssl_cert_file": "keys/cert.pem",
+        "ssl_key_file": "keys/key.pem",
+        "auto_generate_ssl": true
+    },
+    "security": {
+        "jwt_secret": "SUPER_SECRET_KEY",
+        "jwt_algorithm": "HS256",
+        "jwt_exp_seconds": 3600
+    },
+    "gameplay": {
+        "default_map": "Main",
+        "day_length_minutes": 1440,
+        "enable_weather": true,
+        "season_cycle_days": 90
+    },
+    "weather": {
+        "default_condition": "clear",
+        "allow_random_storms": true
+    },
+    "logging": {
+        "level": "INFO",
+        "json_format": false,
+        "debug_mode": false
+    }
+}

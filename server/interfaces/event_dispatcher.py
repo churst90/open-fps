@@ -1,7 +1,9 @@
+# interfaces/event_dispatcher.py
 import asyncio
 import logging
 from typing import Callable, Awaitable, Dict, List, Any
 
+from infrastructure.logging.custom_logger import get_logger
 
 class EventDispatcher:
     """
@@ -19,11 +21,12 @@ class EventDispatcher:
         """
         Initialize the EventDispatcher.
 
-        :param logger: Optional logger instance. If not provided, a default logger will be created.
+        :param logger: Optional logger instance. If not provided, a default logger using custom_logger is created.
         """
-        self.logger = logger or logging.getLogger("EventDispatcher")
+        self.logger = logger or get_logger("EventDispatcher", debug_mode=False)
         self._listeners: Dict[str, List[Callable[[Dict[str, Any]], Awaitable[None]]]] = {}
         self._lock = asyncio.Lock()
+        self.logger.debug("EventDispatcher initialized.")
 
     async def subscribe(self, event_type: str, listener: Callable[[Dict[str, Any]], Awaitable[None]]) -> None:
         """
@@ -36,7 +39,7 @@ class EventDispatcher:
             if event_type not in self._listeners:
                 self._listeners[event_type] = []
             self._listeners[event_type].append(listener)
-            self.logger.debug(f"Subscribed listener {listener.__name__} to event '{event_type}'.")
+            self.logger.debug(f"Subscribed listener '{listener.__name__}' to event '{event_type}'.")
 
     async def unsubscribe(self, event_type: str, listener: Callable[[Dict[str, Any]], Awaitable[None]]) -> None:
         """
@@ -48,9 +51,11 @@ class EventDispatcher:
         async with self._lock:
             if event_type in self._listeners and listener in self._listeners[event_type]:
                 self._listeners[event_type].remove(listener)
-                self.logger.debug(f"Unsubscribed listener {listener.__name__} from event '{event_type}'.")
+                self.logger.debug(f"Unsubscribed listener '{listener.__name__}' from event '{event_type}'.")
             else:
-                self.logger.warning(f"Attempted to unsubscribe a listener that is not registered for event '{event_type}'.")
+                self.logger.warning(
+                    f"Attempted to unsubscribe a listener '{listener.__name__}' that is not registered for event '{event_type}'."
+                )
 
     async def dispatch(self, event_type: str, event_data: Dict[str, Any]) -> None:
         """
@@ -66,13 +71,21 @@ class EventDispatcher:
             listeners = self._listeners.get(event_type, [])[:]
 
         # Notify listeners concurrently but handle errors individually.
-        await asyncio.gather(
+        results = await asyncio.gather(
             *[self._notify_listener(listener, event_type, event_data) for listener in listeners],
             return_exceptions=True
         )
 
-    async def _notify_listener(self, listener: Callable[[Dict[str, Any]], Awaitable[None]], 
-                               event_type: str, event_data: Dict[str, Any]) -> None:
+        for res in results:
+            if isinstance(res, Exception):
+                self.logger.debug(f"An exception was returned for event '{event_type}', listener notification failed gracefully.")
+
+    async def _notify_listener(
+        self,
+        listener: Callable[[Dict[str, Any]], Awaitable[None]], 
+        event_type: str, 
+        event_data: Dict[str, Any]
+    ) -> None:
         """
         Notify a single listener about an event, handling exceptions gracefully.
 
@@ -82,6 +95,6 @@ class EventDispatcher:
         """
         try:
             await listener(event_data)
-            self.logger.debug(f"Listener {listener.__name__} handled event '{event_type}' successfully.")
+            self.logger.debug(f"Listener '{listener.__name__}' handled event '{event_type}' successfully.")
         except Exception as e:
-            self.logger.exception(f"Error notifying listener {listener.__name__} for event '{event_type}': {e}")
+            self.logger.exception(f"Error notifying listener '{listener.__name__}' for event '{event_type}': {e}")

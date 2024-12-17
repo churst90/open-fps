@@ -2,13 +2,16 @@
 import asyncio
 import logging
 
+from utils.settings_manager import global_settings
+from infrastructure.logging.custom_logger import get_logger
+
 class ConsoleInterface:
     def __init__(self, user_repo, map_repo, event_dispatcher, shutdown_event: asyncio.Event, logger=None):
         self.user_repo = user_repo
         self.map_repo = map_repo
         self.event_dispatcher = event_dispatcher
         self.shutdown_event = shutdown_event
-        self.logger = logger or logging.getLogger("ConsoleInterface")
+        self.logger = logger or get_logger("ConsoleInterface", debug_mode=False)
         self.command_queue = asyncio.Queue()
 
         self.user_input_task = None
@@ -35,13 +38,12 @@ class ConsoleInterface:
         self.logger.info("Console interface stopped.")
 
     async def _user_input(self):
-        # Use asyncio.to_thread to safely call input in a blocking manner, off the main thread
         while not self.shutdown_event.is_set():
             try:
                 command = await asyncio.to_thread(input, "server> ")
                 await self.command_queue.put(command.strip())
             except (EOFError, KeyboardInterrupt):
-                self.logger.info("Console input ended.")
+                self.logger.debug("Console input ended.")
                 break
             except asyncio.CancelledError:
                 self.logger.debug("User input task cancelled.")
@@ -87,7 +89,6 @@ class ConsoleInterface:
         elif command.startswith("server announce "):
             message_text = command[len("server announce "):].strip()
             if message_text:
-                # Dispatch a chat_message event with chat_category="server"
                 await self.event_dispatcher.dispatch("chat_message", {
                     "client_id": "server_console",
                     "message": {
@@ -101,6 +102,21 @@ class ConsoleInterface:
                 self.logger.info("Server message sent.")
             else:
                 self.logger.warning("No message provided for server announce.")
+        elif command.startswith("log debug"):
+            # Toggle debug mode
+            parts = command.split()
+            if len(parts) == 3:
+                state = parts[2].lower()
+                if state in ["on", "off"]:
+                    new_debug = True if state == "on" else False
+                    global_settings.set("logging.debug_mode", new_debug)
+                    global_settings.save_settings()
+                    self._reconfigure_logging(new_debug)
+                    self.logger.info(f"Debug logging turned {'on' if new_debug else 'off'}.")
+                else:
+                    self.logger.warning("Usage: log debug on/off")
+            else:
+                self.logger.warning("Usage: log debug on/off")
         else:
             self.logger.warning(f"Unknown command: {command}")
 
@@ -114,6 +130,20 @@ class ConsoleInterface:
             "backup maps: Back up map data.\n"
             "backup users: Back up user data.\n"
             "server announce <message>: Sends a server-wide announcement.\n"
+            "log debug on/off: Toggle debug logging.\n"
             "exit: Shuts down the server.\n"
         )
         self.logger.info(help_text)
+
+    def _reconfigure_logging(self, debug_mode: bool):
+        # We reconfigure loggers at runtime by changing their level
+        # This can get tricky; ideally we store references or re-init loggers.
+        # For simplicity, we’ll just re-init main loggers.
+        # In a more advanced setup, you could iterate over loggers and set their levels.
+
+        # Reinitialize primary logger and others if needed
+        # This simplistic approach:
+        main_logger = get_logger("Main", debug_mode)
+        main_logger.info("Logging reconfigured.")
+        self.logger = get_logger("ConsoleInterface", debug_mode)
+        self.logger.info("Console interface logging reconfigured.")

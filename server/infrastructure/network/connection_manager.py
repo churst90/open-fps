@@ -2,81 +2,81 @@
 import asyncio
 import logging
 from typing import Optional
+from infrastructure.logging.custom_logger import get_logger
 
 class ConnectionManager:
     """
-    ConnectionManager manages the mapping between usernames and client_ids.
-    It allows us to quickly find which client_id corresponds to a given username
-    (to send messages to a specific user), and also find the username for a given
-    client_id (e.g., to clean up on disconnect).
+    ConnectionManager manages mappings between usernames and client_ids:
+     - username_to_client[username] = client_id
+     - client_to_username[client_id] = username
 
-    - username_to_client: Dict[username, client_id]
-    - client_to_username: Dict[client_id, username]
+    Allows quick lookups for sending messages to a user or cleaning up on disconnect.
 
-    This assumes one session per username at a time. If multiple sessions per username
-    are desired, this can be adjusted to store lists of client_ids per username.
+    One session per username is enforced. If multiple sessions per user are needed,
+    the internal structure can be adjusted to maintain lists rather than single entries.
     """
 
     def __init__(self, logger: Optional[logging.Logger] = None):
-        self.logger = logger or logging.getLogger("ConnectionManager")
+        # If no logger is provided, create a default one.
+        self.logger = logger or get_logger("ConnectionManager", debug_mode=False)
         self._username_to_client = {}
         self._client_to_username = {}
         self._lock = asyncio.Lock()
 
     async def register_login(self, username: str, client_id: str):
         """
-        Called when a user successfully logs in and a client_id is associated with them.
-        If the username was previously logged in with another client_id, we overwrite it.
-        This enforces one active session per username.
+        Called when a user logs in. Updates mappings, removing old ones if they exist.
         """
         async with self._lock:
-            # If username was previously connected, remove old mappings
             old_client_id = self._username_to_client.get(username)
             if old_client_id:
-                self.logger.debug(f"Username '{username}' was previously mapped to '{old_client_id}', removing old mapping.")
+                # If user was previously connected from another client, remove that mapping.
+                self.logger.debug(f"Re-mapping '{username}' from old_client_id='{old_client_id}' to new_client_id='{client_id}'.")
                 self._client_to_username.pop(old_client_id, None)
 
             self._username_to_client[username] = client_id
             self._client_to_username[client_id] = username
-            self.logger.info(f"Registered login: username='{username}', client_id='{client_id}'")
+            self.logger.info(f"User '{username}' logged in and mapped to client_id='{client_id}'.")
 
     async def register_logout(self, username: str):
         """
-        Called when a user logs out. Removes any mapping for that username.
-        The corresponding client_id is also removed. If username is not found,
-        this is a no-op.
+        Called when a user logs out. Removes username's mapping if it exists.
         """
         async with self._lock:
             client_id = self._username_to_client.pop(username, None)
             if client_id:
                 self._client_to_username.pop(client_id, None)
-                self.logger.info(f"Registered logout: username='{username}', client_id='{client_id}'")
+                self.logger.info(f"User '{username}' logged out and mapping removed (client_id='{client_id}').")
             else:
-                self.logger.debug(f"No active session found for username='{username}' on logout.")
+                self.logger.debug(f"Logout requested for '{username}', but no active session found.")
 
     async def handle_disconnect(self, client_id: str):
         """
-        Called when a client disconnects. If that client was associated with a username,
-        remove that mapping.
+        Called when a client disconnects unexpectedly or gracefully.
+        Removes any associated username mapping.
         """
         async with self._lock:
             username = self._client_to_username.pop(client_id, None)
             if username:
                 self._username_to_client.pop(username, None)
-                self.logger.info(f"Handle disconnect: client_id='{client_id}' was associated with '{username}', mapping removed.")
+                self.logger.info(f"Client '{client_id}' disconnected, unmapped from username='{username}'.")
             else:
-                self.logger.debug(f"Client_id='{client_id}' disconnected, but no username mapping found.")
+                self.logger.debug(f"Disconnect event for client_id='{client_id}' with no username mapping found.")
 
     async def get_client_id_by_username(self, username: str) -> Optional[str]:
         """
-        Return the client_id associated with a given username, or None if not found.
+        Returns the client_id for the given username, or None if not logged in.
         """
         async with self._lock:
-            return self._username_to_client.get(username)
+            cid = self._username_to_client.get(username)
+            self.logger.debug(f"get_client_id_by_username('{username}') -> '{cid}'")
+            return cid
 
     async def get_username_by_client_id(self, client_id: str) -> Optional[str]:
         """
-        Return the username associated with a given client_id, or None if not found.
+        Returns the username for the given client_id, or None if not found.
         """
         async with self._lock:
-            return self._client_to_username.get(client_id)
+            uname = self._client_to_username.get(client_id)
+            self.logger.debug(f"get_username_by_client_id('{client_id}') -> '{uname}'")
+            return uname

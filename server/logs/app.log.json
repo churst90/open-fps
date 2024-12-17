@@ -43,3 +43,859 @@
 {"time": "2024-12-16 13:57:28,662", "level": "INFO", "name": "map_registry", "message": "Retrieved list of all map names: []"}
 {"time": "2024-12-16 14:09:31,152", "level": "INFO", "name": "map_registry", "message": "Retrieved list of all map names: []"}
 {"time": "2024-12-16 14:09:31,189", "level": "INFO", "name": "map_registry", "message": "Map 'Main' saved successfully."}
+{"time": "2024-12-16 20:09:08,247", "level": "INFO", "name": "user_registry", "message": "Account created successfully for username: admin"}
+{"time": "2024-12-16 20:09:08,283", "level": "INFO", "name": "map_registry", "message": "Retrieved list of all map names: []"}
+{"time": "2024-12-16 20:09:08,318", "level": "INFO", "name": "map_registry", "message": "Map 'Main' saved successfully."}
+{"time": "2024-12-16 20:33:06,988", "level": "INFO", "name": "ServerMain", "message": "My Awesome Audio Game Server, version 1.0.0."}
+{"time": "2024-12-16 20:33:06,989", "level": "INFO", "name": "ServerMain", "message": "Originally developed by Cody Hurst: https://github.com/churst90/open-fps"}
+{"time": "2024-12-16 20:33:06,989", "level": "INFO", "name": "ServerMain", "message": "This server is completely open source and community additions are welcome."}
+{"time": "2024-12-16 20:33:06,990", "level": "INFO", "name": "ServerMain", "message": "You are running the original vanilla server code."}
+{"time": "2024-12-16 20:33:07,001", "level": "INFO", "name": "ServerMain", "message": ""}
+{"time": "2024-12-16 20:33:07,001", "level": "INFO", "name": "ServerMain", "message": "Loading server components..."}
+{"time": "2024-12-16 20:33:07,003", "level": "INFO", "name": "ServerMain", "message": "Loading SSL..."}
+{"time": "2024-12-16 20:33:07,006", "level": "INFO", "name": "ServerMain", "message": "Loading SSL: ok"}
+{"time": "2024-12-16 20:33:07,006", "level": "INFO", "name": "ServerMain", "message": "Loading security manager..."}
+{"time": "2024-12-16 20:33:07,007", "level": "INFO", "name": "ServerMain", "message": "Loading security manager: ok"}
+{"time": "2024-12-16 20:33:07,014", "level": "INFO", "name": "ServerMain", "message": "Loading connection manager..."}
+{"time": "2024-12-16 20:33:07,016", "level": "INFO", "name": "ServerMain", "message": "Loading connection manager: ok"}
+{"time": "2024-12-16 20:33:07,032", "level": "INFO", "name": "ServerMain", "message": "Loading map service..."}
+{"time": "2024-12-16 20:33:07,051", "level": "INFO", "name": "ServerMain", "message": "Loading map service: ok"}
+{"time": "2024-12-16 20:33:07,052", "level": "INFO", "name": "ServerMain", "message": "Loading user service..."}
+{"time": "2024-12-16 20:33:07,056", "level": "INFO", "name": "ServerMain", "message": "Loading user service: ok"}
+{"time": "2024-12-16 20:33:07,056", "level": "INFO", "name": "ServerMain", "message": "Loading AI service..."}
+{"time": "2024-12-16 20:33:07,072", "level": "INFO", "name": "ServerMain", "message": "Loading AI service: ok"}
+{"time": "2024-12-16 20:33:07,073", "level": "INFO", "name": "ServerMain", "message": "Loading role service..."}
+{"time": "2024-12-16 20:33:07,091", "level": "INFO", "name": "ServerMain", "message": "Loading role service: ok"}
+{"time": "2024-12-16 20:33:07,092", "level": "INFO", "name": "ServerMain", "message": "Loading physics service..."}
+{"time": "2024-12-16 20:33:07,113", "level": "INFO", "name": "ServerMain", "message": "Loading physics service: ok"}
+{"time": "2024-12-16 20:33:07,115", "level": "INFO", "name": "ServerMain", "message": "Loading movement service..."}
+{"time": "2024-12-16 20:33:07,126", "level": "INFO", "name": "ServerMain", "message": "Loading movement service: ok"}
+{"time": "2024-12-16 20:33:07,127", "level": "INFO", "name": "ServerMain", "message": "Loading chat service..."}
+{"time": "2024-12-16 20:33:07,136", "level": "INFO", "name": "ServerMain", "message": "Loading chat service: ok"}
+{"time": "2024-12-16 20:33:07,138", "level": "INFO", "name": "map_registry", "message": "Retrieved list of all map names: ['Main']"}
+{"time": "2024-12-16 20:33:07,154", "level": "INFO", "name": "NetworkServer", "message": "Starting NetworkServer on localhost:33288 with SSL/TLS"}
+{"time": "2024-12-16 20:33:07,179", "level": "INFO", "name": "NetworkServer", "message": "NetworkServer started and listening."}
+{"time": "2024-12-16 20:33:07,180", "level": "INFO", "name": "ServerMain", "message": "Server is running and listening on localhost:33288. Console ready for input..."}
+{"time": "2024-12-16 20:34:49,754", "level": "INFO", "name": "ConsoleInterface", "message": "Shutdown command received. Stopping the server..."}
+{"time": "2024-12-16 20:34:49,759", "level": "INFO", "name": "ConsoleInterface", "message": "Stopping console interface..."}
+{"time": "2024-12-16 20:34:49,767", "level": "INFO", "name": "ConsoleInterface", "message": "Console interface stopped."}
+{"time": "2024-12-16 20:34:49,768", "level": "INFO", "name": "NetworkServer", "message": "Stopping NetworkServer..."}
+{"time": "2024-12-16 20:34:49,769", "level": "INFO", "name": "NetworkServer", "message": "NetworkServer stopped."}
+{"time": "2024-12-16 20:34:49,770", "level": "INFO", "name": "ServerMain", "message": "Server shut down cleanly."}
+{"time": "2024-12-16 20:35:33,381", "level": "INFO", "name": "ServerMain", "message": "My Awesome Audio Game Server, version 1.0.0."}
+{"time": "2024-12-16 20:35:33,382", "level": "INFO", "name": "ServerMain", "message": "Originally developed by Cody Hurst: https://github.com/churst90/open-fps"}
+{"time": "2024-12-16 20:35:33,382", "level": "INFO", "name": "ServerMain", "message": "This server is completely open source and community additions are welcome."}
+{"time": "2024-12-16 20:35:33,383", "level": "INFO", "name": "ServerMain", "message": "You are running the original vanilla server code."}
+{"time": "2024-12-16 20:35:33,383", "level": "INFO", "name": "ServerMain", "message": ""}
+{"time": "2024-12-16 20:35:33,383", "level": "INFO", "name": "ServerMain", "message": "Loading server components..."}
+{"time": "2024-12-16 20:35:33,384", "level": "INFO", "name": "ServerMain", "message": "Loading SSL..."}
+{"time": "2024-12-16 20:35:33,459", "level": "INFO", "name": "ServerMain", "message": "Loading SSL: ok"}
+{"time": "2024-12-16 20:35:33,460", "level": "INFO", "name": "ServerMain", "message": "Loading security manager..."}
+{"time": "2024-12-16 20:35:33,461", "level": "INFO", "name": "ServerMain", "message": "Loading security manager: ok"}
+{"time": "2024-12-16 20:35:33,462", "level": "INFO", "name": "ServerMain", "message": "Loading connection manager..."}
+{"time": "2024-12-16 20:35:33,462", "level": "INFO", "name": "ServerMain", "message": "Loading connection manager: ok"}
+{"time": "2024-12-16 20:35:33,462", "level": "INFO", "name": "ServerMain", "message": "Loading map service..."}
+{"time": "2024-12-16 20:35:33,463", "level": "INFO", "name": "ServerMain", "message": "Loading map service: ok"}
+{"time": "2024-12-16 20:35:33,463", "level": "INFO", "name": "ServerMain", "message": "Loading user service..."}
+{"time": "2024-12-16 20:35:33,464", "level": "INFO", "name": "ServerMain", "message": "Loading user service: ok"}
+{"time": "2024-12-16 20:35:33,464", "level": "INFO", "name": "ServerMain", "message": "Loading AI service..."}
+{"time": "2024-12-16 20:35:33,464", "level": "INFO", "name": "ServerMain", "message": "Loading AI service: ok"}
+{"time": "2024-12-16 20:35:33,465", "level": "INFO", "name": "ServerMain", "message": "Loading role service..."}
+{"time": "2024-12-16 20:35:33,466", "level": "INFO", "name": "ServerMain", "message": "Loading role service: ok"}
+{"time": "2024-12-16 20:35:33,466", "level": "INFO", "name": "ServerMain", "message": "Loading physics service..."}
+{"time": "2024-12-16 20:35:33,466", "level": "INFO", "name": "ServerMain", "message": "Loading physics service: ok"}
+{"time": "2024-12-16 20:35:33,466", "level": "INFO", "name": "ServerMain", "message": "Loading movement service..."}
+{"time": "2024-12-16 20:35:33,467", "level": "INFO", "name": "ServerMain", "message": "Loading movement service: ok"}
+{"time": "2024-12-16 20:35:33,467", "level": "INFO", "name": "ServerMain", "message": "Loading chat service..."}
+{"time": "2024-12-16 20:35:33,468", "level": "INFO", "name": "ServerMain", "message": "Loading chat service: ok"}
+{"time": "2024-12-16 20:35:33,619", "level": "INFO", "name": "user_registry", "message": "Account created successfully for username: admin"}
+{"time": "2024-12-16 20:35:33,619", "level": "INFO", "name": "UserService", "message": "Account created for username: admin"}
+{"time": "2024-12-16 20:35:33,620", "level": "INFO", "name": "map_registry", "message": "Retrieved list of all map names: []"}
+{"time": "2024-12-16 20:35:33,620", "level": "INFO", "name": "MapService", "message": "Added a grass tile within map bounds."}
+{"time": "2024-12-16 20:35:33,621", "level": "INFO", "name": "map_registry", "message": "Map 'Main' saved successfully."}
+{"time": "2024-12-16 20:35:33,622", "level": "INFO", "name": "MapService", "message": "Map 'Main' created successfully."}
+{"time": "2024-12-16 20:35:33,622", "level": "INFO", "name": "NetworkServer", "message": "Starting NetworkServer on localhost:33288 with SSL/TLS"}
+{"time": "2024-12-16 20:35:33,628", "level": "INFO", "name": "NetworkServer", "message": "NetworkServer started and listening."}
+{"time": "2024-12-16 20:35:33,629", "level": "INFO", "name": "ServerMain", "message": "Server is running and listening on localhost:33288. Console ready for input..."}
+{"time": "2024-12-16 20:36:46,390", "level": "INFO", "name": "ConsoleInterface", "message": "Shutdown command received. Stopping the server..."}
+{"time": "2024-12-16 20:36:46,391", "level": "INFO", "name": "ConsoleInterface", "message": "Stopping console interface..."}
+{"time": "2024-12-16 20:36:46,392", "level": "INFO", "name": "ConsoleInterface", "message": "Console interface stopped."}
+{"time": "2024-12-16 20:36:46,392", "level": "INFO", "name": "NetworkServer", "message": "Stopping NetworkServer..."}
+{"time": "2024-12-16 20:36:46,393", "level": "INFO", "name": "NetworkServer", "message": "NetworkServer stopped."}
+{"time": "2024-12-16 20:36:46,395", "level": "INFO", "name": "ServerMain", "message": "Server shut down cleanly."}
+{"time": "2024-12-16 23:52:52,389", "level": "INFO", "name": "Main", "message": "Loading server components..."}
+{"time": "2024-12-16 23:52:52,393", "level": "INFO", "name": "SSLManager", "message": "SSL enabled with provided (or self-signed) certificate and key."}
+{"time": "2024-12-16 23:52:52,395", "level": "INFO", "name": "Main", "message": "Components loaded:"}
+{"time": "2024-12-16 23:52:52,402", "level": "INFO", "name": "Main", "message": " - Network"}
+{"time": "2024-12-16 23:52:52,402", "level": "INFO", "name": "Main", "message": " - User Service"}
+{"time": "2024-12-16 23:52:52,403", "level": "INFO", "name": "Main", "message": " - Map Service"}
+{"time": "2024-12-16 23:52:52,405", "level": "INFO", "name": "Main", "message": " - AI Service"}
+{"time": "2024-12-16 23:52:52,405", "level": "INFO", "name": "Main", "message": " - Role Service"}
+{"time": "2024-12-16 23:52:52,415", "level": "INFO", "name": "Main", "message": " - Physics Service"}
+{"time": "2024-12-16 23:52:52,435", "level": "INFO", "name": "Main", "message": " - Movement Service"}
+{"time": "2024-12-16 23:52:52,438", "level": "INFO", "name": "Main", "message": " - Chat Service"}
+{"time": "2024-12-16 23:52:52,443", "level": "INFO", "name": "map_registry", "message": "Retrieved list of all map names: ['Main']"}
+{"time": "2024-12-16 23:52:52,444", "level": "INFO", "name": "NetworkServer", "message": "Starting NetworkServer on localhost:33288 with SSL/TLS"}
+{"time": "2024-12-16 23:52:52,463", "level": "INFO", "name": "NetworkServer", "message": "NetworkServer started and listening."}
+{"time": "2024-12-16 23:52:52,463", "level": "INFO", "name": "Main", "message": "My Awesome Audio Game Server version 1.0.0 started."}
+{"time": "2024-12-16 23:52:52,475", "level": "INFO", "name": "Main", "message": "Server running on localhost:33288. Type 'exit' in console to shut down."}
+{"time": "2024-12-16 23:54:04,489", "level": "INFO", "name": "Main", "message": "Logging reconfigured."}
+{"time": "2024-12-16 23:54:04,493", "level": "INFO", "name": "ConsoleInterface", "message": "Console interface logging reconfigured."}
+{"time": "2024-12-16 23:54:04,501", "level": "INFO", "name": "ConsoleInterface", "message": "Debug logging turned on."}
+{"time": "2024-12-16 23:54:17,816", "level": "INFO", "name": "Main", "message": "Logging reconfigured."}
+{"time": "2024-12-16 23:54:17,818", "level": "INFO", "name": "ConsoleInterface", "message": "Console interface logging reconfigured."}
+{"time": "2024-12-16 23:54:17,818", "level": "INFO", "name": "ConsoleInterface", "message": "Debug logging turned off."}
+{"time": "2024-12-16 23:54:34,003", "level": "INFO", "name": "Main", "message": "Logging reconfigured."}
+{"time": "2024-12-16 23:54:34,008", "level": "INFO", "name": "ConsoleInterface", "message": "Console interface logging reconfigured."}
+{"time": "2024-12-16 23:54:34,018", "level": "INFO", "name": "ConsoleInterface", "message": "Debug logging turned on."}
+{"time": "2024-12-16 23:55:24,818", "level": "INFO", "name": "ConsoleInterface", "message": "Shutdown command received. Stopping the server..."}
+{"time": "2024-12-16 23:55:24,820", "level": "INFO", "name": "ConsoleInterface", "message": "Stopping console interface..."}
+{"time": "2024-12-16 23:55:24,831", "level": "DEBUG", "name": "ConsoleInterface", "message": "User input task cancelled."}
+{"time": "2024-12-16 23:55:24,831", "level": "INFO", "name": "ConsoleInterface", "message": "Console interface stopped."}
+{"time": "2024-12-16 23:55:24,832", "level": "INFO", "name": "NetworkServer", "message": "Stopping NetworkServer..."}
+{"time": "2024-12-16 23:55:24,842", "level": "INFO", "name": "NetworkServer", "message": "NetworkServer stopped."}
+{"time": "2024-12-16 23:55:24,845", "level": "INFO", "name": "Main", "message": "Server shut down cleanly."}
+{"time": "2024-12-16 23:55:37,452", "level": "INFO", "name": "Main", "message": "Loading server components..."}
+{"time": "2024-12-16 23:55:37,456", "level": "INFO", "name": "SSLManager", "message": "SSL enabled with provided (or self-signed) certificate and key."}
+{"time": "2024-12-16 23:55:37,457", "level": "INFO", "name": "Main", "message": "Components loaded:"}
+{"time": "2024-12-16 23:55:37,466", "level": "INFO", "name": "Main", "message": " - Network"}
+{"time": "2024-12-16 23:55:37,467", "level": "INFO", "name": "Main", "message": " - User Service"}
+{"time": "2024-12-16 23:55:37,468", "level": "INFO", "name": "Main", "message": " - Map Service"}
+{"time": "2024-12-16 23:55:37,469", "level": "INFO", "name": "Main", "message": " - AI Service"}
+{"time": "2024-12-16 23:55:37,469", "level": "INFO", "name": "Main", "message": " - Role Service"}
+{"time": "2024-12-16 23:55:37,481", "level": "INFO", "name": "Main", "message": " - Physics Service"}
+{"time": "2024-12-16 23:55:37,492", "level": "INFO", "name": "Main", "message": " - Movement Service"}
+{"time": "2024-12-16 23:55:37,493", "level": "INFO", "name": "Main", "message": " - Chat Service"}
+{"time": "2024-12-16 23:55:37,502", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_chat_message to event 'chat_message'."}
+{"time": "2024-12-16 23:55:37,515", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_user_move_request to event 'user_move_request'."}
+{"time": "2024-12-16 23:55:37,516", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_user_turn_request to event 'user_turn_request'."}
+{"time": "2024-12-16 23:55:37,524", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_create_account to event 'user_account_create_request'."}
+{"time": "2024-12-16 23:55:37,524", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_login_request to event 'user_account_login_request'."}
+{"time": "2024-12-16 23:55:37,543", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_logout_request to event 'user_account_logout_request'."}
+{"time": "2024-12-16 23:55:37,544", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_map_create_request to event 'map_create_request'."}
+{"time": "2024-12-16 23:55:37,547", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_map_remove_request to event 'map_remove_request'."}
+{"time": "2024-12-16 23:55:37,561", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_map_tile_add_request to event 'map_tile_add_request'."}
+{"time": "2024-12-16 23:55:37,561", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_map_tile_remove_request to event 'map_tile_remove_request'."}
+{"time": "2024-12-16 23:55:37,570", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_map_zone_add_request to event 'map_zone_add_request'."}
+{"time": "2024-12-16 23:55:37,571", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_map_zone_remove_request to event 'map_zone_remove_request'."}
+{"time": "2024-12-16 23:55:37,587", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_map_join_request to event 'map_join_request'."}
+{"time": "2024-12-16 23:55:37,588", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_map_leave_request to event 'map_leave_request'."}
+{"time": "2024-12-16 23:55:37,592", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_map_physics_update_request to event 'map_physics_update_request'."}
+{"time": "2024-12-16 23:55:37,595", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_ai_spawn_request to event 'ai_spawn_request'."}
+{"time": "2024-12-16 23:55:37,606", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_ai_remove_request to event 'ai_remove_request'."}
+{"time": "2024-12-16 23:55:37,614", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_ai_move_request to event 'ai_move_request'."}
+{"time": "2024-12-16 23:55:37,615", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_ai_update_health_request to event 'ai_update_health_request'."}
+{"time": "2024-12-16 23:55:37,636", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_role_assign_request to event 'role_assign_request'."}
+{"time": "2024-12-16 23:55:37,638", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_role_remove_request to event 'role_remove_request'."}
+{"time": "2024-12-16 23:55:37,650", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_apply_gravity_request to event 'physics_apply_gravity_request'."}
+{"time": "2024-12-16 23:55:37,651", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_jump_request to event 'physics_jump_request'."}
+{"time": "2024-12-16 23:55:37,659", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_apply_force_request to event 'physics_apply_force_request'."}
+{"time": "2024-12-16 23:55:37,673", "level": "DEBUG", "name": "user_registry", "message": "Retrieved all usernames: ['admin']"}
+{"time": "2024-12-16 23:55:37,678", "level": "INFO", "name": "map_registry", "message": "Retrieved list of all map names: ['Main']"}
+{"time": "2024-12-16 23:55:37,696", "level": "INFO", "name": "NetworkServer", "message": "Starting NetworkServer on localhost:33288 with SSL/TLS"}
+{"time": "2024-12-16 23:55:37,704", "level": "INFO", "name": "NetworkServer", "message": "NetworkServer started and listening."}
+{"time": "2024-12-16 23:55:37,705", "level": "INFO", "name": "Main", "message": "My Awesome Audio Game Server version 1.0.0 started."}
+{"time": "2024-12-16 23:55:37,712", "level": "INFO", "name": "Main", "message": "Server running on localhost:33288. Type 'exit' in console to shut down."}
+{"time": "2024-12-16 23:57:53,821", "level": "INFO", "name": "ConsoleInterface", "message": "Shutdown command received. Stopping the server..."}
+{"time": "2024-12-16 23:57:53,824", "level": "INFO", "name": "ConsoleInterface", "message": "Stopping console interface..."}
+{"time": "2024-12-16 23:57:53,825", "level": "DEBUG", "name": "ConsoleInterface", "message": "User input task cancelled."}
+{"time": "2024-12-16 23:57:53,836", "level": "INFO", "name": "ConsoleInterface", "message": "Console interface stopped."}
+{"time": "2024-12-16 23:57:53,837", "level": "INFO", "name": "NetworkServer", "message": "Stopping NetworkServer..."}
+{"time": "2024-12-16 23:57:53,838", "level": "INFO", "name": "NetworkServer", "message": "NetworkServer stopped."}
+{"time": "2024-12-16 23:57:53,842", "level": "INFO", "name": "Main", "message": "Server shut down cleanly."}
+{"time": "2024-12-17 00:12:18,287", "level": "INFO", "name": "Main", "message": "Loading server components..."}
+{"time": "2024-12-17 00:12:18,291", "level": "INFO", "name": "SSLManager", "message": "SSL enabled with provided (or self-signed) certificate and key."}
+{"time": "2024-12-17 00:12:18,293", "level": "INFO", "name": "Main", "message": "Components loaded:"}
+{"time": "2024-12-17 00:12:18,299", "level": "INFO", "name": "Main", "message": " - Network"}
+{"time": "2024-12-17 00:12:18,300", "level": "INFO", "name": "Main", "message": " - User Service"}
+{"time": "2024-12-17 00:12:18,301", "level": "INFO", "name": "Main", "message": " - Map Service"}
+{"time": "2024-12-17 00:12:18,302", "level": "INFO", "name": "Main", "message": " - AI Service"}
+{"time": "2024-12-17 00:12:18,303", "level": "INFO", "name": "Main", "message": " - Role Service"}
+{"time": "2024-12-17 00:12:18,313", "level": "INFO", "name": "Main", "message": " - Physics Service"}
+{"time": "2024-12-17 00:12:18,314", "level": "INFO", "name": "Main", "message": " - Movement Service"}
+{"time": "2024-12-17 00:12:18,326", "level": "INFO", "name": "Main", "message": " - Chat Service"}
+{"time": "2024-12-17 00:12:18,328", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_chat_message to event 'chat_message'."}
+{"time": "2024-12-17 00:12:18,353", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_user_move_request to event 'user_move_request'."}
+{"time": "2024-12-17 00:12:18,354", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_user_turn_request to event 'user_turn_request'."}
+{"time": "2024-12-17 00:12:18,367", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_create_account to event 'user_account_create_request'."}
+{"time": "2024-12-17 00:12:18,368", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_login_request to event 'user_account_login_request'."}
+{"time": "2024-12-17 00:12:18,372", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_logout_request to event 'user_account_logout_request'."}
+{"time": "2024-12-17 00:12:18,373", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_map_create_request to event 'map_create_request'."}
+{"time": "2024-12-17 00:12:18,374", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_map_remove_request to event 'map_remove_request'."}
+{"time": "2024-12-17 00:12:18,386", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_map_tile_add_request to event 'map_tile_add_request'."}
+{"time": "2024-12-17 00:12:18,394", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_map_tile_remove_request to event 'map_tile_remove_request'."}
+{"time": "2024-12-17 00:12:18,395", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_map_zone_add_request to event 'map_zone_add_request'."}
+{"time": "2024-12-17 00:12:18,408", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_map_zone_remove_request to event 'map_zone_remove_request'."}
+{"time": "2024-12-17 00:12:18,409", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_map_join_request to event 'map_join_request'."}
+{"time": "2024-12-17 00:12:18,425", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_map_leave_request to event 'map_leave_request'."}
+{"time": "2024-12-17 00:12:18,427", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_map_physics_update_request to event 'map_physics_update_request'."}
+{"time": "2024-12-17 00:12:18,447", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_ai_spawn_request to event 'ai_spawn_request'."}
+{"time": "2024-12-17 00:12:18,448", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_ai_remove_request to event 'ai_remove_request'."}
+{"time": "2024-12-17 00:12:18,452", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_ai_move_request to event 'ai_move_request'."}
+{"time": "2024-12-17 00:12:18,468", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_ai_update_health_request to event 'ai_update_health_request'."}
+{"time": "2024-12-17 00:12:18,469", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_role_assign_request to event 'role_assign_request'."}
+{"time": "2024-12-17 00:12:18,484", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_role_remove_request to event 'role_remove_request'."}
+{"time": "2024-12-17 00:12:18,498", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_apply_gravity_request to event 'physics_apply_gravity_request'."}
+{"time": "2024-12-17 00:12:18,516", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_jump_request to event 'physics_jump_request'."}
+{"time": "2024-12-17 00:12:18,517", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_apply_force_request to event 'physics_apply_force_request'."}
+{"time": "2024-12-17 00:12:18,534", "level": "DEBUG", "name": "user_registry", "message": "Retrieved all usernames: ['admin']"}
+{"time": "2024-12-17 00:12:18,536", "level": "INFO", "name": "map_registry", "message": "Retrieved list of all map names: ['Main']"}
+{"time": "2024-12-17 00:12:18,557", "level": "INFO", "name": "NetworkServer", "message": "Starting NetworkServer on localhost:33288 with SSL/TLS"}
+{"time": "2024-12-17 00:12:18,576", "level": "INFO", "name": "NetworkServer", "message": "NetworkServer started and listening."}
+{"time": "2024-12-17 00:12:18,577", "level": "INFO", "name": "Main", "message": "My Awesome Audio Game Server version 1.0.0 started."}
+{"time": "2024-12-17 00:12:18,585", "level": "INFO", "name": "Main", "message": "Server running on localhost:33288. Type 'exit' in console to shut down."}
+{"time": "2024-12-17 00:13:04,364", "level": "INFO", "name": "Main", "message": "Logging reconfigured."}
+{"time": "2024-12-17 00:13:04,365", "level": "INFO", "name": "ConsoleInterface", "message": "Console interface logging reconfigured."}
+{"time": "2024-12-17 00:13:04,374", "level": "INFO", "name": "ConsoleInterface", "message": "Debug logging turned off."}
+{"time": "2024-12-17 00:13:11,562", "level": "INFO", "name": "ConsoleInterface", "message": "Shutdown command received. Stopping the server..."}
+{"time": "2024-12-17 00:13:11,563", "level": "INFO", "name": "ConsoleInterface", "message": "Stopping console interface..."}
+{"time": "2024-12-17 00:13:11,564", "level": "INFO", "name": "ConsoleInterface", "message": "Console interface stopped."}
+{"time": "2024-12-17 00:13:11,575", "level": "INFO", "name": "NetworkServer", "message": "Stopping NetworkServer..."}
+{"time": "2024-12-17 00:13:11,576", "level": "INFO", "name": "NetworkServer", "message": "NetworkServer stopped."}
+{"time": "2024-12-17 00:13:11,577", "level": "INFO", "name": "Main", "message": "Server shut down complete."}
+{"time": "2024-12-17 01:16:05,258", "level": "INFO", "name": "Main", "message": "Loading server components..."}
+{"time": "2024-12-17 01:16:05,262", "level": "INFO", "name": "SSLManager", "message": "SSL enabled with provided (or self-signed) certificate and key."}
+{"time": "2024-12-17 01:16:05,263", "level": "INFO", "name": "Main", "message": "Components loaded:"}
+{"time": "2024-12-17 01:16:05,264", "level": "INFO", "name": "Main", "message": " - Network"}
+{"time": "2024-12-17 01:16:05,274", "level": "INFO", "name": "Main", "message": " - User Service"}
+{"time": "2024-12-17 01:16:05,275", "level": "INFO", "name": "Main", "message": " - Map Service"}
+{"time": "2024-12-17 01:16:05,276", "level": "INFO", "name": "Main", "message": " - AI Service"}
+{"time": "2024-12-17 01:16:05,277", "level": "INFO", "name": "Main", "message": " - Role Service"}
+{"time": "2024-12-17 01:16:05,278", "level": "INFO", "name": "Main", "message": " - Physics Service"}
+{"time": "2024-12-17 01:16:05,279", "level": "INFO", "name": "Main", "message": " - Movement Service"}
+{"time": "2024-12-17 01:16:05,288", "level": "INFO", "name": "Main", "message": " - Chat Service"}
+{"time": "2024-12-17 01:16:05,289", "level": "INFO", "name": "map_registry", "message": "Retrieved list of all map names: ['Main']"}
+{"time": "2024-12-17 01:16:05,301", "level": "INFO", "name": "NetworkServer", "message": "Starting NetworkServer on localhost:33288 with SSL/TLS."}
+{"time": "2024-12-17 01:16:05,314", "level": "INFO", "name": "NetworkServer", "message": "NetworkServer started and accepting connections."}
+{"time": "2024-12-17 01:16:05,314", "level": "INFO", "name": "Main", "message": "My Awesome Audio Game Server version 1.0.0 started."}
+{"time": "2024-12-17 01:16:05,328", "level": "INFO", "name": "Main", "message": "Server running on localhost:33288. Type 'exit' in console to shut down."}
+{"time": "2024-12-17 01:16:29,704", "level": "INFO", "name": "Main", "message": "Logging reconfigured."}
+{"time": "2024-12-17 01:16:29,706", "level": "INFO", "name": "ConsoleInterface", "message": "Console interface logging reconfigured."}
+{"time": "2024-12-17 01:16:29,717", "level": "INFO", "name": "ConsoleInterface", "message": "Debug logging turned on."}
+{"time": "2024-12-17 01:16:36,666", "level": "INFO", "name": "ConsoleInterface", "message": "Shutdown command received. Stopping the server..."}
+{"time": "2024-12-17 01:16:36,668", "level": "INFO", "name": "ConsoleInterface", "message": "Stopping console interface..."}
+{"time": "2024-12-17 01:16:36,679", "level": "DEBUG", "name": "ConsoleInterface", "message": "User input task cancelled."}
+{"time": "2024-12-17 01:16:36,680", "level": "INFO", "name": "ConsoleInterface", "message": "Console interface stopped."}
+{"time": "2024-12-17 01:16:36,681", "level": "INFO", "name": "NetworkServer", "message": "Stopping NetworkServer..."}
+{"time": "2024-12-17 01:16:36,682", "level": "INFO", "name": "NetworkServer", "message": "NetworkServer stopped."}
+{"time": "2024-12-17 01:16:36,693", "level": "INFO", "name": "Main", "message": "Server shut down complete."}
+{"time": "2024-12-17 01:16:39,821", "level": "INFO", "name": "Main", "message": "Loading server components..."}
+{"time": "2024-12-17 01:16:39,826", "level": "INFO", "name": "SSLManager", "message": "SSL enabled with provided (or self-signed) certificate and key."}
+{"time": "2024-12-17 01:16:39,827", "level": "INFO", "name": "Main", "message": "Components loaded:"}
+{"time": "2024-12-17 01:16:39,836", "level": "INFO", "name": "Main", "message": " - Network"}
+{"time": "2024-12-17 01:16:39,837", "level": "INFO", "name": "Main", "message": " - User Service"}
+{"time": "2024-12-17 01:16:39,838", "level": "INFO", "name": "Main", "message": " - Map Service"}
+{"time": "2024-12-17 01:16:39,839", "level": "INFO", "name": "Main", "message": " - AI Service"}
+{"time": "2024-12-17 01:16:39,846", "level": "INFO", "name": "Main", "message": " - Role Service"}
+{"time": "2024-12-17 01:16:39,849", "level": "INFO", "name": "Main", "message": " - Physics Service"}
+{"time": "2024-12-17 01:16:39,849", "level": "INFO", "name": "Main", "message": " - Movement Service"}
+{"time": "2024-12-17 01:16:39,867", "level": "INFO", "name": "Main", "message": " - Chat Service"}
+{"time": "2024-12-17 01:16:39,881", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_chat_message to event 'chat_message'."}
+{"time": "2024-12-17 01:16:39,885", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_user_move_request to event 'user_move_request'."}
+{"time": "2024-12-17 01:16:39,886", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_user_turn_request to event 'user_turn_request'."}
+{"time": "2024-12-17 01:16:39,889", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_create_account to event 'user_account_create_request'."}
+{"time": "2024-12-17 01:16:39,890", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_login_request to event 'user_account_login_request'."}
+{"time": "2024-12-17 01:16:39,896", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_logout_request to event 'user_account_logout_request'."}
+{"time": "2024-12-17 01:16:39,896", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_map_create_request to event 'map_create_request'."}
+{"time": "2024-12-17 01:16:39,912", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_map_remove_request to event 'map_remove_request'."}
+{"time": "2024-12-17 01:16:39,931", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_map_tile_add_request to event 'map_tile_add_request'."}
+{"time": "2024-12-17 01:16:39,932", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_map_tile_remove_request to event 'map_tile_remove_request'."}
+{"time": "2024-12-17 01:16:39,935", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_map_zone_add_request to event 'map_zone_add_request'."}
+{"time": "2024-12-17 01:16:39,936", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_map_zone_remove_request to event 'map_zone_remove_request'."}
+{"time": "2024-12-17 01:16:39,938", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_map_join_request to event 'map_join_request'."}
+{"time": "2024-12-17 01:16:39,938", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_map_leave_request to event 'map_leave_request'."}
+{"time": "2024-12-17 01:16:39,948", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_map_physics_update_request to event 'map_physics_update_request'."}
+{"time": "2024-12-17 01:16:39,949", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_ai_spawn_request to event 'ai_spawn_request'."}
+{"time": "2024-12-17 01:16:39,958", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_ai_remove_request to event 'ai_remove_request'."}
+{"time": "2024-12-17 01:16:39,959", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_ai_move_request to event 'ai_move_request'."}
+{"time": "2024-12-17 01:16:39,975", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_ai_update_health_request to event 'ai_update_health_request'."}
+{"time": "2024-12-17 01:16:39,978", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_role_assign_request to event 'role_assign_request'."}
+{"time": "2024-12-17 01:16:39,989", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_role_remove_request to event 'role_remove_request'."}
+{"time": "2024-12-17 01:16:39,998", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_apply_gravity_request to event 'physics_apply_gravity_request'."}
+{"time": "2024-12-17 01:16:39,999", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_jump_request to event 'physics_jump_request'."}
+{"time": "2024-12-17 01:16:40,012", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_apply_force_request to event 'physics_apply_force_request'."}
+{"time": "2024-12-17 01:16:40,014", "level": "DEBUG", "name": "user_registry", "message": "Retrieved all usernames: ['admin']"}
+{"time": "2024-12-17 01:16:40,031", "level": "INFO", "name": "map_registry", "message": "Retrieved list of all map names: ['Main']"}
+{"time": "2024-12-17 01:16:40,036", "level": "INFO", "name": "NetworkServer", "message": "Starting NetworkServer on localhost:33288 with SSL/TLS."}
+{"time": "2024-12-17 01:16:40,060", "level": "INFO", "name": "NetworkServer", "message": "NetworkServer started and accepting connections."}
+{"time": "2024-12-17 01:16:40,061", "level": "INFO", "name": "Main", "message": "My Awesome Audio Game Server version 1.0.0 started."}
+{"time": "2024-12-17 01:16:40,069", "level": "INFO", "name": "Main", "message": "Server running on localhost:33288. Type 'exit' in console to shut down."}
+{"time": "2024-12-17 01:17:17,765", "level": "INFO", "name": "ConsoleInterface", "message": "Shutdown command received. Stopping the server..."}
+{"time": "2024-12-17 01:17:17,768", "level": "INFO", "name": "ConsoleInterface", "message": "Stopping console interface..."}
+{"time": "2024-12-17 01:17:17,779", "level": "DEBUG", "name": "ConsoleInterface", "message": "User input task cancelled."}
+{"time": "2024-12-17 01:17:17,779", "level": "INFO", "name": "ConsoleInterface", "message": "Console interface stopped."}
+{"time": "2024-12-17 01:17:17,780", "level": "INFO", "name": "NetworkServer", "message": "Stopping NetworkServer..."}
+{"time": "2024-12-17 01:17:17,781", "level": "INFO", "name": "NetworkServer", "message": "NetworkServer stopped."}
+{"time": "2024-12-17 01:17:17,782", "level": "INFO", "name": "Main", "message": "Server shut down complete."}
+{"time": "2024-12-17 01:22:27,237", "level": "INFO", "name": "Main", "message": "Loading server components..."}
+{"time": "2024-12-17 01:22:27,239", "level": "DEBUG", "name": "SSLManager", "message": "SSLManager initialized with cert_file='keys/cert.pem', key_file='keys/key.pem'"}
+{"time": "2024-12-17 01:22:27,251", "level": "INFO", "name": "SSLManager", "message": "SSL enabled with provided (or self-signed) certificate and key."}
+{"time": "2024-12-17 01:22:27,252", "level": "DEBUG", "name": "SecurityManager", "message": "SecurityManager initialized with jwt_algorithm='HS256', jwt_exp_delta=3600"}
+{"time": "2024-12-17 01:22:27,254", "level": "INFO", "name": "Main", "message": "Components loaded:"}
+{"time": "2024-12-17 01:22:27,254", "level": "INFO", "name": "Main", "message": " - Network"}
+{"time": "2024-12-17 01:22:27,258", "level": "INFO", "name": "Main", "message": " - User Service"}
+{"time": "2024-12-17 01:22:27,274", "level": "INFO", "name": "Main", "message": " - Map Service"}
+{"time": "2024-12-17 01:22:27,275", "level": "INFO", "name": "Main", "message": " - AI Service"}
+{"time": "2024-12-17 01:22:27,293", "level": "INFO", "name": "Main", "message": " - Role Service"}
+{"time": "2024-12-17 01:22:27,298", "level": "INFO", "name": "Main", "message": " - Physics Service"}
+{"time": "2024-12-17 01:22:27,316", "level": "INFO", "name": "Main", "message": " - Movement Service"}
+{"time": "2024-12-17 01:22:27,317", "level": "INFO", "name": "Main", "message": " - Chat Service"}
+{"time": "2024-12-17 01:22:27,321", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_chat_message to event 'chat_message'."}
+{"time": "2024-12-17 01:22:27,322", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_user_move_request to event 'user_move_request'."}
+{"time": "2024-12-17 01:22:27,337", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_user_turn_request to event 'user_turn_request'."}
+{"time": "2024-12-17 01:22:27,339", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_create_account to event 'user_account_create_request'."}
+{"time": "2024-12-17 01:22:27,359", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_login_request to event 'user_account_login_request'."}
+{"time": "2024-12-17 01:22:27,373", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_logout_request to event 'user_account_logout_request'."}
+{"time": "2024-12-17 01:22:27,374", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_map_create_request to event 'map_create_request'."}
+{"time": "2024-12-17 01:22:27,376", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_map_remove_request to event 'map_remove_request'."}
+{"time": "2024-12-17 01:22:27,377", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_map_tile_add_request to event 'map_tile_add_request'."}
+{"time": "2024-12-17 01:22:27,377", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_map_tile_remove_request to event 'map_tile_remove_request'."}
+{"time": "2024-12-17 01:22:27,384", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_map_zone_add_request to event 'map_zone_add_request'."}
+{"time": "2024-12-17 01:22:27,403", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_map_zone_remove_request to event 'map_zone_remove_request'."}
+{"time": "2024-12-17 01:22:27,405", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_map_join_request to event 'map_join_request'."}
+{"time": "2024-12-17 01:22:27,418", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_map_leave_request to event 'map_leave_request'."}
+{"time": "2024-12-17 01:22:27,419", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_map_physics_update_request to event 'map_physics_update_request'."}
+{"time": "2024-12-17 01:22:27,421", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_ai_spawn_request to event 'ai_spawn_request'."}
+{"time": "2024-12-17 01:22:27,422", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_ai_remove_request to event 'ai_remove_request'."}
+{"time": "2024-12-17 01:22:27,423", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_ai_move_request to event 'ai_move_request'."}
+{"time": "2024-12-17 01:22:27,423", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_ai_update_health_request to event 'ai_update_health_request'."}
+{"time": "2024-12-17 01:22:27,433", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_role_assign_request to event 'role_assign_request'."}
+{"time": "2024-12-17 01:22:27,434", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_role_remove_request to event 'role_remove_request'."}
+{"time": "2024-12-17 01:22:27,456", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_apply_gravity_request to event 'physics_apply_gravity_request'."}
+{"time": "2024-12-17 01:22:27,456", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_jump_request to event 'physics_jump_request'."}
+{"time": "2024-12-17 01:22:27,463", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_apply_force_request to event 'physics_apply_force_request'."}
+{"time": "2024-12-17 01:22:27,474", "level": "DEBUG", "name": "user_registry", "message": "Retrieved all usernames: ['admin']"}
+{"time": "2024-12-17 01:22:27,476", "level": "INFO", "name": "map_registry", "message": "Retrieved list of all map names: ['Main']"}
+{"time": "2024-12-17 01:22:27,493", "level": "INFO", "name": "NetworkServer", "message": "Starting NetworkServer on localhost:33288 with SSL/TLS."}
+{"time": "2024-12-17 01:22:27,513", "level": "INFO", "name": "NetworkServer", "message": "NetworkServer started and accepting connections."}
+{"time": "2024-12-17 01:22:27,514", "level": "INFO", "name": "Main", "message": "My Awesome Audio Game Server version 1.0.0 started."}
+{"time": "2024-12-17 01:22:27,531", "level": "INFO", "name": "Main", "message": "Server running on localhost:33288. Type 'exit' in console to shut down."}
+{"time": "2024-12-17 01:23:42,455", "level": "INFO", "name": "ConsoleInterface", "message": "Shutdown command received. Stopping the server..."}
+{"time": "2024-12-17 01:23:42,458", "level": "INFO", "name": "ConsoleInterface", "message": "Stopping console interface..."}
+{"time": "2024-12-17 01:23:42,460", "level": "DEBUG", "name": "ConsoleInterface", "message": "User input task cancelled."}
+{"time": "2024-12-17 01:23:42,470", "level": "INFO", "name": "ConsoleInterface", "message": "Console interface stopped."}
+{"time": "2024-12-17 01:23:42,487", "level": "INFO", "name": "NetworkServer", "message": "Stopping NetworkServer..."}
+{"time": "2024-12-17 01:23:42,493", "level": "INFO", "name": "NetworkServer", "message": "NetworkServer stopped."}
+{"time": "2024-12-17 01:23:42,498", "level": "INFO", "name": "Main", "message": "Server shut down complete."}
+{"time": "2024-12-17 01:26:46,993", "level": "INFO", "name": "Main", "message": "Loading server components..."}
+{"time": "2024-12-17 01:26:46,995", "level": "DEBUG", "name": "SSLManager", "message": "SSLManager initialized with cert_file='keys/cert.pem', key_file='keys/key.pem'"}
+{"time": "2024-12-17 01:26:46,997", "level": "INFO", "name": "SSLManager", "message": "SSL enabled with provided (or self-signed) certificate and key."}
+{"time": "2024-12-17 01:26:46,998", "level": "DEBUG", "name": "SecurityManager", "message": "SecurityManager initialized with jwt_algorithm='HS256', jwt_exp_delta=3600"}
+{"time": "2024-12-17 01:26:46,999", "level": "DEBUG", "name": "ChatService", "message": "ChatService initialized."}
+{"time": "2024-12-17 01:26:47,000", "level": "INFO", "name": "Main", "message": "Components loaded:"}
+{"time": "2024-12-17 01:26:47,000", "level": "INFO", "name": "Main", "message": " - Network"}
+{"time": "2024-12-17 01:26:47,001", "level": "INFO", "name": "Main", "message": " - User Service"}
+{"time": "2024-12-17 01:26:47,001", "level": "INFO", "name": "Main", "message": " - Map Service"}
+{"time": "2024-12-17 01:26:47,001", "level": "INFO", "name": "Main", "message": " - AI Service"}
+{"time": "2024-12-17 01:26:47,002", "level": "INFO", "name": "Main", "message": " - Role Service"}
+{"time": "2024-12-17 01:26:47,002", "level": "INFO", "name": "Main", "message": " - Physics Service"}
+{"time": "2024-12-17 01:26:47,003", "level": "INFO", "name": "Main", "message": " - Movement Service"}
+{"time": "2024-12-17 01:26:47,003", "level": "INFO", "name": "Main", "message": " - Chat Service"}
+{"time": "2024-12-17 01:26:47,003", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_chat_message to event 'chat_message'."}
+{"time": "2024-12-17 01:26:47,004", "level": "INFO", "name": "ChatService", "message": "ChatService started and subscribed to 'chat_message' event."}
+{"time": "2024-12-17 01:26:47,004", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_user_move_request to event 'user_move_request'."}
+{"time": "2024-12-17 01:26:47,005", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_user_turn_request to event 'user_turn_request'."}
+{"time": "2024-12-17 01:26:47,005", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_create_account to event 'user_account_create_request'."}
+{"time": "2024-12-17 01:26:47,006", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_login_request to event 'user_account_login_request'."}
+{"time": "2024-12-17 01:26:47,006", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_logout_request to event 'user_account_logout_request'."}
+{"time": "2024-12-17 01:26:47,007", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_map_create_request to event 'map_create_request'."}
+{"time": "2024-12-17 01:26:47,007", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_map_remove_request to event 'map_remove_request'."}
+{"time": "2024-12-17 01:26:47,007", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_map_tile_add_request to event 'map_tile_add_request'."}
+{"time": "2024-12-17 01:26:47,008", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_map_tile_remove_request to event 'map_tile_remove_request'."}
+{"time": "2024-12-17 01:26:47,008", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_map_zone_add_request to event 'map_zone_add_request'."}
+{"time": "2024-12-17 01:26:47,009", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_map_zone_remove_request to event 'map_zone_remove_request'."}
+{"time": "2024-12-17 01:26:47,009", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_map_join_request to event 'map_join_request'."}
+{"time": "2024-12-17 01:26:47,010", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_map_leave_request to event 'map_leave_request'."}
+{"time": "2024-12-17 01:26:47,010", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_map_physics_update_request to event 'map_physics_update_request'."}
+{"time": "2024-12-17 01:26:47,010", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_ai_spawn_request to event 'ai_spawn_request'."}
+{"time": "2024-12-17 01:26:47,011", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_ai_remove_request to event 'ai_remove_request'."}
+{"time": "2024-12-17 01:26:47,014", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_ai_move_request to event 'ai_move_request'."}
+{"time": "2024-12-17 01:26:47,014", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_ai_update_health_request to event 'ai_update_health_request'."}
+{"time": "2024-12-17 01:26:47,015", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_role_assign_request to event 'role_assign_request'."}
+{"time": "2024-12-17 01:26:47,015", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_role_remove_request to event 'role_remove_request'."}
+{"time": "2024-12-17 01:26:47,015", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_apply_gravity_request to event 'physics_apply_gravity_request'."}
+{"time": "2024-12-17 01:26:47,016", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_jump_request to event 'physics_jump_request'."}
+{"time": "2024-12-17 01:26:47,016", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_apply_force_request to event 'physics_apply_force_request'."}
+{"time": "2024-12-17 01:26:47,017", "level": "DEBUG", "name": "user_registry", "message": "Retrieved all usernames: ['admin']"}
+{"time": "2024-12-17 01:26:47,018", "level": "INFO", "name": "map_registry", "message": "Retrieved list of all map names: ['Main']"}
+{"time": "2024-12-17 01:26:47,018", "level": "INFO", "name": "NetworkServer", "message": "Starting NetworkServer on localhost:33288 with SSL/TLS."}
+{"time": "2024-12-17 01:26:47,025", "level": "INFO", "name": "NetworkServer", "message": "NetworkServer started and accepting connections."}
+{"time": "2024-12-17 01:26:47,025", "level": "INFO", "name": "Main", "message": "My Awesome Audio Game Server version 1.0.0 started."}
+{"time": "2024-12-17 01:26:47,026", "level": "INFO", "name": "Main", "message": "Server running on localhost:33288. Type 'exit' in console to shut down."}
+{"time": "2024-12-17 01:30:55,219", "level": "INFO", "name": "ConsoleInterface", "message": "Shutdown command received. Stopping the server..."}
+{"time": "2024-12-17 01:30:55,221", "level": "INFO", "name": "ConsoleInterface", "message": "Stopping console interface..."}
+{"time": "2024-12-17 01:30:55,222", "level": "DEBUG", "name": "ConsoleInterface", "message": "User input task cancelled."}
+{"time": "2024-12-17 01:30:55,223", "level": "INFO", "name": "ConsoleInterface", "message": "Console interface stopped."}
+{"time": "2024-12-17 01:30:55,225", "level": "INFO", "name": "NetworkServer", "message": "Stopping NetworkServer..."}
+{"time": "2024-12-17 01:30:55,226", "level": "INFO", "name": "NetworkServer", "message": "NetworkServer stopped."}
+{"time": "2024-12-17 01:30:55,227", "level": "INFO", "name": "Main", "message": "Server shut down complete."}
+{"time": "2024-12-17 01:30:57,768", "level": "INFO", "name": "Main", "message": "Loading server components..."}
+{"time": "2024-12-17 01:30:57,770", "level": "DEBUG", "name": "SSLManager", "message": "SSLManager initialized with cert_file='keys/cert.pem', key_file='keys/key.pem'"}
+{"time": "2024-12-17 01:30:57,784", "level": "INFO", "name": "SSLManager", "message": "SSL enabled with provided (or self-signed) certificate and key."}
+{"time": "2024-12-17 01:30:57,785", "level": "DEBUG", "name": "SecurityManager", "message": "SecurityManager initialized with jwt_algorithm='HS256', jwt_exp_delta=3600"}
+{"time": "2024-12-17 01:30:57,803", "level": "DEBUG", "name": "UserService", "message": "UserService initialized."}
+{"time": "2024-12-17 01:30:57,805", "level": "DEBUG", "name": "ChatService", "message": "ChatService initialized."}
+{"time": "2024-12-17 01:30:57,817", "level": "INFO", "name": "Main", "message": "Components loaded:"}
+{"time": "2024-12-17 01:30:57,818", "level": "INFO", "name": "Main", "message": " - Network"}
+{"time": "2024-12-17 01:30:57,827", "level": "INFO", "name": "Main", "message": " - User Service"}
+{"time": "2024-12-17 01:30:57,828", "level": "INFO", "name": "Main", "message": " - Map Service"}
+{"time": "2024-12-17 01:30:57,840", "level": "INFO", "name": "Main", "message": " - AI Service"}
+{"time": "2024-12-17 01:30:57,841", "level": "INFO", "name": "Main", "message": " - Role Service"}
+{"time": "2024-12-17 01:30:57,849", "level": "INFO", "name": "Main", "message": " - Physics Service"}
+{"time": "2024-12-17 01:30:57,851", "level": "INFO", "name": "Main", "message": " - Movement Service"}
+{"time": "2024-12-17 01:30:57,867", "level": "INFO", "name": "Main", "message": " - Chat Service"}
+{"time": "2024-12-17 01:30:57,868", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_chat_message to event 'chat_message'."}
+{"time": "2024-12-17 01:30:57,877", "level": "INFO", "name": "ChatService", "message": "ChatService started and subscribed to 'chat_message' event."}
+{"time": "2024-12-17 01:30:57,879", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_user_move_request to event 'user_move_request'."}
+{"time": "2024-12-17 01:30:57,891", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_user_turn_request to event 'user_turn_request'."}
+{"time": "2024-12-17 01:30:57,909", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_create_account to event 'user_account_create_request'."}
+{"time": "2024-12-17 01:30:57,911", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_login_request to event 'user_account_login_request'."}
+{"time": "2024-12-17 01:30:57,912", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_logout_request to event 'user_account_logout_request'."}
+{"time": "2024-12-17 01:30:57,932", "level": "INFO", "name": "UserService", "message": "UserService subscribed to user account events."}
+{"time": "2024-12-17 01:30:57,939", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_map_create_request to event 'map_create_request'."}
+{"time": "2024-12-17 01:30:57,951", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_map_remove_request to event 'map_remove_request'."}
+{"time": "2024-12-17 01:30:57,952", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_map_tile_add_request to event 'map_tile_add_request'."}
+{"time": "2024-12-17 01:30:57,968", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_map_tile_remove_request to event 'map_tile_remove_request'."}
+{"time": "2024-12-17 01:30:57,970", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_map_zone_add_request to event 'map_zone_add_request'."}
+{"time": "2024-12-17 01:30:57,983", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_map_zone_remove_request to event 'map_zone_remove_request'."}
+{"time": "2024-12-17 01:30:57,988", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_map_join_request to event 'map_join_request'."}
+{"time": "2024-12-17 01:30:57,989", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_map_leave_request to event 'map_leave_request'."}
+{"time": "2024-12-17 01:30:58,006", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_map_physics_update_request to event 'map_physics_update_request'."}
+{"time": "2024-12-17 01:30:58,007", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_ai_spawn_request to event 'ai_spawn_request'."}
+{"time": "2024-12-17 01:30:58,011", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_ai_remove_request to event 'ai_remove_request'."}
+{"time": "2024-12-17 01:30:58,012", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_ai_move_request to event 'ai_move_request'."}
+{"time": "2024-12-17 01:30:58,032", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_ai_update_health_request to event 'ai_update_health_request'."}
+{"time": "2024-12-17 01:30:58,046", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_role_assign_request to event 'role_assign_request'."}
+{"time": "2024-12-17 01:30:58,047", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_role_remove_request to event 'role_remove_request'."}
+{"time": "2024-12-17 01:30:58,054", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_apply_gravity_request to event 'physics_apply_gravity_request'."}
+{"time": "2024-12-17 01:30:58,058", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_jump_request to event 'physics_jump_request'."}
+{"time": "2024-12-17 01:30:58,059", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_apply_force_request to event 'physics_apply_force_request'."}
+{"time": "2024-12-17 01:30:58,076", "level": "DEBUG", "name": "user_registry", "message": "Retrieved all usernames: ['admin']"}
+{"time": "2024-12-17 01:30:58,078", "level": "INFO", "name": "map_registry", "message": "Retrieved list of all map names: ['Main']"}
+{"time": "2024-12-17 01:30:58,091", "level": "INFO", "name": "NetworkServer", "message": "Starting NetworkServer on localhost:33288 with SSL/TLS."}
+{"time": "2024-12-17 01:30:58,120", "level": "INFO", "name": "NetworkServer", "message": "NetworkServer started and accepting connections."}
+{"time": "2024-12-17 01:30:58,122", "level": "INFO", "name": "Main", "message": "My Awesome Audio Game Server version 1.0.0 started."}
+{"time": "2024-12-17 01:30:58,127", "level": "INFO", "name": "Main", "message": "Server running on localhost:33288. Type 'exit' in console to shut down."}
+{"time": "2024-12-17 01:32:27,964", "level": "INFO", "name": "ConsoleInterface", "message": "Shutdown command received. Stopping the server..."}
+{"time": "2024-12-17 01:32:27,966", "level": "INFO", "name": "ConsoleInterface", "message": "Stopping console interface..."}
+{"time": "2024-12-17 01:32:27,969", "level": "DEBUG", "name": "ConsoleInterface", "message": "User input task cancelled."}
+{"time": "2024-12-17 01:32:27,978", "level": "INFO", "name": "ConsoleInterface", "message": "Console interface stopped."}
+{"time": "2024-12-17 01:32:27,979", "level": "INFO", "name": "NetworkServer", "message": "Stopping NetworkServer..."}
+{"time": "2024-12-17 01:32:27,980", "level": "INFO", "name": "NetworkServer", "message": "NetworkServer stopped."}
+{"time": "2024-12-17 01:32:27,981", "level": "INFO", "name": "Main", "message": "Server shut down complete."}
+{"time": "2024-12-17 01:37:07,221", "level": "INFO", "name": "Main", "message": "Loading server components..."}
+{"time": "2024-12-17 01:37:07,223", "level": "DEBUG", "name": "SSLManager", "message": "SSLManager initialized with cert_file='keys/cert.pem', key_file='keys/key.pem'"}
+{"time": "2024-12-17 01:37:07,228", "level": "INFO", "name": "SSLManager", "message": "SSL enabled with provided (or self-signed) certificate and key."}
+{"time": "2024-12-17 01:37:07,234", "level": "DEBUG", "name": "SecurityManager", "message": "SecurityManager initialized with jwt_algorithm='HS256', jwt_exp_delta=3600"}
+{"time": "2024-12-17 01:37:07,235", "level": "DEBUG", "name": "MapService", "message": "MapService initialized."}
+{"time": "2024-12-17 01:37:07,244", "level": "DEBUG", "name": "UserService", "message": "UserService initialized."}
+{"time": "2024-12-17 01:37:07,247", "level": "DEBUG", "name": "ChatService", "message": "ChatService initialized."}
+{"time": "2024-12-17 01:37:07,266", "level": "INFO", "name": "Main", "message": "Components loaded:"}
+{"time": "2024-12-17 01:37:07,267", "level": "INFO", "name": "Main", "message": " - Network"}
+{"time": "2024-12-17 01:37:07,280", "level": "INFO", "name": "Main", "message": " - User Service"}
+{"time": "2024-12-17 01:37:07,280", "level": "INFO", "name": "Main", "message": " - Map Service"}
+{"time": "2024-12-17 01:37:07,281", "level": "INFO", "name": "Main", "message": " - AI Service"}
+{"time": "2024-12-17 01:37:07,283", "level": "INFO", "name": "Main", "message": " - Role Service"}
+{"time": "2024-12-17 01:37:07,283", "level": "INFO", "name": "Main", "message": " - Physics Service"}
+{"time": "2024-12-17 01:37:07,293", "level": "INFO", "name": "Main", "message": " - Movement Service"}
+{"time": "2024-12-17 01:37:07,294", "level": "INFO", "name": "Main", "message": " - Chat Service"}
+{"time": "2024-12-17 01:37:07,311", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_chat_message to event 'chat_message'."}
+{"time": "2024-12-17 01:37:07,312", "level": "INFO", "name": "ChatService", "message": "ChatService started and subscribed to 'chat_message' event."}
+{"time": "2024-12-17 01:37:07,315", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_user_move_request to event 'user_move_request'."}
+{"time": "2024-12-17 01:37:07,316", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_user_turn_request to event 'user_turn_request'."}
+{"time": "2024-12-17 01:37:07,319", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_create_account to event 'user_account_create_request'."}
+{"time": "2024-12-17 01:37:07,335", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_login_request to event 'user_account_login_request'."}
+{"time": "2024-12-17 01:37:07,336", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_logout_request to event 'user_account_logout_request'."}
+{"time": "2024-12-17 01:37:07,351", "level": "INFO", "name": "UserService", "message": "UserService subscribed to user account events."}
+{"time": "2024-12-17 01:37:07,353", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_map_create_request to event 'map_create_request'."}
+{"time": "2024-12-17 01:37:07,379", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_map_remove_request to event 'map_remove_request'."}
+{"time": "2024-12-17 01:37:07,380", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_map_tile_add_request to event 'map_tile_add_request'."}
+{"time": "2024-12-17 01:37:07,399", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_map_tile_remove_request to event 'map_tile_remove_request'."}
+{"time": "2024-12-17 01:37:07,401", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_map_zone_add_request to event 'map_zone_add_request'."}
+{"time": "2024-12-17 01:37:07,417", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_map_zone_remove_request to event 'map_zone_remove_request'."}
+{"time": "2024-12-17 01:37:07,418", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_map_join_request to event 'map_join_request'."}
+{"time": "2024-12-17 01:37:07,426", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_map_leave_request to event 'map_leave_request'."}
+{"time": "2024-12-17 01:37:07,428", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_map_physics_update_request to event 'map_physics_update_request'."}
+{"time": "2024-12-17 01:37:07,445", "level": "INFO", "name": "MapService", "message": "MapService subscribed to map-related events."}
+{"time": "2024-12-17 01:37:07,446", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_ai_spawn_request to event 'ai_spawn_request'."}
+{"time": "2024-12-17 01:37:07,458", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_ai_remove_request to event 'ai_remove_request'."}
+{"time": "2024-12-17 01:37:07,459", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_ai_move_request to event 'ai_move_request'."}
+{"time": "2024-12-17 01:37:07,476", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_ai_update_health_request to event 'ai_update_health_request'."}
+{"time": "2024-12-17 01:37:07,478", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_role_assign_request to event 'role_assign_request'."}
+{"time": "2024-12-17 01:37:07,498", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_role_remove_request to event 'role_remove_request'."}
+{"time": "2024-12-17 01:37:07,500", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_apply_gravity_request to event 'physics_apply_gravity_request'."}
+{"time": "2024-12-17 01:37:07,521", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_jump_request to event 'physics_jump_request'."}
+{"time": "2024-12-17 01:37:07,523", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_apply_force_request to event 'physics_apply_force_request'."}
+{"time": "2024-12-17 01:37:07,535", "level": "DEBUG", "name": "user_registry", "message": "Retrieved all usernames: ['admin']"}
+{"time": "2024-12-17 01:37:07,536", "level": "INFO", "name": "map_registry", "message": "Retrieved list of all map names: ['Main']"}
+{"time": "2024-12-17 01:37:07,551", "level": "INFO", "name": "NetworkServer", "message": "Starting NetworkServer on localhost:33288 with SSL/TLS."}
+{"time": "2024-12-17 01:37:07,574", "level": "INFO", "name": "NetworkServer", "message": "NetworkServer started and accepting connections."}
+{"time": "2024-12-17 01:37:07,575", "level": "INFO", "name": "Main", "message": "My Awesome Audio Game Server version 1.0.0 started."}
+{"time": "2024-12-17 01:37:07,583", "level": "INFO", "name": "Main", "message": "Server running on localhost:33288. Type 'exit' in console to shut down."}
+{"time": "2024-12-17 01:41:00,986", "level": "INFO", "name": "ConsoleInterface", "message": "Shutdown command received. Stopping the server..."}
+{"time": "2024-12-17 01:41:00,989", "level": "INFO", "name": "ConsoleInterface", "message": "Stopping console interface..."}
+{"time": "2024-12-17 01:41:00,998", "level": "DEBUG", "name": "ConsoleInterface", "message": "User input task cancelled."}
+{"time": "2024-12-17 01:41:01,000", "level": "INFO", "name": "ConsoleInterface", "message": "Console interface stopped."}
+{"time": "2024-12-17 01:41:01,001", "level": "INFO", "name": "NetworkServer", "message": "Stopping NetworkServer..."}
+{"time": "2024-12-17 01:41:01,003", "level": "INFO", "name": "NetworkServer", "message": "NetworkServer stopped."}
+{"time": "2024-12-17 01:41:01,013", "level": "INFO", "name": "Main", "message": "Server shut down complete."}
+{"time": "2024-12-17 01:41:09,460", "level": "INFO", "name": "Main", "message": "Loading server components..."}
+{"time": "2024-12-17 01:41:09,462", "level": "DEBUG", "name": "SSLManager", "message": "SSLManager initialized with cert_file='keys/cert.pem', key_file='keys/key.pem'"}
+{"time": "2024-12-17 01:41:09,464", "level": "INFO", "name": "SSLManager", "message": "SSL enabled with provided (or self-signed) certificate and key."}
+{"time": "2024-12-17 01:41:09,466", "level": "DEBUG", "name": "SecurityManager", "message": "SecurityManager initialized with jwt_algorithm='HS256', jwt_exp_delta=3600"}
+{"time": "2024-12-17 01:41:09,467", "level": "DEBUG", "name": "MapService", "message": "MapService initialized."}
+{"time": "2024-12-17 01:41:09,468", "level": "DEBUG", "name": "UserService", "message": "UserService initialized."}
+{"time": "2024-12-17 01:41:09,469", "level": "DEBUG", "name": "PhysicsService", "message": "PhysicsService initialized."}
+{"time": "2024-12-17 01:41:09,469", "level": "DEBUG", "name": "ChatService", "message": "ChatService initialized."}
+{"time": "2024-12-17 01:41:09,470", "level": "INFO", "name": "Main", "message": "Components loaded:"}
+{"time": "2024-12-17 01:41:09,470", "level": "INFO", "name": "Main", "message": " - Network"}
+{"time": "2024-12-17 01:41:09,471", "level": "INFO", "name": "Main", "message": " - User Service"}
+{"time": "2024-12-17 01:41:09,471", "level": "INFO", "name": "Main", "message": " - Map Service"}
+{"time": "2024-12-17 01:41:09,472", "level": "INFO", "name": "Main", "message": " - AI Service"}
+{"time": "2024-12-17 01:41:09,473", "level": "INFO", "name": "Main", "message": " - Role Service"}
+{"time": "2024-12-17 01:41:09,473", "level": "INFO", "name": "Main", "message": " - Physics Service"}
+{"time": "2024-12-17 01:41:09,474", "level": "INFO", "name": "Main", "message": " - Movement Service"}
+{"time": "2024-12-17 01:41:09,474", "level": "INFO", "name": "Main", "message": " - Chat Service"}
+{"time": "2024-12-17 01:41:09,475", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_chat_message to event 'chat_message'."}
+{"time": "2024-12-17 01:41:09,475", "level": "INFO", "name": "ChatService", "message": "ChatService started and subscribed to 'chat_message' event."}
+{"time": "2024-12-17 01:41:09,476", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_user_move_request to event 'user_move_request'."}
+{"time": "2024-12-17 01:41:09,476", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_user_turn_request to event 'user_turn_request'."}
+{"time": "2024-12-17 01:41:09,477", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_create_account to event 'user_account_create_request'."}
+{"time": "2024-12-17 01:41:09,477", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_login_request to event 'user_account_login_request'."}
+{"time": "2024-12-17 01:41:09,478", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_logout_request to event 'user_account_logout_request'."}
+{"time": "2024-12-17 01:41:09,478", "level": "INFO", "name": "UserService", "message": "UserService subscribed to user account events."}
+{"time": "2024-12-17 01:41:09,479", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_map_create_request to event 'map_create_request'."}
+{"time": "2024-12-17 01:41:09,479", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_map_remove_request to event 'map_remove_request'."}
+{"time": "2024-12-17 01:41:09,479", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_map_tile_add_request to event 'map_tile_add_request'."}
+{"time": "2024-12-17 01:41:09,480", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_map_tile_remove_request to event 'map_tile_remove_request'."}
+{"time": "2024-12-17 01:41:09,480", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_map_zone_add_request to event 'map_zone_add_request'."}
+{"time": "2024-12-17 01:41:09,481", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_map_zone_remove_request to event 'map_zone_remove_request'."}
+{"time": "2024-12-17 01:41:09,484", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_map_join_request to event 'map_join_request'."}
+{"time": "2024-12-17 01:41:09,485", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_map_leave_request to event 'map_leave_request'."}
+{"time": "2024-12-17 01:41:09,485", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_map_physics_update_request to event 'map_physics_update_request'."}
+{"time": "2024-12-17 01:41:09,486", "level": "INFO", "name": "MapService", "message": "MapService subscribed to map-related events."}
+{"time": "2024-12-17 01:41:09,487", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_ai_spawn_request to event 'ai_spawn_request'."}
+{"time": "2024-12-17 01:41:09,488", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_ai_remove_request to event 'ai_remove_request'."}
+{"time": "2024-12-17 01:41:09,489", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_ai_move_request to event 'ai_move_request'."}
+{"time": "2024-12-17 01:41:09,489", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_ai_update_health_request to event 'ai_update_health_request'."}
+{"time": "2024-12-17 01:41:09,490", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_role_assign_request to event 'role_assign_request'."}
+{"time": "2024-12-17 01:41:09,490", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_role_remove_request to event 'role_remove_request'."}
+{"time": "2024-12-17 01:41:09,491", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_apply_gravity_request to event 'physics_apply_gravity_request'."}
+{"time": "2024-12-17 01:41:09,491", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_jump_request to event 'physics_jump_request'."}
+{"time": "2024-12-17 01:41:09,492", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_apply_force_request to event 'physics_apply_force_request'."}
+{"time": "2024-12-17 01:41:09,492", "level": "INFO", "name": "PhysicsService", "message": "PhysicsService subscribed to physics-related events."}
+{"time": "2024-12-17 01:41:09,492", "level": "DEBUG", "name": "user_registry", "message": "Retrieved all usernames: ['admin']"}
+{"time": "2024-12-17 01:41:09,494", "level": "INFO", "name": "map_registry", "message": "Retrieved list of all map names: ['Main']"}
+{"time": "2024-12-17 01:41:09,495", "level": "INFO", "name": "NetworkServer", "message": "Starting NetworkServer on localhost:33288 with SSL/TLS."}
+{"time": "2024-12-17 01:41:09,502", "level": "INFO", "name": "NetworkServer", "message": "NetworkServer started and accepting connections."}
+{"time": "2024-12-17 01:41:09,502", "level": "INFO", "name": "Main", "message": "My Awesome Audio Game Server version 1.0.0 started."}
+{"time": "2024-12-17 01:41:09,503", "level": "INFO", "name": "Main", "message": "Server running on localhost:33288. Type 'exit' in console to shut down."}
+{"time": "2024-12-17 01:41:23,844", "level": "INFO", "name": "ConsoleInterface", "message": "Shutdown command received. Stopping the server..."}
+{"time": "2024-12-17 01:41:23,847", "level": "INFO", "name": "ConsoleInterface", "message": "Stopping console interface..."}
+{"time": "2024-12-17 01:41:23,858", "level": "DEBUG", "name": "ConsoleInterface", "message": "User input task cancelled."}
+{"time": "2024-12-17 01:41:23,859", "level": "INFO", "name": "ConsoleInterface", "message": "Console interface stopped."}
+{"time": "2024-12-17 01:41:23,860", "level": "INFO", "name": "NetworkServer", "message": "Stopping NetworkServer..."}
+{"time": "2024-12-17 01:41:23,861", "level": "INFO", "name": "NetworkServer", "message": "NetworkServer stopped."}
+{"time": "2024-12-17 01:41:23,873", "level": "INFO", "name": "Main", "message": "Server shut down complete."}
+{"time": "2024-12-17 01:45:43,825", "level": "INFO", "name": "Main", "message": "Loading server components..."}
+{"time": "2024-12-17 01:45:43,827", "level": "DEBUG", "name": "SSLManager", "message": "SSLManager initialized with cert_file='keys/cert.pem', key_file='keys/key.pem'"}
+{"time": "2024-12-17 01:45:43,829", "level": "INFO", "name": "SSLManager", "message": "SSL enabled with provided (or self-signed) certificate and key."}
+{"time": "2024-12-17 01:45:43,830", "level": "DEBUG", "name": "SecurityManager", "message": "SecurityManager initialized with jwt_algorithm='HS256', jwt_exp_delta=3600"}
+{"time": "2024-12-17 01:45:43,831", "level": "DEBUG", "name": "MapService", "message": "MapService initialized."}
+{"time": "2024-12-17 01:45:43,832", "level": "DEBUG", "name": "UserService", "message": "UserService initialized."}
+{"time": "2024-12-17 01:45:43,833", "level": "DEBUG", "name": "PhysicsService", "message": "PhysicsService initialized."}
+{"time": "2024-12-17 01:45:43,833", "level": "DEBUG", "name": "ChatService", "message": "ChatService initialized."}
+{"time": "2024-12-17 01:45:43,834", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_chat_message to event 'chat_message'."}
+{"time": "2024-12-17 01:45:43,834", "level": "INFO", "name": "ChatService", "message": "ChatService started and subscribed to 'chat_message' event."}
+{"time": "2024-12-17 01:45:43,835", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_user_move_request to event 'user_move_request'."}
+{"time": "2024-12-17 01:45:43,835", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_user_turn_request to event 'user_turn_request'."}
+{"time": "2024-12-17 01:45:43,836", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_create_account to event 'user_account_create_request'."}
+{"time": "2024-12-17 01:45:43,837", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_login_request to event 'user_account_login_request'."}
+{"time": "2024-12-17 01:45:43,837", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_logout_request to event 'user_account_logout_request'."}
+{"time": "2024-12-17 01:45:43,838", "level": "INFO", "name": "UserService", "message": "UserService subscribed to user account events."}
+{"time": "2024-12-17 01:45:43,839", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_map_create_request to event 'map_create_request'."}
+{"time": "2024-12-17 01:45:43,839", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_map_remove_request to event 'map_remove_request'."}
+{"time": "2024-12-17 01:45:43,840", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_map_tile_add_request to event 'map_tile_add_request'."}
+{"time": "2024-12-17 01:45:43,840", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_map_tile_remove_request to event 'map_tile_remove_request'."}
+{"time": "2024-12-17 01:45:43,841", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_map_zone_add_request to event 'map_zone_add_request'."}
+{"time": "2024-12-17 01:45:43,841", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_map_zone_remove_request to event 'map_zone_remove_request'."}
+{"time": "2024-12-17 01:45:43,842", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_map_join_request to event 'map_join_request'."}
+{"time": "2024-12-17 01:45:43,845", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_map_leave_request to event 'map_leave_request'."}
+{"time": "2024-12-17 01:45:43,845", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_map_physics_update_request to event 'map_physics_update_request'."}
+{"time": "2024-12-17 01:45:43,846", "level": "INFO", "name": "MapService", "message": "MapService subscribed to map-related events."}
+{"time": "2024-12-17 01:45:43,847", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_ai_spawn_request to event 'ai_spawn_request'."}
+{"time": "2024-12-17 01:45:43,847", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_ai_remove_request to event 'ai_remove_request'."}
+{"time": "2024-12-17 01:45:43,848", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_ai_move_request to event 'ai_move_request'."}
+{"time": "2024-12-17 01:45:43,848", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_ai_update_health_request to event 'ai_update_health_request'."}
+{"time": "2024-12-17 01:45:43,849", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_role_assign_request to event 'role_assign_request'."}
+{"time": "2024-12-17 01:45:43,849", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_role_remove_request to event 'role_remove_request'."}
+{"time": "2024-12-17 01:45:43,849", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_apply_gravity_request to event 'physics_apply_gravity_request'."}
+{"time": "2024-12-17 01:45:43,850", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_jump_request to event 'physics_jump_request'."}
+{"time": "2024-12-17 01:45:43,850", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener handle_apply_force_request to event 'physics_apply_force_request'."}
+{"time": "2024-12-17 01:45:43,851", "level": "INFO", "name": "PhysicsService", "message": "PhysicsService subscribed to physics-related events."}
+{"time": "2024-12-17 01:45:43,852", "level": "DEBUG", "name": "user_registry", "message": "Retrieved all usernames: ['admin']"}
+{"time": "2024-12-17 01:45:43,852", "level": "INFO", "name": "map_registry", "message": "Retrieved list of all map names: ['Main']"}
+{"time": "2024-12-17 01:45:43,853", "level": "INFO", "name": "NetworkServer", "message": "Starting NetworkServer on localhost:33288 with SSL/TLS."}
+{"time": "2024-12-17 01:45:43,860", "level": "INFO", "name": "NetworkServer", "message": "NetworkServer started and accepting connections."}
+{"time": "2024-12-17 01:45:43,860", "level": "INFO", "name": "Main", "message": "My Awesome Audio Game Server version 1.0.0 started."}
+{"time": "2024-12-17 01:45:43,861", "level": "INFO", "name": "Main", "message": "Server running on localhost:33288. Type 'exit' in console to shut down."}
+{"time": "2024-12-17 01:46:12,292", "level": "INFO", "name": "Main", "message": "Logging reconfigured."}
+{"time": "2024-12-17 01:46:12,294", "level": "INFO", "name": "ConsoleInterface", "message": "Console interface logging reconfigured."}
+{"time": "2024-12-17 01:46:12,294", "level": "INFO", "name": "ConsoleInterface", "message": "Debug logging turned off."}
+{"time": "2024-12-17 01:46:14,459", "level": "INFO", "name": "ConsoleInterface", "message": "Shutdown command received. Stopping the server..."}
+{"time": "2024-12-17 01:46:14,462", "level": "INFO", "name": "ConsoleInterface", "message": "Stopping console interface..."}
+{"time": "2024-12-17 01:46:14,463", "level": "INFO", "name": "ConsoleInterface", "message": "Console interface stopped."}
+{"time": "2024-12-17 01:46:14,476", "level": "INFO", "name": "NetworkServer", "message": "Stopping NetworkServer..."}
+{"time": "2024-12-17 01:46:14,487", "level": "INFO", "name": "NetworkServer", "message": "NetworkServer stopped."}
+{"time": "2024-12-17 01:46:14,490", "level": "INFO", "name": "Main", "message": "Server shut down complete."}
+{"time": "2024-12-17 01:46:22,349", "level": "INFO", "name": "Main", "message": "Loading server components..."}
+{"time": "2024-12-17 01:46:22,352", "level": "INFO", "name": "SSLManager", "message": "SSL enabled with provided (or self-signed) certificate and key."}
+{"time": "2024-12-17 01:46:22,354", "level": "INFO", "name": "ChatService", "message": "ChatService started and subscribed to 'chat_message' event."}
+{"time": "2024-12-17 01:46:22,354", "level": "INFO", "name": "UserService", "message": "UserService subscribed to user account events."}
+{"time": "2024-12-17 01:46:22,365", "level": "INFO", "name": "MapService", "message": "MapService subscribed to map-related events."}
+{"time": "2024-12-17 01:46:22,367", "level": "INFO", "name": "PhysicsService", "message": "PhysicsService subscribed to physics-related events."}
+{"time": "2024-12-17 01:46:22,368", "level": "INFO", "name": "map_registry", "message": "Retrieved list of all map names: ['Main']"}
+{"time": "2024-12-17 01:46:22,383", "level": "INFO", "name": "NetworkServer", "message": "Starting NetworkServer on localhost:33288 with SSL/TLS."}
+{"time": "2024-12-17 01:46:22,409", "level": "INFO", "name": "NetworkServer", "message": "NetworkServer started and accepting connections."}
+{"time": "2024-12-17 01:46:22,409", "level": "INFO", "name": "Main", "message": "My Awesome Audio Game Server version 1.0.0 started."}
+{"time": "2024-12-17 01:46:22,417", "level": "INFO", "name": "Main", "message": "Server running on localhost:33288. Type 'exit' in console to shut down."}
+{"time": "2024-12-17 01:47:59,089", "level": "INFO", "name": "ConsoleInterface", "message": "Shutdown command received. Stopping the server..."}
+{"time": "2024-12-17 01:47:59,090", "level": "INFO", "name": "ConsoleInterface", "message": "Stopping console interface..."}
+{"time": "2024-12-17 01:47:59,102", "level": "INFO", "name": "ConsoleInterface", "message": "Console interface stopped."}
+{"time": "2024-12-17 01:47:59,105", "level": "INFO", "name": "NetworkServer", "message": "Stopping NetworkServer..."}
+{"time": "2024-12-17 01:47:59,106", "level": "INFO", "name": "NetworkServer", "message": "NetworkServer stopped."}
+{"time": "2024-12-17 01:47:59,107", "level": "INFO", "name": "Main", "message": "Server shut down complete."}
+{"time": "2024-12-17 01:54:50,013", "level": "INFO", "name": "Main", "message": "Loading server components..."}
+{"time": "2024-12-17 01:54:50,019", "level": "INFO", "name": "SSLManager", "message": "SSL enabled with provided (or self-signed) certificate and key."}
+{"time": "2024-12-17 01:54:50,021", "level": "INFO", "name": "ChatService", "message": "ChatService started and subscribed to 'chat_message' event."}
+{"time": "2024-12-17 01:54:50,029", "level": "INFO", "name": "UserService", "message": "UserService subscribed to user account events."}
+{"time": "2024-12-17 01:54:50,031", "level": "INFO", "name": "MapService", "message": "MapService subscribed to map-related events."}
+{"time": "2024-12-17 01:54:50,042", "level": "INFO", "name": "AIService", "message": "AIService subscribed to AI-related events."}
+{"time": "2024-12-17 01:54:50,042", "level": "INFO", "name": "RoleService", "message": "RoleService subscribed to role-related events."}
+{"time": "2024-12-17 01:54:50,052", "level": "INFO", "name": "PhysicsService", "message": "PhysicsService subscribed to physics-related events."}
+{"time": "2024-12-17 01:54:50,070", "level": "INFO", "name": "map_registry", "message": "Retrieved list of all map names: ['Main']"}
+{"time": "2024-12-17 01:54:50,071", "level": "INFO", "name": "NetworkServer", "message": "Starting NetworkServer on localhost:33288 with SSL/TLS."}
+{"time": "2024-12-17 01:54:50,084", "level": "INFO", "name": "NetworkServer", "message": "NetworkServer started and accepting connections."}
+{"time": "2024-12-17 01:54:50,085", "level": "INFO", "name": "Main", "message": "My Awesome Audio Game Server version 1.0.0 started."}
+{"time": "2024-12-17 01:54:50,096", "level": "INFO", "name": "Main", "message": "Server running on localhost:33288. Type 'exit' in console to shut down."}
+{"time": "2024-12-17 01:55:14,331", "level": "INFO", "name": "ConsoleInterface", "message": "Shutdown command received. Stopping the server..."}
+{"time": "2024-12-17 01:55:14,333", "level": "INFO", "name": "ConsoleInterface", "message": "Stopping console interface..."}
+{"time": "2024-12-17 01:55:14,335", "level": "INFO", "name": "ConsoleInterface", "message": "Console interface stopped."}
+{"time": "2024-12-17 01:55:14,346", "level": "INFO", "name": "NetworkServer", "message": "Stopping NetworkServer..."}
+{"time": "2024-12-17 01:55:14,347", "level": "INFO", "name": "NetworkServer", "message": "NetworkServer stopped."}
+{"time": "2024-12-17 01:55:14,348", "level": "INFO", "name": "Main", "message": "Server shut down complete."}
+{"time": "2024-12-17 01:55:48,449", "level": "INFO", "name": "Main", "message": "Loading server components..."}
+{"time": "2024-12-17 01:55:48,450", "level": "WARNING", "name": "SSLManager", "message": "SSL certificates not found. Generating a self-signed certificate..."}
+{"time": "2024-12-17 01:55:48,484", "level": "INFO", "name": "SSLManager", "message": "Self-signed SSL certificate and key generated successfully."}
+{"time": "2024-12-17 01:55:48,487", "level": "INFO", "name": "SSLManager", "message": "SSL enabled with provided (or self-signed) certificate and key."}
+{"time": "2024-12-17 01:55:48,489", "level": "INFO", "name": "ChatService", "message": "ChatService started and subscribed to 'chat_message' event."}
+{"time": "2024-12-17 01:55:48,498", "level": "INFO", "name": "UserService", "message": "UserService subscribed to user account events."}
+{"time": "2024-12-17 01:55:48,499", "level": "INFO", "name": "MapService", "message": "MapService subscribed to map-related events."}
+{"time": "2024-12-17 01:55:48,499", "level": "INFO", "name": "AIService", "message": "AIService subscribed to AI-related events."}
+{"time": "2024-12-17 01:55:48,500", "level": "INFO", "name": "RoleService", "message": "RoleService subscribed to role-related events."}
+{"time": "2024-12-17 01:55:48,500", "level": "INFO", "name": "PhysicsService", "message": "PhysicsService subscribed to physics-related events."}
+{"time": "2024-12-17 01:55:48,501", "level": "INFO", "name": "EventDispatcher", "message": "Dispatching event 'user_account_create_request' with data: {'client_id': 'server_startup', 'message': {'message_type': 'user_account_create_request', 'username': 'admin', 'password': 'adminpass', 'role': 'developer', 'current_map': 'Main'}}"}
+{"time": "2024-12-17 01:55:48,657", "level": "INFO", "name": "user_registry", "message": "Account created successfully for username: admin"}
+{"time": "2024-12-17 01:55:48,658", "level": "INFO", "name": "UserService", "message": "Account created successfully for username='admin'."}
+{"time": "2024-12-17 01:55:48,671", "level": "INFO", "name": "EventDispatcher", "message": "Dispatching event 'user_account_create_ok' with data: {'client_id': 'server_startup', 'message': {'username': 'admin', 'role': 'developer'}}"}
+{"time": "2024-12-17 01:55:48,672", "level": "INFO", "name": "map_registry", "message": "Retrieved list of all map names: []"}
+{"time": "2024-12-17 01:55:48,673", "level": "INFO", "name": "EventDispatcher", "message": "Dispatching event 'map_create_request' with data: {'client_id': 'server_startup', 'message': {'message_type': 'map_create_request', 'username': 'admin', 'map_name': 'Main', 'map_size': (0.0, 99.0, 0.0, 99.0, 0.0, 9.0), 'start_position': (0.0, 0.0, 0.0), 'is_public': True, 'tiles': {'672b0875-2c22-4b67-bb7f-3ca00546304c': {'tile_position': (0.0, 99.0, 0.0, 99.0, 0.0, 1.0), 'tile_type': 'grass', 'is_wall': False}}}}"}
+{"time": "2024-12-17 01:55:48,675", "level": "INFO", "name": "map_registry", "message": "Map 'Main' saved successfully."}
+{"time": "2024-12-17 01:55:48,676", "level": "INFO", "name": "MapService", "message": "Map 'Main' created successfully."}
+{"time": "2024-12-17 01:55:48,684", "level": "INFO", "name": "EventDispatcher", "message": "Dispatching event 'map_create_ok' with data: {'client_id': 'server_startup', 'message': {'map_name': 'Main'}}"}
+{"time": "2024-12-17 01:55:48,704", "level": "INFO", "name": "NetworkServer", "message": "Starting NetworkServer on localhost:33288 with SSL/TLS."}
+{"time": "2024-12-17 01:55:48,726", "level": "INFO", "name": "NetworkServer", "message": "NetworkServer started and accepting connections."}
+{"time": "2024-12-17 01:55:48,728", "level": "INFO", "name": "Main", "message": "My Awesome Audio Game Server version 1.0.0 started."}
+{"time": "2024-12-17 01:55:48,746", "level": "INFO", "name": "Main", "message": "Server running on localhost:33288. Type 'exit' in console to shut down."}
+{"time": "2024-12-17 01:59:42,702", "level": "INFO", "name": "ConsoleInterface", "message": "Shutdown command received. Stopping the server..."}
+{"time": "2024-12-17 01:59:42,704", "level": "INFO", "name": "ConsoleInterface", "message": "Stopping console interface..."}
+{"time": "2024-12-17 01:59:42,719", "level": "INFO", "name": "ConsoleInterface", "message": "Console interface stopped."}
+{"time": "2024-12-17 01:59:42,720", "level": "INFO", "name": "NetworkServer", "message": "Stopping NetworkServer..."}
+{"time": "2024-12-17 01:59:42,724", "level": "INFO", "name": "NetworkServer", "message": "NetworkServer stopped."}
+{"time": "2024-12-17 01:59:42,724", "level": "INFO", "name": "Main", "message": "Server shut down complete."}
+{"time": "2024-12-17 02:01:41,698", "level": "INFO", "name": "Main", "message": "Loading server components..."}
+{"time": "2024-12-17 02:01:41,878", "level": "INFO", "name": "SSLManager", "message": "SSL enabled with provided (or self-signed) certificate and key."}
+{"time": "2024-12-17 02:01:41,881", "level": "INFO", "name": "ChatService", "message": "ChatService started and subscribed to 'chat_message' event."}
+{"time": "2024-12-17 02:01:41,883", "level": "INFO", "name": "UserService", "message": "UserService subscribed to user account events."}
+{"time": "2024-12-17 02:01:41,884", "level": "INFO", "name": "MapService", "message": "MapService subscribed to map-related events."}
+{"time": "2024-12-17 02:01:41,885", "level": "INFO", "name": "AIService", "message": "AIService subscribed to AI-related events."}
+{"time": "2024-12-17 02:01:41,886", "level": "INFO", "name": "RoleService", "message": "RoleService subscribed to role-related events."}
+{"time": "2024-12-17 02:01:41,887", "level": "INFO", "name": "PhysicsService", "message": "PhysicsService subscribed to physics-related events."}
+{"time": "2024-12-17 02:01:41,889", "level": "INFO", "name": "map_registry", "message": "Retrieved list of all map names: ['Main']"}
+{"time": "2024-12-17 02:01:41,891", "level": "INFO", "name": "NetworkServer", "message": "Starting NetworkServer on localhost:33288 with SSL/TLS."}
+{"time": "2024-12-17 02:01:41,900", "level": "INFO", "name": "NetworkServer", "message": "NetworkServer started and accepting connections."}
+{"time": "2024-12-17 02:01:41,901", "level": "INFO", "name": "Main", "message": "My Awesome Audio Game Server version 1.0.0 started."}
+{"time": "2024-12-17 02:01:41,902", "level": "INFO", "name": "Main", "message": "Server running on localhost:33288. Type 'exit' in console to shut down."}
+{"time": "2024-12-17 02:02:05,397", "level": "INFO", "name": "Main", "message": "Logging reconfigured."}
+{"time": "2024-12-17 02:02:05,399", "level": "INFO", "name": "ConsoleInterface", "message": "Console interface logging reconfigured."}
+{"time": "2024-12-17 02:02:05,400", "level": "INFO", "name": "ConsoleInterface", "message": "Debug logging turned on."}
+{"time": "2024-12-17 02:02:15,351", "level": "INFO", "name": "ConsoleInterface", "message": "Shutdown command received. Stopping the server..."}
+{"time": "2024-12-17 02:02:15,353", "level": "INFO", "name": "ConsoleInterface", "message": "Stopping console interface..."}
+{"time": "2024-12-17 02:02:15,354", "level": "DEBUG", "name": "ConsoleInterface", "message": "User input task cancelled."}
+{"time": "2024-12-17 02:02:15,356", "level": "INFO", "name": "ConsoleInterface", "message": "Console interface stopped."}
+{"time": "2024-12-17 02:02:15,357", "level": "INFO", "name": "NetworkServer", "message": "Stopping NetworkServer..."}
+{"time": "2024-12-17 02:02:15,358", "level": "INFO", "name": "NetworkServer", "message": "NetworkServer stopped."}
+{"time": "2024-12-17 02:02:15,359", "level": "INFO", "name": "Main", "message": "Server shut down complete."}
+{"time": "2024-12-17 02:02:18,698", "level": "INFO", "name": "Main", "message": "Loading server components..."}
+{"time": "2024-12-17 02:02:18,700", "level": "DEBUG", "name": "SSLManager", "message": "SSLManager initialized with cert_file='keys/cert.pem', key_file='keys/key.pem'"}
+{"time": "2024-12-17 02:02:18,702", "level": "INFO", "name": "SSLManager", "message": "SSL enabled with provided (or self-signed) certificate and key."}
+{"time": "2024-12-17 02:02:18,703", "level": "DEBUG", "name": "SecurityManager", "message": "SecurityManager initialized with jwt_algorithm='HS256', jwt_exp_delta=3600"}
+{"time": "2024-12-17 02:02:18,704", "level": "DEBUG", "name": "EventDispatcher", "message": "EventDispatcher initialized."}
+{"time": "2024-12-17 02:02:18,704", "level": "DEBUG", "name": "MapService", "message": "MapService initialized."}
+{"time": "2024-12-17 02:02:18,705", "level": "DEBUG", "name": "UserService", "message": "UserService initialized."}
+{"time": "2024-12-17 02:02:18,706", "level": "DEBUG", "name": "AIService", "message": "AIService initialized."}
+{"time": "2024-12-17 02:02:18,707", "level": "DEBUG", "name": "RoleService", "message": "RoleService initialized."}
+{"time": "2024-12-17 02:02:18,707", "level": "DEBUG", "name": "PhysicsService", "message": "PhysicsService initialized."}
+{"time": "2024-12-17 02:02:18,708", "level": "DEBUG", "name": "ChatService", "message": "ChatService initialized."}
+{"time": "2024-12-17 02:02:18,709", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener 'handle_chat_message' to event 'chat_message'."}
+{"time": "2024-12-17 02:02:18,709", "level": "INFO", "name": "ChatService", "message": "ChatService started and subscribed to 'chat_message' event."}
+{"time": "2024-12-17 02:02:18,710", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener 'handle_user_move_request' to event 'user_move_request'."}
+{"time": "2024-12-17 02:02:18,711", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener 'handle_user_turn_request' to event 'user_turn_request'."}
+{"time": "2024-12-17 02:02:18,711", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener 'handle_create_account' to event 'user_account_create_request'."}
+{"time": "2024-12-17 02:02:18,712", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener 'handle_login_request' to event 'user_account_login_request'."}
+{"time": "2024-12-17 02:02:18,713", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener 'handle_logout_request' to event 'user_account_logout_request'."}
+{"time": "2024-12-17 02:02:18,713", "level": "INFO", "name": "UserService", "message": "UserService subscribed to user account events."}
+{"time": "2024-12-17 02:02:18,714", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener 'handle_map_create_request' to event 'map_create_request'."}
+{"time": "2024-12-17 02:02:18,714", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener 'handle_map_remove_request' to event 'map_remove_request'."}
+{"time": "2024-12-17 02:02:18,715", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener 'handle_map_tile_add_request' to event 'map_tile_add_request'."}
+{"time": "2024-12-17 02:02:18,716", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener 'handle_map_tile_remove_request' to event 'map_tile_remove_request'."}
+{"time": "2024-12-17 02:02:18,720", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener 'handle_map_zone_add_request' to event 'map_zone_add_request'."}
+{"time": "2024-12-17 02:02:18,738", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener 'handle_map_zone_remove_request' to event 'map_zone_remove_request'."}
+{"time": "2024-12-17 02:02:18,740", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener 'handle_map_join_request' to event 'map_join_request'."}
+{"time": "2024-12-17 02:02:18,760", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener 'handle_map_leave_request' to event 'map_leave_request'."}
+{"time": "2024-12-17 02:02:18,761", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener 'handle_map_physics_update_request' to event 'map_physics_update_request'."}
+{"time": "2024-12-17 02:02:18,765", "level": "INFO", "name": "MapService", "message": "MapService subscribed to map-related events."}
+{"time": "2024-12-17 02:02:18,767", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener 'handle_ai_spawn_request' to event 'ai_spawn_request'."}
+{"time": "2024-12-17 02:02:18,782", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener 'handle_ai_remove_request' to event 'ai_remove_request'."}
+{"time": "2024-12-17 02:02:18,785", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener 'handle_ai_move_request' to event 'ai_move_request'."}
+{"time": "2024-12-17 02:02:18,803", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener 'handle_ai_update_health_request' to event 'ai_update_health_request'."}
+{"time": "2024-12-17 02:02:18,816", "level": "INFO", "name": "AIService", "message": "AIService subscribed to AI-related events."}
+{"time": "2024-12-17 02:02:18,817", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener 'handle_role_assign_request' to event 'role_assign_request'."}
+{"time": "2024-12-17 02:02:18,824", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener 'handle_role_remove_request' to event 'role_remove_request'."}
+{"time": "2024-12-17 02:02:18,827", "level": "INFO", "name": "RoleService", "message": "RoleService subscribed to role-related events."}
+{"time": "2024-12-17 02:02:18,847", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener 'handle_apply_gravity_request' to event 'physics_apply_gravity_request'."}
+{"time": "2024-12-17 02:02:18,860", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener 'handle_jump_request' to event 'physics_jump_request'."}
+{"time": "2024-12-17 02:02:18,862", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener 'handle_apply_force_request' to event 'physics_apply_force_request'."}
+{"time": "2024-12-17 02:02:18,863", "level": "INFO", "name": "PhysicsService", "message": "PhysicsService subscribed to physics-related events."}
+{"time": "2024-12-17 02:02:18,866", "level": "DEBUG", "name": "user_registry", "message": "Retrieved all usernames: ['admin']"}
+{"time": "2024-12-17 02:02:18,867", "level": "INFO", "name": "map_registry", "message": "Retrieved list of all map names: ['Main']"}
+{"time": "2024-12-17 02:02:18,870", "level": "INFO", "name": "NetworkServer", "message": "Starting NetworkServer on localhost:33288 with SSL/TLS."}
+{"time": "2024-12-17 02:02:18,889", "level": "INFO", "name": "NetworkServer", "message": "NetworkServer started and accepting connections."}
+{"time": "2024-12-17 02:02:18,889", "level": "INFO", "name": "Main", "message": "My Awesome Audio Game Server version 1.0.0 started."}
+{"time": "2024-12-17 02:02:18,892", "level": "INFO", "name": "Main", "message": "Server running on localhost:33288. Type 'exit' in console to shut down."}
+{"time": "2024-12-17 02:02:56,254", "level": "INFO", "name": "ConsoleInterface", "message": "Shutdown command received. Stopping the server..."}
+{"time": "2024-12-17 02:02:56,256", "level": "INFO", "name": "ConsoleInterface", "message": "Stopping console interface..."}
+{"time": "2024-12-17 02:02:56,268", "level": "DEBUG", "name": "ConsoleInterface", "message": "User input task cancelled."}
+{"time": "2024-12-17 02:02:56,284", "level": "INFO", "name": "ConsoleInterface", "message": "Console interface stopped."}
+{"time": "2024-12-17 02:02:56,298", "level": "INFO", "name": "NetworkServer", "message": "Stopping NetworkServer..."}
+{"time": "2024-12-17 02:02:56,300", "level": "INFO", "name": "NetworkServer", "message": "NetworkServer stopped."}
+{"time": "2024-12-17 02:02:56,312", "level": "INFO", "name": "Main", "message": "Server shut down complete."}
+{"time": "2024-12-17 02:03:17,654", "level": "INFO", "name": "Main", "message": "Loading server components..."}
+{"time": "2024-12-17 02:03:17,655", "level": "DEBUG", "name": "SSLManager", "message": "SSLManager initialized with cert_file='keys/cert.pem', key_file='keys/key.pem'"}
+{"time": "2024-12-17 02:03:17,659", "level": "WARNING", "name": "SSLManager", "message": "SSL certificates not found. Generating a self-signed certificate..."}
+{"time": "2024-12-17 02:03:17,669", "level": "DEBUG", "name": "SSLManager", "message": "Generating RSA private key."}
+{"time": "2024-12-17 02:03:17,692", "level": "DEBUG", "name": "SSLManager", "message": "Building a self-signed certificate."}
+{"time": "2024-12-17 02:03:17,694", "level": "DEBUG", "name": "SSLManager", "message": "Writing private key and certificate to disk."}
+{"time": "2024-12-17 02:03:17,696", "level": "INFO", "name": "SSLManager", "message": "Self-signed SSL certificate and key generated successfully."}
+{"time": "2024-12-17 02:03:17,708", "level": "INFO", "name": "SSLManager", "message": "SSL enabled with provided (or self-signed) certificate and key."}
+{"time": "2024-12-17 02:03:17,709", "level": "DEBUG", "name": "SecurityManager", "message": "SecurityManager initialized with jwt_algorithm='HS256', jwt_exp_delta=3600"}
+{"time": "2024-12-17 02:03:17,710", "level": "DEBUG", "name": "EventDispatcher", "message": "EventDispatcher initialized."}
+{"time": "2024-12-17 02:03:17,720", "level": "DEBUG", "name": "MapService", "message": "MapService initialized."}
+{"time": "2024-12-17 02:03:17,722", "level": "DEBUG", "name": "UserService", "message": "UserService initialized."}
+{"time": "2024-12-17 02:03:17,741", "level": "DEBUG", "name": "AIService", "message": "AIService initialized."}
+{"time": "2024-12-17 02:03:17,743", "level": "DEBUG", "name": "RoleService", "message": "RoleService initialized."}
+{"time": "2024-12-17 02:03:17,759", "level": "DEBUG", "name": "PhysicsService", "message": "PhysicsService initialized."}
+{"time": "2024-12-17 02:03:17,760", "level": "DEBUG", "name": "ChatService", "message": "ChatService initialized."}
+{"time": "2024-12-17 02:03:17,764", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener 'handle_chat_message' to event 'chat_message'."}
+{"time": "2024-12-17 02:03:17,764", "level": "INFO", "name": "ChatService", "message": "ChatService started and subscribed to 'chat_message' event."}
+{"time": "2024-12-17 02:03:17,774", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener 'handle_user_move_request' to event 'user_move_request'."}
+{"time": "2024-12-17 02:03:17,775", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener 'handle_user_turn_request' to event 'user_turn_request'."}
+{"time": "2024-12-17 02:03:17,790", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener 'handle_create_account' to event 'user_account_create_request'."}
+{"time": "2024-12-17 02:03:17,791", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener 'handle_login_request' to event 'user_account_login_request'."}
+{"time": "2024-12-17 02:03:17,798", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener 'handle_logout_request' to event 'user_account_logout_request'."}
+{"time": "2024-12-17 02:03:17,809", "level": "INFO", "name": "UserService", "message": "UserService subscribed to user account events."}
+{"time": "2024-12-17 02:03:17,818", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener 'handle_map_create_request' to event 'map_create_request'."}
+{"time": "2024-12-17 02:03:17,819", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener 'handle_map_remove_request' to event 'map_remove_request'."}
+{"time": "2024-12-17 02:03:17,838", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener 'handle_map_tile_add_request' to event 'map_tile_add_request'."}
+{"time": "2024-12-17 02:03:17,843", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener 'handle_map_tile_remove_request' to event 'map_tile_remove_request'."}
+{"time": "2024-12-17 02:03:17,846", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener 'handle_map_zone_add_request' to event 'map_zone_add_request'."}
+{"time": "2024-12-17 02:03:17,861", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener 'handle_map_zone_remove_request' to event 'map_zone_remove_request'."}
+{"time": "2024-12-17 02:03:17,864", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener 'handle_map_join_request' to event 'map_join_request'."}
+{"time": "2024-12-17 02:03:17,881", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener 'handle_map_leave_request' to event 'map_leave_request'."}
+{"time": "2024-12-17 02:03:17,884", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener 'handle_map_physics_update_request' to event 'map_physics_update_request'."}
+{"time": "2024-12-17 02:03:17,895", "level": "INFO", "name": "MapService", "message": "MapService subscribed to map-related events."}
+{"time": "2024-12-17 02:03:17,897", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener 'handle_ai_spawn_request' to event 'ai_spawn_request'."}
+{"time": "2024-12-17 02:03:17,905", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener 'handle_ai_remove_request' to event 'ai_remove_request'."}
+{"time": "2024-12-17 02:03:17,921", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener 'handle_ai_move_request' to event 'ai_move_request'."}
+{"time": "2024-12-17 02:03:17,922", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener 'handle_ai_update_health_request' to event 'ai_update_health_request'."}
+{"time": "2024-12-17 02:03:17,939", "level": "INFO", "name": "AIService", "message": "AIService subscribed to AI-related events."}
+{"time": "2024-12-17 02:03:17,957", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener 'handle_role_assign_request' to event 'role_assign_request'."}
+{"time": "2024-12-17 02:03:17,959", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener 'handle_role_remove_request' to event 'role_remove_request'."}
+{"time": "2024-12-17 02:03:17,977", "level": "INFO", "name": "RoleService", "message": "RoleService subscribed to role-related events."}
+{"time": "2024-12-17 02:03:17,978", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener 'handle_apply_gravity_request' to event 'physics_apply_gravity_request'."}
+{"time": "2024-12-17 02:03:17,986", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener 'handle_jump_request' to event 'physics_jump_request'."}
+{"time": "2024-12-17 02:03:17,988", "level": "DEBUG", "name": "EventDispatcher", "message": "Subscribed listener 'handle_apply_force_request' to event 'physics_apply_force_request'."}
+{"time": "2024-12-17 02:03:17,998", "level": "INFO", "name": "PhysicsService", "message": "PhysicsService subscribed to physics-related events."}
+{"time": "2024-12-17 02:03:17,999", "level": "DEBUG", "name": "user_registry", "message": "Retrieved all usernames: []"}
+{"time": "2024-12-17 02:03:18,007", "level": "INFO", "name": "EventDispatcher", "message": "Dispatching event 'user_account_create_request' with data: {'client_id': 'server_startup', 'message': {'message_type': 'user_account_create_request', 'username': 'admin', 'password': 'adminpass', 'role': 'developer', 'current_map': 'Main'}}"}
+{"time": "2024-12-17 02:03:18,009", "level": "DEBUG", "name": "UserService", "message": "Attempting to create account for username='admin', role='developer', map='Main'."}
+{"time": "2024-12-17 02:03:18,434", "level": "DEBUG", "name": "user_registry", "message": "User 'admin' saved successfully."}
+{"time": "2024-12-17 02:03:18,437", "level": "INFO", "name": "user_registry", "message": "Account created successfully for username: admin"}
+{"time": "2024-12-17 02:03:18,440", "level": "INFO", "name": "UserService", "message": "Account created successfully for username='admin'."}
+{"time": "2024-12-17 02:03:18,449", "level": "DEBUG", "name": "UserService", "message": "Dispatching OK event 'user_account_create_ok' to client_id='server_startup' with data={'username': 'admin', 'role': 'developer'}"}
+{"time": "2024-12-17 02:03:18,451", "level": "INFO", "name": "EventDispatcher", "message": "Dispatching event 'user_account_create_ok' with data: {'client_id': 'server_startup', 'message': {'username': 'admin', 'role': 'developer'}}"}
+{"time": "2024-12-17 02:03:18,453", "level": "DEBUG", "name": "UserService", "message": "Assigned role 'developer' to user 'admin'."}
+{"time": "2024-12-17 02:03:18,454", "level": "DEBUG", "name": "EventDispatcher", "message": "Listener 'handle_create_account' handled event 'user_account_create_request' successfully."}
+{"time": "2024-12-17 02:03:18,464", "level": "INFO", "name": "map_registry", "message": "Retrieved list of all map names: []"}
+{"time": "2024-12-17 02:03:18,480", "level": "INFO", "name": "EventDispatcher", "message": "Dispatching event 'map_create_request' with data: {'client_id': 'server_startup', 'message': {'message_type': 'map_create_request', 'username': 'admin', 'map_name': 'Main', 'map_size': (0.0, 99.0, 0.0, 99.0, 0.0, 9.0), 'start_position': (0.0, 0.0, 0.0), 'is_public': True, 'tiles': {'2f3ba50d-3b7d-47f3-87aa-6951f9a02cd6': {'tile_position': (0.0, 99.0, 0.0, 99.0, 0.0, 1.0), 'tile_type': 'grass', 'is_wall': False}}}}"}
+{"time": "2024-12-17 02:03:18,489", "level": "DEBUG", "name": "MapService", "message": "Map create request by client_id='server_startup', username='admin', map='Main'."}
+{"time": "2024-12-17 02:03:18,501", "level": "DEBUG", "name": "MapService", "message": "Bypassing auth/permission checks for server_startup client."}
+{"time": "2024-12-17 02:03:18,506", "level": "DEBUG", "name": "MapService", "message": "Tile 'grass' added to map 'Main' at (0.0, 99.0, 0.0, 99.0, 0.0, 1.0)."}
+{"time": "2024-12-17 02:03:18,507", "level": "DEBUG", "name": "MapService", "message": "User 'admin' added as owner and joined to map 'Main'."}
+{"time": "2024-12-17 02:03:18,521", "level": "INFO", "name": "map_registry", "message": "Map 'Main' saved successfully."}
+{"time": "2024-12-17 02:03:18,523", "level": "INFO", "name": "MapService", "message": "Map 'Main' created successfully."}
+{"time": "2024-12-17 02:03:18,540", "level": "DEBUG", "name": "MapService", "message": "Dispatching OK event 'map_create_ok' to client_id='server_startup' with data={'map_name': 'Main'}"}
+{"time": "2024-12-17 02:03:18,542", "level": "INFO", "name": "EventDispatcher", "message": "Dispatching event 'map_create_ok' with data: {'client_id': 'server_startup', 'message': {'map_name': 'Main'}}"}
+{"time": "2024-12-17 02:03:18,558", "level": "DEBUG", "name": "EventDispatcher", "message": "Listener 'handle_map_create_request' handled event 'map_create_request' successfully."}
+{"time": "2024-12-17 02:03:18,579", "level": "INFO", "name": "NetworkServer", "message": "Starting NetworkServer on localhost:33288 with SSL/TLS."}
+{"time": "2024-12-17 02:03:18,598", "level": "INFO", "name": "NetworkServer", "message": "NetworkServer started and accepting connections."}
+{"time": "2024-12-17 02:03:18,600", "level": "INFO", "name": "Main", "message": "My Awesome Audio Game Server version 1.0.0 started."}
+{"time": "2024-12-17 02:03:18,601", "level": "INFO", "name": "Main", "message": "Server running on localhost:33288. Type 'exit' in console to shut down."}
+{"time": "2024-12-17 02:04:18,753", "level": "INFO", "name": "Main", "message": "Logging reconfigured."}
+{"time": "2024-12-17 02:04:18,755", "level": "INFO", "name": "ConsoleInterface", "message": "Console interface logging reconfigured."}
+{"time": "2024-12-17 02:04:18,765", "level": "INFO", "name": "ConsoleInterface", "message": "Debug logging turned off."}
+{"time": "2024-12-17 02:04:26,094", "level": "INFO", "name": "ConsoleInterface", "message": "Shutdown command received. Stopping the server..."}
+{"time": "2024-12-17 02:04:26,098", "level": "INFO", "name": "ConsoleInterface", "message": "Stopping console interface..."}
+{"time": "2024-12-17 02:04:26,100", "level": "INFO", "name": "ConsoleInterface", "message": "Console interface stopped."}
+{"time": "2024-12-17 02:04:26,116", "level": "INFO", "name": "NetworkServer", "message": "Stopping NetworkServer..."}
+{"time": "2024-12-17 02:04:26,131", "level": "INFO", "name": "NetworkServer", "message": "NetworkServer stopped."}
+{"time": "2024-12-17 02:04:26,136", "level": "INFO", "name": "Main", "message": "Server shut down complete."}
+{"time": "2024-12-17 02:04:44,936", "level": "INFO", "name": "Main", "message": "Loading server components..."}
+{"time": "2024-12-17 02:04:44,938", "level": "WARNING", "name": "SSLManager", "message": "SSL certificates not found. Generating a self-signed certificate..."}
+{"time": "2024-12-17 02:04:44,957", "level": "INFO", "name": "SSLManager", "message": "Self-signed SSL certificate and key generated successfully."}
+{"time": "2024-12-17 02:04:44,961", "level": "INFO", "name": "SSLManager", "message": "SSL enabled with provided (or self-signed) certificate and key."}
+{"time": "2024-12-17 02:04:44,963", "level": "INFO", "name": "ChatService", "message": "ChatService started and subscribed to 'chat_message' event."}
+{"time": "2024-12-17 02:04:44,964", "level": "INFO", "name": "UserService", "message": "UserService subscribed to user account events."}
+{"time": "2024-12-17 02:04:44,964", "level": "INFO", "name": "MapService", "message": "MapService subscribed to map-related events."}
+{"time": "2024-12-17 02:04:44,965", "level": "INFO", "name": "AIService", "message": "AIService subscribed to AI-related events."}
+{"time": "2024-12-17 02:04:44,965", "level": "INFO", "name": "RoleService", "message": "RoleService subscribed to role-related events."}
+{"time": "2024-12-17 02:04:44,966", "level": "INFO", "name": "PhysicsService", "message": "PhysicsService subscribed to physics-related events."}
+{"time": "2024-12-17 02:04:44,967", "level": "INFO", "name": "EventDispatcher", "message": "Dispatching event 'user_account_create_request' with data: {'client_id': 'server_startup', 'message': {'message_type': 'user_account_create_request', 'username': 'admin', 'password': 'adminpass', 'role': 'developer', 'current_map': 'Main'}}"}
+{"time": "2024-12-17 02:04:45,135", "level": "INFO", "name": "user_registry", "message": "Account created successfully for username: admin"}
+{"time": "2024-12-17 02:04:45,136", "level": "INFO", "name": "UserService", "message": "Account created successfully for username='admin'."}
+{"time": "2024-12-17 02:04:45,137", "level": "INFO", "name": "EventDispatcher", "message": "Dispatching event 'user_account_create_ok' with data: {'client_id': 'server_startup', 'message': {'username': 'admin', 'role': 'developer'}}"}
+{"time": "2024-12-17 02:04:45,138", "level": "INFO", "name": "map_registry", "message": "Retrieved list of all map names: []"}
+{"time": "2024-12-17 02:04:45,139", "level": "INFO", "name": "EventDispatcher", "message": "Dispatching event 'map_create_request' with data: {'client_id': 'server_startup', 'message': {'message_type': 'map_create_request', 'username': 'admin', 'map_name': 'Main', 'map_size': (0.0, 99.0, 0.0, 99.0, 0.0, 9.0), 'start_position': (0.0, 0.0, 0.0), 'is_public': True, 'tiles': {'3b727b35-2960-43ef-bd5d-4400c9a44fc7': {'tile_position': (0.0, 99.0, 0.0, 99.0, 0.0, 1.0), 'tile_type': 'grass', 'is_wall': False}}}}"}
+{"time": "2024-12-17 02:04:45,144", "level": "INFO", "name": "map_registry", "message": "Map 'Main' saved successfully."}
+{"time": "2024-12-17 02:04:45,144", "level": "INFO", "name": "MapService", "message": "Map 'Main' created successfully."}
+{"time": "2024-12-17 02:04:45,145", "level": "INFO", "name": "EventDispatcher", "message": "Dispatching event 'map_create_ok' with data: {'client_id': 'server_startup', 'message': {'map_name': 'Main'}}"}
+{"time": "2024-12-17 02:04:45,146", "level": "INFO", "name": "NetworkServer", "message": "Starting NetworkServer on localhost:33288 with SSL/TLS."}
+{"time": "2024-12-17 02:04:45,151", "level": "INFO", "name": "NetworkServer", "message": "NetworkServer started and accepting connections."}
+{"time": "2024-12-17 02:04:45,152", "level": "INFO", "name": "Main", "message": "My Awesome Audio Game Server version 1.0.0 started."}
+{"time": "2024-12-17 02:04:45,152", "level": "INFO", "name": "Main", "message": "Server running on localhost:33288. Type 'exit' in console to shut down."}
+{"time": "2024-12-17 02:05:55,437", "level": "INFO", "name": "ConsoleInterface", "message": "Shutdown command received. Stopping the server..."}
+{"time": "2024-12-17 02:05:55,439", "level": "INFO", "name": "ConsoleInterface", "message": "Stopping console interface..."}
+{"time": "2024-12-17 02:05:55,440", "level": "INFO", "name": "ConsoleInterface", "message": "Console interface stopped."}
+{"time": "2024-12-17 02:05:55,441", "level": "INFO", "name": "NetworkServer", "message": "Stopping NetworkServer..."}
+{"time": "2024-12-17 02:05:55,442", "level": "INFO", "name": "NetworkServer", "message": "NetworkServer stopped."}
+{"time": "2024-12-17 02:05:55,444", "level": "INFO", "name": "Main", "message": "Server shut down complete."}

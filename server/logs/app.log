@@ -43,3 +43,859 @@
 2024-12-16 13:57:28,662 - map_registry - INFO - Retrieved list of all map names: []
 2024-12-16 14:09:31,152 - map_registry - INFO - Retrieved list of all map names: []
 2024-12-16 14:09:31,189 - map_registry - INFO - Map 'Main' saved successfully.
+2024-12-16 20:09:08,247 - user_registry - INFO - Account created successfully for username: admin
+2024-12-16 20:09:08,283 - map_registry - INFO - Retrieved list of all map names: []
+2024-12-16 20:09:08,318 - map_registry - INFO - Map 'Main' saved successfully.
+2024-12-16 20:33:06,988 - ServerMain - INFO - My Awesome Audio Game Server, version 1.0.0.
+2024-12-16 20:33:06,989 - ServerMain - INFO - Originally developed by Cody Hurst: https://github.com/churst90/open-fps
+2024-12-16 20:33:06,989 - ServerMain - INFO - This server is completely open source and community additions are welcome.
+2024-12-16 20:33:06,990 - ServerMain - INFO - You are running the original vanilla server code.
+2024-12-16 20:33:07,001 - ServerMain - INFO - 
+2024-12-16 20:33:07,001 - ServerMain - INFO - Loading server components...
+2024-12-16 20:33:07,003 - ServerMain - INFO - Loading SSL...
+2024-12-16 20:33:07,006 - ServerMain - INFO - Loading SSL: ok
+2024-12-16 20:33:07,006 - ServerMain - INFO - Loading security manager...
+2024-12-16 20:33:07,007 - ServerMain - INFO - Loading security manager: ok
+2024-12-16 20:33:07,014 - ServerMain - INFO - Loading connection manager...
+2024-12-16 20:33:07,016 - ServerMain - INFO - Loading connection manager: ok
+2024-12-16 20:33:07,032 - ServerMain - INFO - Loading map service...
+2024-12-16 20:33:07,051 - ServerMain - INFO - Loading map service: ok
+2024-12-16 20:33:07,052 - ServerMain - INFO - Loading user service...
+2024-12-16 20:33:07,056 - ServerMain - INFO - Loading user service: ok
+2024-12-16 20:33:07,056 - ServerMain - INFO - Loading AI service...
+2024-12-16 20:33:07,072 - ServerMain - INFO - Loading AI service: ok
+2024-12-16 20:33:07,073 - ServerMain - INFO - Loading role service...
+2024-12-16 20:33:07,091 - ServerMain - INFO - Loading role service: ok
+2024-12-16 20:33:07,092 - ServerMain - INFO - Loading physics service...
+2024-12-16 20:33:07,113 - ServerMain - INFO - Loading physics service: ok
+2024-12-16 20:33:07,115 - ServerMain - INFO - Loading movement service...
+2024-12-16 20:33:07,126 - ServerMain - INFO - Loading movement service: ok
+2024-12-16 20:33:07,127 - ServerMain - INFO - Loading chat service...
+2024-12-16 20:33:07,136 - ServerMain - INFO - Loading chat service: ok
+2024-12-16 20:33:07,138 - map_registry - INFO - Retrieved list of all map names: ['Main']
+2024-12-16 20:33:07,154 - NetworkServer - INFO - Starting NetworkServer on localhost:33288 with SSL/TLS
+2024-12-16 20:33:07,179 - NetworkServer - INFO - NetworkServer started and listening.
+2024-12-16 20:33:07,180 - ServerMain - INFO - Server is running and listening on localhost:33288. Console ready for input...
+2024-12-16 20:34:49,754 - ConsoleInterface - INFO - Shutdown command received. Stopping the server...
+2024-12-16 20:34:49,759 - ConsoleInterface - INFO - Stopping console interface...
+2024-12-16 20:34:49,767 - ConsoleInterface - INFO - Console interface stopped.
+2024-12-16 20:34:49,768 - NetworkServer - INFO - Stopping NetworkServer...
+2024-12-16 20:34:49,769 - NetworkServer - INFO - NetworkServer stopped.
+2024-12-16 20:34:49,770 - ServerMain - INFO - Server shut down cleanly.
+2024-12-16 20:35:33,381 - ServerMain - INFO - My Awesome Audio Game Server, version 1.0.0.
+2024-12-16 20:35:33,382 - ServerMain - INFO - Originally developed by Cody Hurst: https://github.com/churst90/open-fps
+2024-12-16 20:35:33,382 - ServerMain - INFO - This server is completely open source and community additions are welcome.
+2024-12-16 20:35:33,383 - ServerMain - INFO - You are running the original vanilla server code.
+2024-12-16 20:35:33,383 - ServerMain - INFO - 
+2024-12-16 20:35:33,383 - ServerMain - INFO - Loading server components...
+2024-12-16 20:35:33,384 - ServerMain - INFO - Loading SSL...
+2024-12-16 20:35:33,459 - ServerMain - INFO - Loading SSL: ok
+2024-12-16 20:35:33,460 - ServerMain - INFO - Loading security manager...
+2024-12-16 20:35:33,461 - ServerMain - INFO - Loading security manager: ok
+2024-12-16 20:35:33,462 - ServerMain - INFO - Loading connection manager...
+2024-12-16 20:35:33,462 - ServerMain - INFO - Loading connection manager: ok
+2024-12-16 20:35:33,462 - ServerMain - INFO - Loading map service...
+2024-12-16 20:35:33,463 - ServerMain - INFO - Loading map service: ok
+2024-12-16 20:35:33,463 - ServerMain - INFO - Loading user service...
+2024-12-16 20:35:33,464 - ServerMain - INFO - Loading user service: ok
+2024-12-16 20:35:33,464 - ServerMain - INFO - Loading AI service...
+2024-12-16 20:35:33,464 - ServerMain - INFO - Loading AI service: ok
+2024-12-16 20:35:33,465 - ServerMain - INFO - Loading role service...
+2024-12-16 20:35:33,466 - ServerMain - INFO - Loading role service: ok
+2024-12-16 20:35:33,466 - ServerMain - INFO - Loading physics service...
+2024-12-16 20:35:33,466 - ServerMain - INFO - Loading physics service: ok
+2024-12-16 20:35:33,466 - ServerMain - INFO - Loading movement service...
+2024-12-16 20:35:33,467 - ServerMain - INFO - Loading movement service: ok
+2024-12-16 20:35:33,467 - ServerMain - INFO - Loading chat service...
+2024-12-16 20:35:33,468 - ServerMain - INFO - Loading chat service: ok
+2024-12-16 20:35:33,619 - user_registry - INFO - Account created successfully for username: admin
+2024-12-16 20:35:33,619 - UserService - INFO - Account created for username: admin
+2024-12-16 20:35:33,620 - map_registry - INFO - Retrieved list of all map names: []
+2024-12-16 20:35:33,620 - MapService - INFO - Added a grass tile within map bounds.
+2024-12-16 20:35:33,621 - map_registry - INFO - Map 'Main' saved successfully.
+2024-12-16 20:35:33,622 - MapService - INFO - Map 'Main' created successfully.
+2024-12-16 20:35:33,622 - NetworkServer - INFO - Starting NetworkServer on localhost:33288 with SSL/TLS
+2024-12-16 20:35:33,628 - NetworkServer - INFO - NetworkServer started and listening.
+2024-12-16 20:35:33,629 - ServerMain - INFO - Server is running and listening on localhost:33288. Console ready for input...
+2024-12-16 20:36:46,390 - ConsoleInterface - INFO - Shutdown command received. Stopping the server...
+2024-12-16 20:36:46,391 - ConsoleInterface - INFO - Stopping console interface...
+2024-12-16 20:36:46,392 - ConsoleInterface - INFO - Console interface stopped.
+2024-12-16 20:36:46,392 - NetworkServer - INFO - Stopping NetworkServer...
+2024-12-16 20:36:46,393 - NetworkServer - INFO - NetworkServer stopped.
+2024-12-16 20:36:46,395 - ServerMain - INFO - Server shut down cleanly.
+2024-12-16 23:52:52,389 - Main - INFO - Loading server components...
+2024-12-16 23:52:52,393 - SSLManager - INFO - SSL enabled with provided (or self-signed) certificate and key.
+2024-12-16 23:52:52,395 - Main - INFO - Components loaded:
+2024-12-16 23:52:52,402 - Main - INFO -  - Network
+2024-12-16 23:52:52,402 - Main - INFO -  - User Service
+2024-12-16 23:52:52,403 - Main - INFO -  - Map Service
+2024-12-16 23:52:52,405 - Main - INFO -  - AI Service
+2024-12-16 23:52:52,405 - Main - INFO -  - Role Service
+2024-12-16 23:52:52,415 - Main - INFO -  - Physics Service
+2024-12-16 23:52:52,435 - Main - INFO -  - Movement Service
+2024-12-16 23:52:52,438 - Main - INFO -  - Chat Service
+2024-12-16 23:52:52,443 - map_registry - INFO - Retrieved list of all map names: ['Main']
+2024-12-16 23:52:52,444 - NetworkServer - INFO - Starting NetworkServer on localhost:33288 with SSL/TLS
+2024-12-16 23:52:52,463 - NetworkServer - INFO - NetworkServer started and listening.
+2024-12-16 23:52:52,463 - Main - INFO - My Awesome Audio Game Server version 1.0.0 started.
+2024-12-16 23:52:52,475 - Main - INFO - Server running on localhost:33288. Type 'exit' in console to shut down.
+2024-12-16 23:54:04,489 - Main - INFO - Logging reconfigured.
+2024-12-16 23:54:04,493 - ConsoleInterface - INFO - Console interface logging reconfigured.
+2024-12-16 23:54:04,501 - ConsoleInterface - INFO - Debug logging turned on.
+2024-12-16 23:54:17,816 - Main - INFO - Logging reconfigured.
+2024-12-16 23:54:17,818 - ConsoleInterface - INFO - Console interface logging reconfigured.
+2024-12-16 23:54:17,818 - ConsoleInterface - INFO - Debug logging turned off.
+2024-12-16 23:54:34,003 - Main - INFO - Logging reconfigured.
+2024-12-16 23:54:34,008 - ConsoleInterface - INFO - Console interface logging reconfigured.
+2024-12-16 23:54:34,018 - ConsoleInterface - INFO - Debug logging turned on.
+2024-12-16 23:55:24,818 - ConsoleInterface - INFO - Shutdown command received. Stopping the server...
+2024-12-16 23:55:24,820 - ConsoleInterface - INFO - Stopping console interface...
+2024-12-16 23:55:24,831 - ConsoleInterface - DEBUG - User input task cancelled.
+2024-12-16 23:55:24,831 - ConsoleInterface - INFO - Console interface stopped.
+2024-12-16 23:55:24,832 - NetworkServer - INFO - Stopping NetworkServer...
+2024-12-16 23:55:24,842 - NetworkServer - INFO - NetworkServer stopped.
+2024-12-16 23:55:24,845 - Main - INFO - Server shut down cleanly.
+2024-12-16 23:55:37,452 - Main - INFO - Loading server components...
+2024-12-16 23:55:37,456 - SSLManager - INFO - SSL enabled with provided (or self-signed) certificate and key.
+2024-12-16 23:55:37,457 - Main - INFO - Components loaded:
+2024-12-16 23:55:37,466 - Main - INFO -  - Network
+2024-12-16 23:55:37,467 - Main - INFO -  - User Service
+2024-12-16 23:55:37,468 - Main - INFO -  - Map Service
+2024-12-16 23:55:37,469 - Main - INFO -  - AI Service
+2024-12-16 23:55:37,469 - Main - INFO -  - Role Service
+2024-12-16 23:55:37,481 - Main - INFO -  - Physics Service
+2024-12-16 23:55:37,492 - Main - INFO -  - Movement Service
+2024-12-16 23:55:37,493 - Main - INFO -  - Chat Service
+2024-12-16 23:55:37,502 - EventDispatcher - DEBUG - Subscribed listener handle_chat_message to event 'chat_message'.
+2024-12-16 23:55:37,515 - EventDispatcher - DEBUG - Subscribed listener handle_user_move_request to event 'user_move_request'.
+2024-12-16 23:55:37,516 - EventDispatcher - DEBUG - Subscribed listener handle_user_turn_request to event 'user_turn_request'.
+2024-12-16 23:55:37,524 - EventDispatcher - DEBUG - Subscribed listener handle_create_account to event 'user_account_create_request'.
+2024-12-16 23:55:37,524 - EventDispatcher - DEBUG - Subscribed listener handle_login_request to event 'user_account_login_request'.
+2024-12-16 23:55:37,543 - EventDispatcher - DEBUG - Subscribed listener handle_logout_request to event 'user_account_logout_request'.
+2024-12-16 23:55:37,544 - EventDispatcher - DEBUG - Subscribed listener handle_map_create_request to event 'map_create_request'.
+2024-12-16 23:55:37,547 - EventDispatcher - DEBUG - Subscribed listener handle_map_remove_request to event 'map_remove_request'.
+2024-12-16 23:55:37,561 - EventDispatcher - DEBUG - Subscribed listener handle_map_tile_add_request to event 'map_tile_add_request'.
+2024-12-16 23:55:37,561 - EventDispatcher - DEBUG - Subscribed listener handle_map_tile_remove_request to event 'map_tile_remove_request'.
+2024-12-16 23:55:37,570 - EventDispatcher - DEBUG - Subscribed listener handle_map_zone_add_request to event 'map_zone_add_request'.
+2024-12-16 23:55:37,571 - EventDispatcher - DEBUG - Subscribed listener handle_map_zone_remove_request to event 'map_zone_remove_request'.
+2024-12-16 23:55:37,587 - EventDispatcher - DEBUG - Subscribed listener handle_map_join_request to event 'map_join_request'.
+2024-12-16 23:55:37,588 - EventDispatcher - DEBUG - Subscribed listener handle_map_leave_request to event 'map_leave_request'.
+2024-12-16 23:55:37,592 - EventDispatcher - DEBUG - Subscribed listener handle_map_physics_update_request to event 'map_physics_update_request'.
+2024-12-16 23:55:37,595 - EventDispatcher - DEBUG - Subscribed listener handle_ai_spawn_request to event 'ai_spawn_request'.
+2024-12-16 23:55:37,606 - EventDispatcher - DEBUG - Subscribed listener handle_ai_remove_request to event 'ai_remove_request'.
+2024-12-16 23:55:37,614 - EventDispatcher - DEBUG - Subscribed listener handle_ai_move_request to event 'ai_move_request'.
+2024-12-16 23:55:37,615 - EventDispatcher - DEBUG - Subscribed listener handle_ai_update_health_request to event 'ai_update_health_request'.
+2024-12-16 23:55:37,636 - EventDispatcher - DEBUG - Subscribed listener handle_role_assign_request to event 'role_assign_request'.
+2024-12-16 23:55:37,638 - EventDispatcher - DEBUG - Subscribed listener handle_role_remove_request to event 'role_remove_request'.
+2024-12-16 23:55:37,650 - EventDispatcher - DEBUG - Subscribed listener handle_apply_gravity_request to event 'physics_apply_gravity_request'.
+2024-12-16 23:55:37,651 - EventDispatcher - DEBUG - Subscribed listener handle_jump_request to event 'physics_jump_request'.
+2024-12-16 23:55:37,659 - EventDispatcher - DEBUG - Subscribed listener handle_apply_force_request to event 'physics_apply_force_request'.
+2024-12-16 23:55:37,673 - user_registry - DEBUG - Retrieved all usernames: ['admin']
+2024-12-16 23:55:37,678 - map_registry - INFO - Retrieved list of all map names: ['Main']
+2024-12-16 23:55:37,696 - NetworkServer - INFO - Starting NetworkServer on localhost:33288 with SSL/TLS
+2024-12-16 23:55:37,704 - NetworkServer - INFO - NetworkServer started and listening.
+2024-12-16 23:55:37,705 - Main - INFO - My Awesome Audio Game Server version 1.0.0 started.
+2024-12-16 23:55:37,712 - Main - INFO - Server running on localhost:33288. Type 'exit' in console to shut down.
+2024-12-16 23:57:53,821 - ConsoleInterface - INFO - Shutdown command received. Stopping the server...
+2024-12-16 23:57:53,824 - ConsoleInterface - INFO - Stopping console interface...
+2024-12-16 23:57:53,825 - ConsoleInterface - DEBUG - User input task cancelled.
+2024-12-16 23:57:53,836 - ConsoleInterface - INFO - Console interface stopped.
+2024-12-16 23:57:53,837 - NetworkServer - INFO - Stopping NetworkServer...
+2024-12-16 23:57:53,838 - NetworkServer - INFO - NetworkServer stopped.
+2024-12-16 23:57:53,842 - Main - INFO - Server shut down cleanly.
+2024-12-17 00:12:18,287 - Main - INFO - Loading server components...
+2024-12-17 00:12:18,291 - SSLManager - INFO - SSL enabled with provided (or self-signed) certificate and key.
+2024-12-17 00:12:18,293 - Main - INFO - Components loaded:
+2024-12-17 00:12:18,299 - Main - INFO -  - Network
+2024-12-17 00:12:18,300 - Main - INFO -  - User Service
+2024-12-17 00:12:18,301 - Main - INFO -  - Map Service
+2024-12-17 00:12:18,302 - Main - INFO -  - AI Service
+2024-12-17 00:12:18,303 - Main - INFO -  - Role Service
+2024-12-17 00:12:18,313 - Main - INFO -  - Physics Service
+2024-12-17 00:12:18,314 - Main - INFO -  - Movement Service
+2024-12-17 00:12:18,326 - Main - INFO -  - Chat Service
+2024-12-17 00:12:18,328 - EventDispatcher - DEBUG - Subscribed listener handle_chat_message to event 'chat_message'.
+2024-12-17 00:12:18,353 - EventDispatcher - DEBUG - Subscribed listener handle_user_move_request to event 'user_move_request'.
+2024-12-17 00:12:18,354 - EventDispatcher - DEBUG - Subscribed listener handle_user_turn_request to event 'user_turn_request'.
+2024-12-17 00:12:18,367 - EventDispatcher - DEBUG - Subscribed listener handle_create_account to event 'user_account_create_request'.
+2024-12-17 00:12:18,368 - EventDispatcher - DEBUG - Subscribed listener handle_login_request to event 'user_account_login_request'.
+2024-12-17 00:12:18,372 - EventDispatcher - DEBUG - Subscribed listener handle_logout_request to event 'user_account_logout_request'.
+2024-12-17 00:12:18,373 - EventDispatcher - DEBUG - Subscribed listener handle_map_create_request to event 'map_create_request'.
+2024-12-17 00:12:18,374 - EventDispatcher - DEBUG - Subscribed listener handle_map_remove_request to event 'map_remove_request'.
+2024-12-17 00:12:18,386 - EventDispatcher - DEBUG - Subscribed listener handle_map_tile_add_request to event 'map_tile_add_request'.
+2024-12-17 00:12:18,394 - EventDispatcher - DEBUG - Subscribed listener handle_map_tile_remove_request to event 'map_tile_remove_request'.
+2024-12-17 00:12:18,395 - EventDispatcher - DEBUG - Subscribed listener handle_map_zone_add_request to event 'map_zone_add_request'.
+2024-12-17 00:12:18,408 - EventDispatcher - DEBUG - Subscribed listener handle_map_zone_remove_request to event 'map_zone_remove_request'.
+2024-12-17 00:12:18,409 - EventDispatcher - DEBUG - Subscribed listener handle_map_join_request to event 'map_join_request'.
+2024-12-17 00:12:18,425 - EventDispatcher - DEBUG - Subscribed listener handle_map_leave_request to event 'map_leave_request'.
+2024-12-17 00:12:18,427 - EventDispatcher - DEBUG - Subscribed listener handle_map_physics_update_request to event 'map_physics_update_request'.
+2024-12-17 00:12:18,447 - EventDispatcher - DEBUG - Subscribed listener handle_ai_spawn_request to event 'ai_spawn_request'.
+2024-12-17 00:12:18,448 - EventDispatcher - DEBUG - Subscribed listener handle_ai_remove_request to event 'ai_remove_request'.
+2024-12-17 00:12:18,452 - EventDispatcher - DEBUG - Subscribed listener handle_ai_move_request to event 'ai_move_request'.
+2024-12-17 00:12:18,468 - EventDispatcher - DEBUG - Subscribed listener handle_ai_update_health_request to event 'ai_update_health_request'.
+2024-12-17 00:12:18,469 - EventDispatcher - DEBUG - Subscribed listener handle_role_assign_request to event 'role_assign_request'.
+2024-12-17 00:12:18,484 - EventDispatcher - DEBUG - Subscribed listener handle_role_remove_request to event 'role_remove_request'.
+2024-12-17 00:12:18,498 - EventDispatcher - DEBUG - Subscribed listener handle_apply_gravity_request to event 'physics_apply_gravity_request'.
+2024-12-17 00:12:18,516 - EventDispatcher - DEBUG - Subscribed listener handle_jump_request to event 'physics_jump_request'.
+2024-12-17 00:12:18,517 - EventDispatcher - DEBUG - Subscribed listener handle_apply_force_request to event 'physics_apply_force_request'.
+2024-12-17 00:12:18,534 - user_registry - DEBUG - Retrieved all usernames: ['admin']
+2024-12-17 00:12:18,536 - map_registry - INFO - Retrieved list of all map names: ['Main']
+2024-12-17 00:12:18,557 - NetworkServer - INFO - Starting NetworkServer on localhost:33288 with SSL/TLS
+2024-12-17 00:12:18,576 - NetworkServer - INFO - NetworkServer started and listening.
+2024-12-17 00:12:18,577 - Main - INFO - My Awesome Audio Game Server version 1.0.0 started.
+2024-12-17 00:12:18,585 - Main - INFO - Server running on localhost:33288. Type 'exit' in console to shut down.
+2024-12-17 00:13:04,364 - Main - INFO - Logging reconfigured.
+2024-12-17 00:13:04,365 - ConsoleInterface - INFO - Console interface logging reconfigured.
+2024-12-17 00:13:04,374 - ConsoleInterface - INFO - Debug logging turned off.
+2024-12-17 00:13:11,562 - ConsoleInterface - INFO - Shutdown command received. Stopping the server...
+2024-12-17 00:13:11,563 - ConsoleInterface - INFO - Stopping console interface...
+2024-12-17 00:13:11,564 - ConsoleInterface - INFO - Console interface stopped.
+2024-12-17 00:13:11,575 - NetworkServer - INFO - Stopping NetworkServer...
+2024-12-17 00:13:11,576 - NetworkServer - INFO - NetworkServer stopped.
+2024-12-17 00:13:11,577 - Main - INFO - Server shut down complete.
+2024-12-17 01:16:05,258 - Main - INFO - Loading server components...
+2024-12-17 01:16:05,262 - SSLManager - INFO - SSL enabled with provided (or self-signed) certificate and key.
+2024-12-17 01:16:05,263 - Main - INFO - Components loaded:
+2024-12-17 01:16:05,264 - Main - INFO -  - Network
+2024-12-17 01:16:05,274 - Main - INFO -  - User Service
+2024-12-17 01:16:05,275 - Main - INFO -  - Map Service
+2024-12-17 01:16:05,276 - Main - INFO -  - AI Service
+2024-12-17 01:16:05,277 - Main - INFO -  - Role Service
+2024-12-17 01:16:05,278 - Main - INFO -  - Physics Service
+2024-12-17 01:16:05,279 - Main - INFO -  - Movement Service
+2024-12-17 01:16:05,288 - Main - INFO -  - Chat Service
+2024-12-17 01:16:05,289 - map_registry - INFO - Retrieved list of all map names: ['Main']
+2024-12-17 01:16:05,301 - NetworkServer - INFO - Starting NetworkServer on localhost:33288 with SSL/TLS.
+2024-12-17 01:16:05,314 - NetworkServer - INFO - NetworkServer started and accepting connections.
+2024-12-17 01:16:05,314 - Main - INFO - My Awesome Audio Game Server version 1.0.0 started.
+2024-12-17 01:16:05,328 - Main - INFO - Server running on localhost:33288. Type 'exit' in console to shut down.
+2024-12-17 01:16:29,704 - Main - INFO - Logging reconfigured.
+2024-12-17 01:16:29,706 - ConsoleInterface - INFO - Console interface logging reconfigured.
+2024-12-17 01:16:29,717 - ConsoleInterface - INFO - Debug logging turned on.
+2024-12-17 01:16:36,666 - ConsoleInterface - INFO - Shutdown command received. Stopping the server...
+2024-12-17 01:16:36,668 - ConsoleInterface - INFO - Stopping console interface...
+2024-12-17 01:16:36,679 - ConsoleInterface - DEBUG - User input task cancelled.
+2024-12-17 01:16:36,680 - ConsoleInterface - INFO - Console interface stopped.
+2024-12-17 01:16:36,681 - NetworkServer - INFO - Stopping NetworkServer...
+2024-12-17 01:16:36,682 - NetworkServer - INFO - NetworkServer stopped.
+2024-12-17 01:16:36,693 - Main - INFO - Server shut down complete.
+2024-12-17 01:16:39,821 - Main - INFO - Loading server components...
+2024-12-17 01:16:39,826 - SSLManager - INFO - SSL enabled with provided (or self-signed) certificate and key.
+2024-12-17 01:16:39,827 - Main - INFO - Components loaded:
+2024-12-17 01:16:39,836 - Main - INFO -  - Network
+2024-12-17 01:16:39,837 - Main - INFO -  - User Service
+2024-12-17 01:16:39,838 - Main - INFO -  - Map Service
+2024-12-17 01:16:39,839 - Main - INFO -  - AI Service
+2024-12-17 01:16:39,846 - Main - INFO -  - Role Service
+2024-12-17 01:16:39,849 - Main - INFO -  - Physics Service
+2024-12-17 01:16:39,849 - Main - INFO -  - Movement Service
+2024-12-17 01:16:39,867 - Main - INFO -  - Chat Service
+2024-12-17 01:16:39,881 - EventDispatcher - DEBUG - Subscribed listener handle_chat_message to event 'chat_message'.
+2024-12-17 01:16:39,885 - EventDispatcher - DEBUG - Subscribed listener handle_user_move_request to event 'user_move_request'.
+2024-12-17 01:16:39,886 - EventDispatcher - DEBUG - Subscribed listener handle_user_turn_request to event 'user_turn_request'.
+2024-12-17 01:16:39,889 - EventDispatcher - DEBUG - Subscribed listener handle_create_account to event 'user_account_create_request'.
+2024-12-17 01:16:39,890 - EventDispatcher - DEBUG - Subscribed listener handle_login_request to event 'user_account_login_request'.
+2024-12-17 01:16:39,896 - EventDispatcher - DEBUG - Subscribed listener handle_logout_request to event 'user_account_logout_request'.
+2024-12-17 01:16:39,896 - EventDispatcher - DEBUG - Subscribed listener handle_map_create_request to event 'map_create_request'.
+2024-12-17 01:16:39,912 - EventDispatcher - DEBUG - Subscribed listener handle_map_remove_request to event 'map_remove_request'.
+2024-12-17 01:16:39,931 - EventDispatcher - DEBUG - Subscribed listener handle_map_tile_add_request to event 'map_tile_add_request'.
+2024-12-17 01:16:39,932 - EventDispatcher - DEBUG - Subscribed listener handle_map_tile_remove_request to event 'map_tile_remove_request'.
+2024-12-17 01:16:39,935 - EventDispatcher - DEBUG - Subscribed listener handle_map_zone_add_request to event 'map_zone_add_request'.
+2024-12-17 01:16:39,936 - EventDispatcher - DEBUG - Subscribed listener handle_map_zone_remove_request to event 'map_zone_remove_request'.
+2024-12-17 01:16:39,938 - EventDispatcher - DEBUG - Subscribed listener handle_map_join_request to event 'map_join_request'.
+2024-12-17 01:16:39,938 - EventDispatcher - DEBUG - Subscribed listener handle_map_leave_request to event 'map_leave_request'.
+2024-12-17 01:16:39,948 - EventDispatcher - DEBUG - Subscribed listener handle_map_physics_update_request to event 'map_physics_update_request'.
+2024-12-17 01:16:39,949 - EventDispatcher - DEBUG - Subscribed listener handle_ai_spawn_request to event 'ai_spawn_request'.
+2024-12-17 01:16:39,958 - EventDispatcher - DEBUG - Subscribed listener handle_ai_remove_request to event 'ai_remove_request'.
+2024-12-17 01:16:39,959 - EventDispatcher - DEBUG - Subscribed listener handle_ai_move_request to event 'ai_move_request'.
+2024-12-17 01:16:39,975 - EventDispatcher - DEBUG - Subscribed listener handle_ai_update_health_request to event 'ai_update_health_request'.
+2024-12-17 01:16:39,978 - EventDispatcher - DEBUG - Subscribed listener handle_role_assign_request to event 'role_assign_request'.
+2024-12-17 01:16:39,989 - EventDispatcher - DEBUG - Subscribed listener handle_role_remove_request to event 'role_remove_request'.
+2024-12-17 01:16:39,998 - EventDispatcher - DEBUG - Subscribed listener handle_apply_gravity_request to event 'physics_apply_gravity_request'.
+2024-12-17 01:16:39,999 - EventDispatcher - DEBUG - Subscribed listener handle_jump_request to event 'physics_jump_request'.
+2024-12-17 01:16:40,012 - EventDispatcher - DEBUG - Subscribed listener handle_apply_force_request to event 'physics_apply_force_request'.
+2024-12-17 01:16:40,014 - user_registry - DEBUG - Retrieved all usernames: ['admin']
+2024-12-17 01:16:40,031 - map_registry - INFO - Retrieved list of all map names: ['Main']
+2024-12-17 01:16:40,036 - NetworkServer - INFO - Starting NetworkServer on localhost:33288 with SSL/TLS.
+2024-12-17 01:16:40,060 - NetworkServer - INFO - NetworkServer started and accepting connections.
+2024-12-17 01:16:40,061 - Main - INFO - My Awesome Audio Game Server version 1.0.0 started.
+2024-12-17 01:16:40,069 - Main - INFO - Server running on localhost:33288. Type 'exit' in console to shut down.
+2024-12-17 01:17:17,765 - ConsoleInterface - INFO - Shutdown command received. Stopping the server...
+2024-12-17 01:17:17,768 - ConsoleInterface - INFO - Stopping console interface...
+2024-12-17 01:17:17,779 - ConsoleInterface - DEBUG - User input task cancelled.
+2024-12-17 01:17:17,779 - ConsoleInterface - INFO - Console interface stopped.
+2024-12-17 01:17:17,780 - NetworkServer - INFO - Stopping NetworkServer...
+2024-12-17 01:17:17,781 - NetworkServer - INFO - NetworkServer stopped.
+2024-12-17 01:17:17,782 - Main - INFO - Server shut down complete.
+2024-12-17 01:22:27,237 - Main - INFO - Loading server components...
+2024-12-17 01:22:27,239 - SSLManager - DEBUG - SSLManager initialized with cert_file='keys/cert.pem', key_file='keys/key.pem'
+2024-12-17 01:22:27,251 - SSLManager - INFO - SSL enabled with provided (or self-signed) certificate and key.
+2024-12-17 01:22:27,252 - SecurityManager - DEBUG - SecurityManager initialized with jwt_algorithm='HS256', jwt_exp_delta=3600
+2024-12-17 01:22:27,254 - Main - INFO - Components loaded:
+2024-12-17 01:22:27,254 - Main - INFO -  - Network
+2024-12-17 01:22:27,258 - Main - INFO -  - User Service
+2024-12-17 01:22:27,274 - Main - INFO -  - Map Service
+2024-12-17 01:22:27,275 - Main - INFO -  - AI Service
+2024-12-17 01:22:27,293 - Main - INFO -  - Role Service
+2024-12-17 01:22:27,298 - Main - INFO -  - Physics Service
+2024-12-17 01:22:27,316 - Main - INFO -  - Movement Service
+2024-12-17 01:22:27,317 - Main - INFO -  - Chat Service
+2024-12-17 01:22:27,321 - EventDispatcher - DEBUG - Subscribed listener handle_chat_message to event 'chat_message'.
+2024-12-17 01:22:27,322 - EventDispatcher - DEBUG - Subscribed listener handle_user_move_request to event 'user_move_request'.
+2024-12-17 01:22:27,337 - EventDispatcher - DEBUG - Subscribed listener handle_user_turn_request to event 'user_turn_request'.
+2024-12-17 01:22:27,339 - EventDispatcher - DEBUG - Subscribed listener handle_create_account to event 'user_account_create_request'.
+2024-12-17 01:22:27,359 - EventDispatcher - DEBUG - Subscribed listener handle_login_request to event 'user_account_login_request'.
+2024-12-17 01:22:27,373 - EventDispatcher - DEBUG - Subscribed listener handle_logout_request to event 'user_account_logout_request'.
+2024-12-17 01:22:27,374 - EventDispatcher - DEBUG - Subscribed listener handle_map_create_request to event 'map_create_request'.
+2024-12-17 01:22:27,376 - EventDispatcher - DEBUG - Subscribed listener handle_map_remove_request to event 'map_remove_request'.
+2024-12-17 01:22:27,377 - EventDispatcher - DEBUG - Subscribed listener handle_map_tile_add_request to event 'map_tile_add_request'.
+2024-12-17 01:22:27,377 - EventDispatcher - DEBUG - Subscribed listener handle_map_tile_remove_request to event 'map_tile_remove_request'.
+2024-12-17 01:22:27,384 - EventDispatcher - DEBUG - Subscribed listener handle_map_zone_add_request to event 'map_zone_add_request'.
+2024-12-17 01:22:27,403 - EventDispatcher - DEBUG - Subscribed listener handle_map_zone_remove_request to event 'map_zone_remove_request'.
+2024-12-17 01:22:27,405 - EventDispatcher - DEBUG - Subscribed listener handle_map_join_request to event 'map_join_request'.
+2024-12-17 01:22:27,418 - EventDispatcher - DEBUG - Subscribed listener handle_map_leave_request to event 'map_leave_request'.
+2024-12-17 01:22:27,419 - EventDispatcher - DEBUG - Subscribed listener handle_map_physics_update_request to event 'map_physics_update_request'.
+2024-12-17 01:22:27,421 - EventDispatcher - DEBUG - Subscribed listener handle_ai_spawn_request to event 'ai_spawn_request'.
+2024-12-17 01:22:27,422 - EventDispatcher - DEBUG - Subscribed listener handle_ai_remove_request to event 'ai_remove_request'.
+2024-12-17 01:22:27,423 - EventDispatcher - DEBUG - Subscribed listener handle_ai_move_request to event 'ai_move_request'.
+2024-12-17 01:22:27,423 - EventDispatcher - DEBUG - Subscribed listener handle_ai_update_health_request to event 'ai_update_health_request'.
+2024-12-17 01:22:27,433 - EventDispatcher - DEBUG - Subscribed listener handle_role_assign_request to event 'role_assign_request'.
+2024-12-17 01:22:27,434 - EventDispatcher - DEBUG - Subscribed listener handle_role_remove_request to event 'role_remove_request'.
+2024-12-17 01:22:27,456 - EventDispatcher - DEBUG - Subscribed listener handle_apply_gravity_request to event 'physics_apply_gravity_request'.
+2024-12-17 01:22:27,456 - EventDispatcher - DEBUG - Subscribed listener handle_jump_request to event 'physics_jump_request'.
+2024-12-17 01:22:27,463 - EventDispatcher - DEBUG - Subscribed listener handle_apply_force_request to event 'physics_apply_force_request'.
+2024-12-17 01:22:27,474 - user_registry - DEBUG - Retrieved all usernames: ['admin']
+2024-12-17 01:22:27,476 - map_registry - INFO - Retrieved list of all map names: ['Main']
+2024-12-17 01:22:27,493 - NetworkServer - INFO - Starting NetworkServer on localhost:33288 with SSL/TLS.
+2024-12-17 01:22:27,513 - NetworkServer - INFO - NetworkServer started and accepting connections.
+2024-12-17 01:22:27,514 - Main - INFO - My Awesome Audio Game Server version 1.0.0 started.
+2024-12-17 01:22:27,531 - Main - INFO - Server running on localhost:33288. Type 'exit' in console to shut down.
+2024-12-17 01:23:42,455 - ConsoleInterface - INFO - Shutdown command received. Stopping the server...
+2024-12-17 01:23:42,458 - ConsoleInterface - INFO - Stopping console interface...
+2024-12-17 01:23:42,460 - ConsoleInterface - DEBUG - User input task cancelled.
+2024-12-17 01:23:42,470 - ConsoleInterface - INFO - Console interface stopped.
+2024-12-17 01:23:42,487 - NetworkServer - INFO - Stopping NetworkServer...
+2024-12-17 01:23:42,493 - NetworkServer - INFO - NetworkServer stopped.
+2024-12-17 01:23:42,498 - Main - INFO - Server shut down complete.
+2024-12-17 01:26:46,993 - Main - INFO - Loading server components...
+2024-12-17 01:26:46,995 - SSLManager - DEBUG - SSLManager initialized with cert_file='keys/cert.pem', key_file='keys/key.pem'
+2024-12-17 01:26:46,997 - SSLManager - INFO - SSL enabled with provided (or self-signed) certificate and key.
+2024-12-17 01:26:46,998 - SecurityManager - DEBUG - SecurityManager initialized with jwt_algorithm='HS256', jwt_exp_delta=3600
+2024-12-17 01:26:46,999 - ChatService - DEBUG - ChatService initialized.
+2024-12-17 01:26:47,000 - Main - INFO - Components loaded:
+2024-12-17 01:26:47,000 - Main - INFO -  - Network
+2024-12-17 01:26:47,001 - Main - INFO -  - User Service
+2024-12-17 01:26:47,001 - Main - INFO -  - Map Service
+2024-12-17 01:26:47,001 - Main - INFO -  - AI Service
+2024-12-17 01:26:47,002 - Main - INFO -  - Role Service
+2024-12-17 01:26:47,002 - Main - INFO -  - Physics Service
+2024-12-17 01:26:47,003 - Main - INFO -  - Movement Service
+2024-12-17 01:26:47,003 - Main - INFO -  - Chat Service
+2024-12-17 01:26:47,003 - EventDispatcher - DEBUG - Subscribed listener handle_chat_message to event 'chat_message'.
+2024-12-17 01:26:47,004 - ChatService - INFO - ChatService started and subscribed to 'chat_message' event.
+2024-12-17 01:26:47,004 - EventDispatcher - DEBUG - Subscribed listener handle_user_move_request to event 'user_move_request'.
+2024-12-17 01:26:47,005 - EventDispatcher - DEBUG - Subscribed listener handle_user_turn_request to event 'user_turn_request'.
+2024-12-17 01:26:47,005 - EventDispatcher - DEBUG - Subscribed listener handle_create_account to event 'user_account_create_request'.
+2024-12-17 01:26:47,006 - EventDispatcher - DEBUG - Subscribed listener handle_login_request to event 'user_account_login_request'.
+2024-12-17 01:26:47,006 - EventDispatcher - DEBUG - Subscribed listener handle_logout_request to event 'user_account_logout_request'.
+2024-12-17 01:26:47,007 - EventDispatcher - DEBUG - Subscribed listener handle_map_create_request to event 'map_create_request'.
+2024-12-17 01:26:47,007 - EventDispatcher - DEBUG - Subscribed listener handle_map_remove_request to event 'map_remove_request'.
+2024-12-17 01:26:47,007 - EventDispatcher - DEBUG - Subscribed listener handle_map_tile_add_request to event 'map_tile_add_request'.
+2024-12-17 01:26:47,008 - EventDispatcher - DEBUG - Subscribed listener handle_map_tile_remove_request to event 'map_tile_remove_request'.
+2024-12-17 01:26:47,008 - EventDispatcher - DEBUG - Subscribed listener handle_map_zone_add_request to event 'map_zone_add_request'.
+2024-12-17 01:26:47,009 - EventDispatcher - DEBUG - Subscribed listener handle_map_zone_remove_request to event 'map_zone_remove_request'.
+2024-12-17 01:26:47,009 - EventDispatcher - DEBUG - Subscribed listener handle_map_join_request to event 'map_join_request'.
+2024-12-17 01:26:47,010 - EventDispatcher - DEBUG - Subscribed listener handle_map_leave_request to event 'map_leave_request'.
+2024-12-17 01:26:47,010 - EventDispatcher - DEBUG - Subscribed listener handle_map_physics_update_request to event 'map_physics_update_request'.
+2024-12-17 01:26:47,010 - EventDispatcher - DEBUG - Subscribed listener handle_ai_spawn_request to event 'ai_spawn_request'.
+2024-12-17 01:26:47,011 - EventDispatcher - DEBUG - Subscribed listener handle_ai_remove_request to event 'ai_remove_request'.
+2024-12-17 01:26:47,014 - EventDispatcher - DEBUG - Subscribed listener handle_ai_move_request to event 'ai_move_request'.
+2024-12-17 01:26:47,014 - EventDispatcher - DEBUG - Subscribed listener handle_ai_update_health_request to event 'ai_update_health_request'.
+2024-12-17 01:26:47,015 - EventDispatcher - DEBUG - Subscribed listener handle_role_assign_request to event 'role_assign_request'.
+2024-12-17 01:26:47,015 - EventDispatcher - DEBUG - Subscribed listener handle_role_remove_request to event 'role_remove_request'.
+2024-12-17 01:26:47,015 - EventDispatcher - DEBUG - Subscribed listener handle_apply_gravity_request to event 'physics_apply_gravity_request'.
+2024-12-17 01:26:47,016 - EventDispatcher - DEBUG - Subscribed listener handle_jump_request to event 'physics_jump_request'.
+2024-12-17 01:26:47,016 - EventDispatcher - DEBUG - Subscribed listener handle_apply_force_request to event 'physics_apply_force_request'.
+2024-12-17 01:26:47,017 - user_registry - DEBUG - Retrieved all usernames: ['admin']
+2024-12-17 01:26:47,018 - map_registry - INFO - Retrieved list of all map names: ['Main']
+2024-12-17 01:26:47,018 - NetworkServer - INFO - Starting NetworkServer on localhost:33288 with SSL/TLS.
+2024-12-17 01:26:47,025 - NetworkServer - INFO - NetworkServer started and accepting connections.
+2024-12-17 01:26:47,025 - Main - INFO - My Awesome Audio Game Server version 1.0.0 started.
+2024-12-17 01:26:47,026 - Main - INFO - Server running on localhost:33288. Type 'exit' in console to shut down.
+2024-12-17 01:30:55,219 - ConsoleInterface - INFO - Shutdown command received. Stopping the server...
+2024-12-17 01:30:55,221 - ConsoleInterface - INFO - Stopping console interface...
+2024-12-17 01:30:55,222 - ConsoleInterface - DEBUG - User input task cancelled.
+2024-12-17 01:30:55,223 - ConsoleInterface - INFO - Console interface stopped.
+2024-12-17 01:30:55,225 - NetworkServer - INFO - Stopping NetworkServer...
+2024-12-17 01:30:55,226 - NetworkServer - INFO - NetworkServer stopped.
+2024-12-17 01:30:55,227 - Main - INFO - Server shut down complete.
+2024-12-17 01:30:57,768 - Main - INFO - Loading server components...
+2024-12-17 01:30:57,770 - SSLManager - DEBUG - SSLManager initialized with cert_file='keys/cert.pem', key_file='keys/key.pem'
+2024-12-17 01:30:57,784 - SSLManager - INFO - SSL enabled with provided (or self-signed) certificate and key.
+2024-12-17 01:30:57,785 - SecurityManager - DEBUG - SecurityManager initialized with jwt_algorithm='HS256', jwt_exp_delta=3600
+2024-12-17 01:30:57,803 - UserService - DEBUG - UserService initialized.
+2024-12-17 01:30:57,805 - ChatService - DEBUG - ChatService initialized.
+2024-12-17 01:30:57,817 - Main - INFO - Components loaded:
+2024-12-17 01:30:57,818 - Main - INFO -  - Network
+2024-12-17 01:30:57,827 - Main - INFO -  - User Service
+2024-12-17 01:30:57,828 - Main - INFO -  - Map Service
+2024-12-17 01:30:57,840 - Main - INFO -  - AI Service
+2024-12-17 01:30:57,841 - Main - INFO -  - Role Service
+2024-12-17 01:30:57,849 - Main - INFO -  - Physics Service
+2024-12-17 01:30:57,851 - Main - INFO -  - Movement Service
+2024-12-17 01:30:57,867 - Main - INFO -  - Chat Service
+2024-12-17 01:30:57,868 - EventDispatcher - DEBUG - Subscribed listener handle_chat_message to event 'chat_message'.
+2024-12-17 01:30:57,877 - ChatService - INFO - ChatService started and subscribed to 'chat_message' event.
+2024-12-17 01:30:57,879 - EventDispatcher - DEBUG - Subscribed listener handle_user_move_request to event 'user_move_request'.
+2024-12-17 01:30:57,891 - EventDispatcher - DEBUG - Subscribed listener handle_user_turn_request to event 'user_turn_request'.
+2024-12-17 01:30:57,909 - EventDispatcher - DEBUG - Subscribed listener handle_create_account to event 'user_account_create_request'.
+2024-12-17 01:30:57,911 - EventDispatcher - DEBUG - Subscribed listener handle_login_request to event 'user_account_login_request'.
+2024-12-17 01:30:57,912 - EventDispatcher - DEBUG - Subscribed listener handle_logout_request to event 'user_account_logout_request'.
+2024-12-17 01:30:57,932 - UserService - INFO - UserService subscribed to user account events.
+2024-12-17 01:30:57,939 - EventDispatcher - DEBUG - Subscribed listener handle_map_create_request to event 'map_create_request'.
+2024-12-17 01:30:57,951 - EventDispatcher - DEBUG - Subscribed listener handle_map_remove_request to event 'map_remove_request'.
+2024-12-17 01:30:57,952 - EventDispatcher - DEBUG - Subscribed listener handle_map_tile_add_request to event 'map_tile_add_request'.
+2024-12-17 01:30:57,968 - EventDispatcher - DEBUG - Subscribed listener handle_map_tile_remove_request to event 'map_tile_remove_request'.
+2024-12-17 01:30:57,970 - EventDispatcher - DEBUG - Subscribed listener handle_map_zone_add_request to event 'map_zone_add_request'.
+2024-12-17 01:30:57,983 - EventDispatcher - DEBUG - Subscribed listener handle_map_zone_remove_request to event 'map_zone_remove_request'.
+2024-12-17 01:30:57,988 - EventDispatcher - DEBUG - Subscribed listener handle_map_join_request to event 'map_join_request'.
+2024-12-17 01:30:57,989 - EventDispatcher - DEBUG - Subscribed listener handle_map_leave_request to event 'map_leave_request'.
+2024-12-17 01:30:58,006 - EventDispatcher - DEBUG - Subscribed listener handle_map_physics_update_request to event 'map_physics_update_request'.
+2024-12-17 01:30:58,007 - EventDispatcher - DEBUG - Subscribed listener handle_ai_spawn_request to event 'ai_spawn_request'.
+2024-12-17 01:30:58,011 - EventDispatcher - DEBUG - Subscribed listener handle_ai_remove_request to event 'ai_remove_request'.
+2024-12-17 01:30:58,012 - EventDispatcher - DEBUG - Subscribed listener handle_ai_move_request to event 'ai_move_request'.
+2024-12-17 01:30:58,032 - EventDispatcher - DEBUG - Subscribed listener handle_ai_update_health_request to event 'ai_update_health_request'.
+2024-12-17 01:30:58,046 - EventDispatcher - DEBUG - Subscribed listener handle_role_assign_request to event 'role_assign_request'.
+2024-12-17 01:30:58,047 - EventDispatcher - DEBUG - Subscribed listener handle_role_remove_request to event 'role_remove_request'.
+2024-12-17 01:30:58,054 - EventDispatcher - DEBUG - Subscribed listener handle_apply_gravity_request to event 'physics_apply_gravity_request'.
+2024-12-17 01:30:58,058 - EventDispatcher - DEBUG - Subscribed listener handle_jump_request to event 'physics_jump_request'.
+2024-12-17 01:30:58,059 - EventDispatcher - DEBUG - Subscribed listener handle_apply_force_request to event 'physics_apply_force_request'.
+2024-12-17 01:30:58,076 - user_registry - DEBUG - Retrieved all usernames: ['admin']
+2024-12-17 01:30:58,078 - map_registry - INFO - Retrieved list of all map names: ['Main']
+2024-12-17 01:30:58,091 - NetworkServer - INFO - Starting NetworkServer on localhost:33288 with SSL/TLS.
+2024-12-17 01:30:58,120 - NetworkServer - INFO - NetworkServer started and accepting connections.
+2024-12-17 01:30:58,122 - Main - INFO - My Awesome Audio Game Server version 1.0.0 started.
+2024-12-17 01:30:58,127 - Main - INFO - Server running on localhost:33288. Type 'exit' in console to shut down.
+2024-12-17 01:32:27,964 - ConsoleInterface - INFO - Shutdown command received. Stopping the server...
+2024-12-17 01:32:27,966 - ConsoleInterface - INFO - Stopping console interface...
+2024-12-17 01:32:27,969 - ConsoleInterface - DEBUG - User input task cancelled.
+2024-12-17 01:32:27,978 - ConsoleInterface - INFO - Console interface stopped.
+2024-12-17 01:32:27,979 - NetworkServer - INFO - Stopping NetworkServer...
+2024-12-17 01:32:27,980 - NetworkServer - INFO - NetworkServer stopped.
+2024-12-17 01:32:27,981 - Main - INFO - Server shut down complete.
+2024-12-17 01:37:07,221 - Main - INFO - Loading server components...
+2024-12-17 01:37:07,223 - SSLManager - DEBUG - SSLManager initialized with cert_file='keys/cert.pem', key_file='keys/key.pem'
+2024-12-17 01:37:07,228 - SSLManager - INFO - SSL enabled with provided (or self-signed) certificate and key.
+2024-12-17 01:37:07,234 - SecurityManager - DEBUG - SecurityManager initialized with jwt_algorithm='HS256', jwt_exp_delta=3600
+2024-12-17 01:37:07,235 - MapService - DEBUG - MapService initialized.
+2024-12-17 01:37:07,244 - UserService - DEBUG - UserService initialized.
+2024-12-17 01:37:07,247 - ChatService - DEBUG - ChatService initialized.
+2024-12-17 01:37:07,266 - Main - INFO - Components loaded:
+2024-12-17 01:37:07,267 - Main - INFO -  - Network
+2024-12-17 01:37:07,280 - Main - INFO -  - User Service
+2024-12-17 01:37:07,280 - Main - INFO -  - Map Service
+2024-12-17 01:37:07,281 - Main - INFO -  - AI Service
+2024-12-17 01:37:07,283 - Main - INFO -  - Role Service
+2024-12-17 01:37:07,283 - Main - INFO -  - Physics Service
+2024-12-17 01:37:07,293 - Main - INFO -  - Movement Service
+2024-12-17 01:37:07,294 - Main - INFO -  - Chat Service
+2024-12-17 01:37:07,311 - EventDispatcher - DEBUG - Subscribed listener handle_chat_message to event 'chat_message'.
+2024-12-17 01:37:07,312 - ChatService - INFO - ChatService started and subscribed to 'chat_message' event.
+2024-12-17 01:37:07,315 - EventDispatcher - DEBUG - Subscribed listener handle_user_move_request to event 'user_move_request'.
+2024-12-17 01:37:07,316 - EventDispatcher - DEBUG - Subscribed listener handle_user_turn_request to event 'user_turn_request'.
+2024-12-17 01:37:07,319 - EventDispatcher - DEBUG - Subscribed listener handle_create_account to event 'user_account_create_request'.
+2024-12-17 01:37:07,335 - EventDispatcher - DEBUG - Subscribed listener handle_login_request to event 'user_account_login_request'.
+2024-12-17 01:37:07,336 - EventDispatcher - DEBUG - Subscribed listener handle_logout_request to event 'user_account_logout_request'.
+2024-12-17 01:37:07,351 - UserService - INFO - UserService subscribed to user account events.
+2024-12-17 01:37:07,353 - EventDispatcher - DEBUG - Subscribed listener handle_map_create_request to event 'map_create_request'.
+2024-12-17 01:37:07,379 - EventDispatcher - DEBUG - Subscribed listener handle_map_remove_request to event 'map_remove_request'.
+2024-12-17 01:37:07,380 - EventDispatcher - DEBUG - Subscribed listener handle_map_tile_add_request to event 'map_tile_add_request'.
+2024-12-17 01:37:07,399 - EventDispatcher - DEBUG - Subscribed listener handle_map_tile_remove_request to event 'map_tile_remove_request'.
+2024-12-17 01:37:07,401 - EventDispatcher - DEBUG - Subscribed listener handle_map_zone_add_request to event 'map_zone_add_request'.
+2024-12-17 01:37:07,417 - EventDispatcher - DEBUG - Subscribed listener handle_map_zone_remove_request to event 'map_zone_remove_request'.
+2024-12-17 01:37:07,418 - EventDispatcher - DEBUG - Subscribed listener handle_map_join_request to event 'map_join_request'.
+2024-12-17 01:37:07,426 - EventDispatcher - DEBUG - Subscribed listener handle_map_leave_request to event 'map_leave_request'.
+2024-12-17 01:37:07,428 - EventDispatcher - DEBUG - Subscribed listener handle_map_physics_update_request to event 'map_physics_update_request'.
+2024-12-17 01:37:07,445 - MapService - INFO - MapService subscribed to map-related events.
+2024-12-17 01:37:07,446 - EventDispatcher - DEBUG - Subscribed listener handle_ai_spawn_request to event 'ai_spawn_request'.
+2024-12-17 01:37:07,458 - EventDispatcher - DEBUG - Subscribed listener handle_ai_remove_request to event 'ai_remove_request'.
+2024-12-17 01:37:07,459 - EventDispatcher - DEBUG - Subscribed listener handle_ai_move_request to event 'ai_move_request'.
+2024-12-17 01:37:07,476 - EventDispatcher - DEBUG - Subscribed listener handle_ai_update_health_request to event 'ai_update_health_request'.
+2024-12-17 01:37:07,478 - EventDispatcher - DEBUG - Subscribed listener handle_role_assign_request to event 'role_assign_request'.
+2024-12-17 01:37:07,498 - EventDispatcher - DEBUG - Subscribed listener handle_role_remove_request to event 'role_remove_request'.
+2024-12-17 01:37:07,500 - EventDispatcher - DEBUG - Subscribed listener handle_apply_gravity_request to event 'physics_apply_gravity_request'.
+2024-12-17 01:37:07,521 - EventDispatcher - DEBUG - Subscribed listener handle_jump_request to event 'physics_jump_request'.
+2024-12-17 01:37:07,523 - EventDispatcher - DEBUG - Subscribed listener handle_apply_force_request to event 'physics_apply_force_request'.
+2024-12-17 01:37:07,535 - user_registry - DEBUG - Retrieved all usernames: ['admin']
+2024-12-17 01:37:07,536 - map_registry - INFO - Retrieved list of all map names: ['Main']
+2024-12-17 01:37:07,551 - NetworkServer - INFO - Starting NetworkServer on localhost:33288 with SSL/TLS.
+2024-12-17 01:37:07,574 - NetworkServer - INFO - NetworkServer started and accepting connections.
+2024-12-17 01:37:07,575 - Main - INFO - My Awesome Audio Game Server version 1.0.0 started.
+2024-12-17 01:37:07,583 - Main - INFO - Server running on localhost:33288. Type 'exit' in console to shut down.
+2024-12-17 01:41:00,986 - ConsoleInterface - INFO - Shutdown command received. Stopping the server...
+2024-12-17 01:41:00,989 - ConsoleInterface - INFO - Stopping console interface...
+2024-12-17 01:41:00,998 - ConsoleInterface - DEBUG - User input task cancelled.
+2024-12-17 01:41:01,000 - ConsoleInterface - INFO - Console interface stopped.
+2024-12-17 01:41:01,001 - NetworkServer - INFO - Stopping NetworkServer...
+2024-12-17 01:41:01,003 - NetworkServer - INFO - NetworkServer stopped.
+2024-12-17 01:41:01,013 - Main - INFO - Server shut down complete.
+2024-12-17 01:41:09,460 - Main - INFO - Loading server components...
+2024-12-17 01:41:09,462 - SSLManager - DEBUG - SSLManager initialized with cert_file='keys/cert.pem', key_file='keys/key.pem'
+2024-12-17 01:41:09,464 - SSLManager - INFO - SSL enabled with provided (or self-signed) certificate and key.
+2024-12-17 01:41:09,466 - SecurityManager - DEBUG - SecurityManager initialized with jwt_algorithm='HS256', jwt_exp_delta=3600
+2024-12-17 01:41:09,467 - MapService - DEBUG - MapService initialized.
+2024-12-17 01:41:09,468 - UserService - DEBUG - UserService initialized.
+2024-12-17 01:41:09,469 - PhysicsService - DEBUG - PhysicsService initialized.
+2024-12-17 01:41:09,469 - ChatService - DEBUG - ChatService initialized.
+2024-12-17 01:41:09,470 - Main - INFO - Components loaded:
+2024-12-17 01:41:09,470 - Main - INFO -  - Network
+2024-12-17 01:41:09,471 - Main - INFO -  - User Service
+2024-12-17 01:41:09,471 - Main - INFO -  - Map Service
+2024-12-17 01:41:09,472 - Main - INFO -  - AI Service
+2024-12-17 01:41:09,473 - Main - INFO -  - Role Service
+2024-12-17 01:41:09,473 - Main - INFO -  - Physics Service
+2024-12-17 01:41:09,474 - Main - INFO -  - Movement Service
+2024-12-17 01:41:09,474 - Main - INFO -  - Chat Service
+2024-12-17 01:41:09,475 - EventDispatcher - DEBUG - Subscribed listener handle_chat_message to event 'chat_message'.
+2024-12-17 01:41:09,475 - ChatService - INFO - ChatService started and subscribed to 'chat_message' event.
+2024-12-17 01:41:09,476 - EventDispatcher - DEBUG - Subscribed listener handle_user_move_request to event 'user_move_request'.
+2024-12-17 01:41:09,476 - EventDispatcher - DEBUG - Subscribed listener handle_user_turn_request to event 'user_turn_request'.
+2024-12-17 01:41:09,477 - EventDispatcher - DEBUG - Subscribed listener handle_create_account to event 'user_account_create_request'.
+2024-12-17 01:41:09,477 - EventDispatcher - DEBUG - Subscribed listener handle_login_request to event 'user_account_login_request'.
+2024-12-17 01:41:09,478 - EventDispatcher - DEBUG - Subscribed listener handle_logout_request to event 'user_account_logout_request'.
+2024-12-17 01:41:09,478 - UserService - INFO - UserService subscribed to user account events.
+2024-12-17 01:41:09,479 - EventDispatcher - DEBUG - Subscribed listener handle_map_create_request to event 'map_create_request'.
+2024-12-17 01:41:09,479 - EventDispatcher - DEBUG - Subscribed listener handle_map_remove_request to event 'map_remove_request'.
+2024-12-17 01:41:09,479 - EventDispatcher - DEBUG - Subscribed listener handle_map_tile_add_request to event 'map_tile_add_request'.
+2024-12-17 01:41:09,480 - EventDispatcher - DEBUG - Subscribed listener handle_map_tile_remove_request to event 'map_tile_remove_request'.
+2024-12-17 01:41:09,480 - EventDispatcher - DEBUG - Subscribed listener handle_map_zone_add_request to event 'map_zone_add_request'.
+2024-12-17 01:41:09,481 - EventDispatcher - DEBUG - Subscribed listener handle_map_zone_remove_request to event 'map_zone_remove_request'.
+2024-12-17 01:41:09,484 - EventDispatcher - DEBUG - Subscribed listener handle_map_join_request to event 'map_join_request'.
+2024-12-17 01:41:09,485 - EventDispatcher - DEBUG - Subscribed listener handle_map_leave_request to event 'map_leave_request'.
+2024-12-17 01:41:09,485 - EventDispatcher - DEBUG - Subscribed listener handle_map_physics_update_request to event 'map_physics_update_request'.
+2024-12-17 01:41:09,486 - MapService - INFO - MapService subscribed to map-related events.
+2024-12-17 01:41:09,487 - EventDispatcher - DEBUG - Subscribed listener handle_ai_spawn_request to event 'ai_spawn_request'.
+2024-12-17 01:41:09,488 - EventDispatcher - DEBUG - Subscribed listener handle_ai_remove_request to event 'ai_remove_request'.
+2024-12-17 01:41:09,489 - EventDispatcher - DEBUG - Subscribed listener handle_ai_move_request to event 'ai_move_request'.
+2024-12-17 01:41:09,489 - EventDispatcher - DEBUG - Subscribed listener handle_ai_update_health_request to event 'ai_update_health_request'.
+2024-12-17 01:41:09,490 - EventDispatcher - DEBUG - Subscribed listener handle_role_assign_request to event 'role_assign_request'.
+2024-12-17 01:41:09,490 - EventDispatcher - DEBUG - Subscribed listener handle_role_remove_request to event 'role_remove_request'.
+2024-12-17 01:41:09,491 - EventDispatcher - DEBUG - Subscribed listener handle_apply_gravity_request to event 'physics_apply_gravity_request'.
+2024-12-17 01:41:09,491 - EventDispatcher - DEBUG - Subscribed listener handle_jump_request to event 'physics_jump_request'.
+2024-12-17 01:41:09,492 - EventDispatcher - DEBUG - Subscribed listener handle_apply_force_request to event 'physics_apply_force_request'.
+2024-12-17 01:41:09,492 - PhysicsService - INFO - PhysicsService subscribed to physics-related events.
+2024-12-17 01:41:09,492 - user_registry - DEBUG - Retrieved all usernames: ['admin']
+2024-12-17 01:41:09,494 - map_registry - INFO - Retrieved list of all map names: ['Main']
+2024-12-17 01:41:09,495 - NetworkServer - INFO - Starting NetworkServer on localhost:33288 with SSL/TLS.
+2024-12-17 01:41:09,502 - NetworkServer - INFO - NetworkServer started and accepting connections.
+2024-12-17 01:41:09,502 - Main - INFO - My Awesome Audio Game Server version 1.0.0 started.
+2024-12-17 01:41:09,503 - Main - INFO - Server running on localhost:33288. Type 'exit' in console to shut down.
+2024-12-17 01:41:23,844 - ConsoleInterface - INFO - Shutdown command received. Stopping the server...
+2024-12-17 01:41:23,847 - ConsoleInterface - INFO - Stopping console interface...
+2024-12-17 01:41:23,858 - ConsoleInterface - DEBUG - User input task cancelled.
+2024-12-17 01:41:23,859 - ConsoleInterface - INFO - Console interface stopped.
+2024-12-17 01:41:23,860 - NetworkServer - INFO - Stopping NetworkServer...
+2024-12-17 01:41:23,861 - NetworkServer - INFO - NetworkServer stopped.
+2024-12-17 01:41:23,873 - Main - INFO - Server shut down complete.
+2024-12-17 01:45:43,825 - Main - INFO - Loading server components...
+2024-12-17 01:45:43,827 - SSLManager - DEBUG - SSLManager initialized with cert_file='keys/cert.pem', key_file='keys/key.pem'
+2024-12-17 01:45:43,829 - SSLManager - INFO - SSL enabled with provided (or self-signed) certificate and key.
+2024-12-17 01:45:43,830 - SecurityManager - DEBUG - SecurityManager initialized with jwt_algorithm='HS256', jwt_exp_delta=3600
+2024-12-17 01:45:43,831 - MapService - DEBUG - MapService initialized.
+2024-12-17 01:45:43,832 - UserService - DEBUG - UserService initialized.
+2024-12-17 01:45:43,833 - PhysicsService - DEBUG - PhysicsService initialized.
+2024-12-17 01:45:43,833 - ChatService - DEBUG - ChatService initialized.
+2024-12-17 01:45:43,834 - EventDispatcher - DEBUG - Subscribed listener handle_chat_message to event 'chat_message'.
+2024-12-17 01:45:43,834 - ChatService - INFO - ChatService started and subscribed to 'chat_message' event.
+2024-12-17 01:45:43,835 - EventDispatcher - DEBUG - Subscribed listener handle_user_move_request to event 'user_move_request'.
+2024-12-17 01:45:43,835 - EventDispatcher - DEBUG - Subscribed listener handle_user_turn_request to event 'user_turn_request'.
+2024-12-17 01:45:43,836 - EventDispatcher - DEBUG - Subscribed listener handle_create_account to event 'user_account_create_request'.
+2024-12-17 01:45:43,837 - EventDispatcher - DEBUG - Subscribed listener handle_login_request to event 'user_account_login_request'.
+2024-12-17 01:45:43,837 - EventDispatcher - DEBUG - Subscribed listener handle_logout_request to event 'user_account_logout_request'.
+2024-12-17 01:45:43,838 - UserService - INFO - UserService subscribed to user account events.
+2024-12-17 01:45:43,839 - EventDispatcher - DEBUG - Subscribed listener handle_map_create_request to event 'map_create_request'.
+2024-12-17 01:45:43,839 - EventDispatcher - DEBUG - Subscribed listener handle_map_remove_request to event 'map_remove_request'.
+2024-12-17 01:45:43,840 - EventDispatcher - DEBUG - Subscribed listener handle_map_tile_add_request to event 'map_tile_add_request'.
+2024-12-17 01:45:43,840 - EventDispatcher - DEBUG - Subscribed listener handle_map_tile_remove_request to event 'map_tile_remove_request'.
+2024-12-17 01:45:43,841 - EventDispatcher - DEBUG - Subscribed listener handle_map_zone_add_request to event 'map_zone_add_request'.
+2024-12-17 01:45:43,841 - EventDispatcher - DEBUG - Subscribed listener handle_map_zone_remove_request to event 'map_zone_remove_request'.
+2024-12-17 01:45:43,842 - EventDispatcher - DEBUG - Subscribed listener handle_map_join_request to event 'map_join_request'.
+2024-12-17 01:45:43,845 - EventDispatcher - DEBUG - Subscribed listener handle_map_leave_request to event 'map_leave_request'.
+2024-12-17 01:45:43,845 - EventDispatcher - DEBUG - Subscribed listener handle_map_physics_update_request to event 'map_physics_update_request'.
+2024-12-17 01:45:43,846 - MapService - INFO - MapService subscribed to map-related events.
+2024-12-17 01:45:43,847 - EventDispatcher - DEBUG - Subscribed listener handle_ai_spawn_request to event 'ai_spawn_request'.
+2024-12-17 01:45:43,847 - EventDispatcher - DEBUG - Subscribed listener handle_ai_remove_request to event 'ai_remove_request'.
+2024-12-17 01:45:43,848 - EventDispatcher - DEBUG - Subscribed listener handle_ai_move_request to event 'ai_move_request'.
+2024-12-17 01:45:43,848 - EventDispatcher - DEBUG - Subscribed listener handle_ai_update_health_request to event 'ai_update_health_request'.
+2024-12-17 01:45:43,849 - EventDispatcher - DEBUG - Subscribed listener handle_role_assign_request to event 'role_assign_request'.
+2024-12-17 01:45:43,849 - EventDispatcher - DEBUG - Subscribed listener handle_role_remove_request to event 'role_remove_request'.
+2024-12-17 01:45:43,849 - EventDispatcher - DEBUG - Subscribed listener handle_apply_gravity_request to event 'physics_apply_gravity_request'.
+2024-12-17 01:45:43,850 - EventDispatcher - DEBUG - Subscribed listener handle_jump_request to event 'physics_jump_request'.
+2024-12-17 01:45:43,850 - EventDispatcher - DEBUG - Subscribed listener handle_apply_force_request to event 'physics_apply_force_request'.
+2024-12-17 01:45:43,851 - PhysicsService - INFO - PhysicsService subscribed to physics-related events.
+2024-12-17 01:45:43,852 - user_registry - DEBUG - Retrieved all usernames: ['admin']
+2024-12-17 01:45:43,852 - map_registry - INFO - Retrieved list of all map names: ['Main']
+2024-12-17 01:45:43,853 - NetworkServer - INFO - Starting NetworkServer on localhost:33288 with SSL/TLS.
+2024-12-17 01:45:43,860 - NetworkServer - INFO - NetworkServer started and accepting connections.
+2024-12-17 01:45:43,860 - Main - INFO - My Awesome Audio Game Server version 1.0.0 started.
+2024-12-17 01:45:43,861 - Main - INFO - Server running on localhost:33288. Type 'exit' in console to shut down.
+2024-12-17 01:46:12,292 - Main - INFO - Logging reconfigured.
+2024-12-17 01:46:12,294 - ConsoleInterface - INFO - Console interface logging reconfigured.
+2024-12-17 01:46:12,294 - ConsoleInterface - INFO - Debug logging turned off.
+2024-12-17 01:46:14,459 - ConsoleInterface - INFO - Shutdown command received. Stopping the server...
+2024-12-17 01:46:14,462 - ConsoleInterface - INFO - Stopping console interface...
+2024-12-17 01:46:14,463 - ConsoleInterface - INFO - Console interface stopped.
+2024-12-17 01:46:14,476 - NetworkServer - INFO - Stopping NetworkServer...
+2024-12-17 01:46:14,487 - NetworkServer - INFO - NetworkServer stopped.
+2024-12-17 01:46:14,490 - Main - INFO - Server shut down complete.
+2024-12-17 01:46:22,349 - Main - INFO - Loading server components...
+2024-12-17 01:46:22,352 - SSLManager - INFO - SSL enabled with provided (or self-signed) certificate and key.
+2024-12-17 01:46:22,354 - ChatService - INFO - ChatService started and subscribed to 'chat_message' event.
+2024-12-17 01:46:22,354 - UserService - INFO - UserService subscribed to user account events.
+2024-12-17 01:46:22,365 - MapService - INFO - MapService subscribed to map-related events.
+2024-12-17 01:46:22,367 - PhysicsService - INFO - PhysicsService subscribed to physics-related events.
+2024-12-17 01:46:22,368 - map_registry - INFO - Retrieved list of all map names: ['Main']
+2024-12-17 01:46:22,383 - NetworkServer - INFO - Starting NetworkServer on localhost:33288 with SSL/TLS.
+2024-12-17 01:46:22,409 - NetworkServer - INFO - NetworkServer started and accepting connections.
+2024-12-17 01:46:22,409 - Main - INFO - My Awesome Audio Game Server version 1.0.0 started.
+2024-12-17 01:46:22,417 - Main - INFO - Server running on localhost:33288. Type 'exit' in console to shut down.
+2024-12-17 01:47:59,089 - ConsoleInterface - INFO - Shutdown command received. Stopping the server...
+2024-12-17 01:47:59,090 - ConsoleInterface - INFO - Stopping console interface...
+2024-12-17 01:47:59,102 - ConsoleInterface - INFO - Console interface stopped.
+2024-12-17 01:47:59,105 - NetworkServer - INFO - Stopping NetworkServer...
+2024-12-17 01:47:59,106 - NetworkServer - INFO - NetworkServer stopped.
+2024-12-17 01:47:59,107 - Main - INFO - Server shut down complete.
+2024-12-17 01:54:50,013 - Main - INFO - Loading server components...
+2024-12-17 01:54:50,019 - SSLManager - INFO - SSL enabled with provided (or self-signed) certificate and key.
+2024-12-17 01:54:50,021 - ChatService - INFO - ChatService started and subscribed to 'chat_message' event.
+2024-12-17 01:54:50,029 - UserService - INFO - UserService subscribed to user account events.
+2024-12-17 01:54:50,031 - MapService - INFO - MapService subscribed to map-related events.
+2024-12-17 01:54:50,042 - AIService - INFO - AIService subscribed to AI-related events.
+2024-12-17 01:54:50,042 - RoleService - INFO - RoleService subscribed to role-related events.
+2024-12-17 01:54:50,052 - PhysicsService - INFO - PhysicsService subscribed to physics-related events.
+2024-12-17 01:54:50,070 - map_registry - INFO - Retrieved list of all map names: ['Main']
+2024-12-17 01:54:50,071 - NetworkServer - INFO - Starting NetworkServer on localhost:33288 with SSL/TLS.
+2024-12-17 01:54:50,084 - NetworkServer - INFO - NetworkServer started and accepting connections.
+2024-12-17 01:54:50,085 - Main - INFO - My Awesome Audio Game Server version 1.0.0 started.
+2024-12-17 01:54:50,096 - Main - INFO - Server running on localhost:33288. Type 'exit' in console to shut down.
+2024-12-17 01:55:14,331 - ConsoleInterface - INFO - Shutdown command received. Stopping the server...
+2024-12-17 01:55:14,333 - ConsoleInterface - INFO - Stopping console interface...
+2024-12-17 01:55:14,335 - ConsoleInterface - INFO - Console interface stopped.
+2024-12-17 01:55:14,346 - NetworkServer - INFO - Stopping NetworkServer...
+2024-12-17 01:55:14,347 - NetworkServer - INFO - NetworkServer stopped.
+2024-12-17 01:55:14,348 - Main - INFO - Server shut down complete.
+2024-12-17 01:55:48,449 - Main - INFO - Loading server components...
+2024-12-17 01:55:48,450 - SSLManager - WARNING - SSL certificates not found. Generating a self-signed certificate...
+2024-12-17 01:55:48,484 - SSLManager - INFO - Self-signed SSL certificate and key generated successfully.
+2024-12-17 01:55:48,487 - SSLManager - INFO - SSL enabled with provided (or self-signed) certificate and key.
+2024-12-17 01:55:48,489 - ChatService - INFO - ChatService started and subscribed to 'chat_message' event.
+2024-12-17 01:55:48,498 - UserService - INFO - UserService subscribed to user account events.
+2024-12-17 01:55:48,499 - MapService - INFO - MapService subscribed to map-related events.
+2024-12-17 01:55:48,499 - AIService - INFO - AIService subscribed to AI-related events.
+2024-12-17 01:55:48,500 - RoleService - INFO - RoleService subscribed to role-related events.
+2024-12-17 01:55:48,500 - PhysicsService - INFO - PhysicsService subscribed to physics-related events.
+2024-12-17 01:55:48,501 - EventDispatcher - INFO - Dispatching event 'user_account_create_request' with data: {'client_id': 'server_startup', 'message': {'message_type': 'user_account_create_request', 'username': 'admin', 'password': 'adminpass', 'role': 'developer', 'current_map': 'Main'}}
+2024-12-17 01:55:48,657 - user_registry - INFO - Account created successfully for username: admin
+2024-12-17 01:55:48,658 - UserService - INFO - Account created successfully for username='admin'.
+2024-12-17 01:55:48,671 - EventDispatcher - INFO - Dispatching event 'user_account_create_ok' with data: {'client_id': 'server_startup', 'message': {'username': 'admin', 'role': 'developer'}}
+2024-12-17 01:55:48,672 - map_registry - INFO - Retrieved list of all map names: []
+2024-12-17 01:55:48,673 - EventDispatcher - INFO - Dispatching event 'map_create_request' with data: {'client_id': 'server_startup', 'message': {'message_type': 'map_create_request', 'username': 'admin', 'map_name': 'Main', 'map_size': (0.0, 99.0, 0.0, 99.0, 0.0, 9.0), 'start_position': (0.0, 0.0, 0.0), 'is_public': True, 'tiles': {'672b0875-2c22-4b67-bb7f-3ca00546304c': {'tile_position': (0.0, 99.0, 0.0, 99.0, 0.0, 1.0), 'tile_type': 'grass', 'is_wall': False}}}}
+2024-12-17 01:55:48,675 - map_registry - INFO - Map 'Main' saved successfully.
+2024-12-17 01:55:48,676 - MapService - INFO - Map 'Main' created successfully.
+2024-12-17 01:55:48,684 - EventDispatcher - INFO - Dispatching event 'map_create_ok' with data: {'client_id': 'server_startup', 'message': {'map_name': 'Main'}}
+2024-12-17 01:55:48,704 - NetworkServer - INFO - Starting NetworkServer on localhost:33288 with SSL/TLS.
+2024-12-17 01:55:48,726 - NetworkServer - INFO - NetworkServer started and accepting connections.
+2024-12-17 01:55:48,728 - Main - INFO - My Awesome Audio Game Server version 1.0.0 started.
+2024-12-17 01:55:48,746 - Main - INFO - Server running on localhost:33288. Type 'exit' in console to shut down.
+2024-12-17 01:59:42,702 - ConsoleInterface - INFO - Shutdown command received. Stopping the server...
+2024-12-17 01:59:42,704 - ConsoleInterface - INFO - Stopping console interface...
+2024-12-17 01:59:42,719 - ConsoleInterface - INFO - Console interface stopped.
+2024-12-17 01:59:42,720 - NetworkServer - INFO - Stopping NetworkServer...
+2024-12-17 01:59:42,724 - NetworkServer - INFO - NetworkServer stopped.
+2024-12-17 01:59:42,724 - Main - INFO - Server shut down complete.
+2024-12-17 02:01:41,698 - Main - INFO - Loading server components...
+2024-12-17 02:01:41,878 - SSLManager - INFO - SSL enabled with provided (or self-signed) certificate and key.
+2024-12-17 02:01:41,881 - ChatService - INFO - ChatService started and subscribed to 'chat_message' event.
+2024-12-17 02:01:41,883 - UserService - INFO - UserService subscribed to user account events.
+2024-12-17 02:01:41,884 - MapService - INFO - MapService subscribed to map-related events.
+2024-12-17 02:01:41,885 - AIService - INFO - AIService subscribed to AI-related events.
+2024-12-17 02:01:41,886 - RoleService - INFO - RoleService subscribed to role-related events.
+2024-12-17 02:01:41,887 - PhysicsService - INFO - PhysicsService subscribed to physics-related events.
+2024-12-17 02:01:41,889 - map_registry - INFO - Retrieved list of all map names: ['Main']
+2024-12-17 02:01:41,891 - NetworkServer - INFO - Starting NetworkServer on localhost:33288 with SSL/TLS.
+2024-12-17 02:01:41,900 - NetworkServer - INFO - NetworkServer started and accepting connections.
+2024-12-17 02:01:41,901 - Main - INFO - My Awesome Audio Game Server version 1.0.0 started.
+2024-12-17 02:01:41,902 - Main - INFO - Server running on localhost:33288. Type 'exit' in console to shut down.
+2024-12-17 02:02:05,397 - Main - INFO - Logging reconfigured.
+2024-12-17 02:02:05,399 - ConsoleInterface - INFO - Console interface logging reconfigured.
+2024-12-17 02:02:05,400 - ConsoleInterface - INFO - Debug logging turned on.
+2024-12-17 02:02:15,351 - ConsoleInterface - INFO - Shutdown command received. Stopping the server...
+2024-12-17 02:02:15,353 - ConsoleInterface - INFO - Stopping console interface...
+2024-12-17 02:02:15,354 - ConsoleInterface - DEBUG - User input task cancelled.
+2024-12-17 02:02:15,356 - ConsoleInterface - INFO - Console interface stopped.
+2024-12-17 02:02:15,357 - NetworkServer - INFO - Stopping NetworkServer...
+2024-12-17 02:02:15,358 - NetworkServer - INFO - NetworkServer stopped.
+2024-12-17 02:02:15,359 - Main - INFO - Server shut down complete.
+2024-12-17 02:02:18,698 - Main - INFO - Loading server components...
+2024-12-17 02:02:18,700 - SSLManager - DEBUG - SSLManager initialized with cert_file='keys/cert.pem', key_file='keys/key.pem'
+2024-12-17 02:02:18,702 - SSLManager - INFO - SSL enabled with provided (or self-signed) certificate and key.
+2024-12-17 02:02:18,703 - SecurityManager - DEBUG - SecurityManager initialized with jwt_algorithm='HS256', jwt_exp_delta=3600
+2024-12-17 02:02:18,704 - EventDispatcher - DEBUG - EventDispatcher initialized.
+2024-12-17 02:02:18,704 - MapService - DEBUG - MapService initialized.
+2024-12-17 02:02:18,705 - UserService - DEBUG - UserService initialized.
+2024-12-17 02:02:18,706 - AIService - DEBUG - AIService initialized.
+2024-12-17 02:02:18,707 - RoleService - DEBUG - RoleService initialized.
+2024-12-17 02:02:18,707 - PhysicsService - DEBUG - PhysicsService initialized.
+2024-12-17 02:02:18,708 - ChatService - DEBUG - ChatService initialized.
+2024-12-17 02:02:18,709 - EventDispatcher - DEBUG - Subscribed listener 'handle_chat_message' to event 'chat_message'.
+2024-12-17 02:02:18,709 - ChatService - INFO - ChatService started and subscribed to 'chat_message' event.
+2024-12-17 02:02:18,710 - EventDispatcher - DEBUG - Subscribed listener 'handle_user_move_request' to event 'user_move_request'.
+2024-12-17 02:02:18,711 - EventDispatcher - DEBUG - Subscribed listener 'handle_user_turn_request' to event 'user_turn_request'.
+2024-12-17 02:02:18,711 - EventDispatcher - DEBUG - Subscribed listener 'handle_create_account' to event 'user_account_create_request'.
+2024-12-17 02:02:18,712 - EventDispatcher - DEBUG - Subscribed listener 'handle_login_request' to event 'user_account_login_request'.
+2024-12-17 02:02:18,713 - EventDispatcher - DEBUG - Subscribed listener 'handle_logout_request' to event 'user_account_logout_request'.
+2024-12-17 02:02:18,713 - UserService - INFO - UserService subscribed to user account events.
+2024-12-17 02:02:18,714 - EventDispatcher - DEBUG - Subscribed listener 'handle_map_create_request' to event 'map_create_request'.
+2024-12-17 02:02:18,714 - EventDispatcher - DEBUG - Subscribed listener 'handle_map_remove_request' to event 'map_remove_request'.
+2024-12-17 02:02:18,715 - EventDispatcher - DEBUG - Subscribed listener 'handle_map_tile_add_request' to event 'map_tile_add_request'.
+2024-12-17 02:02:18,716 - EventDispatcher - DEBUG - Subscribed listener 'handle_map_tile_remove_request' to event 'map_tile_remove_request'.
+2024-12-17 02:02:18,720 - EventDispatcher - DEBUG - Subscribed listener 'handle_map_zone_add_request' to event 'map_zone_add_request'.
+2024-12-17 02:02:18,738 - EventDispatcher - DEBUG - Subscribed listener 'handle_map_zone_remove_request' to event 'map_zone_remove_request'.
+2024-12-17 02:02:18,740 - EventDispatcher - DEBUG - Subscribed listener 'handle_map_join_request' to event 'map_join_request'.
+2024-12-17 02:02:18,760 - EventDispatcher - DEBUG - Subscribed listener 'handle_map_leave_request' to event 'map_leave_request'.
+2024-12-17 02:02:18,761 - EventDispatcher - DEBUG - Subscribed listener 'handle_map_physics_update_request' to event 'map_physics_update_request'.
+2024-12-17 02:02:18,765 - MapService - INFO - MapService subscribed to map-related events.
+2024-12-17 02:02:18,767 - EventDispatcher - DEBUG - Subscribed listener 'handle_ai_spawn_request' to event 'ai_spawn_request'.
+2024-12-17 02:02:18,782 - EventDispatcher - DEBUG - Subscribed listener 'handle_ai_remove_request' to event 'ai_remove_request'.
+2024-12-17 02:02:18,785 - EventDispatcher - DEBUG - Subscribed listener 'handle_ai_move_request' to event 'ai_move_request'.
+2024-12-17 02:02:18,803 - EventDispatcher - DEBUG - Subscribed listener 'handle_ai_update_health_request' to event 'ai_update_health_request'.
+2024-12-17 02:02:18,816 - AIService - INFO - AIService subscribed to AI-related events.
+2024-12-17 02:02:18,817 - EventDispatcher - DEBUG - Subscribed listener 'handle_role_assign_request' to event 'role_assign_request'.
+2024-12-17 02:02:18,824 - EventDispatcher - DEBUG - Subscribed listener 'handle_role_remove_request' to event 'role_remove_request'.
+2024-12-17 02:02:18,827 - RoleService - INFO - RoleService subscribed to role-related events.
+2024-12-17 02:02:18,847 - EventDispatcher - DEBUG - Subscribed listener 'handle_apply_gravity_request' to event 'physics_apply_gravity_request'.
+2024-12-17 02:02:18,860 - EventDispatcher - DEBUG - Subscribed listener 'handle_jump_request' to event 'physics_jump_request'.
+2024-12-17 02:02:18,862 - EventDispatcher - DEBUG - Subscribed listener 'handle_apply_force_request' to event 'physics_apply_force_request'.
+2024-12-17 02:02:18,863 - PhysicsService - INFO - PhysicsService subscribed to physics-related events.
+2024-12-17 02:02:18,866 - user_registry - DEBUG - Retrieved all usernames: ['admin']
+2024-12-17 02:02:18,867 - map_registry - INFO - Retrieved list of all map names: ['Main']
+2024-12-17 02:02:18,870 - NetworkServer - INFO - Starting NetworkServer on localhost:33288 with SSL/TLS.
+2024-12-17 02:02:18,889 - NetworkServer - INFO - NetworkServer started and accepting connections.
+2024-12-17 02:02:18,889 - Main - INFO - My Awesome Audio Game Server version 1.0.0 started.
+2024-12-17 02:02:18,892 - Main - INFO - Server running on localhost:33288. Type 'exit' in console to shut down.
+2024-12-17 02:02:56,254 - ConsoleInterface - INFO - Shutdown command received. Stopping the server...
+2024-12-17 02:02:56,256 - ConsoleInterface - INFO - Stopping console interface...
+2024-12-17 02:02:56,268 - ConsoleInterface - DEBUG - User input task cancelled.
+2024-12-17 02:02:56,284 - ConsoleInterface - INFO - Console interface stopped.
+2024-12-17 02:02:56,298 - NetworkServer - INFO - Stopping NetworkServer...
+2024-12-17 02:02:56,300 - NetworkServer - INFO - NetworkServer stopped.
+2024-12-17 02:02:56,312 - Main - INFO - Server shut down complete.
+2024-12-17 02:03:17,654 - Main - INFO - Loading server components...
+2024-12-17 02:03:17,655 - SSLManager - DEBUG - SSLManager initialized with cert_file='keys/cert.pem', key_file='keys/key.pem'
+2024-12-17 02:03:17,659 - SSLManager - WARNING - SSL certificates not found. Generating a self-signed certificate...
+2024-12-17 02:03:17,669 - SSLManager - DEBUG - Generating RSA private key.
+2024-12-17 02:03:17,692 - SSLManager - DEBUG - Building a self-signed certificate.
+2024-12-17 02:03:17,694 - SSLManager - DEBUG - Writing private key and certificate to disk.
+2024-12-17 02:03:17,696 - SSLManager - INFO - Self-signed SSL certificate and key generated successfully.
+2024-12-17 02:03:17,708 - SSLManager - INFO - SSL enabled with provided (or self-signed) certificate and key.
+2024-12-17 02:03:17,709 - SecurityManager - DEBUG - SecurityManager initialized with jwt_algorithm='HS256', jwt_exp_delta=3600
+2024-12-17 02:03:17,710 - EventDispatcher - DEBUG - EventDispatcher initialized.
+2024-12-17 02:03:17,720 - MapService - DEBUG - MapService initialized.
+2024-12-17 02:03:17,722 - UserService - DEBUG - UserService initialized.
+2024-12-17 02:03:17,741 - AIService - DEBUG - AIService initialized.
+2024-12-17 02:03:17,743 - RoleService - DEBUG - RoleService initialized.
+2024-12-17 02:03:17,759 - PhysicsService - DEBUG - PhysicsService initialized.
+2024-12-17 02:03:17,760 - ChatService - DEBUG - ChatService initialized.
+2024-12-17 02:03:17,764 - EventDispatcher - DEBUG - Subscribed listener 'handle_chat_message' to event 'chat_message'.
+2024-12-17 02:03:17,764 - ChatService - INFO - ChatService started and subscribed to 'chat_message' event.
+2024-12-17 02:03:17,774 - EventDispatcher - DEBUG - Subscribed listener 'handle_user_move_request' to event 'user_move_request'.
+2024-12-17 02:03:17,775 - EventDispatcher - DEBUG - Subscribed listener 'handle_user_turn_request' to event 'user_turn_request'.
+2024-12-17 02:03:17,790 - EventDispatcher - DEBUG - Subscribed listener 'handle_create_account' to event 'user_account_create_request'.
+2024-12-17 02:03:17,791 - EventDispatcher - DEBUG - Subscribed listener 'handle_login_request' to event 'user_account_login_request'.
+2024-12-17 02:03:17,798 - EventDispatcher - DEBUG - Subscribed listener 'handle_logout_request' to event 'user_account_logout_request'.
+2024-12-17 02:03:17,809 - UserService - INFO - UserService subscribed to user account events.
+2024-12-17 02:03:17,818 - EventDispatcher - DEBUG - Subscribed listener 'handle_map_create_request' to event 'map_create_request'.
+2024-12-17 02:03:17,819 - EventDispatcher - DEBUG - Subscribed listener 'handle_map_remove_request' to event 'map_remove_request'.
+2024-12-17 02:03:17,838 - EventDispatcher - DEBUG - Subscribed listener 'handle_map_tile_add_request' to event 'map_tile_add_request'.
+2024-12-17 02:03:17,843 - EventDispatcher - DEBUG - Subscribed listener 'handle_map_tile_remove_request' to event 'map_tile_remove_request'.
+2024-12-17 02:03:17,846 - EventDispatcher - DEBUG - Subscribed listener 'handle_map_zone_add_request' to event 'map_zone_add_request'.
+2024-12-17 02:03:17,861 - EventDispatcher - DEBUG - Subscribed listener 'handle_map_zone_remove_request' to event 'map_zone_remove_request'.
+2024-12-17 02:03:17,864 - EventDispatcher - DEBUG - Subscribed listener 'handle_map_join_request' to event 'map_join_request'.
+2024-12-17 02:03:17,881 - EventDispatcher - DEBUG - Subscribed listener 'handle_map_leave_request' to event 'map_leave_request'.
+2024-12-17 02:03:17,884 - EventDispatcher - DEBUG - Subscribed listener 'handle_map_physics_update_request' to event 'map_physics_update_request'.
+2024-12-17 02:03:17,895 - MapService - INFO - MapService subscribed to map-related events.
+2024-12-17 02:03:17,897 - EventDispatcher - DEBUG - Subscribed listener 'handle_ai_spawn_request' to event 'ai_spawn_request'.
+2024-12-17 02:03:17,905 - EventDispatcher - DEBUG - Subscribed listener 'handle_ai_remove_request' to event 'ai_remove_request'.
+2024-12-17 02:03:17,921 - EventDispatcher - DEBUG - Subscribed listener 'handle_ai_move_request' to event 'ai_move_request'.
+2024-12-17 02:03:17,922 - EventDispatcher - DEBUG - Subscribed listener 'handle_ai_update_health_request' to event 'ai_update_health_request'.
+2024-12-17 02:03:17,939 - AIService - INFO - AIService subscribed to AI-related events.
+2024-12-17 02:03:17,957 - EventDispatcher - DEBUG - Subscribed listener 'handle_role_assign_request' to event 'role_assign_request'.
+2024-12-17 02:03:17,959 - EventDispatcher - DEBUG - Subscribed listener 'handle_role_remove_request' to event 'role_remove_request'.
+2024-12-17 02:03:17,977 - RoleService - INFO - RoleService subscribed to role-related events.
+2024-12-17 02:03:17,978 - EventDispatcher - DEBUG - Subscribed listener 'handle_apply_gravity_request' to event 'physics_apply_gravity_request'.
+2024-12-17 02:03:17,986 - EventDispatcher - DEBUG - Subscribed listener 'handle_jump_request' to event 'physics_jump_request'.
+2024-12-17 02:03:17,988 - EventDispatcher - DEBUG - Subscribed listener 'handle_apply_force_request' to event 'physics_apply_force_request'.
+2024-12-17 02:03:17,998 - PhysicsService - INFO - PhysicsService subscribed to physics-related events.
+2024-12-17 02:03:17,999 - user_registry - DEBUG - Retrieved all usernames: []
+2024-12-17 02:03:18,007 - EventDispatcher - INFO - Dispatching event 'user_account_create_request' with data: {'client_id': 'server_startup', 'message': {'message_type': 'user_account_create_request', 'username': 'admin', 'password': 'adminpass', 'role': 'developer', 'current_map': 'Main'}}
+2024-12-17 02:03:18,009 - UserService - DEBUG - Attempting to create account for username='admin', role='developer', map='Main'.
+2024-12-17 02:03:18,434 - user_registry - DEBUG - User 'admin' saved successfully.
+2024-12-17 02:03:18,437 - user_registry - INFO - Account created successfully for username: admin
+2024-12-17 02:03:18,440 - UserService - INFO - Account created successfully for username='admin'.
+2024-12-17 02:03:18,449 - UserService - DEBUG - Dispatching OK event 'user_account_create_ok' to client_id='server_startup' with data={'username': 'admin', 'role': 'developer'}
+2024-12-17 02:03:18,451 - EventDispatcher - INFO - Dispatching event 'user_account_create_ok' with data: {'client_id': 'server_startup', 'message': {'username': 'admin', 'role': 'developer'}}
+2024-12-17 02:03:18,453 - UserService - DEBUG - Assigned role 'developer' to user 'admin'.
+2024-12-17 02:03:18,454 - EventDispatcher - DEBUG - Listener 'handle_create_account' handled event 'user_account_create_request' successfully.
+2024-12-17 02:03:18,464 - map_registry - INFO - Retrieved list of all map names: []
+2024-12-17 02:03:18,480 - EventDispatcher - INFO - Dispatching event 'map_create_request' with data: {'client_id': 'server_startup', 'message': {'message_type': 'map_create_request', 'username': 'admin', 'map_name': 'Main', 'map_size': (0.0, 99.0, 0.0, 99.0, 0.0, 9.0), 'start_position': (0.0, 0.0, 0.0), 'is_public': True, 'tiles': {'2f3ba50d-3b7d-47f3-87aa-6951f9a02cd6': {'tile_position': (0.0, 99.0, 0.0, 99.0, 0.0, 1.0), 'tile_type': 'grass', 'is_wall': False}}}}
+2024-12-17 02:03:18,489 - MapService - DEBUG - Map create request by client_id='server_startup', username='admin', map='Main'.
+2024-12-17 02:03:18,501 - MapService - DEBUG - Bypassing auth/permission checks for server_startup client.
+2024-12-17 02:03:18,506 - MapService - DEBUG - Tile 'grass' added to map 'Main' at (0.0, 99.0, 0.0, 99.0, 0.0, 1.0).
+2024-12-17 02:03:18,507 - MapService - DEBUG - User 'admin' added as owner and joined to map 'Main'.
+2024-12-17 02:03:18,521 - map_registry - INFO - Map 'Main' saved successfully.
+2024-12-17 02:03:18,523 - MapService - INFO - Map 'Main' created successfully.
+2024-12-17 02:03:18,540 - MapService - DEBUG - Dispatching OK event 'map_create_ok' to client_id='server_startup' with data={'map_name': 'Main'}
+2024-12-17 02:03:18,542 - EventDispatcher - INFO - Dispatching event 'map_create_ok' with data: {'client_id': 'server_startup', 'message': {'map_name': 'Main'}}
+2024-12-17 02:03:18,558 - EventDispatcher - DEBUG - Listener 'handle_map_create_request' handled event 'map_create_request' successfully.
+2024-12-17 02:03:18,579 - NetworkServer - INFO - Starting NetworkServer on localhost:33288 with SSL/TLS.
+2024-12-17 02:03:18,598 - NetworkServer - INFO - NetworkServer started and accepting connections.
+2024-12-17 02:03:18,600 - Main - INFO - My Awesome Audio Game Server version 1.0.0 started.
+2024-12-17 02:03:18,601 - Main - INFO - Server running on localhost:33288. Type 'exit' in console to shut down.
+2024-12-17 02:04:18,753 - Main - INFO - Logging reconfigured.
+2024-12-17 02:04:18,755 - ConsoleInterface - INFO - Console interface logging reconfigured.
+2024-12-17 02:04:18,765 - ConsoleInterface - INFO - Debug logging turned off.
+2024-12-17 02:04:26,094 - ConsoleInterface - INFO - Shutdown command received. Stopping the server...
+2024-12-17 02:04:26,098 - ConsoleInterface - INFO - Stopping console interface...
+2024-12-17 02:04:26,100 - ConsoleInterface - INFO - Console interface stopped.
+2024-12-17 02:04:26,116 - NetworkServer - INFO - Stopping NetworkServer...
+2024-12-17 02:04:26,131 - NetworkServer - INFO - NetworkServer stopped.
+2024-12-17 02:04:26,136 - Main - INFO - Server shut down complete.
+2024-12-17 02:04:44,936 - Main - INFO - Loading server components...
+2024-12-17 02:04:44,938 - SSLManager - WARNING - SSL certificates not found. Generating a self-signed certificate...
+2024-12-17 02:04:44,957 - SSLManager - INFO - Self-signed SSL certificate and key generated successfully.
+2024-12-17 02:04:44,961 - SSLManager - INFO - SSL enabled with provided (or self-signed) certificate and key.
+2024-12-17 02:04:44,963 - ChatService - INFO - ChatService started and subscribed to 'chat_message' event.
+2024-12-17 02:04:44,964 - UserService - INFO - UserService subscribed to user account events.
+2024-12-17 02:04:44,964 - MapService - INFO - MapService subscribed to map-related events.
+2024-12-17 02:04:44,965 - AIService - INFO - AIService subscribed to AI-related events.
+2024-12-17 02:04:44,965 - RoleService - INFO - RoleService subscribed to role-related events.
+2024-12-17 02:04:44,966 - PhysicsService - INFO - PhysicsService subscribed to physics-related events.
+2024-12-17 02:04:44,967 - EventDispatcher - INFO - Dispatching event 'user_account_create_request' with data: {'client_id': 'server_startup', 'message': {'message_type': 'user_account_create_request', 'username': 'admin', 'password': 'adminpass', 'role': 'developer', 'current_map': 'Main'}}
+2024-12-17 02:04:45,135 - user_registry - INFO - Account created successfully for username: admin
+2024-12-17 02:04:45,136 - UserService - INFO - Account created successfully for username='admin'.
+2024-12-17 02:04:45,137 - EventDispatcher - INFO - Dispatching event 'user_account_create_ok' with data: {'client_id': 'server_startup', 'message': {'username': 'admin', 'role': 'developer'}}
+2024-12-17 02:04:45,138 - map_registry - INFO - Retrieved list of all map names: []
+2024-12-17 02:04:45,139 - EventDispatcher - INFO - Dispatching event 'map_create_request' with data: {'client_id': 'server_startup', 'message': {'message_type': 'map_create_request', 'username': 'admin', 'map_name': 'Main', 'map_size': (0.0, 99.0, 0.0, 99.0, 0.0, 9.0), 'start_position': (0.0, 0.0, 0.0), 'is_public': True, 'tiles': {'3b727b35-2960-43ef-bd5d-4400c9a44fc7': {'tile_position': (0.0, 99.0, 0.0, 99.0, 0.0, 1.0), 'tile_type': 'grass', 'is_wall': False}}}}
+2024-12-17 02:04:45,144 - map_registry - INFO - Map 'Main' saved successfully.
+2024-12-17 02:04:45,144 - MapService - INFO - Map 'Main' created successfully.
+2024-12-17 02:04:45,145 - EventDispatcher - INFO - Dispatching event 'map_create_ok' with data: {'client_id': 'server_startup', 'message': {'map_name': 'Main'}}
+2024-12-17 02:04:45,146 - NetworkServer - INFO - Starting NetworkServer on localhost:33288 with SSL/TLS.
+2024-12-17 02:04:45,151 - NetworkServer - INFO - NetworkServer started and accepting connections.
+2024-12-17 02:04:45,152 - Main - INFO - My Awesome Audio Game Server version 1.0.0 started.
+2024-12-17 02:04:45,152 - Main - INFO - Server running on localhost:33288. Type 'exit' in console to shut down.
+2024-12-17 02:05:55,437 - ConsoleInterface - INFO - Shutdown command received. Stopping the server...
+2024-12-17 02:05:55,439 - ConsoleInterface - INFO - Stopping console interface...
+2024-12-17 02:05:55,440 - ConsoleInterface - INFO - Console interface stopped.
+2024-12-17 02:05:55,441 - NetworkServer - INFO - Stopping NetworkServer...
+2024-12-17 02:05:55,442 - NetworkServer - INFO - NetworkServer stopped.
+2024-12-17 02:05:55,444 - Main - INFO - Server shut down complete.
