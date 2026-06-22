@@ -1,5 +1,0 @@
-aiofiles
-bcrypt
-pydantic
-pyjwt
-sqlalchemy

@@ -1,0 +1,76 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "OpenFPS Prefab Template",
+  "type": "object",
+  "properties": {
+    "Id": {
+      "type": "string",
+      "description": "Unique identifier for the prefab (e.g., 'guard_npc')."
+    },
+    "Name": {
+      "type": "string",
+      "description": "Friendly display name for the entity."
+    },
+    "Description": {
+      "type": "string",
+      "description": "Short text description of the entity."
+    },
+    "Material": {
+      "type": "string",
+      "description": "Surface material (Concrete, Wood, Metal, Grass, etc.). Affects footsteps and acoustics."
+    },
+    "Type": {
+      "type": "integer",
+      "description": "EntityType enum (0: None, 1: Player, 2: NPC, 3: Beacon, 4: StaticObject, 5: Item).",
+      "enum": [0, 1, 2, 3, 4, 5]
+    },
+    "Collider": {
+      "type": "object",
+      "properties": {
+        "Shape": { "type": "integer", "enum": [0, 1, 2, 3, 4] },
+        "Size": {
+          "type": "object",
+          "properties": {
+            "X": { "type": "number" },
+            "Y": { "type": "number" },
+            "Z": { "type": "number" }
+          }
+        },
+        "IsSolid": { "type": "boolean" }
+      }
+    },
+    "SoundEmitter": {
+      "type": "object",
+      "properties": {
+        "SoundId": { "type": "string" },
+        "Volume": { "type": "number" },
+        "Range": { "type": "number" },
+        "Mode": { "type": "integer", "enum": [0, 1, 2, 3, 4] },
+        "EnableReverb": { "type": "boolean" },
+        "ConeInsideAngle": { "type": "number" },
+        "ConeOutsideAngle": { "type": "number" },
+        "ConeOutsideVolume": { "type": "number" }
+      }
+    },
+    "Acoustics": {
+      "type": "object",
+      "properties": {
+        "Absorption": { "type": "number" },
+        "TransmissionLow": { "type": "number" },
+        "TransmissionMid": { "type": "number" },
+        "TransmissionHigh": { "type": "number" },
+        "Scattering": { "type": "number" }
+      }
+    },
+    "Physics": {
+      "type": "object",
+      "properties": {
+        "Mass": { "type": "number" },
+        "Friction": { "type": "number" },
+        "Restitution": { "type": "number" },
+        "Drag": { "type": "number" }
+      }
+    }
+  },
+  "required": ["Id", "Name", "Type"]
+}

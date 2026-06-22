@@ -1,0 +1,22 @@
+{
+  "Id": "space_megaphone",
+  "Name": "Space Megaphone",
+  "Description": "High-powered directional megaphone.",
+  "Material": "Metal",
+  "ColliderSize": {
+    "X": 0.5,
+    "Y": 0.5,
+    "Z": 1.0
+  },
+  "Type": "Beacon",
+  "MaxHealth": 100,
+  "IsItem": false,
+  "HasEmitter": true,
+  "SoundId": "BEACONS/megaphone",
+  "Volume": 1.5,
+  "Range": 50,
+  "Mode": "LoopOne",
+  "ConeInsideAngle": 45,
+  "ConeOutsideAngle": 90,
+  "ConeOutsideVolume": 0.1
+}

@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="OpenFPS.Client/OpenFPS.Client.csproj" />
+  <Project Path="OpenFPS.Common/OpenFPS.Common.csproj" />
+  <Project Path="OpenFPS.Server/OpenFPS.Server.csproj" />
+  <Project Path="OpenFPS.Tests/OpenFPS.Tests.csproj" />
+</Solution>

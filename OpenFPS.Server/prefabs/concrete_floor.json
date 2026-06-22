@@ -1,0 +1,22 @@
+{
+  "Id": "concrete_floor",
+  "Name": "Concrete Floor",
+  "Description": "",
+  "Material": "Concrete",
+  "ColliderSize": {
+    "X": 10,
+    "Y": 0.1,
+    "Z": 10
+  },
+  "Type": "StaticObject",
+  "MaxHealth": null,
+  "IsItem": false,
+  "ItemWeight": null,
+  "TransmissionLow": 0.05,
+  "TransmissionMid": 0.02,
+  "TransmissionHigh": 0.01,
+  "Mass": null,
+  "Friction": null,
+  "Restitution": null,
+  "Drag": null
+}

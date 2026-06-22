@@ -1,0 +1,30 @@
+{
+  "Id": "wood_floor",
+  "Name": "Wooden Floor",
+  "Description": "",
+  "Material": "Wood",
+  "ColliderSize": {
+    "X": 10,
+    "Y": 0.1,
+    "Z": 10
+  },
+  "Type": "StaticObject",
+  "MaxHealth": null,
+  "IsItem": false,
+  "ItemWeight": null,
+  "TransmissionLow": 0.2,
+  "TransmissionMid": 0.15,
+  "TransmissionHigh": 0.1,
+  "Mass": null,
+  "Friction": null,
+  "Restitution": null,
+  "Drag": null,
+  "HasEmitter": false,
+  "SoundId": null,
+  "Volume": null,
+  "Range": null,
+  "Mode": null,
+  "IsSynth": null,
+  "SynthWave": null,
+  "SynthFreq": null
+}

@@ -1,0 +1,18 @@
+{
+  "Id": "sound_emitter",
+  "Name": "Sound Emitter",
+  "Description": "",
+  "Material": "None",
+  "ColliderSize": null,
+  "Type": "StaticObject",
+  "MaxHealth": null,
+  "IsItem": false,
+  "ItemWeight": null,
+  "TransmissionLow": null,
+  "TransmissionMid": null,
+  "TransmissionHigh": null,
+  "Mass": null,
+  "Friction": null,
+  "Restitution": null,
+  "Drag": null
+}

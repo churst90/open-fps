@@ -1,0 +1,77 @@
+{
+  "Id": "default",
+  "Size": { "X": 100, "Y": 40, "Z": 100 },
+  "MinBound": { "X": -50, "Y": 0, "Z": -50 },
+  "MaxBound": { "X": 50, "Y": 40, "Z": 50 },
+  "SpawnPoint": { "Position": { "X": 0, "Y": 1, "Z": 20 }, "Rotation": { "X": 0, "Y": 0, "Z": 0, "W": 1 } },
+  "Entities": [
+    // --- STREET FOUNDATION ---
+    { "EntityId": 100, "PrefabId": "floor_generic", "Position": { "X": 0, "Y": 0, "Z": 0 }, "Scale": { "X": 10, "Y": 1, "Z": 10 }, "Material": "Concrete" },
+
+    // --- BUILDING A (The 'Heavy' Warehouse - Concrete) ---
+    // Positioned Left, Door facing East into alley
+    { 
+        "EntityId": 1, 
+        "PrefabId": "building_box", 
+        "Position": { "X": -15, "Y": 2.5, "Z": 0 }, 
+        "RegionId": 1,
+        "Material": "Concrete",
+        "RoomSize": { "X": 10, "Y": 5, "Z": 10 },
+        "FaceMask": 59, // 111011 (Missing East wall for the 'open' warehouse feel or doorway)
+        "Materials": [18, 18, 18, 18, 18, 18]
+    },
+    // Add a specific portal for Building A
+    { "EntityId": 17, "PrefabId": "portal", "Position": { "X": -10, "Y": 1, "Z": 0 }, "Rotation": { "X": 0, "Y": 0.7071, "Z": 0, "W": 0.7071 }, "RegionAId": -1, "RegionBId": 1, "ApertureSize": 2.0 },
+    // Industrial Thrum (Synthesized 120Hz)
+    { 
+        "EntityId": 15, 
+        "PrefabId": "chirp_beacon", 
+        "Position": { "X": -15, "Y": 1, "Z": 0 },
+        "Volume": 0.4,
+        "IsSynth": true,
+        "SynthWave": 3, 
+        "SynthFreq": 120,
+        "SynthFilterCutoff": 0.3
+    },
+
+    // --- BUILDING B (The 'Soft' Gallery - Wood/Carpet) ---
+    // Positioned Right, Door facing North
+    { 
+        "EntityId": 2, 
+        "PrefabId": "building_box", 
+        "Position": { "X": 15, "Y": 2.5, "Z": 0 }, 
+        "RegionId": 2,
+        "Material": "Wood",
+        "RoomSize": { "X": 10, "Y": 5, "Z": 10 },
+        "FaceMask": 61, // 111101 (Missing North wall for doorway)
+        "Materials": [6, 21, 21, 21, 21, 21] // Carpet floor, wood others
+    },
+    { "EntityId": 27, "PrefabId": "portal", "Position": { "X": 15, "Y": 1, "Z": 5 }, "RegionAId": -1, "RegionBId": 2, "ApertureSize": 1.5 },
+    // Pulse Bell (Synthesized 440Hz)
+    { 
+        "EntityId": 25, 
+        "PrefabId": "chirp_beacon", 
+        "Position": { "X": 15, "Y": 1, "Z": 0 },
+        "Volume": 0.3,
+        "IsSynth": true,
+        "SynthWave": 1,
+        "SynthFreq": 440,
+        "SynthLfoRate": 2.0,
+        "SynthLfoDepth": 0.2
+    },
+
+    // --- ALLEY PROPS ---
+    // Round Pillar for scattering stress-test
+    { "EntityId": 40, "PrefabId": "pillar_round", "Position": { "X": 0, "Y": 2, "Z": 0 }, "Material": "Marble" },
+    // Staircase leading to a 'virtual' second floor
+    { "EntityId": 41, "PrefabId": "staircase_acoustic", "Position": { "X": 0, "Y": 1.5, "Z": -10 }, "Material": "Metal" },
+
+    // --- THE STREET CRIER (Megaphone) ---
+    { 
+        "EntityId": 30, 
+        "PrefabId": "space_megaphone", 
+        "Position": { "X": 0, "Y": 1.5, "Z": 15 }, 
+        "Rotation": { "X": 0, "Y": 1, "Z": 0, "W": 0 } // Pointing South into the alley
+    }
+  ]
+}

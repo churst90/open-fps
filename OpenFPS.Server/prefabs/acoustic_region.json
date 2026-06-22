@@ -1,0 +1,21 @@
+{
+  "Id": "acoustic_region",
+  "Name": "Acoustic Region",
+  "Description": "",
+  "Material": "None",
+  "ColliderSize": {
+    "X": 10,
+    "Y": 5,
+    "Z": 10
+  },
+  "Type": "StaticObject",
+  "IsIndoor": true,
+  "IsSolid": false,
+  "EnvType": "Atmospheric",
+  "RoomSize": {
+    "X": 10,
+    "Y": 5,
+    "Z": 10
+  },
+  "ReverbScale": 1.0
+}

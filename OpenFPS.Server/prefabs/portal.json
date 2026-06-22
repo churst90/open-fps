@@ -1,0 +1,16 @@
+{
+  "Id": "portal",
+  "Name": "Acoustic Portal",
+  "Description": "",
+  "Material": "None",
+  "ColliderSize": {
+    "X": 2,
+    "Y": 2,
+    "Z": 0.1
+  },
+  "IsSolid": false,
+  "Type": "StaticObject",
+  "TransmissionLow": 1.0,
+  "TransmissionMid": 1.0,
+  "TransmissionHigh": 1.0
+}

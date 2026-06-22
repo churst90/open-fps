@@ -1,0 +1,22 @@
+{
+  "Id": "concrete_wall",
+  "Name": "Concrete Wall",
+  "Description": "",
+  "Material": "Concrete",
+  "ColliderSize": {
+    "X": 2,
+    "Y": 3,
+    "Z": 0.5
+  },
+  "Type": "StaticObject",
+  "MaxHealth": null,
+  "IsItem": false,
+  "ItemWeight": null,
+  "TransmissionLow": 0.1,
+  "TransmissionMid": 0.05,
+  "TransmissionHigh": 0.02,
+  "Mass": null,
+  "Friction": null,
+  "Restitution": null,
+  "Drag": null
+}

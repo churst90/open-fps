@@ -1,0 +1,18 @@
+{
+  "Id": "sword",
+  "Name": "Iron Sword",
+  "Description": "A sharp iron blade.",
+  "Material": "Metal",
+  "ColliderSize": null,
+  "Type": "Item",
+  "MaxHealth": null,
+  "IsItem": true,
+  "ItemWeight": 2,
+  "TransmissionLow": null,
+  "TransmissionMid": null,
+  "TransmissionHigh": null,
+  "Mass": null,
+  "Friction": null,
+  "Restitution": null,
+  "Drag": null
+}
