@@ -918,7 +918,18 @@ public class FmodAudioProvider : IAudioProvider
         }
 
         float roomGainBonus = MathHelper.Lerp(1.0f, active.RoomGain, 0.5f);
-        active.Channel.setVolume(active.BaseVolume * finalVolFactor * roomGainBonus);
+
+        // Distance attenuation: when Steam Audio drives panning (set3DLevel 0), FMOD does NOT apply
+        // its 3D rolloff, so we apply linear distance falloff ourselves (verified by RunDistanceCheck).
+        float distAtten = 1.0f;
+        if (active.SaState != null)
+        {
+            float dist = Vector3.Distance(lPosVec, active.CurrentApparentPosition);
+            float span = MathF.Max(0.01f, active.Range - active.MinDistance);
+            distAtten = Math.Clamp(1.0f - (dist - active.MinDistance) / span, 0.0f, 1.0f);
+        }
+
+        active.Channel.setVolume(active.BaseVolume * finalVolFactor * roomGainBonus * distAtten);
         
         if (active.ThreeEqDsp.hasHandle()) 
         {

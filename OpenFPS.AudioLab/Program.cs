@@ -24,6 +24,13 @@ Console.WriteLine("=== OpenFPS AudioLab ===");
 Console.WriteLine($"Runtime: {RuntimeInformation.OSDescription} ({RuntimeInformation.ProcessArchitecture})");
 Console.WriteLine();
 
+if (args.Contains("--steam-distance"))
+{
+    int code = SteamAudioLiveTest.RunDistanceCheck();
+    Log.CloseAndFlush();
+    Environment.Exit(code);
+}
+
 if (args.Contains("--provider-orbit") || args.Contains("--provider-orbit-smoke"))
 {
     int code = ProviderOrbit.Run(args.Contains("--provider-orbit"), seconds: 3.0);
