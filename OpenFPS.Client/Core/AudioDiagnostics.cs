@@ -19,6 +19,46 @@ namespace OpenFPS.Client.Core;
 /// </summary>
 public static class AudioDiagnostics
 {
+    /// <summary>
+    /// Non-interactive smoke test: initializes the engine, runs the orbit for a fixed duration,
+    /// then exits. Lets CI / a headless box confirm FMOD loads and initializes on this platform
+    /// without needing a TTY or human ears. Returns 0 on success, 1 if the engine did not init.
+    /// </summary>
+    public static int RunSmokeTest(double seconds)
+    {
+        Console.WriteLine($"Smoke test: initializing audio engine, running {seconds:F0}s...");
+        var facade = new AudioEngineFacade();
+        facade.Initialize();
+
+        if (!facade.IsInitialized)
+        {
+            Console.WriteLine("RESULT: FAILED — audio engine did not initialize (see log above for the FMOD error).");
+            facade.Dispose();
+            return 1;
+        }
+
+        facade.UpdateListener(Vector3.Zero, Quaternion.Identity, Vector3.Zero, -1);
+        facade.StartDiagnosticSound();
+
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        double last = 0, angle = 0;
+        while (sw.Elapsed.TotalSeconds < seconds)
+        {
+            double now = sw.Elapsed.TotalSeconds;
+            angle += (Math.PI / 4) * (now - last);
+            last = now;
+            float a = (float)(angle % (Math.PI * 2));
+            facade.UpdateListener(Vector3.Zero, Quaternion.Identity, Vector3.Zero, -1);
+            facade.SetDiagnosticPosition(new Vector3(MathF.Sin(a) * 3f, 0f, MathF.Cos(a) * 3f));
+            Thread.Sleep(40);
+        }
+
+        facade.StopDiagnosticSound();
+        facade.Dispose();
+        Console.WriteLine($"RESULT: PASSED — FMOD initialized and ran for {seconds:F0}s on this platform.");
+        return 0;
+    }
+
     public static void RunOrbitTest()
     {
         Console.WriteLine("=== OpenFPS Audio Diagnostic: Orbiting Mono Source ===");

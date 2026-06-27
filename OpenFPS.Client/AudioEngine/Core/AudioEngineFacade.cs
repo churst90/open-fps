@@ -42,6 +42,9 @@ public class AudioEngineFacade : IDisposable
     private Thread? _audioThread;
     private volatile bool _isRunning = false;
 
+    /// <summary>True once the underlying provider (FMOD) initialized successfully.</summary>
+    public bool IsInitialized => _isInitialized;
+
     public AudioEngineFacade() : this(new FmodAudioProvider()) { }
 
     public AudioEngineFacade(IAudioProvider provider)

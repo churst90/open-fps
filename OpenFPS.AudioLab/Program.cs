@@ -20,6 +20,13 @@ Console.WriteLine("=== OpenFPS AudioLab ===");
 Console.WriteLine($"Runtime: {RuntimeInformation.OSDescription} ({RuntimeInformation.ProcessArchitecture})");
 Console.WriteLine();
 
+if (args.Contains("--smoke"))
+{
+    int code = AudioDiagnostics.RunSmokeTest(seconds: 3);
+    Log.CloseAndFlush();
+    Environment.Exit(code);
+}
+
 AudioDiagnostics.RunOrbitTest();
 
 Log.CloseAndFlush();
