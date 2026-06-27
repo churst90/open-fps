@@ -24,6 +24,7 @@
   <ItemGroup>
     <Compile Include="..\OpenFPS.Client\AudioEngine\**\*.cs" />
     <Compile Include="..\OpenFPS.Client\Core\FmodNative\**\*.cs" />
+    <Compile Include="..\OpenFPS.Client\Core\SpatialService.cs" />
     <Compile Include="..\OpenFPS.Client\Core\AudioDiagnostics.cs" />
   </ItemGroup>
 
