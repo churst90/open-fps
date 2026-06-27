@@ -323,6 +323,11 @@ public class AudioEngineFacade : IDisposable
         if (_isInitialized) _provider.PlayUiBeep(frequencyHz, durationMs);
     }
 
+    // --- Step 1a diagnostics: drive an isolated mono source (see AudioDiagnostics). ---
+    public void StartDiagnosticSound() { if (_isInitialized) _provider.StartDiagnosticSound(); }
+    public void SetDiagnosticPosition(Vector3 position) { if (_isInitialized) _provider.SetDiagnosticPosition(position); }
+    public void StopDiagnosticSound() { if (_isInitialized) _provider.StopDiagnosticSound(); }
+
     public void Dispose()
     {
         _isRunning = false;

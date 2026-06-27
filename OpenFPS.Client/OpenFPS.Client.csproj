@@ -20,6 +20,8 @@
     <PackageReference Include="MemoryPack" Version="1.21.4" />
     <PackageReference Include="NAudio" Version="2.2.1" />
     <PackageReference Include="Serilog" Version="4.2.0" />
+    <PackageReference Include="Serilog.Sinks.Console" Version="6.1.1" />
+    <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
 
     <PackageReference Include="System.Speech" Version="10.0.3" />
   </ItemGroup>
@@ -28,7 +30,14 @@
     <None Update="ASSETS\**\*.*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Update="..\libs\*.dll">
+    <None Update="materials.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <!-- Native libraries (FMOD + NVDA bridge) live in the repo-root lib/ folder, which is
+         OUTSIDE this project's cone. Items outside the cone must be Include'd with a Link,
+         not Update'd — the previous "..\libs\*.dll" (wrong folder, Update) matched nothing,
+         so the FMOD DLLs never landed next to the exe and the client failed to start. -->
+    <None Include="..\lib\*.dll" Link="%(Filename)%(Extension)">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>

@@ -215,18 +215,41 @@ public class FmodAudioProvider : IAudioProvider
     private int _listenerRegionId = -1;
     private float _shelterFactor = 0.0f;
 
+    /// <summary>
+    /// Logs and returns false when an FMOD call fails. FMOD result codes were previously
+    /// discarded everywhere, so failures (missing DLL, bad format, etc.) produced silence
+    /// with no explanation. Route significant calls through this to make failures visible.
+    /// </summary>
+    private static bool FmodCheck(RESULT result, string operation)
+    {
+        if (result != RESULT.OK)
+        {
+            Log.Error("FMOD {Operation} failed: {Code} — {Message}", operation, result, FMOD.Error.String(result));
+            return false;
+        }
+        return true;
+    }
+
     public bool Initialize()
     {
         try
         {
-            RESULT result = Factory.System_Create(out _system);
-            if (result != RESULT.OK) return false;
-            
-            _system.setSoftwareFormat(44100, SPEAKERMODE.STEREO, 0);
-            _system.set3DSettings(1.0f, 1.0f, 1.0f); // Revert to standard units
+            if (!FmodCheck(Factory.System_Create(out _system), "System_Create")) return false;
 
-            result = _system.init(512, INITFLAGS.NORMAL | INITFLAGS.VOL0_BECOMES_VIRTUAL, IntPtr.Zero);
-            if (result != RESULT.OK) return false;
+            // System.Numerics (and our simulation) is RIGHT-handed: +Z forward, +Y up, +X right.
+            // FMOD defaults to LEFT-handed, which silently mirrors left/right and front/back.
+            // INITFLAGS._3D_RIGHTHANDED makes FMOD interpret our world coordinates directly.
+            // NOTE: verify the actual perceived directions by ear with `--audio-test`; if L/R or
+            // F/B come out swapped, this flag (or the listener forward/up vectors) is the lever.
+            FmodCheck(_system.setSoftwareFormat(44100, SPEAKERMODE.STEREO, 0), "setSoftwareFormat");
+            FmodCheck(_system.set3DSettings(1.0f, 1.0f, 1.0f), "set3DSettings"); // 1 unit = 1 metre
+
+            if (!FmodCheck(_system.init(512, INITFLAGS.NORMAL | INITFLAGS.VOL0_BECOMES_VIRTUAL | INITFLAGS._3D_RIGHTHANDED, IntPtr.Zero), "init"))
+                return false;
+
+            _system.getVersion(out uint version);
+            Log.Information("FMOD initialized: v{Major:X}.{Minor:X2}.{Patch:X2}, right-handed 3D, 44.1kHz stereo.",
+                (version >> 16) & 0xFFFF, (version >> 8) & 0xFF, version & 0xFF);
 
             _resources = new FmodResourceManager(_system);
             _granularBank = new GranularBank(_system);
@@ -1156,21 +1179,97 @@ public class FmodAudioProvider : IAudioProvider
         sound.release();
     }
 
-    public void Dispose() { 
-        lock (_lock) { 
-            foreach (var active in _activeSounds) { 
+    // --- Step 1a diagnostic: a single isolated mono source for verifying HRTF / panning. ---
+    // Deliberately bypasses the VoiceManager and the whole acoustics layer so we test ONLY
+    // the renderer + listener path. Driven by AudioDiagnostics (`--audio-test`).
+    private FMOD.Channel _diagChannel;
+    private FMOD.Sound _diagSound;
+    private byte[]? _diagPcm;
+
+    public void StartDiagnosticSound()
+    {
+        if (!_isInitialized) return;
+        StopDiagnosticSound();
+
+        // 1 second mono 44.1kHz loop of short broadband noise bursts. Broadband transients
+        // localize far better than pure tones, so HRTF / panning cues are unmistakable.
+        const int sampleRate = 44100;
+        int numSamples = sampleRate;
+        _diagPcm = new byte[numSamples * 2];
+        const int periodSamples = sampleRate / 8; // 8 bursts per second
+        uint seed = 22695477;
+        for (int i = 0; i < numSamples; i++)
+        {
+            int posInPeriod = i % periodSamples;
+            float env = posInPeriod < periodSamples * 0.32f ? 1.0f : 0.0f; // ~40ms on, ~85ms off
+            seed = seed * 1103515245 + 12345; // LCG white noise
+            float noise = ((seed >> 16) & 0x7FFF) / 16384.0f - 1.0f;
+            short s = (short)(noise * env * 0.5f * short.MaxValue);
+            _diagPcm[i * 2] = (byte)(s & 0xFF);
+            _diagPcm[i * 2 + 1] = (byte)((s >> 8) & 0xFF);
+        }
+
+        var info = new CREATESOUNDEXINFO
+        {
+            cbsize = System.Runtime.InteropServices.Marshal.SizeOf<CREATESOUNDEXINFO>(),
+            length = (uint)_diagPcm.Length,
+            numchannels = 1,
+            defaultfrequency = sampleRate,
+            format = SOUND_FORMAT.PCM16
+        };
+
+        // OPENRAW is required for headerless PCM in memory; OPENMEMORY alone would make FMOD
+        // try to parse a (non-existent) file header. (The existing voice/beep paths omit OPENRAW
+        // and are likely silently broken — out of scope here, flagged for the cleanup pass.)
+        if (!FmodCheck(_system.createSound(_diagPcm, MODE.OPENMEMORY | MODE.OPENRAW | MODE._3D | MODE._3D_LINEARROLLOFF | MODE.LOOP_NORMAL, ref info, out _diagSound), "createSound(diagnostic)"))
+            return;
+        if (!FmodCheck(_system.playSound(_diagSound, default, true, out _diagChannel), "playSound(diagnostic)"))
+            return;
+
+        _diagChannel.setMode(MODE._3D | MODE._3D_LINEARROLLOFF | MODE.LOOP_NORMAL);
+        _diagChannel.set3DLevel(1.0f); // fully spatialized, no 2D blend
+        _diagChannel.set3DMinMaxDistance(1.0f, 100.0f);
+        _diagChannel.setVolume(1.0f);
+        var origin = new FMOD.VECTOR { x = 0, y = 0, z = 3 };
+        var zero = new FMOD.VECTOR();
+        _diagChannel.set3DAttributes(ref origin, ref zero);
+        _diagChannel.setPaused(false);
+        Log.Information("Diagnostic mono source started (broadband burst loop).");
+    }
+
+    public void SetDiagnosticPosition(Vector3 position)
+    {
+        if (!_diagChannel.hasHandle()) return;
+        var fpos = FmodHelpers.ToFmodVec(position);
+        var fvel = new FMOD.VECTOR();
+        _diagChannel.set3DAttributes(ref fpos, ref fvel);
+    }
+
+    public void StopDiagnosticSound()
+    {
+        if (_diagChannel.hasHandle()) { _diagChannel.stop(); _diagChannel = default; }
+        if (_diagSound.hasHandle()) { _diagSound.release(); _diagSound = default; }
+        _diagPcm = null;
+    }
+
+    public void Dispose() {
+        lock (_lock) {
+            foreach (var active in _activeSounds) {
                 ReleaseActiveSoundResources(active);
-            } 
+            }
             _activeSounds.Clear(); 
             foreach (var dsp in _reverbDsps.Values) dsp.release();
             foreach (var bus in _reverbBuses.Values) bus.release();
             if (_masterCombFilter.hasHandle()) _masterCombFilter.release();
         } 
-        _resources?.Dispose(); 
+        StopDiagnosticSound();
+        _resources?.Dispose();
         _granularBank?.Dispose();
         if (_isInitialized) {
-            _system.release();
+            // FMOD requires close() BEFORE release(); the previous order made close() a
+            // use-after-free on an already-freed system handle.
             _system.close();
+            _system.release();
         }
     }
 }

@@ -34,4 +34,9 @@ public interface IAudioProvider : IDisposable
     /// Used for voice-transmission indicators and accessibility cues.
     /// </summary>
     void PlayUiBeep(float frequencyHz, float durationMs);
+
+    // --- Diagnostics (Step 1a): an isolated mono source for verifying HRTF / 3D panning. ---
+    void StartDiagnosticSound();
+    void SetDiagnosticPosition(Vector3 position);
+    void StopDiagnosticSound();
 }
