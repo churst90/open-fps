@@ -8,6 +8,7 @@ using Serilog;
 using OpenFPS.Common.Components;
 using OpenFPS.Client.AudioEngine.Data;
 using OpenFPS.Common;
+using OpenFPS.Client.Core.AudioEngine.SteamAudio;
 
 namespace OpenFPS.Client.AudioEngine.Fmod;
 
@@ -196,6 +197,11 @@ public class FmodAudioProvider : IAudioProvider
         public FMOD.DSPConnection ReverbConnection;
         public FMOD.DSPConnection SourceReverbConnection;
         public float RoomGain = 1.0f;
+
+        // Steam Audio per-voice binaural effect (null when SA disabled / falling back to FMOD pan).
+        public SteamAudioVoiceState? SaState;
+        public FMOD.DSP SaDsp;
+        public System.Runtime.InteropServices.GCHandle SaHandle;
     }
 
     private readonly List<ActiveSound> _activeSounds = new();
@@ -214,6 +220,12 @@ public class FmodAudioProvider : IAudioProvider
     private Quaternion _listenerRot = Quaternion.Identity;
     private int _listenerRegionId = -1;
     private float _shelterFactor = 0.0f;
+
+    // Steam Audio (phonon) HRTF state — shared context + HRTF; per-voice effects live on ActiveSound.
+    private IntPtr _saContext;
+    private IntPtr _saHrtf;
+    private int _saFrameSize = 1024;
+    private bool _steamAudioEnabled;
 
     /// <summary>
     /// Logs and returns false when an FMOD call fails. FMOD result codes were previously
@@ -265,10 +277,74 @@ public class FmodAudioProvider : IAudioProvider
             master.addDSP(CHANNELCONTROL_DSP_INDEX.TAIL, _masterCombFilter);
             _masterCombFilter.setBypass(true);
 
+            TryInitSteamAudio();
+
             _isInitialized = true;
             return true;
         }
         catch (Exception ex) { Log.Error(ex, "Failed to initialize FMOD"); return false; }
+    }
+
+    // --- Steam Audio (phonon) HRTF binaural spatialization. Falls back to FMOD panning if unavailable. ---
+
+    private void TryInitSteamAudio()
+    {
+        try
+        {
+            _system.getDSPBufferSize(out uint block, out int _);
+            _saFrameSize = (int)block;
+            var cs = new Phonon.IPLContextSettings { version = Phonon.STEAMAUDIO_VERSION, simdLevel = Phonon.IPL_SIMDLEVEL_AVX2, flags = 0 };
+            if (Phonon.iplContextCreate(ref cs, out _saContext) != Phonon.IPL_STATUS_SUCCESS)
+            { Log.Warning("Steam Audio: context create failed; using FMOD panning."); return; }
+
+            var au = new Phonon.IPLAudioSettings { samplingRate = 44100, frameSize = _saFrameSize };
+            var hs = new Phonon.IPLHRTFSettings { type = Phonon.IPL_HRTFTYPE_DEFAULT, volume = 1f, normType = Phonon.IPL_HRTFNORMTYPE_NONE };
+            if (Phonon.iplHRTFCreate(_saContext, ref au, ref hs, out _saHrtf) != Phonon.IPL_STATUS_SUCCESS)
+            { Log.Warning("Steam Audio: HRTF create failed; using FMOD panning."); Phonon.iplContextRelease(ref _saContext); return; }
+
+            _steamAudioEnabled = true;
+            Log.Information("Steam Audio HRTF binaural enabled (frameSize={Frame}).", _saFrameSize);
+        }
+        catch (DllNotFoundException) { Log.Warning("Steam Audio: libphonon not found; using FMOD panning."); }
+        catch (Exception ex) { Log.Warning(ex, "Steam Audio init failed; using FMOD panning."); }
+    }
+
+    private bool TryCreateSteamAudioVoice(out SteamAudioVoiceState? state, out FMOD.DSP dsp, out System.Runtime.InteropServices.GCHandle handle)
+    {
+        state = null; dsp = default; handle = default;
+        var au = new Phonon.IPLAudioSettings { samplingRate = 44100, frameSize = _saFrameSize };
+        var es = new Phonon.IPLBinauralEffectSettings { hrtf = _saHrtf };
+        if (Phonon.iplBinauralEffectCreate(_saContext, ref au, ref es, out IntPtr effect) != Phonon.IPL_STATUS_SUCCESS) return false;
+
+        var s = new SteamAudioVoiceState
+        {
+            Context = _saContext, Hrtf = _saHrtf, Effect = effect, FrameSize = _saFrameSize,
+            MonoScratch = new float[_saFrameSize], StereoScratch = new float[_saFrameSize * 2]
+        };
+        Phonon.iplAudioBufferAllocate(_saContext, 1, _saFrameSize, ref s.InBuf);
+        Phonon.iplAudioBufferAllocate(_saContext, 2, _saFrameSize, ref s.OutBuf);
+
+        if (SteamAudioDsp.CreateDSP(_system, s, out dsp, out handle) != RESULT.OK)
+        {
+            Phonon.iplAudioBufferFree(_saContext, ref s.InBuf);
+            Phonon.iplAudioBufferFree(_saContext, ref s.OutBuf);
+            Phonon.iplBinauralEffectRelease(ref effect);
+            return false;
+        }
+        state = s;
+        return true;
+    }
+
+    private void ReleaseSteamAudioVoice(ActiveSound a)
+    {
+        if (a.SaState == null) return;
+        if (a.SaDsp.hasHandle()) { a.SaDsp.release(); a.SaDsp = default; }
+        if (a.SaHandle.IsAllocated) a.SaHandle.Free();
+        Phonon.iplAudioBufferFree(_saContext, ref a.SaState.InBuf);
+        Phonon.iplAudioBufferFree(_saContext, ref a.SaState.OutBuf);
+        IntPtr eff = a.SaState.Effect;
+        Phonon.iplBinauralEffectRelease(ref eff);
+        a.SaState = null;
     }
 
     public void SetAcousticMap(AcousticMap map)
@@ -493,13 +569,26 @@ public class FmodAudioProvider : IAudioProvider
         }
 
         FMOD.DSP threeEqDsp = default, diffractionDsp = default;
+        SteamAudioVoiceState? saState = null;
+        FMOD.DSP saDsp = default;
+        System.Runtime.InteropServices.GCHandle saHandle = default;
         if (emitter.Type != EmitterType.UI)
         {
             threeEqDsp = GetThreeEqDsp();
             channel.addDSP(CHANNELCONTROL_DSP_INDEX.TAIL, threeEqDsp);
             diffractionDsp = GetDiffractionDsp();
             channel.addDSP(CHANNELCONTROL_DSP_INDEX.TAIL, diffractionDsp);
-            channel.set3DLevel(1.0f); 
+            if (_steamAudioEnabled && TryCreateSteamAudioVoice(out saState, out saDsp, out saHandle))
+            {
+                // Steam Audio binaural sits last in the chain (after occlusion EQ + diffraction),
+                // turning the filtered mono into an HRTF stereo pair. FMOD's own panner is muted.
+                channel.addDSP(CHANNELCONTROL_DSP_INDEX.TAIL, saDsp);
+                channel.set3DLevel(0.0f);
+            }
+            else
+            {
+                channel.set3DLevel(1.0f);
+            }
             channel.set3DMinMaxDistance(emitter.MinDistance, emitter.Range);
             if (emitter.ConeInside < 360f)
             {
@@ -541,7 +630,8 @@ public class FmodAudioProvider : IAudioProvider
                 TargetRegionId = emitter.TargetRegionId, IsReflection = emitter.IsReflection,
                 RoomGain = 1.0f,
                 ConeInside = emitter.ConeInside, ConeOutside = emitter.ConeOutside, ConeOutsideVolume = emitter.ConeOutsideVolume,
-                ReflectionSpread = emitter.ReflectionSpread
+                ReflectionSpread = emitter.ReflectionSpread,
+                SaState = saState, SaDsp = saDsp, SaHandle = saHandle
             };
 
             if (_acousticMap != null && !activeSound.IsReflection) // Reflections should not feed back into reverb
@@ -689,7 +779,8 @@ public class FmodAudioProvider : IAudioProvider
 
     private void ReleaseActiveSoundResources(ActiveSound active)
     {
-        ReleaseThreeEqDsp(active.ThreeEqDsp); 
+        ReleaseSteamAudioVoice(active);
+        ReleaseThreeEqDsp(active.ThreeEqDsp);
         ReleaseDiffractionDsp(active.DiffractionDsp);
         ReleaseGranularDsp(active.GranularDsp, active.GranularHandle, active.GranularState);
         ReleaseSynthDsp(active.SynthDsp, active.SynthHandle, active.SynthState);
@@ -769,10 +860,26 @@ public class FmodAudioProvider : IAudioProvider
             active.Channel.set3DSpread(active.ReflectionSpread);
             active.Channel.set3DLevel(1.0f);
         }
-        else 
-        { 
-            active.Channel.set3DSpread(0.0f); 
+        else
+        {
+            active.Channel.set3DSpread(0.0f);
             active.Channel.set3DLevel(1.0f);
+        }
+
+        if (active.SaState != null)
+        {
+            // Steam Audio owns directional panning (override the set3DLevel above); FMOD still
+            // applies distance attenuation via set3DMinMaxDistance. Feed the listener-relative
+            // direction, converted from the game frame (+Z fwd) to Steam Audio's (-Z fwd).
+            active.Channel.set3DLevel(0.0f);
+            Vector3 local = Vector3.Transform(active.CurrentApparentPosition - lPosVec, Quaternion.Conjugate(_listenerRot));
+            float len = local.Length();
+            if (len > 1e-4f)
+            {
+                active.SaState.DirX = local.X / len;
+                active.SaState.DirY = local.Y / len;
+                active.SaState.DirZ = -local.Z / len;
+            }
         }
     }
 
@@ -1263,6 +1370,13 @@ public class FmodAudioProvider : IAudioProvider
             if (_masterCombFilter.hasHandle()) _masterCombFilter.release();
         } 
         StopDiagnosticSound();
+        if (_steamAudioEnabled)
+        {
+            // Per-voice effects were released above via ReleaseActiveSoundResources; now the shared context.
+            Phonon.iplHRTFRelease(ref _saHrtf);
+            Phonon.iplContextRelease(ref _saContext);
+            _steamAudioEnabled = false;
+        }
         _resources?.Dispose();
         _granularBank?.Dispose();
         if (_isInitialized) {
