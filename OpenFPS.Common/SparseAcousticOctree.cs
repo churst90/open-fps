@@ -26,6 +26,10 @@ public partial class SparseAcousticOctree
     private float _size;
     private float _minVoxel;
 
+    // Guards tree structure against concurrent read (acoustic worker thread) vs write (game thread).
+    // Private + no public property => MemoryPack ignores it; reinitialized by the parameterless ctor.
+    private readonly object _treeLock = new();
+
     [MemoryPackConstructor]
     public SparseAcousticOctree()
     {
@@ -51,7 +55,7 @@ public partial class SparseAcousticOctree
 
     public void SetRegion(Vector3 pos, int regionId)
     {
-        SetRegionRecursive(_root, _min, _size, pos, regionId);
+        lock (_treeLock) SetRegionRecursive(_root, _min, _size, pos, regionId);
     }
 
     private void SetRegionRecursive(OctreeNode node, Vector3 nodeMin, float nodeSize, Vector3 targetPos, int regionId)
@@ -86,7 +90,7 @@ public partial class SparseAcousticOctree
 
     public void SetRegionOBB(Vector3 center, Vector3 size, Quaternion rotation, int regionId)
     {
-        SetRegionOBBRecursive(_root, _min, _size, center, size, rotation, regionId);
+        lock (_treeLock) SetRegionOBBRecursive(_root, _min, _size, center, size, rotation, regionId);
     }
 
     private void SetRegionOBBRecursive(OctreeNode node, Vector3 nodeMin, float nodeSize, Vector3 obbCenter, Vector3 obbSize, Quaternion obbRot, int regionId)
@@ -140,8 +144,11 @@ public partial class SparseAcousticOctree
 
     public int GetRegionAt(Vector3 pos)
     {
-        if (!IsInBounds(pos)) return _root.RegionId; // Return root RegionId (usually -1) if outside
-        return GetRegionRecursive(_root, _min, _size, pos);
+        lock (_treeLock)
+        {
+            if (!IsInBounds(pos)) return _root.RegionId; // Return root RegionId (usually -1) if outside
+            return GetRegionRecursive(_root, _min, _size, pos);
+        }
     }
 
     private int GetRegionRecursive(OctreeNode node, Vector3 nodeMin, float nodeSize, Vector3 targetPos)
