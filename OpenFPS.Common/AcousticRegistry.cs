@@ -17,6 +17,21 @@ public struct MaterialProperties
     public int ResonanceIndex { get; set; }
 }
 
+/// <summary>JSON override DTO — every field nullable so omitted fields don't clobber the
+/// hardcoded frequency-band defaults during the merge.</summary>
+internal sealed class MaterialOverride
+{
+    public float? Absorption { get; set; }
+    public float? AbsorptionLow { get; set; }
+    public float? AbsorptionMid { get; set; }
+    public float? AbsorptionHigh { get; set; }
+    public float? Scattering { get; set; }
+    public float? TransmissionLow { get; set; }
+    public float? TransmissionMid { get; set; }
+    public float? TransmissionHigh { get; set; }
+    public int? ResonanceIndex { get; set; }
+}
+
 public static class AcousticRegistry
 {
     private static Dictionary<string, MaterialProperties> _registry = new(System.StringComparer.OrdinalIgnoreCase);
@@ -41,9 +56,27 @@ public static class AcousticRegistry
         {
             try {
                 string json = File.ReadAllText(path);
-                var loaded = JsonSerializer.Deserialize<Dictionary<string, MaterialProperties>>(json);
+                // MERGE, don't replace: materials.json typically carries only a subset of fields
+                // (Absorption/Scattering/ResonanceIndex). Deserializing into the full struct and
+                // overwriting would zero the frequency bands (Transmission*/Absorption{Low,Mid,High}),
+                // collapsing occlusion EQ and wall transmission. Start from the hardcoded entry and
+                // apply only the fields the JSON actually specifies.
+                var loaded = JsonSerializer.Deserialize<Dictionary<string, MaterialOverride>>(json);
                 if (loaded != null) {
-                    foreach(var kvp in loaded) _registry[kvp.Key] = kvp.Value;
+                    foreach (var kvp in loaded) {
+                        var p = _registry.TryGetValue(kvp.Key, out var existing) ? existing : _registry["Generic"];
+                        var o = kvp.Value;
+                        if (o.Absorption.HasValue) p.Absorption = o.Absorption.Value;
+                        if (o.AbsorptionLow.HasValue) p.AbsorptionLow = o.AbsorptionLow.Value;
+                        if (o.AbsorptionMid.HasValue) p.AbsorptionMid = o.AbsorptionMid.Value;
+                        if (o.AbsorptionHigh.HasValue) p.AbsorptionHigh = o.AbsorptionHigh.Value;
+                        if (o.Scattering.HasValue) p.Scattering = o.Scattering.Value;
+                        if (o.TransmissionLow.HasValue) p.TransmissionLow = o.TransmissionLow.Value;
+                        if (o.TransmissionMid.HasValue) p.TransmissionMid = o.TransmissionMid.Value;
+                        if (o.TransmissionHigh.HasValue) p.TransmissionHigh = o.TransmissionHigh.Value;
+                        if (o.ResonanceIndex.HasValue) p.ResonanceIndex = o.ResonanceIndex.Value;
+                        _registry[kvp.Key] = p;
+                    }
                 }
             } catch {}
         }
