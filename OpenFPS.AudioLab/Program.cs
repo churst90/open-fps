@@ -24,6 +24,14 @@ Console.WriteLine("=== OpenFPS AudioLab ===");
 Console.WriteLine($"Runtime: {RuntimeInformation.OSDescription} ({RuntimeInformation.ProcessArchitecture})");
 Console.WriteLine();
 
+if (args.Contains("--steam-live") || args.Contains("--steam-live-smoke"))
+{
+    bool interactive = args.Contains("--steam-live");
+    int code = SteamAudioLiveTest.Run(interactive, seconds: 2.5);
+    Log.CloseAndFlush();
+    Environment.Exit(code);
+}
+
 if (args.Contains("--steam-test"))
 {
     string wav = Path.Combine(Directory.GetCurrentDirectory(), "steam_orbit.wav");
