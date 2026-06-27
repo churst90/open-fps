@@ -19,15 +19,8 @@
     <PackageReference Include="Serilog.Sinks.Console" Version="6.1.1" />
   </ItemGroup>
 
-  <!-- Cross-platform spike: reuse the platform-neutral audio engine source DIRECTLY (no file
-       moves), so the Windows client build is completely untouched. This proves the FMOD audio
-       engine runs on Linux and lets you run the spatial-audio orbit test on your own machine. -->
-  <ItemGroup>
-    <Compile Include="..\OpenFPS.Client\AudioEngine\**\*.cs" />
-    <Compile Include="..\OpenFPS.Client\Core\FmodNative\**\*.cs" />
-    <Compile Include="..\OpenFPS.Client\Core\SpatialService.cs" />
-    <Compile Include="..\OpenFPS.Client\Core\AudioDiagnostics.cs" />
-  </ItemGroup>
+  <!-- The audio engine + diagnostics now live in OpenFPS.Client.Core (referenced above);
+       no source globbing needed. -->
 
   <!-- Drop FMOD's Linux engine libraries (libfmod.so, libfmodL.so) into the repo-root lib/
        folder. Get them free from https://www.fmod.com/download (FMOD Engine > Linux). -->
