@@ -1,0 +1,106 @@
+using System;
+using System.Runtime.InteropServices;
+
+namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
+
+/// <summary>
+/// Minimal P/Invoke bindings for the Steam Audio (phonon) C API — just the binaural-rendering
+/// path needed to prove HRTF works (context, HRTF, binaural effect, audio buffers).
+/// Resolves libphonon.so on Linux / phonon.dll on Windows. Coordinate system: right-handed,
+/// +x right, +y up, -z FORWARD (note: the game uses +z forward, so convert when passing directions).
+/// </summary>
+internal static class Phonon
+{
+    private const string Lib = "phonon";
+    private const CallingConvention CC = CallingConvention.Cdecl;
+
+    // Must match the loaded library; context creation fails otherwise. 4.8.1 -> 0x00040801.
+    public const uint STEAMAUDIO_VERSION = (4u << 16) | (8u << 8) | 1u;
+
+    // IPLerror
+    public const int IPL_STATUS_SUCCESS = 0;
+    // IPLSIMDLevel
+    public const int IPL_SIMDLEVEL_AVX2 = 3;
+    // IPLHRTFType
+    public const int IPL_HRTFTYPE_DEFAULT = 0;
+    // IPLHRTFNormType
+    public const int IPL_HRTFNORMTYPE_NONE = 0;
+    // IPLHRTFInterpolation
+    public const int IPL_HRTFINTERPOLATION_NEAREST = 0;
+    public const int IPL_HRTFINTERPOLATION_BILINEAR = 1;
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct IPLVector3 { public float x, y, z; }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct IPLContextSettings
+    {
+        public uint version;
+        public IntPtr logCallback;       // IPLLogFunction  (null)
+        public IntPtr allocateCallback;  // IPLAllocateFunction (null)
+        public IntPtr freeCallback;      // IPLFreeFunction (null)
+        public int simdLevel;            // IPLSIMDLevel
+        public int flags;                // IPLContextFlags
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct IPLAudioSettings { public int samplingRate; public int frameSize; }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct IPLHRTFSettings
+    {
+        public int type;             // IPLHRTFType
+        public IntPtr sofaFileName;  // const char* (null)
+        public IntPtr sofaData;      // const uint8* (null)
+        public int sofaDataSize;
+        public float volume;
+        public int normType;         // IPLHRTFNormType
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct IPLBinauralEffectSettings { public IntPtr hrtf; }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct IPLBinauralEffectParams
+    {
+        public IPLVector3 direction;
+        public int interpolation;    // IPLHRTFInterpolation
+        public float spatialBlend;
+        public IntPtr hrtf;
+        public IntPtr peakDelays;    // float* (null)
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct IPLAudioBuffer
+    {
+        public int numChannels;
+        public int numSamples;
+        public IntPtr data;          // float**
+    }
+
+    [DllImport(Lib, CallingConvention = CC)]
+    public static extern int iplContextCreate(ref IPLContextSettings settings, out IntPtr context);
+    [DllImport(Lib, CallingConvention = CC)]
+    public static extern void iplContextRelease(ref IntPtr context);
+
+    [DllImport(Lib, CallingConvention = CC)]
+    public static extern int iplHRTFCreate(IntPtr context, ref IPLAudioSettings audioSettings, ref IPLHRTFSettings hrtfSettings, out IntPtr hrtf);
+    [DllImport(Lib, CallingConvention = CC)]
+    public static extern void iplHRTFRelease(ref IntPtr hrtf);
+
+    [DllImport(Lib, CallingConvention = CC)]
+    public static extern int iplBinauralEffectCreate(IntPtr context, ref IPLAudioSettings audioSettings, ref IPLBinauralEffectSettings effectSettings, out IntPtr effect);
+    [DllImport(Lib, CallingConvention = CC)]
+    public static extern int iplBinauralEffectApply(IntPtr effect, ref IPLBinauralEffectParams effectParams, ref IPLAudioBuffer inBuf, ref IPLAudioBuffer outBuf);
+    [DllImport(Lib, CallingConvention = CC)]
+    public static extern void iplBinauralEffectRelease(ref IntPtr effect);
+
+    [DllImport(Lib, CallingConvention = CC)]
+    public static extern int iplAudioBufferAllocate(IntPtr context, int numChannels, int numSamples, ref IPLAudioBuffer audioBuffer);
+    [DllImport(Lib, CallingConvention = CC)]
+    public static extern void iplAudioBufferFree(IntPtr context, ref IPLAudioBuffer audioBuffer);
+    [DllImport(Lib, CallingConvention = CC)]
+    public static extern void iplAudioBufferInterleave(IntPtr context, ref IPLAudioBuffer src, float[] dst);
+    [DllImport(Lib, CallingConvention = CC)]
+    public static extern void iplAudioBufferDeinterleave(IntPtr context, float[] src, ref IPLAudioBuffer dst);
+}

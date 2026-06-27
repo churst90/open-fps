@@ -10,6 +10,11 @@
 server/game.db
 OpenFPS.Server/*.db
 
+# Large native audio engine libs — downloaded per-developer (license/size), see docs/
+lib/libphonon.so
+lib/phonon.dll
+lib/*.so
+
 # dotenv files
 .env
 

@@ -1,6 +1,8 @@
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading;
 using OpenFPS.Client.Core;
+using OpenFPS.Client.Core.AudioEngine.SteamAudio;
 using OpenFPS.Client.Core.Platform;
 using Serilog;
 
@@ -21,6 +23,22 @@ Log.Logger = new LoggerConfiguration()
 Console.WriteLine("=== OpenFPS AudioLab ===");
 Console.WriteLine($"Runtime: {RuntimeInformation.OSDescription} ({RuntimeInformation.ProcessArchitecture})");
 Console.WriteLine();
+
+if (args.Contains("--steam-test"))
+{
+    string wav = Path.Combine(Directory.GetCurrentDirectory(), "steam_orbit.wav");
+    Console.WriteLine("Rendering Steam Audio HRTF orbit (this is offline, takes a moment)...");
+    int code = SteamAudioSpike.RenderOrbitWav(wav);
+    if (code == 0)
+    {
+        Console.WriteLine($"\nWrote: {wav}");
+        Console.WriteLine("Play it on HEADPHONES, e.g.:  paplay steam_orbit.wav   (or mpv/aplay)");
+        Console.WriteLine("First 8s = horizontal circle; last 8s = VERTICAL circle (front/up/back/down).");
+        Console.WriteLine("If you now hear ABOVE vs BELOW, Steam Audio HRTF is working.");
+    }
+    Log.CloseAndFlush();
+    return;
+}
 
 if (args.Contains("--speech-test"))
 {
