@@ -1222,7 +1222,9 @@ public class FmodAudioProvider : IAudioProvider
             format = SOUND_FORMAT.PCM16
         };
 
-        RESULT res = _system.createSound(pcmData, MODE.OPENMEMORY | MODE._3D | MODE._3D_LINEARROLLOFF | MODE.LOOP_OFF, ref info, out FMOD.Sound sound);
+        // OPENRAW is required for headerless PCM in memory; without it FMOD tries to parse a file
+        // header and createSound fails (voice was silently dropped).
+        RESULT res = _system.createSound(pcmData, MODE.OPENMEMORY | MODE.OPENRAW | MODE._3D | MODE._3D_LINEARROLLOFF | MODE.LOOP_OFF, ref info, out FMOD.Sound sound);
         if (res != RESULT.OK) return;
 
         _system.playSound(sound, default, true, out FMOD.Channel ch);
@@ -1290,7 +1292,7 @@ public class FmodAudioProvider : IAudioProvider
             format = SOUND_FORMAT.PCM16
         };
 
-        RESULT res = _system.createSound(pcm, MODE.OPENMEMORY | MODE.LOOP_OFF, ref info, out FMOD.Sound sound);
+        RESULT res = _system.createSound(pcm, MODE.OPENMEMORY | MODE.OPENRAW | MODE.LOOP_OFF, ref info, out FMOD.Sound sound);
         if (res != RESULT.OK) return;
 
         _system.playSound(sound, default, false, out _);
