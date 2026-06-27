@@ -236,19 +236,19 @@ public class FmodAudioProvider : IAudioProvider
         {
             if (!FmodCheck(Factory.System_Create(out _system), "System_Create")) return false;
 
-            // System.Numerics (and our simulation) is RIGHT-handed: +Z forward, +Y up, +X right.
-            // FMOD defaults to LEFT-handed, which silently mirrors left/right and front/back.
-            // INITFLAGS._3D_RIGHTHANDED makes FMOD interpret our world coordinates directly.
-            // NOTE: verify the actual perceived directions by ear with `--audio-test`; if L/R or
-            // F/B come out swapped, this flag (or the listener forward/up vectors) is the lever.
+            // Coordinate convention: the listener uses forward = +Z, up = +Y, right = +X
+            // (strafe-right is Transform(UnitX, yaw)). That is exactly FMOD's DEFAULT LEFT-handed
+            // convention (+X right, +Y up, +Z forward), so NO handedness flag is needed.
+            // Empirically: setting INITFLAGS._3D_RIGHTHANDED inverts left/right (a +X source is
+            // heard on the LEFT). Verified by ear 2026-06 — leave FMOD in its default left-handed mode.
             FmodCheck(_system.setSoftwareFormat(44100, SPEAKERMODE.STEREO, 0), "setSoftwareFormat");
             FmodCheck(_system.set3DSettings(1.0f, 1.0f, 1.0f), "set3DSettings"); // 1 unit = 1 metre
 
-            if (!FmodCheck(_system.init(512, INITFLAGS.NORMAL | INITFLAGS.VOL0_BECOMES_VIRTUAL | INITFLAGS._3D_RIGHTHANDED, IntPtr.Zero), "init"))
+            if (!FmodCheck(_system.init(512, INITFLAGS.NORMAL | INITFLAGS.VOL0_BECOMES_VIRTUAL, IntPtr.Zero), "init"))
                 return false;
 
             _system.getVersion(out uint version);
-            Log.Information("FMOD initialized: v{Major:X}.{Minor:X2}.{Patch:X2}, right-handed 3D, 44.1kHz stereo.",
+            Log.Information("FMOD initialized: v{Major:X}.{Minor:X2}.{Patch:X2}, left-handed 3D (+X right / +Z fwd), 44.1kHz stereo.",
                 (version >> 16) & 0xFFFF, (version >> 8) & 0xFF, version & 0xFF);
 
             _resources = new FmodResourceManager(_system);
