@@ -24,6 +24,31 @@ Console.WriteLine("=== OpenFPS AudioLab ===");
 Console.WriteLine($"Runtime: {RuntimeInformation.OSDescription} ({RuntimeInformation.ProcessArchitecture})");
 Console.WriteLine();
 
+if (args.Contains("--login-test"))
+{
+    var net = new OpenFPS.Client.Core.ClientNetworkService();
+    bool done = false, success = false; string detail = "";
+    net.OnConnected += () =>
+    {
+        Console.WriteLine("connected; sending login (admin)");
+        net.Send(new OpenFPS.Common.Networking.LoginRequest { Username = "admin", Password = "admin123" });
+    };
+    net.OnMessageReceived += m =>
+    {
+        if (m is OpenFPS.Common.Networking.LoginResponse lr)
+        { success = lr.Success; detail = $"user={lr.Username} role={lr.Role} msg='{lr.Message}'"; done = true; }
+    };
+    net.Start();
+    net.Connect("127.0.0.1", 33288);
+    var sw = System.Diagnostics.Stopwatch.StartNew();
+    while (!done && sw.Elapsed.TotalSeconds < 6) { net.Poll(); Thread.Sleep(15); }
+    Console.WriteLine(done
+        ? (success ? $"RESULT: PASSED — login OK ({detail})" : $"RESULT: login rejected ({detail})")
+        : "RESULT: TIMEOUT — no response (is the server running on 33288?)");
+    Log.CloseAndFlush();
+    Environment.Exit(success ? 0 : 1);
+}
+
 if (args.Contains("--steam-distance"))
 {
     int code = SteamAudioLiveTest.RunDistanceCheck();
