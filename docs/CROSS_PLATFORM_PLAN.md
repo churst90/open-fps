@@ -64,12 +64,38 @@ The job hinges on **four interfaces** in Core, implemented per head:
 5. **Drop the global keyboard hook** in favor of focused-window key events — more portable *and* better-behaved with screen readers (Wayland forbids global hooks). Keep `InputStateBuffer` + `InputCommandMapper` (already clean).
 6. **Regression-test the Windows client** still works end-to-end.
 
-## Phase B — GTK Linux head (~1 week; thin once Phase A is done)
+## Phase B — GTK Linux head (Gir.Core / GTK4)
 
-1. Ship FMOD Linux `.so`; make the startup DLL-presence check platform-aware (`libfmod.so` vs `fmod.dll`) — see `ClientRunner.RequiredNativeDlls`.
-2. **`OpenFPS.Client.Gtk` (net10.0)** — GtkSharp (GTK3, most mature a11y) or Gir.Core (GTK4). A window that holds focus + a few menu/login dialogs + key events implementing `IClientShell`/`IInputSource`.
-3. **speech-dispatcher `ISpeechOutput`** impl (P/Invoke libspeechd, or shell `spd-say`).
-4. **Mic capture** via FMOD `recordStart` (or stub voice chat initially).
+Milestones landed (build-green on Gentoo; `OpenFPS.Client` Windows head left untouched):
+- **m1** — accessible main menu + speech (`SpeechDispatcherOutput` → speech-dispatcher/Orca).
+- **m2** — connect + login, speaking the result.
+- **m3** — enter the world: shared Core game loop, GTK key input, FMOD/Steam-Audio spatial sound.
+
+### m3 strategy — Linux-first, keep Windows green
+Rather than the full Phase-A move (which would force untestable edits to the WinForms head), the
+shared-but-neutral game code was relocated to `OpenFPS.Client.Core` **with identical public APIs**,
+so the Windows head keeps compiling against the same `OpenFPS.Client.*` namespaces unchanged:
+- Moved to Core: `LocalPlayerState`, `ClientWorldState`, `ClientPhysicsSystem`, `LocalPlayerController`,
+  `ClientAudioSystem`, `SoundMappingService`. The audio system is now **shared, not duplicated**.
+- `SoundMappingService` kept a backward-compat 3-arg ctor (the Windows head still passes its
+  `TolkService`; that handle was always dead, so the overload ignores it). Added Concentus to Core.
+- GTK-local glue (head-specific, no Windows churn): `Game/GameSession` (netcode + prediction +
+  reconciliation, the Linux `ClientSimulationSystem`), `Game/GameInput` + `Game/GtkKeyMap`
+  (GTK keyval → neutral `GameKey`), `Game/GameWindow` (focus target feeding the input buffer).
+- `Program.cs` runs net poll + fixed-step sim on one `GameLoop` thread; the game window is created
+  on the GTK main thread via the captured `SynchronizationContext`. FMOD degrades gracefully when
+  `libfmod.so` is absent (`FmodLibraryPresent`).
+
+**Verified:** all Linux projects build (0 warnings); 37/37 tests pass; client launches, connects to
+speech-dispatcher, and enables spatial audio (libfmod.so + libphonon.so present).
+**Not yet exercised this session:** a live logged-in walkthrough (needs a running server + GUI login).
+**Windows head:** needs a follow-up build on Windows to confirm still-green (no edits were made to it).
+
+### Phase B remaining
+- **Mic capture / voice chat** via FMOD `recordStart` (the `IMicrophoneCapture` seam) — stubbed for now.
+- Chat/command console (the `/` command window) and friend/player-list UI in the GTK head.
+- Optional: complete the full Phase-A interface extraction (`IClientShell`/`IInputSource`) and migrate
+  the Windows head off `TolkService`, removing the compat shim and any GTK/Windows logic duplication.
 
 ## Toolkit note: GTK vs Avalonia
 

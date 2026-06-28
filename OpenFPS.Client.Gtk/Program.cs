@@ -1,52 +1,112 @@
 using System;
+using System.IO;
+using System.Threading;
 using Gtk;
+using Serilog;
+using OpenFPS.Common;
 using OpenFPS.Common.Networking;
 using OpenFPS.Client.Core;          // ClientNetworkService
 using OpenFPS.Client.Core.Platform; // ISpeechOutput / SpeechDispatcherOutput
+using OpenFPS.Client.Gtk.Game;      // GameSession / GameWindow
 
 // OpenFPS GTK (Linux) client — Phase B.
 //   m1: accessible main menu + speech.
 //   m2: connect + login to the server, speaking the result.
-// Each control speaks on focus (non-visual navigation). Networking runs on a background poll
-// thread; its callbacks only speak (thread-safe), so no GTK UI is touched off the main thread.
+//   m3: enter the world — shared Core game loop, GTK key input, FMOD/Steam-Audio spatial sound.
+// The network poll + fixed-step simulation run on one background thread (GameLoop); GTK widgets are
+// only ever touched on the main thread (window handoff is marshaled via the captured UI context).
 internal static class GtkClientProgram
 {
     private static ISpeechOutput _speech = null!;
     private static ClientNetworkService _network = null!;
     private static volatile bool _networkStarted;
+    private static Application _app = null!;
     private static ApplicationWindow _mainWindow = null!;
+    private static SynchronizationContext? _uiContext;
+
+    private static GameSession? _session;
+    private static GameWindow? _gameWindow;
+    private static bool _audioEnabled;
+
     private static string _pendingUser = "";
     private static string _pendingPass = "";
 
     public static int Main(string[] args)
     {
+        Serilog.Log.Logger = new Serilog.LoggerConfiguration()
+            .MinimumLevel.Information()
+            .WriteTo.Console()
+            .CreateLogger();
+        Serilog.Log.Information("OpenFPS GTK client starting (PID {Pid}).", Environment.ProcessId);
+
         _speech = new SpeechDispatcherOutput();
         _speech.Initialize();
+
+        _audioEnabled = FmodLibraryPresent();
+        Serilog.Log.Information("Speech backend: {Backend}. Spatial audio: {Audio}.",
+            _speech.BackendName, _audioEnabled ? "enabled" : "disabled (libfmod.so not found)");
 
         _network = new ClientNetworkService();
         _network.OnConnected += OnServerConnected;
         _network.OnMessageReceived += OnServerMessage;
 
-        var poll = new System.Threading.Thread(PollLoop) { IsBackground = true, Name = "NetPoll" };
-        poll.Start();
+        var loop = new Thread(GameLoop) { IsBackground = true, Name = "GameLoop" };
+        loop.Start();
 
-        var app = Application.New("org.openfps.client", Gio.ApplicationFlags.FlagsNone);
-        app.OnActivate += (sender, _) => BuildMainMenu((Application)sender);
-        int rc = app.RunWithSynchronizationContext(null);
+        _app = Application.New("org.openfps.client", Gio.ApplicationFlags.FlagsNone);
+        _app.OnActivate += (sender, _) =>
+        {
+            _uiContext = SynchronizationContext.Current;
+            BuildMainMenu((Application)sender);
+        };
+        int rc = _app.RunWithSynchronizationContext(null);
 
+        _session?.Shutdown();
         _speech.Dispose();
         return rc;
     }
 
-    private static void PollLoop()
+    /// <summary>FMOD resolves <c>libfmod.so</c> at runtime; without it, run with audio disabled.</summary>
+    private static bool FmodLibraryPresent() =>
+        File.Exists(Path.Combine(AppContext.BaseDirectory, "libfmod.so"));
+
+    // ── Game / network loop (background thread) ─────────────────────────────────
+    private static void GameLoop()
     {
+        var lastTime = DateTime.Now;
+        double accumulator = 0.0;
+        const double targetDt = PhysicsConstants.FixedDeltaTime;
+
         while (true)
         {
             if (_networkStarted) _network.Poll();
-            System.Threading.Thread.Sleep(15);
+
+            var session = _session;
+            if (session != null && session.IsInGame)
+            {
+                var now = DateTime.Now;
+                double elapsed = (now - lastTime).TotalSeconds;
+                lastTime = now;
+                if (elapsed > 0.2) elapsed = 0.2;
+                accumulator += elapsed;
+
+                while (accumulator >= targetDt)
+                {
+                    session.SimStep((float)targetDt);
+                    accumulator -= targetDt;
+                }
+                session.ContinuousUpdate();
+            }
+            else
+            {
+                lastTime = DateTime.Now; // avoid banking elapsed time while not simulating
+            }
+
+            Thread.Sleep(5);
         }
     }
 
+    // ── Main menu (m1) ──────────────────────────────────────────────────────────
     private static void BuildMainMenu(Application app)
     {
         _mainWindow = ApplicationWindow.New(app);
@@ -62,6 +122,8 @@ internal static class GtkClientProgram
 
         _mainWindow.Present();
         _speech.Speak("Open F P S main menu. Tab or arrow keys to move, Enter to select.", true);
+        if (!_audioEnabled)
+            _speech.Speak("Note: FMOD audio library not found. Running without spatial sound.");
     }
 
     private static void ShowLoginDialog()
@@ -111,16 +173,42 @@ internal static class GtkClientProgram
         _network.Send(new LoginRequest { Username = _pendingUser, Password = _pendingPass });
     }
 
+    // ── Server messages (GameLoop thread) ───────────────────────────────────────
     private static void OnServerMessage(IMessage msg)
     {
         if (msg is LoginResponse lr)
         {
-            if (lr.Success) _speech.Speak($"Logged in as {lr.Username}.", true);
-            else _speech.Speak($"Login failed. {lr.Message}", true);
+            if (lr.Success)
+            {
+                _speech.Speak($"Logged in as {lr.Username}. Loading world.", true);
+                _session = new GameSession(_network, _speech, _audioEnabled);
+                _session.GameJoined += OnGameJoined;
+            }
+            else
+            {
+                _speech.Speak($"Login failed. {lr.Message}", true);
+            }
+            return;
         }
+
+        _session?.HandleMessage(msg);
     }
 
-    // ── UI helpers ──────────────────────────────────────────────────────────
+    /// <summary>Fired on the GameLoop thread when the local player spawns; build the game window on the UI thread.</summary>
+    private static void OnGameJoined()
+    {
+        void Enter()
+        {
+            _mainWindow.SetVisible(false);
+            _gameWindow = new GameWindow(_session!, _speech);
+            _gameWindow.Present(_app);
+        }
+
+        if (_uiContext != null) _uiContext.Post(_ => Enter(), null);
+        else Enter();
+    }
+
+    // ── UI helpers ──────────────────────────────────────────────────────────────
     private static Box VBox(int margin)
     {
         var box = Box.New(Orientation.Vertical, 8);

@@ -18,17 +18,24 @@ namespace OpenFPS.Client.Services;
 public class SoundMappingService
 {
     private readonly AudioEngineFacade _audioEngine;
-    private readonly TolkService _tts;
     private readonly LocalPlayerState _state;
     private readonly AudioBank _bank = new();
     private bool _initialized = false;
 
-    public SoundMappingService(AudioEngineFacade engine, TolkService tts, LocalPlayerState state)
+    public SoundMappingService(AudioEngineFacade engine, LocalPlayerState state)
     {
         _audioEngine = engine;
-        _tts = tts;
         _state = state;
     }
+
+    /// <summary>
+    /// Backward-compat shim. The Windows head still passes its <c>TolkService</c> as the middle
+    /// argument; this service never used it (the handle was always dead), so the overload simply
+    /// ignores it. Lets the Windows client keep compiling unchanged while the GTK head — and any
+    /// future caller — uses the two-argument form. Remove once the Windows head migrates.
+    /// </summary>
+    public SoundMappingService(AudioEngineFacade engine, object? legacySpeech, LocalPlayerState state)
+        : this(engine, state) { }
 
     public void Initialize()
     {

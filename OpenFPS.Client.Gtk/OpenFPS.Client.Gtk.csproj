@@ -16,6 +16,23 @@
   <ItemGroup>
     <!-- GTK4 .NET bindings (P/Invoke to the system libgtk-4). -->
     <PackageReference Include="GirCore.Gtk-4.0" Version="0.6.3" />
+    <PackageReference Include="Serilog" Version="4.2.0" />
+    <PackageReference Include="Serilog.Sinks.Console" Version="6.1.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Game assets (sound bank, materials) consumed by the shared audio engine at runtime. -->
+    <None Include="..\OpenFPS.Client\ASSETS\**\*.*" Link="ASSETS\%(RecursiveDir)%(Filename)%(Extension)">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="..\OpenFPS.Client\materials.json" Link="materials.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <!-- FMOD Linux engine libraries (libfmod.so / libfmodL.so) from the repo-root lib/ folder.
+         Optional: if absent the client runs with spatial audio disabled (see Program.FmodLibraryPresent). -->
+    <None Include="..\lib\*.so" Link="%(Filename)%(Extension)">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
 </Project>
