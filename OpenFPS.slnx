@@ -2,6 +2,7 @@
   <Project Path="OpenFPS.AudioLab/OpenFPS.AudioLab.csproj" />
   <Project Path="OpenFPS.Client/OpenFPS.Client.csproj" />
   <Project Path="OpenFPS.Client.Core/OpenFPS.Client.Core.csproj" />
+  <Project Path="OpenFPS.Client.Gtk/OpenFPS.Client.Gtk.csproj" />
   <Project Path="OpenFPS.Common/OpenFPS.Common.csproj" />
   <Project Path="OpenFPS.Server/OpenFPS.Server.csproj" />
   <Project Path="OpenFPS.Tests/OpenFPS.Tests.csproj" />
