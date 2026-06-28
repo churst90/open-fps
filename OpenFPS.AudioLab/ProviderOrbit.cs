@@ -65,4 +65,49 @@ public static class ProviderOrbit
         if (!interactive) Console.WriteLine("RESULT: provider orbit ran to completion (see log for 'Steam Audio HRTF binaural enabled').");
         return 0;
     }
+
+    /// <summary>
+    /// Stress test: rapidly create and stop many transient spatial voices (footsteps + reflections)
+    /// while the FMOD mixer thread runs the Steam Audio DSP callbacks — reproducing the native crash
+    /// seen in-game when moving near walls (voice create/release churn racing the mixer callback).
+    /// Headless: survives `seconds` and prints a count, or crashes (segfault / heap corruption).
+    /// </summary>
+    public static int RunChurn(double seconds = 12.0)
+    {
+        var provider = new FmodAudioProvider();
+        if (!provider.Initialize()) { Console.WriteLine("provider init failed"); return 1; }
+        provider.UpdateListener(Vector3.Zero, Quaternion.Identity, Vector3.Zero, -1);
+
+        int id = 100000;
+        int created = 0;
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        var rnd = new Random(12345);
+
+        SpatialEmitter MakeVoice(int eid, bool reflection) => new SpatialEmitter
+        {
+            EntityId = eid,
+            Type = EmitterType.WorldLocked,
+            IsSynth = true, SynthWave = SynthWaveType.Noise, SynthFrequency = 180f + rnd.Next(400),
+            SynthFilterCutoff = 1.0f, Volume = 0.25f,
+            Position = new Vector3(rnd.Next(-6, 6), rnd.Next(-2, 2), 1 + rnd.Next(8)),
+            Range = 40f, MinDistance = 1f, IsEvent = true, IsReflection = reflection,
+        };
+
+        while (sw.Elapsed.TotalSeconds < seconds)
+        {
+            // Burst of new voices (some flagged as reflections, like the in-game wall bounces).
+            for (int k = 0; k < 10; k++) { provider.PlaySpatialSound(MakeVoice(++id, k % 2 == 0)); created++; }
+            provider.Update();
+            Thread.Sleep(4);
+            // Stop a batch of older voices to force release churn against the live mixer callbacks.
+            for (int k = 0; k < 10; k++) provider.StopSound(id - 20 - k);
+            provider.Update();
+            Thread.Sleep(4);
+            if (created % 200 == 0) Console.WriteLine($"  churned {created} voices ({sw.Elapsed.TotalSeconds:F1}s)...");
+        }
+
+        provider.Dispose();
+        Console.WriteLine($"RESULT: SURVIVED — churned {created} transient Steam Audio voices in {seconds:F0}s without crashing.");
+        return 0;
+    }
 }

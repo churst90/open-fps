@@ -221,11 +221,32 @@ public class FmodAudioProvider : IAudioProvider
     private int _listenerRegionId = -1;
     private float _shelterFactor = 0.0f;
 
-    // Steam Audio (phonon) HRTF state — shared context + HRTF; per-voice effects live on ActiveSound.
+    // Opt-in spatialization tracing (OPENFPS_AUDIO_DEBUG=1): logs each spatial source's
+    // listener-relative HRTF direction + listener yaw ~once/sec to diagnose panning.
+    private static readonly bool _audioDebug = Environment.GetEnvironmentVariable("OPENFPS_AUDIO_DEBUG") == "1";
+    private int _dbgFrame;
+
+    // Steam Audio (phonon) HRTF state — shared context + HRTF.
     private IntPtr _saContext;
     private IntPtr _saHrtf;
     private int _saFrameSize = 1024;
     private bool _steamAudioEnabled;
+
+    // Pre-allocated pool of Steam Audio voices (binaural effect + Phonon buffers + FMOD DSP). Created
+    // ONCE at init and reused — never iplBinauralEffectCreate/iplAudioBufferAllocate/free at runtime.
+    // Freeing Phonon resources while the FMOD mixer thread is mid-callback on them caused native heap
+    // corruption / segfaults under the voice churn from footsteps + wall reflections (reproduced by
+    // ProviderOrbit.RunChurn). Pooling removes the runtime alloc/free entirely, so there is nothing
+    // to free out from under a live callback.
+    private sealed class SaVoice
+    {
+        public SteamAudioVoiceState State = null!;
+        public FMOD.DSP Dsp;
+        public System.Runtime.InteropServices.GCHandle Handle;
+    }
+    private readonly Stack<SaVoice> _saPool = new();
+    private readonly List<SaVoice> _saAllVoices = new();
+    private const int SaPoolSize = 96;
 
     /// <summary>
     /// Logs and returns false when an FMOD call fails. FMOD result codes were previously
@@ -303,15 +324,22 @@ public class FmodAudioProvider : IAudioProvider
             { Log.Warning("Steam Audio: HRTF create failed; using FMOD panning."); Phonon.iplContextRelease(ref _saContext); return; }
 
             _steamAudioEnabled = true;
-            Log.Information("Steam Audio HRTF binaural enabled (frameSize={Frame}).", _saFrameSize);
+            for (int i = 0; i < SaPoolSize; i++)
+            {
+                if (!CreatePooledVoice(out var v)) break;
+                _saAllVoices.Add(v);
+                _saPool.Push(v);
+            }
+            Log.Information("Steam Audio HRTF binaural enabled (frameSize={Frame}); {Pooled} voices pooled.", _saFrameSize, _saAllVoices.Count);
         }
         catch (DllNotFoundException) { Log.Warning("Steam Audio: libphonon not found; using FMOD panning."); }
         catch (Exception ex) { Log.Warning(ex, "Steam Audio init failed; using FMOD panning."); }
     }
 
-    private bool TryCreateSteamAudioVoice(out SteamAudioVoiceState? state, out FMOD.DSP dsp, out System.Runtime.InteropServices.GCHandle handle)
+    /// <summary>Allocates one pooled voice (effect + Phonon buffers + DSP). Called only at init.</summary>
+    private bool CreatePooledVoice(out SaVoice voice)
     {
-        state = null; dsp = default; handle = default;
+        voice = null!;
         var au = new Phonon.IPLAudioSettings { samplingRate = 44100, frameSize = _saFrameSize };
         var es = new Phonon.IPLBinauralEffectSettings { hrtf = _saHrtf };
         if (Phonon.iplBinauralEffectCreate(_saContext, ref au, ref es, out IntPtr effect) != Phonon.IPL_STATUS_SUCCESS) return false;
@@ -324,27 +352,48 @@ public class FmodAudioProvider : IAudioProvider
         Phonon.iplAudioBufferAllocate(_saContext, 1, _saFrameSize, ref s.InBuf);
         Phonon.iplAudioBufferAllocate(_saContext, 2, _saFrameSize, ref s.OutBuf);
 
-        if (SteamAudioDsp.CreateDSP(_system, s, out dsp, out handle) != RESULT.OK)
+        if (SteamAudioDsp.CreateDSP(_system, s, out var dsp, out var handle) != RESULT.OK)
         {
             Phonon.iplAudioBufferFree(_saContext, ref s.InBuf);
             Phonon.iplAudioBufferFree(_saContext, ref s.OutBuf);
             Phonon.iplBinauralEffectRelease(ref effect);
             return false;
         }
-        state = s;
+        voice = new SaVoice { State = s, Dsp = dsp, Handle = handle };
+        return true;
+    }
+
+    /// <summary>Borrows a voice from the pool (no allocation). Returns false when the pool is empty —
+    /// that sound then plays without HRTF rather than crashing.</summary>
+    private bool TryCreateSteamAudioVoice(out SteamAudioVoiceState? state, out FMOD.DSP dsp, out System.Runtime.InteropServices.GCHandle handle)
+    {
+        state = null; dsp = default; handle = default;
+        SaVoice v;
+        lock (_saPool)
+        {
+            if (_saPool.Count == 0) return false;
+            v = _saPool.Pop();
+        }
+        // Reset transient state. The binaural effect has no public reset, but the next mixer callback
+        // overwrites the direction — a single frame of interpolation from the prior direction is inaudible.
+        v.State.DirX = 0f; v.State.DirY = 0f; v.State.DirZ = -1f;
+        v.State.LastRms = v.State.LastRmsL = v.State.LastRmsR = 0f;
+        v.State.ProducedAudio = false;
+        state = v.State; dsp = v.Dsp; handle = v.Handle;
         return true;
     }
 
     private void ReleaseSteamAudioVoice(ActiveSound a)
     {
         if (a.SaState == null) return;
-        if (a.SaDsp.hasHandle()) { a.SaDsp.release(); a.SaDsp = default; }
-        if (a.SaHandle.IsAllocated) a.SaHandle.Free();
-        Phonon.iplAudioBufferFree(_saContext, ref a.SaState.InBuf);
-        Phonon.iplAudioBufferFree(_saContext, ref a.SaState.OutBuf);
-        IntPtr eff = a.SaState.Effect;
-        Phonon.iplBinauralEffectRelease(ref eff);
-        a.SaState = null;
+        // Detach the DSP from its channel so the mixer stops calling it (removeDSP blocks until any
+        // in-flight callback completes), then return the voice to the pool for reuse. We never free
+        // the Phonon effect/buffers or the GCHandle here — that is exactly what raced the mixer
+        // callback and corrupted the heap. The resources live until Dispose.
+        if (a.SaDsp.hasHandle() && a.Channel.hasHandle()) a.Channel.removeDSP(a.SaDsp);
+        var v = new SaVoice { State = a.SaState, Dsp = a.SaDsp, Handle = a.SaHandle };
+        lock (_saPool) { _saPool.Push(v); }
+        a.SaState = null; a.SaDsp = default; a.SaHandle = default;
     }
 
     public void SetAcousticMap(AcousticMap map)
@@ -581,9 +630,17 @@ public class FmodAudioProvider : IAudioProvider
             if (_steamAudioEnabled && TryCreateSteamAudioVoice(out saState, out saDsp, out saHandle))
             {
                 // Steam Audio binaural sits last in the chain (after occlusion EQ + diffraction),
-                // turning the filtered mono into an HRTF stereo pair. FMOD's own panner is muted.
+                // turning the filtered mono into an HRTF stereo pair.
                 channel.addDSP(CHANNELCONTROL_DSP_INDEX.TAIL, saDsp);
-                channel.set3DLevel(0.0f);
+
+                // CRITICAL: a 3D channel treats the signal as a mono point source and downmixes the
+                // DSP's binaural stereo back to mono on the way to the master bus — set3DLevel(0) does
+                // NOT prevent this (verified by SteamAudioLiveTest.RunStereoCheck: 3D collapses L≈R,
+                // switching the channel to 2D restores full L/R separation). Swap the 3D flags for 2D
+                // while preserving loop/other flags. Distance falloff is applied manually below in
+                // ApplyAcousticFilters (distAtten), so we lose nothing by leaving FMOD's 3D path.
+                channel.getMode(out MODE chMode);
+                channel.setMode((chMode & ~(MODE._3D | MODE._3D_LINEARROLLOFF)) | MODE._2D);
             }
             else
             {
@@ -746,6 +803,7 @@ public class FmodAudioProvider : IAudioProvider
 
             lock (_lock)
             {
+                _dbgFrame++;
                 UpdateActiveReverbs(lPosVec);
 
                 for (int i = _activeSounds.Count - 1; i >= 0; i--)
@@ -836,42 +894,14 @@ public class FmodAudioProvider : IAudioProvider
         }
 
         active.CurrentApparentPosition = Vector3.Lerp(active.CurrentApparentPosition, targetPos, 0.15f);
-        FMOD.VECTOR fpos = FmodHelpers.ToFmodVec(active.CurrentApparentPosition), fvel = FmodHelpers.ToFmodVec(active.Velocity);
-        active.Channel.set3DAttributes(ref fpos, ref fvel);
-        active.Channel.set3DMinMaxDistance(active.MinDistance, active.Range);
-
-        float distToSound = Vector3.Distance(lPosVec, active.CurrentApparentPosition);
-        bool isIndirect = active.ApparentPosition != Vector3.Zero && active.ApparentPosition != active.Position;
-        
-        if (isIndirect)
-        {
-            // --- PHASE 3: Precision Panning ---
-            // Indirect paths (diffraction) fill the room based on aperture size
-            float roomFillSpread = Math.Clamp((distToSound * AcousticConstants.SpreadGrowthFactor), 0.0f, AcousticConstants.VolumetricSpreadMax);
-            float baseSpread = (active.CurrentAperture * 90.0f) / Math.Max(0.5f, distToSound);
-            active.Channel.set3DSpread(Math.Min(baseSpread, roomFillSpread));
-            active.Channel.set3DLevel(1.0f); 
-        }
-        else if (active.IsReflection)
-        {
-            // --- PHASE 3: Scattering-Based Spread ---
-            // High-order reflections on smooth surfaces should be pinpoints. 
-            // Only use high spread for rough materials.
-            active.Channel.set3DSpread(active.ReflectionSpread);
-            active.Channel.set3DLevel(1.0f);
-        }
-        else
-        {
-            active.Channel.set3DSpread(0.0f);
-            active.Channel.set3DLevel(1.0f);
-        }
 
         if (active.SaState != null)
         {
-            // Steam Audio owns directional panning (override the set3DLevel above); FMOD still
-            // applies distance attenuation via set3DMinMaxDistance. Feed the listener-relative
-            // direction, converted from the game frame (+Z fwd) to Steam Audio's (-Z fwd).
-            active.Channel.set3DLevel(0.0f);
+            // Steam Audio path: the channel is 2D (see PlaySpatialSound) so FMOD does not collapse the
+            // binaural stereo. The HRTF owns directional panning and distance is applied manually in
+            // ApplyAcousticFilters — so we skip FMOD's 3D positioning calls entirely (they would be
+            // no-ops on a 2D channel). Feed the listener-relative direction, converting from the game
+            // frame (+Z forward) to Steam Audio's (-Z forward).
             Vector3 local = Vector3.Transform(active.CurrentApparentPosition - lPosVec, Quaternion.Conjugate(_listenerRot));
             float len = local.Length();
             if (len > 1e-4f)
@@ -880,7 +910,43 @@ public class FmodAudioProvider : IAudioProvider
                 active.SaState.DirY = local.Y / len;
                 active.SaState.DirZ = -local.Z / len;
             }
+
+            if (_audioDebug && !active.IsReflection && _dbgFrame % 60 == 0)
+            {
+                Vector3 fwd = Vector3.Transform(Vector3.UnitZ, _listenerRot);
+                float yawDeg = MathF.Atan2(fwd.X, fwd.Z) * 180f / MathF.PI;
+                Log.Information("[ADBG] e{Id} {Sound} dist={D:F1} dir=({X:F2},{Y:F2},{Z:F2}) listenerYaw={Yaw:F0} L/R={L:F3}/{R:F3}",
+                    active.EntityId, active.SoundId, len,
+                    active.SaState.DirX, active.SaState.DirY, active.SaState.DirZ, yawDeg, active.SaState.LastRmsL, active.SaState.LastRmsR);
+            }
+            return;
         }
+
+        // FMOD native 3D fallback (Steam Audio unavailable): position the mono point source and let
+        // FMOD pan + roll off by distance.
+        FMOD.VECTOR fpos = FmodHelpers.ToFmodVec(active.CurrentApparentPosition), fvel = FmodHelpers.ToFmodVec(active.Velocity);
+        active.Channel.set3DAttributes(ref fpos, ref fvel);
+        active.Channel.set3DMinMaxDistance(active.MinDistance, active.Range);
+
+        float distToSound = Vector3.Distance(lPosVec, active.CurrentApparentPosition);
+        bool isIndirect = active.ApparentPosition != Vector3.Zero && active.ApparentPosition != active.Position;
+
+        if (isIndirect)
+        {
+            // Indirect paths (diffraction) fill the room based on aperture size.
+            float roomFillSpread = Math.Clamp((distToSound * AcousticConstants.SpreadGrowthFactor), 0.0f, AcousticConstants.VolumetricSpreadMax);
+            float baseSpread = (active.CurrentAperture * 90.0f) / Math.Max(0.5f, distToSound);
+            active.Channel.set3DSpread(Math.Min(baseSpread, roomFillSpread));
+        }
+        else if (active.IsReflection)
+        {
+            active.Channel.set3DSpread(active.ReflectionSpread);
+        }
+        else
+        {
+            active.Channel.set3DSpread(0.0f);
+        }
+        active.Channel.set3DLevel(1.0f);
     }
 
     private void ApplyAcousticFilters(ActiveSound active, Vector3 lPosVec)
@@ -929,7 +995,27 @@ public class FmodAudioProvider : IAudioProvider
             distAtten = Math.Clamp(1.0f - (dist - active.MinDistance) / span, 0.0f, 1.0f);
         }
 
-        active.Channel.setVolume(active.BaseVolume * finalVolFactor * roomGainBonus * distAtten);
+        // Directional cone: Steam Audio channels are 2D, so FMOD's set3DConeSettings no longer fires.
+        // Reproduce it manually from the angle between the source's facing (Direction) and the
+        // source->listener vector: full volume inside the inner cone, ConeOutsideVolume beyond the
+        // outer cone, smooth between. (Native-3D fallback channels still use FMOD's own cone.)
+        float coneAtten = 1.0f;
+        if (active.SaState != null && active.ConeInside < 360f && active.Direction != Vector3.Zero)
+        {
+            Vector3 toListener = lPosVec - active.CurrentApparentPosition;
+            if (toListener.LengthSquared() > 1e-6f)
+            {
+                float cos = Vector3.Dot(Vector3.Normalize(active.Direction), Vector3.Normalize(toListener));
+                float offAxisDeg = MathF.Acos(Math.Clamp(cos, -1f, 1f)) * (180f / MathF.PI);
+                float innerHalf = active.ConeInside * 0.5f;
+                float outerHalf = MathF.Max(active.ConeOutside * 0.5f, innerHalf + 0.01f);
+                coneAtten = offAxisDeg <= innerHalf ? 1.0f
+                    : offAxisDeg >= outerHalf ? active.ConeOutsideVolume
+                    : MathHelper.Lerp(1.0f, active.ConeOutsideVolume, (offAxisDeg - innerHalf) / (outerHalf - innerHalf));
+            }
+        }
+
+        active.Channel.setVolume(active.BaseVolume * finalVolFactor * roomGainBonus * distAtten * coneAtten);
         
         if (active.ThreeEqDsp.hasHandle()) 
         {
@@ -1402,7 +1488,20 @@ public class FmodAudioProvider : IAudioProvider
         StopDiagnosticSound();
         if (_steamAudioEnabled)
         {
-            // Per-voice effects were released above via ReleaseActiveSoundResources; now the shared context.
+            // Free the whole voice pool (active sounds were returned to it above). Release each DSP
+            // first (detaches it from the mixer), then its Phonon effect/buffers, then the shared
+            // context. This is the ONLY place Phonon voice resources are freed.
+            foreach (var v in _saAllVoices)
+            {
+                if (v.Dsp.hasHandle()) v.Dsp.release();
+                if (v.Handle.IsAllocated) v.Handle.Free();
+                Phonon.iplAudioBufferFree(_saContext, ref v.State.InBuf);
+                Phonon.iplAudioBufferFree(_saContext, ref v.State.OutBuf);
+                IntPtr eff = v.State.Effect;
+                Phonon.iplBinauralEffectRelease(ref eff);
+            }
+            _saAllVoices.Clear();
+            _saPool.Clear();
             Phonon.iplHRTFRelease(ref _saHrtf);
             Phonon.iplContextRelease(ref _saContext);
             _steamAudioEnabled = false;

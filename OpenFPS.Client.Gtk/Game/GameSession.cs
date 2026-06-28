@@ -68,6 +68,8 @@ public sealed class GameSession
         AcousticRegistry.Initialize();
         _sounds.Initialize();
         if (enableAudio) _audioEngine.Initialize();
+        Serilog.Log.Information("GameSession created. Audio requested={Req}, engine initialized={Init}.",
+            enableAudio, _audioEngine.IsInitialized);
 
         _controller.OnStepTriggered += _audioSystem.OnPlayerFootstep;
         _controller.OnLandTriggered += _audioSystem.OnPlayerLand;
@@ -79,6 +81,8 @@ public sealed class GameSession
         switch (msg)
         {
             case MapManifest manifest:
+                Serilog.Log.Information("MapManifest: {Map}, expecting {Count} entities, spawn {Spawn}.",
+                    manifest.MapName, manifest.ExpectedEntityCount, manifest.SpawnPoint.Position);
                 _speech.Speak($"Loading map {manifest.MapName}.");
                 _world.Clear(manifest.WorldSize, manifest.MapMin, manifest.MapMax);
                 _expectedEntityCount = manifest.ExpectedEntityCount;
@@ -105,6 +109,7 @@ public sealed class GameSession
                 break;
 
             case MapLoadComplete:
+                Serilog.Log.Information("MapLoadComplete: {Count} entity definitions received.", _world.GetSnapshot().Entities.Count);
                 _speech.Speak("Geometry received. Generating acoustics.");
                 Task.Run(GenerateAcoustics);
                 break;
@@ -120,7 +125,7 @@ public sealed class GameSession
                 _state.Velocity = Vector3.Zero;
                 _history.Clear();
 
-                _network.Send(new TextCommand { Command = "ready" });
+                Serilog.Log.Information("PlayerSpawned: entity {Id} at {Pos}.", spawn.EntityId, spawn.SpawnTransform.Position);
                 GameJoined?.Invoke();
                 _speech.Speak("You have entered the world. Use W A S D to move, J and L to turn.", true);
                 break;
@@ -181,6 +186,12 @@ public sealed class GameSession
             Serilog.Log.Error(ex, "Acoustic generation failed.");
             _speech.Speak("Acoustic generation failed.");
         }
+
+        // Tell the server we're done loading; it responds by spawning us (-> PlayerSpawned).
+        // This MUST be sent here, not in the PlayerSpawned handler — the spawn is the server's
+        // reply to "ready", so sending it later would deadlock the handshake.
+        Serilog.Log.Information("Acoustics done; sending ready.");
+        _network.Send(new TextCommand { Command = "ready" });
     }
 
     // ── Per-frame simulation (game-loop thread) ─────────────────────────────────

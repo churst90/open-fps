@@ -169,6 +169,7 @@ internal static class GtkClientProgram
 
     private static void OnServerConnected()
     {
+        Log.Information("Connected to server; sending login for user '{User}'.", _pendingUser);
         _speech.Speak("Connected. Logging in.", true);
         _network.Send(new LoginRequest { Username = _pendingUser, Password = _pendingPass });
     }
@@ -178,6 +179,7 @@ internal static class GtkClientProgram
     {
         if (msg is LoginResponse lr)
         {
+            Log.Information("LoginResponse: success={Success} user={User} msg={Msg}", lr.Success, lr.Username, lr.Message);
             if (lr.Success)
             {
                 _speech.Speak($"Logged in as {lr.Username}. Loading world.", true);
@@ -199,9 +201,12 @@ internal static class GtkClientProgram
     {
         void Enter()
         {
-            _mainWindow.SetVisible(false);
-            _gameWindow = new GameWindow(_session!, _speech);
+            // Hide (don't close) the menu: closing it disrupts the new window's keyboard focus so the
+            // game window stops receiving key events. The game window quits the whole app on close
+            // (see GameWindow), so the hidden menu won't keep the process alive.
+            _gameWindow = new GameWindow(_session!, _speech, () => _app.Quit());
             _gameWindow.Present(_app);
+            _mainWindow.SetVisible(false);
         }
 
         if (_uiContext != null) _uiContext.Post(_ => Enter(), null);

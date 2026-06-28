@@ -3,75 +3,55 @@
   "Size": { "X": 100, "Y": 40, "Z": 100 },
   "MinBound": { "X": -50, "Y": 0, "Z": -50 },
   "MaxBound": { "X": 50, "Y": 40, "Z": 50 },
-  "SpawnPoint": { "Position": { "X": 0, "Y": 1, "Z": 20 }, "Rotation": { "X": 0, "Y": 0, "Z": 0, "W": 1 } },
+  "SpawnPoint": { "Position": { "X": 0, "Y": 1, "Z": 0 }, "Rotation": { "X": 0, "Y": 0, "Z": 0, "W": 1 } },
+  "VoxelResolution": 0.5,
+  "OcclusionFloor": 0.15,
   "Entities": [
-    // --- STREET FOUNDATION ---
-    { "EntityId": 100, "PrefabId": "floor_generic", "Position": { "X": 0, "Y": 0, "Z": 0 }, "Scale": { "X": 10, "Y": 1, "Z": 10 }, "Material": "Concrete" },
+    // ============================================================
+    //  OCCLUSION / MATERIAL DEMO
+    //  Spawn at (0,1,0) facing NORTH (+Z). Two rooms ahead at z=15.
+    //  Doors face south (toward you) at z=10: concrete room door x=-7, wood room door x=+7.
+    // ============================================================
 
-    // --- BUILDING A (The 'Heavy' Warehouse - Concrete) ---
-    // Positioned Left, Door facing East into alley
-    { 
-        "EntityId": 1, 
-        "PrefabId": "building_box", 
-        "Position": { "X": -15, "Y": 2.5, "Z": 0 }, 
-        "RegionId": 1,
-        "Material": "Concrete",
-        "RoomSize": { "X": 10, "Y": 5, "Z": 10 },
-        "FaceMask": 59, // 111011 (Missing East wall for the 'open' warehouse feel or doorway)
-        "Materials": [18, 18, 18, 18, 18, 18]
-    },
-    // Add a specific portal for Building A
-    { "EntityId": 17, "PrefabId": "portal", "Position": { "X": -10, "Y": 1, "Z": 0 }, "Rotation": { "X": 0, "Y": 0.7071, "Z": 0, "W": 0.7071 }, "RegionAId": -1, "RegionBId": 1, "ApertureSize": 2.0 },
-    // Industrial Thrum (Synthesized 120Hz)
-    { 
-        "EntityId": 15, 
-        "PrefabId": "chirp_beacon", 
-        "Position": { "X": -15, "Y": 1, "Z": 0 },
-        "Volume": 0.4,
-        "IsSynth": true,
-        "SynthWave": 3, 
-        "SynthFreq": 120,
-        "SynthFilterCutoff": 0.3
-    },
+    // --- GROUND: big concrete slab under the whole play area (x[-20,20], z[-10,30]) ---
+    { "EntityId": 100, "PrefabId": "concrete_floor", "Position": { "X": 0, "Y": 0, "Z": 10 }, "Scale": { "X": 4, "Y": 1, "Z": 4 } },
 
-    // --- BUILDING B (The 'Soft' Gallery - Wood/Carpet) ---
-    // Positioned Right, Door facing North
-    { 
-        "EntityId": 2, 
-        "PrefabId": "building_box", 
-        "Position": { "X": 15, "Y": 2.5, "Z": 0 }, 
-        "RegionId": 2,
-        "Material": "Wood",
-        "RoomSize": { "X": 10, "Y": 5, "Z": 10 },
-        "FaceMask": 61, // 111101 (Missing North wall for doorway)
-        "Materials": [6, 21, 21, 21, 21, 21] // Carpet floor, wood others
-    },
-    { "EntityId": 27, "PrefabId": "portal", "Position": { "X": 15, "Y": 1, "Z": 5 }, "RegionAId": -1, "RegionBId": 2, "ApertureSize": 1.5 },
-    // Pulse Bell (Synthesized 440Hz)
-    { 
-        "EntityId": 25, 
-        "PrefabId": "chirp_beacon", 
-        "Position": { "X": 15, "Y": 1, "Z": 0 },
-        "Volume": 0.3,
-        "IsSynth": true,
-        "SynthWave": 1,
-        "SynthFreq": 440,
-        "SynthLfoRate": 2.0,
-        "SynthLfoDepth": 0.2
-    },
+    // --- MATERIAL ZONES (sit just above the slab; change footstep sound when walked on) ---
+    // Grass approach strip between spawn and the doors (z 4.5..9.5).
+    { "EntityId": 110, "PrefabId": "grass_floor", "Position": { "X": 0, "Y": 0.05, "Z": 7 }, "Scale": { "X": 1.5, "Y": 1, "Z": 0.5 } },
+    // Dirt area off to the west.
+    { "EntityId": 111, "PrefabId": "dirt_floor", "Position": { "X": -15, "Y": 0.05, "Z": 5 }, "Scale": { "X": 1, "Y": 1, "Z": 1 } },
 
-    // --- ALLEY PROPS ---
-    // Round Pillar for scattering stress-test
-    { "EntityId": 40, "PrefabId": "pillar_round", "Position": { "X": 0, "Y": 2, "Z": 0 }, "Material": "Marble" },
-    // Staircase leading to a 'virtual' second floor
-    { "EntityId": 41, "PrefabId": "staircase_acoustic", "Position": { "X": 0, "Y": 1.5, "Z": -10 }, "Material": "Metal" },
+    // ============================================================
+    //  ROOM A — CONCRETE, with an OMNIDIRECTIONAL SIREN inside.
+    //  Interior x[-12,-2], z[10,20]. Door (gap) centered x=-7 at z=10.
+    // ============================================================
+    { "EntityId": 200, "PrefabId": "concrete_wall", "Position": { "X": -7,  "Y": 2, "Z": 20 }, "Scale": { "X": 5,    "Y": 1.333, "Z": 1 } }, // north
+    { "EntityId": 201, "PrefabId": "concrete_wall", "Position": { "X": -2,  "Y": 2, "Z": 15 }, "Scale": { "X": 0.25, "Y": 1.333, "Z": 20 } }, // east
+    { "EntityId": 202, "PrefabId": "concrete_wall", "Position": { "X": -12, "Y": 2, "Z": 15 }, "Scale": { "X": 0.25, "Y": 1.333, "Z": 20 } }, // west
+    { "EntityId": 203, "PrefabId": "concrete_wall", "Position": { "X": -10, "Y": 2, "Z": 10 }, "Scale": { "X": 2,    "Y": 1.333, "Z": 1 } }, // south-left  (x -12..-8)
+    { "EntityId": 204, "PrefabId": "concrete_wall", "Position": { "X": -4,  "Y": 2, "Z": 10 }, "Scale": { "X": 2,    "Y": 1.333, "Z": 1 } }, // south-right (x -6..-2)  -> doorway x -8..-6
+    { "EntityId": 205, "PrefabId": "concrete_floor", "Position": { "X": -7, "Y": 0.05, "Z": 15 }, "Scale": { "X": 1, "Y": 1, "Z": 1 } },
+    { "EntityId": 210, "PrefabId": "acoustic_region", "Position": { "X": -7, "Y": 2, "Z": 15 }, "IsIndoor": true, "Materials": [18, 18, 18, 18, 18, 18] },
+    { "EntityId": 211, "PrefabId": "portal", "Position": { "X": -7, "Y": 1, "Z": 10 }, "RegionAId": -1, "RegionBId": 210, "ApertureSize": 2.0 },
+    { "EntityId": 220, "PrefabId": "chirp_beacon", "Position": { "X": -7, "Y": 1.5, "Z": 15 } },
 
-    // --- THE STREET CRIER (Megaphone) ---
-    { 
-        "EntityId": 30, 
-        "PrefabId": "space_megaphone", 
-        "Position": { "X": 0, "Y": 1.5, "Z": 15 }, 
-        "Rotation": { "X": 0, "Y": 1, "Z": 0, "W": 0 } // Pointing South into the alley
-    }
+    // ============================================================
+    //  ROOM B — WOOD floor, with the DIRECTIONAL MEGAPHONE inside,
+    //  pointing SOUTH out the door (loud as you approach, quiet from behind).
+    //  Interior x[2,12], z[10,20]. Door (gap) centered x=+7 at z=10.
+    // ============================================================
+    { "EntityId": 300, "PrefabId": "concrete_wall", "Position": { "X": 7,  "Y": 2, "Z": 20 }, "Scale": { "X": 5,    "Y": 1.333, "Z": 1 } }, // north
+    { "EntityId": 301, "PrefabId": "concrete_wall", "Position": { "X": 12, "Y": 2, "Z": 15 }, "Scale": { "X": 0.25, "Y": 1.333, "Z": 20 } }, // east
+    { "EntityId": 302, "PrefabId": "concrete_wall", "Position": { "X": 2,  "Y": 2, "Z": 15 }, "Scale": { "X": 0.25, "Y": 1.333, "Z": 20 } }, // west
+    { "EntityId": 303, "PrefabId": "concrete_wall", "Position": { "X": 4,  "Y": 2, "Z": 10 }, "Scale": { "X": 2,    "Y": 1.333, "Z": 1 } }, // south-left  (x 2..6)
+    { "EntityId": 304, "PrefabId": "concrete_wall", "Position": { "X": 10, "Y": 2, "Z": 10 }, "Scale": { "X": 2,    "Y": 1.333, "Z": 1 } }, // south-right (x 8..12) -> doorway x 6..8
+    { "EntityId": 305, "PrefabId": "wood_floor", "Position": { "X": 7, "Y": 0.05, "Z": 15 }, "Scale": { "X": 1, "Y": 1, "Z": 1 } },
+    { "EntityId": 310, "PrefabId": "acoustic_region", "Position": { "X": 7, "Y": 2, "Z": 15 }, "IsIndoor": true, "Materials": [21, 21, 21, 21, 21, 21] },
+    { "EntityId": 311, "PrefabId": "portal", "Position": { "X": 7, "Y": 1, "Z": 10 }, "RegionAId": -1, "RegionBId": 310, "ApertureSize": 2.0 },
+    { "EntityId": 320, "PrefabId": "space_megaphone", "Position": { "X": 7, "Y": 1.5, "Z": 15 }, "Rotation": { "X": 0, "Y": 1, "Z": 0, "W": 0 } },
+
+    // --- OPEN-AIR REFERENCE SIREN (far west, line-of-sight from spawn for panning reference) ---
+    { "EntityId": 400, "PrefabId": "chirp_beacon", "Position": { "X": -20, "Y": 1.5, "Z": 2 } }
   ]
 }

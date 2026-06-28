@@ -13,12 +13,14 @@ internal sealed class GameWindow
 {
     private readonly GameSession _session;
     private readonly ISpeechOutput _speech;
+    private readonly System.Action _onClose;
     private ApplicationWindow _window = null!;
 
-    public GameWindow(GameSession session, ISpeechOutput speech)
+    public GameWindow(GameSession session, ISpeechOutput speech, System.Action onClose)
     {
         _session = session;
         _speech = speech;
+        _onClose = onClose;
     }
 
     public void Present(Application app)
@@ -34,6 +36,10 @@ internal sealed class GameWindow
         _window.SetChild(label);
 
         var keys = EventControllerKey.New();
+        // Capture phase: receive key events at the window level regardless of which (if any) child
+        // widget has focus — the window holds only a non-focusable label, so a bubble-phase
+        // controller would never see keys.
+        keys.SetPropagationPhase(PropagationPhase.Capture);
         keys.OnKeyPressed += (_, e) =>
         {
             _session.Input.SetKey(GtkKeyMap.Map(e.Keyval), true);
@@ -49,6 +55,10 @@ internal sealed class GameWindow
         var focus = EventControllerFocus.New();
         focus.OnLeave += (_, _) => _session.Input.Clear();
         _window.AddController(focus);
+
+        // Closing the in-game window quits the whole app (the menu window is only hidden, so it
+        // would otherwise keep the process — and its audio thread — alive).
+        _window.OnCloseRequest += (_, _) => { _onClose(); return false; };
 
         _window.Present();
     }

@@ -29,6 +29,7 @@ internal sealed class SteamAudioVoiceState
     public long CallbackCount;
     public volatile bool ProducedAudio;
     public volatile float LastRms; // RMS of the most recent output block (level/distance checks)
+    public volatile float LastRmsL, LastRmsR; // per-channel RMS — proves L/R binaural separation
 }
 
 /// <summary>
@@ -131,30 +132,40 @@ internal static class SteamAudioDsp
 
         // 5. Write to FMOD's (interleaved) output buffer.
         bool nonZero = false;
-        double sumSq = 0;
+        double sumSq = 0, sumSqL = 0, sumSqR = 0;
         unsafe
         {
             float* o = (float*)outbuffer;
             float[] st = state.StereoScratch;
             if (outCh == 2)
             {
-                for (int i = 0; i < n * 2; i++) { float v = st[i]; o[i] = v; sumSq += v * (double)v; if (v != 0f) nonZero = true; }
+                for (int i = 0; i < n; i++)
+                {
+                    float l = st[i * 2], r = st[i * 2 + 1];
+                    o[i * 2] = l; o[i * 2 + 1] = r;
+                    sumSqL += l * (double)l; sumSqR += r * (double)r;
+                    if (l != 0f || r != 0f) nonZero = true;
+                }
+                sumSq = sumSqL + sumSqR;
             }
             else
             {
                 for (int i = 0; i < n; i++)
                 {
                     float l = st[i * 2], r = st[i * 2 + 1];
-                    sumSq += l * (double)l + r * (double)r;
+                    sumSqL += l * (double)l; sumSqR += r * (double)r;
                     if (l != 0f || r != 0f) nonZero = true;
                     for (int c = 0; c < outCh; c++) o[i * outCh + c] = c == 0 ? l : (c == 1 ? r : 0f);
                 }
+                sumSq = sumSqL + sumSqR;
             }
         }
 
         Interlocked.Increment(ref state.CallbackCount);
         if (nonZero) state.ProducedAudio = true;
         state.LastRms = (float)Math.Sqrt(sumSq / (n * 2));
+        state.LastRmsL = (float)Math.Sqrt(sumSqL / n);
+        state.LastRmsR = (float)Math.Sqrt(sumSqR / n);
         return RESULT.OK;
     }
 }

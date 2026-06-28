@@ -56,9 +56,23 @@ if (args.Contains("--steam-distance"))
     Environment.Exit(code);
 }
 
+if (args.Contains("--steam-stereo"))
+{
+    int code = SteamAudioLiveTest.RunStereoCheck();
+    Log.CloseAndFlush();
+    Environment.Exit(code);
+}
+
 if (args.Contains("--provider-orbit") || args.Contains("--provider-orbit-smoke"))
 {
     int code = ProviderOrbit.Run(args.Contains("--provider-orbit"), seconds: 3.0);
+    Log.CloseAndFlush();
+    Environment.Exit(code);
+}
+
+if (args.Contains("--provider-churn"))
+{
+    int code = ProviderOrbit.RunChurn(seconds: 12.0);
     Log.CloseAndFlush();
     Environment.Exit(code);
 }

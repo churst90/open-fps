@@ -477,29 +477,10 @@ public class ClientAudioSystem
         };
         _audio.Submit(footstep);
 
-        // Immediate reflection check for transient
-        var paths = _acoustics.CalculateAcousticPaths(_lastSnapshot!, id, _state.VisualPosition + new Vector3(0, 1.7f, 0), nudgePos);
-        foreach (var p in paths)
-        {
-            if (p.IsReflection)
-            {
-                var reflectEmitter = new SpatialEmitter
-                {
-                    EntityId = id - 5000 - p.ReflectionIndex,
-                    SoundId = resolvedSoundId,
-                    Position = p.ApparentPosition,
-                    ApparentPosition = p.ApparentPosition,
-                    Volume = 0.4f * (1.0f - p.Occlusion),
-                    Range = 10.0f,
-                    IsReflection = true,
-                    DelayMs = p.ReflectionDelayMs,
-                    Type = EmitterType.WorldLocked,
-                    EqHigh = p.EqHigh,
-                    MinDistance = 1.0f
-                };
-                _audio.Submit(reflectEmitter);
-            }
-        }
+        // NOTE: footsteps deliberately do NOT spawn reflection/echo emitters. Bouncing each step off
+        // the surrounding walls scattered the sound "all over the place" in enclosed rooms instead of
+        // staying localized at the player's feet. The room's reverb bus still gives footsteps their
+        // indoor character; per-step geometric reflections are reserved for world emitters.
     }
 
     /// <summary>
