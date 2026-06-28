@@ -1235,6 +1235,20 @@ public class FmodAudioProvider : IAudioProvider
         var fvel = new FMOD.VECTOR();
         ch.set3DAttributes(ref fpos, ref fvel);
         ch.setVolume(1.0f);
+
+        // Route voice through the Steam Audio binaural DSP too, so remote players localize like
+        // every other spatial sound (otherwise voice would fall back to FMOD's flat panner).
+        // NOTE: voice is one-shot-per-packet, so this creates/releases a binaural effect per packet.
+        // Functionally correct; a future optimization is to pool SA voices or use a persistent
+        // per-speaker channel instead of one-shot packets.
+        SteamAudioVoiceState? vState = null;
+        FMOD.DSP vDsp = default;
+        System.Runtime.InteropServices.GCHandle vHandle = default;
+        if (_steamAudioEnabled && TryCreateSteamAudioVoice(out vState, out vDsp, out vHandle))
+        {
+            ch.addDSP(CHANNELCONTROL_DSP_INDEX.TAIL, vDsp);
+            ch.set3DLevel(0.0f);
+        }
         ch.setPaused(false);
 
         // Release the sound object once it finishes — FMOD holds its own copy of the PCM.
@@ -1249,10 +1263,13 @@ public class FmodAudioProvider : IAudioProvider
                 Channel = ch,
                 Position = position,
                 ApparentPosition = position,
+                CurrentApparentPosition = position,
                 BaseVolume = 1.0f,
+                MinDistance = 1.0f,
                 Range = 30.0f,
                 IsReflection = false,
-                TargetRegionId = -1
+                TargetRegionId = -1,
+                SaState = vState, SaDsp = vDsp, SaHandle = vHandle
             });
         }
 
