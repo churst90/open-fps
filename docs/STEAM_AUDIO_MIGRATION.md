@@ -95,6 +95,30 @@ audio frame: update source/listener coordinates, run the simulator (on the audio
 Keep the existing `iplBinauralEffect` HRTF as the final stage. Keep the voice **pool** model (pre-alloc
 sources/effects; never create/free under the mixer callback — same crash class we already fixed).
 
+*Integration seam (mapped 2026-06-28):* the existing acoustics already run off the FMOD mixer thread —
+`ClientAudioSystem.Update` enqueues `AcousticRequest`s to `AsyncAcousticWorker` (its own
+`AcousticWorkerThread`), which calls `SpatialAcoustics.CalculateAcousticPaths(WorldSnapshot, …)` and
+pushes results back via `IAudioProvider.SetAcousticPath(id, AcousticPathData)`. So Phase 4a runs the
+simulator on **that worker thread** (NOT the mixer) and just fills `AcousticPathData` — no mixer-callback
+risk. Scene geometry comes from `WorldSnapshot.Entities[*].Definition.Collider` (`IsSolid`, `Shape` Box,
+`Size`) + `Transform` + `Definition.Material.Material` → maps 1:1 onto `SteamAudioScene.Box`. Note SA's
+`occlusion` is a VISIBILITY gain (1=clear) while `AcousticPathData.Occlusion`/`ActiveSound.CurrentOcclusion`
+is "fraction blocked" (provider does `dryVol = 1 - occlusion`), so convert: `pathOcclusion = 1 - visibility`.
+
+  **Phase 4a — runtime engine: DONE ✅** (`AudioLab --sim-perframe`, `SimPerFrameSpike.cs`).
+  `SteamAudioSimulator.cs` owns an `IPLSimulator` (DIRECT) + a fixed pool of `IPLSource` handles, created
+  & added up front (mutating the source graph needs a commit, so per-tick work never touches it — same
+  voice-pool lesson). API matches the worker loop: `SetScene` (lazily creates the pool, rebuildable on map
+  change), `AcquireSource`/`ReleaseSource`, then per tick `SetSourceInputs(src,pos)` ×N → `SetListener` →
+  `Run()` (one batched `iplSimulatorRunDirect`) → `GetResult(src)` (visibility + 3-band transmission).
+  Not thread-safe — single worker thread only; does not own the context/scene. Verified 2026-06-28: two
+  sources batched in one `Run` give INDEPENDENT occlusion (room source 0.00 behind the east wall →
+  1.00 in the doorway as the listener walks in; open control source stays 1.00), and pool
+  release/reacquire returns a working source. **Next (Phase 4b):** wire `SteamAudioScene.Build` to the
+  live `WorldSnapshot` colliders on map load and route `AsyncAcousticWorker` through `SteamAudioSimulator`
+  (batch all active sources per tick), converting visibility→occlusion + transmission→EQ into
+  `AcousticPathData`. Then pathing (4c) and reflections (4d).
+
 **Phase 5 — retire hand-rolled code.** Remove/disable `SpatialAcoustics`, `AcousticPathfinder`, the
 reflection-emitter generation, and the 3D reverb-bus positioning, keeping only what the simulator
 doesn't (e.g. UI region readouts). Re-validate occlusion/portal/reflection by ear.

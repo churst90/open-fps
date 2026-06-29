@@ -77,6 +77,13 @@ if (args.Contains("--sim-scene"))
     Environment.Exit(code);
 }
 
+if (args.Contains("--sim-perframe"))
+{
+    int code = SimPerFrameSpike.Run();
+    Log.CloseAndFlush();
+    Environment.Exit(code);
+}
+
 if (args.Contains("--steam-stereo"))
 {
     int code = SteamAudioLiveTest.RunStereoCheck();
