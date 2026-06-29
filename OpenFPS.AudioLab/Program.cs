@@ -56,6 +56,13 @@ if (args.Contains("--steam-distance"))
     Environment.Exit(code);
 }
 
+if (args.Contains("--sim-occlusion"))
+{
+    int code = SimOcclusionSpike.Run();
+    Log.CloseAndFlush();
+    Environment.Exit(code);
+}
+
 if (args.Contains("--steam-stereo"))
 {
     int code = SteamAudioLiveTest.RunStereoCheck();

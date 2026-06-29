@@ -28,21 +28,24 @@ Bound today (HRTF only): `iplContextCreate/Release`, `iplHRTFCreate/Release`,
 `iplDirectEffectCreate/Apply`, `iplPathEffectCreate/Apply`, `iplReflectionEffectCreate/Apply`,
 `iplReflectionMixer*`, `iplProbe*` (for pathing/baked reverb).
 
-## ⚠ Blocker to resolve first: version mismatch
+## Phase 0 — version: RESOLVED (no mismatch)
 
-`Phonon.cs` `STEAMAUDIO_VERSION` = **4.8.1**; the shipped `lib/libphonon.so` is **4.4.0**. The HRTF
-structs are stable across that range so it works today, but the **simulation** structs are not. Pick one
-before writing any sim binding:
-- (A) Drop Steam Audio **4.8.x** `libphonon.so`/`libphonon.dll` into `lib/` and bind to the 4.8 API, or
-- (B) Bind to the **4.4.0** API/structs that ship today.
-Recommend (A) so the version constant matches and we track the current SDK.
+The `"4.4.0"` string in `libphonon.so` is a red herring (an embedded reference). The shipped
+`lib/libphonon.so` is **byte-identical to the Steam Audio 4.8.1 core-SDK** linux-x64 binary, and
+`iplContextCreate` already accepts the 4.8.1 version constant — so the lib **is** 4.8.1 and matches the
+4.8.1 headers (`~/Downloads/steamaudio_extract/steamaudio/include/phonon.h`). The simulation structs are
+bound verbatim from those 4.8.1 headers in `PhononSim.cs`. No lib swap needed.
 
 ## Phased plan
 
 **Phase 0 — resolve version** (above). Confirm `iplContextCreate` succeeds with no version warning.
 
-**Phase 1 — headless occlusion spike** (de-risk on Linux, like the original HRTF spike).
-New `AudioLab --sim-occlusion`:
+**Phase 1 — headless occlusion spike: DONE ✅** (`AudioLab --sim-occlusion`, `SimOcclusionSpike.cs`).
+One-wall scene → simulator → source → `iplSimulatorRunDirect` → read `IPLDirectEffectParams.occlusion`.
+Result: visibility 0.00 behind the wall, 1.00 beside it. Proven on Linux; struct layouts in `PhononSim.cs`
+are valid (no crash, correct values). **Note: `occlusion` is a VISIBILITY/gain factor — 1 = clear,
+0 = fully blocked — and the direct effect multiplies the signal by it** (NOT "fraction occluded").
+Original step list (for reference):
 1. Create context (already have), scene (`iplSceneCreate`, type DEFAULT).
 2. Add one static mesh: a single wall quad (4 verts / 2 triangles) + a material; `iplStaticMeshAdd`;
    `iplSceneCommit`.

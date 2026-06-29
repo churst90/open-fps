@@ -9,7 +9,7 @@ namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 /// Resolves libphonon.so on Linux / phonon.dll on Windows. Coordinate system: right-handed,
 /// +x right, +y up, -z FORWARD (note: the game uses +z forward, so convert when passing directions).
 /// </summary>
-internal static class Phonon
+internal static partial class Phonon
 {
     private const string Lib = "phonon";
     private const CallingConvention CC = CallingConvention.Cdecl;
