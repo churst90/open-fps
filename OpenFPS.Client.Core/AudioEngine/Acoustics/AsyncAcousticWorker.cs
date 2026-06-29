@@ -108,19 +108,20 @@ public class AsyncAcousticWorker : IDisposable
             lock (_worldLock) { world = _latestWorld; }
             if (world == null) { _pending.Clear(); continue; }
 
-            // 1. Batched Steam Audio occlusion/transmission for every pending source (optional).
-            Dictionary<int, SteamAudioSimulator.DirectResult>? sim = RunSteamAudio(world);
+            // 1. Batched Steam Audio occlusion/transmission/pathing for every pending source (optional).
+            Dictionary<int, SaResult>? sim = RunSteamAudio(world);
 
-            // 2. Per-entity hand-rolled paths (reflections / portals / air absorption / room gain), with
-            //    the DIRECT path's occlusion+EQ overridden by the simulator when available.
+            // 2. Per-entity hand-rolled paths (reflections / air absorption / room gain), with the DIRECT
+            //    path's occlusion+EQ — and, when a source is occluded, its apparent position — overridden
+            //    by the simulator when available.
             foreach (var kv in _pending)
             {
                 var req = kv.Value;
                 try
                 {
                     var paths = _acoustics.CalculateAcousticPaths(world, req.EntityId, req.ListenerPos, req.SourcePos, req.IsImportant);
-                    if (sim != null && sim.TryGetValue(req.EntityId, out var dr))
-                        ApplyDirectOverride(paths, dr);
+                    if (sim != null && sim.TryGetValue(req.EntityId, out var sr))
+                        ApplyDirectOverride(paths, sr);
                     _results[req.EntityId] = paths;
                 }
                 catch (Exception ex)
@@ -133,9 +134,18 @@ public class AsyncAcousticWorker : IDisposable
         }
     }
 
-    /// <summary>Runs the Steam Audio direct stage for all pending sources against the current listener and
-    /// returns per-entity results, or null when SA simulation is unavailable/disabled.</summary>
-    private Dictionary<int, SteamAudioSimulator.DirectResult>? RunSteamAudio(WorldSnapshot world)
+    /// <summary>Per-entity Steam Audio result for one tick: the direct occlusion/transmission, and (when the
+    /// source is occluded and pathing found a route) the world-space apparent position to localize the HRTF
+    /// to the opening the sound arrives through.</summary>
+    private readonly record struct SaResult(SteamAudioSimulator.DirectResult Direct, Vector3 ApparentPosition, bool HasApparent);
+
+    // Below this direct visibility a source is "occluded enough" that pathing should drive its apparent
+    // position to the opening the sound arrives through (rather than the straight-through-wall direction).
+    private const float PathRedirectVisibility = 0.5f;
+
+    /// <summary>Runs the Steam Audio direct + pathing stages for all pending sources against the current
+    /// listener and returns per-entity results, or null when SA simulation is unavailable/disabled.</summary>
+    private Dictionary<int, SaResult>? RunSteamAudio(WorldSnapshot world)
     {
         if (!_saEnabled || _saSim == null) return null;
         try
@@ -160,10 +170,28 @@ public class AsyncAcousticWorker : IDisposable
             _saSim.SetListener(listener);
             _saSim.Run();
 
-            var results = new Dictionary<int, SteamAudioSimulator.DirectResult>(_pending.Count);
+            var results = new Dictionary<int, SaResult>(_pending.Count);
             foreach (var kv in _pending)
-                if (_saSources.TryGetValue(kv.Key, out var src) && src != IntPtr.Zero)
-                    results[kv.Key] = _saSim.GetResult(src);
+            {
+                if (!_saSources.TryGetValue(kv.Key, out var src) || src == IntPtr.Zero) continue;
+                var direct = _saSim.GetResult(src);
+
+                Vector3 apparent = default;
+                bool hasApparent = false;
+                if (direct.Visibility < PathRedirectVisibility)
+                {
+                    var path = _saSim.GetPathing(src);
+                    if (path.Found)
+                    {
+                        // Localize the HRTF to the opening: place the apparent source along the arrival
+                        // direction, at the real source's distance.
+                        float dist = Vector3.Distance(kv.Value.ListenerPos, kv.Value.SourcePos);
+                        apparent = kv.Value.ListenerPos + path.WorldDirection * dist;
+                        hasApparent = true;
+                    }
+                }
+                results[kv.Key] = new SaResult(direct, apparent, hasApparent);
+            }
 
             EvictStaleSources(now);
             return results;
@@ -175,11 +203,14 @@ public class AsyncAcousticWorker : IDisposable
         }
     }
 
-    /// <summary>Maps a Steam Audio direct result onto the direct (non-reflection) entries of a path list.
-    /// SA <c>occlusion</c> is a VISIBILITY gain (1=clear); the engine wants "fraction blocked", and per-band
-    /// clarity blends straight-line visibility with what transmits through the occluder.</summary>
-    private static void ApplyDirectOverride(List<AcousticPathData> paths, SteamAudioSimulator.DirectResult dr)
+    /// <summary>Maps a Steam Audio result onto the direct (non-reflection) entries of a path list. SA
+    /// <c>occlusion</c> is a VISIBILITY gain (1=clear); the engine wants "fraction blocked", and per-band
+    /// clarity blends straight-line visibility with what transmits through the occluder. When pathing found
+    /// a route around an occluder, the apparent position is redirected to the opening so the HRTF localizes
+    /// the sound to the doorway it actually arrives through.</summary>
+    private static void ApplyDirectOverride(List<AcousticPathData> paths, SaResult sr)
     {
+        var dr = sr.Direct;
         float v = Math.Clamp(dr.Visibility, 0f, 1f);
         float occ = Math.Clamp(1f - v, 0f, AcousticConstants.OcclusionCap);
         float eqL = Math.Clamp(v + (1f - v) * dr.TransLow, 0f, 1f);
@@ -196,6 +227,7 @@ public class AsyncAcousticWorker : IDisposable
             p.EqMid = eqM;
             p.EqHigh = eqH;
             p.TransmissionBleed = bleed;
+            if (sr.HasApparent) p.ApparentPosition = sr.ApparentPosition;
             paths[i] = p;
         }
     }
@@ -211,7 +243,7 @@ public class AsyncAcousticWorker : IDisposable
             if (Phonon.iplContextCreate(ref cs, out _saContext) != Phonon.IPL_STATUS_SUCCESS)
             { _saContext = IntPtr.Zero; Console.WriteLine("[AcousticWorker] Steam Audio context create failed; using hand-rolled occlusion."); return; }
 
-            _saSim = new SteamAudioSimulator(_saContext, SaMaxSources);
+            _saSim = new SteamAudioSimulator(_saContext, SaMaxSources, enablePathing: true);
             if (!_saSim.IsValid)
             {
                 _saSim.Dispose(); _saSim = null;

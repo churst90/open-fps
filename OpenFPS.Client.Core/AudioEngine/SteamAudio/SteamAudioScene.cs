@@ -26,6 +26,11 @@ public sealed class SteamAudioScene : IDisposable
     public IntPtr Handle => _scene;
     public bool IsBuilt => _scene != IntPtr.Zero;
 
+    /// <summary>World-space AABB of all built geometry (valid after <see cref="Build"/>). Used to size the
+    /// probe volume for pathing. Zero-sized when the scene is empty.</summary>
+    public Vector3 BoundsMin { get; private set; }
+    public Vector3 BoundsMax { get; private set; }
+
     public SteamAudioScene(IntPtr context) => _context = context;
 
     /// <summary>
@@ -74,6 +79,15 @@ public sealed class SteamAudioScene : IDisposable
         var tArr = tris.ToArray();
         var miArr = triMat.ToArray();
         var mArr = materials.ToArray();
+
+        var min = new Vector3(float.MaxValue);
+        var max = new Vector3(float.MinValue);
+        foreach (var v in vArr)
+        {
+            min = Vector3.Min(min, new Vector3(v.x, v.y, v.z));
+            max = Vector3.Max(max, new Vector3(v.x, v.y, v.z));
+        }
+        BoundsMin = min; BoundsMax = max;
 
         var hV = GCHandle.Alloc(vArr, GCHandleType.Pinned);
         var hT = GCHandle.Alloc(tArr, GCHandleType.Pinned);

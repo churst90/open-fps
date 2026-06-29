@@ -44,7 +44,9 @@ portal/occlusion/reflection behaviour is physically correct. See `docs/STEAM_AUD
 - [x] Phase 4a: per-source simulation engine (`SteamAudioSimulator`) with pooled sources (`--sim-perframe`)
 - [x] Phase 4b: wired into `AsyncAcousticWorker` — scene from `WorldSnapshot`, batched per-source direct
       occlusion/EQ/transmission override on the worker thread (`--sim-worldscene`)
-- [ ] Phase 4b: validate by ear in the live client (A/B `OPENFPS_STEAMAUDIO_SIM=0` vs on)
-- [ ] Phase 4c: pathing — arrival direction through openings fed into the HRTF
+- [x] Phase 4c: pathing — SH→world-direction convention pinned (`--sim-pathdir`), probe/bake in the
+      simulator, occluded sources' HRTF apparent-position redirected to the opening (`--sim-pathframe`)
+- [ ] Phase 4c: tune bent-path routing (probe density / `pathRange`) for fully-blocked straight lines
+- [ ] Phase 4b/4c: validate by ear in the live client (A/B `OPENFPS_STEAMAUDIO_SIM=0` vs on)
 - [ ] Phase 4d: reflections — `iplReflectionEffect` + mixer (replace hand-rolled reflection emitters)
 - [ ] Phase 5: retire hand-rolled `SpatialAcoustics` / `AcousticPathfinder` / reflection generation

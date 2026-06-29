@@ -91,6 +91,20 @@ if (args.Contains("--sim-worldscene"))
     Environment.Exit(code);
 }
 
+if (args.Contains("--sim-pathdir"))
+{
+    int code = SimPathDirSpike.Run();
+    Log.CloseAndFlush();
+    Environment.Exit(code);
+}
+
+if (args.Contains("--sim-pathframe"))
+{
+    int code = SimPathFrameSpike.Run();
+    Log.CloseAndFlush();
+    Environment.Exit(code);
+}
+
 if (args.Contains("--steam-stereo"))
 {
     int code = SteamAudioLiveTest.RunStereoCheck();

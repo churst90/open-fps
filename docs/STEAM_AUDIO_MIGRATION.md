@@ -131,9 +131,34 @@ is "fraction blocked" (provider does `dryVol = 1 - occlusion`), so convert: `pat
   untouched. Verified 2026-06-28: `BoxesFromWorld` extracts the 5 wood-room solids and the simulator
   reports blocked-behind-wall (0.00) / clear-through-door (1.00) end-to-end from a `WorldSnapshot`.
   **Not yet validated by ear in the live client** (Linux client is the GTK port in progress); next pass
-  should A/B `OPENFPS_STEAMAUDIO_SIM=0` vs on in-game. **Next (Phase 4c):** pathing — feed
-  `iplSimulatorRunPathing` arrival direction into the HRTF (replaces the cross-region snap + apparent-
-  position hack). Then reflections (4d).
+  should A/B `OPENFPS_STEAMAUDIO_SIM=0` vs on in-game.
+
+  **Phase 4c — pathing → HRTF arrival direction: DONE ✅** (`AudioLab --sim-pathdir`, `--sim-pathframe`;
+  `SimPathDirSpike.cs`, `SimPathFrameSpike.cs`).
+  - **SH→direction convention PINNED** (the open Phase 2 question). `SimPathDirSpike` runs pathing through
+    four scenes whose opening forces a known pure-axis arrival (±x, ±z) and reads the raw order-1 SH; the
+    mapping is `worldDir = normalize(-sh[1], sh[2], -sh[3])` (world X = -ACN(m=-1), Z = -ACN(m=+1),
+    Y = ACN(m=0)) — agrees 4/4. Locked into `SteamAudioSimulator.PathingWorldDirection`.
+  - **Engine pathing.** `SteamAudioSimulator(enablePathing:true)` adds PATHING to the sim+source flags and,
+    on `SetScene`, generates UNIFORMFLOOR probes over the scene's world bounds (`SteamAudioScene.BoundsMin/Max`)
+    and bakes the path graph (`iplPathBakerBake`, non-null progress cb — null segfaults; built once, re-baked
+    on map change). `SetSourceInputs` adds the pathing inputs, `Run` also calls `iplSimulatorRunPathing`, and
+    `GetPathing(src)` returns the world arrival direction + energy (`PathResult`). Needs floor geometry wound
+    normal-up or no probes are placed (`PathingReady` is then false and pathing silently no-ops).
+  - **Wired into the worker.** `AsyncAcousticWorker` now constructs the simulator with pathing; per tick,
+    for a source that is occluded (`direct.Visibility < 0.5`) and has a found path, it synthesizes an
+    apparent position = `listener + arrivalDir · distance(listener,source)` and overrides the direct path's
+    `ApparentPosition`. The provider's existing HRTF code already localizes to `ApparentPosition`, so the
+    occluded sound now comes from the doorway it actually arrives through — **no provider change needed**.
+    Clear-LOS sources (visibility ≥ 0.5) keep their real position.
+  - Verified 2026-06-28/29 headless: `--sim-pathframe` builds the wood-room + floor, the simulator generates
+    probes from bounds, bakes, runs pathing, and reports the source arriving from the doorway (+z) with a
+    synthesized apparent position. All seven sim spikes pass.
+  - **Not yet validated by ear** (same GTK-client caveat). **Known limitation:** bent paths around a fully
+    blocked straight line still want probe-density/`pathRange` tuning (Phase 2 gotcha #4); the lined-up /
+    through-opening case is solid. Probe positions are not relocated on map change (re-bake only) — tuned for
+    single-map sessions. **Next (Phase 4d):** reflections — `iplReflectionEffect` + `iplReflectionMixer`
+    (replace the hand-rolled reflection emitters).
 
 **Phase 5 — retire hand-rolled code.** Remove/disable `SpatialAcoustics`, `AcousticPathfinder`, the
 reflection-emitter generation, and the 3D reverb-bus positioning, keeping only what the simulator
