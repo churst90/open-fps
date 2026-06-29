@@ -210,6 +210,9 @@ public class FmodAudioProvider : IAudioProvider
     private Dictionary<int, FMOD.ChannelGroup> _reverbBuses = new();
     private Dictionary<int, FMOD.DSP> _reverbDsps = new();
     private Dictionary<int, float> _reverbVolumes = new();
+    // Per-bus Steam Audio voice (HRTF) used to localize a room's reverb to its doorway when the listener
+    // is OUTSIDE. Bus-lifetime (no churn); borrowed from the voice pool, returned on bus teardown.
+    private readonly Dictionary<int, SaVoice> _reverbSaVoices = new();
     private HashSet<int> _activeRegionIds = new();
 
     private FMOD.ChannelGroup _reflectionGroup;
@@ -444,6 +447,7 @@ public class FmodAudioProvider : IAudioProvider
 
     private void ClearReverbBuses()
     {
+        ReturnReverbVoices(); // detach HRTF voices while the buses still exist, return them to the pool
         foreach (var dsp in _reverbDsps.Values) dsp.release();
         foreach (var bus in _reverbBuses.Values) bus.release();
         _reverbDsps.Clear(); _reverbBuses.Clear(); _reverbVolumes.Clear();
@@ -560,12 +564,64 @@ public class FmodAudioProvider : IAudioProvider
         bus.addDSP(CHANNELCONTROL_DSP_INDEX.HEAD, reverbDsp);
         
         float initialVol = (regionId == _listenerRegionId) ? 1.0f : 0.0f;
-        bus.setVolume(initialVol); 
-        _reverbBuses[regionId] = bus; 
-        _reverbDsps[regionId] = reverbDsp; 
+        bus.setVolume(initialVol);
+        _reverbBuses[regionId] = bus;
+        _reverbDsps[regionId] = reverbDsp;
         _reverbVolumes[regionId] = initialVol;
         _system.getMasterChannelGroup(out var master);
         master.addGroup(bus);
+
+        // Steam Audio directional reverb: route this room's reverb output through an HRTF voice so that,
+        // when the listener is OUTSIDE, the reverberation localizes to the doorway (like the direct sound)
+        // instead of washing from all sides. The voice's binaural DSP sits at the bus TAIL and is bypassed
+        // while inside the room (reverb then fills the space as 2D stereo). The bus is switched to 2D so
+        // FMOD doesn't also collapse the binaural pair. Voice is held for the bus lifetime.
+        if (_steamAudioEnabled && TryCreateSteamAudioVoice(out var rvState, out var rvDsp, out var rvHandle))
+        {
+            bus.getMode(out MODE bm);
+            bus.setMode((bm & ~(MODE._3D | MODE._3D_LINEARROLLOFF)) | MODE._2D);
+            bus.addDSP(CHANNELCONTROL_DSP_INDEX.TAIL, rvDsp);
+            rvDsp.setBypass(true); // start omnidirectional; UpdateReverbBuses enables it when outside
+            _reverbSaVoices[regionId] = new SaVoice { State = rvState!, Dsp = rvDsp, Handle = rvHandle };
+        }
+    }
+
+    /// <summary>Localizes a room's reverb to its doorway (HRTF) when the listener is outside, or makes it
+    /// fill the room (binaural bypassed) when inside. Falls back to FMOD 3D positioning if Steam Audio is
+    /// unavailable for this bus.</summary>
+    private void SetReverbDirection(int regionId, FMOD.ChannelGroup bus, Vector3 doorwayPos, bool outside, Vector3 lPos)
+    {
+        if (_reverbSaVoices.TryGetValue(regionId, out var v) && v.Dsp.hasHandle())
+        {
+            if (outside)
+            {
+                Vector3 local = Vector3.Transform(doorwayPos - lPos, Quaternion.Conjugate(_listenerRot));
+                float len = local.Length();
+                if (len > 1e-4f) { v.State.DirX = local.X / len; v.State.DirY = local.Y / len; v.State.DirZ = -local.Z / len; }
+                v.Dsp.setBypass(false);
+            }
+            else v.Dsp.setBypass(true);
+        }
+        else if (outside)
+        {
+            bus.set3DLevel(1.0f); bus.set3DSpread(0.0f);
+            FMOD.VECTOR fp = FmodHelpers.ToFmodVec(doorwayPos); FMOD.VECTOR fv = new FMOD.VECTOR();
+            bus.set3DAttributes(ref fp, ref fv);
+        }
+        else bus.set3DLevel(0.0f);
+    }
+
+    /// <summary>Detaches and returns all per-bus reverb HRTF voices to the pool (before the buses are
+    /// released). Safe to call repeatedly.</summary>
+    private void ReturnReverbVoices()
+    {
+        foreach (var kvp in _reverbSaVoices)
+        {
+            var v = kvp.Value;
+            if (v.Dsp.hasHandle() && _reverbBuses.TryGetValue(kvp.Key, out var b) && b.hasHandle()) b.removeDSP(v.Dsp);
+            lock (_saPool) { _saPool.Push(v); }
+        }
+        _reverbSaVoices.Clear();
     }
 
     public void PlaySpatialSound(SpatialEmitter emitter)
@@ -1161,30 +1217,25 @@ public class FmodAudioProvider : IAudioProvider
                 if (regionId == listenerRegionId)
                 {
                     targetVol = 1.0f;
-                    bus.set3DLevel(0.0f);
+                    SetReverbDirection(regionId, bus, default, outside: false, lPosVec); // fill the room
                 }
                 else
                 {
                     // Leakage through portals
-                    var portals = _acousticMap.Portals.Values.Where(p => 
-                        (p.Portal.RegionAId == regionId && p.Portal.RegionBId == listenerRegionId) || 
+                    var portals = _acousticMap.Portals.Values.Where(p =>
+                        (p.Portal.RegionAId == regionId && p.Portal.RegionBId == listenerRegionId) ||
                         (p.Portal.RegionAId == listenerRegionId && p.Portal.RegionBId == regionId) ||
                         (listenerRegionId == _acousticMap.GlobalEnvironmentId && (p.Portal.RegionAId == regionId || p.Portal.RegionBId == regionId))
                     );
-                    
+
                     var nearest = portals.OrderBy(p => Vector3.Distance(lPosVec, p.Position)).FirstOrDefault();
                     if (nearest.Portal.ApertureSize > 0)
                     {
                         float dist = Vector3.Distance(lPosVec, nearest.Position);
                         targetVol = Math.Clamp((nearest.Portal.ApertureSize / 2.0f) / Math.Max(1.0f, dist), 0.0f, 1.0f);
-                        
-                        bus.set3DLevel(1.0f);
-                        // Collapse the stereo reverb to a point so it localizes AT the doorway instead
-                        // of FMOD spreading the two channels into a wide, non-directional image.
-                        bus.set3DSpread(0.0f);
-                        FMOD.VECTOR fpos = FmodHelpers.ToFmodVec(nearest.Position);
-                        FMOD.VECTOR fvel = new FMOD.VECTOR { x = 0, y = 0, z = 0 };
-                        bus.set3DAttributes(ref fpos, ref fvel);
+                        // Localize the room's reverb to the doorway (HRTF), so from outside the reverb
+                        // arrives from the opening — not spread around the listener.
+                        SetReverbDirection(regionId, bus, nearest.Position, outside: true, lPosVec);
                     }
                 }
             }
@@ -1546,7 +1597,8 @@ public class FmodAudioProvider : IAudioProvider
             foreach (var active in _activeSounds) {
                 ReleaseActiveSoundResources(active);
             }
-            _activeSounds.Clear(); 
+            _activeSounds.Clear();
+            ReturnReverbVoices();
             foreach (var dsp in _reverbDsps.Values) dsp.release();
             foreach (var bus in _reverbBuses.Values) bus.release();
             if (_masterCombFilter.hasHandle()) _masterCombFilter.release();
