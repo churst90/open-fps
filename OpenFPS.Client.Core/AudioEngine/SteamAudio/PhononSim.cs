@@ -30,6 +30,8 @@ internal static partial class Phonon
     public const int IPL_OCCLUSIONTYPE_VOLUMETRIC = 1;
 
     public const int IPL_REFLECTIONEFFECTTYPE_CONVOLUTION = 0;
+    public const int IPL_REFLECTIONEFFECTTYPE_PARAMETRIC = 1;
+    public const int IPL_REFLECTIONEFFECTTYPE_HYBRID = 2;
 
     public const int IPL_PROBEGENERATIONTYPE_CENTROID = 0;
     public const int IPL_PROBEGENERATIONTYPE_UNIFORMFLOOR = 1;
@@ -233,6 +235,7 @@ internal static partial class Phonon
     [DllImport(Lib, CallingConvention = CC)] public static extern void iplSimulatorSetSharedInputs(IntPtr simulator, int flags, ref IPLSimulationSharedInputs sharedInputs);
     [DllImport(Lib, CallingConvention = CC)] public static extern void iplSimulatorCommit(IntPtr simulator);
     [DllImport(Lib, CallingConvention = CC)] public static extern void iplSimulatorRunDirect(IntPtr simulator);
+    [DllImport(Lib, CallingConvention = CC)] public static extern void iplSimulatorRunReflections(IntPtr simulator);
 
     [DllImport(Lib, CallingConvention = CC)] public static extern int iplSourceCreate(IntPtr simulator, ref IPLSourceSettings settings, out IntPtr source);
     [DllImport(Lib, CallingConvention = CC)] public static extern void iplSourceRelease(ref IntPtr source);

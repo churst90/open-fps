@@ -127,6 +127,7 @@ public class AudioEngineFacade : IDisposable
         _provider.UpdateListener(lPos, lRot, lVel, lRegion);
         _provider.UpdateShelter(lShelter);
         _provider.UpdateProximity(lProx);
+        _provider.SetSimulatedReverbDecay(_simReverbMs);
         
         // 3. Synchronize acoustic map
         if (aMap != null) _provider.SetAcousticMap(aMap);
@@ -207,6 +208,11 @@ public class AudioEngineFacade : IDisposable
             _acousticMap = map;
         }
     }
+
+    // Geometry-driven reverb decay (ms) for the listener's room, supplied by the acoustic worker's
+    // reflection sim. Volatile scalar — read once per flush; 0 means "no override".
+    private volatile float _simReverbMs;
+    public void SetSimulatedReverbDecay(float decayMs) => _simReverbMs = decayMs;
 
     /// <summary>
     /// Submits a spatial emitter for playback. 

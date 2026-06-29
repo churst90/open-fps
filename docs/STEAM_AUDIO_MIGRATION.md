@@ -157,12 +157,37 @@ is "fraction blocked" (provider does `dryVol = 1 - occlusion`), so convert: `pat
   - **Not yet validated by ear** (same GTK-client caveat). **Known limitation:** bent paths around a fully
     blocked straight line still want probe-density/`pathRange` tuning (Phase 2 gotcha #4); the lined-up /
     through-opening case is solid. Probe positions are not relocated on map change (re-bake only) — tuned for
-    single-map sessions. **Next (Phase 4d):** reflections — `iplReflectionEffect` + `iplReflectionMixer`
-    (replace the hand-rolled reflection emitters).
+    single-map sessions.
 
-**Phase 5 — retire hand-rolled code.** Remove/disable `SpatialAcoustics`, `AcousticPathfinder`, the
-reflection-emitter generation, and the 3D reverb-bus positioning, keeping only what the simulator
-doesn't (e.g. UI region readouts). Re-validate occlusion/portal/reflection by ear.
+  **Phase 4d — geometry-driven reverb: DONE ✅** (`AudioLab --sim-reflect`, `SimReflectSpike.cs`).
+  Chose the **parametric** path over convolution-in-the-mixer (lower risk, no new mixer-thread DSP, headless-
+  testable). Probe finding: `iplSimulatorRunReflections` with `IPL_REFLECTIONEFFECTTYPE_PARAMETRIC` yields
+  usable per-band RT60 — a sealed concrete room reads 0.62 s vs 0.10 s in the open. So reflections drive
+  *reverb decay* from real geometry instead of the Sabine estimate.
+  - `SteamAudioSimulator` now takes independent `enableDirect/enablePathing/enableReflections` flags (each
+    `Run` stage gated), adds `GetReverb` (per-band RT60) and the pure `ReverbDecayMs` mapping (longest band →
+    FMOD SFXREVERB ms, clamped). `iplSimulatorRunReflections` bound in `PhononSim`.
+  - `AsyncAcousticWorker` runs a **second, reflections-only** simulator with a single listener probe on a
+    throttle (every 6th tick — reflections are the heaviest stage, so not per-source/per-tick), producing the
+    listener room's RT60 → decay ms, exposed via `TryGetListenerReverbDecayMs`.
+  - `ClientAudioSystem` pushes that to `IAudioProvider.SetSimulatedReverbDecay`; `FmodAudioProvider` overrides
+    the listener-region reverb DSP decay with it (no-op/Sabine when 0). The hand-rolled **discrete reflection
+    emitters are retired when SA sim is active** (`SteamAudioActive`); they remain the fallback when sim is off.
+  - Verified headless 2026-06-29 (`--sim-reflect` via the real simulator API: sealed 0.62 s ≫ open 0.10 s) and
+    62/62 unit tests pass. **Not yet validated by ear.** **Future:** per-source early-reflection *direction*
+    (convolution path) if parametric room reverb proves insufficient; relocate probes on map change.
+
+**Phase 4 is feature-complete (4a–4d), all geometry-driven and behind `OPENFPS_STEAMAUDIO_SIM` with graceful
+fallback. The whole of Phase 4 is headless-verified but NOT yet ear-validated — that gate comes when the
+Linux/GTK client runs. Phase 5 (below) should follow ear-validation, not precede it.**
+
+**Phase 5 — retire hand-rolled code (AFTER ear-validation).** Once 4a–4d are confirmed good by ear in the
+live client, remove/disable `SpatialAcoustics`, `AcousticPathfinder`, the reflection-emitter generation, and
+the 3D reverb-bus positioning, keeping only what the simulator doesn't yet provide (air absorption, distance
+model, region detection / UI readouts) — or migrate those onto the simulator first. Do NOT delete the
+hand-rolled fallback before ear-validation: it is still the `OPENFPS_STEAMAUDIO_SIM=0` / no-libphonon path.
+Discrete reflection emitters are already disabled when SA sim is active (4d), so the main remaining work is
+collapsing the now-redundant occlusion ray-tracing and reverb Sabine math once the sim path is trusted.
 
 ## Risks / notes
 - Simulation runs rays on a worker; budget it (Steam Audio has a thread-pool + per-frame source cap).

@@ -74,6 +74,11 @@ public class ClientAudioSystem
         Vector3 listenerVelocity = _state.Velocity + _state.WindVelocity * 0.1f;
         _audio.UpdateListener(visualEyePos, _state.Rotation, listenerVelocity, listenerRegionId);
         _audio.UpdateShelter(_state.ShelterFactor);
+
+        // Geometry-driven reverb (Phase 4d): drive the listener-region reverb decay from the Steam Audio
+        // reflection sim when available (replaces the Sabine estimate for the room the listener is in).
+        if (_acousticWorker.TryGetListenerReverbDecayMs(out float simReverbMs))
+            _audio.SetSimulatedReverbDecay(simReverbMs);
         
         // 3. Synchronize the acoustic map ONLY if it changed (optimization)
         if (world.AcousticMap != null)
@@ -176,7 +181,10 @@ public class ClientAudioSystem
                     {
                         _audio.SetAcousticPath(id, path);
                     }
-                    else
+                    // Hand-rolled discrete reflection emitters are retired once Steam Audio simulation is
+                    // active — geometry-driven reverb (4d) covers reflected energy. They still run as the
+                    // fallback when SA sim is unavailable (OPENFPS_STEAMAUDIO_SIM=0 / no libphonon).
+                    else if (!_acousticWorker.SteamAudioActive)
                     {
                     // OUTDOOR BUILDING REFLECTIONS
                     if (world.Entities.TryGetValue(id, out var originalSnap))

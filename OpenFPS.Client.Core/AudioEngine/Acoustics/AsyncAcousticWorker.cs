@@ -47,6 +47,27 @@ public class AsyncAcousticWorker : IDisposable
     private SteamAudioScene? _saScene;
     private SteamAudioSimulator? _saSim;
     private AcousticMap? _saSceneMap; // the map the current scene was built for (rebuild when it changes)
+
+    // Phase 4d: a reflections-only simulator with a single listener probe, run on a throttle, that yields
+    // geometry-driven reverb decay (RT60) for the room the listener is in. Cheap (one source, every Nth
+    // tick) so reflections — the heaviest stage — don't run per-source per-tick.
+    private SteamAudioSimulator? _saReverbSim;
+    private IntPtr _reverbSource;
+    private volatile float _listenerReverbMs;  // 0 = no simulated reverb available yet
+    private int _reverbTick;
+    private const int ReverbEveryNTicks = 6;
+
+    /// <summary>True once Steam Audio simulation is running (occlusion/pathing). The client uses this to
+    /// stop spawning the hand-rolled discrete reflection emitters, since geometry-driven reverb covers them.</summary>
+    public bool SteamAudioActive => _saEnabled;
+
+    /// <summary>The simulated reverb decay (FMOD SFXREVERB ms) for the listener's room, or false if SA
+    /// simulation isn't producing one. Read from the game thread to drive the listener-region reverb.</summary>
+    public bool TryGetListenerReverbDecayMs(out float ms)
+    {
+        ms = _listenerReverbMs;
+        return _saEnabled && ms > 0f;
+    }
     private readonly Dictionary<int, IntPtr> _saSources = new();   // entityId -> acquired IPLSource
     private readonly Dictionary<int, long> _saLastSeen = new();     // entityId -> TickCount64 of last request
     private readonly Dictionary<int, AcousticRequest> _pending = new(); // drained-per-tick latest request
@@ -193,6 +214,7 @@ public class AsyncAcousticWorker : IDisposable
                 results[kv.Key] = new SaResult(direct, apparent, hasApparent);
             }
 
+            RunListenerReverb(listener);
             EvictStaleSources(now);
             return results;
         }
@@ -247,8 +269,12 @@ public class AsyncAcousticWorker : IDisposable
                 return;
             }
             _saScene = new SteamAudioScene(_saContext);
+
+            _saReverbSim = new SteamAudioSimulator(_saContext, maxSources: 4, enableReflections: true, enableDirect: false);
+            if (!_saReverbSim.IsValid) { _saReverbSim.Dispose(); _saReverbSim = null; }
+
             _saEnabled = true;
-            Console.WriteLine("[AcousticWorker] Steam Audio simulation enabled (per-source occlusion/transmission from geometry).");
+            Console.WriteLine("[AcousticWorker] Steam Audio simulation enabled (per-source occlusion/transmission + geometry reverb).");
         }
         catch (DllNotFoundException) { Console.WriteLine("[AcousticWorker] libphonon not found; using hand-rolled occlusion."); }
         catch (Exception ex) { Console.WriteLine($"[AcousticWorker] Steam Audio sim init failed; using hand-rolled occlusion: {ex.Message}"); }
@@ -264,8 +290,29 @@ public class AsyncAcousticWorker : IDisposable
         var boxes = SteamAudioScene.BoxesFromWorld(world);
         _saScene.Build(boxes);
         _saSceneMap = world.AcousticMap;
-        if (_saScene.IsBuilt) _saSim.SetScene(_saScene);
+        if (_saScene.IsBuilt)
+        {
+            _saSim.SetScene(_saScene);
+            _saReverbSim?.SetScene(_saScene);
+        }
         Console.WriteLine($"[AcousticWorker] Built Steam Audio scene from {boxes.Count} solid box colliders.");
+    }
+
+    /// <summary>Throttled: runs the reflections sim for a single probe at the listener to get the room's
+    /// geometry-driven RT60, mapped to an FMOD reverb decay (ms) the provider applies to the listener's
+    /// reverb. Reflections are the heaviest stage, so this runs only every Nth tick for one source.</summary>
+    private void RunListenerReverb(Vector3 listener)
+    {
+        if (_saReverbSim == null || !_saReverbSim.IsValid) return;
+        if (++_reverbTick % ReverbEveryNTicks != 0) return;
+        if (_reverbSource == IntPtr.Zero) _reverbSource = _saReverbSim.AcquireSource();
+        if (_reverbSource == IntPtr.Zero) return;
+
+        _saReverbSim.SetSourceInputs(_reverbSource, listener);
+        _saReverbSim.SetListener(listener);
+        _saReverbSim.Run();
+        var rv = _saReverbSim.GetReverb(_reverbSource);
+        _listenerReverbMs = SteamAudioSimulator.ReverbDecayMs(rv);
     }
 
     private IntPtr GetOrAcquireSource(int entityId)
@@ -302,6 +349,7 @@ public class AsyncAcousticWorker : IDisposable
         _workerThread?.Join(); // after this, no other thread touches the Phonon sim objects
 
         if (_saSim != null) { _saSim.Dispose(); _saSim = null; }
+        if (_saReverbSim != null) { _saReverbSim.Dispose(); _saReverbSim = null; }
         if (_saScene != null) { _saScene.Dispose(); _saScene = null; }
         if (_saContext != IntPtr.Zero) Phonon.iplContextRelease(ref _saContext);
 

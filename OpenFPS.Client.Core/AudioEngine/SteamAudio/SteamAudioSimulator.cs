@@ -62,6 +62,18 @@ public sealed class SteamAudioSimulator : IDisposable
             Math.Clamp(dr.TransLow, 0f, 1f));
     }
 
+    /// <summary>Reflection result for a source/probe: per-band RT60 reverb decay in seconds.</summary>
+    public readonly record struct ReverbResult(float Rt60Low, float Rt60Mid, float Rt60High)
+    {
+        public static readonly ReverbResult None = new(0f, 0f, 0f);
+        public float Max => MathF.Max(Rt60Low, MathF.Max(Rt60Mid, Rt60High));
+    }
+
+    /// <summary>Maps a simulated RT60 (seconds, per band) to an FMOD SFXREVERB decay time in ms, using the
+    /// longest band and clamping to a sane range. Pure, unit-tested.</summary>
+    public static float ReverbDecayMs(ReverbResult r, float minMs = 100f, float maxMs = 20000f)
+        => Math.Clamp(r.Max * 1000f, minMs, maxMs);
+
     private delegate void ProgressCallback(float progress, IntPtr userData);
     // Kept alive so native code can't call a collected delegate during a (synchronous) bake.
     private static readonly ProgressCallback _bakeProgress = (p, u) => { };
@@ -70,8 +82,10 @@ public sealed class SteamAudioSimulator : IDisposable
     private readonly int _maxSources;
     private readonly int _samplingRate;
     private readonly int _frameSize;
-    private readonly int _flags;        // DIRECT, or DIRECT|PATHING when pathing is enabled
+    private readonly int _flags;        // any combination of DIRECT | PATHING | REFLECTIONS
+    private readonly bool _direct;
     private readonly bool _pathing;
+    private readonly bool _reflections;
 
     private IntPtr _simulator;
     private readonly Stack<IntPtr> _freeSources = new();
@@ -100,21 +114,27 @@ public sealed class SteamAudioSimulator : IDisposable
     /// <summary>True once the simulator was created successfully.</summary>
     public bool IsValid => _simulator != IntPtr.Zero;
 
-    public SteamAudioSimulator(IntPtr context, int maxSources = 64, bool enablePathing = false, int samplingRate = 44100, int frameSize = 1024)
+    public SteamAudioSimulator(IntPtr context, int maxSources = 64, bool enablePathing = false,
+        bool enableReflections = false, bool enableDirect = true, int samplingRate = 44100, int frameSize = 1024)
     {
         _context = context;
         _maxSources = maxSources;
         _samplingRate = samplingRate;
         _frameSize = frameSize;
+        _direct = enableDirect;
         _pathing = enablePathing;
-        _flags = Phonon.IPL_SIMULATIONFLAGS_DIRECT | (enablePathing ? Phonon.IPL_SIMULATIONFLAGS_PATHING : 0);
+        _reflections = enableReflections;
+        _flags = (enableDirect ? Phonon.IPL_SIMULATIONFLAGS_DIRECT : 0)
+               | (enablePathing ? Phonon.IPL_SIMULATIONFLAGS_PATHING : 0)
+               | (enableReflections ? Phonon.IPL_SIMULATIONFLAGS_REFLECTIONS : 0);
 
         var s = new Phonon.IPLSimulationSettings
         {
             flags = _flags,
             sceneType = Phonon.IPL_SCENETYPE_DEFAULT,
-            reflectionType = Phonon.IPL_REFLECTIONEFFECTTYPE_CONVOLUTION,
-            maxNumOcclusionSamples = 16, maxNumRays = 4096, numDiffuseSamples = 32, maxDuration = 1.0f,
+            reflectionType = enableReflections ? Phonon.IPL_REFLECTIONEFFECTTYPE_PARAMETRIC : Phonon.IPL_REFLECTIONEFFECTTYPE_CONVOLUTION,
+            maxNumOcclusionSamples = 16, maxNumRays = enableReflections ? 8192 : 4096, numDiffuseSamples = 32,
+            maxDuration = enableReflections ? 2.0f : 1.0f,
             maxOrder = 1, maxNumSources = maxSources, numThreads = 1, rayBatchSize = 16, numVisSamples = 4,
             samplingRate = samplingRate, frameSize = frameSize,
         };
@@ -224,13 +244,17 @@ public sealed class SteamAudioSimulator : IDisposable
         var inputs = new Phonon.IPLSimulationInputs
         {
             flags = _flags,
-            directFlags = Phonon.IPL_DIRECTSIMULATIONFLAGS_OCCLUSION | Phonon.IPL_DIRECTSIMULATIONFLAGS_TRANSMISSION,
+            directFlags = _direct ? (Phonon.IPL_DIRECTSIMULATIONFLAGS_OCCLUSION | Phonon.IPL_DIRECTSIMULATIONFLAGS_TRANSMISSION) : 0,
             source = Coord(worldPos),
             occlusionType = Phonon.IPL_OCCLUSIONTYPE_VOLUMETRIC,
             occlusionRadius = 0.5f,
             numOcclusionSamples = 16,
             numTransmissionRays = 1,
         };
+        if (_reflections)
+        {
+            inputs.reverbScale0 = 1f; inputs.reverbScale1 = 1f; inputs.reverbScale2 = 1f;
+        }
         if (PathingReady)
         {
             inputs.pathingProbes = _probeBatch;
@@ -252,17 +276,32 @@ public sealed class SteamAudioSimulator : IDisposable
         var shared = new Phonon.IPLSimulationSharedInputs
         {
             listener = Coord(_listener),
-            numRays = 4096, numBounces = 1, duration = 1.0f, order = 1, irradianceMinDistance = 1.0f,
+            numRays = _reflections ? 8192 : 4096,
+            numBounces = _reflections ? 16 : 1,
+            duration = _reflections ? 2.0f : 1.0f,
+            order = 1, irradianceMinDistance = 1.0f,
         };
         Phonon.iplSimulatorSetSharedInputs(_simulator, _flags, ref shared);
-        Phonon.iplSimulatorRunDirect(_simulator);
+        if (_direct) Phonon.iplSimulatorRunDirect(_simulator);
         if (PathingReady) Phonon.iplSimulatorRunPathing(_simulator);
+        if (_reflections) Phonon.iplSimulatorRunReflections(_simulator);
+    }
+
+    /// <summary>Reads the most recent reflection RT60 for a source (valid after <see cref="Run"/> when
+    /// reflections are enabled). Returns <see cref="ReverbResult.None"/> otherwise.</summary>
+    public ReverbResult GetReverb(IntPtr source)
+    {
+        if (source == IntPtr.Zero || !_reflections) return ReverbResult.None;
+        var outputs = default(Phonon.IPLSimulationOutputs);
+        Phonon.iplSourceGetOutputs(source, _flags, ref outputs);
+        ref var r = ref outputs.reflections;
+        return new ReverbResult(r.reverbTimes0, r.reverbTimes1, r.reverbTimes2);
     }
 
     /// <summary>Reads the most recent direct result for a source (valid after <see cref="Run"/>).</summary>
     public DirectResult GetResult(IntPtr source)
     {
-        if (source == IntPtr.Zero) return DirectResult.Clear;
+        if (source == IntPtr.Zero || !_direct) return DirectResult.Clear;
         var outputs = default(Phonon.IPLSimulationOutputs);
         Phonon.iplSourceGetOutputs(source, _flags, ref outputs);
         ref var d = ref outputs.direct;

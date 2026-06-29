@@ -105,6 +105,13 @@ if (args.Contains("--sim-pathframe"))
     Environment.Exit(code);
 }
 
+if (args.Contains("--sim-reflect"))
+{
+    int code = SimReflectSpike.Run();
+    Log.CloseAndFlush();
+    Environment.Exit(code);
+}
+
 if (args.Contains("--make-siren"))
 {
     // Emit a realistic police-siren wail WAV. Optional path after the flag; defaults to the client asset.

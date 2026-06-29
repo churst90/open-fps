@@ -71,4 +71,26 @@ public class SteamAudioMappingTests
         Assert.Equal(0.5f, ap.Occlusion, 3);
         Assert.Equal(0.5f, ap.EqMid, 3); // v + (1-v)*0 = 0.5
     }
+
+    // --- Reflection RT60 -> FMOD reverb decay (ms) ---
+
+    [Fact]
+    public void ReverbDecayMs_UsesLongestBandInMilliseconds()
+    {
+        var r = new SteamAudioSimulator.ReverbResult(0.62f, 0.61f, 0.61f);
+        Assert.Equal(620f, SteamAudioSimulator.ReverbDecayMs(r), 1);
+    }
+
+    [Fact]
+    public void ReverbDecayMs_ClampsToFloor()
+    {
+        Assert.Equal(100f, SteamAudioSimulator.ReverbDecayMs(SteamAudioSimulator.ReverbResult.None), 1);
+    }
+
+    [Fact]
+    public void ReverbDecayMs_ClampsToCeiling()
+    {
+        var r = new SteamAudioSimulator.ReverbResult(50f, 50f, 50f);
+        Assert.Equal(20000f, SteamAudioSimulator.ReverbDecayMs(r), 1);
+    }
 }

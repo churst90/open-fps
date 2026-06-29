@@ -16,6 +16,10 @@ public interface IAudioProvider : IDisposable
     void PlaySpatialSound(SpatialEmitter emitter);
     void UpdateSpatialAttributes(SpatialEmitter emitter);
     void SetAcousticPath(int entityId, AcousticPathData path);
+
+    /// <summary>Overrides the listener-region reverb decay (FMOD SFXREVERB ms) with a geometry-derived
+    /// value from the Steam Audio reflection simulation. 0 = no override (keep the Sabine estimate).</summary>
+    void SetSimulatedReverbDecay(float decayMs);
     void StopSound(int entityId);
     bool IsPlaying(int entityId);
     Vector3 GetSoundPosition(int entityId);

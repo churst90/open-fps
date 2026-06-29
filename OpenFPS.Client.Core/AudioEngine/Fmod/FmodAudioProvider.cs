@@ -221,6 +221,9 @@ public class FmodAudioProvider : IAudioProvider
     private int _listenerRegionId = -1;
     private float _shelterFactor = 0.0f;
 
+    // Geometry-driven reverb decay (ms) from the Steam Audio reflection sim; 0 = keep the Sabine estimate.
+    private float _simReverbDecayMs;
+
     // Opt-in spatialization tracing (OPENFPS_AUDIO_DEBUG=1): logs each spatial source's
     // listener-relative HRTF direction + listener yaw ~once/sec to diagnose panning.
     private static readonly bool _audioDebug = Environment.GetEnvironmentVariable("OPENFPS_AUDIO_DEBUG") == "1";
@@ -394,6 +397,20 @@ public class FmodAudioProvider : IAudioProvider
         var v = new SaVoice { State = a.SaState, Dsp = a.SaDsp, Handle = a.SaHandle };
         lock (_saPool) { _saPool.Push(v); }
         a.SaState = null; a.SaDsp = default; a.SaHandle = default;
+    }
+
+    public void SetSimulatedReverbDecay(float decayMs) => _simReverbDecayMs = decayMs;
+
+    /// <summary>Overrides the listener-region reverb DSP decay with the simulated RT60-derived value when
+    /// available, replacing the Sabine estimate for the room the listener is in. No-op when 0 (sim off).</summary>
+    private void ApplySimulatedReverb(int listenerRegionId)
+    {
+        if (_simReverbDecayMs <= 0f || listenerRegionId == -1) return;
+        if (_reverbDsps.TryGetValue(listenerRegionId, out var dsp) && dsp.hasHandle())
+        {
+            float ms = Math.Clamp(_simReverbDecayMs, AcousticConstants.MinReverbDecayMs, AcousticConstants.MaxReverbDecayMs);
+            dsp.setParameterFloat(0, ms);
+        }
     }
 
     public void SetAcousticMap(AcousticMap map)
@@ -818,6 +835,7 @@ public class FmodAudioProvider : IAudioProvider
             {
                 _dbgFrame++;
                 UpdateActiveReverbs(lPosVec);
+                ApplySimulatedReverb(listenerRegionId);
 
                 for (int i = _activeSounds.Count - 1; i >= 0; i--)
                 {
