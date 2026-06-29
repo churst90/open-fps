@@ -56,8 +56,16 @@ Original step list (for reference):
 6. Print the returned occlusion/transmission as the source moves behind vs beside the wall.
    PASS = occluded behind the wall, clear beside it. No ears needed.
 
-**Phase 2 — pathing spike**: add `IPL_SIMULATIONFLAGS_PATHING` + a probe batch over the scene; verify
-the pathing output direction points at the opening when the source is in another "room".
+**Phase 2 — pathing spike: DONE ✅** (`AudioLab --sim-pathing`, `SimPathingSpike.cs`).
+Floor + wall-with-doorway scene → `UNIFORMFLOOR` probes → **`iplPathBakerBake`** (the probe-to-probe
+visibility graph; pathing finds nothing without it) → `iplSimulatorRunPathing` → read the path's
+order-1 SH + EQ from `IPLPathEffectParams`. Result: a path is found through the opening (W=0.047,
+eq≈1.0 = clear). Pipeline + bindings proven. **Gotchas for integration:** (1) `iplPathBakerBake`
+requires a non-null progress callback — a null one segfaults. (2) floor geometry must be wound
+normal-UP or `UNIFORMFLOOR` places no probes. (3) the SH→world-direction convention still needs the
+exact ACN/axis mapping pinned down (the spike reported `-x` for a `+z` path). (4) routing a *bent* path
+around a fully-blocked straight line needs probe-graph density/`pathRange` tuning (the straight-through
+gap path is found; the off-axis bent one needs work).
 
 **Phase 3 — scene from the game world.** Build the `IPLScene` from the server geometry the client
 already receives (`EntityDefinition` colliders/walls → triangle meshes + acoustic materials, reusing

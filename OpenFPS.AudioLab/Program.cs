@@ -63,6 +63,13 @@ if (args.Contains("--sim-occlusion"))
     Environment.Exit(code);
 }
 
+if (args.Contains("--sim-pathing"))
+{
+    int code = SimPathingSpike.Run();
+    Log.CloseAndFlush();
+    Environment.Exit(code);
+}
+
 if (args.Contains("--steam-stereo"))
 {
     int code = SteamAudioLiveTest.RunStereoCheck();
