@@ -471,6 +471,14 @@ public class FmodAudioProvider : IAudioProvider
 
         string busName = (region.FriendlyName ?? "Unknown") + "_Reverb";
         _system.createChannelGroup(busName, out var bus);
+        // Make the reverb bus positionable in 3D so UpdateReverbBuses can place a room's reverb AT its
+        // doorway when the listener is outside (set3DLevel 1 + set3DAttributes(portal)). Without a 3D
+        // mode those calls are no-ops and the reverb is heard omnidirectionally everywhere it is sent.
+        // We gate the LEVEL manually (per-portal aperture/distance), so keep FMOD's own distance
+        // rolloff out of the way with a huge max distance. When the listener is inside the room we set
+        // 3D level back to 0 so the reverb fills the space non-directionally.
+        bus.setMode(MODE._3D | MODE._3D_LINEARROLLOFF);
+        bus.set3DMinMaxDistance(2.0f, 10000.0f);
         _system.createDSPByType(DSP_TYPE.SFXREVERB, out var reverbDsp);
         
         float decayMs = AcousticConstants.DefaultReverbDecayMs;
@@ -508,10 +516,15 @@ public class FmodAudioProvider : IAudioProvider
         reverbDsp.setParameterFloat(0, Math.Max(AcousticConstants.MinReverbDecayMs, decayMs)); 
         reverbDsp.setParameterFloat(1, 0.1f); 
         
-        if (region.ReverbTimeScale > 0.01f) {
+        // The global/outdoor "region" spans the whole map, so its Sabine decay is enormous and it is
+        // always at full volume — that omnipresent wash is what reads as "reverb all around, even far
+        // from any room". Open air should be effectively dry, so mute the outdoor reverb; rooms keep
+        // their own (gated + doorway-positioned) reverb.
+        bool outdoors = regionId == _acousticMap.GlobalEnvironmentId;
+        if (region.ReverbTimeScale > 0.01f && !outdoors) {
             reverbDsp.setParameterFloat(11, 0.0f); // Wet level normal
         } else {
-            reverbDsp.setParameterFloat(11, -80.0f); // Mute Reverb
+            reverbDsp.setParameterFloat(11, -80.0f); // Mute (outdoors dry / no global wash)
         }
         reverbDsp.setParameterFloat(12, 0.0f); // Dry level normal
         
@@ -1124,6 +1137,9 @@ public class FmodAudioProvider : IAudioProvider
                         targetVol = Math.Clamp((nearest.Portal.ApertureSize / 2.0f) / Math.Max(1.0f, dist), 0.0f, 1.0f);
                         
                         bus.set3DLevel(1.0f);
+                        // Collapse the stereo reverb to a point so it localizes AT the doorway instead
+                        // of FMOD spreading the two channels into a wide, non-directional image.
+                        bus.set3DSpread(0.0f);
                         FMOD.VECTOR fpos = FmodHelpers.ToFmodVec(nearest.Position);
                         FMOD.VECTOR fvel = new FMOD.VECTOR { x = 0, y = 0, z = 0 };
                         bus.set3DAttributes(ref fpos, ref fvel);
@@ -1133,6 +1149,14 @@ public class FmodAudioProvider : IAudioProvider
 
             _reverbVolumes[regionId] = MathHelper.Lerp(_reverbVolumes[regionId], targetVol, AcousticConstants.ReverbFadeSpeed);
             bus.setVolume(_reverbVolumes[regionId]);
+
+            if (_audioDebug && _dbgFrame % 60 == 0)
+            {
+                string name = _acousticMap.Regions.TryGetValue(regionId, out var rg) ? rg.FriendlyName : "?";
+                float rdist = (regionId == _acousticMap.GlobalEnvironmentId) ? 0 : Vector3.Distance(lPosVec, _acousticMap.RegionPositions.GetValueOrDefault(regionId, Vector3.Zero));
+                Log.Information("[REVERB] listenerRegion={LR} bus={Rid}({Name}) {Pos} dist={D:F1} target={T:F2} vol={V:F2}",
+                    listenerRegionId, regionId, name, regionId == listenerRegionId ? "INSIDE" : "outside", rdist, targetVol, _reverbVolumes[regionId]);
+            }
         }
     }
 
