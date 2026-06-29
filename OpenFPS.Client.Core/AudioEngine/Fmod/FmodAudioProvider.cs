@@ -214,6 +214,7 @@ public class FmodAudioProvider : IAudioProvider
 
     private FMOD.ChannelGroup _reflectionGroup;
     private FMOD.DSP _masterCombFilter;
+    private FMOD.DSP _masterLimiter;
 
     private Vector3 _listenerPos = Vector3.Zero;
     private Vector3 _listenerVel = Vector3.Zero;
@@ -301,6 +302,14 @@ public class FmodAudioProvider : IAudioProvider
             master.addDSP(CHANNELCONTROL_DSP_INDEX.TAIL, _masterCombFilter);
             _masterCombFilter.setBypass(true);
 
+            // Master brick-wall limiter: a production safeguard so loud/overlapping sources (e.g. close
+            // beacons, stacked reverb) can never clip or "deafen" the output. Caps peaks at -1 dBFS.
+            _system.createDSPByType(DSP_TYPE.LIMITER, out _masterLimiter);
+            _masterLimiter.setParameterFloat(0, 50.0f);   // release time (ms)
+            _masterLimiter.setParameterFloat(1, -1.0f);   // ceiling (dBFS)
+            _masterLimiter.setParameterFloat(2, 0.0f);    // maximizer gain (dB) — none, just limit
+            master.addDSP(CHANNELCONTROL_DSP_INDEX.TAIL, _masterLimiter);
+
             TryInitSteamAudio();
 
             _isInitialized = true;
@@ -377,8 +386,11 @@ public class FmodAudioProvider : IAudioProvider
             if (_saPool.Count == 0) return false;
             v = _saPool.Pop();
         }
-        // Reset transient state. The binaural effect has no public reset, but the next mixer callback
-        // overwrites the direction — a single frame of interpolation from the prior direction is inaudible.
+        // Reset transient state. Crucially, clear the binaural effect's internal overlap-add buffers:
+        // pooled voices are reused rapidly (footsteps), and reusing an effect that still holds the tail of
+        // the previous sound produces an audible click/pop on the first frame. The DSP is detached from any
+        // channel at this point (ReleaseSteamAudioVoice removed it), so resetting here is safe.
+        Phonon.iplBinauralEffectReset(v.State.Effect);
         v.State.DirX = 0f; v.State.DirY = 0f; v.State.DirZ = -1f;
         v.State.LastRms = v.State.LastRmsL = v.State.LastRmsR = 0f;
         v.State.ProducedAudio = false;
@@ -1085,19 +1097,19 @@ public class FmodAudioProvider : IAudioProvider
             active.ThreeEqDsp.setParameterFloat(2, Math.Clamp(highDb, -80.0f, 10.0f));
         }
 
-        float distFactor = Math.Clamp(active.EffectiveDistance / 50.0f, 0.0f, 1.0f);
-        float baseReverbMix = 0.25f + (MathF.Sqrt(distFactor) * 0.65f);
-        
-        // --- Reverb-Reflection Coupling ---
-        // For reflections, the 'RoomGain' property actually carries the 'Remaining Energy' 
-        // after all bounces. We use this to excite the reverb bus.
-        if (active.IsReflection)
-        {
-            baseReverbMix *= Math.Max(0.5f, active.RoomGain);
-        }
+        // Reverb send: a modest, roughly CONSTANT contribution per source. It must NOT grow with distance
+        // — the old `0.25 + sqrt(dist)*0.65` made distant sounds drown in reverb and the room "follow" the
+        // listener ("the further back I get, the more it sounds like I'm in the room"). The dry path already
+        // rolls off with distance (distAtten / FMOD rolloff), so a fixed wet send naturally reads as a
+        // wetter ratio when far — without piling on absolute reverb everywhere.
+        float baseReverbMix = active.IsReflection
+            ? 0.15f * Math.Max(0.5f, active.RoomGain) // reflections excite the bus by remaining energy
+            : 0.15f;
 
-        if (active.SourceReverbConnection.hasHandle()) active.SourceReverbConnection.setMix(baseReverbMix * 0.8f);
-        if (active.ReverbConnection.hasHandle()) active.ReverbConnection.setMix(baseReverbMix * 0.4f);
+        // The source's OWN room gets the primary send. The listener's room gets only a small cross-send,
+        // so a sound in an adjacent room doesn't smear reverb from many directions at once.
+        if (active.SourceReverbConnection.hasHandle()) active.SourceReverbConnection.setMix(baseReverbMix);
+        if (active.ReverbConnection.hasHandle()) active.ReverbConnection.setMix(baseReverbMix * 0.25f);
 
         if (active.DiffractionDsp.hasHandle())
         {
@@ -1538,6 +1550,7 @@ public class FmodAudioProvider : IAudioProvider
             foreach (var dsp in _reverbDsps.Values) dsp.release();
             foreach (var bus in _reverbBuses.Values) bus.release();
             if (_masterCombFilter.hasHandle()) _masterCombFilter.release();
+            if (_masterLimiter.hasHandle()) _masterLimiter.release();
         } 
         StopDiagnosticSound();
         if (_steamAudioEnabled)

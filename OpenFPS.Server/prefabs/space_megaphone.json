@@ -13,7 +13,7 @@
   "IsItem": false,
   "HasEmitter": true,
   "SoundId": "BEACONS/megaphone",
-  "Volume": 1.5,
+  "Volume": 1.0,
   "Range": 50,
   "Mode": "LoopOne",
   "ConeInsideAngle": 45,

@@ -93,6 +93,8 @@ internal static partial class Phonon
     [DllImport(Lib, CallingConvention = CC)]
     public static extern int iplBinauralEffectApply(IntPtr effect, ref IPLBinauralEffectParams effectParams, ref IPLAudioBuffer inBuf, ref IPLAudioBuffer outBuf);
     [DllImport(Lib, CallingConvention = CC)]
+    public static extern void iplBinauralEffectReset(IntPtr effect);
+    [DllImport(Lib, CallingConvention = CC)]
     public static extern void iplBinauralEffectRelease(ref IntPtr effect);
 
     [DllImport(Lib, CallingConvention = CC)]

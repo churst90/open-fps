@@ -24,9 +24,8 @@ DOTNET_CLI_TELEMETRY_OPTOUT=1 DOTNET_NOLOGO=1 DOTNET_CLI_USE_MSBUILD_SERVER=0 \
 echo "Launching GTK client from $OUT ..."
 cd "$OUT"                 # cwd so materials.json (loaded relative to cwd) resolves
 
-# Default the audio-occlusion trace ON, and mirror all console output to a log file so it can be
-# inspected after the session (handy for screen-reader users — no need to read the terminal live).
-export OPENFPS_AUDIO_DEBUG="${OPENFPS_AUDIO_DEBUG:-1}"
+# Mirror all console output to a log file so it can be inspected after the session (handy for
+# screen-reader users). Set OPENFPS_AUDIO_DEBUG=1 before running to add the per-source occlusion trace.
 LOG=/tmp/openfps-client.log
 echo "(logging to $LOG)"
 "$DOTNET" OpenFPS.Client.Gtk.dll "$@" 2>&1 | tee "$LOG"

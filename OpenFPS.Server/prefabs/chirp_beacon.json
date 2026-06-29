@@ -17,7 +17,7 @@
   "Drag": null,
   "HasEmitter": true,
   "SoundId": "BEACONS/siren",
-  "Volume": 1.4,
+  "Volume": 0.9,
   "Range": 50,
   "Mode": "LoopOne",
   "IsSynth": false
