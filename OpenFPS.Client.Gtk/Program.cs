@@ -79,27 +79,36 @@ internal static class GtkClientProgram
 
         while (true)
         {
-            if (_networkStarted) _network.Poll();
-
-            var session = _session;
-            if (session != null && session.IsInGame)
+            try
             {
-                var now = DateTime.Now;
-                double elapsed = (now - lastTime).TotalSeconds;
-                lastTime = now;
-                if (elapsed > 0.2) elapsed = 0.2;
-                accumulator += elapsed;
+                if (_networkStarted) _network.Poll();
 
-                while (accumulator >= targetDt)
+                var session = _session;
+                if (session != null && session.IsInGame)
                 {
-                    session.SimStep((float)targetDt);
-                    accumulator -= targetDt;
+                    var now = DateTime.Now;
+                    double elapsed = (now - lastTime).TotalSeconds;
+                    lastTime = now;
+                    if (elapsed > 0.2) elapsed = 0.2;
+                    accumulator += elapsed;
+
+                    while (accumulator >= targetDt)
+                    {
+                        session.SimStep((float)targetDt);
+                        accumulator -= targetDt;
+                    }
+                    session.ContinuousUpdate();
                 }
-                session.ContinuousUpdate();
+                else
+                {
+                    lastTime = DateTime.Now; // avoid banking elapsed time while not simulating
+                }
             }
-            else
+            catch (Exception ex)
             {
-                lastTime = DateTime.Now; // avoid banking elapsed time while not simulating
+                // A handler/sim exception must never silently kill the game loop (which pumps the network):
+                // that would freeze the world-load handshake with no diagnostic. Log and keep pumping.
+                Log.Error(ex, "GameLoop iteration failed.");
             }
 
             Thread.Sleep(5);
@@ -185,6 +194,7 @@ internal static class GtkClientProgram
                 _speech.Speak($"Logged in as {lr.Username}. Loading world.", true);
                 _session = new GameSession(_network, _speech, _audioEnabled);
                 _session.GameJoined += OnGameJoined;
+                _session.BeginAudioInit(); // off the network thread — must not block the load handshake
             }
             else
             {

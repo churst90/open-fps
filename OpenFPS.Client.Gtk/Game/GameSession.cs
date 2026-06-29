@@ -55,10 +55,13 @@ public sealed class GameSession
     public GameInput Input { get; } = new();
     public bool AudioReady => _audioEngine.IsInitialized;
 
+    private readonly bool _enableAudio;
+
     public GameSession(ClientNetworkService network, ISpeechOutput speech, bool enableAudio)
     {
         _network = network;
         _speech = speech;
+        _enableAudio = enableAudio;
         _physics = new ClientPhysicsSystem(_state, new SpatialService());
         _controller = new LocalPlayerController(_state);
         _audioEngine = new AudioEngineFacade();
@@ -67,12 +70,27 @@ public sealed class GameSession
 
         AcousticRegistry.Initialize();
         _sounds.Initialize();
-        if (enableAudio) _audioEngine.Initialize();
-        Serilog.Log.Information("GameSession created. Audio requested={Req}, engine initialized={Init}.",
-            enableAudio, _audioEngine.IsInitialized);
+        // NOTE: audio engine init (FMOD + voices + asset bank) is deferred to BeginAudioInit() on a
+        // background thread. It must NOT run here: GameSession is constructed on the network/game-loop
+        // thread inside the LoginResponse handler, and a synchronous audio init would block that thread
+        // from pumping the next messages (MapManifest, …) — stalling the world-load handshake.
+        Serilog.Log.Information("GameSession created. Audio requested={Req}.", enableAudio);
 
         _controller.OnStepTriggered += _audioSystem.OnPlayerFootstep;
         _controller.OnLandTriggered += _audioSystem.OnPlayerLand;
+    }
+
+    /// <summary>Starts audio-engine initialization on a dedicated background thread so FMOD / asset
+    /// loading never blocks the network/game-loop thread. Audio is only used after spawn, by which time
+    /// this has completed; until then the provider's calls no-op. Safe to call once, right after construction.</summary>
+    public void BeginAudioInit()
+    {
+        if (!_enableAudio) return;
+        new Thread(() =>
+        {
+            try { _audioEngine.Initialize(); Serilog.Log.Information("Audio engine initialized (background): {Init}.", _audioEngine.IsInitialized); }
+            catch (Exception ex) { Serilog.Log.Error(ex, "Audio engine init failed."); }
+        }) { IsBackground = true, Name = "AudioInit" }.Start();
     }
 
     // ── Network message handling (game-loop thread) ─────────────────────────────
