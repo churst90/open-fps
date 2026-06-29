@@ -67,17 +67,22 @@ exact ACN/axis mapping pinned down (the spike reported `-x` for a `+z` path). (4
 around a fully-blocked straight line needs probe-graph density/`pathRange` tuning (the straight-through
 gap path is found; the off-axis bent one needs work).
 
-**Phase 3 — scene from the game world: CODE DONE, runtime check pending.**
+**Phase 3 — scene from the game world: DONE ✅** (`AudioLab --sim-scene`, `SimSceneSpike.cs`).
 `SteamAudioScene.cs` builds an `IPLScene` from box colliders (each box → 8 verts + 12 tris with an
-`AcousticRegistry`-derived `IPLMaterial`; rebuild on map load). `SimSceneSpike.cs` (`AudioLab
---sim-scene`) builds the demo wood-room's walls+doorway as boxes and asserts occlusion (clear through
-the door, blocked behind a side wall). **Compiles** (Client.Core built with both files). The headless
-`--sim-scene` run was NOT verified this session: the build environment wedged (`dotnet build` started
-hanging at startup with no output — not the drive [I/O tested fast] and not the code; likely stuck
-MSBuild/compiler servers). To verify after a clean shell/restart:
-`dotnet run --project OpenFPS.AudioLab -- --sim-scene` (expects "clear through door, blocked behind
-wall"). Then wire `SteamAudioScene.Build(...)` to the live solid colliders from the `WorldSnapshot` on
-map load. (`AcousticVolumeGenerator`'s voxel grid becomes unnecessary for audio once Phase 4 lands.)
+`AcousticRegistry`-derived `IPLMaterial`; rebuild on map load). `SimSceneSpike.cs` builds the demo
+wood-room's walls+doorway as boxes and asserts occlusion against the generated mesh. **Verified
+2026-06-28:** visibility 1.00 clear through the open doorway, 0.00 blocked behind the east wall —
+PASSED. Next: wire `SteamAudioScene.Build(...)` to the live solid colliders from the `WorldSnapshot`
+on map load. (`AcousticVolumeGenerator`'s voxel grid becomes unnecessary for audio once Phase 4 lands.)
+
+**Build-env note (the recurring "build wedges at startup"):** the repo is on an **ntfs3** volume, and
+MSBuild's output-write phase hangs in the *kernel* — a `RequestBuilder` thread blocks in `do_truncate`
+on ntfs3 holding a lock while the "Parallel Copy" threads wait behind it at 0% CPU (looks like a stuck
+compiler server but is a filesystem hang; source *reads* are fine, only *writes/truncates* hang). Fix:
+build with output on tmpfs and run the built DLL directly (so `dotnet run` doesn't rebuild→copy back
+onto ntfs3):
+`dotnet build OpenFPS.AudioLab --artifacts-path /tmp/openfps-art` (succeeds in ~5s), then
+`LD_LIBRARY_PATH=/tmp/openfps-art/bin/OpenFPS.AudioLab/debug dotnet /tmp/openfps-art/bin/OpenFPS.AudioLab/debug/OpenFPS.AudioLab.dll --sim-scene`.
 
 **Phase 4 — per-source simulation in `FmodAudioProvider`.** One `IPLSource` per `ActiveSound`. Each
 audio frame: update source/listener coordinates, run the simulator (on the audio/worker thread),
