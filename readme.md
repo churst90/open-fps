@@ -11,7 +11,7 @@ OpenFPS focuses on a rich **binaural landscape** and **spatial awareness** rathe
 - **ECS:** Arch (High-performance Entity Component System)
 - **Serialization:** MemoryPack (Zero-allocation binary)
 - **Accessibility:** Tolk (Direct NVDA Bridge with SAPI fallback)
-- **Audio Engine:** FMOD Studio Engine with Resonance Audio HRTF
+- **Audio Engine:** FMOD Core engine with Steam Audio (phonon) HRTF binaural; environmental acoustics migrating to Steam Audio's geometry-driven simulator
 
 ## Architecture (SRP Modular)
 - **OpenFPS.Common**: Shared ECS components, spatial partitioning (Uniform Grid), and binary network protocols. Contains the **SharedMovementEngine**, a stateless physics solver ensuring 100% deterministic parity between client and server.
@@ -28,5 +28,6 @@ OpenFPS focuses on a rich **binaural landscape** and **spatial awareness** rathe
 - **Deterministic Physics:** Implemented a unified `SharedMovementEngine` for sliding, step-climbing, and OBB collisions.
 - **Spatial Partitioning:** Implemented a Uniform Grid for O(1) collision and acoustic scanning.
 - **Networking:** Added Prediction and Reconciliation to eliminate movement jitter.
-- **Spatial Audio:** Fully migrated to FMOD + Resonance. Implemented dynamic LPF-based atmospheric absorption and sound diffraction.
+- **Spatial Audio:** FMOD Core + Steam Audio HRTF binaural, with dynamic LPF-based atmospheric absorption and diffraction.
+- **Geometry-Driven Acoustics (in progress):** Migrating the hand-rolled occlusion/portal/reflection layer to Steam Audio's `iplSimulator`, so occlusion and transmission are ray-traced from real box-collider geometry on a background thread. See `docs/STEAM_AUDIO_MIGRATION.md`.
 - **NPC System:** Integrated a Behavior Tree system for autonomous NPC logic.

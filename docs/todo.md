@@ -34,3 +34,17 @@
 - [ ] Client: Advanced Spatial Reverb (Room Coupling)
 - [ ] Client: Interpolation/Extrapolation for non-player entities
 - [ ] System: Automated Stress Testing (Simulated 50+ bots)
+
+## Audio: Steam Audio Simulation Migration (IN PROGRESS)
+Replacing the hand-rolled occlusion/reflection/portal layer with Steam Audio's `iplSimulator` so
+portal/occlusion/reflection behaviour is physically correct. See `docs/STEAM_AUDIO_MIGRATION.md`.
+- [x] Phase 0–1: simulation P/Invoke bindings (`PhononSim`) + headless occlusion spike (`--sim-occlusion`)
+- [x] Phase 2: pathing spike — probe bake + `RunPathing` (`--sim-pathing`)
+- [x] Phase 3: scene builder from box colliders (`SteamAudioScene`) + headless verify (`--sim-scene`)
+- [x] Phase 4a: per-source simulation engine (`SteamAudioSimulator`) with pooled sources (`--sim-perframe`)
+- [x] Phase 4b: wired into `AsyncAcousticWorker` — scene from `WorldSnapshot`, batched per-source direct
+      occlusion/EQ/transmission override on the worker thread (`--sim-worldscene`)
+- [ ] Phase 4b: validate by ear in the live client (A/B `OPENFPS_STEAMAUDIO_SIM=0` vs on)
+- [ ] Phase 4c: pathing — arrival direction through openings fed into the HRTF
+- [ ] Phase 4d: reflections — `iplReflectionEffect` + mixer (replace hand-rolled reflection emitters)
+- [ ] Phase 5: retire hand-rolled `SpatialAcoustics` / `AcousticPathfinder` / reflection generation

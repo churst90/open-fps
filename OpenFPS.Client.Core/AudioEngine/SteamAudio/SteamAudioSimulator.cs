@@ -106,6 +106,16 @@ public sealed class SteamAudioSimulator : IDisposable
         if (source != IntPtr.Zero) _freeSources.Push(source);
     }
 
+    /// <summary>Clears a source's per-frame inputs (zeroed flags) so the next <see cref="Run"/> stops
+    /// tracing it. Call before releasing a source whose voice has stopped, so an idle pooled source costs
+    /// no rays.</summary>
+    public void ClearSource(IntPtr source)
+    {
+        if (source == IntPtr.Zero) return;
+        var inputs = default(Phonon.IPLSimulationInputs); // flags = 0, directFlags = 0 -> inert
+        Phonon.iplSourceSetInputs(source, Flags, ref inputs);
+    }
+
     /// <summary>Sets the listener position used by the next <see cref="Run"/> (shared across all sources).</summary>
     public void SetListener(Vector3 worldPos) => _listener = worldPos;
 

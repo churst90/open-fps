@@ -114,10 +114,26 @@ is "fraction blocked" (provider does `dryVol = 1 - occlusion`), so convert: `pat
   Not thread-safe — single worker thread only; does not own the context/scene. Verified 2026-06-28: two
   sources batched in one `Run` give INDEPENDENT occlusion (room source 0.00 behind the east wall →
   1.00 in the doorway as the listener walks in; open control source stays 1.00), and pool
-  release/reacquire returns a working source. **Next (Phase 4b):** wire `SteamAudioScene.Build` to the
-  live `WorldSnapshot` colliders on map load and route `AsyncAcousticWorker` through `SteamAudioSimulator`
-  (batch all active sources per tick), converting visibility→occlusion + transmission→EQ into
-  `AcousticPathData`. Then pathing (4c) and reflections (4d).
+  release/reacquire returns a working source.
+
+  **Phase 4b — wired into the acoustic worker: DONE ✅** (`AudioLab --sim-worldscene`, `SimWorldSceneSpike.cs`).
+  `AsyncAcousticWorker` now lazily creates (on its own thread) an `IPLContext` + `SteamAudioScene` +
+  `SteamAudioSimulator`, rebuilds the scene from `SteamAudioScene.BoxesFromWorld(WorldSnapshot)` whenever
+  the `AcousticMap` reference changes (per-map-load cost), and on each tick **drains all queued requests**
+  (latest per entity), batches one `iplSimulatorRunDirect` for every active source, then reads per-source
+  occlusion/transmission. It still calls the hand-rolled `SpatialAcoustics.CalculateAcousticPaths` for
+  reflections/portals/air-absorption/room-gain, but **overrides the DIRECT path's occlusion + 3-band EQ +
+  transmission bleed** with the simulator result (`occ = 1 - visibility`; `eqBand = v + (1-v)·transBand`;
+  `bleed = transLow`). Sources are pooled per entity with a 5 s idle TTL (cleared + released so idle voices
+  cost no rays). Falls back to pure hand-rolled occlusion if libphonon is missing or `OPENFPS_STEAMAUDIO_SIM=0`.
+  No FMOD-mixer-thread involvement — all Phonon sim calls stay on `AcousticWorkerThread`; freed in
+  `Dispose` after the thread joins. The provider's HRTF positioning, distance, cone and reverb paths are
+  untouched. Verified 2026-06-28: `BoxesFromWorld` extracts the 5 wood-room solids and the simulator
+  reports blocked-behind-wall (0.00) / clear-through-door (1.00) end-to-end from a `WorldSnapshot`.
+  **Not yet validated by ear in the live client** (Linux client is the GTK port in progress); next pass
+  should A/B `OPENFPS_STEAMAUDIO_SIM=0` vs on in-game. **Next (Phase 4c):** pathing — feed
+  `iplSimulatorRunPathing` arrival direction into the HRTF (replaces the cross-region snap + apparent-
+  position hack). Then reflections (4d).
 
 **Phase 5 — retire hand-rolled code.** Remove/disable `SpatialAcoustics`, `AcousticPathfinder`, the
 reflection-emitter generation, and the 3D reverb-bus positioning, keeping only what the simulator

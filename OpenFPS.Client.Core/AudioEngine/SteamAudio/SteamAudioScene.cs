@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Numerics;
 using System.Runtime.InteropServices;
 using OpenFPS.Common;
+using OpenFPS.Common.Components;
 using PV = OpenFPS.Client.Core.AudioEngine.SteamAudio.Phonon.IPLVector3;
 
 namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
@@ -26,6 +27,28 @@ public sealed class SteamAudioScene : IDisposable
     public bool IsBuilt => _scene != IntPtr.Zero;
 
     public SteamAudioScene(IntPtr context) => _context = context;
+
+    /// <summary>
+    /// Extracts the solid box colliders from a <see cref="WorldSnapshot"/> as scene geometry — each solid
+    /// box entity becomes one <see cref="Box"/> at its live transform, with the acoustic material taken
+    /// from its <c>MaterialComponent</c>. Phase 4b uses boxes only (the simulator scene is built from
+    /// boxes); non-box solids are skipped. Pure/static so the acoustic worker and the headless spikes
+    /// share one definition of "what counts as audio geometry".
+    /// </summary>
+    public static List<Box> BoxesFromWorld(WorldSnapshot world)
+    {
+        var boxes = new List<Box>();
+        if (world == null) return boxes;
+        foreach (var snap in world.Entities.Values)
+        {
+            var def = snap.Definition;
+            if (def == null || !def.Collider.IsSolid || def.Collider.Shape != ColliderShape.Box) continue;
+            var size = def.Collider.Size;
+            if (size.X <= 0 || size.Y <= 0 || size.Z <= 0) continue;
+            boxes.Add(new Box(snap.Transform.Position, size, snap.Transform.Rotation, def.Material.Material));
+        }
+        return boxes;
+    }
 
     public void Build(IReadOnlyList<Box> boxes)
     {
