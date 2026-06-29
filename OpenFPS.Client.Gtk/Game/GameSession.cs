@@ -62,13 +62,18 @@ public sealed class GameSession
         _network = network;
         _speech = speech;
         _enableAudio = enableAudio;
+
+        // Initialize the material registry FIRST — before the audio system starts its acoustic worker
+        // thread (which reads/uses the registry). Initialize() is thread-safe, but doing it up front keeps
+        // ordering deterministic and avoids redundant concurrent rebuilds.
+        AcousticRegistry.Initialize();
+
         _physics = new ClientPhysicsSystem(_state, new SpatialService());
         _controller = new LocalPlayerController(_state);
         _audioEngine = new AudioEngineFacade();
         _sounds = new SoundMappingService(_audioEngine, _state);
         _audioSystem = new ClientAudioSystem(_audioEngine, _sounds, _state);
 
-        AcousticRegistry.Initialize();
         _sounds.Initialize();
         // NOTE: audio engine init (FMOD + voices + asset bank) is deferred to BeginAudioInit() on a
         // background thread. It must NOT run here: GameSession is constructed on the network/game-loop
