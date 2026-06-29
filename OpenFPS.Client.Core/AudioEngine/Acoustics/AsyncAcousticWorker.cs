@@ -129,25 +129,36 @@ public class AsyncAcousticWorker : IDisposable
             lock (_worldLock) { world = _latestWorld; }
             if (world == null) { _pending.Clear(); continue; }
 
-            // 1. Batched Steam Audio occlusion/transmission/pathing for every pending source (optional).
-            Dictionary<int, SaResult>? sim = RunSteamAudio(world);
-
-            // 2. Per-entity hand-rolled paths (reflections / air absorption / room gain), with the DIRECT
-            //    path's occlusion+EQ — and, when a source is occluded, its apparent position — overridden
-            //    by the simulator when available.
-            foreach (var kv in _pending)
+            if (_saEnabled && _saSim != null)
             {
-                var req = kv.Value;
-                try
+                // Steam Audio is the ACTIVE spatializer: build the acoustic result purely from the
+                // simulator (occlusion/transmission + pathing arrival direction). The hand-rolled
+                // ray-tracer is NOT run on this path.
+                Dictionary<int, SaResult>? sim = RunSteamAudio(world);
+                foreach (var kv in _pending)
                 {
-                    var paths = _acoustics.CalculateAcousticPaths(world, req.EntityId, req.ListenerPos, req.SourcePos, req.IsImportant);
-                    if (sim != null && sim.TryGetValue(req.EntityId, out var sr))
-                        ApplyDirectOverride(paths, sr);
-                    _results[req.EntityId] = paths;
+                    var req = kv.Value;
+                    SaResult sr = (sim != null && sim.TryGetValue(req.EntityId, out var r))
+                        ? r
+                        : new SaResult(SteamAudioSimulator.DirectResult.Clear, default, false);
+                    _results[req.EntityId] = BuildSimPath(world, req, sr);
                 }
-                catch (Exception ex)
+            }
+            else
+            {
+                // Legacy hand-rolled spatializer — only the fallback when Steam Audio sim is unavailable
+                // or disabled (OPENFPS_STEAMAUDIO_SIM=0 / no libphonon).
+                foreach (var kv in _pending)
                 {
-                    Console.WriteLine($"[AcousticWorker] Error processing acoustic path for {req.EntityId}: {ex.Message}");
+                    var req = kv.Value;
+                    try
+                    {
+                        _results[req.EntityId] = _acoustics.CalculateAcousticPaths(world, req.EntityId, req.ListenerPos, req.SourcePos, req.IsImportant);
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"[AcousticWorker] Error processing acoustic path for {req.EntityId}: {ex.Message}");
+                    }
                 }
             }
 
@@ -225,28 +236,41 @@ public class AsyncAcousticWorker : IDisposable
         }
     }
 
-    /// <summary>Maps a Steam Audio result onto the direct (non-reflection) entries of a path list. SA
-    /// <c>occlusion</c> is a VISIBILITY gain (1=clear); the engine wants "fraction blocked", and per-band
-    /// clarity blends straight-line visibility with what transmits through the occluder. When pathing found
-    /// a route around an occluder, the apparent position is redirected to the opening so the HRTF localizes
-    /// the sound to the doorway it actually arrives through.</summary>
-    private static void ApplyDirectOverride(List<AcousticPathData> paths, SaResult sr)
+    /// <summary>Builds the complete acoustic result for one source purely from the Steam Audio simulator —
+    /// occlusion/transmission EQ (SA <c>occlusion</c> is a VISIBILITY gain; the engine wants "fraction
+    /// blocked" + per-band clarity), and the apparent position redirected to the opening when pathing found a
+    /// route around an occluder. Region is looked up from the map (for reverb routing) when one is loaded.
+    /// No hand-rolled ray-tracing or reflection entries — those are retired on the SA path.</summary>
+    private List<AcousticPathData> BuildSimPath(WorldSnapshot world, AcousticRequest req, SaResult sr)
     {
         var ap = SteamAudioSimulator.ToAcousticParams(sr.Direct);
         float occ = Math.Clamp(ap.Occlusion, 0f, AcousticConstants.OcclusionCap);
+        Vector3 apparent = sr.HasApparent ? sr.ApparentPosition : req.SourcePos;
+        float dist = Vector3.Distance(req.ListenerPos, req.SourcePos);
 
-        for (int i = 0; i < paths.Count; i++)
+        int region = -1;
+        if (world.AcousticMap != null)
         {
-            if (paths[i].IsReflection) continue;
-            var p = paths[i];
-            p.Occlusion = occ;
-            p.EqLow = ap.EqLow;
-            p.EqMid = ap.EqMid;
-            p.EqHigh = ap.EqHigh;
-            p.TransmissionBleed = ap.Bleed;
-            if (sr.HasApparent) p.ApparentPosition = sr.ApparentPosition;
-            paths[i] = p;
+            try { region = _acoustics.GetRegionAt(world, req.SourcePos); }
+            catch { region = -1; }
         }
+
+        var path = new AcousticPathData
+        {
+            Occlusion = occ,
+            EqLow = ap.EqLow,
+            EqMid = ap.EqMid,
+            EqHigh = ap.EqHigh,
+            TransmissionBleed = ap.Bleed,
+            ApparentPosition = apparent,
+            EffectiveDistance = dist,
+            ApertureFactor = 1f,   // sim owns occlusion EQ; bypass the diffraction LPF
+            RoomGain = 1f,
+            AirAbsorption = 0f,    // distance/humidity air-absorption is a later phenomena pass
+            RegionId = region,
+            IsReflection = false,
+        };
+        return new List<AcousticPathData> { path };
     }
 
     private void EnsureSteamAudio()
@@ -256,6 +280,11 @@ public class AsyncAcousticWorker : IDisposable
         if (_saDisabled) { Console.WriteLine("[AcousticWorker] Steam Audio sim disabled (OPENFPS_STEAMAUDIO_SIM=0); using hand-rolled occlusion."); return; }
         try
         {
+            // Idempotent: ensure acoustic materials exist before the scene build queries them. Without this
+            // an uninitialized registry makes every scene-material lookup throw, and the sim silently falls
+            // back to no-occlusion. The clients already call this, but the SA path shouldn't depend on it.
+            AcousticRegistry.Initialize();
+
             var cs = new Phonon.IPLContextSettings { version = Phonon.STEAMAUDIO_VERSION, simdLevel = Phonon.IPL_SIMDLEVEL_AVX2, flags = 0 };
             if (Phonon.iplContextCreate(ref cs, out _saContext) != Phonon.IPL_STATUS_SUCCESS)
             { _saContext = IntPtr.Zero; Console.WriteLine("[AcousticWorker] Steam Audio context create failed; using hand-rolled occlusion."); return; }

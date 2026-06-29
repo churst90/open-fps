@@ -181,6 +181,20 @@ is "fraction blocked" (provider does `dryVol = 1 - occlusion`), so convert: `pat
 fallback. The whole of Phase 4 is headless-verified but NOT yet ear-validated — that gate comes when the
 Linux/GTK client runs. Phase 5 (below) should follow ear-validation, not precede it.**
 
+**Active-path switch (2026-06-29):** when SA sim is enabled the worker now builds the acoustic result PURELY
+from the simulator (`AsyncAcousticWorker.BuildSimPath`) and no longer calls the hand-rolled
+`SpatialAcoustics.CalculateAcousticPaths` at all — the old ray-tracer runs ONLY as the `OPENFPS_STEAMAUDIO_SIM=0`
+/ no-libphonon fallback. The worker also defensively calls `AcousticRegistry.Initialize()` (idempotent) so a
+forgotten registry init can't make scene-material lookups throw and silently drop the sim to no-occlusion
+(this bit the first ear-test harness run).
+
+**Ear test:** `AudioLab --ear-test` drives the real `FmodAudioProvider` + `AsyncAcousticWorker` with the new
+police siren looping inside the wood-room. Interactive (WASD move / J,L turn / Q quit) on a terminal, or a
+scripted flythrough when stdin is redirected. Headless run confirmed occlusion 0.00 in the doorway → 0.95
+behind the east wall → 0.00 back at the door, end-to-end through the real provider. HEADPHONES; set
+`OPENFPS_STEAMAUDIO_SIM=0` to A/B the old spatializer. The full game ear-test path is the GTK client
+(`OpenFPS.Client.Gtk`, which inits the registry in `GameSession`).
+
 **Phase 5 — retire hand-rolled code (AFTER ear-validation).** Once 4a–4d are confirmed good by ear in the
 live client, remove/disable `SpatialAcoustics`, `AcousticPathfinder`, the reflection-emitter generation, and
 the 3D reverb-bus positioning, keeping only what the simulator doesn't yet provide (air absorption, distance
