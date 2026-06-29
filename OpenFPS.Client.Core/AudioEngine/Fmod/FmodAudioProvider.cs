@@ -946,8 +946,9 @@ public class FmodAudioProvider : IAudioProvider
             {
                 Vector3 fwd = Vector3.Transform(Vector3.UnitZ, _listenerRot);
                 float yawDeg = MathF.Atan2(fwd.X, fwd.Z) * 180f / MathF.PI;
-                Log.Information("[ADBG] e{Id} {Sound} dist={D:F1} dir=({X:F2},{Y:F2},{Z:F2}) listenerYaw={Yaw:F0} L/R={L:F3}/{R:F3}",
-                    active.EntityId, active.SoundId, len,
+                Log.Information("[ADBG] e{Id} {Sound} dist={D:F1} occ={Occ:F2} eqLMH=({EL:F2},{EM:F2},{EH:F2}) dir=({X:F2},{Y:F2},{Z:F2}) listenerYaw={Yaw:F0} L/R={L:F3}/{R:F3}",
+                    active.EntityId, active.SoundId, len, active.CurrentOcclusion,
+                    active.CurrentLow, active.CurrentMid, active.CurrentHigh,
                     active.SaState.DirX, active.SaState.DirY, active.SaState.DirZ, yawDeg, active.SaState.LastRmsL, active.SaState.LastRmsR);
             }
             return;
