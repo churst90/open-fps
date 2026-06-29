@@ -70,6 +70,13 @@ if (args.Contains("--sim-pathing"))
     Environment.Exit(code);
 }
 
+if (args.Contains("--sim-scene"))
+{
+    int code = SimSceneSpike.Run();
+    Log.CloseAndFlush();
+    Environment.Exit(code);
+}
+
 if (args.Contains("--steam-stereo"))
 {
     int code = SteamAudioLiveTest.RunStereoCheck();
