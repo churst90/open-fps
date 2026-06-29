@@ -48,6 +48,11 @@ public sealed class SteamAudioScene : IDisposable
         {
             var def = snap.Definition;
             if (def == null || !def.Collider.IsSolid || def.Collider.Shape != ColliderShape.Box) continue;
+            // A sound SOURCE must not be part of the occluding geometry, or its own collider sits at its
+            // emission point and occludes itself (a solid beacon goes permanently silent). Beacons/NPCs/
+            // machines that emit sound are excluded from the acoustic mesh; they are small relative to
+            // walls, so losing their occlusion of OTHER sources is negligible.
+            if (!string.IsNullOrEmpty(def.SoundEmitter.SoundId)) continue;
             var size = def.Collider.Size;
             if (size.X <= 0 || size.Y <= 0 || size.Z <= 0) continue;
             boxes.Add(new Box(snap.Transform.Position, size, snap.Transform.Rotation, def.Material.Material));

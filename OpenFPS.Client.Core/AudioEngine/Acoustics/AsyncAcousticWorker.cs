@@ -38,6 +38,8 @@ public class AsyncAcousticWorker : IDisposable
     // portal apparent-position, air absorption and room gain; we only override occlusion/EQ/bleed.
     // Set OPENFPS_STEAMAUDIO_SIM=0 to force the legacy hand-rolled occlusion.
     private static readonly bool _saDisabled = Environment.GetEnvironmentVariable("OPENFPS_STEAMAUDIO_SIM") == "0";
+    private static readonly bool _saDebug = Environment.GetEnvironmentVariable("OPENFPS_AUDIO_DEBUG") == "1";
+    private int _lastSceneBoxes;
     private const int SaMaxSources = 64;
     private const long SaSourceTtlMs = 5000; // release a source whose voice hasn't been requested in 5s
 
@@ -208,6 +210,12 @@ public class AsyncAcousticWorker : IDisposable
                 if (!_saSources.TryGetValue(kv.Key, out var src) || src == IntPtr.Zero) continue;
                 var direct = _saSim.GetResult(src);
 
+                if (_saDebug && kv.Key >= 0)
+                {
+                    var sp = kv.Value.SourcePos; var lp = kv.Value.ListenerPos;
+                    Console.WriteLine($"[SAWORKER] e{kv.Key} vis={direct.Visibility:F2} src=({sp.X:F1},{sp.Y:F1},{sp.Z:F1}) reqLis=({lp.X:F1},{lp.Y:F1},{lp.Z:F1}) runLis=({listener.X:F1},{listener.Y:F1},{listener.Z:F1}) sceneBoxes={_lastSceneBoxes}");
+                }
+
                 Vector3 apparent = default;
                 bool hasApparent = false;
                 if (direct.Visibility < PathRedirectVisibility)
@@ -317,6 +325,10 @@ public class AsyncAcousticWorker : IDisposable
         if (_saScene.IsBuilt && ReferenceEquals(world.AcousticMap, _saSceneMap)) return;
 
         var boxes = SteamAudioScene.BoxesFromWorld(world);
+        _lastSceneBoxes = boxes.Count;
+        if (_saDebug)
+            foreach (var b in boxes)
+                Console.WriteLine($"[SABOX] center=({b.Center.X:F1},{b.Center.Y:F1},{b.Center.Z:F1}) size=({b.Size.X:F1},{b.Size.Y:F1},{b.Size.Z:F1}) mat={b.Material}");
         _saScene.Build(boxes);
         _saSceneMap = world.AcousticMap;
         if (_saScene.IsBuilt)

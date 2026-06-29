@@ -112,6 +112,13 @@ if (args.Contains("--sim-reflect"))
     Environment.Exit(code);
 }
 
+if (args.Contains("--sim-roomdbg"))
+{
+    int code = SimRoomDbgSpike.Run();
+    Log.CloseAndFlush();
+    Environment.Exit(code);
+}
+
 if (args.Contains("--ear-test"))
 {
     int code = EarTest.Run();

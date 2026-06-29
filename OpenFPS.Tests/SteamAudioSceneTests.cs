@@ -10,13 +10,14 @@ namespace OpenFPS.Tests;
 public class SteamAudioSceneTests
 {
     private static void Add(WorldSnapshot w, int id, Vector3 pos, Vector3 size, bool solid,
-        ColliderShape shape = ColliderShape.Box, string material = "Concrete")
+        ColliderShape shape = ColliderShape.Box, string material = "Concrete", string soundId = "")
     {
         var def = new EntityDefinition
         {
             EntityId = id,
             Collider = new ColliderComponent { Shape = shape, Size = size, IsSolid = solid },
             Material = new MaterialComponent { Material = material },
+            SoundEmitter = new SoundEmitterComponent { SoundId = soundId },
         };
         w.Entities[id] = new EntitySnapshot
         {
@@ -59,5 +60,20 @@ public class SteamAudioSceneTests
     public void BoxesFromWorld_EmptyWorld_ReturnsEmpty()
     {
         Assert.Empty(SteamAudioScene.BoxesFromWorld(new WorldSnapshot()));
+    }
+
+    [Fact]
+    public void BoxesFromWorld_ExcludesSoundEmitters_SoNoSelfOcclusion()
+    {
+        // A solid beacon that also emits sound must NOT become occluding geometry — otherwise its own
+        // collider sits at its emission point and occludes itself (the megaphone-goes-silent bug).
+        var w = new WorldSnapshot();
+        Add(w, 1, new Vector3(0, 2, 0), new Vector3(4, 4, 4), solid: true);                         // a wall -> included
+        Add(w, 2, new Vector3(7, 1.5f, 15), new Vector3(0.5f, 0.5f, 1f), solid: true, soundId: "BEACONS/megaphone"); // emitter -> excluded
+
+        var boxes = SteamAudioScene.BoxesFromWorld(w);
+
+        Assert.Single(boxes);
+        Assert.Equal(new Vector3(0, 2, 0), boxes[0].Center); // only the wall, not the beacon
     }
 }
