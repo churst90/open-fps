@@ -1029,8 +1029,19 @@ public class FmodAudioProvider : IAudioProvider
         }
 
         active.Channel.setVolume(active.BaseVolume * finalVolFactor * roomGainBonus * distAtten * coneAtten);
-        
-        if (active.ThreeEqDsp.hasHandle()) 
+
+        // Doppler: Steam Audio voices play on a 2D channel, so FMOD's own Doppler is bypassed — apply it
+        // manually to the channel pitch from the real (not apparent) source/listener motion. Native-3D
+        // fallback voices already get FMOD Doppler, so skip them here.
+        if (active.SaState != null)
+        {
+            float doppler = OpenFPS.Client.AudioEngine.Core.AudioPhysics.DopplerFactor(
+                lPosVec, _listenerVel, active.Position, active.Velocity);
+            float basePitch = (active.GranularState != null || active.SynthState != null) ? 1.0f : active.Pitch;
+            active.Channel.setPitch(basePitch * doppler);
+        }
+
+        if (active.ThreeEqDsp.hasHandle())
         {
             Vector3 toSound = Vector3.Normalize(active.CurrentApparentPosition - lPosVec);
             Vector3 forward = Vector3.Transform(Vector3.UnitZ, _listenerRot);

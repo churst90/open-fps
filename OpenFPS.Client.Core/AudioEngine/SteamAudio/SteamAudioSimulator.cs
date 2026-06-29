@@ -43,6 +43,25 @@ public sealed class SteamAudioSimulator : IDisposable
         public static readonly PathResult None = new(false, Vector3.Zero, 0f);
     }
 
+    /// <summary>The direct result mapped to the engine's per-band acoustic parameters: <see cref="Occlusion"/>
+    /// is "fraction blocked" (0=clear) and EqLow/Mid/High are per-band clarity (1=clear). Pure mapping,
+    /// unit-tested. The caller still clamps occlusion to its own cap.</summary>
+    public readonly record struct AcousticParams(float Occlusion, float EqLow, float EqMid, float EqHigh, float Bleed);
+
+    /// <summary>Maps a <see cref="DirectResult"/> (SA visibility gain + per-band transmission) to engine
+    /// acoustic parameters: occlusion = 1−visibility; per-band clarity blends straight-line visibility with
+    /// what transmits through the occluder (eq = v + (1−v)·trans); bleed = low-band transmission.</summary>
+    public static AcousticParams ToAcousticParams(DirectResult dr)
+    {
+        float v = Math.Clamp(dr.Visibility, 0f, 1f);
+        return new AcousticParams(
+            1f - v,
+            Math.Clamp(v + (1f - v) * dr.TransLow, 0f, 1f),
+            Math.Clamp(v + (1f - v) * dr.TransMid, 0f, 1f),
+            Math.Clamp(v + (1f - v) * dr.TransHigh, 0f, 1f),
+            Math.Clamp(dr.TransLow, 0f, 1f));
+    }
+
     private delegate void ProgressCallback(float progress, IntPtr userData);
     // Kept alive so native code can't call a collected delegate during a (synchronous) bake.
     private static readonly ProgressCallback _bakeProgress = (p, u) => { };

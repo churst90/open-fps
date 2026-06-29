@@ -105,6 +105,19 @@ if (args.Contains("--sim-pathframe"))
     Environment.Exit(code);
 }
 
+if (args.Contains("--make-siren"))
+{
+    // Emit a realistic police-siren wail WAV. Optional path after the flag; defaults to the client asset.
+    int idx = Array.IndexOf(args, "--make-siren");
+    string outPath = (idx >= 0 && idx + 1 < args.Length && !args[idx + 1].StartsWith("--"))
+        ? args[idx + 1]
+        : System.IO.Path.Combine("OpenFPS.Client", "ASSETS", "SOUNDS", "BEACONS", "siren.wav");
+    OpenFPS.Client.Core.AudioEngine.Tools.PoliceSirenGenerator.WriteWav(outPath);
+    Console.WriteLine($"Wrote police-siren wail to {outPath} ({new System.IO.FileInfo(outPath).Length} bytes).");
+    Log.CloseAndFlush();
+    return;
+}
+
 if (args.Contains("--steam-stereo"))
 {
     int code = SteamAudioLiveTest.RunStereoCheck();

@@ -210,23 +210,18 @@ public class AsyncAcousticWorker : IDisposable
     /// the sound to the doorway it actually arrives through.</summary>
     private static void ApplyDirectOverride(List<AcousticPathData> paths, SaResult sr)
     {
-        var dr = sr.Direct;
-        float v = Math.Clamp(dr.Visibility, 0f, 1f);
-        float occ = Math.Clamp(1f - v, 0f, AcousticConstants.OcclusionCap);
-        float eqL = Math.Clamp(v + (1f - v) * dr.TransLow, 0f, 1f);
-        float eqM = Math.Clamp(v + (1f - v) * dr.TransMid, 0f, 1f);
-        float eqH = Math.Clamp(v + (1f - v) * dr.TransHigh, 0f, 1f);
-        float bleed = Math.Clamp(dr.TransLow, 0f, 1f); // low band carries most through-wall energy
+        var ap = SteamAudioSimulator.ToAcousticParams(sr.Direct);
+        float occ = Math.Clamp(ap.Occlusion, 0f, AcousticConstants.OcclusionCap);
 
         for (int i = 0; i < paths.Count; i++)
         {
             if (paths[i].IsReflection) continue;
             var p = paths[i];
             p.Occlusion = occ;
-            p.EqLow = eqL;
-            p.EqMid = eqM;
-            p.EqHigh = eqH;
-            p.TransmissionBleed = bleed;
+            p.EqLow = ap.EqLow;
+            p.EqMid = ap.EqMid;
+            p.EqHigh = ap.EqHigh;
+            p.TransmissionBleed = ap.Bleed;
             if (sr.HasApparent) p.ApparentPosition = sr.ApparentPosition;
             paths[i] = p;
         }

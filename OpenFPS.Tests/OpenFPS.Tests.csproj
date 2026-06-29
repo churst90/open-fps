@@ -16,6 +16,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\OpenFPS.Common\OpenFPS.Common.csproj" />
+    <ProjectReference Include="..\OpenFPS.Client.Core\OpenFPS.Client.Core.csproj" />
   </ItemGroup>
 
   <ItemGroup>
