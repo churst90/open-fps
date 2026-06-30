@@ -811,8 +811,22 @@ public class FmodAudioProvider : IAudioProvider
                 }
             }
 
-            _activeSounds.Add(activeSound); 
+            _activeSounds.Add(activeSound);
         }
+
+        // Short fade-in on one-shot event voices (footsteps, impacts). These recycle pooled HRTF voices
+        // rapidly; an abrupt onset (or a hard cut when the pool reuses a still-playing voice) clicks. A
+        // ~6 ms ramp from silence removes the onset pop. Fade points multiply with setVolume, so the
+        // per-frame distance/cone volume still applies on top.
+        if (emitter.IsEvent && channel.hasHandle())
+        {
+            channel.getDSPClock(out ulong startClock, out _);
+            _system.getSoftwareFormat(out int sr, out _, out _);
+            ulong ramp = (ulong)(sr * 0.006f);
+            channel.addFadePoint(startClock, 0.0f);
+            channel.addFadePoint(startClock + ramp, 1.0f);
+        }
+
         channel.setPaused(false);
     }
 
@@ -1085,14 +1099,19 @@ public class FmodAudioProvider : IAudioProvider
 
         float roomGainBonus = MathHelper.Lerp(1.0f, active.RoomGain, 0.5f);
 
-        // Distance attenuation: when Steam Audio drives panning (set3DLevel 0), FMOD does NOT apply
-        // its 3D rolloff, so we apply linear distance falloff ourselves (verified by RunDistanceCheck).
+        // Distance attenuation: when Steam Audio drives panning (set3DLevel 0), FMOD does NOT apply its
+        // 3D rolloff, so we apply it ourselves. Use a NATURAL inverse-distance rolloff (≈1/dist) rather
+        // than a gentle linear ramp, so a source is loud/present right up close and falls off quickly as
+        // you move away — then a smooth fade over the last stretch brings it fully to zero at Range.
         float distAtten = 1.0f;
         if (active.SaState != null)
         {
             float dist = Vector3.Distance(lPosVec, active.CurrentApparentPosition);
-            float span = MathF.Max(0.01f, active.Range - active.MinDistance);
-            distAtten = Math.Clamp(1.0f - (dist - active.MinDistance) / span, 0.0f, 1.0f);
+            float min = MathF.Max(0.1f, active.MinDistance);
+            float span = MathF.Max(0.01f, active.Range - min);
+            float inv = Math.Clamp(min / MathF.Max(dist, min), 0.0f, 1.0f);          // 1/dist beyond MinDistance
+            float edgeFade = Math.Clamp((active.Range - dist) / (0.25f * span), 0.0f, 1.0f); // last 25% → 0 at Range
+            distAtten = inv * edgeFade;
         }
 
         // Directional cone: Steam Audio channels are 2D, so FMOD's set3DConeSettings no longer fires.
