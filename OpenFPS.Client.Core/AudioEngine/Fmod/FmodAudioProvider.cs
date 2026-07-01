@@ -1178,8 +1178,8 @@ public class FmodAudioProvider : IAudioProvider
         // rolls off with distance (distAtten / FMOD rolloff), so a fixed wet send naturally reads as a
         // wetter ratio when far — without piling on absolute reverb everywhere.
         float baseReverbMix = active.IsReflection
-            ? 0.15f * Math.Max(0.5f, active.RoomGain) // reflections excite the bus by remaining energy
-            : 0.15f;
+            ? 0.08f * Math.Max(0.5f, active.RoomGain) // reflections excite the bus by remaining energy
+            : 0.08f;
 
         // The source's OWN room gets the primary send. The listener's room gets only a small cross-send,
         // so a sound in an adjacent room doesn't smear reverb from many directions at once.
@@ -1266,8 +1266,11 @@ public class FmodAudioProvider : IAudioProvider
             {
                 string name = _acousticMap.Regions.TryGetValue(regionId, out var rg) ? rg.FriendlyName : "?";
                 float rdist = (regionId == _acousticMap.GlobalEnvironmentId) ? 0 : Vector3.Distance(lPosVec, _acousticMap.RegionPositions.GetValueOrDefault(regionId, Vector3.Zero));
-                Log.Information("[REVERB] listenerRegion={LR} bus={Rid}({Name}) {Pos} dist={D:F1} target={T:F2} vol={V:F2}",
-                    listenerRegionId, regionId, name, regionId == listenerRegionId ? "INSIDE" : "outside", rdist, targetVol, _reverbVolumes[regionId]);
+                string binaural = "n/a";
+                if (_reverbSaVoices.TryGetValue(regionId, out var rv) && rv.Dsp.hasHandle())
+                { rv.Dsp.getBypass(out bool byp); binaural = byp ? "OMNI(inside)" : "DOORWAY"; }
+                Log.Information("[REVERB] listenerRegion={LR} bus={Rid}({Name}) {Pos} dist={D:F1} target={T:F2} vol={V:F2} reverbMode={B}",
+                    listenerRegionId, regionId, name, regionId == listenerRegionId ? "INSIDE" : "outside", rdist, targetVol, _reverbVolumes[regionId], binaural);
             }
         }
     }
