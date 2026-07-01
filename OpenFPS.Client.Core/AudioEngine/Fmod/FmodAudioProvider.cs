@@ -710,10 +710,20 @@ public class FmodAudioProvider : IAudioProvider
         }
         else
         {
-            if (!_isInitialized || !_resources.TryGetSound(emitter.SoundId, out FMOD.Sound sound, loopNative)) return;
+            if (!_isInitialized) return;
+            if (!_resources.TryGetSound(emitter.SoundId, out FMOD.Sound sound, loopNative))
+            {
+                if (_audioDebug && emitter.Mode == PlaybackMode.LoopOne)
+                    Log.Information("[BEACON] e{Id} '{Sound}' NOT PLAYING — sound not ready/found", emitter.EntityId, emitter.SoundId);
+                return;
+            }
             if (_system.playSound(sound, targetGroup, true, out channel) != RESULT.OK) return;
             channel.setMode(MODE._3D | MODE._3D_LINEARROLLOFF);
         }
+
+        if (_audioDebug && emitter.Mode == PlaybackMode.LoopOne)
+            Log.Information("[BEACON] e{Id} '{Sound}' PLAYING pos=({X:F0},{Y:F0},{Z:F0}) range={R:F0}",
+                emitter.EntityId, emitter.SoundId, emitter.Position.X, emitter.Position.Y, emitter.Position.Z, emitter.Range);
 
         FMOD.DSP threeEqDsp = default, diffractionDsp = default;
         SteamAudioVoiceState? saState = null;
