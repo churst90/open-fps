@@ -16,7 +16,7 @@
   "Volume": 1.0,
   "Range": 25,
   "Mode": "LoopOne",
-  "ConeInsideAngle": 45,
-  "ConeOutsideAngle": 90,
-  "ConeOutsideVolume": 0.1
+  "ConeInsideAngle": 40,
+  "ConeOutsideAngle": 110,
+  "ConeOutsideVolume": 0.05
 }

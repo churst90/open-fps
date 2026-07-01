@@ -52,6 +52,34 @@
     { "EntityId": 320, "PrefabId": "space_megaphone", "Position": { "X": 7, "Y": 1.5, "Z": 15 }, "Rotation": { "X": 0, "Y": 1, "Z": 0, "W": 0 } },
 
     // --- OPEN-AIR REFERENCE SIREN (far west, line-of-sight from spawn for panning reference) ---
-    { "EntityId": 400, "PrefabId": "chirp_beacon", "Position": { "X": -20, "Y": 1.5, "Z": 2 } }
+    { "EntityId": 400, "PrefabId": "chirp_beacon", "Position": { "X": -20, "Y": 1.5, "Z": 2 } },
+
+    // ============================================================
+    //  MATERIAL LAB — one open room, two acoustic halves (interior z[30,40]).
+    //  WEST half (x[-10,0]) = CARPET / FOAM: sound-deadening, little/no reverb.
+    //  EAST half (x[0,10])  = GYM: concrete walls + wood floor, live & reverberant.
+    //  The megaphone sits on the DEAD (west) side, beaming EAST into the live half — so from
+    //  the gym you hear it come from the quiet side and reverberate around you; on the carpet
+    //  side everything is deadened. The two halves are OPEN to each other at x=0.
+    //  Reach it: walk far north (+Z) to z~30, then veer east to the doorway at x[3,7].
+    // ============================================================
+    // -- West (carpet/foam) shell --
+    { "EntityId": 500, "PrefabId": "carpet_wall",  "Position": { "X": -10, "Y": 2, "Z": 35 }, "Scale": { "X": 0.25, "Y": 1.333, "Z": 20 } }, // west
+    { "EntityId": 501, "PrefabId": "carpet_wall",  "Position": { "X": -5,  "Y": 2, "Z": 40 }, "Scale": { "X": 5,    "Y": 1.333, "Z": 1 } },  // north-west
+    { "EntityId": 502, "PrefabId": "carpet_wall",  "Position": { "X": -5,  "Y": 2, "Z": 30 }, "Scale": { "X": 5,    "Y": 1.333, "Z": 1 } },  // south-west
+    { "EntityId": 503, "PrefabId": "carpet_floor", "Position": { "X": -5,  "Y": 0.05, "Z": 35 } },
+    // -- East (gym) shell --
+    { "EntityId": 510, "PrefabId": "concrete_wall", "Position": { "X": 10,  "Y": 2, "Z": 35 }, "Scale": { "X": 0.25, "Y": 1.333, "Z": 20 } }, // east
+    { "EntityId": 511, "PrefabId": "concrete_wall", "Position": { "X": 5,   "Y": 2, "Z": 40 }, "Scale": { "X": 5,    "Y": 1.333, "Z": 1 } },  // north-east
+    { "EntityId": 512, "PrefabId": "concrete_wall", "Position": { "X": 1.5, "Y": 2, "Z": 30 }, "Scale": { "X": 1.5,  "Y": 1.333, "Z": 1 } },  // south-east-left  (x0..3)
+    { "EntityId": 513, "PrefabId": "concrete_wall", "Position": { "X": 8.5, "Y": 2, "Z": 30 }, "Scale": { "X": 1.5,  "Y": 1.333, "Z": 1 } },  // south-east-right (x7..10) -> door x3..7
+    { "EntityId": 514, "PrefabId": "wood_floor",    "Position": { "X": 5,   "Y": 0.05, "Z": 35 } },
+    // -- Acoustic regions + portals --
+    { "EntityId": 530, "PrefabId": "acoustic_region", "Position": { "X": 5,  "Y": 2, "Z": 35 }, "IsIndoor": true, "Materials": [21, 18, 18, 18, 18, 18] }, // GYM (live)
+    { "EntityId": 540, "PrefabId": "acoustic_region", "Position": { "X": -5, "Y": 2, "Z": 35 }, "IsIndoor": true, "Materials": [6, 6, 6, 6, 6, 6] },         // CARPET (dead)
+    { "EntityId": 531, "PrefabId": "portal", "Position": { "X": 0, "Y": 2, "Z": 35 }, "RegionAId": 530, "RegionBId": 540, "ApertureSize": 8.0 }, // open between halves
+    { "EntityId": 532, "PrefabId": "portal", "Position": { "X": 5, "Y": 1, "Z": 30 }, "RegionAId": -1,  "RegionBId": 530, "ApertureSize": 4.0 }, // entry doorway (gym side)
+    // -- Megaphone on the DEAD side, beaming EAST (+X) into the live half --
+    { "EntityId": 520, "PrefabId": "space_megaphone", "Position": { "X": -5, "Y": 1.5, "Z": 35 }, "Rotation": { "X": 0, "Y": 0.7071, "Z": 0, "W": 0.7071 } }
   ]
 }

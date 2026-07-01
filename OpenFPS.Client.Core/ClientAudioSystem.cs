@@ -458,7 +458,9 @@ public class ClientAudioSystem
     public void PlayVoiceIndicator() => _audio.PlayUiBeep(880f, 80f);
 
     private int _footstepPoolIndex = 0;
-    private const int FOOTSTEP_POOL_SIZE = 4;
+    // Larger pool so rapid footsteps rarely reuse an ID while the previous step is still playing — reusing
+    // an active voice hard-cuts it (click). 12 IDs gives plenty of headroom at running cadence.
+    private const int FOOTSTEP_POOL_SIZE = 12;
     private const int FOOTSTEP_BASE_ID = -100;
 
     public void OnPlayerFootstep(Vector3 pos, string mat, string var)

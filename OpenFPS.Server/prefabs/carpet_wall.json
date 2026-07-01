@@ -1,0 +1,15 @@
+{
+  "Id": "carpet_wall",
+  "Name": "Foam-Lined Wall",
+  "Description": "Sound-deadening wall (thick foam / carpet lining).",
+  "Material": "Carpet",
+  "ColliderSize": {
+    "X": 2,
+    "Y": 3,
+    "Z": 0.5
+  },
+  "Type": "StaticObject",
+  "TransmissionLow": 0.1,
+  "TransmissionMid": 0.05,
+  "TransmissionHigh": 0.02
+}

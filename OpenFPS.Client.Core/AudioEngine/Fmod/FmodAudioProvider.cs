@@ -1119,6 +1119,7 @@ public class FmodAudioProvider : IAudioProvider
         // source->listener vector: full volume inside the inner cone, ConeOutsideVolume beyond the
         // outer cone, smooth between. (Native-3D fallback channels still use FMOD's own cone.)
         float coneAtten = 1.0f;
+        float coneOffAxis = 0.0f; // 0 = on-axis, 1 = fully outside the cone (drives the off-axis timbre)
         if (active.SaState != null && active.ConeInside < 360f && active.Direction != Vector3.Zero)
         {
             Vector3 toListener = lPosVec - active.CurrentApparentPosition;
@@ -1128,9 +1129,10 @@ public class FmodAudioProvider : IAudioProvider
                 float offAxisDeg = MathF.Acos(Math.Clamp(cos, -1f, 1f)) * (180f / MathF.PI);
                 float innerHalf = active.ConeInside * 0.5f;
                 float outerHalf = MathF.Max(active.ConeOutside * 0.5f, innerHalf + 0.01f);
-                coneAtten = offAxisDeg <= innerHalf ? 1.0f
-                    : offAxisDeg >= outerHalf ? active.ConeOutsideVolume
-                    : MathHelper.Lerp(1.0f, active.ConeOutsideVolume, (offAxisDeg - innerHalf) / (outerHalf - innerHalf));
+                coneOffAxis = offAxisDeg <= innerHalf ? 0.0f
+                    : offAxisDeg >= outerHalf ? 1.0f
+                    : (offAxisDeg - innerHalf) / (outerHalf - innerHalf);
+                coneAtten = MathHelper.Lerp(1.0f, active.ConeOutsideVolume, coneOffAxis);
             }
         }
 
@@ -1166,6 +1168,15 @@ public class FmodAudioProvider : IAudioProvider
 
             highDb -= (totalMuffle * 40.0f); midDb -= (totalMuffle * 20.0f);
             lowDb += (active.CurrentBleed * 10.0f);
+
+            // Directional-source timbre: off-axis, a projecting source (e.g. a megaphone) loses its highs
+            // first, then mids — so to the sides it sounds DULL, not just quieter. Combined with the cone
+            // volume attenuation above, this gives it a real "beamed" character (bright/present in front).
+            if (coneOffAxis > 0f)
+            {
+                highDb -= coneOffAxis * 36.0f;
+                midDb -= coneOffAxis * 14.0f;
+            }
 
             active.ThreeEqDsp.setParameterFloat(0, Math.Clamp(lowDb, -80.0f, 10.0f));
             active.ThreeEqDsp.setParameterFloat(1, Math.Clamp(midDb, -80.0f, 10.0f));
