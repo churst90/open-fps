@@ -27,8 +27,16 @@ public class NetworkService : INetEventListener
         Log.Information("NetworkService started on port {Port}", port);
     }
 
-    public void PollEvents() => _netManager.PollEvents();
-    public void Stop() => _netManager.Stop();
+    public void PollEvents() => _netManager?.PollEvents();
+
+    /// <summary>Closes the socket. Safe before Start and safe to call twice.</summary>
+    public void Stop()
+    {
+        if (_netManager == null || !_netManager.IsRunning) return;
+        _netManager.DisconnectAll();
+        _netManager.Stop();
+        Log.Information("NetworkService stopped.");
+    }
     public bool TryDequeueMessage(out (NetPeer peer, IMessage message) item) => _incomingMessages.TryDequeue(out item);
 
     public void SendMessage(NetPeer peer, IMessage message, DeliveryMethod deliveryMethod)
@@ -57,7 +65,7 @@ public class NetworkService : INetEventListener
         }
     }
 
-    public NetPeer? GetPeer(int id) => _netManager.GetPeerById(id);
+    public NetPeer? GetPeer(int id) => _netManager?.GetPeerById(id);
 
     public void OnPeerConnected(NetPeer peer) => OnConnected?.Invoke(peer);
     public void OnPeerDisconnected(NetPeer peer, DisconnectInfo info) => OnDisconnected?.Invoke(peer, info);

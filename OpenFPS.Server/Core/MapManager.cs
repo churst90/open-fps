@@ -230,6 +230,79 @@ public class MapManager
     public void RegisterEntity(string mapId, Entity e) => _maps[mapId].lookup[e.Id] = e;
     public void UnregisterEntity(string mapId, int entityId) => _maps[mapId].lookup.Remove(entityId);
 
+    /// <summary>
+    /// The one way anything enters a live map after load. <paramref name="create"/> builds the entity in
+    /// the map's world; this then does the three things that made it real and that every ad-hoc
+    /// <c>world.Create</c> forgot: register it in the id lookup, index it in the spatial grid, and mark it
+    /// dirty so the next broadcast carries its definition to every client in range. An entity created
+    /// without those is invisible to collision, to <c>/scan</c> and to every client — while the command
+    /// that made it reports success.
+    /// </summary>
+    public Entity SpawnEntity(string mapId, Func<World, Entity> create)
+    {
+        if (!_maps.TryGetValue(mapId, out var data))
+        {
+            Log.Warning("MapManager: SpawnEntity called for unknown map '{Id}'.", mapId);
+            return Entity.Null;
+        }
+
+        var entity = create(data.world);
+        IndexEntity(mapId, entity);
+        return entity;
+    }
+
+    /// <summary>
+    /// Registers and indexes an entity that already exists in the map's world (the player-spawn path
+    /// builds its entity component by component, so it cannot use <see cref="SpawnEntity"/>).
+    /// </summary>
+    public void IndexEntity(string mapId, Entity entity)
+    {
+        if (!_maps.TryGetValue(mapId, out var data)) return;
+        var world = data.world;
+        if (!world.IsAlive(entity)) return;
+
+        data.lookup[entity.Id] = entity;
+        if (!world.Has<Transform>(entity)) return;
+
+        ref var t = ref world.Get<Transform>(entity);
+        t.IsDirty = true;
+
+        // Dynamic entities are re-added to the grid every tick from scratch; only static geometry needs
+        // a durable entry, and only the static half survives the per-tick Clear().
+        bool isDynamic = world.Has<Velocity>(entity) || world.Has<PlayerComponent>(entity);
+        if (!isDynamic && world.Has<ColliderComponent>(entity))
+            data.grid.AddOverlapping(t.Position, world.Get<ColliderComponent>(entity).Size, entity, isStatic: true);
+    }
+
+    /// <summary>
+    /// Removes an entity from the map: out of the lookup, out of the world, and — for static geometry —
+    /// out of the spatial grid, which can only forget an entry by being rebuilt.
+    /// </summary>
+    public void DestroyEntity(string mapId, Entity entity)
+    {
+        if (!_maps.TryGetValue(mapId, out var data)) return;
+        if (!data.world.IsAlive(entity)) { data.lookup.Remove(entity.Id); return; }
+
+        bool wasStatic = !data.world.Has<Velocity>(entity) && !data.world.Has<PlayerComponent>(entity)
+                         && data.world.Has<ColliderComponent>(entity);
+
+        data.lookup.Remove(entity.Id);
+        data.world.Destroy(entity);
+
+        if (wasStatic) RefreshGrid(mapId);
+    }
+
+    /// <summary>Tears down every map world. Called once, on shutdown.</summary>
+    public void Shutdown()
+    {
+        foreach (var kv in _maps)
+        {
+            try { World.Destroy(kv.Value.world); }
+            catch (Exception ex) { Log.Warning(ex, "MapManager: error destroying world for map '{Id}'.", kv.Key); }
+        }
+        _maps.Clear();
+    }
+
     public void RefreshGrid(string mapId)
     {
         if (!_maps.TryGetValue(mapId, out var data)) return;
@@ -256,6 +329,18 @@ public class MapManager
     {
         if (_maps.TryGetValue(id, out var data)) { world = data.world; size = data.size; grid = data.grid; lookup = data.lookup; return true; }
         world = null!; size = default; grid = null!; lookup = null!; return false;
+    }
+
+    /// <summary>
+    /// The loaded map's authored data. The login path used to call <c>MapRepository.LoadAll()</c> for
+    /// this — re-reading and re-parsing every map file on disk, per login, to read one record that was
+    /// already in memory.
+    /// </summary>
+    public bool TryGetMapData(string id, out MapData data)
+    {
+        if (_maps.TryGetValue(id, out var entry)) { data = entry.data; return true; }
+        data = null!;
+        return false;
     }
 
     public string GetMapChecksum(string id) => _mapRepo.GetMapChecksum(id);

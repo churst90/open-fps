@@ -32,6 +32,7 @@ namespace OpenFPS.Common.Networking;
 [MemoryPackUnion(23, typeof(FriendListRequest))]
 [MemoryPackUnion(24, typeof(FriendListResponse))]
 [MemoryPackUnion(25, typeof(MapPublishRequest))]
+[MemoryPackUnion(26, typeof(EntityRemoved))]
 public partial interface IMessage { }
 
 public enum PlayerListScope
@@ -110,6 +111,19 @@ public partial class MapDataRequest : IMessage
 
 [MemoryPackable]
 public partial class MapLoadComplete : IMessage { public MapLoadComplete() { } }
+
+/// <summary>
+/// Tells a client that entities it was told about are gone — destroyed, or left its area of interest.
+/// Sent reliably: a client that misses this keeps a ghost forever, because every other message about an
+/// entity is additive. The client must purge the id from definitions, transforms, velocities, audio ids
+/// and any voice currently playing on it.
+/// </summary>
+[MemoryPackable]
+public partial class EntityRemoved : IMessage
+{
+    public List<int> EntityIds = new();
+    public EntityRemoved() { }
+}
 
 [MemoryPackable]
 public partial class PlayerSpawned : IMessage

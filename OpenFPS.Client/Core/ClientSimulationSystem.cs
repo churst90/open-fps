@@ -243,6 +243,11 @@ public class ClientSimulationSystem
                 }
                 break;
 
+            case EntityRemoved removed:
+                foreach (int goneId in _world.RemoveEntities(removed.EntityIds))
+                    _audioSystem?.ForgetEntity(goneId);
+                break;
+
             case MapLoadComplete:
                 _navigation?.UpdateLoadingStatus("Geometry ready. Finalizing acoustics...", 80);
                 Task.Run(() => {

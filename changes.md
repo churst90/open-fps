@@ -196,3 +196,78 @@ them logged; every one of them was invisible from inside a game played entirely 
   present in the required-native list as `Required` with an HRTF cost, that the expected names match the
   platform, and that `DescribeMissing` names every library and what it costs; and that a connect to a dead
   port produces a spoken, finished sentence rather than silence. 97/97 pass.
+### 14. The Server's Structural Holes, Closed (Engineering Audit — Step 4 of 7)
+
+The theme of these was state that only ever grew. The wire protocol could add an entity to a client and had
+no way to remove one. The loop banked unbounded elapsed time. Registration always answered "Success". Text
+commands mutated the ECS world from whichever thread happened to call them — and the guard preventing that
+race worked by throwing every MUD command away, silently. `/spawn` reported success for an object nothing
+could see, hear or walk into.
+
+- **The client never learned an entity was gone.** The message union had no despawn message, so
+  `ClientWorldState`'s four dictionaries were append-only and cleared only on map load. A disconnected
+  player left a corpse on every other client: still occupying space in the collision grid, still answering
+  proximity scans, still playing whatever emitter it carried. `EntityRemoved` (union tag 26, a list of ids)
+  is now sent **reliably** on destroy and on area-of-interest exit; `ClientWorldState.RemoveEntities` purges
+  definitions, transforms, velocities and audio ids and rebuilds the static grid, and both heads then call
+  `ClientAudioSystem.ForgetEntity`, which stops the entity's voice *and* the reflection voices derived from
+  its id (`-10000-id`, `-5000-id`, and the `-30000-(id*100)` band) and drops its cached acoustic result.
+- **`UserSession.KnownEntities` existed and was never used.** It now decides when a definition is sent: the
+  map stream records what it streamed, and the broadcast sends a definition the first time an entity enters
+  a client's earshot. That closes a second hole in the same place — remote players were only ever sent
+  *state*, never a definition, so they never appeared in the client's snapshot at all. Removal is tracked
+  separately in `VisibleDynamicEntities`: only dynamic entities are evicted on AoI exit, because the client
+  builds its acoustic map from the whole streamed map and dropping a distant wall would change how the
+  world sounds.
+- **A moved wall could be lost forever.** `ServerStateUpdate` went out `Unreliable` and `Transform.IsDirty`
+  was cleared for the whole map after one pass, so a dropped packet permanently lost that move for that
+  client. Dynamic entities stay unreliable (the next tick corrects them); a **static** entity that moved now
+  goes on the reliable channel, where delivery is itself the acknowledgement.
+- **No accumulator clamp.** A GC pause or a debugger break banked arbitrary elapsed time and the server then
+  ran hundreds of catch-up ticks back to back with no network poll between them. `RunLoop` clamps at
+  `PhysicsConstants.MaxCatchUpSeconds` — one shared 0.2 s that both client heads now reference too — and
+  logs how many ticks it dropped rather than fast-forwarding the world.
+- **No graceful shutdown.** `_isRunning` was never set false, there was no `Console.CancelKeyPress` handler
+  and `NetworkService.Stop()` was never called: Ctrl-C tore down sockets, ECS worlds and SQLite mid-tick.
+  Ctrl-C and SIGTERM now both cancel the signal and ask the loop to stop; teardown runs on the loop thread
+  after the last tick, in order — notify the players, stop the MUD gateway, disconnect and close the socket,
+  destroy the map worlds.
+- **Registration always reported success.** `HandleRegister` replied `Success = true` even when `AddUser`
+  rejected a duplicate, so the player was told the account existed and then could not log in with it.
+  `IUserRepository.AddUser` returns a bool, both implementations honour it, and the reply now says "That
+  username is already taken." Usernames also fold with `ToLowerInvariant` rather than the current culture,
+  which under a Turkish locale mapped the same name to two different keys.
+- **No rate limiting on the UDP path at all.** Login and registration each verify a bcrypt hash inline on
+  the tick thread, so unthrottled they are both a credential oracle and a way to occupy the simulation. A
+  token bucket (`RateLimiter`) keyed by **remote address** — not connection id, which is free to cycle —
+  allows six attempts in a burst and one every five seconds thereafter. Both transports share it, because
+  login itself is now one method instead of two.
+- **MUD commands were silently dropped, and the null guard was load-bearing.** Every gameplay handler began
+  with `_network.GetPeer(id)`, which returns null for MUD ids (10000+), so `scan`, `move`, `spawn` and chat
+  did nothing for telnet clients — and that guard was also the only thing preventing `MudGateway`'s TCP task
+  thread from mutating the Arch world underneath the simulation. Both are fixed together: `CommandHandler`
+  no longer knows what a `NetPeer` is (it answers through a reply callback) and enqueues every command body
+  onto `_commandBuffer`, so all of them run on the tick thread whatever the transport. `GameServer.SendToSession`
+  routes by whichever transport a session actually has, so chat reaches MUD players and `say` sends it from
+  them; `ready` spawns a telnet player a real body; a command from a session with no body says so instead of
+  dereferencing `Entity.Null`; and a MUD disconnect now ends the session and removes that body.
+- **`/spawn` created objects nobody could see, hear or touch.** `HandleSpawn` called `world.Create` and
+  returned: the entity never entered the map's `lookup` or the `SpatialGrid`, and both broadcast and
+  collision iterate the grid. `MapManager.SpawnEntity` / `IndexEntity` / `DestroyEntity` are now the single
+  path — register, index, flag for definition broadcast — and the player spawn uses it too. `HandleSetSound`
+  had the mirror bug (`world.Add` throws on an entity that already has the component) and now uses `SetOrAdd`
+  like its siblings.
+- **Also fixed in passing:** `HandleLogin` logged and rethrew, abandoning the manifest send with the session
+  already registered; the manifest called `MapRepository.LoadAll()` — re-reading and re-parsing every map
+  file on disk — per login, and now reads the already-loaded `MapData`; "default" is no longer hardcoded in
+  the login and ready paths (both use `session.CurrentMapId`); the dirty-audio scan was linear per entity
+  per player and is now a set; and `world.Get<HealthComponent>` in the broadcast is guarded by a `Has` check.
+- **Tests (97 → 116):** `ServerHolesTests` covers the `EntityRemoved` union round-trip and the client-side
+  purge (definitions, audio ids and collision grid); the AoI departure diff; the accumulator clamp; the rate
+  limiter's burst, refill and per-key isolation; duplicate and Turkish-locale registration against a real
+  SQLite database; `SpawnEntity` landing in the lookup, the grid and the dirty flag, and `DestroyEntity`
+  removing it from all three; and that a command defers to the tick thread, that a MUD-range connection id
+  is executed rather than dropped, that a player with no body gets told to send `ready`, and that elevated
+  commands are still refused. 116/116 pass. Verified live as well: a telnet session logs in, enters the
+  world, scans, spawns a metal box and sees it in the next scan; the seventh rapid login attempt is refused
+  and recovers after the bucket refills; and SIGINT produces an ordered "Server stopped cleanly."

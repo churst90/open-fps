@@ -26,6 +26,13 @@ public class MudGateway
     private readonly ConcurrentDictionary<int, MudConnection> _connections = new();
 
     /// <summary>
+    /// Raised (on the connection's own task thread) when a MUD client goes away. The server uses it to
+    /// end the session and remove the player's body — a telnet player can now spawn one, so without this
+    /// every dropped connection would leave a corpse standing in the world.
+    /// </summary>
+    public Action<int>? OnDisconnected;
+
+    /// <summary>
     /// Internal container for a MUD client's connection state.
     /// </summary>
     private class MudConnection
@@ -36,6 +43,9 @@ public class MudGateway
         public StreamWriter Writer = null!;
         public int CommandsThisSecond;
         public long LastSecondTimestamp;
+        /// <summary>Serialises writes: replies now arrive from the game tick thread as well as this
+        /// connection's own reader task, and two interleaved WriteLine calls produce a garbled line.</summary>
+        public readonly object WriteLock = new();
     }
 
     /// <summary>
@@ -167,18 +177,21 @@ public class MudGateway
             _connections.TryRemove(conn.Id, out _);
             conn.Client.Close();
             Log.Information("MUD Connection {Id} closed.", conn.Id);
+            try { OnDisconnected?.Invoke(conn.Id); }
+            catch (Exception ex) { Log.Warning(ex, "MUD disconnect handler failed for connection {Id}.", conn.Id); }
         }
     }
 
     /// <summary>
     /// Sends a response message back to the MUD client, formatting it as plain text.
     /// </summary>
-    private void SendReply(MudConnection conn, IMessage reply)
+    private static void SendReply(MudConnection conn, IMessage reply)
     {
         try
         {
             string text = FormatReply(reply);
-            if (!string.IsNullOrEmpty(text))
+            if (string.IsNullOrEmpty(text)) return;
+            lock (conn.WriteLock)
             {
                 conn.Writer.WriteLine(text);
             }
@@ -190,15 +203,62 @@ public class MudGateway
     }
 
     /// <summary>
+    /// Pushes a message to a MUD connection outside a request/reply exchange — chat, private messages and
+    /// world events that the UDP clients receive by peer. Without this a MUD player can talk but never
+    /// hears anyone answer. Returns false if the id is not a live MUD connection.
+    /// </summary>
+    public bool TrySend(int connectionId, IMessage message)
+    {
+        if (!_connections.TryGetValue(connectionId, out var conn)) return false;
+        SendReply(conn, message);
+        return true;
+    }
+
+    /// <summary>True if the id belongs to a live MUD connection rather than a UDP peer.</summary>
+    public bool IsMudConnection(int connectionId) => _connections.ContainsKey(connectionId);
+
+    /// <summary>The remote address of a MUD connection, for rate limiting. Null if the id is not ours.</summary>
+    public string? GetRemoteAddress(int connectionId)
+    {
+        if (!_connections.TryGetValue(connectionId, out var conn)) return null;
+        try { return (conn.Client.Client.RemoteEndPoint as IPEndPoint)?.Address.ToString(); }
+        catch { return null; }
+    }
+
+    /// <summary>Stops accepting connections and closes the open ones. Idempotent.</summary>
+    public void Stop()
+    {
+        if (!_isRunning) return;
+        _isRunning = false;
+
+        try { _listener.Stop(); }
+        catch (Exception ex) { Log.Warning(ex, "MUD Gateway: error stopping the listener."); }
+
+        foreach (var kv in _connections)
+        {
+            try
+            {
+                lock (kv.Value.WriteLock) kv.Value.Writer.WriteLine("Server shutting down. Goodbye.");
+            }
+            catch { /* the client may already be gone */ }
+            try { kv.Value.Client.Close(); } catch { }
+        }
+        _connections.Clear();
+        Log.Information("MUD Gateway stopped.");
+    }
+
+    /// <summary>
     /// Translates a structured game message (IMessage) into a human-readable string for the MUD player.
     /// </summary>
-    private string FormatReply(IMessage reply)
+    private static string FormatReply(IMessage reply)
     {
         return reply switch
         {
             PlayerListResponse p => "Players online: " + (p.Players.Length > 0 ? string.Join(", ", p.Players) : "None"),
             FriendListResponse f => "Friends: " + (f.Friends.Length > 0 ? string.Join(", ", f.Friends) : "None"),
             LoginResponse l => l.Success ? "Login successful." : "Login failed: " + l.Message,
+            RegisterResponse r => r.Success ? "Registration successful." : "Registration failed: " + r.Message,
+            PlayerSpawned => "You are now in the world. Try 'scan'.",
             TextEvent t => t.Text,
             ChatMessage c => $"[{c.Sender}]: {c.Text}",
             _ => "" // Movement and world state updates are not converted to text for performance/verbosity reasons.
@@ -220,6 +280,8 @@ public class MudGateway
             "who_map" => new PlayerListRequest { Scope = PlayerListScope.Map },
             "friends" => new FriendListRequest(),
             "login" when parts.Length >= 3 => new LoginRequest { Username = parts[1], Password = parts[2] },
+            // Chat now reaches MUD players; this is the other half — a way for them to answer.
+            "say" when parts.Length >= 2 => new ChatMessage { Text = string.Join(' ', parts[1..]) },
             _ => new TextCommand { Command = cmd, Args = parts.Length > 1 ? parts[1..] : Array.Empty<string>() }
         };
     }

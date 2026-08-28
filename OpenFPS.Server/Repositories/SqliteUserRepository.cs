@@ -46,9 +46,12 @@ public class SqliteUserRepository : IUserRepository
 
     public UserData? GetUser(string username)
     {
+        // Folded here, not inside the expression tree: EF has to translate the predicate to SQL and
+        // cannot translate a call into our own code.
+        var key = Normalize(username);
         using var ctx = CreateContext();
         var record = ctx.Users.AsNoTracking()
-            .FirstOrDefault(u => u.Username == username.ToLower());
+            .FirstOrDefault(u => u.Username == key);
         if (record == null) return null;
         return new UserData
         {
@@ -58,14 +61,14 @@ public class SqliteUserRepository : IUserRepository
         };
     }
 
-    public void AddUser(string username, string password, UserRole role)
+    public bool AddUser(string username, string password, UserRole role)
     {
         using var ctx = CreateContext();
-        var key = username.ToLower();
+        var key = Normalize(username);
         if (ctx.Users.Any(u => u.Username == key))
         {
             Log.Warning("UserRepository: Attempted to register duplicate username '{User}'.", key);
-            return;
+            return false;
         }
 
         ctx.Users.Add(new UserRecord
@@ -76,6 +79,7 @@ public class SqliteUserRepository : IUserRepository
         });
         ctx.SaveChanges();
         Log.Information("UserRepository: Registered user '{User}' with role {Role}.", key, role);
+        return true;
     }
 
     public bool VerifyPassword(string username, string password)
@@ -86,4 +90,11 @@ public class SqliteUserRepository : IUserRepository
     }
 
     private AppDbContext CreateContext() => new(_options);
+
+    /// <summary>
+    /// Case-folds a username for storage and lookup. Invariant, not current-culture: under a Turkish
+    /// locale ToLower() maps 'I' to a dotless 'ı', so the same account name would hash to two different
+    /// keys depending on where the server happens to be running.
+    /// </summary>
+    private static string Normalize(string username) => username.Trim().ToLowerInvariant();
 }

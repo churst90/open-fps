@@ -9,6 +9,10 @@ namespace OpenFPS.Server.Repositories;
 public interface IUserRepository
 {
     UserData? GetUser(string username);
-    void AddUser(string username, string password, UserRole role);
+    /// <summary>
+    /// Creates a user. Returns false if the username is already taken — the caller is expected to tell
+    /// the person the truth about that rather than reporting a success they cannot then log in with.
+    /// </summary>
+    bool AddUser(string username, string password, UserRole role);
     bool VerifyPassword(string username, string password);
 }

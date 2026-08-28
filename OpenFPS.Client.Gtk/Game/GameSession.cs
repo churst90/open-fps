@@ -132,6 +132,11 @@ public sealed class GameSession
                 _world.RegisterDefinition(def);
                 break;
 
+            case EntityRemoved removed:
+                foreach (int goneId in _world.RemoveEntities(removed.EntityIds))
+                    _audioSystem.ForgetEntity(goneId);
+                break;
+
             case MapLoadComplete:
                 Serilog.Log.Information("MapLoadComplete: {Count} entity definitions received.", _world.GetSnapshot().Entities.Count);
                 _speech.Speak("Geometry received. Generating acoustics.");

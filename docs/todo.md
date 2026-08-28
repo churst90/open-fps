@@ -92,10 +92,19 @@ Sequenced so each step is verifiable before the next begins. Steps 1–4 are the
       `OnConnectionFailed` / `OnProtocolError` for socket, disconnect, decode and send failures that were
       previously empty catch blocks. `FmodResourceManager` returns `Ready`/`Loading`/`Missing` and a deferred
       queue retries a still-decoding sound instead of dropping its first play. Covered by `DegradationTests`.
-- [ ] **4. Close the server's structural holes.** `EntityRemoved` message + per-client acks via
-      `KnownEntities`; accumulator clamp; `Console.CancelKeyPress` shutdown; registration reports the truth;
-      rate limits on login/register; route `CommandHandler` mutations through `_commandBuffer` then unblock
-      MUD commands; one `SpawnEntity` path that registers, indexes and broadcasts.
+- [x] **4. Close the server's structural holes.** `EntityRemoved` is in the protocol and sent reliably on
+      destroy and on area-of-interest exit; `UserSession.KnownEntities` now decides when a definition is
+      sent (so remote players finally arrive as entities, not bare transforms) and moved *static* entities
+      go out on the reliable channel — delivery is the acknowledgement. The loop clamps its accumulator at
+      the shared `PhysicsConstants.MaxCatchUpSeconds` and says how many ticks it dropped.
+      `Console.CancelKeyPress` and SIGTERM both request an ordered teardown on the loop thread (notify,
+      close sockets, destroy worlds). Registration reports duplicates instead of always claiming success,
+      usernames fold with `ToLowerInvariant`, and a token bucket per remote address limits login and
+      register alike. `CommandHandler` answers through a reply callback and runs every command body on the
+      tick thread via `_commandBuffer`, which is what let the MUD peer guard go: telnet players now log in,
+      spawn, scan, move, spawn objects, and send and receive chat. `MapManager.SpawnEntity` /
+      `IndexEntity` / `DestroyEntity` are the single path that registers, indexes and broadcasts — `/spawn`
+      objects are now solid, audible and scannable. Covered by `ServerHolesTests`.
 - [ ] **5. One prefab spec, validated at load.** `PrefabTemplate` becomes the single source of truth
       (`prefab-schema.json` and `GEMINI_MAP_STANDARD.md` currently describe two other formats); add collider
       shape, emitter direction, start/stop sounds, room materials; reject incoherent prefabs at load; write

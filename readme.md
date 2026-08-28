@@ -37,6 +37,19 @@ OpenFPS focuses on a rich **binaural landscape** and **spatial awareness** rathe
   what it costs; connection, disconnect and protocol failures are logged and **spoken**; and a sound whose
   asynchronous decode has not finished is retried instead of having its first play dropped. In a game played
   entirely by ear, a component that quietly stops working is indistinguishable from one that is working.
+- **A Reliable Entity Lifecycle:** The server tells each client exactly which entities it can see and, just
+  as importantly, which have gone — `EntityRemoved` on destroy and on area-of-interest exit, tracked per
+  client in `KnownEntities`, so a player who disconnects does not leave a body that still blocks movement,
+  still answers scans and still makes noise. A static object that moves goes out on the reliable channel,
+  where delivery is the acknowledgement. Runtime spawns go through one path that registers, indexes and
+  broadcasts, so an object created by `/spawn` is solid, audible and scannable the moment it exists.
+- **A Server That Stops Cleanly:** Ctrl-C and SIGTERM finish the current tick and then tear down in order —
+  players notified, gateway stopped, socket closed, worlds destroyed. The loop clamps how much elapsed time
+  it will bank, so a long pause costs a few dropped ticks instead of a fast-forward.
+- **One Text-Command Path:** Telnet (MUD) sessions are ordinary sessions. Commands answer through a reply
+  callback rather than a UDP peer and every command body runs on the tick thread, which both unblocks the
+  text interface — login, `ready`, `scan`, `move`, `spawn`, and chat in both directions — and removes the
+  data race that the old peer-null guard was quietly standing in for.
 - **Authored Portals:** A map describes its doorways explicitly — a `portal` entity carries the two region ids it joins (`-1` = outside) and the width of the opening. Portals drive portal-aware occlusion, adjacent-room reverb coupling, doorway leakage, and the HRTF localization that makes a room's reverb arrive *through* its door. Boundaries with no portal are reported at load with the exact entry the map is missing; nothing is guessed by default.
 
 ## Current Engineering Priorities

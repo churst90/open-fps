@@ -29,6 +29,15 @@ public static class PhysicsConstants
     public const int TickRate = 30; // 30 ticks per second, client and server
     public const float FixedDeltaTime = 1.0f / TickRate; // ~0.0333s
 
+    /// <summary>
+    /// Longest real interval a fixed-step loop may bank before it stops trying to catch up.
+    /// A GC pause, a debugger break or a suspended laptop hands the loop an arbitrarily large
+    /// elapsed time; without this the next iteration runs hundreds of ticks back to back, which
+    /// looks to every connected player like the world fast-forwarding. Both client heads already
+    /// clamp here — the server clamps to the same number so the three agree about the worst case.
+    /// </summary>
+    public const float MaxCatchUpSeconds = 0.2f;
+
     // --- Input Integrity (server-side) ---
     /// <summary>Longest simulated step a single client input may claim (guards a forged DeltaTime).</summary>
     public const float MaxInputDeltaTime = FixedDeltaTime * 1.5f;

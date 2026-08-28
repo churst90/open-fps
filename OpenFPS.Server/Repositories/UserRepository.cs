@@ -35,7 +35,7 @@ public class UserRepository : IUserRepository
 
             string json = File.ReadAllText(_filePath);
             var list = JsonSerializer.Deserialize<List<UserData>>(json) ?? new();
-            _users = list.ToDictionary(u => u.Username.ToLower());
+            _users = list.ToDictionary(u => u.Username.Trim().ToLowerInvariant());
         }
     }
 
@@ -52,16 +52,18 @@ public class UserRepository : IUserRepository
     {
         lock (_lock)
         {
-            return _users.GetValueOrDefault(username.ToLower());
+            return _users.GetValueOrDefault(username.Trim().ToLowerInvariant());
         }
     }
 
-    public void AddUser(string username, string password, UserRole role)
+    public bool AddUser(string username, string password, UserRole role)
     {
         lock (_lock)
         {
+            if (_users.ContainsKey(username.Trim().ToLowerInvariant())) return false;
             AddUserInternal(username, password, role);
             SaveInternal();
+            return true;
         }
     }
 
@@ -73,7 +75,7 @@ public class UserRepository : IUserRepository
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(password),
             Role = role
         };
-        _users[username.ToLower()] = userData;
+        _users[username.Trim().ToLowerInvariant()] = userData;
     }
 
     private void SaveInternal()

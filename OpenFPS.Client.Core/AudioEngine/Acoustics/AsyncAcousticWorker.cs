@@ -110,6 +110,12 @@ public class AsyncAcousticWorker : IDisposable
         return _results.TryGetValue(entityId, out paths!);
     }
 
+    /// <summary>
+    /// Drops a removed entity's cached acoustic result. Its Steam Audio source (if any) is released by
+    /// the idle TTL sweep; this stops the stale paths being handed back for an entity that no longer exists.
+    /// </summary>
+    public void Forget(int entityId) => _results.TryRemove(entityId, out _);
+
     public WorldSnapshot? GetLastWorld()
     {
         lock (_worldLock) { return _latestWorld; }

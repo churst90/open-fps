@@ -54,6 +54,26 @@ public class ClientAudioSystem
     }
 
     /// <summary>
+    /// Silences everything an entity was making sound with, after the server said it is gone.
+    /// A voice is keyed by entity id and keeps playing on its own once started, so a looping emitter on a
+    /// despawned object would otherwise sit in the world for the rest of the session. The reflection
+    /// voices derived from that id are stopped too — they carry synthetic ids, not the entity's own.
+    /// </summary>
+    public void ForgetEntity(int entityId)
+    {
+        _audio.StopSound(entityId);
+        _audio.StopSound(-10000 - entityId); // floor reflection
+        _audio.StopSound(-5000 - entityId);  // wall reflection
+        // Discrete ray-traced reflections hash into a 100-wide band per entity (see the -30000 scheme
+        // below); a removed entity is rare enough that sweeping its band is cheaper than tracking it.
+        int band = -30000 - (entityId * 100);
+        for (int i = 0; i < 100; i++)
+            if (_audio.IsPlaying(band - i)) _audio.StopSound(band - i);
+
+        _acousticWorker.Forget(entityId);
+    }
+
+    /// <summary>
     /// Primary entry point called every frame from the Game Loop.
     /// Uses the VisualPosition for the listener to ensure smooth audio during server corrections.
     /// </summary>

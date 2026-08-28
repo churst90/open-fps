@@ -17,9 +17,27 @@ public class UserSession
     public string CurrentMapId { get; set; } = "default";
     public Entity Entity { get; set; } = Entity.Null;
     public long LastProcessedSequenceId { get; set; } = -1;
+
+    /// <summary>
+    /// Entities this client has been sent a definition for. The server owns this: an entity it is not in
+    /// here gets its definition before any state that references it, and an entity removed from the world
+    /// is announced and struck off. Without it, remote players arrive as bare transforms with no
+    /// definition — invisible to the client's snapshot — and disconnected players never leave.
+    /// </summary>
     public HashSet<int> KnownEntities { get; } = new();
+
+    /// <summary>
+    /// The dynamic entities that were inside this client's area of interest last broadcast. Anything that
+    /// drops out is announced as removed. Static geometry is deliberately NOT tracked here: the client
+    /// builds its acoustic map from the whole streamed map, so evicting a distant wall would silently
+    /// change how the world sounds.
+    /// </summary>
+    public HashSet<int> VisibleDynamicEntities { get; } = new();
     public ClientInputUpdate LastInput { get; set; } = new();
     public System.Collections.Concurrent.ConcurrentQueue<ClientInputUpdate> InputQueue { get; } = new();
+
+    /// <summary>True for a MUD (telnet) session: no UDP peer, so no state stream and no voice.</summary>
+    public bool IsTextClient { get; set; }
 
     /// <summary>
     /// Simulated seconds this player is still owed. Each tick grants one tick's worth (capped),

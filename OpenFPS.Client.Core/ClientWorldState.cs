@@ -97,6 +97,36 @@ public class ClientWorldState
             _gridNeedsRebuild = true;
         }
     }
+
+    /// <summary>
+    /// Purges entities the server says are gone (destroyed, or out of our area of interest).
+    /// Everything else about an entity is additive — a definition arrives and stays — so without this
+    /// a disconnected player's body remains forever: still colliding, still announced by scans, still
+    /// emitting whatever sound it carried. Returns the ids that were actually being tracked, so the
+    /// caller can stop their voices.
+    /// </summary>
+    public List<int> RemoveEntities(IEnumerable<int> entityIds)
+    {
+        var removed = new List<int>();
+        foreach (int id in entityIds)
+        {
+            bool known = _definitions.TryRemove(id, out _);
+            known |= _serverTransforms.TryRemove(id, out _);
+            _serverVelocities.TryRemove(id, out _);
+            _audioEntityIds.TryRemove(id, out _);
+            if (known) removed.Add(id);
+        }
+
+        if (removed.Count > 0)
+        {
+            lock (_gridLock)
+            {
+                _gridNeedsRebuild = true;
+            }
+        }
+        return removed;
+    }
+
     public void SyncState(ServerStateUpdate update)
     {
         lock (_snapshotBuffer)

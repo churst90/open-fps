@@ -1,10 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
 using System.Numerics;
 using System.Threading;
-using System.Buffers;
+using System.Runtime.InteropServices;
 using LiteNetLib;
 using Serilog;
 using Arch.Core;
@@ -35,11 +34,17 @@ public class GameServer
     private readonly System.Collections.Concurrent.ConcurrentQueue<Action> _commandBuffer = new();
 
     private readonly MessageDispatcher _dispatcher = new();
+
+    // Login and registration both verify a bcrypt hash on the tick thread. Six attempts in a burst, then
+    // one every five seconds, per remote address — generous for a person mistyping a password, useless
+    // for guessing one.
+    private readonly RateLimiter _authLimiter = new(capacity: 6, refillPerSecond: 0.2);
     private DiscoveryService _discovery = null!;
     private SocialService _social = null!;
     private MapAuthorityService _mapAuthority = null!;
     private MudGateway _mudGateway = null!;
     private readonly ServerStateUpdate _reusableBroadcast = new();
+    private readonly ServerStateUpdate _reliableBroadcast = new();
 
     public GameServer(IUserRepository userRepo)
     {
@@ -48,8 +53,55 @@ public class GameServer
 
     public void EnqueueCommand(Action action) => _commandBuffer.Enqueue(action);
 
-    private bool _isRunning = true;
+    /// <summary>
+    /// Runs everything queued for the tick thread. This is the only place world mutations from other
+    /// threads — the MUD gateway's TCP tasks, command handlers, despawns — are allowed to happen.
+    /// Returns how many ran.
+    /// </summary>
+    public int DrainCommandBuffer()
+    {
+        int ran = 0;
+        while (_commandBuffer.TryDequeue(out var cmd))
+        {
+            ran++;
+            try { cmd(); }
+            catch (Exception ex) { Log.Error(ex, "Buffered command threw."); }
+        }
+        return ran;
+    }
+
+    /// <summary>
+    /// Caps banked simulation time. Returns the accumulator to keep, and reports how many ticks' worth
+    /// were thrown away — see <see cref="RunLoop"/> for why they must be.
+    /// </summary>
+    public static double ClampAccumulatorMs(double accumulatorMs, out int droppedTicks)
+    {
+        const double maxMs = MaxCatchUpSeconds * 1000.0;
+        if (accumulatorMs <= maxMs) { droppedTicks = 0; return accumulatorMs; }
+        droppedTicks = (int)((accumulatorMs - maxMs) / TickTimeMs);
+        return maxMs;
+    }
+
+    /// <summary>
+    /// The area-of-interest diff: what a client could see last broadcast and cannot see now. Those ids
+    /// are ghosts on its side until it is told, because everything else about an entity is additive.
+    /// </summary>
+    public static void CollectDeparted(HashSet<int> previouslyVisible, HashSet<int> visibleNow, List<int> into)
+    {
+        into.Clear();
+        foreach (int id in previouslyVisible)
+            if (!visibleNow.Contains(id)) into.Add(id);
+    }
+
+    private volatile bool _isRunning = true;
     private long _currentTick = 0;
+
+    /// <summary>
+    /// Asks the loop to finish the current tick and shut down. Safe to call from a signal handler on any
+    /// thread; teardown itself happens on the loop thread once it has left the tick, so nothing is
+    /// disposed underneath a simulation step.
+    /// </summary>
+    public void Stop() => _isRunning = false;
 
     public void SyncAudioComponent(int entityId)
     {
@@ -66,7 +118,7 @@ public class GameServer
         _mapRepo = new MapRepository("maps");
         _maps = new MapManager(_mapRepo, prefabRepo);
         _maps.Initialize();
-        _commands = new CommandHandler(_network, _sessions, _maps, this);
+        _commands = new CommandHandler(_sessions, _maps, this);
         
         // Initialize new Service Architecture
         _discovery = new DiscoveryService(_dispatcher, _sessions);
@@ -77,25 +129,65 @@ public class GameServer
 
         // Start MUD Gateway on port + 1 (e.g. 33289)
         _mudGateway = new MudGateway(port + 1, _dispatcher);
+        _mudGateway.OnDisconnected = HandleMudDisconnected;
         _mudGateway.Start();
 
         _network.OnConnected = (peer) => Log.Information("Peer connected: {Id}", peer.Id);
         _network.OnDisconnected = HandlePeerDisconnected;
         _network.Start(port);
         RunLoop();
+        Shutdown();
+    }
+
+    /// <summary>
+    /// Ordered teardown, on the loop thread after the last tick: tell the players first, then close the
+    /// sockets, then destroy the worlds. Previously Ctrl-C tore all three down at once, mid-tick.
+    /// </summary>
+    private void Shutdown()
+    {
+        Log.Information("Server shutting down: {Count} session(s) connected.", _sessions.Count);
+
+        foreach (var session in _sessions.GetAllSessions())
+        {
+            try { SendToSession(session, new TextEvent { Text = "Server is shutting down." }); }
+            catch (Exception ex) { Log.Debug(ex, "Shutdown notice failed for {User}.", session.Username); }
+        }
+
+        try { _mudGateway?.Stop(); }
+        catch (Exception ex) { Log.Warning(ex, "Error stopping the MUD gateway."); }
+
+        try { _network.Stop(); }
+        catch (Exception ex) { Log.Warning(ex, "Error stopping the network service."); }
+
+        try { _maps?.Shutdown(); }
+        catch (Exception ex) { Log.Warning(ex, "Error tearing down map worlds."); }
+
+        Log.Information("Server stopped cleanly.");
+    }
+
+    /// <summary>
+    /// Sends to a session over whichever transport it actually has. A MUD session has no UDP peer, which
+    /// is why every gameplay reply used to vanish for telnet players — including chat aimed at them.
+    /// </summary>
+    public void SendToSession(UserSession session, IMessage message, DeliveryMethod delivery = DeliveryMethod.ReliableOrdered)
+    {
+        var peer = _network.GetPeer(session.ConnectionId);
+        if (peer != null) { _network.SendMessage(peer, message, delivery); return; }
+        _mudGateway?.TrySend(session.ConnectionId, message);
+    }
+
+    /// <summary>Rate-limit key: the remote address, which a reconnecting attacker cannot cycle for free.</summary>
+    private string RateKeyFor(int connectionId)
+    {
+        var peer = _network.GetPeer(connectionId);
+        if (peer != null) return peer.Address?.ToString() ?? $"peer:{connectionId}";
+        return _mudGateway?.GetRemoteAddress(connectionId) ?? $"conn:{connectionId}";
     }
 
     private void RegisterHandlers()
     {
-        _dispatcher.RegisterHandler<LoginRequest>((id, req, reply) => {
-            var peer = _network.GetPeer(id);
-            if (peer != null) { HandleLogin(peer, req); } 
-            else { HandleMudLogin(id, req, reply); }
-        });
-        _dispatcher.RegisterHandler<RegisterRequest>((id, req, reply) => {
-            var peer = _network.GetPeer(id);
-            if (peer != null) HandleRegister(peer, req);
-        });
+        _dispatcher.RegisterHandler<LoginRequest>(HandleLogin);
+        _dispatcher.RegisterHandler<RegisterRequest>(HandleRegister);
         _dispatcher.RegisterHandler<MapDataRequest>((id, req, reply) => {
             var peer = _network.GetPeer(id);
             if (peer != null) HandleMapDataRequest(peer, req);
@@ -115,23 +207,18 @@ public class GameServer
             s.InputQueue.Enqueue(req);
         });
         _dispatcher.RegisterHandler<TextCommand>((id, req, reply) => {
-            var peer = _network.GetPeer(id);
-            if (peer != null)
-            {
-                if (req.Command == "ready") HandlePlayerReady(peer);
-                else HandleTextCommand(peer, req);
-            }
+            // No peer lookup here any more: that guard was the only thing keeping MUD commands out, and
+            // it dropped every one of them silently. Commands now run on the tick thread whatever the
+            // transport, so a telnet client is just another session.
+            if (req.Command.TrimStart('/').Equals("ready", StringComparison.OrdinalIgnoreCase)) HandlePlayerReady(id);
+            else _commands.HandleTextCommand(id, req, reply);
         });
         _dispatcher.RegisterHandler<ChatMessage>((id, req, reply) => {
             if (_sessions.TryGetSession(id, out var sess)) 
             {
                 Log.Information("[CHAT] {User}: {Text}", sess.Username, req.Text);
                 var broadcast = new ChatMessage { Sender = sess.Username, Text = req.Text };
-                foreach (var s in _sessions.GetAllSessions())
-                {
-                    var p = _network.GetPeer(s.ConnectionId);
-                    if (p != null) _network.SendMessage(p, broadcast, DeliveryMethod.ReliableOrdered);
-                }
+                foreach (var s in _sessions.GetAllSessions()) SendToSession(s, broadcast);
             }
         });
         _dispatcher.RegisterHandler<InteractRequest>((id, req, reply) => {
@@ -152,27 +239,26 @@ public class GameServer
         });
     }
 
-    private void HandleMudLogin(int connId, LoginRequest req, Action<IMessage> reply)
-    {
-        if (!_userRepo.VerifyPassword(req.Username, req.Password))
-        {
-            reply(new LoginResponse { Success = false, Message = "Invalid Credentials" });
-            return;
-        }
-        var user = _userRepo.GetUser(req.Username)!;
-        _sessions.AddSession(connId, new UserSession { ConnectionId = connId, Username = user.Username, Role = user.Role });
-        reply(new LoginResponse { Success = true, Message = "Authenticated", Username = user.Username });
-    }
-
     private void RunLoop()
     {
         var stopwatch = Stopwatch.StartNew();
         double accumulator = 0;
+
         while (_isRunning)
         {
             double elapsed = stopwatch.Elapsed.TotalMilliseconds;
             stopwatch.Restart();
             accumulator += elapsed;
+
+            // A GC pause, a debugger break or a suspended host hands us an arbitrarily large elapsed
+            // time. Unclamped, the loop then runs every banked tick back to back with no network poll
+            // between them: players teleport, inputs arrive for ticks already simulated, and the catch-up
+            // itself takes long enough to bank more time. Drop the excess and say so — the simulation
+            // loses a few ticks of wall clock, which is the honest outcome, instead of fast-forwarding.
+            accumulator = ClampAccumulatorMs(accumulator, out int droppedTicks);
+            if (droppedTicks > 0)
+                Log.Warning("Server loop fell behind; dropped {Dropped} catch-up tick(s).", droppedTicks);
+
             _network.PollEvents();
             while (accumulator >= TickTimeMs) { Update(_currentTick++); accumulator -= TickTimeMs; }
             Thread.Sleep(1);
@@ -184,7 +270,7 @@ public class GameServer
         try
         {
             // 1. Process Commands & Network Messages
-            while (_commandBuffer.TryDequeue(out var cmd)) cmd();
+            DrainCommandBuffer();
             while (_network.TryDequeueMessage(out var item))
             {
                 _dispatcher.Dispatch(item.peer.Id, item.message, msg => _network.SendMessage(item.peer, msg, DeliveryMethod.ReliableOrdered));
@@ -230,97 +316,108 @@ public class GameServer
         }
     }
 
-    private void HandleLogin(NetPeer peer, LoginRequest request)
+    private void HandleLogin(int connectionId, LoginRequest request, Action<IMessage> reply)
     {
-        try
+        // One path for both transports. The MUD gateway used to have its own copy of this, which is how
+        // it ended up with neither the rate limit nor the spawn.
+        if (!_authLimiter.TryConsume(RateKeyFor(connectionId)))
         {
-            if (!_userRepo.VerifyPassword(request.Username, request.Password))
-            {
-                _network.SendMessage(peer, new LoginResponse { Success = false, Message = "Invalid Credentials" }, DeliveryMethod.ReliableOrdered);
-                return;
-            }
-
-            var user = _userRepo.GetUser(request.Username)!;
-            var session = new UserSession { ConnectionId = peer.Id, Username = user.Username, Role = user.Role };
-            _sessions.AddSession(peer.Id, session);
-
-            Log.Information("User {User} authenticated. Sending Manifest.", user.Username);
-
-            _network.SendMessage(peer, new LoginResponse { 
-                Success = true, 
-                Message = "Authenticated",
-                Username = user.Username,
-                Role = user.Role
-            }, DeliveryMethod.ReliableOrdered);
-
-            if (_maps.TryGetMap("default", out var world, out var mapSize, out var _, out var _))
-            {
-                var staticEntities = new List<Entity>();
-                world.Query(new QueryDescription().WithAll<Transform>(), (Entity e, ref Transform t) => {
-                    if (!world.Has<PlayerComponent>(e) && !world.Has<Velocity>(e)) staticEntities.Add(e);
-                });
-
-                string checksum = _maps.GetMapChecksum("default"); 
-                
-                float voxelRes = 0.5f;
-                float occFloor = 0.2f;
-                float minimumY = -10.0f;
-                Transform spawnPoint = new Transform { Position = new Vector3(0, 5, 0) };
-                Vector3 mapMin = new Vector3(-50, 0, -50);
-                Vector3 mapMax = new Vector3(50, 20, 50);
-                float gravity = 15.0f;
-                float temperature = 20.0f;
-                float humidity = 0.5f;
-                float pressure = 1.0f;
-                float absorbMult = 1.0f;
-
-                var allMaps = _mapRepo.LoadAll();
-                var currentMapData = allMaps.FirstOrDefault(m => m.Id == "default");
-                if (currentMapData != null)
-                {
-                    voxelRes = currentMapData.VoxelResolution;
-                    occFloor = currentMapData.OcclusionFloor;
-                    spawnPoint = new Transform { Position = currentMapData.SpawnPoint.Position, Rotation = currentMapData.SpawnPoint.Rotation };
-                    minimumY = currentMapData.MinimumY;
-                    mapMin = currentMapData.MinBound;
-                    mapMax = currentMapData.MaxBound;
-                    gravity = currentMapData.Gravity;
-                    temperature = currentMapData.Temperature;
-                    humidity = currentMapData.Humidity;
-                    pressure = currentMapData.AirPressure;
-                    absorbMult = currentMapData.AirAbsorptionMultiplier;
-                }
-
-                _network.SendMessage(peer, new MapManifest {
-                    MapName = "default",
-                    Checksum = checksum,
-                    WorldSize = mapSize,
-                    MapMin = mapMin,
-                    MapMax = mapMax,
-                    ExpectedEntityCount = staticEntities.Count,
-                    VoxelResolution = voxelRes,
-                    OcclusionFloor = occFloor,
-                    SpawnPoint = spawnPoint,
-                    MinimumY = minimumY,
-                    Gravity = gravity,
-                    Temperature = temperature,
-                    Humidity = humidity,
-                    AirPressure = pressure,
-                    AirAbsorptionMultiplier = absorbMult
-                }, DeliveryMethod.ReliableOrdered);
-                Log.Information("Manifest sent to {User}. Waiting for data request or ready.", user.Username);
-            }
+            Log.Warning("Login rate limit hit for connection {Id} (user '{User}').", connectionId, request.Username);
+            reply(new LoginResponse { Success = false, Message = "Too many attempts. Wait a few seconds and try again." });
+            return;
         }
-        catch (Exception ex)
+
+        if (!_userRepo.VerifyPassword(request.Username, request.Password))
         {
-            Log.Fatal(ex, "CRASH in HandleLogin for user {User}", request.Username);
-            throw;
+            reply(new LoginResponse { Success = false, Message = "Invalid Credentials" });
+            return;
         }
+
+        var user = _userRepo.GetUser(request.Username)!;
+        var peer = _network.GetPeer(connectionId);
+        var session = new UserSession
+        {
+            ConnectionId = connectionId,
+            Username = user.Username,
+            Role = user.Role,
+            IsTextClient = peer == null
+        };
+        _sessions.AddSession(connectionId, session);
+
+        Log.Information("User {User} authenticated ({Transport}).", user.Username, peer == null ? "MUD" : "UDP");
+
+        reply(new LoginResponse
+        {
+            Success = true,
+            Message = "Authenticated",
+            Username = user.Username,
+            Role = user.Role
+        });
+
+        // A text client has no geometry to load — it goes straight to 'ready'.
+        if (peer == null)
+        {
+            reply(new TextEvent { Text = "Type 'ready' to enter the world, then 'scan' to look around." });
+            return;
+        }
+
+        SendManifest(peer, session);
+    }
+
+    private void SendManifest(NetPeer peer, UserSession session)
+    {
+        string mapId = session.CurrentMapId;
+        if (!_maps.TryGetMap(mapId, out var world, out var mapSize, out var _, out var _))
+        {
+            Log.Error("Login for {User}: map '{Map}' is not loaded; no manifest sent.", session.Username, mapId);
+            _network.SendMessage(peer, new TextEvent { Text = $"Map '{mapId}' is not loaded on this server." }, DeliveryMethod.ReliableOrdered);
+            return;
+        }
+
+        int staticCount = 0;
+        world.Query(new QueryDescription().WithAll<Transform>(), (Entity e, ref Transform t) => {
+            if (!world.Has<PlayerComponent>(e) && !world.Has<Velocity>(e)) staticCount++;
+        });
+
+        var manifest = new MapManifest
+        {
+            MapName = mapId,
+            Checksum = _maps.GetMapChecksum(mapId),
+            WorldSize = mapSize,
+            ExpectedEntityCount = staticCount,
+            SpawnPoint = new Transform { Position = new Vector3(0, 5, 0) },
+            MapMin = new Vector3(-50, 0, -50),
+            MapMax = new Vector3(50, 20, 50)
+        };
+
+        // Straight from the loaded map rather than re-reading every map file from disk per login.
+        if (_maps.TryGetMapData(mapId, out var mapData))
+        {
+            manifest.VoxelResolution = mapData.VoxelResolution;
+            manifest.OcclusionFloor = mapData.OcclusionFloor;
+            manifest.SpawnPoint = new Transform { Position = mapData.SpawnPoint.Position, Rotation = mapData.SpawnPoint.Rotation };
+            manifest.MinimumY = mapData.MinimumY;
+            manifest.MapMin = mapData.MinBound;
+            manifest.MapMax = mapData.MaxBound;
+            manifest.Gravity = mapData.Gravity;
+            manifest.Temperature = mapData.Temperature;
+            manifest.Humidity = mapData.Humidity;
+            manifest.AirPressure = mapData.AirPressure;
+            manifest.AirAbsorptionMultiplier = mapData.AirAbsorptionMultiplier;
+        }
+        else
+        {
+            Log.Warning("Login for {User}: no authored data for map '{Map}'; sending defaults.", session.Username, mapId);
+        }
+
+        _network.SendMessage(peer, manifest, DeliveryMethod.ReliableOrdered);
+        Log.Information("Manifest sent to {User}. Waiting for data request or ready.", session.Username);
     }
 
     private void HandleMapDataRequest(NetPeer peer, MapDataRequest request)
     {
         if (!_maps.TryGetMap(request.MapName, out var world, out var _, out var _, out var _)) return;
+        if (!_sessions.TryGetSession(peer.Id, out var session)) return;
 
         var staticEntities = new List<Entity>();
         world.Query(new QueryDescription().WithAll<Transform>(), (Entity e, ref Transform t) => {
@@ -329,25 +426,38 @@ public class GameServer
 
         Log.Information("Streaming {Count} entities to {Peer}...", staticEntities.Count, peer.Id);
 
+        // The client clears its world on the manifest, so the server's record of what it knows starts
+        // over here too — otherwise a re-request would leave the two disagreeing about a set the removal
+        // logic is driven from.
+        session.KnownEntities.Clear();
+        session.VisibleDynamicEntities.Clear();
+
         foreach (var e in staticEntities)
         {
             _network.SendMessage(peer, CreateDefinition(world, e), DeliveryMethod.ReliableOrdered);
+            session.KnownEntities.Add(e.Id);
         }
 
         _network.SendMessage(peer, new MapLoadComplete(), DeliveryMethod.ReliableOrdered);
     }
 
-    private void HandlePlayerReady(NetPeer peer)
+    private void HandlePlayerReady(int connectionId)
     {
-        if (!_sessions.TryGetSession(peer.Id, out var session)) return;
-        if (!_maps.TryGetMap("default", out var world, out var _, out var _, out var lookup)) return;
+        if (!_sessions.TryGetSession(connectionId, out var session)) return;
+        if (session.Entity != Entity.Null) return; // already in the world
+        string mapId = session.CurrentMapId;
+        if (!_maps.TryGetMap(mapId, out var world, out var _, out var _, out var _))
+        {
+            Log.Error("Player {User} sent ready for map '{Map}', which is not loaded.", session.Username, mapId);
+            return;
+        }
 
-        Transform spawnPoint = _maps.GetSpawnPoint("default");
+        Transform spawnPoint = _maps.GetSpawnPoint(mapId);
 
         _commandBuffer.Enqueue(() => {
             session.Entity = world.Create();
             world.Add(session.Entity, new PlayerComponent { 
-                    ConnectionId = peer.Id, 
+                    ConnectionId = connectionId, 
                     Username = session.Username, 
                     Role = session.Role,
                     Yaw = 0,
@@ -362,11 +472,11 @@ public class GameServer
             world.Add(session.Entity, new MaterialComponent { Material = "Generic" });
             world.Add(session.Entity, new ColliderComponent { Shape = ColliderShape.Cylinder, Size = new Vector3(PlayerRadius * 2, PlayerHeight, PlayerRadius * 2), IsSolid = true });
 
-            _maps.RegisterEntity("default", session.Entity);
-            ref var t = ref world.Get<Transform>(session.Entity);
-            t.IsDirty = true;
-            
-            _network.SendMessage(peer, new PlayerSpawned { EntityId = session.Entity.Id, SpawnTransform = t }, DeliveryMethod.ReliableOrdered);
+            // The one registration path: lookup, spatial index, dirty flag.
+            _maps.IndexEntity(mapId, session.Entity);
+
+            var t = world.Get<Transform>(session.Entity);
+            SendToSession(session, new PlayerSpawned { EntityId = session.Entity.Id, SpawnTransform = t });
             Log.Information("Spawned player {User} as Entity {Id}", session.Username, session.Entity.Id);
         });
     }
@@ -376,15 +486,15 @@ public class GameServer
     // these, so any divergence would only surface as a wrong-sounding room.
     private EntityDefinition CreateDefinition(World world, Entity e) => EntityDefinitionFactory.From(world, e);
 
-    private readonly HashSet<int> _addedEntitiesBuffer = new();
+    private readonly HashSet<int> _visibleBuffer = new();
+    private readonly HashSet<int> _visibleDynamicBuffer = new();
+    private readonly HashSet<int> _dirtyAudioBuffer = new();
+    private readonly List<int> _removedBuffer = new();
 
     private void BroadcastWorldState(long tick)
     {
-        int dirtyCount = _dirtyAudioEntities.Count;
-        int[] dirtyRented = ArrayPool<int>.Shared.Rent(Math.Max(dirtyCount, 1));
-        int i = 0;
-        while (_dirtyAudioEntities.TryDequeue(out int id)) { dirtyRented[i++] = id; }
-        dirtyCount = i;
+        _dirtyAudioBuffer.Clear();
+        while (_dirtyAudioEntities.TryDequeue(out int id)) _dirtyAudioBuffer.Add(id);
 
         foreach (var mapEntry in _maps.GetAllMaps())
         {
@@ -397,6 +507,7 @@ public class GameServer
                 try
                 {
                     if (session.Entity == Entity.Null) continue;
+                    if (!world.IsAlive(session.Entity)) continue;
                     var pPos = world.Get<Transform>(session.Entity).Position;
                     var peer = _network.GetPeer(session.ConnectionId);
                     if (peer == null) continue;
@@ -404,43 +515,82 @@ public class GameServer
                     _reusableBroadcast.Tick = tick;
                     _reusableBroadcast.LastProcessedSequenceId = session.LastProcessedSequenceId;
                     _reusableBroadcast.States.Clear();
-                    _addedEntitiesBuffer.Clear();
+                    _reliableBroadcast.Tick = tick;
+                    _reliableBroadcast.LastProcessedSequenceId = session.LastProcessedSequenceId;
+                    _reliableBroadcast.States.Clear();
+                    _visibleBuffer.Clear();
+                    _visibleDynamicBuffer.Clear();
 
                     foreach (var e in grid.GetItemsInRadius(pPos, EarshotRange))
                     {
-                        if (!_addedEntitiesBuffer.Add(e.Id)) continue;
+                        if (!_visibleBuffer.Add(e.Id)) continue;
                         if (!world.Has<Transform>(e)) continue;
                         ref var t = ref world.Get<Transform>(e);
 
                         bool isDynamic = world.Has<Velocity>(e) || world.Has<PlayerComponent>(e);
-                        if (isDynamic || t.IsDirty)
+                        if (isDynamic) _visibleDynamicBuffer.Add(e.Id);
+
+                        // A state message names an entity the client may never have heard of — every
+                        // remote player, and anything spawned at runtime. Send the definition first, and
+                        // only once: KnownEntities is what makes it once rather than every tick.
+                        bool isNew = session.KnownEntities.Add(e.Id);
+                        if (isNew || _dirtyAudioBuffer.Contains(e.Id))
+                            _network.SendMessage(peer, CreateDefinition(world, e), DeliveryMethod.ReliableOrdered);
+
+                        if (!isDynamic && !t.IsDirty && !isNew) continue;
+
+                        var state = new NetworkEntityState {
+                            EntityId = e.Id,
+                            Transform = QuantizedTransform.FromTransform(t)
+                        };
+                        if (world.Has<Velocity>(e)) state.LinearVelocity = world.Get<Velocity>(e).Linear;
+                        if (world.Has<BeaconComponent>(e))
                         {
-                            bool isDirtyAudio = false;
-                            for (int j = 0; j < dirtyCount; j++) if (dirtyRented[j] == e.Id) { isDirtyAudio = true; break; }
-
-                            if (isDirtyAudio)
-                                _network.SendMessage(peer, CreateDefinition(world, e), DeliveryMethod.ReliableOrdered);
-
-                            var state = new NetworkEntityState {
-                                EntityId = e.Id,
-                                Transform = QuantizedTransform.FromTransform(t)
-                            };
-                            if (world.Has<Velocity>(e)) state.LinearVelocity = world.Get<Velocity>(e).Linear;
-                            if (world.Has<BeaconComponent>(e))
-                            {
-                                var beacon = world.Get<BeaconComponent>(e);
-                                state.ExtraData = new BeaconData { Frequency = beacon.Frequency, Interval = beacon.Interval };
-                            }
-                            _reusableBroadcast.States.Add(state);
+                            var beacon = world.Get<BeaconComponent>(e);
+                            state.ExtraData = new BeaconData { Frequency = beacon.Frequency, Interval = beacon.Interval };
                         }
+
+                        // A dynamic entity is corrected by the next tick's packet, so losing one costs
+                        // nothing. A static entity that moved is a one-off event that nothing will ever
+                        // resend — on the unreliable channel a single dropped packet leaves that client
+                        // colliding with a wall that is no longer there. Reliable delivery IS the
+                        // acknowledgement; there is no separate ack to wait for.
+                        if (isDynamic) _reusableBroadcast.States.Add(state);
+                        else _reliableBroadcast.States.Add(state);
                     }
 
-                    _network.SendMessage(peer, _reusableBroadcast, DeliveryMethod.Unreliable);
+                    // Anything dynamic this client could see and now cannot is a ghost on their side.
+                    // Static geometry is never evicted: the client's acoustic map is built from the whole
+                    // streamed map, so dropping a distant wall would change how the world sounds.
+                    CollectDeparted(session.VisibleDynamicEntities, _visibleDynamicBuffer, _removedBuffer);
 
-                    var health = world.Get<HealthComponent>(session.Entity);
+                    if (_removedBuffer.Count > 0)
+                    {
+                        foreach (int goneId in _removedBuffer)
+                        {
+                            session.VisibleDynamicEntities.Remove(goneId);
+                            session.KnownEntities.Remove(goneId);
+                        }
+                        _network.SendMessage(peer, new EntityRemoved { EntityIds = new List<int>(_removedBuffer) },
+                            DeliveryMethod.ReliableOrdered);
+                    }
+
+                    foreach (int id in _visibleDynamicBuffer) session.VisibleDynamicEntities.Add(id);
+
+                    if (_reusableBroadcast.States.Count > 0)
+                        _network.SendMessage(peer, _reusableBroadcast, DeliveryMethod.Unreliable);
+                    if (_reliableBroadcast.States.Count > 0)
+                        _network.SendMessage(peer, _reliableBroadcast, DeliveryMethod.ReliableOrdered);
+
+                    int health = 0, maxHealth = 0;
+                    if (world.Has<HealthComponent>(session.Entity))
+                    {
+                        var h = world.Get<HealthComponent>(session.Entity);
+                        health = h.Current; maxHealth = h.Max;
+                    }
                     var stats = GetMaterialUnderPlayer(world, grid, pPos);
                     _network.SendMessage(peer, new StatsUpdate {
-                        Health = health.Current, MaxHealth = health.Max,
+                        Health = health, MaxHealth = maxHealth,
                         CurrentMaterial = stats.matType, CurrentVariant = stats.variant
                     }, DeliveryMethod.ReliableOrdered);
                 }
@@ -453,8 +603,6 @@ public class GameServer
             // Cleanup dirty flags after broadcast
             world.Query(new QueryDescription().WithAll<Transform>(), (ref Transform t) => { t.IsDirty = false; });
         }
-
-        ArrayPool<int>.Shared.Return(dirtyRented);
     }
 
     private (string matType, string variant) GetMaterialUnderPlayer(World world, SpatialGrid<Entity> grid, Vector3 pos)
@@ -463,15 +611,46 @@ public class GameServer
         return (floorMat ?? "Generic", "0");
     }
 
+    private void HandleMudDisconnected(int connectionId)
+    {
+        if (!_sessions.TryRemoveSession(connectionId, out var s)) return;
+        Log.Information("MUD session {Id} ({User}) ended.", connectionId, s.Username);
+        DespawnSession(s);
+    }
+
     private void HandlePeerDisconnected(NetPeer peer, DisconnectInfo info)
     {
-        if (_sessions.TryRemoveSession(peer.Id, out var s))
+        if (!_sessions.TryRemoveSession(peer.Id, out var s)) return;
+        Log.Information("Peer {Id} ({User}) disconnected: {Reason}", peer.Id, s.Username, info.Reason);
+        DespawnSession(s);
+    }
+
+    /// <summary>
+    /// Removes a session's body from the world and tells everyone who could see it. Without the second
+    /// half every other client keeps the corpse forever: it still occupies space, still answers scans,
+    /// and still plays whatever sound it carried.
+    /// </summary>
+    private void DespawnSession(UserSession session)
+    {
+        if (session.Entity == Entity.Null) return;
+        var entity = session.Entity;
+        string mapId = session.CurrentMapId;
+        session.Entity = Entity.Null;
+
+        _commandBuffer.Enqueue(() => {
+            _maps.DestroyEntity(mapId, entity);
+            BroadcastEntityRemoved(mapId, entity.Id);
+        });
+    }
+
+    /// <summary>Tells every session on a map that an entity is gone, and forgets it on their behalf.</summary>
+    private void BroadcastEntityRemoved(string mapId, int entityId)
+    {
+        foreach (var other in _sessions.GetSessionsInMap(mapId))
         {
-            if (s.Entity != Entity.Null && _maps.TryGetMap(s.CurrentMapId, out var world, out var _, out var _, out var _)) 
-            {
-                _maps.UnregisterEntity(s.CurrentMapId, s.Entity.Id);
-                world.Destroy(s.Entity);
-            }
+            other.VisibleDynamicEntities.Remove(entityId);
+            if (!other.KnownEntities.Remove(entityId)) continue;
+            SendToSession(other, new EntityRemoved { EntityIds = new List<int> { entityId } });
         }
     }
 
@@ -499,14 +678,34 @@ public class GameServer
         _network.SendMessage(peer, new TextEvent { Text = $"Interaction '{interact.Action}' received." }, DeliveryMethod.ReliableOrdered);
     }
 
-    private void HandleRegister(NetPeer peer, RegisterRequest request)
+    private void HandleRegister(int connectionId, RegisterRequest request, Action<IMessage> reply)
     {
-        if (string.IsNullOrWhiteSpace(request.Username)) return;
-        _userRepo.AddUser(request.Username, request.Password, UserRole.Player);
-        _network.SendMessage(peer, new RegisterResponse { Success = true, Message = "Registration Successful." }, DeliveryMethod.ReliableOrdered);
-    }
+        if (!_authLimiter.TryConsume(RateKeyFor(connectionId)))
+        {
+            Log.Warning("Register rate limit hit for connection {Id}.", connectionId);
+            reply(new RegisterResponse { Success = false, Message = "Too many attempts. Wait a few seconds and try again." });
+            return;
+        }
 
-    private void HandleTextCommand(NetPeer peer, TextCommand cmd) => _commands.HandleTextCommand(peer, cmd);
+        if (string.IsNullOrWhiteSpace(request.Username))
+        {
+            reply(new RegisterResponse { Success = false, Message = "A username is required." });
+            return;
+        }
+
+        if (string.IsNullOrEmpty(request.Password))
+        {
+            reply(new RegisterResponse { Success = false, Message = "A password is required." });
+            return;
+        }
+
+        // The reply used to be an unconditional Success = true, so a duplicate username told the player
+        // their account was created and then refused every login with it.
+        bool created = _userRepo.AddUser(request.Username, request.Password, UserRole.Player);
+        reply(created
+            ? new RegisterResponse { Success = true, Message = "Registration Successful." }
+            : new RegisterResponse { Success = false, Message = "That username is already taken." });
+    }
 
     private void BroadcastEnvironment()
     {
@@ -517,10 +716,10 @@ public class GameServer
             AirPressure = state.AirPressure, WindVelocity = state.WindVelocity,
             WindGustiness = state.WindGustiness, PrecipitationIntensity = state.PrecipitationIntensity
         };
-        foreach(var session in _sessions.GetAllSessions())
+        foreach (var session in _sessions.GetAllSessions())
         {
-            var peer = _network.GetPeer(session.ConnectionId);
-            if (peer != null) _network.SendMessage(peer, update, DeliveryMethod.ReliableOrdered);
+            if (session.IsTextClient) continue; // nothing to render it with
+            SendToSession(session, update);
         }
     }
 }
@@ -538,7 +737,25 @@ public class Program
         try
         {
             using var serviceProvider = ConfigureServices().BuildServiceProvider();
-            serviceProvider.GetRequiredService<GameServer>().Start(33288);
+            var server = serviceProvider.GetRequiredService<GameServer>();
+
+            // Ctrl-C and SIGTERM both ask the loop to finish its tick and tear down in order. Cancelling
+            // the signal is the point: the default action kills the process where it stands, with sockets
+            // open, ECS worlds live and SQLite mid-write.
+            Console.CancelKeyPress += (_, e) =>
+            {
+                e.Cancel = true;
+                Log.Information("Ctrl-C received; shutting down.");
+                server.Stop();
+            };
+            using var sigterm = PosixSignalRegistration.Create(PosixSignal.SIGTERM, ctx =>
+            {
+                ctx.Cancel = true;
+                Log.Information("SIGTERM received; shutting down.");
+                server.Stop();
+            });
+
+            server.Start(33288);
         }
         catch (Exception ex)
         {

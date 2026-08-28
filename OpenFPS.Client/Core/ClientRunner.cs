@@ -183,7 +183,7 @@ public class ClientRunner
             lastTime = currentTime;
 
             // Cap elapsed time to prevent "Spiral of Death" after long pauses
-            if (elapsed > 0.2) elapsed = 0.2;
+            if (elapsed > PhysicsConstants.MaxCatchUpSeconds) elapsed = PhysicsConstants.MaxCatchUpSeconds;
             accumulator += elapsed;
 
             _network.Poll();

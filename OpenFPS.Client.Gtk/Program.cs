@@ -96,7 +96,7 @@ internal static class GtkClientProgram
                     var now = DateTime.Now;
                     double elapsed = (now - lastTime).TotalSeconds;
                     lastTime = now;
-                    if (elapsed > 0.2) elapsed = 0.2;
+                    if (elapsed > PhysicsConstants.MaxCatchUpSeconds) elapsed = PhysicsConstants.MaxCatchUpSeconds;
                     accumulator += elapsed;
 
                     while (accumulator >= targetDt)
