@@ -51,6 +51,13 @@ OpenFPS focuses on a rich **binaural landscape** and **spatial awareness** rathe
   text interface — login, `ready`, `scan`, `move`, `spawn`, and chat in both directions — and removes the
   data race that the old peer-null guard was quietly standing in for.
 - **Authored Portals:** A map describes its doorways explicitly — a `portal` entity carries the two region ids it joins (`-1` = outside) and the width of the opening. Portals drive portal-aware occlusion, adjacent-room reverb coupling, doorway leakage, and the HRTF localization that makes a room's reverb arrive *through* its door. Boundaries with no portal are reported at load with the exact entry the map is missing; nothing is guessed by default.
+- **One Prefab Spec, Checked at Load:** `PrefabTemplate` is the prefab format — one class, documented field
+  by field, with the schema generated against it and a test that fails if they drift. A prefab that
+  describes something the engine cannot honour is **rejected** at load with the reason named: an unknown
+  field, emitter settings on an object whose emitter is switched off, an inside-out directivity cone, a room
+  volume that is also solid geometry, a doorway that blocks the doorway. Rooms name their six surface
+  materials instead of numbering them, emitters can be aimed and given spin-up/spin-down sounds, and
+  colliders can be shapes other than a box. Authoring guide: `docs/AUTHORING.md`.
 
 ## Current Engineering Priorities
 A full component-by-component audit of the rewrite (grades, ranked defects, sequenced remediation plan) lives at

@@ -1,76 +1,152 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "OpenFPS Prefab Template",
+  "description": "The prefab format, generated against OpenFPS.Server/Repositories/PrefabTemplate.cs — the class the loader actually reads. Every key below is a property of that class and nothing else is accepted: PrefabValidator rejects a file carrying an unknown field, because System.Text.Json would otherwise drop it silently and the setting would never apply. Enums are written by NAME. Omit a field rather than setting it to null; an omitted field means 'do not attach this behaviour'. Authoring guide: docs/AUTHORING.md. A prefab whose values the engine cannot honour is rejected at load with the reason named — see PrefabValidator for the full rule set.",
   "type": "object",
+  "additionalProperties": false,
+  "required": ["Id", "Name"],
+  "definitions": {
+    "vector3": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "X": { "type": "number" },
+        "Y": { "type": "number" },
+        "Z": { "type": "number" }
+      }
+    },
+    "material": {
+      "type": "string",
+      "description": "A material name known to AcousticRegistry.",
+      "enum": ["Generic", "Wood", "Metal", "Concrete", "Marble", "Carpet", "Glass", "None", "Plastic", "Grass", "Dirt"]
+    }
+  },
   "properties": {
     "Id": {
       "type": "string",
-      "description": "Unique identifier for the prefab (e.g., 'guard_npc')."
+      "description": "Unique id, and the name a map's PrefabId refers to. Should match the file name; no whitespace."
     },
     "Name": {
       "type": "string",
-      "description": "Friendly display name for the entity."
+      "description": "Spoken name. The only handle the player has on this entity — required."
     },
     "Description": {
       "type": "string",
-      "description": "Short text description of the entity."
-    },
-    "Material": {
-      "type": "string",
-      "description": "Surface material (Concrete, Wood, Metal, Grass, etc.). Affects footsteps and acoustics."
+      "description": "Longer description, read on examine (IdentityComponent.Description)."
     },
     "Type": {
+      "type": "string",
+      "description": "EntityType by name. Defaults to StaticObject. 'Beacon' requires HasEmitter; 'Item' requires IsItem.",
+      "enum": ["None", "Player", "NPC", "Beacon", "StaticObject", "Item", "Projectile", "Trigger"]
+    },
+    "Material": {
+      "$ref": "#/definitions/material",
+      "description": "Surface material. Drives footsteps and the per-band acoustics of this surface. 'None' for a non-surface (emitter, region, portal)."
+    },
+
+    "ColliderSize": {
+      "$ref": "#/definitions/vector3",
+      "description": "Full extents in metres, multiplied by the map entity's Scale. Every extent must be > 0. Omit for no physical presence."
+    },
+    "Shape": {
+      "type": "string",
+      "description": "Collider shape. Defaults to Box. For round shapes, ColliderSize.X is the diameter and .Y the height. Non-Box on SOLID geometry is warned about: movement collides against the AABB regardless, and Steam Audio's scene is built from box colliders only.",
+      "enum": ["Box", "Sphere", "Cylinder", "Cone", "Polygon"]
+    },
+    "IsSolid": {
+      "type": "boolean",
+      "description": "Whether the collider blocks movement. Defaults to true when ColliderSize is given. A region or portal must set this false."
+    },
+
+    "MaxHealth": { "type": "integer", "minimum": 1, "description": "Spawns a HealthComponent at full health." },
+    "IsItem": { "type": "boolean", "description": "Declares this an item; must agree with Type = Item. Recorded only — there is no inventory system yet." },
+    "ItemWeight": { "type": "number", "exclusiveMinimum": 0, "description": "Item weight. Recorded only; requires IsItem." },
+
+    "TransmissionLow": { "type": "number", "minimum": 0, "maximum": 1, "description": "Fraction of low-band energy passing THROUGH this surface. Any transmission/absorption field attaches an AcousticComponent; the others default to 1 (transparent)." },
+    "TransmissionMid": { "type": "number", "minimum": 0, "maximum": 1 },
+    "TransmissionHigh": { "type": "number", "minimum": 0, "maximum": 1 },
+    "Absorption": { "type": "number", "minimum": 0, "maximum": 1, "description": "Energy absorbed on reflection (0 = perfect mirror)." },
+    "Scattering": { "type": "number", "minimum": 0, "maximum": 1, "description": "Reflected energy scattered diffusely." },
+    "ShellThickness": { "type": "number", "minimum": 0, "description": "Wall thickness in metres; > 0 marks the collider hollow." },
+    "FaceMask": {
+      "type": "integer", "minimum": 0, "maximum": 63,
+      "description": "Which faces exist: North 1, South 2, East 4, West 8, Top 16, Bottom 32 (63 = closed box). Mutually exclusive with MissingFaces."
+    },
+    "MissingFaces": {
+      "type": "array",
+      "description": "The readable form of FaceMask: the faces to REMOVE. Mutually exclusive with FaceMask.",
+      "items": { "type": "string", "enum": ["North", "South", "East", "West", "Top", "Ceiling", "Bottom", "Floor"] }
+    },
+
+    "Mass": { "type": "number", "minimum": 0, "description": "Any physics field attaches a PhysicsPropertyComponent; the rest default (Mass 0, Friction 0.5, Restitution 0, Drag 0.1)." },
+    "Friction": { "type": "number", "minimum": 0 },
+    "Restitution": { "type": "number", "minimum": 0, "maximum": 1 },
+    "Drag": { "type": "number", "minimum": 0 },
+
+    "HasEmitter": {
+      "type": "boolean",
+      "description": "Gate for the whole emitter block. False (default) means every emitter field below is ignored — setting one without this is REJECTED rather than producing a mute object."
+    },
+    "SoundId": { "type": "string", "description": "Sound id resolved by the client (e.g. 'BEACONS/siren'). Required unless IsSynth." },
+    "StartSoundId": { "type": "string", "description": "Played once when the voice starts, before SoundId takes over (a spin-up)." },
+    "StopSoundId": { "type": "string", "description": "Played once when the voice is asked to stop, instead of cutting it (a spin-down)." },
+    "Volume": { "type": "number", "minimum": 0, "description": "Linear gain. Above 1 is amplification and is warned about." },
+    "Range": { "type": "number", "exclusiveMinimum": 0, "description": "Audible radius in metres." },
+    "MinDistance": { "type": "number", "exclusiveMinimum": 0, "description": "Distance below which the sound stops getting louder. Must be < Range." },
+    "Mode": {
+      "type": "string",
+      "description": "Playback mode.",
+      "enum": ["Single", "LoopOne", "LoopFolder", "Sequential", "StateMachine"]
+    },
+    "EmitterDirection": {
+      "$ref": "#/definitions/vector3",
+      "description": "Direction the emitter points, in the entity's LOCAL space (rotated by the map entity's Rotation). Omit for forward (0,0,1). Only audible with a cone narrower than 360."
+    },
+    "ConeInsideAngle": { "type": "number", "minimum": 0, "maximum": 360, "description": "Full volume within this angle. Must be <= ConeOutsideAngle. 360/360 is omnidirectional." },
+    "ConeOutsideAngle": { "type": "number", "minimum": 0, "maximum": 360 },
+    "ConeOutsideVolume": { "type": "number", "minimum": 0, "maximum": 1, "description": "Gain beyond the outer cone angle." },
+
+    "IsGranular": { "type": "boolean", "description": "Play SoundId as a grain cloud. Mutually exclusive with IsSynth." },
+    "GranularPosition": { "type": "number", "minimum": 0, "maximum": 1, "description": "Playhead position in the source sample." },
+    "GranularGrainSize": { "type": "number", "exclusiveMinimum": 0, "maximum": 1000, "description": "Grain length in milliseconds." },
+    "GranularDensity": { "type": "number", "exclusiveMinimum": 0, "description": "Grains per second." },
+    "GranularPitch": { "type": "number", "exclusiveMinimum": 0, "description": "Playback rate multiplier." },
+    "GranularPosJitter": { "type": "number", "minimum": 0, "maximum": 1 },
+    "GranularPitchJitter": { "type": "number", "minimum": 0 },
+
+    "IsSynth": { "type": "boolean", "description": "Generate the signal instead of playing a sample. Synth fields without this are REJECTED." },
+    "SynthWave": { "type": "integer", "minimum": 0, "maximum": 4, "description": "0 Sine, 1 Square, 2 Triangle, 3 Saw, 4 Noise." },
+    "SynthFreq": { "type": "number", "exclusiveMinimum": 0, "maximum": 20000, "description": "Base frequency in Hz." },
+    "SynthLfoRate": { "type": "number", "minimum": 0, "description": "Amplitude-LFO rate in Hz." },
+    "SynthLfoDepth": { "type": "number", "minimum": 0, "maximum": 1 },
+    "SynthFilterCutoff": { "type": "number", "exclusiveMinimum": 0, "maximum": 1, "description": "Low-pass cutoff as a fraction of Nyquist (1 = open)." },
+    "SynthFilterResonance": { "type": "number", "minimum": 0, "maximum": 1 },
+    "SynthPulseWidth": { "type": "number", "exclusiveMinimum": 0, "exclusiveMaximum": 1, "description": "Square-wave duty cycle." },
+
+    "IsIndoor": {
+      "type": "boolean",
+      "description": "Any field in this block declares the entity an acoustic REGION — a room volume the listener stands inside. A region must not be solid and must carry a positive RoomSize."
+    },
+    "EnvType": {
+      "type": "string",
+      "enum": ["Atmospheric", "Vacuum", "Underwater", "Digital", "LargeOpen", "SmallTight"]
+    },
+    "RoomSize": { "$ref": "#/definitions/vector3", "description": "Interior dimensions in metres — the volume and surface areas the reverb time is computed from." },
+    "AmbienceId": { "type": "string", "description": "Ambience loop crossfaded in while the listener is inside." },
+    "ReverbScale": { "type": "number", "exclusiveMinimum": 0, "description": "Multiplier on the computed reverb time." },
+    "RoomMaterials": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 6,
+      "items": { "$ref": "#/definitions/material" },
+      "description": "The six interior surfaces by material NAME, in the order Floor, Ceiling, North, South, East, West — the order the reverb math reads them, which is NOT the FaceMask bit order."
+    },
+
+    "RegionAId": {
       "type": "integer",
-      "description": "EntityType enum (0: None, 1: Player, 2: NPC, 3: Beacon, 4: StaticObject, 5: Item).",
-      "enum": [0, 1, 2, 3, 4, 5]
+      "description": "Either region field declares a PORTAL — an opening joining two regions, given as map EntityIds (-1 = the outside). A reusable portal prefab normally leaves both at -1 and lets the MAP entity name the pair. A portal must not be solid."
     },
-    "Collider": {
-      "type": "object",
-      "properties": {
-        "Shape": { "type": "integer", "enum": [0, 1, 2, 3, 4] },
-        "Size": {
-          "type": "object",
-          "properties": {
-            "X": { "type": "number" },
-            "Y": { "type": "number" },
-            "Z": { "type": "number" }
-          }
-        },
-        "IsSolid": { "type": "boolean" }
-      }
-    },
-    "SoundEmitter": {
-      "type": "object",
-      "properties": {
-        "SoundId": { "type": "string" },
-        "Volume": { "type": "number" },
-        "Range": { "type": "number" },
-        "Mode": { "type": "integer", "enum": [0, 1, 2, 3, 4] },
-        "EnableReverb": { "type": "boolean" },
-        "ConeInsideAngle": { "type": "number" },
-        "ConeOutsideAngle": { "type": "number" },
-        "ConeOutsideVolume": { "type": "number" }
-      }
-    },
-    "Acoustics": {
-      "type": "object",
-      "properties": {
-        "Absorption": { "type": "number" },
-        "TransmissionLow": { "type": "number" },
-        "TransmissionMid": { "type": "number" },
-        "TransmissionHigh": { "type": "number" },
-        "Scattering": { "type": "number" }
-      }
-    },
-    "Physics": {
-      "type": "object",
-      "properties": {
-        "Mass": { "type": "number" },
-        "Friction": { "type": "number" },
-        "Restitution": { "type": "number" },
-        "Drag": { "type": "number" }
-      }
-    }
-  },
-  "required": ["Id", "Name", "Type"]
+    "RegionBId": { "type": "integer" },
+    "ApertureSize": { "type": "number", "minimum": 0, "description": "Width of the opening in metres. 0 means 'derive it from the collider at map load'." }
+  }
 }

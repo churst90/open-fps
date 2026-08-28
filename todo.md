@@ -105,10 +105,20 @@ Sequenced so each step is verifiable before the next begins. Steps 1–4 are the
       spawn, scan, move, spawn objects, and send and receive chat. `MapManager.SpawnEntity` /
       `IndexEntity` / `DestroyEntity` are the single path that registers, indexes and broadcasts — `/spawn`
       objects are now solid, audible and scannable. Covered by `ServerHolesTests`.
-- [ ] **5. One prefab spec, validated at load.** `PrefabTemplate` becomes the single source of truth
-      (`prefab-schema.json` and `GEMINI_MAP_STANDARD.md` currently describe two other formats); add collider
-      shape, emitter direction, start/stop sounds, room materials; reject incoherent prefabs at load; write
-      the authoring guide against the real format.
+- [x] **5. One prefab spec, validated at load.** `PrefabTemplate` is now the format, in its own file with
+      every field documented, and it gained the four things the components had and the format could not
+      describe: collider `Shape`, `EmitterDirection`, `StartSoundId` / `StopSoundId`, and `RoomMaterials` by
+      material NAME (Floor, Ceiling, North, South, East, West — deliberately not the `FaceMask` bit order).
+      `PrefabValidator` runs on every file at load and REJECTS a prefab the engine cannot honour, naming
+      each problem: an unknown field (which `System.Text.Json` would drop in silence), a duplicate id, an
+      unknown material, emitter settings with `HasEmitter` false, an inside-out cone, `MinDistance >= Range`,
+      a solid region, a region with no `RoomSize`, a portal that is solid or links a region to itself, synth
+      parameters without `IsSynth`, out-of-range numbers. A map entity referring to a rejected prefab is told
+      it was rejected, not that it does not exist. Maps get the same unknown-field report (logged, not
+      rejected — dropping an entity would delete a wall) and name their room materials too.
+      `prefab-schema.json` is written against the class and a test fails if they drift;
+      `GEMINI_MAP_STANDARD.md` (which described a format the loader had never read) is replaced by
+      `docs/AUTHORING.md`. Covered by `PrefabSpecTests`.
 - [ ] **6. Profile, then cut the hot paths.** One `GetSnapshot()` per frame (currently 3–6); cap the audio
       update to 60 Hz; cache the server ground probe; fix the double enumeration in `GetEntitiesToTest`;
       index active sounds by entity id; measure the Steam Audio ray budget.

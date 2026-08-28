@@ -47,14 +47,7 @@ public class MapManager
                 lookup[entityData.EntityId > 0 ? entityData.EntityId : entity.Id] = entity;
                 if (entityData.EntityId > 0) idMap[entityData.EntityId] = entity.Id;
 
-                if (entityData.Materials != null && world.Has<RegionComponent>(entity))
-                {
-                    ref var r = ref world.Get<RegionComponent>(entity);
-                    for (int i = 0; i < Math.Min(6, entityData.Materials.Length); i++)
-                    {
-                        r.Materials[i] = entityData.Materials[i];
-                    }
-                }
+                ApplyRoomMaterials(world, entity, entityData, m.Id);
 
                 if (entityData.IsIndoor.HasValue && world.Has<RegionComponent>(entity))
                 {
@@ -191,6 +184,59 @@ public class MapManager
         _maps[m.Id] = (world, m.Size, grid, lookup, m);
         RefreshGrid(m.Id);
         VerifySpawnPoint(m);
+    }
+
+    /// <summary>
+    /// Writes a map entity's per-face room materials onto its RegionComponent. Six faces, in the order
+    /// Floor, Ceiling, North, South, East, West — the order the reverb math reads them, which is NOT the
+    /// FaceMask bit order, so it is worth saying out loud wherever it is written down.
+    ///
+    /// `RoomMaterials` names them ("Concrete", "Carpet"); `Materials` is the same thing as raw resonance
+    /// indices, kept for the maps that already use it. Both are checked here: a name the registry does not
+    /// know, or an array that is not six long, is reported with the entity that carries it rather than
+    /// silently leaving that face as material 0 ("None"), which reads as a perfectly reflective surface.
+    /// </summary>
+    private static void ApplyRoomMaterials(World world, Entity entity, Repositories.EntityData entityData, string mapId)
+    {
+        if (entityData.RoomMaterials == null && entityData.Materials == null) return;
+
+        if (!world.Has<RegionComponent>(entity))
+        {
+            Log.Warning("MapManager: Entity {Id} in '{Map}' sets room materials but prefab '{Prefab}' is not an acoustic region, so they are ignored.",
+                entityData.EntityId, mapId, entityData.PrefabId);
+            return;
+        }
+
+        ref var r = ref world.Get<RegionComponent>(entity);
+
+        if (entityData.RoomMaterials != null)
+        {
+            if (entityData.RoomMaterials.Length != 6)
+                Log.Warning("MapManager: Entity {Id} in '{Map}' has {Count} RoomMaterials; it needs exactly 6 ({Order}). The rest keep the prefab's.",
+                    entityData.EntityId, mapId, entityData.RoomMaterials.Length, string.Join(", ", PrefabValidator.RoomFaceOrder));
+
+            for (int i = 0; i < Math.Min(6, entityData.RoomMaterials.Length); i++)
+            {
+                if (AcousticRegistry.TryGetResonanceIndex(entityData.RoomMaterials[i], out int index))
+                    r.Materials[i] = index;
+                else
+                    Log.Warning("MapManager: Entity {Id} in '{Map}' names material '{Material}' for its {Face}, which is not a known material. Known: {Known}.",
+                        entityData.EntityId, mapId, entityData.RoomMaterials[i], PrefabValidator.RoomFaceOrder[i],
+                        string.Join(", ", AcousticRegistry.KnownMaterials()));
+            }
+        }
+
+        if (entityData.Materials != null)
+        {
+            if (entityData.Materials.Length != 6)
+                Log.Warning("MapManager: Entity {Id} in '{Map}' has {Count} Materials indices; it needs exactly 6 ({Order}).",
+                    entityData.EntityId, mapId, entityData.Materials.Length, string.Join(", ", PrefabValidator.RoomFaceOrder));
+
+            for (int i = 0; i < Math.Min(6, entityData.Materials.Length); i++)
+            {
+                r.Materials[i] = entityData.Materials[i];
+            }
+        }
     }
 
     private void VerifySpawnPoint(MapData m)

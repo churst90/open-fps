@@ -271,3 +271,61 @@ could see, hear or walk into.
   commands are still refused. 116/116 pass. Verified live as well: a telnet session logs in, enters the
   world, scans, spawns a metal box and sees it in the next scan; the seventh rapid login attempt is refused
   and recovers after the bucket refills; and SIGINT produces an ordered "Server stopped cleanly."
+
+### 15. One Prefab Spec, Validated at Load (Engineering Audit — Step 5 of 7)
+
+Three documents described the prefab format and the loader had read none of them. `prefab-schema.json`
+documented nested `Collider` / `SoundEmitter` / `Acoustics` objects and an integer `Type`;
+`GEMINI_MAP_STANDARD.md` documented per-entity components; `PrefabTemplate` — the class actually
+deserialized — is flat, uses enum *names*, and carries fields neither document mentioned. An author
+following either produced a file that deserialized into all-defaults and spawned an invisible, silent,
+materialless cube, with no error at all: `System.Text.Json` drops a key it does not recognise without a
+word, which is the same failure as the rest of this audit — the engine answering as though it had done
+what it was asked.
+
+- **`PrefabTemplate` is the format.** Moved into its own file with every field documented against the
+  component it produces, and given the four things the components had and the format could not describe:
+  collider `Shape` (the loader hard-coded `Box`), `EmitterDirection`, `StartSoundId` / `StopSoundId`, and
+  `RoomMaterials`. The last three existed on `SoundEmitterComponent` and `RegionComponent`, crossed the
+  wire in `EntityDefinition`, and were consumed by `VoiceManager` and the Sabine reverb — no prefab could
+  set them, and `ClientAudioSystem` never handed the start/stop ids to the voice or read the emitter's own
+  direction. `Description` was in the format and thrown away at spawn; it now reaches `IdentityComponent`.
+- **Room materials are named, not numbered.** `RegionComponent.Materials` stores resonance indices, so a
+  map said `"Materials": [21, 18, 18, 18, 18, 18]` — unreadable and unverifiable. `RoomMaterials` takes six
+  material NAMES in the order the reverb math reads them (Floor, Ceiling, North, South, East, West, which
+  is deliberately **not** the `FaceMask` bit order), on the prefab and on the map entity alike; the shipped
+  map now uses them. `AcousticRegistry` gained `IsKnown` / `TryGetResonanceIndex` / `KnownMaterials` and an
+  idempotent `EnsureInitialized`, because the server had never initialized the registry at all.
+- **`PrefabValidator` rejects what the engine cannot honour**, and says which file and which rule. The rules
+  are one rule: *a prefab must not be able to describe something the engine will then quietly ignore.* An
+  unknown field (named, with the list of real ones); a duplicate `Id`, or a missing `Id` or `Name`; an
+  unknown material; a collider with a non-positive extent, `IsSolid` with nothing to be solid, `Shape` with
+  no collider; emitter settings with `HasEmitter` false (a permanently mute object), an emitter with nothing
+  to play, `Type: "Beacon"` with no emitter, an inside-out cone, `MinDistance >= Range` (inverted
+  attenuation), a zero-length `EmitterDirection`; synth or granular parameters without their flag, or both
+  flags at once; a region that is solid or has no `RoomSize`; a portal that is solid, or links a region to
+  itself, or an entity that is both; and out-of-range numbers throughout. Warnings load anyway — a non-`Box`
+  solid collider is one, because movement collides against the AABB whatever the shape and Steam Audio's
+  scene is built from boxes only, so a solid sphere is walked around but never *heard*.
+- **Rejection is visible where it bites.** Rejected ids are remembered, so a map entity naming one is told
+  the prefab "was REJECTED at load with N problem(s)" instead of "not found", and the startup log ends with
+  a single line saying how many prefabs loaded and how many did not. One shipped prefab failed its own spec:
+  `building_box` was a 10×5×10 **solid** box that also declared itself an indoor region, so its region
+  voxels sat inside geometry the listener can never stand in.
+- **Maps are checked, not rejected.** An unknown field in a map file or on one of its entities is logged as
+  an error naming the file, the entity and the field — but the map still loads, because dropping the entity
+  would delete a wall. Room materials on a non-region entity, an array that is not six long, and a name the
+  registry does not know are reported the same way. `EntityData.RegionId` was read by nothing and is gone.
+- **The documents now describe the format.** `prefab-schema.json` is written against `PrefabTemplate` with
+  `additionalProperties: false`, and `PrefabSpecTests.Schema_DescribesExactlyTheTemplateClass` fails if the
+  two ever drift apart again. `GEMINI_MAP_STANDARD.md` is replaced by `docs/AUTHORING.md`, which covers
+  prefabs and maps against the real loaders, with the shipped map as the worked example. The stale root
+  `prefabs/` directory — a migration leftover the server never read, holding a second `concrete_wall` with
+  different transmission values — is deleted, and the shipped prefab files no longer carry pages of
+  explicit `null`s.
+
+Tests 116 → 146 (`PrefabSpecTests`), including "every shipped prefab satisfies the spec" and "the shipped
+map uses only fields the loader reads". Verified live: the server loads 18 prefabs with no complaint, links
+4 portals and spawns the map; a map with `Occlusion_Flooor` and `Aperture` typed into it names both fields
+and the entity that carries one. Docs updated: todo.md step 5, readme.md, docs/AUTHORING.md (new),
+GEMINI_MAP_STANDARD.md (removed).

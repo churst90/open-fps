@@ -326,6 +326,10 @@ public class ClientAudioSystem
         {
             EntityId = snap.Id,
             SoundId = resolvedSoundId,
+            // Spin-up / spin-down sounds. VoiceManager has always known how to play these; nothing ever
+            // handed them to it, so an authored StartSoundId was dropped between the prefab and the voice.
+            StartSoundId = def.SoundEmitter.StartSoundId ?? "",
+            StopSoundId = def.SoundEmitter.StopSoundId ?? "",
             Mode = def.SoundEmitter.Mode,
             Position = snap.Transform.Position,
             ApparentPosition = acousticPath.ApparentPosition,
@@ -334,7 +338,14 @@ public class ClientAudioSystem
             ApertureFactor = acousticPath.ApertureFactor,
             TransmissionBleed = acousticPath.TransmissionBleed,
             Velocity = snap.Velocity,
-            Direction = Vector3.Transform(Vector3.UnitZ, snap.Transform.Rotation),
+            // The emitter aims along its own LOCAL direction, rotated into the world by the entity's
+            // rotation. Zero (the default, and what every prefab produced before the field was authorable)
+            // means "straight ahead", which is the old behaviour exactly.
+            Direction = Vector3.Transform(
+                def.SoundEmitter.Direction.LengthSquared() > 0f
+                    ? Vector3.Normalize(def.SoundEmitter.Direction)
+                    : Vector3.UnitZ,
+                snap.Transform.Rotation),
             Volume = def.SoundEmitter.Volume,
             Range = Math.Max(1.0f, def.SoundEmitter.Range),
             Pitch = 1.0f,

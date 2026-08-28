@@ -32,7 +32,7 @@
     { "EntityId": 203, "PrefabId": "concrete_wall", "Position": { "X": -10, "Y": 2, "Z": 10 }, "Scale": { "X": 2,    "Y": 1.333, "Z": 1 } }, // south-left  (x -12..-8)
     { "EntityId": 204, "PrefabId": "concrete_wall", "Position": { "X": -4,  "Y": 2, "Z": 10 }, "Scale": { "X": 2,    "Y": 1.333, "Z": 1 } }, // south-right (x -6..-2)  -> doorway x -8..-6
     { "EntityId": 205, "PrefabId": "concrete_floor", "Position": { "X": -7, "Y": 0.05, "Z": 15 }, "Scale": { "X": 1, "Y": 1, "Z": 1 } },
-    { "EntityId": 210, "PrefabId": "acoustic_region", "Position": { "X": -7, "Y": 2, "Z": 15 }, "IsIndoor": true, "Materials": [18, 18, 18, 18, 18, 18] },
+    { "EntityId": 210, "PrefabId": "acoustic_region", "Position": { "X": -7, "Y": 2, "Z": 15 }, "IsIndoor": true, "RoomMaterials": ["Concrete", "Concrete", "Concrete", "Concrete", "Concrete", "Concrete"] },
     { "EntityId": 211, "PrefabId": "portal", "Position": { "X": -7, "Y": 1, "Z": 10 }, "RegionAId": -1, "RegionBId": 210, "ApertureSize": 2.0 },
     { "EntityId": 220, "PrefabId": "chirp_beacon", "Position": { "X": -7, "Y": 1.5, "Z": 15 } },
 
@@ -47,7 +47,7 @@
     { "EntityId": 303, "PrefabId": "concrete_wall", "Position": { "X": 4,  "Y": 2, "Z": 10 }, "Scale": { "X": 2,    "Y": 1.333, "Z": 1 } }, // south-left  (x 2..6)
     { "EntityId": 304, "PrefabId": "concrete_wall", "Position": { "X": 10, "Y": 2, "Z": 10 }, "Scale": { "X": 2,    "Y": 1.333, "Z": 1 } }, // south-right (x 8..12) -> doorway x 6..8
     { "EntityId": 305, "PrefabId": "wood_floor", "Position": { "X": 7, "Y": 0.05, "Z": 15 }, "Scale": { "X": 1, "Y": 1, "Z": 1 } },
-    { "EntityId": 310, "PrefabId": "acoustic_region", "Position": { "X": 7, "Y": 2, "Z": 15 }, "IsIndoor": true, "Materials": [21, 21, 21, 21, 21, 21] },
+    { "EntityId": 310, "PrefabId": "acoustic_region", "Position": { "X": 7, "Y": 2, "Z": 15 }, "IsIndoor": true, "RoomMaterials": ["Wood", "Wood", "Wood", "Wood", "Wood", "Wood"] },
     { "EntityId": 311, "PrefabId": "portal", "Position": { "X": 7, "Y": 1, "Z": 10 }, "RegionAId": -1, "RegionBId": 310, "ApertureSize": 2.0 },
     { "EntityId": 320, "PrefabId": "space_megaphone", "Position": { "X": 7, "Y": 1.5, "Z": 15 }, "Rotation": { "X": 0, "Y": 1, "Z": 0, "W": 0 } },
 
@@ -75,8 +75,8 @@
     { "EntityId": 513, "PrefabId": "concrete_wall", "Position": { "X": 8.5, "Y": 2, "Z": 30 }, "Scale": { "X": 1.5,  "Y": 1.333, "Z": 1 } },  // south-east-right (x7..10) -> door x3..7
     { "EntityId": 514, "PrefabId": "wood_floor",    "Position": { "X": 5,   "Y": 0.05, "Z": 35 } },
     // -- Acoustic regions + portals --
-    { "EntityId": 530, "PrefabId": "acoustic_region", "Position": { "X": 5,  "Y": 2, "Z": 35 }, "IsIndoor": true, "Materials": [21, 18, 18, 18, 18, 18] }, // GYM (live)
-    { "EntityId": 540, "PrefabId": "acoustic_region", "Position": { "X": -5, "Y": 2, "Z": 35 }, "IsIndoor": true, "Materials": [6, 6, 6, 6, 6, 6] },         // CARPET (dead)
+    { "EntityId": 530, "PrefabId": "acoustic_region", "Position": { "X": 5,  "Y": 2, "Z": 35 }, "IsIndoor": true, "RoomMaterials": ["Wood", "Concrete", "Concrete", "Concrete", "Concrete", "Concrete"] }, // GYM (live)
+    { "EntityId": 540, "PrefabId": "acoustic_region", "Position": { "X": -5, "Y": 2, "Z": 35 }, "IsIndoor": true, "RoomMaterials": ["Carpet", "Carpet", "Carpet", "Carpet", "Carpet", "Carpet"] },         // CARPET (dead)
     { "EntityId": 531, "PrefabId": "portal", "Position": { "X": 0, "Y": 2, "Z": 35 }, "RegionAId": 530, "RegionBId": 540, "ApertureSize": 8.0 }, // open between halves
     { "EntityId": 532, "PrefabId": "portal", "Position": { "X": 5, "Y": 1, "Z": 30 }, "RegionAId": -1,  "RegionBId": 530, "ApertureSize": 4.0 }, // entry doorway (gym side)
     // -- Megaphone on the DEAD side, beaming EAST (+X) into the live half --

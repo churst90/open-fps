@@ -9,22 +9,9 @@
     "Z": 10
   },
   "Type": "StaticObject",
-  "MaxHealth": null,
   "IsItem": false,
-  "ItemWeight": null,
   "TransmissionLow": 0.3,
   "TransmissionMid": 0.5,
   "TransmissionHigh": 0.8,
-  "Mass": null,
-  "Friction": null,
-  "Restitution": null,
-  "Drag": null,
-  "HasEmitter": false,
-  "SoundId": null,
-  "Volume": null,
-  "Range": null,
-  "Mode": null,
-  "IsSynth": null,
-  "SynthWave": null,
-  "SynthFreq": null
+  "HasEmitter": false
 }

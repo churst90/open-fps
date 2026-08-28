@@ -16,11 +16,17 @@ public class EntityData
     public Vector3 Position { get; set; }
     public Quaternion Rotation { get; set; } = Quaternion.Identity;
     public Vector3 Scale { get; set; } = Vector3.One;
-    public int? RegionId { get; set; }
     public int? RegionAId { get; set; }
     public int? RegionBId { get; set; }
     public bool? IsIndoor { get; set; }
     public float? ApertureSize { get; set; }
+
+    /// <summary>Per-face materials for an acoustic REGION entity, by MATERIAL NAME, in the order
+    /// Floor, Ceiling, North, South, East, West. Exactly six entries. Overrides whatever the prefab set.</summary>
+    public string[]? RoomMaterials { get; set; }
+
+    /// <summary>The same thing as <see cref="RoomMaterials"/> written as raw resonance indices.
+    /// Kept for the maps that already use it; prefer the names, which can be checked at load.</summary>
     public int[]? Materials { get; set; }
 }
 
@@ -87,6 +93,7 @@ public class MapRepository
             try
             {
                 string json = File.ReadAllText(file);
+                ReportUnknownFields(json, Path.GetFileName(file));
                 var data = JsonSerializer.Deserialize<MapData>(json, options);
                 if (data != null && !string.IsNullOrEmpty(data.Id)) 
                 {
@@ -115,6 +122,62 @@ public class MapRepository
 
         return maps;
     }
+
+    /// <summary>
+    /// Names every key the map file carries that the loader does not understand.
+    ///
+    /// System.Text.Json drops an unrecognised property without a word, so a mistyped field — `Aperture`
+    /// for `ApertureSize`, `Materials` on an entity that is not a region — is a setting that never applies
+    /// and never complains, and the only symptom is that the map sounds wrong. Unlike a prefab, a map
+    /// entity is NOT rejected for it: dropping it would delete a wall. It is reported and loaded.
+    /// </summary>
+    private static void ReportUnknownFields(string json, string fileName)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(json, new JsonDocumentOptions
+            {
+                AllowTrailingCommas = true,
+                CommentHandling = JsonCommentHandling.Skip
+            });
+            if (doc.RootElement.ValueKind != JsonValueKind.Object) return;
+
+            foreach (var property in doc.RootElement.EnumerateObject())
+            {
+                if (!MapFields.Contains(property.Name))
+                    Log.Error("MapRepository: {File} has unknown map field '{Field}', which the loader ignores. Known: {Known}.",
+                        fileName, property.Name, string.Join(", ", MapFields));
+            }
+
+            if (!doc.RootElement.TryGetProperty("Entities", out var entities) || entities.ValueKind != JsonValueKind.Array) return;
+
+            int index = 0;
+            foreach (var entity in entities.EnumerateArray())
+            {
+                string label = entity.TryGetProperty("EntityId", out var idElement) ? idElement.ToString() : $"#{index}";
+                if (entity.ValueKind == JsonValueKind.Object)
+                {
+                    foreach (var property in entity.EnumerateObject())
+                    {
+                        if (!EntityFields.Contains(property.Name))
+                            Log.Error("MapRepository: {File} entity {Entity} has unknown field '{Field}', which the loader ignores. Known: {Known}.",
+                                fileName, label, property.Name, string.Join(", ", EntityFields));
+                    }
+                }
+                index++;
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Warning("MapRepository: could not scan {File} for unknown fields. {Error}", fileName, ex.Message);
+        }
+    }
+
+    private static readonly HashSet<string> MapFields = new(
+        typeof(MapData).GetProperties().Select(p => p.Name), StringComparer.OrdinalIgnoreCase);
+
+    private static readonly HashSet<string> EntityFields = new(
+        typeof(EntityData).GetProperties().Select(p => p.Name), StringComparer.OrdinalIgnoreCase);
 
     public string GetMapChecksum(string mapId)
     {

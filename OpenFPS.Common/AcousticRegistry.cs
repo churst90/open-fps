@@ -108,6 +108,47 @@ public static class AcousticRegistry
         }
     }
 
+    /// <summary>
+    /// Initializes the table if nothing has yet — the server never called <see cref="Initialize"/>, so
+    /// anything on the server side that needs to know what a material *is* (prefab validation, name to
+    /// resonance-index resolution) would otherwise read an empty registry and reject every material name.
+    /// Idempotent; a caller that wants to re-read materials.json still calls <see cref="Initialize"/>.
+    /// </summary>
+    public static void EnsureInitialized()
+    {
+        if (_registry.Count == 0) Initialize();
+    }
+
+    /// <summary>True if <paramref name="type"/> names a material the registry actually knows about.
+    /// <see cref="GetProperties"/> substitutes "Generic" for anything else, which is the right runtime
+    /// behaviour and the wrong authoring behaviour — a typo'd material must be reported, not guessed.</summary>
+    public static bool IsKnown(string type)
+    {
+        EnsureInitialized();
+        return !string.IsNullOrEmpty(type) && _registry.ContainsKey(type);
+    }
+
+    /// <summary>Resolves a material NAME to the ResonanceIndex that region face arrays are stored as.
+    /// Authoring by raw index (`"Materials": [18, 18, ...]`) is unreadable and unverifiable.</summary>
+    public static bool TryGetResonanceIndex(string type, out int index)
+    {
+        EnsureInitialized();
+        index = 0;
+        if (string.IsNullOrEmpty(type)) return false;
+        if (!_registry.TryGetValue(type, out var props)) return false;
+        index = props.ResonanceIndex;
+        return true;
+    }
+
+    /// <summary>Every known material name, sorted — for naming the alternatives in an error message.</summary>
+    public static IReadOnlyList<string> KnownMaterials()
+    {
+        EnsureInitialized();
+        var names = new List<string>(_registry.Keys);
+        names.Sort(System.StringComparer.OrdinalIgnoreCase);
+        return names;
+    }
+
     public static MaterialProperties GetProperties(string type)
     {
         if (string.IsNullOrEmpty(type)) return _registry["Generic"];
