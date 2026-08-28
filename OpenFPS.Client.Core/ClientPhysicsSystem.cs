@@ -33,26 +33,31 @@ public class ClientPhysicsSystem
         _spatial = spatial;
     }
 
-    private float _targetYaw = 0;
-    private float _targetPitch = 0;
-    private bool _initRotation = false;
-
-    public void Predict(ClientInputUpdate input, WorldSnapshot snapshot, float dt)
+    /// <summary>
+    /// Applies a look delta to the player's orientation using the *same* formula the server's
+    /// MovementSystem uses — no smoothing, no target angles. Rotation is deliberately NOT part of
+    /// <see cref="Predict"/>: prediction is replayed on every server correction, and replaying a
+    /// stateful, lerped rotation made the client's heading depend on how many packets were in
+    /// flight. Call this once per input, when the input is first gathered.
+    /// </summary>
+    public void ApplyLook(ClientInputUpdate input, float dt)
     {
-        if (!_initRotation) { _targetYaw = _state.Yaw; _targetPitch = _state.Pitch; _initRotation = true; }
-
-        // 1. Rotation Update (Interpolated for smoothness)
         if (input.LookDelta != Vector2.Zero)
         {
-            _targetYaw -= input.LookDelta.X * RotationSpeed * dt;
-            _targetPitch = Math.Clamp(_targetPitch + (input.LookDelta.Y * RotationSpeed * dt), -1.5f, 1.5f);
+            _state.Yaw -= input.LookDelta.X * RotationSpeed * dt;
+            _state.Pitch = Math.Clamp(_state.Pitch + (input.LookDelta.Y * RotationSpeed * dt), -1.5f, 1.5f);
         }
-
-        _state.Yaw = MathHelper.LerpAngle(_state.Yaw, _targetYaw, 5.0f * dt);
-        _state.Pitch = MathHelper.Lerp(_state.Pitch, _targetPitch, 5.0f * dt);
         _state.Rotation = Quaternion.CreateFromYawPitchRoll(_state.Yaw, _state.Pitch, 0);
+    }
 
-        // 2. Vertical Physics (Unified logic with server)
+    /// <summary>
+    /// Advances the local player one step. Pure in the state it reads: position, velocity and the
+    /// current yaw in, new position/velocity out — so replaying the same input list from the same
+    /// server state always lands in the same place.
+    /// </summary>
+    public void Predict(ClientInputUpdate input, WorldSnapshot snapshot, float dt)
+    {
+        // 1. Vertical Physics (Unified logic with server)
         float groundY = PhysicsUtils.GetGroundHeight(snapshot, _state.Position, OwnEntityId, out string mat);
         _state.CurrentMaterial = mat;
 
@@ -62,7 +67,7 @@ public class ClientPhysicsSystem
             inputDir = Vector3.Transform(input.MoveDirection, Quaternion.CreateFromYawPitchRoll(_state.Yaw, 0, 0));
         }
 
-        // 3. GATHER COLLIDERS from Snapshot using ArrayPool
+        // 2. GATHER COLLIDERS from Snapshot using ArrayPool
         IEnumerable<EntitySnapshot> candidates;
         var gridResults = snapshot.StaticGrid?.GetItemsInRadius(_state.Position, CollisionSearchRadius);
         if (gridResults != null && gridResults.Any())

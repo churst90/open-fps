@@ -72,10 +72,15 @@ Sequenced so each step is verifiable before the next begins. Steps 1–4 are the
       from the collider when omitted; unlinked portals probed; auto-discovery demoted to opt-in with the
       undescribed boundaries reported; `PortalPipelineTests` covers the whole chain. *(Ear-validation of
       doorway-localized reverb still outstanding — needs a live client session.)*
-- [ ] **2. Unify the tick rate and de-state the predictor.** Delete `GameServer.TickRate` (30) in favour of
-      `PhysicsConstants.TickRate` (20) — the mismatch means the client predicts 4.5 m/s while the server
-      moves the player 3.0 m/s. Move rotation out of the replayed `Predict` path and reconcile yaw. Bound
-      the input history; add a per-tick input budget (closes the speed hack).
+- [x] **2. Unify the tick rate and de-state the predictor.** `GameServer.TickRate` deleted;
+      `PhysicsConstants.TickRate` is **30** (the agreed rate) and drives the server tick, the client's
+      fixed step and the interpolator alike — the client's predicted 4.5 m/s and the server's 3.0 m/s
+      now agree. Rotation moved out of the replayed `Predict` into `ApplyLook` (server-identical, never
+      replayed); yaw reconciled against the server transform via `MathHelper.ToYawPitch`, projected
+      forward by the unacknowledged look deltas. History bounded at `MaxInputHistory`; a per-session
+      `InputBudget` of simulated seconds plus a `DeltaTime` clamp, a per-tick input cap and a queue cap
+      close the speed hack. Both heads now share one `PredictionReconciler`. Covered by
+      `TickRateAndPredictionTests`.
 - [ ] **3. Make every degradation loud.** Real hand-rolled fallback when a Steam Audio tick returns null
       (today it yields zero occlusion for every source); add phonon to the required-native check; query the
       CPU's SIMD level instead of assuming AVX2; log and speak protocol/connection failures; stop dropping

@@ -21,6 +21,23 @@ public static class PhysicsConstants
     public const float CollisionSearchRadius = 5.0f;
 
     // --- Simulation Timing ---
-    public const int TickRate = 20; // 20 ticks per second (Standard for networking)
-    public const float FixedDeltaTime = 1.0f / TickRate; // 0.05s
+    // ONE rate for the whole game: the server's authoritative tick, the client's fixed
+    // prediction step, and the tick period the interpolator reconstructs server time from.
+    // A mismatch here is not a smoothness problem, it is a divergence problem — the client
+    // integrates WalkSpeed over its own step while the server integrates it over the tick,
+    // so the two disagree about how far a held key moves you.
+    public const int TickRate = 30; // 30 ticks per second, client and server
+    public const float FixedDeltaTime = 1.0f / TickRate; // ~0.0333s
+
+    // --- Input Integrity (server-side) ---
+    /// <summary>Longest simulated step a single client input may claim (guards a forged DeltaTime).</summary>
+    public const float MaxInputDeltaTime = FixedDeltaTime * 1.5f;
+    /// <summary>Hard cap on inputs drained per player per tick, so a flood cannot stall the loop.</summary>
+    public const int MaxInputsPerTick = 4;
+    /// <summary>Backlog of simulated time a player may bank while lagging, in ticks.</summary>
+    public const float MaxInputBudgetTicks = 3.0f;
+    /// <summary>Depth of a session's pending-input queue; excess arrivals are dropped.</summary>
+    public const int MaxQueuedInputs = 64;
+    /// <summary>Unacknowledged inputs the client keeps for reconciliation (~3 seconds).</summary>
+    public const int MaxInputHistory = TickRate * 3;
 }

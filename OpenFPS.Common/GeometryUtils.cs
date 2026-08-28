@@ -12,6 +12,26 @@ public static class MathHelper
         if (delta < -MathF.PI) delta += MathF.PI * 2;
         return a + delta * Math.Clamp(t, 0, 1);
     }
+
+    /// <summary>Folds an angle into (-PI, PI], so two yaws can be compared by magnitude.</summary>
+    public static float WrapAngle(float radians)
+    {
+        float wrapped = ((radians + MathF.PI) % (MathF.PI * 2)) - MathF.PI;
+        if (wrapped <= -MathF.PI) wrapped += MathF.PI * 2;
+        return wrapped;
+    }
+
+    /// <summary>
+    /// Inverse of <see cref="Quaternion.CreateFromYawPitchRoll"/> for the roll-free rotations the
+    /// simulation uses: recovers the yaw/pitch pair that produced this orientation, so a client can
+    /// reconcile its look angles against a quantized server transform.
+    /// </summary>
+    public static void ToYawPitch(Quaternion rotation, out float yaw, out float pitch)
+    {
+        Vector3 forward = Vector3.Transform(new Vector3(0, 0, 1), Quaternion.Normalize(rotation));
+        yaw = MathF.Atan2(forward.X, forward.Z);
+        pitch = -MathF.Asin(Math.Clamp(forward.Y, -1f, 1f));
+    }
 }
 
 public static class GeometryUtils

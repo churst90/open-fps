@@ -20,5 +20,16 @@ public class UserSession
     public HashSet<int> KnownEntities { get; } = new();
     public ClientInputUpdate LastInput { get; set; } = new();
     public System.Collections.Concurrent.ConcurrentQueue<ClientInputUpdate> InputQueue { get; } = new();
+
+    /// <summary>
+    /// Simulated seconds this player is still owed. Each tick grants one tick's worth (capped),
+    /// and every input consumes what it claims — so a client cannot buy extra distance by sending
+    /// inputs faster than real time, however large a DeltaTime it forges.
+    /// </summary>
+    public float InputBudget { get; set; }
+
+    /// <summary>Inputs discarded because the queue was full — flood diagnostics.</summary>
+    public long DroppedInputs { get; set; }
+
     public DateTime LastCollisionTime { get; set; } = DateTime.MinValue;
 }

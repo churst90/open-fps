@@ -39,11 +39,26 @@ public static class MovementSystem
         world.Query(new QueryDescription().WithAll<PlayerComponent, Transform, Velocity, MaterialComponent>(), (Entity e, ref PlayerComponent player, ref Transform transform, ref Velocity velocity, ref MaterialComponent material) =>
         {
             if (!sessions.TryGetSession(player.ConnectionId, out var session)) return;
-            
-            // Sub-tick simulation: Process every input received since the last tick to ensure no precision loss.
-            while (session.InputQueue.TryDequeue(out var input)) 
-            { 
+
+            // Sub-tick simulation with a real-time budget. The tick grants exactly one tick of
+            // simulated time (plus a small backlog for lag), and each input spends what it claims.
+            // Inputs that outrun the budget stay queued for a later tick rather than being
+            // integrated now, which is what closes the "send inputs faster than real time" speed
+            // hack: extra packets buy latency, never distance.
+            session.InputBudget = MathF.Min(session.InputBudget + dt, FixedDeltaTime * MaxInputBudgetTicks);
+
+            int processedInputs = 0;
+            while (processedInputs < MaxInputsPerTick
+                   && session.InputBudget > 0f
+                   && session.InputQueue.TryDequeue(out var input))
+            {
+                processedInputs++;
                 session.LastProcessedSequenceId = input.SequenceId;
+
+                // The client's claimed step is advisory: clamp it, then trim it to the budget.
+                float stepDt = input.DeltaTime > 0f ? MathF.Min(input.DeltaTime, MaxInputDeltaTime) : dt;
+                stepDt = MathF.Min(stepDt, session.InputBudget);
+                session.InputBudget -= stepDt;
 
                 // 1. VOID CHECK (Safety Net)
                 if (transform.Position.Y < voidThreshold)
@@ -65,8 +80,8 @@ public static class MovementSystem
                 // 2. ROTATION
                 if (input.LookDelta != Vector2.Zero)
                 {
-                    player.Yaw -= input.LookDelta.X * RotationSpeed * dt;
-                    player.Pitch = Math.Clamp(player.Pitch + (input.LookDelta.Y * RotationSpeed * dt), -1.5f, 1.5f);
+                    player.Yaw -= input.LookDelta.X * RotationSpeed * stepDt;
+                    player.Pitch = Math.Clamp(player.Pitch + (input.LookDelta.Y * RotationSpeed * stepDt), -1.5f, 1.5f);
                     transform.Rotation = Quaternion.CreateFromYawPitchRoll(player.Yaw, player.Pitch, 0);
                     transform.IsDirty = true;
                 }
@@ -112,7 +127,7 @@ public static class MovementSystem
                         Position = transform.Position,
                         Velocity = velocity.Linear,
                         InputDirection = inputDir,
-                        DeltaTime = dt,
+                        DeltaTime = stepDt,
                         GroundHeight = groundY,
                         Gravity = mapGravity,
                         JumpForce = JumpPower,

@@ -38,7 +38,7 @@ public sealed class GameSession
     private readonly SoundMappingService _sounds;
     private readonly ClientAudioSystem _audioSystem;
 
-    private readonly List<ClientInputUpdate> _history = new();
+    private readonly PredictionReconciler _reconciler;
     private long _sequenceId = 0;
     private int _ownEntityId = -1;
     private int _expectedEntityCount = 0;
@@ -69,6 +69,7 @@ public sealed class GameSession
         AcousticRegistry.Initialize();
 
         _physics = new ClientPhysicsSystem(_state, new SpatialService());
+        _reconciler = new PredictionReconciler(_state, _physics);
         _controller = new LocalPlayerController(_state);
         _audioEngine = new AudioEngineFacade();
         _sounds = new SoundMappingService(_audioEngine, _state);
@@ -146,7 +147,7 @@ public sealed class GameSession
                 _state.Position = spawn.SpawnTransform.Position;
                 _state.Rotation = spawn.SpawnTransform.Rotation;
                 _state.Velocity = Vector3.Zero;
-                _history.Clear();
+                _reconciler.Reset();
 
                 Serilog.Log.Information("PlayerSpawned: entity {Id} at {Pos}.", spawn.EntityId, spawn.SpawnTransform.Position);
                 GameJoined?.Invoke();
@@ -228,8 +229,7 @@ public sealed class GameSession
         HandleActionKeys(justPressed);
 
         var input = GatherInput(held, dt);
-        _physics.Predict(input, _world.GetSnapshot(), dt);
-        _history.Add(input);
+        _reconciler.Step(input, _world.GetSnapshot(), dt);
 
         _world.UpdateInterpolation(dt, _ownEntityId);
 
@@ -326,23 +326,8 @@ public sealed class GameSession
         }
     }
 
-    private void ApplyServerCorrection(EntityState serverState, long lastProcessedId)
-    {
-        Vector3 predictedPos = _state.Position;
-
-        var transform = serverState.Transform.ToTransform();
-        _state.Position = transform.Position;
-        _state.Velocity = serverState.LinearVelocity;
-
-        _history.RemoveAll(i => i.SequenceId <= lastProcessedId);
-
-        var snap = _world.GetSnapshot();
-        foreach (var input in _history)
-            _physics.Predict(input, snap, input.DeltaTime);
-
-        _state.VisualOffset = predictedPos - _state.Position;
-        if (_state.VisualOffset.Length() > 5.0f) _state.VisualOffset = Vector3.Zero;
-    }
+    private void ApplyServerCorrection(EntityState serverState, long lastProcessedId) =>
+        _reconciler.ApplyServerCorrection(serverState, lastProcessedId, _world.GetSnapshot());
 
     public void Shutdown() => _audioEngine.Dispose();
 }

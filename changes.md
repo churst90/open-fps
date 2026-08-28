@@ -97,3 +97,43 @@
   JSON to its output so the fixtures cannot drift from the shipped content.
 - **Verified:** `MapManager: Linked 4 portal(s) for map 'default'.` on server boot; 72/72 tests pass.
   Still pending: ear-validation in the live client that Room A's reverb now arrives from its south doorway.
+
+### 12. One Tick Rate, a Stateless Predictor (Engineering Audit — Step 2 of 7)
+- **The bug:** two tick rates. `PhysicsConstants.TickRate` was 20 (the client's fixed prediction step, and
+  the period the interpolator reconstructed server time from) while `GameServer.TickRate` was 30 (the
+  authoritative loop). A 30 fps client therefore predicted `WalkSpeed` = 4.5 m/s while the server, integrating
+  each queued input over its own 1/30 s tick, moved the player 20 × 4.5 × (1/30) = **3.0 m/s** — a permanent
+  33% disagreement that reconciliation papered over as a constant rubber-band on every step taken.
+- **One constant.** `GameServer.TickRate` is gone; `PhysicsConstants.TickRate` is **30** and is now the
+  server tick, the client's fixed step, and the interpolator's tick period. The server's per-tick `dt` is
+  `FixedDeltaTime` rather than a re-derivation from milliseconds, and the once-a-second environment
+  broadcast is keyed off `TickRate` instead of a hardcoded 30.
+- **The predictor is stateless.** `ClientPhysicsSystem.Predict` held `_targetYaw`/`_targetPitch` and lerped
+  toward them — and `Predict` is replayed for every unacknowledged input on every server correction, so the
+  player's heading depended on how many packets happened to be in flight. Rotation moved out to
+  `ApplyLook()`, which uses the *same* formula as the server's `MovementSystem` (no smoothing), is called
+  once when an input is gathered, and is never replayed. `Predict` now reads only position, velocity and yaw,
+  so replaying an input list from a server state is deterministic.
+- **Yaw is reconciled.** `MathHelper.ToYawPitch` inverts `CreateFromYawPitchRoll` for the roll-free
+  rotations the simulation uses, so the client can compare its heading against the server's quantized
+  transform. The server's yaw is behind the client by exactly the unacknowledged look deltas, so the
+  reconciler projects it forward by those before comparing, and snaps only past a 0.05 rad threshold —
+  quantization noise never twitches the player's facing, and a genuine divergence is corrected.
+- **`PredictionReconciler` (shared).** History, replay and yaw reconciliation moved into one class in
+  `OpenFPS.Client.Core` that both heads drive, replacing two hand-copied implementations of
+  `ApplyServerCorrection` in the Windows and GTK sessions.
+- **The input history is bounded.** It was an unbounded `List` — a client whose acks stopped arriving grew it
+  forever and re-simulated all of it on every correction. Capped at `MaxInputHistory` (3 seconds).
+- **The speed hack is closed.** The server used to drain the *entire* input queue each tick and integrate
+  every input at full `dt`, so a client that sent inputs faster than real time simply moved faster. Each
+  session now carries an `InputBudget` of simulated seconds: a tick grants one tick's worth (with up to 3
+  ticks of backlog for genuine lag), each input spends what it claims, a forged `DeltaTime` is clamped to
+  `MaxInputDeltaTime`, and at most `MaxInputsPerTick` inputs are drained per tick. Surplus inputs stay
+  queued — extra packets buy latency, never distance. The session queue itself is capped at
+  `MaxQueuedInputs`, with dropped-input counts logged, so a flood cannot grow server memory either.
+- **Tests (72 → 86):** `TickRateAndPredictionTests` drives the real `MovementSystem` against an Arch world
+  and asserts one second of client-cadence input moves the player exactly `WalkSpeed` (3.0 m before the fix);
+  that a 200-input burst, a 10× flood and a forged one-second `DeltaTime` are all bounded by the budget
+  (all three fail against the pre-fix drain-everything loop); that `ToYawPitch`/`WrapAngle` round-trip; that
+  a correction + replay lands back on the predicted position; that pending turns are not double-counted and a
+  disagreeing server snaps the yaw; and that the history stays capped. 86/86 pass.

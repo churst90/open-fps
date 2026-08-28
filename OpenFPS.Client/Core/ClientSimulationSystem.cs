@@ -34,8 +34,8 @@ public class ClientSimulationSystem
     private long _sequenceId = 0;
     private int _expectedEntityCount = 0;
 
-    // History of inputs for reconciliation
-    private readonly List<ClientInputUpdate> _history = new();
+    // Prediction history + reconciliation (shared with the GTK head).
+    private readonly PredictionReconciler _reconciler;
 
     // Interaction proximity tracking
     private readonly HashSet<int> _announcedNearby = new();
@@ -54,6 +54,7 @@ public class ClientSimulationSystem
         _state = state;
         _tts = tts;
         _physics = new ClientPhysicsSystem(state, new SpatialService());
+        _reconciler = new PredictionReconciler(state, _physics);
         _inputHandler = new InputHandler(tts, net, state, world);
     }
 
@@ -88,8 +89,7 @@ public class ClientSimulationSystem
         }
 
         // 3. Client-Side Prediction (CSP)
-        _physics.Predict(input, _world.GetSnapshot(), dt);
-        _history.Add(input);
+        _reconciler.Step(input, _world.GetSnapshot(), dt);
 
         // 3.5. Remote Interpolation
         _world.UpdateInterpolation(dt, _ownEntityId);
@@ -140,7 +140,7 @@ public class ClientSimulationSystem
     /// </summary>
     private void CheckInteractableProximity()
     {
-        if (++_proximityCheckCounter % 20 != 0) return;
+        if (++_proximityCheckCounter % PhysicsConstants.TickRate != 0) return;
 
         var snap = _world.GetSnapshot();
         var currentNearby = new HashSet<int>();
@@ -285,7 +285,7 @@ public class ClientSimulationSystem
                 _state.Position = spawn.SpawnTransform.Position;
                 _state.Rotation = spawn.SpawnTransform.Rotation;
                 _state.Velocity = Vector3.Zero;
-                _history.Clear(); // CRITICAL: Reset prediction buffer on teleport/spawn
+                _reconciler.Reset(); // CRITICAL: Reset prediction buffer on teleport/spawn
                 
                 _navigation?.UpdateLoadingStatus("Entering World...", 100);
                 OnGameJoined?.Invoke();
@@ -396,35 +396,9 @@ public class ClientSimulationSystem
     }
 
     /// <summary>
-    /// Re-simulates the player's path starting from a verified server state.
-    /// Incorporates position smoothing to avoid visual snaps.
+    /// Re-simulates the player's path starting from a verified server state, reconciling both the
+    /// position and the look angles. See <see cref="PredictionReconciler"/>.
     /// </summary>
-    private void ApplyServerCorrection(EntityState serverState, long lastProcessedId)
-    {
-        // 1. Record our predicted position before correction
-        Vector3 predictedPos = _state.Position;
-
-        // 2. Snap to the authoritative server state
-        var transform = serverState.Transform.ToTransform();
-        _state.Position = transform.Position;
-        _state.Velocity = serverState.LinearVelocity;
-
-        // 3. Purge history of already acknowledged inputs
-        _history.RemoveAll(i => i.SequenceId <= lastProcessedId);
-
-        // 4. Re-simulate all inputs that haven't been processed by the server yet
-        // Using the EXACT DeltaTime used during initial prediction
-        var snap = _world.GetSnapshot();
-        foreach (var input in _history) 
-        {
-            _physics.Predict(input, snap, input.DeltaTime);
-        }
-
-        // 5. Calculate visual error for smoothing
-        // VisualOffset = (Where we WERE predicted to be) - (Where we ARE NOW after correction)
-        _state.VisualOffset = predictedPos - _state.Position;
-
-        // If the error is massive (e.g. > 5m), don't smooth, just snap.
-        if (_state.VisualOffset.Length() > 5.0f) _state.VisualOffset = Vector3.Zero;
-    }
+    private void ApplyServerCorrection(EntityState serverState, long lastProcessedId) =>
+        _reconciler.ApplyServerCorrection(serverState, lastProcessedId, _world.GetSnapshot());
 }

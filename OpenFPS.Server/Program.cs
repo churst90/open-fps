@@ -56,8 +56,8 @@ public class GameServer
         _dirtyAudioEntities.Enqueue(entityId);
     }
 
-    private const int TickRate = 30;
-    private const double TickTimeMs = 1000.0 / TickRate;
+    // The tick rate lives in PhysicsConstants — the client predicts against the same number.
+    private const double TickTimeMs = 1000.0 / PhysicsConstants.TickRate;
     private const float EarshotRange = 200.0f; 
 
     public void Start(int port)
@@ -101,8 +101,18 @@ public class GameServer
             if (peer != null) HandleMapDataRequest(peer, req);
         });
         _dispatcher.RegisterHandler<ClientInputUpdate>((id, req, reply) => {
-            if (_sessions.TryGetSession(id, out var s) && req.SequenceId > s.LastProcessedSequenceId)
-                s.InputQueue.Enqueue(req);
+            if (!_sessions.TryGetSession(id, out var s)) return;
+            if (req.SequenceId <= s.LastProcessedSequenceId) return;
+            // Bound the backlog: a client that floods inputs cannot grow the queue without limit,
+            // and gains nothing by trying — MovementSystem spends real time, not queue depth.
+            if (s.InputQueue.Count >= MaxQueuedInputs)
+            {
+                s.DroppedInputs++;
+                if (s.DroppedInputs % 120 == 1)
+                    Log.Warning("Input queue full for {User}; dropping inputs ({Count} so far).", s.Username, s.DroppedInputs);
+                return;
+            }
+            s.InputQueue.Enqueue(req);
         });
         _dispatcher.RegisterHandler<TextCommand>((id, req, reply) => {
             var peer = _network.GetPeer(id);
@@ -181,7 +191,7 @@ public class GameServer
             }
 
             // 2. Update Environment
-            float dt = (float)(TickTimeMs / 1000.0);
+            float dt = FixedDeltaTime;
             _environment.Update(dt);
 
             foreach (var entry in _maps.GetAllMaps())
@@ -209,7 +219,7 @@ public class GameServer
                 }
             }
 
-            if (tick % 30 == 0) BroadcastEnvironment();
+            if (tick % TickRate == 0) BroadcastEnvironment(); // once per second
 
             // 5. Broadcast World State
             BroadcastWorldState(tick);
