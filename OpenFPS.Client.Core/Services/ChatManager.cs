@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using OpenFPS.Common.Networking;
+using OpenFPS.Client.Core.Platform;
 
 namespace OpenFPS.Client.Services;
 
@@ -13,16 +14,22 @@ public enum ChatBufferType
     Error     // Error messages from the server or client systems
 }
 
+/// <summary>
+/// The player's message history, bucketed by kind and navigable by keyboard — the accessible
+/// equivalent of a scrollback pane. Speaks through <see cref="ISpeechOutput"/>, so it is shared by
+/// both heads; it used to be Windows-only and typed on that head's concrete TTS service, which is
+/// why the Linux client had no chat buffers at all.
+/// </summary>
 public class ChatManager
 {
     private readonly Dictionary<ChatBufferType, List<ChatMessage>> _buffers = new();
     private readonly Dictionary<ChatBufferType, int> _bufferCursors = new();
     private ChatBufferType _activeBuffer = ChatBufferType.Global;
-    private readonly TolkService _tts;
+    private readonly ISpeechOutput _tts;
 
     public ChatBufferType ActiveBuffer => _activeBuffer;
 
-    public ChatManager(TolkService tts)
+    public ChatManager(ISpeechOutput tts)
     {
         _tts = tts;
         foreach (ChatBufferType type in Enum.GetValues(typeof(ChatBufferType)))
@@ -52,7 +59,7 @@ public class ChatManager
         bool alwaysSpeak = target == ChatBufferType.Private || target == ChatBufferType.Error;
         if (alwaysSpeak || target == _activeBuffer)
         {
-            _tts.Speak($"{msg.Sender}: {msg.Text}");
+            _tts.Speak($"{msg.Sender}: {msg.Text}", interrupt: false);
         }
     }
 
@@ -79,7 +86,7 @@ public class ChatManager
         current = (current + direction + count) % count;
         _activeBuffer = (ChatBufferType)current;
 
-        _tts.Speak($"Switched to {_activeBuffer} buffer.");
+        _tts.Speak($"Switched to {_activeBuffer} buffer.", interrupt: true);
 
         _bufferCursors[_activeBuffer] = _buffers[_activeBuffer].Count - 1;
         ReadCursorMessage();
@@ -90,7 +97,7 @@ public class ChatManager
         var buffer = _buffers[_activeBuffer];
         if (buffer.Count == 0)
         {
-            _tts.Speak($"{_activeBuffer} buffer is empty.");
+            _tts.Speak($"{_activeBuffer} buffer is empty.", interrupt: false);
             return;
         }
 
@@ -109,11 +116,11 @@ public class ChatManager
         if (idx >= 0 && idx < buffer.Count)
         {
             var msg = buffer[idx];
-            _tts.Speak($"{msg.Sender}: {msg.Text}");
+            _tts.Speak($"{msg.Sender}: {msg.Text}", interrupt: false);
         }
         else
         {
-            _tts.Speak($"{_activeBuffer} buffer is empty.");
+            _tts.Speak($"{_activeBuffer} buffer is empty.", interrupt: false);
         }
     }
 

@@ -29,5 +29,12 @@ public enum GameKey
     F1, F2, F3, F4, F5, F6, F7, F8, F9, F10, F11, F12,
 
     // Punctuation the game binds
-    Comma, Period, Slash, Semicolon
+    Comma, Period, Slash, Semicolon,
+
+    // Chat buffer navigation
+    BracketLeft, BracketRight,
+
+    /// <summary>The numeric keypad's divide key — a second binding for the command console, so the
+    /// console is reachable without a modifier on layouts where slash needs one.</summary>
+    NumpadDivide
 }

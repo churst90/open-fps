@@ -20,6 +20,10 @@ public interface IAudioProvider : IDisposable
     /// <summary>Overrides the listener-region reverb decay (FMOD SFXREVERB ms) with a geometry-derived
     /// value from the Steam Audio reflection simulation. 0 = no override (keep the Sabine estimate).</summary>
     void SetSimulatedReverbDecay(float decayMs);
+
+    /// <summary>Sets the air temperature (°C) the Doppler math uses for the speed of sound. This is how
+    /// the simulated weather reaches the mix: c = 331.3 + 0.606·T.</summary>
+    void SetAirTemperature(float celsius);
     void StopSound(int entityId);
     bool IsPlaying(int entityId);
     Vector3 GetSoundPosition(int entityId);

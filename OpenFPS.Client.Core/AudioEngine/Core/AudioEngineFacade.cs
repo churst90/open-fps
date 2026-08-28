@@ -128,6 +128,7 @@ public class AudioEngineFacade : IDisposable
         _provider.UpdateShelter(lShelter);
         _provider.UpdateProximity(lProx);
         _provider.SetSimulatedReverbDecay(_simReverbMs);
+        _provider.SetAirTemperature(_airTemperatureC);
         
         // 3. Synchronize acoustic map
         if (aMap != null) _provider.SetAcousticMap(aMap);
@@ -213,6 +214,11 @@ public class AudioEngineFacade : IDisposable
     // reflection sim. Volatile scalar — read once per flush; 0 means "no override".
     private volatile float _simReverbMs;
     public void SetSimulatedReverbDecay(float decayMs) => _simReverbMs = decayMs;
+
+    // The world's air temperature (°C), supplied by the client audio system from the server's weather.
+    // Volatile scalar, read once per flush, like the reverb decay above.
+    private volatile float _airTemperatureC = 20.0f;
+    public void SetAirTemperature(float celsius) => _airTemperatureC = celsius;
 
     /// <summary>
     /// Submits a spatial emitter for playback. 

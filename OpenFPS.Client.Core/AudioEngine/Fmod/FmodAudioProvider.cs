@@ -484,6 +484,12 @@ public class FmodAudioProvider : IAudioProvider
 
     public void SetSimulatedReverbDecay(float decayMs) => _simReverbDecayMs = decayMs;
 
+    // Speed of sound, m/s, derived from the world's air temperature. Defaults to the 20 °C value so a
+    // provider that is never told the weather behaves exactly as it did before.
+    private float _speedOfSound = OpenFPS.Client.AudioEngine.Core.AudioPhysics.SpeedOfSound;
+    public void SetAirTemperature(float celsius) =>
+        _speedOfSound = OpenFPS.Client.AudioEngine.Core.AudioPhysics.SpeedOfSoundAt(celsius);
+
     /// <summary>Overrides the listener-region reverb DSP decay with the simulated RT60-derived value when
     /// available, replacing the Sabine estimate for the room the listener is in. No-op when 0 (sim off).</summary>
     private void ApplySimulatedReverb(int listenerRegionId)
@@ -1314,7 +1320,7 @@ public class FmodAudioProvider : IAudioProvider
         if (active.SaState != null)
         {
             float doppler = OpenFPS.Client.AudioEngine.Core.AudioPhysics.DopplerFactor(
-                lPosVec, _listenerVel, active.Position, active.Velocity);
+                lPosVec, _listenerVel, active.Position, active.Velocity, speedOfSound: _speedOfSound);
             float basePitch = (active.GranularState != null || active.SynthState != null) ? 1.0f : active.Pitch;
             active.Channel.setPitch(basePitch * doppler);
         }
@@ -1379,12 +1385,8 @@ public class FmodAudioProvider : IAudioProvider
         }
     }
 
-    private const int MaxReverbSlots = 4;
-    private readonly Dictionary<int, int> _regionToSlot = new();
-    private readonly int[] _slotToRegion = new int[MaxReverbSlots];
-    private readonly FMOD.ChannelGroup[] _reverbSlots = new FMOD.ChannelGroup[MaxReverbSlots];
-    private readonly FMOD.DSP[] _reverbSlotDsps = new FMOD.DSP[MaxReverbSlots];
-    private readonly float[] _slotVolumes = new float[MaxReverbSlots];
+    /// <summary>How many region reverb buses may be audible at once; the rest fade to silence.</summary>
+    private const int MaxActiveReverbBuses = 4;
 
     private void UpdateReverbBuses(Vector3 lPosVec, int listenerRegionId)
     {
@@ -1399,7 +1401,7 @@ public class FmodAudioProvider : IAudioProvider
             })
             .OrderBy(c => c.Priority)
             .ThenBy(c => c.Dist)
-            .Take(MaxReverbSlots)
+            .Take(MaxActiveReverbBuses)
             .ToList();
 
         // 2. Manage bus volumes directly instead of slots for now to fix the handles
@@ -1455,80 +1457,6 @@ public class FmodAudioProvider : IAudioProvider
             }
         }
     }
-
-    private int FindBestSlotToLease(HashSet<int> preferred)
-    {
-        for (int i = 0; i < MaxReverbSlots; i++) if (_slotToRegion[i] == -2) return i;
-        // Priority-based eviction (oldest/quietest)
-        return 0; 
-    }
-
-    private void LeaseSlot(int slotIdx, int regionId)
-    {
-        if (_reverbSlots[slotIdx].hasHandle()) {
-            ConfigureReverbDsp(_reverbSlotDsps[slotIdx], regionId);
-            _slotToRegion[slotIdx] = regionId;
-            _regionToSlot[regionId] = slotIdx;
-            _slotVolumes[slotIdx] = 0.0f; // Start silent for fade-in
-        }
-    }
-
-    private void EvictSlot(int slotIdx)
-    {
-        int regId = _slotToRegion[slotIdx];
-        if (regId != -2) {
-            _regionToSlot.Remove(regId);
-            _slotToRegion[slotIdx] = -2;
-        }
-    }
-
-    private void ConfigureReverbDsp(FMOD.DSP dsp, int regionId)
-    {
-        if (_acousticMap == null) return;
-        
-        if (regionId != -1)
-        {
-            var region = _acousticMap.Regions[regionId];
-            float decayMs = AcousticConstants.DefaultReverbDecayMs;
-            var matProps = (region.Materials != null && region.Materials.Length > 0) ? AcousticRegistry.GetPropertiesByResonanceIndex(region.Materials[0]) : AcousticRegistry.GetProperties("Generic");
-            float volume = region.RoomSize.X * region.RoomSize.Y * region.RoomSize.Z;
-            float surfaceArea = 2 * (region.RoomSize.X * region.RoomSize.Y + region.RoomSize.Y * region.RoomSize.Z + region.RoomSize.X * region.RoomSize.Z);
-            float totalAbs = surfaceArea * matProps.Absorption;
-            if (totalAbs > 0.01f) decayMs = Math.Clamp(0.161f * volume / totalAbs * 1000.0f, AcousticConstants.MinReverbDecayMs, AcousticConstants.MaxReverbDecayMs);
-            decayMs *= Math.Max(0.1f, region.ReverbTimeScale);
-            
-            dsp.setBypass(false);
-            dsp.setParameterFloat(0, decayMs);
-            dsp.setParameterFloat(11, 0.0f); // Wet 0dB
-            dsp.setParameterFloat(12, 0.0f); // Dry 0dB
-        }
-        else 
-        { 
-            // Fix: Truly bypass the DSP for the Outside region
-            dsp.setBypass(true);
-        }
-    }
-
-    private void UpdateSlotAcoustics(int slotIdx, int regionId, Vector3 lPosVec, int listenerRegionId)
-    {
-        float targetVol = (regionId == listenerRegionId) ? 1.0f : 0.0f;
-        if (regionId != listenerRegionId)
-        {
-            var portals = _acousticMap!.Portals.Values.Where(p => (p.Portal.RegionAId == regionId && p.Portal.RegionBId == listenerRegionId) || (p.Portal.RegionAId == listenerRegionId && p.Portal.RegionBId == regionId));
-            var nearest = portals.OrderBy(p => Vector3.Distance(lPosVec, p.Position)).FirstOrDefault();
-            if (nearest.Portal.ApertureSize > 0) targetVol = Math.Clamp((nearest.Portal.ApertureSize / 2.0f) / Math.Max(1.0f, Vector3.Distance(lPosVec, nearest.Position)), 0.0f, 1.0f);
-        }
-
-        _slotVolumes[slotIdx] = MathHelper.Lerp(_slotVolumes[slotIdx], targetVol, AcousticConstants.ReverbFadeSpeed);
-        _reverbSlots[slotIdx].setVolume(_slotVolumes[slotIdx]);
-
-        if (regionId == listenerRegionId) _reverbSlots[slotIdx].set3DLevel(0.0f);
-        else {
-            _reverbSlots[slotIdx].set3DLevel(1.0f);
-            // Position at portal for leakage
-        }
-    }
-
 
     public void UpdateListener(Vector3 position, Quaternion rotation, Vector3 velocity, int regionId)
     {

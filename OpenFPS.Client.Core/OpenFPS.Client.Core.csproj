@@ -22,6 +22,9 @@
          asserted rather than assumed — asking libphonon for AVX2 on a CPU without it is an illegal
          instruction, not an error code. -->
     <InternalsVisibleTo Include="OpenFPS.Tests" />
+    <!-- The Steam Audio migration spikes moved out of the shipped client library into OpenFPS.AudioLab
+         (a dev harness), but they still drive the raw P/Invoke surface directly — that is what a spike is. -->
+    <InternalsVisibleTo Include="OpenFPS.AudioLab" />
   </ItemGroup>
 
 </Project>

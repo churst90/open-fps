@@ -73,10 +73,11 @@ public partial struct ZoneComponent
     public float Gravity { get; set; } = 15.0f;
     public float MinimumY { get; set; }
     
-    // Environment Overrides
+    // Environment Overrides. AirPressure is MILLIBARS (sea level 1013.25), matching what the client's
+    // air-absorption model divides by — not atmospheres.
     public float Temperature { get; set; } = 20.0f;
     public float Humidity { get; set; } = 0.5f;
-    public float AirPressure { get; set; } = 1.0f;
+    public float AirPressure { get; set; } = 1013.25f;
     public float AirAbsorptionMultiplier { get; set; } = 1.0f;
 
     public ZoneComponent() { }
@@ -192,13 +193,19 @@ public partial struct WorldEnvironmentComponent
 {
     public float GameTime { get; set; }
     public int DayOfYear { get; set; }
-    public float Temperature { get; set; } 
-    public float Humidity { get; set; } 
-    public float AirPressure { get; set; } 
-    public float AirAbsorptionMultiplier { get; set; }
-    public Vector3 WindVelocity { get; set; } 
-    public float WindGustiness { get; set; } 
-    public float PrecipitationIntensity { get; set; } 
+
+    // Defaulted to a still, temperate, sea-level day. A default-constructed instance used to describe a
+    // freezing near-vacuum with an air-absorption multiplier of zero, which is what the client's world
+    // state started at and handed to the acoustics until the first WorldStateUpdate arrived.
+    public float Temperature { get; set; } = 20.0f;
+    public float Humidity { get; set; } = 0.5f;
+    /// <summary>Millibars. Sea level is 1013.25.</summary>
+    public float AirPressure { get; set; } = 1013.25f;
+    /// <summary>Scales the air-absorption reference distance. Must be positive; 1 is no scaling.</summary>
+    public float AirAbsorptionMultiplier { get; set; } = 1.0f;
+    public Vector3 WindVelocity { get; set; }
+    public float WindGustiness { get; set; }
+    public float PrecipitationIntensity { get; set; }
     public WorldEnvironmentComponent() { }
 }
 

@@ -1,5 +1,6 @@
 using System.Windows.Forms;
 using OpenFPS.Client.Services;
+using OpenFPS.Client.Core.Platform;
 using System.Drawing;
 using System;
 
@@ -7,7 +8,7 @@ namespace OpenFPS.Client.UI;
 
 public class MainWindow : Form
 {
-    private readonly TolkService _tts;
+    private readonly ISpeechOutput _tts;
     private Panel _gameArea = null!; 
 
     public bool IsCommandMode { get; private set; } = false;
@@ -18,7 +19,7 @@ public class MainWindow : Form
 
     public event Action<string>? OnCommandEntered;
 
-    public MainWindow(TolkService tts)
+    public MainWindow(ISpeechOutput tts)
     {
         _tts = tts;
         InitializeComponent();

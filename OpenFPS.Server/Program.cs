@@ -711,18 +711,42 @@ public class GameServer
             : new RegisterResponse { Success = false, Message = "That username is already taken." });
     }
 
+    /// <summary>
+    /// Sends the world state to every graphical session, built PER MAP.
+    ///
+    /// The weather is global, but two of the fields in the message are not: air pressure is altitude
+    /// and the air-absorption multiplier is authored tuning, and both belong to the map the player is
+    /// standing on. Sending one message to everybody meant a player on a mountain map heard sea-level
+    /// air — and, worse, <c>AirAbsorptionMultiplier</c> was never assigned at all, so it arrived as 0
+    /// and the client's `distance / max(0.1, multiplier)` guard silently multiplied the absorption
+    /// distance by ten, switching air absorption off for the whole game.
+    /// </summary>
     private void BroadcastEnvironment()
     {
-        var state = _environment.GetCurrentState();
-        var update = new WorldStateUpdate {
-            GameTime = state.GameTime, Season = _environment.GetSeason(),
-            Temperature = state.Temperature, Humidity = state.Humidity, 
-            AirPressure = state.AirPressure, WindVelocity = state.WindVelocity,
-            WindGustiness = state.WindGustiness, PrecipitationIntensity = state.PrecipitationIntensity
-        };
+        string season = _environment.GetSeason();
+        var perMap = new Dictionary<string, WorldStateUpdate>();
+
         foreach (var session in _sessions.GetAllSessions())
         {
             if (session.IsTextClient) continue; // nothing to render it with
+
+            if (!perMap.TryGetValue(session.CurrentMapId, out var update))
+            {
+                var atmosphere = _maps.TryGetMapData(session.CurrentMapId, out var mapData)
+                    ? new MapAtmosphere(mapData.Temperature, mapData.Humidity, mapData.AirPressure, mapData.AirAbsorptionMultiplier)
+                    : MapAtmosphere.Default;
+
+                var state = _environment.GetStateForMap(atmosphere);
+                update = new WorldStateUpdate {
+                    GameTime = state.GameTime, Season = season,
+                    Temperature = state.Temperature, Humidity = state.Humidity,
+                    AirPressure = state.AirPressure, AirAbsorptionMultiplier = state.AirAbsorptionMultiplier,
+                    WindVelocity = state.WindVelocity,
+                    WindGustiness = state.WindGustiness, PrecipitationIntensity = state.PrecipitationIntensity
+                };
+                perMap[session.CurrentMapId] = update;
+            }
+
             SendToSession(session, update);
         }
     }

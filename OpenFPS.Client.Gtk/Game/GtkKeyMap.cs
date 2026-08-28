@@ -16,6 +16,9 @@ internal static class GtkKeyMap
     private const uint GDK_period = 0x02e;
     private const uint GDK_slash = 0x02f;
     private const uint GDK_semicolon = 0x03b;
+    private const uint GDK_bracketleft = 0x05b;
+    private const uint GDK_bracketright = 0x05d;
+    private const uint GDK_KP_Divide = 0xffaf;
     private const uint GDK_Return = 0xff0d;
     private const uint GDK_Escape = 0xff1b;
     private const uint GDK_Tab = 0xff09;
@@ -57,6 +60,9 @@ internal static class GtkKeyMap
             GDK_period => GameKey.Period,
             GDK_slash => GameKey.Slash,
             GDK_semicolon => GameKey.Semicolon,
+            GDK_bracketleft => GameKey.BracketLeft,
+            GDK_bracketright => GameKey.BracketRight,
+            GDK_KP_Divide => GameKey.NumpadDivide,
             GDK_Left => GameKey.Left,
             GDK_Right => GameKey.Right,
             GDK_Up => GameKey.Up,

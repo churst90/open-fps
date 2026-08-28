@@ -2,16 +2,17 @@ using System.Windows.Forms;
 using System.Drawing;
 using System;
 using OpenFPS.Client.Services;
+using OpenFPS.Client.Core.Platform;
 
 namespace OpenFPS.Client.UI;
 
 public class LoadingWindow : Form
 {
-    private readonly TolkService _tts;
+    private readonly ISpeechOutput _tts;
     private ProgressBar _progressBar = null!;
     private Label _statusLabel = null!;
 
-    public LoadingWindow(TolkService tts)
+    public LoadingWindow(ISpeechOutput tts)
     {
         _tts = tts;
         InitializeComponent();
@@ -70,6 +71,8 @@ public class LoadingWindow : Form
         _progressBar.Value = Math.Clamp(percent, 0, 100);
         
         // Immediate announcement for major status changes
-        if (percent % 25 == 0 || percent == 100) _tts.Speak(text);
+        // Speak only at quarter marks: a thousand-entity map produces a thousand of these, and a
+        // screen reader asked to read all of them ends up reading none.
+        if (percent % 25 == 0 || percent == 100) _tts.Speak(text, interrupt: false);
     }
 }

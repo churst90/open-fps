@@ -139,9 +139,34 @@ Sequenced so each step is verifiable before the next begins. Steps 1–4 are the
       SH array per source per tick — and a real bug this surfaced, `_lastSnapshot` being assigned before it
       was compared against, which had silently disabled the moving-region check. Covered by `HotPathTests`;
       the FMOD voice index and the ray-budget report are verified by inspection (no native library in CI).
-- [ ] **7. Finish weather, converge the heads, delete the dead code.** Scenario temperature/gustiness/air
-      absorption wired end to end; complete the Phase-A interface extraction so one session class drives both
-      heads; remove the reverb-slot block, dead `SoundMappingService` methods, and the spike files.
+- [x] **7. Finish weather, converge the heads, delete the dead code.** Every stage of the atmospheric chain
+      had a silent break in it. The scenario temperature was computed into `_targetTemp`, which nothing read
+      — and which compounded, so two rain fronts would have cooled the world twice and never given it back;
+      it is now a per-scenario offset plus a ceiling, applied to the seasonal/daily curve. Gustiness snapped
+      onto the state and nothing consumed it; it now fades, and the split is explicit — the server broadcasts
+      the *sustained* wind plus one gustiness scalar, and each client synthesizes the gust locally at audio
+      rate (`WindModel`: deterministic, bounded, never reverses the wind, stilled by shelter). The big one:
+      `BroadcastEnvironment` never assigned `AirAbsorptionMultiplier`, so it arrived as 0 and the client's
+      `Math.Max(0.1f, m)` guard multiplied the absorption distance by TEN — air absorption was off for the
+      whole game. Both ends now substitute the neutral value. `AirPressure` was defaulted to `1.0` while
+      every consumer reads millibars, so every map described a near-vacuum; the defaults are millibars and
+      `MapRepository.NormalizeAtmosphere` names a bad one at load. The broadcast is per map
+      (`GetStateForMap` overlays pressure + multiplier, reads authored temperature/humidity as biases), the
+      manifest's air applies on arrival (`ApplyManifestAtmosphere`), and temperature finally reaches the mix
+      as the speed of sound (`AudioPhysics.SpeedOfSoundAt` → `IAudioProvider.SetAirTemperature`).
+      **The heads are converged:** `ClientGameSession` in Core is the whole of the client's game logic and
+      both heads run it verbatim, behind four seams and nothing else — `ISpeechOutput`, `IClientShell`,
+      `IMicrophoneCapture`, and each head's key map. `InputStateBuffer` / `InputCommandMapper` /
+      `ChatManager` moved to Core on `GameKey` + `ISpeechOutput`, so there is one binding table instead of
+      three processors on one head and an `if` ladder on the other. Linux gained chat scrollback, proximity
+      announcements, a command console, a quit confirmation and loading progress; Windows gained the same
+      table. Deleted: `ClientSimulationSystem`, `InputHandler`, the Windows input mapper/buffer/processors,
+      the GTK `GameSession` + `GameInput`. `EnableWindowsTargeting` lets the Windows head be
+      compile-checked from Linux. **Dead code gone:** the reverb-slot block in `FmodAudioProvider`, the
+      three uncalled `SoundMappingService` play methods and its compat constructor; the ten Steam Audio
+      spikes moved out of the shipped client into `OpenFPS.AudioLab/Spikes/` (the migration's open phases
+      still need `--sim-*`; all ten re-run and pass from there). Covered by `WeatherAndConvergenceTests`.
+      *(Ear-validation of the weather, and a live logged-in walkthrough on either head, still outstanding.)*
 
 ### Corrections to the lists above
 - "Server: Implement Inventory/Take/Drop commands" is **not** done — `/inv`, take and drop are absent from

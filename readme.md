@@ -10,7 +10,7 @@ OpenFPS focuses on a rich **binaural landscape** and **spatial awareness** rathe
 - **Networking:** LiteNetLib 1.2.0 (Reliable UDP)
 - **ECS:** Arch (High-performance Entity Component System)
 - **Serialization:** MemoryPack (Zero-allocation binary)
-- **Accessibility:** Tolk (Direct NVDA Bridge with SAPI fallback)
+- **Accessibility:** `ISpeechOutput` — NVDA direct bridge with SAPI fallback on Windows, speech-dispatcher (Orca / espeak-ng) on Linux
 - **Audio Engine:** FMOD Core engine with Steam Audio (phonon) HRTF binaural; environmental acoustics migrating to Steam Audio's geometry-driven simulator
 
 ## Architecture (SRP Modular)

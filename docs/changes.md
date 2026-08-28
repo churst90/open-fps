@@ -329,3 +329,145 @@ map uses only fields the loader reads". Verified live: the server loads 18 prefa
 4 portals and spawns the map; a map with `Occlusion_Flooor` and `Aperture` typed into it names both fields
 and the entity that carries one. Docs updated: todo.md step 5, readme.md, docs/AUTHORING.md (new),
 GEMINI_MAP_STANDARD.md (removed).
+
+### 16. Profile, Then Cut the Hot Paths (Engineering Audit — Step 6 of 7)
+
+The theme is repeated work: the same answer computed several times over, because nothing remembered it and
+nothing said how often it was allowed to be asked for. Every item below was found by reading the frame, and
+every one is now measurable rather than asserted.
+
+- **A profiler that lives in the code.** `PerfProbe` — named timers and counters any thread can write to,
+  and a report every 30 s — is off unless `OPENFPS_PROFILE=1`, at which point each call is a static bool
+  test and a return. That is what makes it permanent instead of scaffolding put up and taken down around
+  each investigation: the next time something is slow the numbers are one environment variable away.
+  Wired into the server tick, both client loops, the audio update and the Steam Audio simulation.
+- **One snapshot per version of the world, not per consumer.** A `WorldSnapshot` is a full copy of every
+  definition and transform in the map, and a frame built between three and six of them — one for
+  prediction, one for the shelter raycast, one for the proximity scan, one for the audio system, all
+  describing the same instant. `ClientWorldState` now stamps every mutation with a version and hands back
+  the copy built for it; a change produces a NEW copy rather than editing one already given out, which is
+  what keeps it safe to share with the acoustic worker thread. Both heads advance remote interpolation —
+  the tick's only mutation — *before* the readers rather than between two of them, so the whole frame reads
+  one build. Map load no longer builds a snapshot per arriving entity to count entities (`EntityCount`).
+- **The audio update is capped at 60 Hz.** It hung off a loop that spins as fast as it can poll the socket —
+  a 5 ms sleep, so roughly 200 Hz — and drove all of it at that rate: listener sync, region resolution, six
+  near-field raycasts, an acoustic request per active voice, the FMOD tick. Nothing there resolves faster
+  than a frame. `UpdateThrottle` caps it inside `ClientAudioSystem` so both heads are capped by one rule,
+  and re-arms from the moment it ran, so a stall does not then burn catch-up frames for audio nobody can
+  still hear.
+- **The server's ground probe is memoized.** It ran once per INPUT, not once per tick, and each run walks
+  every grid cell within 50 m and tests five points against everything in them; standing still cost exactly
+  as much as sprinting. `GroundProbeMemo` (on the session, so it is per-player and disappears with the
+  disconnect) returns the last answer while the static geometry version, the probe position and the age all
+  hold. The age bound is the honest part: dynamic colliders are not in the version count, so a remembered
+  floor is allowed to be at most 150 ms stale — under a fifth of the interpolation delay the client already
+  tolerates, and still enough to cut a standing player from thirty-plus probes a second to under seven.
+- **Grid queries walk the cells once and return each item once.** `GetItemsInRadius` is an iterator, so
+  asking it for a count and then walking it — which both the server's collision gather and the client's
+  candidate query did — walked every cell twice. Worse, a wall wide enough to span cells is filed in each
+  of them, so it came back four or nine times and was ray-tested four or nine times, per ray, per source,
+  per frame. `SpatialGrid.CollectInRadius` fixes both once, for every caller, into caller-owned buffers so
+  the grid stays safe to read from several threads.
+- **Playing voices are indexed by entity id.** Every per-frame audio call — `IsPlaying`,
+  `GetSoundPosition`, `SetAcousticPath`, and the lookup at the head of `PlaySpatialSound` and
+  `UpdateSpatialAttributes` — was a linear scan of the active-voice list, run once per active voice, so the
+  cost of a frame grew as the square of the number of things making noise. Silencing one removed entity was
+  worse: `ForgetEntity` probes a hundred reflection ids, each a full scan.
+- **The Steam Audio ray budget is measured.** Its cost is a configuration — rays × bounces × sources — not
+  an emergent one, so `SteamAudioSimulator` times its own runs and reports what was asked for against what
+  it cost (`4096 rays x 1 bounce(s), 12/64 sources: avg 2.1ms, max 7.4ms over 900 runs`). A run that costs
+  more than the 16.6 ms audio frame it feeds says so loudly, throttled, because a worker that cannot keep
+  up does not fail — it silently delivers older and older acoustics.
+- **Smaller cuts on the same paths:** remote interpolation was quadratic in the entity count with a lambda
+  closure allocated per entity per frame (now an indexed lookup); the near-field radar allocated its
+  direction array every update; the pathing stage allocated a four-float array per occluded source per
+  tick. And a real bug the snapshot work surfaced: `ClientAudioSystem` assigned `_lastSnapshot` *before*
+  comparing against it, so the moving-region check compared the world with itself and never fired.
+
+Tests 146 → 159 (`HotPathTests`). Two things are verified by inspection rather than by test and are called
+out in the file: the FMOD voice index (no native library in CI) and the ray-budget report (needs a real
+simulation run). Verified live: the server ran 75 s under `OPENFPS_PROFILE=1` and reported
+`server.tick n=900 avg=0.015ms max=0.081ms` — 900 ticks in 30 s, exactly the 30 Hz the rate is set to.
+Docs updated: todo.md step 6, readme.md.
+
+### 17. Finish Weather, Converge the Heads, Delete the Dead Code (Engineering Audit — Step 7 of 7)
+
+Two families of defect with one shape between them: something was written down and never read.
+
+**Weather, end to end.** Every stage of the atmospheric chain had a break in it, and each break was
+silent.
+
+- **The scenario temperature reached nothing.** `WorldEnvironmentSystem` computed rain and storm cooling
+  into `_targetTemp`, a field no other line of the file ever read; the temperature lerped to the bare
+  seasonal/daily curve. It also *compounded* — `_targetTemp -= 2.0f` subtracted from a running total, so
+  two rain fronts in a row would have cooled the world by four degrees and never given them back. The
+  front's contribution is now an offset plus an optional ceiling, applied to the curve each tick: rain
+  −2 °C, a storm −4 °C, and snow capped below freezing so it cannot fall into a summer afternoon.
+- **Gustiness went nowhere, and snapped when it went.** It was assigned straight onto the state (a front
+  took the air from calm to a gale between one tick and the next) and nothing on the client consumed it.
+  It now fades like the wind it travels with, and the split is explicit: the server broadcasts the
+  *sustained* wind plus a gustiness scalar once a second, and each client synthesizes the gust locally at
+  audio rate from that scalar (`WindModel` in Common — a deterministic sum of three incommensurate sines,
+  bounded, never reversing the wind, stilled by shelter). Sampling a two-second swell at 1 Hz would have
+  aliased it into a stutter; this is the standard split, and it makes wind audible as weather rather than
+  as a constant.
+- **`AirAbsorptionMultiplier` was broadcast but never assigned.** `BroadcastEnvironment` built a
+  `WorldStateUpdate` without it, so it arrived as `0` — and the client's `distance / Math.Max(0.1f, m)`
+  guard turned an unset field into a TEN-FOLD increase in the absorption distance. Air absorption was
+  therefore off for the entire game, and the map's authored value never applied. The guard now
+  substitutes the *neutral* value at both ends, and the broadcast carries the field.
+- **Air pressure was authored in the wrong unit.** The default everywhere — `MapData`, `ZoneComponent`,
+  `MapManifest` — was `1.0`, while every consumer reads millibars (sea level 1013.25). Divided by 1013.25
+  that clamped at the floor of the normalisation, so every map on the server described a near-vacuum. The
+  defaults are millibars now, and `MapRepository.NormalizeAtmosphere` names the problem at load and
+  substitutes sea level rather than absorbing it — the same rule step 5 set for prefabs.
+- **The broadcast is per map.** The weather is global, but air pressure is altitude and the absorption
+  multiplier is authored tuning; both belong to the map the player is standing on. `GetStateForMap`
+  overlays them, and reads the map's authored temperature and humidity as *biases* from the baseline, so
+  a map that authors the defaults behaves exactly as before while one authored ten degrees colder stays
+  ten degrees colder than the season.
+- **The map's air applies on arrival.** `ClientWorldState.ApplyManifestAtmosphere` runs from the manifest
+  handler, so the first second in a new map is no longer heard through the previous map's air (the world
+  state broadcast only arrives once a second). A default-constructed `WorldEnvironmentComponent` is now a
+  still, temperate, sea-level day rather than a freezing vacuum.
+- **Temperature reaches the mix.** `AudioPhysics.SpeedOfSoundAt` (c = 331.3 + 0.606·T) feeds the Doppler
+  factor through a new `IAudioProvider.SetAirTemperature`. It is a ~4% swing across a playable range,
+  which is small alone but moves every Doppler shift in the world together: a siren on a winter night is
+  measurably flatter than the same siren in high summer.
+
+**One session class, two heads.** The Windows `ClientSimulationSystem` and the GTK `GameSession` were two
+implementations of one job, and they had already drifted — the Linux client had no chat buffers, no
+proximity announcements, no voice key and no loading progress; the two spoke different sentences on spawn.
+`ClientGameSession` in `OpenFPS.Client.Core` is now the whole of the client's game logic, and both heads
+run it verbatim. What is genuinely platform-specific sits behind four interfaces and nothing else:
+
+| Seam | Windows | Linux |
+|---|---|---|
+| `ISpeechOutput` | `NvdaSpeechOutput` (NVDA + SAPI fallback) | `SpeechDispatcherOutput` (Orca / espeak-ng) |
+| `IClientShell` | `WinFormsClientShell` over `ClientNavigationService` | `GtkClientShell` (loading, console, quit dialogs) |
+| `IMicrophoneCapture` | `VoiceCapture` (NAudio → Opus) | `NullMicrophoneCapture` — says so out loud |
+| key map | `WinFormsKeyMap` (`Keys` → `GameKey`) | `GtkKeyMap` (GDK keyval → `GameKey`) |
+
+`InputStateBuffer`, `InputCommandMapper` and `ChatManager` moved into Core and are typed on `GameKey` and
+`ISpeechOutput`, so there is now one binding table rather than three key processors on one head and a
+hand-rolled `if` ladder on the other. Both heads gained what the other had: Linux gets chat scrollback,
+proximity announcements, a command console, a quit confirmation and loading progress; Windows gets the
+look-ahead and inventory bindings in the same table as everything else. The GTK head's `GameSession`,
+`GameInput`, and the Windows head's `ClientSimulationSystem`, `InputHandler`, `InputCommandMapper`,
+`InputStateBuffer` and three input processors are all deleted. `EnableWindowsTargeting` is set on the
+Windows csproj so that head can be **compile-checked from Linux** — a shared class only one of its two
+heads can be built against is exactly how they drifted apart in the first place.
+
+**Dead code.** The reverb *slot* machinery in `FmodAudioProvider` (`LeaseSlot`, `EvictSlot`,
+`FindBestSlotToLease`, `UpdateSlotAcoustics`, `ConfigureReverbDsp` and five backing fields) was superseded
+by direct per-bus volume management and had no callers; `SoundMappingService` lost
+`PlayPhysicalInteraction`, `PlayUiSound`, `PlayReflection` and its backward-compat constructor, all of
+which duplicated `ClientAudioSystem`'s emitter construction with drifted values and none of which were
+called. The ten Steam Audio migration spikes moved out of the shipped client library into
+`OpenFPS.AudioLab/Spikes/`, which is the only thing that runs them — the migration's remaining phases
+still need `--sim-*`, so they are relocated rather than destroyed. All ten were re-run from their new home
+and pass.
+
+Tests 159 → 188 (`WeatherAndConvergenceTests`). The whole solution builds, the Windows head included.
+Not verified: a live logged-in walkthrough on either head (needs a GUI session), and the weather is
+audible-by-design but has not been ear-checked.

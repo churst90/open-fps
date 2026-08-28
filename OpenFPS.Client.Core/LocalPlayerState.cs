@@ -51,8 +51,18 @@ public class LocalPlayerState
     public float Temperature { get; set; } = 20.0f;
     public float Humidity { get; set; } = 0.5f;
     public float AirPressure { get; set; } = 1013.25f;
+
+    /// <summary>The sustained wind the server broadcasts, m/s. Weather, not what you feel.</summary>
     public Vector3 WindVelocity { get; set; } = Vector3.Zero;
+
+    /// <summary>How hard the sustained wind gusts, 0..1. The amplitude of the swell the client
+    /// synthesizes locally; see <see cref="OpenFPS.Common.WindModel"/>.</summary>
     public float WindGustiness { get; set; } = 0.0f;
+
+    /// <summary>The wind actually felt at the listener this frame: the sustained wind swung by the
+    /// gust envelope and attenuated by shelter. This is the one that reaches the mix.</summary>
+    public Vector3 FeltWind { get; set; } = Vector3.Zero;
+
     public float PrecipitationIntensity { get; set; } = 0.0f;
 
     public string GetCompassDirection()

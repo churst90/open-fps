@@ -12,6 +12,21 @@ public static class AudioPhysics
     public const float SpeedOfSound = 343f;
 
     /// <summary>
+    /// Speed of sound in dry air at a given temperature, m/s: c = 331.3 + 0.606·T(°C).
+    ///
+    /// This is what makes the simulated temperature audible rather than decorative. It is a ~4%
+    /// swing across a playable range (−20 °C to +40 °C), which is small on its own but shifts every
+    /// Doppler factor in the world in the same direction — a siren on a winter night is measurably
+    /// flatter than the same siren in high summer.
+    /// </summary>
+    /// <param name="celsius">Air temperature. Clamped to a range the linear fit still holds over.</param>
+    public static float SpeedOfSoundAt(float celsius)
+    {
+        float t = Math.Clamp(celsius, -60f, 60f);
+        return 331.3f + 0.606f * t;
+    }
+
+    /// <summary>
     /// Doppler pitch multiplier for a source heard by a listener, from their positions and velocities.
     /// &gt;1 = pitched up (closing), &lt;1 = pitched down (receding). Steam Audio voices are rendered on a 2D
     /// FMOD channel (so FMOD's own Doppler is bypassed); the provider applies this factor to the channel

@@ -92,11 +92,13 @@ public partial class MapManifest : IMessage
     public string OwnerId = "";
     public bool IsPublic = false;
 
-    // Atmospheric & Physics
+    // Atmospheric & Physics. The map's authored atmosphere, applied by the client the moment the
+    // manifest lands so the world sounds right before the first WorldStateUpdate arrives a second later.
+    // AirPressure is MILLIBARS (sea level 1013.25).
     public float Gravity = 15.0f;
     public float Temperature = 20.0f;
     public float Humidity = 0.5f;
-    public float AirPressure = 1.0f;
+    public float AirPressure = 1013.25f;
     public float AirAbsorptionMultiplier = 1.0f;
 
     public MapManifest() { }

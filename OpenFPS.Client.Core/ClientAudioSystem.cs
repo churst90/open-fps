@@ -118,10 +118,22 @@ public class ClientAudioSystem
         int listenerRegionId = _acoustics.GetRegionAt(world, visualEyePos);
 
         // 2. Synchronize the listener's smoothed physical state.
-        // Include a fraction of wind velocity so moving air produces subtle Doppler on distant sounds.
-        Vector3 listenerVelocity = _state.Velocity + _state.WindVelocity * 0.1f;
+        //
+        // The wind the listener actually feels is synthesized HERE, not received. The server broadcasts
+        // the sustained wind and a single gustiness scalar once a second; sampling a gust at 1 Hz would
+        // alias it into a stutter, so the swell is generated locally at audio rate from that scalar and
+        // the local clock (see WindModel). Shelter attenuates it: indoors the air is still.
+        Vector3 feltWind = WindModel.Felt(
+            world.WindVelocity, world.WindGustiness, _clock.Elapsed.TotalSeconds, _state.ShelterFactor);
+        _state.FeltWind = feltWind;
+
+        // A fraction of the moving air rides on the listener velocity, so wind produces a subtle Doppler
+        // on distant sounds — and a gust now audibly swells and drops it.
+        Vector3 listenerVelocity = _state.Velocity + feltWind * 0.1f;
         _audio.UpdateListener(visualEyePos, _state.Rotation, listenerVelocity, listenerRegionId);
         _audio.UpdateShelter(_state.ShelterFactor);
+        // Temperature reaches the mix as the speed of sound: c = 331.3 + 0.606·T.
+        _audio.SetAirTemperature(world.Temperature);
 
         // Geometry-driven reverb (Phase 4d): drive the listener-region reverb decay from the Steam Audio
         // reflection sim when available (replaces the Sabine estimate for the room the listener is in).

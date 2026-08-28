@@ -40,6 +40,12 @@ bound verbatim from those 4.8.1 headers in `PhononSim.cs`. No lib swap needed.
 
 **Phase 0 — resolve version** (above). Confirm `iplContextCreate` succeeds with no version warning.
 
+> **Where the spikes live (since audit step 7):** the `Sim*Spike.cs` / `SteamAudioSpike.cs` files moved out
+> of `OpenFPS.Client.Core` — the shipped client library — into `OpenFPS.AudioLab/Spikes/`, which is the only
+> thing that runs them. Every `--sim-*` flag below works unchanged; all ten were re-run from the new location
+> and pass. `Phonon`/`PhononSim` stay in Core (the engine uses them) and are reachable from the lab via
+> `InternalsVisibleTo`.
+
 **Phase 1 — headless occlusion spike: DONE ✅** (`AudioLab --sim-occlusion`, `SimOcclusionSpike.cs`).
 One-wall scene → simulator → source → `iplSimulatorRunDirect` → read `IPLDirectEffectParams.occlusion`.
 Result: visibility 0.00 behind the wall, 1.00 beside it. Proven on Linux; struct layouts in `PhononSim.cs`

@@ -1,5 +1,6 @@
 using System.Windows.Forms;
 using OpenFPS.Client.Services;
+using OpenFPS.Client.Core.Platform;
 using System.Drawing;
 using System;
 
@@ -7,13 +8,13 @@ namespace OpenFPS.Client.UI;
 
 public class MenuWindow : Form
 {
-    private readonly TolkService _tts;
+    private readonly ISpeechOutput _tts;
     private readonly PersistenceService _persistence;
 
     public event Action<SavedServer, string, string>? OnLoginRequested;
     public event Action<SavedServer, string, string>? OnRegisterRequested;
 
-    public MenuWindow(TolkService tts, PersistenceService persistence)
+    public MenuWindow(ISpeechOutput tts, PersistenceService persistence)
     {
         _tts = tts;
         _persistence = persistence;

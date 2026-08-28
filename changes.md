@@ -389,3 +389,85 @@ out in the file: the FMOD voice index (no native library in CI) and the ray-budg
 simulation run). Verified live: the server ran 75 s under `OPENFPS_PROFILE=1` and reported
 `server.tick n=900 avg=0.015ms max=0.081ms` — 900 ticks in 30 s, exactly the 30 Hz the rate is set to.
 Docs updated: todo.md step 6, readme.md.
+
+### 17. Finish Weather, Converge the Heads, Delete the Dead Code (Engineering Audit — Step 7 of 7)
+
+Two families of defect with one shape between them: something was written down and never read.
+
+**Weather, end to end.** Every stage of the atmospheric chain had a break in it, and each break was
+silent.
+
+- **The scenario temperature reached nothing.** `WorldEnvironmentSystem` computed rain and storm cooling
+  into `_targetTemp`, a field no other line of the file ever read; the temperature lerped to the bare
+  seasonal/daily curve. It also *compounded* — `_targetTemp -= 2.0f` subtracted from a running total, so
+  two rain fronts in a row would have cooled the world by four degrees and never given them back. The
+  front's contribution is now an offset plus an optional ceiling, applied to the curve each tick: rain
+  −2 °C, a storm −4 °C, and snow capped below freezing so it cannot fall into a summer afternoon.
+- **Gustiness went nowhere, and snapped when it went.** It was assigned straight onto the state (a front
+  took the air from calm to a gale between one tick and the next) and nothing on the client consumed it.
+  It now fades like the wind it travels with, and the split is explicit: the server broadcasts the
+  *sustained* wind plus a gustiness scalar once a second, and each client synthesizes the gust locally at
+  audio rate from that scalar (`WindModel` in Common — a deterministic sum of three incommensurate sines,
+  bounded, never reversing the wind, stilled by shelter). Sampling a two-second swell at 1 Hz would have
+  aliased it into a stutter; this is the standard split, and it makes wind audible as weather rather than
+  as a constant.
+- **`AirAbsorptionMultiplier` was broadcast but never assigned.** `BroadcastEnvironment` built a
+  `WorldStateUpdate` without it, so it arrived as `0` — and the client's `distance / Math.Max(0.1f, m)`
+  guard turned an unset field into a TEN-FOLD increase in the absorption distance. Air absorption was
+  therefore off for the entire game, and the map's authored value never applied. The guard now
+  substitutes the *neutral* value at both ends, and the broadcast carries the field.
+- **Air pressure was authored in the wrong unit.** The default everywhere — `MapData`, `ZoneComponent`,
+  `MapManifest` — was `1.0`, while every consumer reads millibars (sea level 1013.25). Divided by 1013.25
+  that clamped at the floor of the normalisation, so every map on the server described a near-vacuum. The
+  defaults are millibars now, and `MapRepository.NormalizeAtmosphere` names the problem at load and
+  substitutes sea level rather than absorbing it — the same rule step 5 set for prefabs.
+- **The broadcast is per map.** The weather is global, but air pressure is altitude and the absorption
+  multiplier is authored tuning; both belong to the map the player is standing on. `GetStateForMap`
+  overlays them, and reads the map's authored temperature and humidity as *biases* from the baseline, so
+  a map that authors the defaults behaves exactly as before while one authored ten degrees colder stays
+  ten degrees colder than the season.
+- **The map's air applies on arrival.** `ClientWorldState.ApplyManifestAtmosphere` runs from the manifest
+  handler, so the first second in a new map is no longer heard through the previous map's air (the world
+  state broadcast only arrives once a second). A default-constructed `WorldEnvironmentComponent` is now a
+  still, temperate, sea-level day rather than a freezing vacuum.
+- **Temperature reaches the mix.** `AudioPhysics.SpeedOfSoundAt` (c = 331.3 + 0.606·T) feeds the Doppler
+  factor through a new `IAudioProvider.SetAirTemperature`. It is a ~4% swing across a playable range,
+  which is small alone but moves every Doppler shift in the world together: a siren on a winter night is
+  measurably flatter than the same siren in high summer.
+
+**One session class, two heads.** The Windows `ClientSimulationSystem` and the GTK `GameSession` were two
+implementations of one job, and they had already drifted — the Linux client had no chat buffers, no
+proximity announcements, no voice key and no loading progress; the two spoke different sentences on spawn.
+`ClientGameSession` in `OpenFPS.Client.Core` is now the whole of the client's game logic, and both heads
+run it verbatim. What is genuinely platform-specific sits behind four interfaces and nothing else:
+
+| Seam | Windows | Linux |
+|---|---|---|
+| `ISpeechOutput` | `NvdaSpeechOutput` (NVDA + SAPI fallback) | `SpeechDispatcherOutput` (Orca / espeak-ng) |
+| `IClientShell` | `WinFormsClientShell` over `ClientNavigationService` | `GtkClientShell` (loading, console, quit dialogs) |
+| `IMicrophoneCapture` | `VoiceCapture` (NAudio → Opus) | `NullMicrophoneCapture` — says so out loud |
+| key map | `WinFormsKeyMap` (`Keys` → `GameKey`) | `GtkKeyMap` (GDK keyval → `GameKey`) |
+
+`InputStateBuffer`, `InputCommandMapper` and `ChatManager` moved into Core and are typed on `GameKey` and
+`ISpeechOutput`, so there is now one binding table rather than three key processors on one head and a
+hand-rolled `if` ladder on the other. Both heads gained what the other had: Linux gets chat scrollback,
+proximity announcements, a command console, a quit confirmation and loading progress; Windows gets the
+look-ahead and inventory bindings in the same table as everything else. The GTK head's `GameSession`,
+`GameInput`, and the Windows head's `ClientSimulationSystem`, `InputHandler`, `InputCommandMapper`,
+`InputStateBuffer` and three input processors are all deleted. `EnableWindowsTargeting` is set on the
+Windows csproj so that head can be **compile-checked from Linux** — a shared class only one of its two
+heads can be built against is exactly how they drifted apart in the first place.
+
+**Dead code.** The reverb *slot* machinery in `FmodAudioProvider` (`LeaseSlot`, `EvictSlot`,
+`FindBestSlotToLease`, `UpdateSlotAcoustics`, `ConfigureReverbDsp` and five backing fields) was superseded
+by direct per-bus volume management and had no callers; `SoundMappingService` lost
+`PlayPhysicalInteraction`, `PlayUiSound`, `PlayReflection` and its backward-compat constructor, all of
+which duplicated `ClientAudioSystem`'s emitter construction with drifted values and none of which were
+called. The ten Steam Audio migration spikes moved out of the shipped client library into
+`OpenFPS.AudioLab/Spikes/`, which is the only thing that runs them — the migration's remaining phases
+still need `--sim-*`, so they are relocated rather than destroyed. All ten were re-run from their new home
+and pass.
+
+Tests 159 → 188 (`WeatherAndConvergenceTests`). The whole solution builds, the Windows head included.
+Not verified: a live logged-in walkthrough on either head (needs a GUI session), and the weather is
+audible-by-design but has not been ear-checked.

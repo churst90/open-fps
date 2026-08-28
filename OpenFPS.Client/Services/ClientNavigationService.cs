@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Windows.Forms;
 using OpenFPS.Client.UI;
+using OpenFPS.Client.Core.Platform;
 
 namespace OpenFPS.Client.Services;
 
@@ -11,7 +12,7 @@ namespace OpenFPS.Client.Services;
 /// </summary>
 public class ClientNavigationService : ApplicationContext
 {
-    private readonly TolkService _tts;
+    private readonly ISpeechOutput _tts;
     private readonly Func<MenuWindow> _menuFactory;
     
     private MenuWindow? _menu;
@@ -21,7 +22,7 @@ public class ClientNavigationService : ApplicationContext
     // Thread-safe UI update queue
     private readonly ConcurrentQueue<Action> _uiThreadQueue = new();
 
-    public ClientNavigationService(TolkService tts, Func<MenuWindow> menuFactory)
+    public ClientNavigationService(ISpeechOutput tts, Func<MenuWindow> menuFactory)
     {
         _tts = tts;
         _menuFactory = menuFactory;

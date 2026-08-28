@@ -42,11 +42,14 @@ public class MapData
     public float VoxelResolution { get; set; } = 0.5f;
     public float OcclusionFloor { get; set; } = 0.2f;
 
-    // Atmospheric & Physics Overrides
+    // Atmospheric & Physics Overrides.
+    // AirPressure is MILLIBARS, not atmospheres: sea level is 1013.25, not 1. The old default of 1.0
+    // sailed straight into the client's `AirPressure / 1013.25` normalisation and clamped at the floor,
+    // so every map on the server was authored, silently, as near-vacuum. NormalizeAtmosphere now says so.
     public float Gravity { get; set; } = 15.0f;
     public float Temperature { get; set; } = 20.0f;
     public float Humidity { get; set; } = 0.5f;
-    public float AirPressure { get; set; } = 1.0f;
+    public float AirPressure { get; set; } = 1013.25f;
     public float AirAbsorptionMultiplier { get; set; } = 1.0f;
 
     public List<EntityData> Entities { get; set; } = new();
@@ -97,6 +100,7 @@ public class MapRepository
                 var data = JsonSerializer.Deserialize<MapData>(json, options);
                 if (data != null && !string.IsNullOrEmpty(data.Id)) 
                 {
+                    NormalizeAtmosphere(data, Path.GetFileName(file));
                     maps.Add(data);
                     Log.Information("MapRepository: Successfully loaded map '{Id}' from {File}.", data.Id, Path.GetFileName(file));
                 }
@@ -121,6 +125,48 @@ public class MapRepository
         }
 
         return maps;
+    }
+
+    /// <summary>
+    /// Checks the map's authored atmosphere against the units the engine actually reads it in, and
+    /// says so out loud when it does not match.
+    ///
+    /// This is the same rule as everywhere else in the loader: a value the engine cannot honour is
+    /// named, not silently absorbed. A map is not rejected for it (that would delete a playable world
+    /// over a number), but the substitution is reported so the number can be fixed at the source.
+    /// </summary>
+    public static void NormalizeAtmosphere(MapData data, string fileName)
+    {
+        // Below 300 mb is lower than the summit of Everest (~337 mb) — no map is up there, so a value
+        // this small is an author writing atmospheres (1.0) where the engine reads millibars.
+        const float MinPlausibleMb = 300.0f;
+        const float MaxPlausibleMb = 1100.0f;
+        const float SeaLevelMb = 1013.25f;
+
+        if (data.AirPressure < MinPlausibleMb || data.AirPressure > MaxPlausibleMb)
+        {
+            Log.Warning("MapRepository: map '{Id}' in {File} authors AirPressure {Value} — that is not millibars " +
+                        "(sea level is {SeaLevel}, and the plausible range is {Min}-{Max}). Using {SeaLevel}. " +
+                        "Air absorption would otherwise be computed for a near-vacuum.",
+                data.Id, fileName, data.AirPressure, SeaLevelMb, MinPlausibleMb, MaxPlausibleMb);
+            data.AirPressure = SeaLevelMb;
+        }
+
+        if (data.AirAbsorptionMultiplier <= 0f)
+        {
+            Log.Warning("MapRepository: map '{Id}' in {File} authors AirAbsorptionMultiplier {Value}; it scales a " +
+                        "distance and must be positive. Using 1.0 (no scaling).",
+                data.Id, fileName, data.AirAbsorptionMultiplier);
+            data.AirAbsorptionMultiplier = 1.0f;
+        }
+
+        if (data.Humidity < 0f || data.Humidity > 1f)
+        {
+            float clamped = Math.Clamp(data.Humidity, 0f, 1f);
+            Log.Warning("MapRepository: map '{Id}' in {File} authors Humidity {Value}; the range is 0 to 1. Using {Clamped}.",
+                data.Id, fileName, data.Humidity, clamped);
+            data.Humidity = clamped;
+        }
     }
 
     /// <summary>

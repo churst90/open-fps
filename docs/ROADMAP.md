@@ -99,15 +99,15 @@ The client is hard Windows-locked today: `net10.0-windows` + WinForms, a Win32 `
 
 Target: **Avalonia** — one cross-platform UI codebase with AT-SPI/Orca accessibility. Sequenced refactor:
 
-- [ ] **Extract `ISpeechOutput`** from the (misnamed) `TolkService` — it's already the single chokepoint every announcement flows through; cheapest, highest-leverage portability win. Provide `WindowsSpeechOutput` (NVDA/SAPI) and `LinuxSpeechOutput` (speech-dispatcher / libspeechd).
-- [ ] **Abstract the `Keys` enum** out of the input/logic layer (it's `System.Windows.Forms.Keys` leaking into `ClientSimulationSystem`, `InputCommandMapper`, etc.). Map at the OS boundary.
+- [x] **Extract `ISpeechOutput`** (done, audit step 7) from the (misnamed) `TolkService`, now `NvdaSpeechOutput` — it's already the single chokepoint every announcement flows through; cheapest, highest-leverage portability win. Provide `WindowsSpeechOutput` (NVDA/SAPI) and `LinuxSpeechOutput` (speech-dispatcher / libspeechd).
+- [x] **Abstract the `Keys` enum** out of the input/logic layer (done, audit step 7). `GameKey` is the neutral type; `WinFormsKeyMap` and `GtkKeyMap` map at the OS boundary, and `ClientSimulationSystem` is gone entirely — both heads run `ClientGameSession` from Core.
 - [ ] **Replace the global keyboard hook** with focused-window key events (Avalonia provides these). The global hook is also a *design* smell — it captures system-wide keystrokes then filters by focus in software, fights the screen reader, and is unportable (Wayland forbids it).
 - [ ] **Introduce `INavigationService`** (ShowMenu / ShowLoading / EnterGame) to isolate WinForms in `ClientNavigationService`; build the Avalonia head against it.
 - [ ] **Replace NAudio mic capture** (`VoiceCapture`) with a cross-platform backend (OpenAL/PortAudio, or FMOD's own recording API).
 - [ ] **Ship FMOD Linux `.so`** and fix the `RequiredNativeDlls` hard-coded `.dll` filename check (`ClientRunner.cs:56`).
 - [ ] Multi-target the project (neutral core lib + Windows head + Avalonia head), or move fully to Avalonia.
 
-Fix the two cross-thread-read bugs along the way (the duplicate `InputHandler` instances; unsynchronized reads of `LocalPlayerState` from the TTS thread).
+The duplicate `InputHandler` instances are gone with `InputHandler` itself (audit step 7): there is one session, one binding table and one input buffer. Unsynchronized reads of `LocalPlayerState` from the TTS thread remain to be checked.
 
 ---
 

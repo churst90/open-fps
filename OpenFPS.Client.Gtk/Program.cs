@@ -1,20 +1,23 @@
 using System;
-using System.IO;
 using System.Threading;
 using Gtk;
 using Serilog;
 using OpenFPS.Common;
 using OpenFPS.Common.Networking;
+using OpenFPS.Client.AudioEngine.Core;
 using OpenFPS.Client.Core;          // ClientNetworkService
 using OpenFPS.Client.Core.Platform; // ISpeechOutput / SpeechDispatcherOutput / NativeAudioLibraries
-using OpenFPS.Client.Gtk.Game;      // GameSession / GameWindow
+using OpenFPS.Client.Core.Session;  // ClientGameSession
+using OpenFPS.Client.Gtk.Game;      // GtkClientShell / GameWindow
 
-// OpenFPS GTK (Linux) client — Phase B.
-//   m1: accessible main menu + speech.
-//   m2: connect + login to the server, speaking the result.
-//   m3: enter the world — shared Core game loop, GTK key input, FMOD/Steam-Audio spatial sound.
+// OpenFPS GTK (Linux) client.
+//
+// The head is now genuinely thin: it owns speech, the GTK windows behind IClientShell, and the
+// GDK-keyval-to-GameKey map. Everything else — netcode, prediction, acoustics, bindings, the spoken
+// announcements — is ClientGameSession in OpenFPS.Client.Core, shared verbatim with the Windows head.
+//
 // The network poll + fixed-step simulation run on one background thread (GameLoop); GTK widgets are
-// only ever touched on the main thread (window handoff is marshaled via the captured UI context).
+// only ever touched on the main thread (the shell marshals through the captured UI context).
 internal static class GtkClientProgram
 {
     private static ISpeechOutput _speech = null!;
@@ -22,11 +25,9 @@ internal static class GtkClientProgram
     private static volatile bool _networkStarted;
     private static Application _app = null!;
     private static ApplicationWindow _mainWindow = null!;
-    private static SynchronizationContext? _uiContext;
 
-    private static GameSession? _session;
-    private static GameWindow? _gameWindow;
-    private static bool _audioEnabled;
+    private static GtkClientShell _shell = null!;
+    private static ClientGameSession _session = null!;
     private static string _missingAudioReport = "";
 
     private static string _pendingUser = "";
@@ -47,11 +48,11 @@ internal static class GtkClientProgram
         // disabled" on its own tells a player nothing they can act on.
         var missingLibs = NativeAudioLibraries.FindMissing();
         _missingAudioReport = NativeAudioLibraries.DescribeMissing(missingLibs);
-        _audioEnabled = NativeAudioLibraries.IsPresent(NativeAudioLibraries.FmodFileName);
+        bool audioEnabled = NativeAudioLibraries.IsPresent(NativeAudioLibraries.FmodFileName);
         if (missingLibs.Count > 0) Serilog.Log.Warning("DEGRADED AUDIO. {Report}", _missingAudioReport);
 
         Serilog.Log.Information("Speech backend: {Backend}. Spatial audio: {Audio}.",
-            _speech.BackendName, _audioEnabled ? "enabled" : "disabled (no FMOD library)");
+            _speech.BackendName, audioEnabled ? "enabled" : "disabled (no FMOD library)");
 
         _network = new ClientNetworkService();
         _network.OnConnected += OnServerConnected;
@@ -60,22 +61,35 @@ internal static class GtkClientProgram
         _network.OnConnectionFailed += reason => _speech.Speak(reason, true);
         _network.OnProtocolError += reason => _speech.Speak(reason, true);
 
+        // The session is built up front (both heads do this now) so it can handle the login response
+        // itself; audio initialization is deferred to a background thread inside BeginAudioInit.
+        var audioEngine = new AudioEngineFacade();
+        _shell = new GtkClientShell(_speech, onQuit: () => _app?.Quit());
+        _session = new ClientGameSession(_network, _speech, _shell, audioEngine,
+            microphone: new NullMicrophoneCapture("Voice chat is not available on Linux yet."),
+            enableAudio: audioEnabled);
+        // The shell needs the session's input buffer to clear held keys around modal dialogs; the
+        // session needs the shell at construction. The buffer is created by the session, so it is
+        // handed over immediately afterwards.
+        _shell.SetInput(_session.Input);
+        _session.BeginAudioInit();
+
         var loop = new Thread(GameLoop) { IsBackground = true, Name = "GameLoop" };
         loop.Start();
 
         _app = Application.New("org.openfps.client", Gio.ApplicationFlags.FlagsNone);
         _app.OnActivate += (sender, _) =>
         {
-            _uiContext = SynchronizationContext.Current;
-            BuildMainMenu((Application)sender);
+            var app = (Application)sender;
+            BuildMainMenu(app);
+            _shell.AttachToApplication(app, SynchronizationContext.Current, _mainWindow);
         };
         int rc = _app.RunWithSynchronizationContext(null);
 
-        _session?.Shutdown();
+        _session.Dispose();
         _speech.Dispose();
         return rc;
     }
-
 
     // ── Game / network loop (background thread) ─────────────────────────────────
     private static void GameLoop()
@@ -90,8 +104,7 @@ internal static class GtkClientProgram
             {
                 if (_networkStarted) _network.Poll();
 
-                var session = _session;
-                if (session != null && session.IsInGame)
+                if (_session.IsInGame)
                 {
                     var now = DateTime.Now;
                     double elapsed = (now - lastTime).TotalSeconds;
@@ -101,10 +114,10 @@ internal static class GtkClientProgram
 
                     while (accumulator >= targetDt)
                     {
-                        session.SimStep((float)targetDt);
+                        _session.SimStep((float)targetDt);
                         accumulator -= targetDt;
                     }
-                    session.ContinuousUpdate();
+                    _session.ContinuousUpdate();
                 }
                 else
                 {
@@ -116,8 +129,8 @@ internal static class GtkClientProgram
             }
             catch (Exception ex)
             {
-                // A handler/sim exception must never silently kill the game loop (which pumps the network):
-                // that would freeze the world-load handshake with no diagnostic. Log and keep pumping.
+                // A handler/sim exception must never silently kill the game loop (which pumps the
+                // network): that would freeze the world-load handshake with no diagnostic.
                 Log.Error(ex, "GameLoop iteration failed.");
             }
 
@@ -125,7 +138,7 @@ internal static class GtkClientProgram
         }
     }
 
-    // ── Main menu (m1) ──────────────────────────────────────────────────────────
+    // ── Main menu ───────────────────────────────────────────────────────────────
     private static void BuildMainMenu(Application app)
     {
         _mainWindow = ApplicationWindow.New(app);
@@ -194,44 +207,7 @@ internal static class GtkClientProgram
     }
 
     // ── Server messages (GameLoop thread) ───────────────────────────────────────
-    private static void OnServerMessage(IMessage msg)
-    {
-        if (msg is LoginResponse lr)
-        {
-            Log.Information("LoginResponse: success={Success} user={User} msg={Msg}", lr.Success, lr.Username, lr.Message);
-            if (lr.Success)
-            {
-                _speech.Speak($"Logged in as {lr.Username}. Loading world.", true);
-                _session = new GameSession(_network, _speech, _audioEnabled);
-                _session.GameJoined += OnGameJoined;
-                _session.BeginAudioInit(); // off the network thread — must not block the load handshake
-            }
-            else
-            {
-                _speech.Speak($"Login failed. {lr.Message}", true);
-            }
-            return;
-        }
-
-        _session?.HandleMessage(msg);
-    }
-
-    /// <summary>Fired on the GameLoop thread when the local player spawns; build the game window on the UI thread.</summary>
-    private static void OnGameJoined()
-    {
-        void Enter()
-        {
-            // Hide (don't close) the menu: closing it disrupts the new window's keyboard focus so the
-            // game window stops receiving key events. The game window quits the whole app on close
-            // (see GameWindow), so the hidden menu won't keep the process alive.
-            _gameWindow = new GameWindow(_session!, _speech, () => _app.Quit());
-            _gameWindow.Present(_app);
-            _mainWindow.SetVisible(false);
-        }
-
-        if (_uiContext != null) _uiContext.Post(_ => Enter(), null);
-        else Enter();
-    }
+    private static void OnServerMessage(IMessage msg) => _session.HandleMessage(msg);
 
     // ── UI helpers ──────────────────────────────────────────────────────────────
     private static Box VBox(int margin)

@@ -74,6 +74,8 @@ public class ClientWorldState
 
     public float CurrentPrecipitation { get { lock(_envLock) return _env.PrecipitationIntensity; } }
     public float CurrentTemperature { get { lock(_envLock) return _env.Temperature; } }
+    public float CurrentWindGustiness { get { lock(_envLock) return _env.WindGustiness; } }
+    public Vector3 CurrentWindVelocity { get { lock(_envLock) return _env.WindVelocity; } }
 
     public void UpdateAtmosphere(WorldStateUpdate update)
     {
@@ -81,14 +83,40 @@ public class ClientWorldState
         {
             _env.Temperature = update.Temperature;
             _env.Humidity = update.Humidity;
-            _env.AirPressure = update.AirPressure;
-            _env.AirAbsorptionMultiplier = update.AirAbsorptionMultiplier;
+            _env.AirPressure = SanePressure(update.AirPressure);
+            _env.AirAbsorptionMultiplier = SaneAbsorptionMultiplier(update.AirAbsorptionMultiplier);
             _env.WindVelocity = update.WindVelocity;
-            _env.WindGustiness = update.WindGustiness;
+            _env.WindGustiness = Math.Clamp(update.WindGustiness, 0f, 1f);
             _env.PrecipitationIntensity = update.PrecipitationIntensity;
         }
         Touch();
     }
+
+    /// <summary>
+    /// Applies the map's authored atmosphere the moment the manifest lands.
+    ///
+    /// The world state broadcast arrives once a second, so without this the first second in a new map
+    /// is heard through whatever the previous map's air was — or, on the first map, through the
+    /// defaults. Everything here is overwritten by the next <see cref="UpdateAtmosphere"/>; it exists
+    /// so the gap is authored rather than arbitrary.
+    /// </summary>
+    public void ApplyManifestAtmosphere(MapManifest manifest)
+    {
+        lock (_envLock)
+        {
+            _env.Temperature = manifest.Temperature;
+            _env.Humidity = Math.Clamp(manifest.Humidity, 0f, 1f);
+            _env.AirPressure = SanePressure(manifest.AirPressure);
+            _env.AirAbsorptionMultiplier = SaneAbsorptionMultiplier(manifest.AirAbsorptionMultiplier);
+        }
+        Touch();
+    }
+
+    // A server that sends nonsense (an old build, a map authored in atmospheres, an unassigned field)
+    // must not be able to switch the acoustics off from a distance. Both guards substitute the neutral
+    // value rather than letting a zero propagate into a divisor.
+    private static float SanePressure(float mb) => mb is > 300f and < 1100f ? mb : 1013.25f;
+    private static float SaneAbsorptionMultiplier(float m) => m > 0.01f ? m : 1.0f;
 
     public void Clear(Vector3 size, Vector3 minBound, Vector3 maxBound)
     {

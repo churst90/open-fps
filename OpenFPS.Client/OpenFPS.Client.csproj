@@ -7,6 +7,11 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWindowsForms>true</UseWindowsForms>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <!-- Lets this Windows-targeted project COMPILE on Linux (it still only RUNS on Windows). Without
+         it the SDK refuses with NETSDK1100, which meant the Windows head could not be compile-checked
+         from the machine the Linux head is developed on — and a shared session class that only one of
+         its two heads can be built against is exactly how the two drifted apart in the first place. -->
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
   </PropertyGroup>
 
   <ItemGroup>

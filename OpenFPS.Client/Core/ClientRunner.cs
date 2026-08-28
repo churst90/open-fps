@@ -1,64 +1,58 @@
-using System.Windows.Forms;
-using OpenFPS.Common;
-using OpenFPS.Client.Services;
-using OpenFPS.Client.UI;
-using OpenFPS.Common.Networking;
-using System.Numerics;
 using System;
 using System.Threading;
+using System.Windows.Forms;
+using OpenFPS.Common;
+using OpenFPS.Common.Networking;
 using OpenFPS.Client.AudioEngine.Core;
-using OpenFPS.Client.AudioEngine.Fmod;
 using OpenFPS.Client.Core.Platform;
+using OpenFPS.Client.Core.Session;
+using OpenFPS.Client.Services;
+using OpenFPS.Client.UI;
 
 namespace OpenFPS.Client.Core;
 
 /// <summary>
-/// Responsibility: The application entry point and main bootstrap.
-/// It initializes all services and maintains the high-level game thread.
+/// The Windows head: the application entry point, the WinForms bootstrap, and the game thread.
+///
+/// The head is now thin. It owns speech (NVDA / SAPI), the WinForms windows behind
+/// <see cref="IClientShell"/>, microphone capture, and the virtual-key-to-<c>GameKey</c> map — and
+/// nothing else. Netcode, prediction, acoustics, bindings and every spoken announcement live in
+/// <see cref="ClientGameSession"/> in OpenFPS.Client.Core, shared verbatim with the GTK head.
 /// </summary>
 public class ClientRunner
 {
-    // High-level Services
-    private readonly TolkService _tts = new();
+    // Platform services (the four seams).
+    private readonly ISpeechOutput _speech = new NvdaSpeechOutput();
+    private readonly VoiceCapture _microphone = new();
     private readonly PersistenceService _persistence = new();
     private readonly ClientNetworkService _network = new();
     private readonly AudioEngineFacade _audio;
-    private readonly SoundMappingService _sounds;
-
-    // Engine State
-    private readonly ClientWorldState _world = new();
-    private readonly LocalPlayerState _state = new();
-    private readonly InputStateBuffer _inputBuffer = new();
     private readonly GlobalKeyboardHook _keyboardHook = new();
 
-    // Game Systems
-    private ClientSimulationSystem _simulation = null!;
-    private ClientAudioSystem _audioSystem = null!;
-    private LocalPlayerController _playerController = null!;
-    private InputHandler _inputHandler = null!;
+    private ClientGameSession _session = null!;
+    private ClientNavigationService _navigation = null!;
+    private WinFormsClientShell _shell = null!;
 
-    private ClientNavigationService? _appContext;
     private bool _isRunning = true;
     private Thread? _gameThread;
+
+    private string _pendingUser = "";
+    private string _pendingPass = "";
+    private bool _isRegistering;
 
     public ClientRunner() : this(new AudioEngineFacade()) { }
 
     public ClientRunner(AudioEngineFacade audio)
     {
         _audio = audio;
-        _sounds = new SoundMappingService(_audio, _tts, _state);
     }
-
-    private string _pendingUser = "";
-    private string _pendingPass = "";
-    private bool _isRegistering = false;
 
     /// <summary>
     /// Starts the application, initializes dependencies, and opens the main UI.
     /// </summary>
     public void Run()
     {
-        _tts.Initialize();
+        _speech.Initialize();
 
         // Native audio libraries: FMOD (sound at all) AND phonon (HRTF binaural). phonon is required, not
         // optional — without it the game still makes noise, which is precisely the dangerous case: it looks
@@ -73,42 +67,32 @@ public class ClientRunner
             Serilog.Log.Error("Startup aborted. {Report}", NativeAudioLibraries.DescribeMissing(missingDlls));
 
             // Announce via screen reader / SAPI before showing any UI — accessibility-first.
-            _tts.Speak(message);
+            _speech.Speak(message, interrupt: true);
             MessageBox.Show(message, "Missing Dependencies", MessageBoxButtons.OK, MessageBoxIcon.Error);
             return;
         }
 
         _persistence.Load();
-        AcousticRegistry.Initialize();
-        _sounds.Initialize();
-        _audio.Initialize();
 
         // Subscribe BEFORE Start(): a failure to open the socket is reported from inside Start(), and a
         // handler attached afterwards would never hear the one message that explains why nothing works.
         // A connection or protocol failure must be heard, not inferred from the game going quiet.
-        _network.OnConnectionFailed += reason => _tts.Speak(reason, true);
-        _network.OnProtocolError += reason => _tts.Speak(reason, true);
+        _network.OnConnectionFailed += reason => _speech.Speak(reason, true);
+        _network.OnProtocolError += reason => _speech.Speak(reason, true);
         _network.Start();
 
-        // System Wiring
-        _simulation = new ClientSimulationSystem(_network, _world, _state, _tts);
-        _audioSystem = new ClientAudioSystem(_audio, _sounds, _state);
-        
-        // Link simulation to audio for ID synchronization
-        _simulation.SetAudioSystem(_audioSystem);
-        
-        _playerController = new LocalPlayerController(_state);
-        _inputHandler = new InputHandler(_tts, _network, _state, _world);
-
-        _appContext = new ClientNavigationService(_tts, () => {
-            var menu = new MenuWindow(_tts, _persistence);
-            menu.OnLoginRequested += (server, user, pass) => {
+        _navigation = new ClientNavigationService(_speech, () =>
+        {
+            var menu = new MenuWindow(_speech, _persistence);
+            menu.OnLoginRequested += (server, user, pass) =>
+            {
                 _isRegistering = false;
                 _pendingUser = user;
                 _pendingPass = pass;
                 _network.Connect(server.Address, server.Port);
             };
-            menu.OnRegisterRequested += (server, user, pass) => {
+            menu.OnRegisterRequested += (server, user, pass) =>
+            {
                 _isRegistering = true;
                 _pendingUser = user;
                 _pendingPass = pass;
@@ -117,45 +101,42 @@ public class ClientRunner
             return menu;
         });
 
-        _simulation.SetNavigation(_appContext);
-
-        // --- GLOBAL PRELOAD SEQUENCE ---
-        _appContext.ShowLoading("Initializing Sound Library...");
-        Task.Run(() => {
-            _audio.PreloadAll((msg, pct) => {
-                _appContext.UpdateLoadingStatus(msg, pct);
-            });
-            _tts.Speak("Sound library ready.");
-            _appContext.ShowMenu();
+        _shell = new WinFormsClientShell(_navigation, () =>
+        {
+            _network.Send(new LogoutRequest());
+            Application.Exit();
         });
 
-        // Physical Event Wiring
-        _playerController.OnStepTriggered += _audioSystem.OnPlayerFootstep;
-        _playerController.OnLandTriggered += _audioSystem.OnPlayerLand;
+        _session = new ClientGameSession(_network, _speech, _shell, _audio, _microphone);
 
-        // Input Wiring
-        _keyboardHook.OnKeyStateChanged += (key, isDown) => _inputBuffer.SetKeyState(key, isDown);
+        // Preloading the sound library is the long pole at startup, so it runs on the session's audio
+        // thread and reports progress through the shell — the same path the GTK head uses.
+        _navigation.ShowLoading("Initializing Sound Library...");
+        _session.GameJoined += () => Serilog.Log.Information("Entered the world as entity {Id}.", _session.OwnEntityId);
+        _session.BeginAudioInit(onReady: () => _navigation.ShowMenu());
+
+        // Input: the low-level hook reports Windows virtual keys; they are mapped to the neutral GameKey
+        // at this boundary and never seen by the game logic. (The cross-platform plan calls for replacing
+        // the hook with focused-window key events; that is a separate change with its own risk, and the
+        // seam here is what makes it a one-file swap when it happens.)
+        _keyboardHook.OnKeyStateChanged += (key, isDown) =>
+            _session.Input.SetKey(WinFormsKeyMap.Map(key), isDown);
+
         _network.OnConnected += HandleConnectedToServer;
-        _network.OnMessageReceived += (msg) => _simulation.HandleMessage(msg);
-        
-        // Transition from Menu to Game
-        _simulation.OnGameJoined += () => {
-            _appContext.EnterGame(win => {
-                _simulation.GetInputHandler().SetActiveWindow(win);
-                win.OnCommandEntered += t => _simulation.GetInputHandler().HandleCommandEntered(t);
-            });
-        };
+        _network.OnMessageReceived += msg => _session.HandleMessage(msg);
 
         // Start the dedicated game logic thread
         _gameThread = new Thread(GameLoop) { IsBackground = true };
         _gameThread.Start();
 
         // Start WinForms UI message pump
-        Application.Run(_appContext);
-        
+        Application.Run(_navigation);
+
         // Cleanup on exit
         _isRunning = false;
-        _audio.Dispose();
+        _keyboardHook.Dispose();
+        _session.Dispose();
+        _speech.Dispose();
     }
 
     private void HandleConnectedToServer()
@@ -167,8 +148,7 @@ public class ClientRunner
     }
 
     /// <summary>
-    /// The high-frequency game thread. 
-    /// Responsibility: Network polling, Simulation, Physics, and Audio updates.
+    /// The high-frequency game thread: network polling, simulation, physics, and audio updates.
     /// </summary>
     private void GameLoop()
     {
@@ -178,38 +158,45 @@ public class ClientRunner
 
         while (_isRunning)
         {
-            var currentTime = DateTime.Now;
-            double elapsed = (currentTime - lastTime).TotalSeconds;
-            lastTime = currentTime;
-
-            // Cap elapsed time to prevent "Spiral of Death" after long pauses
-            if (elapsed > PhysicsConstants.MaxCatchUpSeconds) elapsed = PhysicsConstants.MaxCatchUpSeconds;
-            accumulator += elapsed;
-
-            _network.Poll();
-
-            if (_simulation.IsInGame)
+            try
             {
-                // 1. Logic & Simulation (Fixed Ticks)
-                while (accumulator >= targetDt)
+                var currentTime = DateTime.Now;
+                double elapsed = (currentTime - lastTime).TotalSeconds;
+                lastTime = currentTime;
+
+                // Cap elapsed time to prevent a "spiral of death" after long pauses.
+                if (elapsed > PhysicsConstants.MaxCatchUpSeconds) elapsed = PhysicsConstants.MaxCatchUpSeconds;
+                accumulator += elapsed;
+
+                _network.Poll();
+
+                if (_session.IsInGame)
                 {
-                    var inputSnapshot = _inputBuffer.GetSnapshot();
-                    _simulation.Update(inputSnapshot.held, inputSnapshot.justPressed, (float)targetDt);
-                    accumulator -= targetDt;
+                    while (accumulator >= targetDt)
+                    {
+                        _session.SimStep((float)targetDt);
+                        accumulator -= targetDt;
+                    }
+
+                    _session.ContinuousUpdate();
                 }
-                
-                // 2. Continuous Updates (Render-rate or high-frequency)
-                _playerController.Update(_state.Position + _state.VisualOffset, _state.Velocity);
-                // Internally capped to 60 Hz; the loop below spins far faster than that to keep the
-                // socket serviced. See ClientAudioSystem.UpdateHz.
-                _audioSystem.Update(_world.GetSnapshot());
+                else
+                {
+                    accumulator = 0; // don't bank elapsed time while not simulating
+                }
+
+                // Costs nothing unless OPENFPS_PROFILE=1; see PerfProbe.
+                PerfProbe.ReportIfDue(TimeSpan.FromSeconds(30), line => Serilog.Log.Information("{Perf}", line));
+            }
+            catch (Exception ex)
+            {
+                // A handler or simulation exception must never silently kill the loop that pumps the
+                // network: that would freeze the world-load handshake with no diagnostic at all.
+                Serilog.Log.Error(ex, "GameLoop iteration failed.");
             }
 
-            // Costs nothing unless OPENFPS_PROFILE=1; see PerfProbe.
-            PerfProbe.ReportIfDue(TimeSpan.FromSeconds(30), line => Serilog.Log.Information("{Perf}", line));
-
             // Throttle to save CPU, but allow enough headroom for high-frequency polling
-            Thread.Sleep(5); 
+            Thread.Sleep(5);
         }
     }
 }
