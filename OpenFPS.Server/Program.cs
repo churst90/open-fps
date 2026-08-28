@@ -361,21 +361,10 @@ public class GameServer
         });
     }
 
-    private EntityDefinition CreateDefinition(World world, Entity e)
-    {
-        var def = new EntityDefinition { EntityId = e.Id, Type = EntityType.StaticObject };
-        if (world.Has<EntityType>(e)) def.Type = world.Get<EntityType>(e);
-        def.Identity = world.Has<IdentityComponent>(e) ? world.Get<IdentityComponent>(e) : new IdentityComponent();
-        def.Collider = world.Has<ColliderComponent>(e) ? world.Get<ColliderComponent>(e) : new ColliderComponent();
-        def.Acoustics = world.Has<AcousticComponent>(e) ? world.Get<AcousticComponent>(e) : new AcousticComponent();
-        def.Material = world.Has<MaterialComponent>(e) ? world.Get<MaterialComponent>(e) : new MaterialComponent();
-        def.SoundEmitter = world.Has<SoundEmitterComponent>(e) ? world.Get<SoundEmitterComponent>(e) : new SoundEmitterComponent();
-        def.Physics = world.Has<PhysicsPropertyComponent>(e) ? world.Get<PhysicsPropertyComponent>(e) : new PhysicsPropertyComponent();
-        def.Region = world.Has<RegionComponent>(e) ? world.Get<RegionComponent>(e) : new RegionComponent();
-        def.Portal = world.Has<PortalComponent>(e) ? world.Get<PortalComponent>(e) : new PortalComponent();
-        def.Transform = world.Has<Transform>(e) ? world.Get<Transform>(e) : new Transform();
-        return def;
-    }
+    // Definition building lives in EntityDefinitionFactory so the streaming path and the map/acoustics
+    // tests share one implementation — the client builds its acoustic map (regions AND portals) from
+    // these, so any divergence would only surface as a wrong-sounding room.
+    private EntityDefinition CreateDefinition(World world, Entity e) => EntityDefinitionFactory.From(world, e);
 
     private readonly HashSet<int> _addedEntitiesBuffer = new();
 

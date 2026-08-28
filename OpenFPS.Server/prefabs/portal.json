@@ -1,7 +1,7 @@
 {
   "Id": "portal",
   "Name": "Acoustic Portal",
-  "Description": "",
+  "Description": "An opening between two acoustic regions. Place it in the gap between walls and set RegionAId / RegionBId on the MAP entity to the EntityIds of the two regions it joins (-1 means the outside). ApertureSize is the width of the opening in metres; omit it and it is derived from this collider.",
   "Material": "None",
   "ColliderSize": {
     "X": 2,
@@ -12,5 +12,8 @@
   "Type": "StaticObject",
   "TransmissionLow": 1.0,
   "TransmissionMid": 1.0,
-  "TransmissionHigh": 1.0
+  "TransmissionHigh": 1.0,
+  "RegionAId": -1,
+  "RegionBId": -1,
+  "ApertureSize": 2.0
 }

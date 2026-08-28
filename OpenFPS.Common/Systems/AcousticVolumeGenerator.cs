@@ -13,7 +13,14 @@ namespace OpenFPS.Common.Systems;
 /// </summary>
 public static class AcousticVolumeGenerator
 {
-    public static AcousticMap GenerateRegions(IEnumerable<EntityDefinition> entities, Vector3 mapSize, Vector3 minBound, float voxelResolution = 0.5f, float occlusionFloor = 0.05f)
+    /// <param name="autoDiscoverPortals">
+    /// When true, any region boundary the map did not describe gets a synthesized portal at the centre of
+    /// that face. This is OFF by default: the placement is a guess, and a guessed portal puts a room's
+    /// reverb and its doorway-localized arrival direction on the wrong wall — which sounds worse than an
+    /// unopened boundary, because walls still transmit and occlude correctly on their own. Undescribed
+    /// boundaries are always reported either way, with the exact portal the map is missing.
+    /// </param>
+    public static AcousticMap GenerateRegions(IEnumerable<EntityDefinition> entities, Vector3 mapSize, Vector3 minBound, float voxelResolution = 0.5f, float occlusionFloor = 0.05f, bool autoDiscoverPortals = false)
     {
         // 1. Initialize the map with the full map bounds
         var acousticMap = new AcousticMap(mapSize, minBound, voxelResolution);
@@ -62,105 +69,124 @@ public static class AcousticVolumeGenerator
             }
         }
 
-        // 4. Automated Portal Discovery (Spatial Audit)
-        // Detect gaps between regions and synthesize portals if none exist
-        var discoveredPortals = new Dictionary<int, (PortalComponent Portal, Vector3 Position)>();
+        // 4. AUTHORED PORTALS — the primary source of truth.
+        // A portal entity carries the two regions it joins and the size of the opening. These are placed
+        // by hand at the actual doorway, so they must be processed BEFORE any automatic guessing.
+        int authoredCount = 0;
+        foreach (var def in entities)
+        {
+            if (def.Portal.ApertureSize <= 0) continue;
+
+            int rA = def.Portal.RegionAId;
+            int rB = def.Portal.RegionBId;
+
+            // Unlinked portal (both ends identical — typically the prefab default, or an author who
+            // dropped a portal in a doorway without naming the rooms): probe the voxel grid outward
+            // from the opening and take the first two distinct regions found.
+            if (rA == rB)
+            {
+                Vector3 forward = Vector3.Transform(Vector3.UnitZ, def.Transform.Rotation);
+                Vector3[] searchDirs = { forward, -forward, Vector3.UnitX, -Vector3.UnitX, Vector3.UnitY, -Vector3.UnitY };
+
+                var foundRegions = new List<int>();
+                foreach (var dir in searchDirs)
+                {
+                    // One sample just past the opening on each side. The octree answers GlobalRegionId
+                    // for anything outside a room, so a single sample is enough and is deterministic.
+                    int r = grid.GetRegionAt(def.Transform.Position + dir * 0.5f);
+                    if (!foundRegions.Contains(r)) foundRegions.Add(r);
+                    if (foundRegions.Count >= 2) break;
+                }
+
+                if (foundRegions.Count >= 2) { rA = foundRegions[0]; rB = foundRegions[1]; }
+                else if (foundRegions.Count == 1) { rA = foundRegions[0]; rB = AcousticConstants.GlobalRegionId; }
+
+                Console.WriteLine(rA != rB
+                    ? $"[AcousticMap] Portal {def.EntityId} had no region link; probed the voxel grid and joined region {rA} to {rB}."
+                    : $"[AcousticMap] WARNING: portal {def.EntityId} at {def.Transform.Position} has no region link and probing found no rooms — it will be ignored. Set RegionAId/RegionBId on the map entity.");
+            }
+
+            if (rA == rB) continue;
+
+            var portalComp = def.Portal;
+            portalComp.RegionAId = rA;
+            portalComp.RegionBId = rB;
+            acousticMap.Portals[def.EntityId] = (portalComp, def.Transform.Position);
+            authoredCount++;
+        }
+
+        // 5. UNDESCRIBED BOUNDARY AUDIT (and, only on request, synthesis).
+        // Report every region boundary the map did not describe. Optionally fill it with a guessed portal
+        // at the centre of the face — see the autoDiscoverPortals remarks: the guess is almost never where
+        // the real doorway is, and a portal on the wrong wall is exactly what makes a room's reverb arrive
+        // from the wrong direction. Reporting is unconditional; synthesizing is not.
+        var linkedPairs = new HashSet<(int, int)>();
+        foreach (var p in acousticMap.Portals.Values)
+            linkedPairs.Add(PairKey(p.Portal.RegionAId, p.Portal.RegionBId));
+
         int virtualPortalId = -1000;
+        int discoveredCount = 0;
 
         foreach (var r1 in acousticMap.Regions.Keys)
         {
             if (r1 == acousticMap.GlobalEnvironmentId) continue;
             if (!acousticMap.RegionPositions.TryGetValue(r1, out var pos1)) continue;
             var size1 = acousticMap.Regions[r1].RoomSize;
-            
+
             // D: Use rotation-aware face normals so buildings rotated away from cardinal axes
             // have their actual wall faces probed, not just the world-axis directions.
+            // Each face is probed just beyond ITS OWN half-extent — using the largest dimension for all
+            // six faces (as this did previously) puts the probe metres past a thin room's short faces.
             Quaternion regionRot = acousticMap.RegionRotations.GetValueOrDefault(r1, Quaternion.Identity);
-            Vector3[] dirs =
+            (Vector3 dir, float halfExtent)[] faces =
             {
-                Vector3.Normalize(Vector3.Transform(Vector3.UnitX, regionRot)),
-                Vector3.Normalize(Vector3.Transform(-Vector3.UnitX, regionRot)),
-                Vector3.Normalize(Vector3.Transform(Vector3.UnitZ, regionRot)),
-                Vector3.Normalize(Vector3.Transform(-Vector3.UnitZ, regionRot)),
-                Vector3.UnitY,   // Vertical faces are never rotated horizontally
-                -Vector3.UnitY
+                (Vector3.Normalize(Vector3.Transform(Vector3.UnitX, regionRot)),  size1.X / 2f),
+                (Vector3.Normalize(Vector3.Transform(-Vector3.UnitX, regionRot)), size1.X / 2f),
+                (Vector3.Normalize(Vector3.Transform(Vector3.UnitZ, regionRot)),  size1.Z / 2f),
+                (Vector3.Normalize(Vector3.Transform(-Vector3.UnitZ, regionRot)), size1.Z / 2f),
+                (Vector3.UnitY,  size1.Y / 2f),   // Vertical faces are never rotated horizontally
+                (-Vector3.UnitY, size1.Y / 2f)
             };
-            foreach (var dir in dirs)
+
+            foreach (var (dir, halfExtent) in faces)
             {
-                Vector3 edgePos = pos1 + (dir * (Math.Max(size1.X, Math.Max(size1.Y, size1.Z)) / 2f + 0.5f));
+                Vector3 edgePos = pos1 + (dir * (halfExtent + 0.5f));
                 int r2 = grid.GetRegionAt(edgePos);
-                if (r2 != r1 && r2 != 0) // Valid boundary
+                if (r2 == r1 || r2 == 0) continue; // not a boundary
+
+                var key = PairKey(r1, r2);
+                if (!linkedPairs.Add(key)) continue; // already described (authored or discovered)
+
+                string nameA = acousticMap.Regions.TryGetValue(r1, out var ra) ? ra.FriendlyName : r1.ToString();
+                string nameB = r2 == acousticMap.GlobalEnvironmentId ? "Outside"
+                    : acousticMap.Regions.TryGetValue(r2, out var rb) ? rb.FriendlyName : r2.ToString();
+
+                if (!autoDiscoverPortals)
                 {
-                    // Check if a portal already links these
-                    bool hasPortal = entities.Any(e => e.Portal.ApertureSize > 0 && 
-                        ((e.Portal.RegionAId == r1 && e.Portal.RegionBId == r2) || 
-                         (e.Portal.RegionAId == r2 && e.Portal.RegionBId == r1)));
-                         
-                    if (!hasPortal)
-                    {
-                        // Auto-generate portal
-                        var portal = new PortalComponent { 
-                            RegionAId = r1, RegionBId = r2, ApertureSize = 2.0f 
-                        };
-                        discoveredPortals[virtualPortalId--] = (portal, edgePos);
-                    }
+                    Console.WriteLine($"[AcousticMap] NOTE: '{nameA}' ({r1}) borders '{nameB}' ({r2}) with no portal authored, " +
+                                      $"so the two are not acoustically coupled. If there is a real opening there, add a portal " +
+                                      $"entity at the doorway with RegionAId={r1}, RegionBId={r2}.");
+                    continue;
                 }
+
+                Console.WriteLine($"[AcousticMap] WARNING: no portal authored between '{nameA}' ({r1}) and '{nameB}' ({r2}). " +
+                                  $"Guessing one at the centre of a face, {edgePos} — reverb and occlusion will arrive from the wrong direction. " +
+                                  $"Add a portal entity at the real doorway with RegionAId={r1}, RegionBId={r2}.");
+
+                acousticMap.Portals[virtualPortalId--] = (
+                    new PortalComponent { RegionAId = r1, RegionBId = r2, ApertureSize = 2.0f },
+                    edgePos);
+                discoveredCount++;
             }
         }
 
-        // 5. Process Portals
-        // Build the nodal graph for A* pathfinding.
-        foreach (var def in entities)
-        {
-            if (def.Portal.ApertureSize > 0)
-            {
-                int rA = def.Portal.RegionAId;
-                int rB = def.Portal.RegionBId;
-
-                // If IDs are missing, attempt to probe the voxel grid around the portal
-                if (rA == 0 && rB == 0) 
-                {
-                    Vector3 forward = Vector3.Transform(Vector3.UnitZ, def.Transform.Rotation);
-                    Vector3[] searchDirs = { forward, -forward, Vector3.UnitY, -Vector3.UnitY, Vector3.UnitX, -Vector3.UnitX };
-                    
-                    HashSet<int> foundRegions = new();
-                    foreach (var dir in searchDirs)
-                    {
-                        for (float d = 0.25f; d <= 5.0f; d += 0.25f)
-                        {
-                            Vector3 probe = def.Transform.Position + dir * d;
-                            int r = grid.GetRegionAt(probe);
-                            if (r != 0) { foundRegions.Add(r); break; }
-                        }
-                    }
-
-                    if (foundRegions.Count >= 2) { var l = foundRegions.ToList(); rA = l[0]; rB = l[1]; }
-                    else if (foundRegions.Count == 1) { rA = foundRegions.First(); rB = AcousticConstants.GlobalRegionId; }
-                }
-
-                if (rA != rB)
-                {
-                    var portalComp = def.Portal;
-                    portalComp.RegionAId = rA;
-                    portalComp.RegionBId = rB;
-                    acousticMap.Portals[def.EntityId] = (portalComp, def.Transform.Position);
-                }
-            }
-        }
-
-        foreach (var kvp in discoveredPortals)
-        {
-            // Only add if we haven't reached the same boundary manually
-            if (!acousticMap.Portals.Values.Any(p => 
-                (p.Portal.RegionAId == kvp.Value.Portal.RegionAId && p.Portal.RegionBId == kvp.Value.Portal.RegionBId) ||
-                (p.Portal.RegionAId == kvp.Value.Portal.RegionBId && p.Portal.RegionBId == kvp.Value.Portal.RegionAId)))
-            {
-                acousticMap.Portals[kvp.Key] = kvp.Value;
-            }
-        }
+        Console.WriteLine($"[AcousticMap] {acousticMap.Regions.Count - 1} region(s), {authoredCount} authored portal(s), {discoveredCount} guessed.");
 
         return acousticMap;
     }
+
+    /// <summary>Order-independent key for a region boundary, so A→B and B→A are the same pair.</summary>
+    private static (int, int) PairKey(int a, int b) => a <= b ? (a, b) : (b, a);
 
     /// <summary>
     /// Performs a delta update for a single region entity that has moved or changed.

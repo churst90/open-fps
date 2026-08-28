@@ -89,20 +89,69 @@ public class MapManager
         }
 
         // 2nd Pass: Link Portals and Regions using the ID map
+        int portalsLinked = 0;
         foreach (var entityData in m.Entities)
         {
             if (!lookup.TryGetValue(entityData.EntityId > 0 ? entityData.EntityId : -1, out var entity)) continue;
 
-            if (world.Has<PortalComponent>(entity))
-            {
-                ref var p = ref world.Get<PortalComponent>(entity);
-                // Translate Region IDs from JSON context to ECS context
-                p.RegionAId = (entityData.RegionAId.HasValue && idMap.TryGetValue(entityData.RegionAId.Value, out var ecsA)) ? ecsA : AcousticConstants.GlobalRegionId;
-                p.RegionBId = (entityData.RegionBId.HasValue && idMap.TryGetValue(entityData.RegionBId.Value, out var ecsB)) ? ecsB : AcousticConstants.GlobalRegionId;
+            // A map entity DECLARES a portal by carrying any of the portal fields. Previously this pass
+            // only wrote into a PortalComponent the prefab had already attached — and `portal.json` carried
+            // no portal fields, so PrefabRepository never attached one and every authored portal in every
+            // map was silently discarded. The map entity's own fields must be able to CREATE the component.
+            bool declaresPortal = entityData.RegionAId.HasValue || entityData.RegionBId.HasValue || entityData.ApertureSize.HasValue;
+            if (!declaresPortal && !world.Has<PortalComponent>(entity)) continue;
 
-                if (entityData.ApertureSize.HasValue) p.ApertureSize = entityData.ApertureSize.Value;
+            if (!world.Has<PortalComponent>(entity))
+            {
+                // Add BEFORE taking a ref — Add moves the entity to a new archetype and would invalidate it.
+                world.Add(entity, new PortalComponent
+                {
+                    RegionAId = AcousticConstants.GlobalRegionId,
+                    RegionBId = AcousticConstants.GlobalRegionId,
+                    ApertureSize = 0f
+                });
+            }
+
+            ref var p = ref world.Get<PortalComponent>(entity);
+
+            // Translate Region IDs from JSON context to ECS context. Only overwrite what the map actually
+            // declared, so a prefab that ships sensible defaults keeps them. An unresolvable id (including
+            // the conventional -1) means "the outside".
+            if (entityData.RegionAId.HasValue)
+                p.RegionAId = idMap.TryGetValue(entityData.RegionAId.Value, out var ecsA) ? ecsA : AcousticConstants.GlobalRegionId;
+            if (entityData.RegionBId.HasValue)
+                p.RegionBId = idMap.TryGetValue(entityData.RegionBId.Value, out var ecsB) ? ecsB : AcousticConstants.GlobalRegionId;
+
+            if (entityData.ApertureSize.HasValue) p.ApertureSize = entityData.ApertureSize.Value;
+
+            // An aperture of 0 means "no opening", which downstream reads as "not a portal at all".
+            // Derive one from the doorway's own collider so an author can drop a portal prefab in a gap
+            // and get the physically obvious opening size without restating it.
+            if (p.ApertureSize <= 0f)
+            {
+                float derived = 1.0f;
+                if (world.Has<ColliderComponent>(entity))
+                {
+                    var size = world.Get<ColliderComponent>(entity).Size;
+                    if (size.X > 0 || size.Y > 0) derived = MathF.Max(size.X, size.Y);
+                }
+                p.ApertureSize = derived;
+                Log.Information("MapManager: Portal entity {Id} in '{Map}' had no ApertureSize; derived {Aperture:F2} from its collider.",
+                    entityData.EntityId, m.Id, derived);
+            }
+
+            if (p.RegionAId == p.RegionBId)
+            {
+                Log.Warning("MapManager: Portal entity {Id} in '{Map}' links region {Region} to itself — it will be ignored. " +
+                            "Set RegionAId/RegionBId to the two region EntityIds it joins (-1 = outside).",
+                    entityData.EntityId, m.Id, p.RegionAId);
+            }
+            else
+            {
+                portalsLinked++;
             }
         }
+        Log.Information("MapManager: Linked {Count} portal(s) for map '{Id}'.", portalsLinked, m.Id);
 
         // AUTO-GENERATE FOUNDATION if missing
         if (!foundationExists)

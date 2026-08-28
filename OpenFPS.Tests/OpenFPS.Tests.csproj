@@ -17,6 +17,19 @@
   <ItemGroup>
     <ProjectReference Include="..\OpenFPS.Common\OpenFPS.Common.csproj" />
     <ProjectReference Include="..\OpenFPS.Client.Core\OpenFPS.Client.Core.csproj" />
+    <!-- The map/prefab loaders live in the server. Referenced so the portal pipeline can be tested
+         against the real shipped data rather than a hand-built stand-in. -->
+    <ProjectReference Include="..\OpenFPS.Server\OpenFPS.Server.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Real shipped map + prefab data, copied so tests run against exactly what the server loads. -->
+    <None Include="..\OpenFPS.Server\maps\*.json" Link="maps\%(Filename)%(Extension)">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="..\OpenFPS.Server\prefabs\*.json" Link="prefabs\%(Filename)%(Extension)">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
   <ItemGroup>

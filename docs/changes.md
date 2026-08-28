@@ -59,3 +59,41 @@
 - **Active Clamping:** The `SharedMovementEngine` now enforces hard map boundaries (`MapMin`/`MapMax`). Player position and velocity are actively clamped, treating map edges as solid planes to prevent walking into the void.
 - **Sub-Tick Synchronization:** Respawn logic now clears the `InputQueue` for the current tick. This prevents "input ghosting" where a player could instantly move away from their spawn point due to stale inputs processed in the same tick as a respawn.
 - **Dynamic Thresholds:** The void-fall safety net now uses a dynamic threshold (5m below the map's minimum geometry surface) to support maps with varying verticality.
+
+### 11. Portal Pipeline Repaired (Engineering Audit — Step 1 of 7)
+- **The bug:** authored portals never reached the game. `prefabs/portal.json` carried no portal fields, so
+  `PrefabRepository.Spawn` never attached a `PortalComponent`; `MapManager`'s linking pass only *wrote into*
+  an existing component, so the `RegionAId` / `RegionBId` / `ApertureSize` on every portal entity in
+  `maps/default.json` were read and discarded; every streamed `EntityDefinition` therefore reported
+  `ApertureSize = 0`, and `AcousticVolumeGenerator` registered no portals at all. Nothing threw and nothing
+  logged. The whole portal layer — portal-aware occlusion, adjacent-region reverb activation, doorway
+  leakage volume, and the HRTF "reverb arrives through the opening" localization — was dead code running at
+  full cost, and rooms sounded as though their reverb leaked from the wrong wall.
+- **Map data can now create the component.** `MapManager` attaches a `PortalComponent` when the *map entity*
+  declares any portal field, independent of what the prefab template happens to carry, and only overwrites
+  the fields the map actually declared (so prefab defaults survive). An unresolvable region id — including
+  the conventional `-1` — still means "the outside".
+- **Aperture is derived when omitted.** A portal with no `ApertureSize` takes the larger of its collider's
+  width/height rather than silently becoming a zero-width (i.e. non-existent) opening.
+- **Self-linked portals are reported.** A portal whose two ends resolve to the same region is logged with the
+  fix, instead of being dropped in silence.
+- **Unlinked portals are probed.** `AcousticVolumeGenerator` now resolves a portal with no region link by
+  sampling the voxel grid either side of the opening, so dropping a portal prefab into a doorway is enough.
+  (Previously this only triggered on `0/0`, which the prefab default never produced.)
+- **Auto-discovery is opt-in.** Synthesizing a portal at the centre of an undescribed region face is a guess,
+  and a guessed portal puts a room's reverb and its doorway arrival direction on the wrong wall — the exact
+  symptom this work set out to fix. `GenerateRegions(..., autoDiscoverPortals: false)` is now the default;
+  undescribed boundaries are still *reported*, with the precise portal the map is missing.
+- **Face probing uses per-axis extents.** Auto-discovery previously probed all six faces at
+  `max(roomSize)/2`, landing metres past the short faces of any non-cubic room.
+- **`EntityDefinitionFactory`** extracts the definition builder out of `GameServer` so the streaming path and
+  the tests construct definitions from one implementation — the client builds its acoustic map from these,
+  so a divergence would only ever surface as a wrong-sounding room.
+- **Tests (63 → 72):** `PortalPipelineTests` drives the real shipped `maps/` and `prefabs/` data through
+  `PrefabRepository` → `MapManager` → `EntityDefinition` → `AcousticVolumeGenerator` and asserts four portals
+  at the authored doorways, correctly resolved region ids, no guessed portals, region lookup from inside a
+  room, that the prefab alone yields a portal, and that an unlinked portal is probed. Six of these fail
+  against the pre-fix code. The test project now references `OpenFPS.Server` and copies the live map/prefab
+  JSON to its output so the fixtures cannot drift from the shipped content.
+- **Verified:** `MapManager: Linked 4 portal(s) for map 'default'.` on server boot; 72/72 tests pass.
+  Still pending: ear-validation in the live client that Room A's reverb now arrives from its south doorway.

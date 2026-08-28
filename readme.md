@@ -30,4 +30,10 @@ OpenFPS focuses on a rich **binaural landscape** and **spatial awareness** rathe
 - **Networking:** Added Prediction and Reconciliation to eliminate movement jitter.
 - **Spatial Audio:** FMOD Core + Steam Audio HRTF binaural, with dynamic LPF-based atmospheric absorption and diffraction.
 - **Geometry-Driven Acoustics (in progress):** Migrating the hand-rolled occlusion/portal/reflection layer to Steam Audio's `iplSimulator`, so occlusion and transmission are ray-traced from real box-collider geometry on a background thread. See `docs/STEAM_AUDIO_MIGRATION.md`.
+- **Authored Portals:** A map describes its doorways explicitly — a `portal` entity carries the two region ids it joins (`-1` = outside) and the width of the opening. Portals drive portal-aware occlusion, adjacent-room reverb coupling, doorway leakage, and the HRTF localization that makes a room's reverb arrive *through* its door. Boundaries with no portal are reported at load with the exact entry the map is missing; nothing is guessed by default.
+
+## Current Engineering Priorities
+A full component-by-component audit of the rewrite (grades, ranked defects, sequenced remediation plan) lives at
+<https://claude.ai/code/artifact/2505b86c-2813-41c2-9a9d-fa9f1a22a1f9>. The active work list is tracked under
+**Engineering Audit Remediation** in `todo.md`.
 - **NPC System:** Integrated a Behavior Tree system for autonomous NPC logic.
