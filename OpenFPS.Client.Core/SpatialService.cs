@@ -16,15 +16,52 @@ public class SpatialService
 {
     public int OwnEntityId { get; set; } = -1;
 
-    private IEnumerable<EntitySnapshot> GetEntitiesToTest(WorldSnapshot world, Vector3 center, float radius)
+    // Every geometry query starts by asking which entities could possibly matter, so this ran several times
+    // per ray, per source, per frame — on the game thread and the acoustic worker thread at once. Hence
+    // per-thread scratch: no allocation, no lock, no shared state between the two callers.
+    [ThreadStatic] private static List<EntitySnapshot>? _candidates;
+    [ThreadStatic] private static List<int>? _candidateIds;
+    [ThreadStatic] private static HashSet<int>? _candidateSeen;
+
+    /// <summary>
+    /// The entities a query at <paramref name="center"/> could possibly hit.
+    ///
+    /// Two costs came out of here. The old form asked the grid iterator whether it had anything
+    /// (<c>ids.Any()</c>) and then walked it AGAIN to project it — two full walks of every cell in radius,
+    /// per ray. And a wall wide enough to span cells is filed in each of them, so it came back four or nine
+    /// times and was ray-tested four or nine times. This walks once and returns each entity once.
+    ///
+    /// The returned list is per-thread scratch, valid until this thread calls back in. Callers must finish
+    /// with it before starting another query — which every caller does; none nests a second query inside a
+    /// walk of the first.
+    /// </summary>
+    private List<EntitySnapshot> GetEntitiesToTest(WorldSnapshot world, Vector3 center, float radius)
     {
-        var ids = world.StaticGrid?.GetItemsInRadius(center, radius);
-        if (ids != null && ids.Any())
+        var candidates = _candidates ??= new List<EntitySnapshot>(64);
+        candidates.Clear();
+
+        if (world.StaticGrid != null)
         {
-            return ids.Select(id => world.Entities[id]).Concat(world.DynamicEntities);
+            var ids = _candidateIds ??= new List<int>(64);
+            var seen = _candidateSeen ??= new HashSet<int>();
+            world.StaticGrid.CollectInRadius(center, radius, ids, seen);
+
+            for (int i = 0; i < ids.Count; i++)
+                if (world.Entities.TryGetValue(ids[i], out var snap)) candidates.Add(snap);
+
+            if (candidates.Count > 0)
+            {
+                // Dynamic entities are not in the static grid, so they are always in play.
+                for (int i = 0; i < world.DynamicEntities.Count; i++)
+                    if (seen.Add(world.DynamicEntities[i].Id)) candidates.Add(world.DynamicEntities[i]);
+
+                return candidates;
+            }
         }
-        // Fallback to all entities if grid returns nothing or is null
-        return world.Entities.Values;
+
+        // Fallback to all entities if the grid found nothing here or there is no grid yet.
+        foreach (var snap in world.Entities.Values) candidates.Add(snap);
+        return candidates;
     }
 
     /// <summary>

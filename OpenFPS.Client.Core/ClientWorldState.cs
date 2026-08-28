@@ -6,6 +6,7 @@ using OpenFPS.Common.Networking;
 using OpenFPS.Common;
 using System.Linq;
 using System;
+using System.Threading;
 
 namespace OpenFPS.Client.Core;
 
@@ -37,6 +38,40 @@ public class ClientWorldState
     private readonly object _envLock = new();
     private WorldEnvironmentComponent _env = new();
 
+    // --- Snapshot cache -------------------------------------------------------------------------------
+    // A snapshot is a full copy of the world: every definition, every transform, a dictionary and two lists.
+    // A frame used to build between three and six of them — the predictor asked for one, the shelter check
+    // asked for another, the proximity scan a third, the audio system a fourth — all describing the same
+    // instant. They are read-only once built, so there is no reason for more than one to exist per version
+    // of the world.
+    //
+    // Every mutation bumps _version. GetSnapshot hands back the cached copy while the version it was built
+    // at still stands, and builds a new one when it does not. The pair is stored as a single immutable
+    // object so a reader can never see a new version stamped on an old copy.
+    private sealed record CachedSnapshot(long Version, WorldSnapshot Snapshot);
+    private readonly Dictionary<int, EntityState> _interpolationFrom = new();
+    private readonly object _snapshotLock = new();
+    private volatile CachedSnapshot? _cached;
+    private long _version;
+    private long _snapshotBuilds;
+
+    /// <summary>Snapshots actually built (as opposed to served from the cache). Diagnostic; used by tests
+    /// to prove the frame builds one.</summary>
+    public long SnapshotBuilds => Interlocked.Read(ref _snapshotBuilds);
+
+    /// <summary>The current world version. Changes on every mutation; a snapshot is valid for exactly one.</summary>
+    public long Version => Interlocked.Read(ref _version);
+
+    /// <summary>
+    /// How many entities the client knows about, without building a snapshot to count them. Map load
+    /// reports progress on every definition that arrives, and asking for a snapshot to do it made the
+    /// load quadratic: a full copy of the world, per entity of the world.
+    /// </summary>
+    public int EntityCount => _definitions.Count;
+
+    /// <summary>Marks the world changed, so the next <see cref="GetSnapshot"/> rebuilds.</summary>
+    private void Touch() => Interlocked.Increment(ref _version);
+
     public float CurrentPrecipitation { get { lock(_envLock) return _env.PrecipitationIntensity; } }
     public float CurrentTemperature { get { lock(_envLock) return _env.Temperature; } }
 
@@ -52,6 +87,7 @@ public class ClientWorldState
             _env.WindGustiness = update.WindGustiness;
             _env.PrecipitationIntensity = update.PrecipitationIntensity;
         }
+        Touch();
     }
 
     public void Clear(Vector3 size, Vector3 minBound, Vector3 maxBound)
@@ -74,6 +110,8 @@ public class ClientWorldState
                 10.0f);
             _gridNeedsRebuild = true;
         }
+
+        Touch();
     }
 
     public void SetAcousticMap(AcousticMap map)
@@ -82,6 +120,7 @@ public class ClientWorldState
         {
             AcousticMap = map;
         }
+        Touch();
     }
 
     public void RegisterDefinition(EntityDefinition def)
@@ -96,6 +135,8 @@ public class ClientWorldState
         {
             _gridNeedsRebuild = true;
         }
+
+        Touch();
     }
 
     /// <summary>
@@ -123,6 +164,7 @@ public class ClientWorldState
             {
                 _gridNeedsRebuild = true;
             }
+            Touch();
         }
         return removed;
     }
@@ -145,6 +187,7 @@ public class ClientWorldState
     {
         if (_snapshotBuffer.Count < 2) return;
 
+        bool moved = false;
         lock (_snapshotBuffer)
         {
             // 1. Determine the 'Playback Time' (current server tick we want to show)
@@ -177,13 +220,19 @@ public class ClientWorldState
                 double t1 = to.Tick * PhysicsConstants.FixedDeltaTime;
                 float alpha = (float)((_clientInterpolationTime - t0) / (t1 - t0));
 
+                // Index the 'from' states once. The inner FirstOrDefault this replaces made the whole
+                // interpolation quadratic in the entity count and allocated a lambda closure per entity,
+                // every frame, for a lookup a dictionary answers in one step.
+                _interpolationFrom.Clear();
+                foreach (var stateFrom in from.States) _interpolationFrom[stateFrom.EntityId] = stateFrom;
+
                 // 3. Perform Linear Interpolation for all dynamic entities
                 foreach (var stateTo in to.States)
                 {
                     if (stateTo.EntityId == localPlayerId) continue; // Skip ourselves (handled by CSP)
+                    moved = true;
 
-                    var stateFrom = from.States.FirstOrDefault(s => s.EntityId == stateTo.EntityId);
-                    if (stateFrom.EntityId != 0)
+                    if (_interpolationFrom.TryGetValue(stateTo.EntityId, out var stateFrom) && stateFrom.EntityId != 0)
                     {
                         var transFrom = stateFrom.Transform.ToTransform();
                         var transTo = stateTo.Transform.ToTransform();
@@ -203,6 +252,11 @@ public class ClientWorldState
                 }
             }
         }
+
+        // Only a frame that actually moved something invalidates the snapshot. A frame that found no
+        // bracketing pair changed nothing, and rebuilding a copy of an unchanged world is the exact cost
+        // this cache exists to remove.
+        if (moved) Touch();
     }
 
     public void SyncState(IEnumerable<EntityState> states)
@@ -212,12 +266,42 @@ public class ClientWorldState
             _serverTransforms[s.EntityId] = s.Transform.ToTransform();
             _serverVelocities[s.EntityId] = s.LinearVelocity;
         }
+        Touch();
     }
 
     /// <summary>
-    /// Generates a thread-safe copy of the world state for the simulation and audio threads.
+    /// The world as the simulation and audio threads read it: one immutable copy per version of the world.
+    ///
+    /// Everything that consumes a snapshot within a frame — prediction, the shelter raycast, the proximity
+    /// scan, the audio system, the acoustic worker — now shares the same object rather than each paying to
+    /// rebuild it. The copy is never mutated after it is built, which is what makes sharing it across
+    /// threads safe; a change to the world produces a NEW copy, it never edits the one already handed out.
     /// </summary>
     public WorldSnapshot GetSnapshot()
+    {
+        long version = Interlocked.Read(ref _version);
+
+        var cached = _cached;
+        if (cached != null && cached.Version == version) return cached.Snapshot;
+
+        lock (_snapshotLock)
+        {
+            // Re-read under the lock: another thread may have built exactly this version while we waited.
+            version = Interlocked.Read(ref _version);
+            cached = _cached;
+            if (cached != null && cached.Version == version) return cached.Snapshot;
+
+            var built = BuildSnapshot();
+            // Stamped with the version read BEFORE the build. A mutation that lands mid-build leaves
+            // _version ahead of the stamp, so the next caller rebuilds — stale data is never labelled fresh.
+            _cached = new CachedSnapshot(version, built);
+            Interlocked.Increment(ref _snapshotBuilds);
+            PerfProbe.Count("client.snapshot.build");
+            return built;
+        }
+    }
+
+    private WorldSnapshot BuildSnapshot()
     {
         SpatialGrid<int>? gridCopy;
         lock (_gridLock)

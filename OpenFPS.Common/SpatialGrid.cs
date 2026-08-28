@@ -18,6 +18,15 @@ public class SpatialGrid<T>
     private readonly Dictionary<(int, int), List<T>> _dynamicGrid = new();
 
     /// <summary>
+    /// Bumped every time the STATIC half of the grid changes (a static add, or a full clear). The dynamic
+    /// half is torn down and rebuilt every tick, so a version that counted it would change every tick and
+    /// be useless as a cache key; this one only moves when the world's geometry actually does. Anything
+    /// memoizing a query against static geometry — the server's ground probe, for one — keeps the version
+    /// it was computed at and recomputes when it no longer matches.
+    /// </summary>
+    public int StaticVersion { get; private set; }
+
+    /// <summary>
     /// Creates a new spatial grid with defined boundaries and cell resolution.
     /// </summary>
     /// <param name="min">The minimum world coordinates (X, Z).</param>
@@ -51,6 +60,7 @@ public class SpatialGrid<T>
             grid[cell] = list;
         }
         list.Add(item);
+        if (isStatic) StaticVersion++;
     }
 
     /// <summary>
@@ -84,6 +94,8 @@ public class SpatialGrid<T>
                 list.Add(item);
             }
         }
+
+        if (isStatic) StaticVersion++;
     }
 
     /// <summary>
@@ -113,6 +125,46 @@ public class SpatialGrid<T>
     }
 
     /// <summary>
+    /// The allocation-free, repeat-free form of <see cref="GetItemsInRadius"/>: fills <paramref name="into"/>
+    /// with every distinct item in the overlapping cells.
+    ///
+    /// Two things make this the form the hot paths want. <see cref="GetItemsInRadius"/> is an iterator, so
+    /// asking it for a count and then walking it — which both the server's collision gather and the client's
+    /// candidate query did — walks every cell TWICE. And a wall wide enough to span cells is filed in each
+    /// one, so a plain walk hands the same wall back four or nine times and every caller then ray-tests it
+    /// four or nine times. Deduplicating here fixes that once, for everyone.
+    ///
+    /// The caller owns both buffers (they are cleared on entry), which is what keeps the grid itself free of
+    /// per-call state and therefore safe to read from several threads at once.
+    /// </summary>
+    public void CollectInRadius(Vector3 pos, float radius, List<T> into, HashSet<T> seen)
+    {
+        into.Clear();
+        seen.Clear();
+
+        int cellRadius = (int)Math.Ceiling(radius / _cellSize);
+        var centerCell = GetCell(pos);
+
+        for (int x = -cellRadius; x <= cellRadius; x++)
+        {
+            for (int z = -cellRadius; z <= cellRadius; z++)
+            {
+                var cell = (centerCell.Item1 + x, centerCell.Item2 + z);
+                if (_staticGrid.TryGetValue(cell, out var staticList))
+                {
+                    for (int i = 0; i < staticList.Count; i++)
+                        if (seen.Add(staticList[i])) into.Add(staticList[i]);
+                }
+                if (_dynamicGrid.TryGetValue(cell, out var dynamicList))
+                {
+                    for (int i = 0; i < dynamicList.Count; i++)
+                        if (seen.Add(dynamicList[i])) into.Add(dynamicList[i]);
+                }
+            }
+        }
+    }
+
+    /// <summary>
     /// Clears only the dynamic items from the grid. 
     /// Should be called every tick before re-populating if tracking dynamic entities.
     /// </summary>
@@ -128,5 +180,6 @@ public class SpatialGrid<T>
     {
         _staticGrid.Clear();
         _dynamicGrid.Clear();
+        StaticVersion++;
     }
 }

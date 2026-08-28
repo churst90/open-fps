@@ -138,7 +138,7 @@ public sealed class GameSession
                 break;
 
             case MapLoadComplete:
-                Serilog.Log.Information("MapLoadComplete: {Count} entity definitions received.", _world.GetSnapshot().Entities.Count);
+                Serilog.Log.Information("MapLoadComplete: {Count} entity definitions received.", _world.EntityCount);
                 _speech.Speak("Geometry received. Generating acoustics.");
                 Task.Run(GenerateAcoustics);
                 break;
@@ -193,14 +193,13 @@ public sealed class GameSession
 
     private void GenerateAcoustics()
     {
-        var snapshot = _world.GetSnapshot();
         int timeout = 0;
-        while (snapshot.Entities.Count < _expectedEntityCount && timeout < 40)
+        while (_world.EntityCount < _expectedEntityCount && timeout < 40)
         {
             Thread.Sleep(100);
-            snapshot = _world.GetSnapshot();
             timeout++;
         }
+        var snapshot = _world.GetSnapshot();
 
         try
         {
@@ -234,9 +233,12 @@ public sealed class GameSession
         HandleActionKeys(justPressed);
 
         var input = GatherInput(held, dt);
-        _reconciler.Step(input, _world.GetSnapshot(), dt);
 
+        // Interpolation first: it is the only mutation in the tick, so advancing it before the readers
+        // lets prediction and the audio system share one snapshot build (see the Windows head for the
+        // same ordering and the reason).
         _world.UpdateInterpolation(dt, _ownEntityId);
+        _reconciler.Step(input, _world.GetSnapshot(), dt);
 
         // Bleed the reconciliation visual offset toward zero so server snaps don't pop.
         if (_state.VisualOffset.LengthSquared() > 0.0001f)

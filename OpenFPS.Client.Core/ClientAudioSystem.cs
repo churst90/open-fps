@@ -42,6 +42,25 @@ public class ClientAudioSystem
     private AcousticMap? _lastAcousticMap;
     private int _frameCount = 0;
 
+    /// <summary>
+    /// The audio update is capped here rather than in each head's game loop, so both are capped by the same
+    /// rule. The loop it hangs off polls the network as fast as it can — a 5 ms sleep, so roughly 200 Hz —
+    /// and it was driving the entire audio update from that: listener sync, region resolution, the
+    /// near-field radar's six raycasts, an acoustic request per active voice, and the FMOD tick. None of
+    /// that resolves faster than a frame, so two updates in three were work nobody could hear, taken from
+    /// the thread that has to service the socket.
+    /// </summary>
+    public const double UpdateHz = 60.0;
+    private readonly UpdateThrottle _throttle = new(UpdateHz);
+    private readonly System.Diagnostics.Stopwatch _clock = System.Diagnostics.Stopwatch.StartNew();
+
+    /// <summary>Audio updates performed / skipped by the rate cap. Diagnostic.</summary>
+    public (long Ran, long Skipped) UpdateCounts => (_throttle.Runs, _throttle.Skipped);
+
+    /// <summary>The near-field radar's fixed probe directions — a constant, not a per-frame allocation.</summary>
+    private static readonly Vector3[] RadarDirections =
+        { Vector3.UnitX, -Vector3.UnitX, Vector3.UnitY, Vector3.UnitZ, -Vector3.UnitZ };
+
     public ClientAudioSystem(AudioEngineFacade audio, SoundMappingService sounds, LocalPlayerState state)
     {
         _audio = audio;
@@ -79,7 +98,16 @@ public class ClientAudioSystem
     /// </summary>
     public void Update(WorldSnapshot world)
     {
+        if (!_throttle.ShouldRun(_clock.Elapsed.TotalSeconds)) return;
+
+        using var _perf = PerfProbe.Measure("audio.update");
+
         _frameCount++;
+        // Keep the PREVIOUS snapshot to compare against: assigning first and then comparing `world` with
+        // `_lastSnapshot` compares it with itself, which is what silently disabled the moving-region check
+        // below. With the snapshot cache in place the two can also legitimately be the same object — a
+        // world that has not changed — and a zero delta is then exactly the right answer.
+        var previous = _lastSnapshot;
         _lastSnapshot = world;
         _acousticWorker.UpdateWorld(world);
         
@@ -115,7 +143,7 @@ public class ClientAudioSystem
                 {
                     if (snap.Definition.Region.RoomSize.X > 0)
                     {
-                        if (_lastSnapshot != null && _lastSnapshot.Entities.TryGetValue(snap.Id, out var oldSnap))
+                        if (previous != null && previous.Entities.TryGetValue(snap.Id, out var oldSnap))
                         {
                             if (Vector3.Distance(snap.Transform.Position, oldSnap.Transform.Position) > 0.1f || 
                                 Math.Abs(Quaternion.Dot(snap.Transform.Rotation, oldSnap.Transform.Rotation)) < 0.999f)
@@ -133,10 +161,9 @@ public class ClientAudioSystem
 
         // 4.5. Near-field proximity radar (Head-to-wall pressure simulation)
         float closestWallDist = 2.0f;
-        Vector3[] radarDirs = { Vector3.UnitX, -Vector3.UnitX, Vector3.UnitY, Vector3.UnitZ, -Vector3.UnitZ };
-        _spatial.RaycastAll(world, visualEyePos, radarDirs, 2.0f, out float[] pDists, out _, out _);
+        _spatial.RaycastAll(world, visualEyePos, RadarDirections, 2.0f, out float[] pDists, out _, out _);
         
-        for (int i = 0; i < radarDirs.Length; i++)
+        for (int i = 0; i < RadarDirections.Length; i++)
         {
             if (pDists[i] < closestWallDist) closestWallDist = pDists[i];
         }

@@ -58,6 +58,13 @@ OpenFPS focuses on a rich **binaural landscape** and **spatial awareness** rathe
   volume that is also solid geometry, a doorway that blocks the doorway. Rooms name their six surface
   materials instead of numbering them, emitters can be aimed and given spin-up/spin-down sounds, and
   colliders can be shapes other than a box. Authoring guide: `docs/AUTHORING.md`.
+- **A Frame That Does Each Thing Once:** The client builds one copy of the world per frame instead of three
+  to six, the audio update is capped at 60 Hz rather than running at whatever rate the network poll spins
+  at, the server remembers where the floor was instead of re-probing it for every sub-tick input, spatial
+  queries walk their cells once and return a wall once however many cells it spans, and playing voices are
+  looked up by id rather than scanned for. `OPENFPS_PROFILE=1` turns on a report of what each of those
+  actually costs, including the Steam Audio ray budget — which says so, loudly, when a simulation run
+  outruns the audio frame it is feeding.
 
 ## Current Engineering Priorities
 A full component-by-component audit of the rewrite (grades, ranked defects, sequenced remediation plan) lives at

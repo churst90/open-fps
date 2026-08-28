@@ -200,8 +200,13 @@ public class ClientRunner
                 
                 // 2. Continuous Updates (Render-rate or high-frequency)
                 _playerController.Update(_state.Position + _state.VisualOffset, _state.Velocity);
+                // Internally capped to 60 Hz; the loop below spins far faster than that to keep the
+                // socket serviced. See ClientAudioSystem.UpdateHz.
                 _audioSystem.Update(_world.GetSnapshot());
             }
+
+            // Costs nothing unless OPENFPS_PROFILE=1; see PerfProbe.
+            PerfProbe.ReportIfDue(TimeSpan.FromSeconds(30), line => Serilog.Log.Information("{Perf}", line));
 
             // Throttle to save CPU, but allow enough headroom for high-frequency polling
             Thread.Sleep(5); 

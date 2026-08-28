@@ -162,6 +162,7 @@ public class AsyncAcousticWorker : IDisposable
                     }
                 }
                 ReportSimCoverage(degraded, _pending.Count, sim == null);
+                ReportRayBudget(_pending.Count);
             }
             else
             {
@@ -244,6 +245,45 @@ public class AsyncAcousticWorker : IDisposable
             ? "the simulation tick produced no results at all"
             : "the simulator had no result for some sources (source pool exhausted or newly added)";
         Console.WriteLine($"[AcousticWorker] DEGRADED: {degraded}/{total} sources fell back to the hand-rolled ray-tracer — {cause}.");
+    }
+
+    // --- Ray budget -----------------------------------------------------------------------------------
+    // "Measure the Steam Audio ray budget" (audit step 6). The simulation cost is a configuration — rays
+    // times bounces times sources — and until it is measured on real hardware every number in it is a
+    // guess. The simulator times its own runs; this reports them, and says so loudly when a run costs more
+    // than the audio frame it is feeding, because a worker that cannot keep up does not fail, it just
+    // silently delivers older and older acoustics.
+    private long _lastRayBudgetReportTicks;
+    private long _lastRayBudgetWarnTicks;
+    private const long RayBudgetReportIntervalMs = 30_000;
+
+    /// <summary>One audio frame at <see cref="ClientAudioSystem"/>'s 60 Hz cap — the wall a run should
+    /// stay under to keep the acoustics current with what is being heard.</summary>
+    private const double RayBudgetFrameMs = 1000.0 / 60.0;
+
+    /// <summary>The last measured simulation cost, for anything that wants to display it.</summary>
+    public string RayBudgetSummary { get; private set; } = "no simulation runs yet";
+
+    private void ReportRayBudget(int sources)
+    {
+        if (_saSim == null || _saSim.RunCount == 0) return;
+
+        long now = Environment.TickCount64;
+
+        if (_saSim.MaxRunMs > RayBudgetFrameMs && now - _lastRayBudgetWarnTicks >= DegradeLogIntervalMs)
+        {
+            _lastRayBudgetWarnTicks = now;
+            Console.WriteLine($"[AcousticWorker] RAY BUDGET EXCEEDED: a simulation run took {_saSim.MaxRunMs:F1}ms " +
+                              $"against a {RayBudgetFrameMs:F1}ms audio frame ({_saSim.RaysPerRun} rays x " +
+                              $"{_saSim.BouncesPerRun} bounce(s), {sources} sources). Acoustics are lagging what is heard.");
+        }
+
+        if (now - _lastRayBudgetReportTicks < RayBudgetReportIntervalMs) return;
+        _lastRayBudgetReportTicks = now;
+        RayBudgetSummary = _saSim.DescribeRayBudget();
+        if (_saDebug || PerfProbe.Enabled)
+            Console.WriteLine($"[AcousticWorker] ray budget: {RayBudgetSummary}");
+        _saSim.ResetRayBudgetStats();
     }
 
     private string? _lastSimTickFailure;

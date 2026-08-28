@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Numerics;
 using System.Runtime.InteropServices;
+using OpenFPS.Common;
 using PV = OpenFPS.Client.Core.AudioEngine.SteamAudio.Phonon.IPLVector3;
 
 namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
@@ -106,6 +107,8 @@ public sealed class SteamAudioSimulator : IDisposable
         float len = d.Length();
         return len > 1e-6f ? d / len : Vector3.Zero;
     }
+
+    private readonly float[] _shScratch = new float[4];
 
     /// <summary>Total pooled sources (0 until the first <see cref="SetScene"/>).</summary>
     public int Capacity => _allSources.Count;
@@ -268,6 +271,41 @@ public sealed class SteamAudioSimulator : IDisposable
         Phonon.iplSourceSetInputs(source, _flags, ref inputs);
     }
 
+    // --- Ray budget ------------------------------------------------------------------------------------
+    // The simulation is the most expensive thing the client does per audio frame and its cost is a
+    // configuration choice — rays x bounces — not an emergent one. These make that choice legible: what was
+    // asked for, and what it actually cost on this machine's CPU. Measured unconditionally (a timestamp
+    // either side of a millisecond-scale ray trace is free) so the numbers exist the moment anyone asks.
+
+    /// <summary>Rays cast per <see cref="Run"/>, as configured.</summary>
+    public int RaysPerRun => _reflections ? 8192 : 4096;
+
+    /// <summary>Bounces per ray, as configured. Reflections are the expensive multiplier.</summary>
+    public int BouncesPerRun => _reflections ? 16 : 1;
+
+    /// <summary>Completed simulation runs.</summary>
+    public long RunCount { get; private set; }
+
+    /// <summary>Milliseconds spent in <see cref="Run"/>, total and worst-case.</summary>
+    public double TotalRunMs { get; private set; }
+    public double MaxRunMs { get; private set; }
+
+    /// <summary>Mean cost of a run so far, or 0 before the first one.</summary>
+    public double AverageRunMs => RunCount > 0 ? TotalRunMs / RunCount : 0.0;
+
+    /// <summary>One line describing the budget and what it is costing. For the periodic perf report.</summary>
+    public string DescribeRayBudget() =>
+        $"{RaysPerRun} rays x {BouncesPerRun} bounce(s), {Capacity - Available}/{Capacity} sources: " +
+        $"avg {AverageRunMs:F2}ms, max {MaxRunMs:F2}ms over {RunCount} runs";
+
+    /// <summary>Zeroes the timing window so each report covers one interval rather than all of history.</summary>
+    public void ResetRayBudgetStats()
+    {
+        RunCount = 0;
+        TotalRunMs = 0.0;
+        MaxRunMs = 0.0;
+    }
+
     /// <summary>Runs the direct (and, when enabled, pathing) stage once for ALL staged sources against the
     /// current listener. Expensive (ray-traced) — call on a worker thread, never the mixer/game thread.</summary>
     public void Run()
@@ -276,15 +314,24 @@ public sealed class SteamAudioSimulator : IDisposable
         var shared = new Phonon.IPLSimulationSharedInputs
         {
             listener = Coord(_listener),
-            numRays = _reflections ? 8192 : 4096,
-            numBounces = _reflections ? 16 : 1,
+            numRays = RaysPerRun,
+            numBounces = BouncesPerRun,
             duration = _reflections ? 2.0f : 1.0f,
             order = 1, irradianceMinDistance = 1.0f,
         };
+
+        long start = System.Diagnostics.Stopwatch.GetTimestamp();
         Phonon.iplSimulatorSetSharedInputs(_simulator, _flags, ref shared);
         if (_direct) Phonon.iplSimulatorRunDirect(_simulator);
         if (PathingReady) Phonon.iplSimulatorRunPathing(_simulator);
         if (_reflections) Phonon.iplSimulatorRunReflections(_simulator);
+        long elapsed = System.Diagnostics.Stopwatch.GetTimestamp() - start;
+
+        double ms = elapsed * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+        RunCount++;
+        TotalRunMs += ms;
+        if (ms > MaxRunMs) MaxRunMs = ms;
+        PerfProbe.Record(_reflections ? "sa.sim.run.reflections" : "sa.sim.run.direct", elapsed);
     }
 
     /// <summary>Reads the most recent reflection RT60 for a source (valid after <see cref="Run"/> when
@@ -318,7 +365,9 @@ public sealed class SteamAudioSimulator : IDisposable
         Phonon.iplSourceGetOutputs(source, _flags, ref outputs);
         if (outputs.pathing.shCoeffs == IntPtr.Zero) return PathResult.None;
 
-        var sh = new float[4];
+        // Reused: this runs once per occluded source per tick, and a four-float array per call is a
+        // garbage-collection cost paid on the audio worker thread. Single-threaded by contract (see Run).
+        var sh = _shScratch;
         Marshal.Copy(outputs.pathing.shCoeffs, sh, 0, 4);
         float energy = sh[0];
         if (energy <= 0.001f) return PathResult.None;

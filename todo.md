@@ -119,9 +119,26 @@ Sequenced so each step is verifiable before the next begins. Steps 1–4 are the
       `prefab-schema.json` is written against the class and a test fails if they drift;
       `GEMINI_MAP_STANDARD.md` (which described a format the loader had never read) is replaced by
       `docs/AUTHORING.md`. Covered by `PrefabSpecTests`.
-- [ ] **6. Profile, then cut the hot paths.** One `GetSnapshot()` per frame (currently 3–6); cap the audio
-      update to 60 Hz; cache the server ground probe; fix the double enumeration in `GetEntitiesToTest`;
-      index active sounds by entity id; measure the Steam Audio ray budget.
+- [x] **6. Profile, then cut the hot paths.** `PerfProbe` is the measuring half — named timers and counters
+      with a 30 s report, off unless `OPENFPS_PROFILE=1` and free when off, wired into the server tick, both
+      client loops, the audio update and the Steam Audio sim. A frame now builds **one** snapshot, not three
+      to six: `ClientWorldState` stamps every mutation with a version and serves the copy built for it (a
+      change makes a NEW copy, never edits one already handed out), and both heads advance interpolation —
+      the tick's only mutation — before the readers. Map load no longer copies the world per arriving entity
+      (`EntityCount`). The audio update is capped at 60 Hz by `UpdateThrottle` inside `ClientAudioSystem`,
+      so both heads obey one rule instead of running at the ~200 Hz the network poll spins at. The server's
+      ground probe — once per INPUT, each run walking every cell within 50 m — is memoized per session by
+      `GroundProbeMemo`, valid while the static geometry version, the position and a 150 ms age all hold
+      (dynamic colliders are not in the version, so the age bound is what keeps it honest).
+      `SpatialGrid.CollectInRadius` replaces the Count()-then-walk double enumeration **and** the repeats a
+      multi-cell wall produced, for every caller, into caller-owned buffers. Playing voices are indexed by
+      entity id, so the per-frame audio calls stop being linear scans and a frame stops being quadratic in
+      the number of things making noise. `SteamAudioSimulator` times its own runs and reports the ray budget
+      (rays × bounces × sources vs. measured ms), warning loudly when a run outruns the 16.6 ms audio frame.
+      Also cut: quadratic interpolation with a per-entity closure, the radar's per-update array, the pathing
+      SH array per source per tick — and a real bug this surfaced, `_lastSnapshot` being assigned before it
+      was compared against, which had silently disabled the moving-region check. Covered by `HotPathTests`;
+      the FMOD voice index and the ray-budget report are verified by inspection (no native library in CI).
 - [ ] **7. Finish weather, converge the heads, delete the dead code.** Scenario temperature/gustiness/air
       absorption wired end to end; complete the Phase-A interface extraction so one session class drives both
       heads; remove the reverb-slot block, dead `SoundMappingService` methods, and the spike files.

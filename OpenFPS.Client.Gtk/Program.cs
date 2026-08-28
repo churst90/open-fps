@@ -110,6 +110,9 @@ internal static class GtkClientProgram
                 {
                     lastTime = DateTime.Now; // avoid banking elapsed time while not simulating
                 }
+
+                // Costs nothing unless OPENFPS_PROFILE=1; see PerfProbe.
+                PerfProbe.ReportIfDue(TimeSpan.FromSeconds(30), line => Log.Information("{Perf}", line));
             }
             catch (Exception ex)
             {

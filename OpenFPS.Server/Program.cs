@@ -261,12 +261,16 @@ public class GameServer
 
             _network.PollEvents();
             while (accumulator >= TickTimeMs) { Update(_currentTick++); accumulator -= TickTimeMs; }
+
+            // Costs nothing unless OPENFPS_PROFILE=1; see PerfProbe.
+            PerfProbe.ReportIfDue(TimeSpan.FromSeconds(30), line => Log.Information("{Perf}", line));
             Thread.Sleep(1);
         }
     }
 
     private void Update(long tick)
     {
+        using var _perf = PerfProbe.Measure("server.tick");
         try
         {
             // 1. Process Commands & Network Messages

@@ -49,5 +49,13 @@ public class UserSession
     /// <summary>Inputs discarded because the queue was full — flood diagnostics.</summary>
     public long DroppedInputs { get; set; }
 
+    /// <summary>
+    /// This player's memory of where the floor was. The ground probe runs once per INPUT, and a player who
+    /// sends several sub-tick inputs in a tick has barely moved between them, so the probe kept recomputing
+    /// an answer it already had. Lives on the session so it is naturally per-player and disappears with the
+    /// disconnect. See <see cref="OpenFPS.Common.GroundProbeMemo"/>.
+    /// </summary>
+    public OpenFPS.Common.GroundProbeMemo GroundProbe;
+
     public DateTime LastCollisionTime { get; set; } = DateTime.MinValue;
 }

@@ -260,6 +260,14 @@ public class FmodAudioProvider : IAudioProvider
     }
 
     private readonly List<ActiveSound> _activeSounds = new();
+
+    // The same voices, indexed by the entity that owns them. Every per-frame audio query used to be a
+    // linear scan of the list — IsPlaying, GetSoundPosition, and the lookup at the head of both
+    // PlaySpatialSound and UpdateSpatialAttributes — and the audio update runs those once per active
+    // voice, so the cost of a frame grew as the SQUARE of the number of things making noise. Silencing one
+    // removed entity was worse still: ForgetEntity probes a hundred reflection ids, each a full scan.
+    // An entity can own more than one voice (a sound and its reflections), hence a list per id.
+    private readonly Dictionary<int, List<ActiveSound>> _activeById = new();
     private readonly object _lock = new();
     private AcousticMap? _acousticMap;
     private Dictionary<int, FMOD.ChannelGroup> _reverbBuses = new();
@@ -689,7 +697,7 @@ public class FmodAudioProvider : IAudioProvider
         bool loopNative = emitter.Mode == PlaybackMode.LoopOne;
         lock (_lock)
         {
-            var active = _activeSounds.FirstOrDefault(s => s.EntityId == emitter.EntityId);
+            var active = FindActive(emitter.EntityId);
             if (active != null)
             {
                 if (emitter.IsGranular && active.GranularDsp.hasHandle() && active.SoundId == emitter.SoundId)
@@ -894,7 +902,7 @@ public class FmodAudioProvider : IAudioProvider
                 }
             }
 
-            _activeSounds.Add(activeSound);
+            AddActive(activeSound);
         }
 
         // Short fade-in on one-shot event voices (footsteps, impacts). These recycle pooled HRTF voices
@@ -917,7 +925,7 @@ public class FmodAudioProvider : IAudioProvider
     { 
         lock (_lock) 
         { 
-            var active = _activeSounds.FirstOrDefault(s => s.EntityId == emitter.EntityId); 
+            var active = FindActive(emitter.EntityId); 
             if (active != null) 
             { 
                 active.Position = emitter.Position; active.ApparentPosition = emitter.ApparentPosition; 
@@ -967,22 +975,22 @@ public class FmodAudioProvider : IAudioProvider
     { 
         lock (_lock) 
         { 
-            foreach (var active in _activeSounds) 
+            // Once per active voice per audio frame, so the scan this replaces was the squared term in the
+            // frame's cost all by itself. Every voice the entity owns still gets the path.
+            if (!_activeById.TryGetValue(entityId, out var voices)) return;
+            foreach (var active in voices) 
             {
-                if (active.EntityId == entityId) 
-                { 
-                    active.TargetOcclusion = path.Occlusion; 
-                    active.ApparentPosition = path.ApparentPosition; 
-                    active.EffectiveDistance = path.EffectiveDistance; 
-                    active.TargetAperture = path.ApertureFactor;
-                    active.TargetBleed = path.TransmissionBleed; 
-                    active.AirAbsorption = path.AirAbsorption;
-                    active.TargetRegionId = path.RegionId; 
-                    active.TargetLow = path.EqLow;
-                    active.TargetMid = path.EqMid; 
-                    active.TargetHigh = path.EqHigh;
-                    active.RoomGain = path.RoomGain;
-                } 
+                active.TargetOcclusion = path.Occlusion;
+                active.ApparentPosition = path.ApparentPosition;
+                active.EffectiveDistance = path.EffectiveDistance;
+                active.TargetAperture = path.ApertureFactor;
+                active.TargetBleed = path.TransmissionBleed;
+                active.AirAbsorption = path.AirAbsorption;
+                active.TargetRegionId = path.RegionId;
+                active.TargetLow = path.EqLow;
+                active.TargetMid = path.EqMid;
+                active.TargetHigh = path.EqHigh;
+                active.RoomGain = path.RoomGain;
             } 
         } 
     }
@@ -1087,7 +1095,7 @@ public class FmodAudioProvider : IAudioProvider
                     active.Channel.isPlaying(out bool isPlaying);
                     if (!isPlaying) { 
                         ReleaseActiveSoundResources(active);
-                        _activeSounds.RemoveAt(i); continue; 
+                        RemoveActiveAt(i); continue; 
                     }
                     
                     if (active.Type == EmitterType.UI) continue;
@@ -1565,22 +1573,50 @@ public class FmodAudioProvider : IAudioProvider
         }
     }
 
+    // --- Active-voice bookkeeping. Every mutation of _activeSounds goes through these so the index and the
+    // list cannot drift apart. All of them assume _lock is already held.
+    private void AddActive(ActiveSound sound)
+    {
+        _activeSounds.Add(sound);
+        if (!_activeById.TryGetValue(sound.EntityId, out var voices))
+            _activeById[sound.EntityId] = voices = new List<ActiveSound>(1);
+        voices.Add(sound);
+    }
+
+    private void DeindexActive(ActiveSound sound)
+    {
+        if (!_activeById.TryGetValue(sound.EntityId, out var voices)) return;
+        voices.Remove(sound);
+        if (voices.Count == 0) _activeById.Remove(sound.EntityId);
+    }
+
+    private void RemoveActiveAt(int index)
+    {
+        var sound = _activeSounds[index];
+        _activeSounds.RemoveAt(index);
+        DeindexActive(sound);
+    }
+
+    /// <summary>The voice an entity's per-frame update should drive, or null. O(1).</summary>
+    private ActiveSound? FindActive(int entityId) =>
+        _activeById.TryGetValue(entityId, out var voices) && voices.Count > 0 ? voices[0] : null;
+
     public void StopSound(int entityId) { 
         lock (_lock) { 
-            for (int i = _activeSounds.Count - 1; i >= 0; i--) {
-                if (_activeSounds[i].EntityId == entityId) { 
-                    _activeSounds[i].Channel.stop(); 
-                    ReleaseActiveSoundResources(_activeSounds[i]);
-                    _activeSounds.RemoveAt(i); 
-                } 
-            } 
+            if (!_activeById.TryGetValue(entityId, out var voices)) return;
+            foreach (var sound in voices) {
+                sound.Channel.stop();
+                ReleaseActiveSoundResources(sound);
+                _activeSounds.Remove(sound);
+            }
+            _activeById.Remove(entityId);
         } 
     }
     
-    public bool IsPlaying(int entityId) { lock (_lock) return _activeSounds.Any(s => s.EntityId == entityId); }
+    public bool IsPlaying(int entityId) { lock (_lock) return _activeById.ContainsKey(entityId); }
     public float GetPlaybackProgress(int entityId) { 
         lock (_lock) { 
-            var sound = _activeSounds.FirstOrDefault(s => s.EntityId == entityId); 
+            var sound = FindActive(entityId); 
             if (sound == null) return 0f; 
             sound.Channel.getCurrentSound(out var fmodSound); 
             if (!fmodSound.hasHandle()) return 0f; 
@@ -1589,8 +1625,8 @@ public class FmodAudioProvider : IAudioProvider
             return (len == 0) ? 0f : (float)pos / len; 
         } 
     }
-    public IEnumerable<int> GetActiveSpatialSoundIds() { lock(_lock) return _activeSounds.Select(s => s.EntityId).Distinct().ToList(); }
-    public Vector3 GetSoundPosition(int entityId) { lock(_lock) return _activeSounds.FirstOrDefault(s => s.EntityId == entityId)?.Position ?? Vector3.Zero; }
+    public IEnumerable<int> GetActiveSpatialSoundIds() { lock(_lock) return new List<int>(_activeById.Keys); }
+    public Vector3 GetSoundPosition(int entityId) { lock(_lock) return FindActive(entityId)?.Position ?? Vector3.Zero; }
 
     public void Preload(string soundId)
     {
@@ -1654,7 +1690,7 @@ public class FmodAudioProvider : IAudioProvider
         // We queue a callback via the active sound list so it is released in the Update loop.
         lock (_lock)
         {
-            _activeSounds.Add(new ActiveSound
+            AddActive(new ActiveSound
             {
                 EntityId = -(senderId + 90000), // negative offset to avoid collision
                 SoundId = "__voice__",
@@ -1794,6 +1830,7 @@ public class FmodAudioProvider : IAudioProvider
                 ReleaseActiveSoundResources(active);
             }
             _activeSounds.Clear();
+            _activeById.Clear();
             ReturnReverbVoices();
             foreach (var dsp in _reverbDsps.Values) dsp.release();
             foreach (var bus in _reverbBuses.Values) bus.release();

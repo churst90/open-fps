@@ -329,3 +329,63 @@ map uses only fields the loader reads". Verified live: the server loads 18 prefa
 4 portals and spawns the map; a map with `Occlusion_Flooor` and `Aperture` typed into it names both fields
 and the entity that carries one. Docs updated: todo.md step 5, readme.md, docs/AUTHORING.md (new),
 GEMINI_MAP_STANDARD.md (removed).
+
+### 16. Profile, Then Cut the Hot Paths (Engineering Audit — Step 6 of 7)
+
+The theme is repeated work: the same answer computed several times over, because nothing remembered it and
+nothing said how often it was allowed to be asked for. Every item below was found by reading the frame, and
+every one is now measurable rather than asserted.
+
+- **A profiler that lives in the code.** `PerfProbe` — named timers and counters any thread can write to,
+  and a report every 30 s — is off unless `OPENFPS_PROFILE=1`, at which point each call is a static bool
+  test and a return. That is what makes it permanent instead of scaffolding put up and taken down around
+  each investigation: the next time something is slow the numbers are one environment variable away.
+  Wired into the server tick, both client loops, the audio update and the Steam Audio simulation.
+- **One snapshot per version of the world, not per consumer.** A `WorldSnapshot` is a full copy of every
+  definition and transform in the map, and a frame built between three and six of them — one for
+  prediction, one for the shelter raycast, one for the proximity scan, one for the audio system, all
+  describing the same instant. `ClientWorldState` now stamps every mutation with a version and hands back
+  the copy built for it; a change produces a NEW copy rather than editing one already given out, which is
+  what keeps it safe to share with the acoustic worker thread. Both heads advance remote interpolation —
+  the tick's only mutation — *before* the readers rather than between two of them, so the whole frame reads
+  one build. Map load no longer builds a snapshot per arriving entity to count entities (`EntityCount`).
+- **The audio update is capped at 60 Hz.** It hung off a loop that spins as fast as it can poll the socket —
+  a 5 ms sleep, so roughly 200 Hz — and drove all of it at that rate: listener sync, region resolution, six
+  near-field raycasts, an acoustic request per active voice, the FMOD tick. Nothing there resolves faster
+  than a frame. `UpdateThrottle` caps it inside `ClientAudioSystem` so both heads are capped by one rule,
+  and re-arms from the moment it ran, so a stall does not then burn catch-up frames for audio nobody can
+  still hear.
+- **The server's ground probe is memoized.** It ran once per INPUT, not once per tick, and each run walks
+  every grid cell within 50 m and tests five points against everything in them; standing still cost exactly
+  as much as sprinting. `GroundProbeMemo` (on the session, so it is per-player and disappears with the
+  disconnect) returns the last answer while the static geometry version, the probe position and the age all
+  hold. The age bound is the honest part: dynamic colliders are not in the version count, so a remembered
+  floor is allowed to be at most 150 ms stale — under a fifth of the interpolation delay the client already
+  tolerates, and still enough to cut a standing player from thirty-plus probes a second to under seven.
+- **Grid queries walk the cells once and return each item once.** `GetItemsInRadius` is an iterator, so
+  asking it for a count and then walking it — which both the server's collision gather and the client's
+  candidate query did — walked every cell twice. Worse, a wall wide enough to span cells is filed in each
+  of them, so it came back four or nine times and was ray-tested four or nine times, per ray, per source,
+  per frame. `SpatialGrid.CollectInRadius` fixes both once, for every caller, into caller-owned buffers so
+  the grid stays safe to read from several threads.
+- **Playing voices are indexed by entity id.** Every per-frame audio call — `IsPlaying`,
+  `GetSoundPosition`, `SetAcousticPath`, and the lookup at the head of `PlaySpatialSound` and
+  `UpdateSpatialAttributes` — was a linear scan of the active-voice list, run once per active voice, so the
+  cost of a frame grew as the square of the number of things making noise. Silencing one removed entity was
+  worse: `ForgetEntity` probes a hundred reflection ids, each a full scan.
+- **The Steam Audio ray budget is measured.** Its cost is a configuration — rays × bounces × sources — not
+  an emergent one, so `SteamAudioSimulator` times its own runs and reports what was asked for against what
+  it cost (`4096 rays x 1 bounce(s), 12/64 sources: avg 2.1ms, max 7.4ms over 900 runs`). A run that costs
+  more than the 16.6 ms audio frame it feeds says so loudly, throttled, because a worker that cannot keep
+  up does not fail — it silently delivers older and older acoustics.
+- **Smaller cuts on the same paths:** remote interpolation was quadratic in the entity count with a lambda
+  closure allocated per entity per frame (now an indexed lookup); the near-field radar allocated its
+  direction array every update; the pathing stage allocated a four-float array per occluded source per
+  tick. And a real bug the snapshot work surfaced: `ClientAudioSystem` assigned `_lastSnapshot` *before*
+  comparing against it, so the moving-region check compared the world with itself and never fired.
+
+Tests 146 → 159 (`HotPathTests`). Two things are verified by inspection rather than by test and are called
+out in the file: the FMOD voice index (no native library in CI) and the ray-budget report (needs a real
+simulation run). Verified live: the server ran 75 s under `OPENFPS_PROFILE=1` and reported
+`server.tick n=900 avg=0.015ms max=0.081ms` — 900 ticks in 30 s, exactly the 30 Hz the rate is set to.
+Docs updated: todo.md step 6, readme.md.

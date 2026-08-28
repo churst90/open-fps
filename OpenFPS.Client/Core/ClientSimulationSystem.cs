@@ -88,14 +88,19 @@ public class ClientSimulationSystem
             input.LookDelta = Vector2.Zero;
         }
 
-        // 3. Client-Side Prediction (CSP)
-        _reconciler.Step(input, _world.GetSnapshot(), dt);
-
-        // 3.5. Remote Interpolation
+        // 3. Remote Interpolation FIRST, then everything that reads the world reads one snapshot.
+        // Interpolation is the only step in the tick that mutates the world, and it touches only remote
+        // entities (it skips the local player, whose position prediction owns). Advancing it before the
+        // readers rather than between two of them means prediction, the shelter raycast, the proximity
+        // scan and the audio system all share a single snapshot build instead of forcing a second one.
         _world.UpdateInterpolation(dt, _ownEntityId);
+        var snapshot = _world.GetSnapshot();
+
+        // 3.5. Client-Side Prediction (CSP)
+        _reconciler.Step(input, snapshot, dt);
 
         // 3.6. Update Environmental Shelter (Roof check + Indoor Region check)
-        UpdateShelterFactor(dt);
+        UpdateShelterFactor(dt, snapshot);
         
         // 3.7. Localize Atmospheric Effects (Scale precipitation by shelter)
         _state.PrecipitationIntensity = _world.CurrentPrecipitation * (1.0f - _state.ShelterFactor);
@@ -235,7 +240,7 @@ public class ClientSimulationSystem
 
             case EntityDefinition def: 
                 _world.RegisterDefinition(def); 
-                int count = _world.GetSnapshot().Entities.Count;
+                int count = _world.EntityCount;
                 if (_expectedEntityCount > 0)
                 {
                     int pct = 10 + (int)((float)count / _expectedEntityCount * 60);
@@ -251,14 +256,13 @@ public class ClientSimulationSystem
             case MapLoadComplete:
                 _navigation?.UpdateLoadingStatus("Geometry ready. Finalizing acoustics...", 80);
                 Task.Run(() => {
-                    var snapshot = _world.GetSnapshot();
                     int timeout = 0;
-                    while (snapshot.Entities.Count < _expectedEntityCount && timeout < 40) 
+                    while (_world.EntityCount < _expectedEntityCount && timeout < 40) 
                     {
                         Thread.Sleep(100);
-                        snapshot = _world.GetSnapshot();
                         timeout++;
                     }
+                    var snapshot = _world.GetSnapshot();
 
                     _tts.Speak($"Generating acoustics for {snapshot.Entities.Count} entities.");
                     
@@ -348,9 +352,8 @@ public class ClientSimulationSystem
     /// Calculates the ShelterFactor (0.0 to 1.0) based on regional data and vertical raycasting.
     /// ShelterFactor reduces precipitation rendering and environmental ambient loops.
     /// </summary>
-    private void UpdateShelterFactor(float dt)
+    private void UpdateShelterFactor(float dt, WorldSnapshot snap)
     {
-        var snap = _world.GetSnapshot();
         bool isSheltered = false;
         
         // Use the same eye position logic as the audio system for consistency

@@ -21,6 +21,13 @@ public static class MovementSystem
 {
     private static MapManager _maps = null!;
 
+    // The tick runs on one thread; these are reused across every player and every sub-tick input so the
+    // collision gather allocates nothing. CollectInRadius also walks the grid cells once and yields each
+    // obstacle once — the previous Count()-then-foreach walked them twice, and a wall spanning four cells
+    // was copied into the collider array four times, quadrupling the work the physics step then did.
+    private static readonly List<Entity> _nearbyScratch = new(64);
+    private static readonly HashSet<Entity> _nearbySeen = new();
+
     public static void Update(World world, Vector3 mapMin, Vector3 mapMax, SpatialGrid<Entity> grid, SessionManager sessions, MapManager maps, float dt)
     {
         _maps = maps;
@@ -74,6 +81,7 @@ public static class MovementSystem
                     // to prevent the player from instantly walking away from the spawn point 
                     // before the client acknowledges the teleport.
                     while (session.InputQueue.TryDequeue(out _)) { }
+                    session.GroundProbe.Invalidate(); // the remembered floor is at the old position
                     break; 
                 }
 
@@ -86,7 +94,7 @@ public static class MovementSystem
                     transform.IsDirty = true;
                 }
 
-                float groundY = PhysicsUtils.GetGroundHeight(world, grid, transform.Position, out string floorMat);
+                float groundY = PhysicsUtils.GetGroundHeight(world, grid, transform.Position, ref session.GroundProbe, out string floorMat);
                 if (floorMat != null) material.Material = floorMat;
 
                 Vector3 inputDir = Vector3.Zero;
@@ -96,14 +104,13 @@ public static class MovementSystem
                 }
 
                 // 3. COLLISION GATHERING
-                var nearbyItems = grid.GetItemsInRadius(transform.Position, CollisionSearchRadius);
-                int maxColliders = nearbyItems.Count();
-                var colliderArray = ArrayPool<SharedMovementEngine.Collider>.Shared.Rent(maxColliders);
+                grid.CollectInRadius(transform.Position, CollisionSearchRadius, _nearbyScratch, _nearbySeen);
+                var colliderArray = ArrayPool<SharedMovementEngine.Collider>.Shared.Rent(Math.Max(1, _nearbyScratch.Count));
                 int colliderCount = 0;
 
                 try
                 {
-                    foreach (var obstacle in nearbyItems)
+                    foreach (var obstacle in _nearbyScratch)
                     {
                         if (obstacle.Id == e.Id) continue;
                         if (!world.Has<ColliderComponent>(obstacle)) continue;
