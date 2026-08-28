@@ -17,7 +17,7 @@ public static class SimSceneSpike
     {
         AcousticRegistry.Initialize();
 
-        var ctxS = new Phonon.IPLContextSettings { version = Phonon.STEAMAUDIO_VERSION, simdLevel = Phonon.IPL_SIMDLEVEL_AVX2, flags = 0 };
+        var ctxS = Phonon.DefaultContextSettings();
         if (Phonon.iplContextCreate(ref ctxS, out IntPtr ctx) != Phonon.IPL_STATUS_SUCCESS) { Console.WriteLine("ctx failed"); return 1; }
 
         // Wood room (concrete walls), interior x[2,12] z[10,20], door gap x[6,8] in the south wall (z=10).

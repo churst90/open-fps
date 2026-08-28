@@ -172,7 +172,8 @@ is "fraction blocked" (provider does `dryVol = 1 - occlusion`), so convert: `pat
     listener room's RT60 → decay ms, exposed via `TryGetListenerReverbDecayMs`.
   - `ClientAudioSystem` pushes that to `IAudioProvider.SetSimulatedReverbDecay`; `FmodAudioProvider` overrides
     the listener-region reverb DSP decay with it (no-op/Sabine when 0). The hand-rolled **discrete reflection
-    emitters are retired when SA sim is active** (`SteamAudioActive`); they remain the fallback when sim is off.
+    emitters are retired when SA sim answers for a source**; a reflection path can only come from the
+    hand-rolled tracer, so one that *is* present is always rendered (see the per-source fallback note below).
   - Verified headless 2026-06-29 (`--sim-reflect` via the real simulator API: sealed 0.62 s ≫ open 0.10 s) and
     62/62 unit tests pass. **Not yet validated by ear.** **Future:** per-source early-reflection *direction*
     (convolution path) if parametric room reverb proves insufficient; relocate probes on map change.
@@ -181,10 +182,28 @@ is "fraction blocked" (provider does `dryVol = 1 - occlusion`), so convert: `pat
 fallback. The whole of Phase 4 is headless-verified but NOT yet ear-validated — that gate comes when the
 Linux/GTK client runs. Phase 5 (below) should follow ear-validation, not precede it.**
 
-**Active-path switch (2026-06-29):** when SA sim is enabled the worker now builds the acoustic result PURELY
-from the simulator (`AsyncAcousticWorker.BuildSimPath`) and no longer calls the hand-rolled
-`SpatialAcoustics.CalculateAcousticPaths` at all — the old ray-tracer runs ONLY as the `OPENFPS_STEAMAUDIO_SIM=0`
-/ no-libphonon fallback. The worker also defensively calls `AcousticRegistry.Initialize()` (idempotent) so a
+**Active-path switch (2026-06-29):** when SA sim is enabled the worker builds the acoustic result from the
+simulator (`AsyncAcousticWorker.BuildSimPath`) rather than from the hand-rolled
+`SpatialAcoustics.CalculateAcousticPaths` — the old ray-tracer is the `OPENFPS_STEAMAUDIO_SIM=0` /
+no-phonon path.
+
+**Per-source fallback (2026-08-28, audit step 3):** "the simulator is active" is decided *per source, per
+tick*, not once for the session. When `RunSteamAudio` returns null (unbuilt scene, simulator exception) or
+simply has no entry for a source (exhausted `IPLSource` pool, a source added this tick), that source is
+routed through `HandRolledPath` — the hand-rolled tracer. It previously received
+`SteamAudioSimulator.DirectResult.Clear`, i.e. **zero occlusion**, which in an audio-first game means every
+wall in the level silently vanishing for as long as the fault lasts. Related fixes: the listener position is
+now taken from the first pending request rather than only from requests that won a source (an exhausted pool
+used to drop the whole tick); `ClientAudioSystem` honours reflection paths whenever they are present rather
+than gating them on the `SteamAudioActive` flag, so a source that falls back keeps its reflections; and the
+degraded/recovered transition is logged (rate-limited) and exposed as `AsyncAcousticWorker.IsDegraded`.
+
+**SIMD level (2026-08-28, audit step 3):** every `iplContextCreate` call site used to pass
+`IPL_SIMDLEVEL_AVX2`. Steam Audio does not probe the CPU — it emits code for the level you give it, so on a
+non-AVX2 machine that is an illegal instruction inside `libphonon`, not an error code. All call sites now use
+`Phonon.DefaultContextSettings()`, whose `simdLevel` comes from `Phonon.DetectSimdLevel()`
+(AVX-512 → AVX2 → AVX → SSE4.2 → SSE2/NEON via `System.Runtime.Intrinsics`). The chosen level is named in the
+"Steam Audio simulation enabled" log line. The worker also defensively calls `AcousticRegistry.Initialize()` (idempotent) so a
 forgotten registry init can't make scene-material lookups throw and silently drop the sim to no-occlusion
 (this bit the first ear-test harness run).
 
@@ -199,7 +218,9 @@ behind the east wall → 0.00 back at the door, end-to-end through the real prov
 live client, remove/disable `SpatialAcoustics`, `AcousticPathfinder`, the reflection-emitter generation, and
 the 3D reverb-bus positioning, keeping only what the simulator doesn't yet provide (air absorption, distance
 model, region detection / UI readouts) — or migrate those onto the simulator first. Do NOT delete the
-hand-rolled fallback before ear-validation: it is still the `OPENFPS_STEAMAUDIO_SIM=0` / no-libphonon path.
+hand-rolled fallback before ear-validation: it is the `OPENFPS_STEAMAUDIO_SIM=0` / no-phonon path AND the
+per-source fallback for any tick or source the simulator cannot answer (audit step 3) — deleting it would
+restore the "zero occlusion for everything" failure mode that step removed.
 Discrete reflection emitters are already disabled when SA sim is active (4d), so the main remaining work is
 collapsing the now-redundant occlusion ray-tracing and reverb Sabine math once the sim path is trusted.
 

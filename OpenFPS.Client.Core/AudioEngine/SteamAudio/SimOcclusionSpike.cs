@@ -16,7 +16,7 @@ public static class SimOcclusionSpike
     public static int Run()
     {
         // 1. Context.
-        var ctxS = new Phonon.IPLContextSettings { version = Phonon.STEAMAUDIO_VERSION, simdLevel = Phonon.IPL_SIMDLEVEL_AVX2, flags = 0 };
+        var ctxS = Phonon.DefaultContextSettings();
         if (Phonon.iplContextCreate(ref ctxS, out IntPtr ctx) != Phonon.IPL_STATUS_SUCCESS) { Console.WriteLine("iplContextCreate failed"); return 1; }
 
         // 2. Scene (built-in ray tracer).

@@ -133,39 +133,131 @@ public class AsyncAcousticWorker : IDisposable
 
             if (_saEnabled && _saSim != null)
             {
-                // Steam Audio is the ACTIVE spatializer: build the acoustic result purely from the
-                // simulator (occlusion/transmission + pathing arrival direction). The hand-rolled
-                // ray-tracer is NOT run on this path.
+                // Steam Audio is the ACTIVE spatializer: build the acoustic result from the simulator
+                // (occlusion/transmission + pathing arrival direction). Any source the simulator did NOT
+                // produce a result for — a failed tick, an unbuilt scene, an exhausted source pool — falls
+                // back to the hand-rolled ray-tracer for that source. It must NEVER fall back to
+                // DirectResult.Clear: "no result" would then be rendered as "nothing is in the way", which
+                // is the single worst possible answer in a game played by ear — every wall in the level
+                // silently disappears and the player is told a lie about where sounds are.
                 Dictionary<int, SaResult>? sim = RunSteamAudio(world);
+                int degraded = 0;
                 foreach (var kv in _pending)
                 {
                     var req = kv.Value;
-                    SaResult sr = (sim != null && sim.TryGetValue(req.EntityId, out var r))
-                        ? r
-                        : new SaResult(SteamAudioSimulator.DirectResult.Clear, default, false);
-                    _results[req.EntityId] = BuildSimPath(world, req, sr);
+                    if (sim != null && sim.TryGetValue(req.EntityId, out var r))
+                    {
+                        _results[req.EntityId] = BuildSimPath(world, req, r);
+                    }
+                    else
+                    {
+                        _results[req.EntityId] = HandRolledPath(world, req);
+                        degraded++;
+                    }
                 }
+                ReportSimCoverage(degraded, _pending.Count, sim == null);
             }
             else
             {
-                // Legacy hand-rolled spatializer — only the fallback when Steam Audio sim is unavailable
-                // or disabled (OPENFPS_STEAMAUDIO_SIM=0 / no libphonon).
+                // Legacy hand-rolled spatializer — the standing configuration when Steam Audio sim is
+                // unavailable or disabled (OPENFPS_STEAMAUDIO_SIM=0 / no phonon library).
                 foreach (var kv in _pending)
-                {
-                    var req = kv.Value;
-                    try
-                    {
-                        _results[req.EntityId] = _acoustics.CalculateAcousticPaths(world, req.EntityId, req.ListenerPos, req.SourcePos, req.IsImportant);
-                    }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine($"[AcousticWorker] Error processing acoustic path for {req.EntityId}: {ex.Message}");
-                    }
-                }
+                    _results[kv.Key] = HandRolledPath(world, kv.Value);
             }
 
             _pending.Clear();
         }
+    }
+
+    /// <summary>
+    /// The hand-rolled ray-traced acoustic path for one source — the real fallback whenever the Steam Audio
+    /// simulator did not answer for it. It is a worse model than the simulator, but it is a MODEL: it still
+    /// occludes through walls, still finds portals, still attenuates. Returning it is always better than
+    /// returning "clear".
+    ///
+    /// If even the hand-rolled tracer throws, the source keeps whatever result it last had rather than being
+    /// reset to unoccluded; only a source that has never had one gets a clear path, and that is logged.
+    /// </summary>
+    private List<AcousticPathData> HandRolledPath(WorldSnapshot world, AcousticRequest req)
+    {
+        try
+        {
+            return _acoustics.CalculateAcousticPaths(world, req.EntityId, req.ListenerPos, req.SourcePos, req.IsImportant);
+        }
+        catch (Exception ex)
+        {
+            ReportTracerFailure(req.EntityId, ex);
+            if (_results.TryGetValue(req.EntityId, out var previous) && previous.Count > 0) return previous;
+            return new List<AcousticPathData>
+            {
+                new()
+                {
+                    Occlusion = 0f, EqLow = 1f, EqMid = 1f, EqHigh = 1f, TransmissionBleed = 0f,
+                    ApparentPosition = req.SourcePos,
+                    EffectiveDistance = Vector3.Distance(req.ListenerPos, req.SourcePos),
+                    ApertureFactor = 1f, RoomGain = 1f, AirAbsorption = 0f, RegionId = -1, IsReflection = false,
+                }
+            };
+        }
+    }
+
+    // --- Degradation reporting ------------------------------------------------------------------------
+    // A degradation that nobody is told about is a bug that never gets fixed. These log on the TRANSITION
+    // (healthy -> degraded and back) rather than every tick, so the log stays readable while never hiding
+    // the fact that the geometry-driven acoustics stopped answering.
+    private bool _simDegradedLogged;
+    private long _lastDegradeLogTicks;
+    private const long DegradeLogIntervalMs = 10_000;
+    private readonly HashSet<int> _tracerFailuresReported = new();
+
+    /// <summary>True when Steam Audio simulation is enabled but is not currently covering every source, so
+    /// some or all of the acoustics are coming from the hand-rolled tracer.</summary>
+    public bool IsDegraded { get; private set; }
+
+    private void ReportSimCoverage(int degraded, int total, bool wholeTickFailed)
+    {
+        bool nowDegraded = degraded > 0;
+        IsDegraded = nowDegraded;
+
+        if (!nowDegraded)
+        {
+            if (_simDegradedLogged)
+            {
+                Console.WriteLine("[AcousticWorker] Steam Audio simulation recovered; all sources are geometry-simulated again.");
+                _simDegradedLogged = false;
+            }
+            return;
+        }
+
+        long now = Environment.TickCount64;
+        if (_simDegradedLogged && now - _lastDegradeLogTicks < DegradeLogIntervalMs) return;
+
+        _simDegradedLogged = true;
+        _lastDegradeLogTicks = now;
+        string cause = wholeTickFailed
+            ? "the simulation tick produced no results at all"
+            : "the simulator had no result for some sources (source pool exhausted or newly added)";
+        Console.WriteLine($"[AcousticWorker] DEGRADED: {degraded}/{total} sources fell back to the hand-rolled ray-tracer — {cause}.");
+    }
+
+    private string? _lastSimTickFailure;
+    private long _lastSimTickFailureTicks;
+
+    /// <summary>Records why a whole simulation tick produced nothing. Logged on change of cause, and at
+    /// most once per interval thereafter — a persistent failure stays visible without flooding.</summary>
+    private void ReportSimTickFailure(string reason)
+    {
+        long now = Environment.TickCount64;
+        if (reason == _lastSimTickFailure && now - _lastSimTickFailureTicks < DegradeLogIntervalMs) return;
+        _lastSimTickFailure = reason;
+        _lastSimTickFailureTicks = now;
+        Console.WriteLine($"[AcousticWorker] Steam Audio simulation tick produced no results — {reason}. Falling back to the hand-rolled ray-tracer.");
+    }
+
+    private void ReportTracerFailure(int entityId, Exception ex)
+    {
+        if (!_tracerFailuresReported.Add(entityId)) return;
+        Console.WriteLine($"[AcousticWorker] Hand-rolled acoustic tracer failed for entity {entityId} (reported once): {ex.Message}");
     }
 
     /// <summary>Per-entity Steam Audio result for one tick: the direct occlusion/transmission, and (when the
@@ -185,21 +277,28 @@ public class AsyncAcousticWorker : IDisposable
         try
         {
             RebuildSceneIfNeeded(world);
-            if (_saScene == null || !_saScene.IsBuilt) return null;
+            if (_saScene == null || !_saScene.IsBuilt)
+            {
+                ReportSimTickFailure("the Steam Audio scene is not built");
+                return null;
+            }
 
             long now = Environment.TickCount64;
             Vector3 listener = default;
             bool haveListener = false;
             foreach (var kv in _pending)
             {
+                // The listener is the same for every request this tick, so take it from the first one —
+                // NOT only from requests that won a source. Otherwise an exhausted source pool would drop
+                // the whole tick instead of just the sources it could not fit.
+                if (!haveListener) { listener = kv.Value.ListenerPos; haveListener = true; }
+
                 IntPtr src = GetOrAcquireSource(kv.Key);
-                if (src == IntPtr.Zero) continue; // pool exhausted -> that voice stays hand-rolled this tick
+                if (src == IntPtr.Zero) continue; // pool exhausted -> that source falls back to hand-rolled
                 _saSim.SetSourceInputs(src, kv.Value.SourcePos);
                 _saLastSeen[kv.Key] = now;
-                listener = kv.Value.ListenerPos;
-                haveListener = true;
             }
-            if (!haveListener) return null;
+            if (!haveListener) return null;   // nothing pending; not a degradation
 
             _saSim.SetListener(listener);
             _saSim.Run();
@@ -239,7 +338,7 @@ public class AsyncAcousticWorker : IDisposable
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[AcousticWorker] Steam Audio sim tick failed; falling back to hand-rolled: {ex.Message}");
+            ReportSimTickFailure($"the simulation threw: {ex.Message}");
             return null;
         }
     }
@@ -285,7 +384,7 @@ public class AsyncAcousticWorker : IDisposable
     {
         if (_saTried) return;
         _saTried = true;
-        if (_saDisabled) { Console.WriteLine("[AcousticWorker] Steam Audio sim disabled (OPENFPS_STEAMAUDIO_SIM=0); using hand-rolled occlusion."); return; }
+        if (_saDisabled) { Console.WriteLine("[AcousticWorker] Steam Audio sim disabled by OPENFPS_STEAMAUDIO_SIM=0; using the hand-rolled ray-tracer for occlusion, portals and reverb."); return; }
         try
         {
             // Idempotent: ensure acoustic materials exist before the scene build queries them. Without this
@@ -293,16 +392,17 @@ public class AsyncAcousticWorker : IDisposable
             // back to no-occlusion. The clients already call this, but the SA path shouldn't depend on it.
             AcousticRegistry.Initialize();
 
-            var cs = new Phonon.IPLContextSettings { version = Phonon.STEAMAUDIO_VERSION, simdLevel = Phonon.IPL_SIMDLEVEL_AVX2, flags = 0 };
+            var cs = Phonon.DefaultContextSettings();
+            string simd = Phonon.SimdLevelName(cs.simdLevel);
             if (Phonon.iplContextCreate(ref cs, out _saContext) != Phonon.IPL_STATUS_SUCCESS)
-            { _saContext = IntPtr.Zero; Console.WriteLine("[AcousticWorker] Steam Audio context create failed; using hand-rolled occlusion."); return; }
+            { _saContext = IntPtr.Zero; Console.WriteLine($"[AcousticWorker] DEGRADED: Steam Audio context create failed (SIMD {simd}); using the hand-rolled ray-tracer."); return; }
 
             _saSim = new SteamAudioSimulator(_saContext, SaMaxSources, enablePathing: true);
             if (!_saSim.IsValid)
             {
                 _saSim.Dispose(); _saSim = null;
                 Phonon.iplContextRelease(ref _saContext);
-                Console.WriteLine("[AcousticWorker] Steam Audio simulator create failed; using hand-rolled occlusion.");
+                Console.WriteLine("[AcousticWorker] DEGRADED: Steam Audio simulator create failed; using the hand-rolled ray-tracer.");
                 return;
             }
             _saScene = new SteamAudioScene(_saContext);
@@ -311,10 +411,15 @@ public class AsyncAcousticWorker : IDisposable
             if (!_saReverbSim.IsValid) { _saReverbSim.Dispose(); _saReverbSim = null; }
 
             _saEnabled = true;
-            Console.WriteLine("[AcousticWorker] Steam Audio simulation enabled (per-source occlusion/transmission + geometry reverb).");
+            Console.WriteLine($"[AcousticWorker] Steam Audio simulation enabled (SIMD {simd}; per-source occlusion/transmission + geometry reverb).");
+            if (_saReverbSim == null)
+                Console.WriteLine("[AcousticWorker] DEGRADED: the reflection simulator failed to create; room reverb falls back to the hand-rolled Sabine estimate.");
         }
-        catch (DllNotFoundException) { Console.WriteLine("[AcousticWorker] libphonon not found; using hand-rolled occlusion."); }
-        catch (Exception ex) { Console.WriteLine($"[AcousticWorker] Steam Audio sim init failed; using hand-rolled occlusion: {ex.Message}"); }
+        catch (DllNotFoundException)
+        {
+            Console.WriteLine($"[AcousticWorker] DEGRADED: {OpenFPS.Client.Core.Platform.NativeAudioLibraries.PhononFileName} not found; using the hand-rolled ray-tracer for occlusion, portals and reverb.");
+        }
+        catch (Exception ex) { Console.WriteLine($"[AcousticWorker] DEGRADED: Steam Audio sim init failed; using the hand-rolled ray-tracer: {ex.Message}"); }
     }
 
     /// <summary>Rebuilds the simulator scene from the world's solid box colliders when the acoustic map

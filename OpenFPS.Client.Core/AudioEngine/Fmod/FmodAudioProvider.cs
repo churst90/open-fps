@@ -9,6 +9,7 @@ using OpenFPS.Common.Components;
 using OpenFPS.Client.AudioEngine.Data;
 using OpenFPS.Common;
 using OpenFPS.Client.Core.AudioEngine.SteamAudio;
+using OpenFPS.Client.Core.Platform;
 
 namespace OpenFPS.Client.AudioEngine.Fmod;
 
@@ -17,26 +18,56 @@ internal static class FmodHelpers
     public static FMOD.VECTOR ToFmodVec(Vector3 v) => new FMOD.VECTOR { x = v.X, y = v.Y, z = v.Z };
 }
 
+/// <summary>Outcome of asking the resource manager for a sound. The distinction between "still loading"
+/// and "will never exist" is the whole point: a <see cref="Loading"/> sound must be retried, a
+/// <see cref="Missing"/> one must be reported. Collapsing the two is what silently ate the first play of
+/// every sound in the game.</summary>
+internal enum SoundLoadState
+{
+    /// <summary>Decoded and playable right now.</summary>
+    Ready,
+    /// <summary>Load started (or still in flight). Ask again shortly.</summary>
+    Loading,
+    /// <summary>No such asset on disk, or FMOD refused it. Retrying will not help.</summary>
+    Missing,
+}
+
 internal class FmodResourceManager : IDisposable
 {
     private readonly FMOD.System _system;
     private readonly Dictionary<string, FMOD.Sound> _cache = new();
+    private readonly HashSet<string> _reportedMissing = new();
 
     public FmodResourceManager(FMOD.System system) => _system = system;
 
-    public bool TryGetSound(string soundId, out FMOD.Sound sound, bool loop = false)
+    /// <summary>
+    /// Resolves a sound, kicking off its NONBLOCKING load on first request.
+    ///
+    /// Sounds are created with <see cref="MODE.NONBLOCKING"/>, so the very first request for an
+    /// un-preloaded asset can only ever answer "loading" — the decode has not finished yet. Reporting
+    /// that honestly (rather than handing back a not-yet-ready handle that <c>playSound</c> rejects with
+    /// ERR_NOTREADY) is what lets the caller retry instead of dropping the play.
+    /// </summary>
+    public SoundLoadState TryGetSound(string soundId, out FMOD.Sound sound, bool loop = false)
     {
-        if (string.IsNullOrEmpty(soundId)) { sound = default; return false; }
+        sound = default;
+        if (string.IsNullOrEmpty(soundId)) return SoundLoadState.Missing;
+
         string cacheKey = soundId + (loop ? "_L" : "");
         if (_cache.TryGetValue(cacheKey, out sound))
         {
             // NONBLOCKING loads complete asynchronously — verify the sound is ready before use.
             sound.getOpenState(out OPENSTATE openState, out _, out _, out _);
-            if (openState == OPENSTATE.READY) return true;
+            if (openState == OPENSTATE.READY) return SoundLoadState.Ready;
             sound = default;
-            return false;
+            if (openState == OPENSTATE.ERROR)
+            {
+                ReportMissing(soundId, "FMOD reported OPENSTATE.ERROR after loading");
+                return SoundLoadState.Missing;
+            }
+            return SoundLoadState.Loading;
         }
-        
+
         string path;
         if (soundId.Contains("ASSETS", StringComparison.OrdinalIgnoreCase)) path = soundId;
         else
@@ -50,18 +81,42 @@ internal class FmodResourceManager : IDisposable
             string[] extensions = { ".wav", ".ogg", ".mp3" };
             bool found = false;
             foreach (var ext in extensions) { if (File.Exists(path + ext)) { path = path + ext; found = true; break; } }
-            if (!found) return false;
+            if (!found)
+            {
+                ReportMissing(soundId, $"no file at '{path}' (.wav/.ogg/.mp3)");
+                return SoundLoadState.Missing;
+            }
         }
 
         MODE mode = MODE.CREATESAMPLE | MODE._3D | MODE._3D_LINEARROLLOFF | MODE.NONBLOCKING;
         if (loop) mode |= MODE.LOOP_NORMAL;
-        
+
         RESULT res = _system.createSound(path, mode, out sound);
-        if (res != RESULT.OK) return false;
+        if (res != RESULT.OK)
+        {
+            sound = default;
+            ReportMissing(soundId, $"createSound failed: {res}");
+            return SoundLoadState.Missing;
+        }
 
         _cache[cacheKey] = sound;
-        return true;
+
+        // The load has only just been queued; it is never ready on this call. Say so, so the caller can
+        // defer the play rather than lose it.
+        sound.getOpenState(out OPENSTATE state, out _, out _, out _);
+        if (state == OPENSTATE.READY) return SoundLoadState.Ready;
+        sound = default;
+        return SoundLoadState.Loading;
     }
+
+    /// <summary>Logs an unresolvable sound once per id — a missing asset is a content bug and must be
+    /// visible, but it must not spam the log every frame the emitter is in range.</summary>
+    private void ReportMissing(string soundId, string reason)
+    {
+        if (!_reportedMissing.Add(soundId)) return;
+        Log.Warning("Audio asset '{SoundId}' cannot be played: {Reason}. That emitter will be silent.", soundId, reason);
+    }
+
     public void Dispose() { foreach (var s in _cache.Values) s.release(); _cache.Clear(); }
 }
 
@@ -329,14 +384,15 @@ public class FmodAudioProvider : IAudioProvider
         {
             _system.getDSPBufferSize(out uint block, out int _);
             _saFrameSize = (int)block;
-            var cs = new Phonon.IPLContextSettings { version = Phonon.STEAMAUDIO_VERSION, simdLevel = Phonon.IPL_SIMDLEVEL_AVX2, flags = 0 };
+            var cs = Phonon.DefaultContextSettings();
+            string simd = Phonon.SimdLevelName(cs.simdLevel);
             if (Phonon.iplContextCreate(ref cs, out _saContext) != Phonon.IPL_STATUS_SUCCESS)
-            { Log.Warning("Steam Audio: context create failed; using FMOD panning."); return; }
+            { Log.Warning("Steam Audio: context create failed (SIMD {Simd}); DEGRADED to FMOD panning — no HRTF binaural.", simd); return; }
 
             var au = new Phonon.IPLAudioSettings { samplingRate = 44100, frameSize = _saFrameSize };
             var hs = new Phonon.IPLHRTFSettings { type = Phonon.IPL_HRTFTYPE_DEFAULT, volume = 1f, normType = Phonon.IPL_HRTFNORMTYPE_NONE };
             if (Phonon.iplHRTFCreate(_saContext, ref au, ref hs, out _saHrtf) != Phonon.IPL_STATUS_SUCCESS)
-            { Log.Warning("Steam Audio: HRTF create failed; using FMOD panning."); Phonon.iplContextRelease(ref _saContext); return; }
+            { Log.Warning("Steam Audio: HRTF create failed; DEGRADED to FMOD panning — no HRTF binaural."); Phonon.iplContextRelease(ref _saContext); return; }
 
             _steamAudioEnabled = true;
             for (int i = 0; i < SaPoolSize; i++)
@@ -345,10 +401,14 @@ public class FmodAudioProvider : IAudioProvider
                 _saAllVoices.Add(v);
                 _saPool.Push(v);
             }
-            Log.Information("Steam Audio HRTF binaural enabled (frameSize={Frame}); {Pooled} voices pooled.", _saFrameSize, _saAllVoices.Count);
+            Log.Information("Steam Audio HRTF binaural enabled (SIMD={Simd}, frameSize={Frame}); {Pooled} voices pooled.", simd, _saFrameSize, _saAllVoices.Count);
         }
-        catch (DllNotFoundException) { Log.Warning("Steam Audio: libphonon not found; using FMOD panning."); }
-        catch (Exception ex) { Log.Warning(ex, "Steam Audio init failed; using FMOD panning."); }
+        catch (DllNotFoundException)
+        {
+            Log.Warning("Steam Audio: {Lib} not found; DEGRADED to FMOD panning — no HRTF binaural. " +
+                        "Spatial cues will be stereo pan only.", NativeAudioLibraries.PhononFileName);
+        }
+        catch (Exception ex) { Log.Warning(ex, "Steam Audio init failed; DEGRADED to FMOD panning — no HRTF binaural."); }
     }
 
     /// <summary>Allocates one pooled voice (effect + Phonon buffers + DSP). Called only at init.</summary>
@@ -711,13 +771,26 @@ public class FmodAudioProvider : IAudioProvider
         else
         {
             if (!_isInitialized) return;
-            if (!_resources.TryGetSound(emitter.SoundId, out FMOD.Sound sound, loopNative))
+            var loadState = _resources.TryGetSound(emitter.SoundId, out FMOD.Sound sound, loopNative);
+            if (loadState != SoundLoadState.Ready)
             {
                 if (_audioDebug && emitter.Mode == PlaybackMode.LoopOne)
-                    Log.Information("[BEACON] e{Id} '{Sound}' NOT PLAYING — sound not ready/found", emitter.EntityId, emitter.SoundId);
+                    Log.Information("[BEACON] e{Id} '{Sound}' not playing yet — {State}", emitter.EntityId, emitter.SoundId, loadState);
+
+                // A NONBLOCKING load that has not finished is NOT a reason to lose the play: park the
+                // emitter and retry it on subsequent Update() ticks (see DrainDeferredPlays). Only a
+                // genuinely Missing asset is dropped, and that has already been logged once by name.
+                if (loadState == SoundLoadState.Loading) DeferPlay(emitter);
                 return;
             }
-            if (_system.playSound(sound, targetGroup, true, out channel) != RESULT.OK) return;
+            RESULT playRes = _system.playSound(sound, targetGroup, true, out channel);
+            if (playRes != RESULT.OK)
+            {
+                // ERR_NOTREADY can still race a load that completed between getOpenState and playSound.
+                if (playRes == RESULT.ERR_NOTREADY) DeferPlay(emitter);
+                else Log.Warning("playSound failed for '{Sound}' on entity {Id}: {Result}", emitter.SoundId, emitter.EntityId, playRes);
+                return;
+            }
             channel.setMode(MODE._3D | MODE._3D_LINEARROLLOFF);
         }
 
@@ -914,10 +987,89 @@ public class FmodAudioProvider : IAudioProvider
         } 
     }
 
+    // --- Deferred plays: NONBLOCKING loads that were not ready when the emitter asked to be heard ------
+    // Without this, the FIRST play of any un-preloaded sound is silently lost — createSound returns
+    // immediately, the decode is still in flight, and playSound answers ERR_NOTREADY. Parking the emitter
+    // and retrying costs nothing and makes the sound arrive a few milliseconds late instead of never.
+    private sealed class DeferredPlay
+    {
+        public SpatialEmitter Emitter;
+        public long DeadlineTicks;
+        public DeferredPlay(SpatialEmitter emitter, long deadlineTicks) { Emitter = emitter; DeadlineTicks = deadlineTicks; }
+    }
+
+    // How long a queued play waits for its decode before we give up and say so. Generous: a cold ogg
+    // decode on a slow disk is still well inside this, and a one-off late sound beats a missing one.
+    private const int DeferredPlayTimeoutMs = 3000;
+    private readonly List<DeferredPlay> _deferredPlays = new();
+    private readonly object _deferredLock = new();
+
+    /// <summary>Parks an emitter whose sound is still decoding, to be retried by <see cref="Update"/>.
+    /// The latest request per entity wins, so a re-triggered emitter never queues twice.</summary>
+    private void DeferPlay(SpatialEmitter emitter)
+    {
+        long deadline = Environment.TickCount64 + DeferredPlayTimeoutMs;
+        lock (_deferredLock)
+        {
+            for (int i = 0; i < _deferredPlays.Count; i++)
+            {
+                if (_deferredPlays[i].Emitter.EntityId != emitter.EntityId) continue;
+                // Keep the ORIGINAL deadline: re-requesting a still-loading sound every frame must not
+                // extend the wait forever, or a genuinely broken asset would never be reported.
+                _deferredPlays[i].Emitter = emitter;
+                return;
+            }
+            _deferredPlays.Add(new DeferredPlay(emitter, deadline));
+        }
+    }
+
+    /// <summary>Retries parked plays whose sound has since finished decoding, and reports the ones that
+    /// ran out of time. Called at the top of <see cref="Update"/>, OUTSIDE the active-sound lock, because
+    /// a successful retry re-enters PlaySpatialSound and mutates the active list.</summary>
+    private void DrainDeferredPlays()
+    {
+        List<DeferredPlay>? due = null;
+        long now = Environment.TickCount64;
+
+        lock (_deferredLock)
+        {
+            if (_deferredPlays.Count == 0) return;
+            due = new List<DeferredPlay>(_deferredPlays);
+            _deferredPlays.Clear();
+        }
+
+        foreach (var d in due)
+        {
+            bool loopNative = d.Emitter.Mode == PlaybackMode.LoopOne;
+            var state = _resources.TryGetSound(d.Emitter.SoundId, out _, loopNative);
+
+            if (state == SoundLoadState.Ready)
+            {
+                PlaySpatialSound(d.Emitter);   // re-enters the normal path now that the decode is done
+                continue;
+            }
+
+            if (state == SoundLoadState.Missing)
+                continue;                       // already logged by name in the resource manager
+
+            if (now >= d.DeadlineTicks)
+            {
+                Log.Warning("Audio asset '{SoundId}' still not decoded after {Timeout} ms; entity {Id} stayed silent.",
+                    d.Emitter.SoundId, DeferredPlayTimeoutMs, d.Emitter.EntityId);
+                continue;
+            }
+
+            lock (_deferredLock) { _deferredPlays.Add(d); }   // still loading — keep waiting
+        }
+    }
+
     public void Update()
     {
         if (!_isInitialized) return;
-        
+
+        // Before anything else: retry plays that were waiting on a NONBLOCKING decode.
+        DrainDeferredPlays();
+
         try
         {
             Vector3 lPosVec = _listenerPos;
@@ -1447,7 +1599,8 @@ public class FmodAudioProvider : IAudioProvider
         // Try preloading as a granular sound first
         _granularBank.TryGetPcmData(soundId, out _, out _, out _);
 
-        // Also preload as a standard FMOD sound
+        // Also preload as a standard FMOD sound. This is exactly what makes the deferred-play path rare:
+        // the NONBLOCKING decode is started here, long before anything asks to hear it.
         _resources.TryGetSound(soundId, out _, false);
     }
 

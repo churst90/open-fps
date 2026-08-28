@@ -137,3 +137,62 @@
   (all three fail against the pre-fix drain-everything loop); that `ToYawPitch`/`WrapAngle` round-trip; that
   a correction + replay lands back on the predicted position; that pending turns are not double-counted and a
   disagreeing server snaps the yaw; and that the history stays capped. 86/86 pass.
+
+### 13. Every Degradation Is Loud (Engineering Audit — Step 3 of 7)
+Five places where the engine could not do its job and answered as if it had. None of them threw; none of
+them logged; every one of them was invisible from inside a game played entirely by ear.
+
+- **A failed Steam Audio tick reported "nothing is in the way".** When `RunSteamAudio` returned null — a
+  scene that had not built, a simulator exception, an exhausted source pool — `AsyncAcousticWorker`
+  substituted `DirectResult.Clear` for *every* source. That is not a fallback; it is the single worst answer
+  available: every wall in the level silently disappears and the player is told, by ear, that a sound behind
+  concrete is in the open. Each un-simulated source now falls back to the hand-rolled ray-tracer
+  (`HandRolledPath`), which is a worse model but still a *model* — it occludes, it finds portals, it
+  attenuates. If even that throws, the source keeps its previous result rather than being reset to clear, and
+  the failure is logged once per entity. `IsDegraded` exposes the state, and the transition into and out of
+  degradation is logged (rate-limited), so a session that quietly stopped being geometry-simulated says so.
+- **A source that lost the pool race lost its listener too.** `RunSteamAudio` only recorded the listener
+  position from requests that successfully acquired an `IPLSource`, so an exhausted pool made the *whole tick*
+  return null instead of just the sources it could not fit. The listener is now taken from the first pending
+  request.
+- **Reflections were gated on a mode flag, not on the data.** `ClientAudioSystem` skipped discrete reflection
+  emitters whenever `SteamAudioActive` was true — so a source that fell back mid-session lost its reflections
+  as well as its simulation. The simulator never emits a reflection path, so a reflection entry can only have
+  come from the hand-rolled tracer; it is now honoured unconditionally.
+- **AVX2 was assumed, never checked.** Every `iplContextCreate` call site passed `IPL_SIMDLEVEL_AVX2`. Steam
+  Audio does not probe the CPU — it emits code for whatever level you hand it, so on a machine without AVX2
+  that is an illegal instruction inside `libphonon`, not an error code. `Phonon.DetectSimdLevel()` now queries
+  `System.Runtime.Intrinsics` (AVX-512 → AVX2 → AVX → SSE4.2 → SSE2/NEON) and `Phonon.DefaultContextSettings()`
+  replaces the hand-built struct at all fourteen call sites. The chosen level is named in the enable log line.
+- **phonon was missing from the required-native check.** `ClientRunner` required `fmod.dll` and
+  `fmodstudio.dll` but not `phonon.dll` — so a client with no Steam Audio started, made noise, and ran with
+  the HRTF binaural the entire game exists for quietly switched off. That is the dangerous failure, because it
+  *looks* like it works. `NativeAudioLibraries` (new, in `Client.Core/Platform`) is the one shared,
+  platform-aware list of expected libraries with the cost of each; phonon is `Required`. The Windows head
+  refuses to start and both speaks and shows exactly which libraries are missing and what each one costs; the
+  GTK head, which deliberately still runs without audio, now speaks the same specific report instead of
+  "FMOD audio library not found".
+- **Connection and protocol failures were empty method bodies.** `ClientNetworkService.OnNetworkError` was
+  `{ }`, `OnPeerDisconnected` silently nulled the peer, a failed deserialize was `catch (Exception) { }`, and
+  `Send` with no peer dropped the message without a word. For a blind player there is no greyed-out button or
+  spinner to look at: the game simply stopped responding. Every one of those paths now logs *and* raises a
+  finished, speakable sentence — `OnConnectionFailed` (with LiteNetLib's `DisconnectReason` translated into
+  something worth hearing: "The server did not answer", "The server is running an incompatible protocol
+  version") and `OnProtocolError` (rate-limited, so a packet-rate fault stays loud without flooding). Both
+  heads speak them. A socket that fails to open is reported too — the Windows head now subscribes *before*
+  `Start()`, which is where that failure is raised.
+- **The first play of every NONBLOCKING sound was dropped.** `FmodResourceManager.TryGetSound` created sounds
+  with `MODE.NONBLOCKING` and returned `true` immediately, while the decode was still in flight; `playSound`
+  then answered `ERR_NOTREADY` and the caller returned, losing the play. It came back on the *next* trigger,
+  so every un-preloaded sound in the game was silently swallowed once — and the GTK head, which never calls
+  `PreloadAll`, swallowed the first play of everything. `TryGetSound` now returns a tri-state
+  (`Ready` / `Loading` / `Missing`): a still-decoding sound is parked in a deferred-play queue and retried
+  from `Update()` until it is ready or a 3 s deadline passes, and a genuinely missing asset is logged once by
+  name with the reason. A late sound instead of a lost one.
+- **Tests (86 → 97):** `DegradationTests` drives the real shipped map through `AsyncAcousticWorker` and
+  asserts a source behind a wall never comes back with zero occlusion, that a clear-line-of-sight source is
+  not blanket-occluded, and that every requested source is answered; that the detected SIMD level never
+  exceeds what the running CPU actually supports and that `DefaultContextSettings` carries it; that phonon is
+  present in the required-native list as `Required` with an HRTF cost, that the expected names match the
+  platform, and that `DescribeMissing` names every library and what it costs; and that a connect to a dead
+  port produces a spoken, finished sentence rather than silence. 97/97 pass.

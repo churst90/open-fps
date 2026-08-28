@@ -19,8 +19,14 @@ internal static partial class Phonon
 
     // IPLerror
     public const int IPL_STATUS_SUCCESS = 0;
-    // IPLSIMDLevel
+
+    // IPLSIMDLevel (phonon.h). NEON aliases SSE2 (both are 4-wide), exactly as the header declares it.
+    public const int IPL_SIMDLEVEL_SSE2 = 0;
+    public const int IPL_SIMDLEVEL_SSE4 = 1;
+    public const int IPL_SIMDLEVEL_AVX = 2;
     public const int IPL_SIMDLEVEL_AVX2 = 3;
+    public const int IPL_SIMDLEVEL_AVX512 = 4;
+    public const int IPL_SIMDLEVEL_NEON = IPL_SIMDLEVEL_SSE2;
     // IPLHRTFType
     public const int IPL_HRTFTYPE_DEFAULT = 0;
     // IPLHRTFNormType
@@ -77,6 +83,47 @@ internal static partial class Phonon
         public int numSamples;
         public IntPtr data;          // float**
     }
+
+    // --- SIMD capability -----------------------------------------------------------------------------
+    // Steam Audio does NOT probe the CPU: whatever level you hand iplContextCreate is the level it will
+    // emit code for. Asking for AVX2 on a machine without it is an illegal-instruction crash inside
+    // libphonon, not a graceful failure — so ask the CPU what it actually has. Cached: CPU features
+    // cannot change while the process runs.
+    private static int _simdLevel = -1;
+
+    /// <summary>The highest IPLSIMDLevel this CPU actually supports.</summary>
+    public static int DetectSimdLevel()
+    {
+        if (_simdLevel >= 0) return _simdLevel;
+
+        int level;
+        if (System.Runtime.Intrinsics.X86.Avx512F.IsSupported) level = IPL_SIMDLEVEL_AVX512;
+        else if (System.Runtime.Intrinsics.X86.Avx2.IsSupported) level = IPL_SIMDLEVEL_AVX2;
+        else if (System.Runtime.Intrinsics.X86.Avx.IsSupported) level = IPL_SIMDLEVEL_AVX;
+        else if (System.Runtime.Intrinsics.X86.Sse42.IsSupported) level = IPL_SIMDLEVEL_SSE4;
+        else level = IPL_SIMDLEVEL_SSE2;  // also the value for ARM NEON
+
+        _simdLevel = level;
+        return level;
+    }
+
+    /// <summary>Human-readable name for an IPLSIMDLevel, for the log line that records what we asked for.</summary>
+    public static string SimdLevelName(int level) => level switch
+    {
+        IPL_SIMDLEVEL_AVX512 => "AVX-512",
+        IPL_SIMDLEVEL_AVX2 => "AVX2",
+        IPL_SIMDLEVEL_AVX => "AVX",
+        IPL_SIMDLEVEL_SSE4 => "SSE4.2",
+        _ => System.Runtime.Intrinsics.Arm.AdvSimd.IsSupported ? "NEON" : "SSE2",
+    };
+
+    /// <summary>Context settings with the SIMD level set from the running CPU rather than assumed.</summary>
+    public static IPLContextSettings DefaultContextSettings() => new()
+    {
+        version = STEAMAUDIO_VERSION,
+        simdLevel = DetectSimdLevel(),
+        flags = 0,
+    };
 
     [DllImport(Lib, CallingConvention = CC)]
     public static extern int iplContextCreate(ref IPLContextSettings settings, out IntPtr context);

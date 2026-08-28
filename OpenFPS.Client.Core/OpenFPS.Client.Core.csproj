@@ -16,4 +16,12 @@
     <PackageReference Include="Serilog" Version="4.2.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- The Phonon P/Invoke surface is internal by design (nothing outside the audio engine should call
+         it), but the CPU SIMD-level detection it now performs is exactly the kind of thing that must be
+         asserted rather than assumed — asking libphonon for AVX2 on a CPU without it is an illegal
+         instruction, not an error code. -->
+    <InternalsVisibleTo Include="OpenFPS.Tests" />
+  </ItemGroup>
+
 </Project>

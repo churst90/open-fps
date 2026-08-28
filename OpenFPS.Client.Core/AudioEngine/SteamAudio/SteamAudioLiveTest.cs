@@ -27,7 +27,7 @@ public static class SteamAudioLiveTest
         int frameSize = (int)blockSize;
 
         // Steam Audio context + HRTF (shared) and a per-voice binaural effect.
-        var ctxS = new Phonon.IPLContextSettings { version = Phonon.STEAMAUDIO_VERSION, simdLevel = Phonon.IPL_SIMDLEVEL_AVX2, flags = 0 };
+        var ctxS = Phonon.DefaultContextSettings();
         if (Phonon.iplContextCreate(ref ctxS, out IntPtr ctx) != Phonon.IPL_STATUS_SUCCESS) { Console.WriteLine("iplContextCreate failed"); return 1; }
         var audio = new Phonon.IPLAudioSettings { samplingRate = 44100, frameSize = frameSize };
         var hrtfS = new Phonon.IPLHRTFSettings { type = Phonon.IPL_HRTFTYPE_DEFAULT, volume = 1f, normType = Phonon.IPL_HRTFNORMTYPE_NONE };
@@ -122,7 +122,7 @@ public static class SteamAudioLiveTest
         system.getDSPBufferSize(out uint blockSize, out int _);
         int frameSize = (int)blockSize;
 
-        var ctxS = new Phonon.IPLContextSettings { version = Phonon.STEAMAUDIO_VERSION, simdLevel = Phonon.IPL_SIMDLEVEL_AVX2, flags = 0 };
+        var ctxS = Phonon.DefaultContextSettings();
         Phonon.iplContextCreate(ref ctxS, out IntPtr ctx);
         var au = new Phonon.IPLAudioSettings { samplingRate = 44100, frameSize = frameSize };
         var hs = new Phonon.IPLHRTFSettings { type = Phonon.IPL_HRTFTYPE_DEFAULT, volume = 1f, normType = Phonon.IPL_HRTFNORMTYPE_NONE };
@@ -217,7 +217,7 @@ public static class SteamAudioLiveTest
         system.getDSPBufferSize(out uint blockSize, out int _);
         int frameSize = (int)blockSize;
 
-        var ctxS = new Phonon.IPLContextSettings { version = Phonon.STEAMAUDIO_VERSION, simdLevel = Phonon.IPL_SIMDLEVEL_AVX2, flags = 0 };
+        var ctxS = Phonon.DefaultContextSettings();
         Phonon.iplContextCreate(ref ctxS, out IntPtr ctx);
         var au = new Phonon.IPLAudioSettings { samplingRate = 44100, frameSize = frameSize };
         var hs = new Phonon.IPLHRTFSettings { type = Phonon.IPL_HRTFTYPE_DEFAULT, volume = 1f, normType = Phonon.IPL_HRTFNORMTYPE_NONE };

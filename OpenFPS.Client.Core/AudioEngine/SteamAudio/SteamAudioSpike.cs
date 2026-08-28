@@ -20,12 +20,7 @@ public static class SteamAudioSpike
         const double segmentSeconds = 8.0;
         const double revolutionSeconds = 4.0; // two revolutions per segment
 
-        var ctxSettings = new Phonon.IPLContextSettings
-        {
-            version = Phonon.STEAMAUDIO_VERSION,
-            simdLevel = Phonon.IPL_SIMDLEVEL_AVX2,
-            flags = 0
-        };
+        var ctxSettings = Phonon.DefaultContextSettings();
         int err = Phonon.iplContextCreate(ref ctxSettings, out IntPtr context);
         if (err != Phonon.IPL_STATUS_SUCCESS) { Console.WriteLine($"iplContextCreate failed: {err}"); return 1; }
 

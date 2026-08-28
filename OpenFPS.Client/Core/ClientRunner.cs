@@ -8,6 +8,7 @@ using System;
 using System.Threading;
 using OpenFPS.Client.AudioEngine.Core;
 using OpenFPS.Client.AudioEngine.Fmod;
+using OpenFPS.Client.Core.Platform;
 
 namespace OpenFPS.Client.Core;
 
@@ -52,29 +53,6 @@ public class ClientRunner
     private string _pendingPass = "";
     private bool _isRegistering = false;
 
-    // Required native DLLs that must be present next to the executable.
-    private static readonly string[] RequiredNativeDlls =
-    [
-        "fmod.dll",
-        "fmodstudio.dll",
-    ];
-
-    /// <summary>
-    /// Validates that all required native DLL dependencies are present on disk.
-    /// Returns a list of missing DLL names, or an empty list if everything is found.
-    /// </summary>
-    private static List<string> FindMissingNativeDlls()
-    {
-        string baseDir = AppDomain.CurrentDomain.BaseDirectory;
-        var missing = new List<string>();
-        foreach (var dll in RequiredNativeDlls)
-        {
-            if (!File.Exists(Path.Combine(baseDir, dll)))
-                missing.Add(dll);
-        }
-        return missing;
-    }
-
     /// <summary>
     /// Starts the application, initializes dependencies, and opens the main UI.
     /// </summary>
@@ -82,12 +60,17 @@ public class ClientRunner
     {
         _tts.Initialize();
 
-        var missingDlls = FindMissingNativeDlls();
+        // Native audio libraries: FMOD (sound at all) AND phonon (HRTF binaural). phonon is required, not
+        // optional — without it the game still makes noise, which is precisely the dangerous case: it looks
+        // like it works while the spatial information the whole game is played on has quietly vanished.
+        var missingDlls = NativeAudioLibraries.FindMissing();
         if (missingDlls.Count > 0)
         {
-            string names = string.Join(", ", missingDlls);
-            string message = $"OpenFPS cannot start: required audio libraries are missing ({names}). " +
-                             "Please reinstall the application or copy the FMOD DLLs next to the executable.";
+            string message = "OpenFPS cannot start. " + NativeAudioLibraries.DescribeMissing(missingDlls) +
+                             " Please reinstall the application, or copy the FMOD and Steam Audio libraries " +
+                             "next to the executable.";
+
+            Serilog.Log.Error("Startup aborted. {Report}", NativeAudioLibraries.DescribeMissing(missingDlls));
 
             // Announce via screen reader / SAPI before showing any UI — accessibility-first.
             _tts.Speak(message);
@@ -99,6 +82,12 @@ public class ClientRunner
         AcousticRegistry.Initialize();
         _sounds.Initialize();
         _audio.Initialize();
+
+        // Subscribe BEFORE Start(): a failure to open the socket is reported from inside Start(), and a
+        // handler attached afterwards would never hear the one message that explains why nothing works.
+        // A connection or protocol failure must be heard, not inferred from the game going quiet.
+        _network.OnConnectionFailed += reason => _tts.Speak(reason, true);
+        _network.OnProtocolError += reason => _tts.Speak(reason, true);
         _network.Start();
 
         // System Wiring

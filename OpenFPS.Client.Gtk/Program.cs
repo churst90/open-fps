@@ -6,7 +6,7 @@ using Serilog;
 using OpenFPS.Common;
 using OpenFPS.Common.Networking;
 using OpenFPS.Client.Core;          // ClientNetworkService
-using OpenFPS.Client.Core.Platform; // ISpeechOutput / SpeechDispatcherOutput
+using OpenFPS.Client.Core.Platform; // ISpeechOutput / SpeechDispatcherOutput / NativeAudioLibraries
 using OpenFPS.Client.Gtk.Game;      // GameSession / GameWindow
 
 // OpenFPS GTK (Linux) client — Phase B.
@@ -27,6 +27,7 @@ internal static class GtkClientProgram
     private static GameSession? _session;
     private static GameWindow? _gameWindow;
     private static bool _audioEnabled;
+    private static string _missingAudioReport = "";
 
     private static string _pendingUser = "";
     private static string _pendingPass = "";
@@ -42,13 +43,22 @@ internal static class GtkClientProgram
         _speech = new SpeechDispatcherOutput();
         _speech.Initialize();
 
-        _audioEnabled = FmodLibraryPresent();
+        // Report EXACTLY which native audio libraries are missing and what each one costs. "Audio
+        // disabled" on its own tells a player nothing they can act on.
+        var missingLibs = NativeAudioLibraries.FindMissing();
+        _missingAudioReport = NativeAudioLibraries.DescribeMissing(missingLibs);
+        _audioEnabled = NativeAudioLibraries.IsPresent(NativeAudioLibraries.FmodFileName);
+        if (missingLibs.Count > 0) Serilog.Log.Warning("DEGRADED AUDIO. {Report}", _missingAudioReport);
+
         Serilog.Log.Information("Speech backend: {Backend}. Spatial audio: {Audio}.",
-            _speech.BackendName, _audioEnabled ? "enabled" : "disabled (libfmod.so not found)");
+            _speech.BackendName, _audioEnabled ? "enabled" : "disabled (no FMOD library)");
 
         _network = new ClientNetworkService();
         _network.OnConnected += OnServerConnected;
         _network.OnMessageReceived += OnServerMessage;
+        // Connection and protocol failures are spoken, not swallowed.
+        _network.OnConnectionFailed += reason => _speech.Speak(reason, true);
+        _network.OnProtocolError += reason => _speech.Speak(reason, true);
 
         var loop = new Thread(GameLoop) { IsBackground = true, Name = "GameLoop" };
         loop.Start();
@@ -66,9 +76,6 @@ internal static class GtkClientProgram
         return rc;
     }
 
-    /// <summary>FMOD resolves <c>libfmod.so</c> at runtime; without it, run with audio disabled.</summary>
-    private static bool FmodLibraryPresent() =>
-        File.Exists(Path.Combine(AppContext.BaseDirectory, "libfmod.so"));
 
     // ── Game / network loop (background thread) ─────────────────────────────────
     private static void GameLoop()
@@ -131,8 +138,8 @@ internal static class GtkClientProgram
 
         _mainWindow.Present();
         _speech.Speak("Open F P S main menu. Tab or arrow keys to move, Enter to select.", true);
-        if (!_audioEnabled)
-            _speech.Speak("Note: FMOD audio library not found. Running without spatial sound.");
+        if (_missingAudioReport.Length > 0)
+            _speech.Speak("Warning. " + _missingAudioReport);
     }
 
     private static void ShowLoginDialog()

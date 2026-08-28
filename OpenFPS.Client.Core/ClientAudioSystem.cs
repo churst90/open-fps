@@ -182,9 +182,12 @@ public class ClientAudioSystem
                         _audio.SetAcousticPath(id, path);
                     }
                     // Hand-rolled discrete reflection emitters are retired once Steam Audio simulation is
-                    // active — geometry-driven reverb (4d) covers reflected energy. They still run as the
-                    // fallback when SA sim is unavailable (OPENFPS_STEAMAUDIO_SIM=0 / no libphonon).
-                    else if (!_acousticWorker.SteamAudioActive)
+                    // active — geometry-driven reverb (4d) covers reflected energy. The test is the DATA,
+                    // not the mode: the simulator never emits a reflection path, so a reflection entry can
+                    // only have come from the hand-rolled tracer. Honouring it unconditionally is what keeps
+                    // reflections alive for sources that fell back mid-session (an exhausted SA source pool,
+                    // a failed sim tick) instead of silently losing them to a mode flag.
+                    else
                     {
                     // OUTDOOR BUILDING REFLECTIONS
                     if (world.Entities.TryGetValue(id, out var originalSnap))

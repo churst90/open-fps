@@ -20,7 +20,7 @@ public static class SimPerFrameSpike
     {
         AcousticRegistry.Initialize();
 
-        var ctxS = new Phonon.IPLContextSettings { version = Phonon.STEAMAUDIO_VERSION, simdLevel = Phonon.IPL_SIMDLEVEL_AVX2, flags = 0 };
+        var ctxS = Phonon.DefaultContextSettings();
         if (Phonon.iplContextCreate(ref ctxS, out IntPtr ctx) != Phonon.IPL_STATUS_SUCCESS) { Console.WriteLine("ctx failed"); return 1; }
 
         var q = Quaternion.Identity;

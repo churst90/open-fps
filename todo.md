@@ -81,10 +81,17 @@ Sequenced so each step is verifiable before the next begins. Steps 1–4 are the
       `InputBudget` of simulated seconds plus a `DeltaTime` clamp, a per-tick input cap and a queue cap
       close the speed hack. Both heads now share one `PredictionReconciler`. Covered by
       `TickRateAndPredictionTests`.
-- [ ] **3. Make every degradation loud.** Real hand-rolled fallback when a Steam Audio tick returns null
-      (today it yields zero occlusion for every source); add phonon to the required-native check; query the
-      CPU's SIMD level instead of assuming AVX2; log and speak protocol/connection failures; stop dropping
-      the first play of each `NONBLOCKING` sound.
+- [x] **3. Make every degradation loud.** A failed Steam Audio tick no longer reports "nothing is in the way":
+      each un-simulated source falls back to the hand-rolled ray-tracer (`HandRolledPath`), the listener is
+      taken from any pending request so an exhausted source pool costs only that source, degradation
+      transitions are logged and exposed as `IsDegraded`, and reflections are gated on the data rather than on
+      `SteamAudioActive`. `Phonon.DetectSimdLevel()` queries the CPU (AVX-512 → SSE2/NEON) and
+      `DefaultContextSettings()` replaces the assumed-AVX2 struct at every call site. `NativeAudioLibraries`
+      is the one shared, platform-aware required-native list — phonon is now `Required`, and both heads report
+      exactly which libraries are missing and what each one costs. `ClientNetworkService` raises spoken
+      `OnConnectionFailed` / `OnProtocolError` for socket, disconnect, decode and send failures that were
+      previously empty catch blocks. `FmodResourceManager` returns `Ready`/`Loading`/`Missing` and a deferred
+      queue retries a still-decoding sound instead of dropping its first play. Covered by `DegradationTests`.
 - [ ] **4. Close the server's structural holes.** `EntityRemoved` message + per-client acks via
       `KnownEntities`; accumulator clamp; `Console.CancelKeyPress` shutdown; registration reports the truth;
       rate limits on login/register; route `CommandHandler` mutations through `_commandBuffer` then unblock
