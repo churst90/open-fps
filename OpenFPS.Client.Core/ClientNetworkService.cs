@@ -15,6 +15,10 @@ public class ClientNetworkService : INetEventListener
     private NetPeer? _serverPeer;
     private string _lastTarget = "";
 
+    /// <summary>True from the moment a connect is started until the peer connects or the attempt ends.
+    /// Without it, a second press of Connect during the handshake queues a second login.</summary>
+    private volatile bool _connectPending;
+
     public event Action<IMessage>? OnMessageReceived;
     public event Action? OnConnected;
 
@@ -32,6 +36,12 @@ public class ClientNetworkService : INetEventListener
     /// between client and server, or a corrupt packet. Argument is a speakable sentence.</summary>
     public event Action<string>? OnProtocolError;
 
+    /// <summary>Raised for a connection event that is not a failure but that the player must still hear —
+    /// a second Connect while one is already in flight, for instance. Argument is a speakable sentence.
+    /// Kept separate from <see cref="OnConnectionFailed"/> so nothing is announced as an error that
+    /// isn't one.</summary>
+    public event Action<string>? OnConnectionNotice;
+
     /// <summary>True while a server peer is connected.</summary>
     public bool IsConnected => _serverPeer != null;
 
@@ -48,16 +58,44 @@ public class ClientNetworkService : INetEventListener
         Log.Information("Client network started on local port {Port}.", _netManager.LocalPort);
     }
 
+    /// <summary>
+    /// Connects, or — when a peer to that server is already up — re-runs the connected handshake.
+    ///
+    /// LiteNetLib's <c>NetManager.Connect</c> RETURNS the existing peer when one is already connected to
+    /// the same endpoint, and fires no <c>OnPeerConnected</c> for it. That is the whole of the "I typed
+    /// the wrong password, tried again, and was dropped back at the menu with nothing said" bug: the
+    /// rejected login leaves the peer connected, so the retry produced no event, so the head never sent
+    /// its second <c>LoginRequest</c>, so the server never answered and there was nothing to speak. The
+    /// retry is legitimate — the server rate-limits it — so raise <see cref="OnConnected"/> ourselves.
+    /// </summary>
     public void Connect(string ip, int port)
     {
         _lastTarget = $"{ip} port {port}";
+
+        var existing = _serverPeer;
+        if (existing != null && existing.ConnectionState == ConnectionState.Connected)
+        {
+            Log.Information("Already connected to {Target}; re-running the connected handshake.", _lastTarget);
+            OnConnected?.Invoke();
+            return;
+        }
+
+        if (_connectPending)
+        {
+            Log.Information("Connect to {Target} is already in flight; ignoring the repeat.", _lastTarget);
+            OnConnectionNotice?.Invoke($"Still connecting to {_lastTarget}. Please wait.");
+            return;
+        }
+
         Log.Information("Connecting to {Target}.", _lastTarget);
         try
         {
+            _connectPending = true;
             _netManager.Connect(ip, port, "OpenFPS_Key");
         }
         catch (Exception ex)
         {
+            _connectPending = false;
             Log.Error(ex, "Connect to {Target} could not be started.", _lastTarget);
             OnConnectionFailed?.Invoke($"Could not connect to {_lastTarget}. {ex.Message}");
         }
@@ -90,6 +128,7 @@ public class ClientNetworkService : INetEventListener
 
     public void OnPeerConnected(NetPeer peer)
     {
+        _connectPending = false;
         _serverPeer = peer;
         Log.Information("Connected to server {EndPoint}.", peer.Address);
         OnConnected?.Invoke();
@@ -143,6 +182,7 @@ public class ClientNetworkService : INetEventListener
     public void OnPeerDisconnected(NetPeer peer, DisconnectInfo info)
     {
         bool wasConnected = _serverPeer != null;
+        _connectPending = false;
         _serverPeer = null;
 
         string reason = DescribeDisconnect(info);

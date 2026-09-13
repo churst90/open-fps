@@ -168,6 +168,31 @@ Sequenced so each step is verifiable before the next begins. Steps 1–4 are the
       still need `--sim-*`; all ten re-run and pass from there). Covered by `WeatherAndConvergenceTests`.
       *(Ear-validation of the weather, and a live logged-in walkthrough on either head, still outstanding.)*
 
+## Live-session findings (2026-09-13)
+
+First logged-in walkthrough on the GTK head since the audit. Three defects, all fixed; see `changes.md`.
+
+- [x] **The reverb was an omnidirectional wash.** A region bus is built as `send -> reverb -> fader ->
+      doorway HRTF -> out`; it was built as `send -> reverb -> out` with the fader and the HRTF stage
+      stranded upstream, because FMOD's DSP chain runs TAIL (input) to HEAD (output) and everything was
+      attached the other way round. The per-portal gating applied to nothing and the doorway HRTF stage
+      binauralized silence. Also: the bus passed SFXREVERB's dry path at 0 dB, so each send was a second,
+      undirected copy of the source. Verified by `OpenFPS.AudioLab --reverb-route`, which fails on the
+      old graph (both ears exactly zero) and passes on the new one.
+- [x] **Crossing a portal spoke the portal prefab's authoring notes.** The proximity announcer spoke
+      every named entity in range, and everything is named. `Announce` is now part of the prefab spec,
+      defaulting to true only for Item / NPC / Beacon.
+- [x] **A rejected login was silent, and retrying it did nothing.** Two separate faults stacked: the head
+      closed its connect form on the button press, so the focus announcement interrupted the rejection;
+      and `NetManager.Connect` returns the existing peer without an event when one is already connected,
+      so the retry never sent a second `LoginRequest`.
+
+Still outstanding from the audit, and still needing ears rather than a harness:
+- [ ] Ear-validate the doorway-localized reverb now that it is actually routed (audit step 1 + 7).
+      `AcousticConstants.ReverbSendMix` is the one knob if the rooms are too wet or too dry.
+- [ ] Ear-validate the weather chain (audit step 7).
+- [ ] A full logged-in walkthrough on the Windows head — its login form got the same fix, unheard.
+
 ### Corrections to the lists above
 - "Server: Implement Inventory/Take/Drop commands" is **not** done — `/inv`, take and drop are absent from
   `CommandHandler`, so pressing I returns "Command 'inv' not recognized".

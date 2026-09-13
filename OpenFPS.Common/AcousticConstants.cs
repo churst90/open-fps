@@ -36,6 +36,17 @@ public static class AcousticConstants
     public const float ReflectionMaxSpread = 120.0f; 
     public const float ActiveRegionRadius = 50.0f;
     public const float ReverbFadeSpeed = 0.15f;
+    /// <summary>How much of a source is sent into its OWN room's reverb bus. The bus is a pure send
+    /// (its dry path is muted) and its level is gated per-portal by the bus fader, so this is the one
+    /// knob for "how wet is a room". Deliberately constant with distance — a send that grows with range
+    /// makes the room follow the listener.</summary>
+    public const float ReverbSendMix = 0.35f;
+
+    /// <summary>The cross-send into the room the LISTENER is standing in, as a fraction of
+    /// <see cref="ReverbSendMix"/>. Small on purpose: a sound in the next room should reverberate in
+    /// THAT room and arrive through the doorway, not smear the listener's own room from all sides.</summary>
+    public const float ReverbCrossSendScale = 0.25f;
+
     public const float DefaultReverbDecayMs = 500.0f;
     public const float MinReverbDecayMs = 100.0f;
     public const float MaxReverbDecayMs = 10000.0f;

@@ -88,6 +88,17 @@ public partial struct IdentityComponent
 {
     public string Name { get; set; } = "";
     public string Description { get; set; } = "";
+
+    /// <summary>Whether the client should SAY this thing as the player walks up to it.
+    ///
+    /// Not every named entity is an interactable. The acoustic scaffolding — portals, region volumes —
+    /// and the architecture itself (walls, floors, the auto-injected foundation) all carry names so that
+    /// authors and logs can refer to them, and announcing those meant that crossing a doorway read the
+    /// portal prefab's AUTHORING NOTES aloud, mid-stride. Default false: a thing earns its announcement.
+    /// The prefab's `Announce` field sets it (see PrefabTemplate), defaulting to true only for the
+    /// types a player can actually encounter: Item, NPC, Beacon.</summary>
+    public bool Announce { get; set; } = false;
+
     public IdentityComponent() { }
 }
 

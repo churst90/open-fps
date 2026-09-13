@@ -145,6 +145,12 @@ public class PrefabRepository
         File.WriteAllText(path, JsonSerializer.Serialize(prefab, options));
     }
 
+    /// <summary>Whether this prefab is spoken as the player walks up to it. An explicit `Announce` wins;
+    /// otherwise only the types a player actually encounters are announced, which keeps the acoustic
+    /// scaffolding (portals, region volumes) and the architecture silent.</summary>
+    internal static bool AnnouncesByDefault(PrefabTemplate t) =>
+        t.Announce ?? t.Type is EntityType.Item or EntityType.NPC or EntityType.Beacon;
+
     public Entity Spawn(World world, string prefabId, Vector3 position, Quaternion? rotation = null, Vector3? scale = null)
     {
         if (!_prefabs.TryGetValue(prefabId.ToLowerInvariant(), out var t))
@@ -158,7 +164,7 @@ public class PrefabRepository
         {
             new Transform { Position = position, Rotation = rotation ?? Quaternion.Identity, Scale = scale ?? Vector3.One },
             new NameComponent { Name = t.Name },
-            new IdentityComponent { Name = t.Name, Description = t.Description },
+            new IdentityComponent { Name = t.Name, Description = t.Description, Announce = AnnouncesByDefault(t) },
             t.Type
         };
 

@@ -34,6 +34,10 @@
       "type": "string",
       "description": "Longer description, read on examine (IdentityComponent.Description)."
     },
+    "Announce": {
+      "type": "boolean",
+      "description": "Whether the client speaks this entity as the player walks into range. Omit to follow Type: true for Item/NPC/Beacon, false for StaticObject/Trigger/Projectile. Set false to silence a named landmark, true for architecture worth narrating (a staircase, a door)."
+    },
     "Type": {
       "type": "string",
       "description": "EntityType by name. Defaults to StaticObject. 'Beacon' requires HasEmitter; 'Item' requires IsItem.",

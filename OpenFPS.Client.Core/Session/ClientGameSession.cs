@@ -91,6 +91,19 @@ public sealed class ClientGameSession : IDisposable
     /// <summary>Raised on the game-loop thread once the local player has spawned.</summary>
     public event Action? GameJoined;
 
+    /// <summary>Raised on the game-loop thread when the server ACCEPTS a login; the argument is the
+    /// username it accepted. A head uses it to dismiss its connect form.</summary>
+    public event Action<string>? LoginSucceeded;
+
+    /// <summary>Raised on the game-loop thread when the server REJECTS a login; the argument is the
+    /// server's reason, already spoken by the session.
+    ///
+    /// The head needs to know because the outcome is a UI event as much as a spoken one: a connect form
+    /// that closes the moment the button is pressed drops the player back on the menu, and the focus
+    /// change there speaks over the rejection with interrupt — which is why a wrong password read as
+    /// total silence. Keep the form open, and put focus back where the player can fix it.</summary>
+    public event Action<string>? LoginFailed;
+
     public ClientGameSession(
         ClientNetworkService network,
         ISpeechOutput speech,
@@ -317,10 +330,13 @@ public sealed class ClientGameSession : IDisposable
                 {
                     _speech.Speak($"Logged in as {login.Username}. Loading world.", interrupt: true);
                     _shell.ShowLoading("Authenticated. Preparing manifest...");
+                    LoginSucceeded?.Invoke(login.Username);
                 }
                 else
                 {
+                    Serilog.Log.Warning("Login rejected by the server: {Reason}", login.Message);
                     _speech.Speak($"Login failed. {login.Message}", interrupt: true);
+                    LoginFailed?.Invoke(login.Message);
                 }
                 break;
 
@@ -558,6 +574,13 @@ public sealed class ClientGameSession : IDisposable
         {
             if (entity.Id == _ownEntityId) continue;
             if (entity.Definition.Type == EntityType.Player) continue;
+
+            // Only things that earn an announcement. Every entity carries a name — the walls, the floor,
+            // the auto-injected foundation, the acoustic region volumes and the portals all have one so
+            // that authors and logs can refer to them. Announcing all of them meant that stepping through
+            // a doorway read the portal prefab's authoring notes aloud. The server decides (prefab
+            // `Announce`); the client just obeys.
+            if (!entity.Definition.Identity.Announce) continue;
 
             string name = entity.Definition.Identity.Name;
             if (string.IsNullOrWhiteSpace(name)) continue;

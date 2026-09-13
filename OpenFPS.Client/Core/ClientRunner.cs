@@ -77,8 +77,13 @@ public class ClientRunner
         // Subscribe BEFORE Start(): a failure to open the socket is reported from inside Start(), and a
         // handler attached afterwards would never hear the one message that explains why nothing works.
         // A connection or protocol failure must be heard, not inferred from the game going quiet.
-        _network.OnConnectionFailed += reason => _speech.Speak(reason, true);
+        _network.OnConnectionFailed += reason =>
+        {
+            _speech.Speak(reason, true);
+            _navigation?.ReportLoginOutcome(reason, success: false);
+        };
         _network.OnProtocolError += reason => _speech.Speak(reason, true);
+        _network.OnConnectionNotice += notice => _speech.Speak(notice, true);
         _network.Start();
 
         _navigation = new ClientNavigationService(_speech, () =>
@@ -113,6 +118,10 @@ public class ClientRunner
         // thread and reports progress through the shell — the same path the GTK head uses.
         _navigation.ShowLoading("Initializing Sound Library...");
         _session.GameJoined += () => Serilog.Log.Information("Entered the world as entity {Id}.", _session.OwnEntityId);
+        // The session speaks the outcome; the navigation layer only moves the auth form out of the way,
+        // or puts focus back where the player can correct the mistake.
+        _session.LoginSucceeded += _ => _navigation.ReportLoginOutcome("", success: true);
+        _session.LoginFailed += reason => _navigation.ReportLoginOutcome($"Login failed. {reason}", success: false);
         _session.BeginAudioInit(onReady: () => _navigation.ShowMenu());
 
         // Input: the low-level hook reports Windows virtual keys; they are mapped to the neutral GameKey

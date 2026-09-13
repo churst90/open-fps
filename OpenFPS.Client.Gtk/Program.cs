@@ -26,12 +26,25 @@ internal static class GtkClientProgram
     private static Application _app = null!;
     private static ApplicationWindow _mainWindow = null!;
 
+    private static SynchronizationContext? _uiContext;
     private static GtkClientShell _shell = null!;
     private static ClientGameSession _session = null!;
     private static string _missingAudioReport = "";
 
     private static string _pendingUser = "";
     private static string _pendingPass = "";
+
+    // The connect form stays up until the server has answered. Closing it on the button press dropped
+    // focus back onto the main menu, and that focus announcement — spoken with interrupt — cut off the
+    // rejection the session had just said, so a wrong password was indistinguishable from silence.
+    private static Window? _loginDialog;
+    private static Entry? _loginUser;
+    private static Label? _loginStatus;
+    private static string _loginStatusText = "";
+
+    // Set immediately before a programmatic GrabFocus whose reason has ALREADY been spoken, so the
+    // focus handler does not interrupt it with the name of the widget it just landed on.
+    private static bool _suppressFocusSpeech;
 
     public static int Main(string[] args)
     {
@@ -58,8 +71,9 @@ internal static class GtkClientProgram
         _network.OnConnected += OnServerConnected;
         _network.OnMessageReceived += OnServerMessage;
         // Connection and protocol failures are spoken, not swallowed.
-        _network.OnConnectionFailed += reason => _speech.Speak(reason, true);
+        _network.OnConnectionFailed += reason => { _speech.Speak(reason, true); OnLoginOutcome(reason, success: false); };
         _network.OnProtocolError += reason => _speech.Speak(reason, true);
+        _network.OnConnectionNotice += notice => _speech.Speak(notice, true);
 
         // The session is built up front (both heads do this now) so it can handle the login response
         // itself; audio initialization is deferred to a background thread inside BeginAudioInit.
@@ -72,6 +86,10 @@ internal static class GtkClientProgram
         // session needs the shell at construction. The buffer is created by the session, so it is
         // handed over immediately afterwards.
         _shell.SetInput(_session.Input);
+        // The session speaks the outcome; the head only moves the form out of the way, or puts focus
+        // back where the player can correct the mistake.
+        _session.LoginSucceeded += _ => OnUi(CloseLoginDialog);
+        _session.LoginFailed += reason => OnLoginOutcome($"Login failed. {reason}", success: false);
         _session.BeginAudioInit();
 
         var loop = new Thread(GameLoop) { IsBackground = true, Name = "GameLoop" };
@@ -81,8 +99,9 @@ internal static class GtkClientProgram
         _app.OnActivate += (sender, _) =>
         {
             var app = (Application)sender;
+            _uiContext = SynchronizationContext.Current;
             BuildMainMenu(app);
-            _shell.AttachToApplication(app, SynchronizationContext.Current, _mainWindow);
+            _shell.AttachToApplication(app, _uiContext, _mainWindow);
         };
         int rc = _app.RunWithSynchronizationContext(null);
 
@@ -160,30 +179,73 @@ internal static class GtkClientProgram
 
     private static void ShowLoginDialog()
     {
+        if (_loginDialog != null) { _loginDialog.Present(); return; }
+
         var dialog = Window.New();
         dialog.Title = "Connect to Server";
         dialog.SetTransientFor(_mainWindow);
         dialog.SetModal(true);
-        dialog.SetDefaultSize(420, 300);
+        dialog.SetDefaultSize(420, 320);
+        dialog.OnCloseRequest += (_, _) => { _loginDialog = null; _loginUser = null; _loginStatus = null; return false; };
 
         var box = VBox(16);
+
+        // A focusable status line so the last outcome can be re-read by tabbing back to it, rather than
+        // existing only as speech that has already gone by.
+        _loginStatusText = "";
+        _loginStatus = Label.New("");
+        _loginStatus.SetWrap(true);
+        _loginStatus.SetFocusable(true);
+        SpeakOnFocus(_loginStatus, () => _loginStatusText.Length > 0 ? _loginStatusText : "No messages.");
+        box.Append(_loginStatus);
+
         var server = LabeledEntry(box, "Server address", "127.0.0.1:33288", false);
         var user = LabeledEntry(box, "Username", "", false);
         var pass = LabeledEntry(box, "Password", "", true);
+        _loginUser = user;
 
         box.Append(MenuButton("Connect", () =>
         {
             string addr = server.GetText();
             _pendingUser = user.GetText();
             _pendingPass = pass.GetText();
-            dialog.Close();
+            // The dialog stays open: it closes only once the server has accepted the login.
             DoConnect(addr);
         }));
-        box.Append(MenuButton("Cancel", () => dialog.Close()));
+        box.Append(MenuButton("Cancel", CloseLoginDialog));
 
+        _loginDialog = dialog;
         dialog.SetChild(box);
         dialog.Present();
         _speech.Speak("Connect dialog. Server address, username, and password fields.", true);
+    }
+
+    /// <summary>Records a connect/login outcome on the still-open form and puts focus where the player
+    /// can act on it. The message itself has already been spoken by whoever raised it, so the focus move
+    /// is silenced — otherwise the widget's name would interrupt the reason.</summary>
+    private static void OnLoginOutcome(string message, bool success) => OnUi(() =>
+    {
+        if (_loginDialog == null) return;
+        _loginStatusText = message;
+        _loginStatus?.SetText(message);
+        if (success) { CloseLoginDialog(); return; }
+        _suppressFocusSpeech = true;
+        _loginUser?.GrabFocus();
+    });
+
+    private static void CloseLoginDialog()
+    {
+        var dialog = _loginDialog;
+        _loginDialog = null; _loginUser = null; _loginStatus = null;
+        dialog?.Close();
+    }
+
+    /// <summary>Runs an action on the GTK main thread. Login outcomes arrive on the game-loop thread.</summary>
+    private static void OnUi(Action action)
+    {
+        var ui = _uiContext;
+        if (ui != null) ui.Post(_ => action(), null);
+        else action();
     }
 
     private static void DoConnect(string addr)
@@ -236,10 +298,17 @@ internal static class GtkClientProgram
         return entry;
     }
 
-    private static void SpeakOnFocus(Widget widget, string text)
+    private static void SpeakOnFocus(Widget widget, string text) => SpeakOnFocus(widget, () => text);
+
+    private static void SpeakOnFocus(Widget widget, Func<string> text)
     {
         var focus = EventControllerFocus.New();
-        focus.OnEnter += (_, _) => _speech.Speak(text, true);
+        focus.OnEnter += (_, _) =>
+        {
+            // A programmatic focus move that already announced its reason must not speak over it.
+            if (_suppressFocusSpeech) { _suppressFocusSpeech = false; return; }
+            _speech.Speak(text(), true);
+        };
         widget.AddController(focus);
     }
 }

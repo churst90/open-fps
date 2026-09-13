@@ -146,6 +146,14 @@ if (args.Contains("--steam-stereo"))
     Environment.Exit(code);
 }
 
+if (args.Contains("--reverb-route"))
+{
+    Console.WriteLine("--- Reverb routing: is a room's reverb gated by, and heard through, its doorway? ---");
+    int code = OpenFPS.Client.Core.AudioEngine.Fmod.ReverbRouteSpike.Run();
+    Log.CloseAndFlush();
+    Environment.Exit(code);
+}
+
 if (args.Contains("--provider-orbit") || args.Contains("--provider-orbit-smoke"))
 {
     int code = ProviderOrbit.Run(args.Contains("--provider-orbit"), seconds: 3.0);

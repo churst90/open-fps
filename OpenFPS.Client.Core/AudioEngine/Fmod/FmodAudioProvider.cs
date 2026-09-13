@@ -633,9 +633,18 @@ public class FmodAudioProvider : IAudioProvider
         } else {
             reverbDsp.setParameterFloat(11, -80.0f); // Mute (outdoors dry / no global wash)
         }
-        reverbDsp.setParameterFloat(12, 0.0f); // Dry level normal
-        
-        bus.addDSP(CHANNELCONTROL_DSP_INDEX.HEAD, reverbDsp);
+        // A region bus is an AUX SEND, not an insert: the only thing that should leave it is the
+        // reverberant field. Dry at 0 dB meant every send was ALSO an undirected copy of the source —
+        // a second, position-less image of the siren mixed in on top of its own HRTF voice.
+        reverbDsp.setParameterFloat(12, -80.0f); // Dry muted (send bus)
+
+        // ORDER MATTERS, and it is the opposite of what it reads like. FMOD's chain runs TAIL (input) ->
+        // HEAD (output), so the reverb must go at the TAIL for the fader — and the binaural stage added
+        // at the HEAD below — to sit DOWNSTREAM of it. With the reverb at the HEAD (where it used to be)
+        // the sends injected past both: the per-portal volume gating did nothing and the doorway HRTF
+        // localized silence, which is exactly why a room's reverb was heard at full level, from all
+        // directions, from anywhere on the map.
+        bus.addDSP(CHANNELCONTROL_DSP_INDEX.TAIL, reverbDsp);
         
         float initialVol = (regionId == _listenerRegionId) ? 1.0f : 0.0f;
         bus.setVolume(initialVol);
@@ -647,17 +656,34 @@ public class FmodAudioProvider : IAudioProvider
 
         // Steam Audio directional reverb: route this room's reverb output through an HRTF voice so that,
         // when the listener is OUTSIDE, the reverberation localizes to the doorway (like the direct sound)
-        // instead of washing from all sides. The voice's binaural DSP sits at the bus TAIL and is bypassed
+        // instead of washing from all sides. The voice's binaural DSP sits at the bus HEAD — the OUTPUT
+        // end, so it binauralizes the finished reverb tail rather than the dry input — and is bypassed
         // while inside the room (reverb then fills the space as 2D stereo). The bus is switched to 2D so
         // FMOD doesn't also collapse the binaural pair. Voice is held for the bus lifetime.
         if (_steamAudioEnabled && TryCreateSteamAudioVoice(out var rvState, out var rvDsp, out var rvHandle))
         {
             bus.getMode(out MODE bm);
             bus.setMode((bm & ~(MODE._3D | MODE._3D_LINEARROLLOFF)) | MODE._2D);
-            bus.addDSP(CHANNELCONTROL_DSP_INDEX.TAIL, rvDsp);
+            bus.addDSP(CHANNELCONTROL_DSP_INDEX.HEAD, rvDsp);
             rvDsp.setBypass(true); // start omnidirectional; UpdateReverbBuses enables it when outside
             _reverbSaVoices[regionId] = new SaVoice { State = rvState!, Dsp = rvDsp, Handle = rvHandle };
         }
+    }
+
+    /// <summary>The DSP a source's reverb SEND must feed: the region bus's own SFXREVERB unit, which sits
+    /// at the TAIL (input end) of the bus chain. Addressing it by identity rather than by
+    /// <c>getDSP(HEAD)</c> is the point — the head is the binaural output stage, and sending into it
+    /// bypassed both the bus fader (the per-portal distance/aperture gating) and the reverb itself.</summary>
+    private bool TryGetReverbInput(int regionId, out FMOD.DSP dsp)
+        => _reverbDsps.TryGetValue(regionId, out dsp) && dsp.hasHandle();
+
+    /// <summary>Removes a send connection outright instead of leaving it muted. A muted-but-attached
+    /// connection is re-created every time the region flips back, and FMOD caps inputs per DSP.</summary>
+    private static void DropSend(ref FMOD.DSPConnection conn, FMOD.DSP target, FMOD.DSP source)
+    {
+        if (!conn.hasHandle()) return;
+        if (target.hasHandle() && source.hasHandle()) target.disconnectFrom(source, conn);
+        conn = default;
     }
 
     /// <summary>Localizes a room's reverb to its doorway (HRTF) when the listener is outside, or makes it
@@ -683,6 +709,31 @@ public class FmodAudioProvider : IAudioProvider
             bus.set3DAttributes(ref fp, ref fv);
         }
         else bus.set3DLevel(0.0f);
+    }
+
+    /// <summary>Diagnostics only (OpenFPS.AudioLab's `--reverb-route`): the live state of one region's
+    /// reverb bus. There is no way to see a DSP graph from outside FMOD, and the graph is exactly what
+    /// was wrong — the sends were injected at the bus HEAD, downstream of both the fader and the
+    /// binaural stage, so the gating and the doorway localization were connected to nothing.</summary>
+    /// <param name="doorwayLocalized">True when the bus's HRTF stage is engaged (listener outside).</param>
+    /// <param name="volume">The gated bus level — what the per-portal aperture/distance rule produced.</param>
+    /// <param name="rmsL">Left-ear energy of the last block the HRTF stage produced.</param>
+    /// <param name="rmsR">Right-ear energy of the last block the HRTF stage produced.</param>
+    internal bool TryGetReverbDiagnostics(int regionId, out bool doorwayLocalized, out float volume,
+                                          out float rmsL, out float rmsR)
+    {
+        doorwayLocalized = false; volume = 0f; rmsL = 0f; rmsR = 0f;
+        if (!_reverbVolumes.TryGetValue(regionId, out volume)) return false;
+        if (_reverbSaVoices.TryGetValue(regionId, out var v) && v.Dsp.hasHandle())
+        {
+            v.Dsp.getBypass(out bool bypassed);
+            doorwayLocalized = !bypassed;
+            // A bypassed stage is not running, so its last block is stale. Report nothing rather than
+            // the numbers it produced the last time the listener was somewhere else.
+            rmsL = bypassed ? 0f : v.State.LastRmsL;
+            rmsR = bypassed ? 0f : v.State.LastRmsR;
+        }
+        return true;
     }
 
     /// <summary>Detaches and returns all per-bus reverb HRTF voices to the pool (before the buses are
@@ -889,21 +940,19 @@ public class FmodAudioProvider : IAudioProvider
             if (_acousticMap != null && !activeSound.IsReflection) // Reflections should not feed back into reverb
             {
                 int sourceRegionId = activeSound.TargetRegionId;
-                if (sourceRegionId != -1 && _reverbBuses.TryGetValue(sourceRegionId, out var sourceBus))
+                if (sourceRegionId != -1 && TryGetReverbInput(sourceRegionId, out var sourceReverb))
                 {
                     activeSound.Channel.getDSP(CHANNELCONTROL_DSP_INDEX.FADER, out var channelDsp);
-                    sourceBus.getDSP(CHANNELCONTROL_DSP_INDEX.HEAD, out var busDsp);
-                    busDsp.addInput(channelDsp, out activeSound.SourceReverbConnection, DSPCONNECTION_TYPE.SEND);
-                    activeSound.SourceReverbConnection.setMix(0.1f);
+                    sourceReverb.addInput(channelDsp, out activeSound.SourceReverbConnection, DSPCONNECTION_TYPE.SEND);
+                    activeSound.SourceReverbConnection.setMix(AcousticConstants.ReverbSendMix);
                     activeSound.CurrentSourceRegionId = sourceRegionId;
                 }
 
-                if (_listenerRegionId != -1 && _reverbBuses.TryGetValue(_listenerRegionId, out var listenerBus))
+                if (_listenerRegionId != -1 && TryGetReverbInput(_listenerRegionId, out var listenerReverb))
                 {
                     activeSound.Channel.getDSP(CHANNELCONTROL_DSP_INDEX.FADER, out var channelDsp);
-                    listenerBus.getDSP(CHANNELCONTROL_DSP_INDEX.HEAD, out var busDsp);
-                    busDsp.addInput(channelDsp, out activeSound.ReverbConnection, DSPCONNECTION_TYPE.SEND);
-                    activeSound.ReverbConnection.setMix(0.1f);
+                    listenerReverb.addInput(channelDsp, out activeSound.ReverbConnection, DSPCONNECTION_TYPE.SEND);
+                    activeSound.ReverbConnection.setMix(AcousticConstants.ReverbSendMix * AcousticConstants.ReverbCrossSendScale);
                     activeSound.CurrentRegionId = _listenerRegionId;
                 }
             }
@@ -1138,36 +1187,38 @@ public class FmodAudioProvider : IAudioProvider
         if (_acousticMap == null) return;
         int sourceRegionId = active.TargetRegionId;
         
+        bool sourceChanged = sourceRegionId != active.CurrentSourceRegionId || !active.SourceReverbConnection.hasHandle();
+        bool listenerChanged = listenerRegionId != active.CurrentRegionId || !active.ReverbConnection.hasHandle();
+        if (!sourceChanged && !listenerChanged) return; // the steady state, which is nearly every frame
+
+        active.Channel.getDSP(CHANNELCONTROL_DSP_INDEX.FADER, out var sourceFader);
+
         // Update Source Reverb Send (the room the sound is in)
-        if (sourceRegionId != active.CurrentSourceRegionId || !active.SourceReverbConnection.hasHandle())
+        if (sourceChanged)
         {
-            if (active.SourceReverbConnection.hasHandle()) active.SourceReverbConnection.setMix(0.0f);
-            if (sourceRegionId != -2 && _reverbBuses.TryGetValue(sourceRegionId, out var sourceBus)) 
-            { 
-                if (!active.IsReflection)
-                {
-                    active.Channel.getDSP(CHANNELCONTROL_DSP_INDEX.FADER, out var channelDsp);
-                    sourceBus.getDSP(CHANNELCONTROL_DSP_INDEX.HEAD, out var busDsp);
-                    busDsp.addInput(channelDsp, out active.SourceReverbConnection, DSPCONNECTION_TYPE.SEND); 
-                    active.SourceReverbConnection.setMix(0.1f);
-                }
+            if (TryGetReverbInput(active.CurrentSourceRegionId, out var oldReverb))
+                DropSend(ref active.SourceReverbConnection, oldReverb, sourceFader);
+            active.SourceReverbConnection = default;
+
+            if (sourceRegionId != -2 && !active.IsReflection && TryGetReverbInput(sourceRegionId, out var sourceReverb))
+            {
+                sourceReverb.addInput(sourceFader, out active.SourceReverbConnection, DSPCONNECTION_TYPE.SEND);
+                active.SourceReverbConnection.setMix(AcousticConstants.ReverbSendMix);
             }
             active.CurrentSourceRegionId = sourceRegionId;
         }
 
         // Update Listener Reverb Send (the room the listener is in)
-        if (listenerRegionId != active.CurrentRegionId || !active.ReverbConnection.hasHandle())
+        if (listenerChanged)
         {
-            if (active.ReverbConnection.hasHandle()) active.ReverbConnection.setMix(0.0f);
-            if (listenerRegionId != -2 && _reverbBuses.TryGetValue(listenerRegionId, out var listenerBus))
+            if (TryGetReverbInput(active.CurrentRegionId, out var oldListenerReverb))
+                DropSend(ref active.ReverbConnection, oldListenerReverb, sourceFader);
+            active.ReverbConnection = default;
+
+            if (listenerRegionId != -2 && !active.IsReflection && TryGetReverbInput(listenerRegionId, out var listenerReverb))
             {
-                if (!active.IsReflection)
-                {
-                    active.Channel.getDSP(CHANNELCONTROL_DSP_INDEX.FADER, out var channelDsp);
-                    listenerBus.getDSP(CHANNELCONTROL_DSP_INDEX.HEAD, out var busDsp);
-                    busDsp.addInput(channelDsp, out active.ReverbConnection, DSPCONNECTION_TYPE.SEND);
-                    active.ReverbConnection.setMix(0.1f);
-                }
+                listenerReverb.addInput(sourceFader, out active.ReverbConnection, DSPCONNECTION_TYPE.SEND);
+                active.ReverbConnection.setMix(AcousticConstants.ReverbSendMix * AcousticConstants.ReverbCrossSendScale);
             }
             active.CurrentRegionId = listenerRegionId;
         }
@@ -1365,13 +1416,13 @@ public class FmodAudioProvider : IAudioProvider
         // rolls off with distance (distAtten / FMOD rolloff), so a fixed wet send naturally reads as a
         // wetter ratio when far — without piling on absolute reverb everywhere.
         float baseReverbMix = active.IsReflection
-            ? 0.08f * Math.Max(0.5f, active.RoomGain) // reflections excite the bus by remaining energy
-            : 0.08f;
+            ? AcousticConstants.ReverbSendMix * Math.Max(0.5f, active.RoomGain) // reflections excite the bus by remaining energy
+            : AcousticConstants.ReverbSendMix;
 
         // The source's OWN room gets the primary send. The listener's room gets only a small cross-send,
         // so a sound in an adjacent room doesn't smear reverb from many directions at once.
         if (active.SourceReverbConnection.hasHandle()) active.SourceReverbConnection.setMix(baseReverbMix);
-        if (active.ReverbConnection.hasHandle()) active.ReverbConnection.setMix(baseReverbMix * 0.25f);
+        if (active.ReverbConnection.hasHandle()) active.ReverbConnection.setMix(baseReverbMix * AcousticConstants.ReverbCrossSendScale);
 
         if (active.DiffractionDsp.hasHandle())
         {

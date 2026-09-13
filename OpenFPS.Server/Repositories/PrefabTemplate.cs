@@ -29,6 +29,16 @@ public class PrefabTemplate
     /// <summary>Longer description, read out on examine. Becomes IdentityComponent.Description.</summary>
     public string Description { get; set; } = string.Empty;
 
+    /// <summary>Whether the client SPEAKS this entity's name (and description) as the player walks within
+    /// interaction range. Omit it and the default follows <see cref="Type"/>: true for Item, NPC and
+    /// Beacon — the things a player encounters — and false for StaticObject, Trigger and Projectile.
+    ///
+    /// Set it false on a named landmark you do not want narrated, or true on a piece of architecture that
+    /// should be (a staircase, a door). The default exists because the acoustic scaffolding is all
+    /// StaticObject: before it, walking through a doorway announced the portal prefab — including the
+    /// paragraph of authoring instructions in its Description — in the middle of the step.</summary>
+    public bool? Announce { get; set; }
+
     /// <summary>EntityType by NAME ("StaticObject", "Beacon", "Item", "NPC", ...). Defaults to StaticObject.</summary>
     public EntityType Type { get; set; } = EntityType.StaticObject;
 

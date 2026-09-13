@@ -333,6 +333,10 @@ public class GameServer
 
         if (!_userRepo.VerifyPassword(request.Username, request.Password))
         {
+            // A rejected login left no trace at all, which made "the client said nothing" impossible to
+            // tell apart from "the client never asked". Log the attempt (never the password).
+            Log.Warning("Login REJECTED for user '{User}' on connection {Id}: invalid credentials.",
+                request.Username, connectionId);
             reply(new LoginResponse { Success = false, Message = "Invalid Credentials" });
             return;
         }

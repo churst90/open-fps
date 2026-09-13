@@ -51,6 +51,16 @@ public class ClientNavigationService : ApplicationContext
         }
     }
 
+    /// <summary>Passes a connect/login outcome to the menu's auth form, if one is open. Safe from any
+    /// thread — it goes through the same idle-drained queue as every other UI change.</summary>
+    public void ReportLoginOutcome(string message, bool success)
+    {
+        EnqueueUIAction(() =>
+        {
+            if (_menu is { IsDisposed: false }) _menu.ReportLoginOutcome(message, success);
+        });
+    }
+
     public void ShowMenu()
     {
         if (this.MainForm != null && this.MainForm.InvokeRequired)

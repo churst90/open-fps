@@ -63,7 +63,7 @@ shape of it.
 
 | Block | Fields | Produces |
 |---|---|---|
-| Identity | `Id`, `Name`, `Description`, `Type`, `Material` | `NameComponent`, `IdentityComponent`, `EntityType`, `MaterialComponent` |
+| Identity | `Id`, `Name`, `Description`, `Announce`, `Type`, `Material` | `NameComponent`, `IdentityComponent`, `EntityType`, `MaterialComponent` |
 | Collider | `ColliderSize`, `Shape`, `IsSolid` | `ColliderComponent` |
 | Health | `MaxHealth` | `HealthComponent` |
 | Acoustics | `Transmission{Low,Mid,High}`, `Absorption`, `Scattering`, `ShellThickness`, `FaceMask` / `MissingFaces` | `AcousticComponent` |
@@ -77,6 +77,26 @@ shape of it.
 `ColliderSize` is **full extents in metres**, multiplied by the map instance's `Scale`. So a
 `concrete_wall` sized `2 × 3 × 0.5` placed with `"Scale": { "X": 5, "Y": 1.333, "Z": 1 }` is a 10 m wall,
 4 m high, half a metre thick.
+
+### Announcing
+
+`Announce` decides whether the client SPEAKS this thing as the player walks within three metres of it.
+Omit it and it follows `Type`: **true** for `Item`, `NPC` and `Beacon` — the things a player encounters —
+and **false** for `StaticObject`, `Trigger` and `Projectile`.
+
+The default is that way round because every entity is named: the walls, the floors, the auto-injected
+foundation, the acoustic region volumes and the portals all carry a `Name` so that you and the logs can
+refer to them. When the announcer spoke every named entity in range, walking through a doorway read the
+`portal` prefab's authoring notes aloud, mid-stride.
+
+Set it explicitly when the default is wrong for your thing:
+
+```json
+{ "Id": "stone_stairs", "Name": "Stone Staircase", "Type": "StaticObject", "Announce": true }
+```
+
+Keep `Description` short if you set `Announce` — it is read out after the name, every time the player
+walks back into range.
 
 ### Materials
 
