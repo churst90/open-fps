@@ -47,6 +47,21 @@ public static class AcousticConstants
     /// THAT room and arrive through the doorway, not smear the listener's own room from all sides.</summary>
     public const float ReverbCrossSendScale = 0.25f;
 
+    /// <summary>Per audio update (60 Hz), how far a region bus's HRTF stage moves toward being fully
+    /// localized to its doorway or fully filling the room. ~0.2 s end to end; a hard switch clicks.</summary>
+    public const float ReverbBlendSpeed = 0.08f;
+
+    /// <summary>Per audio update, how far a region bus's apparent doorway direction moves toward the
+    /// current nearest portal. Stops a change of nearest portal from snapping the reverb across the head.</summary>
+    public const float ReverbDirectionSmoothing = 0.12f;
+
+    /// <summary>Ceiling on the SUM of the near-field boundary reflections' gains. A corner, a narrow
+    /// corridor or a stairwell can put a surface in every probed direction at once; each reflection is
+    /// individually correct but six of them together would swamp the direct sound. Above this the whole
+    /// set is trimmed proportionally, so the balance between the surfaces — which is the actual cue —
+    /// is kept while the total stays sane.</summary>
+    public const float MaxBoundaryReflectionSum = 1.2f;
+
     public const float DefaultReverbDecayMs = 500.0f;
     public const float MinReverbDecayMs = 100.0f;
     public const float MaxReverbDecayMs = 10000.0f;

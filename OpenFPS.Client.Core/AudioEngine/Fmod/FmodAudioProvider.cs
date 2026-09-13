@@ -7,6 +7,7 @@ using FMOD;
 using Serilog;
 using OpenFPS.Common.Components;
 using OpenFPS.Client.AudioEngine.Data;
+using OpenFPS.Client.AudioEngine.Core;
 using OpenFPS.Common;
 using OpenFPS.Client.Core.AudioEngine.SteamAudio;
 using OpenFPS.Client.Core.Platform;
@@ -279,7 +280,10 @@ public class FmodAudioProvider : IAudioProvider
     private HashSet<int> _activeRegionIds = new();
 
     private FMOD.ChannelGroup _reflectionGroup;
-    private FMOD.DSP _masterCombFilter;
+    // Near-field boundary reflections (see BoundaryProximityProcessor). Held for the provider's life.
+    private FMOD.DSP _boundaryDsp;
+    private System.Runtime.InteropServices.GCHandle _boundaryHandle;
+    private BoundaryVoiceState? _boundaryState;
     private FMOD.DSP _masterLimiter;
 
     private Vector3 _listenerPos = Vector3.Zero;
@@ -360,13 +364,15 @@ public class FmodAudioProvider : IAudioProvider
             _system.getMasterChannelGroup(out var master);
             master.addGroup(_reflectionGroup);
 
-            _system.createDSPByType(DSP_TYPE.ECHO, out _masterCombFilter);
-            _masterCombFilter.setParameterFloat(0, 10.0f); 
-            _masterCombFilter.setParameterFloat(1, 30.0f); 
-            _masterCombFilter.setParameterFloat(2, 0.0f); 
-            _masterCombFilter.setParameterFloat(3, -80.0f); 
-            master.addDSP(CHANNELCONTROL_DSP_INDEX.TAIL, _masterCombFilter);
-            _masterCombFilter.setBypass(true);
+            // Near-field boundary reflections, at the TAIL so every world sound passes through them —
+            // a wall reflects the whole room back at you, not one voice. It sits before the limiter so
+            // a reflection can never push the master over the ceiling.
+            _system.getDriverInfo(0, out _, 0, out _, out int driverRate, out _, out _);
+            _boundaryState = new BoundaryVoiceState(driverRate > 0 ? driverRate : 44100);
+            if (BoundaryProximityProcessor.CreateDSP(_system, _boundaryState, out _boundaryDsp, out _boundaryHandle) == RESULT.OK)
+                master.addDSP(CHANNELCONTROL_DSP_INDEX.TAIL, _boundaryDsp);
+            else
+                Log.Warning("Boundary proximity DSP could not be created; walls will not colour the mix.");
 
             // Master brick-wall limiter: a production safeguard so loud/overlapping sources (e.g. close
             // beacons, stacked reverb) can never clip or "deafen" the output. Caps peaks at -1 dBFS.
@@ -693,14 +699,33 @@ public class FmodAudioProvider : IAudioProvider
     {
         if (_reverbSaVoices.TryGetValue(regionId, out var v) && v.Dsp.hasHandle())
         {
+            // Crossing a threshold used to flip this stage's bypass in a single frame, which is a step
+            // change in the signal and CLICKS — once per crossing at best, and repeatedly while a player
+            // stood in a doorway. The switch is a RAMP now: spatialBlend goes 1 (arriving through the
+            // opening) to 0 (filling the room the listener is in) over a couple of hundred milliseconds,
+            // and the direction is smoothed with it so a change of nearest portal does not snap either.
             if (outside)
             {
+                v.Dsp.setBypass(false); // re-engage before the ramp climbs, never during it
                 Vector3 local = Vector3.Transform(doorwayPos - lPos, Quaternion.Conjugate(_listenerRot));
                 float len = local.Length();
-                if (len > 1e-4f) { v.State.DirX = local.X / len; v.State.DirY = local.Y / len; v.State.DirZ = -local.Z / len; }
-                v.Dsp.setBypass(false);
+                if (len > 1e-4f)
+                {
+                    var target = new Vector3(local.X / len, local.Y / len, -local.Z / len);
+                    var next = Vector3.Lerp(new Vector3(v.State.DirX, v.State.DirY, v.State.DirZ),
+                                            target, AcousticConstants.ReverbDirectionSmoothing);
+                    if (next.LengthSquared() > 1e-6f) next = Vector3.Normalize(next);
+                    v.State.DirX = next.X; v.State.DirY = next.Y; v.State.DirZ = next.Z;
+                }
             }
-            else v.Dsp.setBypass(true);
+
+            float blend = MathHelper.Lerp(v.State.SpatialBlend, outside ? 1f : 0f, AcousticConstants.ReverbBlendSpeed);
+            v.State.SpatialBlend = blend;
+
+            // Bypass only at the bottom of the ramp, where the stage is contributing no direction at
+            // all. That restores the reverb's true stereo width inside a room, and the only thing that
+            // changes at the switch is decorrelation — not level, so there is no edge to hear.
+            if (!outside && blend < 0.02f) v.Dsp.setBypass(true);
         }
         else if (outside)
         {
@@ -715,19 +740,20 @@ public class FmodAudioProvider : IAudioProvider
     /// reverb bus. There is no way to see a DSP graph from outside FMOD, and the graph is exactly what
     /// was wrong — the sends were injected at the bus HEAD, downstream of both the fader and the
     /// binaural stage, so the gating and the doorway localization were connected to nothing.</summary>
-    /// <param name="doorwayLocalized">True when the bus's HRTF stage is engaged (listener outside).</param>
+    /// <param name="doorwayBlend">How localized to the doorway the bus currently is: 1 outside, 0 when
+    /// it fills the listener's own room, and anything between while the crossing ramp runs.</param>
     /// <param name="volume">The gated bus level — what the per-portal aperture/distance rule produced.</param>
     /// <param name="rmsL">Left-ear energy of the last block the HRTF stage produced.</param>
     /// <param name="rmsR">Right-ear energy of the last block the HRTF stage produced.</param>
-    internal bool TryGetReverbDiagnostics(int regionId, out bool doorwayLocalized, out float volume,
+    internal bool TryGetReverbDiagnostics(int regionId, out float doorwayBlend, out float volume,
                                           out float rmsL, out float rmsR)
     {
-        doorwayLocalized = false; volume = 0f; rmsL = 0f; rmsR = 0f;
+        doorwayBlend = 0f; volume = 0f; rmsL = 0f; rmsR = 0f;
         if (!_reverbVolumes.TryGetValue(regionId, out volume)) return false;
         if (_reverbSaVoices.TryGetValue(regionId, out var v) && v.Dsp.hasHandle())
         {
             v.Dsp.getBypass(out bool bypassed);
-            doorwayLocalized = !bypassed;
+            doorwayBlend = bypassed ? 0f : v.State.SpatialBlend;
             // A bypassed stage is not running, so its last block is stale. Report nothing rather than
             // the numbers it produced the last time the listener was somewhere else.
             rmsL = bypassed ? 0f : v.State.LastRmsL;
@@ -1522,35 +1548,61 @@ public class FmodAudioProvider : IAudioProvider
 
     public void UpdateShelter(float shelterFactor) => _shelterFactor = shelterFactor;
 
-    private float _currentProximityMix = 0.0f;
-
-    public void UpdateProximity(float distance)
+    /// <summary>
+    /// Hands the mixer what the space immediately around the listener's head looks like: one probe per
+    /// direction, each with the distance to whatever is there and what it is made of.
+    ///
+    /// This replaced a single "distance to the nearest wall" scalar, which could only ever produce one
+    /// undifferentiated colouration — a ceiling a metre up and a wall thirty centimetres to the left
+    /// sounded the same, and turning your head changed nothing. Each probe now becomes its own
+    /// reflection, with its own delay, its own damping and its own place between the ears.
+    /// </summary>
+    public void UpdateBoundaries(ReadOnlySpan<BoundaryProbe> probes)
     {
-        if (!_isInitialized || !_masterCombFilter.hasHandle()) return;
-        
-        float targetMix = distance >= 1.5f ? 0.0f : 1.0f - (distance / 1.5f);
-        _currentProximityMix = MathHelper.Lerp(_currentProximityMix, targetMix, 0.15f); // Faster response
+        var s = _boundaryState;
+        if (!_isInitialized || s == null) return;
 
-        // --- PHASE 2: DSP Smoothing ---
-        // Instead of hard-toggling bypass (which causes pops), we always leave the DSP 
-        // active but fade the Wet Level to silence (-80dB).
-        float wetLevel = MathHelper.Lerp(-80.0f, -4.0f, _currentProximityMix); 
-        
-        if (_currentProximityMix > 0.001f)
+        int count = Math.Min(probes.Length, BoundaryVoiceState.MaxTaps);
+        Span<BoundaryTap> taps = stackalloc BoundaryTap[BoundaryVoiceState.MaxTaps];
+        Span<bool> live = stackalloc bool[BoundaryVoiceState.MaxTaps];
+        float total = 0f;
+
+        for (int i = 0; i < count; i++)
         {
-            _masterCombFilter.setBypass(false);
-            // Pressure simulation: very short delay (comb filter)
-            float delayMs = MathHelper.Lerp(0.1f, 1.2f, distance / 1.5f);
-            _masterCombFilter.setParameterFloat(0, delayMs);
-            _masterCombFilter.setParameterFloat(1, 45.0f); // 45% feedback for metallic resonance
-            _masterCombFilter.setParameterFloat(3, wetLevel);
+            live[i] = BoundaryModel.TryBuildTap(probes[i], _speedOfSound, s.SampleRate, out taps[i]);
+            if (live[i]) total += Math.Max(Math.Abs(taps[i].GainL), Math.Abs(taps[i].GainR));
         }
-        else
+
+        // A tight hard-walled space can put a surface in every direction at once. Each reflection is
+        // individually right, but six of them summed onto the master would swamp the direct sound and
+        // ride the limiter. Scale the set back together rather than clipping it — the RATIOS between
+        // the surfaces are the cue, and they survive.
+        float trim = total > AcousticConstants.MaxBoundaryReflectionSum
+            ? AcousticConstants.MaxBoundaryReflectionSum / total
+            : 1f;
+
+        for (int i = 0; i < BoundaryVoiceState.MaxTaps; i++)
         {
-            _masterCombFilter.setParameterFloat(3, -80.0f);
-            _masterCombFilter.setBypass(true);
+            if (i < count && live[i])
+            {
+                s.TargetDelayL[i] = taps[i].DelayLSeconds;
+                s.TargetDelayR[i] = taps[i].DelayRSeconds;
+                s.TargetGainL[i] = taps[i].GainL * trim;
+                s.TargetGainR[i] = taps[i].GainR * trim;
+                s.LowpassAlpha[i] = taps[i].LowpassAlpha;
+            }
+            else
+            {
+                // Silence it rather than detaching it: the mixer glides the gain down, so a surface
+                // leaving probe range fades out instead of being cut off.
+                s.TargetGainL[i] = 0f;
+                s.TargetGainR[i] = 0f;
+            }
         }
     }
+
+    /// <summary>Diagnostics (AudioLab): the loudest boundary reflection currently being rendered.</summary>
+    internal float BoundaryReflectionLevel => _boundaryState?.LoudestGain ?? 0f;
 
     // --- Active-voice bookkeeping. Every mutation of _activeSounds goes through these so the index and the
     // list cannot drift apart. All of them assume _lock is already held.
@@ -1813,7 +1865,8 @@ public class FmodAudioProvider : IAudioProvider
             ReturnReverbVoices();
             foreach (var dsp in _reverbDsps.Values) dsp.release();
             foreach (var bus in _reverbBuses.Values) bus.release();
-            if (_masterCombFilter.hasHandle()) _masterCombFilter.release();
+            if (_boundaryDsp.hasHandle()) _boundaryDsp.release();
+            if (_boundaryHandle.IsAllocated) _boundaryHandle.Free();
             if (_masterLimiter.hasHandle()) _masterLimiter.release();
         } 
         StopDiagnosticSound();

@@ -34,7 +34,11 @@ public class AudioEngineFacade : IDisposable
     private Quaternion _listenerRot = Quaternion.Identity;
     private Vector3 _listenerVel;
     private int _listenerRegionId = -1;
-    private float _listenerProximity = 2.0f;
+    // The surfaces around the listener's head, double-buffered: the game thread fills one while the
+    // audio thread reads the other, so the per-frame probe never allocates and never tears.
+    private readonly BoundaryProbe[] _boundariesIn = new BoundaryProbe[BoundaryVoiceState.MaxTaps];
+    private readonly BoundaryProbe[] _boundariesOut = new BoundaryProbe[BoundaryVoiceState.MaxTaps];
+    private int _boundaryCount;
     private float _listenerShelter = 0.0f;
     private AcousticMap? _acousticMap;
     private readonly object _stateLock = new();
@@ -109,7 +113,8 @@ public class AudioEngineFacade : IDisposable
         Vector3 lPos, lVel;
         Quaternion lRot;
         int lRegion;
-        float lProx, lShelter;
+        float lShelter;
+        int lBoundaries;
         AcousticMap? aMap;
 
         lock (_stateLock)
@@ -118,7 +123,8 @@ public class AudioEngineFacade : IDisposable
             lRot = _listenerRot;
             lVel = _listenerVel;
             lRegion = _listenerRegionId;
-            lProx = _listenerProximity;
+            lBoundaries = _boundaryCount;
+            Array.Copy(_boundariesIn, _boundariesOut, lBoundaries);
             lShelter = _listenerShelter;
             aMap = _acousticMap;
         }
@@ -126,7 +132,7 @@ public class AudioEngineFacade : IDisposable
         // 2. Synchronize listener
         _provider.UpdateListener(lPos, lRot, lVel, lRegion);
         _provider.UpdateShelter(lShelter);
-        _provider.UpdateProximity(lProx);
+        _provider.UpdateBoundaries(new ReadOnlySpan<BoundaryProbe>(_boundariesOut, 0, lBoundaries));
         _provider.SetSimulatedReverbDecay(_simReverbMs);
         _provider.SetAirTemperature(_airTemperatureC);
         
@@ -186,11 +192,12 @@ public class AudioEngineFacade : IDisposable
         }
     }
 
-    public void UpdateProximity(float distance)
+    public void UpdateBoundaries(ReadOnlySpan<BoundaryProbe> probes)
     {
         lock (_stateLock)
         {
-            _listenerProximity = distance;
+            _boundaryCount = Math.Min(probes.Length, _boundariesIn.Length);
+            for (int i = 0; i < _boundaryCount; i++) _boundariesIn[i] = probes[i];
         }
     }
 

@@ -11,6 +11,10 @@ namespace OpenFPS.Common;
 /// </summary>
 public static class SharedMovementEngine
 {
+    /// <summary>How far past the surface a resolved collision leaves the player, in metres. Enough that
+    /// the next tick's overlap test starts clear of the face; small enough not to be a visible gap.</summary>
+    public const float CollisionSkinWidth = 0.001f;
+
     public struct Collider
     {
         public Vector3 Position;
@@ -82,10 +86,19 @@ public static class SharedMovementEngine
         float collisionHeight = ctx.PlayerHeight - footPadding;
         Vector3 cylinderCenterOffset = new Vector3(0, footPadding + (collisionHeight / 2f), 0);
 
+        // Collide and slide. Each pass moves by whatever is left of this frame's motion and then lifts
+        // the player back out of the deepest surface they ended up inside. Removing the normal component
+        // that way IS the slide — the tangential part of the move survives it — so the remainder is spent
+        // and later passes start from a standstill; they exist to depenetrate a second collider that the
+        // first push moved us into, and to lift a player who was already overlapping something.
+        //
+        // The push used to be applied to `pos` — the position BEFORE the move — using a penetration
+        // measured at the position after it. The player was outside the wall to begin with, so pressing
+        // into one shoved them BACKWARDS by most of a step every tick and the next tick walked them back
+        // in: no net movement, 4.5 m/s of path length, footsteps that never stopped, and an acoustic
+        // region that flipped back and forth at half the tick rate wherever that straddled a doorway.
         for (int i = 0; i < 3; i++)
         {
-            if (remainingMove.LengthSquared() < 0.000001f) break;
-
             Vector3 nextPos = pos + remainingMove;
             GeometryUtils.CollisionResult bestHit = new() { IsColliding = false };
 
@@ -119,8 +132,10 @@ public static class SharedMovementEngine
             }
 
             // --- 3a. STEP CLIMBING ---
+            // Only while actually trying to move. On a depenetration pass there is no motion to climb
+            // with, and stepping then would lift a merely-overlapping player into the air.
             bool stepped = false;
-            if (isGrounded && bestHit.Penetration > 0.001f)
+            if (isGrounded && bestHit.Penetration > 0.001f && remainingMove.LengthSquared() > 0.000001f)
             {
                 Vector3 stepTarget = nextPos + new Vector3(0, ctx.StepHeight, 0);
                 bool stepBlocked = false;
@@ -148,13 +163,11 @@ public static class SharedMovementEngine
 
             if (!stepped)
             {
-                // Resolve by sliding: Push out slightly more than penetration (skin width) to avoid jitter
-                pos += bestHit.Normal * (bestHit.Penetration + 0.001f);
-                
-                // Clip remaining movement and velocity against the normal
-                float dot = Vector3.Dot(remainingMove, bestHit.Normal);
-                if (dot < 0) remainingMove -= bestHit.Normal * dot;
-                
+                // Take the move, then come back out along the surface normal by the depth measured
+                // THERE, plus a skin width so the next test starts clear of it.
+                pos = nextPos + bestHit.Normal * (bestHit.Penetration + CollisionSkinWidth);
+                remainingMove = Vector3.Zero; // spent: the slide is what survived the push-out
+
                 float velDot = Vector3.Dot(vel, bestHit.Normal);
                 if (velDot < 0)
                 {

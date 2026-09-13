@@ -25,6 +25,12 @@ internal sealed class SteamAudioVoiceState
     // Live direction (torn reads are inaudible for a single frame).
     public volatile float DirX, DirY = 0f, DirZ = -1f; // default: straight ahead
 
+    /// <summary>How spatialized this voice is: 1 = fully HRTF'd toward <c>Dir</c>, 0 = passed through
+    /// unspatialized. The continuous form of "is this voice being localized", and the reason it exists:
+    /// switching a binaural stage on or off between one block and the next is a step change in the
+    /// signal, and it clicks. Ramping this instead lets a listener cross a threshold silently.</summary>
+    public volatile float SpatialBlend = 1f;
+
     // Diagnostics for the headless smoke test.
     public long CallbackCount;
     public volatile bool ProducedAudio;
@@ -121,7 +127,7 @@ internal static class SteamAudioDsp
         {
             direction = new Phonon.IPLVector3 { x = state.DirX, y = state.DirY, z = state.DirZ },
             interpolation = Phonon.IPL_HRTFINTERPOLATION_BILINEAR,
-            spatialBlend = 1.0f,
+            spatialBlend = Math.Clamp(state.SpatialBlend, 0f, 1f),
             hrtf = state.Hrtf,
             peakDelays = IntPtr.Zero
         };

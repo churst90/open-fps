@@ -57,9 +57,14 @@ public class ClientAudioSystem
     /// <summary>Audio updates performed / skipped by the rate cap. Diagnostic.</summary>
     public (long Ran, long Skipped) UpdateCounts => (_throttle.Runs, _throttle.Skipped);
 
-    /// <summary>The near-field radar's fixed probe directions — a constant, not a per-frame allocation.</summary>
-    private static readonly Vector3[] RadarDirections =
-        { Vector3.UnitX, -Vector3.UnitX, Vector3.UnitY, Vector3.UnitZ, -Vector3.UnitZ };
+    // Near-field boundary probing. The directions are rebuilt each frame from the listener's rotation
+    // (BoundaryModel.ProbeDirections is head space), and every buffer here is owned and reused — this
+    // runs on every audio frame.
+    private readonly Vector3[] _boundaryRays = new Vector3[BoundaryModel.ProbeDirections.Length];
+    private readonly float[] _boundaryDistances = new float[BoundaryModel.ProbeDirections.Length];
+    private readonly float[] _boundaryAbsorptions = new float[BoundaryModel.ProbeDirections.Length];
+    private readonly string[] _boundaryMaterials = new string[BoundaryModel.ProbeDirections.Length];
+    private readonly BoundaryProbe[] _boundaryProbes = new BoundaryProbe[BoundaryModel.ProbeDirections.Length];
 
     public ClientAudioSystem(AudioEngineFacade audio, SoundMappingService sounds, LocalPlayerState state)
     {
@@ -171,19 +176,14 @@ public class ClientAudioSystem
         // 4. Update the local player's environmental state
         UpdateAcousticState(world, visualEyePos, listenerRegionId);
 
-        // 4.5. Near-field proximity radar (Head-to-wall pressure simulation)
-        float closestWallDist = 2.0f;
-        _spatial.RaycastAll(world, visualEyePos, RadarDirections, 2.0f, out float[] pDists, out _, out _);
-        
-        for (int i = 0; i < RadarDirections.Length; i++)
-        {
-            if (pDists[i] < closestWallDist) closestWallDist = pDists[i];
-        }
-        
-        _spatial.RaycastSingle(world, visualEyePos, -Vector3.UnitY, 2.0f, out _, out float floorDist);
-        if (floorDist < 0.5f && floorDist < closestWallDist) closestWallDist = floorDist;
-
-        _audio.UpdateProximity(closestWallDist);
+        // 4.5. Near-field boundary probing.
+        //
+        // Six rays out of the listener's head — right, left, up, down, forward, back — turned into world
+        // space by the listener's own rotation, so what comes back is "there is concrete half a metre to
+        // my LEFT", not "there is concrete somewhere near". Each becomes its own early reflection in the
+        // mixer (see BoundaryModel / BoundaryProximityProcessor), which is what lets a player hear the
+        // difference between a corridor, a doorway and the open air, and hear it change as they turn.
+        UpdateBoundaryProbes(world, visualEyePos);
 
         // 5. Update the acoustic path (occlusion/diffraction) for ALL active sounds in FMOD
         var activeIds = _audio.GetActiveSpatialSoundIds();
@@ -564,6 +564,27 @@ public class ClientAudioSystem
         // the surrounding walls scattered the sound "all over the place" in enclosed rooms instead of
         // staying localized at the player's feet. The room's reverb bus still gives footsteps their
         // indoor character; per-step geometric reflections are reserved for world emitters.
+    }
+
+    /// <summary>
+    /// Probes the space around the listener's head and hands the result to the mixer. Head-relative,
+    /// so the picture turns with the player.
+    /// </summary>
+    private void UpdateBoundaryProbes(WorldSnapshot world, Vector3 visualEyePos)
+    {
+        var head = _state.Rotation;
+        var directions = BoundaryModel.ProbeDirections;
+
+        for (int i = 0; i < directions.Length; i++)
+            _boundaryRays[i] = Vector3.Transform(directions[i], head);
+
+        _spatial.RaycastAll(world, visualEyePos, _boundaryRays, BoundaryModel.MaxDistance,
+                            _boundaryDistances, _boundaryAbsorptions, _boundaryMaterials);
+
+        for (int i = 0; i < directions.Length; i++)
+            _boundaryProbes[i] = new BoundaryProbe(directions[i], _boundaryDistances[i], _boundaryMaterials[i]);
+
+        _audio.UpdateBoundaries(_boundaryProbes);
     }
 
     /// <summary>

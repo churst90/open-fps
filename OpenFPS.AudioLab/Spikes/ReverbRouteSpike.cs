@@ -101,6 +101,13 @@ public static class ReverbRouteSpike
                         !inside.Localized);
             ok &= Check("inside the room the bus is at full level", inside.Volume > 0.9f);
 
+            // 5. The crossing itself. A hard bypass toggle was a step change in the signal — one click
+            // per threshold, and a stream of them while standing in the doorway. Walk in, and watch how
+            // fast the localization can move between one audio update and the next.
+            float worstJump = WalkThroughTheDoorway(provider, siren);
+            Console.WriteLine($"  crossing the threshold             largest localization change in one update = {worstJump:F3}");
+            ok &= Check("crossing the threshold ramps rather than snapping", worstJump < 0.25f);
+
             Console.WriteLine(ok
                 ? "RESULT: PASS — a room's reverb is gated by its doorway and arrives from it."
                 : "RESULT: FAIL — see the unmet conditions above.");
@@ -112,7 +119,42 @@ public static class ReverbRouteSpike
         }
     }
 
-    private readonly record struct BusState(bool Localized, float Volume, float RmsL, float RmsR);
+    private readonly record struct BusState(float Blend, float Volume, float RmsL, float RmsR)
+    {
+        public bool Localized => Blend > 0.5f;
+    }
+
+    /// <summary>Walks the listener from outside to the middle of the room and back, one small step per
+    /// audio update, and returns the largest single-update change in the bus's doorway localization.
+    /// A hard switch reports 1.0 — the whole range in one block.</summary>
+    private static float WalkThroughTheDoorway(FmodAudioProvider provider, SpatialEmitter emitter)
+    {
+        var from = new Vector3(-7f, 1.7f, 4f);   // outside, square on to the opening
+        var to = RoomCentre with { Y = 1.7f };   // the middle of the room
+        float worst = 0f;
+        float previous = float.NaN;
+
+        for (int pass = 0; pass < 2; pass++)
+        {
+            for (int i = 0; i <= 120; i++)
+            {
+                float t = pass == 0 ? i / 120f : 1f - (i / 120f);
+                Vector3 p = Vector3.Lerp(from, to, t);
+                // The region the listener is in is what the game would report: inside once past the wall.
+                int region = p.Z > Doorway.Z ? RoomRegionId : AcousticConstants.GlobalRegionId;
+
+                provider.UpdateListener(p, Quaternion.Identity, Vector3.Zero, region);
+                provider.UpdateSpatialAttributes(emitter);
+                provider.Update();
+                provider.TryGetReverbDiagnostics(RoomRegionId, out float blend, out _, out _, out _);
+
+                if (!float.IsNaN(previous)) worst = Math.Max(worst, Math.Abs(blend - previous));
+                previous = blend;
+                Thread.Sleep(5);
+            }
+        }
+        return worst;
+    }
 
     private static float Energy(BusState s) => s.RmsL + s.RmsR;
 
@@ -137,23 +179,23 @@ public static class ReverbRouteSpike
 
         // The tail is driven by noise, so a single mixer block is a poor measurement. Average over a
         // couple of hundred of them once the level has settled.
-        bool localized = false; float vol = 0f;
+        float blend = 0f, vol = 0f;
         double sumL = 0, sumR = 0; int samples = 0;
         for (int i = 0; i < 120; i++)
         {
             provider.UpdateListener(listenerPos, Quaternion.Identity, Vector3.Zero, listenerRegionId);
             provider.UpdateSpatialAttributes(emitter);
             provider.Update();
-            provider.TryGetReverbDiagnostics(RoomRegionId, out localized, out vol, out float l, out float r);
+            provider.TryGetReverbDiagnostics(RoomRegionId, out blend, out vol, out float l, out float r);
             sumL += l; sumR += r; samples++;
             Thread.Sleep(5);
         }
 
-        return new BusState(localized, vol, (float)(sumL / samples), (float)(sumR / samples));
+        return new BusState(blend, vol, (float)(sumL / samples), (float)(sumR / samples));
     }
 
     private static void Report(string where, BusState s) =>
-        Console.WriteLine($"  {where,-32} doorwayHRTF={(s.Localized ? "on " : "off")} " +
+        Console.WriteLine($"  {where,-32} doorwayBlend={s.Blend:F2} " +
                           $"busLevel={s.Volume:F3} L/R={s.RmsL:F6}/{s.RmsR:F6} asymmetry={Asymmetry(s):P0}");
 
     private static bool Check(string what, bool held)

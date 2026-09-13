@@ -561,3 +561,98 @@ login is now logged with the username and connection id (never the password).
 
 Tests 188 → 205 (`AnnouncementAndLoginTests`), plus `OpenFPS.AudioLab --reverb-route`. The whole solution
 builds, the Windows head included; the existing provider and Steam Audio spikes were re-run and pass.
+
+---
+
+# Second live session, 2026-09-13
+
+Reverb confirmed by ear — "reverb comes from the actual source now". Three more findings, and the first
+two were the same bug wearing two hats.
+
+## Footsteps that never stopped, and a wall that clicked
+
+Walking into a wall and holding forward kept producing footsteps indefinitely, and produced a stream of
+pops and clicks with them. Both came out of four lines in `SharedMovementEngine.Step`:
+
+```csharp
+Vector3 nextPos = pos + remainingMove;      // where we are trying to go
+... bestHit measured AT nextPos ...
+pos += bestHit.Normal * (bestHit.Penetration + 0.001f);   // ...applied to where we STARTED
+```
+
+The penetration is measured at the position being moved *to*; it was applied to the position being moved
+*from*, which was outside the wall to begin with. So pressing into a wall pushed the player **backwards**
+by most of a step, every tick, and the next tick walked them back in. A test pinned it at **0.15 m of
+movement per tick** — 4.5 m/s of path length going nowhere. Two consequences:
+
+- `LocalPlayerController` accumulates stride from the *magnitude* of each frame's movement, so an
+  oscillation banks distance at full walking speed in both directions. Footsteps forever.
+- Wherever that 0.15 m oscillation straddled a boundary, the listener's acoustic region flipped back and
+  forth at half the tick rate — and every flip re-routed the reverb sends and toggled a DSP.
+
+The resolution now takes the move and comes back out of the surface it landed in
+(`pos = nextPos + normal * (penetration + skin)`), which removes the normal component of the motion and
+keeps the tangential — that *is* the slide. Step-climbing is gated on actually having motion to climb
+with, so a depenetration pass cannot lift a merely-overlapping player into the air. `SharedMovementEngine`
+is shared by client prediction and server authority, so both ends were wrong in exactly the same way and
+both are fixed together.
+
+## Crossing a threshold clicked
+
+Even with the oscillation gone, a real crossing flipped the region bus's binaural stage from engaged to
+bypassed between one mixer block and the next. That is a step change in the sample stream, and a step
+change is a click. Steam Audio has the continuous form of the same switch — `spatialBlend` — so the
+transition is a ramp now: 1 (arriving through the opening) to 0 (filling the room you are standing in)
+over about 0.2 s, with the apparent doorway direction smoothed alongside it so a change of nearest portal
+does not snap the reverb across the head either. Bypass is only touched at the bottom of the ramp, where
+the stage contributes no direction at all and the switch changes decorrelation rather than level.
+
+`--reverb-route` measures it: the largest single-update change in localization across a crossing is now
+**0.08**, where a hard switch is 1.0.
+
+## Walls you can hear before you touch them
+
+There was already a "near-field proximity" effect. It was wrong in every particular:
+
+- **The delay was seven times too short.** It used an FMOD echo of 0.1–1.2 ms. The physical round trip to
+  a surface 1.5 m away is 2d/c = **8.7 ms**. At those delays the comb peaks sit above 1.4 kHz, which is
+  metallic ringing, not the boxy colouration of a corridor.
+- **It had 45% feedback.** A feedback delay is a resonator: it rings at a fixed pitch no matter what the
+  geometry does. A single boundary reflection is *feedforward* — one tap.
+- **It was one scalar.** "Distance to the nearest wall", from world-axis probes. A ceiling a metre up and
+  a wall thirty centimetres to the left produced identical output, and turning your head changed nothing.
+- **It ignored material.** Carpet and concrete reflected the same.
+
+`BoundaryModel` + `BoundaryProximityProcessor` replace it. Six rays leave the listener's head in **head
+space** — right, left, up, down, forward, back — so what comes back is "concrete, half a metre, on my
+left". Each becomes one tap of a multi-tap feedforward comb on the master bus:
+
+| | |
+|---|---|
+| delay | `2d/c`, with c from the world's air temperature — the same knob that moves every Doppler shift |
+| gain | mid-band reflectivity of the material, times a linear distance window out to 3 m |
+| timbre | a one-pole low-pass from the material's *high-band* absorption — carpet returns a dull thump, concrete returns the lot |
+| position | constant-power pan plus a real interaural delay, so the near ear hears it first |
+
+Everything glides per-sample — gains *and* delays, with fractional-delay interpolation — so a 60 Hz update
+from the game thread can never put a step into the stream, and walking toward a wall sweeps the comb
+continuously rather than stepping between whole samples. A corner or a stairwell can put a surface in
+every probed direction at once, so the summed gain is trimmed to `MaxBoundaryReflectionSum` — scaling the
+set together, because the *ratios* between the surfaces are the cue.
+
+The tests measure the rendered **impulse response**, not the parameters the renderer was handed: at
+0.4 m, 0.8 m and 1.5 m the first notch is where `c/4d` says it should be, a wall at 0.4 m and one at
+1.2 m demonstrably do not produce the same notch, a carpeted wall reflects less and duller than concrete,
+colder air moves the whole comb, nothing nearby leaves the signal bit-for-bit untouched, and a wall
+appearing in one update fades in rather than stepping. That first assertion is the one the old
+implementation could not have passed — its notch did not move with distance at all.
+
+`OpenFPS.AudioLab --boundary` runs it through the real mixer and prints, for each distance, the round trip
+and the frequency of the first notch. `--boundary-live` walks a wall from your right, to the front, to
+your left, to be judged by ear.
+
+Also here: a non-allocating `SpatialService.RaycastAll` overload, since the allocating one ran three
+array allocations per call on every audio frame.
+
+Tests 209 → 223. Not verified: how strong the boundary effect should be. The geometry is measured; the
+level is a judgement, and `BoundaryModel.ReflectionGain` is the knob.

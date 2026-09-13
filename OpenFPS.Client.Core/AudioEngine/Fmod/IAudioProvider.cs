@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Numerics;
 using OpenFPS.Client.AudioEngine.Data;
+using OpenFPS.Client.AudioEngine.Core;
 
 namespace OpenFPS.Client.AudioEngine.Fmod;
 
@@ -11,7 +12,9 @@ public interface IAudioProvider : IDisposable
     void Update();
     void UpdateListener(Vector3 position, Quaternion rotation, Vector3 velocity, int regionId);
     void UpdateShelter(float shelterFactor);
-    void UpdateProximity(float nearestWallDistance);
+    /// <summary>Describes the surfaces immediately around the listener's head — one probe per
+    /// direction, in HEAD space — so the mixer can render each as its own early reflection.</summary>
+    void UpdateBoundaries(ReadOnlySpan<BoundaryProbe> probes);
     void SetAcousticMap(OpenFPS.Common.AcousticMap map);
     void PlaySpatialSound(SpatialEmitter emitter);
     void UpdateSpatialAttributes(SpatialEmitter emitter);

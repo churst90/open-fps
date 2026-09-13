@@ -248,7 +248,17 @@ public class SpatialService
         distances = new float[directions.Length];
         absorptions = new float[directions.Length];
         materials = new string[directions.Length];
+        RaycastAll(world, start, directions, maxDist, distances, absorptions, materials);
+    }
 
+    /// <summary>
+    /// The same fan of rays, into buffers the caller owns. The allocating overload above runs on every
+    /// audio frame in one caller and every acoustic tick in another; three arrays per call, sixty times
+    /// a second, is exactly the kind of steady garbage the profiling pass exists to remove.
+    /// </summary>
+    public void RaycastAll(WorldSnapshot world, Vector3 start, Vector3[] directions, float maxDist,
+                           float[] distances, float[] absorptions, string[] materials)
+    {
         for (int i = 0; i < directions.Length; i++)
         {
             distances[i] = maxDist;

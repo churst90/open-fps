@@ -187,11 +187,39 @@ First logged-in walkthrough on the GTK head since the audit. Three defects, all 
       and `NetManager.Connect` returns the existing peer without an event when one is already connected,
       so the retry never sent a second `LoginRequest`.
 
+## Second live session (2026-09-13)
+
+Reverb confirmed by ear — it comes from the source now. Three more findings.
+
+- [x] **Footsteps never stopped at a wall, and pushing into one popped and clicked.** One bug, not two:
+      `SharedMovementEngine.Step` pushed the pre-move position out by a penetration measured at the
+      post-move position, shoving a blocked player BACKWARDS by most of a step every tick. 0.15 m of
+      phantom movement per tick — 4.5 m/s of stride going nowhere, so the footstep accumulator never
+      stopped, and an acoustic region that straddled the oscillation flipped at 15 Hz. Shared by client
+      and server, so both ends were doing it identically. Covered by `WallProximityAndJitterTests`.
+- [x] **Crossing a threshold clicked.** The region bus's binaural stage had its bypass flipped in a
+      single frame, which is a step change in the signal. It is a ramp now (Steam Audio's `spatialBlend`,
+      ~0.2 s), with the apparent doorway direction smoothed alongside it. `--reverb-route` measures the
+      largest single-update change across a crossing: 0.08, where a hard switch is 1.0.
+- [x] **Near-field boundary effect — walls you can hear before you touch them.** There WAS one, and it
+      was wrong in every particular: a fixed-ish 0.1–1.2 ms FMOD echo (the physical round trip at 1.5 m
+      is 8.7 ms — seven times longer) with 45% feedback, which is a resonator that rings on one pitch
+      rather than a reflection that tracks geometry, driven by a single "nearest wall" scalar so a
+      ceiling and a wall behind you sounded identical. Replaced by `BoundaryModel` +
+      `BoundaryProximityProcessor`: six head-relative probes, each rendered as its own delayed, damped,
+      lateralized reflection at 2d/c. Covered by `BoundaryReflectionTests` (which measure the rendered
+      impulse response, not the parameters) and `OpenFPS.AudioLab --boundary[-live]`.
+
 Still outstanding from the audit, and still needing ears rather than a harness:
 - [ ] Ear-validate the doorway-localized reverb now that it is actually routed (audit step 1 + 7).
       `AcousticConstants.ReverbSendMix` is the one knob if the rooms are too wet or too dry.
 - [ ] Ear-validate the weather chain (audit step 7).
 - [ ] A full logged-in walkthrough on the Windows head — its login form got the same fix, unheard.
+- [ ] Ear-validate the near-field boundary effect and tune it. The geometry is verified; the LEVEL is a
+      judgement. `BoundaryModel.ReflectionGain` is how strong, `MaxDistance` is how far out it reaches,
+      and `AcousticConstants.MaxBoundaryReflectionSum` caps what a corner or a corridor can add up to.
+- [ ] The boundary probe is six rays: a surface met at a glancing angle reflects away rather than back,
+      and nothing models that yet. Worth revisiting if walls read as too present at oblique approaches.
 
 ### Corrections to the lists above
 - "Server: Implement Inventory/Take/Drop commands" is **not** done — `/inv`, take and drop are absent from

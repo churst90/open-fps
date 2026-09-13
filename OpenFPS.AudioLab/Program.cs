@@ -146,6 +146,14 @@ if (args.Contains("--steam-stereo"))
     Environment.Exit(code);
 }
 
+if (args.Contains("--boundary") || args.Contains("--boundary-live"))
+{
+    Console.WriteLine("--- Near-field boundaries: does a nearby surface colour the mix, and does the colour track it? ---");
+    int code = OpenFPS.Client.Core.AudioEngine.Fmod.BoundarySpike.Run(args.Contains("--boundary-live"));
+    Log.CloseAndFlush();
+    Environment.Exit(code);
+}
+
 if (args.Contains("--reverb-route"))
 {
     Console.WriteLine("--- Reverb routing: is a room's reverb gated by, and heard through, its doorway? ---");
