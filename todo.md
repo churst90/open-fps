@@ -228,6 +228,21 @@ Reverb confirmed by ear — it comes from the source now. Three more findings.
       sample data" — then called `lock`, getting a correctly-sized buffer full of nothing. Every load
       logged success and returned silence. Never caught because its only consumer, the granular engine,
       has never had a caller. Verified by `--bed`.
+## Weapons (2026-09-13)
+
+- [x] **One synthesized weapon, dry and mono.** `WeaponProfile` + `WeaponSynth` render muzzle blast,
+      supersonic crack and mechanical action as separate layers with no room baked in, so the engine's
+      own acoustics are the only ones heard. `Ballistics` computes the crack-to-report gap —
+      `d·(1/c − 1/v)`, ~1.7 ms/m — which recovers the range exactly when read back. Covered by
+      `BallisticsTests` and `--gunshot` / `--gunshot-live`.
+- [ ] Play the crack from the ENGINE rather than the spike: it needs a shot event that schedules the
+      crack at the listener and the report at the weapon, separated by the ballistic gap.
+- [ ] Tune the profiles by ear and substitute recorded transients as they turn up. A recorded blast
+      must be trimmed to the transient — everything after it is the field it was recorded in.
+- [ ] Impact layer per material: `AcousticRegistry` already knows 36 surfaces, so a round striking one
+      can say which it was.
+- [ ] Glass: puncture, fragment shower (the granular engine's first proper caller) and delayed collapse.
+
 - [ ] Label the 146 unsorted footstep takes in `ASSETS/SOUNDS/_unsorted/footsteps`, then re-run ingest.
 - [ ] **Wire `AmbienceId` to the bed API.** Still the dead field it was: the prefab spec carries it, the
       server sends it, no client code reads it. Now that beds play, this is the join — a region's

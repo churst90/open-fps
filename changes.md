@@ -808,3 +808,84 @@ turns when the listener does. It sweeps a full circle and checks the ear balance
 because a farm ambience is largely diffuse, which is the physically correct answer.
 
 Tests still 244. Every spike re-run and passing.
+
+---
+
+# One synthesized weapon, and the crack that tells you where it came from
+
+## Why synthesis is the right answer here, not a fallback
+
+Every gunshot recording is a few milliseconds of muzzle blast followed by a second of the field it was
+recorded in — you cannot fire a rifle in an anechoic chamber. This engine now generates its own field:
+region reverb, boundary reflections, occlusion, Steam Audio. Feed it a recording with a tail and you hear
+two rooms at once, and the wrong one wins.
+
+What comes out of `WeaponSynth` has no room in it at all, so the room it ends up in is the one the player
+is standing in. Mono, dry, and peak-normalized, because the engine owns distance.
+
+## `Ballistics` — the part worth having
+
+A supersonic round makes **two** sounds, and the relationship between them is worth more than either:
+
+- The **muzzle blast** leaves the weapon at the speed of sound and arrives at `d/c`.
+- The bullet outruns it, dragging a shock cone behind it. The **crack** you hear is made at the moment
+  the round passes *you*, and arrives at roughly `d/v`.
+
+Since `v > c` the crack lands **first**, and the gap is `d·(1/c − 1/v)` — about 1.7 ms per metre for a
+rifle. The spike prints it:
+
+```
+  range    crack at   report at      gap   (gap read back as range)
+     25 m      32.8 ms     72.9 ms    44.5 ms     25.0 m
+    100 m     118.0 ms    291.5 ms   177.9 ms    100.0 m
+    400 m     458.9 ms   1166.2 ms   711.6 ms    400.0 m
+```
+
+That last column is the test: run the gap back through the physics and it recovers the range exactly. A
+player learning to read that gap is doing real arithmetic on real numbers, not responding to a designed
+cue — so it stays true at any range, for any muzzle velocity, and it widens in cold air along with every
+Doppler shift in the world. Sighted shooters throw this information away.
+
+A subsonic round never outruns its own report, so it makes no crack at all. That is a gameplay fact
+about suppressed weapons, not an omission.
+
+## The layers
+
+`MuzzleBlast` is a transient (what tells you a gun went off rather than a door slamming), a resonant
+body (what tells you *which* gun), and a low thump that falls slightly in pitch as it decays (what stops
+it sounding like a test tone). `SupersonicCrack` is an N-wave — a pressure step up and back down lasting
+a fraction of a millisecond — which is why it reads as a whip rather than a bang, and why it is so easy
+to place: nearly all its energy is high and broadband. `MechanicalAction` is the bolt, quiet and close,
+and it tells a listener a weapon was re-cocked rather than fired again.
+
+They are played at different *places* as well as different times: the blast at the weapon, the crack at
+the listener, the action at the weapon a moment later.
+
+A `WeaponProfile` holds everything weapon-specific — velocity, body resonance, decay, brightness — so a
+new gun is a profile, not a renderer.
+
+## Two defects the spike caught
+
+The raw N-wave came out sitting **0.119 above the centre line**: resonators and one-pole filters settle
+at an offset rather than at zero. That is twelve per cent of the headroom spent on something inaudible,
+and a step in the waveform every time a voice starts or stops. And both layers' buffers ended while the
+sound was still decaying, which is a click at the end of every shot. `Finish` now DC-blocks at 18 Hz,
+fades the last 8 ms to true silence, and only then scales to peak.
+
+The crack's noise tail also decayed too slowly to be over by the end of its buffer — and a crack that
+trails off slowly stops sounding like a whip and starts sounding like a firework, which is both wrong and
+much harder to place. Shortened to a fifth of the buffer.
+
+## Verifying it
+
+`OpenFPS.AudioLab --gunshot` renders the layers into `ASSETS/SOUNDS/WEAPONS`, prints the timing table,
+and asserts the crack precedes the report, the gap recovers the range, a subsonic round is silent, a
+distant crack is longer than a near one, and every layer is dry and centred. `--gunshot-live` fires the
+same shot from 25 m, 100 m and 400 m through the real spatial path — crack at the listener, report out in
+front — so the gap can be heard opening up.
+
+`BallisticsTests` holds the physics to the physics rather than to taste: the moment the gap stops being
+`d·(1/c − 1/v)` it stops being trustworthy, and a player who has learned to read range by ear would be
+quietly misled.
+
+Tests 244 → 261.

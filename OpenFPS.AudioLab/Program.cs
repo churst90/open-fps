@@ -146,6 +146,14 @@ if (args.Contains("--steam-stereo"))
     Environment.Exit(code);
 }
 
+if (args.Contains("--gunshot") || args.Contains("--gunshot-live"))
+{
+    Console.WriteLine("--- Weapons: a dry synthesized shot, and a crack-to-report gap that encodes range ---");
+    int code = OpenFPS.Client.Core.AudioEngine.Fmod.GunshotSpike.Run(args.Contains("--gunshot-live"), "");
+    Log.CloseAndFlush();
+    Environment.Exit(code);
+}
+
 if (args.Contains("--bed") || args.Contains("--bed-live"))
 {
     int bi = Array.IndexOf(args, args.Contains("--bed-live") ? "--bed-live" : "--bed");
