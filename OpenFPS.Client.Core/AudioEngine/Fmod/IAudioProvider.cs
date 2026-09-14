@@ -15,6 +15,21 @@ public interface IAudioProvider : IDisposable
     /// <summary>Describes the surfaces immediately around the listener's head — one probe per
     /// direction, in HEAD space — so the mixer can render each as its own early reflection.</summary>
     void UpdateBoundaries(ReadOnlySpan<BoundaryProbe> probes);
+
+    /// <summary>
+    /// Starts an ambisonic ambience bed, or re-aims a playing one at a new level. The soundfield is
+    /// fixed in the WORLD: it is rotated by the listener's orientation and decoded binaurally every
+    /// block, so turning your head moves you through it rather than carrying it with you. Returns false
+    /// (having said why in the log) when the file is not a full-sphere ambisonic recording, or when
+    /// Steam Audio is unavailable to decode one.
+    /// </summary>
+    bool PlayAmbientBed(string soundId, AmbisonicLayout layout, float volume, bool loop = true);
+
+    /// <summary>Sets the level a bed glides toward. Two beds at two levels is a cross-fade.</summary>
+    void SetAmbientBedVolume(string soundId, float volume);
+
+    /// <summary>Stops a bed and frees its decoder.</summary>
+    void StopAmbientBed(string soundId);
     void SetAcousticMap(OpenFPS.Common.AcousticMap map);
     void PlaySpatialSound(SpatialEmitter emitter);
     void UpdateSpatialAttributes(SpatialEmitter emitter);

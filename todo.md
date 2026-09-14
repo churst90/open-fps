@@ -210,6 +210,24 @@ Reverb confirmed by ear — it comes from the source now. Three more findings.
       lateralized reflection at 2d/c. Covered by `BoundaryReflectionTests` (which measure the rendered
       impulse response, not the parameters) and `OpenFPS.AudioLab --boundary[-live]`.
 
+## Ambisonic ambience beds (2026-09-13)
+
+- [x] **Steam Audio ambisonics bindings.** `PhononAmbisonics.cs` binds the decode effect (which rotates
+      the soundfield by the listener's frame and then renders it binaurally, in one call) and the encode
+      effect. `AmbisonicFormat` converts AmbiX/SN3D and FuMa into the N3D the decoder actually expects —
+      the conversion nothing warns you about and that makes a field sound merely *vague* when skipped.
+      `AmbisonicBedDsp` is an FMOD generator DSP that owns its PCM, because FMOD would downmix a
+      4-channel sound to the output speaker mode long before a DSP saw it. `FmodAudioProvider` gains
+      `PlayAmbientBed` / `SetAmbientBedVolume` / `StopAmbientBed`, several beds at once so regions can
+      cross-fade. Verified by `OpenFPS.AudioLab --ambisonic` and `AmbisonicFormatTests`.
+- [ ] **Wire `AmbienceId` to the bed API.** Still the dead field it was: the prefab spec carries it, the
+      server sends it, no client code reads it. Now that beds play, this is the join — a region's
+      ambience starts on entry and cross-fades on exit, gated by `ShelterFactor` so indoors is quieter.
+- [ ] Decide what happens without Steam Audio: a bed currently refuses to start and says so. A stereo
+      downmix fallback would be kinder, at the cost of the rotation that is the whole point.
+- [ ] An asset ingest step: resample, loudness-normalise and loop-prep a drop folder, and record the
+      layout (AmbiX/FuMa) per file rather than guessing it from the name.
+
 Still outstanding from the audit, and still needing ears rather than a harness:
 - [ ] Ear-validate the doorway-localized reverb now that it is actually routed (audit step 1 + 7).
       `AcousticConstants.ReverbSendMix` is the one knob if the rooms are too wet or too dry.

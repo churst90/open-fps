@@ -146,6 +146,14 @@ if (args.Contains("--steam-stereo"))
     Environment.Exit(code);
 }
 
+if (args.Contains("--ambisonic"))
+{
+    Console.WriteLine("--- Ambisonics: does a recorded soundfield rotate with the listener and decode to the right ear? ---");
+    int code = OpenFPS.Client.Core.AudioEngine.SteamAudio.AmbisonicSpike.Run();
+    Log.CloseAndFlush();
+    Environment.Exit(code);
+}
+
 if (args.Contains("--boundary") || args.Contains("--boundary-live"))
 {
     Console.WriteLine("--- Near-field boundaries: does a nearby surface colour the mix, and does the colour track it? ---");

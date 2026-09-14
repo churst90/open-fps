@@ -656,3 +656,93 @@ array allocations per call on every audio frame.
 
 Tests 209 → 223. Not verified: how strong the boundary effect should be. The geometry is measured; the
 level is a judgement, and `BoundaryModel.ReflectionGain` is the knob.
+
+---
+
+# Ambisonic ambience beds, 2026-09-13
+
+The groundwork for ambience that stays where you left it.
+
+## Why not just play a binaural recording
+
+Because a binaural recording is **head-locked**. Its spatial image is baked to the orientation of the
+head that recorded it, so the bird on your left is on your left after you turn around. For a sighted
+player that is a mild wrongness; for a player navigating by ear it is a false spatial reference that
+never moves, which is worse than plain stereo — plain stereo at least does not claim to be anywhere.
+
+A first-order ambisonic recording instead describes sound arriving from every direction as a *field*.
+Rotate the field by the listener's orientation, then decode it binaurally, and the world stays put while
+the player turns in it. Steam Audio does exactly this, and `libphonon.so` already shipped in the build —
+but `Phonon.cs` bound only the binaural effect. Nothing else.
+
+## What was built
+
+**`PhononAmbisonics.cs`** binds `iplAmbisonicsDecodeEffect*` and `iplAmbisonicsEncodeEffect*` against the
+real header. The decode effect does the rotation *and* the binaural render in one call — the separate
+rotation effect is not needed. `IPLCoordinateSpace3` already existed in `PhononSim.cs` with matching
+field order, so it is reused rather than redeclared. `ListenerFrame()` converts a game rotation (+Z
+forward) into Steam Audio's frame (−Z forward); per Valve's documentation, you hand the decoder the
+listener's own axes as world-space vectors and it works out the rotation.
+
+**`AmbisonicFormat`** converts what you download into what the decoder wants. This is the part with no
+failure mode you can hear as a failure:
+
+| Layout | What it is | What happens if you skip the conversion |
+|---|---|---|
+| AmbiX (ACN/SN3D) | what nearly every modern recording and every ambisonic mic produces | directional channels arrive 4.8 dB down; the field renders over-wide and badly localized |
+| N3D | Steam Audio's native format | nothing — it is already right |
+| FuMa | what "B-format" meant before AmbiX; common in older free recordings | the axes are permuted outright: front becomes up |
+
+Neither mismatch returns an error. `GuessLayout` reads the filename as a hint — and its test caught a
+real bug immediately, because **"sn3d" contains "n3d"**, so checking for N3D first read every
+SN3D-labelled file (which is to say most AmbiX files) as N3D and skipped the conversion it needed.
+
+**`AmbisonicBedDsp`** is an FMOD **generator** DSP — no input buffers, owning its own PCM. That is
+deliberate: FMOD downmixes a four-channel sound to the output speaker mode long before any DSP sees it,
+which would destroy the soundfield on the way past. Owning the PCM sidesteps the channel-format question
+entirely and makes looping exact. Per block it reads (order+1)² channels, hands them to the decode effect
+with the listener's current frame, and takes back a binaural pair. Sample-rate conversion is interpolated,
+so a 48 kHz bed plays correctly through the 44.1 kHz mixer instead of running fast; levels glide, so
+starting, stopping and cross-fading a bed never steps the signal.
+
+**The provider** gains `PlayAmbientBed` / `SetAmbientBedVolume` / `StopAmbientBed`, keyed by sound id
+with several beds live at once — which is a cross-fade as soon as something wants one. A file that is not
+a full-sphere ambisonic layout (4, 9 or 16 channels) is refused with the reason, rather than played as if
+it were: the alternative is a soundfield pointing in an arbitrary direction with nothing to say so. The
+N3D conversion happens once at load, on that bed's own copy, never per block.
+
+## How it is verified
+
+`OpenFPS.AudioLab --ambisonic` generates the test field with Steam Audio's **own encoder**, so it tests
+the round trip rather than testing a guess at the library's spherical-harmonic convention. Every way of
+getting a P/Invoke layer wrong here is silent — a struct field out of order, a handedness left
+unconverted, a rotation applied backwards — so the assertions are about *direction*, not about whether
+sound came out:
+
+```
+  source left,  facing forward   L/R = 0.37265 / 0.28424   balance = LEFT
+  source right, facing forward   L/R = 0.28435 / 0.37496   balance = right
+  source left,  facing backward  L/R = 0.28435 / 0.37496   balance = right
+  source left,  facing it        L/R = 0.26846 / 0.25619   balance = LEFT
+```
+
+The third line is the one that earns its keep: turning the listener 180° produced **exactly** the numbers
+of a source on the right, which is the rotation being applied correctly rather than at half angle or
+mirrored — and it is the assertion a head-locked binaural recording would fail while sounding fine.
+
+`AmbisonicFormatTests` covers the channel maths and the three layout conversions offline, including that
+AmbiX and FuMa provably do not produce the same thing (if they agreed, the layout field would be
+decoration).
+
+## One thing fixed along the way
+
+`HotPathTests.TheProfilerCostsNothingUntilItIsTurnedOn` asserts `PerfProbe` holds nothing until switched
+on — but `PerfProbe` is global static state written to by `ClientWorldState`, `ClientAudioSystem` and
+`PhysicsUtils`, and xUnit runs test classes in parallel. It was racing any class that stepped a client
+session: passing alone, passing most of the time, failing at random in a full run. Adding test classes
+made it likely enough to actually fire. The assembly is serialized now
+(`DisableTestParallelization`), which costs ~2 s across 244 tests and removes the whole class of failure
+rather than the one instance that surfaced.
+
+Tests 223 → 244. Every spike re-run and passing. Not verified: a real recording — there is no ambisonic
+asset in the repo yet, so the decode path has been proven against a synthesised field only.
