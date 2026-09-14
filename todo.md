@@ -220,6 +220,15 @@ Reverb confirmed by ear — it comes from the source now. Three more findings.
       4-channel sound to the output speaker mode long before a DSP saw it. `FmodAudioProvider` gains
       `PlayAmbientBed` / `SetAmbientBedVolume` / `StopAmbientBed`, several beds at once so regions can
       cross-fade. Verified by `OpenFPS.AudioLab --ambisonic` and `AmbisonicFormatTests`.
+- [x] **Asset ingest** (`tools/ingest_audio.py`): ambisonic beds resampled and trimmed through sox (which
+      does not reorder channels), footstep takes sliced on silence into per-material/variant pools,
+      unlabelled takes parked in `_unsorted` rather than guessed at, manifest written for licences.
+      1,807 slices from 47 labelled takes; beds 69–485 MB -> 31–46 MB.
+- [x] **`GranularBank` fixed.** It opened every sound with `MODE.OPENONLY` — "parse the header, read no
+      sample data" — then called `lock`, getting a correctly-sized buffer full of nothing. Every load
+      logged success and returned silence. Never caught because its only consumer, the granular engine,
+      has never had a caller. Verified by `--bed`.
+- [ ] Label the 146 unsorted footstep takes in `ASSETS/SOUNDS/_unsorted/footsteps`, then re-run ingest.
 - [ ] **Wire `AmbienceId` to the bed API.** Still the dead field it was: the prefab spec carries it, the
       server sends it, no client code reads it. Now that beds play, this is the join — a region's
       ambience starts on entry and cross-fades on exit, gated by `ShelterFactor` so indoors is quieter.

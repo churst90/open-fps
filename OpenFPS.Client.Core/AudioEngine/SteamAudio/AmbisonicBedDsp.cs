@@ -46,6 +46,10 @@ internal sealed class AmbisonicBedState
 
     // Diagnostics.
     public long CallbackCount;
+    public volatile int LastBlockLength;
+    public volatile int LastOutChannels;
+    public volatile int Bailed;
+    public volatile float InputRms;
     public volatile bool ProducedAudio;
     public volatile float LastRmsL, LastRmsR;
 }
@@ -105,8 +109,13 @@ internal static class AmbisonicBedDsp
         int n = (int)length;
 
         // Steam Audio's effects are built for exactly the frame size they were created with.
+        s.LastBlockLength = n;
+        s.LastOutChannels = outCh;
+        Interlocked.Increment(ref s.CallbackCount);
+
         if (n != s.FrameSize || s.Effect == IntPtr.Zero || s.Pcm.Length == 0)
         {
+            s.Bailed = n != s.FrameSize ? 1 : (s.Effect == IntPtr.Zero ? 2 : 3);
             unsafe { float* o = (float*)outbuffer; for (int i = 0; i < n * outCh; i++) o[i] = 0f; }
             return RESULT.OK;
         }
@@ -161,6 +170,10 @@ internal static class AmbisonicBedDsp
         }
         s.CurrentVolume = target;
 
+        double inSum = 0;
+        for (int i = 0; i < n * ch; i++) inSum += scratch[i] * (double)scratch[i];
+        s.InputRms = (float)Math.Sqrt(inSum / (n * ch));
+
         // 3. Interleaved -> Steam Audio's planar buffer -> rotated + decoded binaural pair.
         Phonon.iplAudioBufferDeinterleave(s.Context, scratch, ref s.InBuf);
 
@@ -192,7 +205,6 @@ internal static class AmbisonicBedDsp
             }
         }
 
-        Interlocked.Increment(ref s.CallbackCount);
         if (nonZero) s.ProducedAudio = true;
         s.LastRmsL = (float)Math.Sqrt(sumL / n);
         s.LastRmsR = (float)Math.Sqrt(sumR / n);

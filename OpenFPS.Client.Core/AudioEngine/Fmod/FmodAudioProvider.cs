@@ -1758,6 +1758,24 @@ public class FmodAudioProvider : IAudioProvider
         return true;
     }
 
+    /// <summary>Diagnostics (AudioLab): why a bed is silent, which is otherwise unknowable from outside
+    /// the mixer thread.</summary>
+    internal string DescribeAmbientBed(string soundId)
+    {
+        if (!_ambientBeds.TryGetValue(soundId, out var bed)) return "no such bed";
+        var s = bed.State;
+        string bail = s.Bailed switch
+        {
+            0 => "none",
+            1 => $"BLOCK LENGTH {s.LastBlockLength} != effect frame size {s.FrameSize}",
+            2 => "decode effect is null",
+            _ => "no PCM"
+        };
+        return $"callbacks={s.CallbackCount} inputRms={s.InputRms:F5} block={s.LastBlockLength} outCh={s.LastOutChannels} " +
+               $"frames={(s.Channels > 0 ? s.Pcm.Length / s.Channels : 0)} pos={s.Position:F0} " +
+               $"produced={s.ProducedAudio} bail={bail}";
+    }
+
     private void ReleaseBedResources(AmbisonicBedState state, System.Runtime.InteropServices.GCHandle handle)
     {
         if (state.Effect != IntPtr.Zero) Phonon.iplAmbisonicsDecodeEffectRelease(ref state.Effect);

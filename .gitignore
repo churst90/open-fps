@@ -494,3 +494,12 @@ $RECYCLE.BIN/
 *.swp
 AudioEngine.zip
 default.json.bak
+
+# Raw audio drops. Source material, often hundreds of megabytes, and never what ships —
+# tools/ingest_audio.py reads it and writes the converted result into ASSETS.
+inbox/
+
+# Ambience beds. Four-channel ambisonic recordings are tens of megabytes each even after the ingest
+# trims and resamples them, which does not belong in a source repository. Regenerate them with
+# tools/ingest_audio.py, or distribute them as a separate asset download.
+OpenFPS.Client/ASSETS/SOUNDS/AMBIENCE/

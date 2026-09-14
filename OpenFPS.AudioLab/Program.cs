@@ -146,6 +146,17 @@ if (args.Contains("--steam-stereo"))
     Environment.Exit(code);
 }
 
+if (args.Contains("--bed") || args.Contains("--bed-live"))
+{
+    int bi = Array.IndexOf(args, args.Contains("--bed-live") ? "--bed-live" : "--bed");
+    string bedId = (bi >= 0 && bi + 1 < args.Length && !args[bi + 1].StartsWith("--"))
+        ? args[bi + 1] : "AMBIENCE/woods_mid_day";
+    Console.WriteLine("--- Ambient bed: does a real recorded soundfield play and turn with the listener? ---");
+    int code = OpenFPS.Client.Core.AudioEngine.SteamAudio.AmbientBedSpike.Run(bedId, args.Contains("--bed-live"));
+    Log.CloseAndFlush();
+    Environment.Exit(code);
+}
+
 if (args.Contains("--ambisonic"))
 {
     Console.WriteLine("--- Ambisonics: does a recorded soundfield rotate with the listener and decode to the right ear? ---");

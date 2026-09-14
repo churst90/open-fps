@@ -1,0 +1,582 @@
+{
+  "entries": [
+    {
+      "source": "inbox/ambisonic ambiance/farm_ambiance.wav",
+      "outputs": [
+        "OpenFPS.Client/ASSETS/SOUNDS/AMBIENCE/farm_ambiance.wav"
+      ],
+      "licence": "TODO \u2014 fill in before shipping",
+      "author": "TODO",
+      "url": "TODO",
+      "note": "first-order ambisonic, 96000 Hz -> 44100 Hz, 60s -> 60s"
+    },
+    {
+      "source": "inbox/ambisonic ambiance/woods_evening.wav",
+      "outputs": [
+        "OpenFPS.Client/ASSETS/SOUNDS/AMBIENCE/woods_evening.wav"
+      ],
+      "licence": "TODO \u2014 fill in before shipping",
+      "author": "TODO",
+      "url": "TODO",
+      "note": "first-order ambisonic, 96000 Hz -> 44100 Hz, 180s -> 90s"
+    },
+    {
+      "source": "inbox/ambisonic ambiance/woods_mid_day.wav",
+      "outputs": [
+        "OpenFPS.Client/ASSETS/SOUNDS/AMBIENCE/woods_mid_day.wav"
+      ],
+      "licence": "TODO \u2014 fill in before shipping",
+      "author": "TODO",
+      "url": "TODO",
+      "note": "first-order ambisonic, 96000 Hz -> 44100 Hz, 421s -> 90s"
+    },
+    {
+      "source": "inbox/outdoor ambiance non ambisonic/ambient outdoor suburban.mp3",
+      "outputs": [
+        "OpenFPS.Client/ASSETS/SOUNDS/AMBIENCE/stereo/ambient_outdoor_suburban.ogg"
+      ],
+      "licence": "TODO \u2014 fill in before shipping",
+      "author": "TODO",
+      "url": "TODO",
+      "note": "stereo bed, head-locked; 44100 Hz -> 44100 Hz"
+    },
+    {
+      "source": "inbox/outdoor ambiance non ambisonic/neighborhood ambiance.mp3",
+      "outputs": [
+        "OpenFPS.Client/ASSETS/SOUNDS/AMBIENCE/stereo/neighborhood_ambiance.ogg"
+      ],
+      "licence": "TODO \u2014 fill in before shipping",
+      "author": "TODO",
+      "url": "TODO",
+      "note": "stereo bed, head-locked; 44100 Hz -> 44100 Hz"
+    },
+    {
+      "source": "inbox/outdoor ambiance non ambisonic/night time ambiance crickets distance.mp3",
+      "outputs": [
+        "OpenFPS.Client/ASSETS/SOUNDS/AMBIENCE/stereo/night_time_ambiance_crickets_distance.ogg"
+      ],
+      "licence": "TODO \u2014 fill in before shipping",
+      "author": "TODO",
+      "url": "TODO",
+      "note": "stereo bed, head-locked; 44100 Hz -> 44100 Hz"
+    },
+    {
+      "source": "inbox/outdoor ambiance non ambisonic/quiet ambiance outdoors.mp3",
+      "outputs": [
+        "OpenFPS.Client/ASSETS/SOUNDS/AMBIENCE/stereo/quiet_ambiance_outdoors.ogg"
+      ],
+      "licence": "TODO \u2014 fill in before shipping",
+      "author": "TODO",
+      "url": "TODO",
+      "note": "stereo bed, head-locked; 44100 Hz -> 44100 Hz"
+    },
+    {
+      "source": "inbox/outdoor ambiance non ambisonic/suburban distance ambiance.mp3",
+      "outputs": [
+        "OpenFPS.Client/ASSETS/SOUNDS/AMBIENCE/stereo/suburban_distance_ambiance.ogg"
+      ],
+      "licence": "TODO \u2014 fill in before shipping",
+      "author": "TODO",
+      "url": "TODO",
+      "note": "stereo bed, head-locked; 44100 Hz -> 44100 Hz"
+    },
+    {
+      "source": "inbox/outdoor ambiance non ambisonic/urban ambiance distance.mp3",
+      "outputs": [
+        "OpenFPS.Client/ASSETS/SOUNDS/AMBIENCE/stereo/urban_ambiance_distance.ogg"
+      ],
+      "licence": "TODO \u2014 fill in before shipping",
+      "author": "TODO",
+      "url": "TODO",
+      "note": "stereo bed, head-locked; 44100 Hz -> 44100 Hz"
+    },
+    {
+      "source": "inbox/foot steps sounds/17 - Footsteps/shoes on carpet.mp3",
+      "outputs": [
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Carpet/Carpet0/ingest_01.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Carpet/Carpet0/ingest_02.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Carpet/Carpet0/ingest_03.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Carpet/Carpet0/ingest_04.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Carpet/Carpet0/ingest_05.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Carpet/Carpet0/ingest_06.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Carpet/Carpet0/ingest_07.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Carpet/Carpet0/ingest_08.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Carpet/Carpet0/ingest_09.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Carpet/Carpet0/ingest_10.wav"
+      ],
+      "licence": "TODO \u2014 fill in before shipping",
+      "author": "TODO",
+      "url": "TODO",
+      "note": "sliced from a take into FOOTSTEPS/Carpet/Carpet0"
+    },
+    {
+      "source": "inbox/foot steps sounds/16 - Foley #1 Footsteps/shoes on cement.mp3",
+      "outputs": [
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Cement/Cement0/ingest_01.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Cement/Cement0/ingest_02.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Cement/Cement0/ingest_03.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Cement/Cement0/ingest_04.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Cement/Cement0/ingest_05.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Cement/Cement0/ingest_06.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Cement/Cement0/ingest_07.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Cement/Cement0/ingest_08.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Cement/Cement0/ingest_09.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Cement/Cement0/ingest_10.wav"
+      ],
+      "licence": "TODO \u2014 fill in before shipping",
+      "author": "TODO",
+      "url": "TODO",
+      "note": "sliced from a take into FOOTSTEPS/Cement/Cement0"
+    },
+    {
+      "source": "inbox/foot steps sounds/16 - Foley #1 Footsteps/high heals on cement running.mp3",
+      "outputs": [
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Cement/Cement2/ingest_01.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Cement/Cement2/ingest_02.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Cement/Cement2/ingest_03.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Cement/Cement2/ingest_04.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Cement/Cement2/ingest_05.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Cement/Cement2/ingest_06.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Cement/Cement2/ingest_07.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Cement/Cement2/ingest_08.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Cement/Cement2/ingest_09.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Cement/Cement2/ingest_10.wav"
+      ],
+      "licence": "TODO \u2014 fill in before shipping",
+      "author": "TODO",
+      "url": "TODO",
+      "note": "sliced from a take into FOOTSTEPS/Cement/Cement2"
+    },
+    {
+      "source": "inbox/foot steps sounds/16 - Foley #1 Footsteps/barefoot on concrete 2.mp3",
+      "outputs": [
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Concrete/Concrete1/ingest_01.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Concrete/Concrete1/ingest_02.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Concrete/Concrete1/ingest_03.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Concrete/Concrete1/ingest_04.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Concrete/Concrete1/ingest_05.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Concrete/Concrete1/ingest_06.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Concrete/Concrete1/ingest_07.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Concrete/Concrete1/ingest_08.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Concrete/Concrete1/ingest_09.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Concrete/Concrete1/ingest_10.wav"
+      ],
+      "licence": "TODO \u2014 fill in before shipping",
+      "author": "TODO",
+      "url": "TODO",
+      "note": "sliced from a take into FOOTSTEPS/Concrete/Concrete1"
+    },
+    {
+      "source": "inbox/foot steps sounds/16 - Foley #1 Footsteps/high heals on concrete.mp3",
+      "outputs": [
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Concrete/Concrete2/ingest_01.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Concrete/Concrete2/ingest_02.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Concrete/Concrete2/ingest_03.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Concrete/Concrete2/ingest_04.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Concrete/Concrete2/ingest_05.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Concrete/Concrete2/ingest_06.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Concrete/Concrete2/ingest_07.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Concrete/Concrete2/ingest_08.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Concrete/Concrete2/ingest_09.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Concrete/Concrete2/ingest_10.wav"
+      ],
+      "licence": "TODO \u2014 fill in before shipping",
+      "author": "TODO",
+      "url": "TODO",
+      "note": "sliced from a take into FOOTSTEPS/Concrete/Concrete2"
+    },
+    {
+      "source": "inbox/foot steps sounds/16 - Foley #1 Footsteps/shoes on dirt.mp3",
+      "outputs": [
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Dirt/Dirt0/ingest_01.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Dirt/Dirt0/ingest_02.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Dirt/Dirt0/ingest_03.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Dirt/Dirt0/ingest_04.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Dirt/Dirt0/ingest_05.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Dirt/Dirt0/ingest_06.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Dirt/Dirt0/ingest_07.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Dirt/Dirt0/ingest_08.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Dirt/Dirt0/ingest_09.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Dirt/Dirt0/ingest_10.wav"
+      ],
+      "licence": "TODO \u2014 fill in before shipping",
+      "author": "TODO",
+      "url": "TODO",
+      "note": "sliced from a take into FOOTSTEPS/Dirt/Dirt0"
+    },
+    {
+      "source": "inbox/foot steps sounds/16 - Foley #1 Footsteps/shoes on grass.mp3",
+      "outputs": [
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Grass/Grass0/ingest_01.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Grass/Grass0/ingest_02.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Grass/Grass0/ingest_03.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Grass/Grass0/ingest_04.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Grass/Grass0/ingest_05.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Grass/Grass0/ingest_06.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Grass/Grass0/ingest_07.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Grass/Grass0/ingest_08.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Grass/Grass0/ingest_09.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Grass/Grass0/ingest_10.wav"
+      ],
+      "licence": "TODO \u2014 fill in before shipping",
+      "author": "TODO",
+      "url": "TODO",
+      "note": "sliced from a take into FOOTSTEPS/Grass/Grass0"
+    },
+    {
+      "source": "inbox/foot steps sounds/16 - Foley #1 Footsteps/shoes on gravel 2.mp3",
+      "outputs": [
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Gravel/Gravel0/ingest_01.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Gravel/Gravel0/ingest_02.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Gravel/Gravel0/ingest_03.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Gravel/Gravel0/ingest_04.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Gravel/Gravel0/ingest_05.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Gravel/Gravel0/ingest_06.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Gravel/Gravel0/ingest_07.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Gravel/Gravel0/ingest_08.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Gravel/Gravel0/ingest_09.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Gravel/Gravel0/ingest_10.wav"
+      ],
+      "licence": "TODO \u2014 fill in before shipping",
+      "author": "TODO",
+      "url": "TODO",
+      "note": "sliced from a take into FOOTSTEPS/Gravel/Gravel0"
+    },
+    {
+      "source": "inbox/foot steps sounds/16 - Foley #1 Footsteps/shoes on leaves.mp3",
+      "outputs": [
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Leaves/Leaves0/ingest_01.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Leaves/Leaves0/ingest_02.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Leaves/Leaves0/ingest_03.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Leaves/Leaves0/ingest_04.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Leaves/Leaves0/ingest_05.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Leaves/Leaves0/ingest_06.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Leaves/Leaves0/ingest_07.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Leaves/Leaves0/ingest_08.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Leaves/Leaves0/ingest_09.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Leaves/Leaves0/ingest_10.wav"
+      ],
+      "licence": "TODO \u2014 fill in before shipping",
+      "author": "TODO",
+      "url": "TODO",
+      "note": "sliced from a take into FOOTSTEPS/Leaves/Leaves0"
+    },
+    {
+      "source": "inbox/foot steps sounds/16 - Foley #1 Footsteps/sneakers on tile.mp3",
+      "outputs": [
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Tile/Tile0/ingest_01.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Tile/Tile0/ingest_02.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Tile/Tile0/ingest_03.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Tile/Tile0/ingest_04.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Tile/Tile0/ingest_05.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Tile/Tile0/ingest_06.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Tile/Tile0/ingest_07.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Tile/Tile0/ingest_08.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Tile/Tile0/ingest_09.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Tile/Tile0/ingest_10.wav"
+      ],
+      "licence": "TODO \u2014 fill in before shipping",
+      "author": "TODO",
+      "url": "TODO",
+      "note": "sliced from a take into FOOTSTEPS/Tile/Tile0"
+    },
+    {
+      "source": "inbox/foot steps sounds/16 - Foley #1 Footsteps/barefoot on tile.mp3",
+      "outputs": [
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Tile/Tile1/ingest_01.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Tile/Tile1/ingest_02.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Tile/Tile1/ingest_03.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Tile/Tile1/ingest_04.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Tile/Tile1/ingest_05.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Tile/Tile1/ingest_06.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Tile/Tile1/ingest_07.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Tile/Tile1/ingest_08.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Tile/Tile1/ingest_09.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Tile/Tile1/ingest_10.wav"
+      ],
+      "licence": "TODO \u2014 fill in before shipping",
+      "author": "TODO",
+      "url": "TODO",
+      "note": "sliced from a take into FOOTSTEPS/Tile/Tile1"
+    },
+    {
+      "source": "inbox/foot steps sounds/16 - Foley #1 Footsteps/flitflops on tile.mp3",
+      "outputs": [
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Tile/Tile3/ingest_01.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Tile/Tile3/ingest_02.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Tile/Tile3/ingest_03.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Tile/Tile3/ingest_04.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Tile/Tile3/ingest_05.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Tile/Tile3/ingest_06.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Tile/Tile3/ingest_07.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Tile/Tile3/ingest_08.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Tile/Tile3/ingest_09.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Tile/Tile3/ingest_10.wav"
+      ],
+      "licence": "TODO \u2014 fill in before shipping",
+      "author": "TODO",
+      "url": "TODO",
+      "note": "sliced from a take into FOOTSTEPS/Tile/Tile3"
+    },
+    {
+      "source": "inbox/foot steps sounds/16 - Foley #1 Footsteps/shoes on creaky wood.mp3",
+      "outputs": [
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Wood/Wood0/ingest_01.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Wood/Wood0/ingest_02.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Wood/Wood0/ingest_03.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Wood/Wood0/ingest_04.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Wood/Wood0/ingest_05.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Wood/Wood0/ingest_06.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Wood/Wood0/ingest_07.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Wood/Wood0/ingest_08.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Wood/Wood0/ingest_09.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Wood/Wood0/ingest_10.wav"
+      ],
+      "licence": "TODO \u2014 fill in before shipping",
+      "author": "TODO",
+      "url": "TODO",
+      "note": "sliced from a take into FOOTSTEPS/Wood/Wood0"
+    },
+    {
+      "source": "inbox/foot steps sounds/16 - Foley #1 Footsteps/sneakers on creaky wood.mp3",
+      "outputs": [
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Wood/Wood0/ingest_01.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Wood/Wood0/ingest_02.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Wood/Wood0/ingest_03.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Wood/Wood0/ingest_04.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Wood/Wood0/ingest_05.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Wood/Wood0/ingest_06.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Wood/Wood0/ingest_07.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Wood/Wood0/ingest_08.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Wood/Wood0/ingest_09.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Wood/Wood0/ingest_10.wav"
+      ],
+      "licence": "TODO \u2014 fill in before shipping",
+      "author": "TODO",
+      "url": "TODO",
+      "note": "sliced from a take into FOOTSTEPS/Wood/Wood0"
+    },
+    {
+      "source": "inbox/foot steps sounds/17 - Footsteps/shoes on wood floor.mp3",
+      "outputs": [
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Wood/Wood0/ingest_01.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Wood/Wood0/ingest_02.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Wood/Wood0/ingest_03.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Wood/Wood0/ingest_04.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Wood/Wood0/ingest_05.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Wood/Wood0/ingest_06.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Wood/Wood0/ingest_07.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Wood/Wood0/ingest_08.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Wood/Wood0/ingest_09.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Wood/Wood0/ingest_10.wav"
+      ],
+      "licence": "TODO \u2014 fill in before shipping",
+      "author": "TODO",
+      "url": "TODO",
+      "note": "sliced from a take into FOOTSTEPS/Wood/Wood0"
+    },
+    {
+      "source": "inbox/foot steps sounds/17 - Footsteps/shoes on carpet land.mp3",
+      "outputs": [
+        "OpenFPS.Client/ASSETS/SOUNDS/LANDING/Carpet/Carpet0/ingest_01.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/LANDING/Carpet/Carpet0/ingest_02.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/LANDING/Carpet/Carpet0/ingest_03.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/LANDING/Carpet/Carpet0/ingest_04.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/LANDING/Carpet/Carpet0/ingest_05.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/LANDING/Carpet/Carpet0/ingest_06.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/LANDING/Carpet/Carpet0/ingest_07.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/LANDING/Carpet/Carpet0/ingest_08.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/LANDING/Carpet/Carpet0/ingest_09.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/LANDING/Carpet/Carpet0/ingest_10.wav"
+      ],
+      "licence": "TODO \u2014 fill in before shipping",
+      "author": "TODO",
+      "url": "TODO",
+      "note": "sliced from a take into LANDING/Carpet/Carpet0"
+    },
+    {
+      "source": "inbox/foot steps sounds/16 - Foley #1 Footsteps/sneakers on cement land.mp3",
+      "outputs": [
+        "OpenFPS.Client/ASSETS/SOUNDS/LANDING/Cement/Cement0/ingest_01.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/LANDING/Cement/Cement0/ingest_02.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/LANDING/Cement/Cement0/ingest_03.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/LANDING/Cement/Cement0/ingest_04.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/LANDING/Cement/Cement0/ingest_05.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/LANDING/Cement/Cement0/ingest_06.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/LANDING/Cement/Cement0/ingest_07.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/LANDING/Cement/Cement0/ingest_08.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/LANDING/Cement/Cement0/ingest_09.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/LANDING/Cement/Cement0/ingest_10.wav"
+      ],
+      "licence": "TODO \u2014 fill in before shipping",
+      "author": "TODO",
+      "url": "TODO",
+      "note": "sliced from a take into LANDING/Cement/Cement0"
+    },
+    {
+      "source": "inbox/foot steps sounds/16 - Foley #1 Footsteps/sneakers on cement land 2.mp3",
+      "outputs": [
+        "OpenFPS.Client/ASSETS/SOUNDS/LANDING/Cement/Cement0/ingest_01.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/LANDING/Cement/Cement0/ingest_02.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/LANDING/Cement/Cement0/ingest_03.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/LANDING/Cement/Cement0/ingest_04.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/LANDING/Cement/Cement0/ingest_05.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/LANDING/Cement/Cement0/ingest_06.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/LANDING/Cement/Cement0/ingest_07.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/LANDING/Cement/Cement0/ingest_08.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/LANDING/Cement/Cement0/ingest_09.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/LANDING/Cement/Cement0/ingest_10.wav"
+      ],
+      "licence": "TODO \u2014 fill in before shipping",
+      "author": "TODO",
+      "url": "TODO",
+      "note": "sliced from a take into LANDING/Cement/Cement0"
+    },
+    {
+      "source": "inbox/foot steps sounds/16 - Foley #1 Footsteps/shoes on concrete land.mp3",
+      "outputs": [
+        "OpenFPS.Client/ASSETS/SOUNDS/LANDING/Concrete/Concrete0/ingest_01.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/LANDING/Concrete/Concrete0/ingest_02.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/LANDING/Concrete/Concrete0/ingest_03.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/LANDING/Concrete/Concrete0/ingest_04.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/LANDING/Concrete/Concrete0/ingest_05.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/LANDING/Concrete/Concrete0/ingest_06.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/LANDING/Concrete/Concrete0/ingest_07.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/LANDING/Concrete/Concrete0/ingest_08.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/LANDING/Concrete/Concrete0/ingest_09.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/LANDING/Concrete/Concrete0/ingest_10.wav"
+      ],
+      "licence": "TODO \u2014 fill in before shipping",
+      "author": "TODO",
+      "url": "TODO",
+      "note": "sliced from a take into LANDING/Concrete/Concrete0"
+    },
+    {
+      "source": "inbox/foot steps sounds/16 - Foley #1 Footsteps/barefoot on concrete land.mp3",
+      "outputs": [
+        "OpenFPS.Client/ASSETS/SOUNDS/LANDING/Concrete/Concrete1/ingest_01.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/LANDING/Concrete/Concrete1/ingest_02.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/LANDING/Concrete/Concrete1/ingest_03.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/LANDING/Concrete/Concrete1/ingest_04.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/LANDING/Concrete/Concrete1/ingest_05.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/LANDING/Concrete/Concrete1/ingest_06.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/LANDING/Concrete/Concrete1/ingest_07.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/LANDING/Concrete/Concrete1/ingest_08.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/LANDING/Concrete/Concrete1/ingest_09.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/LANDING/Concrete/Concrete1/ingest_10.wav"
+      ],
+      "licence": "TODO \u2014 fill in before shipping",
+      "author": "TODO",
+      "url": "TODO",
+      "note": "sliced from a take into LANDING/Concrete/Concrete1"
+    },
+    {
+      "source": "inbox/foot steps sounds/16 - Foley #1 Footsteps/barefoot on tile land.mp3",
+      "outputs": [
+        "OpenFPS.Client/ASSETS/SOUNDS/LANDING/Tile/Tile1/ingest_01.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/LANDING/Tile/Tile1/ingest_02.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/LANDING/Tile/Tile1/ingest_03.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/LANDING/Tile/Tile1/ingest_04.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/LANDING/Tile/Tile1/ingest_05.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/LANDING/Tile/Tile1/ingest_06.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/LANDING/Tile/Tile1/ingest_07.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/LANDING/Tile/Tile1/ingest_08.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/LANDING/Tile/Tile1/ingest_09.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/LANDING/Tile/Tile1/ingest_10.wav"
+      ],
+      "licence": "TODO \u2014 fill in before shipping",
+      "author": "TODO",
+      "url": "TODO",
+      "note": "sliced from a take into LANDING/Tile/Tile1"
+    },
+    {
+      "source": "inbox/foot steps sounds/16 - Foley #1 Footsteps/shoes on creaky wood land.mp3",
+      "outputs": [
+        "OpenFPS.Client/ASSETS/SOUNDS/LANDING/Wood/Wood0/ingest_01.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/LANDING/Wood/Wood0/ingest_02.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/LANDING/Wood/Wood0/ingest_03.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/LANDING/Wood/Wood0/ingest_04.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/LANDING/Wood/Wood0/ingest_05.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/LANDING/Wood/Wood0/ingest_06.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/LANDING/Wood/Wood0/ingest_07.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/LANDING/Wood/Wood0/ingest_08.wav"
+      ],
+      "licence": "TODO \u2014 fill in before shipping",
+      "author": "TODO",
+      "url": "TODO",
+      "note": "sliced from a take into LANDING/Wood/Wood0"
+    },
+    {
+      "source": "inbox/foot steps sounds/16 - Foley #1 Footsteps/sneakers on creaky wood land.mp3",
+      "outputs": [
+        "OpenFPS.Client/ASSETS/SOUNDS/LANDING/Wood/Wood0/ingest_01.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/LANDING/Wood/Wood0/ingest_02.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/LANDING/Wood/Wood0/ingest_03.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/LANDING/Wood/Wood0/ingest_04.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/LANDING/Wood/Wood0/ingest_05.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/LANDING/Wood/Wood0/ingest_06.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/LANDING/Wood/Wood0/ingest_07.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/LANDING/Wood/Wood0/ingest_08.wav"
+      ],
+      "licence": "TODO \u2014 fill in before shipping",
+      "author": "TODO",
+      "url": "TODO",
+      "note": "sliced from a take into LANDING/Wood/Wood0"
+    },
+    {
+      "source": "inbox/foot steps sounds/17 - Footsteps/shoes on wood floor land.mp3",
+      "outputs": [
+        "OpenFPS.Client/ASSETS/SOUNDS/LANDING/Wood/Wood0/ingest_01.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/LANDING/Wood/Wood0/ingest_02.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/LANDING/Wood/Wood0/ingest_03.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/LANDING/Wood/Wood0/ingest_04.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/LANDING/Wood/Wood0/ingest_05.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/LANDING/Wood/Wood0/ingest_06.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/LANDING/Wood/Wood0/ingest_07.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/LANDING/Wood/Wood0/ingest_08.wav"
+      ],
+      "licence": "TODO \u2014 fill in before shipping",
+      "author": "TODO",
+      "url": "TODO",
+      "note": "sliced from a take into LANDING/Wood/Wood0"
+    },
+    {
+      "source": "inbox/foot steps sounds/16 - Foley #1 Footsteps/shoes on concrete.mp3",
+      "outputs": [
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Concrete/Concrete0/ingest_01.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Concrete/Concrete0/ingest_02.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Concrete/Concrete0/ingest_03.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Concrete/Concrete0/ingest_04.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Concrete/Concrete0/ingest_05.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Concrete/Concrete0/ingest_06.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Concrete/Concrete0/ingest_07.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Concrete/Concrete0/ingest_08.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Concrete/Concrete0/ingest_09.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Concrete/Concrete0/ingest_10.wav"
+      ],
+      "licence": "TODO \u2014 fill in before shipping",
+      "author": "TODO",
+      "url": "TODO",
+      "note": "sliced from a take into FOOTSTEPS/Concrete/Concrete0"
+    },
+    {
+      "source": "inbox/foot steps sounds/16 - Foley #1 Footsteps/shoes on concrete2.mp3",
+      "outputs": [
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Concrete/Concrete0/ingest_01.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Concrete/Concrete0/ingest_02.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Concrete/Concrete0/ingest_03.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Concrete/Concrete0/ingest_04.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Concrete/Concrete0/ingest_05.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Concrete/Concrete0/ingest_06.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Concrete/Concrete0/ingest_07.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Concrete/Concrete0/ingest_08.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Concrete/Concrete0/ingest_09.wav",
+        "OpenFPS.Client/ASSETS/SOUNDS/FOOTSTEPS/Concrete/Concrete0/ingest_10.wav"
+      ],
+      "licence": "TODO \u2014 fill in before shipping",
+      "author": "TODO",
+      "url": "TODO",
+      "note": "sliced from a take into FOOTSTEPS/Concrete/Concrete0"
+    }
+  ]
+}

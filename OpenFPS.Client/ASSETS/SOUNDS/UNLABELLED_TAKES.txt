@@ -1,0 +1,151 @@
+Takes whose surface could not be read from the filename.
+
+Rename each with the surface in it (e.g. 'shoes on slate') and re-run the ingest;
+add the surface to MATERIALS in tools/ingest_audio.py if it is a new one.
+
+inbox/foot steps sounds/16 - Foley #1 Footsteps/Track 27.mp3
+inbox/foot steps sounds/16 - Foley #1 Footsteps/Track 28.mp3
+inbox/foot steps sounds/16 - Foley #1 Footsteps/Track 29.mp3
+inbox/foot steps sounds/16 - Foley #1 Footsteps/Track 30.mp3
+inbox/foot steps sounds/16 - Foley #1 Footsteps/Track 31.mp3
+inbox/foot steps sounds/16 - Foley #1 Footsteps/Track 32.mp3
+inbox/foot steps sounds/16 - Foley #1 Footsteps/Track 33.mp3
+inbox/foot steps sounds/16 - Foley #1 Footsteps/Track 34.mp3
+inbox/foot steps sounds/16 - Foley #1 Footsteps/Track 35.mp3
+inbox/foot steps sounds/16 - Foley #1 Footsteps/Track 36.mp3
+inbox/foot steps sounds/16 - Foley #1 Footsteps/Track 37.mp3
+inbox/foot steps sounds/16 - Foley #1 Footsteps/Track 38.mp3
+inbox/foot steps sounds/16 - Foley #1 Footsteps/Track 39.mp3
+inbox/foot steps sounds/16 - Foley #1 Footsteps/Track 40.mp3
+inbox/foot steps sounds/16 - Foley #1 Footsteps/Track 41.mp3
+inbox/foot steps sounds/16 - Foley #1 Footsteps/Track 44.mp3
+inbox/foot steps sounds/16 - Foley #1 Footsteps/Track 45.mp3
+inbox/foot steps sounds/16 - Foley #1 Footsteps/Track 46.mp3
+inbox/foot steps sounds/16 - Foley #1 Footsteps/Track 47.mp3
+inbox/foot steps sounds/16 - Foley #1 Footsteps/Track 48.mp3
+inbox/foot steps sounds/16 - Foley #1 Footsteps/Track 49.mp3
+inbox/foot steps sounds/16 - Foley #1 Footsteps/Track 50.mp3
+inbox/foot steps sounds/16 - Foley #1 Footsteps/Track 51.mp3
+inbox/foot steps sounds/16 - Foley #1 Footsteps/Track 52.mp3
+inbox/foot steps sounds/16 - Foley #1 Footsteps/Track 54.mp3
+inbox/foot steps sounds/16 - Foley #1 Footsteps/Track 56.mp3
+inbox/foot steps sounds/16 - Foley #1 Footsteps/Track 57.mp3
+inbox/foot steps sounds/16 - Foley #1 Footsteps/Track 58.mp3
+inbox/foot steps sounds/16 - Foley #1 Footsteps/Track 59.mp3
+inbox/foot steps sounds/16 - Foley #1 Footsteps/Track 60.mp3
+inbox/foot steps sounds/16 - Foley #1 Footsteps/Track 61.mp3
+inbox/foot steps sounds/16 - Foley #1 Footsteps/Track 62.mp3
+inbox/foot steps sounds/16 - Foley #1 Footsteps/Track 63.mp3
+inbox/foot steps sounds/16 - Foley #1 Footsteps/Track 64.mp3
+inbox/foot steps sounds/16 - Foley #1 Footsteps/Track 65.mp3
+inbox/foot steps sounds/16 - Foley #1 Footsteps/Track 66.mp3
+inbox/foot steps sounds/16 - Foley #1 Footsteps/Track 67.mp3
+inbox/foot steps sounds/16 - Foley #1 Footsteps/Track 68.mp3
+inbox/foot steps sounds/16 - Foley #1 Footsteps/Track 69.mp3
+inbox/foot steps sounds/16 - Foley #1 Footsteps/Track 70.mp3
+inbox/foot steps sounds/16 - Foley #1 Footsteps/Track 71.mp3
+inbox/foot steps sounds/16 - Foley #1 Footsteps/Track 72.mp3
+inbox/foot steps sounds/16 - Foley #1 Footsteps/Track 73.mp3
+inbox/foot steps sounds/16 - Foley #1 Footsteps/Track 74.mp3
+inbox/foot steps sounds/16 - Foley #1 Footsteps/Track 75.mp3
+inbox/foot steps sounds/16 - Foley #1 Footsteps/Track 76.mp3
+inbox/foot steps sounds/16 - Foley #1 Footsteps/Track 77.mp3
+inbox/foot steps sounds/16 - Foley #1 Footsteps/Track 78.mp3
+inbox/foot steps sounds/16 - Foley #1 Footsteps/Track 79.mp3
+inbox/foot steps sounds/16 - Foley #1 Footsteps/Track 80.mp3
+inbox/foot steps sounds/16 - Foley #1 Footsteps/Track 81.mp3
+inbox/foot steps sounds/16 - Foley #1 Footsteps/Track 82.mp3
+inbox/foot steps sounds/16 - Foley #1 Footsteps/Track 83.mp3
+inbox/foot steps sounds/16 - Foley #1 Footsteps/Track 84.mp3
+inbox/foot steps sounds/16 - Foley #1 Footsteps/Track 85.mp3
+inbox/foot steps sounds/16 - Foley #1 Footsteps/Track 86.mp3
+inbox/foot steps sounds/16 - Foley #1 Footsteps/Track 93.mp3
+inbox/foot steps sounds/16 - Foley #1 Footsteps/Track 94.mp3
+inbox/foot steps sounds/16 - Foley #1 Footsteps/Track 97.mp3
+inbox/foot steps sounds/17 - Footsteps/04.mp3
+inbox/foot steps sounds/17 - Footsteps/05.mp3
+inbox/foot steps sounds/17 - Footsteps/06.mp3
+inbox/foot steps sounds/17 - Footsteps/07.mp3
+inbox/foot steps sounds/17 - Footsteps/08.mp3
+inbox/foot steps sounds/17 - Footsteps/09.mp3
+inbox/foot steps sounds/17 - Footsteps/10.mp3
+inbox/foot steps sounds/17 - Footsteps/11.mp3
+inbox/foot steps sounds/17 - Footsteps/12.mp3
+inbox/foot steps sounds/17 - Footsteps/13.mp3
+inbox/foot steps sounds/17 - Footsteps/14.mp3
+inbox/foot steps sounds/17 - Footsteps/15.mp3
+inbox/foot steps sounds/17 - Footsteps/16.mp3
+inbox/foot steps sounds/17 - Footsteps/17.mp3
+inbox/foot steps sounds/17 - Footsteps/18.mp3
+inbox/foot steps sounds/17 - Footsteps/19.mp3
+inbox/foot steps sounds/17 - Footsteps/20.mp3
+inbox/foot steps sounds/17 - Footsteps/21.mp3
+inbox/foot steps sounds/17 - Footsteps/22.mp3
+inbox/foot steps sounds/17 - Footsteps/23.mp3
+inbox/foot steps sounds/17 - Footsteps/24.mp3
+inbox/foot steps sounds/17 - Footsteps/30.mp3
+inbox/foot steps sounds/17 - Footsteps/31.mp3
+inbox/foot steps sounds/17 - Footsteps/32.mp3
+inbox/foot steps sounds/17 - Footsteps/33.mp3
+inbox/foot steps sounds/17 - Footsteps/35.mp3
+inbox/foot steps sounds/17 - Footsteps/36.mp3
+inbox/foot steps sounds/17 - Footsteps/37.mp3
+inbox/foot steps sounds/17 - Footsteps/38.mp3
+inbox/foot steps sounds/17 - Footsteps/39.mp3
+inbox/foot steps sounds/17 - Footsteps/40.mp3
+inbox/foot steps sounds/17 - Footsteps/41.mp3
+inbox/foot steps sounds/17 - Footsteps/42.mp3
+inbox/foot steps sounds/17 - Footsteps/43.mp3
+inbox/foot steps sounds/17 - Footsteps/44.mp3
+inbox/foot steps sounds/17 - Footsteps/45.mp3
+inbox/foot steps sounds/17 - Footsteps/46.mp3
+inbox/foot steps sounds/17 - Footsteps/47.mp3
+inbox/foot steps sounds/17 - Footsteps/48.mp3
+inbox/foot steps sounds/17 - Footsteps/49.mp3
+inbox/foot steps sounds/17 - Footsteps/50.mp3
+inbox/foot steps sounds/17 - Footsteps/51.mp3
+inbox/foot steps sounds/17 - Footsteps/52.mp3
+inbox/foot steps sounds/17 - Footsteps/53.mp3
+inbox/foot steps sounds/17 - Footsteps/54.mp3
+inbox/foot steps sounds/17 - Footsteps/55.mp3
+inbox/foot steps sounds/17 - Footsteps/56.mp3
+inbox/foot steps sounds/17 - Footsteps/57.mp3
+inbox/foot steps sounds/17 - Footsteps/58.mp3
+inbox/foot steps sounds/17 - Footsteps/59.mp3
+inbox/foot steps sounds/17 - Footsteps/60.mp3
+inbox/foot steps sounds/17 - Footsteps/61.mp3
+inbox/foot steps sounds/17 - Footsteps/62.mp3
+inbox/foot steps sounds/17 - Footsteps/63.mp3
+inbox/foot steps sounds/17 - Footsteps/64.mp3
+inbox/foot steps sounds/17 - Footsteps/65.mp3
+inbox/foot steps sounds/17 - Footsteps/66.mp3
+inbox/foot steps sounds/17 - Footsteps/67.mp3
+inbox/foot steps sounds/17 - Footsteps/68.mp3
+inbox/foot steps sounds/17 - Footsteps/69.mp3
+inbox/foot steps sounds/17 - Footsteps/70.mp3
+inbox/foot steps sounds/17 - Footsteps/71.mp3
+inbox/foot steps sounds/17 - Footsteps/72.mp3
+inbox/foot steps sounds/17 - Footsteps/73.mp3
+inbox/foot steps sounds/17 - Footsteps/74.mp3
+inbox/foot steps sounds/17 - Footsteps/75.mp3
+inbox/foot steps sounds/17 - Footsteps/76.mp3
+inbox/foot steps sounds/17 - Footsteps/77.mp3
+inbox/foot steps sounds/17 - Footsteps/78.mp3
+inbox/foot steps sounds/17 - Footsteps/79.mp3
+inbox/foot steps sounds/17 - Footsteps/80.mp3
+inbox/foot steps sounds/17 - Footsteps/81.mp3
+inbox/foot steps sounds/17 - Footsteps/82.mp3
+inbox/foot steps sounds/17 - Footsteps/83.mp3
+inbox/foot steps sounds/17 - Footsteps/84.mp3
+inbox/foot steps sounds/17 - Footsteps/85.mp3
+inbox/foot steps sounds/17 - Footsteps/86.mp3
+inbox/foot steps sounds/17 - Footsteps/87.mp3
+inbox/foot steps sounds/17 - Footsteps/88.mp3
+inbox/foot steps sounds/17 - Footsteps/89.mp3
+inbox/foot steps sounds/17 - Footsteps/90.mp3
+inbox/foot steps sounds/17 - Footsteps/91.mp3
+inbox/foot steps sounds/17 - Footsteps/92.mp3
+inbox/foot steps sounds/17 - Footsteps/93.mp3
+inbox/foot steps sounds/17 - Footsteps/94.mp3
+inbox/foot steps sounds/17 - Footsteps/95.mp3
+inbox/foot steps sounds/17 - Footsteps/96.mp3

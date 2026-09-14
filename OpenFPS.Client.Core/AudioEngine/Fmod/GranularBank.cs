@@ -43,9 +43,15 @@ public class GranularBank : IDisposable
         string path = ResolvePath(soundId);
         if (string.IsNullOrEmpty(path)) return false;
 
-        // Load sound as a stream to extract raw data, making sure we decode it properly.
-        // We use CREATESAMPLE | OPENONLY so FMOD parses the format.
-        MODE mode = MODE.CREATESAMPLE | MODE.OPENONLY | MODE.ACCURATETIME;
+        // CREATESAMPLE decodes the whole file into memory, which is what `lock` then hands back.
+        //
+        // OPENONLY used to be in here too, and it is the opposite of what was wanted: it tells FMOD to
+        // open the file and parse its header but NOT to read or decode any sample data, leaving you to
+        // pull it yourself with readData. `lock` on a sound like that returns a buffer of exactly the
+        // right size containing nothing at all — so every load reported the correct channel count,
+        // sample rate and length, logged a confident success, and produced silence. Nothing caught it
+        // because the only consumer was the granular engine, which has never had a caller.
+        MODE mode = MODE.CREATESAMPLE | MODE.ACCURATETIME;
         RESULT res = _system.createSound(path, mode, out FMOD.Sound sound);
         if (res != RESULT.OK)
         {

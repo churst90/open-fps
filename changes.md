@@ -746,3 +746,65 @@ rather than the one instance that surfaced.
 
 Tests 223 → 244. Every spike re-run and passing. Not verified: a real recording — there is no ambisonic
 asset in the repo yet, so the decode path has been proven against a synthesised field only.
+
+---
+
+# Asset ingest, and a decoder that never decoded, 2026-09-13
+
+## `tools/ingest_audio.py`
+
+Nothing arrives usable. The ambisonic beds came at 96 kHz and up to seven minutes long — 647 MB of RAM
+once the bed DSP loads one as float. The footstep "samples" were ninety-second studio takes with **172
+steps in them**, not one-shots. The stereo ambiences were 128 kbps MP3 at arbitrary levels. So this is
+the step between "downloaded" and "committed": read `inbox/`, write the ASSETS tree, record where every
+file came from.
+
+**Ambisonic beds** go through **sox, not ffmpeg, deliberately.** ffmpeg gives a 4-channel WAV the "quad"
+speaker layout and is entitled to reorder or downmix it during a conversion; to sox the channels are
+opaque and numbered, which is what W/Y/Z/X require. Resampled to 44.1 kHz (the mixer rate — 96 kHz is
+resampled on playback anyway and costs only memory), trimmed to 90 s, normalized with a single
+whole-file gain because per-channel normalization would rescale W against the directional channels and
+tilt the entire soundfield. The output's channel count is re-probed afterwards and the file deleted if
+it changed. 69–485 MB became 31–46 MB.
+
+**Footsteps** are split on the silence between hits by sox's `silence ... : newfile : restart`, which is
+C-speed and completely reliable here because the takes have a −94 dBFS floor between steps. Slices
+outside 0.06–1.5 s are discarded (a short one is a click, a long one is two steps and a pause), as are
+any under 2% peak. Then mono, 3 ms fades, peak-normalized to −3 dBFS. **1,807 usable slices** came out
+of 47 labelled takes.
+
+Footwear becomes the **variant**, not another sample in the pool: `SoundMappingService` picks at random
+within `<Material><Variant>`, so putting barefoot and high heels in one folder would have the player
+changing shoes between steps. Shoes/sneakers are variant 0, barefoot 1, heels 2, flip-flops 3.
+Filenames containing "land" go to `LANDING/` rather than `FOOTSTEPS/`.
+
+**The 146 unlabelled takes are copied to `_unsorted/` and not guessed at.** A wrong guess here puts
+gravel under a player walking on carpet and nothing ever says so.
+
+Nothing is destructive — the inbox is only read, existing outputs are left alone without `--force`, and
+`--dry-run` reports without writing. The manifest preserves licence fields a human has already filled in.
+
+## GranularBank has never worked
+
+The bed played silence. Callbacks were running, the block size matched, the position was advancing, the
+file reported the right channel count and sample rate — and the input RMS was **exactly zero**.
+
+`GranularBank.TryGetPcmData` opened sounds with `MODE.CREATESAMPLE | MODE.OPENONLY`. `OPENONLY` is the
+opposite of what was wanted: it tells FMOD to open the file and parse its header but **not to read or
+decode any sample data**, leaving the caller to pull it with `readData`. The code then called `lock`,
+which for a sound like that returns a buffer of exactly the right size containing nothing at all.
+
+So every load logged a confident success with the correct channel count, sample rate and length, and
+handed back silence. Nothing caught it because the only consumer was the granular engine — which has
+never had a caller. Dropping `OPENONLY` fixes it, and fixes granular synthesis before its first use.
+
+## `OpenFPS.AudioLab --bed`
+
+The `--ambisonic` spike proves the Phonon calls against a synthesised field. This proves everything
+above them, which is where the bug actually was: that a four-channel file survives being loaded as PCM,
+that the N3D conversion reaches it, that the generator DSP streams and resamples it, and that the field
+turns when the listener does. It sweeps a full circle and checks the ear balance actually moves;
+`--bed-live` turns slowly and audibly. On `farm_ambiance` the balance swings 0.081 across a turn — modest
+because a farm ambience is largely diffuse, which is the physically correct answer.
+
+Tests still 244. Every spike re-run and passing.
