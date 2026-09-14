@@ -889,3 +889,55 @@ front — so the gap can be heard opening up.
 quietly misled.
 
 Tests 244 → 261.
+
+---
+
+# Ambience on the map, sirens off it, and a weather pin
+
+## `AmbienceId` is finally connected
+
+It had been a dead field for the life of the project — in the prefab spec, accepted by the validator,
+written into `RegionComponent`, serialized by the server, and read by nothing. Every step looked correct
+in isolation, which is exactly why it survived so long.
+
+There are two kinds of ambience and they needed different treatment:
+
+**The map's outdoor bed** is new (`MapData.AmbienceId` → `MapManifest.AmbienceId`), because outdoors is
+not a region — it is everywhere a region is not. It starts when the manifest lands and plays for as long
+as the map is loaded. Crucially it is **ducked by shelter, not switched off**: `ShelterFactor` is already
+the sky-visibility raycast plus the indoor flag, so walking into a building takes the world outside down
+by `ShelteredAmbienceDuck` and leaves the rest. A room with a door in it is still connected to outside,
+and a building that silences the world completely feels like a loading screen.
+
+**A region's own bed** (`RegionComponent.AmbienceId`) plays on top while the listener is inside it — a
+hum, a machine room, running water. Both beds glide to their levels rather than switching, so a doorway
+is a cross-fade.
+
+The test walks the value the whole way from prefab JSON to `EntityDefinition` rather than checking any
+one link, since every individual link already looked fine.
+
+Honest limitation: the outdoor bed ducks, it does not arrive *through the doorway*. It is a soundfield
+centred on the listener, so it rotates correctly but has no position in the room. Directional leakage
+through a portal would need the bed feeding a portal-positioned send, which is a larger change.
+
+## The sirens are gone
+
+Both `chirp_beacon`s — the one inside the west room and the open-air reference to the far west. The room
+is quiet now, so what you hear in it is the reverb and the boundary reflections rather than a test tone.
+
+## `OPENFPS_WEATHER`
+
+Weather is not decoration in this engine: precipitation and temperature swap the material under the
+player's feet — rain turns Concrete into Wet_Concrete, freezing turns everything into Snow. That is
+correct, and it is also the last thing you want happening on its own while you are listening to something
+else, because the ground changing underfoot reads as a bug in whatever you were actually testing.
+
+    OPENFPS_WEATHER=Clear ./run-server.sh
+
+pins the scenario and stops fronts rolling in. An unrecognised name is reported with the list of valid
+ones and the weather left rolling, rather than being silently pinned to a default.
+
+(`Wet_Concrete` currently has no footsteps at all, so rain on concrete falls back to `Generic` — one for
+the unsorted takes to fill.)
+
+Tests 261 → 268.

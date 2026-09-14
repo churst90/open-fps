@@ -52,6 +52,10 @@ public class MapData
     public float AirPressure { get; set; } = 1013.25f;
     public float AirAbsorptionMultiplier { get; set; } = 1.0f;
 
+    /// <summary>Outdoor ambience bed for the whole map — an ambisonic recording under ASSETS/SOUNDS,
+    /// e.g. "AMBIENCE/woods_mid_day". See MapManifest.AmbienceId.</summary>
+    public string AmbienceId { get; set; } = string.Empty;
+
     public List<EntityData> Entities { get; set; } = new();
 }
 public class MapRepository

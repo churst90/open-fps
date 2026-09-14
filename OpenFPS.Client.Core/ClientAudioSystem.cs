@@ -66,6 +66,12 @@ public class ClientAudioSystem
     private readonly string[] _boundaryMaterials = new string[BoundaryModel.ProbeDirections.Length];
     private readonly BoundaryProbe[] _boundaryProbes = new BoundaryProbe[BoundaryModel.ProbeDirections.Length];
 
+    // Ambience beds. The map's outdoor bed plays for the whole session and is ducked by shelter; a
+    // region that declares one of its own plays on top while the listener is inside it.
+    private string _mapAmbienceId = "";
+    private string _regionAmbienceId = "";
+    private int _ambienceRegionId = int.MinValue;
+
     public ClientAudioSystem(AudioEngineFacade audio, SoundMappingService sounds, LocalPlayerState state)
     {
         _audio = audio;
@@ -184,6 +190,10 @@ public class ClientAudioSystem
         // mixer (see BoundaryModel / BoundaryProximityProcessor), which is what lets a player hear the
         // difference between a corridor, a doorway and the open air, and hear it change as they turn.
         UpdateBoundaryProbes(world, visualEyePos);
+
+        // 4.6. Ambience beds: the map's outdoor soundfield, ducked by shelter, plus whatever the
+        // listener's own region declares.
+        UpdateAmbience(world, listenerRegionId);
 
         // 5. Update the acoustic path (occlusion/diffraction) for ALL active sounds in FMOD
         var activeIds = _audio.GetActiveSpatialSoundIds();
@@ -564,6 +574,58 @@ public class ClientAudioSystem
         // the surrounding walls scattered the sound "all over the place" in enclosed rooms instead of
         // staying localized at the player's feet. The room's reverb bus still gives footsteps their
         // indoor character; per-step geometric reflections are reserved for world emitters.
+    }
+
+    /// <summary>
+    /// The map's outdoor ambience bed, from the manifest. Starting it is deferred to the audio update
+    /// so it happens on the audio thread with everything else.
+    /// </summary>
+    public void SetMapAmbience(string ambienceId)
+    {
+        _mapAmbienceId = ambienceId ?? "";
+        _ambienceRegionId = int.MinValue;   // force the next update to reconsider
+    }
+
+    /// <summary>
+    /// Keeps the ambience beds in step with where the listener is.
+    ///
+    /// The outdoor bed is never stopped while the map is loaded, only ducked: walking into a building
+    /// should take the world outside DOWN, not switch it off, because a room with a door in it is still
+    /// connected to outside. <see cref="LocalPlayerState.ShelterFactor"/> already measures exactly that
+    /// — it is the sky-visibility raycast plus the indoor-region flag — so it is what drives the duck.
+    ///
+    /// A region that declares its own AmbienceId (a hum, a machine room, running water) plays on top
+    /// while the listener is inside it, and cross-fades out on the way through the door because both
+    /// beds glide to their new levels rather than switching.
+    /// </summary>
+    private void UpdateAmbience(WorldSnapshot world, int listenerRegionId)
+    {
+        if (_mapAmbienceId.Length > 0)
+        {
+            // Ducked, not silenced. Even fully sheltered the world outside is still faintly there.
+            float outdoor = AcousticConstants.OutdoorAmbienceLevel *
+                            (1f - _state.ShelterFactor * AcousticConstants.ShelteredAmbienceDuck);
+            _audio.PlayAmbientBed(_mapAmbienceId, AmbisonicFormat.GuessLayout(_mapAmbienceId), outdoor);
+        }
+
+        if (listenerRegionId == _ambienceRegionId) return;
+        _ambienceRegionId = listenerRegionId;
+
+        string wanted = "";
+        if (world.AcousticMap != null &&
+            listenerRegionId != AcousticConstants.GlobalRegionId &&
+            world.AcousticMap.Regions.TryGetValue(listenerRegionId, out var region))
+        {
+            wanted = region.AmbienceId ?? "";
+        }
+
+        if (wanted == _regionAmbienceId) return;
+
+        if (_regionAmbienceId.Length > 0) _audio.StopAmbientBed(_regionAmbienceId);
+        _regionAmbienceId = wanted;
+        if (_regionAmbienceId.Length > 0)
+            _audio.PlayAmbientBed(_regionAmbienceId, AmbisonicFormat.GuessLayout(_regionAmbienceId),
+                                  AcousticConstants.RegionAmbienceLevel);
     }
 
     /// <summary>

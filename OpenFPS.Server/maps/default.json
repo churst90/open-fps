@@ -4,6 +4,10 @@
   "MinBound": { "X": -50, "Y": 0, "Z": -50 },
   "MaxBound": { "X": 50, "Y": 40, "Z": 50 },
   "SpawnPoint": { "Position": { "X": 0, "Y": 1, "Z": 0 }, "Rotation": { "X": 0, "Y": 0, "Z": 0, "W": 1 } },
+  // Outdoor soundfield for the whole map: a first-order ambisonic recording, so it stays put in the
+  // world while the player turns in it. The client ducks it by shelter rather than switching it off,
+  // so stepping into a room takes the outside down instead of away.
+  "AmbienceId": "AMBIENCE/woods_mid_day",
   "VoxelResolution": 0.5,
   "OcclusionFloor": 0.15,
   "Entities": [
@@ -34,7 +38,8 @@
     { "EntityId": 205, "PrefabId": "concrete_floor", "Position": { "X": -7, "Y": 0.05, "Z": 15 }, "Scale": { "X": 1, "Y": 1, "Z": 1 } },
     { "EntityId": 210, "PrefabId": "acoustic_region", "Position": { "X": -7, "Y": 2, "Z": 15 }, "IsIndoor": true, "RoomMaterials": ["Concrete", "Concrete", "Concrete", "Concrete", "Concrete", "Concrete"] },
     { "EntityId": 211, "PrefabId": "portal", "Position": { "X": -7, "Y": 1, "Z": 10 }, "RegionAId": -1, "RegionBId": 210, "ApertureSize": 2.0 },
-    { "EntityId": 220, "PrefabId": "chirp_beacon", "Position": { "X": -7, "Y": 1.5, "Z": 15 } },
+    // (the siren that used to stand here is gone — the room is quiet now, so the reverb and the
+    //  boundary reflections are what you hear in it)
 
     // ============================================================
     //  ROOM B — WOOD floor, with the DIRECTIONAL MEGAPHONE inside,
@@ -51,8 +56,6 @@
     { "EntityId": 311, "PrefabId": "portal", "Position": { "X": 7, "Y": 1, "Z": 10 }, "RegionAId": -1, "RegionBId": 310, "ApertureSize": 2.0 },
     { "EntityId": 320, "PrefabId": "space_megaphone", "Position": { "X": 7, "Y": 1.5, "Z": 15 }, "Rotation": { "X": 0, "Y": 1, "Z": 0, "W": 0 } },
 
-    // --- OPEN-AIR REFERENCE SIREN (far west, line-of-sight from spawn for panning reference) ---
-    { "EntityId": 400, "PrefabId": "chirp_beacon", "Position": { "X": -20, "Y": 1.5, "Z": 2 } },
 
     // ============================================================
     //  MATERIAL LAB — one open room, two acoustic halves (interior z[30,40]).

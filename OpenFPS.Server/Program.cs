@@ -408,6 +408,7 @@ public class GameServer
             manifest.MapMin = mapData.MinBound;
             manifest.MapMax = mapData.MaxBound;
             manifest.Gravity = mapData.Gravity;
+            manifest.AmbienceId = mapData.AmbienceId ?? "";
             manifest.Temperature = mapData.Temperature;
             manifest.Humidity = mapData.Humidity;
             manifest.AirPressure = mapData.AirPressure;

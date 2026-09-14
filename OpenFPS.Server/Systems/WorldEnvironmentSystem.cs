@@ -70,6 +70,38 @@ public class WorldEnvironmentSystem
     public WorldEnvironmentSystem(Random? random)
     {
         _random = random ?? Random.Shared;
+        ApplyPinnedWeather();
+    }
+
+    /// <summary>
+    /// Pins the weather from OPENFPS_WEATHER, and stops fronts rolling in while it is set.
+    ///
+    /// Weather is not decoration here: precipitation and temperature swap the material under the
+    /// player's feet (see SoundMappingService — rain turns Concrete into Wet_Concrete, freezing turns
+    /// everything into Snow). That is correct, and it is also the last thing you want happening on its
+    /// own in the middle of testing something else, because the ground changing underfoot reads as a
+    /// bug in whatever you were actually listening to.
+    ///
+    ///     OPENFPS_WEATHER=Clear   ./run-server.sh
+    ///
+    /// Accepts any WeatherType name — Clear, Rain, Snow, Storm. Unset, the weather rolls as before.
+    /// </summary>
+    private void ApplyPinnedWeather()
+    {
+        string? pinned = Environment.GetEnvironmentVariable("OPENFPS_WEATHER");
+        if (string.IsNullOrWhiteSpace(pinned)) return;
+
+        if (!Enum.TryParse<WeatherType>(pinned.Trim(), ignoreCase: true, out var scenario))
+        {
+            Log.Warning("OPENFPS_WEATHER='{Value}' is not a weather type. Expected one of: {Names}. " +
+                        "The weather will roll normally.", pinned, string.Join(", ", Enum.GetNames<WeatherType>()));
+            return;
+        }
+
+        SetScenario(scenario);
+        FrontProbabilityPerTick = 0;
+        Log.Information("WorldEnvironment: PINNED to {Scenario} by OPENFPS_WEATHER — no fronts will roll in.",
+                        scenario);
     }
 
     public void Update(float dt)

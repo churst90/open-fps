@@ -243,6 +243,15 @@ Reverb confirmed by ear — it comes from the source now. Three more findings.
       can say which it was.
 - [ ] Glass: puncture, fragment shower (the granular engine's first proper caller) and delayed collapse.
 
+- [x] **`AmbienceId` wired.** Map-level outdoor bed on the manifest, ducked by `ShelterFactor` rather
+      than switched off; region-level beds play on top inside their region. Sirens removed from the
+      default map. `OPENFPS_WEATHER=Clear` pins the weather so it stops swapping the ground underfoot
+      mid-test. Covered by `AmbienceAndWeatherTests`.
+- [ ] The outdoor bed ducks but does not arrive THROUGH the doorway — it is centred on the listener, so
+      it rotates correctly but has no position in the room. Directional leakage needs the bed feeding a
+      portal-positioned send.
+- [ ] Rain: a precipitation layer driven by `PrecipitationIntensity` and `ShelterFactor`, plus surface
+      variation (rain on a roof is not rain on grass). `Wet_Concrete` has no footsteps at all yet.
 - [ ] Label the 146 unsorted footstep takes in `ASSETS/SOUNDS/_unsorted/footsteps`, then re-run ingest.
 - [ ] **Wire `AmbienceId` to the bed API.** Still the dead field it was: the prefab spec carries it, the
       server sends it, no client code reads it. Now that beds play, this is the join — a region's

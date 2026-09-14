@@ -101,6 +101,14 @@ public partial class MapManifest : IMessage
     public float AirPressure = 1013.25f;
     public float AirAbsorptionMultiplier = 1.0f;
 
+    /// <summary>The map's OUTDOOR ambience bed — an ambisonic recording under ASSETS/SOUNDS, e.g.
+    /// "AMBIENCE/woods_mid_day". Empty for a map with no outdoor sound of its own.
+    ///
+    /// It belongs to the map rather than to a region because outdoors is not a region: it is everywhere
+    /// a region is not. The client keeps it playing the whole time and ducks it by the listener's
+    /// shelter, so walking into a building takes the world outside down rather than switching it off.</summary>
+    public string AmbienceId = "";
+
     public MapManifest() { }
 }
 

@@ -349,6 +349,10 @@ public sealed class ClientGameSession : IDisposable
                 // arrives once a second, and until it does the acoustics would otherwise be computed for
                 // the previous map's air.
                 _world.ApplyManifestAtmosphere(manifest);
+                // The map's outdoor soundfield. It plays for as long as the map is loaded and is
+                // ducked by shelter rather than switched off, so a doorway is a change in the world
+                // rather than a boundary the world stops at.
+                _audioSystem.SetMapAmbience(manifest.AmbienceId);
 
                 _expectedEntityCount = manifest.ExpectedEntityCount;
                 _voxelResolution = manifest.VoxelResolution;

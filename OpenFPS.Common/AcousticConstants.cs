@@ -62,6 +62,17 @@ public static class AcousticConstants
     /// is kept while the total stays sane.</summary>
     public const float MaxBoundaryReflectionSum = 1.2f;
 
+    /// <summary>Level of the map's outdoor ambience bed in the open air.</summary>
+    public const float OutdoorAmbienceLevel = 0.55f;
+
+    /// <summary>How much of the outdoor bed a fully sheltered listener loses. Not all of it: a room
+    /// with a door in it is still connected to outside, and a building that silences the world
+    /// completely is a building that feels like a loading screen.</summary>
+    public const float ShelteredAmbienceDuck = 0.75f;
+
+    /// <summary>Level of a region's own ambience bed while the listener is inside it.</summary>
+    public const float RegionAmbienceLevel = 0.5f;
+
     public const float DefaultReverbDecayMs = 500.0f;
     public const float MinReverbDecayMs = 100.0f;
     public const float MaxReverbDecayMs = 10000.0f;
