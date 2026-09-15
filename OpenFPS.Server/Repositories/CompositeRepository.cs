@@ -139,6 +139,10 @@ public class CompositeRepository
                 if (!string.IsNullOrWhiteSpace(t.VehiclePreset)
                     && !OpenFPS.Common.VehicleProfile.Presets.ContainsKey(t.VehiclePreset))
                 { _rejected[t.Id] = $"unknown vehicle preset '{t.VehiclePreset}'"; continue; }
+                // A vehicle nobody can drive is a shed with an engine in it. Caught here as well as
+                // at /drivable, because a file on disk can be edited by hand and this is the door.
+                if (!string.IsNullOrWhiteSpace(t.VehiclePreset) && !t.Seats.Exists(s => s.Controls))
+                { _rejected[t.Id] = "it drives but has no seat that drives"; continue; }
                 if (t.Seats.Exists(s => string.IsNullOrWhiteSpace(s.Name)))
                 { _rejected[t.Id] = "a seat has no name"; continue; }
                 _templates[t.Id] = t;

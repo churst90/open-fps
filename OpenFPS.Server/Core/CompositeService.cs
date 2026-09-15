@@ -565,9 +565,24 @@ public class CompositeService
         { error = $"'{world.Get<CompositeComponent>(root).Name}' belongs to {world.Get<CompositeComponent>(root).Owner}"; return false; }
         if (world.Get<CompositeComponent>(root).Anchored)
         { error = "it is fixed in place; regroup it with 'free' first"; return false; }
+        if (!HasDrivingSeat(world, root))
+        { error = "nothing in it drives; add a seat with /addseat driver drive first"; return false; }
 
         return MakeDrivable(mapId, world, root, preset, out error);
     }
+
+    /// <summary>
+    /// Whether anybody could actually drive this.
+    ///
+    /// A vehicle with no driving seat is not a vehicle, it is a shed with an engine in it: nothing
+    /// can ever ask it to move, so all an engine buys it is a noise. Refusing at the moment somebody
+    /// says "make it drivable" is the only place the refusal helps — by the time it is a saved
+    /// template being placed on a map at startup, the person who could have added a seat is long gone.
+    /// </summary>
+    public static bool HasDrivingSeat(World world, Entity root)
+        => world.Has<OccupancyComponent>(root)
+        && world.Get<OccupancyComponent>(root).Seats is { Count: > 0 } seats
+        && seats.Exists(s => s.Controls);
 
     private bool MakeDrivable(string mapId, World world, Entity root, string preset, out string error)
     {

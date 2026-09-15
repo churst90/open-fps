@@ -451,6 +451,68 @@ public class OccupancyTests : IDisposable
         Assert.Contains("fixed in place", error);
     }
 
+    /// <summary>
+    /// An engine in something nobody can drive is a shed with an engine in it: nothing can ever ask
+    /// it to move, so all the engine buys it is a noise.
+    /// </summary>
+    [Fact]
+    public void SomethingWithNoDrivingSeatIsNotDrivable()
+    {
+        var f = new Fixture(_dir);
+        int root = f.BuildShell(new Vector3(-20, 0, 40));
+
+        Assert.False(f.Composites.MakeDrivable(f.MapId, root, "v8_sports", "cody", true, out string error));
+        Assert.Contains("nothing in it drives", error);
+
+        // Passenger seats are not enough either — somebody has to be able to steer it.
+        Assert.True(f.Composites.AddSeat(f.MapId, root, "bench", false, new Vector3(-20, 0, 40), 0f,
+                                         "cody", true, out error), error);
+        Assert.False(f.Composites.MakeDrivable(f.MapId, root, "v8_sports", "cody", true, out error));
+
+        Assert.True(f.Composites.AddSeat(f.MapId, root, "driver", true, new Vector3(-20, 0, 40), 0f,
+                                         "cody", true, out error), error);
+        Assert.True(f.Composites.MakeDrivable(f.MapId, root, "v8_sports", "cody", true, out error), error);
+    }
+
+    /// <summary>
+    /// Every refusal names what IS free. A no on its own is a no a player has to go and investigate,
+    /// and investigating a car you cannot see means walking round it trying doors.
+    /// </summary>
+    [Fact]
+    public void BeingTurnedAwayFromASeatTellsYouWhichOnesAreFree()
+    {
+        var f = new Fixture(_dir);
+        int root = f.BuildCar(new Vector3(20, 0, 20), owner: "cody");
+        var owner = f.Player("cody", new Vector3(21, 0, 20));
+        var friend = f.Player("mate", new Vector3(21, 0, 21));
+
+        // Refused because it is not theirs to drive, with nobody in it at all.
+        Assert.False(f.Seats.Enter(friend, root, "driver", out string notYours));
+        Assert.Contains("cannot drive it", notYours);
+        Assert.Contains("passenger", notYours);
+
+        // ...and refused because somebody is already in it, which is the more useful of the two facts.
+        Assert.True(f.Seats.Enter(owner, root, null, out _));
+        Assert.False(f.Seats.Enter(friend, root, "driver", out string taken));
+        Assert.Contains("taken", taken);
+        Assert.Contains("passenger", taken);
+    }
+
+    /// <summary>
+    /// Owning a thing permits; it never compels. Wanting to ride in your own car is not a special
+    /// case that has to be allowed for — asking for the passenger seat asks for the passenger seat.
+    /// </summary>
+    [Fact]
+    public void AnOwnerMayRideInTheirOwnVehicle()
+    {
+        var f = new Fixture(_dir);
+        int root = f.BuildCar(new Vector3(20, 0, 20), owner: "cody");
+        var owner = f.Player("cody", new Vector3(21, 0, 20));
+
+        Assert.True(f.Seats.Enter(owner, root, "passenger", out string message), message);
+        Assert.False(f.World.Get<OccupantComponent>(owner.Entity).Controls);
+    }
+
     // ── Fixture ─────────────────────────────────────────────────────────────────────────────────
 
     /// <summary>
@@ -508,6 +570,9 @@ public class OccupancyTests : IDisposable
 
         /// <summary>The same walls, fixed down. A house.</summary>
         public int BuildHouse(Vector3 where, string owner = "") => Group(where, owner, anchored: true, name: "house");
+
+        /// <summary>The same walls, free, and nothing to sit in. A body on a trolley.</summary>
+        public int BuildShell(Vector3 where, string owner = "cody") => Group(where, owner, anchored: false, name: "shell");
 
         private int Group(Vector3 where, string owner, bool anchored, string name)
         {

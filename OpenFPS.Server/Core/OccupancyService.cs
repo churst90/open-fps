@@ -123,10 +123,13 @@ public class OccupancyService
         if (!string.IsNullOrWhiteSpace(seatName))
         {
             chosen = seats.FindIndex(x => string.Equals(x.Name, seatName, StringComparison.OrdinalIgnoreCase));
-            if (chosen < 0) { message = $"There is no seat called '{seatName}'."; return false; }
-            if (SeatTaken(world, rootId, chosen)) { message = $"The {seats[chosen].Name} seat is taken."; return false; }
+            if (chosen < 0)
+            { message = $"There is no seat called '{seatName}'.{Alternatives(world, rootId, seats, mayDrive)}"; return false; }
+            if (SeatTaken(world, rootId, chosen))
+            { message = $"The {seats[chosen].Name} seat is taken.{Alternatives(world, rootId, seats, mayDrive)}"; return false; }
             if (seats[chosen].Controls && !mayDrive)
-            { message = $"{composite.Name} belongs to {composite.Owner}; you cannot drive it."; return false; }
+            { message = $"{composite.Name} belongs to {composite.Owner}; you cannot drive it."
+                      + Alternatives(world, rootId, seats, mayDrive); return false; }
         }
         else
         {
@@ -176,6 +179,26 @@ public class OccupancyService
         Log.Information("{User} took the '{Seat}' seat of composite {Root} ('{Name}').",
                         session.Username, seat.Name, rootId, composite.Name);
         return true;
+    }
+
+    /// <summary>
+    /// What else they could have asked for, named.
+    ///
+    /// A refusal that only says no is a refusal a player has to go and investigate, and investigating
+    /// a car you cannot see means walking round it trying doors. Every no here carries the yeses with
+    /// it, which costs one sentence and saves a lap of the vehicle.
+    /// </summary>
+    private static string Alternatives(World world, int rootId, List<Seat> seats, bool mayDrive)
+    {
+        var free = new List<string>();
+        for (int i = 0; i < seats.Count; i++)
+        {
+            if (SeatTaken(world, rootId, i)) continue;
+            if (seats[i].Controls && !mayDrive) continue;
+            free.Add(seats[i].Name);
+        }
+        if (free.Count == 0) return " Nothing else is free either.";
+        return $" Free: {string.Join(", ", free)}.";
     }
 
     /// <summary>

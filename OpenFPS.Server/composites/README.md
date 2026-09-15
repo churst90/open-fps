@@ -24,7 +24,9 @@ you. Widen the radius and bigger things come into scope, which is also right.
 
     /addseat driver drive  — a seat where you are standing, facing the way you face, and it drives
     /addseat passenger     — and one for somebody else
-    /drivable v8_sports    — give it an engine, a gearbox, tyres and a mass
+    /drivable v8_sports    — give it an engine, a gearbox, tyres and a mass. Needs a driving seat
+                             first: an engine in something nobody can steer is a shed with an
+                             engine in it
     /seats                 — read out what is inside the nearest thing, and which seats are taken
     /enter [seat]          — get in. Or just press E beside it
     /exit                  — get out, onto clear ground beside where you were sitting
@@ -45,3 +47,8 @@ a lorry's profile and it drives like a lorry. `/drivable` with no argument lists
 Whoever groups or places a composite owns it. Ownership gates four things: taking it apart, saving it
 out as your own, changing what it is, and driving it. It gates nothing else — a composite with no
 owner is public property, and riding in somebody else's passenger seat is not trespass.
+
+Ownership permits; it never compels. `/enter` with no seat named takes the first seat you are ALLOWED
+into, which for an owner is the driver's seat — but `/enter passenger` asks for the passenger seat
+and gets it, in your own car as in anybody's. And every refusal names what is free instead, so being
+turned away from a seat never costs you a lap of the vehicle to find out why.
