@@ -289,7 +289,13 @@ public static class VehicleSynth
         // difference between a tyre working and a tyre screaming, and no amount of turning the layer
         // up afterwards could put it back. A gentle knee keeps the quiet case where it was and gives
         // the loud one somewhere to go.
-        return MathF.Tanh(y * 0.13f) * 7f;
+        // The knee has to stay OUT OF THE WAY. At a drive of 0.13 a full squeal sat well up the
+        // curve, so the level was coming from saturation rather than from gain — and a listener
+        // described exactly that: "it sounds like it clips from the source". A gentler drive with
+        // the range restored afterwards leaves the same loudness with the waveform intact, and keeps
+        // the tanh for what it is for, which is catching the rare extreme rather than shaping the
+        // normal case.
+        return MathF.Tanh(y * 0.05f) * 26f;
     }
 
     /// <summary>
@@ -307,10 +313,10 @@ public static class VehicleSynth
     ///
     /// Twenty is large and was arrived at by measurement rather than by taste: rendering the whole
     /// engine voice with and without slip, a full squeal moved a sports car by six tenths of a
-    /// decibel at unity, five at 2.6, and eight and a half at twenty. Eight and a half decibels over
-    /// a V8 at full throttle is a screech somebody notices, which is what one is.
+    /// decibel at unity, five at 2.6, and eight and a half at twenty — then backed off a quarter
+    /// from there, on the ear that said twenty was too much.
     /// </summary>
-    public const float SquealProminence = 20f;
+    public const float SquealProminence = 15f;
 
     /// <summary>The squeal level relative to the rolling noise, as a linear factor. Both are quoted
     /// in dB at a metre, so the difference between them is the only thing that matters.</summary>

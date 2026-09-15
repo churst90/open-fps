@@ -125,7 +125,10 @@ public class ImpactAndGlassSoundTests
         // The FIRST piece to arrive is the one that fell freely from the pane; the rest trail it,
         // because they do not all leave the frame at the same instant. It is the first that carries
         // the height.
-        float firstLanding = sounds.Where(s => s.Character == SoundCharacter.Knock).Min(s => s.DelaySeconds);
+        // The landings are the ones that arrive at the FOOT of the wall — which is what distinguishes
+        // them, not what they sound like. A piece of glass rings whether it is in the air or on the
+        // pavement; where it is coming from is the information.
+        float firstLanding = sounds.Where(s => s.Position.Y < pane.Centre.Y - 4f).Min(s => s.DelaySeconds);
 
         Assert.True(firstLanding - breakAt > 1.2f,
                     $"the glass arrived {firstLanding - breakAt:F2} s after the break, from fifteen metres up");
@@ -145,11 +148,15 @@ public class ImpactAndGlassSoundTests
 
     /// <summary>
     /// A pane letting go is not one impact, it is thousands inside a tenth of a second — and a crowd
-    /// that dense stops being heard as impacts at all. A single shard landing IS one impact. That is
-    /// why a window breaking sounds nothing like the pieces of it arriving.
+    /// that dense stops being heard as impacts at all, which is why it is a NOISE. A single piece
+    /// arriving is one small stiff plate ringing, which is why it is a RING. That is the whole of why
+    /// a window breaking sounds nothing like the pieces of it landing.
+    ///
+    /// The landing was a knock until somebody listened to it and said it sounded like plastic. It
+    /// rings for the same reason the shards in the air ring: it is the same piece of glass.
     /// </summary>
     [Fact]
-    public void ShatteringIsANoiseAndLandingIsABlow()
+    public void ShatteringIsANoiseAndAPieceLandingRings()
     {
         var events = new List<GlassEvent>
         {
@@ -158,8 +165,10 @@ public class ImpactAndGlassSoundTests
         };
         var sounds = GlassSound.From(events, GlassType.Annealed, new Vector2(1f, 1.5f));
 
-        Assert.Contains(sounds, s => s.Character == SoundCharacter.Hiss);
-        Assert.Contains(sounds, s => s.Character == SoundCharacter.Knock);
+        Assert.Equal(SoundCharacter.Hiss, sounds.First(s => s.DelaySeconds < 0.1f).Character);
+        var landing = sounds.Single(s => s.DelaySeconds > 1f);
+        Assert.Equal(SoundCharacter.Ring, landing.Character);
+        Assert.True(landing.Hz > 2500f, $"the piece landed at {landing.Hz:F0} Hz, which is not glass");
     }
 
     /// <summary>

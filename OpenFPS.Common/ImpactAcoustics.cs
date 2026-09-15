@@ -54,6 +54,19 @@ public static class ImpactAcoustics
         // steel bar is a dull thump; hitting a steel bar with a carpet is the same dull thump.
         var softer = hitter.YoungsModulusGPa <= struck.YoungsModulusGPa ? hitter : struck;
         float softness = 1f / (1f + MathF.Max(0f, softer.YoungsModulusGPa));
+
+        // ...and HOW BIG the things are decides the pitch, which this had no notion of at all: a
+        // latch bolt and a fifteen-hundred-kilo car were being given the same frequency law and
+        // coming out within an octave of each other. They are nothing like each other.
+        //
+        // Contact time grows with mass — two heavy things stay in contact for tens of milliseconds
+        // while two light ones are done in microseconds — and a longer contact is a lower sound. A
+        // car meeting a wall came out at 1.4 kHz for 28 ms, which is a tap; it should be a low crunch
+        // and now is, because the mass is in the formula. One kilogram is the neutral point.
+        float reduced = PanelAcoustics.ImpactJoules(hitterMassKg, struckMassKg, 1f) * 2f;
+        float sizeScale = 1f / MathF.Pow(MathF.Max(0.02f, reduced), 0.28f);
+        float lengthScale = MathF.Pow(MathF.Max(0.02f, reduced), 0.18f);
+
         sounds.Add(new TransientSound
         {
             Character = SoundCharacter.Knock,
@@ -61,8 +74,8 @@ public static class ImpactAcoustics
             Position = where,
             LevelDb = db,
             // A soft contact spreads the blow over more time, which is the same as saying it is lower.
-            Hz = Math.Clamp(1400f * (1f - softness) + 70f, 60f, 2500f),
-            DecaySeconds = Math.Clamp(0.02f + softness * 0.25f, 0.02f, 0.3f),
+            Hz = Math.Clamp((1400f * (1f - softness) + 70f) * sizeScale, 45f, 3000f),
+            DecaySeconds = Math.Clamp((0.02f + softness * 0.25f) * lengthScale, 0.02f, 0.6f),
             Noisiness = 0.85f,
         });
 
@@ -228,11 +241,18 @@ public static class GlassSound
                     });
                     break;
 
-                default:    // Landing: one piece, one impact, at the foot of the wall.
+                default:
+                    // Landing: one piece arriving at the foot of the wall. A RING and not a knock —
+                    // a fragment hitting cement is the same small stiff plate ringing that it was in
+                    // the air, and the shards, which are rings, were judged right while this, which
+                    // was a knock, was judged to sound like plastic. The only differences are that
+                    // it is a little lower, because the pieces that reach the ground are the bigger
+                    // ones, and a little shorter, because the ground damps it.
                     sounds.Add(new TransientSound
                     {
-                        Character = SoundCharacter.Knock, DelaySeconds = e.DelaySeconds, Position = e.Position,
-                        LevelDb = baseDb, Hz = 5200f * e.Pitch, DecaySeconds = 0.06f, Noisiness = 0.3f,
+                        Character = SoundCharacter.Ring, DelaySeconds = e.DelaySeconds, Position = e.Position,
+                        LevelDb = baseDb, Hz = 3200f * e.Pitch * shardPitch * sizePitch,
+                        DecaySeconds = 0.09f, Noisiness = 0.2f,
                     });
                     break;
             }

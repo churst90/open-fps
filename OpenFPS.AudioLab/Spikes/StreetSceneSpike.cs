@@ -112,10 +112,10 @@ public static class StreetSceneSpike
     private static bool Window(out List<(string Name, float[] Pcm)> layers)
     {
         layers = new List<(string, float[])>();
-        Console.WriteLine("\n  TWO — a window on the second floor, shot out from fourteen metres.");
+        Console.WriteLine("\n  TWO — a window on the second floor, shot out from across the street.");
 
         const float height = 12f;
-        var pane = new GlassPane(new Vector3(0f, height, 14f), new Vector2(1.2f, 1.6f), -Vector3.UnitZ,
+        var pane = new GlassPane(new Vector3(0f, height, 10f), new Vector2(1.2f, 1.6f), -Vector3.UnitZ,
                                  GlassType.Tempered, HeightAboveGround: height);
         if (!WeaponRegistry.TryGet("akm", out var weapon)) return false;
 
@@ -126,7 +126,10 @@ public static class StreetSceneSpike
 
         var sounds = GlassSound.From(events, pane.Type, pane.Size, thicknessMetres: 0.006f);
         float breakAt = sounds.Min(s => s.DelaySeconds);
-        float firstLanding = sounds.Where(s => s.Character == SoundCharacter.Knock)
+        // The landings are the ones that arrive at the FOOT of the wall. What distinguishes them is
+        // where they come from, not what they sound like — a piece of glass rings in the air and
+        // rings again on the pavement, because it is the same piece of glass.
+        float firstLanding = sounds.Where(s => s.Position.Y < pane.Centre.Y - 4f)
                                    .DefaultIfEmpty().Min(s => s.DelaySeconds);
         float ideal = GlassBreak.FallSeconds(height);
 
@@ -151,16 +154,16 @@ public static class StreetSceneSpike
     private static bool Crash(out List<(string Name, float[] Pcm)> layers)
     {
         layers = new List<(string, float[])>();
-        Console.WriteLine("\n  FOUR — the truck finds a wall at eleven metres a second.");
+        Console.WriteLine("\n  FOUR — a car finds a wall at eighteen metres a second.");
 
-        var truck = VehicleProfile.ByName("diesel_truck");
+        var truck = VehicleProfile.ByName("v8_sports");
         var sounds = ImpactAcoustics.Between(AcousticRegistry.GetProperties("Metal"),
                                              AcousticRegistry.GetProperties("Concrete"),
-                                             new Vector3(0f, 1f, 26f), closingSpeed: 11f,
+                                             new Vector3(26f, 1f, 14f), closingSpeed: 18f,
                                              hitterMassKg: truck.MassKg, struckMassKg: truck.MassKg * 50f,
                                              struckWidth: 4f, struckHeight: 3f, struckThickness: 0.4f);
 
-        float joules = PanelAcoustics.ImpactJoules(truck.MassKg, truck.MassKg * 50f, 11f);
+        float joules = PanelAcoustics.ImpactJoules(truck.MassKg, truck.MassKg * 50f, 18f);
         Console.WriteLine($"    {joules / 1000f:F0} kJ arriving — {sounds[0].LevelDb:F0} dB at a metre, "
                         + $"{(sounds.Any(s => s.Character == SoundCharacter.Ring) ? "and the wall rings" : "and nothing rings")}.");
 
@@ -205,7 +208,8 @@ public static class StreetSceneSpike
             Console.WriteLine("            Same model, same code; the difference is the rubber.");
             PlayPass(provider, "v8_sports", launch: 9.3f);
 
-            Console.WriteLine("  FOUR — and finds the wall.");
+            Console.WriteLine("  FOUR — ...and the car that just left finds a wall.");
+            Wait(provider, 700);
             PlayCrash(provider);
             Wait(provider, 2500);
             return 0;
@@ -220,7 +224,7 @@ public static class StreetSceneSpike
         float edge = DoorAcoustics.EdgeSpeed(0.9f, MathF.PI / 2f, 0.9f);
 
         var opening = DoorAcoustics.Opening(props, at, at + new Vector3(-0.9f, 0f, 0f),
-                                            0.9f, 2.1f, thickness, 0.9f, hingeDryness: 0.35f,
+                                            0.9f, 2.1f, thickness, 0.9f, hingeDryness: 0f,
                                             hasSeal: material == "Metal");
         Schedule(provider, opening.Select(s => s.ToTransient()), seed);
         Wait(provider, 1400);
@@ -232,20 +236,25 @@ public static class StreetSceneSpike
     private static void PlayWindow(FmodAudioProvider provider)
     {
         const float height = 12f;
-        var pane = new GlassPane(new Vector3(0f, height, 14f), new Vector2(1.2f, 1.6f), -Vector3.UnitZ,
+        var pane = new GlassPane(new Vector3(0f, height, 10f), new Vector2(1.2f, 1.6f), -Vector3.UnitZ,
                                  GlassType.Tempered, height);
         WeaponRegistry.TryGet("akm", out var weapon);
 
-        // The muzzle blast is at YOUR shoulder — you are the one shooting.
+        // Somebody ELSE is shooting, from off to your left. With the muzzle at your own shoulder the
+        // blast was twenty-nine decibels above the window it broke, and you cannot hear the
+        // consequence of a gunshot through the gunshot — which is why the glass kept coming back as
+        // "quiet". Standing in the street while somebody else shoots is also the situation a player
+        // is actually in.
+        var shooter = new Vector3(-16f, 1.5f, 4f);
         var shot = new TransientSound
         {
-            Character = SoundCharacter.Knock, Position = Ear + new Vector3(0.3f, 0f, 0.4f),
+            Character = SoundCharacter.Knock, Position = shooter,
             LevelDb = Loudness.MuzzleBlastDb(weapon), SynthKey = "weapon:" + weapon.Id, DecaySeconds = 0.6f,
         };
         Schedule(provider, new[] { shot }, seed: 9);
 
         // The round takes a moment to get there. Thirty metres at seven hundred metres a second.
-        Wait(provider, 14f / weapon.MuzzleVelocity * 1000f + 40f);
+        Wait(provider, Vector3.Distance(shooter, pane.Centre) / weapon.MuzzleVelocity * 1000f + 40f);
 
         Span<GlassEvent> buffer = stackalloc GlassEvent[64];
         int count = GlassBreak.Resolve(pane, pane.Centre, weapon, 9, buffer);
@@ -259,11 +268,14 @@ public static class StreetSceneSpike
 
     private static void PlayCrash(FmodAudioProvider provider)
     {
-        var truck = VehicleProfile.ByName("diesel_truck");
+        // The car that just screeched off, not the truck that left half a minute ago. A listener
+        // reported "a thud at the very end, what is that?" and the honest answer was that the scene
+        // had told its story in the wrong order: the crash belonged to a vehicle already gone.
+        var car = VehicleProfile.ByName("v8_sports");
         Schedule(provider, ImpactAcoustics.Between(AcousticRegistry.GetProperties("Metal"),
                                                    AcousticRegistry.GetProperties("Concrete"),
-                                                   new Vector3(0f, 1f, 26f), 11f,
-                                                   truck.MassKg, truck.MassKg * 50f, 4f, 3f, 0.4f), seed: 5);
+                                                   new Vector3(26f, 1f, 14f), 18f,
+                                                   car.MassKg, car.MassKg * 50f, 4f, 3f, 0.4f), seed: 5);
     }
 
     /// <summary>

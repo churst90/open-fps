@@ -64,23 +64,60 @@ public static class TransientSynth
     /// </summary>
     private static void RenderKnock(float[] buffer, float hz, float seconds, float noisiness, Random rng)
     {
-        // Q spans a much wider range than it did. A knock with little noise in it is a hard small
-        // thing striking another hard small thing — a latch bolt on its keeper — and that RINGS, at a
-        // Q of twenty-odd. At the old top of five it popped, which the first listening test described
-        // exactly: "sounds like someone popping a cork".
-        var filter = new Resonator(hz, q: 2.5f + 26f * (1f - Math.Clamp(noisiness, 0f, 1f)));
-        float k = 6.9f / (seconds * SampleRate);          // 60 dB over the whole length
+        // AN IMPACT IS NOT ONE RESONANCE.
+        //
+        // A single pole struck by an impulse is a cork coming out of a bottle — and that is what
+        // listeners called this, twice, about two completely different sounds: a door shutting and a
+        // car hitting a wall. Both were one resonance, so both were a cork.
+        //
+        // A struck object answers on MANY modes at once. They are inharmonically spaced, because a
+        // plate or a panel or a car wing is not a string, and the high ones die first because they
+        // radiate faster. That spread is the whole difference between "something was struck" and "a
+        // note was played", and no amount of moving the one note around will produce it.
+        Span<float> ratios = stackalloc float[] { 1f, 1.71f, 2.63f, 4.07f, 6.2f };
+        Span<float> gains = stackalloc float[] { 1f, 0.72f, 0.5f, 0.31f, 0.17f };
 
-        // The strike is an IMPULSE. The noise that follows it is contact scrape and lasts a
-        // millisecond or two, not the length of the sound — spreading it over the whole decay is
-        // what turned a click into a hiss.
-        float contact = MathF.Max(1f, 0.0015f * SampleRate);
+        float noise = Math.Clamp(noisiness, 0f, 1f);
+        float q = 2.5f + 24f * (1f - noise);
+        Span<Resonator> modes = stackalloc Resonator[5];
+        int used = 0;
+        for (int m = 0; m < 5; m++)
+        {
+            float f = hz * ratios[m];
+            if (f > SampleRate * 0.45f) break;
+            modes[m] = new Resonator(f, q);
+            used++;
+        }
+        if (used == 0) { modes[0] = new Resonator(hz, q); used = 1; }
+
+        float k = 6.9f / (seconds * SampleRate);          // 60 dB over the whole length
+        // The contact itself: a broadband burst a millisecond or two long, under everything else.
+        // This is the part that says two things TOUCHED, as opposed to one thing rang.
+        float contact = MathF.Max(1f, 0.0018f * SampleRate);
+
+        // ...and it has to be as bright as the thing is SMALL. Unfiltered, the burst is flat to
+        // twenty kilohertz, so a fifteen-hundred-kilo car meeting a wall came out with a third of
+        // its energy above 4 kHz — the sound of a tiny hard tap laid over a low crunch. Tying the
+        // cutoff to the sound's own pitch keeps a latch bright and lets a crash be the low,
+        // gravelly thing it is.
+        float bright = 1f - MathF.Exp(-2f * MathF.PI * MathF.Min(hz * 6f, SampleRate * 0.45f) / SampleRate);
+        float lp = 0f;
+
         for (int i = 0; i < buffer.Length; i++)
         {
-            float excite = i == 0
+            float raw = i == 0
                 ? 1f
-                : (float)(rng.NextDouble() * 2.0 - 1.0) * noisiness * MathF.Exp(-i / contact);
-            buffer[i] = filter.Process(excite) * MathF.Exp(-k * i);
+                : (float)(rng.NextDouble() * 2.0 - 1.0) * MathF.Exp(-i / contact);
+            lp += bright * (raw - lp);
+
+            float v = 0f;
+            for (int m = 0; m < used; m++)
+            {
+                // Higher modes decay faster: they radiate more readily, which is why a struck thing
+                // gets duller as it dies rather than simply quieter.
+                v += modes[m].Process(raw) * gains[m] * MathF.Exp(-k * i * (1f + m * 0.55f));
+            }
+            buffer[i] = v + lp * noise * 0.6f * MathF.Exp(-k * i * 3f);
         }
     }
 

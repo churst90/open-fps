@@ -1095,7 +1095,48 @@ completely silent.
       over their grip; and the same truck finding a wall at eleven metres a second, 830 kJ arriving.
       Headless it checks the arithmetic and writes every layer out to audition.
 
-#### What listening to it found (2026-09-15)
+#### Calibration against recordings, and what only an ear could find (2026-09-15)
+
+Five reference recordings in `inbox/`, measured rather than played. Every one corrected something,
+and two corrected things the tests were confidently asserting.
+
+- [x] **A door latch is mostly BODY** — 42 per cent of the recording is below 200 Hz, against two per
+      cent in the model. A latch is not a little click, it is a mechanism bolted through a leaf, and
+      what you mostly hear is the leaf answering the bolt. Rendered as pure click it had nothing
+      underneath it, and a bright transient with nothing underneath it is a puff of air — which is
+      what it was called. Three parts now: ramp tick, click into the keeper, and body.
+- [x] **Glass shards were an octave low and three times too long**, which is a bottle cap. The
+      recording of shards on cement is 38 per cent above 4 kHz with two per cent below 1.5 kHz and
+      66 ms a piece; the model now measures within a few points in every band.
+- [x] **A piece of glass landing RINGS**, it does not knock. It is the same piece of glass on the
+      ground that it was in the air, and the shards — which ring — were judged right while the
+      landings, which knocked, were judged to sound like plastic.
+- [x] **The car screech recording matched the sports car band for band** (21/44/28 against 21/40/27),
+      so the model was right and the TRUCK was the dull one: it squeals at 430 Hz against a car's 950.
+- [x] **AN IMPACT IS NOT ONE RESONANCE.** A single pole struck by an impulse is a cork coming out of
+      a bottle, and that is what listeners called it — twice, about a door shutting and a car hitting
+      a wall. Both were one pole, so both were a cork. Five inharmonic modes now, the high ones dying
+      first, over a broadband contact burst whose brightness is tied to the sound's own pitch.
+- [x] **A latch bolt and a fifteen-hundred-kilo car had the same frequency law.** Contact time grows
+      with mass, and a longer contact is a lower sound; a car meeting a wall was coming out at 1.4 kHz
+      for 28 ms, which is a tap. With mass in the formula it is 185 Hz for 115 ms.
+- [x] **Sound pressure is not loudness**, and this one cost three rounds. Rendering the whole engine
+      voice with and without slip showed a full squeal moving a sports car by SIX TENTHS OF A
+      DECIBEL. A squeal sits where hearing is most sensitive and an engine's energy sits an octave or
+      two below it, so a 92 dB squeal against a 116 dB engine is not 24 dB down to a listener.
+      `SquealProminence` is that correction and was measured, not chosen.
+- [x] **The render ceiling was anchored 18 dB too high.** At 130 dB = full scale the only thing that
+      ever reached the top of the mix was gunfire, and everything everyday — 60 to 95 dB, which is
+      what the game is mostly made of — lived in the bottom third. 112 now.
+- [x] Hinges silent by default. A creak is a FAULT, not a feature; every door in the game was
+      creaking, which a listener heard as an unexplained hiss either side of every thud.
+
+Still not right, and the honest state of it: **the door is "better but not perfect"**. The thud and
+the panel ring are the weakest parts. What would settle it is a close-mic'd recording of a door
+closing — the reference list is in the session notes, and a car crash or heavy metal impact is the
+biggest gap of all, since there is currently no measurement behind collisions at all.
+
+#### What listening to it found, earlier the same day
 
 Every one of these passed every test in the suite. None of the tests could hear.
 

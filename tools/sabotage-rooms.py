@@ -232,8 +232,8 @@ SABOTAGE = [
 
  ("A latch that fires after the leaf has already landed",
   "OpenFPS.Common/Doors.cs",
-  "        sounds.Add(new DoorSound(DoorSoundKind.Latch, SoundCharacter.Knock, 0.02f, latchEdge,",
-  "        sounds.Add(new DoorSound(DoorSoundKind.Latch, SoundCharacter.Knock, 0f, latchEdge,",
+  "SoundCharacter.Knock, 0.072f, latchEdge,\n                                 impactDb - 21f, LatchHz * 1.2f, 0.015f, 0.3f));\n        sounds.Add(new DoorSound(DoorSoundKind.Latch, SoundCharacter.Knock, 0.098f, latchEdge,\n                                 impactDb - 15f, LatchHz, 0.03f, 0.25f));\n        sounds.Add(new DoorSound(DoorSoundKind.Latch, SoundCharacter.Knock, 0.099f, latchEdge,",
+  "SoundCharacter.Knock, 0.002f, latchEdge,\n                                 impactDb - 21f, LatchHz * 1.2f, 0.015f, 0.3f));\n        sounds.Add(new DoorSound(DoorSoundKind.Latch, SoundCharacter.Knock, 0.004f, latchEdge,\n                                 impactDb - 15f, LatchHz, 0.03f, 0.25f));\n        sounds.Add(new DoorSound(DoorSoundKind.Latch, SoundCharacter.Knock, 0.005f, latchEdge,",
   "TheLatchComesFirstAndTheRingComesLast"),
 
  ("Every part of a door coming from the same point",
@@ -244,8 +244,8 @@ SABOTAGE = [
 
  ("Opening treated as a quieter close, impact and all",
   "OpenFPS.Common/Doors.cs",
-  "            new(DoorSoundKind.Latch, SoundCharacter.Knock, 0f, latchEdge, 58f, LatchHz, 0.04f, 0.8f),",
-  "            new(DoorSoundKind.Impact, SoundCharacter.Knock, 0f, latchEdge, 58f, LatchHz, 0.04f, 0.8f),",
+  "            new(DoorSoundKind.Latch, SoundCharacter.Knock, 0f, latchEdge, 74f, LatchHz, 0.03f, 0.2f),",
+  "            new(DoorSoundKind.Impact, SoundCharacter.Knock, 0f, latchEdge, 74f, LatchHz, 0.03f, 0.2f),",
   "OpeningIsADifferentEventAndNotAQuieterClose"),
 
  ("Hinges that sing however well oiled they are",
@@ -336,14 +336,14 @@ SABOTAGE = [
 
  ("A shattering pane treated as one blow rather than as thousands",
   "OpenFPS.Common/ImpactAcoustics.cs",
-  "                        Character = SoundCharacter.Hiss, DelaySeconds = e.DelaySeconds, Position = e.Position,\n                        LevelDb = baseDb,\n                        Hz = type == GlassType.Laminated ? 900f : 4200f,",
-  "                        Character = SoundCharacter.Knock, DelaySeconds = e.DelaySeconds, Position = e.Position,\n                        LevelDb = baseDb,\n                        Hz = type == GlassType.Laminated ? 900f : 4200f,",
-  "ShatteringIsANoiseAndLandingIsABlow"),
+  "                        Character = SoundCharacter.Hiss, DelaySeconds = e.DelaySeconds, Position = e.Position,\n                        LevelDb = baseDb,",
+  "                        Character = SoundCharacter.Knock, DelaySeconds = e.DelaySeconds, Position = e.Position,\n                        LevelDb = baseDb,",
+  "ShatteringIsANoiseAndAPieceLandingRings"),
 
  ("Laminated glass that sounds like any other glass",
   "OpenFPS.Common/ImpactAcoustics.cs",
-  "                        Hz = type == GlassType.Laminated ? 900f : 4200f,",
-  "                        Hz = 4200f,",
+  "                        Hz = (type == GlassType.Laminated ? 900f : 2800f) * sizePitch,",
+  "                        Hz = 2800f * sizePitch,",
   "LaminatedGlassIsDullerAndDoesNotRing"),
 
  ("A room that does not say what is still open",
