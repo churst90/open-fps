@@ -351,6 +351,14 @@ if (args.Contains("--battle") || args.Contains("--battle-live"))
     Environment.Exit(code);
 }
 
+if (args.Contains("--street") || args.Contains("--street-live"))
+{
+    Console.WriteLine("--- A street: two doors, a window shot out, a truck, and a wall ---");
+    int code = OpenFPS.Client.Core.AudioEngine.Fmod.StreetSceneSpike.Run(args.Contains("--street-live"));
+    Log.CloseAndFlush();
+    Environment.Exit(code);
+}
+
 if (args.Contains("--gunshot") || args.Contains("--gunshot-live"))
 {
     Console.WriteLine("--- Weapons: a dry synthesized shot, and a crack-to-report gap that encodes range ---");

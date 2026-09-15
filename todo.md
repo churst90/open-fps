@@ -1087,6 +1087,13 @@ completely silent.
       because nothing connects a gun to a player. Held items will supply the real trigger; having any
       at all is the difference between four tested models and four tested models nobody has heard.
 - [x] `ImpactAndGlassSoundTests`; sabotage suite up to 57.
+- [x] **`--street` / `--street-live`** — a minute on a street with all of it in one place, because the
+      only way to judge "nothing here was recorded" is to stand in the street and listen. A wooden
+      door and a steel one through the same doorway; a window on the second floor shot out from
+      thirty metres, and the gap before the glass arrives reading back as thirteen metres against an
+      actual twelve; a truck coasting past and standing on it hard enough to put the tyres a third
+      over their grip; and the same truck finding a wall at eleven metres a second, 830 kJ arriving.
+      Headless it checks the arithmetic and writes every layer out to audition.
 
 ### 1b. The original plan, kept for the reasoning
 
