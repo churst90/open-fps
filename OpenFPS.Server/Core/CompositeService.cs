@@ -66,7 +66,8 @@ public class CompositeService
     /// vertically — which is to say, where the thing meets the ground. That matters for placing it
     /// again later: a house placed at your feet should have its floor at your feet, not its middle.
     /// </summary>
-    public int Group(string mapId, Vector3 near, float radius, string name, bool anchored, out int partCount)
+    public int Group(string mapId, Vector3 near, float radius, string name, bool anchored,
+                     string owner, out int partCount)
     {
         partCount = 0;
         if (!_maps.TryGetMap(mapId, out var world, out _, out _, out var lookup)) return -1;
@@ -78,6 +79,7 @@ public class CompositeService
         {
             if (Vector3.DistanceSquared(t.Position, near) > r2) return;
             if (!CanBeGrouped(world, e)) return;
+            if (IsBiggerThanTheSweep(world, e, radius)) return;
             members.Add(e);
         });
         if (members.Count == 0) return -1;
@@ -93,16 +95,84 @@ public class CompositeService
 
         var root = _maps.SpawnEntity(mapId, w => w.Create(
             new Transform { Position = origin, Rotation = Quaternion.Identity, IsDirty = true },
-            new CompositeComponent { Name = name, Anchored = anchored, TemplateId = "" },
+            new CompositeComponent { Name = name, Anchored = anchored, TemplateId = "", Owner = owner },
             new NameComponent { Name = name },
             new IdentityComponent { Name = name, Announce = true },
             EntityType.StaticObject));
         if (root == Entity.Null) return -1;
 
         Attach(world, root, members, origin);
+        if (!anchored) MakeDynamic(mapId, world, root, members);
         partCount = members.Count;
         Log.Information("Composite '{Name}' grouped {Count} entit(ies) on '{Map}' at {Origin}.", name, partCount, mapId, origin);
         return root.Id;
+    }
+
+    /// <summary>
+    /// Makes a composite and everything in it move-able, as far as the spatial grid is concerned.
+    ///
+    /// The grid keeps two halves: a static one, built once and rebuilt only when geometry is created
+    /// or destroyed, and a dynamic one rebuilt from scratch every tick. Which half a thing goes in is
+    /// decided by whether it carries a <see cref="Velocity"/>. A free composite's walls MOVE, so
+    /// leaving them in the static half would leave the car's body permanently parked where it was
+    /// built: players colliding with a ghost of it, and the audio hearing it there.
+    ///
+    /// The rebuild at the end is what evicts those stale static entries; it is the only way the
+    /// static half can forget anything.
+    /// </summary>
+    private void MakeDynamic(string mapId, World world, Entity root, List<Entity> members)
+    {
+        bool anyWasStatic = false;
+        if (!world.Has<Velocity>(root)) { world.Add(root, new Velocity()); anyWasStatic = true; }
+        foreach (var m in members)
+            if (!world.Has<Velocity>(m)) { world.Add(m, new Velocity()); anyWasStatic = true; }
+        if (anyWasStatic) _maps.RefreshGrid(mapId);
+    }
+
+    /// <summary>The reverse: parts that stop belonging to something that moves go back to being scenery.</summary>
+    private void MakeStatic(string mapId, World world, IEnumerable<Entity> entities)
+    {
+        bool any = false;
+        foreach (var e in entities)
+            if (world.IsAlive(e) && world.Has<Velocity>(e)) { world.Remove<Velocity>(e); any = true; }
+        if (any) _maps.RefreshGrid(mapId);
+    }
+
+    /// <summary>
+    /// Whether somebody may take this composite apart, save it out, change what it is, or drive it.
+    ///
+    /// Owning something is not the same as having a fence round it. A composite with no owner is
+    /// public property, an elevated role can do anything, and NOTHING here gates walking into a
+    /// building or sitting in a passenger seat — a world where you cannot enter other people's
+    /// houses is not a world, it is a street of locked doors.
+    /// </summary>
+    public static bool MayModify(World world, Entity root, string requester, bool elevated)
+    {
+        if (elevated) return true;
+        if (!world.Has<CompositeComponent>(root)) return false;
+        string owner = world.Get<CompositeComponent>(root).Owner ?? "";
+        return string.IsNullOrWhiteSpace(owner)
+            || string.Equals(owner, requester, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// Whether a thing is too big to have been what somebody meant.
+    ///
+    /// A sweep is somebody standing in a place and saying "this, and everything round me". The floor
+    /// they are standing on is within twelve metres of them and so is the field it sits in, and
+    /// neither is what they meant — you cannot be SELECTING something whose far side is nowhere near
+    /// you. So anything wider than the sweep itself is not in it.
+    ///
+    /// Geometric, not a list of things called floors. The same rule keeps a house out of a sweep
+    /// meant for the table inside it and lets a twelve-metre sweep take a twelve-metre wall, which is
+    /// exactly the line a person would draw. Widen the radius and the bigger thing comes into scope,
+    /// which is also right: at thirty metres you plainly do mean the building.
+    /// </summary>
+    private static bool IsBiggerThanTheSweep(World world, Entity e, float radius)
+    {
+        if (!world.Has<ColliderComponent>(e)) return false;
+        var size = world.Get<ColliderComponent>(e).Size;
+        return MathF.Max(size.X, size.Z) > radius * 2f;
     }
 
     private static void Attach(World world, Entity root, List<Entity> members, Vector3 origin)
@@ -128,31 +198,70 @@ public class CompositeService
     /// what makes group and ungroup safe to use while experimenting, which is what anyone building
     /// something will actually be doing.
     /// </summary>
-    public bool Ungroup(string mapId, int rootId, out string name, out int partCount)
+    public bool Ungroup(string mapId, int rootId, string requester, bool elevated,
+                        out string name, out int partCount, out string error)
     {
-        name = ""; partCount = 0;
-        if (!_maps.TryGetMap(mapId, out var world, out _, out _, out var lookup)) return false;
-        if (!lookup.TryGetValue(rootId, out var root) || !world.IsAlive(root) || !world.Has<CompositeComponent>(root)) return false;
+        name = ""; partCount = 0; error = "";
+        if (!_maps.TryGetMap(mapId, out var world, out _, out _, out var lookup)) { error = "map not loaded"; return false; }
+        if (!lookup.TryGetValue(rootId, out var root) || !world.IsAlive(root) || !world.Has<CompositeComponent>(root))
+        { error = "that is not a composite"; return false; }
 
-        name = world.Get<CompositeComponent>(root).Name;
-        foreach (var member in MembersOf(world, rootId))
+        var composite = world.Get<CompositeComponent>(root);
+        if (!MayModify(world, root, requester, elevated))
+        { error = $"'{composite.Name}' belongs to {composite.Owner}"; return false; }
+
+        name = composite.Name;
+        var members = MembersOf(world, rootId);
+        foreach (var member in members)
         {
             world.Remove<ParentComponent>(member);
             partCount++;
         }
+        // Whoever was inside it is standing in the open now; the thing they were sitting in is gone.
+        foreach (var occupant in OccupantsOf(world, rootId)) Disembark(world, occupant);
+
+        if (!composite.Anchored) MakeStatic(mapId, world, members);
         lookup.Remove(rootId);
         world.Destroy(root);
+        // The root itself may have been in the static half of the grid; only a rebuild forgets it.
+        if (composite.Anchored) _maps.RefreshGrid(mapId);
         Log.Information("Composite '{Name}' ungrouped into {Count} loose entit(ies).", name, partCount);
         return true;
     }
 
-    /// <summary>Every entity currently parented to this root.</summary>
+    /// <summary>Every entity currently parented to this root — the parts it is MADE of.</summary>
     public static List<Entity> MembersOf(World world, int rootId)
     {
         var found = new List<Entity>();
         var q = new QueryDescription().WithAll<ParentComponent>();
         world.Query(in q, (Entity e, ref ParentComponent p) => { if (p.ParentEntityId == rootId) found.Add(e); });
         return found;
+    }
+
+    /// <summary>Everyone currently inside this root — the people it is CARRYING.</summary>
+    public static List<Entity> OccupantsOf(World world, int rootId)
+    {
+        var found = new List<Entity>();
+        var q = new QueryDescription().WithAll<OccupantComponent>();
+        world.Query(in q, (Entity e, ref OccupantComponent o) => { if (o.RootEntityId == rootId) found.Add(e); });
+        return found;
+    }
+
+    /// <summary>
+    /// Takes somebody out of whatever they were in, wherever they now are.
+    ///
+    /// Deliberately does NOT move them: the caller knows whether this is getting out (put them down
+    /// beside it) or the thing they were in ceasing to exist (leave them exactly where it left them).
+    /// </summary>
+    public static void Disembark(World world, Entity occupant)
+    {
+        if (!world.IsAlive(occupant) || !world.Has<OccupantComponent>(occupant)) return;
+        world.Remove<OccupantComponent>(occupant);
+        if (world.Has<PlayerComponent>(occupant))
+        {
+            ref var p = ref world.Get<PlayerComponent>(occupant);
+            p.IsInVehicle = false;
+        }
     }
 
     /// <summary>The composite root nearest a point, or -1. How a player refers to "this house" when
@@ -177,7 +286,8 @@ public class CompositeService
     /// when it was grouped: everything here is relative to it, so placing the template anywhere
     /// reproduces the same arrangement rather than the same coordinates.
     /// </summary>
-    public bool SaveAsTemplate(string mapId, int rootId, string templateId, out int partCount, out string error)
+    public bool SaveAsTemplate(string mapId, int rootId, string templateId, string requester, bool elevated,
+                               out int partCount, out string error)
     {
         partCount = 0; error = "";
         if (!_maps.TryGetMap(mapId, out var world, out _, out _, out var lookup)) { error = "map not loaded"; return false; }
@@ -185,6 +295,9 @@ public class CompositeService
         { error = "that is not a composite"; return false; }
 
         var composite = world.Get<CompositeComponent>(root);
+        if (!MayModify(world, root, requester, elevated))
+        { error = $"'{composite.Name}' belongs to {composite.Owner}"; return false; }
+
         var rootT = world.Get<Transform>(root);
         var inverse = Quaternion.Inverse(rootT.Rotation);
 
@@ -194,6 +307,21 @@ public class CompositeService
             Name = string.IsNullOrWhiteSpace(composite.Name) ? templateId : composite.Name,
             Anchored = composite.Anchored,
         };
+
+        // Seats and the vehicle profile are part of what the thing IS, so they go out with it. Place
+        // the template again and the second one has the same seats and the same engine, the same way
+        // it has the same walls.
+        if (world.Has<OccupancyComponent>(root))
+            foreach (var seat in world.Get<OccupancyComponent>(root).Seats)
+                template.Seats.Add(new SeatDefinition
+                {
+                    Name = seat.Name,
+                    Position = seat.LocalPosition,
+                    YawDegrees = seat.LocalYaw * (180f / MathF.PI),
+                    Controls = seat.Controls,
+                });
+        if (world.Has<DriveComponent>(root))
+            template.VehiclePreset = world.Get<DriveComponent>(root).Preset;
 
         foreach (var member in MembersOf(world, rootId))
         {
@@ -240,7 +368,7 @@ public class CompositeService
         if (!_composites.TryGet(templateId, out var template)) { error = $"no composite called '{templateId}'"; return -1; }
         if (!_maps.TryGetMap(mapId, out var world, out _, out _, out _)) { error = "map not loaded"; return -1; }
 
-        int rootId = Instantiate(mapId, template, position, rotation, out partCount);
+        int rootId = Instantiate(mapId, template, position, rotation, owner, out partCount);
         if (rootId < 0) { error = "nothing could be placed"; return -1; }
 
         if (_maps.TryGetMapData(mapId, out var data))
@@ -280,7 +408,7 @@ public class CompositeService
                 if (p.Anchored.HasValue && p.Anchored.Value != template.Anchored)
                     t = new CompositeTemplate { Id = template.Id, Name = template.Name, Description = template.Description,
                                                 Anchored = p.Anchored.Value, Parts = template.Parts };
-                if (Instantiate(mapId, t, p.Position, p.Rotation, out _) >= 0) placed++; else failed++;
+                if (Instantiate(mapId, t, p.Position, p.Rotation, p.Owner, out _) >= 0) placed++; else failed++;
             }
             if (placed > 0 || failed > 0)
                 Log.Information("Map '{Map}': {Placed} composite(s) placed, {Failed} failed.", mapId, placed, failed);
@@ -290,18 +418,32 @@ public class CompositeService
     /// <summary>Builds an instance without recording a placement — used by map load, which is
     /// replaying placements that are already recorded.</summary>
     public int Instantiate(string mapId, CompositeTemplate template, Vector3 position, Quaternion rotation,
-                           out int partCount)
+                           string owner, out int partCount)
     {
         partCount = 0;
         if (!_maps.TryGetMap(mapId, out var world, out _, out _, out _)) return -1;
 
         var root = _maps.SpawnEntity(mapId, w => w.Create(
             new Transform { Position = position, Rotation = rotation, IsDirty = true },
-            new CompositeComponent { Name = template.Name, Anchored = template.Anchored, TemplateId = template.Id },
+            new CompositeComponent { Name = template.Name, Anchored = template.Anchored, TemplateId = template.Id, Owner = owner ?? "" },
             new NameComponent { Name = template.Name },
             new IdentityComponent { Name = template.Name, Description = template.Description, Announce = true },
             EntityType.StaticObject));
         if (root == Entity.Null) return -1;
+
+        if (template.Seats.Count > 0)
+        {
+            var seats = new OccupancyComponent();
+            foreach (var d in template.Seats)
+                seats.Seats.Add(new Seat
+                {
+                    Name = d.Name,
+                    LocalPosition = d.Position,
+                    LocalYaw = d.YawDegrees * (MathF.PI / 180f),
+                    Controls = d.Controls,
+                });
+            world.Add(root, seats);
+        }
 
         foreach (var part in template.Parts)
         {
@@ -322,7 +464,178 @@ public class CompositeService
             partCount++;
         }
 
-        Log.Information("Placed composite '{Id}' on '{Map}' at {Pos} — {Parts} part(s).", template.Id, mapId, position, partCount);
+        if (!string.IsNullOrWhiteSpace(template.VehiclePreset))
+            MakeDrivable(mapId, world, root, template.VehiclePreset, out _);
+        else if (!template.Anchored)
+            MakeDynamic(mapId, world, root, MembersOf(world, root.Id));
+
+        Log.Information("Placed composite '{Id}' on '{Map}' at {Pos} — {Parts} part(s){Extra}.",
+                        template.Id, mapId, position, partCount,
+                        string.IsNullOrWhiteSpace(template.VehiclePreset) ? "" : $", driving as a {template.VehiclePreset}");
         return root.Id;
+    }
+
+    // ── Seats, and driving ──────────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Puts a seat where somebody is standing.
+    ///
+    /// Authored by standing in the right place rather than by typing coordinates, for the same reason
+    /// grouping is by radius: a player here cannot point at anything, but they can always walk to a
+    /// spot and say "here". The seat is recorded in the composite's OWN frame, so it survives the
+    /// thing being saved, placed again, and turned to face another way.
+    /// </summary>
+    public bool AddSeat(string mapId, int rootId, string seatName, bool controls, Vector3 worldPosition,
+                        float worldYaw, string requester, bool elevated, out string error)
+    {
+        error = "";
+        if (!_maps.TryGetMap(mapId, out var world, out _, out _, out var lookup)) { error = "map not loaded"; return false; }
+        if (!lookup.TryGetValue(rootId, out var root) || !world.IsAlive(root) || !world.Has<CompositeComponent>(root))
+        { error = "that is not a composite"; return false; }
+        if (!MayModify(world, root, requester, elevated))
+        { error = $"'{world.Get<CompositeComponent>(root).Name}' belongs to {world.Get<CompositeComponent>(root).Owner}"; return false; }
+
+        var rootT = world.Get<Transform>(root);
+        var inverse = Quaternion.Inverse(rootT.Rotation);
+        MathHelper.ToYawPitch(rootT.Rotation, out float rootYaw, out _);
+
+        var seat = new Seat
+        {
+            Name = seatName,
+            LocalPosition = Vector3.Transform(worldPosition - rootT.Position, inverse),
+            LocalYaw = MathHelper.WrapAngle(worldYaw - rootYaw),
+            Controls = controls,
+        };
+
+        if (!world.Has<OccupancyComponent>(root)) world.Add(root, new OccupancyComponent());
+        ref var occupancy = ref world.Get<OccupancyComponent>(root);
+        occupancy.Seats ??= new List<Seat>();
+        int existing = occupancy.Seats.FindIndex(x => string.Equals(x.Name, seatName, StringComparison.OrdinalIgnoreCase));
+        if (existing >= 0) occupancy.Seats[existing] = seat; else occupancy.Seats.Add(seat);
+
+        Log.Information("Composite {Root}: seat '{Seat}' at {Local} ({Controls}).",
+                        rootId, seatName, seat.LocalPosition, controls ? "drives" : "passenger");
+        return true;
+    }
+
+    /// <summary>Forgets a seat. Anyone sitting in it is put out of the composite first.</summary>
+    public bool RemoveSeat(string mapId, int rootId, string seatName, string requester, bool elevated, out string error)
+    {
+        error = "";
+        if (!_maps.TryGetMap(mapId, out var world, out _, out _, out var lookup)) { error = "map not loaded"; return false; }
+        if (!lookup.TryGetValue(rootId, out var root) || !world.IsAlive(root) || !world.Has<OccupancyComponent>(root))
+        { error = "that has no seats"; return false; }
+        if (!MayModify(world, root, requester, elevated))
+        { error = $"'{world.Get<CompositeComponent>(root).Name}' belongs to {world.Get<CompositeComponent>(root).Owner}"; return false; }
+
+        ref var occupancy = ref world.Get<OccupancyComponent>(root);
+        int index = occupancy.Seats.FindIndex(x => string.Equals(x.Name, seatName, StringComparison.OrdinalIgnoreCase));
+        if (index < 0) { error = $"no seat called '{seatName}'"; return false; }
+
+        // Everyone at or beyond the removed seat is put out: the indices behind it all shift, and a
+        // passenger silently moved into the driver's seat by a list edit is not a thing that should
+        // be able to happen.
+        foreach (var occupant in OccupantsOf(world, rootId))
+            if (world.Get<OccupantComponent>(occupant).SeatIndex >= index) Disembark(world, occupant);
+
+        occupancy.Seats.RemoveAt(index);
+        return true;
+    }
+
+    /// <summary>
+    /// Makes a composite drive.
+    ///
+    /// Everything this adds is something the map's own traffic already has: a profile naming the
+    /// engine and the tyres, a velocity so the world treats it as a thing that moves, a body the
+    /// grid can see, and a synthesised engine the client runs itself from the speed it is told. That
+    /// is the point — a car somebody built out of walls and a car the map spawned are the same kind
+    /// of object, so every bit of machinery that already makes traffic audible works on this one
+    /// without knowing it exists.
+    ///
+    /// It must be a FREE composite. A house that drives away is a caravan, and saying so is the one
+    /// line of policy in here.
+    /// </summary>
+    public bool MakeDrivable(string mapId, int rootId, string preset, string requester, bool elevated, out string error)
+    {
+        error = "";
+        if (!_maps.TryGetMap(mapId, out var world, out _, out _, out var lookup)) { error = "map not loaded"; return false; }
+        if (!lookup.TryGetValue(rootId, out var root) || !world.IsAlive(root) || !world.Has<CompositeComponent>(root))
+        { error = "that is not a composite"; return false; }
+        if (!MayModify(world, root, requester, elevated))
+        { error = $"'{world.Get<CompositeComponent>(root).Name}' belongs to {world.Get<CompositeComponent>(root).Owner}"; return false; }
+        if (world.Get<CompositeComponent>(root).Anchored)
+        { error = "it is fixed in place; regroup it with 'free' first"; return false; }
+
+        return MakeDrivable(mapId, world, root, preset, out error);
+    }
+
+    private bool MakeDrivable(string mapId, World world, Entity root, string preset, out string error)
+    {
+        error = "";
+        if (!VehicleProfile.Presets.ContainsKey(preset))
+        {
+            error = $"'{preset}' is not a vehicle; try one of {string.Join(", ", VehicleProfile.Presets.Keys)}";
+            return false;
+        }
+        var profile = VehicleProfile.ByName(preset);
+        var members = MembersOf(world, root.Id);
+        MathHelper.ToYawPitch(world.Get<Transform>(root).Rotation, out float yaw, out _);
+
+        SetOrAdd(world, root, new DriveComponent { Preset = preset, Heading = yaw });
+        SetOrAdd(world, root, new VehicleComponent
+        {
+            VehicleType = preset,
+            MaxSeats = world.Has<OccupancyComponent>(root) ? world.Get<OccupancyComponent>(root).Seats.Count : 0,
+        });
+        SetOrAdd(world, root, new SoundEmitterComponent
+        {
+            // The client recognises the "engine:" prefix and runs the engine itself, following the
+            // speed this entity reports. The server decides where the car is and how fast; it knows
+            // nothing about exhausts.
+            IsSynth = true,
+            SoundId = "engine:" + preset,
+            Mode = PlaybackMode.LoopOne,
+            Volume = 1f,
+            Range = Loudness.AudibleRange(profile.SourceLevelDb),
+            MinDistance = 3f,
+        });
+        // A body, so the grid carries it into earshot and a person can walk into it. Not solid: the
+        // parts it is built from are the solid things, and they are already here.
+        SetOrAdd(world, root, new ColliderComponent
+        {
+            Shape = ColliderShape.Box,
+            Size = LocalBounds(world, members, out _),
+            IsSolid = false,
+        });
+        MakeDynamic(mapId, world, root, members);
+        Log.Information("Composite {Root} drives as a {Preset} ({Engine}).", root.Id, preset, profile.Engine.Name);
+        return true;
+    }
+
+    private static void SetOrAdd<T>(World world, Entity e, T component) where T : struct
+    {
+        if (world.Has<T>(e)) world.Set(e, component); else world.Add(e, component);
+    }
+
+    /// <summary>
+    /// How big the thing is, from the parts it is made of — including what they are made of, not just
+    /// where their centres are, or a car would come out the size of a dot.
+    /// </summary>
+    public static Vector3 LocalBounds(World world, List<Entity> members, out Vector3 centre)
+    {
+        centre = Vector3.Zero;
+        if (members.Count == 0) return Vector3.One;
+        Vector3 min = new(float.MaxValue), max = new(float.MinValue);
+        foreach (var m in members)
+        {
+            if (!world.Has<ParentComponent>(m)) continue;
+            var local = world.Get<ParentComponent>(m).LocalPosition;
+            var half = world.Has<ColliderComponent>(m) ? world.Get<ColliderComponent>(m).Size * 0.5f : Vector3.Zero;
+            min = Vector3.Min(min, local - half);
+            max = Vector3.Max(max, local + half);
+        }
+        if (min.X > max.X) return Vector3.One;
+        centre = (min + max) * 0.5f;
+        return Vector3.Max(max - min, new Vector3(0.1f));
     }
 }

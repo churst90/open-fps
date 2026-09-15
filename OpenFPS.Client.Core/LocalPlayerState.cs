@@ -28,6 +28,18 @@ public class LocalPlayerState
     public float Yaw;
     public float Pitch;
     public bool IsGrounded { get; set; } = true;
+
+    /// <summary>
+    /// The composite this player is riding in, or -1 when they are on their own two feet.
+    ///
+    /// While it is set, the client does not predict its own position: there is nothing of its own to
+    /// predict. A passenger's position belongs to a seat, the seat belongs to something the client
+    /// cannot simulate, and guessing would earn a correction every single tick. It also stops
+    /// footsteps, which somebody sitting down does not make.
+    /// </summary>
+    public int RidingEntityId { get; set; } = -1;
+
+    public bool IsRiding => RidingEntityId >= 0;
     public int Health { get; set; } = 100;
     public int MaxHealth { get; set; } = 100;
     public string CurrentMaterial { get; set; } = "Generic";

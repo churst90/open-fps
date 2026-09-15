@@ -282,11 +282,37 @@ public sealed class ClientGameSession : IDisposable
         CheckInteractableProximity(snapshot);
     }
 
+    /// <summary>
+    /// Getting in and out, as the server reports it.
+    ///
+    /// The transition is what matters, not the state: sitting down and standing up are both teleports
+    /// as far as prediction is concerned, so the unacknowledged input history is meaningless across
+    /// either and the stride accumulator is holding distance walked by somebody who is now sitting in
+    /// a car. Both are thrown away, exactly as they are on a spawn.
+    /// </summary>
+    private void NoteRiding(int ridingEntityId)
+    {
+        if (ridingEntityId == _state.RidingEntityId) return;
+
+        bool wasRiding = _state.IsRiding;
+        _state.RidingEntityId = ridingEntityId;
+        _reconciler.Riding = _state.IsRiding;
+        _reconciler.Reset();
+        _controller.Teleported();
+        _state.VisualOffset = Vector3.Zero;
+
+        if (_state.IsRiding && !wasRiding) Serilog.Log.Information("Riding entity {Id}.", ridingEntityId);
+        else if (!_state.IsRiding) Serilog.Log.Information("No longer riding.");
+    }
+
     /// <summary>Render-rate update: footstep generation + spatial audio listener/emitters.</summary>
     public void ContinuousUpdate()
     {
         if (!IsInGame) return;
-        _controller.Update(_state.Position + _state.VisualOffset, _state.Velocity);
+        // A passenger travels without walking. Feeding the vehicle's motion to the stride generator
+        // would produce a footstep every stride-length of ROAD — at sixty miles an hour, a machine gun.
+        if (_state.IsRiding) _controller.Teleported();
+        else _controller.Update(_state.Position + _state.VisualOffset, _state.Velocity);
         // Internally capped to 60 Hz; the loop this hangs off spins far faster to keep the socket
         // serviced. See ClientAudioSystem.UpdateHz.
         _audioSystem.Update(_world.GetSnapshot());
@@ -511,6 +537,7 @@ public sealed class ClientGameSession : IDisposable
 
             case ServerStateUpdate update:
                 _world.SyncState(update);
+                NoteRiding(update.RidingEntityId);
                 foreach (var s in update.States)
                     if (s.EntityId == _ownEntityId)
                         _reconciler.ApplyServerCorrection(s, update.LastProcessedSequenceId, _world.GetSnapshot());

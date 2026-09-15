@@ -26,6 +26,25 @@ public class CompositePart
     public float? ApertureSize { get; set; }
 }
 
+/// <summary>
+/// One seat, in the composite's own frame. The saved form of <see cref="Seat"/>.
+///
+/// Seats are part of what a thing IS, so they travel in the template rather than being re-authored
+/// on every instance: place a bus twice and both have the same seats, the same as both have the same
+/// walls.
+/// </summary>
+public class SeatDefinition
+{
+    public string Name { get; set; } = string.Empty;
+    /// <summary>Where the occupant's feet go, relative to the composite's origin.</summary>
+    public Vector3 Position { get; set; }
+    /// <summary>Which way the seat faces within the composite, DEGREES — this is a file a person may
+    /// end up reading, and radians in a file are a small cruelty.</summary>
+    public float YawDegrees { get; set; }
+    /// <summary>Whether sitting here drives it.</summary>
+    public bool Controls { get; set; }
+}
+
 /// <summary>A saved composite: what it is called, whether it is fixed down, and what it is made of.</summary>
 public class CompositeTemplate
 {
@@ -35,6 +54,18 @@ public class CompositeTemplate
     /// <summary>Whether an instance is fixed to the world. A house is; a caravan is not.</summary>
     public bool Anchored { get; set; } = true;
     public List<CompositePart> Parts { get; set; } = new();
+
+    /// <summary>Where people can sit in it. Empty for a thing nobody gets inside, like a barricade.</summary>
+    public List<SeatDefinition> Seats { get; set; } = new();
+
+    /// <summary>
+    /// The vehicle profile this drives as, or empty for something that does not drive.
+    ///
+    /// A key into <see cref="OpenFPS.Common.VehicleProfile.Presets"/> — the same profiles the map's own
+    /// traffic uses, so a composite somebody built out of walls and a hatchback the map spawned are
+    /// the same kind of thing to the engine, the tyres and the client that has to make them audible.
+    /// </summary>
+    public string VehiclePreset { get; set; } = string.Empty;
 }
 
 /// <summary>
@@ -105,6 +136,11 @@ public class CompositeRepository
                 if (t.Parts.Count == 0) { _rejected[t.Id] = "no Parts"; continue; }
                 if (t.Parts.Exists(p => string.IsNullOrWhiteSpace(p.PrefabId)))
                 { _rejected[t.Id] = "a part names no prefab"; continue; }
+                if (!string.IsNullOrWhiteSpace(t.VehiclePreset)
+                    && !OpenFPS.Common.VehicleProfile.Presets.ContainsKey(t.VehiclePreset))
+                { _rejected[t.Id] = $"unknown vehicle preset '{t.VehiclePreset}'"; continue; }
+                if (t.Seats.Exists(s => string.IsNullOrWhiteSpace(s.Name)))
+                { _rejected[t.Id] = "a seat has no name"; continue; }
                 _templates[t.Id] = t;
             }
             catch (Exception ex) { _rejected[name] = ex.Message; }

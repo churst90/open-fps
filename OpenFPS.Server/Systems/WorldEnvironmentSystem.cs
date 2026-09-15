@@ -261,7 +261,7 @@ public readonly record struct MapAtmosphere(
         1.0f);
 }
 
-internal static class MathHelper
-{
-    public static float Lerp(float a, float b, float t) => a + (b - a) * Math.Clamp(t, 0f, 1f);
-}
+// The local MathHelper that used to live here was a byte-for-byte copy of OpenFPS.Common.MathHelper.Lerp,
+// and being in this namespace it SHADOWED the shared one for every file in OpenFPS.Server.Systems —
+// so anything here reaching for WrapAngle or ToYawPitch found a class with neither. Deleted; the
+// shared one is in scope through `using OpenFPS.Common` above and does the same arithmetic.

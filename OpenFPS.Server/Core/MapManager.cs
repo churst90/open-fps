@@ -479,6 +479,12 @@ public class MapManager
         
         data.world.Query(new QueryDescription().WithAll<Transform, ColliderComponent>(), (Entity e, ref Transform t, ref ColliderComponent c) =>
         {
+            // Only geometry that stays put. The same test IndexEntity uses, and it has to be the same
+            // one: anything that moves is rebuilt into the dynamic half every tick, so a static entry
+            // for it is a permanent ghost of wherever it happened to be when this ran. That was
+            // harmless while nothing but players and traffic moved — both spawned after the last
+            // refresh — and stops being harmless the moment a building can drive away.
+            if (data.world.Has<Velocity>(e) || data.world.Has<PlayerComponent>(e)) return;
             data.grid.AddOverlapping(t.Position, c.Size, e, isStatic: true);
             gridCount++;
         });

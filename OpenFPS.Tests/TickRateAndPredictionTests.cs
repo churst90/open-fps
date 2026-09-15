@@ -52,7 +52,8 @@ public class TickRateAndPredictionTests
         new() { SequenceId = seq, MoveDirection = new Vector3(0, 0, 1), DeltaTime = dt };
 
     private static void RunServerTick(World world, SpatialGrid<Entity> grid, SessionManager sessions) =>
-        MovementSystem.Update(world, new Vector3(-100, -100, -100), new Vector3(100, 100, 100), grid, sessions, null!, FixedDeltaTime);
+        MovementSystem.Update(world, new Vector3(-100, -100, -100), new Vector3(100, 100, 100), grid,
+                              new Dictionary<int, Entity>(), sessions, null!, FixedDeltaTime);
 
     // ── Tick-rate unification ───────────────────────────────────────────────────
 

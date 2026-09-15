@@ -860,14 +860,101 @@ drive away are the same structure. Only whether anything moves the root differs.
       not a house, it is a rehearsal. Covered end to end by `APlacedBuildingSurvivesARestart`.
 - [x] Commands: `/group name [radius] [free]`, `/ungroup`, `/saveas id`, `/place id [yaw]`,
       `/composites`, `/savemap`.
-- [ ] **Occupancy** — enter a composite, and let the root carry its occupants' transforms. Driving
-      falls out of it: the difference between standing in a kitchen and sitting in a driver's seat is
-      which root you are parented to.
-- [ ] Ownership: `CompositePlacement.Owner` is recorded but nothing enforces it yet.
+- [x] **Occupancy and driving** — see the section below.
+- [x] Ownership — `CompositeComponent.Owner`, enforced.
+- [x] A sweep no longer swallows anything WIDER THAN ITSELF. `/group` on a map with a floor took the
+      floor, because the floor is within twelve metres of you; it is within twelve metres of
+      everybody. Geometric, not a list of things called floors: you cannot be selecting something
+      whose far side is nowhere near you, and widening the radius correctly brings bigger things into
+      scope.
 - [ ] Parts that were not spawned from a prefab cannot be saved. Right answer for now (it fails
       loudly rather than dropping a wall), but hand-built geometry needs a home eventually.
 - [ ] A composite's own acoustics: a house should be a REGION, so being inside one is audible without
       anyone authoring a region volume by hand.
+
+## Occupancy: get in, and drive it away (2026-09-15)
+
+The last of the four things a composite is for — saved, placed again, owned, ENTERED — and the one
+that makes driving stop being a feature of its own. A car somebody built out of walls and a car the
+map spawned are now the same kind of object, so everything that already makes traffic audible works
+on the player's one without being told it exists.
+
+The whole loop, from a pile of walls to driving away:
+
+    /group car 6 free        — one thing, not fixed down
+    /addseat driver drive    — a seat where you are standing, and it drives
+    /addseat passenger       — and one for somebody else
+    /drivable v8_sports      — an engine, a gearbox, tyres and a mass
+    /saveas car              — anyone can place another
+    /enter                   — or press E beside it
+    W and S to drive, A and D to steer, space to brake, /exit to get out
+
+- [x] `Seat` / `OccupancyComponent` on the root, `OccupantComponent` on the person. Who is in a seat
+      lives on the OCCUPANT only — one place knows, so there is nothing to keep in step.
+- [x] `OccupancySystem` runs last, after everything that could have moved a root. It carries two
+      things differently, and the difference is the point. POSITION belongs to the seat outright.
+      HEADING is the player's own, with the vehicle's rotation ADDED to it: turn a car ninety degrees
+      and its driver is facing ninety degrees further round having turned their head not at all.
+      Overwriting it instead would leave a driver hearing the track swing around them every corner.
+      That is also why occupants do NOT wear a `ParentComponent` like the parts do — a wall keeps no
+      opinion of its own about which way it is pointing.
+- [x] Adding the delta rather than setting the angle is what makes it survive the trip to the client:
+      the client already reconciles its heading against the server's, so a yaw the server turned
+      arrives as an ordinary correction and the listener turns with the car. No new client machinery.
+- [x] `DrivingSystem`, and there is not one handling number in it. What a car pulls comes from its
+      engine's torque through its own gearbox; what it corners and stops at comes from its tyres'
+      peak grip against its mass; what it will not exceed comes from its drag area, because top speed
+      is where the engine stops out-pulling the air. `WhatItDrivesLikeComesOutOfWhatItIs` holds that:
+      an F1 car and a fourteen-tonne truck are told apart by their profiles alone.
+- [x] The friction circle is `TyreFriction.Demand` — the same function the client uses to decide
+      whether a tyre squeals. Ask for more cornering than is left after the braking and the car runs
+      wide, and the noise it makes doing so is the same number that made it run wide. Neither half
+      was written for the other, and tyre squeal under a player's own braking therefore costs nothing.
+- [x] Engine braking, because a closed throttle drags the engine rather than disconnecting it. Added
+      when a coasting car took several minutes to stop — which is what a car in NEUTRAL does, and not
+      what anyone lifting off expects. It is stronger in a low gear, as it should be.
+- [x] Held controls, not sampled ones: a driver does not lift off because a packet was lost. They
+      decay after three quarters of a second of silence, so a client that dies mid-corner coasts to a
+      stop rather than driving away forever (`ASilentDriverCoastsToAStop`).
+- [x] Driving is fed from the same input queue, budget and sequence numbering as walking, so the
+      sub-tick speed limiter covers it: a driver cannot outrun it by sending packets faster any more
+      than a pedestrian can.
+- [x] The client stops PREDICTING while riding. A passenger's position belongs to a seat, the seat
+      belongs to something the client has no simulation of, and guessing earns a correction every
+      tick. Look is untouched — turning your head is still yours. `ServerStateUpdate.RidingEntityId`
+      carries it, and the transition throws away the input history and the stride accumulator exactly
+      as a spawn does.
+- [x] No footsteps while riding. Feeding a vehicle's motion to the stride generator produces a
+      footstep every stride-length of ROAD, which at sixty miles an hour is a machine gun.
+- [x] A free composite and everything in it is now gridded as DYNAMIC. `RefreshGrid` was also putting
+      moving things into the static half, which was harmless while only players and traffic moved —
+      both spawn after the last refresh — and stops being harmless the moment a building can drive
+      away, because a static entry is a permanent ghost of wherever the thing was.
+- [x] Interact (E) is get in / get out. From inside something, the only interaction there is IS
+      getting out. It also now runs on the tick thread through the command buffer like every other
+      world-touching handler; it was reading the Arch world from the network thread.
+- [x] Ownership gates taking something apart, saving it out as your own, changing what it is, and
+      DRIVING it. It gates nothing else: an unowned composite is public property, and riding in
+      somebody's passenger seat is not trespass. A world you cannot get a lift in is not a world.
+- [x] Getting out searches outward from the SEAT, preferring the spot you climbed in from — ground
+      you demonstrably fitted on a moment ago. Searching from the composite's origin works for a car
+      and is absurd for a bus: stepping off one would put you level with its front bumper.
+- [x] `OccupancyTests`: 21 tests, driven through the real tick in the real order.
+
+Not done, and deliberately:
+
+- [ ] **Standing aboard** — being carried by something while free to walk about inside it (a bus
+      aisle, a boat deck, a lift). The server side is small; the client side is not, because such a
+      player has movement of their own to predict AND a floor moving under it. Seats are the whole of
+      occupancy for now, and `OccupantComponent.SeatIndex` is already shaped to take a -1 for it.
+- [ ] **Collision response.** A driven composite that hits something stops dead. The impulse, the
+      damage and the SOUND of it are the next step, and stopping dead is the honest placeholder
+      rather than a pretence that it is done.
+- [ ] A driven composite's parts are dynamic, so they are outside the client's acoustic bake — you
+      hear a car drive past you correctly, but not the room its walls make around you while you are
+      inside it. That is the same work as "a composite should be a REGION", above.
+- [ ] Interior sound. Sitting in a car puts the listener a metre from its own engine with nothing
+      between them; a cabin is a filter and a much quieter place than a bonnet.
 
 ## Held items, inventory, occupancy, collisions (2026-09-15, planned)
 
@@ -880,7 +967,8 @@ The order these go in, and why. Everything here was blocked on composites existi
 - [ ] **Inventory over `InventoryComponent`**, which is already entity-backed (an item in your bag is
       the same entity as one on the ground — the right foundation). Delete the parallel
       `LocalPlayerState.Inventory` list of strings before the two drift.
-- [ ] **Occupancy**: enter a composite. Then vehicles are drivable for free.
+- [x] **Occupancy**: enter a composite. Vehicles came out drivable, as predicted. See the section
+      above.
 - [ ] **Collision response**: `MassKg` is on every vehicle profile already. Missing is the impulse
       from relative velocity and mass, damage from kinetic energy, and the SOUND of it — which should
       come from the materials and the energy, not a sample library. Stepping onto a live track should

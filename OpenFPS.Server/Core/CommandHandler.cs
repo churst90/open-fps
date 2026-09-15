@@ -24,14 +24,16 @@ public class CommandHandler
     private readonly MapManager _maps;
     private readonly GameServer _server;
     private readonly CompositeService? _composites;
+    private readonly OccupancyService? _seats;
 
     public CommandHandler(SessionManager sessions, MapManager maps, GameServer server,
-                          CompositeService? composites = null)
+                          CompositeService? composites = null, OccupancyService? seats = null)
     {
         _sessions = sessions;
         _maps = maps;
         _server = server;
         _composites = composites;
+        _seats = seats;
     }
 
     public void HandleTextCommand(int connectionId, TextCommand cmd, Action<IMessage> reply)
@@ -111,6 +113,34 @@ public class CommandHandler
                 break;
             case "composites":
                 HandleListComposites(reply);
+                break;
+            case "addseat":
+                if (!isElevated) { DenyCommand(reply); return; }
+                HandleAddSeat(session, args, reply);
+                break;
+            case "removeseat":
+                if (!isElevated) { DenyCommand(reply); return; }
+                HandleRemoveSeat(session, args, reply);
+                break;
+            case "drivable":
+                if (!isElevated) { DenyCommand(reply); return; }
+                HandleDrivable(session, args, reply);
+                break;
+            // ── Occupancy ───────────────────────────────────────────────────────────────────
+            //
+            // Not elevated, any of it. Getting into things is what the world is FOR; building the
+            // thing you get into is the part that needs a role.
+            case "enter":
+            case "board":
+            case "getin":
+                HandleEnter(session, args, reply);
+                break;
+            case "exit":
+            case "getout":
+                HandleExit(session, reply);
+                break;
+            case "seats":
+                HandleSeats(session, reply);
                 break;
             case "savemap":
                 if (!isElevated) { DenyCommand(reply); return; }
@@ -355,10 +385,10 @@ public class CommandHandler
         // "free" is the word for a composite that is not fixed down: a caravan rather than a house.
         bool anchored = !args.Contains("free", StringComparer.OrdinalIgnoreCase);
 
-        int root = svc.Group(session.CurrentMapId, position, radius, name, anchored, out int parts);
+        int root = svc.Group(session.CurrentMapId, position, radius, name, anchored, session.Username, out int parts);
         if (root < 0) { Say(reply, $"Nothing within {radius:F0} m could be grouped."); return; }
         Say(reply, $"Grouped {parts} part(s) within {radius:F0} m into '{name}', "
-                 + $"{(anchored ? "fixed in place" : "free to be moved")}. Save it with /saveas.");
+                 + $"{(anchored ? "fixed in place" : "free to be moved")}, yours. Save it with /saveas.");
     }
 
     /// <summary>/ungroup — takes the nearest composite apart, leaving its parts exactly where they are.</summary>
@@ -369,8 +399,9 @@ public class CommandHandler
 
         int root = svc.NearestRoot(session.CurrentMapId, position, CompositeReachRadius);
         if (root < 0) { Say(reply, $"No composite within {CompositeReachRadius:F0} m."); return; }
-        if (!svc.Ungroup(session.CurrentMapId, root, out string name, out int parts))
-        { Say(reply, "That could not be ungrouped."); return; }
+        if (!svc.Ungroup(session.CurrentMapId, root, session.Username, Elevated(session),
+                         out string name, out int parts, out string error))
+        { Say(reply, $"That could not be ungrouped: {error}."); return; }
         Say(reply, $"'{name}' is now {parts} loose part(s), all where they were.");
     }
 
@@ -383,7 +414,8 @@ public class CommandHandler
 
         int root = svc.NearestRoot(session.CurrentMapId, position, CompositeReachRadius);
         if (root < 0) { Say(reply, $"No composite within {CompositeReachRadius:F0} m. Use /group first."); return; }
-        if (!svc.SaveAsTemplate(session.CurrentMapId, root, args[0], out int parts, out string error))
+        if (!svc.SaveAsTemplate(session.CurrentMapId, root, args[0], session.Username, Elevated(session),
+                                out int parts, out string error))
         { Say(reply, $"Could not save: {error}."); return; }
         Say(reply, $"Saved '{args[0]}' with {parts} part(s). Place another with /place {args[0]}.");
     }
@@ -403,6 +435,131 @@ public class CommandHandler
         if (root < 0) { Say(reply, $"Could not place: {error}."); return; }
         Say(reply, $"Placed '{args[0]}' here, {parts} part(s), facing {yaw:F0} degrees. "
                  + "It will be gone after a restart until you /savemap.");
+    }
+
+    private static bool Elevated(UserSession session)
+        => session.Role == UserRole.Dev || session.Role == UserRole.Admin;
+
+    private OccupancyService? Seats(Action<IMessage> reply)
+    {
+        if (_seats == null) Say(reply, "Getting into things is not available on this server.");
+        return _seats;
+    }
+
+    /// <summary>
+    /// /addseat name [drive] — puts a seat where you are standing, facing the way you are facing.
+    ///
+    /// Authored by standing in the right place, for the same reason grouping is by radius: a player
+    /// here cannot point at anything, but they can always walk to a spot and say "here".
+    /// </summary>
+    private void HandleAddSeat(UserSession session, string[] args, Action<IMessage> reply)
+    {
+        var svc = Composites(reply); if (svc == null) return;
+        if (args.Length < 1) { Say(reply, "Usage: /addseat name [drive]"); return; }
+        if (!TryGetBody(session, reply, out var world, out _, out var position)) return;
+
+        int root = svc.NearestRoot(session.CurrentMapId, position, CompositeReachRadius);
+        if (root < 0) { Say(reply, $"No composite within {CompositeReachRadius:F0} m. Use /group first."); return; }
+
+        bool controls = args.Contains("drive", StringComparer.OrdinalIgnoreCase)
+                     || args.Contains("driver", StringComparer.OrdinalIgnoreCase);
+        float yaw = world.Has<PlayerComponent>(session.Entity) ? world.Get<PlayerComponent>(session.Entity).Yaw : 0f;
+
+        if (!svc.AddSeat(session.CurrentMapId, root, args[0], controls, position, yaw,
+                         session.Username, Elevated(session), out string error))
+        { Say(reply, $"Could not add that seat: {error}."); return; }
+
+        Say(reply, controls
+            ? $"Seat '{args[0]}' added here, and it drives."
+            : $"Seat '{args[0]}' added here.");
+    }
+
+    /// <summary>/removeseat name — forgets a seat, putting whoever is in it out first.</summary>
+    private void HandleRemoveSeat(UserSession session, string[] args, Action<IMessage> reply)
+    {
+        var svc = Composites(reply); if (svc == null) return;
+        if (args.Length < 1) { Say(reply, "Usage: /removeseat name"); return; }
+        if (!TryGetBody(session, reply, out _, out _, out var position)) return;
+
+        int root = svc.NearestRoot(session.CurrentMapId, position, CompositeReachRadius);
+        if (root < 0) { Say(reply, $"No composite within {CompositeReachRadius:F0} m."); return; }
+        if (!svc.RemoveSeat(session.CurrentMapId, root, args[0], session.Username, Elevated(session), out string error))
+        { Say(reply, $"Could not remove that seat: {error}."); return; }
+        Say(reply, $"Seat '{args[0]}' removed.");
+    }
+
+    /// <summary>
+    /// /drivable preset — gives the nearest free composite an engine, tyres and a mass.
+    ///
+    /// The last step of turning a pile of walls into a car, and the shortest, because everything it
+    /// needs already exists: the same vehicle profiles the map's own traffic runs on. From here the
+    /// thing is a vehicle to every system that cares — the grid, the broadcast radius, the client's
+    /// engine synthesis — none of which needs telling that a player built this one.
+    /// </summary>
+    private void HandleDrivable(UserSession session, string[] args, Action<IMessage> reply)
+    {
+        var svc = Composites(reply); if (svc == null) return;
+        if (args.Length < 1)
+        {
+            Say(reply, $"Usage: /drivable preset. Known: {string.Join(", ", VehicleProfile.Presets.Keys)}");
+            return;
+        }
+        if (!TryGetBody(session, reply, out _, out _, out var position)) return;
+
+        int root = svc.NearestRoot(session.CurrentMapId, position, CompositeReachRadius);
+        if (root < 0) { Say(reply, $"No composite within {CompositeReachRadius:F0} m."); return; }
+        if (!svc.MakeDrivable(session.CurrentMapId, root, args[0], session.Username, Elevated(session), out string error))
+        { Say(reply, $"Could not make that drivable: {error}."); return; }
+
+        _server.SyncAudioComponent(root);
+        var profile = VehicleProfile.ByName(args[0]);
+        Say(reply, $"It drives as a {profile.Name} now — {profile.Engine.Name}, {profile.MassKg:F0} kg. "
+                 + "Add a seat that drives with /addseat driver drive, then get in with /enter.");
+    }
+
+    /// <summary>/enter [seat] — gets into the nearest thing with seats.</summary>
+    private void HandleEnter(UserSession session, string[] args, Action<IMessage> reply)
+    {
+        var svc = Seats(reply); if (svc == null) return;
+        if (!TryGetBody(session, reply, out _, out _, out var position)) return;
+
+        int root = svc.NearestEnterable(session.CurrentMapId, position, OccupancyService.BoardingRange);
+        if (root < 0) { Say(reply, "There is nothing to get into within reach."); return; }
+
+        svc.Enter(session, root, args.Length > 0 ? string.Join(" ", args) : null, out string message);
+        Say(reply, message);
+    }
+
+    /// <summary>/exit — gets out, onto a clear patch of ground beside it.</summary>
+    private void HandleExit(UserSession session, Action<IMessage> reply)
+    {
+        var svc = Seats(reply); if (svc == null) return;
+        svc.Exit(session, out string message);
+        Say(reply, message);
+    }
+
+    /// <summary>
+    /// /seats — reads out what is inside the nearest thing you could get into.
+    ///
+    /// The replacement for looking through a window, and it has to say which seats are TAKEN as well
+    /// as which exist: walking round a car trying doors is how a sighted player finds that out.
+    /// </summary>
+    private void HandleSeats(UserSession session, Action<IMessage> reply)
+    {
+        var svc = Seats(reply); if (svc == null) return;
+        if (!TryGetBody(session, reply, out var world, out _, out var position)) return;
+
+        int root = world.Has<OccupantComponent>(session.Entity)
+            ? world.Get<OccupantComponent>(session.Entity).RootEntityId
+            : svc.NearestEnterable(session.CurrentMapId, position, CompositeReachRadius);
+        if (root < 0) { Say(reply, "Nothing with seats nearby."); return; }
+
+        var seats = svc.Seats(session.CurrentMapId, root, position);
+        if (seats.Count == 0) { Say(reply, "It has no seats."); return; }
+
+        foreach (var seat in seats)
+            Say(reply, $"  {seat.Name}{(seat.Controls ? " (drives)" : "")}: "
+                     + $"{(seat.Taken ? "taken" : "free")}, {seat.Distance:F1} metres.");
     }
 
     /// <summary>/composites — what there is to place.</summary>

@@ -40,13 +40,26 @@ public sealed class PredictionReconciler
     public void Reset() => _history.Clear();
 
     /// <summary>
+    /// Whether the player's position is currently a seat's business rather than their own.
+    ///
+    /// Prediction exists to hide the round trip on movement the client CAUSED. A passenger causes
+    /// none: where they are is decided by something the client has no simulation of — a vehicle with
+    /// an engine, tyres and a driver who may be somebody else. Predicting it would mean inventing a
+    /// position and being corrected off it every tick, which is worse than the honest lag of simply
+    /// following the server. Look is untouched; turning your head is still yours.
+    /// </summary>
+    public bool Riding { get; set; }
+
+    /// <summary>
     /// Applies one freshly gathered input: rotate, predict, and remember it for replay.
     /// </summary>
     public void Step(ClientInputUpdate input, WorldSnapshot snapshot, float dt)
     {
         _physics.ApplyLook(input, dt);
-        _physics.Predict(input, snapshot, dt);
+        if (!Riding) _physics.Predict(input, snapshot, dt);
 
+        // Still recorded while riding: the server acknowledges these sequence numbers, and the yaw
+        // reconciliation below needs to know which look deltas it has not seen yet.
         _history.Add(input);
 
         // Bound the history. Without this, a client whose acks stop arriving (server hitch, packet
@@ -74,9 +87,11 @@ public sealed class PredictionReconciler
 
         // Replay only the movement of the still-unacknowledged inputs. Look is NOT replayed: the
         // local heading is already ahead of the server by exactly those inputs (see ReconcileYaw),
-        // and re-applying the deltas here would double-count every turn.
-        foreach (var input in _history)
-            _physics.Predict(input, snapshot, input.DeltaTime);
+        // and re-applying the deltas here would double-count every turn. A passenger replays
+        // nothing at all — none of those inputs moved them.
+        if (!Riding)
+            foreach (var input in _history)
+                _physics.Predict(input, snapshot, input.DeltaTime);
 
         _state.VisualOffset = predictedPos - _state.Position;
         if (_state.VisualOffset.Length() > SnapDistance) _state.VisualOffset = Vector3.Zero;

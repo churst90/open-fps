@@ -28,7 +28,8 @@ public static class MovementSystem
     private static readonly List<Entity> _nearbyScratch = new(64);
     private static readonly HashSet<Entity> _nearbySeen = new();
 
-    public static void Update(World world, Vector3 mapMin, Vector3 mapMax, SpatialGrid<Entity> grid, SessionManager sessions, MapManager maps, float dt)
+    public static void Update(World world, Vector3 mapMin, Vector3 mapMax, SpatialGrid<Entity> grid,
+                              Dictionary<int, Entity> lookup, SessionManager sessions, MapManager maps, float dt)
     {
         _maps = maps;
         
@@ -66,6 +67,34 @@ public static class MovementSystem
                 float stepDt = input.DeltaTime > 0f ? MathF.Min(input.DeltaTime, MaxInputDeltaTime) : dt;
                 stepDt = MathF.Min(stepDt, session.InputBudget);
                 session.InputBudget -= stepDt;
+
+                // 0. SITTING DOWN
+                //
+                // An occupant's body is not theirs to move. The seat owns where they are — OccupancySystem
+                // puts them in it once everything that could have moved the vehicle has run — so none of
+                // the walking below applies: no input direction, no gravity, no ground probe, no
+                // collision gather. Two things are still theirs. Where they are LOOKING, always; and in a
+                // control seat, what the thing they are sitting in is being asked to do. That second one
+                // is the whole of driving, and it is deliberately fed from the same input queue, budget
+                // and sequence numbering as walking: a driver cannot outrun the speed limiter by sending
+                // packets faster any more than a pedestrian can.
+                if (world.Has<OccupantComponent>(e))
+                {
+                    if (input.LookDelta != Vector2.Zero)
+                    {
+                        player.Yaw -= input.LookDelta.X * RotationSpeed * stepDt;
+                        player.Pitch = Math.Clamp(player.Pitch + (input.LookDelta.Y * RotationSpeed * stepDt), -1.5f, 1.5f);
+                    }
+
+                    var occupant = world.Get<OccupantComponent>(e);
+                    if (occupant.Controls
+                        && lookup.TryGetValue(occupant.RootEntityId, out var vehicle)
+                        && world.IsAlive(vehicle))
+                    {
+                        DrivingSystem.ApplyControls(world, vehicle, input);
+                    }
+                    continue;
+                }
 
                 // 1. VOID CHECK (Safety Net)
                 if (transform.Position.Y < voidThreshold)

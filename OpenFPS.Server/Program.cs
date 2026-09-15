@@ -32,7 +32,9 @@ public class GameServer
     private CommandHandler _commands = null!;
     private readonly System.Collections.Concurrent.ConcurrentQueue<int> _dirtyAudioEntities = new();
     private readonly VehicleSystem _vehicles = new();
+    private readonly OccupancySystem _occupancy = new();
     private CompositeService _composites = null!;
+    private OccupancyService _seats = null!;
     private readonly System.Collections.Concurrent.ConcurrentQueue<Action> _commandBuffer = new();
 
     private readonly MessageDispatcher _dispatcher = new();
@@ -128,7 +130,8 @@ public class GameServer
         _vehicles.Spawn(_maps);
         // Now that every sound source exists, size each map's broadcast radius from it.
         _maps.RefreshEarshotRanges();
-        _commands = new CommandHandler(_sessions, _maps, this, _composites);
+        _seats = new OccupancyService(_maps);
+        _commands = new CommandHandler(_sessions, _maps, this, _composites, _seats);
         
         // Initialize new Service Architecture
         _discovery = new DiscoveryService(_dispatcher, _sessions);
@@ -309,10 +312,16 @@ public class GameServer
                     });
 
                     // 4. Update Simulation (Movement/AI)
-                    MovementSystem.Update(world, entry.Value.data.MinBound, entry.Value.data.MaxBound, grid, _sessions, _maps, dt);
+                    MovementSystem.Update(world, entry.Value.data.MinBound, entry.Value.data.MaxBound, grid, lookup, _sessions, _maps, dt);
                     AISystem.Update(world, lookup, dt);
                     _vehicles.Update(entry.Key, world, dt);
+                    // Driven composites move AFTER the players who are steering them have had their
+                    // say, and BEFORE anything is carried: the order here is the whole contract.
+                    // Parts are bolted to the root and follow it exactly; occupants are carried by it
+                    // but keep their own heads, so they come last of all.
+                    DrivingSystem.Update(world, grid, entry.Value.data.MinBound, entry.Value.data.MaxBound, dt);
                     ParentSystem.Update(world, lookup);
+                    _occupancy.Update(world, lookup);
                 }
                 catch (Exception ex)
                 {
@@ -536,11 +545,18 @@ public class GameServer
                     var peer = _network.GetPeer(session.ConnectionId);
                     if (peer == null) continue;
 
+                    // What the client needs to know about itself that is not in its transform: whether
+                    // its position is its own to predict, or a seat's to decide.
+                    int riding = world.Has<OccupantComponent>(session.Entity)
+                        ? world.Get<OccupantComponent>(session.Entity).RootEntityId : -1;
+
                     _reusableBroadcast.Tick = tick;
                     _reusableBroadcast.LastProcessedSequenceId = session.LastProcessedSequenceId;
+                    _reusableBroadcast.RidingEntityId = riding;
                     _reusableBroadcast.States.Clear();
                     _reliableBroadcast.Tick = tick;
                     _reliableBroadcast.LastProcessedSequenceId = session.LastProcessedSequenceId;
+                    _reliableBroadcast.RidingEntityId = riding;
                     _reliableBroadcast.States.Clear();
                     _visibleBuffer.Clear();
                     _visibleDynamicBuffer.Clear();
@@ -678,28 +694,87 @@ public class GameServer
         }
     }
 
+    /// <summary>
+    /// The interact key, which is mostly a door handle.
+    ///
+    /// Getting into and out of things is what "interact" means almost every time anyone presses it
+    /// near a composite, so it is what the key does: press it beside a car and you are in it, press
+    /// it again and you are out. That the same key does both is not a shortcut — from inside the
+    /// thing, the only interaction there is IS getting out.
+    ///
+    /// Runs on the tick thread through the command buffer, like every other world-touching handler.
+    /// Reading the Arch world from the network thread raced the simulation.
+    /// </summary>
     private void HandleInteract(NetPeer peer, InteractRequest interact)
     {
         if (!_sessions.TryGetSession(peer.Id, out var session)) return;
 
-        if (interact.TargetEntityId.HasValue)
+        EnqueueCommand(() =>
         {
-            if (_maps.TryGetMap(session.CurrentMapId, out var world, out _, out _, out var lookup))
-            {
-                if (lookup.TryGetValue(interact.TargetEntityId.Value, out var targetEntity))
-                {
-                    var pPos = world.Get<Transform>(session.Entity).Position;
-                    var tPos = world.Get<Transform>(targetEntity).Position;
-                    if (Vector3.Distance(pPos, tPos) > 5.0f)
-                    {
-                        _network.SendMessage(peer, new TextEvent { Text = "Interaction rejected: Target too far away (> 5.0m)." }, DeliveryMethod.ReliableOrdered);
-                        return;
-                    }
-                }
-            }
-        }
+            void Say(string text) =>
+                _network.SendMessage(peer, new TextEvent { Text = text }, DeliveryMethod.ReliableOrdered);
 
-        _network.SendMessage(peer, new TextEvent { Text = $"Interaction '{interact.Action}' received." }, DeliveryMethod.ReliableOrdered);
+            if (!_maps.TryGetMap(session.CurrentMapId, out var world, out _, out _, out _)
+                || session.Entity == Entity.Null || !world.IsAlive(session.Entity))
+            {
+                Say("You are not in the world yet.");
+                return;
+            }
+
+            if (world.Has<OccupantComponent>(session.Entity))
+            {
+                _seats.Exit(session, out string leaving);
+                Say(leaving);
+                return;
+            }
+
+            var position = world.Get<Transform>(session.Entity).Position;
+            // The client points at the nearest entity it knows about, which beside a car is usually
+            // one of its doors rather than the car. Either names the thing.
+            int root = -1;
+            if (interact.TargetEntityId.HasValue) root = RootOf(session.CurrentMapId, interact.TargetEntityId.Value);
+            if (root < 0) root = _seats.NearestEnterable(session.CurrentMapId, position, OccupancyService.BoardingRange);
+
+            if (root >= 0)
+            {
+                _seats.Enter(session, root, null, out string entering);
+                Say(entering);
+                return;
+            }
+
+            if (interact.TargetEntityId.HasValue
+                && _maps.TryGetMap(session.CurrentMapId, out var w, out _, out _, out var lookup)
+                && lookup.TryGetValue(interact.TargetEntityId.Value, out var target)
+                && w.Has<Transform>(target)
+                && Vector3.Distance(position, w.Get<Transform>(target).Position) > PhysicsConstants.InteractionRange)
+            {
+                Say("Interaction rejected: Target too far away.");
+                return;
+            }
+
+            Say($"Interaction '{interact.Action}' received.");
+        });
+    }
+
+    /// <summary>
+    /// The composite an entity belongs to, if it is one or is part of one, else -1.
+    ///
+    /// Pointing at a door is pointing at the car. Nothing a player can pick out by proximity is
+    /// reliably the root — the root is an origin on the ground in the middle of the thing, which is
+    /// exactly where nobody is standing.
+    /// </summary>
+    private int RootOf(string mapId, int entityId)
+    {
+        if (!_maps.TryGetMap(mapId, out var world, out _, out _, out var lookup)) return -1;
+        if (!lookup.TryGetValue(entityId, out var e) || !world.IsAlive(e)) return -1;
+        if (world.Has<OccupancyComponent>(e)) return e.Id;
+        if (world.Has<ParentComponent>(e))
+        {
+            int parentId = world.Get<ParentComponent>(e).ParentEntityId;
+            if (lookup.TryGetValue(parentId, out var parent)
+                && world.IsAlive(parent) && world.Has<OccupancyComponent>(parent)) return parentId;
+        }
+        return -1;
     }
 
     private void HandleRegister(int connectionId, RegisterRequest request, Action<IMessage> reply)

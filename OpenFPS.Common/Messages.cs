@@ -254,6 +254,19 @@ public partial class ServerStateUpdate : IMessage
     public long Tick;
     public long LastProcessedSequenceId;
     public List<EntityState> States = new();
+
+    // APPEND ONLY BELOW THIS LINE — members serialise positionally.
+
+    /// <summary>
+    /// The composite this client is riding in, or -1 for standing on their own two feet.
+    ///
+    /// The client stops predicting its own movement while this is set, because there is nothing of
+    /// its own to predict: a passenger's position belongs to the seat, and the seat belongs to
+    /// something the client cannot simulate. Guessing would only produce a correction every tick.
+    /// It also stops generating footsteps, which a person sitting down does not make and a person
+    /// sitting down travelling at ninety miles an hour would make a great many of.
+    /// </summary>
+    public int RidingEntityId = -1;
 }
 
 [MemoryPackable]

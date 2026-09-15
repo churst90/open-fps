@@ -35,7 +35,7 @@ public class CompositeTests : IDisposable
         var (svc, maps, mapId) = Build();
         var walls = Walls(maps, mapId, new Vector3(40, 0, 40), 4);
 
-        int root = svc.Group(mapId, new Vector3(40, 0, 40), radius: 10f, "shed", anchored: true, out int parts);
+        int root = svc.Group(mapId, new Vector3(40, 0, 40), radius: 10f, "shed", anchored: true, "builder", out int parts);
         Assert.True(root >= 0);
         Assert.Equal(4, parts);
 
@@ -62,7 +62,7 @@ public class CompositeTests : IDisposable
         var (svc, maps, mapId) = Build();
         Walls(maps, mapId, new Vector3(100, 0, 100), 4, height: 3f);
 
-        int root = svc.Group(mapId, new Vector3(100, 0, 100), 10f, "hut", true, out _);
+        int root = svc.Group(mapId, new Vector3(100, 0, 100), 10f, "hut", true, "builder", out _);
         Assert.True(maps.TryGetMap(mapId, out var world, out _, out _, out var lookup));
         var origin = world.Get<Transform>(lookup[root]).Position;
 
@@ -76,9 +76,9 @@ public class CompositeTests : IDisposable
     {
         var (svc, maps, mapId) = Build();
         var walls = Walls(maps, mapId, new Vector3(60, 0, 60), 3);
-        int root = svc.Group(mapId, new Vector3(60, 0, 60), 10f, "stall", true, out _);
+        int root = svc.Group(mapId, new Vector3(60, 0, 60), 10f, "stall", true, "builder", out _);
 
-        Assert.True(svc.Ungroup(mapId, root, out string name, out int parts));
+        Assert.True(svc.Ungroup(mapId, root, "builder", false, out string name, out int parts, out _));
         Assert.Equal("stall", name);
         Assert.Equal(3, parts);
 
@@ -100,9 +100,9 @@ public class CompositeTests : IDisposable
     {
         var (svc, maps, mapId) = Build();
         Walls(maps, mapId, new Vector3(-80, 0, -80), 4);
-        int root = svc.Group(mapId, new Vector3(-80, 0, -80), 10f, "Cabin", true, out int built);
+        int root = svc.Group(mapId, new Vector3(-80, 0, -80), 10f, "Cabin", true, "builder", out int built);
 
-        Assert.True(svc.SaveAsTemplate(mapId, root, "cabin", out int saved, out string error), error);
+        Assert.True(svc.SaveAsTemplate(mapId, root, "cabin", "builder", false, out int saved, out string error), error);
         Assert.Equal(built, saved);
 
         // It is now on disk and placeable by id.
@@ -135,7 +135,7 @@ public class CompositeTests : IDisposable
     {
         var (svc, maps, mapId) = Build();
         Walls(maps, mapId, new Vector3(0, 0, 200), 3);
-        int root = svc.Group(mapId, new Vector3(0, 0, 200), 10f, "caravan", anchored: false, out _);
+        int root = svc.Group(mapId, new Vector3(0, 0, 200), 10f, "caravan", anchored: false, "builder", out _);
 
         Assert.True(maps.TryGetMap(mapId, out var world, out _, out _, out var lookup));
         Assert.False(world.Get<CompositeComponent>(lookup[root]).Anchored);
@@ -168,7 +168,7 @@ public class CompositeTests : IDisposable
         maps.IndexEntity(mapId, player);
         maps.IndexEntity(mapId, car);
 
-        svc.Group(mapId, new Vector3(300, 0, 0), 10f, "wall", true, out int parts);
+        svc.Group(mapId, new Vector3(300, 0, 0), 10f, "wall", true, "builder", out int parts);
         Assert.Equal(2, parts);
         Assert.False(world.Has<ParentComponent>(player));
         Assert.False(world.Has<ParentComponent>(car));
@@ -185,8 +185,8 @@ public class CompositeTests : IDisposable
     {
         var (svc, maps, mapId) = Build();
         Walls(maps, mapId, new Vector3(-200, 0, 90), 4);
-        int root = svc.Group(mapId, new Vector3(-200, 0, 90), 10f, "Hut", true, out int built);
-        Assert.True(svc.SaveAsTemplate(mapId, root, "hut", out _, out string error), error);
+        int root = svc.Group(mapId, new Vector3(-200, 0, 90), 10f, "Hut", true, "builder", out int built);
+        Assert.True(svc.SaveAsTemplate(mapId, root, "hut", "builder", false, out _, out string error), error);
 
         var where = new Vector3(-320, 0, 40);
         Assert.True(svc.Place(mapId, "hut", where, Quaternion.Identity, "tester", out _, out error) >= 0, error);

@@ -382,7 +382,19 @@ public partial struct CompositeComponent
     /// </summary>
     public bool Anchored { get; set; }
 
-    public CompositeComponent() { TemplateId = ""; Name = ""; Anchored = true; }
+    // APPEND ONLY BELOW THIS LINE — members serialise positionally; inserting one renumbers the rest.
+
+    /// <summary>
+    /// Who this belongs to, or empty for public property.
+    ///
+    /// Recorded by whoever grouped or placed it. What it gates is deliberately narrow: taking a thing
+    /// APART, saving it out as your own, changing what it is, and driving it. Standing in someone
+    /// else's house, or riding in their passenger seat, is not trespass — it is how a world with
+    /// other people in it works.
+    /// </summary>
+    public string Owner { get; set; }
+
+    public CompositeComponent() { TemplateId = ""; Name = ""; Anchored = true; Owner = ""; }
 }
 
 [MemoryPackable]
@@ -392,4 +404,93 @@ public partial struct ParentComponent
     public Vector3 LocalPosition { get; set; }
     public Quaternion LocalRotation { get; set; }
     public ParentComponent() { ParentEntityId = -1; LocalPosition = Vector3.Zero; LocalRotation = Quaternion.Identity; }
+}
+
+// ── Occupancy ───────────────────────────────────────────────────────────────────────────────────
+//
+// Getting INSIDE a composite, which is the last of the four things a composite is for: a set of
+// entities with a local origin, which can be saved, placed again, owned, and ENTERED.
+//
+// A seat is where in a composite's own frame a person sits and which way they face, and whether
+// sitting there drives the thing. That last flag is the whole of the difference between a kitchen
+// chair and a driver's seat — not a difference of kind, the same as a house and a caravan differ
+// only by <see cref="CompositeComponent.Anchored"/>.
+
+/// <summary>One place a person can be inside a composite, in the composite's OWN frame.</summary>
+[MemoryPackable]
+public partial struct Seat
+{
+    /// <summary>What it is called when the seats are read out: "driver", "passenger", "back left".</summary>
+    public string Name { get; set; }
+    /// <summary>Where the occupant's FEET go, relative to the composite's origin.</summary>
+    public Vector3 LocalPosition { get; set; }
+    /// <summary>Which way the seat faces within the composite, radians. Forward is zero.</summary>
+    public float LocalYaw { get; set; }
+    /// <summary>Whether sitting here drives it.</summary>
+    public bool Controls { get; set; }
+    public Seat() { Name = ""; }
+}
+
+/// <summary>
+/// The seats a composite has. Carried by the ROOT, because a seat is a property of the thing, not of
+/// whoever happens to be in it — who is in it is on the occupant (see <see cref="OccupantComponent"/>),
+/// so there is exactly one place that knows, and nothing to keep in step.
+/// </summary>
+[MemoryPackable]
+public partial struct OccupancyComponent
+{
+    public List<Seat> Seats { get; set; }
+    public OccupancyComponent() { Seats = new List<Seat>(); }
+}
+
+/// <summary>
+/// On a PLAYER: which composite they are inside, and which seat.
+///
+/// While this is worn, the body's position is not its own — it belongs to the seat, and the root
+/// carries it. What stays the player's own is where they are LOOKING, which is why the occupant's
+/// rotation is restored after the carry rather than being taken from the seat: a passenger can turn
+/// their head, and for a player who navigates by ear that is most of what a passenger does.
+/// </summary>
+[MemoryPackable]
+public partial struct OccupantComponent
+{
+    public int RootEntityId { get; set; }
+    public int SeatIndex { get; set; }
+    /// <summary>Whether this seat drives. Cached from the seat so the movement path need not look it up.</summary>
+    public bool Controls { get; set; }
+    /// <summary>Where they were standing when they got in, so getting out puts them back outside it.</summary>
+    public Vector3 BoardedFrom { get; set; }
+    public OccupantComponent() { RootEntityId = -1; SeatIndex = -1; }
+}
+
+/// <summary>
+/// A composite that a person can drive, and what its driver is asking of it right now.
+///
+/// The controls are held, not sampled: a driver who stops sending packets for a moment does not lift
+/// off, because a real one would not. They do decay — <see cref="ControlAge"/> — so a client that
+/// dies mid-corner coasts to a stop instead of driving away forever.
+///
+/// Everything about HOW it then moves comes out of <see cref="OpenFPS.Common.VehicleProfile"/>: the
+/// engine's torque through the gearbox for what it pulls, the tyres' peak grip for what it can
+/// corner and brake at, the mass and drag area for what it cannot. There are no handling numbers
+/// here, because a car's handling is not a property of the act of driving.
+/// </summary>
+[MemoryPackable]
+public partial struct DriveComponent
+{
+    /// <summary>Key into <see cref="OpenFPS.Common.VehicleProfile.Presets"/>.</summary>
+    public string Preset { get; set; }
+    /// <summary>0..1.</summary>
+    public float Throttle { get; set; }
+    /// <summary>0..1.</summary>
+    public float Brake { get; set; }
+    /// <summary>-1..1, left negative.</summary>
+    public float Steer { get; set; }
+    /// <summary>Metres per second along the heading. Negative is reversing.</summary>
+    public float Speed { get; set; }
+    /// <summary>Radians. The way the nose points.</summary>
+    public float Heading { get; set; }
+    /// <summary>Seconds since the driver last said anything. Held controls decay once this grows.</summary>
+    public float ControlAge { get; set; }
+    public DriveComponent() { Preset = ""; }
 }
