@@ -1031,6 +1031,24 @@ About four bytes per driven vehicle per tick, and there are only ever a handful.
 automatic as the default, `[` and `]` to shift, gear announced, auto-clutch. A clutch key is one key
 too many.
 
+### 4b. `/spawn` cannot actually build a shell — found live, blocks using any of this
+
+Walking the room work through a real server turned up the practical blocker. `/spawn` always drops
+its box THREE METRES AHEAD OF YOU AT YOUR OWN FEET HEIGHT, and there is no way to turn it or raise
+it. So with the commands as they stand you can make a heap, and you cannot make a shed: no roof, and
+no wall that runs the other way. (The heap is correctly not a room — the hollowness rule threw it
+out, which is the right answer arrived at honestly.)
+
+Everything the region work does is reachable from `/place` and from prefab-built composites, which is
+what the tests exercise, and none of it is reachable from the building commands a player actually has.
+That makes the authoring commands the next thing standing between all of this and anyone using it —
+they were deliberately left until after composites so they would be a thin shell over the right
+model, and the model is now here.
+
+Minimum to unblock: an offset and a rotation on `/spawn` (`/spawn Box Concrete 6 3 0.4 at 0 3 0`
+relative to where you stand and which way you face), which is the same "stand where you mean and say
+here" idea that `/group` and `/addseat` already use.
+
 ### 5. Lending a vehicle
 
 `Owner` is one name and there is no grant, so an owner cannot let a friend drive. `/lend <player>`
