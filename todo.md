@@ -1049,10 +1049,44 @@ completely silent.
       like and nothing about doors appears anywhere in the audio engine.
 - [x] `WorldAudioEventTests`, sabotage suite up to 49.
 
-Next users, in the order they are cheapest: **glass** (the model is written and tested and has
-nothing to speak through), **collisions** (ditto, and it wants the same material mechanical
-properties the door panel now uses), **gunfire** (`WeaponSynth` renders buffers already and needs
-only to be pointed at the channel), and **weather on panels**.
+### The three that were within easy reach, done (2026-09-15)
+
+- [x] **`PanelAcoustics`** — the plate law lifted out of `DoorAcoustics`, where it had no business
+      being. A door leaf, a pane of glass, a car's wing and the side of a container are all a flat
+      piece of stuff that rings when struck, and they ring by the same law. One place, so they cannot
+      slowly stop agreeing.
+- [x] It returns the lowest AUDIBLE mode, not always the fundamental. A window pane's fundamental is
+      down around fifteen hertz and it plainly does not thud at fifteen hertz when struck: what you
+      hear is the lowest of its higher modes your ears can reach, and a plate's modes go as
+      (m²/a² + n²/b²), so climbing that series is the honest way up rather than clamping.
+- [x] **Having a note is not the same as ringing.** The modal series hands back an audible frequency
+      for almost anything — a carpet has modes too — so `RingsAudibly` asks the question that
+      actually separates a bell from a bag of sand: does the note outlast the blow that caused it.
+      Found by a test noticing a carpeted wall had started to ring.
+- [x] **`ImpactAcoustics.Between`** — two materials, two masses, a size, a closing speed. A car
+      meeting a wall, a ball meeting a floor and a crate off a lorry are one function called three
+      times; there is no case for cars anywhere in it. Energy uses the REDUCED mass, because a lorry
+      hitting a drink can and a drink can hitting a lorry are the same collision and the lighter one
+      governs. The blow takes the character of the SOFTER of the pair; the ring belongs to whichever
+      of them rings, which is why a hammer on a bell is a bell.
+- [x] Driven composites now make that noise when they hit something. The impulse and the damage are
+      still to come; the sound is not a placeholder for them, it is the same calculation everything
+      else will use.
+- [x] **Glass speaks.** `GlassBreak` had been written, tested and silent for want of anything to
+      speak through. The mapping is a mapping and not a second model — the physics was decided long
+      ago. A shatter is a HISS rather than a knock, which is the interesting part: a pane letting go
+      is thousands of tiny impacts inside a tenth of a second, and a crowd that dense stops being
+      heard as impacts at all, whereas one shard landing IS one impact. That is why a window breaking
+      sounds nothing like the pieces of it arriving — and the gap between them is which floor it was.
+- [x] **Gunfire**, via a narrow escape hatch: `TransientSound.SynthKey`. Four characters describe
+      nearly everything and a few things they cannot, and a gunshot — blast wave, body resonance,
+      brightness sweep, action working — is one of them, with a model that already exists and is
+      better. So a sound may name one, exactly as an engine emitter names "engine:v8_sports".
+- [x] `/fire [weapon]`, honestly labelled a DEV TRIGGER. `WeaponSynth`, `ShotResolver`,
+      `WeaponMechanics` and `GlassBreak` have all been tested for a while and had never made a sound
+      because nothing connects a gun to a player. Held items will supply the real trigger; having any
+      at all is the difference between four tested models and four tested models nobody has heard.
+- [x] `ImpactAndGlassSoundTests`; sabotage suite up to 57.
 
 ### 1b. The original plan, kept for the reasoning
 

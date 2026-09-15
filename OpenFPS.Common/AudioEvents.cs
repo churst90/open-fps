@@ -62,6 +62,21 @@ public partial struct TransientSound
     /// <summary>0 is a pure tone, 1 is pure noise.</summary>
     public float Noisiness { get; set; }
 
+    /// <summary>
+    /// A richer model to render this with, or empty for the four generic characters.
+    ///
+    /// The escape hatch, and it is deliberately narrow. Four characters and seven numbers describe
+    /// almost everything that happens in a world, and a few things they cannot: a gunshot is a blast
+    /// wave, a body resonance, a brightness sweep and the action working, and flattening that to one
+    /// knock would throw away a model that already exists and is better. So a sound may name one —
+    /// "weapon:akm" — the same way an engine emitter names "engine:v8_sports", and the client routes
+    /// it to the model that knows.
+    ///
+    /// Everything else about it still applies: the level, the position, the delay and the acoustic
+    /// path are the channel's, and only the waveform comes from elsewhere.
+    /// </summary>
+    public string SynthKey { get; set; } = "";
+
     public TransientSound() { }
 }
 

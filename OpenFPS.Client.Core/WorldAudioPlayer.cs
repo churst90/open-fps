@@ -73,7 +73,7 @@ public sealed class WorldAudioPlayer
             string id = IdFor(sound, message.Seed);
             if (_registered.Add(id))
             {
-                var pcm = TransientSynth.Render(sound, message.Seed);
+                var pcm = RenderOne(sound, message.Seed);
                 if (!_audio.RegisterSynthesisedSound(id, TransientSynth.ToPcm16(pcm), TransientSynth.SampleRate))
                 {
                     _registered.Remove(id);      // the engine is not up yet; try again next time
@@ -137,6 +137,26 @@ public sealed class WorldAudioPlayer
         }
     }
 
+    /// <summary>
+    /// Renders one sound, by whichever model knows how.
+    ///
+    /// Nearly everything is one of the four generic characters. A few things name a richer model
+    /// instead — a gunshot is a blast wave, a body resonance, a brightness sweep and the action
+    /// working, and flattening that to one knock would throw away a model that exists and is better.
+    /// The routing is by prefix, exactly as engine emitters already route "engine:v8_sports".
+    /// </summary>
+    private static float[] RenderOne(TransientSound sound, int seed)
+    {
+        if (!string.IsNullOrEmpty(sound.SynthKey)
+            && sound.SynthKey.StartsWith("weapon:", StringComparison.OrdinalIgnoreCase))
+        {
+            string id = sound.SynthKey["weapon:".Length..];
+            if (WeaponRegistry.TryGet(id, out var weapon))
+                return WeaponSynth.MuzzleBlast(WeaponProfile.From(weapon), seed);
+        }
+        return TransientSynth.Render(sound, seed);
+    }
+
     /// <summary>Forgets everything queued. Called on a map change, where the positions mean nothing
     /// any more and the things that made them are gone.</summary>
     public void Clear() => _pending.Clear();
@@ -156,6 +176,8 @@ public sealed class WorldAudioPlayer
         int decay = (int)MathF.Round(sound.DecaySeconds * 100f);
         int noise = (int)MathF.Round(sound.Noisiness * 20f);
         // The seed is coarse on purpose: a handful of variations of each sound, not one per event.
+        // A named model is its own identity — two shots from one rifle are one buffer.
+        if (!string.IsNullOrEmpty(sound.SynthKey)) return $"synth:{sound.SynthKey}:{seed & 3}";
         return $"synth:{sound.Character}:{hz}:{level}:{decay}:{noise}:{seed & 3}";
     }
 }

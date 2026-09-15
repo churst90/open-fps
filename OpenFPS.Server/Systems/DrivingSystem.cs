@@ -103,7 +103,8 @@ public static class DrivingSystem
     }
 
     /// <summary>Everything currently under its own power on this map, moved one tick.</summary>
-    public static void Update(World world, SpatialGrid<Entity> grid, Vector3 mapMin, Vector3 mapMax, float dt)
+    public static void Update(World world, SpatialGrid<Entity> grid, Vector3 mapMin, Vector3 mapMax, float dt,
+                              Action<int, string, IReadOnlyList<TransientSound>>? heard = null)
     {
         var query = new QueryDescription().WithAll<Transform, DriveComponent, Velocity>();
         var driven = new List<Entity>();
@@ -111,12 +112,13 @@ public static class DrivingSystem
 
         foreach (var root in driven)
         {
-            try { Step(world, grid, root, mapMin, mapMax, dt); }
+            try { Step(world, grid, root, mapMin, mapMax, dt, heard); }
             catch (Exception ex) { Log.Error(ex, "DrivingSystem: entity {Id} failed to move.", root.Id); }
         }
     }
 
-    private static void Step(World world, SpatialGrid<Entity> grid, Entity root, Vector3 mapMin, Vector3 mapMax, float dt)
+    private static void Step(World world, SpatialGrid<Entity> grid, Entity root, Vector3 mapMin, Vector3 mapMax,
+                             float dt, Action<int, string, IReadOnlyList<TransientSound>>? heard)
     {
         ref var drive = ref world.Get<DriveComponent>(root);
         if (string.IsNullOrEmpty(drive.Preset)) return;
@@ -209,15 +211,16 @@ public static class DrivingSystem
         wanted.Y = PhysicsUtils.GetGroundHeight(world, grid, wanted, out _);
         wanted = Vector3.Clamp(wanted, mapMin, mapMax);
 
-        // Hitting something stops it. What hitting something SOUNDS like — the impulse, the damage,
-        // the noise of two materials meeting at a closing speed — is the collision-response work that
-        // comes after this; stopping dead is the honest placeholder, not a pretence that it is done.
-        if (Blocked(world, grid, root, wanted, drive.Heading, out float hitSpeedLoss))
+        // Hitting something stops it, and now it is audible. The IMPULSE and the damage are still to
+        // come — a car that hits a wall should be damaged by it and should push what it hit — but the
+        // noise of two materials meeting at a closing speed is the same calculation for a car, a ball
+        // and a dropped crate, and it is made once in ImpactAcoustics rather than here.
+        if (Blocked(world, grid, root, wanted, drive.Heading, out float hitSpeed, out var struck))
         {
             drive.Speed = 0f;
             drive.Throttle = 0f;
-            if (hitSpeedLoss > 3f)
-                Log.Debug("Driven composite {Id} hit something at {Speed:F1} m/s.", root.Id, hitSpeedLoss);
+            if (hitSpeed > ImpactAcoustics.MinimumSpeed && heard != null && struck != null)
+                Collision(world, root, struck.Value, wanted, hitSpeed, profile.MassKg, heard);
         }
         else
         {
@@ -293,9 +296,38 @@ public static class DrivingSystem
     /// parts and its own occupants are invisible to the test — they travel with it, and a car that
     /// collided with its own doors would never move at all.
     /// </summary>
-    private static bool Blocked(World world, SpatialGrid<Entity> grid, Entity root, Vector3 position,
-                                float heading, out float closingSpeed)
+    /// <summary>
+    /// What the car just hit, told the way everything else in the game tells it.
+    ///
+    /// Nothing here is about cars. Two materials, two masses, a closing speed and the size of what
+    /// was struck — the same call a ball bouncing or a crate coming off a lorry would make, which is
+    /// why there is no collision sound code in this file beyond gathering those five things.
+    /// </summary>
+    private static void Collision(World world, Entity root, Entity struck, Vector3 where, float speed,
+                                  float massKg, Action<int, string, IReadOnlyList<TransientSound>> heard)
     {
+        var hitter = AcousticRegistry.GetProperties(
+            world.Has<MaterialComponent>(root) ? world.Get<MaterialComponent>(root).Material ?? "Metal" : "Metal");
+        var target = AcousticRegistry.GetProperties(
+            world.Has<MaterialComponent>(struck) ? world.Get<MaterialComponent>(struck).Material ?? "Generic" : "Generic");
+
+        var size = world.Has<ColliderComponent>(struck) ? world.Get<ColliderComponent>(struck).Size : Vector3.One;
+        // A struck thing that can move takes some of the energy away with it; one bolted to the world
+        // gives all of it back. Mass from its own volume and density, the same as everywhere else.
+        bool fixedInPlace = !world.Has<Velocity>(struck);
+        float struckMass = fixedInPlace
+            ? massKg * 50f                       // effectively the planet
+            : MathF.Max(1f, size.X * size.Y * size.Z * MathF.Max(100f, target.DensityKgM3));
+
+        var sounds = ImpactAcoustics.Between(hitter, target, where, speed, massKg, struckMass,
+                                             size.X, size.Y, MathF.Max(0.01f, size.Z), fixedInPlace);
+        if (sounds.Count > 0) heard(root.Id, "impact", sounds);
+    }
+
+    private static bool Blocked(World world, SpatialGrid<Entity> grid, Entity root, Vector3 position,
+                                float heading, out float closingSpeed, out Entity? struck)
+    {
+        struck = null;
         closingSpeed = MathF.Abs(world.Get<DriveComponent>(root).Speed);
         if (!world.Has<ColliderComponent>(root)) return false;
 
@@ -329,7 +361,10 @@ public static class DrivingSystem
                 var toLocal = Matrix4x4.CreateFromQuaternion(Quaternion.Inverse(t.Rotation));
                 var local = Vector3.Transform(centre - t.Position, toLocal);
                 if (GeometryUtils.AABBIntersectsCylinder(-c.Size / 2f, c.Size / 2f, local, radius, height))
+                {
+                    struck = other;
                     return true;
+                }
             }
         }
         return false;

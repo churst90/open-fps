@@ -139,6 +139,10 @@ public class CommandHandler
             case "prefabs":
                 HandleListPrefabs(reply);
                 break;
+            case "fire":
+                if (!isElevated) { DenyCommand(reply); return; }
+                HandleFire(session, args, reply);
+                break;
             // ── Doors ───────────────────────────────────────────────────────────────────────
             //
             // Not elevated. Building a door needs a role; going through one does not.
@@ -863,6 +867,113 @@ public class CommandHandler
             < 157.5f => "south east", < 202.5f => "south", < 247.5f => "south west",
             < 292.5f => "west", _ => "north west",
         };
+    }
+
+    /// <summary>
+    /// /fire [weapon] — fires a weapon from where you stand, at whatever is in front of you.
+    ///
+    /// A DEV TRIGGER, and honestly labelled as one. `WeaponSynth`, `ShotResolver`, `WeaponMechanics`
+    /// and `GlassBreak` have all been written and tested for a while and have never made a sound,
+    /// because nothing connects a gun to a player: there is no equip, no held item and no trigger.
+    /// The held-item work will supply the real one. Until then this is a trigger, and having any at
+    /// all is the difference between four tested models and four tested models nobody has ever heard.
+    ///
+    /// It also happens to be the only thing in the game that can currently break a window, which is
+    /// why the glass path hangs off it too.
+    /// </summary>
+    private void HandleFire(UserSession session, string[] args, Action<IMessage> reply)
+    {
+        if (!TryGetBody(session, reply, out var world, out var grid, out var position)) return;
+
+        string id = args.Length > 0 ? args[0] : "akm";
+        if (!WeaponRegistry.TryGet(id, out var weapon))
+        {
+            Say(reply, $"No weapon called '{id}'. Try: {string.Join(", ", WeaponRegistry.All.Select(w => w.Id))}");
+            return;
+        }
+
+        var rotation = world.Get<Transform>(session.Entity).Rotation;
+        var forward = Vector3.Transform(new Vector3(0, 0, 1), rotation);
+        var muzzle = position + new Vector3(0, 1.5f, 0) + forward * 0.5f;
+
+        // 1. The shot itself. Named rather than described, because a gunshot is a blast wave, a body
+        //    resonance, a brightness sweep and the action working — and a model for that already
+        //    exists and is better than four numbers.
+        _server.EmitWorldAudio(session.CurrentMapId, session.Entity.Id, weapon.DisplayName, new[]
+        {
+            new TransientSound
+            {
+                Character = SoundCharacter.Knock,
+                Position = muzzle,
+                LevelDb = Loudness.MuzzleBlastDb(weapon),
+                SynthKey = "weapon:" + weapon.Id,
+                DecaySeconds = 0.6f,
+            },
+        });
+
+        // 2. What it hit, if anything.
+        string hit = "nothing in the first hundred metres";
+        foreach (var candidate in grid.GetItemsInRadius(position, 100f).OrderBy(
+                     e => Vector3.Distance(position, world.Get<Transform>(e).Position)))
+        {
+            if (candidate.Id == session.Entity.Id || !world.Has<ColliderComponent>(candidate)) continue;
+            var t = world.Get<Transform>(candidate);
+            var c = world.Get<ColliderComponent>(candidate);
+            if (!c.IsSolid) continue;
+
+            var toTarget = t.Position - muzzle;
+            float distance = toTarget.Length();
+            if (distance < 0.1f || Vector3.Dot(Vector3.Normalize(toTarget), forward) < 0.97f) continue;
+
+            string material = world.Has<MaterialComponent>(candidate)
+                ? world.Get<MaterialComponent>(candidate).Material ?? "Generic" : "Generic";
+            hit = $"{material} at {distance:F0} metres";
+
+            if (material.Equals("Glass", StringComparison.OrdinalIgnoreCase))
+                BreakGlass(session, world, candidate, t, c, weapon);
+            else
+                _server.EmitWorldAudio(session.CurrentMapId, candidate.Id, "impact",
+                    ImpactAcoustics.Between(AcousticRegistry.GetProperties("Metal"),
+                                            AcousticRegistry.GetProperties(material),
+                                            t.Position, weapon.MuzzleVelocity * 0.02f,
+                                            0.01f, 500f, c.Size.X, c.Size.Y, MathF.Max(0.02f, c.Size.Z)));
+            break;
+        }
+        Say(reply, $"You fire the {weapon.DisplayName}. It hits {hit}.");
+    }
+
+    /// <summary>
+    /// A window going out, which is two sounds most of two seconds apart and from two different places.
+    ///
+    /// The whole reason `GlassBreak` was worth writing: the break is up at the window, then nothing,
+    /// then the glass arrives at the FOOT of the wall — and the gap between them is sqrt(2h/g), a
+    /// direct readout of which floor the shot was on. One crash sample throws that away, and a sighted
+    /// game would never notice it was gone.
+    /// </summary>
+    private void BreakGlass(UserSession session, World world, Entity pane, Transform t,
+                            ColliderComponent collider, WeaponDefinition weapon)
+    {
+        var glass = new GlassPane(
+            Centre: t.Position,
+            Size: new Vector2(MathF.Max(0.3f, collider.Size.X), MathF.Max(0.3f, collider.Size.Y)),
+            Normal: Vector3.Transform(new Vector3(0, 0, 1), t.Rotation),
+            // Tempered: what modern glazing is, and the type that always fails completely rather
+            // than taking a neat hole. Held in compression, so there is no such thing as a tidy
+            // bullet hole in it.
+            Type: GlassType.Tempered,
+            HeightAboveGround: MathF.Max(0f, t.Position.Y - collider.Size.Y * 0.5f));
+
+        Span<GlassEvent> buffer = stackalloc GlassEvent[48];
+        int count = GlassBreak.Resolve(glass, t.Position, weapon, pane.Id, buffer);
+        if (count == 0) return;
+
+        var events = new List<GlassEvent>(count);
+        for (int i = 0; i < count; i++) events.Add(buffer[i]);
+
+        _server.EmitWorldAudio(session.CurrentMapId, pane.Id, "glass",
+                               GlassSound.From(events, glass.Type, glass.Size));
+        _maps.DestroyEntity(session.CurrentMapId, pane);
+        _server.BroadcastRemoval(session.CurrentMapId, pane.Id);
     }
 
     // ── Doors ───────────────────────────────────────────────────────────────────────────────────

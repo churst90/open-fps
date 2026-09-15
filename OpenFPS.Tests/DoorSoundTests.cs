@@ -68,14 +68,24 @@ public class DoorSoundTests
         Assert.True(thin < door, $"the thin leaf rang at {thin:F0} Hz and the thick one at {door:F0}");
     }
 
-    /// <summary>A carpet does not have a note. Nothing should invent one for it.</summary>
+    /// <summary>
+    /// A carpet does not ring, and the reason is worth being precise about: it is not that it has no
+    /// modes — every slab of everything has modes — it is that whatever note it has dies with the
+    /// blow that caused it. Having a note and ringing are different questions, and only the second
+    /// one is audible.
+    /// </summary>
     [Fact]
     public void SomeThingsDoNotRingAtAll()
     {
-        Assert.Equal(0f, DoorAcoustics.PanelHz(Of("Carpet"), 0.9f, 2.1f, 0.04f));
+        var carpet = Of("Carpet");
+        float hz = DoorAcoustics.PanelHz(carpet, 0.9f, 2.1f, 0.04f);
+        Assert.False(PanelAcoustics.RingsAudibly(carpet, hz),
+                     $"a carpet was found to ring for {PanelAcoustics.RingSeconds(carpet, hz):F2} s");
+
+        // Something with no stiffness at all has no note to begin with.
         Assert.Equal(0f, DoorAcoustics.PanelHz(Of("None"), 0.9f, 2.1f, 0.04f));
 
-        var sounds = DoorAcoustics.Closing(Of("Carpet"), Vector3.Zero, Vector3.Zero,
+        var sounds = DoorAcoustics.Closing(carpet, Vector3.Zero, Vector3.Zero,
                                            0.9f, 2.1f, 0.04f, 20f, 1.5f, hasSeal: false);
         Assert.DoesNotContain(sounds, s => s.Kind == DoorSoundKind.Panel);
         Assert.Contains(sounds, s => s.Kind == DoorSoundKind.Impact);   // it still hits the frame

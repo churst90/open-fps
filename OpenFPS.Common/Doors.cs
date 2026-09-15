@@ -95,30 +95,13 @@ public readonly record struct DoorSound(
 /// </summary>
 public static class DoorAcoustics
 {
-    /// <summary>Reference level for an impact of one joule at one metre, dB SPL. Everything scales
-    /// logarithmically from here, so this sets the absolute and nothing else does.</summary>
-    private const float ImpactReferenceDb = 74f;
-
     /// <summary>The bolt and strike plate are steel however wooden the door is, so the latch is the
     /// one part of a door that sounds much the same on all of them.</summary>
     private const float LatchHz = 2600f;
 
-    /// <summary>Below this a panel does not have a note, it has a thud. Nothing should clamp a
-    /// frequency into existence for something that does not ring.</summary>
-    public const float MinimumRingHz = 40f;
-
-    /// <summary>
-    /// How much damping a panel picks up simply by being HUNG rather than floating free.
-    ///
-    /// Added to the material's own internal loss, and for anything metallic it dominates it
-    /// completely. Steel's intrinsic loss factor is about two ten-thousandths, which on its own says
-    /// a steel door rings for a minute and a half; it does not, because it is bolted to hinges and
-    /// meets a frame, and that path carries energy away far faster than the steel itself loses it.
-    /// Published TOTAL loss factors for building panels in situ run from about one to five per cent
-    /// and are dominated by exactly this — energy leaving through the edges — which is why measured
-    /// figures for a mounted panel bear so little relation to the material's own.
-    /// </summary>
-    public const float HungPanelLoss = 0.03f;
+    /// <summary>A door is a panel hung in a frame; the damping that comes with being hung lives with
+    /// every other panel's.</summary>
+    public const float HungPanelLoss = PanelAcoustics.MountedLoss;
 
     /// <summary>
     /// The note a flat panel rings at, Hz.
@@ -128,24 +111,7 @@ public static class DoorAcoustics
     /// carpet does not have a note.
     /// </summary>
     public static float PanelHz(MaterialProperties material, float width, float height, float thickness)
-    {
-        float rho = MathF.Max(1f, material.DensityKgM3);
-        float e = material.YoungsModulusGPa * 1e9f;
-        if (e <= 0f) return 0f;
-
-        float a = MathF.Max(0.05f, width);
-        float b = MathF.Max(0.05f, height);
-        float t = Math.Clamp(thickness, 0.002f, 0.5f);
-
-        // The (1,1) mode of a simply supported plate. 0.4755 is (pi/2) / (2 * sqrt(3 (1 - v^2))) with
-        // Poisson's ratio at 0.3 — the plate constant, not a tuning knob — and BOTH spans enter it,
-        // which is why a tall narrow door and a square hatch of the same area do not ring alike.
-        float hz = 0.4755f * t * MathF.Sqrt(e / rho) * (1f / (a * a) + 1f / (b * b));
-
-        // Below the bottom of pitch there is no note, only a thud. A carpet does not ring, and
-        // nothing should invent a note for it by clamping one into existence.
-        return hz < MinimumRingHz ? 0f : MathF.Min(hz, 6000f);
-    }
+        => PanelAcoustics.RingHz(material, width, height, thickness);
 
     /// <summary>
     /// How long that ring takes to fall 60 dB.
@@ -155,13 +121,7 @@ public static class DoorAcoustics
     /// before you notice it started.
     /// </summary>
     public static float RingSeconds(MaterialProperties material, float hz, float mountingLoss = HungPanelLoss)
-    {
-        if (hz <= 0f) return 0f;
-        float loss = MathF.Max(1e-5f, material.LossFactor + MathF.Max(0f, mountingLoss));
-        // Two and a half seconds is the ceiling because nothing in a building rings longer than that
-        // except a bell, and a door is not one.
-        return Math.Clamp(2.2f / (loss * hz), 0.01f, 2.5f);
-    }
+        => PanelAcoustics.RingSeconds(material, hz, mountingLoss);
 
     /// <summary>
     /// Everything a door does when it shuts, in order.
@@ -184,7 +144,7 @@ public static class DoorAcoustics
         float sealAbsorbed = hasSeal ? 0.55f : 0f;
         float impactEnergy = energy * (1f - sealAbsorbed);
 
-        float impactDb = ImpactReferenceDb + 10f * MathF.Log10(MathF.Max(0.001f, impactEnergy));
+        float impactDb = PanelAcoustics.ImpactDb(impactEnergy);
 
         // 1. The latch, first, and before the leaf has met anything: the bolt rides up the strike
         //    plate and drops. Almost independent of the door, because the mechanism is steel whatever
@@ -207,7 +167,10 @@ public static class DoorAcoustics
         if (hz > 0f)
         {
             float ring = RingSeconds(material, hz);
-            if (ring > 0.02f)
+            // Having a note is not the same as ringing. A carpet has modes like everything else and
+            // very obviously does not ring; what tells them apart is whether the note outlasts the
+            // blow that caused it.
+            if (PanelAcoustics.RingsAudibly(material, hz, HungPanelLoss))
                 sounds.Add(new DoorSound(DoorSoundKind.Panel, SoundCharacter.Ring, 0.004f, centre,
                                          impactDb - 6f - 12f * sealAbsorbed, hz, ring, 0.15f));
         }

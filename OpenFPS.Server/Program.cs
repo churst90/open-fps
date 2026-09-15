@@ -373,7 +373,8 @@ public class GameServer
                     // say, and BEFORE anything is carried: the order here is the whole contract.
                     // Parts are bolted to the root and follow it exactly; occupants are carried by it
                     // but keep their own heads, so they come last of all.
-                    DrivingSystem.Update(world, grid, entry.Value.data.MinBound, entry.Value.data.MaxBound, dt);
+                    DrivingSystem.Update(world, grid, entry.Value.data.MinBound, entry.Value.data.MaxBound, dt,
+                                         (id, label, sounds) => EmitWorldAudio(entry.Key, id, label, sounds));
                     // Doors swing BEFORE the parts are placed: a door in a building is one of its
                     // parts, and ParentSystem writes every part's world transform from its local one
                     // each tick, so a swing applied after it would be overwritten before anyone saw
