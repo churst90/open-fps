@@ -344,6 +344,21 @@ public class AsyncAcousticWorker : IDisposable
                 return null;
             }
 
+            // ── A finished bake joins the simulation HERE, before anything is staged ───────────
+            //
+            // Before, not after, and that ordering is the whole of it. Attaching the probe batch flips
+            // PathingReady true, and PathingReady is what decides BOTH whether a source's inputs carry
+            // a probe batch and whether the run executes the pathing stage. Committing it after the
+            // sources were staged left the two disagreeing for exactly one tick: thirty sources staged
+            // without probes, and then a pathing run over them. Steam Audio dereferenced a probe batch
+            // no source had been given and took the process with it — no exception, no log line, the
+            // client simply ended a second after the cars started.
+            //
+            // Between runs, and on the thread that owns the simulator: it is single-threaded by
+            // contract, and the bake thread never touches it.
+            if (_saSim.CommitPendingProbes())
+                Console.WriteLine("[AcousticWorker] Pathing probes are live; occluded sources can now be localized to the opening they arrive through.");
+
             long now = Environment.TickCount64;
             Vector3 listener = default;
             bool haveListener = false;
@@ -361,12 +376,6 @@ public class AsyncAcousticWorker : IDisposable
                 _saLastSeen[kv.Key] = now;
             }
             if (!haveListener) return null;   // nothing pending; not a degradation
-
-            // A bake that finished on its own thread joins the simulation here, between runs, on the
-            // thread that owns it. Until it does, pathing is simply absent — which is a direction hint
-            // for occluded sources, not a level, and no source waits on it.
-            if (_saSim.CommitPendingProbes())
-                Console.WriteLine("[AcousticWorker] Pathing probes are live; occluded sources can now be localized to the opening they arrive through.");
 
             _saSim.SetListener(listener);
             _saSim.Run();

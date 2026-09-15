@@ -111,6 +111,9 @@ public sealed class SteamAudioSimulator : IDisposable
 
     private readonly float[] _shScratch = new float[4];
 
+    /// <summary>Whether any source staged pathing inputs since the last <see cref="Run"/>. See Run.</summary>
+    private bool _pathingStaged;
+
     /// <summary>Total pooled sources (0 until the first <see cref="SetScene"/>).</summary>
     public int Capacity => _allSources.Count;
     /// <summary>Sources currently available to acquire.</summary>
@@ -326,9 +329,18 @@ public sealed class SteamAudioSimulator : IDisposable
     public void SetSourceInputs(IntPtr source, Vector3 worldPos, float occlusionRadius = 0.5f)
     {
         if (source == IntPtr.Zero) return;
+        // ── A source only claims the pathing stage once it HAS probes ─────────────────────────
+        //
+        // The flags on a source persist until it is staged again, and the pathing run walks every
+        // source that claims the stage and dereferences the probe batch it was given. A source staged
+        // before the bake finished claims pathing with a null batch — and it keeps claiming it, for as
+        // long as it goes un-restaged, which for a distant source throttled to one update in ten
+        // frames is a third of a second after the bake lands. Leaving the bit off until the probes
+        // exist means no source can ever be in that state, whatever order anything is called in.
+        int flags = PathingReady ? _flags : _flags & ~Phonon.IPL_SIMULATIONFLAGS_PATHING;
         var inputs = new Phonon.IPLSimulationInputs
         {
-            flags = _flags,
+            flags = flags,
             directFlags = _direct ? (Phonon.IPL_DIRECTSIMULATIONFLAGS_OCCLUSION | Phonon.IPL_DIRECTSIMULATIONFLAGS_TRANSMISSION) : 0,
             source = Coord(worldPos),
             occlusionType = Phonon.IPL_OCCLUSIONTYPE_VOLUMETRIC,
@@ -352,8 +364,9 @@ public sealed class SteamAudioSimulator : IDisposable
             inputs.visRange = 50.0f;
             inputs.pathingOrder = 1;
             inputs.findAlternatePaths = 1;
+            _pathingStaged = true;
         }
-        Phonon.iplSourceSetInputs(source, _flags, ref inputs);
+        Phonon.iplSourceSetInputs(source, flags, ref inputs);
     }
 
     // --- Ray budget ------------------------------------------------------------------------------------
@@ -408,8 +421,13 @@ public sealed class SteamAudioSimulator : IDisposable
         long start = System.Diagnostics.Stopwatch.GetTimestamp();
         Phonon.iplSimulatorSetSharedInputs(_simulator, _flags, ref shared);
         if (_direct) Phonon.iplSimulatorRunDirect(_simulator);
-        if (PathingReady) Phonon.iplSimulatorRunPathing(_simulator);
+        // Only over sources that were actually STAGED with a probe batch. Running the pathing stage
+        // over sources that were not is a null dereference inside Steam Audio, which is a dead
+        // process rather than an exception — and the window for it opens the instant a background
+        // bake completes. Caller ordering should keep the two in step; this makes it structural.
+        if (PathingReady && _pathingStaged) Phonon.iplSimulatorRunPathing(_simulator);
         if (_reflections) Phonon.iplSimulatorRunReflections(_simulator);
+        _pathingStaged = false;
         long elapsed = System.Diagnostics.Stopwatch.GetTimestamp() - start;
 
         double ms = elapsed * 1000.0 / System.Diagnostics.Stopwatch.Frequency;

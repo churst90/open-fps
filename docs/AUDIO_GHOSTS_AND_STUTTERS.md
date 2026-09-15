@@ -505,3 +505,34 @@ Two things came out of it:
   `run-gtk-client.sh`, so a long-lived server silently becomes an old protocol while the client moves
   on. Worth remembering the shape of this failure: not a crash, not a warning — plausible numbers in
   the wrong fields, and a world that goes quiet.
+
+## Postscript 2: the crash a second after the cars started
+
+With the protocol fixed the cars came back — and the client died about a second later, right after:
+
+    [SteamAudio] Pathing bake finished: 1719 probe(s) at 6.8 m spacing in 0.5 s.
+    [AcousticWorker] Pathing probes are live; occluded sources can now be localized ...
+
+and then nothing. No exception, no stack: a native segfault, and the log simply stops.
+
+Moving the bake off the critical path created a moment that had never existed before — the moment
+`PathingReady` goes from false to true **while sources are already staged**. That one flag decides two
+separate things: whether a source's inputs carry a probe batch, and whether the run executes the
+pathing stage. Committing the batch AFTER staging left them disagreeing for a single tick: thirty
+sources staged without probes, then a pathing run over them, then Steam Audio dereferencing a probe
+batch nobody had been given.
+
+The obvious fix is ordering — commit first, stage second — and that is done. But ordering alone is not
+enough, and the reason is worth keeping. A source's flags persist until it is staged AGAIN, and the
+pathing run walks every source that claims the stage, not just the ones staged this tick. Distant
+sources are throttled to one update in ten frames, so a source staged just before the bake landed goes
+on claiming pathing with a null batch for a third of a second afterwards. The ordering fix would have
+turned a reliable crash into an intermittent one.
+
+So the flag is now the gate: `SetSourceInputs` leaves the PATHING bit OFF until probes actually exist,
+and `Run` executes the pathing stage only if something staged it. No source can be in the bad state,
+whatever order anything is called in.
+
+Verified by running the client for thirty seconds: past the handoff, 30 cars synthesized, 7-10
+reflection voices, dsp 10-13 %, no starves after the load transient, and no "placed at a position N ms
+old" warning.
