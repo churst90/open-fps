@@ -474,3 +474,34 @@ gains already carry the barrier's frequency dependence.
 3. Walk with the field and listen for a car passing at a few metres. `OPENFPS_AUDIO_TRACE=<car id>`
    gives the CSV; the bearing and Doppler columns should move on every row rather than in eights.
 4. Watch for `Voice N was placed at a position X ms old` in the log. It should not appear.
+
+
+---
+
+## Postscript: the silence, and the reason for it (same session)
+
+The first run after the fixes was completely silent — no cars at all. The log said why in two lines:
+
+    Cars: 0 on the map — 0 synthesized, 0 borrowed, 0 out of budget
+    Audio asset 'engine:nascar_v8' cannot be played: no file at '.../ASSETS/SOUNDS/engine:nascar_v8'
+
+Nothing threw and nothing warned about a protocol. The client had simply read `IsSynth` as **false**
+for every vehicle in the world, so thirty cars each became an attempt to play a sample file named
+after their engine preset, and there is no such file.
+
+`SoundEmitterComponent` is `[MemoryPackable]`, and MemoryPack serialises members POSITIONALLY, in
+declaration order, with no names on the wire. **The order of that struct is a network protocol.**
+`Offset` was added after `MinDistance` — the middle — which does not add a field so much as renumber
+every field after it. Against a server process that had been running since before the change, the
+client read a `Vector3` where a `float` had been written, lost twelve bytes of alignment, and
+everything past that point was garbage that happened to parse.
+
+Two things came out of it:
+
+- `Offset` moved to the END of the struct, under an APPEND ONLY marker and the explanation. Appended,
+  the worst an out-of-date peer can do is not send it, and a member nobody sent reads back as its
+  default — which for an emitter offset is the origin, exactly the old behaviour.
+- **The server must be restarted after any component change.** It is not rebuilt by
+  `run-gtk-client.sh`, so a long-lived server silently becomes an old protocol while the client moves
+  on. Worth remembering the shape of this failure: not a crash, not a warning — plausible numbers in
+  the wrong fields, and a world that goes quiet.

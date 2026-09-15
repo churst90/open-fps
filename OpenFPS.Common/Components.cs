@@ -131,24 +131,6 @@ public partial struct SoundEmitterComponent
     public float MinDistance { get; set; } = 3.0f;
 
     /// <summary>
-    /// Where the sound comes OUT, relative to the entity's origin and in its own frame
-    /// (x right, y up, z forward). Zero — the default — means the origin itself.
-    ///
-    /// The emission point, not the object's position, is what every acoustic question is about: what
-    /// is in the way of the sound, how far it has come, which direction it arrives from. Asking those
-    /// about the origin was worth a whole class of fault. A vehicle's origin is its contact patch on
-    /// the road, so the occlusion probe — a half-metre sphere — sat HALF UNDERGROUND on every level
-    /// stretch of every track, and roughly half its samples reported "blocked" before any wall was
-    /// considered. Six decibels down and forty off the top, permanently, for being a car on a road.
-    ///
-    /// Authored per emitter rather than corrected per case, because the answer is different for every
-    /// object and known for all of them: a tailpipe is a third of a metre up and a metre or two back,
-    /// a chimney is on the roof, a drain is at ground level, a speaker is where it was bolted. A fixed
-    /// height added to everything would be the same mistake pointing the other way.
-    /// </summary>
-    public Vector3 Offset { get; set; }
-
-    /// <summary>
     /// Replay this sound every N seconds. Zero (the default) means it is not a repeater.
     ///
     /// Deliberately a property of ANY emitter rather than of a public-address system: the thing that
@@ -180,6 +162,39 @@ public partial struct SoundEmitterComponent
     public float SynthFilterCutoff { get; set; }
     public float SynthFilterResonance { get; set; }
     public float SynthPulseWidth { get; set; }
+
+    // ── APPEND ONLY BELOW THIS LINE ─────────────────────────────────────────────────────────────
+    //
+    // MemoryPack serialises these members POSITIONALLY, in declaration order, with no names on the
+    // wire. That makes the order of this struct a network protocol: inserting a member in the middle
+    // does not add a field, it renumbers every field after it.
+    //
+    // Which is not a hypothetical. Offset went in after MinDistance, and against a server that had
+    // not been restarted the client read a Vector3 where a float had been written, lost twelve bytes
+    // of alignment, and came out the other side with IsSynth false on every vehicle in the world.
+    // Thirty cars turned into thirty attempts to play a sample called "engine:nascar_v8", and the
+    // speedway went completely silent. Nothing threw; the numbers were simply the wrong numbers.
+    //
+    // Appended, the worst an out-of-date peer can do is not send it, and a member nobody sent reads
+    // back as its default — which for an emitter offset is the origin, exactly the old behaviour.
+
+    /// <summary>
+    /// Where the sound comes OUT, relative to the entity's origin and in its own frame
+    /// (x right, y up, z forward). Zero — the default — means the origin itself.
+    ///
+    /// The emission point, not the object's position, is what every acoustic question is about: what
+    /// is in the way of the sound, how far it has come, which direction it arrives from. Asking those
+    /// about the origin was worth a whole class of fault. A vehicle's origin is its contact patch on
+    /// the road, so the occlusion probe — a half-metre sphere — sat HALF UNDERGROUND on every level
+    /// stretch of every track, and roughly half its samples reported "blocked" before any wall was
+    /// considered. Six decibels down and forty off the top, permanently, for being a car on a road.
+    ///
+    /// Authored per emitter rather than corrected per case, because the answer is different for every
+    /// object and known for all of them: a tailpipe is a third of a metre up and a metre or two back,
+    /// a chimney is on the roof, a drain is at ground level, a speaker is where it was bolted. A fixed
+    /// height added to everything would be the same mistake pointing the other way.
+    /// </summary>
+    public Vector3 Offset { get; set; }
 
     public SoundEmitterComponent() { }
 }
