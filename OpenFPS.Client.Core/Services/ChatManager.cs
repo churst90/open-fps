@@ -40,7 +40,7 @@ public class ChatManager
     }
 
     /// <summary>
-    /// Routes an incoming message to the correct buffer and speaks it immediately.
+    /// Routes an incoming message to the correct buffer and speaks it if it is addressed to you.
     /// Sender prefixes drive routing:
     ///   "[PM"    → Private
     ///   "[Map]"  → Map
@@ -54,14 +54,29 @@ public class ChatManager
         _buffers[target].Add(msg);
         _bufferCursors[target] = _buffers[target].Count - 1;
 
-        // Always speak the message immediately.
-        // Private and Error messages are spoken regardless of active buffer.
-        bool alwaysSpeak = target == ChatBufferType.Private || target == ChatBufferType.Error;
-        if (alwaysSpeak || target == _activeBuffer)
-        {
+        if (IsAddressedToYou(target) || target == _activeBuffer)
             _tts.Speak($"{msg.Sender}: {msg.Text}", interrupt: false);
-        }
     }
+
+    /// <summary>
+    /// Is this message an ANSWER, or is it other people talking?
+    ///
+    /// The distinction decides whether it is spoken regardless of which buffer the player is reading,
+    /// and getting it wrong made every command in the game silently unanswerable. A server reply is a
+    /// System message, System messages land in the Server buffer, and the Server buffer is not the
+    /// one anybody starts in — so "Moved to 40, 0, 120", "Cannot move there: area is solid" and "You
+    /// do not have permission" were all delivered to a buffer nobody was listening to. From the
+    /// player's side a command simply did nothing, with no way to tell whether it had failed, been
+    /// refused, or worked and moved them somewhere identical-sounding.
+    ///
+    /// Ambient chatter is different and SHOULD be gated: other players talking in a global channel is
+    /// exactly the thing a buffer exists to let you turn away from. What you can never turn away from
+    /// is the game answering a question you just asked it.
+    /// </summary>
+    private static bool IsAddressedToYou(ChatBufferType target) => target
+        is ChatBufferType.Private     // someone sent it to you by name
+        or ChatBufferType.Error       // something went wrong, and it went wrong for you
+        or ChatBufferType.Server;     // the game replying to you
 
     /// <summary>
     /// Posts a plain error string directly to the Error buffer and speaks it immediately.
