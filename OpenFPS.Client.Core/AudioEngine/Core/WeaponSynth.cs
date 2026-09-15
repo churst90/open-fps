@@ -181,7 +181,7 @@ public static class WeaponSynth
             float sub = (1f - us) * MathF.Exp(-us);
 
             // 2. Broadband noise, decaying fast, through a closing low-pass.
-            float noiseEnv = MathF.Exp(-t / MathF.Max(0.004f, w.BlastDecaySeconds));
+            float noiseEnv = MathF.Exp(-t / MathF.Max(0.002f, w.BlastDecaySeconds * NoiseDecayFraction));
             float noise = (float)(rng.NextDouble() * 2.0 - 1.0) * noiseEnv;
 
             // Cutoff falls geometrically, which is how it is heard — as octaves, not as hertz.
@@ -431,13 +431,29 @@ public static class WeaponSynth
     public const float BlastWaveLevel = 1.45f;
     /// <summary>Weight of the slow blast wave underneath it — the part you feel in your chest. This is
     /// the knob for "I should be able to feel a gun fire".</summary>
-    public const float SubWeightLevel = 1.10f;
+    public const float SubWeightLevel = 1.45f;
     /// <summary>How hard the blast is driven into the soft clipper. Higher is denser and louder-feeling
     /// at the same peak; far too high and it stops sounding like air moving.</summary>
     public const float SaturationDrive = 2.1f;
-    /// <summary>Weight of the swept broadband noise — the part that sounds like a gunshot rather than
-    /// like a drum. This is where the character is.</summary>
-    public const float NoiseLayerLevel = 1.9f;
+    /// <summary>
+    /// Weight of the swept broadband noise — the part that sounds like a gunshot rather than like a
+    /// drum. This is where the character is, and it was where ALL of it was.
+    ///
+    /// At 1.9 the noise carried more energy than both blast waves together: the first listening test
+    /// called the result "a burst of white noise", and measuring it agreed — barely a fifth of the
+    /// energy sat below 500 Hz, where nearly all of a real gunshot's does. The gas jet leaving a
+    /// muzzle is loud and it is BRIEF; what carries across a street is the pressure wave behind it.
+    /// </summary>
+    public const float NoiseLayerLevel = 0.85f;
+
+    /// <summary>
+    /// How much faster the noise dies than the blast body.
+    ///
+    /// The turbulent jet is over in a few milliseconds — far sooner than the pressure disturbance it
+    /// rode out on. Decaying both at the same rate left a couple of hundred milliseconds of hiss
+    /// under every shot, which is most of what made it read as noise rather than as a bang.
+    /// </summary>
+    public const float NoiseDecayFraction = 0.4f;
 
     /// <summary>Reads a 16-bit mono WAV back to floats. Enough to re-load what the ingest wrote; it
     /// is not a general decoder and says so by returning empty rather than guessing at a format it

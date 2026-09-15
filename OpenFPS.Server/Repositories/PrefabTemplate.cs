@@ -70,12 +70,24 @@ public class PrefabTemplate
     /// <summary>Spawns a HealthComponent at full health. Omit for something that cannot be damaged.</summary>
     public int? MaxHealth { get; set; }
 
-    /// <summary>Declares this an item. Recorded on the template only — there is no inventory system yet,
-    /// so nothing consumes it; it must agree with <see cref="Type"/> = Item.</summary>
+    /// <summary>Declares this an item: something that can be picked up, carried and put down. Must
+    /// agree with <see cref="Type"/> = Item.</summary>
     public bool IsItem { get; set; }
 
-    /// <summary>Item weight. Recorded only; see <see cref="IsItem"/>.</summary>
+    /// <summary>What it weighs, kilograms. Not bookkeeping — it is what you hear when it lands.</summary>
     public float? ItemWeight { get; set; }
+
+    /// <summary>
+    /// How many hands it takes: one or two. Defaults to one.
+    ///
+    /// The constraint that makes carrying things a spatial decision rather than a menu. A rifle takes
+    /// both, so a rifle and a torch is a choice somebody has to make in the moment.
+    /// </summary>
+    public int? Hands { get; set; }
+
+    /// <summary>The weapon this IS, if it is one — a key into the weapon registry, so a thing you are
+    /// holding can be fired without anything here knowing what a weapon is.</summary>
+    public string? WeaponId { get; set; }
 
     // --- Acoustics (AcousticComponent) -------------------------------------------------------------
 

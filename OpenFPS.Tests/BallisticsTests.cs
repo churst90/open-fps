@@ -119,6 +119,52 @@ public class BallisticsTests
         }
     }
 
+    /// <summary>
+    /// A gunshot is mostly LOW. Nearly all of a real one's energy is below a few hundred hertz — the
+    /// pressure wave — with a brief bright edge on top from the gas jet, and the jet is over in
+    /// milliseconds while the wave carries across a street.
+    ///
+    /// This test exists because the first person to listen to it said "the muzzle sounds like a burst
+    /// of white noise", and measuring agreed: barely a fifth of the energy was under 500 Hz. Every
+    /// other test on this synthesis passed throughout — they checked that it was dry, centred,
+    /// deterministic and different per weapon, and none of them could tell a gunshot from a hiss.
+    /// </summary>
+    [Fact]
+    public void AShotIsMostlyLowEnergyAndNotABurstOfNoise()
+    {
+        var pcm = WeaponSynth.MuzzleBlast(WeaponProfile.Rifle);
+
+        float below500 = BandEnergy(pcm, 10f, 500f);
+        float above500 = BandEnergy(pcm, 500f, 20000f);
+        float total = below500 + above500;
+        Assert.True(total > 0f);
+
+        float lowShare = below500 / total;
+        Assert.True(lowShare > 0.5f,
+                    $"only {lowShare * 100f:F0} per cent of the shot's energy is below 500 Hz; it is a hiss");
+
+        // ...and it still has an edge. All weight and no edge is a door, not a gun.
+        Assert.True(BandEnergy(pcm, 2000f, 8000f) / total > 0.02f, "the shot has no bright edge at all");
+    }
+
+    /// <summary>Energy in a band, by one-pole filtering. Crude and adequate: the question is whether
+    /// two thirds of the energy is in the bottom two octaves, not where a notch sits.</summary>
+    private static float BandEnergy(float[] pcm, float lowHz, float highHz)
+    {
+        const float sampleRate = 48000f;
+        float a = 1f - MathF.Exp(-2f * MathF.PI * lowHz / sampleRate);
+        float b = 1f - MathF.Exp(-2f * MathF.PI * highHz / sampleRate);
+        float s1 = 0f, s2 = 0f, energy = 0f;
+        foreach (float x in pcm)
+        {
+            s2 += b * (x - s2);
+            s1 += a * (s2 - s1);
+            float y = s2 - s1;
+            energy += y * y;
+        }
+        return energy;
+    }
+
     [Fact]
     public void RenderingIsDeterministic()
     {

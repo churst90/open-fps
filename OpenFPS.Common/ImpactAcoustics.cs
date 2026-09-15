@@ -121,7 +121,17 @@ public static class GlassSound
 
         foreach (var e in events)
         {
-            float baseDb = 60f + 20f * MathF.Log10(MathF.Max(0.01f, e.Volume));
+            // A pane letting go is ninety-odd decibels at a metre — it is one of the loudest things a
+            // building does. Sixty was the level of a conversation, which is why it could not be
+            // heard at all from across a street.
+            float reference = e.Kind switch
+            {
+                GlassEventKind.Shatter => 96f,
+                GlassEventKind.Puncture => 82f,
+                GlassEventKind.Shard => 80f,
+                _ => 84f,       // a piece arriving on pavement
+            };
+            float baseDb = reference + 20f * MathF.Log10(MathF.Max(0.01f, e.Volume));
             switch (e.Kind)
             {
                 case GlassEventKind.Puncture:
@@ -162,10 +172,14 @@ public static class GlassSound
                     break;
 
                 case GlassEventKind.Shard:
+                    // A piece of glass in the air is a TINKLE — short, bright, and pitched, because a
+                    // fragment is a small stiff plate and rings like one. Rendering it as a long
+                    // broadband hiss made a dozen of them into one wash of white noise, which is
+                    // what a shower of glass is emphatically not.
                     sounds.Add(new TransientSound
                     {
-                        Character = SoundCharacter.Hiss, DelaySeconds = e.DelaySeconds, Position = e.Position,
-                        LevelDb = baseDb, Hz = 5000f * e.Pitch, DecaySeconds = 0.2f, Noisiness = 1f,
+                        Character = SoundCharacter.Ring, DelaySeconds = e.DelaySeconds, Position = e.Position,
+                        LevelDb = baseDb, Hz = 3400f * e.Pitch, DecaySeconds = 0.12f, Noisiness = 0.35f,
                     });
                     break;
 

@@ -313,9 +313,14 @@ public static class StreetSceneSpike
             }
             else
             {
-                speed = MathF.Min(26f, speed + 6.5f * dt);
-                float demand = TyreFriction.Demand(6.5f, 0f, truck.Tyres.PeakGripG);
-                slip = MathF.Max(0f, demand - 0.55f);
+                // Hard enough on it that the tyres cannot deliver what is being asked. The number
+                // handed over IS the demand — a fraction of available grip, where 0.78 is where a
+                // tyre starts to sing and 1.0 is all it has. Subtracting anything from it, as this
+                // did at first, put it below the onset and produced a truck that accelerated in
+                // perfect silence.
+                const float launch = 7.5f;
+                speed = MathF.Min(26f, speed + launch * dt);
+                slip = TyreFriction.Demand(launch, 0f, truck.Tyres.PeakGripG);
             }
 
             x += speed * dt;
@@ -357,6 +362,7 @@ public static class StreetSceneSpike
             float wait = MathF.Max(0f, sound.DelaySeconds - elapsed);
             if (wait > 0f) { Wait(provider, wait * 1000f); elapsed += wait; }
 
+            var placed = Loudness.Place(sound.LevelDb);
             string id = $"scene:{sound.Character}:{(int)sound.Hz}:{(int)sound.LevelDb}:{seed}";
             var pcm = !string.IsNullOrEmpty(sound.SynthKey) && WeaponRegistry.TryGet(sound.SynthKey["weapon:".Length..], out var w)
                 ? WeaponSynth.MuzzleBlast(WeaponProfile.From(w), seed)
@@ -370,9 +376,9 @@ public static class StreetSceneSpike
                 Type = EmitterType.WorldLocked,
                 Mode = PlaybackMode.Single,
                 Position = sound.Position,
-                Volume = Loudness.GainFor(sound.LevelDb),
+                Volume = placed.Gain,
                 Range = MathF.Min(400f, Loudness.AudibleRange(sound.LevelDb)),
-                MinDistance = 1.0f,
+                MinDistance = placed.ReferenceDistance,
                 Pitch = 1f,
                 TargetRegionId = AcousticConstants.GlobalRegionId,
                 EnableReverb = true,

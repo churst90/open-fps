@@ -293,6 +293,16 @@ public class PrefabRepository
             components.Add(region);
         }
 
+        if (t.IsItem)
+        {
+            components.Add(new ItemComponent
+            {
+                MassKg = MathF.Max(0.01f, t.ItemWeight ?? 1f),
+                Hands = t.Hands is 2 ? 2 : 1,
+                WeaponId = t.WeaponId ?? "",
+            });
+        }
+
         bool isDoor = t.IsDoor == true;
 
         // A door is always a portal, whether or not the prefab said so: the opening it makes when it

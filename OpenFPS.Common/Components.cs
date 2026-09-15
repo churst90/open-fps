@@ -580,3 +580,61 @@ public partial struct DoorComponent
         HingeSide = 1f;
     }
 }
+
+// ── Holding things ──────────────────────────────────────────────────────────────────────────────
+//
+// An item in your hands is the SAME ENTITY as one on the ground. That is already what
+// InventoryComponent says it believes, and it is the right belief: a rifle you are carrying has a
+// material, a mass and a position, and dropping it should make the noise that mass and that material
+// make when they meet that floor — which is a calculation that already exists and knows nothing about
+// rifles. Items as rows in a table would need all of that inventing again, wrongly.
+
+/// <summary>
+/// Something that can be picked up, carried and put down.
+/// </summary>
+[MemoryPackable]
+public partial struct ItemComponent
+{
+    /// <summary>What it weighs. Not bookkeeping: it is what you hear when it lands, and what makes
+    /// carrying a thing different from not carrying it.</summary>
+    public float MassKg { get; set; }
+
+    /// <summary>
+    /// How many hands it takes. One or two.
+    ///
+    /// The constraint that makes an inventory a spatial thing you reason about by ear rather than a
+    /// menu. A rifle takes both hands, so a rifle and a torch is a decision — and a decision a
+    /// player has to make out loud, in the moment, is worth more than a list they can scroll.
+    /// </summary>
+    public int Hands { get; set; }
+
+    /// <summary>The weapon this IS, or empty. A key into <see cref="OpenFPS.Common.WeaponRegistry"/>,
+    /// so a thing you are holding can be fired without anything knowing what a weapon is.</summary>
+    public string WeaponId { get; set; }
+
+    public ItemComponent() { MassKg = 1f; Hands = 1; WeaponId = ""; }
+}
+
+/// <summary>
+/// What a player has hold of.
+///
+/// Two slots, and something needing both is recorded in BOTH of them — the same entity id twice.
+/// That way "have I a hand free" is one question with one answer, rather than a rule about a flag
+/// that some code remembers to check and some does not.
+/// </summary>
+[MemoryPackable]
+public partial struct HandsComponent
+{
+    public int RightEntityId { get; set; }
+    public int LeftEntityId { get; set; }
+    public HandsComponent() { RightEntityId = -1; LeftEntityId = -1; }
+}
+
+/// <summary>On the item: who has it, and whether it is filling both their hands.</summary>
+[MemoryPackable]
+public partial struct HeldComponent
+{
+    public int HolderEntityId { get; set; }
+    public bool BothHands { get; set; }
+    public HeldComponent() { HolderEntityId = -1; }
+}

@@ -1095,6 +1095,31 @@ completely silent.
       over their grip; and the same truck finding a wall at eleven metres a second, 830 kJ arriving.
       Headless it checks the arithmetic and writes every layer out to audition.
 
+#### What listening to it found (2026-09-15)
+
+Every one of these passed every test in the suite. None of the tests could hear.
+
+- [x] **The muzzle blast was a burst of white noise**, and measuring agreed: barely a FIFTH of its
+      energy sat below 500 Hz, where nearly all of a real gunshot's does. The noise layer — the gas
+      jet — carried more than both blast waves together and decayed at the same rate as the pressure
+      wave, leaving two hundred milliseconds of hiss under every shot. The jet is loud and BRIEF;
+      what crosses a street is the wave behind it. Rebalanced to 68 per cent below 500 Hz, and
+      `AShotIsMostlyLowEnergyAndNotABurstOfNoise` now holds it there — the gap being that the four
+      existing tests checked it was dry, centred, deterministic and different per weapon, and not one
+      of them could tell a gunshot from a hiss.
+- [x] **No glass at all**, because it was authored at 60 dB — the level of a conversation — and heard
+      from thirty metres. A pane letting go is ninety-odd at a metre; it is one of the loudest things
+      a building does.
+- [x] **Glass shards were a wash of white noise.** A fragment in the air is a TINKLE: a small stiff
+      plate that rings, short and bright and pitched. Rendered as a long broadband hiss, a dozen of
+      them became one hiss.
+- [x] **Doors were nearly silent**, because `MinDistance` was hardcoded to a metre. Gain and reference
+      distance are decided TOGETHER — that is the whole of what `Loudness.Place` is for — and taking
+      the gain while hardcoding the reference threw half of it away.
+- [x] **The truck never squealed.** The number handed to the tyre model IS the demand, where 0.78 is
+      where a tyre starts to sing; the scene subtracted 0.55 from it first and put it below the onset.
+      A truck accelerating in perfect silence.
+
 ### 1b. The original plan, kept for the reasoning
 
 Three pieces already exist and compose; the thing to resist is inventing a fourth.

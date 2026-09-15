@@ -109,6 +109,7 @@ public sealed class WorldAudioPlayer
 
             var path = _acoustics.CalculateAcousticPath(world, item.SourceEntityId,
                                                         listenerPosition, item.Sound.Position);
+            var placed = Loudness.Place(item.Sound.LevelDb);
 
             _audio.Submit(new SpatialEmitter
             {
@@ -126,9 +127,13 @@ public sealed class WorldAudioPlayer
                 ApertureFactor = path.ApertureFactor,
                 TransmissionBleed = path.TransmissionBleed,
                 TargetRegionId = path.RegionId,
-                Volume = Loudness.GainFor(item.Sound.LevelDb),
+                // Gain and reference distance are decided TOGETHER — that is the whole point of
+                // Loudness.Place, and taking the gain while hardcoding the reference throws half of
+                // it away. A quiet source wants a short reference so it is still itself close to;
+                // a gunshot wants a long one so it is still full scale across a street.
+                Volume = placed.Gain,
                 Range = MathF.Min(MaxRange, Loudness.AudibleRange(item.Sound.LevelDb)),
-                MinDistance = 1.0f,
+                MinDistance = placed.ReferenceDistance,
                 Pitch = 1.0f,
                 Type = EmitterType.WorldLocked,
                 Priority = 2,
