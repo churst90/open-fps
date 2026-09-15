@@ -970,12 +970,53 @@ A door is two things at once and only one of them is obvious.
       stand for a moment first, the way a real one does.
 - [x] `DoorTests`: 14 tests, and the sabotage suite is up to 31 rows, all caught.
 
-Still to come, and it is the sound: the **latch** (a small sharp metallic transient), the **seal**
-(a short pressure whoomp as it compresses, which is most of why an expensive car sounds expensive and
-is absent entirely on a van's sliding door), and the **panel** ringing at its own modes afterwards,
-so a steel door, a glass one and a canvas flap are three different events. All three fall out of
-material and area. Hinges creaking are a stick-slip relaxation oscillation — the same process as tyre
-squeal, which `TyreFriction` already models.
+#### The sound of one (2026-09-15)
+
+- [x] **Materials gained mechanical properties.** Everything the registry held described a material
+      as a SURFACE — what it absorbs, what it lets through — which is enough for a wall between you
+      and a noise and nothing like enough for a wall that IS the noise. `DensityKgM3`,
+      `YoungsModulusGPa` and `LossFactor` now sit beside them, because a door panel, a windscreen in
+      hail and two cars meeting are the same calculation asked three times.
+- [x] `DoorAcoustics` — the model, and there is not a per-door setting in it. A door is a FAMILY of
+      sounds, not a sound:
+      * **The latch** first, before the leaf has met anything — the bolt rides the strike plate and
+        drops. Nearly independent of the door, because the mechanism is steel whatever the leaf is.
+      * **The seal**, where there is one: air driven out of a closing gap, low and soft. It absorbs
+        more than half the impact energy, so a sealed door is QUIETER than the same leaf bare and it
+        robs the panel of the ring. That is a car door against a garden gate, and it is most of why
+        an expensive car sounds expensive.
+      * **The impact**: half m v squared arriving, so twice the closing speed is six decibels. That
+        ratio is what makes a slam recognisable AS a slam rather than as a louder close.
+      * **The panel** ringing on afterwards at its plate-bending fundamental — 0.4755 t sqrt(E/rho)
+        (1/a² + 1/b²), which is the plate constant and not a tuning knob.
+      * **The hinges**, while it is moving and only if they are dry — a stick-slip relaxation
+        oscillation, the same process as tyre squeal.
+- [x] Three things the tests found, all of them the model being wrong rather than the test:
+      * A carpet was being given a note, because a frequency below the bottom of pitch was being
+        CLAMPED into existence rather than treated as the thud it is.
+      * A steel door rang for ninety-eight seconds. A hung panel loses energy through its edges far
+        faster than steel loses it internally — published total loss factors for panels in situ run
+        one to five per cent and are dominated by exactly that. `HungPanelLoss` is that, and its
+        absence was being hidden by a clamp, so the test now asserts the physics decides the figure
+        rather than the ceiling.
+      * A wooden door rang for a second and a half, because the loss factor was the one for a solid
+        clear billet rather than for the plywood or hollow core a door is actually made of.
+- [x] And one comfortable belief the model refused to support: **a steel door and a wooden one of the
+      same thickness ring at almost the same pitch**, because steel's twenty-fold stiffness is paid
+      for in twelve-fold weight. What tells them apart is how LONG, the seal, and the level — so the
+      test asserts that, rather than asserting folklore.
+- [x] `DoorSoundTests`: 13 tests on relationships rather than absolutes — it does not matter whether
+      a door rings at 480 Hz or 520, it matters that the ratios are right. Sabotage suite up to 43.
+
+- [ ] **The renderer and the wire.** `DoorSynth` to turn these parameters into PCM the way
+      `WeaponSynth` already does for gunshots, and a way to get a one-shot transient to a client
+      through the acoustic path. The route is mapped: `ClientAudioSystem` already builds a full
+      emitter for a repeating one-shot and simply withholds it until a clock says so — "everything
+      else about it, placement, occlusion, reverb, the acoustic path, is whatever that emitter would
+      always have got". A world audio event is the same thing with the server as the gate instead of
+      the clock. That channel is shared infrastructure: glass, gunshots and collisions all need it
+      and none of them has it, which is why it is its own step rather than something to half-build
+      inside the door work.
 
 ### 1b. The original plan, kept for the reasoning
 

@@ -15,6 +15,34 @@ public struct MaterialProperties
     public float TransmissionMid { get; set; }
     public float TransmissionHigh { get; set; }
     public int ResonanceIndex { get; set; }
+
+    // -- What the stuff IS, as opposed to how it treats sound arriving at it ----------------------
+    //
+    // Everything above describes a material as a SURFACE: what it absorbs, what it lets through.
+    // That is enough for a wall between you and a noise, and not nearly enough for a wall that IS
+    // the noise. A panel struck by a door latch, by a hailstone, or by another car rings at its own
+    // modes, and where those modes are is a matter of how stiff and how heavy the panel is.
+    //
+    // Two numbers do it. A flat panel's fundamental goes as sqrt(E / rho), times its thickness over
+    // its span squared - so steel rings high and hard, glass higher still because it is stiff for
+    // its weight, and a carpet does not ring at all. They live here rather than in any one caller
+    // because a door panel, a windscreen in hail and two cars meeting are the same calculation asked
+    // three times.
+
+    /// <summary>Density, kg/m^3.</summary>
+    public float DensityKgM3 { get; set; }
+
+    /// <summary>Young's modulus, GPa. With density, this is the note it rings at.</summary>
+    public float YoungsModulusGPa { get; set; }
+
+    /// <summary>
+    /// How fast that ring dies away: roughly the fraction of energy lost per cycle.
+    ///
+    /// NOT the same number as <see cref="Absorption"/>, which is about sound ARRIVING at the surface
+    /// out of the air. This is internal damping - a struck bell and a struck lump of putty differ
+    /// here by orders of magnitude and absorb airborne sound about the same.
+    /// </summary>
+    public float LossFactor { get; set; }
 }
 
 /// <summary>JSON override DTO — every field nullable so omitted fields don't clobber the
@@ -30,6 +58,9 @@ internal sealed class MaterialOverride
     public float? TransmissionMid { get; set; }
     public float? TransmissionHigh { get; set; }
     public int? ResonanceIndex { get; set; }
+    public float? DensityKgM3 { get; set; }
+    public float? YoungsModulusGPa { get; set; }
+    public float? LossFactor { get; set; }
 }
 
 public static class AcousticRegistry
@@ -50,17 +81,17 @@ public static class AcousticRegistry
             var reg = new Dictionary<string, MaterialProperties>(System.StringComparer.OrdinalIgnoreCase);
 
             // HARDCODED REALISM CONSTANTS: Ensuring these are ALWAYS used regardless of external JSON
-            reg["Generic"] = new MaterialProperties { Absorption = 0.2f, AbsorptionLow = 0.1f, AbsorptionMid = 0.2f, AbsorptionHigh = 0.3f, Scattering = 0.2f, TransmissionLow = 0.4f, TransmissionMid = 0.3f, TransmissionHigh = 0.2f, ResonanceIndex = 22 };
-            reg["Wood"] = new MaterialProperties { Absorption = 0.15f, AbsorptionLow = 0.1f, AbsorptionMid = 0.15f, AbsorptionHigh = 0.2f, Scattering = 0.4f, TransmissionLow = 0.6f, TransmissionMid = 0.4f, TransmissionHigh = 0.2f, ResonanceIndex = 21 };
-            reg["Metal"] = new MaterialProperties { Absorption = 0.05f, AbsorptionLow = 0.05f, AbsorptionMid = 0.05f, AbsorptionHigh = 0.1f, Scattering = 0.1f, TransmissionLow = 0.1f, TransmissionMid = 0.05f, TransmissionHigh = 0.02f, ResonanceIndex = 13 };
-            reg["Concrete"] = new MaterialProperties { Absorption = 0.02f, AbsorptionLow = 0.01f, AbsorptionMid = 0.02f, AbsorptionHigh = 0.02f, Scattering = 0.1f, TransmissionLow = 0.05f, TransmissionMid = 0.02f, TransmissionHigh = 0.01f, ResonanceIndex = 18 };
-            reg["Marble"] = new MaterialProperties { Absorption = 0.01f, AbsorptionLow = 0.01f, AbsorptionMid = 0.01f, AbsorptionHigh = 0.01f, Scattering = 0.05f, TransmissionLow = 0.05f, TransmissionMid = 0.02f, TransmissionHigh = 0.01f, ResonanceIndex = 12 };
-            reg["Carpet"] = new MaterialProperties { Absorption = 0.60f, AbsorptionLow = 0.15f, AbsorptionMid = 0.5f, AbsorptionHigh = 0.75f, Scattering = 0.6f, TransmissionLow = 0.1f, TransmissionMid = 0.05f, TransmissionHigh = 0.01f, ResonanceIndex = 6 };
-            reg["Glass"] = new MaterialProperties { Absorption = 0.05f, AbsorptionLow = 0.05f, AbsorptionMid = 0.05f, AbsorptionHigh = 0.05f, Scattering = 0.05f, TransmissionLow = 0.7f, TransmissionMid = 0.5f, TransmissionHigh = 0.3f, ResonanceIndex = 3 };
-            reg["None"] = new MaterialProperties { Absorption = 0.0f, AbsorptionLow = 0.0f, AbsorptionMid = 0.0f, AbsorptionHigh = 0.0f, Scattering = 0.0f, TransmissionLow = 1.0f, TransmissionMid = 1.0f, TransmissionHigh = 1.0f, ResonanceIndex = 0 };
-            reg["Plastic"] = new MaterialProperties { Absorption = 0.1f, AbsorptionLow = 0.05f, AbsorptionMid = 0.1f, AbsorptionHigh = 0.2f, Scattering = 0.2f, TransmissionLow = 0.5f, TransmissionMid = 0.4f, TransmissionHigh = 0.2f, ResonanceIndex = 15 };
-            reg["Grass"] = new MaterialProperties { Absorption = 0.75f, AbsorptionLow = 0.5f, AbsorptionMid = 0.7f, AbsorptionHigh = 0.9f, Scattering = 0.9f, TransmissionLow = 0.4f, TransmissionMid = 0.6f, TransmissionHigh = 0.8f, ResonanceIndex = 2 };
-            reg["Dirt"] = new MaterialProperties { Absorption = 0.60f, AbsorptionLow = 0.4f, AbsorptionMid = 0.5f, AbsorptionHigh = 0.6f, Scattering = 0.8f, TransmissionLow = 0.3f, TransmissionMid = 0.4f, TransmissionHigh = 0.5f, ResonanceIndex = 4 };
+            reg["Generic"] = new MaterialProperties { Absorption = 0.2f, AbsorptionLow = 0.1f, AbsorptionMid = 0.2f, AbsorptionHigh = 0.3f, Scattering = 0.2f, TransmissionLow = 0.4f, TransmissionMid = 0.3f, TransmissionHigh = 0.2f, ResonanceIndex = 22, DensityKgM3 = 1200f, YoungsModulusGPa = 5f, LossFactor = 0.02f };
+            reg["Wood"] = new MaterialProperties { Absorption = 0.15f, AbsorptionLow = 0.1f, AbsorptionMid = 0.15f, AbsorptionHigh = 0.2f, Scattering = 0.4f, TransmissionLow = 0.6f, TransmissionMid = 0.4f, TransmissionHigh = 0.2f, ResonanceIndex = 21, DensityKgM3 = 650f, YoungsModulusGPa = 11f, LossFactor = 0.03f };
+            reg["Metal"] = new MaterialProperties { Absorption = 0.05f, AbsorptionLow = 0.05f, AbsorptionMid = 0.05f, AbsorptionHigh = 0.1f, Scattering = 0.1f, TransmissionLow = 0.1f, TransmissionMid = 0.05f, TransmissionHigh = 0.02f, ResonanceIndex = 13, DensityKgM3 = 7850f, YoungsModulusGPa = 200f, LossFactor = 0.0002f };
+            reg["Concrete"] = new MaterialProperties { Absorption = 0.02f, AbsorptionLow = 0.01f, AbsorptionMid = 0.02f, AbsorptionHigh = 0.02f, Scattering = 0.1f, TransmissionLow = 0.05f, TransmissionMid = 0.02f, TransmissionHigh = 0.01f, ResonanceIndex = 18, DensityKgM3 = 2400f, YoungsModulusGPa = 30f, LossFactor = 0.015f };
+            reg["Marble"] = new MaterialProperties { Absorption = 0.01f, AbsorptionLow = 0.01f, AbsorptionMid = 0.01f, AbsorptionHigh = 0.01f, Scattering = 0.05f, TransmissionLow = 0.05f, TransmissionMid = 0.02f, TransmissionHigh = 0.01f, ResonanceIndex = 12, DensityKgM3 = 2700f, YoungsModulusGPa = 60f, LossFactor = 0.002f };
+            reg["Carpet"] = new MaterialProperties { Absorption = 0.60f, AbsorptionLow = 0.15f, AbsorptionMid = 0.5f, AbsorptionHigh = 0.75f, Scattering = 0.6f, TransmissionLow = 0.1f, TransmissionMid = 0.05f, TransmissionHigh = 0.01f, ResonanceIndex = 6, DensityKgM3 = 200f, YoungsModulusGPa = 0.01f, LossFactor = 0.4f };
+            reg["Glass"] = new MaterialProperties { Absorption = 0.05f, AbsorptionLow = 0.05f, AbsorptionMid = 0.05f, AbsorptionHigh = 0.05f, Scattering = 0.05f, TransmissionLow = 0.7f, TransmissionMid = 0.5f, TransmissionHigh = 0.3f, ResonanceIndex = 3, DensityKgM3 = 2500f, YoungsModulusGPa = 70f, LossFactor = 0.001f };
+            reg["None"] = new MaterialProperties { Absorption = 0.0f, AbsorptionLow = 0.0f, AbsorptionMid = 0.0f, AbsorptionHigh = 0.0f, Scattering = 0.0f, TransmissionLow = 1.0f, TransmissionMid = 1.0f, TransmissionHigh = 1.0f, ResonanceIndex = 0, DensityKgM3 = 0f, YoungsModulusGPa = 0f, LossFactor = 1f };
+            reg["Plastic"] = new MaterialProperties { Absorption = 0.1f, AbsorptionLow = 0.05f, AbsorptionMid = 0.1f, AbsorptionHigh = 0.2f, Scattering = 0.2f, TransmissionLow = 0.5f, TransmissionMid = 0.4f, TransmissionHigh = 0.2f, ResonanceIndex = 15, DensityKgM3 = 1100f, YoungsModulusGPa = 2.5f, LossFactor = 0.05f };
+            reg["Grass"] = new MaterialProperties { Absorption = 0.75f, AbsorptionLow = 0.5f, AbsorptionMid = 0.7f, AbsorptionHigh = 0.9f, Scattering = 0.9f, TransmissionLow = 0.4f, TransmissionMid = 0.6f, TransmissionHigh = 0.8f, ResonanceIndex = 2, DensityKgM3 = 400f, YoungsModulusGPa = 0.005f, LossFactor = 0.6f };
+            reg["Dirt"] = new MaterialProperties { Absorption = 0.60f, AbsorptionLow = 0.4f, AbsorptionMid = 0.5f, AbsorptionHigh = 0.6f, Scattering = 0.8f, TransmissionLow = 0.3f, TransmissionMid = 0.4f, TransmissionHigh = 0.5f, ResonanceIndex = 4, DensityKgM3 = 1600f, YoungsModulusGPa = 0.05f, LossFactor = 0.5f };
 
             string path = "materials.json";
             if (File.Exists(path))
@@ -86,6 +117,9 @@ public static class AcousticRegistry
                             if (o.TransmissionMid.HasValue) p.TransmissionMid = o.TransmissionMid.Value;
                             if (o.TransmissionHigh.HasValue) p.TransmissionHigh = o.TransmissionHigh.Value;
                             if (o.ResonanceIndex.HasValue) p.ResonanceIndex = o.ResonanceIndex.Value;
+                            if (o.DensityKgM3.HasValue) p.DensityKgM3 = o.DensityKgM3.Value;
+                            if (o.YoungsModulusGPa.HasValue) p.YoungsModulusGPa = o.YoungsModulusGPa.Value;
+                            if (o.LossFactor.HasValue) p.LossFactor = o.LossFactor.Value;
                             reg[kvp.Key] = p;
                         }
                     }

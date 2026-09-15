@@ -736,14 +736,21 @@ public class GameServer
                 return;
             }
 
+            var position = world.Get<Transform>(session.Entity).Position;
+
+            // A door in reach comes first, and from a seat that means the door beside YOU. The
+            // sequence a person expects falls straight out of it: press it once beside a car and the
+            // door opens, press it again and you are in; sitting in one, press it once and your door
+            // opens, again and you are out. Climbing in through a shut door would be the alternative,
+            // and it is not one.
+            if (OpenDoorInReach(world, position, Say)) return;
+
             if (world.Has<OccupantComponent>(session.Entity))
             {
                 _seats.Exit(session, out string leaving);
                 Say(leaving);
                 return;
             }
-
-            var position = world.Get<Transform>(session.Entity).Position;
             // The client points at the nearest entity it knows about, which beside a car is usually
             // one of its doors rather than the car. Either names the thing.
             int root = -1;
@@ -769,6 +776,34 @@ public class GameServer
 
             Say($"Interaction '{interact.Action}' received.");
         });
+    }
+
+    /// <summary>
+    /// Opens the shut door within arm's length, if there is one. Says so, and says nothing otherwise.
+    ///
+    /// Only SHUT doors count, which is what turns the interact key into a SEQUENCE rather than a
+    /// toggle that fights you: once the door is open, the key moves on to meaning "get in" or "get
+    /// out". Somebody who wants it shut again says so.
+    /// </summary>
+    private static bool OpenDoorInReach(World world, Vector3 position, Action<string> say)
+    {
+        Entity? nearest = null;
+        float best = PhysicsConstants.InteractionRange;
+        string name = "door";
+        world.Query(new QueryDescription().WithAll<Transform, DoorComponent>(), (Entity e, ref Transform t, ref DoorComponent d) =>
+        {
+            if (d.Target > 0f) return;                    // already open, or on its way
+            float distance = Vector3.Distance(position, t.Position);
+            if (distance > best) return;
+            best = distance; nearest = e;
+            name = world.Has<IdentityComponent>(e) && !string.IsNullOrWhiteSpace(world.Get<IdentityComponent>(e).Name)
+                 ? world.Get<IdentityComponent>(e).Name : "door";
+        });
+
+        if (nearest == null) return false;
+        if (!DoorSystem.Set(world, nearest.Value, open: true)) return false;
+        say($"The {name} swings open.");
+        return true;
     }
 
     /// <summary>
