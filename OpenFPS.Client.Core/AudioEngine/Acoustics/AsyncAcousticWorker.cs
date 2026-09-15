@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Numerics;
 using System.Threading;
 using OpenFPS.Common;
+using OpenFPS.Client.AudioEngine.Core;
 using OpenFPS.Common.Components;
 using OpenFPS.Client.AudioEngine.Data;
 using OpenFPS.Client.Core.AudioEngine.SteamAudio;
@@ -14,7 +15,12 @@ public struct AcousticRequest
 {
     public int EntityId;
     public Vector3 ListenerPos;
+    /// <summary>Where the sound comes OUT — see <see cref="AudioEmission.PointFor"/> — not the
+    /// entity's origin. Everything downstream is an answer about this point.</summary>
     public Vector3 SourcePos;
+    /// <summary>How big a sphere to probe around it. Per source because it depends on how much room
+    /// the emitter has above what it is resting on. See <see cref="AudioEmission.OcclusionRadiusFor"/>.</summary>
+    public float SourceRadius;
     public bool IsImportant;
 }
 
@@ -87,7 +93,16 @@ public class AsyncAcousticWorker : IDisposable
         {
             IsBackground = true,
             Name = "AcousticWorkerThread",
-            Priority = ThreadPriority.AboveNormal
+            // BELOW the game, and a long way below the engine producers and the mixer.
+            //
+            // What this thread computes — occlusion, reflection paths, the geometry-driven reverb —
+            // is allowed to arrive late. What the mixer computes is not: a block that misses its
+            // deadline is not stale, it is a hole. At AboveNormal this competed for cores with the
+            // audio at the one moment there are none to spare, which is a map load: the scene is
+            // being built from a hundred-odd colliders and thirty engines are starting at the same
+            // time. The cost of losing that race is a fraction of a second of slightly stale
+            // occlusion. The cost of the mixer losing it is the audio cutting out.
+            Priority = ThreadPriority.BelowNormal
         };
         _workerThread.Start();
     }
@@ -341,10 +356,17 @@ public class AsyncAcousticWorker : IDisposable
 
                 IntPtr src = GetOrAcquireSource(kv.Key);
                 if (src == IntPtr.Zero) continue; // pool exhausted -> that source falls back to hand-rolled
-                _saSim.SetSourceInputs(src, kv.Value.SourcePos);
+                float radius = kv.Value.SourceRadius > 0f ? kv.Value.SourceRadius : AudioEmission.DefaultOcclusionRadius;
+                _saSim.SetSourceInputs(src, kv.Value.SourcePos, radius);
                 _saLastSeen[kv.Key] = now;
             }
             if (!haveListener) return null;   // nothing pending; not a degradation
+
+            // A bake that finished on its own thread joins the simulation here, between runs, on the
+            // thread that owns it. Until it does, pathing is simply absent — which is a direction hint
+            // for occluded sources, not a level, and no source waits on it.
+            if (_saSim.CommitPendingProbes())
+                Console.WriteLine("[AcousticWorker] Pathing probes are live; occluded sources can now be localized to the opening they arrive through.");
 
             _saSim.SetListener(listener);
             _saSim.Run();
@@ -401,6 +423,41 @@ public class AsyncAcousticWorker : IDisposable
         Vector3 apparent = sr.HasApparent ? sr.ApparentPosition : req.SourcePos;
         float dist = Vector3.Distance(req.ListenerPos, req.SourcePos);
 
+        // ── What actually gets past the thing in the way ────────────────────────────────────
+        //
+        // The simulator's direct stage knows line-of-sight and transmission THROUGH a material. It has
+        // no edge diffraction, so a source it cannot see is a source that can only reach the ear by
+        // going through the wall — and for a solid wall that is almost nothing. Taken literally, a
+        // knee-high pit wall silenced a car twenty metres behind it: twenty-six decibels down with the
+        // top three octaves gone. The wall is 0.9 m tall. You can see over it.
+        //
+        // So the simulator's visibility is an INPUT here, not the answer. What arrives is the better of
+        // the two routes sound can take past an obstacle — through it, or round it — and the second is
+        // a function of how far out of its way it had to go, which is geometry the simulator does not
+        // report and we can measure ourselves. A high wall gives a big detour and stays a wall; a low
+        // one gives a few centimetres and costs a handful of decibels, mostly at the top end. Neither
+        // outcome is written down anywhere: both fall out of the same measurement.
+        if (occ > 0f)
+        {
+            float delta = BarrierPathDifference(req.SourcePos, req.ListenerPos);
+            if (delta >= 0f)
+            {
+                var (dLow, dMid, dHigh) = Diffraction.BandGains(delta, AudioPhysics.SpeedOfSound);
+                // Per band, the better route wins. Transmission is what the material lets through;
+                // diffraction is what came round the edge regardless of what the material is.
+                ap = new SteamAudioSimulator.AcousticParams(
+                    ap.Occlusion,
+                    MathF.Max(ap.EqLow, dLow),
+                    MathF.Max(ap.EqMid, dMid),
+                    MathF.Max(ap.EqHigh, dHigh),
+                    ap.Bleed);
+                // And the dry level cannot fall below what the loudest band still delivers: a source
+                // whose energy is arriving round an edge is quieter, not absent.
+                float throughput = MathF.Max(dLow, MathF.Max(dMid, dHigh));
+                occ = Math.Clamp(MathF.Min(occ, 1f - throughput), 0f, AcousticConstants.OcclusionCap);
+            }
+        }
+
         int region = -1;
         if (world.AcousticMap != null)
         {
@@ -417,13 +474,49 @@ public class AsyncAcousticWorker : IDisposable
             TransmissionBleed = ap.Bleed,
             ApparentPosition = apparent,
             EffectiveDistance = dist,
-            ApertureFactor = 1f,   // sim owns occlusion EQ; bypass the diffraction LPF
+            // The per-band gains above already carry the barrier's frequency dependence, so the
+            // provider's aperture low-pass — which models a sound squeezing through a small OPENING,
+            // a different phenomenon — stays out of the way and is not a second filter over the top.
+            ApertureFactor = 1f,
             RoomGain = 1f,
-            AirAbsorption = 0f,    // distance/humidity air-absorption is a later phenomena pass
+            // Was a hard zero, described as "a later phenomena pass". The effect of that was that
+            // turning the simulator ON turned air absorption OFF for every source in the game, so a
+            // shot two streets away arrived with all its high frequency intact — quiet, but bright,
+            // which the ear reads as small-and-near rather than big-and-far.
+            AirAbsorption = AudioPhysics.AirAbsorptionFor(
+                dist, world.Humidity, world.Temperature,
+                world.AirPressure, world.AirAbsorptionMultiplier,
+                listenerIndoors: region != AcousticConstants.GlobalRegionId),
             RegionId = region,
             IsReflection = false,
         };
         return new List<AcousticPathData> { path };
+    }
+
+    /// <summary>The boxes the current scene was built from, for the barrier search. Replaced whole on
+    /// a scene rebuild and only ever read afterwards, so the worker needs no lock to walk it.</summary>
+    private List<OpenFPS.Client.Core.AudioEngine.SteamAudio.SteamAudioScene.Box> _barrierBoxes = new();
+
+    /// <summary>
+    /// How far out of its way sound had to go to get from the source to the listener, metres, or -1 if
+    /// nothing is in the way at all.
+    ///
+    /// Barriers do not add up: two screens in a row are not twice one screen, because the second is
+    /// standing in the first one's shadow. What governs is the single worst detour, which is what the
+    /// standards use and the only version that does not silence a source merely for having a lot of
+    /// scenery near it.
+    /// </summary>
+    private float BarrierPathDifference(Vector3 source, Vector3 listener)
+    {
+        var boxes = _barrierBoxes;
+        float worst = -1f;
+        for (int i = 0; i < boxes.Count; i++)
+        {
+            var b = boxes[i];
+            if (!Diffraction.PathDifferenceAroundBox(b.Center, b.Size, b.Rotation, source, listener, out float d)) continue;
+            if (d > worst) worst = d;
+        }
+        return worst;
     }
 
     private void EnsureSteamAudio()
@@ -486,7 +579,15 @@ public class AsyncAcousticWorker : IDisposable
         {
             _saSim.SetScene(_saScene);
             _saReverbSim?.SetScene(_saScene);
+            // Off the worker thread and out of the way. This is the work that used to sit inside
+            // SetScene and take a hundred seconds of a single core before ANY source got an occlusion
+            // value — a hundred seconds in which the whole world was rendered as if nothing were in
+            // the way, ending in every source receiving its first real occlusion in the same frame.
+            _saSim.BeginProbeBake(_saScene);
         }
+        // The boxes the barrier model bends sound around. The same list the scene was built from, so
+        // the diffraction path and the occlusion test can never disagree about what is in the world.
+        _barrierBoxes = boxes;
         Console.WriteLine($"[AcousticWorker] Built Steam Audio scene from {boxes.Count} solid box colliders.");
     }
 

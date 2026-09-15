@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Runtime.InteropServices;
 using FMOD;
 using OpenFPS.Client.AudioEngine.Core;
@@ -111,14 +112,53 @@ public static class BoundaryProximityProcessor
         int inCh = inchannels > 0 ? inchannels : outCh;
         int n = (int)length;
 
-        unsafe
+        // A MANAGED DSP CALLBACK MUST NOT THROW.
+        //
+        // This one had no guard and it killed the client outright: an IndexOutOfRangeException in
+        // here does not fault a voice, it unwinds into FMOD's native mixer thread, and an exception
+        // that crosses that boundary takes the process with it. Every other custom DSP in this
+        // engine already catches; this one was the exception, and it is the one that crashed.
+        //
+        // The fallback is a PASS-THROUGH rather than silence: this unit sits at the tail of the
+        // master bus, so everything in the game goes through it. Clearing the buffer would mute the
+        // whole mix; copying the input across loses the walls and keeps the game audible.
+        try
         {
-            var input = new ReadOnlySpan<float>((void*)inbuffer, n * inCh);
-            var output = new Span<float>((void*)outbuffer, n * outCh);
-            Process(s, input, output, inCh, outCh);
+            unsafe
+            {
+                if (inbuffer == IntPtr.Zero || outbuffer == IntPtr.Zero) return RESULT.OK;
+                var input = new ReadOnlySpan<float>((void*)inbuffer, n * inCh);
+                var output = new Span<float>((void*)outbuffer, n * outCh);
+                Process(s, input, output, inCh, outCh);
+            }
+        }
+        catch (Exception ex)
+        {
+            unsafe
+            {
+                if (outbuffer != IntPtr.Zero)
+                {
+                    var output = new Span<float>((void*)outbuffer, n * outCh);
+                    if (inbuffer != IntPtr.Zero && inCh == outCh)
+                        new ReadOnlySpan<float>((void*)inbuffer, n * inCh).CopyTo(output);
+                    else output.Clear();
+                }
+            }
+            // Once, with everything needed to find it — a message per block would be a second fault.
+            if (!_faulted)
+            {
+                _faulted = true;
+                Serilog.Log.Error(ex, "Boundary DSP faulted and has been bypassed: length {Length}, in {InCh}ch, out {OutCh}ch, "
+                                    + "line {Line} samples, write {Write}, glide {Glide}. Taps (delayL, gainL): {Taps}",
+                                  n, inchannels, outchannels, s.Line.Length, s.Write, s.Glide,
+                                  string.Join(" ", System.Linq.Enumerable.Range(0, BoundaryVoiceState.MaxTaps)
+                                      .Select(t => $"({s.CurrentDelayL[t]:G6},{s.CurrentGainL[t]:G6})")));
+            }
         }
         return RESULT.OK;
     }
+
+    private static bool _faulted;
 
     /// <summary>
     /// The whole of the effect, over spans rather than mixer pointers — so it can be rendered offline
@@ -129,7 +169,13 @@ public static class BoundaryProximityProcessor
                                int inChannels, int outChannels)
     {
         int n = outChannels > 0 ? output.Length / outChannels : 0;
+        // ...and never more samples than the INPUT holds. The two spans are sized from the same
+        // block length and channel counts FMOD reported, so they should agree; "should" is not a
+        // bounds check, and this runs on the thread where being wrong is a crash rather than a bug.
+        if (inChannels > 0) n = Math.Min(n, input.Length / inChannels);
         int lineLen = s.Line.Length;
+        if (lineLen < 4 || n <= 0) { if (!output.IsEmpty) output.Clear(); return; }
+        if ((uint)s.Write >= (uint)lineLen) s.Write = 0;
         float glide = s.Glide;
         float loudest = 0f;
 
@@ -188,14 +234,19 @@ public static class BoundaryProximityProcessor
     /// neighbouring samples so a delay that is gliding sweeps smoothly instead of stepping.</summary>
     private static float ReadInterpolated(float[] line, int lineLen, int write, float delaySamples)
     {
-        if (delaySamples < 1f) delaySamples = 1f;
+        // Written as "is it in range?" rather than "is it out of range?", because NaN answers NO to
+        // every comparison: `if (d < 1f) d = 1f;` leaves a NaN untouched, and a NaN delay then walks
+        // straight through both clamps and into the index. One NaN in a tap's target delay is
+        // permanent, too — the glide carries it forward for ever.
         float maxDelay = lineLen - 2f;
-        if (delaySamples > maxDelay) delaySamples = maxDelay;
+        if (!(delaySamples >= 1f)) delaySamples = 1f;
+        if (!(delaySamples <= maxDelay)) delaySamples = maxDelay;
 
         float readPos = write - delaySamples;
         while (readPos < 0f) readPos += lineLen;
 
         int i0 = (int)readPos;
+        if ((uint)i0 >= (uint)lineLen) return 0f;      // belt and braces: this is the mixer thread
         float frac = readPos - i0;
         int i1 = i0 + 1 >= lineLen ? 0 : i0 + 1;
         return line[i0] + (line[i1] - line[i0]) * frac;

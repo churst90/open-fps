@@ -8,6 +8,19 @@
   // world while the player turns in it. The client ducks it by shelter rather than switching it off,
   // so stepping into a room takes the outside down instead of away.
   "AmbienceId": "AMBIENCE/woods_mid_day",
+  // A big-block muscle car drives the road in front of the spawn point, four and a half metres out,
+  // east to west and back, at 30, 60 and 90 km/h in turn. The client synthesizes its engine live.
+  "Vehicles": [
+    {
+      "Name": "big-block muscle car",
+      "Preset": "v8_muscle",
+      "RoadStart": { "X": -46, "Y": 0.6, "Z": 4.5 },
+      "RoadEnd": { "X": 46, "Y": 0.6, "Z": 4.5 },
+      "SpeedsKmh": [ 30, 60, 90 ],
+      "WaitSeconds": 5,
+      "StartDelaySeconds": 8
+    }
+  ],
   "VoxelResolution": 0.5,
   "OcclusionFloor": 0.15,
   "Entities": [

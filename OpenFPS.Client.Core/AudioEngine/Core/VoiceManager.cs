@@ -54,16 +54,27 @@ public class VoiceManager
         _activeSubmissions[emitter.EntityId] = emitter;
     }
 
-    public void RequestStop(int entityId)
+    /// <summary>
+    /// Asks for a voice to stop. Returns TRUE if this manager owns it and will deal with it, FALSE
+    /// if it has never heard of it.
+    ///
+    /// The return value matters, and its absence was a leak. Voices started through
+    /// <c>PlayPhysicalSoundDirect</c> — every engine reflection, every floor slapback — deliberately
+    /// bypass this manager, so they are not in <c>_voiceStates</c> and the else branch below quietly
+    /// dropped the request on the floor. Nothing ever stopped them. On the speedway, where a
+    /// reflection voice is created for each car against each wall, that ran from 24 live voices to
+    /// 123 in fifty seconds with the mixer pegged at 100% — heard as the whole map crackling and
+    /// stuttering. The caller now knows to stop those itself.
+    /// </summary>
+    public bool RequestStop(int entityId)
     {
         if (_voiceStates.TryGetValue(entityId, out var status))
         {
             status.StopRequested = true;
+            return true;
         }
-        else
-        {
-            _activeSubmissions.Remove(entityId);
-        }
+        _activeSubmissions.Remove(entityId);
+        return false;
     }
 
     public void Process(Vector3 listenerPos)

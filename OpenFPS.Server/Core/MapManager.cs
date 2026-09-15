@@ -15,6 +15,116 @@ public class MapManager
     private readonly PrefabRepository _prefabRepo;
     private readonly Dictionary<string, (World world, Vector3 size, SpatialGrid<Entity> grid, Dictionary<int, Entity> lookup, MapData data)> _maps = new();
 
+    /// <summary>The map a player lands on at login: whichever map sets <c>IsDefault</c>, and the
+    /// map literally called "default" when none does.</summary>
+    public string DefaultMapId { get; private set; } = "default";
+
+    private readonly Dictionary<string, float> _earshot = new();
+
+    private readonly Dictionary<string, int> _trackObstructions = new();
+
+    /// <summary>
+    /// How many places each track on each loaded map is not driveable, keyed "&lt;map&gt;/&lt;track&gt;".
+    ///
+    /// Zero for every entry is the only acceptable state, and it is exposed rather than merely logged
+    /// so a test can hold a shipped map to it. The check that fills this exists because the speedway's
+    /// front straight ran through the grandstand for a hundred and twenty metres, every car on that
+    /// stretch was inside a solid box, and the only symptom anyone could hear was that the cars
+    /// disappeared — a map fault that looked for four days like an audio one.
+    /// </summary>
+    public IReadOnlyDictionary<string, int> TrackObstructions => _trackObstructions;
+
+    /// <summary>
+    /// How far from a player the server bothers telling them about things, metres.
+    ///
+    /// This used to be one constant — 200 m — which is fine for a room and wrong for a racetrack.
+    /// A one-mile oval is seven hundred metres across, so cars spent most of a lap outside it: they
+    /// vanished round the back, reappeared out of nowhere at two hundred metres already at full
+    /// throttle, and the client tore down and rebuilt their engine synthesis every time round. What
+    /// the player heard was cars pinned at one side of the soundscape, silence from the far side,
+    /// and stuttering — none of which is an audio bug.
+    ///
+    /// It is derived rather than authored, from the two things that actually decide it: how far the
+    /// map's own loudest emitter carries (Loudness.AudibleRange, which every sound in this game
+    /// already declares), and how big the map is, because there is no point reaching past its
+    /// corners. A map with a quiet beacon keeps a small radius; add a race engine to it and the
+    /// radius grows on its own, which is the only way this can work when nobody knows in advance
+    /// what a map will carry.
+    /// </summary>
+    /// <summary>
+    /// Walks every track the map declares against every solid box in it, and says so when the route a
+    /// vehicle is told to drive passes through — or within a vehicle's width of — something solid.
+    ///
+    /// A warning rather than a refusal, deliberately: a map with a clipping wall is still playable,
+    /// and refusing to load one would be a worse failure than the one it is reporting. But it is
+    /// reported in the map author's terms — which track, where, how far off the line — at load, which
+    /// is the difference between a fifteen-minute fix and a session spent believing the audio engine
+    /// has gone wrong.
+    /// </summary>
+    private void ValidateTracks(MapData m, World world)
+    {
+        if (m.Tracks == null || m.Tracks.Count == 0) return;
+
+        var solids = new List<TrackClearance.Solid>();
+        world.Query(new QueryDescription().WithAll<Transform, ColliderComponent>(),
+            (Entity e, ref Transform t, ref ColliderComponent c) =>
+            {
+                if (!c.IsSolid || c.Shape != ColliderShape.Box) return;
+                if (c.Size.X <= 0 || c.Size.Y <= 0 || c.Size.Z <= 0) return;
+                solids.Add(new TrackClearance.Solid(t.Position, c.Size, t.Rotation));
+            });
+        if (solids.Count == 0) return;
+
+        foreach (var track in m.Tracks)
+        {
+            var bad = TrackClearance.Check(track.Waypoints, track.WidthMetres, solids);
+            _trackObstructions[$"{m.Id}/{track.Id}"] = bad.Count;
+            if (bad.Count == 0) continue;
+
+            var first = bad[0];
+            Log.Warning("MapManager: track '{Track}' in '{Map}' is blocked at {Count} of its sampled points — "
+                      + "the first is {Point} ({Offset:F1} m off the centreline), inside a {Size} solid centred at {Centre}. "
+                      + "Vehicles driving that route will be inside geometry, which is heard as them disappearing.",
+                        track.Id, m.Id, bad.Count, first.Point, first.LateralOffset, first.ObstacleSize, first.ObstacleCentre);
+        }
+    }
+
+    public float GetEarshotRange(string mapId)
+        => _earshot.TryGetValue(mapId, out float r) ? r : DefaultEarshotRange;
+
+    /// <summary>The floor, for a map whose loudest thing is quiet or which has no emitters at all.</summary>
+    public const float DefaultEarshotRange = 200f;
+    /// <summary>And a ceiling, so a very large map does not turn interest management off entirely.</summary>
+    public const float MaxEarshotRange = 1200f;
+
+    /// <summary>
+    /// Recomputes every map's broadcast radius from what is actually in it now.
+    ///
+    /// Call it after everything that emits sound has been spawned. Computing it at map load alone is
+    /// not enough: the vehicles a map declares are spawned by VehicleSystem afterwards, so the map
+    /// was measured before its loudest sources existed and every racetrack came out at the 200 m
+    /// floor — which is how eight cars on a one-mile oval ended up only existing for the client along
+    /// the front straight.
+    /// </summary>
+    public void RefreshEarshotRanges()
+    {
+        foreach (var kv in _maps) ComputeEarshot(kv.Value.data, kv.Value.world);
+        foreach (var kv in _earshot)
+            Log.Information("MapManager: map '{Map}' broadcasts within {Range:F0} m of a player.", kv.Key, kv.Value);
+    }
+
+    private void ComputeEarshot(MapData m, World world)
+    {
+        float loudest = DefaultEarshotRange;
+        world.Query(new QueryDescription().WithAll<SoundEmitterComponent>(), (Entity e, ref SoundEmitterComponent s) =>
+        {
+            if (s.Range > loudest) loudest = s.Range;
+        });
+        var size = m.MaxBound - m.MinBound;
+        float diagonal = new Vector2(size.X, size.Z).Length();
+        _earshot[m.Id] = Math.Clamp(MathF.Min(loudest, diagonal), DefaultEarshotRange, MaxEarshotRange);
+    }
+
     public MapManager(MapRepository mapRepo, PrefabRepository prefabRepo) 
     {
         _mapRepo = mapRepo;
@@ -24,6 +134,10 @@ public class MapManager
     public void Initialize()
     {
         foreach (var m in _mapRepo.LoadAll()) CreateMapInstance(m);
+        // Said out loud, because "the client logged into the wrong map" is otherwise indistinguishable
+        // from "the server you are talking to is an older one that had never heard of this map".
+        Log.Information("MapManager: {Count} map(s) loaded; players will land on '{Default}'.",
+                        _maps.Count, DefaultMapId);
     }
 
     private void CreateMapInstance(MapData m)
@@ -158,6 +272,8 @@ public class MapManager
             foundMinimumY = 0f;
         }
 
+        ValidateTracks(m, world);
+
         // Set MinimumY as a "Void Plane" 20 meters below the lowest floor surface found
         m.MinimumY = hasAnyFloor ? (foundMinimumY - 20.0f) : -50.0f;
         
@@ -182,6 +298,12 @@ public class MapManager
         Log.Information("MapManager: Loaded map '{Id}' with {Count} entities. Void Plane (MinimumY): {MinY}", m.Id, m.Entities.Count, m.MinimumY);
         
         _maps[m.Id] = (world, m.Size, grid, lookup, m);
+        ComputeEarshot(m, world);
+        if (m.IsDefault)
+        {
+            if (DefaultMapId == "default" || DefaultMapId == m.Id) DefaultMapId = m.Id;
+            else Log.Warning("MapManager: map '{Map}' also claims IsDefault, but '{Winner}' claimed it first; players will land on '{Winner}'.", m.Id, DefaultMapId);
+        }
         RefreshGrid(m.Id);
         VerifySpawnPoint(m);
     }

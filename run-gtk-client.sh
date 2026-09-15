@@ -14,11 +14,19 @@ set -e
 REPO="$(cd "$(dirname "$0")" && pwd)"
 DOTNET="${DOTNET:-$HOME/.dotnet/dotnet}"
 ART=/tmp/openfps-gtk
-OUT="$ART/bin/OpenFPS.Client.Gtk/debug"
 
-echo "Building GTK client to tmpfs ($ART) ..."
+# RELEASE by default, and it is not a detail. A vehicle's engine is synthesized sample by sample
+# inside the FMOD mixer callback; measured with `--engine-cost`, one V8 renders about 9 seconds of
+# audio per second of a core in release and about 3 in debug. Four cars is half a core built one way
+# and more than a whole core built the other, and a mixer callback that misses its deadline is not
+# slow, it is silence. CONFIG=Debug for a debugging session, and expect fewer cars.
+CONFIG="${CONFIG:-Release}"
+LOWER=$(echo "$CONFIG" | tr '[:upper:]' '[:lower:]')
+OUT="$ART/bin/OpenFPS.Client.Gtk/$LOWER"
+
+echo "Building GTK client ($CONFIG) to tmpfs ($ART) ..."
 DOTNET_CLI_TELEMETRY_OPTOUT=1 DOTNET_NOLOGO=1 DOTNET_CLI_USE_MSBUILD_SERVER=0 \
-  "$DOTNET" build "$REPO/OpenFPS.Client.Gtk" --artifacts-path "$ART" \
+  "$DOTNET" build "$REPO/OpenFPS.Client.Gtk" -c "$CONFIG" --artifacts-path "$ART" \
   -nodeReuse:false -p:UseSharedCompilation=false -v minimal
 
 echo "Launching GTK client from $OUT ..."

@@ -52,6 +52,62 @@ public class NetworkService : INetEventListener
         }
     }
 
+    /// <summary>
+    /// Sends a world-state update, SPLIT into as many packets as it takes to fit.
+    ///
+    /// LiteNetLib does not fragment unreliable packets: past the peer's single-packet size it throws
+    /// `TooBigPacketException` and the send does not happen. The broadcast loop catches, logs and
+    /// moves on, so the entire tick's world state is simply LOST — every entity, for every client.
+    ///
+    /// Eight cars fitted in 1023 bytes and thirty do not, which is how raising the field turned this
+    /// from dormant into constant: 47 dropped ticks in three minutes. A dropped tick freezes every
+    /// entity until one gets through, and because the packet is only sometimes over the line — it
+    /// depends how many cars are in range of that player — it is intermittent, and it lands on
+    /// whichever cars happened to be moving. Heard exactly as reported: some of the cars, not all of
+    /// them, stopping for about a second in front of you and then carrying on.
+    ///
+    /// Split by halving rather than by a size constant per entity: the serializer decides how big a
+    /// state is, the peer decides how big a packet may be, and neither of those is ours to predict.
+    /// Every chunk keeps the same Tick, so the client reassembles them into one snapshot.
+    /// </summary>
+    public void SendStateUpdate(NetPeer peer, ServerStateUpdate update, DeliveryMethod deliveryMethod)
+    {
+        try
+        {
+            byte[] data = MemoryPackSerializer.Serialize<IMessage>(update);
+            if (data.Length <= peer.GetMaxSinglePacketSize(deliveryMethod))
+            {
+                peer.Send(data, deliveryMethod);
+                return;
+            }
+            if (update.States.Count <= 1)
+            {
+                // One entity that will not fit is not a splitting problem; say so rather than
+                // recursing for ever.
+                Log.Warning("A single entity state is larger than the peer's packet limit ({Max} bytes); dropped.",
+                            peer.GetMaxSinglePacketSize(deliveryMethod));
+                return;
+            }
+            int half = update.States.Count / 2;
+            SendStateUpdate(peer, new ServerStateUpdate
+            {
+                Tick = update.Tick,
+                LastProcessedSequenceId = update.LastProcessedSequenceId,
+                States = update.States.GetRange(0, half),
+            }, deliveryMethod);
+            SendStateUpdate(peer, new ServerStateUpdate
+            {
+                Tick = update.Tick,
+                LastProcessedSequenceId = update.LastProcessedSequenceId,
+                States = update.States.GetRange(half, update.States.Count - half),
+            }, deliveryMethod);
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "FAILED to send a world state update of {Count} entities to peer {Id}", update.States.Count, peer.Id);
+        }
+    }
+
     public void BroadcastToMap(IEnumerable<NetPeer?> peers, IMessage message)
     {
         try

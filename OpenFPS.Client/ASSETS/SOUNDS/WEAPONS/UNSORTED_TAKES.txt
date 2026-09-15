@@ -1,0 +1,7 @@
+Weapon takes whose action could not be read from the filename, or which name a
+different model from the folder they were dropped in.
+
+Add the action to WEAPON_ACTIONS in tools/ingest_audio.py, or move the file to
+the folder for the weapon it actually is, and re-run.
+
+inbox/weapons/AKM/678881__drinkingwindgames__ar15-pulling-trigger.wav

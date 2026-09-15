@@ -106,9 +106,14 @@
       "$ref": "#/definitions/vector3",
       "description": "Direction the emitter points, in the entity's LOCAL space (rotated by the map entity's Rotation). Omit for forward (0,0,1). Only audible with a cone narrower than 360."
     },
+    "EmitterOffset": {
+      "$ref": "#/definitions/vector3",
+      "description": "Where the sound comes OUT, in the entity's LOCAL space (x right, y up, z forward). Omit for the entity's origin. Every acoustic question - what is in the way, how far, which direction - is asked about this point, so author it for anything whose sound does not come from its own base: a tailpipe is 0.3 m up and a metre or two back, a chimney is on the roof."
+    },
     "ConeInsideAngle": { "type": "number", "minimum": 0, "maximum": 360, "description": "Full volume within this angle. Must be <= ConeOutsideAngle. 360/360 is omnidirectional." },
     "ConeOutsideAngle": { "type": "number", "minimum": 0, "maximum": 360 },
     "ConeOutsideVolume": { "type": "number", "minimum": 0, "maximum": 1, "description": "Gain beyond the outer cone angle." },
+    "RepeatIntervalSeconds": { "type": "number", "minimum": 0, "description": "Replay the sound every N seconds with silence between (0 = not a repeater). Unlike LoopOne, the GAP is the point: an announcement you can wait for is a landmark; a drone is furniture." },
 
     "IsGranular": { "type": "boolean", "description": "Play SoundId as a grain cloud. Mutually exclusive with IsSynth." },
     "GranularPosition": { "type": "number", "minimum": 0, "maximum": 1, "description": "Playhead position in the source sample." },

@@ -151,6 +151,10 @@ public static class AcousticRegistry
 
     public static MaterialProperties GetProperties(string type)
     {
+        // Every other accessor does this; this one did not, and so the one call that reached the
+        // registry before anything had initialised it threw KeyNotFoundException on "Generic"
+        // instead of returning the fallback it advertises.
+        EnsureInitialized();
         if (string.IsNullOrEmpty(type)) return _registry["Generic"];
         if (_registry.TryGetValue(type, out var props)) return props;
         System.Console.WriteLine($"[WARNING] AcousticRegistry: Material '{type}' not found, falling back to 'Generic'.");
@@ -159,6 +163,7 @@ public static class AcousticRegistry
 
     public static MaterialProperties GetPropertiesByResonanceIndex(int index)
     {
+        EnsureInitialized();
         foreach (var props in _registry.Values)
         {
             if (props.ResonanceIndex == index) return props;

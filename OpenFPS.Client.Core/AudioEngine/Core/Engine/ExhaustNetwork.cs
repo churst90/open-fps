@@ -1,0 +1,475 @@
+using System;
+using System.Collections.Generic;
+using OpenFPS.Common;
+using System.Runtime.CompilerServices;
+
+namespace OpenFPS.Client.AudioEngine.Core.Engine;
+
+/// <summary>
+/// The exhaust system as a network of pipes that meet each other, built from an
+/// <see cref="ExhaustSpec"/>: one primary per cylinder into its collector, the collectors joined
+/// (or not) by the crossover, then each branch runs mid-pipe, muffler and tailpipe to an open end.
+///
+/// A junction is not a mixer. When a wave arrives at one, part reflects back up the pipe it came from
+/// and the rest divides among the others — including back up the other primaries toward closed
+/// valves, which return it again. That cross-talk is why cylinder 3 is audible in cylinder 5's pipe,
+/// why four pipes of four lengths make a forest of resonances rather than one, and why the same
+/// engine on a cast manifold and on long-tubes is two different sounds.
+///
+/// The muffler is not a filter either. A chambered muffler is literally what it says — the pipe
+/// opens into a can several times its area and closes again, and the transmission loss of that is
+/// the textbook expansion chamber, 10 log(1 + (m - 1/m)^2 sin^2(kL) / 4), which this reproduces from
+/// the two area steps and the delay between them. An absorptive muffler is a straight tube with
+/// packing round it, so it is a pipe with heavy frequency-dependent loss. A resonator is a neck into
+/// a closed volume. They are built from the same pipes and junctions as everything else.
+/// </summary>
+internal sealed class ExhaustNetwork
+{
+    private readonly EngineProfile _e;
+    private readonly ExhaustSpec _x;
+    private readonly float _rate;
+    private readonly int _n;
+
+    private readonly Pipe[] _primary;
+    private readonly int[][] _groups;
+    private readonly Pipe[] _collector;             // one per group, collector to the merge
+    private readonly Pipe? _crossTube;              // H-pipe balance tube
+    private readonly Branch[] _branch;
+    private readonly float[] _valveArrived;
+    private readonly float[] _scratchA = new float[20], _scratchY = new float[20], _scratchB = new float[20];
+    private readonly float _airDensity = 1.2f;
+    private float _flowLossFraction;
+    private float _meanMassFlow;
+
+    /// <summary>One run from the merge point to the open air.</summary>
+    private sealed class Branch
+    {
+        public readonly List<Pipe> Chain = new();
+        /// <summary>Side branches attached at the junction AFTER chain pipe i: a Helmholtz neck+cavity.</summary>
+        public readonly Dictionary<int, (Pipe Neck, Pipe Cavity)> Resonators = new();
+        public required OpenEnd End;
+        public required JetNoise Jet;
+        public float ExitVelocity, MeanVelocity;
+        public float Radiated;
+    }
+
+    public ExhaustNetwork(EngineProfile e, float rate, int seed = 3)
+    {
+        _e = e;
+        _x = e.Exhaust;
+        _rate = rate;
+        _n = e.Cylinders;
+        _groups = e.CollectorGroups;
+        _valveArrived = new float[_n];
+
+        float steep = Math.Clamp(_x.Steepening, 0f, 1.5f);
+        float wall = MathF.Max(0.2f, _x.WallLossMultiplier);
+
+        // ── Primaries ───────────────────────────────────────────────────────────────────────
+        // Unequal, front to back down each bank, unless the profile lists them explicitly.
+        _primary = new Pipe[_n];
+        float primArea = Circle(_x.PrimaryDiameterMm);
+        for (int c = 0; c < _n; c++)
+        {
+            float L;
+            if (_x.PrimaryLengthsMetres != null && c < _x.PrimaryLengthsMetres.Length)
+                L = _x.PrimaryLengthsMetres[c];
+            else
+            {
+                // Position along the bank decides the length: the pipe from the rear cylinder
+                // has further to go to a front collector, and a spread of 0 makes them equal.
+                int bank = e.Bank[c];
+                int inBank = 0, ofBank = 0;
+                for (int k = 0; k < _n; k++) if (e.Bank[k] == bank) { if (k < c) inBank++; ofBank++; }
+                float pos = ofBank <= 1 ? 0.5f : inBank / (float)(ofBank - 1);
+                L = _x.PrimaryLengthMetres * (1f + _x.PrimarySpread * (pos - 0.5f) * 2f * 0.5f);
+                // A little deterministic scatter on top, so two pipes never quite match.
+                L *= 1f + 0.015f * MathF.Sin(c * 2.399f);
+            }
+            _primary[c] = new Pipe(L, primArea, rate, wall, steep);
+        }
+
+        // ── Collectors and the merge ────────────────────────────────────────────────────────
+        int g = _groups.Length;
+        float colArea = Circle(_x.CollectorDiameterMm);
+        _collector = new Pipe[g];
+        for (int i = 0; i < g; i++)
+            _collector[i] = new Pipe(_x.CollectorPipeMetres * (1f + 0.04f * i), colArea, rate, wall, steep);
+
+        var cross = _x.Crossover;
+        if (g != 2 && (cross == CrossoverKind.HPipe || cross == CrossoverKind.XPipe))
+            cross = g == 1 ? CrossoverKind.Merged : CrossoverKind.None;
+        _crossover = cross;
+        if (cross == CrossoverKind.HPipe)
+            _crossTube = new Pipe(_x.CrossoverTubeMetres, colArea * Math.Clamp(_x.CrossoverArea, 0.05f, 1.5f), rate, wall, steep * 0.5f);
+
+        int branches = cross == CrossoverKind.Merged ? 1 : g;
+        _branch = new Branch[branches];
+        float tailArea = Circle(_x.TailpipeDiameterMm);
+        for (int b = 0; b < branches; b++)
+        {
+            var br = new Branch
+            {
+                End = new OpenEnd(rate),
+                Jet = new JetNoise(rate, _x.TailpipeDiameterMm * 1e-3f, seed + 17 * b),
+            };
+            // Mid pipe from the merge to the muffler.
+            br.Chain.Add(new Pipe(_x.MidPipeMetres * (1f + 0.03f * b), tailArea, rate, wall, steep));
+            BuildMuffler(br, _x.Muffler, tailArea, wall, steep);
+            // Tailpipe: two branches get two lengths, and if only one is given the second is 9% longer.
+            float tailL = _x.TailpipeMetres.Length > b ? _x.TailpipeMetres[b]
+                        : _x.TailpipeMetres[0] * (1f + 0.09f * b);
+            br.Chain.Add(new Pipe(tailL, tailArea, rate, wall, steep));
+            _branch[b] = br;
+        }
+
+        UpdateGas(_x.GasCelsiusIdle + 273.15f, 0f);
+    }
+
+    private readonly CrossoverKind _crossover;
+
+    private static float Circle(float diameterMm)
+    {
+        float r = diameterMm * 0.5e-3f;
+        return MathF.PI * r * r;
+    }
+
+    /// <summary>Builds the muffler's internals onto the branch chain.</summary>
+    private void BuildMuffler(Branch br, MufflerSpec m, float pipeArea, float wall, float steep)
+    {
+        switch (m.Kind)
+        {
+            case MufflerKind.None:
+                return;
+
+            case MufflerKind.Chambered:
+            case MufflerKind.Baffled:
+            {
+                float canArea = pipeArea * MathF.Max(1.5f, m.ExpansionRatio);
+                for (int i = 0; i < m.ChamberLengthsMetres.Length; i++)
+                {
+                    // The chamber: an expansion to the can's area over its length. Baffles and
+                    // deflectors inside take energy off every internal reflection, which broadens
+                    // the chamber's notches — a clean expansion chamber rings, a Flowmaster does not.
+                    var chamber = new Pipe(m.ChamberLengthsMetres[i], canArea, _rate, wall, 0f);
+                    float baffle = Math.Clamp(m.BaffleLoss, 0f, 0.95f);
+                    chamber.SetExtraLoss(1f - 0.5f * baffle, OnePole.AlphaFor(MathHelper.Lerp(12000f, 1500f, baffle), _rate));
+                    br.Chain.Add(chamber);
+                    // Between chambers, a short passage through the partition at pipe area.
+                    if (i + 1 < m.ChamberLengthsMetres.Length)
+                        br.Chain.Add(new Pipe(0.04f, pipeArea, _rate, wall, 0f));
+                }
+                if (m.Kind == MufflerKind.Baffled)
+                {
+                    AddAbsorptive(br, m, pipeArea, wall);
+                    if (m.ResonatorHz > 0f) AddResonator(br, m, pipeArea, wall);
+                }
+                return;
+            }
+
+            case MufflerKind.Absorptive:
+                AddAbsorptive(br, m, pipeArea, wall);
+                if (m.ResonatorHz > 0f) AddResonator(br, m, pipeArea, wall);
+                return;
+        }
+    }
+
+    /// <summary>A perforated tube in packing: the pipe continues at its own area, and loses its top
+    /// progressively along the length. Absorption 0.6 takes the corner down to about 700 Hz.</summary>
+    private void AddAbsorptive(Branch br, MufflerSpec m, float pipeArea, float wall)
+    {
+        var p = new Pipe(m.AbsorptiveLengthMetres, pipeArea, _rate, wall, 0.3f);
+        float a = Math.Clamp(m.Absorption, 0f, 1f);
+        float corner = MathHelper.Lerp(9000f, 450f, MathF.Pow(a, 0.8f));
+        p.SetExtraLoss(1f - 0.35f * a, OnePole.AlphaFor(corner, _rate));
+        br.Chain.Add(p);
+    }
+
+    /// <summary>A Helmholtz resonator hung off the pipe after the last element added: a neck into a
+    /// closed cavity, sized to speak at the requested frequency in gas at the tailpipe temperature.</summary>
+    private void AddResonator(Branch br, MufflerSpec m, float pipeArea, float wall)
+    {
+        // f = c/(2 pi) sqrt(S / (V L')). Pick a neck of 30 mm diameter and 60 mm length and solve for V.
+        float neckArea = Circle(30f);
+        float neckL = 0.06f;
+        float neckEff = neckL + 1.7f * MathF.Sqrt(neckArea / MathF.PI);
+        float c = Gas.SoundSpeed(273.15f + _x.GasCelsiusIdle * _x.TailCooling + 20f, Gas.GammaExhaust);
+        float w = 2f * MathF.PI * MathF.Max(20f, m.ResonatorHz);
+        float V = c * c * neckArea / (w * w * neckEff);
+        // Cavity as a wide short pipe closed at the far end; keep it well under a quarter wave at
+        // the frequencies that matter so it behaves as a compliance.
+        float cavArea = pipeArea * 6f;
+        float cavL = MathF.Max(0.03f, V / cavArea);
+        var neck = new Pipe(neckL, neckArea, _rate, wall * 2f, 0f);
+        var cavity = new Pipe(cavL, cavArea, _rate, wall * 2f, 0f);
+        float q = MathF.Max(1f, m.ResonatorQ);
+        cavity.SetExtraLoss(1f - 0.5f / q, 1f);
+        br.Resonators[br.Chain.Count - 1] = (neck, cavity);
+    }
+
+    /// <summary>Characteristic impedance of a cylinder's primary, Pa s/m^3 — the valve boundary needs it.</summary>
+    public float PrimaryImpedance(int cyl) => _primary[cyl].Impedance;
+    public float PrimaryDensity(int cyl) => _primary[cyl].Density;
+    public float PrimarySoundSpeed(int cyl) => _primary[cyl].SoundSpeed;
+
+    /// <summary>The wave arriving back at the valve end of a cylinder's primary. Once per sample.</summary>
+    public float ArrivedAtValve(int cyl) => _valveArrived[cyl] = _primary[cyl].ArriveNear();
+    /// <summary>The wave the valve sends down its primary. Once per sample, after ArrivedAtValve.</summary>
+    public void PushFromValve(int cyl, float p)
+    {
+        _primary[cyl].PushForward(p);
+        _portSumAcc += _valveArrived[cyl] + p;
+    }
+    private float _portSumAcc;
+    /// <summary>Sum of the pressures at every valve end this sample, pascals — the source before the
+    /// pipes have their say. Diagnostic.</summary>
+    public float PortSum { get; private set; }
+
+    /// <summary>Radiated pressure at one metre from all tailpipes, pascals, this sample.</summary>
+    public float Radiated { get; private set; }
+    /// <summary>Exit velocity of branch 0 this sample, m/s, for anyone who wants to look.</summary>
+    public float ExitVelocity => _branch[0].ExitVelocity;
+
+    /// <summary>
+    /// Retunes every pipe for the gas now in the system. Called a few hundred times a second, not
+    /// per sample: it has square roots in it.
+    /// </summary>
+    /// <param name="portKelvin">Gas temperature at the port.</param>
+    /// <param name="massFlowKgPerS">Mean exhaust mass flow of the whole engine.</param>
+    public void UpdateGas(float portKelvin, float massFlowKgPerS)
+    {
+        _meanMassFlow = massFlowKgPerS;
+        float ambient = 293f;
+        float tailK = ambient + (portKelvin - ambient) * _x.TailCooling;
+        int branches = _branch.Length;
+        float flowPerBranch = massFlowKgPerS / branches;
+
+        // Temperature falls along the run; each pipe gets the temperature at its position.
+        float primK = portKelvin;
+        float colK = MathHelper.Lerp(portKelvin, tailK, 0.25f);
+        for (int c = 0; c < _n; c++)
+        {
+            float rho = Gas.Density(Gas.Atmosphere, primK);
+            float cs = Gas.SoundSpeed(primK, Gas.GammaExhaust);
+            // Each primary carries its cylinder's share, but only while that valve is open; the
+            // Mach number here is the mean, which is what the loss and delay corrections want.
+            float mach = massFlowKgPerS / _n / (rho * cs * _primary[c].Area);
+            _primary[c].SetGas(primK, Gas.GammaExhaust, mach);
+        }
+        for (int i = 0; i < _collector.Length; i++)
+        {
+            float rho = Gas.Density(Gas.Atmosphere, colK);
+            float cs = Gas.SoundSpeed(colK, Gas.GammaExhaust);
+            float share = massFlowKgPerS * _groups[i].Length / _n;
+            _collector[i].SetGas(colK, Gas.GammaExhaust, share / (rho * cs * _collector[i].Area));
+        }
+        _crossTube?.SetGas(colK, Gas.GammaExhaust, 0f);
+
+        float fullLoadFlow = FullLoadMassFlow();
+        _flowLossFraction = Math.Clamp(_x.FlowLoss * massFlowKgPerS / MathF.Max(1e-3f, fullLoadFlow), 0f, 1.5f);
+
+        foreach (var br in _branch)
+        {
+            int count = br.Chain.Count;
+            for (int i = 0; i < count; i++)
+            {
+                float t = MathHelper.Lerp(colK, tailK, (i + 0.5f) / count);
+                var p = br.Chain[i];
+                float rho = Gas.Density(Gas.Atmosphere, t);
+                float cs = Gas.SoundSpeed(t, Gas.GammaExhaust);
+                float mach = flowPerBranch / (rho * cs * p.Area);
+                p.SetGas(t, Gas.GammaExhaust, mach);
+                if (br.Resonators.TryGetValue(i, out var res))
+                {
+                    res.Neck.SetGas(t, Gas.GammaExhaust, 0f);
+                    res.Cavity.SetGas(t, Gas.GammaExhaust, 0f);
+                }
+            }
+            var tail = br.Chain[^1];
+            float rhoT = Gas.Density(Gas.Atmosphere, tailK);
+            float cT = Gas.SoundSpeed(tailK, Gas.GammaExhaust);
+            br.MeanVelocity = flowPerBranch / (rhoT * tail.Area);
+            br.End.Configure(tail.Radius, cT, rhoT, tail.Area, br.MeanVelocity / cT);
+        }
+    }
+
+    /// <summary>Exhaust mass flow at redline and full throttle, for scaling the flow losses.</summary>
+    private float FullLoadMassFlow()
+    {
+        // Displacement per second at redline times the density of intake air, times 0.9 VE.
+        float cyclesPerSec = _e.RedlineRpm / 60f / (_e.Strokes == 2 ? 1f : 2f);
+        return _e.DisplacementLitres * 1e-3f * cyclesPerSec * 1.18f * 0.9f;
+    }
+
+    /// <summary>One sample through everything downstream of the valves. Call after every cylinder
+    /// has done its ArrivedAtValve / PushFromValve for this sample.</summary>
+    [MethodImpl(MethodImplOptions.AggressiveOptimization)]
+    public void Step()
+    {
+        PortSum = _portSumAcc;
+        _portSumAcc = 0f;
+        var a = _scratchA.AsSpan();
+        var y = _scratchY.AsSpan();
+        var b = _scratchB.AsSpan();
+        float loss = _flowLossFraction;
+
+        // ── Collectors: each group's primaries meet their collector pipe ─────────────────────
+        for (int gi = 0; gi < _groups.Length; gi++)
+        {
+            var group = _groups[gi];
+            int n = group.Length;
+            float ySum = 0f;
+            for (int k = 0; k < n; k++)
+            {
+                var p = _primary[group[k]];
+                a[k] = p.ArriveFar();
+                y[k] = p.Admittance;
+                ySum += y[k];
+            }
+            a[n] = _collector[gi].ArriveNear();
+            y[n] = _collector[gi].Admittance;
+            Junction.Scatter(a[..(n + 1)], y[..(n + 1)], b[..(n + 1)], loss * ySum * 0.5f);
+            for (int k = 0; k < n; k++) _primary[group[k]].PushBackward(b[k]);
+            _collector[gi].PushForward(b[n]);
+        }
+
+        // ── The merge: collectors into branches ──────────────────────────────────────────────
+        switch (_crossover)
+        {
+            case CrossoverKind.None:
+                for (int gi = 0; gi < _groups.Length; gi++)
+                {
+                    var col = _collector[gi];
+                    var mid = _branch[gi].Chain[0];
+                    var (back, on) = Junction.Two(col.ArriveFar(), mid.ArriveNear(), col.Admittance, mid.Admittance, loss * col.Admittance * 0.3f);
+                    col.PushBackward(back);
+                    mid.PushForward(on);
+                }
+                break;
+
+            case CrossoverKind.Merged:
+            {
+                int g = _collector.Length;
+                var mid = _branch[0].Chain[0];
+                float ySum = 0f;
+                for (int gi = 0; gi < g; gi++) { a[gi] = _collector[gi].ArriveFar(); y[gi] = _collector[gi].Admittance; ySum += y[gi]; }
+                a[g] = mid.ArriveNear(); y[g] = mid.Admittance;
+                Junction.Scatter(a[..(g + 1)], y[..(g + 1)], b[..(g + 1)], loss * ySum * 0.3f);
+                for (int gi = 0; gi < g; gi++) _collector[gi].PushBackward(b[gi]);
+                mid.PushForward(b[g]);
+                break;
+            }
+
+            case CrossoverKind.XPipe:
+            {
+                // Four pipes meet at one point: both collectors and both mid pipes.
+                var mid0 = _branch[0].Chain[0];
+                var mid1 = _branch[1].Chain[0];
+                a[0] = _collector[0].ArriveFar(); y[0] = _collector[0].Admittance;
+                a[1] = _collector[1].ArriveFar(); y[1] = _collector[1].Admittance;
+                a[2] = mid0.ArriveNear(); y[2] = mid0.Admittance;
+                a[3] = mid1.ArriveNear(); y[3] = mid1.Admittance;
+                Junction.Scatter(a[..4], y[..4], b[..4], loss * (y[0] + y[1]) * 0.3f);
+                _collector[0].PushBackward(b[0]);
+                _collector[1].PushBackward(b[1]);
+                mid0.PushForward(b[2]);
+                mid1.PushForward(b[3]);
+                break;
+            }
+
+            case CrossoverKind.HPipe:
+            {
+                // A third branch on each side, joined by the balance tube.
+                var tube = _crossTube!;
+                float tubeToA = tube.ArriveNear();
+                float tubeToB = tube.ArriveFar();
+                for (int gi = 0; gi < 2; gi++)
+                {
+                    var col = _collector[gi];
+                    var mid = _branch[gi].Chain[0];
+                    a[0] = col.ArriveFar(); y[0] = col.Admittance;
+                    a[1] = mid.ArriveNear(); y[1] = mid.Admittance;
+                    a[2] = gi == 0 ? tubeToA : tubeToB; y[2] = tube.Admittance;
+                    Junction.Scatter(a[..3], y[..3], b[..3], loss * y[0] * 0.3f);
+                    col.PushBackward(b[0]);
+                    mid.PushForward(b[1]);
+                    if (gi == 0) tube.PushForward(b[2]); else tube.PushBackward(b[2]);
+                }
+                break;
+            }
+        }
+
+        // ── Each branch: the chain of pipes to the open end ──────────────────────────────────
+        float radiated = 0f;
+        foreach (var br in _branch)
+        {
+            var chain = br.Chain;
+            for (int i = 0; i + 1 < chain.Count; i++)
+            {
+                var up = chain[i];
+                var down = chain[i + 1];
+                if (br.Resonators.TryGetValue(i, out var res))
+                {
+                    // Three-port: pipe, next pipe, and the resonator's neck. The neck's far end
+                    // meets the cavity, whose far end is closed.
+                    a[0] = up.ArriveFar(); y[0] = up.Admittance;
+                    a[1] = down.ArriveNear(); y[1] = down.Admittance;
+                    a[2] = res.Neck.ArriveNear(); y[2] = res.Neck.Admittance;
+                    Junction.Scatter(a[..3], y[..3], b[..3], loss * y[0] * 0.2f);
+                    up.PushBackward(b[0]);
+                    down.PushForward(b[1]);
+                    res.Neck.PushForward(b[2]);
+                    var (nb, cf) = Junction.Two(res.Neck.ArriveFar(), res.Cavity.ArriveNear(), res.Neck.Admittance, res.Cavity.Admittance, 0f);
+                    res.Neck.PushBackward(nb);
+                    res.Cavity.PushForward(cf);
+                    // Closed end of the cavity: rigid.
+                    res.Cavity.PushBackward(res.Cavity.ArriveFar());
+                }
+                else
+                {
+                    var (back, on) = Junction.Two(up.ArriveFar(), down.ArriveNear(), up.Admittance, down.Admittance,
+                                                  loss * MathF.Min(up.Admittance, down.Admittance) * 0.25f);
+                    up.PushBackward(back);
+                    down.PushForward(on);
+                }
+            }
+
+            // The open end.
+            var tail = chain[^1];
+            float arriving = tail.ArriveFar();
+            var (reflected, u) = br.End.Process(arriving);
+            tail.PushBackward(reflected);
+            br.ExitVelocity = u / tail.Area;
+            float direct = br.End.Radiate(u, _airDensity);
+            float jet = br.Jet.Process(br.ExitVelocity + br.MeanVelocity, br.MeanVelocity, _x.JetNoiseLevel);
+            br.Radiated = direct + jet;
+            radiated += br.Radiated;
+        }
+        Radiated = radiated;
+    }
+
+    /// <summary>Mean exhaust flow the network was last told about, kg/s.</summary>
+    public float MeanMassFlow => _meanMassFlow;
+
+    /// <summary>Everything the console might want to print about the geometry.</summary>
+    public IEnumerable<string> Describe()
+    {
+        float c = Gas.SoundSpeed(_x.GasCelsiusIdle + 273.15f, Gas.GammaExhaust);
+        float cFull = Gas.SoundSpeed(_x.GasCelsiusFull + 273.15f, Gas.GammaExhaust);
+        yield return $"gas {c:F0} m/s idling, {cFull:F0} m/s at full load";
+        var lens = new List<string>();
+        for (int i = 0; i < _n; i++) lens.Add($"{_primary[i].Length:F2}");
+        yield return $"primaries {string.Join(" ", lens)} m ({_x.PrimaryDiameterMm:F0} mm) -> quarter-wave "
+                   + $"{c / (4 * _primary[0].Length):F0}-{c / (4 * _primary[^1].Length):F0} Hz idling";
+        for (int gi = 0; gi < _groups.Length; gi++)
+            yield return $"collector {gi}: cylinders {string.Join(",", Array.ConvertAll(_groups[gi], k => (k + 1).ToString()))}"
+                       + $" firing every {string.Join("/", Array.ConvertAll(_e.GroupIntervals(gi), v => $"{v:F0}"))} deg";
+        yield return $"crossover {_crossover}, {_branch.Length} tailpipe(s), muffler {_x.Muffler.Kind}";
+        foreach (var br in _branch)
+        {
+            float total = 0f;
+            foreach (var p in br.Chain) total += p.Length;
+            yield return $"  branch: {br.Chain.Count} sections, {total:F2} m from merge to tip";
+        }
+    }
+}

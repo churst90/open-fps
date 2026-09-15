@@ -1,0 +1,446 @@
+using System;
+using System.Collections.Generic;
+using System.Numerics;
+
+namespace OpenFPS.Common;
+
+/// <summary>A manual gearbox: the ratios, and how long the driver's left foot takes.</summary>
+public sealed record Gearbox
+{
+    /// <summary>Ratio per gear, first at index 0.</summary>
+    public required float[] Ratios { get; init; }
+    public required float FinalDrive { get; init; }
+    /// <summary>Rolling radius of the driven wheel, metres.</summary>
+    public required float WheelRadiusMetres { get; init; }
+
+    /// <summary>How long the clutch is DOWN during a shift. This is the silence in the middle of the
+    /// shift, and getting it right is most of what makes a change sound like a person rather than an
+    /// event: a quick change is about a quarter of a second.</summary>
+    public float ShiftSeconds { get; init; } = 0.28f;
+    /// <summary>RPM the driver shifts up at when accelerating hard.</summary>
+    public float UpshiftRpm { get; init; } = 6100f;
+    /// <summary>...and drops to when coasting down.</summary>
+    public float DownshiftRpm { get; init; } = 1500f;
+
+    public int TopGear => Ratios.Length;
+
+    /// <summary>Engine RPM for a road speed in a given gear. The whole reason a gearbox is audible.</summary>
+    public float RpmFor(float speedMetresPerSecond, int gear)
+    {
+        if (gear < 1 || gear > Ratios.Length) return 0f;
+        float wheelRevsPerSec = speedMetresPerSecond / (2f * MathF.PI * WheelRadiusMetres);
+        return MathF.Max(0f, wheelRevsPerSec * Ratios[gear - 1] * FinalDrive * 60f);
+    }
+
+    /// <summary>Road speed at which a gear reaches a given RPM — for picking a starting gear.</summary>
+    public float SpeedFor(float rpm, int gear)
+    {
+        if (gear < 1 || gear > Ratios.Length) return 0f;
+        return rpm / 60f * 2f * MathF.PI * WheelRadiusMetres / (Ratios[gear - 1] * FinalDrive);
+    }
+
+    /// <summary>A six-speed sports car on 255/40R19s.</summary>
+    public static Gearbox SixSpeedSports => new()
+    {
+        Ratios = new[] { 2.97f, 2.07f, 1.43f, 1.00f, 0.84f, 0.56f },
+        FinalDrive = 3.42f,
+        WheelRadiusMetres = 0.337f,
+        ShiftSeconds = 0.26f,
+        UpshiftRpm = 6150f,
+        DownshiftRpm = 1450f,
+    };
+}
+
+/// <summary>The tyre and the road under it.</summary>
+public sealed record TyreProfile
+{
+    /// <summary>Tread blocks around the circumference. Their passing rate is a real tonal component of
+    /// tyre noise — speed divided by block spacing — and it is why tyre roar rises in PITCH with speed
+    /// rather than only in level.</summary>
+    public int TreadBlocks { get; init; } = 68;
+    /// <summary>How rough the surface is, 0 = polished concrete, 1 = coarse chip seal. Drives how much
+    /// broadband roar there is against the tonal component.</summary>
+    public float SurfaceRoughness { get; init; } = 0.55f;
+    /// <summary>Level at a reference 20 m/s, dB SPL at 1 m. Tyres are the dominant sound of a car above
+    /// about fifty km/h, which surprises people who expect the engine to be.</summary>
+    public float ReferenceDb { get; init; } = 74f;
+
+    public static TyreProfile SportsOnAsphalt => new();
+}
+
+/// <summary>Everything about one vehicle.</summary>
+public sealed record VehicleProfile
+{
+    public required string Name { get; init; }
+    public required EngineProfile Engine { get; init; }
+    public required Gearbox Gearbox { get; init; }
+    public required TyreProfile Tyres { get; init; }
+    public float MassKg { get; init; } = 1620f;
+    public float DragArea { get; init; } = 0.62f;      // Cd * A
+    public float RollingResistance { get; init; } = 0.013f;
+
+    /// <summary>Where each emitter sits relative to the car's centre, metres (x right, y up, z forward).
+    /// A vehicle is a RIG, not a sound: the exhaust is three metres behind the intake, and at close
+    /// range that separation tells a listener which way the car is pointing.</summary>
+    public float ExhaustOffsetZ { get; init; } = -2.05f;
+    public float IntakeOffsetZ { get; init; } = 1.35f;
+
+    /// <summary>How high the tailpipe is above the car's contact patch, metres. Its own field because
+    /// a truck's stack and a saloon's tailpipe are not at the same height, and because it is the number
+    /// that keeps the occlusion probe out of the road surface.</summary>
+    public float ExhaustHeight { get; init; } = 0.3f;
+
+    /// <summary>
+    /// How far back along <see cref="ExhaustOffsetZ"/> the single combined engine voice actually sits.
+    ///
+    /// A car heard as ONE voice is a compromise between an intake at the front and an exhaust at the
+    /// back; the voice belongs between them, nearer the exhaust because that is where most of the
+    /// sound is. Named so it stops being an unexplained 0.6 in two different files.
+    /// </summary>
+    public const float ExhaustEmitterBias = 0.6f;
+
+    /// <summary>Where the car's engine voice sits, in the car's own frame. This is the emitter slot:
+    /// where the sound comes out, which is what occlusion, distance and direction are all about.</summary>
+    public Vector3 ExhaustOffset => new(0f, ExhaustHeight, ExhaustOffsetZ * ExhaustEmitterBias);
+    public float FrontAxleZ { get; init; } = 1.25f;
+    public float RearAxleZ { get; init; } = -1.35f;
+
+    /// <summary>The preset key of the engine, for a map or a command line to name. See EngineProfile.Presets.</summary>
+    public string EngineKey { get; init; } = "";
+
+    /// <summary>
+    /// What this vehicle measures at one metre at full load, dB SPL — and the number the whole
+    /// audio chain is hung off.
+    ///
+    /// It decides two separate things, and they are both wrong if it is wrong. It decides where the
+    /// emitter sits in the mix (<see cref="Loudness.Place"/>), so a car that claims to be quieter
+    /// than it is gets placed too far down. And it decides what ONE FULL-SCALE SAMPLE MEANS inside
+    /// the synthesis (<c>EngineVoiceState.PascalsAtFullScale</c>), which is the one that bites: the
+    /// voice runs anything past its reference through a tanh, so a race engine twenty decibels over
+    /// a road car's reference does not arrive loud, it arrives as a SQUARE WAVE. That is what the
+    /// first speedway sounded like — "everything is overloaded, crackling and breaking up" — and no
+    /// amount of turning the volume down fixes it, because the clipping happens before the volume.
+    ///
+    /// Measured, not chosen: `--engine-levels` renders every preset at full load and prints it, and
+    /// `EngineSynthTests.DeclaredSourceLevelMatchesWhatThePresetMeasures` fails if one drifts.
+    /// </summary>
+    public float SourceLevelDb { get; init; } = 116f;
+
+    /// <summary>
+    /// Headroom between the declared level and the pressure that maps to full scale, dB.
+    ///
+    /// The declared level is the loudest SECOND — an RMS — and a firing engine's peaks run well above
+    /// its mean: the measured crest factor across the presets is 8 to 21 dB, a backfire further still.
+    ///
+    /// It is ONE number for every engine on purpose. Normalising each voice by its own peak instead
+    /// would let the crest factor leak into the mix, so an engine with peaky transients would render
+    /// quieter than an equally loud smooth one — the relative loudness of two cars would depend on
+    /// the shape of their pulses rather than on how loud they are. With a shared headroom, every
+    /// engine's RMS lands at the same place below full scale and Loudness.Place alone decides the
+    /// balance, which is what it is for.
+    ///
+    /// Sixteen is measured, not chosen: it is the largest SUSTAINED crest across the presets (the
+    /// 99.9th percentile against the mean, 6 to 15 dB — see `--engine-levels`). The absolute peaks
+    /// run higher, to 21 dB, but those are individual backfires and overrun pops a few times a
+    /// second, and rounding one transient is limiting where rounding all of them is clipping.
+    ///
+    /// It leaves an engine's mean about sixteen decibels under full scale, which is where a
+    /// peak-normalised sample file sits too — so a synthesized engine and a recorded sound arrive at
+    /// Loudness.Place on the same terms.
+    /// </summary>
+    public const float PeakHeadroomDb = 16f;
+
+    /// <summary>The pressure that renders at full scale inside the synthesis, pascals.</summary>
+    public float PascalsAtFullScale
+        => 20e-6f * MathF.Pow(10f, (SourceLevelDb + PeakHeadroomDb) / 20f);
+
+    /// <summary>Every vehicle preset by key, so a map can say "v8_muscle" and get a whole car.</summary>
+    public static IReadOnlyDictionary<string, Func<VehicleProfile>> Presets { get; } =
+        new Dictionary<string, Func<VehicleProfile>>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["v8_muscle"] = () => V8Muscle,
+            ["v8_sports"] = () => V8Sports,
+            ["v8_flatplane"] = () => Supercar,
+            ["i4_economy"] = () => Hatchback,
+            ["i4_sport"] = () => HotHatch,
+            ["i6"] = () => Saloon6,
+            ["v6"] = () => Sedan6,
+            ["vtwin"] = () => Cruiser,
+            ["single"] = () => DirtBike,
+            ["diesel_i4"] = () => Pickup,
+            ["diesel_truck"] = () => Truck,
+            ["boxer4"] = () => Wagon,
+            ["v10"] = () => V10Coupe,
+            ["v12"] = () => GrandTourer,
+            ["nascar_v8"] = () => StockCar,
+            ["f1_v10"] = () => FormulaCar,
+            ["police_v8"] = () => PoliceCar,
+        };
+
+    public static VehicleProfile ByName(string key)
+        => Presets.TryGetValue(key, out var make) ? make()
+         : throw new ArgumentException($"No vehicle preset '{key}'. Known: {string.Join(", ", Presets.Keys)}");
+
+    /// <summary>A big-block muscle car: long cam, true duals, four-speed.</summary>
+    public static VehicleProfile V8Muscle => new()
+    {
+        Name = "Big-block muscle car, true duals",
+        EngineKey = "v8_muscle",
+        SourceLevelDb = 119f,
+        Engine = EngineProfile.V8MuscleBigBlock,
+        Gearbox = Gearbox.SixSpeedSports with
+        {
+            Ratios = new[] { 2.52f, 1.88f, 1.46f, 1.00f },
+            FinalDrive = 3.73f,
+            ShiftSeconds = 0.38f,
+            UpshiftRpm = 5300f,
+            DownshiftRpm = 1300f,
+        },
+        Tyres = TyreProfile.SportsOnAsphalt,
+        MassKg = 1720f,
+        DragArea = 0.78f,
+    };
+
+    public static VehicleProfile V8Sports => new()
+    {
+        Name = "V8 sports car, Flowmaster 40s",
+        EngineKey = "v8_sports",
+        SourceLevelDb = 116f,
+        Engine = EngineProfile.V8SportsFlowmaster40,
+        Gearbox = Gearbox.SixSpeedSports,
+        Tyres = TyreProfile.SportsOnAsphalt,
+    };
+
+    public static VehicleProfile Supercar => new()
+    {
+        Name = "Flat-plane V8 supercar",
+        EngineKey = "v8_flatplane",
+        SourceLevelDb = 124f,
+        Engine = EngineProfile.V8FlatPlane,
+        Gearbox = Gearbox.SixSpeedSports with { Ratios = new[] { 3.08f, 2.19f, 1.63f, 1.29f, 1.03f, 0.84f, 0.69f }, FinalDrive = 4.1f, ShiftSeconds = 0.12f, UpshiftRpm = 8600f, DownshiftRpm = 2500f },
+        Tyres = TyreProfile.SportsOnAsphalt,
+        MassKg = 1420f, DragArea = 0.68f,
+        ExhaustOffsetZ = -1.9f, IntakeOffsetZ = -0.4f,
+    };
+
+    public static VehicleProfile Hatchback => new()
+    {
+        Name = "1.6 hatchback",
+        EngineKey = "i4_economy",
+        SourceLevelDb = 93f,
+        Engine = EngineProfile.Inline4Economy,
+        Gearbox = Gearbox.SixSpeedSports with { Ratios = new[] { 3.6f, 2.0f, 1.36f, 1.03f, 0.82f }, FinalDrive = 4.2f, ShiftSeconds = 0.4f, UpshiftRpm = 5200f, DownshiftRpm = 1400f, WheelRadiusMetres = 0.30f },
+        Tyres = TyreProfile.SportsOnAsphalt with { TreadBlocks = 60 },
+        MassKg = 1150f, DragArea = 0.66f,
+        ExhaustOffsetZ = -1.8f, IntakeOffsetZ = 1.4f, FrontAxleZ = 1.2f, RearAxleZ = -1.3f,
+    };
+
+    public static VehicleProfile HotHatch => new()
+    {
+        Name = "2.0 hot hatch",
+        EngineKey = "i4_sport",
+        SourceLevelDb = 117f,
+        Engine = EngineProfile.Inline4Sport,
+        Gearbox = Gearbox.SixSpeedSports with { Ratios = new[] { 3.27f, 2.13f, 1.52f, 1.15f, 0.92f, 0.76f }, FinalDrive = 4.3f, ShiftSeconds = 0.3f, UpshiftRpm = 7800f, DownshiftRpm = 1800f, WheelRadiusMetres = 0.31f },
+        Tyres = TyreProfile.SportsOnAsphalt,
+        MassKg = 1280f, DragArea = 0.68f,
+        ExhaustOffsetZ = -1.9f, IntakeOffsetZ = 1.4f,
+    };
+
+    public static VehicleProfile Saloon6 => new()
+    {
+        Name = "3.0 straight-six saloon",
+        EngineKey = "i6",
+        SourceLevelDb = 116f,
+        Engine = EngineProfile.Inline6,
+        Gearbox = Gearbox.SixSpeedSports with { Ratios = new[] { 4.06f, 2.37f, 1.56f, 1.16f, 0.85f, 0.67f }, FinalDrive = 3.15f, ShiftSeconds = 0.3f, UpshiftRpm = 6600f, DownshiftRpm = 1500f },
+        Tyres = TyreProfile.SportsOnAsphalt,
+        MassKg = 1600f, DragArea = 0.64f,
+    };
+
+    public static VehicleProfile Sedan6 => new()
+    {
+        Name = "3.5 V6 sedan",
+        EngineKey = "v6",
+        SourceLevelDb = 99f,
+        Engine = EngineProfile.V6Sedan,
+        Gearbox = Gearbox.SixSpeedSports with { Ratios = new[] { 4.58f, 2.96f, 1.91f, 1.45f, 1.0f, 0.75f }, FinalDrive = 3.3f, ShiftSeconds = 0.35f, UpshiftRpm = 6000f, DownshiftRpm = 1400f, WheelRadiusMetres = 0.33f },
+        Tyres = TyreProfile.SportsOnAsphalt with { TreadBlocks = 62 },
+        MassKg = 1650f, DragArea = 0.66f,
+    };
+
+    public static VehicleProfile Cruiser => new()
+    {
+        Name = "V-twin cruiser motorcycle",
+        EngineKey = "vtwin",
+        SourceLevelDb = 120f,
+        Engine = EngineProfile.VTwin45,
+        Gearbox = Gearbox.SixSpeedSports with { Ratios = new[] { 3.34f, 2.3f, 1.71f, 1.41f, 1.18f, 1.0f }, FinalDrive = 2.87f, ShiftSeconds = 0.25f, UpshiftRpm = 5000f, DownshiftRpm = 1800f, WheelRadiusMetres = 0.33f },
+        Tyres = TyreProfile.SportsOnAsphalt with { TreadBlocks = 40, SurfaceRoughness = 0.4f },
+        MassKg = 380f, DragArea = 0.55f,
+        ExhaustOffsetZ = -0.5f, IntakeOffsetZ = 0.1f, FrontAxleZ = 0.8f, RearAxleZ = -0.8f,
+    };
+
+    public static VehicleProfile DirtBike => new()
+    {
+        Name = "450 dirt bike",
+        EngineKey = "single",
+        SourceLevelDb = 118f,
+        Engine = EngineProfile.Single450,
+        Gearbox = Gearbox.SixSpeedSports with { Ratios = new[] { 2.4f, 1.8f, 1.4f, 1.15f, 0.96f }, FinalDrive = 3.8f, ShiftSeconds = 0.18f, UpshiftRpm = 10000f, DownshiftRpm = 3000f, WheelRadiusMetres = 0.33f },
+        Tyres = TyreProfile.SportsOnAsphalt with { TreadBlocks = 28, SurfaceRoughness = 0.7f },
+        MassKg = 190f, DragArea = 0.5f,
+        ExhaustOffsetZ = -0.4f, IntakeOffsetZ = 0.1f, FrontAxleZ = 0.75f, RearAxleZ = -0.75f,
+    };
+
+    public static VehicleProfile Pickup => new()
+    {
+        Name = "2.8 turbo-diesel pickup",
+        EngineKey = "diesel_i4",
+        SourceLevelDb = 91f,
+        Engine = EngineProfile.DieselPickupI4,
+        Gearbox = Gearbox.SixSpeedSports with { Ratios = new[] { 4.31f, 2.33f, 1.52f, 1.13f, 0.86f, 0.68f }, FinalDrive = 3.73f, ShiftSeconds = 0.45f, UpshiftRpm = 3600f, DownshiftRpm = 1300f, WheelRadiusMetres = 0.38f },
+        Tyres = TyreProfile.SportsOnAsphalt with { TreadBlocks = 48, SurfaceRoughness = 0.6f },
+        MassKg = 2200f, DragArea = 1.1f,
+        ExhaustOffsetZ = -2.4f, IntakeOffsetZ = 1.8f, FrontAxleZ = 1.6f, RearAxleZ = -1.6f,
+    };
+
+    public static VehicleProfile Truck => new()
+    {
+        Name = "13 litre semi truck",
+        EngineKey = "diesel_truck",
+        SourceLevelDb = 104f,
+        Engine = EngineProfile.DieselTruckI6,
+        Gearbox = Gearbox.SixSpeedSports with { Ratios = new[] { 11.7f, 7.6f, 5.0f, 3.3f, 2.2f, 1.45f, 1.0f, 0.78f }, FinalDrive = 3.55f, ShiftSeconds = 0.8f, UpshiftRpm = 1800f, DownshiftRpm = 1100f, WheelRadiusMetres = 0.51f },
+        Tyres = TyreProfile.SportsOnAsphalt with { TreadBlocks = 44, SurfaceRoughness = 0.7f, ReferenceDb = 80f },
+        MassKg = 14000f, DragArea = 5.5f, RollingResistance = 0.008f,
+        ExhaustOffsetZ = 1.0f, IntakeOffsetZ = 2.5f, FrontAxleZ = 3.5f, RearAxleZ = -3.0f,
+    };
+
+    public static VehicleProfile Wagon => new()
+    {
+        Name = "2.5 flat-four wagon",
+        EngineKey = "boxer4",
+        SourceLevelDb = 117f,
+        Engine = EngineProfile.Boxer4,
+        Gearbox = Gearbox.SixSpeedSports with { Ratios = new[] { 3.45f, 1.95f, 1.37f, 0.97f, 0.74f }, FinalDrive = 4.11f, ShiftSeconds = 0.35f, UpshiftRpm = 6000f, DownshiftRpm = 1500f, WheelRadiusMetres = 0.32f },
+        Tyres = TyreProfile.SportsOnAsphalt,
+        MassKg = 1500f, DragArea = 0.72f,
+    };
+
+    public static VehicleProfile V10Coupe => new()
+    {
+        Name = "V10 coupe, side pipes",
+        EngineKey = "v10",
+        SourceLevelDb = 115f,
+        Engine = EngineProfile.V10,
+        Gearbox = Gearbox.SixSpeedSports with { Ratios = new[] { 2.66f, 1.78f, 1.3f, 1.0f, 0.74f, 0.5f }, FinalDrive = 3.07f, ShiftSeconds = 0.3f, UpshiftRpm = 6000f, DownshiftRpm = 1500f },
+        Tyres = TyreProfile.SportsOnAsphalt,
+        MassKg = 1560f, DragArea = 0.75f,
+        ExhaustOffsetZ = 0.3f, IntakeOffsetZ = 1.3f,
+    };
+
+    /// <summary>
+    /// A Cup stock car: 1450 kg, no muffler, a four-speed geared for a one-mile oval so top gear runs
+    /// out right at the end of the straight. The exhaust leaves through the side of the car just
+    /// behind the driver's door rather than out of the back, which is why a stock car going past is
+    /// loudest square abeam and not after it has gone.
+    /// </summary>
+    public static VehicleProfile StockCar => new()
+    {
+        Name = "NASCAR Cup stock car",
+        EngineKey = "nascar_v8",
+        SourceLevelDb = 130f,
+        Engine = EngineProfile.NascarV8,
+        Gearbox = Gearbox.SixSpeedSports with
+        {
+            Ratios = new[] { 2.20f, 1.56f, 1.24f, 1.00f },
+            FinalDrive = 3.90f,
+            WheelRadiusMetres = 0.356f,
+            ShiftSeconds = 0.14f,
+            UpshiftRpm = 8900f,
+            // A race driver never lets it fall out of the power band; there is nothing down there.
+            DownshiftRpm = 5200f,
+        },
+        Tyres = TyreProfile.SportsOnAsphalt with { TreadBlocks = 0, SurfaceRoughness = 0.35f, ReferenceDb = 78f },
+        MassKg = 1450f, DragArea = 0.92f, RollingResistance = 0.011f,
+        // Side exit, level with the driver; the airbox faces forward under the windscreen cowl.
+        ExhaustOffsetZ = 0.1f, IntakeOffsetZ = 1.1f, FrontAxleZ = 1.4f, RearAxleZ = -1.4f,
+    };
+
+    /// <summary>
+    /// A three-litre V10 formula car: 620 kg with the driver, seven gears, and a diffuser instead of
+    /// a silencer. The pipes exit behind the rear axle pointing back and up, so unlike the stock car
+    /// it is loudest going away from you.
+    /// </summary>
+    public static VehicleProfile FormulaCar => new()
+    {
+        Name = "V10 formula car",
+        EngineKey = "f1_v10",
+        SourceLevelDb = 133f,
+        Engine = EngineProfile.F1V10,
+        Gearbox = Gearbox.SixSpeedSports with
+        {
+            Ratios = new[] { 5.90f, 4.40f, 3.55f, 2.95f, 2.50f, 2.10f, 1.75f },
+            // Geared so top gear runs out at 330 km/h right on the limiter, which is what an oval
+            // gear set is for. Taller than a road course would use, and the reason the car sits
+            // pinned near the top of the range for most of a lap instead of shifting through it.
+            FinalDrive = 3.23f,
+            WheelRadiusMetres = 0.33f,
+            // A seamless-shift box is quicker than a person; the gap is the reason the note steps
+            // rather than sweeps.
+            ShiftSeconds = 0.05f,
+            UpshiftRpm = 15100f,
+            DownshiftRpm = 8500f,
+        },
+        Tyres = TyreProfile.SportsOnAsphalt with { TreadBlocks = 0, SurfaceRoughness = 0.3f, ReferenceDb = 76f },
+        MassKg = 620f,
+        // OVAL TRIM, and it has to be. 1.35 m^2 is a road-course wing package, and with it this car
+        // could not reach 230 km/h — the map asked it for 327, so it sat permanently flat out, a
+        // hundred short, droning at 10,500 of 15,500 rpm and never once revving out. Ten of the
+        // thirty cars on the speedway were doing that. A car set up for a banked oval runs the wings
+        // off: about 0.85 here, which puts it at 296 km/h with the crank at 13,450 — its torque peak
+        // is 13,500 — so it sits in the meat of the range where a V10 is supposed to live.
+        // Measured, not guessed: 1.35 -> 230, 1.10 -> 270, 0.95 -> 285, 0.85 -> 296 km/h.
+        DragArea = 0.85f, RollingResistance = 0.014f,
+        ExhaustOffsetZ = -1.6f, IntakeOffsetZ = -0.2f, FrontAxleZ = 1.7f, RearAxleZ = -1.6f,
+    };
+
+    /// <summary>
+    /// The pace/police car: interceptor V8, enough gearing to run with the field, and a siren.
+    ///
+    /// Heavier and draggier than a stock car because it is a road car with a bar on the roof, so it
+    /// tops out under the racers and has to work — which is the point. You hear it coming a long way
+    /// off, because the exhaust is open and the cam is enormous.
+    /// </summary>
+    public static VehicleProfile PoliceCar => new()
+    {
+        Name = "Police interceptor",
+        EngineKey = "police_v8",
+        SourceLevelDb = 126f,
+        Engine = EngineProfile.PoliceV8,
+        Gearbox = Gearbox.SixSpeedSports with
+        {
+            Ratios = new[] { 2.97f, 2.07f, 1.43f, 1.00f, 0.85f },
+            FinalDrive = 3.55f,
+            WheelRadiusMetres = 0.35f,
+            ShiftSeconds = 0.25f,
+            UpshiftRpm = 6500f,
+            DownshiftRpm = 2200f,
+        },
+        Tyres = TyreProfile.SportsOnAsphalt with { TreadBlocks = 4, SurfaceRoughness = 0.4f, ReferenceDb = 74f },
+        MassKg = 1980f, DragArea = 1.05f, RollingResistance = 0.013f,
+        ExhaustOffsetZ = -2.2f, IntakeOffsetZ = 1.3f, FrontAxleZ = 1.5f, RearAxleZ = -1.5f,
+    };
+
+    public static VehicleProfile GrandTourer => new()
+    {
+        Name = "V12 grand tourer",
+        EngineKey = "v12",
+        SourceLevelDb = 126f,
+        Engine = EngineProfile.V12,
+        Gearbox = Gearbox.SixSpeedSports with { Ratios = new[] { 4.17f, 2.34f, 1.52f, 1.14f, 0.87f, 0.69f }, FinalDrive = 3.46f, ShiftSeconds = 0.25f, UpshiftRpm = 7200f, DownshiftRpm = 1600f },
+        Tyres = TyreProfile.SportsOnAsphalt,
+        MassKg = 1850f, DragArea = 0.7f,
+    };
+}

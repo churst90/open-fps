@@ -19,6 +19,138 @@
 - [x] Server: Map Manager with Material-tagged environments
 - [x] Server: User Registration and Login flow
 
+## Audio: the load-time dropouts, diagnosed and fixed (2026-09-14, sessions 4-5)
+The speedway cutting out for seconds on load was read as proof that live synthesis does not scale. It
+was not. Four mechanical faults stalled the FMOD MIXER THREAD itself, and ring depth cannot help when
+the thing that stopped is the CONSUMER — which is exactly why "buffer depth, thread priority and
+dedicated threads all helped and none fixed it". Diagnosis and measurements: `docs/AUDIO_LOAD_DROPOUTS.md`.
+- [x] `EngineRenderPool` moved steady-state synthesis off the mixer callback onto dedicated threads:
+      60 voices at dsp 17%, against ~100% for 12 voices before.
+- [x] Fixed on the way: a voice leak (`VoiceManager.RequestStop` silently dropped directly-played
+      voices), a faded voice that could never be revived, engines restarting on every lead change,
+      the Doppler staircase (60 Hz -> 250 Hz attribute updates), and phantom footsteps from position
+      corrections being banked as strides.
+- [x] **1. The mixer callback blocked on the producer's lock.** `Produce` held it for a whole top-up
+      (warm-up plus up to 0.7 s of audio ~ 175 ms of wall clock at load-time speed); `Consume` took
+      the same lock and, holding it, synthesized the shortfall ON THE MIXER THREAD. FMOD's buffer was
+      93 ms. The ring is now single-producer / single-consumer and lock-free: the callback takes what
+      is there, ramps out of the rest, and reports a starve. Deeper buffers can no longer make it
+      worse, because nothing waits. The lead is per voice, grown only by a voice's own starvation and
+      only once it has been playing for a lead. The snapshot is sorted nearest-first, so a shortfall
+      lands on the car at the far end of the back straight.
+- [x] **2. The JIT ran the synthesis at tier-0 for the whole load — measured 2x.** Tiering promotes
+      after 30 calls plus a 100 ms quiet period that RESTARTS while other methods are being jitted, and
+      a map load jits continuously for seconds. `AggressiveOptimization` on the per-sample path:
+      `nascar_v8` under a pinned tier-0 went 4.0x -> ~6.9x realtime (25% -> 14.5% of a core per voice)
+      with steady state unchanged at ~8x. `--engine-cost` now has a "first 500 ms" column, which is the
+      condition it never measured.
+- [x] **3. `ThreadPriority.Highest` is a placebo on Linux** (needs CAP_SYS_NICE). What works is
+      lowering: `BackgroundPriority.RunLowered` nices the acoustic bake to +10 and takes it off the
+      shared thread pool, so the mixer and the producers win contention with it.
+- [x] **4. GC suspensions freeze every managed DSP** — a native mixer thread entering managed code
+      during a suspension waits for the collection. `GCSettings.LatencyMode = SustainedLowLatency`.
+      The Mixer load line now carries gen2 count and total pause time so this is checked, not assumed.
+- [x] **5. The budget loop churned on load.** It steered on a `dsp %` that pins at 100% while the mixer
+      is STALLED rather than busy, shed echoes/voices/cars, then rebuilt them a second later — each
+      rebuild a new synth, a warm-up, a fill and an FMOD graph rebuild. Held for 3 s after a load and
+      after a spawn, and the ceiling must now be exceeded for 0.75 s together before anything goes.
+- [x] **6. Two FMOD knobs that were never set.** `setDSPBufferSize(1024, 8)` doubles the stall
+      tolerance to ~185 ms. `setSoftwareChannels(128)`: the 512 at init is the VIRTUAL count, the real
+      limit was 64 — and a 30-car speedway measures 59-62 real channels, so it was being reached.
+- [x] **The field is back to thirty** (`FIELD_SIZE` in `tools/gen_speedway.py`). Measured on the
+      speedway spike: 30 cars, 60 voices, dsp 12-16%, starves only in the first two seconds, capture
+      continuous from 0.2 s with no clipping.
+- [ ] Confirm in the REAL client (the spike has no map load, no bake, no GC pressure): run the
+      speedway, watch the Mixer load line's starve / gen2 / pause / real-channel figures across the
+      first ten seconds, and line them up against an `OPENFPS_AUDIO_CAPTURE` WAV.
+- [ ] Not done, and deliberately: reuse retired `EngineVoiceState` objects for the same entity rather
+      than reconstructing them. With the budget held and the existing keep-bias the churn it fixes is
+      no longer measurable; do it if the client run shows otherwise.
+- [ ] **Pre-rendered engine sample banks** — still the right long-term design for a field of a hundred,
+      and now a SEPARATE decision rather than a forced one. `EngineSynth` offline into seamless loops
+      per preset across an RPM grid, crossfaded and pitch-shifted at run time; per-car cost falls to an
+      ordinary sample voice. Only steady state at 30+ cars can justify it now, and faults 4, 5 and 6
+      apply to that design just as much, because they have nothing to do with how the sound is made.
+
+## Audio: the speedway — a race you log into (2026-09-14, session 3)
+`maps/speedway.json` is now the map a player lands on (`IsDefault`). A one-mile banked oval, eight
+cars lapping it, a concrete wall the whole way round, a grandstand you stand on, and no ambience bed.
+- [x] Two race engines: `nascar_v8` (5.9 cross-plane pushrod V8, open side exits, 9200 rpm) and
+      `f1_v10` (3.0 even-firing V10, open pipes, 15,500 rpm). Vehicle profiles `StockCar` / `FormulaCar`
+      geared for a one-mile oval. The stock car rumbles because its BANKS fire unevenly; the V10
+      screams on order 5 because they do not. Both measured with `--engine-orders`.
+- [x] **Radiation efficiency capped at ka = 1** (`OpenEnd.Radiate`). The monopole derivative rose at
+      6 dB/octave without limit, so every engine that revved hard came out top-heavy — the V10's
+      spectral centroid was at 8 kHz. One pole at c/(2*pi*a) is the physics and it fixes the
+      long-standing "small high-revving engines are 10 dB too loud" item below. `v8_muscle` is
+      unchanged to within 0.2 dB (its orders all live under a kilohertz).
+- [x] Racing: `RaceLine` (OpenFPS.Common) turns a map's track waypoints into a speed profile from the
+      local curvature (v = sqrt(g*9.81*R)) and a backward braking pass. `VehicleSystem` laps it.
+      Cars lift for the turns and pull on the straights because of the geometry, not a script.
+- [x] Engine reflections IN THE GAME (`EngineReflections`): image sources off the map's walls, each
+      rendered as the engine's own ring buffer read back at the mirrored path's delay. This existed
+      only in the lab before; a live engine in a map got no reflections at all.
+- [x] `ImageSource.FacesOfBox` with a rotation, so a curved wall's segments are mirrors at their own
+      angles; and coincident reflections are deduplicated, because overlapping wall segments were
+      each answering the same bounce (two voices, 6 dB too loud).
+- [x] An engine voice budget (`EngineVoiceBudget`, default 4, `OPENFPS_ENGINE_VOICES`) with
+      hysteresis. A V8 costs ~12% of a core in release and ~30% in debug (`--engine-cost`), so
+      `run-gtk-client.sh` now builds RELEASE by default.
+- [x] `--speedway` auditions the shipped map without a server; `--speedway speedway probe` prints
+      what reflects from where.
+- [x] **Levels.** `EngineVoiceState` had ONE clipping reference (40 Pa / 126 dB) for every engine, so
+      race presets arrived as square waves (`f1_v10` peaks 13x over it) and several road presets were
+      clipping too. Now `VehicleProfile.SourceLevelDb`, measured per preset with `--engine-levels`,
+      plus a shared 16 dB `PeakHeadroomDb`, guarded by a test.
+- [x] **Gain staging.** The headroom is paid back once on the master limiter's makeup gain (10 dB,
+      chosen against the FMOD loudness meter now on the master: -19 to -23 LUFS), not per source.
+      Also fixed: the limiter was added at the DSP chain's TAIL, so it ran BEFORE the boundary
+      reflections it exists to catch.
+- [x] **Popping.** Three discontinuities, all in the voice lifecycle, none of them clipping: a voice
+      started from rest and spun up inside 80 ms; a voice was cut mid-waveform when it lost its
+      budget slot; a wall's echo was held at gain then cut. Now `PlaceAtSpeed`, a 60 ms envelope with
+      `FadedOut`, and a ramped echo release.
+- [ ] Only the nearest four cars sound at all. A cheap "distant engine" voice — a filtered, decimated
+      render, or one shared voice for the pack — would let the whole field be heard.
+- [ ] The V10 is limited to 15,500 rpm by the SAMPLE RATE, not by the engine: past about sixteen
+      thousand the firing events alias and half orders climb above whole ones on an engine that
+      cannot have them. Oversampling the synthesis would lift it, at four times the CPU.
+- [ ] Reflections are first-order only and mono-band. Second order is written (`ImageSource`) but not
+      wired in; it is what would make the turns sound enclosed.
+- [ ] `ImageSource.MaxPathLength` is 400 m, which is short for a mile oval: cars on the far side get
+      no reflection at all rather than a late one.
+
+## Audio: vehicle engine synthesis — physical engine (2026-09-14, session 2)
+- [x] Replaced the drawn-pulse engine with a physical one: cylinders as gas volumes, valves as flow
+      boundaries into waveguides in real units (Pa, m, K), crank driven by piston pressure, lumped
+      plenum with emergent manifold pressure, finite-amplitude steepening, Levine-Schwinger open ends
+      with monopole radiation, expansion-chamber/absorptive/Helmholtz mufflers. `EngineSynth`,
+      `ExhaustNetwork`, `IntakeNetwork`, `Waveguide`, `Driveline` under `AudioEngine/Core/Engine/`.
+- [x] `EngineProfile` is general: any cylinder count, firing order, bank layout, collector grouping,
+      crossover, muffler, cam, valve, induction, fuel. 14 presets, 14 vehicle presets (`VehicleProfile.Presets`).
+- [x] Real-time: `EngineProcessor` FMOD DSP runs the engine live following an entity's speed
+      (`VirtualDriver`). Server `VehicleSystem` drives map `Vehicles` along a road; default map has a
+      big block passing the spawn at 30/60/90 km/h. Client recognises `engine:<preset>` emitters.
+- [x] Instruments: `--engine-trace`, `--engine-orders`, `--engine-gallery`, `--engine-live`, `--engine-solver`.
+- [x] Bench matches the literature: port pulses 0.1 bar idle -> 0.8 bar WOT, 25 dB idle-to-WOT, 92-116 dB.
+- [x] Levels of small high-revving engines came out 120-127 dB at full load, ~10 dB high, because the
+      radiation derivative scaled with frequency without limit. Fixed in session 3 by capping the
+      radiation efficiency at ka = 1 — see the speedway section above.
+- [ ] V6 and some stock presets still hunt ±150 rpm at idle; raise `IdleGovernorGain` or tune.
+- [ ] Two-stroke timing is accepted by the profile but untested.
+- [ ] The in-game vehicle is one voice at the tailpipe; the lab rig (exhaust/intake/tyres apart) is offline only.
+- See `docs/ENGINE_SYNTHESIS.md`.
+
+## Audio: vehicle engine synthesis, session 1 (superseded)
+- [x] Rewrote the exhaust source as a gas-dynamic blowdown transient, not a harmonic stack
+- [x] Hot-gas speed of sound throughout the exhaust (pipes were an octave flat at 343 m/s)
+- [x] `ExhaustNetwork`: digital waveguide with real collector junctions, crossover, true duals
+- [x] Measurement harness `--engine-orders` / `--engine-tones` (order spectrum, lope, chop, bands)
+- [x] Lope from a shared stochastic burn-quality walk rather than a fixed pattern
+- [ ] Muffler as a transfer-matrix network instead of nine biquads and a scalar — **next**
+- [ ] `<80 Hz` band drops out at 1500-3000 rpm but not at 5000; find out why
+- See `docs/ENGINE_SYNTHESIS.md` for findings, dead ends, and how to read the metrics.
+
 ## Phase 4: Gameplay Systems (COMPLETED)
 - [x] Common: Defined Item/Inventory components
 - [x] Server: Implement Inventory/Take/Drop commands
@@ -235,13 +367,520 @@ Reverb confirmed by ear — it comes from the source now. Three more findings.
       own acoustics are the only ones heard. `Ballistics` computes the crack-to-report gap —
       `d·(1/c − 1/v)`, ~1.7 ms/m — which recovers the range exactly when read back. Covered by
       `BallisticsTests` and `--gunshot` / `--gunshot-live`.
-- [ ] Play the crack from the ENGINE rather than the spike: it needs a shot event that schedules the
-      crack at the listener and the report at the weapon, separated by the ballistic gap.
-- [ ] Tune the profiles by ear and substitute recorded transients as they turn up. A recorded blast
-      must be trimmed to the transient — everything after it is the field it was recorded in.
-- [ ] Impact layer per material: `AcousticRegistry` already knows 36 surfaces, so a round striking one
-      can say which it was.
-- [ ] Glass: puncture, fragment shower (the granular engine's first proper caller) and delayed collapse.
+- [x] **Recorded transients ingested.** `tools/ingest_audio.py --only weapons` now handles the drop:
+      83 files. The firing takes are cut to the DIRECT SOUND ONLY — a 2 ms RMS envelope is walked
+      forward from the peak and the cut goes just before the first sustained 4 dB rise, which is the
+      recording's own first reflection; where nothing rises the window caps at 30 ms. Two takes cut at
+      12 ms on a real arrival, four at the cap. Handling sounds (charge, magazines, selectors, bolt,
+      pump, shell) are filed per weapon per action; the AKM's metal and polymer magazines are separate
+      pools because pooled they would change magazine at random between reloads. Three defects the
+      measurements turned up and the code now states: every take is **clipped** (0.15-2.4% of samples
+      on the rail, reconstructed by parabola across runs of 2-64); every take is **limited flat at full
+      scale** for 9-96 ms after the peak, so the natural blast decay is simply not in the file; and the
+      handgun take spends 8 ms pinned against the NEGATIVE rail, leaving the extracted window with a
+      mean of -0.40 against a peak of 0.72 until a 30 Hz high-pass takes it to 0.03.
+- [x] **The weapon spec.** `WeaponDefinition` + `WeaponRegistry` (`OpenFPS.Common/Weapons.cs`): five
+      weapons, real cartridges and real muzzle velocities, because the velocity is not a damage stat
+      here — it decides whether the round cracks, how tight the cone is, and how big the gap is. AKM
+      (7.62x39, 715 m/s, Safe/Auto/Semi, 30), AR-15 (5.56x45, 940, Safe/Semi, 30), Glock 17 (9x19, 375
+      — Mach 1.09, so it barely cracks, 17, no selector at all), a hammer-fired .45 service pistol (253
+      m/s, **subsonic, no crack**, 8), and a pump 12 gauge (9 pellets, 3.5° cone, tube-fed one shell at
+      a time).
+- [x] **The mechanism.** `WeaponMechanics` — stateless and deterministic like `SharedMovementEngine`,
+      events written into a caller-owned span. Covers what a listener can actually learn: safe makes no
+      sound at all (not even a click), semi needs the trigger released, a pump gun's trigger is dead
+      until it is pumped and silent while it is, a magazine comes out sounding loaded or empty, the
+      bolt locks back audibly on the last round, a reload without charging leaves an empty chamber, and
+      a shotgun's tube is loaded one countable shell at a time. Covered by `WeaponSystemTests` (23,
+      mutation-checked).
+- [x] **Bullets are hitscan, and their flight is modelled in the AUDIO.** `ShotResolver` resolves the
+      hit on the tick the trigger is pulled — no projectile entity to tick, network, reconcile, or add
+      0.3 s of latency to hit registration — and then tells each listener when each of the three sounds
+      reaches THEM: the crack from the closest-approach point beside them, the report from the muzzle,
+      the impact from wherever it stopped. `SpatialEmitter.DelayMs` is FMOD's sample-accurate
+      `setDelay`, which matters when the gap being conveyed is single-digit milliseconds. Projectile
+      entities stay the right answer for grenades, where the flight IS the event.
+- [x] **Outdoors can reverberate now.** The outdoor bus was built muted and `ApplySimulatedReverb`
+      returned early on the global region, so a concrete street canyon produced no reflections at all.
+      The mute is right for the *Sabine* estimate it was written against — that takes the whole map as
+      one room and washes the world — but Steam Audio's ray-traced RT60 is computed from the geometry
+      actually standing around the listener, and the early return was suppressing the one model that
+      gets it right. Outdoors now takes its decay AND its wet level from the simulation, ramped rather
+      than stepped. Measured: 2.1 s in the canyon, 0.10 s on open ground, so open ground stays exactly
+      as dry as it was. `AcousticConstants.OutdoorDryDecayMs` / `OutdoorFullWetDecayMs` /
+      `OutdoorMaxWetDb` are the knobs.
+- [x] **`--battle` / `--battle-live`.** Concrete Row: a 24 m street, 26 m concrete blocks down both
+      sides, two cross streets, six shooters. Headless it checks that the crack leads the report, that
+      the gap recovers the range *given the miss distance*, that the canyon reverberates and open
+      ground does not, and that nobody is standing inside a building (two of the six were).
+
+## Listening session (2026-09-14) — "thin", "a tick", "thumping on a bathtub", "one big room"
+
+Four complaints, four separate root causes, all real. Three fixed, one only half fixed.
+
+- [x] **"Sounds like a tick."** The report was the recorded transient played alone — twelve to
+      thirty-three milliseconds of limited, clipped audio. `WeaponSynth.CompositeBlast` puts the
+      synthesized body and decay back underneath it.
+- [x] **"Thumping on a bathtub."** The synthesis deserved that. `MuzzleBlast` was a resonant band-pass
+      ringing at 280-470 Hz plus a decaying SINE for the thump — a tuned resonator and a tone, which
+      between them are the definition of a boxy thud, and it ran for 860 ms when a DRY blast is under
+      a tenth of a second. Rebuilt on the physics: the low end is now a **Friedlander wave**,
+      p(t) = P(1 − t/T)·e^(−t/T), which is one pressure excursion rather than a cycle, so it has weight
+      without pitch; over it sits broadband noise through a low-pass whose cutoff FALLS as it decays,
+      which is what makes a blast open bright and close dark. Blasts are 160-340 ms, not 860.
+- [x] **"The guns don't seem that loud — have we introduced the concept of dB?"** We had not, and the
+      arithmetic was stark: every asset ships normalised to the same peak and the only per-sound
+      control was a 0-1 multiplier, so a gunshot ten metres away rendered **fourteen decibels quieter
+      than a footstep at one metre**. In air those differ by eighty-five in the other direction.
+      `Loudness` gives every sound a source level in dB SPL (rifle 165, handling 78, footstep 55) and
+      converts it, with the range compression written down as the deliberate lie it is.
+- [x] **"Shouldn't distant ones be muffled?"** They were not, at all. `AsyncAcousticWorker` set
+      `AirAbsorption = 0f` with a comment calling it "a later phenomena pass" — so switching the Steam
+      Audio simulator ON switched air absorption OFF for every source in the game. There is now one
+      law in `AudioPhysics`, used by both paths, plus `AtmosphericBands` with ISO 9613 coefficients and
+      an urban excess term for the scattering a city adds. A shot at 178 m now arrives 19 dB down at
+      4 kHz and untouched at the bottom; at 10 m it is 0.4 dB. `UrbanExcessHighDbPer100M` is the knob.
+- [x] **Five weapons were two sounds.** The blast came from a table of three profiles keyed by name,
+      so the Glock and the .45 rendered BYTE-IDENTICAL and the AKM and AR-15 differed only by which
+      take got picked at random. Blast character now lives on `WeaponDefinition` — one place per
+      weapon — which also retires the name lookup that had already caused the Glock's crack to be
+      scheduled and then rendered as silence.
+- [x] **The street's reverb could vanish mid-firefight.** The ray-traced RT60 is stochastic — the same
+      canyon measured 1729, 2131 and 2800 ms on consecutive runs — and occasionally a run finds
+      nothing and reports zero, which read as "open field" and muted the outdoor bus for a frame.
+      `SetSimulatedReverbDecay` now median-filters the last five readings: a dropout cannot move the
+      median, but walking out of the canyon still does.
+
+- [x] **"The demo sounded dry" — it was, completely, and for a second reason.** With the bus finally
+      metered directly (`TryMeterReverbBus`, because `TryGetReverbDiagnostics` reads a stage that is
+      BYPASSED whenever the listener is inside the region and so reports zero for the outdoors no
+      matter what) the send level into the outdoor reverb was 0.021 and is now 0.486. Two causes: the
+      play-time send had `if (sourceRegionId != -1 ...)`, which excluded every sound in the open world
+      from every reverb bus; and the whole chain was quiet because of the dB bug below.
+- [x] **Guns are very loud, and the model now says so.** `Loudness` was wrong in a way that looked
+      right: it put the CEILING at the loudest source level (165 dB, a rifle at one metre), so a
+      gunshot only reached full scale if you were standing at the muzzle and the inverse-square law
+      had taken 30 dB off it before the mix saw it. The ceiling is now the SPL at the LISTENER that
+      uses all the headroom (130 dB, about where loud becomes pain), and the reference distance is
+      DERIVED from the source level — a 159 dB rifle holds full scale out to 28 m and only then falls.
+      An AKM at 48 m went from -31 dBFS to -5.
+- [x] **"Thumping on a bathtub", then "still too thin".** Both were the synthesis. The first was a
+      resonant band-pass plus a sine — a tuned resonator and a tone. The second was my own arithmetic:
+      a Friedlander wave of time constant T puts its energy near 1/(2*pi*T), not 1/T, so the sub-bass
+      was being generated at THIRTEEN HERTZ and then removed by the DC-blocking filter. The weight was
+      rendered and thrown away. Corrected, plus a second slower blast wave and a hard soft-clip drive
+      (saturation is what lets the low end be loud without simply owning the peak).
+- [x] **"A gun that sounds like a bug zapper firing four times".** The AR-15, and two causes. It was
+      firing SEMI-automatic at its CYCLIC rate — 800 rpm, four rounds inside 225 ms, which nobody's
+      finger can do and which does not read as four shots. `SemiAutoRoundsPerMinute` (280) now limits
+      the trigger and `IntervalFor(mode)` picks the right one. And every round of a burst played the
+      same cached crack render; four variants now.
+- [x] **A dryness regression I caused and the tests caught.** I changed the blast buffer from six time
+      constants to four, over a comment in the file explaining why four is not enough — at four the
+      layer is still at 1.8% when the buffer ends, which is a step at the end of every shot. Restored,
+      with shorter decays so the blast stays under 230 ms.
+
+## Real gunshot recordings (2026-09-14)
+
+- [x] **The Cadre Forensics dataset replaces four of the five firing sounds.** NIJ grant
+      2016-DN-BX-0183, free with registration, and it measures as well as it reads: the Zoom H4N
+      recordings are **96 kHz, 0.00% clipped and 0 ms limited at every position tested**. That is the
+      defect nothing downstream recovers, and every take in the original drop had it (0.15-2.4%
+      clipped, 9-96 ms limited). Mapped M16 -> AR-15 (a real 5.56 at last), WASR -> AKM (7.62x39 AK
+      pattern), Glock9 -> Glock, Colt1911 -> the hammer-fired .45. The dataset has no shotgun, so the
+      pump gun is now the ONLY weapon still firing a borrowed take, and it is the weakest by ear.
+- [x] **`--measure` for vetting a library before committing to it.** Reports the three defects that
+      decide usability: clipping, how long the peak envelope stays pinned at full scale, and energy
+      above 2 kHz. The original drop scores `good 0, usable 1, poor 5`; the Cadre takes score
+      `good 8, usable 0, poor 0`; the handling sounds we already had score `good 9, usable 2, poor 0`,
+      which is why they are kept.
+- [x] **A measurement bug in that tool, found by using it.** It took a fixed SAMPLE count and
+      decimated by 4 without filtering, so everything above sr/8 aliased into the band being measured —
+      at 48 kHz that inflated the high band with fold-down from above 6 kHz and at 96 kHz it did not,
+      making the two datasets incomparable. Comparing them is the entire purpose of the tool. Now a
+      fixed TIME window with no decimation.
+- [x] **Angle held constant across the distance series.** Bucketing by distance alone mixed 90-degree
+      and 180-degree takes, and a muzzle blast is strongly directional — the AKM came out BRIGHTER at
+      40 m than at 3 m, which is not what air does to sound, it is what standing beside the muzzle
+      rather than behind it does. Everything is now 180 degrees (the shooter's own perspective, and
+      the one angle the dataset has at 3/10/20/40 m), leaving directivity to the engine's cone.
+- [x] **Five weapons are now five sounds.** AR-15 brightest and shortest (+0.7 dB high/low, 126 ms),
+      .45 darkest (-3.7 dB), shotgun longest (240 ms) — the ordering their calibres imply.
+- [x] **The synthesizer was drowning the recordings.** Synth at 1.0, recording at 0.45 — so replacing
+      four of the five firing sounds with 96 kHz unclipped takes changed almost nothing, because what
+      was audible was still mostly synthetic. That balance was set when every recording was clipped,
+      limited and dark; it survived the reason for it. The recording now leads at full level.
+- [x] **And most of the synthesis was inventing a tail.** A 7.62 blast three metres from the muzzle
+      decays TWENTY-SEVEN DECIBELS IN THIRTY MILLISECONDS — it is genuinely over by then, and what
+      follows in the file is the desert. The synthesized layer ran 120-240 ms, so it was not
+      reinforcing the blast, it was appending a room to it — inside the sample, where the engine's own
+      reflections and reverb cannot get at it. That is a large part of why everything sounded like one
+      echoey space. What is left for synthesis is one narrow job: the bottom octave a handheld
+      recorder's capsules roll off below 80 Hz (`SubReinforcementLevel`, 0.25).
+- [x] **The AR-15 sounded like a tick because I picked the wrong microphone position.** 180 degrees is
+      BEHIND the muzzle, which for a rifle is the extreme of the directivity pattern, not a sample of
+      it. Measured on the M16 at 3 m: side-on, the low band sits +17.3 dB relative to the mids; from
+      behind, MINUS 2.8. Twenty decibels of body that was never in the file, and no amount of
+      downstream work puts it back. The AKM survived it because a 7.62 has low end to spare; the 5.56
+      did not. The whole series is now 90 degrees, which the dataset also has at 3/10/20/40 m, and the
+      AR-15's body went from -2.8 dB to +8.2. It is also the more honest default: most shots a player
+      hears are someone else's, from the side.
+- [x] **`--blast-compare` / `--blast-compare-live`.** Plays each weapon three ways — recording alone,
+      recording plus sub, pure synthesis — at the same level through the same path, so "do we still
+      need the synthesizer" is answerable by ear rather than by argument.
+- [x] **The shotgun is now deliberately fully synthesized.** Its only recording is twelve milliseconds
+      of a single-shot RIFLE take, and twelve milliseconds of the wrong weapon is worse than a
+      synthesized one of the right weapon. `RecordedBlend = 0` says so explicitly.
+
+- [ ] **Use the distance series at runtime.** 3/10/20/40 m of every weapon are ingested and only the
+      3 m set is wired up. A blast that genuinely travelled forty metres beats one we filtered.
+      Measured honestly, though, the effect is smaller than expected at these ranges: across 3->40 m
+      the 2-8 kHz band falls only 0.8 dB faster than 150-1500 Hz. Air absorption does not really bite
+      below 8 kHz until hundreds of metres, which means `AirDbPerMetreHigh` is right and
+      `UrbanExcessHighDbPer100M` — scattering and obstruction, a design choice rather than a measured
+      one — is doing most of the "distant is dull" work in the engine. Worth saying out loud.
+- [ ] A shotgun take. Nothing free measured so far has one that passes.
+
+## Vehicles (2026-09-14) — `--vehicle` / `--vehicle-live`
+
+A V8 sports car with Flowmaster 40s, synthesized from its mechanism rather than sampled. Three
+emitters, because a car is three sources in three places: exhaust at the back, intake at the front
+3.4 m ahead of it, tyres at the axles between. On a pass the front reaches you before the back and each
+Dopplers on its own schedule — none of which has to be authored, it falls out of putting the sources
+where they are.
+
+- [x] **The engine is its firing pattern.** A cross-plane V8's banks fire at 90/180/180/270 degree
+      intervals — UNEVENLY — and that irregularity is the lope. (A flat-plane fires every 180 exactly,
+      which is why a Ferrari screams instead.) Impulse train -> header quarter-wave -> H-pipe coupling
+      -> system resonance -> muffler -> tailpipe radiation.
+- [x] **The Flowmaster is its chambers.** A 40-series is CHAMBERED, so it cancels rather than absorbs —
+      each chamber notches c/4L and its odd multiples (591, 746, 953 Hz here), and because nothing is
+      absorbed the upper harmonics survive, which is the rasp. The model even reproduces the famous
+      highway drone for free: the system's 5th mode meets the firing rate at **2042 rpm**, which is
+      exactly where Flowmasters are notorious for droning.
+- [x] **Manual gearbox, simulated not scripted.** Six speeds, 260 ms shifts. The RPM drop across a
+      change is the actual ratio step (6150 -> 4270 on the 2-3 change, which is 2.97/2.07), and a shift
+      at part throttle differs from one at full because the torque curve is being asked for different
+      things. Overrun pops on a closed throttle — on a loud chambered system that IS the character.
+- [x] **Tyres are two mechanisms, not one.** Broadband roar rising ~30log10(v), plus the TREAD BLOCKS
+      striking the road at speed/spacing — several hundred hertz at 25 m/s. That second component is
+      why tyre noise rises in PITCH with speed, and it is what a plain noise generator misses.
+- [x] **The start is a trajectory, not a sample.** Solenoid, starter churn at 260 rpm with compression
+      pulses but NO combustion (so the pipe never rings — that is why cranking sounds hollow), catch,
+      flare to ~1500, settle to idle. A failed start would fall out of the same model for free.
+
+Three bugs found by measuring rather than listening, each of which would have been mistaken for a
+tuning problem:
+- The torque curve was a narrow lognormal giving the engine **5.6 Nm at idle**, so the car could not
+  pull away at all and never reached a shift point — the entire gearbox was unreachable behind one
+  wrong curve shape. A parabola about the peak is both more realistic and much harder to get wrong.
+- There was no CLUTCH, so at a standstill the gearing said idle and nothing could launch. Slipping it
+  at 2300 rpm is also what a launch sounds like: revs held flat while the road catches up.
+- The muffler chambers were feedforward combs, which have a **zero at DC** — three in series took the
+  firing fundamental down 33 dB, and an idle measured 45 dB below its own firing rate and came out as a
+  buzz near 300 Hz. A quarter-wave side branch removes a band AROUND its resonance and passes the rest;
+  it is a notch, not a high-pass.
+
+Measured afterwards, the band balance moves the way it should: idle peaks at 60-150 Hz, under load at
+150-400 with the rasp arriving above 1.2 kHz, and on the overrun at 400-1200 — the crackle.
+
+- [x] **"Electronicy, buzzy like a sawtooth" — four causes, all structural.** A sawtooth is perfectly
+      periodic harmonics with no noise between them, and the model was literally that.
+      * The pipes were LOSSLESS delay lines, so they reflected 5 kHz as readily as 100 Hz and rang like
+        metal. A real pipe's loss rises with frequency — wall drag and end radiation both take the top
+        first — so there is now one pole in each feedback path. This is the single biggest change: the
+        harmonics above the 5th now roll off 30-40 dB, and the buzz went with them.
+      * There was NO turbulent noise anywhere. A real exhaust is moving a lot of hot gas fast and that
+        flow is noisy BETWEEN the firing harmonics; without it there is nothing but harmonics, which is
+        the definition of the problem. Added both continuous flow noise (scales with gas velocity) and
+        turbulence carried by each blowdown (present at any engine speed).
+      * Every firing event was identical. Cylinders are not: different runners, different breathing,
+        different wear. The trims are small, a few per cent, and FIXED per cylinder — consistency is
+        what makes it read as a machine with eight of them rather than as noise.
+      * Combustion pressure now varies cycle to cycle. (Valve TIMING deliberately does not — that is
+        mechanically fixed by the camshaft, so jittering it would have been wrong.)
+- [x] **The engine blipped to 1035 rpm every time it stopped.** The start-up flare was applied to every
+      Idling order rather than to the catch that earns it, so pulling up sounded like a driver blipping
+      the throttle. Gated to the catch; idle now settles at 772.
+
+- [x] **`--engine-match FILE`** measures a real exhaust recording and prints the synthesis constants it
+      implies: firing rate (so, RPM), harmonic rolloff (-> pipe damping), harmonic-to-noise (-> the two
+      noise levels) and band balance (-> the gas hump). Any format ffmpeg reads; a phone clip is plenty,
+      because every measurement is a RATIO within the clip and so is insensitive to microphone, level
+      and most of the room. Nothing from the recording enters the game — the output is numbers.
+      Self-testing it against our own render caught two bugs in it: it picked SILENCE as the "steadiest"
+      passage (perfectly steady, says nothing) and reported the engine's character from a moment after
+      it had been switched off; and the noise recommendation had its SIGN BACKWARDS, so a clip measuring
+      as a sawtooth would have been told to get cleaner still.
+- [x] Pointed at our own V8 it measured **+34 dB harmonic-to-noise at a steady 2302 rpm** — arithmetic
+      confirmation of "sounds electronic". Applying its correction overshot to +4.9; interpolating
+      between the two lands at FlowNoiseLevel 2.10 / PulseNoiseLevel 1.32, now +23.
+
+- [ ] **The first reference file could not be used, and the measurement says why.** A 71 kbps MP3 of a
+      muffler comparison. Even in 120 ms windows — short enough that a moving fundamental cannot smear —
+      its harmonics sit 20-36 dB under the fundamental and the 1-6 kHz band is 46-63 dB down. A real V8
+      exhaust keeps its harmonics within roughly 6-20 dB and has real energy at 1-6 kHz, which IS the
+      rasp. At that bitrate a bass-dominant signal gets its whole bit budget spent on the fundamental
+      and the rest is discarded; what looks like content at 8-20 kHz is encoder noise, flat at -40 dB.
+      Recoverable from it: the firing rate, so the RPM (1920-2160 across the passages). Nothing else.
+      A phone recording at 2-5 m would be far better than a low-bitrate copy of a good one.
+- [ ] **Scale the pipe delays by exhaust gas temperature.** Raised by the impulse-response question and
+      worth doing on its own: gas leaves the head at 700-900 C, and the speed of sound goes as the
+      square root of absolute temperature, so every resonance in the system sits about 75% higher hot
+      than cold. It also moves with load, which is part of why an engine's timbre changes under power
+      rather than only its pitch. The model has the pipe lengths as delays already, so this is one
+      multiplier — and it is the thing a static impulse response fundamentally cannot represent.
+
+- [x] **Fitted to a real reference at last.** The second file — a Mustang 5.0 with Original 40s, idle,
+      rev and take-off, 125 kbps — has its harmonics intact (x2 at -7 to -14 dB, against -20 to -36 in
+      the unusable one), so it could be measured.
+      **The headline number: real Flowmaster 40s measure +6.5 dB harmonic-to-noise.** The 8-18 dB
+      target the fitting had been aiming at was my own estimate and it was wrong — a real exhaust is
+      NOISIER than that. Ours measured +27.6, so it was 21.1 dB too clean, which is the arithmetic
+      behind "sounds electronic". Two iterations closed it to within 2.0 dB:
+      FlowNoiseLevel 4.95, PulseNoiseLevel 3.13, HeaderDamping 0.11, SystemDamping 0.07, HumpLevel 1.85.
+- [x] **`--engine-match REF --compare OURS`.** The tool conflated two different jobs — measuring a
+      reference and correcting our engine — so handed a reference it said "this is noisier than target,
+      reduce the noise", which is backwards. Measurement and recommendation are now separate: it
+      measures both files and derives the correction from the DIFFERENCE.
+
+- [ ] **The rolloff cannot be fitted independently by this method, and that is a property of the
+      measurement rather than a bug.** Damping and noise interact through it: heavy damping lowers the
+      harmonics, which lowers measured harmonic-to-noise, and a high noise floor makes the upper
+      harmonics measure flat because they are sitting ON it. A third iteration chasing the rolloff went
+      backwards on two of the three metrics and was reverted. Fitting it properly needs the harmonic
+      envelope measured ABOVE the noise floor — the "sample the transfer function at the harmonics"
+      idea from the impulse-response discussion — rather than a single slope number.
+
+ Everything above is physics, but the LEVELS are
+      still guesses — including the harmonic-to-noise target, which I picked rather than measured. A
+      YouTube link cannot be analysed; an audio FILE in the inbox can, and all the measuring tooling
+      already exists. Given one, the pipe damping, flow noise and pulse noise can be fitted to the real
+      thing instead of estimated.
+- [ ] Real-time DSP. The drive is rendered offline and then moved through space, which is right for a
+      demo and wrong for a game: RPM has to follow a player's right foot. The synthesis is sample-by-
+      sample already, so it wants wrapping as an FMOD DSP like `SynthProcessor`.
+- [ ] No engine braking, no rev-matched downshifts, no differential or transmission whine.
+- [ ] Tyres do not know what they are rolling on — `AcousticRegistry` knows 36 surfaces and gravel,
+      wet asphalt and concrete all sound different. This is the granular engine's other obvious job.
+
+## Why it sounded sterile (2026-09-14)
+
+- [x] **There was no ambience at all.** The demo played gunshots into perfect silence, which is not a
+      place, it is a test signal. An ambisonic bed now plays — first order, so it stays PUT in the world
+      while the listener turns, rather than being glued to the head the way a stereo bed is. It does
+      two jobs: gives the ear a continuous reference to localize the shots against, and fills the gaps
+      so the silence between them stops sounding like the engine has stopped.
+- [x] **The near-field boundary system was never fed.** `BoundaryModel` has been in the engine since
+      the near-field work and `--battle` never called `UpdateBoundaries`, so every surface in Concrete
+      Row was silent until it was far enough away to echo. Six head-relative probes are now cast
+      against the street geometry each frame.
+- [x] **`DemonstrateProximity`** — the same shot from mid-road and from two metres in front of a block,
+      back to back, with the probe distances printed. Mid-road finds only the ground below (1.7 m);
+      beside the building it finds the wall on the LEFT at 2.0 m, returning 12 ms after the direct
+      sound. That is the "would I not sense the skyscraper" question, answerable by ear.
+
+Worth being precise about the two regimes, because they are different phenomena and only one of them
+is "proximity":
+
+  * Closer than about five metres, a surface is NOT heard as an event. Its return arrives inside the
+    window where the ear fuses it with the direct sound, and what changes is the timbre plus an
+    unmistakable sense of something solid being there. `BoundaryModel`, capped at 3 m.
+  * Beyond that it is an arrival: 2d/c is 70 ms at twelve metres, late enough to be its own event.
+    `ImageSource`.
+
+- [x] **Beds replaced by world-placed emitters.** The diagnosis was "the environment is not part of
+      the game environment", and that is exactly right: a recorded bed does not reflect off OUR
+      buildings, is not occluded when you step behind one, comes from nowhere, and does not change as
+      you move. The gunshots are being filtered, delayed and reflected by the geometry and the bed is
+      not, so the two do not share a world and the bed reads as a soundtrack. The street's noise is now
+      made of EMITTERS going through the identical pipeline — a main road north-east at 283 m, traffic
+      south at 165 m, a rooftop plant on the near block at 54 m. Step behind a building and they
+      occlude. They also give the player something to orient BY, which a head-locked bed can never do.
+- [x] **A synthesized rumble floor** for everything too far to be any one thing. Steeply low-passed —
+      "low level white noise" is the right instinct about LEVEL and the wrong one about SPECTRUM: a
+      distant city is a rumble, not a hiss, because kilometres of air have taken everything above a few
+      hundred hertz. Synthesized so it never loops, and so it can be made to respond to going indoors,
+      which a recording cannot.
+- [x] **Reflector SIZE now decides how much comes back.** The model treated a garden fence and a
+      fifty-storey tower as equally reflective at the same distance. It now weighs the surface against
+      the first FRESNEL ZONE at the bounce point, radius sqrt(lambda*d1*d2/(d1+d2)): a reflector much
+      larger than that zone behaves as an infinite plane, a smaller one intercepts only part of the
+      contributing area and the rest diffracts past. Frequency dependent through lambda, which is why a
+      fence mirrors a whistle and is transparent to a lorry, and it grows with distance — so at 150 m
+      only genuinely large things still answer. A 2 m fence returns 71% at 5 m and 25% at 40 m; a
+      tower returns 100% at any range.
+
+- [x] **Ambience sources now get the same reflections gunshots do, which is what stops them sounding
+      dry.** `Arrivals()` was only ever called from the gunshot path, so every placed emitter was a
+      bare point source in an empty field. The important part is that NO special case was needed: a
+      delayed copy of an impulse is heard as a separate arrival (an echo), and a delayed copy of a
+      SUSTAINED sound is not heard as a second event at all — it sums with the original into a comb
+      filter, notches every 1/d Hz, which the ear reads as colour and as the size of the place. A dog
+      barking from a sixth-floor window does not echo off the block opposite; it takes on that block's
+      colouration. Same geometry, same code; the difference is entirely whether the source is a bang
+      or a drone. Capped at 3 facades per source, because these run forever and each holds a voice.
+
+- [ ] **Get SINGLE-SOURCE recordings, not fields.** The three emitters above are stereo FIELD
+      recordings being used as point sources, which is a stopgap — each contains several things at
+      once, so it localizes to one place while sounding like many. What the architecture wants is one
+      recording per object: an air-conditioning unit, a generator, one road, one dog, one aircraft
+      pass. Those are far easier to find than a convincing field, and they are what makes the world
+      composable.
+- [ ] **A synthesis plan for the things that are hard to record** (the answer to "how do I get
+      vehicles"). The taxonomy matters more than any one asset, because it says which tool fits what:
+      * PERIODIC IMPULSE TRAIN for anything with a firing or blade rate — engines, fans, compressors,
+        generators, rotors. An engine is impulses at RPM/60 x cylinders/2 through exhaust and body
+        resonances, with a little cycle-to-cycle jitter so it does not read as a synth. This is the
+        right answer for VEHICLES specifically: it gives continuous RPM, load and Doppler for free,
+        where a sample set needs a dozen loops and still cannot cover arbitrary revs.
+      * GRANULAR for stochastic textures made of many small irregular events — tyres on gravel, rain,
+        crowds, fire, debris, water. The control that matters is DENSITY, and it has to track a
+        physical quantity: grains per second proportional to speed is what makes acceleration read as
+        acceleration rather than as a volume knob.
+      * SUBTRACTIVE (shaped noise) for broadband continuous sources — wind, jets, airflow, the distant
+        traffic rumble. A distant jet is very nearly pure filtered noise with a slow spectral sweep.
+      * MODAL for struck solids — casings, glass, pipes, railings. A handful of decaying sinusoids,
+        endlessly variable, never repeats. This also replaces the six casing recordings, which will be
+        heard repeating.
+      An AC unit is the instructive case because it is two of these at once: a blade-pass tone with
+      harmonics (periodic) plus airflow hiss (subtractive), and no part of it wants to be granular.
+- [ ] The granular engine exists and still has no caller. Tyres on a loose surface and the glass
+      fragment shower are its two obvious first jobs.
+- [ ] Nothing moves yet. A car passing, an aircraft overhead — the engine already has Doppler, and a
+      moving source is the single most alive-sounding thing a street can have.
+- [ ] Nothing is occasional. Everything placed loops forever; real environments have events. A dog at
+      a random interval, a door, a distant siren.
+- [ ] The rumble floor does not yet respond to going indoors, which is the main reason for
+      synthesizing it rather than recording it.
+- [ ] **The 4-channel beds are still right for the places they were recorded.** Woods and farm are
+      genuinely diffuse and have no localizable sources, so a soundfield is the correct tool there.
+      The mistake was using one in a city, not having them.- [ ] `BoundaryModel.MaxDistance` is 3 m, so a building twelve metres away contributes nothing to the
+      sense of enclosure — only its discrete reflection. A large surface reflects the whole ambient
+      FIELD back at you, which is why standing near one feels different even in silence, and nothing
+      models that yet.
+
+## Outdoor reflections (2026-09-14) — "it sounds like one big echoy room"
+
+- [x] **Discrete, directional building reflections.** `ImageSource` (Common) is the missing piece: a
+      first- and second-order image-source solver. Mirror the source through a facade's plane and you
+      have, exactly, where the reflected wavefront appears to come from — not an approximation, just
+      what the geometry does. The engine's existing reflection pass could never do this: it scans for
+      surfaces within 40 m of the LISTENER, so it finds the wall you are standing next to and never
+      the one the sound came off in the distance. The AR-15 at 154 m now gets answers at 15, 184 and
+      380 ms; something in the fight answers 692 ms late, off 237 m of extra path.
+- [x] **Second order, because a canyon needs it.** Two flat parallel walls offer exactly ONE
+      first-order bounce each, so a shot down the middle of a road produced two reflections and then
+      nothing — and with nothing else arriving, the diffuse tail was all that was left, which is
+      precisely "one big echoey room". Wall-to-wall paths are where a street's character lives.
+      Every shot in the fight now gets at least one discrete arrival; before, three of six got none.
+- [x] **Coincident reflections no longer get a voice.** `MinDelaySeconds` (12 ms). A shooter and a
+      listener both 1.5 m up and 178 m apart have a GROUND-bounce path three centimetres longer than
+      the direct one — a tenth of a millisecond. Rendered separately at 98% gain that is not a
+      reflection off anything, it is the direct sound played twice, 6 dB louder, comb-filtered. It was
+      also crowding the genuinely distant bounces out of the voice budget.
+- [x] **The diffuse wash turned down and capped.** `OutdoorMaxWetDb` -6 -> -16 and a new
+      `OutdoorMaxDecayMs` of 1100. The ray tracer measures 1.7-2.8 s for a concrete canyon and taken
+      literally that is not wrong — but a two-second decay is a cathedral, and the sky is an infinite
+      absorber that a tracer working from box colliders cannot see. Now the facades answer
+      individually and this is only the tail behind them.
+- [x] **Realistic rather than exaggerated.** Facade absorption 0.02 -> 0.25 and `ReflectionLevel` 0.5.
+      A building front is not a polished slab: it is windows, reveals, sills and signage, and all of
+      that scatters. At 0.02 every facade answered at 98% and the street came back like a hall of
+      mirrors. A reflection you notice AS a reflection is already too loud.
+- [x] **Cross streets are one-sided.** Cutting both rows put the gap exactly where a mid-street shot
+      would have bounced, and three shooters got nothing from anything. Real blocks are not
+      symmetrical either.
+- [x] Fold `ImageSource` into `ClientAudioSystem` / `SpatialAcoustics` so the GAME gets this and not
+      just `--battle`. `EngineReflections` holds the surface cache (keyed by PLANE, so a wall built
+      from twelve blocks is one surface and one voice), the budget is an audibility floor rather than
+      a count, and as of session 7 the occlusion callback IS wired: both legs of every mirrored path
+      are obstruction-tested, and each echo carries the direct path's occlusion and EQ.
+
+## The cars that vanish, and the cars that stop (2026-09-14, sessions 6-7)
+
+Two reports from the speedway. Diagnosed with no code changed in session 6, fixed in session 7. The
+full record — what each fault was, what was done, and what was deliberately left — is in
+`docs/AUDIO_GHOSTS_AND_STUTTERS.md`.
+
+- [x] **A position is stamped by when it was SAMPLED, not submitted.** `SpatialEmitter.PositionSampledAt`
+      off `WorldSnapshot.PositionsSampledAt`, so the voice manager's 250 Hz refresh re-applies the
+      same age instead of resetting it. Dead reckoning works for the first time.
+- [x] **One monotonic clock for every timestamp** (`OpenFPS.Common.AudioClock`). The provider's stamps
+      and its dead reckoning were both measured on a stopwatch the mixer-load report RESTARTS every
+      250 ms, so the age went negative for most of every quarter second and the reckoning did nothing.
+- [x] **The pathing bake is off the critical path.** It used to run inside `SetScene` and take 100 s of
+      one core before ANY source got an occlusion value. Now a `Lowest`-priority background thread,
+      with the probe count budgeted rather than fixed at 2 m spacing.
+- [x] **The occlusion probe is at the emission point** (`AudioEmission`, `SoundEmitterComponent.Offset`,
+      `VehicleProfile.ExhaustOffset`), with a volumetric radius that fits above what the emitter rests
+      on. It was at the entity origin with a fixed 0.5 m sphere — half underground for anything that
+      drives, on every level stretch of every track.
+- [x] **A barrier attenuates by its geometry** (`OpenFPS.Common/Diffraction.cs`): Maekawa insertion
+      loss from the path difference round the obstacle, per band, as a floor under the simulator's
+      transmission. A 0.9 m pit wall cost 26 dB and three octaves; it now costs single digits.
+- [x] **Reflections obey the same physics as the direct path.** Obstruction-tested, occluded with
+      their source, and no longer given the listener's Doppler twice.
+- [x] **The map is validated against what drives on it** (`TrackClearance`, run at map load and
+      asserted by `EveryShippedTrackIsDriveable`). The speedway's front straight ran through the
+      grandstand deck for 138 sampled points of the lap; `gen_speedway.py` now takes the setback from
+      the wall's furthest point rather than its nearest.
+- [ ] Vehicles as prefabs with a LIST of emitter slots (exhaust, intake, tyres, horn), not one offset
+      and a map-level `VehicleData`. The acoustic half is done; the authoring half is a feature.
+- [ ] The two field-wide starve bursts (~150 ms of silence, twice in thirteen minutes). Still
+      unexplained; needs the producer-side scheduling gauge — time between two consecutive `Produce`
+      calls on the same thread — on the census line.
+- [ ] A borrowed distant engine voice reads another car's ring, so it inherits THAT car's Doppler and
+      then applies its own. Needs the borrowed voice to advance its own read cursor rather than follow
+      the source's play position.
+
+## Glass (2026-09-14)
+
+- [x] **`GlassBreak`** — the mechanic, tested, not yet wired to anything that can be shot. A pane shot
+      out five floors up makes TWO sounds separated by most of two seconds, from two different places:
+      the break at the window, then silence, then the glass arriving at the pavement at the foot of the
+      wall. The gap is sqrt(2h/g) — a direct readout of which floor the shot was on, the same trick as
+      the crack-to-report gap. `GlassType` matters and is not a difficulty setting: tempered always
+      fails completely (it is held in compression, so there is no such thing as a neat hole in it),
+      laminated never does (the interlayer keeps the pieces, and that ABSENCE is information), annealed
+      depends on what hit it. Uses the mayonnaise jar for the break and the sliced tinkle pool for the
+      shower and the landing. Covered by `ReflectionAndGlassTests`.
+- [ ] Wire it to something shootable: a `GlassPane` on the prefab spec, hit detection against it, and
+      the events rendered through the audio system. Then a window in the demo map.
+- [ ] The fragment shower should be the granular engine's first real caller (`GLASS/BED` is ingested
+      and waiting) rather than a scatter of one-shots.
+
+- [ ] **"I didn't hear any buildings" — the engine still does not have this; only `--battle` does.** Outdoors now
+      reverberates, but what it has is ONE parametric RT60 wash, which by construction sounds like one
+      big room. What is missing is what was actually asked for: discrete, delayed, DIRECTIONAL
+      reflections, so a facade a hundred metres up the street answers a shot 0.6 s later from over
+      there specifically. The machinery exists — `SpatialAcoustics.CalculateAcousticPaths` returns
+      reflection paths with `ReflectionDelayMs`, `ApparentPosition`, `EqHigh` and `Spread`, and
+      `ClientAudioSystem` renders them — but `--battle` bypasses all of it and talks to the provider
+      directly, so the demo has never exercised it. Wire the spike through the real acoustic path.
+- [ ] The recordings cannot carry a gunshot on their own and the measurements say why: they are
+      CLIPPED, LIMITED FLAT for up to 96 ms, and very DARK — the handgun take has 34 dB less energy at
+      4 kHz than at 55 Hz, and a gunshot's character lives between 2 and 8 kHz. `RecordedLayerLevel`
+      is down to 0.45 for that reason. Better takes are the fix; see the recording brief.
+
+- [ ] Tune by ear, now that the knobs exist and are named: `Loudness.DynamicRangeCompression` (0.45)
+      is how much of the real 115 dB survives into the mix; `WeaponSynth.BlastWaveLevel` /
+      `NoiseLayerLevel` / `RecordedLayerLevel` are the three layers of a shot;
+      `AudioPhysics.UrbanExcessHighDbPer100M` is how dull distance makes things;
+      `AcousticConstants.OutdoorMaxWetDb` is how loud the street answers.
+- [ ] **Fire weapons from the SERVER.** `WeaponMechanics` is shared and deterministic but nothing calls
+      it outside the spike: no `EquippedWeaponComponent`, no shot message in the protocol, no
+      `HealthComponent` ever decremented. This is the join between the mechanism and the game.
+- [ ] Impact layer per material: `ShotAudition` already computes when and where the strike is heard and
+      `AcousticRegistry` knows 36 surfaces — what is missing is the assets and the emitter.
+- [ ] Glass: assets are in (`GLASS/SHATTER`, `GLASS/TINKLE` 24 one-shots, `GLASS/BED` 30 s for the
+      granular engine). The MECHANIC is not: a pane that is shot out at height should puncture, shower,
+      and then collapse to the ground a `sqrt(2h/g)` fall later — 1.7 s from a fifth floor — with the
+      landing placed at the foot of the building, not at the window. That delayed second sound is the
+      cue that tells a player how high up the shot was.
+- [ ] Casings: the event and the sound exist and the spike plays them, but they are played at the
+      shooter rather than where the case actually lands, and they do not bounce on the material
+      underneath them.
 
 - [x] **`AmbienceId` wired.** Map-level outdoor bed on the manifest, ducked by `ShelterFactor` rather
       than switched off; region-level beds play on top inside their region. Sirens removed from the
@@ -274,6 +913,9 @@ Still outstanding from the audit, and still needing ears rather than a harness:
 
 ### Corrections to the lists above
 - "Server: Implement Inventory/Take/Drop commands" is **not** done — `/inv`, take and drop are absent from
-  `CommandHandler`, so pressing I returns "Command 'inv' not recognized".
-- There is no combat system of any kind: no weapon, damage, projectile or hit-detection code exists, and
-  `HealthComponent` is never modified after spawn.
+  `CommandHandler`, so pressing I returns "Command 'inv' not recognized". `InventoryComponent` exists and
+  holds a list of entity ids; nothing reads or writes it.
+- There is no combat system wired into the GAME yet. As of 2026-09-14 the weapon spec, the mechanism and
+  the ballistics all exist and are tested (`Weapons.cs`, `WeaponMechanics.cs`, `ShotResolver.cs`), and
+  `--battle` drives them end to end — but only from the AudioLab spike. The server still has no equipped
+  weapon, no shot message, and `HealthComponent` is still never modified after spawn.

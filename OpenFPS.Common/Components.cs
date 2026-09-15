@@ -130,6 +130,38 @@ public partial struct SoundEmitterComponent
     public float ConeOutsideVolume { get; set; } = 1.0f;
     public float MinDistance { get; set; } = 3.0f;
 
+    /// <summary>
+    /// Where the sound comes OUT, relative to the entity's origin and in its own frame
+    /// (x right, y up, z forward). Zero — the default — means the origin itself.
+    ///
+    /// The emission point, not the object's position, is what every acoustic question is about: what
+    /// is in the way of the sound, how far it has come, which direction it arrives from. Asking those
+    /// about the origin was worth a whole class of fault. A vehicle's origin is its contact patch on
+    /// the road, so the occlusion probe — a half-metre sphere — sat HALF UNDERGROUND on every level
+    /// stretch of every track, and roughly half its samples reported "blocked" before any wall was
+    /// considered. Six decibels down and forty off the top, permanently, for being a car on a road.
+    ///
+    /// Authored per emitter rather than corrected per case, because the answer is different for every
+    /// object and known for all of them: a tailpipe is a third of a metre up and a metre or two back,
+    /// a chimney is on the roof, a drain is at ground level, a speaker is where it was bolted. A fixed
+    /// height added to everything would be the same mistake pointing the other way.
+    /// </summary>
+    public Vector3 Offset { get; set; }
+
+    /// <summary>
+    /// Replay this sound every N seconds. Zero (the default) means it is not a repeater.
+    ///
+    /// Deliberately a property of ANY emitter rather than of a public-address system: the thing that
+    /// wanted it first was a PA announcing a racetrack, but a repeating one-shot from a fixed point
+    /// is also a foghorn, a station bell, a level-crossing, a dripping tap and a klaxon. Nothing
+    /// about it should know what a racetrack is.
+    ///
+    /// Distinct from LoopOne, which restarts the instant the sample ends and so has no gap. This is
+    /// for a sound with SILENCE around it, where the silence is most of the point — the gap is what
+    /// makes an announcement a landmark you can wait for rather than a drone you stop hearing.
+    /// </summary>
+    public float RepeatIntervalSeconds { get; set; }
+
     // Granular Synthesis
     public bool IsGranular { get; set; }
     public float GranularPosition { get; set; }

@@ -131,6 +131,77 @@ public class WallProximityAndJitterTests
         Assert.True(pos.X > 1.5f, $"sliding along the wall only travelled {pos.X:F2} m in X");
     }
 
+    /// <summary>
+    /// Being MOVED is not walking.
+    ///
+    /// Spawning, a server correction and a teleport all change the player's position without a foot
+    /// touching anything. The stride accumulator cannot tell the difference by itself, so it banked
+    /// them as distance walked: landing on a map, where the predicted and authoritative positions
+    /// reconcile over several frames, produced a burst of footsteps from a player who had not
+    /// touched a key.
+    /// </summary>
+    [Fact]
+    public void ATeleportDoesNotSoundLikeFootsteps()
+    {
+        var state = new LocalPlayerState { IsGrounded = true, CurrentMaterial = "Concrete" };
+        var controller = new LocalPlayerController(state);
+        int steps = 0;
+        controller.OnStepTriggered += (_, _, _) => steps++;
+
+        // Settle where we are.
+        var at = new Vector3(0, 0, 0);
+        for (int i = 0; i < 5; i++) controller.Update(at, Vector3.Zero);
+        Assert.Equal(0, steps);
+
+        // Now get moved a long way, repeatedly, the way a spawn reconciliation does — standing still
+        // throughout, velocity zero.
+        for (int i = 0; i < 20; i++)
+        {
+            at += new Vector3(0, 0, 7f);
+            controller.Update(at, Vector3.Zero);
+            System.Threading.Thread.Sleep(1);
+        }
+
+        Assert.Equal(0, steps);
+    }
+
+    /// <summary>
+    /// The corrections that are too SMALL for the teleport rule to catch — which is what a spawn
+    /// actually looks like.
+    ///
+    /// The distance rule only rejects a jump of more than a metre, and a reconciliation is not one
+    /// jump. Arriving on a map, the predicted position and the server's authoritative one converge
+    /// over many frames in steps of a few centimetres: every one of them under the limit, every one
+    /// of them banked as distance walked, and together far more than a stride. Heard as a handful of
+    /// footsteps on being dropped onto the map from a player who has not touched a key, petering out
+    /// as the reconciliation settles — which is exactly how it was reported.
+    ///
+    /// Velocity is what tells a correction from a stride, and it is the player's OWN velocity: being
+    /// dragged does not move your legs.
+    /// </summary>
+    [Fact]
+    public void ASpawnReconciliationDoesNotSoundLikeFootsteps()
+    {
+        var state = new LocalPlayerState { IsGrounded = true, CurrentMaterial = "Concrete" };
+        var controller = new LocalPlayerController(state);
+        int steps = 0;
+        controller.OnStepTriggered += (_, _, _) => steps++;
+
+        var at = new Vector3(0, 0, 0);
+        for (int i = 0; i < 5; i++) controller.Update(at, Vector3.Zero);
+
+        // Thirty corrections of 30 cm — each one well inside the one-metre "plausible stride" limit,
+        // nine metres in total, and the player standing perfectly still throughout.
+        for (int i = 0; i < 30; i++)
+        {
+            at += new Vector3(0, 0, 0.3f);
+            controller.Update(at, Vector3.Zero);
+            Thread.Sleep(1);
+        }
+
+        Assert.Equal(0, steps);
+    }
+
     [Fact]
     public void AFootstepAccumulatorSeesNoStrideWhileBlocked()
     {

@@ -1,0 +1,20 @@
+{
+  "Id": "pa_speaker",
+  "Name": "Public address speaker",
+  "Description": "A horn on a pole. Says its piece, then waits.",
+  "Material": "Metal",
+  "ColliderSize": { "X": 0.6, "Y": 0.8, "Z": 0.6 },
+  "Type": "Beacon",
+  "MaxHealth": 100,
+  "IsItem": false,
+  "HasEmitter": true,
+  "SoundId": "ANNOUNCE/st_louis_welcome",
+  "Volume": 1.0,
+  "Range": 400,
+  "MinDistance": 12,
+  "Mode": "Single",
+  "RepeatIntervalSeconds": 20,
+  "ConeInsideAngle": 90,
+  "ConeOutsideAngle": 240,
+  "ConeOutsideVolume": 0.35
+}

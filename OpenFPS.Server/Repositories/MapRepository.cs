@@ -57,6 +57,81 @@ public class MapData
     public string AmbienceId { get; set; } = string.Empty;
 
     public List<EntityData> Entities { get; set; } = new();
+
+    /// <summary>Vehicles that drive the map's roads. See VehicleSystem.</summary>
+    public List<VehicleData>? Vehicles { get; set; }
+
+    /// <summary>Closed circuits the map's vehicles can lap. See TrackData.</summary>
+    public List<TrackData>? Tracks { get; set; }
+
+    /// <summary>The map a player lands on when they log in, if no other map claims it. Exactly one
+    /// map should set it; if several do, the first loaded wins and the rest are logged.</summary>
+    public bool IsDefault { get; set; }
+}
+
+/// <summary>
+/// A closed circuit: the centreline, as a loop of points a car follows round and round.
+///
+/// It is deliberately just a polyline. An oval, a road course and a figure of eight are the same
+/// object to the code that drives it, and the shape lives in the map where it can be seen and
+/// changed rather than in a track-generator nobody can read. The points are the CENTRELINE; a
+/// vehicle picks its own line by offsetting sideways from it.
+/// </summary>
+public class TrackData
+{
+    public string Id { get; set; } = string.Empty;
+    /// <summary>Centreline points in order. The loop closes from the last back to the first, so do
+    /// not repeat the first point at the end.</summary>
+    public List<Vector3> Waypoints { get; set; } = new();
+    /// <summary>Surface width, metres. Bounds how far a vehicle may pull off the centreline.</summary>
+    public float WidthMetres { get; set; } = 15f;
+    /// <summary>
+    /// How steeply the turns are banked, degrees. Zero is a flat track.
+    ///
+    /// The racing line needs this and cannot work it out: the waypoints give the centreline's
+    /// elevation, and the bank is the CROSS-slope, which a single line of points does not describe.
+    /// Leaving it at zero on a track whose geometry is banked makes the cars lift for corners they
+    /// could take flat — on the speedway that was three to four semitones of rev drop, twice a lap,
+    /// for every car.
+    /// </summary>
+    public float BankingDegrees { get; set; } = 0f;
+}
+
+/// <summary>A vehicle on a map: which car, which road, how fast on each pass.</summary>
+public class VehicleData
+{
+    public string? Name { get; set; }
+    /// <summary>A VehicleProfile preset key: v8_muscle, i4_economy, diesel_truck, ...</summary>
+    public string Preset { get; set; } = "v8_muscle";
+    public Vector3 RoadStart { get; set; }
+    public Vector3 RoadEnd { get; set; }
+    /// <summary>Speed of each pass in turn, km/h; wraps round. Shuttle mode only.</summary>
+    public float[]? SpeedsKmh { get; set; }
+    public float AccelerationMps2 { get; set; }
+    public float BrakingMps2 { get; set; }
+    /// <summary>How long it idles at each end before setting off. Shuttle mode only.</summary>
+    public float WaitSeconds { get; set; }
+    public float StartDelaySeconds { get; set; }
+
+    // ── Racing: set Track and the vehicle laps that circuit instead of shuttling a road ──────────
+
+    /// <summary>Id of a <see cref="TrackData"/> on this map. When set, RoadStart/RoadEnd are ignored
+    /// and the vehicle laps the circuit continuously.</summary>
+    public string? Track { get; set; }
+    /// <summary>What this car will do on the straight, km/h. Its own limit, not the track's.</summary>
+    public float TopSpeedKmh { get; set; }
+    /// <summary>Lateral grip in g. This is what decides corner speed — v = sqrt(g * 9.81 * R) at the
+    /// local radius — and therefore how much a car has to lift and how hard it gets back on the
+    /// throttle, which is the whole sound of a lap. A road car on a flat bend is 0.9; a stock car on
+    /// a banked oval is nearer 2.8 because the banking carries part of the load; a formula car with
+    /// wings is 4 and up.</summary>
+    public float CorneringG { get; set; }
+    /// <summary>Where on the lap this car starts, metres along from the first waypoint. Spreading a
+    /// field out is the difference between a race and a convoy.</summary>
+    public float StartOffsetMetres { get; set; }
+    /// <summary>The line this car takes, metres to the RIGHT of the centreline (negative is left,
+    /// which on an anticlockwise oval is the inside). Clamped to the track width.</summary>
+    public float LaneOffsetMetres { get; set; }
 }
 public class MapRepository
 {
@@ -78,11 +153,20 @@ public class MapRepository
         Log.Information("MapRepository: Initialized with directory {Path}", _directory);
     }
 
-    public List<MapData> LoadAll()
+    /// <summary>
+    /// How a map file is read. One definition, so anything that loads a map — the server at startup,
+    /// a test, a tool — agrees about trailing commas, comments and how a Vector3 is spelled. Maps are
+    /// hand-edited, and a loader that silently disagrees with the one the server uses is a map that
+    /// passes its test and fails in the game.
+    /// </summary>
+    public static JsonSerializerOptions JsonOptions { get; } = BuildOptions();
+
+    private static JsonSerializerOptions BuildOptions()
     {
-        var maps = new List<MapData>();
-        var options = new JsonSerializerOptions { 
-            Converters = { 
+        var options = new JsonSerializerOptions
+        {
+            Converters =
+            {
                 new JsonStringEnumConverter(JsonNamingPolicy.CamelCase), // Support both CamelCase and exact matches
                 new OpenFPS.Common.Networking.Vector3Converter(),
                 new OpenFPS.Common.Networking.QuaternionConverter()
@@ -91,9 +175,22 @@ public class MapRepository
             AllowTrailingCommas = true,
             ReadCommentHandling = JsonCommentHandling.Skip
         };
-        
         // Add a case-insensitive string-to-enum fallback
         options.Converters.Add(new JsonStringEnumConverter());
+        return options;
+    }
+
+    /// <summary>Reads one map file. Returns null if it does not parse or has no Id.</summary>
+    public static MapData? LoadFromFile(string path)
+    {
+        var data = JsonSerializer.Deserialize<MapData>(File.ReadAllText(path), JsonOptions);
+        return data != null && !string.IsNullOrEmpty(data.Id) ? data : null;
+    }
+
+    public List<MapData> LoadAll()
+    {
+        var maps = new List<MapData>();
+        var options = JsonOptions;
 
         foreach (var file in Directory.GetFiles(_directory, "*.json"))
         {

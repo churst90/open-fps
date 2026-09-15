@@ -18,12 +18,45 @@ public class ClientWorldState
 {
     private readonly ConcurrentDictionary<int, EntityDefinition> _definitions = new();
     private readonly ConcurrentDictionary<int, Transform> _serverTransforms = new();
+
+    /// <summary>The interpolated transform of one entity, if the client has one. Diagnostic and test
+    /// access: the snapshot only carries entities whose definition has arrived, and whether the
+    /// INTERPOLATOR is still moving things is a separate question from that.</summary>
+    public bool TryGetInterpolatedTransform(int entityId, out Transform transform)
+        => _serverTransforms.TryGetValue(entityId, out transform);
     private readonly ConcurrentDictionary<int, Vector3> _serverVelocities = new();
     private readonly ConcurrentDictionary<int, byte> _audioEntityIds = new();
 
     // --- Snapshot Interpolation ---
     private readonly List<ServerStateUpdate> _snapshotBuffer = new();
     private const double InterpolationDelay = 0.1; // 100ms buffer
+
+    /// <summary>
+    /// How many server snapshots of history to keep.
+    ///
+    /// Ten was 333 ms at the 30 Hz tick, and playback sits 100 ms behind the newest — so there were
+    /// 233 ms of margin before the snapshot the interpolator is reading FROM got pruned out from
+    /// under it. When that happens no bracketing pair exists and every entity in the world simply
+    /// holds its position until one does, with no correction and nothing in the log. Heard from the
+    /// grandstand as some of the cars stopping in front of you for about a second and then carrying
+    /// on — "some" because a frozen car straight in front changes bearing enormously and a frozen
+    /// one on the far side of the track does not.
+    ///
+    /// Thirty is a full second of history. It is a list of references; the cost is nothing.
+    /// </summary>
+    private const int SnapshotHistory = 30;
+
+    /// <summary>Past this far out of step, the playback clock is snapped rather than eased — the
+    /// stream stopped and restarted, and one jump beats seconds of a world that does not move.</summary>
+    private const double MaxDriftBeforeSnap = 0.5;
+
+    /// <summary>Times the playback clock has run outside the buffer. Diagnostic — it should be 0.</summary>
+    public int InterpolationStalls => _interpolationStalls;
+    private int _interpolationStalls;
+
+    /// <summary>When the interpolated transforms were last advanced, seconds on
+    /// <see cref="OpenFPS.Common.AudioClock"/>. Copied into every snapshot built from them.</summary>
+    private double _positionsSampledAt;
     private double _clientInterpolationTime = 0;
     
     private readonly object _gridLock = new();
@@ -197,12 +230,42 @@ public class ClientWorldState
         return removed;
     }
 
+    /// <summary>
+    /// Takes one world-state packet into the interpolation buffer, MERGING it with any packet
+    /// already held for the same tick.
+    ///
+    /// A tick's world state is not always one packet. LiteNetLib will not fragment an unreliable
+    /// send, so past the peer's limit the server splits a tick across several packets that all carry
+    /// the same Tick — see NetworkService.SendStateUpdate. Filing those as separate snapshots would
+    /// be worse than the problem it solves: the interpolator brackets the playback time between two
+    /// buffered snapshots and divides by the time between them, so two entries with the SAME tick is
+    /// a zero denominator, and each of them holds only half the world anyway.
+    ///
+    /// Merging by entity id rather than appending, so a retransmitted or duplicated state replaces
+    /// rather than doubling.
+    /// </summary>
     public void SyncState(ServerStateUpdate update)
     {
         lock (_snapshotBuffer)
         {
+            ServerStateUpdate? existing = null;
+            for (int i = _snapshotBuffer.Count - 1; i >= 0; i--)
+                if (_snapshotBuffer[i].Tick == update.Tick) { existing = _snapshotBuffer[i]; break; }
+
+            if (existing != null)
+            {
+                foreach (var st in update.States)
+                {
+                    int at = existing.States.FindIndex(e => e.EntityId == st.EntityId);
+                    if (at >= 0) existing.States[at] = st;
+                    else existing.States.Add(st);
+                }
+                existing.LastProcessedSequenceId = Math.Max(existing.LastProcessedSequenceId, update.LastProcessedSequenceId);
+                return;
+            }
+
             _snapshotBuffer.Add(update);
-            if (_snapshotBuffer.Count > 10) _snapshotBuffer.RemoveAt(0); // Prune old history
+            while (_snapshotBuffer.Count > SnapshotHistory) _snapshotBuffer.RemoveAt(0); // Prune old history
             _snapshotBuffer.Sort((a, b) => a.Tick.CompareTo(b.Tick));
         }
     }
@@ -221,9 +284,39 @@ public class ClientWorldState
             // 1. Determine the 'Playback Time' (current server tick we want to show)
             // We lag behind the latest received tick by InterpolationDelay seconds.
             double latestServerTime = _snapshotBuffer.Last().Tick * PhysicsConstants.FixedDeltaTime;
-            if (_clientInterpolationTime == 0) _clientInterpolationTime = latestServerTime - InterpolationDelay;
-            
-            _clientInterpolationTime += dt;
+            double oldestServerTime = _snapshotBuffer[0].Tick * PhysicsConstants.FixedDeltaTime;
+            double target = latestServerTime - InterpolationDelay;
+            if (_clientInterpolationTime == 0) _clientInterpolationTime = target;
+
+            // ── Keep the playback clock ON the server's clock ────────────────────────────────
+            //
+            // It used to be set once and then advanced by the CLIENT's own dt for ever, which makes
+            // it an independent clock: two crystals, two frame-rate regimes, no correction anywhere.
+            // They drift, and when the drift exceeds the buffer the bracket search below finds no
+            // pair, every entity freezes where it stands, and nothing says so. Minutes in, that is
+            // what "some of the cars stop in front of me, then keep going" was.
+            //
+            // Corrected by RATE, not by jumping: playback runs up to 10 % fast or slow to close the
+            // gap. Setting the time directly would move every entity in the world at once, which is
+            // the very artefact this is here to avoid. A gap too big for that to fix in reasonable
+            // time is not drift, it is a stall — a stream that stopped and restarted — and there one
+            // jump now beats several seconds of a frozen world.
+            double error = target - _clientInterpolationTime;
+            if (Math.Abs(error) > MaxDriftBeforeSnap)
+            {
+                _clientInterpolationTime = target;
+                _interpolationStalls++;
+                Serilog.Log.Debug("Interpolation clock resynchronised: {Error:F2} s out, {Count} snapshot(s) buffered.",
+                                  error, _snapshotBuffer.Count);
+            }
+            else
+            {
+                _clientInterpolationTime += dt * Math.Clamp(1.0 + error * 2.0, 0.9, 1.1);
+            }
+
+            // And never outside what the buffer can actually serve, whatever the arithmetic above did.
+            if (_clientInterpolationTime > latestServerTime) _clientInterpolationTime = latestServerTime;
+            if (_clientInterpolationTime < oldestServerTime) _clientInterpolationTime = oldestServerTime;
 
             // 2. Find the two snapshots that bracket our playback time
             ServerStateUpdate? from = null;
@@ -284,7 +377,15 @@ public class ClientWorldState
         // Only a frame that actually moved something invalidates the snapshot. A frame that found no
         // bracketing pair changed nothing, and rebuilding a copy of an unchanged world is the exact cost
         // this cache exists to remove.
-        if (moved) Touch();
+        //
+        // The stamp goes on at the same moment, and only when something moved, because it is an answer
+        // to "how old is this position" and a frame that produced no new position did not make the old
+        // one any younger. Everything downstream — dead reckoning most of all — measures from here.
+        if (moved)
+        {
+            _positionsSampledAt = OpenFPS.Common.AudioClock.Now;
+            Touch();
+        }
     }
 
     public void SyncState(IEnumerable<EntityState> states)
@@ -294,6 +395,7 @@ public class ClientWorldState
             _serverTransforms[s.EntityId] = s.Transform.ToTransform();
             _serverVelocities[s.EntityId] = s.LinearVelocity;
         }
+        _positionsSampledAt = OpenFPS.Common.AudioClock.Now;
         Touch();
     }
 
@@ -341,7 +443,8 @@ public class ClientWorldState
         var snap = new WorldSnapshot
         {
             StaticGrid = gridCopy,
-            AcousticMap = AcousticMap
+            AcousticMap = AcousticMap,
+            PositionsSampledAt = _positionsSampledAt
         };
 
         lock (_envLock)

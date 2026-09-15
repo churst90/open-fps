@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 using OpenFPS.Common;
+using OpenFPS.Client.AudioEngine.Core;
 using OpenFPS.Common.Components;
 using OpenFPS.Client.Core;
 using OpenFPS.Client.AudioEngine.Data;
@@ -300,20 +301,13 @@ public class SpatialAcoustics
             }
         }
 
-        // An absent or zero multiplier means "no scaling", not "scale by a tenth". The old
-        // Math.Max(0.1f, ...) turned an unset field — which is exactly what the server was sending —
-        // into a TEN-FOLD increase in the absorption distance, i.e. air absorption switched off.
-        float airAbsMultiplier = world.AirAbsorptionMultiplier > 0.01f ? world.AirAbsorptionMultiplier : 1.0f;
-        // Normalize air pressure to standard atmosphere (1013.25 mbar).
-        // High altitude (low pressure) → sound scatters more → shorter effective absorption distance.
-        float pressureNorm = Math.Clamp(world.AirPressure / 1013.25f, 0.5f, 2.0f);
-        float effectiveAbsorbDist = Math.Max(50.0f,
-            (AcousticConstants.AirAbsorptionReferenceDist - (world.Humidity * 100f) + (Math.Max(0, 20f - world.Temperature) * 2f))
-            / airAbsMultiplier
-            * pressureNorm);
-        
-        if (GetRegionAt(world, listenerPos) != AcousticConstants.GlobalRegionId) effectiveAbsorbDist *= 2.0f;
-        float airAbsorption = Math.Clamp((finalEffectiveDist - AcousticConstants.AirAbsorptionMinDist) / effectiveAbsorbDist, 0.0f, AcousticConstants.AirAbsorptionMaxMuffle);
+        // One law, in AudioPhysics, so the hand-rolled tracer and the Steam Audio path cannot drift.
+        // (The absent-multiplier trap is handled in there: an unset field means "no scaling", and the
+        // old Math.Max(0.1f, ...) turned it into a TEN-FOLD increase in the absorption distance.)
+        float airAbsorption = AudioPhysics.AirAbsorptionFor(
+            finalEffectiveDist, world.Humidity, world.Temperature, world.AirPressure,
+            world.AirAbsorptionMultiplier,
+            listenerIndoors: GetRegionAt(world, listenerPos) != AcousticConstants.GlobalRegionId);
 
         int regionId = GetRegionAt(world, sourcePos + new Vector3(0, 0.5f, 0));
         float roomGain = 1.0f;

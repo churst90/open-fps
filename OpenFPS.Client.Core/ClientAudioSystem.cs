@@ -10,6 +10,7 @@ using OpenFPS.Common.Components;
 using OpenFPS.Client.AudioEngine.Core;
 using OpenFPS.Client.AudioEngine.Data;
 using OpenFPS.Client.AudioEngine.Acoustics;
+using Serilog;
 
 namespace OpenFPS.Client.Core;
 
@@ -42,6 +43,27 @@ public class ClientAudioSystem
     private AcousticMap? _lastAcousticMap;
     private int _frameCount = 0;
 
+    /// <summary>The walls answering the live engines. See EngineReflections.</summary>
+    private readonly EngineReflections _engineEchoes = new();
+    private readonly List<(int Id, float Key, float D2)> _engineDistances = new();
+    private double _lastEngineTime;
+
+    /// <summary>
+    /// How much nearer a silent car has to be than a sounding one before it takes its voice.
+    ///
+    /// Pure ranking by distance churns: on an oval, two cars swap order several times a lap, and
+    /// every swap stops one engine and starts another — which is not a cross-fade, it is a synthesis
+    /// thrown away and restarted with cold pipes and a stopped crank. It was audible as a car
+    /// stuttering in and out. Ranking a car that is already sounding as if it were a quarter nearer
+    /// than it is makes it keep its voice until the challenger is decisively closer.
+    /// </summary>
+    private const float EngineKeepBias = 0.75f;
+
+    /// <summary>And no engine is dropped within this long of being started, whatever the ranking
+    /// says, so a car that crosses the boundary at three hundred kilometres an hour cannot be
+    /// started and stopped inside the same second.</summary>
+    private const double EngineMinimumHoldSeconds = 2.5;
+
     /// <summary>
     /// The audio update is capped here rather than in each head's game loop, so both are capped by the same
     /// rule. The loop it hangs off polls the network as fast as it can — a 5 ms sleep, so roughly 200 Hz —
@@ -51,6 +73,118 @@ public class ClientAudioSystem
     /// the thread that has to service the socket.
     /// </summary>
     public const double UpdateHz = 60.0;
+    /// <summary>
+    /// What a loud exhaust measures at one metre under load — the fallback for a vehicle that does
+    /// not declare its own level.
+    ///
+    /// Every preset does declare one (<c>VehicleProfile.SourceLevelDb</c>, measured with
+    /// `--engine-levels`), and they run from 91 dB for a diesel pickup to 133 for an unsilenced V10.
+    /// Placing all of them at this one number put the race cars forty decibels of dynamic range out
+    /// and, worse, was also being used as the synthesis's clipping reference.
+    /// </summary>
+    public const float EngineSourceLevelDb = 116f;
+
+    /// <summary>
+    /// How many vehicles may run a LIVE engine at once.
+    ///
+    /// Every one of them is a whole engine — cylinders, valves, waveguides — integrated sample by
+    /// sample inside the FMOD mixer callback, and measured (`--engine-cost`) a V8 renders about nine
+    /// seconds of audio per second of one core in a release build. Four is therefore already about
+    /// half a core, and the mixer callback still has HRTF, reverb and every other voice to do in the
+    /// same deadline. A field of cars can be any size it likes on the server; the nearest few are
+    /// the ones a listener can pick out anyway, and the rest are the ones the wind takes.
+    ///
+    /// Overridable with OPENFPS_ENGINE_VOICES for anyone with a machine to spend.
+    /// </summary>
+    public static readonly int EngineVoiceBudget =
+        int.TryParse(Environment.GetEnvironmentVariable("OPENFPS_ENGINE_VOICES"), out int budget) && budget > 0
+            ? budget : 32;
+
+    /// <summary>
+    /// The budget actually in force, which follows the MEASURED mixer load rather than a guess.
+    ///
+    /// A fixed number cannot be right. What one engine costs depends on the engine, and what is left
+    /// over depends on everything else in the map — reverb, reflections, footsteps, however many
+    /// sources a map nobody has seen yet decides to carry. Four engines measured half a core on the
+    /// bench and pegged the mixer at a hundred per cent in the game, because the game also had all of
+    /// that. And a mixer at a hundred per cent does not sound busy, it sounds broken: the callback
+    /// misses its deadline and the output tears, which is heard as crackling and is easy to mistake
+    /// for distortion.
+    ///
+    /// So the budget is a control loop, and it gives things up IN ORDER. Reflections first — a car's
+    /// second reflection, then its first — and only then a car. That order is not a detail: shedding
+    /// cars first made the field sound like voices being swapped, because a car arriving pushed out
+    /// one that had not finished going past, and then the one that left came back. A listener notices
+    /// a car vanishing and does not notice a wall stopping answering.
+    ///
+    /// The floor is two cars, not one. One engine on a racetrack is not a race.
+    /// </summary>
+    private int _adaptiveBudget = EngineVoiceBudget;
+    private int _adaptiveEchoes = EngineReflections.MaxEchoesPerEngine;
+    private double _lastBudgetChange;
+
+    /// <summary>However short the mixer runs, this many cars are fully SYNTHESIZED.</summary>
+    private const int MinEngineVoices = 2;
+
+    /// <summary>Which source each distant voice is currently bound to, so a change can rebind it.</summary>
+    private readonly Dictionary<int, int> _distantBoundTo = new();
+
+    /// <summary>Distant car voices live in their own id band.</summary>
+    private const int DistantVoiceBase = -700000;
+
+    /// <summary>How many engines may be BUILT in one audio update. See ChooseLiveEngines.</summary>
+    private const int NewEnginesPerUpdate = 2;
+
+    /// <summary>
+    /// How many borrowed voices may sound at once, beyond the synthesized ones.
+    ///
+    /// Borrowing makes a car cheap; it does not make it free. The engine is not run, but the voice is
+    /// still placed — HRTF, filtering, a channel — so thirty of them is thirty spatialised sources
+    /// and the saving is thrown away again. This is the second budget, and it is what actually lets a
+    /// map carry any number of cars: the field can be thirty or three hundred, a few are synthesized,
+    /// the nearest handful of the rest are voiced, and everything beyond that is genuinely too far
+    /// away to pick out of the pack.
+    /// </summary>
+    private int _adaptiveDistant = MaxDistantVoices;
+    private const int MaxDistantVoices = 12;
+    private const int MinDistantVoices = 4;
+
+    /// <summary>Which cars currently hold a borrowed voice, so the rest can be let go.</summary>
+    private readonly HashSet<int> _distantVoiced = new();
+
+    /// <summary>Past this the callback is close enough to its deadline to start shedding work.</summary>
+    private const float MixerLoadCeiling = 0.70f;
+    /// <summary>And under this there is room to take a voice back.</summary>
+    private const float MixerLoadFloor = 0.45f;
+    private const double BudgetSettleSeconds = 1.0;
+
+    /// <summary>
+    /// How long after a map load the budget is left alone, and how long the mixer must stay over the
+    /// ceiling before anything is given up.
+    ///
+    /// The control loop steers on FMOD's dsp percentage, and during a load that reading is a LIE. It
+    /// pins at a hundred per cent while the mixer thread is stalled — by a GC suspension, by a
+    /// producer it was waiting on — and a stall is not a mixer that is short of capacity, it is a
+    /// mixer that is not running. The loop could not tell the difference: it shed echoes, then
+    /// borrowed voices, then cars, and a second later, the stall over and the load back to normal,
+    /// it added them all back. Every re-added engine is a NEW voice — a new synth, a tenth of a
+    /// second of warm-up, a quarter of a second of fill, an FMOD graph rebuild — so the loop's
+    /// response to a busy machine was to make more work for it, at the worst possible moment, and it
+    /// was heard as cars appearing and vanishing on the first lap.
+    ///
+    /// So: nothing is given up for the first few seconds in a map, and after that the ceiling has to
+    /// be exceeded for three quarters of a second together, not in one sample.
+    /// </summary>
+    private const double BudgetHoldSeconds = 3.0;
+    private const double OverCeilingSeconds = 0.75;
+    private double _budgetHeldUntil;
+    private double _overCeilingSince = -1;
+
+    /// <summary>
+    /// Called when a map starts loading and again when the player is spawned into it. See
+    /// BudgetHoldSeconds: for the next few seconds the mixer's load reading cannot be trusted.
+    /// </summary>
+    public void NoteSceneLoading() => _budgetHeldUntil = _clock.Elapsed.TotalSeconds + BudgetHoldSeconds;
     private readonly UpdateThrottle _throttle = new(UpdateHz);
     private readonly System.Diagnostics.Stopwatch _clock = System.Diagnostics.Stopwatch.StartNew();
 
@@ -92,6 +226,12 @@ public class ClientAudioSystem
     public void ForgetEntity(int entityId)
     {
         _audio.StopSound(entityId);
+        _liveEngines.Remove(entityId);
+        _engineStarted.Remove(entityId);
+        _engineRetiring.Remove(entityId);
+        _engineEchoes.Forget(entityId, _audio);
+        int distant = DistantVoiceBase - Math.Abs(entityId);
+        if (_distantBoundTo.Remove(distant)) _audio.StopSound(distant);
         _audio.StopSound(-10000 - entityId); // floor reflection
         _audio.StopSound(-5000 - entityId);  // wall reflection
         // Discrete ray-traced reflections hash into a 100-wide band per entity (see the -30000 scheme
@@ -112,6 +252,28 @@ public class ClientAudioSystem
         if (!_throttle.ShouldRun(_clock.Elapsed.TotalSeconds)) return;
 
         using var _perf = PerfProbe.Measure("audio.update");
+
+        // ── How long every source's position went unrefreshed ────────────────────────────────
+        //
+        // This is the only place an emitter's position is resubmitted. Between two runs of it, every
+        // sound in the world is placed where it was when the last one finished — so the gap between
+        // these calls IS the length of time a car's engine sits still in the air while the car keeps
+        // driving. It is not the audio thread (which holds 240 Hz and only re-reads what it was last
+        // given) and it is not the interpolator (which had already moved the car); it is this, and
+        // nothing was measuring it.
+        //
+        // Thirty cars is roughly four times the per-source work of eight — acoustic paths, occlusion,
+        // reflections, emitter submission — all of it inside one game-loop iteration.
+        double nowSec = _clock.Elapsed.TotalSeconds;
+        if (_lastUpdateAt > 0)
+        {
+            double gapMs = (nowSec - _lastUpdateAt) * 1000.0;
+            if (gapMs > _worstGapMs) _worstGapMs = gapMs;
+        }
+        _lastUpdateAt = nowSec;
+        long startTicks = System.Diagnostics.Stopwatch.GetTimestamp();
+        try
+        {
 
         _frameCount++;
         // Keep the PREVIOUS snapshot to compare against: assigning first and then comparing `world` with
@@ -209,10 +371,19 @@ public class ClientAudioSystem
                 continue; 
             }
 
+            // ── Ask about the point the sound comes OUT of ───────────────────────────────────
+            //
+            // Not the entity's origin. The voice has always been placed at the emission point; the
+            // occlusion probe was left behind at the origin, so the engine was answering "what can be
+            // heard from here" about a place nothing was radiating from. For anything that drives,
+            // that origin is its contact patch on the ground and the probe sphere was half buried —
+            // about half the samples reporting blocked on open road, before any wall was considered.
             Vector3 sourcePos;
+            float sourceRadius = OpenFPS.Common.AudioEmission.DefaultOcclusionRadius;
             if (world.Entities.TryGetValue(id, out var snap))
             {
-                sourcePos = snap.Transform.Position;
+                sourcePos = OpenFPS.Common.AudioEmission.PointFor(snap);
+                sourceRadius = OpenFPS.Common.AudioEmission.OcclusionRadiusFor(snap);
             }
             else
             {
@@ -238,6 +409,7 @@ public class ClientAudioSystem
                     EntityId = id,
                     ListenerPos = visualEyePos,
                     SourcePos = sourcePos,
+                    SourceRadius = sourceRadius,
                     IsImportant = isImportant
                 });
             }
@@ -292,19 +464,44 @@ public class ClientAudioSystem
             }
         }
 
+        // 5.5. Decide which vehicles get a live engine: the nearest EngineVoiceBudget of them.
+        //
+        // Done here, once, rather than inside the per-entity pass, because it is a decision ABOUT the
+        // set: the eighth-nearest car cannot know it is eighth. A car that loses its slot has its
+        // engine and its echoes stopped, which is a real cut rather than a fade — but it only ever
+        // happens to whichever car is furthest away and being drowned by three nearer ones.
+        ChooseLiveEngines(world, visualEyePos);
+        _engineEchoes.EchoesPerEngine = _adaptiveEchoes;
+        _engineEchoes.SyncGeometry(world);
+        float engineDt = (float)Math.Max(1e-3, _clock.Elapsed.TotalSeconds - _lastEngineTime);
+        _lastEngineTime = _clock.Elapsed.TotalSeconds;
+
         // 6. Process persistent audio emitters attached to world entities (NPCs, Beacons, Machines)
         foreach (var entityId in world.AudioEntityIds)
         {
             if (entityId == OwnEntityId) continue;
             if (world.Entities.TryGetValue(entityId, out var snap))
             {
-                ProcessAudioEmitter(world, snap, visualEyePos);
+                ProcessAudioEmitter(world, snap, visualEyePos, engineDt);
             }
         }
 
+        // Every source has now been offered to the reflection system; it can work out what the
+        // next frame will demand of a reflection to be worth a voice.
+        _engineEchoes.EndFrame();
+
         // 7. Execute the audio engine tick (mixing, DSP updates)
         _audio.Update();
+        }
+        finally
+        {
+            double ms = (System.Diagnostics.Stopwatch.GetTimestamp() - startTicks) * 1000.0
+                      / System.Diagnostics.Stopwatch.Frequency;
+            if (ms > _worstUpdateMs) _worstUpdateMs = ms;
+        }
     }
+
+    private double _lastUpdateAt, _worstGapMs, _worstUpdateMs;
 
     private void UpdateAcousticState(WorldSnapshot world, Vector3 eyePos, int regId)
     {
@@ -334,8 +531,280 @@ public class ClientAudioSystem
             _state.IsIndoor = false;
         }
     }
-    private void ProcessAudioEmitter(WorldSnapshot world, EntitySnapshot snap, Vector3 eyePos)
+    /// <summary>
+    /// Decides which cars get their own engine, and which borrow one.
+    ///
+    /// Every car in earshot gets its OWN engine now, because the engines no longer run inside the
+    /// mixer callback — a worker pool renders them ahead across all the machine's cores (see
+    /// EngineRenderPool). What used to be the hard constraint, one thread integrating every engine in
+    /// the world one after another before a deadline, is gone, and with it the reason cars had to be
+    /// rationed, borrowed, handed over between voices, or dropped.
+    ///
+    /// The budget survives only as a SAFETY NET. It follows measured mixer load, and what it protects
+    /// against now is not the synthesis but the placement: thirty cars is still thirty spatialised
+    /// voices with HRTF and filtering, and that cost is the mixer's. If it ever runs short the order
+    /// of sacrifice is reflections, then borrowed voices, then engines — never the cars first.
+    /// </summary>
+    private void ChooseLiveEngines(WorldSnapshot world, Vector3 eyePos)
     {
+        double now = _clock.Elapsed.TotalSeconds;
+
+        float load = _audio.MixerLoad;
+        if (load > MixerLoadCeiling) { if (_overCeilingSince < 0) _overCeilingSince = now; }
+        else _overCeilingSince = -1;
+
+        if (load > 0f && now >= _budgetHeldUntil && now - _lastBudgetChange >= BudgetSettleSeconds)
+        {
+            if (load > MixerLoadCeiling && now - _overCeilingSince >= OverCeilingSeconds)
+            {
+                if (_adaptiveEchoes > 0) _adaptiveEchoes--;
+                else if (_adaptiveDistant > MinDistantVoices) _adaptiveDistant--;
+                else if (_adaptiveBudget > MinEngineVoices) _adaptiveBudget--;
+                else goto settled;
+                _lastBudgetChange = now;
+                Log.Information("Audio: mixer at {Load:P0}; {Cars} engine(s), {Distant} borrowed, {Echoes} reflection(s) each.",
+                                load, _adaptiveBudget, _adaptiveDistant, _adaptiveEchoes);
+            }
+            else if (load < MixerLoadFloor)
+            {
+                if (_adaptiveBudget < EngineVoiceBudget) _adaptiveBudget++;
+                else if (_adaptiveDistant < MaxDistantVoices) _adaptiveDistant++;
+                else if (_adaptiveEchoes < EngineReflections.MaxEchoesPerEngine) _adaptiveEchoes++;
+                else goto settled;
+                _lastBudgetChange = now;
+                Log.Information("Audio: mixer at {Load:P0}; {Cars} engine(s), {Distant} borrowed, {Echoes} reflection(s) each.",
+                                load, _adaptiveBudget, _adaptiveDistant, _adaptiveEchoes);
+            }
+            settled: ;
+        }
+
+        _engineDistances.Clear();
+        _carPreset.Clear();
+        foreach (var entityId in world.AudioEntityIds)
+        {
+            if (entityId == OwnEntityId) continue;
+            if (!world.Entities.TryGetValue(entityId, out var snap)) continue;
+            var em = snap.Definition.SoundEmitter;
+            if (!em.IsSynth || em.SoundId == null) continue;
+            if (!em.SoundId.StartsWith("engine:", StringComparison.OrdinalIgnoreCase)) continue;
+            string preset = em.SoundId[7..];
+            if (!OpenFPS.Common.VehicleProfile.Presets.ContainsKey(preset)) continue;
+            _carPreset[entityId] = preset;
+
+            float d2 = Vector3.DistanceSquared(snap.Transform.Position, eyePos);
+            // A car that already has an engine keeps it unless a silent one is decisively nearer;
+            // and one that has only just been given an engine is not taken off it at once. Both stop
+            // the set churning as cars trade places, which on a full grid happens constantly.
+            float key = _liveEngines.Contains(entityId) ? d2 * (EngineKeepBias * EngineKeepBias) : d2;
+            if (_engineStarted.TryGetValue(entityId, out double began) && now - began < EngineMinimumHoldSeconds)
+                key = -1f;
+            _engineDistances.Add((entityId, key, d2));
+        }
+        _engineDistances.Sort((a, b) => a.Key.CompareTo(b.Key));
+
+        int keep = Math.Min(_adaptiveBudget, _engineDistances.Count);
+
+        // Cars that have lost their engine fade it out rather than being cut mid-waveform.
+        foreach (int id in _liveEngines)
+        {
+            bool survives = false;
+            for (int i = 0; i < keep; i++) if (_engineDistances[i].Id == id) { survives = true; break; }
+            if (survives) continue;
+            _engineEchoes.Forget(id, _audio);
+            _engineStarted.Remove(id);
+            if (!_engineRetiring.Contains(id)) _engineRetiring.Add(id);
+        }
+        for (int i = _engineRetiring.Count - 1; i >= 0; i--)
+        {
+            int id = _engineRetiring[i];
+            bool wanted = false;
+            for (int k = 0; k < keep; k++) if (_engineDistances[k].Id == id) { wanted = true; break; }
+            if (wanted) { _engineRetiring.RemoveAt(i); continue; }
+            if (_audio.FadeOutEngine(id)) { _audio.StopSound(id); _engineRetiring.RemoveAt(i); }
+        }
+
+        // New engines are let in a FEW AT A TIME.
+        //
+        // Building one is not free — a cylinder set, waveguides for every pipe, buffers for all of
+        // it — and a map load presents thirty cars in the same instant. Thirty constructions at once
+        // is an allocation spike on the thread that also services the mixer's queues, at the exact
+        // moment the scene, the geometry and the sample banks are all loading too, and it was heard
+        // as dropouts for the first second or two. Spread over a few frames it is inaudible: a car
+        // that arrives a sixteenth of a second late is a car that arrived.
+        int admitted = 0;
+        _liveEngines.Clear();
+        _engineSourceByPreset.Clear();
+        for (int i = 0; i < keep; i++)
+        {
+            int id = _engineDistances[i].Id;
+            if (!_engineStarted.ContainsKey(id))
+            {
+                if (admitted >= NewEnginesPerUpdate) continue;
+                admitted++;
+            }
+            _liveEngines.Add(id);
+            // Whatever happened to it before, a car that holds a slot is audible. Cheap and
+            // idempotent, and the only place that can undo a fade that was started and abandoned.
+            _audio.ReviveEngine(id);
+            if (!_engineStarted.ContainsKey(id)) _engineStarted[id] = now;
+            _engineSourceByPreset.TryAdd(_carPreset[id], id);
+            // Anything that has just earned a real engine gives its borrowed voice back.
+            int lent = DistantVoiceBase - Math.Abs(id);
+            if (_distantBoundTo.Remove(lent)) _audio.StopSound(lent);
+        }
+
+        // Whatever is left over, nearest first, borrows — a fallback now rather than the normal case.
+        _distantVoiced.Clear();
+        for (int i = keep; i < _engineDistances.Count && i < keep + _adaptiveDistant; i++)
+            _distantVoiced.Add(_engineDistances[i].Id);
+
+        foreach (int voiceId in new List<int>(_distantBoundTo.Keys))
+        {
+            bool wanted = false;
+            foreach (int car in _distantVoiced) if (DistantVoiceBase - Math.Abs(car) == voiceId) { wanted = true; break; }
+            if (wanted) continue;
+            _audio.StopSound(voiceId);
+            _distantBoundTo.Remove(voiceId);
+        }
+
+        // A census, every five seconds. "Are there really thirty cars out there?" is not a question
+        // anybody should have to answer by counting engines with their ears, and the number that
+        // matters is not the map's — it is how many of the map's cars this machine is currently
+        // SYNTHESIZING, how many are borrowing a voice, and how many are past both budgets and
+        // therefore genuinely silent.
+        if (now - _lastCensus >= 5.0)
+        {
+            _lastCensus = now;
+            int cars = _engineDistances.Count;
+            // The list is sorted by the KEEP-BIASED key, not by distance, so [0] is not necessarily
+            // the nearest car. Ask the distances.
+            float nearestD2 = float.MaxValue;
+            foreach (var e in _engineDistances) if (e.D2 < nearestD2) nearestD2 = e.D2;
+            float nearest = cars > 0 ? MathF.Sqrt(nearestD2) : 0f;
+            Log.Information("Cars: {Cars} on the map — {Live} synthesized, {Borrowed} borrowed, {Silent} out of budget; "
+                          + "nearest {Nearest:F0} m; {Echoes} reflection(s) per engine.",
+                            cars, _liveEngines.Count, _distantVoiced.Count,
+                            Math.Max(0, cars - _liveEngines.Count - _distantVoiced.Count),
+                            nearest, _adaptiveEchoes);
+            Log.Information("  {Voices} reflection voice(s) of a {Budget} budget, floor {Floor:G3}.",
+                            _engineEchoes.VoiceCount, _engineEchoes.MaxReflectionVoices, _engineEchoes.AudibilityFloor);
+
+            // The worst that every source in the world stood still for. Target is one 60 Hz period,
+            // 17 ms; anything over about 100 ms is long enough to hear a car passing in front of you
+            // stop dead and then carry on, which is precisely what it was reported as.
+            if (_worstGapMs > 100)
+                Log.Warning("Audio placement stalled: every source held its position for up to {Gap:F0} ms "
+                          + "in the last 5 s (the pass itself took at most {Work:F0} ms). A car in front of you "
+                          + "stops for that long.", _worstGapMs, _worstUpdateMs);
+            else
+                Log.Information("Audio placement: worst gap {Gap:F0} ms between position refreshes, "
+                              + "worst pass {Work:F0} ms.", _worstGapMs, _worstUpdateMs);
+            _worstGapMs = 0; _worstUpdateMs = 0;
+
+            // And what the three nearest engines are actually DOING, which is the only way to tell
+            // apart the four things that sound identical from a chair: the cars really are slowing
+            // (an oval makes them lift twice a lap), the world is reporting a speed that is too low,
+            // the virtual driver is not holding the speed it was given, or it is shifting up. If
+            // "told" is steady and "own" or "rpm" sags, the fault is in the synthesis; if "told"
+            // itself falls, the car is genuinely slowing and the audio is right.
+            _censusOrder.Clear();
+            foreach (var e in _engineDistances) if (_liveEngines.Contains(e.Id)) _censusOrder.Add((e.D2, e.Id));
+            _censusOrder.Sort(static (x, y) => x.D2.CompareTo(y.D2));
+            for (int i = 0; i < Math.Min(3, _censusOrder.Count); i++)
+            {
+                int id = _censusOrder[i].Id;
+                if (!_audio.TryGetEngineTelemetry(id, out float told, out float own, out float rpm, out int gear)) continue;
+                Log.Information("  car {Id} ({Preset}) at {Dist:F0} m: told {Told:F0} km/h, driveline {Own:F0} km/h, {Rpm:F0} rpm, gear {Gear}",
+                                id, _carPreset.GetValueOrDefault(id, "?"), MathF.Sqrt(_censusOrder[i].D2),
+                                told * 3.6f, own * 3.6f, rpm, gear);
+            }
+        }
+    }
+
+    private double _lastCensus;
+    private readonly List<(float D2, int Id)> _censusOrder = new();
+
+    /// <summary>When each repeating emitter is next due to speak. See RepeatIntervalSeconds.</summary>
+    private readonly Dictionary<int, double> _repeatDue = new();
+
+
+    private readonly Dictionary<int, string> _carPreset = new();
+    private readonly Dictionary<string, int> _engineSourceByPreset = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<int> _liveEngines = new();
+    private readonly Dictionary<int, double> _engineStarted = new();
+    private readonly List<int> _engineRetiring = new();
+
+    /// <summary>
+    /// A car too far away to be worth its own engine, voiced by BORROWING one that is near.
+    ///
+    /// This is what stops the number of cars a map may carry from being decided by the mixer. A full
+    /// engine is cylinders, valves and waveguides integrated per sample — about a tenth of a core —
+    /// so simulating fifty of them is five cores, and the answer is not a bigger machine. It is that
+    /// past a certain distance nobody can tell one engine from another of the same kind: what reaches
+    /// you is the pack.
+    ///
+    /// So a distant car reads the ring buffer of the NEAREST car of its own preset, at a fixed offset
+    /// of its own, and is placed at its own position with its own velocity. It costs a buffer read
+    /// and an HRTF, not an engine. Its revs are the lead car's rather than its own, which at two
+    /// hundred metres is a difference no listener has ever been able to name — and it means the
+    /// field keeps circulating instead of cars dropping out of the world as they go round the back.
+    ///
+    /// The offset per car matters: without it, every borrowed voice would be the same waveform at the
+    /// same instant and they would sum coherently into one loud car rather than spreading into traffic.
+    /// </summary>
+    private void DistantEngine(EntitySnapshot snap, OpenFPS.Common.Networking.EntityDefinition def, string preset, Vector3 eyePos, double sampledAt)
+    {
+        if (!_distantVoiced.Contains(snap.Id)) return;
+        if (!_engineSourceByPreset.TryGetValue(preset, out int sourceId)) return;
+        if (sourceId == snap.Id) return;
+
+        int voiceId = DistantVoiceBase - Math.Abs(snap.Id);
+
+        // Rebind if the car it was borrowing from has itself gone: the ring buffer it was reading no
+        // longer exists, and a voice pointed at a dead source is silence that never recovers.
+        if (_distantBoundTo.TryGetValue(voiceId, out int bound) && bound != sourceId)
+            _audio.StopSound(voiceId);
+        _distantBoundTo[voiceId] = sourceId;
+
+        var profile = OpenFPS.Common.VehicleProfile.ByName(preset);
+        float level = profile.SourceLevelDb > 0f ? profile.SourceLevelDb : EngineSourceLevelDb;
+        var (gain, reference) = OpenFPS.Common.Loudness.Place(level);
+        Vector3 pos = OpenFPS.Common.AudioEmission.PointFor(snap);
+
+        // A stable, arbitrary offset per car, spread across most of the ring buffer.
+        float offset = 0.08f + (Math.Abs(snap.Id) % 17) * 0.045f;
+
+        var e = new SpatialEmitter
+        {
+            EntityId = voiceId,
+            SoundId = "engine-distant",
+            IsSynth = true,
+            EchoOfEntity = sourceId,
+            EchoDelaySeconds = offset,
+            EchoGain = 1f,
+            EngineKey = "",
+            Mode = PlaybackMode.LoopOne,
+            Type = EmitterType.WorldLocked,
+            Position = pos,
+            ApparentPosition = pos,
+            // Its OWN velocity, so it Dopplers as itself rather than as the car it borrowed from.
+            Velocity = snap.Velocity,
+            PositionSampledAt = sampledAt,
+            Volume = gain * def.SoundEmitter.Volume,
+            Range = OpenFPS.Common.Loudness.AudibleRange(level),
+            MinDistance = MathF.Max(reference, 3f),
+            Pitch = 1f,
+            Priority = 1,
+            TargetRegionId = AcousticConstants.GlobalRegionId,
+            EnableReverb = true,
+        };
+        if (_audio.IsPlaying(voiceId)) _audio.UpdateSpatialAttributes(e);
+        else _audio.PlayPhysicalSoundDirect(e);
+    }
+
+    private void ProcessAudioEmitter(WorldSnapshot world, EntitySnapshot snap, Vector3 eyePos, float engineDt = 0f)
+    {
+        double now = _clock.Elapsed.TotalSeconds;
         var def = snap.Definition;
 
         // Use the async worker's last computed result rather than a synchronous per-frame calculation.
@@ -347,15 +816,45 @@ public class ClientAudioSystem
         }
         else
         {
-            float directDist = Vector3.Distance(eyePos, snap.Transform.Position);
-            acousticPath = new AcousticPathData(0f, snap.Transform.Position, directDist);
+            Vector3 fallbackSource = OpenFPS.Common.AudioEmission.PointFor(snap);
+            float directDist = Vector3.Distance(eyePos, fallbackSource);
+            acousticPath = new AcousticPathData(0f, fallbackSource, directDist);
         }
 
         string resolvedSoundId = "";
+        string engineKey = "";
+        // Where the sound comes out. One shared answer, so the voice and the occlusion probe in step 5
+        // can never again be asking about two different points in space.
+        Vector3 emitterPosition = OpenFPS.Common.AudioEmission.PointFor(snap);
+        float engineVolume = def.SoundEmitter.Volume;
+        float engineMinDistance = def.SoundEmitter.MinDistance;
+        float engineRange = def.SoundEmitter.Range;
         if (def.SoundEmitter.IsSynth)
         {
             resolvedSoundId = def.SoundEmitter.SoundId;
             if (string.IsNullOrEmpty(resolvedSoundId)) resolvedSoundId = "SYNTH"; // Last resort dummy
+            if (resolvedSoundId.StartsWith("engine:", StringComparison.OrdinalIgnoreCase)
+                && OpenFPS.Common.VehicleProfile.Presets.ContainsKey(resolvedSoundId[7..]))
+            {
+                // A vehicle: the engine runs live in the mixer and follows the entity's speed. The
+                // voice sits toward the tailpipe, since that is where most of the sound comes from,
+                // and it is placed at the level a loud exhaust really has.
+                // Its own engine if it has one; a borrowed voice if the mixer is short. See DistantEngine.
+                if (!_liveEngines.Contains(snap.Id))
+                {
+                    DistantEngine(snap, def, resolvedSoundId[7..], eyePos, world.PositionsSampledAt);
+                    return;
+                }
+                engineKey = resolvedSoundId[7..];
+                var profile = OpenFPS.Common.VehicleProfile.ByName(engineKey);
+                // This car's own measured level, not one number for every car. A stock car is
+                // fourteen decibels over a road car and a diesel pickup thirty under it.
+                float level = profile.SourceLevelDb > 0f ? profile.SourceLevelDb : EngineSourceLevelDb;
+                var (gain, reference) = OpenFPS.Common.Loudness.Place(level);
+                engineVolume = gain * def.SoundEmitter.Volume;
+                engineMinDistance = MathF.Max(reference, 3f);
+                engineRange = MathF.Max(engineRange, OpenFPS.Common.Loudness.AudibleRange(level));
+            }
         }
         else
         {
@@ -380,13 +879,14 @@ public class ClientAudioSystem
             StartSoundId = def.SoundEmitter.StartSoundId ?? "",
             StopSoundId = def.SoundEmitter.StopSoundId ?? "",
             Mode = def.SoundEmitter.Mode,
-            Position = snap.Transform.Position,
-            ApparentPosition = acousticPath.ApparentPosition,
+            Position = emitterPosition,
+            ApparentPosition = engineKey.Length > 0 ? emitterPosition : acousticPath.ApparentPosition,
             EffectiveDistance = acousticPath.EffectiveDistance,
             Occlusion = acousticPath.Occlusion,
             ApertureFactor = acousticPath.ApertureFactor,
             TransmissionBleed = acousticPath.TransmissionBleed,
             Velocity = snap.Velocity,
+            PositionSampledAt = world.PositionsSampledAt,
             // The emitter aims along its own LOCAL direction, rotated into the world by the entity's
             // rotation. Zero (the default, and what every prefab produced before the field was authorable)
             // means "straight ahead", which is the old behaviour exactly.
@@ -395,8 +895,8 @@ public class ClientAudioSystem
                     ? Vector3.Normalize(def.SoundEmitter.Direction)
                     : Vector3.UnitZ,
                 snap.Transform.Rotation),
-            Volume = def.SoundEmitter.Volume,
-            Range = Math.Max(1.0f, def.SoundEmitter.Range),
+            Volume = engineVolume,
+            Range = Math.Max(1.0f, engineRange),
             Pitch = 1.0f,
             Type = EmitterType.EntityAttached,
             Priority = 1,
@@ -406,7 +906,10 @@ public class ClientAudioSystem
             ConeInside = def.SoundEmitter.ConeInsideAngle,
             ConeOutside = def.SoundEmitter.ConeOutsideAngle,
             ConeOutsideVolume = def.SoundEmitter.ConeOutsideVolume,
-            MinDistance = def.SoundEmitter.MinDistance,
+            MinDistance = engineMinDistance,
+            EngineKey = engineKey,
+            EngineSpeed = snap.Velocity.Length(),
+            EngineRunning = true,
 
             // Synthesis mapping
             IsGranular = def.SoundEmitter.IsGranular,
@@ -427,11 +930,42 @@ public class ClientAudioSystem
             SynthPulseWidth = def.SoundEmitter.SynthPulseWidth
         };
 
+        // ── A repeating one-shot: submitted only when its interval comes round ───────────────
+        //
+        // Any emitter may carry RepeatIntervalSeconds. It is not a mode of playback so much as a
+        // decision about WHEN to ask for one: the emitter is built as normal and then simply not
+        // handed over until the clock says so, which means everything else about it — placement,
+        // occlusion, reverb, the acoustic path — is whatever that emitter would always have got.
+        // A PA announcing a racetrack, a foghorn and a station bell are the same object.
+        float repeat = def.SoundEmitter.RepeatIntervalSeconds;
+        if (repeat > 0f)
+        {
+            double due = _repeatDue.GetValueOrDefault(snap.Id, double.NegativeInfinity);
+            if (double.IsNegativeInfinity(due))
+            {
+                // First sight of it: stagger the first firing by the entity's own id so that two
+                // announcers on one map do not talk over each other for ever.
+                _repeatDue[snap.Id] = now + (Math.Abs(snap.Id) % 7) * 0.9;
+                return;
+            }
+            if (now < due) return;
+            _repeatDue[snap.Id] = now + repeat;
+            if (_audio.IsPlaying(snap.Id)) return;    // still saying the last one
+        }
+
         _audio.Submit(emitter);
+
+        // 6.1. The walls answering this engine. A live engine has no file to replay, so its
+        // reflections are read back out of the synthesis's own ring buffer at the delay the mirrored
+        // path implies — see EngineReflections.
+        if (engineKey.Length > 0)
+            _engineEchoes.Update(snap.Id, emitter, acousticPath, eyePos, AudioPhysics.SpeedOfSound, engineDt, _audio);
 
         // 6.5. Dynamic Height Reflections (Floor Slapback)
         // If sound is significantly below eye level, synthesize a floor reflection
-        if (!emitter.IsReflection && emitter.Position.Y < (eyePos.Y - 1.0f) && emitter.Volume > 0.3f)
+        // A live engine has no file to play a delayed copy of, so it gets no floor slapback here;
+        // its reflections are the echo voices, when a scene asks for them.
+        if (!emitter.IsReflection && engineKey.Length == 0 && emitter.Position.Y < (eyePos.Y - 1.0f) && emitter.Volume > 0.3f)
         {
             if (_frameCount % 20 == Math.Abs(snap.Id) % 20)
             {

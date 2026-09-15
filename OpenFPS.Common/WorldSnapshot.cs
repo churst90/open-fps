@@ -17,6 +17,16 @@ public class WorldSnapshot
     public SpatialGrid<int>? StaticGrid;
     public AcousticMap? AcousticMap;
 
+    /// <summary>
+    /// When the transforms in this snapshot were last TRUE, seconds on <see cref="AudioClock"/>.
+    ///
+    /// Remote entities move on the interpolation clock, which ticks once per simulation step; anything
+    /// that reads a snapshot reads it more often than that and would otherwise have no way to tell a
+    /// position sampled this instant from one sampled a whole step ago. Carried here rather than asked
+    /// for separately so that a consumer holding a snapshot is holding its age with it.
+    /// </summary>
+    public double PositionsSampledAt;
+
     // Atmospheric State
     public float Temperature = 20.0f;
     public float Humidity = 0.5f;

@@ -17,10 +17,22 @@
   <ItemGroup>
     <PackageReference Include="Serilog" Version="4.2.0" />
     <PackageReference Include="Serilog.Sinks.Console" Version="6.1.1" />
+    <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
   </ItemGroup>
 
   <!-- The audio engine + diagnostics now live in OpenFPS.Client.Core (referenced above);
        no source globbing needed. -->
+
+  <!-- The shipped maps and prefabs, so a spike can audition the REAL map rather than a copy of its
+       numbers that drifts from it. -->
+  <ItemGroup>
+    <None Include="..\OpenFPS.Server\maps\*.json" Link="maps\%(Filename)%(Extension)">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="..\OpenFPS.Server\prefabs\*.json" Link="prefabs\%(Filename)%(Extension)">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
 
   <!-- Drop FMOD's Linux engine libraries (libfmod.so, libfmodL.so) into the repo-root lib/
        folder. Get them free from https://www.fmod.com/download (FMOD Engine > Linux). -->

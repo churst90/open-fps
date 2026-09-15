@@ -246,7 +246,8 @@ public sealed class ClientGameSession : IDisposable
         var context = gameplayActive ? InputContext.Gameplay : InputContext.UI;
         foreach (var key in justPressed) _bindings.Execute(context, key);
 
-        var input = GatherInput(held, dt);
+        _simTime += dt;
+        var input = GatherInput(held, justPressed, dt);
         if (!gameplayActive)
         {
             input.MoveDirection = Vector3.Zero;
@@ -291,31 +292,105 @@ public sealed class ClientGameSession : IDisposable
         _audioSystem.Update(_world.GetSnapshot());
     }
 
-    private ClientInputUpdate GatherInput(HashSet<GameKey> held, float dt)
+    // ── Turning ─────────────────────────────────────────────────────────────────────────────────
+    //
+    // Which way each key turns you, as a sign on the values the physics applies:
+    //   Yaw   -= LookDelta.X * RotationSpeed * dt      (and forward = (sin yaw, 0, cos yaw), so
+    //                                                   INCREASING yaw swings forward toward +X,
+    //                                                   which is right — therefore a POSITIVE
+    //                                                   LookDelta.X decreases yaw and turns LEFT)
+    //   Pitch += LookDelta.Y * RotationSpeed * dt      (positive is up)
+    //
+    // J and L were the wrong way round, and the derivation above is why: J emitted a NEGATIVE X,
+    // which increases yaw, which turns right. Reported as "turning left seems to turn me right", and
+    // it is only findable by following the sign all the way to the forward vector, because every
+    // step of it is individually plausible.
+    private static readonly (GameKey Key, float X, float Y)[] TurnKeys =
+    {
+        (GameKey.J, +1f,  0f),   // left
+        (GameKey.L, -1f,  0f),   // right
+        (GameKey.K,  0f, -1f),   // down
+        (GameKey.O,  0f, +1f),   // up
+    };
+
+    /// <summary>A tap turns this far. A quarter turn: four presses face you the other way.</summary>
+    private const float TurnStepDegrees = 45f;
+    /// <summary>...and with shift, this far, for lining something up by ear.</summary>
+    private const float TurnFineDegrees = 1f;
+    /// <summary>How long a key must be down before a tap becomes a sweep.</summary>
+    private const double TurnHoldBeforeSweep = 0.35;
+    private const float SweepDegreesPerSecond = 180f;
+    private const float FineSweepDegreesPerSecond = 20f;
+
+    private readonly Dictionary<GameKey, double> _turnDownAt = new();
+    private double _simTime;
+
+    /// <summary>
+    /// Turns the four look keys into a LookDelta, as DISCRETE steps rather than a continuous push.
+    ///
+    /// A key that turns for as long as it is down cannot be aimed: at the old rate a press held for
+    /// a tenth of a second swung you twenty-six degrees, so listening to something and then asking
+    /// which way you were facing gave a different answer every time — "it seems jumpy when I turn and
+    /// then press f, it's like sometimes I overshoot". A tap is now exactly forty-five degrees,
+    /// whatever the frame rate and however fast the key was released, so four of them face you the
+    /// other way and eight bring you back. Holding still sweeps, for when you want to scan.
+    ///
+    /// The step is converted into the units the physics expects for ONE tick, so the client's
+    /// prediction and the server's authoritative copy apply exactly the same arithmetic and agree.
+    /// </summary>
+    private Vector2 GatherLook(HashSet<GameKey> held, IReadOnlyCollection<GameKey> justPressed, bool fine, float dt)
+    {
+        Vector2 look = Vector2.Zero;
+        float perTick = PhysicsConstants.RotationSpeed * MathF.Max(dt, 1e-4f);
+
+        foreach (var (key, ax, ay) in TurnKeys)
+        {
+            if (!held.Contains(key)) { _turnDownAt.Remove(key); continue; }
+
+            float degrees;
+            if (justPressed.Contains(key))
+            {
+                _turnDownAt[key] = _simTime;
+                degrees = fine ? TurnFineDegrees : TurnStepDegrees;
+            }
+            else if (_simTime - _turnDownAt.GetValueOrDefault(key, _simTime) >= TurnHoldBeforeSweep)
+            {
+                degrees = (fine ? FineSweepDegreesPerSecond : SweepDegreesPerSecond) * dt;
+            }
+            else continue;   // still inside the tap the press already paid for
+
+            float mag = degrees * (MathF.PI / 180f) / perTick;
+            look.X += ax * mag;
+            look.Y += ay * mag;
+        }
+        return look;
+    }
+
+    private ClientInputUpdate GatherInput(HashSet<GameKey> held, IReadOnlyCollection<GameKey> justPressed, float dt)
     {
         var input = new ClientInputUpdate { SequenceId = ++_sequenceId, DeltaTime = dt };
 
-        // Suppress movement while a modifier or the console key is held: window-manager and screen-reader
-        // chords must never walk the player across the map.
-        if (InputStateBuffer.HasModifier(held) || held.Contains(GameKey.Slash) || held.Contains(GameKey.NumpadDivide))
-            return input;
+        // Shift is a TURN modifier now, not just a suppressor, so it has to be told apart from the
+        // window-manager and screen-reader chords that must never move the player.
+        bool fine = InputStateBuffer.HasShift(held);
+        bool chord = (InputStateBuffer.HasModifier(held) && !fine)
+                   || held.Contains(GameKey.Slash) || held.Contains(GameKey.NumpadDivide);
+        if (chord) return input;
 
-        Vector3 move = Vector3.Zero;
-        if (held.Contains(GameKey.W)) move.Z += 1;
-        if (held.Contains(GameKey.S)) move.Z -= 1;
-        if (held.Contains(GameKey.A)) move.X -= 1;
-        if (held.Contains(GameKey.D)) move.X += 1;
-        if (move != Vector3.Zero) input.MoveDirection = Vector3.Normalize(move);
+        // Movement still stops dead under shift: shift+J is a one-degree nudge, not a nudge and a step.
+        if (!fine)
+        {
+            Vector3 move = Vector3.Zero;
+            if (held.Contains(GameKey.W)) move.Z += 1;
+            if (held.Contains(GameKey.S)) move.Z -= 1;
+            if (held.Contains(GameKey.A)) move.X -= 1;
+            if (held.Contains(GameKey.D)) move.X += 1;
+            if (move != Vector3.Zero) input.MoveDirection = Vector3.Normalize(move);
 
-        if (held.Contains(GameKey.Space)) input.Jump = true;
+            if (held.Contains(GameKey.Space)) input.Jump = true;
+        }
 
-        Vector2 look = Vector2.Zero;
-        if (held.Contains(GameKey.J)) look.X -= 3;
-        if (held.Contains(GameKey.L)) look.X += 3;
-        if (held.Contains(GameKey.K)) look.Y -= 3;
-        if (held.Contains(GameKey.O)) look.Y += 3;
-        input.LookDelta = look;
-
+        input.LookDelta = GatherLook(held, justPressed, fine, dt);
         return input;
     }
 
@@ -394,10 +469,18 @@ public sealed class ClientGameSession : IDisposable
             case MapLoadComplete:
                 Serilog.Log.Information("MapLoadComplete: {Count} entity definitions received.", _world.EntityCount);
                 _shell.UpdateLoadingStatus("Geometry ready. Finalizing acoustics...", 80);
-                Task.Run(GenerateAcoustics);
+                // Niced, and off the shared pool. The voxel bake is seconds of solid CPU that lands
+                // at the exact moment thirty engine voices are being created and primed; at equal
+                // priority on a pool that is also decoding samples, it takes its cores from the
+                // audio. See BackgroundPriority for why lowering this is the only lever that works.
+                _audioSystem.NoteSceneLoading();
+                BackgroundPriority.RunLowered("AcousticBake", GenerateAcoustics);
                 break;
 
             case PlayerSpawned spawn:
+                // The other half of the budget hold: the bake is over, but the cars only start
+                // sounding now, and their first seconds are the expensive ones.
+                _audioSystem.NoteSceneLoading();
                 _ownEntityId = spawn.EntityId;
                 _physics.OwnEntityId = spawn.EntityId;
                 _physics.Spatial.OwnEntityId = spawn.EntityId; // ignore self in prediction/raycasts
@@ -407,6 +490,7 @@ public sealed class ClientGameSession : IDisposable
                 _state.Rotation = spawn.SpawnTransform.Rotation;
                 _state.Velocity = Vector3.Zero;
                 _reconciler.Reset(); // CRITICAL: reset the prediction buffer on teleport/spawn
+                _controller.Teleported(); // ...and the stride accumulator, or the spawn walks for you
 
                 Serilog.Log.Information("PlayerSpawned: entity {Id} at {Pos}.", spawn.EntityId, spawn.SpawnTransform.Position);
                 _shell.UpdateLoadingStatus("Entering World...", 100);

@@ -65,7 +65,34 @@ public static class SynthProcessor
         return res;
     }
 
-    private static RESULT ReadCallback(ref DSP_STATE dsp_state, IntPtr inbuffer, IntPtr outbuffer, uint length, int inchannels, ref int outchannels)
+    /// <summary>
+    /// The guard, and the reason it is a separate method: a managed DSP callback MUST NOT THROW.
+    ///
+    /// FMOD calls this from its own native mixer thread, and an exception that unwinds across that
+    /// boundary does not fault a voice — it takes the whole process down. The client was killed
+    /// exactly that way by an index slip in the boundary DSP, which had no guard either. Everything
+    /// below stays as it was; a fault now costs one silent block and one line in the log.
+    /// </summary>
+    private static RESULT ReadCallback(ref DSP_STATE dsp_state, IntPtr inbuffer, IntPtr outbuffer,
+                                       uint length, int inchannels, ref int outchannels)
+    {
+        try { return ReadCallbackCore(ref dsp_state, inbuffer, outbuffer, length, inchannels, ref outchannels); }
+        catch (Exception ex)
+        {
+            unsafe
+            {
+                int ch = outchannels > 0 ? outchannels : (inchannels > 0 ? inchannels : 2);
+                if (outbuffer != IntPtr.Zero)
+                    new Span<float>((void*)outbuffer, (int)length * ch).Clear();
+            }
+            if (!_faulted) { _faulted = true; Serilog.Log.Error(ex, "SynthProcessor DSP faulted; the block was silenced."); }
+            return RESULT.OK;
+        }
+    }
+
+    private static bool _faulted;
+
+    private static RESULT ReadCallbackCore(ref DSP_STATE dsp_state, IntPtr inbuffer, IntPtr outbuffer, uint length, int inchannels, ref int outchannels)
     {
         IntPtr userData;
         unsafe

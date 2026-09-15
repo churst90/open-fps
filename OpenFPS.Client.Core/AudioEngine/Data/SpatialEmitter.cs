@@ -32,6 +32,25 @@ public struct SpatialEmitter
     public bool EnableReverb;
     public int TargetRegionId;
     public Vector3 Velocity;
+    /// <summary>
+    /// When <see cref="Position"/> was TRUE, seconds on <see cref="OpenFPS.Common.AudioClock"/>.
+    /// Zero means "nobody knows", and the provider then treats it as now.
+    ///
+    /// The distinction between when a position was sampled and when it was handed over is the whole
+    /// of why a close, fast car stopped mid-pass. Remote entities are interpolated once per 33 ms
+    /// simulation step; the audio update submits at about 45 Hz, so half its submissions carry a
+    /// position that has not changed; and the 250 Hz attribute loop then re-applies whatever it was
+    /// last given. Stamped on SUBMISSION, every one of those looked freshly sampled, dead reckoning
+    /// saw an age of four milliseconds, and the loop wrote the same pitch and the same bearing eight
+    /// times over before jumping — a 30 Hz staircase, which at three metres and 235 km/h is two and a
+    /// third semitones and sixty degrees a step. Freeze, jump, freeze, jump is what "it stops for a
+    /// second and then continues" sounds like.
+    ///
+    /// Stamped at SAMPLE time, the same value can be re-applied as often as anything likes and the
+    /// age keeps growing, which is what makes the reckoning carry the car between updates instead of
+    /// being reset by its own re-submission. It is the same rule for a car, a drone and a running NPC.
+    /// </summary>
+    public double PositionSampledAt;
     public Vector3 Direction;
     public float ApertureFactor;
     public float TransmissionBleed;
@@ -50,6 +69,17 @@ public struct SpatialEmitter
 
     // Synthesizer Parameters
     public bool IsSynth;
+    /// <summary>A vehicle engine preset (see VehicleProfile.Presets) run live in the mixer. Set when
+    /// the entity's SoundId is "engine:&lt;preset&gt;".</summary>
+    public string EngineKey;
+    /// <summary>Road speed the engine follows, m/s.</summary>
+    public float EngineSpeed;
+    public bool EngineRunning;
+    /// <summary>When non-zero, this emitter is a reflection of that entity's live engine: the same
+    /// signal delayed by EchoDelaySeconds and scaled by EchoGain, placed at the mirrored source.</summary>
+    public int EchoOfEntity;
+    public float EchoDelaySeconds;
+    public float EchoGain;
     public SynthWaveType SynthWave;
     public float SynthFrequency; // Base frequency (e.g. 440.0f)
     public float SynthLfoRate; // Lfo speed in Hz
@@ -90,6 +120,7 @@ public struct SpatialEmitter
         TargetRegionId = -1;
         Direction = Vector3.UnitZ;
         Velocity = Vector3.Zero;
+        PositionSampledAt = 0;
         ApertureFactor = 1.0f;
         TransmissionBleed = 1.0f;
         IsEvent = false;

@@ -233,9 +233,13 @@ public class PrefabRepository
                 // Local-space aim, rotated into the world by the entity's own rotation on the client.
                 // Zero means "use the entity's forward", which is what every emitter did implicitly before.
                 Direction = t.EmitterDirection ?? Vector3.Zero,
+                // The emitter slot: where the sound comes out, in the entity's own frame. Zero means
+                // the origin, which is what every emitter did implicitly before. See AudioEmission.
+                Offset = t.EmitterOffset ?? Vector3.Zero,
                 ConeInsideAngle = t.ConeInsideAngle ?? 360f,
                 ConeOutsideAngle = t.ConeOutsideAngle ?? 360f,
                 ConeOutsideVolume = t.ConeOutsideVolume ?? 1.0f,
+                RepeatIntervalSeconds = t.RepeatIntervalSeconds ?? 0f,
                 MinDistance = t.MinDistance ?? 3.0f,
                 
                 IsGranular = t.IsGranular ?? false,

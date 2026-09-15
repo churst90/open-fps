@@ -76,6 +76,50 @@ public static class AcousticConstants
     public const float DefaultReverbDecayMs = 500.0f;
     public const float MinReverbDecayMs = 100.0f;
     public const float MaxReverbDecayMs = 10000.0f;
+
+    // ── Outdoor reverberation, from geometry ────────────────────────────────────────────────────
+    //
+    // "Outdoors is dry" is true in a field and false in a street. A concrete canyon between two rows
+    // of tall buildings has a measurable reverberation time — that slapback off a facade a hundred
+    // metres away is the single most useful thing a blind player can hear in a city, because it tells
+    // them the street has sides and roughly where they are. What is NOT true is the Sabine estimate
+    // for "the outdoors", which takes the whole map as one room, returns an enormous number, and
+    // washes the entire world in undirected reverb; that estimate is why the outdoor bus is muted.
+    //
+    // Steam Audio's ray-traced RT60 does not have that problem. It is computed from the geometry that
+    // is actually around the listener, so an open field returns nearly nothing and a street canyon
+    // returns a real decay. These two numbers are the gate: below the first, outdoors stays silent
+    // exactly as it does today; between them the bus opens in proportion to what the rays found.
+    /// <summary>Simulated RT60 below which outdoors is treated as open air and stays dry.</summary>
+    public const float OutdoorDryDecayMs = 260.0f;
+    /// <summary>Simulated RT60 at which the outdoor reverb bus reaches full wet level.</summary>
+    public const float OutdoorFullWetDecayMs = 1400.0f;
+    /// <summary>
+    /// Loudest the outdoor bus may get, dB.
+    ///
+    /// Much lower than it was, because its job changed. Before there were discrete reflections this
+    /// wash was the ONLY thing representing the buildings, so it had to be loud enough to be noticed —
+    /// and a loud undirected two-second decay on every gunshot is precisely "one big echoey room".
+    /// Now the facades answer individually, with their own directions and delays, and this is only the
+    /// diffuse tail behind them: the part that has bounced too many times to have a direction left.
+    /// It should be felt rather than heard.
+    /// </summary>
+    public const float OutdoorMaxWetDb = -16.0f;
+
+    /// <summary>
+    /// Longest reverberation time the outdoors is allowed, milliseconds.
+    ///
+    /// The ray tracer measured 1.7 to 2.8 seconds for a concrete street canyon, and taken literally
+    /// that is not wrong — concrete absorbs almost nothing and a canyon traps sound between two
+    /// parallel faces. But a two-second decay is a cathedral, and applying one to an outdoor space
+    /// makes every shot in the open sound like it was fired indoors. Real streets measure nearer a
+    /// second, because the sky is an infinite absorber and the tracer's rays do not all find it.
+    /// </summary>
+    public const float OutdoorMaxDecayMs = 1100.0f;
+    /// <summary>How fast the outdoor wet level moves toward its target, per audio update. Stepping it
+    /// in one frame is a step change in the signal, which is a click — the same fault that the region
+    /// bus's binaural bypass had when crossing a threshold.</summary>
+    public const float OutdoorWetBlendSpeed = 0.06f;
     
     // --- Panning & Volumetric ---
     public const float SpreadGrowthFactor = 5.0f; // Degrees per meter

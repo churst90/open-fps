@@ -15,9 +15,14 @@ using Serilog;
 //   Linux:   libfmod.so   (drop into repo-root lib/)
 //   Windows: fmod.dll      (already in repo-root lib/)
 
+// A FILE as well as the console, and not as an afterthought. Every diagnosis in this project has
+// come from lining a log up against a capture, and scrollback in a terminal is not a log — least of
+// all for somebody reading it with a screen reader. OPENFPS_LAB_LOG moves it.
+string labLog = Environment.GetEnvironmentVariable("OPENFPS_LAB_LOG") ?? "/tmp/openfps-lab.log";
 Log.Logger = new LoggerConfiguration()
     .MinimumLevel.Debug()
     .WriteTo.Console()
+    .WriteTo.File(labLog, rollingInterval: RollingInterval.Infinite, shared: true)
     .CreateLogger();
 
 Console.WriteLine("=== OpenFPS AudioLab ===");
@@ -142,6 +147,189 @@ if (args.Contains("--make-siren"))
 if (args.Contains("--steam-stereo"))
 {
     int code = SteamAudioLiveTest.RunStereoCheck();
+    Log.CloseAndFlush();
+    Environment.Exit(code);
+}
+
+if (args.Contains("--dry-check"))
+{
+    foreach (var prof in new[]{ OpenFPS.Client.AudioEngine.Core.WeaponProfile.Rifle,
+                                OpenFPS.Client.AudioEngine.Core.WeaponProfile.Pistol,
+                                OpenFPS.Client.AudioEngine.Core.WeaponProfile.Shotgun })
+    {
+        var pcm = OpenFPS.Client.AudioEngine.Core.WeaponSynth.MuzzleBlast(prof);
+        double mean = 0; foreach (var v in pcm) mean += v; mean /= pcm.Length;
+        float tail = 0; for (int i = pcm.Length - pcm.Length/10; i < pcm.Length; i++) tail = Math.Max(tail, Math.Abs(pcm[i]));
+        Console.WriteLine($"  {prof.Name,-8} len={pcm.Length} mean={mean:F6} tailPeak={tail:F4} last={pcm[^1]:F6}");
+    }
+    Log.CloseAndFlush();
+    Environment.Exit(0);
+}
+
+if (args.Contains("--engine-solver"))
+{
+    // The intake valve of the 1.6 at idle, as dumped: runner at 0.6 bar, cylinder at 0.18 bar.
+    float mean = 0.6f * 101325f;
+    float Z = 397000f, area = 8.8e-4f, pCyl = 18200f, tCyl = 386f, pipeK = 305f, gamma = 1.4f, uMean = -6e-4f, uCap = 0.107f;
+    for (float bb = 40000f; bb >= -50000f; bb -= 10000f)
+    {
+        float g = OpenFPS.Client.AudioEngine.Core.Engine.EngineSynth.ValveResidual(0f, bb, Z, area, pCyl, tCyl, pipeK, gamma, uMean, uCap, mean, out float m);
+        Console.WriteLine($"  b={bb,8:F0}  pPort={(mean + bb) / 1e5f:F3} bar  G={g,9:F5}  mdot={m * 1e3f,7:F1} g/s");
+    }
+    float b = OpenFPS.Client.AudioEngine.Core.Engine.EngineSynth.SolveValve(0f, 1300f, Z, area, pCyl, tCyl, pipeK, gamma, 61.8e-6f, 1f / 44100f, uMean, uCap, mean, out float md);
+    Console.WriteLine($"  solver: b={b:F0}  pPort={(mean + b) / 1e5f:F3} bar  mdot={md * 1e3f:F1} g/s");
+    Log.CloseAndFlush();
+    Environment.Exit(0);
+}
+if (args.Contains("--engine-street"))
+{
+    // --engine-street [preset ...] [kmh=50,100]: cars driving past you down Concrete Row, with the
+    // buildings answering. Default: the big block, then the truck.
+    var keys = args.Where(a => OpenFPS.Common.VehicleProfile.Presets.ContainsKey(a)).ToArray();
+    if (keys.Length == 0) keys = new[] { "v8_muscle", "diesel_truck" };
+    string? kmhArg = args.FirstOrDefault(a => a.StartsWith("kmh="));
+    float[]? kmhs = kmhArg == null ? null : Array.ConvertAll(kmhArg[4..].Split(','), float.Parse);
+    int scode = OpenFPS.Client.Core.AudioEngine.Fmod.VehicleSpike.RunStreet(keys, kmhs);
+    Log.CloseAndFlush();
+    Environment.Exit(scode);
+}
+if (args.Contains("--engine-live"))
+{
+    // --engine-live [preset] [kmh=30,60,90]: the game's real-time engine path, driven past you.
+    string presetKey = args.FirstOrDefault(a => OpenFPS.Common.VehicleProfile.Presets.ContainsKey(a)) ?? "v8_muscle";
+    string? kmh = args.FirstOrDefault(a => a.StartsWith("kmh="));
+    float[]? speeds = kmh == null ? null : Array.ConvertAll(kmh[4..].Split(','), float.Parse);
+    int lcode = OpenFPS.Client.Core.AudioEngine.Fmod.VehicleSpike.RunLive(presetKey, speeds);
+    Log.CloseAndFlush();
+    Environment.Exit(lcode);
+}
+if (args.Contains("--speedway"))
+{
+    // --speedway [map] [seconds=] [voices=]: the shipped map, its cars on its track, its walls
+    // answering them, heard from its own spawn point.
+    int wcode = OpenFPS.Client.Core.AudioEngine.Fmod.SpeedwaySpike.Run(args);
+    Log.CloseAndFlush();
+    Environment.Exit(wcode);
+}
+if (args.Contains("--engine-jumps"))
+{
+    int jcode = OpenFPS.Client.Core.AudioEngine.Fmod.EngineCostSpike.Jumps(args);
+    Log.CloseAndFlush();
+    Environment.Exit(jcode);
+}
+if (args.Contains("--engine-levels"))
+{
+    int lvcode = OpenFPS.Client.Core.AudioEngine.Fmod.EngineCostSpike.Levels(args);
+    Log.CloseAndFlush();
+    Environment.Exit(lvcode);
+}
+if (args.Contains("--engine-cost"))
+{
+    // --engine-cost [preset ...] [kmh=..] [sec=..]: what one live voice costs a core, so a grid
+    // of cars can be sized before it is authored.
+    int ccode = OpenFPS.Client.Core.AudioEngine.Fmod.EngineCostSpike.Run(args);
+    Log.CloseAndFlush();
+    Environment.Exit(ccode);
+}
+if (args.Contains("--engine-trace"))
+{
+    int tcode = OpenFPS.Client.Core.AudioEngine.Fmod.EngineOrderSpike.Trace(args);
+    Log.CloseAndFlush();
+    Environment.Exit(tcode);
+}
+if (args.Contains("--engine-gallery"))
+{
+    int gcode = OpenFPS.Client.Core.AudioEngine.Fmod.EngineOrderSpike.Gallery(args);
+    Log.CloseAndFlush();
+    Environment.Exit(gcode);
+}
+if (args.Contains("--engine-orders"))
+{
+    int orderCode = OpenFPS.Client.Core.AudioEngine.Fmod.EngineOrderSpike.Run(args);
+    Log.CloseAndFlush();
+    Environment.Exit(orderCode);
+}
+
+if (args.Contains("--vehicle-cams") || args.Contains("--vehicle-cams-live"))
+{
+    Console.WriteLine("--- The same V8 with three camshafts ---");
+    int camCode = OpenFPS.Client.Core.AudioEngine.Fmod.VehicleSpike.RunCamComparison(
+        args.Contains("--vehicle-cams-live"));
+    Log.CloseAndFlush();
+    Environment.Exit(camCode);
+}
+
+if (args.Contains("--vehicle") || args.Contains("--vehicle-live")
+    || args.Contains("--vehicle-rev") || args.Contains("--vehicle-rev-live")
+    || args.Contains("--muscle-rev") || args.Contains("--muscle-rev-live"))
+{
+    Console.WriteLine("--- V8 sports car with Flowmaster 40s, synthesized from its mechanism ---");
+    bool muscle = args.Contains("--muscle-rev") || args.Contains("--muscle-rev-live");
+    string? preset = args.FirstOrDefault(a => !a.StartsWith("--") && OpenFPS.Common.VehicleProfile.Presets.ContainsKey(a));
+    bool stationary = muscle || args.Contains("--vehicle-rev") || args.Contains("--vehicle-rev-live");
+    int code = OpenFPS.Client.Core.AudioEngine.Fmod.VehicleSpike.Run(
+        args.Contains("--vehicle-live") || args.Contains("--vehicle-rev-live")
+        || args.Contains("--muscle-rev-live"), stationary, muscle, preset);
+    Log.CloseAndFlush();
+    Environment.Exit(code);
+}
+
+if (args.Contains("--blast-compare") || args.Contains("--blast-compare-live"))
+{
+    Console.WriteLine("--- Blast comparison: recording vs recording+sub vs synthesis ---");
+    int i = Array.FindIndex(args, a => a.StartsWith("--blast-compare"));
+    string? only = (i >= 0 && i + 1 < args.Length && !args[i + 1].StartsWith("--")) ? args[i + 1] : null;
+    int code = OpenFPS.Client.Core.AudioEngine.Fmod.BlastCompareSpike.Run(
+        args.Contains("--blast-compare-live"), only);
+    Log.CloseAndFlush();
+    Environment.Exit(code);
+}
+
+if (args.Contains("--blast-probe"))
+{
+    // Writes each weapon's blast three ways — synthesis only, recording only, and the composite — so
+    // the three can be compared spectrally. Which layer is carrying which part of the sound is not
+    // something to decide by argument.
+    string outDir = System.IO.Path.Combine(AppContext.BaseDirectory, "blast-probe");
+    System.IO.Directory.CreateDirectory(outDir);
+    string? assets = null;
+    var d = new System.IO.DirectoryInfo(AppContext.BaseDirectory);
+    for (int i = 0; i < 8 && d != null; i++, d = d.Parent)
+    {
+        string c = System.IO.Path.Combine(d.FullName, "OpenFPS.Client", "ASSETS", "SOUNDS");
+        if (System.IO.Directory.Exists(c)) { assets = c; break; }
+    }
+    foreach (var w in OpenFPS.Common.WeaponRegistry.All)
+    {
+        var prof = OpenFPS.Client.AudioEngine.Core.WeaponProfile.From(w);
+        var synth = OpenFPS.Client.AudioEngine.Core.WeaponSynth.MuzzleBlast(prof);
+        System.IO.File.WriteAllBytes(System.IO.Path.Combine(outDir, $"{w.Id}_synth.wav"),
+            OpenFPS.Client.AudioEngine.Core.WeaponSynth.ToWav16(synth));
+        if (assets != null)
+        {
+            string dir = System.IO.Path.Combine(assets, w.FiringFolder.Replace('/', System.IO.Path.DirectorySeparatorChar));
+            if (System.IO.Directory.Exists(dir))
+            {
+                var files = System.IO.Directory.GetFiles(dir, "*.wav");
+                if (files.Length > 0)
+                {
+                    var rec = OpenFPS.Client.AudioEngine.Core.WeaponSynth.ReadWav16Mono(System.IO.File.ReadAllBytes(files[0]));
+                    System.IO.File.WriteAllBytes(System.IO.Path.Combine(outDir, $"{w.Id}_composite.wav"),
+                        OpenFPS.Client.AudioEngine.Core.WeaponSynth.ToWav16(
+                            OpenFPS.Client.AudioEngine.Core.WeaponSynth.CompositeBlast(prof, rec)));
+                }
+            }
+        }
+    }
+    Console.WriteLine($"wrote {outDir}");
+    Log.CloseAndFlush();
+    Environment.Exit(0);
+}
+
+if (args.Contains("--battle") || args.Contains("--battle-live"))
+{
+    Console.WriteLine("--- Concrete Row: a firefight in a street with sides ---");
+    int code = OpenFPS.Client.Core.AudioEngine.Fmod.BattleSpike.Run(args.Contains("--battle-live"));
     Log.CloseAndFlush();
     Environment.Exit(code);
 }

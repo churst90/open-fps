@@ -31,6 +31,7 @@ public class GameServer
     private readonly IUserRepository _userRepo;
     private CommandHandler _commands = null!;
     private readonly System.Collections.Concurrent.ConcurrentQueue<int> _dirtyAudioEntities = new();
+    private readonly VehicleSystem _vehicles = new();
     private readonly System.Collections.Concurrent.ConcurrentQueue<Action> _commandBuffer = new();
 
     private readonly MessageDispatcher _dispatcher = new();
@@ -110,6 +111,7 @@ public class GameServer
 
     // The tick rate lives in PhysicsConstants — the client predicts against the same number.
     private const double TickTimeMs = 1000.0 / PhysicsConstants.TickRate;
+    /// <summary>Fallback only — the real radius is per map, from MapManager.GetEarshotRange.</summary>
     private const float EarshotRange = 200.0f; 
 
     public void Start(int port)
@@ -118,6 +120,9 @@ public class GameServer
         _mapRepo = new MapRepository("maps");
         _maps = new MapManager(_mapRepo, prefabRepo);
         _maps.Initialize();
+        _vehicles.Spawn(_maps);
+        // Now that every sound source exists, size each map's broadcast radius from it.
+        _maps.RefreshEarshotRanges();
         _commands = new CommandHandler(_sessions, _maps, this);
         
         // Initialize new Service Architecture
@@ -301,6 +306,7 @@ public class GameServer
                     // 4. Update Simulation (Movement/AI)
                     MovementSystem.Update(world, entry.Value.data.MinBound, entry.Value.data.MaxBound, grid, _sessions, _maps, dt);
                     AISystem.Update(world, lookup, dt);
+                    _vehicles.Update(entry.Key, world, dt);
                     ParentSystem.Update(world, lookup);
                 }
                 catch (Exception ex)
@@ -348,11 +354,14 @@ public class GameServer
             ConnectionId = connectionId,
             Username = user.Username,
             Role = user.Role,
-            IsTextClient = peer == null
+            IsTextClient = peer == null,
+            // Where a new player lands: the map that claims IsDefault, not the one named "default".
+            CurrentMapId = _maps.DefaultMapId,
         };
         _sessions.AddSession(connectionId, session);
 
-        Log.Information("User {User} authenticated ({Transport}).", user.Username, peer == null ? "MUD" : "UDP");
+        Log.Information("User {User} authenticated ({Transport}), landing on map '{Map}'.",
+                        user.Username, peer == null ? "MUD" : "UDP", session.CurrentMapId);
 
         reply(new LoginResponse
         {
@@ -518,6 +527,7 @@ public class GameServer
                     if (session.Entity == Entity.Null) continue;
                     if (!world.IsAlive(session.Entity)) continue;
                     var pPos = world.Get<Transform>(session.Entity).Position;
+                    float earshot = _maps.GetEarshotRange(mapEntry.Key);
                     var peer = _network.GetPeer(session.ConnectionId);
                     if (peer == null) continue;
 
@@ -530,7 +540,7 @@ public class GameServer
                     _visibleBuffer.Clear();
                     _visibleDynamicBuffer.Clear();
 
-                    foreach (var e in grid.GetItemsInRadius(pPos, EarshotRange))
+                    foreach (var e in grid.GetItemsInRadius(pPos, earshot))
                     {
                         if (!_visibleBuffer.Add(e.Id)) continue;
                         if (!world.Has<Transform>(e)) continue;
@@ -587,7 +597,7 @@ public class GameServer
                     foreach (int id in _visibleDynamicBuffer) session.VisibleDynamicEntities.Add(id);
 
                     if (_reusableBroadcast.States.Count > 0)
-                        _network.SendMessage(peer, _reusableBroadcast, DeliveryMethod.Unreliable);
+                        _network.SendStateUpdate(peer, _reusableBroadcast, DeliveryMethod.Unreliable);
                     if (_reliableBroadcast.States.Count > 0)
                         _network.SendMessage(peer, _reliableBroadcast, DeliveryMethod.ReliableOrdered);
 
@@ -788,7 +798,12 @@ public class Program
                 server.Stop();
             });
 
-            server.Start(33288);
+            // --port lets a second server be brought up beside a running one, which is the only way
+            // to smoke-test a map change without taking someone's session down.
+            int port = 33288;
+            for (int i = 0; i < args.Length - 1; i++)
+                if (args[i] == "--port" && int.TryParse(args[i + 1], out int p)) port = p;
+            server.Start(port);
         }
         catch (Exception ex)
         {

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Numerics;
 using System.Runtime.InteropServices;
+using System.Threading;
 using OpenFPS.Common;
 using PV = OpenFPS.Client.Core.AudioEngine.SteamAudio.Phonon.IPLVector3;
 
@@ -153,8 +154,11 @@ public sealed class SteamAudioSimulator : IDisposable
         if (!IsValid || scene is null || !scene.IsBuilt) return;
         Phonon.iplSimulatorSetScene(_simulator, scene.Handle);
 
-        if (_pathing) BuildOrRebakeProbes(scene);
-
+        // The pathing bake does NOT happen here any more. See BeginProbeBake: it used to, it took a
+        // hundred seconds on a large map, and for that whole time this method had not returned — so
+        // the worker produced no occlusion for anything, every source in the world was rendered
+        // unoccluded, and then the entire model arrived in one frame a minute and a half into the
+        // session. Nothing that takes longer than a frame may gate the direct stage.
         Phonon.iplSimulatorCommit(_simulator);
 
         if (_allSources.Count == 0)
@@ -176,6 +180,68 @@ public sealed class SteamAudioSimulator : IDisposable
     /// (probe positions are not relocated — pathing is tuned for single-map sessions). Requires the scene
     /// to contain floor geometry wound normal-up, or UNIFORMFLOOR places no probes (pathing then silently
     /// no-ops and the caller falls back to the direct line).</summary>
+    /// <summary>
+    /// Starts the pathing bake on a thread of its own, and returns immediately.
+    ///
+    /// Baking is map-sized work — probes over the whole floor, then a visibility graph between them —
+    /// and the caller is a real-time audio worker. Run inline it was a hundred-second hole in the
+    /// direct stage on the speedway; run here it is a background cost that finishes whenever it
+    /// finishes, and until it does <see cref="PathingReady"/> stays false, pathing is simply not part
+    /// of the simulation, and every source is served its direct result from the first tick.
+    ///
+    /// The baked batch is handed to the simulator by <see cref="CommitPendingProbes"/>, which the
+    /// OWNING thread calls between runs — the simulator itself is single-threaded by contract, so the
+    /// background thread never touches it. What the background thread does touch is the scene and the
+    /// probe batch, both of which the baker only reads.
+    /// </summary>
+    public void BeginProbeBake(SteamAudioScene scene)
+    {
+        if (!IsValid || !_pathing || scene is null || !scene.IsBuilt) return;
+        if (_bakeThread is { IsAlive: true }) return;
+        _bakeThread = new Thread(() =>
+        {
+            try { BuildOrRebakeProbes(scene); }
+            catch (Exception ex) { Console.WriteLine($"[SteamAudio] Pathing bake failed; pathing stays off: {ex.Message}"); }
+        })
+        {
+            IsBackground = true,
+            Name = "SaPathingBake",
+            // Below everything that has a deadline. A map load is the busiest moment the client has,
+            // and this is the one piece of work at that moment which nobody is waiting for.
+            Priority = ThreadPriority.Lowest,
+        };
+        _bakeThread.Start();
+    }
+
+    private Thread? _bakeThread;
+    private IntPtr _bakedBatchPending;
+
+    /// <summary>
+    /// Hands a finished bake to the simulator. Call from the thread that owns the simulator, between
+    /// runs. Returns true on the tick that pathing actually comes alive, so the caller can say so.
+    /// </summary>
+    public bool CommitPendingProbes()
+    {
+        IntPtr batch = Interlocked.Exchange(ref _bakedBatchPending, IntPtr.Zero);
+        if (batch == IntPtr.Zero) return false;
+        Phonon.iplSimulatorAddProbeBatch(_simulator, batch);
+        Phonon.iplSimulatorCommit(_simulator);
+        _probeBatch = batch;
+        return true;
+    }
+
+    /// <summary>
+    /// Probes to generate at most, whatever the map's size.
+    ///
+    /// The bake's cost grows worse than linearly in the probe count and the probe count grows with the
+    /// map's AREA, so a fixed 2 m spacing is a promise that gets more expensive the bigger anyone
+    /// builds — 720 x 420 m of ground is seventy-five thousand probes. A budget with the spacing
+    /// derived from it means a big map gets coarser pathing rather than an unbounded bake, which is
+    /// the trade a listener would choose: coarse direction hints beat waiting for exact ones.
+    /// </summary>
+    private const int MaxProbes = 8192;
+    private const float MinProbeSpacing = 2.0f;
+
     private void BuildOrRebakeProbes(SteamAudioScene scene)
     {
         _pathId = new Phonon.IPLBakedDataIdentifier
@@ -185,32 +251,48 @@ public sealed class SteamAudioSimulator : IDisposable
             endpointInfluence = new Phonon.IPLSphere { center = new PV { x = 0, y = 0, z = 0 }, radius = 100000f },
         };
 
-        if (_probeBatch == IntPtr.Zero)
+        IntPtr batch = _probeBatch;
+        bool isNewBatch = batch == IntPtr.Zero;
+        int probes = 0;
+        float spacing = MinProbeSpacing;
+
+        if (isNewBatch)
         {
             Vector3 min = scene.BoundsMin, max = scene.BoundsMax;
             if (!(max.X > min.X)) return; // empty / invalid bounds -> no probes
             Phonon.iplProbeArrayCreate(_context, out _probeArray);
+            float area = MathF.Max(1f, (max.X - min.X) * (max.Z - min.Z));
+            spacing = MathF.Max(MinProbeSpacing, MathF.Sqrt(area / MaxProbes));
             var genP = new Phonon.IPLProbeGenerationParams
             {
-                type = Phonon.IPL_PROBEGENERATIONTYPE_UNIFORMFLOOR, spacing = 2.0f, height = 1.5f,
+                type = Phonon.IPL_PROBEGENERATIONTYPE_UNIFORMFLOOR, spacing = spacing, height = 1.5f,
             };
             SetBoxTransform(ref genP.transform, min.X, max.X, min.Y - 0.5f, max.Y, min.Z, max.Z);
             Phonon.iplProbeArrayGenerateProbes(_probeArray, scene.Handle, ref genP);
-            if (Phonon.iplProbeArrayGetNumProbes(_probeArray) == 0)
+            probes = Phonon.iplProbeArrayGetNumProbes(_probeArray);
+            if (probes == 0)
             { Phonon.iplProbeArrayRelease(ref _probeArray); _probeArray = IntPtr.Zero; return; }
 
-            Phonon.iplProbeBatchCreate(_context, out _probeBatch);
-            Phonon.iplProbeBatchAddProbeArray(_probeBatch, _probeArray);
-            Phonon.iplProbeBatchCommit(_probeBatch);
-            Phonon.iplSimulatorAddProbeBatch(_simulator, _probeBatch);
+            Phonon.iplProbeBatchCreate(_context, out batch);
+            Phonon.iplProbeBatchAddProbeArray(batch, _probeArray);
+            Phonon.iplProbeBatchCommit(batch);
         }
 
         var bakeP = new Phonon.IPLPathBakeParams
         {
-            scene = scene.Handle, probeBatch = _probeBatch, identifier = _pathId,
+            scene = scene.Handle, probeBatch = batch, identifier = _pathId,
             numSamples = 4, radius = 0.5f, threshold = 0.1f, visRange = 16.0f, pathRange = 100.0f, numThreads = 1,
         };
+        long start = System.Diagnostics.Stopwatch.GetTimestamp();
         Phonon.iplPathBakerBake(_context, ref bakeP, Marshal.GetFunctionPointerForDelegate(_bakeProgress), IntPtr.Zero);
+        double seconds = (System.Diagnostics.Stopwatch.GetTimestamp() - start) / (double)System.Diagnostics.Stopwatch.Frequency;
+        Console.WriteLine($"[SteamAudio] Pathing bake finished: {probes} probe(s) at {spacing:F1} m spacing in {seconds:F1} s. "
+                        + "Occlusion was live from the first tick; only the direction hint for an occluded source was waiting on this.");
+
+        // Published, not attached. The simulator belongs to whichever thread runs it and only that
+        // thread may add to one, so a batch that was built here waits for CommitPendingProbes. A
+        // RE-bake of a batch the simulator already holds has nothing to hand over.
+        if (isNewBatch) Interlocked.Exchange(ref _bakedBatchPending, batch);
     }
 
     /// <summary>True when pathing is enabled and a baked probe batch exists (so pathing can find routes).</summary>
@@ -241,7 +323,7 @@ public sealed class SteamAudioSimulator : IDisposable
 
     /// <summary>Stages one source's inputs (world position) for the next <see cref="Run"/>. Call once per
     /// active source per tick, before <see cref="Run"/>. Includes pathing inputs when pathing is enabled.</summary>
-    public void SetSourceInputs(IntPtr source, Vector3 worldPos)
+    public void SetSourceInputs(IntPtr source, Vector3 worldPos, float occlusionRadius = 0.5f)
     {
         if (source == IntPtr.Zero) return;
         var inputs = new Phonon.IPLSimulationInputs
@@ -250,7 +332,10 @@ public sealed class SteamAudioSimulator : IDisposable
             directFlags = _direct ? (Phonon.IPL_DIRECTSIMULATIONFLAGS_OCCLUSION | Phonon.IPL_DIRECTSIMULATIONFLAGS_TRANSMISSION) : 0,
             source = Coord(worldPos),
             occlusionType = Phonon.IPL_OCCLUSIONTYPE_VOLUMETRIC,
-            occlusionRadius = 0.5f,
+            // Per source, because the right size depends on how much room the emitter has above
+            // whatever it is sitting on. A fixed half metre put half of every ground-level emitter's
+            // probe sphere inside the ground it was standing on. See AudioEmission.OcclusionRadiusFor.
+            occlusionRadius = MathF.Max(0.01f, occlusionRadius),
             numOcclusionSamples = 16,
             numTransmissionRays = 1,
         };
@@ -396,6 +481,25 @@ public sealed class SteamAudioSimulator : IDisposable
 
     public void Dispose()
     {
+        // The bake reads the scene and writes a probe batch. Releasing either underneath it is a
+        // use-after-free in native code, so wait for it — it is the one thing here that can be
+        // running on another thread. Bounded, because a shutdown that hangs on a bake is its own bug;
+        // past the wait we abandon the batch rather than free something still being written.
+        var bake = _bakeThread;
+        if (bake is { IsAlive: true } && !bake.Join(TimeSpan.FromSeconds(5)))
+        {
+            Console.WriteLine("[SteamAudio] Pathing bake did not finish within 5 s of shutdown; leaving its probes to the process exit.");
+            _bakedBatchPending = IntPtr.Zero;
+            _probeBatch = IntPtr.Zero;
+            _probeArray = IntPtr.Zero;
+        }
+        _bakeThread = null;
+        if (_bakedBatchPending != IntPtr.Zero)
+        {
+            IntPtr pending = Interlocked.Exchange(ref _bakedBatchPending, IntPtr.Zero);
+            if (pending != IntPtr.Zero && pending != _probeBatch) Phonon.iplProbeBatchRelease(ref pending);
+        }
+
         for (int i = 0; i < _allSources.Count; i++)
         {
             IntPtr s = _allSources[i];

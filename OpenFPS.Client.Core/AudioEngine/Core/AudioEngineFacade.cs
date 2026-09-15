@@ -99,11 +99,58 @@ public class AudioEngineFacade : IDisposable
                 Serilog.Log.Error(ex, "AudioEngine: Error in audio loop.");
             }
 
-            // Throttle to target framerate (~60fps / 16ms)
+            // Throttle. Faster than a display frame ON PURPOSE.
+            //
+            // Doppler is applied as a channel pitch, and a channel pitch changes the instant it is
+            // set — FMOD ramps volume, not rate. So the update period is the resolution of every
+            // pass-by in the game. A car at 280 km/h going past eleven metres away swings its radial
+            // speed at about v^2/d = 550 m/s^2, which at 60 Hz is a 2.7% pitch step sixty times a
+            // second: not a swoop but a staircase, and clearly audible as one on anything with a
+            // high, pure note — which is exactly where it was first noticed, on the V10s.
+            //
+            // At 250 Hz the same pass steps by 0.65%, which is under the threshold where a pitch
+            // change is heard as a step rather than a glide. The loop itself is cheap — it updates
+            // voice attributes, it does not mix — so this costs a few per cent of one thread and buys
+            // the single most audible cue in the game.
+            const int PeriodMs = 4;
             int elapsed = (int)(DateTime.Now - start).TotalMilliseconds;
-            int sleep = Math.Max(1, 16 - elapsed);
+            int sleep = Math.Max(1, PeriodMs - elapsed);
             Thread.Sleep(sleep);
+            ReportTickRate();
         }
+    }
+
+    private readonly System.Diagnostics.Stopwatch _rateClock = System.Diagnostics.Stopwatch.StartNew();
+    private int _ticks;
+
+    /// <summary>
+    /// Says out loud whether the 250 Hz above is actually being achieved.
+    ///
+    /// It is not a setting, it is an OUTCOME: the period is `max(1 ms, 4 ms - however long the tick
+    /// took)`, and the tick walks every active voice. Eight cars is seventeen voices; thirty cars is
+    /// sixty. Nobody would notice the rate sagging, because the symptom is not a dropout or a warning
+    /// — it is that pass-bys go back to sounding like a staircase, which is the exact thing the
+    /// 250 Hz was chosen to prevent. So it is measured, and it complains.
+    /// </summary>
+    private void ReportTickRate()
+    {
+        _ticks++;
+        double since = _rateClock.Elapsed.TotalSeconds;
+        if (since < 5.0) return;
+        _rateClock.Restart();
+        double hz = _ticks / since;
+        _ticks = 0;
+        var cost = _provider.TakeUpdateCost();
+        // The pitch step a pass-by gets at this rate. 0.65% at 250 Hz is the design point — under the
+        // threshold where a change in pitch is heard as a step rather than a glide.
+        double stepPct = 0.65 * (250.0 / Math.Max(1.0, hz));
+        if (hz < 200)
+            Serilog.Log.Warning("Audio thread: {Hz:F0} Hz of 250 — pass-bys step by {Step:F1}% (0.65% is the target). "
+                              + "Attribute pass {Mean:F2} ms mean, {Max:F1} ms worst over {Voices} voice(s).",
+                                hz, stepPct, cost.MeanMs, cost.MaxMs, cost.Voices);
+        else
+            Serilog.Log.Information("Audio thread: {Hz:F0} Hz, attribute pass {Mean:F2} ms mean, {Max:F1} ms worst over {Voices} voice(s).",
+                                    hz, cost.MeanMs, cost.MaxMs, cost.Voices);
     }
 
     /// <summary>
@@ -145,9 +192,12 @@ public class AudioEngineFacade : IDisposable
         if (aMap != null) _provider.SetAcousticMap(aMap);
 
         // 4. Process incoming commands from Game Thread
-        while (_stopRequests.TryDequeue(out int id)) 
+        while (_stopRequests.TryDequeue(out int id))
         {
-            _voiceManager?.RequestStop(id);
+            // A voice the manager does not own — anything started through PlayPhysicalSoundDirect —
+            // has to be stopped at the provider, or it never stops at all.
+            bool owned = _voiceManager?.RequestStop(id) ?? false;
+            if (!owned) _provider.StopSound(id);
         }
         
         while (_acousticPaths.TryDequeue(out var kvp)) 
@@ -191,6 +241,23 @@ public class AudioEngineFacade : IDisposable
     {
         // No-op in asynchronous mode, but kept for interface compatibility.
     }
+
+    /// <summary>
+    /// Brings the facade up WITHOUT its audio thread, and pumps it by hand.
+    ///
+    /// For tests only. The voice lifecycle is queue-driven, so asserting on it means draining the
+    /// queues deterministically; with the real thread running as well, the test and the engine race
+    /// each other through the same state and the result is noise rather than a verdict.
+    /// </summary>
+    internal void InitializeForTest()
+    {
+        if (!_provider.Initialize()) return;
+        _isInitialized = true;
+        _voiceManager = new VoiceManager(this, _bank, 256);
+    }
+
+    /// <summary>Runs one audio frame synchronously. Pair with <see cref="InitializeForTest"/>.</summary>
+    internal void PumpForTest() => Tick();
 
     public void UpdateListener(Vector3 pos, Quaternion rot, Vector3 vel, int regionId)
     {
@@ -307,6 +374,24 @@ public class AudioEngineFacade : IDisposable
     /// Requests a sound to stop. This may trigger a sequential "Shutdown" sound
     /// if the emitter is configured as a machine.
     /// </summary>
+    /// <summary>The mixer's DSP load, 0..1+. See IAudioProvider.MixerLoad.</summary>
+    public float MixerLoad => _isInitialized ? _provider.MixerLoad : 0f;
+
+    /// <summary>Brings a live engine voice back to full after a fade-out was started.</summary>
+    public void ReviveEngine(int entityId) { if (_isInitialized) _provider.ReviveEngine(entityId); }
+
+    /// <summary>Asks a live engine voice to fade out; true once it is silent and safe to stop.
+    /// Called from the game thread, and it only writes a float the mixer reads.</summary>
+    public bool FadeOutEngine(int entityId) => !_isInitialized || _provider.FadeOutEngine(entityId);
+
+    /// <summary>See IAudioProvider.TryGetEngineTelemetry — the four numbers that tell apart the four
+    /// different reasons a field of cars can sound like it is slowing down.</summary>
+    public bool TryGetEngineTelemetry(int entityId, out float toldSpeed, out float ownSpeed, out float rpm, out int gear)
+    {
+        toldSpeed = ownSpeed = rpm = 0f; gear = 0;
+        return _isInitialized && _provider.TryGetEngineTelemetry(entityId, out toldSpeed, out ownSpeed, out rpm, out gear);
+    }
+
     public void StopSound(int entityId) 
     {
         _stopRequests.Enqueue(entityId);

@@ -148,6 +148,17 @@ public class PrefabTemplate
     /// `Rotation`). Omit for the default forward (0,0,1). Only audible with a cone narrower than 360°.</summary>
     public Vector3? EmitterDirection { get; set; }
 
+    /// <summary>
+    /// Where the sound comes OUT, in the entity's LOCAL space: the emitter slot. Omit for the origin.
+    ///
+    /// Worth authoring for anything whose sound does not come from its own base. Everything acoustic
+    /// is asked about this point — what is in the way of it, how far it is, which way it arrives from —
+    /// and asking about the origin instead is what put a vehicle's occlusion probe half inside the
+    /// road surface on every level stretch of every track. A tailpipe is a third of a metre up and a
+    /// metre or two back; a chimney is on the roof; a drain is at ground level.
+    /// </summary>
+    public Vector3? EmitterOffset { get; set; }
+
     /// <summary>Directivity cone. Inside the inner angle the sound is at full volume, outside the outer
     /// angle it is at <see cref="ConeOutsideVolume"/>, between them it interpolates. Both in degrees,
     /// 0..360, inner &lt;= outer; 360/360 (the default) is omnidirectional.</summary>
@@ -156,6 +167,14 @@ public class PrefabTemplate
     public float? ConeOutsideAngle { get; set; }
     /// <inheritdoc cref="ConeInsideAngle"/>
     public float? ConeOutsideVolume { get; set; }
+
+    /// <summary>
+    /// Replay this emitter's sound every N seconds, with silence in between. Zero is not a repeater.
+    ///
+    /// Not the same as LoopOne, which restarts the instant the sample ends. The GAP is the point: an
+    /// announcement you can wait for is a landmark, and a drone is furniture.
+    /// </summary>
+    public float? RepeatIntervalSeconds { get; set; }
 
     // --- Granular synthesis (SoundEmitterComponent) --------------------------------------------------
 

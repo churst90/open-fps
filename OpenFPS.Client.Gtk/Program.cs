@@ -116,6 +116,9 @@ internal static class GtkClientProgram
         var lastTime = DateTime.Now;
         double accumulator = 0.0;
         const double targetDt = PhysicsConstants.FixedDeltaTime;
+        var _lastLoopReport = DateTime.Now;
+        int _loopIterations = 0;
+        double _worstLoopMs = 0;
 
         while (true)
         {
@@ -137,6 +140,30 @@ internal static class GtkClientProgram
                         accumulator -= targetDt;
                     }
                     _session.ContinuousUpdate();
+
+                    // ── What rate this loop is actually managing ──────────────────────────────
+                    //
+                    // ContinuousUpdate is where every sound in the world gets its position, so the
+                    // period of THIS loop is the resolution of every moving source. Nothing measured
+                    // it, and with thirty cars instead of eight there is four times the per-source
+                    // work inside one iteration. Reported next to the audio system's own figure, so
+                    // a stall can be attributed to the loop or to the audio pass rather than guessed
+                    // at: if the loop is slow, it is the loop; if the loop is fine and the placement
+                    // gap is not, it is the audio pass.
+                    _loopIterations++;
+                    double loopMs = (DateTime.Now - now).TotalMilliseconds;
+                    if (loopMs > _worstLoopMs) _worstLoopMs = loopMs;
+                    if ((now - _lastLoopReport).TotalSeconds >= 5.0)
+                    {
+                        double hz = _loopIterations / (now - _lastLoopReport).TotalSeconds;
+                        if (hz < 45 || _worstLoopMs > 100)
+                            Log.Warning("Game loop: {Hz:F0} Hz, worst iteration {Worst:F0} ms. Every moving sound "
+                                      + "is placed once per iteration, so this is how often a car's engine moves.",
+                                        hz, _worstLoopMs);
+                        else
+                            Log.Information("Game loop: {Hz:F0} Hz, worst iteration {Worst:F0} ms.", hz, _worstLoopMs);
+                        _lastLoopReport = now; _loopIterations = 0; _worstLoopMs = 0;
+                    }
                 }
                 else
                 {
