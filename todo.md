@@ -1031,7 +1031,42 @@ About four bytes per driven vehicle per tick, and there are only ever a handful.
 automatic as the default, `[` and `]` to shift, gear announced, auto-clutch. A clutch key is one key
 too many.
 
-### 4b. `/spawn` cannot actually build a shell — found live, blocks using any of this
+### 4a. DONE — building where you cannot point (2026-09-15)
+
+`/spawn` could only drop a box three metres ahead at your own feet height, so a player could make a
+heap and could not make a shed. Replaced with a cursor.
+
+- [x] `BuildSession` on the player: an origin they set at their own feet, a cursor in origin-relative
+      metres, and what they have placed. The axes are the BUILDER'S and they are fixed at the moment
+      the origin is set — fixed rather than live, because a coordinate system that turns when you turn
+      is one where the wall you placed a moment ago has moved.
+- [x] It reads out as "two right, three forward, one up", never as a world coordinate. Small numbers
+      relative to somewhere you chose are somewhere you can hold in your head and walk back to.
+- [x] `/at` says what is ALREADY at the cursor. Moving somewhere and being told nothing is the same
+      as not moving; being told "Concrete Wall" is how you find the wall you placed a minute ago and
+      build the next one against it.
+- [x] `/put prefab [turn d] [run n [direction]]`. The run is the important half: a wall is a LINE of
+      parts, and a line placed by hand is only as straight as the arithmetic somebody did in their
+      head. A run steps by the part's own footprint, so they touch, and leaves the cursor at the end.
+- [x] It refuses to build inside something that is already there, which is otherwise undetectable.
+- [x] `/undo`, which is not a convenience: a part in the wrong place is invisible to somebody who
+      cannot see it, so the mistake is not merely unfixed, it is undetectable until they walk into it,
+      and by then they have built three more things around it.
+- [x] **`/room` — the replacement for standing back and looking.** A dry run of the rule `/group`
+      will apply, asked BEFORE committing, and it names what is missing rather than saying no:
+      "only 3 of its six faces are walled — 4 are needed. Open: floor, ceiling, north wall." The
+      three rules are always all measured rather than stopping at the first failure, because a
+      builder told only the first thing wrong fixes it and is told the next thing, and building a
+      shed becomes twenty round trips.
+- [x] `/prefabs`, so there is a way to find out what can be put down and how big each one is.
+- [x] `BuildCursorTests`, driven through the real command path rather than the services — the
+      arithmetic being right is worth nothing if the words a player types do not reach it. Sabotage
+      pass extended to nineteen rows, all caught.
+
+Proved live over telnet: a four-walled shed with a roof, built from nothing, with `/room` correctly
+reporting a mis-aimed first wall as a missing north wall before it was fixed.
+
+### 4b. `/spawn` cannot actually build a shell — FIXED by 4a above, kept for the record
 
 Walking the room work through a real server turned up the practical blocker. `/spawn` always drops
 its box THREE METRES AHEAD OF YOU AT YOUR OWN FEET HEIGHT, and there is no way to turn it or raise

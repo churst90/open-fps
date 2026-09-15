@@ -46,6 +46,63 @@ public static class CompositeAcoustics
     /// <summary>How many of the six faces have to be walls. Four is a roofless yard.</summary>
     public const int MinimumCoveredFaces = 4;
 
+    /// <summary>What the six faces are called, in the order the whole codebase uses them.</summary>
+    public static readonly string[] FaceNames = { "floor", "ceiling", "north wall", "south wall", "east wall", "west wall" };
+
+    /// <summary>
+    /// What was found when the parts were asked whether they enclose anything — and, when they do
+    /// not, WHICH of the three rules said no and by how much.
+    ///
+    /// The diagnosis is not a debugging aid, it is the feature. A sighted builder can stand back and
+    /// see that the roof is missing; a player who cannot has no way to tell a shed from four walls
+    /// and a hole except by being told. "It is not a room" is a dead end. "Its ceiling is open" is
+    /// an instruction.
+    /// </summary>
+    public readonly struct RoomSurvey
+    {
+        public required Vector3 Size { get; init; }
+        public required float SolidFraction { get; init; }
+        /// <summary>0..1 per face, in <see cref="FaceNames"/> order.</summary>
+        public required float[] Coverage { get; init; }
+        /// <summary>What each face is mostly made of, in <see cref="FaceNames"/> order.</summary>
+        public required string[] Materials { get; init; }
+        public required int PartCount { get; init; }
+
+        public float SmallestDimension => MathF.Min(Size.X, MathF.Min(Size.Y, Size.Z));
+        public bool BigEnough => SmallestDimension >= MinimumRoomDimension;
+        public bool Hollow => SolidFraction <= MaxSolidFraction;
+        public int Walls { get { int n = 0; foreach (float c in Coverage) if (c >= FaceCoverage) n++; return n; } }
+        public bool Covered => Walls >= MinimumCoveredFaces;
+        public bool IsRoom => PartCount > 0 && BigEnough && Hollow && Covered;
+
+        /// <summary>One or two sentences a person can act on.</summary>
+        public string Explain()
+        {
+            if (PartCount == 0) return "There is nothing here to enclose anything.";
+
+            string shape = $"{Size.X:F1} by {Size.Z:F1} metres and {Size.Y:F1} high";
+            if (IsRoom)
+                return $"It encloses a room {shape}, with {Walls} of its six faces walled "
+                     + $"({string.Join(", ", Open())} open). The floor is {Materials[0]}.";
+
+            if (!BigEnough)
+                return $"It is {shape} — only {SmallestDimension:F1} metres through at its narrowest, "
+                     + $"so there is no inside to it. A room needs {MinimumRoomDimension:F0} metres in every direction.";
+            if (!Hollow)
+                return $"It is {shape} but {SolidFraction * 100f:F0} per cent solid, so there is nowhere in it "
+                     + "to stand. Spread the parts out or hollow it.";
+            return $"It is {shape}, and only {Walls} of its six faces are walled — {MinimumCoveredFaces} are needed. "
+                 + $"Open: {string.Join(", ", Open())}.";
+        }
+
+        /// <summary>The faces that are not walls, named.</summary>
+        public IEnumerable<string> Open()
+        {
+            for (int i = 0; i < Coverage.Length; i++)
+                if (Coverage[i] < FaceCoverage) yield return FaceNames[i];
+        }
+    }
+
     /// <summary>The face order the whole codebase uses: floor, ceiling, north, south, east, west.</summary>
     private static readonly (int Axis, float Side)[] Faces =
     {
@@ -68,47 +125,103 @@ public static class CompositeAcoustics
                               out RegionComponent room, out Vector3 centre)
     {
         room = default;
-        var size = Bounds(world, parts, out centre);
-        if (parts.Count == 0) return false;
+        var survey = Survey(world, parts, out centre);
+        if (!survey.IsRoom) return false;
 
-        // 1. Big enough to be inside.
-        if (MathF.Min(size.X, MathF.Min(size.Y, size.Z)) < MinimumRoomDimension) return false;
-
-        // 2. Mostly empty.
-        float boxVolume = size.X * size.Y * size.Z;
-        float solid = 0f;
-        foreach (var part in parts)
-        {
-            if (!world.Has<ColliderComponent>(part)) continue;
-            var s = world.Get<ColliderComponent>(part).Size;
-            solid += MathF.Abs(s.X * s.Y * s.Z);
-        }
-        if (boxVolume <= 0f || solid / boxVolume > MaxSolidFraction) return false;
-
-        // 3. Mostly covered — and, on the way, what each face is made of.
         var materials = new int[6];
-        int walls = 0;
-        for (int f = 0; f < Faces.Length; f++)
-        {
-            float coverage = Face(world, parts, size, centre, Faces[f].Axis, Faces[f].Side, out string material);
-            if (coverage >= FaceCoverage) walls++;
-            materials[f] = AcousticRegistry.TryGetResonanceIndex(material, out int index)
+        for (int f = 0; f < 6; f++)
+            materials[f] = AcousticRegistry.TryGetResonanceIndex(survey.Materials[f], out int index)
                 ? index
                 : AcousticRegistry.TryGetResonanceIndex("Generic", out int fallback) ? fallback : 0;
-        }
-        if (walls < MinimumCoveredFaces) return false;
 
         room = new RegionComponent
         {
             FriendlyName = string.IsNullOrWhiteSpace(name) ? "Inside" : name,
             IsIndoor = true,
             Environment = AcousticEnvironmentType.Atmospheric,
-            RoomSize = size,
+            RoomSize = survey.Size,
             ReverbTimeScale = 1.0f,
             Materials = materials,
             AmbienceId = "",
         };
         return true;
+    }
+
+    /// <summary>
+    /// Measures a set of parts against all three rules and reports everything it found, whether or
+    /// not they make a room.
+    ///
+    /// Always measures all three rather than stopping at the first failure, because a builder who is
+    /// told only the first thing wrong fixes it and is told the next thing, and building a shed
+    /// becomes twenty round trips. One survey, everything that is wrong with it.
+    /// </summary>
+    public static RoomSurvey Survey(World world, List<Entity> parts, out Vector3 centre)
+        => Survey(Pieces(world, parts, loose: false), out centre);
+
+    /// <summary>
+    /// The same survey, asked of entities that are not in a composite yet.
+    ///
+    /// `/room` is a DRY RUN — it answers "would this be a room if I grouped it" before anyone commits
+    /// to grouping it, which is the difference between finding out your roof is missing now and
+    /// finding out after you have saved it as a template. Loose entities have no parent to be
+    /// relative to, so they are measured in the world's frame, which is exactly the frame a fresh
+    /// grouping would put them in anyway.
+    /// </summary>
+    public static RoomSurvey SurveyLoose(World world, List<Entity> entities)
+        => Survey(Pieces(world, entities, loose: true), out _);
+
+    /// <summary>One part, reduced to the four things this file cares about.</summary>
+    private readonly record struct Piece(Vector3 Position, Quaternion Rotation, Vector3 Size, string Material);
+
+    private static List<Piece> Pieces(World world, List<Entity> parts, bool loose)
+    {
+        var pieces = new List<Piece>(parts.Count);
+        foreach (var part in parts)
+        {
+            if (!world.Has<ColliderComponent>(part)) continue;
+            Vector3 position;
+            Quaternion rotation;
+            if (loose)
+            {
+                if (!world.Has<Transform>(part)) continue;
+                var t = world.Get<Transform>(part);
+                position = t.Position;
+                rotation = t.Rotation;
+            }
+            else
+            {
+                if (!world.Has<ParentComponent>(part)) continue;
+                var parent = world.Get<ParentComponent>(part);
+                position = parent.LocalPosition;
+                rotation = parent.LocalRotation;
+            }
+            pieces.Add(new Piece(position, rotation, world.Get<ColliderComponent>(part).Size,
+                                 world.Has<MaterialComponent>(part) ? world.Get<MaterialComponent>(part).Material ?? "Generic" : "Generic"));
+        }
+        return pieces;
+    }
+
+    private static RoomSurvey Survey(List<Piece> pieces, out Vector3 centre)
+    {
+        var size = Bounds(pieces, out centre);
+
+        float boxVolume = size.X * size.Y * size.Z;
+        float solid = 0f;
+        foreach (var piece in pieces) solid += MathF.Abs(piece.Size.X * piece.Size.Y * piece.Size.Z);
+
+        var coverage = new float[6];
+        var materials = new string[6];
+        for (int f = 0; f < Faces.Length; f++)
+            coverage[f] = Face(pieces, size, centre, Faces[f].Axis, Faces[f].Side, out materials[f]);
+
+        return new RoomSurvey
+        {
+            Size = size,
+            SolidFraction = boxVolume > 0f ? solid / boxVolume : float.MaxValue,
+            Coverage = coverage,
+            Materials = materials,
+            PartCount = pieces.Count,
+        };
     }
 
     /// <summary>
@@ -119,7 +232,7 @@ public static class CompositeAcoustics
     /// wall that is a little inboard of the corner still count as that wall, and it is why a pillar in
     /// the middle of a room covers nothing.
     /// </summary>
-    private static float Face(World world, List<Entity> parts, Vector3 size, Vector3 centre,
+    private static float Face(List<Piece> pieces, Vector3 size, Vector3 centre,
                               int axis, float side, out string material)
     {
         material = "Generic";
@@ -131,24 +244,16 @@ public static class CompositeAcoustics
         float depth = MathF.Max(0.5f, Component(size, a) * 0.25f);
 
         float covered = 0f, best = 0f;
-        foreach (var part in parts)
+        foreach (var piece in pieces)
         {
-            if (!world.Has<ColliderComponent>(part) || !world.Has<ParentComponent>(part)) continue;
-            var parent = world.Get<ParentComponent>(part);
-            var half = AxisAlignedHalfExtents(world.Get<ColliderComponent>(part).Size * 0.5f, parent.LocalRotation);
+            var half = AxisAlignedHalfExtents(piece.Size * 0.5f, piece.Rotation);
 
-            float outer = Component(parent.LocalPosition, a) + side * Component(half, a);
+            float outer = Component(piece.Position, a) + side * Component(half, a);
             if (MathF.Abs(plane - outer) > depth) continue;
 
             float area = 4f * Component(half, b) * Component(half, c);
             covered += area;
-            if (area > best)
-            {
-                best = area;
-                material = world.Has<MaterialComponent>(part)
-                    ? world.Get<MaterialComponent>(part).Material ?? "Generic"
-                    : "Generic";
-            }
+            if (area > best) { best = area; material = piece.Material; }
         }
         return MathF.Min(1f, covered / faceArea);
     }
@@ -161,20 +266,19 @@ public static class CompositeAcoustics
     /// naive way makes every building that has corners come out the wrong shape.
     /// </summary>
     public static Vector3 Bounds(World world, List<Entity> parts, out Vector3 centre)
+        => Bounds(Pieces(world, parts, loose: false), out centre);
+
+    private static Vector3 Bounds(List<Piece> pieces, out Vector3 centre)
     {
         centre = Vector3.Zero;
-        if (parts.Count == 0) return Vector3.Zero;
+        if (pieces.Count == 0) return Vector3.Zero;
 
         Vector3 min = new(float.MaxValue), max = new(float.MinValue);
-        foreach (var part in parts)
+        foreach (var piece in pieces)
         {
-            if (!world.Has<ParentComponent>(part)) continue;
-            var parent = world.Get<ParentComponent>(part);
-            var half = world.Has<ColliderComponent>(part)
-                ? AxisAlignedHalfExtents(world.Get<ColliderComponent>(part).Size * 0.5f, parent.LocalRotation)
-                : Vector3.Zero;
-            min = Vector3.Min(min, parent.LocalPosition - half);
-            max = Vector3.Max(max, parent.LocalPosition + half);
+            var half = AxisAlignedHalfExtents(piece.Size * 0.5f, piece.Rotation);
+            min = Vector3.Min(min, piece.Position - half);
+            max = Vector3.Max(max, piece.Position + half);
         }
         if (min.X > max.X) return Vector3.Zero;
 

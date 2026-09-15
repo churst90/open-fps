@@ -31,8 +31,8 @@ SABOTAGE = [
 
  ("Every room is made of Generic, whatever the walls are",
   "OpenFPS.Server/Core/CompositeAcoustics.cs",
-  "            material = world.Has<MaterialComponent>(part)\n                    ? world.Get<MaterialComponent>(part).Material ?? \"Generic\"\n                    : \"Generic\";",
-  "            material = \"Generic\";",
+  "            if (area > best) { best = area; material = piece.Material; }",
+  "            if (area > best) { best = area; material = \"Generic\"; }",
   "TheRoomTakesItsMaterialsFromTheParts"),
 
  ("Measure rotated parts by their own dimensions rather than the box that contains them",
@@ -70,6 +70,55 @@ SABOTAGE = [
   "            ForgetRegions(removed);",
   "",
   "ARoomThatArrivesAfterTheBakeStillReachesTheAcousticMap"),
+
+ # ── The build cursor ───────────────────────────────────────────────────────────────────────────
+ ("Ignore the build heading, so the cursor's axes are the world's",
+  "OpenFPS.Server/Core/BuildSession.cs",
+  "        => Origin + Vector3.Transform(local, Quaternion.CreateFromYawPitchRoll(Yaw, 0f, 0f));",
+  "        => Origin + local;",
+  "TheCursorsAxesAreTheBuildersAndTheyDoNotMove"),
+
+ ("Space a run by one metre instead of by the part's own footprint",
+  "OpenFPS.Server/Core/CommandHandler.cs",
+  "        return MathF.Max(0.1f, along * 2f);",
+  "        return 1f;",
+  "ARunComesOutStraightAndTouching"),
+
+ ("Leave the cursor where the run started",
+  "OpenFPS.Server/Core/CommandHandler.cs",
+  "        if (placed > 1) build.Cursor += step * (spacing * placed);",
+  "",
+  "ARunLeavesTheCursorAtTheEndOfIt"),
+
+ ("Never say what is already at the cursor",
+  "OpenFPS.Server/Core/CommandHandler.cs",
+  "        if (closest == null) return \"Empty.\";",
+  "        if (true) return \"Empty.\";",
+  "TheCursorSaysWhatIsAlreadyThere"),
+
+ ("Build straight through whatever is already there",
+  "OpenFPS.Server/Core/CommandHandler.cs",
+  "            if (Occupied(world, grid, at, 0.3f)) { blocked++; continue; }",
+  "",
+  "ItRefusesToBuildInsideSomethingThatIsAlreadyThere"),
+
+ ("Undo says it did something without destroying anything",
+  "OpenFPS.Server/Core/CommandHandler.cs",
+  "            _maps.DestroyEntity(session.CurrentMapId, e);",
+  "",
+  "AMistakeCanBeTakenBack"),
+
+ ("A refusal that does not say which faces are open",
+  "OpenFPS.Server/Core/CompositeAcoustics.cs",
+  "            return $\"It is {shape}, and only {Walls} of its six faces are walled — {MinimumCoveredFaces} are needed. \"\n                 + $\"Open: {string.Join(\", \", Open())}.\";",
+  "            return \"It is not a room.\";",
+  "RoomSaysWhatIsMissingAndNotJustNo"),
+
+ ("A room that does not say what is still open",
+  "OpenFPS.Server/Core/CompositeAcoustics.cs",
+  "                return $\"It encloses a room {shape}, with {Walls} of its six faces walled \"\n                     + $\"({string.Join(\", \", Open())} open). The floor is {Materials[0]}.\";",
+  "                return $\"It encloses a room {shape}.\";",
+  "ItNamesWhatIsStillOpenEvenWhenItPasses"),
 ]
 
 def run(test):
@@ -100,7 +149,10 @@ for label, rel, find, repl, test in SABOTAGE:
 print("\n=== SABOTAGE RESULTS (want FAILED for every row) ===")
 worst = 0
 for label, test, outcome in results:
-    mark = "caught" if outcome == "FAILED" else "*** NOT CAUGHT ***"
+    mark = {"FAILED": "caught",
+            "PASSED": "*** TEST DID NOT BITE ***",
+            "PATCH-DID-NOT-APPLY": "*** SABOTAGE IS STALE ***",
+            "BUILD-ERROR": "*** SABOTAGE DID NOT COMPILE ***"}.get(outcome, f"*** {outcome} ***")
     if outcome != "FAILED": worst = 1
-    print(f"{mark:20} {test:52} {label}")
+    print(f"{mark:32} {test:52} {label}")
 sys.exit(worst)

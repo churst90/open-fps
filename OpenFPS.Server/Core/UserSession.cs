@@ -58,4 +58,12 @@ public class UserSession
     public OpenFPS.Common.GroundProbeMemo GroundProbe;
 
     public DateTime LastCollisionTime { get; set; } = DateTime.MinValue;
+
+    /// <summary>
+    /// Where this player is building, and what they have put there.
+    ///
+    /// Per-session and deliberately not persisted: a build cursor is a place you are working, like a
+    /// caret, not a property of the world. It goes when you do.
+    /// </summary>
+    public BuildSession Build { get; } = new();
 }

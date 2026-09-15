@@ -683,7 +683,15 @@ public class GameServer
         });
     }
 
-    /// <summary>Tells every session on a map that an entity is gone, and forgets it on their behalf.</summary>
+    /// <summary>
+    /// Tells every session on a map that an entity is gone, and forgets it on their behalf.
+    ///
+    /// Public because /undo destroys things too, and an entity destroyed without this stays on every
+    /// client forever: still in their acoustic map, still occluding, still answering a scan. Every
+    /// other message about an entity is additive, so this is the only thing that can take one back.
+    /// </summary>
+    public void BroadcastRemoval(string mapId, int entityId) => BroadcastEntityRemoved(mapId, entityId);
+
     private void BroadcastEntityRemoved(string mapId, int entityId)
     {
         foreach (var other in _sessions.GetSessionsInMap(mapId))

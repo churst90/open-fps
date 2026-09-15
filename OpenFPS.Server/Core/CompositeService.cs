@@ -42,6 +42,7 @@ public class CompositeService
     }
 
     public CompositeRepository Templates => _composites;
+    public PrefabRepository Prefabs => _prefabs;
 
     /// <summary>
     /// What a grouping sweep will and will not take.
@@ -169,7 +170,7 @@ public class CompositeService
     /// exactly the line a person would draw. Widen the radius and the bigger thing comes into scope,
     /// which is also right: at thirty metres you plainly do mean the building.
     /// </summary>
-    private static bool IsBiggerThanTheSweep(World world, Entity e, float radius)
+    public static bool IsBiggerThanTheSweep(World world, Entity e, float radius)
     {
         if (!world.Has<ColliderComponent>(e)) return false;
         var size = world.Get<ColliderComponent>(e).Size;

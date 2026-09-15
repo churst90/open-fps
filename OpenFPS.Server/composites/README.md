@@ -5,6 +5,36 @@ vehicle body. Each file here is a template — what it is called, whether it is 
 made of, where people sit in it and what it drives as — with every part positioned in the composite's
 OWN frame rather than the world's.
 
+## Putting the parts there in the first place
+
+You cannot point at anything, so there is a CURSOR: moved in metres from an origin you chose, saying
+where it is and what is already there every time it moves. A review cursor, on a building site.
+
+    /origin                          — origin at your feet, forward is the way you face
+    /at 2 0 4                        — cursor to 2 right, 4 forward: "Cursor 4 forward, 2 right. Empty."
+    /at forward 3                    — or step it, relative to where it already is
+    /put concrete_wall               — put one there
+    /put concrete_wall run 4 right   — run four of them, touching, dead straight
+    /put concrete_wall turn 90       — turned ninety degrees from your build heading
+    /undo                            — take back the last thing you placed
+    /room [radius]                   — stand back and listen to what you have built
+    /prefabs                         — what there is to put down, and how big each one is
+
+The axes are yours and they do not move: right, up and forward from where you were standing when you
+set the origin. Fixed rather than live, because a coordinate system that turns when you turn is one
+where the wall you placed a moment ago has moved.
+
+`run` is the important one. A wall is not one part, it is a line of them, and a line placed by hand
+is only as straight as the arithmetic you did in your head. A run steps by the part's own footprint,
+so the panels touch and the wall is straight, and the cursor is left at the end of it ready for the
+next one.
+
+`/room` is the replacement for standing back and looking. It measures exactly what `/group` would
+take, before you commit to grouping it, and it names what is missing rather than just saying no:
+
+    16 part(s) within 9 m. It is 11.2 by 8.2 metres and 4.5 high, and only 3 of its six
+    faces are walled — 4 are needed. Open: floor, ceiling, north wall.
+
 They are written by the game, not by hand. Stand among the parts and:
 
     /group cabin          — make one thing out of everything within 12 m (add a radius to widen it)
