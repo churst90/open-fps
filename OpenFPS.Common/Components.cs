@@ -515,3 +515,68 @@ public partial struct DerivedRoomComponent
 {
     public DerivedRoomComponent() { }
 }
+
+/// <summary>
+/// A door: a part that swings out of its own doorway.
+///
+/// It is an ordinary part of a composite — a leaf like a wall is a leaf — and everything that makes
+/// it a door rather than a wall is here. Two things happen when it opens, and only one of them is
+/// the obvious one.
+///
+/// The leaf SWINGS ASIDE. It is always solid; what changes is where it is. A door that went
+/// non-solid to let you through would be a door you could walk through while it was shut and standing
+/// in front of you, and one whose open leaf was not in the way of anything — which is wrong twice.
+///
+/// And the OPENING appears. A <see cref="PortalComponent"/> on the same part has its aperture driven
+/// by how far the leaf has swung, so the room beyond opens up gradually as it moves. That is the half
+/// that matters to somebody listening: a door is not a thing you hear, it is a thing that changes
+/// what you can hear through it, and the existing portal machinery already knows how to do that. No
+/// new acoustics were needed, only something to move the number.
+/// </summary>
+[MemoryPackable]
+public partial struct DoorComponent
+{
+    /// <summary>0 is shut, 1 is as far as it goes.</summary>
+    public float Openness { get; set; }
+
+    /// <summary>What it is swinging toward. The difference between this and <see cref="Openness"/> is
+    /// what makes a door take a moment rather than teleporting between two states.</summary>
+    public float Target { get; set; }
+
+    /// <summary>How long the full swing takes, seconds.</summary>
+    public float SwingSeconds { get; set; }
+
+    /// <summary>How far it opens, radians. A quarter turn for nearly everything.</summary>
+    public float SwingRadians { get; set; }
+
+    /// <summary>
+    /// Which edge it is hinged on: -1 for the left edge, +1 for the right.
+    ///
+    /// Not cosmetic. It decides which way the leaf sweeps, and therefore which side of the doorway is
+    /// blocked while it is moving — and for somebody who navigates by ear, an open door heard on your
+    /// left is a different piece of information from one heard on your right.
+    /// </summary>
+    public float HingeSide { get; set; }
+
+    /// <summary>How wide the opening is when the leaf is out of the way, metres. Derived from the
+    /// leaf itself at capture: a door makes a hole exactly its own size.</summary>
+    public float Aperture { get; set; }
+
+    /// <summary>Where the leaf sits when shut, in whatever frame it lives in — parent-local for a
+    /// door in a composite, world for one standing on its own.</summary>
+    public Vector3 ShutPosition { get; set; }
+
+    /// <summary>...and which way it faces when shut, in that same frame.</summary>
+    public float ShutYaw { get; set; }
+
+    /// <summary>Whether the shut pose above has been taken yet. A door records where "shut" is the
+    /// first time it is looked at, so a door placed anywhere by anything is shut where it was put.</summary>
+    public bool Captured { get; set; }
+
+    public DoorComponent()
+    {
+        SwingSeconds = 0.9f;
+        SwingRadians = MathF.PI / 2f;
+        HingeSide = 1f;
+    }
+}

@@ -245,4 +245,28 @@ public class PrefabTemplate
     public int? RegionBId { get; set; }
     /// <summary>Width of the opening in metres (&gt;= 0). 0 means "derive it from the collider at map load".</summary>
     public float? ApertureSize { get; set; }
+
+    // --- Door (DoorComponent) --------------------------------------------------------------------
+
+    /// <summary>
+    /// Declares the entity a DOOR: a leaf that swings out of its own doorway.
+    ///
+    /// A door is the one thing that is legitimately a portal AND solid. The leaf blocks the opening
+    /// while it is shut — that is what a door is for — and opening it moves the leaf aside rather
+    /// than making it insubstantial. Everything else that is both is a mistake and is still rejected.
+    ///
+    /// A door needs a collider, because the leaf's own width is both what it blocks and the size of
+    /// the hole it leaves.
+    /// </summary>
+    public bool? IsDoor { get; set; }
+
+    /// <summary>How long the full swing takes, seconds. Defaults to a little under a second.</summary>
+    public float? SwingSeconds { get; set; }
+
+    /// <summary>How far it opens, DEGREES — this is a file people read. A quarter turn by default.</summary>
+    public float? SwingDegrees { get; set; }
+
+    /// <summary>Which edge it is hinged on: -1 the left, +1 the right. Decides which way it sweeps,
+    /// and therefore which side of the doorway an open leaf is heard on.</summary>
+    public float? HingeSide { get; set; }
 }

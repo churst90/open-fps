@@ -918,7 +918,66 @@ a developer visits it.
 Everything here was asked for in the walkthrough after occupancy landed. Ordered by what unblocks
 what, not by how interesting it is.
 
-### 1. Doors — unblocked by the room work above, do this next
+### 1. DONE — Doors (2026-09-15)
+
+A door is two things at once and only one of them is obvious.
+
+- [x] **The leaf swings aside.** It is solid the whole time; what opening changes is where it is. A
+      door that went insubstantial instead would be one you could walk through while it was shut and
+      standing in front of you, and one whose open leaf was in the way of nothing. So there is no
+      collider mutation anywhere in this — just a leaf that moves.
+- [x] **The opening appears**, and that is the half a listener cares about. A `PortalComponent` on
+      the same part has its aperture driven by how far the leaf has swung, so the room beyond opens
+      up gradually as it moves. No new acoustics were written: the portal machinery already knew how
+      to do this, and all `DoorSystem` does is move the number.
+- [x] The hinge is an EDGE. Swinging about the centre would sweep the leaf through the doorway in
+      both directions and leave half of it in the way at ninety degrees. Which edge is authored, and
+      it is not cosmetic — an open door heard on your left is a different fact from one on your right.
+- [x] `DoorSystem` runs BEFORE `ParentSystem` and writes the swing into the door's
+      `ParentComponent`, because a door in a building is one of its parts and ParentSystem rewrites
+      every part's world pose from its local one every tick. A door standing on its own has no parent
+      and is moved directly.
+- [x] The client is told as the leaf moves, over the path that already re-sends an entity whose audio
+      changed — but only when the aperture has moved enough to matter. Every tick would be thirty
+      reliable messages for a thing that takes a second.
+- [x] `ClientWorldState` tracks runtime portals the way it already tracks runtime regions, and a shut
+      door comes straight back OFF the map: an aperture of zero is not an opening, which is the same
+      thing the bake already does with one.
+- [x] Which room a doorway joins is a property of WHERE IT IS, so the link is made when the room is
+      derived and remade whenever the shape changes. A door in a building leads out of it, with
+      nobody authoring the pair.
+- [x] **Which door serves which seat is proximity, not a table.** `/open` from a seat reaches from
+      the seat, so on a bus you open the door beside you rather than the one nearest the middle.
+- [x] `door` and `steel_door` prefabs, `IsDoor` / `SwingSeconds` / `SwingDegrees` / `HingeSide` in
+      the prefab format. A door is the one thing legitimately a portal AND solid, so the validator
+      learned that exception — and only that one; everything else that is both is still the mistake
+      it always was.
+- [x] Commands `/open [name]`, `/close`, `/doors`. Not elevated: building a door needs a role, going
+      through one does not. `/doors` says the STATE as well as the name, because an open door and a
+      shut one in the same place are different facts and the only other way to find out which you
+      have is to walk into it.
+- [x] Reach is `PhysicsConstants.InteractionRange`, the same as everything else you reach for, and a
+      refusal names the distance — found live, where `/doors` reported a door at 4.7 m while `/open`
+      said there was none within four, which is the tool contradicting itself.
+- [x] **Found live: grouping a building changes the frame its doors live in.** A door records where
+      "shut" is in whatever frame it lives in — world when loose, parent-local when part of a
+      building — so one that kept a world pose and was then asked to swing as a part computed its
+      local pose from a world one and flung the leaf out of the world. A shed's door opened
+      perfectly until the shed was grouped, and then vanished. Doors now shut and forget their
+      reference pose whenever they are grouped or ungrouped, which is both easy to say and what
+      anybody would expect. The tests had missed it because the fixture grouped in the same instant
+      it built, so no door ever recorded a loose pose to go stale; the fixture now lets the building
+      stand for a moment first, the way a real one does.
+- [x] `DoorTests`: 14 tests, and the sabotage suite is up to 31 rows, all caught.
+
+Still to come, and it is the sound: the **latch** (a small sharp metallic transient), the **seal**
+(a short pressure whoomp as it compresses, which is most of why an expensive car sounds expensive and
+is absent entirely on a van's sliding door), and the **panel** ringing at its own modes afterwards,
+so a steel door, a glass one and a canvas flap are three different events. All three fall out of
+material and area. Hinges creaking are a stick-slip relaxation oscillation — the same process as tyre
+squeal, which `TyreFriction` already models.
+
+### 1b. The original plan, kept for the reasoning
 
 Three pieces already exist and compose; the thing to resist is inventing a fourth.
 

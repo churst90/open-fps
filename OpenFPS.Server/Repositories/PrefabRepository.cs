@@ -293,13 +293,33 @@ public class PrefabRepository
             components.Add(region);
         }
 
-        if (t.RegionAId.HasValue || t.RegionBId.HasValue)
+        bool isDoor = t.IsDoor == true;
+
+        // A door is always a portal, whether or not the prefab said so: the opening it makes when it
+        // swings aside is the entire point of it, and an aperture with nothing to join joins the
+        // outside, which is right for a front door and harmless for any other.
+        if (t.RegionAId.HasValue || t.RegionBId.HasValue || isDoor)
         {
             components.Add(new PortalComponent
             {
                 RegionAId = t.RegionAId ?? AcousticConstants.GlobalRegionId,
                 RegionBId = t.RegionBId ?? AcousticConstants.GlobalRegionId,
-                ApertureSize = t.ApertureSize ?? 0f
+                // Shut. A door's aperture is not authored — it is however far the leaf has swung, and
+                // at rest the leaf has not.
+                ApertureSize = isDoor ? 0f : t.ApertureSize ?? 0f
+            });
+        }
+
+        if (isDoor)
+        {
+            components.Add(new DoorComponent
+            {
+                SwingSeconds = t.SwingSeconds ?? 0.9f,
+                SwingRadians = (t.SwingDegrees ?? 90f) * (MathF.PI / 180f),
+                HingeSide = t.HingeSide is < 0 ? -1f : 1f,
+                // Left at zero so DoorSystem takes it from the leaf itself: a door makes a hole
+                // exactly its own size, and a second authored copy of that could only disagree.
+                Aperture = 0f,
             });
         }
 

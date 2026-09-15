@@ -72,6 +72,24 @@ torque through its own gearbox, what it corners and stops at comes out of its ty
 against its mass, and what it will not exceed comes out of its drag area. Give the same shape of car
 a lorry's profile and it drives like a lorry. `/drivable` with no argument lists the profiles.
 
+## Doors
+
+    /put door                        — a leaf that swings out of its own doorway
+    /put steel_door                  — heavier, slower, and it lets almost nothing through
+    /open [name]                     — open the one within reach; from a seat, the one beside you
+    /close                           — shut it again
+    /doors                           — what is near, which way, how far, and whether it is open
+
+A door is solid the whole time. Opening it moves the leaf aside, which is what a door does — one
+that went insubstantial would be a door you could walk through while it was shut in front of you.
+
+What you actually hear is the opening. The aperture on the door's portal follows the leaf, so the
+room beyond opens up gradually as it swings, and a door in a building automatically leads out of that
+building — which room a doorway joins is a property of where it is, so nobody authors the pair.
+
+A door shuts when the building around it is grouped or taken apart. Where "shut" is depends on
+whether the door is loose in the world or part of a building, and grouping changes which.
+
 ## The inside of one
 
 A composite that encloses space grows a room, and nobody authors it. Put four walls, a floor and a

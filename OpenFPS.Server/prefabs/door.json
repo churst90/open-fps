@@ -1,0 +1,16 @@
+{
+  "Id": "door",
+  "Name": "Door",
+  "Description": "A leaf that swings out of its own doorway. Solid while it is shut, because that is what a door is for; opening it moves the leaf aside rather than making it insubstantial, and the opening it leaves is what changes what you can hear through it.",
+  "Material": "Wood",
+  "ColliderSize": { "X": 0.9, "Y": 2.1, "Z": 0.06 },
+  "IsSolid": true,
+  "Type": "StaticObject",
+  "IsDoor": true,
+  "SwingSeconds": 0.9,
+  "SwingDegrees": 90,
+  "HingeSide": 1,
+  "TransmissionLow": 0.6,
+  "TransmissionMid": 0.35,
+  "TransmissionHigh": 0.15
+}

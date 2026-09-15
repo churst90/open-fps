@@ -258,10 +258,21 @@ public static class PrefabValidator
         // --- Portal ---------------------------------------------------------------------------------
         bool declaresPortal = t.RegionAId.HasValue || t.RegionBId.HasValue;
 
-        if (declaresPortal || t.ApertureSize.HasValue)
+        bool isDoor = t.IsDoor == true;
+
+        if (declaresPortal || t.ApertureSize.HasValue || isDoor)
         {
-            if (isSolid)
+            // A DOOR is the one thing that is legitimately both. The leaf blocks the opening while it
+            // is shut — that is what a door is for — and opening it swings the leaf aside rather than
+            // making it insubstantial. Everything else that is both is still the mistake this says.
+            if (isSolid && !isDoor)
                 r.Errors.Add("This is a portal AND a solid collider — a doorway that blocks the doorway. Set IsSolid to false.");
+            if (isDoor && !hasCollider)
+                r.Errors.Add("A door needs a collider: the leaf's own width is both what it blocks and the size "
+                           + "of the hole it leaves when it swings aside.");
+            if (isDoor && t.SwingSeconds is <= 0)
+                r.Errors.Add($"SwingSeconds {t.SwingSeconds} must be positive; a door that opens in no time is a door "
+                           + "nobody can hear open.");
             if (declaresRegion)
                 r.Errors.Add("The same entity declares both an acoustic REGION and a PORTAL. A portal joins two regions; " +
                              "it cannot be one of them. Split them into two entities.");

@@ -190,6 +190,33 @@ public class CompositeService
                 LocalRotation = inverse * t.Rotation,
             });
         }
+        ShutAndForget(world, members);
+    }
+
+    /// <summary>
+    /// Shuts every door in a set and makes it forget where "shut" was.
+    ///
+    /// A door records its shut pose in whatever frame it lives in — world for one standing on its
+    /// own, parent-local for one that is part of a building. Grouping and ungrouping CHANGE that
+    /// frame, so a door that remembers a world position and is then asked to swing as a part
+    /// computes its local pose from a world one and flings the leaf out of the world. Found exactly
+    /// that way: a shed's door opened perfectly until the shed was grouped, and then vanished.
+    ///
+    /// Shutting it first rather than trying to carry the swing across is the honest answer. A door
+    /// shuts when the building it belongs to is picked up or taken apart, which is both easy to say
+    /// and what anybody would expect.
+    /// </summary>
+    private static void ShutAndForget(World world, IEnumerable<Entity> entities)
+    {
+        foreach (var e in entities)
+        {
+            if (!world.IsAlive(e) || !world.Has<DoorComponent>(e)) continue;
+            ref var door = ref world.Get<DoorComponent>(e);
+            door.Openness = 0f;
+            door.Target = 0f;
+            door.Captured = false;
+            if (world.Has<PortalComponent>(e)) world.Get<PortalComponent>(e).ApertureSize = 0f;
+        }
     }
 
     /// <summary>
@@ -222,6 +249,8 @@ public class CompositeService
             world.Remove<ParentComponent>(member);
             members.Add(member);
             partCount++;
+            // Its frame just changed from the building's to the world's; see ShutAndForget.
+            if (world.Has<DoorComponent>(member)) ShutAndForget(world, new[] { member });
         }
         // Whoever was inside it is standing in the open now; the thing they were sitting in is gone.
         foreach (var occupant in OccupantsOf(world, rootId)) Disembark(world, occupant);
@@ -545,8 +574,22 @@ public class CompositeService
             EntityType.Trigger));
         if (e == Entity.Null) return false;
 
-        Log.Information("Composite {Root} ('{Name}') encloses a room {Size} — floor {Floor}, walls {Walls}.",
-                        root.Id, name, room.RoomSize, room.Materials[0], room.Materials[2]);
+        // Every door in the building now leads somewhere: from this room to the outside. Which room a
+        // doorway joins is a property of WHERE IT IS, and until the room existed there was nothing
+        // for it to be a doorway into — so this is the moment the link can be made, and it is remade
+        // whenever the shape changes for the same reason.
+        int doors = 0;
+        foreach (var part in parts)
+        {
+            if (!world.Has<PortalComponent>(part) || !world.Has<DoorComponent>(part)) continue;
+            ref var portal = ref world.Get<PortalComponent>(part);
+            portal.RegionAId = e.Id;
+            portal.RegionBId = AcousticConstants.GlobalRegionId;
+            doors++;
+        }
+
+        Log.Information("Composite {Root} ('{Name}') encloses a room {Size} with {Doors} door(s) — floor {Floor}, walls {Walls}.",
+                        root.Id, name, room.RoomSize, doors, room.Materials[0], room.Materials[2]);
         return true;
     }
 

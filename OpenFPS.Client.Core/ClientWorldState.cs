@@ -195,6 +195,12 @@ public class ClientWorldState
         // nowhere.
         if (def.Region.RoomSize.X > 0f) TrackRegion(def);
 
+        // A door's aperture is not a fixed property of it, it is how far the leaf has swung. The
+        // server re-sends the definition as it moves, and this is what turns that into the opening
+        // the acoustics actually use — without it a door swings silently and nothing sounds different
+        // on the other side of it, which is the entire point of a door.
+        if (def.Portal.RegionAId != def.Portal.RegionBId) TrackPortal(def);
+
         // Anything that makes sound on its own is processed every frame. See RunsOnItsOwn: this used
         // to be a list of two playback modes rather than a rule, and everything outside the list was
         // silently absent from the audio system entirely.
@@ -235,6 +241,33 @@ public class ClientWorldState
         }
     }
 
+    /// <summary>
+    /// Puts a portal on the acoustic map, or moves the one already there.
+    ///
+    /// A shut door has no aperture and is therefore not an opening at all, so it comes straight back
+    /// off — which is right, and is the same thing the map bake does with an aperture of zero.
+    ///
+    /// Build-then-swap for the same reason as the regions: these tables are walked without a lock
+    /// from the audio worker while this runs on the network thread.
+    /// </summary>
+    private void TrackPortal(EntityDefinition def)
+    {
+        lock (_metaLock)
+        {
+            var map = AcousticMap;
+            if (map == null) return;
+
+            bool openable = def.Portal.ApertureSize > 0f;
+            bool known = map.Portals.ContainsKey(def.EntityId);
+            if (!openable && !known) return;
+
+            var portals = new Dictionary<int, (PortalComponent Portal, Vector3 Position)>(map.Portals);
+            if (openable) portals[def.EntityId] = (def.Portal, def.Transform.Position);
+            else portals.Remove(def.EntityId);
+            map.Portals = portals;
+        }
+    }
+
     /// <summary>Takes a region off the acoustic map when whatever enclosed it is gone.</summary>
     private void ForgetRegions(List<int> entityIds)
     {
@@ -255,6 +288,25 @@ public class ClientWorldState
             map.Regions = regions;
             map.RegionPositions = positions;
             map.RegionRotations = rotations;
+        }
+    }
+
+    /// <summary>...and the same for a doorway whose door is gone.</summary>
+    private void ForgetPortals(List<int> entityIds)
+    {
+        lock (_metaLock)
+        {
+            var map = AcousticMap;
+            if (map == null) return;
+
+            List<int>? present = null;
+            foreach (int id in entityIds)
+                if (map.Portals.ContainsKey(id)) (present ??= new List<int>()).Add(id);
+            if (present == null) return;
+
+            var portals = new Dictionary<int, (PortalComponent Portal, Vector3 Position)>(map.Portals);
+            foreach (int id in present) portals.Remove(id);
+            map.Portals = portals;
         }
     }
 
@@ -280,6 +332,7 @@ public class ClientWorldState
         if (removed.Count > 0)
         {
             ForgetRegions(removed);
+            ForgetPortals(removed);
             lock (_gridLock)
             {
                 _gridNeedsRebuild = true;

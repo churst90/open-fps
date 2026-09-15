@@ -1,0 +1,16 @@
+{
+  "Id": "steel_door",
+  "Name": "Steel Door",
+  "Description": "The same leaf in steel: heavier, slower on its hinges, and it lets almost nothing through while it is shut.",
+  "Material": "Metal",
+  "ColliderSize": { "X": 1.0, "Y": 2.1, "Z": 0.08 },
+  "IsSolid": true,
+  "Type": "StaticObject",
+  "IsDoor": true,
+  "SwingSeconds": 1.4,
+  "SwingDegrees": 90,
+  "HingeSide": 1,
+  "TransmissionLow": 0.15,
+  "TransmissionMid": 0.06,
+  "TransmissionHigh": 0.02
+}

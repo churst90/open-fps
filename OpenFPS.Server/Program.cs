@@ -33,6 +33,7 @@ public class GameServer
     private readonly System.Collections.Concurrent.ConcurrentQueue<int> _dirtyAudioEntities = new();
     private readonly VehicleSystem _vehicles = new();
     private readonly OccupancySystem _occupancy = new();
+    private readonly DoorSystem _doors = new();
     private CompositeService _composites = null!;
     private OccupancyService _seats = null!;
     private readonly System.Collections.Concurrent.ConcurrentQueue<Action> _commandBuffer = new();
@@ -320,6 +321,12 @@ public class GameServer
                     // Parts are bolted to the root and follow it exactly; occupants are carried by it
                     // but keep their own heads, so they come last of all.
                     DrivingSystem.Update(world, grid, entry.Value.data.MinBound, entry.Value.data.MaxBound, dt);
+                    // Doors swing BEFORE the parts are placed: a door in a building is one of its
+                    // parts, and ParentSystem writes every part's world transform from its local one
+                    // each tick, so a swing applied after it would be overwritten before anyone saw
+                    // it. The announcement re-sends the door's definition, which is how the aperture
+                    // reaches the client's acoustic map.
+                    _doors.Update(world, dt, SyncAudioComponent);
                     ParentSystem.Update(world, lookup);
                     _occupancy.Update(world, lookup);
                 }
