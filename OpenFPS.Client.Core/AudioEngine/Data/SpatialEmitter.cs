@@ -80,6 +80,15 @@ public struct SpatialEmitter
     public int EchoOfEntity;
     public float EchoDelaySeconds;
     public float EchoGain;
+    /// <summary>
+    /// How hard the road is working this vehicle's tyres, as a fraction of the grip they have.
+    ///
+    /// Zero is rolling; one is the limit, where a tyre squeals; above that it is sliding. Computed
+    /// from the entity's OWN motion rather than from anything knowing what a corner is — see
+    /// ClientAudioSystem.TyreDemand — so a car, a bus, a runaway trolley and a player-driven vehicle
+    /// all get it on the same terms.
+    /// </summary>
+    public float TyreSlip;
     public SynthWaveType SynthWave;
     public float SynthFrequency; // Base frequency (e.g. 440.0f)
     public float SynthLfoRate; // Lfo speed in Hz

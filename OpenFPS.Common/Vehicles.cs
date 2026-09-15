@@ -65,7 +65,69 @@ public sealed record TyreProfile
     /// about fifty km/h, which surprises people who expect the engine to be.</summary>
     public float ReferenceDb { get; init; } = 74f;
 
+    // ── Sliding ─────────────────────────────────────────────────────────────────────────────────
+    //
+    // Everything below describes what this tyre does when it is asked for more than it has. It lives
+    // on the TYRE, not on the car and not on the map, because that is where it comes from: a road
+    // tyre lets go at about one g and squeals near a kilohertz; a slick holds three and sings lower
+    // and louder because the casing is bigger; a truck tyre gives up early and groans. Put a set of
+    // slicks on a van and the van squeals like a racing car, which is correct.
+
+    /// <summary>
+    /// Peak friction this tyre can deliver, in g.
+    ///
+    /// The denominator of everything: how hard a car can corner, brake or accelerate before the
+    /// contact patch starts sliding and singing. A road tyre on dry asphalt is about 0.95; a modern
+    /// performance tyre 1.1; a stock-car slick on a banked oval nearer 2.9 once the banking is
+    /// carrying part of the load; a loaded truck tyre 0.75.
+    /// </summary>
+    public float PeakGripG { get; init; } = 0.95f;
+
+    /// <summary>
+    /// The stick-slip resonance of a tread element, Hz — the note the tyre squeals.
+    ///
+    /// Set by how stiff the rubber is and how big the block is, so it goes DOWN as tyres get bigger:
+    /// a kart tyre shrieks, a truck tyre groans. This is the fundamental; the harmonics come with it.
+    /// </summary>
+    public float SquealHz { get; init; } = 950f;
+
+    /// <summary>How sharp that resonance is. High is a clean, almost musical squeal; low is a rough,
+    /// noisy scrub. Soft compounds and worn surfaces blur it.</summary>
+    public float SquealQ { get; init; } = 14f;
+
+    /// <summary>Level of a full squeal at 1 m, dB SPL. Loud: a car at the limit is heard from a long
+    /// way, and on a track it carries further than the engines because it is higher up the spectrum.</summary>
+    public float SquealDb { get; init; } = 92f;
+
+    /// <summary>A decent road tyre on dry asphalt.</summary>
     public static TyreProfile SportsOnAsphalt => new();
+
+    /// <summary>
+    /// A racing slick: no tread, so no block tone at all — the whole rolling sound is roar. Enormous
+    /// grip, and when it finally lets go it does so loudly and at a lower pitch, because the block
+    /// that is sticking and slipping is the width of the whole contact patch.
+    /// </summary>
+    public static TyreProfile RaceSlick => new()
+    {
+        TreadBlocks = 0, SurfaceRoughness = 0.35f, ReferenceDb = 78f,
+        // EFFECTIVE grip, not the tyre's pure lateral figure, and the difference is worth writing
+        // down. A slick does about 1.75 g on the flat. On a banked turn the load vector tilts, so the
+        // same tyre delivers far more cornering than that — and the client measures a car's lateral
+        // acceleration from its own motion, which it can only do in the world frame. It sees the
+        // total, including the part the banking is carrying, and it has no way to see a bank angle.
+        //
+        // So the figure here is what these tyres achieve on the surfaces they run on. It is right for
+        // the reason it looks wrong, and the honest fix — the server sending the friction demand it
+        // already computes from the racing line, banking included — is a protocol change for later.
+        PeakGripG = 3.1f, SquealHz = 620f, SquealQ = 17f, SquealDb = 99f,
+    };
+
+    /// <summary>A loaded truck tyre: coarse tread, a lot of roar, and it gives up early and groans.</summary>
+    public static TyreProfile TruckOnAsphalt => new()
+    {
+        TreadBlocks = 96, SurfaceRoughness = 0.72f, ReferenceDb = 82f,
+        PeakGripG = 0.75f, SquealHz = 430f, SquealQ = 9f, SquealDb = 97f,
+    };
 }
 
 /// <summary>Everything about one vehicle.</summary>
@@ -163,6 +225,7 @@ public sealed record VehicleProfile
             ["v8_flatplane"] = () => Supercar,
             ["i4_economy"] = () => Hatchback,
             ["i4_sport"] = () => HotHatch,
+            ["i4_turbo"] = () => TurboHatch,
             ["i6"] = () => Saloon6,
             ["v6"] = () => Sedan6,
             ["vtwin"] = () => Cruiser,
@@ -177,9 +240,23 @@ public sealed record VehicleProfile
             ["police_v8"] = () => PoliceCar,
         };
 
+    /// <summary>
+    /// A preset by name — built once and then shared.
+    ///
+    /// Memoised because this is asked on the hot path, several times per car per frame, and building
+    /// one is not cheap: a whole engine, its cams, valves, exhaust and intake networks, a gearbox and
+    /// a set of tyres, constructed and thrown away to read a single field. Thirty cars at sixty
+    /// frames a second was thousands of them a second on the audio thread.
+    ///
+    /// Safe to share: every member is init-only, so a profile cannot be changed after construction.
+    /// Anything that wants a variation uses `with`, which copies.
+    /// </summary>
     public static VehicleProfile ByName(string key)
-        => Presets.TryGetValue(key, out var make) ? make()
-         : throw new ArgumentException($"No vehicle preset '{key}'. Known: {string.Join(", ", Presets.Keys)}");
+        => _cache.GetOrAdd(key, static k => Presets.TryGetValue(k, out var make) ? make()
+             : throw new ArgumentException($"No vehicle preset '{k}'. Known: {string.Join(", ", Presets.Keys)}"));
+
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, VehicleProfile> _cache =
+        new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>A big-block muscle car: long cam, true duals, four-speed.</summary>
     public static VehicleProfile V8Muscle => new()
@@ -247,6 +324,29 @@ public sealed record VehicleProfile
         ExhaustOffsetZ = -1.9f, IntakeOffsetZ = 1.4f,
     };
 
+    /// <summary>
+    /// The turbo version of the hot hatch: same size of car, a very different noise.
+    ///
+    /// Shorter gearing is not needed, because the torque is there from two thousand — so it is
+    /// LONGER geared than the atmospheric car and spends a lap in fewer, taller gears. That is an
+    /// audible consequence of the engine rather than a styling choice, and it is why a turbo car
+    /// sounds lazy next to a screaming naturally-aspirated one doing the same lap time.
+    /// </summary>
+    public static VehicleProfile TurboHatch => new()
+    {
+        Name = "2.0 turbo hatch",
+        EngineKey = "i4_turbo",
+        // Measured, not guessed: EngineSynthTests renders every preset and holds its declared level
+        // to what it actually produces. A first guess of 101 was sixteen decibels light, which would
+        // have put this car forty times too quiet next to the field it shares a track with.
+        SourceLevelDb = 117f,
+        Engine = EngineProfile.I4Turbo,
+        Gearbox = Gearbox.SixSpeedSports with { Ratios = new[] { 3.4f, 2.05f, 1.42f, 1.06f, 0.84f, 0.68f }, FinalDrive = 3.7f, ShiftSeconds = 0.18f, UpshiftRpm = 6300f, DownshiftRpm = 2000f },
+        Tyres = TyreProfile.SportsOnAsphalt with { TreadBlocks = 58, PeakGripG = 1.1f, SquealHz = 880f },
+        MassKg = 1380f, DragArea = 0.68f,
+        ExhaustOffsetZ = -1.85f, IntakeOffsetZ = 1.3f,
+    };
+
     public static VehicleProfile Saloon6 => new()
     {
         Name = "3.0 straight-six saloon",
@@ -312,7 +412,7 @@ public sealed record VehicleProfile
         SourceLevelDb = 104f,
         Engine = EngineProfile.DieselTruckI6,
         Gearbox = Gearbox.SixSpeedSports with { Ratios = new[] { 11.7f, 7.6f, 5.0f, 3.3f, 2.2f, 1.45f, 1.0f, 0.78f }, FinalDrive = 3.55f, ShiftSeconds = 0.8f, UpshiftRpm = 1800f, DownshiftRpm = 1100f, WheelRadiusMetres = 0.51f },
-        Tyres = TyreProfile.SportsOnAsphalt with { TreadBlocks = 44, SurfaceRoughness = 0.7f, ReferenceDb = 80f },
+        Tyres = TyreProfile.TruckOnAsphalt,
         MassKg = 14000f, DragArea = 5.5f, RollingResistance = 0.008f,
         ExhaustOffsetZ = 1.0f, IntakeOffsetZ = 2.5f, FrontAxleZ = 3.5f, RearAxleZ = -3.0f,
     };
@@ -362,7 +462,7 @@ public sealed record VehicleProfile
             // A race driver never lets it fall out of the power band; there is nothing down there.
             DownshiftRpm = 5200f,
         },
-        Tyres = TyreProfile.SportsOnAsphalt with { TreadBlocks = 0, SurfaceRoughness = 0.35f, ReferenceDb = 78f },
+        Tyres = TyreProfile.RaceSlick,
         MassKg = 1450f, DragArea = 0.92f, RollingResistance = 0.011f,
         // Side exit, level with the driver; the airbox faces forward under the windscreen cowl.
         ExhaustOffsetZ = 0.1f, IntakeOffsetZ = 1.1f, FrontAxleZ = 1.4f, RearAxleZ = -1.4f,
@@ -393,7 +493,7 @@ public sealed record VehicleProfile
             UpshiftRpm = 15100f,
             DownshiftRpm = 8500f,
         },
-        Tyres = TyreProfile.SportsOnAsphalt with { TreadBlocks = 0, SurfaceRoughness = 0.3f, ReferenceDb = 76f },
+        Tyres = TyreProfile.RaceSlick with { SurfaceRoughness = 0.3f, ReferenceDb = 76f, PeakGripG = 4.2f, SquealHz = 690f },
         MassKg = 620f,
         // OVAL TRIM, and it has to be. 1.35 m^2 is a road-course wing package, and with it this car
         // could not reach 230 km/h — the map asked it for 327, so it sat permanently flat out, a

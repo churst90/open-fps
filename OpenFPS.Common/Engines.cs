@@ -647,6 +647,63 @@ public sealed record EngineProfile
         Mechanical = new MechanicalSpec { ValvetrainLevel = 0.5f, CombustionKnock = 0.03f },
     };
 
+    /// <summary>
+    /// The same 2.0 four with a turbo bolted to it — and almost everything about how it SOUNDS
+    /// follows from that one change rather than from any of it being described separately.
+    ///
+    /// Compression comes down (9.4 from 11.5) because you cannot run eleven-to-one on boost, which
+    /// takes some of the hard edge off the combustion event. The cam loses overlap, because a turbo
+    /// engine does not want exhaust reversion diluting a pressurised intake charge, and less overlap
+    /// is a cleaner idle — a boosted engine idles smoother than the naturally aspirated version of
+    /// itself, which surprises people. The exhaust gets bigger and quieter downstream because the
+    /// turbine is a muffler: it takes the sharp pressure pulses and turns them into shaft work, which
+    /// is why a turbo car sounds flat and woofly next to the crack of an atmospheric one, and why the
+    /// interesting noise moves to the INTAKE side.
+    ///
+    /// The whistle, the spool lag and the way boost raises airbox pressure are already in the
+    /// synthesis; this is the first petrol engine to ask for them.
+    /// </summary>
+    public static EngineProfile I4Turbo => new()
+    {
+        Name = "2.0 turbo inline-4",
+        Layout = EngineLayout.Inline,
+        Fuel = FuelType.Petrol, Induction = Induction.Turbocharged, BoostBar = 1.45f,
+        FiringAngles = EvenFire(new[] { 1, 3, 4, 2 }),
+        Bank = OneBank(4),
+        BoreMm = 86f, StrokeMm = 86f, RodRatio = 1.6f, CompressionRatio = 9.4f,
+        // Tight lobe centres and little overlap: on boost the intake is at higher pressure than the
+        // exhaust, so overlap would blow fresh charge straight out of the pipe.
+        ExhaustCam = new CamLobe { DurationDegrees = 252f, MaxLiftMm = 10f, RampFraction = 0.2f, CentrelineDegrees = 246f },
+        IntakeCam = new CamLobe { DurationDegrees = 248f, MaxLiftMm = 10.5f, RampFraction = 0.2f, CentrelineDegrees = 478f },
+        ExhaustValve = new ValveSpec { Count = 2, DiameterMm = 28f, DischargeCoefficient = 0.66f },
+        IntakeValve = new ValveSpec { Count = 2, DiameterMm = 34f, DischargeCoefficient = 0.68f },
+        EvoTemperatureK = 1120f, IdleMapBar = 0.38f,
+        IdleRoughness = 0.09f, IdleGovernorGain = 3.5f,
+        IdleRpm = 820f, RedlineRpm = 6800f,
+        InertiaKgM2 = 0.11f, FrictionNm = 16f, FrictionNmPerKrpm = 5.2f,
+        // Torque arrives early and stays: the defining shape of a boosted engine, and the reason it
+        // needs fewer gears and pulls from nothing.
+        PeakTorqueNm = 380f, PeakTorqueRpm = 3200f,
+        Exhaust = new ExhaustSpec
+        {
+            // Short primaries into a close-coupled turbine, then a big soft system after it.
+            PrimaryLengthMetres = 0.34f, PrimarySpread = 0.03f, PrimaryDiameterMm = 40f,
+            CollectorGroups = new[] { new[] { 0, 1, 2, 3 } },
+            CollectorDiameterMm = 60f, CollectorPipeMetres = 0.35f,
+            Crossover = CrossoverKind.Merged,
+            MidPipeMetres = 2.0f,
+            Muffler = MufflerSpec.Glasspack,
+            TailpipeMetres = new[] { 0.6f },
+            TailpipeDiameterMm = 70f,
+            // The turbine drops a lot of heat and most of the pulse energy across itself.
+            GasCelsiusIdle = 300f, GasCelsiusFull = 720f,
+            WallLossMultiplier = 2.1f,
+            OverrunPopRate = 11f,
+        },
+        Intake = new IntakeSpec { RunnerLengthMetres = 0.26f, RunnerDiameterMm = 42f, PlenumLitres = 3.2f, ThrottleDiameterMm = 70f, AirboxLitres = 7f, SnorkelLengthMetres = 0.5f, Level = 0.95f, Absorption = 0.15f },
+        Mechanical = new MechanicalSpec { ValvetrainLevel = 0.45f, CombustionKnock = 0.05f, TurboWhistleLevel = 0.85f, TurboLagSeconds = 0.38f },
+    };
+
     /// <summary>A 3.0-litre straight six on two 3-into-1 headers joined into a single system: silky
     /// 120-degree firing, each collector seeing an even 240.</summary>
     public static EngineProfile Inline6 => new()

@@ -203,6 +203,23 @@ if (args.Contains("--engine-live"))
     Log.CloseAndFlush();
     Environment.Exit(lcode);
 }
+if (args.Contains("--tyres"))
+{
+    // --tyres [preset ...]: a standing start with wheelspin and chirping upshifts, a lock-up under
+    // braking, and a corner tightened until the tyres let go. One curve, three demands.
+    var keys = args.Where(a => OpenFPS.Common.VehicleProfile.Presets.ContainsKey(a)).ToArray();
+    int tcode = OpenFPS.Client.Core.AudioEngine.Fmod.GripSpike.RunTyres(keys);
+    Log.CloseAndFlush();
+    Environment.Exit(tcode);
+}
+if (args.Contains("--turbo"))
+{
+    // --turbo [preset ...]: the same 2.0 four with and without a turbocharger, then the truck.
+    var keys = args.Where(a => OpenFPS.Common.VehicleProfile.Presets.ContainsKey(a)).ToArray();
+    int bcode = OpenFPS.Client.Core.AudioEngine.Fmod.GripSpike.RunTurbo(keys);
+    Log.CloseAndFlush();
+    Environment.Exit(bcode);
+}
 if (args.Contains("--speedway"))
 {
     // --speedway [map] [seconds=] [voices=]: the shipped map, its cars on its track, its walls

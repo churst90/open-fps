@@ -1414,6 +1414,7 @@ public class FmodAudioProvider : IAudioProvider
                 {
                     active.EngineState.TargetSpeed = emitter.EngineSpeed;
                     active.EngineState.Running = emitter.EngineRunning;
+                    active.EngineState.RoadSlip = emitter.TyreSlip;
                 }
                 else if (emitter.IsSynth && active.EchoState != null)
                 {

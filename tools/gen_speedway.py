@@ -281,6 +281,26 @@ CLASSES = [
     ("Stock car", "nascar_v8",  300, 1.75, 5.5,  8.0),
 ]
 
+# ── And a support race, because one class of car tells you nothing about the others ──────────────
+#
+# Two trucks and two turbo hatches share the circuit with the field. This is not decoration: a map
+# with one kind of vehicle on it cannot show that an engine's character comes from its MECHANISM
+# rather than from a recording, and it cannot show a turbocharger at all, because there is no
+# turbocharged stock car.
+#
+# What you should be able to hear without being told: the trucks are slower and far lower — a
+# 600 rpm idle and a 2100 redline against the stock cars' 9000, so they are an octave and a half
+# under everything else and they take an age between shifts. Their turbine whistles on the way up
+# and hisses away when the driver lifts. Their tyres give up at three-quarters of a g where a slick
+# holds three, so they are the only things on the track that actually squeal in the corners. And
+# the turbo hatches sound lazy next to the atmospheric cars at the same speed, because torque at
+# three thousand means taller gearing and fewer revs for the same lap.
+SUPPORT = [
+    # name          preset        top   g     accel brake  count
+    ("Race truck",  "diesel_truck", 160, 0.72, 2.2,  5.5,   2),
+    ("Turbo hatch", "i4_turbo",     235, 1.10, 4.4,  7.5,   2),
+]
+
 # ...and one that is not. The pace car runs the same lap in a road car with a bar on the roof: an
 # interceptor V8 on a cam that cannot idle straight, open pipes, and half a tonne more to carry. It
 # is slower than the field, so it is always being caught, which means you hear it pass you at a
@@ -295,14 +315,27 @@ NUMBERS = [24, 3, 48, 11, 9, 22, 5, 17, 43, 88, 12, 20, 2, 19, 77, 8, 14, 6, 45,
 # engine: only the nearest handful are ever SYNTHESIZED and the rest borrow one of those.
 FIELD_SIZE = 30
 
+# The support runners take the LAST slots, so they start at the back of a lap that is already
+# spread out and spend their time being caught and passed by the field. That is the point of them:
+# a truck at 160 and a stock car at 300 on the same circuit means a closing speed you can hear.
+SUPPORT_SLOTS = {}
+_slot = FIELD_SIZE - 1
+for _name, _preset, _top, _g, _acc, _brk, _count in SUPPORT:
+    for _k in range(_count):
+        SUPPORT_SLOTS[_slot] = (f"{_name} {_k + 1}", _preset, _top, _g, _acc, _brk)
+        _slot -= 1
+
 field = []
 for i in range(FIELD_SIZE):
-    name, preset, top, g, acc, brk = PACE if i == 0 else CLASSES[0]
+    if i in SUPPORT_SLOTS:
+        name, preset, top, g, acc, brk = SUPPORT_SLOTS[i]
+    else:
+        name, preset, top, g, acc, brk = PACE if i == 0 else CLASSES[0]
     # Each car is its own machine: a per-car spread in top speed and grip is what makes a field
     # string out into traffic instead of circulating as one block.
     jitter = ((i * 7919) % 100) / 100.0 - 0.5          # deterministic, -0.5..+0.5
     field.append((
-        name if i == 0 else f"{name} {NUMBERS[i % len(NUMBERS)]}",
+        name if i == 0 or i in SUPPORT_SLOTS else f"{name} {NUMBERS[i % len(NUMBERS)]}",
         preset,
         top * (1.0 + 0.03 * jitter),
         g * (1.0 + 0.05 * jitter),

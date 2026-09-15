@@ -68,8 +68,9 @@ public static class VehicleSynth
         foreach (var line in engine.Describe()) log.Add("  " + line);
 
         float dt = 1f / SampleRate;
-        float tyreLp = 0f, tyreHp = 0f, tyreHpPrev = 0f;
-        double treadPhase = 0;
+        var tyreVoice = default(TyreVoice);
+        float lastSpeed = 0f, chirp = 0f;
+        int tyreGear = 0;
         var orderStart = new int[orders.Count];
         int at = 0;
         for (int oi = 0; oi < orders.Count; oi++)
@@ -91,7 +92,21 @@ public static class VehicleSynth
                 exhaust[at] = engine.Exhaust;
                 intake[at] = engine.Intake + engine.Block;
                 port[at] = engine.PortSum;
-                tyres[at] = Tyre(v.Tyres, driveline.Speed, rng, ref tyreLp, ref tyreHp, ref tyreHpPrev, ref treadPhase);
+                // What the tyres are being asked for, from the car's own motion. Straight-line only
+                // here — the bench drives in a straight line — so the lateral term is zero and every
+                // squeal in a render is longitudinal: wheelspin, a shift, or a lock-up under braking.
+                float aLong = (driveline.Speed - lastSpeed) / dt;
+                lastSpeed = driveline.Speed;
+                if (driveline.Gear != tyreGear && tyreGear >= 1 && driveline.Gear >= 1)
+                {
+                    float from = driveline.Ratio(tyreGear), to = driveline.Ratio(driveline.Gear);
+                    if (from > 0f && to > 0f)
+                        chirp = MathF.Max(chirp, TyreFriction.ShiftChirp(from / to, engine.Throttle));
+                }
+                tyreGear = driveline.Gear;
+                chirp *= 0.99985f;   // about a tenth of a second for the driveline to resolve it
+                float slip = TyreFriction.Demand(aLong, 0f, v.Tyres.PeakGripG) + chirp;
+                tyres[at] = Tyre(v.Tyres, driveline.Speed, slip, rng, ref tyreVoice);
                 distance[at] = driveline.Distance;
                 rpmTrace[at] = engine.Rpm;
                 peakRpm = MathF.Max(peakRpm, engine.Rpm);
@@ -168,28 +183,125 @@ public static class VehicleSynth
     // ── Tyres ───────────────────────────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Tyre on asphalt: broadband roar plus the tread blocks going past. The roar is the tread
-    /// deforming over the aggregate, rising about 30 log10(v); the tone is the blocks striking the
-    /// road at speed over their spacing, which is why tyre noise rises in pitch as a car accelerates.
+    /// Everything one tyre needs to remember between samples. A struct passed by ref, because this
+    /// runs per sample per car inside a mixer callback and a class would be a pointer chase and a
+    /// collection in the one place neither is affordable.
     /// </summary>
-    [MethodImpl(MethodImplOptions.AggressiveOptimization)]
-    public static float Tyre(TyreProfile t, float speed, Random rng,
-                             ref float lp, ref float hp, ref float hpPrev, ref double treadPhase)
+    public struct TyreVoice
     {
-        if (speed < 0.3f) { lp = hp = hpPrev = 0f; return 0f; }
-        float level = MathF.Pow(speed / 20f, 1.5f);
+        public float Lp, Hp, HpPrev;
+        public double TreadPhase;
+        // The stick-slip resonator: a two-pole bandpass, which is the cheapest thing that actually
+        // RINGS. A filtered-noise squeal without resonance is a hiss with the top taken off.
+        public float R1, R2, R1b, R2b;
+        public float SlipSmooth;
+        public float SlideLp;
+    }
+
+    /// <summary>
+    /// Tyre on asphalt: rolling, sliding, or somewhere between.
+    ///
+    /// ROLLING is broadband roar plus the tread blocks going past — the roar is the tread deforming
+    /// over the aggregate, rising about 30 log10(v), and the tone is the blocks striking the road at
+    /// speed over their spacing, which is why tyre noise rises in pitch as a car accelerates. A slick
+    /// has no blocks and so has no tone at all, which falls out of TreadBlocks being zero rather than
+    /// being a case anyone writes.
+    ///
+    /// SLIDING is a different mechanism in the same rubber. A tread element grips, deflects as the
+    /// contact patch moves under it, releases, and snaps back at its own resonance; thousands of them
+    /// doing it slightly out of step is the squeal. It is a NOTE, which is why a car at the limit
+    /// sings rather than just getting louder, and it rises in pitch as the tyre is worked harder
+    /// because each element completes its cycle faster.
+    ///
+    /// Past the limit the patch slides continuously, the stick-slip cycle stops being periodic, and
+    /// the note collapses into the broadband roar of a locked wheel. Chirp, squeal and skid are one
+    /// continuum sampled at three demands — see TyreFriction — not three sounds to be triggered.
+    /// </summary>
+    /// <param name="slip">Fraction of available grip in use. See <see cref="TyreFriction.Demand"/>.</param>
+    [MethodImpl(MethodImplOptions.AggressiveOptimization)]
+    public static float Tyre(TyreProfile t, float speed, float slip, Random rng, ref TyreVoice v)
+    {
+        // The demand is smoothed, and asymmetrically: a tyre lets go quickly and settles slowly, so
+        // a squeal starts on the instant and dies away over a couple of hundred milliseconds. Stepping
+        // it would make every corner entry a click.
+        float k = slip > v.SlipSmooth ? 0.0016f : 0.00035f;
+        v.SlipSmooth += (slip - v.SlipSmooth) * k;
+        float demand = v.SlipSmooth;
+
+        if (speed < 0.3f && demand < TyreFriction.SquealOnset)
+        { v.Lp = v.Hp = v.HpPrev = 0f; return 0f; }
+
         float noise = (float)(rng.NextDouble() * 2 - 1);
+
+        // ── Rolling ──
+        float level = MathF.Pow(MathF.Max(speed, 0.3f) / 20f, 1.5f);
         float cutoff = MathHelper.Lerp(0.06f, 0.34f, Math.Clamp(speed / 40f, 0f, 1f));
-        lp += cutoff * (noise - lp);
-        float roar = lp * (0.55f + 0.45f * t.SurfaceRoughness);
-        float blockHz = speed / (2f * MathF.PI * 0.337f) * t.TreadBlocks;
-        treadPhase += 2.0 * Math.PI * blockHz / SampleRate;
-        float tone = (float)(Math.Sin(treadPhase) * 0.34 + Math.Sin(treadPhase * 2) * 0.16);
-        tone *= 1f - t.SurfaceRoughness * 0.55f;
+        v.Lp += cutoff * (noise - v.Lp);
+        float roar = v.Lp * (0.55f + 0.45f * t.SurfaceRoughness);
+        float tone = 0f;
+        if (t.TreadBlocks > 0)
+        {
+            float blockHz = speed / (2f * MathF.PI * 0.337f) * t.TreadBlocks;
+            v.TreadPhase += 2.0 * Math.PI * blockHz / SampleRate;
+            if (v.TreadPhase > 2.0 * Math.PI) v.TreadPhase -= 2.0 * Math.PI;
+            tone = (float)(Math.Sin(v.TreadPhase) * 0.34 + Math.Sin(v.TreadPhase * 2) * 0.16);
+            tone *= 1f - t.SurfaceRoughness * 0.55f;
+        }
         float mix = (roar * 1.4f + tone) * level * 0.3f;
-        float y = 0.992f * (hpPrev + mix - hp);
-        hp = mix; hpPrev = y;
+
+        // ── Sliding ──
+        float squeal = TyreFriction.SquealAmount(demand);
+        float skid = TyreFriction.SkidAmount(demand);
+        if (squeal > 1e-3f || skid > 1e-3f)
+        {
+            // How fast the rubber is actually being dragged across the road decides how much of this
+            // there is: a stationary wheel cannot squeal, however hard it is being pushed, and the
+            // same demand at eighty is far louder than at ten. Saturating, because past walking pace
+            // the mechanism is fully established and only the demand matters.
+            float rub = Math.Clamp(speed / 12f, 0f, 1f);
+
+            if (squeal > 1e-3f)
+            {
+                float hz = t.SquealHz * TyreFriction.SquealPitch(demand);
+                float amp = Level(t.SquealDb) * squeal * rub;
+                // Two poles at the fundamental and one at the second harmonic. Real squeal is rich —
+                // the release is a snap, not a sine — and the octave is most of what makes it read as
+                // rubber rather than as a test tone.
+                float sq = Resonate(ref v.R1, ref v.R2, noise, hz, t.SquealQ)
+                         + Resonate(ref v.R1b, ref v.R2b, noise, hz * 2f, t.SquealQ * 0.7f) * 0.45f;
+                mix += sq * amp;
+            }
+
+            if (skid > 1e-3f)
+            {
+                // A locked wheel is broadband and DARK: the tread is being torn rather than tapped,
+                // and the energy sits well below the squeal it replaced.
+                v.SlideLp += 0.10f * (noise - v.SlideLp);
+                mix += v.SlideLp * Level(t.SquealDb) * skid * rub * 1.6f;
+            }
+        }
+
+        float y = 0.992f * (v.HpPrev + mix - v.Hp);
+        v.Hp = mix; v.HpPrev = y;
         return MathF.Tanh(y * 0.8f);
+    }
+
+    /// <summary>The squeal level relative to the rolling noise, as a linear factor. Both are quoted
+    /// in dB at a metre, so the difference between them is the only thing that matters.</summary>
+    private static float Level(float squealDb) => MathF.Pow(10f, (squealDb - 96f) / 20f) * 6f;
+
+    /// <summary>
+    /// One two-pole resonator, driven by noise. The cheapest thing that rings, and ringing is the
+    /// entire point: a squeal is a resonance being excited, not a filtered hiss.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static float Resonate(ref float z1, ref float z2, float x, float hz, float q)
+    {
+        float w = 2f * MathF.PI * Math.Clamp(hz, 40f, SampleRate * 0.45f) / SampleRate;
+        float r = MathF.Exp(-w / (2f * MathF.Max(0.5f, q)));
+        float y = x * (1f - r) + 2f * r * MathF.Cos(w) * z1 - r * r * z2;
+        z2 = z1; z1 = y;
+        return y;
     }
 
     private static float[] Scale(float[] buf, float k)

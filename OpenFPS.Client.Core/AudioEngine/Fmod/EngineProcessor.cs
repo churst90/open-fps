@@ -22,11 +22,23 @@ public sealed class EngineVoiceState
     public readonly Driveline Driveline;
     public readonly VirtualDriver Driver;
     private readonly Random _rng;
-    private float _tyreLp, _tyreHp, _tyreHpPrev;
-    private double _treadPhase;
+    private VehicleSynth.TyreVoice _tyre;
+    private float _tyreChirp;
+    private int _tyreGear;
 
     /// <summary>Road speed the world says the vehicle is doing, m/s. Game thread writes.</summary>
     public volatile float TargetSpeed;
+
+    /// <summary>
+    /// How hard the ROAD is working this car's tyres, as a fraction of the grip they have.
+    ///
+    /// Set by the game from the car's own motion — see ClientAudioSystem — because only the game can
+    /// see the corner. The DSP knows how fast the car is going and what gear it is in; it has no idea
+    /// whether it is going round anything. What it adds on top is the part the game cannot see: the
+    /// instant of slip a gear change puts through the driven wheels, which happens inside this
+    /// synthesis and lasts a tenth of a second.
+    /// </summary>
+    public volatile float RoadSlip;
     /// <summary>Whether the engine should be running. Game thread writes.</summary>
     public volatile bool Running = true;
 
@@ -368,7 +380,18 @@ public sealed class EngineVoiceState
             Driver.TargetSpeed = _speedSmooth;
             Driver.Apply(dt);
             Driveline.Step(Engine, dt);
-            float tyre = VehicleSynth.Tyre(Vehicle.Tyres, Driveline.Speed, _rng, ref _tyreLp, ref _tyreHp, ref _tyreHpPrev, ref _treadPhase);
+            // The shift chirp, which the game cannot see because the gearbox lives in here. A big
+            // ratio step with the throttle open puts the driven wheels briefly out of step with the
+            // road, and that is the sound a shift kit is bought for.
+            if (Driveline.Gear != _tyreGear && _tyreGear >= 1 && Driveline.Gear >= 1)
+            {
+                float from = Driveline.Ratio(_tyreGear), to = Driveline.Ratio(Driveline.Gear);
+                if (from > 0f && to > 0f)
+                    _tyreChirp = MathF.Max(_tyreChirp, TyreFriction.ShiftChirp(from / to, Engine.Throttle));
+            }
+            _tyreGear = Driveline.Gear;
+            _tyreChirp *= 0.99985f;
+            float tyre = VehicleSynth.Tyre(Vehicle.Tyres, Driveline.Speed, RoadSlip + _tyreChirp, _rng, ref _tyre);
             // Tyres are in arbitrary units; place them about 30 dB under a loud exhaust.
             float pa = Engine.Exhaust + (Engine.Intake + Engine.Block * 0.4f) * FrontMix + tyre * 1.2f * TyreMix;
             float y = pa * gain;

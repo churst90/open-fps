@@ -228,6 +228,8 @@ public class ClientAudioSystem
         _audio.StopSound(entityId);
         _liveEngines.Remove(entityId);
         _engineStarted.Remove(entityId);
+        _motionHistory.Remove(entityId);
+        _tyreDemand.Remove(entityId);
         _engineRetiring.Remove(entityId);
         _engineEchoes.Forget(entityId, _audio);
         int distant = DistantVoiceBase - Math.Abs(entityId);
@@ -802,6 +804,62 @@ public class ClientAudioSystem
         else _audio.PlayPhysicalSoundDirect(e);
     }
 
+    // ── How hard the road is working a moving thing's tyres ─────────────────────────────────────
+    //
+    // Derived from its OWN MOTION, which is the only way this can be general. Nothing here knows what
+    // a corner is, or that this map has a track on it: a source whose velocity is changing direction
+    // is turning, a source whose speed is changing is accelerating or braking, and the two combine as
+    // a vector because a tyre has one friction budget to spend on both. A car, a bus, a runaway
+    // trolley and a player-driven vehicle all get it on the same terms, and so will whatever the next
+    // map has on it.
+    //
+    // The lateral term is the interesting one and it needs no curvature, no racing line and no server
+    // support: if the velocity vector rotated by an angle in a time, the centripetal acceleration is
+    // speed times that rate. That is the definition, and it is true of anything that moves.
+    private readonly Dictionary<int, (Vector3 Velocity, double At)> _motionHistory = new();
+    private readonly Dictionary<int, float> _tyreDemand = new();
+
+    /// <summary>
+    /// The fraction of its tyres' grip an entity is currently using, from two successive samples of
+    /// its velocity.
+    ///
+    /// Held between calls rather than recomputed, because the position is only new thirty times a
+    /// second and differentiating the same pair twice would halve the answer. Smoothed on the way out
+    /// for the same reason the provider smooths anything else: a 30 Hz staircase in a level is as
+    /// audible as one in a pitch.
+    /// </summary>
+    private float TyreDemand(EntitySnapshot snap, double sampledAt, float gripG)
+    {
+        float previous = _tyreDemand.GetValueOrDefault(snap.Id, 0f);
+        if (_motionHistory.TryGetValue(snap.Id, out var last))
+        {
+            double dt = sampledAt - last.At;
+            // Only when the sample is genuinely new. Asking twice about one pair of snapshots would
+            // compute an acceleration from no elapsed time.
+            if (dt > 1e-3)
+            {
+                Vector3 v = snap.Velocity;
+                Vector3 a = (v - last.Velocity) / (float)dt;
+                float speed = v.Length();
+                float aLong = 0f, aLat = a.Length();
+                if (speed > 0.5f)
+                {
+                    Vector3 along = v / speed;
+                    aLong = Vector3.Dot(a, along);
+                    aLat = (a - along * aLong).Length();
+                }
+                float demand = OpenFPS.Common.TyreFriction.Demand(aLong, aLat, gripG);
+                // Fast to rise, slow to fall — a tyre lets go on the instant and settles over a
+                // couple of hundred milliseconds. Matches the DSP's own smoothing of the same number.
+                previous += (demand - previous) * (demand > previous ? 0.5f : 0.12f);
+                _tyreDemand[snap.Id] = previous;
+                _motionHistory[snap.Id] = (v, sampledAt);
+            }
+        }
+        else _motionHistory[snap.Id] = (snap.Velocity, sampledAt);
+        return previous;
+    }
+
     private void ProcessAudioEmitter(WorldSnapshot world, EntitySnapshot snap, Vector3 eyePos, float engineDt = 0f)
     {
         double now = _clock.Elapsed.TotalSeconds;
@@ -910,6 +968,9 @@ public class ClientAudioSystem
             EngineKey = engineKey,
             EngineSpeed = snap.Velocity.Length(),
             EngineRunning = true,
+            TyreSlip = engineKey.Length > 0
+                ? TyreDemand(snap, world.PositionsSampledAt, OpenFPS.Common.VehicleProfile.ByName(engineKey).Tyres.PeakGripG)
+                : 0f,
 
             // Synthesis mapping
             IsGranular = def.SoundEmitter.IsGranular,
