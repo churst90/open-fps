@@ -1,0 +1,10 @@
+{
+  "Id": "crowbar",
+  "Name": "Crowbar",
+  "Description": "A metre of forged steel. Heavy in the hand and unmistakable when it hits a floor.",
+  "Material": "Metal",
+  "Type": "Item",
+  "IsItem": true,
+  "ItemWeight": 5,
+  "Hands": 1
+}

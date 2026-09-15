@@ -36,6 +36,7 @@ public class GameServer
     private readonly DoorSystem _doors = new();
     private CompositeService _composites = null!;
     private OccupancyService _seats = null!;
+    private HandsService _hands = null!;
     private readonly System.Collections.Concurrent.ConcurrentQueue<Action> _commandBuffer = new();
 
     private readonly MessageDispatcher _dispatcher = new();
@@ -185,7 +186,8 @@ public class GameServer
         // Now that every sound source exists, size each map's broadcast radius from it.
         _maps.RefreshEarshotRanges();
         _seats = new OccupancyService(_maps);
-        _commands = new CommandHandler(_sessions, _maps, this, _composites, _seats);
+        _hands = new HandsService(_maps);
+        _commands = new CommandHandler(_sessions, _maps, this, _composites, _seats, _hands);
         
         // Initialize new Service Architecture
         _discovery = new DiscoveryService(_dispatcher, _sessions);

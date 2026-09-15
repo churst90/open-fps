@@ -941,3 +941,96 @@ ones and the weather left rolling, rather than being silently pinned to a defaul
 the unsorted takes to fill.)
 
 Tests 261 → 268.
+
+---
+
+# Two hands, a back, and a gun that is the thing you are holding
+
+## An item you are carrying is the same entity it was on the floor
+
+`InventoryComponent` has held a list of entity ids since the first week of the project, and nothing
+ever read or wrote it. That list was right, and everything here falls out of it being right.
+
+A rifle on the ground has a mass, a material and a position. Pick it up and it keeps all three — it
+simply acquires a `ParentComponent` pointing at you, and `ParentSystem` has been carrying children
+with their parent every tick since long before anything could be picked up. A held rifle and a wall
+in a house are attached by the same machinery for the same reason. Put it down and the noise it makes
+is the noise that mass and that material make meeting that floor, from the height it actually fell,
+out of `ImpactAcoustics.Between` — a calculation that already existed and has never heard of a rifle.
+A 20 kg anvil lands 10 dB louder than a 300 g torch on the same concrete, and nobody recorded either.
+
+Items as rows in a table would have needed every bit of that inventing again, and inventing it worse.
+
+## Three places, three questions, three answers
+
+`HeldComponent` says **somebody has it** — that and nothing else, which is the one question anything
+reaching for an item needs to ask. Nobody can lift a thing off the floor while it is set, and nobody
+can lift one off your shoulder either. *Which* of the two it is gets answered by `HandsComponent`
+(the ids in your hands) and `InventoryComponent` (the ids slung on you). Nothing is a flag that some
+code remembers to check.
+
+Two hands, and something needing both is recorded in **both slots — the same id twice**, so "have I a
+hand free" stays one question with one answer. That constraint is the point rather than a limitation
+to be worked around: a rifle spends both hands, so a rifle and a torch is a decision, and a decision
+a player has to make out loud in the moment is worth more than a list they can scroll.
+
+The back is what makes that liveable, and it is limited by **mass, not slots** — 25 kg. Two rifles and
+a crowbar is a load and six torches is not, and a count cannot tell those apart. When it refuses it
+says the arithmetic ("18.0 plus 9.0 is over the 25 kilograms you can manage"), because a player who is
+told the numbers can work out what to put down and one told "too heavy" cannot. Every refusal here
+names what is in the way: "Your hands are full. You are holding the AKM in both hands" is an
+instruction where "you cannot" is a dead end.
+
+## Six verbs and no inventory screen
+
+`/take [name]`, `/drop [name|left|right|all]`, `/stow`, `/draw [name]`, `/hands`, `/inv` — plus G, Q
+and R on the client for the three you use while moving. There is no inventory screen because there is
+nothing to put on one, and the readout is a sentence rather than a grid because a sentence is what a
+screen reader takes in at a go:
+
+    You are holding the Torch in your right hand. On your back: an AKM — 3.7 of 25 kilograms.
+
+(The article is chosen by the sound of the first letter. It is four lines of code and it stops the one
+sentence that tells a player what they are carrying from stumbling over "a AKM".)
+
+## The gun is the thing in your hands
+
+`WeaponSynth`, `ShotResolver`, `WeaponMechanics` and `GlassBreak` have been written and tested for
+weeks and had never made a sound in the game, because nothing connected a gun to a player: no equip,
+no held item, no trigger. `/fire` now fires **the weapon you are holding**, and there is no
+`EquippedWeaponComponent` anywhere — the weapon is the `ItemComponent.WeaponId` of the thing in your
+hands, so picking a gun up and equipping it are the same act, putting it down disarms you with no
+bookkeeping, and slinging it on your back leaves you unarmed until you draw it. Naming a weapon out
+of the air is still the dev trigger it always was, and still elevated.
+
+## The bug the walkthrough found, which nothing else could have
+
+Everything above passed twenty tests and then failed on a live server in the first minute:
+
+    > take
+    You take the Torch in your right hand.
+    > inv
+    Your hands are empty. You have nothing on your back.
+
+And the torch really was gone from the floor. A map's entity lookup had **two id namespaces poured
+into one dictionary**: entities spawned by a command were keyed by their runtime ECS id, and entities
+spawned *from the map file* were keyed by the number their author typed in the JSON — so a map entity
+could not be found by its own runtime id at all. Every component in the game carries runtime ids, so
+the moment `HandsComponent` held one it resolved to nothing. The author's numbers now live in a
+dictionary of their own that exists only during load, which is the whole of their business.
+
+It could not have shown up in a test, because tests spawn their own props. `SomethingTheMapPutThereCanBePickedUpAndReadBack`
+now covers it, and fails on the old code.
+
+## Things to pick up
+
+Four item prefabs (`akm_rifle`, `glock_pistol`, `crowbar`, `torch`) join `sword`, which had been
+sitting in the prefab folder with nothing able to lift it. A crowbar and a torch go in the speedway
+infield at the foot of the PA pole — a five-kilo bar of steel and four hundred grams of plastic, on
+grass and on paving, which is four different noises out of one calculation. The demo map gets the
+whole set scattered across its concrete, grass, wood and carpet.
+
+They are on the speedway because the speedway is the map a player actually lands on, and a verb you
+cannot reach is a verb nobody has.
+
+Tests 502 → 503 (21 of them new here).

@@ -145,7 +145,14 @@ public class MapManager
         var world = World.Create();
         var grid = new SpatialGrid<Entity>(new Vector2(m.MinBound.X, m.MinBound.Z), new Vector2(m.MaxBound.X, m.MaxBound.Z), 10.0f);
         var lookup = new Dictionary<int, Entity>();
-        var idMap = new Dictionary<int, int>(); // JSON ID -> ECS ID
+        // Two id namespaces, kept apart on purpose. `lookup` is the map's RUNTIME index and is keyed by
+        // the ECS entity id, which is what every component, every broadcast and every command carries.
+        // `authored` and `idMap` belong to the FILE: the numbers an author wrote in the JSON so one
+        // entity could refer to another. Those used to be poured into `lookup` too, and the collision was
+        // silent and total — a thing spawned from a map could not be found by its own runtime id at all,
+        // so anything holding one (a rifle you had just picked up) resolved to nothing.
+        var authored = new Dictionary<int, Entity>();   // JSON ID -> entity, during load only
+        var idMap = new Dictionary<int, int>();         // JSON ID -> ECS ID
         
         float foundMinimumY = 1000f;
         bool hasAnyFloor = false;
@@ -158,8 +165,12 @@ public class MapManager
             try 
             {
                 var entity = _prefabRepo.Spawn(world, entityData.PrefabId, entityData.Position, entityData.Rotation, entityData.Scale);
-                lookup[entityData.EntityId > 0 ? entityData.EntityId : entity.Id] = entity;
-                if (entityData.EntityId > 0) idMap[entityData.EntityId] = entity.Id;
+                lookup[entity.Id] = entity;
+                if (entityData.EntityId > 0)
+                {
+                    authored[entityData.EntityId] = entity;
+                    idMap[entityData.EntityId] = entity.Id;
+                }
 
                 ApplyRoomMaterials(world, entity, entityData, m.Id);
 
@@ -199,7 +210,7 @@ public class MapManager
         int portalsLinked = 0;
         foreach (var entityData in m.Entities)
         {
-            if (!lookup.TryGetValue(entityData.EntityId > 0 ? entityData.EntityId : -1, out var entity)) continue;
+            if (!authored.TryGetValue(entityData.EntityId > 0 ? entityData.EntityId : -1, out var entity)) continue;
 
             // A map entity DECLARES a portal by carrying any of the portal fields. Previously this pass
             // only wrote into a PortalComponent the prefab had already attached — and `portal.json` carried

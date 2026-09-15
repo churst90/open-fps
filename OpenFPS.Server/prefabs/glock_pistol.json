@@ -1,0 +1,11 @@
+{
+  "Id": "glock_pistol",
+  "Name": "Glock 17",
+  "Description": "A 9mm pistol. Light enough for one hand, which is most of what a pistol is for.",
+  "Material": "Plastic",
+  "Type": "Item",
+  "IsItem": true,
+  "ItemWeight": 0.9,
+  "Hands": 1,
+  "WeaponId": "glock"
+}

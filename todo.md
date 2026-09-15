@@ -1432,13 +1432,39 @@ Not done, and deliberately:
 
 The order these go in, and why. Everything here was blocked on composites existing.
 
-- [ ] **Held items and a hand slot.** `WeaponSynth`, `ShotResolver` and `WeaponMechanics` are written
-      and tested, and nothing connects a gun to a player: there is no equip, no held item, no trigger.
-      Two hands, and a rifle takes both — the constraint is what makes it a spatial thing you can
-      reason about by ear rather than a menu.
-- [ ] **Inventory over `InventoryComponent`**, which is already entity-backed (an item in your bag is
-      the same entity as one on the ground — the right foundation). Delete the parallel
-      `LocalPlayerState.Inventory` list of strings before the two drift.
+- [x] **Held items and a hand slot.** `HandsService` + `/take /drop /stow /draw /hands /inv`, and G, Q
+      and R on the client. Two hands, and something needing both is recorded in BOTH slots — the same
+      id twice — so "have I a hand free" is one question with one answer. A carried item wears a
+      `ParentComponent` pointing at its holder, so carrying is the composite machinery once more and
+      a held rifle and a wall in a house are attached the same way. Covered by `HeldItemTests`.
+- [x] **Inventory over `InventoryComponent`.** A back rather than a bag, limited by MASS (25 kg) and
+      not by slots, because two rifles and a crowbar is a load and six torches is not. A stowed thing
+      is still an entity at a position, riding on you, and it falls from there. `HeldComponent` means
+      "somebody has it" — hands versus back is answered by `HandsComponent` and `InventoryComponent`,
+      so there are three places and each is one question. `LocalPlayerState.Inventory` is gone.
+- [x] **`/fire` fires what you are holding**, with no `EquippedWeaponComponent` anywhere: the weapon
+      is the `ItemComponent.WeaponId` of the thing in your hands, so picking a gun up and equipping it
+      are the same act and putting it down disarms you. Naming one out of the air is still the dev
+      trigger, and still elevated. The rest of the combat join — a shot MESSAGE, `HealthComponent` ever
+      decremented, damage from `ShotResolver` — is still outstanding; see below.
+- [x] **The map's own entities were unreachable by their runtime ids.** Found by a live walkthrough in
+      the first minute, after twenty green tests: `/take` said "You take the Torch", `/inv` said your
+      hands were empty, and the torch really was gone from the floor. `MapManager` poured TWO id
+      namespaces into one dictionary — a command-spawned entity keyed by its ECS id, a map-spawned one
+      keyed by the number its author typed in the JSON — so a map entity could not be found by the id
+      every component in the game carries. The author's numbers now live in a load-time dictionary of
+      their own. `SomethingTheMapPutThereCanBePickedUpAndReadBack` fails on the old code.
+- [ ] **There is no way to change map at runtime**, so everything in `default.json` — the two rooms,
+      the doors, the megaphone, the material lab — is unreachable in play: the speedway claims
+      `IsDefault` and nothing else can be asked for. This is why the walkthrough above needed the flag
+      flipped by hand. A `/goto <map>` needs the client to tear down and rebuild its acoustic map, so
+      it is not a one-liner, but it is the thing standing between the demo map and anybody's ears.
+- [ ] Held things are not HEARD yet. A carried item moves with you and a dropped one lands audibly, but
+      nothing rattles, swings or knocks against a doorway on the way past, and a thing on your back
+      makes no sound when you run. The emitter is the missing half.
+- [ ] Taking something from ANOTHER PLAYER (handing over, stealing) — `HeldComponent.HolderEntityId`
+      already says who has it, so the refusal is there and the transfer is not. The ownership note
+      further down (`MayModify` becoming "you own it, or you are holding its key") waits on this.
 - [x] **Occupancy**: enter a composite. Vehicles came out drivable, as predicted. See the section
       above.
 - [ ] **Collision response**: `MassKg` is on every vehicle profile already. Missing is the impulse
@@ -1484,9 +1510,11 @@ The order these go in, and why. Everything here was blocked on composites existi
       `NoiseLayerLevel` / `RecordedLayerLevel` are the three layers of a shot;
       `AudioPhysics.UrbanExcessHighDbPer100M` is how dull distance makes things;
       `AcousticConstants.OutdoorMaxWetDb` is how loud the street answers.
-- [ ] **Fire weapons from the SERVER.** `WeaponMechanics` is shared and deterministic but nothing calls
-      it outside the spike: no `EquippedWeaponComponent`, no shot message in the protocol, no
-      `HealthComponent` ever decremented. This is the join between the mechanism and the game.
+- [ ] **Fire weapons from the SERVER.** Half done as of 2026-09-15: `/fire` now fires the weapon in your
+      hands and the shot reaches everyone in earshot. `EquippedWeaponComponent` turned out not to be
+      needed — the held item IS the equip. Still missing: a shot message in the protocol so a trigger
+      is a key rather than a typed command, `ShotResolver` consulted for what the round actually hit,
+      and `HealthComponent` decremented by something, ever.
 - [ ] Impact layer per material: `ShotAudition` already computes when and where the strike is heard and
       `AcousticRegistry` knows 36 surfaces — what is missing is the assets and the emitter.
 - [ ] Glass: assets are in (`GLASS/SHATTER`, `GLASS/TINKLE` 24 one-shots, `GLASS/BED` 30 s for the
@@ -1528,10 +1556,10 @@ Still outstanding from the audit, and still needing ears rather than a harness:
       and nothing models that yet. Worth revisiting if walls read as too present at oblique approaches.
 
 ### Corrections to the lists above
-- "Server: Implement Inventory/Take/Drop commands" is **not** done — `/inv`, take and drop are absent from
-  `CommandHandler`, so pressing I returns "Command 'inv' not recognized". `InventoryComponent` exists and
-  holds a list of entity ids; nothing reads or writes it.
-- There is no combat system wired into the GAME yet. As of 2026-09-14 the weapon spec, the mechanism and
-  the ballistics all exist and are tested (`Weapons.cs`, `WeaponMechanics.cs`, `ShotResolver.cs`), and
-  `--battle` drives them end to end — but only from the AudioLab spike. The server still has no equipped
-  weapon, no shot message, and `HealthComponent` is still never modified after spawn.
+- "Server: Implement Inventory/Take/Drop commands" is done as of 2026-09-15, and done over
+  `InventoryComponent` rather than beside it. See the held-items section above.
+- There is still no combat system wired into the GAME, but the gap is narrower than it was. As of
+  2026-09-15 a player can hold a gun and `/fire` it, and the shot goes out through `EmitWorldAudio` to
+  everyone in earshot. What is still missing is the half that hurts: no shot MESSAGE in the protocol
+  (the client cannot pull a trigger, only the text command can), `ShotResolver` is not consulted for
+  what was hit, and `HealthComponent` has still never been decremented by anything.

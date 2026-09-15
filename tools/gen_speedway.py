@@ -261,6 +261,20 @@ for k, (dx, dz) in enumerate(((0, 1), (1, 0), (0, -1), (-1, 0))):
         "Rotation": yaw_quat(math.atan2(dx, dz)),
     }); eid += 1
 
+# ── Pit gear, where you are standing ─────────────────────────────────────────────────────────────
+# Two things to pick up, at the foot of the PA pole you spawn beside. Not scenery: a crowbar is five
+# kilos of steel and a torch is four hundred grams of plastic, so putting one down on the infield
+# grass and the other on the paved apron is four different noises out of one calculation, and the
+# difference between them is audible without anybody having recorded any of it.
+#
+# They are here rather than only on the demo map because this is the map a player actually lands on,
+# and a verb you cannot reach is a verb nobody has.
+for prefab, ox, oz in (("crowbar", 1.6, -0.9), ("torch", -1.4, -1.1)):
+    entities.append({
+        "EntityId": eid, "PrefabId": prefab,
+        "Position": v3(SPAWN[0] + ox, 0.08, SPAWN[2] + oz),
+    }); eid += 1
+
 # ── The field ────────────────────────────────────────────────────────────────────────────────────
 # Lane offsets spread the cars across the eighteen metres so they are not in single file; start
 # offsets spread them round the lap so the grid is a race in progress rather than a standing start.

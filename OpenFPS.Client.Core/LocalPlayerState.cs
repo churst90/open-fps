@@ -58,7 +58,6 @@ public class LocalPlayerState
     public Vector3 MapSize { get; set; } = new Vector3(100, 100, 100);
     public float MinimumY { get; set; } = -10.0f;
     public float ShelterFactor { get; set; } = 0.0f;
-    public List<string> Inventory { get; set; } = new();
 
     public float Temperature { get; set; } = 20.0f;
     public float Humidity { get; set; } = 0.5f;

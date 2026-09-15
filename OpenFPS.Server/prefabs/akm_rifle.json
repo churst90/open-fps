@@ -1,0 +1,11 @@
+{
+  "Id": "akm_rifle",
+  "Name": "AKM",
+  "Description": "A 7.62x39 rifle. Wood, pressed steel, and both of your hands.",
+  "Material": "Wood",
+  "Type": "Item",
+  "IsItem": true,
+  "ItemWeight": 3.3,
+  "Hands": 2,
+  "WeaponId": "akm"
+}

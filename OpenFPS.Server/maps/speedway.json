@@ -3491,6 +3491,24 @@
     "Z": 0.0,
     "W": 0.707107
    }
+  },
+  {
+   "EntityId": 1114,
+   "PrefabId": "crowbar",
+   "Position": {
+    "X": 1.6,
+    "Y": 0.08,
+    "Z": -0.9
+   }
+  },
+  {
+   "EntityId": 1115,
+   "PrefabId": "torch",
+   "Position": {
+    "X": -1.4,
+    "Y": 0.08,
+    "Z": -1.1
+   }
   }
  ]
 }

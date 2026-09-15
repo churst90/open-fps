@@ -1,0 +1,10 @@
+{
+  "Id": "torch",
+  "Name": "Torch",
+  "Description": "A hand torch. Almost nothing to carry, which is the point of having one.",
+  "Material": "Plastic",
+  "Type": "Item",
+  "IsItem": true,
+  "ItemWeight": 0.4,
+  "Hands": 1
+}

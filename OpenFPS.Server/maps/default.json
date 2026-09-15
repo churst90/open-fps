@@ -96,6 +96,22 @@
     { "EntityId": 531, "PrefabId": "portal", "Position": { "X": 0, "Y": 2, "Z": 35 }, "RegionAId": 530, "RegionBId": 540, "ApertureSize": 8.0 }, // open between halves
     { "EntityId": 532, "PrefabId": "portal", "Position": { "X": 5, "Y": 1, "Z": 30 }, "RegionAId": -1,  "RegionBId": 530, "ApertureSize": 4.0 }, // entry doorway (gym side)
     // -- Megaphone on the DEAD side, beaming EAST (+X) into the live half --
-    { "EntityId": 520, "PrefabId": "space_megaphone", "Position": { "X": -5, "Y": 1.5, "Z": 35 }, "Rotation": { "X": 0, "Y": 0.7071, "Z": 0, "W": 0.7071 } }
+    { "EntityId": 520, "PrefabId": "space_megaphone", "Position": { "X": -5, "Y": 1.5, "Z": 35 }, "Rotation": { "X": 0, "Y": 0.7071, "Z": 0, "W": 0.7071 } },
+
+    // ============================================================
+    //  THINGS TO PICK UP
+    //  Scattered on purpose rather than heaped at the spawn point: finding one is half of what
+    //  carrying things is for, and a heap teaches nothing. They are also on DIFFERENT FLOORS —
+    //  concrete, grass, carpet, wood — because putting a thing down makes the noise its mass and
+    //  its material make meeting THAT floor, and the four of them are easy to tell apart by ear.
+    //
+    //  The rifle takes both hands and the torch takes one, so picking both up is the decision the
+    //  whole two-hand constraint exists to force.
+    // ============================================================
+    { "EntityId": 600, "PrefabId": "crowbar",      "Position": { "X": 1.2,  "Y": 0.05, "Z": 2.5 } },   // concrete, a few steps from spawn
+    { "EntityId": 601, "PrefabId": "torch",        "Position": { "X": -0.6, "Y": 0.05, "Z": 6.5 } },   // on the grass strip
+    { "EntityId": 602, "PrefabId": "sword",        "Position": { "X": -7,   "Y": 0.05, "Z": 16 } },    // concrete room, west
+    { "EntityId": 603, "PrefabId": "akm_rifle",    "Position": { "X": 7,    "Y": 0.05, "Z": 13 } },    // wood room, east
+    { "EntityId": 604, "PrefabId": "glock_pistol", "Position": { "X": -5,   "Y": 0.05, "Z": 36 } }     // the carpet half of the lab
   ]
 }

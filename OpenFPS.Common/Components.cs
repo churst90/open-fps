@@ -322,6 +322,20 @@ public partial struct Velocity { public Vector3 Linear { get; set; } public Velo
 [MemoryPackable]
 public partial struct BeaconComponent { public float Frequency { get; set; } public float Interval { get; set; } public float LastPulseTime { get; set; } public BeaconComponent() { } }
 
+/// <summary>
+/// What a player has slung on them rather than in their hands.
+///
+/// ENTITY IDS, and that was right from the first day it was written: a rifle on your back is the
+/// same entity the rifle on the floor was, still with a mass, a material and a position — it just
+/// happens to be parented to you at shoulder height. Which is why dropping it makes the noise that
+/// mass and that material make meeting that floor, from the height it actually fell from, through a
+/// calculation that already existed and knows nothing about rifles. A list of item NAMES would have
+/// needed every bit of that inventing again, and inventing it worse.
+///
+/// The limit on this is a MASS and not a number of slots (see <c>HandsService.CarryCapacityKg</c>),
+/// because two rifles and a crowbar is a load and six torches is not, and a count cannot tell those
+/// apart.
+/// </summary>
 [MemoryPackable]
 public partial struct InventoryComponent { public List<int> ItemEntityIds { get; set; } = new(); public InventoryComponent() { } }
 
@@ -630,7 +644,16 @@ public partial struct HandsComponent
     public HandsComponent() { RightEntityId = -1; LeftEntityId = -1; }
 }
 
-/// <summary>On the item: who has it, and whether it is filling both their hands.</summary>
+/// <summary>
+/// On the item: who has it, and whether it is filling both their hands.
+///
+/// "Has it" and not "is holding it" — this is on a thing slung on a back exactly as it is on a thing
+/// in a fist, and it is the one question anything reaching for an item needs to ask: nobody can lift
+/// a thing off the floor, or off your shoulder, while this is set. WHICH of the two it is gets
+/// answered by <see cref="HandsComponent"/> and <see cref="InventoryComponent"/>, each of which
+/// names the ids it owns — so there are three places a thing can be, and each is one question with
+/// one answer rather than a flag some code remembers to check.
+/// </summary>
 [MemoryPackable]
 public partial struct HeldComponent
 {

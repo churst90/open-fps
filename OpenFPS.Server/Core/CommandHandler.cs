@@ -27,15 +27,18 @@ public class CommandHandler
     private readonly GameServer _server;
     private readonly CompositeService? _composites;
     private readonly OccupancyService? _seats;
+    private readonly HandsService? _hands;
 
     public CommandHandler(SessionManager sessions, MapManager maps, GameServer server,
-                          CompositeService? composites = null, OccupancyService? seats = null)
+                          CompositeService? composites = null, OccupancyService? seats = null,
+                          HandsService? hands = null)
     {
         _sessions = sessions;
         _maps = maps;
         _server = server;
         _composites = composites;
         _seats = seats;
+        _hands = hands;
     }
 
     public void HandleTextCommand(int connectionId, TextCommand cmd, Action<IMessage> reply)
@@ -139,9 +142,11 @@ public class CommandHandler
             case "prefabs":
                 HandleListPrefabs(reply);
                 break;
+            // Firing is no longer elevated when you are HOLDING the thing: a gun in your hands is
+            // the permission. Naming a weapon out of the air still is — that is the dev trigger.
             case "fire":
-                if (!isElevated) { DenyCommand(reply); return; }
-                HandleFire(session, args, reply);
+            case "shoot":
+                HandleFire(session, args, reply, isElevated);
                 break;
             // ── Doors ───────────────────────────────────────────────────────────────────────
             //
@@ -183,6 +188,40 @@ public class CommandHandler
                 break;
             case "seats":
                 HandleSeats(session, reply);
+                break;
+            // ── Carrying things ─────────────────────────────────────────────────────────────
+            //
+            // Not elevated either, and for the same reason: picking a thing up is what the world is
+            // for. Every one of these takes an optional NAME, because a player who cannot point has
+            // to be able to say which one they meant, and every refusal says what is in the way
+            // rather than merely no.
+            case "take":
+            case "get":
+            case "grab":
+            case "pickup":
+                HandleTake(session, args, reply);
+                break;
+            case "drop":
+            case "putdown":
+                HandleDrop(session, args, reply);
+                break;
+            case "stow":
+            case "sling":
+                HandleStow(session, args, reply);
+                break;
+            case "draw":
+            case "equip":
+            case "wield":
+            case "unsling":
+                HandleDraw(session, args, reply);
+                break;
+            case "hands":
+                HandleHands(session, reply);
+                break;
+            case "inv":
+            case "i":
+            case "inventory":
+                HandleInventory(session, reply);
                 break;
             case "savemap":
                 if (!isElevated) { DenyCommand(reply); return; }
@@ -604,6 +643,77 @@ public class CommandHandler
                      + $"{(seat.Taken ? "taken" : "free")}, {seat.Distance:F1} metres.");
     }
 
+    // ── Carrying things ─────────────────────────────────────────────────────────────────────────
+    //
+    // Four verbs and two readouts, and between them they are the whole inventory: take, drop, stow,
+    // draw, hands, inv. There is no inventory SCREEN because there is nothing to put on one — a
+    // thing you are carrying is the same entity it was on the floor, at a position on your body, and
+    // the readout is a sentence rather than a grid because a sentence is what a screen reader takes
+    // in at a go.
+
+    private HandsService? Hands(Action<IMessage> reply)
+    {
+        if (_hands == null) Say(reply, "Picking things up is not available on this server.");
+        return _hands;
+    }
+
+    /// <summary>/take [name] — picks up the nearest thing you can reach, or the nearest one called that.</summary>
+    private void HandleTake(UserSession session, string[] args, Action<IMessage> reply)
+    {
+        var svc = Hands(reply); if (svc == null) return;
+        svc.Take(session, string.Join(" ", args), out string message);
+        Say(reply, message);
+    }
+
+    /// <summary>
+    /// /drop [name|left|right|all] — puts something down, and it lands.
+    ///
+    /// The landing goes out to everyone in earshot rather than back to the person who dropped it: a
+    /// dropped thing is a sound in a room, and the useful half of it is that the people who did NOT
+    /// drop it can hear where it went.
+    /// </summary>
+    private void HandleDrop(UserSession session, string[] args, Action<IMessage> reply)
+    {
+        var svc = Hands(reply); if (svc == null) return;
+        svc.Drop(session, string.Join(" ", args), out string message,
+                 (id, label, sounds) => _server.EmitWorldAudio(session.CurrentMapId, id, label, sounds));
+        Say(reply, message);
+    }
+
+    /// <summary>/stow [name|left|right|all] — slings what you are holding onto your back.</summary>
+    private void HandleStow(UserSession session, string[] args, Action<IMessage> reply)
+    {
+        var svc = Hands(reply); if (svc == null) return;
+        svc.Stow(session, string.Join(" ", args), out string message);
+        Say(reply, message);
+    }
+
+    /// <summary>/draw [name] — takes something off your back and puts it in your hands.</summary>
+    private void HandleDraw(UserSession session, string[] args, Action<IMessage> reply)
+    {
+        var svc = Hands(reply); if (svc == null) return;
+        svc.Draw(session, string.Join(" ", args), out string message);
+        Say(reply, message);
+    }
+
+    /// <summary>/hands — what is in your hands, which is the question with the hard limit behind it.</summary>
+    private void HandleHands(UserSession session, Action<IMessage> reply)
+    {
+        var svc = Hands(reply); if (svc == null) return;
+        if (!TryGetBody(session, reply, out var world, out _, out _)) return;
+        if (!_maps.TryGetMap(session.CurrentMapId, out _, out _, out _, out var lookup)) return;
+        var hands = world.Has<HandsComponent>(session.Entity)
+            ? world.Get<HandsComponent>(session.Entity) : new HandsComponent();
+        Say(reply, HandsService.Carrying(world, lookup, hands));
+    }
+
+    /// <summary>/inv — everything you have on you, hands first, with what it weighs.</summary>
+    private void HandleInventory(UserSession session, Action<IMessage> reply)
+    {
+        var svc = Hands(reply); if (svc == null) return;
+        Say(reply, svc.Readout(session));
+    }
+
     // ── Building where you cannot point ─────────────────────────────────────────────────────────
     //
     // Walking to the spot works for a wall and not for a roof, and walking to twenty wall positions
@@ -870,25 +980,42 @@ public class CommandHandler
     }
 
     /// <summary>
-    /// /fire [weapon] — fires a weapon from where you stand, at whatever is in front of you.
+    /// /fire [weapon] — fires what is in your hands, at whatever is in front of you.
     ///
-    /// A DEV TRIGGER, and honestly labelled as one. `WeaponSynth`, `ShotResolver`, `WeaponMechanics`
-    /// and `GlassBreak` have all been written and tested for a while and have never made a sound,
-    /// because nothing connects a gun to a player: there is no equip, no held item and no trigger.
-    /// The held-item work will supply the real one. Until then this is a trigger, and having any at
-    /// all is the difference between four tested models and four tested models nobody has ever heard.
+    /// This used to be a DEV TRIGGER and nothing else, because nothing connected a gun to a player:
+    /// there was no equip, no held item and no trigger, so `WeaponSynth`, `ShotResolver`,
+    /// `WeaponMechanics` and `GlassBreak` were four tested models nobody had ever heard. Hands supply
+    /// the real join, and they supply it without an `EquippedWeaponComponent`: the weapon is the
+    /// `ItemComponent.WeaponId` of the thing you are holding, so equipping a gun and picking one up
+    /// are the same act, and putting it down disarms you with no bookkeeping anywhere.
+    ///
+    /// Naming a weapon out of the air stays elevated, and stays the trigger it was — useful for
+    /// hearing a model without first building a world to find a gun in.
     ///
     /// It also happens to be the only thing in the game that can currently break a window, which is
     /// why the glass path hangs off it too.
     /// </summary>
-    private void HandleFire(UserSession session, string[] args, Action<IMessage> reply)
+    private void HandleFire(UserSession session, string[] args, Action<IMessage> reply, bool isElevated)
     {
         if (!TryGetBody(session, reply, out var world, out var grid, out var position)) return;
+        if (!_maps.TryGetMap(session.CurrentMapId, out _, out _, out _, out var lookup)) return;
 
-        string id = args.Length > 0 ? args[0] : "akm";
-        if (!WeaponRegistry.TryGet(id, out var weapon))
+        bool armed = HandsService.TryGetHeldWeapon(world, session.Entity, lookup, out var weapon, out _);
+
+        // Naming one overrides what you are holding, and only a dev may do that. Everyone else fires
+        // the thing in their hands or nothing, which is the rule the world should have had all along.
+        if (isElevated && (args.Length > 0 || !armed))
         {
-            Say(reply, $"No weapon called '{id}'. Try: {string.Join(", ", WeaponRegistry.All.Select(w => w.Id))}");
+            string id = args.Length > 0 ? args[0] : "akm";
+            if (!WeaponRegistry.TryGet(id, out weapon))
+            {
+                Say(reply, $"No weapon called '{id}'. Try: {string.Join(", ", WeaponRegistry.All.Select(w => w.Id))}");
+                return;
+            }
+        }
+        else if (!armed)
+        {
+            Say(reply, "You are not holding anything you can fire.");
             return;
         }
 

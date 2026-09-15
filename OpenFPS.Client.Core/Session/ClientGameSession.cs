@@ -200,6 +200,14 @@ public sealed class ClientGameSession : IDisposable
         _bindings.Bind(InputContext.Gameplay, GameKey.Enter, Interact);
         _bindings.Bind(InputContext.Gameplay, GameKey.P, () => _network.Send(new TextCommand { Command = "scan" }));
         _bindings.Bind(InputContext.Gameplay, GameKey.I, () => _network.Send(new TextCommand { Command = "inv" }));
+
+        // Carrying things. G takes whatever is within reach, Q puts down what is in your hand, and
+        // R swaps a hand for your back — the three verbs you use while moving, on keys you can find
+        // without letting go of the movement ones. Naming a particular thing is what the console is
+        // for; these are the ones you want under a finger.
+        _bindings.Bind(InputContext.Gameplay, GameKey.G, () => _network.Send(new TextCommand { Command = "take" }));
+        _bindings.Bind(InputContext.Gameplay, GameKey.Q, () => _network.Send(new TextCommand { Command = "drop" }));
+        _bindings.Bind(InputContext.Gameplay, GameKey.R, () => _network.Send(new TextCommand { Command = "stow" }));
         _bindings.Bind(InputContext.Gameplay, GameKey.V, ToggleVoiceTransmission);
 
         // Social / discovery.
