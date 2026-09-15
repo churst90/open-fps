@@ -163,6 +163,63 @@ public class ImpactAndGlassSoundTests
     }
 
     /// <summary>
+    /// How much glass there was decides how loud it is. A shop front going in is not a wing mirror
+    /// going in, and the energy a pane releases is the strain energy stored in it — which scales with
+    /// its VOLUME, so twice the area and twice the thickness is four times the glass and six decibels
+    /// more of it.
+    /// </summary>
+    [Fact]
+    public void HowMuchGlassThereWasDecidesHowLoudItIs()
+    {
+        var shatter = new List<GlassEvent> { new(GlassEventKind.Shatter, 0f, Vector3.Zero, 1f, 1f) };
+
+        float window = Level(shatter, new Vector2(1.2f, 1.6f), 0.006f);   // a house window
+        float mirror = Level(shatter, new Vector2(0.2f, 0.15f), 0.003f);  // a wing mirror
+        float front = Level(shatter, new Vector2(3f, 2.5f), 0.010f);      // a shop front
+
+        Assert.True(mirror < window - 8f, $"the mirror came out at {mirror:F0} dB against the window's {window:F0}");
+        Assert.True(front > window + 5f, $"the shop front came out at {front:F0} dB against the window's {window:F0}");
+
+        // Four times the glass is six decibels, which is the law and not a taste setting.
+        float doubled = Level(shatter, new Vector2(2.4f, 1.6f), 0.012f);
+        Assert.Equal(6f, doubled - window, 1);
+    }
+
+    /// <summary>
+    /// A shop front is not a loud teacup. Size has to reach the CHARACTER and not only the level: a
+    /// crack crosses a bigger sheet over a longer time and releases bigger fragments, so the event
+    /// lasts longer and sits lower.
+    /// </summary>
+    [Fact]
+    public void ABigPaneIsLowerAndLongerAndNotJustLouder()
+    {
+        var shatter = new List<GlassEvent> { new(GlassEventKind.Shatter, 0f, Vector3.Zero, 1f, 1f) };
+
+        var cup = GlassSound.From(shatter, GlassType.Tempered, new Vector2(0.25f, 0.2f), 0.003f)[0];
+        var front = GlassSound.From(shatter, GlassType.Tempered, new Vector2(3f, 2.5f), 0.010f)[0];
+
+        Assert.True(front.Hz < cup.Hz * 0.6f, $"the shop front broke at {front.Hz:F0} Hz and the cup at {cup.Hz:F0}");
+        Assert.True(front.DecaySeconds > cup.DecaySeconds * 2f,
+                    $"the shop front lasted {front.DecaySeconds:F2} s and the cup {cup.DecaySeconds:F2} s");
+        Assert.True(front.LevelDb > cup.LevelDb + 10f);
+    }
+
+    /// <summary>Thicker glass breaks into bigger pieces, and a bigger piece of a stiff plate rings
+    /// lower. Four-millimetre glass tinkles brighter than ten.</summary>
+    [Fact]
+    public void ThickerGlassTinklesLower()
+    {
+        var shards = new List<GlassEvent> { new(GlassEventKind.Shard, 0.2f, Vector3.Zero, 0.8f, 1f) };
+        float thin = GlassSound.From(shards, GlassType.Tempered, new Vector2(1f, 1f), 0.004f)[0].Hz;
+        float thick = GlassSound.From(shards, GlassType.Tempered, new Vector2(1f, 1f), 0.012f)[0].Hz;
+        Assert.True(thick < thin * 0.7f, $"ten-mil rang at {thick:F0} Hz against four-mil's {thin:F0}");
+    }
+
+    private static float Level(List<GlassEvent> events, Vector2 size, float thickness)
+        => GlassSound.From(events, GlassType.Tempered, size, thickness)
+                     .First(s => s.Character == SoundCharacter.Hiss).LevelDb;
+
+    /// <summary>
     /// Laminated glass keeps the pane: a dull crunch and no fall at all. A very distinctive absence,
     /// and it tells a listener something about the building they are shooting at.
     /// </summary>

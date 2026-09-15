@@ -971,7 +971,8 @@ public class CommandHandler
         for (int i = 0; i < count; i++) events.Add(buffer[i]);
 
         _server.EmitWorldAudio(session.CurrentMapId, pane.Id, "glass",
-                               GlassSound.From(events, glass.Type, glass.Size));
+                               GlassSound.From(events, glass.Type, glass.Size,
+                                               MathF.Max(0.003f, collider.Size.Z)));
         _maps.DestroyEntity(session.CurrentMapId, pane);
         _server.BroadcastRemoval(session.CurrentMapId, pane.Id);
     }

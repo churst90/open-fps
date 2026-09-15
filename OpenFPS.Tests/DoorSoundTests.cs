@@ -174,9 +174,13 @@ public class DoorSoundTests
     // ── The order of it ─────────────────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// The latch is FIRST, before the leaf has met anything — the bolt rides up the strike plate as
-    /// the handle is worked. Getting that order wrong makes a door sound like a recording played
-    /// backwards, and it is the kind of thing only a listener would ever notice.
+    /// Closing, the leaf meets the frame FIRST and the bolt snaps home a moment later, once the seal
+    /// has compressed. (Opening is the other way round, which is why it is a separate method.)
+    ///
+    /// And "a moment later" has to be long enough to be heard as a separate event: forward masking
+    /// from a broadband impact runs well over a tenth of a second, so a click twenty milliseconds
+    /// behind a thump is not a click, it is part of the thump. The first person to listen to this
+    /// said exactly that — "just a thump" — while every test passed.
     /// </summary>
     [Fact]
     public void TheLatchComesFirstAndTheRingComesLast()
@@ -184,11 +188,33 @@ public class DoorSoundTests
         var sounds = DoorAcoustics.Closing(Of("Metal"), Vector3.Zero, Vector3.Zero,
                                            0.9f, 2.1f, 0.04f, 30f, 2f, hasSeal: false);
 
-        var latch = sounds.Single(s => s.Kind == DoorSoundKind.Latch);
+        // Three of them: the bolt rides the ramp of the keeper, it drops into it, and the door
+        // itself answers. A recorded latch puts forty-two per cent of its energy below 200 Hz — it
+        // is not a little click, it is a mechanism bolted through a leaf, and what you mostly hear
+        // is the leaf. Rendered as pure click it read as a puff of air, because a bright transient
+        // with nothing underneath it is a puff.
+        var latches = sounds.Where(s => s.Kind == DoorSoundKind.Latch).OrderBy(s => s.DelaySeconds).ToList();
+        Assert.Equal(3, latches.Count);
+        var latch = latches[^1];
+
+        // ...and the body is the loudest of the three, as it is in the recording.
+        Assert.True(latches.OrderByDescending(l => l.LevelDb).First().Hz < 400f,
+                    "the loudest part of the latch is a click, so there is nothing underneath it");
         var impact = sounds.Single(s => s.Kind == DoorSoundKind.Impact);
         var panel = sounds.Single(s => s.Kind == DoorSoundKind.Panel);
 
-        Assert.True(latch.DelaySeconds > impact.DelaySeconds, "the bolt drops before the leaf lands");
+        // Far enough apart to be two events and close enough to be one mechanism.
+        float gap = latches[1].DelaySeconds - latches[0].DelaySeconds;
+        Assert.InRange(gap, 0.012f, 0.06f);
+
+        // Nearly all tone and very little noise — steel on steel RINGS, briefly. At three quarters
+        // noise the renderer made it a hiss, which is what the first listening test heard.
+        Assert.All(latches, l => Assert.True(l.Noisiness <= 0.6f, $"the latch is {l.Noisiness:F2} noise"));
+
+        Assert.True(latch.DelaySeconds > impact.DelaySeconds, "the bolt snaps home after the leaf seats");
+        Assert.True(latch.DelaySeconds - impact.DelaySeconds > 0.05f,
+                    $"the latch is only {(latch.DelaySeconds - impact.DelaySeconds) * 1000f:F0} ms behind the "
+                  + "impact, which is inside its masking and will not be heard as a separate sound");
         Assert.True(panel.DelaySeconds >= impact.DelaySeconds, "the panel rings after the blow, not before");
         Assert.True(panel.DecaySeconds > impact.DecaySeconds, "the ring outlasts the blow");
     }
@@ -202,7 +228,7 @@ public class DoorSoundTests
         var centre = new Vector3(4.5f, 1, 0);
         var sounds = DoorAcoustics.Closing(Of("Metal"), latchEdge, centre, 0.9f, 2.1f, 0.04f, 30f, 2f, false);
 
-        Assert.Equal(latchEdge, sounds.Single(s => s.Kind == DoorSoundKind.Latch).Position);
+        Assert.All(sounds.Where(s => s.Kind == DoorSoundKind.Latch), l => Assert.Equal(latchEdge, l.Position));
         Assert.Equal(latchEdge, sounds.Single(s => s.Kind == DoorSoundKind.Impact).Position);
         Assert.Equal(centre, sounds.Single(s => s.Kind == DoorSoundKind.Panel).Position);
     }

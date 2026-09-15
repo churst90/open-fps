@@ -146,33 +146,73 @@ public static class DoorAcoustics
 
         float impactDb = PanelAcoustics.ImpactDb(impactEnergy);
 
-        // 1. The latch, first, and before the leaf has met anything: the bolt rides up the strike
-        //    plate and drops. Almost independent of the door, because the mechanism is steel whatever
-        //    the leaf is made of.
-        sounds.Add(new DoorSound(DoorSoundKind.Latch, SoundCharacter.Knock, 0.02f, latchEdge,
-                                 impactDb - 8f, LatchHz, 0.05f, 0.75f));
+        // 1. The latch, AFTER the leaf has seated: closing, the door meets the frame first and the
+        //    bolt snaps into the keeper a moment later, once the seal has compressed. (Opening is the
+        //    other way round, which is why it is a separate method.)
+        //
+        //    Ninety milliseconds, not twenty. A small bright click twenty milliseconds behind a
+        //    broadband thump is not heard at all — forward masking from an impact runs well over a
+        //    tenth of a second — and the first person to listen to this said exactly that: "I didn't
+        //    hear the knob or latch or anything, just a thump". It is also simply truer; a bolt does
+        //    not drop the instant the leaf touches.
+        // A latch is THREE things, and the one that was missing is the one that carries it.
+        //
+        // A recorded latch puts FORTY-TWO PER CENT of its energy below 200 Hz. That was the surprise:
+        // a latch is not a little click, it is a mechanism bolted through a door, and what you mostly
+        // hear is the whole leaf answering the bolt. Rendered as pure click it had two per cent down
+        // there and a listening test called it "a puff of white noise" — correctly, because a bright
+        // transient with nothing underneath it is a puff.
+        //
+        // So: the ramp tick as the bolt rides up, the click as it drops into the keeper, and the
+        // BODY of the door responding to both.
+        sounds.Add(new DoorSound(DoorSoundKind.Latch, SoundCharacter.Knock, 0.072f, latchEdge,
+                                 impactDb - 21f, LatchHz * 1.2f, 0.015f, 0.3f));
+        sounds.Add(new DoorSound(DoorSoundKind.Latch, SoundCharacter.Knock, 0.098f, latchEdge,
+                                 impactDb - 15f, LatchHz, 0.03f, 0.25f));
+        sounds.Add(new DoorSound(DoorSoundKind.Latch, SoundCharacter.Knock, 0.099f, latchEdge,
+                                 impactDb - 2f, 140f, 0.09f, 0.5f));
 
         // 2. The seal, if there is one, overlapping the end of the travel — air being pushed out of
         //    a closing gap, so it is low, soft and brief.
         if (hasSeal)
+            // Air squeezed out of a narrowing gap: broadband, brief, and UP where escaping air lives.
+            // At 90 Hz through a broad resonator this was a low resonant thump lasting a tenth of a
+            // second — which a listening test called "someone popping a cork", and it was right.
+            // Quieter too: a seal is the part of a door closing you hear LEAST, not most.
             sounds.Add(new DoorSound(DoorSoundKind.Seal, SoundCharacter.Hiss, 0f, centre,
-                                     impactDb - 4f, 90f, 0.12f, 0.95f));
+                                     impactDb - 24f, 520f, 0.03f, 1f));
 
         // 3. The impact itself.
+        // 320 Hz, not 160. A recorded door closing carries nearly two fifths of its energy between
+        // 200 Hz and 1.5 kHz — the frame, the stop and the hardware all answering — where this had
+        // three quarters of everything under 300 Hz and almost nothing above it. All bottom and no
+        // middle is a boom rather than a thud.
         sounds.Add(new DoorSound(DoorSoundKind.Impact, SoundCharacter.Knock, 0f, latchEdge,
-                                 impactDb, 160f, 0.06f, 0.85f));
+                                 impactDb, 430f, 0.06f, 0.85f));
 
         // 4. The panel ringing on afterwards, with whatever energy the seal did not take.
         float hz = PanelHz(material, width, height, thickness);
         if (hz > 0f)
         {
-            float ring = RingSeconds(material, hz);
+            // A closing door dumps most of its energy into the FRAME IT JUST HIT, so its leaf rings
+            // far less than the same panel struck in free air would. Without this a wooden door held
+            // a 129 Hz note for a third of a second, which a listening test described as "a cork
+            // being popped" — and it was right: that is what a low decaying tone of that length is.
+            //
+            // A factor rather than more damping in PanelAcoustics, because this is a fact about
+            // doors and not about panels. The same leaf hanging on a rope would ring the full time.
+            const float intoTheFrame = 0.45f;
+            float ring = RingSeconds(material, hz) * intoTheFrame;
             // Having a note is not the same as ringing. A carpet has modes like everything else and
             // very obviously does not ring; what tells them apart is whether the note outlasts the
             // blow that caused it.
             if (PanelAcoustics.RingsAudibly(material, hz, HungPanelLoss))
+                // The whole leaf radiating, against a blow delivered at one point on its edge. Six
+                // decibels down was treating it as the lesser event; it is the larger surface.
+                // Subordinate to the blow, not competing with it. A door's ring is something you
+                // notice AFTER the thud rather than instead of it.
                 sounds.Add(new DoorSound(DoorSoundKind.Panel, SoundCharacter.Ring, 0.004f, centre,
-                                         impactDb - 6f - 12f * sealAbsorbed, hz, ring, 0.15f));
+                                         impactDb - 9f - 12f * sealAbsorbed, hz, ring, 0.15f));
         }
         return sounds;
     }
@@ -188,13 +228,16 @@ public static class DoorAcoustics
                                           float width, float height, float thickness,
                                           float swingSeconds, float hingeDryness, bool hasSeal)
     {
+        // Levels raised from where they started, which was the level of a conversation and inaudible
+        // at two metres. A handle worked at arm's length is a clearly audible thing, and the first
+        // listening test heard none of this at all.
         var sounds = new List<DoorSound>(3)
         {
-            new(DoorSoundKind.Latch, SoundCharacter.Knock, 0f, latchEdge, 58f, LatchHz, 0.04f, 0.8f),
+            new(DoorSoundKind.Latch, SoundCharacter.Knock, 0f, latchEdge, 74f, LatchHz, 0.03f, 0.2f),
         };
 
         if (hasSeal)
-            sounds.Add(new DoorSound(DoorSoundKind.Seal, SoundCharacter.Hiss, 0.03f, latchEdge, 50f, 220f, 0.09f, 0.9f));
+            sounds.Add(new DoorSound(DoorSoundKind.Seal, SoundCharacter.Hiss, 0.03f, latchEdge, 66f, 220f, 0.09f, 0.9f));
 
         // Hinges are a stick-slip relaxation oscillation: rubber on road, brake on disc, a dry pin in
         // a dry knuckle. The same process as a tyre at its limit, and it sings for the same reason.
@@ -203,7 +246,7 @@ public static class DoorAcoustics
             // A bigger, heavier pin groans lower — so the note comes off the leaf, not off a table.
             float hz = Math.Clamp(900f / MathF.Max(0.3f, width * height), 120f, 2200f);
             sounds.Add(new DoorSound(DoorSoundKind.Hinge, SoundCharacter.Scrape, 0.05f, hinge,
-                                     44f + 16f * hingeDryness, hz,
+                                     60f + 16f * hingeDryness, hz,
                                      MathF.Max(0.1f, swingSeconds * 0.8f), 0.35f));
         }
         return sounds;

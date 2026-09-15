@@ -64,12 +64,22 @@ public static class TransientSynth
     /// </summary>
     private static void RenderKnock(float[] buffer, float hz, float seconds, float noisiness, Random rng)
     {
-        var filter = new Resonator(hz, q: 3.5f + 6f * (1f - noisiness));
+        // Q spans a much wider range than it did. A knock with little noise in it is a hard small
+        // thing striking another hard small thing — a latch bolt on its keeper — and that RINGS, at a
+        // Q of twenty-odd. At the old top of five it popped, which the first listening test described
+        // exactly: "sounds like someone popping a cork".
+        var filter = new Resonator(hz, q: 2.5f + 26f * (1f - Math.Clamp(noisiness, 0f, 1f)));
         float k = 6.9f / (seconds * SampleRate);          // 60 dB over the whole length
+
+        // The strike is an IMPULSE. The noise that follows it is contact scrape and lasts a
+        // millisecond or two, not the length of the sound — spreading it over the whole decay is
+        // what turned a click into a hiss.
+        float contact = MathF.Max(1f, 0.0015f * SampleRate);
         for (int i = 0; i < buffer.Length; i++)
         {
-            // The strike itself is one sample of everything; the rest is the body letting go of it.
-            float excite = i == 0 ? 1f : (float)(rng.NextDouble() * 2.0 - 1.0) * MathF.Exp(-k * i * 6f);
+            float excite = i == 0
+                ? 1f
+                : (float)(rng.NextDouble() * 2.0 - 1.0) * noisiness * MathF.Exp(-i / contact);
             buffer[i] = filter.Process(excite) * MathF.Exp(-k * i);
         }
     }

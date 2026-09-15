@@ -79,7 +79,14 @@ public static class Loudness
     /// inverse-square law has already taken 30 dB off it before the mix sees it. Guns are very loud;
     /// they have to be loud at the ranges people actually shoot from.
     /// </summary>
-    public const float RenderCeilingDb = 130f;
+    // Lowered from 130. At 130 the only thing that ever reached full scale was gunfire: a door slam
+    // at 88 dB rendered at -28 dBFS, a pane of glass across a street at -41, and three separate
+    // listening tests in a row reported doors, glass and tyres as "weak", "quiet" and "dull" while
+    // every measurement said the physics was right. It was — the ANCHOR was wrong. Everyday sounds
+    // are 60 to 95 dB and they are what the game is mostly made of, so that is the range the mix
+    // should spend itself on. Gunfire now runs into the ceiling and clips, which is what a gunshot
+    // does to an ear and to a microphone.
+    public const float RenderCeilingDb = 112f;
 
     /// <summary>
     /// How much of the real decibel difference survives into the mix. 1.0 is literal physics and
@@ -98,7 +105,12 @@ public static class Loudness
     /// <summary>Largest reference distance we will hand out. Past this a source stops being a point
     /// and the 1/r model stops meaning much anyway.</summary>
     public const float MaxReferenceDistance = 40f;
-    public const float MinReferenceDistance = 0.5f;
+    // Raised from half a metre. The reference distance is where a sound stops getting louder as you
+    // approach, and beyond it everything falls away as 1/d — so a floor of 0.5 m meant a quiet source
+    // was already losing six decibels by the time you were a metre from it. Nothing in this game is
+    // heard from closer than about a metre anyway; a door at arm's length was being attenuated as
+    // though the listener's ear were pressed to the latch.
+    public const float MinReferenceDistance = 1.2f;
 
     /// <summary>
     /// Where to put a sound of a given source level: the gain it plays at, and the reference distance

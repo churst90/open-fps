@@ -87,7 +87,22 @@ public sealed class EngineVoiceState
     /// <summary>How much of the front of the car (intake and block) is mixed into this one voice,
     /// 0..1. The rig's separation is lost in a single emitter; the timbre is kept.</summary>
     public float FrontMix = 0.35f;
-    public float TyreMix = 0.5f;
+    /// <summary>
+    /// How much of the tyre layer reaches the mix.
+    ///
+    /// The tyre model already works in physical levels — a squeal is scaled from the tyre's own
+    /// SquealDb, which for a road tyre is 92 dB against a diesel truck's 104 — so halving it here was
+    /// scaling a derived quantity by a taste constant, and it put the squeal sixteen decibels under
+    /// the engine instead of twelve. The first person to listen to a truck launching hard heard the
+    /// revs and no tyres at all.
+    ///
+    /// Measured rather than guessed, in the end: rendering the tyre voice on its own put a full
+    /// squeal at an RMS of 0.89 where the exhaust runs in pascals and reaches tens, leaving the
+    /// squeal twenty-odd decibels under an engine it should be about seven under. Two listening
+    /// tests in a row said "hardly noticeable" and "extremely dull", and the dullness was the same
+    /// thing: what was audible of it was the low shoulder, because the rest was buried.
+    /// </summary>
+    public float TyreMix = 1.4f;
     public float SampleRate = 44100f;
 
     private float _speedSmooth;

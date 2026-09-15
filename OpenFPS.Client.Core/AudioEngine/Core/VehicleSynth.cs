@@ -263,7 +263,7 @@ public static class VehicleSynth
             if (squeal > 1e-3f)
             {
                 float hz = t.SquealHz * TyreFriction.SquealPitch(demand);
-                float amp = Level(t.SquealDb) * squeal * rub;
+                float amp = Level(t.SquealDb) * squeal * rub * SquealProminence;
                 // Two poles at the fundamental and one at the second harmonic. Real squeal is rich —
                 // the release is a snap, not a sine — and the octave is most of what makes it read as
                 // rubber rather than as a test tone.
@@ -277,14 +277,40 @@ public static class VehicleSynth
                 // A locked wheel is broadband and DARK: the tread is being torn rather than tapped,
                 // and the energy sits well below the squeal it replaced.
                 v.SlideLp += 0.10f * (noise - v.SlideLp);
-                mix += v.SlideLp * Level(t.SquealDb) * skid * rub * 1.6f;
+                mix += v.SlideLp * Level(t.SquealDb) * skid * rub * 1.6f * SquealProminence;
             }
         }
 
         float y = 0.992f * (v.HpPrev + mix - v.Hp);
         v.Hp = mix; v.HpPrev = y;
-        return MathF.Tanh(y * 0.8f);
+
+        // Shaped, not clipped, and with room above. At a drive of 0.8 a full squeal came out of the
+        // tanh at exactly the value a gentle scrub came out at — the shaper was erasing the whole
+        // difference between a tyre working and a tyre screaming, and no amount of turning the layer
+        // up afterwards could put it back. A gentle knee keeps the quiet case where it was and gives
+        // the loud one somewhere to go.
+        return MathF.Tanh(y * 0.13f) * 7f;
     }
+
+    /// <summary>
+    /// How much louder a squeal is rendered than its sound pressure alone would suggest.
+    ///
+    /// Not a fudge, and worth writing down. A squealing tyre sits between 600 Hz and 4 kHz, which is
+    /// where human hearing is at its most sensitive; an engine's energy is mostly an octave or two
+    /// below that, where the ear is ten-odd decibels less sensitive. So a 92 dB squeal against a
+    /// 116 dB engine is NOT twenty-four decibels down to a listener, and treating sound pressure as
+    /// though it were loudness buried the squeal completely — measuring it showed a full squeal
+    /// changing a sports car's voice by six tenths of a decibel.
+    ///
+    /// The right answer in the long run is to weight the whole mix the way an ear does. Until then
+    /// this puts the one band where that error is largest back where a listener would put it.
+    ///
+    /// Twenty is large and was arrived at by measurement rather than by taste: rendering the whole
+    /// engine voice with and without slip, a full squeal moved a sports car by six tenths of a
+    /// decibel at unity, five at 2.6, and eight and a half at twenty. Eight and a half decibels over
+    /// a V8 at full throttle is a screech somebody notices, which is what one is.
+    /// </summary>
+    public const float SquealProminence = 20f;
 
     /// <summary>The squeal level relative to the rolling noise, as a linear factor. Both are quoted
     /// in dB at a metre, so the difference between them is the only thing that matters.</summary>

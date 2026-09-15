@@ -88,7 +88,8 @@ public static class StreetSceneSpike
 
             float hz = DoorAcoustics.PanelHz(props, 0.9f, 2.1f, thickness);
             float ring = DoorAcoustics.RingSeconds(props, hz);
-            var latch = shutting.Single(s => s.Kind == DoorSoundKind.Latch);
+            // Two latch clicks now — the bolt rides the ramp, then drops into the keeper.
+            var latch = shutting.Where(s => s.Kind == DoorSoundKind.Latch).OrderBy(s => s.DelaySeconds).Last();
             var impact = shutting.Single(s => s.Kind == DoorSoundKind.Impact);
 
             Console.WriteLine($"    {label,-7} panel {hz,5:F0} Hz, rings {ring,5:F2} s, "
@@ -98,8 +99,9 @@ public static class StreetSceneSpike
             // The latch has to come first, or it reads as a recording played backwards.
             if (latch.DelaySeconds <= impact.DelaySeconds) ok = false;
 
+            int layer = 0;
             foreach (var sound in shutting)
-                layers.Add(($"door_{label}_{sound.Kind}".ToLowerInvariant(),
+                layers.Add(($"door_{label}_{layer++}_{sound.Kind}".ToLowerInvariant(),
                             TransientSynth.Render(sound.ToTransient(), seed: 3)));
         }
         return ok;
@@ -110,10 +112,10 @@ public static class StreetSceneSpike
     private static bool Window(out List<(string Name, float[] Pcm)> layers)
     {
         layers = new List<(string, float[])>();
-        Console.WriteLine("\n  TWO — a window on the second floor, shot out from thirty metres.");
+        Console.WriteLine("\n  TWO — a window on the second floor, shot out from fourteen metres.");
 
         const float height = 12f;
-        var pane = new GlassPane(new Vector3(0f, height, 30f), new Vector2(1.2f, 1.6f), -Vector3.UnitZ,
+        var pane = new GlassPane(new Vector3(0f, height, 14f), new Vector2(1.2f, 1.6f), -Vector3.UnitZ,
                                  GlassType.Tempered, HeightAboveGround: height);
         if (!WeaponRegistry.TryGet("akm", out var weapon)) return false;
 
@@ -122,7 +124,7 @@ public static class StreetSceneSpike
         var events = new List<GlassEvent>(count);
         for (int i = 0; i < count; i++) events.Add(buffer[i]);
 
-        var sounds = GlassSound.From(events, pane.Type, pane.Size);
+        var sounds = GlassSound.From(events, pane.Type, pane.Size, thicknessMetres: 0.006f);
         float breakAt = sounds.Min(s => s.DelaySeconds);
         float firstLanding = sounds.Where(s => s.Character == SoundCharacter.Knock)
                                    .DefaultIfEmpty().Min(s => s.DelaySeconds);
@@ -180,18 +182,28 @@ public static class StreetSceneSpike
             provider.UpdateListener(Ear, Quaternion.Identity, Vector3.Zero, AcousticConstants.GlobalRegionId);
             Console.WriteLine("\n  LIVE. HEADPHONES.\n");
 
-            Console.WriteLine("  ONE — a wooden door, then a steel one. Two metres to your left.");
-            PlayDoor("Wood", 0.045f, 22f, new Vector3(-2f, 1.1f, 0f), provider, 1);
-            Wait(provider, 1800);
-            PlayDoor("Metal", 0.05f, 65f, new Vector3(-2f, 1.1f, 0f), provider, 2);
+            // At the door rather than across the room from it. A door is a thing you are standing at
+            // when you shut it, and putting the ear two metres off cost twelve decibels to distance
+            // alone — which is most of why the first listening test got "a thud off to the left".
+            var doorway = new Vector3(-0.8f, 1.1f, 0.4f);
+            Console.WriteLine("  ONE — a wooden door, then a steel one, at arm's length to your left.");
+            Console.WriteLine("        Listen for: the handle, the swing, the thud, then the latch snapping home.");
+            PlayDoor("Wood", 0.045f, 22f, doorway, provider, 1);
             Wait(provider, 2200);
+            PlayDoor("Metal", 0.05f, 65f, doorway, provider, 2);
+            Wait(provider, 2600);
 
             Console.WriteLine("  TWO — the shot, the pane, then the glass coming down. Count the gap.");
             PlayWindow(provider);
             Wait(provider, 1500);
 
-            Console.WriteLine("  THREE — a truck comes past, stands on it, and lets the tyres go.");
-            PlayTruck(provider);
+            Console.WriteLine("  THREE — a truck comes past and stands on it. Truck tyres GROAN: 430 Hz,");
+            Console.WriteLine("          low and rough, because a truck tyre is huge and gives up early.");
+            PlayPass(provider, "diesel_truck", launch: 7.35f);
+
+            Console.WriteLine("  THREE b — now a sports car does the same. 950 Hz, and it SCREECHES.");
+            Console.WriteLine("            Same model, same code; the difference is the rubber.");
+            PlayPass(provider, "v8_sports", launch: 9.3f);
 
             Console.WriteLine("  FOUR — and finds the wall.");
             PlayCrash(provider);
@@ -220,7 +232,7 @@ public static class StreetSceneSpike
     private static void PlayWindow(FmodAudioProvider provider)
     {
         const float height = 12f;
-        var pane = new GlassPane(new Vector3(0f, height, 30f), new Vector2(1.2f, 1.6f), -Vector3.UnitZ,
+        var pane = new GlassPane(new Vector3(0f, height, 14f), new Vector2(1.2f, 1.6f), -Vector3.UnitZ,
                                  GlassType.Tempered, height);
         WeaponRegistry.TryGet("akm", out var weapon);
 
@@ -233,13 +245,13 @@ public static class StreetSceneSpike
         Schedule(provider, new[] { shot }, seed: 9);
 
         // The round takes a moment to get there. Thirty metres at seven hundred metres a second.
-        Wait(provider, 30f / weapon.MuzzleVelocity * 1000f + 40f);
+        Wait(provider, 14f / weapon.MuzzleVelocity * 1000f + 40f);
 
         Span<GlassEvent> buffer = stackalloc GlassEvent[64];
         int count = GlassBreak.Resolve(pane, pane.Centre, weapon, 9, buffer);
         var events = new List<GlassEvent>(count);
         for (int i = 0; i < count; i++) events.Add(buffer[i]);
-        Schedule(provider, GlassSound.From(events, pane.Type, pane.Size), seed: 9);
+        Schedule(provider, GlassSound.From(events, pane.Type, pane.Size, thicknessMetres: 0.006f), seed: 9);
 
         // Long enough for the glass to finish arriving.
         Wait(provider, 3200);
@@ -263,10 +275,9 @@ public static class StreetSceneSpike
     /// how much of the tyres' grip is being asked for and sings when the answer is "more than they
     /// have".
     /// </summary>
-    private static void PlayTruck(FmodAudioProvider provider)
+    private static void PlayPass(FmodAudioProvider provider, string preset, float launch)
     {
-        const string preset = "diesel_truck";
-        const int Id = -77001;
+        int Id = -77001 - preset.GetHashCode() % 500;
         var truck = VehicleProfile.ByName(preset);
         var (gain, reference) = Loudness.Place(truck.SourceLevelDb);
 
@@ -313,13 +324,13 @@ public static class StreetSceneSpike
             }
             else
             {
-                // Hard enough on it that the tyres cannot deliver what is being asked. The number
-                // handed over IS the demand — a fraction of available grip, where 0.78 is where a
-                // tyre starts to sing and 1.0 is all it has. Subtracting anything from it, as this
-                // did at first, put it below the onset and produced a truck that accelerated in
-                // perfect silence.
-                const float launch = 7.5f;
-                speed = MathF.Min(26f, speed + launch * dt);
+                // Hard enough that the tyres cannot deliver what is being asked, and NOT harder than
+                // that. The number handed over is the demand: 0.78 is where a tyre starts to sing,
+                // and 1.02 is where it stops singing and starts SLIDING — past that the stick-slip
+                // cycle loses its regularity and the note collapses into broadband roar. Aiming at
+                // 1.02 produced exactly that and the listening test called it "very dull"; the tonal
+                // squeal lives just under the slide, not over it.
+                speed = MathF.Min(30f, speed + launch * dt);
                 slip = TyreFriction.Demand(launch, 0f, truck.Tyres.PeakGripG);
             }
 
@@ -330,8 +341,11 @@ public static class StreetSceneSpike
             if (now - reported >= 1.5)
             {
                 reported = (float)now;
-                Console.WriteLine($"    {Vector3.Distance(at, Ear),5:F0} m   {speed * 3.6f,5:F0} km/h"
-                                + (slip > 0.05f ? $"   tyres at {slip * 100f:F0}% over" : ""));
+                string tyres = slip < 0.05f ? ""
+                    : slip < TyreFriction.SquealOnset ? $"   tyres at {slip * 100f:F0}% of grip"
+                    : slip < TyreFriction.SlideOnset ? $"   SQUEAL, {slip * 100f:F0}% of grip"
+                    : $"   sliding, {slip * 100f:F0}% of grip";
+                Console.WriteLine($"    {Vector3.Distance(at, Ear),5:F0} m   {speed * 3.6f,5:F0} km/h" + tyres);
             }
 
             provider.UpdateListener(Ear, Quaternion.Identity, Vector3.Zero, AcousticConstants.GlobalRegionId);
