@@ -164,7 +164,9 @@ public class PrefabRepository
         {
             new Transform { Position = position, Rotation = rotation ?? Quaternion.Identity, Scale = scale ?? Vector3.One },
             new NameComponent { Name = t.Name },
-            new IdentityComponent { Name = t.Name, Description = t.Description, Announce = AnnouncesByDefault(t) },
+            // PrefabId recorded on the instance so it can be written back out again: a composite saved
+            // from a house somebody built has to know that this wall is a `concrete_wall`.
+            new IdentityComponent { Name = t.Name, Description = t.Description, Announce = AnnouncesByDefault(t), PrefabId = t.Id },
             t.Type
         };
 

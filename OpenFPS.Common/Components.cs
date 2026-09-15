@@ -99,6 +99,19 @@ public partial struct IdentityComponent
     /// types a player can actually encounter: Item, NPC, Beacon.</summary>
     public bool Announce { get; set; } = false;
 
+    // APPEND ONLY below this line — see SoundEmitterComponent for why the order of a component is a
+    // network protocol.
+
+    /// <summary>
+    /// The prefab this entity is an instance OF, or empty if it was built by hand.
+    ///
+    /// Identity in the literal sense: what kind of thing this is, as opposed to what it is called.
+    /// Nothing recorded it before, and the cost of that only becomes visible when you try to go the
+    /// other way — saving a house somebody built back out to a template needs to know that this wall
+    /// is a `concrete_wall`, and an entity that cannot say so cannot be rebuilt.
+    /// </summary>
+    public string PrefabId { get; set; } = "";
+
     public IdentityComponent() { }
 }
 
@@ -334,6 +347,42 @@ public partial struct PortalComponent
     public int RegionBId { get; set; }
     public float ApertureSize { get; set; } 
     public PortalComponent() { }
+}
+
+/// <summary>
+/// A named group of entities that is ONE THING: a house, a vehicle, a market stall, a barricade.
+///
+/// The realisation this exists to act on is that a map, a house, a car and a thing somebody invented
+/// from scratch are the same idea at four scales. All of them are "a set of entities with a local
+/// origin, which can be saved, placed again, owned, and entered". Building that once means placing a
+/// house and driving a car stop being separate features.
+///
+/// It carries almost nothing, because almost nothing is needed: the members are ordinary entities
+/// wearing a <see cref="ParentComponent"/> that points here, and ParentSystem — which has existed and
+/// run every tick all along — already carries them with the root. A composite that never moves and a
+/// composite you can drive away differ only in whether anything is allowed to move the root.
+/// </summary>
+[MemoryPackable]
+public partial struct CompositeComponent
+{
+    /// <summary>The template this was placed from, or empty when it was grouped in place and has not
+    /// been saved as anything. Saving it later fills this in; that is the whole of "build it out of
+    /// parts, then classify it as an object".</summary>
+    public string TemplateId { get; set; }
+
+    /// <summary>What it is called when a player walks up to it.</summary>
+    public string Name { get; set; }
+
+    /// <summary>
+    /// Whether this is fixed to the world.
+    ///
+    /// The ONLY difference between a house and a caravan, and it is deliberately not a difference of
+    /// kind. A house is anchored because houses are; unanchor the same set of walls and it is
+    /// something you can tow. Nothing else in the model changes.
+    /// </summary>
+    public bool Anchored { get; set; }
+
+    public CompositeComponent() { TemplateId = ""; Name = ""; Anchored = true; }
 }
 
 [MemoryPackable]

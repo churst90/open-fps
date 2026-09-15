@@ -64,6 +64,15 @@ public class MapData
     /// <summary>Closed circuits the map's vehicles can lap. See TrackData.</summary>
     public List<TrackData>? Tracks { get; set; }
 
+    /// <summary>
+    /// Composites placed on this map — houses, stalls, barricades, anything built out of parts and
+    /// saved. Instantiated at load in the order they appear.
+    ///
+    /// This list is what makes a building PERMANENT. A composite placed at run time and not recorded
+    /// here is a house until the next restart, which is not a house; it is a rehearsal.
+    /// </summary>
+    public List<CompositePlacement>? Composites { get; set; }
+
     /// <summary>The map a player lands on when they log in, if no other map claims it. Exactly one
     /// map should set it; if several do, the first loaded wins and the rest are logged.</summary>
     public bool IsDefault { get; set; }
@@ -337,6 +346,13 @@ public class MapRepository
         return BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
     }
 
+    /// <summary>
+    /// Writes a map back to its own file, exactly as it now stands.
+    ///
+    /// Load-bearing since composites: a building placed at run time is appended to the map's own data
+    /// the moment it is placed, and this is what commits that to disk. Without it a house lasts until
+    /// the next restart, which is not a house, it is a rehearsal.
+    /// </summary>
     public void Save(MapData map)
     {
         string filePath = Path.Combine(_directory, $"{map.Id}.json");

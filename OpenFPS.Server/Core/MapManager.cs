@@ -504,6 +504,29 @@ public class MapManager
     /// this — re-reading and re-parsing every map file on disk, per login, to read one record that was
     /// already in memory.
     /// </summary>
+    /// <summary>Every map currently loaded, by id.</summary>
+    public IEnumerable<string> LoadedMapIds => _maps.Keys;
+
+    /// <summary>
+    /// Writes a map back to disk exactly as it now stands, including anything built on it since.
+    ///
+    /// The other half of "is the house permanent". A composite placed at run time is appended to the
+    /// map's own data the moment it is placed; this is what commits that to the file, so the building
+    /// is still there after a restart. Deliberately explicit rather than automatic — a world that
+    /// rewrites its own map on every change cannot be experimented with.
+    /// </summary>
+    public bool SaveMap(string mapId, out string error)
+    {
+        error = "";
+        if (!_maps.TryGetValue(mapId, out var entry)) { error = $"map '{mapId}' is not loaded"; return false; }
+        try
+        {
+            _mapRepo.Save(entry.data);
+            return true;
+        }
+        catch (Exception ex) { error = ex.Message; return false; }
+    }
+
     public bool TryGetMapData(string id, out MapData data)
     {
         if (_maps.TryGetValue(id, out var entry)) { data = entry.data; return true; }

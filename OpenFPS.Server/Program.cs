@@ -32,6 +32,7 @@ public class GameServer
     private CommandHandler _commands = null!;
     private readonly System.Collections.Concurrent.ConcurrentQueue<int> _dirtyAudioEntities = new();
     private readonly VehicleSystem _vehicles = new();
+    private CompositeService _composites = null!;
     private readonly System.Collections.Concurrent.ConcurrentQueue<Action> _commandBuffer = new();
 
     private readonly MessageDispatcher _dispatcher = new();
@@ -120,10 +121,14 @@ public class GameServer
         _mapRepo = new MapRepository("maps");
         _maps = new MapManager(_mapRepo, prefabRepo);
         _maps.Initialize();
+        // Composites BEFORE vehicles and before the earshot pass: a placed building is geometry that
+        // the acoustic scene, the spatial grid and the broadcast radius all have to account for.
+        _composites = new CompositeService(_maps, prefabRepo, new CompositeRepository("composites"));
+        _composites.PlaceRecorded(_maps);
         _vehicles.Spawn(_maps);
         // Now that every sound source exists, size each map's broadcast radius from it.
         _maps.RefreshEarshotRanges();
-        _commands = new CommandHandler(_sessions, _maps, this);
+        _commands = new CommandHandler(_sessions, _maps, this, _composites);
         
         // Initialize new Service Architecture
         _discovery = new DiscoveryService(_dispatcher, _sessions);

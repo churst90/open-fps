@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Numerics;
 using OpenFPS.Common;
 using OpenFPS.Common.Networking;
@@ -22,12 +23,15 @@ public class CommandHandler
     private readonly SessionManager _sessions;
     private readonly MapManager _maps;
     private readonly GameServer _server;
+    private readonly CompositeService? _composites;
 
-    public CommandHandler(SessionManager sessions, MapManager maps, GameServer server)
+    public CommandHandler(SessionManager sessions, MapManager maps, GameServer server,
+                          CompositeService? composites = null)
     {
         _sessions = sessions;
         _maps = maps;
         _server = server;
+        _composites = composites;
     }
 
     public void HandleTextCommand(int connectionId, TextCommand cmd, Action<IMessage> reply)
@@ -82,6 +86,35 @@ public class CommandHandler
             case "start_state":
                 if (!isElevated) { DenyCommand(reply); return; }
                 HandleStartState(session, args, reply);
+                break;
+            // ── Building ────────────────────────────────────────────────────────────────────
+            //
+            // The whole verb set for making something, and it is deliberately small: gather what is
+            // around you into one thing, take it apart again, save it so it can be made again, put a
+            // saved one down, and write the world to disk. A house, a market stall, a barricade and a
+            // vehicle body are all the same five verbs.
+            case "group":
+                if (!isElevated) { DenyCommand(reply); return; }
+                HandleGroup(session, args, reply);
+                break;
+            case "ungroup":
+                if (!isElevated) { DenyCommand(reply); return; }
+                HandleUngroup(session, args, reply);
+                break;
+            case "saveas":
+                if (!isElevated) { DenyCommand(reply); return; }
+                HandleSaveAs(session, args, reply);
+                break;
+            case "place":
+                if (!isElevated) { DenyCommand(reply); return; }
+                HandlePlace(session, args, reply);
+                break;
+            case "composites":
+                HandleListComposites(reply);
+                break;
+            case "savemap":
+                if (!isElevated) { DenyCommand(reply); return; }
+                HandleSaveMap(session, reply);
                 break;
             default:
                 Say(reply, $"Command '{commandName}' not recognized.");
@@ -289,6 +322,113 @@ public class CommandHandler
             string direction = GetRelativeDirection(playerRotation, item.Direction);
             Say(reply, $"{item.Name} at {direction}, {item.Distance:F1} meters.");
         }
+    }
+
+    // ── Building ────────────────────────────────────────────────────────────────────────────────
+
+    /// <summary>How far a grouping sweep reaches by default, metres. About a room.</summary>
+    private const float DefaultGroupRadius = 12f;
+    /// <summary>How far away a composite may be and still count as "this one".</summary>
+    private const float CompositeReachRadius = 30f;
+
+    private CompositeService? Composites(Action<IMessage> reply)
+    {
+        if (_composites == null) Say(reply, "Building is not available on this server.");
+        return _composites;
+    }
+
+    /// <summary>
+    /// /group name [radius] [free] — makes one thing out of everything standing near you.
+    ///
+    /// A radius rather than a selection, because a selection needs pointing at things and pointing is
+    /// the one thing a player here cannot do. "Everything within twelve metres of me" is a selection
+    /// anybody can make, and can widen or narrow until it is the right one.
+    /// </summary>
+    private void HandleGroup(UserSession session, string[] args, Action<IMessage> reply)
+    {
+        var svc = Composites(reply); if (svc == null) return;
+        if (args.Length < 1) { Say(reply, "Usage: /group name [radius] [free]"); return; }
+        if (!TryGetBody(session, reply, out _, out _, out var position)) return;
+
+        string name = args[0];
+        float radius = args.Length > 1 && float.TryParse(args[1], out float r) ? r : DefaultGroupRadius;
+        // "free" is the word for a composite that is not fixed down: a caravan rather than a house.
+        bool anchored = !args.Contains("free", StringComparer.OrdinalIgnoreCase);
+
+        int root = svc.Group(session.CurrentMapId, position, radius, name, anchored, out int parts);
+        if (root < 0) { Say(reply, $"Nothing within {radius:F0} m could be grouped."); return; }
+        Say(reply, $"Grouped {parts} part(s) within {radius:F0} m into '{name}', "
+                 + $"{(anchored ? "fixed in place" : "free to be moved")}. Save it with /saveas.");
+    }
+
+    /// <summary>/ungroup — takes the nearest composite apart, leaving its parts exactly where they are.</summary>
+    private void HandleUngroup(UserSession session, string[] args, Action<IMessage> reply)
+    {
+        var svc = Composites(reply); if (svc == null) return;
+        if (!TryGetBody(session, reply, out _, out _, out var position)) return;
+
+        int root = svc.NearestRoot(session.CurrentMapId, position, CompositeReachRadius);
+        if (root < 0) { Say(reply, $"No composite within {CompositeReachRadius:F0} m."); return; }
+        if (!svc.Ungroup(session.CurrentMapId, root, out string name, out int parts))
+        { Say(reply, "That could not be ungrouped."); return; }
+        Say(reply, $"'{name}' is now {parts} loose part(s), all where they were.");
+    }
+
+    /// <summary>/saveas id — writes the nearest composite to disk so anyone can place it again.</summary>
+    private void HandleSaveAs(UserSession session, string[] args, Action<IMessage> reply)
+    {
+        var svc = Composites(reply); if (svc == null) return;
+        if (args.Length < 1) { Say(reply, "Usage: /saveas id"); return; }
+        if (!TryGetBody(session, reply, out _, out _, out var position)) return;
+
+        int root = svc.NearestRoot(session.CurrentMapId, position, CompositeReachRadius);
+        if (root < 0) { Say(reply, $"No composite within {CompositeReachRadius:F0} m. Use /group first."); return; }
+        if (!svc.SaveAsTemplate(session.CurrentMapId, root, args[0], out int parts, out string error))
+        { Say(reply, $"Could not save: {error}."); return; }
+        Say(reply, $"Saved '{args[0]}' with {parts} part(s). Place another with /place {args[0]}.");
+    }
+
+    /// <summary>/place id [yaw] — puts a saved composite down at your feet, facing where you like.</summary>
+    private void HandlePlace(UserSession session, string[] args, Action<IMessage> reply)
+    {
+        var svc = Composites(reply); if (svc == null) return;
+        if (args.Length < 1) { Say(reply, "Usage: /place id [yaw degrees]"); return; }
+        if (!TryGetBody(session, reply, out _, out _, out var position)) return;
+
+        float yaw = args.Length > 1 && float.TryParse(args[1], out float y) ? y : 0f;
+        var rotation = Quaternion.CreateFromYawPitchRoll(yaw * (MathF.PI / 180f), 0f, 0f);
+
+        int root = svc.Place(session.CurrentMapId, args[0], position, rotation, session.Username,
+                             out int parts, out string error);
+        if (root < 0) { Say(reply, $"Could not place: {error}."); return; }
+        Say(reply, $"Placed '{args[0]}' here, {parts} part(s), facing {yaw:F0} degrees. "
+                 + "It will be gone after a restart until you /savemap.");
+    }
+
+    /// <summary>/composites — what there is to place.</summary>
+    private void HandleListComposites(Action<IMessage> reply)
+    {
+        var svc = Composites(reply); if (svc == null) return;
+        var all = svc.Templates.All;
+        if (all.Count == 0) { Say(reply, "Nothing has been saved yet. Build something and use /group then /saveas."); return; }
+        Say(reply, $"{all.Count} composite(s) available:");
+        foreach (var kv in all)
+            Say(reply, $"  {kv.Key}: {kv.Value.Name}, {kv.Value.Parts.Count} part(s), "
+                     + $"{(kv.Value.Anchored ? "fixed" : "free")}.");
+    }
+
+    /// <summary>
+    /// /savemap — writes this map to disk exactly as it now stands.
+    ///
+    /// Explicit rather than automatic on purpose. A world that rewrites its own map file every time
+    /// somebody experiments cannot be experimented with, and the first thing anyone does with a
+    /// building tool is put something in the wrong place.
+    /// </summary>
+    private void HandleSaveMap(UserSession session, Action<IMessage> reply)
+    {
+        if (!_maps.SaveMap(session.CurrentMapId, out string error))
+        { Say(reply, $"Could not save the map: {error}."); return; }
+        Say(reply, $"Map '{session.CurrentMapId}' saved. Anything you placed is now permanent.");
     }
 
     private void HandleMove(UserSession session, string[] args, Action<IMessage> reply)

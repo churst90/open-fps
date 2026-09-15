@@ -834,6 +834,62 @@ full record — what each fault was, what was done, and what was deliberately le
       then applies its own. Needs the borrowed voice to advance its own read cursor rather than follow
       the source's play position.
 
+## Composites: a house, a car and a map are the same idea (2026-09-15)
+
+The spine under "how do I build a house, customise it, classify it as an object later, and get inside
+it like a car" — which turned out to be one question asked four ways. A composite is a set of entities
+with a local origin that can be saved, placed again, owned and entered. Members wear a
+`ParentComponent` pointing at the root, and `ParentSystem` — which has run every tick since long
+before this — already carries them with it, so a house that never moves and a vehicle body you can
+drive away are the same structure. Only whether anything moves the root differs.
+
+- [x] `CompositeComponent`, `CompositeTemplate`/`CompositePart`, `CompositeRepository` (JSON on disk,
+      mirroring `PrefabRepository` — a composite IS a prefab, just one made of more than one entity).
+- [x] `CompositeService`: **group** what is standing there, **ungroup** it leaving the parts exactly
+      where they were, **save** it as a template anyone can place, **place** an instance.
+- [x] The origin is where the thing meets the ground, not its middle — so a house placed at your feet
+      has its floor at your feet rather than being buried or floating.
+- [x] Grouping is by RADIUS, because a selection needs pointing at things and pointing is the one
+      thing a player here cannot do. "Everything within twelve metres of me" is a selection anybody
+      can make, and can widen until it is the right one.
+- [x] Players, vehicles and existing composites are never swallowed by a sweep.
+- [x] `IdentityComponent.PrefabId` — nothing recorded what an entity was an instance OF, and a wall
+      that cannot say it is a `concrete_wall` cannot be written back out to a template.
+- [x] `MapData.Composites` + `MapManager.SaveMap` — a placement is recorded on the map the moment it
+      is made, and `/savemap` commits it. Without that a house lasts until the next restart, which is
+      not a house, it is a rehearsal. Covered end to end by `APlacedBuildingSurvivesARestart`.
+- [x] Commands: `/group name [radius] [free]`, `/ungroup`, `/saveas id`, `/place id [yaw]`,
+      `/composites`, `/savemap`.
+- [ ] **Occupancy** — enter a composite, and let the root carry its occupants' transforms. Driving
+      falls out of it: the difference between standing in a kitchen and sitting in a driver's seat is
+      which root you are parented to.
+- [ ] Ownership: `CompositePlacement.Owner` is recorded but nothing enforces it yet.
+- [ ] Parts that were not spawned from a prefab cannot be saved. Right answer for now (it fails
+      loudly rather than dropping a wall), but hand-built geometry needs a home eventually.
+- [ ] A composite's own acoustics: a house should be a REGION, so being inside one is audible without
+      anyone authoring a region volume by hand.
+
+## Held items, inventory, occupancy, collisions (2026-09-15, planned)
+
+The order these go in, and why. Everything here was blocked on composites existing.
+
+- [ ] **Held items and a hand slot.** `WeaponSynth`, `ShotResolver` and `WeaponMechanics` are written
+      and tested, and nothing connects a gun to a player: there is no equip, no held item, no trigger.
+      Two hands, and a rifle takes both — the constraint is what makes it a spatial thing you can
+      reason about by ear rather than a menu.
+- [ ] **Inventory over `InventoryComponent`**, which is already entity-backed (an item in your bag is
+      the same entity as one on the ground — the right foundation). Delete the parallel
+      `LocalPlayerState.Inventory` list of strings before the two drift.
+- [ ] **Occupancy**: enter a composite. Then vehicles are drivable for free.
+- [ ] **Collision response**: `MassKg` is on every vehicle profile already. Missing is the impulse
+      from relative velocity and mass, damage from kinetic energy, and the SOUND of it — which should
+      come from the materials and the energy, not a sample library. Stepping onto a live track should
+      be lethal, and lethal in a way you hear coming.
+- [ ] Authoring commands (`/createmap` and friends) — deliberately AFTER composites, because they are
+      a thin shell over the model and building them first would freeze the wrong model.
+- [ ] Weather. Mostly there already (wind, precipitation, shelter) and the least blocked, which is
+      why it waits for the blocked things to be unblocked.
+
 ## Glass (2026-09-14)
 
 - [x] **`GlassBreak`** — the mechanic, tested, not yet wired to anything that can be shot. A pane shot
