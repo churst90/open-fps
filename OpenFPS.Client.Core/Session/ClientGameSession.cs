@@ -543,6 +543,13 @@ public sealed class ClientGameSession : IDisposable
                         _reconciler.ApplyServerCorrection(s, update.LastProcessedSequenceId, _world.GetSnapshot());
                 break;
 
+            case WorldAudioEvent audioEvent:
+                // Something happened somewhere and made a noise. Rendered on arrival and queued for
+                // its own moment, because the parts of one event do not all happen at once: a latch
+                // precedes its own impact, and a pane's glass lands a second and a half after it broke.
+                _audioSystem.WorldAudio.Receive(audioEvent, OpenFPS.Common.AudioClock.Now);
+                break;
+
             case WorldStateUpdate wsu:
                 _world.UpdateAtmosphere(wsu);
                 break;

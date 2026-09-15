@@ -411,6 +411,16 @@ public class AudioEngineFacade : IDisposable
     }
 
     public bool IsPlaying(int entityId) => _isInitialized && _provider.IsPlaying(entityId);
+
+    /// <summary>
+    /// Makes a buffer the game synthesised available under a sound id.
+    ///
+    /// The bridge between physical modelling and the rest of the engine. After this call the id is an
+    /// ordinary sound: placed, attenuated, occluded, reverberated and voice-budgeted by exactly the
+    /// paths that handle recordings, none of which needs to know that nobody recorded it.
+    /// </summary>
+    public bool RegisterSynthesisedSound(string soundId, byte[] pcm16Mono, int sampleRate)
+        => _isInitialized && _provider.RegisterSynthesisedSound(soundId, pcm16Mono, sampleRate);
     public Vector3 GetSoundPosition(int entityId) => _isInitialized ? _provider.GetSoundPosition(entityId) : Vector3.Zero;
     public float GetPlaybackProgress(int entityId) => _isInitialized ? _provider.GetPlaybackProgress(entityId) : 0f;
     public bool HasCategory(string category) => _isInitialized && _bank.HasCategory(category);

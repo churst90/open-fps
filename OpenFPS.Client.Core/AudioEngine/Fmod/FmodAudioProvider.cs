@@ -50,6 +50,44 @@ internal class FmodResourceManager : IDisposable
     /// that honestly (rather than handing back a not-yet-ready handle that <c>playSound</c> rejects with
     /// ERR_NOTREADY) is what lets the caller retry instead of dropping the play.
     /// </summary>
+    /// <summary>
+    /// Puts a buffer the game SYNTHESISED into the cache under an id, so that everything downstream
+    /// can treat it as an ordinary sound.
+    ///
+    /// This is the whole bridge between physical modelling and the rest of the audio engine, and it
+    /// is deliberately one method. Every path that plays a sound — placement, occlusion, reverb, the
+    /// region, the acoustic path, the voice budget — works from a sound id, so a rendered door latch
+    /// registered here is heard through a wall exactly as a recorded one would be, with none of those
+    /// paths knowing that nobody recorded it.
+    /// </summary>
+    public bool RegisterPcm(string soundId, byte[] pcm16Mono, int sampleRate)
+    {
+        if (string.IsNullOrEmpty(soundId) || pcm16Mono.Length == 0) return false;
+        if (_cache.ContainsKey(soundId)) return true;
+
+        var info = new CREATESOUNDEXINFO
+        {
+            cbsize = System.Runtime.InteropServices.Marshal.SizeOf<CREATESOUNDEXINFO>(),
+            length = (uint)pcm16Mono.Length,
+            numchannels = 1,
+            defaultfrequency = sampleRate,
+            format = SOUND_FORMAT.PCM16,
+        };
+
+        // OPENRAW because there is no file header on a buffer we made ourselves; without it FMOD
+        // tries to parse one and refuses the sound silently.
+        RESULT res = _system.createSound(pcm16Mono,
+            MODE.OPENMEMORY | MODE.OPENRAW | MODE._3D | MODE._3D_LINEARROLLOFF | MODE.LOOP_OFF,
+            ref info, out FMOD.Sound sound);
+        if (res != RESULT.OK)
+        {
+            Log.Warning("FmodResourceManager: could not register synthesised sound {Id}: {Result}", soundId, res);
+            return false;
+        }
+        _cache[soundId] = sound;
+        return true;
+    }
+
     public SoundLoadState TryGetSound(string soundId, out FMOD.Sound sound, bool loop = false)
     {
         sound = default;
@@ -2558,6 +2596,13 @@ public class FmodAudioProvider : IAudioProvider
     /// Plays a decoded 16-bit mono 48kHz PCM voice packet as a one-shot 3D sound.
     /// Copies the data into FMOD's internal buffers (MODE.OPENMEMORY) so no pinning is needed.
     /// </summary>
+    /// <summary>
+    /// Registers a synthesised buffer under an id, so an ordinary emitter naming that id plays it
+    /// with the full acoustic treatment. Returns false if the audio engine is not up.
+    /// </summary>
+    public bool RegisterSynthesisedSound(string soundId, byte[] pcm16Mono, int sampleRate)
+        => _isInitialized && _resources.RegisterPcm(soundId, pcm16Mono, sampleRate);
+
     public void PlayVoice(int senderId, Vector3 position, byte[] pcmData)
     {
         if (!_isInitialized || pcmData.Length == 0) return;

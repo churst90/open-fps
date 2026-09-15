@@ -33,6 +33,7 @@ namespace OpenFPS.Common.Networking;
 [MemoryPackUnion(24, typeof(FriendListResponse))]
 [MemoryPackUnion(25, typeof(MapPublishRequest))]
 [MemoryPackUnion(26, typeof(EntityRemoved))]
+[MemoryPackUnion(27, typeof(WorldAudioEvent))]
 public partial interface IMessage { }
 
 public enum PlayerListScope

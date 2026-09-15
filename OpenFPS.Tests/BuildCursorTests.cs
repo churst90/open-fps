@@ -137,7 +137,7 @@ public class BuildCursorTests : IDisposable
 
         var placed = f.PlacedEntities().Select(e => f.World.Get<Transform>(e).Position).ToList();
         Assert.Equal(3, placed.Count);
-        Assert.Equal(placed.Select(p => p.Z).Distinct().Count(), 1);       // all on one line...
+        Assert.Single(placed.Select(p => p.Z).Distinct());       // all on one line...
         Assert.True(placed.Max(p => p.X) - placed.Min(p => p.X) > 3f);     // ...and that line runs right
     }
 

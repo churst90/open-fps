@@ -85,6 +85,15 @@ public interface IAudioProvider : IDisposable
     void PlayVoice(int senderId, Vector3 position, byte[] pcmData);
 
     /// <summary>
+    /// Makes a buffer the game synthesised available under a sound id.
+    ///
+    /// The bridge between physical modelling and everything else: once registered, a rendered door
+    /// latch is an ordinary sound id, so it is placed, attenuated, occluded and reverberated by the
+    /// same path that handles a recording, and none of that path needs to know nobody recorded it.
+    /// </summary>
+    bool RegisterSynthesisedSound(string soundId, byte[] pcm16Mono, int sampleRate);
+
+    /// <summary>
     /// Plays a short synthesized sine tone at a given frequency as a non-spatial UI sound.
     /// Used for voice-transmission indicators and accessibility cues.
     /// </summary>

@@ -4,6 +4,7 @@ using System.Numerics;
 using Arch.Core;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
+using OpenFPS.Common.Networking;
 using Serilog;
 
 namespace OpenFPS.Server.Systems;
@@ -45,19 +46,21 @@ public sealed class DoorSystem
     /// from definitions, and an aperture nobody was told about is a door that opens silently and
     /// changes nothing.
     /// </summary>
-    public void Update(World world, float dt, Action<int> announce)
+    public void Update(World world, float dt, Action<int> announce,
+                       Action<int, string, IReadOnlyList<TransientSound>>? heard = null)
     {
         _doors.Clear();
         world.Query(new QueryDescription().WithAll<Transform, DoorComponent>(), (Entity e) => _doors.Add(e));
 
         foreach (var door in _doors)
         {
-            try { Step(world, door, dt, announce); }
+            try { Step(world, door, dt, announce, heard); }
             catch (Exception ex) { Log.Error(ex, "DoorSystem: door {Id} failed to swing.", door.Id); }
         }
     }
 
-    private void Step(World world, Entity entity, float dt, Action<int> announce)
+    private void Step(World world, Entity entity, float dt, Action<int> announce,
+                      Action<int, string, IReadOnlyList<TransientSound>>? heard)
     {
         ref var door = ref world.Get<DoorComponent>(entity);
         bool parented = world.Has<ParentComponent>(entity);
@@ -67,10 +70,17 @@ public sealed class DoorSystem
         if (door.Openness != door.Target)
         {
             float step = door.SwingSeconds > 0f ? dt / door.SwingSeconds : 1f;
+            bool wasShut = door.Openness <= 0f;
             door.Openness = door.Target > door.Openness
                 ? MathF.Min(door.Target, door.Openness + step)
                 : MathF.Max(door.Target, door.Openness - step);
             Place(world, entity, door, parented);
+
+            // The two moments a door makes a noise: the instant it starts to open, and the instant it
+            // arrives shut. Not while it is travelling — that is the hinges, and they are part of the
+            // opening event because they last as long as the swing does.
+            if (wasShut && door.Openness > 0f) Heard(world, entity, door, opening: true, heard);
+            else if (door.Openness <= 0f && door.Target <= 0f) Heard(world, entity, door, opening: false, heard);
         }
 
         // The opening, which is the half anyone listening cares about.
@@ -169,6 +179,54 @@ public sealed class DoorSystem
             t.Rotation = rotation;
             t.IsDirty = true;
         }
+    }
+
+    /// <summary>
+    /// Works out what the door just sounded like and hands it over.
+    ///
+    /// Everything the model needs is already on the leaf: what it is made of, how big it is, how
+    /// thick, and — from its own swing time and width — how fast its latch edge was travelling. So a
+    /// door somebody builds out of a material somebody else invented is audible the first time it
+    /// shuts, with nobody having recorded anything.
+    /// </summary>
+    private static void Heard(World world, Entity entity, DoorComponent door, bool opening,
+                              Action<int, string, IReadOnlyList<TransientSound>>? heard)
+    {
+        if (heard == null) return;
+
+        var size = world.Has<ColliderComponent>(entity)
+            ? world.Get<ColliderComponent>(entity).Size
+            : new Vector3(0.9f, 2.1f, 0.05f);
+        var material = AcousticRegistry.GetProperties(
+            world.Has<MaterialComponent>(entity) ? world.Get<MaterialComponent>(entity).Material ?? "Wood" : "Wood");
+
+        var transform = world.Get<Transform>(entity);
+        float halfWidth = size.X * 0.5f;
+        var acrossLeaf = Vector3.Transform(new Vector3(halfWidth * -door.HingeSide, 0f, 0f), transform.Rotation);
+        var latchEdge = transform.Position + acrossLeaf;
+        var hinge = transform.Position - acrossLeaf;
+
+        // Mass from the leaf's own volume and the density of what it is made of. A steel door is
+        // heavy because steel is heavy, not because somebody typed a number.
+        float massKg = MathF.Max(2f, size.X * size.Y * size.Z * MathF.Max(100f, material.DensityKgM3));
+
+        // A seal is a property of what the thing is FOR: anything that keeps weather or noise out has
+        // one, and the material is the best evidence available. Metal and glass doors are sealed;
+        // a wooden one in a shed is not.
+        bool hasSeal = material.DensityKgM3 > 2000f;
+
+        var sounds = opening
+            ? DoorAcoustics.Opening(material, latchEdge, hinge, size.X, size.Y, size.Z,
+                                    door.SwingSeconds, hingeDryness: 0.25f, hasSeal)
+            : DoorAcoustics.Closing(material, latchEdge, transform.Position, size.X, size.Y, size.Z, massKg,
+                                    DoorAcoustics.EdgeSpeed(size.X, door.SwingRadians, door.SwingSeconds), hasSeal);
+
+        var transients = new List<TransientSound>(sounds.Count);
+        foreach (var sound in sounds) transients.Add(sound.ToTransient());
+
+        string name = world.Has<IdentityComponent>(entity) && !string.IsNullOrWhiteSpace(world.Get<IdentityComponent>(entity).Name)
+            ? world.Get<IdentityComponent>(entity).Name : "door";
+        heard(entity.Id, name, transients);
     }
 
     /// <summary>Asks a door to open or shut. Returns false if it is already going that way.</summary>

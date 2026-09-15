@@ -232,20 +232,20 @@ SABOTAGE = [
 
  ("A latch that fires after the leaf has already landed",
   "OpenFPS.Common/Doors.cs",
-  "        sounds.Add(new DoorSound(DoorSoundKind.Latch, 0.02f, latchEdge,",
-  "        sounds.Add(new DoorSound(DoorSoundKind.Latch, 0f, latchEdge,",
+  "        sounds.Add(new DoorSound(DoorSoundKind.Latch, SoundCharacter.Knock, 0.02f, latchEdge,",
+  "        sounds.Add(new DoorSound(DoorSoundKind.Latch, SoundCharacter.Knock, 0f, latchEdge,",
   "TheLatchComesFirstAndTheRingComesLast"),
 
  ("Every part of a door coming from the same point",
   "OpenFPS.Common/Doors.cs",
-  "            sounds.Add(new DoorSound(DoorSoundKind.Panel, 0.004f, centre,",
-  "            sounds.Add(new DoorSound(DoorSoundKind.Panel, 0.004f, latchEdge,",
+  "            sounds.Add(new DoorSound(DoorSoundKind.Panel, SoundCharacter.Ring, 0.004f, centre,",
+  "            sounds.Add(new DoorSound(DoorSoundKind.Panel, SoundCharacter.Ring, 0.004f, latchEdge,",
   "EachSoundComesFromWhereItActuallyHappens"),
 
  ("Opening treated as a quieter close, impact and all",
   "OpenFPS.Common/Doors.cs",
-  "            new(DoorSoundKind.Latch, 0f, latchEdge, 58f, LatchHz, 0.04f, 0.8f),",
-  "            new(DoorSoundKind.Impact, 0f, latchEdge, 58f, LatchHz, 0.04f, 0.8f),",
+  "            new(DoorSoundKind.Latch, SoundCharacter.Knock, 0f, latchEdge, 58f, LatchHz, 0.04f, 0.8f),",
+  "            new(DoorSoundKind.Impact, SoundCharacter.Knock, 0f, latchEdge, 58f, LatchHz, 0.04f, 0.8f),",
   "OpeningIsADifferentEventAndNotAQuieterClose"),
 
  ("Hinges that sing however well oiled they are",
@@ -259,6 +259,43 @@ SABOTAGE = [
   "        => swingSeconds <= 0f ? 0f : MathF.Abs(width * swingRadians) / swingSeconds;",
   "        => swingSeconds <= 0f ? 0f : MathF.Abs(swingRadians) / swingSeconds;",
   "AWideLeafLandsHarderThanANarrowOneInTheSameTime"),
+
+ # ── The world audio channel ────────────────────────────────────────────────────────────────────
+ ("A ring that decays as fast as a knock",
+  "OpenFPS.Client.Core/AudioEngine/Core/TransientSynth.cs",
+  "                v += gains[p] * MathF.Sin(phases[p]) * MathF.Exp(-k * i * (1f + p * 0.8f));",
+  "                v += gains[p] * MathF.Sin(phases[p]) * MathF.Exp(-k * i * 40f);",
+  "ARingOutlastsAKnock"),
+
+ ("A renderer that ignores the seed, so every event is identical",
+  "OpenFPS.Client.Core/AudioEngine/Core/TransientSynth.cs",
+  "        var rng = new Random(seed);",
+  "        var rng = new Random(1);",
+  "TheSeedVariesItAndRepeatsIt"),
+
+ ("A ring rendered an octave away from the note it was asked for",
+  "OpenFPS.Client.Core/AudioEngine/Core/TransientSynth.cs",
+  "                phases[p] += twoPiOverSr * hz * partials[p];",
+  "                phases[p] += twoPiOverSr * hz * 2f * partials[p];",
+  "ARingComesOutAtAboutTheNoteItWasAskedFor"),
+
+ ("A buffer as long as its decay claims, however absurd that is",
+  "OpenFPS.Client.Core/AudioEngine/Core/TransientSynth.cs",
+  "        float seconds = Math.Clamp(sound.DecaySeconds, 0.005f, MaxSeconds);",
+  "        float seconds = MathF.Max(0.005f, sound.DecaySeconds);",
+  "NothingRendersARidiculousBuffer"),
+
+ ("Sixteen-bit conversion that wraps instead of clamping",
+  "OpenFPS.Client.Core/AudioEngine/Core/TransientSynth.cs",
+  "            short s = (short)Math.Clamp(buffer[i] * 32767f, short.MinValue, short.MaxValue);",
+  "            short s = (short)(buffer[i] * 32767f);",
+  "ItConvertsToSixteenBitWithoutWrappingRound"),
+
+ ("A door part that loses its physical character on the way to the wire",
+  "OpenFPS.Common/Doors.cs",
+  "        Character = Character,",
+  "        Character = SoundCharacter.Knock,",
+  "ADoorsSoundsBecomeOrdinaryTransients"),
 
  ("A room that does not say what is still open",
   "OpenFPS.Server/Core/CompositeAcoustics.cs",

@@ -113,6 +113,59 @@ public class GameServer
         _dirtyAudioEntities.Enqueue(entityId);
     }
 
+    /// <summary>
+    /// Tells everyone who could hear it that something just happened.
+    ///
+    /// The one channel for every short sound the world makes. Until this existed the server's entire
+    /// vocabulary for sound was "this entity carries a looping emitter", which is why glass breakage,
+    /// gunfire and collisions are all written, tested and completely silent: there was no way to say
+    /// "that just happened", only "that is always happening".
+    ///
+    /// Sent RELIABLY, because a transient is a one-off event that nothing will ever resend. A dropped
+    /// state packet costs nothing — the next tick corrects it — and a dropped door is a door that
+    /// opened in silence, which the player then walks into.
+    ///
+    /// Earshot is the map's own broadcast radius, which is sized from how far the loudest thing on it
+    /// actually carries, so nothing needs a per-event range.
+    /// </summary>
+    public void EmitWorldAudio(string mapId, int sourceEntityId, string label,
+                               IReadOnlyList<TransientSound> sounds)
+    {
+        if (sounds.Count == 0) return;
+        if (!_maps.TryGetMap(mapId, out var world, out _, out _, out var lookup)) return;
+
+        // Where it happened, for the earshot test: the loudest of its own sounds.
+        Vector3 at = sounds[0].Position;
+        float loudest = float.MinValue;
+        foreach (var sound in sounds)
+            if (sound.LevelDb > loudest) { loudest = sound.LevelDb; at = sound.Position; }
+
+        float earshot = _maps.GetEarshotRange(mapId);
+        var message = new WorldAudioEvent
+        {
+            SourceEntityId = sourceEntityId,
+            Label = label,
+            Sounds = new List<TransientSound>(sounds),
+            Seed = _audioEventSeed++,
+        };
+
+        foreach (var session in _sessions.GetSessionsInMap(mapId))
+        {
+            if (session.Entity == Entity.Null || !world.IsAlive(session.Entity)) continue;
+            if (Vector3.Distance(world.Get<Transform>(session.Entity).Position, at) > earshot) continue;
+            SendToSession(session, message);
+        }
+    }
+
+    /// <summary>
+    /// Travels with every event so two of the same thing do not render bit-identically.
+    ///
+    /// Twenty rounds from one rifle that are the same twenty samples read as a recording, which is
+    /// the one thing this engine exists not to sound like. It is shared rather than per-client so
+    /// that two players standing together hear the same variation of the same event.
+    /// </summary>
+    private int _audioEventSeed = 1;
+
     // The tick rate lives in PhysicsConstants — the client predicts against the same number.
     private const double TickTimeMs = 1000.0 / PhysicsConstants.TickRate;
     /// <summary>Fallback only — the real radius is per map, from MapManager.GetEarshotRange.</summary>
@@ -326,7 +379,8 @@ public class GameServer
                     // each tick, so a swing applied after it would be overwritten before anyone saw
                     // it. The announcement re-sends the door's definition, which is how the aperture
                     // reaches the client's acoustic map.
-                    _doors.Update(world, dt, SyncAudioComponent);
+                    _doors.Update(world, dt, SyncAudioComponent,
+                                  (id, label, sounds) => EmitWorldAudio(entry.Key, id, label, sounds));
                     ParentSystem.Update(world, lookup);
                     _occupancy.Update(world, lookup);
                 }

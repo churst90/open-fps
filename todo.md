@@ -1008,15 +1008,51 @@ A door is two things at once and only one of them is obvious.
 - [x] `DoorSoundTests`: 13 tests on relationships rather than absolutes — it does not matter whether
       a door rings at 480 Hz or 520, it matters that the ratios are right. Sabotage suite up to 43.
 
-- [ ] **The renderer and the wire.** `DoorSynth` to turn these parameters into PCM the way
-      `WeaponSynth` already does for gunshots, and a way to get a one-shot transient to a client
-      through the acoustic path. The route is mapped: `ClientAudioSystem` already builds a full
-      emitter for a repeating one-shot and simply withholds it until a clock says so — "everything
-      else about it, placement, occlusion, reverb, the acoustic path, is whatever that emitter would
-      always have got". A world audio event is the same thing with the server as the gate instead of
-      the clock. That channel is shared infrastructure: glass, gunshots and collisions all need it
-      and none of them has it, which is why it is its own step rather than something to half-build
-      inside the door work.
+## The world audio channel (2026-09-15) — the thing everything else was waiting for
+
+Until this existed the server's entire vocabulary for sound was "this entity carries a looping
+emitter". There was no way to say **that just happened** — only *that is always happening* — which is
+the single reason `GlassBreak`, `WeaponSynth` and every collision in the tree are written, tested and
+completely silent.
+
+- [x] `WorldAudioEvent`: a place, a label, a seed, and a list of `TransientSound`. Sent reliably,
+      because a transient is a one-off that nothing will ever resend — a dropped state packet costs
+      nothing and a dropped door is a door that opened in silence.
+- [x] **It carries no sound id, and that is the whole point.** A file name means every new thing in
+      the world needs a recording of itself, made in advance, at one size and one material and one
+      force. Parameters mean a door somebody builds out of a material somebody else invented is
+      audible the first time it shuts.
+- [x] `SoundCharacter` — **Knock, Ring, Hiss, Scrape**. Named for the PHYSICS, not the source. A door
+      latch and a bullet striking concrete are both knocks; a struck panel and a bell are both rings;
+      a door seal and a tyre letting go are a hiss and a scrape. A synthesiser that knows about
+      "doors" needs a new case for every new thing in the world; one that knows about knocks and
+      rings already handles the ball nobody has invented yet.
+- [x] `TransientSynth` — four short DSPs on one resonator, and not a single case for doors or glass
+      or gunfire anywhere in the file. Rings are three slightly INHARMONIC partials whose upper ones
+      die first, because a plate is not a string and that inharmonicity is most of what separates a
+      struck panel from a synthesiser pretending to be one.
+- [x] **Render once, play by name.** A sound's parameters ARE its identity, so the id is a hash of
+      them: two doors of the same material and size shutting at the same speed are the same buffer,
+      and a corridor of identical doors costs one render.
+- [x] `RegisterSynthesisedSound` — the bridge, and deliberately one method. Everything downstream
+      works from a sound id, so a rendered latch is placed, attenuated, occluded through walls,
+      reverberated, routed through the region and voice-budgeted by exactly the paths that handle a
+      recording, none of which needed changing and none of which knows nobody recorded it. Bridging
+      at the sound-id layer rather than playing buffers directly is what buys all of that.
+- [x] The seed travels, so two players standing together hear the SAME variation of the same event —
+      and two events from one door are not bit-identical, because twenty rounds that are the same
+      twenty samples read as a recording, which is the one thing this engine exists not to be.
+- [x] Sounds are queued to their own moments rather than fired together: a latch precedes its own
+      impact, and a pane's glass lands a second and a half after it broke.
+- [x] Doors are the first user. Everything the model needs is already on the leaf — material, size,
+      thickness, and the edge speed implied by its own swing — so `DoorSystem` says what it sounded
+      like and nothing about doors appears anywhere in the audio engine.
+- [x] `WorldAudioEventTests`, sabotage suite up to 49.
+
+Next users, in the order they are cheapest: **glass** (the model is written and tested and has
+nothing to speak through), **collisions** (ditto, and it wants the same material mechanical
+properties the door panel now uses), **gunfire** (`WeaponSynth` renders buffers already and needs
+only to be pointed at the channel), and **weather on panels**.
 
 ### 1b. The original plan, kept for the reasoning
 

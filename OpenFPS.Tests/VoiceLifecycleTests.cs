@@ -57,6 +57,10 @@ public class VoiceLifecycleTests
         public IEnumerable<int> GetActiveSpatialSoundIds() => new List<int>(Live);
         public void Preload(string id) { }
         public void PlayVoice(int sender, Vector3 pos, byte[] pcm) { }
+
+        /// <summary>Records nothing: this fake has no FMOD behind it to hand a buffer to, and
+        /// every test here is about voice LIFECYCLE rather than about what a voice sounds like.</summary>
+        public bool RegisterSynthesisedSound(string soundId, byte[] pcm16Mono, int sampleRate) => true;
         public void PlayUiBeep(float hz, float ms) { }
         public void StartDiagnosticSound() { }
         public void SetDiagnosticPosition(Vector3 p) { }

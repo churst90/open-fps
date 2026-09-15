@@ -33,6 +33,10 @@ public enum DoorSoundKind
 /// </summary>
 public readonly record struct DoorSound(
     DoorSoundKind Kind,
+    /// <summary>What it is PHYSICALLY, as opposed to which part of a door it is. A latch and a bullet
+    /// striking concrete are both knocks; a panel and a bell are both rings. The audio engine only
+    /// ever needs to know this much, which is what lets it handle the thing nobody has invented yet.</summary>
+    SoundCharacter Character,
     /// <summary>Seconds after the event this one starts.</summary>
     float DelaySeconds,
     /// <summary>Where it comes from. The latch is at the latch edge, not the middle of the leaf.</summary>
@@ -44,7 +48,20 @@ public readonly record struct DoorSound(
     /// <summary>How long it takes to fall 60 dB, seconds.</summary>
     float DecaySeconds,
     /// <summary>0 is a pure tone, 1 is pure noise. A latch is mostly noise; a panel is mostly not.</summary>
-    float Noisiness);
+    float Noisiness)
+{
+    /// <summary>The same sound in the vocabulary every other source in the game uses.</summary>
+    public TransientSound ToTransient() => new()
+    {
+        Character = Character,
+        DelaySeconds = DelaySeconds,
+        Position = Position,
+        LevelDb = LevelDb,
+        Hz = Hz,
+        DecaySeconds = DecaySeconds,
+        Noisiness = Noisiness,
+    };
+}
 
 /// <summary>
 /// What a door sounds like, from what it is made of and how hard it was moved.
@@ -172,17 +189,17 @@ public static class DoorAcoustics
         // 1. The latch, first, and before the leaf has met anything: the bolt rides up the strike
         //    plate and drops. Almost independent of the door, because the mechanism is steel whatever
         //    the leaf is made of.
-        sounds.Add(new DoorSound(DoorSoundKind.Latch, 0.02f, latchEdge,
+        sounds.Add(new DoorSound(DoorSoundKind.Latch, SoundCharacter.Knock, 0.02f, latchEdge,
                                  impactDb - 8f, LatchHz, 0.05f, 0.75f));
 
         // 2. The seal, if there is one, overlapping the end of the travel — air being pushed out of
         //    a closing gap, so it is low, soft and brief.
         if (hasSeal)
-            sounds.Add(new DoorSound(DoorSoundKind.Seal, 0f, centre,
+            sounds.Add(new DoorSound(DoorSoundKind.Seal, SoundCharacter.Hiss, 0f, centre,
                                      impactDb - 4f, 90f, 0.12f, 0.95f));
 
         // 3. The impact itself.
-        sounds.Add(new DoorSound(DoorSoundKind.Impact, 0f, latchEdge,
+        sounds.Add(new DoorSound(DoorSoundKind.Impact, SoundCharacter.Knock, 0f, latchEdge,
                                  impactDb, 160f, 0.06f, 0.85f));
 
         // 4. The panel ringing on afterwards, with whatever energy the seal did not take.
@@ -191,7 +208,7 @@ public static class DoorAcoustics
         {
             float ring = RingSeconds(material, hz);
             if (ring > 0.02f)
-                sounds.Add(new DoorSound(DoorSoundKind.Panel, 0.004f, centre,
+                sounds.Add(new DoorSound(DoorSoundKind.Panel, SoundCharacter.Ring, 0.004f, centre,
                                          impactDb - 6f - 12f * sealAbsorbed, hz, ring, 0.15f));
         }
         return sounds;
@@ -210,11 +227,11 @@ public static class DoorAcoustics
     {
         var sounds = new List<DoorSound>(3)
         {
-            new(DoorSoundKind.Latch, 0f, latchEdge, 58f, LatchHz, 0.04f, 0.8f),
+            new(DoorSoundKind.Latch, SoundCharacter.Knock, 0f, latchEdge, 58f, LatchHz, 0.04f, 0.8f),
         };
 
         if (hasSeal)
-            sounds.Add(new DoorSound(DoorSoundKind.Seal, 0.03f, latchEdge, 50f, 220f, 0.09f, 0.9f));
+            sounds.Add(new DoorSound(DoorSoundKind.Seal, SoundCharacter.Hiss, 0.03f, latchEdge, 50f, 220f, 0.09f, 0.9f));
 
         // Hinges are a stick-slip relaxation oscillation: rubber on road, brake on disc, a dry pin in
         // a dry knuckle. The same process as a tyre at its limit, and it sings for the same reason.
@@ -222,7 +239,7 @@ public static class DoorAcoustics
         {
             // A bigger, heavier pin groans lower — so the note comes off the leaf, not off a table.
             float hz = Math.Clamp(900f / MathF.Max(0.3f, width * height), 120f, 2200f);
-            sounds.Add(new DoorSound(DoorSoundKind.Hinge, 0.05f, hinge,
+            sounds.Add(new DoorSound(DoorSoundKind.Hinge, SoundCharacter.Scrape, 0.05f, hinge,
                                      44f + 16f * hingeDryness, hz,
                                      MathF.Max(0.1f, swingSeconds * 0.8f), 0.35f));
         }

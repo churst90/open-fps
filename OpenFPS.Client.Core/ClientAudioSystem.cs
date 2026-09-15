@@ -25,6 +25,15 @@ public class ClientAudioSystem
     private readonly LocalPlayerState _state;
     private readonly SpatialService _spatial; 
     private readonly SpatialAcoustics _acoustics;
+
+    /// <summary>
+    /// The short sounds the world reports — a door shutting, glass landing, a round striking a wall.
+    ///
+    /// Lives here rather than beside the network code because it needs this system's acoustics: a
+    /// transient has to be occluded, reverberated and placed by the same path as everything else, or
+    /// a door heard through a wall would be the one sound in the game that is not muffled by it.
+    /// </summary>
+    public WorldAudioPlayer WorldAudio { get; }
     private readonly AsyncAcousticWorker _acousticWorker;
     private readonly HashSet<string> _preloadedSounds = new();
 
@@ -213,6 +222,9 @@ public class ClientAudioSystem
         _state = state;
         _spatial = new SpatialService();
         _acoustics = new SpatialAcoustics(_spatial); // Share the same SpatialService instance
+        // The short sounds the world reports. Shares this system's acoustics so a rendered latch
+        // takes exactly the path a recorded one would.
+        WorldAudio = new WorldAudioPlayer(_audio, _acoustics);
         _acousticWorker = new AsyncAcousticWorker(_acoustics);
         _acousticWorker.Start();
     }
@@ -345,6 +357,7 @@ public class ClientAudioSystem
         
         // 4. Update the local player's environmental state
         UpdateAcousticState(world, visualEyePos, listenerRegionId);
+        WorldAudio.Update(world, visualEyePos, OpenFPS.Common.AudioClock.Now);
 
         // 4.5. Near-field boundary probing.
         //
