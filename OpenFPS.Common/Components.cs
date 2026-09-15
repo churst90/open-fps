@@ -494,3 +494,24 @@ public partial struct DriveComponent
     public float ControlAge { get; set; }
     public DriveComponent() { Preset = ""; }
 }
+
+/// <summary>
+/// Marks the region entity a composite DERIVED for itself, rather than one somebody authored.
+///
+/// A composite that encloses space grows a room: an ordinary entity, parented to the root like every
+/// other part, carrying the <see cref="RegionComponent"/> and sitting at the middle of the space
+/// rather than at the origin — because a composite's origin is where it meets the GROUND, and a
+/// room's centre is half its height above that. Putting the volume at the origin would leave its
+/// ceiling at your knees.
+///
+/// Doing it as a part rather than as a component on the root means ParentSystem carries it with the
+/// thing for free, and it is exactly what a person authoring a building by hand is already told to do
+/// (see the `building_box` prefab: "place an acoustic_region inside it if the interior is
+/// enterable"). The marker is what tells the derived one apart from the authored one, so a rebuild
+/// replaces what it produced last time and never touches what a person put there.
+/// </summary>
+[MemoryPackable]
+public partial struct DerivedRoomComponent
+{
+    public DerivedRoomComponent() { }
+}

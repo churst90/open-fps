@@ -42,6 +42,23 @@ torque through its own gearbox, what it corners and stops at comes out of its ty
 against its mass, and what it will not exceed comes out of its drag area. Give the same shape of car
 a lorry's profile and it drives like a lorry. `/drivable` with no argument lists the profiles.
 
+## The inside of one
+
+A composite that encloses space grows a room, and nobody authors it. Put four walls, a floor and a
+roof around yourself and you are indoors — so the question is asked of the geometry:
+
+  * **big enough to be inside** — a fence is half a metre thick whatever its footprint;
+  * **mostly empty** — a stack of crates the size of a garage is not a garage;
+  * **mostly covered** — four faces of six, so a walled courtyard counts and a pair of walls does not.
+
+What it is made of comes from the walls: each of the six faces takes the material of whichever part
+covers most of it, so a glass-sided office is bright and a carpeted one is dead without anyone
+saying so. The room is carried like any other part, which means a caravan takes its acoustics with
+it and the cab of a car is a room in exactly the way a house is.
+
+If `/group` does not report a room, it did not find one — widen the walls, put a roof on, or check
+you have not built something solid.
+
 ## Owning one
 
 Whoever groups or places a composite owns it. Ownership gates four things: taking it apart, saving it

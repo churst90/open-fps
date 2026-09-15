@@ -869,8 +869,184 @@ drive away are the same structure. Only whether anything moves the root differs.
       scope.
 - [ ] Parts that were not spawned from a prefab cannot be saved. Right answer for now (it fails
       loudly rather than dropping a wall), but hand-built geometry needs a home eventually.
-- [ ] A composite's own acoustics: a house should be a REGION, so being inside one is audible without
-      anyone authoring a region volume by hand.
+- [x] **A composite's own acoustics** — see "Inside is a fact about the geometry" below.
+
+## Inside is a fact about the geometry (2026-09-15)
+
+Nobody should have to author the inside of a building they just built. Put four walls, a floor and a
+roof around yourself and you are indoors; that is true of a shed, a cathedral and the cab of a lorry
+by the same rule, and if it is not derived then every building a player makes is silent inside until
+a developer visits it.
+
+- [x] `CompositeAcoustics.Derive` asks three questions of the PARTS, and each rules out a thing that
+      is not a room. **Big enough to be inside** — a fence is a wall with more wall next to it;
+      whatever its footprint, one of its dimensions is a wall's thickness. **Mostly empty** — a stack
+      of crates the size of a garage is not a garage. **Mostly covered** — four faces of six, which
+      is a roofless courtyard, and that is generous on purpose because a walled yard genuinely does
+      sound closer to a room than to a field.
+- [x] What the room is MADE of comes from the parts too: each of the six faces takes the material of
+      whichever part covers most of it. A glass-sided office is bright and a carpeted one is dead
+      because of what somebody built them out of, not because anyone ticked a box.
+- [x] The room is a PART — an ordinary entity wearing `ParentComponent` and `DerivedRoomComponent` —
+      not a component on the root. So ParentSystem carries it for free and a caravan takes its
+      acoustics with it. It is also exactly what the `building_box` prefab already tells a person
+      authoring by hand to do: "place an acoustic_region inside it if the interior is enterable".
+- [x] It sits at the middle of the SPACE, not at the composite's origin. The origin is where the
+      thing meets the ground — that is what makes a house placed at your feet have its floor at your
+      feet — so a volume centred there is half underground with its ceiling at your knees, and
+      standing up inside your own building would put you outdoors.
+- [x] Rotated parts are measured by the box that CONTAINS them. A wall turned ninety degrees is two
+      metres of wall across, not half a metre, and measuring it the naive way makes every building
+      that has corners come out the wrong shape.
+- [x] `ClientWorldState` registers regions that arrive AFTER the acoustic bake. The client bakes once
+      from the static geometry streamed at map load; a building somebody puts down while you are
+      standing there is not in that, and the inside of a car never can be, because it moves. Build-
+      then-swap rather than mutating in place: those tables are read without a lock from the audio
+      worker and the FMOD thread.
+- [x] Deliberately NOT voxelized. The voxel grid is the fallback for entities the client cannot see
+      in its snapshot; a composite's room is one it can always see, so the exact point-in-box test
+      against the live transform is both cheaper and the only one that can be right for a room that
+      moves.
+- [x] `CompositeRoomTests`: 12 tests, and a **sabotage pass** (`tools/sabotage-rooms.py`) that breaks
+      each rule in turn and checks the matching test actually goes red. It caught a real hole on the
+      first run: the fence fixture was being rejected by the HOLLOWNESS rule, so the
+      minimum-dimension rule was doing no work in any test and would have passed for free however
+      badly it was written. The fence now has gaps in it, which isolates the rule it is there to test.
+
+## Vehicle sound: what is left, in the order it should go (2026-09-15, planned)
+
+Everything here was asked for in the walkthrough after occupancy landed. Ordered by what unblocks
+what, not by how interesting it is.
+
+### 1. Doors — unblocked by the room work above, do this next
+
+Three pieces already exist and compose; the thing to resist is inventing a fourth.
+
+- A door is a **part** like a wall. What it is called is `IdentityComponent.Name` — "front left
+  door" — which is already how a player refers to anything.
+- A door **is a portal**. `PortalComponent` already carries `ApertureSize`; open and closed are that
+  going to the door's area or to zero. Opening a door then changes what you hear through it with NO
+  new acoustic code, because the portal transmission already exists.
+- Which door serves which seat is **proximity, not a table**: the door for a seat is the nearest door
+  to it. That is automatically right for a two-door, a four-door, a bus with a middle door, and
+  whatever somebody invents on a Tuesday.
+
+So: `DoorComponent { Closed, HingeAxis, Swing, OpenSeconds }` on a part that also carries a
+`PortalComponent`, collider going non-solid while it swings. `/open` with no argument takes the
+nearest; from a seat it takes YOUR door.
+
+The SOUND of it is three things, and they are worth separating because each one tells you something
+different. The **latch** is a small sharp metallic transient. The **seal** is a short pressure
+whoomp as it compresses — which is most of why an expensive car sounds expensive, and it is absent
+entirely on a van's sliding door. The **panel** rings at its own modes afterwards, so a steel door,
+a glass one and a canvas flap are three different events. All three fall out of material and area;
+none of them wants a sample, because a sample cannot tell you which vehicle you just heard.
+
+Hinges creaking are a stick-slip relaxation oscillation — the SAME process as tyre squeal, which
+`TyreFriction` already models. Reuse it.
+
+### 2. Weather on the vehicle — rain on a roof, and why it must not be a sample
+
+Asked directly: do we need samples of rain on a windscreen? **No, and a sample would be worse.**
+
+Rain on a panel is a stochastic impact process: drops arrive at a rate of intensity x area / drop
+volume, and each one briefly excites the panel at its own modes. That is the same machinery as the
+tyre-tread impacts and `GlassBreak` already in the tree. What makes it worth synthesizing is that
+every variable in it is information:
+
+- **The panel decides the sound.** Steel car roof: rings a few hundred Hz, moderately damped. Glass
+  screen: stiffer, brighter, faster decay. Canvas: a dull thud with no ring at all. A truck's
+  aluminium box booms. That is `MaterialComponent` plus area — the same inputs as everything else.
+- **Drop size is the difference between sounds people recognise.** Drizzle is a dense hiss of tiny
+  impacts; heavy rain is fewer, bigger, harder strikes you can count. A loop cannot move between
+  them, and moving between them is exactly what tells you the weather is turning.
+- **Sleet and hail are a different impact regime**, not louder rain. A hailstone does not splash, it
+  BOUNCES — a much shorter, harder contact, higher up the spectrum, with individual strikes audible
+  even at high rates. Getting that from a rain loop is impossible.
+- **Snow is nearly silent on impact** and that is the point: what you hear is everything else going
+  quiet. The hush after snowfall is an absorption change, not a new sound, and the acoustic map
+  already has the machinery to express it.
+- **The rate scales with speed.** Driving sweeps out more volume per second, so rain on a moving
+  screen gets louder and moves forward off the roof and onto the glass. A free speed cue.
+
+Needs: a precipitation TYPE on the wire (`WeatherType` exists server-side as Clear/Rain/Snow/Storm
+but only the intensity is broadcast), plus sleet and hail, plus a drop-size figure. Then a panel
+impact synth keyed by intensity, type, material, area and relative speed.
+
+And the payoff from the room work: `ShelterFactor` already kills direct rain under a roof. Getting
+into a car should therefore stop the rain ON you and start the rain ABOVE you — which is as strong
+an "I am now inside" cue as exists, and it costs nothing extra once a car is a region.
+
+### 3. Interior audio — the cab, the road, the wind
+
+Right now sitting in a car puts the listener a metre from an engine rendered as though you were
+standing next to it in the open. The room work makes the CAB real; these make the rest of it.
+
+- **The engine from inside** is the same source through the bulkhead: a steep low-pass plus a
+  structure-borne path carrying the low orders more than the high. This falls out for free once the
+  car's own body occludes, which needs dynamic geometry in the acoustic path — the one genuinely
+  hard piece on this list. An "inside" flag applying a bulkhead filter would be a special case and
+  is the wrong answer.
+- **Road noise is the one that matters most.** Above about fifty km/h it is the dominant interior
+  sound and it is what actually tells you your speed. `VehicleSynth.Tyre` already synthesizes it
+  from `TreadBlocks` and `SurfaceRoughness`; the interior version is the same source arriving
+  structure-borne, so it is LESS filtered than the engine and comes from below and all round rather
+  than from a point. `EngineProcessor` already has `TyreMix` and `FrontMix` as constants — inside is
+  tyres up, intake down.
+- **It should change with the surface.** `GetGroundHeight` already returns the floor material, so
+  asphalt to gravel to a bridge deck would be instantly audible. For a blind driver that is
+  navigation, not decoration, and it is nearly free.
+- **Wind noise** is the best high-speed cue there is: broadband, from the A-pillar and mirrors,
+  rising far more steeply with speed than engine or tyres. It should come out of
+  `VehicleProfile.DragArea`, so a brick of a van roars and a slippery coupe hisses. `WindModel`
+  already exists for weather; the interior version is the same synthesis on relative airspeed.
+  Cheapest item here and the highest navigational payoff.
+- A truck versus a car then needs nothing bespoke: a bigger cab gives lower room modes, the engine
+  sits under the seat rather than beyond a bulkhead, and the diesel clatter is already in the
+  profiles.
+
+### 4. Gears and pedals — a wire change, and it makes the model simpler
+
+Today it is an automatic, and the client picks the gear, not the server: `DrivingSystem.SelectGear`
+picks one only to compute tractive force, while `EngineProcessor`'s `VirtualDriver` independently
+picks its own from the speed it is sent. They agree because they share a rule, not because anything
+is transmitted.
+
+It SOUNDS right — `VirtualDriver` works a real clutch (`_shiftTimer` holds it down for
+`Gearbox.ShiftSeconds` with the throttle shut, which is the gap in the middle of a shift) and
+`Driveline` fires `TyreFriction.ShiftChirp` on a big ratio step. But a player cannot be given manual
+gears without sending them, because the client INFERS the gear from speed: hold second at a hundred
+and the client still plays top. There is a subtler version of the same problem already — the virtual
+driver is a PID chasing a target SPEED, so it is not reproducing your pedal, it is inferring a pedal
+that would produce your speed. Lift off at the crest of a hill and it may stay on the throttle.
+
+The fix removes machinery rather than adding it: for a player-driven vehicle, stop inferring the
+driver and SEND them. `VirtualDriver` exists to guess throttle, clutch and gear from speed alone;
+for a car with a real driver the server already knows all three. A "real driver" path in
+`EngineProcessor` that takes them off the wire and skips `VirtualDriver.Apply` leaves `EngineSynth`,
+`Driveline` and `ExhaustNetwork` untouched, and makes manual gears, holding a gear downhill, and
+engine braking you chose all audible — because the synthesis was always physical.
+
+About four bytes per driven vehicle per tick, and there are only ever a handful. Controls: keep
+automatic as the default, `[` and `]` to shift, gear announced, auto-clutch. A clutch key is one key
+too many.
+
+### 5. Lending a vehicle
+
+`Owner` is one name and there is no grant, so an owner cannot let a friend drive. `/lend <player>`
+is a two-line stopgap. The real answer is **keys as an item**: a key is an entity, it lives in
+`InventoryComponent`, it is handed over, dropped, lost and stolen, and `MayModify` becomes "you own
+it, or you are holding its key". Ownership stops being a name check and becomes a physical fact you
+can hear change hands — the same move as "a house, a car and a map are the same idea", applied to
+permission. It waits for the inventory work.
+
+### Synthesize or sample?
+
+The rule that falls out of all of the above: **synthesize what must vary, sample what is a fixed
+signature.** Rain, impacts, latches, hinges and panels all carry information in how they change, and
+a sample freezes exactly the dimension that mattered. An indicator relay, a seatbelt, a handbrake
+ratchet and a warning chime are the same every time and derive from nothing — those are samples, and
+the existing `SoundEmitterComponent` path already plays them with no new machinery.
 
 ## Occupancy: get in, and drive it away (2026-09-15)
 

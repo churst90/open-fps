@@ -102,7 +102,8 @@ public class CompositeService
         if (root == Entity.Null) return -1;
 
         Attach(world, root, members, origin);
-        if (!anchored) MakeDynamic(mapId, world, root, members);
+        RefreshRoom(mapId, world, root);
+        if (!anchored) MakeDynamic(mapId, world, root, MembersOf(world, root.Id));
         partCount = members.Count;
         Log.Information("Composite '{Name}' grouped {Count} entit(ies) on '{Map}' at {Origin}.", name, partCount, mapId, origin);
         return root.Id;
@@ -211,10 +212,14 @@ public class CompositeService
         { error = $"'{composite.Name}' belongs to {composite.Owner}"; return false; }
 
         name = composite.Name;
-        var members = MembersOf(world, rootId);
-        foreach (var member in members)
+        var members = new List<Entity>();
+        foreach (var member in MembersOf(world, rootId))
         {
+            // The room went with the building, so it goes with the building being taken apart. Left
+            // behind it would be an invisible volume in a field that still sounds like a room.
+            if (world.Has<DerivedRoomComponent>(member)) { _maps.DestroyEntity(mapId, member); continue; }
             world.Remove<ParentComponent>(member);
+            members.Add(member);
             partCount++;
         }
         // Whoever was inside it is standing in the open now; the thing they were sitting in is gone.
@@ -236,6 +241,20 @@ public class CompositeService
         var q = new QueryDescription().WithAll<ParentComponent>();
         world.Query(in q, (Entity e, ref ParentComponent p) => { if (p.ParentEntityId == rootId) found.Add(e); });
         return found;
+    }
+
+    /// <summary>
+    /// The parts a composite is BUILT from — its members, less the room it derived for itself.
+    ///
+    /// The derived room is a member in every mechanical sense (it is parented, it is carried, it is
+    /// destroyed with the thing) and is not a part in any meaningful one: nobody built it, it cannot
+    /// be saved, and measuring the building's own size by including it would be measuring the answer.
+    /// </summary>
+    public static List<Entity> PartsOf(World world, int rootId)
+    {
+        var parts = MembersOf(world, rootId);
+        parts.RemoveAll(e => world.Has<DerivedRoomComponent>(e));
+        return parts;
     }
 
     /// <summary>Everyone currently inside this root — the people it is CARRYING.</summary>
@@ -323,7 +342,7 @@ public class CompositeService
         if (world.Has<DriveComponent>(root))
             template.VehiclePreset = world.Get<DriveComponent>(root).Preset;
 
-        foreach (var member in MembersOf(world, rootId))
+        foreach (var member in PartsOf(world, rootId))
         {
             if (!world.Has<Transform>(member)) continue;
             var t = world.Get<Transform>(member);
@@ -464,6 +483,7 @@ public class CompositeService
             partCount++;
         }
 
+        RefreshRoom(mapId, world, root);
         if (!string.IsNullOrWhiteSpace(template.VehiclePreset))
             MakeDrivable(mapId, world, root, template.VehiclePreset, out _);
         else if (!template.Anchored)
@@ -473,6 +493,60 @@ public class CompositeService
                         template.Id, mapId, position, partCount,
                         string.IsNullOrWhiteSpace(template.VehiclePreset) ? "" : $", driving as a {template.VehiclePreset}");
         return root.Id;
+    }
+
+    // ── The inside of it ────────────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Gives a composite the room it encloses, or takes away the one it no longer does.
+    ///
+    /// Called every time the shape changes — grouped, placed, rebuilt. Cheap, and idempotent: the
+    /// derived room is destroyed and made again from what is actually there now, so a wall added or a
+    /// roof taken off is reflected without anyone having to say which change invalidates what.
+    ///
+    /// The room is a PART, not a flag on the root, so ParentSystem carries it with the building for
+    /// free and a house you drive away takes its acoustics with it. It is exactly what somebody
+    /// authoring a building by hand is already told to do.
+    /// </summary>
+    public bool RefreshRoom(string mapId, int rootId)
+    {
+        if (!_maps.TryGetMap(mapId, out var world, out _, out _, out var lookup)) return false;
+        if (!lookup.TryGetValue(rootId, out var root) || !world.IsAlive(root)) return false;
+        return RefreshRoom(mapId, world, root);
+    }
+
+    private bool RefreshRoom(string mapId, World world, Entity root)
+    {
+        foreach (var member in MembersOf(world, root.Id))
+            if (world.Has<DerivedRoomComponent>(member))
+                _maps.DestroyEntity(mapId, member);
+
+        var parts = PartsOf(world, root.Id);
+        string name = world.Has<CompositeComponent>(root) ? world.Get<CompositeComponent>(root).Name : "";
+        if (!CompositeAcoustics.Derive(world, parts, name, out var room, out var centre)) return false;
+
+        var rootT = world.Get<Transform>(root);
+        var e = _maps.SpawnEntity(mapId, w => w.Create(
+            new Transform
+            {
+                Position = rootT.Position + Vector3.Transform(centre, rootT.Rotation),
+                Rotation = rootT.Rotation,
+                IsDirty = true,
+            },
+            new ParentComponent { ParentEntityId = root.Id, LocalPosition = centre, LocalRotation = Quaternion.Identity },
+            room,
+            // Not solid — it is a volume, not an obstacle. It needs a collider all the same: the
+            // broadcast walks the spatial grid, and the grid only carries things that have one, so a
+            // room without a body is a room no client is ever told about.
+            new ColliderComponent { Shape = ColliderShape.Box, Size = room.RoomSize, IsSolid = false },
+            new DerivedRoomComponent(),
+            new NameComponent { Name = room.FriendlyName },
+            EntityType.Trigger));
+        if (e == Entity.Null) return false;
+
+        Log.Information("Composite {Root} ('{Name}') encloses a room {Size} — floor {Floor}, walls {Walls}.",
+                        root.Id, name, room.RoomSize, room.Materials[0], room.Materials[2]);
+        return true;
     }
 
     // ── Seats, and driving ──────────────────────────────────────────────────────────────────────
@@ -593,7 +667,7 @@ public class CompositeService
             return false;
         }
         var profile = VehicleProfile.ByName(preset);
-        var members = MembersOf(world, root.Id);
+        var parts = PartsOf(world, root.Id);
         MathHelper.ToYawPitch(world.Get<Transform>(root).Rotation, out float yaw, out _);
 
         SetOrAdd(world, root, new DriveComponent { Preset = preset, Heading = yaw });
@@ -619,10 +693,10 @@ public class CompositeService
         SetOrAdd(world, root, new ColliderComponent
         {
             Shape = ColliderShape.Box,
-            Size = LocalBounds(world, members, out _),
+            Size = CompositeAcoustics.Bounds(world, parts, out _),
             IsSolid = false,
         });
-        MakeDynamic(mapId, world, root, members);
+        MakeDynamic(mapId, world, root, MembersOf(world, root.Id));
         Log.Information("Composite {Root} drives as a {Preset} ({Engine}).", root.Id, preset, profile.Engine.Name);
         return true;
     }
@@ -632,25 +706,4 @@ public class CompositeService
         if (world.Has<T>(e)) world.Set(e, component); else world.Add(e, component);
     }
 
-    /// <summary>
-    /// How big the thing is, from the parts it is made of — including what they are made of, not just
-    /// where their centres are, or a car would come out the size of a dot.
-    /// </summary>
-    public static Vector3 LocalBounds(World world, List<Entity> members, out Vector3 centre)
-    {
-        centre = Vector3.Zero;
-        if (members.Count == 0) return Vector3.One;
-        Vector3 min = new(float.MaxValue), max = new(float.MinValue);
-        foreach (var m in members)
-        {
-            if (!world.Has<ParentComponent>(m)) continue;
-            var local = world.Get<ParentComponent>(m).LocalPosition;
-            var half = world.Has<ColliderComponent>(m) ? world.Get<ColliderComponent>(m).Size * 0.5f : Vector3.Zero;
-            min = Vector3.Min(min, local - half);
-            max = Vector3.Max(max, local + half);
-        }
-        if (min.X > max.X) return Vector3.One;
-        centre = (min + max) * 0.5f;
-        return Vector3.Max(max - min, new Vector3(0.1f));
-    }
 }

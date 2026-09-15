@@ -189,6 +189,12 @@ public class ClientWorldState
         _definitions[def.EntityId] = def;
         _serverTransforms[def.EntityId] = def.Transform;
 
+        // A room that turned up after the map was baked — a building somebody put down while we were
+        // standing here, or the inside of a car, which is never in the bake at all because it moves.
+        // Without this the acoustic map never hears of it and stepping inside sounds like stepping
+        // nowhere.
+        if (def.Region.RoomSize.X > 0f) TrackRegion(def);
+
         // Anything that makes sound on its own is processed every frame. See RunsOnItsOwn: this used
         // to be a list of two playback modes rather than a rule, and everything outside the list was
         // silently absent from the audio system entirely.
@@ -201,6 +207,55 @@ public class ClientWorldState
         }
 
         Touch();
+    }
+
+    /// <summary>
+    /// Puts a runtime region on the acoustic map, or updates one already there.
+    ///
+    /// Build-then-swap rather than mutating in place, because the region tables are read without a
+    /// lock from the audio worker and the FMOD thread while this runs on the network one, and adding
+    /// a key to a dictionary somebody else is enumerating throws. The tables are small and this
+    /// happens when a building arrives, not per frame, so a copy costs nothing worth having.
+    ///
+    /// Deliberately NOT voxelized. The voxel grid is the fallback for entities the client cannot see
+    /// in its snapshot, and a composite's room is an entity it can always see; the exact
+    /// point-in-box test against the live transform is both cheaper and right, and it is the only one
+    /// that can be right for a room that moves.
+    /// </summary>
+    private void TrackRegion(EntityDefinition def)
+    {
+        lock (_metaLock)
+        {
+            var map = AcousticMap;
+            if (map == null) return;   // still loading; the bake will pick it up from the stream
+
+            map.Regions = new Dictionary<int, RegionComponent>(map.Regions) { [def.EntityId] = def.Region };
+            map.RegionPositions = new Dictionary<int, Vector3>(map.RegionPositions) { [def.EntityId] = def.Transform.Position };
+            map.RegionRotations = new Dictionary<int, Quaternion>(map.RegionRotations) { [def.EntityId] = def.Transform.Rotation };
+        }
+    }
+
+    /// <summary>Takes a region off the acoustic map when whatever enclosed it is gone.</summary>
+    private void ForgetRegions(List<int> entityIds)
+    {
+        lock (_metaLock)
+        {
+            var map = AcousticMap;
+            if (map == null) return;
+
+            List<int>? present = null;
+            foreach (int id in entityIds)
+                if (map.Regions.ContainsKey(id)) (present ??= new List<int>()).Add(id);
+            if (present == null) return;
+
+            var regions = new Dictionary<int, RegionComponent>(map.Regions);
+            var positions = new Dictionary<int, Vector3>(map.RegionPositions);
+            var rotations = new Dictionary<int, Quaternion>(map.RegionRotations);
+            foreach (int id in present) { regions.Remove(id); positions.Remove(id); rotations.Remove(id); }
+            map.Regions = regions;
+            map.RegionPositions = positions;
+            map.RegionRotations = rotations;
+        }
     }
 
     /// <summary>
@@ -224,6 +279,7 @@ public class ClientWorldState
 
         if (removed.Count > 0)
         {
+            ForgetRegions(removed);
             lock (_gridLock)
             {
                 _gridNeedsRebuild = true;
