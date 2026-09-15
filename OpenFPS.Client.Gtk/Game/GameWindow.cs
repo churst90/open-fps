@@ -33,7 +33,7 @@ internal sealed class GameWindow
         _window.SetDefaultSize(480, 320);
 
         var label = Label.New(
-            "In game. W A S D to move, J / L turn, K / O look up/down, Space jump.\n" +
+            "In game. W A S D to move, J / L turn, O / K look up and down, Space jump.\n" +
             "C coordinates, F facing, H health, Z area, comma look ahead, E interact, P scan, I inventory.\n" +
             "V voice, F5 players, brackets to read chat, slash for the command console, Escape to quit.");
         label.SetWrap(true);

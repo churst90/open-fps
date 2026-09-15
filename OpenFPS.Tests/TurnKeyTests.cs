@@ -40,6 +40,46 @@ public class TurnKeyTests
         Assert.True(right.X > 0.5f, $"a negative LookDelta.X should face right (+X); it faced {right}");
     }
 
+    /// <summary>
+    /// Which way a look key tilts you — the same derivation, one axis over.
+    ///
+    /// `Pitch += LookDelta.Y * RotationSpeed * dt`, and the rotation is built by
+    /// Quaternion.CreateFromYawPitchRoll, whose pitch term is a right-handed rotation about +X. That
+    /// takes forward (+Z) toward MINUS Y: increasing pitch looks DOWN, not up. The comment beside the
+    /// key table said the opposite, K was written to look down from that comment, and so K looked up.
+    /// Reported as "k and o seem to be swapped".
+    ///
+    /// Pinned at the end of the chain — where the nose actually points — for the same reason as the
+    /// yaw test: every individual step of the sign chain reads as correct.
+    /// </summary>
+    [Fact]
+    public void APositiveLookYLooksDownAndANegativeOneLooksUp()
+    {
+        Vector3 down = ForwardAfterPitch(LookXForDegrees(30f));
+        Vector3 up = ForwardAfterPitch(-LookXForDegrees(30f));
+
+        Assert.True(down.Y < -0.4f, $"a positive LookDelta.Y should tilt the nose down (-Y); it faced {down}");
+        Assert.True(up.Y > 0.4f, $"a negative LookDelta.Y should tilt the nose up (+Y); it faced {up}");
+    }
+
+    /// <summary>And the keys, as the session maps them: K down, O up.</summary>
+    [Fact]
+    public void KLooksDownAndOLooksUp()
+    {
+        // Mirrors ClientGameSession.TurnKeys. If that table is edited without this, one of them fails.
+        const float KLookY = +1f;
+        const float OLookY = -1f;
+
+        Assert.True(ForwardAfterPitch(KLookY * LookXForDegrees(30f)).Y < 0f, "K must look DOWN");
+        Assert.True(ForwardAfterPitch(OLookY * LookXForDegrees(30f)).Y > 0f, "O must look UP");
+    }
+
+    private static Vector3 ForwardAfterPitch(float lookY, float dt = PhysicsConstants.FixedDeltaTime)
+    {
+        float pitch = lookY * PhysicsConstants.RotationSpeed * dt;
+        return Vector3.Transform(Vector3.UnitZ, Quaternion.CreateFromYawPitchRoll(0f, pitch, 0f));
+    }
+
     [Fact]
     public void FourTapsFaceTheOtherWayAndEightComeBack()
     {

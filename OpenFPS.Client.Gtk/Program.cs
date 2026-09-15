@@ -54,7 +54,9 @@ internal static class GtkClientProgram
             .CreateLogger();
         Serilog.Log.Information("OpenFPS GTK client starting (PID {Pid}).", Environment.ProcessId);
 
-        _speech = new SpeechDispatcherOutput();
+        // Orca when it is running, speech-dispatcher when it is not — decided per line, not once.
+        // See LinuxSpeechOutput.
+        _speech = new OpenFPS.Client.Gtk.Platform.LinuxSpeechOutput();
         _speech.Initialize();
 
         // Report EXACTLY which native audio libraries are missing and what each one costs. "Audio

@@ -299,18 +299,28 @@ public sealed class ClientGameSession : IDisposable
     //                                                   INCREASING yaw swings forward toward +X,
     //                                                   which is right — therefore a POSITIVE
     //                                                   LookDelta.X decreases yaw and turns LEFT)
-    //   Pitch += LookDelta.Y * RotationSpeed * dt      (positive is up)
+    //   Pitch += LookDelta.Y * RotationSpeed * dt      (and Rotation is built by
+    //                                                   Quaternion.CreateFromYawPitchRoll(yaw, pitch, 0),
+    //                                                   whose pitch is a RIGHT-HANDED rotation about
+    //                                                   +X — which takes forward (+Z) toward -Y.
+    //                                                   Therefore INCREASING pitch looks DOWN.)
     //
     // J and L were the wrong way round, and the derivation above is why: J emitted a NEGATIVE X,
     // which increases yaw, which turns right. Reported as "turning left seems to turn me right", and
     // it is only findable by following the sign all the way to the forward vector, because every
     // step of it is individually plausible.
+    //
+    // K and O were wrong for the same reason and the comment here was part of it: it asserted that a
+    // positive pitch looks up, which is the intuitive reading of the word and the opposite of what
+    // CreateFromYawPitchRoll does. So K, written to look down, emitted a negative Y, which decreased
+    // pitch, which looked UP. Reported as "k and o seem to be swapped". The sign now comes from the
+    // rotation, not from the word, and TurnKeyTests holds it there.
     private static readonly (GameKey Key, float X, float Y)[] TurnKeys =
     {
         (GameKey.J, +1f,  0f),   // left
         (GameKey.L, -1f,  0f),   // right
-        (GameKey.K,  0f, -1f),   // down
-        (GameKey.O,  0f, +1f),   // up
+        (GameKey.K,  0f, +1f),   // down  (increasing pitch tilts forward toward -Y)
+        (GameKey.O,  0f, -1f),   // up
     };
 
     /// <summary>A tap turns this far. A quarter turn: four presses face you the other way.</summary>

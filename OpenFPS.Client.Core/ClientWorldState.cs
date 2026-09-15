@@ -189,7 +189,10 @@ public class ClientWorldState
         _definitions[def.EntityId] = def;
         _serverTransforms[def.EntityId] = def.Transform;
 
-        if (def.SoundEmitter.Mode == PlaybackMode.LoopOne || def.SoundEmitter.IsSynth)
+        // Anything that makes sound on its own is processed every frame. See RunsOnItsOwn: this used
+        // to be a list of two playback modes rather than a rule, and everything outside the list was
+        // silently absent from the audio system entirely.
+        if (def.SoundEmitter.RunsOnItsOwn())
             _audioEntityIds[def.EntityId] = 0;
 
         lock (_gridLock)

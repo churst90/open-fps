@@ -256,6 +256,46 @@ public class GhostsAndStuttersTests
             "and long enough to fling a source that stopped dead is not caution either");
     }
 
+    // ── An emitter that makes sound on its own is processed every frame ─────────────────────────
+
+    /// <summary>
+    /// A public-address horn that says its piece every twenty seconds is an emitter that runs on its
+    /// own, and has to be treated as one.
+    ///
+    /// It was not. The client registered an entity for per-frame audio processing only if its mode was
+    /// LoopOne or it was a synth — a list of two cases, not a rule — so a Single-with-a-repeat-interval
+    /// emitter was never in the audio system at all: no voice, no occlusion, no log line, nothing to
+    /// notice. The repeat logic written expressly to serve it could never run, because nothing ever
+    /// called the code containing it.
+    /// </summary>
+    [Fact]
+    public void AnEmitterThatMakesSoundOnItsOwnIsProcessed()
+    {
+        var pa = new SoundEmitterComponent
+        {
+            SoundId = "ANNOUNCE/st_louis_welcome", Mode = PlaybackMode.Single, RepeatIntervalSeconds = 20f,
+        };
+        Assert.True(pa.RunsOnItsOwn(), "a repeating announcer runs on its own and must be processed");
+
+        Assert.True(new SoundEmitterComponent { SoundId = "X", Mode = PlaybackMode.LoopOne }.RunsOnItsOwn());
+        Assert.True(new SoundEmitterComponent { SoundId = "X", Mode = PlaybackMode.LoopFolder }.RunsOnItsOwn());
+        Assert.True(new SoundEmitterComponent { SoundId = "X", Mode = PlaybackMode.Sequential }.RunsOnItsOwn());
+        Assert.True(new SoundEmitterComponent { SoundId = "engine:v8_muscle", IsSynth = true }.RunsOnItsOwn());
+    }
+
+    /// <summary>
+    /// And a plain one-shot does NOT, which is the thing the old narrow test was really protecting.
+    /// Registering a Single with no repeat interval would replay it every frame for ever.
+    /// </summary>
+    [Fact]
+    public void APlainOneShotIsNotProcessedEveryFrame()
+    {
+        Assert.False(new SoundEmitterComponent { SoundId = "DOOR/open", Mode = PlaybackMode.Single }.RunsOnItsOwn());
+        Assert.False(new SoundEmitterComponent().RunsOnItsOwn());
+        // A repeat interval with nothing to play is not a repeater either.
+        Assert.False(new SoundEmitterComponent { Mode = PlaybackMode.Single, RepeatIntervalSeconds = 5f }.RunsOnItsOwn());
+    }
+
     private static EntitySnapshot Car(Vector3 at) => new()
     {
         Id = 42,

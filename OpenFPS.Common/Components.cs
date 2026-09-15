@@ -197,6 +197,32 @@ public partial struct SoundEmitterComponent
     public Vector3 Offset { get; set; }
 
     public SoundEmitterComponent() { }
+
+    /// <summary>
+    /// Does this emitter make sound BY ITSELF, or only when something triggers it?
+    ///
+    /// A method rather than a property on purpose: MemoryPack serialises properties, and this is a
+    /// question ABOUT the data, not part of it. See the APPEND ONLY note above.
+    ///
+    /// The client registers an entity for per-frame audio processing on the strength of this, and it
+    /// used to ask a narrower question — literally "is the mode LoopOne, or is it a synth" — which is
+    /// a list of two cases rather than a rule. Anything else was never registered and so was never
+    /// processed at all: no voice, no occlusion, no reverb, no log line. A public-address horn set to
+    /// play a single announcement every twenty seconds was simply not in the world as far as the
+    /// audio system was concerned, and the repeat logic written to serve it could never run. So were
+    /// Sequential and LoopFolder emitters, which nothing had happened to author yet.
+    ///
+    /// The rule is about RESPONSIBILITY. A looping, folder-looping, sequential or synthesised emitter
+    /// is producing sound continuously; a repeater is producing it on a schedule of its own. All of
+    /// those own their own voice and have to be looked at every frame. A plain Single with no repeat
+    /// interval is a one-shot waiting for something to fire it — a door, a footstep, a gunshot — and
+    /// registering one would make it retrigger endlessly, which is the fault the old narrow test was
+    /// really guarding against.
+    /// </summary>
+    public readonly bool RunsOnItsOwn()
+        => IsSynth
+        || Mode is PlaybackMode.LoopOne or PlaybackMode.LoopFolder or PlaybackMode.Sequential
+        || (RepeatIntervalSeconds > 0f && !string.IsNullOrEmpty(SoundId));
 }
 
 [MemoryPackable]
