@@ -1907,3 +1907,33 @@ makes it read as a turbocharger rather than as a noise.
       `/reloadmap <id>`, which is the cheaper half and does not drop anybody) would take that out of
       the loop. The pieces exist: the server already shuts down gracefully on SIGTERM, finishing the
       tick and notifying players first, so this is mostly announcing it and re-execing.
+
+## The diesels had no engine in them (2026-09-15)
+
+Heard on the track as "loud white noise ... I expected to hear more of the engine", and the
+arithmetic agreed. Measured at load the truck six was **+29 dB harmonic-to-noise** — extremely tonal,
+not noisy at all — with **-26.5 dB at 0.8-2.5 kHz and -61.7 dB at 2.5-6 kHz**. There was nothing above
+800 Hz to hear. Tyres were 11 dB under the exhaust, so they were not it either.
+
+- [x] **A BLOCK stem.** The block was folded into the intake, which made it impossible to tell
+      whether the mechanical layer was quiet or merely buried under a much louder intake. It is the
+      whole character of a diesel and it had never been separable. `VehicleRender.Block`, written as
+      `v8_block.wav`.
+- [x] It showed the fault at once: the block was **94.3 % below 200 Hz**, 1.7 % between 800 Hz and
+      2.5 kHz. All thud, no clatter. `CombustionKnock = 1.3`, `ValvetrainLevel = 0.8` and
+      `TurboWhistleLevel = 0.9` were all specified high and all 15-25 dB under the thud.
+- [x] **The two paths are not alike and had been scaled alike.** The thud is STRUCTURE-BORNE —
+      cylinder pressure into the block, through rubber mounts, into a chassis, every junction a
+      mismatch reflecting most of the energy back. The knock and the clatter radiate straight off the
+      block's surfaces into the air. Weighting the indirect path above the direct one is what buried
+      the engine. Thud down 14 dB, knock up 8.5, valvetrain up 9.5, turbo whistle up 10.
+- [x] Block now measures **64 / 28 / 5.7 / 2.0** across <200 / 200-800 / 0.8-2.5k / 2.5-8k, against
+      94 / 3.6 / 1.7 / 0.5. Injector knock and valvetrain clatter live between about 500 Hz and 4 kHz
+      and they are what makes a diesel recognisable AS one.
+- [x] It does not touch the petrol engines: a V8's block sits 26 dB under its own intake either way,
+      and every declared source level is still within 0.5 dB of measured — the balance moved, the
+      loudness did not.
+
+- [ ] Ear-check on the track. If the clatter still wants more, `thud` is the one number: it is a
+      single scale and everything else is already where it should be.
+- [ ] The turbo whistle is now 10 dB up but has never been heard in the map against a real field.

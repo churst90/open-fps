@@ -12,6 +12,11 @@ public sealed class VehicleRender
     public required float[] Exhaust { get; init; }
     public required float[] Intake { get; init; }
     public required float[] Tyres { get; init; }
+    /// <summary>The BLOCK on its own — combustion knock, valvetrain clatter, accessory and turbo
+    /// whine. It is normally folded into <see cref="Intake"/>, which makes it impossible to tell
+    /// whether the mechanical layer is quiet or simply buried under a much louder intake. It is the
+    /// whole character of a diesel and it had never been separable.</summary>
+    public required float[] Block { get; init; }
     /// <summary>Diagnostic: the summed pressure at the valve ends, BEFORE the pipes. If the source is
     /// lumpy and the output is not, the network is smoothing the life out of it.</summary>
     public required float[] Port { get; init; }
@@ -58,6 +63,7 @@ public static class VehicleSynth
         var exhaust = new float[n];
         var intake = new float[n];
         var tyres = new float[n];
+        var block = new float[n];
         var distance = new float[n];
         var port = new float[n];
         var rpmTrace = new float[n];
@@ -99,6 +105,7 @@ public static class VehicleSynth
                 shellEnergy += engine.ExhaustShell * engine.ExhaustShell;
                 pipeEnergy += engine.ExhaustPipe * engine.ExhaustPipe;
                 intake[at] = engine.Intake + engine.Block;
+                block[at] = engine.Block;
                 port[at] = engine.PortSum;
                 // What the tyres are being asked for, from the car's own motion. Straight-line only
                 // here — the bench drives in a straight line — so the lateral term is zero and every
@@ -166,6 +173,7 @@ public static class VehicleSynth
             Exhaust = Scale(exhaust, scale),
             Intake = Scale(intake, scale),
             Tyres = Scale(tyres, scale),
+            Block = Scale(block, scale),
             Port = port,
             Distance = distance,
             Rpm = rpmTrace,

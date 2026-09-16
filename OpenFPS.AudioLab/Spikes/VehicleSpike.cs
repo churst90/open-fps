@@ -486,6 +486,7 @@ public static class VehicleSpike
         File.WriteAllBytes(Path.Combine(dir, "v8_exhaust.wav"), VehicleSynth.ToWav16(render.Exhaust));
         File.WriteAllBytes(Path.Combine(dir, "v8_intake.wav"), VehicleSynth.ToWav16(render.Intake));
         File.WriteAllBytes(Path.Combine(dir, "v8_tyres.wav"), VehicleSynth.ToWav16(render.Tyres));
+        File.WriteAllBytes(Path.Combine(dir, "v8_block.wav"), VehicleSynth.ToWav16(render.Block));
         Console.WriteLine($"\n  {render.Seconds:F1} s rendered -> {dir}");
 
         if (!live)

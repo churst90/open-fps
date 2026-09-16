@@ -1367,3 +1367,46 @@ hisses off when the driver lifts. Two small turbo-diesels alongside them run 1.4
 than as a noise.
 
 Tests 548.
+
+---
+
+# The diesels had no engine in them
+
+Reported from the track as "loud white noise ... I expected to hear more of the engine". The
+arithmetic agreed, and it took three measurements to find out why, two of which cleared suspects.
+
+The truck six at load measures **+29 dB harmonic-to-noise** — extremely tonal, not noisy at all. The
+tyres are **11 dB below** the exhaust, so they were not it. But the band balance was
+**−26.5 dB at 0.8–2.5 kHz and −61.7 dB at 2.5–6 kHz**: there was nothing above 800 Hz to hear at all.
+A formless low roar is exactly what that predicts.
+
+## A stem that had never existed
+
+The block — combustion knock, valvetrain clatter, accessory and turbo whine — was folded into the
+intake. That makes it impossible to tell a quiet mechanical layer from one buried under a much louder
+intake, and the block is the whole character of a diesel. Given a stem of its own it confessed
+immediately: **94.3 % of its energy below 200 Hz, and 1.7 % between 800 Hz and 2.5 kHz.** All thud,
+no clatter. `CombustionKnock = 1.3`, `ValvetrainLevel = 0.8` and `TurboWhistleLevel = 0.9` were every
+one of them specified high, and every one of them 15 to 25 dB under the thud.
+
+## Two paths that are not alike
+
+The fix is not a gain change, it is noticing that two different transmission paths had been scaled as
+though they were the same one.
+
+The **thud** is structure-borne: cylinder pressure into the block, through rubber mounts, into a
+chassis — and every junction in that chain is an impedance mismatch that reflects most of the energy
+back. The **knock and clatter** radiate straight off the block's own surfaces into the air. Weighting
+the indirect path above the direct one is what buried the engine.
+
+Thud down 14 dB, knock up 8.5, valvetrain up 9.5, turbo whistle up 10. The block now measures
+**64 / 28 / 5.7 / 2.0** across those bands against 94 / 3.6 / 1.7 / 0.5 — injector knock and
+valvetrain clatter live between about 500 Hz and 4 kHz, and they are what makes a diesel recognisable
+as one.
+
+It leaves the petrol engines alone, which is the check that it is a rebalance and not a fudge: a V8's
+block sits 26 dB under its own intake either way, and every declared source level across all
+twenty-two presets is still within half a decibel of measured. The balance moved; the loudness did
+not.
+
+Tests 548.

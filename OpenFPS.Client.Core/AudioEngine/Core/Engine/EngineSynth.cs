@@ -652,13 +652,29 @@ public sealed class EngineSynth
         _knockHp += kh * (knock - _knockHp);
         // Scaled so a truck diesel under load radiates about 95 dB of knock at a metre and a petrol
         // engine's is buried; soft-limited because a misfire's pressure jump is not the block's sound.
-        float knockRaw = (knock - _knockHp) * e.Mechanical.CombustionKnock * 1.5e-9f;
+        float knockRaw = (knock - _knockHp) * e.Mechanical.CombustionKnock * 4.0e-9f;
         float knockOut = 2f * MathF.Tanh(knockRaw * 0.5f);
-        // Low thud of the cylinders through the block and mounts.
+
+        // The low thud of the cylinders reaching the air through the block and the mounts — and it
+        // used to be most of what a block radiated, which had the diesels backwards.
+        //
+        // Measured, a truck six's block came out 94 per cent below 200 Hz with 1.7 per cent between
+        // 800 Hz and 2.5 kHz. That is not what a big diesel sounds like: injector knock and
+        // valvetrain clatter live between about 500 Hz and 4 kHz and they are the whole of what makes
+        // one recognisable AS a diesel. Heard on the track it was a formless low roar with no engine
+        // in it — the listener's words were "loud white noise ... I expected to hear more of the
+        // engine", and the arithmetic agreed with him.
+        //
+        // The two paths are not alike and should not have been scaled alike. The thud is
+        // STRUCTURE-BORNE: cylinder pressure into the block, through rubber mounts, into a chassis,
+        // and every one of those junctions is a mismatch that reflects most of the energy back. The
+        // knock and the clatter radiate straight off the block's own surfaces into the air. Weighting
+        // the indirect path above the direct one is what buried the engine.
         float bl = OnePole.AlphaFor(180f, _rate);
         _blockLp += bl * (blockLow - _blockLp);
-        float thud = _blockLp * 2.5e-7f;
-        float mech = _click.Process() * e.Mechanical.ValvetrainLevel * (0.6f + 0.4f * MathF.Min(1f, rpm / 3000f));
+        float thud = _blockLp * 5.0e-8f;
+        float mech = _click.Process() * e.Mechanical.ValvetrainLevel * 3.0f
+                   * (0.6f + 0.4f * MathF.Min(1f, rpm / 3000f));
         float whine = 0f;
         var m = e.Mechanical;
         if (m.AccessoryWhineLevel > 0f && _omega > 1f)
@@ -683,7 +699,10 @@ public sealed class EngineSynth
             float n = (float)(_rng.NextDouble() * 2 - 1);
             _turboNoiseLp += 0.08f * (n - _turboNoiseLp);
             whine += ((float)Math.Sin(_turboPhase * 2 * Math.PI) * 0.4f + _turboNoiseLp * 2.5f)
-                   * m.TurboWhistleLevel * 0.09f * _spool * _spool;
+                   // A big truck turbo is not a detail you strain for: at 2.2 bar it is the loudest
+                   // single thing about the engine on the way out of a corner. It was rendering
+                   // about fifteen decibels under the block's thud, which is inaudible beside it.
+                   * m.TurboWhistleLevel * 0.28f * _spool * _spool;
         }
         Block = knockOut + thud + mech + whine;
     }
