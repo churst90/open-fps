@@ -282,7 +282,7 @@ public sealed class VehicleSystem
         var line = v.Line!;
         float lookahead = MathF.Max(8f, v.Speed * v.Speed / (2f * v.Brake));
         line.Sample(v.Lap + lookahead, out _, out _, out float ahead);
-        line.Sample(v.Lap, out Vector3 here, out float heading, out float now);
+        line.Sample(v.Lap, out Vector3 here, out float heading, out float now, out float cornerLimit);
         float want = MathF.Min(now, ahead);
 
         float wasSpeed = v.Speed;
@@ -299,7 +299,13 @@ public sealed class VehicleSystem
         // LONGITUDINALLY it is whatever acceleration or braking is actually being applied against the
         // same grip. The two combine in quadrature, because a tyre has one contact patch and cornering
         // and braking come out of the same friction circle.
-        float latFraction = now > 0.5f ? (v.Speed / now) * (v.Speed / now) : 0f;
+        // Against the CORNERING limit, not the speed limit. The speed limit is the top speed on a
+        // straight and whatever the braking pass allows into a turn, so measuring against it reported
+        // a car flat out down the back straight as being at the limit of its grip — which is how
+        // "they're all screeching" survived the first attempt at this.
+        float latFraction = float.IsInfinity(cornerLimit) || cornerLimit < 0.5f
+            ? 0f
+            : (v.Speed / cornerLimit) * (v.Speed / cornerLimit);
         float longFraction = v.Grip > 0.01f ? MathF.Abs(v.Speed - wasSpeed) / MathF.Max(1e-4f, dt) / (v.Grip * 9.81f) : 0f;
         v.TyreDemand = MathF.Min(2f, MathF.Sqrt(latFraction * latFraction + longFraction * longFraction));
 

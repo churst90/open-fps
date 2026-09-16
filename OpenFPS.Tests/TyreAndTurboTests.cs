@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Numerics;
 using OpenFPS.Common;
 using Xunit;
 
@@ -280,5 +282,50 @@ public class TyreAndTurboTests
             TyreDemand = OpenFPS.Common.Networking.EntityState.EncodeTyreDemand(fraction),
         };
         Assert.Equal(fraction, state.TyreDemandFraction, 2);
+    }
+
+    /// <summary>
+    /// A car flat out down a STRAIGHT is not using its cornering grip, and a car on its line through
+    /// a turn is using all of it.
+    ///
+    /// The first attempt at the banked-corner fix measured demand against the racing line's SPEED
+    /// limit, and those are different questions. The speed limit is the car's top speed on a straight
+    /// and whatever the braking pass allows into a turn, so a car doing its top speed in a straight
+    /// line came out at a demand of 1.0 — squealing all the way down the back straight. Reported, in
+    /// the plainest possible terms, as "why are they all screeching".
+    /// </summary>
+    [Fact]
+    public void AStraightAsksNothingOfTheTyresAndACornerAsksEverything()
+    {
+        // A 400 m oval: two 100 m straights joined by two half-circles of 63.66 m radius.
+        var centreline = new List<Vector3>();
+        for (int i = 0; i < 40; i++) centreline.Add(new Vector3(0, 0, i * 2.5f));           // straight
+        for (int i = 0; i <= 20; i++)
+        {
+            float a = MathF.PI * i / 20f;
+            centreline.Add(new Vector3(63.66f * (1 - MathF.Cos(a)), 0, 100f + 63.66f * MathF.Sin(a)));
+        }
+        for (int i = 0; i < 40; i++) centreline.Add(new Vector3(127.32f, 0, 100f - i * 2.5f));
+        for (int i = 0; i <= 20; i++)
+        {
+            float a = MathF.PI * i / 20f;
+            centreline.Add(new Vector3(63.66f * (1 + MathF.Cos(a)), 0, -63.66f * MathF.Sin(a)));
+        }
+
+        var line = new RaceLine(centreline, 0f, topSpeed: 80f, corneringG: 1.2f,
+                                brake: 8f, bankingDegrees: 0f);
+
+        bool sawStraight = false, sawCorner = false;
+        for (float d = 0; d < line.Length; d += line.Length / 200f)
+        {
+            line.Sample(d, out _, out _, out float speedLimit, out float corner);
+            if (float.IsInfinity(corner)) { sawStraight = true; continue; }
+
+            // In a corner the two agree, because there the grip IS what limits the speed.
+            if (corner < 79f) { sawCorner = true; Assert.True(corner > 5f, $"absurd corner limit {corner}"); }
+        }
+
+        Assert.True(sawStraight, "an oval with two straights should have somewhere asking nothing of the tyres");
+        Assert.True(sawCorner, "...and somewhere that does");
     }
 }

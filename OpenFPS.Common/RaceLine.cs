@@ -56,6 +56,16 @@ public sealed class RaceLine
 
     private readonly Vector3[] _points;        // the line itself, evenly spaced, closed
     private readonly float[] _limit;           // m/s allowed at each node
+    /// <summary>The GRIP-limited speed at each node, uncapped by the car's top speed and untouched by
+    /// the braking pass — infinite on a straight, where nothing but drag holds the car back.
+    ///
+    /// Kept apart from <see cref="_limit"/> because they answer different questions and conflating
+    /// them put every car on the circuit permanently on the edge of a slide. `_limit` is "how fast
+    /// may this car go here", which on a straight is its top speed and into a corner is whatever the
+    /// braking pass allows. This is "how fast could its TYRES hold it here", which is the only one of
+    /// the two that says anything about the tyres. A car flat out on a straight is using none of its
+    /// cornering grip, and a formula that cannot tell those apart reports it as sliding.</summary>
+    private readonly float[] _corner;
     private readonly float[] _heading;         // radians, the way the line points at each node
     private readonly float _spacing;           // actual node spacing, metres
 
@@ -80,6 +90,7 @@ public sealed class RaceLine
         _points = new Vector3[n];
         _heading = new float[n];
         _limit = new float[n];
+        _corner = new float[n];
 
         // Offset sideways onto this car's line. The normal is the tangent turned 90 degrees in the
         // ground plane, so a positive offset is to the car's right.
@@ -102,8 +113,12 @@ public sealed class RaceLine
             // them. A straight gives an infinite radius and therefore no limit at all.
             int span = Math.Clamp(CurvatureSpan, 1, Math.Max(1, n / 3));
             float radius = Radius(_points[(i - span + n) % n], _points[i], _points[(i + span) % n]);
-            float grip = float.IsInfinity(radius) ? topSpeed : CorneringSpeed(radius, corneringG, bankingDegrees);
-            _limit[i] = MathF.Min(topSpeed, grip);
+            // A straight has no cornering limit at all — not "the top speed", which is what it used
+            // to be recorded as and which made a car doing its top speed in a straight line read as
+            // though it were at the limit of its grip.
+            _corner[i] = float.IsInfinity(radius) ? float.PositiveInfinity
+                                                  : CorneringSpeed(radius, corneringG, bankingDegrees);
+            _limit[i] = MathF.Min(topSpeed, float.IsInfinity(radius) ? topSpeed : _corner[i]);
         }
 
         // Braking, backwards, twice round — the second lap carries the wrap-around back to the start.
@@ -140,6 +155,33 @@ public sealed class RaceLine
         position = Vector3.Lerp(_points[i], _points[j], f);
         heading = LerpAngle(_heading[i], _heading[j], f);
         speedLimit = _limit[i] + (_limit[j] - _limit[i]) * f;
+    }
+
+    /// <summary>
+    /// As <see cref="Sample(float, out Vector3, out float, out float)"/>, and also how fast this car's
+    /// TYRES could hold it here — which is not the same question as how fast it may go.
+    ///
+    /// Infinite on a straight. The ratio of the actual speed to this is what says how hard the tyres
+    /// are working laterally, and it is exact rather than approximate: the cornering limit is where
+    /// lateral acceleration equals available grip, and acceleration is v²/R either way, so the ratio
+    /// of accelerations is the square of the ratio of speeds.
+    /// </summary>
+    public void Sample(float distance, out Vector3 position, out float heading, out float speedLimit,
+                       out float corneringLimit)
+    {
+        Sample(distance, out position, out heading, out speedLimit);
+
+        float s = distance % Length;
+        if (s < 0f) s += Length;
+        int n = _points.Length;
+        int i = Math.Clamp((int)(s / _spacing), 0, n - 1);
+        float f = Math.Clamp(s / _spacing - i, 0f, 1f);
+        int j = (i + 1) % n;
+
+        // Straights are infinite, so interpolating between a finite node and an infinite one has to
+        // take the finite answer rather than produce a NaN.
+        float a = _corner[i], b = _corner[j];
+        corneringLimit = float.IsInfinity(a) ? b : float.IsInfinity(b) ? a : a + (b - a) * f;
     }
 
     /// <summary>Rounds the joins out of a closed polyline: each point moved a quarter of the way
