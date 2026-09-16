@@ -1410,6 +1410,43 @@ public sealed record EngineProfile
         // total area — 145 mm. Sized as a single 46 the engine strangles above 12,000 and the
         // manifold never reaches atmosphere at full throttle, which is audible as a V10 that will
         // not pull to the limiter.
+        // WHERE THIS ENGINE'S MISSING BODY IS, and why the obvious fix does not work.
+        //
+        // Reported as "it sounds like a siren, very high-end heavy, no real body or substance", and
+        // measured on a drive render it is exactly that: 90 per cent of the exhaust energy in the
+        // 0.8-2.5 kHz band and LITERALLY NOTHING below 200 Hz.
+        //
+        // Some of that is structural and correct. A V10 at 15,500 rpm fires 1,292 times a second, so
+        // its fundamental is at 1.3 kHz and the exhaust has nothing lower to make. It genuinely does
+        // scream, and no amount of tuning should stop it.
+        //
+        // The obvious candidate was tried and REJECTED, which is worth recording. A formula car
+        // breathes through a 26-litre airbox on a 0.8 m snorkel, and that geometry is a Helmholtz
+        // resonator at about fifty hertz — the lowest thing on the whole car by an order of
+        // magnitude. Its intake renders twenty decibels under the exhaust, so raising it looked like
+        // the answer. It is not: measured, the intake is itself 96 per cent inside 0.8-2.5 kHz and
+        // has 0.0 per cent below 200 Hz, so turning it up adds MORE SIREN and no body at all.
+        //
+        // The fault is therefore upstream of any level: the airbox is described in the spec and is
+        // not producing its resonance. That is where the next session should look — see the notes.
+        //
+        // Measured on a drive render, this engine put 90 per cent of its exhaust energy into the
+        // 0.8-2.5 kHz band and had literally nothing below 200 Hz, which is why it was described as a
+        // siren with no beef in it. Some of that is structural and correct — a V10 at 15,500 rpm
+        // fires 1,292 times a second, so its FUNDAMENTAL is at 1.3 kHz, and there is nothing lower
+        // for the exhaust to make. It genuinely does scream.
+        //
+        // But two sources that should be filling in underneath it were not.
+        //
+        // THE AIRBOX. A formula car breathes through a 26-litre box on a 0.8 m snorkel over the
+        // driver's head, and that is a Helmholtz resonator around fifty hertz — the lowest thing on
+        // the car by an order of magnitude. Its intake was rendering twenty decibels under the
+        // exhaust, where on a real one the airbox is comparable to it and is most of what people
+        // recognise. (On a road car twenty down is right; on this it is not.)
+        //
+        // THE VALVETRAIN. Forty valves opening and closing 129 times a second EACH at 15,500 rpm is
+        // an enormous amount of metal hitting metal, and the block was rendering 41 dB under the
+        // exhaust — inaudible. A racing engine is mechanically far noisier than a road one, not less.
         Intake = new IntakeSpec { RunnerLengthMetres = 0.11f, RunnerDiameterMm = 50f, PlenumLitres = 3f, ThrottleDiameterMm = 145f, AirboxLitres = 26f, SnorkelLengthMetres = 0.8f, SnorkelDiameterMm = 150f, Level = 1f, Absorption = 0.08f },
         Mechanical = new MechanicalSpec { ValvetrainLevel = 0.9f, CombustionKnock = 0.02f, AccessoryWhineOrder = 22f, AccessoryWhineLevel = 0.18f },
     };

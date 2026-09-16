@@ -53,7 +53,7 @@ public static class Applause
 
     /// <summary>How much of the crack rides on top of the body. The edge is what says "hands" — at
     /// zero the whole thing rustles.</summary>
-    public const float CrackLevel = 0.85f;
+    public const float CrackLevel = 1.35f;
 
     /// <summary>What the rendered buffer is scaled to, as RMS. Well under full scale, because the
     /// coincidences in a dense crowd need somewhere to go.</summary>
@@ -148,19 +148,36 @@ public static class Applause
 
     private static Clapper NewClapper(Random rng, float intensity)
     {
-        // 900 Hz is a deeply cupped hand, 3300 a flat-palmed crack, and a crowd spans the range.
-        float cavityHz = (900f + (float)rng.NextDouble() * 2400f) * (1f + 0.3f * intensity);
+        // HAND SIZE, and everything about the clap follows from it.
+        //
+        // A crowd is not one kind of person. Children, women and men have palms that differ by most
+        // of a factor of two across their span, and that single number moves the sound in two ways at
+        // once — which is why drawing a frequency and a loudness independently, as this did at first,
+        // came out thin. Big hands trap a bigger pocket of air, and a bigger cavity resonates LOWER;
+        // big hands also present more AREA, and area is what radiates, so they are louder as well.
+        // Deeper and louder together, which is what a listener means by meaty.
+        //
+        // 0.7 is a small child, 1.0 an average adult, 1.35 a large man. Skewed toward adults,
+        // because a grandstand mostly is.
+        float size = 0.7f + (float)Math.Pow(rng.NextDouble(), 0.7) * 0.65f;
 
-        // How far away they are. People fill an AREA, so the number of them at a given distance grows
-        // with that distance while the level falls as 1/r — which leaves a few near ones much louder
-        // than the wash behind them. That spread is most of what makes a crowd sound like people
-        // rather than like a texture: without it every clap is the same size. Area-weighted, hence
-        // the square root.
+        // A cavity's note goes inversely with its linear size. About 800 Hz for an average adult;
+        // a big pair of hands lands nearer 600, a child's nearer 1,150. Settled by ear over three
+        // passes — the first estimate put it at 2,200, an octave and a half up, which read as thin
+        // and papery rather than as hands. Hands are bigger and softer than they sound like they are.
+        float cavityHz = 800f / size * (0.85f + 0.3f * (float)rng.NextDouble());
+        cavityHz *= 1f + 0.25f * intensity;          // harder clapping is brighter as well as louder
+
+        // ...and how far away they are. People fill an AREA, so the number of them at a given
+        // distance grows with it while the level falls as 1/r — which leaves a few near ones much
+        // louder than the wash behind them. Without that spread every clap is the same size and the
+        // sum is a texture rather than a room. Area-weighted, hence the square root.
         float near = 1.5f;
         float distance = near + MathF.Sqrt((float)rng.NextDouble()) * 28f;
 
-        // ...and people do not clap equally hard either, on top of where they are sitting.
-        float loudness = MathF.Pow(10f, (float)(rng.NextDouble() * 10.0 - 5.0) / 20f);
+        // Loudness goes with the radiating AREA, so with the square of the size — and on top of that
+        // people simply do not clap equally hard.
+        float loudness = size * size * MathF.Pow(10f, (float)(rng.NextDouble() * 10.0 - 5.0) / 20f);
 
         return new Clapper(cavityHz, near / distance, loudness);
     }
@@ -190,7 +207,12 @@ public static class Applause
         // couple of milliseconds after it, as the trapped air escapes and the hands rebound, is the
         // body. Separating them lets the crack stay sharp and broadband while the body carries the
         // colour, instead of one filter having to do both and softening the edge to do it.
-        float crackTau = 0.00025f + (float)rng.NextDouble() * 0.00035f;   // 0.25-0.6 ms
+        // Longer and wider than it was. At a quarter of a millisecond through a 9 kHz low-pass the
+        // crack was all edge and no weight — thin, and the listener said so. A real clap's edge has
+        // BODY under it, because the surfaces meeting are hands rather than sticks, and the bigger
+        // the hands the lower that edge reaches. Tied to the cavity, so a big pair of palms cracks
+        // deeper as well as louder.
+        float crackTau = 0.0005f + (float)rng.NextDouble() * 0.0009f;      // 0.5-1.4 ms
         float bodyTau = 0.0015f + (float)rng.NextDouble() * 0.0025f;      // 1.5-4 ms
 
         int len = Math.Min((int)(bodyTau * 6f * sampleRate), into.Length - at);
@@ -198,9 +220,15 @@ public static class Applause
 
         // The body is band-limited by the air pocket. The crack is barely filtered at all, because a
         // step has energy everywhere and filtering it is what took the edge off.
-        float bodyLp = Alpha(who.CavityHz * 1.7f, sampleRate);
-        float crackLp = Alpha(9000f, sampleRate);
-        float hpA = Alpha(320f, sampleRate);
+        // A WIDE band, not a narrow one. The pocket of air between two palms is a poor resonator —
+        // soft, leaky walls and an opening most of its own size — so it tilts a broad spectrum rather
+        // than picking a note out of it. Two and a half octaves wide here, and the narrower it was
+        // made the more the whole crowd sounded like one thing rather than like many.
+        float bodyLp = Alpha(who.CavityHz * 2.8f, sampleRate);
+        float crackLp = Alpha(7000f, sampleRate);
+        // The crack's own high-pass follows the hand: big palms crack down into the low hundreds,
+        // small ones do not. It is the same size that set the cavity.
+        float hpA = Alpha(90f + who.CavityHz * 0.06f, sampleRate);
 
         float lp = 0f, hp = 0f, clp = 0f;
         float bodyDecay = MathF.Exp(-1f / (bodyTau * sampleRate));

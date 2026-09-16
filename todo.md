@@ -2072,3 +2072,58 @@ exhaust was **76.5 % below 200 Hz with half a per cent between 800 Hz and 2.5 kH
 - [x] `OverrunPopRate` 6 -> 16, which is the "popping" literally.
 - [x] Result: **17.6 / 37.5 / 38.2 / 6.7**, against 76.5 / 22.9 / 0.5 / 0.1. The sports bike got the
       same treatment less severely (0 / 75.7 / 21.2 / 3.1 from 0 / 92.7 / 6.9 / 0.3).
+
+## Listening session, 40 cars (2026-09-16) — what is right, what is not
+
+**Confirmed fixed by ear:** cars no longer stop dead at close range. Wall reflections off the
+retaining wall are clearly audible and read as coming from the wall. A listener standing at
+(-19.3, 0, -172) looking 45 degrees into the oncoming cars is the best perspective on the map so far
+— worth keeping as the reference position for any future listening test.
+
+### 1. "Their engine rpm sounds like they're just driving at a comfortable rpm"
+
+NOT a gearing fault — the stock car is at 9,128 rpm against a 9,200 redline at 300 km/h, and the
+formula cars read as flying, correctly. So the arithmetic is right and the PERCEPTION is not, which
+points at the voice rather than the car. Two suspects, in order:
+
+- [ ] **The borrowed distant engine voice** (already open, from session 7). A car beyond the synthesis
+      budget reads another car's ring, inheriting THAT car's Doppler and then applying its own. With
+      forty cars far more of the field is borrowing than at thirty, so this is worse than it was. It
+      is the single best explanation for "technically at the redline, sounds like cruising", because
+      a borrowed voice's pitch movement belongs to a different car.
+- [ ] Failing that: `OPENFPS_AUDIO_TRACE=<entityId>` prints the Doppler factor per update at 250 Hz.
+      A car passing at 70 m/s should swing between about 1.25 and 0.83. If it does not, the pass is
+      not being rendered at the speed it is happening.
+
+### 2. "Sound comes into view, fades out, then I hear them flying up as they approach"
+
+- [ ] Reported on the F1 most clearly. Wind up, cut out, fade back in on the pass. The listener's own
+      guess — that the first part is the REFLECTION of an approaching car and the direct sound arrives
+      later — is plausible and would be correct behaviour heard as a fault. But a voice that "cuts
+      out" is also exactly what a budget eviction sounds like, and forty cars is past anything the
+      budget has been measured at. Check `EngineVoiceBudget` churn in the log before assuming it is
+      the reflections.
+
+### 3. Occasional pops at certain listening angles
+
+- [ ] Rare, angle-dependent. Candidate: reflections arriving coincidentally and summing — the
+      `AudibilityFloor` ranks candidate reflections each frame, so a set flipping in and out at a
+      particular geometry would click. `--speedway speedway probe` prints what bounces off what.
+
+### 4. The F1 sounds like a siren — DIAGNOSED, not fixed
+
+- [x] Measured on a drive render: **90 % of the exhaust energy in 0.8-2.5 kHz and 0.0 % below 200 Hz.**
+      Part of that is structural and correct: a V10 at 15,500 rpm fires 1,292 times a second, so its
+      fundamental is at 1.3 kHz and the exhaust has nothing lower to make. It should scream.
+- [x] **The obvious fix was tried and rejected.** A formula car breathes through a 26-litre airbox on
+      a 0.8 m snorkel — a Helmholtz resonator at about fifty hertz, the lowest thing on the car by an
+      order of magnitude — and its intake renders 20 dB under the exhaust, so raising it looked like
+      the answer. It is not: the intake is itself **96 % inside 0.8-2.5 kHz with 0.0 % below 200 Hz**,
+      so turning it up adds more siren and no body. Reverted; the reasoning is in the preset.
+- [ ] **So the airbox is described in the spec and is not producing its resonance.** That is upstream
+      of any level and it is where to look next. Check whether `IntakeNetwork` models `AirboxLitres` /
+      `SnorkelLengthMetres` as a Helmholtz volume at all, or only as another pipe. If a 26-litre box
+      on a 0.8 m snorkel does not put a peak near 50 Hz, nothing else will give this engine a bottom.
+- [ ] Also worth checking once the airbox works: the block is **41 dB under the exhaust**. Forty
+      valves closing 129 times a second each is an enormous amount of metal, and a racing engine is
+      mechanically NOISIER than a road one, not quieter.

@@ -91,8 +91,13 @@ public class ApplauseTests
         var buf = Applause.Render(new CrowdApplause(300, 0.7f, 2f), Sr, 5);
         var bands = VehicleBody.Bands(buf, Sr);
 
-        Assert.True(bands.Low < 0.25f, $"{bands.Low:P0} of a crowd's energy was below 200 Hz");
-        Assert.True(bands.Mid + bands.High > 0.7f, "a clap lives between a few hundred hertz and a few kilohertz");
+        // The threshold moved once, deliberately, and it is worth saying why rather than quietly
+        // widening it. The clap's cavity was first estimated at 2,200 Hz and settled by ear at 800 —
+        // hands are bigger and softer than they sound like they are — so a third of the energy now
+        // sits under 200 Hz and that is correct. What this still catches is the failure it was
+        // written for: a crowd that is MOSTLY rumble, with no hands in it at all.
+        Assert.True(bands.Low < 0.45f, $"{bands.Low:P0} of a crowd's energy was below 200 Hz");
+        Assert.True(bands.Mid + bands.High > 0.5f, "a clap lives between a few hundred hertz and a few kilohertz");
     }
 
     [Theory]
