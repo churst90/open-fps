@@ -661,3 +661,36 @@ public partial struct HeldComponent
     public bool BothHands { get; set; }
     public HeldComponent() { HolderEntityId = -1; }
 }
+
+/// <summary>
+/// People, in a place, who react to what happens in front of them.
+///
+/// A crowd is not scenery and it is not an ambience bed. It is a source with a POSITION and a SIZE,
+/// and both of those are information: where the noise comes from tells a listener which way the
+/// grandstand is, and how loud it is tells them how many are in it. Independent sources sum in
+/// power, so a crowd twice the size is three decibels louder and not twice as loud — see
+/// <see cref="Applause"/>, which is why this carries a head count rather than a volume.
+///
+/// It reacts rather than loops. A loop of applause is audibly a loop within seconds, and a crowd
+/// that loops is the clearest possible signal that a place is not real.
+/// </summary>
+[MemoryPackable]
+public partial struct CrowdComponent
+{
+    /// <summary>How many people. Decides the level, through a ten-log and not a twenty-log.</summary>
+    public int People { get; set; }
+
+    /// <summary>How close something has to come before they react to it, metres.</summary>
+    public float ReactRadiusMetres { get; set; }
+
+    /// <summary>Seconds before they will react again, so a field of thirty cars is one reaction and
+    /// not thirty.</summary>
+    public float CooldownSeconds { get; set; }
+
+    public CrowdComponent()
+    {
+        People = 200;
+        ReactRadiusMetres = 60f;
+        CooldownSeconds = 6f;
+    }
+}

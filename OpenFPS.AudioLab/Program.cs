@@ -234,6 +234,13 @@ if (args.Contains("--engine-jumps"))
     Log.CloseAndFlush();
     Environment.Exit(jcode);
 }
+if (args.Contains("--applause"))
+{
+    // --applause [people=] [intensity=] [sec=] [out=DIR]: a crowd, on its own.
+    int acode = OpenFPS.Client.Core.AudioEngine.Fmod.ApplauseSpike.Run(args);
+    Log.CloseAndFlush();
+    Environment.Exit(acode);
+}
 if (args.Contains("--body-ir"))
 {
     // --body-ir [preset ...] [out=DIR] [sec=..]: the CAR, with no engine in it — its impulse

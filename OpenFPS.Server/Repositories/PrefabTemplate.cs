@@ -70,6 +70,15 @@ public class PrefabTemplate
     /// <summary>Spawns a HealthComponent at full health. Omit for something that cannot be damaged.</summary>
     public int? MaxHealth { get; set; }
 
+    /// <summary>Spawns a <see cref="CrowdComponent"/>: how many people are here. Omit for anything
+    /// that is not a crowd. Their level follows from the count — a crowd twice the size is three
+    /// decibels louder, because independent sources add in power.</summary>
+    public int? CrowdPeople { get; set; }
+
+    /// <summary>How close something must come before the crowd reacts, metres. Only meaningful with
+    /// <see cref="CrowdPeople"/>.</summary>
+    public float? CrowdReactRadiusMetres { get; set; }
+
     /// <summary>Declares this an item: something that can be picked up, carried and put down. Must
     /// agree with <see cref="Type"/> = Item.</summary>
     public bool IsItem { get; set; }

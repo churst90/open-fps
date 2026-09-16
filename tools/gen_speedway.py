@@ -235,6 +235,15 @@ for i in range(GS_BLOCKS):
     }); eid += 1
     # The upper tier's back wall: the big flat concrete face that answers every car on the straight.
     entities.append(wall(eid, cx, UPPER_BASE, UPPER_Z, blk + 0.5, UPPER_H, 1.5, 1.0, 0.0)); eid += 1
+    # ...and the people in it. One crowd per block, standing ON the deck, so the applause comes from
+    # a row of places along the straight rather than from a single point — a stand you can hear the
+    # width of. They are sources with a position and a head count, not a bed: silent until something
+    # goes past, and their level follows from the count, because independent sources add in POWER and
+    # a crowd twice the size is three decibels louder rather than twice as loud.
+    entities.append({
+        "EntityId": eid, "PrefabId": "crowd",
+        "Position": v3(cx, GS_TOP + 1.5, (GS_FRONT + GS_BACK) / 2),
+    }); eid += 1
 
 # ── Infield grass ────────────────────────────────────────────────────────────────────────────────
 # The ground everywhere else is the concrete foundation MapManager injects when a map has none, which

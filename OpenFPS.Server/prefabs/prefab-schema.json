@@ -101,6 +101,16 @@
       "minimum": 1,
       "description": "Spawns a HealthComponent at full health."
     },
+    "CrowdPeople": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Spawns a CrowdComponent: how many people are here. Their level follows from the count, because independent sources add in power - a crowd twice the size is three decibels louder, not twice as loud. Silent until something goes past."
+    },
+    "CrowdReactRadiusMetres": {
+      "type": "number",
+      "minimum": 1,
+      "description": "How close something must come before the crowd reacts, metres. Only meaningful with CrowdPeople."
+    },
     "IsItem": {
       "type": "boolean",
       "description": "Declares this an item: something that can be picked up, carried and put down. Must agree with Type = Item."

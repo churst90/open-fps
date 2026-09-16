@@ -1970,3 +1970,45 @@ a FULL SLIDE continuously.
 
 - [ ] Ear-check: the corners should now SING rather than hiss, and the hiss should appear only where
       a car is genuinely over the limit — the pace car being caught, a truck braking too late.
+
+## A crowd that reacts (2026-09-15)
+
+The one sound in a stadium that needs no recording, and the granular/stochastic case's first real
+caller. A clap is two flat surfaces meeting — an impact — and a crowd is a Poisson-ish field of them.
+
+- [x] `Applause` in Common: renders a crowd from a head count, an intensity and a duration.
+- [x] `CrowdComponent` + `CrowdSystem` + a `crowd` prefab. A source with a PLACE and a SIZE, not a
+      bed: silent until something goes past. Twelve of them along the grandstand deck, so the stand
+      has width. It reacts to anything moving fast enough close enough — it does not know what a car
+      is, so whatever goes on the track next gets a reaction for free.
+- [x] Level is a TEN-log of the head count, not a twenty: independent sources add in power, so twice
+      the crowd is three decibels. That is also why it is affordable — past a few hundred simultaneous
+      clappers the sum is statistically noise, so 320 are rendered and the rest are accounted for by
+      that square root. The budget IS the physics.
+- [x] Routed through `TransientSound.SynthKey` — "applause:400:0.55:3" — the same escape hatch a
+      gunshot uses, for the same reason: four characters cannot describe a thousand people.
+- [x] `--applause [people= intensity= sec=]`, `ApplauseTests`. Tests 557 -> 567.
+
+**Two listening verdicts, two real faults, and they are worth keeping:**
+
+- [x] **"They all sound like pouring water."** The first clap was a short noise burst through a sharp
+      resonator — which is an excellent model of a WATER DROPLET, because a drip is exactly a brief
+      narrowband resonance. A clap is the opposite: two broad flat surfaces meet and stop, radiating
+      two or three milliseconds of BROADBAND burst. The trapped air colours it rather than sustaining
+      it, so the cavity became a tilt across a wide band instead of a note.
+- [x] **"Crackling static."** The arrivals were one Poisson process for the whole crowd, and a
+      Poisson process is MEMORYLESS — it has no rhythm by construction, and dense identical
+      memoryless clicks is the definition of static. Real applause is not memoryless, because a person
+      has a TEMPO: they keep roughly to it, drift off it, and no two share one. Each rendered clapper
+      now keeps an identity for the whole burst — where they are sitting, what their hands sound like,
+      how fast they clap and where in their own cycle they are — and the sum of a few hundred slightly
+      different quasi-periodic trains has structure a listener can pick individuals out of.
+- [x] Also added on the second pass: people fill an AREA, so the count at a given distance grows with
+      it while the level falls as 1/r. A few near ones are much louder than the wash behind them, and
+      without that spread every clap is the same size and the sum is a texture rather than a room.
+
+- [ ] Cheers, gasps and boos need voices and cannot be synthesized. Babble needs 8-12 takes of
+      ordinary conversation — see `docs/SOUND_INVENTORY.md`.
+- [ ] The crowd should feed the same reflection path the cars do: the grandstand is a big hard
+      surface, and a cheer arriving off the deck a beat after the direct sound is most of what makes
+      a stand sound occupied.

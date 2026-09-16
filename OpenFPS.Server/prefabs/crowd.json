@@ -1,0 +1,9 @@
+{
+  "Id": "crowd",
+  "Name": "Crowd",
+  "Description": "People in a stand, who react to what goes past them. Not an ambience bed: a source with a place and a head count, silent until something happens.",
+  "Material": "Generic",
+  "Type": "Trigger",
+  "CrowdPeople": 400,
+  "CrowdReactRadiusMetres": 70
+}

@@ -191,6 +191,15 @@ public class PrefabRepository
         {
             components.Add(new HealthComponent { Current = t.MaxHealth.Value, Max = t.MaxHealth.Value });
         }
+        if (t.CrowdPeople.HasValue)
+        {
+            components.Add(new CrowdComponent
+            {
+                People = Math.Max(1, t.CrowdPeople.Value),
+                ReactRadiusMetres = t.CrowdReactRadiusMetres ?? 60f,
+                CooldownSeconds = 6f,
+            });
+        }
 
         int finalFaceMask = t.FaceMask ?? 63;
         if (t.MissingFaces != null)

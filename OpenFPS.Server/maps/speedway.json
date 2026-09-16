@@ -2934,20 +2934,29 @@
   },
   {
    "EntityId": 1079,
-   "PrefabId": "building_box",
+   "PrefabId": "crowd",
    "Position": {
-    "X": -180.0,
-    "Y": 6.0,
+    "X": -220.0,
+    "Y": 13.5,
     "Z": -218.181
-   },
-   "Scale": {
-    "X": 4.0,
-    "Y": 2.4,
-    "Z": 1.6
    }
   },
   {
    "EntityId": 1080,
+   "PrefabId": "building_box",
+   "Position": {
+    "X": -180.0,
+    "Y": 6.0,
+    "Z": -218.181
+   },
+   "Scale": {
+    "X": 4.0,
+    "Y": 2.4,
+    "Z": 1.6
+   }
+  },
+  {
+   "EntityId": 1081,
    "PrefabId": "concrete_wall",
    "Position": {
     "X": -180.0,
@@ -2967,44 +2976,19 @@
    }
   },
   {
-   "EntityId": 1081,
-   "PrefabId": "building_box",
-   "Position": {
-    "X": -140.0,
-    "Y": 6.0,
-    "Z": -218.181
-   },
-   "Scale": {
-    "X": 4.0,
-    "Y": 2.4,
-    "Z": 1.6
-   }
-  },
-  {
    "EntityId": 1082,
-   "PrefabId": "concrete_wall",
+   "PrefabId": "crowd",
    "Position": {
-    "X": -140.0,
-    "Y": 18.0,
-    "Z": -228.181
-   },
-   "Rotation": {
-    "X": 0.0,
-    "Y": -0.0,
-    "Z": 0.0,
-    "W": 1.0
-   },
-   "Scale": {
-    "X": 20.25,
-    "Y": 12.0,
-    "Z": 3.0
+    "X": -180.0,
+    "Y": 13.5,
+    "Z": -218.181
    }
   },
   {
    "EntityId": 1083,
    "PrefabId": "building_box",
    "Position": {
-    "X": -100.0,
+    "X": -140.0,
     "Y": 6.0,
     "Z": -218.181
    },
@@ -3018,7 +3002,7 @@
    "EntityId": 1084,
    "PrefabId": "concrete_wall",
    "Position": {
-    "X": -100.0,
+    "X": -140.0,
     "Y": 18.0,
     "Z": -228.181
    },
@@ -3036,43 +3020,18 @@
   },
   {
    "EntityId": 1085,
-   "PrefabId": "building_box",
+   "PrefabId": "crowd",
    "Position": {
-    "X": -60.0,
-    "Y": 6.0,
+    "X": -140.0,
+    "Y": 13.5,
     "Z": -218.181
-   },
-   "Scale": {
-    "X": 4.0,
-    "Y": 2.4,
-    "Z": 1.6
    }
   },
   {
    "EntityId": 1086,
-   "PrefabId": "concrete_wall",
-   "Position": {
-    "X": -60.0,
-    "Y": 18.0,
-    "Z": -228.181
-   },
-   "Rotation": {
-    "X": 0.0,
-    "Y": -0.0,
-    "Z": 0.0,
-    "W": 1.0
-   },
-   "Scale": {
-    "X": 20.25,
-    "Y": 12.0,
-    "Z": 3.0
-   }
-  },
-  {
-   "EntityId": 1087,
    "PrefabId": "building_box",
    "Position": {
-    "X": -20.0,
+    "X": -100.0,
     "Y": 6.0,
     "Z": -218.181
    },
@@ -3083,10 +3042,10 @@
    }
   },
   {
-   "EntityId": 1088,
+   "EntityId": 1087,
    "PrefabId": "concrete_wall",
    "Position": {
-    "X": -20.0,
+    "X": -100.0,
     "Y": 18.0,
     "Z": -228.181
    },
@@ -3100,13 +3059,22 @@
     "X": 20.25,
     "Y": 12.0,
     "Z": 3.0
+   }
+  },
+  {
+   "EntityId": 1088,
+   "PrefabId": "crowd",
+   "Position": {
+    "X": -100.0,
+    "Y": 13.5,
+    "Z": -218.181
    }
   },
   {
    "EntityId": 1089,
    "PrefabId": "building_box",
    "Position": {
-    "X": 20.0,
+    "X": -60.0,
     "Y": 6.0,
     "Z": -218.181
    },
@@ -3120,7 +3088,7 @@
    "EntityId": 1090,
    "PrefabId": "concrete_wall",
    "Position": {
-    "X": 20.0,
+    "X": -60.0,
     "Y": 18.0,
     "Z": -228.181
    },
@@ -3138,43 +3106,18 @@
   },
   {
    "EntityId": 1091,
-   "PrefabId": "building_box",
+   "PrefabId": "crowd",
    "Position": {
-    "X": 60.0,
-    "Y": 6.0,
+    "X": -60.0,
+    "Y": 13.5,
     "Z": -218.181
-   },
-   "Scale": {
-    "X": 4.0,
-    "Y": 2.4,
-    "Z": 1.6
    }
   },
   {
    "EntityId": 1092,
-   "PrefabId": "concrete_wall",
-   "Position": {
-    "X": 60.0,
-    "Y": 18.0,
-    "Z": -228.181
-   },
-   "Rotation": {
-    "X": 0.0,
-    "Y": -0.0,
-    "Z": 0.0,
-    "W": 1.0
-   },
-   "Scale": {
-    "X": 20.25,
-    "Y": 12.0,
-    "Z": 3.0
-   }
-  },
-  {
-   "EntityId": 1093,
    "PrefabId": "building_box",
    "Position": {
-    "X": 100.0,
+    "X": -20.0,
     "Y": 6.0,
     "Z": -218.181
    },
@@ -3185,10 +3128,10 @@
    }
   },
   {
-   "EntityId": 1094,
+   "EntityId": 1093,
    "PrefabId": "concrete_wall",
    "Position": {
-    "X": 100.0,
+    "X": -20.0,
     "Y": 18.0,
     "Z": -228.181
    },
@@ -3202,13 +3145,22 @@
     "X": 20.25,
     "Y": 12.0,
     "Z": 3.0
+   }
+  },
+  {
+   "EntityId": 1094,
+   "PrefabId": "crowd",
+   "Position": {
+    "X": -20.0,
+    "Y": 13.5,
+    "Z": -218.181
    }
   },
   {
    "EntityId": 1095,
    "PrefabId": "building_box",
    "Position": {
-    "X": 140.0,
+    "X": 20.0,
     "Y": 6.0,
     "Z": -218.181
    },
@@ -3222,7 +3174,7 @@
    "EntityId": 1096,
    "PrefabId": "concrete_wall",
    "Position": {
-    "X": 140.0,
+    "X": 20.0,
     "Y": 18.0,
     "Z": -228.181
    },
@@ -3240,20 +3192,158 @@
   },
   {
    "EntityId": 1097,
-   "PrefabId": "building_box",
+   "PrefabId": "crowd",
    "Position": {
-    "X": 180.0,
-    "Y": 6.0,
+    "X": 20.0,
+    "Y": 13.5,
     "Z": -218.181
-   },
-   "Scale": {
-    "X": 4.0,
-    "Y": 2.4,
-    "Z": 1.6
    }
   },
   {
    "EntityId": 1098,
+   "PrefabId": "building_box",
+   "Position": {
+    "X": 60.0,
+    "Y": 6.0,
+    "Z": -218.181
+   },
+   "Scale": {
+    "X": 4.0,
+    "Y": 2.4,
+    "Z": 1.6
+   }
+  },
+  {
+   "EntityId": 1099,
+   "PrefabId": "concrete_wall",
+   "Position": {
+    "X": 60.0,
+    "Y": 18.0,
+    "Z": -228.181
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.0,
+    "Z": 0.0,
+    "W": 1.0
+   },
+   "Scale": {
+    "X": 20.25,
+    "Y": 12.0,
+    "Z": 3.0
+   }
+  },
+  {
+   "EntityId": 1100,
+   "PrefabId": "crowd",
+   "Position": {
+    "X": 60.0,
+    "Y": 13.5,
+    "Z": -218.181
+   }
+  },
+  {
+   "EntityId": 1101,
+   "PrefabId": "building_box",
+   "Position": {
+    "X": 100.0,
+    "Y": 6.0,
+    "Z": -218.181
+   },
+   "Scale": {
+    "X": 4.0,
+    "Y": 2.4,
+    "Z": 1.6
+   }
+  },
+  {
+   "EntityId": 1102,
+   "PrefabId": "concrete_wall",
+   "Position": {
+    "X": 100.0,
+    "Y": 18.0,
+    "Z": -228.181
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.0,
+    "Z": 0.0,
+    "W": 1.0
+   },
+   "Scale": {
+    "X": 20.25,
+    "Y": 12.0,
+    "Z": 3.0
+   }
+  },
+  {
+   "EntityId": 1103,
+   "PrefabId": "crowd",
+   "Position": {
+    "X": 100.0,
+    "Y": 13.5,
+    "Z": -218.181
+   }
+  },
+  {
+   "EntityId": 1104,
+   "PrefabId": "building_box",
+   "Position": {
+    "X": 140.0,
+    "Y": 6.0,
+    "Z": -218.181
+   },
+   "Scale": {
+    "X": 4.0,
+    "Y": 2.4,
+    "Z": 1.6
+   }
+  },
+  {
+   "EntityId": 1105,
+   "PrefabId": "concrete_wall",
+   "Position": {
+    "X": 140.0,
+    "Y": 18.0,
+    "Z": -228.181
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.0,
+    "Z": 0.0,
+    "W": 1.0
+   },
+   "Scale": {
+    "X": 20.25,
+    "Y": 12.0,
+    "Z": 3.0
+   }
+  },
+  {
+   "EntityId": 1106,
+   "PrefabId": "crowd",
+   "Position": {
+    "X": 140.0,
+    "Y": 13.5,
+    "Z": -218.181
+   }
+  },
+  {
+   "EntityId": 1107,
+   "PrefabId": "building_box",
+   "Position": {
+    "X": 180.0,
+    "Y": 6.0,
+    "Z": -218.181
+   },
+   "Scale": {
+    "X": 4.0,
+    "Y": 2.4,
+    "Z": 1.6
+   }
+  },
+  {
+   "EntityId": 1108,
    "PrefabId": "concrete_wall",
    "Position": {
     "X": 180.0,
@@ -3273,7 +3363,16 @@
    }
   },
   {
-   "EntityId": 1099,
+   "EntityId": 1109,
+   "PrefabId": "crowd",
+   "Position": {
+    "X": 180.0,
+    "Y": 13.5,
+    "Z": -218.181
+   }
+  },
+  {
+   "EntityId": 1110,
    "PrefabId": "building_box",
    "Position": {
     "X": 220.0,
@@ -3287,7 +3386,7 @@
    }
   },
   {
-   "EntityId": 1100,
+   "EntityId": 1111,
    "PrefabId": "concrete_wall",
    "Position": {
     "X": 220.0,
@@ -3307,7 +3406,16 @@
    }
   },
   {
-   "EntityId": 1101,
+   "EntityId": 1112,
+   "PrefabId": "crowd",
+   "Position": {
+    "X": 220.0,
+    "Y": 13.5,
+    "Z": -218.181
+   }
+  },
+  {
+   "EntityId": 1113,
    "PrefabId": "grass_floor",
    "Position": {
     "X": -90.0,
@@ -3321,7 +3429,7 @@
    }
   },
   {
-   "EntityId": 1102,
+   "EntityId": 1114,
    "PrefabId": "grass_floor",
    "Position": {
     "X": -90.0,
@@ -3335,7 +3443,7 @@
    }
   },
   {
-   "EntityId": 1103,
+   "EntityId": 1115,
    "PrefabId": "grass_floor",
    "Position": {
     "X": -90.0,
@@ -3349,7 +3457,7 @@
    }
   },
   {
-   "EntityId": 1104,
+   "EntityId": 1116,
    "PrefabId": "grass_floor",
    "Position": {
     "X": 0.0,
@@ -3363,7 +3471,7 @@
    }
   },
   {
-   "EntityId": 1105,
+   "EntityId": 1117,
    "PrefabId": "grass_floor",
    "Position": {
     "X": 0.0,
@@ -3377,7 +3485,7 @@
    }
   },
   {
-   "EntityId": 1106,
+   "EntityId": 1118,
    "PrefabId": "grass_floor",
    "Position": {
     "X": 0.0,
@@ -3391,7 +3499,7 @@
    }
   },
   {
-   "EntityId": 1107,
+   "EntityId": 1119,
    "PrefabId": "grass_floor",
    "Position": {
     "X": 90.0,
@@ -3405,7 +3513,7 @@
    }
   },
   {
-   "EntityId": 1108,
+   "EntityId": 1120,
    "PrefabId": "grass_floor",
    "Position": {
     "X": 90.0,
@@ -3419,7 +3527,7 @@
    }
   },
   {
-   "EntityId": 1109,
+   "EntityId": 1121,
    "PrefabId": "grass_floor",
    "Position": {
     "X": 90.0,
@@ -3433,7 +3541,7 @@
    }
   },
   {
-   "EntityId": 1110,
+   "EntityId": 1122,
    "PrefabId": "pa_speaker",
    "Position": {
     "X": 0.0,
@@ -3448,7 +3556,7 @@
    }
   },
   {
-   "EntityId": 1111,
+   "EntityId": 1123,
    "PrefabId": "pa_speaker",
    "Position": {
     "X": 1.2,
@@ -3463,7 +3571,7 @@
    }
   },
   {
-   "EntityId": 1112,
+   "EntityId": 1124,
    "PrefabId": "pa_speaker",
    "Position": {
     "X": 0.0,
@@ -3478,7 +3586,7 @@
    }
   },
   {
-   "EntityId": 1113,
+   "EntityId": 1125,
    "PrefabId": "pa_speaker",
    "Position": {
     "X": -1.2,
@@ -3493,7 +3601,7 @@
    }
   },
   {
-   "EntityId": 1114,
+   "EntityId": 1126,
    "PrefabId": "crowbar",
    "Position": {
     "X": 1.6,
@@ -3502,7 +3610,7 @@
    }
   },
   {
-   "EntityId": 1115,
+   "EntityId": 1127,
    "PrefabId": "torch",
    "Position": {
     "X": -1.4,

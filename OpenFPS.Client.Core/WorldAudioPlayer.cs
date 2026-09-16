@@ -159,6 +159,11 @@ public sealed class WorldAudioPlayer
             if (WeaponRegistry.TryGet(id, out var weapon))
                 return WeaponSynth.MuzzleBlast(WeaponProfile.From(weapon), seed);
         }
+        // A crowd, which is many impacts rather than one. Named for the same reason a gunshot is:
+        // the four characters describe one event and a thousand people clapping is not one event.
+        if (Applause.TryParseKey(sound.SynthKey, out var crowd))
+            return Applause.Render(crowd, TransientSynth.SampleRate, seed);
+
         return TransientSynth.Render(sound, seed);
     }
 

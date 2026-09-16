@@ -371,6 +371,22 @@ public class GameServer
                     MovementSystem.Update(world, entry.Value.data.MinBound, entry.Value.data.MaxBound, grid, lookup, _sessions, _maps, dt);
                     AISystem.Update(world, lookup, dt);
                     _vehicles.Update(entry.Key, world, dt);
+
+                    // ...and the people watching them. Only a source with a place and a size: no
+                    // loop, no bed, and nothing in it that knows what a car is.
+                    CrowdSystem.Update(entry.Key, world, lookup, AudioClock.Now, (crowdId, at, spec) =>
+                        EmitWorldAudio(entry.Key, crowdId, "crowd", new[]
+                        {
+                            new TransientSound
+                            {
+                                Character = SoundCharacter.Knock,
+                                Position = at,
+                                LevelDb = Applause.LevelDb(spec.Clappers, spec.Intensity),
+                                SynthKey = Applause.Key(spec),
+                                DecaySeconds = spec.Seconds,
+                                Noisiness = 1f,
+                            },
+                        }));
                     // Driven composites move AFTER the players who are steering them have had their
                     // say, and BEFORE anything is carried: the order here is the whole contract.
                     // Parts are bolted to the root and follow it exactly; occupants are carried by it
