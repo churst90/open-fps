@@ -660,6 +660,11 @@ public sealed record EngineProfile
             Muffler = MufflerSpec.Glasspack with { Absorption = 0.25f, AbsorptiveLengthMetres = 0.24f },
             TailpipeMetres = new[] { 0.12f },
             TailpipeDiameterMm = 50f,
+            // Short, thin, hot pipes and a hard blowdown: a bike keeps its top end where a saloon's
+            // long system loses it.
+            WallLossMultiplier = 1.0f,
+            Steepening = 1.6f,
+            OverrunPopRate = 12f,
         },
     };
 
@@ -1021,12 +1026,31 @@ public sealed record EngineProfile
             CollectorDiameterMm = 45f, CollectorPipeMetres = 0.25f,
             Crossover = CrossoverKind.None,
             MidPipeMetres = 0.2f,
-            Muffler = MufflerSpec.Glasspack with { Absorption = 0.3f, AbsorptiveLengthMetres = 0.3f },
+            // STRAIGHT PIPES, which is what its own name has always said. It was carrying a
+            // glasspack, and that was only part of why it came out as rumble.
+            Muffler = MufflerSpec.StraightPipe,
             TailpipeMetres = new[] { 0.25f, 0.35f },
             TailpipeDiameterMm = 50f,
             GasCelsiusIdle = 330f, GasCelsiusFull = 800f,
-            WallLossMultiplier = 1.2f,
-            OverrunPopRate = 12f,
+
+            // A big slow twin is the HARDEST case for keeping the top of the band, and the reason is
+            // arithmetic. Its harmonics are spaced by its firing rate, and at 3,000 rpm a twin fires
+            // 50 times a second where a V8 fires 200. So to have any energy at a kilohertz a twin
+            // needs its TWENTIETH harmonic where the V8 needs its fifth — and any per-harmonic
+            // rolloff therefore hits it four times as hard. Measured, the exhaust came out 76.5 %
+            // below 200 Hz with half a per cent between 800 Hz and 2.5 kHz: pure rumble, no bark.
+            //
+            // Two things push back, and both are properties of this exact pipe rather than taste.
+            // The pipes are SHORT, smooth and very hot, so there is little wall loss to take the top
+            // off — a straight pipe on a cruiser is under a metre from valve to air. And the blowdown
+            // is ENORMOUS: 1.75 litres across two cylinders is the largest single-cylinder charge in
+            // the catalogue, and a finite-amplitude wave that big STEEPENS as it travels, converting
+            // its own energy upward into exactly the harmonics that were missing. Steepening is the
+            // mechanism behind a big twin's bark, and it had been left at the default.
+            WallLossMultiplier = 0.85f,
+            Steepening = 2.0f,
+            // ...and they pop on a closed throttle, which is most of what "popping" means here.
+            OverrunPopRate = 16f,
         },
         Intake = new IntakeSpec { RunnerLengthMetres = 0.12f, RunnerDiameterMm = 45f, PlenumLitres = 0.6f, ThrottleDiameterMm = 50f, AirboxLitres = 2f, SnorkelLengthMetres = 0.15f, SnorkelDiameterMm = 60f, Level = 1f, Absorption = 0.1f },
         Mechanical = new MechanicalSpec { ValvetrainLevel = 1.2f, CombustionKnock = 0.08f, AccessoryWhineLevel = 0.05f },

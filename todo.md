@@ -2048,3 +2048,27 @@ thing being caught, not the thing being watched — and no two of the rest share
       Watch the `Mixer load` line's starve / real-channel figures in the first ten seconds.
 - [ ] The borrowed-voice Doppler bug matters more at forty than at thirty, because more of the field
       is borrowing. Still the main suspect for "they don't sound like they're going that fast".
+
+### The bikes were all rumble (2026-09-15)
+
+"I expect to hear a popping and growling from the engine, not just rumble." Measured, the V-twin's
+exhaust was **76.5 % below 200 Hz with half a per cent between 800 Hz and 2.5 kHz** — where the V8 is
+13 / 70 / 17. Pure rumble, no bark, and the others were fine, so it was not a general fault.
+
+- [x] **A big slow twin is the hardest case for keeping the top of the band, and it is arithmetic.**
+      Harmonics are spaced by the FIRING RATE, and at 3,000 rpm a twin fires 50 times a second where a
+      V8 fires 200 — so to have any energy at a kilohertz the twin needs its TWENTIETH harmonic where
+      the V8 needs its fifth. Any per-harmonic rolloff therefore hits a twin four times as hard. That
+      is why one preset can be rumble while every other one is fine.
+- [x] Two things push back, both properties of this pipe rather than taste:
+      * **`WallLossMultiplier` 1.8 -> 0.85.** A straight pipe on a cruiser is under a metre from valve
+        to air and runs very hot, so there is little wall loss to take the top off.
+      * **`Steepening` 1.0 -> 2.0**, and this is the mechanism behind a big twin's bark. 1.75 litres
+        across two cylinders is the largest single-cylinder charge in the catalogue, and a
+        finite-amplitude wave that big STEEPENS as it travels, converting its own energy upward into
+        exactly the harmonics that were missing. It had been left at the default.
+- [x] **It was carrying a glasspack while calling itself "straight pipes"** in its own Name field.
+      Now `MufflerSpec.StraightPipe`, which also means no case ring — correct for open pipes.
+- [x] `OverrunPopRate` 6 -> 16, which is the "popping" literally.
+- [x] Result: **17.6 / 37.5 / 38.2 / 6.7**, against 76.5 / 22.9 / 0.5 / 0.1. The sports bike got the
+      same treatment less severely (0 / 75.7 / 21.2 / 3.1 from 0 / 92.7 / 6.9 / 0.3).

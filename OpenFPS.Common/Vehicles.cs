@@ -351,7 +351,7 @@ public sealed record VehicleProfile
         Body = VehicleBody.OpenWheeler,
         ExhaustOffsetZ = -0.75f, IntakeOffsetZ = 0.25f, ExhaustHeight = 0.55f,
         FrontAxleZ = 0.70f, RearAxleZ = -0.70f,
-        SourceLevelDb = 116f,
+        SourceLevelDb = 118f,
     };
 
     /// <summary>A blown big block: the whine of the rotors over the lope of the cam, and no lag at
@@ -485,7 +485,7 @@ public sealed record VehicleProfile
         Body = VehicleBody.OpenWheeler,
         Name = "V-twin cruiser motorcycle",
         EngineKey = "vtwin",
-        SourceLevelDb = 120f,
+        SourceLevelDb = 121f,
         Engine = EngineProfile.VTwin45,
         Gearbox = Gearbox.SixSpeedSports with { Ratios = new[] { 3.34f, 2.3f, 1.71f, 1.41f, 1.18f, 1.0f }, FinalDrive = 2.87f, ShiftSeconds = 0.25f, UpshiftRpm = 5000f, DownshiftRpm = 1800f, WheelRadiusMetres = 0.33f },
         Tyres = TyreProfile.SportsOnAsphalt with { TreadBlocks = 40, SurfaceRoughness = 0.4f },
