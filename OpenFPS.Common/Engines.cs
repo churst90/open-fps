@@ -104,20 +104,64 @@ public sealed record MufflerSpec
     /// <summary>How sharply the resonator is tuned. Q of 4-8 is a real one.</summary>
     public float ResonatorQ { get; init; } = 5f;
 
+    /// <summary>
+    /// The CAN ITSELF, as metal that rings — null for a muffler whose case is not worth modelling.
+    ///
+    /// Everything above this line describes what the muffler does to the GAS: chambers that cancel,
+    /// packing that absorbs, a resonator that notches a drone. None of it is the case, and until this
+    /// existed nothing in the model was: a Flowmaster was a set of gas volumes with no steel around
+    /// them. But the case is a bare steel box driven from the inside by the full pressure wave, and
+    /// it is most of what people mean by a metallic exhaust note.
+    ///
+    /// It matters that the case is driven by the pressure INSIDE rather than by what comes out of the
+    /// tailpipe. Those are different signals: the chambers cancel particular frequencies on the way
+    /// through, so a note can be quiet at the pipe and still ring loudly off the can. A muffler that
+    /// cancels well can still be the loudest-sounding thing on the car.
+    /// </summary>
+    public VehicleBody? Shell { get; init; }
+
+    /// <summary>
+    /// How loud the case is against the tailpipe, as a fraction of the internal pressure that ends up
+    /// radiating at one metre.
+    ///
+    /// A ratio rather than a level, because the internal wave and the radiated pressure at a metre are
+    /// not in the same units by a long way — the number folds together transmission through the steel,
+    /// the case's radiating area and the spreading out to a metre. Measured rather than chosen: see
+    /// the calibration note in ExhaustNetwork.
+    /// </summary>
+    public float ShellLevel { get; init; } = 0f;
+
     public static MufflerSpec StraightPipe => new() { Kind = MufflerKind.None };
 
-    /// <summary>A two-chamber 40-series style muffler: aggressive, short, and loud.</summary>
+    /// <summary>A two-chamber 40-series style muffler: aggressive, short, and loud — and a bare
+    /// steel case with nothing in it to stop the case ringing, which is the metallic half of it.</summary>
     public static MufflerSpec Chambered40 => new()
     {
         Kind = MufflerKind.Chambered,
         ChamberLengthsMetres = new[] { 0.09f, 0.115f, 0.145f },
         ExpansionRatio = 5.5f,
         BaffleLoss = 0.32f,
+        Shell = VehicleBody.MufflerCase,
+        ShellLevel = ShellCalibration,
     };
 
-    /// <summary>A packed straight-through can: deep, less rasp.</summary>
+    /// <summary>
+    /// What one pascal inside the can becomes at one metre outside it — measured, not chosen.
+    ///
+    /// The internal wave runs to thousands of pascals and a metre away is tens, so this carries the
+    /// whole conversion: how much gets through the steel, how much of the case radiates, and the
+    /// spreading out to a metre. It is one ratio because measuring one ratio is honest and guessing
+    /// three factors is not. See the calibration run in the vehicles notes.
+    /// </summary>
+    public const float ShellCalibration = 0.035f;
+
+    /// <summary>A packed straight-through can: deep, less rasp — and the packing is pressed against
+    /// the case, so the case is damped too. Its shell is the same model with a loss factor ten times
+    /// higher, which is the whole of the difference.</summary>
     public static MufflerSpec Glasspack => new()
     {
+        Shell = VehicleBody.PackedMufflerCase,
+        ShellLevel = ShellCalibration,
         Kind = MufflerKind.Absorptive,
         Absorption = 0.62f,
         AbsorptiveLengthMetres = 0.50f,
@@ -468,6 +512,104 @@ public sealed record EngineProfile
     /// against each other. Open collectors and a straight pipe take the muffler out of the way of
     /// all of it.
     /// </summary>
+    // ── Four ways to exhaust the same V8 ────────────────────────────────────────────────────────
+    //
+    // Each of these changes the HARDWARE and nothing else: the same cylinders, the same firing
+    // order, the same cam unless it is stated. They exist because a field of one car cannot show
+    // that the character comes from the mechanism, and because the difference between open headers
+    // and a packed can is the single clearest demonstration this engine has that nothing here is a
+    // recording — no sample library ships the same engine four ways.
+
+    /// <summary>
+    /// OPEN HEADERS. The primaries dump straight into the air at the collector — no mid-pipe, no
+    /// crossover, no muffler, no tailpipe.
+    ///
+    /// What you should hear: everything, unfiltered. Nothing cancels the harmonics and nothing
+    /// absorbs them, so the whole series survives and the overrun cracks. It is also the only one
+    /// with no muffler CASE, so none of the metallic ring the others have — the rawness is the
+    /// absence of hardware, not the addition of any.
+    /// </summary>
+    public static EngineProfile V8OpenHeaders => V8MuscleBigBlock with
+    {
+        Name = "7.0 big block V8, open headers",
+        Exhaust = V8MuscleBigBlock.Exhaust with
+        {
+            CollectorPipeMetres = 0.18f,
+            Crossover = CrossoverKind.None,
+            MidPipeMetres = 0.05f,
+            Muffler = MufflerSpec.StraightPipe,
+            TailpipeMetres = new[] { 0.10f },
+        },
+    };
+
+    /// <summary>
+    /// The same big block through GLASSPACKS: a packed straight-through can either side.
+    ///
+    /// What you should hear: the same engine, mellowed. The packing absorbs the top of the band
+    /// rather than cancelling bands out of it, so the harmonics thin from the top down instead of
+    /// being notched — and the packing is pressed against the case, so it damps that too and the
+    /// metallic ring goes with it. Mellow is an ABSENCE here, which is why it cannot be faked by
+    /// turning something down.
+    /// </summary>
+    public static EngineProfile V8BigBlockGlasspack => V8MuscleBigBlock with
+    {
+        Name = "7.0 big block V8, glasspacks",
+        Exhaust = V8MuscleBigBlock.Exhaust with
+        {
+            Crossover = CrossoverKind.XPipe,
+            Muffler = MufflerSpec.Glasspack with { Absorption = 0.55f },
+        },
+    };
+
+    /// <summary>
+    /// A MILD small block: shorter cam, smaller valves, stock manifolds rather than headers.
+    ///
+    /// What you should hear: the least dramatic car on the circuit, and deliberately. Cast log
+    /// manifolds hold their primaries nowhere near equal — PrimarySpread 0.42 against a fabricated
+    /// header's 0.12 — and eight pipes at eight pitches is a band where eight at one pitch is a
+    /// tube. It idles straight because the cam is short, and it runs out of breath early.
+    /// </summary>
+    public static EngineProfile V8MildSmallBlock => V8SportsFlowmaster40 with
+    {
+        Name = "5.0 small block V8, stock manifolds",
+        BoreMm = 101.6f, StrokeMm = 76.2f,
+        ExhaustCam = new CamLobe { DurationDegrees = 258f, MaxLiftMm = 11.2f, RampFraction = 0.24f, CentrelineDegrees = 254f },
+        IntakeCam = new CamLobe { DurationDegrees = 254f, MaxLiftMm = 11.2f, RampFraction = 0.24f, CentrelineDegrees = 470f },
+        IdleRoughness = 0.10f, IdleRpm = 700f, RedlineRpm = 5600f,
+        PeakTorqueNm = 420f, PeakTorqueRpm = 3200f,
+        Exhaust = V8SportsFlowmaster40.Exhaust with
+        {
+            PrimaryLengthMetres = 0.30f, PrimarySpread = 0.42f, PrimaryDiameterMm = 38f,
+            Muffler = MufflerSpec.Glasspack with { Absorption = 0.68f },
+        },
+    };
+
+    /// <summary>
+    /// The beefiest of them: a big block on a LONG cam, through 40-series chambered cans.
+    ///
+    /// What you should hear: an idle that will not sit still. A 330-degree cam overlaps so much at
+    /// low lift that a cylinder breathes its neighbour's exhaust, the burn goes ragged, and the
+    /// engine hunts — the lope is a misfire that nobody fixed because it is what the cam is for.
+    /// Everything above the idle is the chambered can: notches where the chambers cancel, the
+    /// harmonics between them surviving intact because nothing absorbs, and the case ringing.
+    /// </summary>
+    public static EngineProfile V8BigCam => V8MuscleBigBlock with
+    {
+        Name = "7.4 big block V8, long cam, 40-series",
+        BoreMm = 111.8f, StrokeMm = 101.6f,
+        ExhaustCam = new CamLobe { DurationDegrees = 330f, MaxLiftMm = 16.0f, RampFraction = 0.13f, CentrelineDegrees = 246f },
+        IntakeCam = new CamLobe { DurationDegrees = 324f, MaxLiftMm = 16.0f, RampFraction = 0.13f, CentrelineDegrees = 462f },
+        IdleRoughness = 1.0f, IdleGovernorGain = 1.2f,
+        IdleRpm = 900f, RedlineRpm = 6400f,
+        PeakTorqueNm = 880f, PeakTorqueRpm = 4200f,
+        Exhaust = V8MuscleBigBlock.Exhaust with
+        {
+            PrimaryLengthMetres = 0.90f, PrimaryDiameterMm = 48f,
+            Crossover = CrossoverKind.XPipe,
+            Muffler = MufflerSpec.Chambered40,
+        },
+    };
+
     public static EngineProfile PoliceV8 => new()
     {
         Name = "7.0 interceptor V8, lopey cam, open pipes",
@@ -1190,6 +1332,10 @@ public sealed record EngineProfile
             ["nascar_v8"] = () => NascarV8,
             ["f1_v10"] = () => F1V10,
             ["police_v8"] = () => PoliceV8,
+            ["v8_open_headers"] = () => V8OpenHeaders,
+            ["v8_glasspack"] = () => V8BigBlockGlasspack,
+            ["v8_mild"] = () => V8MildSmallBlock,
+            ["v8_bigcam"] = () => V8BigCam,
         };
 
     public static EngineProfile ByName(string key)

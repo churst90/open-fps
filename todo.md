@@ -1563,3 +1563,340 @@ Still outstanding from the audit, and still needing ears rather than a harness:
   everyone in earshot. What is still missing is the half that hurts: no shot MESSAGE in the protocol
   (the client cannot pull a trigger, only the text command can), `ShotResolver` is not consulted for
   what was hit, and `HealthComponent` has still never been decremented by anything.
+
+## Everybody else's feet (2026-09-15)
+
+The only body in the world that made any noise walking was your own. Another player could run past
+you, round you and into you and the map stayed silent — in a game whose whole proposition is knowing
+where things are by ear, the things that matter most were the quietest in it.
+
+- [x] `StrideAccumulator` — what a stride IS, lifted out of `LocalPlayerController` and shared. There
+      are two kinds of body that walk and only one kind of walking: the local player's position is
+      predicted here and corrected by the server, everybody else's arrives interpolated between two
+      snapshots, and a footstep is a footstep either way. Every rule in it was learned from a fault,
+      which is exactly why they must not be written a second time somewhere else and allowed to drift.
+- [x] `OtherBodies` — one accumulator per body on the map, fed from the same snapshot everything else
+      reads. Players and NPCs; a crate is not a body.
+- [x] **Derived, not sent.** A footstep as a message would be a reliable packet per body per half
+      metre, for something the receiver can work out — and it would describe a position the listener
+      has already heard the body leave. Deriving it from the interpolated transform puts the sound
+      where the body is *as this client understands it*, which is the only place it can be without
+      contradicting everything else that client is being told.
+- [x] **A passenger is silent for free, and nothing here knows what a vehicle is.** The server zeroes
+      an occupant's velocity and its movement system leaves their body to the seat, so a rider is a
+      body at rest whose position is changing — the same shape as a teleport, a spawn and a
+      reconciliation, refused by the same rule. Without it a car at sixty miles an hour would be a
+      footstep every half metre of road.
+- [x] **Grounded is read off the vertical velocity, not off the floor.** The movement step clamps a
+      grounded body's `vel.Y` to zero and gives it to gravity otherwise, so this is a fact the client
+      is already being told; one tick of free fall is a third of a metre a second. The floor itself is
+      only probed at the moment a foot meets it — twice a second at a walk, not once a frame per body,
+      which is what makes it affordable at render rate.
+- [x] The material under somebody else's feet comes from the listener's own copy of the world, so a
+      body on grass sounds like grass with nothing added to the protocol.
+- [x] `OtherBodiesTests`. Tests 503 -> 511.
+
+What is still missing, in the order it matters:
+
+- [ ] **A footstep does not know how hard it was.** Every step is the same recorded sample at the same
+      level whether the body is strolling or sprinting, and "how fast is that person moving" is
+      precisely what a listener needs. It should not be a chosen curve: a foot is a mass meeting a
+      floor at a speed, which is `ImpactAcoustics.Between` — the same calculation that already decides
+      what a dropped rifle sounds like. That would also retire the last recorded sample in the walking
+      path and make a footstep respond to the floor's material rather than selecting a file by it.
+- [ ] Held things are still not heard. A body carrying something should knock, rattle and swing as it
+      walks, and the client cannot know what a remote body is carrying — `HandsComponent` and
+      `InventoryComponent` are not on `EntityDefinition`. Either the definition carries what is held,
+      or the server emits the knock as a `WorldAudioEvent` off the carrier's own gait, which it
+      currently has no notion of.
+- [ ] Nothing is heard of a body that is not walking: no breathing, no effort, no clothing. A body
+      standing still in a room with you is completely silent, and a body that has stopped is exactly
+      the one you most want to locate.
+- [ ] Jumping has a landing and no launch, for the local player as well.
+- [ ] Ear-validation, which is the only thing that can settle it: two clients on one map, one walking
+      circles round the other. Everything above is measured and none of it has been heard.
+
+## Keys, running, breathing and the map list (2026-09-15)
+
+From a list of nine. The ones that were decisions rather than work are recorded as decisions below.
+
+- [x] **Modifiers are part of a binding.** `InputCommandMapper` is keyed on key AND modifiers, and a
+      binding that names modifiers is tried first. A binding that names none still fires whatever is
+      held, which is what keeps the chat brackets working — they read shift themselves.
+- [x] **F5 / shift-F5** players everywhere and players here; **F6 / shift-F6** maps on the server and
+      your own maps; **F8** friends (it was F7, which item 2 wants for the editor). The plain key is
+      the wider question and shift narrows it to here, on both, so there is one rule rather than two.
+- [x] A player list is a list of STATUSES now, not names: who is on your map, who is elsewhere and
+      where, sorted with the people you can actually reach first.
+- [x] `MapListRequest` / `MapListResponse` / `MapSummary`, answered from LOADED maps — a map file the
+      server has not loaded is not somewhere you can go, and a chooser that offers unreachable places
+      is worse than no chooser. `MapData.OwnerId` and `MapData.IsPublic` exist now, defaulting to
+      public so a map authored before the question existed does not vanish by having said nothing.
+      Walkable as `maps` / `mymaps` from the MUD gateway.
+- [x] **Control fires**, both of them. Control no longer suppresses movement, because a player has to
+      be able to fire while moving; alt still does, since alt belongs to the window manager.
+- [x] **P is "what am I looking at"**, answered on the client from geometry it already has instead of
+      a round trip. It says what, what it is MADE OF, and how far — the material because that is what
+      the thing will sound like when something happens to it. Nothing ahead gives you your zone and
+      your heading rather than "nothing directly ahead", which is a non-answer. Shift-P is the old
+      `scan` (the five nearest things in any direction).
+- [x] **Zones announce themselves as you cross.** Keyed on the region ID, never the name: two rooms
+      can share a name, and the outdoor fallback flips between "Outside" and "Under Shelter" on a
+      continuous shelter value, which would announce itself every time a bridge passed overhead.
+      Spoken without interrupting, because crossing a doorway must not cut off the thing that made
+      you walk through it. Z still reads it on demand.
+- [x] **Shift runs.** `PhysicsConstants.SprintSpeed` (4.5 -> 7.2 m/s), `ClientInputUpdate.Sprint`
+      appended to the wire, read identically by prediction and by the authority so a stride does not
+      mispredict.
+- [x] **Shift stopped being a blanket suppressor.** It used to stop movement dead so a shift chord
+      could never walk you somewhere, which also made shift-W unusable. It now modifies the key it is
+      pressed WITH: shift with a turn key is still a one-degree nudge, shift with a movement key is a
+      run, and holding both does both. **Confirm this by ear** — it is the one change here that
+      alters a key you already use.
+- [x] **Every half metre is a footstep, and there is no cadence floor.** There was one — five steps a
+      second — and it was eating most of them: a walk is 4.5 m/s, a footfall every 111 ms, so more
+      than half of every walk was silent and a run lost seven in ten. A cadence cap is a rule about
+      the clock standing in for a rule about distance, and the distance rule is the true one.
+- [x] **`Breathing`** — exertion as an integrator with two time constants, because getting out of
+      breath and getting it back are not the same process at the same speed (15 s up, 35 s down).
+      That asymmetry is the point: a body that has been running is still findable well after it has
+      stopped and gone quiet, and breathing is the ONLY sound a body makes once it stops moving.
+      A breath is a Hiss through `WorldAudioPlayer` — nobody recorded one, and it is occluded,
+      reverberated and placed by the same code as a gunshot. Both your own and everybody else's.
+      B reads your exertion out in words.
+- [x] `RunningAndBreathingTests`, `KeyBindingTests`. Tests 511 -> 527. Live-walked on a real server.
+
+Still to settle, and why each is a decision rather than work:
+
+- [ ] **Enter on a map in the list should take you there, and there is no runtime map change at all.**
+      `session.CurrentMapId` is assigned once at login and never again. The pieces are closer than
+      they look — the client's `MapManifest` handler already tears the world down and rebuilds it,
+      and `SendManifest(peer, session)` is already a method — so travel is: migrate the player's
+      entity between the two maps' ECS worlds, clear `KnownEntities`, re-send the manifest, and let
+      the client's existing load path run. What makes it a session of its own is the acoustic rebake
+      and proving it live.
+- [ ] **Breath and footstep levels have never been heard**, only measured. The breath curve in
+      particular (22 dB at rest, 56 dB flat out) is a first estimate that wants three reference
+      recordings — at rest, after a jog, after a sprint. See `docs/SOUND_INVENTORY.md`.
+- [ ] Your own breath is placed at your own head, so it is spatialised like anything else. It may
+      want to bypass the HRTF entirely, since a sound made inside your own skull has no direction.
+- [ ] Footsteps are still the last recorded sample in the walking path. `ImpactAcoustics.Between`
+      would give loudness-with-speed, every one of the 36 materials, and the difference between a
+      heavy person in boots and a light one in trainers. See `docs/SOUND_INVENTORY.md`.
+
+## The car the engine is bolted into (2026-09-15)
+
+Step one of the impulse-response experiment: generate the body's response from the geometry rather
+than shopping for one. No recording needed, no licence attached, and variants come from numbers.
+
+- [x] **`VehicleBody`** — a car as panels and a box of air. Modes from `PanelAcoustics`, the same
+      plate law a door leaf and a window pane already use; cabin modes from the dimensions of the box.
+      Five presets (saloon, van, supercar, race saloon, open-wheeler) plus `None` for A/B.
+- [x] **`BodyResonator`** — a parallel bank of two-pole resonators, which IS the convolution. A modal
+      impulse response is a sum of decaying sinusoids, so running the signal through resonators tuned
+      to those modes computes exactly what convolving with the rendered response computes. The
+      difference is only cost: 2,600 taps per sample against six multiply-adds per mode. Each mode is
+      normalised to unity at its own note by evaluating the transfer function there exactly, so a
+      weight means what it says instead of inheriting whatever gain the pole placement gave it.
+- [x] **Why the body and not the exhaust.** The gas path is not time-invariant — exhaust gas leaves
+      the head at 700-900 C and every pipe resonance sits ~75 % higher hot than cold, moving with load
+      — so an impulse response fitted at one engine speed is wrong at every other. A steel roof panel
+      does not care how hot the gas is. Gas path stays in the waveguide model; the body is the part
+      that can honestly be a fixed response.
+- [x] **`--body-ir [preset] [out=DIR] [sec=]`** renders each body's response, writes it to a WAV and
+      measures it. One command for all three because they are one job: a response is a sound you can
+      audition, a file another tool can load, and a spectrum to hold a recording against.
+- [x] Applied in `EngineVoiceState`'s per-sample loop, ADDED to the direct sound rather than replacing
+      it — the tailpipe still radiates straight at you and the car rings as well.
+- [x] **It is free.** Measured A/B in Release with `--engine-cost body=off`: nascar_v8 8.5x realtime
+      with the body against 8.4x without; v8_muscle 8.2 against 8.3. Sixteen two-pole resonators is
+      nothing beside an engine integrating cylinders, valves and waveguides every sample. And levels
+      are unchanged — 119.3 dB measured against 119 declared — so it colours without adding gain.
+- [x] `VehicleBodyTests`. Tests 527 -> 545.
+
+**Two faults the measurement caught, both of them physics that had been left out:**
+
+- [x] **The panel spans were the size of the pressings.** First render: 97 % of a saloon's energy
+      below 200 Hz, which is a bass boost rather than a car. A door skin 1.2 m across, taken as a
+      free flat plate, has a fundamental around four hertz — and a real one plainly does not drum at
+      four hertz, because it is pressed with beads, curved in two directions and spot-welded every
+      few inches. What sets the note is the distance between STIFFENERS, 150-400 mm on a production
+      car. It is also why a van booms: its flat sides are stiffened far more sparsely.
+- [x] **The low modes were given the radiation efficiency of the high ones.** A panel small against
+      its wavelength barely radiates — its two halves push and pull against each other and the air
+      moves round the edge — so power goes as (ka)² until it is about a wavelength across. This is
+      the SAME law `OpenEnd.Radiate` applies at an exhaust's open end, where leaving it out made
+      every high-revving engine ten decibels too loud and top-heavy. Here it does the opposite and is
+      just as necessary: a panel's low modes are driven hardest and radiate worst, and the balance
+      needs both facts.
+- [x] **And a third, about who is listening.** The cabin modes at full weight swamped everything.
+      A cabin boom is a resonance of the air INSIDE the car — it is what the DRIVER hears, and it
+      reaches the street only by driving the bodywork from inside or leaking past the seals. Hence
+      `CabinLeak`, deliberately a leak rather than a deletion: the same cabin at FULL weight is
+      exactly what an interior mix needs, and a player can already sit in one of these cars.
+
+After all three, the presets differ the way they should and none of it was dialled in:
+saloon 37/55/8 ringing 29 ms, van 30/60/10 at 85 ms, supercar 33/53/14 at 38 ms, race saloon
+44/51/5 at 248 ms, open-wheeler 34/66/1 at 16 ms (percent below 200 Hz / to 1.5 kHz / above).
+
+Next, in order:
+
+- [ ] **Ear-validation, which is the only thing that can settle it.** `--body-ir` writes the responses
+      to audition on their own; `--speedway` hears them under an engine. Nothing here has been heard.
+- [ ] **`Coupling` is the one number most worth fitting to a real car** — how much of the engine gets
+      into the structure at all. It is currently 0.06 to 0.40 by judgement.
+- [ ] **Fit against recordings**, once clips arrive: render our engine at the recording's firing rate
+      and take the ratio of the two spectra AT THE HARMONICS. That also replaces the single rolloff
+      slope `--engine-match` uses, which the vehicles section already records as the wrong shape.
+      Clips want to be uncompressed or >=192 kbps, a steady rpm held for several seconds, and two or
+      three different rpms — because whatever moves with rpm is gas path and whatever stays put is
+      body, so the separation falls out of the recordings themselves.
+- [ ] **Scale the pipe delays by exhaust gas temperature** — the part an impulse response can never
+      do, and one multiplier on delays that already exist.
+- [ ] Interior audio can now turn `CabinLeak` up rather than invent a model.
+
+### Fitting to the Mustang clip (2026-09-15)
+
+- [x] **`--engine-envelope FILE`** in `tools/ingest_audio.py`: finds every steady passage in a clip,
+      measures the harmonic series at each, pools them, fits the recording's own broadband tilt and
+      subtracts it. Pure-Python radix-2 FFT, because this machine has no numpy and a per-bin DFT over
+      a 32k window costs minutes. `--envelope-compare OURS` holds our render against the reference.
+- [x] **A boomy clip does not need EQ-ing first, and should not be.** The boom is a SMOOTH curve —
+      proximity, a car park, platform normalisation, codec rolloff — and an exhaust's character is
+      STRUCTURE, sharp peaks at the firing harmonics and notches where the chambers cancel. Different
+      shapes, so arithmetic separates them. EQ-ing by ear removes by judgement exactly what the fit
+      removes by measurement, and leaves nobody able to say how much of the engine went with it.
+      Measured on the Mustang: the tilt runs **-6.7 dB at 60 Hz to -52.5 dB at 4 kHz**, a 46 dB
+      slope. That is the "super boomy" quantified, and removing it leaves 6.1 dB mean of structure.
+- [x] **The clip did not need shortening.** Six steady passages found by themselves at three
+      operating points: idle at 739-769 rpm (three separate passages agreeing to 4 %), a rev at
+      1815-1901, and the take-off at 4219.
+- [x] **A band is only believed where the passages AGREE.** A fixed filter sits at the same frequency
+      however fast the engine turns, so disagreement across engine speeds means that band is not
+      measuring the system. On this clip 5 of 20 bands agree, **147 Hz to 562 Hz** — above about a
+      kilohertz the 125 kbps codec floor is what is being measured, not the car.
+- [x] **The comparison refused to produce a correction, and that is the tool working.** Only two
+      bands were measurable in BOTH the reference and our render, which is not enough to move a
+      constant on. Comparing a band the reference cannot measure against one we render perfectly is
+      how a fitting run talks itself into changing something that was already right.
+
+- [ ] **Our muscle car's idle hunts by more than a thousand rpm** — the measurement's own by-product.
+      A real Mustang held 739-769 rpm across three separate passages; ours logs "Idling (675-1832,
+      hunting 1157)" and "(481-3617, hunting 3136)". That is why it produces almost no steady passage
+      to compare, and it is a fault in its own right — see the idle-governor item in the session-2
+      list. Fix it and the comparison gets its bands.
+- [ ] Then re-run the compare. The reference's numbers are already measured and will not need redoing.
+
+### And two faults in the body work, both found by trying to demo it
+
+- [x] **The body was in only one of the two renderers.** `--vehicle` renders offline through
+      `VehicleSynth`; the game renders live through `EngineVoiceState`. The body went into the live
+      one, so the demo measured a 0.1 dB difference — the change was real, tested and completely
+      inaudible in the thing built to listen to it. Both now drive the body from `Engine.Exhaust`,
+      which is also the more physical choice: the exhaust is what shakes a floorpan, not the finished
+      mix with the tyres in it.
+- [x] **The mode weights were normalised against their SUM, which made the layer 30 dB too quiet.**
+      Sixteen modes summing to one leaves the loudest around a tenth, and a tenth of a coupling of
+      0.25 is two and a half per cent. It also had the wrong shape — it made a body with MORE
+      resonances quieter at each of them, and a car with more panels is not a quieter car. Normalised
+      against the strongest mode now, so `Coupling` means what it says. Guarded by
+      `AddingModesDoesNotQuietenTheOnesAlreadyThere`.
+- [x] Declared source levels re-measured with `--engine-levels` and updated across all 18 presets: a
+      shell radiates more than a bare pipe, so a car with one IS louder. Most moved 2-4 dB; the
+      open-wheelers barely moved at all, which is the check that the coupling numbers mean something.
+- [x] `--vehicle-live <preset> body=off` and `coupling=X` for A/B listening. Tests -> 546.
+- [ ] **Where `Coupling` should sit is a listening question**, and three pass-bys are with Cody: no
+      shell, 0.25 as modelled, and 0.60. At 0.25 the shell measures +1 to +2.3 dB across 40-680 Hz.
+
+## The can, as metal (2026-09-15)
+
+"Metallic, throaty" — and the metallic half was not modelled anywhere. `ExhaustNetwork` described
+what a muffler does to the GAS (chambers that cancel, packing that absorbs, a resonator that notches
+a drone) and nothing at all about the steel around it. A Flowmaster was a set of gas volumes.
+
+- [x] **`MufflerSpec.Shell`** — the can as a `VehicleBody`, deliberately the same type as a car's
+      bodywork. A door leaf, a window pane, a car's wing and the side of a muffler are all a flat
+      piece of stuff that rings by one law; a second implementation for exhausts would be that law
+      written twice and free to drift. Everything that makes it sound different is in the numbers:
+      spans of 100-230 mm instead of 250-350 (so the modes land high), a loss factor of 0.03 because
+      a chambered can has no packing and no deadening (so it rings where a car panel thuds), and a
+      drive that is the pressure INSIDE rather than what leaks through a structure.
+- [x] **Driven from the chamber pressure, not the tailpipe.** Those are different signals — the
+      chambers cancel particular frequencies on the way through — so a note can be quiet at the pipe
+      and still ring loudly off the can. Taken as the sum of the two waves meeting at each chamber's
+      junction.
+- [x] **A packed muffler comes out right for free.** The glasspack that absorbs the gas is pressed
+      against the case and damps it too, so `PackedMufflerCase` is the same model with ten times the
+      loss factor. Same model, opposite result, no special case.
+- [x] `shell=off` and `shell=X` on the vehicle spike, for A/B.
+
+**The fault the rev bench found, and it was in the resonator itself:**
+
+- [x] **Every mode was all-pole, so it passed DC.** Measured, the can was adding 5 to 8 dB BELOW
+      200 Hz — beneath every mode it has — and taking the whole render's headroom with it. An
+      all-pole resonator has real gain a long way under its own note; that is harmless with a
+      broadband drive and ruinous with an exhaust, whose pressure is dominated by the firing
+      fundamental at 40-200 Hz, well below the lowest panel mode. A small off-resonance gain on an
+      enormous drive is a lot of output.
+      A panel is a mechanical high-pass — below its fundamental it barely moves, and what little it
+      moves radiates as (ka)² of nothing. Each mode now carries a zero at DC and a matching one at
+      Nyquist, which is what makes it a resonance rather than a filter that happens to peak. The
+      low band fell from 37 % to 2 %, and the sibling of this bug is already in the notes: the
+      muffler chambers were once feedforward combs with a zero at DC where they needed none. This
+      was the same mistake with the sign reversed.
+- [x] With the zeros in, the can measures as structure in the right place: **+5.0 dB at 178 Hz** (the
+      0.23 m span's fundamental, predicted 179), +3.8 at 422, and a lift right through 562 Hz to
+      4.2 kHz — filling in BETWEEN the exhaust's own peaks, which is where "metallic" lives.
+- [x] Comparing renders needs the spectra normalised to their own energy first: `VehicleSynth` scales
+      every render by its peak, so adding energy anywhere makes every other band measure lower. The
+      first comparison read as the can making everything quieter.
+- [x] Declared source levels re-measured twice over, once per change to the resonator. Tests -> 548.
+
+- [ ] **`ShellLevel` is a calibration and it is currently a guess: 0.004.** It carries the whole
+      conversion from pascals inside the can to pascals at a metre outside — transmission through the
+      steel, radiating area, and spreading — as one ratio. Three rev-bench renders are with Cody at
+      0, 0.004 and 0.016 to settle where it sits by ear.
+- [ ] The car BODY layer is honestly a small effect and was oversold: a car's outer panels are big,
+      low and deliberately damped. It stays because it is free, physically right, and the substrate
+      both this and interior audio needed — but it is not what makes a car sound like that car.
+- [ ] **Interior audio still does not exist.** `ClientAudioSystem` never asks whether the listener is
+      riding, so sitting in a car sounds exactly like standing next to it. What it needs: the engine
+      through the body's transmission loss, `CabinLeak` turned up, road noise through the floor, and
+      wind. The cabin MODEL is the part that is done.
+
+## Settled by ear: the can's note, and a field of V8s (2026-09-15)
+
+**Span is the tube's NOTE; the loss factor is its Q.** Confusing those two cost several rounds. Asked
+for "deeper", the case's big face was emphasised — and it made the exhaust MUFFLED rather than fuller,
+because energy piled into 75-180 Hz pulls everything above 750 Hz down with it once the render
+normalises by peak. Asked for more ring, the modes were lengthened — which was heard, exactly right,
+as "making the tube longer when it needs to be wider".
+
+- [x] The shipped `MufflerCase` is the SMALL spans, widened 30 % — lowest mode 194 Hz, ring 0.030.
+      Every setting here was chosen by ear from a bracket, with the level held constant so that only
+      one thing moved at a time.
+- [x] `--muscle-rev` knobs for all of it: `shell=` level, `ring=` loss factor, `wide=` span scale,
+      `case=deep|bright`, `shell=off`. The listening test is reproducible.
+- [x] `DeepMufflerCase` kept, with the reasoning, so nobody re-tries the big face.
+- [x] The diagnostic was lying: it compared the can against PIPE PLUS CAN, so it saturated at 0 dB
+      however loud the can got and a six-fold change read as three decibels. `PipeRadiated` is now
+      tracked separately.
+- [x] `BigCam_IdlesRougherThanStockCam` measures the cam with the case SILENCED. It began failing
+      for a real reason: a can ringing 220 ms carries energy across a 170 ms idle cycle and averages
+      neighbouring cycles together, burying the very variation a lopey cam produces. True of the
+      exhaust, false about the camshaft.
+
+**Four ways to exhaust one V8**, all on the speedway, same mass and gearing so the hardware is the
+only variable — `v8_open_headers` (127.5 dB, no collector, no crossover, no muffler, and therefore no
+case ring at all), `v8_bigcam` (7.4 l on a 330-degree cam that will not idle straight), `v8_glasspack`
+(packing absorbs the top AND damps the case, so mellow is an absence), `v8_mild` (112.1 dB, cast log
+manifolds at 0.42 primary spread). Fifteen decibels apart, none of it dialled in — every figure came
+off `--engine-levels` afterwards.
+
+**Turbo diesels**: four 13-litre truck sixes (2.2 bar, whistle 0.9, a shaft taking 1.4 s to spool)
+and two small turbo-diesels (1.4 bar, 0.9 s). The same mechanism at two sizes on one lap is what
+makes it read as a turbocharger rather than as a noise.
+
+- [ ] Ear-check the new field on the real speedway rather than the rev bench.
+- [ ] `ShellLevel` is still one measured ratio standing in for transmission, radiating area and
+      spreading. It is set where it sounds right, which is honest but is not the same as measured.

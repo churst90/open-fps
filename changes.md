@@ -1034,3 +1034,336 @@ They are on the speedway because the speedway is the map a player actually lands
 cannot reach is a verb nobody has.
 
 Tests 502 → 503 (21 of them new here).
+
+---
+
+# Everybody else's feet
+
+## The quietest things on the map were the ones that mattered most
+
+The only body in the world that made any noise walking was your own. Another player could run past
+you, round you and into you, and the map stayed silent — in a game whose entire proposition is
+knowing where things are by ear, the things a player most needs to locate were the only things with
+no sound at all.
+
+Nothing was missing to fix it. The positions, the velocities and the floor were already on the
+client, being read every frame for other purposes.
+
+## One kind of walking
+
+`LocalPlayerController` had grown a small, hard-won state machine: what counts as a stride, what
+counts as being moved, how fast a body can put a foot down. Every rule in it came out of a fault —
+footsteps on spawning, footsteps while blocked against a wall, footsteps from a reconciliation nobody
+walked — and the last thing that should happen to a set of rules like that is being written a second
+time for remote bodies, where they would quietly stop agreeing with the first.
+
+So `StrideAccumulator` is the rules, and both kinds of body use it. There are two kinds of body that
+walk and only one kind of walking: your own position is predicted here and corrected by the server,
+everybody else's arrives interpolated between two snapshots. A footstep is a footstep either way, and
+nothing downstream of `OnPlayerFootstep` is told whose it was.
+
+## A passenger is silent, and nothing knows what a vehicle is
+
+The rule that catches a spawn reconciliation — *being moved is not walking, so ask the body's own
+velocity* — turned out to answer a question it was never written for.
+
+A player riding in a car has a position that changes and legs that do not. That could have been a
+check for a vehicle, or for a seat, or for a parent; it is none of them. The server zeroes an
+occupant's velocity and its movement system leaves their body to the seat, so a rider is a body at
+rest whose position is changing, which is the same shape as a teleport and refused for the same
+reason. Without it a car at sixty miles an hour is a footstep every half metre of road — a machine
+gun — and the fix for that would have been a special case about cars in a file that should never
+learn what a car is.
+
+## Derived, not sent
+
+A footstep could have been a message. It should not be: that is a reliable packet per body per half
+metre of walking, for something the receiver can work out from what it already has — and worse, the
+step would arrive describing a position the listener has already heard the body leave.
+
+Derived from the interpolated transform, the sound lands exactly where the body is *as this client
+understands it*, which is the only place it can be without contradicting everything else that client
+is being told about where that body is.
+
+The same argument settles the floor. The material under somebody else's feet is not sent either; the
+listener's own copy of the world knows what is under everyone. A body on grass sounds like grass, and
+the protocol did not change by a byte.
+
+## Two cheap answers to expensive questions
+
+**Is it on the ground?** The movement step clamps a grounded body's vertical velocity to zero and
+hands it to gravity otherwise, so this is a fact the client is already being told once a tick. One
+tick of free fall is a third of a metre a second, comfortably clear of any threshold. Probing the
+floor instead would mean walking the static grid and testing five points, per body, at render rate,
+for an answer that changes twice a second.
+
+**What is it standing on?** Asked only at the moment a foot actually meets the floor — twice a second
+at a walk rather than once a frame. That is the difference between affordable and not.
+
+## What it does not do yet
+
+Honestly: every step is the same recorded sample at the same level whether the body is strolling or
+sprinting, and *how fast is that person moving* is precisely the thing a listener wants. That should
+not be a curve somebody chose. A foot is a mass meeting a floor at a speed, which is
+`ImpactAcoustics.Between` — the same calculation that already decides what a dropped rifle sounds
+like, and the one that would retire the last recorded sample left in the walking path.
+
+A body carrying something still carries it in silence, because the client is not told what a remote
+body is holding. A body standing still is silent too — no breathing, no clothing, no effort — and a
+body that has stopped moving is exactly the one you most want to find.
+
+And none of this has been heard. It is measured, it is tested, and settling it needs two clients on
+one map with one of them walking circles round the other.
+
+Tests 503 → 511.
+
+---
+
+# Keys that do things, a run, and getting your breath back
+
+## Shift stopped being a suppressor
+
+Shift used to stop movement dead. That was deliberate — a shift chord should never walk you somewhere
+— and it also made shift-W unusable, which is exactly where a run belongs.
+
+It now modifies the key it is pressed *with*. Shift with a turn key is still a one-degree nudge;
+shift with a movement key is a run; holding both does both. They never collide because they were
+never the same key. Alt still suppresses everything, because alt belongs to the window manager and
+the screen reader. Control no longer does, because control is the trigger now and nobody should have
+to stop moving to shoot.
+
+The binding table learned about modifiers to make this work, and it learned carefully: a binding that
+names modifiers is tried first, and a binding that names none still fires whatever is held. Without
+that second rule, adding modifiers would have silently broken every key that reads its own — the chat
+brackets choose between stepping messages and stepping buffers by asking about shift themselves, and
+a table that refused to fire them under shift would have taken that away without a word.
+
+## Every half metre is a footstep
+
+There was a floor under the footstep rate: no more than five a second. That sounds generous until you
+notice a walk is 4.5 metres a second, which is a footfall every 111 milliseconds — so **more than
+half of every walk was silent**, and a run lost seven in ten.
+
+A cadence cap is a rule about the clock standing in for a rule about distance, and the distance rule
+is the true one. A body that is not moving banks nothing, and a body that is being moved rather than
+walking is refused by its own velocity long before any timer would have caught it. So the cap is
+gone: half a metre of ground is one footfall, at any speed, for anybody.
+
+## Getting your breath back takes longer than losing it
+
+A body that has been running is audible after it stops, and that is information rather than
+decoration. It says somebody came this way at speed. It says which of two people has been chasing
+you. And it is the **only sound a body makes once it has stopped moving** — which makes it the only
+way to find somebody who has stopped to listen for you.
+
+`Breathing` is an integrator with two time constants: about fifteen seconds to get out of breath,
+about thirty-five to get it back. The asymmetry is the whole point — the breathing outlasts the
+running by long enough to be worth listening for. Breath rate and level follow exertion, so a body
+goes from fifteen inaudible breaths a minute to fifty you can place across a room, and which half of
+the cycle is loud moves too: at rest the exhale is the audible one, and a winded body is the other
+way round, because the gasp going *in* is the loud part.
+
+Nobody recorded any of it. A breath is turbulent air through a narrow opening, which is a hiss, and
+the transient synthesiser has known how to make one of those since doors did. It goes out through
+`WorldAudioPlayer`, so it is attenuated, occluded through walls, reverberated by the room and placed
+in the listener's head by exactly the code that handles a gunshot — none of which had to learn what
+breathing is. Your own, and everybody else's, through the same call.
+
+The levels are measured and have never been heard. Three reference recordings would settle them: a
+person at rest, after a jog, and after a hard sprint.
+
+## P answers the question it was asked
+
+P used to send `scan` to the server — the five nearest things in any direction, most of them the
+floor — and cross the network to do it. It now answers *what am I looking at*, here, from geometry
+the client already has: what it is, **what it is made of**, and how far.
+
+The material is there because it is what the thing will *sound* like when something happens to it, so
+it is the difference between "a wall" and a wall you now expect to ring. With nothing in front of you
+the answer is your zone and your heading, because "nothing directly ahead" is a non-answer to
+somebody who pressed a key to find out where they were pointing. Shift-P is the old scan.
+
+## Zones say themselves
+
+Crossing into a room announces it, without interrupting — because crossing a doorway must not cut off
+whatever you were being told, which is very often the thing that made you walk through it.
+
+Keyed on the region **id**, never its name. Two rooms can share a name, and the outdoor fallback name
+flips between "Outside" and "Under Shelter" on a continuous shelter value, so a name-keyed announcer
+would have said something every time a bridge passed overhead. The id changes exactly when you cross
+a boundary, which is exactly when a player wants to be told.
+
+## Lists that are worth listening to
+
+F5 is the players, shift-F5 the players *here*. F6 is the maps, shift-F6 your own. The plain key is
+the wider question and shift narrows it to where you are, on both, so there is one rule to remember
+rather than two.
+
+A player list used to be names. Names tell you what exists; *where* tells you where the game is, so
+it reads "four of them are on the map you are on" and sorts the reachable people first. The map list
+is answered from the maps the server has **loaded**, not the ones on disk, because a map the server
+has not loaded is not somewhere you can go and a chooser that offers unreachable places is worse than
+no chooser.
+
+What it does not do yet is take you there. There is no runtime map change in the game at all —
+`CurrentMapId` is set once at login and never again — which is also why everything in `default.json`
+has been unreachable since the speedway claimed the spawn.
+
+Tests 511 → 527, and walked on a live server rather than only asserted.
+
+---
+
+# The car the engine is bolted into
+
+Two cars with the same engine do not sound the same, and almost none of the difference is the engine.
+It is a couple of square metres of thin steel, a floorpan the exhaust runs the length of, and a box
+of air in the middle with people sitting in it — all of it driven by the engine and radiating on its
+own account. The physical model has always made the source well and has never had the car.
+
+## Why the body can be an impulse response and the exhaust cannot
+
+This is the whole reason the layer goes where it goes.
+
+The gas path is not time-invariant. Exhaust gas leaves the head at 700 to 900 degrees, the speed of
+sound goes as the square root of absolute temperature, and every resonance in the pipes therefore
+sits about 75 % higher hot than cold — and moves with load, which is part of why an engine's timbre
+changes under power rather than only its pitch. An impulse response is a fixed filter. Fit one at
+2,300 rpm and it is wrong at 4,000.
+
+A steel roof panel does not care how hot the exhaust gas is. So the split is: pipes stay in the
+waveguide model and get the temperature scaling they still want; the body becomes a response, fixed,
+and swappable to make a different car.
+
+## A resonator bank *is* the convolution
+
+A modal impulse response is a sum of decaying sinusoids — that is what a mode is. Running the signal
+through a parallel bank of two-pole resonators tuned to those modes computes exactly what convolving
+with the rendered response computes. The only difference is the bill: a 60 ms response at 48 kHz is
+2,900 taps per sample, against six multiply-adds per mode.
+
+So the bank is what runs, and `--body-ir` renders the response itself when you want to hear it, load
+it into something else, or hold it against a recording of a real car.
+
+It costs nothing. Measured A/B in Release: `nascar_v8` renders at 8.5 times realtime with the body
+and 8.4 without. Levels are unchanged too — 119.3 dB measured against 119 declared — which is the
+test that it colours rather than simply turning things up.
+
+## Three things measuring found, all of them physics left out
+
+**The panel spans were the size of the pressings.** The first render put 97 % of a saloon's energy
+below 200 Hz, which is not a car, it is a bass boost. A door skin 1.2 m across, treated as a free
+flat plate, has a fundamental around four hertz — and a real one does not drum at four hertz, because
+it is pressed with beads and swages, curved in two directions, and spot-welded to a structure every
+few inches. Every one of those divides it into sub-panels. What sets the note is the distance between
+the **stiffeners**, which on a production car is 150 to 400 mm. It is also exactly why a van booms
+and a saloon does not: a van's flat sides are stiffened far more sparsely.
+
+**The low modes were given the radiation efficiency of the high ones.** A panel that is small
+compared with the wavelength it is moving at barely radiates at all: its two halves push and pull
+against each other and the air moves round the edge instead of being compressed. Power goes as (ka)²
+until the panel is about a wavelength across. This is the same law `OpenEnd.Radiate` already applies
+at the end of an exhaust pipe, where leaving it out was what made every high-revving engine come out
+ten decibels too loud and top-heavy. Here it does the opposite and is just as necessary — a panel's
+low modes are driven hardest and radiate worst, and only both facts together give a real balance.
+
+**And one about who is listening.** With the cabin at full weight it still swamped everything, and
+the reason is that a cabin boom is a resonance of the air *inside* the car. It is what the driver
+hears. It reaches the street only by driving the bodywork from the inside, or leaking past the seals.
+Hence `CabinLeak` — and deliberately a leak rather than a deletion, because that same cabin at full
+weight is precisely what an interior mix needs, and a player can already sit in one of these cars.
+When interior audio arrives it turns this number up instead of inventing a model.
+
+## What came out
+
+Five bodies, and the differences between them fall out of the numbers describing them rather than
+being dialled in afterwards. Percentages are energy below 200 Hz, up to 1.5 kHz, and above:
+
+- **Saloon** 37/55/8, ringing 29 ms — deadened, which is what a manufacturer pays for.
+- **Van** 30/60/10, 85 ms — thicker, flatter, sparsely stiffened, barely deadened.
+- **Supercar** 33/53/14, 38 ms — small thick heavily-stiffened panels, so the brightest of them.
+- **Race saloon** 44/51/5, 248 ms — a stripped shell rings for a quarter of a second, and sounds it.
+- **Open-wheeler** 34/66/1, 16 ms — no cabin, almost no panel, which is itself the character.
+
+Nothing here has been heard yet. `--body-ir` writes each response out to audition on its own, and
+`--speedway` puts them under an engine.
+
+Tests 527 → 545.
+
+---
+
+# The note of a tube, and a field of V8s
+
+## Span is the note; damping is the Q
+
+This took several rounds to learn and the correction came from a listener, not a measurement.
+
+Asked to make the muffler case deeper, I emphasised its big flat face — and made the car **muffled**
+rather than fuller. Energy piled into 75-180 Hz pulls everything above 750 Hz down with it once the
+render normalises by peak: measured, four to thirteen decibels off the top. Asked for more resonance,
+I lengthened the ring, and got told, exactly right, that I was *making the tube longer when it needed
+to be wider*.
+
+They are two independent levers and I had been reaching for the wrong one. The **span** of a panel
+sets the pitch of its ring; the **loss factor** sets how long it sustains. Widening the spans 30 %
+drops every mode about five semitones together, leaving the character untouched — which is what was
+wanted all along.
+
+The shipped case is the small spans — the end caps, seams and baffle-welded strips, not the big face
+— widened 30 %, ringing for 0.030. Every one of those was picked out of a bracket by ear with the
+level held constant so only one thing moved at a time, and `--muscle-rev` now carries the knobs
+(`shell=`, `ring=`, `wide=`, `case=`) so the test is reproducible rather than a memory.
+
+The big-face configuration is kept as `DeepMufflerCase` along with the reasoning, so nobody tries it
+again. Its second failure is the more interesting one: with the low modes lightly damped, one of them
+*integrates* the firing harmonics across a rev — each pass adding to what has not yet decayed — until
+it carries 97 per cent of the spectrum and the car is a single droning note.
+
+## The diagnostic was lying
+
+Worth recording because it wasted a round. The "how loud is the can" figure compared the can against
+`Radiated` — which already included the can. So it saturated at 0 dB however loud the can got, and a
+six-fold change in level read as three decibels. The pipe's contribution is tracked separately now.
+
+## A test that broke for a true reason
+
+`BigCam_IdlesRougherThanStockCam` measures a lopey cam by cycle-to-cycle variation at the tailpipe,
+and it started failing the moment the case could ring. A can ringing for 220 ms carries energy across
+a 170 ms idle cycle, averaging neighbouring cycles together and burying the exact variation being
+looked for. That smoothing is a true property of the exhaust system and a false reading of the
+camshaft, so the cam is now measured with the case silenced.
+
+## Four ways to exhaust one V8
+
+Same cylinders, same firing order, same mass, same gearing, same tyres. Anything you can hear between
+them is the hardware — and no sample library ships the same engine four ways.
+
+**Open headers** dump the primaries into the air at the collector: no crossover, no muffler, no
+tailpipe. Nothing cancels the harmonics and nothing absorbs them, and it is the only car out there
+with no muffler *case*, so it has none of the metallic ring the others have. Its rawness is what is
+absent. 127.5 dB, loudest thing on the circuit.
+
+**Big cam** is 7.4 litres on a 330-degree cam. It will not idle straight, because that much overlap
+has a cylinder breathing its neighbour's exhaust and the burn goes ragged — the lope is a misfire
+nobody fixed, because it is what the cam is for.
+
+**Glasspacks** mellow the same big block, and mellow here is an *absence*: packing absorbs the top of
+the band rather than notching bands out of it, and because it is pressed against the case it damps
+that too, so the metallic ring goes with it. It could not be faked by turning something down.
+
+**Mild small block** is the quietest thing on the track at 112.1 dB, on cast log manifolds whose
+primaries are nowhere near equal — spread 0.42 against a header's 0.12, and eight pipes at eight
+pitches is a band where eight at one pitch is a tube.
+
+Fifteen decibels separate the loudest from the quietest and none of it was dialled in; every figure
+came off `--engine-levels` after the fact.
+
+## And the turbos
+
+Four 13-litre truck sixes now instead of two, because the turbo is the point of them and one passing
+occasionally is not enough to hear it work: 2.2 bar of boost, a whistle level of 0.9, and a shaft
+that takes **1.4 seconds** to come up, so it spools out of a corner, holds down the straight and
+hisses off when the driver lifts. Two small turbo-diesels alongside them run 1.4 bar and spool in
+0.9 s. The same mechanism at two sizes on one lap is what makes it read as a turbocharger rather
+than as a noise.
+
+Tests 548.

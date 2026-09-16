@@ -344,7 +344,15 @@ public sealed class EngineVoiceState
         Driveline = new Driveline(v);
         Driver = new VirtualDriver(Driveline, Engine);
         _rng = new Random(seed);
+        _body = new BodyResonator(v.Body ?? VehicleBody.None, sampleRate);
     }
+
+    /// <summary>The car's own resonances. Built once: the modes are a property of the vehicle, not
+    /// of what it is doing.</summary>
+    private readonly BodyResonator _body;
+
+    /// <summary>How many body modes this voice is running. Diagnostic, for the cost report.</summary>
+    public int BodyModeCount => _body.ModeCount;
 
     /// <summary>
     /// Starts the voice as a car ALREADY DOING this speed, rather than as one that has to get there.
@@ -409,6 +417,19 @@ public sealed class EngineVoiceState
             float tyre = VehicleSynth.Tyre(Vehicle.Tyres, Driveline.Speed, RoadSlip + _tyreChirp, _rng, ref _tyre);
             // Tyres are in arbitrary units; place them about 30 dB under a loud exhaust.
             float pa = Engine.Exhaust + (Engine.Intake + Engine.Block * 0.4f) * FrontMix + tyre * 1.2f * TyreMix;
+
+            // ...and then the car it is all bolted into. The body is driven by everything above and
+            // rings on its own account, so it is ADDED to the direct sound rather than replacing it:
+            // the tailpipe still radiates straight at the listener, and the panels ring as well.
+            // This is the one part of a vehicle that is linear and time-invariant, which is why it
+            // can be a fixed impulse response while the gas path — whose resonances move 75 % with
+            // exhaust temperature — cannot. See VehicleBody.
+            // Driven by the EXHAUST, not by the finished mix: that is what physically shakes a
+            // floorpan, and it is how the offline VehicleSynth render drives it too. Two renderers,
+            // one rule — a body that coloured one and not the other is how a change can be measured
+            // as working and heard as nothing.
+            pa += _body.Process(Engine.Exhaust);
+
             float y = pa * gain;
             // A soft ceiling: the physics can spike past any fixed reference on a backfire.
             float o = y > 0.8f || y < -0.8f ? MathF.Tanh(y) : y;

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace OpenFPS.Common;
 
@@ -95,6 +96,51 @@ public static class PanelAcoustics
             }
 
         return best == 0f ? 0f : MathF.Min(best, 6000f);
+    }
+
+    /// <summary>One plate-bending mode: which one it is, and what note it sounds.</summary>
+    public readonly record struct PlateMode(int M, int N, float Hz, float Weight);
+
+    /// <summary>
+    /// Every mode of a panel that a broadband drive actually excites, lowest first.
+    ///
+    /// <see cref="RingHz"/> answers "what note does this thing make when struck", which needs one
+    /// frequency. Colouring a continuous sound needs the SERIES, because that is what a panel does to
+    /// everything passing through it rather than what it does once when hit.
+    ///
+    /// The weights are not a taste curve, they are a selection rule. A plate driven by pressure
+    /// spread over its whole face couples to a mode by the integral of that mode's shape across it,
+    /// and for a simply-supported plate that integral is proportional to
+    /// (1 - cos m*pi)(1 - cos n*pi) / (m n pi²) — which is ZERO unless m and n are both odd, and
+    /// 4/(m n pi²) when they are. Half the modes are simply not driven: their two halves move in
+    /// opposite directions and cancel. So a uniformly-driven panel is a much sparser thing than its
+    /// mode count suggests, and the ones that survive fall away as 1/(m n).
+    /// </summary>
+    public static List<PlateMode> Modes(MaterialProperties material, float width, float height,
+                                        float thickness, float maxHz = 6000f, int order = 7)
+    {
+        var modes = new List<PlateMode>();
+
+        float rho = MathF.Max(1f, material.DensityKgM3);
+        float e = material.YoungsModulusGPa * 1e9f;
+        if (e <= 0f) return modes;
+
+        float a = MathF.Max(0.05f, width);
+        float b = MathF.Max(0.05f, height);
+        float t = Math.Clamp(thickness, 0.0002f, 0.5f);
+        float scale = 0.4755f * t * MathF.Sqrt(e / rho);
+
+        // Odd m and odd n only — the rest are driven with zero net force by a distributed pressure.
+        for (int m = 1; m <= order; m += 2)
+            for (int n = 1; n <= order; n += 2)
+            {
+                float hz = scale * (m * m / (a * a) + n * n / (b * b));
+                if (hz < MinimumRingHz || hz > maxHz) continue;
+                modes.Add(new PlateMode(m, n, hz, 1f / (m * n)));
+            }
+
+        modes.Sort((x, y) => x.Hz.CompareTo(y.Hz));
+        return modes;
     }
 
     /// <summary>

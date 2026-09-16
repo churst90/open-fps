@@ -65,9 +65,15 @@ public static class VehicleSynth
         var engine = new EngineSynth(v.Engine, SampleRate, seed);
         var driveline = new Driveline(v);
         var driver = new Driver(driveline, engine);
+        // The car the engine is bolted into. Driven by the EXHAUST rather than by the finished mix,
+        // because that is what physically shakes a floorpan — and because EngineVoiceState drives it
+        // the same way, so the offline render and the game's live voice cannot disagree about what a
+        // car sounds like. They are two renderers of one model and this is the seam where that shows.
+        var body = new BodyResonator(v.Body ?? VehicleBody.None, SampleRate);
         foreach (var line in engine.Describe()) log.Add("  " + line);
 
         float dt = 1f / SampleRate;
+        double shellEnergy = 0, pipeEnergy = 0;
         var tyreVoice = default(TyreVoice);
         float lastSpeed = 0f, chirp = 0f;
         int tyreGear = 0;
@@ -89,7 +95,9 @@ public static class VehicleSynth
             {
                 driver.Apply(order, phase, dt);
                 driveline.Step(engine, dt);
-                exhaust[at] = engine.Exhaust;
+                exhaust[at] = engine.Exhaust + body.Process(engine.Exhaust);
+                shellEnergy += engine.ExhaustShell * engine.ExhaustShell;
+                pipeEnergy += engine.ExhaustPipe * engine.ExhaustPipe;
                 intake[at] = engine.Intake + engine.Block;
                 port[at] = engine.PortSum;
                 // What the tyres are being asked for, from the car's own motion. Straight-line only
@@ -130,6 +138,12 @@ public static class VehicleSynth
         }
 
         // Levels before normalising, so the game knows how loud each source really is.
+        // How loud the can is against the pipe. Printed because "I could not tell the three apart"
+        // is only answerable by a number: a layer nobody can hear is either too quiet or not there.
+        if (shellEnergy > 0f)
+            log.Add($"  muffler case {10.0 * Math.Log10(shellEnergy / Math.Max(1e-20, pipeEnergy)):F1} dB "
+                  + $"against the pipe (ShellLevel {v.Engine.Exhaust.Muffler.ShellLevel:G3})");
+
         float exDb = LoudestSecondDb(exhaust);
         float inDb = LoudestSecondDb(intake);
         log.Add($"  exhaust {exDb:F0} dB SPL at 1 m in its loudest second, intake+block {inDb:F0} dB");

@@ -190,6 +190,9 @@ public static class EngineCostSpike
     public static int Run(string[] args)
     {
         float kmh = 180f, seconds = 4f;
+        // body=off strips the car's own resonances, so what they cost can be measured rather than
+        // assumed. A remembered figure from a different build is not a baseline.
+        bool withBody = true;
         var presets = new System.Collections.Generic.List<string>();
         foreach (var arg in args)
         {
@@ -200,6 +203,7 @@ public static class EngineCostSpike
                 string k = arg[..eq], v = arg[(eq + 1)..];
                 if (k == "kmh") kmh = float.Parse(v);
                 else if (k == "sec") seconds = float.Parse(v);
+                else if (k == "body") withBody = v != "off" && v != "0";
             }
             else if (VehicleProfile.Presets.ContainsKey(arg)) presets.Add(arg);
         }
@@ -214,7 +218,9 @@ public static class EngineCostSpike
 
         foreach (var key in presets)
         {
-            var voice = new EngineVoiceState(VehicleProfile.ByName(key), sr, 7) { TargetSpeed = kmh / 3.6f };
+            var profile = VehicleProfile.ByName(key);
+            if (!withBody) profile = profile with { Body = VehicleBody.None };
+            var voice = new EngineVoiceState(profile, sr, 7) { TargetSpeed = kmh / 3.6f };
 
             // The FIRST half second, before anything has settled — the column this spike spent its
             // whole life not having.

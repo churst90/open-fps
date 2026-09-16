@@ -1,3 +1,4 @@
+using System.Linq;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -380,10 +381,46 @@ public static class VehicleSpike
         finally { provider.Dispose(); }
     }
 
-    public static int Run(bool live, bool stationary = false, bool muscle = false, string? preset = null)
+    public static int Run(bool live, bool stationary = false, bool muscle = false, string? preset = null,
+                          bool withBody = true, float? coupling = null, bool withShell = true,
+                          float? shellLevel = null, string? shellCase = null, float? shellLoss = null,
+                          float? shellWiden = null)
     {
         AcousticRegistry.Initialize();
         var v = preset != null ? VehicleProfile.ByName(preset) : muscle ? VehicleProfile.V8Muscle : VehicleProfile.V8Sports;
+        // body=off renders the same car with its shell taken away, so the two files can be played
+        // against each other. A demo of a new layer that cannot be turned off is not a demo of it.
+        if (!withBody) v = v with { Body = VehicleBody.None };
+        // coupling=X overrides how much of the engine gets into the structure. It is the one number
+        // in the body model still set by judgement rather than measured, so it is the one a listening
+        // test has to be able to move.
+        else if (coupling.HasValue && v.Body != null) v = v with { Body = v.Body with { Coupling = coupling.Value } };
+        // shell=off silences the muffler CAN while leaving everything the gas does untouched, which
+        // is the only way to hear what the metal is contributing on its own.
+        // case=bright swaps the can's big face for its small spans, which is the difference between
+        // ring at 73 Hz and ring across the whole sound.
+        if (shellCase != null)
+            v = v with { Engine = v.Engine with { Exhaust = v.Engine.Exhaust with {
+                Muffler = v.Engine.Exhaust.Muffler with {
+                    Shell = shellCase == "deep" ? VehicleBody.DeepMufflerCase : VehicleBody.MufflerCase } } } };
+        // ring=X is the case's loss factor: how LONG it rings, as against how loud. "More aggressive"
+        // can mean either, and they are different knobs with different sounds.
+        // wide=X scales the case's free spans, which moves the PITCH of its ring without touching how
+        // long it rings for. A longer tube and a wider tube are different things: ring length is the
+        // tube's Q, span is its note.
+        if (shellWiden.HasValue && v.Engine.Exhaust.Muffler.Shell is { } wb)
+        {
+            var spans = wb.PanelSpansM.Select(x => x * shellWiden.Value).ToArray();
+            v = v with { Engine = v.Engine with { Exhaust = v.Engine.Exhaust with {
+                Muffler = v.Engine.Exhaust.Muffler with { Shell = wb with { PanelSpansM = spans } } } } };
+        }
+        if (shellLoss.HasValue && v.Engine.Exhaust.Muffler.Shell != null)
+            v = v with { Engine = v.Engine with { Exhaust = v.Engine.Exhaust with {
+                Muffler = v.Engine.Exhaust.Muffler with {
+                    Shell = v.Engine.Exhaust.Muffler.Shell with { PanelLoss = shellLoss.Value } } } } };
+        if (!withShell || shellLevel.HasValue)
+            v = v with { Engine = v.Engine with { Exhaust = v.Engine.Exhaust with {
+                Muffler = v.Engine.Exhaust.Muffler with { ShellLevel = withShell ? shellLevel!.Value : 0f } } } };
         var e = v.Engine;
         var gb = v.Gearbox;
 

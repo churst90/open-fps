@@ -1,49 +1,45 @@
 using System;
 using System.Numerics;
+using OpenFPS.Common;
 using OpenFPS.Common.Components;
 
 namespace OpenFPS.Client.Core;
 
 /// <summary>
-/// Responsibility: Owns the high-level movement logic, air-time tracking, 
-/// and physical event generation (footsteps, landing) for the local player.
+/// Responsibility: the local player's physical events — footsteps and landings — from the position
+/// prediction already owns.
+///
+/// What a stride IS lives in <see cref="StrideAccumulator"/>, which this shares with every other body
+/// on the map (see <see cref="OtherBodies"/>). All that is local about the local player is where the
+/// three facts come from: the ground state and the material underfoot are the ones the client's own
+/// physics worked out this frame, rather than anything that had to travel.
 /// </summary>
 public class LocalPlayerController
 {
     private readonly LocalPlayerState _state;
-    
-    private Vector3? _lastPosition = null;
-    private float _accumulatedDistance = 0.0f;
-    private int _stepCount = 0;
-    private bool _wasInAir = false;
-    private DateTime _lastFootstepTime = DateTime.MinValue;
-    private DateTime _lastLandTime = DateTime.MinValue;
+    private readonly StrideAccumulator _stride = new();
+    private readonly Breathing _lungs = new();
+    private double _lastUpdateAt = -1;
 
-    /// <summary>Furthest a player could plausibly move under their own feet in ONE update, metres.
-    /// Anything past this is a teleport, a spawn or a server correction — not a step.</summary>
-    private const float MaxStrideStep = 1.0f;
+    /// <summary>How far above the player's feet the breath comes from, metres.</summary>
+    private const float HeadHeight = 1.7f;
 
-    /// <summary>Slowest the player's OWN velocity can be and still be walking, m/s. Below this any
-    /// movement in the position is something being done to them, not by them.</summary>
-    private const float MinStrideSpeed = 0.5f;
-
-    /// <summary>
-    /// Forgets where the player was, for a spawn or a teleport.
-    ///
-    /// Without it the first update after a spawn measures a stride from wherever the player last
-    /// stood — the lobby, the previous map — which is caught by the size test only because it
-    /// happens to be large. Saying so explicitly is better than relying on the distance being big
-    /// enough, and it costs one call at the one place that knows a teleport happened.
-    /// </summary>
+    /// <summary>Forgets where the player was, for a spawn, a teleport, or getting in or out of a seat.</summary>
     public void Teleported()
     {
-        _lastPosition = null;
-        _accumulatedDistance = 0f;
-        _wasInAir = false;
+        _stride.Forget();
+        _lastUpdateAt = -1;
     }
 
     public event Action<Vector3, string, string>? OnStepTriggered; // Position, Material, Variant
     public event Action<Vector3, string, string>? OnLandTriggered;
+
+    /// <summary>The player took a breath. Getting in and out of a seat does NOT reset this the way it
+    /// resets the stride: a driver who sprinted to the car is still out of breath in it.</summary>
+    public event Action<Vector3, Breath>? OnBreath;
+
+    /// <summary>How hard the player is working, 0 to 1. For a spoken readout, and for tests.</summary>
+    public float Exertion => _lungs.Exertion;
 
     public LocalPlayerController(LocalPlayerState state)
     {
@@ -52,96 +48,36 @@ public class LocalPlayerController
 
     public void Update(Vector3 newPosition, Vector3 velocity)
     {
-        // Grounded based on physics state
-        bool isGrounded = _state.IsGrounded; 
+        Breathe(newPosition, velocity);
 
-        if (!isGrounded) 
-        {
-            _wasInAir = true;
-        }
+        var fall = _stride.Update(newPosition, velocity, _state.IsGrounded, _state.Rotation);
+        if (!fall.Anything) return;
 
-        if (isGrounded && _wasInAir)
-        {
-            // We just landed!
-            // We allow landing sounds even if material is "None" as a fallback to Generic
-            if ((DateTime.Now - _lastLandTime).TotalMilliseconds > 500)
-            {
-                string mat = _state.CurrentMaterial == "None" ? "Generic" : _state.CurrentMaterial;
-                OnLandTriggered?.Invoke(newPosition, mat, _state.CurrentVariant);
-                _lastLandTime = DateTime.Now;
-                _accumulatedDistance = 0.0f; // Reset stride on landing
-            }
-            _wasInAir = false;
-        }
+        // "None" is what the ground probe says when it found no floor to name; a landing is still a
+        // landing on it, so it falls back rather than going silent.
+        string mat = _state.CurrentMaterial == "None" ? "Generic" : _state.CurrentMaterial;
 
-        if (_lastPosition.HasValue)
-        {
-            // Only accumulate distance for footsteps if we are actually grounded
-            if (isGrounded)
-            {
-                Vector3 flatMove = new Vector3(newPosition.X - _lastPosition.Value.X, 0, newPosition.Z - _lastPosition.Value.Z);
-                float moveLen = flatMove.Length();
+        if (fall.Landed) OnLandTriggered?.Invoke(newPosition, mat, _state.CurrentVariant);
+        if (fall.Stepped) OnStepTriggered?.Invoke(fall.StepPosition, mat, _state.CurrentVariant);
+    }
 
-                // A stride is something a person did. A jump in position is not.
-                //
-                // The accumulator cannot tell walking from being MOVED: spawning, a server
-                // correction, a teleport. Arriving on a map, the client's predicted position and the
-                // server's authoritative one reconcile over several frames, and every correction was
-                // banked as distance walked — so a player who had not touched a key heard a burst of
-                // footsteps on landing.
-                //
-                // Judged as a distance per update rather than a speed, deliberately. A speed needs a
-                // delta time, and this is called at whatever rate its caller manages — including, in
-                // tests, as fast as a loop will go — so a wall clock makes the rule depend on how
-                // fast the game happens to be running. A metre in one update is past anything a
-                // stride explains at any sane rate: a sprinter at six metres a second covers a fifth
-                // of that between frames.
-                // ...and the second half of the same idea: a stride is something a person did ON
-                // PURPOSE, so ask the player's own VELOCITY whether they were walking at all.
-                //
-                // The size test above catches a teleport, which is one big jump. It does not catch a
-                // RECONCILIATION, which is a run of small ones: arriving on a map, the predicted
-                // position and the server's authoritative one converge over several frames in steps
-                // of a few centimetres each — every one of them under a metre, every one of them
-                // "plausible", and together more than enough to bank a stride. Heard as a few
-                // footsteps on being dropped onto the map, from a player who has not touched a key,
-                // dying away as the reconciliation settles.
-                //
-                // Velocity is the thing that tells them apart, and it was already being passed in
-                // and thrown away. A correction moves you without your legs; standing still, the
-                // predicted velocity is zero however far the server drags you.
-                float ownSpeed = new Vector2(velocity.X, velocity.Z).Length();
-                bool walking = ownSpeed > MinStrideSpeed;
-                bool plausibleStride = moveLen <= MaxStrideStep;
-                if (!plausibleStride || !walking) _accumulatedDistance = 0f;
-                else if (moveLen > 0.001f) _accumulatedDistance += moveLen;
-            }
-            else
-            {
-                _accumulatedDistance = 0; // Don't bank up footsteps while in mid-air
-            }
-            
-            if (_accumulatedDistance > 1.0f) _accumulatedDistance = 1.0f; 
-        }
-        _lastPosition = newPosition;
+    /// <summary>
+    /// Lungs run on elapsed time, not on frames — this is called at whatever rate the renderer
+    /// manages, and how out of breath somebody is cannot depend on that.
+    /// </summary>
+    private void Breathe(Vector3 position, Vector3 velocity)
+    {
+        double now = OpenFPS.Common.AudioClock.Now;
+        if (_lastUpdateAt < 0) { _lastUpdateAt = now; return; }
 
-        if (isGrounded && _accumulatedDistance >= 0.5f)
-        {
-            if ((DateTime.Now - _lastFootstepTime).TotalMilliseconds > 200)
-            {
-                _stepCount++;
-                float lateralOffset = (_stepCount % 2 == 0) ? 0.15f : -0.15f; 
-                Vector3 rightVector = Vector3.Transform(Vector3.UnitX, _state.Rotation);
-                
-                Vector3 stepPos = newPosition + (rightVector * lateralOffset);
-                stepPos.Y = newPosition.Y; 
+        float dt = (float)(now - _lastUpdateAt);
+        _lastUpdateAt = now;
+        // A gap that long is a stall, a load or a breakpoint, and integrating it would have the
+        // player recover a minute of breath in one frame.
+        if (dt <= 0f || dt > 1f) return;
 
-                string mat = _state.CurrentMaterial == "None" ? "Generic" : _state.CurrentMaterial;
-                OnStepTriggered?.Invoke(stepPos, mat, _state.CurrentVariant);
-                _lastFootstepTime = DateTime.Now;
-            }
-            // Always consume the distance so we don't spam footsteps when the timer expires while stationary
-            _accumulatedDistance %= 0.5f; 
-        }
+        float speed = new Vector2(velocity.X, velocity.Z).Length();
+        if (_lungs.Update(speed, dt, out var breath))
+            OnBreath?.Invoke(position + new Vector3(0, HeadHeight, 0), breath);
     }
 }

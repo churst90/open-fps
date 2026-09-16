@@ -530,6 +530,7 @@ public class ClientAudioSystem
         _state.PrecipitationIntensity = world.PrecipitationIntensity * (1.0f - _state.ShelterFactor);
 
         // Update readable region for accessibility
+        _state.CurrentRegionId = regId;
         if (world.AcousticMap != null && world.AcousticMap.Regions.TryGetValue(regId, out var reg))
         {
             _state.CurrentRegion = reg.FriendlyName;
@@ -1279,6 +1280,41 @@ public class ClientAudioSystem
             // Signal the audio engine to recreate the reverb bus with updated material data.
             _audio.SetAcousticMap(_lastAcousticMap);
         }
+    }
+
+    private int _breathSeed;
+
+    /// <summary>
+    /// A body breathing, through the same channel as every other short sound in the world.
+    ///
+    /// Nobody recorded any of these. A breath is turbulent air through a narrow opening — a hiss —
+    /// and the transient synthesiser has known how to make one of those since doors did. Routing it
+    /// through <see cref="WorldAudioPlayer"/> rather than playing a sample means it is attenuated,
+    /// occluded through walls, reverberated by the room and placed in the listener's head by exactly
+    /// the code that handles a gunshot, none of which had to learn what breathing is.
+    /// </summary>
+    public void OnBreath(int entityId, Vector3 position, OpenFPS.Common.Breath breath)
+    {
+        if (!breath.Taken) return;
+
+        WorldAudio.Receive(new OpenFPS.Common.Networking.WorldAudioEvent
+        {
+            SourceEntityId = entityId,
+            Label = breath.IsInhale ? "breath in" : "breath out",
+            Seed = unchecked(++_breathSeed),
+            Sounds = new System.Collections.Generic.List<OpenFPS.Common.TransientSound>
+            {
+                new OpenFPS.Common.TransientSound
+                {
+                    Character = OpenFPS.Common.SoundCharacter.Hiss,
+                    Position = position,
+                    LevelDb = breath.LevelDb,
+                    Hz = breath.Hz,
+                    DecaySeconds = breath.DecaySeconds,
+                    Noisiness = 1.0f,
+                },
+            },
+        }, OpenFPS.Common.AudioClock.Now);
     }
 
     public void OnPlayerLand(Vector3 pos, string mat, string var)

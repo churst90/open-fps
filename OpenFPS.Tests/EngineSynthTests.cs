@@ -531,6 +531,16 @@ public class EngineSynthTests
                 ExhaustCam = baseE.ExhaustCam with { DurationDegrees = duration },
                 IntakeCam = baseE.IntakeCam with { DurationDegrees = duration - 4f },
             };
+            // With the muffler CASE silenced, because the claim under test is about the camshaft.
+            //
+            // This started failing when the case gained its ring, and for a real reason rather than
+            // a broken one: a can ringing for 220 ms carries energy across an idle cycle of 170 ms,
+            // so it averages neighbouring cycles together and buries exactly the cycle-to-cycle
+            // difference a lopey cam produces. That smoothing is a true property of the exhaust
+            // system and a false reading of the cam, so the cam is measured without it.
+            e = e with { Exhaust = e.Exhaust with {
+                Muffler = e.Exhaust.Muffler with { ShellLevel = 0f } } };
+
             var v = VehicleProfile.V8Sports with { Engine = e };
             var r = VehicleSynth.Render(v, new List<DriveOrder> { new(DriverAction.Cranking, 0.5f), new(DriverAction.Idling, 6f) }, 5);
             // Cycle-to-cycle variation of the exhaust energy over the last three seconds.

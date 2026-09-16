@@ -309,10 +309,49 @@ CLASSES = [
 # holds three, so they are the only things on the track that actually squeal in the corners. And
 # the turbo hatches sound lazy next to the atmospheric cars at the same speed, because torque at
 # three thousand means taller gearing and fewer revs for the same lap.
+# Eight MUSCLE CARS join them, and they are the same car four ways.
+#
+# One V8, four exhausts, nothing else changed between them — same mass, same gearing, same street
+# tyres — so anything you can hear between them is the hardware and nothing else. No sample library
+# ships the same engine four ways; this is the clearest demonstration the project has that none of
+# this is a recording.
+#
+# What to listen for as they come past:
+#   OPEN HEADERS    the primaries dumping straight into the air. No collector, no crossover, no
+#                   muffler, no tailpipe — so nothing cancels the harmonics and nothing absorbs
+#                   them. It is also the only car out there with no muffler CASE, so it has none of
+#                   the metallic ring the chambered cars have. Loudest thing on the circuit at
+#                   127 dB, and raw because of what is ABSENT.
+#   BIG CAM         7.4 litres on a 330-degree cam. Listen at low revs: it will not idle straight,
+#                   because that much overlap has a cylinder breathing its neighbour's exhaust and
+#                   the burn goes ragged. The lope is a misfire nobody fixed.
+#   GLASSPACK       the same big block, mellowed. Packing ABSORBS the top of the band instead of
+#                   cancelling notches out of it, and because the packing is pressed against the
+#                   case it damps that too — so the metallic ring goes with it. Mellow here is an
+#                   absence, which is why it could not be faked by turning something down.
+#   MILD           a small block on cast log manifolds, 112 dB and the quietest thing on the track.
+#                   Its primaries are nowhere near equal (spread 0.42 against a header's 0.12) and
+#                   eight pipes at eight pitches is a band where eight at one pitch is a tube.
+#
+# Fifteen decibels separate the open headers from the mild one, and none of that was dialled in:
+# every figure came off --engine-levels after the fact.
 SUPPORT = [
-    # name          preset        top   g     accel brake  count
-    ("Race truck",  "diesel_truck", 160, 0.72, 2.2,  5.5,   2),
-    ("Turbo hatch", "i4_turbo",     235, 1.10, 4.4,  7.5,   2),
+    # name              preset             top   g     accel brake  count
+    # Four big diesels rather than two, because the turbo is the point of them and one passing
+    # occasionally is not enough to hear it work. A 13-litre truck six runs 2.2 bar of boost with a
+    # whistle level of 0.9 and a shaft that takes 1.4 SECONDS to come up — so you hear it spool on
+    # the way out of a corner, hold on the straight, and hiss off when the driver lifts for the
+    # next one. It idles at 600 and stops at 2100, an octave and a half under everything else.
+    ("Race truck",      "diesel_truck",    160, 0.72, 2.2,  5.5,   4),
+    # ...and two small turbo-diesels, which are the SAME mechanism at a different size: 1.4 bar,
+    # half the whistle, and a shaft that spools in 0.9 s instead of 1.4. Hearing a big turbo and a
+    # small one on the same lap is what makes it read as a turbocharger rather than as a noise.
+    ("Diesel pickup",   "diesel_i4",       185, 0.88, 3.0,  6.0,   2),
+    ("Turbo hatch",     "i4_turbo",        235, 1.10, 4.4,  7.5,   2),
+    ("Open header",     "v8_open_headers", 245, 1.05, 4.8,  6.5,   2),
+    ("Big cam",         "v8_bigcam",       235, 1.02, 4.6,  6.5,   2),
+    ("Glasspack",       "v8_glasspack",    225, 1.00, 4.3,  6.5,   2),
+    ("Mild small block","v8_mild",         200, 0.98, 3.6,  6.5,   2),
 ]
 
 # ...and one that is not. The pace car runs the same lap in a road car with a bar on the roof: an

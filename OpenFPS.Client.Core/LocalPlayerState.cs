@@ -45,6 +45,13 @@ public class LocalPlayerState
     public string CurrentMaterial { get; set; } = "Generic";
     public string CurrentVariant { get; set; } = "0";
     public string CurrentRegion { get; set; } = "Unknown Area";
+
+    /// <summary>Which acoustic region the listener is in, or a negative id for none.
+    ///
+    /// The ID rather than the NAME is what a crossing is: two rooms can share a name, and the outdoor
+    /// fallback name flips between "Outside" and "Under Shelter" on a continuous shelter value, which
+    /// would announce itself every time a cloud of geometry passed overhead.</summary>
+    public int CurrentRegionId { get; set; } = int.MinValue;
     public bool IsIndoor { get; set; }
     public Vector3 RoomSize { get; set; }
     public Vector3 RoomCenter { get; set; }

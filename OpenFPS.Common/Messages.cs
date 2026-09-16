@@ -34,6 +34,8 @@ namespace OpenFPS.Common.Networking;
 [MemoryPackUnion(25, typeof(MapPublishRequest))]
 [MemoryPackUnion(26, typeof(EntityRemoved))]
 [MemoryPackUnion(27, typeof(WorldAudioEvent))]
+[MemoryPackUnion(28, typeof(MapListRequest))]
+[MemoryPackUnion(29, typeof(MapListResponse))]
 public partial interface IMessage { }
 
 public enum PlayerListScope
@@ -67,6 +69,49 @@ public partial class FriendListResponse : IMessage
 {
     public string[] Friends = Array.Empty<string>();
     public FriendListResponse() { }
+}
+
+/// <summary>Which maps to list: everything this server will let you walk into, or only your own.</summary>
+public enum MapListScope
+{
+    Server,
+    Mine,
+}
+
+[MemoryPackable]
+public partial class MapListRequest : IMessage
+{
+    public MapListScope Scope;
+    public MapListRequest() { }
+}
+
+/// <summary>One map, as a chooser needs to know it.</summary>
+[MemoryPackable]
+public partial struct MapSummary
+{
+    public string Id;
+    public string OwnerId;
+    public bool IsPublic;
+
+    /// <summary>How many players are on it right now. The one fact that decides where you go.</summary>
+    public int PlayerCount;
+
+    /// <summary>Whether this is the map you are standing on.</summary>
+    public bool IsCurrent;
+
+    public MapSummary()
+    {
+        Id = "";
+        OwnerId = "";
+    }
+}
+
+[MemoryPackable]
+public partial class MapListResponse : IMessage
+{
+    public MapListScope Scope;
+    public MapSummary[] Maps = Array.Empty<MapSummary>();
+    public MapListResponse() { }
 }
 
 [MemoryPackable]
@@ -278,6 +323,14 @@ public partial class ClientInputUpdate : IMessage
     public Vector2 LookDelta; 
     public bool Jump;
     public float DeltaTime;
+
+    // APPEND ONLY BELOW THIS LINE. MemoryPack writes these positionally with no names on the wire,
+    // so inserting a member in the middle renumbers every one after it — silently.
+
+    /// <summary>Running rather than walking. The speed is the server's to apply; this is only the
+    /// claim that the key was held, and prediction and the authority must read it the same way or
+    /// every stride mispredicts.</summary>
+    public bool Sprint;
 }
 
 [MemoryPackable]

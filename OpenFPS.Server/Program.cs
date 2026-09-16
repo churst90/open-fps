@@ -190,7 +190,7 @@ public class GameServer
         _commands = new CommandHandler(_sessions, _maps, this, _composites, _seats, _hands);
         
         // Initialize new Service Architecture
-        _discovery = new DiscoveryService(_dispatcher, _sessions);
+        _discovery = new DiscoveryService(_dispatcher, _sessions, _maps);
         _social = new SocialService(_dispatcher);
         _mapAuthority = new MapAuthorityService(_dispatcher);
         

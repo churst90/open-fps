@@ -234,6 +234,14 @@ if (args.Contains("--engine-jumps"))
     Log.CloseAndFlush();
     Environment.Exit(jcode);
 }
+if (args.Contains("--body-ir"))
+{
+    // --body-ir [preset ...] [out=DIR] [sec=..]: the CAR, with no engine in it — its impulse
+    // response rendered, written to a WAV and measured.
+    int bcode = OpenFPS.Client.Core.AudioEngine.Fmod.BodyIrSpike.Run(args);
+    Log.CloseAndFlush();
+    Environment.Exit(bcode);
+}
 if (args.Contains("--engine-levels"))
 {
     int lvcode = OpenFPS.Client.Core.AudioEngine.Fmod.EngineCostSpike.Levels(args);
@@ -286,7 +294,18 @@ if (args.Contains("--vehicle") || args.Contains("--vehicle-live")
     bool stationary = muscle || args.Contains("--vehicle-rev") || args.Contains("--vehicle-rev-live");
     int code = OpenFPS.Client.Core.AudioEngine.Fmod.VehicleSpike.Run(
         args.Contains("--vehicle-live") || args.Contains("--vehicle-rev-live")
-        || args.Contains("--muscle-rev-live"), stationary, muscle, preset);
+        || args.Contains("--muscle-rev-live"), stationary, muscle, preset,
+        withBody: !args.Contains("body=off"),
+        coupling: args.FirstOrDefault(a => a.StartsWith("coupling=")) is { } cp
+                  && float.TryParse(cp[9..], out float cv) ? cv : null,
+        withShell: !args.Contains("shell=off"),
+        shellCase: args.FirstOrDefault(a => a.StartsWith("case=")) is { } sc ? sc[5..] : null,
+        shellLoss: args.FirstOrDefault(a => a.StartsWith("ring=")) is { } rg
+                   && float.TryParse(rg[5..], out float rv) ? rv : null,
+        shellWiden: args.FirstOrDefault(a => a.StartsWith("wide=")) is { } wd
+                    && float.TryParse(wd[5..], out float wv) ? wv : null,
+        shellLevel: args.FirstOrDefault(a => a.StartsWith("shell=") && a != "shell=off") is { } sl
+                    && float.TryParse(sl[6..], out float slv) ? slv : null);
     Log.CloseAndFlush();
     Environment.Exit(code);
 }

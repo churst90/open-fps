@@ -77,4 +77,20 @@ public sealed class InputStateBuffer
     /// <summary>True when either shift is held — the chat bindings' modifier.</summary>
     public static bool HasShift(HashSet<GameKey> held) =>
         held.Contains(GameKey.ShiftLeft) || held.Contains(GameKey.ShiftRight);
+
+    public static bool HasControl(HashSet<GameKey> held) =>
+        held.Contains(GameKey.ControlLeft) || held.Contains(GameKey.ControlRight);
+
+    public static bool HasAlt(HashSet<GameKey> held) =>
+        held.Contains(GameKey.AltLeft) || held.Contains(GameKey.AltRight);
+
+    /// <summary>Which modifiers are down, as one value a binding can be keyed on.</summary>
+    public static KeyModifiers ModifiersIn(HashSet<GameKey> held)
+    {
+        var mods = KeyModifiers.None;
+        if (HasShift(held)) mods |= KeyModifiers.Shift;
+        if (HasControl(held)) mods |= KeyModifiers.Control;
+        if (HasAlt(held)) mods |= KeyModifiers.Alt;
+        return mods;
+    }
 }

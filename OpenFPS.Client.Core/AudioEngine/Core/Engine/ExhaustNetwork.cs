@@ -51,6 +51,19 @@ internal sealed class ExhaustNetwork
         public required JetNoise Jet;
         public float ExitVelocity, MeanVelocity;
         public float Radiated;
+
+        /// <summary>Which entries in <see cref="Chain"/> are muffler chambers — the pipes with the
+        /// can's steel around them, and therefore the ones whose pressure drives it.</summary>
+        public readonly List<int> ChamberIndices = new();
+
+        /// <summary>The can, as metal. Null when the muffler has no shell worth modelling.</summary>
+        public BodyResonator? Shell;
+
+        /// <summary>What the shell radiated this sample, pascals at one metre. Diagnostic.</summary>
+        public float ShellRadiated;
+
+        /// <summary>Acoustic pressure summed over the chambers this sample — the drive. Diagnostic.</summary>
+        public float ChamberPressure;
     }
 
     public ExhaustNetwork(EngineProfile e, float rate, int seed = 3)
@@ -116,6 +129,9 @@ internal sealed class ExhaustNetwork
             // Mid pipe from the merge to the muffler.
             br.Chain.Add(new Pipe(_x.MidPipeMetres * (1f + 0.03f * b), tailArea, rate, wall, steep));
             BuildMuffler(br, _x.Muffler, tailArea, wall, steep);
+            // The can, once the chambers it wraps are known.
+            if (_x.Muffler.Shell != null && _x.Muffler.ShellLevel > 0f && br.ChamberIndices.Count > 0)
+                br.Shell = new BodyResonator(_x.Muffler.Shell, rate);
             // Tailpipe: two branches get two lengths, and if only one is given the second is 9% longer.
             float tailL = _x.TailpipeMetres.Length > b ? _x.TailpipeMetres[b]
                         : _x.TailpipeMetres[0] * (1f + 0.09f * b);
@@ -155,6 +171,9 @@ internal sealed class ExhaustNetwork
                     float baffle = Math.Clamp(m.BaffleLoss, 0f, 0.95f);
                     chamber.SetExtraLoss(1f - 0.5f * baffle, OnePole.AlphaFor(MathHelper.Lerp(12000f, 1500f, baffle), _rate));
                     br.Chain.Add(chamber);
+                    // Remember where it is: this is a pipe with the can's steel wrapped round it, so
+                    // its pressure is what shakes the case.
+                    br.ChamberIndices.Add(br.Chain.Count - 1);
                     // Between chambers, a short passage through the partition at pipe area.
                     if (i + 1 < m.ChamberLengthsMetres.Length)
                         br.Chain.Add(new Pipe(0.04f, pipeArea, _rate, wall, 0f));
@@ -227,6 +246,16 @@ internal sealed class ExhaustNetwork
 
     /// <summary>Radiated pressure at one metre from all tailpipes, pascals, this sample.</summary>
     public float Radiated { get; private set; }
+
+    /// <summary>How much of <see cref="Radiated"/> came off the muffler CASE rather than out of the
+    /// pipe. Diagnostic: the only way to answer "how loud is the can" without guessing at it.</summary>
+    public float ShellRadiated { get; private set; }
+
+    /// <summary>...and the rest of it, out of the pipes. Kept separately because the obvious way to
+    /// report the can's level — against <see cref="Radiated"/> — compares it against ITSELF plus the
+    /// pipe, so the number saturates at 0 dB however loud the can gets and a six-fold change in it
+    /// reads as three decibels.</summary>
+    public float PipeRadiated { get; private set; }
     /// <summary>Exit velocity of branch 0 this sample, m/s, for anyone who wants to look.</summary>
     public float ExitVelocity => _branch[0].ExitVelocity;
 
@@ -400,10 +429,11 @@ internal sealed class ExhaustNetwork
         }
 
         // ── Each branch: the chain of pipes to the open end ──────────────────────────────────
-        float radiated = 0f;
+        float radiated = 0f, shell = 0f, pipe = 0f;
         foreach (var br in _branch)
         {
             var chain = br.Chain;
+            float chamberPressure = 0f;
             for (int i = 0; i + 1 < chain.Count; i++)
             {
                 var up = chain[i];
@@ -431,6 +461,11 @@ internal sealed class ExhaustNetwork
                                                   loss * MathF.Min(up.Admittance, down.Admittance) * 0.25f);
                     up.PushBackward(back);
                     down.PushForward(on);
+
+                    // Pressure at this junction is the sum of the two waves meeting there — the
+                    // arriving one and the one reflected back into it. Where that junction is the end
+                    // of a chamber, that is the pressure pushing on the can.
+                    if (br.Shell != null && br.ChamberIndices.Contains(i)) chamberPressure += up.ArriveFar() + back;
                 }
             }
 
@@ -443,9 +478,30 @@ internal sealed class ExhaustNetwork
             float direct = br.End.Radiate(u, _airDensity);
             float jet = br.Jet.Process(br.ExitVelocity + br.MeanVelocity, br.MeanVelocity, _x.JetNoiseLevel);
             br.Radiated = direct + jet;
+
+            // ...and the can, which radiates straight into the air rather than out of the pipe.
+            //
+            // CALIBRATION. The drive is the acoustic pressure inside the chambers and the output is
+            // pressure at one metre, and those differ by orders of magnitude: the internal wave is
+            // thousands of pascals where a metre away is tens. ShellLevel carries that whole
+            // conversion — transmission through the steel, the case's radiating area, and the
+            // spreading out to a metre — as one measured ratio rather than three guessed ones. It is
+            // set by rendering with the shell on and reading the level it lands at against the pipe;
+            // see the note on MufflerSpec.ShellLevel.
+            br.ChamberPressure = chamberPressure;
+            if (br.Shell != null)
+            {
+                br.ShellRadiated = br.Shell.Process(chamberPressure) * _x.Muffler.ShellLevel;
+                br.Radiated += br.ShellRadiated;
+            }
+
             radiated += br.Radiated;
+            shell += br.ShellRadiated;
+            pipe += direct + jet;
         }
         Radiated = radiated;
+        ShellRadiated = shell;
+        PipeRadiated = pipe;
     }
 
     /// <summary>Mean exhaust flow the network was last told about, kg/s.</summary>

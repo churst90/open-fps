@@ -53,6 +53,13 @@ public sealed class EngineSynth
 
     /// <summary>Pressure at one metre from the tailpipes, pascals.</summary>
     public float Exhaust { get; private set; }
+
+    /// <summary>The part of <see cref="Exhaust"/> that came off the muffler case rather than out of
+    /// the pipe, pascals at one metre. Diagnostic.</summary>
+    public float ExhaustShell { get; private set; }
+
+    /// <summary>...and the part that came out of the pipes. Diagnostic.</summary>
+    public float ExhaustPipe { get; private set; }
     /// <summary>Pressure at one metre from the intake mouth, pascals.</summary>
     public float Intake { get; private set; }
     /// <summary>Pressure at one metre from the block: valvetrain, combustion through the metal, accessories.</summary>
@@ -635,6 +642,8 @@ public sealed class EngineSynth
         _exhaust.Step();
         _intake.Step();
         Exhaust = _exhaust.Radiated;
+        ExhaustShell = _exhaust.ShellRadiated;
+        ExhaustPipe = _exhaust.PipeRadiated;
         Intake = _intake.Radiated * e.Intake.Level;
 
         // ── The block ────────────────────────────────────────────────────────────────────────

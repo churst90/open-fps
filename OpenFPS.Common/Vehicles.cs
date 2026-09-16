@@ -171,6 +171,16 @@ public sealed record VehicleProfile
     public string EngineKey { get; init; } = "";
 
     /// <summary>
+    /// The car the engine is bolted into, as something the sound has to get out through.
+    ///
+    /// Two cars with the same engine do not sound the same, and most of the difference is here: how
+    /// much steel there is, how big the panels are, how much deadening the manufacturer paid for,
+    /// and whether there is a cabin behind it. See <see cref="VehicleBody"/> for why this is the one
+    /// part of a vehicle that can honestly be an impulse response while the exhaust cannot.
+    /// </summary>
+    public VehicleBody Body { get; init; } = VehicleBody.Saloon;
+
+    /// <summary>
     /// What this vehicle measures at one metre at full load, dB SPL — and the number the whole
     /// audio chain is hung off.
     ///
@@ -238,6 +248,10 @@ public sealed record VehicleProfile
             ["nascar_v8"] = () => StockCar,
             ["f1_v10"] = () => FormulaCar,
             ["police_v8"] = () => PoliceCar,
+            ["v8_open_headers"] = () => OpenHeaderMuscle,
+            ["v8_glasspack"] = () => GlasspackMuscle,
+            ["v8_mild"] = () => MildMuscle,
+            ["v8_bigcam"] = () => BigCamMuscle,
         };
 
     /// <summary>
@@ -258,12 +272,59 @@ public sealed record VehicleProfile
     private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, VehicleProfile> _cache =
         new(StringComparer.OrdinalIgnoreCase);
 
+    // ── Four muscle cars, one V8, four exhausts ─────────────────────────────────────────────────
+    //
+    // Same car underneath, so nothing but the engine and what is bolted to it can account for the
+    // difference. They share the muscle car's mass, gearing and tyres deliberately: put them on a
+    // circuit together and any difference you can hear is the hardware.
+
+    /// <summary>Open headers. The rawest thing on the track, and the only one with no can at all.</summary>
+    public static VehicleProfile OpenHeaderMuscle => V8Muscle with
+    {
+        Name = "Muscle car, open headers",
+        EngineKey = "v8_open_headers",
+        Engine = EngineProfile.V8OpenHeaders,
+        SourceLevelDb = 128f,
+    };
+
+    /// <summary>The same big block through glasspacks: mellower, and no metallic ring, because the
+    /// packing that absorbs the gas is against the case and damps it too.</summary>
+    public static VehicleProfile GlasspackMuscle => V8Muscle with
+    {
+        Name = "Muscle car, glasspacks",
+        EngineKey = "v8_glasspack",
+        Engine = EngineProfile.V8BigBlockGlasspack,
+        SourceLevelDb = 123f,
+    };
+
+    /// <summary>A mild small block on stock manifolds — the least dramatic car out there, which is
+    /// what makes the others audible as choices rather than as the only way a V8 sounds.</summary>
+    public static VehicleProfile MildMuscle => V8Muscle with
+    {
+        Name = "Muscle car, mild small block",
+        EngineKey = "v8_mild",
+        Engine = EngineProfile.V8MildSmallBlock,
+        MassKg = 1520f,
+        SourceLevelDb = 112f,
+    };
+
+    /// <summary>The beefiest: 7.4 litres on a 330-degree cam through 40-series cans. It lopes at
+    /// idle because the cam overlaps enough to make the burn ragged, which is what the cam is for.</summary>
+    public static VehicleProfile BigCamMuscle => V8Muscle with
+    {
+        Name = "Muscle car, big cam",
+        EngineKey = "v8_bigcam",
+        Engine = EngineProfile.V8BigCam,
+        MassKg = 1720f,
+        SourceLevelDb = 119f,
+    };
+
     /// <summary>A big-block muscle car: long cam, true duals, four-speed.</summary>
     public static VehicleProfile V8Muscle => new()
     {
         Name = "Big-block muscle car, true duals",
         EngineKey = "v8_muscle",
-        SourceLevelDb = 119f,
+        SourceLevelDb = 122f,
         Engine = EngineProfile.V8MuscleBigBlock,
         Gearbox = Gearbox.SixSpeedSports with
         {
@@ -290,9 +351,11 @@ public sealed record VehicleProfile
 
     public static VehicleProfile Supercar => new()
     {
+        // Small aluminium panels, a tiny cabin, and an exhaust that barely touches the shell.
+        Body = VehicleBody.Supercar,
         Name = "Flat-plane V8 supercar",
         EngineKey = "v8_flatplane",
-        SourceLevelDb = 124f,
+        SourceLevelDb = 125f,
         Engine = EngineProfile.V8FlatPlane,
         Gearbox = Gearbox.SixSpeedSports with { Ratios = new[] { 3.08f, 2.19f, 1.63f, 1.29f, 1.03f, 0.84f, 0.69f }, FinalDrive = 4.1f, ShiftSeconds = 0.12f, UpshiftRpm = 8600f, DownshiftRpm = 2500f },
         Tyres = TyreProfile.SportsOnAsphalt,
@@ -304,7 +367,7 @@ public sealed record VehicleProfile
     {
         Name = "1.6 hatchback",
         EngineKey = "i4_economy",
-        SourceLevelDb = 93f,
+        SourceLevelDb = 94f,
         Engine = EngineProfile.Inline4Economy,
         Gearbox = Gearbox.SixSpeedSports with { Ratios = new[] { 3.6f, 2.0f, 1.36f, 1.03f, 0.82f }, FinalDrive = 4.2f, ShiftSeconds = 0.4f, UpshiftRpm = 5200f, DownshiftRpm = 1400f, WheelRadiusMetres = 0.30f },
         Tyres = TyreProfile.SportsOnAsphalt with { TreadBlocks = 60 },
@@ -316,7 +379,7 @@ public sealed record VehicleProfile
     {
         Name = "2.0 hot hatch",
         EngineKey = "i4_sport",
-        SourceLevelDb = 117f,
+        SourceLevelDb = 119f,
         Engine = EngineProfile.Inline4Sport,
         Gearbox = Gearbox.SixSpeedSports with { Ratios = new[] { 3.27f, 2.13f, 1.52f, 1.15f, 0.92f, 0.76f }, FinalDrive = 4.3f, ShiftSeconds = 0.3f, UpshiftRpm = 7800f, DownshiftRpm = 1800f, WheelRadiusMetres = 0.31f },
         Tyres = TyreProfile.SportsOnAsphalt,
@@ -339,7 +402,7 @@ public sealed record VehicleProfile
         // Measured, not guessed: EngineSynthTests renders every preset and holds its declared level
         // to what it actually produces. A first guess of 101 was sixteen decibels light, which would
         // have put this car forty times too quiet next to the field it shares a track with.
-        SourceLevelDb = 117f,
+        SourceLevelDb = 118f,
         Engine = EngineProfile.I4Turbo,
         Gearbox = Gearbox.SixSpeedSports with { Ratios = new[] { 3.4f, 2.05f, 1.42f, 1.06f, 0.84f, 0.68f }, FinalDrive = 3.7f, ShiftSeconds = 0.18f, UpshiftRpm = 6300f, DownshiftRpm = 2000f },
         Tyres = TyreProfile.SportsOnAsphalt with { TreadBlocks = 58, PeakGripG = 1.1f, SquealHz = 880f },
@@ -351,7 +414,7 @@ public sealed record VehicleProfile
     {
         Name = "3.0 straight-six saloon",
         EngineKey = "i6",
-        SourceLevelDb = 116f,
+        SourceLevelDb = 117f,
         Engine = EngineProfile.Inline6,
         Gearbox = Gearbox.SixSpeedSports with { Ratios = new[] { 4.06f, 2.37f, 1.56f, 1.16f, 0.85f, 0.67f }, FinalDrive = 3.15f, ShiftSeconds = 0.3f, UpshiftRpm = 6600f, DownshiftRpm = 1500f },
         Tyres = TyreProfile.SportsOnAsphalt,
@@ -362,7 +425,7 @@ public sealed record VehicleProfile
     {
         Name = "3.5 V6 sedan",
         EngineKey = "v6",
-        SourceLevelDb = 99f,
+        SourceLevelDb = 100f,
         Engine = EngineProfile.V6Sedan,
         Gearbox = Gearbox.SixSpeedSports with { Ratios = new[] { 4.58f, 2.96f, 1.91f, 1.45f, 1.0f, 0.75f }, FinalDrive = 3.3f, ShiftSeconds = 0.35f, UpshiftRpm = 6000f, DownshiftRpm = 1400f, WheelRadiusMetres = 0.33f },
         Tyres = TyreProfile.SportsOnAsphalt with { TreadBlocks = 62 },
@@ -371,6 +434,8 @@ public sealed record VehicleProfile
 
     public static VehicleProfile Cruiser => new()
     {
+        // A motorcycle has no body and no cabin: the pipes radiate into open air.
+        Body = VehicleBody.OpenWheeler,
         Name = "V-twin cruiser motorcycle",
         EngineKey = "vtwin",
         SourceLevelDb = 120f,
@@ -383,6 +448,8 @@ public sealed record VehicleProfile
 
     public static VehicleProfile DirtBike => new()
     {
+        // Likewise, and even less of it.
+        Body = VehicleBody.OpenWheeler,
         Name = "450 dirt bike",
         EngineKey = "single",
         SourceLevelDb = 118f,
@@ -395,9 +462,11 @@ public sealed record VehicleProfile
 
     public static VehicleProfile Pickup => new()
     {
+        // A cab and an empty steel bed, which is the most resonant thing on the road.
+        Body = VehicleBody.Van,
         Name = "2.8 turbo-diesel pickup",
         EngineKey = "diesel_i4",
-        SourceLevelDb = 91f,
+        SourceLevelDb = 92f,
         Engine = EngineProfile.DieselPickupI4,
         Gearbox = Gearbox.SixSpeedSports with { Ratios = new[] { 4.31f, 2.33f, 1.52f, 1.13f, 0.86f, 0.68f }, FinalDrive = 3.73f, ShiftSeconds = 0.45f, UpshiftRpm = 3600f, DownshiftRpm = 1300f, WheelRadiusMetres = 0.38f },
         Tyres = TyreProfile.SportsOnAsphalt with { TreadBlocks = 48, SurfaceRoughness = 0.6f },
@@ -407,6 +476,8 @@ public sealed record VehicleProfile
 
     public static VehicleProfile Truck => new()
     {
+        // Big flat undeadened panels over a big box.
+        Body = VehicleBody.Van,
         Name = "13 litre semi truck",
         EngineKey = "diesel_truck",
         SourceLevelDb = 104f,
@@ -419,9 +490,11 @@ public sealed record VehicleProfile
 
     public static VehicleProfile Wagon => new()
     {
+        // A long roof and a big rear volume — a wagon booms where a saloon does not.
+        Body = VehicleBody.Van,
         Name = "2.5 flat-four wagon",
         EngineKey = "boxer4",
-        SourceLevelDb = 117f,
+        SourceLevelDb = 118f,
         Engine = EngineProfile.Boxer4,
         Gearbox = Gearbox.SixSpeedSports with { Ratios = new[] { 3.45f, 1.95f, 1.37f, 0.97f, 0.74f }, FinalDrive = 4.11f, ShiftSeconds = 0.35f, UpshiftRpm = 6000f, DownshiftRpm = 1500f, WheelRadiusMetres = 0.32f },
         Tyres = TyreProfile.SportsOnAsphalt,
@@ -432,7 +505,7 @@ public sealed record VehicleProfile
     {
         Name = "V10 coupe, side pipes",
         EngineKey = "v10",
-        SourceLevelDb = 115f,
+        SourceLevelDb = 116f,
         Engine = EngineProfile.V10,
         Gearbox = Gearbox.SixSpeedSports with { Ratios = new[] { 2.66f, 1.78f, 1.3f, 1.0f, 0.74f, 0.5f }, FinalDrive = 3.07f, ShiftSeconds = 0.3f, UpshiftRpm = 6000f, DownshiftRpm = 1500f },
         Tyres = TyreProfile.SportsOnAsphalt,
@@ -448,6 +521,8 @@ public sealed record VehicleProfile
     /// </summary>
     public static VehicleProfile StockCar => new()
     {
+        // A stripped steel shell with side exits hard against it — hollow, and loud with it.
+        Body = VehicleBody.RaceSaloon,
         Name = "NASCAR Cup stock car",
         EngineKey = "nascar_v8",
         SourceLevelDb = 130f,
@@ -475,6 +550,8 @@ public sealed record VehicleProfile
     /// </summary>
     public static VehicleProfile FormulaCar => new()
     {
+        // No panels worth the name and nothing enclosed at all.
+        Body = VehicleBody.OpenWheeler,
         Name = "V10 formula car",
         EngineKey = "f1_v10",
         SourceLevelDb = 133f,
@@ -515,9 +592,11 @@ public sealed record VehicleProfile
     /// </summary>
     public static VehicleProfile PoliceCar => new()
     {
+        // A stripped interior: no carpet, no trim, a cage and a lot of bare steel.
+        Body = VehicleBody.RaceSaloon,
         Name = "Police interceptor",
         EngineKey = "police_v8",
-        SourceLevelDb = 126f,
+        SourceLevelDb = 132f,
         Engine = EngineProfile.PoliceV8,
         Gearbox = Gearbox.SixSpeedSports with
         {
@@ -537,7 +616,7 @@ public sealed record VehicleProfile
     {
         Name = "V12 grand tourer",
         EngineKey = "v12",
-        SourceLevelDb = 126f,
+        SourceLevelDb = 128f,
         Engine = EngineProfile.V12,
         Gearbox = Gearbox.SixSpeedSports with { Ratios = new[] { 4.17f, 2.34f, 1.52f, 1.14f, 0.87f, 0.69f }, FinalDrive = 3.46f, ShiftSeconds = 0.25f, UpshiftRpm = 7200f, DownshiftRpm = 1600f },
         Tyres = TyreProfile.SportsOnAsphalt,

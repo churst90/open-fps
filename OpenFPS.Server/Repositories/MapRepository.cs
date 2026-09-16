@@ -76,6 +76,14 @@ public class MapData
     /// <summary>The map a player lands on when they log in, if no other map claims it. Exactly one
     /// map should set it; if several do, the first loaded wins and the rest are logged.</summary>
     public bool IsDefault { get; set; }
+
+    /// <summary>Whose map it is — a username, or empty for a map that ships with the server. It is
+    /// the owner who may edit it, and the owner whose private maps are listed only to them.</summary>
+    public string OwnerId { get; set; } = string.Empty;
+
+    /// <summary>Whether anybody may walk into it. Defaults to true, so that a map authored before
+    /// there was such a question does not vanish from the list by having said nothing.</summary>
+    public bool IsPublic { get; set; } = true;
 }
 
 /// <summary>

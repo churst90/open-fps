@@ -1293,6 +1293,317 @@ def match_engine(path: Path, rpm_hint=None, against: Path = None):
     return 0
 
 
+# ── The exhaust's own transfer function ─────────────────────────────────────────────────────────
+
+def _fft(re, im):
+    """Iterative radix-2 FFT, in place. Pure Python because this machine has no numpy, and a
+    per-bin DFT over a 32k window costs minutes where this costs about a second."""
+    n = len(re)
+    j = 0
+    for i in range(1, n):
+        bit = n >> 1
+        while j & bit:
+            j ^= bit
+            bit >>= 1
+        j |= bit
+        if i < j:
+            re[i], re[j] = re[j], re[i]
+            im[i], im[j] = im[j], im[i]
+    length = 2
+    while length <= n:
+        ang = -2 * math.pi / length
+        wr, wi = math.cos(ang), math.sin(ang)
+        for i in range(0, n, length):
+            cr, ci = 1.0, 0.0
+            half = length >> 1
+            for k in range(i, i + half):
+                ur, ui = re[k], im[k]
+                vr = re[k + half] * cr - im[k + half] * ci
+                vi = re[k + half] * ci + im[k + half] * cr
+                re[k], im[k] = ur + vr, ui + vi
+                re[k + half], im[k + half] = ur - vr, ui - vi
+                cr, ci = cr * wr - ci * wi, cr * wi + ci * wr
+        length <<= 1
+
+
+def _spectrum(seg, sr, size=32768):
+    """One Hann-windowed power spectrum, in dB, and the Hz per bin."""
+    n = min(size, len(seg))
+    n = 1 << (n.bit_length() - 1)          # down to a power of two
+    re = [seg[i] * (0.5 - 0.5 * math.cos(2 * math.pi * i / n)) for i in range(n)]
+    im = [0.0] * n
+    _fft(re, im)
+    half = n // 2
+    mag = [10 * math.log10(re[i] * re[i] + im[i] * im[i] + 1e-20) for i in range(half)]
+    return mag, sr / n
+
+
+def _steady_passages(smp, sr, want=6):
+    """Several steady passages spread across the clip's ENGINE SPEEDS, not just the steadiest one.
+
+    One passage measures one operating point. What separates a fixed filter — the pipes, the mic, the
+    room, the boom — from something tied to the firing is that a fixed filter sits at the same
+    FREQUENCIES however fast the engine is turning, while the harmonics move. That separation needs
+    more than one engine speed, and a clip with an idle, a rev and a take-off in it has several.
+    """
+    win = int(sr * 0.75)
+    step = int(sr * 0.25)
+    scored = []
+    for i in range(0, max(1, len(smp) - win), step):
+        blocks = []
+        for j in range(i, i + win - int(sr * 0.05), int(sr * 0.05)):
+            seg = smp[j:j + int(sr * 0.05)]
+            blocks.append(math.sqrt(sum(x * x for x in seg) / len(seg)) + 1e-9)
+        mean = sum(blocks) / len(blocks)
+        var = sum((b / mean - 1) ** 2 for b in blocks) / len(blocks)
+        scored.append((i, var, mean))
+
+    loudest = max(m for _, _, m in scored)
+    usable = [p for p in scored if p[2] >= loudest * 0.35 and p[1] < 0.25]
+    usable.sort(key=lambda p: p[1])
+
+    # Spread them out: two passages a quarter second apart measure the same thing twice.
+    chosen = []
+    for at, var, _ in usable:
+        if all(abs(at - c) > sr * 1.5 for c in chosen):
+            chosen.append(at)
+        if len(chosen) >= want:
+            break
+    return sorted(chosen), win
+
+
+def _fire_rate(mag, hz_per_bin, lo=20.0, hi=420.0):
+    """The firing rate: the fundamental whose HARMONICS are also strong, so a loud second harmonic
+    cannot win and report the engine an octave fast."""
+    best, best_score = 0.0, -1e9
+    f = lo
+    while f < hi:
+        score = 0.0
+        for h in (1, 2, 3, 4, 5, 6):
+            b = int(round(f * h / hz_per_bin))
+            if 0 < b < len(mag):
+                score += mag[b]
+        if score > best_score:
+            best, best_score = f, score
+        f += 0.25
+    return best
+
+
+def _harmonics(mag, hz_per_bin, fire, ceiling=7000.0):
+    """Level of each firing harmonic, dB, with its frequency. Peak-picked over a small
+    neighbourhood, because a real engine's speed drifts a little even when it is being held."""
+    out = []
+    h = 1
+    while fire * h < ceiling:
+        f = fire * h
+        centre = f / hz_per_bin
+        lo = max(1, int(centre - 2))
+        hi = min(len(mag) - 1, int(centre + 3))
+        if hi > lo:
+            out.append((h, f, max(mag[lo:hi])))
+        h += 1
+    return out
+
+
+def _fit_tilt(points, order=3):
+    """Fit a smooth curve in log-frequency through (Hz, dB) — the BROADBAND TILT.
+
+    This is the whole reason a boomy clip is still usable. A phone's proximity, a car park, a
+    platform's loudness normalisation and a codec's top-end all act as a SMOOTH multiplicative curve
+    across the spectrum; an exhaust's character is STRUCTURE — sharp peaks at the firing harmonics
+    and notches where the muffler's chambers cancel. Those are different shapes, and shape is
+    something arithmetic can separate. Fit the smooth part, subtract it, and what is left is the
+    engine.
+
+    Doing this by ear instead — EQ-ing the clip until it sounds right — removes by judgement exactly
+    what this removes by measurement, and leaves nobody able to say how much of the engine went too.
+
+    Least squares on a Vandermonde system, solved by Gaussian elimination. No numpy on this machine.
+    """
+    xs = [math.log10(max(1.0, f)) for f, _ in points]
+    ys = [d for _, d in points]
+    n = order + 1
+
+    a = [[sum(x ** (i + j) for x in xs) for j in range(n)] for i in range(n)]
+    b = [sum(y * x ** i for x, y in zip(xs, ys)) for i in range(n)]
+
+    for col in range(n):
+        piv = max(range(col, n), key=lambda r: abs(a[r][col]))
+        if abs(a[piv][col]) < 1e-12:
+            return lambda f: sum(ys) / len(ys)
+        a[col], a[piv] = a[piv], a[col]
+        b[col], b[piv] = b[piv], b[col]
+        for r in range(n):
+            if r == col:
+                continue
+            factor = a[r][col] / a[col][col]
+            for c in range(col, n):
+                a[r][c] -= factor * a[col][c]
+            b[r] -= factor * b[col]
+    coef = [b[i] / a[i][i] for i in range(n)]
+
+    def curve(f):
+        x = math.log10(max(1.0, f))
+        return sum(c * x ** i for i, c in enumerate(coef))
+    return curve
+
+
+def engine_envelope(path: Path, rpm_hint=None, quiet=False):
+    """What the exhaust SYSTEM does to the engine's harmonics, measured across several engine speeds.
+
+    `match_engine` reports a single rolloff slope, and the vehicles notes already record why that is
+    the wrong shape: damping and noise interact through it, so chasing the slope moved two metrics
+    backwards. A slope is one number standing in for a curve. This measures the curve.
+
+    Returns the residual transfer function sampled at the harmonics, pooled across passages — which
+    is exactly the thing the impulse-response discussion wanted and could not get from one passage.
+    """
+    smp, sr = _decode_mono(path)
+    if smp is None:
+        return None
+
+    print(f"  {path.name}: {len(smp) / sr:.1f}s at {sr} Hz")
+
+    starts, win = _steady_passages(smp, sr)
+    if not starts:
+        print("  no steady passage found — the whole clip is moving")
+        return None
+
+    pooled = []
+    report = []
+    for at in starts:
+        seg = smp[at:at + win]
+        mag, hz_per_bin = _spectrum(seg, sr)
+        fire = _fire_rate(mag, hz_per_bin)
+        if fire <= 0:
+            continue
+        harm = _harmonics(mag, hz_per_bin, fire)
+        if len(harm) < 6:
+            continue
+        top = max(d for _, _, d in harm)
+        report.append((at / sr, fire, fire / 4 * 60, len(harm)))
+        for _, f, d in harm:
+            pooled.append((f, d - top))
+
+    if not pooled:
+        print("  found passages but no usable harmonic series in them")
+        return None
+
+    print(f"\n  {len(report)} steady passage(s), {len(pooled)} harmonic samples:")
+    print("     at        firing      rpm (V8)   harmonics")
+    for t, fire, rpm, nh in report:
+        print(f"    {t:5.1f}s    {fire:6.1f} Hz    {rpm:6.0f}      {nh:3d}")
+
+    tilt = _fit_tilt(pooled)
+    grid = _residual_grid(pooled, tilt)
+
+    print("\n  Residual transfer function — the clip's own tilt removed, so this is the SYSTEM.")
+    print("  A band is only believable where the passages AGREE: a fixed filter sits at the same")
+    print("  frequency however fast the engine is turning, so disagreement across engine speeds")
+    print(f"  means that band is not measuring one. Bands spreading more than {AGREE_DB:.0f} dB are marked.")
+    print("\n       Hz     dB   spread   n")
+    for f, mean, spread, n in grid:
+        flag = "" if spread <= AGREE_DB else "   <- passages disagree; not the system"
+        bar = "#" * max(0, min(30, int(15 + mean)))
+        print(f"    {f:7.0f}  {mean:+6.1f}  {spread:6.1f}  {n:3d}  {bar}{flag}")
+
+    firm = [g for g in grid if g[2] <= AGREE_DB]
+    dev = [abs(d - tilt(f)) for f, d in pooled]
+    print(f"\n  Tilt removed spans {tilt(60):+.1f} dB at 60 Hz to {tilt(4000):+.1f} dB at 4 kHz.")
+    print(f"  Residual is {sum(dev) / len(dev):.1f} dB mean absolute — that is the engine's structure.")
+    if firm:
+        print(f"  {len(firm)} of {len(grid)} bands agree across engine speeds, "
+              f"{firm[0][0]:.0f} Hz to {firm[-1][0]:.0f} Hz.")
+    return {"passages": report, "pooled": pooled, "tilt": tilt, "grid": grid}
+
+
+AGREE_DB = 12.0
+
+
+def _residual_grid(pooled, tilt):
+    """The residual binned by twelfth-decade: (Hz, mean dB, spread dB, count)."""
+    grid = {}
+    for f, d in pooled:
+        grid.setdefault(round(math.log10(f) * 12), []).append(d - tilt(f))
+    out = []
+    for band in sorted(grid):
+        vals = grid[band]
+        if len(vals) < 2:
+            continue
+        out.append((10 ** (band / 12), sum(vals) / len(vals), max(vals) - min(vals), len(vals)))
+    return out
+
+
+def compare_envelopes(ref_path: Path, ours_path: Path, rpm_hint=None):
+    """Hold our render against a real recording, band by band, where both can be believed.
+
+    Only where BOTH agree across their own engine speeds — comparing a band the reference cannot
+    measure against one we render perfectly is how a fitting run talks itself into moving a constant
+    that was already right.
+    """
+    print(f"\n=== REFERENCE: {ref_path.name} ===")
+    ref = engine_envelope(ref_path, rpm_hint)
+    if ref is None:
+        return 2
+    print(f"\n=== OURS: {ours_path.name} ===")
+    ours = engine_envelope(ours_path)
+    if ours is None:
+        return 2
+
+    rg = {round(math.log10(f) * 12): (m, s) for f, m, s, _ in ref["grid"]}
+    og = {round(math.log10(f) * 12): (m, s) for f, m, s, _ in ours["grid"]}
+
+    print("\n\n  WHERE WE DIFFER, in the bands both can measure:")
+    print("       Hz     ref     ours     diff")
+    diffs = []
+    for band in sorted(set(rg) & set(og)):
+        (rm, rs), (om, os_) = rg[band], og[band]
+        if rs > AGREE_DB or os_ > AGREE_DB:
+            continue
+        f = 10 ** (band / 12)
+        d = om - rm
+        diffs.append((f, d))
+        print(f"    {f:7.0f}  {rm:+6.1f}  {om:+6.1f}  {d:+7.1f}")
+
+    if not diffs:
+        print("    no band is measurable in both — the reference is too degraded to fit against.")
+        return 0
+
+    mean = sum(d for _, d in diffs) / len(diffs)
+    print(f"\n  Mean difference {mean:+.1f} dB over {len(diffs)} comparable band(s).")
+    print("  Positive means OURS has more there than the real car does.")
+    return 0
+
+
+def _decode_mono(path: Path):
+    """Any format ffmpeg reads, as mono float samples."""
+    import wave, struct
+    conv = None
+    try:
+        if path.suffix.lower() != ".wav":
+            conv = Path(tempfile.mkdtemp()) / "ref.wav"
+            if run(["ffmpeg", "-v", "error", "-y", "-i", str(path), "-ac", "1",
+                    "-ar", "44100", str(conv)]).returncode != 0:
+                print(f"  could not decode {path.name}")
+                return None, 0
+            read = conv
+        else:
+            read = path
+        with wave.open(str(read), "rb") as w:
+            sr, ch, n = w.getframerate(), w.getnchannels(), w.getnframes()
+            if w.getsampwidth() != 2:
+                print("  need 16-bit audio")
+                return None, 0
+            raw = w.readframes(n)
+        smp = struct.unpack("<%dh" % (len(raw) // 2), raw)
+        if ch > 1:
+            smp = smp[0::ch]
+        return [x / 32768.0 for x in smp], sr
+    finally:
+        if conv is not None:
+            shutil.rmtree(conv.parent, ignore_errors=True)
+
+
 def _measure(path: Path, rpm_hint=None, quiet=False):
     import wave, struct, cmath
 
@@ -1443,7 +1754,12 @@ def main():
     ap.add_argument("--engine-match", type=Path, metavar="FILE",
                     help="measure a real exhaust recording and print the synthesis constants it "
                          "implies. Any format ffmpeg reads; a phone clip is good enough.")
+    ap.add_argument("--engine-envelope", type=Path, metavar="FILE",
+                    help="measure the exhaust SYSTEM's transfer function across every steady passage "
+                         "in a clip, with the recording's own broadband tilt fitted and removed")
     ap.add_argument("--rpm", type=float, help="rough engine speed in the clip, if you know it")
+    ap.add_argument("--envelope-compare", type=Path, metavar="OURS",
+                    help="with --engine-envelope: our render, to hold against the reference")
     ap.add_argument("--compare", type=Path, metavar="FILE",
                     help="our own render, to compare against the reference and get the corrections")
     ap.add_argument("--measure", type=Path, metavar="FOLDER",
@@ -1460,6 +1776,15 @@ def main():
         if not have(tool):
             print(f"error: {tool} is not on PATH. This needs sox and ffmpeg.", file=sys.stderr)
             return 2
+
+    if args.engine_envelope:
+        if not args.engine_envelope.is_file():
+            print(f"error: no file at {args.engine_envelope}", file=sys.stderr)
+            return 2
+        if args.envelope_compare:
+            return compare_envelopes(args.engine_envelope, args.envelope_compare, args.rpm)
+        print(f"\nmeasuring {args.engine_envelope}:")
+        return 0 if engine_envelope(args.engine_envelope, args.rpm) else 2
 
     if args.engine_match:
         if not args.engine_match.is_file():

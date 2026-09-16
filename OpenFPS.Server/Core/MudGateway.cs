@@ -256,6 +256,7 @@ public class MudGateway
         {
             PlayerListResponse p => "Players online: " + (p.Players.Length > 0 ? string.Join(", ", p.Players) : "None"),
             FriendListResponse f => "Friends: " + (f.Friends.Length > 0 ? string.Join(", ", f.Friends) : "None"),
+            MapListResponse m => FormatMaps(m),
             LoginResponse l => l.Success ? "Login successful." : "Login failed: " + l.Message,
             RegisterResponse r => r.Success ? "Registration successful." : "Registration failed: " + r.Message,
             PlayerSpawned => "You are now in the world. Try 'scan'.",
@@ -263,6 +264,20 @@ public class MudGateway
             ChatMessage c => $"[{c.Sender}]: {c.Text}",
             _ => "" // Movement and world state updates are not converted to text for performance/verbosity reasons.
         };
+    }
+
+    private static string FormatMaps(MapListResponse response)
+    {
+        string what = response.Scope == MapListScope.Mine ? "Your maps" : "Maps on this server";
+        if (response.Maps.Length == 0) return $"{what}: none.";
+
+        var lines = new List<string> { $"{what}:" };
+        foreach (var map in response.Maps)
+        {
+            string people = map.PlayerCount == 1 ? "1 player" : $"{map.PlayerCount} players";
+            lines.Add($"  {map.Id}: {people}{(map.IsPublic ? "" : ", private")}{(map.IsCurrent ? ", where you are" : "")}.");
+        }
+        return string.Join("\n", lines);
     }
 
     /// <summary>
@@ -278,6 +293,8 @@ public class MudGateway
         {
             "who" => new PlayerListRequest { Scope = PlayerListScope.Server },
             "who_map" => new PlayerListRequest { Scope = PlayerListScope.Map },
+            "maps" => new MapListRequest { Scope = MapListScope.Server },
+            "mymaps" => new MapListRequest { Scope = MapListScope.Mine },
             "friends" => new FriendListRequest(),
             "login" when parts.Length >= 3 => new LoginRequest { Username = parts[1], Password = parts[2] },
             // Chat now reaches MUD players; this is the other half — a way for them to answer.

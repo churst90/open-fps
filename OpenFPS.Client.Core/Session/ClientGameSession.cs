@@ -47,6 +47,7 @@ public sealed class ClientGameSession : IDisposable
     private readonly LocalPlayerState _state;
     private readonly ClientPhysicsSystem _physics;
     private readonly LocalPlayerController _controller;
+    private readonly OtherBodies _others;
     private readonly AudioEngineFacade _audioEngine;
     private readonly SoundMappingService _sounds;
     private readonly ClientAudioSystem _audioSystem;
@@ -129,6 +130,7 @@ public sealed class ClientGameSession : IDisposable
         _physics = new ClientPhysicsSystem(_state, new SpatialService());
         _reconciler = new PredictionReconciler(_state, _physics);
         _controller = new LocalPlayerController(_state);
+        _others = new OtherBodies();
         _sounds = new SoundMappingService(_state);
         _audioSystem = new ClientAudioSystem(_audioEngine, _sounds, _state);
         _chat = new ChatManager(_speech);
@@ -136,6 +138,16 @@ public sealed class ClientGameSession : IDisposable
         _sounds.Initialize();
         _controller.OnStepTriggered += _audioSystem.OnPlayerFootstep;
         _controller.OnLandTriggered += _audioSystem.OnPlayerLand;
+
+        // Everybody else's feet arrive through exactly the same two calls as your own. A footstep
+        // does not care whose it was, and nothing downstream of here is told.
+        _others.OnStepTriggered += _audioSystem.OnPlayerFootstep;
+        _others.OnLandTriggered += _audioSystem.OnPlayerLand;
+
+        // Breathing, which is the only sound a body still makes once it has stopped moving — and
+        // therefore the only way to find somebody who has stopped to listen for you.
+        _controller.OnBreath += (pos, breath) => _audioSystem.OnBreath(_ownEntityId, pos, breath);
+        _others.OnBreath += _audioSystem.OnBreath;
 
         _shell.CommandEntered += HandleCommandEntered;
         _microphone.PacketReady += OnVoicePacketReady;
@@ -194,11 +206,19 @@ public sealed class ClientGameSession : IDisposable
         _bindings.Bind(InputContext.Gameplay, GameKey.H, () => Say($"Health: {_state.Health} percent"));
         _bindings.Bind(InputContext.Gameplay, GameKey.Z, () => Say($"Area: {_state.CurrentRegion}"));
         _bindings.Bind(InputContext.Gameplay, GameKey.Comma, LookAhead);
+        _bindings.Bind(InputContext.Gameplay, GameKey.B, () => Say(ExertionReadout()));
 
         // Interaction.
         _bindings.Bind(InputContext.Gameplay, GameKey.E, Interact);
         _bindings.Bind(InputContext.Gameplay, GameKey.Enter, Interact);
-        _bindings.Bind(InputContext.Gameplay, GameKey.P, () => _network.Send(new TextCommand { Command = "scan" }));
+
+        // P is "what am I looking at", answered HERE rather than by the server. It used to send
+        // `scan`, which is a different question — the five nearest things in any direction, most of
+        // them the floor — and it had to cross the network to answer a question the client can answer
+        // instantly from geometry it already has. `scan` is still a command for when you want it.
+        _bindings.Bind(InputContext.Gameplay, GameKey.P, LookAhead);
+        _bindings.Bind(InputContext.Gameplay, GameKey.P, KeyModifiers.Shift,
+            () => _network.Send(new TextCommand { Command = "scan" }));
         _bindings.Bind(InputContext.Gameplay, GameKey.I, () => _network.Send(new TextCommand { Command = "inv" }));
 
         // Carrying things. G takes whatever is within reach, Q puts down what is in your hand, and
@@ -210,10 +230,18 @@ public sealed class ClientGameSession : IDisposable
         _bindings.Bind(InputContext.Gameplay, GameKey.R, () => _network.Send(new TextCommand { Command = "stow" }));
         _bindings.Bind(InputContext.Gameplay, GameKey.V, ToggleVoiceTransmission);
 
-        // Social / discovery.
+        // Firing, on the control keys. Both of them, because which hand is free depends on what else
+        // you are holding down, and a player should never have to think about that mid-fight.
+        _bindings.Bind(InputContext.Gameplay, GameKey.ControlLeft, Fire);
+        _bindings.Bind(InputContext.Gameplay, GameKey.ControlRight, Fire);
+
+        // Social / discovery. The plain key is the wider question and shift narrows it to here —
+        // the same relationship on both, so there is one thing to remember rather than two.
         _bindings.Bind(GameKey.F5, () => _network.Send(new PlayerListRequest { Scope = PlayerListScope.Server }));
-        _bindings.Bind(GameKey.F6, () => _network.Send(new PlayerListRequest { Scope = PlayerListScope.Map }));
-        _bindings.Bind(GameKey.F7, () => _network.Send(new FriendListRequest()));
+        _bindings.Bind(GameKey.F5, KeyModifiers.Shift, () => _network.Send(new PlayerListRequest { Scope = PlayerListScope.Map }));
+        _bindings.Bind(GameKey.F6, () => _network.Send(new MapListRequest { Scope = MapListScope.Server }));
+        _bindings.Bind(GameKey.F6, KeyModifiers.Shift, () => _network.Send(new MapListRequest { Scope = MapListScope.Mine }));
+        _bindings.Bind(GameKey.F8, () => _network.Send(new FriendListRequest()));
 
         // Chat scrollback: brackets step through messages, shift-brackets through buffers.
         _bindings.Bind(GameKey.BracketLeft, () => CycleChat(-1));
@@ -247,12 +275,13 @@ public sealed class ClientGameSession : IDisposable
 
         var (held, justPressed) = Input.GetSnapshot();
         _shiftHeldThisStep = InputStateBuffer.HasShift(held);
+        var modifiers = InputStateBuffer.ModifiersIn(held);
 
         // Bindings run in the context the shell reports: with a modal console open, gameplay bindings
         // must not fire, but the global ones (chat navigation, quit) still should.
         bool gameplayActive = _shell.IsGameInputActive;
         var context = gameplayActive ? InputContext.Gameplay : InputContext.UI;
-        foreach (var key in justPressed) _bindings.Execute(context, key);
+        foreach (var key in justPressed) _bindings.Execute(context, key, modifiers);
 
         _simTime += dt;
         var input = GatherInput(held, justPressed, dt);
@@ -321,9 +350,21 @@ public sealed class ClientGameSession : IDisposable
         // would produce a footstep every stride-length of ROAD — at sixty miles an hour, a machine gun.
         if (_state.IsRiding) _controller.Teleported();
         else _controller.Update(_state.Position + _state.VisualOffset, _state.Velocity);
+
+        var snapshot = _world.GetSnapshot();
+
+        // ...and everybody else, off the same snapshot. A passenger needs no exemption here the way
+        // the local player does above: the server zeroes an occupant's velocity and its movement
+        // system leaves their body to the seat, so a rider is a body at rest being carried, which is
+        // the one thing the stride rules already refuse to call walking.
+        _others.Update(snapshot, _ownEntityId);
+
         // Internally capped to 60 Hz; the loop this hangs off spins far faster to keep the socket
         // serviced. See ClientAudioSystem.UpdateHz.
-        _audioSystem.Update(_world.GetSnapshot());
+        _audioSystem.Update(snapshot);
+
+        // ...and only then, because the region the audio system just worked out is the one to say.
+        AnnounceZoneChanges();
     }
 
     // ── Turning ─────────────────────────────────────────────────────────────────────────────────
@@ -417,22 +458,32 @@ public sealed class ClientGameSession : IDisposable
         // Shift is a TURN modifier now, not just a suppressor, so it has to be told apart from the
         // window-manager and screen-reader chords that must never move the player.
         bool fine = InputStateBuffer.HasShift(held);
-        bool chord = (InputStateBuffer.HasModifier(held) && !fine)
+        // Alt still suppresses everything — it is the window manager's and the screen reader's. Control
+        // no longer does, because control is the trigger now, and a player must be able to fire while
+        // they are moving.
+        bool chord = InputStateBuffer.HasAlt(held)
                    || held.Contains(GameKey.Slash) || held.Contains(GameKey.NumpadDivide);
         if (chord) return input;
 
-        // Movement still stops dead under shift: shift+J is a one-degree nudge, not a nudge and a step.
-        if (!fine)
-        {
-            Vector3 move = Vector3.Zero;
-            if (held.Contains(GameKey.W)) move.Z += 1;
-            if (held.Contains(GameKey.S)) move.Z -= 1;
-            if (held.Contains(GameKey.A)) move.X -= 1;
-            if (held.Contains(GameKey.D)) move.X += 1;
-            if (move != Vector3.Zero) input.MoveDirection = Vector3.Normalize(move);
+        // Shift modifies the key it is pressed WITH, rather than suppressing everything.
+        //
+        // It used to stop movement dead, so that a shift chord could never walk the player somewhere.
+        // That also made shift+W unusable, and shift+W is where a run belongs — it is the key every
+        // other game puts it on and the one a hand finds without looking. The two meanings do not
+        // collide, because they are on different keys: shift with a turn key is still a one-degree
+        // nudge, shift with a movement key is a run, and holding both does both.
+        Vector3 move = Vector3.Zero;
+        if (held.Contains(GameKey.W)) move.Z += 1;
+        if (held.Contains(GameKey.S)) move.Z -= 1;
+        if (held.Contains(GameKey.A)) move.X -= 1;
+        if (held.Contains(GameKey.D)) move.X += 1;
+        if (move != Vector3.Zero) input.MoveDirection = Vector3.Normalize(move);
 
-            if (held.Contains(GameKey.Space)) input.Jump = true;
-        }
+        if (held.Contains(GameKey.Space)) input.Jump = true;
+
+        // Running is a claim about a key, not about a speed: the speed is the server's to apply, and
+        // prediction reads the same flag so a stride does not mispredict.
+        input.Sprint = fine && move != Vector3.Zero;
 
         input.LookDelta = GatherLook(held, justPressed, fine, dt);
         return input;
@@ -464,6 +515,10 @@ public sealed class ClientGameSession : IDisposable
                     manifest.MapName, manifest.ExpectedEntityCount, manifest.SpawnPoint.Position);
                 _shell.UpdateLoadingStatus($"Loading {manifest.MapName}...", 10);
                 _world.Clear(manifest.WorldSize, manifest.MapMin, manifest.MapMax);
+                // A new map's regions are numbered from scratch, so the last id announced describes
+                // nowhere. Arriving somewhere is not crossing into it.
+                _lastAnnouncedRegionId = int.MinValue;
+                _others.Clear();
                 // The map's authored atmosphere applies immediately: the world-state broadcast only
                 // arrives once a second, and until it does the acoustics would otherwise be computed for
                 // the previous map's air.
@@ -581,6 +636,10 @@ public sealed class ClientGameSession : IDisposable
                 Say("Friends: " + (fList.Friends.Length > 0 ? string.Join(", ", fList.Friends) : "none"));
                 break;
 
+            case MapListResponse mList:
+                Say(DescribeMaps(mList));
+                break;
+
             case TextEvent tEvent:
                 _chat.AddServerMessage(tEvent.Text);
                 break;
@@ -640,6 +699,17 @@ public sealed class ClientGameSession : IDisposable
             Say("Nothing within reach.");
     }
 
+    /// <summary>
+    /// What you are looking at, answered here and now.
+    ///
+    /// Three facts in the order a player wants them: what it is, what it is made of, and how far. The
+    /// material is worth saying because it is what the thing will SOUND like when anything happens to
+    /// it, so it is the difference between "a wall" and a wall you now expect to ring.
+    ///
+    /// With nothing in front of you the answer is where you are, because "nothing directly ahead" is
+    /// a non-answer to a player who pressed a key to find out where they were pointing. The zone is
+    /// the fact underneath that question.
+    /// </summary>
     private void LookAhead()
     {
         var snapshot = _world.GetSnapshot();
@@ -650,12 +720,96 @@ public sealed class ClientGameSession : IDisposable
         {
             string name = hit.Definition.Identity.Name;
             if (string.IsNullOrEmpty(name)) name = "an object";
-            Say($"{name}, {dist:F1} meters ahead.");
+
+            string material = hit.Definition.Material.Material;
+            string made = string.IsNullOrEmpty(material) || material == "Generic" ? "" : $", {material.ToLowerInvariant()}";
+
+            Say($"{name}{made}, {dist:F1} metres ahead.");
         }
         else
         {
-            Say("Nothing directly ahead.");
+            Say($"Nothing ahead. {_state.CurrentRegion}, facing {_state.GetCompassDirection()}.");
         }
+    }
+
+    /// <summary>
+    /// Firing what is in your hands, on a key rather than a typed command.
+    ///
+    /// It is still a text command on the wire, and that is the honest state of it: there is no shot
+    /// message in the protocol yet, no round is resolved against what it hit, and nothing has ever
+    /// decremented a health component. What this changes is only that the trigger is a trigger.
+    /// </summary>
+    private void Fire() => _network.Send(new TextCommand { Command = "fire" });
+
+    /// <summary>How hard you have been working, in words rather than a number.</summary>
+    private string ExertionReadout()
+    {
+        float e = _controller.Exertion;
+        string effort = e switch
+        {
+            < 0.15f => "Breathing easily",
+            < 0.35f => "Breathing a little hard",
+            < 0.6f  => "Breathing hard",
+            < 0.85f => "Winded",
+            _       => "Badly winded",
+        };
+        return $"{effort}.";
+    }
+
+    /// <summary>
+    /// Says the zone as you cross into it, without being asked.
+    ///
+    /// Keyed on the region ID and not on its name: two rooms may share a name, and the outdoor
+    /// fallback name flips between "Outside" and "Under Shelter" on a continuous shelter value, which
+    /// would announce itself every time a bridge passed overhead. The id changes exactly when you
+    /// cross a boundary, which is exactly when a player wants to be told.
+    ///
+    /// Spoken WITHOUT interrupting, because crossing a doorway must not cut off whatever you were
+    /// already being told — very often the thing that made you walk through it.
+    /// </summary>
+    private void AnnounceZoneChanges()
+    {
+        int region = _state.CurrentRegionId;
+        if (region == _lastAnnouncedRegionId) return;
+
+        // The first region after arriving on a map is where you spawned, not somewhere you walked
+        // into; the loading announcement has already said where you are.
+        bool first = _lastAnnouncedRegionId == int.MinValue;
+        _lastAnnouncedRegionId = region;
+        if (first) return;
+
+        _speech.Speak(_state.CurrentRegion, interrupt: false);
+    }
+
+    private int _lastAnnouncedRegionId = int.MinValue;
+
+    /// <summary>
+    /// The map list, as a sentence rather than a grid.
+    ///
+    /// Ordered by how many people are on each, because that is the fact a player is actually asking
+    /// for: a list of names tells you what exists, and the population tells you where the game is.
+    /// </summary>
+    private static string DescribeMaps(MapListResponse response)
+    {
+        string what = response.Scope == MapListScope.Mine ? "Your maps" : "Maps on this server";
+        if (response.Maps.Length == 0)
+            return response.Scope == MapListScope.Mine ? "You have no maps of your own." : "No maps available.";
+
+        var parts = new List<string>(response.Maps.Length);
+        foreach (var map in response.Maps)
+        {
+            string people = map.PlayerCount switch
+            {
+                0 => "empty",
+                1 => "1 player",
+                _ => $"{map.PlayerCount} players",
+            };
+            string here = map.IsCurrent ? ", where you are" : "";
+            string visibility = map.IsPublic ? "" : ", private";
+            parts.Add($"{map.Id}, {people}{visibility}{here}");
+        }
+
+        return $"{what}: {string.Join("; ", parts)}.";
     }
 
     private void ToggleVoiceTransmission()

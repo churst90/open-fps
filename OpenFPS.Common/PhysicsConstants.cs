@@ -8,6 +8,20 @@ public static class PhysicsConstants
     public const float PlayerRadius = 0.3f;
     public const float PlayerHeight = 1.8f;
     public const float WalkSpeed = 4.5f;
+
+    /// <summary>
+    /// How much faster a body moves while it is running, as a multiple of <see cref="WalkSpeed"/>.
+    ///
+    /// Running is not simply "walking, but sooner". It is what decides how loud and how often a body
+    /// is heard — its footfalls come twice as often, it breathes afterwards, and it is audible from
+    /// further away — so the number is a physical claim about a body and not a tuning knob for the
+    /// feel of the keyboard. 4.5 m/s is a brisk jog; 7.2 is a hard run and about what a fit person
+    /// sustains.
+    /// </summary>
+    public const float SprintMultiplier = 1.6f;
+
+    /// <summary>Metres per second at a run. One number, client and server, exactly as with the walk.</summary>
+    public const float SprintSpeed = WalkSpeed * SprintMultiplier;
     public const float JumpPower = 5.0f;
     public const float Gravity = 15.0f;
     public const float StepHeight = 0.4f;
