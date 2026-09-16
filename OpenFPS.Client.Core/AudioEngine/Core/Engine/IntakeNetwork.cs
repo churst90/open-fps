@@ -97,6 +97,8 @@ internal sealed class IntakeNetwork
         // The mean follows the throttle within about 15 ms, so a snapped pedal moves the mean flow
         // rather than arriving as one enormous gulp; what is left is the pulsation.
         _meanAlpha = OnePole.AlphaFor(12f, rate);
+        // Both kinds of forced induction put a rotor in the INTAKE path — a turbo's compressor and a
+        // blower's rotors alike — so both get the barrier. Only the exhaust side distinguishes them.
         _compressorBarrier = e.Induction == Induction.NaturallyAspirated ? 1f : 0.1f;
         SetThrottle(0f);
         UpdateGas(305f, Gas.Atmosphere);

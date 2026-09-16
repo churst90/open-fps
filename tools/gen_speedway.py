@@ -284,6 +284,94 @@ for prefab, ox, oz in (("crowbar", 1.6, -0.9), ("torch", -1.4, -1.1)):
         "Position": v3(SPAWN[0] + ox, 0.08, SPAWN[2] + oz),
     }); eid += 1
 
+# ── Map bounds, from what is actually in the map ──────────────────────────────────────────────────
+# Everything the acoustic grid must cover: the track and its walls, and the grandstand behind them.
+_MARGIN = 30.0
+_xs = [p[0] for p in _cl]
+_zs = [p[2] for p in _cl]
+BOUND_MIN = (min(min(_xs) - OUT_R, -GS_HALF_X) - _MARGIN, 0.0,
+             min(min(_zs) - OUT_R, UPPER_Z) - _MARGIN)
+BOUND_MAX = (max(max(_xs) + OUT_R, GS_HALF_X) + _MARGIN, 60.0,
+             max(max(_zs) + OUT_R, GS_FRONT) + _MARGIN)
+
+
+# ── ZONES: named places, so a blind player knows where they are standing ─────────────────────────
+#
+# A map with no regions in it answers "where am I" with "Outside" for ever, which is what this one
+# did. Everything else here — the walls, the crowd, the cars — tells you what is HAPPENING; none of
+# it tells you WHERE, and on a 2 km loop of track that are all the same width and all the same
+# surface, where is the hard question.
+#
+# A region is an oriented box the listener can be inside, and the client says its name as you cross
+# in. Two things make that work on a racetrack rather than in a building:
+#
+#   - A PLACE IS NOT ONE BOX. A banked turn is a curve; a straight is four hundred metres. Either has
+#     to be tiled out of several volumes, so the announcement keys on the region's NAME changing and
+#     not merely its id, and walking the length of the front straight says "Front straight" once.
+#   - THE VOLUME FOLLOWS THE ENTITY'S SCALE, which it did not until today — a map could place a
+#     region of exactly one size, the prefab's.
+#
+# The sectors are named the way a driver names them, which is also the way a commentator does, so
+# the PA and the map agree with each other.
+ZONE_H = 6.0            # tall enough to catch you on the banking, short enough not to swallow the stand
+ZONE_EVERY = 4          # centreline points per box: about 41 m, whose sagitta on the tight turn is 1.5 m
+ZONE_WIDE = WIDTH + 12.0 # wider than the track, to cover the apron and the chord sagitta
+
+def _sector_name(i, n):
+    """Which named place the i-th centreline point belongs to.
+
+    centreline() walks front straight, turns 1-2, back straight, turns 3-4, so the boundaries are
+    the same counts it was built from and not a guess at an angle."""
+    ns, nt = 34, 64
+    if i < ns:                     return "Front straight"
+    if i < ns + nt:                return "Turns one and two"
+    if i < ns + nt + ns:           return "Back straight"
+    return "Turns three and four"
+
+for _i in range(0, len(_cl), ZONE_EVERY):
+    _p = _cl[_i]
+    _q = _cl[(_i + ZONE_EVERY) % len(_cl)]
+    _dx, _dz = _q[0] - _p[0], _q[2] - _p[2]
+    _len = math.hypot(_dx, _dz)
+    if _len < 1e-3:
+        continue
+    _mid = ((_p[0] + _q[0]) / 2, (_p[1] + _q[1]) / 2, (_p[2] + _q[2]) / 2)
+    entities.append({
+        "EntityId": eid, "PrefabId": "acoustic_region",
+        "Name": _sector_name(_i, len(_cl)),
+        "Position": v3(_mid[0], _mid[1] + ZONE_H / 2 - 0.5, _mid[2]),
+        "Rotation": yaw_quat(math.atan2(_dx, _dz)),
+        # The prefab is 10 x 5 x 10, so the scale is what the box actually wants divided by that.
+        # Generously long, so consecutive boxes OVERLAP. Two boxes of one sector share a name
+        # and so never announce twice, which makes overlap free — and the seam where a straight
+        # meets a turn is exactly where a chord-aligned box would otherwise leave a gap.
+        "Scale": v3(ZONE_WIDE / 10.0, ZONE_H / 5.0, (_len + 14.0) / 10.0),
+        "IsIndoor": False,
+    }); eid += 1
+
+# The infield, where you spawn and where the PA is. Kept well inside the track: the innermost point
+# of the tight turn is 122.5 m from the origin on the x axis and the front straight's inner edge is
+# about 128 m out on z, so this stops short of both and cannot overlap a sector box.
+entities.append({
+    "EntityId": eid, "PrefabId": "acoustic_region",
+    "Name": "Infield",
+    "Position": v3(0.0, ZONE_H / 2 - 0.5, 0.0),
+    "Scale": v3(220.0 / 10.0, ZONE_H / 5.0, 210.0 / 10.0),
+    "IsIndoor": False,
+}); eid += 1
+
+# The grandstand deck you can climb onto, which is a different place from the ground in front of it
+# — you are twelve metres up with a wall at your back, and it is the one spot on the map where every
+# car is in front of you.
+entities.append({
+    "EntityId": eid, "PrefabId": "acoustic_region",
+    "Name": "Grandstand",
+    "Position": v3(0.0, GS_TOP + 2.0, (GS_FRONT + GS_BACK) / 2),
+    "Scale": v3((GS_HALF_X * 2) / 10.0, 8.0 / 5.0, abs(GS_FRONT - GS_BACK) / 10.0),
+    "IsIndoor": False,
+}); eid += 1
+
+
 # ── The field ────────────────────────────────────────────────────────────────────────────────────
 # Lane offsets spread the cars across the eighteen metres so they are not in single file; start
 # offsets spread them round the lap so the grid is a race in progress rather than a standing start.
@@ -345,49 +433,34 @@ CLASSES = [
 # Fifteen decibels separate the open headers from the mild one, and none of that was dialled in:
 # every figure came off --engine-levels after the fact.
 SUPPORT = [
-    # name              preset             top   g     accel brake  count
+    # name              preset               top   g     accel brake  count
     #
-    # A field of forty. Seven stock cars still make it a stock car race — the support runners are the
-    # thing being caught, not the thing being watched — and the point of them is that no two classes
-    # share a mechanism. Every figure
-    # below is what the vehicle can do; what it SOUNDS like falls out of the engine, the exhaust and
-    # the body, and not one of them is a recording.
+    # A DEMONSTRATION FIELD, not a stock-car race. Nineteen machines of seven kinds, chosen so that
+    # every one of them differs from its neighbour by a MECHANISM rather than by a setting.
     #
-    # Diesels — four big ones and two small, because a turbo is only a turbo if you can hear it work.
-    # The truck six runs 2.2 bar with a shaft that takes 1.4 SECONDS to come up; the pickup runs 1.4
-    # bar and spools in 0.9. The same mechanism at two sizes on one lap is what makes it read as a
-    # turbocharger rather than as a noise. They idle at 600 and stop at 2100, an octave and a half
-    # under everything else, and their tyres give up at three quarters of a g.
-    ("Race truck",      "diesel_truck",    160, 0.72, 2.2,  5.5,   4),
-    ("Diesel pickup",   "diesel_i4",       185, 0.88, 3.0,  6.0,   2),
-    ("Turbo hatch",     "i4_turbo",        235, 1.10, 4.4,  7.5,   2),
-    #
-    # Five ways to exhaust one V8. Same cylinders, same firing order, same mass and gearing, so
-    # anything you hear between them is the hardware. Fifteen decibels separate the loudest from the
-    # quietest and none of it was dialled in.
-    ("Open header",     "v8_open_headers", 245, 1.05, 4.8,  6.5,   2),   # no muffler, and no CASE
-    ("Big cam",         "v8_bigcam",       235, 1.02, 4.6,  6.5,   2),   # 330 deg cam; will not idle straight
-    ("Blown big block", "v8_blown",        240, 1.02, 5.4,  6.5,   2),   # rotors whining over the lope
-    ("Flowmaster coupe","v8_sports",       250, 1.08, 5.0,  6.8,   3),   # the can the case was tuned against
-    ("Glasspack",       "v8_glasspack",    225, 1.00, 4.3,  6.5,   2),   # packing damps the case too
-    ("Mild small block","v8_mild",         200, 0.98, 3.6,  6.5,   2),   # cast logs, 112 dB, the quiet one
-    #
-    # Exotica: a V10 with an automated single-clutch box that bangs gears in in SIXTY milliseconds,
-    # too short to hear as a gap, and a formula car whose fundamental at 15,000 rpm is a pitch rather
-    # than a beat.
-    ("V10 supercar",    "v10",             290, 1.35, 6.2,  8.5,   2),
-    ("Formula car",     "f1_v10",          300, 2.60, 9.0, 12.0,   2),
-    #
-    # Motorcycles. No body and no cabin at all, so the pipes radiate into open air — and a litre four
-    # at 14,500 rpm fires 483 times a second, which is a musical pitch where a car's firing rate is a
+    # Five of each motorcycle, because a bike has no body and no cabin at all — the pipes radiate
+    # into open air, so what you hear is the gas and nothing else. Three engines that could not be
+    # more different: a 45-degree twin firing 315 then 405 degrees apart (the lumpiest thing here), a
+    # 450 single that fires once every two revolutions and rings the crank down in between, and an
+    # inline four at 14,500 rpm whose firing rate is 483 Hz — a musical pitch where the twin's is a
     # beat you could count.
-    ("Sports bike",     "sportbike",       270, 1.25, 6.0,  9.0,   2),
-    ("Cruiser",         "vtwin",           180, 0.85, 3.2,  6.0,   2),
-    ("Dirt bike",       "single",          150, 0.90, 3.8,  6.5,   2),
+    ("Sports bike",     "sportbike",         270, 1.25, 6.0,  9.0,   5),
+    ("Cruiser",         "vtwin",             180, 0.85, 3.2,  6.0,   5),
+    ("Dirt bike",       "single",            150, 0.90, 3.8,  6.5,   5),
     #
-    # ...and three perfectly ordinary cars, because a circuit where everything is dramatic has no
-    # scale to it. 94 dB, the quietest thing out there by twenty decibels.
-    ("Hatchback",       "i4_economy",      175, 0.95, 3.0,  6.0,   2),
+    # And four diesels arranged as TWO PAIRS, each pair the same engine with and without its turbo.
+    # This is the A/B on the track rather than on a bench. A turbo sits in both gas paths and does
+    # four things, all audible on one lap: it eats the exhaust pulses (the turbo pickup measures 7.7
+    # dB QUIETER than the same engine without one, and the bus 12.8), it low-passes the crack off the
+    # front of them, it puts a rotor between the runners and the airbox so the intake whooshes
+    # instead of honking, and it raises the boost that lets the engine make a third more torque.
+    # The naturally aspirated ones also run higher compression — 19:1 against 17 on the Cummins,
+    # because without boost there is only the piston to heat the air with — which SHORTENS the
+    # ignition delay and makes them clatter less, not more.
+    ("Cummins pickup",  "diesel_cummins",    185, 0.88, 3.0,  6.0,   1),
+    ("6B pickup",       "diesel_cummins_na", 170, 0.88, 2.4,  6.0,   1),
+    ("School bus",      "school_bus",        120, 0.70, 1.8,  5.0,   1),
+    ("DT466 bus",       "school_bus_na",     110, 0.70, 1.5,  5.0,   1),
 ]
 
 
@@ -403,7 +476,9 @@ NUMBERS = [24, 3, 48, 11, 9, 22, 5, 17, 43, 88, 12, 20, 2, 19, 77, 8, 14, 6, 45,
 # synthesis — four mechanical faults stalled the FMOD mixer thread itself. All fixed; see
 # docs/AUDIO_LOAD_DROPOUTS.md. The number of cars a map may carry is not a property of the audio
 # engine: only the nearest handful are ever SYNTHESIZED and the rest borrow one of those.
-FIELD_SIZE = 40
+# Nineteen: five of each bike and two pairs of diesels. There is no stock-car class on this map any
+# more and no pace car — it is a demonstration of what the engine can voice, not a race.
+FIELD_SIZE = sum(c for *_, c in SUPPORT)
 
 # The support runners take the LAST slots, so they start at the back of a lap that is already
 # spread out and spend their time being caught and passed by the field. That is the point of them:
@@ -417,21 +492,18 @@ for _name, _preset, _top, _g, _acc, _brk, _count in SUPPORT:
 
 field = []
 for i in range(FIELD_SIZE):
-    if i in SUPPORT_SLOTS:
-        name, preset, top, g, acc, brk = SUPPORT_SLOTS[i]
-    else:
-        name, preset, top, g, acc, brk = PACE if i == 0 else CLASSES[0]
+    name, preset, top, g, acc, brk = SUPPORT_SLOTS[i]
     # Each car is its own machine: a per-car spread in top speed and grip is what makes a field
     # string out into traffic instead of circulating as one block.
     jitter = ((i * 7919) % 100) / 100.0 - 0.5          # deterministic, -0.5..+0.5
     field.append((
-        name if i == 0 or i in SUPPORT_SLOTS else f"{name} {NUMBERS[i % len(NUMBERS)]}",
+        name,
         preset,
         top * (1.0 + 0.03 * jitter),
         g * (1.0 + 0.05 * jitter),
         acc, brk,
         # Spread across the racing surface, and round the whole lap.
-        round(-6.5 + (i % 5) * 3.25, 2),
+        round(-6.5 + (i % 5) * 3.25, 2),   # five lanes across the eighteen metres
         round(i * (LAP_LEN / FIELD_SIZE), 1),
     ))
 
@@ -448,10 +520,20 @@ lap_len = sum(math.dist(cl[i], cl[(i + 1) % len(cl)]) for i in range(len(cl)))
 map_data = {
     "Id": "speedway",
     "IsDefault": True,
-    "Description": "St Louis raceway: a 1.25-mile egg, turns 1-2 tighter than 3-4. A full stock-car field, a pace car that cannot keep up, and you standing in the infield.",
-    "Size": v3(720, 60, 420),
-    "MinBound": v3(-360, 0, -230),
-    "MaxBound": v3(360, 60, 200),
+    "Description": "St Louis raceway: a 1.25-mile banked egg, named zones the whole way round, fifteen motorcycles and two pairs of diesels running with and without their turbos.",
+    # THE BOUNDS ARE COMPUTED, because guessing them left a third of a corner outside the map.
+    #
+    # These were 720 x 420 from (-360, -230), and the track does not fit in that: turns 3-4 are the
+    # WIDE end, centred 250.5 m out with a 183 m radius, so their outer wall stands at x = -444.5.
+    # Everything past x = -360 was outside the acoustic grid, and the grid answers "no region" for
+    # anything outside itself — so thirty-five waypoints of a two-kilometre lap had no acoustics at
+    # all and nothing said so. An unnamed zone was how it finally showed.
+    #
+    # So they come off the geometry now, with a margin, and a map that changes shape cannot leave
+    # part of itself behind.
+    "Size": v3(BOUND_MAX[0] - BOUND_MIN[0], 60, BOUND_MAX[2] - BOUND_MIN[2]),
+    "MinBound": v3(BOUND_MIN[0], 0, BOUND_MIN[2]),
+    "MaxBound": v3(BOUND_MAX[0], 60, BOUND_MAX[2]),
     "MinimumY": -20.0,
     "SpawnPoint": {"Position": v3(*SPAWN), "Rotation": {"X": 0, "Y": 0, "Z": 0, "W": 1}},
     "AmbienceId": "",

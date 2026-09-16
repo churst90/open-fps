@@ -41,6 +41,55 @@ internal sealed class ExhaustNetwork
     private float _flowLossFraction;
     private float _meanMassFlow;
 
+    /// <summary>
+    /// The turbine, sitting where it really sits: between the manifold and the downpipe.
+    ///
+    /// This is the other half of the turbo, and the model had neither half. A turbine is not a pipe
+    /// with a restriction in it — it is a bladed rotor across the whole gas path, and to a pressure
+    /// wave arriving from the cylinders it is three things at once:
+    ///
+    /// IT TAKES ENERGY OUT. That is its job. The pulse energy the exhaust would otherwise radiate is
+    /// what spins the compressor, so a turbo engine is quieter at the tailpipe than the same engine
+    /// with the turbo removed — measurably so, and it is why a "turbo" exhaust note is a RUSH where a
+    /// naturally aspirated one is a set of beats.
+    ///
+    /// IT REFLECTS. What it does not pass and does not absorb goes back up the manifold, which is why
+    /// a turbo manifold has its own strong resonances and why turbo engines are so sensitive to
+    /// manifold volume. Blocking without reflecting would leave the manifold looking like an open
+    /// end, which it is not.
+    ///
+    /// AND IT IS A LOW-PASS. The blade passages are short compared with a long wavelength, so the low
+    /// end leaks through while everything above a few hundred hertz is scattered into the rotor. That
+    /// asymmetry is most of the character: the deep part of the pulse survives and the crack does not.
+    /// </summary>
+    private sealed class Turbine
+    {
+        private readonly float _alpha;
+        private float _lp;
+
+        /// <summary>Fraction of a LOW-frequency wave that reaches the downpipe.</summary>
+        private readonly float _pass;
+        /// <summary>How much of what is stopped comes back up the manifold rather than becoming
+        /// shaft work. A rotor is a poor absorber and a fair mirror.</summary>
+        private readonly float _reflect;
+
+        public Turbine(float rate, float cornerHz, float pass, float reflect)
+        {
+            _alpha = OnePole.AlphaFor(cornerHz, rate);
+            _pass = pass;
+            _reflect = reflect;
+        }
+
+        /// <summary>Splits a wave heading into the downpipe into what gets through and what comes
+        /// back. The remainder — neither transmitted nor reflected — is the shaft work.</summary>
+        public (float Through, float Back) Split(float incoming)
+        {
+            _lp += _alpha * (incoming - _lp);
+            float through = _lp * _pass;
+            return (through, (incoming - through) * _reflect);
+        }
+    }
+
     /// <summary>One run from the merge point to the open air.</summary>
     private sealed class Branch
     {
@@ -49,6 +98,8 @@ internal sealed class ExhaustNetwork
         public readonly Dictionary<int, (Pipe Neck, Pipe Cavity)> Resonators = new();
         public required OpenEnd End;
         public required JetNoise Jet;
+        /// <summary>Null on a naturally aspirated engine — there is nothing in the way.</summary>
+        public Turbine? Turbine;
         public float ExitVelocity, MeanVelocity;
         public float Radiated;
 
@@ -125,6 +176,14 @@ internal sealed class ExhaustNetwork
             {
                 End = new OpenEnd(rate),
                 Jet = new JetNoise(rate, _x.TailpipeDiameterMm * 1e-3f, seed + 17 * b),
+                // A radial turbine passes the bottom of the band and scatters the rest: about a
+                // third of a low wave gets to the downpipe, the corner is a few hundred hertz, and
+                // half of what is stopped comes back up the manifold rather than becoming work.
+                // TURBOCHARGED ONLY. A blower is belt-driven and has nothing in the exhaust at all —
+                // that is the whole difference between the two kinds of forced induction, and giving
+                // a supercharged V8 a turbine took 17 dB off it for no reason.
+                Turbine = e.Induction == Induction.Turbocharged
+                        ? new Turbine(rate, 260f, 0.34f, 0.5f) : null,
             };
             // Mid pipe from the merge to the muffler.
             br.Chain.Add(new Pipe(_x.MidPipeMetres * (1f + 0.03f * b), tailArea, rate, wall, steep));
@@ -371,8 +430,17 @@ internal sealed class ExhaustNetwork
                     var col = _collector[gi];
                     var mid = _branch[gi].Chain[0];
                     var (back, on) = Junction.Two(col.ArriveFar(), mid.ArriveNear(), col.Admittance, mid.Admittance, loss * col.Admittance * 0.3f);
-                    col.PushBackward(back);
-                    mid.PushForward(on);
+                    if (_branch[gi].Turbine is { } t)
+                    {
+                        var (through, reflected) = t.Split(on);
+                        col.PushBackward(back + reflected);
+                        mid.PushForward(through);
+                    }
+                    else
+                    {
+                        col.PushBackward(back);
+                        mid.PushForward(on);
+                    }
                 }
                 break;
 
@@ -384,8 +452,19 @@ internal sealed class ExhaustNetwork
                 for (int gi = 0; gi < g; gi++) { a[gi] = _collector[gi].ArriveFar(); y[gi] = _collector[gi].Admittance; ySum += y[gi]; }
                 a[g] = mid.ArriveNear(); y[g] = mid.Admittance;
                 Junction.Scatter(a[..(g + 1)], y[..(g + 1)], b[..(g + 1)], loss * ySum * 0.3f);
-                for (int gi = 0; gi < g; gi++) _collector[gi].PushBackward(b[gi]);
-                mid.PushForward(b[g]);
+                if (_branch[0].Turbine is { } tm)
+                {
+                    // One turbine fed by every collector: what it sends back is shared among them.
+                    var (through, reflected) = tm.Split(b[g]);
+                    float share = reflected / MathF.Max(1, g);
+                    for (int gi = 0; gi < g; gi++) _collector[gi].PushBackward(b[gi] + share);
+                    mid.PushForward(through);
+                }
+                else
+                {
+                    for (int gi = 0; gi < g; gi++) _collector[gi].PushBackward(b[gi]);
+                    mid.PushForward(b[g]);
+                }
                 break;
             }
 
@@ -399,10 +478,13 @@ internal sealed class ExhaustNetwork
                 a[2] = mid0.ArriveNear(); y[2] = mid0.Admittance;
                 a[3] = mid1.ArriveNear(); y[3] = mid1.Admittance;
                 Junction.Scatter(a[..4], y[..4], b[..4], loss * (y[0] + y[1]) * 0.3f);
-                _collector[0].PushBackward(b[0]);
-                _collector[1].PushBackward(b[1]);
-                mid0.PushForward(b[2]);
-                mid1.PushForward(b[3]);
+                float r0 = 0f, r1 = 0f, f0 = b[2], f1 = b[3];
+                if (_branch[0].Turbine is { } tx0) { var s0 = tx0.Split(b[2]); f0 = s0.Through; r0 = s0.Back; }
+                if (_branch[1].Turbine is { } tx1) { var s1 = tx1.Split(b[3]); f1 = s1.Through; r1 = s1.Back; }
+                _collector[0].PushBackward(b[0] + r0);
+                _collector[1].PushBackward(b[1] + r1);
+                mid0.PushForward(f0);
+                mid1.PushForward(f1);
                 break;
             }
 
@@ -420,8 +502,10 @@ internal sealed class ExhaustNetwork
                     a[1] = mid.ArriveNear(); y[1] = mid.Admittance;
                     a[2] = gi == 0 ? tubeToA : tubeToB; y[2] = tube.Admittance;
                     Junction.Scatter(a[..3], y[..3], b[..3], loss * y[0] * 0.3f);
-                    col.PushBackward(b[0]);
-                    mid.PushForward(b[1]);
+                    float fwd = b[1], rev = 0f;
+                    if (_branch[gi].Turbine is { } th) { var sp = th.Split(b[1]); fwd = sp.Through; rev = sp.Back; }
+                    col.PushBackward(b[0] + rev);
+                    mid.PushForward(fwd);
                     if (gi == 0) tube.PushForward(b[2]); else tube.PushBackward(b[2]);
                 }
                 break;

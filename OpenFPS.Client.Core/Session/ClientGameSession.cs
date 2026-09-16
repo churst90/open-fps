@@ -771,17 +771,29 @@ public sealed class ClientGameSession : IDisposable
     {
         int region = _state.CurrentRegionId;
         if (region == _lastAnnouncedRegionId) return;
+        _lastAnnouncedRegionId = region;
+
+        // ...and the NAME has to have changed too, which is the other half of it.
+        //
+        // A place worth naming is rarely one box. A banked turn is a curve and a straight is four
+        // hundred metres, so either is tiled out of several region volumes that are all the same
+        // PLACE — and keying on the id alone announced "Turn one and two" four times while you
+        // walked through it. Requiring the name to change as well makes crossing between two boxes
+        // of one region silent, which is what a player means by not having moved.
+        string name = _state.CurrentRegion;
+        if (string.IsNullOrWhiteSpace(name) || name == _lastAnnouncedRegion) return;
 
         // The first region after arriving on a map is where you spawned, not somewhere you walked
         // into; the loading announcement has already said where you are.
-        bool first = _lastAnnouncedRegionId == int.MinValue;
-        _lastAnnouncedRegionId = region;
+        bool first = _lastAnnouncedRegion == null;
+        _lastAnnouncedRegion = name;
         if (first) return;
 
-        _speech.Speak(_state.CurrentRegion, interrupt: false);
+        _speech.Speak(name, interrupt: false);
     }
 
     private int _lastAnnouncedRegionId = int.MinValue;
+    private string? _lastAnnouncedRegion;
 
     /// <summary>
     /// The map list, as a sentence rather than a grid.

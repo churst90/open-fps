@@ -1,21 +1,21 @@
 {
  "Id": "speedway",
  "IsDefault": true,
- "Description": "St Louis raceway: a 1.25-mile egg, turns 1-2 tighter than 3-4. A full stock-car field, a pace car that cannot keep up, and you standing in the infield.",
+ "Description": "St Louis raceway: a 1.25-mile banked egg, named zones the whole way round, fifteen motorcycles and two pairs of diesels running with and without their turbos.",
  "Size": {
-  "X": 720,
+  "X": 903.0,
   "Y": 60,
-  "Z": 420
+  "Z": 482.167
  },
  "MinBound": {
-  "X": -360,
+  "X": -474.5,
   "Y": 0,
-  "Z": -230
+  "Z": -258.181
  },
  "MaxBound": {
-  "X": 360,
+  "X": 428.5,
   "Y": 60,
-  "Z": 200
+  "Z": 223.987
  },
  "MinimumY": -20.0,
  "SpawnPoint": {
@@ -1027,128 +1027,128 @@
  ],
  "Vehicles": [
   {
-   "Name": "Pace car",
-   "Preset": "police_v8",
+   "Name": "DT466 bus 1",
+   "Preset": "school_bus_na",
    "Track": "oval",
-   "TopSpeedKmh": 246.2,
-   "CorneringG": 1.316,
-   "AccelerationMps2": 4.5,
-   "BrakingMps2": 7.0,
+   "TopSpeedKmh": 108.3,
+   "CorneringG": 0.682,
+   "AccelerationMps2": 1.5,
+   "BrakingMps2": 5.0,
    "LaneOffsetMetres": -6.5,
    "StartOffsetMetres": 0.0
   },
   {
-   "Name": "Stock car 3",
-   "Preset": "nascar_v8",
+   "Name": "School bus 1",
+   "Preset": "school_bus",
    "Track": "oval",
-   "TopSpeedKmh": 297.2,
-   "CorneringG": 1.723,
-   "AccelerationMps2": 5.5,
-   "BrakingMps2": 8.0,
+   "TopSpeedKmh": 118.9,
+   "CorneringG": 0.689,
+   "AccelerationMps2": 1.8,
+   "BrakingMps2": 5.0,
    "LaneOffsetMetres": -3.25,
-   "StartOffsetMetres": 50.3
+   "StartOffsetMetres": 105.9
   },
   {
-   "Name": "Stock car 48",
-   "Preset": "nascar_v8",
+   "Name": "6B pickup 1",
+   "Preset": "diesel_cummins_na",
    "Track": "oval",
-   "TopSpeedKmh": 298.9,
-   "CorneringG": 1.74,
-   "AccelerationMps2": 5.5,
-   "BrakingMps2": 8.0,
+   "TopSpeedKmh": 169.4,
+   "CorneringG": 0.875,
+   "AccelerationMps2": 2.4,
+   "BrakingMps2": 6.0,
    "LaneOffsetMetres": 0.0,
-   "StartOffsetMetres": 100.6
+   "StartOffsetMetres": 211.7
   },
   {
-   "Name": "Stock car 11",
-   "Preset": "nascar_v8",
+   "Name": "Cummins pickup 1",
+   "Preset": "diesel_cummins",
    "Track": "oval",
-   "TopSpeedKmh": 300.6,
-   "CorneringG": 1.756,
-   "AccelerationMps2": 5.5,
-   "BrakingMps2": 8.0,
+   "TopSpeedKmh": 185.4,
+   "CorneringG": 0.883,
+   "AccelerationMps2": 3.0,
+   "BrakingMps2": 6.0,
    "LaneOffsetMetres": 3.25,
-   "StartOffsetMetres": 150.9
+   "StartOffsetMetres": 317.6
   },
   {
-   "Name": "Stock car 9",
-   "Preset": "nascar_v8",
+   "Name": "Dirt bike 5",
+   "Preset": "single",
    "Track": "oval",
-   "TopSpeedKmh": 302.3,
-   "CorneringG": 1.773,
-   "AccelerationMps2": 5.5,
-   "BrakingMps2": 8.0,
+   "TopSpeedKmh": 151.2,
+   "CorneringG": 0.912,
+   "AccelerationMps2": 3.8,
+   "BrakingMps2": 6.5,
    "LaneOffsetMetres": 6.5,
-   "StartOffsetMetres": 201.2
+   "StartOffsetMetres": 423.5
   },
   {
-   "Name": "Stock car 22",
-   "Preset": "nascar_v8",
+   "Name": "Dirt bike 4",
+   "Preset": "single",
    "Track": "oval",
-   "TopSpeedKmh": 304.1,
-   "CorneringG": 1.789,
-   "AccelerationMps2": 5.5,
-   "BrakingMps2": 8.0,
+   "TopSpeedKmh": 152.0,
+   "CorneringG": 0.92,
+   "AccelerationMps2": 3.8,
+   "BrakingMps2": 6.5,
    "LaneOffsetMetres": -6.5,
-   "StartOffsetMetres": 251.4
+   "StartOffsetMetres": 529.3
   },
   {
-   "Name": "Stock car 5",
-   "Preset": "nascar_v8",
+   "Name": "Dirt bike 3",
+   "Preset": "single",
    "Track": "oval",
-   "TopSpeedKmh": 296.8,
-   "CorneringG": 1.718,
-   "AccelerationMps2": 5.5,
-   "BrakingMps2": 8.0,
+   "TopSpeedKmh": 148.4,
+   "CorneringG": 0.884,
+   "AccelerationMps2": 3.8,
+   "BrakingMps2": 6.5,
    "LaneOffsetMetres": -3.25,
-   "StartOffsetMetres": 301.7
-  },
-  {
-   "Name": "Hatchback 2",
-   "Preset": "i4_economy",
-   "Track": "oval",
-   "TopSpeedKmh": 174.1,
-   "CorneringG": 0.942,
-   "AccelerationMps2": 3.0,
-   "BrakingMps2": 6.0,
-   "LaneOffsetMetres": 0.0,
-   "StartOffsetMetres": 352.0
-  },
-  {
-   "Name": "Hatchback 1",
-   "Preset": "i4_economy",
-   "Track": "oval",
-   "TopSpeedKmh": 175.1,
-   "CorneringG": 0.951,
-   "AccelerationMps2": 3.0,
-   "BrakingMps2": 6.0,
-   "LaneOffsetMetres": 3.25,
-   "StartOffsetMetres": 402.3
+   "StartOffsetMetres": 635.2
   },
   {
    "Name": "Dirt bike 2",
    "Preset": "single",
    "Track": "oval",
-   "TopSpeedKmh": 150.9,
-   "CorneringG": 0.909,
+   "TopSpeedKmh": 149.2,
+   "CorneringG": 0.892,
    "AccelerationMps2": 3.8,
    "BrakingMps2": 6.5,
-   "LaneOffsetMetres": 6.5,
-   "StartOffsetMetres": 452.6
+   "LaneOffsetMetres": 0.0,
+   "StartOffsetMetres": 741.1
   },
   {
    "Name": "Dirt bike 1",
    "Preset": "single",
    "Track": "oval",
-   "TopSpeedKmh": 151.8,
-   "CorneringG": 0.918,
+   "TopSpeedKmh": 150.1,
+   "CorneringG": 0.901,
    "AccelerationMps2": 3.8,
    "BrakingMps2": 6.5,
-   "LaneOffsetMetres": -6.5,
-   "StartOffsetMetres": 502.9
+   "LaneOffsetMetres": 3.25,
+   "StartOffsetMetres": 846.9
   },
   {
-   "Name": "Cruiser 2",
+   "Name": "Cruiser 5",
+   "Preset": "vtwin",
+   "Track": "oval",
+   "TopSpeedKmh": 181.1,
+   "CorneringG": 0.859,
+   "AccelerationMps2": 3.2,
+   "BrakingMps2": 6.0,
+   "LaneOffsetMetres": 6.5,
+   "StartOffsetMetres": 952.8
+  },
+  {
+   "Name": "Cruiser 4",
+   "Preset": "vtwin",
+   "Track": "oval",
+   "TopSpeedKmh": 182.2,
+   "CorneringG": 0.867,
+   "AccelerationMps2": 3.2,
+   "BrakingMps2": 6.0,
+   "LaneOffsetMetres": -6.5,
+   "StartOffsetMetres": 1058.7
+  },
+  {
+   "Name": "Cruiser 3",
    "Preset": "vtwin",
    "Track": "oval",
    "TopSpeedKmh": 177.8,
@@ -1156,10 +1156,10 @@
    "AccelerationMps2": 3.2,
    "BrakingMps2": 6.0,
    "LaneOffsetMetres": -3.25,
-   "StartOffsetMetres": 553.2
+   "StartOffsetMetres": 1164.6
   },
   {
-   "Name": "Cruiser 1",
+   "Name": "Cruiser 2",
    "Preset": "vtwin",
    "Track": "oval",
    "TopSpeedKmh": 178.8,
@@ -1167,21 +1167,21 @@
    "AccelerationMps2": 3.2,
    "BrakingMps2": 6.0,
    "LaneOffsetMetres": 0.0,
-   "StartOffsetMetres": 603.5
+   "StartOffsetMetres": 1270.4
   },
   {
-   "Name": "Sports bike 2",
-   "Preset": "sportbike",
+   "Name": "Cruiser 1",
+   "Preset": "vtwin",
    "Track": "oval",
-   "TopSpeedKmh": 269.8,
-   "CorneringG": 1.248,
-   "AccelerationMps2": 6.0,
-   "BrakingMps2": 9.0,
+   "TopSpeedKmh": 179.8,
+   "CorneringG": 0.849,
+   "AccelerationMps2": 3.2,
+   "BrakingMps2": 6.0,
    "LaneOffsetMetres": 3.25,
-   "StartOffsetMetres": 653.7
+   "StartOffsetMetres": 1376.3
   },
   {
-   "Name": "Sports bike 1",
+   "Name": "Sports bike 5",
    "Preset": "sportbike",
    "Track": "oval",
    "TopSpeedKmh": 271.3,
@@ -1189,282 +1189,51 @@
    "AccelerationMps2": 6.0,
    "BrakingMps2": 9.0,
    "LaneOffsetMetres": 6.5,
-   "StartOffsetMetres": 704.0
+   "StartOffsetMetres": 1482.2
   },
   {
-   "Name": "Formula car 2",
-   "Preset": "f1_v10",
+   "Name": "Sports bike 4",
+   "Preset": "sportbike",
    "Track": "oval",
-   "TopSpeedKmh": 303.1,
-   "CorneringG": 2.646,
-   "AccelerationMps2": 9.0,
-   "BrakingMps2": 12.0,
+   "TopSpeedKmh": 272.8,
+   "CorneringG": 1.272,
+   "AccelerationMps2": 6.0,
+   "BrakingMps2": 9.0,
    "LaneOffsetMetres": -6.5,
-   "StartOffsetMetres": 754.3
+   "StartOffsetMetres": 1588.0
   },
   {
-   "Name": "Formula car 1",
-   "Preset": "f1_v10",
+   "Name": "Sports bike 3",
+   "Preset": "sportbike",
    "Track": "oval",
-   "TopSpeedKmh": 295.9,
-   "CorneringG": 2.54,
-   "AccelerationMps2": 9.0,
-   "BrakingMps2": 12.0,
+   "TopSpeedKmh": 266.3,
+   "CorneringG": 1.221,
+   "AccelerationMps2": 6.0,
+   "BrakingMps2": 9.0,
    "LaneOffsetMetres": -3.25,
-   "StartOffsetMetres": 804.6
+   "StartOffsetMetres": 1693.9
   },
   {
-   "Name": "V10 supercar 2",
-   "Preset": "v10",
+   "Name": "Sports bike 2",
+   "Preset": "sportbike",
    "Track": "oval",
-   "TopSpeedKmh": 287.7,
-   "CorneringG": 1.332,
-   "AccelerationMps2": 6.2,
-   "BrakingMps2": 8.5,
+   "TopSpeedKmh": 267.8,
+   "CorneringG": 1.233,
+   "AccelerationMps2": 6.0,
+   "BrakingMps2": 9.0,
    "LaneOffsetMetres": 0.0,
-   "StartOffsetMetres": 854.9
+   "StartOffsetMetres": 1799.8
   },
   {
-   "Name": "V10 supercar 1",
-   "Preset": "v10",
+   "Name": "Sports bike 1",
+   "Preset": "sportbike",
    "Track": "oval",
-   "TopSpeedKmh": 289.3,
-   "CorneringG": 1.345,
-   "AccelerationMps2": 6.2,
-   "BrakingMps2": 8.5,
+   "TopSpeedKmh": 269.4,
+   "CorneringG": 1.245,
+   "AccelerationMps2": 6.0,
+   "BrakingMps2": 9.0,
    "LaneOffsetMetres": 3.25,
-   "StartOffsetMetres": 905.2
-  },
-  {
-   "Name": "Mild small block 2",
-   "Preset": "v8_mild",
-   "Track": "oval",
-   "TopSpeedKmh": 200.7,
-   "CorneringG": 0.985,
-   "AccelerationMps2": 3.6,
-   "BrakingMps2": 6.5,
-   "LaneOffsetMetres": 6.5,
-   "StartOffsetMetres": 955.5
-  },
-  {
-   "Name": "Mild small block 1",
-   "Preset": "v8_mild",
-   "Track": "oval",
-   "TopSpeedKmh": 201.8,
-   "CorneringG": 0.995,
-   "AccelerationMps2": 3.6,
-   "BrakingMps2": 6.5,
-   "LaneOffsetMetres": -6.5,
-   "StartOffsetMetres": 1005.8
-  },
-  {
-   "Name": "Glasspack 2",
-   "Preset": "v8_glasspack",
-   "Track": "oval",
-   "TopSpeedKmh": 228.3,
-   "CorneringG": 1.024,
-   "AccelerationMps2": 4.3,
-   "BrakingMps2": 6.5,
-   "LaneOffsetMetres": -3.25,
-   "StartOffsetMetres": 1056.0
-  },
-  {
-   "Name": "Glasspack 1",
-   "Preset": "v8_glasspack",
-   "Track": "oval",
-   "TopSpeedKmh": 222.8,
-   "CorneringG": 0.984,
-   "AccelerationMps2": 4.3,
-   "BrakingMps2": 6.5,
-   "LaneOffsetMetres": 0.0,
-   "StartOffsetMetres": 1106.3
-  },
-  {
-   "Name": "Flowmaster coupe 3",
-   "Preset": "v8_sports",
-   "Track": "oval",
-   "TopSpeedKmh": 249.0,
-   "CorneringG": 1.073,
-   "AccelerationMps2": 5.0,
-   "BrakingMps2": 6.8,
-   "LaneOffsetMetres": 3.25,
-   "StartOffsetMetres": 1156.6
-  },
-  {
-   "Name": "Flowmaster coupe 2",
-   "Preset": "v8_sports",
-   "Track": "oval",
-   "TopSpeedKmh": 250.5,
-   "CorneringG": 1.083,
-   "AccelerationMps2": 5.0,
-   "BrakingMps2": 6.8,
-   "LaneOffsetMetres": 6.5,
-   "StartOffsetMetres": 1206.9
-  },
-  {
-   "Name": "Flowmaster coupe 1",
-   "Preset": "v8_sports",
-   "Track": "oval",
-   "TopSpeedKmh": 251.9,
-   "CorneringG": 1.093,
-   "AccelerationMps2": 5.0,
-   "BrakingMps2": 6.8,
-   "LaneOffsetMetres": -6.5,
-   "StartOffsetMetres": 1257.2
-  },
-  {
-   "Name": "Blown big block 2",
-   "Preset": "v8_blown",
-   "Track": "oval",
-   "TopSpeedKmh": 243.2,
-   "CorneringG": 1.042,
-   "AccelerationMps2": 5.4,
-   "BrakingMps2": 6.5,
-   "LaneOffsetMetres": -3.25,
-   "StartOffsetMetres": 1307.5
-  },
-  {
-   "Name": "Blown big block 1",
-   "Preset": "v8_blown",
-   "Track": "oval",
-   "TopSpeedKmh": 237.3,
-   "CorneringG": 1.001,
-   "AccelerationMps2": 5.4,
-   "BrakingMps2": 6.5,
-   "LaneOffsetMetres": 0.0,
-   "StartOffsetMetres": 1357.8
-  },
-  {
-   "Name": "Big cam 2",
-   "Preset": "v8_bigcam",
-   "Track": "oval",
-   "TopSpeedKmh": 233.7,
-   "CorneringG": 1.011,
-   "AccelerationMps2": 4.6,
-   "BrakingMps2": 6.5,
-   "LaneOffsetMetres": 3.25,
-   "StartOffsetMetres": 1408.1
-  },
-  {
-   "Name": "Big cam 1",
-   "Preset": "v8_bigcam",
-   "Track": "oval",
-   "TopSpeedKmh": 235.1,
-   "CorneringG": 1.021,
-   "AccelerationMps2": 4.6,
-   "BrakingMps2": 6.5,
-   "LaneOffsetMetres": 6.5,
-   "StartOffsetMetres": 1458.3
-  },
-  {
-   "Name": "Open header 2",
-   "Preset": "v8_open_headers",
-   "Track": "oval",
-   "TopSpeedKmh": 246.5,
-   "CorneringG": 1.06,
-   "AccelerationMps2": 4.8,
-   "BrakingMps2": 6.5,
-   "LaneOffsetMetres": -6.5,
-   "StartOffsetMetres": 1508.6
-  },
-  {
-   "Name": "Open header 1",
-   "Preset": "v8_open_headers",
-   "Track": "oval",
-   "TopSpeedKmh": 247.9,
-   "CorneringG": 1.07,
-   "AccelerationMps2": 4.8,
-   "BrakingMps2": 6.5,
-   "LaneOffsetMetres": -3.25,
-   "StartOffsetMetres": 1558.9
-  },
-  {
-   "Name": "Turbo hatch 2",
-   "Preset": "i4_turbo",
-   "Track": "oval",
-   "TopSpeedKmh": 232.0,
-   "CorneringG": 1.077,
-   "AccelerationMps2": 4.4,
-   "BrakingMps2": 7.5,
-   "LaneOffsetMetres": 0.0,
-   "StartOffsetMetres": 1609.2
-  },
-  {
-   "Name": "Turbo hatch 1",
-   "Preset": "i4_turbo",
-   "Track": "oval",
-   "TopSpeedKmh": 233.4,
-   "CorneringG": 1.087,
-   "AccelerationMps2": 4.4,
-   "BrakingMps2": 7.5,
-   "LaneOffsetMetres": 3.25,
-   "StartOffsetMetres": 1659.5
-  },
-  {
-   "Name": "Diesel pickup 2",
-   "Preset": "diesel_i4",
-   "Track": "oval",
-   "TopSpeedKmh": 184.8,
-   "CorneringG": 0.878,
-   "AccelerationMps2": 3.0,
-   "BrakingMps2": 6.0,
-   "LaneOffsetMetres": 6.5,
-   "StartOffsetMetres": 1709.8
-  },
-  {
-   "Name": "Diesel pickup 1",
-   "Preset": "diesel_i4",
-   "Track": "oval",
-   "TopSpeedKmh": 185.8,
-   "CorneringG": 0.887,
-   "AccelerationMps2": 3.0,
-   "BrakingMps2": 6.0,
-   "LaneOffsetMetres": -6.5,
-   "StartOffsetMetres": 1760.1
-  },
-  {
-   "Name": "Race truck 4",
-   "Preset": "diesel_truck",
-   "Track": "oval",
-   "TopSpeedKmh": 161.6,
-   "CorneringG": 0.732,
-   "AccelerationMps2": 2.2,
-   "BrakingMps2": 5.5,
-   "LaneOffsetMetres": -3.25,
-   "StartOffsetMetres": 1810.4
-  },
-  {
-   "Name": "Race truck 3",
-   "Preset": "diesel_truck",
-   "Track": "oval",
-   "TopSpeedKmh": 157.7,
-   "CorneringG": 0.703,
-   "AccelerationMps2": 2.2,
-   "BrakingMps2": 5.5,
-   "LaneOffsetMetres": 0.0,
-   "StartOffsetMetres": 1860.6
-  },
-  {
-   "Name": "Race truck 2",
-   "Preset": "diesel_truck",
-   "Track": "oval",
-   "TopSpeedKmh": 158.7,
-   "CorneringG": 0.71,
-   "AccelerationMps2": 2.2,
-   "BrakingMps2": 5.5,
-   "LaneOffsetMetres": 3.25,
-   "StartOffsetMetres": 1910.9
-  },
-  {
-   "Name": "Race truck 1",
-   "Preset": "diesel_truck",
-   "Track": "oval",
-   "TopSpeedKmh": 159.6,
-   "CorneringG": 0.717,
-   "AccelerationMps2": 2.2,
-   "BrakingMps2": 5.5,
-   "LaneOffsetMetres": 6.5,
-   "StartOffsetMetres": 1961.2
+   "StartOffsetMetres": 1905.6
   }
  ],
  "Entities": [
@@ -3727,6 +3496,1116 @@
     "Y": 0.08,
     "Z": -1.1
    }
+  },
+  {
+   "EntityId": 1128,
+   "PrefabId": "acoustic_region",
+   "Name": "Front straight",
+   "Position": {
+    "X": 43.913,
+    "Y": 2.5,
+    "Z": -156.63
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.673863,
+    "Z": 0.0,
+    "W": 0.738856
+   },
+   "Scale": {
+    "X": 3.0,
+    "Y": 1.2,
+    "Z": 7.269
+   },
+   "IsIndoor": false
+  },
+  {
+   "EntityId": 1129,
+   "PrefabId": "acoustic_region",
+   "Name": "Front straight",
+   "Position": {
+    "X": 102.357,
+    "Y": 2.5,
+    "Z": -151.241
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.673863,
+    "Z": 0.0,
+    "W": 0.738856
+   },
+   "Scale": {
+    "X": 3.0,
+    "Y": 1.2,
+    "Z": 7.269
+   },
+   "IsIndoor": false
+  },
+  {
+   "EntityId": 1130,
+   "PrefabId": "acoustic_region",
+   "Name": "Front straight",
+   "Position": {
+    "X": 160.801,
+    "Y": 2.5,
+    "Z": -145.852
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.673863,
+    "Z": 0.0,
+    "W": 0.738856
+   },
+   "Scale": {
+    "X": 3.0,
+    "Y": 1.2,
+    "Z": 7.269
+   },
+   "IsIndoor": false
+  },
+  {
+   "EntityId": 1131,
+   "PrefabId": "acoustic_region",
+   "Name": "Front straight",
+   "Position": {
+    "X": 219.246,
+    "Y": 2.5,
+    "Z": -140.463
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.673863,
+    "Z": 0.0,
+    "W": 0.738856
+   },
+   "Scale": {
+    "X": 3.0,
+    "Y": 1.2,
+    "Z": 7.269
+   },
+   "IsIndoor": false
+  },
+  {
+   "EntityId": 1132,
+   "PrefabId": "acoustic_region",
+   "Name": "Front straight",
+   "Position": {
+    "X": 265.14,
+    "Y": 2.633,
+    "Z": -135.571
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.659292,
+    "Z": 0.0,
+    "W": 0.751887
+   },
+   "Scale": {
+    "X": 3.0,
+    "Y": 1.2,
+    "Z": 4.763
+   },
+   "IsIndoor": false
+  },
+  {
+   "EntityId": 1133,
+   "PrefabId": "acoustic_region",
+   "Name": "Front straight",
+   "Position": {
+    "X": 293.802,
+    "Y": 3.156,
+    "Z": -129.36
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.584197,
+    "Z": 0.0,
+    "W": 0.811612
+   },
+   "Scale": {
+    "X": 3.0,
+    "Y": 1.2,
+    "Z": 3.929
+   },
+   "IsIndoor": false
+  },
+  {
+   "EntityId": 1134,
+   "PrefabId": "acoustic_region",
+   "Name": "Front straight",
+   "Position": {
+    "X": 316.841,
+    "Y": 3.812,
+    "Z": -119.197
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.506794,
+    "Z": 0.0,
+    "W": 0.862067
+   },
+   "Scale": {
+    "X": 3.0,
+    "Y": 1.2,
+    "Z": 3.929
+   },
+   "IsIndoor": false
+  },
+  {
+   "EntityId": 1135,
+   "PrefabId": "acoustic_region",
+   "Name": "Front straight",
+   "Position": {
+    "X": 337.62,
+    "Y": 4.082,
+    "Z": -104.972
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.425065,
+    "Z": 0.0,
+    "W": 0.905163
+   },
+   "Scale": {
+    "X": 3.0,
+    "Y": 1.2,
+    "Z": 3.929
+   },
+   "IsIndoor": false
+  },
+  {
+   "EntityId": 1136,
+   "PrefabId": "acoustic_region",
+   "Name": "Front straight",
+   "Position": {
+    "X": 355.43,
+    "Y": 4.087,
+    "Z": -87.171
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.339707,
+    "Z": 0.0,
+    "W": 0.940531
+   },
+   "Scale": {
+    "X": 3.0,
+    "Y": 1.2,
+    "Z": 3.929
+   },
+   "IsIndoor": false
+  },
+  {
+   "EntityId": 1137,
+   "PrefabId": "acoustic_region",
+   "Name": "Turns one and two",
+   "Position": {
+    "X": 369.665,
+    "Y": 4.087,
+    "Z": -66.399
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.251449,
+    "Z": 0.0,
+    "W": 0.96787
+   },
+   "Scale": {
+    "X": 3.0,
+    "Y": 1.2,
+    "Z": 3.929
+   },
+   "IsIndoor": false
+  },
+  {
+   "EntityId": 1138,
+   "PrefabId": "acoustic_region",
+   "Name": "Turns one and two",
+   "Position": {
+    "X": 379.839,
+    "Y": 4.087,
+    "Z": -43.364
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.161045,
+    "Z": 0.0,
+    "W": 0.986947
+   },
+   "Scale": {
+    "X": 3.0,
+    "Y": 1.2,
+    "Z": 3.929
+   },
+   "IsIndoor": false
+  },
+  {
+   "EntityId": 1139,
+   "PrefabId": "acoustic_region",
+   "Name": "Turns one and two",
+   "Position": {
+    "X": 385.606,
+    "Y": 4.087,
+    "Z": -18.852
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.069266,
+    "Z": 0.0,
+    "W": 0.997598
+   },
+   "Scale": {
+    "X": 3.0,
+    "Y": 1.2,
+    "Z": 3.929
+   },
+   "IsIndoor": false
+  },
+  {
+   "EntityId": 1140,
+   "PrefabId": "acoustic_region",
+   "Name": "Turns one and two",
+   "Position": {
+    "X": 386.77,
+    "Y": 4.087,
+    "Z": 6.302
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.023105,
+    "Z": 0.0,
+    "W": 0.999733
+   },
+   "Scale": {
+    "X": 3.0,
+    "Y": 1.2,
+    "Z": 3.929
+   },
+   "IsIndoor": false
+  },
+  {
+   "EntityId": 1141,
+   "PrefabId": "acoustic_region",
+   "Name": "Turns one and two",
+   "Position": {
+    "X": 383.29,
+    "Y": 4.087,
+    "Z": 31.242
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.115278,
+    "Z": 0.0,
+    "W": 0.993333
+   },
+   "Scale": {
+    "X": 3.0,
+    "Y": 1.2,
+    "Z": 3.929
+   },
+   "IsIndoor": false
+  },
+  {
+   "EntityId": 1142,
+   "PrefabId": "acoustic_region",
+   "Name": "Turns one and two",
+   "Position": {
+    "X": 375.285,
+    "Y": 4.087,
+    "Z": 55.117
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.206468,
+    "Z": 0.0,
+    "W": 0.978453
+   },
+   "Scale": {
+    "X": 3.0,
+    "Y": 1.2,
+    "Z": 3.929
+   },
+   "IsIndoor": false
+  },
+  {
+   "EntityId": 1143,
+   "PrefabId": "acoustic_region",
+   "Name": "Turns one and two",
+   "Position": {
+    "X": 363.028,
+    "Y": 4.087,
+    "Z": 77.114
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.295894,
+    "Z": 0.0,
+    "W": 0.955221
+   },
+   "Scale": {
+    "X": 3.0,
+    "Y": 1.2,
+    "Z": 3.929
+   },
+   "IsIndoor": false
+  },
+  {
+   "EntityId": 1144,
+   "PrefabId": "acoustic_region",
+   "Name": "Turns one and two",
+   "Position": {
+    "X": 346.937,
+    "Y": 4.087,
+    "Z": 96.483
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.382795,
+    "Z": 0.0,
+    "W": 0.923833
+   },
+   "Scale": {
+    "X": 3.0,
+    "Y": 1.2,
+    "Z": 3.929
+   },
+   "IsIndoor": false
+  },
+  {
+   "EntityId": 1145,
+   "PrefabId": "acoustic_region",
+   "Name": "Turns one and two",
+   "Position": {
+    "X": 327.56,
+    "Y": 3.99,
+    "Z": 112.565
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.466428,
+    "Z": 0.0,
+    "W": 0.884559
+   },
+   "Scale": {
+    "X": 3.0,
+    "Y": 1.2,
+    "Z": 3.929
+   },
+   "IsIndoor": false
+  },
+  {
+   "EntityId": 1146,
+   "PrefabId": "acoustic_region",
+   "Name": "Turns one and two",
+   "Position": {
+    "X": 305.557,
+    "Y": 3.515,
+    "Z": 124.811
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.546078,
+    "Z": 0.0,
+    "W": 0.837734
+   },
+   "Scale": {
+    "X": 3.0,
+    "Y": 1.2,
+    "Z": 3.929
+   },
+   "IsIndoor": false
+  },
+  {
+   "EntityId": 1147,
+   "PrefabId": "acoustic_region",
+   "Name": "Turns one and two",
+   "Position": {
+    "X": 281.678,
+    "Y": 2.836,
+    "Z": 132.805
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.621068,
+    "Z": 0.0,
+    "W": 0.783757
+   },
+   "Scale": {
+    "X": 3.0,
+    "Y": 1.2,
+    "Z": 3.929
+   },
+   "IsIndoor": false
+  },
+  {
+   "EntityId": 1148,
+   "PrefabId": "acoustic_region",
+   "Name": "Turns one and two",
+   "Position": {
+    "X": 244.307,
+    "Y": 2.517,
+    "Z": 138.079
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.672789,
+    "Z": 0.0,
+    "W": 0.739834
+   },
+   "Scale": {
+    "X": 3.0,
+    "Y": 1.2,
+    "Z": 6.435
+   },
+   "IsIndoor": false
+  },
+  {
+   "EntityId": 1149,
+   "PrefabId": "acoustic_region",
+   "Name": "Turns one and two",
+   "Position": {
+    "X": 190.023,
+    "Y": 2.5,
+    "Z": 143.157
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.673863,
+    "Z": 0.0,
+    "W": 0.738856
+   },
+   "Scale": {
+    "X": 3.0,
+    "Y": 1.2,
+    "Z": 7.269
+   },
+   "IsIndoor": false
+  },
+  {
+   "EntityId": 1150,
+   "PrefabId": "acoustic_region",
+   "Name": "Turns one and two",
+   "Position": {
+    "X": 131.579,
+    "Y": 2.5,
+    "Z": 148.546
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.673863,
+    "Z": 0.0,
+    "W": 0.738856
+   },
+   "Scale": {
+    "X": 3.0,
+    "Y": 1.2,
+    "Z": 7.269
+   },
+   "IsIndoor": false
+  },
+  {
+   "EntityId": 1151,
+   "PrefabId": "acoustic_region",
+   "Name": "Turns one and two",
+   "Position": {
+    "X": 73.135,
+    "Y": 2.5,
+    "Z": 153.935
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.673863,
+    "Z": 0.0,
+    "W": 0.738856
+   },
+   "Scale": {
+    "X": 3.0,
+    "Y": 1.2,
+    "Z": 7.269
+   },
+   "IsIndoor": false
+  },
+  {
+   "EntityId": 1152,
+   "PrefabId": "acoustic_region",
+   "Name": "Turns one and two",
+   "Position": {
+    "X": 14.691,
+    "Y": 2.5,
+    "Z": 159.324
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.673863,
+    "Z": 0.0,
+    "W": 0.738856
+   },
+   "Scale": {
+    "X": 3.0,
+    "Y": 1.2,
+    "Z": 7.269
+   },
+   "IsIndoor": false
+  },
+  {
+   "EntityId": 1153,
+   "PrefabId": "acoustic_region",
+   "Name": "Back straight",
+   "Position": {
+    "X": -43.754,
+    "Y": 2.5,
+    "Z": 164.713
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.673863,
+    "Z": 0.0,
+    "W": 0.738856
+   },
+   "Scale": {
+    "X": 3.0,
+    "Y": 1.2,
+    "Z": 7.269
+   },
+   "IsIndoor": false
+  },
+  {
+   "EntityId": 1154,
+   "PrefabId": "acoustic_region",
+   "Name": "Back straight",
+   "Position": {
+    "X": -102.198,
+    "Y": 2.5,
+    "Z": 170.102
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.673863,
+    "Z": 0.0,
+    "W": 0.738856
+   },
+   "Scale": {
+    "X": 3.0,
+    "Y": 1.2,
+    "Z": 7.269
+   },
+   "IsIndoor": false
+  },
+  {
+   "EntityId": 1155,
+   "PrefabId": "acoustic_region",
+   "Name": "Back straight",
+   "Position": {
+    "X": -160.642,
+    "Y": 2.5,
+    "Z": 175.491
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.673863,
+    "Z": 0.0,
+    "W": 0.738856
+   },
+   "Scale": {
+    "X": 3.0,
+    "Y": 1.2,
+    "Z": 7.269
+   },
+   "IsIndoor": false
+  },
+  {
+   "EntityId": 1156,
+   "PrefabId": "acoustic_region",
+   "Name": "Back straight",
+   "Position": {
+    "X": -216.525,
+    "Y": 2.517,
+    "Z": 180.52
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.675566,
+    "Z": 0.0,
+    "W": 0.737299
+   },
+   "Scale": {
+    "X": 3.0,
+    "Y": 1.2,
+    "Z": 6.752
+   },
+   "IsIndoor": false
+  },
+  {
+   "EntityId": 1157,
+   "PrefabId": "acoustic_region",
+   "Name": "Back straight",
+   "Position": {
+    "X": -262.129,
+    "Y": 2.836,
+    "Z": 181.641
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.729347,
+    "Z": 0.0,
+    "W": 0.684144
+   },
+   "Scale": {
+    "X": 3.0,
+    "Y": 1.2,
+    "Z": 5.197
+   },
+   "IsIndoor": false
+  },
+  {
+   "EntityId": 1158,
+   "PrefabId": "acoustic_region",
+   "Name": "Back straight",
+   "Position": {
+    "X": -299.361,
+    "Y": 3.515,
+    "Z": 175.332
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.796381,
+    "Z": 0.0,
+    "W": 0.604795
+   },
+   "Scale": {
+    "X": 3.0,
+    "Y": 1.2,
+    "Z": 5.197
+   },
+   "IsIndoor": false
+  },
+  {
+   "EntityId": 1159,
+   "PrefabId": "acoustic_region",
+   "Name": "Back straight",
+   "Position": {
+    "X": -334.489,
+    "Y": 3.99,
+    "Z": 161.476
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.854823,
+    "Z": 0.0,
+    "W": 0.51892
+   },
+   "Scale": {
+    "X": 3.0,
+    "Y": 1.2,
+    "Z": 5.197
+   },
+   "IsIndoor": false
+  },
+  {
+   "EntityId": 1160,
+   "PrefabId": "acoustic_region",
+   "Name": "Back straight",
+   "Position": {
+    "X": -366.002,
+    "Y": 4.087,
+    "Z": 140.67
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.904041,
+    "Z": 0.0,
+    "W": 0.427446
+   },
+   "Scale": {
+    "X": 3.0,
+    "Y": 1.2,
+    "Z": 5.197
+   },
+   "IsIndoor": false
+  },
+  {
+   "EntityId": 1161,
+   "PrefabId": "acoustic_region",
+   "Name": "Turns three and four",
+   "Position": {
+    "X": -392.543,
+    "Y": 4.087,
+    "Z": 113.809
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.943504,
+    "Z": 0.0,
+    "W": 0.33136
+   },
+   "Scale": {
+    "X": 3.0,
+    "Y": 1.2,
+    "Z": 5.197
+   },
+   "IsIndoor": false
+  },
+  {
+   "EntityId": 1162,
+   "PrefabId": "acoustic_region",
+   "Name": "Turns three and four",
+   "Position": {
+    "X": -412.97,
+    "Y": 4.087,
+    "Z": 82.049
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.972788,
+    "Z": 0.0,
+    "W": 0.231698
+   },
+   "Scale": {
+    "X": 3.0,
+    "Y": 1.2,
+    "Z": 5.197
+   },
+   "IsIndoor": false
+  },
+  {
+   "EntityId": 1163,
+   "PrefabId": "acoustic_region",
+   "Name": "Turns three and four",
+   "Position": {
+    "X": -426.404,
+    "Y": 4.087,
+    "Z": 46.757
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.991575,
+    "Z": 0.0,
+    "W": 0.129537
+   },
+   "Scale": {
+    "X": 3.0,
+    "Y": 1.2,
+    "Z": 5.197
+   },
+   "IsIndoor": false
+  },
+  {
+   "EntityId": 1164,
+   "PrefabId": "acoustic_region",
+   "Name": "Turns three and four",
+   "Position": {
+    "X": -432.267,
+    "Y": 4.087,
+    "Z": 9.453
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": -0.999663,
+    "Z": 0.0,
+    "W": 0.025977
+   },
+   "Scale": {
+    "X": 3.0,
+    "Y": 1.2,
+    "Z": 5.197
+   },
+   "IsIndoor": false
+  },
+  {
+   "EntityId": 1165,
+   "PrefabId": "acoustic_region",
+   "Name": "Turns three and four",
+   "Position": {
+    "X": -430.306,
+    "Y": 4.087,
+    "Z": -28.258
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.996964,
+    "Z": 0.0,
+    "W": 0.077862
+   },
+   "Scale": {
+    "X": 3.0,
+    "Y": 1.2,
+    "Z": 5.197
+   },
+   "IsIndoor": false
+  },
+  {
+   "EntityId": 1166,
+   "PrefabId": "acoustic_region",
+   "Name": "Turns three and four",
+   "Position": {
+    "X": -420.605,
+    "Y": 4.087,
+    "Z": -64.752
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.983509,
+    "Z": 0.0,
+    "W": 0.180862
+   },
+   "Scale": {
+    "X": 3.0,
+    "Y": 1.2,
+    "Z": 5.197
+   },
+   "IsIndoor": false
+  },
+  {
+   "EntityId": 1167,
+   "PrefabId": "acoustic_region",
+   "Name": "Turns three and four",
+   "Position": {
+    "X": -403.583,
+    "Y": 4.087,
+    "Z": -98.46
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.959441,
+    "Z": 0.0,
+    "W": 0.28191
+   },
+   "Scale": {
+    "X": 3.0,
+    "Y": 1.2,
+    "Z": 5.197
+   },
+   "IsIndoor": false
+  },
+  {
+   "EntityId": 1168,
+   "PrefabId": "acoustic_region",
+   "Name": "Turns three and four",
+   "Position": {
+    "X": -379.971,
+    "Y": 4.087,
+    "Z": -127.929
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.925021,
+    "Z": 0.0,
+    "W": 0.379916
+   },
+   "Scale": {
+    "X": 3.0,
+    "Y": 1.2,
+    "Z": 5.197
+   },
+   "IsIndoor": false
+  },
+  {
+   "EntityId": 1169,
+   "PrefabId": "acoustic_region",
+   "Name": "Turns three and four",
+   "Position": {
+    "X": -350.786,
+    "Y": 4.082,
+    "Z": -151.892
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.88062,
+    "Z": 0.0,
+    "W": 0.473823
+   },
+   "Scale": {
+    "X": 3.0,
+    "Y": 1.2,
+    "Z": 5.197
+   },
+   "IsIndoor": false
+  },
+  {
+   "EntityId": 1170,
+   "PrefabId": "acoustic_region",
+   "Name": "Turns three and four",
+   "Position": {
+    "X": -317.285,
+    "Y": 3.812,
+    "Z": -169.317
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.826718,
+    "Z": 0.0,
+    "W": 0.562617
+   },
+   "Scale": {
+    "X": 3.0,
+    "Y": 1.2,
+    "Z": 5.197
+   },
+   "IsIndoor": false
+  },
+  {
+   "EntityId": 1171,
+   "PrefabId": "acoustic_region",
+   "Name": "Turns three and four",
+   "Position": {
+    "X": -280.909,
+    "Y": 3.156,
+    "Z": -179.455
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.763895,
+    "Z": 0.0,
+    "W": 0.645341
+   },
+   "Scale": {
+    "X": 3.0,
+    "Y": 1.2,
+    "Z": 5.197
+   },
+   "IsIndoor": false
+  },
+  {
+   "EntityId": 1172,
+   "PrefabId": "acoustic_region",
+   "Name": "Turns three and four",
+   "Position": {
+    "X": -240.639,
+    "Y": 2.633,
+    "Z": -181.753
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.692647,
+    "Z": 0.0,
+    "W": 0.721276
+   },
+   "Scale": {
+    "X": 3.0,
+    "Y": 1.2,
+    "Z": 5.714
+   },
+   "IsIndoor": false
+  },
+  {
+   "EntityId": 1173,
+   "PrefabId": "acoustic_region",
+   "Name": "Turns three and four",
+   "Position": {
+    "X": -189.864,
+    "Y": 2.5,
+    "Z": -178.185
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.673863,
+    "Z": 0.0,
+    "W": 0.738856
+   },
+   "Scale": {
+    "X": 3.0,
+    "Y": 1.2,
+    "Z": 7.269
+   },
+   "IsIndoor": false
+  },
+  {
+   "EntityId": 1174,
+   "PrefabId": "acoustic_region",
+   "Name": "Turns three and four",
+   "Position": {
+    "X": -131.42,
+    "Y": 2.5,
+    "Z": -172.796
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.673863,
+    "Z": 0.0,
+    "W": 0.738856
+   },
+   "Scale": {
+    "X": 3.0,
+    "Y": 1.2,
+    "Z": 7.269
+   },
+   "IsIndoor": false
+  },
+  {
+   "EntityId": 1175,
+   "PrefabId": "acoustic_region",
+   "Name": "Turns three and four",
+   "Position": {
+    "X": -72.976,
+    "Y": 2.5,
+    "Z": -167.408
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.673863,
+    "Z": 0.0,
+    "W": 0.738856
+   },
+   "Scale": {
+    "X": 3.0,
+    "Y": 1.2,
+    "Z": 7.269
+   },
+   "IsIndoor": false
+  },
+  {
+   "EntityId": 1176,
+   "PrefabId": "acoustic_region",
+   "Name": "Turns three and four",
+   "Position": {
+    "X": -14.532,
+    "Y": 2.5,
+    "Z": -162.019
+   },
+   "Rotation": {
+    "X": 0.0,
+    "Y": 0.673863,
+    "Z": 0.0,
+    "W": 0.738856
+   },
+   "Scale": {
+    "X": 3.0,
+    "Y": 1.2,
+    "Z": 7.269
+   },
+   "IsIndoor": false
+  },
+  {
+   "EntityId": 1177,
+   "PrefabId": "acoustic_region",
+   "Name": "Infield",
+   "Position": {
+    "X": 0.0,
+    "Y": 2.5,
+    "Z": 0.0
+   },
+   "Scale": {
+    "X": 22.0,
+    "Y": 1.2,
+    "Z": 21.0
+   },
+   "IsIndoor": false
+  },
+  {
+   "EntityId": 1178,
+   "PrefabId": "acoustic_region",
+   "Name": "Grandstand",
+   "Position": {
+    "X": 0.0,
+    "Y": 14.0,
+    "Z": -218.181
+   },
+   "Scale": {
+    "X": 48.0,
+    "Y": 1.6,
+    "Z": 1.6
+   },
+   "IsIndoor": false
   }
  ]
 }

@@ -19,6 +19,10 @@ public class EntityData
     public int? RegionAId { get; set; }
     public int? RegionBId { get; set; }
     public bool? IsIndoor { get; set; }
+
+    /// <summary>What to call this thing. On a region it is the name a player HEARS as they walk into
+    /// it, so it is the difference between a map you can navigate and one you cannot.</summary>
+    public string? Name { get; set; }
     public float? ApertureSize { get; set; }
 
     /// <summary>Per-face materials for an acoustic REGION entity, by MATERIAL NAME, in the order

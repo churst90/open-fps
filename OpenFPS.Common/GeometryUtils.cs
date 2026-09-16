@@ -81,14 +81,85 @@ public static class GeometryUtils
 
         if (pointsInside == 8) return BoxContainment.FullyInside;
         if (pointsInside > 0) return BoxContainment.Partial;
-        
-        // Check if OBB is entirely inside the Box (rare but possible for large nodes)
-        if (Math.Abs(obbCenter.X - boxCenter.X) <= halfSize.X &&
-            Math.Abs(obbCenter.Y - boxCenter.Y) <= halfSize.Y &&
-            Math.Abs(obbCenter.Z - boxCenter.Z) <= halfSize.Z)
-            return BoxContainment.Partial;
 
-        return BoxContainment.Outside;
+        // CORNER SAMPLING IS NOT AN INTERSECTION TEST, and believing it was lost whole regions.
+        //
+        // A long thin box can pass clean THROUGH a big cube without containing any of its eight
+        // corners and without its own centre being inside it. The octree asks this question of nodes
+        // hundreds of metres across, so a 24 m wide region volume laid along a racetrack answered
+        // "Outside" for node after node, the recursion stopped there, and the region simply was not
+        // in the grid over those stretches — while being perfectly present either side of them. The
+        // symptom was a player walking a named straight and being told the name, then nothing, then
+        // the name again.
+        //
+        // The honest test is separating axes: two convex boxes miss each other if and only if some
+        // axis exists on which their projections do not overlap, and for a box pair the candidates
+        // are the three axes of each plus the nine cross products.
+        return ObbIntersectsAabb(boxCenter, boxSize, obbCenter, obbSize, obbRot)
+             ? BoxContainment.Partial
+             : BoxContainment.Outside;
+    }
+
+    /// <summary>
+    /// Do an axis-aligned box and an oriented box share any volume at all? Separating-axis theorem,
+    /// fifteen axes, no allocation.
+    /// </summary>
+    public static bool ObbIntersectsAabb(Vector3 aabbCenter, Vector3 aabbSize,
+                                         Vector3 obbCenter, Vector3 obbSize, Quaternion obbRot)
+    {
+        Vector3 a = aabbSize * 0.5f;
+        Vector3 b = obbSize * 0.5f;
+        var m = Matrix4x4.CreateFromQuaternion(obbRot);
+        Vector3 bx = new(m.M11, m.M12, m.M13);
+        Vector3 by = new(m.M21, m.M22, m.M23);
+        Vector3 bz = new(m.M31, m.M32, m.M33);
+        Vector3 t = obbCenter - aabbCenter;
+
+        // r[i,j] is the i-th world axis against the j-th box axis, and the epsilon keeps the cross
+        // products from exploding when two axes are parallel — which for a yaw-only rotation they
+        // always are, so it is the normal case here and not the corner case.
+        Span<float> r = stackalloc float[9];
+        Span<float> ar = stackalloc float[9];
+        r[0] = bx.X; r[1] = by.X; r[2] = bz.X;
+        r[3] = bx.Y; r[4] = by.Y; r[5] = bz.Y;
+        r[6] = bx.Z; r[7] = by.Z; r[8] = bz.Z;
+        for (int i = 0; i < 9; i++) ar[i] = MathF.Abs(r[i]) + 1e-6f;
+
+        Span<float> ae = stackalloc float[3] { a.X, a.Y, a.Z };
+        Span<float> be = stackalloc float[3] { b.X, b.Y, b.Z };
+        Span<float> te = stackalloc float[3] { t.X, t.Y, t.Z };
+
+        // The three axes of the axis-aligned box.
+        for (int i = 0; i < 3; i++)
+        {
+            float ra = ae[i];
+            float rb = be[0] * ar[i * 3] + be[1] * ar[i * 3 + 1] + be[2] * ar[i * 3 + 2];
+            if (MathF.Abs(te[i]) > ra + rb) return false;
+        }
+
+        // The three axes of the oriented box.
+        for (int j = 0; j < 3; j++)
+        {
+            float ra = ae[0] * ar[j] + ae[1] * ar[3 + j] + ae[2] * ar[6 + j];
+            float rb = be[j];
+            float tj = te[0] * r[j] + te[1] * r[3 + j] + te[2] * r[6 + j];
+            if (MathF.Abs(tj) > ra + rb) return false;
+        }
+
+        // And the nine cross products of one axis with another.
+        for (int i = 0; i < 3; i++)
+        {
+            int i1 = (i + 1) % 3, i2 = (i + 2) % 3;
+            for (int j = 0; j < 3; j++)
+            {
+                int j1 = (j + 1) % 3, j2 = (j + 2) % 3;
+                float ra = ae[i1] * ar[i2 * 3 + j] + ae[i2] * ar[i1 * 3 + j];
+                float rb = be[j1] * ar[i * 3 + j2] + be[j2] * ar[i * 3 + j1];
+                float tv = te[i2] * r[i1 * 3 + j] - te[i1] * r[i2 * 3 + j];
+                if (MathF.Abs(tv) > ra + rb) return false;
+            }
+        }
+        return true;
     }
 
     public static bool IsPointInOBB(Vector3 point, Vector3 boxPos, Vector3 boxSize, Quaternion boxRot)

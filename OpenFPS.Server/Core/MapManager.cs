@@ -164,7 +164,13 @@ public class MapManager
         {
             try 
             {
-                var entity = _prefabRepo.Spawn(world, entityData.PrefabId, entityData.Position, entityData.Rotation, entityData.Scale);
+                var entity = _prefabRepo.Spawn(world, entityData.PrefabId, entityData.Position,
+                                               entityData.Rotation, entityData.Scale, entityData.Name);
+                if (!string.IsNullOrWhiteSpace(entityData.Name))
+                {
+                    if (world.Has<NameComponent>(entity)) world.Get<NameComponent>(entity).Name = entityData.Name;
+                    if (world.Has<IdentityComponent>(entity)) world.Get<IdentityComponent>(entity).Name = entityData.Name;
+                }
                 lookup[entity.Id] = entity;
                 if (entityData.EntityId > 0)
                 {

@@ -244,6 +244,8 @@ public sealed record VehicleProfile
             ["diesel_truck"] = () => Truck,
             ["diesel_cummins"] = () => DieselPickupLoud,
             ["school_bus"] = () => SchoolBus,
+            ["diesel_cummins_na"] = () => DieselPickupNa,
+            ["school_bus_na"] = () => SchoolBusNa,
             ["boxer4"] = () => Wagon,
             ["v10"] = () => V10Coupe,
             ["v12"] = () => GrandTourer,
@@ -451,7 +453,7 @@ public sealed record VehicleProfile
         // Measured, not guessed: EngineSynthTests renders every preset and holds its declared level
         // to what it actually produces. A first guess of 101 was sixteen decibels light, which would
         // have put this car forty times too quiet next to the field it shares a track with.
-        SourceLevelDb = 118f,
+        SourceLevelDb = 100f,
         Engine = EngineProfile.I4Turbo,
         Gearbox = Gearbox.SixSpeedSports with { Ratios = new[] { 3.4f, 2.05f, 1.42f, 1.06f, 0.84f, 0.68f }, FinalDrive = 3.7f, ShiftSeconds = 0.18f, UpshiftRpm = 6300f, DownshiftRpm = 2000f },
         Tyres = TyreProfile.SportsOnAsphalt with { TreadBlocks = 58, PeakGripG = 1.1f, SquealHz = 880f },
@@ -529,7 +531,7 @@ public sealed record VehicleProfile
         Body = VehicleBody.Van,
         Name = "13 litre semi truck",
         EngineKey = "diesel_truck",
-        SourceLevelDb = 104f,
+        SourceLevelDb = 93f,
         Engine = EngineProfile.DieselTruckI6,
         Gearbox = Gearbox.SixSpeedSports with { Ratios = new[] { 11.7f, 7.6f, 5.0f, 3.3f, 2.2f, 1.45f, 1.0f, 0.78f }, FinalDrive = 3.55f, ShiftSeconds = 0.8f, UpshiftRpm = 1800f, DownshiftRpm = 1100f, WheelRadiusMetres = 0.51f },
         Tyres = TyreProfile.TruckOnAsphalt,
@@ -551,7 +553,7 @@ public sealed record VehicleProfile
         // Measured with --engine-levels, not guessed: a straight-piped 5.9 is eleven decibels above
         // what a silenced pickup diesel makes.
         EngineKey = "diesel_cummins",
-        SourceLevelDb = 116f,
+        SourceLevelDb = 107f,
         Engine = EngineProfile.DieselCumminsI6,
         // Four ratios and a very tall final drive: this engine has no revs to give and does not need
         // any. Governed at 2,900, top gear runs out around 160 km/h.
@@ -579,7 +581,7 @@ public sealed record VehicleProfile
         Body = VehicleBody.SchoolBus,
         Name = "school bus",
         EngineKey = "diesel_bus",
-        SourceLevelDb = 100f,
+        SourceLevelDb = 85f,
         Engine = EngineProfile.DieselBusI6,
         Gearbox = Gearbox.SixSpeedSports with
         {
@@ -591,6 +593,28 @@ public sealed record VehicleProfile
         MassKg = 11000f, DragArea = 5.8f, RollingResistance = 0.009f,
         // Nose to tail, which is what makes it read as a bus rather than a truck.
         ExhaustOffsetZ = -5.2f, IntakeOffsetZ = 4.6f, FrontAxleZ = 3.4f, RearAxleZ = -3.2f,
+    };
+
+    /// <summary>The same pickup with the turbo taken off, so the two can be run on one lap and the
+    /// turbo heard as a mechanism rather than as a setting.</summary>
+    public static VehicleProfile DieselPickupNa => DieselPickupLoud with
+    {
+        Name = "5.9 Cummins 6B pickup, no turbo",
+        EngineKey = "diesel_cummins_na",
+        Engine = EngineProfile.DieselCumminsNaI6,
+        // Measured: nearly eight decibels ABOVE the turbo version, because no turbine is eating the
+        // pulse energy any more. Taking a turbo off makes a diesel louder, not quieter.
+        SourceLevelDb = 115f,
+    };
+
+    /// <summary>And the bus, likewise.</summary>
+    public static VehicleProfile SchoolBusNa => SchoolBus with
+    {
+        Name = "school bus, no turbo",
+        EngineKey = "diesel_bus_na",
+        Engine = EngineProfile.DieselBusNaI6,
+        // Thirteen decibels above the turbo bus, same reason.
+        SourceLevelDb = 98f,
     };
 
     public static VehicleProfile Wagon => new()

@@ -151,7 +151,11 @@ public class PrefabRepository
     internal static bool AnnouncesByDefault(PrefabTemplate t) =>
         t.Announce ?? t.Type is EntityType.Item or EntityType.NPC or EntityType.Beacon;
 
-    public Entity Spawn(World world, string prefabId, Vector3 position, Quaternion? rotation = null, Vector3? scale = null)
+    /// <param name="regionName">What to call the region this spawns, if it declares one. A prefab
+    /// names a KIND of room ("Acoustic Region"); the map that places one names THAT room ("Pit lane").
+    /// Without this every region in a map answers to its prefab's name, which is no name at all.</param>
+    public Entity Spawn(World world, string prefabId, Vector3 position, Quaternion? rotation = null,
+                        Vector3? scale = null, string? regionName = null)
     {
         if (!_prefabs.TryGetValue(prefabId.ToLowerInvariant(), out var t))
         {
@@ -291,10 +295,13 @@ public class PrefabRepository
         {
             var region = new RegionComponent
             {
-                FriendlyName = t.Name,
+                FriendlyName = string.IsNullOrWhiteSpace(regionName) ? t.Name : regionName,
                 IsIndoor = t.IsIndoor ?? true,
                 Environment = t.EnvType ?? AcousticEnvironmentType.Atmospheric,
-                RoomSize = t.RoomSize ?? Vector3.Zero,
+                // The ROOM follows the entity's scale, the same way the collider above already does.
+                // It did not, so a map could place a region of exactly one size — the prefab's — and
+                // scaling one gave you a big collider around a small room.
+                RoomSize = (t.RoomSize ?? Vector3.Zero) * (scale ?? Vector3.One),
                 AmbienceId = t.AmbienceId ?? "",
                 ReverbTimeScale = t.ReverbScale ?? 1.0f,
                 Materials = ResolveRoomMaterials(t.RoomMaterials)

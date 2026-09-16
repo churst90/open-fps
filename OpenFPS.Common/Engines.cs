@@ -1095,7 +1095,7 @@ public sealed record EngineProfile
         IntakeValve = new ValveSpec { Count = 2, DiameterMm = 37f, DischargeCoefficient = 0.68f },
         EvoTemperatureK = 1180f, IdleMapBar = 0.36f,
         IdleRoughness = 0.4f, IdleGovernorGain = 2.5f,
-        IdleRpm = 1500f, RedlineRpm = 11000f,
+        IdleRpm = 1900f, RedlineRpm = 11000f,
         InertiaKgM2 = 0.02f, FrictionNm = 3.4f, FrictionNmPerKrpm = 1.3f,
         PeakTorqueNm = 48f, PeakTorqueRpm = 7000f,
         Exhaust = new ExhaustSpec
@@ -1574,6 +1574,49 @@ public sealed record EngineProfile
         Mechanical = new MechanicalSpec { ValvetrainLevel = 0.8f, CombustionKnock = 1.4f, AccessoryWhineLevel = 0.2f, TurboWhistleLevel = 0.7f, TurboLagSeconds = 1.3f },
     };
 
+    /// <summary>
+    /// The same 5.9 Cummins with the turbo taken off — a real engine, the 6B, not a thought
+    /// experiment. Sold by the thousand in tractors and boats and gensets.
+    ///
+    /// Losing a turbo is not losing a noise. It changes four things and every one is audible:
+    ///
+    /// THE COMPRESSION GOES UP, 17:1 to 19:1. A naturally aspirated diesel has only the piston to
+    /// heat its air with, so it needs more squeeze to light at all — and higher compression means a
+    /// shorter ignition delay, less fuel accumulated before it lights, and a SMALLER premixed spike.
+    /// The engine that sounds like it should clatter more clatters less.
+    ///
+    /// THE TORQUE GOES DOWN by a third, because there is only an atmosphere of air to burn.
+    ///
+    /// THE TURBINE LEAVES THE EXHAUST, so every pulse the cylinders make goes straight out of the
+    /// pipe instead of spinning a wheel. This is the loud one: nothing is absorbing the pulse energy
+    /// any more, and nothing is low-passing the crack off the front of it.
+    ///
+    /// AND THE COMPRESSOR LEAVES THE INTAKE, so the runners and the plenum are no longer speaking
+    /// through a rotor. An NA diesel honks where a turbo one whooshes.
+    ///
+    /// None of that is written here. It falls out of Induction and the compression ratio.
+    /// </summary>
+    public static EngineProfile DieselCumminsNaI6 => DieselCumminsI6 with
+    {
+        Name = "5.9 Cummins 6B, no turbo",
+        Induction = Induction.NaturallyAspirated, BoostBar = 0f,
+        CompressionRatio = 19f,
+        PeakTorqueNm = 470f, PeakTorqueRpm = 1500f,
+        Mechanical = DieselCumminsI6.Mechanical with { TurboWhistleLevel = 0f },
+    };
+
+    /// <summary>The DT466 as it was first sold: naturally aspirated, 17.5:1, and about two thirds of
+    /// the torque. Same argument as <see cref="DieselCumminsNaI6"/> — the turbo leaves both gas
+    /// paths, and the compression comes up to compensate for the air it is no longer being given.</summary>
+    public static EngineProfile DieselBusNaI6 => DieselBusI6 with
+    {
+        Name = "7.6 DT466, no turbo",
+        Induction = Induction.NaturallyAspirated, BoostBar = 0f,
+        CompressionRatio = 17.5f,
+        PeakTorqueNm = 700f, PeakTorqueRpm = 1400f,
+        Mechanical = DieselBusI6.Mechanical with { TurboWhistleLevel = 0f },
+    };
+
     /// <summary>Every preset, by a short key a map or a command line can name.</summary>
     public static IReadOnlyDictionary<string, Func<EngineProfile>> Presets { get; } =
         new Dictionary<string, Func<EngineProfile>>(StringComparer.OrdinalIgnoreCase)
@@ -1591,6 +1634,8 @@ public sealed record EngineProfile
             ["diesel_truck"] = () => DieselTruckI6,
             ["diesel_cummins"] = () => DieselCumminsI6,
             ["diesel_bus"] = () => DieselBusI6,
+            ["diesel_cummins_na"] = () => DieselCumminsNaI6,
+            ["diesel_bus_na"] = () => DieselBusNaI6,
             ["boxer4"] = () => Boxer4,
             ["v10"] = () => V10,
             ["v12"] = () => V12,
