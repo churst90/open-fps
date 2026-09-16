@@ -19,24 +19,20 @@ public class ApplauseTests
     [Fact]
     public void AnOvationIsDenserThanPoliteClapping()
     {
-        int Crossings(float intensity)
+        // Crest factor: the peak against the RMS. A handful of separate claps is spiky — long
+        // stretches of nothing with events sticking out of it — while a roar approaches noise, whose
+        // crest is fixed and low. It is the same statistic that says whether you can pick individual
+        // people out, which is exactly the difference being asserted.
+        float Crest(float intensity)
         {
             var buf = Applause.Render(new CrowdApplause(200, intensity, 3f), Sr, 7);
-            // Count how often it crosses a high threshold: sparse claps are peaky, a roar is not.
             float peak = buf.Max(MathF.Abs);
-            int n = 0;
-            bool above = false;
-            foreach (float v in buf)
-            {
-                bool now = MathF.Abs(v) > peak * 0.35f;
-                if (now && !above) n++;
-                above = now;
-            }
-            return n;
+            float rms = MathF.Sqrt(buf.Sum(v => v * v) / buf.Length);
+            return rms < 1e-9f ? 0f : peak / rms;
         }
 
-        Assert.True(Crossings(1f) > Crossings(0.05f) * 2,
-            "an ovation should be many times denser than polite clapping");
+        Assert.True(Crest(0.05f) > Crest(1f),
+            "polite clapping should be spikier than an ovation, because you can still hear the claps");
     }
 
     /// <summary>

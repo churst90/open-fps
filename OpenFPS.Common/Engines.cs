@@ -610,6 +610,85 @@ public sealed record EngineProfile
         },
     };
 
+    /// <summary>
+    /// A litre sports bike: an inline four that revs to fourteen and a half thousand.
+    ///
+    /// The reason it sounds nothing like a car is not that it is small, it is that it is FAST. Four
+    /// cylinders firing every 180 degrees at 14,500 rpm is a firing rate of 483 Hz — above the note
+    /// of most cars' third harmonic — so the fundamental itself is a pitch rather than a beat, and
+    /// the orders above it run into the kilohertz where the ear is most sensitive. Its valvetrain is
+    /// busy for the same reason: sixteen valves closing 120 times a second each.
+    ///
+    /// Almost no exhaust to speak of. A short 4-into-1 and a can the size of a shoe, so nothing
+    /// cancels and nothing absorbs.
+    /// </summary>
+    public static EngineProfile SportBike => new()
+    {
+        Name = "1000 cc inline-four sports bike",
+        Layout = EngineLayout.Inline,
+        FiringAngles = EvenFire(new[] { 1, 2, 4, 3 }),
+        Bank = new int[4],
+        BoreMm = 76f, StrokeMm = 55f, RodRatio = 1.72f, CompressionRatio = 13.0f,
+        ExhaustCam = new CamLobe { DurationDegrees = 284f, MaxLiftMm = 9.4f, RampFraction = 0.14f, CentrelineDegrees = 250f },
+        IntakeCam = new CamLobe { DurationDegrees = 280f, MaxLiftMm = 9.8f, RampFraction = 0.14f, CentrelineDegrees = 472f },
+        ExhaustValve = new ValveSpec { DiameterMm = 24f, DischargeCoefficient = 0.70f },
+        IntakeValve = new ValveSpec { DiameterMm = 30f, DischargeCoefficient = 0.72f },
+        EvoTemperatureK = 1180f, IdleMapBar = 0.34f,
+        // A stiff governor, because a bike has almost no flywheel — 0.055 kg m² against a big block's
+        // 0.42 — so the same disturbance moves it eight times as far and a lazy governor lets the
+        // idle hunt up past 2,500. Modern bikes hold theirs with an idle-air valve for exactly this
+        // reason; it is the low inertia that makes the stiffness necessary, not the revs.
+        IdleRoughness = 0.15f, IdleGovernorGain = 14f,
+        IdleRpm = 1300f, RedlineRpm = 14500f,
+        // Low inertia AND high losses, which is the whole of why a bike behaves as it does. The crank
+        // is a tenth of a big block's — 0.055 against 0.42 — so anything that pushes it moves it a
+        // long way, and the catch flare overshot to 4,500 rpm before the governor could get near it.
+        // What brings it back is friction: a 1000 cc four at speed is pumping and rubbing far harder
+        // for its size than a lazy V8 is, which is why a bike's revs FALL as fast as they rise and a
+        // big block's coast down. Raising the losses to match the inertia settles it without a
+        // governor stiff enough to be doing the physics' job for it.
+        InertiaKgM2 = 0.055f, FrictionNm = 12.5f, FrictionNmPerKrpm = 5.0f,
+        PeakTorqueNm = 112f, PeakTorqueRpm = 11000f,
+        // Sixteen valves at very high speed: a bike's top end is a large part of its voice.
+        Mechanical = new MechanicalSpec { ValvetrainLevel = 1.0f, CombustionKnock = 0.08f, AccessoryWhineLevel = 0.15f, AccessoryWhineOrder = 2.5f },
+        Exhaust = new ExhaustSpec
+        {
+            PrimaryLengthMetres = 0.42f, PrimarySpread = 0.10f, PrimaryDiameterMm = 34f,
+            CollectorDiameterMm = 50f, CollectorPipeMetres = 0.30f,
+            Crossover = CrossoverKind.None,
+            MidPipeMetres = 0.15f,
+            Muffler = MufflerSpec.Glasspack with { Absorption = 0.25f, AbsorptiveLengthMetres = 0.24f },
+            TailpipeMetres = new[] { 0.12f },
+            TailpipeDiameterMm = 50f,
+        },
+    };
+
+    /// <summary>
+    /// A blown big block: 7.4 litres with a Roots supercharger sitting on top of it.
+    ///
+    /// The blower is the point, and it is two sounds rather than one. It WHINES, because a pair of
+    /// meshing rotors pumps in discrete gulps and that gulp rate is a high multiple of engine speed —
+    /// a pitch that rises with the revs and sits right on top of the exhaust note. And it MOVES AIR,
+    /// so every cylinder gets more of it: more pressure, more torque, a harder blowdown into the
+    /// pipes. The whine is what everyone recognises; the second is what makes it sound heavy.
+    ///
+    /// Unlike a turbo it has no lag worth the name. It is geared to the crank, so it is making boost
+    /// at idle and there is nothing to spool — which is exactly why it sounds instant and a turbo
+    /// does not.
+    /// </summary>
+    public static EngineProfile V8Blown => V8BigCam with
+    {
+        Name = "7.4 blown big block V8, 40-series",
+        Induction = Induction.Supercharged,
+        BoostBar = 0.75f,
+        IdleRpm = 950f, RedlineRpm = 6200f,
+        PeakTorqueNm = 1180f, PeakTorqueRpm = 4400f,
+        InertiaKgM2 = 0.52f, FrictionNm = 74f, FrictionNmPerKrpm = 26f,
+        // Order twelve: three lobes on each of two rotors, geared above the crank. At 4,000 rpm that
+        // is 800 Hz, which is where a blower actually sits.
+        Mechanical = V8BigCam.Mechanical with { BlowerWhineOrder = 12f, BlowerWhineLevel = 0.85f },
+    };
+
     public static EngineProfile PoliceV8 => new()
     {
         Name = "7.0 interceptor V8, lopey cam, open pipes",
@@ -1336,6 +1415,8 @@ public sealed record EngineProfile
             ["v8_glasspack"] = () => V8BigBlockGlasspack,
             ["v8_mild"] = () => V8MildSmallBlock,
             ["v8_bigcam"] = () => V8BigCam,
+            ["v8_blown"] = () => V8Blown,
+            ["sportbike"] = () => SportBike,
         };
 
     public static EngineProfile ByName(string key)

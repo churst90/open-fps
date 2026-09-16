@@ -1046,7 +1046,7 @@
    "AccelerationMps2": 5.5,
    "BrakingMps2": 8.0,
    "LaneOffsetMetres": -3.25,
-   "StartOffsetMetres": 67.1
+   "StartOffsetMetres": 50.3
   },
   {
    "Name": "Stock car 48",
@@ -1057,7 +1057,7 @@
    "AccelerationMps2": 5.5,
    "BrakingMps2": 8.0,
    "LaneOffsetMetres": 0.0,
-   "StartOffsetMetres": 134.1
+   "StartOffsetMetres": 100.6
   },
   {
    "Name": "Stock car 11",
@@ -1068,7 +1068,7 @@
    "AccelerationMps2": 5.5,
    "BrakingMps2": 8.0,
    "LaneOffsetMetres": 3.25,
-   "StartOffsetMetres": 201.2
+   "StartOffsetMetres": 150.9
   },
   {
    "Name": "Stock car 9",
@@ -1079,7 +1079,7 @@
    "AccelerationMps2": 5.5,
    "BrakingMps2": 8.0,
    "LaneOffsetMetres": 6.5,
-   "StartOffsetMetres": 268.2
+   "StartOffsetMetres": 201.2
   },
   {
    "Name": "Stock car 22",
@@ -1090,7 +1090,7 @@
    "AccelerationMps2": 5.5,
    "BrakingMps2": 8.0,
    "LaneOffsetMetres": -6.5,
-   "StartOffsetMetres": 335.3
+   "StartOffsetMetres": 251.4
   },
   {
    "Name": "Stock car 5",
@@ -1101,260 +1101,370 @@
    "AccelerationMps2": 5.5,
    "BrakingMps2": 8.0,
    "LaneOffsetMetres": -3.25,
+   "StartOffsetMetres": 301.7
+  },
+  {
+   "Name": "Hatchback 2",
+   "Preset": "i4_economy",
+   "Track": "oval",
+   "TopSpeedKmh": 174.1,
+   "CorneringG": 0.942,
+   "AccelerationMps2": 3.0,
+   "BrakingMps2": 6.0,
+   "LaneOffsetMetres": 0.0,
+   "StartOffsetMetres": 352.0
+  },
+  {
+   "Name": "Hatchback 1",
+   "Preset": "i4_economy",
+   "Track": "oval",
+   "TopSpeedKmh": 175.1,
+   "CorneringG": 0.951,
+   "AccelerationMps2": 3.0,
+   "BrakingMps2": 6.0,
+   "LaneOffsetMetres": 3.25,
    "StartOffsetMetres": 402.3
   },
   {
-   "Name": "Stock car 17",
-   "Preset": "nascar_v8",
+   "Name": "Dirt bike 2",
+   "Preset": "single",
    "Track": "oval",
-   "TopSpeedKmh": 298.5,
-   "CorneringG": 1.735,
-   "AccelerationMps2": 5.5,
-   "BrakingMps2": 8.0,
+   "TopSpeedKmh": 150.9,
+   "CorneringG": 0.909,
+   "AccelerationMps2": 3.8,
+   "BrakingMps2": 6.5,
+   "LaneOffsetMetres": 6.5,
+   "StartOffsetMetres": 452.6
+  },
+  {
+   "Name": "Dirt bike 1",
+   "Preset": "single",
+   "Track": "oval",
+   "TopSpeedKmh": 151.8,
+   "CorneringG": 0.918,
+   "AccelerationMps2": 3.8,
+   "BrakingMps2": 6.5,
+   "LaneOffsetMetres": -6.5,
+   "StartOffsetMetres": 502.9
+  },
+  {
+   "Name": "Cruiser 2",
+   "Preset": "vtwin",
+   "Track": "oval",
+   "TopSpeedKmh": 177.8,
+   "CorneringG": 0.833,
+   "AccelerationMps2": 3.2,
+   "BrakingMps2": 6.0,
+   "LaneOffsetMetres": -3.25,
+   "StartOffsetMetres": 553.2
+  },
+  {
+   "Name": "Cruiser 1",
+   "Preset": "vtwin",
+   "Track": "oval",
+   "TopSpeedKmh": 178.8,
+   "CorneringG": 0.841,
+   "AccelerationMps2": 3.2,
+   "BrakingMps2": 6.0,
    "LaneOffsetMetres": 0.0,
-   "StartOffsetMetres": 469.4
+   "StartOffsetMetres": 603.5
+  },
+  {
+   "Name": "Sports bike 2",
+   "Preset": "sportbike",
+   "Track": "oval",
+   "TopSpeedKmh": 269.8,
+   "CorneringG": 1.248,
+   "AccelerationMps2": 6.0,
+   "BrakingMps2": 9.0,
+   "LaneOffsetMetres": 3.25,
+   "StartOffsetMetres": 653.7
+  },
+  {
+   "Name": "Sports bike 1",
+   "Preset": "sportbike",
+   "Track": "oval",
+   "TopSpeedKmh": 271.3,
+   "CorneringG": 1.26,
+   "AccelerationMps2": 6.0,
+   "BrakingMps2": 9.0,
+   "LaneOffsetMetres": 6.5,
+   "StartOffsetMetres": 704.0
+  },
+  {
+   "Name": "Formula car 2",
+   "Preset": "f1_v10",
+   "Track": "oval",
+   "TopSpeedKmh": 303.1,
+   "CorneringG": 2.646,
+   "AccelerationMps2": 9.0,
+   "BrakingMps2": 12.0,
+   "LaneOffsetMetres": -6.5,
+   "StartOffsetMetres": 754.3
+  },
+  {
+   "Name": "Formula car 1",
+   "Preset": "f1_v10",
+   "Track": "oval",
+   "TopSpeedKmh": 295.9,
+   "CorneringG": 2.54,
+   "AccelerationMps2": 9.0,
+   "BrakingMps2": 12.0,
+   "LaneOffsetMetres": -3.25,
+   "StartOffsetMetres": 804.6
+  },
+  {
+   "Name": "V10 supercar 2",
+   "Preset": "v10",
+   "Track": "oval",
+   "TopSpeedKmh": 287.7,
+   "CorneringG": 1.332,
+   "AccelerationMps2": 6.2,
+   "BrakingMps2": 8.5,
+   "LaneOffsetMetres": 0.0,
+   "StartOffsetMetres": 854.9
+  },
+  {
+   "Name": "V10 supercar 1",
+   "Preset": "v10",
+   "Track": "oval",
+   "TopSpeedKmh": 289.3,
+   "CorneringG": 1.345,
+   "AccelerationMps2": 6.2,
+   "BrakingMps2": 8.5,
+   "LaneOffsetMetres": 3.25,
+   "StartOffsetMetres": 905.2
   },
   {
    "Name": "Mild small block 2",
    "Preset": "v8_mild",
    "Track": "oval",
-   "TopSpeedKmh": 200.1,
-   "CorneringG": 0.981,
+   "TopSpeedKmh": 200.7,
+   "CorneringG": 0.985,
    "AccelerationMps2": 3.6,
    "BrakingMps2": 6.5,
-   "LaneOffsetMetres": 3.25,
-   "StartOffsetMetres": 536.4
+   "LaneOffsetMetres": 6.5,
+   "StartOffsetMetres": 955.5
   },
   {
    "Name": "Mild small block 1",
    "Preset": "v8_mild",
    "Track": "oval",
-   "TopSpeedKmh": 201.3,
-   "CorneringG": 0.99,
+   "TopSpeedKmh": 201.8,
+   "CorneringG": 0.995,
    "AccelerationMps2": 3.6,
    "BrakingMps2": 6.5,
-   "LaneOffsetMetres": 6.5,
-   "StartOffsetMetres": 603.5
+   "LaneOffsetMetres": -6.5,
+   "StartOffsetMetres": 1005.8
   },
   {
    "Name": "Glasspack 2",
    "Preset": "v8_glasspack",
    "Track": "oval",
-   "TopSpeedKmh": 227.7,
-   "CorneringG": 1.02,
+   "TopSpeedKmh": 228.3,
+   "CorneringG": 1.024,
    "AccelerationMps2": 4.3,
    "BrakingMps2": 6.5,
-   "LaneOffsetMetres": -6.5,
-   "StartOffsetMetres": 670.5
+   "LaneOffsetMetres": -3.25,
+   "StartOffsetMetres": 1056.0
   },
   {
    "Name": "Glasspack 1",
    "Preset": "v8_glasspack",
    "Track": "oval",
-   "TopSpeedKmh": 222.2,
-   "CorneringG": 0.98,
+   "TopSpeedKmh": 222.8,
+   "CorneringG": 0.984,
    "AccelerationMps2": 4.3,
    "BrakingMps2": 6.5,
-   "LaneOffsetMetres": -3.25,
-   "StartOffsetMetres": 737.6
-  },
-  {
-   "Name": "Flowmaster coupe 4",
-   "Preset": "v8_sports",
-   "Track": "oval",
-   "TopSpeedKmh": 248.3,
-   "CorneringG": 1.068,
-   "AccelerationMps2": 5.0,
-   "BrakingMps2": 6.8,
    "LaneOffsetMetres": 0.0,
-   "StartOffsetMetres": 804.6
+   "StartOffsetMetres": 1106.3
   },
   {
    "Name": "Flowmaster coupe 3",
    "Preset": "v8_sports",
    "Track": "oval",
-   "TopSpeedKmh": 249.8,
-   "CorneringG": 1.078,
+   "TopSpeedKmh": 249.0,
+   "CorneringG": 1.073,
    "AccelerationMps2": 5.0,
    "BrakingMps2": 6.8,
    "LaneOffsetMetres": 3.25,
-   "StartOffsetMetres": 871.7
+   "StartOffsetMetres": 1156.6
   },
   {
    "Name": "Flowmaster coupe 2",
    "Preset": "v8_sports",
    "Track": "oval",
-   "TopSpeedKmh": 251.2,
-   "CorneringG": 1.089,
+   "TopSpeedKmh": 250.5,
+   "CorneringG": 1.083,
    "AccelerationMps2": 5.0,
    "BrakingMps2": 6.8,
    "LaneOffsetMetres": 6.5,
-   "StartOffsetMetres": 938.7
+   "StartOffsetMetres": 1206.9
   },
   {
    "Name": "Flowmaster coupe 1",
    "Preset": "v8_sports",
    "Track": "oval",
-   "TopSpeedKmh": 252.6,
-   "CorneringG": 1.099,
+   "TopSpeedKmh": 251.9,
+   "CorneringG": 1.093,
    "AccelerationMps2": 5.0,
    "BrakingMps2": 6.8,
    "LaneOffsetMetres": -6.5,
-   "StartOffsetMetres": 1005.8
+   "StartOffsetMetres": 1257.2
   },
   {
-   "Name": "Big cam 4",
-   "Preset": "v8_bigcam",
+   "Name": "Blown big block 2",
+   "Preset": "v8_blown",
    "Track": "oval",
-   "TopSpeedKmh": 231.8,
-   "CorneringG": 0.997,
-   "AccelerationMps2": 4.6,
+   "TopSpeedKmh": 243.2,
+   "CorneringG": 1.042,
+   "AccelerationMps2": 5.4,
    "BrakingMps2": 6.5,
    "LaneOffsetMetres": -3.25,
-   "StartOffsetMetres": 1072.8
+   "StartOffsetMetres": 1307.5
   },
   {
-   "Name": "Big cam 3",
-   "Preset": "v8_bigcam",
+   "Name": "Blown big block 1",
+   "Preset": "v8_blown",
    "Track": "oval",
-   "TopSpeedKmh": 233.1,
-   "CorneringG": 1.006,
-   "AccelerationMps2": 4.6,
+   "TopSpeedKmh": 237.3,
+   "CorneringG": 1.001,
+   "AccelerationMps2": 5.4,
    "BrakingMps2": 6.5,
    "LaneOffsetMetres": 0.0,
-   "StartOffsetMetres": 1139.9
+   "StartOffsetMetres": 1357.8
   },
   {
    "Name": "Big cam 2",
    "Preset": "v8_bigcam",
    "Track": "oval",
-   "TopSpeedKmh": 234.4,
-   "CorneringG": 1.016,
+   "TopSpeedKmh": 233.7,
+   "CorneringG": 1.011,
    "AccelerationMps2": 4.6,
    "BrakingMps2": 6.5,
    "LaneOffsetMetres": 3.25,
-   "StartOffsetMetres": 1206.9
+   "StartOffsetMetres": 1408.1
   },
   {
    "Name": "Big cam 1",
    "Preset": "v8_bigcam",
    "Track": "oval",
-   "TopSpeedKmh": 235.8,
-   "CorneringG": 1.026,
+   "TopSpeedKmh": 235.1,
+   "CorneringG": 1.021,
    "AccelerationMps2": 4.6,
    "BrakingMps2": 6.5,
    "LaneOffsetMetres": 6.5,
-   "StartOffsetMetres": 1274.0
+   "StartOffsetMetres": 1458.3
   },
   {
    "Name": "Open header 2",
    "Preset": "v8_open_headers",
    "Track": "oval",
-   "TopSpeedKmh": 247.2,
-   "CorneringG": 1.066,
+   "TopSpeedKmh": 246.5,
+   "CorneringG": 1.06,
    "AccelerationMps2": 4.8,
    "BrakingMps2": 6.5,
    "LaneOffsetMetres": -6.5,
-   "StartOffsetMetres": 1341.0
+   "StartOffsetMetres": 1508.6
   },
   {
    "Name": "Open header 1",
    "Preset": "v8_open_headers",
    "Track": "oval",
-   "TopSpeedKmh": 248.6,
-   "CorneringG": 1.076,
+   "TopSpeedKmh": 247.9,
+   "CorneringG": 1.07,
    "AccelerationMps2": 4.8,
    "BrakingMps2": 6.5,
    "LaneOffsetMetres": -3.25,
-   "StartOffsetMetres": 1408.1
+   "StartOffsetMetres": 1558.9
   },
   {
    "Name": "Turbo hatch 2",
    "Preset": "i4_turbo",
    "Track": "oval",
-   "TopSpeedKmh": 232.7,
-   "CorneringG": 1.082,
+   "TopSpeedKmh": 232.0,
+   "CorneringG": 1.077,
    "AccelerationMps2": 4.4,
    "BrakingMps2": 7.5,
    "LaneOffsetMetres": 0.0,
-   "StartOffsetMetres": 1475.1
+   "StartOffsetMetres": 1609.2
   },
   {
    "Name": "Turbo hatch 1",
    "Preset": "i4_turbo",
    "Track": "oval",
-   "TopSpeedKmh": 234.1,
-   "CorneringG": 1.093,
+   "TopSpeedKmh": 233.4,
+   "CorneringG": 1.087,
    "AccelerationMps2": 4.4,
    "BrakingMps2": 7.5,
    "LaneOffsetMetres": 3.25,
-   "StartOffsetMetres": 1542.2
+   "StartOffsetMetres": 1659.5
   },
   {
    "Name": "Diesel pickup 2",
    "Preset": "diesel_i4",
    "Track": "oval",
-   "TopSpeedKmh": 185.3,
-   "CorneringG": 0.883,
+   "TopSpeedKmh": 184.8,
+   "CorneringG": 0.878,
    "AccelerationMps2": 3.0,
    "BrakingMps2": 6.0,
    "LaneOffsetMetres": 6.5,
-   "StartOffsetMetres": 1609.2
+   "StartOffsetMetres": 1709.8
   },
   {
    "Name": "Diesel pickup 1",
    "Preset": "diesel_i4",
    "Track": "oval",
-   "TopSpeedKmh": 186.4,
-   "CorneringG": 0.891,
+   "TopSpeedKmh": 185.8,
+   "CorneringG": 0.887,
    "AccelerationMps2": 3.0,
    "BrakingMps2": 6.0,
    "LaneOffsetMetres": -6.5,
-   "StartOffsetMetres": 1676.3
+   "StartOffsetMetres": 1760.1
   },
   {
    "Name": "Race truck 4",
    "Preset": "diesel_truck",
    "Track": "oval",
-   "TopSpeedKmh": 162.1,
-   "CorneringG": 0.736,
+   "TopSpeedKmh": 161.6,
+   "CorneringG": 0.732,
    "AccelerationMps2": 2.2,
    "BrakingMps2": 5.5,
    "LaneOffsetMetres": -3.25,
-   "StartOffsetMetres": 1743.3
+   "StartOffsetMetres": 1810.4
   },
   {
    "Name": "Race truck 3",
    "Preset": "diesel_truck",
    "Track": "oval",
-   "TopSpeedKmh": 158.2,
-   "CorneringG": 0.707,
+   "TopSpeedKmh": 157.7,
+   "CorneringG": 0.703,
    "AccelerationMps2": 2.2,
    "BrakingMps2": 5.5,
    "LaneOffsetMetres": 0.0,
-   "StartOffsetMetres": 1810.4
+   "StartOffsetMetres": 1860.6
   },
   {
    "Name": "Race truck 2",
    "Preset": "diesel_truck",
    "Track": "oval",
-   "TopSpeedKmh": 159.1,
-   "CorneringG": 0.714,
+   "TopSpeedKmh": 158.7,
+   "CorneringG": 0.71,
    "AccelerationMps2": 2.2,
    "BrakingMps2": 5.5,
    "LaneOffsetMetres": 3.25,
-   "StartOffsetMetres": 1877.4
+   "StartOffsetMetres": 1910.9
   },
   {
    "Name": "Race truck 1",
    "Preset": "diesel_truck",
    "Track": "oval",
-   "TopSpeedKmh": 160.0,
-   "CorneringG": 0.72,
+   "TopSpeedKmh": 159.6,
+   "CorneringG": 0.717,
    "AccelerationMps2": 2.2,
    "BrakingMps2": 5.5,
    "LaneOffsetMetres": 6.5,
-   "StartOffsetMetres": 1944.5
+   "StartOffsetMetres": 1961.2
   }
  ],
  "Entities": [

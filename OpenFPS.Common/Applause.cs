@@ -49,7 +49,15 @@ public static class Applause
     public const int MaxRendered = 320;
 
     /// <summary>One clap at one metre, dB SPL. A single pair of hands is about this.</summary>
-    public const float SingleClapDb = 85f;
+    public const float SingleClapDb = 89f;
+
+    /// <summary>How much of the crack rides on top of the body. The edge is what says "hands" — at
+    /// zero the whole thing rustles.</summary>
+    public const float CrackLevel = 0.85f;
+
+    /// <summary>What the rendered buffer is scaled to, as RMS. Well under full scale, because the
+    /// coincidences in a dense crowd need somewhere to go.</summary>
+    public const float TargetRms = 0.16f;
 
     /// <summary>
     /// How loud a crowd of this size is at one metre, dB SPL.
@@ -172,24 +180,46 @@ public static class Applause
     private static void AddClap(float[] into, int at, int sampleRate, Random rng, Clapper who, float gain)
     {
         float level = gain * who.DistanceGain * who.Loudness;
-        float tau = 0.0012f + (float)rng.NextDouble() * 0.0022f;     // 1.2-3.4 ms: the whole event
-        int len = Math.Min((int)(tau * 6f * sampleRate), into.Length - at);
+
+        // TWO PARTS, because a clap has an edge and the edge is the whole of what identifies it.
+        //
+        // One decaying broadband burst is not enough, and the failure is specific: hundreds of soft
+        // bursts a second average into a rustle, and a listener called it leaves blowing. What is
+        // missing is the ATTACK. Palms meeting is very nearly a step change in pressure — the contact
+        // is complete in well under a millisecond — and that near-discontinuity is the crack. The
+        // couple of milliseconds after it, as the trapped air escapes and the hands rebound, is the
+        // body. Separating them lets the crack stay sharp and broadband while the body carries the
+        // colour, instead of one filter having to do both and softening the edge to do it.
+        float crackTau = 0.00025f + (float)rng.NextDouble() * 0.00035f;   // 0.25-0.6 ms
+        float bodyTau = 0.0015f + (float)rng.NextDouble() * 0.0025f;      // 1.5-4 ms
+
+        int len = Math.Min((int)(bodyTau * 6f * sampleRate), into.Length - at);
         if (len <= 2) return;
 
-        // A wide band rather than a resonance: one pole either side, so it tilts and does not ring.
-        float lpA = Alpha(who.CavityHz * 1.7f, sampleRate);
+        // The body is band-limited by the air pocket. The crack is barely filtered at all, because a
+        // step has energy everywhere and filtering it is what took the edge off.
+        float bodyLp = Alpha(who.CavityHz * 1.7f, sampleRate);
+        float crackLp = Alpha(9000f, sampleRate);
         float hpA = Alpha(320f, sampleRate);
-        float lp = 0f, hp = 0f;
-        float decay = MathF.Exp(-1f / (tau * sampleRate));
-        float amp = 1f;
+
+        float lp = 0f, hp = 0f, clp = 0f;
+        float bodyDecay = MathF.Exp(-1f / (bodyTau * sampleRate));
+        float crackDecay = MathF.Exp(-1f / (crackTau * sampleRate));
+        float bodyAmp = 1f, crackAmp = CrackLevel;
 
         for (int i = 0; i < len; i++)
         {
-            float x = (float)(rng.NextDouble() * 2 - 1) * amp;
-            amp *= decay;
-            lp += lpA * (x - lp);
+            float n1 = (float)(rng.NextDouble() * 2 - 1);
+            float n2 = (float)(rng.NextDouble() * 2 - 1);
+
+            lp += bodyLp * (n1 * bodyAmp - lp);
             hp += hpA * (lp - hp);
-            into[at + i] += (lp - hp) * level;
+            clp += crackLp * (n2 * crackAmp - clp);
+
+            bodyAmp *= bodyDecay;
+            crackAmp *= crackDecay;
+
+            into[at + i] += ((lp - hp) + clp) * level;
         }
     }
 
@@ -205,13 +235,32 @@ public static class Applause
         return up * up * down;
     }
 
+    /// <summary>
+    /// Normalised to its ENERGY, not to its loudest sample.
+    ///
+    /// Peak normalisation is wrong for a dense texture and it was making the crowd quiet. Hundreds of
+    /// claps a second overlap, and every so often enough of them land together to make a peak far
+    /// above the average; scaling that peak to full scale then drags everything else down with it, so
+    /// the busier the crowd the quieter it renders — which is backwards. Scaling by RMS keeps the
+    /// loudness where the level says it should be, and the rare coincidences are caught by the
+    /// limiter at the end rather than being allowed to set the gain for the whole buffer.
+    /// </summary>
     private static void Normalise(float[] buffer)
     {
-        float peak = 0f;
-        foreach (float v in buffer) peak = MathF.Max(peak, MathF.Abs(v));
-        if (peak <= 1e-9f) return;
-        float k = 0.9f / peak;
-        for (int i = 0; i < buffer.Length; i++) buffer[i] *= k;
+        if (buffer.Length == 0) return;
+
+        double sum = 0;
+        foreach (float v in buffer) sum += (double)v * v;
+        float rms = (float)Math.Sqrt(sum / buffer.Length);
+        if (rms <= 1e-9f) return;
+
+        float k = TargetRms / rms;
+        for (int i = 0; i < buffer.Length; i++)
+        {
+            float y = buffer[i] * k;
+            // Only the coincidences, and rounded rather than clipped: a clipped crowd is a buzz.
+            buffer[i] = y > 0.9f || y < -0.9f ? MathF.Tanh(y * 1.111f) * 0.9f : y;
+        }
     }
 
     private static float MathHelperLerp(float a, float b, float t) => a + (b - a) * Math.Clamp(t, 0f, 1f);

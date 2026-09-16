@@ -2012,3 +2012,39 @@ caller. A clap is two flat surfaces meeting — an impact — and a crowd is a P
 - [ ] The crowd should feed the same reflection path the cars do: the grandstand is a big hard
       surface, and a cheer arriving off the deck a beat after the direct sound is most of what makes
       a stand sound occupied.
+
+## A field of forty, and seventeen different machines (2026-09-15)
+
+`FIELD_SIZE = 40`. Seven stock cars still make it a stock car race — the support runners are the
+thing being caught, not the thing being watched — and no two of the rest share a mechanism.
+
+- [x] **`SportBike`** — a litre inline-four to 14,500 rpm. It sounds nothing like a car for a reason
+      that is arithmetic rather than character: four cylinders firing every 180 degrees at 14,500 is
+      483 firings a second, so its FUNDAMENTAL is a musical pitch where a car's is a beat you could
+      count, and its orders run into the kilohertz where the ear is most sensitive. A quickshifter
+      box: 90 ms, the clutch never opening, heard as a cut rather than a lift.
+- [x] **`V8Blown`** — 7.4 with a Roots blower. Two sounds, not one: it WHINES, because meshing rotors
+      pump in discrete gulps at a high multiple of engine speed (order 12, so 800 Hz at 4,000 rpm),
+      and it MOVES AIR, so every cylinder gets a harder blowdown. And unlike a turbo there is no lag
+      at all — it is geared to the crank, so there is nothing to spool, which is exactly why one
+      sounds instant and the other does not. `BlowerWhineLevel` and `BlowerWhineOrder` had been in
+      `MechanicalSpec` since the beginning with nothing ever using them.
+- [x] **The V10 supercar got its box.** An automated single-clutch, 60 ms against a manual's 280 —
+      too short to hear as a gap, so the note steps down like a hammer instead of falling through a
+      lift. That one number is most of the difference between a supercar and a fast car.
+- [x] Three ordinary hatchbacks at 94 dB, twenty decibels under everything else, because a circuit
+      where everything is dramatic has no scale to it.
+- [x] Two faults the new presets found:
+      * **The bike's idle flared to 4,500 rpm.** Its crank is a tenth of a big block's, so anything
+        that pushes it moves it a long way and the catch flare overshot before the governor could get
+        near it. What brings a real bike back is FRICTION — a litre four is pumping and rubbing far
+        harder for its size than a lazy V8 — so the losses were raised to match the inertia rather
+        than the governor being stiffened enough to do the physics' job for it.
+      * The applause density test measured peak crossings, which the crack and the RMS normalisation
+        invalidated. It measures CREST FACTOR now: sparse claps are spiky, a roar approaches noise,
+        and that is the same statistic as "can you pick individuals out".
+
+- [ ] **Load check at forty.** Measured fine at 60 voices with thirty cars; forty has never been run.
+      Watch the `Mixer load` line's starve / real-channel figures in the first ten seconds.
+- [ ] The borrowed-voice Doppler bug matters more at forty than at thirty, because more of the field
+      is borrowing. Still the main suspect for "they don't sound like they're going that fast".

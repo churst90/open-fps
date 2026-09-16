@@ -346,32 +346,50 @@ CLASSES = [
 # every figure came off --engine-levels after the fact.
 SUPPORT = [
     # name              preset             top   g     accel brake  count
-    # Four big diesels rather than two, because the turbo is the point of them and one passing
-    # occasionally is not enough to hear it work. A 13-litre truck six runs 2.2 bar of boost with a
-    # whistle level of 0.9 and a shaft that takes 1.4 SECONDS to come up — so you hear it spool on
-    # the way out of a corner, hold on the straight, and hiss off when the driver lifts for the
-    # next one. It idles at 600 and stops at 2100, an octave and a half under everything else.
+    #
+    # A field of forty. Seven stock cars still make it a stock car race — the support runners are the
+    # thing being caught, not the thing being watched — and the point of them is that no two classes
+    # share a mechanism. Every figure
+    # below is what the vehicle can do; what it SOUNDS like falls out of the engine, the exhaust and
+    # the body, and not one of them is a recording.
+    #
+    # Diesels — four big ones and two small, because a turbo is only a turbo if you can hear it work.
+    # The truck six runs 2.2 bar with a shaft that takes 1.4 SECONDS to come up; the pickup runs 1.4
+    # bar and spools in 0.9. The same mechanism at two sizes on one lap is what makes it read as a
+    # turbocharger rather than as a noise. They idle at 600 and stop at 2100, an octave and a half
+    # under everything else, and their tyres give up at three quarters of a g.
     ("Race truck",      "diesel_truck",    160, 0.72, 2.2,  5.5,   4),
-    # ...and two small turbo-diesels, which are the SAME mechanism at a different size: 1.4 bar,
-    # half the whistle, and a shaft that spools in 0.9 s instead of 1.4. Hearing a big turbo and a
-    # small one on the same lap is what makes it read as a turbocharger rather than as a noise.
     ("Diesel pickup",   "diesel_i4",       185, 0.88, 3.0,  6.0,   2),
     ("Turbo hatch",     "i4_turbo",        235, 1.10, 4.4,  7.5,   2),
-    ("Open header",     "v8_open_headers", 245, 1.05, 4.8,  6.5,   2),
-    # FOUR of these, not two, and the count is the point.
     #
-    # The muffler case was tuned by ear and then could barely be heard on the circuit, for a reason
-    # that had nothing to do with the tuning: a NASCAR has open side exits and the pace car has open
-    # pipes, so THIRTEEN of the thirty cars have no muffler at all, the open-header cars have none by
-    # design, and the glasspack and mild cars have theirs damped by the packing pressed against it.
-    # Two cars out of thirty carried the ringing chambered can. A thing you can hear twice a lap is
-    # not a thing you can hear.
-    ("Big cam",         "v8_bigcam",       235, 1.02, 4.6,  6.5,   4),
-    # ...and a Flowmaster coupe, the preset the case was actually tuned against.
-    ("Flowmaster coupe","v8_sports",       250, 1.08, 5.0,  6.8,   4),
-    ("Glasspack",       "v8_glasspack",    225, 1.00, 4.3,  6.5,   2),
-    ("Mild small block","v8_mild",         200, 0.98, 3.6,  6.5,   2),
+    # Five ways to exhaust one V8. Same cylinders, same firing order, same mass and gearing, so
+    # anything you hear between them is the hardware. Fifteen decibels separate the loudest from the
+    # quietest and none of it was dialled in.
+    ("Open header",     "v8_open_headers", 245, 1.05, 4.8,  6.5,   2),   # no muffler, and no CASE
+    ("Big cam",         "v8_bigcam",       235, 1.02, 4.6,  6.5,   2),   # 330 deg cam; will not idle straight
+    ("Blown big block", "v8_blown",        240, 1.02, 5.4,  6.5,   2),   # rotors whining over the lope
+    ("Flowmaster coupe","v8_sports",       250, 1.08, 5.0,  6.8,   3),   # the can the case was tuned against
+    ("Glasspack",       "v8_glasspack",    225, 1.00, 4.3,  6.5,   2),   # packing damps the case too
+    ("Mild small block","v8_mild",         200, 0.98, 3.6,  6.5,   2),   # cast logs, 112 dB, the quiet one
+    #
+    # Exotica: a V10 with an automated single-clutch box that bangs gears in in SIXTY milliseconds,
+    # too short to hear as a gap, and a formula car whose fundamental at 15,000 rpm is a pitch rather
+    # than a beat.
+    ("V10 supercar",    "v10",             290, 1.35, 6.2,  8.5,   2),
+    ("Formula car",     "f1_v10",          300, 2.60, 9.0, 12.0,   2),
+    #
+    # Motorcycles. No body and no cabin at all, so the pipes radiate into open air — and a litre four
+    # at 14,500 rpm fires 483 times a second, which is a musical pitch where a car's firing rate is a
+    # beat you could count.
+    ("Sports bike",     "sportbike",       270, 1.25, 6.0,  9.0,   2),
+    ("Cruiser",         "vtwin",           180, 0.85, 3.2,  6.0,   2),
+    ("Dirt bike",       "single",          150, 0.90, 3.8,  6.5,   2),
+    #
+    # ...and three perfectly ordinary cars, because a circuit where everything is dramatic has no
+    # scale to it. 94 dB, the quietest thing out there by twenty decibels.
+    ("Hatchback",       "i4_economy",      175, 0.95, 3.0,  6.0,   2),
 ]
+
 
 # ...and one that is not. The pace car runs the same lap in a road car with a bar on the roof: an
 # interceptor V8 on a cam that cannot idle straight, open pipes, and half a tonne more to carry. It
@@ -385,7 +403,7 @@ NUMBERS = [24, 3, 48, 11, 9, 22, 5, 17, 43, 88, 12, 20, 2, 19, 77, 8, 14, 6, 45,
 # synthesis — four mechanical faults stalled the FMOD mixer thread itself. All fixed; see
 # docs/AUDIO_LOAD_DROPOUTS.md. The number of cars a map may carry is not a property of the audio
 # engine: only the nearest handful are ever SYNTHESIZED and the rest borrow one of those.
-FIELD_SIZE = 30
+FIELD_SIZE = 40
 
 # The support runners take the LAST slots, so they start at the back of a lap that is already
 # spread out and spend their time being caught and passed by the field. That is the point of them:

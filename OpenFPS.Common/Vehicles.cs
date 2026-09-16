@@ -252,6 +252,8 @@ public sealed record VehicleProfile
             ["v8_glasspack"] = () => GlasspackMuscle,
             ["v8_mild"] = () => MildMuscle,
             ["v8_bigcam"] = () => BigCamMuscle,
+            ["v8_blown"] = () => BlownMuscle,
+            ["sportbike"] = () => SportBike,
         };
 
     /// <summary>
@@ -316,6 +318,51 @@ public sealed record VehicleProfile
         EngineKey = "v8_bigcam",
         Engine = EngineProfile.V8BigCam,
         MassKg = 1720f,
+        SourceLevelDb = 119f,
+    };
+
+    /// <summary>
+    /// A litre sports bike. No body, no cabin, and it changes gear in a tenth of a second.
+    ///
+    /// It is the loudest small thing on a circuit and it sounds nothing like a car, for a reason that
+    /// is arithmetic rather than character: at 14,500 rpm a four fires 483 times a second, so its
+    /// FUNDAMENTAL is a musical pitch and its orders run into the kilohertz. A car's fundamental is a
+    /// beat you could count.
+    /// </summary>
+    public static VehicleProfile SportBike => new()
+    {
+        Name = "Litre sports bike",
+        EngineKey = "sportbike",
+        Engine = EngineProfile.SportBike,
+        Gearbox = Gearbox.SixSpeedSports with
+        {
+            Ratios = new[] { 2.57f, 1.94f, 1.61f, 1.41f, 1.29f, 1.19f },
+            FinalDrive = 3.0f, WheelRadiusMetres = 0.31f,
+            // A sequential box with a quickshifter: the clutch never opens and the ignition is cut
+            // for the instant the dog rings move. A tenth of a second, and audible as a CUT rather
+            // than a lift.
+            ShiftSeconds = 0.09f, UpshiftRpm = 13800f, DownshiftRpm = 5000f,
+        },
+        Tyres = TyreProfile.SportsOnAsphalt,
+        MassKg = 200f,
+        DragArea = 0.42f,
+        RollingResistance = 0.015f,
+        // Nothing to radiate through: an open frame with the engine hanging in it.
+        Body = VehicleBody.OpenWheeler,
+        ExhaustOffsetZ = -0.75f, IntakeOffsetZ = 0.25f, ExhaustHeight = 0.55f,
+        FrontAxleZ = 0.70f, RearAxleZ = -0.70f,
+        SourceLevelDb = 116f,
+    };
+
+    /// <summary>A blown big block: the whine of the rotors over the lope of the cam, and no lag at
+    /// all, because a supercharger is geared to the crank and has nothing to spool.</summary>
+    public static VehicleProfile BlownMuscle => V8Muscle with
+    {
+        Name = "Muscle car, blown big block",
+        EngineKey = "v8_blown",
+        Engine = EngineProfile.V8Blown,
+        MassKg = 1780f,
+        Body = VehicleBody.RaceSaloon,
         SourceLevelDb = 119f,
     };
 
@@ -507,7 +554,11 @@ public sealed record VehicleProfile
         EngineKey = "v10",
         SourceLevelDb = 116f,
         Engine = EngineProfile.V10,
-        Gearbox = Gearbox.SixSpeedSports with { Ratios = new[] { 2.66f, 1.78f, 1.3f, 1.0f, 0.74f, 0.5f }, FinalDrive = 3.07f, ShiftSeconds = 0.3f, UpshiftRpm = 6000f, DownshiftRpm = 1500f },
+        // An automated single-clutch box, and the shift time is the whole character of it. A manual
+        // takes about 280 ms and you hear the revs fall through the gap; this takes 60, which is too
+        // short to hear as a gap at all — the note simply steps down, like a hammer. It is the same
+        // mechanism as a racing box and it is why one sounds violent where a manual sounds smooth.
+        Gearbox = Gearbox.SixSpeedSports with { Ratios = new[] { 2.66f, 1.78f, 1.3f, 1.0f, 0.74f, 0.5f }, FinalDrive = 3.07f, ShiftSeconds = 0.06f, UpshiftRpm = 8200f, DownshiftRpm = 3000f },
         Tyres = TyreProfile.SportsOnAsphalt,
         MassKg = 1560f, DragArea = 0.75f,
         ExhaustOffsetZ = 0.3f, IntakeOffsetZ = 1.3f,
