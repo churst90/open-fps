@@ -43,6 +43,10 @@ internal sealed class IntakeNetwork
     private readonly float _meanAlpha;
     private float _runnerLossGain;
 
+    // The plate's turbulence.
+    private readonly Random _rng = new(20260916);
+    private float _tnLp1, _tnLp2;
+
     public IntakeNetwork(EngineProfile e, float rate)
     {
         _spec = e.Intake;
@@ -153,7 +157,8 @@ internal sealed class IntakeNetwork
         // the plate does, and some of that gets through.
         _plenumMean += _meanAlpha * (pPlenum - _plenumMean);
         float acoustic = (pPlenum - _plenumMean) * area / (Gas.Density(_airboxPressure, _plenumK) * 340f) * 0.5f;
-        float uAb = (flow - _throttleFlowMean) / Gas.Density(_airboxPressure, _plenumK) + acoustic;
+        float uAb = (flow - _throttleFlowMean) / Gas.Density(_airboxPressure, _plenumK) + acoustic
+                  + ThrottleTurbulence(flow, area);
         float aAb = _airbox.ArriveNear();
         _airbox.PushForward(aAb - _airbox.Impedance * uAb);   // drawing air is a rarefaction into the box
         {
@@ -165,6 +170,49 @@ internal sealed class IntakeNetwork
         var (reflected, uOut) = _end.Process(arriving);
         _snorkel.PushBackward(reflected);
         Radiated = _end.Radiate(uOut, _airDensity);
+    }
+
+    /// <summary>
+    /// The broadband the plate makes, as a fluctuating volume flow into the airbox.
+    ///
+    /// A sharp-edged orifice in a duct is a dipole: the jet through it beats on the plate, and the
+    /// plate pushes back on the air. Below the duct's cut-on frequency there is only the plane wave
+    /// to radiate into, and none of the inefficiency a dipole suffers in free air — so the power goes
+    /// as the fourth power of the velocity through the gap rather than the sixth (Nelson and Morfey,
+    /// 1981), which is the second power in pressure, and that is the one Mach number in the term
+    /// below. Getting this wrong by a power of U does not change a level, it changes whether a car is
+    /// loudest under your foot or off it.
+    ///
+    /// The BAND is the Strouhal number of the gap: turbulence peaks where the velocity divided by the
+    /// size of the hole puts it, so the same source is fifty hertz through an open plate and ten
+    /// kilohertz through a shut one. Nothing here knows what kind of engine it is on.
+    /// </summary>
+    /// <param name="massFlow">Mass through the plate now, kg/s.</param>
+    /// <param name="area">Open area of the plate now, m^2.</param>
+    [MethodImpl(MethodImplOptions.AggressiveOptimization)]
+    private float ThrottleTurbulence(float massFlow, float area)
+    {
+        float level = _spec.FlowNoiseLevel;
+        if (level <= 0f || area <= 1e-9f) return 0f;
+
+        float rho = Gas.Density(MathF.Min(_airboxPressure, PlenumPressure), _plenumK);
+        float u = MathF.Abs(massFlow) / MathF.Max(1e-6f, rho * area);
+        if (u < 0.5f) return 0f;
+
+        // Strouhal 0.2 on the hydraulic diameter of the gap.
+        float d = MathF.Sqrt(4f * area / MathF.PI);
+        float fc = Math.Clamp(0.2f * u / d, 20f, _rate * 0.4f);
+        float a = OnePole.AlphaFor(fc, _rate);
+        float n = (float)(_rng.NextDouble() * 2 - 1);
+        _tnLp1 += a * (n - _tnLp1);
+        _tnLp2 += a * (_tnLp1 - _tnLp2);
+        float band = _tnLp1 - _tnLp2;
+
+        // Turbulence intensity at a sharp orifice is ten per cent or so of the mean; the Mach number
+        // is what makes it a SOUND rather than a fluctuation, and it is what carries the U^4 law.
+        const float intensity = 0.10f;
+        float mach = u / MathF.Max(1f, _airbox.SoundSpeed);
+        return intensity * area * u * mach * band * level * 8f;
     }
 
     /// <summary>Choked/subsonic orifice flow for air, kg/s.</summary>

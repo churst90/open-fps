@@ -384,10 +384,13 @@ public static class VehicleSpike
     public static int Run(bool live, bool stationary = false, bool muscle = false, string? preset = null,
                           bool withBody = true, float? coupling = null, bool withShell = true,
                           float? shellLevel = null, string? shellCase = null, float? shellLoss = null,
-                          float? shellWiden = null)
+                          float? shellWiden = null, string[]? knobs = null)
     {
         AcousticRegistry.Initialize();
         var v = preset != null ? VehicleProfile.ByName(preset) : muscle ? VehicleProfile.V8Muscle : VehicleProfile.V8Sports;
+        // The same key=value sweep every other engine tool takes. A layer that can only be judged by
+        // rebuilding cannot be bracketed, and bracketing is how everything here gets settled.
+        if (knobs != null) v = EngineOrderSpike.Override(v, knobs);
         // body=off renders the same car with its shell taken away, so the two files can be played
         // against each other. A demo of a new layer that cannot be turned off is not a demo of it.
         if (!withBody) v = v with { Body = VehicleBody.None };

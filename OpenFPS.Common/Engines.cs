@@ -272,6 +272,24 @@ public sealed record IntakeSpec
     /// <summary>How much of the intake noise reaches the outside of the car. An open filter under the
     /// bonnet is 1; a factory airbox with a resonator in the snorkel is 0.25.</summary>
     public float Level { get; init; } = 0.6f;
+
+    /// <summary>
+    /// Turbulence at the throttle plate, as a multiple of what the flow predicts. 0 for none.
+    ///
+    /// The counterpart of the exhaust's <see cref="ExhaustSpec.JetNoiseLevel"/>, and the intake had
+    /// no equivalent at all until it was noticed that the airbox never spoke. An airbox on a snorkel
+    /// is a resonator, and the engine breathing through it drives it only at the firing rate and its
+    /// harmonics — which on a fast engine is a kilohertz and more, nowhere near the tens of hertz the
+    /// box is tuned to. A resonator nothing drives at its own note is silent however well it is
+    /// built. The plate is what drives it: a sharp-edged orifice with the whole of the engine's air
+    /// going through it, and the broadband it makes is the one source in the tract with energy
+    /// everywhere, including down where the box lives.
+    ///
+    /// It is also why a throttle HISSES when it is nearly shut and ROARS when it is open, without
+    /// anybody writing that down: the peak frequency follows the velocity over the gap divided by
+    /// the size of the gap, and a shut plate is a fast jet through a slot.
+    /// </summary>
+    public float FlowNoiseLevel { get; init; } = 1f;
 }
 
 /// <summary>The noises the block makes that are not gas: valvetrain, injection, accessories.</summary>
@@ -1354,14 +1372,23 @@ public sealed record EngineProfile
     /// It idles at 4000 rpm because it cannot idle lower: the cams are enormous, the flywheel is a
     /// carbon disc, and at anything less the overlap dilutes the charge past the point of burning.
     ///
-    /// The real thing turned 19,000. This one is limited to 15,500, and the limit is the SYNTHESIS
-    /// rather than the engine: at 44.1 kHz a firing every 28 samples is no longer enough to resolve
-    /// the blowdown transient, and past about sixteen thousand the order structure measurably falls
-    /// apart — half orders climb above whole ones on an engine that fires evenly and can have none,
-    /// which is aliasing of the firing events and not a sound. Fifteen five still puts the firing
-    /// frequency at 1290 Hz, which is the scream. Raising it needs the engine oversampled, and an
-    /// oversampled engine costs four times the CPU of one that is already the most expensive voice
-    /// in the mixer. Measured with `--engine-orders f1_v10 rpm=15000,17000 thr=1`.
+    /// The real thing turned 19,000 and made about 950 hp; BMW's 2005 V10 shared this engine's 98 mm
+    /// bore and quoted 350 Nm. This one is limited to 15,500, and the limit is the SYNTHESIS rather
+    /// than the engine — which has been re-tested rather than assumed, with `--engine-alias`:
+    ///
+    ///     held at 19,000 rpm     samples/firing   half/whole   structure
+    ///       44,100 Hz                      27.7      +1.1 dB     13.4 dB
+    ///       88,200 Hz                      55.3      -5.7 dB     13.6 dB
+    ///
+    /// An even-firing ten can have NO half-order energy — five evenly spaced firings a bank cannot
+    /// make a component at half the crank order — so half orders sitting ABOVE whole ones at 44.1 kHz
+    /// is the integrator failing, and it recovers by 6.8 dB when the rate doubles. That is aliasing
+    /// of the firing events, exactly as suspected, and the honest correction is that the fix is TWO
+    /// times oversampling and not four: at 176.4 kHz nothing further is gained.
+    ///
+    /// Held at 15,500 the same measurement reads half/whole -5.8 dB and structure 52.5, which is a
+    /// clean engine. So 15,500 is where the model stops being able to tell the truth, and the firing
+    /// frequency there is still 1,304 Hz, which is the scream.
     /// </summary>
     public static EngineProfile F1V10 => new()
     {
@@ -1383,8 +1410,9 @@ public sealed record EngineProfile
         IdleRpm = 4000f, RedlineRpm = 15500f,
         InertiaKgM2 = 0.035f,
         FrictionNm = 22.8f, FrictionNmPerKrpm = 9f,
-        // About 16 bar BMEP, which is where a naturally aspirated racing V10 lives.
-        PeakTorqueNm = 375f, PeakTorqueRpm = 13500f,
+        // BMW quoted 350 Nm for its 3.0 V10, which is 14.7 bar BMEP — where a naturally aspirated
+        // racing V10 lives. Taken from the real engine rather than fitted to a power figure.
+        PeakTorqueNm = 350f, PeakTorqueRpm = 13500f,
         Exhaust = new ExhaustSpec
         {
             // Equal-length 5-into-1 per bank, tuned for the top of the range, then straight out the
@@ -1410,43 +1438,25 @@ public sealed record EngineProfile
         // total area — 145 mm. Sized as a single 46 the engine strangles above 12,000 and the
         // manifold never reaches atmosphere at full throttle, which is audible as a V10 that will
         // not pull to the limiter.
-        // WHERE THIS ENGINE'S MISSING BODY IS, and why the obvious fix does not work.
+        // THE AIRBOX, and a diagnosis that was wrong.
         //
-        // Reported as "it sounds like a siren, very high-end heavy, no real body or substance", and
-        // measured on a drive render it is exactly that: 90 per cent of the exhaust energy in the
-        // 0.8-2.5 kHz band and LITERALLY NOTHING below 200 Hz.
+        // This engine was reported as "a siren, very high-end heavy, no real body", and measured that
+        // is what it is: ninety per cent of the exhaust energy in 0.8-2.5 kHz and nothing below
+        // 200 Hz. Most of that is structural and correct — a V10 at 15,500 rpm fires 1,292 times a
+        // second, so its fundamental IS 1.3 kHz and there is nothing lower for the exhaust to make.
         //
-        // Some of that is structural and correct. A V10 at 15,500 rpm fires 1,292 times a second, so
-        // its fundamental is at 1.3 kHz and the exhaust has nothing lower to make. It genuinely does
-        // scream, and no amount of tuning should stop it.
+        // The 26-litre box on a 0.8 m snorkel is a Helmholtz resonator near fifty hertz, the lowest
+        // thing on the car by an order of magnitude, and it was recorded here that the model was
+        // failing to produce that resonance. THAT WAS WRONG, and it is worth keeping why. Measured
+        // with `--intake-ir f1_v10`, the tract's own modes are 45.4, 206, 393, 530 and 631 Hz against
+        // a lumped prediction of 48 — the resonator is built, it is in the right place, and thumped
+        // it puts 14.9 per cent of its energy below 200 Hz.
         //
-        // The obvious candidate was tried and REJECTED, which is worth recording. A formula car
-        // breathes through a 26-litre airbox on a 0.8 m snorkel, and that geometry is a Helmholtz
-        // resonator at about fifty hertz — the lowest thing on the whole car by an order of
-        // magnitude. Its intake renders twenty decibels under the exhaust, so raising it looked like
-        // the answer. It is not: measured, the intake is itself 96 per cent inside 0.8-2.5 kHz and
-        // has 0.0 per cent below 200 Hz, so turning it up adds MORE SIREN and no body at all.
-        //
-        // The fault is therefore upstream of any level: the airbox is described in the spec and is
-        // not producing its resonance. That is where the next session should look — see the notes.
-        //
-        // Measured on a drive render, this engine put 90 per cent of its exhaust energy into the
-        // 0.8-2.5 kHz band and had literally nothing below 200 Hz, which is why it was described as a
-        // siren with no beef in it. Some of that is structural and correct — a V10 at 15,500 rpm
-        // fires 1,292 times a second, so its FUNDAMENTAL is at 1.3 kHz, and there is nothing lower
-        // for the exhaust to make. It genuinely does scream.
-        //
-        // But two sources that should be filling in underneath it were not.
-        //
-        // THE AIRBOX. A formula car breathes through a 26-litre box on a 0.8 m snorkel over the
-        // driver's head, and that is a Helmholtz resonator around fifty hertz — the lowest thing on
-        // the car by an order of magnitude. Its intake was rendering twenty decibels under the
-        // exhaust, where on a real one the airbox is comparable to it and is most of what people
-        // recognise. (On a road car twenty down is right; on this it is not.)
-        //
-        // THE VALVETRAIN. Forty valves opening and closing 129 times a second EACH at 15,500 rpm is
-        // an enormous amount of metal hitting metal, and the block was rendering 41 dB under the
-        // exhaust — inaudible. A racing engine is mechanically far noisier than a road one, not less.
+        // What was missing was anything to DRIVE it. The engine breathing through the tract excites
+        // it only at the firing rate and its harmonics, which on this engine is 1.3 kHz — nowhere
+        // near where the box is tuned. A resonator nothing drives at its own note is silent however
+        // well it is built, and the intake had no broadband source at all where the exhaust has two.
+        // See IntakeSpec.FlowNoiseLevel: the throttle plate is the source, and it was simply absent.
         Intake = new IntakeSpec { RunnerLengthMetres = 0.11f, RunnerDiameterMm = 50f, PlenumLitres = 3f, ThrottleDiameterMm = 145f, AirboxLitres = 26f, SnorkelLengthMetres = 0.8f, SnorkelDiameterMm = 150f, Level = 1f, Absorption = 0.08f },
         Mechanical = new MechanicalSpec { ValvetrainLevel = 0.9f, CombustionKnock = 0.02f, AccessoryWhineOrder = 22f, AccessoryWhineLevel = 0.18f },
     };

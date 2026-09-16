@@ -249,6 +249,14 @@ if (args.Contains("--body-ir"))
     Log.CloseAndFlush();
     Environment.Exit(bcode);
 }
+if (args.Contains("--intake-ir"))
+{
+    // --intake-ir [preset ...] [thr=..] [sec=..] [out=DIR]: the INTAKE TRACT alone, thumped once —
+    // what note the airbox and its snorkel make, independently of anything driving them.
+    int iicode = OpenFPS.Client.Core.AudioEngine.Fmod.IntakeIrSpike.Run(args);
+    Log.CloseAndFlush();
+    Environment.Exit(iicode);
+}
 if (args.Contains("--engine-levels"))
 {
     int lvcode = OpenFPS.Client.Core.AudioEngine.Fmod.EngineCostSpike.Levels(args);
@@ -274,6 +282,13 @@ if (args.Contains("--engine-gallery"))
     int gcode = OpenFPS.Client.Core.AudioEngine.Fmod.EngineOrderSpike.Gallery(args);
     Log.CloseAndFlush();
     Environment.Exit(gcode);
+}
+if (args.Contains("--engine-alias"))
+{
+    // --engine-alias [preset] [rpm=..] [rates=..]: is the redline the engine's or the sample rate's?
+    int eacode = OpenFPS.Client.Core.AudioEngine.Fmod.EngineOrderSpike.Alias(args);
+    Log.CloseAndFlush();
+    Environment.Exit(eacode);
 }
 if (args.Contains("--engine-orders"))
 {
@@ -312,7 +327,8 @@ if (args.Contains("--vehicle") || args.Contains("--vehicle-live")
         shellWiden: args.FirstOrDefault(a => a.StartsWith("wide=")) is { } wd
                     && float.TryParse(wd[5..], out float wv) ? wv : null,
         shellLevel: args.FirstOrDefault(a => a.StartsWith("shell=") && a != "shell=off") is { } sl
-                    && float.TryParse(sl[6..], out float slv) ? slv : null);
+                    && float.TryParse(sl[6..], out float slv) ? slv : null,
+        knobs: args);
     Log.CloseAndFlush();
     Environment.Exit(code);
 }

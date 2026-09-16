@@ -140,17 +140,153 @@ public static class EngineOrderSpike
         static float Db2(double meanSq) => (float)(10 * Math.Log10(Math.Max(1e-20, meanSq) / (2e-5 * 2e-5)));
     }
 
+    /// <summary>
+    /// Is the engine's redline the ENGINE's, or the sample rate's?
+    ///
+    ///   --engine-alias [preset] [rpm=..] [rates=44100,88200,176400]
+    ///
+    /// An even-firing V10 can have NO half-order energy — five evenly spaced firings a bank, twice a
+    /// cycle, cannot produce a component at half the crank order. So any half-order energy this
+    /// measures is the model failing, and how it moves with sample rate says why. If it falls when
+    /// the rate rises, the firing events are being under-resolved and the redline in the profile is
+    /// a property of the integrator rather than of the engine.
+    ///
+    /// It builds the engine directly rather than going through VehicleSynth, because the whole point
+    /// is to vary the one thing VehicleSynth holds constant.
+    /// </summary>
+    public static int Alias(string[] args)
+    {
+        string preset = args.FirstOrDefault(a => VehicleProfile.Presets.ContainsKey(a)) ?? "f1_v10";
+        var v = Override(VehicleProfile.ByName(preset), args);
+        float rpm = 0f;
+        var rates = new List<int> { 44100, 88200, 176400 };
+        foreach (var a in args)
+        {
+            int eq = a.IndexOf('=');
+            if (eq <= 0) continue;
+            if (a[..eq] == "rpm") rpm = float.Parse(a[(eq + 1)..]);
+            else if (a[..eq] == "rates") { rates.Clear(); foreach (var r in a[(eq + 1)..].Split(',')) rates.Add(int.Parse(r)); }
+        }
+        if (rpm <= 0f) rpm = v.Engine.RedlineRpm;
+
+        Console.WriteLine($"\n  {v.Engine.Name} held at {rpm:F0} rpm, {v.Engine.Cylinders} cylinders even-firing.");
+        Console.WriteLine($"  Firing {rpm / 60f * v.Engine.Cylinders / 2f:F0} Hz.\n");
+        Console.WriteLine("    rate      samples/firing   half/whole   structure");
+
+        foreach (int rate in rates)
+        {
+            var engine = new EngineSynth(v.Engine, rate, 7);
+            var dl = new Driveline(v);
+            var driver = new Driver(dl, engine);
+            float dt = 1f / rate;
+            var orders = new List<DriveOrder>
+            {
+                new(DriverAction.Cranking, 0.5f), new(DriverAction.Idling, 1.5f),
+                new(DriverAction.Holding, 12f, rpm, 1f),
+            };
+            int total = 0;
+            foreach (var o in orders) total += (int)(o.Seconds * rate);
+            var buf = new float[total];
+            int at = 0;
+            float achieved = 0f; int rc = 0;
+            foreach (var order in orders)
+            {
+                int len = (int)(order.Seconds * rate);
+                float phase = 0f;
+                for (int i = 0; i < len; i++, phase += dt)
+                {
+                    driver.Apply(order, phase, dt);
+                    dl.Step(engine, dt);
+                    buf[at++] = engine.Exhaust;
+                    if (at > total - rate * 2) { achieved += engine.Rpm; rc++; }
+                }
+            }
+            int from = total - rate * 2;
+            var x = new float[total - from];
+            Array.Copy(buf, from, x, 0, x.Length);
+            float f1 = achieved / Math.Max(1, rc) / 60f;
+
+            double half = 0, whole = 0, harm = 0, floor = 0;
+            for (float o = 0.5f; o * f1 < rate * 0.45f && o <= 200f; o += 0.5f)
+            {
+                float m = G(x, o * f1, rate);
+                bool isWhole = MathF.Abs(o - MathF.Round(o)) < 0.01f;
+                if (o >= 1f) { if (isWhole) whole += m * m; else half += m * m; }
+                harm += m * m;
+                float g = G(x, (o + 0.25f) * f1, rate);
+                floor += g * g;
+            }
+            float hw = (float)(10 * Math.Log10(Math.Max(1e-20, half) / Math.Max(1e-20, whole)));
+            float hnr = (float)(10 * Math.Log10(Math.Max(1e-20, harm) / Math.Max(1e-20, floor)));
+            float perFiring = rate / (f1 * v.Engine.Cylinders / 2f);
+            Console.WriteLine($"  {rate,7} Hz {perFiring,12:F1}   {hw,10:F1} dB {hnr,10:F1} dB");
+        }
+        Console.WriteLine("""
+
+    An even-firing engine wants half/whole as far below zero as it can get. If that number climbs
+    toward zero at 44.1 kHz and falls again at 88.2, the redline is the integrator's and not the
+    engine's, and the fix is to oversample the engine rather than to lower the limiter.
+""");
+        return 0;
+    }
+
+    private static float G(float[] x, float freq, int rate)
+    {
+        double w = 2 * Math.PI * freq / rate;
+        double sr = 0, si = 0, norm = 0;
+        for (int i = 0; i < x.Length; i++)
+        {
+            double win = 0.5 - 0.5 * Math.Cos(2 * Math.PI * i / (x.Length - 1));
+            double a = w * i;
+            sr += x[i] * win * Math.Cos(a);
+            si -= x[i] * win * Math.Sin(a);
+            norm += win;
+        }
+        return (float)(2 * Math.Sqrt(sr * sr + si * si) / Math.Max(1, norm));
+    }
+
     /// <summary>key=value overrides so the model can be swept without a rebuild: steep= wall= torque=
-    /// idlemap= rough= jet= port= flowloss= hdr= sprd=</summary>
+    /// idlemap= rough= jet= port= flowloss= hdr= sprd= induction= ilevel= absorb= valves=</summary>
     public static VehicleProfile Override(VehicleProfile v, string[] args)
     {
         var e = v.Engine;
         var x = e.Exhaust;
+        var n_ = e.Intake;
+        var m_ = e.Mechanical;
         foreach (var arg in args)
         {
             int eq = arg.IndexOf('=');
             if (eq <= 0 || arg.StartsWith("--")) continue;
             string k = arg[..eq];
+            if (k == "crank")
+            {
+                // Even-fire or shared-pin, on a ten. A 90-degree V10 whose crankpins carry two rods
+                // with no offset fires 90 then 54 degrees apart for ever: the pair on a pin goes off
+                // a bank-angle apart, then waits for the next pin. That unevenness is the whole of
+                // where half-order energy — the rumble — comes from, and an even-fire ten has none
+                // of it by construction.
+                if (e.Cylinders == 10)
+                    e = e with { FiringAngles = arg[(eq + 1)..] == "odd"
+                        ? EngineProfile.IntervalFire(new[] { 1, 6, 2, 7, 3, 8, 4, 9, 5, 10 },
+                                                     new[] { 90f, 54f, 90f, 54f, 90f, 54f, 90f, 54f, 90f, 54f })
+                        : EngineProfile.EvenFire(new[] { 1, 6, 5, 10, 2, 7, 3, 8, 4, 9 }) };
+                Console.WriteLine($"  override crank = {arg[(eq + 1)..]}");
+                continue;
+            }
+            if (k == "muffler")
+            {
+                // The one override that is not a number: which can, if any, is on the end.
+                x = x with { Muffler = arg[(eq + 1)..] switch
+                {
+                    "none" or "straight" => MufflerSpec.StraightPipe,
+                    "glass" => MufflerSpec.Glasspack,
+                    "chambered" => MufflerSpec.Chambered40,
+                    "stock" => MufflerSpec.Stock,
+                    _ => x.Muffler,
+                } };
+                Console.WriteLine($"  override muffler = {arg[(eq + 1)..]}");
+                continue;
+            }
             if (!float.TryParse(arg[(eq + 1)..], out float n)) continue;
             switch (k)
             {
@@ -164,11 +300,47 @@ public static class EngineOrderSpike
                 case "idlemap": e = e with { IdleMapBar = n }; break;
                 case "rough": e = e with { IdleRoughness = n }; break;
                 case "gov": e = e with { IdleGovernorGain = n }; break;
+                // Every part of the engine a bisection has to be able to move one at a time.
+                case "bore": e = e with { BoreMm = n }; break;
+                case "stroke": e = e with { StrokeMm = n }; break;
+                case "rod": e = e with { RodRatio = n }; break;
+                case "cr": e = e with { CompressionRatio = n }; break;
+                case "evo": e = e with { EvoTemperatureK = n }; break;
+                case "exdur": e = e with { ExhaustCam = e.ExhaustCam with { DurationDegrees = n } }; break;
+                case "indur": e = e with { IntakeCam = e.IntakeCam with { DurationDegrees = n } }; break;
+                case "excl": e = e with { ExhaustCam = e.ExhaustCam with { CentrelineDegrees = n } }; break;
+                case "incl": e = e with { IntakeCam = e.IntakeCam with { CentrelineDegrees = n } }; break;
+                case "exlift": e = e with { ExhaustCam = e.ExhaustCam with { MaxLiftMm = n } }; break;
+                case "inlift": e = e with { IntakeCam = e.IntakeCam with { MaxLiftMm = n } }; break;
+                case "exramp": e = e with { ExhaustCam = e.ExhaustCam with { RampFraction = n } }; break;
+                case "inramp": e = e with { IntakeCam = e.IntakeCam with { RampFraction = n } }; break;
+                case "exvalve": e = e with { ExhaustValve = e.ExhaustValve with { DiameterMm = n } }; break;
+                case "invalve": e = e with { IntakeValve = e.IntakeValve with { DiameterMm = n } }; break;
+                case "excd": e = e with { ExhaustValve = e.ExhaustValve with { DischargeCoefficient = n } }; break;
+                case "friction": e = e with { FrictionNm = n }; break;
+                case "prdia": x = x with { PrimaryDiameterMm = n }; break;
+                case "taildia": x = x with { TailpipeDiameterMm = n }; break;
+                case "port": x = x with { PortNoiseLevel = n }; break;
+                case "colpipe": x = x with { CollectorPipeMetres = n }; break;
+                case "midpipe": x = x with { MidPipeMetres = n }; break;
+                case "tail": x = x with { TailpipeMetres = new[] { n, n * 1.12f } }; break;
+                case "coldia": x = x with { CollectorDiameterMm = n }; break;
+                case "redline": e = e with { RedlineRpm = n }; break;
+                case "idlerpm": e = e with { IdleRpm = n }; break;
+                case "inertia": e = e with { InertiaKgM2 = n }; break;
+                case "induction": n_ = n_ with { FlowNoiseLevel = n }; break;
+                case "plenum": n_ = n_ with { PlenumLitres = n }; break;
+                case "airbox": n_ = n_ with { AirboxLitres = n }; break;
+                case "snorkel": n_ = n_ with { SnorkelLengthMetres = n }; break;
+                case "throttle": n_ = n_ with { ThrottleDiameterMm = n }; break;
+                case "ilevel": n_ = n_ with { Level = n }; break;
+                case "absorb": n_ = n_ with { Absorption = n }; break;
+                case "valves": m_ = m_ with { ValvetrainLevel = n }; break;
                 default: continue;
             }
             Console.WriteLine($"  override {k} = {n}");
         }
-        return v with { Engine = e with { Exhaust = x } };
+        return v with { Engine = e with { Exhaust = x, Intake = n_, Mechanical = m_ } };
     }
 
     /// <summary>Renders every preset at idle and at speed to WAV so the family can be auditioned.</summary>
@@ -218,15 +390,26 @@ public static class EngineOrderSpike
 
     private static void Measure(VehicleProfile v, float rpm, float throttle, bool wav)
     {
-        // Run for long enough for the governor and the pipes to settle, analyse the last two seconds.
+        // Run for long enough for the governor and THE PIPES to settle, analyse the last two seconds.
+        //
+        // The pipes are the slow half and five seconds was not enough for them. An exhaust primary is
+        // a quarter-wave resonator whose note is set by the SPEED OF SOUND IN THE GAS, and the gas
+        // takes several seconds to go from its idle temperature to its full-load one. So a pipe that
+        // rings with the firing rate when the engine picks up walks away from it as it heats: the
+        // V10 measured 136.8 dB at 3,300 rpm, held it for three seconds, and then fell to 121.6 and
+        // stayed there — same rpm, same torque, same manifold pressure, a pipe that had detuned.
+        //
+        // Analysed at five seconds that engine reads twenty decibels louder than it is, and the two
+        // seconds written to a WAV are a fade rather than a steady state, which is exactly what a
+        // listener reported. Twelve seconds costs render time and buys a number that is true.
         bool idle = rpm <= v.Engine.IdleRpm * 1.05f && throttle < 0f;
         var orders = idle
-            ? new List<DriveOrder> { new(DriverAction.Cranking, 0.5f), new(DriverAction.Idling, 6.5f) }
+            ? new List<DriveOrder> { new(DriverAction.Cranking, 0.5f), new(DriverAction.Idling, 13.5f) }
             : new List<DriveOrder>
             {
                 new(DriverAction.Cranking, 0.5f),
                 new(DriverAction.Idling, 1.5f),
-                new(DriverAction.Holding, 5f, rpm, throttle < 0f ? 1f : throttle),
+                new(DriverAction.Holding, 12f, rpm, throttle < 0f ? 1f : throttle),
             };
         var r = VehicleSynth.Render(v, orders, seed: 7);
         int from = r.Exhaust.Length - Sr * 2;
@@ -254,6 +437,25 @@ public static class EngineOrderSpike
             else { if (whole) hiWhole += m * m; else hiHalf += m * m; }
         }
         float halfP = lowHalf + hiHalf, wholeP = lowWhole + hiWhole;
+
+        // STRUCTURE AGAINST FLOOR, which is the difference between an engine and a hiss.
+        //
+        // Every band measure here is blind to it: a cross-plane V8 puts most of its energy below
+        // 80 Hz because its half order IS 40 Hz, and an engine whose broadband floor has risen to
+        // swamp everything puts energy there too. Those read identically by band and could not sound
+        // less alike. So this samples the same spectrum ON the orders and BETWEEN them — a quarter of
+        // an order off, where nothing periodic can live — and reports the ratio. A clean engine runs
+        // 40 dB and up; the thing a listener calls white noise through a pipe was at 25.
+        double harm = 0, floor = 0;
+        for (float o = 0.5f; o * f1 < Sr * 0.45f && o <= 200f; o += 0.5f)
+        {
+            float m = Goertzel(x, o * f1);
+            harm += m * m;
+            float g = Goertzel(x, (o + 0.25f) * f1);
+            floor += g * g;
+        }
+        float hnr = (float)(10 * Math.Log10(Math.Max(1e-20, harm) / Math.Max(1e-20, floor)));
+
         var (lopeDb, swing) = Lump(x, achieved);
         double rms = 0; float peak = 0f;
         foreach (var s in pa) { rms += s * s; peak = MathF.Max(peak, MathF.Abs(s)); }
@@ -265,7 +467,7 @@ public static class EngineOrderSpike
 
         Console.WriteLine($"  ── asked {rpm:F0} rpm, got {achieved:F0} — order 1 = {f1:F1} Hz, firing = {f1 * v.Engine.Cylinders / (v.Engine.Strokes == 2 ? 1f : 2f):F0} Hz   {map}  {portPeak}");
         Console.WriteLine($"     level {db,5:F1} dB SPL   crest {peak / MathF.Max(1e-6f, (float)rms),4:F1}   centroid {Centroid(x),5:F0} Hz   "
-                        + $"half/whole {Db(halfP / MathF.Max(1e-12f, wholeP)) * 0.5f,6:F1} dB");
+                        + $"half/whole {Db(halfP / MathF.Max(1e-12f, wholeP)) * 0.5f,6:F1} dB   structure {hnr,5:F1} dB");
         Console.WriteLine($"     rumble {Db(lowHalf / MathF.Max(1e-12f, lowWhole)) * 0.5f,6:F1} dB   buzz {Db(hiHalf / MathF.Max(1e-12f, hiWhole)) * 0.5f,6:F1} dB   "
                         + $"lope {lopeDb,6:F1} dB  swing {swing * 100,5:F1} %   chop {Chop(x, achieved) * 100,5:F1} %   blop {Blop(x) * 100,5:F1} %");
         Console.WriteLine($"     bands  <80Hz {Band(x, 20f, 80f),5:F1}   80-250 {Band(x, 80f, 250f),5:F1}"

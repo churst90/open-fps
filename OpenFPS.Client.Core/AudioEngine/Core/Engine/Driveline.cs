@@ -171,6 +171,11 @@ public sealed class Driver
     private float _launchRpm;
     private float _holdIntegral;
     private float _revIntegral;
+    private float _revPrevRpm, _revRate;
+
+    /// <summary>How long the plate takes to answer the pedal — the lag EngineSynth puts on it. Here
+    /// because a governor that does not lead its own actuator is not a governor.</summary>
+    private const float PedalLagSeconds = 0.04f;
     public bool Shifting => _shiftTimer > 0f;
 
     public Driver(Driveline dl, EngineSynth engine)
@@ -237,9 +242,36 @@ public sealed class Driver
                 float release = order.Seconds * 0.62f;
                 if (phase < release)
                 {
-                    // Governed: full throttle while it is well short, easing off as it arrives.
-                    float err = (target - _engine.Rpm) / 900f;
-                    _revIntegral = Math.Clamp(_revIntegral + err * 1.5f * dt, 0f, 0.6f);
+                    // Governed on where the crank is HEADING, not where it is.
+                    //
+                    // An unloaded engine is the fastest thing on the car: the F1's ten pistons weigh
+                    // nothing and turn in 0.035 kg m^2, so it gains rpm at five figures a second. A
+                    // governor that waits until the needle is within a fixed band of the target has
+                    // already lost — by the time the plate moves, the plenum empties and the next
+                    // charge burns, the crank has gone thousands of rpm past. That is why every blip
+                    // on this bench landed within a whisker of the limiter whatever it was asked for,
+                    // and why a rev bench built to compare an engine at four speeds compared it with
+                    // itself at one.
+                    //
+                    // So the error is taken against the PREDICTED speed: where the crank will be when
+                    // the throttle's answer actually arrives. That delay has two parts and the
+                    // SMALLER one is the obvious one: two crank revolutions to stop drawing and stop
+                    // burning, 30 ms at a 4,000 rpm idle and 8 ms at 15,500. The larger is the PLATE,
+                    // which does not teleport — EngineSynth runs the pedal through a 40 ms lag, and a
+                    // light engine gains four thousand rpm while the plate is still travelling.
+                    // Anticipating only the combustion and not the linkage was worth almost nothing,
+                    // which is the useful part of this: the delay a governor must lead is the whole
+                    // chain to torque, and the slowest link in it sets the answer.
+                    float rate = (_engine.Rpm - _revPrevRpm) / MathF.Max(dt, 1e-6f);
+                    _revPrevRpm = _engine.Rpm;
+                    _revRate += (rate - _revRate) * MathF.Min(1f, dt * 200f);
+                    float lead = PedalLagSeconds + 2f * 60f / MathF.Max(400f, _engine.Rpm);
+                    float predicted = _engine.Rpm + _revRate * lead;
+
+                    // The band is the engine's own scale rather than a fixed number of rpm: 900 is a
+                    // sixth of a diesel's whole range and a seventeenth of this one's.
+                    float err = (target - predicted) / MathF.Max(150f, 0.06f * e.RedlineRpm);
+                    _revIntegral = Math.Clamp(_revIntegral + err * 1.5f * dt, -0.3f, 0.6f);
                     float t = Math.Clamp(err + _revIntegral, 0f, 1f);
                     _engine.Throttle = t * (1f + 0.03f * MathF.Sin(phase * 17f));
                 }
@@ -247,6 +279,8 @@ public sealed class Driver
                 {
                     _engine.Throttle = 0f;
                     _revIntegral = 0f;
+                    _revRate = 0f;
+                    _revPrevRpm = _engine.Rpm;
                 }
                 return;
             }
