@@ -349,7 +349,17 @@ SUPPORT = [
     ("Diesel pickup",   "diesel_i4",       185, 0.88, 3.0,  6.0,   2),
     ("Turbo hatch",     "i4_turbo",        235, 1.10, 4.4,  7.5,   2),
     ("Open header",     "v8_open_headers", 245, 1.05, 4.8,  6.5,   2),
-    ("Big cam",         "v8_bigcam",       235, 1.02, 4.6,  6.5,   2),
+    # FOUR of these, not two, and the count is the point.
+    #
+    # The muffler case was tuned by ear and then could barely be heard on the circuit, for a reason
+    # that had nothing to do with the tuning: a NASCAR has open side exits and the pace car has open
+    # pipes, so THIRTEEN of the thirty cars have no muffler at all, the open-header cars have none by
+    # design, and the glasspack and mild cars have theirs damped by the packing pressed against it.
+    # Two cars out of thirty carried the ringing chambered can. A thing you can hear twice a lap is
+    # not a thing you can hear.
+    ("Big cam",         "v8_bigcam",       235, 1.02, 4.6,  6.5,   4),
+    # ...and a Flowmaster coupe, the preset the case was actually tuned against.
+    ("Flowmaster coupe","v8_sports",       250, 1.08, 5.0,  6.8,   4),
     ("Glasspack",       "v8_glasspack",    225, 1.00, 4.3,  6.5,   2),
     ("Mild small block","v8_mild",         200, 0.98, 3.6,  6.5,   2),
 ]
