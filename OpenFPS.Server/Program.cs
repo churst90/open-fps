@@ -648,6 +648,12 @@ public class GameServer
                             Transform = QuantizedTransform.FromTransform(t)
                         };
                         if (world.Has<Velocity>(e)) state.LinearVelocity = world.Get<Velocity>(e).Linear;
+                        // How hard it is working its tyres. Sent because only the server can know it:
+                        // a banked corner and a flat one look identical in a velocity, and a listener
+                        // dividing lateral acceleration by flat grip reads every car on a banked oval
+                        // as sliding. See EntityState.TyreDemand.
+                        if (_vehicles.TryGetTyreDemand(e.Id, out float tyreDemand))
+                            state.TyreDemand = NetworkEntityState.EncodeTyreDemand(tyreDemand);
                         if (world.Has<BeaconComponent>(e))
                         {
                             var beacon = world.Get<BeaconComponent>(e);

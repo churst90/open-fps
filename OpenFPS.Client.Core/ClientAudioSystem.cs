@@ -982,9 +982,15 @@ public class ClientAudioSystem
             EngineKey = engineKey,
             EngineSpeed = snap.Velocity.Length(),
             EngineRunning = true,
-            TyreSlip = engineKey.Length > 0
-                ? TyreDemand(snap, world.PositionsSampledAt, OpenFPS.Common.VehicleProfile.ByName(engineKey).Tyres.PeakGripG)
-                : 0f,
+            // Straight from the server, which is the only thing that knows the corner.
+            //
+            // It used to be differentiated here from the interpolated velocity and divided by the
+            // tyre's FLAT-ground grip — and a banked corner is indistinguishable from a flat one in a
+            // velocity, because the bank shows up in the normal load and not in the kinematics. On
+            // the speedway that read 1.43 to 1.59 against a full-slide threshold of 1.45, so every
+            // car in every corner rendered pure broadband skid for the length of both turns. Heard as
+            // a long white-noise tail travelling with the field.
+            TyreSlip = snap.TyreDemand,
 
             // Synthesis mapping
             IsGranular = def.SoundEmitter.IsGranular,

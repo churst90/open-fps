@@ -1937,3 +1937,36 @@ not noisy at all — with **-26.5 dB at 0.8-2.5 kHz and -61.7 dB at 2.5-6 kHz**.
 - [ ] Ear-check on the track. If the clatter still wants more, `thud` is the one number: it is a
       single scale and everything else is already where it should be.
 - [ ] The turbo whistle is now 10 dB up but has never been heard in the map against a real field.
+
+## The white-noise tail: every car was sliding, all the time (2026-09-15)
+
+Heard walking beside the track: the tyres screeching with a long broadband tail that travelled with
+the field. It was not the turbos and it was not a tail — it was every car in every corner rendering
+a FULL SLIDE continuously.
+
+- [x] **The sibling of the racing-line banking bug, surviving by one file.** `RaceLine` learned that
+      banking raises the cornering limit — that was the fix for cars lifting four semitones a lap.
+      `TyreDemand` never did: it differentiated the interpolated velocity and divided by the tyre's
+      FLAT-ground grip. On the speedway's ten degrees with a 1.75 g slick that is
+      `(mu + tan)/(1 - mu·tan) / mu` = **1.59**, against a full-slide threshold of **1.45**. Measured
+      across the field: stock 1.59, muscle 1.43, truck 1.43. Every one of them at or past full slide,
+      for the length of both turns, for ever.
+- [x] **A listener cannot fix this for itself**, which is why the number is on the wire now. A banked
+      constant-radius turn at constant speed and a flat one have IDENTICAL accelerations — the bank
+      appears in the normal load, not in the kinematics — so no amount of differentiating a velocity
+      can tell them apart. `EntityState.TyreDemand`, one byte, 0..2 over 0..255.
+- [x] Computed in `VehicleSystem`, which is the only place that knows the corner. Laterally it is
+      `(v / vlimit)²` — not an approximation: the limit speed is where lateral acceleration equals
+      available grip and a = v²/R either way, so the ratio of accelerations is the square of the
+      ratio of speeds, and the line's limit ALREADY has the banking in it. Longitudinally it is the
+      applied acceleration against the same grip. They combine in quadrature, because one contact
+      patch does both.
+- [x] A car tracking its line now reads **1.0** — singing, which is right for a car at the limit, and
+      not sliding. `ACarOnItsLineThroughABankedCornerIsAtTheLimitAndNotPastIt` asserts both halves:
+      that the naive reading really would have exceeded the slide threshold, and that the fraction
+      form lands between squeal onset and slide onset.
+- [x] It also removes a numerical differentiation of an interpolated velocity from the client's hot
+      path, which was fragile for its own reasons. Tests 548 -> 556.
+
+- [ ] Ear-check: the corners should now SING rather than hiss, and the hiss should appear only where
+      a car is genuinely over the limit — the pace car being caught, a truck braking too late.

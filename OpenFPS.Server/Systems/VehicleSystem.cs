@@ -59,6 +59,16 @@ public sealed class VehicleSystem
         public float Lap;                      // metres round the circuit
         public int Laps;
         public string DisplayName = "";
+
+        /// <summary>How hard the tyres are working, 0..2, 1 being the limit. Worked out HERE because
+        /// this is the only place that knows the corner: the racing line's speed limit already has
+        /// the banking in it, so the fraction of it being used is the fraction of the grip being
+        /// used, and no listener can arrive at that from a velocity alone.</summary>
+        public float TyreDemand;
+
+        /// <summary>Flat-ground grip in g, from the map. Only the LONGITUDINAL half of the demand
+        /// needs it; the lateral half comes out of the racing line, which already knows the bank.</summary>
+        public float Grip = 1f;
     }
 
     private enum State { Waiting, Driving, Turning }
@@ -150,6 +160,7 @@ public sealed class VehicleSystem
                     Line = line,
                     Lap = vd.StartOffsetMetres,
                     DisplayName = display,
+                    Grip = vd.CorneringG > 0 ? vd.CorneringG : 1.0f,
                 };
                 // A racer is already at speed when the world starts; it is a lap in progress, not a
                 // standing start, and a standing start would put eight engines on the limiter at
@@ -274,8 +285,23 @@ public sealed class VehicleSystem
         line.Sample(v.Lap, out Vector3 here, out float heading, out float now);
         float want = MathF.Min(now, ahead);
 
+        float wasSpeed = v.Speed;
         if (want > v.Speed) v.Speed = MathF.Min(want, v.Speed + v.Accel * dt);
         else v.Speed = MathF.Max(want, v.Speed - v.Brake * dt);
+
+        // What the tyres are being asked for, as a fraction of what they have.
+        //
+        // LATERALLY it is (v / vlimit)^2, and that is not an approximation: the line's limit speed is
+        // the one where lateral acceleration equals the available grip, a = v^2/R either way, so the
+        // ratio of accelerations is the square of the ratio of speeds. Crucially the line's limit
+        // ALREADY has the banking in it — that was fixed when the cars were found to be lifting four
+        // semitones a lap — so a car tracking its line comes out at 1.0 rather than at 1.59.
+        // LONGITUDINALLY it is whatever acceleration or braking is actually being applied against the
+        // same grip. The two combine in quadrature, because a tyre has one contact patch and cornering
+        // and braking come out of the same friction circle.
+        float latFraction = now > 0.5f ? (v.Speed / now) * (v.Speed / now) : 0f;
+        float longFraction = v.Grip > 0.01f ? MathF.Abs(v.Speed - wasSpeed) / MathF.Max(1e-4f, dt) / (v.Grip * 9.81f) : 0f;
+        v.TyreDemand = MathF.Min(2f, MathF.Sqrt(latFraction * latFraction + longFraction * longFraction));
 
         float before = v.Lap;
         v.Lap += v.Speed * dt;
@@ -287,6 +313,16 @@ public sealed class VehicleSystem
         t.Rotation = Quaternion.CreateFromYawPitchRoll(heading, 0f, 0f);
         t.IsDirty = true;
         vel.Linear = new Vector3(MathF.Sin(heading), 0f, MathF.Cos(heading)) * v.Speed;
+    }
+
+    /// <summary>How hard a vehicle is working its tyres, 0..2 with 1 the limit. False for anything
+    /// that is not one of ours.</summary>
+    public bool TryGetTyreDemand(int entityId, out float demand)
+    {
+        foreach (var v in _vehicles)
+            if (v.Entity.Id == entityId) { demand = v.TyreDemand; return true; }
+        demand = 0f;
+        return false;
     }
 
     public int Count => _vehicles.Count;

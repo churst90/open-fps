@@ -256,6 +256,28 @@ public partial struct EntityState
     public Vector3 LinearVelocity;
     public BeaconData ExtraData;
 
+    // APPEND ONLY BELOW THIS LINE. MemoryPack writes these positionally with no names on the wire.
+
+    /// <summary>
+    /// How hard this vehicle is working its tyres, as a fraction of what they have, over the range
+    /// 0 to 2 with 1.0 the limit. One byte, so the resolution is about 0.008 — far finer than the
+    /// gap between singing and sliding, which is the only distinction it has to carry.
+    ///
+    /// It is sent rather than worked out by the listener, and that is the whole point of it. A
+    /// listener can differentiate a velocity and get an acceleration, but it CANNOT tell a banked
+    /// corner from a flat one: a constant-radius turn at constant speed has a purely horizontal
+    /// acceleration either way, and the bank shows up in the normal load, not in the kinematics. So
+    /// a client dividing lateral acceleration by flat-ground grip reads a banked oval as though every
+    /// car were sliding — measured on the speedway it came out at 1.43 to 1.59 against a full-slide
+    /// threshold of 1.45, which is every car in every corner rendering pure broadband skid noise for
+    /// the length of both turns. Heard, correctly, as "a long white noise tail travelling with the
+    /// vehicles".
+    ///
+    /// One byte per dynamic entity per tick, and it replaces a numerical differentiation of an
+    /// interpolated velocity, which was fragile for its own reasons.
+    /// </summary>
+    public byte TyreDemand;
+
     public EntityState()
     {
         EntityId = 0;
@@ -263,6 +285,12 @@ public partial struct EntityState
         LinearVelocity = Vector3.Zero;
         ExtraData = new BeaconData();
     }
+
+    /// <summary>The demand as a fraction, 0..2.</summary>
+    public float TyreDemandFraction => TyreDemand / 127.5f;
+
+    public static byte EncodeTyreDemand(float fraction)
+        => (byte)Math.Clamp((int)MathF.Round(fraction * 127.5f), 0, 255);
 }
 
 /// <summary>

@@ -47,4 +47,8 @@ public struct EntitySnapshot
     public EntityDefinition Definition;
     public Transform Transform;
     public Vector3 Velocity;
+
+    /// <summary>How hard this vehicle is working its tyres, 0..2 with 1 the limit — as the SERVER
+    /// worked it out, because a listener cannot tell a banked corner from a flat one.</summary>
+    public float TyreDemand;
 }

@@ -25,6 +25,7 @@ public class ClientWorldState
     public bool TryGetInterpolatedTransform(int entityId, out Transform transform)
         => _serverTransforms.TryGetValue(entityId, out transform);
     private readonly ConcurrentDictionary<int, Vector3> _serverVelocities = new();
+    private readonly ConcurrentDictionary<int, float> _serverTyreDemand = new();
     private readonly ConcurrentDictionary<int, byte> _audioEntityIds = new();
 
     // --- Snapshot Interpolation ---
@@ -156,6 +157,7 @@ public class ClientWorldState
         _definitions.Clear();
         _serverTransforms.Clear();
         _serverVelocities.Clear();
+        _serverTyreDemand.Clear();
         _audioEntityIds.Clear();
         
         lock (_metaLock)
@@ -325,6 +327,7 @@ public class ClientWorldState
             bool known = _definitions.TryRemove(id, out _);
             known |= _serverTransforms.TryRemove(id, out _);
             _serverVelocities.TryRemove(id, out _);
+            _serverTyreDemand.TryRemove(id, out _);
             _audioEntityIds.TryRemove(id, out _);
             if (known) removed.Add(id);
         }
@@ -475,12 +478,14 @@ public class ClientWorldState
 
                         _serverTransforms[stateTo.EntityId] = new Transform { Position = lerpedPos, Rotation = lerpedRot };
                         _serverVelocities[stateTo.EntityId] = Vector3.Lerp(stateFrom.LinearVelocity, stateTo.LinearVelocity, alpha);
+                        _serverTyreDemand[stateTo.EntityId] = stateTo.TyreDemandFraction;
                     }
                     else
                     {
                         // Fallback if entity is missing from 'from' snapshot
                         _serverTransforms[stateTo.EntityId] = stateTo.Transform.ToTransform();
                         _serverVelocities[stateTo.EntityId] = stateTo.LinearVelocity;
+                        _serverTyreDemand[stateTo.EntityId] = stateTo.TyreDemandFraction;
                     }
                 }
             }
@@ -506,6 +511,7 @@ public class ClientWorldState
         {
             _serverTransforms[s.EntityId] = s.Transform.ToTransform();
             _serverVelocities[s.EntityId] = s.LinearVelocity;
+            _serverTyreDemand[s.EntityId] = s.TyreDemandFraction;
         }
         _positionsSampledAt = OpenFPS.Common.AudioClock.Now;
         Touch();
@@ -578,7 +584,8 @@ public class ClientWorldState
                 Id = id,
                 Definition = kvp.Value,
                 Transform = _serverTransforms.GetValueOrDefault(id, kvp.Value.Transform),
-                Velocity = _serverVelocities.GetValueOrDefault(id, Vector3.Zero)
+                Velocity = _serverVelocities.GetValueOrDefault(id, Vector3.Zero),
+                TyreDemand = _serverTyreDemand.GetValueOrDefault(id, 0f)
             };
             snap.Entities[id] = s;
             if (s.Definition.Type != EntityType.StaticObject) snap.DynamicEntities.Add(s);

@@ -224,4 +224,61 @@ public class TyreAndTurboTests
                 $"{key}: boosted but silent about it");
         }
     }
+
+    /// <summary>
+    /// A car going round a BANKED corner at its racing line's limit is at its limit — not half as far
+    /// past it again.
+    ///
+    /// This is the sibling of the racing-line banking bug and it survived that fix by one file. The
+    /// line learned that banking raises the cornering limit; the tyre DEMAND kept dividing lateral
+    /// acceleration by flat-ground grip. On ten degrees of bank with a 1.75 g slick that reads 1.59
+    /// against a full-slide threshold of 1.45 — so every car in every corner rendered pure broadband
+    /// skid for the length of both turns, heard as a long white-noise tail travelling with the field.
+    ///
+    /// A listener cannot fix this for itself, and that is why the number is on the wire now: a banked
+    /// constant-radius turn at constant speed and a flat one have identical accelerations, because
+    /// the bank appears in the normal load and not in the kinematics.
+    /// </summary>
+    [Theory]
+    [InlineData(1.75f)]   // stock car slick
+    [InlineData(1.02f)]   // street-tyred muscle car
+    [InlineData(0.72f)]   // race truck
+    public void ACarOnItsLineThroughABankedCornerIsAtTheLimitAndNotPastIt(float gripG)
+    {
+        const float bankDegrees = 10f;                 // the speedway's turns
+        float tan = MathF.Tan(bankDegrees * MathF.PI / 180f);
+
+        // What the racing line lets it do: v^2 = R g (mu + tan) / (1 - mu tan).
+        float corneringG = (gripG + tan) / (1f - gripG * tan);
+
+        // What a listener differentiating velocity and dividing by FLAT grip would conclude.
+        float naive = TyreFriction.Demand(0f, corneringG * 9.81f, gripG);
+        Assert.True(naive > TyreFriction.SlideOnset,
+            $"the naive reading was {naive:F2}, which would not have shown the bug");
+
+        // What the server sends: the fraction of the line's own limit being used. A car tracking its
+        // line exactly is at 1.0 — working its tyres fully, squealing, and not sliding.
+        const float onTheLimit = 1.0f;
+        Assert.InRange(onTheLimit, TyreFriction.SquealOnset, TyreFriction.SlideOnset);
+        Assert.True(TyreFriction.SkidAmount(onTheLimit) < 0.05f,
+            "a car on its line should not be rendering broadband skid");
+        Assert.True(TyreFriction.SquealAmount(onTheLimit) > 0.5f,
+            "a car on its line should still be singing, because it is at the limit");
+    }
+
+    /// <summary>The demand is a fraction and it survives the wire as one, to within a 1/128th.</summary>
+    [Theory]
+    [InlineData(0f)]
+    [InlineData(0.78f)]
+    [InlineData(1.0f)]
+    [InlineData(1.45f)]
+    [InlineData(2.0f)]
+    public void TheDemandSurvivesTheWire(float fraction)
+    {
+        var state = new OpenFPS.Common.Networking.EntityState
+        {
+            TyreDemand = OpenFPS.Common.Networking.EntityState.EncodeTyreDemand(fraction),
+        };
+        Assert.Equal(fraction, state.TyreDemandFraction, 2);
+    }
 }
