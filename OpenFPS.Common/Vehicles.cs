@@ -242,6 +242,8 @@ public sealed record VehicleProfile
             ["single"] = () => DirtBike,
             ["diesel_i4"] = () => Pickup,
             ["diesel_truck"] = () => Truck,
+            ["diesel_cummins"] = () => DieselPickupLoud,
+            ["school_bus"] = () => SchoolBus,
             ["boxer4"] = () => Wagon,
             ["v10"] = () => V10Coupe,
             ["v12"] = () => GrandTourer,
@@ -533,6 +535,62 @@ public sealed record VehicleProfile
         Tyres = TyreProfile.TruckOnAsphalt,
         MassKg = 14000f, DragArea = 5.5f, RollingResistance = 0.008f,
         ExhaustOffsetZ = 1.0f, IntakeOffsetZ = 2.5f, FrontAxleZ = 3.5f, RearAxleZ = -3.0f,
+    };
+
+    /// <summary>
+    /// A Dodge Ram with the 5.9 Cummins in it and five inches of straight pipe out the back.
+    ///
+    /// A cab and an empty steel bed — the most resonant thing on the road — over an engine with no
+    /// silencer at all. The pipe exits behind the rear axle, so it is loudest going away, and the
+    /// bed sits directly over most of its run.
+    /// </summary>
+    public static VehicleProfile DieselPickupLoud => new()
+    {
+        Body = VehicleBody.Van,
+        Name = "5.9 Cummins pickup, straight pipe",
+        // Measured with --engine-levels, not guessed: a straight-piped 5.9 is eleven decibels above
+        // what a silenced pickup diesel makes.
+        EngineKey = "diesel_cummins",
+        SourceLevelDb = 116f,
+        Engine = EngineProfile.DieselCumminsI6,
+        // Four ratios and a very tall final drive: this engine has no revs to give and does not need
+        // any. Governed at 2,900, top gear runs out around 160 km/h.
+        Gearbox = Gearbox.SixSpeedSports with
+        {
+            Ratios = new[] { 5.61f, 3.04f, 1.67f, 1.00f, 0.75f },
+            FinalDrive = 3.55f, ShiftSeconds = 0.55f,
+            UpshiftRpm = 2750f, DownshiftRpm = 1250f, WheelRadiusMetres = 0.40f,
+        },
+        Tyres = TyreProfile.SportsOnAsphalt with { TreadBlocks = 40, SurfaceRoughness = 0.9f },
+        MassKg = 3200f, DragArea = 1.9f, RollingResistance = 0.012f,
+        ExhaustOffsetZ = -2.7f, IntakeOffsetZ = 1.9f, FrontAxleZ = 1.8f, RearAxleZ = -1.8f,
+    };
+
+    /// <summary>
+    /// A school bus: a DT466 under a long steel box, silenced, and geared to get there eventually.
+    ///
+    /// The engine is at the FRONT and the pipe comes out at the BACK, eleven metres away, which is
+    /// the one thing about a bus that a listener outside it notices without being told — the clatter
+    /// arrives from the nose and the exhaust from the tail, and they are far enough apart to hear as
+    /// two places.
+    /// </summary>
+    public static VehicleProfile SchoolBus => new()
+    {
+        Body = VehicleBody.SchoolBus,
+        Name = "school bus",
+        EngineKey = "diesel_bus",
+        SourceLevelDb = 100f,
+        Engine = EngineProfile.DieselBusI6,
+        Gearbox = Gearbox.SixSpeedSports with
+        {
+            Ratios = new[] { 7.05f, 4.14f, 2.52f, 1.56f, 1.00f, 0.74f },
+            FinalDrive = 4.78f, ShiftSeconds = 0.9f,
+            UpshiftRpm = 2350f, DownshiftRpm = 1150f, WheelRadiusMetres = 0.50f,
+        },
+        Tyres = TyreProfile.TruckOnAsphalt,
+        MassKg = 11000f, DragArea = 5.8f, RollingResistance = 0.009f,
+        // Nose to tail, which is what makes it read as a bus rather than a truck.
+        ExhaustOffsetZ = -5.2f, IntakeOffsetZ = 4.6f, FrontAxleZ = 3.4f, RearAxleZ = -3.2f,
     };
 
     public static VehicleProfile Wagon => new()

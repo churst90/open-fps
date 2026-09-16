@@ -246,7 +246,10 @@ public static class EngineOrderSpike
     }
 
     /// <summary>key=value overrides so the model can be swept without a rebuild: steep= wall= torque=
-    /// idlemap= rough= jet= port= flowloss= hdr= sprd= induction= ilevel= absorb= valves=</summary>
+    /// idlemap= rough= jet= port= flowloss= hdr= sprd= induction= ilevel= absorb= valves= knock=
+    /// turbo= whine= bore= stroke= rod= cr= evo= exdur= indur= excl= incl= exvalve= invalve= redline=
+    /// idlerpm= inertia= plenum= airbox= snorkel= throttle= colpipe= midpipe= tail= coldia= prdia=
+    /// taildia=, plus muffler=none|glass|chambered|stock and crank=even|odd</summary>
     public static VehicleProfile Override(VehicleProfile v, string[] args)
     {
         var e = v.Engine;
@@ -336,6 +339,9 @@ public static class EngineOrderSpike
                 case "ilevel": n_ = n_ with { Level = n }; break;
                 case "absorb": n_ = n_ with { Absorption = n }; break;
                 case "valves": m_ = m_ with { ValvetrainLevel = n }; break;
+                case "knock": m_ = m_ with { CombustionKnock = n }; break;
+                case "turbo": m_ = m_ with { TurboWhistleLevel = n }; break;
+                case "whine": m_ = m_ with { AccessoryWhineLevel = n }; break;
                 default: continue;
             }
             Console.WriteLine($"  override {k} = {n}");

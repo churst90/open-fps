@@ -47,6 +47,31 @@ internal sealed class IntakeNetwork
     private readonly Random _rng = new(20260916);
     private float _tnLp1, _tnLp2;
 
+    /// <summary>
+    /// How much of the engine's own pulsation gets past the COMPRESSOR to the airbox and out.
+    ///
+    /// On a turbocharged or blown engine there is a wheel in the way. Everything the cylinders do —
+    /// the runner's quarter-wave, the plenum's breathing, the plate's turbulence — has to cross a
+    /// bladed rotor spinning at a hundred thousand rpm before it can reach the snorkel, and a rotor
+    /// is a wall to a plane wave: it reflects and scatters most of it. That is why a turbo engine's
+    /// intake is a WHOOSH and a whistle rather than the induction honk of a naturally aspirated one,
+    /// and the whistle is the compressor's own noise, generated downstream of the barrier.
+    ///
+    /// Leaving it out was audible and diesel-specific. The leak term below is scaled by the OPEN
+    /// AREA of the plate, so on a petrol engine at part throttle almost nothing crosses — but a
+    /// diesel has no plate at all and runs wide open for ever, so the runners' fixed 386 Hz
+    /// quarter-wave went straight out of the airbox. A listener heard it as a note, worst on the
+    /// overrun where no combustion covers it, and it survived silencing the exhaust, the valvetrain,
+    /// the turbo whistle, the knock, the alternator and the throttle turbulence one at a time —
+    /// because it was none of those, it was the engine breathing out through a hole that should
+    /// have had a compressor in it.
+    ///
+    /// Twenty decibels, which is the order of a centrifugal stage's insertion loss for plane waves
+    /// well below blade-passing. The MEAN flow is untouched: a compressor passes air, it is only
+    /// pulsation it stops.
+    /// </summary>
+    private readonly float _compressorBarrier;
+
     public IntakeNetwork(EngineProfile e, float rate)
     {
         _spec = e.Intake;
@@ -72,6 +97,7 @@ internal sealed class IntakeNetwork
         // The mean follows the throttle within about 15 ms, so a snapped pedal moves the mean flow
         // rather than arriving as one enormous gulp; what is left is the pulsation.
         _meanAlpha = OnePole.AlphaFor(12f, rate);
+        _compressorBarrier = e.Induction == Induction.NaturallyAspirated ? 1f : 0.1f;
         SetThrottle(0f);
         UpdateGas(305f, Gas.Atmosphere);
     }
@@ -157,8 +183,8 @@ internal sealed class IntakeNetwork
         // the plate does, and some of that gets through.
         _plenumMean += _meanAlpha * (pPlenum - _plenumMean);
         float acoustic = (pPlenum - _plenumMean) * area / (Gas.Density(_airboxPressure, _plenumK) * 340f) * 0.5f;
-        float uAb = (flow - _throttleFlowMean) / Gas.Density(_airboxPressure, _plenumK) + acoustic
-                  + ThrottleTurbulence(flow, area);
+        float uAb = ((flow - _throttleFlowMean) / Gas.Density(_airboxPressure, _plenumK) + acoustic
+                  + ThrottleTurbulence(flow, area)) * _compressorBarrier;
         float aAb = _airbox.ArriveNear();
         _airbox.PushForward(aAb - _airbox.Impedance * uAb);   // drawing air is a rarefaction into the box
         {
@@ -195,6 +221,24 @@ internal sealed class IntakeNetwork
         float level = _spec.FlowNoiseLevel;
         if (level <= 0f || area <= 1e-9f) return 0f;
 
+        // A PLATE THAT IS NOT IN THE WAY IS NOT AN ORIFICE.
+        //
+        // This whole term is the dipole of a separated jet beating on a sharp edge, and a jet only
+        // exists where there is a pressure drop to drive one. Scaling it by the duct velocity alone
+        // was wrong in a way that shows up hardest on the engine that has no plate at all: a diesel
+        // is pedal-is-fuel and runs its intake WIDE OPEN for ever, so it was being given the
+        // turbulence of a throttle it does not have — and fed to a tract with modes at 300-460 Hz,
+        // broadband comes back out as a NOTE. A listener heard it as "a frequency, like a phone
+        // interfering with a speaker", loudest on the overrun where no combustion masks it.
+        //
+        // The drop across the plate is the honest measure of how much of an orifice it is: about
+        // 0.6 of the upstream pressure on a petrol engine at idle, a few per cent at wide open, and
+        // essentially nothing on a diesel at any time. It is also why induction HISS is a
+        // part-throttle sound — at full throttle what you hear is the pulsation, not the plate.
+        float pUp = MathF.Max(1e3f, _airboxPressure);
+        float restriction = Math.Clamp((pUp - PlenumPressure) / pUp, 0f, 1f);
+        if (restriction < 0.02f) return 0f;
+
         float rho = Gas.Density(MathF.Min(_airboxPressure, PlenumPressure), _plenumK);
         float u = MathF.Abs(massFlow) / MathF.Max(1e-6f, rho * area);
         if (u < 0.5f) return 0f;
@@ -212,7 +256,7 @@ internal sealed class IntakeNetwork
         // is what makes it a SOUND rather than a fluctuation, and it is what carries the U^4 law.
         const float intensity = 0.10f;
         float mach = u / MathF.Max(1f, _airbox.SoundSpeed);
-        return intensity * area * u * mach * band * level * 8f;
+        return intensity * area * u * mach * band * level * 8f * restriction;
     }
 
     /// <summary>Choked/subsonic orifice flow for air, kg/s.</summary>

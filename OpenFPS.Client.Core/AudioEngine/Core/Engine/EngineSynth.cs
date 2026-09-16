@@ -151,7 +151,48 @@ public sealed class EngineSynth
     private float _lastLoad;
 
     // Block noise
-    private float _knockHp, _knockPrev, _blockLp;
+    private float _blockLp, _knockHp;
+
+    /// <summary>
+    /// One mode of the gas in the cylinder: a two-pole resonator with its zeros at DC and Nyquist,
+    /// so it passes a band and nothing else.
+    /// </summary>
+    private struct Mode
+    {
+        public float A, C, R2, Weight;
+        public float X2, Y1, Y2;
+
+        public float Q;
+
+        public void Set(float hz, float q, float rate, float weight)
+        {
+            Q = q;
+            Weight = weight;
+            Retune(hz, rate);
+        }
+
+        /// <summary>Move the note without disturbing what is already ringing in it.</summary>
+        public void Retune(float hz, float rate)
+        {
+            float w = 2f * MathF.PI * MathF.Min(hz, rate * 0.45f) / rate;
+            float r = MathF.Exp(-w / (2f * Q));
+            A = (1f - r * r) * 0.5f;
+            C = 2f * r * MathF.Cos(w);
+            R2 = r * r;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveOptimization)]
+        public float Step(float x)
+        {
+            float y = A * (x - X2) + C * Y1 - R2 * Y2;
+            X2 = x; Y2 = Y1; Y1 = y;
+            return y * Weight;
+        }
+    }
+
+    private Mode[] _knockModes = Array.Empty<Mode>();
+    private float _knockTemp = 1100f, _knockBore = 0.1f;
+    private int _knockRetune;
     private readonly ClickVoice _click;
     private double _whinePhase, _blowerPhase, _turboPhase;
     private float _turboNoiseLp;
@@ -168,6 +209,7 @@ public sealed class EngineSynth
         public float PortE, PortI, FlowE, FlowI; // diagnostics: port acoustic pressure, valve mass flow
         // This cycle's combustion, decided at intake valve closing.
         public float HeatTotal, SparkDeg, BurnDeg, BurnPrev, Quality, Dilution;
+        public float Premix;                   // diesel: fraction of the charge that burns premixed
         public bool Burning, ChargeDecided, Misfired;
         public float PopAmp; public int PopLeft, PopLength;
         public float Trim;
@@ -194,6 +236,30 @@ public sealed class EngineSynth
         _cp = _cv + Gas.R;
         _exhaustAreaMax = ValveArea(e.ExhaustValve, e.ExhaustCam.MaxLiftMm * 1e-3f);
         _intakeAreaMax = ValveArea(e.IntakeValve, e.IntakeCam.MaxLiftMm * 1e-3f);
+
+        // THE MODES OF THE GAS IN THE CYLINDER, which is a cavity and not a tuned pipe.
+        //
+        // A combustion chamber at TDC is a shallow disc of gas, and a shallow disc has a whole family
+        // of transverse modes, not one. Draper's numbers are the roots of the Bessel derivative:
+        // the first circumferential at 1.841, the second at 3.054, the first radial at 3.832, each
+        // times c/(pi D). Knock sensors are tuned to the first because it is the strongest, which is
+        // what makes it tempting to model only that — and modelling only that is WRONG in a way a
+        // listener catches immediately. One high-Q pole struck at the firing rate is not a knock, it
+        // is a NOTE: the same pitch, over and over, at 120 hits a second. Three modes at
+        // incommensurate ratios beat against each other and never settle on a pitch, which is what a
+        // knock is.
+        //
+        // The frequency still falls out of the bore and nothing else, so a 102 mm Cummins knocks at
+        // 5.2 kHz and a 116 mm bus at 4.5, and no preset says so.
+        _knockBore = MathF.Max(0.04f, bore);
+        float baseHz = 900f / (MathF.PI * _knockBore);
+        bool ci = e.Fuel == FuelType.Diesel;
+        _knockModes = new Mode[3];
+        // Damped hard: a bore of gas against wet metal, full of turbulence. These die in about a
+        // millisecond, which is a knock; leave them ringing for five and they are a chime.
+        _knockModes[0].Set(1.841f * baseHz, ci ? 6f : 5f, rate, 1.00f);
+        _knockModes[1].Set(3.054f * baseHz, ci ? 5f : 4f, rate, 0.55f);
+        _knockModes[2].Set(3.832f * baseHz, ci ? 4.5f : 3.5f, rate, 0.40f);
 
         _exhaust = new ExhaustNetwork(e, rate, seed);
         _intake = new IntakeNetwork(e, rate);
@@ -312,7 +378,7 @@ public sealed class EngineSynth
         {
             float Vn = VolumeAt(a + step);
             float dV = Vn - V;
-            float xb = Wiebe((a + step) - spark, burn, e.Fuel);
+            float xb = Wiebe((a + step) - spark, burn, e.Fuel, 0.35f);
             float dQ = Q * (xb - xbPrev);
             xbPrev = xb;
             E += dQ - p * dV;
@@ -370,6 +436,39 @@ public sealed class EngineSynth
         return -MathF.Max(-5f, adv);
     }
 
+    /// <summary>
+    /// How long a diesel waits between the injector opening and the charge lighting, in CRANK
+    /// DEGREES — and, through that, how much of it clatters.
+    ///
+    /// This is the parameter a diesel is built around. Fuel sprayed into the cylinder does not burn
+    /// on contact: it has to break up, evaporate, mix and reach its autoignition temperature, and
+    /// that takes a time set by how hot and how dense the air it lands in is. Everything injected
+    /// during that wait is sitting there premixed when the first of it finally lights, so it all goes
+    /// off together — and THAT is the pressure spike the block radiates as clatter. Whatever is
+    /// injected afterwards burns as fast as it can mix, which is slow and smooth and quiet.
+    ///
+    /// So the split is not a constant, and making it one is what stopped the model sounding like a
+    /// diesel. At idle the injector is open for a few degrees and the delay is longer than that, so
+    /// nearly the whole charge is premixed and the engine clatters. Under load the injector is open
+    /// for forty or fifty degrees while the delay is shorter still — hotter, denser, boosted air —
+    /// so most of the fuel arrives into an already-burning cylinder and never joins the spike. That
+    /// is the whole reason a diesel rattles at a standstill and goes smooth and hard when it pulls,
+    /// and none of it has to be written down anywhere: it falls out of the two timescales.
+    ///
+    /// The delay in milliseconds is the usual Arrhenius form — it goes as the inverse of pressure and
+    /// exponentially with the reciprocal of temperature — and crank degrees are milliseconds times
+    /// the crank speed, which is why the delay in DEGREES grows as an engine revs even though the
+    /// delay in time shrinks.
+    /// </summary>
+    /// <param name="pressureBar">Cylinder pressure at injection, bar absolute.</param>
+    /// <param name="kelvin">Charge temperature at injection.</param>
+    private static float IgnitionDelayDegrees(float rpm, float pressureBar, float kelvin)
+    {
+        float ms = 0.40f * MathF.Pow(MathF.Max(1f, pressureBar), -1.02f) * MathF.Exp(2100f / MathF.Max(400f, kelvin));
+        ms = Math.Clamp(ms, 0.25f, 4f);
+        return Math.Clamp(6f * rpm * ms / 1000f, 1.5f, 30f);
+    }
+
     /// <summary>Burn duration in crank degrees: longer when diluted, a little longer at speed.</summary>
     private float BurnDuration(float rpm, float dilution, float load)
     {
@@ -377,17 +476,21 @@ public sealed class EngineSynth
         return 42f + 45f * Math.Clamp(dilution * 3f, 0f, 1f) + 12f * MathF.Min(1f, rpm / 6000f) + 10f * (1f - load);
     }
 
-    /// <summary>Burnt mass fraction at an angle after ignition: Wiebe, a=5, m=2. A diesel gets a
-    /// premixed spike over the first few degrees before the diffusion burn — the knock.</summary>
+    /// <summary>Burnt mass fraction at an angle after ignition: Wiebe, a=5, m=2. A diesel burns in
+    /// two parts and <paramref name="premix"/> is the split between them — see
+    /// <see cref="IgnitionDelayDegrees"/> for where that number comes from and why it is not a
+    /// constant.</summary>
     [MethodImpl(MethodImplOptions.AggressiveOptimization)]
-    private static float Wiebe(float degAfterSpark, float duration, FuelType fuel)
+    private static float Wiebe(float degAfterSpark, float duration, FuelType fuel, float premix)
     {
         if (degAfterSpark <= 0f) return 0f;
         if (fuel == FuelType.Diesel)
         {
+            // The premixed burn is what accumulated during the delay going off nearly at once, so it
+            // is quick however much of it there is: a few degrees, not a fraction of the duration.
             float pre = 1f - MathF.Exp(-5f * MathF.Pow(Math.Clamp(degAfterSpark / 7f, 0f, 1f), 2.5f));
             float dif = 1f - MathF.Exp(-5f * MathF.Pow(Math.Clamp(degAfterSpark / duration, 0f, 1f), 1.6f));
-            return 0.22f * pre + 0.78f * dif;
+            return premix * pre + (1f - premix) * dif;
         }
         float u = Math.Clamp(degAfterSpark / duration, 0f, 1f);
         return 1f - MathF.Exp(-5f * u * u * u);
@@ -430,6 +533,7 @@ public sealed class EngineSynth
         float portPeak = 0f;
         float knock = 0f;
         float blockLow = 0f;
+        float knockTempAcc = 0f, knockTempWgt = 0f;
         float massOut = 0f;
         _map = _intake.PlenumPressure;
         float load = Math.Clamp((_map / Gas.Atmosphere - 0.3f) / 0.7f, 0f, 1f);
@@ -475,7 +579,7 @@ public sealed class EngineSynth
             {
                 float since = phase - sparkAbs;
                 if (since < 0f) since += _cycleDeg;
-                float xb = Wiebe(since, cy.BurnDeg, e.Fuel);
+                float xb = Wiebe(since, cy.BurnDeg, e.Fuel, cy.Premix);
                 dQ = cy.HeatTotal * (xb - cy.BurnPrev);
                 cy.BurnPrev = xb;
                 if (xb >= 0.999f || since > cy.BurnDeg + 5f)
@@ -609,7 +713,16 @@ public sealed class EngineSynth
             // ── What the block radiates ──────────────────────────────────────────────────
             // Combustion through the metal: the rate of pressure rise, which for a petrol engine
             // is modest and for a diesel is the sound.
-            if (cy.Burning) knock += (cy.Pressure - cy.PressurePrev) * _rate;
+            if (cy.Burning)
+            {
+                float dp = (cy.Pressure - cy.PressurePrev) * _rate;
+                knock += dp;
+                // The modes are the gas's, so they move with the gas. Weighted by how hard this
+                // cylinder is driving them, because that is whose temperature is being heard.
+                float wgt = MathF.Abs(dp);
+                knockTempAcc += cy.Temp * wgt;
+                knockTempWgt += wgt;
+            }
             blockLow += cy.Pressure - Gas.Atmosphere;
 
             // Valvetrain: a tick as each valve leaves its seat and a louder one as it lands.
@@ -647,12 +760,58 @@ public sealed class EngineSynth
         Intake = _intake.Radiated * e.Intake.Level;
 
         // ── The block ────────────────────────────────────────────────────────────────────────
-        // Knock: the pressure-rise rate, high-passed, through the metal.
-        float kh = OnePole.AlphaFor(600f, _rate);
+        // Knock: the pressure-rise rate, RUNG THROUGH THE GAS, and then through the metal.
+        //
+        // A combustion knock is not a broadband thump that happens to be high-pitched. The sudden
+        // pressure rise excites a standing wave ACROSS THE BORE — the first radial mode of the gas
+        // in a shallow cylinder, at 1.841c/(pi D) — and what the block radiates is that ringing. It
+        // is why knock sensors are tuned filters and why the band they listen in is quoted per
+        // engine: the frequency is the bore and the gas temperature and nothing else.
+        //
+        // That makes it fall out rather than be declared. Hot burnt gas runs about 900 m/s, so a
+        // 130 mm truck bore rings near 4 kHz and an 80 mm car bore near 6.6 — the big engine knocks
+        // DEEPER, which is most of what tells them apart by ear, and no preset has to say so.
+        // Previously this was a 600 Hz high-pass, which has no frequency of its own at all and gave
+        // every engine in the family the same colour of knock.
+        //
+        // What DRIVES the modes is the sharp part of the pressure rise, not the smooth part. The
+        // smooth rise is the thud that goes through the mounts and is handled below; feeding it to
+        // the resonators as well just pumps them with a slow ramp. So it is high-passed first.
+        float kh = OnePole.AlphaFor(700f, _rate);
         _knockHp += kh * (knock - _knockHp);
+        float knockDrive = knock - _knockHp;
+
+        // AND THE MODES MOVE WHILE THEY RING, which is the difference between a knock and a note.
+        //
+        // The frequency is c/(pi D) times a Bessel root, and c is sqrt(gamma R T) in gas that is
+        // cooling as fast as the piston can pull it down — 2,500 K at the peak to 1,200 a few degrees
+        // later. That is a 30 per cent fall in the speed of sound, so every knock CHIRPS DOWNWARD
+        // through a third of its frequency while it decays. A fixed-frequency resonator struck a
+        // hundred times a second gives the same pitch every time and the ear hears a tone; one that
+        // slides gives a knock. A listener caught exactly this — "a note, and I don't know what it
+        // is" — on a model that had the frequency right and held it still.
+        //
+        // Retuned every 32 samples, which is 0.7 ms: fast enough to follow the chirp, and 1/32 of
+        // the cost of doing it per sample on the most expensive voice in the mixer.
+        float knockRing;
+        if (DebugLegacyDiesel) { knockRing = knockDrive; goto knockDone; }
+        if (knockTempWgt > 1e-6f) _knockTemp = knockTempAcc / knockTempWgt;
+        else _knockTemp += (1100f - _knockTemp) * 0.001f;
+        if (++_knockRetune >= 32)
+        {
+            _knockRetune = 0;
+            float c = MathF.Sqrt(1.33f * Gas.R * Math.Clamp(_knockTemp, 500f, 3000f));
+            float b = c / (MathF.PI * _knockBore);
+            _knockModes[0].Retune(1.841f * b, _rate);
+            _knockModes[1].Retune(3.054f * b, _rate);
+            _knockModes[2].Retune(3.832f * b, _rate);
+        }
+        knockRing = 0f;
+        for (int i = 0; i < _knockModes.Length; i++) knockRing += _knockModes[i].Step(knockDrive);
+        knockDone:
         // Scaled so a truck diesel under load radiates about 95 dB of knock at a metre and a petrol
         // engine's is buried; soft-limited because a misfire's pressure jump is not the block's sound.
-        float knockRaw = (knock - _knockHp) * e.Mechanical.CombustionKnock * 4.0e-9f;
+        float knockRaw = knockRing * e.Mechanical.CombustionKnock * 4.0e-9f;
         float knockOut = 2f * MathF.Tanh(knockRaw * 0.5f);
 
         // The low thud of the cylinders reaching the air through the block and the mounts — and it
@@ -850,8 +1009,31 @@ public sealed class EngineSynth
 
         float fuelFrac = e.Fuel == FuelType.Diesel ? Math.Clamp(0.04f + 0.96f * _pedal, 0f, 1f) : 1f;
         cy.HeatTotal = fresh * FuelEnergyPerKg * _heatScale * q * fuelFrac;
-        cy.SparkDeg = SparkAngle(rpm, load);
         cy.BurnDeg = BurnDuration(rpm, dilution, load);
+        if (e.Fuel == FuelType.Diesel && DebugLegacyDiesel)
+        {
+            cy.SparkDeg = SparkAngle(rpm, load);
+            cy.Premix = 0.22f;
+        }
+        else if (e.Fuel == FuelType.Diesel)
+        {
+            // Injection starts where SparkAngle says; combustion starts a delay later.
+            float inject = SparkAngle(rpm, load);
+            float pBar = MathF.Max(1f, cy.Pressure / 1e5f);
+            float delay = IgnitionDelayDegrees(rpm, pBar, cy.Temp);
+            cy.SparkDeg = inject + delay;
+            // How long the injector stays open: the fuel quantity is the pedal, and it is metered
+            // over crank degrees. A few degrees at idle, most of the burn under full load.
+            float injectDeg = 3f + 45f * fuelFrac;
+            // What is already in the cylinder when it lights is what burns premixed. Real engines
+            // run roughly half at idle and under a tenth at full load, which is what this gives.
+            cy.Premix = Math.Clamp(delay / MathF.Max(1e-3f, delay + injectDeg), 0.04f, 0.6f);
+        }
+        else
+        {
+            cy.SparkDeg = SparkAngle(rpm, load);
+            cy.Premix = 0f;
+        }
         cy.ChargeDecided = true;
     }
 
@@ -968,6 +1150,11 @@ public sealed class EngineSynth
 
     /// <summary>Diagnostic: treat every valve as shut for the pipes, so the network can be tested
     /// on its own. Never set in a game.</summary>
+    /// <summary>Diagnostic: put the diesel combustion model back to what it was before the ignition
+    /// delay and the chamber modes, so a listener can A/B the change against what it replaced.
+    /// Set by the `legacydiesel` knob on any of the vehicle render commands.</summary>
+    public static bool DebugLegacyDiesel;
+
     public static bool DebugRigidValves;
 
     /// <summary>Diagnostic: one line per cylinder.</summary>

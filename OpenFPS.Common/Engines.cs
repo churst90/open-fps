@@ -285,9 +285,15 @@ public sealed record IntakeSpec
     /// going through it, and the broadband it makes is the one source in the tract with energy
     /// everywhere, including down where the box lives.
     ///
-    /// It is also why a throttle HISSES when it is nearly shut and ROARS when it is open, without
-    /// anybody writing that down: the peak frequency follows the velocity over the gap divided by
-    /// the size of the gap, and a shut plate is a fast jet through a slot.
+    /// It is also why a throttle HISSES when it is nearly shut, without anybody writing that down:
+    /// the peak frequency follows the velocity over the gap divided by the size of the gap, and a
+    /// shut plate is a fast jet through a slot.
+    ///
+    /// It is a PART-THROTTLE sound and only that. The term is a separated jet beating on an edge, so
+    /// it is scaled by the pressure drop across the plate — large at idle, a few per cent at wide
+    /// open, and zero on a diesel, which has no plate at all and whose intake is open for ever.
+    /// Without that scaling the diesels were given the turbulence of a throttle they do not have,
+    /// and an intake tract with modes at 300-460 Hz turned it into an audible note.
     /// </summary>
     public float FlowNoiseLevel { get; init; } = 1f;
 }
@@ -1461,6 +1467,113 @@ public sealed record EngineProfile
         Mechanical = new MechanicalSpec { ValvetrainLevel = 0.9f, CombustionKnock = 0.02f, AccessoryWhineOrder = 22f, AccessoryWhineLevel = 0.18f },
     };
 
+    /// <summary>
+    /// The 5.9 Cummins 6BT out of a Dodge Ram, straight-piped.
+    ///
+    /// Real numbers: 102 x 120 mm on six cylinders for 5.88 litres, 17.0:1, TWO valves a cylinder —
+    /// it is the twelve-valve — firing 1-5-3-6-2-4, and 460 lb-ft (624 Nm) at 1,600 rpm. It is
+    /// governed just under three thousand and everything about it is slow and enormous.
+    ///
+    /// What makes it that engine rather than any other diesel is the exhaust, or the lack of one.
+    /// A log manifold into the turbo and then five inches of straight pipe the length of the truck:
+    /// no chambers, no packing, nothing between the turbine and the air but a tube whose
+    /// half-wavelength is 27 Hz. And the knock that goes with a 102 mm bore lands near 5.2 kHz,
+    /// where a school bus's 116 mm bore puts it at 4.5 — the same mechanism, two different engines,
+    /// nothing in either preset saying so.
+    ///
+    /// KNOWN GAP, recorded rather than hidden: there is no TURBINE in the exhaust model. On a real
+    /// turbo diesel the turbo sits between the ports and the pipe and eats most of the pulse energy,
+    /// which is why one sounds more like rush than like beats. Here the pulses go straight out, so
+    /// this will be more pulsed than the real thing until the exhaust network grows a turbine stage.
+    /// </summary>
+    public static EngineProfile DieselCumminsI6 => new()
+    {
+        Name = "5.9 Cummins 12v, straight pipe",
+        Layout = EngineLayout.Inline,
+        Fuel = FuelType.Diesel, Induction = Induction.Turbocharged, BoostBar = 1.5f,
+        FiringAngles = EvenFire(new[] { 1, 5, 3, 6, 2, 4 }),
+        Bank = OneBank(6),
+        BoreMm = 102f, StrokeMm = 120f, RodRatio = 1.7f, CompressionRatio = 17f,
+        // Two valves a cylinder, and big slow ones: this head has no room for four and never did.
+        ExhaustCam = new CamLobe { DurationDegrees = 236f, MaxLiftMm = 11f, RampFraction = 0.26f, CentrelineDegrees = 256f },
+        IntakeCam = new CamLobe { DurationDegrees = 232f, MaxLiftMm = 11f, RampFraction = 0.26f, CentrelineDegrees = 478f },
+        ExhaustValve = new ValveSpec { Count = 1, DiameterMm = 40f, DischargeCoefficient = 0.6f },
+        IntakeValve = new ValveSpec { Count = 1, DiameterMm = 44f, DischargeCoefficient = 0.6f },
+        EvoTemperatureK = 1020f, IdleMapBar = 1.0f,
+        CombustionVariation = 0.025f, IdleRoughness = 0.2f, IdleGovernorGain = 5f,
+        IdleRpm = 750f, RedlineRpm = 2900f,
+        InertiaKgM2 = 0.9f, FrictionNm = 70f, FrictionNmPerKrpm = 26f,
+        PeakTorqueNm = 624f, PeakTorqueRpm = 1600f,
+        Exhaust = new ExhaustSpec
+        {
+            // A cast log, not a header: short, fat, and all six into one.
+            PrimaryLengthMetres = 0.18f, PrimarySpread = 0.55f, PrimaryDiameterMm = 48f,
+            CollectorGroups = new[] { new[] { 0, 1, 2, 3, 4, 5 } },
+            CollectorDiameterMm = 90f, CollectorPipeMetres = 0.35f,
+            Crossover = CrossoverKind.Merged,
+            MidPipeMetres = 2.4f,
+            Muffler = MufflerSpec.StraightPipe,
+            TailpipeMetres = new[] { 1.1f },
+            TailpipeDiameterMm = 127f,
+            GasCelsiusIdle = 150f, GasCelsiusFull = 620f,
+            WallLossMultiplier = 1.2f,
+            OverrunPopRate = 0f,
+        },
+        Intake = new IntakeSpec { RunnerLengthMetres = 0.2f, RunnerDiameterMm = 45f, PlenumLitres = 6f, ThrottleDiameterMm = 76f, AirboxLitres = 18f, SnorkelLengthMetres = 0.9f, SnorkelDiameterMm = 90f, Level = 0.45f, Absorption = 0.4f },
+        // The HX35's whistle is half of why people know this engine by ear.
+        Mechanical = new MechanicalSpec { ValvetrainLevel = 0.75f, CombustionKnock = 1.5f, AccessoryWhineLevel = 0.15f, TurboWhistleLevel = 1.0f, TurboLagSeconds = 1.0f },
+    };
+
+    /// <summary>
+    /// The International DT466 out of a school bus.
+    ///
+    /// Real numbers: 116.5 x 118.9 mm on six for 7.63 litres, 16.5:1, 800 lb-ft (1,085 Nm), governed
+    /// around 2,500. Almost square, where the Cummins is long-stroke, and half a litre a cylinder
+    /// bigger.
+    ///
+    /// It is the same kind of engine as the Cummins and sounds nothing like it, and the reasons are
+    /// all geometry. The bore is 14 mm wider, so the gas rings lower — 4.5 kHz of knock against
+    /// 5.2. And it has a SILENCER and a long one: a bus runs four metres of pipe under the floor into
+    /// a full chambered can, where the pickup runs five inches of tube straight out. That is the
+    /// difference between a clatter you hear across a car park and the soft chuffing idle of a bus
+    /// at a stop.
+    /// </summary>
+    public static EngineProfile DieselBusI6 => new()
+    {
+        Name = "7.6 DT466 bus diesel",
+        Layout = EngineLayout.Inline,
+        Fuel = FuelType.Diesel, Induction = Induction.Turbocharged, BoostBar = 1.5f,
+        FiringAngles = EvenFire(new[] { 1, 5, 3, 6, 2, 4 }),
+        Bank = OneBank(6),
+        BoreMm = 116.5f, StrokeMm = 118.9f, RodRatio = 1.75f, CompressionRatio = 16.5f,
+        ExhaustCam = new CamLobe { DurationDegrees = 238f, MaxLiftMm = 11.5f, RampFraction = 0.26f, CentrelineDegrees = 256f },
+        IntakeCam = new CamLobe { DurationDegrees = 234f, MaxLiftMm = 11.5f, RampFraction = 0.26f, CentrelineDegrees = 478f },
+        ExhaustValve = new ValveSpec { Count = 1, DiameterMm = 46f, DischargeCoefficient = 0.6f },
+        IntakeValve = new ValveSpec { Count = 1, DiameterMm = 50f, DischargeCoefficient = 0.6f },
+        EvoTemperatureK = 990f, IdleMapBar = 1.0f,
+        CombustionVariation = 0.02f, IdleRoughness = 0.16f, IdleGovernorGain = 5.5f,
+        IdleRpm = 700f, RedlineRpm = 2500f,
+        InertiaKgM2 = 1.4f, FrictionNm = 95f, FrictionNmPerKrpm = 32f,
+        PeakTorqueNm = 1085f, PeakTorqueRpm = 1400f,
+        Exhaust = new ExhaustSpec
+        {
+            PrimaryLengthMetres = 0.2f, PrimarySpread = 0.55f, PrimaryDiameterMm = 50f,
+            CollectorGroups = new[] { new[] { 0, 1, 2, 3, 4, 5 } },
+            CollectorDiameterMm = 102f, CollectorPipeMetres = 0.5f,
+            Crossover = CrossoverKind.Merged,
+            // The whole length of a bus, under the floor, into a big can and out at the back.
+            MidPipeMetres = 4.0f,
+            Muffler = MufflerSpec.Stock with { ChamberLengthsMetres = new[] { 0.35f, 0.45f }, ExpansionRatio = 8f, Absorption = 0.55f, ResonatorHz = 45f },
+            TailpipeMetres = new[] { 0.7f },
+            TailpipeDiameterMm = 102f,
+            GasCelsiusIdle = 150f, GasCelsiusFull = 580f,
+            WallLossMultiplier = 2f,
+            OverrunPopRate = 0f,
+        },
+        Intake = new IntakeSpec { RunnerLengthMetres = 0.22f, RunnerDiameterMm = 48f, PlenumLitres = 9f, ThrottleDiameterMm = 85f, AirboxLitres = 26f, SnorkelLengthMetres = 1.1f, SnorkelDiameterMm = 100f, Level = 0.3f, Absorption = 0.5f },
+        Mechanical = new MechanicalSpec { ValvetrainLevel = 0.8f, CombustionKnock = 1.4f, AccessoryWhineLevel = 0.2f, TurboWhistleLevel = 0.7f, TurboLagSeconds = 1.3f },
+    };
+
     /// <summary>Every preset, by a short key a map or a command line can name.</summary>
     public static IReadOnlyDictionary<string, Func<EngineProfile>> Presets { get; } =
         new Dictionary<string, Func<EngineProfile>>(StringComparer.OrdinalIgnoreCase)
@@ -1476,6 +1589,8 @@ public sealed record EngineProfile
             ["single"] = () => Single450,
             ["diesel_i4"] = () => DieselPickupI4,
             ["diesel_truck"] = () => DieselTruckI6,
+            ["diesel_cummins"] = () => DieselCumminsI6,
+            ["diesel_bus"] = () => DieselBusI6,
             ["boxer4"] = () => Boxer4,
             ["v10"] = () => V10,
             ["v12"] = () => V12,

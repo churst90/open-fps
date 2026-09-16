@@ -329,6 +329,30 @@ public sealed record VehicleBody
     /// one is a thickness, which is what is written here — and adding an "Aluminium" material would
     /// change nothing about the frequencies.
     /// </summary>
+    /// <summary>
+    /// A school bus: the biggest, thinnest, flattest steel box on the road.
+    ///
+    /// It differs from a van in the direction you would expect and by more than you would guess. The
+    /// side skin is the same gauge but the RIBS are further apart, and a panel's note goes as the
+    /// inverse SQUARE of its free span — so going from a van's 0.40 m bay to a bus's 0.62 m does not
+    /// drop the panel a little, it drops it to less than half the frequency. That is why a bus
+    /// booms where a van rattles.
+    ///
+    /// And the cabin behind it is enormous: eleven metres of hard flat surfaces with a few soft seats
+    /// in it, whose lowest axial mode is under sixteen hertz. Everything the engine does gets poured
+    /// into that and comes back slower.
+    /// </summary>
+    public static VehicleBody SchoolBus => new()
+    {
+        PanelThicknessM = 0.0011f,
+        // Ribs about two feet apart over a very long flat flank.
+        PanelSpansM = new[] { 0.62f, 0.52f, 0.44f, 0.34f, 0.24f },
+        PanelLoss = 0.035f,
+        Coupling = 0.40f,
+        CabinLengthM = 11.0f, CabinWidthM = 2.4f, CabinHeightM = 2.0f,
+        CabinAbsorption = 0.16f,
+    };
+
     public static VehicleBody Supercar => new()
     {
         PanelThicknessM = 0.0011f,

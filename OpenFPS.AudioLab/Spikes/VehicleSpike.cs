@@ -391,6 +391,7 @@ public static class VehicleSpike
         // The same key=value sweep every other engine tool takes. A layer that can only be judged by
         // rebuilding cannot be bracketed, and bracketing is how everything here gets settled.
         if (knobs != null) v = EngineOrderSpike.Override(v, knobs);
+        EngineSynth.DebugLegacyDiesel = knobs != null && Array.IndexOf(knobs, "legacydiesel") >= 0;
         // body=off renders the same car with its shell taken away, so the two files can be played
         // against each other. A demo of a new layer that cannot be turned off is not a demo of it.
         if (!withBody) v = v with { Body = VehicleBody.None };
