@@ -1900,3 +1900,10 @@ makes it read as a turbocharger rather than as a noise.
 - [ ] Ear-check the new field on the real speedway rather than the rev bench.
 - [ ] `ShellLevel` is still one measured ratio standing in for transmission, radiating area and
       spreading. It is set where it sounds right, which is honest but is not the same as measured.
+
+- [ ] **Restart the server from inside the game, as an admin.** Every map change currently means
+      finding the process, stopping it and running `run-server.sh` from a shell — and a map is loaded
+      once at startup, so every edit costs a manual restart. An elevated `/restart` (and probably
+      `/reloadmap <id>`, which is the cheaper half and does not drop anybody) would take that out of
+      the loop. The pieces exist: the server already shuts down gracefully on SIGTERM, finishing the
+      tick and notifying players first, so this is mostly announcing it and re-execing.
