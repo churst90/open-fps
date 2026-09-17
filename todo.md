@@ -2553,10 +2553,45 @@ any decision about the mix's anchor, because it would move the anchor.
       of magnitude past the 23 ms the engine voices manage, so something is submitting a reflection
       and then not updating it while it keeps playing.
 
-- [ ] **Footstep synthesis: the render, not the model.** See the band analysis in `changes.md` —
-      every render peaks at 8-16 kHz where a footstep peaks at 100-600 Hz. One-pole filters (6 dB/oct)
-      were used to define bands, and `Crunch` injects unfiltered white noise per stone plus a sine
-      resonance, which is a heap of little bells. Needs a real filter bank (biquads), a click rather
-      than a ring per stone, and the tilt measured against the target spectrum before anyone listens
-      again. `--footsteps` renders them; `--footsteps table` prints the numbers. Not in the game path.
+- [ ] **Footstep synthesis, calibrated against a recording.** Worst band is now **9.9 dB** (125-250 Hz,
+      the band a footstep keeps its body in) against a measured reference, down from 32 dB. Six of
+      nine bands are within 3 dB. `FootstepTests.TheModelMatchesTheShapeOfARealFootstep` ratchets it
+      at 11 dB so it cannot get worse; tighten as it closes. NOT played to Cody as finished — the
+      agreement is that he listens once it passes, and a 10 dB hole in the body band is not passing.
+
+      What went in, all found by measuring rather than by listening:
+      - **Radiation efficiency.** The model computed the force correctly and then radiated it as
+        though a shoe sole were a perfect loudspeaker. It is not: (ka)², the same term
+        `VehicleBody.RadiationFactor` uses. The radiator is the SOLE (9 cm), not the Hertzian contact
+        patch (7 mm) — getting those confused was worth fifty decibels on the first try.
+      - **Two paths out.** The sole pays (ka)²; the GROUND does not, because a point load on a stiff
+        plate spreads over a bending wavelength — metres of concrete at 100 Hz — so its ka is of
+        order one where the sole's is a hundredth. That is why you hear someone walking upstairs and
+        not the grit under their shoes.
+      - **A third contact scale.** Whole heel (35 mm, 43 Hz) and surface grit (0.45 mm, 3.4 kHz) had
+        nothing between them; the sole's own lumps — a tread block, 8 mm — land at ~200 Hz, which is
+        exactly where the hole was.
+      - **The bulk contact is the ENVELOPE of the tread contacts, not a source beside them.** Treating
+        it as both double-counted the force and put it at the wrong frequency.
+      - Stones click rather than ring (sine resonances per stone were the "broken glass"); the
+        contact band is half a decade wide, not a full one; the scuff conserves energy so a longer
+        contact is quieter; loose pieces scale with mass so grass blades are not pebbles.
+
+      Fitted rather than derived, and named so they stay visible: `GroundCoupling` (0.16),
+      `ThumpShare` (0.12), `TreadShare` (3.0), `ShoeRingShare` (6.0). Same status as
+      `VehicleBody.Coupling`. Re-fit, do not nudge.
+
+      **Open, and the next thing to do:**
+      - `SoftGroundIsQuieterThanHardGround` is SKIPPED and failing: concrete 76 dB, grass 79, carpet
+        80 — soft ground comes out louder, which is the opposite of true. It passed before this
+        rebuild. Needs a per-mechanism level breakdown for two surfaces side by side; that diagnostic
+        does not exist yet and guessing at it burned an hour.
+      - The shoe's own panel note is computed (trainer 137 Hz, dress shoe 245) but contributes
+        nothing audible even at 7x weight, because both radiating paths attenuate ~137 Hz by 25 dB.
+      - Only concrete has a reference. Wood, grass and gravel are unmeasured and their numbers are
+        the model's opinion.
+      - Still not in the game path: the client plays sampled footsteps.
+
+      Tools: `--footsteps table` (the numbers), `--footsteps compare=<dir>` (against real steps),
+      `tools/split_footsteps.py` (makes the reference out of a recording).
 

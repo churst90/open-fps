@@ -43,32 +43,75 @@ public sealed record Shoe
     /// <summary>Mass of the shoe itself, kg. It is part of what arrives.</summary>
     public float MassKg { get; init; } = 0.4f;
 
+    /// <summary>
+    /// The radius of a disc with the same area as the sole, metres — what actually pushes air.
+    ///
+    /// NOT the Hertzian contact patch, and getting those two confused cost fifty decibels. The patch
+    /// is where the FORCE is applied and it is the size of a coin; the RADIATOR is the whole
+    /// underside of the shoe moving against the floor, which for an adult's shoe is about 280 by 90
+    /// millimetres and so an equivalent radius of nine centimetres. Radiating efficiency goes as the
+    /// square of size times frequency, so a factor of twelve in radius is more than twenty decibels
+    /// at every frequency below where it stops mattering.
+    /// </summary>
+    public float SoleRadiusM { get; init; } = 0.09f;
+
+    /// <summary>
+    /// How thick the sole is, metres — and therefore what note the shoe itself makes.
+    ///
+    /// A shoe is not only a hammer, it is a small stiff panel that gets struck, and the panel law
+    /// says its note goes as thickness times the square root of stiffness over density. A trainer's
+    /// thick soft midsole lands near ninety hertz and is damped almost out of existence by the foam;
+    /// a leather board sole a quarter the thickness and twenty times the stiffness lands near two
+    /// hundred and fifty and rings for long enough to be the "clop".
+    ///
+    /// That is the whole of the mid-band difference between a trainer and a dress shoe, and it is
+    /// where a real footstep keeps most of its body — the measurement against a recording showed a
+    /// twenty-eight decibel hole at 125-250 Hz before this existed.
+    /// </summary>
+    public float SoleThicknessM { get; init; } = 0.012f;
+
+    /// <summary>
+    /// How big the individual lumps of the sole are, metres — a tread block, or the edge of a heel.
+    ///
+    /// The scale that was missing, and the measurement found it as a thirty-decibel hole. A footstep
+    /// has THREE contact sizes, not two: the whole heel (three centimetres, and so a thump down at
+    /// forty hertz), the grit on the ground (half a millimetre, and so a hiss at three kilohertz),
+    /// and BETWEEN them the lumps the sole is actually made of — a tread block or the rounded edge
+    /// the heel lands on, about a centimetre, which by the same size-scaling lands at a couple of
+    /// hundred hertz. That middle band is where a real footstep keeps most of its body, and a model
+    /// with only the outer two has a hole exactly there.
+    ///
+    /// It is also the honest place for the difference between a lugged boot and a smooth leather
+    /// sole, which is a real audible difference and had nowhere to live before.
+    /// </summary>
+    public float TreadBlockM { get; init; } = 0.010f;
+
     /// <summary>A trainer: thick soft rubber, a big rounded heel, and it conforms to everything.</summary>
     public static Shoe Sneaker => new()
     {
         Name = "sneaker", SoleMaterial = "Rubber",
-        HeelRadiusM = 0.035f, TreadGrip = 0.35f, MassKg = 0.35f,
+        HeelRadiusM = 0.035f, TreadGrip = 0.35f, MassKg = 0.35f, SoleRadiusM = 0.095f, SoleThicknessM = 0.022f, TreadBlockM = 0.008f,
     };
 
     /// <summary>A leather-soled dress shoe. Thin, hard, and a squared-off heel that lands on an edge.</summary>
     public static Shoe DressShoe => new()
     {
         Name = "dress shoe", SoleMaterial = "Leather",
-        HeelRadiusM = 0.008f, TreadGrip = 0.02f, MassKg = 0.45f,
+        HeelRadiusM = 0.008f, TreadGrip = 0.02f, MassKg = 0.45f, SoleRadiusM = 0.085f, SoleThicknessM = 0.006f, TreadBlockM = 0.006f,
     };
 
     /// <summary>A work boot: hard rubber, heavy, and a wide heel that lands flat and hard.</summary>
     public static Shoe Boot => new()
     {
         Name = "boot", SoleMaterial = "BootRubber",
-        HeelRadiusM = 0.022f, TreadGrip = 0.30f, MassKg = 0.9f,
+        HeelRadiusM = 0.022f, TreadGrip = 0.30f, MassKg = 0.9f, SoleRadiusM = 0.105f, SoleThicknessM = 0.016f, TreadBlockM = 0.020f,
     };
 
     /// <summary>A bare foot. Soft, wide, quiet, and it slaps rather than clicks.</summary>
     public static Shoe Bare => new()
     {
         Name = "bare foot", SoleMaterial = "Skin",
-        HeelRadiusM = 0.045f, TreadGrip = 0.45f, MassKg = 0f,
+        HeelRadiusM = 0.045f, TreadGrip = 0.45f, MassKg = 0f, SoleRadiusM = 0.080f, SoleThicknessM = 0.020f, TreadBlockM = 0.025f,
     };
 
     public static IReadOnlyDictionary<string, Func<Shoe>> Presets { get; } =
@@ -200,6 +243,44 @@ public static class Footsteps
     public const float HeelVelocityRatio = 0.28f;
 
     /// <summary>
+    /// How much of the impact reaches the air through the GROUND rather than through the sole.
+    ///
+    /// The one number here that is fitted rather than derived, and it is named so that it stays
+    /// visible. Everything else — contact time, the grain's scale, the panel's modes, the (ka)²
+    /// penalty — falls out of the materials; this is the ratio between two radiating paths whose
+    /// absolute efficiencies would need a plate-vibration model to compute honestly, so it was set
+    /// by measuring a real recording of somebody walking on concrete
+    /// (`--footsteps compare=`, and `tools/split_footsteps.py` to make the reference).
+    ///
+    /// It is the same kind of number, for the same kind of reason, as
+    /// <see cref="VehicleBody.Coupling"/> — "the one number most worth fitting against a real
+    /// recording" — and like that one it should be re-fitted, not nudged, if the model around it
+    /// changes.
+    /// </summary>
+    public const float GroundCoupling = 0.16f;
+
+    /// <summary>
+    /// How the impact's energy divides between the two contact scales that carry it.
+    ///
+    /// Not a mix control. The first version treated the whole-heel contact and the tread-block
+    /// contacts as two sources standing side by side, and they are not: THE TREAD BLOCKS ARE THE
+    /// CONTACT. What touches the ground is a few lumps of rubber a centimetre across, and the
+    /// twenty-millisecond "bulk contact" is simply the envelope over which they take up and release
+    /// the load. Adding a full-strength bulk thump on top of them counts the same force twice, and
+    /// counts it at the wrong frequency — which measured as eighteen decibels of rubble at thirty
+    /// hertz against a recording, in a band where a real footstep is at its quietest.
+    ///
+    /// So the blocks carry the force and the bulk term is only the skirt underneath them. The two
+    /// numbers were settled against a real recording (`--footsteps compare=`) and are the second and
+    /// last fitted pair in this model; everything else comes from the materials.
+    /// </summary>
+    public const float ThumpShare = 0.12f;
+    public const float TreadShare = 3.0f;
+
+    /// <summary>How hard the impact drives the sole's own panel modes. See Shoe.SoleThicknessM.</summary>
+    public const float ShoeRingShare = 6.0f;
+
+    /// <summary>
     /// How much of the ground's roughness a sole flows into rather than rattling over.
     ///
     /// Soft conforms, hard bridges. A decade of modulus is worth a long way here, which is why the
@@ -256,6 +337,51 @@ public static class Footsteps
     /// <summary>The corner above which an impact of this length has nothing left to say, Hz.</summary>
     public static float ImpactCornerHz(float contactSeconds)
         => Math.Clamp(1f / MathF.Max(1e-4f, contactSeconds), 12f, 16000f);
+
+    /// <summary>
+    /// How big the patch of sole actually touching the ground is, metres — the thing that radiates.
+    ///
+    /// A heel under load flattens against the floor, and how much depends on how soft it is: a
+    /// trainer spreads into a patch the size of a coin's diameter and more, a leather heel barely
+    /// spreads at all. Hertz gives the contact radius as (3FR/4E*)^(1/3), and taking F as the peak of
+    /// the impulse — momentum over contact time — makes it fall out of numbers already computed.
+    /// </summary>
+    public static float ContactPatchRadius(float effectiveMassKg, float velocityMps, float radiusM,
+                                           float modulusPa, float contactSeconds)
+    {
+        // Peak force of a half-sine impulse carrying this momentum.
+        float force = MathF.PI * 0.5f * effectiveMassKg * MathF.Max(0.05f, velocityMps)
+                    / MathF.Max(1e-4f, contactSeconds);
+        float a = MathF.Pow(3f * force * MathF.Max(0.002f, radiusM) / (4f * MathF.Max(1e5f, modulusPa)), 1f / 3f);
+        return Math.Clamp(a, 0.002f, 0.12f);
+    }
+
+    /// <summary>
+    /// How well a source this small radiates at this frequency, 0 to 1.
+    ///
+    /// THE PIECE THAT WAS MISSING, and the one that made the first renders unlistenable. The model
+    /// computed the FORCE at the contact correctly — a soft sole really is in contact for twenty
+    /// milliseconds and really does put its energy below a hundred hertz — and then radiated that
+    /// force as though the patch of rubber under a heel were a perfect loudspeaker at every
+    /// frequency. It is not. A source much smaller than a wavelength barely couples to the air at
+    /// all: the pressure it builds simply flows around it instead of propagating, and the efficiency
+    /// goes as (ka)² — the same term <see cref="VehicleBody"/> uses for exactly this reason, and for
+    /// exactly the same physics, on a car's panels.
+    ///
+    /// The arithmetic is brutal and is why it mattered so much. A contact patch two centimetres
+    /// across at forty hertz has ka = 0.015, so it radiates about thirty-six decibels down; at a
+    /// kilohertz ka = 0.37 and it is only eight down. That is a twenty-eight decibel tilt AWAY from
+    /// the bass, applied to a model that measured eighteen decibels too bass-heavy against a real
+    /// recording. The thump is genuinely there in the force and mostly does not get out.
+    ///
+    /// It is also why you FEEL a heavy footstep through a floor and do not especially hear it: the
+    /// structure-borne path has no such penalty, and the airborne one does.
+    /// </summary>
+    public static float RadiationEfficiency(float hz, float patchRadiusM)
+    {
+        float ka = 2f * MathF.PI * MathF.Max(1f, hz) * MathF.Max(0.002f, patchRadiusM) / 343f;
+        return MathF.Min(1f, ka * ka);
+    }
 
     // ── The floor as a panel ────────────────────────────────────────────────────────────────────
 
@@ -434,30 +560,118 @@ public static class Footsteps
         float levelDb = PanelAcoustics.ImpactDb(joules) + 10f * MathF.Log10(MathF.Max(0.02f, returned));
         float amp = weight * MathF.Pow(10f, (levelDb - 94f) / 20f);
 
-        // ── 1. The bulk contact: a half-sine of force, which is a thump with nothing above 1/tau.
-        Thump(buf, at, amp, corner, tau, ground, rng, sampleRate);
+        // Everything that happens AT THE CONTACT goes into its own buffer first, because all of it
+        // radiates from the same small patch of sole and has to pay the same penalty for being small
+        // (see RadiationEfficiency). The floor's own ring does not — a panel is a large radiator and
+        // gets out far more easily — so it is added afterwards, outside this.
+        int span = Math.Min(buf.Length - at, (int)(sampleRate * 0.6f));
+        if (span <= 0) return;
+        var near = new float[span];
+
+        // ── 1. The bulk contact: a force that takes tau to happen, so nothing above 1/tau.
+        // Weak, deliberately. See the note on ThumpShare: the bulk contact is the ENVELOPE of the
+        // tread contacts below, not a source standing alongside them, and treating it as both is
+        // what put eighteen decibels of rubble at thirty hertz in the first version.
+        Thump(near, 0, amp * ThumpShare, corner, tau, ground, rng, sampleRate);
 
         // ── 2. The asperities: whatever the sole does not flow into, it rattles over.
         //
-        // This is the part of a footstep you can actually HEAR on a hard floor, because the bulk
-        // impact above is at forty hertz for a soft shoe and nobody hears forty hertz from a foot.
-        // It lives two decades higher because a grain of grit is two decades smaller than a heel.
+        // The grain sets the FORCE's spectrum — a grain is two decades smaller than a heel and so is
+        // in contact two decades more briefly — while the patch below decides how much of it gets
+        // out. Two different sizes doing two different jobs.
         float conform = MathF.Max(Conformity(sole), step.Shoe.TreadGrip);
         var (grainMm, coverage) = ContactTexture(step.Surface);
         float grainTau = GrainContactSeconds(tau, step.Shoe.HeelRadiusM, grainMm);
         float scuffLevel = amp * coverage * (1f - conform) * 1.9f * scuffBias;
         if (scuffLevel > 1e-5f)
-            Scuff(buf, at, scuffLevel, ImpactCornerHz(grainTau), tau, rng, sampleRate);
+            Scuff(near, 0, scuffLevel, ImpactCornerHz(grainTau), tau, rng, sampleRate);
 
-        // ── 3. The floor, if it is a panel rather than the ground.
-        float span = FreeSpanM(step.Surface), thick = DeckThicknessM(step.Surface);
-        if (span > 0f && thick > 0f)
-            Ring(buf, at, amp, ground, span, thick, rng, sampleRate);
+        // ── 3. THE LUMPS OF THE SOLE meeting the ground: the middle of the three scales.
+        //
+        // Same equation as the grit, a different size. A tread block a centimetre across is in
+        // contact about a third as long as the whole heel, so it lands two or three times higher —
+        // a couple of hundred hertz, which is the body of the sound. Unlike the grit, this happens
+        // whether or not the ground is rough, because it is the SOLE that is lumpy.
+        float treadTau = GrainContactSeconds(tau, step.Shoe.HeelRadiusM, step.Shoe.TreadBlockM * 1000f);
+        Scuff(near, 0, amp * TreadShare * scuffBias, ImpactCornerHz(treadTau), tau * 1.6f, rng, sampleRate);
 
-        // ── 4. Loose pieces, if the ground is a heap of them.
+        // ── 4. THE SHOE ITSELF, which is a small panel that has just been hit.
+        //
+        // Struck, a sole rings at the plate law's note the same way a door leaf and a car's wing do,
+        // through the same PanelAcoustics. It is heavily damped — rubber's loss factor is two orders
+        // above steel's — so it is a short "clop" rather than a ring, and that is exactly right: it
+        // is the body of a footstep, not a tone you could name.
+        //
+        // Its width is the sole's, its length two and a half times that, and it is mounted on a foot,
+        // which damps it further.
+        float soleWidth = step.Shoe.SoleRadiusM * 1.15f;
+        Ring(near, 0, amp * ShoeRingShare, sole, soleWidth, soleWidth * 2.5f, step.Shoe.SoleThicknessM,
+             rng, sampleRate, mounting: 0.25f);
+
+        // ── 5. Loose pieces, if the ground is a heap of them.
         var (count, stoneMm) = LooseMaterial(step.Surface);
         if (count > 0)
-            Crunch(buf, at, amp, count, stoneMm, weight, ground, rng, sampleRate);
+            Crunch(near, 0, amp, count, stoneMm, weight, ground, rng, sampleRate);
+
+        // ── TWO PATHS OUT, and they are not alike.
+        //
+        // Everything above is a FORCE at the contact. It reaches the air two ways, and the first
+        // attempt modelled only one of them, which is why it came back thirty decibels short below
+        // five hundred hertz.
+        //
+        // Through the SOLE: a disc about nine centimetres across pushing on the air, which is much
+        // smaller than a wavelength at any frequency that matters and therefore radiates them badly —
+        // the (ka)² penalty, twelve decibels per octave below about six hundred hertz. This is the
+        // path that carries the grit and the click.
+        //
+        // Through the GROUND: the same force spreading into the floor. A point load on a stiff plate
+        // is not carried by the point — it spreads over a region about a bending wavelength across,
+        // which at a hundred hertz is METRES of concrete. So its ka is of order one exactly where the
+        // sole's is a hundredth, and it radiates broadband where the sole radiates only treble. That
+        // is not special pleading for the low end; it is why you can hear somebody walking upstairs
+        // through a ceiling and cannot hear the grit under their shoes.
+        //
+        // It is also why this path is loud on a slab and nearly absent on turf: a surface that
+        // absorbs does not move, and one that does not move does not radiate.
+        float groundShare = GroundCoupling * (1f - Math.Clamp(ground.Absorption, 0f, 0.95f));
+        for (int i = 0; i < span; i++) buf[at + i] += near[i] * groundShare;
+
+        Radiate(near, step.Shoe.SoleRadiusM, sampleRate);
+        for (int i = 0; i < span; i++) buf[at + i] += near[i];
+
+        // ── 6. The floor, if it is a panel rather than the ground. Added AFTER the radiation filter:
+        // a floorboard deck is a square metre of moving surface and radiates perfectly well at the
+        // frequencies it rings at, which is why a wooden floor carries through a building and a
+        // footstep on a slab does not.
+        float freeSpan = FreeSpanM(step.Surface), thick = DeckThicknessM(step.Surface);
+        if (freeSpan > 0f && thick > 0f)
+            Ring(buf, at, amp, ground, freeSpan, freeSpan * 2.4f, thick, rng, sampleRate, mounting: 0.09f);
+    }
+
+    /// <summary>
+    /// Applies (ka)² — what a source this small can actually get into the air.
+    ///
+    /// Two cascaded one-pole high-passes at the frequency where ka reaches one. Below that each
+    /// contributes six decibels per octave, so together they are the twelve per octave that (ka)²
+    /// means; above it they are flat, which is the point where the patch is a wavelength across and
+    /// stops being a poor radiator. Cheap, and it is the actual shape rather than an approximation
+    /// of it.
+    /// </summary>
+    private static void Radiate(float[] x, float patchRadiusM, int sampleRate)
+    {
+        float kaOne = Math.Clamp(343f / (2f * MathF.PI * MathF.Max(0.002f, patchRadiusM)), 200f, 12000f);
+        float k = MathF.Exp(-2f * MathF.PI * kaOne / sampleRate);
+        float lp1 = 0f, lp2 = 0f;
+        // The gain the pair takes out at the top of the band is put back, so this changes the SHAPE
+        // and leaves the overall level to PanelAcoustics.ImpactDb, which is where level belongs.
+        for (int i = 0; i < x.Length; i++)
+        {
+            float v = x[i];
+            lp1 += (v - lp1) * (1f - k);
+            float hp1 = v - lp1;
+            lp2 += (hp1 - lp2) * (1f - k);
+            x[i] = hp1 - lp2;
+        }
     }
 
     /// <summary>
@@ -507,13 +721,25 @@ public static class Footsteps
         // It lasts as long as the sole is moving across the ground, which is longer than the bulk
         // impact: the foot is still travelling forward a few millimetres as it settles.
         float dur = tau * 2.2f;
+
+        // ENERGY, not amplitude, is what the impact delivers. A soft surface stretches the contact
+        // out, and spreading a fixed amount of energy over a longer time makes it QUIETER, not the
+        // same loudness for longer. Without this a footstep on grass came out louder than one on
+        // concrete — which the tests caught, and which is the opposite of true.
+        amp *= MathF.Sqrt(0.012f / MathF.Max(1e-4f, dur));
         int len = Math.Min(buf.Length - at, (int)(sampleRate * dur * 3.5f) + 8);
         if (len <= 0) return;
 
         // Noise rolled off above the grain's own corner and below a decade under it. The band is
         // wide on purpose — grains are not all one size, and a single resonance would be a whistle.
-        float hi = Math.Clamp(grainCornerHz, 200f, sampleRate * 0.45f);
-        float lo = hi * 0.12f;
+        float hi = Math.Clamp(grainCornerHz, 60f, sampleRate * 0.45f);
+        // Half a decade, not a full one. The pieces doing the contacting are a POPULATION OF ONE
+        // SIZE — grains of grit, or the lugs of a tread — so their contacts are all about the same
+        // length and the energy belongs around that corner rather than smeared an order of magnitude
+        // below it. At a decade wide, a tread lug whose contact says two hundred hertz was putting
+        // energy at twenty, which measured as a great mound of rubble in the band where a real
+        // footstep is quietest.
+        float lo = hi * 0.45f;
         float kHi = MathF.Exp(-2f * MathF.PI * hi / sampleRate);
         float kLo = MathF.Exp(-2f * MathF.PI * lo / sampleRate);
         float lpHi = 0f, lpLo = 0f;
@@ -541,14 +767,15 @@ public static class Footsteps
     /// why a wooden floor is recognisable through a wall.
     /// </summary>
     private static void Ring(float[] buf, int at, float amp, MaterialProperties material,
-                             float span, float thickness, Random rng, int sampleRate)
+                             float width, float height, float thickness, Random rng, int sampleRate,
+                             float mounting = 0.09f)
     {
-        var modes = PanelAcoustics.Modes(material, span, span * 2.4f, thickness, maxHz: 3000f, order: 5);
+        var modes = PanelAcoustics.Modes(material, width, height, thickness, maxHz: 3000f, order: 5);
         if (modes.Count == 0) return;
 
-        // A floor is walked on, screwed down and sitting on a joist: it is far more damped than a
-        // panel hanging in the air, and a floor that rang like a drum would be a fault in the floor.
-        const float mounting = 0.09f;
+        // Mounted, not free. A floor is screwed down and sitting on a joist and a sole is wrapped
+        // round a foot; both are far more damped than the same panel hanging in the air, and a floor
+        // that rang like a drum would be a fault in the floor.
         int taken = 0;
         foreach (var mode in modes)
         {
@@ -588,6 +815,13 @@ public static class Footsteps
                                MaterialProperties ground, Random rng, int sampleRate)
     {
         int pieces = Math.Max(1, (int)(count * Math.Clamp(weight, 0.05f, 1f)));
+
+        // How much one piece can carry, by its size. A stone's mass goes as the cube of how big it
+        // is, so the energy it can take away does too, and the amplitude as the square root of that:
+        // a blade of grass a millimetre and a half across carries a thousandth of what a
+        // twelve-millimetre stone does. Without it, a footstep on grass came out LOUDER than one on
+        // concrete, because thirty blades were being knocked about like thirty pebbles.
+        float piece = MathF.Pow(Math.Clamp(grainMm / 12f, 0.02f, 4f), 1.5f);
         // A stone's ring: a lump of rock a centimetre across is a few kilohertz, and it goes as
         // 1/size, which is why grit hisses and ballast rattles.
         float baseHz = Math.Clamp(38000f / MathF.Max(0.5f, grainMm), 200f, 12000f);
@@ -600,25 +834,33 @@ public static class Footsteps
             int start = at + (int)(when * sampleRate);
             if (start >= buf.Length - 4) continue;
 
-            // Most of the pieces that move barely move; a few take a real knock. A log-normal spread
-            // is what makes a crunch sound like stones and not like static.
+            // Most of the pieces that move barely move; a few take a real knock.
             float energy = MathF.Exp(-2.2f * (float)rng.NextDouble() * (float)rng.NextDouble() * 3f);
             float hz = baseHz * (0.45f + 1.6f * (float)rng.NextDouble());
-            float ring = 0.004f + 0.02f * (float)rng.NextDouble();
-            int len = Math.Min(buf.Length - start, (int)(sampleRate * ring * 3f) + 4);
 
-            float w = 2f * MathF.PI * hz / sampleRate;
+            // A STONE IS NOT A BELL. The first version gave each piece a sine at a few kilohertz and
+            // a twenty-millisecond decay, which is a small tuned resonator — and a heap of small
+            // tuned resonators is a tinkle. It was heard immediately and exactly: "gravel sounds like
+            // walking on broken glass", which is fair, because glass is the one material that really
+            // does ring up there.
+            //
+            // A stone is an irregular lump of rock wedged against its neighbours. Its modes are dense
+            // and mistuned and its damping is enormous, so what comes off it is a CLICK with a
+            // spectral centre, not a note: a couple of milliseconds of noise around the frequency its
+            // size implies. Same parameter, honest shape.
+            float ring = 0.0012f + 0.004f * (float)rng.NextDouble();
+            int len = Math.Min(buf.Length - start, (int)(sampleRate * ring * 4f) + 4);
+
+            float k = MathF.Exp(-2f * MathF.PI * MathF.Min(hz, sampleRate * 0.45f) / sampleRate);
             float decay = MathF.Exp(-1f / MathF.Max(1f, ring * sampleRate));
-            float phase = (float)(rng.NextDouble() * Math.PI * 2.0);
-            float g = amp * energy * 0.42f;
-            float env = 1f;
+            float g = amp * energy * piece * 0.5f;
+            float env = 1f, lp = 0f, band = 0f;
             for (int i = 0; i < len; i++)
             {
-                // Part tone, part noise: a stone is not a bell, and the noisier it is the smaller and
-                // more irregular it is.
-                float tone = MathF.Sin(w * i + phase);
-                float noise = (float)(rng.NextDouble() * 2.0 - 1.0);
-                buf[start + i] += (tone * 0.45f + noise * 0.55f) * env * g;
+                float noise = (float)(rng.NextDouble() * 2.0 - 1.0) * env;
+                lp += (noise - lp) * (1f - k);        // below the stone's own note
+                band += ((noise - lp) - band) * 0.5f; // ...and a little smoothing above it
+                buf[start + i] += band * g;
                 env *= decay;
             }
         }
