@@ -137,7 +137,7 @@ public class CompositeRepository
                 if (t.Parts.Exists(p => string.IsNullOrWhiteSpace(p.PrefabId)))
                 { _rejected[t.Id] = "a part names no prefab"; continue; }
                 if (!string.IsNullOrWhiteSpace(t.VehiclePreset)
-                    && !OpenFPS.Common.VehicleProfile.Presets.ContainsKey(t.VehiclePreset))
+                    && !OpenFPS.Common.MachineRegistry.Knows(t.VehiclePreset))
                 { _rejected[t.Id] = $"unknown vehicle preset '{t.VehiclePreset}'"; continue; }
                 // A vehicle nobody can drive is a shed with an engine in it. Caught here as well as
                 // at /drivable, because a file on disk can be edited by hand and this is the door.

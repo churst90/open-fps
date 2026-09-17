@@ -81,6 +81,15 @@ public struct SpatialEmitter
     public float EchoDelaySeconds;
     public float EchoGain;
     /// <summary>
+    /// When non-zero, this voice is the FRONT OUTLET of that entity's live engine — what the machine
+    /// breathes through, and the block behind it — placed at its own point on the machine.
+    ///
+    /// Not a second engine: the same integration writes both taps, so this costs a buffer read and a
+    /// voice. The two sum to exactly what the single voice was, so a machine does not change level
+    /// when it gains or loses its second outlet. See EngineTapState.
+    /// </summary>
+    public int IntakeOfEntity;
+    /// <summary>
     /// How hard the road is working this vehicle's tyres, as a fraction of the grip they have.
     ///
     /// Zero is rolling; one is the limit, where a tyre squeals; above that it is sliding. Computed

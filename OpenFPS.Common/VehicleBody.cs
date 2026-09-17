@@ -502,6 +502,23 @@ public sealed record VehicleBody
 
     /// <summary>No body at all — the model as it was before this existed. For A/B.</summary>
     public static VehicleBody None => new() { Coupling = 0f, MaxModes = 0, CabinLengthM = 0f };
+
+    /// <summary>Every shell by key, so a machine's parts list can name one (see MachinePart).</summary>
+    public static System.Collections.Generic.IReadOnlyDictionary<string, System.Func<VehicleBody>> Presets { get; } =
+        new System.Collections.Generic.Dictionary<string, System.Func<VehicleBody>>(System.StringComparer.OrdinalIgnoreCase)
+        {
+            ["saloon"] = () => Saloon,
+            ["van"] = () => Van,
+            ["school_bus"] = () => SchoolBus,
+            ["supercar"] = () => Supercar,
+            ["race_saloon"] = () => RaceSaloon,
+            ["open_wheeler"] = () => OpenWheeler,
+            ["none"] = () => None,
+        };
+
+    public static VehicleBody ByName(string key)
+        => Presets.TryGetValue(key, out var make) ? make()
+         : throw new System.ArgumentException($"No body preset '{key}'. Known: {string.Join(", ", Presets.Keys)}");
 }
 
 /// <summary>

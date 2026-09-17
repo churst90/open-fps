@@ -1626,6 +1626,10 @@ public sealed record EngineProfile
             ["v8_flatplane"] = () => V8FlatPlane,
             ["i4_economy"] = () => Inline4Economy,
             ["i4_sport"] = () => Inline4Sport,
+            // Missing until a machine's parts list had to NAME the engine it holds: the turbo four
+            // was reachable as a C# static and not as a key, so the one vehicle using it could not
+            // say what was in it.
+            ["i4_turbo"] = () => I4Turbo,
             ["i6"] = () => Inline6,
             ["v6"] = () => V6Sedan,
             ["vtwin"] = () => VTwin45,

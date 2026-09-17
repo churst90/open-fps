@@ -122,7 +122,7 @@ public static class DrivingSystem
     {
         ref var drive = ref world.Get<DriveComponent>(root);
         if (string.IsNullOrEmpty(drive.Preset)) return;
-        var profile = VehicleProfile.ByName(drive.Preset);
+        var profile = MachineRegistry.VehicleFor(drive.Preset);
 
         // A driver who has gone quiet. Not an instant cut — that would make ordinary packet loss
         // stutter the throttle — but a lift, then a coast.

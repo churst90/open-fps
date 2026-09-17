@@ -124,6 +124,9 @@ public sealed class ClientGameSession : IDisposable
         // thread (which reads the registry). Initialize() is thread-safe, but doing it up front keeps
         // ordering deterministic and avoids redundant concurrent rebuilds.
         AcousticRegistry.Initialize();
+        // ...and the machines, for the same reason: the client assembles a car's engine itself from
+        // the name the server sends, so it has to know the same names the server does.
+        MachineRegistry.EnsureLoaded();
 
         _world = new ClientWorldState();
         _state = new LocalPlayerState();

@@ -61,7 +61,7 @@ public static class AudioEmission
     private static Vector3 PresetOffset(string preset)
     {
         if (_presetOffsets.TryGetValue(preset, out var cached)) return cached;
-        var offset = VehicleProfile.Presets.ContainsKey(preset) ? VehicleProfile.ByName(preset).ExhaustOffset : Vector3.Zero;
+        var offset = MachineRegistry.Knows(preset) ? MachineRegistry.VehicleFor(preset).ExhaustOffset : Vector3.Zero;
         _presetOffsets[preset] = offset;
         return offset;
     }

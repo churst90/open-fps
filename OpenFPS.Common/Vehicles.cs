@@ -128,6 +128,19 @@ public sealed record TyreProfile
         TreadBlocks = 96, SurfaceRoughness = 0.72f, ReferenceDb = 82f,
         PeakGripG = 0.75f, SquealHz = 430f, SquealQ = 9f, SquealDb = 97f,
     };
+
+    /// <summary>Every tyre by key, so a machine's parts list can name one (see MachinePart).</summary>
+    public static IReadOnlyDictionary<string, Func<TyreProfile>> Presets { get; } =
+        new Dictionary<string, Func<TyreProfile>>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["sports_asphalt"] = () => SportsOnAsphalt,
+            ["race_slick"] = () => RaceSlick,
+            ["truck_asphalt"] = () => TruckOnAsphalt,
+        };
+
+    public static TyreProfile ByName(string key)
+        => Presets.TryGetValue(key, out var make) ? make()
+         : throw new ArgumentException($"No tyre preset '{key}'. Known: {string.Join(", ", Presets.Keys)}");
 }
 
 /// <summary>Everything about one vehicle.</summary>
@@ -151,6 +164,18 @@ public sealed record VehicleProfile
     /// a truck's stack and a saloon's tailpipe are not at the same height, and because it is the number
     /// that keeps the occlusion probe out of the road surface.</summary>
     public float ExhaustHeight { get; init; } = 0.3f;
+
+    /// <summary>
+    /// How high the intake mouth is above the contact patch, metres.
+    ///
+    /// The other end of the rig, and it had no number at all while the car was one voice, because a
+    /// single emitter between the two ends only ever needed the tailpipe's height. A car breathes at
+    /// about the top of the engine bay; a formula car's airbox is above the driver's head, and a
+    /// bike's is between your knees. It matters for the same reason the exhaust's does: it is where
+    /// the occlusion probe goes, and it is what a listener standing beside the car actually hears
+    /// from the front of it.
+    /// </summary>
+    public float IntakeHeight { get; init; } = 0.7f;
 
     /// <summary>
     /// How far back along <see cref="ExhaustOffsetZ"/> the single combined engine voice actually sits.

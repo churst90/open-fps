@@ -2437,13 +2437,29 @@ The specification, in Cody's words: *"this stuff needs to be done without the us
 I want to place a tree, or water fountain or a race track, and those features should have
 corresponding correct binaural audio effects, reflections — most things are diffused reflections."*
 
-- [ ] **1. Parts as data.** A machine prefab with a LIST of emitter slots, each part a physical model
-      plus an offset. `VehicleProfile` is already a rig (`ExhaustOffsetZ`, `IntakeOffsetZ`,
-      `ExhaustHeight`) — what is hardcoded is the COMPOSITION: `VehicleProfile.Presets` is a dictionary
-      of factory functions and a map can only name one. A helicopter, a bus, a fountain and a tree are
-      then the same kind of thing. Acceptance: the speedway's field expressed as parts lists with
-      `--engine-levels` unchanged, and a two-voice car (intake in front, exhaust behind) audibly
-      directional at five metres in `--vehicle-live`.
+- [x] **1. Parts as data.** DONE (session 10). `MachineDefinition` is a machine as a list of parts —
+      `engine`, `exhaust`, `intake`, `tyres`, `body`, `gearbox`, `chassis`, each a model plus a profile
+      plus where it sits — and `MachineRegistry.Describe`/`Assemble` are the two directions of one
+      translation. Every built-in vehicle survives the round trip field for field, including through
+      JSON (`MachineTests`), which is what makes an authored machine use the SAME parts the library is
+      made of. Authored machines live in `machines/*.json` beside the maps, loaded by server, client
+      and lab; one may be built from parts alone or `base`d on an existing machine, and one of the same
+      name overrides the built-in. `--machines`, `--machines <id>`, `--machines export=DIR`.
+      `--engine-levels` measures machines now and every built-in still measures its declared level.
+      The two-voice car is done too: the engine is integrated once and writes two taps (exhaust+body,
+      intake+block), a car close enough for its outlets to subtend more than ten degrees gets a voice
+      for each (`Localisation`), and the taps SUM to exactly the single voice, so spending or not
+      spending the second one is inaudible as a level change. `--machine-pass` auditions it.
+
+      Still open from it:
+      - The intake voice aligns to the exhaust voice's play position at its first block, so it can sit
+        up to one mixer block (23 ms) either side of it. Stable thereafter. Exact alignment wants
+        FMOD's DSP clock (`getclock`), which costs a marshalled call on the mixer thread.
+      - One acoustic path is computed per machine, at its acoustic centre, and both outlets use it. A
+        wall between you and one end of a bus is not modelled yet.
+      - `ChooseFrontVoices` has no test: nothing constructs a `ClientAudioSystem` in the suite.
+        `Localisation` and the tap summing are tested; the bookkeeping around them is not.
+
 - [ ] **2. Extent on every emitter, and audibility ranking.** Delete authored `SpatialEmitter.Priority`
       — engines are 1 and transients are 2, so a clap 200 m away outranks a car at 5 m by four to one.
       Rank instead by `Loudness.RenderedGain x occlusion`, which is the mixer's own law and already

@@ -266,6 +266,8 @@ public class FmodAudioProvider : IAudioProvider
         public System.Runtime.InteropServices.GCHandle EngineHandle;
         public EngineVoiceState? EngineState;
         public EngineEchoState? EchoState;
+        /// <summary>One outlet of a machine whose engine belongs to another voice.</summary>
+        public EngineTapState? TapState;
 
         /// <summary>When this voice's position was last TRUE, seconds on <see cref="OpenFPS.Common.AudioClock"/>
         /// — the sample time carried by the emitter, not the moment it was handed over.
@@ -1170,6 +1172,7 @@ public class FmodAudioProvider : IAudioProvider
         System.Runtime.InteropServices.GCHandle engineHandle = default;
         EngineVoiceState? engineState = null;
         EngineEchoState? echoState = null;
+        EngineTapState? tapState = null;
 
         if (emitter.IsGranular)
         {
@@ -1195,6 +1198,30 @@ public class FmodAudioProvider : IAudioProvider
                 return;
             }
             channel.setMode(MODE._3D | MODE._3D_LINEARROLLOFF);
+        }
+        else if (emitter.IsSynth && emitter.IntakeOfEntity != 0)
+        {
+            // The front outlet of a machine that already has a voice. It reads that engine's front
+            // tap; if the engine is not there — the car lost its slot in the same frame — there is
+            // nothing to be the other half OF, and the voice is simply not created.
+            if (!_isInitialized) return;
+            EngineVoiceState? src;
+            lock (_lock) { src = FindActive(emitter.IntakeOfEntity)?.EngineState; }
+            if (src == null) return;
+            var tap = new EngineTapState(src);
+            if (TapProcessor.CreateDSP(_system, tap, out engineDsp, out engineHandle) != RESULT.OK) return;
+            engineDsp.setChannelFormat(0, 0, SPEAKERMODE.MONO);
+            if (_system.playDSP(engineDsp, targetGroup, true, out channel) != RESULT.OK)
+            {
+                engineDsp.release();
+                engineHandle.Free();
+                return;
+            }
+            channel.setMode(MODE._3D | MODE._3D_LINEARROLLOFF);
+            tapState = tap;
+            // ...and the voice it came from stops carrying the front of the machine. Slewed, not
+            // switched: see EngineVoiceState.SplitVoices.
+            src.SplitVoices = true;
         }
         else if (emitter.IsSynth && emitter.EchoOfEntity != 0)
         {
@@ -1226,7 +1253,7 @@ public class FmodAudioProvider : IAudioProvider
         {
             if (!_isInitialized) return;
             _system.getSoftwareFormat(out int rate, out _, out _);
-            engineState = new EngineVoiceState(OpenFPS.Common.VehicleProfile.ByName(emitter.EngineKey), rate, emitter.EntityId)
+            engineState = new EngineVoiceState(OpenFPS.Common.MachineRegistry.VehicleFor(emitter.EngineKey), rate, emitter.EntityId)
             {
                 TargetSpeed = emitter.EngineSpeed,
                 Running = emitter.EngineRunning,
@@ -1379,6 +1406,7 @@ public class FmodAudioProvider : IAudioProvider
                 GranularDsp = granularDsp, GranularHandle = granularHandle, GranularState = granularState,
                 SynthDsp = synthDsp, SynthHandle = synthHandle, SynthState = synthState,
                 EngineDsp = engineDsp, EngineHandle = engineHandle, EngineState = engineState, EchoState = echoState,
+                TapState = tapState,
                 Position = emitter.Position, ApparentPosition = emitter.ApparentPosition,
                 LastAttributeAt = emitter.PositionSampledAt > 0 ? emitter.PositionSampledAt : OpenFPS.Common.AudioClock.Now,
                 CurrentApparentPosition = (emitter.ApparentPosition != Vector3.Zero) ? emitter.ApparentPosition : emitter.Position, 
@@ -1851,6 +1879,11 @@ public class FmodAudioProvider : IAudioProvider
             active.EngineDsp = default;
             active.EngineState = null;
             active.EchoState = null;
+            // A machine whose second outlet has gone is a machine heard through one voice again, and
+            // the front tap slews back into it. Without this the intake would simply disappear — the
+            // car would lose a third of its sound for being far enough away to be heard as one thing.
+            if (active.TapState != null) active.TapState.Source.SplitVoices = false;
+            active.TapState = null;
         }
     }
 
@@ -2580,6 +2613,18 @@ public class FmodAudioProvider : IAudioProvider
         lock (_lock)
         {
             var active = FindActive(entityId);
+            // A machine's second outlet retires by the same call, because it is the same question:
+            // this voice is no longer wanted, fade it and tell me when it is safe to stop.
+            var tap = active?.TapState;
+            if (tap != null)
+            {
+                tap.TargetGain = 0f;
+                // Handed back at the moment the fade STARTS, so the two crossfade rather than
+                // leaving a hole: the voice that stays gains the front tap over the same sixty
+                // milliseconds this one loses it.
+                tap.Source.SplitVoices = false;
+                return tap.FadedOut;
+            }
             var st = active?.EngineState;
             if (st == null) return true;
             st.TargetEnvelope = 0f;

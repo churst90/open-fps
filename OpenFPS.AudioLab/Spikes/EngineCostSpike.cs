@@ -39,9 +39,11 @@ public static class EngineCostSpike
     {
         Console.WriteLine("\n  Full load, one metre. level = loudest second; peak = the largest sample in it.\n");
         Console.WriteLine("    preset            level dB    peak dB   99.9% dB   crest dB   sust dB   declared");
-        foreach (var key in VehicleProfile.Presets.Keys)
+        // Every machine the game would play, not every preset the library holds: an authored machine
+        // that overrides a built-in has to be measured as the thing that will actually be heard.
+        foreach (var key in MachineRegistry.Ids)
         {
-            var v = VehicleProfile.ByName(key);
+            var v = MachineRegistry.VehicleFor(key);
             var orders = new System.Collections.Generic.List<DriveOrder>
             {
                 new(DriverAction.Cranking, 0.5f),

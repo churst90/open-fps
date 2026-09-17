@@ -1410,3 +1410,66 @@ twenty-two presets is still within half a decibel of measured. The balance moved
 not.
 
 Tests 548.
+
+---
+
+# A machine is a parts list, and a car has two ends
+
+Two things that had always been true of a vehicle in this engine, and that nothing could say out
+loud. A car was a RIG — an exhaust three metres behind an intake, a body, a set of tyres — and that
+composition lived in C#: `VehicleProfile.Presets` is a dictionary of factory functions, so a map could
+NAME a car and could not assemble one. And a car was heard through ONE voice, sitting between its two
+ends and biased toward the tailpipe, because voices were scarce enough that the rig's geometry was the
+thing to give up.
+
+## Parts as data
+
+`MachineDefinition` is a machine as a list of parts, each part a model (`engine`, `exhaust`, `intake`,
+`tyres`, `body`, `gearbox`, `chassis`), a profile within that model, where it sits, and how big a
+source it is. `MachineRegistry.Describe` takes a built-in apart into that vocabulary and `Assemble`
+puts it back, and the test that matters is that the round trip is the identity: **every one of the
+twenty-eight built-in vehicles survives being taken apart and reassembled, field for field, including
+through JSON**. That is what makes it safe for an author to use the same parts — they are not a
+simplified imitation of the library, they are the library.
+
+An authored machine lives in `machines/*.json` next to the maps, loaded by the server, the client and
+the lab, and it may be built from parts alone or `base`d on one that exists — "that bus, but with the
+silencer taken off" is three lines. An authored machine of the same name overrides the built-in, which
+is how a map replaces a car without editing the library. `--machines` lists what there is,
+`--machines <id>` prints one part by part, and `--machines export=DIR` writes the whole library out as
+the JSON an author would edit. The library is NOT checked in as data on purpose: an exported file is a
+copy of what C# says, and a copy that overrides its original quietly freezes every car at the numbers
+it had the day it was written.
+
+The first thing the round-trip test found was a hole: the turbo four was reachable as a C# static and
+had no key in `EngineProfile.Presets`, so the one car using it could not say what was in it.
+
+`--engine-levels` now measures every MACHINE rather than every preset, and every built-in still
+measures its declared level to the decibel.
+
+## A car has two ends
+
+The engine is integrated ONCE and writes two rings — the exhaust and the body it shakes, and what the
+machine breathes through with the block behind it. A car close enough for its outlets to be told apart
+gets a voice for each; everything else gets the single voice, which is the two taps summed. So the
+second voice costs a buffer read and an HRTF slot, **not a second engine**, and — the property that
+makes it safe to spend or not spend — the taps sum to exactly what the one voice was. A machine does
+not change level when the mixer changes its mind about how many voices to spend on it. A test holds
+that to a ten-thousandth of full scale, sample for sample.
+
+When to split is not authored and does not know what a car is. It is the angle the outlets subtend at
+the listener (`Localisation`): two parts of one moving thing are two things while that angle is wide,
+and one thing after it. A car's ends are 3.4 m apart and separate inside about twenty metres; a
+motorcycle's are one metre and separate inside six; an airliner's would separate from half a kilometre
+away. The same arithmetic is what step 3 will use to collapse a street of cars into one extended
+source, because it is the same question asked from the other side.
+
+The handover is a crossfade, not a switch — sixty milliseconds, the same as the engine's own envelope
+— because an exhaust is a running waveform with no zero-crossing to step at. And a machine's second
+outlet is the FIRST thing given up when the mixer runs short, ahead of reflections: it is the only
+voice whose loss costs nothing but geometry.
+
+`--machine-pass [id] [kmh=..] [side=..]` drives a machine past you twice, once as one voice and once
+as two, which is the only way to judge it.
+
+Tests 605.

@@ -705,12 +705,12 @@ public class CompositeService
     private bool MakeDrivable(string mapId, World world, Entity root, string preset, out string error)
     {
         error = "";
-        if (!VehicleProfile.Presets.ContainsKey(preset))
+        if (!MachineRegistry.Knows(preset))
         {
-            error = $"'{preset}' is not a vehicle; try one of {string.Join(", ", VehicleProfile.Presets.Keys)}";
+            error = $"'{preset}' is not a vehicle; try one of {string.Join(", ", MachineRegistry.Ids)}";
             return false;
         }
-        var profile = VehicleProfile.ByName(preset);
+        var profile = MachineRegistry.VehicleFor(preset);
         var parts = PartsOf(world, root.Id);
         MathHelper.ToYawPitch(world.Get<Transform>(root).Rotation, out float yaw, out _);
 

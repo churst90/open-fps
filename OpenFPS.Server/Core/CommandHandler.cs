@@ -582,7 +582,7 @@ public class CommandHandler
         var svc = Composites(reply); if (svc == null) return;
         if (args.Length < 1)
         {
-            Say(reply, $"Usage: /drivable preset. Known: {string.Join(", ", VehicleProfile.Presets.Keys)}");
+            Say(reply, $"Usage: /drivable preset. Known: {string.Join(", ", MachineRegistry.Ids)}");
             return;
         }
         if (!TryGetBody(session, reply, out _, out _, out var position)) return;
@@ -593,7 +593,7 @@ public class CommandHandler
         { Say(reply, $"Could not make that drivable: {error}."); return; }
 
         _server.SyncAudioComponent(root);
-        var profile = VehicleProfile.ByName(args[0]);
+        var profile = MachineRegistry.VehicleFor(args[0]);
         Say(reply, $"It drives as a {profile.Name} now — {profile.Engine.Name}, {profile.MassKg:F0} kg. "
                  + "Add a seat that drives with /addseat driver drive, then get in with /enter.");
     }

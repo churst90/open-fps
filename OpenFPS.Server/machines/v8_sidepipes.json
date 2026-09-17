@@ -1,0 +1,31 @@
+{
+  "id": "v8_sidepipes",
+  "name": "Muscle car, side pipes",
+  "base": "v8_muscle",
+
+  // A machine is a parts list, and this is the smallest interesting one: the same big block in the
+  // same car, with the exhaust brought out of the SIDE ahead of the rear wheel instead of out of the
+  // back. Nothing else changes, so anything you can hear is the pipe moving.
+  //
+  // It is here as the worked example of something that could not be said before this file existed.
+  // A map could name a preset and get the preset; where the pipes came out lived in C#.
+  "parts": [
+    { "model": "engine", "profile": "v8_open_headers" },
+
+    // Out of the side, level with the driver's elbow and a little ahead of the rear axle. The x is
+    // the part that matters: it is the first emitter in the game that is not on the car's centreline,
+    // so the car is louder on one side than the other, and that is simply where the pipe is.
+    { "model": "exhaust", "at": [0.95, 0.35, -0.6], "levelDb": 126, "extent": 0.4 },
+
+    // The airbox, up on top of the engine at the front. Unchanged from the saloon it is based on —
+    // written out only so the rig reads as a rig.
+    { "model": "intake", "at": [0.0, 0.75, 1.35], "extent": 0.3 },
+
+    { "model": "body", "profile": "race_saloon" },
+
+    // 126, because that is what it MEASURES: `--engine-levels` renders every machine at full load
+    // and prints what it makes. The open-header saloon this borrows its engine from declares 128,
+    // and the two decibels are the stripped race shell radiating less than the road car's.
+    { "model": "chassis", "settings": { "sourceLevelDb": 126 } }
+  ]
+}

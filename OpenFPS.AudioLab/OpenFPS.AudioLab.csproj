@@ -32,6 +32,9 @@
     <None Include="..\OpenFPS.Server\prefabs\*.json" Link="prefabs\%(Filename)%(Extension)">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <None Include="..\OpenFPS.Server\machines\*.json" Link="machines\%(Filename)%(Extension)">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
   <!-- Drop FMOD's Linux engine libraries (libfmod.so, libfmodL.so) into the repo-root lib/

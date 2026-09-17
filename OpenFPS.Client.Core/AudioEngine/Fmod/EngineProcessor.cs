@@ -43,6 +43,17 @@ public sealed class EngineVoiceState
     public volatile bool Running = true;
 
     /// <summary>
+    /// True when this machine's front outlet has a voice of its own, so this one is the back alone.
+    ///
+    /// Written by the game when it decides a car is close enough for the two ends of it to be told
+    /// apart (see Localisation.Resolvable). The change is not a switch: the front component slews
+    /// out of this voice over about sixty milliseconds while the intake voice slews in, because the
+    /// exhaust is a running waveform with no zero-crossing to step at — the same reason an engine is
+    /// never simply stopped.
+    /// </summary>
+    public volatile bool SplitVoices;
+
+    /// <summary>
     /// Where the voice's own envelope is heading, 0 or 1. Game thread writes.
     ///
     /// A synthesized engine cannot simply be switched on and off. There is no zero-crossing to stop
@@ -120,7 +131,24 @@ public sealed class EngineVoiceState
     // they already did — they simply read behind the PLAY position now rather than behind the write
     // position, so they no longer depend on which DSP the mixer happens to call first.
     private const int RingBits = 17;                       // about three seconds at 44.1 kHz
+
+    /// <summary>The back of the machine: the exhaust, and the body it shakes.</summary>
     private readonly float[] _ring = new float[1 << RingBits];
+
+    /// <summary>
+    /// The front of the machine: what it breathes through, and the block behind that.
+    ///
+    /// A second ring rather than a second engine. The engine is integrated ONCE and its two outlets
+    /// are written separately, so a car that earns two voices costs one more copy-out and no more
+    /// synthesis — which is the only reason a two-voice car is affordable at all.
+    ///
+    /// The two taps sum to exactly what the single voice used to be (see <see cref="Consume"/>), so
+    /// a car is the same loudness whether it is being heard through one voice or two. That is not a
+    /// nicety: a level that changed when the mixer changed its mind about how many voices to spend
+    /// would be heard as the car jumping, which is precisely the kind of thing a listener notices
+    /// and cannot explain.
+    /// </summary>
+    private readonly float[] _front = new float[1 << RingBits];
     private long _written;                                 // producer writes, consumer only reads
     private long _played;                                  // consumer writes, producer only reads
 
@@ -189,9 +217,31 @@ public sealed class EngineVoiceState
         long i0 = (long)Math.Floor(position);
         float f = (float)(position - i0);
         int mask = _ring.Length - 1;
-        float a = _ring[(int)(i0 & mask)], b = _ring[(int)((i0 + 1) & mask)];
-        return a + (b - a) * f;
+        int j0 = (int)(i0 & mask), j1 = (int)((i0 + 1) & mask);
+        // BOTH taps: a borrowed voice and an echo are a whole car heard from somewhere else, not the
+        // back half of one. Only a listener close enough to tell the two ends apart gets them apart.
+        float a = _ring[j0] + _front[j0], b = _ring[j1] + _front[j1];
+        return Soft(a + (b - a) * f);
     }
+
+    /// <summary>One sample of the FRONT tap alone, absolute, interpolated — what an intake voice
+    /// reads. The same cursor rules as a borrowed voice: see <see cref="EngineTapState"/>.</summary>
+    public float ReadFrontAt(double position)
+    {
+        long i0 = (long)Math.Floor(position);
+        float f = (float)(position - i0);
+        int mask = _front.Length - 1;
+        float a = _front[(int)(i0 & mask)], b = _front[(int)((i0 + 1) & mask)];
+        return Soft(a + (b - a) * f);
+    }
+
+    /// <summary>The soft ceiling the physics needs: a backfire can spike past any fixed reference,
+    /// and a step at full scale is a click. Applied where the taps are summed, once.</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static float Soft(float y) => y > 0.8f || y < -0.8f ? MathF.Tanh(y) : y;
+
+    /// <summary>How much of the front tap this voice is still carrying, 0..1. Consumer-side.</summary>
+    private float _frontShare = 1f;
 
     /// <summary>How many samples the ring holds — the whole of the past a borrowed voice may read.</summary>
     public int RingLength => _ring.Length;
@@ -309,7 +359,17 @@ public sealed class EngineVoiceState
         long avail = _primed ? Volatile.Read(ref _written) - at : 0;
         int take = (int)Math.Clamp(avail, 0, mono.Length);
         int mask = _ring.Length - 1;
-        for (int i = 0; i < take; i++) mono[i] = _ring[(int)((at + i) & mask)];
+        // The front of the car belongs in this voice only while nothing else is carrying it. The
+        // share slews rather than switches: sixty milliseconds, the same as the envelope, so handing
+        // the intake over to its own voice is a crossfade and not a step.
+        float shareTarget = SplitVoices ? 0f : 1f;
+        float shareStep = 1f / (0.06f * SampleRate);
+        for (int i = 0; i < take; i++)
+        {
+            int j = (int)((at + i) & mask);
+            _frontShare += Math.Clamp(shareTarget - _frontShare, -shareStep, shareStep);
+            mono[i] = Soft(_ring[j] + _front[j] * _frontShare);
+        }
         if (take > 0)
         {
             _lastOut = mono[take - 1];
@@ -345,7 +405,14 @@ public sealed class EngineVoiceState
         long avail = Volatile.Read(ref _written) - at;
         if (avail < mono.Length) Synthesize((int)(mono.Length - avail));
         int mask = _ring.Length - 1;
-        for (int i = 0; i < mono.Length; i++) mono[i] = _ring[(int)((at + i) & mask)];
+        float shareTarget = SplitVoices ? 0f : 1f;
+        float shareStep = 1f / (0.06f * SampleRate);
+        for (int i = 0; i < mono.Length; i++)
+        {
+            int j = (int)((at + i) & mask);
+            _frontShare += Math.Clamp(shareTarget - _frontShare, -shareStep, shareStep);
+            mono[i] = Soft(_ring[j] + _front[j] * _frontShare);
+        }
         Volatile.Write(ref _played, at + mono.Length);
     }
 
@@ -429,8 +496,12 @@ public sealed class EngineVoiceState
             _tyreGear = Driveline.Gear;
             _tyreChirp *= 0.99985f;
             float tyre = VehicleSynth.Tyre(Vehicle.Tyres, Driveline.Speed, RoadSlip + _tyreChirp, _rng, ref _tyre);
-            // Tyres are in arbitrary units; place them about 30 dB under a loud exhaust.
-            float pa = Engine.Exhaust + (Engine.Intake + Engine.Block * 0.4f) * FrontMix + tyre * 1.2f * TyreMix;
+            // Tyres are in arbitrary units; place them about 30 dB under a loud exhaust. Half at each
+            // end of the car, because that is where the wheels are: the two halves sum to the whole
+            // at any distance where the car is one thing, and separate as you walk up to it.
+            float halfTyre = tyre * 0.6f * TyreMix;
+            float front = (Engine.Intake + Engine.Block * 0.4f) * FrontMix + halfTyre;
+            float pa = Engine.Exhaust + halfTyre;
 
             // ...and then the car it is all bolted into. The body is driven by everything above and
             // rings on its own account, so it is ADDED to the direct sound rather than replacing it:
@@ -444,12 +515,12 @@ public sealed class EngineVoiceState
             // as working and heard as nothing.
             pa += _body.Process(Engine.Exhaust);
 
-            float y = pa * gain;
-            // A soft ceiling: the physics can spike past any fixed reference on a backfire.
-            float o = y > 0.8f || y < -0.8f ? MathF.Tanh(y) : y;
             _envelope += Math.Clamp(envTarget - _envelope, -envStep, envStep);
-            o *= _envelope;
-            _ring[(int)(w & mask)] = o;
+            // Written WITHOUT the soft ceiling, which now belongs to whoever sums the taps back up:
+            // a limiter applied to each half separately is not the same limiter, and the single-voice
+            // case has to come out bit for bit as it did before the machine had two outlets.
+            _ring[(int)(w & mask)] = pa * gain * _envelope;
+            _front[(int)(w & mask)] = front * gain * _envelope;
             w++;
         }
         Volatile.Write(ref _written, w);
@@ -582,6 +653,127 @@ public sealed class EngineEchoState
         // Never let the cursor reach what the source has not played yet.
         double ceiling = played - floorSamples;
         if (_cursor > ceiling) _cursor = ceiling;
+    }
+}
+
+/// <summary>
+/// The front outlet of a machine, as a voice of its own.
+///
+/// A car is a RIG, not a sound: the exhaust is a couple of metres behind the intake, and at close
+/// range that separation is most of how a listener knows which way it is pointing. Heard through one
+/// voice the separation is simply lost — the timbre survives, the geometry does not — and the single
+/// voice sits between the two ends, biased toward the tailpipe because that is where most of the
+/// sound is (VehicleProfile.ExhaustEmitterBias).
+///
+/// This is the other end. It is not a second engine and not a copy: the same integration writes both
+/// taps (see <see cref="EngineVoiceState"/>), and this reads the front one. A car close enough for
+/// the two to be told apart gets both; everything else gets the one voice, summed, at exactly the
+/// level it always had.
+///
+/// The cursor rules are a borrowed voice's, for a borrowed voice's reason: it must advance at the
+/// rate the audio was SYNTHESIZED, not at the rate some other channel is being consumed, or the
+/// exhaust's Doppler arrives in the intake on top of the intake's own. It is nudged, never jumped,
+/// back into step — a rate correction is a pitch error, and a jump is a click.
+/// </summary>
+public sealed class EngineTapState
+{
+    public readonly EngineVoiceState Source;
+
+    /// <summary>Where this voice is heading, 0 or 1. Zero retires it; see <see cref="FadedOut"/>.</summary>
+    public volatile float TargetGain = 1f;
+
+    /// <summary>True once a fade-out has finished and the voice can be released.</summary>
+    public volatile bool FadedOut;
+
+    private float _gain;
+    private double _cursor = -1;
+    private float _lastOut;
+
+    public EngineTapState(EngineVoiceState source) { Source = source; }
+
+    public void Render(Span<float> mono)
+    {
+        // Nothing until the engine has something to give. A tap that synthesized on demand would be
+        // doing it on the mixer thread, which is the one thing the whole producer design exists to
+        // prevent.
+        if (!Source.Primed) { mono.Clear(); _lastOut = 0f; return; }
+
+        long played = Source.Played;
+        // Start in step with the voice we are the other half of, and resync outright only when there
+        // is no continuity left to keep — the source stopped, or we have fallen off the ring.
+        if (_cursor < 0 || Math.Abs(played - _cursor) > Source.RingLength - 4 * mono.Length)
+            _cursor = played;
+
+        float gTarget = TargetGain;
+        float step = 1f / (0.06f * MathF.Max(1f, Source.SampleRate));
+        for (int i = 0; i < mono.Length; i++)
+        {
+            _gain += Math.Clamp(gTarget - _gain, -step, step);
+            mono[i] = Source.ReadFrontAt(_cursor + i) * _gain;
+        }
+        _lastOut = mono.Length > 0 ? mono[^1] : 0f;
+
+        // Wall clock, plus an inaudible pull back toward where the other half of this machine has
+        // got to. A hundredth of the block is about a sixth of a semitone, applied only while the
+        // two are out of step; what it is correcting is the difference between two channels' pitch,
+        // which for the two ends of one car is very nearly nothing.
+        double drift = played - _cursor;
+        double maxNudge = Math.Max(1.0, mono.Length * EngineEchoState.MaxRateCorrection);
+        _cursor += mono.Length + Math.Clamp(drift, -maxNudge, maxNudge);
+
+        if (gTarget <= 0f && _gain <= 1e-4f) FadedOut = true;
+    }
+}
+
+/// <summary>An FMOD DSP that is one outlet of a machine. Modelled on <see cref="EchoProcessor"/>.</summary>
+public static class TapProcessor
+{
+    private static readonly DSP_READ_CALLBACK _readCallback = ReadCallback;
+
+    public static RESULT CreateDSP(FMOD.System system, EngineTapState state, out FMOD.DSP dsp, out GCHandle handle)
+    {
+        var desc = new DSP_DESCRIPTION
+        {
+            pluginsdkversion = VERSION.number,
+            numinputbuffers = 0,
+            numoutputbuffers = 1,
+            read = _readCallback,
+        };
+        RESULT res = system.createDSP(ref desc, out dsp);
+        if (res == RESULT.OK)
+        {
+            handle = GCHandle.Alloc(state);
+            dsp.setUserData(GCHandle.ToIntPtr(handle));
+        }
+        else handle = default;
+        return res;
+    }
+
+    [ThreadStatic] private static float[]? _scratch;
+
+    private static RESULT ReadCallback(ref DSP_STATE dsp_state, IntPtr inbuffer, IntPtr outbuffer, uint length, int inchannels, ref int outchannels)
+    {
+        IntPtr userData;
+        unsafe
+        {
+            var dsp = new FMOD.DSP(dsp_state.instance);
+            dsp.getUserData(out userData);
+        }
+        if (userData == IntPtr.Zero) return RESULT.OK;
+        var state = (EngineTapState?)GCHandle.FromIntPtr(userData).Target;
+        if (state == null) return RESULT.OK;
+        if (outchannels == 0) outchannels = 1;
+        int ch = outchannels, n = (int)length;
+        if (_scratch == null || _scratch.Length < n) _scratch = new float[Math.Max(n, 1024)];
+        var mono = _scratch.AsSpan(0, n);
+        try { state.Render(mono); } catch { mono.Clear(); }
+        unsafe
+        {
+            float* outBuf = (float*)outbuffer;
+            for (int i = 0; i < n; i++)
+                for (int c = 0; c < ch; c++) outBuf[i * ch + c] = mono[i];
+        }
+        return RESULT.OK;
     }
 }
 

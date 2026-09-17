@@ -141,6 +141,26 @@ public class ClientAudioSystem
     /// <summary>Distant car voices live in their own id band.</summary>
     internal const int DistantVoiceBase = -700000;
 
+    /// <summary>...and a machine's front outlet in another one.</summary>
+    internal const int IntakeVoiceBase = -800000;
+
+    /// <summary>
+    /// How many machines may have their front outlet voiced separately.
+    ///
+    /// A car close enough for its two ends to be told apart is a car going past you, and there are
+    /// never many of those at once — the geometry says so: inside about twenty metres for a car, and
+    /// a listener has one of those either side of them at worst. The budget exists for the case the
+    /// geometry does not cover, which is standing in the middle of a grid on a start line, and it is
+    /// the FIRST thing given up when the mixer runs short, before reflections: a second outlet is the
+    /// most expendable voice in the world, because the machine is still fully audible without it.
+    /// </summary>
+    private const int FrontVoiceBudget = 6;
+    private int _adaptiveFront = FrontVoiceBudget;
+
+    /// <summary>Which machines currently have their front outlet on a voice of its own.</summary>
+    private readonly HashSet<int> _frontVoiced = new();
+    private readonly List<int> _frontRetiring = new();
+
     /// <summary>How many engines may be BUILT in one audio update. See ChooseLiveEngines.</summary>
     private const int NewEnginesPerUpdate = 2;
 
@@ -246,6 +266,8 @@ public class ClientAudioSystem
         _engineEchoes.Forget(entityId, _audio);
         int distant = DistantVoiceBase - Math.Abs(entityId);
         if (_distantBoundTo.Remove(distant)) _audio.StopSound(distant);
+        if (_frontVoiced.Remove(entityId)) _audio.StopSound(IntakeVoiceBase - Math.Abs(entityId));
+        _frontRetiring.Remove(entityId);
         _audio.StopSound(-10000 - entityId); // floor reflection
         _audio.StopSound(-5000 - entityId);  // wall reflection
         // Discrete ray-traced reflections hash into a 100-wide band per entity (see the -30000 scheme
@@ -576,7 +598,11 @@ public class ClientAudioSystem
         {
             if (load > MixerLoadCeiling && now - _overCeilingSince >= OverCeilingSeconds)
             {
-                if (_adaptiveEchoes > 0) _adaptiveEchoes--;
+                // A machine's second outlet goes first: it is the only voice whose loss costs
+                // nothing but geometry — the machine stays exactly as loud, because the front tap
+                // slews back into the voice that is still playing.
+                if (_adaptiveFront > 0) _adaptiveFront--;
+                else if (_adaptiveEchoes > 0) _adaptiveEchoes--;
                 else if (_adaptiveDistant > MinDistantVoices) _adaptiveDistant--;
                 else if (_adaptiveBudget > MinEngineVoices) _adaptiveBudget--;
                 else goto settled;
@@ -588,6 +614,7 @@ public class ClientAudioSystem
             {
                 if (_adaptiveBudget < EngineVoiceBudget) _adaptiveBudget++;
                 else if (_adaptiveDistant < MaxDistantVoices) _adaptiveDistant++;
+                else if (_adaptiveFront < FrontVoiceBudget) _adaptiveFront++;
                 else if (_adaptiveEchoes < EngineReflections.MaxEchoesPerEngine) _adaptiveEchoes++;
                 else goto settled;
                 _lastBudgetChange = now;
@@ -607,7 +634,7 @@ public class ClientAudioSystem
             if (!em.IsSynth || em.SoundId == null) continue;
             if (!em.SoundId.StartsWith("engine:", StringComparison.OrdinalIgnoreCase)) continue;
             string preset = em.SoundId[7..];
-            if (!OpenFPS.Common.VehicleProfile.Presets.ContainsKey(preset)) continue;
+            if (!OpenFPS.Common.MachineRegistry.Knows(preset)) continue;
             _carPreset[entityId] = preset;
 
             float d2 = Vector3.DistanceSquared(snap.Transform.Position, eyePos);
@@ -671,6 +698,8 @@ public class ClientAudioSystem
             int lent = DistantVoiceBase - Math.Abs(id);
             if (_distantBoundTo.Remove(lent)) _audio.StopSound(lent);
         }
+
+        ChooseFrontVoices();
 
         // Whatever is left over, nearest first, borrows — a fallback now rather than the normal case.
         _distantVoiced.Clear();
@@ -756,6 +785,132 @@ public class ClientAudioSystem
     private readonly List<int> _engineRetiring = new();
 
     /// <summary>
+    /// Which machines are close enough for their two ends to be heard as two ends.
+    ///
+    /// The test is geometric and nothing about it knows what a car is: how far apart this machine's
+    /// outlets are, and what angle that separation subtends from here (see Localisation). A car is
+    /// three and a half metres from airbox to tailpipe, so it separates inside about twenty metres; a
+    /// motorcycle is one metre and separates inside six; an airliner would separate from half a
+    /// kilometre away. Nothing had to be authored for any of those.
+    ///
+    /// It costs one extra voice and NO extra synthesis — the engine is integrated once and its two
+    /// outlets are written to their own taps — and the machine's level is identical either way, so
+    /// crossing the threshold is a change in where the sound comes from and not in how much of it
+    /// there is.
+    /// </summary>
+    private void ChooseFrontVoices()
+    {
+        _frontCandidates.Clear();
+        foreach (var (id, _, d2) in _engineDistances)
+        {
+            if (!_liveEngines.Contains(id)) continue;
+            if (!_carPreset.TryGetValue(id, out string? preset)) continue;
+            float separation = OutletSeparation(preset);
+            if (separation <= 0f) continue;
+            if (!OpenFPS.Common.Localisation.Resolvable(separation, MathF.Sqrt(d2))) continue;
+            _frontCandidates.Add((id, d2));
+        }
+        _frontCandidates.Sort((a, b) => a.D2.CompareTo(b.D2));
+
+        // Anything that had a front voice and no longer wants one gives it back — faded, not cut:
+        // the tap is a running waveform like the engine it comes from.
+        foreach (int id in _frontVoiced)
+        {
+            bool survives = false;
+            for (int i = 0; i < _frontCandidates.Count && i < _adaptiveFront; i++)
+                if (_frontCandidates[i].Id == id) { survives = true; break; }
+            if (!survives && !_frontRetiring.Contains(id)) _frontRetiring.Add(id);
+        }
+        for (int i = _frontRetiring.Count - 1; i >= 0; i--)
+        {
+            int id = _frontRetiring[i];
+            int voice = IntakeVoiceBase - Math.Abs(id);
+            bool wanted = false;
+            for (int k = 0; k < _frontCandidates.Count && k < _adaptiveFront; k++)
+                if (_frontCandidates[k].Id == id) { wanted = true; break; }
+            if (wanted) { _frontRetiring.RemoveAt(i); continue; }
+            if (_audio.FadeOutEngine(voice)) { _audio.StopSound(voice); _frontRetiring.RemoveAt(i); }
+        }
+
+        _frontVoiced.Clear();
+        for (int i = 0; i < _frontCandidates.Count && i < _adaptiveFront; i++)
+            _frontVoiced.Add(_frontCandidates[i].Id);
+    }
+
+    private readonly List<(int Id, float D2)> _frontCandidates = new();
+
+    /// <summary>How far apart a machine's outlets are, metres. Memoised: it is a property of the
+    /// machine, asked once per car per frame.</summary>
+    private static float OutletSeparation(string preset)
+    {
+        if (_outletSeparation.TryGetValue(preset, out float cached)) return cached;
+        var v = OpenFPS.Common.MachineRegistry.VehicleFor(preset);
+        float sep = Vector3.Distance(ExhaustSlot(v), IntakeSlot(v));
+        _outletSeparation[preset] = sep;
+        return sep;
+    }
+
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, float> _outletSeparation = new();
+
+    /// <summary>Where the gas leaves, in the machine's own frame — the TRUE tailpipe, not the
+    /// compromise position a single voice sits at (VehicleProfile.ExhaustEmitterBias).</summary>
+    private static Vector3 ExhaustSlot(OpenFPS.Common.VehicleProfile v)
+        => new(0f, v.ExhaustHeight, v.ExhaustOffsetZ);
+
+    /// <summary>...and where it breathes.</summary>
+    private static Vector3 IntakeSlot(OpenFPS.Common.VehicleProfile v)
+        => new(0f, v.IntakeHeight, v.IntakeOffsetZ);
+
+    /// <summary>
+    /// The front outlet of a machine, placed and kept up to date.
+    ///
+    /// It carries no engine of its own: the voice reads the front tap of the entity's live engine
+    /// (EngineTapState), so it costs a buffer read and an HRTF. Everything about it that is not the
+    /// position is the same as the machine's other voice, because it is the same machine — the same
+    /// level reference, the same range, the same region, the same sampled time.
+    /// </summary>
+    private void FrontVoice(EntitySnapshot snap, OpenFPS.Common.Networking.EntityDefinition def,
+                            OpenFPS.Common.VehicleProfile profile, in AcousticPathData path,
+                            float volume, float minDistance, float range, double sampledAt)
+    {
+        int voiceId = IntakeVoiceBase - Math.Abs(snap.Id);
+        Vector3 pos = snap.Transform.Position
+                    + Vector3.Transform(IntakeSlot(profile), snap.Transform.Rotation);
+
+        var e = new SpatialEmitter
+        {
+            EntityId = voiceId,
+            SoundId = "engine-intake",
+            IsSynth = true,
+            IntakeOfEntity = snap.Id,
+            EngineKey = "",
+            Mode = PlaybackMode.LoopOne,
+            Type = EmitterType.EntityAttached,
+            Position = pos,
+            ApparentPosition = pos,
+            Velocity = snap.Velocity,
+            PositionSampledAt = sampledAt,
+            // The SAME level reference as the exhaust voice. The two taps already carry the
+            // difference between what an intake radiates and what a tailpipe does — that is what the
+            // synthesis is for — and applying a second, guessed difference on top of it here would
+            // be the taste constant this design is trying not to have.
+            Volume = volume,
+            MinDistance = minDistance,
+            Range = range,
+            Pitch = 1f,
+            Priority = 1,
+            Occlusion = path.Occlusion,
+            ApertureFactor = path.ApertureFactor,
+            TransmissionBleed = path.TransmissionBleed,
+            EffectiveDistance = path.EffectiveDistance,
+            TargetRegionId = path.RegionId,
+            EnableReverb = true,
+        };
+        if (_audio.IsPlaying(voiceId)) _audio.UpdateSpatialAttributes(e);
+        else _audio.PlayPhysicalSoundDirect(e);
+    }
+
+    /// <summary>
     /// A car too far away to be worth its own engine, voiced by BORROWING one that is near.
     ///
     /// This is what stops the number of cars a map may carry from being decided by the mixer. A full
@@ -787,7 +942,7 @@ public class ClientAudioSystem
             _audio.StopSound(voiceId);
         _distantBoundTo[voiceId] = sourceId;
 
-        var profile = OpenFPS.Common.VehicleProfile.ByName(preset);
+        var profile = OpenFPS.Common.MachineRegistry.VehicleFor(preset);
         float level = profile.SourceLevelDb > 0f ? profile.SourceLevelDb : EngineSourceLevelDb;
         var (gain, reference) = OpenFPS.Common.Loudness.Place(level);
         Vector3 pos = OpenFPS.Common.AudioEmission.PointFor(snap);
@@ -911,7 +1066,7 @@ public class ClientAudioSystem
             resolvedSoundId = def.SoundEmitter.SoundId;
             if (string.IsNullOrEmpty(resolvedSoundId)) resolvedSoundId = "SYNTH"; // Last resort dummy
             if (resolvedSoundId.StartsWith("engine:", StringComparison.OrdinalIgnoreCase)
-                && OpenFPS.Common.VehicleProfile.Presets.ContainsKey(resolvedSoundId[7..]))
+                && OpenFPS.Common.MachineRegistry.Knows(resolvedSoundId[7..]))
             {
                 // A vehicle: the engine runs live in the mixer and follows the entity's speed. The
                 // voice sits toward the tailpipe, since that is where most of the sound comes from,
@@ -923,7 +1078,7 @@ public class ClientAudioSystem
                     return;
                 }
                 engineKey = resolvedSoundId[7..];
-                var profile = OpenFPS.Common.VehicleProfile.ByName(engineKey);
+                var profile = OpenFPS.Common.MachineRegistry.VehicleFor(engineKey);
                 // This car's own measured level, not one number for every car. A stock car is
                 // fourteen decibels over a road car and a diesel pickup thirty under it.
                 float level = profile.SourceLevelDb > 0f ? profile.SourceLevelDb : EngineSourceLevelDb;
@@ -931,6 +1086,15 @@ public class ClientAudioSystem
                 engineVolume = gain * def.SoundEmitter.Volume;
                 engineMinDistance = MathF.Max(reference, 3f);
                 engineRange = MathF.Max(engineRange, OpenFPS.Common.Loudness.AudibleRange(level));
+
+                // Close enough to hear which end is which: this voice moves back to the TAILPIPE and
+                // the front of the machine gets a voice of its own at the airbox. Further away the
+                // voice stays where it has always been — between the two, biased toward the exhaust
+                // (VehicleProfile.ExhaustEmitterBias) — because that is the honest position for a
+                // machine being heard as one thing.
+                if (_frontVoiced.Contains(snap.Id))
+                    emitterPosition = snap.Transform.Position
+                                    + Vector3.Transform(ExhaustSlot(profile), snap.Transform.Rotation);
             }
         }
         else
@@ -1040,6 +1204,13 @@ public class ClientAudioSystem
         }
 
         _audio.Submit(emitter);
+
+        // The other end of the machine, when it is close enough to be a second thing. Placed after
+        // the machine's own voice, so an engine that has only just been built already exists for the
+        // tap to read.
+        if (engineKey.Length > 0 && _frontVoiced.Contains(snap.Id))
+            FrontVoice(snap, def, OpenFPS.Common.MachineRegistry.VehicleFor(engineKey), acousticPath,
+                       engineVolume, engineMinDistance, Math.Max(1.0f, engineRange), world.PositionsSampledAt);
 
         // 6.1. The walls answering this engine. A live engine has no file to replay, so its
         // reflections are read back out of the synthesis's own ring buffer at the delay the mirrored

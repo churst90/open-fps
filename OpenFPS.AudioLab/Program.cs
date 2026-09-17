@@ -29,6 +29,10 @@ Console.WriteLine("=== OpenFPS AudioLab ===");
 Console.WriteLine($"Runtime: {RuntimeInformation.OSDescription} ({RuntimeInformation.ProcessArchitecture})");
 Console.WriteLine();
 
+// The authored machine library, copied in beside the maps and prefabs, so a spike auditions the same
+// cars the game plays rather than only the built-in ones.
+OpenFPS.Common.MachineRegistry.EnsureLoaded();
+
 if (args.Contains("--login-test"))
 {
     var net = new OpenFPS.Client.Core.ClientNetworkService();
@@ -256,6 +260,21 @@ if (args.Contains("--intake-ir"))
     int iicode = OpenFPS.Client.Core.AudioEngine.Fmod.IntakeIrSpike.Run(args);
     Log.CloseAndFlush();
     Environment.Exit(iicode);
+}
+if (args.Contains("--machine-pass"))
+{
+    // --machine-pass [id] [kmh=..] [side=..] [one] [two]: a machine drives past, once as one voice
+    // and once as two, so the rig can be judged by ear rather than by argument.
+    int mpcode = OpenFPS.AudioLab.Spikes.MachineSpike.Pass(args);
+    Log.CloseAndFlush();
+    Environment.Exit(mpcode);
+}
+if (args.Contains("--machines"))
+{
+    // --machines [id] [export=DIR]: what a machine is made of, and the JSON an author would write.
+    int mcode = OpenFPS.AudioLab.Spikes.MachineSpike.Run(args);
+    Log.CloseAndFlush();
+    Environment.Exit(mcode);
 }
 if (args.Contains("--engine-levels"))
 {

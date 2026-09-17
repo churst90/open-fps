@@ -85,13 +85,13 @@ public sealed class VehicleSystem
             if (data.Vehicles == null) continue;
             foreach (var vd in data.Vehicles)
             {
-                if (!VehicleProfile.Presets.ContainsKey(vd.Preset))
+                if (!MachineRegistry.Knows(vd.Preset))
                 {
                     Log.Warning("Map {Map}: vehicle preset '{Preset}' is not known; known: {Known}",
-                                mapId, vd.Preset, string.Join(", ", VehicleProfile.Presets.Keys));
+                                mapId, vd.Preset, string.Join(", ", MachineRegistry.Ids));
                     continue;
                 }
-                var profile = VehicleProfile.ByName(vd.Preset);
+                var profile = MachineRegistry.VehicleFor(vd.Preset);
 
                 // A vehicle that names a track laps it; one that does not shuttles its road.
                 RaceLine? line = null;

@@ -5,6 +5,11 @@ borrowed-voice Doppler (commit `94bb376`). **No code in this document has been w
 exists so the next session can start from the argument rather than rebuild it, and it ends with the
 order to do things in and how to know each step worked.
 
+> **Step 1 was done in session 10 (2026-09-16).** Machines are parts lists (`OpenFPS.Common/Machines.cs`,
+> `machines/*.json`, `--machines`) and a close car is heard through two voices, one per outlet
+> (`EngineTapState`, `Localisation`, `--machine-pass`). What was learned doing it, and the three things
+> left open, are at the end of section 7. Everything from step 2 on is still an argument, not code.
+
 The question that prompted it, verbatim:
 
 > "so we're limited to the fmod voice slots then? I'm not sure what to tell you in terms of sound
@@ -173,7 +178,7 @@ Missing:
 
 ## 7. The order, and how to know each step worked
 
-1. **Parts as data.** A machine prefab with a parts list, each part a model plus an offset. Acceptance:
+1. ~~**Parts as data.**~~ **Done, session 10.** A machine prefab with a parts list, each part a model plus an offset. Acceptance:
    the speedway's field is expressed as parts lists and `--engine-levels` measures every preset
    unchanged; a two-voice car (intake + exhaust) is audibly directional at five metres in
    `--vehicle-live`.
@@ -187,6 +192,28 @@ Missing:
 4. **The city map.** Materials first (brick, foliage, water), then geometry and zones, then traffic AI,
    then birds. NPC speech waits on recordings.
 5. **Aircraft**, which by then cost a rotor model and a jet-mixing model rather than a subsystem.
+
+### What step 1 taught, and what it left open
+
+- **The round trip is the test.** Not "can an author write a machine" but "does the library survive
+  being written as one" — every built-in taken apart into parts and reassembled, field for field. It
+  found a real hole on the first run: the turbo four had no key in `EngineProfile.Presets`, so the car
+  using it could not say what engine it held.
+- **The exported library is not checked in.** An authored machine overrides the built-in of its name,
+  so a generated copy sitting in `machines/` would freeze every car at the numbers it had the day it
+  was written. `--machines export=DIR` writes it somewhere to read and to copy from.
+- **The two taps must SUM to the one voice**, or a machine changes level when the mixer changes its
+  mind about how many voices to spend on it. That is the property to keep when step 2 starts moving
+  voices around on a ranked list, and it is held by a test to a ten-thousandth of full scale.
+- **The split criterion is the aggregation criterion.** `Localisation.Resolvable` asks whether two
+  things subtend enough angle to be told apart; step 3 asks the same question of thirty cars in a
+  street. It is one rule, and neither caller knows what a car is.
+- Open: the intake voice can sit up to one mixer block (23 ms) either side of the exhaust voice,
+  because it aligns to the source's play position at its first block and FMOD does not promise which
+  DSP it calls first. Exact alignment wants `getclock` on the mixer thread.
+- Open: one acoustic path per machine, taken at its acoustic centre, is used by both outlets. A wall
+  between you and one end of a bus is not modelled.
+- Open: `ChooseFrontVoices` is untested — nothing in the suite constructs a `ClientAudioSystem`.
 
 ## 8. Still open from this session
 
