@@ -1772,6 +1772,24 @@ public class FmodAudioProvider : IAudioProvider
         _lastSaPoolMisses = _saPoolMisses;
         _lastStarves = starves; _lastGen2 = gen2; _lastPauseMs = pauseMs;
 
+        // What the room is doing to everything, which is the one thing the load line never said.
+        //
+        // "Everything sounds like it is in a room when I am outdoors" has two completely different
+        // causes and they are fixed in different places, so guessing between them is worthless. Either
+        // the listener's bus is OPEN — a long decay at an audible wet level, which outdoors can only
+        // come from the ray-traced RT60 finding geometry around the listener — or the bus is shut and
+        // the wetness is coming from how much of each voice is SENT to it, which is a fixed fraction
+        // and therefore the same proportion at one metre as at a hundred.
+        //
+        // Both numbers, every report, so the next person to hear it can tell which.
+        float listenerDecay = 0f, listenerWet = -80f;
+        TryGetReverbSettings(_listenerRegionId, out listenerDecay, out listenerWet);
+        Log.Information("Room: listener in region {Region} ({Kind}), reverb {Decay:F0} ms at {Wet:F0} dB wet; "
+                      + "ray-traced RT60 {Sim:F0} ms, outdoor bus {Outdoor:F0} dB;each voice sends {Send:P0}",
+                        _listenerRegionId, _dryReverbBuses.Contains(_listenerRegionId) ? "no Sabine estimate" : "enclosed",
+                        listenerDecay, listenerWet, _simReverbDecayMs, _outdoorWetDb,
+                        AcousticConstants.ReverbSendMix);
+
         // One simulation step plus a comfortable margin. Below that a voice is being placed at a
         // position from the last step, which is exactly what the interpolation clock delivers and what
         // dead reckoning carries forward; above it, something is holding a source still.

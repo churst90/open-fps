@@ -2521,3 +2521,42 @@ bus where life says about 10. Every one of those numbers is MEASURED from the sy
 radiates for a big slow diesel against a fast petrol V8, and the answer belongs in the mechanism
 (radiating area, stack diameter, how block noise is scaled against the gas path). Worth doing before
 any decision about the mix's anchor, because it would move the anchor.
+
+### Reported from the track, session 10 — reverb outdoors, and a synthesis that failed
+
+- [ ] **A gunshot on the open track is echoey and footsteps sound boxy.** Reported after crossing onto
+      the speedway. Two candidate causes, and they are fixed in completely different places, so the
+      next run must say which:
+      1. **The bus is OPEN.** Outdoors the ray-traced RT60 sets the decay AND opens the wet in
+         proportion to it (`ApplySimulatedReverb`) — capped at `OutdoorMaxDecayMs` 1100 ms and
+         `OutdoorMaxWetDb` -16. A ray tracer working from box colliders cannot see the sky, so
+         grandstands down one side of a track can give it a canyon's RT60.
+      2. **The SEND is distance-independent.** `ReverbSendMix` is a constant 0.35 and the send is
+         taken POST-FADER, so it carries the same distance attenuation the direct sound does — which
+         makes the direct-to-reverberant ratio CONSTANT at every distance. Your own footstep at one
+         metre gets a reverberant return only 9 dB below its direct sound, where in a real space at
+         one metre it would be 30-40 dB below. In a real room the reverberant field is roughly uniform
+         and the direct falls as 1/r, so D/R should fall as (r_c/r)² — nothing here computes a
+         critical distance at all.
+      The new `Room:` log line reports the listener's region, whether it has a Sabine estimate, the
+      bus decay and wet, the ray-traced RT60 and the outdoor bus level. A long decay at an open wet is
+      cause 1; a shut bus with the complaint still audible is cause 2. **Do not change the reverb
+      model before that line is read** — the rooms were settled by ear in session 9.
+
+- [ ] **The PA announcement never decodes.** `Audio asset 'ANNOUNCE/st_louis_welcome' still not
+      decoded after 3000 ms; entity -5124 stayed silent`, repeatedly, for three different entities.
+      Either the asset is missing from the bank or the decode never completes. Separately,
+      `synth:applause:...` keys are still timing out at 3000 ms — the pre-warm item below is not just
+      the FIRST reaction of each kind, it is every new parameter combination a crowd produces.
+
+- [ ] **A voice was placed at a position 1912 ms old.** Voice -5125 (a reflection band id). Two orders
+      of magnitude past the 23 ms the engine voices manage, so something is submitting a reflection
+      and then not updating it while it keeps playing.
+
+- [ ] **Footstep synthesis: the render, not the model.** See the band analysis in `changes.md` —
+      every render peaks at 8-16 kHz where a footstep peaks at 100-600 Hz. One-pole filters (6 dB/oct)
+      were used to define bands, and `Crunch` injects unfiltered white noise per stone plus a sine
+      resonance, which is a heap of little bells. Needs a real filter bank (biquads), a click rather
+      than a ring per stone, and the tilt measured against the target spectrum before anyone listens
+      again. `--footsteps` renders them; `--footsteps table` prints the numbers. Not in the game path.
+
