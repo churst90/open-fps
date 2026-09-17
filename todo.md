@@ -2427,3 +2427,52 @@ energy   31% below 200 Hz, 45% to 1.5 kHz, 24% above   (per octave, `--applause`
       `Cupping` are the three knobs; `logs/clap/applause_400_0.70.wav` is the current render.
 - [ ] A crowd's first reaction of each kind is silent, because that is the one that pays for the
       render. Pre-warming the handful of keys a map's crowds actually produce would remove it.
+
+## WHERE THE NEXT SESSION STARTS (2026-09-16, end of session 9)
+
+The argument, the numbers and the order are in **`docs/VOICES_MACHINES_AND_THE_CITY.md`**. Read that
+first; this is the index to it.
+
+The specification, in Cody's words: *"this stuff needs to be done without the user thinking about it.
+I want to place a tree, or water fountain or a race track, and those features should have
+corresponding correct binaural audio effects, reflections — most things are diffused reflections."*
+
+- [ ] **1. Parts as data.** A machine prefab with a LIST of emitter slots, each part a physical model
+      plus an offset. `VehicleProfile` is already a rig (`ExhaustOffsetZ`, `IntakeOffsetZ`,
+      `ExhaustHeight`) — what is hardcoded is the COMPOSITION: `VehicleProfile.Presets` is a dictionary
+      of factory functions and a map can only name one. A helicopter, a bus, a fountain and a tree are
+      then the same kind of thing. Acceptance: the speedway's field expressed as parts lists with
+      `--engine-levels` unchanged, and a two-voice car (intake in front, exhaust behind) audibly
+      directional at five metres in `--vehicle-live`.
+- [ ] **2. Extent on every emitter, and audibility ranking.** Delete authored `SpatialEmitter.Priority`
+      — engines are 1 and transients are 2, so a clap 200 m away outranks a car at 5 m by four to one.
+      Rank instead by `Loudness.RenderedGain x occlusion`, which is the mixer's own law and already
+      lives in Common for exactly this. The pattern to copy is `EngineReflections.AudibilityFloor`.
+      A continuous source that falls out of the list FADES; a one-shot DROPS. And extent replaces
+      `MathF.Max(reference, 3f)` in `ClientAudioSystem`, which is a car-sized fudge with no gain
+      compensation.
+- [ ] **3. Aggregation.** Many like sources collapse into one extended source past the distance at
+      which nobody can tell them apart — the crowd is the worked example and it is already built
+      (`ExtentMetres`, `Place(level, extent)`, ten log of the count). This is what makes a city fit in
+      96 HRTF slots. Acceptance: a street of thirty cars costs a handful of voices at 200 m and thirty
+      at five, measured.
+- [ ] **4. The city map.** Materials first (brick, foliage, water — foliage is absorption 0.5-0.9 AND
+      scattering 0.9, which is why a tree-lined street is not a canyon), then geometry, zones, houses
+      with doors, then traffic AI (`VehicleSystem` follows a racing line and knows nothing about
+      junctions), then birds (`RepeatIntervalSeconds` already does them). NPC speech waits on
+      recordings — see `docs/SOUND_INVENTORY.md`.
+- [ ] **5. Aircraft**, which by then cost a rotor model and a jet-mixing model rather than a subsystem.
+      Jet mixing noise goes as the EIGHTH power of exhaust velocity and is broadband and low; the whine
+      is beamed forward and stripped by air over a few kilometres, so "a faint roar with no whine"
+      falls out. A helicopter's rotor is 10-25 Hz with blade-vortex thump, which air barely touches and
+      which diffracts round buildings — heard blocks away, for free, from the mechanisms already here.
+
+### The one thing needing a measurement before it can be fixed
+
+- [ ] **"Vehicles stop close in front of me while going past."** Mechanism identified, not confirmed.
+      Ask for two lines from a live client:
+      `Mixer load: ... N without HRTF (M new since last)` and
+      `Cars: N on the map — X synthesized, Y borrowed, Z out of budget`.
+      `without HRTF` in the tens means voice pressure (raise `SaPoolSize`, or cut further); zero with a
+      non-zero `out of budget` means the adaptive engine budget is shedding cars under mixer load,
+      which is a different fix.

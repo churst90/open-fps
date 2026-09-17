@@ -60,6 +60,10 @@ OpenFPS focuses on a rich **binaural landscape** and **spatial awareness** rathe
   colliders can be shapes other than a box. Authoring guide: `docs/AUTHORING.md`.
 
 ## Current Engineering Priorities
+**Next up, in order:** parts-as-data machines, audibility ranking instead of authored priority,
+aggregation of like sources, then the city map and aircraft — the argument, the numbers and the
+acceptance checks are in `docs/VOICES_MACHINES_AND_THE_CITY.md`, indexed at the end of `todo.md`.
+
 A full component-by-component audit of the rewrite (grades, ranked defects, sequenced remediation plan) lives at
 <https://claude.ai/code/artifact/2505b86c-2813-41c2-9a9d-fa9f1a22a1f9>. The active work list is tracked under
 **Engineering Audit Remediation** in `todo.md`.
