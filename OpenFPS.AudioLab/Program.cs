@@ -261,6 +261,13 @@ if (args.Contains("--intake-ir"))
     Log.CloseAndFlush();
     Environment.Exit(iicode);
 }
+if (args.Contains("--footsteps"))
+{
+    // --footsteps [surface ...] [shoe=..] [run] [kg=..] [steps=..] [table]
+    int fscode = OpenFPS.AudioLab.Spikes.FootstepSpike.Run(args);
+    Log.CloseAndFlush();
+    Environment.Exit(fscode);
+}
 if (args.Contains("--machine-levels"))
 {
     // --machine-levels [id ...] [kmh=..]: how loud a machine is at a cruise, and what reaches a listener.

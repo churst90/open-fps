@@ -1531,3 +1531,69 @@ same thing to authored emitters: a fountain three metres across, a grille half a
 sets it is saying how big the thing is, not asking for it to be louder.
 
 Tests 611.
+
+---
+
+# Footsteps from the mechanism: the model measures right and the render does not
+
+An attempt to replace sampled footsteps with a synthesized one, played to the owner, and REJECTED by
+ear: "none of them pass", and gravel "sounds like walking on broken glass". Written up because the
+failure is measured and specific rather than a matter of taste, and because the half that works is
+worth keeping.
+
+## What the model says
+
+A footstep is four mechanisms, not one sample:
+
+- **The heel lands.** Hertzian contact between sole and ground, and the SOFTER of the two decides it.
+  A trainer is in contact for 23 ms and a leather heel for 9, so one cannot contain anything above
+  about 43 Hz and the other reaches 111 — which is why a trainer cannot click however hard you stamp.
+- **The sole crosses the grit.** The bulk impact of a soft shoe is at forty hertz, which nobody hears
+  from a foot, so if that were all there was a trainer on a pavement would be silent. What is heard is
+  the individual grains, and a grain is a far smaller contact: Hertz gives tau proportional to size
+  once mass is allowed to go as the cube of radius, so a 0.45 mm grain against a 35 mm heel is a
+  contact a hundred times shorter — 3.4 kHz instead of 43 Hz, from the same equation.
+- **The floor answers**, if it is a panel rather than the ground. A floorboard deck spanning its
+  joists rings at 301 Hz through the same `PanelAcoustics` that rings a door and a car's wing; a slab
+  bearing on the earth has no free span and no note, which is what "hollow" means about a wooden floor.
+- **Loose material moves.** Gravel is a heap, not a surface, and a foot landing in it displaces tens
+  of stones — the same argument as a crowd, where the texture is the count.
+
+Those numbers hold up and `FootstepTests` pins them: a hard sole puts twice the grit content into the
+sound as a soft one (0.61 against 0.30 on concrete), grass returns a quarter of what concrete does,
+running is louder than walking because the foot arrives faster and not because of a flag.
+
+## Why it does not sound like a foot
+
+A band analysis of the renders, which is the part worth keeping:
+
+```
+concrete, trainer      30-60 Hz  -24 dB   ...   8-16 kHz   -3 dB
+concrete, dress shoe   30-60 Hz  -19 dB   ...   8-16 kHz   -2 dB
+gravel, boot           30-60 Hz  -18 dB   ...   8-16 kHz   -3 dB
+```
+
+Every one of them RISES to 16 kHz and peaks there. A real footstep does the opposite — most of its
+energy between about a hundred and six hundred hertz, rolling off hard above one or two kilohertz. The
+renders are tilted roughly twenty decibels the wrong way, which is thin and glassy rather than heavy,
+and which makes gravel read as broken glass in particular because glass is exactly the material that
+rings at those frequencies.
+
+Two faults, both in the rendering and neither in the model:
+
+1. **One-pole filters are 6 dB per octave and were asked to define BANDS.** The grit band is the
+   difference of two one-poles, which three octaves up is still only eighteen decibels down — so a
+   band meant to sit at three kilohertz is in practice bright noise to Nyquist.
+2. **The crunch injects unfiltered white noise per stone**, and gave each stone a SINE resonance on
+   top. A stone is a small, irregular, heavily damped lump: it clicks. A sine at a few kilohertz is a
+   bell, and a heap of little bells is a tinkle.
+
+What stands between this and a footstep is a competent filter bank, not a different theory.
+
+**Nothing in the game changed.** The client still plays sampled footsteps; the model is reachable only
+from `--footsteps` in the AudioLab. Five materials were added along the way and those are keepers:
+Gravel, and four soles — Rubber, Leather, BootRubber and Skin — because a sole is a material like any
+other, and putting it in the same table as the ground is the whole reason a shoe needs no sound of
+its own.
+
+Tests 621.

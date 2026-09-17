@@ -101,6 +101,38 @@ public static class AcousticRegistry
             reg["Audience"] = new MaterialProperties { Absorption = 0.72f, AbsorptionLow = 0.5f, AbsorptionMid = 0.75f, AbsorptionHigh = 0.85f, Scattering = 0.8f, TransmissionLow = 0.3f, TransmissionMid = 0.15f, TransmissionHigh = 0.05f, ResonanceIndex = 5, DensityKgM3 = 300f, YoungsModulusGPa = 0.01f, LossFactor = 0.5f };
             reg["Dirt"] = new MaterialProperties { Absorption = 0.60f, AbsorptionLow = 0.4f, AbsorptionMid = 0.5f, AbsorptionHigh = 0.6f, Scattering = 0.8f, TransmissionLow = 0.3f, TransmissionMid = 0.4f, TransmissionHigh = 0.5f, ResonanceIndex = 4, DensityKgM3 = 1600f, YoungsModulusGPa = 0.05f, LossFactor = 0.5f };
 
+
+            // ── Things you walk on, and things you walk in ───────────────────────────────────────
+            //
+            // Gravel is not a surface, it is a HEAP: very absorbent because the sound goes down into
+            // the voids between the stones and does not come back, and almost entirely scattering
+            // because there is no flat face anywhere in it. Which is also why a gravel drive is the
+            // quietest hard ground there is to stand on and the loudest to walk on.
+            reg["Gravel"] = new MaterialProperties { Absorption = 0.65f, AbsorptionLow = 0.35f, AbsorptionMid = 0.65f, AbsorptionHigh = 0.80f, Scattering = 0.95f, TransmissionLow = 0.35f, TransmissionMid = 0.45f, TransmissionHigh = 0.55f, ResonanceIndex = 7, DensityKgM3 = 1700f, YoungsModulusGPa = 0.35f, LossFactor = 0.55f };
+
+            // ── Soles ───────────────────────────────────────────────────────────────────────────
+            //
+            // A sole is a material like any other, and putting it in the same table as the ground is
+            // the whole reason a shoe does not need a sound of its own: what a footstep sounds like
+            // falls out of the SOFTER of the two things that meet, and these are the soft ones.
+            // Their moduli span four decades, which is two octaves of contact brightness — see
+            // Footsteps.ContactSeconds — and that single span is most of the difference between
+            // every kind of footwear there is.
+
+            /// Soft trainer sole: EVA foam and soft rubber, around 20 MPa.
+            reg["Rubber"] = new MaterialProperties { Absorption = 0.20f, AbsorptionLow = 0.10f, AbsorptionMid = 0.20f, AbsorptionHigh = 0.35f, Scattering = 0.35f, TransmissionLow = 0.5f, TransmissionMid = 0.35f, TransmissionHigh = 0.2f, ResonanceIndex = 8, DensityKgM3 = 1100f, YoungsModulusGPa = 0.02f, LossFactor = 0.25f };
+
+            // A leather board sole: two orders of magnitude stiffer than a trainer's, which is why it
+            // is the one kind of shoe that can make a click.
+            reg["Leather"] = new MaterialProperties { Absorption = 0.12f, AbsorptionLow = 0.08f, AbsorptionMid = 0.12f, AbsorptionHigh = 0.18f, Scattering = 0.15f, TransmissionLow = 0.5f, TransmissionMid = 0.4f, TransmissionHigh = 0.25f, ResonanceIndex = 9, DensityKgM3 = 900f, YoungsModulusGPa = 0.45f, LossFactor = 0.12f };
+
+            // A work boot's sole: hard vulcanised rubber, ten times a trainer's and a tenth of leather.
+            reg["BootRubber"] = new MaterialProperties { Absorption = 0.15f, AbsorptionLow = 0.08f, AbsorptionMid = 0.15f, AbsorptionHigh = 0.25f, Scattering = 0.30f, TransmissionLow = 0.5f, TransmissionMid = 0.35f, TransmissionHigh = 0.2f, ResonanceIndex = 10, DensityKgM3 = 1250f, YoungsModulusGPa = 0.20f, LossFactor = 0.20f };
+
+            // A bare foot. Softer than any sole ever made, which is exactly why it slaps rather than
+            // clicks on everything, however hard the floor is.
+            reg["Skin"] = new MaterialProperties { Absorption = 0.30f, AbsorptionLow = 0.15f, AbsorptionMid = 0.30f, AbsorptionHigh = 0.45f, Scattering = 0.45f, TransmissionLow = 0.6f, TransmissionMid = 0.45f, TransmissionHigh = 0.3f, ResonanceIndex = 11, DensityKgM3 = 1050f, YoungsModulusGPa = 0.0015f, LossFactor = 0.45f };
+
             string path = "materials.json";
             if (File.Exists(path))
             {
