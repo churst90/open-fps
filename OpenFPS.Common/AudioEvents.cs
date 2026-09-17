@@ -77,6 +77,23 @@ public partial struct TransientSound
     /// </summary>
     public string SynthKey { get; set; } = "";
 
+    /// <summary>
+    /// How big the thing making it is, metres. Zero — a point — for almost everything.
+    ///
+    /// A door latch, a shell casing and a rifle are points: a metre away you are outside them, and
+    /// from there the level falls by six decibels every time the distance doubles. A GRANDSTAND FULL
+    /// OF PEOPLE is not a point, and neither is a waterfall, a motorway or a river. Inside its own
+    /// size the level barely changes at all, because walking a metre closer to one clapper walks you a
+    /// metre further from another, and the inverse law only starts once the whole thing is in front of
+    /// you.
+    ///
+    /// What it changes is the NEAR field — stand under the grandstand and four hundred people are not
+    /// a firework two metres from your ear — and what it must not change is the far field, because a
+    /// crowd and a point source of the same power sound the same once you are well outside them. See
+    /// <see cref="Loudness.Place(float, float)"/>, which holds one and fixes the other.
+    /// </summary>
+    public float ExtentMetres { get; set; }
+
     public TransientSound() { }
 }
 

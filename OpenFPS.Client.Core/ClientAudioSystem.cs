@@ -139,7 +139,7 @@ public class ClientAudioSystem
     private readonly Dictionary<int, int> _distantBoundTo = new();
 
     /// <summary>Distant car voices live in their own id band.</summary>
-    private const int DistantVoiceBase = -700000;
+    internal const int DistantVoiceBase = -700000;
 
     /// <summary>How many engines may be BUILT in one audio update. See ChooseLiveEngines.</summary>
     private const int NewEnginesPerUpdate = 2;
@@ -357,7 +357,10 @@ public class ClientAudioSystem
         
         // 4. Update the local player's environmental state
         UpdateAcousticState(world, visualEyePos, listenerRegionId);
-        WorldAudio.Update(world, visualEyePos, OpenFPS.Common.AudioClock.Now);
+        // Through the echo system: a wall does not care what made the sound, so the grandstand that
+        // answers a car answers the people sitting on it too — and on the same terms, which means
+        // obstruction-tested.
+        WorldAudio.Update(world, visualEyePos, OpenFPS.Common.AudioClock.Now, _engineEchoes);
 
         // 4.5. Near-field boundary probing.
         //
@@ -702,8 +705,10 @@ public class ClientAudioSystem
                             cars, _liveEngines.Count, _distantVoiced.Count,
                             Math.Max(0, cars - _liveEngines.Count - _distantVoiced.Count),
                             nearest, _adaptiveEchoes);
-            Log.Information("  {Voices} reflection voice(s) of a {Budget} budget, floor {Floor:G3}.",
-                            _engineEchoes.VoiceCount, _engineEchoes.MaxReflectionVoices, _engineEchoes.AudibilityFloor);
+            Log.Information("  {Voices} reflection voice(s) of a {Budget} budget, floor {Floor:G3}; "
+                          + "{Pending} submission(s) queued, {Transients} transient(s) waiting to be heard.",
+                            _engineEchoes.VoiceCount, _engineEchoes.MaxReflectionVoices, _engineEchoes.AudibilityFloor,
+                            _audio.PendingSubmissions, WorldAudio.Pending_Count);
 
             // The worst that every source in the world stood still for. Target is one 60 Hz period,
             // 17 ms; anything over about 100 ms is long enough to hear a car passing in front of you
@@ -1279,13 +1284,20 @@ public class ClientAudioSystem
 
         // Override the floor material (index 0) with the server-reported underfoot material.
         int resonanceIndex = AcousticRegistry.GetProperties(material).ResonanceIndex;
-        if (region.Materials != null && region.Materials.Length > 0 && region.Materials[0] != resonanceIndex)
-        {
-            region.Materials[0] = resonanceIndex;
-            _lastAcousticMap.Regions[listenerRegionId] = region;
-            // Signal the audio engine to recreate the reverb bus with updated material data.
+        if (region.Materials == null || region.Materials.Length == 0 || region.Materials[0] == resonanceIndex)
+            return;
+
+        float was = OpenFPS.Common.RoomAcoustics.DecayMs(region);
+        region.Materials[0] = resonanceIndex;
+        _lastAcousticMap.Regions[listenerRegionId] = region;
+
+        // Only rebuild if it CHANGED anything. SetAcousticMap tears down every reverb bus on the map
+        // and every Steam Audio voice attached to them, and walking from grass onto asphalt crosses a
+        // material boundary — so on a racetrack this fired every few steps for a region whose ground
+        // is not what decides its reverberation at all. Out of doors it never does: five open faces
+        // are five open faces whatever you are standing on.
+        if (MathF.Abs(OpenFPS.Common.RoomAcoustics.DecayMs(region) - was) > 1f)
             _audio.SetAcousticMap(_lastAcousticMap);
-        }
     }
 
     private int _breathSeed;

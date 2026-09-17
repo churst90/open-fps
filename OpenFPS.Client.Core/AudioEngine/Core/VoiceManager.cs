@@ -13,9 +13,26 @@ public class ScoredCandidate
     public float Score;
 }
 
+/// <summary>
+/// Everything the budget needs from the mixer, and nothing else.
+///
+/// It exists so the budget can be TESTED. Deciding which sounds get a voice is the one part of this
+/// engine with no acoustics in it at all — it is bookkeeping — and it was the part with no tests,
+/// because <see cref="AudioEngineFacade"/> needs FMOD and a sound card. What went wrong there was a
+/// one-shot that lost the budget being kept in the queue for ever and fired minutes later from a
+/// position computed for somewhere the listener no longer was, and nothing could have caught it.
+/// </summary>
+public interface IVoiceSink
+{
+    bool IsPlaying(int entityId);
+    void PlayPhysicalSoundDirect(SpatialEmitter emitter);
+    void UpdateSpatialAttributes(SpatialEmitter emitter);
+    void StopSoundImmediate(int entityId);
+}
+
 public class VoiceManager
 {
-    private readonly AudioEngineFacade _audio;
+    private readonly IVoiceSink _audio;
     private readonly AudioBank _bank;
     private readonly int _maxVoices;
     
@@ -37,13 +54,17 @@ public class VoiceManager
     private readonly List<int> _keysToRemove = new();
     private readonly List<int> _voiceStatesToRemove = new();
 
-    public VoiceManager(AudioEngineFacade audio, AudioBank bank, int maxVoices = 64)
+    public VoiceManager(IVoiceSink audio, AudioBank bank, int maxVoices = 64)
     {
         _audio = audio;
         _bank = bank;
         _maxVoices = maxVoices;
         _scoredCandidates = new List<ScoredCandidate>(maxVoices * 2);
     }
+
+    /// <summary>How many submissions are waiting to be scored. Diagnostic — a number that grows
+    /// without bound is a leak, and one-shots are what leak.</summary>
+    public int SubmissionCount => _activeSubmissions.Count;
 
     public void Submit(SpatialEmitter emitter)
     {
@@ -159,6 +180,7 @@ public class VoiceManager
         }
 
         _voiceStatesToRemove.Clear();
+        _keysToRemove.Clear();
         foreach (var kvp in _voiceStates)
         {
             var id = kvp.Key;
@@ -170,13 +192,36 @@ public class VoiceManager
                     _audio.StopSoundImmediate(id);
                     status.IsPhysicallyPlaying = false;
                 }
-                
+
+                // AN EVENT THAT DID NOT WIN A SLOT HAS MISSED ITS MOMENT.
+                //
+                // A submission stays here until it has been observed to start and then stop, which is
+                // right for a car — it is still there, still making a noise, and will get a voice back
+                // when one frees up. A one-shot is not: a clap that lost the budget this frame cannot
+                // be played later, because "later" is a different moment and the sound belongs to this
+                // one. Left in, it sat in the queue being re-scored for ever and FIRED whenever the
+                // listener moved somewhere that made its score win — heard as reflections piling up in
+                // a place where nothing was happening, and as a crowd arriving from the wrong side of
+                // the track, because a mirrored position means nothing once you have walked away from
+                // where it was computed.
+                //
+                // It was invisible until transients got one voice id each. Sharing ids by sound meant
+                // the next footstep overwrote the last one's stale entry, so the queue stayed small by
+                // accident and the fault looked like a feature.
+                if (!status.IsPhysicallyPlaying && status.Emitter.IsEvent)
+                {
+                    _keysToRemove.Add(id);
+                    _voiceStatesToRemove.Add(id);
+                    continue;
+                }
+
                 if (!_activeSubmissions.ContainsKey(id))
                 {
                     _voiceStatesToRemove.Add(id);
                 }
             }
         }
+        foreach (var id in _keysToRemove) _activeSubmissions.Remove(id);
         foreach (var id in _voiceStatesToRemove) _voiceStates.Remove(id);
     }
 

@@ -1,0 +1,16 @@
+{
+  "Id": "grandstand_seating",
+  "Name": "Grandstand Seating",
+  "Description": "The face a grandstand presents to the track: tiered seats, steps, railings and people. Acoustically an audience — it takes about three quarters of what reaches it and scatters most of what is left, which is why a full stand answers a race with a wash rather than a copy.",
+  "Material": "Audience",
+  "ColliderSize": {
+    "X": 2,
+    "Y": 3,
+    "Z": 0.5
+  },
+  "Type": "StaticObject",
+  "IsSolid": true,
+  "TransmissionLow": 0.3,
+  "TransmissionMid": 0.15,
+  "TransmissionHigh": 0.05
+}

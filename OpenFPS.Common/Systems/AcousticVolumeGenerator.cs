@@ -47,7 +47,12 @@ public static class AcousticVolumeGenerator
                 Environment = AcousticEnvironmentType.LargeOpen,
                 RoomSize = mapSize,
                 ReverbTimeScale = 0.0f, // Default to dry unless a GlobalEnvironment entity exists
-                Materials = new int[] { 1, 1, 1, 15, 1, 1 }
+                // Six open faces, because that is what outdoors IS: the map-sized box has no surfaces
+                // on it and nothing that leaves through one comes back. It used to be given six real
+                // materials, which made the whole outdoors read as a sealed map-sized room to anything
+                // that asked its boundary a question — and the only reason that never sounded like one
+                // was a separate test for this region's id. See RoomAcoustics.
+                Materials = new int[6]
             };
             acousticMap.RegionPositions[outsideRegionId] = Vector3.Zero;
         }
@@ -64,10 +69,32 @@ public static class AcousticVolumeGenerator
                 acousticMap.RegionPositions[regionId] = def.Transform.Position;
                 acousticMap.RegionRotations[regionId] = def.Transform.Rotation;
 
+                // A region that says it is indoors and names no surfaces is a contradiction, and the
+                // consequence of it is silence: no closed boundary means no reverberation estimate, so
+                // the room the map thinks it placed would be as dry as the field outside it and nothing
+                // would say so. Exactly the shape of fault that let the speedway go without regions for
+                // weeks — "not configured" and "working" look the same from everywhere else.
+                if (def.Region.IsIndoor && RoomAcoustics.OpenFaceCount(def.Region) == 6)
+                    System.Console.WriteLine(
+                        $"[WARNING] AcousticVolumeGenerator: region '{def.Region.FriendlyName}' (entity {regionId}) " +
+                        "is marked indoors but declares no RoomMaterials, so it has no surfaces and cannot reverberate.");
+
                 // Voxelize using the high-performance hierarchical OBB method
                 grid.SetRegionOBB(def.Transform.Position, def.Region.RoomSize, def.Transform.Rotation, regionId);
             }
         }
+
+        // A map that names nowhere is not broken, and it is not finished either.
+        //
+        // Regions are OPTIONAL: since a region's acoustics come from its own boundary rather than from
+        // its existence, naming a place costs nothing and changes nothing, and a map with none of them
+        // is simply one where everywhere is "Outside". That is fine for a test rig and useless for a
+        // player who cannot see, which is the fault the speedway had for weeks without anything
+        // noticing — a two-kilometre loop that answered "where am I" once and then never again.
+        if (acousticMap.Regions.Count <= 1)
+            System.Console.WriteLine(
+                "[WARNING] AcousticVolumeGenerator: this map has no named regions, so every place in it " +
+                "answers to 'Outside'. Nothing else will report this.");
 
         // 4. AUTHORED PORTALS — the primary source of truth.
         // A portal entity carries the two regions it joins and the size of the opening. These are placed

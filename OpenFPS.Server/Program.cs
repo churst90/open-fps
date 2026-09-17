@@ -385,6 +385,10 @@ public class GameServer
                                 SynthKey = Applause.Key(spec),
                                 DecaySeconds = spec.Seconds,
                                 Noisiness = 1f,
+                                // How far across they are. A stand is not a firework: inside the patch
+                                // the people fill, moving does not change the level, and the falling
+                                // off only starts once the whole crowd is in front of you.
+                                ExtentMetres = Applause.SpreadRadiusMetres(spec.Clappers),
                             },
                         }));
                     // Driven composites move AFTER the players who are steering them have had their

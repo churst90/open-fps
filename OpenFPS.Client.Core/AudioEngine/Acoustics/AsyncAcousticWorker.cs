@@ -468,10 +468,22 @@ public class AsyncAcousticWorker : IDisposable
         }
 
         int region = -1;
+        bool listenerEnclosed = false;
         if (world.AcousticMap != null)
         {
             try { region = _acoustics.GetRegionAt(world, req.SourcePos); }
             catch { region = -1; }
+            // The LISTENER's boundary, which is what the air absorption model is asking about. This
+            // was the SOURCE's region and the test was "is it not the global id", so a source that
+            // stood in any named region made the listener indoors — and after the speedway got its
+            // sector names, that was every source on the map.
+            try
+            {
+                listenerEnclosed = world.AcousticMap.Regions.TryGetValue(
+                                       _acoustics.GetRegionAt(world, req.ListenerPos), out var lr)
+                                   && RoomAcoustics.IsEnclosure(lr);
+            }
+            catch { listenerEnclosed = false; }
         }
 
         var path = new AcousticPathData
@@ -495,7 +507,7 @@ public class AsyncAcousticWorker : IDisposable
             AirAbsorption = AudioPhysics.AirAbsorptionFor(
                 dist, world.Humidity, world.Temperature,
                 world.AirPressure, world.AirAbsorptionMultiplier,
-                listenerIndoors: region != AcousticConstants.GlobalRegionId),
+                listenerIndoors: listenerEnclosed),
             RegionId = region,
             IsReflection = false,
         };

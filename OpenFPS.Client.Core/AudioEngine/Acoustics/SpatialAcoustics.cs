@@ -304,18 +304,30 @@ public class SpatialAcoustics
         // One law, in AudioPhysics, so the hand-rolled tracer and the Steam Audio path cannot drift.
         // (The absent-multiplier trap is handled in there: an unset field means "no scaling", and the
         // old Math.Max(0.1f, ...) turned it into a TEN-FOLD increase in the absorption distance.)
+        // Indoors is a closed boundary around the listener, not the mere fact that the map has a name
+        // for where they are standing. The speedway named its sectors and every car on it was suddenly
+        // being heard "indoors": the reference distance doubles in here, so two hundred metres of
+        // track kept its high frequencies and the field read as small and close.
+        int listenerRegionId = GetRegionAt(world, listenerPos);
+        bool listenerEnclosed = world.AcousticMap != null
+            && world.AcousticMap.Regions.TryGetValue(listenerRegionId, out var listenerRegion)
+            && RoomAcoustics.IsEnclosure(listenerRegion);
+
         float airAbsorption = AudioPhysics.AirAbsorptionFor(
             finalEffectiveDist, world.Humidity, world.Temperature, world.AirPressure,
             world.AirAbsorptionMultiplier,
-            listenerIndoors: GetRegionAt(world, listenerPos) != AcousticConstants.GlobalRegionId);
+            listenerIndoors: listenerEnclosed);
 
         int regionId = GetRegionAt(world, sourcePos + new Vector3(0, 0.5f, 0));
         float roomGain = 1.0f;
-        if (world.AcousticMap != null && regionId != AcousticConstants.GlobalRegionId && world.AcousticMap.Regions.TryGetValue(regionId, out var region))
+        // The small-room lift is a pressure build-up between surfaces. No surfaces, no lift — and a
+        // region the size of an infield read as a room was taking 6 dB off every car on the map.
+        if (world.AcousticMap != null && world.AcousticMap.Regions.TryGetValue(regionId, out var region)
+            && RoomAcoustics.IsEnclosure(region))
         {
             float volume = region.RoomSize.X * region.RoomSize.Y * region.RoomSize.Z;
             roomGain = Math.Clamp(1000.0f / Math.Max(50.0f, volume), 0.5f, 4.0f);
-            if (region.IsIndoor && GetRegionAt(world, listenerPos) == regionId) roomGain *= 1.25f;
+            if (region.IsIndoor && listenerRegionId == regionId) roomGain *= 1.25f;
         }
 
         finalOcclusion = Math.Min(finalOcclusion, AcousticConstants.OcclusionCap);

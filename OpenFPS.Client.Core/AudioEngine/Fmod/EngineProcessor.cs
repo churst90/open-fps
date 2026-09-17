@@ -172,15 +172,29 @@ public sealed class EngineVoiceState
     public const float MaxLeadSeconds = 0.7f;
 
     /// <summary>The sample played <paramref name="back"/> samples ago, linearly interpolated.</summary>
-    public float ReadBack(double back)
+    public float ReadBack(double back) => ReadAt(Volatile.Read(ref _played) - back);
+
+    /// <summary>
+    /// One sample at an ABSOLUTE position in this voice's stream, linearly interpolated.
+    ///
+    /// The difference from <see cref="ReadBack"/> is the whole of the borrowed-voice Doppler fault.
+    /// Reading BACK is relative to the play position, and the play position moves at whatever rate the
+    /// mixer is consuming this voice — which is the rate its own channel is pitched at, which is ITS
+    /// Doppler. Anything that reads back from it is therefore hearing this car's Doppler already, and
+    /// a borrowed voice that then applies its own is applying two. A reader that keeps its own cursor
+    /// and asks for an absolute position gets the audio at the rate it was synthesized.
+    /// </summary>
+    public float ReadAt(double position)
     {
-        double pos = Volatile.Read(ref _played) - back;
-        long i0 = (long)Math.Floor(pos);
-        float f = (float)(pos - i0);
+        long i0 = (long)Math.Floor(position);
+        float f = (float)(position - i0);
         int mask = _ring.Length - 1;
         float a = _ring[(int)(i0 & mask)], b = _ring[(int)((i0 + 1) & mask)];
         return a + (b - a) * f;
     }
+
+    /// <summary>How many samples the ring holds — the whole of the past a borrowed voice may read.</summary>
+    public int RingLength => _ring.Length;
 
     /// <summary>
     /// True once the producer has filled the ring far enough for the mixer to start taking from it.
@@ -480,6 +494,36 @@ public sealed class EngineEchoState
 
     private int _blockSlack;
 
+    /// <summary>
+    /// This voice keeps its OWN read cursor instead of following the source's play position.
+    ///
+    /// Set for a BORROWED voice — a distant car too far away to be worth its own engine, which is
+    /// voiced by reading a near car's ring. False for a REFLECTION, which must follow: an echo of a
+    /// car is that car's sound arriving late, so the source's own Doppler belongs in it and the delay
+    /// slewing adds the rest of the mirrored path's on top. (That is why a reflection's channel pitch
+    /// is pinned to 1 and a borrowed voice's is not.)
+    ///
+    /// A borrowed voice is a DIFFERENT car. It is placed at its own position, moves at its own
+    /// velocity and is pitched by its own Doppler — so inheriting the source car's Doppler through the
+    /// read rate and then applying its own gave it two of them, belonging to two cars going different
+    /// ways. Heard as a car that is technically at the redline and sounds like it is cruising, and it
+    /// gets worse the more of the field is borrowing.
+    /// </summary>
+    public bool OwnCursor;
+
+    /// <summary>Where this voice has read up to, absolute, when it keeps its own cursor.</summary>
+    private double _cursor = -1;
+
+    /// <summary>
+    /// Hardest this voice will pull its cursor back toward where it should sit, as a fraction of the
+    /// sample rate. A rate error IS a pitch error, so the correction has to be inaudible: a hundredth
+    /// is about a sixth of a semitone, applied only while the cursor is out of place, on a voice that
+    /// by definition is too far away to tell apart from the car beside it. The thing it is correcting
+    /// is the slow drift between our rate and the source's, which is the integral of the source car's
+    /// Doppler and averages out over a lap.
+    /// </summary>
+    public const double MaxRateCorrection = 0.01;
+
     public EngineEchoState(EngineVoiceState source) { Source = source; SampleRate = source.SampleRate; }
 
     public void Render(Span<float> mono)
@@ -493,6 +537,8 @@ public sealed class EngineEchoState
         double target = Math.Max(floorSamples, TargetDelaySeconds * SampleRate);
         if (_delay < 0) _delay = target;
         float gTarget = TargetGain;
+
+        if (OwnCursor) { RenderOwnCursor(mono, floorSamples, target, gTarget); return; }
         // Slew: up to 12% per sample of drift, which covers the Doppler of a fast pass.
         for (int i = 0; i < mono.Length; i++)
         {
@@ -506,6 +552,36 @@ public sealed class EngineEchoState
             double back = Math.Max(_delay, floorSamples) + (mono.Length - i);
             mono[i] = Source.ReadBack(back) * _gain;
         }
+    }
+
+    /// <summary>
+    /// The same audio, read at the rate it was synthesized.
+    ///
+    /// The cursor advances one sample per sample and is nudged — never jumped — back toward its
+    /// place behind the source's play position, so nothing about how fast the SOURCE is being
+    /// consumed reaches this voice's pitch. It resyncs outright only when it has fallen off the ring
+    /// entirely, which means the source stopped or restarted and there is no continuity left to keep.
+    /// </summary>
+    private void RenderOwnCursor(Span<float> mono, double floorSamples, double target, float gTarget)
+    {
+        long played = Source.Played;
+        double want = played - target;
+        // Off the ring, or ahead of what the source has played at all: there is nothing to be
+        // continuous with, so start again where we should be.
+        if (_cursor < 0 || _cursor > played || played - _cursor > Source.RingLength - 4 * mono.Length)
+            _cursor = want;
+
+        for (int i = 0; i < mono.Length; i++)
+        {
+            _gain += (gTarget - _gain) * 0.0015f;
+            mono[i] = Source.ReadAt(_cursor) * _gain;
+            // One sample per sample, plus an inaudible pull back toward where the cursor belongs.
+            double drift = (played - target) - _cursor;
+            _cursor += 1.0 + Math.Clamp(drift * 1e-5, -MaxRateCorrection, MaxRateCorrection);
+        }
+        // Never let the cursor reach what the source has not played yet.
+        double ceiling = played - floorSamples;
+        if (_cursor > ceiling) _cursor = ceiling;
     }
 }
 

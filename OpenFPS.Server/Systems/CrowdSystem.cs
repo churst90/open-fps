@@ -73,7 +73,10 @@ public static class CrowdSystem
             int clapping = Math.Max(1, (int)(c.People * (ParticipationFloor + (1f - ParticipationFloor) * intensity)));
 
             _lastReaction[id] = now;
-            react(id, at, new CrowdApplause(clapping, intensity, 2.0f + 2.5f * intensity));
+            // Quantised, because a rendered crowd is a cached BUFFER and two crowds whose numbers
+            // differ by a person are the same sound. Unquantised, every reaction on the speedway was a
+            // fresh render and a fresh sound registered with the mixer — ninety a minute, for ever.
+            react(id, at, Applause.Quantise(new CrowdApplause(clapping, intensity, 2.0f + 2.5f * intensity)));
         }
     }
 

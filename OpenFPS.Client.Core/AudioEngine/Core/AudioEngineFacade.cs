@@ -15,7 +15,7 @@ namespace OpenFPS.Client.AudioEngine.Core;
 /// It wraps the FMOD provider, the Voice Manager, and the Audio Bank into a single clean interface.
 /// Now uses lock-free queues and zero-allocation state passing.
 /// </summary>
-public class AudioEngineFacade : IDisposable
+public class AudioEngineFacade : IDisposable, IVoiceSink
 {
     private IAudioProvider _provider;
     private bool _isInitialized = false;
@@ -400,7 +400,7 @@ public class AudioEngineFacade : IDisposable
     /// <summary>
     /// Immediate, hard cutoff of a sound channel.
     /// </summary>
-    internal void StopSoundImmediate(int entityId) => _provider.StopSound(entityId);
+    public void StopSoundImmediate(int entityId) => _provider.StopSound(entityId);
 
     /// <summary>
     /// Sets the real-time physical path data (occlusion, bleed) for an entity.
@@ -411,6 +411,12 @@ public class AudioEngineFacade : IDisposable
     }
 
     public bool IsPlaying(int entityId) => _isInitialized && _provider.IsPlaying(entityId);
+
+    /// <summary>How many submissions the budget is holding. A number that climbs and does not come
+    /// back down is one-shots being kept after their moment — see VoiceManager.Process. It has been
+    /// heard twice as "reflections piling up where nothing is happening", and both times there was no
+    /// gauge to look at.</summary>
+    public int PendingSubmissions => _voiceManager?.SubmissionCount ?? 0;
 
     /// <summary>
     /// Makes a buffer the game synthesised available under a sound id.

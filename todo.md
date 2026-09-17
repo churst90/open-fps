@@ -2127,3 +2127,303 @@ points at the voice rather than the car. Two suspects, in order:
 - [ ] Also worth checking once the airbox works: the block is **41 dB under the exhaust**. Forty
       valves closing 129 times a second each is an enormous amount of metal, and a racing engine is
       mechanically NOISIER than a road one, not quieter.
+
+## The map named its places and the whole track moved indoors (2026-09-16)
+
+Logging in put the listener in a big room: every car, the PA and the crowd arrived with a tail on
+them, on an oval in the open air. It appeared with the zones — the commit that gave the speedway
+Front straight, Turns one and two, Infield and Grandstand so a blind player could be told where they
+were standing — and the reason is one sentence: **every open-air behaviour in the engine was keyed on
+"the listener is in the GLOBAL region id", which is not a question about the place, it is a question
+about whether the map has bothered to name it.** Name the place and you were indoors.
+
+Measured through the real FMOD graph with the new `--open-air-reverb` spike, with the old rule put
+back to make sure the instrument can fail:
+
+| standing in | decay | wet |
+| --- | --- | --- |
+| the named infield (old rule) | 500 ms | 0 dB |
+| the identical unnamed ground one step away (old rule) | — | −80 dB |
+| either of them (now) | — | −80 dB |
+| a sealed concrete room (now) | 10,000 ms | 0 dB |
+
+- [x] **A face of material "None" is an OPENING, not a mirror.** The speedway's regions declare no
+      surfaces, which resolves to six "None" faces — absorption 0, transmission 1. Sabine reads
+      absorption 0 as a perfect reflector, so an unbounded 277,000 m³ infield came out as a sealed
+      box; and because nothing had absorbed, the total fell under the "did anything absorb?" guard
+      and the code substituted `DefaultReverbDecayMs`. A 500 ms room, at full wet, over the whole map.
+- [x] **The estimate has a precondition and it is not a taste.** Sabine's V/A describes a diffuse
+      field in a CLOSED enclosure, where the energy keeps coming back until the surfaces have eaten
+      it. Open one face and there is no such field. `OpenFPS.Common/RoomAcoustics.cs` owns the question
+      now: `IsEnclosure`, `Enclosure` (area-weighted, because an open sky over an infield is not "one
+      face out of six"), and `DecayMs`, which returns ZERO where the model does not apply and the
+      clamp — not a 500 ms default — where a closed boundary absorbs nothing.
+- [x] **The ray-traced RT60 was writing over it uncapped and ungated.** `ApplySimulatedReverb` sets the
+      listener region's decay from the simulator and then, for the global region only, caps it and
+      opens the wet level in proportion to what the rays found. Both of those returned early on a
+      named region, so the infield got the rays' decay at full wet. It now applies to any bus with no
+      estimate behind it, which is the same set plus every named stretch of open ground.
+- [x] **Three more sites asked the same wrong question** and all now ask `RoomAcoustics.IsEnclosure`:
+      air absorption doubled its reference distance "indoors", so two hundred metres of track kept its
+      high frequencies and the field read as small and close; the small-room gain lift took 6 dB off
+      every car on the map (`clamp(1000 / volume)` of an infield is the 0.5 floor); and a room's
+      reverb could only be heard through its doorway by a listener standing in the global region.
+- [x] The async worker was passing the SOURCE's region as `listenerIndoors`. It asks about the
+      listener now.
+- [x] The outdoors is built with six open faces, because that is what outdoors IS. It used to be
+      given six real materials and kept dry only by a test for its own id.
+- [x] A region marked indoors that declares no surfaces now warns at map load. "Not configured" and
+      "working" look the same from everywhere else, which is the fault this whole session is about.
+
+### Still open
+
+- [ ] **The grandstand deck should declare its boundary.** You are twelve metres up with a wall at
+      your back and a roof over part of it, and the map says "no surfaces" for that region like every
+      other. It is the one place on the speedway that should have a short real decay of its own.
+- [ ] **A region's faces could be MEASURED rather than declared.** `AcousticVolumeGenerator` has every
+      static collider and its material, and `CompositeAcoustics.Survey` already computes per-face
+      coverage for player-built rooms — the same test against map geometry would let a map stop
+      declaring surfaces at all and have the boundary fall out of what is standing there.
+- [ ] **Air absorption is not in the Sabine estimate.** 4mV is the reason a large hall does not ring
+      for ten seconds, and a sealed concrete 10 x 5 x 10 currently clamps at 10 s. Left alone
+      deliberately: it changes rooms that have been approved by ear, and nothing forced it here.
+- [ ] `--speedway` in the lab still hardcodes `GlobalRegionId` as the listener's region and builds no
+      acoustic map, so it could not have reproduced this and cannot confirm the fix. The confirmation
+      is `--open-air-reverb` and `OpenAirReverbTests`.
+
+## The stand was full and silent, and a borrowed car had two Dopplers (2026-09-16)
+
+Three faults, found by measuring rather than by listening, because none of them was audible as itself:
+the crowd was simply not there, and a distant car's revs were simply wrong.
+
+### The crowd was emitting the whole time
+
+Ninety reactions a minute, eleven of the twelve blocks, at 114-118 dB. `CrowdSystem` was working
+perfectly and nothing it produced could be heard. Three reasons, and only the last is about crowds:
+
+- [x] **A transient's range was capped at 250 m**, and the mixer fades a voice to nothing over the
+      last quarter of its range — so everything past 187 m was on its way out for being far away, and
+      the grandstand is 219 m from where you land. A range shorter than a sound can be heard is not a
+      saving, it is a silence. `Loudness.AudibleRange` decides it now, and the SERVER's per-map
+      earshot (400 m here, computed from what is actually in the map) is what bounds the cost.
+- [x] **A crowd was placed as a POINT.** `TransientSound.ExtentMetres` and `Loudness.Place(level,
+      extent)`: four hundred people at half a square metre each fill a patch eight metres across, and
+      inside that the level is flat because stepping towards one clapper steps you away from another.
+      The gain comes down to pay for the wider reference, so the FAR field does not move — a crowd and
+      a point source of the same power sound the same once you are well outside them, and widening the
+      reference without paying for it would just have made the stand louder than physics allows.
+      Measured: the crowd now sits 16.4 dB under a bike 60 m away where the physics says 12.8; it was
+      out by 16 dB before. (The residual is the engines' own `max(reference, 3 m)`, which lifts every
+      car about 6 dB above what `Place` intends. Left alone — it is a calibration that was settled by
+      ear, and nothing here forced it.)
+- [x] **The applause key carried unrounded floats**, so nothing above `WorldAudioPlayer.IdFor` — which
+      quantises for exactly this reason — reached the escape hatch. `Applause.Quantise` fixes that.
+      **The claim that went with it was wrong and the measurement is here:** it is NOT ninety fresh
+      renders a minute. The intensity is built from two SATURATING terms, so a steady race lands on the
+      same handful of values whatever the key does — about fifteen distinct buffers in a minute with
+      the quantiser and twenty-two across the whole (cars nearby, fastest car) grid without it. The
+      test that was meant to protect it counted keys and passed either way; it asserts the property
+      now (two crowds a person apart are one buffer) and the sabotage row bites.
+- [x] **A transient now reflects off the world**, which is the todo item from the day the crowd was
+      written: "a cheer arriving off the deck a beat after the direct sound is most of what makes a
+      stand sound occupied". A reflection of a one-shot IS the one-shot, delayed, quieter and from
+      somewhere else — so it needs no voices and no model, only the same image-source search the cars
+      use and the queue that already exists. Measured on the real map: a cheer from the middle of the
+      stand reaches the racing line 53 ms later off the back wall behind the seats, at 0.75 gain. A
+      gunshot gets the slapback off the building opposite for nothing.
+
+### The reverb that appeared when you stepped onto the track
+
+- [x] The same fault as the morning's, with a trigger. The client overrides a region's FLOOR material
+      with whatever is underfoot, so a sector of track with no declared surfaces had NO absorption
+      while you stood on the grass — the 500 ms default — and exactly one absorbing surface in a
+      9,000 m³ box the moment you stepped onto the asphalt, which Sabine reads as ten seconds. Now
+      five open faces are five open faces whatever you are standing on.
+- [x] And `SetAcousticMap` — which tears down every reverb bus on the map and every Steam Audio voice
+      attached to them — is no longer called when the underfoot material changes nothing, which out of
+      doors is always. It was firing every few steps.
+
+### A borrowed voice had two Dopplers
+
+- [x] A car beyond the synthesis budget borrows a near car's ring buffer, and read it back from that
+      car's PLAY POSITION — which advances at whatever rate the mixer is consuming it, which is its
+      channel pitch, which is ITS Doppler. So the borrowed car inherited the lead car's Doppler and
+      then applied its own: two cars' pitch movement on one voice, going different ways. It keeps its
+      own read cursor now, advancing one sample per sample, nudged back into place at a hundredth of
+      the sample rate — inaudible, and slow enough that it is correcting drift rather than adding
+      pitch. A REFLECTION still follows the source, because an echo of a car is that car's sound
+      arriving late and the source's Doppler belongs in it.
+- [x] `BorrowedVoiceDopplerTests` drives the mechanism with the source consumed 25 % fast: following
+      it, the borrowed voice comes out at 333 Hz where the source is at 98; with its own cursor, 99.
+      The control — the same code with the source consumed at real time — is correct, which is why
+      this was invisible until a car moved.
+
+### Still open
+
+- [ ] The three blocks at the ends of the stand (x = 140 to 220) are 71-79 m from the racing line and
+      the react radius is 70, so they never react at all. Not obviously wrong — the action is in front
+      of the main straight — but it means a sixth of the stand is dead.
+- [ ] Cheers, gasps and boos still need voices and cannot be synthesized. Babble needs 8-12 takes.
+- [ ] The crowd's reflections are first-order and capped at two, like a car's. The stand is the one
+      place on the map where a second-order path (deck, then back wall) might be worth having.
+
+### Listening pass on the transient reflections, same evening
+
+Three reports, three faults, all introduced by the reflection change a few hours earlier:
+
+- [x] **"I'm only hearing the reflections of the clapping."** A transient's voice id was a hash of the
+      SOUND — but the id is what the VoiceManager keys a submission by, so a sound and its own
+      reflection, submitted together under one id, replaced each other and the last one written won.
+      Every transient gets its own id now, from its own band.
+- [x] **And that band overlapped two others.** `-|hash % 1,000,000| - 1000` spans −1,000 to −1,001,000,
+      straight across the engine-echo band at −600,000 and the borrowed-voice band at −700,000. A door
+      or a footstep whose hash landed there took over a car's reflection voice or a distant car's
+      voice — which is heard as "a loud reflection from a bike that was long gone", and as cars going
+      quiet for no reason. Transients now live at −100,001 to −500,000, above both.
+- [x] **"Footsteps shouldn't have such pronounced and delayed echo."** Two things. The delay was
+      counted TWICE: the facade already delays every submission by its own distance over the speed of
+      sound, and the echo is submitted at the mirrored position, so queueing it late as well doubled
+      the extra path. And the threshold was `ImageSource.MinGain` — 34 dB down, which is right for a
+      continuous source whose reflection is part of the wash it makes, and wrong for a one-shot. A
+      copy of a single event far enough under the original is not heard as a second event at all.
+      `ImageSource.EchoAudibleRatio` is 20 dB, and it is a RATIO, which is what ties it to the
+      loudness of the thing: your own footstep is a metre away and the wall is fifty, so its echo is
+      40 dB down and there is no echo; the same footstep in a corridor two metres wide is 10 dB down
+      and slaps. Measured on the real map: the cheer off the back of the stand is 0.753, the
+      footsteps under your own feet are 0.078 and 0.040.
+- [x] **The transient reflections were never obstruction-tested**, which reproduced exactly the fault
+      `EngineReflections` was written to fix — an echo that cannot be blocked is all that is left
+      where the direct sound is. They go through `EngineReflections.FindReflections` now, which does
+      the near-face prefilter and tests both legs.
+- [x] A map that names no regions at all now says so at load. Regions are OPTIONAL — since a region's
+      acoustics come from its own boundary rather than from its existence, naming a place costs
+      nothing and changes nothing — but a map where everywhere answers to "Outside" is useless to a
+      player who cannot see, and that is exactly what went unnoticed on the speedway for weeks.
+
+### The one-shot that missed its moment (same evening, second pass)
+
+Reported at a specific spot — walk across the track at (-19, 0, -172) and reflections from bikes pile
+up where there are none, and the clapping arrives from the INSIDE of the oval instead of from the
+stand outside it.
+
+- [x] **A submission that does not win a voice was kept and re-scored for ever.** `VoiceManager` holds
+      a submission until it has been seen to start and then stop, which is right for a car — it is
+      still there, still making a noise, and deserves a voice back when one frees. A ONE-SHOT is not:
+      a clap that lost the budget this frame cannot be played later, because later is a different
+      moment. Left in the queue it FIRED whenever the listener moved somewhere that made its score
+      win — from a mirrored position computed for a place they had walked away from, which is exactly
+      "loud reflections on the inside of the track, only at that location". An event that did not win
+      a slot is dropped now, and a transient is marked `IsEvent`.
+- [x] It was invisible until transients got one voice id each this afternoon: sharing ids by SOUND
+      meant the next footstep overwrote the last one's stale entry, so the queue stayed small by
+      accident and the leak looked like a feature. `VoiceManager.SubmissionCount` is exposed for the
+      next time.
+
+**And the spot itself is not a fault.** Measured out of the real map: at (-19, 1.7, -172) there is a
+3.5 m concrete wall 2.5 m away — `centre (-20.8, 1.75, -173.6), size 44.5 x 3.5 x 0.6` — and the
+crowd is 47.7 m away and 13.5 m up on the far side of it. The direct path is BLOCKED, and once the
+reflections are obstruction-tested nothing reaches that point either. Standing there, the stand
+should be muffled and arrive over the top of the wall by diffraction. Before this afternoon's
+obstruction fix the echoes were the only thing exempt from that, which is why they were all that
+was left.
+
+### A stand is a diffuser, not a slab (2026-09-16, evening)
+
+> "the clapping reflections are crisp and they shouldn't be... a lot of the noise from clapping will be
+> taken by the open space so reflections shouldn't be so directional, more diffused than an exact copy
+> like a mirror"
+
+- [x] **A surface's scattering now splits its return.** `ReflectingSurface` carries `Scattering`, and
+      `ImageSource.FirstOrder` gives the mirror image only `(1 - s)` of what the surface reflects. The
+      rest radiates FROM THE SURFACE, sampled at two points across its width: each tap is the Lambert
+      fraction `A·cosθs·cosθl·direct² / (π·rs²·rl²)` — which is "taken by the open space" written down —
+      and the two arrive over the spread of path lengths the face covers, which is what makes it a wash
+      rather than a copy. Measured on a 40 x 8 m wall: **concrete slab specular 0.829 / scattered 0.045;
+      the same wall as a full stand, specular 0.053 / scattered 0.104**, the taps 28 ms apart.
+- [x] **A rough surface answers from wherever you are standing.** The diffuse share is no longer gated
+      by the specular bounce landing on the face — that test is what makes a mirror a mirror, and a
+      scattering face does not obey it.
+- [x] **`Audience` is a material**: absorption 0.72, scattering 0.8. An occupied seating area is the
+      most absorbent and most scattering thing in ordinary acoustics, which is why a full house deadens
+      a hall. Nothing about grandstands is written anywhere in the engine.
+- [x] **The speedway's stand is surfaced in it** (`grandstand_seating` prefab, deck and upper back
+      wall). The retaining walls are still concrete and still slap. Measured at the back straight, the
+      crowd's return went from **one specular arrival at gain 0.93** to **two diffuse arrivals at 0.105
+      each, 88 and 92 ms out** — a wash 20 dB down instead of a copy 0.6 dB down. The bike's slapback
+      off the concrete retaining wall is unchanged at 0.41.
+- [x] Scattering also reaches the CARS' reflections, because it is a property of the surface: off grass
+      (scattering 0.9) a car's mirror image all but disappears, which is what grass does. Off the
+      concrete walls, where the cars are actually heard, it costs 10 %.
+
+### "The reflections feel like they're beamed right into my ears"
+
+- [x] Not the geometry. When the Steam Audio voice pool is empty a sound plays without HRTF — that is
+      deliberate and fine — but it then fell back to FMOD's **LINEAR** rolloff, which ramps straight
+      from the reference distance to the range: over the 3 km range a transient now honestly carries,
+      a source two hundred metres away comes out at **93 % of full scale**. So an occasional clap or
+      skid arrived essentially undimmed while everything around it obeyed `min/distance`. It was made
+      much more likely by everything else today — more voices, longer ranges. The fallback uses
+      INVERSE rolloff now, which is the same law the HRTF path applies by hand.
+- [x] The mixer load line reports `N without HRTF (M new since last)` so pool exhaustion is visible
+      rather than inferred.
+
+### Sabotage
+
+- [x] 17 new rows, every one caught: the open-face rule, `None` as a surface, room materials reaching
+      the decay, the outdoors' own faces, the underfoot override, the crowd's extent, the gain
+      compensation, the applause key, the range cap, the echo ratio, the borrowed cursor, the one-shot
+      drop, the voice-id bands, audience scattering, the specular/diffuse split, the tap spread, and
+      whether a rough surface answers off-axis. The runner takes substrings now (`sabotage-rooms.py
+      <substring> ...`) so adding a row costs one test run instead of sixty.
+- [x] The budget had NO tests because `VoiceManager` needed FMOD to construct. `IVoiceSink` — four
+      methods — makes it testable, and `VoiceBudgetTests` now proves a one-shot that loses the budget
+      is forgotten while an engine that loses it comes back.
+
+## A clap is hands, not cellophane (2026-09-16, late)
+
+> "the clapping itself needs to be more pronounced. each clap should have a long distinct transient
+> because this clapping sounds like a crinkling bag. I thought we worked on this but it doesn't sound
+> like the clapping was updated on the map"
+
+It IS the same renderer on the map as in the lab — one `Applause.Render`, no second path. What was
+wrong was the clap, and measuring one told the whole story. The old model, one clap:
+
+```
+decay    -20 dB at 12 ms, nothing at all after 24 ms
+energy   31% below 200 Hz, 45% to 1.5 kHz, 24% above   (per octave, `--applause`)
+```
+
+- [x] **The pocket of air had stopped ringing.** The first version had a sharp resonator and was called
+      pouring water — right, a drip IS a brief narrow resonance — so it was replaced with a plain
+      low-pass tilt, which has no note in it at all. Both were wrong the same way: the question is not
+      whether the cavity resonates but HOW HARD IT IS DAMPED. Two soft leaky palms give a Q of about
+      three. Cupped hands trap more of it and ring more; flat hands let it out sideways. `Cupping` is
+      per clapper, so a crowd is a mixture, and the mixture is the texture.
+- [x] **And the flesh did not thump.** Two palms meeting is a soft heavy impact before it is anything
+      else: low, slow, and the part that carries. It is what gives a clap a TAIL — with it the clap is
+      at −49 dB thirty milliseconds in; without it, −66 and gone.
+- [x] Rebalanced with both in: `16% below 200 Hz, 74% to 1.5 kHz, 11% above` against the old
+      `31 / 45 / 24`. The bulk is now in the two octaves where hands are, instead of up where paper is.
+- [x] **Why it was WORSE across the track**, and this is the part worth keeping: air takes the
+      4-12 kHz half of a clap away over a couple of hundred metres. A clap made only of edge arrives at
+      the infield as a crinkle by construction. One with a body arrives as a clap.
+- [x] `ClapTests` — body per OCTAVE (counted per hertz, the ten kilohertz above 1.5 kHz swamp the two
+      octaves that matter and a paper bag measures as well balanced), the tail, the near edge of the
+      crowd, and that it never repeats. Four sabotage rows, all caught.
+
+### And the render was stopping the world
+
+- [x] **170 ms, on the game thread.** A new crowd buffer was synthesised by whichever thread took the
+      packet off the wire — three hundred people clapping for three and a half seconds is a thousand
+      claps a second to render. The same reasoning that moved engine synthesis off the mixer callback
+      applies: the thread that must not be blocked is the one holding the clock. Rendering happens on a
+      worker now and the finished buffer is registered in `Update`. The event that discovers a new
+      sound is dropped rather than delayed — a one-shot belongs to a moment — and every one after it
+      finds the buffer waiting.
+
+### Still open
+
+- [ ] The balance is measured, not settled by ear. `CrackLevel` (2.0), the thump mix (0.30) and
+      `Cupping` are the three knobs; `logs/clap/applause_400_0.70.wav` is the current render.
+- [ ] A crowd's first reaction of each kind is silent, because that is the one that pays for the
+      render. Pre-warming the handful of keys a map's crowds actually produce would remove it.

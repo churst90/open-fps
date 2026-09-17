@@ -141,8 +141,52 @@ public static class Loudness
         return (MathF.Min(1f, MathF.Pow(10f, renderedDb / 20f)), reference);
     }
 
+    /// <summary>
+    /// The same placement, for a source that is not a point.
+    ///
+    /// A crowd, a waterfall or a motorway has a SIZE, and inside it the inverse law does not hold:
+    /// stepping a metre towards one clapper steps you a metre away from another, so the level is flat
+    /// across the patch and only starts falling once the whole of it is in front of you. So the
+    /// reference distance is the thing's own radius.
+    ///
+    /// The gain comes down to pay for it, and that is the half that is easy to get wrong. Beyond the
+    /// patch a distributed source and a point source of the same total power sound IDENTICAL — that is
+    /// what makes the point model usable at all — so widening the reference without touching the gain
+    /// would not model a crowd, it would just make one louder than physics allows at every distance
+    /// that matters. What the inverse law carries is the PRODUCT of gain and reference distance, so
+    /// that product is held and only the near field changes.
+    /// </summary>
+    public static (float Gain, float ReferenceDistance) Place(float sourceLevelDb, float extentMetres)
+    {
+        var (gain, reference) = Place(sourceLevelDb);
+        if (!(extentMetres > reference)) return (gain, reference);
+        return (gain * (reference / extentMetres), extentMetres);
+    }
+
     /// <summary>Just the gain, for a caller that is setting the reference distance itself.</summary>
     public static float GainFor(float sourceLevelDb) => Place(sourceLevelDb).Gain;
+
+    /// <summary>
+    /// What distance does to a voice: the law the mixer actually applies, in one place.
+    ///
+    /// A natural inverse-distance rolloff from the reference distance out — a source is fully itself
+    /// up close and falls away as 1/d — and then a fade over the last quarter of its range so it
+    /// reaches nothing at the range rather than stopping on a step. That fade is the part worth
+    /// knowing about: a range set shorter than a sound can actually be heard does not save anything,
+    /// it silences the sound early. See <see cref="AudibleRange"/>, which is what a range should be.
+    ///
+    /// It lives here rather than inside the FMOD provider so that a test can ask what the mixer will
+    /// do without a sound card, which is the only way the balance between two sources can be checked
+    /// at all.
+    /// </summary>
+    public static float RenderedGain(float gain, float referenceDistance, float range, float distance)
+    {
+        float min = MathF.Max(0.1f, referenceDistance);
+        float span = MathF.Max(0.01f, range - min);
+        float inv = Math.Clamp(min / MathF.Max(distance, min), 0f, 1f);
+        float edgeFade = Math.Clamp((range - distance) / (0.25f * span), 0f, 1f);
+        return gain * inv * edgeFade;
+    }
 
     /// <summary>The muzzle blast level for a weapon, from its cartridge. Falls back to the 7.62
     /// figure — audible and plausible — rather than to silence or to the ceiling.</summary>

@@ -168,8 +168,9 @@ public sealed class EngineReflections
         int id = 1;
         foreach (var b in boxes)
         {
-            float absorption = AcousticRegistry.GetProperties(b.Material).Absorption;
-            int n = ImageSource.FacesOfBox(b.Center, b.Size, b.Rotation, absorption, id, six);
+            var props = AcousticRegistry.GetProperties(b.Material);
+            int n = ImageSource.FacesOfBox(b.Center, b.Size, b.Rotation, props.Absorption, id, six,
+                                           props.Scattering);
             id += 6;
             for (int i = 0; i < n; i++)
             {
@@ -215,6 +216,7 @@ public sealed class EngineReflections
 
     /// <summary>How many reflecting faces the current geometry offers. Diagnostic.</summary>
     public int SurfaceCount => _surfaces.Count;
+
 
     /// <summary>
     /// Brings one engine's echo voices up to date. <paramref name="direct"/> is the emitter that was
@@ -329,7 +331,23 @@ public sealed class EngineReflections
     /// <summary>True if this id is one of ours.</summary>
     public static bool IsEchoVoice(int id) => id <= EchoVoiceIdBase;
 
-    private int FirstOrderNear(Vector3 source, Vector3 listener, float speedOfSound, Span<Reflection> into)
+    /// <summary>
+    /// The reflections the world offers a sound at this point, obstruction-tested.
+    ///
+    /// Public because a wall does not care what made the sound. The crowd in the grandstand, a door
+    /// slamming and a rifle going off need exactly this search, and the two things that make it right
+    /// — only mirroring through faces near the path, and testing both legs for something standing in
+    /// the way — are the two things a caller doing it itself forgets. The transient path DID forget
+    /// the second one, and reproduced the fault this class was written to fix: an echo that is never
+    /// obstruction-tested keeps sounding off a wall the source can no longer see, so where the direct
+    /// sound is blocked the echo is all that is left.
+    /// </summary>
+    public int FindReflections(Vector3 source, Vector3 listener, float speedOfSound, Span<Reflection> into,
+                               int diffuseTaps = 0)
+        => FirstOrderNear(source, listener, speedOfSound, into, diffuseTaps);
+
+    private int FirstOrderNear(Vector3 source, Vector3 listener, float speedOfSound, Span<Reflection> into,
+                               int diffuseTaps = 0)
     {
         // Only the faces near the path are worth mirroring through. Judged from the midpoint, which
         // is where a specular bounce off anything between the two has to land.
@@ -339,7 +357,7 @@ public sealed class EngineReflections
         foreach (var s in _surfaces)
             if (Vector3.DistanceSquared(s.Centre, mid) <= r2) _near.Add(s);
         return ImageSource.FirstOrder(System.Runtime.InteropServices.CollectionsMarshal.AsSpan(_near),
-                                      source, listener, speedOfSound, into, Blocked);
+                                      source, listener, speedOfSound, into, Blocked, diffuseTaps);
     }
 
     private readonly List<ReflectingSurface> _near = new();

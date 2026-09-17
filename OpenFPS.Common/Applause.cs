@@ -48,12 +48,27 @@ public static class Applause
     /// </summary>
     public const int MaxRendered = 320;
 
-    /// <summary>One clap at one metre, dB SPL. A single pair of hands is about this.</summary>
-    public const float SingleClapDb = 89f;
+    /// <summary>
+    /// One clap at one metre, dB SPL.
+    ///
+    /// A single pair of hands measures anywhere from the mid eighties to about a hundred depending on
+    /// how hard somebody means it; this sits in the middle of that, and three decibels up from where it
+    /// was, which was judged a touch quiet against a full stand heard across a racetrack.
+    /// </summary>
+    public const float SingleClapDb = 92f;
 
     /// <summary>How much of the crack rides on top of the body. The edge is what says "hands" — at
     /// zero the whole thing rustles.</summary>
-    public const float CrackLevel = 1.35f;
+    public const float CrackLevel = 2.0f;
+
+    /// <summary>
+    /// How hard the contact drives the thump: the low, slow part that is two palms of flesh meeting.
+    ///
+    /// It is the half of a clap that survives distance. Air takes the four-to-twelve-kilohertz half of
+    /// a clap away over a couple of hundred metres, so a clap made ONLY of edge — which is what this
+    /// was — arrives across a stadium as a crinkle, and a clap with a thump under it arrives as a clap.
+    /// </summary>
+    public const float ThumpLevel = 1.1f;
 
     /// <summary>What the rendered buffer is scaled to, as RMS. Well under full scale, because the
     /// coincidences in a dense crowd need somewhere to go.</summary>
@@ -68,6 +83,46 @@ public static class Applause
     /// </summary>
     public static float LevelDb(int clappers, float intensity)
         => SingleClapDb + 10f * MathF.Log10(Math.Max(1, clappers)) + 6f * Math.Clamp(intensity, 0f, 1f);
+
+    /// <summary>How closely people sit, per square metre. A seated crowd is about half a square metre
+    /// each; standing on a terrace is tighter, and nothing in this engine has a terrace yet.</summary>
+    public const float PeoplePerSquareMetre = 2.0f;
+
+    /// <summary>
+    /// How far across a crowd of this many people is — the radius of the patch they occupy.
+    ///
+    /// This is the reference distance for the inverse law, and it is not one metre. Sound falls off
+    /// with distance because the same energy spreads over a bigger sphere, and inside a crowd's own
+    /// footprint there is no such spreading: stepping a metre towards one clapper steps you a metre
+    /// away from another. Four hundred people at half a square metre each fill two hundred square
+    /// metres, which is a patch about eight metres across, so eight metres is where the falling-off
+    /// starts.
+    /// </summary>
+    public static float SpreadRadiusMetres(int people)
+        => MathF.Sqrt(Math.Max(1, people) / PeoplePerSquareMetre / MathF.PI);
+
+    /// <summary>
+    /// The nearest crowd this engine will bother telling apart from this one.
+    ///
+    /// A rendered crowd is a BUFFER, cached under its key, and two crowds whose numbers differ by a
+    /// person are the same sound — but nothing quantised the key, so every reaction on the speedway
+    /// was a fresh 3.8-second render of three hundred people and a fresh sound registered with the
+    /// mixer, ninety times a minute, for ever. The same reasoning is already written above
+    /// WorldAudioPlayer.IdFor and it had simply never reached the escape hatch.
+    ///
+    /// The steps are coarse on purpose and none of them is audible: a tenth of the head count is under
+    /// half a decibel, and a crowd does not clap to a schedule accurate to a quarter second.
+    /// </summary>
+    public static CrowdApplause Quantise(CrowdApplause spec)
+    {
+        int clappers = Math.Max(1, spec.Clappers);
+        int step = Math.Max(1, clappers / 10);
+        clappers = Math.Max(1, (clappers + step / 2) / step * step);
+
+        float intensity = MathF.Round(Math.Clamp(spec.Intensity, 0f, 1f) * 20f) / 20f;
+        float seconds = MathF.Round(Math.Clamp(spec.Seconds, 0.2f, 12f) * 4f) / 4f;
+        return new CrowdApplause(clappers, intensity, MathF.Max(0.25f, seconds));
+    }
 
     /// <summary>
     /// Renders the applause. Mono, normalised, at whatever rate the caller renders in.
@@ -144,7 +199,8 @@ public static class Applause
     /// </summary>
     /// <summary>One person: where they are sitting and what their hands sound like. Drawn once and
     /// kept, because a person does not move seats or change hands between claps.</summary>
-    private readonly record struct Clapper(float CavityHz, float DistanceGain, float Loudness);
+    private readonly record struct Clapper(float CavityHz, float DistanceGain, float Loudness,
+                                          float Cupping, float ThumpHz);
 
     private static Clapper NewClapper(Random rng, float intensity)
     {
@@ -179,7 +235,19 @@ public static class Applause
         // people simply do not clap equally hard.
         float loudness = size * size * MathF.Pow(10f, (float)(rng.NextDouble() * 10.0 - 5.0) / 20f);
 
-        return new Clapper(cavityHz, near / distance, loudness);
+        // HOW THEY CLAP, which is the other half of what a clap sounds like and was not modelled at
+        // all. Palm to palm with cupped hands traps the air and the pocket RINGS — that is the pock a
+        // listener calls a clap. Flat palms, or fingers into a palm, let it out sideways and leave
+        // almost nothing but the contact. A crowd is a mixture, and the mixture is the texture.
+        float cupping = 0.25f + 0.75f * (float)rng.NextDouble();
+
+        // ...and the thump under it: the flesh of two palms deforming and rebounding. It is slow,
+        // it is low, and it is most of what survives a hundred metres of air — which is why a stand
+        // full of people sounded like a crinkling bag from across the track. Scales with the hand,
+        // like everything else here.
+        float thumpHz = (260f + 140f * (float)rng.NextDouble()) / size;
+
+        return new Clapper(cavityHz, near / distance, loudness, cupping, thumpHz);
     }
 
     /// <summary>
@@ -214,8 +282,11 @@ public static class Applause
         // deeper as well as louder.
         float crackTau = 0.0005f + (float)rng.NextDouble() * 0.0009f;      // 0.5-1.4 ms
         float bodyTau = 0.0015f + (float)rng.NextDouble() * 0.0025f;      // 1.5-4 ms
+        // The flesh is slow. Palms are soft and heavy and they take a while to stop moving, so the
+        // thump outlasts everything else in the clap by a factor of five.
+        float thumpTau = 0.004f + (float)rng.NextDouble() * 0.008f;       // 4-12 ms
 
-        int len = Math.Min((int)(bodyTau * 6f * sampleRate), into.Length - at);
+        int len = Math.Min((int)(thumpTau * 5f * sampleRate), into.Length - at);
         if (len <= 2) return;
 
         // The body is band-limited by the air pocket. The crack is barely filtered at all, because a
@@ -225,29 +296,74 @@ public static class Applause
         // than picking a note out of it. Two and a half octaves wide here, and the narrower it was
         // made the more the whole crowd sounded like one thing rather than like many.
         float bodyLp = Alpha(who.CavityHz * 2.8f, sampleRate);
-        float crackLp = Alpha(7000f, sampleRate);
+        // Five kilohertz, not seven. Above that a clap has very little — what lives up there is
+        // paper and cellophane, which is what a crowd of these sounded like.
+        float crackLp = Alpha(6500f, sampleRate);
         // The crack's own high-pass follows the hand: big palms crack down into the low hundreds,
         // small ones do not. It is the same size that set the cavity.
         float hpA = Alpha(90f + who.CavityHz * 0.06f, sampleRate);
 
+        // THE POCKET OF AIR RINGS, and leaving it out is what made a crowd sound like a bag being
+        // crushed. The first version of this had a sharp resonator and a listener called it pouring
+        // water, which is correct — a drip IS a brief narrow resonance — so it was replaced by a plain
+        // tilt, and a tilt has no note in it at all. Both were wrong in the same way: the question is
+        // not whether the cavity resonates but HOW HARD IT IS DAMPED. Two soft leaky palms give a Q of
+        // about three: a pock, audible as a pitch, over in a few milliseconds. Cupped hands trap more
+        // of it and ring more; flat hands let it out sideways and barely ring at all.
+        float q = 1.5f + 4f * who.Cupping;
+        float w = 2f * MathF.PI * Math.Clamp(who.CavityHz, 60f, sampleRate * 0.45f) / sampleRate;
+        float r = MathF.Exp(-w / (2f * q));
+        float cav1 = 2f * r * MathF.Cos(w), cav2 = -r * r;
+        // A two-pole resonator has enormous gain at its own note — the closer it is to ringing for
+        // ever, the louder. Normalised so the ringing changes the SHAPE of the clap and not its level.
+        float cavNorm = 1f - r;
+        float cavA = 0f, cavB = 0f;
+
+        // ...and under all of it, the flesh. Two palms meeting is a soft heavy impact before it is
+        // anything else, and that is a low damped thud rather than a click. Same resonator, a much
+        // lower note and a much longer decay — it is the part that carries across a stadium.
+        float tw = 2f * MathF.PI * Math.Clamp(who.ThumpHz, 40f, sampleRate * 0.45f) / sampleRate;
+        float tr = MathF.Exp(-1f / (thumpTau * sampleRate));
+        float th1 = 2f * tr * MathF.Cos(tw), th2 = -tr * tr;
+        float thNorm = 1f - tr;
+        float thA = 0f, thB = 0f;
+
         float lp = 0f, hp = 0f, clp = 0f;
         float bodyDecay = MathF.Exp(-1f / (bodyTau * sampleRate));
         float crackDecay = MathF.Exp(-1f / (crackTau * sampleRate));
-        float bodyAmp = 1f, crackAmp = CrackLevel;
+        float thumpDrive = MathF.Exp(-1f / (0.0008f * sampleRate));
+        float bodyAmp = 1f, crackAmp = CrackLevel, thumpAmp = ThumpLevel;
 
         for (int i = 0; i < len; i++)
         {
             float n1 = (float)(rng.NextDouble() * 2 - 1);
             float n2 = (float)(rng.NextDouble() * 2 - 1);
+            float n3 = (float)(rng.NextDouble() * 2 - 1);
 
+            // The broadband burst that excites everything, still band-limited by the pocket.
             lp += bodyLp * (n1 * bodyAmp - lp);
             hp += hpA * (lp - hp);
+            float drive = lp - hp;
+
+            // Through the cavity, which rings for a few milliseconds at its own note.
+            float cav = drive * cavNorm + cav1 * cavA + cav2 * cavB;
+            cavB = cavA; cavA = cav;
+
+            // The thump is excited by the contact itself — a fraction of a millisecond of it — and
+            // then rings on its own long after the rest has gone.
+            float thump = n3 * thumpAmp * thNorm + th1 * thA + th2 * thB;
+            thB = thA; thA = thump;
+
             clp += crackLp * (n2 * crackAmp - clp);
 
             bodyAmp *= bodyDecay;
             crackAmp *= crackDecay;
+            thumpAmp *= thumpDrive;
 
-            into[at + i] += ((lp - hp) + clp) * level;
+            into[at + i] += (drive * (1f - who.Cupping * 0.25f)
+                             + cav * (1.3f * who.Cupping)
+                             + thump * 0.30f
+                             + clp) * level;
         }
     }
 

@@ -2779,21 +2779,21 @@
   },
   {
    "EntityId": 1077,
-   "PrefabId": "building_box",
+   "PrefabId": "grandstand_seating",
    "Position": {
     "X": -220.0,
     "Y": 6.0,
     "Z": -218.181
    },
    "Scale": {
-    "X": 4.0,
-    "Y": 2.4,
-    "Z": 1.6
+    "X": 20.0,
+    "Y": 4.0,
+    "Z": 32.0
    }
   },
   {
    "EntityId": 1078,
-   "PrefabId": "concrete_wall",
+   "PrefabId": "grandstand_seating",
    "Position": {
     "X": -220.0,
     "Y": 18.0,
@@ -2822,21 +2822,21 @@
   },
   {
    "EntityId": 1080,
-   "PrefabId": "building_box",
+   "PrefabId": "grandstand_seating",
    "Position": {
     "X": -180.0,
     "Y": 6.0,
     "Z": -218.181
    },
    "Scale": {
-    "X": 4.0,
-    "Y": 2.4,
-    "Z": 1.6
+    "X": 20.0,
+    "Y": 4.0,
+    "Z": 32.0
    }
   },
   {
    "EntityId": 1081,
-   "PrefabId": "concrete_wall",
+   "PrefabId": "grandstand_seating",
    "Position": {
     "X": -180.0,
     "Y": 18.0,
@@ -2865,21 +2865,21 @@
   },
   {
    "EntityId": 1083,
-   "PrefabId": "building_box",
+   "PrefabId": "grandstand_seating",
    "Position": {
     "X": -140.0,
     "Y": 6.0,
     "Z": -218.181
    },
    "Scale": {
-    "X": 4.0,
-    "Y": 2.4,
-    "Z": 1.6
+    "X": 20.0,
+    "Y": 4.0,
+    "Z": 32.0
    }
   },
   {
    "EntityId": 1084,
-   "PrefabId": "concrete_wall",
+   "PrefabId": "grandstand_seating",
    "Position": {
     "X": -140.0,
     "Y": 18.0,
@@ -2908,21 +2908,21 @@
   },
   {
    "EntityId": 1086,
-   "PrefabId": "building_box",
+   "PrefabId": "grandstand_seating",
    "Position": {
     "X": -100.0,
     "Y": 6.0,
     "Z": -218.181
    },
    "Scale": {
-    "X": 4.0,
-    "Y": 2.4,
-    "Z": 1.6
+    "X": 20.0,
+    "Y": 4.0,
+    "Z": 32.0
    }
   },
   {
    "EntityId": 1087,
-   "PrefabId": "concrete_wall",
+   "PrefabId": "grandstand_seating",
    "Position": {
     "X": -100.0,
     "Y": 18.0,
@@ -2951,21 +2951,21 @@
   },
   {
    "EntityId": 1089,
-   "PrefabId": "building_box",
+   "PrefabId": "grandstand_seating",
    "Position": {
     "X": -60.0,
     "Y": 6.0,
     "Z": -218.181
    },
    "Scale": {
-    "X": 4.0,
-    "Y": 2.4,
-    "Z": 1.6
+    "X": 20.0,
+    "Y": 4.0,
+    "Z": 32.0
    }
   },
   {
    "EntityId": 1090,
-   "PrefabId": "concrete_wall",
+   "PrefabId": "grandstand_seating",
    "Position": {
     "X": -60.0,
     "Y": 18.0,
@@ -2994,21 +2994,21 @@
   },
   {
    "EntityId": 1092,
-   "PrefabId": "building_box",
+   "PrefabId": "grandstand_seating",
    "Position": {
     "X": -20.0,
     "Y": 6.0,
     "Z": -218.181
    },
    "Scale": {
-    "X": 4.0,
-    "Y": 2.4,
-    "Z": 1.6
+    "X": 20.0,
+    "Y": 4.0,
+    "Z": 32.0
    }
   },
   {
    "EntityId": 1093,
-   "PrefabId": "concrete_wall",
+   "PrefabId": "grandstand_seating",
    "Position": {
     "X": -20.0,
     "Y": 18.0,
@@ -3037,21 +3037,21 @@
   },
   {
    "EntityId": 1095,
-   "PrefabId": "building_box",
+   "PrefabId": "grandstand_seating",
    "Position": {
     "X": 20.0,
     "Y": 6.0,
     "Z": -218.181
    },
    "Scale": {
-    "X": 4.0,
-    "Y": 2.4,
-    "Z": 1.6
+    "X": 20.0,
+    "Y": 4.0,
+    "Z": 32.0
    }
   },
   {
    "EntityId": 1096,
-   "PrefabId": "concrete_wall",
+   "PrefabId": "grandstand_seating",
    "Position": {
     "X": 20.0,
     "Y": 18.0,
@@ -3080,21 +3080,21 @@
   },
   {
    "EntityId": 1098,
-   "PrefabId": "building_box",
+   "PrefabId": "grandstand_seating",
    "Position": {
     "X": 60.0,
     "Y": 6.0,
     "Z": -218.181
    },
    "Scale": {
-    "X": 4.0,
-    "Y": 2.4,
-    "Z": 1.6
+    "X": 20.0,
+    "Y": 4.0,
+    "Z": 32.0
    }
   },
   {
    "EntityId": 1099,
-   "PrefabId": "concrete_wall",
+   "PrefabId": "grandstand_seating",
    "Position": {
     "X": 60.0,
     "Y": 18.0,
@@ -3123,21 +3123,21 @@
   },
   {
    "EntityId": 1101,
-   "PrefabId": "building_box",
+   "PrefabId": "grandstand_seating",
    "Position": {
     "X": 100.0,
     "Y": 6.0,
     "Z": -218.181
    },
    "Scale": {
-    "X": 4.0,
-    "Y": 2.4,
-    "Z": 1.6
+    "X": 20.0,
+    "Y": 4.0,
+    "Z": 32.0
    }
   },
   {
    "EntityId": 1102,
-   "PrefabId": "concrete_wall",
+   "PrefabId": "grandstand_seating",
    "Position": {
     "X": 100.0,
     "Y": 18.0,
@@ -3166,21 +3166,21 @@
   },
   {
    "EntityId": 1104,
-   "PrefabId": "building_box",
+   "PrefabId": "grandstand_seating",
    "Position": {
     "X": 140.0,
     "Y": 6.0,
     "Z": -218.181
    },
    "Scale": {
-    "X": 4.0,
-    "Y": 2.4,
-    "Z": 1.6
+    "X": 20.0,
+    "Y": 4.0,
+    "Z": 32.0
    }
   },
   {
    "EntityId": 1105,
-   "PrefabId": "concrete_wall",
+   "PrefabId": "grandstand_seating",
    "Position": {
     "X": 140.0,
     "Y": 18.0,
@@ -3209,21 +3209,21 @@
   },
   {
    "EntityId": 1107,
-   "PrefabId": "building_box",
+   "PrefabId": "grandstand_seating",
    "Position": {
     "X": 180.0,
     "Y": 6.0,
     "Z": -218.181
    },
    "Scale": {
-    "X": 4.0,
-    "Y": 2.4,
-    "Z": 1.6
+    "X": 20.0,
+    "Y": 4.0,
+    "Z": 32.0
    }
   },
   {
    "EntityId": 1108,
-   "PrefabId": "concrete_wall",
+   "PrefabId": "grandstand_seating",
    "Position": {
     "X": 180.0,
     "Y": 18.0,
@@ -3252,21 +3252,21 @@
   },
   {
    "EntityId": 1110,
-   "PrefabId": "building_box",
+   "PrefabId": "grandstand_seating",
    "Position": {
     "X": 220.0,
     "Y": 6.0,
     "Z": -218.181
    },
    "Scale": {
-    "X": 4.0,
-    "Y": 2.4,
-    "Z": 1.6
+    "X": 20.0,
+    "Y": 4.0,
+    "Z": 32.0
    }
   },
   {
    "EntityId": 1111,
-   "PrefabId": "concrete_wall",
+   "PrefabId": "grandstand_seating",
    "Position": {
     "X": 220.0,
     "Y": 18.0,

@@ -167,6 +167,11 @@ public class FmodAudioProvider : IAudioProvider
     private GranularBank _granularBank = null!;
     private bool _isInitialized = false;
 
+    /// <summary>How many voices have had to play without an HRTF voice because the pool was empty.
+    /// Worth watching: those voices are panned by FMOD rather than placed by Steam Audio, and until
+    /// today they were also attenuated by a different law.</summary>
+    private int _saPoolMisses, _lastSaPoolMisses;
+
     private readonly System.Collections.Concurrent.ConcurrentStack<FMOD.DSP> _threeEqPool = new();
     private readonly System.Collections.Concurrent.ConcurrentStack<FMOD.DSP> _diffractionPool = new();
 
@@ -336,6 +341,10 @@ public class FmodAudioProvider : IAudioProvider
     private Dictionary<int, FMOD.ChannelGroup> _reverbBuses = new();
     private Dictionary<int, FMOD.DSP> _reverbDsps = new();
     private Dictionary<int, float> _reverbVolumes = new();
+    /// <summary>Buses built with their wet level muted because the region they belong to is not a closed
+    /// boundary and so has no Sabine estimate behind it. These are the ones the ray-traced RT60 governs:
+    /// it caps their decay and opens their wet level in proportion to what the rays actually found.</summary>
+    private readonly HashSet<int> _dryReverbBuses = new();
     // Per-bus Steam Audio voice (HRTF) used to localize a room's reverb to its doorway when the listener
     // is OUTSIDE. Bus-lifetime (no churn); borrowed from the voice pool, returned on bus teardown.
     private readonly Dictionary<int, SaVoice> _reverbSaVoices = new();
@@ -805,9 +814,13 @@ public class FmodAudioProvider : IAudioProvider
         float ms = Math.Clamp(_simReverbDecayMs, AcousticConstants.MinReverbDecayMs, AcousticConstants.MaxReverbDecayMs);
         dsp.setParameterFloat(0, ms);
 
-        if (_acousticMap == null || listenerRegionId != _acousticMap.GlobalEnvironmentId) return;
+        // Any region with no Sabine estimate behind it, not just the global one. A named stretch of
+        // open ground is the same acoustic situation as the unnamed ground beside it, and it was the
+        // id test here that made the difference audible: name the infield and its bus stopped being
+        // capped and stopped being gated, so the rays' decay went on at full wet.
+        if (!_dryReverbBuses.Contains(listenerRegionId)) return;
 
-        // Outdoors is capped. The sky is an absorber that a ray tracer working from box colliders
+        // Open air is capped. The sky is an absorber that a ray tracer working from box colliders
         // cannot see, so its canyon RT60 comes back long — and an uncapped two-second decay outdoors
         // is what makes a street sound like a nave.
         if (ms > AcousticConstants.OutdoorMaxDecayMs)
@@ -857,7 +870,7 @@ public class FmodAudioProvider : IAudioProvider
         ReturnReverbVoices(); // detach HRTF voices while the buses still exist, return them to the pool
         foreach (var dsp in _reverbDsps.Values) dsp.release();
         foreach (var bus in _reverbBuses.Values) bus.release();
-        _reverbDsps.Clear(); _reverbBuses.Clear(); _reverbVolumes.Clear();
+        _reverbDsps.Clear(); _reverbBuses.Clear(); _reverbVolumes.Clear(); _dryReverbBuses.Clear();
     }
 
     private void UpdateActiveReverbs(Vector3 listenerPos)
@@ -904,6 +917,15 @@ public class FmodAudioProvider : IAudioProvider
         }
     }
 
+    /// <summary>Is the listener — or a sound — inside a CLOSED boundary?
+    ///
+    /// Every "am I outdoors" test in here used to be "is this the global region id", which answers a
+    /// different question: whether the map has bothered to name the place. RoomAcoustics answers this
+    /// one from the region's own faces, so naming the infield does not put a roof over it.</summary>
+    private bool IsEnclosure(int regionId)
+        => _acousticMap != null && _acousticMap.Regions.TryGetValue(regionId, out var r)
+           && RoomAcoustics.IsEnclosure(r);
+
     private void CreateReverbBus(int regionId)
     {
         if (_acousticMap == null) return;
@@ -921,50 +943,26 @@ public class FmodAudioProvider : IAudioProvider
         bus.set3DMinMaxDistance(2.0f, 10000.0f);
         _system.createDSPByType(DSP_TYPE.SFXREVERB, out var reverbDsp);
         
-        float decayMs = AcousticConstants.DefaultReverbDecayMs;
-        float volume = Math.Max(0.01f, region.RoomSize.X * region.RoomSize.Y * region.RoomSize.Z);
-        
-        // --- Sabin's Multi-Material Calculation ---
-        // Materials index: 0=Floor, 1=Ceiling, 2=North, 3=South, 4=East, 5=West
-        float areaFloorCeil = region.RoomSize.X * region.RoomSize.Z;
-        float areaNS = region.RoomSize.X * region.RoomSize.Y;
-        float areaEW = region.RoomSize.Z * region.RoomSize.Y;
-        
-        float totalAbsorption = 0;
-        
-        // Helper to get absorption safely
-        float GetAbs(int idx) {
-            if (region.Materials == null || idx >= region.Materials.Length) 
-                return AcousticRegistry.GetProperties("Generic").Absorption;
-            return AcousticRegistry.GetPropertiesByResonanceIndex(region.Materials[idx]).Absorption;
-        }
+        // Sabine, from the region's own boundary — see OpenFPS.Common.RoomAcoustics, which owns the
+        // question so that this and the tests and anything else that needs it cannot drift. It comes
+        // back ZERO for a region that is not a closed boundary, and that is the whole of the outdoor
+        // rule: there is no diffuse field to estimate in a place with no ceiling, so nothing is
+        // estimated, and what reverberation the place does have is the ray tracer's to find.
+        float decayMs = RoomAcoustics.DecayMs(region);
 
-        totalAbsorption += areaFloorCeil * GetAbs(0); // Floor
-        totalAbsorption += areaFloorCeil * GetAbs(1); // Ceiling
-        totalAbsorption += areaNS * GetAbs(2);        // North
-        totalAbsorption += areaNS * GetAbs(3);        // South
-        totalAbsorption += areaEW * GetAbs(4);        // East
-        totalAbsorption += areaEW * GetAbs(5);        // West
+        reverbDsp.setParameterFloat(0, Math.Max(AcousticConstants.MinReverbDecayMs, decayMs));
+        reverbDsp.setParameterFloat(1, 0.1f);
 
-        totalAbsorption = Math.Max(0.01f, totalAbsorption);
-
-        if (totalAbsorption > 0.01f) 
-            decayMs = Math.Clamp(0.161f * volume / totalAbsorption * 1000.0f, AcousticConstants.MinReverbDecayMs, AcousticConstants.MaxReverbDecayMs);
-        
-        decayMs *= Math.Max(0.0f, region.ReverbTimeScale);
-        
-        reverbDsp.setParameterFloat(0, Math.Max(AcousticConstants.MinReverbDecayMs, decayMs)); 
-        reverbDsp.setParameterFloat(1, 0.1f); 
-        
-        // The global/outdoor "region" spans the whole map, so its Sabine decay is enormous and it is
-        // always at full volume — that omnipresent wash is what reads as "reverb all around, even far
-        // from any room". Open air should be effectively dry, so mute the outdoor reverb; rooms keep
-        // their own (gated + doorway-positioned) reverb.
-        bool outdoors = regionId == _acousticMap.GlobalEnvironmentId;
-        if (region.ReverbTimeScale > 0.01f && !outdoors) {
+        // A bus with no estimate behind it is built MUTED and stays muted unless the simulator opens
+        // it (ApplySimulatedReverb). That used to be written as "is this the global region id", which
+        // meant the map only had to NAME a stretch of open ground for it to be treated as a room —
+        // and naming places is what a map has to do for a player who cannot see them.
+        bool dry = decayMs < AcousticConstants.MinReverbDecayMs;
+        if (!dry) {
             reverbDsp.setParameterFloat(11, 0.0f); // Wet level normal
         } else {
-            reverbDsp.setParameterFloat(11, -80.0f); // Mute (outdoors dry / no global wash)
+            _dryReverbBuses.Add(regionId);
+            reverbDsp.setParameterFloat(11, -80.0f); // Mute (open air stays dry until the rays say otherwise)
         }
         // A region bus is an AUX SEND, not an insert: the only thing that should leave it is the
         // reverberant field. Dry at 0 dB meant every send was ALSO an undirected copy of the source —
@@ -1089,6 +1087,16 @@ public class FmodAudioProvider : IAudioProvider
         return true;
     }
 
+    /// <summary>What a region's reverb DSP is actually set to, read back OUT of FMOD rather than off our
+    /// own bookkeeping — a measurement that cannot disagree with what we think we set is not one.</summary>
+    internal bool TryGetReverbSettings(int regionId, out float decayMs, out float wetDb)
+    {
+        decayMs = 0f; wetDb = -80f;
+        if (!_reverbDsps.TryGetValue(regionId, out var dsp) || !dsp.hasHandle()) return false;
+        if (dsp.getParameterFloat(0, out decayMs) != RESULT.OK) return false;
+        return dsp.getParameterFloat(11, out wetDb) == RESULT.OK;
+    }
+
     /// <summary>
     /// Peak level actually flowing through a region's reverb DSP, metered by FMOD itself.
     ///
@@ -1194,7 +1202,15 @@ public class FmodAudioProvider : IAudioProvider
             EngineVoiceState? src;
             lock (_lock) { src = FindActive(emitter.EchoOfEntity)?.EngineState; }
             if (src == null) return;
-            var echo = new EngineEchoState(src) { TargetDelaySeconds = emitter.EchoDelaySeconds, TargetGain = emitter.EchoGain };
+            // A BORROWED voice keeps its own read cursor; a REFLECTION follows the source's, because an
+            // echo of a car is that car's sound arriving late and the source's Doppler belongs in it.
+            // Told apart by what the emitter is: a reflection is marked as one.
+            var echo = new EngineEchoState(src)
+            {
+                TargetDelaySeconds = emitter.EchoDelaySeconds,
+                TargetGain = emitter.EchoGain,
+                OwnCursor = !emitter.IsReflection,
+            };
             if (EchoProcessor.CreateDSP(_system, echo, out engineDsp, out engineHandle) != RESULT.OK) return;
             engineDsp.setChannelFormat(0, 0, SPEAKERMODE.MONO);
             if (_system.playDSP(engineDsp, targetGroup, true, out channel) != RESULT.OK)
@@ -1322,6 +1338,18 @@ public class FmodAudioProvider : IAudioProvider
             }
             else
             {
+                // NO HRTF VOICE TO BE HAD — and it still has to obey the same distance law.
+                //
+                // FMOD's LINEAR rolloff is not that law. It ramps straight from the reference distance
+                // to the range, so over a three-kilometre range a source two hundred metres away comes
+                // out at ninety-three per cent of full scale: a clap from across the track arriving
+                // essentially undimmed, which is heard as a sound suddenly in your face and which gets
+                // worse the more honest the range is. The HRTF path applies min/distance by hand in
+                // ApplyAcousticFilters; INVERSE is that same law, so the two agree and a voice that
+                // misses the pool is quieter and further away rather than louder and nearer.
+                _saPoolMisses++;
+                channel.getMode(out MODE fallbackMode);
+                channel.setMode((fallbackMode & ~MODE._3D_LINEARROLLOFF) | MODE._3D | MODE._3D_INVERSEROLLOFF);
                 channel.set3DLevel(1.0f);
             }
             channel.set3DMinMaxDistance(emitter.MinDistance, emitter.Range);
@@ -1684,15 +1712,21 @@ public class FmodAudioProvider : IAudioProvider
             }
         }
 
+        int noHrtf = 0;
+        foreach (var a in _activeSounds) if (a.SaState == null && a.Channel.hasHandle()) noHrtf++;
+
         int starves = EngineVoiceState.GlobalStarves;
         int gen2 = GC.CollectionCount(2);
         double pauseMs = GC.GetTotalPauseDuration().TotalMilliseconds;
         _system.getChannelsPlaying(out int playing, out int real);
         Log.Information("Mixer load: dsp {Dsp:F1}%, update {Update:F1}%, stream {Stream:F1}% — "
                       + "{Engines} engine/echo voice(s) of {Total} active, {Real}/{Playing} real channel(s), "
-                      + "{Starve} starve(s), gc {Gen2} gen2 / {Pause:F0} ms paused",
+                      + "{NoHrtf} without HRTF ({Misses} new since last), {Starve} starve(s), "
+                      + "gc {Gen2} gen2 / {Pause:F0} ms paused",
                         cpu.dsp, cpu.update, cpu.stream, voices, _activeSounds.Count, real, playing,
+                        noHrtf, _saPoolMisses - _lastSaPoolMisses,
                         starves - _lastStarves, gen2 - _lastGen2, pauseMs - _lastPauseMs);
+        _lastSaPoolMisses = _saPoolMisses;
         _lastStarves = starves; _lastGen2 = gen2; _lastPauseMs = pauseMs;
 
         // One simulation step plus a comfortable margin. Below that a voice is being placed at a
@@ -2049,12 +2083,10 @@ public class FmodAudioProvider : IAudioProvider
         float distAtten = 1.0f;
         if (active.SaState != null)
         {
-            float dist = Vector3.Distance(lPosVec, active.CurrentApparentPosition);
-            float min = MathF.Max(0.1f, active.MinDistance);
-            float span = MathF.Max(0.01f, active.Range - min);
-            float inv = Math.Clamp(min / MathF.Max(dist, min), 0.0f, 1.0f);          // 1/dist beyond MinDistance
-            float edgeFade = Math.Clamp((active.Range - dist) / (0.25f * span), 0.0f, 1.0f); // last 25% → 0 at Range
-            distAtten = inv * edgeFade;
+            // One law, in Loudness, so a test can ask what this will do to two sources without a sound
+            // card — which is the only way the balance between a crowd and a car can be checked at all.
+            distAtten = Loudness.RenderedGain(1.0f, active.MinDistance, active.Range,
+                                              Vector3.Distance(lPosVec, active.CurrentApparentPosition));
         }
 
         // Directional cone: Steam Audio channels are 2D, so FMOD's set3DConeSettings no longer fires.
@@ -2119,8 +2151,10 @@ public class FmodAudioProvider : IAudioProvider
             float midDb = MathHelper.Lerp(AcousticConstants.OcclusionMaxMidMuffleDb, 0.0f, active.CurrentMid);
             float highDb = MathHelper.Lerp(AcousticConstants.OcclusionMaxHighMuffleDb, 0.0f, active.CurrentHigh);
 
-            // Extra muffle for environmental sounds when sheltered
-            if (active.TargetRegionId == AcousticConstants.GlobalRegionId)
+            // Extra muffle for environmental sounds when sheltered. "Environmental" means a sound that
+            // belongs to the open air, which is a property of its region's boundary and not of the
+            // region's id — a named patch of open ground is still the open air.
+            if (!IsEnclosure(active.TargetRegionId))
             {
                 highDb -= (_shelterFactor * 40.0f);
                 midDb -= (_shelterFactor * 20.0f);
@@ -2211,7 +2245,7 @@ public class FmodAudioProvider : IAudioProvider
                     var portals = _acousticMap.Portals.Values.Where(p =>
                         (p.Portal.RegionAId == regionId && p.Portal.RegionBId == listenerRegionId) ||
                         (p.Portal.RegionAId == listenerRegionId && p.Portal.RegionBId == regionId) ||
-                        (listenerRegionId == _acousticMap.GlobalEnvironmentId && (p.Portal.RegionAId == regionId || p.Portal.RegionBId == regionId))
+                        (!IsEnclosure(listenerRegionId) && (p.Portal.RegionAId == regionId || p.Portal.RegionBId == regionId))
                     );
 
                     var nearest = portals.OrderBy(p => Vector3.Distance(lPosVec, p.Position)).FirstOrDefault();

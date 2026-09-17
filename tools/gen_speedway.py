@@ -228,13 +228,24 @@ for (cx, base, cz, length, height, thickness, tx, tz) in _wall_ring(_cl, -(OUT_R
 blk = 2 * GS_HALF_X / GS_BLOCKS
 for i in range(GS_BLOCKS):
     cx = -GS_HALF_X + blk * (i + 0.5)
+    # THE DECK AND THE WALL BEHIND THE SEATS ARE NOT BARE CONCRETE.
+    #
+    # They were, and the consequence was heard: the applause came back off the stand as a crisp copy
+    # of itself, because a flat slab is a mirror and that is what the map said it was. What a
+    # grandstand actually presents to a racetrack is tiered seating with people in it — the most
+    # absorbent and the most scattering thing in ordinary acoustics — so it takes about three quarters
+    # of what reaches it and sends most of the rest back in every direction at once. That is a
+    # property of the material, not a rule about grandstands: the retaining wall beside the track is
+    # still concrete and still answers the cars with a slapback, because concrete is what it is.
     entities.append({
-        "EntityId": eid, "PrefabId": "building_box",
+        "EntityId": eid, "PrefabId": "grandstand_seating",
         "Position": v3(cx, GS_TOP / 2, (GS_FRONT + GS_BACK) / 2),
-        "Scale": v3(blk / 10.0, GS_TOP / 5.0, abs(GS_FRONT - GS_BACK) / 10.0),
+        "Scale": v3(blk / 2.0, GS_TOP / 3.0, abs(GS_FRONT - GS_BACK) / 0.5),
     }); eid += 1
-    # The upper tier's back wall: the big flat concrete face that answers every car on the straight.
-    entities.append(wall(eid, cx, UPPER_BASE, UPPER_Z, blk + 0.5, UPPER_H, 1.5, 1.0, 0.0)); eid += 1
+    # The upper tier's back wall: the big face that answers every car on the straight, and the one the
+    # crowd is sitting in front of.
+    entities.append(wall(eid, cx, UPPER_BASE, UPPER_Z, blk + 0.5, UPPER_H, 1.5, 1.0, 0.0,
+                         prefab="grandstand_seating")); eid += 1
     # ...and the people in it. One crowd per block, standing ON the deck, so the applause comes from
     # a row of places along the straight rather than from a single point — a stand you can hear the
     # width of. They are sources with a position and a head count, not a bed: silent until something

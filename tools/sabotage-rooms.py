@@ -351,6 +351,140 @@ SABOTAGE = [
   "                return $\"It encloses a room {shape}, with {Walls} of its six faces walled \"\n                     + $\"({string.Join(\", \", Open())} open). The floor is {Materials[0]}.\";",
   "                return $\"It encloses a room {shape}.\";",
   "ItNamesWhatIsStillOpenEvenWhenItPasses"),
+
+ # ── A region is not a room (2026-09-16) ─────────────────────────────────────────────────────────
+ ("An open face is a mirror again: a region with no ceiling is a sealed room",
+  "OpenFPS.Common/RoomAcoustics.cs",
+  "        => region.RoomSize.X > 0f && OpenFaceCount(region) == 0;",
+  "        => region.RoomSize.X > 0f;",
+  "TheSpeedwayIsOutside"),
+
+ ("Material 'None' is a surface again rather than an opening",
+  "OpenFPS.Common/RoomAcoustics.cs",
+  "        => materials != null && face < materials.Length && materials[face] == OpenFaceMaterial;",
+  "        => false;",
+  "AnUnclosedRegionGetsNoSabineEstimate"),
+
+ ("What a room is made of stops reaching its decay",
+  "OpenFPS.Common/RoomAcoustics.cs",
+  "        float decayMs = absorption > 0.01f",
+  "        float decayMs = absorption > 1e9f",
+  "TheRoomsOnTheDefaultMapStillReverberate"),
+
+ ("The outdoors is given six real materials again, so the sky reflects",
+  "OpenFPS.Common/Systems/AcousticVolumeGenerator.cs",
+  "                Materials = new int[6]",
+  "                Materials = new int[] { 1, 1, 1, 15, 1, 1 }",
+  "TheSpeedwayIsOutside"),
+
+ ("The ground underfoot makes a room out of a stretch of racetrack",
+  "OpenFPS.Common/RoomAcoustics.cs",
+  "    public static int OpenFaceCount(in RegionComponent region)\n    {\n        int open = 0;",
+  "    public static int OpenFaceCount(in RegionComponent region)\n    {\n        int open = 0; if (region.RoomSize.X > 0f) return 0;",
+  "AFloorUnderfootDoesNotMakeARoom"),
+
+ # ── A source has a size (2026-09-16) ────────────────────────────────────────────────────────────
+ ("A crowd is a point source again",
+  "OpenFPS.Common/Applause.cs",
+  "        => MathF.Sqrt(Math.Max(1, people) / PeoplePerSquareMetre / MathF.PI);",
+  "        => 0f;",
+  "ACrowdIsNotAPoint"),
+
+ ("An extended source keeps its gain when its reference distance widens",
+  "OpenFPS.Common/Loudness.cs",
+  "        return (gain * (reference / extentMetres), extentMetres);",
+  "        return (gain, extentMetres);",
+  "AStandAcrossTheInfieldIsHeardAgainstTheCars"),
+
+ ("The applause key is not quantised, so every reaction is a fresh render",
+  "OpenFPS.Common/Applause.cs",
+  "        return new CrowdApplause(clappers, intensity, MathF.Max(0.25f, seconds));",
+  "        return spec;",
+  "TwoCrowdsThatDifferByAPersonAreOneSound"),
+
+ ("A transient's range is capped at 250 m again, inside the map it is on",
+  "OpenFPS.Client.Core/WorldAudioPlayer.cs",
+  "    internal const float MaxRange = 3000f;",
+  "    internal const float MaxRange = 250f;",
+  "ALoudTransientIsNotFadedOutInsideTheMapItIsOn"),
+
+ ("A one-shot's echo may be 34 dB down, like a continuous source's",
+  "OpenFPS.Common/ImageSource.cs",
+  "    public const float EchoAudibleRatio = 0.1f;",
+  "    public const float EchoAudibleRatio = 0.02f;",
+  "ACheerComesBackOffTheBackOfTheStand"),
+
+ # ── Voices (2026-09-16) ─────────────────────────────────────────────────────────────────────────
+ ("A borrowed voice follows the play position of the car it borrowed from",
+  "OpenFPS.Client.Core/AudioEngine/Fmod/EngineProcessor.cs",
+  "        if (OwnCursor) { RenderOwnCursor(mono, floorSamples, target, gTarget); return; }",
+  "        if (false) { RenderOwnCursor(mono, floorSamples, target, gTarget); return; }",
+  "ABorrowedVoiceDoesNotInheritTheDopplerOfTheCarItBorrowedFrom"),
+
+ ("A one-shot that lost the budget is kept in the queue and played later",
+  "OpenFPS.Client.Core/AudioEngine/Core/VoiceManager.cs",
+  "                if (!status.IsPhysicallyPlaying && status.Emitter.IsEvent)",
+  "                if (false && status.Emitter.IsEvent)",
+  "AnEventThatDoesNotWinAVoiceIsForgottenRatherThanQueued"),
+
+ ("Transient voice ids reach into the engine-echo and borrowed-voice bands",
+  "OpenFPS.Client.Core/WorldAudioPlayer.cs",
+  "    internal const int TransientVoiceBase = -100_000;",
+  "    internal const int TransientVoiceBase = -1_000_000;",
+  "TheVoiceIdBandsDoNotOverlap"),
+
+
+ # ── A stand is a diffuser, not a slab (2026-09-16) ──────────────────────────────────────────────
+ ("A grandstand full of people reflects like polished concrete",
+  "OpenFPS.Common/AcousticRegistry.cs",
+  "reg[\"Audience\"] = new MaterialProperties { Absorption = 0.72f, AbsorptionLow = 0.5f, AbsorptionMid = 0.75f, AbsorptionHigh = 0.85f, Scattering = 0.8f",
+  "reg[\"Audience\"] = new MaterialProperties { Absorption = 0.72f, AbsorptionLow = 0.5f, AbsorptionMid = 0.75f, AbsorptionHigh = 0.85f, Scattering = 0.05f",
+  "TheStandIsSeatingAndTheWallsAreNot"),
+
+ ("The scattered share is not taken out of the mirror image",
+  "OpenFPS.Common/ImageSource.cs",
+  "                float gain = (direct / path) * reflected * (1f - scatter)",
+  "                float gain = (direct / path) * reflected * 1f",
+  "ASlabMirrorsAndAStandFullOfPeopleScatters"),
+
+ ("Every tap on a scattering face is at the same point, so there is no spread",
+  "OpenFPS.Common/ImageSource.cs",
+  "            float u = taps == 1 ? 0f : -0.9f + 1.8f * t / (taps - 1);",
+  "            float u = 0f;",
+  "AScatteredArrivalComesFromTheWallItself"),
+
+ ("A rough surface only answers from where a mirror would",
+  "OpenFPS.Common/ImageSource.cs",
+  "            if (diffuseTaps > 0 && scatter > 0.01f)",
+  "            if (specularLandsOnTheFace && diffuseTaps > 0 && scatter > 0.01f)",
+  "AScatteredArrivalComesFromTheWallItself"),
+
+
+ # ── A clap is hands, not cellophane (2026-09-16) ────────────────────────────────────────────────
+ ("The palms stop thumping, and the clap loses its tail",
+  "OpenFPS.Common/Applause.cs",
+  "    public const float ThumpLevel = 1.1f;",
+  "    public const float ThumpLevel = 0.0f;",
+  "AClapOutlastsItsOwnEdge"),
+
+ ("The pocket of air stops ringing, leaving a low-pass tilt",
+  "OpenFPS.Common/Applause.cs",
+  "                             + cav * (1.3f * who.Cupping)",
+  "                             + cav * 0f",
+  "AClapHasABodyAndNotJustAnEdge"),
+
+ ("A clap is cut off as soon as its edge has gone",
+  "OpenFPS.Common/Applause.cs",
+  "        int len = Math.Min((int)(thumpTau * 5f * sampleRate), into.Length - at);",
+  "        int len = Math.Min((int)(bodyTau * 3f * sampleRate), into.Length - at);",
+  "AClapOutlastsItsOwnEdge"),
+
+ ("Everyone in the crowd is the same distance away, so every clap is the same size",
+  "OpenFPS.Common/Applause.cs",
+  "        float distance = near + MathF.Sqrt((float)rng.NextDouble()) * 28f;",
+  "        float distance = near;",
+  "ACrowdHasANearEdgeAndIsNotAWash"),
+
 ]
 
 def run(test):
@@ -366,8 +500,14 @@ def run(test):
     if "Failed!" in out: return "FAILED"
     return "UNKNOWN"
 
+# `sabotage-rooms.py <substring> [<substring> ...]` runs only the rows whose label, test or FILE
+# matches one of them — adding one row should not cost an hour of re-running the other sixty.
+only = [a.lower() for a in sys.argv[1:]]
+
 results = []
 for label, rel, find, repl, test in SABOTAGE:
+    if only and not any(a in label.lower() or a in test.lower() or a in rel.lower() for a in only):
+        continue
     path = os.path.join(REPO, rel)
     original = open(path).read()
     if find not in original:

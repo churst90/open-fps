@@ -15,7 +15,11 @@ public readonly record struct ReflectingSurface(
     float Absorption,
     /// <summary>Stable identity for this face, so a reflection keeps the same voice frame to frame
     /// instead of retriggering as a click every time the geometry is rescanned.</summary>
-    int SurfaceId);
+    int SurfaceId,
+    /// <summary>How much of what it reflects leaves in every direction instead of as a mirror image.
+    /// 0 is a polished slab, 1 is a surface that re-radiates everything diffusely. A grandstand full
+    /// of people is near the top of that range; a concrete retaining wall is near the bottom.</summary>
+    float Scattering = 0f);
 
 /// <summary>
 /// A sound arriving by way of one bounce: where it appears to come from, and when.
@@ -33,7 +37,12 @@ public readonly record struct Reflection(
     float PathLength,
     /// <summary>Linear gain relative to the direct sound, from the extra distance and the surface.</summary>
     float Gain,
-    int SurfaceId);
+    int SurfaceId,
+    /// <summary>True if this is the SCATTERED share of a surface's return rather than its mirror
+    /// image: it radiates from the surface itself, so it arrives from the wall rather than from a
+    /// point behind it, and several of them across the face is what makes a rough surface a wash
+    /// instead of a copy.</summary>
+    bool IsDiffuse = false);
 
 /// <summary>
 /// First-order specular reflections, by the image-source method.
@@ -68,6 +77,23 @@ public static class ImageSource
     public const float MinGain = 0.02f;
 
     /// <summary>
+    /// How far under the direct sound a ONE-SHOT's reflection can be and still be heard as an echo.
+    ///
+    /// A continuous source is different: an engine's reflection is part of the wash it makes against a
+    /// wall and is worth having 34 dB down, which is what <see cref="MinGain"/> allows. A single event
+    /// is heard once, and a copy of it far enough under the original is not heard as a second event at
+    /// all — it is fused with the first and then masked by whatever happens next. Twenty decibels is
+    /// about where that line sits.
+    ///
+    /// It is a RATIO, and that is what ties it to the loudness of the thing: your own footstep is a
+    /// metre away and the wall is fifty, so its echo is forty decibels down and there is no echo —
+    /// which is what a footstep outdoors actually does. The same footstep in a corridor with a wall
+    /// two metres away is ten decibels down and slaps, which is also what it actually does. Nothing
+    /// here knows what a footstep is; it knows how loud the copy is against the original.
+    /// </summary>
+    public const float EchoAudibleRatio = 0.1f;
+
+    /// <summary>
     /// The frequency the reflector-size test is evaluated at, Hz.
     ///
     /// Whether a surface reflects or is diffracted around depends on its size against the WAVELENGTH,
@@ -100,9 +126,24 @@ public static class ImageSource
     /// null to skip it — the reflections will then include some that a building is actually standing
     /// in front of, which is cheap and usually inaudible under the ones that are real.
     /// </summary>
+    /// <param name="diffuseTaps">
+    /// How many points across each surface also radiate its SCATTERED share, or 0 for mirrors only.
+    ///
+    /// A real surface does not send everything it reflects along one path. The rougher it is — and a
+    /// grandstand full of seats and people is about as rough as a surface gets — the more of what it
+    /// returns leaves in every direction at once, from the surface itself rather than from a point
+    /// behind it. Sampling that at a few points across the face is what turns a crisp copy into a
+    /// wash, because the taps arrive over the spread of path lengths the face covers rather than all
+    /// at one instant.
+    ///
+    /// Off by default because it costs a voice per tap, and because a CONTINUOUS source's scattered
+    /// energy is already accounted for elsewhere: the ray-traced RT60 that drives the outdoor reverb
+    /// is exactly that field. Nothing accounts for a ONE-SHOT's, which is why the clapping came back
+    /// off the grandstand as an exact copy of itself.
+    /// </param>
     public static int FirstOrder(ReadOnlySpan<ReflectingSurface> surfaces, Vector3 source,
                                  Vector3 listener, float speedOfSound, Span<Reflection> into,
-                                 Func<Vector3, Vector3, bool>? occluded = null)
+                                 Func<Vector3, Vector3, bool>? occluded = null, int diffuseTaps = 0)
     {
         if (into.Length == 0) return 0;
         float direct = Vector3.Distance(source, listener);
@@ -132,30 +173,96 @@ public static class ImageSource
             float t = dS / denom;
             Vector3 hit = image + (listener - image) * t;
 
-            // ...but only counts if it lands ON the face rather than off the end of it. This is the
-            // test that makes a gap in a row of buildings actually be a gap.
+            // ...but the MIRROR IMAGE only counts if the bounce lands ON the face rather than off the
+            // end of it. This is the test that makes a gap in a row of buildings actually be a gap.
+            // A face that fails it can still SCATTER to the listener — that is the difference between
+            // a mirror, which only works from the one place it works from, and a rough surface, which
+            // answers from wherever you are standing — so the specular test gates only the specular.
             Vector3 rel = hit - s.Centre;
             float u = Vector3.Dot(rel, s.HalfU) / MathF.Max(1e-6f, s.HalfU.LengthSquared());
             float v = Vector3.Dot(rel, s.HalfV) / MathF.Max(1e-6f, s.HalfV.LengthSquared());
-            if (MathF.Abs(u) > 1f || MathF.Abs(v) > 1f) continue;
+            bool specularLandsOnTheFace = MathF.Abs(u) <= 1f && MathF.Abs(v) <= 1f;
 
-            float path = Vector3.Distance(image, listener);
+            float reflected = 1f - Math.Clamp(s.Absorption, 0f, 1f);
+            float scatter = Math.Clamp(s.Scattering, 0f, 1f);
+
+            if (specularLandsOnTheFace)
+            {
+                float path = Vector3.Distance(image, listener);
+                float delay = (path - direct) / MathF.Max(1f, speedOfSound);
+                // Spreading loss, what the surface kept, and how much of it there is — and then only
+                // the share that leaves as a mirror image. A polished slab keeps nearly all of it
+                // here; a stand full of people almost none.
+                float gain = (direct / path) * reflected * (1f - scatter)
+                           * ApertureFactor(s, source, listener, hit);
+
+                if (path <= MaxPathLength && path > direct && gain >= MinGain && delay >= MinDelaySeconds
+                    && (occluded == null || (!occluded(source, hit) && !occluded(hit, listener))))
+                    n = Insert(into, n, new Reflection(image, hit, delay, path, gain, s.SurfaceId));
+            }
+
+            if (diffuseTaps > 0 && scatter > 0.01f)
+                n = Scatter(into, n, s, source, listener, direct, speedOfSound, reflected * scatter,
+                            diffuseTaps, occluded);
+        }
+        return n;
+    }
+
+    /// <summary>
+    /// The share a surface sends back in every direction, sampled at a few points across it.
+    ///
+    /// Each tap is the surface radiating from where it is, so what reaches the listener is the
+    /// Lambert fraction: the patch collects what falls on it from the source, spreads it over a
+    /// hemisphere, and the listener gets the part aimed their way —
+    /// <c>A·cosθs·cosθl·direct² / (π·rs²·rl²)</c> as an ENERGY ratio against the direct sound. That
+    /// is the "a lot of it is taken by the open space" term, and it is also why a big surface close
+    /// to the source still comes back strongly: a wall right behind a crowd catches a large part of
+    /// what they make.
+    ///
+    /// Material coefficients stay in the amplitude convention the rest of this file uses, so only the
+    /// geometry goes through the square root.
+    /// </summary>
+    private static int Scatter(Span<Reflection> into, int n, in ReflectingSurface s,
+                               Vector3 source, Vector3 listener, float direct, float speedOfSound,
+                               float returned, int taps, Func<Vector3, Vector3, bool>? occluded)
+    {
+        Vector3 nrm = s.Normal;
+        // Spread the taps along the face's longer axis: that is the axis whose spread of path lengths
+        // smears the arrival, and the smear is what stops it being a copy.
+        bool uLonger = s.HalfU.LengthSquared() >= s.HalfV.LengthSquared();
+        Vector3 along = uLonger ? s.HalfU : s.HalfV;
+        float area = 4f * s.HalfU.Length() * s.HalfV.Length();
+        if (area <= 0.01f) return n;
+
+        for (int t = 0; t < taps; t++)
+        {
+            // Evenly across the face: two taps sit at a quarter and three quarters of its width.
+            float u = taps == 1 ? 0f : -0.9f + 1.8f * t / (taps - 1);
+            Vector3 tap = s.Centre + along * u;
+
+            float rS = Vector3.Distance(source, tap), rL = Vector3.Distance(tap, listener);
+            if (rS < 0.5f || rL < 0.5f) continue;
+            float cosS = Math.Clamp(Vector3.Dot(Vector3.Normalize(source - tap), nrm), 0f, 1f);
+            float cosL = Math.Clamp(Vector3.Dot(Vector3.Normalize(listener - tap), nrm), 0f, 1f);
+            if (cosS <= 0f || cosL <= 0f) continue;
+
+            float path = rS + rL;
             if (path > MaxPathLength || path <= direct) continue;
-
-            if (occluded != null && (occluded(source, hit) || occluded(hit, listener))) continue;
-
-            // Spreading loss, what the surface kept, and HOW MUCH OF IT THERE IS.
-            float gain = (direct / path)
-                       * (1f - Math.Clamp(s.Absorption, 0f, 1f))
-                       * ApertureFactor(s, source, listener, hit);
-            if (gain < MinGain) continue;
-
             float delay = (path - direct) / MathF.Max(1f, speedOfSound);
             if (delay < MinDelaySeconds) continue;
 
-            var refl = new Reflection(image, hit, delay, path, gain, s.SurfaceId);
+            float energy = (area / taps) * cosS * cosL * direct * direct
+                         / (MathF.PI * rS * rS * rL * rL);
+            float gain = MathF.Sqrt(MathF.Max(0f, energy)) * returned;
+            if (gain < MinGain) continue;
 
-            n = Insert(into, n, refl);
+            if (occluded != null && (occluded(source, tap) || occluded(tap, listener))) continue;
+
+            // It radiates from the surface, so that is where it is heard from — not from an image
+            // behind the wall. Identified apart from the specular arrival so a caller keeping one
+            // voice per surface does not confuse the two.
+            n = Insert(into, n, new Reflection(tap, tap, delay, path, gain,
+                                               unchecked(s.SurfaceId * 397 + t + 1), true));
         }
         return n;
     }
@@ -167,7 +274,7 @@ public static class ImageSource
     /// from outside matter, which is all of them for a building standing in a street.
     /// </summary>
     public static int FacesOfBox(Vector3 centre, Vector3 size, float absorption, int baseId,
-                                 Span<ReflectingSurface> into)
+                                 Span<ReflectingSurface> into, float scattering = 0f)
     {
         if (into.Length < 6) return 0;
         Vector3 h = size * 0.5f;
@@ -175,12 +282,12 @@ public static class ImageSource
         var y = new Vector3(0, h.Y, 0);
         var z = new Vector3(0, 0, h.Z);
 
-        into[0] = new ReflectingSurface(centre + x, Vector3.UnitX, y, z, absorption, baseId + 0);
-        into[1] = new ReflectingSurface(centre - x, -Vector3.UnitX, y, z, absorption, baseId + 1);
-        into[2] = new ReflectingSurface(centre + y, Vector3.UnitY, x, z, absorption, baseId + 2);
-        into[3] = new ReflectingSurface(centre - y, -Vector3.UnitY, x, z, absorption, baseId + 3);
-        into[4] = new ReflectingSurface(centre + z, Vector3.UnitZ, x, y, absorption, baseId + 4);
-        into[5] = new ReflectingSurface(centre - z, -Vector3.UnitZ, x, y, absorption, baseId + 5);
+        into[0] = new ReflectingSurface(centre + x, Vector3.UnitX, y, z, absorption, baseId + 0, scattering);
+        into[1] = new ReflectingSurface(centre - x, -Vector3.UnitX, y, z, absorption, baseId + 1, scattering);
+        into[2] = new ReflectingSurface(centre + y, Vector3.UnitY, x, z, absorption, baseId + 2, scattering);
+        into[3] = new ReflectingSurface(centre - y, -Vector3.UnitY, x, z, absorption, baseId + 3, scattering);
+        into[4] = new ReflectingSurface(centre + z, Vector3.UnitZ, x, y, absorption, baseId + 4, scattering);
+        into[5] = new ReflectingSurface(centre - z, -Vector3.UnitZ, x, y, absorption, baseId + 5, scattering);
         return 6;
     }
 
@@ -195,7 +302,7 @@ public static class ImageSource
     /// nothing in particular.
     /// </summary>
     public static int FacesOfBox(Vector3 centre, Vector3 size, Quaternion rotation, float absorption,
-                                 int baseId, Span<ReflectingSurface> into)
+                                 int baseId, Span<ReflectingSurface> into, float scattering = 0f)
     {
         if (into.Length < 6) return 0;
         Vector3 h = size * 0.5f;
@@ -204,12 +311,12 @@ public static class ImageSource
         var z = Vector3.Transform(new Vector3(0, 0, h.Z), rotation);
         Vector3 nx = Norm(x), ny = Norm(y), nz = Norm(z);
 
-        into[0] = new ReflectingSurface(centre + x,  nx, y, z, absorption, baseId + 0);
-        into[1] = new ReflectingSurface(centre - x, -nx, y, z, absorption, baseId + 1);
-        into[2] = new ReflectingSurface(centre + y,  ny, x, z, absorption, baseId + 2);
-        into[3] = new ReflectingSurface(centre - y, -ny, x, z, absorption, baseId + 3);
-        into[4] = new ReflectingSurface(centre + z,  nz, x, y, absorption, baseId + 4);
-        into[5] = new ReflectingSurface(centre - z, -nz, x, y, absorption, baseId + 5);
+        into[0] = new ReflectingSurface(centre + x,  nx, y, z, absorption, baseId + 0, scattering);
+        into[1] = new ReflectingSurface(centre - x, -nx, y, z, absorption, baseId + 1, scattering);
+        into[2] = new ReflectingSurface(centre + y,  ny, x, z, absorption, baseId + 2, scattering);
+        into[3] = new ReflectingSurface(centre - y, -ny, x, z, absorption, baseId + 3, scattering);
+        into[4] = new ReflectingSurface(centre + z,  nz, x, y, absorption, baseId + 4, scattering);
+        into[5] = new ReflectingSurface(centre - z, -nz, x, y, absorption, baseId + 5, scattering);
         return 6;
     }
 

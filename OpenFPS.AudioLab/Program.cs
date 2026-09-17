@@ -436,6 +436,14 @@ if (args.Contains("--boundary") || args.Contains("--boundary-live"))
     Environment.Exit(code);
 }
 
+if (args.Contains("--open-air-reverb"))
+{
+    Console.WriteLine("--- Open air: does naming a place put a roof over it? ---");
+    int code = OpenFPS.Client.Core.AudioEngine.Fmod.OpenAirReverbSpike.Run();
+    Log.CloseAndFlush();
+    Environment.Exit(code);
+}
+
 if (args.Contains("--reverb-route"))
 {
     Console.WriteLine("--- Reverb routing: is a room's reverb gated by, and heard through, its doorway? ---");
