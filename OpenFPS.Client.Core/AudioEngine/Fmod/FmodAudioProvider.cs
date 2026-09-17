@@ -286,6 +286,18 @@ public class FmodAudioProvider : IAudioProvider
         /// </summary>
         public double WorstPositionAge;
 
+        /// <summary>
+        /// The budget's own gain on this voice, and where it is heading — 1 while it holds a slot,
+        /// 0 once it has lost one.
+        ///
+        /// Slewed rather than switched, in the same per-update pass that applies distance and
+        /// occlusion, so letting a voice go is a fade and taking it back is a fade the other way. It
+        /// is a plain multiplier on top of everything else the voice is doing, which is what lets it
+        /// work identically for a sample, a loop and a synthesized engine.
+        /// </summary>
+        public float FadeGain = 1f;
+        public float FadeTarget = 1f;
+
         public Vector3 Position; 
         public Vector3 ApparentPosition; 
         public Vector3 CurrentApparentPosition; 
@@ -460,6 +472,9 @@ public class FmodAudioProvider : IAudioProvider
     private readonly Stack<SaVoice> _saPool = new();
     private readonly List<SaVoice> _saAllVoices = new();
     private const int SaPoolSize = 96;
+
+    /// <summary>What is left of the binaural pool. See IAudioProvider.SpatialVoicesFree.</summary>
+    public int SpatialVoicesFree { get { lock (_saPool) return _saPool.Count; } }
 
     /// <summary>
     /// Logs and returns false when an FMOD call fails. FMOD result codes were previously
@@ -2144,7 +2159,14 @@ public class FmodAudioProvider : IAudioProvider
             }
         }
 
-        active.Channel.setVolume(active.BaseVolume * finalVolFactor * roomGainBonus * distAtten * coneAtten);
+        // The budget's fade, slewed here because this is the pass that already owns the voice's gain.
+        // About eighty milliseconds either way: long enough that no step survives it, short enough
+        // that a voice which has genuinely gone does not linger.
+        float fadeStep = dt / VoiceFadeSeconds;
+        active.FadeGain += Math.Clamp(active.FadeTarget - active.FadeGain, -fadeStep, fadeStep);
+
+        active.Channel.setVolume(active.BaseVolume * finalVolFactor * roomGainBonus * distAtten * coneAtten
+                                 * active.FadeGain);
 
         // Doppler: Steam Audio voices play on a 2D channel, so FMOD's own Doppler is bypassed — apply it
         // manually to the channel pitch from the real (not apparent) source/listener motion. Native-3D
@@ -2606,6 +2628,29 @@ public class FmodAudioProvider : IAudioProvider
     public void ReviveEngine(int entityId)
     {
         lock (_lock) { FindActive(entityId)?.EngineState?.Revive(); }
+    }
+
+    /// <summary>How long the budget's fade takes, seconds. See ActiveSound.FadeGain.</summary>
+    private const float VoiceFadeSeconds = 0.08f;
+
+    public bool FadeOutVoice(int entityId)
+    {
+        lock (_lock)
+        {
+            var active = FindActive(entityId);
+            if (active == null) return true;
+            active.FadeTarget = 0f;
+            return active.FadeGain <= 0.01f;
+        }
+    }
+
+    public void CancelVoiceFade(int entityId)
+    {
+        lock (_lock)
+        {
+            var active = FindActive(entityId);
+            if (active != null) active.FadeTarget = 1f;
+        }
     }
 
     public bool FadeOutEngine(int entityId)

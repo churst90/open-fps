@@ -2460,13 +2460,23 @@ corresponding correct binaural audio effects, reflections — most things are di
       - `ChooseFrontVoices` has no test: nothing constructs a `ClientAudioSystem` in the suite.
         `Localisation` and the tap summing are tested; the bookkeeping around them is not.
 
-- [ ] **2. Extent on every emitter, and audibility ranking.** Delete authored `SpatialEmitter.Priority`
-      — engines are 1 and transients are 2, so a clap 200 m away outranks a car at 5 m by four to one.
-      Rank instead by `Loudness.RenderedGain x occlusion`, which is the mixer's own law and already
-      lives in Common for exactly this. The pattern to copy is `EngineReflections.AudibilityFloor`.
-      A continuous source that falls out of the list FADES; a one-shot DROPS. And extent replaces
-      `MathF.Max(reference, 3f)` in `ClientAudioSystem`, which is a car-sized fudge with no gain
-      compensation.
+- [x] **2. Extent on every emitter, and audibility ranking.** DONE (session 10). `Priority` deleted;
+      voices rank on `Loudness.RenderedGain x (1 - occlusion)`, which is the mixer's own law, with a
+      2 dB hysteresis for a voice already playing and a short pinned list (`Essential`: your own
+      footsteps and landing, speech when it exists). Continuous sources FADE out of the budget
+      (`IVoiceSink.FadeOut`/`CancelFade`, an 80 ms slew on the channel gain in the provider's own
+      volume pass); one-shots drop. `VoiceManager.MaxVoices` is now asked of the mixer every frame —
+      what it holds plus the free HRTF voices — so the budget is the real resource rather than 256.
+      And `MathF.Max(reference, 3f)` is replaced by the machine's own extent through `Loudness.Widen`,
+      which cost every quiet vehicle the 8 dB it had not earned.
+
+      Still open from it:
+      - The acceptance that needs a live client: `without HRTF` should now stay at zero through a full
+        crowd reaction. Nothing headless can check it.
+      - `AudioEngineFacade` sets the budget and has no test — it needs FMOD to construct.
+      - The lab's older spikes (`VehicleSpike`, `StreetSceneSpike`) still carry their own
+        `MathF.Max(reference, 3f)`, so they are now 8 dB louder than the game for quiet machines.
+
 - [ ] **3. Aggregation.** Many like sources collapse into one extended source past the distance at
       which nobody can tell them apart — the crowd is the worked example and it is already built
       (`ExtentMetres`, `Place(level, extent)`, ten log of the count). This is what makes a city fit in
@@ -2492,3 +2502,22 @@ corresponding correct binaural audio effects, reflections — most things are di
       `without HRTF` in the tens means voice pressure (raise `SaPoolSize`, or cut further); zero with a
       non-zero `out of budget` means the adaptive engine budget is shedding cars under mixer load,
       which is a different fix.
+
+### Found while listening, session 10: the utility diesels may be 10-15 dB under life
+
+Reported by ear — "the truck and the bus are quiet at a distance at idle, and the muscle car too until
+it revs". Measured with `--machine-levels`, declared levels are at FULL LOAD and at 1 m:
+
+| machine | idle | cruise 50 | full load | a real one, full load |
+|---|---|---|---|---|
+| 13 L semi | 72 | 83 | 93 | ~102 (drive-by 84 dBA at 7.5 m) |
+| school bus | 71 | 79 | 85 | ~95-100 |
+| big-block muscle car | 103 | 107 | 122 | ~100-110 |
+| NASCAR | 119 | 126 | 130 | ~130 |
+
+If those reference figures hold, the spread is wrong at both ends: the muscle car sits 37 dB over the
+bus where life says about 10. Every one of those numbers is MEASURED from the synthesis and held by
+`EngineSynthTests`, so this is not a gain to nudge — it is a question about how much power the model
+radiates for a big slow diesel against a fast petrol V8, and the answer belongs in the mechanism
+(radiating area, stack diameter, how block noise is scaled against the gas path). Worth doing before
+any decision about the mix's anchor, because it would move the anchor.

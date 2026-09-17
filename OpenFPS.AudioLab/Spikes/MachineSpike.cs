@@ -81,13 +81,18 @@ public static class MachineSpike
     /// identical either way by construction (the taps sum to the single voice), so anything you can
     /// hear between the two passes is the rig.
     ///
-    /// Command line: --machine-pass [id] [kmh=..] [side=..] [one] [two]
+    /// Command line: --machine-pass [id] [kmh=..] [side=..] [one] [two] [hard]
+    ///
+    /// `hard` accelerates the machine through the pass instead of holding a speed, which is worth
+    /// knowing about before judging how loud anything is: a declared source level is measured at FULL
+    /// LOAD, and an engine cruising at a steady 50 km/h in a tall gear is doing a fraction of that
+    /// work. A car that idles past you quietly and shouts when it is opened up is not a bug.
     /// </summary>
     public static int Pass(string[] args)
     {
         string id = args.FirstOrDefault(a => !a.StartsWith("--") && MachineRegistry.Knows(a)) ?? "v8_muscle";
         float kmh = Arg(args, "kmh", 50f), side = Arg(args, "side", 5f);
-        bool onlyOne = args.Contains("one"), onlyTwo = args.Contains("two");
+        bool onlyOne = args.Contains("one"), onlyTwo = args.Contains("two"), hard = args.Contains("hard");
 
         AcousticRegistry.Initialize();
         var v = MachineRegistry.VehicleFor(id);
@@ -109,8 +114,8 @@ public static class MachineSpike
             provider.UpdateListener(ear, Quaternion.Identity, Vector3.Zero, AcousticConstants.GlobalRegionId);
             for (int i = 0; i < 30; i++) { provider.Update(); Thread.Sleep(8); }
 
-            if (!onlyTwo) Drive(provider, v, id, ear, kmh, side, split: false);
-            if (!onlyOne) Drive(provider, v, id, ear, kmh, side, split: true);
+            if (!onlyTwo) Drive(provider, v, id, ear, kmh, side, split: false, hard);
+            if (!onlyOne) Drive(provider, v, id, ear, kmh, side, split: true, hard);
         }
         finally { provider.Dispose(); }
         return 0;
@@ -120,17 +125,22 @@ public static class MachineSpike
     private const int IntakeId = -91501;
 
     private static void Drive(FmodAudioProvider provider, VehicleProfile v, string key,
-                              Vector3 ear, float kmh, float side, bool split)
+                              Vector3 ear, float kmh, float side, bool split, bool hard = false)
     {
         float speed = kmh / 3.6f;
+        // Opened up: the driver chases a speed well past the one it starts at, so the engine is under
+        // load and changing gear as it goes by — which is the state a declared source level describes
+        // and the state anybody notices a vehicle in.
+        float top = hard ? speed * 3f : speed;
         float from = -130f, to = 130f;
         var level = v.SourceLevelDb;
         var (gain, reference) = Loudness.Place(level);
         float range = Loudness.AudibleRange(level);
 
-        Console.WriteLine(split
+        Console.WriteLine((split
             ? "  ── TWO voices: the airbox at the front, the tailpipe at the back."
-            : "  ── ONE voice: the whole machine at a point between its ends.");
+            : "  ── ONE voice: the whole machine at a point between its ends.")
+            + (hard ? $"  Accelerating to {top * 3.6f:F0} km/h." : "  Steady speed."));
 
         // Where each outlet is. Heard as one thing, the voice sits between them and nearer the
         // exhaust — VehicleProfile.ExhaustEmitterBias — which is the compromise the split removes.
@@ -169,6 +179,8 @@ public static class MachineSpike
         {
             double now = clock.Elapsed.TotalSeconds;
             float dt = (float)(now - last); last = now;
+            if (hard) speed = MathF.Min(top, speed + 2.4f * dt);
+            vel = new Vector3(0f, 0f, speed);
             pos = new Vector3(side, 0.6f, pos.Z + speed * dt);
             provider.UpdateSpatialAttributes(Exhaust(pos, vel));
             if (split) provider.UpdateSpatialAttributes(Intake(pos, vel));
@@ -191,6 +203,76 @@ public static class MachineSpike
         provider.StopSound(CarId);
         for (int i = 0; i < 60; i++) { provider.Update(); Thread.Sleep(8); }
         Console.WriteLine();
+    }
+
+    /// <summary>
+    /// How loud a machine actually is at a speed — and what that becomes at a distance.
+    ///
+    /// The declared `SourceLevelDb` every preset carries is measured at FULL LOAD, which is the right
+    /// anchor for the mix and the wrong number to have in your head when a car cruises past. This
+    /// renders the game's own live voice at a steady speed, measures the pressure it makes, and then
+    /// walks it out through the mixer's own distance law (Loudness.RenderedGain) so the two questions
+    /// — "how loud is this thing" and "what will I hear" — are answered with one set of numbers.
+    ///
+    /// Command line: --machine-levels [id ...] [kmh=..]
+    /// </summary>
+    public static int Levels(string[] args)
+    {
+        float kmh = Arg(args, "kmh", 50f);
+        var ids = args.Where(a => !a.StartsWith("--") && MachineRegistry.Knows(a)).ToList();
+        if (ids.Count == 0) ids = MachineRegistry.Ids.ToList();
+
+        Console.WriteLine($"\n  What each machine makes at a steady {kmh:F0} km/h, and what reaches a listener.");
+        Console.WriteLine("  full = its declared level at FULL LOAD, 1 m. cruise = measured here, 1 m.");
+        Console.WriteLine("  The dBFS columns are what the mixer renders at that distance.\n");
+        Console.WriteLine("    machine            full dB   idle dB   cruise dB   under      5 m     20 m     50 m    130 m");
+        foreach (string id in ids)
+        {
+            var v = MachineRegistry.VehicleFor(id);
+            float idleDb = CruiseLevelDb(v, 0f);
+            float cruiseDb = CruiseLevelDb(v, kmh / 3.6f);
+            // Placed the way the game places it: a machine is as big as the distance between the
+            // ends it radiates from, and the gain is paid down as the reference widens.
+            float extent = Vector3.Distance(
+                new Vector3(0f, v.ExhaustHeight, v.ExhaustOffsetZ),
+                new Vector3(0f, v.IntakeHeight, v.IntakeOffsetZ));
+            var (gain, reference) = Loudness.Place(v.SourceLevelDb, extent);
+            float range = Loudness.AudibleRange(v.SourceLevelDb);
+            // The voice renders the pressure it actually makes, so the cruise/full difference is
+            // already IN the signal; the placement below is the same for both.
+            float under = cruiseDb - v.SourceLevelDb;
+            string At(float d)
+            {
+                float g = Loudness.RenderedGain(gain, reference, range, d);
+                if (g <= 0f) return "   —  ";
+                // Rendered gain, the voice's own headroom, and how far under full load it is running.
+                return $"{20f * MathF.Log10(g) - VehicleProfile.PeakHeadroomDb + under,6:F0}";
+            }
+            Console.WriteLine($"    {id,-16}  {v.SourceLevelDb,7:F0}   {idleDb,7:F0}   {cruiseDb,9:F0}   {under,5:F0}   {At(5f)}   {At(20f)}   {At(50f)}   {At(130f)}");
+        }
+        Console.WriteLine("\n  dBFS is RMS. A steady cruise is a long way under full load, by design and by physics.\n");
+        return 0;
+    }
+
+    /// <summary>The RMS the game's live voice makes at a steady speed, as dB SPL at one metre.</summary>
+    private static float CruiseLevelDb(VehicleProfile v, float metresPerSecond)
+    {
+        var voice = new OpenFPS.Client.AudioEngine.Fmod.EngineVoiceState(v, 44100f, 11)
+        { TargetSpeed = metresPerSecond };
+        voice.PlaceAtSpeed(metresPerSecond);
+        var block = new float[1024];
+        double sum = 0; int n = 0;
+        for (int b = 0; b < 44100 * 2 / 1024; b++)
+        {
+            voice.Produce();
+            voice.Consume(block);
+            if (b < 10) continue;                     // the envelope fading in
+            foreach (float x in block) { sum += x * x; n++; }
+        }
+        float rms = MathF.Sqrt((float)(sum / Math.Max(1, n)));
+        // Back into pascals: the voice divides by the pressure that maps to full scale.
+        float pa = rms * v.PascalsAtFullScale;
+        return 20f * MathF.Log10(MathF.Max(1e-9f, pa) / 20e-6f);
     }
 
     private static float Arg(string[] args, string name, float fallback)

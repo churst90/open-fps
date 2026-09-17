@@ -195,9 +195,9 @@ public sealed class WorldAudioPlayer
                 MinDistance = placed.ReferenceDistance,
                 Pitch = 1.0f,
                 Type = EmitterType.WorldLocked,
-                // A reflection is a COPY, so it gives way first when there is not room for everything:
-                // losing the slapback off a wall costs a cue, losing the car that made it costs the car.
-                Priority = item.IsReflection ? 1 : 2,
+                // Nothing is ranked by WHAT IT IS any more. A reflection gives way first because it
+                // IS quieter — its Volume already carries what the surface kept and how far the
+                // mirrored path ran — and the budget ranks on the level a voice will deliver.
                 EnableReverb = true,
                 // An EVENT: it belongs to a moment. If the budget has no room for it now there is no
                 // playing it later — see VoiceManager.Process, which drops one that did not win a slot

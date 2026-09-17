@@ -1473,3 +1473,61 @@ voice whose loss costs nothing but geometry.
 as two, which is the only way to judge it.
 
 Tests 605.
+
+---
+
+# Nothing is ranked by what it is any more
+
+`SpatialEmitter.Priority` is gone. It was an authored integer, engines 1 and transients 2, squared
+over distance — so a clap two hundred metres away outranked a car at five metres by four to one, and
+the car that lost was not faded, it was `StopSoundImmediate`d and rebuilt the next frame. For a
+synthesized engine a rebuild is a fresh ring, priming silence and an envelope fade. That is what
+"vehicles stop close in front of me while going past" is made of.
+
+Voices are ranked instead on **the level they will actually deliver to the ear**:
+`Loudness.RenderedGain(volume, reference, range, distance)` — the mixer's own distance law, so this is
+not an estimate of the balance, it IS the balance — times what the path lets through. A bird, a bus, a
+fountain and a jet are compared in identical units and nothing in the ranking knows what any of them
+is. Below `SilenceGain` a candidate is not scored at all: not because of what it is, but because
+nobody can hear it.
+
+Two deliberate departures, both small. `Essential` pins a short explicit list above the arithmetic —
+your own footsteps, your own landing, and speech when it exists — because those are what a player
+NEEDS rather than what is loudest, and on a racetrack the physics would rightly bury every one of
+them. And a voice already playing is worth two decibels more than one that is not, which is HYSTERESIS
+and not importance: two sources within a hair of each other would otherwise trade the last slot every
+frame, and a voice swapping in and out at frame rate is a worse noise than either being missing.
+
+**A continuous source now FADES out of the budget; a one-shot is dropped.** The difference is what a
+sound IS. A car that runs out of budget is still there, still making a noise. A one-shot has already
+missed its moment. `IVoiceSink.FadeOut`/`CancelFade` are the two halves, and the second one matters as
+much as the first — a voice that wins its slot back mid-fade is brought round rather than left with
+its gain heading for zero and everything else about it alive, which is a fault this engine has already
+paid for once.
+
+## The budget is the real resource
+
+`VoiceManager.MaxVoices` was 256 and is now asked of the mixer every frame: what this manager already
+holds, plus the binaural voices still free. Every spatialised voice needs one of ninety-six HRTF
+slots, and a voice that cannot get one does not fail — it plays FLAT, with no position at all, which
+on a map navigated by ear is worse than not playing it. The fixed number could not see that coming,
+because the reflections, borrowed cars and second outlets that bypass this manager were spending the
+same pool behind its back. It settles instead of hunting: what is free shrinks as the manager starts
+voices, so the budget stops rising exactly where the pool runs out.
+
+## A source has a size, and it is not a discount
+
+`MathF.Max(reference, 3f)` is gone from the vehicle path. Widening a source's reference distance
+models an extended source only if the gain is paid down to match — what the inverse law carries is the
+PRODUCT — and this widened it and paid nothing, which is not an extended source, it is a louder one.
+It was worth up to **eight decibels** to every quiet vehicle: a hatchback's honest reference is 1.2 m
+and it was being placed at 3 m.
+
+A machine's extent is now the distance between the ends it radiates from — a car is 3.4 m of machine,
+a bus is 9.8, a motorcycle is 1 — through `Loudness.Widen`, so the far field is unchanged to four
+decimal places and only the near field goes flat. Standing five metres from a bus you are INSIDE it,
+and it is 6 dB down on what the old arithmetic claimed. `SoundEmitterComponent.ExtentMetres` gives the
+same thing to authored emitters: a fountain three metres across, a grille half a metre. An author who
+sets it is saying how big the thing is, not asking for it to be louder.
+
+Tests 611.

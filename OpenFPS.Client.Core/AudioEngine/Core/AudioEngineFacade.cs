@@ -20,6 +20,12 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
     private IAudioProvider _provider;
     private bool _isInitialized = false;
     private VoiceManager? _voiceManager;
+
+    /// <summary>However short the mixer runs, this many voices are still placed.</summary>
+    private const int MinBudgetVoices = 8;
+    /// <summary>And no more than this, whatever the pool says — an upper bound on the sort, not a
+    /// statement about the hardware.</summary>
+    private const int MaxBudgetVoices = 256;
     private readonly AudioBank _bank = new();
 
     // Lock-free command queues (Game Thread -> Audio Thread)
@@ -227,6 +233,12 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
         }
 
         // 5. Score and manage active voices
+        // The budget is what the mixer HAS, asked every frame rather than declared once. See
+        // VoiceManager.MaxVoices: the floor keeps a handful of voices alive while the pool is
+        // recovering, and the ceiling is only there so the list does not grow without bound.
+        if (_voiceManager != null)
+            _voiceManager.MaxVoices = Math.Clamp(
+                _voiceManager.PlayingCount + _provider.SpatialVoicesFree, MinBudgetVoices, MaxBudgetVoices);
         _voiceManager?.Process(lPos);
         
         // 6. Tick the low-level provider
@@ -401,6 +413,13 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
     /// Immediate, hard cutoff of a sound channel.
     /// </summary>
     public void StopSoundImmediate(int entityId) => _provider.StopSound(entityId);
+
+    /// <summary>Takes a voice down to silence; true once it is there. The budget's way of letting go
+    /// of a CONTINUOUS source, which is still there and still making a noise. See IVoiceSink.</summary>
+    public bool FadeOut(int entityId) => !_isInitialized || _provider.FadeOutVoice(entityId);
+
+    /// <summary>...and the other half, for one that won its slot back.</summary>
+    public void CancelFade(int entityId) { if (_isInitialized) _provider.CancelVoiceFade(entityId); }
 
     /// <summary>
     /// Sets the real-time physical path data (occlusion, bleed) for an entity.

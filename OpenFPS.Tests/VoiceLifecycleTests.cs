@@ -50,6 +50,9 @@ public class VoiceLifecycleTests
         public float MixerLoad => 0f;
         public void ReviveEngine(int id) { }
         public bool FadeOutEngine(int id) => true;
+        public int SpatialVoicesFree => 96;
+        public bool FadeOutVoice(int id) => true;
+        public void CancelVoiceFade(int id) { }
         public void StopSound(int id) { Stopped.Add(id); Live.Remove(id); }
         public bool IsPlaying(int id) => Live.Contains(id);
         public Vector3 GetSoundPosition(int id) => Vector3.Zero;

@@ -51,12 +51,34 @@ public interface IAudioProvider : IDisposable
     /// <summary>The mixer's DSP load, 0..1+. 1 means the callback is using its whole deadline.</summary>
     float MixerLoad { get; }
 
+    /// <summary>
+    /// How many binaural voices are still free — the resource a voice budget is actually spending.
+    ///
+    /// Every spatialised voice needs an HRTF slot. A voice that cannot get one still plays, and that
+    /// is the trouble: it plays FLAT, with no position at all, which on a map navigated by ear is
+    /// worse than silence because it lies about where something is.
+    /// </summary>
+    int SpatialVoicesFree { get; }
+
     /// <summary>Brings a live engine voice back to full after a fade-out was started. Idempotent.</summary>
     void ReviveEngine(int entityId);
 
     /// <summary>Asks a live engine voice to fade out; true once it is silent and safe to stop.
     /// True also when there is no such voice, so "gone" and "never existed" look the same.</summary>
     bool FadeOutEngine(int entityId);
+
+    /// <summary>
+    /// Takes ANY voice down to silence over about eighty milliseconds; true once it is there.
+    ///
+    /// The budget's way of letting go of a continuous source. Distinct from FadeOutEngine, which
+    /// slews the SYNTHESIS's own envelope inside the DSP: this is the channel's gain, so it works for
+    /// a sample, a loop, a granular voice and a synthesized engine alike. True also when there is no
+    /// such voice, so "gone" and "never existed" look the same.
+    /// </summary>
+    bool FadeOutVoice(int entityId);
+
+    /// <summary>Brings one back after a fade was started. Idempotent.</summary>
+    void CancelVoiceFade(int entityId);
 
     /// <summary>
     /// What one car's engine is actually doing: the road speed it has been TOLD, the speed its own

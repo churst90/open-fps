@@ -433,7 +433,6 @@ public sealed class EngineReflections
         Range = direct.Range,
         MinDistance = direct.MinDistance,
         Pitch = 1f,
-        Priority = 2,
         IsReflection = true,
         TargetRegionId = direct.TargetRegionId,
         // A reflection is already a reflection; sending it to the reverb would count the room twice.

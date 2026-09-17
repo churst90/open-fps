@@ -896,9 +896,9 @@ public class ClientAudioSystem
             // be the taste constant this design is trying not to have.
             Volume = volume,
             MinDistance = minDistance,
+            ExtentMetres = minDistance,
             Range = range,
             Pitch = 1f,
-            Priority = 1,
             Occlusion = path.Occlusion,
             ApertureFactor = path.ApertureFactor,
             TransmissionBleed = path.TransmissionBleed,
@@ -944,7 +944,10 @@ public class ClientAudioSystem
 
         var profile = OpenFPS.Common.MachineRegistry.VehicleFor(preset);
         float level = profile.SourceLevelDb > 0f ? profile.SourceLevelDb : EngineSourceLevelDb;
-        var (gain, reference) = OpenFPS.Common.Loudness.Place(level);
+        // The same machine, the same size: a car does not become a point because it is far away and
+        // borrowing somebody else's engine.
+        float extent = OutletSeparation(preset);
+        var (gain, reference) = OpenFPS.Common.Loudness.Place(level, extent);
         Vector3 pos = OpenFPS.Common.AudioEmission.PointFor(snap);
 
         // A stable, arbitrary offset per car, spread across most of the ring buffer.
@@ -968,9 +971,9 @@ public class ClientAudioSystem
             PositionSampledAt = sampledAt,
             Volume = gain * def.SoundEmitter.Volume,
             Range = OpenFPS.Common.Loudness.AudibleRange(level),
-            MinDistance = MathF.Max(reference, 3f),
+            MinDistance = reference,
+            ExtentMetres = extent,
             Pitch = 1f,
-            Priority = 1,
             TargetRegionId = AcousticConstants.GlobalRegionId,
             EnableReverb = true,
         };
@@ -1061,6 +1064,13 @@ public class ClientAudioSystem
         float engineVolume = def.SoundEmitter.Volume;
         float engineMinDistance = def.SoundEmitter.MinDistance;
         float engineRange = def.SoundEmitter.Range;
+        float engineExtent = def.SoundEmitter.ExtentMetres;
+        // An authored source with a SIZE — a fountain, a grille, a waterfall. Same rule as a machine:
+        // the reference widens to the thing's own radius and the gain is paid down to match, so the
+        // far field is unchanged and only the near field goes flat.
+        if (engineExtent > 0f && !def.SoundEmitter.IsSynth)
+            (engineVolume, engineMinDistance) =
+                OpenFPS.Common.Loudness.Widen(engineVolume, engineMinDistance, engineExtent);
         if (def.SoundEmitter.IsSynth)
         {
             resolvedSoundId = def.SoundEmitter.SoundId;
@@ -1082,9 +1092,20 @@ public class ClientAudioSystem
                 // This car's own measured level, not one number for every car. A stock car is
                 // fourteen decibels over a road car and a diesel pickup thirty under it.
                 float level = profile.SourceLevelDb > 0f ? profile.SourceLevelDb : EngineSourceLevelDb;
-                var (gain, reference) = OpenFPS.Common.Loudness.Place(level);
+                // How big the machine is, acoustically: the distance between the ends it radiates
+                // from. A car is three and a half metres of machine, a bus is ten, a motorcycle is
+                // one — and inside that the level is flat, because walking a metre nearer the intake
+                // walks you a metre further from the exhaust.
+                //
+                // This replaces `MathF.Max(reference, 3f)`, which widened the reference by hand and
+                // paid nothing back for it. That is not an extended source, it is a louder one: it
+                // was worth up to eight decibels to a quiet vehicle, which is most of the measured
+                // 3.6 dB error in the crowd-against-motorcycle balance.
+                float extent = OutletSeparation(engineKey);
+                var (gain, reference) = OpenFPS.Common.Loudness.Place(level, extent);
                 engineVolume = gain * def.SoundEmitter.Volume;
-                engineMinDistance = MathF.Max(reference, 3f);
+                engineMinDistance = reference;
+                engineExtent = extent;
                 engineRange = MathF.Max(engineRange, OpenFPS.Common.Loudness.AudibleRange(level));
 
                 // Close enough to hear which end is which: this voice moves back to the TAILPIPE and
@@ -1140,7 +1161,6 @@ public class ClientAudioSystem
             Range = Math.Max(1.0f, engineRange),
             Pitch = 1.0f,
             Type = EmitterType.EntityAttached,
-            Priority = 1,
             IsReflection = false,
             TargetRegionId = acousticPath.RegionId,
             EnableReverb = true,
@@ -1148,6 +1168,7 @@ public class ClientAudioSystem
             ConeOutside = def.SoundEmitter.ConeOutsideAngle,
             ConeOutsideVolume = def.SoundEmitter.ConeOutsideVolume,
             MinDistance = engineMinDistance,
+            ExtentMetres = engineExtent,
             EngineKey = engineKey,
             EngineSpeed = snap.Velocity.Length(),
             EngineRunning = true,
@@ -1280,7 +1301,6 @@ public class ClientAudioSystem
                         Range = def.SoundEmitter.Range * 0.5f,
                         Pitch = 1.0f,
                         Type = EmitterType.WorldLocked,
-                        Priority = 2,
                         IsReflection = true,
                         DelayMs = delayMs,
                         TargetRegionId = hitRegion,
@@ -1355,7 +1375,9 @@ public class ClientAudioSystem
             Type = EmitterType.WorldLocked,
             Volume = 1.0f,
             Range = 15.0f,
-            Priority = 3,
+            // Your own feet, pinned above the physics: they are how you know you are moving, and on
+            // a loud map the arithmetic would rightly bury them under everything else.
+            Essential = true,
             IsEvent = true,
             MinDistance = 1.0f
         };
@@ -1522,7 +1544,7 @@ public class ClientAudioSystem
                 Type = EmitterType.WorldLocked,
                 Volume = 1.0f,
                 Range = 20.0f,
-                Priority = 2,
+                Essential = true,
                 IsEvent = true,
                 MinDistance = 1.0f
             };

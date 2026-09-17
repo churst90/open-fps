@@ -34,16 +34,34 @@ public class VoiceBudgetTests
         public readonly List<int> Started = new();
         public readonly List<int> Stopped = new();
 
+        public readonly HashSet<int> Fading = new();
+        /// <summary>How many frames a fade takes here. The real one is a slew in the mixer; what the
+        /// budget needs to be right about is that it takes MORE THAN ONE, and that a voice can win
+        /// its slot back in the middle of one.</summary>
+        public int FadeFrames = 2;
+        private readonly Dictionary<int, int> _fadeAge = new();
+
         public bool IsPlaying(int entityId) => Playing.Contains(entityId);
         public void PlayPhysicalSoundDirect(SpatialEmitter e) { Playing.Add(e.EntityId); Started.Add(e.EntityId); }
         public void UpdateSpatialAttributes(SpatialEmitter e) { }
-        public void StopSoundImmediate(int entityId) { Playing.Remove(entityId); Stopped.Add(entityId); }
+        public void StopSoundImmediate(int entityId) { Playing.Remove(entityId); Stopped.Add(entityId); Fading.Remove(entityId); _fadeAge.Remove(entityId); }
+
+        public bool FadeOut(int entityId)
+        {
+            if (!Playing.Contains(entityId)) return true;
+            Fading.Add(entityId);
+            int age = _fadeAge.GetValueOrDefault(entityId) + 1;
+            _fadeAge[entityId] = age;
+            return age >= FadeFrames;
+        }
+
+        public void CancelFade(int entityId) { Fading.Remove(entityId); _fadeAge.Remove(entityId); }
 
         /// <summary>The sound reached its end on its own, as a one-shot does.</summary>
         public void FinishedOnItsOwn(int entityId) => Playing.Remove(entityId);
     }
 
-    private static SpatialEmitter Event(int id, Vector3 at, float priority = 2f) => new()
+    private static SpatialEmitter Event(int id, Vector3 at, float volume = 1f) => new()
     {
         EntityId = id,
         SoundId = "knock",
@@ -52,12 +70,11 @@ public class VoiceBudgetTests
         Position = at,
         Range = 500f,
         MinDistance = 2f,
-        Volume = 1f,
-        Priority = (int)priority,
+        Volume = volume,
         IsEvent = true,
     };
 
-    private static SpatialEmitter Engine(int id, Vector3 at, float priority = 5f) => new()
+    private static SpatialEmitter Engine(int id, Vector3 at, float volume = 1f) => new()
     {
         EntityId = id,
         SoundId = "engine",
@@ -66,8 +83,7 @@ public class VoiceBudgetTests
         Position = at,
         Range = 500f,
         MinDistance = 3f,
-        Volume = 1f,
-        Priority = (int)priority,
+        Volume = volume,
         IsEvent = false,
     };
 
@@ -137,6 +153,188 @@ public class VoiceBudgetTests
 
         _o.WriteLine($"started: {string.Join(", ", mixer.Started)}");
         Assert.Contains(2, mixer.Started);
+    }
+
+    /// <summary>
+    /// A hundred quiet, distant sources cannot take the voice off one near car.
+    ///
+    /// This is the fault the old ranking had, stated as a test. Voices were scored on an AUTHORED
+    /// priority — engines 1, transients 2 — squared, over distance: so a clap two hundred metres away
+    /// outranked a car at five metres by four to one, and the car did not fade, it was stopped and
+    /// rebuilt the next frame. Now everything is ranked on the level it will actually deliver, and a
+    /// hundred things nobody can hear add up to nothing.
+    /// </summary>
+    [Fact]
+    public void AHundredQuietDistantSourcesCannotDisplaceOneNearCar()
+    {
+        var mixer = new FakeMixer();
+        var voices = new VoiceManager(mixer, new AudioBank(), maxVoices: 8);
+
+        for (int frame = 0; frame < 3; frame++)
+        {
+            voices.Submit(Engine(1, new Vector3(5, 0, 0)));
+            for (int i = 0; i < 100; i++)
+                voices.Submit(Event(200 + i, new Vector3(0, 0, 200 + i * 0.5f)));
+            voices.Process(Vector3.Zero);
+        }
+
+        _o.WriteLine($"the near car is {(mixer.Playing.Contains(1) ? "playing" : "SILENT")}; "
+                   + $"{mixer.Playing.Count} voices sounding of a budget of 8");
+        Assert.Contains(1, mixer.Playing);
+        Assert.DoesNotContain(1, mixer.Stopped);
+    }
+
+    /// <summary>
+    /// ...and the reverse, which is the half that makes it physics rather than a rule about cars.
+    ///
+    /// One near, loud transient — a clap at three metres — outranks a distant car, because at that
+    /// moment it is the louder thing. Nothing here knows which is which.
+    /// </summary>
+    [Fact]
+    public void ANearTransientOutranksADistantCar()
+    {
+        var mixer = new FakeMixer();
+        var voices = new VoiceManager(mixer, new AudioBank(), maxVoices: 1);
+
+        voices.Submit(Engine(1, new Vector3(0, 0, 300)));
+        voices.Submit(Event(2, new Vector3(3, 0, 0)));
+        voices.Process(Vector3.Zero);
+
+        _o.WriteLine($"playing: {string.Join(", ", mixer.Playing)}");
+        Assert.Contains(2, mixer.Playing);
+        Assert.DoesNotContain(1, mixer.Playing);
+    }
+
+    /// <summary>
+    /// A continuous source that loses its slot FADES; a one-shot is cut.
+    ///
+    /// The difference is what a sound IS, not how loud it is. A car that runs out of budget is still
+    /// there — cutting it mid-waveform is a click, and for a synthesized engine it is a rebuild from
+    /// silence. A one-shot has already missed its moment, and fading something that is over buys
+    /// nothing and holds a voice.
+    /// </summary>
+    [Fact]
+    public void AContinuousSourceFadesOutWhereAOneShotIsCut()
+    {
+        var mixer = new FakeMixer();
+        var voices = new VoiceManager(mixer, new AudioBank(), maxVoices: 1);
+
+        // The car holds the only slot, then a much nearer event takes it.
+        voices.Submit(Engine(1, new Vector3(6, 0, 0)));
+        voices.Process(Vector3.Zero);
+        Assert.Contains(1, mixer.Playing);
+
+        voices.Submit(Engine(1, new Vector3(6, 0, 0)));
+        voices.Submit(Event(2, new Vector3(1, 0, 0)));
+        voices.Process(Vector3.Zero);
+
+        _o.WriteLine($"after losing the slot: fading={string.Join(",", mixer.Fading)} stopped={string.Join(",", mixer.Stopped)}");
+        Assert.Contains(1, mixer.Fading);
+        Assert.DoesNotContain(1, mixer.Stopped);      // not cut — going down gently
+
+        // ...and once the fade has run, it is let go.
+        for (int frame = 0; frame < 4; frame++)
+        {
+            voices.Submit(Engine(1, new Vector3(6, 0, 0)));
+            voices.Submit(Event(2, new Vector3(1, 0, 0)));
+            voices.Process(Vector3.Zero);
+        }
+        Assert.Contains(1, mixer.Stopped);
+    }
+
+    /// <summary>
+    /// A source that wins its slot back MID-FADE is brought round rather than left to die.
+    ///
+    /// The exact fault that made cars fall silent for the rest of their lives once before: a voice
+    /// was taken off the retiring list with its envelope still heading for zero and nothing anywhere
+    /// to turn it round. It kept its engine, kept its position, kept being updated every frame, and
+    /// was inaudible.
+    /// </summary>
+    [Fact]
+    public void ASourceThatWinsItsSlotBackMidFadeIsBroughtRound()
+    {
+        var mixer = new FakeMixer { FadeFrames = 6 };
+        var voices = new VoiceManager(mixer, new AudioBank(), maxVoices: 1);
+
+        voices.Submit(Engine(1, new Vector3(6, 0, 0)));
+        voices.Process(Vector3.Zero);
+
+        voices.Submit(Engine(1, new Vector3(6, 0, 0)));
+        voices.Submit(Event(2, new Vector3(1, 0, 0)));
+        voices.Process(Vector3.Zero);
+        Assert.Contains(1, mixer.Fading);
+
+        // The event ends; the car is the loudest thing again. Two frames, because a one-shot that
+        // finished is scored once more before it is noticed to be over — it frees its slot on the
+        // frame after it ends, which is a frame of grace out of a fade that is several frames long.
+        mixer.FinishedOnItsOwn(2);
+        voices.Submit(Engine(1, new Vector3(6, 0, 0)));
+        voices.Process(Vector3.Zero);
+        voices.Submit(Engine(1, new Vector3(6, 0, 0)));
+        voices.Process(Vector3.Zero);
+
+        _o.WriteLine($"fading={string.Join(",", mixer.Fading)} playing={string.Join(",", mixer.Playing)}");
+        Assert.DoesNotContain(1, mixer.Fading);
+        Assert.Contains(1, mixer.Playing);
+        Assert.DoesNotContain(1, mixer.Stopped);
+    }
+
+    /// <summary>
+    /// An essential voice is not outbid by the physics.
+    ///
+    /// The one deliberate departure: your own footsteps, speech and a warning tone are what a player
+    /// NEEDS, and on a loud map the arithmetic would rightly bury every one of them. A short explicit
+    /// list, pinned — not a knob on every object.
+    /// </summary>
+    [Fact]
+    public void AnEssentialVoiceIsNotOutbidByTheLoudestThingOnTheMap()
+    {
+        var mixer = new FakeMixer();
+        var voices = new VoiceManager(mixer, new AudioBank(), maxVoices: 1);
+
+        var footstep = Event(-100, new Vector3(0, 0, 1f));
+        footstep.Essential = true;
+        footstep.Volume = 0.05f;                       // quiet, and right next to you
+        voices.Submit(footstep);
+        voices.Submit(Engine(1, new Vector3(4, 0, 0)));  // a car at four metres, far louder
+        voices.Process(Vector3.Zero);
+
+        _o.WriteLine($"playing: {string.Join(", ", mixer.Playing)}");
+        Assert.Contains(-100, mixer.Playing);
+    }
+
+    /// <summary>
+    /// Giving a source a SIZE does not make it louder — it flattens the near field and leaves the far
+    /// field exactly where it was.
+    ///
+    /// The half that was wrong in the engine: a vehicle's reference distance was widened to three
+    /// metres and nothing was paid back for it, which is not an extended source, it is a louder one.
+    /// Worth up to eight decibels on a quiet vehicle.
+    /// </summary>
+    [Fact]
+    public void ExtentFlattensTheNearFieldAndLeavesTheFarFieldAlone()
+    {
+        const float level = 94f;                        // a small hatchback
+        var point = OpenFPS.Common.Loudness.Place(level);
+        var sized = OpenFPS.Common.Loudness.Place(level, 3.2f);
+
+        float Far(float d, (float Gain, float ReferenceDistance) p)
+            => OpenFPS.Common.Loudness.RenderedGain(p.Gain, p.ReferenceDistance, 500f, d);
+
+        _o.WriteLine($"point: gain {point.Gain:F3} ref {point.ReferenceDistance:F2} m; "
+                   + $"3.2 m across: gain {sized.Gain:F3} ref {sized.ReferenceDistance:F2} m");
+        // Far away, identical to within a rounding error: that is what makes the point model usable.
+        foreach (float d in new[] { 20f, 50f, 130f })
+            Assert.Equal(Far(d, point), Far(d, sized), 4);
+
+        // Close in, the sized one is quieter, because you cannot get to the middle of it.
+        Assert.True(Far(2f, sized) < Far(2f, point));
+
+        // And the old fudge — widen the reference, pay nothing back — was louder everywhere.
+        float fudged = OpenFPS.Common.Loudness.RenderedGain(point.Gain, MathF.Max(point.ReferenceDistance, 3f), 500f, 20f);
+        float honest = Far(20f, sized);
+        _o.WriteLine($"at 20 m: honest {20 * MathF.Log10(honest):F1} dBFS, old fudge {20 * MathF.Log10(fudged):F1} dBFS");
+        Assert.True(fudged > honest * 1.5f, "the old fudge was not worth several decibels, so this test proves nothing.");
     }
 
     /// <summary>

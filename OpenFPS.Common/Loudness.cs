@@ -157,11 +157,29 @@ public static class Loudness
     /// that product is held and only the near field changes.
     /// </summary>
     public static (float Gain, float ReferenceDistance) Place(float sourceLevelDb, float extentMetres)
-    {
-        var (gain, reference) = Place(sourceLevelDb);
-        if (!(extentMetres > reference)) return (gain, reference);
-        return (gain * (reference / extentMetres), extentMetres);
-    }
+        => Widen(Place(sourceLevelDb), extentMetres);
+
+    /// <summary>
+    /// The same widening, for a caller that has a gain and a reference distance but no source level.
+    ///
+    /// An authored emitter — a fountain, a ventilation grille, a waterfall — carries a volume rather
+    /// than a level in decibels, and it is just as much a thing with a SIZE. The rule is the one that
+    /// matters and the one that is easy to get wrong in the other direction: what the inverse law
+    /// carries is the PRODUCT of gain and reference distance, so widening the reference without
+    /// paying the gain down does not model an extended source, it makes a louder one at every
+    /// distance that matters.
+    ///
+    /// That mistake was in the engine: a vehicle's reference was widened to three metres with nothing
+    /// paid back, which handed every quiet vehicle up to eight decibels it had not earned.
+    /// </summary>
+    public static (float Gain, float ReferenceDistance) Widen((float Gain, float ReferenceDistance) placed, float extentMetres)
+        => extentMetres > placed.ReferenceDistance
+         ? (placed.Gain * (placed.ReferenceDistance / extentMetres), extentMetres)
+         : placed;
+
+    /// <summary>The same, spelled out for a caller holding two loose floats.</summary>
+    public static (float Gain, float ReferenceDistance) Widen(float gain, float referenceDistance, float extentMetres)
+        => Widen((gain, referenceDistance), extentMetres);
 
     /// <summary>Just the gain, for a caller that is setting the reference distance itself.</summary>
     public static float GainFor(float sourceLevelDb) => Place(sourceLevelDb).Gain;

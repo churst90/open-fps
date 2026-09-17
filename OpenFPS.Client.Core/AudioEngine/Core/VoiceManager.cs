@@ -28,13 +28,58 @@ public interface IVoiceSink
     void PlayPhysicalSoundDirect(SpatialEmitter emitter);
     void UpdateSpatialAttributes(SpatialEmitter emitter);
     void StopSoundImmediate(int entityId);
+
+    /// <summary>
+    /// Takes a voice down to silence over about eighty milliseconds, and says when it is there.
+    ///
+    /// The difference between a continuous source and a one-shot losing its slot. A one-shot has
+    /// missed its moment and is dropped; a car that runs out of budget IS STILL THERE, still making a
+    /// noise, and cutting it mid-waveform is a click — for a synthesized engine it is worse than a
+    /// click, because the voice is rebuilt from nothing when it comes back: a fresh ring, priming
+    /// silence and an envelope fade. That is what "vehicles stop close in front of me" is made of.
+    ///
+    /// Idempotent: called every frame the voice is out of the budget, and returns true once the fade
+    /// has finished and the caller may stop it.
+    /// </summary>
+    bool FadeOut(int entityId);
+
+    /// <summary>Cancels a fade, because the voice won its slot back. Cheap and idempotent — it is the
+    /// other half of <see cref="FadeOut"/>, and its absence is a voice that fades to nothing and never
+    /// comes back while everything else about it looks alive.</summary>
+    void CancelFade(int entityId);
 }
 
 public class VoiceManager
 {
     private readonly IVoiceSink _audio;
     private readonly AudioBank _bank;
-    private readonly int _maxVoices;
+
+    /// <summary>
+    /// How many voices the budget may spend — the REAL resource, not a constant.
+    ///
+    /// Set each frame from what the mixer actually has left (see AudioEngineFacade): every
+    /// spatialised voice needs an HRTF slot, there are ninety-six of them, and a voice that cannot
+    /// get one does not fail — it plays FLAT, with no binaural position at all, which on a map you
+    /// navigate by ear is worse than not playing it. A fixed 256 could not see that coming; it only
+    /// counted its own voices, and the reflections, borrowed cars and outlets that bypass this
+    /// manager were spending the same pool behind its back.
+    ///
+    /// It settles rather than hunting: what is free shrinks as this manager starts voices, so the
+    /// budget stops rising exactly where the pool runs out.
+    /// </summary>
+    public int MaxVoices { get; set; }
+
+    /// <summary>How many voices this manager currently has sounding. With what the mixer says is
+    /// free, this is what the budget above is worth.</summary>
+    public int PlayingCount
+    {
+        get
+        {
+            int n = 0;
+            foreach (var kv in _voiceStates) if (kv.Value.IsPhysicallyPlaying) n++;
+            return n;
+        }
+    }
     
     private enum InternalState { Idle, Starting, Playing, Stopping, Finished }
 
@@ -48,6 +93,9 @@ public class VoiceManager
     }
 
     private readonly Dictionary<int, VoiceStatus> _voiceStates = new();
+    /// <summary>Voices that lost the budget and are on their way out. Kept so a fade can finish, and
+    /// so one that wins its slot back can be brought round rather than restarted.</summary>
+    private readonly HashSet<int> _fading = new();
     private readonly Dictionary<int, SpatialEmitter> _activeSubmissions = new(); 
     private readonly List<ScoredCandidate> _scoredCandidates;
     private readonly HashSet<int> _topEntityIds = new();
@@ -58,7 +106,7 @@ public class VoiceManager
     {
         _audio = audio;
         _bank = bank;
-        _maxVoices = maxVoices;
+        MaxVoices = maxVoices;
         _scoredCandidates = new List<ScoredCandidate>(maxVoices * 2);
     }
 
@@ -118,8 +166,14 @@ public class VoiceManager
                 continue;
             }
 
-            float playingBoost = _audio.IsPlaying(id) ? 1.5f : 1.0f;
-            float score = ((e.Priority * e.Priority) / (1.0f + dist)) * playingBoost;
+            float score = Audibility(e, dist, _audio.IsPlaying(id));
+            // Below this nobody can hear it — not because of what it is, but because of where it is
+            // and how loud it is. A one-shot that cannot be heard has missed nothing by being dropped.
+            if (score < OpenFPS.Common.Loudness.SilenceGain && !e.Essential)
+            {
+                if (e.IsEvent) _keysToRemove.Add(id);
+                continue;
+            }
             _scoredCandidates.Add(new ScoredCandidate { EntityId = id, Score = score });
         }
 
@@ -127,7 +181,7 @@ public class VoiceManager
         _keysToRemove.Clear();
 
         _scoredCandidates.Sort((a, b) => b.Score.CompareTo(a.Score));
-        int activeCount = Math.Min(_scoredCandidates.Count, _maxVoices);
+        int activeCount = Math.Min(_scoredCandidates.Count, Math.Max(1, MaxVoices));
 
         foreach (var kvp in _activeSubmissions)
         {
@@ -165,6 +219,10 @@ public class VoiceManager
 
             if (isActuallyPlayingInFmod && status.IsPhysicallyPlaying)
             {
+                // Whatever happened to it before, a voice that holds a slot is audible. The other
+                // half of the fade above, and the reason a source that dips out of the budget for a
+                // moment comes back instead of dying quietly with everything else about it alive.
+                if (_fading.Remove(scored.EntityId)) _audio.CancelFade(scored.EntityId);
                 _audio.UpdateSpatialAttributes(status.Emitter);
             }
             else if (!string.IsNullOrEmpty(status.CurrentResolvedPath) && (status.State == InternalState.Playing || status.State == InternalState.Starting || status.State == InternalState.Stopping))
@@ -189,8 +247,31 @@ public class VoiceManager
             {
                 if (status.IsPhysicallyPlaying)
                 {
-                    _audio.StopSoundImmediate(id);
-                    status.IsPhysicallyPlaying = false;
+                    // A ONE-SHOT is dropped: its moment has gone, and a moment cannot be resumed.
+                    // ANYTHING ELSE IS STILL THERE — a car does not stop existing because the budget
+                    // ran out — so it fades, and is let go only once it is silent. Cutting it instead
+                    // is a click on anything with a waveform running, and on a synthesized engine it
+                    // is a rebuild: ring, priming silence and envelope, every time it comes back.
+                    if (status.Emitter.IsEvent)
+                    {
+                        _audio.StopSoundImmediate(id);
+                        status.IsPhysicallyPlaying = false;
+                    }
+                    else if (_audio.FadeOut(id))
+                    {
+                        _audio.StopSoundImmediate(id);
+                        status.IsPhysicallyPlaying = false;
+                        _fading.Remove(id);
+                    }
+                    else
+                    {
+                        // Still going down. Keep the voice and its bookkeeping alive, and keep
+                        // placing it: a fading car is still moving, and a fade from a frozen
+                        // position is a sound sliding off to one side as it goes.
+                        _fading.Add(id);
+                        _audio.UpdateSpatialAttributes(status.Emitter);
+                        continue;
+                    }
                 }
 
                 // AN EVENT THAT DID NOT WIN A SLOT HAS MISSED ITS MOMENT.
@@ -295,6 +376,42 @@ public class VoiceManager
             }
         }
     }
+
+    /// <summary>
+    /// What this voice will actually deliver to the ear — the one quantity everything is ranked on.
+    ///
+    /// <see cref="OpenFPS.Common.Loudness.RenderedGain"/> is the mixer's own distance law, so this is
+    /// not an estimate of the balance, it IS the balance: the same gain, reference distance and range
+    /// the voice will be played at, times what the path lets through. A bird, a bus, a fountain and a
+    /// jet are compared in identical units, and nothing in here knows what any of them is.
+    ///
+    /// The two departures from pure physics are deliberate and small:
+    ///
+    /// <see cref="SpatialEmitter.Essential"/> pins a voice above the arithmetic — speech, your own
+    /// footsteps, a warning tone — because those are what a player NEEDS rather than what is loudest,
+    /// and on a racetrack the physics would rightly bury every one of them.
+    ///
+    /// A voice that is already playing is worth a little more than one that is not, which is
+    /// HYSTERESIS and not importance: two sources within a hair of each other would otherwise trade
+    /// the last slot every frame, and a voice swapping in and out at frame rate is a far worse noise
+    /// than either of them being missing. Two decibels is enough to settle it and small enough that
+    /// it cannot hold a slot against anything actually louder.
+    /// </summary>
+    internal static float Audibility(in SpatialEmitter e, float distance, bool playing)
+    {
+        float level = OpenFPS.Common.Loudness.RenderedGain(e.Volume, e.MinDistance, e.Range, distance);
+        level *= 1f - Math.Clamp(e.Occlusion, 0f, 1f);
+        if (playing) level *= PlayingHysteresis;
+        // Pinned, not weighted: an essential voice ranks above every voice that is merely loud, and
+        // among themselves they still rank on what can be heard.
+        return e.Essential ? level + EssentialPin : level;
+    }
+
+    /// <summary>About two decibels. See <see cref="Audibility"/>.</summary>
+    private const float PlayingHysteresis = 1.26f;
+
+    /// <summary>Above any gain the physics can produce, so an essential voice cannot be outbid.</summary>
+    private const float EssentialPin = 1000f;
 
     private string ResolvePath(string pathOrCategory)
     {

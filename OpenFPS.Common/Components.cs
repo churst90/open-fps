@@ -209,6 +209,22 @@ public partial struct SoundEmitterComponent
     /// </summary>
     public Vector3 Offset { get; set; }
 
+    /// <summary>
+    /// How big the thing making the sound is, metres. Zero — the default — means a point.
+    ///
+    /// A fountain is about three metres across, a ventilation grille half a metre, a waterfall
+    /// twenty, a motorway is as long as you can see. Inside a source's own size the inverse law does
+    /// not hold, because stepping a metre nearer one part of it steps you a metre further from
+    /// another: the level is flat across the thing and only starts falling once the whole of it is in
+    /// front of you.
+    ///
+    /// <see cref="OpenFPS.Common.Loudness.Widen"/> does the arithmetic, and the half that is easy to
+    /// get wrong is that the gain comes DOWN as the reference widens — beyond the patch, an extended
+    /// source and a point source of the same power are identical, so the far field must not change.
+    /// An author who sets this is saying how big the thing is, not asking for it to be louder.
+    /// </summary>
+    public float ExtentMetres { get; set; }
+
     public SoundEmitterComponent() { }
 
     /// <summary>
