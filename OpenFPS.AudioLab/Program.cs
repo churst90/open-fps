@@ -323,6 +323,14 @@ if (args.Contains("--engine-alias"))
     Log.CloseAndFlush();
     Environment.Exit(eacode);
 }
+if (args.Contains("--aircraft"))
+{
+    // --aircraft [preset ...] [alt= speed= offset= sec= lever= descend=]: aircraft flying past a
+    // listener on the ground, one WAV each. See docs/AIRCRAFT.md.
+    int aircode = OpenFPS.Client.Core.AudioEngine.Fmod.AircraftSpike.Run(args);
+    Log.CloseAndFlush();
+    Environment.Exit(aircode);
+}
 if (args.Contains("--engine-orders"))
 {
     int orderCode = OpenFPS.Client.Core.AudioEngine.Fmod.EngineOrderSpike.Run(args);

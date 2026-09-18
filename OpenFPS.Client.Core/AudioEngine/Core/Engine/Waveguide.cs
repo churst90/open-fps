@@ -51,11 +51,28 @@ internal static class Gas
 /// idling is soft, and why a lossless linear delay line could never reproduce the difference.
 ///
 /// The steepening is done by WRITING AT ARRIVAL TIME rather than reading at a fixed offset: each
-/// injected sample is given the arrival time its own amplitude implies, the slots between the
-/// previous arrival and this one are filled by interpolation, and if this sample arrives EARLIER
-/// than the last one did it simply overwrites — the crest has overtaken the foot, and the profile
-/// that results is the weak-shock solution with the overtaken part dissipated. Compressions
-/// steepen, rarefactions stretch, and it costs a division per sample.
+/// injected sample is given the arrival time its own amplitude implies and the slots between the
+/// previous arrival and this one are filled by interpolation. Compressions steepen, rarefactions
+/// stretch, and it costs a division per sample.
+///
+/// WHEN A CREST OVERTAKES THE FOOT the characteristics have crossed and the single-valued wave no
+/// longer exists; what the gas does is form a shock, and where it forms is Whitham's equal-area
+/// rule: the multivalued lobe is cut by a jump placed so that the area is conserved, and the energy
+/// in the cut-off part is lost. That is the shock's dissipation, and it is not optional — it is the
+/// only thing that stops a nearly lossless network of steepening pipes pumping itself up. This line
+/// does it literally: the samples whose arrivals have crossed are merged into one jump at the MEAN
+/// of the arrival times they wanted, the slots behind it are rewritten to the value behind the
+/// shock, and the jump lands across one slot with the fraction of the sample split linearly (a
+/// first-order band-limited step), so the front is exactly one sample thick whatever the rate.
+///
+/// The previous rule held an overtaking crest to arrive "just after" the foot, half a sample on,
+/// and kept its full amplitude. That anchors the shock to the SLOWEST part of the wave, so a big
+/// pulse arrived late by the whole overtaking distance and lost nothing — and on the F1 at full
+/// load, where a 2 bar crest wants to run two and a half times faster than the foot through a
+/// 12 cm pipe, the undissipated fronts fed each other through the collector until the port peaks
+/// doubled and the spectrum between the orders filled in. Measured as `structure` falling from 51 dB
+/// to 15 between 12,200 and 12,800 rpm, and getting WORSE at higher sample rates because the front
+/// got thinner rather than better behaved.
 /// </summary>
 internal sealed class WaveLine
 {
@@ -74,33 +91,18 @@ internal sealed class WaveLine
     private double _accSum;
     private int _accN;
 
-    /// <summary>
-    /// The shortest a steepening front may be compressed to, in SAMPLES.
-    ///
-    /// A real shock is not a mathematical discontinuity: it has a thickness set by viscosity, and the
-    /// top of it is absorbed before it leaves the pipe. Rendering it as one it was — arrivals a
-    /// thousandth of a sample apart — put the whole front into a single sample, which is broadband
-    /// energy this sample rate cannot carry, so it folded back down as crackle that got worse the
-    /// harder the engine worked.
-    ///
-    /// Half a sample is measured, not chosen. Swept against the two things that trade off, on a stock
-    /// car at 8000 rpm (steps) and a big block at 3500 WOT (the 800 Hz - 3 kHz band, which IS the
-    /// rasp), with the averaging in Deposit also in place:
-    ///
-    /// | floor | largest step | steps over 0.15 | rasp    |
-    /// |-------|--------------|-----------------|---------|
-    /// | 0.001 | 0.48         | 170 /s          | -5.6 dB |
-    /// | 0.5   | 0.24         | 11 /s           | -5.7 dB |
-    /// | 0.75  | 0.23         | 39 /s           | -8.5 dB |
-    /// | 1.0   | 0.22         | 0.25 /s         | -41 dB  |
-    ///
-    /// Half keeps the rasp exactly and takes twenty-five times the impulses out. A whole sample takes
-    /// the rest of them and the rasp with it, which is the wrong trade: the rasp was never the last
-    /// microsecond of the rise, but at one sample the front stops steepening at all.
-    /// </summary>
-    private static readonly double MinFrontSamples =
-        double.TryParse(Environment.GetEnvironmentVariable("OPENFPS_SHOCK_FRONT"), out double f)
-            ? Math.Clamp(f, 0.0, 4.0) : 0.5;
+    // The shock being built, if the last arrivals crossed: how many samples have merged into it, the
+    // sum of the arrivals they wanted (the mean is where the jump sits), and the wave just AHEAD of
+    // it — the last sample deposited before anything crossed — which is what the jump rises from.
+    private int _frontN;
+    private double _frontSumTau;
+    private double _preTau;
+    private float _preV;
+
+    /// <summary>Arrivals closer than this are a crossing: the crest has caught the foot. A quarter of
+    /// a sample rather than zero so that a wave steepening right at the limit of what the grid can
+    /// hold is merged rather than left as a one-sample impulse of arbitrary height.</summary>
+    private const double CrossingSamples = 0.25;
 
     /// <param name="maxDelaySamples">Longest delay this line will ever be asked for.</param>
     public WaveLine(int maxDelaySamples)
@@ -109,6 +111,7 @@ internal sealed class WaveLine
         _buf = new float[_len];
         _d0 = Math.Max((float)MinDelay, maxDelaySamples - 2);
         _tauPrev = _d0 - 1;
+        _preTau = _tauPrev - 1;
     }
 
     public void SetDelay(float samples)
@@ -116,7 +119,7 @@ internal sealed class WaveLine
         _d0 = Math.Clamp(samples, (float)MinDelay, _len - 4f);
         // A line that has never been read is empty: its next arrival is simply the new delay away.
         // Without this the construction-time delay held every early write back until time caught up.
-        if (_time == 0) _tauPrev = _d0 - 1;
+        if (_time == 0) { _tauPrev = _d0 - 1; _preTau = _tauPrev - 1; }
     }
 
     /// <summary>Steepening coefficient: the fractional increase in wave speed per pascal.
@@ -143,39 +146,66 @@ internal sealed class WaveLine
         // A pipe is read and then written within one sample step, so "now" for the write is the
         // sample that was just read: the delay is then exactly what SetDelay asked for.
         double tau = (_time - 1) + d;
+        // Never fill further ahead than the buffer holds.
+        long kMax = _time + _len - 2;
 
-        // A crest that would overtake the foot is held to arrive just after it: the front compresses
-        // to a shock and nothing already laid down is overwritten.
-        if (tau < _tauPrev + MinFrontSamples) tau = _tauPrev + MinFrontSamples;
+        if (tau < _tauPrev + CrossingSamples)
+        {
+            // THE CREST HAS CAUGHT THE FOOT. Merge this arrival into the shock and move the jump to
+            // the mean of everything that has crossed; the slots it vacates behind it take the
+            // value behind the shock, which is this sample's.
+            if (_frontN == 0)
+            {
+                // The previous sample is the first thing crossed. What the jump rises from is the
+                // wave before THAT.
+                _frontSumTau = _tauPrev;
+                _frontN = 1;
+            }
+            _frontSumTau += tau;
+            _frontN++;
+            double tauS = _frontSumTau / _frontN;
+            // The jump cannot land before the wave ahead of it, nor in a slot already read.
+            double floor = Math.Max(_preTau + 1.0, _time + 0.001);
+            if (tauS < floor) tauS = floor;
+            if (tauS > _tauPrev) tauS = _tauPrev;
+
+            long kS = (long)Math.Floor(tauS);
+            float frac = (float)(tauS - kS);
+            long kEnd = Math.Min((long)Math.Floor(_tauPrev), kMax);
+            if (kS <= kMax)
+            {
+                // The slot the jump lands in: the sample is split by where in the slot it falls.
+                _buf[Slot(kS)] = _preV + (v - _preV) * (1f - frac);
+                for (long k = kS + 1; k <= kEnd; k++) _buf[Slot(k)] = v;
+            }
+            _accSlot = long.MinValue;
+            _tauPrev = tauS;
+            _vPrev = v;
+            return;
+        }
+
+        if (_frontN > 0)
+        {
+            // The wave behind the shock is stretching away from it again: the shock is finished
+            // where it is, and this sample continues the waveform from it.
+            _frontN = 0;
+        }
+        _preTau = _tauPrev;
+        _preV = _vPrev;
         {
             double span = tau - _tauPrev;
             long k0 = (long)Math.Floor(_tauPrev) + 1;
             long k1 = (long)Math.Floor(tau);
-            // Never fill further ahead than the buffer holds.
-            long kMax = _time + _len - 2;
             if (k1 > kMax) k1 = kMax;
             for (long k = k0; k <= k1; k++)
             {
                 float f = (float)((k - _tauPrev) / span);
                 Deposit(k, _vPrev + (v - _vPrev) * f);
             }
-            // Compression: this sample's arrival fell INSIDE the slot the last one landed in, so the
-            // loop above wrote nothing for it.
-            //
-            // It used to be dropped, and that is where the crackle came from. Several input samples
-            // collapse into one slot at a steep front, and whichever happened to cross the boundary
-            // last became the slot's value while the rest were thrown away — so the front arrived as
-            // a single sample carrying an arbitrary crest, three times the amplitude of the waveform
-            // around it, at the same crank angle every cycle. Measured on a stock car at 8000 rpm
-            // that is a jump from -0.15 to +0.64 between adjacent samples, and a one-sample spike is
-            // broadband: most of its energy is above Nyquist, where it folds back down as crackle
-            // that gets worse the harder the engine works.
-            //
-            // Averaging them into the slot instead is the right answer twice over. It is the correct
-            // anti-aliasing for compressing a signal in time — a box filter over exactly the samples
-            // being compressed — and it is also what the physics says happens to them: the weak-shock
-            // solution dissipates the overtaken part of the wave rather than letting one arbitrary
-            // sample of it survive.
+            // Compression short of a crossing: this arrival fell inside the slot the last one landed
+            // in, so the loop above wrote nothing for it. It is averaged into that slot — a box
+            // filter over exactly the samples being compressed, which is the right anti-aliasing
+            // for squeezing a signal in time, and what the gas does to them too.
             if (k1 < k0)
             {
                 long k = (long)Math.Floor(tau);
@@ -185,6 +215,9 @@ internal sealed class WaveLine
         _tauPrev = tau;
         _vPrev = v;
     }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private int Slot(long k) => (int)(((k % _len) + _len) % _len);
 
     /// <summary>
     /// Puts a value into a slot, averaging with anything already deposited there this pass.
@@ -196,7 +229,7 @@ internal sealed class WaveLine
     [MethodImpl(MethodImplOptions.AggressiveOptimization)]
     private void Deposit(long k, float value)
     {
-        int idx = (int)(((k % _len) + _len) % _len);
+        int idx = Slot(k);
         if (k == _accSlot) { _accSum += value; _accN++; _buf[idx] = (float)(_accSum / _accN); }
         else { _accSlot = k; _accSum = value; _accN = 1; _buf[idx] = value; }
     }
@@ -216,8 +249,10 @@ internal sealed class WaveLine
     public void Clear()
     {
         Array.Clear(_buf);
-        _lp = 0f; _vPrev = 0f;
+        _lp = 0f; _vPrev = 0f; _preV = 0f;
         _tauPrev = _time - 1 + _d0;
+        _preTau = _tauPrev - 1;
+        _frontN = 0; _frontSumTau = 0;
         _accSlot = long.MinValue; _accSum = 0; _accN = 0;
     }
 }
@@ -446,34 +481,80 @@ internal sealed class OpenEnd
 }
 
 /// <summary>
-/// Broadband noise of the exhaust jet leaving the tailpipe.
+/// Broadband noise of the exhaust jet leaving the tailpipe — Lighthill's law, and nothing else.
 ///
-/// Gordon (NASA SP-207): a plain pipe's radiated power goes as U^8 at high velocity (free jet mixing)
-/// and U^6 at lower (edge dipoles at the lip and at internal obstructions); a muffled car tailpipe at
-/// Mach 0.05-0.3 with baffles upstream is in the U^6 regime. Peak Strouhal number St = fD/U ~ 0.2.
-/// So: pressure amplitude goes as U^3, the spectrum is a band that slides up with velocity, and the
-/// whole thing is negligible at idle (2-3 m/s exit) and a real part of the roar at 150 m/s. It is
-/// modulated by the instantaneous velocity because the flow is pulsating — the rush comes in slugs.
+/// A stream of gas mixing with still air radiates acoustic power W = K rho0 (rho_jet/rho0) U^8 D^2 / c^5
+/// (K about 1e-4 for a subsonic jet), so the pressure at a metre goes as the FOURTH power of the
+/// velocity and linearly with the nozzle diameter, peaking in frequency at Strouhal 0.2 on the
+/// nozzle. It is modulated by the instantaneous velocity because the flow is pulsating — the rush
+/// comes in slugs — which is the one thing an exhaust jet has that a free jet does not.
+///
+/// It used to be calibrated by hand — "120 m/s at 1 m gives about 2 Pa (100 dB)" with a U^3 law
+/// — and that point sits 17 dB above Lighthill for a 63 mm pipe of 500 K gas, with a shallower
+/// slope below it. Measured, that put a hiss over every small muffled engine at speed: the 2.8 turbo
+/// diesel's exhaust was 15-20 dB of jet at 2,600-4,000 rpm and read as white noise through a pipe
+/// (`structure` 1.5 dB against 60 with the jet muted); the V6, the economy four and the school bus
+/// were 4 dB of it. The race engines, whose pulses are tens of times louder, hardly noticed. One law
+/// for every jet in the game — this one and the aircraft's — is the rule; the level anchor is the
+/// physics, not a number somebody liked.
 /// </summary>
 internal sealed class JetNoise
 {
     private readonly float _rate;
     private readonly Random _rng;
-    private float _lp1, _lp2, _hp;
+    private float _lp1, _lp2, _hp, _uSlow;
     private readonly float _diameter;
 
     public JetNoise(float rate, float diameterMetres, int seed)
     {
         _rate = rate;
-        _diameter = diameterMetres;
+        _diameter = MathF.Max(0.01f, diameterMetres);
         _rng = new Random(seed);
     }
 
-    /// <summary>Pressure at one metre, pascals, given the exit velocity now (m/s) and the mean.</summary>
-    [MethodImpl(MethodImplOptions.AggressiveOptimization)]
-    public float Process(float exitVelocity, float meanVelocity, float level)
+    /// <summary>Lighthill coefficient for a subsonic jet, the textbook 1e-4.</summary>
+    public const float Lighthill = 1e-4f;
+
+    /// <summary>
+    /// RMS pressure at one metre, pascals, of a jet of this diameter and velocity at this gas
+    /// temperature. Velocity is taken no higher than a high subsonic value: past the speed of sound
+    /// the eighth power gives way to the third, and this is not a model of a supersonic jet.
+    /// </summary>
+    public static float LighthillPressure(float diameterMetres, float velocity, float gasKelvin)
     {
-        float uAbs = MathF.Abs(exitVelocity);
+        const float rho0 = 1.2f, c = 343f;
+        float rhoRatio = 293f / MathF.Max(293f, gasKelvin);
+        double u = Math.Min(Math.Abs(velocity), 600.0);
+        double w = Lighthill * rho0 * rhoRatio * Math.Pow(u, 8) * diameterMetres * diameterMetres / Math.Pow(c, 5);
+        double p2 = w * rho0 * c / (4 * Math.PI);
+        return (float)Math.Sqrt(Math.Max(0.0, p2));
+    }
+
+    /// <summary>The same, in dB SPL at one metre.</summary>
+    public static float LighthillDb(float diameterMetres, float velocity, float gasKelvin)
+        => 20f * MathF.Log10(MathF.Max(1e-9f, LighthillPressure(diameterMetres, velocity, gasKelvin)) / 2e-5f);
+
+    /// <summary>
+    /// A two-pole band of unit white noise has an RMS of about 0.285 times the square root of the
+    /// one-pole coefficient (measured over 60 Hz - 3 kHz at 44.1 kHz); dividing by that makes the
+    /// band unit-RMS whatever its corner and whatever the sample rate, so a level is a level.
+    /// </summary>
+    public static float BandNormaliser(float alpha) => 0.285f * MathF.Sqrt(MathF.Max(1e-6f, alpha));
+
+    /// <summary>Pressure at one metre, pascals, given the exit velocity now (m/s), the mean, and
+    /// the gas temperature at the tailpipe.</summary>
+    [MethodImpl(MethodImplOptions.AggressiveOptimization)]
+    public float Process(float exitVelocity, float meanVelocity, float level, float gasKelvin)
+    {
+        // The velocity that makes mixing noise is the jet's over the length it mixes in — five to
+        // ten diameters downstream — not the instantaneous velocity at the lip. A pulse a millisecond
+        // long does not make a millisecond of eighth-power roar; it feeds a slug that takes 5D/U to
+        // go by. Smoothed over that time the slugs of a big slow engine still breathe at its firing
+        // rate, and the spikes of a small fast one no longer masquerade as a jet ten times faster.
+        float uInst = MathF.Abs(exitVelocity);
+        float mixTime = 5f * _diameter / MathF.Max(5f, 0.5f * meanVelocity + 0.5f * _uSlow);
+        _uSlow += (uInst - _uSlow) * MathF.Min(1f, 1f / (mixTime * _rate));
+        float uAbs = _uSlow;
         float uRef = MathF.Max(8f, 0.5f * meanVelocity + 0.5f * uAbs);
         // Band centred on St = 0.2, two poles wide.
         float fc = Math.Clamp(0.2f * uRef / _diameter, 60f, 6000f);
@@ -481,12 +562,10 @@ internal sealed class JetNoise
         float n = (float)(_rng.NextDouble() * 2 - 1);
         _lp1 += a * (n - _lp1);
         _lp2 += a * (_lp1 - _lp2);
-        float bp = _lp1 - _lp2;                 // one-pole band-pass-ish
+        float bp = (_lp1 - _lp2) / BandNormaliser(a);
         // A steady floor from the mean flow, plus the pulsating part: the slugs.
         float amp = 0.7f * meanVelocity + 0.6f * uAbs;
-        // U^3 in pressure. Reference: 120 m/s at 1 m gives about 2 Pa (100 dB) for a plain 63 mm pipe.
-        float r = amp / 120f;
-        float p = 2.0f * r * r * r * level * bp * 3.5f;
+        float p = LighthillPressure(_diameter, amp, gasKelvin) * level * bp;
         // Nothing below 40 Hz belongs to a jet.
         float hpA = OnePole.AlphaFor(40f, _rate);
         _hp += hpA * (p - _hp);

@@ -209,8 +209,14 @@ public static class EngineOrderSpike
             Array.Copy(buf, from, x, 0, x.Length);
             float f1 = achieved / Math.Max(1, rc) / 60f;
 
+            // THE SAME BAND AT EVERY RATE. Measured up to Nyquist, a 176.4 kHz render was being
+            // judged on energy out to 80 kHz that no listener and no loudspeaker will ever meet, and
+            // a shock front one sample thick puts plenty there; that is how "worse when oversampled"
+            // was read off a bench that was not comparing like with like. Twenty kilohertz is the
+            // ceiling for all of them.
+            const float audible = 20000f;
             double half = 0, whole = 0, harm = 0, floor = 0;
-            for (float o = 0.5f; o * f1 < rate * 0.45f && o <= 200f; o += 0.5f)
+            for (float o = 0.5f; o * f1 < MathF.Min(audible, rate * 0.45f) && o <= 200f; o += 0.5f)
             {
                 float m = G(x, o * f1, rate);
                 bool isWhole = MathF.Abs(o - MathF.Round(o)) < 0.01f;

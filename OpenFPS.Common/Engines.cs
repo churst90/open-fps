@@ -1646,6 +1646,51 @@ public sealed record EngineProfile
     };
 
     /// <summary>Every preset, by a short key a map or a command line can name.</summary>
+    /// <summary>
+    /// A 5.2 litre aviation flat-four — the Lycoming O-320 kind of engine: 130 mm bore on a 98 mm
+    /// stroke, 8.5:1 on 100 octane, two big valves a cylinder, a mild cam, magnetos, and a redline of
+    /// 2,700 because the propeller is bolted straight to the crank and its tips are already at
+    /// Mach 0.8. Four short stubs into a small muffler each side and out under the cowl. It is
+    /// slow, big-bore and even-firing, and at 2,700 rpm its firing rate is 90 Hz — right on top of a
+    /// two-blade prop's 90 Hz blade-passing, which is why the two are so hard to tell apart on the
+    /// ground and why a light aircraft sounds like one thing.
+    /// </summary>
+    public static EngineProfile AeroFlat4 => new()
+    {
+        Name = "5.2 aviation flat-four",
+        Layout = EngineLayout.Flat,
+        FiringAngles = EvenFire(new[] { 1, 3, 2, 4 }),
+        Bank = AlternatingBanks(4),
+        BoreMm = 130.2f, StrokeMm = 98.4f, RodRatio = 1.75f, CompressionRatio = 8.5f,
+        ExhaustCam = new CamLobe { DurationDegrees = 250f, MaxLiftMm = 11f, RampFraction = 0.25f, CentrelineDegrees = 252f },
+        IntakeCam = new CamLobe { DurationDegrees = 246f, MaxLiftMm = 11f, RampFraction = 0.25f, CentrelineDegrees = 474f },
+        ExhaustValve = new ValveSpec { DiameterMm = 46f, DischargeCoefficient = 0.6f },
+        IntakeValve = new ValveSpec { DiameterMm = 52f, DischargeCoefficient = 0.62f },
+        EvoTemperatureK = 1150f, IdleMapBar = 0.35f,
+        IdleRoughness = 0.35f, IdleGovernorGain = 1.5f,
+        IdleRpm = 650f, RedlineRpm = 2700f,
+        // The crank alone; the prop is added by whoever bolts one on (AircraftProfile.PropInertiaKgM2).
+        InertiaKgM2 = 0.25f,
+        FrictionNm = 39.5f, FrictionNmPerKrpm = 14f,
+        PeakTorqueNm = 400f, PeakTorqueRpm = 2400f,
+        Exhaust = new ExhaustSpec
+        {
+            PrimaryLengthMetres = 0.45f, PrimarySpread = 0.2f, PrimaryDiameterMm = 44f,
+            CollectorDiameterMm = 57f, CollectorPipeMetres = 0.25f,
+            Crossover = CrossoverKind.None,
+            MidPipeMetres = 0.15f,
+            Muffler = new MufflerSpec { Kind = MufflerKind.Absorptive, Absorption = 0.4f, AbsorptiveLengthMetres = 0.3f },
+            TailpipeMetres = new[] { 0.25f, 0.27f },
+            TailpipeDiameterMm = 57f,
+            TailpipeExitsMetres = new[] { new Vector3(-0.45f, 0f, 0f), new Vector3(0.45f, 0f, 0f) },
+            GasCelsiusIdle = 300f, GasCelsiusFull = 760f,
+            WallLossMultiplier = 1.6f,
+            OverrunPopRate = 2f,
+        },
+        Intake = new IntakeSpec { RunnerLengthMetres = 0.35f, RunnerDiameterMm = 40f, PlenumLitres = 3f, ThrottleDiameterMm = 55f, AirboxLitres = 6f, SnorkelLengthMetres = 0.4f, SnorkelDiameterMm = 80f, Level = 0.7f },
+        Mechanical = new MechanicalSpec { ValvetrainLevel = 0.7f, CombustionKnock = 0.04f, AccessoryWhineOrder = 0f, AccessoryWhineLevel = 0f },
+    };
+
     public static IReadOnlyDictionary<string, Func<EngineProfile>> Presets { get; } =
         new Dictionary<string, Func<EngineProfile>>(StringComparer.OrdinalIgnoreCase)
         {
@@ -1680,6 +1725,7 @@ public sealed record EngineProfile
             ["v8_bigcam"] = () => V8BigCam,
             ["v8_blown"] = () => V8Blown,
             ["sportbike"] = () => SportBike,
+            ["aero_flat4"] = () => AeroFlat4,
         };
 
     public static EngineProfile ByName(string key)

@@ -262,10 +262,48 @@ settled by ear as one point; giving the true-dual V8s their rear-corner exits is
 listening decision, not a fix. The bench default stays on the centre line (null), so declared
 `SourceLevelDb` figures are unchanged; the F1 is up to 2.3 dB louder off-axis, inside the headroom.
 
-Still open on the F1, and separate from this: above about 12,300 rpm the render is erratic
-(`structure` 15–34 dB where 50 is clean) and it is not aliasing of the firings — oversampling makes
-it worse. Only pipe wall loss and steepening move it, which points at the shock front in `WaveLine`
-(a thickness floor in SAMPLES). See todo.md, 2026-09-18.
+## The shock is an equal-area jump (2026-09-18)
+
+Above about 12,300 rpm the F1's render was erratic — `structure` 51 dB at 12,159 rpm, 15 at
+12,751, 46 at 13,056, 18 at 13,170, 30–34 from 14,000 up, port peaks doubling past 14,500 — and it
+was not aliasing of the firing events: the alias bench got WORSE at 176 kHz. Bisecting one knob at
+a time, only pipe wall loss and steepening moved it, which put it in `WaveLine`.
+
+The old rule held an overtaking crest to arrive "just after" the foot, half a sample on, at full
+amplitude. That anchors the shock to the slowest part of the wave and dissipates nothing; on a
+2 bar crest running two and a half times faster than its foot through a 12 cm pipe, undissipated
+fronts fed each other through the collector. `WaveLine.Write` now does Whitham's equal-area rule
+literally: the samples whose arrivals have crossed merge into one jump at the mean of the arrivals
+they wanted, the slots behind it are rewritten to the value behind the shock, and the jump lands
+across one slot with the sample split linearly. The cut-off lobe is the shock's dissipation.
+
+| f1_v10 | before | after |
+|---|---|---|
+| 12,466 rpm | 20.3 dB | — |
+| 12,751 | 15.1 | 26.4 |
+| 13,170 | 17.7 | 40.9 |
+| 15,000 | 31.9 | 18.7 |
+| port peak at 15,000 | 2.04 bar | 1.55 bar |
+
+Every other preset moved by 0.1 dB or less in level and gained 0–3 dB of `structure`. **The top
+end is still not right**: 15,000 is worse, and the alias bench (now band-limited to 20 kHz so that
+rates are compared over the same band) still shows the model unconverged — 49 / 52 / −13 dB at
+44.1 / 88.2 / 176.4 kHz at 12,000 rpm. Something in the integration is rate-dependent in a way the
+grid should not be; the 176 kHz collapse is the lead. Recorded in todo.md.
+
+## Every jet is Lighthill's (2026-09-18)
+
+`JetNoise` was hand-calibrated ("120 m/s gives about 2 Pa") with a U³ law — 17 dB above Lighthill
+for a 63 mm pipe of 500 K gas, and shallower below. Muting it (`jet=0`) across every preset found
+the hiss over the small muffled engines at speed: the 2.8 turbo diesel's exhaust was **15–20 dB of
+jet** at 2,600–4,000 rpm (`structure` 1.5 dB against 60 without it), the V6, the economy four and
+the school bus 4 dB of it; the race engines hardly noticed. It is now `W = K ρ₀ (ρ_jet/ρ₀) U⁸ D² /
+c⁵`, K = 1e-4, the same function the aircraft use, with the noise band normalised to unit RMS
+whatever its corner (`BandNormaliser`, 0.285√α — measured), and the velocity it uses is smoothed
+over the jet's mixing time, 5D/U, because a millisecond pulse at the lip does not make a
+millisecond of eighth-power roar. Approved presets: unchanged to 0.1 dB. The small diesel still
+measures jet-heavy (89 dB total against 74 of engine) — its smoothed exit velocity is over 100 m/s
+through a 57 mm pipe — and that is now the open question for it, not the law.
 
 ## Levels: where the headroom goes, and where it comes back
 

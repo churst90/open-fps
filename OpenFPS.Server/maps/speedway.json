@@ -1046,7 +1046,7 @@
    "AccelerationMps2": 1.8,
    "BrakingMps2": 5.0,
    "LaneOffsetMetres": -3.25,
-   "StartOffsetMetres": 105.9
+   "StartOffsetMetres": 95.8
   },
   {
    "Name": "6B pickup 1",
@@ -1057,7 +1057,7 @@
    "AccelerationMps2": 2.4,
    "BrakingMps2": 6.0,
    "LaneOffsetMetres": 0.0,
-   "StartOffsetMetres": 211.7
+   "StartOffsetMetres": 191.6
   },
   {
    "Name": "Cummins pickup 1",
@@ -1068,7 +1068,7 @@
    "AccelerationMps2": 3.0,
    "BrakingMps2": 6.0,
    "LaneOffsetMetres": 3.25,
-   "StartOffsetMetres": 317.6
+   "StartOffsetMetres": 287.4
   },
   {
    "Name": "Dirt bike 5",
@@ -1079,7 +1079,7 @@
    "AccelerationMps2": 3.8,
    "BrakingMps2": 6.5,
    "LaneOffsetMetres": 6.5,
-   "StartOffsetMetres": 423.5
+   "StartOffsetMetres": 383.1
   },
   {
    "Name": "Dirt bike 4",
@@ -1090,7 +1090,7 @@
    "AccelerationMps2": 3.8,
    "BrakingMps2": 6.5,
    "LaneOffsetMetres": -6.5,
-   "StartOffsetMetres": 529.3
+   "StartOffsetMetres": 478.9
   },
   {
    "Name": "Dirt bike 3",
@@ -1101,7 +1101,7 @@
    "AccelerationMps2": 3.8,
    "BrakingMps2": 6.5,
    "LaneOffsetMetres": -3.25,
-   "StartOffsetMetres": 635.2
+   "StartOffsetMetres": 574.7
   },
   {
    "Name": "Dirt bike 2",
@@ -1112,7 +1112,7 @@
    "AccelerationMps2": 3.8,
    "BrakingMps2": 6.5,
    "LaneOffsetMetres": 0.0,
-   "StartOffsetMetres": 741.1
+   "StartOffsetMetres": 670.5
   },
   {
    "Name": "Dirt bike 1",
@@ -1123,7 +1123,7 @@
    "AccelerationMps2": 3.8,
    "BrakingMps2": 6.5,
    "LaneOffsetMetres": 3.25,
-   "StartOffsetMetres": 846.9
+   "StartOffsetMetres": 766.3
   },
   {
    "Name": "Cruiser 5",
@@ -1134,7 +1134,7 @@
    "AccelerationMps2": 3.2,
    "BrakingMps2": 6.0,
    "LaneOffsetMetres": 6.5,
-   "StartOffsetMetres": 952.8
+   "StartOffsetMetres": 862.1
   },
   {
    "Name": "Cruiser 4",
@@ -1145,7 +1145,7 @@
    "AccelerationMps2": 3.2,
    "BrakingMps2": 6.0,
    "LaneOffsetMetres": -6.5,
-   "StartOffsetMetres": 1058.7
+   "StartOffsetMetres": 957.9
   },
   {
    "Name": "Cruiser 3",
@@ -1156,7 +1156,7 @@
    "AccelerationMps2": 3.2,
    "BrakingMps2": 6.0,
    "LaneOffsetMetres": -3.25,
-   "StartOffsetMetres": 1164.6
+   "StartOffsetMetres": 1053.6
   },
   {
    "Name": "Cruiser 2",
@@ -1167,7 +1167,7 @@
    "AccelerationMps2": 3.2,
    "BrakingMps2": 6.0,
    "LaneOffsetMetres": 0.0,
-   "StartOffsetMetres": 1270.4
+   "StartOffsetMetres": 1149.4
   },
   {
    "Name": "Cruiser 1",
@@ -1178,7 +1178,7 @@
    "AccelerationMps2": 3.2,
    "BrakingMps2": 6.0,
    "LaneOffsetMetres": 3.25,
-   "StartOffsetMetres": 1376.3
+   "StartOffsetMetres": 1245.2
   },
   {
    "Name": "Sports bike 5",
@@ -1189,7 +1189,7 @@
    "AccelerationMps2": 6.0,
    "BrakingMps2": 9.0,
    "LaneOffsetMetres": 6.5,
-   "StartOffsetMetres": 1482.2
+   "StartOffsetMetres": 1341.0
   },
   {
    "Name": "Sports bike 4",
@@ -1200,7 +1200,7 @@
    "AccelerationMps2": 6.0,
    "BrakingMps2": 9.0,
    "LaneOffsetMetres": -6.5,
-   "StartOffsetMetres": 1588.0
+   "StartOffsetMetres": 1436.8
   },
   {
    "Name": "Sports bike 3",
@@ -1211,7 +1211,7 @@
    "AccelerationMps2": 6.0,
    "BrakingMps2": 9.0,
    "LaneOffsetMetres": -3.25,
-   "StartOffsetMetres": 1693.9
+   "StartOffsetMetres": 1532.6
   },
   {
    "Name": "Sports bike 2",
@@ -1222,7 +1222,7 @@
    "AccelerationMps2": 6.0,
    "BrakingMps2": 9.0,
    "LaneOffsetMetres": 0.0,
-   "StartOffsetMetres": 1799.8
+   "StartOffsetMetres": 1628.4
   },
   {
    "Name": "Sports bike 1",
@@ -1233,7 +1233,29 @@
    "AccelerationMps2": 6.0,
    "BrakingMps2": 9.0,
    "LaneOffsetMetres": 3.25,
-   "StartOffsetMetres": 1905.6
+   "StartOffsetMetres": 1724.1
+  },
+  {
+   "Name": "Formula car 2",
+   "Preset": "f1_v10",
+   "Track": "oval",
+   "TopSpeedKmh": 301.0,
+   "CorneringG": 2.614,
+   "AccelerationMps2": 9.0,
+   "BrakingMps2": 12.0,
+   "LaneOffsetMetres": 6.5,
+   "StartOffsetMetres": 1819.9
+  },
+  {
+   "Name": "Formula car 1",
+   "Preset": "f1_v10",
+   "Track": "oval",
+   "TopSpeedKmh": 302.7,
+   "CorneringG": 2.639,
+   "AccelerationMps2": 9.0,
+   "BrakingMps2": 12.0,
+   "LaneOffsetMetres": -6.5,
+   "StartOffsetMetres": 1915.7
   }
  ],
  "Entities": [

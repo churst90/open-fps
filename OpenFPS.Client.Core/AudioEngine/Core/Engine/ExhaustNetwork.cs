@@ -41,6 +41,7 @@ internal sealed class ExhaustNetwork
     private readonly float _airDensity = 1.2f;
     private float _flowLossFraction;
     private float _meanMassFlow;
+    private float _tailK = 293f;
 
     /// <summary>
     /// The turbine, sitting where it really sits: between the manifold and the downpipe.
@@ -405,6 +406,7 @@ internal sealed class ExhaustNetwork
         _meanMassFlow = massFlowKgPerS;
         float ambient = 293f;
         float tailK = ambient + (portKelvin - ambient) * _x.TailCooling;
+        _tailK = tailK;
         int branches = _branch.Length;
         float flowPerBranch = massFlowKgPerS / branches;
 
@@ -636,7 +638,7 @@ internal sealed class ExhaustNetwork
             tail.PushBackward(reflected);
             br.ExitVelocity = u / tail.Area;
             float direct = br.End.Radiate(u, _airDensity);
-            float jet = br.Jet.Process(br.ExitVelocity + br.MeanVelocity, br.MeanVelocity, _x.JetNoiseLevel);
+            float jet = br.Jet.Process(br.ExitVelocity + br.MeanVelocity, br.MeanVelocity, _x.JetNoiseLevel, _tailK);
             br.Radiated = direct + jet;
 
             // ...and the can, which radiates straight into the air rather than out of the pipe.

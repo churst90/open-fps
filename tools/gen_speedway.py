@@ -455,6 +455,13 @@ SUPPORT = [
     # 450 single that fires once every two revolutions and rings the crank down in between, and an
     # inline four at 14,500 rpm whose firing rate is 483 Hz — a musical pitch where the twin's is a
     # beat you could count.
+    #
+    # Two formula cars, back on the map now that their two tailpipes radiate from where they are
+    # (ExhaustSpec.TailpipeExitsMetres): the even-firing V10 is the one machine here whose sound
+    # depends on where you STAND — dead behind it the banks cancel to a single order-5 scream, off
+    # the centre line the bank fundamental an octave down comes back, and a pass-by sweeps through
+    # both. Geared to run out at 330 on the limiter; the tight end holds them to about 220.
+    ("Formula car",     "f1_v10",            300, 2.60, 9.0, 12.0,   2),
     ("Sports bike",     "sportbike",         270, 1.25, 6.0,  9.0,   5),
     ("Cruiser",         "vtwin",             180, 0.85, 3.2,  6.0,   5),
     ("Dirt bike",       "single",            150, 0.90, 3.8,  6.5,   5),
@@ -487,8 +494,8 @@ NUMBERS = [24, 3, 48, 11, 9, 22, 5, 17, 43, 88, 12, 20, 2, 19, 77, 8, 14, 6, 45,
 # synthesis — four mechanical faults stalled the FMOD mixer thread itself. All fixed; see
 # docs/AUDIO_LOAD_DROPOUTS.md. The number of cars a map may carry is not a property of the audio
 # engine: only the nearest handful are ever SYNTHESIZED and the rest borrow one of those.
-# Nineteen: five of each bike and two pairs of diesels. There is no stock-car class on this map any
-# more and no pace car — it is a demonstration of what the engine can voice, not a race.
+# Twenty-one: two formula cars, five of each bike and two pairs of diesels. There is no stock-car class
+# on this map any more and no pace car — it is a demonstration of what the engine can voice, not a race.
 FIELD_SIZE = sum(c for *_, c in SUPPORT)
 
 # The support runners take the LAST slots, so they start at the back of a lap that is already

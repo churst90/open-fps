@@ -2683,3 +2683,38 @@ scratch builds used (`OPENFPS_ONE_BRANCH`, `OPENFPS_EXH_CAP`) were measured and 
       cannot say (a named place with no walls). That is the version of "regions" that needs no
       author. Second-order reflections (`ImageSource.SecondOrder`, written, unwired) are the other
       half of "the turns should sound enclosed".
+
+## Session 2 of 2026-09-18: shock, jets, the F1 on the track, and aircraft
+
+- [x] **Equal-area shock in `WaveLine`** (see docs/ENGINE_SYNTHESIS.md). Repairs the F1's
+      12,300–13,300 rpm pocket (15 -> 26, 18 -> 41 dB structure), leaves every approved preset within
+      0.1 dB, and does NOT fix 15,000 (32 -> 19). `--engine-alias` is band-limited to 20 kHz now so
+      rates are compared like with like — and it still says the model is not converged: 49 / 52 /
+      -13 dB at 44.1 / 88.2 / 176.4 kHz at 12,000 rpm.
+- [ ] **The 176 kHz collapse is the lead for the F1's top end.** Something integrates differently at
+      4x the rate: candidates are anything with a per-sample constant (`ClickVoice` decay, the
+      `Mode` retune, the valve solver's tolerances) or a delay floor in samples (`MinDelay` 1.05 on
+      the F1's 12 cm mid-pipe). Find what changes between 88.2 and 176.4 kHz at 12,000 rpm, where
+      44.1 kHz is clean; the answer is probably also why 15,000 is erratic at 44.1.
+- [x] **Every jet is Lighthill's** (`JetNoise.LighthillPressure`, shared with the aircraft), band
+      normalised, velocity smoothed over 5D/U. Found by muting the jet on all 28 vehicle presets
+      (`jet=0`): the 2.8 diesel's exhaust at speed was 15–20 dB of jet, the V6/economy four/school
+      bus 4 dB; nothing else moved by more than 0.1 dB.
+- [ ] **The 2.8 turbo diesel is still jet-heavy** — 89 dB total against 74 dB of engine at 3,960
+      rpm, `structure` 3 dB. Its smoothed exit velocity is over 100 m/s through a 57 mm tailpipe.
+      Either that is what the network really delivers (check `ExitVelocity` mean and RMS against
+      the mass flow — a DC offset in the arriving wave would pass straight into it), or a real
+      2.8 diesel's pipe is 63–76 mm. Measure before touching the preset. The V6 (structure 20 at
+      4,000+) and the school bus at 2,250 are the same question.
+- [x] **Two formula cars are back on the speedway** (`tools/gen_speedway.py`, regenerated; the
+      server was restarted on it at 14:19). Heard through `--speedway seconds=90 voices=6`.
+- [x] **Other vehicles, surveyed on the bench:** bikes clean (vtwin 37–44 dB structure, single 39–46,
+      sportbike = i4_sport 48–66); diesels clean except the 2.8 above; the four idle limit cycles
+      from the morning stand. Nothing else needed adjusting for the idle or the top end.
+- [x] **Aircraft, specified and first built** — `docs/AIRCRAFT.md`, `OpenFPS.Common/Aircraft.cs`,
+      `AircraftSynth`, `--aircraft`. Four presets (light single on the new `aero_flat4` engine,
+      regional turboprop, high-bypass airliner, light turbine helicopter), rendered as flyovers with
+      arrival-time deposit (Doppler emerges), air absorption and a ground bounce. **Approved by ear:
+      "the jets and planes sound really really good."** The approved jet balance is pinned as
+      `CoreJetTrimDb` / `BypassJetTrimDb` (−16 / −21 dB against Lighthill) and the four WAVs are in
+      `inbox/aircraft-demo-2026-09-18/`. Not in the game yet; the order of work is in the doc.

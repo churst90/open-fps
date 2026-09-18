@@ -542,7 +542,7 @@ public sealed record VehicleProfile
         Body = VehicleBody.Van,
         Name = "2.8 turbo-diesel pickup",
         EngineKey = "diesel_i4",
-        SourceLevelDb = 92f,
+        SourceLevelDb = 88f,   // re-measured 2026-09-18 after the jet went onto Lighthill: was 92, most of the difference was hiss
         Engine = EngineProfile.DieselPickupI4,
         Gearbox = Gearbox.SixSpeedSports with { Ratios = new[] { 4.31f, 2.33f, 1.52f, 1.13f, 0.86f, 0.68f }, FinalDrive = 3.73f, ShiftSeconds = 0.45f, UpshiftRpm = 3600f, DownshiftRpm = 1300f, WheelRadiusMetres = 0.38f },
         Tyres = TyreProfile.SportsOnAsphalt with { TreadBlocks = 48, SurfaceRoughness = 0.6f },
