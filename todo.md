@@ -2595,3 +2595,91 @@ any decision about the mix's anchor, because it would move the anchor.
       Tools: `--footsteps table` (the numbers), `--footsteps compare=<dir>` (against real steps),
       `tools/split_footsteps.py` (makes the reference out of a recording).
 
+
+## Analysis session (2026-09-18): the F1 siren, the idles, and what "outside" is made of
+
+Nothing in the engine was changed this session. Every number below is from the bench; the two
+scratch builds used (`OPENFPS_ONE_BRANCH`, `OPENFPS_EXH_CAP`) were measured and reverted.
+
+### The F1 — "no low end, too high pitched, a siren when it revs"
+
+- [x] **DIAGNOSED: the two tailpipes are summed at one point and that cancels the engine's real
+      fundamental.** `ExhaustNetwork.Radiated` adds both branches coherently. An even-firing V10's
+      banks are exactly anti-phase at order 2.5 (the BANK firing rate — the fundamental of each
+      pipe), so the sum leaves order 5 alone. Measured with a scratch single-pipe build: order 2.5
+      reads 0 dB against order 5 on one pipe and **-12 dB at 12,000 rpm / -19 dB at 8,000** on the
+      sum. The ear pitches {2.5, 5, 7.5} at order 2.5 and {5} at order 5 — an octave up, and a
+      single partial gliding is what a siren is. A real car's pipes are ~0.8 m apart; off the centre
+      line they do not cancel. The V8s are barely touched (no such symmetry in a cross-plane pattern).
+- [x] **FIXED (same day): each tailpipe radiates from its own place.** `ExhaustSpec.TailpipeExitsMetres`
+      (machine frame), `ExhaustNetwork.SetListener` (per-branch path delay through air, slewed at
+      0.5 %/sample, plus spreading ratio inside a metre), `EngineVoiceState.SetListener` fed from
+      `FmodAudioProvider.ListenerInMachineFrame` on every attribute update, `VehicleSynth.Render(...,
+      listener)`, and `azimuth= dist= pipe=` on `--engine-orders` / `--engine-gallery`. Dead behind
+      the car it is the old sum bit for bit (measured identical); at 30° order 2.5 reads 0 dB against
+      order 5 where it read −12. `TwoTailpipes_HeardOffTheCentreLine_KeepTheBankFundamental` holds it.
+      Only the F1 declares exits (±0.30 m). Giving the true-dual V8s their rear corners is a listening
+      decision left open. The bench default stays on the centre line, so declared levels are unchanged.
+- [x] **DIAGNOSED: above about 12,300 rpm the F1 render is erratic**, and the FormulaCar is geared
+      to 330 km/h on the limiter, so on the straights it lives there. `structure` reads 50.8 at
+      12,159 rpm, 20 at 12,466, 15 at 12,751, 46 at 13,056, 18 at 13,170, 30-34 from 14,000; port
+      peak 0.9 -> 2.0-2.4 bar past 14,500. RPM is steady to the rpm in the analysed window, so it is
+      real between-order energy. **It is NOT aliasing of the firing events**: `--engine-alias` at
+      12,000 rpm gives 50 / 54 / **-7 dB** at 44.1 / 88.2 / 176.4 kHz — oversampling makes it worse,
+      and the preset comment saying 176 kHz gains nothing was wrong. Eliminated by bisection: jet
+      noise, crank inertia, torque/heat, valve size, primary diameter, junction flow loss, cam
+      duration, the exhaust volume-velocity cap. What moves it: `wall=3` 15 -> 41.5, `wall=6` 42.7,
+      `steep=0` 37. Both act inside `WaveLine`.
+- [ ] **Hypothesis to test next:** the steepened front is compressed to `MinFrontSamples` = 0.5
+      SAMPLES — a floor in samples, not seconds — so its arrival jitters against the grid from cycle
+      to cycle and the energy lands between orders; a higher rate makes the front thinner, not
+      better. The fix would be an anti-aliased (viscous, band-limited) front in `WaveLine.Write`.
+      Trap: `OPENFPS_SHOCK_FRONT` >= 1 forbids all compression (tau cannot advance less than a
+      sample) and kills the engine to 82 dB; it cannot be used to test this.
+- [x] `ExhaustSpec.PortNoiseLevel` and `EngineProfile.EvoTemperatureK` are declared, documented and
+      never read by the synthesis. The Cummins preset comment "no turbine" is stale: `ExhaustNetwork.Turbine` exists.
+
+### The idles — measured on all sixteen presets (`--engine-trace <p> idle sec=10`)
+
+| preset | target | mean | min-max | sd | burn q | residual |
+|---|---|---|---|---|---|---|
+| nascar_v8 | 1300 | 1935 | 814-2912 | 620 | 0.74 | 0.39 |
+| v8_muscle | 720 | 858 | 559-1205 | 177 | 0.56 | 0.44 |
+| v10 | 750 | 767 | 492-1070 | 176 | 0.86 | 0.35 |
+| f1_v10 | 4000 | 4022 | 3812-4471 | 113 | 0.70 | 0.42 |
+| v8_flatplane, i4_sport, v8_sports | | | | 58-77 | ~0.9 | 0.35 |
+| the other nine | | | | 14-55 | 1.00 | 0.05-0.26 |
+
+- [x] **One mechanism.** `DecideCharge` collapses burn quality between 33 % and 46 % residual (a
+      1.5-power cliff plus a bimodal cut), and every bad idler sits on it: rpm high -> shut plate
+      pulls MAP down -> reversion through 80 deg of overlap -> residual past 0.4 -> misfires ->
+      torque negative -> rpm falls -> the plenum refills -> clean burn -> +130 Nm into a 0.15 kg m^2
+      crank -> 2,900 rpm. About one second a cycle on the stock car. The F1 holds its rpm and
+      misfires instead (crest 4.9, blop 36 %).
+- [x] `gov=8` does nothing (sd 622) — the open item "raise IdleGovernorGain" will not fix it.
+      `inertia=0.35` holds the stock car to 1198-1638 but the burn is still 0.66. It is the
+      combustion model's residual tolerance (real SI engines fall off gently past ~25-30 % EGR), not
+      a gain and not a per-preset number.
+
+### Outside — "walls should dictate reflectivity, not just standing outside"
+
+- [x] **Discrete reflections already do.** `EngineReflections` builds surfaces from every solid box
+      with its material; `ImageSource.FirstOrder` gain is `(direct/path)(1-absorption)(1-scattering)`,
+      the rest scatters from the face. Nothing in that path asks about regions or the outdoors.
+- [x] **Reverb outdoors still has two constants standing in for physics.** (1) The Steam Audio scene
+      is boxes only — the ground is in it, the sky is not — so the ray-traced RT60 is capped at
+      `OutdoorMaxDecayMs` 1100 instead of the sky absorbing what it should. (2) `ReverbSendMix` 0.35
+      is fixed and post-fader, so direct-to-reverberant is the same at every distance (already
+      logged above as "gunshot echoey / footsteps boxy"; read the `Room:` line first).
+- [x] **Regions are hand-authored and the prefab has no materials.** `acoustic_region` is 10x5x10,
+      IsIndoor true, no `RoomMaterials` — six open faces unless the map entity names them.
+      `AcousticVolumeGenerator` copies and voxelises regions; it detects nothing.
+      `CompositeAcoustics.Survey` DOES detect "these parts enclose a room" (size, hollowness, four
+      of six faces covered, face material from whichever part covers most) but runs only for
+      player-built composites and `/room`, never at static map load.
+- [ ] **Automatic, with the entity as an override.** Run the survey over a static map's solid
+      parts at load (cluster by adjacency, or seed from each declared region's box) and derive the
+      six face materials from the walls actually there; keep `acoustic_region` for what geometry
+      cannot say (a named place with no walls). That is the version of "regions" that needs no
+      author. Second-order reflections (`ImageSource.SecondOrder`, written, unwired) are the other
+      half of "the turns should sound enclosed".

@@ -1,4 +1,5 @@
 using System;
+using System.Numerics;
 using System.Runtime.InteropServices;
 using System.Threading;
 using FMOD;
@@ -41,6 +42,24 @@ public sealed class EngineVoiceState
     public volatile float RoadSlip;
     /// <summary>Whether the engine should be running. Game thread writes.</summary>
     public volatile bool Running = true;
+
+    // Where the listener stands, in the machine's own frame. Game thread writes, producer reads;
+    // the three floats may tear against each other by one update, which the network's slew absorbs.
+    private float _listenerX, _listenerY, _listenerZ;
+    private volatile bool _listenerKnown;
+
+    /// <summary>
+    /// Tells the engine where the listener is, in the machine's frame (x across, y up, z forward,
+    /// origin at the exhaust part), so a machine with more than one tailpipe can radiate each from
+    /// its own place. See <see cref="ExhaustNetwork.SetListener"/> for why that is not a detail.
+    /// </summary>
+    public void SetListener(Vector3 machineFrame)
+    {
+        Volatile.Write(ref _listenerX, machineFrame.X);
+        Volatile.Write(ref _listenerY, machineFrame.Y);
+        Volatile.Write(ref _listenerZ, machineFrame.Z);
+        _listenerKnown = true;
+    }
 
     /// <summary>
     /// True when this machine's front outlet has a voice of its own, so this one is the back alone.
@@ -477,6 +496,8 @@ public sealed class EngineVoiceState
         float envTarget = TargetEnvelope;
         int mask = _ring.Length - 1;
         long w = _written;
+        if (_listenerKnown)
+            Engine.SetListener(new Vector3(Volatile.Read(ref _listenerX), Volatile.Read(ref _listenerY), Volatile.Read(ref _listenerZ)));
         for (int i = 0; i < count; i++)
         {
             // Smooth the network's speed steps over about 80 ms.

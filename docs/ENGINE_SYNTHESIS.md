@@ -229,6 +229,44 @@ synthesized engine has no file to replay, so its echo is its own ring buffer rea
 mirrored path's delay and placed at the image source. The read position is slewed rather than
 stepped, so the echo Dopplers on its own as the car moves.
 
+## Two tailpipes are two sources (2026-09-18)
+
+The F1 was reported as "no low end, too high pitched, a siren when it revs". Measured, the exhaust
+was a single partial: order 5 with everything else 12 dB or more down at 12,000 rpm. The reason was
+not in the engine. `ExhaustNetwork` summed every branch's radiated pressure at ONE point, and an
+even-firing V10's banks are exactly anti-phase at the bank firing rate — order 2.5, the fundamental
+of each pipe — so the sum cancelled the engine's own fundamental and handed the ear the next
+harmonic alone, an octave up. A scratch single-pipe build proved it: order 2.5 level with order 5 on
+one pipe, −12 dB (12,000 rpm) to −19 dB (8,000) on the sum.
+
+`ExhaustSpec.TailpipeExitsMetres` now says where each pipe leaves the car, in the machine's frame,
+and `ExhaustNetwork.SetListener` is told where the listener stands in that frame. Each branch then
+radiates with the path difference its exit implies — the extra distance to the listener against the
+nearest pipe, as a slewed delay through air — plus the spherical-spreading ratio, which only matters
+inside a metre. Dead behind the car this reduces to the old sum bit for bit; off the centre line the
+two pipes interfere as two sources do, and on a pass-by the balance sweeps with the bearing. The
+game hands the listener to each `EngineVoiceState` from the emitter's heading (`FmodAudioProvider.
+ListenerInMachineFrame`); the lab takes `azimuth=<deg> dist=<m>` on `--engine-orders` and
+`--engine-gallery`, and `pipe=<n>` solos a tailpipe.
+
+| f1_v10 at 12,000 rpm, 10 m | order 2.5 vs 5 | level |
+|---|---|---|
+| summed at one point (before) | −12 dB | 137.4 dB |
+| 0° (dead behind) | −12 dB | 137.4 dB |
+| 30° | 0 dB (order 5 at −2) | 139.7 dB |
+| 60° | 0 dB (order 5 at −8) | 136.3 dB |
+| 90° | −1 dB | 136.5 dB |
+
+Only the F1 declares exits. A cross-plane V8 has no such symmetry to lose and its presets were
+settled by ear as one point; giving the true-dual V8s their rear-corner exits is available and is a
+listening decision, not a fix. The bench default stays on the centre line (null), so declared
+`SourceLevelDb` figures are unchanged; the F1 is up to 2.3 dB louder off-axis, inside the headroom.
+
+Still open on the F1, and separate from this: above about 12,300 rpm the render is erratic
+(`structure` 15–34 dB where 50 is clean) and it is not aliasing of the firings — oversampling makes
+it worse. Only pipe wall loss and steepening move it, which points at the shock front in `WaveLine`
+(a thickness floor in SAMPLES). See todo.md, 2026-09-18.
+
 ## Levels: where the headroom goes, and where it comes back
 
 Three bugs in a row here, and they are worth writing down together because they look identical from

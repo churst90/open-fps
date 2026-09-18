@@ -1,4 +1,5 @@
 using System;
+using System.Numerics;
 using OpenFPS.Common;
 using System.Runtime.CompilerServices;
 
@@ -1156,6 +1157,16 @@ public sealed class EngineSynth
     public static bool DebugLegacyDiesel;
 
     public static bool DebugRigidValves;
+
+    /// <summary>Diagnostic: hear ONE tailpipe on its own (0-based branch index), scaled up by the
+    /// branch count so the level is comparable. -1 is every pipe. Set by the `pipe=` knob in the lab.
+    /// Never set in a game.</summary>
+    public static int DebugSoloTailpipe = -1;
+
+    /// <summary>Where the listener stands, in the machine's frame (x across, y up, z forward, origin
+    /// at the exhaust part), so each tailpipe can radiate from its own position. Optional: an engine
+    /// nobody has told sums its pipes at one point. See <see cref="ExhaustNetwork.SetListener"/>.</summary>
+    public void SetListener(Vector3 machineFrame) => _exhaust.SetListener(machineFrame);
 
     /// <summary>Diagnostic: one line per cylinder.</summary>
     public System.Collections.Generic.IEnumerable<string> DescribeCylinders()

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Numerics;
 
 namespace OpenFPS.Common;
 
@@ -217,6 +218,26 @@ public sealed record ExhaustSpec
     /// step and cancel each other's unevenness.</summary>
     public float[] TailpipeMetres { get; init; } = { 0.60f };
     public float TailpipeDiameterMm { get; init; } = 63f;
+
+    /// <summary>
+    /// WHERE each tailpipe leaves the car, metres, in the machine's frame (x across the car, y up,
+    /// z forward) relative to the exhaust part's position. One entry per branch. Null puts every exit
+    /// at the same point.
+    ///
+    /// This is not decoration. Two pipes are two sources, and what a listener hears is the two
+    /// arriving with the path difference their spacing and the listener's bearing imply. Summed at
+    /// one point — which is what null does, and what every engine did before this existed — the two
+    /// banks of an even-firing V10 are exactly anti-phase at the bank firing rate, so the sum cancels
+    /// the engine's own fundamental and leaves the next harmonic alone: measured, order 2.5 sat
+    /// 12-19 dB under order 5 on the sum and level with it on one pipe. The ear pitches that an
+    /// octave up, and a single partial gliding is a siren. A real car's pipes are half a metre or
+    /// more apart, so from anywhere off the centre line they do not cancel, and on a pass-by the
+    /// balance between them sweeps with the angle. See ExhaustNetwork.SetListener.
+    ///
+    /// Cross-plane V8s have no such symmetry to lose, which is why the field is null on the presets
+    /// that were settled by ear as one point and set only where the geometry was proven to matter.
+    /// </summary>
+    public Vector3[]? TailpipeExitsMetres { get; init; }
     /// <summary>Second exhaust system count for engines that split by bank. Derived: it is the number
     /// of collector groups unless <see cref="Crossover"/> is Merged.</summary>
 
@@ -1402,7 +1423,11 @@ public sealed record EngineProfile
         Layout = EngineLayout.Vee,
         FiringAngles = EvenFire(new[] { 1, 6, 5, 10, 2, 7, 3, 8, 4, 9 }),
         // Cylinders 1-5 down one bank and 6-10 down the other, which with this order gives each
-        // bank an EVEN 144 degrees between firings. No half orders, no rumble — just order five.
+        // bank an EVEN 144 degrees between firings. No half orders, no rumble — just order five...
+        // ...on the CENTRE LINE. Each bank's own pipe carries five firings a cycle, order 2.5, and
+        // the two pipes are anti-phase there. Summed at one point that fundamental cancelled and the
+        // engine was a single partial an octave up: the siren a listener reported. With the two
+        // exits placed (TailpipeExitsMetres) it is there from anywhere off the centre line.
         Bank = HalfBanks(10),
         // 98 mm bore on a 39.75 mm stroke: 300 cc a cylinder, and a mean piston speed at 19,000 rpm
         // that is only just past what a road engine sees at 8,000.
@@ -1430,6 +1455,9 @@ public sealed record EngineProfile
             Muffler = MufflerSpec.StraightPipe,
             TailpipeMetres = new[] { 0.18f, 0.20f },
             TailpipeDiameterMm = 72f,
+            // One exit each side of the gearbox, about sixty centimetres apart. This is the field
+            // that undoes the siren: see TailpipeExitsMetres.
+            TailpipeExitsMetres = new[] { new Vector3(-0.30f, 0f, 0f), new Vector3(0.30f, 0f, 0f) },
             GasCelsiusIdle = 520f, GasCelsiusFull = 1020f,
             WallLossMultiplier = 1.0f,
             Steepening = 1.25f,

@@ -500,6 +500,67 @@ public class EngineSynthTests
             $"fading stepped by {worst:F4}, against a natural slew of {natural:F4}");
     }
 
+    /// <summary>
+    /// Two tailpipes are two sources. Dead behind the car the even-firing V10's banks arrive in step
+    /// and cancel at the bank firing rate (order 2.5); a listener round the side hears the two with
+    /// a path difference and the fundamental comes back. Summing the pipes at one point — which is
+    /// what the model did for every engine — gave everyone the centre-line sound: a single partial an
+    /// octave up, heard as a siren.
+    /// </summary>
+    [Fact]
+    public void TwoTailpipes_HeardOffTheCentreLine_KeepTheBankFundamental()
+    {
+        var v = VehicleProfile.ByName("f1_v10");
+        Assert.NotNull(v.Engine.Exhaust.TailpipeExitsMetres);
+        var orders = new List<DriveOrder>
+        {
+            new(DriverAction.Cranking, 0.5f),
+            new(DriverAction.Idling, 1.0f),
+            new(DriverAction.Holding, 6f, 12000f, 1f),
+        };
+        // 10 m away: dead behind, and 30 degrees round toward one side.
+        var behind = VehicleSynth.Render(v, orders, 7, new System.Numerics.Vector3(0f, 1.2f, -10f));
+        var side = VehicleSynth.Render(v, orders, 7, new System.Numerics.Vector3(5f, 1.2f, -8.66f));
+        // And the old bench — no listener at all — must be exactly the centre-line sum.
+        var summed = VehicleSynth.Render(v, orders, 7);
+
+        float bankOverFiring(VehicleRender r)
+        {
+            int from = r.Exhaust.Length - Sr * 2;
+            float rpm = 0f;
+            for (int i = from; i < r.Rpm.Length; i++) rpm += r.Rpm[i];
+            rpm /= r.Rpm.Length - from;
+            var x = r.Exhaust[from..];
+            float f1 = rpm / 60f;
+            return Goertzel(x, 2.5f * f1) / MathF.Max(1e-9f, Goertzel(x, 5f * f1));
+        }
+        float ratioBehind = bankOverFiring(behind), ratioSide = bankOverFiring(side), ratioSummed = bankOverFiring(summed);
+
+        // Behind: the bank rate is well under the firing rate (it was -12 dB on the sum).
+        Assert.True(ratioBehind < 0.45f, $"behind the car order 2.5 should cancel; it is {20 * MathF.Log10(ratioBehind):F1} dB against order 5");
+        // Off to the side it is a real fundamental again, within a few dB of the firing order.
+        Assert.True(ratioSide > 0.5f, $"30 degrees round order 2.5 should survive; it is {20 * MathF.Log10(ratioSide):F1} dB against order 5");
+        Assert.True(ratioSide > 2f * ratioBehind, "the side must hear more bank fundamental than the centre line");
+        // The far-field centre line and the one-point sum are the same sound.
+        Assert.InRange(20 * MathF.Log10(ratioBehind / MathF.Max(1e-9f, ratioSummed)), -3f, 3f);
+    }
+
+    /// <summary>Magnitude of one frequency in a Hann-windowed buffer, the bench's own measure.</summary>
+    private static float Goertzel(float[] x, float freq)
+    {
+        double w = 2 * Math.PI * freq / Sr;
+        double sr = 0, si = 0, norm = 0;
+        for (int i = 0; i < x.Length; i++)
+        {
+            double win = 0.5 - 0.5 * Math.Cos(2 * Math.PI * i / (x.Length - 1));
+            double a = w * i;
+            sr += x[i] * win * Math.Cos(a);
+            si -= x[i] * win * Math.Sin(a);
+            norm += win;
+        }
+        return (float)(2 * Math.Sqrt(sr * sr + si * si) / Math.Max(1, norm));
+    }
+
     [Fact]
     public void FullLoad_IsMuchLouderThanIdle_AndPulsesAreBiggerInThePipe()
     {

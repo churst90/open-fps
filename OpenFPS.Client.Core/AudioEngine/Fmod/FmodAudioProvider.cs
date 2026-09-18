@@ -1276,6 +1276,8 @@ public class FmodAudioProvider : IAudioProvider
             // The car is already doing this speed; start the engine in that state rather than
             // spinning it up from rest inside the first eighty milliseconds.
             engineState.PlaceAtSpeed(emitter.EngineSpeed);
+            if (ListenerInMachineFrame(emitter.Position, emitter.Direction, emitter.Velocity, out var localListener))
+                engineState.SetListener(localListener);
             if (EngineProcessor.CreateDSP(_system, engineState, out engineDsp, out engineHandle) != RESULT.OK) return;
             engineDsp.setChannelFormat(0, 0, SPEAKERMODE.MONO);
             Log.Information("Engine voice started: entity {Id} runs '{Preset}' live at {Rate} Hz", emitter.EntityId, emitter.EngineKey, rate);
@@ -1524,6 +1526,8 @@ public class FmodAudioProvider : IAudioProvider
                     active.EngineState.TargetSpeed = emitter.EngineSpeed;
                     active.EngineState.Running = emitter.EngineRunning;
                     active.EngineState.RoadSlip = emitter.TyreSlip;
+                    if (ListenerInMachineFrame(emitter.Position, emitter.Direction, emitter.Velocity, out var local))
+                        active.EngineState.SetListener(local);
                 }
                 else if (emitter.IsSynth && active.EchoState != null)
                 {
@@ -2347,6 +2351,27 @@ public class FmodAudioProvider : IAudioProvider
                     listenerRegionId, regionId, name, regionId == listenerRegionId ? "INSIDE" : "outside", rdist, targetVol, _reverbVolumes[regionId], binaural);
             }
         }
+    }
+
+    /// <summary>
+    /// The listener as a machine sees it: in the frame the machine's parts are placed in (x across,
+    /// y up, z forward), with the origin at the emitter. The machine's forward is the emitter's
+    /// Direction — which for an engine is the entity's own heading — or, failing that, the way it is
+    /// moving. A machine standing still with no heading has nothing to say, and says so.
+    /// </summary>
+    private bool ListenerInMachineFrame(Vector3 position, Vector3 direction, Vector3 velocity, out Vector3 local)
+    {
+        Vector3 fwd = direction;
+        if (fwd.LengthSquared() < 1e-6f) fwd = velocity;
+        fwd.Y = 0f;
+        if (fwd.LengthSquared() < 1e-4f) { local = default; return false; }
+        fwd = Vector3.Normalize(fwd);
+        // A proper rotation carries cross products, so the machine's local +x is up cross forward —
+        // the same axis Vector3.Transform(slot, rotation) puts a part's x on.
+        Vector3 right = Vector3.Cross(Vector3.UnitY, fwd);
+        Vector3 d = _listenerPos - position;
+        local = new Vector3(Vector3.Dot(d, right), d.Y, Vector3.Dot(d, fwd));
+        return true;
     }
 
     public void UpdateListener(Vector3 position, Quaternion rotation, Vector3 velocity, int regionId)

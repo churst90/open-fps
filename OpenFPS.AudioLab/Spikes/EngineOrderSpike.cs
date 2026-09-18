@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Numerics;
 using OpenFPS.Common;
 using OpenFPS.Client.AudioEngine.Core;
 using OpenFPS.Client.AudioEngine.Core.Engine;
@@ -47,6 +48,7 @@ public static class EngineOrderSpike
             else if (VehicleProfile.Presets.ContainsKey(arg)) preset = arg;
         }
         var v = Override(VehicleProfile.ByName(preset), args);
+        var listener = ListenerFromArgs(args, out string standing);
         if (rpms.Count == 0)
         {
             rpms.Add(v.Engine.IdleRpm);
@@ -58,13 +60,14 @@ public static class EngineOrderSpike
         Console.WriteLine($"\n  {v.Name} — {v.Engine.Name}");
         var probe = new EngineSynth(v.Engine, Sr);
         foreach (var line in probe.Describe()) Console.WriteLine($"    {line}");
+        Console.WriteLine($"    {standing}");
         Console.WriteLine();
 
         foreach (float rpm in rpms)
         {
             // Idle at whatever throttle holds it; everything else at full throttle unless told.
             float t = thr >= 0f ? thr : (rpm <= v.Engine.IdleRpm * 1.05f ? -1f : 1f);
-            Measure(v, rpm, t, wav);
+            Measure(v, rpm, t, wav, listener);
         }
 
         Console.WriteLine("""
@@ -250,6 +253,38 @@ public static class EngineOrderSpike
     /// turbo= whine= bore= stroke= rod= cr= evo= exdur= indur= excl= incl= exvalve= invalve= redline=
     /// idlerpm= inertia= plenum= airbox= snorkel= throttle= colpipe= midpipe= tail= coldia= prdia=
     /// taildia=, plus muffler=none|glass|chambered|stock and crank=even|odd</summary>
+    /// <summary>
+    /// Where the bench stands: `azimuth=<deg>` round from dead behind the car (positive toward the
+    /// machine's +x side), `dist=<m>` from the exhaust (default 10), ear 1.2 m above the tailpipe.
+    /// Null — no azimuth given — is the old bench exactly: every tailpipe summed at one point, which
+    /// is what a listener on the centre line hears. `pipe=<n>` solos one tailpipe for A/B by ear.
+    /// </summary>
+    public static Vector3? ListenerFromArgs(string[] args, out string describe)
+    {
+        float? az = null; float dist = 10f;
+        EngineSynth.DebugSoloTailpipe = -1;
+        foreach (var arg in args)
+        {
+            int eq = arg.IndexOf('=');
+            if (eq <= 0 || arg.StartsWith("--")) continue;
+            string k = arg[..eq];
+            if (!float.TryParse(arg[(eq + 1)..], out float n)) continue;
+            if (k == "azimuth") az = n;
+            else if (k == "dist") dist = MathF.Max(0.5f, n);
+            else if (k == "pipe") EngineSynth.DebugSoloTailpipe = (int)n;
+        }
+        string solo = EngineSynth.DebugSoloTailpipe >= 0 ? $", tailpipe {EngineSynth.DebugSoloTailpipe} alone" : "";
+        if (az is not { } deg)
+        {
+            describe = "listener: on the centre line, every tailpipe summed at one point" + solo;
+            return null;
+        }
+        float rad = deg * MathF.PI / 180f;
+        var p = new Vector3(dist * MathF.Sin(rad), 1.2f, -dist * MathF.Cos(rad));
+        describe = $"listener: {dist:F0} m from the exhaust, {deg:F0} deg round from dead behind{solo}";
+        return p;
+    }
+
     public static VehicleProfile Override(VehicleProfile v, string[] args)
     {
         var e = v.Engine;
@@ -356,10 +391,12 @@ public static class EngineOrderSpike
         Directory.CreateDirectory(dir);
         Console.WriteLine($"\n  Every engine: cranks, idles, blips twice, and is shut off.\n");
         string? only = args.FirstOrDefault(a => VehicleProfile.Presets.ContainsKey(a));
+        var listener = ListenerFromArgs(args, out string standing);
+        Console.WriteLine($"  {standing}\n");
         foreach (var (key, make) in VehicleProfile.Presets)
         {
             if (only != null && key != only) continue;
-            var v = make();
+            var v = Override(make(), args);
             var e = v.Engine;
             var orders = new List<DriveOrder>
             {
@@ -371,7 +408,7 @@ public static class EngineOrderSpike
                 new(DriverAction.Idling, 1.8f),
                 new(DriverAction.ShuttingDown, 1.5f),
             };
-            var r = VehicleSynth.Render(v, orders, seed: 5);
+            var r = VehicleSynth.Render(v, orders, seed: 5, listener: listener);
             File.WriteAllBytes(Path.Combine(dir, $"{key}_exhaust.wav"), VehicleSynth.ToWav16(r.Exhaust));
             File.WriteAllBytes(Path.Combine(dir, $"{key}_front.wav"), VehicleSynth.ToWav16(r.Intake));
             // A near mix: exhaust with the front of the car 8 dB under it.
@@ -394,7 +431,7 @@ public static class EngineOrderSpike
         return 0;
     }
 
-    private static void Measure(VehicleProfile v, float rpm, float throttle, bool wav)
+    private static void Measure(VehicleProfile v, float rpm, float throttle, bool wav, Vector3? listener = null)
     {
         // Run for long enough for the governor and THE PIPES to settle, analyse the last two seconds.
         //
@@ -417,7 +454,7 @@ public static class EngineOrderSpike
                 new(DriverAction.Idling, 1.5f),
                 new(DriverAction.Holding, 12f, rpm, throttle < 0f ? 1f : throttle),
             };
-        var r = VehicleSynth.Render(v, orders, seed: 7);
+        var r = VehicleSynth.Render(v, orders, seed: 7, listener: listener);
         int from = r.Exhaust.Length - Sr * 2;
         var x = Window(r.Exhaust, from, r.Exhaust.Length);
         var pa = new float[x.Length];

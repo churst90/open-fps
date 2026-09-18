@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Numerics;
 using OpenFPS.Common;
 using OpenFPS.Client.AudioEngine.Core.Engine;
 using System.Runtime.CompilerServices;
@@ -52,7 +53,10 @@ public static class VehicleSynth
     public static float GasSoundSpeed(float celsius) => Gas.SoundSpeed(celsius + 273.15f, Gas.GammaExhaust);
 
     /// <summary>Renders a whole drive. Deterministic given the seed.</summary>
-    public static VehicleRender Render(VehicleProfile v, IReadOnlyList<DriveOrder> orders, int seed = 11)
+    /// <param name="listener">Where the bench stands, in the machine's frame (x across, y up, z
+    /// forward, origin at the exhaust). Null sums every tailpipe at one point, which is what a
+    /// listener dead behind the car hears and what every render did before tailpipes had positions.</param>
+    public static VehicleRender Render(VehicleProfile v, IReadOnlyList<DriveOrder> orders, int seed = 11, Vector3? listener = null)
     {
         var rng = new Random(seed);
         var log = new List<string>();
@@ -69,6 +73,7 @@ public static class VehicleSynth
         var rpmTrace = new float[n];
 
         var engine = new EngineSynth(v.Engine, SampleRate, seed);
+        if (listener is { } standing) engine.SetListener(standing);
         var driveline = new Driveline(v);
         var driver = new Driver(driveline, engine);
         // The car the engine is bolted into. Driven by the EXHAUST rather than by the finished mix,

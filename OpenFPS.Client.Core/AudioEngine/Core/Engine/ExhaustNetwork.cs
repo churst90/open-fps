@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Numerics;
 using OpenFPS.Common;
 using System.Runtime.CompilerServices;
 
@@ -115,6 +116,20 @@ internal sealed class ExhaustNetwork
 
         /// <summary>Acoustic pressure summed over the chambers this sample — the drive. Diagnostic.</summary>
         public float ChamberPressure;
+
+        /// <summary>Where this pipe leaves the car, machine frame, relative to the exhaust part.</summary>
+        public Vector3 Exit;
+
+        /// <summary>
+        /// The extra distance this pipe's sound travels to the listener, against the nearest pipe,
+        /// in samples — and the ring that delays it by that much. See <see cref="SetListener"/>.
+        /// </summary>
+        public float[] Path = Array.Empty<float>();
+        public int PathAt;
+        public float PathSamples, PathTarget;
+        /// <summary>Spherical spreading against the part's centre: one over the ratio of this pipe's
+        /// distance to the listener and the centre's. Unity in the far field.</summary>
+        public float Spread = 1f, SpreadTarget = 1f;
     }
 
     public ExhaustNetwork(EngineProfile e, float rate, int seed = 3)
@@ -195,13 +210,74 @@ internal sealed class ExhaustNetwork
             float tailL = _x.TailpipeMetres.Length > b ? _x.TailpipeMetres[b]
                         : _x.TailpipeMetres[0] * (1f + 0.09f * b);
             br.Chain.Add(new Pipe(tailL, tailArea, rate, wall, steep));
+            var exits = _x.TailpipeExitsMetres;
+            br.Exit = exits != null && b < exits.Length ? exits[b] : Vector3.Zero;
+            if (br.Exit != Vector3.Zero) _hasExits = true;
             _branch[b] = br;
+        }
+        if (_hasExits)
+        {
+            // Long enough for two metres of spacing at any rate this will be run at.
+            int len = 64;
+            while (len < 0.006f * rate) len <<= 1;
+            foreach (var br in _branch) br.Path = new float[len];
         }
 
         UpdateGas(_x.GasCelsiusIdle + 273.15f, 0f);
     }
 
     private readonly CrossoverKind _crossover;
+
+    /// <summary>True when the profile places its tailpipes apart; false means one point, as before.</summary>
+    private readonly bool _hasExits;
+    /// <summary>True once anyone has said where the listener is.</summary>
+    private bool _listenerKnown;
+
+    /// <summary>
+    /// The most a pipe's path delay may move per sample. A delay that changes is a pitch shift of
+    /// that pipe against the other, which is real — the two ends of a car passing you have slightly
+    /// different Dopplers — and on a real pass-by it stays under half a per cent. This is the cap
+    /// that keeps a game-thread jump (a car teleported, a listener respawned) from arriving as a chirp.
+    /// </summary>
+    private const float MaxPathSlew = 0.005f;
+
+    /// <summary>
+    /// Tells the network where the listener stands, in the machine's frame (x across, y up, z
+    /// forward, origin at the exhaust part), so each tailpipe can radiate from its own place.
+    ///
+    /// The exhaust used to be one source: every branch's radiated pressure added at a single point.
+    /// That is exactly right for a listener equidistant from every pipe — dead behind the car — and
+    /// systematically wrong everywhere else, because the components that DIFFER between banks are the
+    /// ones a coherent sum destroys. On an even-firing V10 the banks are anti-phase at the bank firing
+    /// rate, so the sum cancelled the engine's fundamental and the ear was handed the next harmonic
+    /// alone: a siren. Measured, order 2.5 read 12-19 dB under order 5 on the sum and level with it
+    /// on one pipe.
+    ///
+    /// Each branch now gets the path difference its exit implies — the extra distance to the listener
+    /// against the nearest pipe, as a delay — and the ratio of spherical spreading, which only matters
+    /// up close. In the far field on the centre line this reduces to the old sum exactly; off it the
+    /// two pipes interfere as two sources do, and on a pass-by the balance sweeps with the bearing.
+    /// Called a few hundred times a second at most; the delays slew, never step.
+    /// </summary>
+    public void SetListener(Vector3 machineFrame)
+    {
+        if (!_hasExits) return;
+        float r = machineFrame.Length();
+        if (r < 0.05f) return;                    // standing in the tailpipe: nothing to say
+        // Air, not exhaust gas: the extra distance is travelled outside the pipe.
+        const float airC = 343f;
+        float nearest = float.MaxValue;
+        foreach (var br in _branch) nearest = MathF.Min(nearest, Vector3.Distance(machineFrame, br.Exit));
+        foreach (var br in _branch)
+        {
+            float path = Vector3.Distance(machineFrame, br.Exit);
+            br.PathTarget = Math.Clamp((path - nearest) / airC * _rate, 0f, br.Path.Length - 3f);
+            // Inside a metre the pipes are separate sources at separate distances; beyond it the
+            // ratio is within a few per cent of one and not worth a discontinuity at the boundary.
+            br.SpreadTarget = r > 1f ? Math.Clamp(r / MathF.Max(0.1f, path), 0.25f, 4f) : 1f;
+        }
+        _listenerKnown = true;
+    }
 
     private static float Circle(float diameterMm)
     {
@@ -579,7 +655,28 @@ internal sealed class ExhaustNetwork
                 br.Radiated += br.ShellRadiated;
             }
 
-            radiated += br.Radiated;
+            // Each pipe from its own place, if the profile says where that is and anyone has said
+            // where the listener is. Otherwise the sum at one point, bit for bit as it always was.
+            float heard = br.Radiated;
+            if (_listenerKnown)
+            {
+                br.PathSamples += Math.Clamp(br.PathTarget - br.PathSamples, -MaxPathSlew, MaxPathSlew);
+                br.Spread += Math.Clamp(br.SpreadTarget - br.Spread, -0.0005f, 0.0005f);
+                var ring = br.Path;
+                int mask = ring.Length - 1;
+                ring[br.PathAt] = heard;
+                float read = br.PathAt - br.PathSamples;
+                if (read < 0f) read += ring.Length;
+                int i0 = (int)read;
+                float f = read - i0;
+                float a0 = ring[i0 & mask], a1 = ring[(i0 + 1) & mask];
+                heard = (a0 + (a1 - a0) * f) * br.Spread;
+                br.PathAt = (br.PathAt + 1) & mask;
+            }
+            int solo = EngineSynth.DebugSoloTailpipe;
+            if (solo >= 0) heard = Array.IndexOf(_branch, br) == solo ? heard * _branch.Length : 0f;
+
+            radiated += heard;
             shell += br.ShellRadiated;
             pipe += direct + jet;
         }
