@@ -1645,6 +1645,135 @@ public sealed record EngineProfile
         Mechanical = DieselBusI6.Mechanical with { TurboWhistleLevel = 0f },
     };
 
+    /// <summary>
+    /// A GE 7FDL16: the prime mover in an Amtrak Genesis and in thousands of freight locomotives.
+    /// Sixteen cylinders of 229 mm bore and 267 mm stroke — 175 litres — turbocharged, four-stroke,
+    /// and governed to eight fixed notches from 440 rpm to 1,050. Its firing rate is therefore 59 Hz
+    /// at idle and 140 Hz flat out, and because a governor holds a NOTCH rather than following a
+    /// pedal, a locomotive changes speed in steps you can count.
+    ///
+    /// Everything about the sound is the size. A 229 mm bore has a knock frequency about a third of
+    /// a truck engine's, so the clatter is a thud. The exhaust leaves through a turbine the size of a
+    /// dustbin and out a stack half a metre across and less than a metre long, which is why there is
+    /// almost no pipe tuning in it at all and why what you hear is the ports and the turbo rather
+    /// than a note.
+    /// </summary>
+    public static EngineProfile Ge7Fdl16 => new()
+    {
+        Name = "GE 7FDL16, 175 litre turbocharged V16",
+        Layout = EngineLayout.Vee,
+        Fuel = FuelType.Diesel, Induction = Induction.Turbocharged, BoostBar = 1.7f,
+        FiringAngles = EvenFire(new[] { 1, 10, 3, 12, 5, 14, 7, 16, 2, 9, 4, 11, 6, 13, 8, 15 }),
+        Bank = HalfBanks(16),
+        BoreMm = 228.6f, StrokeMm = 266.7f, RodRatio = 1.9f, CompressionRatio = 12.7f,
+        ExhaustCam = new CamLobe { DurationDegrees = 250f, MaxLiftMm = 22f, RampFraction = 0.28f, CentrelineDegrees = 254f },
+        IntakeCam = new CamLobe { DurationDegrees = 244f, MaxLiftMm = 22f, RampFraction = 0.28f, CentrelineDegrees = 472f },
+        ExhaustValve = new ValveSpec { Count = 2, DiameterMm = 76f, DischargeCoefficient = 0.6f },
+        IntakeValve = new ValveSpec { Count = 2, DiameterMm = 82f, DischargeCoefficient = 0.6f },
+        EvoTemperatureK = 1010f, IdleMapBar = 1.05f,
+        CombustionVariation = 0.018f, IdleRoughness = 0.12f, IdleGovernorGain = 9f,
+        IdleRpm = 440f, RedlineRpm = 1050f, CrankingRpm = 120f,
+        InertiaKgM2 = 165f, FrictionNm = 2600f, FrictionNmPerKrpm = 900f,
+        PeakTorqueNm = 29800f, PeakTorqueRpm = 1050f,
+        Exhaust = new ExhaustSpec
+        {
+            PrimaryLengthMetres = 0.34f, PrimarySpread = 0.5f, PrimaryDiameterMm = 92f,
+            CollectorGroups = new[] { new[] { 0, 1, 2, 3, 4, 5, 6, 7 }, new[] { 8, 9, 10, 11, 12, 13, 14, 15 } },
+            CollectorDiameterMm = 185f, CollectorPipeMetres = 1.3f,
+            Crossover = CrossoverKind.Merged, CrossoverTubeMetres = 0.5f, CrossoverArea = 0.9f,
+            MidPipeMetres = 0.7f,
+            // Not a muffler: a turbine wheel, which is a big absorptive expansion with a great deal
+            // of loss and no tuning worth the name.
+            Muffler = MufflerSpec.Chambered40 with
+            {
+                Kind = MufflerKind.Absorptive, ChamberLengthsMetres = new[] { 0.42f },
+                ExpansionRatio = 14f, Absorption = 0.62f, AbsorptiveLengthMetres = 0.5f, BaffleLoss = 0.2f,
+            },
+            TailpipeMetres = new[] { 0.55f }, TailpipeDiameterMm = 260f,
+            GasCelsiusIdle = 220f, GasCelsiusFull = 640f,
+            WallLossMultiplier = 1.6f, Steepening = 1.1f, JetNoiseLevel = 1.3f, OverrunPopRate = 0f,
+        },
+        Intake = new IntakeSpec
+        {
+            RunnerLengthMetres = 0.30f, RunnerDiameterMm = 86f, PlenumLitres = 120f,
+            ThrottleDiameterMm = 300f, AirboxLitres = 900f,
+            SnorkelLengthMetres = 1.6f, SnorkelDiameterMm = 330f, Level = 0.35f, Absorption = 0.55f,
+        },
+        Mechanical = new MechanicalSpec
+        {
+            ValvetrainLevel = 0.9f, CombustionKnock = 1.5f,
+            AccessoryWhineOrder = 9.5f, AccessoryWhineLevel = 0.3f,
+            TurboWhistleLevel = 0.9f, TurboLagSeconds = 3.5f,
+        },
+    };
+
+    /// <summary>
+    /// An EMD 645E3: sixteen cylinders, 230 mm by 254 mm, and a TWO-STROKE — every cylinder fires
+    /// every revolution instead of every other one. That single fact is why an EMD does not sound
+    /// like any four-stroke: at its 900 rpm maximum it fires 240 times a second where a GE at 1,050
+    /// manages 140, so the beat is not a beat any more, it is a pitch, and the engine hums where the
+    /// other one hammers.
+    ///
+    /// Uniflow scavenged: four poppet exhaust valves in the head, opening 75 degrees before bottom
+    /// centre, and a ring of ports in the liner that the piston uncovers around bottom centre, fed by
+    /// a Roots blower. So the "intake cam" here is the piston edge, with a duration and a centre that
+    /// are geometry rather than a camshaft, and it closes AFTER the exhaust valves do, which is how
+    /// the cylinder ends up with more air in it than it swept.
+    /// </summary>
+    public static EngineProfile Emd645E3 => new()
+    {
+        Name = "EMD 645E3, 169 litre two-stroke V16",
+        Layout = EngineLayout.Vee,
+        Strokes = 2,
+        Fuel = FuelType.Diesel, Induction = Induction.Turbocharged, BoostBar = 1.4f,
+        FiringAngles = EvenFire(new[] { 1, 8, 9, 16, 3, 6, 11, 14, 4, 5, 12, 13, 2, 7, 10, 15 }, 2),
+        Bank = HalfBanks(16),
+        BoreMm = 230.2f, StrokeMm = 254f, RodRatio = 2.0f, CompressionRatio = 14.5f,
+        // Exhaust valves open 75 degrees before bottom centre and shut 45 after: centred on BDC.
+        ExhaustCam = new CamLobe { DurationDegrees = 150f, MaxLiftMm = 20f, RampFraction = 0.3f, CentrelineDegrees = 182f },
+        // The ports: the piston uncovers them 55 degrees before bottom centre and covers them 55
+        // after, so they are square about BDC by construction. Nothing chooses this; the crank does.
+        IntakeCam = new CamLobe { DurationDegrees = 110f, MaxLiftMm = 40f, RampFraction = 0.12f, CentrelineDegrees = 180f },
+        ExhaustValve = new ValveSpec { Count = 4, DiameterMm = 62f, DischargeCoefficient = 0.62f },
+        IntakeValve = new ValveSpec { Count = 1, DiameterMm = 170f, DischargeCoefficient = 0.72f },
+        EvoTemperatureK = 1040f, IdleMapBar = 1.15f,
+        CombustionVariation = 0.02f, IdleRoughness = 0.1f, IdleGovernorGain = 9f,
+        IdleRpm = 315f, RedlineRpm = 900f, CrankingRpm = 110f,
+        InertiaKgM2 = 175f, FrictionNm = 2900f, FrictionNmPerKrpm = 1100f,
+        PeakTorqueNm = 31500f, PeakTorqueRpm = 900f,
+        Exhaust = new ExhaustSpec
+        {
+            PrimaryLengthMetres = 0.30f, PrimarySpread = 0.45f, PrimaryDiameterMm = 100f,
+            CollectorGroups = new[] { new[] { 0, 1, 2, 3, 4, 5, 6, 7 }, new[] { 8, 9, 10, 11, 12, 13, 14, 15 } },
+            CollectorDiameterMm = 190f, CollectorPipeMetres = 1.1f,
+            Crossover = CrossoverKind.Merged, CrossoverTubeMetres = 0.45f, CrossoverArea = 0.9f,
+            MidPipeMetres = 0.6f,
+            Muffler = MufflerSpec.Chambered40 with
+            {
+                Kind = MufflerKind.Absorptive, ChamberLengthsMetres = new[] { 0.40f },
+                ExpansionRatio = 12f, Absorption = 0.55f, AbsorptiveLengthMetres = 0.45f, BaffleLoss = 0.2f,
+            },
+            TailpipeMetres = new[] { 0.5f }, TailpipeDiameterMm = 270f,
+            GasCelsiusIdle = 200f, GasCelsiusFull = 590f,
+            WallLossMultiplier = 1.5f, Steepening = 1.1f, JetNoiseLevel = 1.35f, OverrunPopRate = 0f,
+        },
+        Intake = new IntakeSpec
+        {
+            RunnerLengthMetres = 0.25f, RunnerDiameterMm = 170f, PlenumLitres = 260f,
+            ThrottleDiameterMm = 360f, AirboxLitres = 700f,
+            SnorkelLengthMetres = 1.2f, SnorkelDiameterMm = 340f, Level = 0.55f, Absorption = 0.4f,
+        },
+        Mechanical = new MechanicalSpec
+        {
+            ValvetrainLevel = 1.0f, CombustionKnock = 1.3f,
+            // The Roots blower is geared off the crank and its three lobes make a tone at three
+            // times shaft speed on each of two rotors: the whine under every EMD.
+            AccessoryWhineOrder = 6f, AccessoryWhineLevel = 0.2f,
+            BlowerWhineOrder = 15.6f, BlowerWhineLevel = 0.45f,
+            TurboWhistleLevel = 0.5f, TurboLagSeconds = 2.5f,
+        },
+    };
+
     /// <summary>Every preset, by a short key a map or a command line can name.</summary>
     /// <summary>
     /// A 5.2 litre aviation flat-four — the Lycoming O-320 kind of engine: 130 mm bore on a 98 mm
@@ -1726,6 +1855,8 @@ public sealed record EngineProfile
             ["v8_blown"] = () => V8Blown,
             ["sportbike"] = () => SportBike,
             ["aero_flat4"] = () => AeroFlat4,
+            ["ge_7fdl16"] = () => Ge7Fdl16,
+            ["emd_645e3"] = () => Emd645E3,
         };
 
     public static EngineProfile ByName(string key)

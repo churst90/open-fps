@@ -58,6 +58,34 @@ if (args.Contains("--login-test"))
     Environment.Exit(success ? 0 : 1);
 }
 
+if (args.Contains("--airbrake"))
+{
+    int code = OpenFPS.Client.Core.AudioEngine.Fmod.CrossingSpike.RunAirBrake(args);
+    Log.CloseAndFlush();
+    Environment.Exit(code);
+}
+
+if (args.Contains("--crossing"))
+{
+    int code = OpenFPS.Client.Core.AudioEngine.Fmod.CrossingSpike.RunCrossing(args);
+    Log.CloseAndFlush();
+    Environment.Exit(code);
+}
+
+if (args.Contains("--train"))
+{
+    int code = OpenFPS.Client.Core.AudioEngine.Fmod.TrainSpike.Run(args);
+    Log.CloseAndFlush();
+    Environment.Exit(code);
+}
+
+if (args.Contains("--signals"))
+{
+    int code = OpenFPS.Client.Core.AudioEngine.Fmod.SignalSpike.Run(args);
+    Log.CloseAndFlush();
+    Environment.Exit(code);
+}
+
 if (args.Contains("--steam-distance"))
 {
     int code = SteamAudioLiveTest.RunDistanceCheck();
