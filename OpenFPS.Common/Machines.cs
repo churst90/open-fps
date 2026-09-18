@@ -40,6 +40,34 @@ public static class MachineModels
     /// <summary>Mass, drag, and where the axles are — everything about the machine that is not a
     /// sound but decides how it moves, and therefore what the sounds do.</summary>
     public const string Chassis = "chassis";
+
+    /// <summary>A bogie: a frame with wheelsets in it. Profile is a rail vehicle in the
+    /// <see cref="ModelLibrary"/>, which carries the wheel and where the axles sit.</summary>
+    public const string Bogie = "bogie";
+
+    /// <summary>What it runs on. Profile is a track in the <see cref="ModelLibrary"/> — this is the
+    /// one "part" that belongs to the WORLD rather than to the machine, and it is here because what
+    /// a wheel sounds like is half the rail's doing.</summary>
+    public const string Track = "track";
+
+    /// <summary>A prime mover that is not a road engine: a diesel-electric's alternator set, an
+    /// electric drive, a steam front end. Profile names which.</summary>
+    public const string Traction = "traction";
+
+    /// <summary>An air horn. Profile is a horn in the <see cref="ModelLibrary"/>. A lorry, a bus, a
+    /// locomotive and a ship all have one, which is why it is a part and not a train fitting.</summary>
+    public const string Horn = "horn";
+
+    /// <summary>A steam whistle. Profile is a whistle in the <see cref="ModelLibrary"/>.</summary>
+    public const string Whistle = "whistle";
+
+    /// <summary>A struck bell — a locomotive bell, a tram gong, a crossing gong on its mast.
+    /// Profile is a bell in the <see cref="ModelLibrary"/>.</summary>
+    public const string Bell = "bell";
+
+    /// <summary>A compressed-air system: reservoir, governor and the ports that let it out. Profile
+    /// is an air system in the <see cref="ModelLibrary"/>.</summary>
+    public const string Air = "air";
 }
 
 /// <summary>

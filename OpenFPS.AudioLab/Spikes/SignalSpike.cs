@@ -28,9 +28,9 @@ public static class SignalSpike
         Console.WriteLine("\n  Horns, whistles and bells at one metre.\n");
 
         if (wantHorn)
-            foreach (var key in Keys(args, ChimeHornSpec.Presets.Keys))
+            foreach (var key in Keys(args, ModelLibrary.Ids(ModelLibrary.Kinds.Horn)))
             {
-                var spec = ChimeHornSpec.ByName(key);
+                var spec = ModelLibrary.Horn(key);
                 var horn = new ChimeHorn(spec, Sr, 11);
                 Console.WriteLine($"  horn {key}");
                 foreach (var l in horn.Describe()) Console.WriteLine($"    {l}");
@@ -41,9 +41,9 @@ public static class SignalSpike
             }
 
         if (wantWhistle)
-            foreach (var key in Keys(args, WhistleSpec.Presets.Keys))
+            foreach (var key in Keys(args, ModelLibrary.Ids(ModelLibrary.Kinds.Whistle)))
             {
-                var spec = WhistleSpec.ByName(key);
+                var spec = ModelLibrary.Whistle(key);
                 var w = new SteamWhistle(spec, Sr, 23);
                 Console.WriteLine($"  whistle {key}");
                 foreach (var l in w.Describe()) Console.WriteLine($"    {l}");
@@ -52,9 +52,9 @@ public static class SignalSpike
             }
 
         if (wantBell)
-            foreach (var key in Keys(args, StruckBellSpec.Presets.Keys))
+            foreach (var key in Keys(args, ModelLibrary.Ids(ModelLibrary.Kinds.Bell)))
             {
-                var spec = StruckBellSpec.ByName(key);
+                var spec = ModelLibrary.Bell(key);
                 var b = new StruckBell(spec, Sr, 31);
                 Console.WriteLine($"  bell {key}");
                 foreach (var l in b.Describe()) Console.WriteLine($"    {l}");

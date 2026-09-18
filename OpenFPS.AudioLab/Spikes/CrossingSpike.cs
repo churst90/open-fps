@@ -35,15 +35,15 @@ public static class CrossingSpike
     public static int RunAirBrake(string[] args)
     {
         AcousticRegistry.Initialize();
-        var keys = args.Where(a => AirSystemSpec.Presets.ContainsKey(a)).ToList();
-        if (keys.Count == 0) keys = AirSystemSpec.Presets.Keys.ToList();
+        var keys = args.Where(a => ModelLibrary.Knows(ModelLibrary.Kinds.Air, a)).ToList();
+        if (keys.Count == 0) keys = ModelLibrary.Ids(ModelLibrary.Kinds.Air).ToList();
         string dir = Path.Combine(AppContext.BaseDirectory, "ASSETS", "SOUNDS", "AIR");
         Directory.CreateDirectory(dir);
         Console.WriteLine("\n  Compressed air, at three metres.\n");
 
         foreach (var key in keys)
         {
-            var spec = AirSystemSpec.ByName(key);
+            var spec = ModelLibrary.Air(key);
             var sys = new AirSystem(spec, Sr, 61) { EngineRpm = 700f };
             Console.WriteLine($"  {key}");
             foreach (var l in sys.Describe()) Console.WriteLine($"    {l}");
@@ -112,8 +112,8 @@ public static class CrossingSpike
     public static int RunCrossing(string[] args)
     {
         AcousticRegistry.Initialize();
-        string key = args.FirstOrDefault(a => TrainProfile.Presets.ContainsKey(a)) ?? "amtrak";
-        var profile = TrainProfile.ByName(key);
+        string key = args.FirstOrDefault(a => ModelLibrary.Knows(ModelLibrary.Kinds.Train, a)) ?? "amtrak";
+        var profile = ModelLibrary.Train(key);
         float speed = TrainSpike.Arg(args, "speed", profile.TypicalSpeedMps);
         float seconds = TrainSpike.Arg(args, "sec", 46f);
 
@@ -132,12 +132,12 @@ public static class CrossingSpike
         var mastAt = new Vector3(MathF.Sqrt(MathF.Max(0.01f, mastDist * mastDist - 4f)) * 0.8f, 3.6f, 1.2f);
 
         var train = new TrainSynth(profile, Sr, 41) { Speed = speed, Notch = 7f };
-        var gong = new StruckBell(StruckBellSpec.CrossingGong, Sr, 31);
-        var truckAir = new AirSystem(AirSystemSpec.TractorTrailer, Sr, 71) { EngineRpm = 650f };
-        var busAir = new AirSystem(AirSystemSpec.TransitBus, Sr, 83) { EngineRpm = 700f };
+        var gong = new StruckBell(ModelLibrary.Bell("crossing_gong"), Sr, 31);
+        var truckAir = new AirSystem(ModelLibrary.Air("tractor_trailer"), Sr, 71) { EngineRpm = 650f };
+        var busAir = new AirSystem(ModelLibrary.Air("transit_bus"), Sr, 83) { EngineRpm = 700f };
         var truckEngine = new EngineSynth(EngineProfile.ByName("diesel_truck"), Sr, 91) { Ignition = true };
         var busEngine = new EngineSynth(EngineProfile.ByName("diesel_bus"), Sr, 97) { Ignition = true };
-        var truckHorn = new ChimeHorn(ChimeHornSpec.TruckDualTrumpet, Sr, 103);
+        var truckHorn = new ChimeHorn(ModelLibrary.Horn("truck_dual"), Sr, 103);
 
         // When everything happens. The train is abeam the crossing half way through.
         float pass = seconds * 0.5f;

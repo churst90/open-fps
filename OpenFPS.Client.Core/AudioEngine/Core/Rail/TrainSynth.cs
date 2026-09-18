@@ -193,7 +193,7 @@ public sealed class TrainSynth
         string? hornKey = tr.HornKey;
         if (hornKey != null && _horn == null)
         {
-            _horn = new ChimeHorn(ChimeHornSpec.ByName(hornKey), _rate, seed++);
+            _horn = new ChimeHorn(ModelLibrary.Horn(hornKey), _rate, seed++);
             var h = _horn;
             _sources.Add(new Source
             {
@@ -204,7 +204,7 @@ public sealed class TrainSynth
         }
         if (tr.Steam?.WhistleKey is { } wk && _whistle == null)
         {
-            _whistle = new SteamWhistle(WhistleSpec.ByName(wk), _rate, seed++);
+            _whistle = new SteamWhistle(ModelLibrary.Whistle(wk), _rate, seed++);
             var w = _whistle;
             _sources.Add(new Source
             {
@@ -216,7 +216,7 @@ public sealed class TrainSynth
         string? bellKey = tr.BellKey ?? tr.Steam?.BellKey;
         if (bellKey != null && _bell == null)
         {
-            _bell = new StruckBell(StruckBellSpec.ByName(bellKey), _rate, seed++);
+            _bell = new StruckBell(ModelLibrary.Bell(bellKey), _rate, seed++);
             var bl = _bell;
             _sources.Add(new Source
             {

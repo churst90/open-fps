@@ -1,3 +1,4 @@
+using System.Linq;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading;
@@ -32,6 +33,7 @@ Console.WriteLine();
 // The authored machine library, copied in beside the maps and prefabs, so a spike auditions the same
 // cars the game plays rather than only the built-in ones.
 OpenFPS.Common.MachineRegistry.EnsureLoaded();
+OpenFPS.Common.ModelLibrary.EnsureLoaded();
 
 if (args.Contains("--login-test"))
 {
@@ -56,6 +58,26 @@ if (args.Contains("--login-test"))
         : "RESULT: TIMEOUT — no response (is the server running on 33288?)");
     Log.CloseAndFlush();
     Environment.Exit(success ? 0 : 1);
+}
+
+if (args.Contains("--models"))
+{
+    string? exportTo = args.FirstOrDefault(a => a.StartsWith("export=", StringComparison.Ordinal))?["export=".Length..];
+    if (exportTo != null)
+    {
+        int n = OpenFPS.Common.ModelLibrary.Export(exportTo);
+        Console.WriteLine($"  wrote {n} models to {exportTo}");
+        Console.WriteLine("  NOT into models/ — an authored file overrides the built-in, so a copy of");
+        Console.WriteLine("  the library there would freeze every model at today's numbers for good.");
+    }
+    else
+    {
+        foreach (string kind in OpenFPS.Common.ModelLibrary.AllKinds)
+            Console.WriteLine($"  {kind,-13} {string.Join(", ", OpenFPS.Common.ModelLibrary.Ids(kind))}");
+        Console.WriteLine("\n  --models export=DIR writes every one as the JSON the loader reads.");
+    }
+    Log.CloseAndFlush();
+    Environment.Exit(0);
 }
 
 if (args.Contains("--airbrake"))

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json.Serialization;
 
 namespace OpenFPS.Common;
 
@@ -119,6 +120,7 @@ public sealed record TrackSpec
     /// of every rolling-noise spectrum and it is a property of the rail section and the sleeper
     /// spacing, nothing else.
     /// </summary>
+    [JsonIgnore]
     public float PinnedPinnedHz
     {
         get
@@ -239,6 +241,7 @@ public sealed record SteamLocoSpec
     /// <summary>Exhaust beats a second at this speed. Two cylinders, double acting: four a turn.</summary>
     public float ChuffHz(float mps) => 2f * Cylinders * mps / (MathF.PI * MathF.Max(0.3f, DriverDiameterMetres));
     /// <summary>The chimney's first resonance — the note in the bark.</summary>
+    [JsonIgnore]
     public float StackHz => 343f / (2f * MathF.Max(0.1f, StackLengthMetres + 0.3f * StackDiameterMetres));
 }
 
@@ -276,6 +279,7 @@ public sealed record RailVehicleSpec
     /// hitting the same joint a tenth of a second apart.</summary>
     public float BogieWheelbaseMetres { get; init; } = 2.56f;
     public int Bogies { get; init; } = 2;
+    [JsonIgnore]
     public int AxlesPerBogie { get; init; } = 2;
     public required WheelsetSpec Wheels { get; init; }
     public float MassTonnes { get; init; } = 45f;
@@ -285,15 +289,25 @@ public sealed record RailVehicleSpec
     public float BodyDrumDb { get; init; }
     public float BodyDrumHz { get; init; } = 70f;
 
+    [JsonIgnore]
     public int Axles => Bogies * AxlesPerBogie;
 }
 
 /// <summary>A train: vehicles in order, on a track.</summary>
+/// <summary>How many of one vehicle, in a row. A named pair rather than a tuple, because this is a
+/// thing an author writes in a file.</summary>
+public sealed record ConsistEntry
+{
+    public required RailVehicleSpec Vehicle { get; init; }
+    public int Count { get; init; } = 1;
+    public void Deconstruct(out RailVehicleSpec vehicle, out int count) { vehicle = Vehicle; count = Count; }
+}
+
 public sealed record TrainProfile
 {
     public required string Name { get; init; }
-    /// <summary>The consist, head to tail, as (vehicle, how many).</summary>
-    public required (RailVehicleSpec Vehicle, int Count)[] Consist { get; init; }
+    /// <summary>The consist, head to tail.</summary>
+    public required ConsistEntry[] Consist { get; init; }
     public required TrackSpec Track { get; init; }
     public float TypicalSpeedMps { get; init; } = 25f;
     /// <summary>
@@ -312,7 +326,9 @@ public sealed record TrainProfile
     /// </summary>
     public float RollingReferenceDb { get; init; } = 104f;
 
+    [JsonIgnore]
     public int TotalAxles => Consist.Sum(c => c.Vehicle.Axles * c.Count);
+    [JsonIgnore]
     public float LengthMetres => Consist.Sum(c => c.Vehicle.LengthMetres * c.Count);
 
     // ── The vehicles ────────────────────────────────────────────────────────────────────────────
@@ -527,7 +543,7 @@ public sealed record TrainProfile
     public static TrainProfile AmtrakDiesel => new()
     {
         Name = "Amtrak, Genesis and six coaches, welded rail",
-        Consist = new[] { (GenesisP42, 1), (PassengerCoach, 6) },
+        Consist = new ConsistEntry[] { new() { Vehicle = GenesisP42, Count = 1 }, new() { Vehicle = PassengerCoach, Count = 6 } },
         Track = TrackSpec.WeldedMainLine,
         TypicalSpeedMps = 36f,
     };
@@ -535,7 +551,7 @@ public sealed record TrainProfile
     public static TrainProfile FreightJointed => new()
     {
         Name = "freight, two EMDs and fifty wagons on jointed rail",
-        Consist = new[] { (EmdRoadSwitcher, 2), (FreightWagon, 50) },
+        Consist = new ConsistEntry[] { new() { Vehicle = EmdRoadSwitcher, Count = 2 }, new() { Vehicle = FreightWagon, Count = 50 } },
         Track = TrackSpec.JointedTimber,
         TypicalSpeedMps = 18f,
     };
@@ -543,7 +559,7 @@ public sealed record TrainProfile
     public static TrainProfile SteamPassenger => new()
     {
         Name = "4-8-4 with a tender and five heavyweights, jointed rail",
-        Consist = new[] { (SteamNorthern, 1), (SteamTender, 1), (HeavyweightCoach, 5) },
+        Consist = new ConsistEntry[] { new() { Vehicle = SteamNorthern, Count = 1 }, new() { Vehicle = SteamTender, Count = 1 }, new() { Vehicle = HeavyweightCoach, Count = 5 } },
         Track = TrackSpec.JointedTimber,
         TypicalSpeedMps = 24f,
     };
@@ -551,7 +567,7 @@ public sealed record TrainProfile
     public static TrainProfile LightRail => new()
     {
         Name = "two-car light rail set in the street",
-        Consist = new[] { (LightRailCar, 2) },
+        Consist = new ConsistEntry[] { new() { Vehicle = LightRailCar, Count = 2 } },
         Track = TrackSpec.StreetTramway,
         TypicalSpeedMps = 12f,
     };
@@ -559,7 +575,7 @@ public sealed record TrainProfile
     public static TrainProfile Metro => new()
     {
         Name = "six-car metro on slab track",
-        Consist = new[] { (MetroCar, 6) },
+        Consist = new ConsistEntry[] { new() { Vehicle = MetroCar, Count = 6 } },
         Track = TrackSpec.MetroSlab,
         TypicalSpeedMps = 17f,
     };

@@ -187,6 +187,37 @@ that and out of nothing else:
 - the far end of a long freight is **duller** than the near end, because the air has had four
   hundred metres to take the top off it.
 
+## The models are data
+
+Every one of these lives in `ModelLibrary` and can be written, shared and overridden without
+recompiling anything:
+
+```
+--models                  list every model, by kind
+--models export=DIR       write all 33 as the JSON the loader reads
+```
+
+Put a file in `models/` beside the maps and it OVERRIDES the built-in of the same name — which is
+how a map replaces the crossing bell on one line, and is also the trap: **never check an export back
+into `models/`**, because a generated copy freezes every model at the numbers it had the day it was
+written, and the next time somebody improves the bell nobody can see why their map still has the old
+one. Export somewhere to READ.
+
+A horn an author actually writes is three lines, and the note is not one of them:
+
+```json
+{ "kind": "horn", "id": "single_chime",
+  "spec": { "Name": "one bell, and nothing to hide behind",
+            "Bells": [ { "LengthMetres": 0.62, "MouthDiameterMetres": 0.12 } ],
+            "ReferenceDb": 134 } }
+```
+
+`ModelLibraryTests` holds the claim: every built-in must survive being written out and read back
+with not one number changed. If a spec grows a field the serializer cannot carry — a computed
+property, an interface, a tuple — that is what catches it, for every model at once. (It caught one
+already: a consist was an array of TUPLES, which serialize to a row of empty objects, so a train was
+the one model an author could not write.)
+
 ## The instruments
 
 ```

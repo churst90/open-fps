@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text.Json.Serialization;
 
 namespace OpenFPS.Common;
 
@@ -42,8 +43,10 @@ public sealed record ChimeBellSpec
     public float LevelTrimDb { get; init; }
 
     /// <summary>Effective length: the tube plus the flanged-mouth end correction 0.6a.</summary>
+    [JsonIgnore]
     public float EffectiveLengthMetres => LengthMetres + 0.6f * 0.5f * MouthDiameterMetres;
     /// <summary>The note, hertz, at 20 C. A full cone: all harmonics of c/2L.</summary>
+    [JsonIgnore]
     public float Hz => 343f / (2f * MathF.Max(0.02f, EffectiveLengthMetres));
 }
 
@@ -183,6 +186,7 @@ public sealed record WhistleBellSpec
     /// <summary>Level adjustment against the others, dB.</summary>
     public float LevelTrimDb { get; init; }
 
+    [JsonIgnore]
     public float EffectiveLengthMetres => LengthMetres + 0.3f * BoreMetres;
     /// <summary>The note at a given sound speed. A STOPPED pipe: c/4L, odd harmonics.</summary>
     public float HzAt(float soundSpeed) => soundSpeed / (4f * MathF.Max(0.02f, EffectiveLengthMetres));
@@ -338,6 +342,7 @@ public sealed record StruckBellSpec
     public float ReferenceDb { get; init; } = 86f;
 
     /// <summary>Longitudinal wave speed in the metal, m/s.</summary>
+    [JsonIgnore]
     public float PlateWaveSpeed => MathF.Sqrt(YoungsPa / DensityKgM3);
 
     // ── Presets ─────────────────────────────────────────────────────────────────────────────────

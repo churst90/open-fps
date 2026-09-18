@@ -177,6 +177,7 @@ public class GameServer
         // Machines an author has written, before anything asks what a vehicle name means: a map's
         // cars, a composite made drivable, and /drivable all resolve through the registry.
         OpenFPS.Common.MachineRegistry.EnsureLoaded();
+        OpenFPS.Common.ModelLibrary.EnsureLoaded();
         var prefabRepo = new PrefabRepository("prefabs");
         _mapRepo = new MapRepository("maps");
         _maps = new MapManager(_mapRepo, prefabRepo);

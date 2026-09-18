@@ -38,8 +38,8 @@ public static class TrainSpike
         bool stems = args.Contains("stems");
         bool binaural = args.Contains("binaural");
 
-        var presets = args.Where(a => TrainProfile.Presets.ContainsKey(a)).ToList();
-        if (presets.Count == 0) presets = TrainProfile.Presets.Keys.ToList();
+        var presets = args.Where(a => ModelLibrary.Knows(ModelLibrary.Kinds.Train, a)).ToList();
+        if (presets.Count == 0) presets = ModelLibrary.Ids(ModelLibrary.Kinds.Train).ToList();
 
         string dir = Path.Combine(AppContext.BaseDirectory, "ASSETS", "SOUNDS", "TRAINS");
         Directory.CreateDirectory(dir);
@@ -47,13 +47,13 @@ public static class TrainSpike
 
         foreach (var key in presets)
         {
-            var p = TrainProfile.ByName(key);
+            var p = ModelLibrary.Train(key);
             // Only rewrite a consist that HAS a long tail of like vehicles: "cars=18" means
             // eighteen wagons behind the locomotives, not eighteen trams.
             if (cars > 0 && p.Consist[^1].Count > 4)
             {
                 var consist = p.Consist.ToArray();
-                consist[^1] = (consist[^1].Vehicle, cars);
+                consist[^1] = consist[^1] with { Count = cars };
                 p = p with { Consist = consist };
             }
             float v = speed > 0 ? speed : p.TypicalSpeedMps;

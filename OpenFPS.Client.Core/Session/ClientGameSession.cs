@@ -127,6 +127,7 @@ public sealed class ClientGameSession : IDisposable
         // ...and the machines, for the same reason: the client assembles a car's engine itself from
         // the name the server sends, so it has to know the same names the server does.
         MachineRegistry.EnsureLoaded();
+        ModelLibrary.EnsureLoaded();
 
         _world = new ClientWorldState();
         _state = new LocalPlayerState();
