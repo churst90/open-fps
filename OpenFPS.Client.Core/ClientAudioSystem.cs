@@ -344,6 +344,9 @@ public class ClientAudioSystem
 
         // 1. Resolve high-precision listener region (OBB check)
         int listenerRegionId = _acoustics.GetRegionAt(world, visualEyePos);
+        // Kept, because your own feet are submitted from the game thread between updates and have to
+        // know which room to reverberate in. See SubmitFootstep.
+        _listenerRegion = listenerRegionId;
 
         // 2. Synchronize the listener's smoothed physical state.
         //
@@ -1372,6 +1375,21 @@ public class ClientAudioSystem
     // Larger pool so rapid footsteps rarely reuse an ID while the previous step is still playing — reusing
     // an active voice hard-cuts it (click). 12 IDs gives plenty of headroom at running cadence.
     private const int FOOTSTEP_POOL_SIZE = 12;
+    /// <summary>
+    /// The room the listener was last found in, for the sounds the BODY makes.
+    ///
+    /// A SpatialEmitter's TargetRegionId defaults to -1, which is the outdoors, and a footstep is
+    /// built between updates on the game thread where nothing has worked out a region. So every
+    /// footfall sent its reverberation to the OUTDOOR bus and gave the room the player was standing
+    /// in only the small cross-send meant for a sound in the NEXT room — a quarter of it.
+    ///
+    /// What that produces is a tail that is the same length wherever you are, because it is the same
+    /// bus wherever you are. Reported after the rooms had been measured and the measurements shown to
+    /// be right: "the tail on the reverb is the same no matter where I am in the stairs, corridor or
+    /// parking garage... the walls might be farther away but the decay is short".
+    /// </summary>
+    private int _listenerRegion = AcousticConstants.GlobalRegionId;
+
     private const int FOOTSTEP_BASE_ID = -100;
 
     /// <summary>Somebody else's step: a sound at a place in the world, left there as they walk on.</summary>
@@ -1439,7 +1457,9 @@ public class ClientAudioSystem
             // a loud map the arithmetic would rightly bury them under everything else.
             Essential = true,
             IsEvent = true,
-            MinDistance = stepReference
+            MinDistance = stepReference,
+            // The room the body is standing in, so its reverberation is THAT room's.
+            TargetRegionId = _listenerRegion,
         };
         _audio.Submit(footstep);
 
@@ -1533,6 +1553,7 @@ public class ClientAudioSystem
                 IsReflection = true,
                 IsEvent = true,
                 ReflectionSpread = r.IsDiffuse ? 1f : 0f,
+                TargetRegionId = _listenerRegion,
             });
         }
     }
@@ -1708,7 +1729,8 @@ public class ClientAudioSystem
                 Range = 20.0f,
                 Essential = true,
                 IsEvent = true,
-                MinDistance = landReference
+                MinDistance = landReference,
+                TargetRegionId = _listenerRegion,
             };
             _audio.Submit(landEmitter);
         }

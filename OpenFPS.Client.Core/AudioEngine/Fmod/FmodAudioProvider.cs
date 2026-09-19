@@ -2350,8 +2350,14 @@ public class FmodAudioProvider : IAudioProvider
         if (_acousticMap == null) return;
         int sourceRegionId = active.TargetRegionId;
 
+        // A sound in the listener's OWN room needs no cross-send: the cross-send exists so that a
+        // sound in the NEXT room reverberates a little here as well as there, and a source that is
+        // already here would simply be sent to the same bus twice.
+        int crossRegionId = sourceRegionId == listenerRegionId
+            ? AcousticConstants.GlobalRegionId : listenerRegionId;
+
         bool sourceChanged = sourceRegionId != active.CurrentSourceRegionId || !active.SourceReverbConnection.hasHandle();
-        bool listenerChanged = listenerRegionId != active.CurrentRegionId || !active.ReverbConnection.hasHandle();
+        bool listenerChanged = crossRegionId != active.CurrentRegionId || !active.ReverbConnection.hasHandle();
 
         // Not the steady state any more: a crossfade still running has to be advanced even when
         // nothing changed this frame, which is most frames of one.
@@ -2402,7 +2408,7 @@ public class FmodAudioProvider : IAudioProvider
                 listenerReverb.addInput(sourceFader, out active.ReverbConnection, DSPCONNECTION_TYPE.SEND);
                 active.ReverbConnection.setMix(0f);
             }
-            active.CurrentRegionId = listenerRegionId;
+            active.CurrentRegionId = crossRegionId;
         }
 
         AdvanceSendFade(active, sourceFader);
