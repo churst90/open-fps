@@ -6065,7 +6065,7 @@
    "PrefabId": "concrete_floor",
    "Position": {
     "X": -20.125,
-    "Y": -0.125,
+    "Y": 0.125,
     "Z": 32.0
    },
    "Scale": {
@@ -6432,21 +6432,6 @@
   },
   {
    "EntityId": 1444,
-   "PrefabId": "acoustic_region",
-   "Position": {
-    "X": 7.9,
-    "Y": 1.2,
-    "Z": -0.8
-   },
-   "Scale": {
-    "X": 0.32,
-    "Y": 0.48,
-    "Z": 0.44
-   },
-   "Name": "Bus shelter"
-  },
-  {
-   "EntityId": 1445,
    "PrefabId": "concrete_floor",
    "Position": {
     "X": 39.75,
@@ -6461,7 +6446,7 @@
    "Name": "Platform"
   },
   {
-   "EntityId": 1446,
+   "EntityId": 1445,
    "PrefabId": "tile_floor",
    "Position": {
     "X": 39.75,
@@ -6475,7 +6460,7 @@
    }
   },
   {
-   "EntityId": 1447,
+   "EntityId": 1446,
    "PrefabId": "brick_wall",
    "Position": {
     "X": 36.575,
@@ -6490,7 +6475,7 @@
    "Name": "Platform wall"
   },
   {
-   "EntityId": 1448,
+   "EntityId": 1447,
    "PrefabId": "dirt_floor",
    "Position": {
     "X": 47.25,
@@ -6505,7 +6490,7 @@
    "Name": "Track bed"
   },
   {
-   "EntityId": 1449,
+   "EntityId": 1448,
    "PrefabId": "metal_wall",
    "Position": {
     "X": 41.075,
@@ -6520,7 +6505,7 @@
    "Name": "Platform canopy"
   },
   {
-   "EntityId": 1450,
+   "EntityId": 1449,
    "PrefabId": "concrete_wall",
    "Position": {
     "X": 42.35,
@@ -6534,7 +6519,7 @@
    }
   },
   {
-   "EntityId": 1451,
+   "EntityId": 1450,
    "PrefabId": "concrete_wall",
    "Position": {
     "X": 42.35,
@@ -6548,7 +6533,7 @@
    }
   },
   {
-   "EntityId": 1452,
+   "EntityId": 1451,
    "PrefabId": "concrete_wall",
    "Position": {
     "X": 42.35,
@@ -6562,7 +6547,7 @@
    }
   },
   {
-   "EntityId": 1453,
+   "EntityId": 1452,
    "PrefabId": "concrete_wall",
    "Position": {
     "X": 42.35,
@@ -6576,7 +6561,7 @@
    }
   },
   {
-   "EntityId": 1454,
+   "EntityId": 1453,
    "PrefabId": "concrete_wall",
    "Position": {
     "X": 42.35,
@@ -6590,7 +6575,7 @@
    }
   },
   {
-   "EntityId": 1455,
+   "EntityId": 1454,
    "PrefabId": "concrete_wall",
    "Position": {
     "X": 42.35,
@@ -6604,7 +6589,7 @@
    }
   },
   {
-   "EntityId": 1456,
+   "EntityId": 1455,
    "PrefabId": "concrete_wall",
    "Position": {
     "X": 42.35,
@@ -6618,7 +6603,7 @@
    }
   },
   {
-   "EntityId": 1457,
+   "EntityId": 1456,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": 39.75,
@@ -6633,7 +6618,7 @@
    "Name": "Metro platform, south end"
   },
   {
-   "EntityId": 1458,
+   "EntityId": 1457,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": 39.75,
@@ -6648,7 +6633,7 @@
    "Name": "Metro platform, middle end"
   },
   {
-   "EntityId": 1459,
+   "EntityId": 1458,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": 39.75,
@@ -6663,7 +6648,7 @@
    "Name": "Metro platform, north end"
   },
   {
-   "EntityId": 1460,
+   "EntityId": 1459,
    "PrefabId": "foliage_hedge",
    "Position": {
     "X": -8.3,
@@ -6677,7 +6662,7 @@
    }
   },
   {
-   "EntityId": 1461,
+   "EntityId": 1460,
    "PrefabId": "foliage_hedge",
    "Position": {
     "X": 8.3,
@@ -6691,7 +6676,7 @@
    }
   },
   {
-   "EntityId": 1462,
+   "EntityId": 1461,
    "PrefabId": "foliage_hedge",
    "Position": {
     "X": -8.3,
@@ -6705,7 +6690,7 @@
    }
   },
   {
-   "EntityId": 1463,
+   "EntityId": 1462,
    "PrefabId": "foliage_hedge",
    "Position": {
     "X": 8.3,
@@ -6719,7 +6704,7 @@
    }
   },
   {
-   "EntityId": 1464,
+   "EntityId": 1463,
    "PrefabId": "foliage_hedge",
    "Position": {
     "X": -8.3,
@@ -6733,7 +6718,7 @@
    }
   },
   {
-   "EntityId": 1465,
+   "EntityId": 1464,
    "PrefabId": "foliage_hedge",
    "Position": {
     "X": 8.3,
@@ -6747,7 +6732,7 @@
    }
   },
   {
-   "EntityId": 1466,
+   "EntityId": 1465,
    "PrefabId": "foliage_hedge",
    "Position": {
     "X": -8.3,
@@ -6761,7 +6746,7 @@
    }
   },
   {
-   "EntityId": 1467,
+   "EntityId": 1466,
    "PrefabId": "foliage_hedge",
    "Position": {
     "X": 8.3,
@@ -6775,7 +6760,7 @@
    }
   },
   {
-   "EntityId": 1468,
+   "EntityId": 1467,
    "PrefabId": "foliage_hedge",
    "Position": {
     "X": -8.3,
@@ -6789,7 +6774,7 @@
    }
   },
   {
-   "EntityId": 1469,
+   "EntityId": 1468,
    "PrefabId": "foliage_hedge",
    "Position": {
     "X": 8.3,
@@ -6803,7 +6788,7 @@
    }
   },
   {
-   "EntityId": 1470,
+   "EntityId": 1469,
    "PrefabId": "foliage_hedge",
    "Position": {
     "X": -8.3,
@@ -6817,7 +6802,7 @@
    }
   },
   {
-   "EntityId": 1471,
+   "EntityId": 1470,
    "PrefabId": "foliage_hedge",
    "Position": {
     "X": 8.3,
@@ -6831,7 +6816,7 @@
    }
   },
   {
-   "EntityId": 1472,
+   "EntityId": 1471,
    "PrefabId": "foliage_hedge",
    "Position": {
     "X": -8.3,
@@ -6845,7 +6830,7 @@
    }
   },
   {
-   "EntityId": 1473,
+   "EntityId": 1472,
    "PrefabId": "foliage_hedge",
    "Position": {
     "X": 8.3,
@@ -6859,7 +6844,7 @@
    }
   },
   {
-   "EntityId": 1474,
+   "EntityId": 1473,
    "PrefabId": "foliage_hedge",
    "Position": {
     "X": -8.3,
@@ -6873,7 +6858,7 @@
    }
   },
   {
-   "EntityId": 1475,
+   "EntityId": 1474,
    "PrefabId": "foliage_hedge",
    "Position": {
     "X": 8.3,
@@ -6887,7 +6872,7 @@
    }
   },
   {
-   "EntityId": 1476,
+   "EntityId": 1475,
    "PrefabId": "foliage_hedge",
    "Position": {
     "X": -8.3,
@@ -6901,7 +6886,7 @@
    }
   },
   {
-   "EntityId": 1477,
+   "EntityId": 1476,
    "PrefabId": "foliage_hedge",
    "Position": {
     "X": 8.3,
@@ -6915,7 +6900,7 @@
    }
   },
   {
-   "EntityId": 1478,
+   "EntityId": 1477,
    "PrefabId": "foliage_hedge",
    "Position": {
     "X": -8.3,
@@ -6929,7 +6914,7 @@
    }
   },
   {
-   "EntityId": 1479,
+   "EntityId": 1478,
    "PrefabId": "foliage_hedge",
    "Position": {
     "X": 8.3,
@@ -6943,7 +6928,7 @@
    }
   },
   {
-   "EntityId": 1480,
+   "EntityId": 1479,
    "PrefabId": "foliage_hedge",
    "Position": {
     "X": -8.3,
@@ -6957,7 +6942,7 @@
    }
   },
   {
-   "EntityId": 1481,
+   "EntityId": 1480,
    "PrefabId": "foliage_hedge",
    "Position": {
     "X": 8.3,
@@ -6971,7 +6956,7 @@
    }
   },
   {
-   "EntityId": 1482,
+   "EntityId": 1481,
    "PrefabId": "foliage_hedge",
    "Position": {
     "X": -8.3,
@@ -6985,7 +6970,7 @@
    }
   },
   {
-   "EntityId": 1483,
+   "EntityId": 1482,
    "PrefabId": "foliage_hedge",
    "Position": {
     "X": 8.3,
@@ -6999,7 +6984,7 @@
    }
   },
   {
-   "EntityId": 1484,
+   "EntityId": 1483,
    "PrefabId": "foliage_hedge",
    "Position": {
     "X": -8.3,
@@ -7013,7 +6998,7 @@
    }
   },
   {
-   "EntityId": 1485,
+   "EntityId": 1484,
    "PrefabId": "foliage_hedge",
    "Position": {
     "X": 8.3,
@@ -7027,7 +7012,7 @@
    }
   },
   {
-   "EntityId": 1486,
+   "EntityId": 1485,
    "PrefabId": "foliage_hedge",
    "Position": {
     "X": -8.3,
@@ -7041,7 +7026,7 @@
    }
   },
   {
-   "EntityId": 1487,
+   "EntityId": 1486,
    "PrefabId": "foliage_hedge",
    "Position": {
     "X": 8.3,
@@ -7055,7 +7040,7 @@
    }
   },
   {
-   "EntityId": 1488,
+   "EntityId": 1487,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": 0.0,
@@ -7070,7 +7055,7 @@
    "Name": "Main Street, block 1"
   },
   {
-   "EntityId": 1489,
+   "EntityId": 1488,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": -7.75,
@@ -7085,7 +7070,7 @@
    "Name": "West pavement, block 1"
   },
   {
-   "EntityId": 1490,
+   "EntityId": 1489,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": 7.75,
@@ -7100,7 +7085,7 @@
    "Name": "East pavement, block 1"
   },
   {
-   "EntityId": 1491,
+   "EntityId": 1490,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": 0.0,
@@ -7115,7 +7100,7 @@
    "Name": "Main Street, block 2"
   },
   {
-   "EntityId": 1492,
+   "EntityId": 1491,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": -7.75,
@@ -7130,7 +7115,7 @@
    "Name": "West pavement, block 2"
   },
   {
-   "EntityId": 1493,
+   "EntityId": 1492,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": 7.75,
@@ -7145,7 +7130,7 @@
    "Name": "East pavement, block 2"
   },
   {
-   "EntityId": 1494,
+   "EntityId": 1493,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": 0.0,
@@ -7160,7 +7145,7 @@
    "Name": "Main Street, block 3"
   },
   {
-   "EntityId": 1495,
+   "EntityId": 1494,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": -7.75,
@@ -7175,7 +7160,7 @@
    "Name": "West pavement, block 3"
   },
   {
-   "EntityId": 1496,
+   "EntityId": 1495,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": 7.75,
@@ -7190,7 +7175,7 @@
    "Name": "East pavement, block 3"
   },
   {
-   "EntityId": 1497,
+   "EntityId": 1496,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": 0.0,
@@ -7205,7 +7190,7 @@
    "Name": "Main Street, block 4"
   },
   {
-   "EntityId": 1498,
+   "EntityId": 1497,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": -7.75,
@@ -7220,7 +7205,7 @@
    "Name": "West pavement, block 4"
   },
   {
-   "EntityId": 1499,
+   "EntityId": 1498,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": 7.75,
@@ -7235,7 +7220,7 @@
    "Name": "East pavement, block 4"
   },
   {
-   "EntityId": 1500,
+   "EntityId": 1499,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": 0.0,
@@ -7250,7 +7235,7 @@
    "Name": "Main Street, block 5"
   },
   {
-   "EntityId": 1501,
+   "EntityId": 1500,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": -7.75,
@@ -7265,7 +7250,7 @@
    "Name": "West pavement, block 5"
   },
   {
-   "EntityId": 1502,
+   "EntityId": 1501,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": 7.75,
@@ -7280,7 +7265,7 @@
    "Name": "East pavement, block 5"
   },
   {
-   "EntityId": 1503,
+   "EntityId": 1502,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": 0.0,
@@ -7295,7 +7280,7 @@
    "Name": "Main Street, block 6"
   },
   {
-   "EntityId": 1504,
+   "EntityId": 1503,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": -7.75,
@@ -7310,7 +7295,7 @@
    "Name": "West pavement, block 6"
   },
   {
-   "EntityId": 1505,
+   "EntityId": 1504,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": 7.75,

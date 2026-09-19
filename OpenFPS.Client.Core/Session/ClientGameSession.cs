@@ -152,8 +152,19 @@ public sealed class ClientGameSession : IDisposable
 
         // Breathing, which is the only sound a body still makes once it has stopped moving — and
         // therefore the only way to find somebody who has stopped to listen for you.
-        _controller.OnBreath += (pos, breath) => _audioSystem.OnBreath(_ownEntityId, pos, breath);
-        _others.OnBreath += _audioSystem.OnBreath;
+        // ── BREATHING IS NOT PLAYED ─────────────────────────────────────────────────────────────
+        //
+        // Judged by ear and rejected: "I don't like the breathing, remove it." Not a bug — the model
+        // and the synthesis were both repaired first (see BreathTests and --breath), and what was
+        // left was a breath that sounded like a breath and was still not wanted. A sound nobody wants
+        // to hear is not information, however correct it is.
+        //
+        // The MODEL stays and keeps running: Breathing drives the exertion readout ("Breathing hard",
+        // "Winded") that the player asks for on a key, and that readout is the useful half. Only the
+        // voice is gone, and bringing it back is these two lines.
+        //
+        //   _controller.OnBreath += (pos, breath) => _audioSystem.OnBreath(_ownEntityId, pos, breath);
+        //   _others.OnBreath += _audioSystem.OnBreath;
 
         _shell.CommandEntered += HandleCommandEntered;
         _microphone.PacketReady += OnVoicePacketReady;

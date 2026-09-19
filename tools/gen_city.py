@@ -398,7 +398,14 @@ for i in range(3):
 # it and the street.
 for lv in range(GARAGE_LEVELS):
     y0 = lv * (GARAGE_CLEAR + SLAB)
-    box("concrete_floor", WEST_X0, WEST_X1, y0 - SLAB, y0, GARAGE_Z0, GARAGE_Z1)
+    # The ground deck's slab is laid ON the ground, not level with it. At `y0 - SLAB .. y0` its top
+    # tied with the map's dirt at exactly 0.0, and a tie goes to whichever box the probe tested first
+    # — so level 0 measured a DIRT floor (absorption 0.60) where level 1 measured concrete (0.02).
+    # Two decks of the same car park came out 615 ms and 4557 ms.
+    if lv == 0:
+        box("concrete_floor", WEST_X0, WEST_X1, 0.0, SLAB, GARAGE_Z0, GARAGE_Z1)
+    else:
+        box("concrete_floor", WEST_X0, WEST_X1, y0 - SLAB, y0, GARAGE_Z0, GARAGE_Z1)
     box("concrete_wall", WEST_X0, WEST_X0 + 0.3, y0, y0 + GARAGE_CLEAR, GARAGE_Z0, GARAGE_Z1)
     box("concrete_wall", WEST_X0, WEST_X1, y0, y0 + GARAGE_CLEAR, GARAGE_Z0, GARAGE_Z0 + 0.3)
     box("concrete_wall", WEST_X0, WEST_X1, y0, y0 + GARAGE_CLEAR, GARAGE_Z1 - 0.3, GARAGE_Z1)
@@ -423,7 +430,17 @@ box("glass_wall", WALK_X - 0.1, WALK_X, 0.0, 2.4, SH_Z0, SH_Z1, name="Shelter ba
 box("glass_wall", KERB_X + 0.3, WALK_X, 0.0, 2.4, SH_Z0, SH_Z0 + 0.06)
 box("glass_wall", KERB_X + 0.3, WALK_X, 0.0, 2.4, SH_Z1 - 0.06, SH_Z1)
 box("metal_wall", KERB_X + 0.3, WALK_X, 2.4, 2.5, SH_Z0, SH_Z1, name="Shelter roof")
-region("Bus shelter", KERB_X + 0.3, WALK_X, 0.0, 2.4, SH_Z0, SH_Z1)
+# NO REGION. A bus shelter is not a room, it is street furniture, and calling it one is what made it
+# measure a two-and-a-half-second tail: the survey's rays leave through the open front, cross the
+# street, hit the building opposite, and come back recorded as this three-metre box's own hard walls.
+# Its surface measured 612 m^2 against a true 65.
+#
+# The listener stays in the STREET under it, which is what standing in a shelter is — you hear the
+# street, with a pane of glass a metre from your ear, and the near-field probes already give you that
+# (reported as working: "only when I get close to walls do I hear the proximity, which is good").
+# The thing a small enclosure inside a big one needs is a survey that knows a ray has LEFT, and that
+# is real work: keyed to the median it shrinks a car park, keyed to the mean free path it does not
+# move a shelter, and settling it does both. Not guessed at here.
 
 # ══ The metro platform ════════════════════════════════════════════════════════════════════════════
 #

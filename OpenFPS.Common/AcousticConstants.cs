@@ -122,6 +122,25 @@ public static class AcousticConstants
     /// </summary>
     public const float OutdoorMaxDecayMs = 1100.0f;
 
+    /// <summary>
+    /// How enclosed a place may be and still have <see cref="OutdoorMaxDecayMs"/> applied to it.
+    ///
+    /// The cap above was written against a ray tracer whose rays "do not all find the sky", and that
+    /// is no longer the estimator. Enclosure.Look treats a direction that hits nothing as a perfect
+    /// absorber, so the sky is IN the measurement: a street on the city map reads 525 ms and a
+    /// pavement 627, with no cap involved at all. Nothing genuinely outdoors comes near 1,100.
+    ///
+    /// What the cap had started doing instead was silencing the places that are supposed to ring. It
+    /// is applied to any region with no Sabine estimate, and a roofed tunnel has none — so a tunnel
+    /// measuring three seconds was served 1.1, and was reported as "tunnel sounds dry, but shouldn't
+    /// it sound echoy like reverby wet?". A car park's upper deck measured 4.5 s, a tiled stairwell 2.
+    ///
+    /// So the cap now asks whether the place is actually open. Below this it is outdoors and the cap
+    /// is the safety net it was meant to be; above it, the rays found walls and a roof, and what they
+    /// measured is what a listener should get.
+    /// </summary>
+    public const float OutdoorEnclosureCeiling = 0.45f;
+
     // ── What the reverb unit is for ─────────────────────────────────────────────────────────────
     //
     // The unit's own synthetic early reflections are OFF. Early reflections are a fact about the

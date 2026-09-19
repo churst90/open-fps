@@ -1090,7 +1090,13 @@ public class FmodAudioProvider : IAudioProvider
         // The cap is on the TIME only: the estimator's tail can run long, and an uncapped two-second
         // decay is what makes a street sound like a nave. A room with a real Sabine estimate behind it
         // keeps its own, which is why this only trims what the rays produced.
-        if (_dryReverbBuses.Contains(listenerRegionId) && ms > AcousticConstants.OutdoorMaxDecayMs)
+        // ...and only where the place is actually OPEN. See OutdoorEnclosureCeiling: the survey has
+        // the sky in it now, so nothing outdoors reaches this cap on its own, and all the cap was
+        // still doing was flattening the places built to ring — a tunnel measuring three seconds got
+        // 1.1 and was heard as dry.
+        if (_dryReverbBuses.Contains(listenerRegionId)
+            && _listenerEnclosure < AcousticConstants.OutdoorEnclosureCeiling
+            && ms > AcousticConstants.OutdoorMaxDecayMs)
         {
             ms = AcousticConstants.OutdoorMaxDecayMs;
             dsp.setParameterFloat(0, ms);
