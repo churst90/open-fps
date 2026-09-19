@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.IO;
 using System;
 using OpenFPS.Client.Core;
@@ -34,6 +35,30 @@ public class SoundMappingService
     }
 
     /// <summary>
+    /// The folder a material's footsteps come from when it has none of its own. The key is a
+    /// material in the <see cref="AcousticRegistry"/>; the value is a folder under FOOTSTEPS/.
+    ///
+    /// Deliberately a short, explicit list rather than a guess: a material that belongs here is one
+    /// somebody looked at and said "a footfall on that is a footfall on this". Anything not named
+    /// keeps its own name and takes the ordinary fallback chain below.
+    /// </summary>
+    private static readonly Dictionary<string, string> RecordedStandIn = new(StringComparer.OrdinalIgnoreCase)
+    {
+        // A road is a pavement is a path, to a shoe. What differs between them is what they do to
+        // sound arriving from elsewhere, not what a heel does on them.
+        ["Asphalt"] = "Pavement",
+        // Brick paving underfoot is a hard fired surface with joints in it, which is what Stone is.
+        ["Brick"] = "Stone",
+        // Walking into a hedge is walking into leaves.
+        ["Foliage"] = "Leaves",
+        // A crowd is a floor with people standing on it; you are walking on whatever they are.
+        ["Audience"] = "Concrete",
+    };
+
+    private static string NearestRecorded(string material)
+        => RecordedStandIn.TryGetValue(material, out var folder) ? folder : material;
+
+    /// <summary>
     /// Resolves a material-specific sound path for physical interactions.
     /// </summary>
     public string GetImpactSoundId(string material, float force)
@@ -49,6 +74,21 @@ public class SoundMappingService
         // Ensure proper capitalization for folder naming convention (e.g. "marble" -> "Marble")
         if (char.IsLower(materialName[0])) 
             materialName = char.ToUpper(materialName[0]) + materialName.Substring(1);
+
+        // ── A material with no recordings of its own borrows the nearest one that has them ──────
+        //
+        // The acoustic table and the sample bank are two different collections and they do not have
+        // to agree. A material earns its place in the table by being a different SURFACE — asphalt
+        // absorbs three or four times what concrete does, brick scatters four times as much as a
+        // poured wall — and none of that obliges anybody to have gone out and recorded somebody
+        // walking on it. Without this, the city's road resolved to Generic, so the first thing a
+        // player heard walking off the spawn point was the fallback.
+        //
+        // What it is NOT is a way to make two materials sound alike: the reflections, the occlusion
+        // and the reverb still come from the real material. This is only about which recording plays
+        // when there is no recording of its own, and every one of these is a surface a person would
+        // struggle to tell from its stand-in by footfall alone.
+        materialName = NearestRecorded(materialName);
 
         // Weather-based material overrides (Only if not sheltered)
         if (_state.ShelterFactor < 0.5f)

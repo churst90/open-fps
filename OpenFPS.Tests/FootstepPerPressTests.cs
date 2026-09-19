@@ -54,20 +54,20 @@ public class FootstepPerPressTests
         var at = Vector3.Zero;
 
         // Fifteen centimetres a tap: before the stride was phased from the start of a walk, the first
-        // three of these were silent and only the fourth sounded.
-        Assert.True(OneTickOfWalking < StrideAccumulator.StrideLength / 3f,
-            $"a tap is {OneTickOfWalking:F2} m, which is no longer small against a stride");
+        // several of these were silent and only the last sounded.
+        Assert.True(OneTickOfWalking < StrideAccumulator.StepLength(PhysicsConstants.WalkSpeed) / 3f,
+            $"a tap is {OneTickOfWalking:F2} m, which is no longer small against a step");
 
         for (int i = 1; i <= 8; i++)
             Assert.Equal(1, Tap(stride, ref at));
     }
 
     /// <summary>
-    /// Holding the key is still half a metre a footfall — the tap fix phases the walk, it does not
-    /// re-rate it. Ten metres held down is the opening footfall and then one every stride.
+    /// Holding the key is one footfall a STEP, and a step is as long as the speed makes it. Ten
+    /// metres held down is the opening footfall and then one every 1.38 m.
     /// </summary>
     [Fact]
-    public void HoldingTheKeyIsStillAFootfallEveryHalfMetre()
+    public void HoldingTheKeyIsAFootfallEveryStep()
     {
         var stride = new StrideAccumulator();
         var at = Vector3.Zero;
@@ -81,7 +81,8 @@ public class FootstepPerPressTests
             if (stride.Update(at, velocity, true, Facing).Stepped) steps++;
         }
 
-        Assert.InRange(steps, 20, 21);   // twenty strides in ten metres, plus the one that started it
+        float expected = 10f / StrideAccumulator.StepLength(PhysicsConstants.WalkSpeed);
+        Assert.InRange(steps, (int)expected, (int)expected + 2);   // plus the one that started it
     }
 
     /// <summary>

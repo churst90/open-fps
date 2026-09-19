@@ -32,6 +32,10 @@ namespace OpenFPS.Client.Core;
 /// generator would otherwise be a footstep every half metre of ROAD: at sixty miles an hour, a
 /// machine gun.
 ///
+/// <b>A step is as long as the speed makes it.</b> How far a body goes between footfalls is not a
+/// constant — it is <see cref="StepLength"/>, from the body's leg length and how fast it is moving,
+/// because a leg is a pendulum and a fast body takes longer steps rather than more of them.
+///
 /// <b>A walk's first footfall is at the start of the walk.</b> Distance since the last footfall is
 /// what spaces the ones after it, but it cannot place the FIRST: counted from a standstill it puts
 /// the opening footfall half a stride in, and a body cannot move half a metre without having already
@@ -43,8 +47,51 @@ namespace OpenFPS.Client.Core;
 /// </summary>
 public sealed class StrideAccumulator
 {
-    /// <summary>How far a body walks between footfalls, metres.</summary>
-    public const float StrideLength = 0.5f;
+    /// <summary>
+    /// How long a leg is, metres — hip height on a 1.8 m body. It is the ONE number the gait is
+    /// built on, because a leg is a pendulum and a pendulum's period is its length.
+    /// </summary>
+    public const float LegLengthMetres = 0.95f;
+
+    /// <summary>Slowest step a body takes while it is still moving under its own feet, metres.
+    /// A floor under the law below, so a body creeping at nothing does not step for ever.</summary>
+    public const float MinStepLength = 0.3f;
+
+    /// <summary>
+    /// How far a body travels between footfalls at a given speed, metres.
+    ///
+    /// This used to be HALF A METRE, FULL STOP — and that one constant is what a listener heard as
+    /// *"sounds like cockroaches running"*. The game walks at 4.5 m/s, so half a metre a footfall is
+    /// **nine footfalls a second**, and a sprint is fourteen. No animal has ever done that. A human
+    /// tops out near four a second however hard they are trying, because a leg has to swing forward
+    /// and a leg is a pendulum: past a certain rate you cannot get it round any faster, so everything
+    /// above that speed is bought with a LONGER STEP instead.
+    ///
+    /// That is what this is. Dynamic similarity — Alexander's relation, the one that puts a mouse, a
+    /// human and an elephant on a single curve — says relative stride length goes as the 0.3 power of
+    /// the Froude number:
+    ///
+    ///     stride / L  =  2.3 (v² / gL)^0.3
+    ///
+    /// with L the leg length and a footfall half a stride. Nothing in it was chosen to make the game
+    /// sound right; it is the same curve for every legged thing that has been filmed, and what falls
+    /// out of it is:
+    ///
+    ///     1.4 m/s (a real walk)     0.69 m per step    2.0 a second
+    ///     4.5 m/s (this game's W)   1.38 m per step    3.3 a second
+    ///     7.2 m/s (shift held)      1.82 m per step    4.0 a second
+    ///
+    /// — a steady cadence that barely rises with speed and a stride that does most of the work, which
+    /// is exactly what a run sounds like against a walk. The difference a listener hears between the
+    /// two is then the LENGTH of the step and how hard it lands, not a faster machine gun.
+    /// </summary>
+    public static float StepLength(float speedMps)
+    {
+        float v = MathF.Max(0.15f, speedMps);
+        float froude = v * v / (9.81f * LegLengthMetres);
+        float stride = 2.3f * MathF.Pow(froude, 0.3f) * LegLengthMetres;
+        return MathF.Max(MinStepLength, 0.5f * stride);
+    }
 
     /// <summary>Furthest a body could plausibly move under its own feet in ONE update, metres.
     /// Anything past this is a teleport, a spawn or a server correction — not a step.</summary>
@@ -166,22 +213,24 @@ public sealed class StrideAccumulator
                 _accumulatedDistance = 0f; // Nothing banks up while a body is off the ground.
             }
 
-            if (_accumulatedDistance > 2f * StrideLength) _accumulatedDistance = 2f * StrideLength;
+            float step = StepLength(ownSpeed);
+            if (_accumulatedDistance > 2f * step) _accumulatedDistance = 2f * step;
         }
         _lastPosition = position;
 
         bool stepped = false;
         var stepPosition = position;
 
-        // Half a metre of walking is one footfall, and there is deliberately no floor under the rate.
+        // A step of ground is one footfall, and how long a step is comes from how fast the body is
+        // going — see StepLength. There is deliberately no floor under the RATE.
         //
         // There used to be one — no more than five steps a second — and it was quietly eating most of
-        // them: a walk is 4.5 m/s, which is a footfall every 111 ms, so more than half of every walk
-        // was silent, and a run lost seven in ten. A cadence cap is a rule about the CLOCK standing in
-        // for a rule about DISTANCE, and the distance rule is the true one: a body that is not moving
-        // banks nothing, and a body that is being moved rather than walking is refused by its own
-        // velocity long before any timer would have caught it.
-        if (startedWalking || (isGrounded && _accumulatedDistance >= StrideLength))
+        // them. Taking it out was right; what was wrong was the half-metre constant beside it, which
+        // made a walk nine footfalls a second and a run fourteen. A cadence cap is a rule about the
+        // CLOCK standing in for a rule about the BODY, and the body's rule is the true one: a leg is
+        // a pendulum, so a fast body takes longer steps rather than more of them, and the cadence
+        // comes out under four a second on its own without anything watching a timer.
+        if (startedWalking || (isGrounded && _accumulatedDistance >= StepLength(ownSpeed)))
         {
             stepped = true;
             _stepCount++;
@@ -190,11 +239,11 @@ public sealed class StrideAccumulator
             stepPosition = position + right * lateral;
             stepPosition.Y = position.Y;
 
-            // A walk that starts here has walked nothing yet; one half a metre in has walked whatever
-            // is over the half metre, and that remainder is what keeps a long walk's cadence honest
-            // instead of quantising it to the update rate.
+            // A walk that starts here has walked nothing yet; one a step in has walked whatever is
+            // over that step, and that remainder is what keeps a long walk's cadence honest instead
+            // of quantising it to the update rate.
             if (startedWalking) _accumulatedDistance = 0f;
-            else _accumulatedDistance %= StrideLength;
+            else _accumulatedDistance %= StepLength(ownSpeed);
         }
 
         return new Footfall(stepped, stepPosition, landed);

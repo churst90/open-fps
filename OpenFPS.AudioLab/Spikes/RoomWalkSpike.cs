@@ -117,14 +117,25 @@ public static class RoomWalkSpike
                 new Vector3(3.5f, 1.7f, 11.5f), new Vector3(10.5f, 1.7f, 11.5f),
                 new Vector3(10.5f, 1.7f, 18.5f), new Vector3(3.5f, 1.7f, 18.5f),
             };
-            const float speed = 1.4f;
+            // THE SPEED THE GAME WALKS AT, not a speed that sounds like walking.
+            //
+            // This was 1.4 m/s — a real human walk — and the steps below were every 0.55 s, which is
+            // a real human cadence. Both are lovely and neither is what the game does: the game walks
+            // at 4.5 m/s, and with the half-metre stride it had at the time that was NINE footfalls a
+            // second. So this instrument, which exists to settle "it pops when I walk", was measuring
+            // a walk the game has never taken, and a pop that only happens at nine steps a second
+            // could not appear in it however long it ran. An instrument with its own private idea of
+            // the thing it measures is worse than no instrument.
+            float speed = Num(args, "speed", PhysicsConstants.WalkSpeed);
             float perimeter = 0f;
             for (int i = 0; i < corners.Length; i++) perimeter += Vector3.Distance(corners[i], corners[(i + 1) % corners.Length]);
 
             var probeDirs = BoundaryModel.ProbeDirections;
             var probes = new BoundaryProbe[probeDirs.Length];
             int footstepIndex = 0;
-            double nextStepAt = 0.6;
+            // ...and the footfalls come from the GAME'S OWN accumulator, fed the same speed, so the
+            // cadence here is the cadence there by construction and cannot drift from it again.
+            var gait = new StrideAccumulator();
             int frames = 0, surveys = 0;
             float lastDecayMs = 0f, lastEnclosure = 0f;
 
@@ -212,10 +223,12 @@ public static class RoomWalkSpike
                     });
                 }
 
-                // A footstep every half second or so, at the feet, as OnPlayerFootstep submits it.
-                if (steps && !still && t >= nextStepAt)
+                // A footstep when the body puts a foot down, at the feet, as OnOwnFootstep submits it.
+                var fall = steps && !still
+                    ? gait.Update(eye with { Y = 0f }, vel with { Y = 0f }, true, rot)
+                    : default;
+                if (fall.Stepped)
                 {
-                    nextStepAt = t + 0.55;
                     int id = -100 - (footstepIndex % 12);
                     string file = "FOOTSTEPS/Wood/Wood0/" + (1 + footstepIndex % 4);
                     footstepIndex++;
@@ -225,8 +238,14 @@ public static class RoomWalkSpike
                         SoundId = file,
                         Mode = PlaybackMode.Single,
                         Type = EmitterType.WorldLocked,
+                        // Pinned under the head, as OnOwnFootstep pins it. Left in the world, the
+                        // step recedes at walking pace for the length of its own sample — which
+                        // makes the reverb send climb with the distance and is not what your own
+                        // feet do.
                         Position = eye with { Y = 0.1f },
                         ApparentPosition = eye with { Y = 0.1f },
+                        FollowsListener = true,
+                        ListenerOffset = new Vector3(0f, 0.1f - 1.6f, 0f),
                         Volume = OpenFPS.Common.Loudness.Place(OpenFPS.Common.Loudness.FootstepDb).Gain, Range = 15f,
                         MinDistance = OpenFPS.Common.Loudness.Place(OpenFPS.Common.Loudness.FootstepDb).ReferenceDistance, Pitch = 1f,
                         ConeInside = 360f, ConeOutside = 360f, ConeOutsideVolume = 1f,

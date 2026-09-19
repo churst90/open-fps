@@ -19,20 +19,22 @@ public class RunningAndBreathingTests
     private static readonly Quaternion Facing = Quaternion.Identity;
 
     /// <summary>
-    /// Half a metre of walking is one footstep, whatever speed it happened at.
+    /// One step of ground is one footstep, and the answer does not depend on how often the
+    /// accumulator is asked.
     ///
-    /// There used to be a cadence floor of five steps a second, which sounds generous until you
-    /// notice a walk is 4.5 m/s — a footfall every 111 ms — so more than half of every walk was
-    /// silent and a run lost seven in ten.
+    /// The number of footsteps in ten metres is a property of the BODY and the speed, not of the
+    /// renderer: a fast machine polling every five centimetres and a slow one polling every forty
+    /// have to agree, or how somebody sounds depends on their frame rate.
     /// </summary>
     [Theory]
     [InlineData(0.05f)]   // many small updates, as a fast renderer produces
     [InlineData(0.15f)]   // a walk at 60 Hz
     [InlineData(0.4f)]    // a hard run at 20 Hz
-    public void EveryHalfMetreIsOneFootstep(float metresPerUpdate)
+    public void TenMetresIsTheSameNumberOfStepsHoweverOftenYouLook(float metresPerUpdate)
     {
+        const float speed = 5f;
         var stride = new StrideAccumulator();
-        var velocity = new Vector3(0, 0, 5f);
+        var velocity = new Vector3(0, 0, speed);
         var at = Vector3.Zero;
 
         int steps = 0;
@@ -43,14 +45,23 @@ public class RunningAndBreathingTests
             if (stride.Update(at, velocity, isGrounded: true, Facing).Stepped) steps++;
         }
 
-        // Twenty strides in ten metres, give or take where the last part-stride fell.
-        Assert.InRange(steps, 19, 20);
+        // Ten metres divided by the step this speed takes, plus the one that started the walk.
+        int expected = (int)(10f / StrideAccumulator.StepLength(speed));
+        Assert.InRange(steps, expected, expected + 2);
     }
 
-    /// <summary>The same ground is the same number of footsteps at any speed; the same TIME is not.
-    /// That is the whole of what a listener hears in the difference.</summary>
+    /// <summary>
+    /// A faster body takes LONGER steps, so the same ground is FEWER footsteps — and the cadence
+    /// barely moves.
+    ///
+    /// This is the opposite of what the model used to claim, and the old claim was audible: a
+    /// constant half-metre stride made this game's walk nine footfalls a second and its sprint
+    /// fourteen, reported from the chair as *"sounds like cockroaches running"*. A leg is a pendulum
+    /// and it cannot be swung round faster than about four times a second by anybody, so past a walk
+    /// the speed is bought with stride instead. See <see cref="StrideAccumulator.StepLength"/>.
+    /// </summary>
     [Fact]
-    public void ARunIsTheSameStepsOverGroundAndMoreStepsOverTime()
+    public void ARunIsLongerStepsAndBarelyAFasterCadence()
     {
         int Walk(float speed, float seconds)
         {
@@ -70,8 +81,34 @@ public class RunningAndBreathingTests
         int walking = Walk(PhysicsConstants.WalkSpeed, 4f);
         int running = Walk(PhysicsConstants.SprintSpeed, 4f);
 
-        Assert.True(running > walking * 1.4f,
-            $"four seconds of running made {running} steps against {walking} walking");
+        // Faster, but only just: sixty per cent more speed buys about a fifth more footfalls.
+        Assert.True(running > walking, $"running made {running} steps against {walking} walking");
+        Assert.True(running < walking * 1.4f,
+            $"four seconds of running made {running} steps against {walking} walking — that is a "
+          + "machine gun, not a cadence");
+
+        // And nobody, at any speed this game can produce, steps faster than a human can.
+        Assert.True(running / 4f < 4.5f, $"{running / 4f:F1} footfalls a second is not a body running");
+
+        // ...which means the same ground is FEWER steps at a run, because each one is longer.
+        Assert.True(StrideAccumulator.StepLength(PhysicsConstants.SprintSpeed)
+                  > StrideAccumulator.StepLength(PhysicsConstants.WalkSpeed) * 1.2f);
+    }
+
+    /// <summary>
+    /// The gait curve against the bodies it was measured on. Alexander's relation is not a fit to
+    /// this game, it is the curve every legged animal that has been filmed lies on, so it has to give
+    /// the textbook answers for a human at the speeds humans are studied at.
+    /// </summary>
+    [Theory]
+    [InlineData(1.4f, 0.60f, 0.80f, 1.7f, 2.4f)]    // a real walk: 70 cm steps, 2 a second
+    [InlineData(4.5f, 1.20f, 1.55f, 2.8f, 3.8f)]    // a jog, which is what this game calls walking
+    [InlineData(7.2f, 1.60f, 2.10f, 3.3f, 4.4f)]    // a hard run
+    public void TheGaitMatchesRealBodies(float speed, float stepLo, float stepHi, float rateLo, float rateHi)
+    {
+        float step = StrideAccumulator.StepLength(speed);
+        Assert.InRange(step, stepLo, stepHi);
+        Assert.InRange(speed / step, rateLo, rateHi);
     }
 
     [Fact]

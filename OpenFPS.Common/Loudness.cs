@@ -61,7 +61,26 @@ public static class Loudness
     /// CLOSE, which is most of why it matters.</summary>
     public const float WeaponHandlingDb = 78f;
     public const float SpeechDb = 60f;
-    public const float FootstepDb = 55f;
+
+    /// <summary>
+    /// A footfall, at one metre — YOUR OWN, which is the case that matters, because your feet are the
+    /// only sound in the game you make on purpose to find out where you are.
+    ///
+    /// DERIVED, not chosen, through the same impact constant as everything else that is struck
+    /// (<see cref="PanelAcoustics.ImpactReferenceDb"/>: one joule is 74 dB at a metre). The foot and
+    /// shank are about a seventh of a body — ten kilograms of effective mass — and they arrive at
+    /// something under a metre a second, so a footfall is a couple of joules: 78 dB if every one of
+    /// them radiated. They do not; a sole and a floor between them take most of it, which is the
+    /// whole of what <see cref="Footsteps"/> models, and ten decibels is what that costs.
+    ///
+    /// It was 55, and 55 is wrong twice over. It is a soft trainer on carpet heard from a metre away
+    /// — not a shoe on concrete under your own head — and against the rest of this table it made a
+    /// footstep TWENTY DECIBELS quieter than a spent cartridge case bouncing on the pavement
+    /// (<see cref="CasingDb"/>), which nobody has ever heard. Reported from the chair as "the
+    /// footsteps are so quiet it's hard to tell", and the mix meter agreed: a walk measured -26 LUFS
+    /// against the -18 to -23 a game mix belongs at.
+    /// </summary>
+    public const float FootstepDb = 68f;
     public const float AmbienceBedDb = 48f;
 
     /// <summary>

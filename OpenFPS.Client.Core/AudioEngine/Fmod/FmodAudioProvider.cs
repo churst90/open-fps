@@ -877,6 +877,11 @@ public class FmodAudioProvider : IAudioProvider
     /// is not a thing anyone needs.</summary>
     private const float MaxReverbSend = 10f;
 
+    /// <summary>The largest reverb send any voice was given since the last report, and how far away
+    /// that voice was. Reported rather than the constant, because the send has not been a constant
+    /// since it became the room equation.</summary>
+    private float _worstSendThisInterval, _worstSendDist;
+
     /// <summary>Lab overrides for the reverb unit's early-reflection share (%) and late delay (ms);
     /// NaN means the constants. The AudioLab's room walk sets these to measure them.</summary>
     internal static float ReverbEarlyLateOverride = float.NaN, ReverbLateDelayOverride = float.NaN;
@@ -2064,6 +2069,11 @@ public class FmodAudioProvider : IAudioProvider
             foreach (var a in _activeSounds)
             {
                 if (a.LastAttributeAt <= 0) continue;
+                // A voice pinned to the listener is placed under their head every frame and has no
+                // attribute update to be waiting for, so the age of the last one says nothing about
+                // it. Counting it made every footstep in the game report itself as a sound left
+                // behind by its owner, which buried the one voice that really had been.
+                if (a.FollowsListener) { a.WorstPositionAge = 0; continue; }
                 // The worst it reached DURING the interval, and the worst it is right now — a voice
                 // that has been abandoned since the last report has no placement to have recorded it.
                 double stale = Math.Max(a.WorstPositionAge, nowSec - a.LastAttributeAt);
@@ -2101,13 +2111,20 @@ public class FmodAudioProvider : IAudioProvider
         // Both numbers, every report, so the next person to hear it can tell which.
         float listenerDecay = 0f, listenerWet = -80f;
         TryGetReverbSettings(_listenerRegionId, out listenerDecay, out listenerWet);
+        // The SEND a voice actually got, not the constant. This line used to print
+        // AcousticConstants.ReverbSendMix — the flat 35 % the send stopped being when it became
+        // Enclosure.ReverberantToDirectPower — so it reported a third of the signal going to the room
+        // while a source at a metre and a half was sending two thirds of it. An instrument that
+        // states a constant as if it were a measurement is worse than one that says nothing, and this
+        // one cost an afternoon of looking for a bug in the wrong place.
         Log.Information("Room: listener in region {Region} ({Kind}), reverb {Decay:F0} ms at {Wet:F0} dB wet; "
-                      + "ray-traced RT60 {Sim:F0} ms, outdoor bus {Outdoor:F0} dB; each voice sends {Send:P0}; "
-                      + "enclosure {Enc:P0} ({Field:F1} dB of reverberant field)",
+                      + "ray-traced RT60 {Sim:F0} ms, outdoor bus {Outdoor:F0} dB; wettest voice sent {Send:P0} "
+                      + "(at {Dist:F1} m); enclosure {Enc:P0} ({Field:F1} dB of reverberant field)",
                         _listenerRegionId, _dryReverbBuses.Contains(_listenerRegionId) ? "no Sabine estimate" : "enclosed",
                         listenerDecay, listenerWet, _simReverbDecayMs, _listenerWetDb,
-                        AcousticConstants.ReverbSendMix, _listenerEnclosure,
+                        _worstSendThisInterval, _worstSendDist, _listenerEnclosure,
                         Enclosure.ReverberantGainDb(_listenerEnclosure));
+        _worstSendThisInterval = 0f; _worstSendDist = 0f;
 
         // One simulation step plus a comfortable margin. Below that a voice is being placed at a
         // position from the last step, which is exactly what the interpolation clock delivers and what
@@ -2399,7 +2416,13 @@ public class FmodAudioProvider : IAudioProvider
     private void UpdateSpatialPositioning(ActiveSound active, Vector3 lPosVec)
     {
         double now = OpenFPS.Common.AudioClock.Now;
-        double positionAge = active.LastAttributeAt > 0 ? now - active.LastAttributeAt : 0;
+        // A voice pinned to the listener has no position to go stale: it is placed under the head
+        // every frame a few lines below, whatever it was last TOLD. Counting the age of an attribute
+        // update nobody sends it made every footstep report itself as a sound sitting still while its
+        // owner walked off, which is the opposite of what a footstep does and drowned the one warning
+        // that was worth reading.
+        double positionAge = active.FollowsListener || active.LastAttributeAt <= 0
+            ? 0 : now - active.LastAttributeAt;
         if (positionAge > active.WorstPositionAge) active.WorstPositionAge = positionAge;
 
         Vector3 targetPos = (active.ApparentPosition != Vector3.Zero) ? active.ApparentPosition : active.Position;
@@ -2665,6 +2688,7 @@ public class FmodAudioProvider : IAudioProvider
         // from the other side of the room". A directional source is heard from behind mostly
         // THROUGH the room, and the send is undone by the cone here so that it can be.
         float radiated = 1f / MathF.Max(coneAtten, 0.05f);
+        if (baseReverbMix > _worstSendThisInterval) { _worstSendThisInterval = baseReverbMix; _worstSendDist = sourceDist; }
         if (active.SourceReverbConnection.hasHandle())
             active.SourceReverbConnection.setMix(baseReverbMix * radiated * active.SourceReverbMix);
         if (active.ReverbConnection.hasHandle())

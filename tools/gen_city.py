@@ -432,8 +432,17 @@ map_data = {
     # No ambience bed. See no-ambience-beds: a recorded loop has no source, no distance and no
     # geometry, and on a map built to demonstrate exactly those three it buries all of them.
     "AmbienceId": "",
-    "Temperature": 32.0,
-    "Humidity": 0.45,
+    # A warm, dry afternoon. Temperature and Humidity are read as OFFSETS from the sim's baselines
+    # (20 C / 0.5), and the world's calendar starts on day 1 — deep winter, which on the seasonal
+    # curve is about -5 C before the daily swing. Plus twelve degrees, which is what this said, still
+    # let the cold end of the day fall under +2, and under +2 with any precipitation the client swaps
+    # every footstep for SNOW: reported as "I hear snow so I think the weather keeps randomly changing
+    # on me". Twenty-two puts the whole daily swing comfortably clear of freezing.
+    #
+    # Fronts still roll in on their own (WorldEnvironmentSystem, about one a minute). To hold the
+    # weather still for a listening test, set OPENFPS_WEATHER.
+    "Temperature": 42.0,
+    "Humidity": 0.40,
     "VoxelResolution": 0.5,
     "OcclusionFloor": 0.1,
     "Entities": entities,

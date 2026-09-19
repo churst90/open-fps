@@ -31,8 +31,8 @@
   }
  },
  "AmbienceId": "",
- "Temperature": 32.0,
- "Humidity": 0.45,
+ "Temperature": 42.0,
+ "Humidity": 0.4,
  "VoxelResolution": 0.5,
  "OcclusionFloor": 0.1,
  "Entities": [
