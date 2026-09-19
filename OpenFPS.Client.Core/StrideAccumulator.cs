@@ -32,6 +32,11 @@ namespace OpenFPS.Client.Core;
 /// generator would otherwise be a footstep every half metre of ROAD: at sixty miles an hour, a
 /// machine gun.
 ///
+/// <b>A walk's first footfall is at the start of the walk.</b> Distance since the last footfall is
+/// what spaces the ones after it, but it cannot place the FIRST: counted from a standstill it puts
+/// the opening footfall half a stride in, and a body cannot move half a metre without having already
+/// put a foot down. So starting to move is itself a footfall and the distance counts from there.
+///
 /// The distance test is judged per UPDATE and not as a speed, deliberately. A speed needs a delta
 /// time, and this is driven at whatever rate its caller manages — including, in tests, as fast as a
 /// loop will go — so a wall clock would make the rule depend on how fast the game happens to run.
@@ -49,6 +54,16 @@ public sealed class StrideAccumulator
     /// movement in its position is something being done to it, not by it.</summary>
     public const float MinStrideSpeed = 0.5f;
 
+    /// <summary>Slow enough that the body has stopped and its feet are together again, m/s.
+    ///
+    /// Starting to walk puts a foot down (see <see cref="Update"/>), so "is it walking" has to be a
+    /// latch and not a comparison: a velocity sitting exactly on <see cref="MinStrideSpeed"/> — which
+    /// a remote body's, arriving a tick at a time through the interpolator, can do — would otherwise
+    /// cross it back and forth and start a new walk on every crossing. A body is walking above the one
+    /// number and standing below the other, and between them it is doing whatever it was doing
+    /// before.</summary>
+    public const float StoppedSpeed = MinStrideSpeed * 0.5f;
+
     /// <summary>How far to either side of the body's centre a foot goes down, metres. Feet alternate,
     /// so a walker is two sound sources a third of a metre apart rather than one down the middle.</summary>
     public const float StepWidth = 0.15f;
@@ -60,6 +75,7 @@ public sealed class StrideAccumulator
     private float _accumulatedDistance;
     private int _stepCount;
     private bool _wasInAir;
+    private bool _feetMoving;
     private double _lastLandAt = double.NegativeInfinity;
 
     /// <summary>What the body did this update, if anything. Both can be true at once: a body that
@@ -82,6 +98,7 @@ public sealed class StrideAccumulator
         _lastPosition = null;
         _accumulatedDistance = 0f;
         _wasInAir = false;
+        _feetMoving = false;
     }
 
     /// <summary>
@@ -107,6 +124,31 @@ public sealed class StrideAccumulator
             _wasInAir = false;
         }
 
+        float ownSpeed = new Vector2(velocity.X, velocity.Z).Length();
+        bool walking = ownSpeed > MinStrideSpeed;
+
+        // ── The first footfall of a walk is at the START of it ──────────────────────────────────
+        //
+        // A body standing still has both feet planted and its weight between them. It cannot begin to
+        // move without lifting one and putting it down somewhere else, so the first footfall happens
+        // when the walking starts — not half a stride into it, which is where counting distance from
+        // a standstill puts it.
+        //
+        // Reported as "each W A S D press should be a footstep, not every two or three presses", and
+        // that is exactly the arithmetic: a tap moves the player for one 30 Hz tick at 4.5 m/s, which
+        // is 15 cm, so three or four taps were needed to bank the half metre and the first two or
+        // three were silent. With the stride phased from the start of the walk a tap is one footfall,
+        // a longer press is that footfall and then one every half metre, and nothing about the walk
+        // itself has changed.
+        //
+        // Only a body on the GROUND can be said to have stopped: a run that ends in a jump has not put
+        // its feet together, it has them in the air, so the latch is left alone until they are back
+        // down and a landing does not read as a fresh start. And a landing IS a foot going down — the
+        // one it lands on — so it takes the place of this footfall rather than sounding beside it.
+        if (isGrounded && ownSpeed < StoppedSpeed) _feetMoving = false;
+        bool startedWalking = isGrounded && walking && !_feetMoving && !landed;
+        if (isGrounded && walking) _feetMoving = true;
+
         if (_lastPosition.HasValue)
         {
             if (isGrounded)
@@ -114,8 +156,6 @@ public sealed class StrideAccumulator
                 var flat = new Vector3(position.X - _lastPosition.Value.X, 0, position.Z - _lastPosition.Value.Z);
                 float moved = flat.Length();
 
-                float ownSpeed = new Vector2(velocity.X, velocity.Z).Length();
-                bool walking = ownSpeed > MinStrideSpeed;
                 bool plausible = moved <= MaxStrideStep;
 
                 if (!plausible || !walking) _accumulatedDistance = 0f;
@@ -141,7 +181,7 @@ public sealed class StrideAccumulator
         // for a rule about DISTANCE, and the distance rule is the true one: a body that is not moving
         // banks nothing, and a body that is being moved rather than walking is refused by its own
         // velocity long before any timer would have caught it.
-        if (isGrounded && _accumulatedDistance >= StrideLength)
+        if (startedWalking || (isGrounded && _accumulatedDistance >= StrideLength))
         {
             stepped = true;
             _stepCount++;
@@ -150,7 +190,11 @@ public sealed class StrideAccumulator
             stepPosition = position + right * lateral;
             stepPosition.Y = position.Y;
 
-            _accumulatedDistance %= StrideLength;
+            // A walk that starts here has walked nothing yet; one half a metre in has walked whatever
+            // is over the half metre, and that remainder is what keeps a long walk's cadence honest
+            // instead of quantising it to the update rate.
+            if (startedWalking) _accumulatedDistance = 0f;
+            else _accumulatedDistance %= StrideLength;
         }
 
         return new Footfall(stepped, stepPosition, landed);

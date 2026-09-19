@@ -491,11 +491,21 @@ public sealed class ClientGameSession : IDisposable
         // other game puts it on and the one a hand finds without looking. The two meanings do not
         // collide, because they are on different keys: shift with a turn key is still a one-degree
         // nudge, shift with a movement key is a run, and holding both does both.
+        // A key that went down AND back up between two drains still moved the player.
+        //
+        // Held state is sampled once per fixed tick, 33 ms apart, and a quick tap is shorter than
+        // that: pressed and released inside one interval, the key was never in `held` when the tick
+        // looked, so the press did nothing at all — no movement, no footstep, no packet. A press is a
+        // player asking to move, and the smallest amount of movement this simulation can express is
+        // one tick of it, so that is what a press that is already over is worth. The just-pressed set
+        // is consumed by the same drain, so it is paid exactly once however the two rates line up.
+        bool Pressed(GameKey k) => held.Contains(k) || justPressed.Contains(k);
+
         Vector3 move = Vector3.Zero;
-        if (held.Contains(GameKey.W)) move.Z += 1;
-        if (held.Contains(GameKey.S)) move.Z -= 1;
-        if (held.Contains(GameKey.A)) move.X -= 1;
-        if (held.Contains(GameKey.D)) move.X += 1;
+        if (Pressed(GameKey.W)) move.Z += 1;
+        if (Pressed(GameKey.S)) move.Z -= 1;
+        if (Pressed(GameKey.A)) move.X -= 1;
+        if (Pressed(GameKey.D)) move.X += 1;
         if (move != Vector3.Zero) input.MoveDirection = Vector3.Normalize(move);
 
         if (held.Contains(GameKey.Space)) input.Jump = true;
