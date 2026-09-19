@@ -179,7 +179,8 @@ public static class RoomWalkSpike
                     provider.SetSimulatedReverbDecay(lastDecayMs, survey.Enclosure,
                         Math.Clamp(high / MathF.Max(0.01f, mid), 0.1f, 2f),
                         Math.Clamp(low / MathF.Max(0.01f, mid), 0.1f, 4f));
-                    provider.SetListenerReverbField(survey.ReturnDirection, survey.Anisotropy, survey.MeanFreePathMetres);
+                    provider.SetListenerReverbField(survey.ReturnDirection, survey.Anisotropy,
+                                                    survey.MeanFreePathMetres, survey.SurfaceAreaSquareMetres);
                     surveys++;
                 }
 

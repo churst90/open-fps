@@ -46,7 +46,7 @@ public class VoiceLifecycleTests
         public void UpdateSpatialAttributes(SpatialEmitter e) { }
         public void SetAcousticPath(int id, AcousticPathData p) { }
         public void SetSimulatedReverbDecay(float ms, float enclosure, float hf, float lf) { }
-        public void SetListenerReverbField(Vector3 dir, float anisotropy, float mfp) { }
+        public void SetListenerReverbField(Vector3 returnDirection, float anisotropy, float meanFreePathMetres, float surfaceAreaSquareMetres = 0f) { }
         public void SetAirTemperature(float c) { }
         public float MixerLoad => 0f;
         public void ReviveEngine(int id) { }

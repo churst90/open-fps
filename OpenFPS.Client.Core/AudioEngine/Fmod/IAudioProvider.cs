@@ -53,7 +53,8 @@ public interface IAudioProvider : IDisposable
     void SetSimulatedReverbDecay(float decayMs, float enclosure, float hfDecayRatio, float lfDecayRatio);
     /// <summary>Where the listener's reverberant field comes from (world space, unit or zero) and how
     /// one-sided it is, 0..1. The listener's reverb is steered by it. See Enclosure.ReturnCentroid.</summary>
-    void SetListenerReverbField(Vector3 returnDirection, float anisotropy, float meanFreePathMetres);
+    void SetListenerReverbField(Vector3 returnDirection, float anisotropy, float meanFreePathMetres,
+                                float surfaceAreaSquareMetres = 0f);
 
     /// <summary>Sets the air temperature (°C) the Doppler math uses for the speed of sound. This is how
     /// the simulated weather reaches the mix: c = 331.3 + 0.606·T.</summary>

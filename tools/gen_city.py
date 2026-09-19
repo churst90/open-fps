@@ -262,6 +262,24 @@ def apartment_block(side, x0, x1, z0, z1, label):
             for fx0, fx1 in (far_flat, near_flat):
                 box("concrete_wall", fx0, fx1, floor_top, ceil, pz - WALL_T / 2, pz + WALL_T / 2)
 
+        # ── What is ON the floors ───────────────────────────────────────────────────────────────
+        #
+        # A flat is not a bare concrete box. Measured with `--enclosure map=city at=14.35,1.6,3.1`,
+        # one of these with a concrete floor reads a 330 % reverb send at a metre and a half — the
+        # room answering ten decibels over your own footstep — and that is CORRECT for four hard
+        # walls, a hard floor and nothing in the room at all. Nobody lives in that.
+        #
+        # Carpet in the flats and down the corridors, which is what an apartment block has, and it is
+        # the one material in the table that takes sixty per cent of what reaches it. The stairwell
+        # keeps its tile deliberately: it is the live space in the building and the contrast is the
+        # point. This is the "thick carpet and curtains are material entries, not code" item from
+        # docs/NEXT_THE_CITY.md, and it belongs to the map rather than the engine.
+        box("carpet_floor", far_flat[0], far_flat[1], floor_top, floor_top + 0.04, z0 + WALL_T, z1 - WALL_T)
+        # The near row stops at the stairwell: carpet laid over it would bury the tile and the
+        # stairwell would measure the same as a flat, which is the one thing it must not do.
+        box("carpet_floor", near_flat[0], near_flat[1], floor_top, floor_top + 0.04, stair_z[1], z1 - WALL_T)
+        box("carpet_floor", corridor[0], corridor[1], floor_top, floor_top + 0.04, z0 + WALL_T, z1 - WALL_T)
+
         # ── Zones, and the doors between them ──────────────────────────────────────────────────
         corridor_id = region(f"{label} corridor, floor {s}",
                              corridor[0], corridor[1], floor_top, ceil, z0 + WALL_T, z1 - WALL_T)

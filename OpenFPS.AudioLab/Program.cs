@@ -380,6 +380,15 @@ if (args.Contains("--engine-alias"))
     Log.CloseAndFlush();
     Environment.Exit(eacode);
 }
+if (args.Contains("--enclosure"))
+{
+    // --enclosure [map= at= walk= step= head= dist=]: what the room round a listener measures at a
+    // place on a real map, and the reverb send that follows from it. See EnclosureSpike.
+    int encCode = OpenFPS.Client.Core.AudioEngine.Fmod.EnclosureSpike.Run(args);
+    Log.CloseAndFlush();
+    Environment.Exit(encCode);
+}
+
 if (args.Contains("--yard"))
 {
     // --yard [preset ...] [levels] [pass] [sec= dist=]: the machinery that stands in a garden and

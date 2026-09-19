@@ -434,6 +434,48 @@
   },
   {
    "EntityId": 1029,
+   "PrefabId": "carpet_floor",
+   "Position": {
+    "X": -25.9,
+    "Y": 0.04,
+    "Z": -8.0
+   },
+   "Scale": {
+    "X": 0.9,
+    "Y": 0.4,
+    "Z": 3.93
+   }
+  },
+  {
+   "EntityId": 1030,
+   "PrefabId": "carpet_floor",
+   "Position": {
+    "X": -14.175,
+    "Y": 0.04,
+    "Z": -3.0875
+   },
+   "Scale": {
+    "X": 0.865,
+    "Y": 0.4,
+    "Z": 2.9475
+   }
+  },
+  {
+   "EntityId": 1031,
+   "PrefabId": "carpet_floor",
+   "Position": {
+    "X": -19.95,
+    "Y": 0.04,
+    "Z": -8.0
+   },
+   "Scale": {
+    "X": 0.22,
+    "Y": 0.4,
+    "Z": 3.93
+   }
+  },
+  {
+   "EntityId": 1032,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": -19.95,
@@ -448,7 +490,7 @@
    "Name": "Westside corridor, floor 0"
   },
   {
-   "EntityId": 1030,
+   "EntityId": 1033,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": -25.9,
@@ -463,7 +505,7 @@
    "Name": "Westside flat 01B"
   },
   {
-   "EntityId": 1031,
+   "EntityId": 1034,
    "PrefabId": "door",
    "Position": {
     "X": -21.225,
@@ -476,11 +518,11 @@
     "Z": 0,
     "W": 0.7071
    },
-   "RegionAId": 1030,
-   "RegionBId": 1029
+   "RegionAId": 1033,
+   "RegionBId": 1032
   },
   {
-   "EntityId": 1032,
+   "EntityId": 1035,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": -14.175,
@@ -495,7 +537,7 @@
    "Name": "Westside flat 02F"
   },
   {
-   "EntityId": 1033,
+   "EntityId": 1036,
    "PrefabId": "door",
    "Position": {
     "X": -18.675,
@@ -508,11 +550,11 @@
     "Z": 0,
     "W": 0.7071
    },
-   "RegionAId": 1032,
-   "RegionBId": 1029
+   "RegionAId": 1035,
+   "RegionBId": 1032
   },
   {
-   "EntityId": 1034,
+   "EntityId": 1037,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": -25.9,
@@ -527,7 +569,7 @@
    "Name": "Westside flat 02B"
   },
   {
-   "EntityId": 1035,
+   "EntityId": 1038,
    "PrefabId": "door",
    "Position": {
     "X": -21.225,
@@ -540,11 +582,11 @@
     "Z": 0,
     "W": 0.7071
    },
-   "RegionAId": 1034,
-   "RegionBId": 1029
+   "RegionAId": 1037,
+   "RegionBId": 1032
   },
   {
-   "EntityId": 1036,
+   "EntityId": 1039,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": -14.175,
@@ -559,7 +601,7 @@
    "Name": "Westside flat 03F"
   },
   {
-   "EntityId": 1037,
+   "EntityId": 1040,
    "PrefabId": "door",
    "Position": {
     "X": -18.675,
@@ -572,11 +614,11 @@
     "Z": 0,
     "W": 0.7071
    },
-   "RegionAId": 1036,
-   "RegionBId": 1029
+   "RegionAId": 1039,
+   "RegionBId": 1032
   },
   {
-   "EntityId": 1038,
+   "EntityId": 1041,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": -25.9,
@@ -591,7 +633,7 @@
    "Name": "Westside flat 03B"
   },
   {
-   "EntityId": 1039,
+   "EntityId": 1042,
    "PrefabId": "door",
    "Position": {
     "X": -21.225,
@@ -604,11 +646,11 @@
     "Z": 0,
     "W": 0.7071
    },
-   "RegionAId": 1038,
-   "RegionBId": 1029
+   "RegionAId": 1041,
+   "RegionBId": 1032
   },
   {
-   "EntityId": 1040,
+   "EntityId": 1043,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": -14.175,
@@ -623,7 +665,7 @@
    "Name": "Westside flat 04F"
   },
   {
-   "EntityId": 1041,
+   "EntityId": 1044,
    "PrefabId": "door",
    "Position": {
     "X": -18.675,
@@ -636,11 +678,11 @@
     "Z": 0,
     "W": 0.7071
    },
-   "RegionAId": 1040,
-   "RegionBId": 1029
+   "RegionAId": 1043,
+   "RegionBId": 1032
   },
   {
-   "EntityId": 1042,
+   "EntityId": 1045,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": -25.9,
@@ -655,7 +697,7 @@
    "Name": "Westside flat 04B"
   },
   {
-   "EntityId": 1043,
+   "EntityId": 1046,
    "PrefabId": "door",
    "Position": {
     "X": -21.225,
@@ -668,11 +710,11 @@
     "Z": 0,
     "W": 0.7071
    },
-   "RegionAId": 1042,
-   "RegionBId": 1029
+   "RegionAId": 1045,
+   "RegionBId": 1032
   },
   {
-   "EntityId": 1044,
+   "EntityId": 1047,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": -14.175,
@@ -687,7 +729,7 @@
    "Name": "Westside stairwell, floor 0"
   },
   {
-   "EntityId": 1045,
+   "EntityId": 1048,
    "PrefabId": "tile_floor",
    "Position": {
     "X": -14.175,
@@ -701,19 +743,19 @@
    }
   },
   {
-   "EntityId": 1046,
+   "EntityId": 1049,
    "PrefabId": "portal",
    "Position": {
     "X": -18.675,
     "Y": 1.02,
     "Z": -22.7375
    },
-   "RegionAId": 1044,
-   "RegionBId": 1029,
+   "RegionAId": 1047,
+   "RegionBId": 1032,
    "ApertureSize": 1.4
   },
   {
-   "EntityId": 1047,
+   "EntityId": 1050,
    "PrefabId": "concrete_floor",
    "Position": {
     "X": -14.175,
@@ -727,7 +769,7 @@
    }
   },
   {
-   "EntityId": 1048,
+   "EntityId": 1051,
    "PrefabId": "concrete_floor",
    "Position": {
     "X": -14.175,
@@ -741,7 +783,7 @@
    }
   },
   {
-   "EntityId": 1049,
+   "EntityId": 1052,
    "PrefabId": "concrete_floor",
    "Position": {
     "X": -14.175,
@@ -755,7 +797,7 @@
    }
   },
   {
-   "EntityId": 1050,
+   "EntityId": 1053,
    "PrefabId": "concrete_floor",
    "Position": {
     "X": -14.175,
@@ -769,7 +811,7 @@
    }
   },
   {
-   "EntityId": 1051,
+   "EntityId": 1054,
    "PrefabId": "concrete_floor",
    "Position": {
     "X": -14.175,
@@ -783,7 +825,7 @@
    }
   },
   {
-   "EntityId": 1052,
+   "EntityId": 1055,
    "PrefabId": "concrete_floor",
    "Position": {
     "X": -14.175,
@@ -797,7 +839,7 @@
    }
   },
   {
-   "EntityId": 1053,
+   "EntityId": 1056,
    "PrefabId": "concrete_floor",
    "Position": {
     "X": -14.175,
@@ -811,7 +853,7 @@
    }
   },
   {
-   "EntityId": 1054,
+   "EntityId": 1057,
    "PrefabId": "concrete_floor",
    "Position": {
     "X": -14.175,
@@ -825,7 +867,7 @@
    }
   },
   {
-   "EntityId": 1055,
+   "EntityId": 1058,
    "PrefabId": "concrete_floor",
    "Position": {
     "X": -14.175,
@@ -839,7 +881,7 @@
    }
   },
   {
-   "EntityId": 1056,
+   "EntityId": 1059,
    "PrefabId": "concrete_floor",
    "Position": {
     "X": -14.175,
@@ -853,7 +895,7 @@
    }
   },
   {
-   "EntityId": 1057,
+   "EntityId": 1060,
    "PrefabId": "concrete_floor",
    "Position": {
     "X": -14.175,
@@ -867,7 +909,7 @@
    }
   },
   {
-   "EntityId": 1058,
+   "EntityId": 1061,
    "PrefabId": "concrete_floor",
    "Position": {
     "X": -14.175,
@@ -881,7 +923,7 @@
    }
   },
   {
-   "EntityId": 1059,
+   "EntityId": 1062,
    "PrefabId": "steel_door",
    "Position": {
     "X": -9.675,
@@ -894,11 +936,11 @@
     "Z": 0,
     "W": 1
    },
-   "RegionAId": 1044,
+   "RegionAId": 1047,
    "RegionBId": -1
   },
   {
-   "EntityId": 1060,
+   "EntityId": 1063,
    "PrefabId": "concrete_floor",
    "Position": {
     "X": -20.125,
@@ -912,7 +954,7 @@
    }
   },
   {
-   "EntityId": 1061,
+   "EntityId": 1064,
    "PrefabId": "concrete_floor",
    "Position": {
     "X": -20.125,
@@ -926,7 +968,7 @@
    }
   },
   {
-   "EntityId": 1062,
+   "EntityId": 1065,
    "PrefabId": "brick_wall",
    "Position": {
     "X": -30.575,
@@ -940,7 +982,7 @@
    }
   },
   {
-   "EntityId": 1063,
+   "EntityId": 1066,
    "PrefabId": "brick_wall",
    "Position": {
     "X": -9.675,
@@ -954,7 +996,7 @@
    }
   },
   {
-   "EntityId": 1064,
+   "EntityId": 1067,
    "PrefabId": "brick_wall",
    "Position": {
     "X": -20.125,
@@ -968,7 +1010,7 @@
    }
   },
   {
-   "EntityId": 1065,
+   "EntityId": 1068,
    "PrefabId": "brick_wall",
    "Position": {
     "X": -20.125,
@@ -982,7 +1024,7 @@
    }
   },
   {
-   "EntityId": 1066,
+   "EntityId": 1069,
    "PrefabId": "concrete_wall",
    "Position": {
     "X": -18.675,
@@ -996,7 +1038,7 @@
    }
   },
   {
-   "EntityId": 1067,
+   "EntityId": 1070,
    "PrefabId": "concrete_wall",
    "Position": {
     "X": -18.675,
@@ -1010,7 +1052,7 @@
    }
   },
   {
-   "EntityId": 1068,
+   "EntityId": 1071,
    "PrefabId": "concrete_wall",
    "Position": {
     "X": -18.675,
@@ -1024,54 +1066,12 @@
    }
   },
   {
-   "EntityId": 1069,
+   "EntityId": 1072,
    "PrefabId": "concrete_wall",
    "Position": {
     "X": -18.675,
     "Y": 4.5,
     "Z": 1.825
-   },
-   "Scale": {
-    "X": 0.175,
-    "Y": 0.8333,
-    "Z": 17.65
-   }
-  },
-  {
-   "EntityId": 1070,
-   "PrefabId": "concrete_wall",
-   "Position": {
-    "X": -18.675,
-    "Y": 4.5,
-    "Z": 9.6187
-   },
-   "Scale": {
-    "X": 0.175,
-    "Y": 0.8333,
-    "Z": 9.525
-   }
-  },
-  {
-   "EntityId": 1071,
-   "PrefabId": "concrete_wall",
-   "Position": {
-    "X": -21.225,
-    "Y": 4.5,
-    "Z": -25.6187
-   },
-   "Scale": {
-    "X": 0.175,
-    "Y": 0.8333,
-    "Z": 9.525
-   }
-  },
-  {
-   "EntityId": 1072,
-   "PrefabId": "concrete_wall",
-   "Position": {
-    "X": -21.225,
-    "Y": 4.5,
-    "Z": -17.825
    },
    "Scale": {
     "X": 0.175,
@@ -1083,6 +1083,48 @@
    "EntityId": 1073,
    "PrefabId": "concrete_wall",
    "Position": {
+    "X": -18.675,
+    "Y": 4.5,
+    "Z": 9.6187
+   },
+   "Scale": {
+    "X": 0.175,
+    "Y": 0.8333,
+    "Z": 9.525
+   }
+  },
+  {
+   "EntityId": 1074,
+   "PrefabId": "concrete_wall",
+   "Position": {
+    "X": -21.225,
+    "Y": 4.5,
+    "Z": -25.6187
+   },
+   "Scale": {
+    "X": 0.175,
+    "Y": 0.8333,
+    "Z": 9.525
+   }
+  },
+  {
+   "EntityId": 1075,
+   "PrefabId": "concrete_wall",
+   "Position": {
+    "X": -21.225,
+    "Y": 4.5,
+    "Z": -17.825
+   },
+   "Scale": {
+    "X": 0.175,
+    "Y": 0.8333,
+    "Z": 17.65
+   }
+  },
+  {
+   "EntityId": 1076,
+   "PrefabId": "concrete_wall",
+   "Position": {
     "X": -21.225,
     "Y": 4.5,
     "Z": -8.0
@@ -1094,7 +1136,7 @@
    }
   },
   {
-   "EntityId": 1074,
+   "EntityId": 1077,
    "PrefabId": "concrete_wall",
    "Position": {
     "X": -21.225,
@@ -1108,7 +1150,7 @@
    }
   },
   {
-   "EntityId": 1075,
+   "EntityId": 1078,
    "PrefabId": "concrete_wall",
    "Position": {
     "X": -21.225,
@@ -1122,57 +1164,15 @@
    }
   },
   {
-   "EntityId": 1076,
-   "PrefabId": "concrete_wall",
-   "Position": {
-    "X": -25.9,
-    "Y": 4.5,
-    "Z": -17.825
-   },
-   "Scale": {
-    "X": 4.5,
-    "Y": 0.8333,
-    "Z": 0.7
-   }
-  },
-  {
-   "EntityId": 1077,
-   "PrefabId": "concrete_wall",
-   "Position": {
-    "X": -14.175,
-    "Y": 4.5,
-    "Z": -17.825
-   },
-   "Scale": {
-    "X": 4.325,
-    "Y": 0.8333,
-    "Z": 0.7
-   }
-  },
-  {
-   "EntityId": 1078,
-   "PrefabId": "concrete_wall",
-   "Position": {
-    "X": -25.9,
-    "Y": 4.5,
-    "Z": -8.0
-   },
-   "Scale": {
-    "X": 4.5,
-    "Y": 0.8333,
-    "Z": 0.7
-   }
-  },
-  {
    "EntityId": 1079,
    "PrefabId": "concrete_wall",
    "Position": {
-    "X": -14.175,
+    "X": -25.9,
     "Y": 4.5,
-    "Z": -8.0
+    "Z": -17.825
    },
    "Scale": {
-    "X": 4.325,
+    "X": 4.5,
     "Y": 0.8333,
     "Z": 0.7
    }
@@ -1181,6 +1181,48 @@
    "EntityId": 1080,
    "PrefabId": "concrete_wall",
    "Position": {
+    "X": -14.175,
+    "Y": 4.5,
+    "Z": -17.825
+   },
+   "Scale": {
+    "X": 4.325,
+    "Y": 0.8333,
+    "Z": 0.7
+   }
+  },
+  {
+   "EntityId": 1081,
+   "PrefabId": "concrete_wall",
+   "Position": {
+    "X": -25.9,
+    "Y": 4.5,
+    "Z": -8.0
+   },
+   "Scale": {
+    "X": 4.5,
+    "Y": 0.8333,
+    "Z": 0.7
+   }
+  },
+  {
+   "EntityId": 1082,
+   "PrefabId": "concrete_wall",
+   "Position": {
+    "X": -14.175,
+    "Y": 4.5,
+    "Z": -8.0
+   },
+   "Scale": {
+    "X": 4.325,
+    "Y": 0.8333,
+    "Z": 0.7
+   }
+  },
+  {
+   "EntityId": 1083,
+   "PrefabId": "concrete_wall",
+   "Position": {
     "X": -25.9,
     "Y": 4.5,
     "Z": 1.825
@@ -1192,7 +1234,7 @@
    }
   },
   {
-   "EntityId": 1081,
+   "EntityId": 1084,
    "PrefabId": "concrete_wall",
    "Position": {
     "X": -14.175,
@@ -1206,7 +1248,49 @@
    }
   },
   {
-   "EntityId": 1082,
+   "EntityId": 1085,
+   "PrefabId": "carpet_floor",
+   "Position": {
+    "X": -25.9,
+    "Y": 3.27,
+    "Z": -8.0
+   },
+   "Scale": {
+    "X": 0.9,
+    "Y": 0.4,
+    "Z": 3.93
+   }
+  },
+  {
+   "EntityId": 1086,
+   "PrefabId": "carpet_floor",
+   "Position": {
+    "X": -14.175,
+    "Y": 3.27,
+    "Z": -3.0875
+   },
+   "Scale": {
+    "X": 0.865,
+    "Y": 0.4,
+    "Z": 2.9475
+   }
+  },
+  {
+   "EntityId": 1087,
+   "PrefabId": "carpet_floor",
+   "Position": {
+    "X": -19.95,
+    "Y": 3.27,
+    "Z": -8.0
+   },
+   "Scale": {
+    "X": 0.22,
+    "Y": 0.4,
+    "Z": 3.93
+   }
+  },
+  {
+   "EntityId": 1088,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": -19.95,
@@ -1221,7 +1305,7 @@
    "Name": "Westside corridor, floor 1"
   },
   {
-   "EntityId": 1083,
+   "EntityId": 1089,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": -25.9,
@@ -1236,7 +1320,7 @@
    "Name": "Westside flat 11B"
   },
   {
-   "EntityId": 1084,
+   "EntityId": 1090,
    "PrefabId": "door",
    "Position": {
     "X": -21.225,
@@ -1249,11 +1333,11 @@
     "Z": 0,
     "W": 0.7071
    },
-   "RegionAId": 1083,
-   "RegionBId": 1082
+   "RegionAId": 1089,
+   "RegionBId": 1088
   },
   {
-   "EntityId": 1085,
+   "EntityId": 1091,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": -14.175,
@@ -1268,7 +1352,7 @@
    "Name": "Westside flat 12F"
   },
   {
-   "EntityId": 1086,
+   "EntityId": 1092,
    "PrefabId": "door",
    "Position": {
     "X": -18.675,
@@ -1281,11 +1365,11 @@
     "Z": 0,
     "W": 0.7071
    },
-   "RegionAId": 1085,
-   "RegionBId": 1082
+   "RegionAId": 1091,
+   "RegionBId": 1088
   },
   {
-   "EntityId": 1087,
+   "EntityId": 1093,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": -25.9,
@@ -1300,7 +1384,7 @@
    "Name": "Westside flat 12B"
   },
   {
-   "EntityId": 1088,
+   "EntityId": 1094,
    "PrefabId": "door",
    "Position": {
     "X": -21.225,
@@ -1313,11 +1397,11 @@
     "Z": 0,
     "W": 0.7071
    },
-   "RegionAId": 1087,
-   "RegionBId": 1082
+   "RegionAId": 1093,
+   "RegionBId": 1088
   },
   {
-   "EntityId": 1089,
+   "EntityId": 1095,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": -14.175,
@@ -1332,7 +1416,7 @@
    "Name": "Westside flat 13F"
   },
   {
-   "EntityId": 1090,
+   "EntityId": 1096,
    "PrefabId": "door",
    "Position": {
     "X": -18.675,
@@ -1345,11 +1429,11 @@
     "Z": 0,
     "W": 0.7071
    },
-   "RegionAId": 1089,
-   "RegionBId": 1082
+   "RegionAId": 1095,
+   "RegionBId": 1088
   },
   {
-   "EntityId": 1091,
+   "EntityId": 1097,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": -25.9,
@@ -1364,7 +1448,7 @@
    "Name": "Westside flat 13B"
   },
   {
-   "EntityId": 1092,
+   "EntityId": 1098,
    "PrefabId": "door",
    "Position": {
     "X": -21.225,
@@ -1377,11 +1461,11 @@
     "Z": 0,
     "W": 0.7071
    },
-   "RegionAId": 1091,
-   "RegionBId": 1082
+   "RegionAId": 1097,
+   "RegionBId": 1088
   },
   {
-   "EntityId": 1093,
+   "EntityId": 1099,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": -14.175,
@@ -1396,7 +1480,7 @@
    "Name": "Westside flat 14F"
   },
   {
-   "EntityId": 1094,
+   "EntityId": 1100,
    "PrefabId": "door",
    "Position": {
     "X": -18.675,
@@ -1409,11 +1493,11 @@
     "Z": 0,
     "W": 0.7071
    },
-   "RegionAId": 1093,
-   "RegionBId": 1082
+   "RegionAId": 1099,
+   "RegionBId": 1088
   },
   {
-   "EntityId": 1095,
+   "EntityId": 1101,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": -25.9,
@@ -1428,7 +1512,7 @@
    "Name": "Westside flat 14B"
   },
   {
-   "EntityId": 1096,
+   "EntityId": 1102,
    "PrefabId": "door",
    "Position": {
     "X": -21.225,
@@ -1441,11 +1525,11 @@
     "Z": 0,
     "W": 0.7071
    },
-   "RegionAId": 1095,
-   "RegionBId": 1082
+   "RegionAId": 1101,
+   "RegionBId": 1088
   },
   {
-   "EntityId": 1097,
+   "EntityId": 1103,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": -14.175,
@@ -1460,7 +1544,7 @@
    "Name": "Westside stairwell, floor 1"
   },
   {
-   "EntityId": 1098,
+   "EntityId": 1104,
    "PrefabId": "tile_floor",
    "Position": {
     "X": -14.175,
@@ -1474,19 +1558,19 @@
    }
   },
   {
-   "EntityId": 1099,
+   "EntityId": 1105,
    "PrefabId": "portal",
    "Position": {
     "X": -18.675,
     "Y": 4.25,
     "Z": -22.7375
    },
-   "RegionAId": 1097,
-   "RegionBId": 1082,
+   "RegionAId": 1103,
+   "RegionBId": 1088,
    "ApertureSize": 1.4
   },
   {
-   "EntityId": 1100,
+   "EntityId": 1106,
    "PrefabId": "concrete_floor",
    "Position": {
     "X": -14.175,
@@ -1500,7 +1584,7 @@
    }
   },
   {
-   "EntityId": 1101,
+   "EntityId": 1107,
    "PrefabId": "concrete_floor",
    "Position": {
     "X": -14.175,
@@ -1514,7 +1598,7 @@
    }
   },
   {
-   "EntityId": 1102,
+   "EntityId": 1108,
    "PrefabId": "concrete_floor",
    "Position": {
     "X": -14.175,
@@ -1528,7 +1612,7 @@
    }
   },
   {
-   "EntityId": 1103,
+   "EntityId": 1109,
    "PrefabId": "concrete_floor",
    "Position": {
     "X": -14.175,
@@ -1542,7 +1626,7 @@
    }
   },
   {
-   "EntityId": 1104,
+   "EntityId": 1110,
    "PrefabId": "concrete_floor",
    "Position": {
     "X": -14.175,
@@ -1556,7 +1640,7 @@
    }
   },
   {
-   "EntityId": 1105,
+   "EntityId": 1111,
    "PrefabId": "concrete_floor",
    "Position": {
     "X": -14.175,
@@ -1570,7 +1654,7 @@
    }
   },
   {
-   "EntityId": 1106,
+   "EntityId": 1112,
    "PrefabId": "concrete_floor",
    "Position": {
     "X": -14.175,
@@ -1584,7 +1668,7 @@
    }
   },
   {
-   "EntityId": 1107,
+   "EntityId": 1113,
    "PrefabId": "concrete_floor",
    "Position": {
     "X": -14.175,
@@ -1598,7 +1682,7 @@
    }
   },
   {
-   "EntityId": 1108,
+   "EntityId": 1114,
    "PrefabId": "concrete_floor",
    "Position": {
     "X": -14.175,
@@ -1612,7 +1696,7 @@
    }
   },
   {
-   "EntityId": 1109,
+   "EntityId": 1115,
    "PrefabId": "concrete_floor",
    "Position": {
     "X": -14.175,
@@ -1626,7 +1710,7 @@
    }
   },
   {
-   "EntityId": 1110,
+   "EntityId": 1116,
    "PrefabId": "concrete_floor",
    "Position": {
     "X": -14.175,
@@ -1640,7 +1724,7 @@
    }
   },
   {
-   "EntityId": 1111,
+   "EntityId": 1117,
    "PrefabId": "concrete_floor",
    "Position": {
     "X": -14.175,
@@ -1654,7 +1738,7 @@
    }
   },
   {
-   "EntityId": 1112,
+   "EntityId": 1118,
    "PrefabId": "concrete_floor",
    "Position": {
     "X": -20.125,
@@ -1668,7 +1752,7 @@
    }
   },
   {
-   "EntityId": 1113,
+   "EntityId": 1119,
    "PrefabId": "concrete_floor",
    "Position": {
     "X": -20.125,
@@ -1682,7 +1766,7 @@
    }
   },
   {
-   "EntityId": 1114,
+   "EntityId": 1120,
    "PrefabId": "brick_wall",
    "Position": {
     "X": -30.575,
@@ -1696,7 +1780,7 @@
    }
   },
   {
-   "EntityId": 1115,
+   "EntityId": 1121,
    "PrefabId": "brick_wall",
    "Position": {
     "X": -9.675,
@@ -1710,7 +1794,7 @@
    }
   },
   {
-   "EntityId": 1116,
+   "EntityId": 1122,
    "PrefabId": "brick_wall",
    "Position": {
     "X": -20.125,
@@ -1724,7 +1808,7 @@
    }
   },
   {
-   "EntityId": 1117,
+   "EntityId": 1123,
    "PrefabId": "brick_wall",
    "Position": {
     "X": -20.125,
@@ -1738,110 +1822,26 @@
    }
   },
   {
-   "EntityId": 1118,
-   "PrefabId": "concrete_wall",
-   "Position": {
-    "X": -18.675,
-    "Y": 7.5,
-    "Z": -25.6187
-   },
-   "Scale": {
-    "X": 0.175,
-    "Y": 0.8333,
-    "Z": 9.525
-   }
-  },
-  {
-   "EntityId": 1119,
-   "PrefabId": "concrete_wall",
-   "Position": {
-    "X": -18.675,
-    "Y": 7.5,
-    "Z": -17.825
-   },
-   "Scale": {
-    "X": 0.175,
-    "Y": 0.8333,
-    "Z": 17.65
-   }
-  },
-  {
-   "EntityId": 1120,
-   "PrefabId": "concrete_wall",
-   "Position": {
-    "X": -18.675,
-    "Y": 7.5,
-    "Z": -8.0
-   },
-   "Scale": {
-    "X": 0.175,
-    "Y": 0.8333,
-    "Z": 17.65
-   }
-  },
-  {
-   "EntityId": 1121,
-   "PrefabId": "concrete_wall",
-   "Position": {
-    "X": -18.675,
-    "Y": 7.5,
-    "Z": 1.825
-   },
-   "Scale": {
-    "X": 0.175,
-    "Y": 0.8333,
-    "Z": 17.65
-   }
-  },
-  {
-   "EntityId": 1122,
-   "PrefabId": "concrete_wall",
-   "Position": {
-    "X": -18.675,
-    "Y": 7.5,
-    "Z": 9.6187
-   },
-   "Scale": {
-    "X": 0.175,
-    "Y": 0.8333,
-    "Z": 9.525
-   }
-  },
-  {
-   "EntityId": 1123,
-   "PrefabId": "concrete_wall",
-   "Position": {
-    "X": -21.225,
-    "Y": 7.5,
-    "Z": -25.6187
-   },
-   "Scale": {
-    "X": 0.175,
-    "Y": 0.8333,
-    "Z": 9.525
-   }
-  },
-  {
    "EntityId": 1124,
    "PrefabId": "concrete_wall",
    "Position": {
-    "X": -21.225,
+    "X": -18.675,
     "Y": 7.5,
-    "Z": -17.825
+    "Z": -25.6187
    },
    "Scale": {
     "X": 0.175,
     "Y": 0.8333,
-    "Z": 17.65
+    "Z": 9.525
    }
   },
   {
    "EntityId": 1125,
    "PrefabId": "concrete_wall",
    "Position": {
-    "X": -21.225,
+    "X": -18.675,
     "Y": 7.5,
-    "Z": -8.0
+    "Z": -17.825
    },
    "Scale": {
     "X": 0.175,
@@ -1853,6 +1853,90 @@
    "EntityId": 1126,
    "PrefabId": "concrete_wall",
    "Position": {
+    "X": -18.675,
+    "Y": 7.5,
+    "Z": -8.0
+   },
+   "Scale": {
+    "X": 0.175,
+    "Y": 0.8333,
+    "Z": 17.65
+   }
+  },
+  {
+   "EntityId": 1127,
+   "PrefabId": "concrete_wall",
+   "Position": {
+    "X": -18.675,
+    "Y": 7.5,
+    "Z": 1.825
+   },
+   "Scale": {
+    "X": 0.175,
+    "Y": 0.8333,
+    "Z": 17.65
+   }
+  },
+  {
+   "EntityId": 1128,
+   "PrefabId": "concrete_wall",
+   "Position": {
+    "X": -18.675,
+    "Y": 7.5,
+    "Z": 9.6187
+   },
+   "Scale": {
+    "X": 0.175,
+    "Y": 0.8333,
+    "Z": 9.525
+   }
+  },
+  {
+   "EntityId": 1129,
+   "PrefabId": "concrete_wall",
+   "Position": {
+    "X": -21.225,
+    "Y": 7.5,
+    "Z": -25.6187
+   },
+   "Scale": {
+    "X": 0.175,
+    "Y": 0.8333,
+    "Z": 9.525
+   }
+  },
+  {
+   "EntityId": 1130,
+   "PrefabId": "concrete_wall",
+   "Position": {
+    "X": -21.225,
+    "Y": 7.5,
+    "Z": -17.825
+   },
+   "Scale": {
+    "X": 0.175,
+    "Y": 0.8333,
+    "Z": 17.65
+   }
+  },
+  {
+   "EntityId": 1131,
+   "PrefabId": "concrete_wall",
+   "Position": {
+    "X": -21.225,
+    "Y": 7.5,
+    "Z": -8.0
+   },
+   "Scale": {
+    "X": 0.175,
+    "Y": 0.8333,
+    "Z": 17.65
+   }
+  },
+  {
+   "EntityId": 1132,
+   "PrefabId": "concrete_wall",
+   "Position": {
     "X": -21.225,
     "Y": 7.5,
     "Z": 1.825
@@ -1864,7 +1948,7 @@
    }
   },
   {
-   "EntityId": 1127,
+   "EntityId": 1133,
    "PrefabId": "concrete_wall",
    "Position": {
     "X": -21.225,
@@ -1878,91 +1962,133 @@
    }
   },
   {
-   "EntityId": 1128,
-   "PrefabId": "concrete_wall",
-   "Position": {
-    "X": -25.9,
-    "Y": 7.5,
-    "Z": -17.825
-   },
-   "Scale": {
-    "X": 4.5,
-    "Y": 0.8333,
-    "Z": 0.7
-   }
-  },
-  {
-   "EntityId": 1129,
-   "PrefabId": "concrete_wall",
-   "Position": {
-    "X": -14.175,
-    "Y": 7.5,
-    "Z": -17.825
-   },
-   "Scale": {
-    "X": 4.325,
-    "Y": 0.8333,
-    "Z": 0.7
-   }
-  },
-  {
-   "EntityId": 1130,
-   "PrefabId": "concrete_wall",
-   "Position": {
-    "X": -25.9,
-    "Y": 7.5,
-    "Z": -8.0
-   },
-   "Scale": {
-    "X": 4.5,
-    "Y": 0.8333,
-    "Z": 0.7
-   }
-  },
-  {
-   "EntityId": 1131,
-   "PrefabId": "concrete_wall",
-   "Position": {
-    "X": -14.175,
-    "Y": 7.5,
-    "Z": -8.0
-   },
-   "Scale": {
-    "X": 4.325,
-    "Y": 0.8333,
-    "Z": 0.7
-   }
-  },
-  {
-   "EntityId": 1132,
-   "PrefabId": "concrete_wall",
-   "Position": {
-    "X": -25.9,
-    "Y": 7.5,
-    "Z": 1.825
-   },
-   "Scale": {
-    "X": 4.5,
-    "Y": 0.8333,
-    "Z": 0.7
-   }
-  },
-  {
-   "EntityId": 1133,
-   "PrefabId": "concrete_wall",
-   "Position": {
-    "X": -14.175,
-    "Y": 7.5,
-    "Z": 1.825
-   },
-   "Scale": {
-    "X": 4.325,
-    "Y": 0.8333,
-    "Z": 0.7
-   }
-  },
-  {
    "EntityId": 1134,
+   "PrefabId": "concrete_wall",
+   "Position": {
+    "X": -25.9,
+    "Y": 7.5,
+    "Z": -17.825
+   },
+   "Scale": {
+    "X": 4.5,
+    "Y": 0.8333,
+    "Z": 0.7
+   }
+  },
+  {
+   "EntityId": 1135,
+   "PrefabId": "concrete_wall",
+   "Position": {
+    "X": -14.175,
+    "Y": 7.5,
+    "Z": -17.825
+   },
+   "Scale": {
+    "X": 4.325,
+    "Y": 0.8333,
+    "Z": 0.7
+   }
+  },
+  {
+   "EntityId": 1136,
+   "PrefabId": "concrete_wall",
+   "Position": {
+    "X": -25.9,
+    "Y": 7.5,
+    "Z": -8.0
+   },
+   "Scale": {
+    "X": 4.5,
+    "Y": 0.8333,
+    "Z": 0.7
+   }
+  },
+  {
+   "EntityId": 1137,
+   "PrefabId": "concrete_wall",
+   "Position": {
+    "X": -14.175,
+    "Y": 7.5,
+    "Z": -8.0
+   },
+   "Scale": {
+    "X": 4.325,
+    "Y": 0.8333,
+    "Z": 0.7
+   }
+  },
+  {
+   "EntityId": 1138,
+   "PrefabId": "concrete_wall",
+   "Position": {
+    "X": -25.9,
+    "Y": 7.5,
+    "Z": 1.825
+   },
+   "Scale": {
+    "X": 4.5,
+    "Y": 0.8333,
+    "Z": 0.7
+   }
+  },
+  {
+   "EntityId": 1139,
+   "PrefabId": "concrete_wall",
+   "Position": {
+    "X": -14.175,
+    "Y": 7.5,
+    "Z": 1.825
+   },
+   "Scale": {
+    "X": 4.325,
+    "Y": 0.8333,
+    "Z": 0.7
+   }
+  },
+  {
+   "EntityId": 1140,
+   "PrefabId": "carpet_floor",
+   "Position": {
+    "X": -25.9,
+    "Y": 6.27,
+    "Z": -8.0
+   },
+   "Scale": {
+    "X": 0.9,
+    "Y": 0.4,
+    "Z": 3.93
+   }
+  },
+  {
+   "EntityId": 1141,
+   "PrefabId": "carpet_floor",
+   "Position": {
+    "X": -14.175,
+    "Y": 6.27,
+    "Z": -3.0875
+   },
+   "Scale": {
+    "X": 0.865,
+    "Y": 0.4,
+    "Z": 2.9475
+   }
+  },
+  {
+   "EntityId": 1142,
+   "PrefabId": "carpet_floor",
+   "Position": {
+    "X": -19.95,
+    "Y": 6.27,
+    "Z": -8.0
+   },
+   "Scale": {
+    "X": 0.22,
+    "Y": 0.4,
+    "Z": 3.93
+   }
+  },
+  {
+   "EntityId": 1143,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": -19.95,
@@ -1977,7 +2103,7 @@
    "Name": "Westside corridor, floor 2"
   },
   {
-   "EntityId": 1135,
+   "EntityId": 1144,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": -25.9,
@@ -1992,7 +2118,7 @@
    "Name": "Westside flat 21B"
   },
   {
-   "EntityId": 1136,
+   "EntityId": 1145,
    "PrefabId": "door",
    "Position": {
     "X": -21.225,
@@ -2005,11 +2131,11 @@
     "Z": 0,
     "W": 0.7071
    },
-   "RegionAId": 1135,
-   "RegionBId": 1134
+   "RegionAId": 1144,
+   "RegionBId": 1143
   },
   {
-   "EntityId": 1137,
+   "EntityId": 1146,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": -14.175,
@@ -2024,7 +2150,7 @@
    "Name": "Westside flat 22F"
   },
   {
-   "EntityId": 1138,
+   "EntityId": 1147,
    "PrefabId": "door",
    "Position": {
     "X": -18.675,
@@ -2037,11 +2163,11 @@
     "Z": 0,
     "W": 0.7071
    },
-   "RegionAId": 1137,
-   "RegionBId": 1134
+   "RegionAId": 1146,
+   "RegionBId": 1143
   },
   {
-   "EntityId": 1139,
+   "EntityId": 1148,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": -25.9,
@@ -2056,7 +2182,7 @@
    "Name": "Westside flat 22B"
   },
   {
-   "EntityId": 1140,
+   "EntityId": 1149,
    "PrefabId": "door",
    "Position": {
     "X": -21.225,
@@ -2069,11 +2195,11 @@
     "Z": 0,
     "W": 0.7071
    },
-   "RegionAId": 1139,
-   "RegionBId": 1134
+   "RegionAId": 1148,
+   "RegionBId": 1143
   },
   {
-   "EntityId": 1141,
+   "EntityId": 1150,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": -14.175,
@@ -2088,7 +2214,7 @@
    "Name": "Westside flat 23F"
   },
   {
-   "EntityId": 1142,
+   "EntityId": 1151,
    "PrefabId": "door",
    "Position": {
     "X": -18.675,
@@ -2101,11 +2227,11 @@
     "Z": 0,
     "W": 0.7071
    },
-   "RegionAId": 1141,
-   "RegionBId": 1134
+   "RegionAId": 1150,
+   "RegionBId": 1143
   },
   {
-   "EntityId": 1143,
+   "EntityId": 1152,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": -25.9,
@@ -2120,7 +2246,7 @@
    "Name": "Westside flat 23B"
   },
   {
-   "EntityId": 1144,
+   "EntityId": 1153,
    "PrefabId": "door",
    "Position": {
     "X": -21.225,
@@ -2133,11 +2259,11 @@
     "Z": 0,
     "W": 0.7071
    },
-   "RegionAId": 1143,
-   "RegionBId": 1134
+   "RegionAId": 1152,
+   "RegionBId": 1143
   },
   {
-   "EntityId": 1145,
+   "EntityId": 1154,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": -14.175,
@@ -2152,7 +2278,7 @@
    "Name": "Westside flat 24F"
   },
   {
-   "EntityId": 1146,
+   "EntityId": 1155,
    "PrefabId": "door",
    "Position": {
     "X": -18.675,
@@ -2165,11 +2291,11 @@
     "Z": 0,
     "W": 0.7071
    },
-   "RegionAId": 1145,
-   "RegionBId": 1134
+   "RegionAId": 1154,
+   "RegionBId": 1143
   },
   {
-   "EntityId": 1147,
+   "EntityId": 1156,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": -25.9,
@@ -2184,7 +2310,7 @@
    "Name": "Westside flat 24B"
   },
   {
-   "EntityId": 1148,
+   "EntityId": 1157,
    "PrefabId": "door",
    "Position": {
     "X": -21.225,
@@ -2197,11 +2323,11 @@
     "Z": 0,
     "W": 0.7071
    },
-   "RegionAId": 1147,
-   "RegionBId": 1134
+   "RegionAId": 1156,
+   "RegionBId": 1143
   },
   {
-   "EntityId": 1149,
+   "EntityId": 1158,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": -14.175,
@@ -2216,7 +2342,7 @@
    "Name": "Westside stairwell, floor 2"
   },
   {
-   "EntityId": 1150,
+   "EntityId": 1159,
    "PrefabId": "tile_floor",
    "Position": {
     "X": -14.175,
@@ -2230,19 +2356,19 @@
    }
   },
   {
-   "EntityId": 1151,
+   "EntityId": 1160,
    "PrefabId": "portal",
    "Position": {
     "X": -18.675,
     "Y": 7.25,
     "Z": -22.7375
    },
-   "RegionAId": 1149,
-   "RegionBId": 1134,
+   "RegionAId": 1158,
+   "RegionBId": 1143,
    "ApertureSize": 1.4
   },
   {
-   "EntityId": 1152,
+   "EntityId": 1161,
    "PrefabId": "concrete_floor",
    "Position": {
     "X": -20.125,
@@ -2257,7 +2383,7 @@
    "Name": "Westside roof"
   },
   {
-   "EntityId": 1153,
+   "EntityId": 1162,
    "PrefabId": "concrete_floor",
    "Position": {
     "X": 20.125,
@@ -2271,7 +2397,7 @@
    }
   },
   {
-   "EntityId": 1154,
+   "EntityId": 1163,
    "PrefabId": "concrete_floor",
    "Position": {
     "X": 20.125,
@@ -2285,7 +2411,7 @@
    }
   },
   {
-   "EntityId": 1155,
+   "EntityId": 1164,
    "PrefabId": "brick_wall",
    "Position": {
     "X": 30.575,
@@ -2299,7 +2425,7 @@
    }
   },
   {
-   "EntityId": 1156,
+   "EntityId": 1165,
    "PrefabId": "brick_wall",
    "Position": {
     "X": 9.675,
@@ -2313,7 +2439,7 @@
    }
   },
   {
-   "EntityId": 1157,
+   "EntityId": 1166,
    "PrefabId": "brick_wall",
    "Position": {
     "X": 9.675,
@@ -2327,7 +2453,7 @@
    }
   },
   {
-   "EntityId": 1158,
+   "EntityId": 1167,
    "PrefabId": "brick_wall",
    "Position": {
     "X": 9.675,
@@ -2341,7 +2467,7 @@
    }
   },
   {
-   "EntityId": 1159,
+   "EntityId": 1168,
    "PrefabId": "brick_wall",
    "Position": {
     "X": 20.125,
@@ -2355,7 +2481,7 @@
    }
   },
   {
-   "EntityId": 1160,
+   "EntityId": 1169,
    "PrefabId": "brick_wall",
    "Position": {
     "X": 20.125,
@@ -2369,138 +2495,12 @@
    }
   },
   {
-   "EntityId": 1161,
-   "PrefabId": "concrete_wall",
-   "Position": {
-    "X": 19.025,
-    "Y": 1.385,
-    "Z": -9.6188
-   },
-   "Scale": {
-    "X": 0.175,
-    "Y": 0.91,
-    "Z": 9.525
-   }
-  },
-  {
-   "EntityId": 1162,
-   "PrefabId": "concrete_wall",
-   "Position": {
-    "X": 19.025,
-    "Y": 1.385,
-    "Z": -1.825
-   },
-   "Scale": {
-    "X": 0.175,
-    "Y": 0.91,
-    "Z": 17.65
-   }
-  },
-  {
-   "EntityId": 1163,
-   "PrefabId": "concrete_wall",
-   "Position": {
-    "X": 19.025,
-    "Y": 1.385,
-    "Z": 8.0
-   },
-   "Scale": {
-    "X": 0.175,
-    "Y": 0.91,
-    "Z": 17.65
-   }
-  },
-  {
-   "EntityId": 1164,
-   "PrefabId": "concrete_wall",
-   "Position": {
-    "X": 19.025,
-    "Y": 1.385,
-    "Z": 17.825
-   },
-   "Scale": {
-    "X": 0.175,
-    "Y": 0.91,
-    "Z": 17.65
-   }
-  },
-  {
-   "EntityId": 1165,
-   "PrefabId": "concrete_wall",
-   "Position": {
-    "X": 19.025,
-    "Y": 1.385,
-    "Z": 25.6187
-   },
-   "Scale": {
-    "X": 0.175,
-    "Y": 0.91,
-    "Z": 9.525
-   }
-  },
-  {
-   "EntityId": 1166,
-   "PrefabId": "concrete_wall",
-   "Position": {
-    "X": 21.575,
-    "Y": 1.385,
-    "Z": -9.6188
-   },
-   "Scale": {
-    "X": 0.175,
-    "Y": 0.91,
-    "Z": 9.525
-   }
-  },
-  {
-   "EntityId": 1167,
-   "PrefabId": "concrete_wall",
-   "Position": {
-    "X": 21.575,
-    "Y": 1.385,
-    "Z": -1.825
-   },
-   "Scale": {
-    "X": 0.175,
-    "Y": 0.91,
-    "Z": 17.65
-   }
-  },
-  {
-   "EntityId": 1168,
-   "PrefabId": "concrete_wall",
-   "Position": {
-    "X": 21.575,
-    "Y": 1.385,
-    "Z": 8.0
-   },
-   "Scale": {
-    "X": 0.175,
-    "Y": 0.91,
-    "Z": 17.65
-   }
-  },
-  {
-   "EntityId": 1169,
-   "PrefabId": "concrete_wall",
-   "Position": {
-    "X": 21.575,
-    "Y": 1.385,
-    "Z": 17.825
-   },
-   "Scale": {
-    "X": 0.175,
-    "Y": 0.91,
-    "Z": 17.65
-   }
-  },
-  {
    "EntityId": 1170,
    "PrefabId": "concrete_wall",
    "Position": {
-    "X": 21.575,
+    "X": 19.025,
     "Y": 1.385,
-    "Z": 25.6187
+    "Z": -9.6188
    },
    "Scale": {
     "X": 0.175,
@@ -2512,20 +2512,146 @@
    "EntityId": 1171,
    "PrefabId": "concrete_wall",
    "Position": {
-    "X": 26.075,
+    "X": 19.025,
     "Y": 1.385,
     "Z": -1.825
    },
    "Scale": {
-    "X": 4.325,
+    "X": 0.175,
     "Y": 0.91,
-    "Z": 0.7
+    "Z": 17.65
    }
   },
   {
    "EntityId": 1172,
    "PrefabId": "concrete_wall",
    "Position": {
+    "X": 19.025,
+    "Y": 1.385,
+    "Z": 8.0
+   },
+   "Scale": {
+    "X": 0.175,
+    "Y": 0.91,
+    "Z": 17.65
+   }
+  },
+  {
+   "EntityId": 1173,
+   "PrefabId": "concrete_wall",
+   "Position": {
+    "X": 19.025,
+    "Y": 1.385,
+    "Z": 17.825
+   },
+   "Scale": {
+    "X": 0.175,
+    "Y": 0.91,
+    "Z": 17.65
+   }
+  },
+  {
+   "EntityId": 1174,
+   "PrefabId": "concrete_wall",
+   "Position": {
+    "X": 19.025,
+    "Y": 1.385,
+    "Z": 25.6187
+   },
+   "Scale": {
+    "X": 0.175,
+    "Y": 0.91,
+    "Z": 9.525
+   }
+  },
+  {
+   "EntityId": 1175,
+   "PrefabId": "concrete_wall",
+   "Position": {
+    "X": 21.575,
+    "Y": 1.385,
+    "Z": -9.6188
+   },
+   "Scale": {
+    "X": 0.175,
+    "Y": 0.91,
+    "Z": 9.525
+   }
+  },
+  {
+   "EntityId": 1176,
+   "PrefabId": "concrete_wall",
+   "Position": {
+    "X": 21.575,
+    "Y": 1.385,
+    "Z": -1.825
+   },
+   "Scale": {
+    "X": 0.175,
+    "Y": 0.91,
+    "Z": 17.65
+   }
+  },
+  {
+   "EntityId": 1177,
+   "PrefabId": "concrete_wall",
+   "Position": {
+    "X": 21.575,
+    "Y": 1.385,
+    "Z": 8.0
+   },
+   "Scale": {
+    "X": 0.175,
+    "Y": 0.91,
+    "Z": 17.65
+   }
+  },
+  {
+   "EntityId": 1178,
+   "PrefabId": "concrete_wall",
+   "Position": {
+    "X": 21.575,
+    "Y": 1.385,
+    "Z": 17.825
+   },
+   "Scale": {
+    "X": 0.175,
+    "Y": 0.91,
+    "Z": 17.65
+   }
+  },
+  {
+   "EntityId": 1179,
+   "PrefabId": "concrete_wall",
+   "Position": {
+    "X": 21.575,
+    "Y": 1.385,
+    "Z": 25.6187
+   },
+   "Scale": {
+    "X": 0.175,
+    "Y": 0.91,
+    "Z": 9.525
+   }
+  },
+  {
+   "EntityId": 1180,
+   "PrefabId": "concrete_wall",
+   "Position": {
+    "X": 26.075,
+    "Y": 1.385,
+    "Z": -1.825
+   },
+   "Scale": {
+    "X": 4.325,
+    "Y": 0.91,
+    "Z": 0.7
+   }
+  },
+  {
+   "EntityId": 1181,
+   "PrefabId": "concrete_wall",
+   "Position": {
     "X": 14.35,
     "Y": 1.385,
     "Z": -1.825
@@ -2537,7 +2663,7 @@
    }
   },
   {
-   "EntityId": 1173,
+   "EntityId": 1182,
    "PrefabId": "concrete_wall",
    "Position": {
     "X": 26.075,
@@ -2551,7 +2677,7 @@
    }
   },
   {
-   "EntityId": 1174,
+   "EntityId": 1183,
    "PrefabId": "concrete_wall",
    "Position": {
     "X": 14.35,
@@ -2565,7 +2691,7 @@
    }
   },
   {
-   "EntityId": 1175,
+   "EntityId": 1184,
    "PrefabId": "concrete_wall",
    "Position": {
     "X": 26.075,
@@ -2579,7 +2705,7 @@
    }
   },
   {
-   "EntityId": 1176,
+   "EntityId": 1185,
    "PrefabId": "concrete_wall",
    "Position": {
     "X": 14.35,
@@ -2593,7 +2719,49 @@
    }
   },
   {
-   "EntityId": 1177,
+   "EntityId": 1186,
+   "PrefabId": "carpet_floor",
+   "Position": {
+    "X": 26.075,
+    "Y": 0.04,
+    "Z": 8.0
+   },
+   "Scale": {
+    "X": 0.865,
+    "Y": 0.4,
+    "Z": 3.93
+   }
+  },
+  {
+   "EntityId": 1187,
+   "PrefabId": "carpet_floor",
+   "Position": {
+    "X": 14.35,
+    "Y": 0.04,
+    "Z": 12.9125
+   },
+   "Scale": {
+    "X": 0.9,
+    "Y": 0.4,
+    "Z": 2.9475
+   }
+  },
+  {
+   "EntityId": 1188,
+   "PrefabId": "carpet_floor",
+   "Position": {
+    "X": 20.3,
+    "Y": 0.04,
+    "Z": 8.0
+   },
+   "Scale": {
+    "X": 0.22,
+    "Y": 0.4,
+    "Z": 3.93
+   }
+  },
+  {
+   "EntityId": 1189,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": 20.3,
@@ -2608,7 +2776,7 @@
    "Name": "Eastside corridor, floor 0"
   },
   {
-   "EntityId": 1178,
+   "EntityId": 1190,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": 26.075,
@@ -2623,7 +2791,7 @@
    "Name": "Eastside flat 01B"
   },
   {
-   "EntityId": 1179,
+   "EntityId": 1191,
    "PrefabId": "door",
    "Position": {
     "X": 21.575,
@@ -2636,11 +2804,11 @@
     "Z": 0,
     "W": 0.7071
    },
-   "RegionAId": 1178,
-   "RegionBId": 1177
+   "RegionAId": 1190,
+   "RegionBId": 1189
   },
   {
-   "EntityId": 1180,
+   "EntityId": 1192,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": 14.35,
@@ -2655,7 +2823,7 @@
    "Name": "Eastside flat 02F"
   },
   {
-   "EntityId": 1181,
+   "EntityId": 1193,
    "PrefabId": "door",
    "Position": {
     "X": 19.025,
@@ -2668,11 +2836,11 @@
     "Z": 0,
     "W": 0.7071
    },
-   "RegionAId": 1180,
-   "RegionBId": 1177
+   "RegionAId": 1192,
+   "RegionBId": 1189
   },
   {
-   "EntityId": 1182,
+   "EntityId": 1194,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": 26.075,
@@ -2687,7 +2855,7 @@
    "Name": "Eastside flat 02B"
   },
   {
-   "EntityId": 1183,
+   "EntityId": 1195,
    "PrefabId": "door",
    "Position": {
     "X": 21.575,
@@ -2700,11 +2868,11 @@
     "Z": 0,
     "W": 0.7071
    },
-   "RegionAId": 1182,
-   "RegionBId": 1177
+   "RegionAId": 1194,
+   "RegionBId": 1189
   },
   {
-   "EntityId": 1184,
+   "EntityId": 1196,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": 14.35,
@@ -2719,7 +2887,7 @@
    "Name": "Eastside flat 03F"
   },
   {
-   "EntityId": 1185,
+   "EntityId": 1197,
    "PrefabId": "door",
    "Position": {
     "X": 19.025,
@@ -2732,11 +2900,11 @@
     "Z": 0,
     "W": 0.7071
    },
-   "RegionAId": 1184,
-   "RegionBId": 1177
+   "RegionAId": 1196,
+   "RegionBId": 1189
   },
   {
-   "EntityId": 1186,
+   "EntityId": 1198,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": 26.075,
@@ -2751,7 +2919,7 @@
    "Name": "Eastside flat 03B"
   },
   {
-   "EntityId": 1187,
+   "EntityId": 1199,
    "PrefabId": "door",
    "Position": {
     "X": 21.575,
@@ -2764,11 +2932,11 @@
     "Z": 0,
     "W": 0.7071
    },
-   "RegionAId": 1186,
-   "RegionBId": 1177
+   "RegionAId": 1198,
+   "RegionBId": 1189
   },
   {
-   "EntityId": 1188,
+   "EntityId": 1200,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": 14.35,
@@ -2783,7 +2951,7 @@
    "Name": "Eastside flat 04F"
   },
   {
-   "EntityId": 1189,
+   "EntityId": 1201,
    "PrefabId": "door",
    "Position": {
     "X": 19.025,
@@ -2796,11 +2964,11 @@
     "Z": 0,
     "W": 0.7071
    },
-   "RegionAId": 1188,
-   "RegionBId": 1177
+   "RegionAId": 1200,
+   "RegionBId": 1189
   },
   {
-   "EntityId": 1190,
+   "EntityId": 1202,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": 26.075,
@@ -2815,7 +2983,7 @@
    "Name": "Eastside flat 04B"
   },
   {
-   "EntityId": 1191,
+   "EntityId": 1203,
    "PrefabId": "door",
    "Position": {
     "X": 21.575,
@@ -2828,11 +2996,11 @@
     "Z": 0,
     "W": 0.7071
    },
-   "RegionAId": 1190,
-   "RegionBId": 1177
+   "RegionAId": 1202,
+   "RegionBId": 1189
   },
   {
-   "EntityId": 1192,
+   "EntityId": 1204,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": 14.35,
@@ -2847,7 +3015,7 @@
    "Name": "Eastside stairwell, floor 0"
   },
   {
-   "EntityId": 1193,
+   "EntityId": 1205,
    "PrefabId": "tile_floor",
    "Position": {
     "X": 14.35,
@@ -2861,19 +3029,19 @@
    }
   },
   {
-   "EntityId": 1194,
+   "EntityId": 1206,
    "PrefabId": "portal",
    "Position": {
     "X": 19.025,
     "Y": 1.02,
     "Z": -6.7375
    },
-   "RegionAId": 1192,
-   "RegionBId": 1177,
+   "RegionAId": 1204,
+   "RegionBId": 1189,
    "ApertureSize": 1.4
   },
   {
-   "EntityId": 1195,
+   "EntityId": 1207,
    "PrefabId": "concrete_floor",
    "Position": {
     "X": 14.35,
@@ -2887,7 +3055,7 @@
    }
   },
   {
-   "EntityId": 1196,
+   "EntityId": 1208,
    "PrefabId": "concrete_floor",
    "Position": {
     "X": 14.35,
@@ -2901,7 +3069,7 @@
    }
   },
   {
-   "EntityId": 1197,
+   "EntityId": 1209,
    "PrefabId": "concrete_floor",
    "Position": {
     "X": 14.35,
@@ -2915,7 +3083,7 @@
    }
   },
   {
-   "EntityId": 1198,
+   "EntityId": 1210,
    "PrefabId": "concrete_floor",
    "Position": {
     "X": 14.35,
@@ -2929,7 +3097,7 @@
    }
   },
   {
-   "EntityId": 1199,
+   "EntityId": 1211,
    "PrefabId": "concrete_floor",
    "Position": {
     "X": 14.35,
@@ -2943,7 +3111,7 @@
    }
   },
   {
-   "EntityId": 1200,
+   "EntityId": 1212,
    "PrefabId": "concrete_floor",
    "Position": {
     "X": 14.35,
@@ -2957,7 +3125,7 @@
    }
   },
   {
-   "EntityId": 1201,
+   "EntityId": 1213,
    "PrefabId": "concrete_floor",
    "Position": {
     "X": 14.35,
@@ -2971,7 +3139,7 @@
    }
   },
   {
-   "EntityId": 1202,
+   "EntityId": 1214,
    "PrefabId": "concrete_floor",
    "Position": {
     "X": 14.35,
@@ -2985,7 +3153,7 @@
    }
   },
   {
-   "EntityId": 1203,
+   "EntityId": 1215,
    "PrefabId": "concrete_floor",
    "Position": {
     "X": 14.35,
@@ -2999,7 +3167,7 @@
    }
   },
   {
-   "EntityId": 1204,
+   "EntityId": 1216,
    "PrefabId": "concrete_floor",
    "Position": {
     "X": 14.35,
@@ -3013,7 +3181,7 @@
    }
   },
   {
-   "EntityId": 1205,
+   "EntityId": 1217,
    "PrefabId": "concrete_floor",
    "Position": {
     "X": 14.35,
@@ -3027,7 +3195,7 @@
    }
   },
   {
-   "EntityId": 1206,
+   "EntityId": 1218,
    "PrefabId": "concrete_floor",
    "Position": {
     "X": 14.35,
@@ -3041,7 +3209,7 @@
    }
   },
   {
-   "EntityId": 1207,
+   "EntityId": 1219,
    "PrefabId": "steel_door",
    "Position": {
     "X": 9.675,
@@ -3054,11 +3222,11 @@
     "Z": 0,
     "W": 1
    },
-   "RegionAId": 1192,
+   "RegionAId": 1204,
    "RegionBId": -1
   },
   {
-   "EntityId": 1208,
+   "EntityId": 1220,
    "PrefabId": "concrete_floor",
    "Position": {
     "X": 20.125,
@@ -3072,7 +3240,7 @@
    }
   },
   {
-   "EntityId": 1209,
+   "EntityId": 1221,
    "PrefabId": "concrete_floor",
    "Position": {
     "X": 20.125,
@@ -3086,7 +3254,7 @@
    }
   },
   {
-   "EntityId": 1210,
+   "EntityId": 1222,
    "PrefabId": "brick_wall",
    "Position": {
     "X": 30.575,
@@ -3100,7 +3268,7 @@
    }
   },
   {
-   "EntityId": 1211,
+   "EntityId": 1223,
    "PrefabId": "brick_wall",
    "Position": {
     "X": 9.675,
@@ -3114,7 +3282,7 @@
    }
   },
   {
-   "EntityId": 1212,
+   "EntityId": 1224,
    "PrefabId": "brick_wall",
    "Position": {
     "X": 20.125,
@@ -3128,7 +3296,7 @@
    }
   },
   {
-   "EntityId": 1213,
+   "EntityId": 1225,
    "PrefabId": "brick_wall",
    "Position": {
     "X": 20.125,
@@ -3142,191 +3310,191 @@
    }
   },
   {
-   "EntityId": 1214,
-   "PrefabId": "concrete_wall",
-   "Position": {
-    "X": 19.025,
-    "Y": 4.5,
-    "Z": -9.6188
-   },
-   "Scale": {
-    "X": 0.175,
-    "Y": 0.8333,
-    "Z": 9.525
-   }
-  },
-  {
-   "EntityId": 1215,
-   "PrefabId": "concrete_wall",
-   "Position": {
-    "X": 19.025,
-    "Y": 4.5,
-    "Z": -1.825
-   },
-   "Scale": {
-    "X": 0.175,
-    "Y": 0.8333,
-    "Z": 17.65
-   }
-  },
-  {
-   "EntityId": 1216,
-   "PrefabId": "concrete_wall",
-   "Position": {
-    "X": 19.025,
-    "Y": 4.5,
-    "Z": 8.0
-   },
-   "Scale": {
-    "X": 0.175,
-    "Y": 0.8333,
-    "Z": 17.65
-   }
-  },
-  {
-   "EntityId": 1217,
-   "PrefabId": "concrete_wall",
-   "Position": {
-    "X": 19.025,
-    "Y": 4.5,
-    "Z": 17.825
-   },
-   "Scale": {
-    "X": 0.175,
-    "Y": 0.8333,
-    "Z": 17.65
-   }
-  },
-  {
-   "EntityId": 1218,
-   "PrefabId": "concrete_wall",
-   "Position": {
-    "X": 19.025,
-    "Y": 4.5,
-    "Z": 25.6187
-   },
-   "Scale": {
-    "X": 0.175,
-    "Y": 0.8333,
-    "Z": 9.525
-   }
-  },
-  {
-   "EntityId": 1219,
-   "PrefabId": "concrete_wall",
-   "Position": {
-    "X": 21.575,
-    "Y": 4.5,
-    "Z": -9.6188
-   },
-   "Scale": {
-    "X": 0.175,
-    "Y": 0.8333,
-    "Z": 9.525
-   }
-  },
-  {
-   "EntityId": 1220,
-   "PrefabId": "concrete_wall",
-   "Position": {
-    "X": 21.575,
-    "Y": 4.5,
-    "Z": -1.825
-   },
-   "Scale": {
-    "X": 0.175,
-    "Y": 0.8333,
-    "Z": 17.65
-   }
-  },
-  {
-   "EntityId": 1221,
-   "PrefabId": "concrete_wall",
-   "Position": {
-    "X": 21.575,
-    "Y": 4.5,
-    "Z": 8.0
-   },
-   "Scale": {
-    "X": 0.175,
-    "Y": 0.8333,
-    "Z": 17.65
-   }
-  },
-  {
-   "EntityId": 1222,
-   "PrefabId": "concrete_wall",
-   "Position": {
-    "X": 21.575,
-    "Y": 4.5,
-    "Z": 17.825
-   },
-   "Scale": {
-    "X": 0.175,
-    "Y": 0.8333,
-    "Z": 17.65
-   }
-  },
-  {
-   "EntityId": 1223,
-   "PrefabId": "concrete_wall",
-   "Position": {
-    "X": 21.575,
-    "Y": 4.5,
-    "Z": 25.6187
-   },
-   "Scale": {
-    "X": 0.175,
-    "Y": 0.8333,
-    "Z": 9.525
-   }
-  },
-  {
-   "EntityId": 1224,
-   "PrefabId": "concrete_wall",
-   "Position": {
-    "X": 26.075,
-    "Y": 4.5,
-    "Z": -1.825
-   },
-   "Scale": {
-    "X": 4.325,
-    "Y": 0.8333,
-    "Z": 0.7
-   }
-  },
-  {
-   "EntityId": 1225,
-   "PrefabId": "concrete_wall",
-   "Position": {
-    "X": 14.35,
-    "Y": 4.5,
-    "Z": -1.825
-   },
-   "Scale": {
-    "X": 4.5,
-    "Y": 0.8333,
-    "Z": 0.7
-   }
-  },
-  {
    "EntityId": 1226,
    "PrefabId": "concrete_wall",
    "Position": {
-    "X": 26.075,
+    "X": 19.025,
     "Y": 4.5,
-    "Z": 8.0
+    "Z": -9.6188
    },
    "Scale": {
-    "X": 4.325,
+    "X": 0.175,
     "Y": 0.8333,
-    "Z": 0.7
+    "Z": 9.525
    }
   },
   {
    "EntityId": 1227,
    "PrefabId": "concrete_wall",
    "Position": {
+    "X": 19.025,
+    "Y": 4.5,
+    "Z": -1.825
+   },
+   "Scale": {
+    "X": 0.175,
+    "Y": 0.8333,
+    "Z": 17.65
+   }
+  },
+  {
+   "EntityId": 1228,
+   "PrefabId": "concrete_wall",
+   "Position": {
+    "X": 19.025,
+    "Y": 4.5,
+    "Z": 8.0
+   },
+   "Scale": {
+    "X": 0.175,
+    "Y": 0.8333,
+    "Z": 17.65
+   }
+  },
+  {
+   "EntityId": 1229,
+   "PrefabId": "concrete_wall",
+   "Position": {
+    "X": 19.025,
+    "Y": 4.5,
+    "Z": 17.825
+   },
+   "Scale": {
+    "X": 0.175,
+    "Y": 0.8333,
+    "Z": 17.65
+   }
+  },
+  {
+   "EntityId": 1230,
+   "PrefabId": "concrete_wall",
+   "Position": {
+    "X": 19.025,
+    "Y": 4.5,
+    "Z": 25.6187
+   },
+   "Scale": {
+    "X": 0.175,
+    "Y": 0.8333,
+    "Z": 9.525
+   }
+  },
+  {
+   "EntityId": 1231,
+   "PrefabId": "concrete_wall",
+   "Position": {
+    "X": 21.575,
+    "Y": 4.5,
+    "Z": -9.6188
+   },
+   "Scale": {
+    "X": 0.175,
+    "Y": 0.8333,
+    "Z": 9.525
+   }
+  },
+  {
+   "EntityId": 1232,
+   "PrefabId": "concrete_wall",
+   "Position": {
+    "X": 21.575,
+    "Y": 4.5,
+    "Z": -1.825
+   },
+   "Scale": {
+    "X": 0.175,
+    "Y": 0.8333,
+    "Z": 17.65
+   }
+  },
+  {
+   "EntityId": 1233,
+   "PrefabId": "concrete_wall",
+   "Position": {
+    "X": 21.575,
+    "Y": 4.5,
+    "Z": 8.0
+   },
+   "Scale": {
+    "X": 0.175,
+    "Y": 0.8333,
+    "Z": 17.65
+   }
+  },
+  {
+   "EntityId": 1234,
+   "PrefabId": "concrete_wall",
+   "Position": {
+    "X": 21.575,
+    "Y": 4.5,
+    "Z": 17.825
+   },
+   "Scale": {
+    "X": 0.175,
+    "Y": 0.8333,
+    "Z": 17.65
+   }
+  },
+  {
+   "EntityId": 1235,
+   "PrefabId": "concrete_wall",
+   "Position": {
+    "X": 21.575,
+    "Y": 4.5,
+    "Z": 25.6187
+   },
+   "Scale": {
+    "X": 0.175,
+    "Y": 0.8333,
+    "Z": 9.525
+   }
+  },
+  {
+   "EntityId": 1236,
+   "PrefabId": "concrete_wall",
+   "Position": {
+    "X": 26.075,
+    "Y": 4.5,
+    "Z": -1.825
+   },
+   "Scale": {
+    "X": 4.325,
+    "Y": 0.8333,
+    "Z": 0.7
+   }
+  },
+  {
+   "EntityId": 1237,
+   "PrefabId": "concrete_wall",
+   "Position": {
+    "X": 14.35,
+    "Y": 4.5,
+    "Z": -1.825
+   },
+   "Scale": {
+    "X": 4.5,
+    "Y": 0.8333,
+    "Z": 0.7
+   }
+  },
+  {
+   "EntityId": 1238,
+   "PrefabId": "concrete_wall",
+   "Position": {
+    "X": 26.075,
+    "Y": 4.5,
+    "Z": 8.0
+   },
+   "Scale": {
+    "X": 4.325,
+    "Y": 0.8333,
+    "Z": 0.7
+   }
+  },
+  {
+   "EntityId": 1239,
+   "PrefabId": "concrete_wall",
+   "Position": {
     "X": 14.35,
     "Y": 4.5,
     "Z": 8.0
@@ -3338,7 +3506,7 @@
    }
   },
   {
-   "EntityId": 1228,
+   "EntityId": 1240,
    "PrefabId": "concrete_wall",
    "Position": {
     "X": 26.075,
@@ -3352,7 +3520,7 @@
    }
   },
   {
-   "EntityId": 1229,
+   "EntityId": 1241,
    "PrefabId": "concrete_wall",
    "Position": {
     "X": 14.35,
@@ -3366,7 +3534,49 @@
    }
   },
   {
-   "EntityId": 1230,
+   "EntityId": 1242,
+   "PrefabId": "carpet_floor",
+   "Position": {
+    "X": 26.075,
+    "Y": 3.27,
+    "Z": 8.0
+   },
+   "Scale": {
+    "X": 0.865,
+    "Y": 0.4,
+    "Z": 3.93
+   }
+  },
+  {
+   "EntityId": 1243,
+   "PrefabId": "carpet_floor",
+   "Position": {
+    "X": 14.35,
+    "Y": 3.27,
+    "Z": 12.9125
+   },
+   "Scale": {
+    "X": 0.9,
+    "Y": 0.4,
+    "Z": 2.9475
+   }
+  },
+  {
+   "EntityId": 1244,
+   "PrefabId": "carpet_floor",
+   "Position": {
+    "X": 20.3,
+    "Y": 3.27,
+    "Z": 8.0
+   },
+   "Scale": {
+    "X": 0.22,
+    "Y": 0.4,
+    "Z": 3.93
+   }
+  },
+  {
+   "EntityId": 1245,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": 20.3,
@@ -3381,7 +3591,7 @@
    "Name": "Eastside corridor, floor 1"
   },
   {
-   "EntityId": 1231,
+   "EntityId": 1246,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": 26.075,
@@ -3396,7 +3606,7 @@
    "Name": "Eastside flat 11B"
   },
   {
-   "EntityId": 1232,
+   "EntityId": 1247,
    "PrefabId": "door",
    "Position": {
     "X": 21.575,
@@ -3409,11 +3619,11 @@
     "Z": 0,
     "W": 0.7071
    },
-   "RegionAId": 1231,
-   "RegionBId": 1230
+   "RegionAId": 1246,
+   "RegionBId": 1245
   },
   {
-   "EntityId": 1233,
+   "EntityId": 1248,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": 14.35,
@@ -3428,7 +3638,7 @@
    "Name": "Eastside flat 12F"
   },
   {
-   "EntityId": 1234,
+   "EntityId": 1249,
    "PrefabId": "door",
    "Position": {
     "X": 19.025,
@@ -3441,11 +3651,11 @@
     "Z": 0,
     "W": 0.7071
    },
-   "RegionAId": 1233,
-   "RegionBId": 1230
+   "RegionAId": 1248,
+   "RegionBId": 1245
   },
   {
-   "EntityId": 1235,
+   "EntityId": 1250,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": 26.075,
@@ -3460,7 +3670,7 @@
    "Name": "Eastside flat 12B"
   },
   {
-   "EntityId": 1236,
+   "EntityId": 1251,
    "PrefabId": "door",
    "Position": {
     "X": 21.575,
@@ -3473,11 +3683,11 @@
     "Z": 0,
     "W": 0.7071
    },
-   "RegionAId": 1235,
-   "RegionBId": 1230
+   "RegionAId": 1250,
+   "RegionBId": 1245
   },
   {
-   "EntityId": 1237,
+   "EntityId": 1252,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": 14.35,
@@ -3492,7 +3702,7 @@
    "Name": "Eastside flat 13F"
   },
   {
-   "EntityId": 1238,
+   "EntityId": 1253,
    "PrefabId": "door",
    "Position": {
     "X": 19.025,
@@ -3505,11 +3715,11 @@
     "Z": 0,
     "W": 0.7071
    },
-   "RegionAId": 1237,
-   "RegionBId": 1230
+   "RegionAId": 1252,
+   "RegionBId": 1245
   },
   {
-   "EntityId": 1239,
+   "EntityId": 1254,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": 26.075,
@@ -3524,7 +3734,7 @@
    "Name": "Eastside flat 13B"
   },
   {
-   "EntityId": 1240,
+   "EntityId": 1255,
    "PrefabId": "door",
    "Position": {
     "X": 21.575,
@@ -3537,11 +3747,11 @@
     "Z": 0,
     "W": 0.7071
    },
-   "RegionAId": 1239,
-   "RegionBId": 1230
+   "RegionAId": 1254,
+   "RegionBId": 1245
   },
   {
-   "EntityId": 1241,
+   "EntityId": 1256,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": 14.35,
@@ -3556,7 +3766,7 @@
    "Name": "Eastside flat 14F"
   },
   {
-   "EntityId": 1242,
+   "EntityId": 1257,
    "PrefabId": "door",
    "Position": {
     "X": 19.025,
@@ -3569,11 +3779,11 @@
     "Z": 0,
     "W": 0.7071
    },
-   "RegionAId": 1241,
-   "RegionBId": 1230
+   "RegionAId": 1256,
+   "RegionBId": 1245
   },
   {
-   "EntityId": 1243,
+   "EntityId": 1258,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": 26.075,
@@ -3588,7 +3798,7 @@
    "Name": "Eastside flat 14B"
   },
   {
-   "EntityId": 1244,
+   "EntityId": 1259,
    "PrefabId": "door",
    "Position": {
     "X": 21.575,
@@ -3601,11 +3811,11 @@
     "Z": 0,
     "W": 0.7071
    },
-   "RegionAId": 1243,
-   "RegionBId": 1230
+   "RegionAId": 1258,
+   "RegionBId": 1245
   },
   {
-   "EntityId": 1245,
+   "EntityId": 1260,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": 14.35,
@@ -3620,7 +3830,7 @@
    "Name": "Eastside stairwell, floor 1"
   },
   {
-   "EntityId": 1246,
+   "EntityId": 1261,
    "PrefabId": "tile_floor",
    "Position": {
     "X": 14.35,
@@ -3634,19 +3844,19 @@
    }
   },
   {
-   "EntityId": 1247,
+   "EntityId": 1262,
    "PrefabId": "portal",
    "Position": {
     "X": 19.025,
     "Y": 4.25,
     "Z": -6.7375
    },
-   "RegionAId": 1245,
-   "RegionBId": 1230,
+   "RegionAId": 1260,
+   "RegionBId": 1245,
    "ApertureSize": 1.4
   },
   {
-   "EntityId": 1248,
+   "EntityId": 1263,
    "PrefabId": "concrete_floor",
    "Position": {
     "X": 14.35,
@@ -3660,7 +3870,7 @@
    }
   },
   {
-   "EntityId": 1249,
+   "EntityId": 1264,
    "PrefabId": "concrete_floor",
    "Position": {
     "X": 14.35,
@@ -3674,7 +3884,7 @@
    }
   },
   {
-   "EntityId": 1250,
+   "EntityId": 1265,
    "PrefabId": "concrete_floor",
    "Position": {
     "X": 14.35,
@@ -3688,7 +3898,7 @@
    }
   },
   {
-   "EntityId": 1251,
+   "EntityId": 1266,
    "PrefabId": "concrete_floor",
    "Position": {
     "X": 14.35,
@@ -3702,7 +3912,7 @@
    }
   },
   {
-   "EntityId": 1252,
+   "EntityId": 1267,
    "PrefabId": "concrete_floor",
    "Position": {
     "X": 14.35,
@@ -3716,7 +3926,7 @@
    }
   },
   {
-   "EntityId": 1253,
+   "EntityId": 1268,
    "PrefabId": "concrete_floor",
    "Position": {
     "X": 14.35,
@@ -3730,7 +3940,7 @@
    }
   },
   {
-   "EntityId": 1254,
+   "EntityId": 1269,
    "PrefabId": "concrete_floor",
    "Position": {
     "X": 14.35,
@@ -3744,7 +3954,7 @@
    }
   },
   {
-   "EntityId": 1255,
+   "EntityId": 1270,
    "PrefabId": "concrete_floor",
    "Position": {
     "X": 14.35,
@@ -3758,7 +3968,7 @@
    }
   },
   {
-   "EntityId": 1256,
+   "EntityId": 1271,
    "PrefabId": "concrete_floor",
    "Position": {
     "X": 14.35,
@@ -3772,7 +3982,7 @@
    }
   },
   {
-   "EntityId": 1257,
+   "EntityId": 1272,
    "PrefabId": "concrete_floor",
    "Position": {
     "X": 14.35,
@@ -3786,7 +3996,7 @@
    }
   },
   {
-   "EntityId": 1258,
+   "EntityId": 1273,
    "PrefabId": "concrete_floor",
    "Position": {
     "X": 14.35,
@@ -3800,7 +4010,7 @@
    }
   },
   {
-   "EntityId": 1259,
+   "EntityId": 1274,
    "PrefabId": "concrete_floor",
    "Position": {
     "X": 14.35,
@@ -3814,7 +4024,7 @@
    }
   },
   {
-   "EntityId": 1260,
+   "EntityId": 1275,
    "PrefabId": "concrete_floor",
    "Position": {
     "X": 20.125,
@@ -3828,7 +4038,7 @@
    }
   },
   {
-   "EntityId": 1261,
+   "EntityId": 1276,
    "PrefabId": "concrete_floor",
    "Position": {
     "X": 20.125,
@@ -3842,7 +4052,7 @@
    }
   },
   {
-   "EntityId": 1262,
+   "EntityId": 1277,
    "PrefabId": "brick_wall",
    "Position": {
     "X": 30.575,
@@ -3856,7 +4066,7 @@
    }
   },
   {
-   "EntityId": 1263,
+   "EntityId": 1278,
    "PrefabId": "brick_wall",
    "Position": {
     "X": 9.675,
@@ -3870,7 +4080,7 @@
    }
   },
   {
-   "EntityId": 1264,
+   "EntityId": 1279,
    "PrefabId": "brick_wall",
    "Position": {
     "X": 20.125,
@@ -3884,7 +4094,7 @@
    }
   },
   {
-   "EntityId": 1265,
+   "EntityId": 1280,
    "PrefabId": "brick_wall",
    "Position": {
     "X": 20.125,
@@ -3898,231 +4108,273 @@
    }
   },
   {
-   "EntityId": 1266,
-   "PrefabId": "concrete_wall",
-   "Position": {
-    "X": 19.025,
-    "Y": 7.5,
-    "Z": -9.6188
-   },
-   "Scale": {
-    "X": 0.175,
-    "Y": 0.8333,
-    "Z": 9.525
-   }
-  },
-  {
-   "EntityId": 1267,
-   "PrefabId": "concrete_wall",
-   "Position": {
-    "X": 19.025,
-    "Y": 7.5,
-    "Z": -1.825
-   },
-   "Scale": {
-    "X": 0.175,
-    "Y": 0.8333,
-    "Z": 17.65
-   }
-  },
-  {
-   "EntityId": 1268,
-   "PrefabId": "concrete_wall",
-   "Position": {
-    "X": 19.025,
-    "Y": 7.5,
-    "Z": 8.0
-   },
-   "Scale": {
-    "X": 0.175,
-    "Y": 0.8333,
-    "Z": 17.65
-   }
-  },
-  {
-   "EntityId": 1269,
-   "PrefabId": "concrete_wall",
-   "Position": {
-    "X": 19.025,
-    "Y": 7.5,
-    "Z": 17.825
-   },
-   "Scale": {
-    "X": 0.175,
-    "Y": 0.8333,
-    "Z": 17.65
-   }
-  },
-  {
-   "EntityId": 1270,
-   "PrefabId": "concrete_wall",
-   "Position": {
-    "X": 19.025,
-    "Y": 7.5,
-    "Z": 25.6187
-   },
-   "Scale": {
-    "X": 0.175,
-    "Y": 0.8333,
-    "Z": 9.525
-   }
-  },
-  {
-   "EntityId": 1271,
-   "PrefabId": "concrete_wall",
-   "Position": {
-    "X": 21.575,
-    "Y": 7.5,
-    "Z": -9.6188
-   },
-   "Scale": {
-    "X": 0.175,
-    "Y": 0.8333,
-    "Z": 9.525
-   }
-  },
-  {
-   "EntityId": 1272,
-   "PrefabId": "concrete_wall",
-   "Position": {
-    "X": 21.575,
-    "Y": 7.5,
-    "Z": -1.825
-   },
-   "Scale": {
-    "X": 0.175,
-    "Y": 0.8333,
-    "Z": 17.65
-   }
-  },
-  {
-   "EntityId": 1273,
-   "PrefabId": "concrete_wall",
-   "Position": {
-    "X": 21.575,
-    "Y": 7.5,
-    "Z": 8.0
-   },
-   "Scale": {
-    "X": 0.175,
-    "Y": 0.8333,
-    "Z": 17.65
-   }
-  },
-  {
-   "EntityId": 1274,
-   "PrefabId": "concrete_wall",
-   "Position": {
-    "X": 21.575,
-    "Y": 7.5,
-    "Z": 17.825
-   },
-   "Scale": {
-    "X": 0.175,
-    "Y": 0.8333,
-    "Z": 17.65
-   }
-  },
-  {
-   "EntityId": 1275,
-   "PrefabId": "concrete_wall",
-   "Position": {
-    "X": 21.575,
-    "Y": 7.5,
-    "Z": 25.6187
-   },
-   "Scale": {
-    "X": 0.175,
-    "Y": 0.8333,
-    "Z": 9.525
-   }
-  },
-  {
-   "EntityId": 1276,
-   "PrefabId": "concrete_wall",
-   "Position": {
-    "X": 26.075,
-    "Y": 7.5,
-    "Z": -1.825
-   },
-   "Scale": {
-    "X": 4.325,
-    "Y": 0.8333,
-    "Z": 0.7
-   }
-  },
-  {
-   "EntityId": 1277,
-   "PrefabId": "concrete_wall",
-   "Position": {
-    "X": 14.35,
-    "Y": 7.5,
-    "Z": -1.825
-   },
-   "Scale": {
-    "X": 4.5,
-    "Y": 0.8333,
-    "Z": 0.7
-   }
-  },
-  {
-   "EntityId": 1278,
-   "PrefabId": "concrete_wall",
-   "Position": {
-    "X": 26.075,
-    "Y": 7.5,
-    "Z": 8.0
-   },
-   "Scale": {
-    "X": 4.325,
-    "Y": 0.8333,
-    "Z": 0.7
-   }
-  },
-  {
-   "EntityId": 1279,
-   "PrefabId": "concrete_wall",
-   "Position": {
-    "X": 14.35,
-    "Y": 7.5,
-    "Z": 8.0
-   },
-   "Scale": {
-    "X": 4.5,
-    "Y": 0.8333,
-    "Z": 0.7
-   }
-  },
-  {
-   "EntityId": 1280,
-   "PrefabId": "concrete_wall",
-   "Position": {
-    "X": 26.075,
-    "Y": 7.5,
-    "Z": 17.825
-   },
-   "Scale": {
-    "X": 4.325,
-    "Y": 0.8333,
-    "Z": 0.7
-   }
-  },
-  {
    "EntityId": 1281,
    "PrefabId": "concrete_wall",
    "Position": {
-    "X": 14.35,
+    "X": 19.025,
     "Y": 7.5,
-    "Z": 17.825
+    "Z": -9.6188
    },
    "Scale": {
-    "X": 4.5,
+    "X": 0.175,
     "Y": 0.8333,
-    "Z": 0.7
+    "Z": 9.525
    }
   },
   {
    "EntityId": 1282,
+   "PrefabId": "concrete_wall",
+   "Position": {
+    "X": 19.025,
+    "Y": 7.5,
+    "Z": -1.825
+   },
+   "Scale": {
+    "X": 0.175,
+    "Y": 0.8333,
+    "Z": 17.65
+   }
+  },
+  {
+   "EntityId": 1283,
+   "PrefabId": "concrete_wall",
+   "Position": {
+    "X": 19.025,
+    "Y": 7.5,
+    "Z": 8.0
+   },
+   "Scale": {
+    "X": 0.175,
+    "Y": 0.8333,
+    "Z": 17.65
+   }
+  },
+  {
+   "EntityId": 1284,
+   "PrefabId": "concrete_wall",
+   "Position": {
+    "X": 19.025,
+    "Y": 7.5,
+    "Z": 17.825
+   },
+   "Scale": {
+    "X": 0.175,
+    "Y": 0.8333,
+    "Z": 17.65
+   }
+  },
+  {
+   "EntityId": 1285,
+   "PrefabId": "concrete_wall",
+   "Position": {
+    "X": 19.025,
+    "Y": 7.5,
+    "Z": 25.6187
+   },
+   "Scale": {
+    "X": 0.175,
+    "Y": 0.8333,
+    "Z": 9.525
+   }
+  },
+  {
+   "EntityId": 1286,
+   "PrefabId": "concrete_wall",
+   "Position": {
+    "X": 21.575,
+    "Y": 7.5,
+    "Z": -9.6188
+   },
+   "Scale": {
+    "X": 0.175,
+    "Y": 0.8333,
+    "Z": 9.525
+   }
+  },
+  {
+   "EntityId": 1287,
+   "PrefabId": "concrete_wall",
+   "Position": {
+    "X": 21.575,
+    "Y": 7.5,
+    "Z": -1.825
+   },
+   "Scale": {
+    "X": 0.175,
+    "Y": 0.8333,
+    "Z": 17.65
+   }
+  },
+  {
+   "EntityId": 1288,
+   "PrefabId": "concrete_wall",
+   "Position": {
+    "X": 21.575,
+    "Y": 7.5,
+    "Z": 8.0
+   },
+   "Scale": {
+    "X": 0.175,
+    "Y": 0.8333,
+    "Z": 17.65
+   }
+  },
+  {
+   "EntityId": 1289,
+   "PrefabId": "concrete_wall",
+   "Position": {
+    "X": 21.575,
+    "Y": 7.5,
+    "Z": 17.825
+   },
+   "Scale": {
+    "X": 0.175,
+    "Y": 0.8333,
+    "Z": 17.65
+   }
+  },
+  {
+   "EntityId": 1290,
+   "PrefabId": "concrete_wall",
+   "Position": {
+    "X": 21.575,
+    "Y": 7.5,
+    "Z": 25.6187
+   },
+   "Scale": {
+    "X": 0.175,
+    "Y": 0.8333,
+    "Z": 9.525
+   }
+  },
+  {
+   "EntityId": 1291,
+   "PrefabId": "concrete_wall",
+   "Position": {
+    "X": 26.075,
+    "Y": 7.5,
+    "Z": -1.825
+   },
+   "Scale": {
+    "X": 4.325,
+    "Y": 0.8333,
+    "Z": 0.7
+   }
+  },
+  {
+   "EntityId": 1292,
+   "PrefabId": "concrete_wall",
+   "Position": {
+    "X": 14.35,
+    "Y": 7.5,
+    "Z": -1.825
+   },
+   "Scale": {
+    "X": 4.5,
+    "Y": 0.8333,
+    "Z": 0.7
+   }
+  },
+  {
+   "EntityId": 1293,
+   "PrefabId": "concrete_wall",
+   "Position": {
+    "X": 26.075,
+    "Y": 7.5,
+    "Z": 8.0
+   },
+   "Scale": {
+    "X": 4.325,
+    "Y": 0.8333,
+    "Z": 0.7
+   }
+  },
+  {
+   "EntityId": 1294,
+   "PrefabId": "concrete_wall",
+   "Position": {
+    "X": 14.35,
+    "Y": 7.5,
+    "Z": 8.0
+   },
+   "Scale": {
+    "X": 4.5,
+    "Y": 0.8333,
+    "Z": 0.7
+   }
+  },
+  {
+   "EntityId": 1295,
+   "PrefabId": "concrete_wall",
+   "Position": {
+    "X": 26.075,
+    "Y": 7.5,
+    "Z": 17.825
+   },
+   "Scale": {
+    "X": 4.325,
+    "Y": 0.8333,
+    "Z": 0.7
+   }
+  },
+  {
+   "EntityId": 1296,
+   "PrefabId": "concrete_wall",
+   "Position": {
+    "X": 14.35,
+    "Y": 7.5,
+    "Z": 17.825
+   },
+   "Scale": {
+    "X": 4.5,
+    "Y": 0.8333,
+    "Z": 0.7
+   }
+  },
+  {
+   "EntityId": 1297,
+   "PrefabId": "carpet_floor",
+   "Position": {
+    "X": 26.075,
+    "Y": 6.27,
+    "Z": 8.0
+   },
+   "Scale": {
+    "X": 0.865,
+    "Y": 0.4,
+    "Z": 3.93
+   }
+  },
+  {
+   "EntityId": 1298,
+   "PrefabId": "carpet_floor",
+   "Position": {
+    "X": 14.35,
+    "Y": 6.27,
+    "Z": 12.9125
+   },
+   "Scale": {
+    "X": 0.9,
+    "Y": 0.4,
+    "Z": 2.9475
+   }
+  },
+  {
+   "EntityId": 1299,
+   "PrefabId": "carpet_floor",
+   "Position": {
+    "X": 20.3,
+    "Y": 6.27,
+    "Z": 8.0
+   },
+   "Scale": {
+    "X": 0.22,
+    "Y": 0.4,
+    "Z": 3.93
+   }
+  },
+  {
+   "EntityId": 1300,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": 20.3,
@@ -4137,7 +4389,7 @@
    "Name": "Eastside corridor, floor 2"
   },
   {
-   "EntityId": 1283,
+   "EntityId": 1301,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": 26.075,
@@ -4152,7 +4404,7 @@
    "Name": "Eastside flat 21B"
   },
   {
-   "EntityId": 1284,
+   "EntityId": 1302,
    "PrefabId": "door",
    "Position": {
     "X": 21.575,
@@ -4165,11 +4417,11 @@
     "Z": 0,
     "W": 0.7071
    },
-   "RegionAId": 1283,
-   "RegionBId": 1282
+   "RegionAId": 1301,
+   "RegionBId": 1300
   },
   {
-   "EntityId": 1285,
+   "EntityId": 1303,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": 14.35,
@@ -4184,7 +4436,7 @@
    "Name": "Eastside flat 22F"
   },
   {
-   "EntityId": 1286,
+   "EntityId": 1304,
    "PrefabId": "door",
    "Position": {
     "X": 19.025,
@@ -4197,11 +4449,11 @@
     "Z": 0,
     "W": 0.7071
    },
-   "RegionAId": 1285,
-   "RegionBId": 1282
+   "RegionAId": 1303,
+   "RegionBId": 1300
   },
   {
-   "EntityId": 1287,
+   "EntityId": 1305,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": 26.075,
@@ -4216,7 +4468,7 @@
    "Name": "Eastside flat 22B"
   },
   {
-   "EntityId": 1288,
+   "EntityId": 1306,
    "PrefabId": "door",
    "Position": {
     "X": 21.575,
@@ -4229,11 +4481,11 @@
     "Z": 0,
     "W": 0.7071
    },
-   "RegionAId": 1287,
-   "RegionBId": 1282
+   "RegionAId": 1305,
+   "RegionBId": 1300
   },
   {
-   "EntityId": 1289,
+   "EntityId": 1307,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": 14.35,
@@ -4248,7 +4500,7 @@
    "Name": "Eastside flat 23F"
   },
   {
-   "EntityId": 1290,
+   "EntityId": 1308,
    "PrefabId": "door",
    "Position": {
     "X": 19.025,
@@ -4261,11 +4513,11 @@
     "Z": 0,
     "W": 0.7071
    },
-   "RegionAId": 1289,
-   "RegionBId": 1282
+   "RegionAId": 1307,
+   "RegionBId": 1300
   },
   {
-   "EntityId": 1291,
+   "EntityId": 1309,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": 26.075,
@@ -4280,7 +4532,7 @@
    "Name": "Eastside flat 23B"
   },
   {
-   "EntityId": 1292,
+   "EntityId": 1310,
    "PrefabId": "door",
    "Position": {
     "X": 21.575,
@@ -4293,11 +4545,11 @@
     "Z": 0,
     "W": 0.7071
    },
-   "RegionAId": 1291,
-   "RegionBId": 1282
+   "RegionAId": 1309,
+   "RegionBId": 1300
   },
   {
-   "EntityId": 1293,
+   "EntityId": 1311,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": 14.35,
@@ -4312,7 +4564,7 @@
    "Name": "Eastside flat 24F"
   },
   {
-   "EntityId": 1294,
+   "EntityId": 1312,
    "PrefabId": "door",
    "Position": {
     "X": 19.025,
@@ -4325,11 +4577,11 @@
     "Z": 0,
     "W": 0.7071
    },
-   "RegionAId": 1293,
-   "RegionBId": 1282
+   "RegionAId": 1311,
+   "RegionBId": 1300
   },
   {
-   "EntityId": 1295,
+   "EntityId": 1313,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": 26.075,
@@ -4344,7 +4596,7 @@
    "Name": "Eastside flat 24B"
   },
   {
-   "EntityId": 1296,
+   "EntityId": 1314,
    "PrefabId": "door",
    "Position": {
     "X": 21.575,
@@ -4357,11 +4609,11 @@
     "Z": 0,
     "W": 0.7071
    },
-   "RegionAId": 1295,
-   "RegionBId": 1282
+   "RegionAId": 1313,
+   "RegionBId": 1300
   },
   {
-   "EntityId": 1297,
+   "EntityId": 1315,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": 14.35,
@@ -4376,7 +4628,7 @@
    "Name": "Eastside stairwell, floor 2"
   },
   {
-   "EntityId": 1298,
+   "EntityId": 1316,
    "PrefabId": "tile_floor",
    "Position": {
     "X": 14.35,
@@ -4390,19 +4642,19 @@
    }
   },
   {
-   "EntityId": 1299,
+   "EntityId": 1317,
    "PrefabId": "portal",
    "Position": {
     "X": 19.025,
     "Y": 7.25,
     "Z": -6.7375
    },
-   "RegionAId": 1297,
-   "RegionBId": 1282,
+   "RegionAId": 1315,
+   "RegionBId": 1300,
    "ApertureSize": 1.4
   },
   {
-   "EntityId": 1300,
+   "EntityId": 1318,
    "PrefabId": "concrete_floor",
    "Position": {
     "X": 20.125,
@@ -4417,7 +4669,7 @@
    "Name": "Eastside roof"
   },
   {
-   "EntityId": 1301,
+   "EntityId": 1319,
    "PrefabId": "asphalt_road",
    "Position": {
     "X": 0.0,
@@ -4431,7 +4683,7 @@
    }
   },
   {
-   "EntityId": 1302,
+   "EntityId": 1320,
    "PrefabId": "concrete_wall",
    "Position": {
     "X": -6.25,
@@ -4446,7 +4698,7 @@
    "Name": "Tunnel west wall"
   },
   {
-   "EntityId": 1303,
+   "EntityId": 1321,
    "PrefabId": "concrete_wall",
    "Position": {
     "X": 6.25,
@@ -4461,7 +4713,7 @@
    "Name": "Tunnel east wall"
   },
   {
-   "EntityId": 1304,
+   "EntityId": 1322,
    "PrefabId": "concrete_wall",
    "Position": {
     "X": -8.0,
@@ -4475,7 +4727,7 @@
    }
   },
   {
-   "EntityId": 1305,
+   "EntityId": 1323,
    "PrefabId": "concrete_wall",
    "Position": {
     "X": 8.0,
@@ -4489,7 +4741,7 @@
    }
   },
   {
-   "EntityId": 1306,
+   "EntityId": 1324,
    "PrefabId": "concrete_floor",
    "Position": {
     "X": 0.0,
@@ -4504,7 +4756,7 @@
    "Name": "Tunnel roof"
   },
   {
-   "EntityId": 1307,
+   "EntityId": 1325,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": 0.0,
@@ -4519,7 +4771,7 @@
    "Name": "Tunnel, south third"
   },
   {
-   "EntityId": 1308,
+   "EntityId": 1326,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": 0.0,
@@ -4534,7 +4786,7 @@
    "Name": "Tunnel, middle third"
   },
   {
-   "EntityId": 1309,
+   "EntityId": 1327,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": 0.0,
@@ -4549,7 +4801,7 @@
    "Name": "Tunnel, north third"
   },
   {
-   "EntityId": 1310,
+   "EntityId": 1328,
    "PrefabId": "concrete_floor",
    "Position": {
     "X": -20.125,
@@ -4563,7 +4815,7 @@
    }
   },
   {
-   "EntityId": 1311,
+   "EntityId": 1329,
    "PrefabId": "concrete_wall",
    "Position": {
     "X": -30.6,
@@ -4577,7 +4829,7 @@
    }
   },
   {
-   "EntityId": 1312,
+   "EntityId": 1330,
    "PrefabId": "concrete_wall",
    "Position": {
     "X": -20.125,
@@ -4591,7 +4843,7 @@
    }
   },
   {
-   "EntityId": 1313,
+   "EntityId": 1331,
    "PrefabId": "concrete_wall",
    "Position": {
     "X": -20.125,
@@ -4605,7 +4857,7 @@
    }
   },
   {
-   "EntityId": 1314,
+   "EntityId": 1332,
    "PrefabId": "concrete_wall",
    "Position": {
     "X": -9.7,
@@ -4619,7 +4871,7 @@
    }
   },
   {
-   "EntityId": 1315,
+   "EntityId": 1333,
    "PrefabId": "concrete_wall",
    "Position": {
     "X": -9.7,
@@ -4633,7 +4885,7 @@
    }
   },
   {
-   "EntityId": 1316,
+   "EntityId": 1334,
    "PrefabId": "concrete_wall",
    "Position": {
     "X": -9.7,
@@ -4647,7 +4899,7 @@
    }
   },
   {
-   "EntityId": 1317,
+   "EntityId": 1335,
    "PrefabId": "concrete_wall",
    "Position": {
     "X": -9.7,
@@ -4661,7 +4913,7 @@
    }
   },
   {
-   "EntityId": 1318,
+   "EntityId": 1336,
    "PrefabId": "concrete_wall",
    "Position": {
     "X": -9.7,
@@ -4675,7 +4927,7 @@
    }
   },
   {
-   "EntityId": 1319,
+   "EntityId": 1337,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": -20.125,
@@ -4690,7 +4942,7 @@
    "Name": "Parking garage, level 0"
   },
   {
-   "EntityId": 1320,
+   "EntityId": 1338,
    "PrefabId": "concrete_floor",
    "Position": {
     "X": -20.125,
@@ -4704,7 +4956,7 @@
    }
   },
   {
-   "EntityId": 1321,
+   "EntityId": 1339,
    "PrefabId": "concrete_wall",
    "Position": {
     "X": -30.6,
@@ -4718,7 +4970,7 @@
    }
   },
   {
-   "EntityId": 1322,
+   "EntityId": 1340,
    "PrefabId": "concrete_wall",
    "Position": {
     "X": -20.125,
@@ -4732,7 +4984,7 @@
    }
   },
   {
-   "EntityId": 1323,
+   "EntityId": 1341,
    "PrefabId": "concrete_wall",
    "Position": {
     "X": -20.125,
@@ -4746,7 +4998,7 @@
    }
   },
   {
-   "EntityId": 1324,
+   "EntityId": 1342,
    "PrefabId": "concrete_wall",
    "Position": {
     "X": -9.7,
@@ -4760,7 +5012,7 @@
    }
   },
   {
-   "EntityId": 1325,
+   "EntityId": 1343,
    "PrefabId": "concrete_wall",
    "Position": {
     "X": -9.7,
@@ -4774,7 +5026,7 @@
    }
   },
   {
-   "EntityId": 1326,
+   "EntityId": 1344,
    "PrefabId": "concrete_wall",
    "Position": {
     "X": -9.7,
@@ -4788,7 +5040,7 @@
    }
   },
   {
-   "EntityId": 1327,
+   "EntityId": 1345,
    "PrefabId": "concrete_wall",
    "Position": {
     "X": -9.7,
@@ -4802,7 +5054,7 @@
    }
   },
   {
-   "EntityId": 1328,
+   "EntityId": 1346,
    "PrefabId": "concrete_wall",
    "Position": {
     "X": -9.7,
@@ -4816,7 +5068,7 @@
    }
   },
   {
-   "EntityId": 1329,
+   "EntityId": 1347,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": -20.125,
@@ -4831,7 +5083,7 @@
    "Name": "Parking garage, level 1"
   },
   {
-   "EntityId": 1330,
+   "EntityId": 1348,
    "PrefabId": "concrete_floor",
    "Position": {
     "X": -20.125,
@@ -4846,7 +5098,7 @@
    "Name": "Garage roof"
   },
   {
-   "EntityId": 1331,
+   "EntityId": 1349,
    "PrefabId": "metal_wall",
    "Position": {
     "X": -9.55,
@@ -4861,7 +5113,7 @@
    "Name": "Garage shutter"
   },
   {
-   "EntityId": 1332,
+   "EntityId": 1350,
    "PrefabId": "glass_wall",
    "Position": {
     "X": 9.45,
@@ -4876,7 +5128,7 @@
    "Name": "Shelter back"
   },
   {
-   "EntityId": 1333,
+   "EntityId": 1351,
    "PrefabId": "glass_wall",
    "Position": {
     "X": 7.9,
@@ -4890,7 +5142,7 @@
    }
   },
   {
-   "EntityId": 1334,
+   "EntityId": 1352,
    "PrefabId": "glass_wall",
    "Position": {
     "X": 7.9,
@@ -4904,7 +5156,7 @@
    }
   },
   {
-   "EntityId": 1335,
+   "EntityId": 1353,
    "PrefabId": "metal_wall",
    "Position": {
     "X": 7.9,
@@ -4919,7 +5171,7 @@
    "Name": "Shelter roof"
   },
   {
-   "EntityId": 1336,
+   "EntityId": 1354,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": 7.9,
@@ -4934,7 +5186,7 @@
    "Name": "Bus shelter"
   },
   {
-   "EntityId": 1337,
+   "EntityId": 1355,
    "PrefabId": "concrete_floor",
    "Position": {
     "X": 39.75,
@@ -4949,7 +5201,7 @@
    "Name": "Platform"
   },
   {
-   "EntityId": 1338,
+   "EntityId": 1356,
    "PrefabId": "tile_floor",
    "Position": {
     "X": 39.75,
@@ -4963,7 +5215,7 @@
    }
   },
   {
-   "EntityId": 1339,
+   "EntityId": 1357,
    "PrefabId": "brick_wall",
    "Position": {
     "X": 36.575,
@@ -4978,7 +5230,7 @@
    "Name": "Platform wall"
   },
   {
-   "EntityId": 1340,
+   "EntityId": 1358,
    "PrefabId": "dirt_floor",
    "Position": {
     "X": 47.25,
@@ -4993,7 +5245,7 @@
    "Name": "Track bed"
   },
   {
-   "EntityId": 1341,
+   "EntityId": 1359,
    "PrefabId": "metal_wall",
    "Position": {
     "X": 41.075,
@@ -5008,7 +5260,7 @@
    "Name": "Platform canopy"
   },
   {
-   "EntityId": 1342,
+   "EntityId": 1360,
    "PrefabId": "concrete_wall",
    "Position": {
     "X": 42.35,
@@ -5022,7 +5274,7 @@
    }
   },
   {
-   "EntityId": 1343,
+   "EntityId": 1361,
    "PrefabId": "concrete_wall",
    "Position": {
     "X": 42.35,
@@ -5036,7 +5288,7 @@
    }
   },
   {
-   "EntityId": 1344,
+   "EntityId": 1362,
    "PrefabId": "concrete_wall",
    "Position": {
     "X": 42.35,
@@ -5050,7 +5302,7 @@
    }
   },
   {
-   "EntityId": 1345,
+   "EntityId": 1363,
    "PrefabId": "concrete_wall",
    "Position": {
     "X": 42.35,
@@ -5064,7 +5316,7 @@
    }
   },
   {
-   "EntityId": 1346,
+   "EntityId": 1364,
    "PrefabId": "concrete_wall",
    "Position": {
     "X": 42.35,
@@ -5078,7 +5330,7 @@
    }
   },
   {
-   "EntityId": 1347,
+   "EntityId": 1365,
    "PrefabId": "concrete_wall",
    "Position": {
     "X": 42.35,
@@ -5092,7 +5344,7 @@
    }
   },
   {
-   "EntityId": 1348,
+   "EntityId": 1366,
    "PrefabId": "concrete_wall",
    "Position": {
     "X": 42.35,
@@ -5106,7 +5358,7 @@
    }
   },
   {
-   "EntityId": 1349,
+   "EntityId": 1367,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": 39.75,
@@ -5121,7 +5373,7 @@
    "Name": "Metro platform, south end"
   },
   {
-   "EntityId": 1350,
+   "EntityId": 1368,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": 39.75,
@@ -5136,7 +5388,7 @@
    "Name": "Metro platform, middle end"
   },
   {
-   "EntityId": 1351,
+   "EntityId": 1369,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": 39.75,
@@ -5151,7 +5403,7 @@
    "Name": "Metro platform, north end"
   },
   {
-   "EntityId": 1352,
+   "EntityId": 1370,
    "PrefabId": "foliage_hedge",
    "Position": {
     "X": -8.3,
@@ -5165,7 +5417,7 @@
    }
   },
   {
-   "EntityId": 1353,
+   "EntityId": 1371,
    "PrefabId": "foliage_hedge",
    "Position": {
     "X": 8.3,
@@ -5179,7 +5431,7 @@
    }
   },
   {
-   "EntityId": 1354,
+   "EntityId": 1372,
    "PrefabId": "foliage_hedge",
    "Position": {
     "X": -8.3,
@@ -5193,7 +5445,7 @@
    }
   },
   {
-   "EntityId": 1355,
+   "EntityId": 1373,
    "PrefabId": "foliage_hedge",
    "Position": {
     "X": 8.3,
@@ -5207,7 +5459,7 @@
    }
   },
   {
-   "EntityId": 1356,
+   "EntityId": 1374,
    "PrefabId": "foliage_hedge",
    "Position": {
     "X": -8.3,
@@ -5221,7 +5473,7 @@
    }
   },
   {
-   "EntityId": 1357,
+   "EntityId": 1375,
    "PrefabId": "foliage_hedge",
    "Position": {
     "X": 8.3,
@@ -5235,7 +5487,7 @@
    }
   },
   {
-   "EntityId": 1358,
+   "EntityId": 1376,
    "PrefabId": "foliage_hedge",
    "Position": {
     "X": -8.3,
@@ -5249,7 +5501,7 @@
    }
   },
   {
-   "EntityId": 1359,
+   "EntityId": 1377,
    "PrefabId": "foliage_hedge",
    "Position": {
     "X": 8.3,
@@ -5263,7 +5515,7 @@
    }
   },
   {
-   "EntityId": 1360,
+   "EntityId": 1378,
    "PrefabId": "foliage_hedge",
    "Position": {
     "X": -8.3,
@@ -5277,7 +5529,7 @@
    }
   },
   {
-   "EntityId": 1361,
+   "EntityId": 1379,
    "PrefabId": "foliage_hedge",
    "Position": {
     "X": 8.3,
@@ -5291,7 +5543,7 @@
    }
   },
   {
-   "EntityId": 1362,
+   "EntityId": 1380,
    "PrefabId": "foliage_hedge",
    "Position": {
     "X": -8.3,
@@ -5305,7 +5557,7 @@
    }
   },
   {
-   "EntityId": 1363,
+   "EntityId": 1381,
    "PrefabId": "foliage_hedge",
    "Position": {
     "X": 8.3,
@@ -5319,7 +5571,7 @@
    }
   },
   {
-   "EntityId": 1364,
+   "EntityId": 1382,
    "PrefabId": "foliage_hedge",
    "Position": {
     "X": -8.3,
@@ -5333,7 +5585,7 @@
    }
   },
   {
-   "EntityId": 1365,
+   "EntityId": 1383,
    "PrefabId": "foliage_hedge",
    "Position": {
     "X": 8.3,
@@ -5347,7 +5599,7 @@
    }
   },
   {
-   "EntityId": 1366,
+   "EntityId": 1384,
    "PrefabId": "foliage_hedge",
    "Position": {
     "X": -8.3,
@@ -5361,7 +5613,7 @@
    }
   },
   {
-   "EntityId": 1367,
+   "EntityId": 1385,
    "PrefabId": "foliage_hedge",
    "Position": {
     "X": 8.3,
@@ -5375,7 +5627,7 @@
    }
   },
   {
-   "EntityId": 1368,
+   "EntityId": 1386,
    "PrefabId": "foliage_hedge",
    "Position": {
     "X": -8.3,
@@ -5389,7 +5641,7 @@
    }
   },
   {
-   "EntityId": 1369,
+   "EntityId": 1387,
    "PrefabId": "foliage_hedge",
    "Position": {
     "X": 8.3,
@@ -5403,7 +5655,7 @@
    }
   },
   {
-   "EntityId": 1370,
+   "EntityId": 1388,
    "PrefabId": "foliage_hedge",
    "Position": {
     "X": -8.3,
@@ -5417,7 +5669,7 @@
    }
   },
   {
-   "EntityId": 1371,
+   "EntityId": 1389,
    "PrefabId": "foliage_hedge",
    "Position": {
     "X": 8.3,
@@ -5431,7 +5683,7 @@
    }
   },
   {
-   "EntityId": 1372,
+   "EntityId": 1390,
    "PrefabId": "foliage_hedge",
    "Position": {
     "X": -8.3,
@@ -5445,7 +5697,7 @@
    }
   },
   {
-   "EntityId": 1373,
+   "EntityId": 1391,
    "PrefabId": "foliage_hedge",
    "Position": {
     "X": 8.3,
@@ -5459,7 +5711,7 @@
    }
   },
   {
-   "EntityId": 1374,
+   "EntityId": 1392,
    "PrefabId": "foliage_hedge",
    "Position": {
     "X": -8.3,
@@ -5473,7 +5725,7 @@
    }
   },
   {
-   "EntityId": 1375,
+   "EntityId": 1393,
    "PrefabId": "foliage_hedge",
    "Position": {
     "X": 8.3,
@@ -5487,7 +5739,7 @@
    }
   },
   {
-   "EntityId": 1376,
+   "EntityId": 1394,
    "PrefabId": "foliage_hedge",
    "Position": {
     "X": -8.3,
@@ -5501,7 +5753,7 @@
    }
   },
   {
-   "EntityId": 1377,
+   "EntityId": 1395,
    "PrefabId": "foliage_hedge",
    "Position": {
     "X": 8.3,
@@ -5515,7 +5767,7 @@
    }
   },
   {
-   "EntityId": 1378,
+   "EntityId": 1396,
    "PrefabId": "foliage_hedge",
    "Position": {
     "X": -8.3,
@@ -5529,7 +5781,7 @@
    }
   },
   {
-   "EntityId": 1379,
+   "EntityId": 1397,
    "PrefabId": "foliage_hedge",
    "Position": {
     "X": 8.3,
@@ -5543,7 +5795,7 @@
    }
   },
   {
-   "EntityId": 1380,
+   "EntityId": 1398,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": 0.0,
@@ -5558,7 +5810,7 @@
    "Name": "Main Street, block 1"
   },
   {
-   "EntityId": 1381,
+   "EntityId": 1399,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": -7.75,
@@ -5573,7 +5825,7 @@
    "Name": "West pavement, block 1"
   },
   {
-   "EntityId": 1382,
+   "EntityId": 1400,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": 7.75,
@@ -5588,7 +5840,7 @@
    "Name": "East pavement, block 1"
   },
   {
-   "EntityId": 1383,
+   "EntityId": 1401,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": 0.0,
@@ -5603,7 +5855,7 @@
    "Name": "Main Street, block 2"
   },
   {
-   "EntityId": 1384,
+   "EntityId": 1402,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": -7.75,
@@ -5618,7 +5870,7 @@
    "Name": "West pavement, block 2"
   },
   {
-   "EntityId": 1385,
+   "EntityId": 1403,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": 7.75,
@@ -5633,7 +5885,7 @@
    "Name": "East pavement, block 2"
   },
   {
-   "EntityId": 1386,
+   "EntityId": 1404,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": 0.0,
@@ -5648,7 +5900,7 @@
    "Name": "Main Street, block 3"
   },
   {
-   "EntityId": 1387,
+   "EntityId": 1405,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": -7.75,
@@ -5663,7 +5915,7 @@
    "Name": "West pavement, block 3"
   },
   {
-   "EntityId": 1388,
+   "EntityId": 1406,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": 7.75,
@@ -5678,7 +5930,7 @@
    "Name": "East pavement, block 3"
   },
   {
-   "EntityId": 1389,
+   "EntityId": 1407,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": 0.0,
@@ -5693,7 +5945,7 @@
    "Name": "Main Street, block 4"
   },
   {
-   "EntityId": 1390,
+   "EntityId": 1408,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": -7.75,
@@ -5708,7 +5960,7 @@
    "Name": "West pavement, block 4"
   },
   {
-   "EntityId": 1391,
+   "EntityId": 1409,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": 7.75,
@@ -5723,7 +5975,7 @@
    "Name": "East pavement, block 4"
   },
   {
-   "EntityId": 1392,
+   "EntityId": 1410,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": 0.0,
@@ -5738,7 +5990,7 @@
    "Name": "Main Street, block 5"
   },
   {
-   "EntityId": 1393,
+   "EntityId": 1411,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": -7.75,
@@ -5753,7 +6005,7 @@
    "Name": "West pavement, block 5"
   },
   {
-   "EntityId": 1394,
+   "EntityId": 1412,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": 7.75,
@@ -5768,7 +6020,7 @@
    "Name": "East pavement, block 5"
   },
   {
-   "EntityId": 1395,
+   "EntityId": 1413,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": 0.0,
@@ -5783,7 +6035,7 @@
    "Name": "Main Street, block 6"
   },
   {
-   "EntityId": 1396,
+   "EntityId": 1414,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": -7.75,
@@ -5798,7 +6050,7 @@
    "Name": "West pavement, block 6"
   },
   {
-   "EntityId": 1397,
+   "EntityId": 1415,
    "PrefabId": "acoustic_region",
    "Position": {
     "X": 7.75,

@@ -104,7 +104,10 @@ public class AsyncAcousticWorker : IDisposable
     /// <summary>The distance between surfaces round the listener, metres — the room's size as the
     /// rays found it. The diffuse tail begins a couple of these after the direct sound.</summary>
     public float ListenerMeanFreePath => _listenerMfp;
-    private volatile float _listenerReturnX, _listenerReturnY, _listenerReturnZ, _listenerAnisotropy, _listenerMfp;
+    /// <summary>The room's surface area as the rays measured it, m². The room equation needs it and
+    /// used to assume a cube instead; see Enclosure.ReverberantToDirectPower.</summary>
+    public float ListenerSurfaceArea => _listenerSurface;
+    private volatile float _listenerReturnX, _listenerReturnY, _listenerReturnZ, _listenerAnisotropy, _listenerMfp, _listenerSurface;
     public float ListenerLfDecayRatio => _listenerLfDecayRatio;
     private readonly Dictionary<int, IntPtr> _saSources = new();   // entityId -> acquired IPLSource
     private readonly Dictionary<int, long> _saLastSeen = new();     // entityId -> TickCount64 of last request
@@ -896,6 +899,7 @@ public class AsyncAcousticWorker : IDisposable
         _listenerReturnZ = survey.ReturnDirection.Z;
         _listenerAnisotropy = survey.Anisotropy;
         _listenerMfp = survey.MeanFreePathMetres;
+        _listenerSurface = survey.SurfaceAreaSquareMetres;
         _listenerReverbMs = Math.Clamp(mid * 1000f, AcousticConstants.MinReverbDecayMs,
                                                     AcousticConstants.MaxReverbDecayMs);
         // How much faster the top decays than the middle. This is the audible half of what a material

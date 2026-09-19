@@ -137,12 +137,13 @@ public static class Enclosure
     /// distance between surfaces to contribute.</param>
     public readonly record struct Survey(float Enclosure, float OpenFraction, float MeanFreePathMetres,
                                          float AbsorptionLow, float AbsorptionMid, float AbsorptionHigh,
-                                         Vector3 ReturnDirection, float Anisotropy)
+                                         Vector3 ReturnDirection, float Anisotropy,
+                                         float SurfaceAreaSquareMetres)
     {
         public Survey(float enclosure, float openFraction, float meanFreePathMetres,
                       float absorptionLow, float absorptionMid, float absorptionHigh)
             : this(enclosure, openFraction, meanFreePathMetres, absorptionLow, absorptionMid, absorptionHigh,
-                   Vector3.Zero, 0f) { }
+                   Vector3.Zero, 0f, 13.5f * meanFreePathMetres * meanFreePathMetres) { }
     }
 
     /// <summary>
@@ -189,6 +190,10 @@ public static class Enclosure
         int hits = 0;
         float pathSum = 0f;
         float aLow = 0f, aMid = 0f, aHigh = 0f;
+        // The two integrals that give the room's VOLUME and its SURFACE AREA from one point inside
+        // it. For a convex room both are exact: the cone swept by each ray has volume d³dω/3, and the
+        // solid angle a patch of wall subtends is dS·cosθ/d², so ∮(d²/cosθ)dω is the whole of S.
+        double volSum = 0, areaSum = 0;
 
         for (int k = 0; k < Rays; k++)
         {
@@ -208,6 +213,11 @@ public static class Enclosure
 
             hits++;
             pathSum += d1;
+            volSum += (double)d1 * d1 * d1;
+            // Grazing rays make d²/cosθ diverge, and a sphere of 192 directions cannot integrate a
+            // divergence. Floored at a twentieth, which numerically lands within a few per cent of
+            // 4V/S for every room shape tried (see EnclosureTests).
+            areaSum += (double)d1 * d1 / MathF.Max(MathF.Abs(Vector3.Dot(dir, n1)), 0.05f);
             aLow += Math.Clamp(props.AbsorptionLow, 0f, 1f);
             aMid += Math.Clamp(props.AbsorptionMid, 0f, 1f);
             aHigh += Math.Clamp(props.AbsorptionHigh, 0f, 1f);
@@ -221,12 +231,16 @@ public static class Enclosure
         }
 
         Vector3 centroid = ReturnCentroid(returnedFrom, returned, out float anisotropy);
+        // S = 4π·mean(d²/cosθ) over the directions that found a surface. The mean is over HITS rather
+        // than over the sphere, so a room with an opening in it reports the area of the surface it
+        // does have rather than being scaled down by the hole.
+        float surface = hits > 0 ? (float)(4.0 * Math.PI * areaSum / hits) : 0f;
         return new Survey(
             Math.Clamp(returned / Rays, 0f, 1f),
             1f - (float)hits / Rays,
             hits > 0 ? pathSum / hits : ReverberantRangeMetres,
             aLow / Rays, aMid / Rays, aHigh / Rays,
-            centroid, anisotropy);
+            centroid, anisotropy, surface);
     }
 
     /// <summary>
@@ -295,19 +309,51 @@ public static class Enclosure
     /// the law.
     /// </summary>
     public static float ReverberantToDirectPower(float enclosure, float meanFreePathMetres, float distanceMetres)
+        => ReverberantToDirectPower(enclosure, meanFreePathMetres,
+                                    CubeSurfaceOverMfpSquared * meanFreePathMetres * meanFreePathMetres,
+                                    distanceMetres);
+
+    /// <summary>
+    /// The same ratio, with the room's surface area MEASURED rather than assumed to be a cube's.
+    ///
+    /// The cube assumption is the one term above that is not a measurement, and on a city it is the
+    /// one that is furthest wrong. S ≈ 13.5·MFP² is exact for a cube and hopeless for anything flat
+    /// or long: a car park 21 by 28 metres and 2.5 high has a mean free path of 4.3 m, which a cube
+    /// would give 246 m² of surface — and it really has 1,390. A room with five times the surface
+    /// absorbs five times as much, so the reverberant field the cube form predicted was nine
+    /// decibels too loud, and every footstep in that garage went to the master limiter's ceiling and
+    /// stayed there (measured: `--enclosure map=city at=-20,1.6,30` read a 298 % send where the
+    /// classical room equation says 170 %).
+    ///
+    /// Slabs and tubes are what a city is made of — garages, corridors, tunnels, streets — so this is
+    /// not a corner case. <see cref="Look"/> measures S from the same sphere of rays that measures
+    /// everything else: ∮(d²/cosθ)dω is the surface area of any convex room seen from any point
+    /// inside it.
+    /// </summary>
+    public static float ReverberantToDirectPower(float enclosure, float meanFreePathMetres,
+                                                 float surfaceAreaSquareMetres, float distanceMetres)
     {
         float e = Math.Clamp(enclosure, 0f, 0.999f);
         if (e <= 1e-6f) return 0f;
         float mfp = MathF.Max(0.5f, meanFreePathMetres);
+        float s = surfaceAreaSquareMetres > 1f
+            ? surfaceAreaSquareMetres
+            : CubeSurfaceOverMfpSquared * mfp * mfp;    // nothing measured: the old cube
         // A source further off than the room is wide is not IN this room in the sense the diffuse
         // field assumes; its share stops growing there.
         float r = MathF.Min(MathF.Max(0.1f, distanceMetres), 3f * mfp);
-        return BoxSurfaceOverMfpSquared * (r / mfp) * (r / mfp) * e / (1f - e);
+        return 16f * MathF.PI * r * r * e / (s * (1f - e));
     }
 
     /// <summary>16π over the surface area a box has per square metre of its mean free path
     /// (S ≈ 13.5·MFP² for a cube: S = 6L², MFP = 4V/S = 2L/3).</summary>
     private const float BoxSurfaceOverMfpSquared = 16f * MathF.PI / 13.5f;
+
+    /// <summary>The surface a CUBE has per square metre of its mean free path: S = 6L² and
+    /// MFP = 2L/3, so S = 13.5·MFP². This is the assumption <see cref="ReverberantToDirectPower"/>
+    /// falls back on when nothing measured the real surface — and the assumption that was wrong by a
+    /// factor of five on anything flat or long.</summary>
+    private const float CubeSurfaceOverMfpSquared = 13.5f;
 
     public static float ReverberantGainDb(float enclosure)
     {

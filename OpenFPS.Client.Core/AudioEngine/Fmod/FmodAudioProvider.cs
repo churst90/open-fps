@@ -866,10 +866,15 @@ public class FmodAudioProvider : IAudioProvider
     /// listener's own bus is steered by it (SetReverbDirection). See Enclosure.ReturnCentroid.</summary>
     private Vector3 _listenerReturnDir;
     private float _listenerAnisotropy, _listenerMfp;
-    public void SetListenerReverbField(Vector3 returnDirection, float anisotropy, float meanFreePathMetres)
+    public void SetListenerReverbField(Vector3 returnDirection, float anisotropy, float meanFreePathMetres,
+                                       float surfaceAreaSquareMetres = 0f)
     {
         _listenerReturnDir = returnDirection; _listenerAnisotropy = Math.Clamp(anisotropy, 0f, 1f);
-        _listenerMfp = meanFreePathMetres;
+        _mfpTarget = meanFreePathMetres;
+        _surfaceTarget = surfaceAreaSquareMetres;
+        // The first measurement is not a move: nothing to walk from.
+        if (_listenerMfp <= 0f) _listenerMfp = meanFreePathMetres;
+        if (_listenerSurface <= 0f) _listenerSurface = surfaceAreaSquareMetres;
     }
 
     /// <summary>A send may amplify (FMOD allows a mix above 1), and in a sealed hard room the law asks
@@ -888,7 +893,8 @@ public class FmodAudioProvider : IAudioProvider
 
     public void SetSimulatedReverbDecay(float decayMs, float enclosure, float hfDecayRatio, float lfDecayRatio)
     {
-        _listenerEnclosure = enclosure;
+        _enclosureTarget = enclosure;
+        if (_listenerEnclosure < 0f) _listenerEnclosure = enclosure;   // the first measurement is not a move
         _listenerHfRatio = hfDecayRatio;
         _listenerLfRatio = lfDecayRatio;
         for (int i = _simReverbHistory.Length - 1; i > 0; i--)
@@ -905,8 +911,17 @@ public class FmodAudioProvider : IAudioProvider
     /// <summary>The median-filtered decay currently driving the reverb, for the spikes and profiler.</summary>
     public float SimulatedReverbDecayMs => _simReverbDecayMs;
 
-    /// <summary>How enclosed the listener's surroundings are, 0..1. See OpenFPS.Common.Enclosure.</summary>
-    private float _listenerEnclosure;
+    /// <summary>How enclosed the listener's surroundings are, 0..1 — the value in USE, slewed toward
+    /// the measurement. See OpenFPS.Common.Enclosure and <see cref="AdvanceListenerRoom"/>.</summary>
+    private float _listenerEnclosure = -1f;
+
+    /// <summary>The room's surface area as the rays measured it, m² — the term the room equation used
+    /// to assume was a cube's. See Enclosure.ReverberantToDirectPower.</summary>
+    private float _listenerSurface;
+
+    /// <summary>The last measurement of each, which the live values above walk toward.</summary>
+    private float _enclosureTarget, _mfpTarget, _surfaceTarget;
+    private double _roomAdvancedAt;
 
     /// <summary>How the listener's room colours its tail, as ratios of the mid band's decay. This is
     /// what a material sounds like: carpet's top dies four times faster than its middle, concrete's
@@ -947,8 +962,47 @@ public class FmodAudioProvider : IAudioProvider
     /// simulated decay sets the time AND opens the wet level in proportion to it, which leaves open
     /// ground exactly as dry as it is today and gives a concrete canyon the slapback it should have.
     /// </summary>
+    /// <summary>
+    /// Walks the room the listener is IN toward the room the rays just measured.
+    ///
+    /// The measurement is a step function: the probe runs every few ticks, and crossing the mouth of a
+    /// car park moves it from 40 % enclosed to 89 % between one sample and the next. The send is built
+    /// from that (Enclosure.ReverberantToDirectPower), so the reverberation of every voice jumped
+    /// SEVENTEEN AND A HALF DECIBELS in one two-metre step — measured with `--yard`'s sibling,
+    /// `--enclosure map=city walk=-4,30:-30,30`. Heard, and reported, as "when I step into an area
+    /// where I am in range of hearing the reflections from one building it clicks in, then when I
+    /// step out of range it pops again".
+    ///
+    /// A reverberant field cannot do that. It is energy stored in a room, and energy takes as long to
+    /// build up or die away as the room's own tail: walking through a doorway, what you hear is the
+    /// old room fading and the new one filling, both over about an RT60. So the live values walk
+    /// toward the measured ones with the room's own time constant, and the walk is what a listener
+    /// hears instead of a step.
+    ///
+    /// This is not a smoothing filter hiding a bad measurement. The measurement is right — a car park
+    /// really is that much more enclosed than the street outside it — and what was missing is that it
+    /// takes a moment to get there.
+    /// </summary>
+    private void AdvanceListenerRoom()
+    {
+        double now = OpenFPS.Common.AudioClock.Now;
+        float dt = _roomAdvancedAt > 0 ? (float)(now - _roomAdvancedAt) : 0f;
+        _roomAdvancedAt = now;
+        if (dt <= 0f || dt > 0.5f) return;   // a stall is not a walk across a room
+
+        // A room's field settles over its own decay. Floored so a dead room still takes a moment, and
+        // capped so a cathedral does not lag a listener who has walked out of it.
+        float tau = Math.Clamp(_simReverbDecayMs * 0.001f * 0.5f, 0.12f, 0.6f);
+        float a = 1f - MathF.Exp(-dt / tau);
+        _listenerEnclosure += (_enclosureTarget - _listenerEnclosure) * a;
+        if (_mfpTarget > 0f) _listenerMfp += (_mfpTarget - _listenerMfp) * a;
+        if (_surfaceTarget > 0f) _listenerSurface += (_surfaceTarget - _listenerSurface) * a;
+    }
+
     private void ApplySimulatedReverb(int listenerRegionId)
     {
+        AdvanceListenerRoom();
+
         if (_simReverbDecayMs <= 0f) return;
         if (!_reverbDsps.TryGetValue(listenerRegionId, out var dsp) || !dsp.hasHandle()) return;
 
@@ -2670,7 +2724,8 @@ public class FmodAudioProvider : IAudioProvider
         // reverberant field this source should raise. The unit's own gain is held at unity by the
         // metering loop in ApplySimulatedReverb, so nothing else scales it.
         float sourceDist = Vector3.Distance(lPosVec, active.CurrentApparentPosition);
-        float ratio = Enclosure.ReverberantToDirectPower(_listenerEnclosure, _listenerMfp, sourceDist);
+        float ratio = Enclosure.ReverberantToDirectPower(_listenerEnclosure, _listenerMfp,
+                                                        _listenerSurface, sourceDist);
         float baseReverbMix = MathF.Min(MaxReverbSend, MathF.Sqrt(ratio));
         if (active.IsReflection) baseReverbMix *= Math.Max(0.5f, active.RoomGain); // a reflection excites the bus by what it has left
 

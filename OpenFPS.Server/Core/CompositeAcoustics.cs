@@ -305,7 +305,7 @@ public static class CompositeAcoustics
         float cLo = Component(centre, c) - Component(size, c) * 0.5f;
         float cHi = Component(centre, c) + Component(size, c) * 0.5f;
 
-        float covered = 0f, best = 0f;
+        float covered = 0f, best = 0f, bestGap = float.MaxValue, bestReach = float.MinValue;
         foreach (var piece in pieces)
         {
             var half = AxisAlignedHalfExtents(piece.Size * 0.5f, piece.Rotation);
@@ -329,7 +329,26 @@ public static class CompositeAcoustics
             if (area <= 0f) continue;
 
             covered += area;
-            if (area > best) { best = area; material = piece.Material; }
+
+            // ── Which of several parts on one face is the face ──────────────────────────────────
+            //
+            // Biggest area first, and that settles nearly everything. Two more rules settle the rest,
+            // and both were paid for by the city's floors:
+            //
+            // NEARER WINS a tie on area. A flat's ceiling is the concrete slab over it, and the
+            // CARPET OF THE FLAT ABOVE lies on the far side of that slab, covering exactly the same
+            // rectangle and landing inside the same tolerance. Tied on area, whichever was written
+            // last took the face, and every flat came back with a carpeted ceiling.
+            //
+            // INNERMOST WINS a tie on both. A carpet laid on a slab touches the same plane as the
+            // slab, so neither is nearer — and the one you are standing on is the one that reaches
+            // further INTO the room. That is the whole of what "laid on top of" means to a listener,
+            // and without it a carpeted floor measured as the concrete underneath it.
+            float reach = -side * (Component(piece.Position, a) - side * Component(half, a));
+            bool wins = area > best * 1.05f
+                     || (area > best * 0.95f && (gap < bestGap - 0.05f
+                                              || (gap < bestGap + 0.05f && reach > bestReach)));
+            if (wins) { best = MathF.Max(best, area); bestGap = gap; bestReach = reach; material = piece.Material; }
         }
         return MathF.Min(1f, covered / faceArea);
     }

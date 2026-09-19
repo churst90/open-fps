@@ -371,7 +371,8 @@ public class ClientAudioSystem
                                            _acousticWorker.ListenerHfDecayRatio,
                                            _acousticWorker.ListenerLfDecayRatio);
             _audio.SetListenerReverbField(_acousticWorker.ListenerReturnDirection, _acousticWorker.ListenerAnisotropy,
-                                          _acousticWorker.ListenerMeanFreePath);
+                                          _acousticWorker.ListenerMeanFreePath,
+                                          _acousticWorker.ListenerSurfaceArea);
         }
         
         // 3. Synchronize the acoustic map ONLY if it changed (optimization)

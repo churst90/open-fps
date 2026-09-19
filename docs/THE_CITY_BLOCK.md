@@ -91,6 +91,52 @@ Both are in `MapSurveyTests`, with the city geometry that produced them.
 Sixty of the eighty-one are rooms; the other twenty-one are street, pavement and platform, and are
 outdoors because nothing is over them.
 
+## What walking it found: the room was assumed to be a cube
+
+Reported from the chair after the first walk: *"I walk, then I stop, stand still and I'll hear bang,
+bang, pause, bang, like echoes from my footsteps bouncing off everything... at −8.4 0 56 it is like
+when I step into an area where I am in range of hearing the reflections from one building it clicks
+in, then when I step out of range it pops again."* The capture had the master pinned at −1 dBFS in
+bursts a hundred milliseconds long, on a mix averaging −44 LUFS.
+
+`--enclosure map=city walk=-4,30:-30,30` — a new instrument that prints what the room round a
+listener measures, a step at a time along a walk — found it in one line:
+
+```
+ -8.0  30.0   40% enclosed   mfp 6.77   743 ms    send  37%
+-10.0  30.0   89% enclosed   mfp 3.14  3041 ms    send 282%   +17.5 dB from the last step
+```
+
+**Seventeen and a half decibels of reverberation, in one two-metre step**, crossing the mouth of the
+car park. Three separate faults, all now fixed:
+
+**The room equation assumed the room was a cube.** The reverberant field a source raises goes as
+1/(S·ā), and `S ≈ 13.5·MFP²` is exact for a cube and hopeless for anything flat or long. A car park
+21 by 28 metres and 2.5 high has 1,390 m² of surface; the cube form gives it 246 — five times too
+little absorption, **7.6 dB too much reverberation**, and every footstep in there went to the
+limiter's ceiling and stayed. A city is made of slabs and tubes: garages, corridors, tunnels,
+streets. `Enclosure.Look` now MEASURES the surface from the same sphere of rays as everything else —
+∮(d²/cosθ)dω is the surface area of any convex room seen from any point inside it. The garage went
+from a 456 % send to 115 %; the classical room equation says 170 %, so it is now conservative.
+(A long corridor still reads about 30 % low — 192 rays cannot resolve the far end of a tube — which
+is 1.6 dB too wet and is the stated limit of the measure.)
+
+**The room stepped instead of slewing.** The probe runs every few ticks, so its answer is a step
+function. A reverberant field cannot be: it is energy stored in a room, and it takes an RT60 to build
+up or die away. `FmodAudioProvider.AdvanceListenerRoom` walks the live values toward the measured
+ones with the room's own time constant. The measurement is still a step; what the ear gets is a walk.
+
+**And the flats were bare concrete boxes.** 330 % send, a 6-second tail — correct for four hard walls
+and nothing in the room, and nobody lives in that. Carpet in the flats and down the corridors, which
+is the "thick carpet and curtains are material entries, not code" item; the stairwell keeps its tile
+deliberately, and is now the live space in the building by a wide margin.
+
+The ladder the map reads now, as the reverb send to a source at your own feet:
+
+| street | platform | tunnel | corridor | flat | bus shelter | garage | stairwell |
+|---|---|---|---|---|---|---|---|
+| 8 % | 26 % | 39 % | 82 % | 98 % | 81 % | 102 % | 223 % |
+
 ## Four materials a city needed and the table did not have
 
 Each is a difference a listener can hear against the Concrete that was standing in for all of them.
