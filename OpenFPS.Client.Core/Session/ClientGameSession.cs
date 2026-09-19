@@ -236,10 +236,24 @@ public sealed class ClientGameSession : IDisposable
         _bindings.Bind(InputContext.Gameplay, GameKey.R, () => _network.Send(new TextCommand { Command = "stow" }));
         _bindings.Bind(InputContext.Gameplay, GameKey.V, ToggleVoiceTransmission);
 
-        // Firing, on the control keys. Both of them, because which hand is free depends on what else
-        // you are holding down, and a player should never have to think about that mid-fight.
-        _bindings.Bind(InputContext.Gameplay, GameKey.ControlLeft, Fire);
-        _bindings.Bind(InputContext.Gameplay, GameKey.ControlRight, Fire);
+        // ── Firing, on ENTER, and NEVER on a screen reader's key ────────────────────────────────
+        //
+        // This was on both control keys, and the reasoning written here was that a player must be
+        // able to fire while they are moving. True, and the wrong key: CONTROL IS HOW A SCREEN READER
+        // USER SILENCES SPEECH. Every reader there is — NVDA, JAWS, Orca, VoiceOver — stops talking
+        // when you press it, so a blind player presses control constantly, reflexively, without ever
+        // thinking of it as input to anything.
+        //
+        // What that did was fire a rifle. Found in an audio log while chasing a report of "random
+        // banging... bang, wait a few seconds, bang, like someone closing a cabinet, I have no clue
+        // what the noise is": twenty-six `recv 'AKM' ... 159 dB` events in six minutes, in bursts
+        // minutes apart, each with its bullet's impact echoing off the buildings. Five sessions were
+        // spent looking for it in the acoustics. It was the trigger.
+        //
+        // Enter, because a blind player finds it by touch without counting keys from a landmark, it
+        // is under the right hand that is already on J K L O for turning, and no reader claims it in
+        // a focused game window. See ScreenReaderKeys: nothing in gameplay may be bound to one.
+        _bindings.Bind(InputContext.Gameplay, GameKey.Enter, Fire);
 
         // Social / discovery. The plain key is the wider question and shift narrows it to here —
         // the same relationship on both, so there is one thing to remember rather than two.
@@ -259,9 +273,28 @@ public sealed class ClientGameSession : IDisposable
         _bindings.Bind(GameKey.Escape, _shell.RequestQuit);
     }
 
+    /// <summary>
+    /// Keys a screen reader owns, which nothing in gameplay may ever be bound to.
+    ///
+    /// CONTROL silences speech in every screen reader there is. ALT is the window manager's and opens
+    /// menus. Both are pressed by a blind player dozens of times a minute as punctuation, not as
+    /// input — so a game action on either is not a key that is hard to use, it is a key that fires by
+    /// itself. Control was the trigger, and it cost five sessions of hunting a "random banging" that
+    /// was the player's own rifle.
+    ///
+    /// Modified bindings are a different thing and are fine: shift-F5 is a chord somebody chose to
+    /// press. What is forbidden is a screen reader's key AS the action.
+    /// </summary>
+    public static readonly GameKey[] ScreenReaderKeys =
+        { GameKey.ControlLeft, GameKey.ControlRight, GameKey.AltLeft, GameKey.AltRight };
+
     /// <summary>Rebinds a key. Exposed so a head (or a future settings screen) can re-map without
     /// touching the session.</summary>
     public void Bind(InputContext context, GameKey key, Action action) => _bindings.Bind(context, key, action);
+
+    /// <summary>Whether anything is bound to a key in a context. For a settings screen, and for the
+    /// test that keeps a screen reader's keys free of game actions (see <see cref="ScreenReaderKeys"/>).</summary>
+    public bool IsBound(InputContext context, GameKey key) => _bindings.IsBound(context, key);
 
     private void Say(string text) => _speech.Speak(text, interrupt: true);
 
