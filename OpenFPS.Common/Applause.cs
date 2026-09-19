@@ -34,6 +34,7 @@ public readonly record struct CrowdApplause(int Clappers, float Intensity, float
 /// </summary>
 public static class Applause
 {
+
     /// <summary>Claps per second per person when they are barely bothering.</summary>
     public const float PoliteRate = 1.8f;
 
@@ -58,8 +59,56 @@ public static class Applause
     public const float SingleClapDb = 92f;
 
     /// <summary>How much of the crack rides on top of the body. The edge is what says "hands" — at
-    /// zero the whole thing rustles.</summary>
-    public const float CrackLevel = 2.0f;
+    /// zero the whole thing rustles. Fitted (below): at 2.0 there was too much above 4 kHz.</summary>
+    public const float CrackLevel = 1.2f;
+
+    // ── Fitted against a recording, 2026-09-19 ───────────────────────────────────────────────────
+    //
+    // Everything below was first settled by ear and then MEASURED against sixty-seven real claps
+    // (`inbox/Slow Clapping  HQ Sound Effects.mp3`, cut up by `tools/split_footsteps.py`, compared
+    // with `--applause compare=DIR`). The ear had put the cavity at 800 Hz "because hands are bigger
+    // and softer than they sound"; the recording puts the peak of a clap squarely at 1-2 kHz, with the
+    // flesh under it a broad plateau from 125 to 500 Hz about eight decibels down, almost nothing
+    // above 4 kHz, and the whole thing twenty decibels down FIVE milliseconds after its peak. The
+    // model had been eleven decibels heavy at 250-500 Hz, nine light at 1-2 kHz, and twice too slow —
+    // a duller, boxier, longer clap than any pair of hands makes. Same lesson as the footsteps: a
+    // shape guessed by ear and a shape measured are not the same shape. Re-fit, never nudge.
+
+    /// <summary>The note of the pocket of air an average adult's palms trap, Hz. A big pair of hands
+    /// lands about a fifth below, a child's a fifth above.</summary>
+    public const float CavityHzAdult = 1400f;
+
+    /// <summary>How far above its own note the pocket lets the contact burst through, as a multiple
+    /// of the cavity frequency. At the note itself: the recording falls twelve decibels in the octave
+    /// above the peak, and 2.8 (the old value) had the burst flat to four kilohertz.</summary>
+    public const float CavityCeiling = 1.0f;
+
+    /// <summary>Where the flesh thumps, Hz, for an adult: the centre of the 125-500 Hz plateau.</summary>
+    public const float ThumpHzAdult = 240f;
+
+    /// <summary>How long the flesh keeps moving, seconds. Two soft palms stop in a few milliseconds;
+    /// the 4-12 ms this used to be is what made every clap outlast the real ones by a factor of two.</summary>
+    public const float ThumpTauMin = 0.0015f, ThumpTauMax = 0.003f;
+
+    /// <summary>Above this the crack is filtered off, Hz. A real clap has almost nothing above 4 kHz;
+    /// what lives up there is paper.</summary>
+    public const float CrackCeilingHz = 2500f;
+
+    /// <summary>
+    /// Below this nothing radiates, Hz — two hands are a small source and a small source cannot push
+    /// low frequencies, so the spectrum drops off a cliff under sixty hertz in the recording. Applied
+    /// as a two-pole high-pass to the whole clap, because the crack noise had never been high-passed
+    /// at all and the thump resonator passed DC, and between them the 30-60 Hz band was ten decibels
+    /// too loud. A hundred and sixty because the recording's cliff is steeper than two poles, and a
+    /// corner an octave above it is what lands 30-60 Hz within three decibels; 60-125 Hz reads two
+    /// decibels light for it, which is the cheaper of the two errors.
+    /// </summary>
+    public const float RadiationFloorHz = 160f;
+
+    /// <summary>Where the contact burst's own high-pass sits, as a fraction of the cavity note. The
+    /// burst below the pocket's note is the flesh's job, and letting the burst carry it too made the
+    /// plateau under the peak six decibels too flat.</summary>
+    public const float BurstFloorRatio = 0.4f;
 
     /// <summary>
     /// How hard the contact drives the thump: the low, slow part that is two palms of flesh meeting.
@@ -67,8 +116,11 @@ public static class Applause
     /// It is the half of a clap that survives distance. Air takes the four-to-twelve-kilohertz half of
     /// a clap away over a couple of hundred metres, so a clap made ONLY of edge — which is what this
     /// was — arrives across a stadium as a crinkle, and a clap with a thump under it arrives as a clap.
+    /// Fitted (above) at 0.12 from 1.1: the recording's plateau under the peak is eight decibels down,
+    /// and at 1.1 the thump alone put it level with the peak. The thump also radiates its velocity now,
+    /// which is a bandpass, so a given level buys much less rumble than it did.
     /// </summary>
-    public const float ThumpLevel = 1.1f;
+    public const float ThumpLevel = 0.12f;
 
     /// <summary>What the rendered buffer is scaled to, as RMS. Well under full scale, because the
     /// coincidences in a dense crowd need somewhere to go.</summary>
@@ -217,11 +269,13 @@ public static class Applause
         // because a grandstand mostly is.
         float size = 0.7f + (float)Math.Pow(rng.NextDouble(), 0.7) * 0.65f;
 
-        // A cavity's note goes inversely with its linear size. About 800 Hz for an average adult;
-        // a big pair of hands lands nearer 600, a child's nearer 1,150. Settled by ear over three
-        // passes — the first estimate put it at 2,200, an octave and a half up, which read as thin
-        // and papery rather than as hands. Hands are bigger and softer than they sound like they are.
-        float cavityHz = 800f / size * (0.85f + 0.3f * (float)rng.NextDouble());
+        // A cavity's note goes inversely with its linear size. About 1.4 kHz for an average adult
+        // (CavityHzAdult); a big pair of hands lands nearer a kilohertz, a child's nearer two. The ear
+        // had settled this at 800 over three passes — "hands are bigger and softer than they sound" —
+        // and the first estimate of 2,200 had read as thin. Both were wrong for the same reason: with
+        // no flesh under it the only way to make the clap sound heavy was to drag the cavity down.
+        // Measured against a recording the peak of a clap is at 1-2 kHz, and the weight is the thump.
+        float cavityHz = CavityHzAdult / size * (0.85f + 0.3f * (float)rng.NextDouble());
         cavityHz *= 1f + 0.25f * intensity;          // harder clapping is brighter as well as louder
 
         // ...and how far away they are. People fill an AREA, so the number of them at a given
@@ -245,7 +299,7 @@ public static class Applause
         // it is low, and it is most of what survives a hundred metres of air — which is why a stand
         // full of people sounded like a crinkling bag from across the track. Scales with the hand,
         // like everything else here.
-        float thumpHz = (260f + 140f * (float)rng.NextDouble()) / size;
+        float thumpHz = ThumpHzAdult * (0.8f + 0.5f * (float)rng.NextDouble()) / size;
 
         return new Clapper(cavityHz, near / distance, loudness, cupping, thumpHz);
     }
@@ -281,12 +335,16 @@ public static class Applause
         // the hands the lower that edge reaches. Tied to the cavity, so a big pair of palms cracks
         // deeper as well as louder.
         float crackTau = 0.0005f + (float)rng.NextDouble() * 0.0009f;      // 0.5-1.4 ms
-        float bodyTau = 0.0015f + (float)rng.NextDouble() * 0.0025f;      // 1.5-4 ms
-        // The flesh is slow. Palms are soft and heavy and they take a while to stop moving, so the
-        // thump outlasts everything else in the clap by a factor of five.
-        float thumpTau = 0.004f + (float)rng.NextDouble() * 0.008f;       // 4-12 ms
+        float bodyTau = 0.001f + (float)rng.NextDouble() * 0.0015f;       // 1-2.5 ms
+        // The flesh is slower than the edge, and not by as much as it was: a real clap is twenty
+        // decibels down five milliseconds after its peak, and the thump is the last thing left.
+        float thumpTau = ThumpTauMin + (float)rng.NextDouble() * (ThumpTauMax - ThumpTauMin);
 
-        int len = Math.Min((int)(thumpTau * 5f * sampleRate), into.Length - at);
+        // Long enough for the slowest thing in it — the flesh — to have died away on its own: at
+        // eight time constants it is seventy decibels down. Five was fine when the thump ran for
+        // twelve milliseconds and left a truncation nobody could hear; at three it cut the clap off
+        // at minus forty, mid-ring.
+        int len = Math.Min((int)(thumpTau * 8f * sampleRate), into.Length - at);
         if (len <= 2) return;
 
         // The body is band-limited by the air pocket. The crack is barely filtered at all, because a
@@ -295,13 +353,11 @@ public static class Applause
         // soft, leaky walls and an opening most of its own size — so it tilts a broad spectrum rather
         // than picking a note out of it. Two and a half octaves wide here, and the narrower it was
         // made the more the whole crowd sounded like one thing rather than like many.
-        float bodyLp = Alpha(who.CavityHz * 2.8f, sampleRate);
-        // Five kilohertz, not seven. Above that a clap has very little — what lives up there is
-        // paper and cellophane, which is what a crowd of these sounded like.
-        float crackLp = Alpha(6500f, sampleRate);
+        float bodyLp = Alpha(who.CavityHz * CavityCeiling, sampleRate);
+        float crackLp = Alpha(CrackCeilingHz, sampleRate);
         // The crack's own high-pass follows the hand: big palms crack down into the low hundreds,
         // small ones do not. It is the same size that set the cavity.
-        float hpA = Alpha(90f + who.CavityHz * 0.06f, sampleRate);
+        float hpA = Alpha(who.CavityHz * BurstFloorRatio, sampleRate);
 
         // THE POCKET OF AIR RINGS, and leaving it out is what made a crowd sound like a bag being
         // crushed. The first version of this had a sharp resonator and a listener called it pouring
@@ -327,8 +383,17 @@ public static class Applause
         float th1 = 2f * tr * MathF.Cos(tw), th2 = -tr * tr;
         float thNorm = 1f - tr;
         float thA = 0f, thB = 0f;
+        // What radiates from a mass on a spring is its VELOCITY, so the thump is the resonator's
+        // output differenced — a bandpass with a zero at DC. As an all-pole filter it had passed
+        // everything below its own note straight through, at a gain that went UP as its decay was
+        // shortened, and the 30-60 Hz band was ten decibels too loud for exactly that reason. The
+        // difference is scaled back up by the resonant frequency so the note keeps its level.
+        float thVel = 1f / (2f * MathF.Sin(tw / 2f));
 
-        float lp = 0f, hp = 0f, clp = 0f;
+        float lp = 0f, hp = 0f, clp = 0f, clp2 = 0f, chp = 0f;
+        // The radiation floor: two poles, so it is a cliff and not a slope.
+        float floorA = Alpha(RadiationFloorHz, sampleRate);
+        float f1 = 0f, f2 = 0f;
         float bodyDecay = MathF.Exp(-1f / (bodyTau * sampleRate));
         float crackDecay = MathF.Exp(-1f / (crackTau * sampleRate));
         float thumpDrive = MathF.Exp(-1f / (0.0008f * sampleRate));
@@ -352,18 +417,28 @@ public static class Applause
             // The thump is excited by the contact itself — a fraction of a millisecond of it — and
             // then rings on its own long after the rest has gone.
             float thump = n3 * thumpAmp * thNorm + th1 * thA + th2 * thB;
+            float thumpOut = (thump - thA) * thVel;
             thB = thA; thA = thump;
 
+            // The crack: the same hands, so the same floor under it and a two-pole ceiling over it.
             clp += crackLp * (n2 * crackAmp - clp);
+            clp2 += crackLp * (clp - clp2);
+            chp += hpA * (clp2 - chp);
+            float crack = clp2 - chp;
 
             bodyAmp *= bodyDecay;
             crackAmp *= crackDecay;
             thumpAmp *= thumpDrive;
 
-            into[at + i] += (drive * (1f - who.Cupping * 0.25f)
-                             + cav * (1.3f * who.Cupping)
-                             + thump * 0.30f
-                             + clp) * level;
+            float y = drive * (1f - who.Cupping * 0.25f)
+                    + cav * (1.3f * who.Cupping)
+                    + thumpOut * 0.30f
+                    + crack;
+            // Two first-order high-passes in series: twelve decibels an octave under the floor.
+            f1 += floorA * (y - f1);
+            float h1 = y - f1;
+            f2 += floorA * (h1 - f2);
+            into[at + i] += (h1 - f2) * level;
         }
     }
 

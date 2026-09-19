@@ -39,6 +39,85 @@ public class ClapTests
         return (clap, peak);
     }
 
+    /// <summary>
+    /// The band balance of a MEASURED clap, from a recording of one person clapping slowly.
+    ///
+    /// Averaged over the 67 clean claps that `tools/split_footsteps.py` cut out of
+    /// `inbox/Slow Clapping  HQ Sound Effects.mp3` (2026-09-19). Normalised to its own total, so this
+    /// is the SHAPE of a clap and says nothing about level — that is <see cref="Applause.SingleClapDb"/>'s
+    /// job. Baked in so the test runs anywhere; re-measure with `--applause compare=DIR` if the
+    /// reference recording is ever replaced.
+    ///
+    /// What it says, in words: a clap peaks at 1-2 kHz — the same place a footstep does — with a broad
+    /// plateau of flesh from 125 to 500 Hz about eight decibels under the peak, a twelve-decibel fall
+    /// in the octave above it, and a cliff below sixty hertz. Before this was measured the model had
+    /// been settled by ear with its cavity at 800 Hz and a thump that ran for twelve milliseconds,
+    /// and it was eleven decibels heavy at 250-500 Hz, nine light at 1-2 kHz, and twice too slow.
+    /// </summary>
+    private static readonly float[] RealClap =
+        { -36.3f, -22.8f, -17.4f, -15.9f, -7.2f, -2.0f, -11.5f, -13.8f, -17.5f };
+
+    /// <summary>A ratchet, not a target: fitted to 3.8 dB worst-band on 2026-09-19. It may not get
+    /// worse. Tighten it if the fit improves; four decibels is where it stops being worth arguing.</summary>
+    private const float BandToleranceDb = 5f;
+
+    [Fact]
+    public void TheModelMatchesTheShapeOfARealClap()
+    {
+        var acc = new double[Spectrum.BandCount];
+        for (int seed = 0; seed < 32; seed++)
+        {
+            var (clap, _) = OneClap(seed);
+            var e = Spectrum.BandEnergy(clap, Sr);
+            for (int i = 0; i < e.Length; i++) acc[i] += e[i];
+        }
+        double total = 0;
+        foreach (double v in acc) total += v;
+        Assert.True(total > 0, "the model rendered nothing to measure");
+
+        float worst = 0f; int worstBand = 0;
+        for (int i = 0; i < Spectrum.BandCount; i++)
+        {
+            float db = 10f * MathF.Log10((float)Math.Max(acc[i] / total, 1e-9));
+            float gap = db - RealClap[i];
+            _o.WriteLine($"{Spectrum.BandName(i),-14} real {RealClap[i],6:F1}   synth {db,6:F1}   {gap,+6:F1}");
+            if (MathF.Abs(gap) > MathF.Abs(worst)) { worst = gap; worstBand = i; }
+        }
+        _o.WriteLine($"worst: {Spectrum.BandName(worstBand)} at {worst:+0.0;-0.0} dB");
+        Assert.True(MathF.Abs(worst) <= BandToleranceDb,
+            $"{Spectrum.BandName(worstBand)} is {worst:+0.0;-0.0} dB from a real clap, past the {BandToleranceDb:F0} dB ratchet.");
+    }
+
+    /// <summary>
+    /// A real clap is twenty decibels down five milliseconds after its peak (median of the 67, 1 ms
+    /// RMS envelope). The model had taken thirteen and a half; a clap that lingers is a clap heard
+    /// in a room, and the room is the engine's job, not the clap's.
+    /// </summary>
+    [Fact]
+    public void AClapIsOverAlmostAtOnce()
+    {
+        var times = new List<float>();
+        for (int seed = 0; seed < 16; seed++)
+        {
+            var (clap, _) = OneClap(seed);
+            float peak = 0f; int peakAt = 0;
+            for (int i = 0; i < clap.Length; i++) if (MathF.Abs(clap[i]) > peak) { peak = MathF.Abs(clap[i]); peakAt = i; }
+            float floor = peak * 0.1f;
+            int win = Sr / 1000, last = peakAt;
+            for (int at = clap.Length - win; at > peakAt; at -= win)
+            {
+                double sum = 0;
+                for (int i = at; i < at + win; i++) sum += clap[i] * (double)clap[i];
+                if (Math.Sqrt(sum / win) > floor) { last = at + win; break; }
+            }
+            times.Add(1000f * (last - peakAt) / Sr);
+        }
+        times.Sort();
+        float median = times[times.Count / 2];
+        _o.WriteLine($"gone by 20 dB: median {median:F1} ms (real 5.0)");
+        Assert.True(median < 8f, $"the clap takes {median:F1} ms to fall 20 dB; a real one takes 5.");
+    }
+
     /// <summary>A clap is not a tick: most of it lives below 1.5 kHz, where hands are.</summary>
     [Fact]
     public void AClapHasABodyAndNotJustAnEdge()
@@ -60,8 +139,11 @@ public class ClapTests
     }
 
     /// <summary>
-    /// ...and it outlasts its own edge. The old one stopped dead at twenty-four milliseconds; a clap
-    /// has a tail, and the tail is the flesh.
+    /// ...and it outlasts its own edge, but not by much. The recording (median of 67 claps, 1 ms
+    /// RMS against the peak) reads -31 dB at 8 ms, -35 at 16, -52 at 30 and -64 at 45; the slow part
+    /// of that is the room it was made in, and the room is the engine's job: the model's own flesh is
+    /// seventy decibels down by sixteen. What is held here is that there IS a tail past the crack —
+    /// the first model stopped dead at twenty-four milliseconds — and that it is gone by thirty.
     /// </summary>
     [Fact]
     public void AClapOutlastsItsOwnEdge()
@@ -72,15 +154,16 @@ public class ClapTests
         float At(int ms)
         {
             int from = ms * Sr / 1000, to = Math.Min(clap.Length, from + Sr / 1000);
-            if (from >= clap.Length) return 0f;
+            if (from >= clap.Length) return -180f;
             double sum = 0; int n = 0;
             for (int i = from; i < to; i++) { sum += clap[i] * (double)clap[i]; n++; }
             return (float)(20 * Math.Log10(Math.Max(1e-9, Math.Sqrt(sum / Math.Max(1, n)) / peak)));
         }
 
-        _o.WriteLine($"8 ms {At(8):F1} dB, 16 ms {At(16):F1} dB, 30 ms {At(30):F1} dB, 45 ms {At(45):F1} dB");
-        Assert.True(At(30) > -50f, $"the clap is already gone at 30 ms ({At(30):F1} dB).");
-        Assert.True(At(45) < At(8), "it should be decaying, not sustaining.");
+        _o.WriteLine($"8 ms {At(8):F1} dB, 16 ms {At(16):F1} dB, 30 ms {At(30):F1} dB, 45 ms {At(45):F1} dB   (real -31, -35, -52, -64)");
+        Assert.True(At(8) > -50f, $"the clap is already gone at 8 ms ({At(8):F1} dB): it is all edge.");
+        Assert.True(At(30) < -40f, $"the clap is still {At(30):F1} dB at 30 ms; a real one is -52 and that includes its room.");
+        Assert.True(At(16) < At(8), "it should be decaying, not sustaining.");
     }
 
     /// <summary>
