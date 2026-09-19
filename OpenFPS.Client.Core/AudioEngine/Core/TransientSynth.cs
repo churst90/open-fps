@@ -155,14 +155,51 @@ public static class TransientSynth
     /// leaves rather than switching on.</summary>
     private static void RenderHiss(float[] buffer, float hz, float seconds, Random rng)
     {
-        var filter = new Resonator(hz, q: 0.9f);
-        int attack = Math.Max(1, buffer.Length / 12);
-        float k = 4.0f / buffer.Length;
-        for (int i = 0; i < buffer.Length; i++)
+        // ── TURBULENCE IS NOT A RESONANCE, AND A BREATH HAS NO TRANSIENT ────────────────────────
+        //
+        // This was noise through ONE resonator at Q 0.9, with an attack a twelfth of its own length.
+        // Both are wrong and both are audible. A resonance that narrow puts everything in one band:
+        // measured, an exhale came out peaking at 250-1000 Hz with 2-4 kHz twenty-three decibels down
+        // and 4-8 kHz thirty-two down — and the top is where a breath LIVES, it is the whole of what
+        // makes "hhh" sound like air rather than like a thud. And a sharp attack on a 300 ms noise
+        // burst is a transient, which is the difference between a breath and a soft bang.
+        //
+        // It was reported as exactly that, over six sessions: "random banging... it is 2 different
+        // bangs so it makes me think it's breathing in and out... I don't hear the breathing either".
+        // Two bangs, because an inhale and an exhale are different; no breathing, because neither of
+        // them sounded like one.
+        //
+        // What turbulence actually is: a broad band, not a peak. Air tearing past a narrow opening
+        // radiates over decades, rolling off gently either side of a centre set by the aperture and
+        // the flow. So the noise is shaped by a wide band — two poles down at the top, one up at the
+        // bottom — around `hz` rather than resonated at it, which leaves the 2-6 kHz that carries the
+        // character. An inhale is drawn through a narrower opening, so its `hz` is higher and the
+        // whole band moves up with it: brighter, by the same arithmetic, with nothing added.
+        int n = buffer.Length;
+        float lowCut = MathF.Max(60f, hz / 3f);
+        float highCut = MathF.Min(SampleRate * 0.45f, hz * 8f);
+        float aHigh = 1f - MathF.Exp(-MathF.Tau * highCut / SampleRate);
+        float aLow = 1f - MathF.Exp(-MathF.Tau * lowCut / SampleRate);
+        float lp1 = 0f, lp2 = 0f, hp = 0f;
+
+        // ...and it SWELLS. A breath is a flow that starts, peaks and stops — a third of its length
+        // rising, on a raised cosine so there is no corner anywhere in it for an ear to hear as an
+        // onset. That single change is most of the difference between air and a knock.
+        int attack = Math.Max(1, (int)(n * 0.35f));
+        int fall = Math.Max(1, n - attack);
+
+        for (int i = 0; i < n; i++)
         {
             float noise = (float)(rng.NextDouble() * 2.0 - 1.0);
-            float envelope = i < attack ? i / (float)attack : MathF.Exp(-k * (i - attack));
-            buffer[i] = filter.Process(noise) * envelope;
+            lp1 += aHigh * (noise - lp1);
+            lp2 += aHigh * (lp1 - lp2);
+            hp += aLow * (lp2 - hp);
+            float band = lp2 - hp;
+
+            float envelope = i < attack
+                ? 0.5f * (1f - MathF.Cos(MathF.PI * i / attack))
+                : MathF.Exp(-3f * (i - attack) / fall);
+            buffer[i] = band * envelope;
         }
     }
 

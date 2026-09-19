@@ -380,6 +380,15 @@ if (args.Contains("--engine-alias"))
     Log.CloseAndFlush();
     Environment.Exit(eacode);
 }
+if (args.Contains("--breath"))
+{
+    // --breath [effort= seconds= out=]: the real Breathing model rendered through the real
+    // TransientSynth, laid out at its own times and levels. See BreathSpike.
+    int brCode = OpenFPS.Client.Core.AudioEngine.Fmod.BreathSpike.Run(args);
+    Log.CloseAndFlush();
+    Environment.Exit(brCode);
+}
+
 if (args.Contains("--walk"))
 {
     // --walk [map= from= to= seconds= stand= sprint]: the REAL movement engine and ground probe over a
