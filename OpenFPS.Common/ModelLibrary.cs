@@ -44,6 +44,11 @@ public static class ModelLibrary
         public const string Whistle = "whistle";
         public const string Bell = "bell";
         public const string Air = "air";
+
+        /// <summary>A machine that stands still and runs: a mower, a condenser unit, a generator.
+        /// A city is full of them and every one is a parts list, so a map should be able to write
+        /// its own without touching C#.</summary>
+        public const string SmallMachine = "small_machine";
     }
 
     private sealed class ModelFile
@@ -81,6 +86,7 @@ public static class ModelLibrary
         [Kinds.Whistle] = WhistleSpec.Presets.ToDictionary(p => p.Key, p => (Func<object>)(() => p.Value()), StringComparer.OrdinalIgnoreCase),
         [Kinds.Bell] = StruckBellSpec.Presets.ToDictionary(p => p.Key, p => (Func<object>)(() => p.Value()), StringComparer.OrdinalIgnoreCase),
         [Kinds.Air] = AirSystemSpec.Presets.ToDictionary(p => p.Key, p => (Func<object>)(() => p.Value()), StringComparer.OrdinalIgnoreCase),
+        [Kinds.SmallMachine] = SmallMachineSpec.Presets.ToDictionary(p => p.Key, p => (Func<object>)(() => p.Value()), StringComparer.OrdinalIgnoreCase),
         [Kinds.RailVehicle] = new(StringComparer.OrdinalIgnoreCase)
         {
             ["genesis_p42"] = () => TrainProfile.GenesisP42,
@@ -112,6 +118,7 @@ public static class ModelLibrary
         [Kinds.Whistle] = typeof(WhistleSpec),
         [Kinds.Bell] = typeof(StruckBellSpec),
         [Kinds.Air] = typeof(AirSystemSpec),
+        [Kinds.SmallMachine] = typeof(SmallMachineSpec),
     };
 
     // ── Loading ─────────────────────────────────────────────────────────────────────────────────
@@ -231,6 +238,7 @@ public static class ModelLibrary
     public static WhistleSpec Whistle(string id) => Get<WhistleSpec>(Kinds.Whistle, id);
     public static StruckBellSpec Bell(string id) => Get<StruckBellSpec>(Kinds.Bell, id);
     public static AirSystemSpec Air(string id) => Get<AirSystemSpec>(Kinds.Air, id);
+    public static SmallMachineSpec SmallMachine(string id) => Get<SmallMachineSpec>(Kinds.SmallMachine, id);
 
     // ── Writing ─────────────────────────────────────────────────────────────────────────────────
 

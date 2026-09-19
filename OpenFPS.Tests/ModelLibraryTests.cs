@@ -40,6 +40,7 @@ public class ModelLibraryTests : IDisposable
                     ModelLibrary.Kinds.Whistle => ModelLibrary.Whistle(id),
                     ModelLibrary.Kinds.Bell => ModelLibrary.Bell(id),
                     ModelLibrary.Kinds.Air => ModelLibrary.Air(id),
+                    ModelLibrary.Kinds.SmallMachine => ModelLibrary.SmallMachine(id),
                     _ => throw new InvalidOperationException($"no accessor for kind '{kind}'"),
                 };
                 bool ok = ModelLibrary.RoundTrips(kind, spec, out string before, out string after);

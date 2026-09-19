@@ -1820,9 +1820,135 @@ public sealed record EngineProfile
         Mechanical = new MechanicalSpec { ValvetrainLevel = 0.7f, CombustionKnock = 0.04f, AccessoryWhineOrder = 0f, AccessoryWhineLevel = 0f },
     };
 
+    /// <summary>
+    /// A 163 cc overhead-valve single: the engine on a walk-behind mower, a pressure washer and half
+    /// the small machinery in a garden.
+    ///
+    /// Everything about it is small and slow, and that is what it sounds like. It fires once every
+    /// two revolutions, so at its governed 2,900 rpm the firing rate is 24 Hz — below the bottom of
+    /// pitch, which is why a mower is a *chuffing* rather than a note, and why its second order
+    /// (48 Hz) and the blade's 97 Hz are what you actually hear of it. The exhaust is fifteen
+    /// centimetres of 22 mm pipe into a stamped steel can the size of a fist, which will not silence
+    /// anything but takes the sharpness off; the intake is a 20 mm carburettor behind a paper element
+    /// in a plastic box, and at this size the intake is nearly as loud as the exhaust.
+    ///
+    /// There is no idle preset worth having here because these engines are never idled: the throttle
+    /// is a governor's to move and it holds one speed from the moment it starts. See
+    /// <see cref="GovernorSpec"/>.
+    /// </summary>
+    public static EngineProfile MowerSingle => new()
+    {
+        Name = "163 cc OHV single",
+        Layout = EngineLayout.Inline,
+        FiringAngles = new[] { 0f },
+        Bank = new[] { 0 },
+        BoreMm = 68f, StrokeMm = 45f, RodRatio = 1.9f, CompressionRatio = 8.5f,
+        // A mower cam is as mild as a cam gets: almost no overlap, because an engine that must make
+        // its torque at 2,600 rpm and idle at nothing gains nothing from scavenging and loses
+        // everything to reversion.
+        ExhaustCam = new CamLobe { DurationDegrees = 216f, MaxLiftMm = 6.2f, RampFraction = 0.25f, CentrelineDegrees = 246f },
+        IntakeCam = new CamLobe { DurationDegrees = 212f, MaxLiftMm = 6.0f, RampFraction = 0.25f, CentrelineDegrees = 478f },
+        ExhaustValve = new ValveSpec { Count = 1, DiameterMm = 23f, DischargeCoefficient = 0.6f },
+        IntakeValve = new ValveSpec { Count = 1, DiameterMm = 27f, DischargeCoefficient = 0.6f },
+        EvoTemperatureK = 1050f, IdleMapBar = 0.5f,
+        IdleRoughness = 0.35f, IdleGovernorGain = 2f,
+        IdleRpm = 1600f, RedlineRpm = 3600f,
+        // The flywheel is a cast lump on the crank with the magneto in it, and on a mower the BLADE
+        // is bolted to the other end and is more inertia again — that part is the machine's, not the
+        // engine's, and arrives as ExternalInertia.
+        InertiaKgM2 = 0.011f, FrictionNm = 0.8f, FrictionNmPerKrpm = 0.5f,
+        PeakTorqueNm = 7.4f, PeakTorqueRpm = 2600f,
+        Exhaust = new ExhaustSpec
+        {
+            PrimaryLengthMetres = 0.15f, PrimaryDiameterMm = 22f,
+            CollectorGroups = new[] { new[] { 0 } },
+            CollectorDiameterMm = 22f, CollectorPipeMetres = 0.05f,
+            Crossover = CrossoverKind.None,
+            MidPipeMetres = 0.04f,
+            // A stamped can with two baffles and no packing: it reflects, it does not absorb, which
+            // is why a mower muffler is tinny rather than quiet.
+            Muffler = new MufflerSpec
+            {
+                Kind = MufflerKind.Baffled,
+                ChamberLengthsMetres = new[] { 0.06f, 0.08f },
+                ExpansionRatio = 7f, BaffleLoss = 0.5f,
+                Absorption = 0.12f, AbsorptiveLengthMetres = 0.05f,
+                ResonatorHz = 0f,
+            },
+            TailpipeMetres = new[] { 0.04f },
+            TailpipeDiameterMm = 24f,
+            GasCelsiusIdle = 260f, GasCelsiusFull = 620f,
+            // Thin steel, air-cooled, and a very short run: it loses heat fast but has almost no
+            // length to lose the top of the band over.
+            WallLossMultiplier = 1.1f,
+            OverrunPopRate = 1f,
+        },
+        Intake = new IntakeSpec { RunnerLengthMetres = 0.06f, RunnerDiameterMm = 20f, PlenumLitres = 0.15f, ThrottleDiameterMm = 20f, AirboxLitres = 1.1f, SnorkelLengthMetres = 0.06f, SnorkelDiameterMm = 26f, Level = 1.0f, Absorption = 0.25f },
+        // An OHV single with a pushrod each way and solid lifters: audible tappets, and at this
+        // compression no knock to speak of.
+        Mechanical = new MechanicalSpec { ValvetrainLevel = 1.1f, CombustionKnock = 0.03f },
+    };
+
+    /// <summary>
+    /// A 500 cc air-cooled V-twin at 90 degrees: the engine in a lawn tractor.
+    ///
+    /// The one thing that matters against the 163 single is that it fires TWICE per two revolutions
+    /// instead of once, so at 3,200 rpm the firing rate is 53 Hz rather than 24 — an octave up and
+    /// into the bottom of pitch, which is why a lawn tractor drones where a push mower chuffs. Its
+    /// two pipes are unequal and join late, and 90 degrees between the cylinders means the two bangs
+    /// are unevenly spaced within the cycle, so the "note" is really two interleaved series a fifth
+    /// of a revolution apart. That uneven spacing IS the loping sound, and it comes from the vee
+    /// angle in the firing table rather than from anything added.
+    /// </summary>
+    public static EngineProfile MowerTwin => new()
+    {
+        Name = "500 cc air-cooled V-twin",
+        Layout = EngineLayout.Vee,
+        // Both rods on one crankpin with 90 degrees between the cylinders: the rear fires 270
+        // degrees after the front, and then there are 450 before the front comes round again. That
+        // uneven pair is what a V-twin IS, and it is written here as the two intervals it is.
+        FiringAngles = IntervalFire(new[] { 1, 2 }, new[] { 270f, 450f }),
+        Bank = new[] { 0, 1 },
+        BoreMm = 68f, StrokeMm = 68f, RodRatio = 1.8f, CompressionRatio = 8.8f,
+        ExhaustCam = new CamLobe { DurationDegrees = 224f, MaxLiftMm = 7.0f, RampFraction = 0.25f, CentrelineDegrees = 244f },
+        IntakeCam = new CamLobe { DurationDegrees = 220f, MaxLiftMm = 6.8f, RampFraction = 0.25f, CentrelineDegrees = 476f },
+        ExhaustValve = new ValveSpec { Count = 1, DiameterMm = 26f, DischargeCoefficient = 0.6f },
+        IntakeValve = new ValveSpec { Count = 1, DiameterMm = 30f, DischargeCoefficient = 0.6f },
+        EvoTemperatureK = 1070f, IdleMapBar = 0.48f,
+        IdleRoughness = 0.3f, IdleGovernorGain = 2f,
+        IdleRpm = 1500f, RedlineRpm = 3900f,
+        InertiaKgM2 = 0.03f, FrictionNm = 2.1f, FrictionNmPerKrpm = 0.9f,
+        PeakTorqueNm = 27f, PeakTorqueRpm = 2800f,
+        Exhaust = new ExhaustSpec
+        {
+            PrimaryLengthsMetres = new[] { 0.22f, 0.30f }, PrimaryDiameterMm = 26f,
+            CollectorGroups = new[] { new[] { 0, 1 } },
+            CollectorDiameterMm = 30f, CollectorPipeMetres = 0.10f,
+            Crossover = CrossoverKind.None,
+            MidPipeMetres = 0.08f,
+            Muffler = new MufflerSpec
+            {
+                Kind = MufflerKind.Baffled,
+                ChamberLengthsMetres = new[] { 0.10f, 0.14f },
+                ExpansionRatio = 8f, BaffleLoss = 0.55f,
+                Absorption = 0.2f, AbsorptiveLengthMetres = 0.1f,
+                ResonatorHz = 0f,
+            },
+            TailpipeMetres = new[] { 0.08f },
+            TailpipeDiameterMm = 30f,
+            GasCelsiusIdle = 270f, GasCelsiusFull = 650f,
+            WallLossMultiplier = 1.15f,
+            OverrunPopRate = 2f,
+        },
+        Intake = new IntakeSpec { RunnerLengthMetres = 0.09f, RunnerDiameterMm = 26f, PlenumLitres = 0.3f, ThrottleDiameterMm = 26f, AirboxLitres = 2f, SnorkelLengthMetres = 0.08f, SnorkelDiameterMm = 34f, Level = 0.95f, Absorption = 0.25f },
+        Mechanical = new MechanicalSpec { ValvetrainLevel = 1.0f, CombustionKnock = 0.035f },
+    };
+
     public static IReadOnlyDictionary<string, Func<EngineProfile>> Presets { get; } =
         new Dictionary<string, Func<EngineProfile>>(StringComparer.OrdinalIgnoreCase)
         {
+            ["mower_single"] = () => MowerSingle,
+            ["mower_twin"] = () => MowerTwin,
             ["v8_muscle"] = () => V8MuscleBigBlock,
             ["v8_sports"] = () => V8SportsFlowmaster40,
             ["v8_flatplane"] = () => V8FlatPlane,

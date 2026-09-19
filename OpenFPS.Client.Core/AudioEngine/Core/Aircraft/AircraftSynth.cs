@@ -249,6 +249,12 @@ internal sealed class BladeRow
     private readonly float _refAmp;
     private float _hp, _hpAlpha;
 
+    // The broadband half: turbulence off the trailing edge and the tip, band-limited by a Strouhal
+    // number on the blade's thickness. Zero-cost for a row that declares none.
+    private readonly float _selfAmp;
+    private readonly Random? _selfRng;
+    private float _selfLo1, _selfLo2, _selfHi1, _selfHi2, _selfAlphaLo, _selfAlphaHi, _selfNow;
+
     private struct Pulse { public double T0; public float Tau, AmpT, AmpL, AmpB; public bool Live; }
     private readonly Pulse[] _pulses = new Pulse[24];
     private double _t;
@@ -273,6 +279,34 @@ internal sealed class BladeRow
         float pRms = 20e-6f * MathF.Pow(10f, s.ReferenceDb / 20f);
         _refAmp = pRms / MathF.Sqrt(1.33f * refTau * refBpf);
         _hpAlpha = OnePole.AlphaFor(20f, rate);
+
+        if (s.SelfNoiseDb > 1f)
+        {
+            _selfRng = new Random(seed + 991);
+            // The band the vortices are shed in: f = St U / t, St = 0.2, t the blade's own
+            // thickness. Two octaves of it, because a turbulent wake is not a resonance.
+            float thickness = MathF.Max(1e-3f, s.ChordMetres * s.ThicknessRatio);
+            float centre = Math.Clamp(0.2f * refTip / thickness, 80f, rate * 0.38f);
+            _selfAlphaHi = OnePole.AlphaFor(Math.Clamp(centre * 2f, 120f, rate * 0.42f), rate);
+            _selfAlphaLo = OnePole.AlphaFor(Math.Clamp(centre * 0.5f, 40f, rate * 0.2f), rate);
+            // Two two-pole lowpasses differenced is the band; its gain against white noise depends
+            // on where the corners landed, so it is MEASURED here rather than assumed, and the
+            // declared level is then the level it really makes.
+            float sum = 0f;
+            var probe = new Random(7);
+            float a1 = 0f, a2 = 0f, b1 = 0f, b2 = 0f;
+            for (int i = 0; i < 8192; i++)
+            {
+                float n = (float)(probe.NextDouble() * 2 - 1) * 1.732f;   // unit variance
+                a1 += _selfAlphaHi * (n - a1); a2 += _selfAlphaHi * (a1 - a2);
+                b1 += _selfAlphaLo * (n - b1); b2 += _selfAlphaLo * (b1 - b2);
+                float y = a2 - b2;
+                if (i > 2048) sum += y * y;
+            }
+            float bandRms = MathF.Sqrt(sum / 6144f);
+            float pSelf = 20e-6f * MathF.Pow(10f, s.SelfNoiseDb / 20f);
+            _selfAmp = pSelf / MathF.Max(1e-6f, bandRms);
+        }
     }
 
     /// <summary>Speed, loading (0..1), and where the listener is in the machine's frame.</summary>
@@ -342,6 +376,24 @@ internal sealed class BladeRow
                 if (xb > -4f && xb < 4f) y += p.AmpB * (xb * xb - 1f) * MathF.Exp(-0.5f * xb * xb);
             }
         }
+        if (_selfRng != null)
+        {
+            // Dipole: pressure with the cube of tip speed, so power with the sixth. The loading term
+            // enters as a square root — half of this is the wake the blade drags whatever it is
+            // doing, half is the turbulence its own lift makes.
+            float u = _s.TipSpeed(_rpm) / MathF.Max(1f, _s.TipSpeed(_s.RpmMax));
+            float n = (float)(_selfRng.NextDouble() * 2 - 1) * 1.732f;
+            _selfHi1 += _selfAlphaHi * (n - _selfHi1); _selfHi2 += _selfAlphaHi * (_selfHi1 - _selfHi2);
+            _selfLo1 += _selfAlphaLo * (n - _selfLo1); _selfLo2 += _selfAlphaLo * (_selfLo1 - _selfLo2);
+            _selfNow = (_selfHi2 - _selfLo2) * _selfAmp * u * u * u
+                     * MathF.Sqrt(Math.Clamp(0.4f + 0.6f * _loading, 0f, 1.6f))
+                     // Trailing-edge noise is a dipole normal to the blade, so it is loudest out of
+                     // the faces of the disc and a few decibels down in its plane — the opposite way
+                     // round from thickness noise, and much gentler.
+                     * (0.7f + 0.3f * _offPlane);
+            y += _selfNow;
+        }
+
         // Nothing below 20 Hz radiates from anything this size; a duct takes more.
         _hp += _hpAlpha * (y - _hp);
         return y - _hp;

@@ -380,6 +380,15 @@ if (args.Contains("--engine-alias"))
     Log.CloseAndFlush();
     Environment.Exit(eacode);
 }
+if (args.Contains("--yard"))
+{
+    // --yard [preset ...] [levels] [pass] [sec= dist=]: the machinery that stands in a garden and
+    // runs — mowers and air conditioners — measured, scripted and walked past.
+    int yardCode = OpenFPS.Client.Core.AudioEngine.Fmod.YardSpike.Run(args);
+    Log.CloseAndFlush();
+    Environment.Exit(yardCode);
+}
+
 if (args.Contains("--aircraft"))
 {
     // --aircraft [preset ...] [alt= speed= offset= sec= lever= descend=]: aircraft flying past a

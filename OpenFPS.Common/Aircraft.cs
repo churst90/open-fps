@@ -66,6 +66,27 @@ public sealed record BladeRowSpec
     /// under a propeller's note and the whole of the buzz-saw comb on a supersonic fan.</summary>
     public float BladeScatter { get; init; } = 0.015f;
 
+    /// <summary>
+    /// Broadband self-noise at one metre, in the disc plane, at <see cref="RpmMax"/> and full
+    /// loading, dB. Zero means the row does not declare any.
+    ///
+    /// The pulse train above is the TONAL half of a rotating blade: the same thing happening once
+    /// per blade per revolution. The other half is the turbulence — the boundary layer leaving the
+    /// trailing edge and the vortex rolling off the tip — which is broadband, and which of the two
+    /// dominates is decided by how fast the tips go. A propeller at Mach 0.8 concentrates its energy
+    /// into harmonics so hard (the passage compresses by 1/(1-M), which is what the pulse model
+    /// already does) that the broadband is twenty decibels under and inaudible; that is why the
+    /// aircraft presets declare none and are unchanged by this existing. A mower blade at Mach 0.26
+    /// and a condenser fan at Mach 0.06 are the other end of it: almost everything you hear of
+    /// either is this, and the blade-passing tone is a thump underneath.
+    ///
+    /// It scales with the CUBE of tip speed — dipole radiation, power as the sixth — and sits in a
+    /// band placed by a Strouhal number on the blade's own THICKNESS, which is the length scale the
+    /// vortices are shed on: f = 0.2 U / t. That is why a thin fast fan hisses and a blunt slow
+    /// mower blade roars, and neither is an equaliser setting.
+    /// </summary>
+    public float SelfNoiseDb { get; init; }
+
     public float TipSpeed(float rpm) => MathF.PI * DiameterMetres * rpm / 60f;
     public float BladePassHz(float rpm) => Blades * rpm / 60f;
 }
