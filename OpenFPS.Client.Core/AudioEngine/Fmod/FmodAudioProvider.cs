@@ -946,6 +946,10 @@ public class FmodAudioProvider : IAudioProvider
     private float _lastWrittenReverbMs = -1f;
     private int _appliedReverbRegionId = int.MinValue;
 
+    /// <summary>What decay each bus was last driven to. A bus's decay belongs to the bus, so coming
+    /// back to a room resumes where that room was instead of jumping. See ApplySimulatedReverb.</summary>
+    private readonly Dictionary<int, float> _appliedPerRegion = new();
+
     /// <summary>Smallest change in decay worth writing, ms. Below this the slew has converged and
     /// restating it is a parameter change for no audible gain.</summary>
     private const float ReverbWriteEpsilonMs = 2.0f;
@@ -1025,8 +1029,17 @@ public class FmodAudioProvider : IAudioProvider
         if (listenerRegionId != _appliedReverbRegionId)
         {
             _appliedReverbRegionId = listenerRegionId;
-            _appliedReverbMs = 0f;
-            _lastWrittenReverbMs = -1f;
+            // EACH BUS REMEMBERS ITS OWN. Crossing a boundary used to zero the slew and hard-write the
+            // new room's measurement on the next update — a jump straight onto a unit, every crossing.
+            // Walking PAST a doorway is not one crossing, it is a dozen: the region under your feet
+            // flips as the opening comes and goes, and each flip wrote a fresh decay. Reported as
+            // "just walking past an opening to a building causes it to pop in and pop out".
+            //
+            // A bus's decay is a property of that bus, so it is kept per bus. Coming back to a room
+            // you were in a second ago resumes where that room was, which is both what a listener
+            // expects and what the DSP is already sounding.
+            _appliedReverbMs = _appliedPerRegion.TryGetValue(listenerRegionId, out float was) ? was : 0f;
+            _lastWrittenReverbMs = _appliedReverbMs > 0f ? _appliedReverbMs : -1f;
         }
         if (_appliedReverbMs <= 0f) _appliedReverbMs = measured;   // first reading: no tail to protect
         else _appliedReverbMs += (measured - _appliedReverbMs) * AcousticConstants.OutdoorWetBlendSpeed;
@@ -1066,6 +1079,7 @@ public class FmodAudioProvider : IAudioProvider
             dsp.setParameterFloat((int)DSP_SFXREVERB.EARLYLATEMIX, Math.Clamp(earlyLate, 0f, 100f));
             dsp.setParameterFloat((int)DSP_SFXREVERB.LATEDELAY, lateDelayMs);
             _lastWrittenReverbMs = ms;
+            _appliedPerRegion[listenerRegionId] = ms;
         }
 
         // The cap is on the TIME only: the estimator's tail can run long, and an uncapped two-second

@@ -1443,10 +1443,98 @@ public class ClientAudioSystem
         };
         _audio.Submit(footstep);
 
-        // NOTE: footsteps deliberately do NOT spawn reflection/echo emitters. Bouncing each step off
-        // the surrounding walls scattered the sound "all over the place" in enclosed rooms instead of
-        // staying localized at the player's feet. The room's reverb bus still gives footsteps their
-        // indoor character; per-step geometric reflections are reserved for world emitters.
+        SubmitStepReflections(nudgePos, resolvedSoundId, stepGain, stepReference);
+    }
+
+    /// <summary>Voices for the surfaces answering your own footfalls. Their own pool, so a wall's copy
+    /// can never take the slot of the step it is a copy of.</summary>
+    private const int STEP_ECHO_BASE_ID = -200;
+    private const int STEP_ECHO_POOL_SIZE = 16;
+    private int _stepEchoIndex;
+
+    /// <summary>
+    /// How many surfaces answer one footfall.
+    ///
+    /// Few on purpose. What a listener needs from a room is the nearest two or three arrivals — the
+    /// floor, whatever is over your head, the wall you are walking along — because those are the ones
+    /// close enough and loud enough to say where they are. Past that the arrivals are too many and too
+    /// close together to have a direction any more, which is what the diffuse bus is for.
+    /// </summary>
+    private const int StepEchoTaps = 3;
+
+    /// <summary>
+    /// The walls answering your own footsteps.
+    ///
+    /// Footsteps used to spawn none of these. The comment that stood here said per-step geometric
+    /// reflections had been tried and "scattered the sound all over the place in enclosed rooms",
+    /// and that the reverb bus would give them their indoor character instead. It does not, and it
+    /// cannot: a bus is DIFFUSE. Reported from the chair, walking the city's car park —
+    ///
+    ///   "a parking garage is big, this sounds like a box... rather than reflections being emitted
+    ///    from the walls, it's like the whole room is reverby... it surrounds me rather than being
+    ///    directional. I should hear reflections from a wall, from the wall's direction, not an all
+    ///    around reflection from everywhere at once."
+    ///
+    /// — which is exactly right, and exactly what direct-plus-diffuse-tail with nothing in between
+    /// sounds like. The near-field probes already give the last three metres (and were reported as
+    /// working: "only when I get close to walls do I hear the proximity, which is good"); the diffuse
+    /// bus gives the tail. Everything from three metres to the size of the room was missing, and in a
+    /// twenty-one by twenty-eight metre garage that is the whole room.
+    ///
+    /// What fills it is the machinery that already answers for world events and engines: first-order
+    /// image sources off the surfaces actually there, each played from the mirrored position so it
+    /// arrives FROM ITS OWN WALL, delayed by its own extra path. A ceiling nine hundred millimetres
+    /// over your head answers in five milliseconds and is most of why a low garage sounds low; a wall
+    /// ten metres off answers in fifty-five and is the slap. Neither is a tail.
+    ///
+    /// The old failure is guarded against by the two things that were missing then rather than by
+    /// refusing to do it: only a handful of taps, and a level that is the SURFACE's loss alone — the
+    /// distance is applied by the engine when it places the copy at the image position, so a copy off
+    /// a far wall is quiet because it is far, not because anybody scaled it.
+    /// </summary>
+    private void SubmitStepReflections(Vector3 stepPos, string soundId, float stepGain, float stepReference)
+    {
+        if (_engineEchoes.SurfaceCount == 0) return;
+
+        Vector3 ear = _state.VisualPosition + new Vector3(0, 1.7f, 0);
+        Span<OpenFPS.Common.Reflection> found = stackalloc OpenFPS.Common.Reflection[OpenFPS.Common.EarlyReflections.MaxArrivals];
+        int n = _engineEchoes.FindReflections(stepPos, ear, AudioPhysics.SpeedOfSound, found, diffuseTaps: 1);
+        if (n <= 0) return;
+
+        float direct = MathF.Max(0.5f, Vector3.Distance(stepPos, ear));
+        int taps = 0;
+        for (int i = 0; i < n && taps < StepEchoTaps; i++)
+        {
+            var r = found[i];
+            // What the SURFACE took, with the distance divided back out: the voice is placed at the
+            // image position, so the engine applies the path's own falloff. Multiplying both in would
+            // count the distance twice and is how a reflection ends up inaudible.
+            float surfaceGain = Math.Clamp(r.Gain * r.PathLength / direct, 0f, 1f);
+            if (surfaceGain < OpenFPS.Common.ImageSource.MinGain) continue;
+
+            int echoId = STEP_ECHO_BASE_ID - (_stepEchoIndex % STEP_ECHO_POOL_SIZE);
+            _stepEchoIndex++;
+            taps++;
+
+            _audio.Submit(new SpatialEmitter
+            {
+                EntityId = echoId,
+                SoundId = soundId,
+                Position = r.ApparentPosition,
+                ApparentPosition = r.ApparentPosition,
+                Type = EmitterType.WorldLocked,
+                Volume = stepGain * surfaceGain,
+                MinDistance = stepReference,
+                Range = 25f,
+                // From the wall, later than the step, and NOT pinned to the listener: a reflection
+                // stays where the wall is while you walk on, which is the whole of what makes it a
+                // wall rather than a part of you.
+                DelayMs = r.DelaySeconds * 1000f,
+                IsReflection = true,
+                IsEvent = true,
+                ReflectionSpread = r.IsDiffuse ? 1f : 0f,
+            });
+        }
     }
 
     /// <summary>
