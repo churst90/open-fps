@@ -118,11 +118,35 @@ public sealed class StrideAccumulator
     /// <summary>How soon after landing another landing may sound, seconds.</summary>
     public const double MinSecondsBetweenLandings = 0.5;
 
+    /// <summary>
+    /// How fast a body must be falling for arriving to be a LANDING, m/s.
+    ///
+    /// You cannot land from a fall you were not falling in. A blip in the ground underfoot is not a
+    /// fall — and blips happen: a map still streaming in has no floor yet, a probe straddling the
+    /// edge of two surfaces flips between them, a server correction moves you across a lip. Every one
+    /// of those used to sound a landing, which is a heavy sound gated to two a second, so it came out
+    /// as an irregular bang. Measured on arrival at the city map: five landings in two seconds, all
+    /// at the spawn point, before the player had taken a step.
+    ///
+    /// SPEED rather than time in the air, and that matters. Time needs a clock, and this is driven at
+    /// whatever rate its caller manages — the same reason the distance rule is judged per update
+    /// rather than as a speed. How fast you were going when you arrived needs no clock at all: it is
+    /// in the velocity the caller is already passing, and it is also the thing that decides whether
+    /// an arrival is a landing in the first place.
+    ///
+    /// A metre and a half a second is a drop of about seven centimetres — under the smallest step
+    /// anybody would call a fall. Anything the movement engine genuinely puts in the air has dropped
+    /// further than a full StepHeight first (see SharedMovementEngine's step down), which is 3.5 m/s
+    /// by the time it arrives, so this refuses no real landing.
+    /// </summary>
+    public const float MinLandingSpeed = 1.5f;
+
     private Vector3? _lastPosition;
     private float _accumulatedDistance;
     private int _stepCount;
     private bool _wasInAir;
     private bool _feetMoving;
+    private float _fastestFall;
     private double _lastLandAt = double.NegativeInfinity;
 
     /// <summary>What the body did this update, if anything. Both can be true at once: a body that
@@ -146,6 +170,7 @@ public sealed class StrideAccumulator
         _accumulatedDistance = 0f;
         _wasInAir = false;
         _feetMoving = false;
+        _fastestFall = 0f;
     }
 
     /// <summary>
@@ -158,17 +183,26 @@ public sealed class StrideAccumulator
         double now = AudioClock.Now;
         bool landed = false;
 
-        if (!isGrounded) _wasInAir = true;
+        if (!isGrounded)
+        {
+            _wasInAir = true;
+            // The fastest it was going DOWN while it was up there: the impact speed, which is the
+            // whole of what makes an arrival a landing.
+            if (velocity.Y < _fastestFall) _fastestFall = velocity.Y;
+        }
 
         if (isGrounded && _wasInAir)
         {
-            if (now - _lastLandAt > MinSecondsBetweenLandings)
+            // Falling hard enough to have landed, and not so soon after the last landing that one
+            // fall is being heard as two.
+            if (_fastestFall <= -MinLandingSpeed && now - _lastLandAt > MinSecondsBetweenLandings)
             {
                 landed = true;
                 _lastLandAt = now;
                 _accumulatedDistance = 0f; // A landing is not half a stride.
             }
             _wasInAir = false;
+            _fastestFall = 0f;
         }
 
         float ownSpeed = new Vector2(velocity.X, velocity.Z).Length();

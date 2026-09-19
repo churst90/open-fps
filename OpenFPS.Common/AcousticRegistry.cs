@@ -149,6 +149,21 @@ public static class AcousticRegistry
             // what people mean when they say a treed street is quieter.
             reg["Foliage"] = new MaterialProperties { Absorption = 0.55f, AbsorptionLow = 0.2f, AbsorptionMid = 0.5f, AbsorptionHigh = 0.8f, Scattering = 0.92f, TransmissionLow = 0.85f, TransmissionMid = 0.6f, TransmissionHigh = 0.3f, ResonanceIndex = 26, DensityKgM3 = 500f, YoungsModulusGPa = 0.01f, LossFactor = 0.6f };
 
+            // PLASTER — plasterboard on studs, which is what the inside of a building is made of, and
+            // the only common material whose absorption goes DOWN with frequency.
+            //
+            // It is a membrane: a light sheet with an air cavity behind it, so a long wavelength
+            // flexes it and loses energy while a short one bounces off. That is the exact opposite of
+            // carpet, and it is why the two together make a room sound like a room. A carpeted flat
+            // with SOLID walls keeps a two-second bass tail over a 600 ms middle — measured on the
+            // city map, and reported as "the carpeted flat sounds reverby like it's a reflective room
+            // not carpet". The carpet was working; nothing in the room was taking the bottom out,
+            // because nothing in it was a membrane.
+            //
+            // 0.28 at the bottom against 0.05 at the top is the published curve for 12 mm board on
+            // studs, and it is a fact about the construction rather than a preference.
+            reg["Plaster"] = new MaterialProperties { Absorption = 0.12f, AbsorptionLow = 0.28f, AbsorptionMid = 0.10f, AbsorptionHigh = 0.05f, Scattering = 0.15f, TransmissionLow = 0.35f, TransmissionMid = 0.18f, TransmissionHigh = 0.08f, ResonanceIndex = 27, DensityKgM3 = 800f, YoungsModulusGPa = 3f, LossFactor = 0.03f };
+
             // ── Soles ───────────────────────────────────────────────────────────────────────────
             //
             // A sole is a material like any other, and putting it in the same table as the ground is

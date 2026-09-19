@@ -144,15 +144,17 @@ public class FootstepPerPressTests
 
         stride.Update(at, Vector3.Zero, isGrounded: true, Facing);
 
-        var airborne = new Vector3(0, 0, PhysicsConstants.WalkSpeed);
+        // A body in the air is FALLING — a jump reaches about five metres a second on the way back
+        // down — and that is what makes arriving a landing rather than a blip in the floor.
+        var airborne = new Vector3(0, -5f, PhysicsConstants.WalkSpeed);
         for (int i = 0; i < 10; i++)
         {
             at += airborne * PhysicsConstants.FixedDeltaTime;
             stride.Update(at, airborne, isGrounded: false, Facing);
         }
 
-        at += airborne * PhysicsConstants.FixedDeltaTime;
-        var landing = stride.Update(at, airborne, isGrounded: true, Facing);
+        at += new Vector3(0, 0, PhysicsConstants.WalkSpeed) * PhysicsConstants.FixedDeltaTime;
+        var landing = stride.Update(at, new Vector3(0, 0, PhysicsConstants.WalkSpeed), isGrounded: true, Facing);
 
         Assert.True(landing.Landed);
         Assert.False(landing.Stepped);

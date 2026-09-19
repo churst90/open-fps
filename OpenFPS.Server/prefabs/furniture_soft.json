@@ -1,0 +1,12 @@
+{
+  "Id": "furniture_soft",
+  "Name": "Furniture",
+  "Description": "A sofa, a bed, an armchair — upholstery with air behind it. Acoustically the most useful thing in a room and the reason a furnished flat is not a reverberation chamber: carpet is a thin absorber and deaf to a long wavelength, but a padded seat with a cavity under it is a membrane absorber and takes the BASS out, which is the half a bare carpeted room keeps.",
+  "Material": "Audience",
+  "ColliderSize": { "X": 2, "Y": 0.8, "Z": 0.9 },
+  "Type": "StaticObject",
+  "IsSolid": true,
+  "TransmissionLow": 0.3,
+  "TransmissionMid": 0.15,
+  "TransmissionHigh": 0.05
+}

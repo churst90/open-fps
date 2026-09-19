@@ -85,7 +85,10 @@ public static class EnclosureSpike
             else points.Add(("spawn", spawn + new Vector3(0, head, 0)));
         }
 
-        Console.WriteLine("       where          enclosure   open    mfp   surface   decay    send at " + dist.ToString("F1") + " m");
+        // The decay's COLOUR as well as its length: a tail that loses its top four times faster than
+        // its middle is heard as muffled however long it is, and that is a fact about the materials
+        // the rays struck rather than about the size of the place.
+        Console.WriteLine("       where          enclosure   open    mfp   surface   decay lo/mid/hi ms   absorption lo/mid/hi   send at " + dist.ToString("F1") + " m");
         float lastSend = -1f;
         foreach (var (label, at) in points)
         {
@@ -100,7 +103,9 @@ public static class EnclosureSpike
                 : "";
             Console.WriteLine($"  {label,-16} {survey.Enclosure,8:P0} {survey.OpenFraction,6:P0} "
                             + $"{survey.MeanFreePathMetres,6:F2} {survey.SurfaceAreaSquareMetres,8:F0} "
-                            + $"{mid * 1000f,6:F0} ms {send,8:P0}{jump}");
+                            + $"{low * 1000f,6:F0}/{mid * 1000f:F0}/{high * 1000f:F0}   "
+                            + $"{survey.AbsorptionLow,5:F3}/{survey.AbsorptionMid:F3}/{survey.AbsorptionHigh:F3}   "
+                            + $"{send,8:P0}{jump}");
             lastSend = send;
         }
         Console.WriteLine();

@@ -1004,9 +1004,16 @@ public class CommandHandler
 
         // Naming one overrides what you are holding, and only a dev may do that. Everyone else fires
         // the thing in their hands or nothing, which is the rule the world should have had all along.
-        if (isElevated && (args.Length > 0 || !armed))
+        //
+        // NAMING ONE IS THE WHOLE OF THE EXEMPTION. This used to read `isElevated && (args.Length > 0
+        // || !armed)`, so an admin who fired with EMPTY HANDS was handed an AKM out of the air — and
+        // then asked, quite reasonably, "why am I holding an unloaded AKM anyway?" They were not
+        // holding anything. A dev convenience that arms you silently is the same shape of fault as a
+        // trigger on a screen reader's key: the sound happens and the player cannot tell why.
+        // `/fire akm` still works and is what the convenience was for.
+        if (isElevated && args.Length > 0)
         {
-            string id = args.Length > 0 ? args[0] : "akm";
+            string id = args[0];
             if (!WeaponRegistry.TryGet(id, out weapon))
             {
                 Say(reply, $"No weapon called '{id}'. Try: {string.Join(", ", WeaponRegistry.All.Select(w => w.Id))}");

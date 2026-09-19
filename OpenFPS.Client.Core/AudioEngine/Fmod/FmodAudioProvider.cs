@@ -882,6 +882,11 @@ public class FmodAudioProvider : IAudioProvider
     /// is not a thing anyone needs.</summary>
     private const float MaxReverbSend = 10f;
 
+    /// <summary>How much of a reflection's energy is scattered rather than mirrored, and so belongs in
+    /// the diffuse field rather than in the arrival. The rest is already counted by its source's own
+    /// send — see the note in ApplyAcousticFilters.</summary>
+    private const float ReflectionScatteredShare = 0.25f;
+
     /// <summary>The largest reverb send any voice was given since the last report, and how far away
     /// that voice was. Reported rather than the constant, because the send has not been a constant
     /// since it became the room equation.</summary>
@@ -2741,7 +2746,29 @@ public class FmodAudioProvider : IAudioProvider
         float ratio = Enclosure.ReverberantToDirectPower(_listenerEnclosure, _listenerMfp,
                                                         _listenerSurface, sourceDist);
         float baseReverbMix = MathF.Min(MaxReverbSend, MathF.Sqrt(ratio));
-        if (active.IsReflection) baseReverbMix *= Math.Max(0.5f, active.RoomGain); // a reflection excites the bus by what it has left
+
+        // ── A REFLECTION IS ALREADY THE ROOM ANSWERING ──────────────────────────────────────────
+        //
+        // The room equation above says how much reverberant field a SOURCE raises, and it counts
+        // every path from that source to the ear — the direct one, the first bounce, the second, all
+        // of it. So the source's own send already carries the whole tail. A reflection that sends as
+        // well is the same energy counted twice.
+        //
+        // And it is counted twice at the WRONG DISTANCE, which is what made it enormous rather than
+        // merely wrong. A reflection is placed at its IMAGE position, so `sourceDist` is the mirrored
+        // distance — sixteen, twenty-two metres inside a nine-metre flat — and the room equation
+        // quite correctly reads a source that far off as almost entirely reverberant. Measured in a
+        // live session: "wettest voice sent 507 % (at 16.2 m)", on every footfall, three times over,
+        // inside a carpeted room. Reported as "rather than reflections being emitted from the walls,
+        // it's like the whole room is reverby... every time I step, pop pop pop".
+        //
+        // What a reflection may still add is the share its surface SCATTERED rather than mirrored:
+        // that part has no direction left and belongs in the diffuse field. It is a fraction, and it
+        // can never be more than the reflection's own energy — a copy cannot raise more reverberation
+        // than it is loud.
+        if (active.IsReflection)
+            baseReverbMix = MathF.Min(baseReverbMix, 1f) * ReflectionScatteredShare
+                          * Math.Max(0.5f, active.RoomGain);
 
         // The source's OWN room gets the primary send. The listener's room gets only a small cross-send,
         // so a sound in an adjacent room doesn't smear reverb from many directions at once.

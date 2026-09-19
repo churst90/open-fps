@@ -164,9 +164,16 @@ SPAWN = (0.0, 0.1, -20.0)            # in the carriageway, south of both buildin
 # asphalt, which absorbs three or four times what concrete does and most of it at the top of the
 # band, and the pavement is concrete, which does not. Walking from one to the other is the simplest
 # demonstration on this map that a material is a fact about a place.
-box("asphalt_road", -KERB_X, KERB_X, -0.1, 0.0, TUNNEL_Z0, MAP_MAX[2], name="Road")
-box("concrete_floor", -WALK_X, -KERB_X, -0.1, 0.02, TUNNEL_Z1, MAP_MAX[2], name="West pavement")
-box("concrete_floor", KERB_X, WALK_X, -0.1, 0.02, TUNNEL_Z1, MAP_MAX[2], name="East pavement")
+# LAID ON the ground, each with its own thickness, so the probe can tell them apart.
+#
+# The ground probe takes the HIGHEST surface under your feet, and a tie goes to whichever box it
+# happened to test first. Making the bare ground flush with the carriageway — which fixed a lip —
+# made them tie, and the whole street came back as Dirt: 374 footsteps on dirt in one session, on a
+# road. Five centimetres of asphalt on the dirt and a seven-centimetre kerb up to the pavement is
+# what a street actually is, and each surface then wins where it is.
+box("asphalt_road", -KERB_X, KERB_X, 0.0, 0.05, TUNNEL_Z0, MAP_MAX[2], name="Road")
+box("concrete_floor", -WALK_X, -KERB_X, 0.0, 0.12, TUNNEL_Z1, MAP_MAX[2], name="West pavement")
+box("concrete_floor", KERB_X, WALK_X, 0.0, 0.12, TUNNEL_Z1, MAP_MAX[2], name="East pavement")
 # Everything else the map stands on. Dirt, so that stepping off the made ground is audible — and
 # FLUSH with the carriageway, not ten centimetres below it. A lip is a thing a body has to step down,
 # and the only lip on this map that should exist is the kerb.
@@ -253,16 +260,16 @@ def apartment_block(side, x0, x1, z0, z1, label):
             at = z0
             for c0, c1 in cut:
                 if c0 > at:
-                    box("concrete_wall", wall_x, wall_x + WALL_T, floor_top, ceil, at, c0)
+                    box("plaster_wall", wall_x, wall_x + WALL_T, floor_top, ceil, at, c0)
                 at = c1
             if at < z1:
-                box("concrete_wall", wall_x, wall_x + WALL_T, floor_top, ceil, at, z1)
+                box("plaster_wall", wall_x, wall_x + WALL_T, floor_top, ceil, at, z1)
 
         # Partitions between flats, both rows.
         for i in range(1, FLATS):
             pz = z0 + WALL_T + i * flat_len
             for fx0, fx1 in (far_flat, near_flat):
-                box("concrete_wall", fx0, fx1, floor_top, ceil, pz - WALL_T / 2, pz + WALL_T / 2)
+                box("plaster_wall", fx0, fx1, floor_top, ceil, pz - WALL_T / 2, pz + WALL_T / 2)
 
         # ── What is ON the floors ───────────────────────────────────────────────────────────────
         #
@@ -281,6 +288,29 @@ def apartment_block(side, x0, x1, z0, z1, label):
         # stairwell would measure the same as a flat, which is the one thing it must not do.
         box("carpet_floor", near_flat[0], near_flat[1], floor_top, floor_top + 0.04, stair_z[1], z1 - WALL_T)
         box("carpet_floor", corridor[0], corridor[1], floor_top, floor_top + 0.04, z0 + WALL_T, z1 - WALL_T)
+        # A plastered soffit, which is what you are under in a flat — not the bare structural slab.
+        box("plaster_wall", inner_x[0], inner_x[1], ceil - 0.03, ceil, z0 + WALL_T, z1 - WALL_T)
+
+        # ── ...and what is IN them ──────────────────────────────────────────────────────────────
+        #
+        # Carpet alone is not a flat. Measured with `--enclosure map=city at=14.35,1.6,3.1`: the
+        # carpet does its job at mid and top (0.19 and 0.28 of what reaches it) and almost nothing at
+        # the bottom (0.061), because that is what carpet is — a thin absorber is deaf to a long
+        # wavelength. So a carpeted room with bare hard walls keeps a two-second BASS tail over a
+        # 600 ms middle, and is heard, correctly, as "reverby like it's a reflective room not carpet".
+        #
+        # What takes the bottom out of a room is not more carpet, it is furniture: upholstery with air
+        # behind it, which is a membrane absorber and works where carpet cannot. A sofa and a bed in
+        # each flat, as Audience — the most absorbent thing in the table and the right one, since an
+        # upholstered seat is what that material IS.
+        for i in range(FLATS):
+            fz0 = z0 + WALL_T + i * flat_len
+            for which, (fx0, fx1) in (("front", near_flat), ("back", far_flat)):
+                if which == "front" and i == 0:
+                    continue          # the stairwell, which is furnished with stairs
+                # A sofa against the inner wall and a bed against the outer one.
+                box("furniture_soft", fx0 + 0.6, fx0 + 1.5, floor_top, floor_top + 0.85, fz0 + 1.0, fz0 + 3.2)
+                box("furniture_soft", fx1 - 2.1, fx1 - 0.3, floor_top, floor_top + 0.6, fz0 + 5.0, fz0 + 7.0)
 
         # ── Zones, and the doors between them ──────────────────────────────────────────────────
         corridor_id = region(f"{label} corridor, floor {s}",
@@ -347,7 +377,7 @@ apartment_block(-1, EAST_X0, EAST_X1, EAST_Z0, EAST_Z1, "Eastside")
 # A roofed box with two openings, and the best test the enclosure survey has: long, hard, closed on
 # four faces and open on two. If a tunnel does not read as the most enclosed place on the map with
 # the longest decay, the survey is wrong.
-box("asphalt_road", -KERB_X, KERB_X, -0.1, 0.0, TUNNEL_Z0, TUNNEL_Z1)
+box("asphalt_road", -KERB_X, KERB_X, 0.0, 0.05, TUNNEL_Z0, TUNNEL_Z1)
 # Walls half a metre thick, not three and a half. A tunnel bored out of solid rock would be the
 # latter, and what a listener stands next to either way is a face — but a part is only credited to a
 # face it is near, so a wall whose far side is metres away is a wall the survey has to reach for.
