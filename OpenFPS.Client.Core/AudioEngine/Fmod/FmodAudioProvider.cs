@@ -1151,36 +1151,41 @@ public class FmodAudioProvider : IAudioProvider
         // FMOD meters the unit's input and output; the loop below reads them, averages slowly, and
         // trims the wet level by the gain it finds. It converges in a couple of seconds and then
         // only moves if the decay or the colour does.
-        if (!_reverbMetering.Contains(listenerRegionId) && dsp.setMeteringEnabled(true, true) == RESULT.OK)
-            _reverbMetering.Add(listenerRegionId);
-        if (dsp.getMeteringInfo(out DSP_METERING_INFO inMeter, out DSP_METERING_INFO outMeter) == RESULT.OK
-            && inMeter.numchannels > 0 && outMeter.numchannels > 0)
-        {
-            double inRms = 0, outRms = 0;
-            for (int c = 0; c < inMeter.numchannels; c++) inRms += inMeter.rmslevel[c];
-            for (int c = 0; c < outMeter.numchannels; c++) outRms += outMeter.rmslevel[c];
-            inRms /= inMeter.numchannels; outRms /= outMeter.numchannels;
-            // Only a block with real input says anything about gain, and a tail still ringing after
-            // the input stopped says the opposite of the truth; both are skipped.
-            if (inRms > 1e-4 && outRms > 1e-6)
-            {
-                float measuredDb = (float)(20.0 * Math.Log10(outRms / inRms));
-                float unitDb = measuredDb - _listenerWetDb;   // the unit's own, with the trim taken out
-                _reverbUnitGainDb += (unitDb - _reverbUnitGainDb) * ReverbGainTrackRate;
-            }
-        }
-        float target = Math.Clamp(-_reverbUnitGainDb, -30f, 10f);
-        _listenerWetDb += (target - _listenerWetDb) * AcousticConstants.OutdoorWetBlendSpeed;
-        if (MathF.Abs(target - _listenerWetDb) < 0.05f) _listenerWetDb = target;
+        // ── A LIVE ROOM IS LOUDER, AND THAT MUST NOT BE NORMALISED AWAY ─────────────────────────
+        //
+        // This measured the unit's own input and output and trimmed the wet level to hold its gain at
+        // unity, on the reasoning that the per-source send carries the level and the unit should add
+        // no arbitrary gain of its own. The reasoning is right about an ARBITRARY gain. The gain it
+        // was actually measuring is not arbitrary: a reverberation unit fed a steady signal
+        // accumulates energy in proportion to its decay time, so a long tail measures a higher output
+        // — and the loop pulled it back down by exactly that much.
+        //
+        // What that cancels is the whole difference between a car park and a corridor. Measured over
+        // a live session, the trim the loop settled on against the decay it was fed:
+        //
+        //     400- 800 ms (a corridor)  ->  -6.1 dB
+        //    2800-3200 ms (a tunnel)    ->  -8.1 dB
+        //    4800-5200 ms (a car park)  -> -10.5 dB
+        //    7200-7600 ms               -> -13.0 dB
+        //
+        // — a room with twelve times the tail handed back seven decibels quieter, which is most of
+        // the way to sounding identical. Reported, after every other cause had been chased out of the
+        // way: "all of those areas sound the same other than the tunnel and street... they all sound
+        // the same with the only difference being how far away the walls are." The walls' distance is
+        // the early reflections, which were the only part of the room still varying.
+        //
+        // So the wet level is a CONSTANT now. What a source raises is the send's job (the room
+        // equation, with distance and absorption in it); how long it rings is the decay's; and the
+        // unit's job is only to ring. Its one real arbitrary gain — the difference between FMOD's
+        // internal scaling and unity — is a property of the DSP rather than of the room, and is what
+        // this number is.
+        _listenerWetDb += (AcousticConstants.ReverbUnitWetDb - _listenerWetDb)
+                        * AcousticConstants.OutdoorWetBlendSpeed;
+        if (MathF.Abs(AcousticConstants.ReverbUnitWetDb - _listenerWetDb) < 0.05f)
+            _listenerWetDb = AcousticConstants.ReverbUnitWetDb;
         dsp.setParameterFloat(11, _listenerWetDb);
     }
-
-    /// <summary>Buses whose unit has FMOD metering switched on (once each).</summary>
-    private readonly HashSet<int> _reverbMetering = new();
     /// <summary>The reverb unit's measured steady-state gain, dB, slowly tracked. See ApplySimulatedReverb.</summary>
-    private float _reverbUnitGainDb;
-    /// <summary>Per audio update; about two seconds to settle, which is slower than any tail.</summary>
-    private const float ReverbGainTrackRate = 0.01f;
 
     /// <summary>What the listener's reverb bus is currently doing, for the spikes and the profiler. A
     /// value of -80 means no reverberant field at all, which is open ground.</summary>

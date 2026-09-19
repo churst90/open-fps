@@ -141,6 +141,26 @@ public static class AcousticConstants
     /// </summary>
     public const float OutdoorEnclosureCeiling = 0.45f;
 
+    /// <summary>
+    /// The reverberation unit's own wet level, dB — a constant, because the room is carried by the
+    /// two things that ARE the room.
+    ///
+    /// How much reverberant field a source raises is the send's business (the room equation, with the
+    /// distance and the absorption in it). How long it rings is the decay's. What is left for the
+    /// unit is the difference between FMOD's internal scaling and unity, which is a property of the
+    /// DSP and not of the place — so it is one number and does not move.
+    ///
+    /// It used to be driven by a loop that metered the unit and held its gain at unity, and that loop
+    /// was cancelling the rooms: a reverberation unit accumulates energy in proportion to its decay,
+    /// so a long tail measures a higher output and was trimmed back down by exactly as much as it was
+    /// live. Six decibels for a corridor against thirteen for a seven-second hall. See the note in
+    /// FmodAudioProvider.ApplySimulatedReverb for the measurements.
+    ///
+    /// Minus six is where that loop settled for a mid-sized room, which is the one place it was
+    /// giving the right answer.
+    /// </summary>
+    public const float ReverbUnitWetDb = -6.0f;
+
     // ── What the reverb unit is for ─────────────────────────────────────────────────────────────
     //
     // The unit's own synthetic early reflections are OFF. Early reflections are a fact about the
