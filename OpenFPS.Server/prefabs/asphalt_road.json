@@ -1,0 +1,11 @@
+{
+  "Id": "asphalt_road",
+  "Name": "Road",
+  "Description": "Bituminous road surface. Porous, so it absorbs three or four times what concrete does and most of that at the top of the band — which is the whole reason a concrete motorway is louder than an asphalt one — and lossy enough that nothing dropped on it rings.",
+  "Material": "Asphalt",
+  "ColliderSize": { "X": 10, "Y": 0.1, "Z": 10 },
+  "Type": "StaticObject",
+  "TransmissionLow": 0.1,
+  "TransmissionMid": 0.05,
+  "TransmissionHigh": 0.02
+}

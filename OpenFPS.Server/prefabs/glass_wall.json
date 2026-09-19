@@ -1,0 +1,12 @@
+{
+  "Id": "glass_wall",
+  "Name": "Glazing",
+  "Description": "A shopfront or a stairwell window. Hard and flat like tile, and the worst barrier in the city: glass passes seventy per cent of the low end, which is why you hear a bus through a window and not through the brick beside it.",
+  "Material": "Glass",
+  "ColliderSize": { "X": 2, "Y": 3, "Z": 0.02 },
+  "Type": "StaticObject",
+  "IsSolid": true,
+  "TransmissionLow": 0.7,
+  "TransmissionMid": 0.5,
+  "TransmissionHigh": 0.3
+}

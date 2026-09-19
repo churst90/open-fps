@@ -170,6 +170,56 @@ public static class CompositeAcoustics
     public static RoomSurvey SurveyLoose(World world, List<Entity> entities)
         => Survey(Pieces(world, entities, loose: true), out _);
 
+    /// <summary>
+    /// The same three questions asked of a box that is ALREADY KNOWN, rather than one derived from
+    /// the parts.
+    ///
+    /// This is what a static map needs and a composite does not. A composite is a thing somebody
+    /// built, so its bounding box IS the room and deriving it is the whole trick. A map's room is a
+    /// place an author named — the region entity — and the walls around it are shared: the wall
+    /// between two flats belongs to both, and the corridor wall runs the length of the building. Ask
+    /// those parts to derive a box and they give you the building.
+    ///
+    /// So the box is given, and the only question asked of the parts is the one an author should not
+    /// have to answer: WHAT IS EACH OF THE SIX FACES MADE OF. A brick flat and a tiled platform stop
+    /// being a list of materials somebody typed and start being a consequence of the walls that are
+    /// actually there — which is the point, because the walls are the thing that gets moved.
+    ///
+    /// A part larger than the face it covers is not a problem: coverage is clamped, and the material
+    /// is whichever part presents the most area, which for a long wall is that wall.
+    /// </summary>
+    public static RoomSurvey SurveyBox(World world, List<Entity> parts, Vector3 centre, Vector3 size)
+    {
+        var pieces = Pieces(world, parts, loose: true);
+        float boxVolume = size.X * size.Y * size.Z;
+
+        // Volume clipped to the box, so a wall that runs past the room is not counted as filling it.
+        float solid = 0f;
+        Vector3 lo = centre - size * 0.5f, hi = centre + size * 0.5f;
+        foreach (var piece in pieces)
+        {
+            var half = AxisAlignedHalfExtents(piece.Size * 0.5f, piece.Rotation);
+            var pLo = Vector3.Max(lo, piece.Position - half);
+            var pHi = Vector3.Min(hi, piece.Position + half);
+            var overlap = Vector3.Max(pHi - pLo, Vector3.Zero);
+            solid += overlap.X * overlap.Y * overlap.Z;
+        }
+
+        var coverage = new float[6];
+        var materials = new string[6];
+        for (int f = 0; f < Faces.Length; f++)
+            coverage[f] = Face(pieces, size, centre, Faces[f].Axis, Faces[f].Side, out materials[f]);
+
+        return new RoomSurvey
+        {
+            Size = size,
+            SolidFraction = boxVolume > 0f ? solid / boxVolume : float.MaxValue,
+            Coverage = coverage,
+            Materials = materials,
+            PartCount = pieces.Count,
+        };
+    }
+
     /// <summary>One part, reduced to the four things this file cares about.</summary>
     private readonly record struct Piece(Vector3 Position, Quaternion Rotation, Vector3 Size, string Material);
 
@@ -227,10 +277,17 @@ public static class CompositeAcoustics
     /// <summary>
     /// How much of one face is covered, and by what.
     ///
-    /// A part belongs to a face if its OUTER edge is near that face — near meaning within a quarter of
-    /// the box's depth, or half a metre, whichever is more forgiving. That tolerance is what lets a
-    /// wall that is a little inboard of the corner still count as that wall, and it is why a pillar in
-    /// the middle of a room covers nothing.
+    /// Two questions, and it used only to ask the first. A part belongs to a face if its OUTER edge is
+    /// near that face — near meaning within a quarter of the box's depth, or half a metre, whichever
+    /// is more forgiving, which is the tolerance that lets a wall a little inboard of the corner still
+    /// count as that wall. AND it has to be ACROSS the face: the area credited is the part's overlap
+    /// with the face's own rectangle, not the part's whole cross-section.
+    ///
+    /// For a composite, which is measured inside its own bounding box, those are the same thing and
+    /// nothing changes. For a MAP they are not, and the difference put a roof over the street: the
+    /// first-floor slab of a building is at the right height to be a pavement's ceiling and six metres
+    /// to one side of it, so every stretch of pavement came back enclosed, indoors, with a concrete
+    /// ceiling. A part that is not over you is not your ceiling.
     /// </summary>
     private static float Face(List<Piece> pieces, Vector3 size, Vector3 centre,
                               int axis, float side, out string material)
@@ -243,20 +300,43 @@ public static class CompositeAcoustics
         float plane = Component(centre, a) + side * Component(size, a) * 0.5f;
         float depth = MathF.Max(0.5f, Component(size, a) * 0.25f);
 
+        float bLo = Component(centre, b) - Component(size, b) * 0.5f;
+        float bHi = Component(centre, b) + Component(size, b) * 0.5f;
+        float cLo = Component(centre, c) - Component(size, c) * 0.5f;
+        float cHi = Component(centre, c) + Component(size, c) * 0.5f;
+
         float covered = 0f, best = 0f;
         foreach (var piece in pieces)
         {
             var half = AxisAlignedHalfExtents(piece.Size * 0.5f, piece.Rotation);
 
-            float outer = Component(piece.Position, a) + side * Component(half, a);
-            if (MathF.Abs(plane - outer) > depth) continue;
+            // How far the part is from the face's plane, measured to its NEAREST edge and zero if the
+            // plane runs through it.
+            //
+            // It used to measure to the part's OUTER edge, which is the same answer for a composite —
+            // there the box is derived FROM the parts, so a wall's outer edge is the face — and quite
+            // wrong for a box that was drawn first. A tunnel wall three and a half metres thick has
+            // its outer edge three and a half metres away from the room it encloses, so the tunnel
+            // came back with no side walls at all and read as open sky. What faces you is the side of
+            // the wall that faces you.
+            float lo = Component(piece.Position, a) - Component(half, a);
+            float hi = Component(piece.Position, a) + Component(half, a);
+            float gap = plane < lo ? lo - plane : plane > hi ? plane - hi : 0f;
+            if (gap > depth) continue;
 
-            float area = 4f * Component(half, b) * Component(half, c);
+            float area = Overlap(Component(piece.Position, b), Component(half, b), bLo, bHi)
+                       * Overlap(Component(piece.Position, c), Component(half, c), cLo, cHi);
+            if (area <= 0f) continue;
+
             covered += area;
             if (area > best) { best = area; material = piece.Material; }
         }
         return MathF.Min(1f, covered / faceArea);
     }
+
+    /// <summary>How much of [lo, hi] a box of this centre and half-extent covers.</summary>
+    private static float Overlap(float centre, float half, float lo, float hi)
+        => MathF.Max(0f, MathF.Min(centre + half, hi) - MathF.Max(centre - half, lo));
 
     /// <summary>
     /// The bounding box of a set of parts in their composite's own frame, and its centre.

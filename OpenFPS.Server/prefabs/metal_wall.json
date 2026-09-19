@@ -1,0 +1,12 @@
+{
+  "Id": "metal_wall",
+  "Name": "Steel Panel",
+  "Description": "Sheet steel: a roller shutter, a container, the skin of a plant room. Reflects almost everything and rings when struck, because steel's damping is two ten-thousandths before it is bolted to anything.",
+  "Material": "Metal",
+  "ColliderSize": { "X": 2, "Y": 3, "Z": 0.05 },
+  "Type": "StaticObject",
+  "IsSolid": true,
+  "TransmissionLow": 0.1,
+  "TransmissionMid": 0.05,
+  "TransmissionHigh": 0.02
+}

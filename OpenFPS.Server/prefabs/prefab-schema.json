@@ -38,7 +38,13 @@
         "None",
         "Plastic",
         "Grass",
-        "Dirt"
+        "Dirt",
+        "Brick",
+        "Asphalt",
+        "Tile",
+        "Foliage",
+        "Gravel",
+        "Audience"
       ]
     }
   },

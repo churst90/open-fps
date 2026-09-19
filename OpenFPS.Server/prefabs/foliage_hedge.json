@@ -1,0 +1,12 @@
+{
+  "Id": "foliage_hedge",
+  "Name": "Street Trees",
+  "Description": "A row of trees or a hedge. Not a surface but a volume of thousands of small scatterers: nearly everything that goes in comes back out in every direction, and the higher the frequency the less of it comes back out at all. It is what people mean when they say a treed street is quieter.",
+  "Material": "Foliage",
+  "ColliderSize": { "X": 2, "Y": 3, "Z": 1.2 },
+  "Type": "StaticObject",
+  "IsSolid": false,
+  "TransmissionLow": 0.85,
+  "TransmissionMid": 0.6,
+  "TransmissionHigh": 0.3
+}

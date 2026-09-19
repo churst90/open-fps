@@ -110,6 +110,45 @@ public static class AcousticRegistry
             // quietest hard ground there is to stand on and the loudest to walk on.
             reg["Gravel"] = new MaterialProperties { Absorption = 0.65f, AbsorptionLow = 0.35f, AbsorptionMid = 0.65f, AbsorptionHigh = 0.80f, Scattering = 0.95f, TransmissionLow = 0.35f, TransmissionMid = 0.45f, TransmissionHigh = 0.55f, ResonanceIndex = 7, DensityKgM3 = 1700f, YoungsModulusGPa = 0.35f, LossFactor = 0.55f };
 
+            // ── A city is made of four things the table did not have ─────────────────────────────
+            //
+            // Written for the city block, and each of them is a difference a listener can hear
+            // against the Concrete that was standing in for all of them.
+
+            // BRICK. Acoustically close to concrete in how much it takes — masonry absorbs almost
+            // nothing — and quite different in what it does with the rest. A brick wall is courses
+            // and raked mortar joints, a centimetre of relief every seventy millimetres, which is a
+            // quarter wavelength at 8 kHz and a sixteenth at 2: it SCATTERS where a poured concrete
+            // wall mirrors. That is why a brick street is a wash and a concrete underpass is a
+            // slapback, and it is one number apart. Fired clay is also much less stiff than
+            // concrete and far lossier, so a brick wall does not ring when something hits it.
+            reg["Brick"] = new MaterialProperties { Absorption = 0.04f, AbsorptionLow = 0.03f, AbsorptionMid = 0.04f, AbsorptionHigh = 0.07f, Scattering = 0.45f, TransmissionLow = 0.06f, TransmissionMid = 0.03f, TransmissionHigh = 0.015f, ResonanceIndex = 23, DensityKgM3 = 1900f, YoungsModulusGPa = 15f, LossFactor = 0.02f };
+
+            // ASPHALT. The reason a concrete motorway is louder than a bituminous one, and it is not
+            // a small effect: dense-graded asphalt is POROUS, so sound at grazing incidence goes into
+            // the voids between the aggregate and does not all come back. Three to four times
+            // concrete's absorption, most of it at the top of the band. And bitumen is a viscous
+            // solid — a loss factor two orders up on concrete's — so a road surface is the one hard
+            // ground that does not ring at all: a dropped bolt on asphalt thuds, on concrete it
+            // rings.
+            reg["Asphalt"] = new MaterialProperties { Absorption = 0.09f, AbsorptionLow = 0.04f, AbsorptionMid = 0.08f, AbsorptionHigh = 0.16f, Scattering = 0.35f, TransmissionLow = 0.1f, TransmissionMid = 0.05f, TransmissionHigh = 0.02f, ResonanceIndex = 24, DensityKgM3 = 2300f, YoungsModulusGPa = 3f, LossFactor = 0.18f };
+
+            // TILE. The hardest, flattest, least absorbent surface in ordinary life — glazed ceramic
+            // on a solid bed takes about one per cent and returns the rest as a mirror. It is why a
+            // tiled station concourse or a public lavatory is the most reverberant room most people
+            // ever stand in, far more so than a concrete one. It also RINGS: fired glaze is stiff
+            // and almost lossless, a hundredth of concrete's damping, which is the tick under a
+            // heel on a station floor.
+            reg["Tile"] = new MaterialProperties { Absorption = 0.015f, AbsorptionLow = 0.01f, AbsorptionMid = 0.015f, AbsorptionHigh = 0.02f, Scattering = 0.06f, TransmissionLow = 0.15f, TransmissionMid = 0.08f, TransmissionHigh = 0.03f, ResonanceIndex = 25, DensityKgM3 = 2300f, YoungsModulusGPa = 60f, LossFactor = 0.005f };
+
+            // FOLIAGE. A street tree or a hedge is not a surface at all, it is a VOLUME of thousands
+            // of small scatterers, so it is the extreme of the same pair of numbers the Audience is:
+            // nearly everything that goes in comes back out in every direction, and the higher the
+            // frequency the less of it comes back out at all. A row of trees between a road and a
+            // house is worth a few decibels of traffic and takes the edge off all of it, which is
+            // what people mean when they say a treed street is quieter.
+            reg["Foliage"] = new MaterialProperties { Absorption = 0.55f, AbsorptionLow = 0.2f, AbsorptionMid = 0.5f, AbsorptionHigh = 0.8f, Scattering = 0.92f, TransmissionLow = 0.85f, TransmissionMid = 0.6f, TransmissionHigh = 0.3f, ResonanceIndex = 26, DensityKgM3 = 500f, YoungsModulusGPa = 0.01f, LossFactor = 0.6f };
+
             // ── Soles ───────────────────────────────────────────────────────────────────────────
             //
             // A sole is a material like any other, and putting it in the same table as the ground is

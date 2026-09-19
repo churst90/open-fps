@@ -46,7 +46,7 @@ For each of these: what exists, what is missing, and the mechanism.
 
 | Wanted | Exists | Missing | Mechanism |
 |---|---|---|---|
-| **Apartment buildings with insides** | Boxes with materials; regions + portals; composites (`CompositeAcoustics.Survey` detects rooms in player-built structures); the survey reads whatever boxes are there | A building *prefab*: floors, corridors, stairwells, flats, as boxes with doorways — and `Survey` run at static map load so rooms need no hand-authored region | Author one apartment floor as a composite; stack it. Run the composite survey at load for static geometry (`outdoor-acoustics-map` memory: "measure at load with the survey that already exists, keep the region entity as an override"). |
+| **Apartment buildings with insides** | **DONE 2026-09-19.** `tools/gen_city.py` builds them: floors, corridors, stairwells with climbable steps, flats, doors. `MapManager.SurveyRegions` runs the survey at static map load, so a region says only where a place is and what it is called | Nothing. Lifts, and flats with anything in them | `CompositeAcoustics.SurveyBox` — the same survey asked of a box that is already known, because a map's walls are SHARED and deriving a box from them gives you the building. |
 | **Doors** | `DoorComponent`, `/doors`, open/close on the server; the latch is a synthesised transient through `WorldAudioPlayer`; a door leaf is a box the diffraction model bends round | Doors placed in buildings by the prefab; a closed door as an occluder with its material's transmission | Nothing new: place them. |
 | **Planes overhead** | `docs/AIRCRAFT.md` — jets, turboprops, pistons, rotors from the mechanism, approved by ear; the flyover renderer `--aircraft` | Not in the game: no aircraft entity, no flight path, no spawner | An `AircraftSystem` like `VehicleSystem`: a great-circle line at altitude, the aircraft's own Doppler and air absorption (both already general). The renderer is the machine; it needs a body in the world. |
 | **Buses with air brakes** | `Pneumatics/` — air brakes approved by ear (`signals-and-air` memory); machines as parts lists in data (`machines/`) | A bus preset (engine + air system) and a *stop* — the air brake needs a vehicle that decelerates to zero at a place | Depends on traffic AI (below): a bus is a car with a route and stops. |
@@ -59,16 +59,20 @@ For each of these: what exists, what is missing, and the mechanism.
 | **Bus stops, overhangs, parking garage** | Boxes and materials; an overhang is a roof box, a garage is a low, hard, open-sided room | Prefabs for them | Author. The garage is the second-best survey test after the tunnel. |
 | **Airport** | Aircraft models; extent for a distant runway | Flight phases (take-off roll, rotation, climb) as a path with a speed profile | After planes overhead work. |
 | **Zones everywhere** | Regions name places; naming costs nothing since session 9 (`region-is-not-a-room`); F6 lists, C reads position | A zone under every pavement, junction, platform, floor of every building | Author, generously. |
-| **Crowds, AC units, lawn mowers** | Crowd = `Applause` (claps only until recordings); a region may name an ambience (a hum with a place); machines as parts | Recordings Cody will gather (`docs/SOUND_INVENTORY.md` lists the takes); an AC unit and a mower are small machines — a mower is a single-cylinder preset that already exists in spirit | Recordings for crowds and voices; machine presets for the rest. |
+| **Crowds, AC units, lawn mowers** | Crowd = `Applause` (claps only until recordings). **AC units and mowers are DONE 2026-09-19** — `docs/YARD_MACHINES.md`, `SmallMachineSpec`, `--yard`: a governed engine with a blade in a pan, and a fan with a compressor in a box | Recordings Cody will gather for crowds (`docs/SOUND_INVENTORY.md`); and the two machines are **not in the game yet** — a stationary machine needs the client voice path a vehicle's engine has | Recordings for crowds and voices; the voice path for the machines, with the city block. |
+| **AC units and mowers, placed** | `SmallMachineSpec` + `SmallMachineSynth`, measured and scripted (`--yard`) | A client voice path for a machine that stands still: a render-pool voice, a place, an extent, a level — the treatment `ClientAudioSystem` gives a vehicle's engine | A condenser on the garage roof and a mower behind the west block, once a stationary machine can be given a voice. |
 | **Synthetic footsteps** | `FootstepSpike` renders walks from foot and ground (`--footsteps`); 21 files in `/tmp/openfps-footsteps` for Cody to judge | Cody's verdict. The model failed the ear once (`synthesis-failures` memory) and was recalibrated against a recording | If they pass: `SoundMappingService` resolves footsteps from the model instead of the file bank, per material and shoe. If not: keep the recordings and use the synth for the materials that have none. |
 
 ## 3. The order for the city, and how to know each step worked
 
-1. **Static city block** (no traffic yet): two apartment blocks with interiors, a street between, a
-   tunnel at one end, a garage, a bus shelter, a metro platform with overhang, zones under all of it.
-   *Check:* walk it with `capture`; the survey's decay/enclosure/direction line should read sensibly
-   in every place (tunnel long and enclosed, street short and open, flat small and dead), no
-   `placed at a position N ms old`, no doublets in the onset analysis.
+1. ~~**Static city block**~~ **DONE 2026-09-19 — `docs/THE_CITY_BLOCK.md`.** `./run-server.sh city`:
+   397 entities, 81 named places, two three-storey blocks with flats and climbable stairs, a 30 m
+   tunnel, a two-deck garage, a bus shelter, a tiled metro platform under a canopy, street trees.
+   Nothing on it authors an acoustic anything — `MapManager.SurveyRegions` measures all 81 places at
+   load (60 come back rooms), which is the "automatic, with the entity as an override" item that had
+   been open since session 9. Four materials added for it: Brick, Asphalt, Tile, Foliage.
+   *Still to do on it:* **walk it and listen.** Every number is measured and none of it is heard —
+   `capture` and `--room-walk` in the tunnel, the garage and a stairwell.
 2. **Fused early reflections** (§1.3) tried on this block, because a corridor and a stairwell are
    where the difference between "a tail" and "the walls answering" is largest.
 3. **Roads as data + lane follower** replacing the racing line for city vehicles; one car each way;

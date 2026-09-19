@@ -1,0 +1,11 @@
+{
+  "Id": "brick_floor",
+  "Name": "Brick Paving",
+  "Description": "Brick laid flat: a paved yard, an alley, a plaza.",
+  "Material": "Brick",
+  "ColliderSize": { "X": 10, "Y": 0.1, "Z": 10 },
+  "Type": "StaticObject",
+  "TransmissionLow": 0.06,
+  "TransmissionMid": 0.03,
+  "TransmissionHigh": 0.015
+}

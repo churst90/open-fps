@@ -1,0 +1,12 @@
+{
+  "Id": "tile_wall",
+  "Name": "Tiled Wall",
+  "Description": "Tiled masonry, as a station or a subway is lined with. It mirrors: six per cent scattering against brick's forty-five.",
+  "Material": "Tile",
+  "ColliderSize": { "X": 2, "Y": 3, "Z": 0.3 },
+  "Type": "StaticObject",
+  "IsSolid": true,
+  "TransmissionLow": 0.15,
+  "TransmissionMid": 0.08,
+  "TransmissionHigh": 0.03
+}

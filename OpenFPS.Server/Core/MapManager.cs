@@ -182,6 +182,10 @@ public class MapManager
         // so anything holding one (a rifle you had just picked up) resolved to nothing.
         var authored = new Dictionary<int, Entity>();   // JSON ID -> entity, during load only
         var idMap = new Dictionary<int, int>();         // JSON ID -> ECS ID
+        // Regions whose six faces the MAP named. The survey below leaves these alone: geometry fills
+        // in what was left blank, it does not overrule what an author said.
+        var materialsAuthored = new HashSet<int>();     // ECS ID
+        var indoorAuthored = new HashSet<int>();        // ECS ID: maps that said IsIndoor themselves
         
         float foundMinimumY = 1000f;
         bool hasAnyFloor = false;
@@ -208,11 +212,14 @@ public class MapManager
                 }
 
                 ApplyRoomMaterials(world, entity, entityData, m.Id);
+                if (entityData.RoomMaterials != null || entityData.Materials != null)
+                    materialsAuthored.Add(entity.Id);
 
                 if (entityData.IsIndoor.HasValue && world.Has<RegionComponent>(entity))
                 {
                     ref var r = ref world.Get<RegionComponent>(entity);
                     r.IsIndoor = entityData.IsIndoor.Value;
+                    indoorAuthored.Add(entity.Id);
                 }
 
                 if (entityData.PrefabId.Equals("concrete_floor", StringComparison.OrdinalIgnoreCase) && 
@@ -306,6 +313,8 @@ public class MapManager
         }
         Log.Information("MapManager: Linked {Count} portal(s) for map '{Id}'.", portalsLinked, m.Id);
 
+        SurveyRegions(world, m, materialsAuthored, indoorAuthored);
+
         // AUTO-GENERATE FOUNDATION if missing
         if (!foundationExists)
         {
@@ -353,6 +362,128 @@ public class MapManager
         RefreshGrid(m.Id);
         VerifySpawnPoint(m);
     }
+
+    /// <summary>
+    /// What each named place on a static map is MADE of, measured from the walls that are there.
+    ///
+    /// A region entity says where a place is and what it is called. Until now it also had to say what
+    /// its six faces were made of, one material name at a time, by hand — and a map is the one place
+    /// where that is least likely to stay true, because the walls get moved and the list does not.
+    /// The prefab ships no materials at all, so a region that forgot them was six faces of "None",
+    /// which reads as perfectly reflective: a flat with the reverberation of a cathedral.
+    ///
+    /// <see cref="CompositeAcoustics"/> has been able to answer this since composites were built —
+    /// "these parts enclose a room, its floor is Concrete and its east wall is Glass" — and it ran
+    /// only for things a PLAYER assembled. This is the same survey over a map's own geometry, asked
+    /// of the box the author already drew, so a building is boxes and doors and nothing else.
+    ///
+    /// AN AUTHORED LIST STILL WINS, always. Geometry cannot say what a place is called, and there are
+    /// things it cannot say about materials either — a carpeted floor over a concrete slab, a lined
+    /// ceiling — so the entity stays the override. This only fills in what was left blank.
+    /// </summary>
+    private static void SurveyRegions(World world, Repositories.MapData m,
+                                      HashSet<int> materialsAuthored, HashSet<int> indoorAuthored)
+    {
+        // Everything solid enough to be a wall, a floor or a ceiling. Regions and portals are not.
+        var solids = new List<Entity>();
+        var solidQuery = new QueryDescription().WithAll<Transform, ColliderComponent>();
+        world.Query(in solidQuery, (Entity e) =>
+        {
+            if (world.Has<RegionComponent>(e)) return;
+            var c = world.Get<ColliderComponent>(e);
+            if (!c.IsSolid || c.Shape != ColliderShape.Box) return;
+            solids.Add(e);
+        });
+        if (solids.Count == 0) return;
+
+        int surveyed = 0, skipped = 0;
+        var regionQuery = new QueryDescription().WithAll<Transform, RegionComponent>();
+        var regions = new List<Entity>();
+        world.Query(in regionQuery, (Entity e) => regions.Add(e));
+
+        foreach (var region in regions)
+        {
+            var t = world.Get<Transform>(region);
+            ref var r = ref world.Get<RegionComponent>(region);
+            if (r.RoomSize.X <= 0f || r.RoomSize.Y <= 0f || r.RoomSize.Z <= 0f) continue;
+
+            if (materialsAuthored.Contains(region.Id)) { skipped++; continue; }
+
+            // Only the parts that could be this room's own surfaces: anything overlapping its box
+            // with half a metre of slack, which reaches a wall standing just outside it.
+            var lo = t.Position - r.RoomSize * 0.5f - new Vector3(WallReach);
+            var hi = t.Position + r.RoomSize * 0.5f + new Vector3(WallReach);
+            var near = new List<Entity>();
+            foreach (var e in solids)
+            {
+                var et = world.Get<Transform>(e);
+                var half = CompositeAcoustics.AxisAlignedHalfExtents(world.Get<ColliderComponent>(e).Size * 0.5f, et.Rotation);
+                if (et.Position.X + half.X < lo.X || et.Position.X - half.X > hi.X) continue;
+                if (et.Position.Y + half.Y < lo.Y || et.Position.Y - half.Y > hi.Y) continue;
+                if (et.Position.Z + half.Z < lo.Z || et.Position.Z - half.Z > hi.Z) continue;
+                near.Add(e);
+            }
+            if (near.Count == 0) continue;
+
+            var survey = CompositeAcoustics.SurveyBox(world, near, t.Position, r.RoomSize);
+
+            // FILL IN BLANKS, NEVER OVERRULE. A face the map said nothing about is material 0 —
+            // "None" — which the reverb reads as perfectly reflective, so silence there is not
+            // neutral, it is the worst possible answer. Those are the faces this is for. A face that
+            // already names something was named by somebody who could see the map, possibly to say a
+            // thing geometry cannot (a carpet over a slab, a lined ceiling), and it is left alone.
+            //
+            // It also means every map that already sounds right keeps sounding right: this can only
+            // turn "perfectly reflective and nobody meant it" into the material that is actually
+            // there. The speedway, approved by ear, was surveyed the first time this ran and had its
+            // walls replaced wholesale; that is a respec, and it is not what this is for.
+            // ONLY WHERE IT IS ENCLOSED. A face's material decides what comes back off it, and that
+            // only happens inside something. Outdoors the reflections come from the individual walls
+            // that are there (EngineReflections builds surfaces from every solid box), so a named
+            // stretch of street does not need six faces and filling them in would be changing a
+            // number for a place that does not read it. It is also the line that keeps this from
+            // rewriting forty-two regions of an approved racetrack the first time it runs.
+            // How enclosed a place is decides how much reverberation the listener is given, and it is
+            // the difference between a flat and a bus shelter. Measured — but only where the map did
+            // not say: IsIndoor is a thing an author is allowed to assert. Asked of EVERY region,
+            // before the materials are, because "this named place is not a room" is itself the answer
+            // for most of a city.
+            if (!indoorAuthored.Contains(region.Id)) r.IsIndoor = survey.Covered;
+
+            if (!survey.Covered) continue;
+
+            int filled = 0;
+            var took = new List<string>();
+            for (int f = 0; f < 6; f++)
+            {
+                if (r.Materials[f] != 0) continue;                                     // the author's
+                if (survey.Coverage[f] < CompositeAcoustics.FaceCoverage) continue;    // nothing there
+                if (!AcousticRegistry.TryGetResonanceIndex(survey.Materials[f], out int index)) continue;
+                r.Materials[f] = index;
+                filled++;
+                took.Add($"{CompositeAcoustics.FaceNames[f]} {survey.Materials[f]}");
+            }
+
+            if (filled == 0) continue;
+            surveyed++;
+
+            // One line per ROOM at Information, because a room is the interesting answer and there
+            // are a handful of them; everything else at Debug, because a big map has hundreds of
+            // named places outdoors and they would bury the log.
+            var line = "MapManager: '{Map}' measured '{Name}' ({Size}): {Walls}/6 walled, {Solid:P0} solid -> took {Took}{Indoor}";
+            object[] args = { m.Id, r.FriendlyName, r.RoomSize, survey.Walls, survey.SolidFraction,
+                              string.Join(", ", took), survey.Covered ? "" : " (open)" };
+            Log.Information(line, args);
+        }
+
+        if (surveyed + skipped > 0)
+            Log.Information("MapManager: '{Map}': {Surveyed} region(s) had blank faces filled in from the geometry, {Skipped} kept an authored list.",
+                m.Id, surveyed, skipped);
+    }
+
+    /// <summary>How far outside a region's own box a wall may stand and still be that room's wall,
+    /// metres. A region is drawn to the INSIDE of a room; its walls are just beyond that.</summary>
+    private const float WallReach = 0.6f;
 
     /// <summary>
     /// Writes a map entity's per-face room materials onto its RegionComponent. Six faces, in the order

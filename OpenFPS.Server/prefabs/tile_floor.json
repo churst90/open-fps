@@ -1,0 +1,11 @@
+{
+  "Id": "tile_floor",
+  "Name": "Tiled Floor",
+  "Description": "Glazed tile on a solid bed: the hardest, flattest, least absorbent surface in ordinary life, and why a station concourse is the most reverberant room most people ever stand in.",
+  "Material": "Tile",
+  "ColliderSize": { "X": 10, "Y": 0.1, "Z": 10 },
+  "Type": "StaticObject",
+  "TransmissionLow": 0.15,
+  "TransmissionMid": 0.08,
+  "TransmissionHigh": 0.03
+}
