@@ -578,6 +578,14 @@ if (args.Contains("--open-air-reverb"))
     Environment.Exit(code);
 }
 
+if (args.Contains("--tailcheck"))
+{
+    Console.WriteLine("--- Tail check: one decay forced onto the unit, one footstep, and the decay of what came OUT ---");
+    int code = OpenFPS.Client.Core.AudioEngine.Fmod.TailCheckSpike.Run(args);
+    Log.CloseAndFlush();
+    Environment.Exit(code);
+}
+
 if (args.Contains("--room-walk"))
 {
     Console.WriteLine("--- Room walk: the wood room with the megaphone on, walked, the mix captured to a WAV ---");

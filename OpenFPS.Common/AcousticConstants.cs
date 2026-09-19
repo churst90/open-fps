@@ -172,7 +172,21 @@ public static class AcousticConstants
     // footsteps are loud". The unit renders the diffuse tail only, starting after the mean free path
     // has been crossed a couple of times, which is when reflections become too dense to have a
     // direction (see FmodAudioProvider.ApplySimulatedReverb).
-    public const float ReverbEarlyReflectionsPercent = 0.0f;
+    //
+    // ── AND THE NUMBER THAT SAYS SO IS NOT THE ONE IT LOOKS LIKE ────────────────────────────────
+    //
+    // FMOD's EARLYLATEMIX is the blend of LATE REVERB TO EARLY REFLECTIONS: 0 is all early, 100 is
+    // all late. This was 0, written to mean "early reflections off", and it means early reflections
+    // ONLY — the unit rendered its fixed stamped pattern and no tail whatever, in every room, however
+    // long that room's decay was measured and applied. Measured with AudioLab --tailcheck, one
+    // footstep in a room configured for six seconds: at 0 the mixer is at the noise floor 500 ms
+    // later; at 100 it is still 28 dB up two seconds later. Heard as *"the tail on the reverb is the
+    // same no matter where I am in the stairs, corridor or parking garage... just sounds like a
+    // metallic box, short reflections are not in a parking garage"* — which is an exact description of
+    // a fixed early-reflection pattern with the room removed from behind it.
+    //
+    // So it is named after the parameter it writes, because the trap is the name.
+    public const float ReverbLateToEarlyMixPercent = 100.0f;
     public const float ReverbLateDelayMeanFreePaths = 2.0f;
     public const float ReverbLateDelayMaxMs = 100.0f;   // the unit's own ceiling for the parameter
     /// <summary>How fast the outdoor wet level moves toward its target, per audio update. Stepping it

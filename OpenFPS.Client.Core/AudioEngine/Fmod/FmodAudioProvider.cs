@@ -894,7 +894,7 @@ public class FmodAudioProvider : IAudioProvider
 
     /// <summary>Lab overrides for the reverb unit's early-reflection share (%) and late delay (ms);
     /// NaN means the constants. The AudioLab's room walk sets these to measure them.</summary>
-    internal static float ReverbEarlyLateOverride = float.NaN, ReverbLateDelayOverride = float.NaN;
+    public static float ReverbEarlyLateOverride = float.NaN, ReverbLateDelayOverride = float.NaN;
 
     public void SetSimulatedReverbDecay(float decayMs, float enclosure, float hfDecayRatio, float lfDecayRatio)
     {
@@ -1073,11 +1073,14 @@ public class FmodAudioProvider : IAudioProvider
             // transient a tenth of a millisecond after it, the same in every room. Measured on a
             // footstep in the wood room, they put the step 9 dB over its dry level and onto the master
             // limiter's ceiling every time: "pop pop pop, four or five copies piling up, footsteps
-            // loud". So the early share is off and the tail begins once the mean free path — the
+            // loud". So the unit is set to ALL LATE REVERB — EARLYLATEMIX is the blend of late to
+            // early, so that is 100, and the 0 it used to be asked for early reflections ONLY and got
+            // them: no tail at all, in any room, whatever decay was written a few lines above. See
+            // AcousticConstants.ReverbLateToEarlyMixPercent. The tail begins once the mean free path — the
             // room's size as the rays found it — has been crossed a couple of times, which is when
             // reflections are too dense to have a direction any more. A small room's tail starts
             // sooner than a hall's, from the same rule.
-            float earlyLate = float.IsNaN(ReverbEarlyLateOverride) ? AcousticConstants.ReverbEarlyReflectionsPercent : ReverbEarlyLateOverride;
+            float earlyLate = float.IsNaN(ReverbEarlyLateOverride) ? AcousticConstants.ReverbLateToEarlyMixPercent : ReverbEarlyLateOverride;
             float lateDelayMs = float.IsNaN(ReverbLateDelayOverride)
                 ? Math.Clamp(AcousticConstants.ReverbLateDelayMeanFreePaths * _listenerMfp / _speedOfSound * 1000f, 0f, AcousticConstants.ReverbLateDelayMaxMs)
                 : ReverbLateDelayOverride;
@@ -1486,6 +1489,85 @@ public class FmodAudioProvider : IAudioProvider
         for (int i = 0; i < outInfo.numchannels && i < 32; i++)
             outputPeak = Math.Max(outputPeak, outInfo.peaklevel[i]);
         return true;
+    }
+
+    /// <summary>
+    /// Every stage of a room bus at once: what went into the reverb, what came out of it, what came
+    /// out of the binaural stage that sits after it, and the fader that stage feeds.
+    ///
+    /// <see cref="TryMeterReverbBus"/> answers for the unit alone, and the unit was never the thing
+    /// that was wrong: a tail can be generated perfectly and still not reach the mix, because there
+    /// are two more stages and a fader after it. Measured with this, one footstep in a room configured
+    /// for six seconds of decay left the mixer at the noise floor half a second later. A chain is only
+    /// as loud as its quietest stage, and the only way to find which one is to meter all of them.
+    /// </summary>
+    public bool TryMeterReverbChain(int regionId, out float unitInDb, out float unitOutDb,
+                                    out float headOutDb, out float fader, out int sends)
+    {
+        unitInDb = unitOutDb = headOutDb = -120f; fader = 0f; sends = 0;
+        if (!_reverbDsps.TryGetValue(regionId, out var dsp) || !dsp.hasHandle()) return false;
+        if (!_reverbBuses.TryGetValue(regionId, out var bus) || !bus.hasHandle()) return false;
+        dsp.setMeteringEnabled(true, true);
+        if (dsp.getMeteringInfo(out var inI, out var outI) == RESULT.OK)
+        {
+            float a = 0f, b = 0f;
+            for (int i = 0; i < inI.numchannels && i < 32; i++) a = Math.Max(a, inI.peaklevel[i]);
+            for (int i = 0; i < outI.numchannels && i < 32; i++) b = Math.Max(b, outI.peaklevel[i]);
+            unitInDb = ToDb(a); unitOutDb = ToDb(b);
+        }
+        if (_reverbSaVoices.TryGetValue(regionId, out var v) && v.Dsp.hasHandle())
+        {
+            v.Dsp.setMeteringEnabled(true, true);
+            if (v.Dsp.getMeteringInfo(IntPtr.Zero, out var h) == RESULT.OK)
+            {
+                float c = 0f;
+                for (int i = 0; i < h.numchannels && i < 32; i++) c = Math.Max(c, h.peaklevel[i]);
+                headOutDb = ToDb(c);
+            }
+        }
+        bus.getVolume(out fader);
+        dsp.getNumInputs(out sends);
+        return true;
+
+        static float ToDb(float peak) => peak <= 1e-6f ? -120f : 20f * MathF.Log10(peak);
+    }
+
+    public string DescribeReverbChain(int regionId)
+    {
+        if (!_reverbDsps.TryGetValue(regionId, out var dsp) || !dsp.hasHandle()) return $"region {regionId}: no reverb unit";
+        if (!_reverbBuses.TryGetValue(regionId, out var bus) || !bus.hasHandle()) return $"region {regionId}: no bus";
+
+        dsp.setMeteringEnabled(true, true);
+        float unitIn = 0f, unitOut = 0f;
+        if (dsp.getMeteringInfo(out var inInfo, out var outInfo) == RESULT.OK)
+        {
+            for (int i = 0; i < inInfo.numchannels && i < 32; i++) unitIn = Math.Max(unitIn, inInfo.peaklevel[i]);
+            for (int i = 0; i < outInfo.numchannels && i < 32; i++) unitOut = Math.Max(unitOut, outInfo.peaklevel[i]);
+        }
+
+        float headOut = 0f; string headName = "none";
+        if (_reverbSaVoices.TryGetValue(regionId, out var voice) && voice.Dsp.hasHandle())
+        {
+            headName = "binaural";
+            voice.Dsp.setMeteringEnabled(true, true);
+            if (voice.Dsp.getMeteringInfo(IntPtr.Zero, out var hOut) == RESULT.OK)
+                for (int i = 0; i < hOut.numchannels && i < 32; i++) headOut = Math.Max(headOut, hOut.peaklevel[i]);
+        }
+
+        bus.getVolume(out float vol);
+        float tracked = _reverbVolumes.TryGetValue(regionId, out float tv) ? tv : float.NaN;
+        // How many voices are actually PLUGGED IN, and at what mix. A computed send that was never
+        // connected reads as a healthy percentage in every log line and moves no air whatever.
+        dsp.getNumInputs(out int inputs);
+        float loudestMix = 0f;
+        for (int i = 0; i < inputs; i++)
+            if (dsp.getInput(i, out _, out var conn) == RESULT.OK && conn.hasHandle()
+                && conn.getMix(out float m) == RESULT.OK) loudestMix = Math.Max(loudestMix, m);
+        return $"region {regionId}: {inputs} send(s) in, loudest mix {loudestMix:F3} | "
+             + $"unit in {Db(unitIn),6:F1} -> out {Db(unitOut),6:F1} dB | "
+             + $"{headName} out {Db(headOut),6:F1} dB | fader {vol:F3} (tracked {tracked:F3})";
+
+        static float Db(float peak) => peak <= 1e-6f ? -120f : 20f * MathF.Log10(peak);
     }
 
     /// <summary>Detaches and returns all per-bus reverb HRTF voices to the pool (before the buses are
