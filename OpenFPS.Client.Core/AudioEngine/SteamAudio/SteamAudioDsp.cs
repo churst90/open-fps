@@ -154,7 +154,12 @@ internal static class SteamAudioDsp
         {
             direction = new Phonon.IPLVector3 { x = state.DirX, y = state.DirY, z = state.DirZ },
             interpolation = Phonon.IPL_HRTFINTERPOLATION_BILINEAR,
-            spatialBlend = Math.Clamp(state.SpatialBlend, 0f, 1f),
+            // Always fully placed here; the blend is applied below, against the stage's OWN input
+            // rather than against Steam Audio's mono. For a point source the input is mono and the
+            // blend is 1, so nothing changes. For a stereo reverb bus, blend 0 is the reverb's own
+            // stereo passing straight through — which used to need the stage BYPASSED, a switch
+            // that clicked every time a listener crossed a doorway. A crossfade has no switch.
+            spatialBlend = 1f,
             hrtf = state.Hrtf,
             peakDelays = IntPtr.Zero
         };
@@ -163,13 +168,36 @@ internal static class SteamAudioDsp
         // 4. IPL stereo (deinterleaved) -> interleaved scratch
         Phonon.iplAudioBufferInterleave(state.Context, ref state.OutBuf, state.StereoScratch);
 
-        // 5. Write to FMOD's (interleaved) output buffer.
+        // 5. Write to FMOD's (interleaved) output buffer — the placed signal blended with the input.
+        float blend = Math.Clamp(state.SpatialBlend, 0f, 1f);
+        float dry = 1f - blend;
         bool nonZero = false;
         double sumSq = 0, sumSqL = 0, sumSqR = 0;
         unsafe
         {
             float* o = (float*)outbuffer;
+            float* inp = (float*)inbuffer;
             float[] st = state.StereoScratch;
+            if (dry > 0f)
+            {
+                // What the stage would pass through at blend 0: its own input, stereo kept as
+                // stereo, anything else as its mono downmix in both ears.
+                if (inchannels == 2)
+                    for (int i = 0; i < n; i++)
+                    {
+                        st[i * 2] = blend * st[i * 2] + dry * inp[i * 2];
+                        st[i * 2 + 1] = blend * st[i * 2 + 1] + dry * inp[i * 2 + 1];
+                    }
+                else
+                {
+                    float[] mono = state.MonoScratch;
+                    for (int i = 0; i < n; i++)
+                    {
+                        st[i * 2] = blend * st[i * 2] + dry * mono[i];
+                        st[i * 2 + 1] = blend * st[i * 2 + 1] + dry * mono[i];
+                    }
+                }
+            }
             if (outCh == 2)
             {
                 for (int i = 0; i < n; i++)

@@ -173,3 +173,10 @@ Sequenced so each step is verifiable before the next begins. Steps 1–4 are the
   `CommandHandler`, so pressing I returns "Command 'inv' not recognized".
 - There is no combat system of any kind: no weapon, damage, projectile or hit-detection code exists, and
   `HealthComponent` is never modified after spawn.
+
+### 2026-09-19 — the rooms map approved by ear; the city is next
+- `docs/REPEATS_AND_POPS.md`: the megaphone repeat, the per-step pops, the sliding feet, the doorway
+  whoosh, the metallic ring and the loud steps — six old faults, found by measurement, fixed, approved.
+- `docs/NEXT_THE_CITY.md`: the plan — commit, build a city block, fused early reflections (Steam Audio
+  convolution recommended), roads as data, aggregation, rail, aircraft, world events — and Cody's
+  wish list for the map mapped to what exists and what is missing.

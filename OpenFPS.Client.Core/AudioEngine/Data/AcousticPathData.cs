@@ -5,6 +5,11 @@ namespace OpenFPS.Client.AudioEngine.Data;
 public struct AcousticPathData
 {
     public float Occlusion;
+    /// <summary>Where the SOURCE was when this was computed. A result is answered for a place, and a
+    /// voice id that has since been reused for a sound somewhere else must not inherit it — see
+    /// ClientAudioSystem, where a one-shot's pooled id used to be handed the previous occupant's
+    /// occlusion and apparent position for its first frames.</summary>
+    public Vector3 SourcePosition;
     public Vector3 ApparentPosition;
     public float EffectiveDistance;
     public float MaterialAbsorption;

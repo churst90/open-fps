@@ -191,7 +191,10 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
         _provider.UpdateListener(lPos, lRot, lVel, lRegion);
         _provider.UpdateShelter(lShelter);
         _provider.UpdateBoundaries(new ReadOnlySpan<BoundaryProbe>(_boundariesOut, 0, lBoundaries));
-        _provider.SetSimulatedReverbDecay(_simReverbMs);
+        _provider.SetSimulatedReverbDecay(_simReverbMs, _simEnclosure, _simHf, _simLf);
+        Vector3 field; float anis, mfp;
+        lock (_stateLock) { field = _reverbFieldDir; anis = _reverbFieldAnisotropy; mfp = _reverbFieldMfp; }
+        _provider.SetListenerReverbField(field, anis, mfp);
         _provider.SetAirTemperature(_airTemperatureC);
         
         // 3. Synchronize acoustic map
@@ -323,7 +326,18 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
     // Geometry-driven reverb decay (ms) for the listener's room, supplied by the acoustic worker's
     // reflection sim. Volatile scalar — read once per flush; 0 means "no override".
     private volatile float _simReverbMs;
-    public void SetSimulatedReverbDecay(float decayMs) => _simReverbMs = decayMs;
+    public void SetSimulatedReverbDecay(float decayMs, float enclosure, float hfDecayRatio, float lfDecayRatio)
+    { _simReverbMs = decayMs; _simEnclosure = enclosure; _simHf = hfDecayRatio; _simLf = lfDecayRatio; }
+
+    private float _simEnclosure;
+    private float _simHf = 1f;
+    private float _simLf = 1f;
+
+    private Vector3 _reverbFieldDir;
+    private float _reverbFieldAnisotropy, _reverbFieldMfp;
+    /// <summary>See IAudioProvider.SetListenerReverbField. Forwarded on the audio thread's flush.</summary>
+    public void SetListenerReverbField(Vector3 returnDirection, float anisotropy, float meanFreePathMetres)
+    { lock (_stateLock) { _reverbFieldDir = returnDirection; _reverbFieldAnisotropy = anisotropy; _reverbFieldMfp = meanFreePathMetres; } }
 
     // The world's air temperature (°C), supplied by the client audio system from the server's weather.
     // Volatile scalar, read once per flush, like the reverb decay above.

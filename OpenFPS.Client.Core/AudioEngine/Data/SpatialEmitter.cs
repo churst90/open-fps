@@ -55,7 +55,15 @@ public struct SpatialEmitter
     public float ExtentMetres;
 
     public bool IsReflection; 
+    /// <summary>A sound that is part of the listener — their own feet — and is placed at
+    /// <see cref="ListenerOffset"/> from the listener's head every tick, whatever Position says.</summary>
+    public bool FollowsListener;
+    public Vector3 ListenerOffset;
     public float DelayMs; 
+    /// <summary>For a reflection: the entity whose sound this is a copy of. The provider starts the copy
+    /// at that voice's own playback position, so an echo of a sustained sound lags it by exactly the
+    /// path's extra delay instead of being the same file started again from the top.</summary>
+    public int ReflectionOf;
     public long SequenceId; 
     public float ConeInside; 
     public float ConeOutside; 

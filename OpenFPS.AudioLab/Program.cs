@@ -171,6 +171,13 @@ if (args.Contains("--sim-reflect"))
     Environment.Exit(code);
 }
 
+if (args.Contains("--sim-reverbfield"))
+{
+    int code = SimReverbFieldSpike.Run();
+    Log.CloseAndFlush();
+    Environment.Exit(code);
+}
+
 if (args.Contains("--sim-roomdbg"))
 {
     int code = SimRoomDbgSpike.Run();
@@ -531,6 +538,14 @@ if (args.Contains("--open-air-reverb"))
 {
     Console.WriteLine("--- Open air: does naming a place put a roof over it? ---");
     int code = OpenFPS.Client.Core.AudioEngine.Fmod.OpenAirReverbSpike.Run();
+    Log.CloseAndFlush();
+    Environment.Exit(code);
+}
+
+if (args.Contains("--room-walk"))
+{
+    Console.WriteLine("--- Room walk: the wood room with the megaphone on, walked, the mix captured to a WAV ---");
+    int code = OpenFPS.Client.Core.AudioEngine.Fmod.RoomWalkSpike.Run(args);
     Log.CloseAndFlush();
     Environment.Exit(code);
 }

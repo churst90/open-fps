@@ -41,9 +41,19 @@ public interface IAudioProvider : IDisposable
     void UpdateSpatialAttributes(SpatialEmitter emitter);
     void SetAcousticPath(int entityId, AcousticPathData path);
 
-    /// <summary>Overrides the listener-region reverb decay (FMOD SFXREVERB ms) with a geometry-derived
-    /// value from the Steam Audio reflection simulation. 0 = no override (keep the Sabine estimate).</summary>
-    void SetSimulatedReverbDecay(float decayMs);
+    /// <summary>
+    /// Overrides the listener-region reverb decay (FMOD SFXREVERB ms) with a geometry-derived value from
+    /// the Steam Audio reflection simulation. 0 = no override (keep the Sabine estimate).
+    ///
+    /// <paramref name="enclosure"/> is the OTHER half of the same answer, 0 (open field) to 1 (sealed
+    /// box): the decay says how long a tail would last here, and the enclosure says whether there is
+    /// one. They have to arrive together, because a long decay measured where nothing comes back is
+    /// precisely the reading that put a cathedral over an open racetrack. See OpenFPS.Common.Enclosure.
+    /// </summary>
+    void SetSimulatedReverbDecay(float decayMs, float enclosure, float hfDecayRatio, float lfDecayRatio);
+    /// <summary>Where the listener's reverberant field comes from (world space, unit or zero) and how
+    /// one-sided it is, 0..1. The listener's reverb is steered by it. See Enclosure.ReturnCentroid.</summary>
+    void SetListenerReverbField(Vector3 returnDirection, float anisotropy, float meanFreePathMetres);
 
     /// <summary>Sets the air temperature (°C) the Doppler math uses for the speed of sound. This is how
     /// the simulated weather reaches the mix: c = 331.3 + 0.606·T.</summary>

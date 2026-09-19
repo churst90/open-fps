@@ -68,6 +68,15 @@ public static class BoundaryModel
     {
         tap = default;
         if (!(probe.Distance >= 0f) || probe.Distance >= MaxDistance) return false;
+
+        // Not the ground. This model's copy is the round trip from the HEAD to a surface and back,
+        // which is right for a wall beside you and wrong for the floor under you: every source in the
+        // world stands on that floor, and a footstep IS on it, so its "floor reflection" has no path
+        // of its own — the image-source pass mirrors each source through the floor box already, at
+        // the delay that source's own geometry gives. Stamped from the head instead, it was a copy of
+        // every sound ten milliseconds late at a fifth of its level, everywhere, always: "outside and
+        // not in a room, it still sounds like I hear reflections from my footsteps".
+        if (probe.HeadDirection.Y < -0.5f) return false;
         if (speedOfSound <= 1f || sampleRate <= 0) return false;
 
         var props = AcousticRegistry.GetProperties(string.IsNullOrEmpty(probe.Material) ? "Generic" : probe.Material);

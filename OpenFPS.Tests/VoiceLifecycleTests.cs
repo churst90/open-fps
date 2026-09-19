@@ -45,7 +45,8 @@ public class VoiceLifecycleTests
         public void PlaySpatialSound(SpatialEmitter e) { Played.Add(e.EntityId); Live.Add(e.EntityId); }
         public void UpdateSpatialAttributes(SpatialEmitter e) { }
         public void SetAcousticPath(int id, AcousticPathData p) { }
-        public void SetSimulatedReverbDecay(float ms) { }
+        public void SetSimulatedReverbDecay(float ms, float enclosure, float hf, float lf) { }
+        public void SetListenerReverbField(Vector3 dir, float anisotropy, float mfp) { }
         public void SetAirTemperature(float c) { }
         public float MixerLoad => 0f;
         public void ReviveEngine(int id) { }

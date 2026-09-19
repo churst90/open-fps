@@ -54,6 +54,29 @@ public class ClientAudioSystem
 
     /// <summary>The walls answering the live engines. See EngineReflections.</summary>
     private readonly EngineReflections _engineEchoes = new();
+
+    /// <summary>The voice id of one image-source reflection slot of a source. Slots are ordered by
+    /// surface (see EarlyReflections), so a slot is the same wall from tick to tick.</summary>
+    private static int ReflectionVoiceId(int sourceId, int slot)
+        => -30000 - (sourceId * (EarlyReflections.MaxArrivals + 1)) - slot;
+
+    /// <summary>Which of a source's reflection slots answered this frame; the rest are retired.</summary>
+    private readonly bool[] _slotLive = new bool[EarlyReflections.MaxArrivals];
+
+    /// <summary>How far a result's source may be from where a non-entity voice is now and still be
+    /// taken as that voice's own. A pooled one-shot id reused a few seconds later is almost always
+    /// further than this from its previous occupant; a car between two ticks is not a non-entity.</summary>
+    internal const float StaleResultMetres = 1.0f;
+
+    /// <summary>Is this cached result an answer about THIS voice? An entity keeps its last result
+    /// between ticks; a voice that is not an entity — a footstep, a shot, anything from an id pool —
+    /// takes a result only if it was computed for roughly where the voice is now, because the
+    /// worker's cache is keyed by id and the id's previous occupant was somewhere else.</summary>
+    internal static bool ResultIsForThisVoice(WorldSnapshot world, int id, Vector3 sourcePos, List<AcousticPathData> paths)
+    {
+        if (paths.Count == 0 || world.Entities.ContainsKey(id)) return true;
+        return Vector3.DistanceSquared(paths[0].SourcePosition, sourcePos) <= StaleResultMetres * StaleResultMetres;
+    }
     private readonly List<(int Id, float Key, float D2)> _engineDistances = new();
     private double _lastEngineTime;
 
@@ -268,13 +291,9 @@ public class ClientAudioSystem
         if (_distantBoundTo.Remove(distant)) _audio.StopSound(distant);
         if (_frontVoiced.Remove(entityId)) _audio.StopSound(IntakeVoiceBase - Math.Abs(entityId));
         _frontRetiring.Remove(entityId);
-        _audio.StopSound(-10000 - entityId); // floor reflection
-        _audio.StopSound(-5000 - entityId);  // wall reflection
-        // Discrete ray-traced reflections hash into a 100-wide band per entity (see the -30000 scheme
-        // below); a removed entity is rare enough that sweeping its band is cheaper than tracking it.
-        int band = -30000 - (entityId * 100);
-        for (int i = 0; i < 100; i++)
-            if (_audio.IsPlaying(band - i)) _audio.StopSound(band - i);
+        // Its image-source reflections: one voice per slot (see ReflectionVoiceId).
+        for (int slot = 0; slot < EarlyReflections.MaxArrivals; slot++)
+            _audio.StopSound(ReflectionVoiceId(entityId, slot));
 
         _acousticWorker.Forget(entityId);
     }
@@ -347,7 +366,13 @@ public class ClientAudioSystem
         // Geometry-driven reverb (Phase 4d): drive the listener-region reverb decay from the Steam Audio
         // reflection sim when available (replaces the Sabine estimate for the room the listener is in).
         if (_acousticWorker.TryGetListenerReverbDecayMs(out float simReverbMs))
-            _audio.SetSimulatedReverbDecay(simReverbMs);
+        {
+            _audio.SetSimulatedReverbDecay(simReverbMs, _acousticWorker.ListenerEnclosure,
+                                           _acousticWorker.ListenerHfDecayRatio,
+                                           _acousticWorker.ListenerLfDecayRatio);
+            _audio.SetListenerReverbField(_acousticWorker.ListenerReturnDirection, _acousticWorker.ListenerAnisotropy,
+                                          _acousticWorker.ListenerMeanFreePath);
+        }
         
         // 3. Synchronize the acoustic map ONLY if it changed (optimization)
         if (world.AcousticMap != null)
@@ -454,52 +479,98 @@ public class ClientAudioSystem
                 });
             }
             
-            if (_acousticWorker.TryGetResult(id, out var paths))
+            if (_acousticWorker.TryGetResult(id, out var paths) && ResultIsForThisVoice(world, id, sourcePos, paths))
             {
+                Array.Clear(_slotLive);
                 foreach (var path in paths)
                 {
                     if (!path.IsReflection)
                     {
                         _audio.SetAcousticPath(id, path);
+                        continue;
                     }
-                    // Hand-rolled discrete reflection emitters are retired once Steam Audio simulation is
-                    // active — geometry-driven reverb (4d) covers reflected energy. The test is the DATA,
-                    // not the mode: the simulator never emits a reflection path, so a reflection entry can
-                    // only have come from the hand-rolled tracer. Honouring it unconditionally is what keeps
-                    // reflections alive for sources that fell back mid-session (an exhausted SA source pool,
-                    // a failed sim tick) instead of silently losing them to a mode flag.
-                    else
-                    {
-                    // OUTDOOR BUILDING REFLECTIONS
-                    if (world.Entities.TryGetValue(id, out var originalSnap))
-                    {
-                        // --- PHASE 2: Stable Reflection Identity ---
-                        // Use the hashed ReflectionId to ensure a specific wall reflection 
-                        // persists even if the ray-tracer's scan order changes.
-                        int reflectId = -30000 - (id * 100) - (path.ReflectionId % 100);
-                        
-                        var reflectEmitter = new SpatialEmitter
-                        {
-                            EntityId = reflectId,
-                            SoundId = _sounds.ResolvePath(originalSnap.Definition.SoundEmitter.SoundId),
-                            Mode = originalSnap.Definition.SoundEmitter.Mode,
-                            Position = path.ApparentPosition,
-                            ApparentPosition = path.ApparentPosition,
-                            Volume = originalSnap.Definition.SoundEmitter.Volume * (1.0f - path.Occlusion) * 0.8f,
-                            Range = originalSnap.Definition.SoundEmitter.Range * 0.8f,
-                            IsReflection = true,
-                            DelayMs = path.ReflectionDelayMs,
-                            Type = EmitterType.WorldLocked,
-                            EqHigh = path.EqHigh,
-                            ReflectionSpread = path.Spread,
-                            // Feed leftover energy into the reverb bus
-                            TransmissionBleed = path.MaterialAbsorption * 0.5f 
-                        };
 
-                        if (_audio.IsPlaying(reflectId)) _audio.UpdateSpatialAttributes(reflectEmitter);
-                        else _audio.PlayPhysicalSoundDirect(reflectEmitter);
+                    // A reflection path is honoured wherever it came from. Both paths produce them now:
+                    // under Steam Audio simulation they are first-order image sources off the scene's own
+                    // surfaces (EarlyReflections), and on the fallback path they come from the hand-rolled
+                    // tracer. Retiring them under the simulator — on the theory that a parametric reverb
+                    // tail covered the same energy — is what left a room answering from everywhere at once
+                    // and a doorway inaudible from outside.
+                    if (!world.Entities.TryGetValue(id, out var originalSnap)) continue;
+
+                    // A live engine has no file to play a delayed copy of: its sound id names a
+                    // synthesis, not a sample, and asking the provider to play it as one fails every
+                    // frame ("not playing yet — Missing", once a frame per car). The walls answering an
+                    // engine are EngineReflections' job, read out of the synthesis's own ring buffer.
+                    // "engine:" is how the SERVER spells it on a snapshot (VehicleSystem) and the
+                    // form tested before anything is resolved — the same test OtherBodies uses. The
+                    // first version of this line matched the resolved spelling, "ENGINE/", which no
+                    // snapshot ever holds, so it matched nothing and the cars kept their copies.
+                    string sourceSound = originalSnap.Definition.SoundEmitter.SoundId ?? "";
+                    if (sourceSound.StartsWith("engine:", StringComparison.OrdinalIgnoreCase)
+                        || sourceSound.StartsWith("ENGINE/", StringComparison.OrdinalIgnoreCase)) continue;
+                    if ((uint)path.ReflectionIndex >= (uint)EarlyReflections.MaxArrivals) continue;
+                    _slotLive[path.ReflectionIndex] = true;
+
+                    // One voice per slot, and the slots are ordered by the SURFACE each arrival
+                    // came off (see EarlyReflections), so a slot means the same wall from tick to
+                    // tick. It used to be `ReflectionId % 100` — the surface's identity folded into
+                    // a hundred values — which two different surfaces can collide on, and a
+                    // collision is one voice being handed two reflections from opposite sides of a
+                    // room and flickering between them. The index cannot collide: it is 0..N-1
+                    // among the arrivals that are live right now.
+                    int reflectId = ReflectionVoiceId(id, path.ReflectionIndex);
+
+                    var reflectEmitter = new SpatialEmitter
+                    {
+                        EntityId = reflectId,
+                        SoundId = _sounds.ResolvePath(originalSnap.Definition.SoundEmitter.SoundId),
+                        Mode = originalSnap.Definition.SoundEmitter.Mode,
+                        Position = path.ApparentPosition,
+                        ApparentPosition = path.ApparentPosition,
+                        // What the copy has left, per band, is the whole of what makes it a
+                        // reflection rather than a second source: the surface took some of it and
+                        // the extra distance took the rest. The level used to be the emitter's own
+                        // volume less occlusion, which for an image source is always zero — every
+                        // reflection came back at full strength however absorbent the wall was.
+                        Volume = originalSnap.Definition.SoundEmitter.Volume
+                               * Math.Clamp(path.EqMid, 0f, 1f),
+                        Range = originalSnap.Definition.SoundEmitter.Range * 0.8f,
+                        IsReflection = true,
+                        // The copy starts at the source voice's own playback position, so it is what
+                        // is being heard, arriving later — not the file again from the top.
+                        ReflectionOf = id,
+                        DelayMs = path.ReflectionDelayMs,
+                        Type = EmitterType.WorldLocked,
+                        EqLow = path.EqLow,
+                        EqMid = path.EqMid,
+                        EqHigh = path.EqHigh,
+                        ReflectionSpread = path.Spread,
+                        // Feed leftover energy into the reverb bus
+                        TransmissionBleed = path.MaterialAbsorption * 0.5f 
+                    };
+
+                    if (_audio.IsPlaying(reflectId))
+                    {
+                        // Back within the fusion window's reach: a surface that had stopped answering
+                        // and started again keeps its voice rather than restarting it.
+                        _audio.CancelFade(reflectId);
+                        _audio.UpdateSpatialAttributes(reflectEmitter);
                     }
-                    }
+                    else _audio.PlayPhysicalSoundDirect(reflectEmitter);
+                }
+
+                // ── A surface that has stopped answering is let go with a fade, not left playing ──
+                //
+                // Nothing used to stop these. A wall's copy, once started, played on at its last
+                // position for as long as the source did — a listener who walked out of a slapback's
+                // reach kept hearing it from where the wall had been. And a cut is a click, so the
+                // voice fades over the budget's own ramp and is stopped only once it is silent.
+                for (int slot = 0; slot < EarlyReflections.MaxArrivals; slot++)
+                {
+                    if (_slotLive[slot]) continue;
+                    int reflectId = ReflectionVoiceId(id, slot);
+                    if (_audio.IsPlaying(reflectId) && _audio.FadeOut(reflectId)) _audio.StopSound(reflectId);
                 }
             }
         }
@@ -1239,79 +1310,24 @@ public class ClientAudioSystem
         if (engineKey.Length > 0)
             _engineEchoes.Update(snap.Id, emitter, acousticPath, eyePos, AudioPhysics.SpeedOfSound, engineDt, _audio);
 
-        // 6.5. Dynamic Height Reflections (Floor Slapback)
-        // If sound is significantly below eye level, synthesize a floor reflection
-        // A live engine has no file to play a delayed copy of, so it gets no floor slapback here;
-        // its reflections are the echo voices, when a scene asks for them.
-        if (!emitter.IsReflection && engineKey.Length == 0 && emitter.Position.Y < (eyePos.Y - 1.0f) && emitter.Volume > 0.3f)
-        {
-            if (_frameCount % 20 == Math.Abs(snap.Id) % 20)
-            {
-                if (_spatial.RaycastSingle(world, snap.Transform.Position, -Vector3.UnitY, 5.0f, out var floorHit, out float hitDist))
-                {
-                    Vector3 floorHitPos = snap.Transform.Position - new Vector3(0, hitDist, 0);
-                    float delayMs = (hitDist / 343.0f) * 1000.0f;
-                    float absorption = floorHit.Definition.Acoustics.Absorption;
-
-                    int reflectId = -10000 - snap.Id;
-                    var floorReflect = new SpatialEmitter
-                    {
-                        EntityId = reflectId,
-                        SoundId = resolvedSoundId,
-                        Mode = emitter.Mode,
-                        Position = floorHitPos,
-                        ApparentPosition = floorHitPos,
-                        Volume = emitter.Volume * 0.3f * (1.0f - absorption),
-                        Range = emitter.Range * 0.5f,
-                        Pitch = emitter.Pitch * 0.98f, // Slightly lower pitch for reflection
-                        Type = EmitterType.WorldLocked,
-                        IsReflection = true,
-                        DelayMs = delayMs,
-                        EqHigh = 0.7f // Muffle high-end of reflections
-                    };
-                    
-                    if (_audio.IsPlaying(reflectId)) _audio.UpdateSpatialAttributes(floorReflect);
-                    else _audio.PlayPhysicalSoundDirect(floorReflect);
-                }
-            }
-        }
-
-        if (def.SoundEmitter.ConeInsideAngle < 360f && def.SoundEmitter.Volume > 0.5f)
-        {
-            if (_frameCount % 10 == Math.Abs(snap.Id) % 10)
-            {
-                Vector3 forward = Vector3.Transform(Vector3.UnitZ, snap.Transform.Rotation);
-                if (_spatial.RaycastSingle(world, snap.Transform.Position, forward, def.SoundEmitter.Range, out _, out float hitDist))
-                {
-                    Vector3 hitPos = snap.Transform.Position + (forward * hitDist);
-                    int hitRegion = _acoustics.GetRegionAt(world, hitPos);
-                    float delayMs = (hitDist / 343.0f) * 1000.0f;
-                    
-                    int reflectId = -5000 - snap.Id;
-                    var reflectEmitter = new SpatialEmitter
-                    {
-                        EntityId = reflectId,
-                        SoundId = resolvedSoundId,
-                        Mode = def.SoundEmitter.Mode,
-                        Position = hitPos,
-                        ApparentPosition = hitPos,
-                        EffectiveDistance = Vector3.Distance(eyePos, hitPos),
-                        Occlusion = 0.0f,
-                        Volume = def.SoundEmitter.Volume * 0.4f * (1.0f - (hitDist / def.SoundEmitter.Range)),
-                        Range = def.SoundEmitter.Range * 0.5f,
-                        Pitch = 1.0f,
-                        Type = EmitterType.WorldLocked,
-                        IsReflection = true,
-                        DelayMs = delayMs,
-                        TargetRegionId = hitRegion,
-                        EnableReverb = true
-                    };
-                    
-                    if (_audio.IsPlaying(reflectId)) _audio.UpdateSpatialAttributes(reflectEmitter);
-                    else _audio.PlayPhysicalSoundDirect(reflectEmitter);
-                }
-            }
-        }
+        // No floor slapback and no "cone reflection" here any more, and the absence is the fix.
+        //
+        // Two generators used to live at this point. One cast a ray straight down from the emitter
+        // and started a second playback of its sound at the hit, pitched down two per cent. The other,
+        // for a directional source, cast a ray along its beam and started a second playback at
+        // whatever that hit. Both were the mechanism EarlyReflections retired for the walls: another
+        // independent read of the same file, at an unrelated position in it — for a looping
+        // announcement, the announcement again. And both rays tested every collider, solid or not,
+        // including the emitter's own: a ray that starts inside a box hits it at distance zero. So
+        // the megaphone's "floor" and "wall" reflections both sat AT the megaphone, at 30 and 40 per
+        // cent, never occluded (derived ids are skipped by the acoustic pass), one of them drifting
+        // slowly against the original because of the pitch shift. Reported exactly: "I hear like 2
+        // copies, one latent like it is echoing off something way far away... if I stand by the
+        // megaphone I hear it repeat softer but in the same place."
+        //
+        // The floor is a box face and so is the wall the beam points at. The image-source pass
+        // already mirrors the source through both, with the material's absorption and the extra
+        // path, and renders a copy only when the ear would hear one as a separate event.
     }
 
     // One Opus decoder per sender — decoders are stateful (track packet loss continuity).
@@ -1357,14 +1373,49 @@ public class ClientAudioSystem
     private const int FOOTSTEP_POOL_SIZE = 12;
     private const int FOOTSTEP_BASE_ID = -100;
 
+    /// <summary>Somebody else's step: a sound at a place in the world, left there as they walk on.</summary>
     public void OnPlayerFootstep(Vector3 pos, string mat, string var)
+        => SubmitFootstep(pos + new Vector3(0, 0.1f, 0), mat, follows: false, offset: Vector3.Zero);
+
+    /// <summary>
+    /// Your OWN step. It is part of you, so it rides with you.
+    ///
+    /// Your feet are not somewhere in the world that you then walk away from; they are under your
+    /// head, and stay there. Placed as a world-locked sound at the physics position, a step was put
+    /// down wherever the predicted position and the server's disagreed at that instant — the
+    /// listener stands at the smoothed VisualPosition, the step was at Position — and then left
+    /// behind as the listener moved on through its two or three hundred milliseconds. In the log a
+    /// single step's bearing went from straight down to thirty degrees behind while it played.
+    /// Reported as "the footsteps slide all around me; if I move right I hear them trailing to the
+    /// left", and heard, step by step, as a click from somewhere off to one side. So an own step is
+    /// placed at a fixed offset from the listener's head and follows it, whatever the network is
+    /// doing to the position underneath.
+    /// </summary>
+    public void OnOwnFootstep(Vector3 pos, string mat, string var)
+    {
+        Vector3 offset = (pos - _state.Position) + new Vector3(0, 0.1f - 1.7f, 0);   // the foot, from the eye
+        SubmitFootstep(_state.VisualPosition + new Vector3(0, 1.7f, 0) + offset, mat, follows: true, offset: offset);
+    }
+
+    private void SubmitFootstep(Vector3 nudgePos, string mat, bool follows, Vector3 offset)
     {
         int id = FOOTSTEP_BASE_ID - (_footstepPoolIndex % FOOTSTEP_POOL_SIZE);
         _footstepPoolIndex++;
-        Vector3 nudgePos = pos + new Vector3(0, 0.1f, 0);
-        
+
         string resolvedSoundId = _sounds.ResolvePath(_sounds.GetImpactSoundId(mat, 0f));
         if (string.IsNullOrEmpty(resolvedSoundId)) return;
+
+        // ── A footstep is a quiet sound, and it is placed as one ────────────────────────────
+        //
+        // Every engine and every transient in the world is placed by Loudness.Place from a source
+        // level in decibels; the footsteps were not — they played at full scale, which on this
+        // scale is a 112 dB source, a metre from the ear. A step is about 55 dB. Measured
+        // (AudioLab --room-walk): even with the master maximizer's makeup gain at zero a dry step
+        // peaked at −1.6 dBFS, so with the makeup on it hit the brick wall by nine decibels on
+        // every step and the limiter pumped everything under it for the next fifty milliseconds —
+        // "the footsteps are loud", and a pop on every one. The same law that places a rifle and a
+        // car places these, twenty-six decibels down, where a step belongs against a megaphone.
+        var (stepGain, stepReference) = OpenFPS.Common.Loudness.Place(OpenFPS.Common.Loudness.FootstepDb);
 
         // 1. Direct Sound (Will now undergo full acoustic pathing)
         var footstep = new SpatialEmitter
@@ -1372,14 +1423,16 @@ public class ClientAudioSystem
             EntityId = id,
             SoundId = resolvedSoundId,
             Position = nudgePos,
+            FollowsListener = follows,
+            ListenerOffset = offset,
             Type = EmitterType.WorldLocked,
-            Volume = 1.0f,
+            Volume = stepGain,
             Range = 15.0f,
             // Your own feet, pinned above the physics: they are how you know you are moving, and on
             // a loud map the arithmetic would rightly bury them under everything else.
             Essential = true,
             IsEvent = true,
-            MinDistance = 1.0f
+            MinDistance = stepReference
         };
         _audio.Submit(footstep);
 
@@ -1480,17 +1533,16 @@ public class ClientAudioSystem
         if (region.Materials == null || region.Materials.Length == 0 || region.Materials[0] == resonanceIndex)
             return;
 
-        float was = OpenFPS.Common.RoomAcoustics.DecayMs(region);
         region.Materials[0] = resonanceIndex;
         _lastAcousticMap.Regions[listenerRegionId] = region;
 
-        // Only rebuild if it CHANGED anything. SetAcousticMap tears down every reverb bus on the map
-        // and every Steam Audio voice attached to them, and walking from grass onto asphalt crosses a
-        // material boundary — so on a racetrack this fired every few steps for a region whose ground
-        // is not what decides its reverberation at all. Out of doors it never does: five open faces
-        // are five open faces whatever you are standing on.
-        if (MathF.Abs(OpenFPS.Common.RoomAcoustics.DecayMs(region) - was) > 1f)
-            _audio.SetAcousticMap(_lastAcousticMap);
+        // And that is all. This used to rebuild the acoustic map when the floor's Sabine estimate
+        // moved — which tears down every reverb bus on the map, every Steam Audio voice attached to
+        // them and every send into them, mid-tail: the loudest discontinuity the engine can make, on
+        // a footstep. It is not needed. The tail's time, colour and level are surveyed from the boxes
+        // round the listener every few ticks (Enclosure.Look), and the floor underfoot is one of
+        // those boxes, so what you are standing on already colours the room. The region's material
+        // is kept current here for anything that still reads the Sabine estimate at bus creation.
     }
 
     private int _breathSeed;
@@ -1528,25 +1580,39 @@ public class ClientAudioSystem
         }, OpenFPS.Common.AudioClock.Now);
     }
 
-    public void OnPlayerLand(Vector3 pos, string mat, string var)
+    /// <summary>Your own landing: under your own head, and it stays there. See OnOwnFootstep.</summary>
+    public void OnOwnLand(Vector3 pos, string mat, string var)
     {
-        Vector3 nudgePos = pos + new Vector3(0, 0.1f, 0);
+        Vector3 offset = (pos - _state.Position) + new Vector3(0, 0.1f - 1.7f, 0);
+        SubmitLanding(_state.VisualPosition + new Vector3(0, 1.7f, 0) + offset, mat, follows: true, offset: offset);
+    }
+
+    public void OnPlayerLand(Vector3 pos, string mat, string var)
+        => SubmitLanding(pos + new Vector3(0, 0.1f, 0), mat, follows: false, offset: Vector3.Zero);
+
+    private void SubmitLanding(Vector3 nudgePos, string mat, bool follows, Vector3 offset)
+    {
         string impactSound = _sounds.GetImpactSoundId(mat, 0f);
         string resolved = _sounds.ResolvePath(impactSound);
         
         if (!string.IsNullOrEmpty(resolved))
         {
+            // Placed like a step (see SubmitFootstep); a landing is a heavier step, and its extra
+            // weight is in the sound the server chose for it, not in a louder scale.
+            var (landGain, landReference) = OpenFPS.Common.Loudness.Place(OpenFPS.Common.Loudness.FootstepDb);
             var landEmitter = new SpatialEmitter
             {
                 EntityId = -50,
                 SoundId = resolved,
                 Position = nudgePos,
+                FollowsListener = follows,
+                ListenerOffset = offset,
                 Type = EmitterType.WorldLocked,
-                Volume = 1.0f,
+                Volume = landGain,
                 Range = 20.0f,
                 Essential = true,
                 IsEvent = true,
-                MinDistance = 1.0f
+                MinDistance = landReference
             };
             _audio.Submit(landEmitter);
         }

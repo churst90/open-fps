@@ -140,8 +140,10 @@ public sealed class ClientGameSession : IDisposable
         _chat = new ChatManager(_speech);
 
         _sounds.Initialize();
-        _controller.OnStepTriggered += _audioSystem.OnPlayerFootstep;
-        _controller.OnLandTriggered += _audioSystem.OnPlayerLand;
+        // Your own feet ride with your head (see ClientAudioSystem.OnOwnFootstep); everybody
+        // else's are sounds at places in the world.
+        _controller.OnStepTriggered += _audioSystem.OnOwnFootstep;
+        _controller.OnLandTriggered += _audioSystem.OnOwnLand;
 
         // Everybody else's feet arrive through exactly the same two calls as your own. A footstep
         // does not care whose it was, and nothing downstream of here is told.
@@ -353,7 +355,20 @@ public sealed class ClientGameSession : IDisposable
         // A passenger travels without walking. Feeding the vehicle's motion to the stride generator
         // would produce a footstep every stride-length of ROAD — at sixty miles an hour, a machine gun.
         if (_state.IsRiding) _controller.Teleported();
-        else _controller.Update(_state.Position + _state.VisualOffset, _state.Velocity);
+        // ── Where the body IS, not where the camera is being eased to ───────────────────────────
+        //
+        // VisualOffset is a rendering term: when the server corrects the prediction, the listener is
+        // slid to the new position over about two tenths of a second instead of being snapped, so the
+        // world does not jump. Feeding it to the stride generator made that slide into WALKING. A
+        // correction of a few metres decays at up to twenty-five metres a second, in steps small
+        // enough to look plausible, and if the player's own velocity is over the walking threshold at
+        // the time — which it is, if they were moving when it landed — every one of those steps banks
+        // distance. Heard, and reported, as "when I /tp myself or land in the map, I hear a few
+        // footsteps before it settles".
+        //
+        // The accumulator's own rule is that a stride is something a body DID. The smoothing is
+        // something done to the camera, so it has no business here at all.
+        else _controller.Update(_state.Position, _state.Velocity);
 
         var snapshot = _world.GetSnapshot();
 
@@ -607,7 +622,8 @@ public sealed class ClientGameSession : IDisposable
                 NoteRiding(update.RidingEntityId);
                 foreach (var s in update.States)
                     if (s.EntityId == _ownEntityId)
-                        _reconciler.ApplyServerCorrection(s, update.LastProcessedSequenceId, _world.GetSnapshot());
+                        if (_reconciler.ApplyServerCorrection(s, update.LastProcessedSequenceId, _world.GetSnapshot()))
+                            _controller.Teleported();   // moved, not walked: forget the stride
                 break;
 
             case WorldAudioEvent audioEvent:

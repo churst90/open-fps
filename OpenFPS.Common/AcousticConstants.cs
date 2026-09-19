@@ -29,9 +29,13 @@ public static class AcousticConstants
     public const float OcclusionCap = 0.95f;
     
     // --- Reverb & Reflections ---
-    public const int MaxReflectionOrder = 3; 
+    //
+    // MaxReflectionOrder and ReflectionMergeDistance used to live here and are gone with the generator
+    // that needed them. A recursive ray solve produced a scatter of near-duplicate reflections and then
+    // merged whatever landed within three metres to hide it; an image source produces exactly one
+    // arrival per surface, so there is nothing to merge and no order to cap. What a surface returns and
+    // how wide it reads are properties of the surface — see OpenFPS.Common.EarlyReflections.
     public const float ReflectionEnergyThreshold = 0.05f; 
-    public const float ReflectionMergeDistance = 3.0f; // Merge reflections within 3m of each other
     public const float ReflectionMinSpread = 15.0f; // Minimum degrees of spread for a reflection
     public const float ReflectionMaxSpread = 120.0f; 
     public const float ActiveRegionRadius = 50.0f;
@@ -86,25 +90,26 @@ public static class AcousticConstants
     // for "the outdoors", which takes the whole map as one room, returns an enormous number, and
     // washes the entire world in undirected reverb; that estimate is why the outdoor bus is muted.
     //
-    // Steam Audio's ray-traced RT60 does not have that problem. It is computed from the geometry that
-    // is actually around the listener, so an open field returns nearly nothing and a street canyon
-    // returns a real decay. These two numbers are the gate: below the first, outdoors stays silent
-    // exactly as it does today; between them the bus opens in proportion to what the rays found.
-    /// <summary>Simulated RT60 below which outdoors is treated as open air and stays dry.</summary>
-    public const float OutdoorDryDecayMs = 260.0f;
-    /// <summary>Simulated RT60 at which the outdoor reverb bus reaches full wet level.</summary>
-    public const float OutdoorFullWetDecayMs = 1400.0f;
+    // Steam Audio's ray-traced RT60 does not have that problem for the TIME. It does for the LEVEL, and
+    // two constants used to live here that tried to read one off the other — a decay below which
+    // outdoors stayed dry, and a decay at which the bus reached full wet. They are gone, because the
+    // premise under them is false: the estimator fits a curve to whatever energy its rays bring home
+    // and cannot report that there was hardly any, so a roofless yard fits a LONGER tail than the same
+    // walls with a roof on (1.00 s against 0.60 s, AudioLab --sim-reverbfield). No threshold can
+    // separate places that sit on the same side of it. How loud the tail is comes from how enclosed
+    // the place is, measured directly — see OpenFPS.Common.Enclosure.
     /// <summary>
-    /// Loudest the outdoor bus may get, dB.
+    /// Loudest the reverb bus may get, dB — full wet, which is where a sealed hard room belongs.
     ///
-    /// Much lower than it was, because its job changed. Before there were discrete reflections this
-    /// wash was the ONLY thing representing the buildings, so it had to be loud enough to be noticed —
-    /// and a loud undirected two-second decay on every gunshot is precisely "one big echoey room".
-    /// Now the facades answer individually, with their own directions and delays, and this is only the
-    /// diffuse tail behind them: the part that has bounced too many times to have a direction left.
-    /// It should be felt rather than heard.
+    /// It used to be -16, from a time when this wash was the only thing representing a room and had to
+    /// be kept out of the way of everything else. Both halves of that have changed: the surfaces answer
+    /// individually now (EarlyReflections), so this is only the diffuse remainder behind them, and the
+    /// LEVEL of that remainder is measured rather than chosen — it is the fraction of emitted energy
+    /// that comes back, which for open ground is one percent and for a sealed hard box is nearly all of
+    /// it. Holding the top of that scale 16 dB down put a hard-walled courtyard at -35 dB, which is
+    /// audible in a meter and not in the ear.
     /// </summary>
-    public const float OutdoorMaxWetDb = -16.0f;
+    public const float OutdoorMaxWetDb = 0.0f;
 
     /// <summary>
     /// Longest reverberation time the outdoors is allowed, milliseconds.
@@ -116,6 +121,21 @@ public static class AcousticConstants
     /// second, because the sky is an infinite absorber and the tracer's rays do not all find it.
     /// </summary>
     public const float OutdoorMaxDecayMs = 1100.0f;
+
+    // ── What the reverb unit is for ─────────────────────────────────────────────────────────────
+    //
+    // The unit's own synthetic early reflections are OFF. Early reflections are a fact about the
+    // geometry — which wall, how far, what it is made of — and the image-source pass measures them
+    // per source; a reverb unit's are a fixed pattern of copies stamped onto every transient a tenth
+    // of a millisecond after it, whatever the room. Measured on a footstep in the wood room: with
+    // them the step peaked 9 dB louder than dry and sat on the master limiter's ceiling on every step;
+    // heard as "pop pop pop, like four or five copies of reflections piling up on every step, and the
+    // footsteps are loud". The unit renders the diffuse tail only, starting after the mean free path
+    // has been crossed a couple of times, which is when reflections become too dense to have a
+    // direction (see FmodAudioProvider.ApplySimulatedReverb).
+    public const float ReverbEarlyReflectionsPercent = 0.0f;
+    public const float ReverbLateDelayMeanFreePaths = 2.0f;
+    public const float ReverbLateDelayMaxMs = 100.0f;   // the unit's own ceiling for the parameter
     /// <summary>How fast the outdoor wet level moves toward its target, per audio update. Stepping it
     /// in one frame is a step change in the signal, which is a click — the same fault that the region
     /// bus's binaural bypass had when crossing a threshold.</summary>
