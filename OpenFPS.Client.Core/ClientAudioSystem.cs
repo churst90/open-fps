@@ -1392,8 +1392,14 @@ public class ClientAudioSystem
     /// placed at a fixed offset from the listener's head and follows it, whatever the network is
     /// doing to the position underneath.
     /// </summary>
+    /// <summary>Tracing for OPENFPS_AUDIO_DEBUG=1 — what your own feet did, and when. A landing is a
+    /// heavier sound than a step and fires at most twice a second, so "periodic bangs" is a question
+    /// this line answers outright.</summary>
+    private static readonly bool _footTrace = Environment.GetEnvironmentVariable("OPENFPS_AUDIO_DEBUG") == "1";
+
     public void OnOwnFootstep(Vector3 pos, string mat, string var)
     {
+        if (_footTrace) Log.Information("[FOOT] step on {Mat} at {Pos}", mat, pos);
         Vector3 offset = (pos - _state.Position) + new Vector3(0, 0.1f - 1.7f, 0);   // the foot, from the eye
         SubmitFootstep(_state.VisualPosition + new Vector3(0, 1.7f, 0) + offset, mat, follows: true, offset: offset);
     }
@@ -1584,6 +1590,7 @@ public class ClientAudioSystem
     /// <summary>Your own landing: under your own head, and it stays there. See OnOwnFootstep.</summary>
     public void OnOwnLand(Vector3 pos, string mat, string var)
     {
+        if (_footTrace) Log.Information("[FOOT] LANDED on {Mat} at {Pos}", mat, pos);
         Vector3 offset = (pos - _state.Position) + new Vector3(0, 0.1f - 1.7f, 0);
         SubmitLanding(_state.VisualPosition + new Vector3(0, 1.7f, 0) + offset, mat, follows: true, offset: offset);
     }

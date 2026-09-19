@@ -94,9 +94,27 @@ public sealed class WorldAudioPlayer
     /// <summary>
     /// Takes an event off the wire: renders anything new, and queues every sound for its moment.
     /// </summary>
+    /// <summary>
+    /// Tracing for OPENFPS_AUDIO_DEBUG=1, which is what `run-gtk-client.sh capture` turns on.
+    ///
+    /// Every short sound the world makes goes through here, and until this existed there was no way
+    /// to answer "what was that bang" except by reading a synth key out of a spatialiser trace and
+    /// working backwards. A report of "periodic bangs for ten seconds after I stop walking" is a
+    /// question about WHAT and WHEN, and both are known right here.
+    /// </summary>
+    private static readonly bool _trace = Environment.GetEnvironmentVariable("OPENFPS_AUDIO_DEBUG") == "1";
+
     public void Receive(WorldAudioEvent message, double now)
     {
         if (message.Sounds == null) return;
+        if (_trace)
+        {
+            foreach (var s in message.Sounds)
+                Serilog.Log.Information("[WAUDIO] recv '{Label}' from e{Src}: {Ch} {Hz:F0} Hz {Db:F0} dB "
+                                      + "decay {Decay:F2}s delay {Delay:F2}s at {Pos} (queue {Q})",
+                    message.Label, message.SourceEntityId, s.Character, s.Hz, s.LevelDb,
+                    s.DecaySeconds, s.DelaySeconds, s.Position, _pending.Count);
+        }
         foreach (var sound in message.Sounds)
         {
             string id = IdFor(sound, message.Seed);
@@ -153,6 +171,12 @@ public sealed class WorldAudioPlayer
             var item = _pending[i];
             if (now < item.DueAt) continue;
             _pending.RemoveAt(i);
+
+            if (_trace)
+                Serilog.Log.Information("[WAUDIO] play {Id}{Echo} {Db:F0} dB at {Dist:F1} m, {Late:F2}s after it was due "
+                                      + "({Q} still queued)",
+                    item.SoundId, item.IsReflection ? " (echo)" : "", item.Sound.LevelDb,
+                    Vector3.Distance(listenerPosition, item.Sound.Position), now - item.DueAt, _pending.Count);
 
             if (!item.IsReflection) QueueReflections(item, reflections, listenerPosition, now);
 
@@ -299,7 +323,15 @@ public sealed class WorldAudioPlayer
                 Sound = echo,
                 SoundId = item.SoundId,
                 SourceEntityId = item.SourceEntityId,
-                DueAt = item.DueAt,
+                // LATER THAN THE SOUND IT IS A COPY OF — by exactly the extra distance it travelled.
+                //
+                // This was `item.DueAt`, so every echo of every world event arrived on the same sample
+                // as the direct sound. Reflection.DelaySeconds says of itself "seconds later than the
+                // direct sound: this is the whole point", and it was being thrown away. What that
+                // produces is not an echo: it is the direct sound with three or four copies of itself
+                // summed onto its own transient — louder, smeared, and arriving as ONE bang. Near a
+                // building, where there are surfaces to find, that is every world sound.
+                DueAt = item.DueAt + Math.Max(0f, r.DelaySeconds),
                 IsReflection = true,
             });
         }
