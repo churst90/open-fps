@@ -380,6 +380,15 @@ if (args.Contains("--engine-alias"))
     Log.CloseAndFlush();
     Environment.Exit(eacode);
 }
+if (args.Contains("--walk"))
+{
+    // --walk [map= from= to= seconds= stand= sprint]: the REAL movement engine and ground probe over a
+    // real map, reporting every footfall, every landing and every time the ground moved. See WalkSpike.
+    int walkCode = OpenFPS.Client.Core.AudioEngine.Fmod.WalkSpike.Run(args);
+    Log.CloseAndFlush();
+    Environment.Exit(walkCode);
+}
+
 if (args.Contains("--enclosure"))
 {
     // --enclosure [map= at= walk= step= head= dist=]: what the room round a listener measures at a

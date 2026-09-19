@@ -137,6 +137,37 @@ The ladder the map reads now, as the reverb send to a source at your own feet:
 |---|---|---|---|---|---|---|---|
 | 8 % | 26 % | 39 % | 82 % | 98 % | 81 % | 102 % | 223 % |
 
+## And then: the bangs were landings
+
+The reverb work above did not stop *"walk a few steps, stop, and for like 10 seconds, periodic
+bangs."* That turned out not to be an audio fault at all.
+
+`--walk` (`WalkSpike`) drives the **real** `SharedMovementEngine` and the **real** `PhysicsUtils`
+ground probe over a map's own boxes, tick for tick, and prints every footfall, every landing, and
+every time the ground moved. Nothing in it models the movement; it *is* the movement. One run:
+
+```
+--walk map=city from=0,-20 to=20,-20
+    t=2.20s  ground 0.020 -> -0.100 (Dirt) at x=9.90
+    t=2.20s  off the ground
+    t=2.27s  LANDED
+```
+
+A **twelve-centimetre lip** where the made ground ends. The engine could step UP a full `StepHeight`
+and had **no allowance going down**, so the body went airborne for two ticks and then *landed* — and
+a landing plays out of the footstep bank, is much heavier than a step, and is gated to one every half
+second. That is the "periodic".
+
+Standing on one is worse. The ground probe samples five points around the feet, so on a lip it
+straddles the edge; any jitter in the position — server reconciliation keeps nudging it after you
+stop — flips the answer, drops the body, lands it again. **A bang every half second for as long as
+you stand there**, and it happens near buildings because that is where the made ground ends.
+
+Fixed in two places. The floor may now be a full step *below* you and still be the floor you are on,
+unless you are already rising or falling, so walking off a roof is still walking off a roof
+(`StepDownTests`). And this map's bare ground is flush with the carriageway — the kerb stays, because
+a kerb is real and a body can now step off one.
+
 ## Four materials a city needed and the table did not have
 
 Each is a difference a listener can hear against the Concrete that was standing in for all of them.

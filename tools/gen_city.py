@@ -167,8 +167,10 @@ SPAWN = (0.0, 0.1, -20.0)            # in the carriageway, south of both buildin
 box("asphalt_road", -KERB_X, KERB_X, -0.1, 0.0, TUNNEL_Z0, MAP_MAX[2], name="Road")
 box("concrete_floor", -WALK_X, -KERB_X, -0.1, 0.02, TUNNEL_Z1, MAP_MAX[2], name="West pavement")
 box("concrete_floor", KERB_X, WALK_X, -0.1, 0.02, TUNNEL_Z1, MAP_MAX[2], name="East pavement")
-# Everything else the map stands on. Dirt, so that stepping off the made ground is audible.
-box("dirt_floor", MAP_MIN[0], MAP_MAX[0], -0.3, -0.1, MAP_MIN[2], MAP_MAX[2], name="Ground")
+# Everything else the map stands on. Dirt, so that stepping off the made ground is audible — and
+# FLUSH with the carriageway, not ten centimetres below it. A lip is a thing a body has to step down,
+# and the only lip on this map that should exist is the kerb.
+box("dirt_floor", MAP_MIN[0], MAP_MAX[0], -0.2, 0.0, MAP_MIN[2], MAP_MAX[2], name="Ground")
 
 # ══ An apartment building ═════════════════════════════════════════════════════════════════════════
 

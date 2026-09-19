@@ -51,7 +51,22 @@ public static class SharedMovementEngine
         // Only snap to ground if we are close to it and moving downwards or stationary.
         // This prevents the "Void Snap" where a player is teleported to map bottom if ground is missing.
         bool isGrounded = false;
-        if (pos.Y <= ctx.GroundHeight + 0.1f && vel.Y <= 0.1f)
+
+        // ── How far BELOW you the floor may be and still be the floor you are walking on ─────────
+        //
+        // A body walking off a kerb does not leave the ground. It steps down — which is the same
+        // StepHeight the collision code already uses to step UP, and the asymmetry was a bug: a lip
+        // of twelve centimetres put the body in the air for two ticks and then LANDED it, and a
+        // landing is a heavy sound. On a map where the made ground sits proud of the dirt beside it,
+        // that fires wherever a pavement ends — and, once you are standing on the boundary, the
+        // five-point ground probe straddles it and flickers, so it fires again every half second for
+        // as long as you stand there. Reported as "walk a few steps, stop, and for like 10 seconds,
+        // periodic bangs", and heard as footsteps because a landing plays the footstep bank.
+        //
+        // Only for a body that is NOT already going up or down: one that has jumped, or is genuinely
+        // falling, keeps the old tolerance, so walking off a roof is still walking off a roof.
+        float stepDown = vel.Y > -0.01f && vel.Y < 0.01f ? MathF.Max(0.1f, ctx.StepHeight) : 0.1f;
+        if (pos.Y <= ctx.GroundHeight + stepDown && vel.Y <= 0.1f)
         {
             if (ctx.GroundHeight > DefaultGroundCheckLimit) // Valid ground check
             {
