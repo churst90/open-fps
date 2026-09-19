@@ -78,6 +78,28 @@ public sealed class OtherBodies
             var type = body.Definition.Type;
             if (type != EntityType.Player && type != EntityType.NPC) continue;
 
+            // ── A thing with an engine does not have legs ────────────────────────────────────────
+            //
+            // The line above was meant to keep cars out and did not, because a car IS an NPC: the
+            // server drives it with the same AI type as anything else that moves under its own
+            // direction. So every vehicle on the map got a stride accumulator, and a stride is half a
+            // metre — reported from the rooms map as "the car driving by sounds like footsteps are
+            // being drug behind it", which at 30 km/h is sixteen footfalls a second trailing the car.
+            // Nothing protected against it: a car's own velocity is genuinely its own, which is the
+            // test that keeps passengers and server corrections quiet, and at render rate it moves a
+            // few centimetres an update, which is well inside what a stride explains.
+            //
+            // What actually distinguishes them is not the AI type but the machinery: an entity whose
+            // emitter is an engine is a machine, and a machine is heard through its engine, its tyres
+            // and its body — all of which it already has. This is the same test ClientAudioSystem uses
+            // to decide something is a vehicle, so the two cannot disagree about what a car is.
+            // The prefix is "engine:", which is the form the SERVER writes (VehicleSystem) and the form
+            // ClientAudioSystem tests before it resolves anything. Checked against the raw id for that
+            // reason: a first attempt at this filter matched the RESOLVED spelling, "ENGINE/", which
+            // nothing on a snapshot ever holds, so it matched nothing and the cars kept walking.
+            if (body.Definition.SoundEmitter.SoundId is { } sid &&
+                sid.StartsWith("engine:", StringComparison.OrdinalIgnoreCase)) continue;
+
             if (!_bodies.TryGetValue(body.Id, out var state))
                 _bodies[body.Id] = state = new Body();
 

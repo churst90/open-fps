@@ -67,7 +67,30 @@ public sealed class RaceLine
     /// cornering grip, and a formula that cannot tell those apart reports it as sliding.</summary>
     private readonly float[] _corner;
     private readonly float[] _heading;         // radians, the way the line points at each node
-    private readonly float _spacing;           // actual node spacing, metres
+    private readonly float _spacing;           // node spacing of the resampled CENTRELINE, metres
+
+    /// <summary>
+    /// Arc length from node 0 to each node, with the closing segment as the last entry, so
+    /// <c>_arc[n] == Length</c>.
+    ///
+    /// The nodes are NOT evenly spaced, which is what this exists to face. Two things move them
+    /// after <see cref="Resample"/> has laid them out evenly along the centreline: <see cref="Smooth"/>
+    /// pulls every point a quarter of the way toward the mean of its neighbours, which shortens the
+    /// loop wherever it curves, and the lateral offset onto a car's own line then lengthens the turns
+    /// for an outside lane and shortens them for an inside one, in proportion to offset over radius.
+    /// Neither touches a straight. So the spacing this line actually has varies round the lap and
+    /// differs per lane, while the centreline's nominal spacing does not.
+    ///
+    /// Indexing by division on that nominal spacing was therefore wrong in a way that concentrated all
+    /// of its error at one place. `s` wraps on the TRUE perimeter but was divided by the NOMINAL one,
+    /// so on an outside lane `s / _spacing` ran past the last node and the clamp pinned it there: the
+    /// car STOPPED DEAD at one fixed point on the track and stayed there until the lap wrapped. On the
+    /// St Louis egg that is about forty metres of lane, which is the best part of a second for a stock
+    /// car and about half of one for a formula car — reported as "the car will stop in front of me,
+    /// the Doppler change in place, and then the car keeps going". An inside lane had the mirror of it,
+    /// teleporting forward across the seam. The speed was never wrong; only where the car was.
+    /// </summary>
+    private readonly float[] _arc;
 
     /// <summary>Total length of the lap, metres.</summary>
     public float Length { get; }
@@ -101,8 +124,9 @@ public sealed class RaceLine
             _points[i] = resampled[i] + right * lateralOffset;
         }
 
-        Length = 0f;
-        for (int i = 0; i < n; i++) Length += Vector3.Distance(_points[i], _points[(i + 1) % n]);
+        _arc = new float[n + 1];
+        for (int i = 0; i < n; i++) _arc[i + 1] = _arc[i] + Vector3.Distance(_points[i], _points[(i + 1) % n]);
+        Length = _arc[n];
 
         for (int i = 0; i < n; i++)
         {
@@ -145,13 +169,9 @@ public sealed class RaceLine
         float s = distance % Length;
         if (s < 0f) s += Length;
 
-        // Nodes are evenly spaced by construction and the loop closes exactly, so finding the one
-        // the distance falls in is a division rather than a search.
-        int n = _points.Length;
-        int i = Math.Clamp((int)(s / _spacing), 0, n - 1);
-        float f = Math.Clamp(s / _spacing - i, 0f, 1f);
+        Locate(s, out int i, out float f);
 
-        int j = (i + 1) % n;
+        int j = (i + 1) % _points.Length;
         position = Vector3.Lerp(_points[i], _points[j], f);
         heading = LerpAngle(_heading[i], _heading[j], f);
         speedLimit = _limit[i] + (_limit[j] - _limit[i]) * f;
@@ -173,15 +193,34 @@ public sealed class RaceLine
 
         float s = distance % Length;
         if (s < 0f) s += Length;
-        int n = _points.Length;
-        int i = Math.Clamp((int)(s / _spacing), 0, n - 1);
-        float f = Math.Clamp(s / _spacing - i, 0f, 1f);
-        int j = (i + 1) % n;
+        Locate(s, out int i, out float f);
+        int j = (i + 1) % _points.Length;
 
         // Straights are infinite, so interpolating between a finite node and an infinite one has to
         // take the finite answer rather than produce a NaN.
         float a = _corner[i], b = _corner[j];
         corneringLimit = float.IsInfinity(a) ? b : float.IsInfinity(b) ? a : a + (b - a) * f;
+    }
+
+    /// <summary>
+    /// Which segment a distance round the lap falls in, and how far along it.
+    ///
+    /// A binary search over the arc-length table rather than a division, because the nodes are not
+    /// evenly spaced — see <see cref="_arc"/>. Nine comparisons for a five-hundred-node circuit, once
+    /// per car per tick, and it is exact everywhere including across the closing segment.
+    /// </summary>
+    private void Locate(float s, out int index, out float fraction)
+    {
+        int n = _points.Length;
+        int lo = 0, hi = n;                     // find the last i with _arc[i] <= s
+        while (hi - lo > 1)
+        {
+            int mid = (lo + hi) >> 1;
+            if (_arc[mid] <= s) lo = mid; else hi = mid;
+        }
+        index = Math.Clamp(lo, 0, n - 1);
+        float seg = _arc[index + 1] - _arc[index];
+        fraction = seg > 1e-6f ? Math.Clamp((s - _arc[index]) / seg, 0f, 1f) : 0f;
     }
 
     /// <summary>Rounds the joins out of a closed polyline: each point moved a quarter of the way

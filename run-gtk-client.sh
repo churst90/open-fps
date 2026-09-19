@@ -7,8 +7,14 @@
 # next to the DLL, so the tmpfs output is self-contained.
 #
 # Usage:
-#   ./run-gtk-client.sh                 # normal run
-#   OPENFPS_AUDIO_DEBUG=1 ./run-gtk-client.sh   # with per-source occlusion/EQ trace
+#   ./run-gtk-client.sh            normal run — Steam Audio simulation ON (it is ON unless turned off)
+#   ./run-gtk-client.sh on         the same, plus the acoustic trace, logged to /tmp/openfps-sa-on.log
+#   ./run-gtk-client.sh off        the OLD hand-rolled spatializer + trace, to /tmp/openfps-sa-off.log
+#   ./run-gtk-client.sh capture    as `on`, and tap the mix to /tmp/openfps-capture.wav while it plays
+#
+# `on` and `off` are the two halves of one A/B: walk the same route twice and the two logs sit side by
+# side afterwards, which is why each names its own file instead of overwriting one. The trace is opt-in
+# because it is not free; a normal run keeps the plain log.
 set -e
 
 REPO="$(cd "$(dirname "$0")" && pwd)"
@@ -24,16 +30,42 @@ CONFIG="${CONFIG:-Release}"
 LOWER=$(echo "$CONFIG" | tr '[:upper:]' '[:lower:]')
 OUT="$ART/bin/OpenFPS.Client.Gtk/$LOWER"
 
+LOG=/tmp/openfps-client.log
+MODE=""
+if [ $# -gt 0 ]; then
+  case "$1" in
+    on)
+      MODE="Steam Audio simulation ON, acoustic trace on"
+      export OPENFPS_AUDIO_DEBUG=1
+      LOG=/tmp/openfps-sa-on.log
+      shift ;;
+    off)
+      MODE="Steam Audio simulation OFF (hand-rolled ray-tracer), acoustic trace on"
+      export OPENFPS_STEAMAUDIO_SIM=0 OPENFPS_AUDIO_DEBUG=1
+      LOG=/tmp/openfps-sa-off.log
+      shift ;;
+    capture)
+      # The mix, tapped to a WAV, while it keeps playing out of the speakers. For anything that can
+      # only be found by ear: a click, a crackle, a dropout. "It pops" cannot be reasoned about from a
+      # log, and the difference between a step discontinuity, a clipped peak and a starved buffer is
+      # obvious in the samples and invisible from the chair. Walk until it happens, then quit.
+      MODE="Steam Audio simulation ON, acoustic trace on, mix captured to /tmp/openfps-capture.wav"
+      export OPENFPS_AUDIO_DEBUG=1 OPENFPS_AUDIO_CAPTURE=/tmp/openfps-capture.wav
+      LOG=/tmp/openfps-sa-on.log
+      shift ;;
+  esac
+fi
+
 echo "Building GTK client ($CONFIG) to tmpfs ($ART) ..."
 DOTNET_CLI_TELEMETRY_OPTOUT=1 DOTNET_NOLOGO=1 DOTNET_CLI_USE_MSBUILD_SERVER=0 \
   "$DOTNET" build "$REPO/OpenFPS.Client.Gtk" -c "$CONFIG" --artifacts-path "$ART" \
   -nodeReuse:false -p:UseSharedCompilation=false -v minimal
 
 echo "Launching GTK client from $OUT ..."
+[ -n "$MODE" ] && echo "  mode: $MODE"
 cd "$OUT"                 # cwd so materials.json (loaded relative to cwd) resolves
 
 # Mirror all console output to a log file so it can be inspected after the session (handy for
-# screen-reader users). Set OPENFPS_AUDIO_DEBUG=1 before running to add the per-source occlusion trace.
-LOG=/tmp/openfps-client.log
+# screen-reader users).
 echo "(logging to $LOG)"
 "$DOTNET" OpenFPS.Client.Gtk.dll "$@" 2>&1 | tee "$LOG"

@@ -72,7 +72,14 @@ public sealed class PredictionReconciler
     /// Re-simulates the player's path from a verified server state, then measures the visual error
     /// so the caller can bleed it away instead of snapping.
     /// </summary>
-    public void ApplyServerCorrection(EntityState serverState, long lastProcessedId, WorldSnapshot snapshot)
+    /// <returns>
+    /// True when the correction was a TELEPORT rather than a drift — further than any smoothing should
+    /// cover, so the position was snapped outright. The caller uses it to throw away anything that was
+    /// measuring continuous motion; the stride accumulator especially, which would otherwise read the
+    /// jump as ground covered on foot. <c>/tp</c> and an admin move arrive this way and no other: there
+    /// is no message that says "you were moved", only a position that could not have been walked to.
+    /// </returns>
+    public bool ApplyServerCorrection(EntityState serverState, long lastProcessedId, WorldSnapshot snapshot)
     {
         Vector3 predictedPos = _state.Position;
 
@@ -94,7 +101,9 @@ public sealed class PredictionReconciler
                 _physics.Predict(input, snapshot, input.DeltaTime);
 
         _state.VisualOffset = predictedPos - _state.Position;
-        if (_state.VisualOffset.Length() > SnapDistance) _state.VisualOffset = Vector3.Zero;
+        bool snapped = _state.VisualOffset.Length() > SnapDistance;
+        if (snapped) _state.VisualOffset = Vector3.Zero;
+        return snapped;
     }
 
     /// <summary>

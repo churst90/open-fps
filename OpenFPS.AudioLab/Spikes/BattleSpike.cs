@@ -305,11 +305,16 @@ public static class BattleSpike
             Console.WriteLine($"    in the street canyon : RT60 {canyonRt60Ms,6:F0} ms");
             Console.WriteLine($"    on open ground       : RT60 {openRt60Ms,6:F0} ms");
 
-            float span = AcousticConstants.OutdoorFullWetDecayMs - AcousticConstants.OutdoorDryDecayMs;
-            float canyonOpen = Math.Clamp((canyonRt60Ms - AcousticConstants.OutdoorDryDecayMs) / span, 0f, 1f);
-            float openOpen = Math.Clamp((openRt60Ms - AcousticConstants.OutdoorDryDecayMs) / span, 0f, 1f);
-            Console.WriteLine($"    outdoor reverb bus   : {canyonOpen * 100,5:F0}% open in the street, " +
-                              $"{openOpen * 100:F0}% on open ground\n");
+            // How loud that tail is does not come from how long it is — see OpenFPS.Common.Enclosure,
+            // and the measurement in --sim-reverbfield that settled it. It comes from how enclosed the
+            // place is, so that is what this reports and what the checks below hold to.
+            float canyonEnc = Enclose(boxes, Ear);
+            float openEnc = Enclose(new List<SteamAudioScene.Box> { Ground() }, Ear);
+            float canyonWet = Enclosure.ReverberantGainDb(canyonEnc) - Enclosure.SealedRoomGainDb;
+            float openWet = Enclosure.ReverberantGainDb(openEnc) - Enclosure.SealedRoomGainDb;
+            Console.WriteLine($"    enclosure            : {canyonEnc,5:P0} in the street, {openEnc:P0} on open ground");
+            Console.WriteLine($"    outdoor reverb bus   : {canyonWet,5:F1} dB in the street, " +
+                              $"{openWet:F1} dB on open ground (relative to a sealed room)\n");
 
             Console.WriteLine("  What distance does to the tone of a shot:\n");
         Console.WriteLine("    range      low     mid    high   (dB, atmospheric + urban excess)");
@@ -324,12 +329,22 @@ public static class BattleSpike
 
         bool ok = Check("the canyon reverberates for longer than open ground does",
                             canyonRt60Ms > openRt60Ms * 1.5f);
-            ok &= Check("open ground stays dry — the outdoor bus does not open on it",
-                        openRt60Ms < AcousticConstants.OutdoorDryDecayMs);
-            ok &= Check("the street opens the outdoor reverb bus", canyonOpen > 0.15f);
+            ok &= Check("open ground measures as open — almost nothing comes back off it",
+                        openEnc < 0.25f);
+            ok &= Check("the street measures as enclosed — it has sides", canyonEnc > 0.45f);
+            ok &= Check("and so the street's reverb bus is the louder of the two by a clear margin",
+                        canyonWet > openWet + 6f);
             return ok;
         }
         finally { Phonon.iplContextRelease(ref ctx); }
+    }
+
+    /// <summary>Enclosure at a point, from the same boxes the acoustic scene is built from.</summary>
+    private static float Enclose(IReadOnlyList<SteamAudioScene.Box> boxes, Vector3 at)
+    {
+        var solids = new List<Enclosure.Solid>(boxes.Count);
+        foreach (var b in boxes) solids.Add(new Enclosure.Solid(b.Center, b.Size, b.Rotation, b.Material));
+        return Enclosure.Measure(at, solids);
     }
 
     /// <summary>Mid-band RT60 at the listener, in seconds, from Steam Audio's reflection simulation.</summary>
@@ -425,7 +440,7 @@ public static class BattleSpike
         try
         {
             provider.SetAcousticMap(OutdoorMap());
-            provider.SetSimulatedReverbDecay(canyonRt60Ms);
+            provider.SetSimulatedReverbDecay(canyonRt60Ms, 0.62f, 0.9f, 1.1f);   // a street canyon: closed on two sides and the ground
             provider.UpdateListener(Ear, Quaternion.Identity, Vector3.Zero, AcousticConstants.GlobalRegionId);
             for (int i = 0; i < 30; i++) { provider.Update(); Thread.Sleep(8); }
 

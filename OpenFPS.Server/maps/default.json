@@ -4,10 +4,15 @@
   "MinBound": { "X": -50, "Y": 0, "Z": -50 },
   "MaxBound": { "X": 50, "Y": 40, "Z": 50 },
   "SpawnPoint": { "Position": { "X": 0, "Y": 1, "Z": 0 }, "Rotation": { "X": 0, "Y": 0, "Z": 0, "W": 1 } },
-  // Outdoor soundfield for the whole map: a first-order ambisonic recording, so it stays put in the
-  // world while the player turns in it. The client ducks it by shelter rather than switching it off,
-  // so stepping into a room takes the outside down instead of away.
-  "AmbienceId": "AMBIENCE/woods_mid_day",
+  // NO ambience bed, deliberately, and the speedway has none either.
+  //
+  // A recorded loop is the one sound in this engine that is not made by anything: it has no source, no
+  // distance and no geometry, so it cannot be occluded, cannot be walked around, and tells a listener
+  // nothing about where they are. Judged by ear 2026-09-18 and the verdict was that it buried
+  // everything the map was built to demonstrate — "all I hear is the outdoors ambiance loop which is
+  // loud and needs to come out, it doesn't add anything". What a place sounds like has to come from
+  // what is in it.
+  "AmbienceId": "",
   // A big-block muscle car drives the road in front of the spawn point, four and a half metres out,
   // east to west and back, at 30, 60 and 90 km/h in turn. The client synthesizes its engine live.
   "Vehicles": [

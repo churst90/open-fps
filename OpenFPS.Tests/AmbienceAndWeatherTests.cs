@@ -24,13 +24,26 @@ public class AmbienceAndWeatherTests
     private static string PrefabDirectory => System.IO.Path.Combine(AppContext.BaseDirectory, "prefabs");
     private static string MapDirectory => System.IO.Path.Combine(AppContext.BaseDirectory, "maps");
 
+    /// <summary>
+    /// No shipped map lays a recorded loop over the world.
+    ///
+    /// This test used to assert the opposite, and the opposite was a decision rather than a fact. Judged
+    /// by ear on the rooms map, 2026-09-18: "all I hear is the outdoors ambiance loop which is loud and
+    /// needs to come out, it doesn't add anything". A bed is the one sound in this engine that is not
+    /// made by anything — no source, no distance, no geometry — so it cannot be occluded, cannot be
+    /// walked around, and tells a listener nothing about where they are, while sitting over everything
+    /// that would. The speedway has never had one.
+    ///
+    /// The MACHINERY stays, and the test below still walks it end to end: a REGION may name an ambience
+    /// (a hum, a machine room, running water) because that is a sound with a place in it. What is
+    /// refused here is the map-wide bed.
+    /// </summary>
     [Fact]
-    public void TheShippedMapDeclaresAnOutdoorAmbience()
+    public void NoShippedMapLaysARecordedBedOverTheWorld()
     {
-        var data = new MapRepository(MapDirectory).LoadAll().Single(m => m.Id == "default");
-        Assert.False(string.IsNullOrWhiteSpace(data.AmbienceId),
-            "the default map should name an outdoor ambience bed");
-        Assert.StartsWith("AMBIENCE/", data.AmbienceId);
+        foreach (var data in new MapRepository(MapDirectory).LoadAll())
+            Assert.True(string.IsNullOrWhiteSpace(data.AmbienceId),
+                $"map '{data.Id}' names the ambience bed '{data.AmbienceId}'; what a place sounds like has to come from what is in it");
     }
 
     [Fact]

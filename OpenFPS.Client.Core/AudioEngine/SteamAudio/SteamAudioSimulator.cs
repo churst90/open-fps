@@ -64,7 +64,19 @@ public sealed class SteamAudioSimulator : IDisposable
             Math.Clamp(dr.TransLow, 0f, 1f));
     }
 
-    /// <summary>Reflection result for a source/probe: per-band RT60 reverb decay in seconds.</summary>
+    /// <summary>
+    /// Reflection result for a source/probe: per-band RT60 reverb decay in seconds.
+    ///
+    /// The decay TIME, and only that. The reflections output also carries an <c>eq</c> triple that
+    /// looks like the missing half — how much energy the tail actually has — and it was bound and
+    /// measured here on exactly that hope. On the PARAMETRIC path it comes back zero in every band, in
+    /// an open field and inside a sealed room alike, because Steam Audio only fills it for the hybrid
+    /// reflection effect. It is not carried, rather than carried as a permanent zero that the next
+    /// person would have to disprove again.
+    ///
+    /// Whether there is a reverberant field here at all is therefore not answered from this struct.
+    /// It is measured from the geometry — see OpenFPS.Common.Enclosure.
+    /// </summary>
     public readonly record struct ReverbResult(float Rt60Low, float Rt60Mid, float Rt60High)
     {
         public static readonly ReverbResult None = new(0f, 0f, 0f);

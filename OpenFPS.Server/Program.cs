@@ -172,6 +172,9 @@ public class GameServer
     /// <summary>Fallback only — the real radius is per map, from MapManager.GetEarshotRange.</summary>
     private const float EarshotRange = 200.0f; 
 
+    /// <summary>The map players land on, from <c>--map</c>; null leaves it to whichever claims IsDefault.</summary>
+    public string? RequestedMapId { get; set; }
+
     public void Start(int port)
     {
         // Machines an author has written, before anything asks what a vehicle name means: a map's
@@ -180,7 +183,7 @@ public class GameServer
         OpenFPS.Common.ModelLibrary.EnsureLoaded();
         var prefabRepo = new PrefabRepository("prefabs");
         _mapRepo = new MapRepository("maps");
-        _maps = new MapManager(_mapRepo, prefabRepo);
+        _maps = new MapManager(_mapRepo, prefabRepo) { RequestedMapId = RequestedMapId };
         _maps.Initialize();
         // Composites BEFORE vehicles and before the earshot pass: a placed building is geometry that
         // the acoustic scene, the spatial grid and the broadcast radius all have to account for.
@@ -1017,9 +1020,16 @@ public class Program
 
             // --port lets a second server be brought up beside a running one, which is the only way
             // to smoke-test a map change without taking someone's session down.
+            // --map picks the landing map. There is no runtime map change, so without this every map
+            // but the one claiming IsDefault is unreachable in play — the rooms-and-doorways map
+            // included, which is the only one that can answer whether pathing and portal reverb are
+            // right by ear.
             int port = 33288;
             for (int i = 0; i < args.Length - 1; i++)
+            {
                 if (args[i] == "--port" && int.TryParse(args[i + 1], out int p)) port = p;
+                if (args[i] == "--map") server.RequestedMapId = args[i + 1];
+            }
             server.Start(port);
         }
         catch (Exception ex)

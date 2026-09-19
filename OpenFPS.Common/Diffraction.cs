@@ -111,8 +111,29 @@ public static class Diffraction
     /// </summary>
     public static bool PathDifferenceAroundBox(Vector3 centre, Vector3 size, Quaternion rotation,
                                                Vector3 source, Vector3 listener, out float pathDifference)
+        => PathDifferenceAroundBox(centre, size, rotation, source, listener, out pathDifference, out _);
+
+    /// <summary>
+    /// The same search, also reporting WHERE the sound left the obstacle on its way to the ear.
+    ///
+    /// The extra output is the whole of a diffracted source's direction. A screen does not merely
+    /// attenuate what passes it — the edge becomes the thing you hear, and it is a secondary source at
+    /// a place, which is why a voice behind a doorway comes from the doorway and a car behind a
+    /// kerb-high wall still comes from the car. Both fall out of the same point: for a low wall the
+    /// crossing sits almost on the straight line and the bearing barely moves, and for a wall with a
+    /// gap in it the crossing is the jamb.
+    ///
+    /// It is the LISTENER-side crossing, not the source-side one — the last leg is the one arriving at
+    /// the ear. For a thin barrier those are the same point; for anything with depth they are the two
+    /// ends of the run across its face, and taking the far one would put a grandstand's sound at the
+    /// corner the sound entered rather than the one it left.
+    /// </summary>
+    public static bool PathDifferenceAroundBox(Vector3 centre, Vector3 size, Quaternion rotation,
+                                               Vector3 source, Vector3 listener, out float pathDifference,
+                                               out Vector3 listenerSideEdge)
     {
         pathDifference = 0f;
+        listenerSideEdge = listener;
         if (!GeometryUtils.LineIntersectsOBB(source, listener, centre, size, rotation)) return false;
 
         Vector3 h = size * 0.5f;
@@ -159,6 +180,7 @@ public static class Diffraction
             if (!LegIsClear(source, p, centre, size, rotation)) continue;
             if (!LegIsClear(listener, p, centre, size, rotation)) continue;
             best = around;
+            listenerSideEdge = p;
         }
 
         // ── Two edges: over a face and down the other side ─────────────────────────────────
@@ -194,6 +216,7 @@ public static class Diffraction
             // common face, a face is planar and convex, and the straight line between two points on
             // one stays on it. Testing it would fail every time for exactly that reason.
             best = around;
+            listenerSideEdge = r;   // r is the crossing the last leg leaves from
         }
 
         if (best == float.MaxValue) return false;   // wholly enclosed: no route round this box at all

@@ -80,6 +80,7 @@ public sealed class SteamAudioScene : IDisposable
         }
         if (tris.Count == 0) { Phonon.iplSceneCommit(_scene); return; }
 
+
         var vArr = verts.ToArray();
         var tArr = tris.ToArray();
         var miArr = triMat.ToArray();

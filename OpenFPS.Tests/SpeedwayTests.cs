@@ -21,6 +21,94 @@ public class SpeedwayTests
 {
     private const float R = 150f, SX = 164.5f;
 
+    /// <summary>
+    /// A car goes round the lap at the speed it is doing, everywhere, on every lane.
+    ///
+    /// Reported 2026-09-18 from the front straight: "the F1 will stop in front of me, the Doppler
+    /// change in place, and then the car keeps going... other cars are stopping for a second then
+    /// continuing." Nothing in the audio was wrong. <c>RaceLine.Sample</c> wrapped the distance on the
+    /// line's TRUE perimeter and then found the node by dividing by the centreline's NOMINAL spacing,
+    /// and those are not the same number: smoothing shortens the loop where it curves, and the lateral
+    /// offset onto a lane lengthens the turns for an outside line and shortens them for an inside one.
+    /// On the St Louis egg an outside lane is about forty metres longer than nominal, so for forty
+    /// metres of every lap the node index hit the clamp and the car sat motionless on the first node
+    /// of its own line — the best part of a second for a stock car, half of one for a formula car, at
+    /// the same point on the track every lap. An inside lane teleported the same distance forward.
+    ///
+    /// Walking the lap in equal steps of arc length has to move the car equally far each time. That is
+    /// the whole of it, and it is what the clamp could not do.
+    /// </summary>
+    [Theory]
+    [InlineData(-8f)]
+    [InlineData(-4f)]
+    [InlineData(0f)]
+    [InlineData(+4f)]
+    [InlineData(+8f)]
+    public void ACarNeverStopsDeadOnTheLine(float lane)
+    {
+        var line = new RaceLine(Oval(), lane, 90f, 2.9f, 8f);
+
+        const float step = 1f;
+        float shortest = float.MaxValue, longest = 0f;
+        line.Sample(0f, out Vector3 prev, out _, out _);
+        for (float s = step; s <= line.Length; s += step)
+        {
+            line.Sample(s, out Vector3 p, out _, out _);
+            float moved = Vector3.Distance(prev, p);
+            shortest = MathF.Min(shortest, moved);
+            longest = MathF.Max(longest, moved);
+            prev = p;
+        }
+
+        // A metre of arc moves the car a metre. The tolerance is chord-versus-arc on the tightest
+        // corner, which is parts per million here, not the centimetres this allows.
+        Assert.True(shortest > 0.97f * step,
+            $"lane {lane:+0.0;-0.0} m: a metre of lap moved the car {shortest:F3} m at its worst — it stalls");
+        Assert.True(longest < 1.03f * step,
+            $"lane {lane:+0.0;-0.0} m: a metre of lap moved the car {longest:F3} m at its worst — it jumps");
+    }
+
+    /// <summary>
+    /// The lap the line reports is the lap the line IS.
+    ///
+    /// The stall was only visible at all because these two disagreed. An outside lane really is longer
+    /// than the centreline it was offset from — that is geometry, not a fault — so the check is that
+    /// <see cref="RaceLine.Length"/> matches the nodes rather than that it matches the nominal.
+    /// </summary>
+    [Theory]
+    [InlineData(-8f)]
+    [InlineData(0f)]
+    [InlineData(+8f)]
+    public void TheLapLengthIsTheSumOfTheSegments(float lane)
+    {
+        var line = new RaceLine(Oval(), lane, 90f, 2.9f, 8f);
+
+        // Sum the line by walking it in very small steps: the total distance covered over one lap of
+        // arc length must be the lap itself.
+        const float step = 0.25f;
+        float walked = 0f;
+        line.Sample(0f, out Vector3 prev, out _, out _);
+        for (float s = step; s <= line.Length; s += step)
+        {
+            line.Sample(s, out Vector3 p, out _, out _);
+            walked += Vector3.Distance(prev, p);
+            prev = p;
+        }
+        Assert.Equal(line.Length, walked, 0);
+    }
+
+    /// <summary>An outside lane is longer than an inside one, and both are still driven end to end.
+    /// This is the property that made the fault lane-dependent, so it is worth saying out loud.</summary>
+    [Fact]
+    public void AnOutsideLaneIsLongerThanAnInsideOne()
+    {
+        var inner = new RaceLine(Oval(), -8f, 90f, 2.9f, 8f);
+        var outer = new RaceLine(Oval(), +8f, 90f, 2.9f, 8f);
+        Assert.True(outer.Length > inner.Length,
+            $"outer {outer.Length:F1} m should exceed inner {inner.Length:F1} m");
+        Assert.Equal(inner.NodeCount, outer.NodeCount);
+    }
+
     /// <summary>The oval's centreline, drawn the way a map draws one: as a modest number of
     /// waypoints with straight chords between them.</summary>
     private static List<Vector3> Oval(int perTurn = 32, int perStraight = 11)

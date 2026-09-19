@@ -261,6 +261,64 @@ public static class GeometryUtils
         return LineIntersectsAABB(localStart, localEnd, Vector3.Zero, boxSize);
     }
 
+    /// <summary>
+    /// Where a ray enters a box, and which way that face points.
+    ///
+    /// The boolean above answers "is this box in the way", which is all occlusion ever needed. Anything
+    /// that has to follow sound PAST a surface needs two more things: how far away it was, so the
+    /// nearest one wins, and which way the surface faces, so the sound can carry on in the direction it
+    /// would really go. The slab method gives both — the axis whose near-plane was crossed last is the
+    /// face that was hit, and its sign is the side.
+    ///
+    /// Returns false when the ray misses, when the box is behind the ray, or when the origin is already
+    /// inside it (there is no entry face to report).
+    /// </summary>
+    public static bool RayHitsOBB(Vector3 origin, Vector3 direction, float maxDistance,
+                                  Vector3 boxPos, Vector3 boxSize, Quaternion boxRot,
+                                  out float distance, out Vector3 normal)
+    {
+        distance = 0f; normal = Vector3.Zero;
+
+        Quaternion inv = Quaternion.Inverse(boxRot);
+        Vector3 o = Vector3.Transform(origin - boxPos, inv);
+        Vector3 d = Vector3.Transform(direction, inv);
+
+        Vector3 h = boxSize * 0.5f;
+        float tmin = 0f, tmax = maxDistance;
+        int axis = -1;
+        float sign = 1f;
+
+        for (int i = 0; i < 3; i++)
+        {
+            float oi = i == 0 ? o.X : i == 1 ? o.Y : o.Z;
+            float di = i == 0 ? d.X : i == 1 ? d.Y : d.Z;
+            float hi = i == 0 ? h.X : i == 1 ? h.Y : h.Z;
+
+            if (MathF.Abs(di) < 1e-9f)
+            {
+                if (oi < -hi || oi > hi) return false;   // parallel and outside this slab
+                continue;
+            }
+
+            float t1 = (-hi - oi) / di;
+            float t2 = (hi - oi) / di;
+            float s = -1f;
+            if (t1 > t2) { (t1, t2) = (t2, t1); s = 1f; }
+            if (t1 > tmin) { tmin = t1; axis = i; sign = s; }
+            if (t2 < tmax) tmax = t2;
+            if (tmin > tmax) return false;
+        }
+
+        if (axis < 0) return false;                     // started inside, or degenerate
+        distance = tmin;
+
+        Vector3 localN = axis == 0 ? new Vector3(sign, 0, 0)
+                       : axis == 1 ? new Vector3(0, sign, 0)
+                                   : new Vector3(0, 0, sign);
+        normal = Vector3.Transform(localN, boxRot);
+        return true;
+    }
+
     public static bool LineIntersectsAABB(Vector3 start, Vector3 end, Vector3 boxPos, Vector3 boxSize)
     {
         Vector3 min = boxPos - (boxSize / 2.0f);

@@ -139,7 +139,7 @@ public static class SpeedwaySpike
         if (!provider.Initialize()) { Console.WriteLine("  (live playback unavailable)"); return 1; }
         try
         {
-            provider.SetSimulatedReverbDecay(900f);
+            provider.SetSimulatedReverbDecay(900f, 0.23f, 0.9f, 1.1f);           // a grandstand across an open track
             provider.UpdateListener(ear, Quaternion.Identity, Vector3.Zero, AcousticConstants.GlobalRegionId);
             for (int i = 0; i < 30; i++) { provider.Update(); Thread.Sleep(8); }
 

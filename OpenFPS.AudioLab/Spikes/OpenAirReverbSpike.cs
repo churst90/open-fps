@@ -76,7 +76,7 @@ public static class OpenAirReverbSpike
 
             // 4. The rays find a boundary the region never declared — a grandstand deck at your back.
             // This is the only thing that may put reverberation on open ground, and it is measured.
-            provider.SetSimulatedReverbDecay(900f);
+            provider.SetSimulatedReverbDecay(900f, 0.62f, 0.9f, 1.1f);           // the canyon this spike exists to audition
             var withGeometry = Settle(provider, onTheInfield, InfieldCentre with { Y = 1.7f },
                                       InfieldRegionId, InfieldRegionId, warm: 200);
             Report("named infield, rays find 900 ms", withGeometry);

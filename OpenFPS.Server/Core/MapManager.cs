@@ -131,9 +131,38 @@ public class MapManager
         _prefabRepo = prefabRepo;
     }
 
+    /// <summary>
+    /// The map a player lands on, overriding whichever map claims <c>IsDefault</c>.
+    ///
+    /// There is no runtime map change, so the landing map is the ONLY map a session can ever be on —
+    /// which made every map but the default unreachable in play, and the only way to walk one was to
+    /// edit <c>IsDefault</c> in the JSON and put it back afterwards. An ear test that needs a doorway
+    /// (pathing, portal-localized reverb) needs a map with a doorway in it, and that is not the
+    /// speedway. Set from <c>--map &lt;id&gt;</c> before <see cref="Initialize"/>.
+    /// </summary>
+    public string? RequestedMapId { get; set; }
+
     public void Initialize()
     {
         foreach (var m in _mapRepo.LoadAll()) CreateMapInstance(m);
+
+        // After the maps are in, not before: asking for one that does not exist has to be a named
+        // refusal rather than an empty world, and the names are only known once they are loaded.
+        if (!string.IsNullOrWhiteSpace(RequestedMapId))
+        {
+            if (_maps.ContainsKey(RequestedMapId))
+            {
+                Log.Information("MapManager: --map {Map} overrides the map claiming IsDefault ('{WasDefault}').",
+                                RequestedMapId, DefaultMapId);
+                DefaultMapId = RequestedMapId;
+            }
+            else
+            {
+                Log.Warning("MapManager: --map {Map} names no map that loaded; players land on '{Default}'. Loaded: {Maps}.",
+                            RequestedMapId, DefaultMapId, string.Join(", ", _maps.Keys));
+            }
+        }
+
         // Said out loud, because "the client logged into the wrong map" is otherwise indistinguishable
         // from "the server you are talking to is an older one that had never heard of this map".
         Log.Information("MapManager: {Count} map(s) loaded; players will land on '{Default}'.",

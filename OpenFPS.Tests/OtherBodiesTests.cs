@@ -29,7 +29,8 @@ public class OtherBodiesTests
     private static WorldSnapshot Frame(Vector3 bodyPosition, Vector3 bodyVelocity,
                                        string floorMaterial = "Concrete",
                                        EntityType type = EntityType.Player,
-                                       bool includeBody = true)
+                                       bool includeBody = true,
+                                       string soundId = "")
     {
         var world = new WorldSnapshot();
 
@@ -55,6 +56,7 @@ public class OtherBodiesTests
                 Type = type,
                 Collider = new ColliderComponent { Shape = ColliderShape.Box, Size = new Vector3(0.6f, 1.8f, 0.6f), IsSolid = true },
                 Material = new MaterialComponent { Material = "Generic", Variant = "0" },
+                SoundEmitter = new SoundEmitterComponent { SoundId = soundId },
             };
             var snap = new EntitySnapshot
             {
@@ -73,7 +75,8 @@ public class OtherBodiesTests
     /// <summary>Walks a body forward and returns every footstep it made.</summary>
     private static List<(Vector3 Position, string Material)> Walk(
         OtherBodies others, int listenerId, Vector3 from, float metresPerUpdate, int updates,
-        string floorMaterial = "Concrete", EntityType type = EntityType.Player, bool underItsOwnPower = true)
+        string floorMaterial = "Concrete", EntityType type = EntityType.Player, bool underItsOwnPower = true,
+        string soundId = "")
     {
         var steps = new List<(Vector3, string)>();
         others.OnStepTriggered += (p, m, _) => steps.Add((p, m));
@@ -85,12 +88,50 @@ public class OtherBodiesTests
         for (int i = 0; i < updates; i++)
         {
             at += new Vector3(0, 0, metresPerUpdate);
-            others.Update(Frame(at, velocity, floorMaterial, type), listenerId);
+            others.Update(Frame(at, velocity, floorMaterial, type, includeBody: true, soundId: soundId), listenerId);
             // Real time, because the cadence floor is real: no body puts a foot down five times a
             // second, however fast a test loop can call this.
             Thread.Sleep(50);
         }
         return steps;
+    }
+
+    /// <summary>
+    /// A car does not walk, however the server happens to classify it.
+    ///
+    /// Reported from the rooms map, 2026-09-18: "the car driving by sounds like footsteps are being drug
+    /// behind it". `VehicleSystem` spawns vehicles as <see cref="EntityType.NPC"/> — the same type as
+    /// anything else that moves under its own direction — so every car on the map was given a stride
+    /// accumulator. A stride is half a metre, so at 30 km/h that is sixteen footfalls a second trailing
+    /// the car, and nothing stopped it: a car's velocity is genuinely its own, which is the test that
+    /// keeps passengers and server corrections quiet, and at render rate it covers a few centimetres an
+    /// update, which is well inside what a stride explains.
+    ///
+    /// The first fix matched the wrong string — "ENGINE/", which is the spelling AFTER the client
+    /// resolves a sound path, where a snapshot carries the server's "engine:". It compiled, it read
+    /// correctly, and the cars kept walking. Hence a test with the real prefix in it.
+    /// </summary>
+    [Theory]
+    [InlineData("engine:v8_muscle")]
+    [InlineData("ENGINE:v8_muscle")]
+    public void AThingWithAnEngineHasNoLegs(string soundId)
+    {
+        var others = new OtherBodies();
+        var steps = Walk(others, Listener, new Vector3(0, 0, -4f), metresPerUpdate: 0.4f, updates: 20,
+                         type: EntityType.NPC, soundId: soundId);
+
+        Assert.Empty(steps);
+    }
+
+    /// <summary>And an NPC that is not a machine still walks, or the filter has eaten the feature.</summary>
+    [Fact]
+    public void AnNpcOnFootIsStillHeard()
+    {
+        var others = new OtherBodies();
+        var steps = Walk(others, Listener, new Vector3(0, 0, -4f), metresPerUpdate: 0.4f, updates: 20,
+                         type: EntityType.NPC);
+
+        Assert.True(steps.Count >= 3, $"eight metres of walking produced {steps.Count} footstep(s)");
     }
 
     [Fact]

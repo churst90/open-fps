@@ -30,8 +30,6 @@ public class SpatialAcoustics
     /// <summary>
     /// Calculates the complex acoustic path sound takes through the world.
     /// </summary>
-    private readonly Random _rng = new();
-
     public List<AcousticPathData> CalculateAcousticPaths(WorldSnapshot world, int entityId, Vector3 listenerPos, Vector3 sourcePos, bool isImportant = true)
     {
         var rawResults = new List<AcousticPathData>();
@@ -41,209 +39,65 @@ public class SpatialAcoustics
         // 1. Main Direct Path (includes portal diffraction)
         rawResults.Add(CalculateMainPath(world, entityId, listenerPos, sourcePos, localPlayerId));
 
-        // 2. High-Order Recursive Reflections
-        int maxBounces = isImportant ? AcousticConstants.MaxReflectionOrder : 1;
-        var r = new Random(entityId + DateTime.Now.Millisecond);
-
-        _spatial.GetReflectionData(world, listenerPos, 40.0f, out var primarySurfaces);
-
-        foreach (var refl in primarySurfaces)
+        // 2. Early reflections — the copies the surfaces send back.
+        //
+        // ONE model, shared with the Steam Audio path (see AsyncAcousticWorker.AddEarlyReflections),
+        // because two reflection generators is two answers to the same question. What used to be here
+        // was a recursive ray solve that jittered every surface normal with `new Random(entityId +
+        // DateTime.Now.Millisecond)` — a fresh seed on every call, so a wall's reflection moved
+        // slightly every frame and no two ticks agreed about where it was. It then merged whatever
+        // came out by proximity to hide the scatter. Both are gone: an image source is exact, it is
+        // the same every tick for the same geometry, and it needs no merging because a surface
+        // produces one arrival by construction.
+        _reflectionScratch ??= new List<EarlyReflections.Arrival>();
+        EarlyReflections.Find(sourcePos, listenerPos, ReflectionSolids(world), _reflectionScratch);
+        for (int i = 0; i < _reflectionScratch.Count; i++)
         {
-            float jitter = 0.05f;
-            Vector3 jitteredNormal = Vector3.Normalize(refl.normal + new Vector3(
-                (float)(r.NextDouble() * 2 - 1) * jitter,
-                (float)(r.NextDouble() * 2 - 1) * jitter,
-                (float)(r.NextDouble() * 2 - 1) * jitter
-            ));
-
-            Vector3 bounce1Point = listenerPos - (refl.normal * refl.distance);
-
-            if (TrySolveRecursivePath(world, listenerPos, bounce1Point, jitteredNormal, refl.absorption, sourcePos, out var path, maxBounces, entityId))
+            var a = _reflectionScratch[i];
+            // Same rule as the simulator path: a fused arrival is the room, not an event. See
+            // EarlyReflections.FusionSeconds.
+            if (!EarlyReflections.IsSeparateEvent(a)) continue;
+            rawResults.Add(new AcousticPathData
             {
-                // --- PHASE 2: Stable Reflection Identity ---
-                // Calculate a stable ID based on the surface normal and position 
-                // to prevent the "mono clump" of re-triggering looping sounds.
-                int spatialHash = (int)(refl.normal.X * 100) ^ (int)(refl.normal.Z * 100) ^ (int)(bounce1Point.X * 10) ^ (int)(bounce1Point.Z * 10);
-                path.ReflectionId = Math.Abs(spatialHash);
-
-                // Calculate Perceptual Spread based on distance and material scattering
-                float distToWall = Vector3.Distance(listenerPos, bounce1Point);
-                float angularWidth = MathF.Atan2(5.0f, Math.Max(1.0f, distToWall)) * (180.0f / MathF.PI);
-                
-                // --- PHASE 3: Scattering-Based Spread ---
-                // Pinpoint reflections for smooth materials (Glass/Metal), wide for rough ones (Brick/Dirt)
-                float scatteringWidth = path.Scattering * 45.0f; 
-                path.Spread = Math.Clamp(angularWidth + scatteringWidth + (path.ReflectionIndex * 20.0f), AcousticConstants.ReflectionMinSpread, AcousticConstants.ReflectionMaxSpread);
-                
-                rawResults.Add(path);
-            }
+                IsReflection = true,
+                ReflectionId = a.SurfaceId,
+                ReflectionIndex = i,
+                ApparentPosition = a.ImagePosition,
+                EffectiveDistance = a.PathLength,
+                ReflectionDelayMs = a.ExtraDelaySeconds * 1000f,
+                Occlusion = 0f,
+                EqLow = a.GainLow,
+                EqMid = a.GainMid,
+                EqHigh = a.GainHigh,
+                MaterialAbsorption = 1f - a.GainMid,
+                Scattering = a.Scattering,
+                Spread = a.Scattering * 90f,
+                ApertureFactor = 1f,
+                RoomGain = 1f,
+                RegionId = GetRegionAt(world, listenerPos),
+            });
         }
 
-        // 3. REFLECTION MERGING (Robustness Fix)
-        // Group reflections that are physically close to prevent the "Point Source" feel of modular boxes.
-        var mergedResults = new List<AcousticPathData>();
-        if (rawResults.Count > 0) mergedResults.Add(rawResults[0]); // Keep direct path
-
-        var reflectionCandidates = rawResults.Skip(1).ToList();
-        while (reflectionCandidates.Count > 0)
-        {
-            var current = reflectionCandidates[0];
-            reflectionCandidates.RemoveAt(0);
-
-            // Find neighbors within merging distance
-            var neighbors = reflectionCandidates.Where(n => Vector3.Distance(current.ApparentPosition, n.ApparentPosition) < AcousticConstants.ReflectionMergeDistance).ToList();
-            
-            if (neighbors.Count > 0)
-            {
-                // Merge into a single volumetric reflection
-                Vector3 avgPos = current.ApparentPosition;
-                float totalEnergy = current.MaterialAbsorption;
-                float maxEq = current.EqHigh;
-
-                foreach (var n in neighbors)
-                {
-                    avgPos += n.ApparentPosition;
-                    totalEnergy += n.MaterialAbsorption;
-                    maxEq = Math.Max(maxEq, n.EqHigh);
-                    reflectionCandidates.Remove(n);
-                }
-
-                avgPos /= (neighbors.Count + 1);
-                current.ApparentPosition = avgPos;
-                current.MaterialAbsorption = Math.Min(1.0f, totalEnergy);
-                current.EqHigh = maxEq;
-                current.Spread = Math.Min(AcousticConstants.ReflectionMaxSpread, current.Spread + (neighbors.Count * 15.0f));
-            }
-            
-            mergedResults.Add(current);
-            if (mergedResults.Count >= 5) break; // Hard limit on active emitters per sound
-        }
-
-        return mergedResults;
+        return rawResults;
     }
 
-    private bool TrySolveRecursivePath(WorldSnapshot world, Vector3 listenerPos, Vector3 firstHitPoint, Vector3 firstNormal, float firstAbsorb, Vector3 sourcePos, out AcousticPathData path, int maxBounces, int entityId = -1)
+    private List<EarlyReflections.Arrival>? _reflectionScratch;
+    private object? _reflectionSolidsFor;
+    private IReadOnlyList<EarlyReflections.Solid> _reflectionSolids = System.Array.Empty<EarlyReflections.Solid>();
+
+    /// <summary>The world's solid boxes as the reflection model wants them, rebuilt only when the
+    /// acoustic map changes. The same definition of "audio geometry" the simulator's scene uses, so the
+    /// two paths cannot disagree about what a wall is.</summary>
+    private IReadOnlyList<EarlyReflections.Solid> ReflectionSolids(WorldSnapshot world)
     {
-        path = default;
-        Vector3 currentStart = firstHitPoint;
-        Vector3 currentNormal = firstNormal;
-        float cumulativeAbsorb = firstAbsorb;
-        float totalDist = Vector3.Distance(listenerPos, firstHitPoint);
-        
-        // --- PHASE 1 FIX: Correct Mirror Position Logic ---
-        // Mirror the source across the FIRST wall immediately
-        Vector3 mirrorPos = Vector3.Reflect(sourcePos - firstHitPoint, firstNormal) + firstHitPoint; 
-
-        int listenerRegionId = GetRegionAt(world, listenerPos);
-        int sourceRegionId = GetRegionAt(world, sourcePos);
-
-        for (int bounce = 1; bounce <= maxBounces; bounce++)
-        {
-            float occlusion = _spatial.GetOcclusionFactor(world, currentStart, sourcePos, out _, -1);
-            if (occlusion < 0.2f) 
-            {
-                totalDist += Vector3.Distance(currentStart, sourcePos);
-                float directDist = Vector3.Distance(listenerPos, sourcePos);
-                float delayMs = (totalDist - directDist) / 0.343f;
-                if (delayMs < 1.0f) return false;
-
-                // --- PHASE 2 FIX: Source Directivity (Cone Filtering) ---
-                float coneMultiplier = 1.0f;
-                if (entityId != -1 && world.Entities.TryGetValue(entityId, out var sourceSnap))
-                {
-                    var def = sourceSnap.Definition.SoundEmitter;
-                    if (def.ConeInsideAngle < 360f)
-                    {
-                        Vector3 sourceToWall = Vector3.Normalize(currentStart - sourcePos);
-                        Vector3 sourceForward = Vector3.Transform(Vector3.UnitZ, sourceSnap.Transform.Rotation);
-                        float dot = Vector3.Dot(sourceForward, sourceToWall);
-                        float angle = MathF.Acos(Math.Clamp(dot, -1f, 1f)) * (180.0f / MathF.PI);
-                        
-                        if (angle > def.ConeInsideAngle)
-                        {
-                            coneMultiplier = def.ConeOutsideVolume;
-                        }
-                    }
-                }
-
-                // --- PHASE 3 FIX: Incidence-Based Absorption ---
-                Vector3 rayToWall = Vector3.Normalize(currentStart - (bounce == 1 ? listenerPos : mirrorPos));
-                float incidenceDot = Math.Abs(Vector3.Dot(rayToWall, currentNormal));
-                float incidenceMuffle = Math.Clamp(incidenceDot, 0.4f, 1.0f); // Glancing blows (low dot) keep more high-end
-
-                int bounceRegionId = GetRegionAt(world, firstHitPoint);
-                float portalPenalty = 0;
-
-                if (bounceRegionId != listenerRegionId || sourceRegionId != listenerRegionId)
-                {
-                    var pPath = _pathfinder.FindPath(world, listenerPos, sourcePos);
-                    if (!pPath.Found) return false; 
-                    portalPenalty = Math.Clamp(1.0f - (pPath.MinAperture * 2.0f), 0.0f, 0.4f);
-                }
-
-                float remainingEnergy = (1.0f - cumulativeAbsorb - portalPenalty) * coneMultiplier;
-                if (remainingEnergy < AcousticConstants.ReflectionEnergyThreshold) return false;
-
-                path = new AcousticPathData(
-                    Math.Min(0.95f, 0.3f + portalPenalty), 
-                    mirrorPos, totalDist, remainingEnergy, 1.0f, 0.1f, totalDist / 250.0f, AcousticConstants.GlobalRegionId
-                );
-                path.IsReflection = true;
-                path.ReflectionDelayMs = delayMs;
-                
-                // --- PHASE 4 FIX: Material-Specific Decay ---
-                path.EqHigh = Math.Clamp((1.0f - cumulativeAbsorb) * incidenceMuffle, 0.05f, 1.0f);
-                path.MaterialAbsorption = cumulativeAbsorb; 
-                path.ReflectionIndex = bounce;
-                return true;
-            }
-
-            if (bounce == maxBounces) break;
-
-            Vector3 dirToSource = Vector3.Normalize(sourcePos - currentStart);
-            bool hit = false;
-            float hitDist = 0;
-            Vector3 nextNormal = Vector3.Zero;
-            string material = "Generic";
-
-            if (bounce >= 2 && world.AcousticMap != null)
-            {
-                float step = world.AcousticMap.VoxelGrid.MinVoxel;
-                for (float d = step; d < 30.0f; d += step)
-                {
-                    Vector3 p = currentStart + currentNormal * 0.05f + dirToSource * d;
-                    int r = world.AcousticMap.VoxelGrid.GetRegionAt(p);
-                    if (r != AcousticConstants.GlobalRegionId && r != GetRegionAt(world, currentStart))
-                    {
-                        hit = true;
-                        hitDist = d;
-                        nextNormal = -dirToSource; 
-                        material = "Concrete"; 
-                        break;
-                    }
-                }
-            }
-            else
-            {
-                hit = _spatial.RaycastMaterial(world, currentStart + currentNormal * 0.05f, dirToSource, 30.0f, out hitDist, out nextNormal, out material);
-            }
-
-            if (hit)
-            {
-                currentStart = currentStart + dirToSource * hitDist;
-                currentNormal = nextNormal;
-                var props = AcousticRegistry.GetProperties(material);
-                cumulativeAbsorb += props.Absorption;
-                totalDist += hitDist;
-                // Recursive Mirroring
-                mirrorPos = Vector3.Reflect(mirrorPos - currentStart, currentNormal) + currentStart;
-
-                if (cumulativeAbsorb > (1.0f - AcousticConstants.ReflectionEnergyThreshold)) break; 
-            }
-            else break;
-        }
-
-        return false;
+        if (ReferenceEquals(_reflectionSolidsFor, world.AcousticMap) && _reflectionSolids.Count > 0)
+            return _reflectionSolids;
+        var boxes = OpenFPS.Client.Core.AudioEngine.SteamAudio.SteamAudioScene.BoxesFromWorld(world);
+        var solids = new List<EarlyReflections.Solid>(boxes.Count);
+        foreach (var b in boxes) solids.Add(new EarlyReflections.Solid(b.Center, b.Size, b.Rotation, b.Material));
+        _reflectionSolids = solids;
+        _reflectionSolidsFor = world.AcousticMap;
+        return solids;
     }
 
     private AcousticPathData CalculateMainPath(WorldSnapshot world, int entityId, Vector3 listenerPos, Vector3 sourcePos, int localPlayerId)

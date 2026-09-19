@@ -249,7 +249,7 @@ public static class VehicleSpike
         try
         {
             provider.SetAcousticMap(BattleSpike.StreetMap());
-            provider.SetSimulatedReverbDecay(1400f);
+            provider.SetSimulatedReverbDecay(1400f, 0.62f, 0.9f, 1.1f);          // a road between buildings
             provider.UpdateListener(ear, Quaternion.Identity, Vector3.Zero, AcousticConstants.GlobalRegionId);
             var probes = new BoundaryProbe[8];
             for (int i = 0; i < 30; i++) { provider.Update(); Thread.Sleep(8); }
