@@ -101,12 +101,11 @@ public static class GranularProcessor
                 if (outbuffer != IntPtr.Zero)
                     new Span<float>((void*)outbuffer, (int)length * ch).Clear();
             }
-            if (!_faulted) { _faulted = true; Serilog.Log.Error(ex, "GranularProcessor DSP faulted; the block was silenced."); }
+            DspFault.Record("GranularProcessor", ex);
             return RESULT.OK;
         }
     }
 
-    private static bool _faulted;
 
     private static RESULT ReadCallbackCore(ref DSP_STATE dsp_state, IntPtr inbuffer, IntPtr outbuffer, uint length, int inchannels, ref int outchannels)
     {
@@ -115,11 +114,10 @@ public static class GranularProcessor
         unsafe
         {
             // The FMOD wrapper doesn't provide direct access to getUserData from DSP_STATE easily,
-            // but we can cast the dsp_state pointer to get the FMOD::DSP pointer and call it, 
-            // OR use the functions provided in the FMOD C# wrapper.
-            // Wait, we can use dsp_state.instance to get the DSP handle!
-            FMOD.DSP dsp = new FMOD.DSP(dsp_state.instance);
-            dsp.getUserData(out userData);
+            // Through the CALLBACK'S OWN function table — see DspCallback.UserData. Building an
+            // FMOD.DSP from dsp_state.instance and calling the general API re-enters FMOD from
+            // inside its own mix, which is the thing the documentation forbids.
+            userData = DspCallback.UserData(ref dsp_state);
         }
 
         if (userData == IntPtr.Zero) return RESULT.OK;

@@ -49,17 +49,23 @@ public class SpatialService
             for (int i = 0; i < ids.Count; i++)
                 if (world.Entities.TryGetValue(ids[i], out var snap)) candidates.Add(snap);
 
-            if (candidates.Count > 0)
-            {
-                // Dynamic entities are not in the static grid, so they are always in play.
-                for (int i = 0; i < world.DynamicEntities.Count; i++)
-                    if (seen.Add(world.DynamicEntities[i].Id)) candidates.Add(world.DynamicEntities[i]);
+            // Dynamic entities are not in the static grid, so they are always in play.
+            for (int i = 0; i < world.DynamicEntities.Count; i++)
+                if (seen.Add(world.DynamicEntities[i].Id)) candidates.Add(world.DynamicEntities[i]);
 
-                return candidates;
-            }
+            // AN EMPTY ANSWER FROM THE GRID IS AN ANSWER, and it used to be taken as a failure.
+            //
+            // If the grid exists and finds nothing within the radius, then there IS nothing within
+            // the radius — standing in the middle of a road is exactly that. Falling through to
+            // "every entity in the world" there is wrong twice over: it is the wrong answer, and it
+            // is the wrong answer at the cost of the whole map. On a block of five hundred boxes
+            // nobody noticed; on a city of six thousand it is a freeze, and it happens precisely
+            // where a listener spends their time, which is outdoors with nothing close by.
+            return candidates;
         }
 
-        // Fallback to all entities if the grid found nothing here or there is no grid yet.
+        // No grid at all yet — the only case where the whole world is the honest answer. It lasts
+        // until the first RebuildGrid, which is seconds after a map arrives.
         foreach (var snap in world.Entities.Values) candidates.Add(snap);
         return candidates;
     }

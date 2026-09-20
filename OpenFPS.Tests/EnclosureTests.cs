@@ -157,4 +157,90 @@ public class EnclosureTests
         Assert.False(GeometryUtils.RayHitsOBB(new Vector3(0, 1f, 0), Vector3.UnitY, 60f,
                                               new Vector3(0, 0f, 0), new Vector3(10, 1f, 10), Q, out _, out _));
     }
+
+    // ------------------------------------------------------------------------------------------
+    // The survey's known blind spot: a small enclosure standing inside a big one.
+    //
+    // Enclosure.Look counts a direction as a surface of THIS place if the ray hits anything at all
+    // within sixty metres. Standing under a bus shelter that is open at the front, the rays that
+    // leave through the front cross the street, strike the building opposite, and come home recorded
+    // as the shelter's own hard walls. Measured on the city map at <8, 1.6, -0.8>: surface 609 m2
+    // against a true 65, absorption 0.044 against a true ~0.3, mid decay 2894 ms for a glass box
+    // 3.2 x 2.4 x 4.4 — and the reverb send goes from 8% in the street to 153% against the glass,
+    // which is a cathedral opening up as you step under a bus shelter.
+    //
+    // Three fixes were tried and all three reverted (see docs/NEXT_AFTER_THE_TAIL.md section 4),
+    // because every one of them keyed the escape on a DISTANCE and a distance cannot tell the far
+    // wall of a flat garage from a building across a street. These two tests are the pair that any
+    // fourth attempt has to satisfy: the shelter must come down, and the garage must not move.
+    // ------------------------------------------------------------------------------------------
+
+    /// <summary>The city's bus shelter, with the street and the two buildings that flank it: a back
+    /// pane, two end panes, a steel roof, open at the front, and a brick facade seventeen metres away
+    /// across the road. Distances and materials taken from OpenFPS.Server/maps/city.json.</summary>
+    private static List<Enclosure.Solid> StreetShelter() => new()
+    {
+        new(new Vector3(0, -0.25f, 0),    new Vector3(400, 0.5f, 400), Q, "Concrete"),  // road and pavement
+        new(new Vector3(1.55f, 1.2f, 0),  new Vector3(0.1f, 2.4f, 4.4f), Q, "Glass"),   // back pane
+        new(new Vector3(0, 1.2f, 2.17f),  new Vector3(3.2f, 2.4f, 0.06f), Q, "Glass"),  // end pane
+        new(new Vector3(0, 1.2f, -2.17f), new Vector3(3.2f, 2.4f, 0.06f), Q, "Glass"),  // end pane
+        new(new Vector3(0, 2.45f, 0),     new Vector3(3.2f, 0.1f, 4.4f), Q, "Metal"),   // roof
+        new(new Vector3(1.78f, 5f, 0),    new Vector3(0.35f, 10f, 40f), Q, "Brick"),    // the block behind it
+        new(new Vector3(-16f, 5f, 0),     new Vector3(0.35f, 10f, 40f), Q, "Brick"),    // the block opposite
+    };
+
+    /// <summary>The garage's level 0: 21 by 28 and 2.5 high, hard on every side. The flattest real
+    /// room on the map, and the one every distance-keyed fix flattened along with the shelter.</summary>
+    private static List<Enclosure.Solid> FlatGarage() => new()
+    {
+        new(new Vector3(0, -0.25f, 0),   new Vector3(21, 0.5f, 28), Q, "Concrete"),   // floor
+        new(new Vector3(0, 2.75f, 0),    new Vector3(21, 0.5f, 28), Q, "Concrete"),   // ceiling
+        new(new Vector3(0, 1.25f, 14.25f),  new Vector3(21, 2.5f, 0.5f), Q, "Concrete"),
+        new(new Vector3(0, 1.25f, -14.25f), new Vector3(21, 2.5f, 0.5f), Q, "Concrete"),
+        new(new Vector3(10.75f, 1.25f, 0),  new Vector3(0.5f, 2.5f, 28), Q, "Concrete"),
+        new(new Vector3(-10.75f, 1.25f, 0), new Vector3(0.5f, 2.5f, 28), Q, "Concrete"),
+    };
+
+    /// <summary>
+    /// A bus shelter is a box you stand under on an open street, and it rings for about a third of a
+    /// second. It does not ring for three, and it does not ring for longer than the parking garage.
+    ///
+    /// EXPECTED TO FAIL until the survey can tell that a ray has left through the open front. The
+    /// honest figures for this box: surface about 65 m2, a twelfth of which is the opening, mean free
+    /// path about 2 m, mean absorption about 0.3 once the opening is counted as the perfect absorber
+    /// it is — Eyring puts that at roughly 0.2-0.3 s.
+    /// </summary>
+    [Fact(Skip = "THE GATE ON THE FOURTH ATTEMPT, and recorded rather than weakened. Reads 1% open, "
+               + "609 m2 of surface and a 2894 ms tail on the real city map today. Un-skip it with the "
+               + "fix that makes the survey see the open front, and AFlatGarageStillRings below is the "
+               + "guard that says the fix did not flatten a real room to get there.")]
+    public void AStreetShelterIsNotACathedral()
+    {
+        var survey = Enclosure.Look(new Vector3(0, 1.6f, 0), StreetShelter());
+        var (_, mid, _) = Enclosure.DecaySeconds(survey);
+
+        Assert.True(survey.OpenFraction > 0.15f,
+            $"the front of a shelter is open, and the survey saw {survey.OpenFraction:P0} of the sphere open");
+        Assert.True(survey.SurfaceAreaSquareMetres < 150f,
+            $"the shelter's surface measured {survey.SurfaceAreaSquareMetres:F0} m2; it is about 65");
+        Assert.True(mid < 0.8f,
+            $"standing under a bus shelter measured a {mid * 1000:F0} ms tail");
+    }
+
+    /// <summary>
+    /// And the guard on it. The garage is flat, hard and twenty metres across; its far wall IS its
+    /// own wall, and the tail it has is the longest on the map. Every attempt at the shelter so far
+    /// has taken this down with it — median-keyed shrinking put it at 0.7 s.
+    /// </summary>
+    [Fact]
+    public void AFlatGarageStillRings()
+    {
+        var survey = Enclosure.Look(new Vector3(-4f, 1.6f, 6f), FlatGarage());
+        var (_, mid, _) = Enclosure.DecaySeconds(survey);
+
+        Assert.True(survey.OpenFraction < 0.05f, $"the garage is sealed; {survey.OpenFraction:P0} read open");
+        Assert.True(survey.SurfaceAreaSquareMetres > 900f,
+            $"a 21 x 28 x 2.5 garage has about 1,400 m2 of surface; the survey read {survey.SurfaceAreaSquareMetres:F0}");
+        Assert.True(mid > 3.5f, $"the garage measured a {mid * 1000:F0} ms tail; it is the longest on the map");
+    }
 }

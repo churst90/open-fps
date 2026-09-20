@@ -77,6 +77,31 @@ public sealed class AircraftSynth
         }
     }
 
+    /// <summary>
+    /// Starts the aircraft as one ALREADY at this power setting, rather than one that has to get
+    /// there.
+    ///
+    /// The same thing EngineVoiceState.PlaceAtSpeed does for a car, and for the same reason. A
+    /// turbofan spools on a five-second time constant and a turboprop on two and a half: an airliner
+    /// that comes into earshot at cruise starts at IDLE and takes five seconds to become an airliner,
+    /// every time. That is not a spool-up anybody is listening to — the aeroplane has been at cruise
+    /// for an hour — it is the voice being born, and it is audible as a jet fading in from nothing at
+    /// exactly the moment it should be most itself.
+    ///
+    /// Measured by the level check: rendered a second and a half after construction, the airliner
+    /// came out at 102 dB against the 142 it declares. That is the spool, not the model.
+    /// </summary>
+    public void PlaceAtLever(float lever)
+    {
+        Lever = Math.Clamp(lever, 0f, 1f);
+        if (Profile.Turbine is not { } t) return;
+        _spool = t.IdleFraction + (1f - t.IdleFraction) * Lever;
+        float u = MathHelper.Lerp(t.CoreExitVelocityIdle, t.CoreExitVelocityMax,
+                                  Math.Clamp((_spool - t.IdleFraction) / MathF.Max(0.01f, 1f - t.IdleFraction), 0f, 1f));
+        _coreJet?.SetVelocity(u);
+        _bypassJet?.SetVelocity(t.BypassExitVelocityMax * _spool);
+    }
+
     /// <summary>Where the listener stands in the aircraft's frame: x to starboard, y up, z toward
     /// the nose, origin at the engine. Sets every directivity and the tip Mach toward the ear.</summary>
     public void SetListener(Vector3 aircraftFrame)

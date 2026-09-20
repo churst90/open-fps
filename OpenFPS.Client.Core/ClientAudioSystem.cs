@@ -152,7 +152,26 @@ public class ClientAudioSystem
     /// The floor is two cars, not one. One engine on a racetrack is not a race.
     /// </summary>
     private int _adaptiveBudget = EngineVoiceBudget;
-    private int _adaptiveEchoes = EngineReflections.MaxEchoesPerEngine;
+    /// <summary>
+    /// The ceiling on engine reflections, overridable with OPENFPS_ENGINE_ECHOES.
+    ///
+    /// It exists as a switch because echoes are BY FAR the highest-churn object in the audio system
+    /// and the only one that reaches into another voice's buffers: a city put 256 of them through
+    /// create-and-release in 98 seconds, each holding a reference to the engine voice it is an echo
+    /// of. When a crash lands on the mixer thread and cannot be reproduced headlessly, being able to
+    /// take the busiest subsystem out in one run is worth more than another round of reading code.
+    ///
+    ///     OPENFPS_ENGINE_ECHOES=0   no reflections of engines at all
+    ///     OPENFPS_ENGINE_ECHOES=1   one per engine instead of two
+    ///
+    /// Unset is the normal behaviour. This is a diagnostic lever, not a setting anybody should need.
+    /// </summary>
+    public static readonly int EchoCeiling =
+        int.TryParse(Environment.GetEnvironmentVariable("OPENFPS_ENGINE_ECHOES"), out int ec) && ec >= 0
+            ? Math.Min(ec, EngineReflections.MaxEchoesPerEngine)
+            : EngineReflections.MaxEchoesPerEngine;
+
+    private int _adaptiveEchoes = EchoCeiling;
     private double _lastBudgetChange;
 
     /// <summary>However short the mixer runs, this many cars are fully SYNTHESIZED.</summary>
@@ -186,6 +205,48 @@ public class ClientAudioSystem
 
     /// <summary>How many engines may be BUILT in one audio update. See ChooseLiveEngines.</summary>
     private const int NewEnginesPerUpdate = 2;
+
+    /// <summary>
+    /// How many STANDING machines may run live at once — air conditioners, mowers, plant.
+    ///
+    /// Its own budget rather than a share of the engines', because the two are authored at completely
+    /// different densities. A map carries tens of vehicles and it carries HUNDREDS of small machines:
+    /// the city has a hundred and fourteen window units, one in the window of every street-side flat
+    /// on the lower five floors of five towers, which is what a city has. Authoring five of them and
+    /// calling it a city would hide the problem this budget exists to solve rather than pose it.
+    ///
+    /// The ranking underneath it is the part that matters, and it is NOT distance: it is what each
+    /// machine would actually SOUND like here (Loudness.RenderedGain). A rooftop condenser at 65 dB
+    /// eighty metres up the street beats a window unit at 59 dB behind a hedge, and a distance
+    /// ranking gets that backwards. See the audibility note on EngineReflections for the same rule
+    /// applied to reflections.
+    /// </summary>
+    /// <summary>
+    /// ...overridable with OPENFPS_MACHINE_VOICES, and ZERO IS A VALID ANSWER.
+    ///
+    /// It used to treat 0 as "unset" and hand back the default, which makes the lever useless for the
+    /// one thing a lever is for: taking a subsystem out to see whether it is the one at fault. The
+    /// physical voices — machines and aircraft — are the newest code in the audio engine and the last
+    /// line in the log before several crashes; being able to switch them off in one run is worth more
+    /// than a day of reading them.
+    /// </summary>
+    public static readonly int MachineVoiceBudget =
+        int.TryParse(Environment.GetEnvironmentVariable("OPENFPS_MACHINE_VOICES"), out int mbudget) && mbudget >= 0
+            ? mbudget : 10;
+    private int _adaptiveMachines = MachineVoiceBudget;
+
+    /// <summary>However short the mixer runs, this many standing machines keep a voice. One, because
+    /// the one you are standing next to is the one you would notice going silent.</summary>
+    private const int MinMachineVoices = 1;
+
+    /// <summary>Nothing at all, when the budget is zero: the adaptive floor must not put one back.</summary>
+    private int MachineFloor => MachineVoiceBudget == 0 ? 0 : MinMachineVoices;
+
+    /// <summary>Which physical models currently have a live voice, and when each started.</summary>
+    private readonly HashSet<int> _liveMachines = new();
+    private readonly Dictionary<int, double> _machineStarted = new();
+    private readonly List<int> _machineRetiring = new();
+    private readonly List<(int Id, float Key, float Level)> _machineOrder = new();
 
     /// <summary>
     /// How many borrowed voices may sound at once, beyond the synthesized ones.
@@ -327,6 +388,7 @@ public class ClientAudioSystem
         }
         _lastUpdateAt = nowSec;
         long startTicks = System.Diagnostics.Stopwatch.GetTimestamp();
+        long stageTicks = startTicks;
         try
         {
 
@@ -389,9 +451,14 @@ public class ClientAudioSystem
             else
             {
                 // 3.5 Check for moving regions within the same map (Dynamic Geometry Updates)
-                foreach(var snap in world.Entities.Values)
+                //
+                // Over the REGIONS, not over the world. This used to walk every entity there is to
+                // find the ones that declare a room, which on a city block was five hundred struct
+                // copies a frame and on a city is six thousand — for the same six hundred regions,
+                // almost none of which can move at all.
+                foreach (int regionId in world.RegionEntityIds)
                 {
-                    if (snap.Definition.Region.RoomSize.X > 0)
+                    if (world.Entities.TryGetValue(regionId, out var snap))
                     {
                         if (previous != null && previous.Entities.TryGetValue(snap.Id, out var oldSnap))
                         {
@@ -425,6 +492,8 @@ public class ClientAudioSystem
         // 4.6. Ambience beds: the map's outdoor soundfield, ducked by shelter, plus whatever the
         // listener's own region declares.
         UpdateAmbience(world, listenerRegionId);
+
+        Stage(0, ref stageTicks);     // everything up to here: region, listener, map, probes, ambience
 
         // 5. Update the acoustic path (occlusion/diffraction) for ALL active sounds in FMOD
         var activeIds = _audio.GetActiveSpatialSoundIds();
@@ -502,16 +571,26 @@ public class ClientAudioSystem
                     // and a doorway inaudible from outside.
                     if (!world.Entities.TryGetValue(id, out var originalSnap)) continue;
 
-                    // A live engine has no file to play a delayed copy of: its sound id names a
-                    // synthesis, not a sample, and asking the provider to play it as one fails every
-                    // frame ("not playing yet — Missing", once a frame per car). The walls answering an
-                    // engine are EngineReflections' job, read out of the synthesis's own ring buffer.
-                    // "engine:" is how the SERVER spells it on a snapshot (VehicleSystem) and the
-                    // form tested before anything is resolved — the same test OtherBodies uses. The
-                    // first version of this line matched the resolved spelling, "ENGINE/", which no
-                    // snapshot ever holds, so it matched nothing and the cars kept their copies.
-                    string sourceSound = originalSnap.Definition.SoundEmitter.SoundId ?? "";
-                    if (sourceSound.StartsWith("engine:", StringComparison.OrdinalIgnoreCase)
+                    // A SYNTHESISED source has no file to play a delayed copy of, and this is the
+                    // rule rather than a list of names.
+                    //
+                    // Its sound id names a model, not a sample, so asking the provider to play it as
+                    // one fails every frame — "not playing yet — Missing", once a frame per source,
+                    // for ever, with a deferred play queued behind each one. It has now caught two
+                    // different kinds of source: first engines, where the first version of this line
+                    // matched the RESOLVED spelling "ENGINE/" that no snapshot ever holds and so
+                    // matched nothing; then air conditioners, where the test was a list of two
+                    // prefixes and "machine:" was not on it. A hundred and twenty-one window units
+                    // retrying a file load every frame is most of a game loop.
+                    //
+                    // IsSynth is the property that actually decides it, and it is on the snapshot.
+                    // Anything the mixer RENDERS rather than plays is answered by its own reflection
+                    // path — EngineReflections reads a car's walls out of the synthesis's own ring —
+                    // or by nothing, which is correct until one exists.
+                    var sourceEmitter = originalSnap.Definition.SoundEmitter;
+                    string sourceSound = sourceEmitter.SoundId ?? "";
+                    if (sourceEmitter.IsSynth
+                        || sourceSound.StartsWith("engine:", StringComparison.OrdinalIgnoreCase)
                         || sourceSound.StartsWith("ENGINE/", StringComparison.OrdinalIgnoreCase)) continue;
                     if ((uint)path.ReflectionIndex >= (uint)EarlyReflections.MaxArrivals) continue;
                     _slotLive[path.ReflectionIndex] = true;
@@ -579,6 +658,8 @@ public class ClientAudioSystem
             }
         }
 
+        Stage(1, ref stageTicks);     // 5: the acoustic paths of every active voice
+
         // 5.5. Decide which vehicles get a live engine: the nearest EngineVoiceBudget of them.
         //
         // Done here, once, rather than inside the per-entity pass, because it is a decision ABOUT the
@@ -586,10 +667,13 @@ public class ClientAudioSystem
         // engine and its echoes stopped, which is a real cut rather than a fade — but it only ever
         // happens to whichever car is furthest away and being drowned by three nearer ones.
         ChooseLiveEngines(world, visualEyePos);
+        ChooseLiveMachines(world, visualEyePos);
         _engineEchoes.EchoesPerEngine = _adaptiveEchoes;
         _engineEchoes.SyncGeometry(world);
         float engineDt = (float)Math.Max(1e-3, _clock.Elapsed.TotalSeconds - _lastEngineTime);
         _lastEngineTime = _clock.Elapsed.TotalSeconds;
+
+        Stage(2, ref stageTicks);     // 5.5: who gets a voice
 
         // 6. Process persistent audio emitters attached to world entities (NPCs, Beacons, Machines)
         foreach (var entityId in world.AudioEntityIds)
@@ -605,8 +689,11 @@ public class ClientAudioSystem
         // next frame will demand of a reflection to be worth a voice.
         _engineEchoes.EndFrame();
 
+        Stage(3, ref stageTicks);     // 6: building an emitter for everything that has a voice
+
         // 7. Execute the audio engine tick (mixing, DSP updates)
         _audio.Update();
+        Stage(4, ref stageTicks);     // 7: handing it all to the mixer
         }
         finally
         {
@@ -617,6 +704,28 @@ public class ClientAudioSystem
     }
 
     private double _lastUpdateAt, _worstGapMs, _worstUpdateMs;
+
+    /// <summary>
+    /// Where the audio update's time went, by stage, worst case over the reporting interval.
+    ///
+    /// It exists because "the pass itself took at most 74 ms" is a number you cannot act on. The
+    /// whole pass being four times its 17 ms budget says something is wrong and nothing about what,
+    /// and the candidates are not close together: a loop over every entity in the world, a per-voice
+    /// acoustic path, a ranking over every machine on the map, an emitter built per source, and the
+    /// mixer's own attribute pass. On a map fifty times the area of the one this was written for,
+    /// guessing between those is how a session gets spent.
+    /// </summary>
+    private readonly double[] _stageWorstMs = new double[5];
+    private static readonly string[] StageNames =
+        { "listener+map", "paths", "budget", "emitters", "mixer" };
+
+    private void Stage(int stage, ref long since)
+    {
+        long now = System.Diagnostics.Stopwatch.GetTimestamp();
+        double ms = (now - since) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+        if (ms > _stageWorstMs[stage]) _stageWorstMs[stage] = ms;
+        since = now;
+    }
 
     private void UpdateAcousticState(WorldSnapshot world, Vector3 eyePos, int regId)
     {
@@ -648,6 +757,185 @@ public class ClientAudioSystem
         }
     }
     /// <summary>
+    /// Decides which physical models run live — standing machines and aircraft — by picking the ones
+    /// that would actually be LOUDEST here.
+    ///
+    /// Not the nearest, and that is the whole of the decision. A city authors small machines by the
+    /// hundred — sixty window air conditioners on five towers, a mower in every third garden, plant
+    /// on every roof — and the budget can afford ten of them. Ranking by distance answers "which is
+    /// closest", which is not the question a listener asks: a 92 dB mower three gardens away is
+    /// plainly audible where a 59 dB window unit at the same distance is not, and a rooftop
+    /// condenser eighty metres up the street beats both. What decides it is what each one would
+    /// SOUND like at the ear, which is the rendered gain the mixer is about to apply — its own
+    /// source level, placed, paid down for its own extent, rolled off over its own distance.
+    ///
+    /// Which is also why aircraft share this budget rather than getting one of their own. An
+    /// airliner at 142 dB half a kilometre up beats every air conditioner in the city and should;
+    /// the same airliner parked at the far end of its path at idle should not. One ranking on one
+    /// measure answers both, where two budgets would have meant deciding in advance how many
+    /// aeroplanes are worth how many machines — a question with no answer that does not depend on
+    /// where the listener is standing.
+    ///
+    /// Everything else here is the engine's discipline, for the engine's reasons: a machine that
+    /// holds a slot keeps a bias so the set does not churn as you walk, a new one is held for a
+    /// couple of seconds before it can be taken off again, and one that loses its slot FADES rather
+    /// than being cut, because a running synthesiser has no zero-crossing to stop at.
+    /// </summary>
+    /// <summary>
+    /// What a "machine:" or "aircraft:" id is worth, in the two numbers placement needs: how loud it
+    /// is at a metre, and how big it is.
+    ///
+    /// One lookup, used by BOTH the ranking and the emitter, because those two disagreeing is a
+    /// source that wins a voice on one set of numbers and is then played at another — audible as a
+    /// machine that is picked out of a crowd and then cannot be heard.
+    ///
+    /// MEMOISED BY NAME, and that is not an optimisation, it is the difference between the client
+    /// running and not. Behind ByName is ModelLibrary.Get, which CONSTRUCTS the model every call —
+    /// a governor, a deck, a blade row, a casing, a compressor, all nested records — and this is
+    /// asked once per machine per audio update. A city with a hundred and twenty-one of them on it
+    /// is seven thousand whole machines built and thrown away every second, on the thread that also
+    /// places every moving sound. Measured, in the game: gen2 collections with 57 ms pauses, the
+    /// game loop reporting 0 Hz and 88 ms iterations, and the placement pass holding every source
+    /// still for 106 ms — which is not heard as "slow", it is heard as the client hanging.
+    ///
+    /// VehicleProfile.ByName is memoised for exactly this reason and says so; these two are not, and
+    /// a cache here fixes the caller that has the problem without changing what a model means for
+    /// anyone who reloads an authored one.
+    /// </summary>
+    private readonly Dictionary<string, (float LevelDb, float Extent)?> _physicalLevels =
+        new(StringComparer.OrdinalIgnoreCase);
+
+    private bool PhysicalLevel(string soundId, out float sourceLevelDb, out float extentMetres)
+    {
+        if (!_physicalLevels.TryGetValue(soundId, out var cached))
+        {
+            cached = LookUpPhysicalLevel(soundId);
+            _physicalLevels[soundId] = cached;
+        }
+        if (cached is null) { sourceLevelDb = 0f; extentMetres = 1f; return false; }
+        (sourceLevelDb, extentMetres) = cached.Value;
+        return true;
+    }
+
+    private static (float LevelDb, float Extent)? LookUpPhysicalLevel(string soundId)
+    {
+        try
+        {
+            if (soundId.StartsWith("machine:", StringComparison.OrdinalIgnoreCase))
+            {
+                var spec = OpenFPS.Common.SmallMachineSpec.ByName(soundId[8..]);
+                return (spec.SourceLevelDb, spec.ExtentMetres);
+            }
+            if (soundId.StartsWith("aircraft:", StringComparison.OrdinalIgnoreCase))
+            {
+                var p = OpenFPS.Common.AircraftProfile.ByName(soundId[9..]);
+                // What RADIATES is the disc or the nozzle, not the airframe: a listener is never
+                // inside an aeroplane's extent anyway, so the number only has to stop the inverse
+                // law running away at the one distance it could — directly underneath.
+                return (p.SourceLevelDb, MathF.Max(2f, p.Propeller?.DiameterMetres
+                                                     ?? p.Turbine?.Fan?.DiameterMetres
+                                                     ?? p.Turbine?.BypassNozzleDiameterMetres
+                                                     ?? 2f));
+            }
+        }
+        catch { }
+        return null;
+    }
+
+    /// <summary>
+    /// The power lever, and a rotor's wake, from what the aircraft is DOING.
+    ///
+    /// Nothing scripts this and nothing on the wire carries it. An aeroplane climbing is at or near
+    /// full power; one holding height is at cruise, which is well under it; one coming down is at
+    /// idle with the air doing the work. That is the whole difference between an airliner going over
+    /// and the same airliner on approach, and reading it off the climb angle means a map that
+    /// declares a descending flight path gets an aeroplane on approach without saying so.
+    ///
+    /// A helicopter slaps when it is descending into its own downwash or moving fast forward, and
+    /// nothing else makes it slap — so that comes from the same two numbers.
+    /// </summary>
+    private static (float Lever, float Wake) FlightPower(Vector3 velocity)
+    {
+        float speed = velocity.Length();
+        if (speed < 0.5f) return (0.25f, 0f);                  // sitting on the apron at idle
+        float climb = velocity.Y / speed;                      // sine of the flight path angle
+        // Full power by about six degrees up, cruise level, idle by about four degrees down. The
+        // asymmetry is real: a climb needs everything the engines have and a descent needs nothing,
+        // so the lever falls away much faster than it rises.
+        float lever = climb >= 0f
+            ? Math.Clamp(0.62f + climb * 3.6f, 0f, 1f)
+            : Math.Clamp(0.62f + climb * 8.0f, 0.06f, 1f);
+        float wake = Math.Clamp(-climb * 6f, 0f, 1f) * 0.7f
+                   + Math.Clamp((speed - 25f) / 45f, 0f, 1f) * 0.3f;
+        return (lever, Math.Clamp(wake, 0f, 1f));
+    }
+
+    private void ChooseLiveMachines(WorldSnapshot world, Vector3 eyePos)
+    {
+        double now = _clock.Elapsed.TotalSeconds;
+        _machineOrder.Clear();
+
+        foreach (int entityId in world.AudioEntityIds)
+        {
+            if (entityId == OwnEntityId) continue;
+            if (!world.Entities.TryGetValue(entityId, out var snap)) continue;
+            var em = snap.Definition.SoundEmitter;
+            if (!em.IsSynth || em.SoundId == null) continue;
+            if (!PhysicalLevel(em.SoundId, out float levelDb, out float extent)) continue;
+
+            float d = Vector3.Distance(OpenFPS.Common.AudioEmission.PointFor(snap), eyePos);
+            var (gain, reference) = OpenFPS.Common.Loudness.Place(levelDb, extent);
+            float range = MathF.Max(em.Range, OpenFPS.Common.Loudness.AudibleRange(levelDb));
+            float level = OpenFPS.Common.Loudness.RenderedGain(gain * em.Volume, reference, range, d);
+
+            // Louder sorts first, so the key is negated. The hold and the keep bias work on the key
+            // exactly as they do for a car — a machine that already has a voice has to be beaten
+            // decisively, not merely matched.
+            float key = _liveMachines.Contains(entityId) ? -level / (EngineKeepBias * EngineKeepBias) : -level;
+            if (_machineStarted.TryGetValue(entityId, out double began) && now - began < EngineMinimumHoldSeconds)
+                key = float.NegativeInfinity;
+            _machineOrder.Add((entityId, key, level));
+        }
+        _machineOrder.Sort((a, b) => a.Key.CompareTo(b.Key));
+
+        int keep = Math.Min(_adaptiveMachines, _machineOrder.Count);
+
+        foreach (int id in _liveMachines)
+        {
+            bool survives = false;
+            for (int i = 0; i < keep; i++) if (_machineOrder[i].Id == id) { survives = true; break; }
+            if (survives) continue;
+            _machineStarted.Remove(id);
+            if (!_machineRetiring.Contains(id)) _machineRetiring.Add(id);
+        }
+        for (int i = _machineRetiring.Count - 1; i >= 0; i--)
+        {
+            int id = _machineRetiring[i];
+            bool wanted = false;
+            for (int k = 0; k < keep; k++) if (_machineOrder[k].Id == id) { wanted = true; break; }
+            if (wanted) { _machineRetiring.RemoveAt(i); continue; }
+            if (_audio.FadeOutEngine(id)) { _audio.StopSound(id); _machineRetiring.RemoveAt(i); }
+        }
+
+        int admittedMachines = 0;
+        _liveMachines.Clear();
+        for (int i = 0; i < keep; i++)
+        {
+            int id = _machineOrder[i].Id;
+            if (!_machineStarted.ContainsKey(id))
+            {
+                // Same reason as an engine: building one is a set of waveguides and resonators, and
+                // a map load presents all of them in the same instant.
+                if (admittedMachines >= NewEnginesPerUpdate) continue;
+                admittedMachines++;
+            }
+            _liveMachines.Add(id);
+            _audio.ReviveEngine(id);
+            if (!_machineStarted.ContainsKey(id)) _machineStarted[id] = now;
+        }
+    }
+
+    /// <summary>
     /// Decides which cars get their own engine, and which borrow one.
     ///
     /// Every car in earshot gets its OWN engine now, because the engines no longer run inside the
@@ -677,6 +965,10 @@ public class ClientAudioSystem
                 // nothing but geometry — the machine stays exactly as loud, because the front tap
                 // slews back into the voice that is still playing.
                 if (_adaptiveFront > 0) _adaptiveFront--;
+                // Then a standing machine, before a reflection. A machine that drops out is one
+                // fewer air conditioner in a street of forty and is not missed; a car's first
+                // reflection is the wall of the building you are walking beside.
+                else if (_adaptiveMachines > MachineFloor) _adaptiveMachines--;
                 else if (_adaptiveEchoes > 0) _adaptiveEchoes--;
                 else if (_adaptiveDistant > MinDistantVoices) _adaptiveDistant--;
                 else if (_adaptiveBudget > MinEngineVoices) _adaptiveBudget--;
@@ -688,9 +980,10 @@ public class ClientAudioSystem
             else if (load < MixerLoadFloor)
             {
                 if (_adaptiveBudget < EngineVoiceBudget) _adaptiveBudget++;
+                else if (_adaptiveMachines < MachineVoiceBudget) _adaptiveMachines++;
                 else if (_adaptiveDistant < MaxDistantVoices) _adaptiveDistant++;
                 else if (_adaptiveFront < FrontVoiceBudget) _adaptiveFront++;
-                else if (_adaptiveEchoes < EngineReflections.MaxEchoesPerEngine) _adaptiveEchoes++;
+                else if (_adaptiveEchoes < EchoCeiling) _adaptiveEchoes++;
                 else goto settled;
                 _lastBudgetChange = now;
                 Log.Information("Audio: mixer at {Load:P0}; {Cars} engine(s), {Distant} borrowed, {Echoes} reflection(s) each.",
@@ -817,14 +1110,17 @@ public class ClientAudioSystem
             // The worst that every source in the world stood still for. Target is one 60 Hz period,
             // 17 ms; anything over about 100 ms is long enough to hear a car passing in front of you
             // stop dead and then carry on, which is precisely what it was reported as.
+            string stages = string.Join(", ",
+                StageNames.Select((n, i) => $"{n} {_stageWorstMs[i]:F0}"));
             if (_worstGapMs > 100)
                 Log.Warning("Audio placement stalled: every source held its position for up to {Gap:F0} ms "
-                          + "in the last 5 s (the pass itself took at most {Work:F0} ms). A car in front of you "
-                          + "stops for that long.", _worstGapMs, _worstUpdateMs);
+                          + "in the last 5 s (the pass itself took at most {Work:F0} ms — {Stages}). A car in "
+                          + "front of you stops for that long.", _worstGapMs, _worstUpdateMs, stages);
             else
                 Log.Information("Audio placement: worst gap {Gap:F0} ms between position refreshes, "
-                              + "worst pass {Work:F0} ms.", _worstGapMs, _worstUpdateMs);
+                              + "worst pass {Work:F0} ms ({Stages}).", _worstGapMs, _worstUpdateMs, stages);
             _worstGapMs = 0; _worstUpdateMs = 0;
+            Array.Clear(_stageWorstMs);
 
             // And what the three nearest engines are actually DOING, which is the only way to tell
             // apart the four things that sound identical from a chair: the cars really are slowing
@@ -1117,6 +1413,21 @@ public class ClientAudioSystem
         double now = _clock.Elapsed.TotalSeconds;
         var def = snap.Definition;
 
+        // A physical model outside the budget is not heard, so it is not WORKED OUT either.
+        //
+        // This bails before the acoustic path is read, and that is the whole point of where it sits.
+        // A city carries a hundred and twenty-six of these and ten of them get a voice; doing the
+        // occlusion, the diffraction and the placement for the other hundred and sixteen every
+        // frame, to throw all of it away at the branch that builds the emitter, is a hundred and
+        // sixteen sources' worth of work per frame for silence. The ranking in ChooseLiveMachines has already decided, on the measure that
+        // matters, and it ran this frame.
+        if (def.SoundEmitter.IsSynth
+            && def.SoundEmitter.SoundId is { } sid
+            && (sid.StartsWith("machine:", StringComparison.OrdinalIgnoreCase)
+                || sid.StartsWith("aircraft:", StringComparison.OrdinalIgnoreCase))
+            && !_liveMachines.Contains(snap.Id))
+            return;
+
         // Use the async worker's last computed result rather than a synchronous per-frame calculation.
         // On the first frame before the worker has a result, fall back to an unoccluded direct path.
         AcousticPathData acousticPath;
@@ -1133,6 +1444,8 @@ public class ClientAudioSystem
 
         string resolvedSoundId = "";
         string engineKey = "";
+        string physicalKey = "";
+        float powerLever = 1f, rotorWake = 0f;
         // Where the sound comes out. One shared answer, so the voice and the occlusion probe in step 5
         // can never again be asking about two different points in space.
         Vector3 emitterPosition = OpenFPS.Common.AudioEmission.PointFor(snap);
@@ -1150,7 +1463,33 @@ public class ClientAudioSystem
         {
             resolvedSoundId = def.SoundEmitter.SoundId;
             if (string.IsNullOrEmpty(resolvedSoundId)) resolvedSoundId = "SYNTH"; // Last resort dummy
-            if (resolvedSoundId.StartsWith("engine:", StringComparison.OrdinalIgnoreCase)
+            if (resolvedSoundId.StartsWith("machine:", StringComparison.OrdinalIgnoreCase)
+                || resolvedSoundId.StartsWith("aircraft:", StringComparison.OrdinalIgnoreCase))
+            {
+                // A physical model that is not a vehicle. Unlike a car it has no borrowed-voice
+                // fallback: one outside the budget is simply not heard, because there is no sense in
+                // which forty air conditioners are one air conditioner heard from further away —
+                // that is what aggregation will be for, and this is not it.
+                if (!_liveMachines.Contains(snap.Id)) return;
+                // The same memoised numbers the ranking used. Building a fresh spec here as well
+                // would be the same fault at a tenth of the scale, and would also let the two
+                // disagree if a model were ever reloaded between the two calls.
+                if (!PhysicalLevel(resolvedSoundId, out float levelDb, out float extent)) return;
+                physicalKey = resolvedSoundId;
+                // Placed on its own declared level and its own size, the same way a vehicle is.
+                // The extent is what stops a window unit being a point source you can walk into:
+                // inside its own half-metre the level is flat, and the gain is paid down to match so
+                // the far field is unchanged. See Loudness.Widen — widening without paying is how
+                // the engine once handed every quiet vehicle eight decibels it had not earned.
+                var (gain, reference) = OpenFPS.Common.Loudness.Place(levelDb, extent);
+                engineVolume = gain * def.SoundEmitter.Volume;
+                engineMinDistance = reference;
+                engineExtent = extent;
+                engineRange = MathF.Max(engineRange, OpenFPS.Common.Loudness.AudibleRange(levelDb));
+                if (physicalKey.StartsWith("aircraft:", StringComparison.OrdinalIgnoreCase))
+                    (powerLever, rotorWake) = FlightPower(snap.Velocity);
+            }
+            else if (resolvedSoundId.StartsWith("engine:", StringComparison.OrdinalIgnoreCase)
                 && OpenFPS.Common.MachineRegistry.Knows(resolvedSoundId[7..]))
             {
                 // A vehicle: the engine runs live in the mixer and follows the entity's speed. The
@@ -1217,7 +1556,8 @@ public class ClientAudioSystem
             StopSoundId = def.SoundEmitter.StopSoundId ?? "",
             Mode = def.SoundEmitter.Mode,
             Position = emitterPosition,
-            ApparentPosition = engineKey.Length > 0 ? emitterPosition : acousticPath.ApparentPosition,
+            ApparentPosition = engineKey.Length > 0 || physicalKey.Length > 0
+                             ? emitterPosition : acousticPath.ApparentPosition,
             EffectiveDistance = acousticPath.EffectiveDistance,
             Occlusion = acousticPath.Occlusion,
             ApertureFactor = acousticPath.ApertureFactor,
@@ -1245,6 +1585,9 @@ public class ClientAudioSystem
             MinDistance = engineMinDistance,
             ExtentMetres = engineExtent,
             EngineKey = engineKey,
+            PhysicalKey = physicalKey,
+            PowerLever = powerLever,
+            RotorWake = rotorWake,
             EngineSpeed = snap.Velocity.Length(),
             EngineRunning = true,
             // Straight from the server, which is the only thing that knows the corner.

@@ -25,9 +25,23 @@ import sys
 import tempfile
 import wave
 
-# How far the energy has to rise above the noise floor before it counts as a step. A fraction of the
-# loudest step in the file rather than an absolute, so a quiet recording and a loud one behave alike.
+# How far the energy has to rise before it counts as a step, as a fraction of the loudest step NEARBY.
+#
+# Nearby, not in the whole file, and that is the whole of the difference. A library recording of a
+# walk is somebody approaching and going away again, so the last steps are fifteen or twenty decibels
+# under the first — and against one threshold set by the loudest step in the file, none of the far
+# ones fire. They are not lost: they are swallowed into the PREVIOUS cut, which then runs to the
+# length cap with two or three steps in it. Measured on shoes on cement: eight of fifty files came
+# out 562 ms long, and cement_34 held three separate footfalls.
+#
+# So the reference walks with the walker: the loudest step within a second and a half either side.
 ONSET_FRACTION = 0.16
+LOCAL_WINDOW_S = 1.5
+
+# ...floored, so that the silence between two passes cannot become its own reference and turn mp3
+# decode noise into a footstep. A hundredth of the file's loudest step is 40 dB down, which is under
+# every real step in every recording tried and over the floor of all of them.
+GLOBAL_FLOOR_FRACTION = 0.01
 
 # Two heel strikes cannot be closer than this. A walking pace is about two steps a second and a hard
 # run is four, so 150 ms is comfortably under the fastest real gait and well over the gap between a
@@ -38,9 +52,26 @@ MIN_GAP_S = 0.15
 # transient with its own attack cut off is a click rather than a footstep.
 PRE_ROLL_S = 0.012
 
-# A step is over when it has been this far under its own peak for a while.
+# A step is over when its ENERGY has been this far under its own peak for a while.
+#
+# Energy, not sample amplitude, and that distinction cost eight files. The trim used to walk back
+# from the end while |sample| was under peak/50, and a recording with a low bed in it has peaks that
+# cross that line long after the step itself has gone: cement_19 kept 500 ms of room at -35 dB RMS
+# because its noise touched -30 dB once every few milliseconds. The envelope does not have that
+# problem, and "has the step finished" is a question about energy anyway.
 TAIL_DB = -34.0
+TAIL_HOLD_S = 0.04          # how long it has to stay down, so a gap mid-step is not the end of it
 MAX_STEP_S = 0.55
+
+# ...and a step is ALSO over when the next one arrives, however soon that is.
+#
+# MIN_GAP_S stops the detector splitting a heel from its own toe-off, but a scuff or a shuffle really
+# does put two strikes 130 ms apart, and those were landing in one file: cement_43 held nine, its
+# envelope returning to full scale five times in 560 ms. So the cut watches for the energy coming
+# BACK — down to a quarter of this step's peak and then up over half of it again is a second foot,
+# not this one, and the file ends where it starts.
+REARM_FRACTION = 0.25
+RESTRIKE_FRACTION = 0.5
 
 # How far under the loudest step a step may be and still be worth keeping.
 #
@@ -83,15 +114,41 @@ def envelope(x, sr, hop_s=0.002, win_s=0.010):
     return out, hop_s
 
 
+def local_peaks(env, hop_s):
+    """The loudest thing within LOCAL_WINDOW_S of each frame — a sliding maximum, in one pass.
+
+    A monotonic deque, so a hundred seconds of envelope costs a hundred seconds of envelope rather
+    than a hundred seconds times the window.
+    """
+    half = int(LOCAL_WINDOW_S / hop_s)
+    out = [0.0] * len(env)
+    from collections import deque
+    dq = deque()                      # indices, envelope descending
+    right = 0
+    for i in range(len(env)):
+        lo, hi = max(0, i - half), min(len(env), i + half + 1)
+        while right < hi:
+            while dq and env[dq[-1]] <= env[right]:
+                dq.pop()
+            dq.append(right)
+            right += 1
+        while dq and dq[0] < lo:
+            dq.popleft()
+        out[i] = env[dq[0]] if dq else 0.0
+    return out
+
+
 def onsets(env, hop_s):
     """Where the energy crosses upward through the threshold, no two too close together."""
     peak = max(env) if env else 0.0
     if peak <= 0:
         return []
-    thr = peak * ONSET_FRACTION
+    near = local_peaks(env, hop_s)
+    floor = peak * GLOBAL_FLOOR_FRACTION
     found, last = [], -1e9
     for i in range(1, len(env)):
         t = i * hop_s
+        thr = max(near[i] * ONSET_FRACTION, floor)
         if env[i] > thr and env[i - 1] <= thr and (t - last) >= MIN_GAP_S:
             # Walk back to where it actually started rising, so the attack is not clipped.
             j = i
@@ -102,26 +159,58 @@ def onsets(env, hop_s):
     return found
 
 
-def cut(x, sr, start_s, next_s):
-    """One step: from just before the onset to where it has died away or the next one begins."""
+def step_end(env, hop_s, i0, i1):
+    """Which envelope frame this step has finished on, between i0 and i1.
+
+    Two ways for it to be over, and the earlier one wins: the energy has fallen TAIL_DB under this
+    step's peak and stayed there, or it has come back up because the other foot has landed.
+    """
+    seg = env[i0:i1]
+    if not seg:
+        return i1
+    peak = max(seg)
+    if peak <= 0:
+        return i1
+    floor = peak * (10 ** (TAIL_DB / 20.0))
+    hold = max(1, int(TAIL_HOLD_S / hop_s))
+    quiet = 0
+    rearmed = False
+    # The restrike rule must not fire inside one step. A heel strike and its own toe-off are a dip
+    # and a second rise 40 to 80 ms apart, and cutting there gave a 36 ms click with no body to it —
+    # metal came out 38 to 60 ms, where a steel plate rings for a fifth of a second. MIN_GAP_S is
+    # already the answer to "how close can two FEET be", so it guards this too.
+    earliest = int(MIN_GAP_S / hop_s)
+    for k, e in enumerate(seg):
+        if e < peak * REARM_FRACTION:
+            rearmed = True
+        elif rearmed and k >= earliest and e > peak * RESTRIKE_FRACTION:
+            return i0 + k                      # the next foot; this file stops here
+        if e < floor:
+            quiet += 1
+            if quiet >= hold:
+                return i0 + k - hold + 1
+        else:
+            quiet = 0
+    return i1
+
+
+def cut(x, sr, env, hop_s, start_s, next_s):
+    """One step: from just before the onset to where its energy has died or the next one begins."""
     a = max(0, int((start_s - PRE_ROLL_S) * sr))
     limit = int(min(next_s - 0.01 if next_s else 1e9, start_s + MAX_STEP_S) * sr)
     limit = min(limit, len(x))
     if limit <= a:
         return None
 
+    # Where the energy says it stopped, in samples, plus a little room to breathe.
+    e0, e1 = int(a / (hop_s * sr)), int(limit / (hop_s * sr))
+    end_frame = step_end(env, hop_s, e0, max(e0 + 1, e1))
+    limit = min(limit, a + max(int(sr * 0.03), int((end_frame - e0) * hop_s * sr) + int(sr * 0.02)))
+
     seg = x[a:limit]
     peak = max((abs(v) for v in seg), default=0.0)
     if peak <= 1e-5:
         return None
-
-    # Trim the tail: the last place it was above the floor, plus a little room to breathe.
-    floor = peak * (10 ** (TAIL_DB / 20.0))
-    end = len(seg)
-    while end > 1 and abs(seg[end - 1]) < floor:
-        end -= 1
-    end = min(len(seg), end + int(sr * 0.02))
-    seg = seg[:end]
 
     fi, fo = int(sr * FADE_IN_S), int(sr * FADE_OUT_S)
     for i in range(min(fi, len(seg))):
@@ -161,7 +250,7 @@ def main():
 
     steps = []
     for i, t in enumerate(ons):
-        seg = cut(x, sr, t, ons[i + 1] if i + 1 < len(ons) else None)
+        seg = cut(x, sr, env, hop, t, ons[i + 1] if i + 1 < len(ons) else None)
         if seg is not None and len(seg) > sr * 0.03:
             steps.append((t, seg))
 

@@ -30,6 +30,7 @@ public sealed class MasterTap : IDisposable
 
     private static DSP_READ_CALLBACK? _callback;
     private FMOD.DSP _dsp;
+    private ChannelGroup _group;   // the group it was added to, so it can be taken off again
     private GCHandle _handle;
 
     private MasterTap(string path, int rate)
@@ -62,6 +63,7 @@ public sealed class MasterTap : IDisposable
             tap._handle = GCHandle.Alloc(tap);
             tap._dsp.setUserData(GCHandle.ToIntPtr(tap._handle));
             master.addDSP(CHANNELCONTROL_DSP_INDEX.HEAD, tap._dsp);
+            tap._group = master;
             return tap;
         }
         catch { return null; }
@@ -87,18 +89,16 @@ public sealed class MasterTap : IDisposable
                 if (outbuffer != IntPtr.Zero)
                     new Span<float>((void*)outbuffer, (int)length * ch).Clear();
             }
-            if (!_faulted) { _faulted = true; Serilog.Log.Error(ex, "MasterTap DSP faulted; the block was silenced."); }
+            DspFault.Record("MasterTap", ex);
             return RESULT.OK;
         }
     }
 
-    private static bool _faulted;
 
     private static RESULT ReadCallbackCore(ref DSP_STATE state, IntPtr inbuffer, IntPtr outbuffer,
                                        uint length, int inchannels, ref int outchannels)
     {
-        IntPtr user;
-        unsafe { var d = new FMOD.DSP(state.instance); d.getUserData(out user); }
+        IntPtr user = DspCallback.UserData(ref state);
         int n = (int)length, ch = inchannels;
         if (outchannels == 0) outchannels = ch;
 
@@ -140,6 +140,10 @@ public sealed class MasterTap : IDisposable
             _closed = true;
             try
             {
+                // OFF THE GROUP FIRST. FMOD refuses to release an attached unit and says so in its
+                // logging build — `Failed to release because unit is still attached` — so a release
+                // here freed nothing and left the tap in the master chain for the rest of the run.
+                if (_dsp.hasHandle() && _group.hasHandle()) _group.removeDSP(_dsp);
                 if (_dsp.hasHandle()) { _dsp.release(); }
                 if (_handle.IsAllocated) _handle.Free();
 

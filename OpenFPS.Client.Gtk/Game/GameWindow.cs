@@ -84,7 +84,14 @@ internal sealed class GameWindow
 
         // Closing the in-game window quits the whole app (the menu window is only hidden, so it
         // would otherwise keep the process — and its audio thread — alive).
-        _window.OnCloseRequest += (_, _) => { _onClose(); return false; };
+        // Logged, because a window closing is the one thing that ends the process without a crash,
+        // and nothing said when it happened. "It stopped" needs to distinguish this from a signal.
+        _window.OnCloseRequest += (_, _) =>
+        {
+            Serilog.Log.Information("Game window received a close request.");
+            _onClose();
+            return false;
+        };
 
         _window.Present();
         IsActive = true;

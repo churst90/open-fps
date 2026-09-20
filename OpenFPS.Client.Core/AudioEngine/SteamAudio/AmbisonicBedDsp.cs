@@ -3,6 +3,7 @@ using System.Runtime.InteropServices;
 using System.Threading;
 using FMOD;
 using OpenFPS.Client.AudioEngine.Core;
+using OpenFPS.Client.AudioEngine.Fmod;   // DspCallback.UserData
 
 namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 
@@ -122,12 +123,7 @@ internal static class AmbisonicBedDsp
     private static RESULT ReadCallbackCore(ref DSP_STATE dsp_state, IntPtr inbuffer, IntPtr outbuffer,
                                        uint length, int inchannels, ref int outchannels)
     {
-        IntPtr userData;
-        unsafe
-        {
-            FMOD.DSP dsp = new FMOD.DSP(dsp_state.instance);
-            dsp.getUserData(out userData);
-        }
+        IntPtr userData = DspCallback.UserData(ref dsp_state);
         if (userData == IntPtr.Zero) return RESULT.OK;
         if (GCHandle.FromIntPtr(userData).Target is not AmbisonicBedState s) return RESULT.OK;
 

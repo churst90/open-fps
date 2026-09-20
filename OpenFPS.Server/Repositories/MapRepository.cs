@@ -147,6 +147,27 @@ public class VehicleData
     /// a banked oval is nearer 2.8 because the banking carries part of the load; a formula car with
     /// wings is 4 and up.</summary>
     public float CorneringG { get; set; }
+    /// <summary>
+    /// How much grip the tyres actually HAVE, in g — as distinct from how hard this vehicle chooses
+    /// to corner, which is <see cref="CorneringG"/>. Zero means "the same", which is a racing line.
+    ///
+    /// THE TWO ARE NOT THE SAME THING and treating them as one is audible. The line's corner speed
+    /// is sqrt(CorneringG * 9.81 * R), so a vehicle tracking its own line is by construction at
+    /// exactly 1.0 of CorneringG — and VehicleSystem measures the tyres against that same number, so
+    /// the demand comes out at 1.0 in every corner and the client renders 1.0 as a tyre at its limit.
+    /// For a RACE CAR that is correct and is the point: a racing line is at the limit, and the
+    /// speedway is built on it.
+    ///
+    /// A bus is not. A bus taking a corner at the limit of its grip is a bus on two wheels. Ordinary
+    /// traffic corners at a third of what its tyres could do, which is why a city street is not full
+    /// of screeching — and why every vehicle on the city map screeched until these were separated.
+    ///
+    /// So a city vehicle now says both: CorneringG is the gentle number that picks its speed, GripG
+    /// is the real friction circle everything is measured against. Leaving GripG unset keeps the old
+    /// behaviour exactly, which is what every existing map wants.
+    /// </summary>
+    public float GripG { get; set; }
+
     /// <summary>Where on the lap this car starts, metres along from the first waypoint. Spreading a
     /// field out is the difference between a race and a convoy.</summary>
     public float StartOffsetMetres { get; set; }

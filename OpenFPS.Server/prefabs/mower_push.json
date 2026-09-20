@@ -1,0 +1,18 @@
+{
+  "Id": "mower_push",
+  "Name": "Push mower",
+  "Description": "A 21 inch rotary deck with a single-cylinder engine on top of it, held at one speed by a mechanical governor. The note does not move; the bog you hear when it goes into thick grass is the governor's droop, and the recovery after it is the flyweights catching up. SmallMachines.PushMower.",
+  "Material": "Metal",
+  "ColliderSize": { "X": 0.56, "Y": 0.85, "Z": 1.1 },
+  "Type": "StaticObject",
+  "IsSolid": true,
+  "MaxHealth": 50,
+  "IsItem": false,
+  "HasEmitter": true,
+  "IsSynth": true,
+  "SoundId": "machine:mower_push",
+  "Volume": 1.0,
+  "Range": 220,
+  "MinDistance": 1.5,
+  "Mode": "LoopOne"
+}

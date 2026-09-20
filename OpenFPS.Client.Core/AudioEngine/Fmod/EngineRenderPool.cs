@@ -29,7 +29,7 @@ namespace OpenFPS.Client.AudioEngine.Fmod;
 /// </summary>
 public sealed class EngineRenderPool : IDisposable
 {
-    private readonly Func<List<EngineVoiceState>> _snapshot;
+    private readonly Func<List<IRenderedVoice>> _snapshot;
     private readonly Thread[] _workers;
     private readonly Thread _coordinator;
     private volatile bool _running = true;
@@ -45,13 +45,13 @@ public sealed class EngineRenderPool : IDisposable
     /// The list arrives sorted NEAREST FIRST, and the stride preserves that: when the machine cannot
     /// fill every ring in time, the cars that get filled are the ones you can hear.
     /// </summary>
-    private volatile EngineVoiceState[] _voices = Array.Empty<EngineVoiceState>();
+    private volatile IRenderedVoice[] _voices = Array.Empty<IRenderedVoice>();
 
     /// <summary>Blocks the mixer asked for that no producer had rendered yet, since the client
     /// started. The mixer no longer finishes those blocks itself — it ramps out and reports.</summary>
-    public int Underruns => EngineVoiceState.GlobalStarves;
+    public int Underruns => EngineVoiceState.GlobalStarves + PhysicalVoiceState.GlobalStarves;
 
-    public EngineRenderPool(Func<List<EngineVoiceState>> snapshot)
+    public EngineRenderPool(Func<List<IRenderedVoice>> snapshot)
     {
         _snapshot = snapshot;
 

@@ -14,6 +14,18 @@ public class WorldSnapshot
     public readonly Dictionary<int, EntitySnapshot> Entities = new();
     public readonly List<EntitySnapshot> DynamicEntities = new();
     public readonly List<int> AudioEntityIds = new();
+
+    /// <summary>
+    /// Every entity that declares an acoustic REGION, so that looking for one that has moved does not
+    /// mean looking at everything.
+    ///
+    /// The same idea as <see cref="AudioEntityIds"/> and for the same reason. The client checks each
+    /// frame whether a region has moved — a lift, a vehicle's interior, anything carrying a room
+    /// around with it — and it did that by walking every entity in the world. That is a loop the
+    /// size of the MAP running at the frame rate: fine on a block of five hundred boxes, and on a
+    /// city of six thousand it is eleven times the work to find the same handful of regions.
+    /// </summary>
+    public readonly List<int> RegionEntityIds = new();
     public SpatialGrid<int>? StaticGrid;
     public AcousticMap? AcousticMap;
 

@@ -1,0 +1,18 @@
+{
+  "Id": "ac_window",
+  "Name": "Window air conditioner",
+  "Description": "A box in a sash window with its condenser hanging out over the street. A compressor, a fan on a shroud, and a thin steel case that lets all of it straight out — which is why you hear these from the pavement and barely at all from the room they are cooling. The model is SmallMachines.AirConditionerWindow: a constant-speed machine with no governor, so its note does not move, and everything you hear happening to it is the world between you and it.",
+  "Material": "Metal",
+  "ColliderSize": { "X": 0.62, "Y": 0.4, "Z": 0.56 },
+  "Type": "StaticObject",
+  "IsSolid": true,
+  "MaxHealth": 40,
+  "IsItem": false,
+  "HasEmitter": true,
+  "IsSynth": true,
+  "SoundId": "machine:ac_window",
+  "Volume": 1.0,
+  "Range": 90,
+  "MinDistance": 1.2,
+  "Mode": "LoopOne"
+}

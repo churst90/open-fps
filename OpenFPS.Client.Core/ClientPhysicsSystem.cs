@@ -68,9 +68,20 @@ public class ClientPhysicsSystem
         }
 
         // 2. GATHER COLLIDERS from Snapshot using ArrayPool
+        // WHAT IS NEAR ENOUGH TO WALK INTO, and nothing else.
+        //
+        // The grid returning an EMPTY set is an answer: there is no static geometry within the search
+        // radius, which is what standing in the middle of a road is. Treating it as a failure and
+        // falling back to every entity in the world put the whole map through the collision solver on
+        // every physics tick, in the one place a player spends most of their time. Five hundred boxes
+        // survived it; a city of six thousand does not, and it is felt as the client locking up the
+        // moment you start moving.
+        //
+        // Only a MISSING grid — the seconds between a map arriving and the first rebuild — is a
+        // reason to consider everything.
         IEnumerable<EntitySnapshot> candidates;
         var gridResults = snapshot.StaticGrid?.GetItemsInRadius(_state.Position, CollisionSearchRadius);
-        if (gridResults != null && gridResults.Any())
+        if (gridResults != null)
             candidates = gridResults.Select(id => snapshot.Entities[id]);
         else
             candidates = snapshot.Entities.Values;

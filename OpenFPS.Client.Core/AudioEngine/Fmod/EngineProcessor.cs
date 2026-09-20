@@ -16,7 +16,7 @@ namespace OpenFPS.Client.AudioEngine.Fmod;
 /// fields are plain floats and bools, which are atomic on every platform this runs on, and they are
 /// smoothed inside the callback so a 30 Hz network update never steps the throttle.
 /// </summary>
-public sealed class EngineVoiceState
+public sealed class EngineVoiceState : IRenderedVoice
 {
     public readonly VehicleProfile Vehicle;
     public readonly EngineSynth Engine;
@@ -772,14 +772,45 @@ public static class TapProcessor
 
     [ThreadStatic] private static float[]? _scratch;
 
+    /// <summary>
+    /// NOTHING MAY ESCAPE A DSP CALLBACK.
+    ///
+    /// This runs on FMOD's mixer thread, called from native code. An exception that reaches the
+    /// native frame is not a caught fault, it is a CLR FATAL ERROR: the runtime aborts the process
+    /// on the spot, with no managed stack, no log line, and a core that reads
+    /// "libfmod -> libcoreclr -> abort". That is precisely the crash the city kept producing, and
+    /// the only reason it was ever reachable is that the guard below stopped one line short.
+    ///
+    /// The old body wrapped only `state.Render(mono)`. Everything before it was bare — and the line
+    /// that actually throws is `GCHandle.FromIntPtr(userData).Target`, which raises
+    /// InvalidOperationException the moment the handle it names is no longer allocated. So the one
+    /// statement most likely to fail was the one statement outside the net.
+    ///
+    /// GranularProcessor and SynthProcessor have always done it this way, one-shot log and all.
+    /// These four had not.
+    /// </summary>
     private static RESULT ReadCallback(ref DSP_STATE dsp_state, IntPtr inbuffer, IntPtr outbuffer, uint length, int inchannels, ref int outchannels)
     {
-        IntPtr userData;
-        unsafe
+        try { return ReadCallbackCore(ref dsp_state, inbuffer, outbuffer, length, inchannels, ref outchannels); }
+        catch (Exception ex)
         {
-            var dsp = new FMOD.DSP(dsp_state.instance);
-            dsp.getUserData(out userData);
+            // Once. A DSP that faults faults every block, and a log line per block at 43 blocks a
+            // second buries everything else in the file.
+            DspFault.Record("TapProcessor", ex);
+            unsafe
+            {
+                if (outchannels == 0) outchannels = 1;
+                float* outBuf = (float*)outbuffer;
+                for (int i = 0; i < (int)length * outchannels; i++) outBuf[i] = 0f;
+            }
+            return RESULT.OK;
         }
+    }
+
+
+    private static RESULT ReadCallbackCore(ref DSP_STATE dsp_state, IntPtr inbuffer, IntPtr outbuffer, uint length, int inchannels, ref int outchannels)
+    {
+        IntPtr userData = DspCallback.UserData(ref dsp_state);
         if (userData == IntPtr.Zero) return RESULT.OK;
         var state = (EngineTapState?)GCHandle.FromIntPtr(userData).Target;
         if (state == null) return RESULT.OK;
@@ -823,14 +854,45 @@ public static class EchoProcessor
 
     [ThreadStatic] private static float[]? _scratch;
 
+    /// <summary>
+    /// NOTHING MAY ESCAPE A DSP CALLBACK.
+    ///
+    /// This runs on FMOD's mixer thread, called from native code. An exception that reaches the
+    /// native frame is not a caught fault, it is a CLR FATAL ERROR: the runtime aborts the process
+    /// on the spot, with no managed stack, no log line, and a core that reads
+    /// "libfmod -> libcoreclr -> abort". That is precisely the crash the city kept producing, and
+    /// the only reason it was ever reachable is that the guard below stopped one line short.
+    ///
+    /// The old body wrapped only `state.Render(mono)`. Everything before it was bare — and the line
+    /// that actually throws is `GCHandle.FromIntPtr(userData).Target`, which raises
+    /// InvalidOperationException the moment the handle it names is no longer allocated. So the one
+    /// statement most likely to fail was the one statement outside the net.
+    ///
+    /// GranularProcessor and SynthProcessor have always done it this way, one-shot log and all.
+    /// These four had not.
+    /// </summary>
     private static RESULT ReadCallback(ref DSP_STATE dsp_state, IntPtr inbuffer, IntPtr outbuffer, uint length, int inchannels, ref int outchannels)
     {
-        IntPtr userData;
-        unsafe
+        try { return ReadCallbackCore(ref dsp_state, inbuffer, outbuffer, length, inchannels, ref outchannels); }
+        catch (Exception ex)
         {
-            var dsp = new FMOD.DSP(dsp_state.instance);
-            dsp.getUserData(out userData);
+            // Once. A DSP that faults faults every block, and a log line per block at 43 blocks a
+            // second buries everything else in the file.
+            DspFault.Record("EchoProcessor", ex);
+            unsafe
+            {
+                if (outchannels == 0) outchannels = 1;
+                float* outBuf = (float*)outbuffer;
+                for (int i = 0; i < (int)length * outchannels; i++) outBuf[i] = 0f;
+            }
+            return RESULT.OK;
         }
+    }
+
+
+    private static RESULT ReadCallbackCore(ref DSP_STATE dsp_state, IntPtr inbuffer, IntPtr outbuffer, uint length, int inchannels, ref int outchannels)
+    {
+        IntPtr userData = DspCallback.UserData(ref dsp_state);
         if (userData == IntPtr.Zero) return RESULT.OK;
         var state = (EngineEchoState?)GCHandle.FromIntPtr(userData).Target;
         if (state == null) return RESULT.OK;
@@ -879,14 +941,45 @@ public static class EngineProcessor
 
     [ThreadStatic] private static float[]? _scratch;
 
+    /// <summary>
+    /// NOTHING MAY ESCAPE A DSP CALLBACK.
+    ///
+    /// This runs on FMOD's mixer thread, called from native code. An exception that reaches the
+    /// native frame is not a caught fault, it is a CLR FATAL ERROR: the runtime aborts the process
+    /// on the spot, with no managed stack, no log line, and a core that reads
+    /// "libfmod -> libcoreclr -> abort". That is precisely the crash the city kept producing, and
+    /// the only reason it was ever reachable is that the guard below stopped one line short.
+    ///
+    /// The old body wrapped only `state.Render(mono)`. Everything before it was bare — and the line
+    /// that actually throws is `GCHandle.FromIntPtr(userData).Target`, which raises
+    /// InvalidOperationException the moment the handle it names is no longer allocated. So the one
+    /// statement most likely to fail was the one statement outside the net.
+    ///
+    /// GranularProcessor and SynthProcessor have always done it this way, one-shot log and all.
+    /// These four had not.
+    /// </summary>
     private static RESULT ReadCallback(ref DSP_STATE dsp_state, IntPtr inbuffer, IntPtr outbuffer, uint length, int inchannels, ref int outchannels)
     {
-        IntPtr userData;
-        unsafe
+        try { return ReadCallbackCore(ref dsp_state, inbuffer, outbuffer, length, inchannels, ref outchannels); }
+        catch (Exception ex)
         {
-            var dsp = new FMOD.DSP(dsp_state.instance);
-            dsp.getUserData(out userData);
+            // Once. A DSP that faults faults every block, and a log line per block at 43 blocks a
+            // second buries everything else in the file.
+            DspFault.Record("EngineProcessor", ex);
+            unsafe
+            {
+                if (outchannels == 0) outchannels = 1;
+                float* outBuf = (float*)outbuffer;
+                for (int i = 0; i < (int)length * outchannels; i++) outBuf[i] = 0f;
+            }
+            return RESULT.OK;
         }
+    }
+
+
+    private static RESULT ReadCallbackCore(ref DSP_STATE dsp_state, IntPtr inbuffer, IntPtr outbuffer, uint length, int inchannels, ref int outchannels)
+    {
+        IntPtr userData = DspCallback.UserData(ref dsp_state);
         if (userData == IntPtr.Zero) return RESULT.OK;
         var state = (EngineVoiceState?)GCHandle.FromIntPtr(userData).Target;
         if (state == null) return RESULT.OK;

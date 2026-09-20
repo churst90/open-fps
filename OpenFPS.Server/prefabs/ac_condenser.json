@@ -1,0 +1,18 @@
+{
+  "Id": "ac_condenser",
+  "Name": "Condensing unit",
+  "Description": "The outdoor half of a split system, on a roof or a plinth: a scroll compressor under a big slow axial fan in a coil case. Bigger, lower and much further-carrying than a window unit — a roof full of these is what a city hums with on a hot afternoon. SmallMachines.AirConditionerCondenser.",
+  "Material": "Metal",
+  "ColliderSize": { "X": 0.95, "Y": 0.9, "Z": 0.95 },
+  "Type": "StaticObject",
+  "IsSolid": true,
+  "MaxHealth": 60,
+  "IsItem": false,
+  "HasEmitter": true,
+  "IsSynth": true,
+  "SoundId": "machine:ac_condenser",
+  "Volume": 1.0,
+  "Range": 160,
+  "MinDistance": 1.8,
+  "Mode": "LoopOne"
+}

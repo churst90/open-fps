@@ -471,6 +471,17 @@ namespace FMOD
         {
             get { return Marshal.PtrToStructure<FMOD.DSP_STATE_FUNCTIONS>(functions_internal); }
         }
+
+        /// <summary>
+        /// The raw function table, without marshalling the struct.
+        ///
+        /// ADDED TO THE VENDORED BINDING (the only change in this file). `functions` above marshals
+        /// the whole table on every access, which is fine once and wrong once per DSP per block —
+        /// and a DSP callback has to reach that table on every block, because calling the general
+        /// FMOD API from inside a callback is exactly what this engine was doing wrong. Handing out
+        /// the pointer lets a caller fetch the accessor once and cache it. See DspCallback.UserData.
+        /// </summary>
+        public IntPtr functionsPtr => functions_internal;
     }
 
     [StructLayout(LayoutKind.Sequential)]

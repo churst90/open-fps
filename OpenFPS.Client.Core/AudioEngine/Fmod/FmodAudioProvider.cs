@@ -202,6 +202,13 @@ public class FmodAudioProvider : IAudioProvider
     /// Worth watching: those voices are panned by FMOD rather than placed by Steam Audio, and until
     /// today they were also attenuated by a different law.</summary>
     private int _saPoolMisses, _lastSaPoolMisses;
+    // Pooled DSPs that could not be detached from their channel, and so were thrown away
+    // instead of re-used. This should stay at zero; see Detach for why it is not fatal.
+    private int _failedDetaches, _lastFailedDetaches;
+    // Pooled DSPs whose channel had already been recycled, so they had to be cut loose from the DSP
+    // side instead. This is the ORDINARY path for any voice that ended on its own, so it is expected
+    // to be non-zero; it is reported to show the cleanup is happening, not to flag a problem.
+    private int _lateDetaches, _lastLateDetaches;
 
     private readonly System.Collections.Concurrent.ConcurrentStack<FMOD.DSP> _threeEqPool = new();
     private readonly System.Collections.Concurrent.ConcurrentStack<FMOD.DSP> _diffractionPool = new();
@@ -220,14 +227,100 @@ public class FmodAudioProvider : IAudioProvider
         return dsp;
     }
 
-    private void ReleaseThreeEqDsp(FMOD.DSP dsp)
+    // Both of these are POOLED, and a pooled DSP is about to be addDSP'd onto a DIFFERENT channel.
+    // It has to come off this one first: while it is attached to two, tearing either one down leaves
+    // the other holding a connection to something that has gone. Bypassing is not detaching — that
+    // was the bug, and setBypass only hid it by making the wrong output silent.
+    private void ReleaseThreeEqDsp(FMOD.Channel channel, FMOD.DSP dsp)
     {
-        if (dsp.hasHandle()) { dsp.setBypass(true); _threeEqPool.Push(dsp); }
+        if (!dsp.hasHandle()) return;
+        if (!Detach(channel, dsp, "three-band EQ")) return;
+        dsp.setBypass(true);
+        _threeEqPool.Push(dsp);
     }
 
-    private void ReleaseDiffractionDsp(FMOD.DSP dsp)
+    private void ReleaseDiffractionDsp(FMOD.Channel channel, FMOD.DSP dsp)
     {
-        if (dsp.hasHandle()) { dsp.setBypass(true); _diffractionPool.Push(dsp); }
+        if (!dsp.hasHandle()) return;
+        if (!Detach(channel, dsp, "diffraction")) return;
+        dsp.setBypass(true);
+        _diffractionPool.Push(dsp);
+    }
+
+    /// <summary>
+    /// Takes a POOLED DSP off the channel it is on, and says whether it is safe to re-use.
+    ///
+    /// A pooled DSP is about to be addDSP'd onto a DIFFERENT channel. While it is attached to two,
+    /// tearing either one down leaves the other holding a link to something that has gone — and the
+    /// crash we chased was FMOD following exactly such a link: it reads the DSP's owner at +0x78,
+    /// that owner's next link at +0x10, and tests a flag byte at +0x7c. The middle link came back
+    /// null, so the flag test read address 0x7c. Bypassing a DSP does not detach it; only this does.
+    ///
+    /// If the detach FAILS the DSP is NOT pooled — it is dropped, and a fresh one is made next time.
+    /// Losing a pooled object costs a few hundred bytes. Re-using an attached one costs the process.
+    /// </summary>
+    /// <summary>
+    /// Takes every room's reverberation unit off its bus and frees both, IN THAT ORDER.
+    ///
+    /// This used to be two lines — release the DSPs, release the buses — and FMOD's logging build
+    /// counted the cost exactly: 124 of these in a forty-five second churn over 120 rooms, one per
+    /// room, every one of them
+    ///
+    ///     DSPI::release WARNING.  Failed to release because unit is still attached.
+    ///
+    /// followed at shutdown by `closeInternal assertion: connectionsRemaining == 0 failed`. FMOD
+    /// REFUSES a release of an attached unit, so none of them were ever freed; they stayed in the
+    /// graph, attached to a ChannelGroup that was then released out from under them.
+    ///
+    /// A ChannelGroup is not a Channel and has no `stop()` that would do this implicitly. The unit
+    /// has to be removed by hand.
+    /// </summary>
+    private void ReleaseReverbUnits()
+    {
+        foreach (var kvp in _reverbDsps)
+        {
+            if (!kvp.Value.hasHandle()) continue;
+            if (_reverbBuses.TryGetValue(kvp.Key, out var bus) && bus.hasHandle())
+            {
+                if (bus.removeDSP(kvp.Value) != RESULT.OK) _failedDetaches++;
+            }
+            kvp.Value.release();
+        }
+        foreach (var bus in _reverbBuses.Values) if (bus.hasHandle()) bus.release();
+    }
+
+    private bool Detach(FMOD.Channel channel, FMOD.DSP dsp, string what)
+    {
+        if (!dsp.hasHandle()) return false;
+        RESULT r = channel.hasHandle() ? channel.removeDSP(dsp) : RESULT.ERR_INVALID_HANDLE;
+        if (r == RESULT.OK) return true;
+
+        // ERR_INVALID_HANDLE here is NOT an edge case, it is the ordinary case, and it is why the
+        // first version of this fix bought a longer run instead of a clean one.
+        //
+        // The reaper's trigger is `isPlaying == false`. For a sample voice that has simply finished
+        // — a footstep, a door, any one-shot — FMOD retired and RECYCLED that channel before we ever
+        // looked. The handle is stale by construction, so removeDSP can never work, and every pooled
+        // DSP on a naturally-ended voice took this path. Nineteen of them in one five-second report.
+        //
+        // Dropping them was not enough either. A dropped DSP is still wherever it was: sitting in the
+        // chain of a channel that has since been handed to a different sound. So go at it from the
+        // DSP's own side. disconnectAll works on the DSP OBJECT and does not need a live channel; it
+        // cuts every connection the unit still has, which is precisely the owner link FMOD was
+        // following when it read address 0x7c.
+        if (dsp.disconnectAll(true, true) == RESULT.OK)
+        {
+            _lateDetaches++;
+            return true;
+        }
+
+        // Only if even that fails is the unit unsafe to hand out again.
+        _failedDetaches++;
+        if (_failedDetaches == 1)
+            Log.Warning("A {What} DSP would neither come off its channel ({Result}) nor disconnect "
+                      + "itself. It has been dropped rather than pooled; further occurrences are "
+                      + "counted, not logged.", what, r);
+        return false;
     }
 
     private class PooledGranularDsp { public FMOD.DSP Dsp; public System.Runtime.InteropServices.GCHandle Handle; public GranularVoiceState State; public PooledGranularDsp(FMOD.DSP dsp, System.Runtime.InteropServices.GCHandle h, GranularVoiceState s) { Dsp = dsp; Handle = h; State = s; } }
@@ -265,11 +358,17 @@ public class FmodAudioProvider : IAudioProvider
 
     private void ReleaseGranularDsp(FMOD.DSP dsp, System.Runtime.InteropServices.GCHandle handle, GranularVoiceState? state)
     {
+        // Out of the graph before it is handed to anyone else: a pooled DSP that is
+        // still connected is the same dangling pointer as a released one.
+        if (dsp.hasHandle()) dsp.disconnectAll(true, true);
         if (dsp.hasHandle() && state != null) { _granularPool.Push(new PooledGranularDsp(dsp, handle, state)); }
     }
 
     private void ReleaseSynthDsp(FMOD.DSP dsp, System.Runtime.InteropServices.GCHandle handle, SynthVoiceState? state)
     {
+        // Out of the graph before it is handed to anyone else: a pooled DSP that is
+        // still connected is the same dangling pointer as a released one.
+        if (dsp.hasHandle()) dsp.disconnectAll(true, true);
         if (dsp.hasHandle() && state != null) { _synthPool.Push(new PooledSynthDsp(dsp, handle, state)); }
     }
 
@@ -299,6 +398,11 @@ public class FmodAudioProvider : IAudioProvider
         public EngineEchoState? EchoState;
         /// <summary>One outlet of a machine whose engine belongs to another voice.</summary>
         public EngineTapState? TapState;
+
+        /// <summary>A machine that stands still and runs — a window air conditioner, a mower. It
+        /// shares <see cref="EngineDsp"/> and <see cref="EngineHandle"/> with an engine because a
+        /// voice is one or the other and never both, and one release path is one release path.</summary>
+        public PhysicalVoiceState? MachineState;
 
         /// <summary>When this voice's position was last TRUE, seconds on <see cref="OpenFPS.Common.AudioClock"/>
         /// — the sample time carried by the emitter, not the moment it was handed over.
@@ -366,6 +470,11 @@ public class FmodAudioProvider : IAudioProvider
         public int CurrentSourceRegionId = -2;
         public FMOD.DSPConnection ReverbConnection;
         public FMOD.DSPConnection SourceReverbConnection;
+        // The unit each live send actually feeds, kept BESIDE the connection. The bus a send fades
+        // out of must be this unit and no other; it used to be looked up again from a region id,
+        // and the id and the unit disagreed. See DropSend for what FMOD does with the wrong unit.
+        public FMOD.DSP ReverbBus;
+        public FMOD.DSP SourceReverbBus;
 
         // ── A send is a signal path, and one cannot simply appear ───────────────────────────────
         //
@@ -439,13 +548,19 @@ public class FmodAudioProvider : IAudioProvider
     private FMOD.DSP _loudnessMeter;
     private MasterTap? _masterTap;
     private EngineRenderPool? _enginePool;
-    private readonly List<EngineVoiceState> _engineSnapshot = new();
+    private readonly List<IRenderedVoice> _engineSnapshot = new();
 
-    private readonly List<(float Distance, EngineVoiceState Voice)> _engineOrder = new();
+    private readonly List<(float Distance, IRenderedVoice Voice)> _engineOrder = new();
 
     /// <summary>
-    /// Every live engine, for the render pool, NEAREST FIRST. Copied under the lock so the pool never
-    /// walks a list the mixer is changing.
+    /// Every live voice the pool renders ahead — engines and standing machines alike — NEAREST
+    /// FIRST. Copied under the lock so the pool never walks a list the mixer is changing.
+    ///
+    /// The two kinds share one list and one ordering on purpose. A street with a bus going past it
+    /// and forty air conditioners on the wall above has to decide what gets rendered when the
+    /// machine cannot render everything, and the answer is the same answer for both: what is
+    /// nearest. Two lists would have meant two budgets, and a budget per kind is how a distant
+    /// condenser ends up rendered ahead of the truck beside you.
     ///
     /// The order is not cosmetic. When the machine cannot render every ring ahead of the mixer — the
     /// first seconds in a map, on a track with a full field — some voice is going to come up short,
@@ -453,13 +568,16 @@ public class FmodAudioProvider : IAudioProvider
     /// Priming the nearest first means the shortfall lands on the car at the far end of the back
     /// straight, which is a whisper, rather than on the one going past your seat.
     /// </summary>
-    private List<EngineVoiceState> SnapshotEngineVoices()
+    private List<IRenderedVoice> SnapshotEngineVoices()
     {
         _engineSnapshot.Clear();
         _engineOrder.Clear();
         lock (_lock)
             foreach (var a in _activeSounds)
+            {
                 if (a.EngineState != null) _engineOrder.Add((a.EffectiveDistance, a.EngineState));
+                else if (a.MachineState != null) _engineOrder.Add((a.EffectiveDistance, a.MachineState));
+            }
         _engineOrder.Sort(static (x, y) => x.Distance.CompareTo(y.Distance));
         foreach (var e in _engineOrder) _engineSnapshot.Add(e.Voice);
         return _engineSnapshot;
@@ -524,6 +642,21 @@ public class FmodAudioProvider : IAudioProvider
         public System.Runtime.InteropServices.GCHandle Handle;
     }
     private readonly Stack<SaVoice> _saPool = new();
+
+    /// <summary>
+    /// GCHandles for DSPs that have been released, kept alive until Dispose.
+    ///
+    /// They are not freed when the voice is, because FMOD may call that DSP's read callback once
+    /// more after release, and the first thing the callback does is resolve this handle. Freeing it
+    /// is a use-after-free inside the runtime on the mixer thread — the crash that reads as
+    /// "libfmod called libcoreclr and libcoreclr aborted", with no exception and no log line. The
+    /// Steam Audio voices have never freed theirs for exactly this reason; the engine voices did,
+    /// and on a map that makes and drops voices continuously it finally caught up with them.
+    ///
+    /// Sixteen bytes per retired voice, for the life of the session. Freed in Dispose, after the
+    /// system is closed and no callback can be in flight.
+    /// </summary>
+    private readonly List<System.Runtime.InteropServices.GCHandle> _retiredHandles = new();
     private readonly List<SaVoice> _saAllVoices = new();
     private const int SaPoolSize = 96;
 
@@ -750,6 +883,20 @@ public class FmodAudioProvider : IAudioProvider
 
     private void TryInitSteamAudio()
     {
+        // OPENFPS_HRTF=0 leaves the binaural stage out entirely — FMOD's own panning instead.
+        //
+        // A bisect lever, not a setting. The binaural DSP is the largest native surface inside the
+        // mixer callback: one Phonon effect per voice, applied on every block, with buffers and
+        // effects handed round a pool of ninety-six. When a crash lands on an FMOD thread and every
+        // managed suspect has been cleared, being able to take that out in one run is the difference
+        // between knowing and guessing. It costs the HRTF — everything goes flat and stereo — which
+        // is why it is a lever rather than an option.
+        if (Environment.GetEnvironmentVariable("OPENFPS_HRTF") == "0")
+        {
+            Log.Warning("OPENFPS_HRTF=0 — the Steam Audio binaural stage is OFF. Spatial cues are FMOD "
+                      + "panning only. This is a diagnostic lever; unset it for normal listening.");
+            return;
+        }
         try
         {
             _system.getDSPBufferSize(out uint block, out int _);
@@ -838,9 +985,16 @@ public class FmodAudioProvider : IAudioProvider
         // in-flight callback completes), then return the voice to the pool for reuse. We never free
         // the Phonon effect/buffers or the GCHandle here — that is exactly what raced the mixer
         // callback and corrupted the heap. The resources live until Dispose.
-        if (a.SaDsp.hasHandle() && a.Channel.hasHandle()) a.Channel.removeDSP(a.SaDsp);
-        var v = new SaVoice { State = a.SaState, Dsp = a.SaDsp, Handle = a.SaHandle };
-        lock (_saPool) { _saPool.Push(v); }
+        // The detach has to SUCCEED before this voice may be handed to anyone else — see Detach.
+        // A voice that would not come off its channel is simply not pooled again; _saAllVoices still
+        // holds it, so Dispose frees its Phonon effect and buffers as it always did, and the only
+        // cost is one pool miss.
+        bool reusable = !a.SaDsp.hasHandle() || Detach(a.Channel, a.SaDsp, "binaural");
+        if (reusable)
+        {
+            var v = new SaVoice { State = a.SaState, Dsp = a.SaDsp, Handle = a.SaHandle };
+            lock (_saPool) { _saPool.Push(v); }
+        }
         a.SaState = null; a.SaDsp = default; a.SaHandle = default;
     }
 
@@ -1207,10 +1361,14 @@ public class FmodAudioProvider : IAudioProvider
                 active.CurrentSourceRegionId = -2; 
                 active.ReverbConnection = default;
                 active.SourceReverbConnection = default;
+                active.ReverbBus = default;
+                active.SourceReverbBus = default;
                 // The buses these pointed into have just been released, so a fading send has nothing
                 // left to disconnect from; forgetting it is the whole of the cleanup.
                 active.FadingReverbConnection = default;
                 active.FadingSourceConnection = default;
+                active.FadingReverbBus = default;
+                active.FadingSourceBus = default;
                 active.ReverbMix = 0f;
                 active.SourceReverbMix = 0f;
             }
@@ -1220,8 +1378,7 @@ public class FmodAudioProvider : IAudioProvider
     private void ClearReverbBuses()
     {
         ReturnReverbVoices(); // detach HRTF voices while the buses still exist, return them to the pool
-        foreach (var dsp in _reverbDsps.Values) dsp.release();
-        foreach (var bus in _reverbBuses.Values) bus.release();
+        ReleaseReverbUnits();
         _reverbDsps.Clear(); _reverbBuses.Clear(); _reverbVolumes.Clear(); _dryReverbBuses.Clear();
     }
 
@@ -1265,8 +1422,46 @@ public class FmodAudioProvider : IAudioProvider
 
         foreach (var id in activeIds)
         {
-            if (!_reverbBuses.ContainsKey(id)) CreateReverbBus(id);
+            if (!_reverbBuses.ContainsKey(id) && CanAffordAnotherReverbBus(id)) CreateReverbBus(id);
         }
+    }
+
+    /// <summary>
+    /// How many region reverb buses may EXIST at once. Four of them are ever audible
+    /// (<see cref="MaxActiveReverbBuses"/>); this is the headroom above that.
+    ///
+    /// A bus is an FMOD channel group with a live SFXREVERB unit in its chain, and one was created
+    /// for every region any source had ever sent to — which on a city block was a couple of dozen
+    /// and on a city is a hundred and eighty-five, every one of them carrying a reverb unit through
+    /// the mix and taking a setVolume call on every audio update, to be silent. Nothing about that
+    /// is bounded by the map; it is bounded by how far a player has walked.
+    ///
+    /// Twenty-four is six times what can be heard, which is enough that the set never churns while
+    /// walking down a street with rooms either side.
+    /// </summary>
+    private const int MaxReverbBuses = 24;
+
+    /// <summary>
+    /// NOTHING IS TORN DOWN WHILE THE MIXER IS RUNNING. This is a cap, not a recycler.
+    ///
+    /// The first version of this released the furthest silent buses — the channel group, its
+    /// SFXREVERB unit, and its HRTF voice back to the shared pool — and that is the same mistake
+    /// ReleaseSteamAudioVoice warns about, made in a place nobody had made it yet: FMOD objects
+    /// destroyed on the game thread while the mix is in flight. It also drained the pool the spatial
+    /// voices share, which is heard as everything going MONO, because a voice that cannot get a
+    /// binaural effect plays without one.
+    ///
+    /// So a bus that exists is kept for the life of the map. What is bounded is how many get MADE:
+    /// past the cap the far ones are simply not built, they stay dry, and since only four are ever
+    /// audible at once that costs nothing anybody can hear. Walking back towards a room that was
+    /// refused builds it then, because by then it is near.
+    /// </summary>
+    private bool CanAffordAnotherReverbBus(int regionId)
+    {
+        if (_reverbBuses.Count < MaxReverbBuses) return true;
+        if (regionId == _listenerRegionId) return true;         // the room you are IN, always
+        if (_acousticMap != null && regionId == _acousticMap.GlobalEnvironmentId) return true;
+        return false;
     }
 
     /// <summary>Is the listener — or a sound — inside a CLOSED boundary?
@@ -1283,8 +1478,20 @@ public class FmodAudioProvider : IAudioProvider
         if (_acousticMap == null) return;
         if (!_acousticMap.Regions.TryGetValue(regionId, out var region)) return;
 
+        // THE RESULT IS CHECKED, and it was not.
+        //
+        // FMOD refusing to make another channel group or another DSP is a thing that happens — it has
+        // finite pools — and the next line used the handle anyway. That is not a failed reverb, it is
+        // a null dereference inside the native library, with no managed exception and no log line: the
+        // process simply stops. Which is exactly what "it crashes when I walk around" looks like on a
+        // map where walking is what makes more buses.
         string busName = (region.FriendlyName ?? "Unknown") + "_Reverb";
-        _system.createChannelGroup(busName, out var bus);
+        if (_system.createChannelGroup(busName, out var bus) != RESULT.OK || !bus.hasHandle())
+        {
+            Log.Warning("Reverb: FMOD would not make a bus for region {Id} ({Name}) — {Count} already exist. "
+                      + "That room will be dry.", regionId, region.FriendlyName, _reverbBuses.Count);
+            return;
+        }
         // Make the reverb bus positionable in 3D so UpdateReverbBuses can place a room's reverb AT its
         // doorway when the listener is outside (set3DLevel 1 + set3DAttributes(portal)). Without a 3D
         // mode those calls are no-ops and the reverb is heard omnidirectionally everywhere it is sent.
@@ -1293,7 +1500,13 @@ public class FmodAudioProvider : IAudioProvider
         // 3D level back to 0 so the reverb fills the space non-directionally.
         bus.setMode(MODE._3D | MODE._3D_LINEARROLLOFF);
         bus.set3DMinMaxDistance(2.0f, 10000.0f);
-        _system.createDSPByType(DSP_TYPE.SFXREVERB, out var reverbDsp);
+        if (_system.createDSPByType(DSP_TYPE.SFXREVERB, out var reverbDsp) != RESULT.OK || !reverbDsp.hasHandle())
+        {
+            Log.Warning("Reverb: FMOD would not make a reverb unit for region {Id} ({Name}) — {Count} already exist.",
+                        regionId, region.FriendlyName, _reverbDsps.Count);
+            bus.release();
+            return;
+        }
         
         // Sabine, from the region's own boundary — see OpenFPS.Common.RoomAcoustics, which owns the
         // question so that this and the tests and anything else that needs it cannot drift. It comes
@@ -1364,13 +1577,47 @@ public class FmodAudioProvider : IAudioProvider
         => _reverbDsps.TryGetValue(regionId, out dsp) && dsp.hasHandle();
 
     /// <summary>Removes a send connection outright instead of leaving it muted. A muted-but-attached
-    /// connection is re-created every time the region flips back, and FMOD caps inputs per DSP.</summary>
+    /// connection is re-created every time the region flips back, and FMOD caps inputs per DSP.
+    ///
+    /// ── THE UNIT ASKED TO DISCONNECT MUST BE THE UNIT THE CONNECTION FEEDS ─────────────────────
+    ///
+    /// This was the city crash: SIGSEGV at 0x7c on FMOD's mixer thread, or a hang, eighteen seconds
+    /// into a walk, deterministic on /tp. FMOD's <c>DSP::disconnectFrom(target, connection)</c> is
+    /// queued to the mixer as (this, target, connection) and the executor checks ONE thing — that
+    /// the connection's source is <c>target</c>. It then unlinks the connection's node from
+    /// whichever input list holds it, and decrements the input COUNT on <c>this</c>. Given the wrong
+    /// unit, the real owner's list is one shorter than its count from then on, silently; the wrong
+    /// unit's count is one too low. The next honest disconnect on the owner takes its count to 1
+    /// with an empty list, and the executor's final step — "if I have exactly one input, cache its
+    /// source" — reads the list head's null data pointer: <c>testb $0x4,0x7c(%rax)</c>. Three dumps,
+    /// three <c>FMOD Reverb</c> units in that state, each being asked to drop its last send.
+    ///
+    /// Not a race and not a stale handle: a valid call with the wrong <c>this</c>. FMOD's logging
+    /// build says nothing about it. <c>AudioLab --foreign-disconnect</c> does it once, on purpose,
+    /// and dies in a second; <c>--send-churn ownroom</c> reaches it through the provider.
+    ///
+    /// The callers now pass the unit the connection was created on. This guard asks the connection
+    /// itself which unit it feeds and counts any disagreement, so a future regression is a number in
+    /// the health line and not a core file.</summary>
     private static void DropSend(ref FMOD.DSPConnection conn, FMOD.DSP target, FMOD.DSP source)
     {
         if (!conn.hasHandle()) return;
-        if (target.hasHandle() && source.hasHandle()) target.disconnectFrom(source, conn);
+        if (target.hasHandle() && source.hasHandle())
+        {
+            if (conn.getOutput(out var owner) == RESULT.OK && owner.hasHandle() && owner.handle != target.handle)
+            {
+                System.Threading.Interlocked.Increment(ref _sendDropsOnWrongBus);
+                target = owner;
+            }
+            target.disconnectFrom(source, conn);
+        }
         conn = default;
     }
+
+    /// <summary>How many times a send was about to be disconnected through a unit that did not own
+    /// it. Must stay 0; anything else is the city crash waiting to happen (see DropSend).</summary>
+    private static int _sendDropsOnWrongBus;
+    public static int SendDropsOnWrongBus => _sendDropsOnWrongBus;
 
     /// <summary>Localizes a room's reverb to its doorway (HRTF) when the listener is outside, or makes it
     /// fill the room (binaural bypassed) when inside. Falls back to FMOD 3D positioning if Steam Audio is
@@ -1621,6 +1868,7 @@ public class FmodAudioProvider : IAudioProvider
         EngineVoiceState? engineState = null;
         EngineEchoState? echoState = null;
         EngineTapState? tapState = null;
+        PhysicalVoiceState? machineState = null;
 
         if (emitter.IsGranular)
         {
@@ -1696,6 +1944,58 @@ public class FmodAudioProvider : IAudioProvider
             }
             channel.setMode(MODE._3D | MODE._3D_LINEARROLLOFF);
             echoState = echo;
+        }
+        else if (emitter.IsSynth && !string.IsNullOrEmpty(emitter.PhysicalKey))
+        {
+            // A physical model that is not a vehicle: a machine standing still and running, or an
+            // aircraft going over. Everything an engine voice does about threading, priming and
+            // fading applies to both unchanged; what they do not have is a road speed, a gearbox or
+            // a second outlet. See PhysicalVoiceState.
+            //
+            // This is the ONE place that turns a name into a model, which is why the emitter carries
+            // the prefix rather than a stripped key and a flag.
+            if (!_isInitialized) return;
+            _system.getSoftwareFormat(out int mrate, out _, out _);
+            int colon = emitter.PhysicalKey.IndexOf(':');
+            string kind = colon > 0 ? emitter.PhysicalKey[..colon] : "";
+            string preset = colon > 0 ? emitter.PhysicalKey[(colon + 1)..] : emitter.PhysicalKey;
+            try
+            {
+                machineState = kind.ToLowerInvariant() switch
+                {
+                    "machine" => new MachineVoiceState(OpenFPS.Common.SmallMachineSpec.ByName(preset),
+                                                       mrate, emitter.EntityId, emitter.EntityId * 31 + 7),
+                    "aircraft" => new AircraftVoiceState(OpenFPS.Common.AircraftProfile.ByName(preset),
+                                                         mrate, emitter.EntityId * 17 + 3,
+                                                         lever: emitter.PowerLever),
+                    _ => null,
+                };
+            }
+            catch (Exception ex)
+            {
+                Log.Warning("Physical voice: '{Key}' for entity {Id} — {Message}",
+                            emitter.PhysicalKey, emitter.EntityId, ex.Message);
+                return;
+            }
+            if (machineState == null)
+            {
+                Log.Warning("Physical voice: '{Key}' names no model this client knows.", emitter.PhysicalKey);
+                return;
+            }
+            machineState.Running = emitter.EngineRunning;
+            if (ListenerInMachineFrame(emitter.Position, emitter.Direction, emitter.Velocity, out var mlocal))
+                machineState.SetListener(mlocal);
+            if (MachineProcessor.CreateDSP(_system, machineState, out engineDsp, out engineHandle) != RESULT.OK) return;
+            engineDsp.setChannelFormat(0, 0, SPEAKERMODE.MONO);
+            Log.Information("Physical voice started: entity {Id} runs '{Preset}' live at {Rate} Hz",
+                            emitter.EntityId, emitter.PhysicalKey, mrate);
+            if (_system.playDSP(engineDsp, targetGroup, true, out channel) != RESULT.OK)
+            {
+                engineDsp.release();
+                engineHandle.Free();
+                return;
+            }
+            channel.setMode(MODE._3D | MODE._3D_LINEARROLLOFF);
         }
         else if (emitter.IsSynth && !string.IsNullOrEmpty(emitter.EngineKey))
         {
@@ -1829,12 +2129,27 @@ public class FmodAudioProvider : IAudioProvider
                 channel.setMode((fallbackMode & ~MODE._3D_LINEARROLLOFF) | MODE._3D | MODE._3D_INVERSEROLLOFF);
                 channel.set3DLevel(1.0f);
             }
-            channel.set3DMinMaxDistance(emitter.MinDistance, emitter.Range);
-            if (emitter.ConeInside < 360f)
+            // ── NOT ON A CHANNEL WE JUST MADE 2D ────────────────────────────────────────────────
+            //
+            // The branch above switches an HRTF voice to 2D on purpose, and then this asked FMOD for
+            // a 3D minimum/maximum distance and a 3D cone on it anyway. FMOD refuses with
+            // ERR_NEEDS3D — "tried to call a command on a 2d sound when the command was meant for 3d
+            // sound" — and its logging build counted the result: **113,228 refused calls in a
+            // twenty-five second run, 91% of everything FMOD had to say**, about four and a half
+            // thousand a second, every one of them taking FMOD's lock on the GAME thread against a
+            // mixer that wants the same lock.
+            //
+            // None of it ever did anything: the HRTF path applies min/distance and the cone by hand
+            // in ApplyAcousticFilters, which is the whole reason the channel is 2D.
+            if (saState == null)
             {
-                channel.set3DConeSettings(emitter.ConeInside, emitter.ConeOutside, emitter.ConeOutsideVolume);
-                FMOD.VECTOR fdir = FmodHelpers.ToFmodVec(emitter.Direction);
-                channel.set3DConeOrientation(ref fdir);
+                channel.set3DMinMaxDistance(emitter.MinDistance, emitter.Range);
+                if (emitter.ConeInside < 360f)
+                {
+                    channel.set3DConeSettings(emitter.ConeInside, emitter.ConeOutside, emitter.ConeOutsideVolume);
+                    FMOD.VECTOR fdir = FmodHelpers.ToFmodVec(emitter.Direction);
+                    channel.set3DConeOrientation(ref fdir);
+                }
             }
         }
         else { channel.set3DLevel(0.0f); }
@@ -1892,6 +2207,7 @@ public class FmodAudioProvider : IAudioProvider
                 GranularDsp = granularDsp, GranularHandle = granularHandle, GranularState = granularState,
                 SynthDsp = synthDsp, SynthHandle = synthHandle, SynthState = synthState,
                 EngineDsp = engineDsp, EngineHandle = engineHandle, EngineState = engineState, EchoState = echoState,
+                MachineState = machineState,
                 TapState = tapState,
                 Position = emitter.Position, ApparentPosition = emitter.ApparentPosition,
                 LastAttributeAt = emitter.PositionSampledAt > 0 ? emitter.PositionSampledAt : OpenFPS.Common.AudioClock.Now,
@@ -1927,6 +2243,7 @@ public class FmodAudioProvider : IAudioProvider
                 {
                     activeSound.Channel.getDSP(CHANNELCONTROL_DSP_INDEX.FADER, out var channelDsp);
                     sourceReverb.addInput(channelDsp, out activeSound.SourceReverbConnection, DSPCONNECTION_TYPE.SEND);
+                    activeSound.SourceReverbBus = sourceReverb;
                     activeSound.SourceReverbConnection.setMix(AcousticConstants.ReverbSendMix);
                     activeSound.SourceReverbMix = 1f;   // a new voice has no running signal to step
                     activeSound.CurrentSourceRegionId = sourceRegionId;
@@ -1936,6 +2253,7 @@ public class FmodAudioProvider : IAudioProvider
                 {
                     activeSound.Channel.getDSP(CHANNELCONTROL_DSP_INDEX.FADER, out var channelDsp);
                     listenerReverb.addInput(channelDsp, out activeSound.ReverbConnection, DSPCONNECTION_TYPE.SEND);
+                    activeSound.ReverbBus = listenerReverb;
                     activeSound.ReverbConnection.setMix(AcousticConstants.ReverbSendMix * AcousticConstants.ReverbCrossSendScale);
                     activeSound.ReverbMix = 1f;
                     activeSound.CurrentRegionId = _listenerRegionId;
@@ -1998,6 +2316,20 @@ public class FmodAudioProvider : IAudioProvider
                     active.GranularState.PositionJitter = emitter.GranularPositionJitter;
                     active.GranularState.PitchJitter = emitter.GranularPitchJitter;
                 }
+                else if (emitter.IsSynth && active.MachineState != null)
+                {
+                    active.MachineState.Running = emitter.EngineRunning;
+                    // The power lever, for anything that has one. It comes from the flight path
+                    // rather than from a script: see ClientAudioSystem, where it is read off the
+                    // climb angle.
+                    if (active.MachineState is AircraftVoiceState airv)
+                    {
+                        airv.TargetLever = emitter.PowerLever;
+                        airv.TargetDescending = emitter.RotorWake;
+                    }
+                    if (ListenerInMachineFrame(emitter.Position, emitter.Direction, emitter.Velocity, out var mlocal))
+                        active.MachineState.SetListener(mlocal);
+                }
                 else if (emitter.IsSynth && active.EngineState != null)
                 {
                     active.EngineState.TargetSpeed = emitter.EngineSpeed;
@@ -2027,12 +2359,18 @@ public class FmodAudioProvider : IAudioProvider
                     active.Channel.setPitch(active.Pitch);
                 }
                 active.MinDistance = emitter.MinDistance;
-                active.Channel.set3DMinMaxDistance(active.MinDistance, emitter.Range);
-                if (emitter.ConeInside < 360f)
+                // Same again, and this one ran EVERY FRAME for EVERY voice — which is where the
+                // 113,228 came from. A voice with a binaural stage is 2D by design; see the note at
+                // the creation site.
+                if (active.SaState == null)
                 {
-                    active.Channel.set3DConeSettings(emitter.ConeInside, emitter.ConeOutside, emitter.ConeOutsideVolume);
-                    FMOD.VECTOR fdir = FmodHelpers.ToFmodVec(emitter.Direction);
-                    active.Channel.set3DConeOrientation(ref fdir);
+                    active.Channel.set3DMinMaxDistance(active.MinDistance, emitter.Range);
+                    if (emitter.ConeInside < 360f)
+                    {
+                        active.Channel.set3DConeSettings(emitter.ConeInside, emitter.ConeOutside, emitter.ConeOutsideVolume);
+                        FMOD.VECTOR fdir = FmodHelpers.ToFmodVec(emitter.Direction);
+                        active.Channel.set3DConeOrientation(ref fdir);
+                    }
                 }
                 active.TargetOcclusion = emitter.Occlusion; active.TargetAperture = emitter.ApertureFactor;
                 active.TargetBleed = emitter.TransmissionBleed; active.ConeInside = emitter.ConeInside;
@@ -2258,11 +2596,15 @@ public class FmodAudioProvider : IAudioProvider
         Log.Information("Mixer load: dsp {Dsp:F1}%, update {Update:F1}%, stream {Stream:F1}% — "
                       + "{Engines} engine/echo voice(s) of {Total} active, {Real}/{Playing} real channel(s), "
                       + "{NoHrtf} without HRTF ({Misses} new since last), {Starve} starve(s), "
-                      + "gc {Gen2} gen2 / {Pause:F0} ms paused",
+                      + "gc {Gen2} gen2 / {Pause:F0} ms paused, {Late} DSP(s) cut loose after their channel went, {Detach} stuck, "
+                      + "{WrongBus} send drop(s) on the wrong bus",
                         cpu.dsp, cpu.update, cpu.stream, voices, _activeSounds.Count, real, playing,
                         noHrtf, _saPoolMisses - _lastSaPoolMisses,
-                        starves - _lastStarves, gen2 - _lastGen2, pauseMs - _lastPauseMs);
-        _lastSaPoolMisses = _saPoolMisses;
+                        starves - _lastStarves, gen2 - _lastGen2, pauseMs - _lastPauseMs,
+                        _lateDetaches - _lastLateDetaches, _failedDetaches - _lastFailedDetaches,
+                        _sendDropsOnWrongBus);
+        _lastSaPoolMisses = _saPoolMisses; _lastFailedDetaches = _failedDetaches;
+        _lastLateDetaches = _lateDetaches;
         _lastStarves = starves; _lastGen2 = gen2; _lastPauseMs = pauseMs;
 
         // What the room is doing to everything, which is the one thing the load line never said.
@@ -2275,6 +2617,12 @@ public class FmodAudioProvider : IAudioProvider
         // and therefore the same proportion at one metre as at a hundred.
         //
         // Both numbers, every report, so the next person to hear it can tell which.
+        // Anything a DSP callback recorded since the last report. It cannot log from in there — see
+        // DspFault — so this is where a faulting unit gets to say so, on a thread that may block.
+        if (DspFault.TryDrain(out int dspFaults, out string? dspFirst))
+            Log.Error("A DSP callback faulted {Count} time(s) since the last report; the block(s) were "
+                    + "silenced rather than taking the process down. First: {First}", dspFaults, dspFirst);
+
         float listenerDecay = 0f, listenerWet = -80f;
         TryGetReverbSettings(_listenerRegionId, out listenerDecay, out listenerWet);
         // The SEND a voice actually got, not the constant. This line used to print
@@ -2398,21 +2746,93 @@ public class FmodAudioProvider : IAudioProvider
         }
     }
 
+    /// <summary>
+    /// Takes one voice apart. THE CHANNEL IS STOPPED FIRST, and it was not.
+    ///
+    /// Every crash on the city map was a SIGSEGV at the SAME faulting address — `0x7c`, a null
+    /// dereference at field offset 124 — inside libfmod, on an FMOD mixer thread, with none of our
+    /// managed code on the stack. Seven dumps, identical. That is FMOD walking its own graph and
+    /// finding a hole in it.
+    ///
+    /// The hole was made here. One of the three callers is the voice REAPER, which does:
+    ///
+    ///     active.Channel.isPlaying(out bool isPlaying);
+    ///     if (!isPlaying) { ReleaseActiveSoundResources(active); ... }
+    ///
+    /// — and never stops the channel. For an ordinary sample voice that is harmless: "not playing"
+    /// means FMOD has finished with it. For a voice created with `playDSP` — every engine, every
+    /// machine, every echo, every tap — the DSP is still WIRED INTO the channel group, and
+    /// `isPlaying` can read false while the mixer is still holding it. Releasing it there leaves a
+    /// dangling DSP in the graph, and the next block walks into it.
+    ///
+    /// It is probabilistic in WHEN and exact in WHERE, and its rate is the number of DSP voices
+    /// being reaped — which is what the bisection actually measured. Turning off machines, or
+    /// reflections, or the binaural stage, or the simulator each removed SOME of those voices and
+    /// none of them all, so every single-lever run still crashed in under twenty seconds; turning
+    /// off all four at once left so few that a run lasted 131 seconds and exited cleanly.
+    ///
+    /// So: stop the channel, disconnect the DSP from the graph, and only then release it. That is
+    /// the order FMOD documents and the order the other two callers already had by accident.
+    /// </summary>
     private void ReleaseActiveSoundResources(ActiveSound active)
     {
+        // ORDER MATTERS, and it is DETACH-THEN-STOP, not the other way round.
+        //
+        // A stopped Channel is recycled immediately and its handle goes stale, so removeDSP on it
+        // returns ERR_INVALID_HANDLE and the DSP stays attached to a channel that no longer exists.
+        // Every POOLED DSP has to come off while the channel is still alive. removeDSP is also the
+        // call that blocks until an in-flight callback returns, which is the safety we actually want
+        // here — so it has to be the first thing that happens, not something done to a corpse.
         ReleaseSteamAudioVoice(active);
-        ReleaseThreeEqDsp(active.ThreeEqDsp);
-        ReleaseDiffractionDsp(active.DiffractionDsp);
+        ReleaseThreeEqDsp(active.Channel, active.ThreeEqDsp);
+        ReleaseDiffractionDsp(active.Channel, active.DiffractionDsp);
+        // The OWNED units come off the same way, and for the same reason. FMOD's logging build says
+        // this in one line where three sessions of core files did not:
+        //
+        //     DSPI::release WARNING. Failed to release because unit is still attached.
+        //                            Use removeDSP function first.
+        //
+        // and then, at shutdown, `closeInternal assertion: connectionsRemaining == 0 failed`. A
+        // refused release is not a no-op — the unit stays in the graph, and the ATTACHMENT to a
+        // ChannelControl is a different thing from the CONNECTIONS to other DSPs, so disconnectAll
+        // does not satisfy it. Only removeDSP, or stopping the channel, does.
+        Detach(active.Channel, active.GranularDsp, "granular");
+        Detach(active.Channel, active.SynthDsp, "synth");
+        Detach(active.Channel, active.EngineDsp, "engine/machine");
+        // Only once nothing at all is left on it does the channel stop...
+        if (active.Channel.hasHandle()) active.Channel.stop();
         ReleaseGranularDsp(active.GranularDsp, active.GranularHandle, active.GranularState);
         ReleaseSynthDsp(active.SynthDsp, active.SynthHandle, active.SynthState);
         if (active.EngineDsp.hasHandle())
         {
             // Not pooled: an engine is a whole vehicle's worth of state, and the next one is a
             // different car.
+            //
+            // THE GCHANDLE IS NOT FREED HERE, and that is the whole of a crash that took three
+            // sessions to catch. Every DSP read callback in this file begins by resolving the
+            // userdata pointer back to its state object — `GCHandle.FromIntPtr(userData).Target` —
+            // and that call on a handle which has just been freed does not throw, it dereferences a
+            // slot that no longer belongs to it. On FMOD's mixer thread that is a fatal error in the
+            // runtime, which is exactly what the crash dump showed: libfmod calling into libcoreclr,
+            // and libcoreclr going straight to abort. No managed exception, no log line, signal 11.
+            //
+            // ReleaseSteamAudioVoice a few hundred lines up already says this in so many words —
+            // "we never free the Phonon effect/buffers or the GCHandle here, that is exactly what
+            // raced the mixer callback and corrupted the heap" — and the engine path never learned
+            // it, because on a racetrack the voices are made once and kept. A city makes and drops
+            // them continuously as you walk, and the race is then a matter of time.
+            //
+            // The userdata is cleared first so a callback that arrives anyway finds zero and leaves,
+            // and the handle is parked until Dispose. It is sixteen bytes per retired voice.
+            active.EngineDsp.setUserData(IntPtr.Zero);
+            // OUT OF THE GRAPH BEFORE IT IS FREED. release() on a DSP that is still connected is
+            // what left FMOD dereferencing null at 0x7c inside its mix.
+            active.EngineDsp.disconnectAll(true, true);
             active.EngineDsp.release();
-            if (active.EngineHandle.IsAllocated) active.EngineHandle.Free();
+            if (active.EngineHandle.IsAllocated) _retiredHandles.Add(active.EngineHandle);
             active.EngineDsp = default;
             active.EngineState = null;
+            active.MachineState = null;
             active.EchoState = null;
             // A machine whose second outlet has gone is a machine heard through one voice again, and
             // the front tap slews back into it. Without this the intake would simply disappear — the
@@ -2420,6 +2840,8 @@ public class FmodAudioProvider : IAudioProvider
             if (active.TapState != null) active.TapState.Source.SplitVoices = false;
             active.TapState = null;
         }
+        // ...and only now is nothing left pointing at it.
+        active.Channel.clearHandle();
     }
 
     /// <summary>How much of a send's crossfade happens per audio update. At the update rate this is a
@@ -2455,18 +2877,24 @@ public class FmodAudioProvider : IAudioProvider
             // Whatever was already fading out has had its turn; a second change before the first
             // finished drops it outright rather than leaving connections to accumulate.
             DropSend(ref active.FadingSourceConnection, active.FadingSourceBus, sourceFader);
-            if (active.SourceReverbConnection.hasHandle() && TryGetReverbInput(active.CurrentSourceRegionId, out var oldReverb))
+            // The bus it fades out of is the unit the send was made into — the handle stored with
+            // the connection — NOT a fresh lookup by region id. The id recorded in CurrentRegionId
+            // is a change detector and can legitimately differ from the bus (see crossRegionId);
+            // when it did, the lookup handed DropSend another room's unit, and FMOD does not check.
+            if (active.SourceReverbConnection.hasHandle() && active.SourceReverbBus.hasHandle())
             {
                 active.FadingSourceConnection = active.SourceReverbConnection;
-                active.FadingSourceBus = oldReverb;
+                active.FadingSourceBus = active.SourceReverbBus;
                 active.FadingSourceMix = active.SourceReverbMix;
             }
             active.SourceReverbConnection = default;
+            active.SourceReverbBus = default;
             active.SourceReverbMix = 0f;
 
             if (sourceRegionId != -2 && !active.IsReflection && TryGetReverbInput(sourceRegionId, out var sourceReverb))
             {
                 sourceReverb.addInput(sourceFader, out active.SourceReverbConnection, DSPCONNECTION_TYPE.SEND);
+                active.SourceReverbBus = sourceReverb;
                 active.SourceReverbConnection.setMix(0f);   // in at nothing, then ramped
             }
             active.CurrentSourceRegionId = sourceRegionId;
@@ -2476,18 +2904,25 @@ public class FmodAudioProvider : IAudioProvider
         if (listenerChanged)
         {
             DropSend(ref active.FadingReverbConnection, active.FadingReverbBus, sourceFader);
-            if (active.ReverbConnection.hasHandle() && TryGetReverbInput(active.CurrentRegionId, out var oldListenerReverb))
+            // THIS is where the city crashed. CurrentRegionId holds crossRegionId, which is the
+            // GLOBAL id whenever the source is in the listener's own room, while the send itself
+            // was made into listenerRegionId's unit. A city names its outdoors, so the global id
+            // resolved to the outdoor bus, and the room's send was handed to the outdoor unit to
+            // disconnect. The stored handle is the unit that owns the connection, by construction.
+            if (active.ReverbConnection.hasHandle() && active.ReverbBus.hasHandle())
             {
                 active.FadingReverbConnection = active.ReverbConnection;
-                active.FadingReverbBus = oldListenerReverb;
+                active.FadingReverbBus = active.ReverbBus;
                 active.FadingReverbMix = active.ReverbMix;
             }
             active.ReverbConnection = default;
+            active.ReverbBus = default;
             active.ReverbMix = 0f;
 
             if (listenerRegionId != -2 && !active.IsReflection && TryGetReverbInput(listenerRegionId, out var listenerReverb))
             {
                 listenerReverb.addInput(sourceFader, out active.ReverbConnection, DSPCONNECTION_TYPE.SEND);
+                active.ReverbBus = listenerReverb;
                 active.ReverbConnection.setMix(0f);
             }
             active.CurrentRegionId = crossRegionId;
@@ -3291,7 +3726,16 @@ public class FmodAudioProvider : IAudioProvider
 
     public void ReviveEngine(int entityId)
     {
-        lock (_lock) { FindActive(entityId)?.EngineState?.Revive(); }
+        lock (_lock)
+        {
+            var active = FindActive(entityId);
+            // A standing machine fades and revives by exactly the same rules, and for exactly the
+            // same reason: there is no zero-crossing to stop a running synthesiser at. Answering
+            // both here rather than adding a parallel pair of calls keeps "this voice is wanted
+            // again" one question with one answer.
+            active?.EngineState?.Revive();
+            active?.MachineState?.Revive();
+        }
     }
 
     /// <summary>How long the budget's fade takes, seconds. See ActiveSound.FadeGain.</summary>
@@ -3333,6 +3777,12 @@ public class FmodAudioProvider : IAudioProvider
                 // milliseconds this one loses it.
                 tap.Source.SplitVoices = false;
                 return tap.FadedOut;
+            }
+            var mach = active?.MachineState;
+            if (mach != null)
+            {
+                mach.TargetEnvelope = 0f;
+                return mach.FadedOut;
             }
             var st = active?.EngineState;
             if (st == null) return true;
@@ -3579,9 +4029,18 @@ public class FmodAudioProvider : IAudioProvider
             _activeSounds.Clear();
             _activeById.Clear();
             ReturnReverbVoices();
-            foreach (var dsp in _reverbDsps.Values) dsp.release();
-            foreach (var bus in _reverbBuses.Values) bus.release();
+            ReleaseReverbUnits();
             foreach (var id in new List<string>(_ambientBeds.Keys)) StopAmbientBed(id);
+            // The three units on the MASTER GROUP come off it before they are freed, for the same
+            // reason the reverb units do: FMOD refuses to release an attached unit, so releasing
+            // them where they stood freed none of them and left the assertion at close.
+            _system.getMasterChannelGroup(out var masterOut);
+            if (masterOut.hasHandle())
+            {
+                if (_boundaryDsp.hasHandle()) masterOut.removeDSP(_boundaryDsp);
+                if (_loudnessMeter.hasHandle()) masterOut.removeDSP(_loudnessMeter);
+                if (_masterLimiter.hasHandle()) masterOut.removeDSP(_masterLimiter);
+            }
             if (_boundaryDsp.hasHandle()) _boundaryDsp.release();
             if (_boundaryHandle.IsAllocated) _boundaryHandle.Free();
             _enginePool?.Dispose(); _enginePool = null;
@@ -3610,6 +4069,11 @@ public class FmodAudioProvider : IAudioProvider
             Phonon.iplContextRelease(ref _saContext);
             _steamAudioEnabled = false;
         }
+
+        // And the handles of every voice retired during the session. Here and nowhere else: by now
+        // the system is closed and no mixer callback can be in flight to resolve one.
+        foreach (var h in _retiredHandles) if (h.IsAllocated) h.Free();
+        _retiredHandles.Clear();
         _resources?.Dispose();
         _granularBank?.Dispose();
         if (_isInitialized) {

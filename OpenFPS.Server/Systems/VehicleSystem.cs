@@ -65,6 +65,9 @@ public sealed class VehicleSystem
         /// the banking in it, so the fraction of it being used is the fraction of the grip being
         /// used, and no listener can arrive at that from a velocity alone.</summary>
         public float TyreDemand;
+        /// <summary>How hard this vehicle CHOOSES to corner, which set its racing line. The tyres are
+        /// measured against <see cref="Grip"/>, which may be more.</summary>
+        public float CorneringG = 1f;
 
         /// <summary>Flat-ground grip in g, from the map. Only the LONGITUDINAL half of the demand
         /// needs it; the lateral half comes out of the racing line, which already knows the bank.</summary>
@@ -85,13 +88,37 @@ public sealed class VehicleSystem
             if (data.Vehicles == null) continue;
             foreach (var vd in data.Vehicles)
             {
-                if (!MachineRegistry.Knows(vd.Preset))
+                // ── A vehicle, or an aircraft ────────────────────────────────────────────────────
+                //
+                // The mover does not care which. A shuttle is a straight line between two points in
+                // THREE dimensions and always was — RoadStart and RoadEnd carry a Y — so an airliner
+                // crossing the map at six hundred metres and a truck going through the tunnel are
+                // the same object to this system, and an approach is a shuttle that ends lower than
+                // it starts. What differs is only how loud the thing is, how big it is, and which
+                // library the client should look the preset up in.
+                //
+                // That last one is the whole of the coupling: the client reads the SoundId's prefix
+                // and runs the right model. Deciding it HERE, from which library actually has the
+                // preset, means a map names "airliner" and gets an airliner without anything else
+                // on either side having to be told about aircraft.
+                bool isAircraft = AircraftProfile.Presets.ContainsKey(vd.Preset);
+                if (!isAircraft && !MachineRegistry.Knows(vd.Preset))
                 {
                     Log.Warning("Map {Map}: vehicle preset '{Preset}' is not known; known: {Known}",
                                 mapId, vd.Preset, string.Join(", ", MachineRegistry.Ids));
                     continue;
                 }
-                var profile = MachineRegistry.VehicleFor(vd.Preset);
+                var air = isAircraft ? AircraftProfile.ByName(vd.Preset) : null;
+                var profile = isAircraft ? null : MachineRegistry.VehicleFor(vd.Preset);
+                string displayKind = isAircraft ? air!.Name : profile!.Engine.Name;
+                float sourceLevelDb = isAircraft ? air!.SourceLevelDb : profile!.SourceLevelDb;
+                string prefix = isAircraft ? "aircraft:" : "engine:";
+                // An airliner is sixty metres of aeroplane; a car is four and a half of car. The
+                // collider is what carries it into a client's earshot through the spatial grid, so
+                // an aeroplane sized like a hatchback is one that appears late.
+                var hull = isAircraft
+                    ? new Vector3(MathF.Max(8f, air!.CruiseSpeedMps * 0.12f), 6f, MathF.Max(12f, air.CruiseSpeedMps * 0.2f))
+                    : new Vector3(1.9f, 1.4f, 4.6f);
 
                 // A vehicle that names a track laps it; one that does not shuttles its road.
                 RaceLine? line = null;
@@ -103,7 +130,7 @@ public sealed class VehicleSystem
                     if (track == null || track.Waypoints.Count < 3)
                     {
                         Log.Warning("Map {Map}: vehicle '{Name}' asks for track '{Track}', which is missing or has fewer than three waypoints; it will not be spawned.",
-                                    mapId, vd.Name ?? profile.Name, vd.Track);
+                                    mapId, vd.Name ?? displayKind, vd.Track);
                         continue;
                     }
                     float topSpeed = (vd.TopSpeedKmh > 0 ? vd.TopSpeedKmh : 200f) / 3.6f;
@@ -126,27 +153,28 @@ public sealed class VehicleSystem
                     EntityType.NPC,
                     new Transform { Position = start, Rotation = Quaternion.CreateFromYawPitchRoll(heading, 0f, 0f) },
                     new Velocity { Linear = Vector3.Zero },
-                    new ColliderComponent { Shape = ColliderShape.Box, Size = new Vector3(1.9f, 1.4f, 4.6f), IsSolid = false },
-                    new NameComponent { Name = vd.Name ?? profile.Name },
-                    new IdentityComponent { Name = vd.Name ?? profile.Name, Description = $"{profile.Engine.Name}, driving the road" },
-                    new VehicleComponent { VehicleType = vd.Preset, MaxSeats = 2 },
+                    new ColliderComponent { Shape = ColliderShape.Box, Size = hull, IsSolid = false },
+                    new NameComponent { Name = vd.Name ?? displayKind },
+                    new IdentityComponent { Name = vd.Name ?? displayKind,
+                                            Description = isAircraft ? $"{displayKind}, in the air" : $"{displayKind}, driving the road" },
+                    new VehicleComponent { VehicleType = vd.Preset, MaxSeats = isAircraft ? 0 : 2 },
                     new SoundEmitterComponent
                     {
                         // The client recognises the prefix and runs the engine itself.
                         IsSynth = true,
-                        SoundId = "engine:" + vd.Preset,
+                        SoundId = prefix + vd.Preset,
                         Mode = PlaybackMode.LoopOne,
                         Volume = 1f,
                         // How far this car actually carries, from how loud it is — the same
                         // calculation the client uses to place it. A flat 220 m was the number the
                         // server then sized its broadcast radius from, so on a one-mile oval the
                         // cars stopped existing for the client round the back of the track.
-                        Range = Loudness.AudibleRange(profile.SourceLevelDb),
+                        Range = Loudness.AudibleRange(sourceLevelDb),
                         MinDistance = 3f,
                     }));
                 if (e == Entity.Null) continue;
                 var speeds = vd.SpeedsKmh is { Length: > 0 } ? vd.SpeedsKmh : new[] { 30f, 60f, 90f };
-                string display = vd.Name ?? profile.Name;
+                string display = vd.Name ?? displayKind;
                 var v = new DemoVehicle
                 {
                     Entity = e, MapId = mapId, A = vd.RoadStart, B = vd.RoadEnd,
@@ -160,7 +188,9 @@ public sealed class VehicleSystem
                     Line = line,
                     Lap = vd.StartOffsetMetres,
                     DisplayName = display,
-                    Grip = vd.CorneringG > 0 ? vd.CorneringG : 1.0f,
+                    // The friction circle, which is NOT the cornering number unless the map says so.
+                    Grip = vd.GripG > 0 ? vd.GripG : (vd.CorneringG > 0 ? vd.CorneringG : 1.0f),
+                    CorneringG = vd.CorneringG > 0 ? vd.CorneringG : 1.0f,
                 };
                 // A racer is already at speed when the world starts; it is a lap in progress, not a
                 // standing start, and a standing start would put eight engines on the limiter at
@@ -303,9 +333,22 @@ public sealed class VehicleSystem
         // straight and whatever the braking pass allows into a turn, so measuring against it reported
         // a car flat out down the back straight as being at the limit of its grip — which is how
         // "they're all screeching" survived the first attempt at this.
+        // AGAINST THE GRIP, not against the line's own limit.
+        //
+        // The line's limit is sqrt(CorneringG * 9.81 * R), so (v / cornerLimit)^2 is the fraction of
+        // the CORNERING number being used — and a vehicle tracking its line is at 1.0 of that by
+        // construction, in every corner, for ever. That is right for a racing line and wrong for a
+        // bus, and it is why every vehicle on a city map screeched through every junction.
+        //
+        // What the tyre is actually being asked for is the fraction of its GRIP. The radius drops
+        // out: R = cornerLimit^2 / (CorneringG * g), so the grip-limited speed at the same corner is
+        // cornerLimit * sqrt(Grip / CorneringG), and the fraction of grip used is therefore
+        // (v / cornerLimit)^2 * (CorneringG / Grip). With GripG unset the two are equal, the ratio is
+        // one, and the speedway is unchanged to the bit.
+        float cornerShare = v.Grip > 0.01f ? Math.Clamp(v.CorneringG / v.Grip, 0f, 1f) : 1f;
         float latFraction = float.IsInfinity(cornerLimit) || cornerLimit < 0.5f
             ? 0f
-            : (v.Speed / cornerLimit) * (v.Speed / cornerLimit);
+            : (v.Speed / cornerLimit) * (v.Speed / cornerLimit) * cornerShare;
         float longFraction = v.Grip > 0.01f ? MathF.Abs(v.Speed - wasSpeed) / MathF.Max(1e-4f, dt) / (v.Grip * 9.81f) : 0f;
         v.TyreDemand = MathF.Min(2f, MathF.Sqrt(latFraction * latFraction + longFraction * longFraction));
 

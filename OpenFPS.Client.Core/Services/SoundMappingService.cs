@@ -46,13 +46,30 @@ public class SoundMappingService
     {
         // A road is a pavement is a path, to a shoe. What differs between them is what they do to
         // sound arriving from elsewhere, not what a heel does on them.
-        ["Asphalt"] = "Pavement",
-        // Brick paving underfoot is a hard fired surface with joints in it, which is what Stone is.
-        ["Brick"] = "Stone",
+        ["Asphalt"] = "Cement",
+        // Brick paving underfoot is a hard fired surface with joints in it, which is what cement is.
+        ["Brick"] = "Cement",
         // Walking into a hedge is walking into leaves.
         ["Foliage"] = "Leaves",
         // A crowd is a floor with people standing on it; you are walking on whatever they are.
         ["Audience"] = "Concrete",
+        // A lawn is soft ground with a little swish on top, and of the twelve surfaces recorded the
+        // one a mown lawn is nearest is dirt. Measured: dirt carries a low shelf at 60-250 Hz under a
+        // broad mid, which is a footfall on something that gives.
+        ["Grass"] = "Dirt",
+        // Polished stone is a hard tile with less grout in it.
+        ["Marble"] = "Tile",
+        // Rain on a hard floor: no wet recording exists, so it is the dry one rather than silence.
+        // This one is reached from the weather substitution below, not from a map material.
+        ["Wet_Concrete"] = "Concrete",
+        // ── The end of the chain ─────────────────────────────────────────────────────────────────
+        //
+        // Generic is what every material with no bank and no stand-in above falls to — glass,
+        // plaster, plastic, the shoe materials — and until it was listed here it fell to a folder
+        // that no longer exists, which is a SILENT footstep. The bank has twelve recordings for
+        // twenty-two materials and that is the normal state of affairs; what is not acceptable is a
+        // surface a player can walk on and hear nothing from.
+        ["Generic"] = "Concrete",
     };
 
     private static string NearestRecorded(string material)
@@ -97,8 +114,14 @@ public class SoundMappingService
             else if (_state.PrecipitationIntensity > 0.3f && _state.Temperature >= 2.0f)
             {
                 if (string.Equals(materialName, "Concrete", StringComparison.OrdinalIgnoreCase)) materialName = "Wet_Concrete";
-                else if (string.Equals(materialName, "Grass", StringComparison.OrdinalIgnoreCase)) materialName = "Mud";
+                else if (string.Equals(materialName, "Dirt", StringComparison.OrdinalIgnoreCase)) materialName = "Mud";
             }
+            // The weather names a surface too, and it can name one with no recording of its own just
+            // as a map can — Wet_Concrete is the case. Same table, so there is one answer to "what
+            // does this play" rather than two that can drift apart. Grass has already become Dirt by
+            // the line above, which is why the rain test is on Dirt: testing Grass here compared a
+            // name that no longer reaches this point.
+            materialName = NearestRecorded(materialName);
         }
 
         string relativePath = "";
@@ -115,16 +138,17 @@ public class SoundMappingService
             relativePath = _bank.GetRandomSoundPath(key);
         }
 
-        if (string.IsNullOrEmpty(relativePath) && materialName != "Generic")
+        // 3. The last resort, through the same table — so "the end of the chain" is one folder that
+        //    is known to have files in it, rather than the literal name "Generic", which has none.
+        string generic = NearestRecorded("Generic");
+        if (string.IsNullOrEmpty(relativePath) && !string.Equals(materialName, generic, StringComparison.OrdinalIgnoreCase))
         {
-            // 3. Fallback to Generic Variant
-            key = $"{action}/Generic/Generic0";
+            key = $"{action}/{generic}/{generic}0";
             relativePath = _bank.GetRandomSoundPath(key);
-            
+
             if (string.IsNullOrEmpty(relativePath))
             {
-                // 4. Fallback to Generic folder
-                key = $"{action}/Generic";
+                key = $"{action}/{generic}";
                 relativePath = _bank.GetRandomSoundPath(key);
             }
         }

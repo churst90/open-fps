@@ -112,6 +112,36 @@ public struct SpatialEmitter
     /// <summary>A vehicle engine preset (see VehicleProfile.Presets) run live in the mixer. Set when
     /// the entity's SoundId is "engine:&lt;preset&gt;".</summary>
     public string EngineKey;
+    /// <summary>
+    /// A physical model other than a vehicle engine, run live in the mixer, as the WHOLE prefixed id
+    /// the entity carries: "machine:ac_window", "aircraft:airliner".
+    ///
+    /// The prefix is kept rather than stripped because it is the only thing that says which library
+    /// to look the name up in, and there is more than one — a governed single-cylinder machine and a
+    /// turbofan are different models with different inputs. One field with the prefix left on means
+    /// one place decides what a name means (FmodAudioProvider), rather than every reader carrying a
+    /// flag for which kind it was handed.
+    ///
+    /// Separate from <see cref="EngineKey"/>, which buys a whole VEHICLE — driveline, gearbox,
+    /// tyres, a driver following a road speed — and is the one model with two outlets, echoes and
+    /// borrowed voices hanging off it.
+    /// </summary>
+    public string PhysicalKey = "";
+    /// <summary>
+    /// The power lever of anything that has one, 0..1 — an aircraft.
+    ///
+    /// Read off the CLIMB ANGLE rather than scripted (ClientAudioSystem.PowerLeverFor): an aeroplane
+    /// going up is at or near full power, one holding height is at cruise, one coming down is at
+    /// idle with the drag doing the work. That is why the same aeroplane overhead and on approach
+    /// are completely different sounds with nothing about the aeroplane changed, and doing it this
+    /// way means the sound falls out of the flight path instead of being painted onto it.
+    /// </summary>
+    public float PowerLever;
+
+    /// <summary>How hard a rotor is meeting its own wake, 0..1 — a helicopter descending or in fast
+    /// forward flight slaps, one in a hover does not. Ignored by anything without a rotor.</summary>
+    public float RotorWake;
+
     /// <summary>Road speed the engine follows, m/s.</summary>
     public float EngineSpeed;
     public bool EngineRunning;

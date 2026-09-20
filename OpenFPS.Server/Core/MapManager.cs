@@ -94,8 +94,22 @@ public class MapManager
 
     /// <summary>The floor, for a map whose loudest thing is quiet or which has no emitters at all.</summary>
     public const float DefaultEarshotRange = 200f;
-    /// <summary>And a ceiling, so a very large map does not turn interest management off entirely.</summary>
-    public const float MaxEarshotRange = 1200f;
+    /// <summary>
+    /// And a ceiling, so a very large map does not turn interest management off entirely.
+    ///
+    /// IT MUST NOT BE BELOW WHAT THE MAP'S LOUDEST SOURCE CARRIES, and at 1,200 m it was. An
+    /// airliner is 142 dB at a metre and Loudness.AudibleRange gives it 3,000 m; clamped to 1,200 the
+    /// server simply stopped sending it, so the aeroplane did not exist for the client outside that
+    /// sphere. At 228 m/s that is ten seconds of existence per cycle — it appeared from nothing,
+    /// crossed, and vanished — and the rest of the time the sky was empty. Reported as "I'm not
+    /// hearing the planes".
+    ///
+    /// Three thousand is not a bigger guess: it is the same cap AudibleRange itself applies, so the
+    /// two now agree. A source is broadcast exactly as far as it can be heard and no further, which
+    /// is what interest management is for. The other two limits still do the work on a huge map —
+    /// the radius is min(loudest source's range, map diagonal).
+    /// </summary>
+    public const float MaxEarshotRange = 3000f;
 
     /// <summary>
     /// Recomputes every map's broadcast radius from what is actually in it now.

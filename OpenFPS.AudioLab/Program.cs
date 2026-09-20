@@ -7,6 +7,15 @@ using OpenFPS.Client.Core.AudioEngine.SteamAudio;
 using OpenFPS.Client.Core.Platform;
 using Serilog;
 
+// FMOD'S OWN LOGGING, FIRST THING. It does nothing whatsoever once System::create has run, so it
+// cannot live down among the mode handlers — the first attempt put it beside --reap-churn and every
+// mode above it silently got FMOD's default TTY logging instead.
+{
+    string? armed = OpenFPS.Client.Core.AudioEngine.Fmod.FmodDebugLog.ArmFromEnvironment();
+    if (armed != null) Console.Error.WriteLine(armed);
+}
+
+
 // Cross-platform audio test runner. Compiles the platform-neutral OpenFPS audio engine
 // (FMOD + acoustics) into a plain net10.0 console app so it runs on Linux as well as Windows.
 //
@@ -605,6 +614,97 @@ if (args.Contains("--reverb-route"))
 if (args.Contains("--provider-orbit") || args.Contains("--provider-orbit-smoke"))
 {
     int code = ProviderOrbit.Run(args.Contains("--provider-orbit"), seconds: 3.0);
+    Log.CloseAndFlush();
+    Environment.Exit(code);
+}
+
+if (args.Contains("--scene-churn"))
+{
+    // --scene-churn [sec=]: engines, machines, aircraft and region reverb buses all at once, made
+    // and released while the listener walks — the headless shape of a city. See RunSceneChurn.
+    double secs = args.FirstOrDefault(a => a.StartsWith("sec=")) is { } sa && double.TryParse(sa[4..], out double sv) ? sv : 30.0;
+    int code = ProviderOrbit.RunSceneChurn(secs);
+    Log.CloseAndFlush();
+    Environment.Exit(code);
+}
+
+if (args.Contains("--reverb-churn"))
+{
+    // --reverb-churn [n]: ask FMOD for n region reverb buses and report what it does when it will
+    // not give out another. See ProviderOrbit.RunReverbChurn.
+    int n = args.FirstOrDefault(a => a.StartsWith("n=")) is { } na && int.TryParse(na[2..], out int nv) ? nv : 400;
+    int code = ProviderOrbit.RunReverbChurn(n);
+    Log.CloseAndFlush();
+    Environment.Exit(code);
+}
+
+if (args.Contains("--physical-churn"))
+{
+    // --physical-churn: every machine and aircraft preset, created, moved and released against a
+    // live mixer. The headless reproduction of "the client dies a few seconds after an aircraft
+    // starts". See ProviderOrbit.RunPhysicalChurn.
+    int code = ProviderOrbit.RunPhysicalChurn(seconds: 12.0);
+    Log.CloseAndFlush();
+    Environment.Exit(code);
+}
+
+if (args.Contains("--ended-channel"))
+{
+    // --ended-channel: asks FMOD directly whether a DSP stays attached to a Channel that ended on
+    // its own. The answer decides whether pooling those DSPs is safe at all.
+    int code = ProviderOrbit.RunEndedChannelProbe();
+    Log.CloseAndFlush();
+    Environment.Exit(code);
+}
+
+if (args.Contains("--send-churn"))
+{
+    // --send-churn [sec=] [noflip] [ownroom]: one-shots WITH reverb sends, ending on their own, while the
+    // listener's region flips every update — the one path no other harness had (see ProviderOrbit).
+    double sec = 30.0;
+    foreach (var a in args) if (a.StartsWith("sec=")) sec = double.Parse(a[4..]);
+    int code = ProviderOrbit.RunSendChurn(sec, flip: !args.Contains("noflip"), ownRoom: args.Contains("ownroom"));
+    Log.CloseAndFlush();
+    Environment.Exit(code);
+}
+
+if (args.Contains("--foreign-disconnect"))
+{
+    // --foreign-disconnect: one send disconnected through the WRONG reverb unit, and what FMOD's
+    // input counts do afterwards. The mechanism of the city crash, isolated.
+    int code = ProviderOrbit.RunForeignDisconnectProbe();
+    Log.CloseAndFlush();
+    Environment.Exit(code);
+}
+
+if (args.Contains("--send-drift"))
+{
+    // --send-drift scenario=N: tears a sending channel down one way, then trips the wire.
+    int sc = 1; foreach (var a in args) if (a.StartsWith("scenario=")) sc = int.Parse(a[9..]);
+    int code = ProviderOrbit.RunSendDriftProbe(sc);
+    Log.CloseAndFlush();
+    Environment.Exit(code);
+}
+
+if (args.Contains("--send-window"))
+{
+    // --send-window [sec=] [mode=client|forget|stop]: FMOD alone, forcing the window between a
+    // queued send disconnect and the channel finishing.
+    double sec = 20.0; string mode = "client";
+    foreach (var a in args) { if (a.StartsWith("sec=")) sec = double.Parse(a[4..]); if (a.StartsWith("mode=")) mode = a[5..]; }
+    int code = ProviderOrbit.RunSendWindowProbe(sec, mode);
+    Log.CloseAndFlush();
+    Environment.Exit(code);
+}
+
+if (args.Contains("--reap-churn"))
+{
+    // --reap-churn [sec=]: one-shots that END ON THEIR OWN and are collected by the reaper. The only
+    // harness that exercises a STALE channel handle — every other one stops its voices itself, which
+    // is the safe path, and is why none of them reproduced the city crash.
+    double sec = 20.0;
+    foreach (var a in args) if (a.StartsWith("sec=")) sec = double.Parse(a[4..]);
+    int code = ProviderOrbit.RunReapChurn(sec);
     Log.CloseAndFlush();
     Environment.Exit(code);
 }

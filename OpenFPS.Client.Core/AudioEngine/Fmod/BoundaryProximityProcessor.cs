@@ -98,14 +98,34 @@ public static class BoundaryProximityProcessor
     private static RESULT ReadCallback(ref DSP_STATE dsp_state, IntPtr inbuffer, IntPtr outbuffer,
                                        uint length, int inchannels, ref int outchannels)
     {
+        // THE HANDLE RESOLUTION IS INSIDE THE GUARD TOO, and it was not.
+        //
+        // The note below says a managed DSP callback must not throw, and the try it describes began
+        // AFTER these lines — leaving out the one statement most likely to raise. GCHandle.FromIntPtr
+        // throws InvalidOperationException the instant the handle it names is no longer allocated,
+        // and this callback runs on the mixer thread, so that exception is a process abort rather
+        // than a bad block. Same one-line gap as the engine's four callbacks had.
         IntPtr userData;
-        unsafe
+        BoundaryVoiceState s;
+        try
         {
-            FMOD.DSP dsp = new FMOD.DSP(dsp_state.instance);
-            dsp.getUserData(out userData);
+            userData = DspCallback.UserData(ref dsp_state);
+            if (userData == IntPtr.Zero) return RESULT.OK;
+            if (GCHandle.FromIntPtr(userData).Target is not BoundaryVoiceState bs) return RESULT.OK;
+            s = bs;
         }
-        if (userData == IntPtr.Zero) return RESULT.OK;
-        if (GCHandle.FromIntPtr(userData).Target is not BoundaryVoiceState s) return RESULT.OK;
+        catch
+        {
+            // Pass the mix through untouched. This unit is on the master bus; silencing it silences
+            // the game.
+            unsafe
+            {
+                if (inbuffer != IntPtr.Zero && outbuffer != IntPtr.Zero && inchannels == outchannels)
+                    new ReadOnlySpan<float>((void*)inbuffer, (int)length * inchannels)
+                        .CopyTo(new Span<float>((void*)outbuffer, (int)length * outchannels));
+            }
+            return RESULT.OK;
+        }
 
         if (outchannels == 0) outchannels = inchannels > 0 ? inchannels : 2;
         int outCh = outchannels;
@@ -144,21 +164,20 @@ public static class BoundaryProximityProcessor
                     else output.Clear();
                 }
             }
-            // Once, with everything needed to find it — a message per block would be a second fault.
-            if (!_faulted)
-            {
-                _faulted = true;
-                Serilog.Log.Error(ex, "Boundary DSP faulted and has been bypassed: length {Length}, in {InCh}ch, out {OutCh}ch, "
-                                    + "line {Line} samples, write {Write}, glide {Glide}. Taps (delayL, gainL): {Taps}",
-                                  n, inchannels, outchannels, s.Line.Length, s.Write, s.Glide,
-                                  string.Join(" ", System.Linq.Enumerable.Range(0, BoundaryVoiceState.MaxTaps)
-                                      .Select(t => $"({s.CurrentDelayL[t]:G6},{s.CurrentGainL[t]:G6})")));
-            }
+            // RECORDED, NOT LOGGED, and the difference matters more here than anywhere.
+            //
+            // This unit is on the master bus, so its callback runs for every block of the whole mix.
+            // Writing a log line from it stops the mixer; the thread tearing a voice down is inside
+            // removeDSP waiting for exactly this callback to return, holding the provider's lock, and
+            // everything that wants that lock stops behind it. That is a total freeze, and if the
+            // console sink's write is what blocked — a terminal nobody is reading — it never ends.
+            //
+            // The audio update reports it from the game thread. See DspFault.
+            DspFault.Record("BoundaryProximity", ex);
         }
         return RESULT.OK;
     }
 
-    private static bool _faulted;
 
     /// <summary>
     /// The whole of the effect, over spans rather than mixer pointers — so it can be rendered offline

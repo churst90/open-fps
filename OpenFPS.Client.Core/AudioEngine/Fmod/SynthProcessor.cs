@@ -85,21 +85,15 @@ public static class SynthProcessor
                 if (outbuffer != IntPtr.Zero)
                     new Span<float>((void*)outbuffer, (int)length * ch).Clear();
             }
-            if (!_faulted) { _faulted = true; Serilog.Log.Error(ex, "SynthProcessor DSP faulted; the block was silenced."); }
+            DspFault.Record("SynthProcessor", ex);
             return RESULT.OK;
         }
     }
 
-    private static bool _faulted;
 
     private static RESULT ReadCallbackCore(ref DSP_STATE dsp_state, IntPtr inbuffer, IntPtr outbuffer, uint length, int inchannels, ref int outchannels)
     {
-        IntPtr userData;
-        unsafe
-        {
-            FMOD.DSP dsp = new FMOD.DSP(dsp_state.instance);
-            dsp.getUserData(out userData);
-        }
+        IntPtr userData = DspCallback.UserData(ref dsp_state);
 
         if (userData == IntPtr.Zero) return RESULT.OK;
 

@@ -1,5 +1,12 @@
 # What comes next (2026-09-19, after the tail was fixed)
 
+> **SUPERSEDED IN PART by `docs/THE_CITY.md` (session 17, the same day).** Sections 1, 2, 3 and most
+> of 6 below are done: the corridor comb was closed by ear, standing machines and aircraft have a
+> voice and are on the map, footsteps were settled by measurement in favour of the bank, and traffic
+> and aircraft run. Section 4 (the bus shelter) now has the gate test it demanded and a specified
+> fix. Section 5 is untouched and is now the most audible open question on the map. The light rail
+> is the one thing from section 6 still to do.
+
 Approved by ear at the end of session 16: **rooms are distinct, and there is no popping.** The long
 arc that ran from session 9 to here — "all the reflections sound the same, there's no real variation
 at all" — is closed. What follows is what that arc was blocking.

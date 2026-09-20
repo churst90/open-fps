@@ -1,0 +1,18 @@
+{
+  "Id": "mower_riding",
+  "Name": "Riding mower",
+  "Description": "A garden tractor: a twin under a bonnet, a wide deck slung below it, and enough exhaust to be heard across two streets. SmallMachines.RidingMower.",
+  "Material": "Metal",
+  "ColliderSize": { "X": 1.2, "Y": 1.25, "Z": 1.9 },
+  "Type": "StaticObject",
+  "IsSolid": true,
+  "MaxHealth": 90,
+  "IsItem": false,
+  "HasEmitter": true,
+  "IsSynth": true,
+  "SoundId": "machine:mower_riding",
+  "Volume": 1.0,
+  "Range": 320,
+  "MinDistance": 2.0,
+  "Mode": "LoopOne"
+}

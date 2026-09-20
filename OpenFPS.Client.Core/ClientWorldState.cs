@@ -27,6 +27,9 @@ public class ClientWorldState
     private readonly ConcurrentDictionary<int, Vector3> _serverVelocities = new();
     private readonly ConcurrentDictionary<int, float> _serverTyreDemand = new();
     private readonly ConcurrentDictionary<int, byte> _audioEntityIds = new();
+    /// <summary>Everything that declares a region, so the moved-region check is not a walk over the
+    /// whole map every frame. See WorldSnapshot.RegionEntityIds.</summary>
+    private readonly ConcurrentDictionary<int, byte> _regionEntityIds = new();
 
     // --- Snapshot Interpolation ---
     private readonly List<ServerStateUpdate> _snapshotBuffer = new();
@@ -159,6 +162,7 @@ public class ClientWorldState
         _serverVelocities.Clear();
         _serverTyreDemand.Clear();
         _audioEntityIds.Clear();
+        _regionEntityIds.Clear();
         
         lock (_metaLock)
         {
@@ -195,7 +199,11 @@ public class ClientWorldState
         // standing here, or the inside of a car, which is never in the bake at all because it moves.
         // Without this the acoustic map never hears of it and stepping inside sounds like stepping
         // nowhere.
-        if (def.Region.RoomSize.X > 0f) TrackRegion(def);
+        if (def.Region.RoomSize.X > 0f)
+        {
+            TrackRegion(def);
+            _regionEntityIds[def.EntityId] = 0;
+        }
 
         // A door's aperture is not a fixed property of it, it is how far the leaf has swung. The
         // server re-sends the definition as it moves, and this is what turns that into the opening
@@ -329,6 +337,7 @@ public class ClientWorldState
             _serverVelocities.TryRemove(id, out _);
             _serverTyreDemand.TryRemove(id, out _);
             _audioEntityIds.TryRemove(id, out _);
+            _regionEntityIds.TryRemove(id, out _);
             if (known) removed.Add(id);
         }
 
@@ -592,6 +601,7 @@ public class ClientWorldState
         }
 
         snap.AudioEntityIds.AddRange(_audioEntityIds.Keys);
+        snap.RegionEntityIds.AddRange(_regionEntityIds.Keys);
         return snap;
     }
 
