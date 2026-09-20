@@ -99,6 +99,14 @@ public sealed class OtherBodies
             // nothing on a snapshot ever holds, so it matched nothing and the cars kept walking.
             if (body.Definition.SoundEmitter.SoundId is { } sid &&
                 sid.StartsWith("engine:", StringComparison.OrdinalIgnoreCase)) continue;
+            // The same for everything else the server drives with a physical model — an aircraft, a
+            // train's bogies, a riding mower. The one exception is the push mower: it moves because
+            // somebody is walking behind it, and those are that person's footsteps.
+            if (body.Definition.SoundEmitter.SoundId is { } pid && body.Definition.SoundEmitter.IsSynth
+                && (pid.StartsWith("aircraft:", StringComparison.OrdinalIgnoreCase)
+                    || pid.StartsWith("rail:", StringComparison.OrdinalIgnoreCase)
+                    || (pid.StartsWith("machine:", StringComparison.OrdinalIgnoreCase)
+                        && !pid.Equals("machine:mower_push", StringComparison.OrdinalIgnoreCase)))) continue;
 
             if (!_bodies.TryGetValue(body.Id, out var state))
                 _bodies[body.Id] = state = new Body();

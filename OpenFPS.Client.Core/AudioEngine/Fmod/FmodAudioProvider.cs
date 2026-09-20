@@ -1569,6 +1569,30 @@ public class FmodAudioProvider : IAudioProvider
         }
     }
 
+    // ── Trains: one synth per consist, a tap per entity ─────────────────────────────────────────
+    //
+    // See RailVoice.cs. The server names every source of a train "rail:<preset>/<train>/<i>", and the
+    // shared synth for <preset>/<train> is made on the first tap and kept while any tap is alive.
+    private readonly Dictionary<string, TrainVoiceState> _trains = new();
+
+    private PhysicalVoiceState? RailTap(string key, int rate)
+    {
+        if (!TrainVoiceState.ParseKey(key, out string preset, out string train, out int index)) return null;
+        string shared = preset + "/" + train;
+        lock (_trains)
+        {
+            if (!_trains.TryGetValue(shared, out var t))
+            {
+                t = new TrainVoiceState(shared, OpenFPS.Common.TrainProfile.ByName(preset), rate, train.GetHashCode() & 0x7fff);
+                _trains[shared] = t;
+                Log.Information("Train '{Train}' ({Profile}): one synth, {Sources} source(s) over {Length:F0} m",
+                                shared, t.Profile.Name, t.Layout.Count, t.Profile.LengthMetres);
+            }
+            if (index < 0 || index >= t.Layout.Count) return null;
+            return new TrainTapState(t, index, rate);
+        }
+    }
+
     /// <summary>The DSP a source's reverb SEND must feed: the region bus's own SFXREVERB unit, which sits
     /// at the TAIL (input end) of the bus chain. Addressing it by identity rather than by
     /// <c>getDSP(HEAD)</c> is the point — the head is the binaural output stage, and sending into it
@@ -1968,6 +1992,7 @@ public class FmodAudioProvider : IAudioProvider
                     "aircraft" => new AircraftVoiceState(OpenFPS.Common.AircraftProfile.ByName(preset),
                                                          mrate, emitter.EntityId * 17 + 3,
                                                          lever: emitter.PowerLever),
+                    "rail" => RailTap(emitter.PhysicalKey, mrate),
                     _ => null,
                 };
             }
@@ -2326,6 +2351,13 @@ public class FmodAudioProvider : IAudioProvider
                     {
                         airv.TargetLever = emitter.PowerLever;
                         airv.TargetDescending = emitter.RotorWake;
+                    }
+                    else if (active.MachineState is TrainTapState tap)
+                    {
+                        // Any tap may set it; they all read the one train. The lever is the notch
+                        // as a fraction of eight and the wake slot carries the speed.
+                        tap.Shared.TargetSpeed = emitter.RotorWake;
+                        tap.Shared.TargetNotch = emitter.PowerLever * 8f;
                     }
                     if (ListenerInMachineFrame(emitter.Position, emitter.Direction, emitter.Velocity, out var mlocal))
                         active.MachineState.SetListener(mlocal);

@@ -303,7 +303,12 @@ a small room opening onto a big enclosed hall — both read closed, so no jump f
 
 The railway is complete and measurable: 2.5 km of formation and rails, three tiled stations under
 steel canopies, a level crossing, and `Tracks["rail_loop"]` — the same centreline the ballast was
-laid along, so the two cannot drift apart. **Nothing runs on it.**
+laid along, so the two cannot drift apart. **Two light rail sets run it since 2026-09-20**, half a
+lap apart, the second of the two answers below: the server places one entity per sound source
+(`RailSystem`, `TrainLayout`) at `head − along` round the loop, and the client runs one `TrainSynth`
+per set with a voice per source (`RailVoice.cs`). They slow for the corners on the loop's own
+curvature and do not stop at the stations yet. The rest of this section is the reasoning as it stood
+before that, kept because it is still the reason it was done this way.
 
 A train is the one approved model that is NOT one pressure at one point: it is a line of bogies, ten
 or eleven radiators spread over fifty metres of consist, each with its own place along the track

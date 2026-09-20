@@ -6,6 +6,7 @@ using FMOD;
 using OpenFPS.Common;
 using OpenFPS.Client.AudioEngine.Core;
 using OpenFPS.Client.AudioEngine.Core.Engine;
+using OpenFPS.Client.AudioEngine.Core.Pneumatics;
 using System.Runtime.CompilerServices;
 
 namespace OpenFPS.Client.AudioEngine.Fmod;
@@ -445,11 +446,75 @@ public sealed class EngineVoiceState : IRenderedVoice
         Driver = new VirtualDriver(Driveline, Engine);
         _rng = new Random(seed);
         _body = new BodyResonator(v.Body ?? VehicleBody.None, sampleRate);
+        if (!string.IsNullOrEmpty(v.AirSystem))
+        {
+            try { _air = new AirSystem(ModelLibrary.Air(v.AirSystem), sampleRate, seed + 17); }
+            catch (Exception ex) { Serilog.Log.Warning("Vehicle '{Name}': air system '{Air}' — {Err}", v.Name, v.AirSystem, ex.Message); }
+        }
+        _bayLeak = Math.Clamp(v.EngineBayLeakage, 0f, 1f);
     }
 
     /// <summary>The car's own resonances. Built once: the modes are a property of the vehicle, not
     /// of what it is doing.</summary>
     private readonly BodyResonator _body;
+
+    // ── The air a bus or a truck carries, and the brakes that use it ───────────────────────────
+    //
+    // Nothing on the wire says "the brakes came off". It does not have to: the voice already
+    // follows the vehicle's speed, and a brake release is what happens at the END of a
+    // deceleration, a park brake is what happens after a vehicle has stood still for a moment, and
+    // the doors of a bus open when it has stopped and shut before it moves. So the events are read
+    // off the speed history the voice keeps anyway, on the render thread, at sample rate.
+    private readonly AirSystem? _air;
+    private readonly float _bayLeak;
+    private float _lastSpeedForAir, _accelForAir;
+    private float _brakedSeconds, _stoppedSeconds;
+    private bool _parked, _doorsOpen;
+    private const float BrakingDecel = 0.45f;      // m/s²: a foot on the pedal, not drag
+    private const float ParkAfterSeconds = 2.5f;
+
+    private void AirEvents(float dt)
+    {
+        if (_air == null) return;
+        _air.EngineRpm = Engine.Rpm;
+        float accel = (_speedSmooth - _lastSpeedForAir) / dt;
+        _lastSpeedForAir = _speedSmooth;
+        _accelForAir += (accel - _accelForAir) * MathF.Min(1f, dt * 6f);
+        bool moving = _speedSmooth > 0.15f;
+        bool braking = moving && _accelForAir < -BrakingDecel;
+        if (braking) _brakedSeconds += dt;
+        else if (_brakedSeconds > 0.25f)
+        {
+            // The pedal comes up: the service chambers exhaust. A longer application put more air
+            // in them, so a stop from speed hisses longer than a dab.
+            _air.Vent("service_release", MathF.Min(1f, 0.3f + _brakedSeconds / 3f));
+            _brakedSeconds = 0f;
+        }
+        else _brakedSeconds = 0f;
+
+        if (!moving)
+        {
+            _stoppedSeconds += dt;
+            if (!_parked && _stoppedSeconds > ParkAfterSeconds)
+            {
+                _parked = true;
+                _air.Vent("parking");                       // spring brakes: the chambers dump
+                if (_air.Ports.ContainsKey("door")) { _air.Vent("door"); _doorsOpen = true; }
+            }
+        }
+        else
+        {
+            if (_parked)
+            {
+                // Moving off again: the doors shut first, then the park brake is released — a
+                // shorter hiss, since only the control line vents while the springs are pushed back.
+                if (_doorsOpen) { _air.Vent("door", 0.6f); _doorsOpen = false; }
+                _air.Vent("parking", 0.35f);
+                _parked = false;
+            }
+            _stoppedSeconds = 0f;
+        }
+    }
 
     /// <summary>How many body modes this voice is running. Diagnostic, for the cost report.</summary>
     public int BodyModeCount => _body.ModeCount;
@@ -535,6 +600,13 @@ public sealed class EngineVoiceState : IRenderedVoice
             // one rule — a body that coloured one and not the other is how a change can be measured
             // as working and heard as nothing.
             pa += _body.Process(Engine.Exhaust);
+            // What escapes the engine bay. Zero for a car; see VehicleProfile.EngineBayLeakage.
+            if (_bayLeak > 0f) pa += (Engine.Block + 0.5f * Engine.Intake) * _bayLeak;
+            if (_air != null)
+            {
+                if ((i & 63) == 0) AirEvents(dt * 64f);
+                pa += _air.Step();
+            }
 
             _envelope += Math.Clamp(envTarget - _envelope, -envStep, envStep);
             // Written WITHOUT the soft ceiling, which now belongs to whoever sums the taps back up:

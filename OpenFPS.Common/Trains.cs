@@ -303,6 +303,106 @@ public sealed record ConsistEntry
     public void Deconstruct(out RailVehicleSpec vehicle, out int count) { vehicle = Vehicle; count = Count; }
 }
 
+/// <summary>
+/// Where a train's sound comes from, as a list a SERVER can place and a CLIENT can index — the same
+/// list, in the same order, that <c>TrainSynth</c> builds its sources in. A train is not one pressure
+/// at one point: it is a line of bogies, drives, a body drum, a horn and a bell spread over the
+/// consist, each with its own place along it. The server spawns one entity per entry here at
+/// <c>head − Along</c> round the track (so a 55 m set wraps a 26 m corner correctly), and the client
+/// runs ONE synth for the whole train and gives entity <c>i</c> source <c>i</c>. If this and
+/// <c>TrainSynth.BuildVehicle</c> ever disagree about the order, every bogie plays the wrong place;
+/// <c>RailAndSignalTests</c> holds them together.
+/// </summary>
+public static class TrainLayout
+{
+    public enum Kind { Bogie, Body, ExhaustStack, RadiatorFans, Traction, Chimney, Horn, Whistle, Bell }
+
+    public sealed record Entry(int Index, Kind Kind, string Label, float AlongMetres, float HeightMetres,
+                               float ExtentMetres, float LevelDb)
+    {
+        /// <summary>Horns, whistles and bells make no sound until something blows them, and nothing on
+        /// a map does yet. They are listed so the indices match the synth, and not spawned.</summary>
+        public bool IsSignal => Kind is Kind.Horn or Kind.Whistle or Kind.Bell;
+    }
+
+    /// <summary>
+    /// The rolling noise of one bogie at 1 m, at the profile's typical speed. The reference is per
+    /// axle at 100 km/h and the speed law the model measures is 28·log10(V) (see docs/TRAINS.md), so
+    /// this is the same number the synth will actually make, which is what a level for ranking must be.
+    /// </summary>
+    /// <summary>A road locomotive's exhaust stack in run 8, at 1 m: certification-style figures put
+    /// the whole locomotive at 90-96 dBA at 30 m, which is about this at the stack.</summary>
+    public const float LocomotiveStackDb = 112f;
+
+    public static float BogieLevelDb(TrainProfile p, RailVehicleSpec v)
+        => p.RollingReferenceDb
+         + 10f * MathF.Log10(MathF.Max(1, v.AxlesPerBogie))
+         + 28f * MathF.Log10(MathF.Max(0.05f, p.TypicalSpeedMps * 3.6f / 100f))
+         + (v.Wheels.TreadBraked ? 9f : 0f);
+
+    public static IReadOnlyList<Entry> Sources(TrainProfile p)
+    {
+        var list = new List<Entry>();
+        float along = 0f;
+        int unit = 0;
+        bool horn = false, whistle = false, bell = false;
+        foreach (var (v, count) in p.Consist)
+            for (int c = 0; c < count; c++, unit++)
+            {
+                float mid = along + v.LengthMetres * 0.5f;
+                for (int b = 0; b < v.Bogies; b++)
+                {
+                    float at = v.Bogies == 1 ? mid : mid + (b - (v.Bogies - 1) * 0.5f) * v.BogieCentresMetres;
+                    list.Add(new Entry(list.Count, Kind.Bogie, $"{v.Name} #{unit + 1} bogie {b + 1}", at, 0.45f, 2.2f, BogieLevelDb(p, v)));
+                }
+                if (v.BodyDrumDb > 1f)
+                    list.Add(new Entry(list.Count, Kind.Body, $"{v.Name} #{unit + 1} body", mid, 2.0f, v.LengthMetres * 0.5f, v.BodyDrumDb));
+                if (v.Traction is { } tr)
+                {
+                    switch (tr.Kind)
+                    {
+                        case RailTraction.DieselElectric when tr.EngineKey != null:
+                            list.Add(new Entry(list.Count, Kind.ExhaustStack, $"{v.Name} #{unit + 1} exhaust stack",
+                                               mid - v.LengthMetres * 0.22f, 4.4f, 1.0f, LocomotiveStackDb));
+                            list.Add(new Entry(list.Count, Kind.RadiatorFans, $"{v.Name} #{unit + 1} radiator fans",
+                                               mid + v.LengthMetres * 0.34f, 4.2f, 1.6f, tr.FanDb));
+                            break;
+                        case RailTraction.Electric when tr.Drive != null:
+                            for (int b = 0; b < v.Bogies; b++)
+                            {
+                                float at = v.Bogies == 1 ? mid : mid + (b - (v.Bogies - 1) * 0.5f) * v.BogieCentresMetres;
+                                float lv = 10f * MathF.Log10(MathF.Pow(10f, tr.Drive.InverterLevelDb / 10f) + MathF.Pow(10f, tr.Drive.GearLevelDb / 10f)
+                                                             + MathF.Pow(10f, tr.Drive.MotorHumDb / 10f) + MathF.Pow(10f, tr.Drive.BlowerDb / 10f));
+                                list.Add(new Entry(list.Count, Kind.Traction, $"{v.Name} #{unit + 1} traction {b + 1}", at, 0.7f, 2.0f, lv));
+                            }
+                            break;
+                        case RailTraction.Steam when tr.Steam != null:
+                            list.Add(new Entry(list.Count, Kind.Chimney, $"{v.Name} #{unit + 1} chimney",
+                                               along + v.LengthMetres * 0.18f, 4.6f, 0.8f, tr.Steam.MotionDb + 6f));
+                            break;
+                    }
+                    if (tr.HornKey != null && !horn)
+                    {
+                        horn = true;
+                        list.Add(new Entry(list.Count, Kind.Horn, $"{v.Name} #{unit + 1} horn", along + 2.5f, 4.8f, 0.6f, 139f));
+                    }
+                    if (tr.Steam?.WhistleKey is not null && !whistle)
+                    {
+                        whistle = true;
+                        list.Add(new Entry(list.Count, Kind.Whistle, $"{v.Name} #{unit + 1} whistle", along + v.LengthMetres * 0.55f, 4.4f, 0.5f, 130f));
+                    }
+                    if ((tr.BellKey ?? tr.Steam?.BellKey) != null && !bell)
+                    {
+                        bell = true;
+                        list.Add(new Entry(list.Count, Kind.Bell, $"{v.Name} #{unit + 1} bell", along + 1.8f, 3.2f, 0.4f, 100f));
+                    }
+                }
+                along += v.LengthMetres;
+            }
+        return list;
+    }
+}
+
 public sealed record TrainProfile
 {
     public required string Name { get; init; }

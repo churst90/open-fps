@@ -206,10 +206,21 @@ public class MachineVoiceTests
             foreach (var v in map.Vehicles)
             {
                 string name = v.Name ?? v.Preset;
-                Assert.True(AircraftProfile.Presets.ContainsKey(v.Preset) || MachineRegistry.Knows(v.Preset),
-                    $"map '{map.Id}': '{name}' asks for preset '{v.Preset}', which is neither a vehicle "
-                    + "nor an aircraft — it will not be spawned at all");
+                // The same four kinds VehicleSystem.Spawn accepts: a road vehicle, an aircraft, a
+                // small machine that is worked along a line (a mower), and a person walking.
+                Assert.True(AircraftProfile.Presets.ContainsKey(v.Preset) || MachineRegistry.Knows(v.Preset)
+                            || SmallMachineSpec.Presets.ContainsKey(v.Preset)
+                            || string.Equals(v.Preset, "walker", StringComparison.OrdinalIgnoreCase),
+                    $"map '{map.Id}': '{name}' asks for preset '{v.Preset}', which is neither a vehicle, "
+                    + "an aircraft, a small machine nor a walker — it will not be spawned at all");
                 seen++;
+            }
+            foreach (var t in map.Trains ?? new())
+            {
+                Assert.True(TrainProfile.Presets.ContainsKey(t.Preset),
+                    $"map '{map.Id}': train '{t.Name}' asks for preset '{t.Preset}', which no TrainProfile knows");
+                Assert.True(map.Tracks != null && map.Tracks.Exists(k => string.Equals(k.Id, t.Track, StringComparison.OrdinalIgnoreCase)),
+                    $"map '{map.Id}': train '{t.Name}' asks for track '{t.Track}', which the map does not lay");
             }
         }
         Assert.True(seen > 0, "no shipped map declares a vehicle");

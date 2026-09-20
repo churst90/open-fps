@@ -206,6 +206,25 @@ public sealed record VehicleProfile
     public VehicleBody Body { get; init; } = VehicleBody.Saloon;
 
     /// <summary>
+    /// The compressed-air system this vehicle carries, by <see cref="AirSystemSpec"/> preset name, or
+    /// null for a vehicle with hydraulic brakes. A bus or a heavy truck has one, and it is heard: the
+    /// service brakes exhaust to atmosphere every time the pedal comes up, the spring brakes dump
+    /// their chambers when the park brake is set, the dryer purges when the governor cuts out. The
+    /// voice makes those from the vehicle's own speed history, so nothing on the wire carries them.
+    /// </summary>
+    public string? AirSystem { get; init; }
+
+    /// <summary>
+    /// How much of the engine's MECHANICAL noise — injection clatter, timing gears, the block —
+    /// reaches the street, 0..1. A car's engine sits under a bonnet in a lined bay and next to none
+    /// of it does; the exhaust is the car. A truck's engine hangs in the open air under a cab and a
+    /// bus's sits in a compartment ventilated by grilles, and for both of those the mechanical noise
+    /// is a good part of what a bystander hears — it is why a diesel truck idling is loud and a
+    /// diesel car idling is not, on the same fuel. Zero leaves the voice exactly as it was.
+    /// </summary>
+    public float EngineBayLeakage { get; init; }
+
+    /// <summary>
     /// What this vehicle measures at one metre at full load, dB SPL — and the number the whole
     /// audio chain is hung off.
     ///
@@ -557,6 +576,8 @@ public sealed record VehicleProfile
         Name = "13 litre semi truck",
         EngineKey = "diesel_truck",
         SourceLevelDb = 93f,
+        AirSystem = "tractor_trailer",
+        EngineBayLeakage = 0.6f,
         Engine = EngineProfile.DieselTruckI6,
         Gearbox = Gearbox.SixSpeedSports with { Ratios = new[] { 11.7f, 7.6f, 5.0f, 3.3f, 2.2f, 1.45f, 1.0f, 0.78f }, FinalDrive = 3.55f, ShiftSeconds = 0.8f, UpshiftRpm = 1800f, DownshiftRpm = 1100f, WheelRadiusMetres = 0.51f },
         Tyres = TyreProfile.TruckOnAsphalt,
@@ -607,6 +628,8 @@ public sealed record VehicleProfile
         Name = "school bus",
         EngineKey = "diesel_bus",
         SourceLevelDb = 85f,
+        AirSystem = "transit_bus",
+        EngineBayLeakage = 0.45f,
         Engine = EngineProfile.DieselBusI6,
         Gearbox = Gearbox.SixSpeedSports with
         {

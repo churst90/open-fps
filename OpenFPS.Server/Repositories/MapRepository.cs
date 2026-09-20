@@ -64,6 +64,8 @@ public class MapData
 
     /// <summary>Vehicles that drive the map's roads. See VehicleSystem.</summary>
     public List<VehicleData>? Vehicles { get; set; }
+    /// <summary>Trains that run the map's rail tracks. See RailSystem.</summary>
+    public List<TrainData>? Trains { get; set; }
 
     /// <summary>Closed circuits the map's vehicles can lap. See TrackData.</summary>
     public List<TrackData>? Tracks { get; set; }
@@ -116,6 +118,22 @@ public class TrackData
     /// for every car.
     /// </summary>
     public float BankingDegrees { get; set; } = 0f;
+}
+
+/// <summary>
+/// A train on a map: which consist (a <c>TrainProfile</c> preset), which track, how fast. The
+/// server spawns one entity per sound source of the consist and moves them all along the track
+/// together; see RailSystem and TrainLayout.
+/// </summary>
+public class TrainData
+{
+    public string? Name { get; set; }
+    public string Preset { get; set; } = "light_rail";
+    public string Track { get; set; } = "";
+    public float TopSpeedKmh { get; set; } = 45f;
+    public float StartOffsetMetres { get; set; }
+    public float AccelerationMps2 { get; set; } = 0.9f;
+    public float BrakingMps2 { get; set; } = 1.0f;
 }
 
 /// <summary>A vehicle on a map: which car, which road, how fast on each pass.</summary>

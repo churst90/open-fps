@@ -110,7 +110,11 @@ internal sealed class GtkClientShell : IClientShell
         // Hide (don't close) the menu: closing it disrupts the new window's keyboard focus so the game
         // window stops receiving key events. The game window quits the whole app on close, so the
         // hidden menu won't keep the process alive.
-        _gameWindow = new GameWindow(_input, _onQuit);
+        // ONE game window for the life of the session. The server answers every spawn with a
+        // PlayerSpawned — the first one and every /tp after it — and the session calls this for
+        // each. Building a window per call left a stack of "OpenFPS — In Game" windows behind the
+        // live one, one per teleport, found by alt-tab. It is made once and brought forward after.
+        if (_gameWindow == null) _gameWindow = new GameWindow(_input, _onQuit);
         _gameWindow.Present(_app);
 
         _loadingWindow?.SetVisible(false);

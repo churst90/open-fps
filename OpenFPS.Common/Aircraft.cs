@@ -217,7 +217,14 @@ public sealed record AircraftProfile
             CoreNozzleDiameterMetres = 0.60f,
             CoreExitVelocityIdle = 110f, CoreExitVelocityMax = 480f, CoreExitKelvin = 800f,
             BypassNozzleDiameterMetres = 1.45f, BypassExitVelocityMax = 300f,
-            CombustorDb = 96f, WhineHz = 6200f, WhineDb = 84f, SpoolSeconds = 5f, IdleFraction = 0.23f,
+            // The whine is anchored at FULL power, and it was 84 dB there — sixty below the jets — so
+            // it existed only at the gate, where the jets are idling, and vanished as they spooled
+            // up: "the whistle stops when it spools up." On a high-bypass fan at takeoff the tone
+            // forward of the engine is of the same order as the jet, not sixty under it (fan tones
+            // are what a certification measurement at the takeoff point is mostly made of), so it
+            // now rises with the spool the way it does — in pitch AND in level — and is still there
+            // at rotation. The at-the-ear flyover figure that was approved moved under a decibel.
+            CombustorDb = 96f, WhineHz = 6200f, WhineDb = 118f, SpoolSeconds = 5f, IdleFraction = 0.23f,
         },
         CruiseSpeedMps = 230f,
         SourceLevelDb = 142f,

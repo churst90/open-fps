@@ -49,6 +49,13 @@ if [ $# -gt 0 ]; then
       export OPENFPS_STEAMAUDIO_SIM=0 OPENFPS_AUDIO_DEBUG=1
       LOG=/tmp/openfps-sa-off.log
       shift ;;
+    foot)
+      # Every footstep the client submits, with its material and position, so a place where the
+      # steps go missing can be read back instead of described.
+      export OPENFPS_AUDIO_DEBUG=1
+      MODE="FOOTSTEP TRACE — every step logged as [FOOT] in the client log"
+      LOG=/tmp/openfps-foot.log
+      ;;
     fmodlog)
       # ── FMOD'S OWN LOGGING BUILD ────────────────────────────────────────────────────────────────
       #

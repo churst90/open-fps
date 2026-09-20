@@ -32,6 +32,7 @@ public class GameServer
     private CommandHandler _commands = null!;
     private readonly System.Collections.Concurrent.ConcurrentQueue<int> _dirtyAudioEntities = new();
     private readonly VehicleSystem _vehicles = new();
+    private readonly RailSystem _rail = new();
     private readonly OccupancySystem _occupancy = new();
     private readonly DoorSystem _doors = new();
     private CompositeService _composites = null!;
@@ -190,6 +191,7 @@ public class GameServer
         _composites = new CompositeService(_maps, prefabRepo, new CompositeRepository("composites"));
         _composites.PlaceRecorded(_maps);
         _vehicles.Spawn(_maps);
+        _rail.Spawn(_maps);
         // Now that every sound source exists, size each map's broadcast radius from it.
         _maps.RefreshEarshotRanges();
         _seats = new OccupancyService(_maps);
@@ -378,6 +380,7 @@ public class GameServer
                     MovementSystem.Update(world, entry.Value.data.MinBound, entry.Value.data.MaxBound, grid, lookup, _sessions, _maps, dt);
                     AISystem.Update(world, lookup, dt);
                     _vehicles.Update(entry.Key, world, dt);
+                    _rail.Update(entry.Key, world, dt);
 
                     // ...and the people watching them. Only a source with a place and a size: no
                     // loop, no bed, and nothing in it that knows what a car is.

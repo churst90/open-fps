@@ -450,4 +450,28 @@ public class RailAndSignalTests
             Hz = v.WheelModeHz.ToArray();
         }
     }
+
+    /// <summary>The server places a train's sources by TrainLayout and the client indexes the synth's
+    /// sources by the same number. If the two ever disagree, every bogie plays the wrong place.</summary>
+    [Fact]
+    public void TrainLayoutMatchesTheSynthSourceForSource()
+    {
+        foreach (var key in TrainProfile.Presets.Keys)
+        {
+            var p = TrainProfile.ByName(key);
+            var layout = TrainLayout.Sources(p);
+            var synth = new TrainSynth(p, 44100f, 3);
+            Assert.True(layout.Count == synth.Sources.Count,
+                $"{key}: layout lists {layout.Count} sources, the synth builds {synth.Sources.Count}");
+            for (int i = 0; i < layout.Count; i++)
+            {
+                Assert.True(layout[i].Label == synth.Sources[i].Label,
+                    $"{key} source {i}: layout '{layout[i].Label}' vs synth '{synth.Sources[i].Label}'");
+                Assert.True(MathF.Abs(layout[i].AlongMetres - synth.Sources[i].AlongMetres) < 0.01f,
+                    $"{key} source {i} ({layout[i].Label}): along {layout[i].AlongMetres} vs {synth.Sources[i].AlongMetres}");
+                Assert.True(layout[i].LevelDb > 40f && layout[i].LevelDb < 145f,
+                    $"{key} source {i} ({layout[i].Label}): level {layout[i].LevelDb} dB is not a level");
+            }
+        }
+    }
 }

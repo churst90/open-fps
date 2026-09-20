@@ -826,6 +826,18 @@ public class ClientAudioSystem
                 var spec = OpenFPS.Common.SmallMachineSpec.ByName(soundId[8..]);
                 return (spec.SourceLevelDb, spec.ExtentMetres);
             }
+            if (soundId.StartsWith("rail:", StringComparison.OrdinalIgnoreCase))
+            {
+                // "rail:<preset>/<train>/<source index>" — the server places one entity per source
+                // in TrainLayout order; the level is that source's own.
+                if (OpenFPS.Client.AudioEngine.Fmod.TrainVoiceState.ParseKey(soundId, out string preset, out _, out int index))
+                {
+                    var layout = OpenFPS.Common.TrainLayout.Sources(OpenFPS.Common.TrainProfile.ByName(preset));
+                    if (index >= 0 && index < layout.Count)
+                        return (layout[index].LevelDb, layout[index].ExtentMetres);
+                }
+                return null;
+            }
             if (soundId.StartsWith("aircraft:", StringComparison.OrdinalIgnoreCase))
             {
                 var p = OpenFPS.Common.AircraftProfile.ByName(soundId[9..]);
@@ -854,6 +866,8 @@ public class ClientAudioSystem
     /// A helicopter slaps when it is descending into its own downwash or moving fast forward, and
     /// nothing else makes it slap — so that comes from the same two numbers.
     /// </summary>
+    private readonly Dictionary<int, (float Speed, double At)> _lastRailSpeed = new();
+
     private static (float Lever, float Wake) FlightPower(Vector3 velocity)
     {
         float speed = velocity.Length();
@@ -1464,7 +1478,8 @@ public class ClientAudioSystem
             resolvedSoundId = def.SoundEmitter.SoundId;
             if (string.IsNullOrEmpty(resolvedSoundId)) resolvedSoundId = "SYNTH"; // Last resort dummy
             if (resolvedSoundId.StartsWith("machine:", StringComparison.OrdinalIgnoreCase)
-                || resolvedSoundId.StartsWith("aircraft:", StringComparison.OrdinalIgnoreCase))
+                || resolvedSoundId.StartsWith("aircraft:", StringComparison.OrdinalIgnoreCase)
+                || resolvedSoundId.StartsWith("rail:", StringComparison.OrdinalIgnoreCase))
             {
                 // A physical model that is not a vehicle. Unlike a car it has no borrowed-voice
                 // fallback: one outside the budget is simply not heard, because there is no sense in
@@ -1488,6 +1503,20 @@ public class ClientAudioSystem
                 engineRange = MathF.Max(engineRange, OpenFPS.Common.Loudness.AudibleRange(levelDb));
                 if (physicalKey.StartsWith("aircraft:", StringComparison.OrdinalIgnoreCase))
                     (powerLever, rotorWake) = FlightPower(snap.Velocity);
+                else if (physicalKey.StartsWith("rail:", StringComparison.OrdinalIgnoreCase))
+                {
+                    // A train's speed is the bogie's speed, and its notch is what the speed is
+                    // doing: pulling away is full effort, holding speed is a little, braking is none.
+                    // The lever carries the notch as a fraction of eight; the wake slot carries the
+                    // speed itself, which is what the rolling noise is made from.
+                    float speed = snap.Velocity.Length();
+                    float accel = 0f;
+                    if (_lastRailSpeed.TryGetValue(snap.Id, out var prev) && world.PositionsSampledAt > prev.At)
+                        accel = (speed - prev.Speed) / (float)Math.Max(0.02, world.PositionsSampledAt - prev.At);
+                    _lastRailSpeed[snap.Id] = (speed, world.PositionsSampledAt);
+                    powerLever = accel > 0.08f ? 0.9f : accel < -0.15f ? 0f : speed > 0.5f ? 0.3f : 0f;
+                    rotorWake = speed;
+                }
             }
             else if (resolvedSoundId.StartsWith("engine:", StringComparison.OrdinalIgnoreCase)
                 && OpenFPS.Common.MachineRegistry.Knows(resolvedSoundId[7..]))
@@ -1737,7 +1766,17 @@ public class ClientAudioSystem
 
     /// <summary>Somebody else's step: a sound at a place in the world, left there as they walk on.</summary>
     public void OnPlayerFootstep(Vector3 pos, string mat, string var)
-        => SubmitFootstep(pos + new Vector3(0, 0.1f, 0), mat, follows: false, offset: Vector3.Zero);
+        => SubmitFootstep(pos + new Vector3(0, 0.1f, 0), mat, follows: false, offset: Vector3.Zero, boostDb: 0f);
+
+    /// <summary>
+    /// How much louder your OWN footstep is to you than the same footstep is to a bystander standing
+    /// where your ears are. A bystander hears it through the air only. You hear it through the air
+    /// AND through your skeleton — the heel strike travels up the leg and the spine into the skull,
+    /// which is why a footstep on a hard floor is felt as much as heard, and why your own steps
+    /// stay obvious in a street where a stranger's are not. This is that second path. It applies to
+    /// nothing but your own body; every other footstep in the world is the air path alone.
+    /// </summary>
+    private const float OwnFootstepBoneConductionDb = 8f;
 
     /// <summary>
     /// Your OWN step. It is part of you, so it rides with you.
@@ -1762,10 +1801,11 @@ public class ClientAudioSystem
     {
         if (_footTrace) Log.Information("[FOOT] step on {Mat} at {Pos}", mat, pos);
         Vector3 offset = (pos - _state.Position) + new Vector3(0, 0.1f - 1.7f, 0);   // the foot, from the eye
-        SubmitFootstep(_state.VisualPosition + new Vector3(0, 1.7f, 0) + offset, mat, follows: true, offset: offset);
+        SubmitFootstep(_state.VisualPosition + new Vector3(0, 1.7f, 0) + offset, mat, follows: true, offset: offset,
+                       boostDb: OwnFootstepBoneConductionDb);
     }
 
-    private void SubmitFootstep(Vector3 nudgePos, string mat, bool follows, Vector3 offset)
+    private void SubmitFootstep(Vector3 nudgePos, string mat, bool follows, Vector3 offset, float boostDb)
     {
         int id = FOOTSTEP_BASE_ID - (_footstepPoolIndex % FOOTSTEP_POOL_SIZE);
         _footstepPoolIndex++;
@@ -1783,7 +1823,7 @@ public class ClientAudioSystem
         // every step and the limiter pumped everything under it for the next fifty milliseconds —
         // "the footsteps are loud", and a pop on every one. The same law that places a rifle and a
         // car places these, twenty-six decibels down, where a step belongs against a megaphone.
-        var (stepGain, stepReference) = OpenFPS.Common.Loudness.Place(OpenFPS.Common.Loudness.FootstepDb);
+        var (stepGain, stepReference) = OpenFPS.Common.Loudness.Place(OpenFPS.Common.Loudness.FootstepDb + boostDb);
 
         // 1. Direct Sound (Will now undergo full acoustic pathing)
         var footstep = new SpatialEmitter

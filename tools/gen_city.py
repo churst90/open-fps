@@ -957,13 +957,20 @@ for li, lx in enumerate(RES_LANES):
 # after another rather than through a field of them. A push mower is a metre-high machine at the far
 # end of a garden behind a hedge, which is a very different sound from the same machine in front of
 # you — and the difference is the hedge and the distance, not a setting on it.
+# They MOVE. A push mower is pushed, at a walking pace, up one strip of the lawn and back down the
+# next, and its sound goes with it: the engine bogs where the grass is thick and the whole machine
+# comes and goes behind the hedge. So a mower is not a prop here but a shuttle — the same object
+# the server drives a truck with — out and back across the garden at four kilometres an hour, with
+# a pause at each end where the pusher turns it round. The VEHICLES list is built further down; the
+# runs are collected here, where the gardens are.
+MOWER_RUNS = []
 for idx in (2, 9, 17, 26, 34, 41):
     if idx >= len(HOUSES):
         continue
     e = entities[[i for i, en in enumerate(entities)
                   if en.get("Name", "").endswith("back garden")][idx]]
-    prop("mower_push", e["Position"]["X"] + 3.0, 0.42, e["Position"]["Z"],
-         name=f"Mower, garden {idx}")
+    gx, gz = e["Position"]["X"], e["Position"]["Z"]
+    MOWER_RUNS.append((idx, gx, gz))
 # One riding mower, on the open grass beside the airport road, which is where a big one lives.
 box("grass_floor", 120.0, 190.0, 0.0, 0.09, 60.0, 122.0, name="Airport verge")
 prop("mower_riding", 154.0, 0.62, 92.0, name="Verge mower")
@@ -1228,6 +1235,48 @@ for i, (nm, preset) in enumerate((("Civic", "i4_economy"), ("Wagon", "v6"), ("Pi
 # A shuttle is the demonstration case: out and back along a straight line, at each speed in a list.
 # Main Street's is the one that goes through the tunnel, which is the whole reason for having it —
 # a diesel entering a hundred metres of hard concrete box and coming out the far end.
+for idx, gx, gz in MOWER_RUNS:
+    VEHICLES.append({
+        "Name": f"Mower, garden {idx}", "Preset": "mower_push",
+        "RoadStart": v3(gx - 8.0, 0.42, gz), "RoadEnd": v3(gx + 8.0, 0.42, gz),
+        "SpeedsKmh": [4.0, 3.6], "AccelerationMps2": 0.5, "BrakingMps2": 0.8,
+        "WaitSeconds": 1.5, "StartDelaySeconds": (idx % 7) * 2.0,
+    })
+
+# ── People ────────────────────────────────────────────────────────────────────────────────────
+#
+# Somebody walking is heard by their footsteps, which the client makes from the body's own
+# movement, so a walker carries no sound of its own: it is a body on a line at a walking pace. Four
+# of them, on pavements, each with a wait at the end of the walk where they would stand at a
+# crossing or a door. The Main Street pair keep north of the tunnel, whose pavements are wall.
+PAVEMENT_X = KERB + 1.0                                # a metre off the kerb, clear of the shelter
+WALKERS = [
+    ("Pedestrian, Main Street east", v3(PAVEMENT_X, 0.15, -180.0), v3(PAVEMENT_X, 0.15, 115.0), 5.0, 6.0, 0.0),
+    ("Pedestrian, Main Street west", v3(-PAVEMENT_X, 0.15, 110.0), v3(-PAVEMENT_X, 0.15, -175.0), 4.6, 4.0, 11.0),
+    ("Pedestrian, Foundry Street", v3(12.0, 0.15, STREETS[2] - KERB - 1.0), v3(118.0, 0.15, STREETS[2] - KERB - 1.0), 5.2, 8.0, 5.0),
+    ("Pedestrian, Sycamore Lane", v3(RES_LANES[0] - RES_CARRIAGEWAY / 2 - 0.9, 0.15, -100.0),
+                                  v3(RES_LANES[0] - RES_CARRIAGEWAY / 2 - 0.9, 0.15, 125.0), 4.4, 5.0, 3.0),
+]
+for name, a, b, kmh, wait, delay in WALKERS:
+    VEHICLES.append({
+        "Name": name, "Preset": "walker", "RoadStart": a, "RoadEnd": b,
+        "SpeedsKmh": [kmh, kmh * 0.92], "AccelerationMps2": 0.8, "BrakingMps2": 1.0,
+        "WaitSeconds": wait, "StartDelaySeconds": delay,
+    })
+
+# ── Trains ────────────────────────────────────────────────────────────────────────────────────
+#
+# Two light rail sets on the loop, half a lap apart. The server places one entity per sound
+# source of a set — each bogie, each drive, the body — round the track at head minus offset, and the
+# client runs one synth for the set; see RailSystem and TrainLayout. Speed comes from the loop's
+# curvature, so the sets slow for the 26 m corners on their own.
+TRAINS = [
+    {"Name": "Light rail 1", "Preset": "light_rail", "Track": "rail_loop", "TopSpeedKmh": 45.0,
+     "StartOffsetMetres": 0.0, "AccelerationMps2": 0.9, "BrakingMps2": 1.0},
+    {"Name": "Light rail 2", "Preset": "light_rail", "Track": "rail_loop", "TopSpeedKmh": 45.0,
+     "StartOffsetMetres": 1250.0, "AccelerationMps2": 0.9, "BrakingMps2": 1.0},
+]
+
 VEHICLES.append({
     "Name": "Tunnel truck", "Preset": "diesel_truck",
     "RoadStart": v3(LANE, 0.15, MAIN_Z1 - 40.0), "RoadEnd": v3(LANE, 0.15, TUNNEL_Z0 + 8.0),
@@ -1334,6 +1383,7 @@ map_data = {
     "OcclusionFloor": 0.1,
     "Tracks": TRACKS,
     "Vehicles": VEHICLES,
+    "Trains": TRAINS,
     "Entities": entities,
 }
 

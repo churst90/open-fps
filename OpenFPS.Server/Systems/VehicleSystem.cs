@@ -102,22 +102,35 @@ public sealed class VehicleSystem
                 // preset, means a map names "airliner" and gets an airliner without anything else
                 // on either side having to be told about aircraft.
                 bool isAircraft = AircraftProfile.Presets.ContainsKey(vd.Preset);
-                if (!isAircraft && !MachineRegistry.Knows(vd.Preset))
+                // ── ...or a small machine, or a person ──────────────────────────────────────────
+                //
+                // A push mower moves because somebody is pushing it, at a walking pace, up and down
+                // a garden; and a person moves because they are walking. Both are the same object to
+                // this system as a truck: a thing on a line between two points at a speed. What
+                // differs is the voice — a small machine's is "machine:<preset>" (see the client's
+                // physical voice path), and a walker has none at all, because the client hears a
+                // body with legs by its footsteps, which it makes from the body's own movement.
+                bool isMachine = !isAircraft && SmallMachineSpec.Presets.ContainsKey(vd.Preset);
+                bool isWalker = string.Equals(vd.Preset, "walker", StringComparison.OrdinalIgnoreCase);
+                if (!isAircraft && !isMachine && !isWalker && !MachineRegistry.Knows(vd.Preset))
                 {
                     Log.Warning("Map {Map}: vehicle preset '{Preset}' is not known; known: {Known}",
                                 mapId, vd.Preset, string.Join(", ", MachineRegistry.Ids));
                     continue;
                 }
                 var air = isAircraft ? AircraftProfile.ByName(vd.Preset) : null;
-                var profile = isAircraft ? null : MachineRegistry.VehicleFor(vd.Preset);
-                string displayKind = isAircraft ? air!.Name : profile!.Engine.Name;
-                float sourceLevelDb = isAircraft ? air!.SourceLevelDb : profile!.SourceLevelDb;
-                string prefix = isAircraft ? "aircraft:" : "engine:";
+                var machine = isMachine ? SmallMachineSpec.ByName(vd.Preset) : null;
+                var profile = isAircraft || isMachine || isWalker ? null : MachineRegistry.VehicleFor(vd.Preset);
+                string displayKind = isAircraft ? air!.Name : isMachine ? machine!.Name : isWalker ? "someone walking" : profile!.Engine.Name;
+                float sourceLevelDb = isAircraft ? air!.SourceLevelDb : isMachine ? machine!.SourceLevelDb : isWalker ? 0f : profile!.SourceLevelDb;
+                string prefix = isAircraft ? "aircraft:" : isMachine ? "machine:" : "engine:";
                 // An airliner is sixty metres of aeroplane; a car is four and a half of car. The
                 // collider is what carries it into a client's earshot through the spatial grid, so
                 // an aeroplane sized like a hatchback is one that appears late.
                 var hull = isAircraft
                     ? new Vector3(MathF.Max(8f, air!.CruiseSpeedMps * 0.12f), 6f, MathF.Max(12f, air.CruiseSpeedMps * 0.2f))
+                    : isMachine ? new Vector3(0.6f, 1.0f, 0.9f)
+                    : isWalker ? new Vector3(0.5f, 1.8f, 0.5f)
                     : new Vector3(1.9f, 1.4f, 4.6f);
 
                 // A vehicle that names a track laps it; one that does not shuttles its road.
@@ -149,15 +162,26 @@ public sealed class VehicleSystem
                 var start = vd.RoadStart;
                 var heading = MathF.Atan2(vd.RoadEnd.X - vd.RoadStart.X, vd.RoadEnd.Z - vd.RoadStart.Z);
                 if (line != null) line.Sample(vd.StartOffsetMetres, out start, out heading, out _);
-                var e = maps.SpawnEntity(mapId, w => w.Create(
+                string description = isAircraft ? $"{displayKind}, in the air"
+                                   : isMachine ? $"{displayKind}, being worked"
+                                   : isWalker ? "walking"
+                                   : $"{displayKind}, driving the road";
+                var e = isWalker
+                    ? maps.SpawnEntity(mapId, w => w.Create(
                     EntityType.NPC,
                     new Transform { Position = start, Rotation = Quaternion.CreateFromYawPitchRoll(heading, 0f, 0f) },
                     new Velocity { Linear = Vector3.Zero },
                     new ColliderComponent { Shape = ColliderShape.Box, Size = hull, IsSolid = false },
                     new NameComponent { Name = vd.Name ?? displayKind },
-                    new IdentityComponent { Name = vd.Name ?? displayKind,
-                                            Description = isAircraft ? $"{displayKind}, in the air" : $"{displayKind}, driving the road" },
-                    new VehicleComponent { VehicleType = vd.Preset, MaxSeats = isAircraft ? 0 : 2 },
+                    new IdentityComponent { Name = vd.Name ?? displayKind, Description = description }))
+                    : maps.SpawnEntity(mapId, w => w.Create(
+                    EntityType.NPC,
+                    new Transform { Position = start, Rotation = Quaternion.CreateFromYawPitchRoll(heading, 0f, 0f) },
+                    new Velocity { Linear = Vector3.Zero },
+                    new ColliderComponent { Shape = ColliderShape.Box, Size = hull, IsSolid = false },
+                    new NameComponent { Name = vd.Name ?? displayKind },
+                    new IdentityComponent { Name = vd.Name ?? displayKind, Description = description },
+                    new VehicleComponent { VehicleType = vd.Preset, MaxSeats = isAircraft || isMachine ? 0 : 2 },
                     new SoundEmitterComponent
                     {
                         // The client recognises the prefix and runs the engine itself.
