@@ -16,10 +16,10 @@ namespace OpenFPS.Server.Core;
 /// were declared for the sound and the collision long before anyone could sit in one. So there is no
 /// file per car to rot out of step with the car: change the cabin and the shell you sit in changes.
 ///
-/// The cabin is a closed box on purpose. A composite that encloses space grows a ROOM
-/// (<see cref="CompositeService.RefreshRoom"/>), which is what makes the inside of a car sound like
-/// the inside of a car — a small, soft, close space — without anything here saying so. A bus's cabin
-/// is long and hard, a hatchback's short and carpeted, and the difference is the materials below.
+/// The cabin is a closed box on purpose. It is the vehicle's ROOM (<see cref="TryCabin"/>, used by
+/// <see cref="CompositeService.RefreshRoom"/>), which is what makes the inside of a car sound like the
+/// inside of a car — a small, soft, close space — without anything here saying so. A bus's cabin is
+/// long and hard, a hatchback's short and carpeted, and the difference is the materials below.
 /// </summary>
 public static class VehicleShell
 {
@@ -40,6 +40,9 @@ public static class VehicleShell
     /// </summary>
     private const float BeltFraction = 0.45f;
 
+    /// <summary>Where the underside of the body is, metres off the road.</summary>
+    private const float ChassisBottom = 0.15f;
+
     /// <summary>Whether an id names a generated vehicle shell, and which profile.</summary>
     public static bool TryParse(string id, out string preset)
     {
@@ -47,6 +50,50 @@ public static class VehicleShell
         if (!id.StartsWith(Prefix, StringComparison.OrdinalIgnoreCase)) return false;
         preset = id[Prefix.Length..];
         return MachineRegistry.Knows(preset);
+    }
+
+    /// <summary>The body and the cabin inside it, in the vehicle's own frame: x right, y up from the
+    /// road, z forward from the middle of the body.</summary>
+    private readonly record struct Geometry(float L, float W, float H, float Lc, float Wc, float Hc,
+                                            float FloorTop, float Cz, float FrontLen, float RearLen)
+    {
+        public float Front => Cz + Lc * 0.5f;
+        public float Back => Cz - Lc * 0.5f;
+        public float RoofUnder => FloorTop + Hc;
+        public float Belt => FloorTop + BeltFraction * Hc;
+    }
+
+    private static Geometry? Measure(VehicleProfile v)
+    {
+        var body = v.Body ?? VehicleBody.Saloon;
+        if (body.CabinLengthM <= 0f || body.CabinWidthM <= 0f || body.CabinHeightM <= 0f) return null;
+        float L = v.LengthMetres, W = v.WidthMetres, H = v.HeightMetres;
+
+        // The cabin inside the body. Never longer or wider than the body that holds it — a school bus
+        // declares an eleven-metre cabin in a ten-point-nine-metre body, because the cabin was sized
+        // for its acoustics and the body for its bumpers.
+        float Lc = MathF.Min(body.CabinLengthM, L - 0.4f);
+        float Wc = MathF.Min(body.CabinWidthM, W - 2f * Skin);
+        float Hc = MathF.Min(body.CabinHeightM, H - 0.2f);
+        // The floor is wherever the roof leaves room for the cabin: a quarter of a metre up in a car,
+        // over a metre in a bus, which is why you climb steps to get into one.
+        float floorTop = MathF.Max(0.2f, H - Hc - Skin);
+        // Most of what is not cabin is in front of it: the engine is at the front of nearly everything
+        // on this map, and the boot is the shorter end.
+        float spare = L - Lc;
+        float frontLen = spare * 0.6f, rearLen = spare - frontLen;
+        float cz = L * 0.5f - frontLen - Lc * 0.5f;
+        return new Geometry(L, W, H, Lc, Wc, Hc, floorTop, cz, frontLen, rearLen);
+    }
+
+    /// <summary>The cabin as a box in the vehicle's own frame — what its room is.</summary>
+    public static bool TryCabin(string preset, out Vector3 centre, out Vector3 size)
+    {
+        centre = size = Vector3.Zero;
+        if (!MachineRegistry.Knows(preset) || Measure(MachineRegistry.VehicleFor(preset)) is not { } g) return false;
+        centre = new Vector3(0f, g.FloorTop + g.Hc * 0.5f, g.Cz);
+        size = new Vector3(g.Wc, g.Hc, g.Lc);
+        return true;
     }
 
     /// <summary>
@@ -60,37 +107,16 @@ public static class VehicleShell
         var parts = new List<CompositePart>();
         var seats = new List<SeatDefinition>();
 
-        float L = v.LengthMetres, W = v.WidthMetres, H = v.HeightMetres;
-        bool hasCabin = body.CabinLengthM > 0f && body.CabinWidthM > 0f && body.CabinHeightM > 0f;
-
-        if (!hasCabin)
+        if (Measure(v) is not { } g)
         {
             // A motorcycle, a formula car: nothing to be inside. One solid body at saddle height and a
             // seat on top of it — you are sitting ON this, out in the air, and that is the point.
-            float saddle = MathF.Min(H, 0.9f);
-            parts.Add(Box(Steel, new Vector3(0f, saddle * 0.5f + 0.1f, 0f), new Vector3(W, saddle - 0.2f, L), prefabSize));
+            float saddle = MathF.Min(v.HeightMetres, 0.9f);
+            parts.Add(Box(Steel, new Vector3(0f, saddle * 0.5f + 0.1f, 0f),
+                          new Vector3(v.WidthMetres, saddle - 0.2f, v.LengthMetres), prefabSize));
             seats.Add(new SeatDefinition { Name = "rider", Position = Vector3.Zero, Controls = true });
             return Template(preset, v, parts, seats);
         }
-
-        // The cabin inside the body. Never longer or wider than the body that holds it — a school bus
-        // declares an eleven-metre cabin in a ten-point-nine-metre body, because the cabin was sized
-        // for its acoustics and the body for its bumpers.
-        float Lc = MathF.Min(body.CabinLengthM, L - 0.4f);
-        float Wc = MathF.Min(body.CabinWidthM, W - 2f * Skin);
-        float Hc = MathF.Min(body.CabinHeightM, H - 0.2f);
-        // The floor is wherever the roof leaves room for the cabin: a quarter of a metre up in a car,
-        // over a metre in a bus, which is why you climb steps to get into one.
-        float floorTop = MathF.Max(0.2f, H - Hc - Skin);
-        float roofUnder = floorTop + Hc;
-        float belt = floorTop + BeltFraction * Hc;
-
-        // Most of what is not cabin is in front of it: the engine is at the front of nearly everything
-        // on this map, and the boot is the shorter end.
-        float spare = L - Lc;
-        float frontLen = spare * 0.6f, rearLen = spare - frontLen;
-        float cz = L * 0.5f - frontLen - Lc * 0.5f;              // the cabin's centre, along the body
-        float front = cz + Lc * 0.5f, back = cz - Lc * 0.5f;
 
         // Whether the inside is soft. Seats, carpet and a headliner in a car; a bus or a van is
         // hard plastic and steel, which is exactly what CabinAbsorption already says.
@@ -98,52 +124,54 @@ public static class VehicleShell
 
         // Underneath, from just off the road to the floor. Not open space: a player must not walk
         // under a bus, and a bus's floor is over a metre up.
-        float chassisBottom = 0.15f;
-        if (floorTop - Skin - chassisBottom > 0.02f)
-            parts.Add(Box(Steel, new Vector3(0f, (chassisBottom + floorTop - Skin) * 0.5f, cz),
-                          new Vector3(Wc, floorTop - Skin - chassisBottom, Lc), prefabSize));
-        parts.Add(Box(lining, new Vector3(0f, floorTop - Skin * 0.5f, cz), new Vector3(Wc, Skin, Lc), prefabSize));
-        parts.Add(Box(lining, new Vector3(0f, roofUnder + Skin * 0.5f, cz), new Vector3(Wc + 2f * Skin, Skin, Lc), prefabSize));
+        if (g.FloorTop - Skin - ChassisBottom > 0.02f)
+            parts.Add(Box(Steel, new Vector3(0f, (ChassisBottom + g.FloorTop - Skin) * 0.5f, g.Cz),
+                          new Vector3(g.Wc, g.FloorTop - Skin - ChassisBottom, g.Lc), prefabSize));
+        parts.Add(Box(lining, new Vector3(0f, g.FloorTop - Skin * 0.5f, g.Cz), new Vector3(g.Wc, Skin, g.Lc), prefabSize));
+        parts.Add(Box(lining, new Vector3(0f, g.RoofUnder + Skin * 0.5f, g.Cz),
+                      new Vector3(g.Wc + 2f * Skin, Skin, g.Lc), prefabSize));
 
         // The sides: steel doors to the waist, glass to the roof.
         foreach (float side in new[] { -1f, 1f })
         {
-            float x = side * (Wc * 0.5f + Skin * 0.5f);
-            parts.Add(Box(Steel, new Vector3(x, (floorTop + belt) * 0.5f, cz), new Vector3(Skin, belt - floorTop, Lc), prefabSize));
-            parts.Add(Box(Glass, new Vector3(x, (belt + roofUnder) * 0.5f, cz), new Vector3(Skin, roofUnder - belt, Lc), prefabSize));
+            float x = side * (g.Wc * 0.5f + Skin * 0.5f);
+            parts.Add(Box(Steel, new Vector3(x, (g.FloorTop + g.Belt) * 0.5f, g.Cz),
+                          new Vector3(Skin, g.Belt - g.FloorTop, g.Lc), prefabSize));
+            parts.Add(Box(Glass, new Vector3(x, (g.Belt + g.RoofUnder) * 0.5f, g.Cz),
+                          new Vector3(Skin, g.RoofUnder - g.Belt, g.Lc), prefabSize));
         }
 
         // Windscreen and back window, full height: the bulkhead below the screen is the bonnet's job.
-        parts.Add(Box(Glass, new Vector3(0f, (floorTop + roofUnder) * 0.5f, front + Skin * 0.5f),
-                      new Vector3(Wc + 2f * Skin, Hc, Skin), prefabSize));
-        parts.Add(Box(Glass, new Vector3(0f, (floorTop + roofUnder) * 0.5f, back - Skin * 0.5f),
-                      new Vector3(Wc + 2f * Skin, Hc, Skin), prefabSize));
+        parts.Add(Box(Glass, new Vector3(0f, (g.FloorTop + g.RoofUnder) * 0.5f, g.Front + Skin * 0.5f),
+                      new Vector3(g.Wc + 2f * Skin, g.Hc, Skin), prefabSize));
+        parts.Add(Box(Glass, new Vector3(0f, (g.FloorTop + g.RoofUnder) * 0.5f, g.Back - Skin * 0.5f),
+                      new Vector3(g.Wc + 2f * Skin, g.Hc, Skin), prefabSize));
 
         // The bonnet and the boot, solid to the waist. They are the ends you walk into.
-        if (frontLen > 0.2f)
-            parts.Add(Box(Steel, new Vector3(0f, (chassisBottom + belt) * 0.5f, front + Skin + (frontLen - Skin) * 0.5f),
-                          new Vector3(W, belt - chassisBottom, frontLen - Skin), prefabSize));
-        if (rearLen > 0.2f)
-            parts.Add(Box(Steel, new Vector3(0f, (chassisBottom + belt) * 0.5f, back - Skin - (rearLen - Skin) * 0.5f),
-                          new Vector3(W, belt - chassisBottom, rearLen - Skin), prefabSize));
+        if (g.FrontLen > 0.2f)
+            parts.Add(Box(Steel, new Vector3(0f, (ChassisBottom + g.Belt) * 0.5f, g.Front + Skin + (g.FrontLen - Skin) * 0.5f),
+                          new Vector3(g.W, g.Belt - ChassisBottom, g.FrontLen - Skin), prefabSize));
+        if (g.RearLen > 0.2f)
+            parts.Add(Box(Steel, new Vector3(0f, (ChassisBottom + g.Belt) * 0.5f, g.Back - Skin - (g.RearLen - Skin) * 0.5f),
+                          new Vector3(g.W, g.Belt - ChassisBottom, g.RearLen - Skin), prefabSize));
 
         // Seats, in rows from the front: the driver on the left, as on every vehicle on this map.
-        int rows = Math.Max(1, (int)((Lc - 0.3f) / RowPitch));
-        float firstRow = front - 0.75f;
-        float offset = Wc * 0.25f;
+        int rows = Math.Max(1, (int)((g.Lc - 0.3f) / RowPitch));
+        float firstRow = g.Front - 0.75f;
+        float offset = g.Wc * 0.25f;
         for (int r = 0; r < rows; r++)
         {
             float z = firstRow - r * RowPitch;
             if (r == 0)
             {
-                seats.Add(new SeatDefinition { Name = "driver", Position = new Vector3(-offset, floorTop, z), Controls = true });
-                seats.Add(new SeatDefinition { Name = "front passenger", Position = new Vector3(offset, floorTop, z) });
+                seats.Add(new SeatDefinition { Name = "driver", Position = new Vector3(-offset, g.FloorTop, z), Controls = true });
+                seats.Add(new SeatDefinition { Name = "front passenger", Position = new Vector3(offset, g.FloorTop, z) });
             }
             else
             {
                 string row = rows == 2 ? "rear" : $"row {r + 1}";
-                seats.Add(new SeatDefinition { Name = $"{row} left", Position = new Vector3(-offset, floorTop, z) });
-                seats.Add(new SeatDefinition { Name = $"{row} right", Position = new Vector3(offset, floorTop, z) });
+                seats.Add(new SeatDefinition { Name = $"{row} left", Position = new Vector3(-offset, g.FloorTop, z) });
+                seats.Add(new SeatDefinition { Name = $"{row} right", Position = new Vector3(offset, g.FloorTop, z) });
             }
         }
         return Template(preset, v, parts, seats);

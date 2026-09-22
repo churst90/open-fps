@@ -533,9 +533,14 @@ public class OccupancyTests : IDisposable
         Assert.True(seats[0].Controls);
         Assert.True(parts >= 9, $"only {parts} parts");
 
-        // The cabin is a room — which is the whole of what makes sitting in it sound like a car.
-        bool room = CompositeService.MembersOf(f.World, root).Exists(m => f.World.Has<RegionComponent>(m));
-        Assert.True(room, "the cabin did not enclose a room");
+        // The cabin is a room — which is the whole of what makes sitting in it sound like a car. And it
+        // is the CABIN: the bonnet and the boot sit inside the car's bounding box, and a room derived
+        // from that box was the whole 4.1 m car, three times the volume of the 2.4 m cabin.
+        var roomEntity = CompositeService.MembersOf(f.World, root).Find(m => f.World.Has<RegionComponent>(m));
+        Assert.NotEqual(Arch.Core.Entity.Null, roomEntity);
+        var size = f.World.Get<RegionComponent>(roomEntity).RoomSize;
+        Assert.InRange(size.Z, 2.2f, 2.6f);
+        Assert.InRange(size.Y, 1.0f, 1.3f);
     }
 
     /// <summary>

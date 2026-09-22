@@ -572,7 +572,15 @@ public class CompositeService
 
         var parts = PartsOf(world, root.Id);
         string name = world.Has<CompositeComponent>(root) ? world.Get<CompositeComponent>(root).Name : "";
-        if (!CompositeAcoustics.Derive(world, parts, name, out var room, out var centre)) return false;
+        string templateId = world.Has<CompositeComponent>(root) ? world.Get<CompositeComponent>(root).TemplateId ?? "" : "";
+        RegionComponent room;
+        Vector3 centre;
+        if (VehicleShell.TryParse(templateId, out string preset) && VehicleShell.TryCabin(preset, out centre, out var cabin))
+        {
+            // A vehicle built from its profile: the room is its cabin, which the shell knows.
+            if (!CompositeAcoustics.DeriveInBox(world, parts, name, centre, cabin, out room)) return false;
+        }
+        else if (!CompositeAcoustics.Derive(world, parts, name, out room, out centre)) return false;
 
         var rootT = world.Get<Transform>(root);
         var e = _maps.SpawnEntity(mapId, w => w.Create(

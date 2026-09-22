@@ -189,8 +189,43 @@ public static class CompositeAcoustics
     /// is whichever part presents the most area, which for a long wall is that wall.
     /// </summary>
     public static RoomSurvey SurveyBox(World world, List<Entity> parts, Vector3 centre, Vector3 size)
+        => SurveyBox(Pieces(world, parts, loose: true), centre, size);
+
+    /// <summary>
+    /// A composite's room when the room is KNOWN rather than found: a box in the composite's own
+    /// frame, and only its materials measured from the parts.
+    ///
+    /// A car is the case. Its bonnet and its boot are parts — they are what you walk into — and they
+    /// sit inside the bounding box a derived room is taken from, so deriving it gave the whole car
+    /// back as the room: 4.1 metres of hatchback where the cabin is 2.4, three times the volume, and
+    /// a tail to match. The shell knows exactly where its cabin is, so it says so.
+    /// </summary>
+    public static bool DeriveInBox(World world, List<Entity> parts, string name, Vector3 centre, Vector3 size,
+                                   out RegionComponent room)
     {
-        var pieces = Pieces(world, parts, loose: true);
+        room = default;
+        var survey = SurveyBox(Pieces(world, parts, loose: false), centre, size);
+        if (!survey.IsRoom) return false;
+        var materials = new int[6];
+        for (int f = 0; f < 6; f++)
+            materials[f] = AcousticRegistry.TryGetResonanceIndex(survey.Materials[f], out int index)
+                ? index
+                : AcousticRegistry.TryGetResonanceIndex("Generic", out int fallback) ? fallback : 0;
+        room = new RegionComponent
+        {
+            FriendlyName = string.IsNullOrWhiteSpace(name) ? "Inside" : name,
+            IsIndoor = true,
+            Environment = AcousticEnvironmentType.Atmospheric,
+            RoomSize = survey.Size,
+            ReverbTimeScale = 1.0f,
+            Materials = materials,
+            AmbienceId = "",
+        };
+        return true;
+    }
+
+    private static RoomSurvey SurveyBox(List<Piece> pieces, Vector3 centre, Vector3 size)
+    {
         float boxVolume = size.X * size.Y * size.Z;
 
         // Volume clipped to the box, so a wall that runs past the room is not counted as filling it.
