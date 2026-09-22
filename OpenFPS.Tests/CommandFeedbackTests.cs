@@ -89,7 +89,7 @@ public class CommandFeedbackTests
 
         var replies = new List<IMessage>();
         commands.HandleTextCommand(session.ConnectionId,
-            new TextCommand { Command = "move", Args = new[] { "12", "2", "-8" } }, replies.Add);
+            new TextCommand { Command = "move", Args = new[] { "12", "-8", "2" } }, replies.Add);
         server.DrainCommandBuffer();
 
         Assert.True(maps.TryGetMap("default", out var world, out _, out _, out _));
@@ -121,7 +121,7 @@ public class CommandFeedbackTests
 
         var replies = new List<IMessage>();
         commands.HandleTextCommand(session.ConnectionId,
-            new TextCommand { Command = "move", Args = new[] { "20", "2", "20" } }, replies.Add);
+            new TextCommand { Command = "move", Args = new[] { "20", "20", "2" } }, replies.Add);
         server.DrainCommandBuffer();
 
         var after = world.Get<Transform>(session.Entity).Position;

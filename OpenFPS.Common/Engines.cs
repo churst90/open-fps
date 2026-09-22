@@ -295,6 +295,46 @@ public sealed record IntakeSpec
     public float Level { get; init; } = 0.6f;
 
     /// <summary>
+    /// What the AIRBOX ITSELF takes out on the way past, dB — derived from its geometry, not
+    /// declared.
+    ///
+    /// A box in the middle of a duct is an expansion chamber, and an expansion chamber is a
+    /// silencer. Its transmission loss is set by one number, the area ratio between the box and
+    /// the pipe it sits in:
+    ///
+    ///     TL = 10 log10[ 1 + (1/4)(m - 1/m)^2 sin^2(kL) ]      m = A_box / A_snorkel
+    ///
+    /// averaged over frequency (sin^2 -> 1/2). The box is taken as cubic — the volume is declared
+    /// and its proportions are not — so A_box = V^(2/3).
+    ///
+    /// This is the half of the intake that was missing, and its absence is why a stock road car
+    /// came out sounding like a race car. The EXHAUST side has a muffler model, so silencing an
+    /// exhaust works; the intake had only <see cref="Level"/>, a hand-set escape fraction, and no
+    /// preset set it low enough to stand in for a silencer. Measured with `--voice-levels parts`,
+    /// every car with a silenced exhaust was radiating MORE from its airbox than from its
+    /// tailpipe — economy four +8 dB, V6 +11, road police +10 — where a real one is eight to
+    /// fifteen below.
+    ///
+    /// A blanket correction was tried first and was wrong: it moved the race engines too, and they
+    /// were never the problem. What separates them is exactly what this formula reads — a big box
+    /// on a small snorkel silences (an economy four, 13 dB) and a small box on a big one barely
+    /// does (a big-block with an open element, 4 dB). Nothing is declared per preset.
+    /// </summary>
+    public float AirboxLossDb
+    {
+        get
+        {
+            float vBox = MathF.Max(1e-4f, AirboxLitres * 1e-3f);          // m^3
+            float aBox = MathF.Pow(vBox, 2f / 3f);                        // a cube's face
+            float dSnorkel = MathF.Max(5f, SnorkelDiameterMm) * 1e-3f;
+            float aSnorkel = MathF.PI * dSnorkel * dSnorkel * 0.25f;
+            float m = MathF.Max(1f, aBox / MathF.Max(1e-6f, aSnorkel));
+            float d = m - 1f / m;
+            return 10f * MathF.Log10(1f + 0.125f * d * d);
+        }
+    }
+
+    /// <summary>
     /// Turbulence at the throttle plate, as a multiple of what the flow predicts. 0 for none.
     ///
     /// The counterpart of the exhaust's <see cref="ExhaustSpec.JetNoiseLevel"/>, and the intake had
@@ -775,6 +815,153 @@ public sealed record EngineProfile
         },
         Intake = new IntakeSpec { RunnerLengthMetres = 0.20f, RunnerDiameterMm = 54f, PlenumLitres = 7f, ThrottleDiameterMm = 105f, AirboxLitres = 6f, SnorkelLengthMetres = 0.25f, SnorkelDiameterMm = 110f, Level = 1.0f, Absorption = 0.1f },
         Mechanical = new MechanicalSpec { ValvetrainLevel = 1.1f, CombustionKnock = 0.08f, AccessoryWhineLevel = 0.1f },
+    };
+
+    /// <summary>
+    /// The SAME interceptor V8 as a road car has it: stock cam, stock manifolds, a catalyst and a
+    /// silencer. Everything that makes <see cref="PoliceV8"/> loud is aftermarket, and this is the
+    /// engine before any of it went on.
+    ///
+    /// The differences are all real parts, not a level knob: 290-degree cams instead of 320 (so it
+    /// idles, and idles smoothly); 5.0 litres instead of 7.0; cast manifolds with short primaries
+    /// into a single 63 mm pipe; and a stock muffler where the pace car has straight pipe.
+    /// That last one is most of the thirty-five decibels.
+    /// </summary>
+    public static EngineProfile PoliceInterceptorV8 => new()
+    {
+        Name = "5.0 interceptor V8, stock exhaust",
+        Layout = EngineLayout.Vee,
+        FiringAngles = EvenFire(new[] { 1, 5, 4, 8, 6, 3, 7, 2 }),
+        Bank = AlternatingBanks(8),
+        BoreMm = 92.2f, StrokeMm = 92.7f, RodRatio = 1.66f, CompressionRatio = 12.0f,
+        ExhaustCam = new CamLobe { DurationDegrees = 274f, MaxLiftMm = 12.0f, RampFraction = 0.22f, CentrelineDegrees = 250f },
+        IntakeCam = new CamLobe { DurationDegrees = 270f, MaxLiftMm = 12.2f, RampFraction = 0.22f, CentrelineDegrees = 470f },
+        ExhaustValve = new ValveSpec { DiameterMm = 33f, DischargeCoefficient = 0.66f },
+        IntakeValve = new ValveSpec { DiameterMm = 37f, DischargeCoefficient = 0.68f },
+        EvoTemperatureK = 1180f, IdleMapBar = 0.32f,
+        // A stock cam and a stock idle: it does not lope, because nothing about it is lopey.
+        IdleRoughness = 0.12f, IdleGovernorGain = 0.8f,
+        IdleRpm = 680f, RedlineRpm = 6500f,
+        InertiaKgM2 = 0.30f, FrictionNm = 42f, FrictionNmPerKrpm = 16f,
+        PeakTorqueNm = 530f, PeakTorqueRpm = 4250f,
+        Exhaust = new ExhaustSpec
+        {
+            // Cast manifolds: short, fat, and nothing like a header.
+            PrimaryLengthMetres = 0.34f, PrimarySpread = 0.05f, PrimaryDiameterMm = 42f,
+            CollectorDiameterMm = 63f, CollectorPipeMetres = 0.55f,
+            Crossover = CrossoverKind.HPipe,
+            MidPipeMetres = 1.6f,
+            Muffler = MufflerSpec.Stock,
+            Steepening = 0.9f,
+            TailpipeMetres = new[] { 0.60f, 0.60f },
+            TailpipeDiameterMm = 57f,
+            GasCelsiusIdle = 330f, GasCelsiusFull = 820f,
+            WallLossMultiplier = 1.0f,
+            OverrunPopRate = 0.5f,
+        },
+        // Level 0.12: a sealed factory airbox with a Helmholtz resonator in a long snorkel behind
+        // the headlight, which is what IntakeSpec.Level means ("an open filter under the bonnet is
+        // 1; a factory airbox with a resonator in the snorkel is 0.25") and this is quieter than
+        // that. Worth saying because it is doing a lot of work: at 0.55 the intake measured 109 dB
+        // against an 86 dB exhaust and this stock saloon came out louder than a muscle car.
+        Intake = new IntakeSpec { RunnerLengthMetres = 0.26f, RunnerDiameterMm = 44f, PlenumLitres = 5.5f, ThrottleDiameterMm = 80f, AirboxLitres = 12f, SnorkelLengthMetres = 0.35f, SnorkelDiameterMm = 85f, Level = 0.12f, Absorption = 0.65f },
+        Mechanical = new MechanicalSpec { ValvetrainLevel = 0.45f, CombustionKnock = 0.04f, AccessoryWhineLevel = 0.12f },
+    };
+
+    /// <summary>
+    /// A 1969 big-block Charger's 7.2-litre V8 with Flowmaster chambered mufflers — the car people
+    /// actually drive on a street, as against the race saloon that used to stand in for one.
+    ///
+    /// Everything about it is street spec and every difference from the race engines is a part:
+    /// a 284-degree hydraulic cam (it idles, with a little lope, rather than loping so hard it will
+    /// not hold a light), cast-iron exhaust manifolds instead of long-tube headers, an H-pipe
+    /// crossover between the banks — which is what gives a big-block its cross-plane burble rather
+    /// than the flat bark of two separate fours — and a pair of chambered cans on 2.5 inch pipe.
+    /// The cans are the whole difference between this and an open-headered car, and they are worth
+    /// well over ten decibels.
+    /// </summary>
+    public static EngineProfile V8Charger440 => new()
+    {
+        Name = "7.2 big-block V8, H-pipe, chambered 40s",
+        Layout = EngineLayout.Vee,
+        // Chrysler B/RB firing order 1-8-4-3-6-5-7-2.
+        FiringAngles = EvenFire(new[] { 1, 8, 4, 3, 6, 5, 7, 2 }),
+        Bank = AlternatingBanks(8),
+        BoreMm = 109.7f, StrokeMm = 95.2f, RodRatio = 1.70f, CompressionRatio = 10.1f,
+        ExhaustCam = new CamLobe { DurationDegrees = 284f, MaxLiftMm = 11.9f, RampFraction = 0.20f, CentrelineDegrees = 254f },
+        IntakeCam = new CamLobe { DurationDegrees = 280f, MaxLiftMm = 11.9f, RampFraction = 0.20f, CentrelineDegrees = 468f },
+        ExhaustValve = new ValveSpec { DiameterMm = 44.5f, DischargeCoefficient = 0.67f },
+        IntakeValve = new ValveSpec { DiameterMm = 54f, DischargeCoefficient = 0.69f },
+        EvoTemperatureK = 1210f, IdleMapBar = 0.38f,
+        // A street cam in a big block: it lopes, but it idles.
+        IdleRoughness = 0.42f, IdleGovernorGain = 0.9f,
+        IdleRpm = 750f, RedlineRpm = 5600f,
+        InertiaKgM2 = 0.42f, FrictionNm = 52f, FrictionNmPerKrpm = 18f,
+        PeakTorqueNm = 664f, PeakTorqueRpm = 3200f,
+        Exhaust = new ExhaustSpec
+        {
+            // Cast manifolds: short and fat, nothing like a header, and a good part of why a stock
+            // muscle car rumbles where a race car barks.
+            PrimaryLengthMetres = 0.38f, PrimarySpread = 0.05f, PrimaryDiameterMm = 45f,
+            CollectorDiameterMm = 64f, CollectorPipeMetres = 0.5f,
+            // The H. Coupling the banks lets the two firing sequences share pulses, which is the
+            // cross-plane burble; without it a V8 is two inline fours pointing the same way.
+            Crossover = CrossoverKind.HPipe,
+            MidPipeMetres = 1.2f,
+            Muffler = MufflerSpec.Chambered40,
+            Steepening = 1.05f,
+            TailpipeMetres = new[] { 0.85f, 0.90f },
+            TailpipeDiameterMm = 63.5f,
+            GasCelsiusIdle = 360f, GasCelsiusFull = 880f,
+            WallLossMultiplier = 1.05f,
+            OverrunPopRate = 3.5f,
+        },
+        Intake = new IntakeSpec { RunnerLengthMetres = 0.22f, RunnerDiameterMm = 50f, PlenumLitres = 6f, ThrottleDiameterMm = 92f, AirboxLitres = 5f, SnorkelLengthMetres = 0.20f, SnorkelDiameterMm = 95f, Level = 0.30f, Absorption = 0.35f },
+        Mechanical = new MechanicalSpec { ValvetrainLevel = 0.7f, CombustionKnock = 0.05f, AccessoryWhineLevel = 0.12f },
+    };
+
+    /// <summary>
+    /// The same 45-degree V-twin as <see cref="VTwin45"/> with the mufflers the factory fits.
+    ///
+    /// Same engine, same 315/405 firing interval — that uneven beat is the crank, not the pipes,
+    /// and it survives any exhaust — but through a pair of baffled cans instead of straight pipe.
+    /// A motorcycle has to pass 80 dB(A) at fifty feet to be sold, which is about 104 at a metre,
+    /// and that is the difference between the bike in a showroom and the one that sets off car
+    /// alarms.
+    /// </summary>
+    public static EngineProfile VTwin45Stock => VTwin45 with
+    {
+        Name = "1.75 V-twin, 45 degrees, stock mufflers",
+        Exhaust = VTwin45.Exhaust with
+        {
+            Muffler = MufflerSpec.Stock,
+            TailpipeMetres = new[] { 0.32f, 0.42f },
+            TailpipeDiameterMm = 44f,
+            OverrunPopRate = 1.0f,
+        },
+        Intake = VTwin45.Intake with { Level = 0.35f, Absorption = 0.5f },
+    };
+
+    /// <summary>
+    /// And the one most of them are actually riding: stock head pipes with aftermarket slip-on
+    /// cans. Straight-through, packed, and a great deal louder than stock without being open pipe.
+    /// </summary>
+    public static EngineProfile VTwin45SlipOn => VTwin45 with
+    {
+        Name = "1.75 V-twin, 45 degrees, slip-on cans",
+        Exhaust = VTwin45.Exhaust with
+        {
+            // A slip-on is a packed straight-through can, but a SHORT one with a dense pack — a
+            // 350 mm muffler on a motorcycle, not the 500 mm glasspack under a car. Measured at
+            // Glasspack's own 0.62 absorption it came out within four decibels of open pipe, which
+            // is not what a slip-on is: it is halfway between stock and straight, and the length
+            // and density of the packing are what put it there.
+            Muffler = MufflerSpec.Glasspack with { Absorption = 0.86f, AbsorptiveLengthMetres = 0.35f },
+            TailpipeMetres = new[] { 0.30f, 0.40f },
+            TailpipeDiameterMm = 48f,
+            OverrunPopRate = 6f,
+        },
+        Intake = VTwin45.Intake with { Level = 0.5f },
     };
 
     /// <summary>A modern 6.2-litre pushrod V8 with a mild street cam, shorty headers, an H-pipe and
@@ -1974,6 +2161,10 @@ public sealed record EngineProfile
             ["nascar_v8"] = () => NascarV8,
             ["f1_v10"] = () => F1V10,
             ["police_v8"] = () => PoliceV8,
+            ["police_interceptor"] = () => PoliceInterceptorV8,
+            ["v8_charger440"] = () => V8Charger440,
+            ["vtwin_stock"] = () => VTwin45Stock,
+            ["vtwin_slipon"] = () => VTwin45SlipOn,
             ["v8_open_headers"] = () => V8OpenHeaders,
             ["v8_glasspack"] = () => V8BigBlockGlasspack,
             ["v8_mild"] = () => V8MildSmallBlock,

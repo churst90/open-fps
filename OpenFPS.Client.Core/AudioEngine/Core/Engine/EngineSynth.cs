@@ -66,6 +66,16 @@ public sealed class EngineSynth
     /// <summary>Pressure at one metre from the block: valvetrain, combustion through the metal, accessories.</summary>
     public float Block { get; private set; }
 
+    /// <summary>
+    /// The block's missing anchor, as a gain: +7.5 dB. See where Block is assembled for how it was
+    /// measured and why it is one number rather than one per engine.
+    /// </summary>
+    private const float BlockRadiationGain = 2.371f;   // 10^(7.5/20)
+
+    /// <summary>The airbox's own transmission loss as a gain, from its geometry. Built once: it is
+    /// a property of the box, not of what the engine is doing. See IntakeSpec.AirboxLossDb.</summary>
+    private readonly float _airboxLoss;
+
     public float Rpm => _omega * 60f / (2f * MathF.PI);
 
     /// <summary>Crank angle, degrees through the cycle. For instruments: an artefact that recurs at
@@ -226,6 +236,7 @@ public sealed class EngineSynth
         _rng = new Random(seed);
         _n = e.Cylinders;
         _cycleDeg = e.CycleDegrees;
+        _airboxLoss = MathF.Pow(10f, -e.Intake.AirboxLossDb / 20f);
 
         _crankRadius = e.StrokeMm * 0.5e-3f;
         _rodLength = _crankRadius * e.RodRatio;
@@ -758,7 +769,17 @@ public sealed class EngineSynth
         Exhaust = _exhaust.Radiated;
         ExhaustShell = _exhaust.ShellRadiated;
         ExhaustPipe = _exhaust.PipeRadiated;
-        Intake = _intake.Radiated * e.Intake.Level;
+        // ── The intake's silencer ──────────────────────────────────────────────────────────────
+        //
+        // Level is an ESCAPE FRACTION — how much of what the orifice makes gets out of the car —
+        // and it was carrying the whole job on its own, including the job of being a silencer.
+        // It cannot: no preset set it low enough, and the result was that every car with a
+        // silenced EXHAUST came out radiating more from its airbox than from its tailpipe, which
+        // is what a race car with velocity stacks does and not what a road car does. The airbox is
+        // an expansion chamber and silences like one; see IntakeSpec.AirboxLossDb, which reads it
+        // off the box and the snorkel and gives an economy four thirteen decibels where it gives a
+        // big-block with an open element four.
+        Intake = _intake.Radiated * e.Intake.Level * _airboxLoss;
 
         // ── The block ────────────────────────────────────────────────────────────────────────
         // Knock: the pressure-rise rate, RUNG THROUGH THE GAS, and then through the metal.
@@ -864,7 +885,27 @@ public sealed class EngineSynth
                    // about fifteen decibels under the block's thud, which is inaudible beside it.
                    * m.TurboWhistleLevel * 0.28f * _spool * _spool;
         }
-        Block = knockOut + thud + mech + whine;
+        // ── The block's anchor ─────────────────────────────────────────────────────────────────
+        //
+        // Everything above is a MECHANISM with a shape: knock rings the bore at its own modes, the
+        // thud is cylinder pressure through the mounts, the clatter is one event per valve, the
+        // whine is an accessory order. What none of them had was an absolute level. Every other
+        // source in this engine has one — the tyres declare SquealDb, a blade row ReferenceDb, a
+        // jet its Lighthill trim — and the block had four scale factors and no anchor, so where it
+        // landed was wherever the arithmetic put it.
+        //
+        // Measured with `--voice-levels parts`, it landed about seven and a half decibels low, and
+        // by the same amount at both ends of the range: a 13 litre truck six radiated 90.6 dB at a
+        // metre where published engine-surface figures for heavy-duty diesels at rated power are
+        // 97-100, and a 1.6 litre petrol four 76.1 where a small four is 82-86. The DISPLACEMENT
+        // scaling between them was already right (+3.7 dB over 4.6x the swept volume, against the
+        // +4.4 a two-thirds-power surface law gives), which is what says this is one anchor wrong
+        // for everybody rather than a preset needing a number.
+        //
+        // It is worth nothing on a petrol car — a muscle car's block is thirty decibels under its
+        // exhaust either way — and it is most of a bus, whose block is the loudest thing on it.
+        // That asymmetry is why it went unnoticed: "I can hardly hear the engines on those diesels."
+        Block = (knockOut + thud + mech + whine) * BlockRadiationGain;
     }
 
     private float StarterTorque()

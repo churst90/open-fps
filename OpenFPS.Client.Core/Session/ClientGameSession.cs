@@ -218,7 +218,7 @@ public sealed class ClientGameSession : IDisposable
     {
         // Accessibility readouts — the game's HUD, spoken.
         _bindings.Bind(InputContext.Gameplay, GameKey.C,
-            () => Say($"Coordinates: {_state.Position.X:F1}, {_state.Position.Y:F1}, {_state.Position.Z:F1}"));
+            () => Say($"Coordinates: {OpenFPS.Common.PlayerCoordinates.Format(_state.Position)}"));
         _bindings.Bind(InputContext.Gameplay, GameKey.F, () => Say($"Facing: {_state.GetCompassDirection()}"));
         _bindings.Bind(InputContext.Gameplay, GameKey.H, () => Say($"Health: {_state.Health} percent"));
         _bindings.Bind(InputContext.Gameplay, GameKey.Z, () => Say($"Area: {_state.CurrentRegion}"));
@@ -474,6 +474,33 @@ public sealed class ClientGameSession : IDisposable
     private double _simTime;
 
     /// <summary>
+    /// How far to the next forty-five degree mark in the direction a turn key was pressed.
+    ///
+    /// Sign conventions, because they are the whole of it and each one is individually plausible:
+    /// the physics applies <c>Yaw -= LookDelta.X * ...</c>, so a POSITIVE x (J) DECREASES yaw, and
+    /// <c>Pitch += LookDelta.Y * ...</c>, so a positive y (K) increases pitch. The step returned
+    /// here is always a positive magnitude; the key's own axis sign carries the direction.
+    /// </summary>
+    private float SnapDegrees(GameKey key, float ax, float ay)
+    {
+        // Which way the angle itself moves, as against which way the key's axis points.
+        float currentDeg, dir;
+        if (ax != 0f) { currentDeg = _state.Yaw * (180f / MathF.PI); dir = -MathF.Sign(ax); }
+        else { currentDeg = _state.Pitch * (180f / MathF.PI); dir = MathF.Sign(ay); }
+
+        float step = TurnStepDegrees;
+        // Where the grid line is, in the direction of travel. A heading already ON the grid gets a
+        // whole step — otherwise the key would do nothing at all, which is worse than overshooting.
+        float grid = dir > 0f ? MathF.Ceiling(currentDeg / step) * step
+                              : MathF.Floor(currentDeg / step) * step;
+        float delta = MathF.Abs(grid - currentDeg);
+        // A tolerance, because a float yaw is never exactly on a mark after a few turns and a
+        // hundredth of a degree of "snap" is a key that did nothing.
+        const float OnGrid = 0.25f;
+        return delta < OnGrid ? step : delta;
+    }
+
+    /// <summary>
     /// Turns the four look keys into a LookDelta, as DISCRETE steps rather than a continuous push.
     ///
     /// A key that turns for as long as it is down cannot be aimed: at the old rate a press held for
@@ -499,7 +526,20 @@ public sealed class ClientGameSession : IDisposable
             if (justPressed.Contains(key))
             {
                 _turnDownAt[key] = _simTime;
-                degrees = fine ? TurnFineDegrees : TurnStepDegrees;
+                // A coarse tap SNAPS TO THE GRID rather than adding to wherever you happen to be.
+                //
+                // Adding forty-five degrees to an off-angle heading keeps it off-angle for ever.
+                // Once a fine nudge or a sweep has left you at, say, 47 degrees, every coarse tap
+                // after it lands on 92, 137, 182 — and walking "straight" then changes BOTH
+                // coordinates, which is the whole complaint: "if I press j or l to go facing north
+                // and I walk straight, both the x and the y change when they shouldn't."
+                //
+                // Heading north, east, south or west and having exactly one coordinate move is the
+                // thing this key is for. So a coarse tap goes to the next multiple of forty-five in
+                // the direction pressed — which is a full step when you are already on the grid,
+                // and less than one when you are not. Shift is unchanged: one degree, off-grid on
+                // purpose, for lining something up by ear.
+                degrees = fine ? TurnFineDegrees : SnapDegrees(key, ax, ay);
             }
             else if (_simTime - _turnDownAt.GetValueOrDefault(key, _simTime) >= TurnHoldBeforeSweep)
             {

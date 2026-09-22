@@ -49,7 +49,7 @@ walls at the same ~6 ms delay. The city plan flagged the double-count from the s
 alone on purpose: with the tail finally audible the balance against it changes, and pre-emptively
 fixing something that may now be fine is how the last three sessions went wrong.
 
-**How to know:** walk the corridor at `/tp 20.3 0.1 8`. If it sounds combed or metallic *now*, retire
+**How to know:** walk the corridor at `/tp 20.3 8 0.1`. If it sounds combed or metallic *now*, retire
 the near-field probe contribution where an image-source arrival already covers the same surface. If it
 sounds like a corridor, delete this section from the next plan.
 
@@ -116,12 +116,12 @@ From `docs/NEXT_THE_CITY.md`, unchanged and still in this order:
 ## The route, for re-testing anything above
 
 ```
-/tp -20 0.3 32       garage L0     5107 ms   the longest tail on the map
-/tp 14.35 0.1 -6.7   stairwell     2061 ms   bright, tile
-/tp 20.3 0.1 8       corridor       427 ms
-/tp 14.35 0.1 3.1    flat           445 ms   should be nearly dead
-/tp 0 0.2 -55        tunnel        3024 ms   dark
-/tp 0 0.2 -20        street         525 ms   nearly dry
+/tp -20 32 0.3       garage L0     5107 ms   the longest tail on the map
+/tp 14.35 -6.7 0.1   stairwell     2061 ms   bright, tile
+/tp 20.3 8 0.1       corridor       427 ms
+/tp 14.35 3.1 0.1    flat           445 ms   should be nearly dead
+/tp 0 -55 0.2        tunnel        3024 ms   dark
+/tp 0 -20 0.2        street         525 ms   nearly dry
 ```
 
 Server: `./run-server.sh city`. Build to tmpfs with `--artifacts-path`, never `dotnet run`.

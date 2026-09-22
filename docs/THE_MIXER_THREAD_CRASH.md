@@ -376,7 +376,7 @@ the unfinished work.** Candidates not yet eliminated:
   route statically.
 - The client has GTK, GL, PulseAudio and a game loop competing for the same cores; the harnesses are
   near-idle.
-- The client teleports (`/tp 0 1 30`) — the fastest reproduction available, crashing almost
+- The client teleports (`/tp 0 30 1`) — the fastest reproduction available, crashing almost
   immediately — which re-evaluates the whole voice set in one frame. No harness does anything like
   it.
 

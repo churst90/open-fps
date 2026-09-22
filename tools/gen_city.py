@@ -971,9 +971,10 @@ for idx in (2, 9, 17, 26, 34, 41):
                   if en.get("Name", "").endswith("back garden")][idx]]
     gx, gz = e["Position"]["X"], e["Position"]["Z"]
     MOWER_RUNS.append((idx, gx, gz))
-# One riding mower, on the open grass beside the airport road, which is where a big one lives.
+# One riding mower, on the open grass beside the airport road, which is where a big one lives. It
+# is a shuttle like the push mowers, not a prop: a mower standing still is not mowing, and a prop
+# never moves. The run keeps between the avenue's hedges (x 138) and the rail fence (x 177).
 box("grass_floor", 120.0, 190.0, 0.0, 0.09, 60.0, 122.0, name="Airport verge")
-prop("mower_riding", 154.0, 0.62, 92.0, name="Verge mower")
 
 # ══ Street trees ══════════════════════════════════════════════════════════════════════════════════
 #
@@ -1242,6 +1243,13 @@ for idx, gx, gz in MOWER_RUNS:
         "SpeedsKmh": [4.0, 3.6], "AccelerationMps2": 0.5, "BrakingMps2": 0.8,
         "WaitSeconds": 1.5, "StartDelaySeconds": (idx % 7) * 2.0,
     })
+
+VEHICLES.append({
+    "Name": "Verge mower", "Preset": "mower_riding",
+    "RoadStart": v3(156.0, 0.62, 66.0), "RoadEnd": v3(156.0, 0.62, 116.0),
+    "SpeedsKmh": [7.0, 6.5], "AccelerationMps2": 0.8, "BrakingMps2": 1.2,
+    "WaitSeconds": 2.0, "StartDelaySeconds": 3.0,
+})
 
 # ── People ────────────────────────────────────────────────────────────────────────────────────
 #

@@ -257,9 +257,15 @@ public class EngineSynthTests
                 new(DriverAction.Holding, 3.5f, v.Engine.RedlineRpm * 0.85f, 1f),
             }, seed: 5);
 
-            Assert.True(MathF.Abs(r.ExhaustDb - v.SourceLevelDb) <= 3.5f,
-                $"{key}: declares {v.SourceLevelDb:F0} dB but measures {r.ExhaustDb:F1} — "
-                + "re-measure with `--engine-levels` and update the preset");
+            // NOT asserted against the declared level any more, and that is a correction rather
+            // than a relaxation. This render is the TAILPIPE (plus a third of the intake); the
+            // vehicle the game plays is EngineVoiceState, which is that plus the body ringing, the
+            // engine bay, the cooling fan, the tyres and the air system. On a car the two are the
+            // same number to a decibel, because a car IS its exhaust. On a turbocharged bus they
+            // are twelve decibels apart — the turbine has eaten the exhaust and what is left is
+            // the block, the intake and the fan — and declaring the tailpipe figure for the whole
+            // vehicle placed the buses three decibels under their own model. See
+            // DeclaredSourceLevelMatchesTheLiveVoice below, which asserts the thing that matters.
 
             // Two thresholds, because they mean different things. What the waveform does over and
             // over (the 99.9th percentile) must fit inside the headroom, or the engine is clipped.
@@ -285,6 +291,60 @@ public class EngineSynthTests
                 + $"can absorb ({20f * MathF.Log10(peak / 20e-6f):F0} dB SPL against a "
                 + $"{20f * MathF.Log10(reference / 20e-6f):F0} dB reference).");
         }
+    }
+
+    /// <summary>
+    /// What the profile declares is what the GAME'S VOICE measures at one metre — not what an
+    /// offline tailpipe render does.
+    ///
+    /// <see cref="VehicleProfile.SourceLevelDb"/> decides where the emitter is placed AND what one
+    /// full-scale sample means inside the voice, and the two pull in opposite directions: declare a
+    /// vehicle four decibels louder than it really is and its samples come out four decibels
+    /// smaller while its placement gain only comes up by the compressed share of that, so it plays
+    /// about two decibels too quiet. A mis-declaration is never harmless and never cancels.
+    ///
+    /// So this renders <see cref="EngineVoiceState"/> — the object the mixer wraps — at full
+    /// throttle, meters it where the engine is near its redline, and holds it to its declaration.
+    /// Re-measure with <c>--voice-levels</c> and update the preset.
+    /// </summary>
+    [Fact]
+    public void DeclaredSourceLevelMatchesTheLiveVoice()
+    {
+        const int sr = 44100, block = 1024;
+        var bad = new List<string>();
+        foreach (var key in MachineRegistry.Ids)
+        {
+            var v = MachineRegistry.VehicleFor(key);
+            var voice = new EngineVoiceState(v, sr, 5);
+            float redline = v.Engine.RedlineRpm;
+            float start = redline * 0.5f / 60f * 2f * MathF.PI * v.Gearbox.WheelRadiusMetres
+                        / MathF.Max(0.1f, v.Gearbox.Ratios[0] * v.Gearbox.FinalDrive);
+            voice.PlaceAtSpeed(start);
+            voice.Revive();
+            voice.TargetSpeed = 200f;
+
+            var buf = new float[block];
+            for (int i = 0; i < sr / block; i++) voice.Render(buf);
+
+            double sum = 0; long n = 0;
+            for (int b = 0; b < (int)(18f * sr / block) && n <= 3L * sr; b++)
+            {
+                voice.Render(buf);
+                float rpm = voice.Engine.Rpm;
+                // Near the redline and actually on the throttle: a gearbox that takes most of a
+                // second to shift spends it off the throttle at an rpm still inside the window.
+                if (rpm < redline * 0.78f || rpm > redline * 0.95f || voice.Engine.Throttle < 0.8f) continue;
+                foreach (float x in buf) { sum += (double)x * x; n++; }
+            }
+            if (n == 0) continue;   // a preset whose gearing never reaches the window at all
+
+            float rms = MathF.Sqrt((float)(sum / n));
+            float measured = 20f * MathF.Log10(MathF.Max(1e-9f, rms * voice.PascalsAtFullScale) / 20e-6f);
+            if (MathF.Abs(measured - v.SourceLevelDb) > 3.5f)
+                bad.Add($"{key}: declares {v.SourceLevelDb:F0} dB, the live voice measures {measured:F1}");
+        }
+        Assert.True(bad.Count == 0,
+            "Re-measure with `--voice-levels` and update the preset:\n  " + string.Join("\n  ", bad));
     }
 
     // ── The live voice: how it starts and how it stops ──────────────────────────────────────────

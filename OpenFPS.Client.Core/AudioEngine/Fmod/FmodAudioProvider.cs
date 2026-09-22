@@ -15,6 +15,61 @@ using OpenFPS.Client.Core.Platform;
 
 namespace OpenFPS.Client.AudioEngine.Fmod;
 
+/// <summary>
+/// How distance attenuates a voice, and it is NOT a detail.
+///
+/// Every channel in this file was created FMOD_3D_LINEARROLLOFF, which takes a voice from full
+/// volume at MinDistance to silence at Range in a straight line. <see cref="OpenFPS.Common.Loudness"/>'s
+/// <c>RenderedGain</c> — which says of itself that it is "the law the mixer actually applies, in one
+/// place", and which every balance decision and every test in this project is written against — is
+/// an INVERSE law with an edge fade. They are not the same law and they are not close.
+///
+/// What the difference costs, on the city's own numbers: a bus (placement gain -26.6 dBFS,
+/// reference 9.8 m, range 2,292 m) at thirty metres renders at -36.3 dBFS under the model and
+/// -26.7 under FMOD. Linear rolloff barely attenuates anything until the listener is near the range
+/// limit, so DISTANCE STOPS CARRYING INFORMATION: near and far sources sit at nearly the same
+/// level, and what is loud is decided entirely by each source's placement gain. That is why one
+/// over-declared vehicle could be "the only thing that's loud" everywhere on a two-kilometre map.
+/// On a world played by ear, distance is the cue that matters most.
+///
+/// AND IT IS WHY LONG VEHICLES WERE QUIET. This is the systematic fault behind "the buses are
+/// quiet", "the only thing that's loud is that police car" and "the radius of sound doesn't seem
+/// to be as far as it should", and it is one fault, not three.
+///
+/// <see cref="OpenFPS.Common.Loudness"/>'s <c>Widen</c> gives a source with a SIZE a reference
+/// distance equal to its own body, and pays its gain down by the same ratio so the product
+/// gain x reference is held — because under an inverse law that product IS the far field, so the
+/// near field goes flat and nothing else changes. Under a LINEAR law that product means nothing:
+/// the level at distance barely depends on the reference at all. So the payment was taken and the
+/// compensation never arrived, and every vehicle was attenuated in proportion to its own length:
+///
+///     motorcycle  1.0 m extent    0.0 dB      v8 muscle   3.5 m    -0.9 dB
+///     road police 3.5 m extent   -9.3 dB      school bus  9.8 m   -18.2 dB
+///
+/// Worse, it is uneven: a source loud enough to earn a reference distance BIGGER than its own body
+/// pays nothing, so the pace car at 132 dB (reference 10 m) was exempt while the same shape of car
+/// at 95 dB paid nine decibels. The loud got louder and the long got quieter, which is exactly the
+/// map that was reported.
+///
+/// So the default is INVERSE now: not as a preference, but because every piece of arithmetic in
+/// Loudness — the widening, the ranges, the compression, every balance ever measured against it —
+/// is written for that law, and the mixer was running a different one. Linear is kept for A/B:
+///
+///   OPENFPS_ROLLOFF=linear    what the game used to do
+///   OPENFPS_ROLLOFF=inverse   the default, and what Loudness models
+/// </summary>
+internal static class Rolloff
+{
+    public static readonly MODE Mode =
+        string.Equals(Environment.GetEnvironmentVariable("OPENFPS_ROLLOFF"), "linear",
+                      StringComparison.OrdinalIgnoreCase)
+            ? MODE._3D_LINEARROLLOFF
+            : MODE._3D_INVERSEROLLOFF;
+
+    /// <summary>Both laws' bits, for clearing the mode before setting 2D.</summary>
+    public const MODE Either = MODE._3D_LINEARROLLOFF | MODE._3D_INVERSEROLLOFF;
+}
+
 internal static class FmodHelpers
 {
     public static FMOD.VECTOR ToFmodVec(Vector3 v) => new FMOD.VECTOR { x = v.X, y = v.Y, z = v.Z };
@@ -77,7 +132,7 @@ internal class FmodResourceManager : IDisposable
         // OPENRAW because there is no file header on a buffer we made ourselves; without it FMOD
         // tries to parse one and refuses the sound silently.
         RESULT res = _system.createSound(pcm16Mono,
-            MODE.OPENMEMORY | MODE.OPENRAW | MODE._3D | MODE._3D_LINEARROLLOFF | MODE.LOOP_OFF,
+            MODE.OPENMEMORY | MODE.OPENRAW | MODE._3D | Rolloff.Mode | MODE.LOOP_OFF,
             ref info, out FMOD.Sound sound);
         if (res != RESULT.OK)
         {
@@ -159,7 +214,7 @@ internal class FmodResourceManager : IDisposable
             }
         }
 
-        MODE mode = MODE.CREATESAMPLE | MODE._3D | MODE._3D_LINEARROLLOFF | MODE.NONBLOCKING;
+        MODE mode = MODE.CREATESAMPLE | MODE._3D | Rolloff.Mode | MODE.NONBLOCKING;
         if (loop) mode |= MODE.LOOP_NORMAL;
 
         RESULT res = _system.createSound(path, mode, out sound);
@@ -805,6 +860,32 @@ public class FmodAudioProvider : IAudioProvider
             _system.createChannelGroup("Reflections", out _reflectionGroup);
             _system.getMasterChannelGroup(out var master);
             master.addGroup(_reflectionGroup);
+
+            // How loud the whole world is, and the ONE place it belongs.
+            //
+            // With the mixer on the inverse law the mix has headroom it did not have before:
+            // measured with `--earshot`, the city's forty-two vehicles sum to -30 dBFS at the spawn
+            // where under linear rolloff they summed to +6 — that is, the old mix was CLIPPING on
+            // traffic alone, because linear barely attenuates with distance and every vehicle in
+            // the map was arriving at nearly its full placement gain.
+            //
+            // The correct answer to "everything is too quiet" is therefore a master trim and not a
+            // per-source one: the balance between sources is now physics, and nudging individual
+            // presets to get overall loudness would undo exactly the work that made them agree.
+            // Set it by ear; the limiter at the head of this chain catches the peaks.
+            //
+            // SIX is the default, settled by ear: twelve was tried and was too much, zero was the
+            // old clipping-under-linear-rolloff world. OPENFPS_MASTER_DB overrides it.
+            const float DefaultMasterDb = 6f;
+            float masterDb = float.TryParse(Environment.GetEnvironmentVariable("OPENFPS_MASTER_DB"),
+                                            System.Globalization.NumberStyles.Float,
+                                            System.Globalization.CultureInfo.InvariantCulture,
+                                            out float mdb) ? Math.Clamp(mdb, -24f, 24f) : DefaultMasterDb;
+            if (MathF.Abs(masterDb) > 0.01f)
+            {
+                master.setVolume(MathF.Pow(10f, masterDb / 20f));
+                Log.Information("Master trim: {Db:F1} dB (OPENFPS_MASTER_DB).", masterDb);
+            }
 
             // Near-field boundary reflections, at the TAIL so every world sound passes through them —
             // a wall reflects the whole room back at you, not one voice.
@@ -1498,7 +1579,7 @@ public class FmodAudioProvider : IAudioProvider
         // We gate the LEVEL manually (per-portal aperture/distance), so keep FMOD's own distance
         // rolloff out of the way with a huge max distance. When the listener is inside the room we set
         // 3D level back to 0 so the reverb fills the space non-directionally.
-        bus.setMode(MODE._3D | MODE._3D_LINEARROLLOFF);
+        bus.setMode(MODE._3D | Rolloff.Mode);
         bus.set3DMinMaxDistance(2.0f, 10000.0f);
         if (_system.createDSPByType(DSP_TYPE.SFXREVERB, out var reverbDsp) != RESULT.OK || !reverbDsp.hasHandle())
         {
@@ -1559,7 +1640,7 @@ public class FmodAudioProvider : IAudioProvider
         if (_steamAudioEnabled && TryCreateSteamAudioVoice(out var rvState, out var rvDsp, out var rvHandle))
         {
             bus.getMode(out MODE bm);
-            bus.setMode((bm & ~(MODE._3D | MODE._3D_LINEARROLLOFF)) | MODE._2D);
+            bus.setMode((bm & ~(MODE._3D | Rolloff.Either)) | MODE._2D);
             bus.addDSP(CHANNELCONTROL_DSP_INDEX.HEAD, rvDsp);
             // Never bypassed. The stage crossfades between the reverb's own stereo and its binaural
             // placement inside the callback (SpatialBlend), so there is no switch to click and no
@@ -1917,7 +1998,7 @@ public class FmodAudioProvider : IAudioProvider
                 ReleaseGranularDsp(granularDsp, granularHandle, granularState);
                 return;
             }
-            channel.setMode(MODE._3D | MODE._3D_LINEARROLLOFF);
+            channel.setMode(MODE._3D | Rolloff.Mode);
         }
         else if (emitter.IsSynth && emitter.IntakeOfEntity != 0)
         {
@@ -1937,7 +2018,7 @@ public class FmodAudioProvider : IAudioProvider
                 engineHandle.Free();
                 return;
             }
-            channel.setMode(MODE._3D | MODE._3D_LINEARROLLOFF);
+            channel.setMode(MODE._3D | Rolloff.Mode);
             tapState = tap;
             // ...and the voice it came from stops carrying the front of the machine. Slewed, not
             // switched: see EngineVoiceState.SplitVoices.
@@ -1966,7 +2047,7 @@ public class FmodAudioProvider : IAudioProvider
                 engineHandle.Free();
                 return;
             }
-            channel.setMode(MODE._3D | MODE._3D_LINEARROLLOFF);
+            channel.setMode(MODE._3D | Rolloff.Mode);
             echoState = echo;
         }
         else if (emitter.IsSynth && !string.IsNullOrEmpty(emitter.PhysicalKey))
@@ -1993,6 +2074,14 @@ public class FmodAudioProvider : IAudioProvider
                                                          mrate, emitter.EntityId * 17 + 3,
                                                          lever: emitter.PowerLever),
                     "rail" => RailTap(emitter.PhysicalKey, mrate),
+                    // A siren head, on the car that carries it. Its own voice because it is 35 dB
+                    // over the car's exhaust and the two cannot share one full-scale reference —
+                    // see SirenVoiceState.
+                    "siren" => new SirenVoiceState(OpenFPS.Common.SirenSpec.ByName(preset), mrate),
+                    // A crossing bell. Its Running flag is the server's, not the client's — see
+                    // BellVoiceState for why this one cannot be worked out locally.
+                    "bell" => new BellVoiceState(OpenFPS.Common.ModelLibrary.Bell(preset),
+                                                 mrate, emitter.EntityId * 13 + 5),
                     _ => null,
                 };
             }
@@ -2020,7 +2109,7 @@ public class FmodAudioProvider : IAudioProvider
                 engineHandle.Free();
                 return;
             }
-            channel.setMode(MODE._3D | MODE._3D_LINEARROLLOFF);
+            channel.setMode(MODE._3D | Rolloff.Mode);
         }
         else if (emitter.IsSynth && !string.IsNullOrEmpty(emitter.EngineKey))
         {
@@ -2045,7 +2134,7 @@ public class FmodAudioProvider : IAudioProvider
                 engineHandle.Free();
                 return;
             }
-            channel.setMode(MODE._3D | MODE._3D_LINEARROLLOFF);
+            channel.setMode(MODE._3D | Rolloff.Mode);
         }
         else if (emitter.IsSynth)
         {
@@ -2070,7 +2159,7 @@ public class FmodAudioProvider : IAudioProvider
                 ReleaseSynthDsp(synthDsp, synthHandle, synthState);
                 return;
             }
-            channel.setMode(MODE._3D | MODE._3D_LINEARROLLOFF);
+            channel.setMode(MODE._3D | Rolloff.Mode);
         }
         else
         {
@@ -2095,7 +2184,7 @@ public class FmodAudioProvider : IAudioProvider
                 else Log.Warning("playSound failed for '{Sound}' on entity {Id}: {Result}", emitter.SoundId, emitter.EntityId, playRes);
                 return;
             }
-            channel.setMode(MODE._3D | MODE._3D_LINEARROLLOFF);
+            channel.setMode(MODE._3D | Rolloff.Mode);
         }
 
         if (_audioDebug && emitter.Mode == PlaybackMode.LoopOne)
@@ -2136,7 +2225,7 @@ public class FmodAudioProvider : IAudioProvider
                 // while preserving loop/other flags. Distance falloff is applied manually below in
                 // ApplyAcousticFilters (distAtten), so we lose nothing by leaving FMOD's 3D path.
                 channel.getMode(out MODE chMode);
-                channel.setMode((chMode & ~(MODE._3D | MODE._3D_LINEARROLLOFF)) | MODE._2D);
+                channel.setMode((chMode & ~(MODE._3D | Rolloff.Either)) | MODE._2D);
             }
             else
             {
@@ -2151,7 +2240,7 @@ public class FmodAudioProvider : IAudioProvider
                 // misses the pool is quieter and further away rather than louder and nearer.
                 _saPoolMisses++;
                 channel.getMode(out MODE fallbackMode);
-                channel.setMode((fallbackMode & ~MODE._3D_LINEARROLLOFF) | MODE._3D | MODE._3D_INVERSEROLLOFF);
+                channel.setMode((fallbackMode & ~Rolloff.Either) | MODE._3D | MODE._3D_INVERSEROLLOFF);
                 channel.set3DLevel(1.0f);
             }
             // ── NOT ON A CHANNEL WE JUST MADE 2D ────────────────────────────────────────────────
@@ -2347,10 +2436,25 @@ public class FmodAudioProvider : IAudioProvider
                     // The power lever, for anything that has one. It comes from the flight path
                     // rather than from a script: see ClientAudioSystem, where it is read off the
                     // climb angle.
-                    if (active.MachineState is AircraftVoiceState airv)
+                    if (active.MachineState is SirenVoiceState sirenv)
+                    {
+                        // The lever slot carries the mode. A siren has no continuous control, so
+                        // there is nothing to slew and nothing to interpolate: it is a switch on a
+                        // dashboard and the head changes sound between one sweep and the next.
+                        sirenv.TargetMode = (int)MathF.Round(emitter.PowerLever);
+                    }
+                    else if (active.MachineState is AircraftVoiceState airv)
                     {
                         airv.TargetLever = emitter.PowerLever;
                         airv.TargetDescending = emitter.RotorWake;
+                        // The wheels. Speed over the ground is the aeroplane's own speed; it is what
+                        // the runway is doing to a wheel that is not yet turning.
+                        airv.TargetGroundSpeed = emitter.Velocity.Length();
+                        airv.TargetOnGround = emitter.OnGround;
+                    }
+                    else if (active.MachineState is MachineVoiceState mach)
+                    {
+                        mach.TargetGroundSpeed = emitter.Velocity.Length();
                     }
                     else if (active.MachineState is TrainTapState tap)
                     {
@@ -3888,11 +3992,11 @@ public class FmodAudioProvider : IAudioProvider
 
         // OPENRAW is required for headerless PCM in memory; without it FMOD tries to parse a file
         // header and createSound fails (voice was silently dropped).
-        RESULT res = _system.createSound(pcmData, MODE.OPENMEMORY | MODE.OPENRAW | MODE._3D | MODE._3D_LINEARROLLOFF | MODE.LOOP_OFF, ref info, out FMOD.Sound sound);
+        RESULT res = _system.createSound(pcmData, MODE.OPENMEMORY | MODE.OPENRAW | MODE._3D | Rolloff.Mode | MODE.LOOP_OFF, ref info, out FMOD.Sound sound);
         if (res != RESULT.OK) return;
 
         _system.playSound(sound, default, true, out FMOD.Channel ch);
-        ch.setMode(MODE._3D | MODE._3D_LINEARROLLOFF);
+        ch.setMode(MODE._3D | Rolloff.Mode);
         ch.set3DMinMaxDistance(1.0f, 30.0f);
 
         var fpos = FmodHelpers.ToFmodVec(position);
@@ -4022,12 +4126,12 @@ public class FmodAudioProvider : IAudioProvider
         // OPENRAW is required for headerless PCM in memory; OPENMEMORY alone would make FMOD
         // try to parse a (non-existent) file header. (The existing voice/beep paths omit OPENRAW
         // and are likely silently broken — out of scope here, flagged for the cleanup pass.)
-        if (!FmodCheck(_system.createSound(_diagPcm, MODE.OPENMEMORY | MODE.OPENRAW | MODE._3D | MODE._3D_LINEARROLLOFF | MODE.LOOP_NORMAL, ref info, out _diagSound), "createSound(diagnostic)"))
+        if (!FmodCheck(_system.createSound(_diagPcm, MODE.OPENMEMORY | MODE.OPENRAW | MODE._3D | Rolloff.Mode | MODE.LOOP_NORMAL, ref info, out _diagSound), "createSound(diagnostic)"))
             return;
         if (!FmodCheck(_system.playSound(_diagSound, default, true, out _diagChannel), "playSound(diagnostic)"))
             return;
 
-        _diagChannel.setMode(MODE._3D | MODE._3D_LINEARROLLOFF | MODE.LOOP_NORMAL);
+        _diagChannel.setMode(MODE._3D | Rolloff.Mode | MODE.LOOP_NORMAL);
         _diagChannel.set3DLevel(1.0f); // fully spatialized, no 2D blend
         _diagChannel.set3DMinMaxDistance(1.0f, 100.0f);
         _diagChannel.setVolume(1.0f);

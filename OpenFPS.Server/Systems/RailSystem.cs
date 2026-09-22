@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Collections.Generic;
 using System.Numerics;
 using Arch.Core;
@@ -29,11 +30,18 @@ public sealed class RailSystem
 {
     private sealed class Consist
     {
-        public required string MapId, Name, Preset;
+        public required string MapId, Name, Preset, Track;
         public required RaceLine Line;
         public required Entity[] Entities;     // Entity.Null for the signal sources, which are not spawned
         public required float[] Along;
         public float Head, Speed, TopSpeed, Accel, Brake;
+
+        /// <summary>Platforms on this route, in order round it. Same description a bus stop uses:
+        /// a train halting at a platform and a bus halting at a kerb are the same fact about a
+        /// route, and the sounds are each vehicle's own.</summary>
+        public (float At, float Dwell, string Kind)[] Stops = System.Array.Empty<(float, float, string)>();
+        public int NextStop;
+        public float DwellLeft;
     }
 
     private readonly List<Consist> _trains = new();
@@ -99,6 +107,13 @@ public sealed class RailSystem
                 _trains.Add(new Consist
                 {
                     MapId = mapId, Name = name, Preset = td.Preset, Line = line, Entities = ents, Along = along,
+                    Stops = (data.Tracks?.Find(x => string.Equals(x.Id, td.Track, StringComparison.OrdinalIgnoreCase))?.Stops ?? new())
+                        .Where(sp => string.IsNullOrEmpty(sp.ForPreset)
+                                  || td.Preset.Contains(sp.ForPreset!, StringComparison.OrdinalIgnoreCase))
+                        .OrderBy(sp => sp.AtMetres)
+                        .Select(sp => (At: sp.AtMetres, Dwell: sp.DwellSeconds, Kind: sp.Kind ?? "platform"))
+                        .ToArray(),
+                    Track = td.Track,
                     Head = td.StartOffsetMetres, Speed = MathF.Min(v0, top), TopSpeed = top,
                     Accel = td.AccelerationMps2 > 0 ? td.AccelerationMps2 : 0.9f, Brake = brake,
                 });
@@ -114,29 +129,104 @@ public sealed class RailSystem
         foreach (var tr in _trains)
         {
             if (tr.MapId != mapId) continue;
+            // Standing at a platform. Held at a dead stop, because everything a stopped train
+            // makes — the brakes blowing off, the compressor catching up, the doors — is read off
+            // its speed being zero and staying there.
+            if (tr.DwellLeft > 0f)
+            {
+                tr.DwellLeft -= dt;
+                tr.Speed = 0f;
+                PlaceConsist(tr, world);
+                if (tr.DwellLeft <= 0f && tr.Stops.Length > 0)
+                    tr.NextStop = (tr.NextStop + 1) % tr.Stops.Length;
+                continue;
+            }
+
             float lookahead = MathF.Max(15f, tr.Speed * tr.Speed / (2f * tr.Brake));
             tr.Line.Sample(tr.Head + lookahead, out _, out _, out float ahead);
             tr.Line.Sample(tr.Head, out _, out _, out float now);
             float want = MathF.Min(tr.TopSpeed, MathF.Min(now, ahead));
+
+            // Coming up on a platform. A train's braking rate is a tenth of a car's and its
+            // approach is correspondingly long — which is most of why a train arriving sounds
+            // like an event rather than like a vehicle turning up.
+            if (tr.Stops.Length > 0)
+            {
+                float d = tr.Stops[tr.NextStop].At - tr.Head;
+                if (d < -1f) d += tr.Line.Length;
+                d = MathF.Max(0f, d);
+                want = MathF.Min(want, MathF.Sqrt(MathF.Max(0f, 2f * tr.Brake * d)));
+                if (d <= 1.5f && tr.Speed < 1.5f)
+                {
+                    tr.DwellLeft = MathF.Max(1f, tr.Stops[tr.NextStop].Dwell);
+                    tr.Speed = 0f;
+                    PlaceConsist(tr, world);
+                    continue;
+                }
+            }
             if (want > tr.Speed) tr.Speed = MathF.Min(want, tr.Speed + tr.Accel * dt);
             else tr.Speed = MathF.Max(want, tr.Speed - tr.Brake * dt);
             tr.Head += tr.Speed * dt;
             if (tr.Head > tr.Line.Length) tr.Head -= tr.Line.Length;
 
-            for (int i = 0; i < tr.Entities.Length; i++)
-            {
-                var e = tr.Entities[i];
-                if (e == Entity.Null || !world.IsAlive(e)) continue;
-                tr.Line.Sample(tr.Head - tr.Along[i], out var pos, out float heading, out _);
-                ref var t = ref world.Get<Transform>(e);
-                ref var vel = ref world.Get<Velocity>(e);
-                float height = t.Position.Y - pos.Y;            // keep the source's own height above the rail
-                pos.Y += MathF.Abs(height) < 6f ? height : 0.5f;
-                t.Position = pos;
-                t.Rotation = Quaternion.CreateFromYawPitchRoll(heading, 0f, 0f);
-                t.IsDirty = true;
-                vel.Linear = new Vector3(MathF.Sin(heading), 0f, MathF.Cos(heading)) * tr.Speed;
-            }
+            PlaceConsist(tr, world);
         }
+    }
+
+    /// <summary>
+    /// Puts every source of a consist where its own place in the train says it is. Factored out
+    /// because a train standing at a platform still has to be PLACED — it is not moving, but its
+    /// bogies, its compressor and its brakes are all still somewhere, and a stopped train that
+    /// stopped being positioned would stop being audible.
+    /// </summary>
+    private static void PlaceConsist(Consist tr, World world)
+    {
+        for (int i = 0; i < tr.Entities.Length; i++)
+        {
+            var e = tr.Entities[i];
+            if (e == Entity.Null || !world.IsAlive(e)) continue;
+            tr.Line.Sample(tr.Head - tr.Along[i], out var pos, out float heading, out _);
+            ref var t = ref world.Get<Transform>(e);
+            ref var vel = ref world.Get<Velocity>(e);
+            float height = t.Position.Y - pos.Y;            // keep the source's own height above the rail
+            pos.Y += MathF.Abs(height) < 6f ? height : 0.5f;
+            t.Position = pos;
+            t.Rotation = Quaternion.CreateFromYawPitchRoll(heading, 0f, 0f);
+            t.IsDirty = true;
+            vel.Linear = new Vector3(MathF.Sin(heading), 0f, MathF.Cos(heading)) * tr.Speed;
+        }
+    }
+
+    /// <summary>
+    /// The distinct rail lines on a map, by track id — so anything that needs to know where a
+    /// railway RUNS can ask the system that owns it rather than re-reading the map and building a
+    /// second copy of the same geometry. Two copies of a track is two things to get out of step.
+    /// </summary>
+    public IEnumerable<(string Track, RaceLine Line)> Lines(string mapId)
+    {
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var tr in _trains)
+        {
+            if (tr.MapId != mapId || !seen.Add(tr.Track)) continue;
+            yield return (tr.Track, tr.Line);
+        }
+    }
+
+    /// <summary>
+    /// How far round a given line each train's leading end currently is, metres, and how long the
+    /// lap is. The HEAD, because a crossing starts ringing for the front of a train and stops
+    /// ringing for the back of it, and those are different points.
+    /// </summary>
+    public List<float> HeadsOn(string mapId, string track, out float lapLength)
+    {
+        lapLength = 1f;
+        var heads = new List<float>();
+        foreach (var tr in _trains)
+        {
+            if (tr.MapId != mapId || !string.Equals(tr.Track, track, StringComparison.OrdinalIgnoreCase)) continue;
+            lapLength = tr.Line.Length;
+            heads.Add(tr.Head);
+        }
+        return heads;
     }
 }

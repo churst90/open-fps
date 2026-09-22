@@ -333,16 +333,16 @@ approved model:
 ```
 ./run-server.sh city
 
-/tp 0 0.1 -40        Main Street, the spawn — traffic both ways, towers either side
-/tp 9 0.1 -60        the bus shelter — the fault, still there
-/tp 20 0.1 -60       a flat in Kestrel House, carpet and furniture
-/tp -20 0.1 60       the garage, level 0
-/tp 0 0.1 -250       the tunnel — a truck goes through it every minute or so
-/tp 0 0.1 -180       the level crossing
-/tp -300 0.1 -96     the estate — mowers, and one slow car
-/tp -325 0.1 -106    inside a house — plaster, carpet, a sofa and a bed
-/tp 380 0.1 0        the runway — nothing to reflect off, the control
-/tp 250 0.1 190      inside the hangar
+/tp 0 -40 0.1        Main Street, the spawn — traffic both ways, towers either side
+/tp 9 -60 0.1        the bus shelter — the fault, still there
+/tp 20 -60 0.1       a flat in Kestrel House, carpet and furniture
+/tp -20 60 0.1       the garage, level 0
+/tp 0 -250 0.1       the tunnel — a truck goes through it every minute or so
+/tp 0 -180 0.1       the level crossing
+/tp -300 -96 0.1     the estate — mowers, and one slow car
+/tp -325 -106 0.1    inside a house — plaster, carpet, a sofa and a bed
+/tp 380 0 0.1        the runway — nothing to reflect off, the control
+/tp 250 190 0.1      inside the hangar
 ```
 
 Aircraft: the overhead airliner comes round about every two minutes, the turboprop and the light

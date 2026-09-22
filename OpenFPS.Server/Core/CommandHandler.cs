@@ -368,7 +368,7 @@ public class CommandHandler
 
         if (e == Entity.Null) { Say(reply, "Spawn failed: the map is not loaded."); return; }
 
-        Say(reply, $"Spawned {material} {shape} (entity {e.Id}) at {spawnPos.X:F1}, {spawnPos.Y:F1}, {spawnPos.Z:F1}");
+        Say(reply, $"Spawned {material} {shape} (entity {e.Id}) at {PlayerCoordinates.Format(spawnPos)}");
     }
 
     private void HandleSetSound(UserSession session, string[] args, Action<IMessage> reply)
@@ -1259,19 +1259,20 @@ public class CommandHandler
     {
         if (args.Length < 3)
         {
-            Say(reply, "Usage: /move x y z");
+            Say(reply, "Usage: /move x y z — x east, y north, z height");
             return;
         }
 
         if (!float.TryParse(args[0], out float x) || !float.TryParse(args[1], out float y) || !float.TryParse(args[2], out float z))
         {
-            Say(reply, "Usage: /move x y z");
+            Say(reply, "Usage: /move x y z — x east, y north, z height");
             return;
         }
 
         if (!TryGetBody(session, reply, out var world, out var grid, out _)) return;
 
-        Vector3 targetPos = new Vector3(x, y, z);
+        // In the player's order — x east, y north, z height — which is the order C reads out.
+        Vector3 targetPos = PlayerCoordinates.ToWorld(x, y, z);
 
         // COLLISION AWARE TELEPORT (Cylinder-based)
         if (OpenFPS.Server.Systems.MovementSystem.CheckCollision(world, grid, targetPos, PhysicsConstants.PlayerRadius, PhysicsConstants.PlayerHeight))
@@ -1286,7 +1287,7 @@ public class CommandHandler
 
         // Force client reset
         reply(new PlayerSpawned { EntityId = session.Entity.Id, SpawnTransform = t });
-        Say(reply, $"Moved to {targetPos.X:F1}, {targetPos.Y:F1}, {targetPos.Z:F1}");
+        Say(reply, $"Moved to {PlayerCoordinates.Format(targetPos)}");
     }
 
     private void HandlePrivateMessage(UserSession session, string[] args, Action<IMessage> reply)

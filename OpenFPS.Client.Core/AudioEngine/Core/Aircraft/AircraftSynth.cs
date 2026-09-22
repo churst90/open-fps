@@ -32,12 +32,24 @@ public sealed class AircraftSynth
     public float Jet { get; private set; }
     public float Core { get; private set; }
     public float Engine { get; private set; }
+    /// <summary>The wheels: sliding on the instant of touchdown, rolling afterwards.</summary>
+    public float Gear { get; private set; }
     public float Total { get; private set; }
     public float Rpm { get; private set; }
     /// <summary>Spool speed as a fraction of maximum (gas turbines).</summary>
     public float Spool => _spool;
 
-    private readonly BladeRow? _prop, _tail, _fan;
+    /// <summary>One entry per engine. A twin builds two propellers or two fans, each with its own
+    /// blade scatter and its own speed trim, because that is what a twin is; a single builds one.</summary>
+    private readonly BladeRow[] _props = Array.Empty<BladeRow>();
+    private readonly BladeRow[] _fans = Array.Empty<BladeRow>();
+    /// <summary>Each engine's speed as a fraction of the commanded one. No two are ever trimmed
+    /// closer than a few tenths of a per cent, and that difference is the throb.</summary>
+    private readonly float[] _trim = Array.Empty<float>();
+    /// <summary>What the jets and the combustor gain from there being more than one of them. They
+    /// are independent broadband streams, so they add as power: sqrt(N) in pressure.</summary>
+    private readonly float _incoherent = 1f;
+    private readonly BladeRow? _tail;
     private readonly JetStream? _coreJet, _bypassJet;
     private readonly EngineSynth? _piston;
     private readonly Random _rng;
@@ -48,6 +60,14 @@ public sealed class AircraftSynth
     private float _whineGain;
     private float _aftGain = 1f, _fwdGain = 1f;
     private int _slowTick;
+
+    // ── The undercarriage ──────────────────────────────────────────────────────────────────────
+    // Silent for the whole flight and then, for four tenths of a second, the loudest thing on the
+    // aeroplane. See LandingGearSpec: the wheels are not turning and the runway spins them up.
+    private readonly Random? _gearRng;
+    private VehicleSynth.TyreVoice _gearVoice;
+    private float _groundSpeed, _wheelSpeed, _spinUpRate;
+    private bool _onGround;
     private const int SlowEvery = 64;
 
     public AircraftSynth(AircraftProfile p, float rate = 44100f, int seed = 3)
@@ -56,14 +76,35 @@ public sealed class AircraftSynth
         _rate = rate;
         _dt = 1f / rate;
         _rng = new Random(seed);
+        int engines = Math.Max(1, p.Engines);
+        _incoherent = MathF.Sqrt(engines);
+        _trim = new float[engines];
+        var trimRng = new Random(seed + 4242);
+        for (int e = 0; e < engines; e++)
+            // Within about half a per cent of each other, fixed for the life of the machine. On a
+            // twin that is a beat of a cycle or two a second at the blade rate; on a single there is
+            // only one of them and it is exactly on speed.
+            _trim[e] = engines == 1 ? 1f : 1f + (float)(trimRng.NextDouble() * 2 - 1) * 0.005f;
+
         if (p.Propeller != null)
-            _prop = new BladeRow(p.Propeller, rate, p.Power == AircraftPower.Turboshaft ? Vector3.UnitY : Vector3.UnitZ, seed + 1);
+        {
+            _props = new BladeRow[engines];
+            for (int e = 0; e < engines; e++)
+                _props[e] = new BladeRow(p.Propeller, rate,
+                    p.Power == AircraftPower.Turboshaft ? Vector3.UnitY : Vector3.UnitZ, seed + 1 + e * 31);
+        }
         if (p.TailRotor != null)
             _tail = new BladeRow(p.TailRotor, rate, Vector3.UnitX, seed + 2);
+        if (p.Gear != null) _gearRng = new Random(seed + 77);
         if (p.Turbine != null)
         {
             var t = p.Turbine;
-            if (t.Fan != null) _fan = new BladeRow(t.Fan, rate, Vector3.UnitZ, seed + 3);
+            if (t.Fan != null)
+            {
+                _fans = new BladeRow[engines];
+                for (int e = 0; e < engines; e++)
+                    _fans[e] = new BladeRow(t.Fan, rate, Vector3.UnitZ, seed + 3 + e * 37);
+            }
             _coreJet = new JetStream(rate, t.CoreNozzleDiameterMetres, t.CoreExitKelvin, seed + 4, t.CoreJetTrimDb);
             if (t.BypassNozzleDiameterMetres > 0f)
                 _bypassJet = new JetStream(rate, t.BypassNozzleDiameterMetres, 330f, seed + 5, t.BypassJetTrimDb);
@@ -102,6 +143,33 @@ public sealed class AircraftSynth
         _bypassJet?.SetVelocity(t.BypassExitVelocityMax * _spool);
     }
 
+    /// <summary>
+    /// The wheels have just met the runway at this ground speed.
+    ///
+    /// Nothing about this is scheduled or scripted: it is called at the instant the aeroplane stops
+    /// descending at ground level, and what happens next is the mechanism — the wheels are at rest,
+    /// the runway is going past at seventy metres a second, and the contact patch slides until the
+    /// wheel's inertia has been paid for. How long that takes comes out of
+    /// <see cref="LandingGearSpec.SpinUpSeconds"/>, so a jet scrubs and a light single chirps
+    /// without either being told to.
+    /// </summary>
+    public void Touchdown(float groundSpeedMps)
+    {
+        if (Profile.Gear is not { } g) return;
+        _groundSpeed = MathF.Max(0f, groundSpeedMps);
+        _wheelSpeed = 0f;                                   // a wheel in the air is not turning
+        _onGround = true;
+        // Metres per second of rim speed gained per second, from the wheel and the load on it.
+        _spinUpRate = _groundSpeed / MathF.Max(0.001f, g.SpinUpSeconds(_groundSpeed));
+    }
+
+    /// <summary>The aeroplane is flying again (or has gone). The wheels stop being heard.</summary>
+    public void Airborne() { _onGround = false; }
+
+    /// <summary>How fast the aeroplane is moving over the ground, for the wheels. Only read while
+    /// they are on it.</summary>
+    public float GroundSpeed { get => _groundSpeed; set => _groundSpeed = MathF.Max(0f, value); }
+
     /// <summary>Where the listener stands in the aircraft's frame: x to starboard, y up, z toward
     /// the nose, origin at the engine. Sets every directivity and the tip Mach toward the ear.</summary>
     public void SetListener(Vector3 aircraftFrame)
@@ -130,7 +198,11 @@ public sealed class AircraftSynth
             // Fuel flow goes roughly as the cube of spool speed; the rumble follows it.
             _rumbleGain = Db(t.CombustorDb) * _spool * _spool * _spool;
             _whineGain = Db(t.WhineDb) * MathF.Pow(_spool, 3f);
-            _fan?.SetSpeed(t.Fan!.RpmMax * _spool, Math.Clamp(Lever, 0.2f, 1f), dir);
+            // Each fan on its own trim. Half a per cent of five thousand rpm is twenty-five rpm,
+            // which at twenty-four blades is a beat of ten hertz at the blade rate and about one a
+            // second at the shaft — the throb of a twin.
+            for (int e = 0; e < _fans.Length; e++)
+                _fans[e].SetSpeed(t.Fan!.RpmMax * _spool * _trim[e], Math.Clamp(Lever, 0.2f, 1f), dir);
         }
 
         switch (p.Power)
@@ -145,7 +217,8 @@ public sealed class AircraftSynth
                 _piston.Starter = rpm < 300f;
                 _piston.SetListener(_listener);
                 Rpm = rpm * p.PropGearRatio;
-                _prop?.SetSpeed(Rpm, Math.Clamp(0.25f + 0.75f * Lever, 0f, 1f), dir);
+                for (int e = 0; e < _props.Length; e++)
+                    _props[e].SetSpeed(Rpm * _trim[e], Math.Clamp(0.25f + 0.75f * Lever, 0f, 1f), dir);
                 break;
             case AircraftPower.Turboprop:
             {
@@ -154,7 +227,8 @@ public sealed class AircraftSynth
                 // up, and the lever changes the blade LOADING, not the note.
                 float frac = Math.Clamp((_spool - p.Turbine!.IdleFraction) / MathF.Max(0.01f, 1f - p.Turbine.IdleFraction), 0f, 1f);
                 Rpm = MathHelper.Lerp(row.RpmIdle, row.RpmMax, MathF.Min(1f, 0.6f + 0.4f * frac));
-                _prop?.SetSpeed(Rpm, Math.Clamp(0.2f + 0.8f * Lever, 0f, 1f), dir);
+                for (int e = 0; e < _props.Length; e++)
+                    _props[e].SetSpeed(Rpm * _trim[e], Math.Clamp(0.2f + 0.8f * Lever, 0f, 1f), dir);
                 break;
             }
             case AircraftPower.Turboshaft:
@@ -162,7 +236,8 @@ public sealed class AircraftSynth
                 var row = p.Propeller!;
                 float up = Math.Clamp(_spool / MathF.Max(0.05f, p.Turbine!.IdleFraction), 0f, 1f);
                 Rpm = row.RpmMax * up;
-                _prop?.SetSpeed(Rpm, Math.Clamp(0.5f + 0.5f * Lever, 0f, 1f), dir, Descending);
+                for (int e = 0; e < _props.Length; e++)
+                    _props[e].SetSpeed(Rpm * _trim[e], Math.Clamp(0.5f + 0.5f * Lever, 0f, 1f), dir, Descending);
                 _tail?.SetSpeed(p.TailRotor!.RpmMax * up, Math.Clamp(0.5f + 0.5f * Lever, 0f, 1f), dir);
                 break;
             }
@@ -180,46 +255,71 @@ public sealed class AircraftSynth
         if (_slowTick == 0) UpdateSlow();
         _slowTick = _slowTick + 1 == SlowEvery ? 0 : _slowTick + 1;
 
-        float blades = 0f, jet = 0f, core = 0f, engine = 0f;
+        float blades = 0f, jet = 0f, core = 0f, engine = 0f, gear = 0f;
 
         if (_piston != null)
         {
             _piston.Step();
-            engine = _piston.Exhaust + _piston.Intake + _piston.Block;
+            engine = (_piston.Exhaust + _piston.Intake + _piston.Block) * _incoherent;
         }
-        if (_prop != null) blades += _prop.Step();
+        // Every row is stepped. Two propellers a few rpm apart are two pulse trains drifting in and
+        // out of phase, which is the beat; summing them is the whole of the model for it.
+        for (int e = 0; e < _props.Length; e++) blades += _props[e].Step();
         if (_tail != null) blades += _tail.Step();
-        if (_fan != null) blades += _fan.Step() * _fwdGain;
+        for (int e = 0; e < _fans.Length; e++) blades += _fans[e].Step() * _fwdGain;
 
         if (_coreJet != null)
         {
-            jet += _coreJet.Step() * _aftGain;
-            if (_bypassJet != null) jet += _bypassJet.Step() * _aftGain;
+            // One jet is integrated and the rest are counted, because N independent mixing regions
+            // of the same size and speed carry N times the power and nothing else: there is no
+            // structure in broadband noise for a second copy to beat against.
+            jet += _coreJet.Step() * _aftGain * _incoherent;
+            if (_bypassJet != null) jet += _bypassJet.Step() * _aftGain * _incoherent;
 
             // Combustion rumble: low broadband, from the back.
             float n = (float)(_rng.NextDouble() * 2 - 1);
             float a = OnePole.AlphaFor(140f, _rate);
             _rumbleLp1 += a * (n - _rumbleLp1);
             _rumbleLp2 += a * (_rumbleLp1 - _rumbleLp2);
-            core += _rumbleLp2 * _rumbleGain * 6f * (0.6f + 0.4f * _aftGain);
+            core += _rumbleLp2 * _rumbleGain * 6f * (0.6f + 0.4f * _aftGain) * _incoherent;
 
             // The one turbine tone inside hearing, and its octave.
             var t = Profile.Turbine!;
             _whinePhase += t.WhineHz * _spool / _rate;
             if (_whinePhase > 1.0) _whinePhase -= 1.0;
             core += (float)(Math.Sin(_whinePhase * 2 * Math.PI) + 0.25 * Math.Sin(_whinePhase * 4 * Math.PI))
-                  * _whineGain * (0.5f + 0.5f * _fwdGain);
+                  * _whineGain * (0.5f + 0.5f * _fwdGain) * _incoherent;
         }
 
-        Blades = blades; Jet = jet; Core = core; Engine = engine;
-        Total = blades + jet + core + engine;
+        // ── The wheels ─────────────────────────────────────────────────────────────────────────
+        if (_onGround && Profile.Gear is { } g && _gearRng != null)
+        {
+            // The runway spins the wheel up at the rate its own inertia and the load on it allow.
+            // Until it is there, the difference between the two is being scrubbed off as rubber.
+            if (_wheelSpeed < _groundSpeed) _wheelSpeed = MathF.Min(_groundSpeed, _wheelSpeed + _spinUpRate * _dt);
+            // Slip as the tyre model means it: the fraction of the contact patch's speed that is
+            // sliding rather than rolling. One at the instant of touchdown, zero once it is up.
+            float slip = _groundSpeed > 0.5f ? (_groundSpeed - _wheelSpeed) / _groundSpeed : 0f;
+            // The model works in one tyre; there are several, side by side, and they are not in
+            // step with one another, so they add as power.
+            gear = VehicleSynth.Tyre(g.Tyre, _groundSpeed, slip, _gearRng, ref _gearVoice)
+                 * MathF.Sqrt(MathF.Max(1, g.Wheels));
+        }
+
+        Blades = blades; Jet = jet; Core = core; Engine = engine; Gear = gear;
+        Total = blades + jet + core + engine + gear;
     }
 
     /// <summary>Console lines about what was built.</summary>
     public System.Collections.Generic.IEnumerable<string> Describe()
     {
         var p = Profile;
-        yield return $"{p.Name}: {p.Power}, {p.SourceLevelDb:F0} dB at 1 m";
+        yield return $"{p.Name}: {p.Power}, {p.Engines} engine{(p.Engines == 1 ? "" : "s")}"
+                   + (p.EngineSpanMetres > 0f ? $" {p.EngineSpanMetres:F1} m apart" : "")
+                   + $", {p.WingspanMetres:F1} m span, {p.SourceLevelDb:F0} dB at 1 m";
+        if (p.Gear is { } gr)
+            yield return $"gear: {gr.Wheels} main wheels of {gr.WheelRadiusMetres:F2} m, {gr.LandingMassKg / 1000f:F0} t on them; "
+                       + $"spin-up {gr.SpinUpSeconds(p.CruiseSpeedMps * 0.6f) * 1000f:F0} ms at touchdown";
         if (p.Propeller is { } r)
             yield return $"{(p.Power == AircraftPower.Turboshaft ? "main rotor" : "propeller")}: {r.Blades} blades x {r.DiameterMetres:F2} m, "
                        + $"{r.RpmMax:F0} rpm -> blade-pass {r.BladePassHz(r.RpmMax):F0} Hz, tip {r.TipSpeed(r.RpmMax):F0} m/s (Mach {r.TipSpeed(r.RpmMax) / 340f:F2})";
@@ -273,6 +373,8 @@ internal sealed class BladeRow
     private bool _forward = true;
     private readonly float _refAmp;
     private float _hp, _hpAlpha;
+    /// <summary>The inlet liner, for a ducted row. Zero for anything radiating into free air.</summary>
+    private float _lpAlpha, _lp1, _lp2;
 
     // The broadband half: turbulence off the trailing edge and the tip, band-limited by a Strouhal
     // number on the blade's thickness. Zero-cost for a row that declares none.
@@ -348,8 +450,24 @@ internal sealed class BladeRow
         // The tip Mach toward the listener is the in-plane component of the tip speed.
         float tip = _s.TipSpeed(_rpm > 0 ? _rpm : _rpmTarget);
         _machToward = MathF.Min(0.95f, tip / 340f * _inPlane);
-        // A duct will not carry anything below about half the blade-passing rate.
-        if (_s.Ducted) _hpAlpha = OnePole.AlphaFor(MathF.Max(20f, 0.5f * _s.BladePassHz(MathF.Max(1f, _rpmTarget))), _rate);
+        // A duct will not carry anything below about half the blade-passing rate — and it will not
+        // carry much far ABOVE it either, which is the half that was missing.
+        //
+        // A nacelle inlet is a LINED WAVEGUIDE. The liner — perforate over honeycomb, the whole
+        // length of the inlet barrel — is fitted for one purpose, which is to absorb the fan's
+        // noise on its way out, and it works hardest above the blade rate. The duct's finite
+        // length and its modal cut-ons do the rest. Three times the blade rate: the fundamental
+        // and two harmonics pass, the rest rolls off.
+        //
+        // Worth about a decibel of the row's total, measured. It is here because a lined inlet is
+        // a real thing and the model had only half of it, NOT because it rescued the fan's tone —
+        // the tone never needed rescuing. See --spool.
+        if (_s.Ducted)
+        {
+            float bpf = _s.BladePassHz(MathF.Max(1f, _rpmTarget));
+            _hpAlpha = OnePole.AlphaFor(MathF.Max(20f, 0.5f * bpf), _rate);
+            _lpAlpha = OnePole.AlphaFor(Math.Clamp(3f * bpf, 200f, _rate * 0.45f), _rate);
+        }
     }
 
     [MethodImpl(MethodImplOptions.AggressiveOptimization)]
@@ -421,7 +539,16 @@ internal sealed class BladeRow
 
         // Nothing below 20 Hz radiates from anything this size; a duct takes more.
         _hp += _hpAlpha * (y - _hp);
-        return y - _hp;
+        y -= _hp;
+        // And the liner takes the top off, for a row that is inside a duct. Two poles, because one
+        // is 6 dB an octave and a lined inlet is a good deal steeper than that.
+        if (_lpAlpha > 0f)
+        {
+            _lp1 += _lpAlpha * (y - _lp1);
+            _lp2 += _lpAlpha * (_lp1 - _lp2);
+            return _lp2;
+        }
+        return y;
     }
 
     private void Spawn(double t0, int blade, float mach, float machAbs, float scatter)

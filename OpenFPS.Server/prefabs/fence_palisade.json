@@ -1,0 +1,16 @@
+{
+  "Id": "fence_palisade",
+  "Name": "Palisade Fence",
+  "Description": "A steel palisade fence, the kind that runs beside a railway: vertical pales on two rails, more air than metal. You cannot walk through it and you can hear straight through it, and those two facts are usually modelled by the same box \u2014 which is how a boundary fence ends up silencing a whole street. Its material is Fence and not Metal deliberately: the acoustics key on the material NAME, so 'metal with the numbers changed' is still sheet steel to them.",
+  "Material": "Fence",
+  "ColliderSize": {
+    "X": 2,
+    "Y": 2.4,
+    "Z": 0.06
+  },
+  "Type": "StaticObject",
+  "IsSolid": true,
+  "TransmissionLow": 0.94,
+  "TransmissionMid": 0.88,
+  "TransmissionHigh": 0.72
+}

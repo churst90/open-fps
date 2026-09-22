@@ -84,6 +84,20 @@ public static class AcousticRegistry
             reg["Generic"] = new MaterialProperties { Absorption = 0.2f, AbsorptionLow = 0.1f, AbsorptionMid = 0.2f, AbsorptionHigh = 0.3f, Scattering = 0.2f, TransmissionLow = 0.4f, TransmissionMid = 0.3f, TransmissionHigh = 0.2f, ResonanceIndex = 22, DensityKgM3 = 1200f, YoungsModulusGPa = 5f, LossFactor = 0.02f };
             reg["Wood"] = new MaterialProperties { Absorption = 0.15f, AbsorptionLow = 0.1f, AbsorptionMid = 0.15f, AbsorptionHigh = 0.2f, Scattering = 0.4f, TransmissionLow = 0.6f, TransmissionMid = 0.4f, TransmissionHigh = 0.2f, ResonanceIndex = 21, DensityKgM3 = 650f, YoungsModulusGPa = 11f, LossFactor = 0.03f };
             reg["Metal"] = new MaterialProperties { Absorption = 0.05f, AbsorptionLow = 0.05f, AbsorptionMid = 0.05f, AbsorptionHigh = 0.1f, Scattering = 0.1f, TransmissionLow = 0.1f, TransmissionMid = 0.05f, TransmissionHigh = 0.02f, ResonanceIndex = 13, DensityKgM3 = 7850f, YoungsModulusGPa = 200f, LossFactor = 0.0002f };
+            // A PALISADE FENCE, and it is a material rather than a thin wall of metal.
+            //
+            // The Steam Audio scene keys its materials by NAME and takes their properties from this
+            // registry — a per-prefab transmission override never reaches it. So a fence built as
+            // "Metal with the numbers changed" is, to the acoustics, sheet steel: two per cent
+            // transmission at the top end, opaque. Two hundred panels of that along a railway
+            // silenced every vehicle behind them, reported as engines cutting out "like it is going
+            // under a bridge".
+            //
+            // What a palisade actually is, acoustically, is AIR with some steel in it. Half to two
+            // thirds of the area is gap, so most of the sound goes straight through; the pales
+            // scatter the top end, which is why a fence takes the edge off without taking the sound
+            // away. It stops a body and not a wave, and those are different jobs.
+            reg["Fence"] = new MaterialProperties { Absorption = 0.08f, AbsorptionLow = 0.05f, AbsorptionMid = 0.08f, AbsorptionHigh = 0.12f, Scattering = 0.55f, TransmissionLow = 0.94f, TransmissionMid = 0.88f, TransmissionHigh = 0.72f, ResonanceIndex = 29, DensityKgM3 = 7850f, YoungsModulusGPa = 200f, LossFactor = 0.0004f };   // 29: its own, not Metal's 13
             reg["Concrete"] = new MaterialProperties { Absorption = 0.02f, AbsorptionLow = 0.01f, AbsorptionMid = 0.02f, AbsorptionHigh = 0.02f, Scattering = 0.1f, TransmissionLow = 0.05f, TransmissionMid = 0.02f, TransmissionHigh = 0.01f, ResonanceIndex = 18, DensityKgM3 = 2400f, YoungsModulusGPa = 30f, LossFactor = 0.015f };
             reg["Marble"] = new MaterialProperties { Absorption = 0.01f, AbsorptionLow = 0.01f, AbsorptionMid = 0.01f, AbsorptionHigh = 0.01f, Scattering = 0.05f, TransmissionLow = 0.05f, TransmissionMid = 0.02f, TransmissionHigh = 0.01f, ResonanceIndex = 12, DensityKgM3 = 2700f, YoungsModulusGPa = 60f, LossFactor = 0.002f };
             reg["Carpet"] = new MaterialProperties { Absorption = 0.60f, AbsorptionLow = 0.15f, AbsorptionMid = 0.5f, AbsorptionHigh = 0.75f, Scattering = 0.6f, TransmissionLow = 0.1f, TransmissionMid = 0.05f, TransmissionHigh = 0.01f, ResonanceIndex = 6, DensityKgM3 = 200f, YoungsModulusGPa = 0.01f, LossFactor = 0.4f };

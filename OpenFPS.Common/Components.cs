@@ -252,6 +252,23 @@ public partial struct SoundEmitterComponent
         => IsSynth
         || Mode is PlaybackMode.LoopOne or PlaybackMode.LoopFolder or PlaybackMode.Sequential
         || (RepeatIntervalSeconds > 0f && !string.IsNullOrEmpty(SoundId));
+
+    /// <summary>
+    /// Whether a synthesised source is currently SOUNDING, as against merely existing.
+    ///
+    /// Everything that makes a noise on its own has so far decided that for itself from what it
+    /// could see — an engine from the vehicle's speed, a siren from the car's behaviour, an
+    /// aircraft's power from its climb angle — and that has been the right rule, because a client
+    /// that can work something out does not need to be told it.
+    ///
+    /// A level crossing's bell is the first thing that CANNOT be worked out client-side. It rings
+    /// because of where a train is on a line the listener may be a kilometre from and cannot see;
+    /// there is no local observation that implies it. So the server says, and this is how.
+    ///
+    /// Defaults to TRUE so that every existing emitter means exactly what it meant before, and so
+    /// that a peer which does not send it reads back as "sounding" rather than falling silent.
+    /// </summary>
+    public bool SynthRunning { get; set; } = true;
 }
 
 [MemoryPackable]

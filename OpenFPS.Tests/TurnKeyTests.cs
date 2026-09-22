@@ -106,3 +106,63 @@ public class TurnKeyTests
         }
     }
 }
+
+/// <summary>
+/// A coarse turn key lands you ON a compass point, wherever you started.
+///
+/// This is the arithmetic behind "if I press j or l to go facing north and I walk straight, both
+/// the x and the y change when they shouldn't". A tap that ADDS forty-five degrees keeps an
+/// off-angle heading off-angle for ever: once a fine nudge or a held sweep has left you at 47
+/// degrees, every coarse tap after it lands on 92, 137, 182. Walking then moves both coordinates,
+/// and the one thing a coarse turn key exists for — face a cardinal direction and have exactly one
+/// coordinate change — is impossible.
+/// </summary>
+public class TurnSnapTests
+{
+    /// <summary>The session's rule, reproduced: the distance to the next mark in the direction of
+    /// travel, or a whole step if you are already on one.</summary>
+    private static float Snap(float currentDeg, float dir, float step = 45f)
+    {
+        float grid = dir > 0f ? MathF.Ceiling(currentDeg / step) * step
+                              : MathF.Floor(currentDeg / step) * step;
+        float delta = MathF.Abs(grid - currentDeg);
+        return delta < 0.25f ? step : delta;
+    }
+
+    [Theory]
+    // On the grid already: a whole step, in both directions.
+    [InlineData(0f, +1f, 45f)]
+    [InlineData(0f, -1f, 45f)]
+    [InlineData(90f, +1f, 45f)]
+    [InlineData(-135f, -1f, 45f)]
+    // Off the grid: only as far as the next mark.
+    [InlineData(47f, +1f, 43f)]
+    [InlineData(47f, -1f, 2f)]
+    [InlineData(1f, -1f, 1f)]
+    [InlineData(89.9f, +1f, 45f)]     // within tolerance of 90: treat as on-grid
+    public void ACoarseTapGoesToTheNextMark(float from, float dir, float expected)
+        => Assert.Equal(expected, Snap(from, dir), 2);
+
+    /// <summary>
+    /// And the point of it: after one coarse tap from anywhere, walking forward changes exactly one
+    /// coordinate. Four taps from an off-angle start, checked at every step.
+    /// </summary>
+    [Fact]
+    public void AfterACoarseTapForwardIsOnAnAxisOrADiagonal()
+    {
+        float deg = 47f;                                  // left there by a fine nudge
+        for (int tap = 0; tap < 8; tap++)
+        {
+            deg -= Snap(deg, -1f);                        // L: yaw increases... in degrees, one way
+            float yaw = deg * (MathF.PI / 180f);
+            var fwd = Vector3.Transform(Vector3.UnitZ, Quaternion.CreateFromYawPitchRoll(yaw, 0f, 0f));
+            // On a mark, forward is either axis-aligned (one component ~0) or a true diagonal
+            // (both ~0.707). Anything else is an off-angle heading.
+            bool axis = MathF.Abs(fwd.X) < 1e-3f || MathF.Abs(fwd.Z) < 1e-3f;
+            bool diagonal = MathF.Abs(MathF.Abs(fwd.X) - 0.70710678f) < 1e-3f
+                         && MathF.Abs(MathF.Abs(fwd.Z) - 0.70710678f) < 1e-3f;
+            Assert.True(axis || diagonal,
+                $"after tap {tap + 1} the heading is {deg:F2} deg and forward is {fwd} — neither on an axis nor on a diagonal");
+        }
+    }
+}

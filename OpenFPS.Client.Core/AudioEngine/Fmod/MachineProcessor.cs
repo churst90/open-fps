@@ -7,6 +7,7 @@ using FMOD;
 using OpenFPS.Common;
 using OpenFPS.Client.AudioEngine.Core.Yard;
 using OpenFPS.Client.AudioEngine.Core.Aircraft;
+using OpenFPS.Client.AudioEngine.Core.Signals;
 
 namespace OpenFPS.Client.AudioEngine.Fmod;
 
@@ -299,14 +300,33 @@ public sealed class MachineVoiceState : PhysicalVoiceState
         _loadSwing = mows ? 0.34f : 0.06f;
         _loadHz = mows ? 0.19f + (float)rng.NextDouble() * 0.12f : 0.03f;
         _loadPhase = (float)rng.NextDouble() * MathF.Tau;
-        Machine.GroundSpeed = mows ? 0.95f : 0f;
     }
+
+    /// <summary>
+    /// How fast the machine is going over the ground, m/s — the entity's own speed, set from the game
+    /// thread. It was a constant 0.95 for anything that mows, so a mower sounded exactly the same
+    /// pushing a strip, turning at the end of it and standing waiting: it moved on the server and
+    /// nothing in its voice said so. The synth already scales the cutting torque and the stalk rate
+    /// with it; it only had to be told the truth. A machine that stands still reads zero, which is
+    /// right for a condenser and right for a mower that is not mowing.
+    /// </summary>
+    public float TargetGroundSpeed
+    {
+        get => Volatile.Read(ref _targetGroundSpeed);
+        set => Volatile.Write(ref _targetGroundSpeed, value);
+    }
+    private float _targetGroundSpeed;
+    private float _groundSpeed;
 
     protected override void PushListener(Vector3 frame) => Machine.SetListener(frame);
 
     protected override void Control(float seconds, float dt)
     {
         Machine.Running = Running;
+        // Slewed, because the position arrives thirty times a second and a governor hearing a
+        // staircase of speeds would hunt on it. A second to get going is about what a push takes.
+        _groundSpeed += Math.Clamp(TargetGroundSpeed - _groundSpeed, -1.5f * dt, 1.5f * dt);
+        Machine.GroundSpeed = _groundSpeed;
         Machine.Load = Math.Clamp(
             _loadBase + _loadSwing * MathF.Sin(_loadPhase + MathF.Tau * _loadHz * seconds), 0f, 1f);
         if (_cycles)
@@ -348,6 +368,18 @@ public sealed class AircraftVoiceState : PhysicalVoiceState
     /// anything without a rotor. Game thread writes.</summary>
     public volatile float TargetDescending;
 
+    /// <summary>
+    /// The aeroplane is on its wheels, and how fast they are going over the ground. Game thread
+    /// writes; the render thread turns the EDGE into a touchdown.
+    ///
+    /// An edge rather than a message, because a message can be sent twice or missed and a wheel
+    /// cannot touch down twice. The game thread only reports what is true — wheels down or not —
+    /// and the wheels spin up the first render after it becomes true.
+    /// </summary>
+    public volatile bool TargetOnGround;
+    public volatile float TargetGroundSpeed;
+    private bool _onGround;
+
     private float _lever = 1f;
 
     /// <summary>How long the power lever takes to travel its whole range, seconds.</summary>
@@ -377,12 +409,100 @@ public sealed class AircraftVoiceState : PhysicalVoiceState
         _lever += Math.Clamp(TargetLever - _lever, -step, step);
         Aircraft.Lever = Running ? Math.Clamp(_lever, 0f, 1f) : 0f;
         Aircraft.Descending = TargetDescending;
+
+        // The wheels. Touching is an event and rolling is a state, and only the first transition
+        // is the touchdown — everything after it is an aeroplane on a runway.
+        bool down = TargetOnGround;
+        if (down && !_onGround) Aircraft.Touchdown(TargetGroundSpeed);
+        else if (!down && _onGround) Aircraft.Airborne();
+        else if (down) Aircraft.GroundSpeed = TargetGroundSpeed;
+        _onGround = down;
     }
 
     protected override float StepSynth()
     {
         Aircraft.Step();
         return Aircraft.Total;
+    }
+}
+
+/// <summary>
+/// A siren head, as its own voice on the car that carries it.
+///
+/// It is NOT folded into the engine voice, and that is a level argument rather than a tidiness
+/// one. A patrol siren makes 130 dB at a metre and the car it is bolted to makes 95; one shared
+/// <see cref="PhysicalVoiceState.PascalsAtFullScale"/> would have to be set for one of them, and
+/// either choice is wrong — set it for the siren and the engine renders 35 dB under full scale and
+/// vanishes, set it for the engine and the siren arrives as a square wave. Two sources 35 dB apart
+/// need two references, which is what two voices are.
+///
+/// It is also physically a different place on the car: the horn is behind the grille and the
+/// tailpipe is under the back bumper, and once you are close enough to tell, they separate — the
+/// same reason the engine already has a front tap.
+/// </summary>
+public sealed class SirenVoiceState : PhysicalVoiceState
+{
+    public readonly SirenSpec Spec;
+    public readonly ElectronicSiren Siren;
+
+    /// <summary>Which sound the head is making. Game thread writes.</summary>
+    public volatile int TargetMode = (int)SirenMode.Off;
+
+    public SirenVoiceState(SirenSpec spec, float sampleRate)
+        : base(spec.SourceLevelDb, sampleRate)
+    {
+        Spec = spec;
+        Siren = new ElectronicSiren(spec, sampleRate);
+    }
+
+    protected override void PushListener(Vector3 frame) => Siren.SetListener(frame);
+
+    protected override void Control(float seconds, float dt)
+    {
+        // Switching modes is not slewed and must not be: a siren head changes sound between one
+        // sweep and the next, and the oscillator carries straight on at the new rate. The synth
+        // keeps its phase across the change, so there is nothing to smooth.
+        Siren.Mode = Running ? (SirenMode)TargetMode : SirenMode.Off;
+    }
+
+    protected override float StepSynth()
+    {
+        Siren.Step();
+        return Siren.Output;
+    }
+}
+
+/// <summary>
+/// A struck bell that rings while it is told to — a level crossing's gong.
+///
+/// The simplest physical voice there is: the bell model already knows how to be rung over and over
+/// (<see cref="StruckBell.Ringing"/>), so all this does is carry the server's word for whether it
+/// should be. That word matters because a crossing bell is the first sound in this world that a
+/// client CANNOT work out for itself: it rings because of where a train is on a line the listener
+/// may be a kilometre from and cannot see. Everything else — an engine's revs, a siren's mode, an
+/// aeroplane's power — is derivable from what the client can already observe. This one is not, so
+/// it comes down the wire as SoundEmitterComponent.SynthRunning.
+/// </summary>
+public sealed class BellVoiceState : PhysicalVoiceState
+{
+    public readonly StruckBellSpec Spec;
+    public readonly StruckBell Bell;
+
+    public BellVoiceState(StruckBellSpec spec, float sampleRate, int seed)
+        : base(spec.ReferenceDb, sampleRate)
+    {
+        Spec = spec;
+        Bell = new StruckBell(spec, sampleRate, seed);
+    }
+
+    protected override void PushListener(Vector3 frame) { }
+
+    protected override void Control(float seconds, float dt) => Bell.Ringing = Running;
+
+    protected override float StepSynth()
+    {
+        Bell.Step();
+        return Bell.Out;
     }
 }
 

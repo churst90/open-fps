@@ -34,6 +34,9 @@ public class MachineVoiceTests
     {
         var spec = SmallMachineSpec.ByName(preset);
         var voice = new MachineVoiceState(spec, Rate, entityId: 4242, seed: 11);
+        // A mower's declared level is the machine WORKING, which is a mower being pushed. 0.95 m/s is
+        // the speed every mower ran at when the levels were measured, back when it was a constant.
+        if (spec.Cutting != null) voice.TargetGroundSpeed = 0.95f;
         int n = (int)(Rate * seconds);
         var buf = new float[n];
 
@@ -75,6 +78,42 @@ public class MachineVoiceTests
         var (rms, _) = Measure(preset);
         Assert.True(MathF.Abs(rms - spec.SourceLevelDb) < 6f,
             $"{preset} declares {spec.SourceLevelDb:F0} dB at 1 m and rendered {rms:F1}");
+    }
+
+    /// <summary>
+    /// A mower being pushed is working, and one standing at the end of its strip is not.
+    ///
+    /// "The lawnmowers don't move" — they did, on the server, sixteen metres out and back. The voice
+    /// ran a constant ground speed, so pushing, turning and waiting all sounded the same and nothing
+    /// said the thing was going anywhere. Moving puts grass under the deck and the grass takes
+    /// torque. The governor holds the revs to within about one per cent, so the average rpm barely
+    /// moves and is the wrong thing to measure; what it does instead is OPEN THE THROTTLE to carry
+    /// the load, and a single under a wide-open throttle is a harder, louder engine than one idling
+    /// its blade round in air. Standing still, that has to close again.
+    /// </summary>
+    [Theory]
+    [InlineData("mower_push", 1.1f)]
+    [InlineData("mower_riding", 1.9f)]
+    public void AMowerWorksHarderMovingThanStanding(string preset, float walkingPace)
+    {
+        var spec = SmallMachineSpec.ByName(preset);
+        var voice = new MachineVoiceState(spec, Rate, entityId: 4242, seed: 11);
+        var block = new float[(int)(Rate * 0.1f)];
+        float MeanThrottle(float speed)
+        {
+            voice.TargetGroundSpeed = speed;
+            for (int i = 0; i < 60; i++) voice.Render(block);    // settle
+            double sum = 0;
+            for (int i = 0; i < 40; i++) { voice.Render(block); sum += voice.Machine.Throttle; }
+            return (float)(sum / 40);
+        }
+        float standing = MeanThrottle(0f);
+        float moving = MeanThrottle(walkingPace);
+        float standingAgain = MeanThrottle(0f);
+        Assert.True(moving > standing + 0.05f,
+            $"{preset}: throttle {moving:F2} moving against {standing:F2} standing ({standingAgain:F2} after) — the grass took nothing");
+        Assert.True(standingAgain < moving - 0.05f,
+            $"{preset}: throttle {standingAgain:F2} stopped again against {moving:F2} moving ({standing:F2} before) — it never let off");
     }
 
     /// <summary>

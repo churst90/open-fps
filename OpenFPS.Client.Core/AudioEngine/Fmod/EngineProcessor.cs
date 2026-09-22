@@ -115,9 +115,26 @@ public sealed class EngineVoiceState : IRenderedVoice
     /// was put on a map.
     /// </summary>
     public float PascalsAtFullScale = 40f;
-    /// <summary>How much of the front of the car (intake and block) is mixed into this one voice,
-    /// 0..1. The rig's separation is lost in a single emitter; the timbre is kept.</summary>
-    public float FrontMix = 0.35f;
+    /// <summary>
+    /// How much of the front of the car reaches this voice, 0..1 — and it is ONE now, because
+    /// there is nothing left for it to represent.
+    ///
+    /// It was 0.35: a fixed nine decibels taken off the intake on top of everything the intake
+    /// model already did. That was the third of these undeclared duplicates to turn up. The block
+    /// had one (a 0.4 in this same sum, alongside its declared bay leakage) and the intake had
+    /// this. In both cases a real, declared, per-vehicle path existed and a constant was quietly
+    /// attenuating on top of it.
+    ///
+    /// What an intake's route to the street is made of is now all declared and all derived:
+    /// IntakeSpec.AirboxLossDb (the box as an expansion chamber, from its own geometry) and
+    /// IntakeSpec.Level (what escapes the bay). Keeping a 0.35 in front of those would be saying
+    /// the same thing a third time, in a number nobody could look up.
+    ///
+    /// Still a field rather than a constant because a two-outlet vehicle hands its front to a
+    /// SECOND voice when the listener is close enough to tell the ends apart, and that crossfade
+    /// runs through here.
+    /// </summary>
+    public float FrontMix = 1f;
     /// <summary>
     /// How much of the tyre layer reaches the mix.
     ///
@@ -452,7 +469,27 @@ public sealed class EngineVoiceState : IRenderedVoice
             catch (Exception ex) { Serilog.Log.Warning("Vehicle '{Name}': air system '{Air}' — {Err}", v.Name, v.AirSystem, ex.Message); }
         }
         _bayLeak = Math.Clamp(v.EngineBayLeakage, 0f, 1f);
+        if (!string.IsNullOrEmpty(v.AirSystem) && v.DoorChime)
+        {
+            _chime = OpenFPS.Common.DoorChimeSpec.TransitBus;
+            _chimeAmp = 20e-6f * MathF.Pow(10f, _chime.ReferenceDb / 20f);
+        }
+        if (v.CoolingFan is { } fan)
+        {
+            // It blows FORWARD, through the radiator and out of the grille, so its axis is the
+            // vehicle's. That is also why it belongs in the front tap and not with the tailpipe.
+            _fan = new OpenFPS.Client.AudioEngine.Core.Aircraft.BladeRow(fan, sampleRate, Vector3.UnitZ, seed + 53);
+            _fanRatio = v.FanDriveRatio > 0f ? v.FanDriveRatio : 1f;
+        }
     }
+
+    /// <summary>The cooling fan's contribution, 0..1 — normally one. Writable so an instrument can
+    /// mute it and read what it is worth, the same way the bay leak can be.</summary>
+    public float FanMix = 1f;
+
+    /// <summary>How much of the car's own body ringing reaches the mix, 0..1. One normally;
+    /// writable so an instrument can mute it and read what the panels are worth.</summary>
+    public float BodyMix = 1f;
 
     /// <summary>The car's own resonances. Built once: the modes are a property of the vehicle, not
     /// of what it is doing.</summary>
@@ -465,8 +502,39 @@ public sealed class EngineVoiceState : IRenderedVoice
     // deceleration, a park brake is what happens after a vehicle has stood still for a moment, and
     // the doors of a bus open when it has stopped and shut before it moves. So the events are read
     // off the speed history the voice keeps anyway, on the render thread, at sample rate.
+    /// <summary>Whether the doors are standing open, which is what the beeper runs on. Exposed so
+    /// a test can tell "the beeper is inaudible" from "the doors never opened" — two completely
+    /// different faults that sound identical from outside.</summary>
+    public bool DoorsOpen => _doorsOpen;
+
+    /// <summary>Whether this voice built a door beeper at all.</summary>
+    public bool HasDoorChime => _chime != null;
+
+    /// <summary>The largest beeper sample this voice has produced, pascals. Diagnostic.</summary>
+    public float PeakChimePa { get; private set; }
+
     private readonly AirSystem? _air;
-    private readonly float _bayLeak;
+    // The door beeper: a piezo behind a grille over the doorway. Runs while the bus is knelt with
+    // its doors open, which is a state the voice already knows from its own speed history.
+    private readonly OpenFPS.Common.DoorChimeSpec? _chime;
+    private readonly float _chimeAmp;
+    private double _chimePhase, _chimeCycle;
+    private float _chimeEnv;
+    /// <summary>The cooling fan, for a vehicle whose fan is on the engine rather than on a relay.
+    /// The same BladeRow a propeller and a mower blade are; see VehicleProfile.CoolingFan.</summary>
+    private readonly OpenFPS.Client.AudioEngine.Core.Aircraft.BladeRow? _fan;
+    private readonly float _fanRatio;
+    private float _bayLeak;
+
+    /// <summary>
+    /// What escapes the engine bay, 0..1 — normally the vehicle's own
+    /// <see cref="VehicleProfile.EngineBayLeakage"/>, writable so an instrument can mute it.
+    ///
+    /// The only way to answer "how much of this bus am I hearing through the bonnet" is to render
+    /// the same voice twice and difference the two, which is the same rule `--engine-orders jet=0`
+    /// established for the gas path: read the CONTRIBUTION, not the constant.
+    /// </summary>
+    public float BayLeakage { get => _bayLeak; set => _bayLeak = Math.Clamp(value, 0f, 1f); }
     private float _lastSpeedForAir, _accelForAir;
     private float _brakedSeconds, _stoppedSeconds;
     private bool _parked, _doorsOpen;
@@ -499,6 +567,12 @@ public sealed class EngineVoiceState : IRenderedVoice
             {
                 _parked = true;
                 _air.Vent("parking");                       // spring brakes: the chambers dump
+                // And then it kneels — the suspension bags on the kerb side dump and the body
+                // drops a hundred millimetres. A long, low hiss with a great deal of volume behind
+                // it, and the one sound that says "bus at a stop" rather than "vehicle stopped".
+                // The port was declared on the transit bus from the start and nothing ever fired
+                // it, because nothing on a track ever stood still.
+                if (_air.Ports.ContainsKey("kneel")) _air.Vent("kneel");
                 if (_air.Ports.ContainsKey("door")) { _air.Vent("door"); _doorsOpen = true; }
             }
         }
@@ -514,6 +588,35 @@ public sealed class EngineVoiceState : IRenderedVoice
             }
             _stoppedSeconds = 0f;
         }
+    }
+
+    /// <summary>
+    /// One sample of the door beeper. Sounds only while the doors are open, which the voice knows
+    /// already — nothing new has to be told to it.
+    /// </summary>
+    private float StepChime()
+    {
+        var c = _chime!;
+        float dts = 1f / SampleRate;
+        // The pulse train: a beep, then a gap, at the declared rate.
+        _chimeCycle += c.RateHz * dts;
+        if (_chimeCycle >= 1.0) _chimeCycle -= 1.0;
+        bool on = _doorsOpen && _chimeCycle < c.Duty;
+        // A piezo is light but not massless: it takes a few milliseconds to start and to stop, and
+        // an instant edge is a click rather than a beep.
+        float step = dts / MathF.Max(1e-4f, c.EdgeSeconds);
+        _chimeEnv += Math.Clamp((on ? 1f : 0f) - _chimeEnv, -step, step);
+        if (_chimeEnv <= 1e-4f) return 0f;
+
+        _chimePhase += c.ToneHz * dts;
+        if (_chimePhase >= 1.0) _chimePhase -= 1.0;
+        double w = _chimePhase * 2.0 * Math.PI;
+        float y = (float)(Math.Sin(w) + c.SecondHarmonic * Math.Sin(2.0 * w));
+        // Held to the declared level whatever the harmonic content is.
+        float norm = 1f / MathF.Sqrt(0.5f * (1f + c.SecondHarmonic * c.SecondHarmonic)) * 0.7071f;
+        float outPa = y * norm * _chimeAmp * _chimeEnv;
+        if (MathF.Abs(outPa) > PeakChimePa) PeakChimePa = MathF.Abs(outPa);
+        return outPa;
     }
 
     /// <summary>How many body modes this voice is running. Diagnostic, for the cost report.</summary>
@@ -586,7 +689,34 @@ public sealed class EngineVoiceState : IRenderedVoice
             // end of the car, because that is where the wheels are: the two halves sum to the whole
             // at any distance where the car is one thing, and separate as you walk up to it.
             float halfTyre = tyre * 0.6f * TyreMix;
-            float front = (Engine.Intake + Engine.Block * 0.4f) * FrontMix + halfTyre;
+            // The front of the machine: the airbox, which breathes to the outside through the
+            // grille, and the tyres at that end.
+            //
+            // The BLOCK used to be in here as well, at 0.4 — and then again in the bay leak below.
+            // Two routes out of the engine for one mechanism, one of them declared per vehicle from
+            // the geometry and one of them a constant applied to everything. That second path is
+            // what the block actually had: 0.4 x FrontMix = 0.14, a fixed 17 dB of attenuation with
+            // nothing behind it. On a car it does not matter, because a car is its exhaust. On a
+            // bus, whose block measures SEVEN DECIBELS ABOVE its silenced tailpipe (`--voice-levels
+            // parts`), it is most of the machine being thrown away, and that is what "I can hardly
+            // hear the engines on those diesels" was.
+            //
+            // One mechanism, one route: the block gets outside through the bay, and how much of it
+            // does is VehicleProfile.EngineBayLeakage, which every vehicle now declares from what is
+            // actually around its engine.
+            float front = Engine.Intake * FrontMix + halfTyre;
+            if (_fan != null)
+            {
+                // The fan is geared to the crank and has no throttle: it turns at engine speed and
+                // its loading is the air it is pushing, which is all it ever pushes. Its speed is
+                // set on the slow tick like everything else that does not change per sample.
+                if ((i & 63) == 0)
+                    _fan.SetSpeed(Engine.Rpm * _fanRatio, 1f,
+                                  _listenerKnown
+                                      ? new Vector3(Volatile.Read(ref _listenerX), Volatile.Read(ref _listenerY), Volatile.Read(ref _listenerZ))
+                                      : Vector3.UnitZ);
+                front += _fan.Step() * FanMix;
+            }
             float pa = Engine.Exhaust + halfTyre;
 
             // ...and then the car it is all bolted into. The body is driven by everything above and
@@ -599,7 +729,7 @@ public sealed class EngineVoiceState : IRenderedVoice
             // floorpan, and it is how the offline VehicleSynth render drives it too. Two renderers,
             // one rule — a body that coloured one and not the other is how a change can be measured
             // as working and heard as nothing.
-            pa += _body.Process(Engine.Exhaust);
+            pa += _body.Process(Engine.Exhaust) * BodyMix;
             // What escapes the engine bay. Zero for a car; see VehicleProfile.EngineBayLeakage.
             if (_bayLeak > 0f) pa += (Engine.Block + 0.5f * Engine.Intake) * _bayLeak;
             if (_air != null)
@@ -607,6 +737,7 @@ public sealed class EngineVoiceState : IRenderedVoice
                 if ((i & 63) == 0) AirEvents(dt * 64f);
                 pa += _air.Step();
             }
+            if (_chime != null) pa += StepChime();
 
             _envelope += Math.Clamp(envTarget - _envelope, -envStep, envStep);
             // Written WITHOUT the soft ceiling, which now belongs to whoever sums the taps back up:

@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Collections.Generic;
 using System.Numerics;
 using Arch.Core;
@@ -65,6 +66,18 @@ public sealed class VehicleSystem
         /// the banking in it, so the fraction of it being used is the fraction of the grip being
         /// used, and no listener can arrive at that from a velocity alone.</summary>
         public float TyreDemand;
+
+        /// <summary>Where this vehicle stops on its route, in order round the lap. Empty for
+        /// anything that does not — a car does not use a bus stop.</summary>
+        public (float At, float Dwell, string Kind)[] Stops = System.Array.Empty<(float, float, string)>();
+        /// <summary>Which stop it is heading for, an index into <see cref="Stops"/>.</summary>
+        public int NextStop;
+        /// <summary>Seconds left standing. Above zero means it is AT a stop, not driving to one.</summary>
+        public float DwellLeft;
+        /// <summary>The stop it has just left, and how far round it was when it left — so it does
+        /// not immediately see the stop it is standing on and serve it again for ever.</summary>
+        public int LeftStop = -1;
+        public float LeftAtLap;
         /// <summary>How hard this vehicle CHOOSES to corner, which set its racing line. The tyres are
         /// measured against <see cref="Grip"/>, which may be more.</summary>
         public float CorneringG = 1f;
@@ -127,8 +140,11 @@ public sealed class VehicleSystem
                 // An airliner is sixty metres of aeroplane; a car is four and a half of car. The
                 // collider is what carries it into a client's earshot through the spatial grid, so
                 // an aeroplane sized like a hatchback is one that appears late.
+                // An aeroplane's size is its WINGSPAN and its LENGTH, which it now declares. It used
+                // to be guessed from cruise speed — a fast aeroplane was a big one — which made a
+                // turboprop wider than an airliner is long and had nothing to do with either.
                 var hull = isAircraft
-                    ? new Vector3(MathF.Max(8f, air!.CruiseSpeedMps * 0.12f), 6f, MathF.Max(12f, air.CruiseSpeedMps * 0.2f))
+                    ? new Vector3(air!.WingspanMetres, 6f, air.LengthMetres)
                     : isMachine ? new Vector3(0.6f, 1.0f, 0.9f)
                     : isWalker ? new Vector3(0.5f, 1.8f, 0.5f)
                     : new Vector3(1.9f, 1.4f, 4.6f);
@@ -216,6 +232,31 @@ public sealed class VehicleSystem
                     Grip = vd.GripG > 0 ? vd.GripG : (vd.CorneringG > 0 ? vd.CorneringG : 1.0f),
                     CorneringG = vd.CorneringG > 0 ? vd.CorneringG : 1.0f,
                 };
+
+                // Where this vehicle stops on its route. A stop names who uses it — a bus stop is
+                // for buses and a car does not pull into one — so the same track carries the stops
+                // for everything that runs it and each vehicle takes the ones that are its own.
+                if (line != null)
+                {
+                    var track = data.Tracks?.Find(tr => string.Equals(tr.Id, vd.Track, StringComparison.OrdinalIgnoreCase));
+                    if (track is { Stops.Count: > 0 })
+                    {
+                        var mine = track.Stops
+                            .Where(sp => string.IsNullOrEmpty(sp.ForPreset)
+                                      || vd.Preset.Contains(sp.ForPreset!, StringComparison.OrdinalIgnoreCase))
+                            .OrderBy(sp => sp.AtMetres)
+                            .Select(sp => (At: sp.AtMetres, Dwell: sp.DwellSeconds, Kind: sp.Kind ?? "stop"))
+                            .ToArray();
+                        v.Stops = mine;
+                        // Start heading for the first stop that is actually ahead of it, or it will
+                        // drive most of a lap backwards to reach one it has already passed.
+                        for (int si = 0; si < mine.Length; si++)
+                            if (mine[si].At >= v.Lap) { v.NextStop = si; break; }
+                        if (mine.Length > 0)
+                            Log.Information("Map {Map}: {Name} stops at {Count} place(s) round '{Track}'.",
+                                            mapId, display, mine.Length, vd.Track);
+                    }
+                }
                 // A racer is already at speed when the world starts; it is a lap in progress, not a
                 // standing start, and a standing start would put eight engines on the limiter at
                 // once in the same three seconds.
@@ -248,6 +289,16 @@ public sealed class VehicleSystem
             if (v.Line != null)
             {
                 UpdateRacer(v, ref t, ref vel, dt);
+                // The same trace a shuttle gets — racers need it more, because a vehicle on a lap
+                // that fails to stop looks identical to one that has no stops declared.
+                if (Environment.GetEnvironmentVariable("OPENFPS_TRACE_SHUTTLE") is { } rtrace
+                    && v.DisplayName.Contains(rtrace, StringComparison.OrdinalIgnoreCase)
+                    && (int)(v.Phase * 2) != (int)((v.Phase - dt) * 2))
+                    Log.Information("RACER {Name}: lap {Lap:F0}/{Len:F0} m speed {Speed:F1} "
+                                  + "next stop {Next} at {At:F0} m, dwell {Dwell:F1}",
+                                    v.DisplayName, v.Lap, v.Line.Length, v.Speed,
+                                    v.Stops.Length == 0 ? -1 : v.NextStop,
+                                    v.Stops.Length == 0 ? -1f : v.Stops[v.NextStop].At, v.DwellLeft);
                 if (world.Has<VehicleComponent>(v.Entity))
                 {
                     ref var rvc = ref world.Get<VehicleComponent>(v.Entity);
@@ -255,6 +306,21 @@ public sealed class VehicleSystem
                 }
                 continue;
             }
+
+            // Where a shuttle actually is, twice a second, for one vehicle named by a substring:
+            //
+            //   OPENFPS_TRACE_SHUTTLE="Mower, garden 2" ./run-server.sh city
+            //
+            // "The lawnmowers don't move" is a claim about the server that cannot be settled from
+            // the client, where a slow machine on a short line sounds the same standing still as
+            // crawling. Costs nothing unless the variable is set, and it settled that one in three
+            // minutes: the mowers traverse their sixteen metres at 1.1 m/s, turn, wait and come
+            // back, exactly as declared. What was missing was audible MOVEMENT, not movement.
+            if (Environment.GetEnvironmentVariable("OPENFPS_TRACE_SHUTTLE") is { } trace
+                && v.DisplayName.Contains(trace, StringComparison.OrdinalIgnoreCase)
+                && (int)(v.Phase * 2) != (int)((v.Phase - dt) * 2))
+                Log.Information("SHUTTLE {Name}: {State} pos {Pos} speed {Speed:F2} progress {Prog:F1}",
+                                v.DisplayName, v.Current, t.Position, v.Speed, v.Progress);
 
             switch (v.Current)
             {
@@ -331,13 +397,71 @@ public sealed class VehicleSystem
     /// formula car (which stops in half the distance) stays on the throttle noticeably longer into
     /// the same turn than the stock car beside it.
     /// </summary>
-    private static void UpdateRacer(DemoVehicle v, ref Transform t, ref Velocity vel, float dt)
+    private void UpdateRacer(DemoVehicle v, ref Transform t, ref Velocity vel, float dt)
     {
         var line = v.Line!;
+
+        // ── Standing at a stop ─────────────────────────────────────────────────────────────────
+        //
+        // Held STILL, not crawling. Everything a halted vehicle makes is an event read off its own
+        // speed going to zero and staying there — the spring brakes after two and a half seconds,
+        // the doors, the kneel — and a bus that never quite stops never makes any of it. That is
+        // why a city full of buses had no air in it: they were all on racing lines, and a racing
+        // line never stops.
+        if (v.DwellLeft > 0f)
+        {
+            // Held at a crossing: it is the CROSSING that lets you go, not a clock.
+            //
+            // Both halves matter. Counting a declared dwell down at a crossing sends the vehicle
+            // over the rails when the timer expires no matter where the train is — traced doing
+            // exactly that, pulling away with the train eighty-seven metres out — and releasing
+            // only on a timer means it also sits there after the train has long gone. So while the
+            // crossing is closed the dwell is topped up, and the instant it opens it is dropped.
+            if (v.Stops.Length > 0
+                && string.Equals(v.Stops[v.NextStop].Kind, "crossing", StringComparison.OrdinalIgnoreCase)
+                && _crossings != null)
+            {
+                line.Sample(v.Stops[v.NextStop].At, out var gate, out _, out _);
+                v.DwellLeft = _crossings.IsClosedAt(v.MapId, gate) ? 1f : 0f;
+            }
+            v.DwellLeft -= dt;
+            v.Speed = 0f;
+            vel.Linear = Vector3.Zero;
+            line.Sample(v.Lap, out Vector3 at, out float hdg, out _);
+            t.Position = at;
+            t.Rotation = Quaternion.CreateFromYawPitchRoll(hdg, 0f, 0f);
+            t.IsDirty = true;
+            if (v.DwellLeft <= 0f && v.Stops.Length > 0)
+            {
+                v.LeftStop = v.NextStop;
+                v.LeftAtLap = v.Lap;
+            }
+            return;
+        }
+
         float lookahead = MathF.Max(8f, v.Speed * v.Speed / (2f * v.Brake));
         line.Sample(v.Lap + lookahead, out _, out _, out float ahead);
         line.Sample(v.Lap, out Vector3 here, out float heading, out float now, out float cornerLimit);
         float want = MathF.Min(now, ahead);
+
+        // ── Coming up on one ───────────────────────────────────────────────────────────────────
+        //
+        // The same braking rule the shuttle uses: the fastest it may be going with this much road
+        // left and this much brake, v = sqrt(2 a s). So it slows the way a vehicle slows rather
+        // than arriving and then stopping, and the deceleration is real — which is what the air
+        // system reads to decide the service brakes have been used.
+        float toStop = DistanceToNextStop(v, line);
+        if (toStop < float.MaxValue)
+        {
+            want = MathF.Min(want, MathF.Sqrt(MathF.Max(0f, 2f * v.Brake * toStop)));
+            if (toStop <= 0.6f && v.Speed < 1.2f)
+            {
+                v.DwellLeft = MathF.Max(0.5f, v.Stops[v.NextStop].Dwell);
+                v.Speed = 0f;
+                vel.Linear = Vector3.Zero;
+                return;
+            }
+        }
 
         float wasSpeed = v.Speed;
         if (want > v.Speed) v.Speed = MathF.Min(want, v.Speed + v.Accel * dt);
@@ -387,6 +511,65 @@ public sealed class VehicleSystem
         t.IsDirty = true;
         vel.Linear = new Vector3(MathF.Sin(heading), 0f, MathF.Cos(heading)) * v.Speed;
     }
+
+    /// <summary>
+    /// Road left to the next stop this vehicle must actually make, metres, or MaxValue if there is
+    /// none ahead. Sets <see cref="DemoVehicle.NextStop"/> to whichever that is.
+    ///
+    /// It SCANS, every tick, rather than walking a stored index forward. The first version held an
+    /// index and only advanced it on arrival, which works for one stop and fails for two: a vehicle
+    /// locked on to a crossing three hundred metres ahead drove straight over the one under its
+    /// wheels, because that one was not the stop it was thinking about. Traced exactly that way —
+    /// "next stop 0 at 48 m" held for a whole lap while the van crossed the rails at 328 m at
+    /// thirteen metres a second with the bells going.
+    ///
+    /// An OPEN crossing is not a stop at all and is skipped here, which is what makes traffic flow
+    /// over it and queue at it without either being a special case further down.
+    /// </summary>
+    private float DistanceToNextStop(DemoVehicle v, RaceLine line)
+    {
+        if (v.Stops.Length == 0) return float.MaxValue;
+        float best = float.MaxValue;
+        int bestIdx = -1;
+        for (int i = 0; i < v.Stops.Length; i++)
+        {
+            float d = v.Stops[i].At - v.Lap;
+            if (d < -1f) d += line.Length;              // it is round the other side
+            if (d >= best) continue;
+
+            // The one it has just served, until it is properly clear of it. Without this a
+            // vehicle standing on a stop sees a stop nought metres ahead and serves it again,
+            // for ever.
+            if (i == v.LeftStop)
+            {
+                float since = v.Lap - v.LeftAtLap;
+                if (since < 0f) since += line.Length;
+                if (since < 25f) continue;
+            }
+
+            if (string.Equals(v.Stops[i].Kind, "crossing", StringComparison.OrdinalIgnoreCase))
+            {
+                line.Sample(v.Stops[i].At, out var gate, out _, out _);
+                if (_crossings == null || !_crossings.IsClosedAt(v.MapId, gate)) continue;
+            }
+
+            best = d; bestIdx = i;
+        }
+        if (bestIdx < 0) return float.MaxValue;
+        v.NextStop = bestIdx;
+        return MathF.Max(0f, best);
+    }
+
+    private CrossingSystem? _crossings;
+
+    /// <summary>
+    /// Hands the road the crossings, so a stop of kind "crossing" can ask whether it is closed.
+    ///
+    /// One direction only, and deliberately: the road reads the crossing, the crossing reads the
+    /// trains, and the trains read nothing. A train does not slow for a level crossing and does not
+    /// need to know one is there.
+    /// </summary>
+    public void SetCrossings(CrossingSystem crossings) => _crossings = crossings;
 
     /// <summary>How hard a vehicle is working its tyres, 0..2 with 1 the limit. False for anything
     /// that is not one of ours.</summary>

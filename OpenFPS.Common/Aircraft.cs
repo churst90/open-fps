@@ -87,6 +87,7 @@ public sealed record BladeRowSpec
     /// </summary>
     public float SelfNoiseDb { get; init; }
 
+
     public float TipSpeed(float rpm) => MathF.PI * DiameterMetres * rpm / 60f;
     public float BladePassHz(float rpm) => Blades * rpm / 60f;
 }
@@ -129,6 +130,68 @@ public sealed record GasTurbineSpec
     public float IdleFraction { get; init; } = 0.25f;
 }
 
+/// <summary>
+/// The undercarriage, and the one thing it does that nothing else on the aeroplane does: arrive.
+///
+/// A wheel in the air is not turning. A runway arriving underneath it at seventy metres a second
+/// spins it up, and for the few tenths of a second that takes, the whole contact patch is sliding —
+/// a hundred per cent slip, at a speed no car ever reaches — which is the chirp and the puff of
+/// smoke at every touchdown. How LONG that lasts is not a taste constant: it is the wheel's own
+/// inertia divided by the torque the runway can put into it, and both of those are here.
+///
+///     I = ½ m r²  ·  ω = v / r  ·  T = μ W r  ·  t = I ω / T
+///
+/// which for an airliner's main wheel — a hundred and ten kilos, half a metre of radius, sixteen
+/// kilonewtons on it — is about four tenths of a second, and for a light single's little wheel a
+/// twentieth of that. That is the whole difference between a jet's long scrub and a Cessna's chirp,
+/// and neither is declared.
+/// </summary>
+public sealed record LandingGearSpec
+{
+    /// <summary>The tyre itself — the same model a car's wheels use, because it is the same thing:
+    /// rubber sliding on a hard surface at a known speed.</summary>
+    public required TyreProfile Tyre { get; init; }
+    /// <summary>Main wheels that touch. The nose wheel arrives later and carries almost no load.</summary>
+    public int Wheels { get; init; } = 4;
+    public required float WheelRadiusMetres { get; init; }
+    /// <summary>One wheel and tyre assembly, kilograms. It is the flywheel that has to be spun up.</summary>
+    public required float WheelMassKg { get; init; }
+    /// <summary>What the aeroplane weighs when it arrives, kilograms. Shared over the main wheels,
+    /// this is the load that decides how hard the runway can grip.</summary>
+    public required float LandingMassKg { get; init; }
+    /// <summary>Sliding friction of rubber smeared on concrete. Lower than a rolling tyre's peak —
+    /// that is what sliding means.</summary>
+    public float SlidingMu { get; init; } = 0.55f;
+
+    /// <summary>
+    /// How much of the aeroplane's weight is actually ON the wheels at the instant they touch, as a
+    /// fraction.
+    ///
+    /// Almost none of it, and that is the whole reason a touchdown is a long scrub and not a click.
+    /// An aeroplane that has just landed is still FLYING: the wing is carrying it at very nearly one
+    /// g, and all the tyres have on them is whatever the sink rate puts through the oleos. The load
+    /// arrives over the next second or two, as the speed bleeds off, the lift goes and the nose
+    /// comes down. Put the full landing weight on the wheels at contact and the model spins them up
+    /// in ninety milliseconds — a chirp — where a real jet smokes its mains for the better part of a
+    /// second, and that difference is entirely this number.
+    /// </summary>
+    public float WeightOnWheelsAtTouchdown { get; init; } = 0.15f;
+
+    /// <summary>
+    /// How long the wheels take to come up to speed, seconds, from the mechanism above. Never less
+    /// than a millisecond, so a badly declared gear cannot divide by zero.
+    /// </summary>
+    public float SpinUpSeconds(float groundSpeedMps)
+    {
+        float r = MathF.Max(0.05f, WheelRadiusMetres);
+        float inertia = 0.5f * MathF.Max(1f, WheelMassKg) * r * r;
+        float loadN = MathF.Max(1f, LandingMassKg) * 9.81f
+                    * Math.Clamp(WeightOnWheelsAtTouchdown, 0.01f, 1f) / MathF.Max(1, Wheels);
+        float torque = MathF.Max(1f, SlidingMu * loadN * r);
+        return MathF.Max(0.001f, inertia * (MathF.Max(0f, groundSpeedMps) / r) / torque);
+    }
+}
+
 public sealed record AircraftProfile
 {
     public required string Name { get; init; }
@@ -144,6 +207,52 @@ public sealed record AircraftProfile
     /// <summary>Rotating inertia the crank sees through the prop, kg m^2. Piston only.</summary>
     public float PropInertiaKgM2 { get; init; } = 1.5f;
     public float CruiseSpeedMps { get; init; } = 60f;
+
+    /// <summary>
+    /// Over the threshold, metres per second.
+    ///
+    /// Declared rather than taken as a fraction of cruise, because it is not one: it is set by how
+    /// much wing the aeroplane has and how much it weighs, and those vary far more between types
+    /// than cruise speed does. A jet cruises four times as fast as a light single and lands at
+    /// barely twice the speed. Taken as 0.62 of cruise, the airliner came over the fence at 277
+    /// knots.
+    /// </summary>
+    public float ApproachSpeedMps { get; init; }
+
+    /// <summary>
+    /// How many power units the aeroplane has.
+    ///
+    /// Not a multiplier on a number: every engine is BUILT, and they are built slightly differently
+    /// and run at slightly different speeds, because no two are ever synchronised exactly and the
+    /// crew only trims them to within a fraction of a per cent. That mismatch is audible and it is
+    /// the signature of a multi-engine aeroplane — two fans a few rpm apart beat against each other
+    /// at a cycle or two a second, which is the slow throb under a twin going over, and it cannot be
+    /// got by turning one engine up by three decibels.
+    ///
+    /// The broadband halves — the jets, the combustor — are independent streams, so they add as
+    /// POWER: two engines are three decibels, four are six, and that falls out of summing them
+    /// rather than being written down.
+    /// </summary>
+    public int Engines { get; init; } = 1;
+
+    /// <summary>
+    /// Between the outboard engines, metres — how far apart the noise-making ends actually are.
+    ///
+    /// A twin's two engines are eleven metres apart under the wings, so up close it is not a point
+    /// source and walking towards one does not make the other louder. This is what the voice's
+    /// extent is taken from, the same rule a bus's nose-to-tail separation follows. Zero for a
+    /// single, which then falls back to the disc it radiates from.
+    /// </summary>
+    public float EngineSpanMetres { get; init; }
+
+    /// <summary>Wing tip to wing tip, metres. The aeroplane's real size.</summary>
+    public float WingspanMetres { get; init; } = 10f;
+    /// <summary>Nose to tail, metres.</summary>
+    public float LengthMetres { get; init; } = 8f;
+
+    /// <summary>The undercarriage, if this aeroplane's is modelled. Only heard on arrival.</summary>
+    public LandingGearSpec? Gear { get; init; }
+
     /// <summary>Overall level at one metre at full power, for placing the voice.</summary>
     public required float SourceLevelDb { get; init; }
 
@@ -167,7 +276,18 @@ public sealed record AircraftProfile
         PropGearRatio = 1f,
         PropInertiaKgM2 = 1.6f,
         CruiseSpeedMps = 55f,
-        SourceLevelDb = 118f,
+        ApproachSpeedMps = 31f,      // 60 knots over the fence
+        Engines = 1,
+        WingspanMetres = 11.0f, LengthMetres = 8.3f,
+        // Two little wheels with almost nothing on them: they are up to speed in a twentieth of a
+        // second, which is why a light aircraft's arrival is a chirp and not a scrub.
+        Gear = new LandingGearSpec
+        {
+            Tyre = TyreProfile.SportsOnAsphalt with { TreadBlocks = 0, SquealHz = 1250f, SquealQ = 9f, SquealDb = 88f, PeakGripG = 0.7f },
+            Wheels = 2, WheelRadiusMetres = 0.20f, WheelMassKg = 9f, LandingMassKg = 1100f,
+        },
+        // 116.5 measured — the one that was already right.
+        SourceLevelDb = 117f,
     };
 
     /// <summary>
@@ -193,7 +313,23 @@ public sealed record AircraftProfile
             CombustorDb = 92f, WhineHz = 9500f, WhineDb = 86f, SpoolSeconds = 2.5f, IdleFraction = 0.6f,
         },
         CruiseSpeedMps = 140f,
-        SourceLevelDb = 126f,
+        ApproachSpeedMps = 60f,      // 117 knots
+        // A regional turboprop is a TWIN — one of those props on each wing, eight metres apart, and
+        // the beat between the two is most of what it sounds like from the ground. Declared as two
+        // rather than folded into the level, so both the three decibels and the throb are the same
+        // fact. +3 dB on the anchor is exactly that second engine and nothing else has moved.
+        Engines = 2,
+        EngineSpanMetres = 8.1f,
+        WingspanMetres = 27.05f, LengthMetres = 25.7f,
+        Gear = new LandingGearSpec
+        {
+            Tyre = TyreProfile.TruckOnAsphalt with { TreadBlocks = 0, SquealHz = 620f, SquealQ = 7f, SquealDb = 98f, PeakGripG = 0.65f },
+            Wheels = 4, WheelRadiusMetres = 0.40f, WheelMassKg = 48f, LandingMassKg = 20000f,
+        },
+        // 120, measured with `--spool`, not 129. The declaration sets both the placement AND the
+        // voice's full-scale reference, and they pull opposite ways, so over-declaring by nine
+        // decibels played this aeroplane five too QUIETLY. See [live voice vs the bench].
+        SourceLevelDb = 120f,
     };
 
     /// <summary>
@@ -227,7 +363,27 @@ public sealed record AircraftProfile
             CombustorDb = 96f, WhineHz = 6200f, WhineDb = 118f, SpoolSeconds = 5f, IdleFraction = 0.23f,
         },
         CruiseSpeedMps = 230f,
-        SourceLevelDb = 142f,
+        ApproachSpeedMps = 71f,      // 138 knots, a narrow-body at landing weight
+        // Two of them, under the wings, eleven and a half metres apart on a thirty-six metre span.
+        // Both halves of that matter: the power adds (the jets are independent streams, so two is
+        // three decibels and the anchor goes 142 -> 145), and the SEPARATION is what the voice's
+        // extent is, so an airliner on the ground near you is eleven metres wide and not a point.
+        Engines = 2,
+        EngineSpanMetres = 11.6f,
+        WingspanMetres = 35.8f, LengthMetres = 39.5f,
+        // Four main wheels, a hundred and ten kilos each, sixty-five tonnes arriving on them at a
+        // hundred and thirty knots. Four tenths of a second of sliding rubber: the touchdown.
+        Gear = new LandingGearSpec
+        {
+            Tyre = TyreProfile.TruckOnAsphalt with { TreadBlocks = 0, SquealHz = 430f, SquealQ = 6f, SquealDb = 108f, PeakGripG = 0.6f },
+            Wheels = 4, WheelRadiusMetres = 0.56f, WheelMassKg = 110f, LandingMassKg = 65000f,
+        },
+        // 138, measured at the loudest bearing at full power. The old 145 was an estimate made
+        // before AircraftSynth existed to measure, and it is why an airliner had to be almost on
+        // the runway to be heard: seven decibels of over-declaration is four decibels quieter in
+        // the mix, and the same reference also governs an APPROACH, where the engines are at idle
+        // and forty below their full-power figure.
+        SourceLevelDb = 138f,
     };
 
     /// <summary>
@@ -257,7 +413,12 @@ public sealed record AircraftProfile
             CombustorDb = 84f, WhineHz = 11500f, WhineDb = 88f, SpoolSeconds = 2f, IdleFraction = 0.65f,
         },
         CruiseSpeedMps = 55f,
-        SourceLevelDb = 116f,
+        Engines = 1,
+        // A helicopter's "span" is its rotor, which is what the air knows about it.
+        WingspanMetres = 10.16f, LengthMetres = 12.9f,
+        // 104 measured; 116 was an estimate. A light helicopter is not a loud machine at a metre —
+        // what makes one carry is that its rotor radiates DOWNWARD and it is always overhead.
+        SourceLevelDb = 104f,
     };
 
     public static IReadOnlyDictionary<string, Func<AircraftProfile>> Presets { get; } =

@@ -185,6 +185,8 @@ public class ClientAudioSystem
 
     /// <summary>...and a machine's front outlet in another one.</summary>
     internal const int IntakeVoiceBase = -800000;
+    /// <summary>Voice ids for a vehicle's siren head. Its own voice; see SirenVoiceState.</summary>
+    internal const int SirenVoiceBase = -900000;
 
     /// <summary>
     /// How many machines may have their front outlet voiced separately.
@@ -201,6 +203,8 @@ public class ClientAudioSystem
 
     /// <summary>Which machines currently have their front outlet on a voice of its own.</summary>
     private readonly HashSet<int> _frontVoiced = new();
+    /// <summary>Which vehicles currently have a siren voice running.</summary>
+    private readonly HashSet<int> _sirenVoiced = new();
     private readonly List<int> _frontRetiring = new();
 
     /// <summary>How many engines may be BUILT in one audio update. See ChooseLiveEngines.</summary>
@@ -351,6 +355,8 @@ public class ClientAudioSystem
         int distant = DistantVoiceBase - Math.Abs(entityId);
         if (_distantBoundTo.Remove(distant)) _audio.StopSound(distant);
         if (_frontVoiced.Remove(entityId)) _audio.StopSound(IntakeVoiceBase - Math.Abs(entityId));
+        if (_sirenVoiced.Remove(entityId)) _audio.StopSound(SirenVoiceBase - Math.Abs(entityId));
+        _sirenControl.Remove(entityId);
         _frontRetiring.Remove(entityId);
         // Its image-source reflections: one voice per slot (see ReflectionVoiceId).
         for (int slot = 0; slot < EarlyReflections.MaxArrivals; slot++)
@@ -752,10 +758,40 @@ public class ClientAudioSystem
         }
         else
         {
-            _state.CurrentRegion = _state.ShelterFactor > 0.8f ? "Under Shelter" : "Outside";
+            // Outdoors, name the place from WHAT YOU ARE STANDING ON.
+            //
+            // "Outside" is true and useless. A player working out where they are by ear needs to
+            // know they have stepped off the kerb, and the ground already knows — the same probe
+            // that chooses the footstep material. Concrete under the feet in the open air is a
+            // pavement; asphalt is the road; and the difference between them is the single most
+            // navigationally important fact on a city street.
+            //
+            // Derived, not authored: no map has to label a kerb, and a surface nobody has named
+            // still announces itself correctly.
+            _state.CurrentRegion = _state.ShelterFactor > 0.8f
+                ? "Under Shelter"
+                : OutdoorNameFor(_state.CurrentMaterial);
             _state.IsIndoor = false;
         }
     }
+    /// <summary>
+    /// What to call a patch of open ground, from the surface underfoot. Falls back to "outside"
+    /// for anything unrecognised, which is no worse than what it replaced.
+    /// </summary>
+    private static string OutdoorNameFor(string material) => material switch
+    {
+        "Concrete" => "sidewalk",
+        "Asphalt" => "road",
+        "Grass" => "grass",
+        "Dirt" => "dirt",
+        "Gravel" => "gravel",
+        "Sand" => "sand",
+        "Wood" => "boardwalk",
+        "Metal" => "metal grating",
+        "Water" => "water",
+        _ => "outside",
+    };
+
     /// <summary>
     /// Decides which physical models run live — standing machines and aircraft — by picking the ones
     /// that would actually be LOUDEST here.
@@ -838,16 +874,39 @@ public class ClientAudioSystem
                 }
                 return null;
             }
+            if (soundId.StartsWith("bell:", StringComparison.OrdinalIgnoreCase))
+            {
+                // A struck bell — a level crossing's gong. Without this the lookup returns null,
+                // PhysicalLevel says false, and the emitter is dropped by BOTH the ranking and the
+                // submit path: the bell is never ranked, never voiced, never heard. It rang
+                // perfectly on the server and did not exist on the client, which from the pavement
+                // is indistinguishable from a crossing that never closes.
+                //
+                // Its size is the bell itself. A gong is a quarter of a metre of bronze on a post
+                // and there is no sense in which you can stand inside one.
+                var bell = OpenFPS.Common.ModelLibrary.Bell(soundId[5..]);
+                return (bell.ReferenceDb, MathF.Max(0.5f, bell.DiameterMetres));
+            }
             if (soundId.StartsWith("aircraft:", StringComparison.OrdinalIgnoreCase))
             {
                 var p = OpenFPS.Common.AircraftProfile.ByName(soundId[9..]);
                 // What RADIATES is the disc or the nozzle, not the airframe: a listener is never
                 // inside an aeroplane's extent anyway, so the number only has to stop the inverse
                 // law running away at the one distance it could — directly underneath.
-                return (p.SourceLevelDb, MathF.Max(2f, p.Propeller?.DiameterMetres
-                                                     ?? p.Turbine?.Fan?.DiameterMetres
-                                                     ?? p.Turbine?.BypassNozzleDiameterMetres
-                                                     ?? 2f));
+                //
+                // Unless there is MORE THAN ONE of them, which for everything with a jet on it
+                // there is. A twin's two engines are eleven and a half metres apart under the
+                // wings, and that separation is the source's size in exactly the sense a bus's
+                // nose-to-tail is: walking a metre towards one walks you a metre away from the
+                // other, so the level is flat across the span and the far field is unchanged.
+                // Declared as AircraftProfile.EngineSpanMetres, not inferred from the wings.
+                float span = p.EngineSpanMetres > 0f
+                    ? p.EngineSpanMetres
+                    : MathF.Max(2f, p.Propeller?.DiameterMetres
+                                 ?? p.Turbine?.Fan?.DiameterMetres
+                                 ?? p.Turbine?.BypassNozzleDiameterMetres
+                                 ?? 2f);
+                return (p.SourceLevelDb, span);
             }
         }
         catch { }
@@ -882,6 +941,39 @@ public class ClientAudioSystem
         float wake = Math.Clamp(-climb * 6f, 0f, 1f) * 0.7f
                    + Math.Clamp((speed - 25f) / 45f, 0f, 1f) * 0.3f;
         return (lever, Math.Clamp(wake, 0f, 1f));
+    }
+
+    /// <summary>
+    /// Is this aeroplane on its wheels?
+    ///
+    /// Read off the same two things everything else about a flight is — where it is and what it is
+    /// doing — and not scripted. An aeroplane whose belly is within a fraction of its own length of
+    /// the ground is on the runway; one higher than that is flying. The TRANSITION into it is the
+    /// touchdown, and the voice turns that into spinning wheels up from rest (see
+    /// AircraftSynth.Touchdown). Nothing has to declare a landing, and a map that draws a flight
+    /// path down to a runway gets one.
+    ///
+    /// The ground probe is a grid search, so it is asked only about an aeroplane that could
+    /// plausibly be near the ground at all: one more than sixty metres over the listener's head is
+    /// flying, and that is settled without touching the world.
+    /// </summary>
+    private bool OnTheWheels(EntitySnapshot snap, WorldSnapshot world, Vector3 eyePos)
+    {
+        var p = snap.Transform.Position;
+        if (p.Y - eyePos.Y > 60f) return false;
+        float groundY = OpenFPS.Common.PhysicsUtils.GetGroundHeight(world, p, snap.Id, out _);
+        // Its own size sets how close counts: a jet sits five metres up on its gear and a light
+        // single one, so the same fraction of length serves both without either being told.
+        float sitsAt = 0.15f * (PhysicalAircraft(snap)?.LengthMetres ?? 8f);
+        return p.Y - groundY <= sitsAt;
+    }
+
+    /// <summary>The aircraft profile behind an entity, or null if it is not an aeroplane.</summary>
+    private static OpenFPS.Common.AircraftProfile? PhysicalAircraft(EntitySnapshot snap)
+    {
+        string? sid = snap.Definition.SoundEmitter.SoundId;
+        if (sid == null || !sid.StartsWith("aircraft:", StringComparison.OrdinalIgnoreCase)) return null;
+        try { return OpenFPS.Common.AircraftProfile.ByName(sid[9..]); } catch { return null; }
     }
 
     private void ChooseLiveMachines(WorldSnapshot world, Vector3 eyePos)
@@ -1079,6 +1171,33 @@ public class ClientAudioSystem
             // Anything that has just earned a real engine gives its borrowed voice back.
             int lent = DistantVoiceBase - Math.Abs(id);
             if (_distantBoundTo.Remove(lent)) _audio.StopSound(lent);
+        }
+
+        // ── Every preset on the map keeps one live engine ──────────────────────────────────────
+        //
+        // A car outside the budget borrows the ring of the nearest car OF ITS OWN PRESET, and if
+        // no car of that preset has a live engine there is nothing to borrow and the car is simply
+        // SILENT (DistantEngine returns on exactly that). That is fine for a preset the map has
+        // twenty of and fatal for one it has two of: the city carries two slip-on motorcycles, and
+        // the moment both fell out of the budget together the loudest vehicle in the city stopped
+        // existing. Reported as "the motorcycles are very quiet, I can hardly hear them drive by" —
+        // and measured, at their closest approach they are the loudest thing on that street.
+        //
+        // So the highest-ranked car of each distinct preset is admitted whatever the budget said.
+        // It costs at most one engine per preset the map actually uses (eleven on the city, against
+        // a budget of thirty-two) and it is what borrowing has always assumed was true.
+        for (int i = keep; i < _engineDistances.Count; i++)
+        {
+            int id = _engineDistances[i].Id;
+            if (!_carPreset.TryGetValue(id, out string? preset)) continue;
+            if (_engineSourceByPreset.ContainsKey(preset)) continue;     // already has a donor
+            _liveEngines.Add(id);
+            _audio.ReviveEngine(id);
+            if (!_engineStarted.ContainsKey(id)) _engineStarted[id] = now;
+            _engineSourceByPreset[preset] = id;
+            _engineRetiring.Remove(id);
+            int borrowed = DistantVoiceBase - Math.Abs(id);
+            if (_distantBoundTo.Remove(borrowed)) _audio.StopSound(borrowed);
         }
 
         ChooseFrontVoices();
@@ -1296,6 +1415,101 @@ public class ClientAudioSystem
     }
 
     /// <summary>
+    /// The siren on a vehicle that carries one — its own voice at its own level, at the grille.
+    ///
+    /// Everything about it is separate from the engine's voice except where it is, and that is the
+    /// point: a siren head is 130 dB at a metre where the car is 95, so it gets its own placement
+    /// and its own full-scale reference. Sharing the engine's would either square the siren or
+    /// bury the car. See SirenVoiceState.
+    ///
+    /// WHETHER IT IS SOUNDING is not decided here and is not scripted. A patrol car with its
+    /// lights on is one that is going somewhere, and on a track that is a car running above the
+    /// speed the rest of the traffic keeps — so the mode is read off what the car is DOING, the
+    /// same way an aeroplane's power lever is read off its climb angle. Standing still or rolling
+    /// with the traffic: off. Moving with purpose: wail. Hard on the brakes into a junction: yelp,
+    /// which is what a real crew switches to, because a fast sweep is far easier to place.
+    /// </summary>
+    private void SirenVoice(EntitySnapshot snap, string sirenKey, in AcousticPathData path, double sampledAt)
+    {
+        OpenFPS.Common.SirenSpec spec;
+        try { spec = OpenFPS.Common.SirenSpec.ByName(sirenKey); }
+        catch { return; }
+
+        float speed = snap.Velocity.Length();
+        var mode = SirenModeFor(snap.Id, speed, sampledAt);
+        int voiceId = SirenVoiceBase - Math.Abs(snap.Id);
+        if (mode == OpenFPS.Common.SirenMode.Off)
+        {
+            if (_sirenVoiced.Remove(snap.Id)) _audio.StopSound(voiceId);
+            return;
+        }
+
+        // At the grille, which is where the horn is.
+        Vector3 pos = snap.Transform.Position
+                    + Vector3.Transform(new Vector3(0f, 0.4f, 1.9f), snap.Transform.Rotation);
+        var (gain, reference) = OpenFPS.Common.Loudness.Place(spec.SourceLevelDb, spec.HornMouthMetres);
+
+        var e = new SpatialEmitter
+        {
+            EntityId = voiceId,
+            SoundId = "siren",
+            IsSynth = true,
+            PhysicalKey = "siren:" + sirenKey,
+            EngineKey = "",
+            Mode = PlaybackMode.LoopOne,
+            Type = EmitterType.EntityAttached,
+            Position = pos,
+            ApparentPosition = pos,
+            Velocity = snap.Velocity,
+            PositionSampledAt = sampledAt,
+            // Which way the horn points. Without it the machine frame falls back to the VELOCITY,
+            // which is the right answer while the car is moving and no answer at all when it slows
+            // for a junction — exactly when a siren matters most. The car's own rotation always
+            // knows.
+            Direction = Vector3.Transform(Vector3.UnitZ, snap.Transform.Rotation),
+            Volume = gain,
+            MinDistance = reference,
+            ExtentMetres = spec.HornMouthMetres,
+            Range = OpenFPS.Common.Loudness.AudibleRange(spec.SourceLevelDb),
+            Pitch = 1f,
+            // The mode rides in the lever slot, as a train's notch does.
+            PowerLever = (float)(int)mode,
+            EngineRunning = true,
+            Occlusion = path.Occlusion,
+            ApertureFactor = path.ApertureFactor,
+            TransmissionBleed = path.TransmissionBleed,
+            EffectiveDistance = path.EffectiveDistance,
+            TargetRegionId = path.RegionId,
+            EnableReverb = true,
+        };
+        if (_audio.IsPlaying(voiceId)) _audio.UpdateSpatialAttributes(e);
+        else { _audio.PlayPhysicalSoundDirect(e); _sirenVoiced.Add(snap.Id); }
+    }
+
+    /// <summary>One mode decision per vehicle, kept between frames because the decision has
+    /// state in it — see SirenController.</summary>
+    private readonly Dictionary<int, (OpenFPS.Common.SirenController C, double At)> _sirenControl = new();
+
+    /// <summary>
+    /// What a patrol car's siren is doing, from what the car is doing. Nothing on the wire carries
+    /// it and nothing scripts it, which is the same rule the power lever and the air brakes follow.
+    ///
+    /// The decision itself lives in <see cref="OpenFPS.Common.SirenController"/> rather than here,
+    /// because it has memory and hysteresis in it and a thing with memory is a thing a test can
+    /// drive. The first version read the instantaneous deceleration and flipped between wail and
+    /// yelp at every corner of a city lap.
+    /// </summary>
+    private OpenFPS.Common.SirenMode SirenModeFor(int entityId, float speed, double at)
+    {
+        if (!_sirenControl.TryGetValue(entityId, out var held))
+            held = (new OpenFPS.Common.SirenController(entityId), at);
+        float dt = (float)Math.Clamp(at - held.At, 1.0 / 240.0, 0.25);
+        var mode = held.C.Update(speed, dt);
+        _sirenControl[entityId] = (held.C, at);
+        return mode;
+    }
+
+    /// <summary>
     /// A car too far away to be worth its own engine, voiced by BORROWING one that is near.
     ///
     /// This is what stops the number of cars a map may carry from being decided by the mixer. A full
@@ -1437,8 +1651,7 @@ public class ClientAudioSystem
         // matters, and it ran this frame.
         if (def.SoundEmitter.IsSynth
             && def.SoundEmitter.SoundId is { } sid
-            && (sid.StartsWith("machine:", StringComparison.OrdinalIgnoreCase)
-                || sid.StartsWith("aircraft:", StringComparison.OrdinalIgnoreCase))
+            && PhysicalLevel(sid, out _, out _)
             && !_liveMachines.Contains(snap.Id))
             return;
 
@@ -1460,6 +1673,7 @@ public class ClientAudioSystem
         string engineKey = "";
         string physicalKey = "";
         float powerLever = 1f, rotorWake = 0f;
+        bool onGround = false;
         // Where the sound comes out. One shared answer, so the voice and the occlusion probe in step 5
         // can never again be asking about two different points in space.
         Vector3 emitterPosition = OpenFPS.Common.AudioEmission.PointFor(snap);
@@ -1477,9 +1691,12 @@ public class ClientAudioSystem
         {
             resolvedSoundId = def.SoundEmitter.SoundId;
             if (string.IsNullOrEmpty(resolvedSoundId)) resolvedSoundId = "SYNTH"; // Last resort dummy
-            if (resolvedSoundId.StartsWith("machine:", StringComparison.OrdinalIgnoreCase)
-                || resolvedSoundId.StartsWith("aircraft:", StringComparison.OrdinalIgnoreCase)
-                || resolvedSoundId.StartsWith("rail:", StringComparison.OrdinalIgnoreCase))
+            // Asked of the SAME lookup the ranking uses, not a second list of prefixes. There were
+            // two lists: LookUpPhysicalLevel learned "bell:" and this one did not, so the crossing
+            // bell was ranked, won a voice, and then fell through to here as a nameless synth with
+            // no physical key — placed every frame, rendered by nothing. Every kind the lookup
+            // knows is a physical voice, and nothing else is.
+            if (PhysicalLevel(resolvedSoundId, out _, out _))
             {
                 // A physical model that is not a vehicle. Unlike a car it has no borrowed-voice
                 // fallback: one outside the budget is simply not heard, because there is no sense in
@@ -1502,7 +1719,10 @@ public class ClientAudioSystem
                 engineExtent = extent;
                 engineRange = MathF.Max(engineRange, OpenFPS.Common.Loudness.AudibleRange(levelDb));
                 if (physicalKey.StartsWith("aircraft:", StringComparison.OrdinalIgnoreCase))
+                {
                     (powerLever, rotorWake) = FlightPower(snap.Velocity);
+                    onGround = OnTheWheels(snap, world, eyePos);
+                }
                 else if (physicalKey.StartsWith("rail:", StringComparison.OrdinalIgnoreCase))
                 {
                     // A train's speed is the bogie's speed, and its notch is what the speed is
@@ -1617,8 +1837,15 @@ public class ClientAudioSystem
             PhysicalKey = physicalKey,
             PowerLever = powerLever,
             RotorWake = rotorWake,
+            OnGround = onGround,
             EngineSpeed = snap.Velocity.Length(),
-            EngineRunning = true,
+            // Whether a synthesised source is SOUNDING. Almost everything in this world decides
+            // that for itself from what the client can observe — an engine from its speed, a siren
+            // from the car's behaviour, an aeroplane's power from its climb angle. A level
+            // crossing's bell cannot: it rings because of where a train is on a line the listener
+            // may be a kilometre from. So that one comes down the wire, and it defaults to true, so
+            // every other emitter means exactly what it meant before.
+            EngineRunning = def.SoundEmitter.SynthRunning,
             // Straight from the server, which is the only thing that knows the corner.
             //
             // It used to be differentiated here from the interpolated velocity and divided by the
@@ -1679,6 +1906,11 @@ public class ClientAudioSystem
         if (engineKey.Length > 0 && _frontVoiced.Contains(snap.Id))
             FrontVoice(snap, def, OpenFPS.Common.MachineRegistry.VehicleFor(engineKey), acousticPath,
                        engineVolume, engineMinDistance, Math.Max(1.0f, engineRange), world.PositionsSampledAt);
+
+        // And the siren, for a vehicle that carries one.
+        if (engineKey.Length > 0
+            && OpenFPS.Common.MachineRegistry.VehicleFor(engineKey).Siren is { } sirenKey)
+            SirenVoice(snap, sirenKey, acousticPath, world.PositionsSampledAt);
 
         // 6.1. The walls answering this engine. A live engine has no file to replay, so its
         // reflections are read back out of the synthesis's own ring buffer at the delay the mirrored

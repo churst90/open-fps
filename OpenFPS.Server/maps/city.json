@@ -542,6 +542,18 @@
      "Y": 0.95,
      "Z": 395.4737
     }
+   ],
+   "Stops": [
+    {
+     "AtMetres": 400.0,
+     "DwellSeconds": 26.0,
+     "Kind": "platform"
+    },
+    {
+     "AtMetres": 1200.0,
+     "DwellSeconds": 26.0,
+     "Kind": "platform"
+    }
    ]
   },
   {
@@ -1048,6 +1060,42 @@
      "X": -130.0,
      "Y": 0.15,
      "Z": -105.5789
+    }
+   ],
+   "Stops": [
+    {
+     "AtMetres": 89.2,
+     "DwellSeconds": 16.0,
+     "Kind": "bus_stop",
+     "ForPreset": "bus"
+    },
+    {
+     "AtMetres": 344.0,
+     "DwellSeconds": 16.0,
+     "Kind": "bus_stop",
+     "ForPreset": "bus"
+    },
+    {
+     "AtMetres": 407.7,
+     "DwellSeconds": 3.5,
+     "Kind": "give_way"
+    },
+    {
+     "AtMetres": 598.8,
+     "DwellSeconds": 16.0,
+     "Kind": "bus_stop",
+     "ForPreset": "bus"
+    },
+    {
+     "AtMetres": 853.6,
+     "DwellSeconds": 16.0,
+     "Kind": "bus_stop",
+     "ForPreset": "bus"
+    },
+    {
+     "AtMetres": 917.3,
+     "DwellSeconds": 3.5,
+     "Kind": "give_way"
     }
    ]
   },
@@ -1556,6 +1604,42 @@
      "Y": 0.15,
      "Z": 105.5789
     }
+   ],
+   "Stops": [
+    {
+     "AtMetres": 89.2,
+     "DwellSeconds": 16.0,
+     "Kind": "bus_stop",
+     "ForPreset": "bus"
+    },
+    {
+     "AtMetres": 344.0,
+     "DwellSeconds": 16.0,
+     "Kind": "bus_stop",
+     "ForPreset": "bus"
+    },
+    {
+     "AtMetres": 407.7,
+     "DwellSeconds": 3.5,
+     "Kind": "give_way"
+    },
+    {
+     "AtMetres": 598.8,
+     "DwellSeconds": 16.0,
+     "Kind": "bus_stop",
+     "ForPreset": "bus"
+    },
+    {
+     "AtMetres": 853.6,
+     "DwellSeconds": 16.0,
+     "Kind": "bus_stop",
+     "ForPreset": "bus"
+    },
+    {
+     "AtMetres": 917.3,
+     "DwellSeconds": 3.5,
+     "Kind": "give_way"
+    }
    ]
   },
   {
@@ -1842,6 +1926,42 @@
      "X": 0.0,
      "Y": 0.15,
      "Z": 155.25
+    }
+   ],
+   "Stops": [
+    {
+     "AtMetres": 43.7,
+     "DwellSeconds": 16.0,
+     "Kind": "bus_stop",
+     "ForPreset": "bus"
+    },
+    {
+     "AtMetres": 168.5,
+     "DwellSeconds": 16.0,
+     "Kind": "bus_stop",
+     "ForPreset": "bus"
+    },
+    {
+     "AtMetres": 199.7,
+     "DwellSeconds": 3.5,
+     "Kind": "give_way"
+    },
+    {
+     "AtMetres": 293.3,
+     "DwellSeconds": 16.0,
+     "Kind": "bus_stop",
+     "ForPreset": "bus"
+    },
+    {
+     "AtMetres": 418.1,
+     "DwellSeconds": 16.0,
+     "Kind": "bus_stop",
+     "ForPreset": "bus"
+    },
+    {
+     "AtMetres": 449.3,
+     "DwellSeconds": 3.5,
+     "Kind": "give_way"
     }
    ]
   },
@@ -2171,6 +2291,325 @@
      "Z": -75.5
     }
    ]
+  },
+  {
+   "Id": "southgate",
+   "Waypoints": [
+    {
+     "X": -160.0,
+     "Y": 0.15,
+     "Z": -120.0
+    },
+    {
+     "X": -160.0,
+     "Y": 0.15,
+     "Z": -128.75
+    },
+    {
+     "X": -160.0,
+     "Y": 0.15,
+     "Z": -137.5
+    },
+    {
+     "X": -160.0,
+     "Y": 0.15,
+     "Z": -146.25
+    },
+    {
+     "X": -160.0,
+     "Y": 0.15,
+     "Z": -155.0
+    },
+    {
+     "X": -160.0,
+     "Y": 0.15,
+     "Z": -163.75
+    },
+    {
+     "X": -160.0,
+     "Y": 0.45,
+     "Z": -172.5
+    },
+    {
+     "X": -160.0,
+     "Y": 0.867,
+     "Z": -181.25
+    },
+    {
+     "X": -160.0,
+     "Y": 0.283,
+     "Z": -190.0
+    },
+    {
+     "X": -160.0,
+     "Y": 0.15,
+     "Z": -198.75
+    },
+    {
+     "X": -160.0,
+     "Y": 0.15,
+     "Z": -207.5
+    },
+    {
+     "X": -160.0,
+     "Y": 0.15,
+     "Z": -216.25
+    },
+    {
+     "X": -160.0,
+     "Y": 0.15,
+     "Z": -225.0
+    },
+    {
+     "X": -160.0,
+     "Y": 0.15,
+     "Z": -233.75
+    },
+    {
+     "X": -160.0,
+     "Y": 0.15,
+     "Z": -242.5
+    },
+    {
+     "X": -160.0,
+     "Y": 0.15,
+     "Z": -251.25
+    },
+    {
+     "X": -160.0,
+     "Y": 0.15,
+     "Z": -260.0
+    },
+    {
+     "X": -151.42857142857142,
+     "Y": 0.15,
+     "Z": -260.0
+    },
+    {
+     "X": -142.85714285714286,
+     "Y": 0.15,
+     "Z": -260.0
+    },
+    {
+     "X": -134.28571428571428,
+     "Y": 0.15,
+     "Z": -260.0
+    },
+    {
+     "X": -125.71428571428572,
+     "Y": 0.15,
+     "Z": -260.0
+    },
+    {
+     "X": -117.14285714285714,
+     "Y": 0.15,
+     "Z": -260.0
+    },
+    {
+     "X": -108.57142857142858,
+     "Y": 0.15,
+     "Z": -260.0
+    },
+    {
+     "X": -100.0,
+     "Y": 0.15,
+     "Z": -260.0
+    },
+    {
+     "X": -91.42857142857143,
+     "Y": 0.15,
+     "Z": -260.0
+    },
+    {
+     "X": -82.85714285714285,
+     "Y": 0.15,
+     "Z": -260.0
+    },
+    {
+     "X": -74.28571428571428,
+     "Y": 0.15,
+     "Z": -260.0
+    },
+    {
+     "X": -65.71428571428572,
+     "Y": 0.15,
+     "Z": -260.0
+    },
+    {
+     "X": -57.14285714285715,
+     "Y": 0.15,
+     "Z": -260.0
+    },
+    {
+     "X": -48.57142857142857,
+     "Y": 0.15,
+     "Z": -260.0
+    },
+    {
+     "X": -40.0,
+     "Y": 0.15,
+     "Z": -260.0
+    },
+    {
+     "X": -40.0,
+     "Y": 0.15,
+     "Z": -251.25
+    },
+    {
+     "X": -40.0,
+     "Y": 0.15,
+     "Z": -242.5
+    },
+    {
+     "X": -40.0,
+     "Y": 0.15,
+     "Z": -233.75
+    },
+    {
+     "X": -40.0,
+     "Y": 0.15,
+     "Z": -225.0
+    },
+    {
+     "X": -40.0,
+     "Y": 0.15,
+     "Z": -216.25
+    },
+    {
+     "X": -40.0,
+     "Y": 0.15,
+     "Z": -207.5
+    },
+    {
+     "X": -40.0,
+     "Y": 0.15,
+     "Z": -198.75
+    },
+    {
+     "X": -40.0,
+     "Y": 0.283,
+     "Z": -190.0
+    },
+    {
+     "X": -40.0,
+     "Y": 0.867,
+     "Z": -181.25
+    },
+    {
+     "X": -40.0,
+     "Y": 0.45,
+     "Z": -172.5
+    },
+    {
+     "X": -40.0,
+     "Y": 0.15,
+     "Z": -163.75
+    },
+    {
+     "X": -40.0,
+     "Y": 0.15,
+     "Z": -155.0
+    },
+    {
+     "X": -40.0,
+     "Y": 0.15,
+     "Z": -146.25
+    },
+    {
+     "X": -40.0,
+     "Y": 0.15,
+     "Z": -137.5
+    },
+    {
+     "X": -40.0,
+     "Y": 0.15,
+     "Z": -128.75
+    },
+    {
+     "X": -40.0,
+     "Y": 0.15,
+     "Z": -120.0
+    },
+    {
+     "X": -48.57142857142857,
+     "Y": 0.15,
+     "Z": -120.0
+    },
+    {
+     "X": -57.14285714285714,
+     "Y": 0.15,
+     "Z": -120.0
+    },
+    {
+     "X": -65.71428571428571,
+     "Y": 0.15,
+     "Z": -120.0
+    },
+    {
+     "X": -74.28571428571428,
+     "Y": 0.15,
+     "Z": -120.0
+    },
+    {
+     "X": -82.85714285714286,
+     "Y": 0.15,
+     "Z": -120.0
+    },
+    {
+     "X": -91.42857142857142,
+     "Y": 0.15,
+     "Z": -120.0
+    },
+    {
+     "X": -100.0,
+     "Y": 0.15,
+     "Z": -120.0
+    },
+    {
+     "X": -108.57142857142857,
+     "Y": 0.15,
+     "Z": -120.0
+    },
+    {
+     "X": -117.14285714285715,
+     "Y": 0.15,
+     "Z": -120.0
+    },
+    {
+     "X": -125.71428571428572,
+     "Y": 0.15,
+     "Z": -120.0
+    },
+    {
+     "X": -134.28571428571428,
+     "Y": 0.15,
+     "Z": -120.0
+    },
+    {
+     "X": -142.85714285714283,
+     "Y": 0.15,
+     "Z": -120.0
+    },
+    {
+     "X": -151.42857142857144,
+     "Y": 0.15,
+     "Z": -120.0
+    }
+   ],
+   "WidthMetres": 12.0,
+   "BankingDegrees": 0.0,
+   "Stops": [
+    {
+     "AtMetres": 48.0,
+     "DwellSeconds": 3.0,
+     "Kind": "crossing"
+    },
+    {
+     "AtMetres": 328.0,
+     "DwellSeconds": 3.0,
+     "Kind": "crossing"
+    }
+   ]
   }
  ],
  "Vehicles": [
@@ -2260,7 +2699,7 @@
   },
   {
    "Name": "Muscle car 8",
-   "Preset": "v8_muscle",
+   "Preset": "charger440",
    "Track": "downtown_cw",
    "TopSpeedKmh": 58.0,
    "CorneringG": 0.55,
@@ -2272,7 +2711,7 @@
   },
   {
    "Name": "Police car 9",
-   "Preset": "police_v8",
+   "Preset": "police_interceptor",
    "Track": "downtown_cw",
    "TopSpeedKmh": 62.0,
    "CorneringG": 0.6,
@@ -2284,7 +2723,7 @@
   },
   {
    "Name": "Motorcycle 10",
-   "Preset": "vtwin",
+   "Preset": "vtwin_slipon",
    "Track": "downtown_cw",
    "TopSpeedKmh": 56.0,
    "CorneringG": 0.6,
@@ -2869,6 +3308,196 @@
    "BrakingMps2": 1.8,
    "WaitSeconds": 24.0,
    "StartDelaySeconds": 62.0
+  },
+  {
+   "Name": "Police car 14",
+   "Preset": "police_interceptor",
+   "Track": "downtown_ccw",
+   "TopSpeedKmh": 62.0,
+   "CorneringG": 0.6,
+   "GripG": 0.85,
+   "AccelerationMps2": 2.2,
+   "BrakingMps2": 2.92,
+   "LaneOffsetMetres": 1.8,
+   "StartOffsetMetres": 240.0
+  },
+  {
+   "Name": "Police car 22",
+   "Preset": "police_interceptor",
+   "Track": "north_block",
+   "TopSpeedKmh": 62.0,
+   "CorneringG": 0.6,
+   "GripG": 0.85,
+   "AccelerationMps2": 2.2,
+   "BrakingMps2": 2.92,
+   "LaneOffsetMetres": 1.8,
+   "StartOffsetMetres": 96.0
+  },
+  {
+   "Name": "Motorcycle, stock twin",
+   "Preset": "vtwin_stock",
+   "Track": "downtown_ccw",
+   "TopSpeedKmh": 56.0,
+   "CorneringG": 0.6,
+   "GripG": 0.9,
+   "AccelerationMps2": 2.2,
+   "BrakingMps2": 3.09,
+   "LaneOffsetMetres": 3.4,
+   "StartOffsetMetres": 512.0
+  },
+  {
+   "Name": "Motorcycle, slip-ons",
+   "Preset": "vtwin_slipon",
+   "Track": "north_block",
+   "TopSpeedKmh": 56.0,
+   "CorneringG": 0.6,
+   "GripG": 0.9,
+   "AccelerationMps2": 2.2,
+   "BrakingMps2": 3.09,
+   "LaneOffsetMetres": 3.4,
+   "StartOffsetMetres": 300.0
+  },
+  {
+   "Name": "Motorcycle 31",
+   "Preset": "vtwin_slipon",
+   "Track": "downtown_cw",
+   "TopSpeedKmh": 56.0,
+   "CorneringG": 0.6,
+   "GripG": 0.9,
+   "AccelerationMps2": 2.2,
+   "BrakingMps2": 3.09,
+   "LaneOffsetMetres": 3.4,
+   "StartOffsetMetres": 120.0
+  },
+  {
+   "Name": "Motorcycle 32",
+   "Preset": "vtwin_stock",
+   "Track": "downtown_ccw",
+   "TopSpeedKmh": 56.0,
+   "CorneringG": 0.6,
+   "GripG": 0.9,
+   "AccelerationMps2": 2.2,
+   "BrakingMps2": 3.09,
+   "LaneOffsetMetres": 3.4,
+   "StartOffsetMetres": 640.0
+  },
+  {
+   "Name": "Motorcycle 33",
+   "Preset": "vtwin_slipon",
+   "Track": "downtown_cw",
+   "TopSpeedKmh": 56.0,
+   "CorneringG": 0.6,
+   "GripG": 0.9,
+   "AccelerationMps2": 2.2,
+   "BrakingMps2": 3.09,
+   "LaneOffsetMetres": 3.4,
+   "StartOffsetMetres": 560.0
+  },
+  {
+   "Name": "Motorcycle 34",
+   "Preset": "vtwin_slipon",
+   "Track": "north_block",
+   "TopSpeedKmh": 56.0,
+   "CorneringG": 0.6,
+   "GripG": 0.9,
+   "AccelerationMps2": 2.2,
+   "BrakingMps2": 3.09,
+   "LaneOffsetMetres": 3.4,
+   "StartOffsetMetres": 180.0
+  },
+  {
+   "Name": "Southgate van",
+   "Preset": "diesel_i4",
+   "Track": "southgate",
+   "TopSpeedKmh": 48.0,
+   "CorneringG": 0.48,
+   "GripG": 0.85,
+   "AccelerationMps2": 2.2,
+   "BrakingMps2": 2.92,
+   "LaneOffsetMetres": 1.8,
+   "StartOffsetMetres": 0.0
+  },
+  {
+   "Name": "Southgate saloon",
+   "Preset": "v6",
+   "Track": "southgate",
+   "TopSpeedKmh": 48.0,
+   "CorneringG": 0.48,
+   "GripG": 0.85,
+   "AccelerationMps2": 2.2,
+   "BrakingMps2": 2.92,
+   "LaneOffsetMetres": 1.8,
+   "StartOffsetMetres": 130.0
+  },
+  {
+   "Name": "Southgate hatch",
+   "Preset": "i4_economy",
+   "Track": "southgate",
+   "TopSpeedKmh": 48.0,
+   "CorneringG": 0.48,
+   "GripG": 0.85,
+   "AccelerationMps2": 2.2,
+   "BrakingMps2": 2.92,
+   "LaneOffsetMetres": 1.8,
+   "StartOffsetMetres": 260.0
+  },
+  {
+   "Name": "Southgate bus",
+   "Preset": "school_bus_na",
+   "Track": "southgate",
+   "TopSpeedKmh": 48.0,
+   "CorneringG": 0.48,
+   "GripG": 0.85,
+   "AccelerationMps2": 2.2,
+   "BrakingMps2": 2.92,
+   "LaneOffsetMetres": 1.8,
+   "StartOffsetMetres": 390.0
+  },
+  {
+   "Name": "Southgate bike",
+   "Preset": "vtwin_slipon",
+   "Track": "southgate",
+   "TopSpeedKmh": 48.0,
+   "CorneringG": 0.48,
+   "GripG": 0.85,
+   "AccelerationMps2": 2.2,
+   "BrakingMps2": 2.92,
+   "LaneOffsetMetres": 1.8,
+   "StartOffsetMetres": 190.0
+  },
+  {
+   "Name": "Southgate truck",
+   "Preset": "diesel_truck",
+   "Track": "southgate",
+   "TopSpeedKmh": 48.0,
+   "CorneringG": 0.48,
+   "GripG": 0.85,
+   "AccelerationMps2": 2.2,
+   "BrakingMps2": 2.92,
+   "LaneOffsetMetres": 1.8,
+   "StartOffsetMetres": 70.0
+  },
+  {
+   "Name": "Verge mower",
+   "Preset": "mower_riding",
+   "RoadStart": {
+    "X": 156.0,
+    "Y": 0.62,
+    "Z": 66.0
+   },
+   "RoadEnd": {
+    "X": 156.0,
+    "Y": 0.62,
+    "Z": 116.0
+   },
+   "SpeedsKmh": [
+    7.0,
+    6.5
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.2,
+   "WaitSeconds": 2.0,
+   "StartDelaySeconds": 3.0
   }
  ],
  "Trains": [
@@ -52066,7 +52695,7 @@
   },
   {
    "EntityId": 4360,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": 176.8432,
     "Y": 0.78,
@@ -52086,7 +52715,7 @@
   },
   {
    "EntityId": 4361,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": 178.2709,
     "Y": 0.78,
@@ -52126,7 +52755,7 @@
   },
   {
    "EntityId": 4363,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": 175.1502,
     "Y": 0.78,
@@ -52146,7 +52775,7 @@
   },
   {
    "EntityId": 4364,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": 176.4806,
     "Y": 0.78,
@@ -52186,7 +52815,7 @@
   },
   {
    "EntityId": 4366,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": 171.8795,
     "Y": 0.78,
@@ -52206,7 +52835,7 @@
   },
   {
    "EntityId": 4367,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": 173.0219,
     "Y": 0.78,
@@ -52246,7 +52875,7 @@
   },
   {
    "EntityId": 4369,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": 167.2541,
     "Y": 0.78,
@@ -52266,7 +52895,7 @@
   },
   {
    "EntityId": 4370,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": 168.1307,
     "Y": 0.78,
@@ -52306,7 +52935,7 @@
   },
   {
    "EntityId": 4372,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": 161.5891,
     "Y": 0.78,
@@ -52326,7 +52955,7 @@
   },
   {
    "EntityId": 4373,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": 162.1402,
     "Y": 0.78,
@@ -52366,7 +52995,7 @@
   },
   {
    "EntityId": 4375,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": 155.2707,
     "Y": 0.78,
@@ -52386,7 +53015,7 @@
   },
   {
    "EntityId": 4376,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": 155.4586,
     "Y": 0.78,
@@ -52426,7 +53055,7 @@
   },
   {
    "EntityId": 4378,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": 136.4211,
     "Y": 0.78,
@@ -52446,7 +53075,7 @@
   },
   {
    "EntityId": 4379,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": 136.4211,
     "Y": 0.78,
@@ -52486,7 +53115,7 @@
   },
   {
    "EntityId": 4381,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": 105.2632,
     "Y": 0.78,
@@ -52506,7 +53135,7 @@
   },
   {
    "EntityId": 4382,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": 105.2632,
     "Y": 0.78,
@@ -52546,7 +53175,7 @@
   },
   {
    "EntityId": 4384,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": 74.1053,
     "Y": 0.78,
@@ -52566,7 +53195,7 @@
   },
   {
    "EntityId": 4385,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": 74.1053,
     "Y": 0.78,
@@ -52606,7 +53235,7 @@
   },
   {
    "EntityId": 4387,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": 42.9474,
     "Y": 0.78,
@@ -52626,7 +53255,7 @@
   },
   {
    "EntityId": 4388,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": 42.9474,
     "Y": 0.78,
@@ -52666,7 +53295,7 @@
   },
   {
    "EntityId": 4390,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": 11.7895,
     "Y": 0.78,
@@ -52686,7 +53315,7 @@
   },
   {
    "EntityId": 4391,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": 11.7895,
     "Y": 0.78,
@@ -52726,7 +53355,7 @@
   },
   {
    "EntityId": 4393,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -19.3684,
     "Y": 0.78,
@@ -52746,7 +53375,7 @@
   },
   {
    "EntityId": 4394,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -19.3684,
     "Y": 0.78,
@@ -52786,7 +53415,7 @@
   },
   {
    "EntityId": 4396,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -50.5263,
     "Y": 0.78,
@@ -52806,7 +53435,7 @@
   },
   {
    "EntityId": 4397,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -50.5263,
     "Y": 0.78,
@@ -52846,7 +53475,7 @@
   },
   {
    "EntityId": 4399,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -81.6842,
     "Y": 0.78,
@@ -52866,7 +53495,7 @@
   },
   {
    "EntityId": 4400,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -81.6842,
     "Y": 0.78,
@@ -52906,7 +53535,7 @@
   },
   {
    "EntityId": 4402,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -112.8421,
     "Y": 0.78,
@@ -52926,7 +53555,7 @@
   },
   {
    "EntityId": 4403,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -112.8421,
     "Y": 0.78,
@@ -52966,7 +53595,7 @@
   },
   {
    "EntityId": 4405,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -144.0,
     "Y": 0.78,
@@ -52986,7 +53615,7 @@
   },
   {
    "EntityId": 4406,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -144.0,
     "Y": 0.78,
@@ -53026,7 +53655,7 @@
   },
   {
    "EntityId": 4408,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -175.1579,
     "Y": 0.78,
@@ -53046,7 +53675,7 @@
   },
   {
    "EntityId": 4409,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -175.1579,
     "Y": 0.78,
@@ -53086,7 +53715,7 @@
   },
   {
    "EntityId": 4411,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -206.3158,
     "Y": 0.78,
@@ -53106,7 +53735,7 @@
   },
   {
    "EntityId": 4412,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -206.3158,
     "Y": 0.78,
@@ -53146,7 +53775,7 @@
   },
   {
    "EntityId": 4414,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -237.4737,
     "Y": 0.78,
@@ -53166,7 +53795,7 @@
   },
   {
    "EntityId": 4415,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -237.4737,
     "Y": 0.78,
@@ -53206,7 +53835,7 @@
   },
   {
    "EntityId": 4417,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -268.6316,
     "Y": 0.78,
@@ -53226,7 +53855,7 @@
   },
   {
    "EntityId": 4418,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -268.6316,
     "Y": 0.78,
@@ -53266,7 +53895,7 @@
   },
   {
    "EntityId": 4420,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -299.7895,
     "Y": 0.78,
@@ -53286,7 +53915,7 @@
   },
   {
    "EntityId": 4421,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -299.7895,
     "Y": 0.78,
@@ -53326,7 +53955,7 @@
   },
   {
    "EntityId": 4423,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -330.9474,
     "Y": 0.78,
@@ -53346,7 +53975,7 @@
   },
   {
    "EntityId": 4424,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -330.9474,
     "Y": 0.78,
@@ -53386,7 +54015,7 @@
   },
   {
    "EntityId": 4426,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -362.1053,
     "Y": 0.78,
@@ -53406,7 +54035,7 @@
   },
   {
    "EntityId": 4427,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -362.1053,
     "Y": 0.78,
@@ -53446,7 +54075,7 @@
   },
   {
    "EntityId": 4429,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -393.2632,
     "Y": 0.78,
@@ -53466,7 +54095,7 @@
   },
   {
    "EntityId": 4430,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -393.2632,
     "Y": 0.78,
@@ -53506,7 +54135,7 @@
   },
   {
    "EntityId": 4432,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -424.4211,
     "Y": 0.78,
@@ -53526,7 +54155,7 @@
   },
   {
    "EntityId": 4433,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -424.4211,
     "Y": 0.78,
@@ -53566,7 +54195,7 @@
   },
   {
    "EntityId": 4435,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -443.2707,
     "Y": 0.78,
@@ -53586,7 +54215,7 @@
   },
   {
    "EntityId": 4436,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -443.4586,
     "Y": 0.78,
@@ -53626,7 +54255,7 @@
   },
   {
    "EntityId": 4438,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -449.5891,
     "Y": 0.78,
@@ -53646,7 +54275,7 @@
   },
   {
    "EntityId": 4439,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -450.1402,
     "Y": 0.78,
@@ -53686,7 +54315,7 @@
   },
   {
    "EntityId": 4441,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -455.2541,
     "Y": 0.78,
@@ -53706,7 +54335,7 @@
   },
   {
    "EntityId": 4442,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -456.1307,
     "Y": 0.78,
@@ -53746,7 +54375,7 @@
   },
   {
    "EntityId": 4444,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -459.8795,
     "Y": 0.78,
@@ -53766,7 +54395,7 @@
   },
   {
    "EntityId": 4445,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -461.0219,
     "Y": 0.78,
@@ -53806,7 +54435,7 @@
   },
   {
    "EntityId": 4447,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -463.1502,
     "Y": 0.78,
@@ -53826,7 +54455,7 @@
   },
   {
    "EntityId": 4448,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -464.4806,
     "Y": 0.78,
@@ -53866,7 +54495,7 @@
   },
   {
    "EntityId": 4450,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -464.8432,
     "Y": 0.78,
@@ -53886,7 +54515,7 @@
   },
   {
    "EntityId": 4451,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -466.2709,
     "Y": 0.78,
@@ -53926,7 +54555,7 @@
   },
   {
    "EntityId": 4453,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -465.28,
     "Y": 0.78,
@@ -53946,7 +54575,7 @@
   },
   {
    "EntityId": 4454,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -466.72,
     "Y": 0.78,
@@ -53986,7 +54615,7 @@
   },
   {
    "EntityId": 4456,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -465.28,
     "Y": 0.78,
@@ -54006,7 +54635,7 @@
   },
   {
    "EntityId": 4457,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -466.72,
     "Y": 0.78,
@@ -54046,7 +54675,7 @@
   },
   {
    "EntityId": 4459,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -465.28,
     "Y": 0.78,
@@ -54066,7 +54695,7 @@
   },
   {
    "EntityId": 4460,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -466.72,
     "Y": 0.78,
@@ -54106,7 +54735,7 @@
   },
   {
    "EntityId": 4462,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -465.28,
     "Y": 0.78,
@@ -54126,7 +54755,7 @@
   },
   {
    "EntityId": 4463,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -466.72,
     "Y": 0.78,
@@ -54166,7 +54795,7 @@
   },
   {
    "EntityId": 4465,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -465.28,
     "Y": 0.78,
@@ -54186,7 +54815,7 @@
   },
   {
    "EntityId": 4466,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -466.72,
     "Y": 0.78,
@@ -54226,7 +54855,7 @@
   },
   {
    "EntityId": 4468,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -465.28,
     "Y": 0.78,
@@ -54246,7 +54875,7 @@
   },
   {
    "EntityId": 4469,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -466.72,
     "Y": 0.78,
@@ -54286,7 +54915,7 @@
   },
   {
    "EntityId": 4471,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -465.28,
     "Y": 0.78,
@@ -54306,7 +54935,7 @@
   },
   {
    "EntityId": 4472,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -466.72,
     "Y": 0.78,
@@ -54346,7 +54975,7 @@
   },
   {
    "EntityId": 4474,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -465.28,
     "Y": 0.78,
@@ -54366,7 +54995,7 @@
   },
   {
    "EntityId": 4475,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -466.72,
     "Y": 0.78,
@@ -54406,7 +55035,7 @@
   },
   {
    "EntityId": 4477,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -465.28,
     "Y": 0.78,
@@ -54426,7 +55055,7 @@
   },
   {
    "EntityId": 4478,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -466.72,
     "Y": 0.78,
@@ -54466,7 +55095,7 @@
   },
   {
    "EntityId": 4480,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -465.28,
     "Y": 0.78,
@@ -54486,7 +55115,7 @@
   },
   {
    "EntityId": 4481,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -466.72,
     "Y": 0.78,
@@ -54526,7 +55155,7 @@
   },
   {
    "EntityId": 4483,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -465.28,
     "Y": 0.78,
@@ -54546,7 +55175,7 @@
   },
   {
    "EntityId": 4484,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -466.72,
     "Y": 0.78,
@@ -54586,7 +55215,7 @@
   },
   {
    "EntityId": 4486,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -465.28,
     "Y": 0.78,
@@ -54606,7 +55235,7 @@
   },
   {
    "EntityId": 4487,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -466.72,
     "Y": 0.78,
@@ -54646,7 +55275,7 @@
   },
   {
    "EntityId": 4489,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -465.28,
     "Y": 0.78,
@@ -54666,7 +55295,7 @@
   },
   {
    "EntityId": 4490,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -466.72,
     "Y": 0.78,
@@ -54706,7 +55335,7 @@
   },
   {
    "EntityId": 4492,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -465.28,
     "Y": 0.78,
@@ -54726,7 +55355,7 @@
   },
   {
    "EntityId": 4493,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -466.72,
     "Y": 0.78,
@@ -54766,7 +55395,7 @@
   },
   {
    "EntityId": 4495,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -465.28,
     "Y": 0.78,
@@ -54786,7 +55415,7 @@
   },
   {
    "EntityId": 4496,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -466.72,
     "Y": 0.78,
@@ -54826,7 +55455,7 @@
   },
   {
    "EntityId": 4498,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -465.28,
     "Y": 0.78,
@@ -54846,7 +55475,7 @@
   },
   {
    "EntityId": 4499,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -466.72,
     "Y": 0.78,
@@ -54886,7 +55515,7 @@
   },
   {
    "EntityId": 4501,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -465.28,
     "Y": 0.78,
@@ -54906,7 +55535,7 @@
   },
   {
    "EntityId": 4502,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -466.72,
     "Y": 0.78,
@@ -54946,7 +55575,7 @@
   },
   {
    "EntityId": 4504,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -465.28,
     "Y": 0.78,
@@ -54966,7 +55595,7 @@
   },
   {
    "EntityId": 4505,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -466.72,
     "Y": 0.78,
@@ -55006,7 +55635,7 @@
   },
   {
    "EntityId": 4507,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -465.28,
     "Y": 0.78,
@@ -55026,7 +55655,7 @@
   },
   {
    "EntityId": 4508,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -466.72,
     "Y": 0.78,
@@ -55066,7 +55695,7 @@
   },
   {
    "EntityId": 4510,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -464.8432,
     "Y": 0.78,
@@ -55086,7 +55715,7 @@
   },
   {
    "EntityId": 4511,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -466.2709,
     "Y": 0.78,
@@ -55126,7 +55755,7 @@
   },
   {
    "EntityId": 4513,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -463.1502,
     "Y": 0.78,
@@ -55146,7 +55775,7 @@
   },
   {
    "EntityId": 4514,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -464.4806,
     "Y": 0.78,
@@ -55186,7 +55815,7 @@
   },
   {
    "EntityId": 4516,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -459.8795,
     "Y": 0.78,
@@ -55206,7 +55835,7 @@
   },
   {
    "EntityId": 4517,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -461.0219,
     "Y": 0.78,
@@ -55246,7 +55875,7 @@
   },
   {
    "EntityId": 4519,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -455.2541,
     "Y": 0.78,
@@ -55266,7 +55895,7 @@
   },
   {
    "EntityId": 4520,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -456.1307,
     "Y": 0.78,
@@ -55306,7 +55935,7 @@
   },
   {
    "EntityId": 4522,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -449.5891,
     "Y": 0.78,
@@ -55326,7 +55955,7 @@
   },
   {
    "EntityId": 4523,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -450.1402,
     "Y": 0.78,
@@ -55366,7 +55995,7 @@
   },
   {
    "EntityId": 4525,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -443.2707,
     "Y": 0.78,
@@ -55386,7 +56015,7 @@
   },
   {
    "EntityId": 4526,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -443.4586,
     "Y": 0.78,
@@ -55426,7 +56055,7 @@
   },
   {
    "EntityId": 4528,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -424.4211,
     "Y": 0.78,
@@ -55446,7 +56075,7 @@
   },
   {
    "EntityId": 4529,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -424.4211,
     "Y": 0.78,
@@ -55486,7 +56115,7 @@
   },
   {
    "EntityId": 4531,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -393.2632,
     "Y": 0.78,
@@ -55506,7 +56135,7 @@
   },
   {
    "EntityId": 4532,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -393.2632,
     "Y": 0.78,
@@ -55546,7 +56175,7 @@
   },
   {
    "EntityId": 4534,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -362.1053,
     "Y": 0.78,
@@ -55566,7 +56195,7 @@
   },
   {
    "EntityId": 4535,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -362.1053,
     "Y": 0.78,
@@ -55606,7 +56235,7 @@
   },
   {
    "EntityId": 4537,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -330.9474,
     "Y": 0.78,
@@ -55626,7 +56255,7 @@
   },
   {
    "EntityId": 4538,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -330.9474,
     "Y": 0.78,
@@ -55666,7 +56295,7 @@
   },
   {
    "EntityId": 4540,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -299.7895,
     "Y": 0.78,
@@ -55686,7 +56315,7 @@
   },
   {
    "EntityId": 4541,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -299.7895,
     "Y": 0.78,
@@ -55726,7 +56355,7 @@
   },
   {
    "EntityId": 4543,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -268.6316,
     "Y": 0.78,
@@ -55746,7 +56375,7 @@
   },
   {
    "EntityId": 4544,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -268.6316,
     "Y": 0.78,
@@ -55786,7 +56415,7 @@
   },
   {
    "EntityId": 4546,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -237.4737,
     "Y": 0.78,
@@ -55806,7 +56435,7 @@
   },
   {
    "EntityId": 4547,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -237.4737,
     "Y": 0.78,
@@ -55846,7 +56475,7 @@
   },
   {
    "EntityId": 4549,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -206.3158,
     "Y": 0.78,
@@ -55866,7 +56495,7 @@
   },
   {
    "EntityId": 4550,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -206.3158,
     "Y": 0.78,
@@ -55906,7 +56535,7 @@
   },
   {
    "EntityId": 4552,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -175.1579,
     "Y": 0.78,
@@ -55926,7 +56555,7 @@
   },
   {
    "EntityId": 4553,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -175.1579,
     "Y": 0.78,
@@ -55966,7 +56595,7 @@
   },
   {
    "EntityId": 4555,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -144.0,
     "Y": 0.78,
@@ -55986,7 +56615,7 @@
   },
   {
    "EntityId": 4556,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -144.0,
     "Y": 0.78,
@@ -56026,7 +56655,7 @@
   },
   {
    "EntityId": 4558,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -112.8421,
     "Y": 0.78,
@@ -56046,7 +56675,7 @@
   },
   {
    "EntityId": 4559,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -112.8421,
     "Y": 0.78,
@@ -56086,7 +56715,7 @@
   },
   {
    "EntityId": 4561,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -81.6842,
     "Y": 0.78,
@@ -56106,7 +56735,7 @@
   },
   {
    "EntityId": 4562,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -81.6842,
     "Y": 0.78,
@@ -56146,7 +56775,7 @@
   },
   {
    "EntityId": 4564,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -50.5263,
     "Y": 0.78,
@@ -56166,7 +56795,7 @@
   },
   {
    "EntityId": 4565,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -50.5263,
     "Y": 0.78,
@@ -56206,7 +56835,7 @@
   },
   {
    "EntityId": 4567,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -19.3684,
     "Y": 0.78,
@@ -56226,7 +56855,7 @@
   },
   {
    "EntityId": 4568,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": -19.3684,
     "Y": 0.78,
@@ -56266,7 +56895,7 @@
   },
   {
    "EntityId": 4570,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": 11.7895,
     "Y": 0.78,
@@ -56286,7 +56915,7 @@
   },
   {
    "EntityId": 4571,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": 11.7895,
     "Y": 0.78,
@@ -56326,7 +56955,7 @@
   },
   {
    "EntityId": 4573,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": 42.9474,
     "Y": 0.78,
@@ -56346,7 +56975,7 @@
   },
   {
    "EntityId": 4574,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": 42.9474,
     "Y": 0.78,
@@ -56386,7 +57015,7 @@
   },
   {
    "EntityId": 4576,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": 74.1053,
     "Y": 0.78,
@@ -56406,7 +57035,7 @@
   },
   {
    "EntityId": 4577,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": 74.1053,
     "Y": 0.78,
@@ -56446,7 +57075,7 @@
   },
   {
    "EntityId": 4579,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": 105.2632,
     "Y": 0.78,
@@ -56466,7 +57095,7 @@
   },
   {
    "EntityId": 4580,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": 105.2632,
     "Y": 0.78,
@@ -56506,7 +57135,7 @@
   },
   {
    "EntityId": 4582,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": 136.4211,
     "Y": 0.78,
@@ -56526,7 +57155,7 @@
   },
   {
    "EntityId": 4583,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": 136.4211,
     "Y": 0.78,
@@ -56566,7 +57195,7 @@
   },
   {
    "EntityId": 4585,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": 155.2707,
     "Y": 0.78,
@@ -56586,7 +57215,7 @@
   },
   {
    "EntityId": 4586,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": 155.4586,
     "Y": 0.78,
@@ -56626,7 +57255,7 @@
   },
   {
    "EntityId": 4588,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": 161.5891,
     "Y": 0.78,
@@ -56646,7 +57275,7 @@
   },
   {
    "EntityId": 4589,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": 162.1402,
     "Y": 0.78,
@@ -56686,7 +57315,7 @@
   },
   {
    "EntityId": 4591,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": 167.2541,
     "Y": 0.78,
@@ -56706,7 +57335,7 @@
   },
   {
    "EntityId": 4592,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": 168.1307,
     "Y": 0.78,
@@ -56746,7 +57375,7 @@
   },
   {
    "EntityId": 4594,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": 171.8795,
     "Y": 0.78,
@@ -56766,7 +57395,7 @@
   },
   {
    "EntityId": 4595,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": 173.0219,
     "Y": 0.78,
@@ -56806,7 +57435,7 @@
   },
   {
    "EntityId": 4597,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": 175.1502,
     "Y": 0.78,
@@ -56826,7 +57455,7 @@
   },
   {
    "EntityId": 4598,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": 176.4806,
     "Y": 0.78,
@@ -56866,7 +57495,7 @@
   },
   {
    "EntityId": 4600,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": 176.8432,
     "Y": 0.78,
@@ -56886,7 +57515,7 @@
   },
   {
    "EntityId": 4601,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": 178.2709,
     "Y": 0.78,
@@ -56926,7 +57555,7 @@
   },
   {
    "EntityId": 4603,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": 177.28,
     "Y": 0.78,
@@ -56946,7 +57575,7 @@
   },
   {
    "EntityId": 4604,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": 178.72,
     "Y": 0.78,
@@ -56986,7 +57615,7 @@
   },
   {
    "EntityId": 4606,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": 177.28,
     "Y": 0.78,
@@ -57006,7 +57635,7 @@
   },
   {
    "EntityId": 4607,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": 178.72,
     "Y": 0.78,
@@ -57046,7 +57675,7 @@
   },
   {
    "EntityId": 4609,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": 177.28,
     "Y": 0.78,
@@ -57066,7 +57695,7 @@
   },
   {
    "EntityId": 4610,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": 178.72,
     "Y": 0.78,
@@ -57106,7 +57735,7 @@
   },
   {
    "EntityId": 4612,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": 177.28,
     "Y": 0.78,
@@ -57126,7 +57755,7 @@
   },
   {
    "EntityId": 4613,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": 178.72,
     "Y": 0.78,
@@ -57166,7 +57795,7 @@
   },
   {
    "EntityId": 4615,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": 177.28,
     "Y": 0.78,
@@ -57186,7 +57815,7 @@
   },
   {
    "EntityId": 4616,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": 178.72,
     "Y": 0.78,
@@ -57226,7 +57855,7 @@
   },
   {
    "EntityId": 4618,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": 177.28,
     "Y": 0.78,
@@ -57246,7 +57875,7 @@
   },
   {
    "EntityId": 4619,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": 178.72,
     "Y": 0.78,
@@ -57286,7 +57915,7 @@
   },
   {
    "EntityId": 4621,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": 177.28,
     "Y": 0.78,
@@ -57306,7 +57935,7 @@
   },
   {
    "EntityId": 4622,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": 178.72,
     "Y": 0.78,
@@ -57346,7 +57975,7 @@
   },
   {
    "EntityId": 4624,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": 177.28,
     "Y": 0.78,
@@ -57366,7 +57995,7 @@
   },
   {
    "EntityId": 4625,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": 178.72,
     "Y": 0.78,
@@ -57406,7 +58035,7 @@
   },
   {
    "EntityId": 4627,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": 177.28,
     "Y": 0.78,
@@ -57426,7 +58055,7 @@
   },
   {
    "EntityId": 4628,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": 178.72,
     "Y": 0.78,
@@ -57466,7 +58095,7 @@
   },
   {
    "EntityId": 4630,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": 177.28,
     "Y": 0.78,
@@ -57486,7 +58115,7 @@
   },
   {
    "EntityId": 4631,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": 178.72,
     "Y": 0.78,
@@ -57526,7 +58155,7 @@
   },
   {
    "EntityId": 4633,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": 177.28,
     "Y": 0.78,
@@ -57546,7 +58175,7 @@
   },
   {
    "EntityId": 4634,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": 178.72,
     "Y": 0.78,
@@ -57586,7 +58215,7 @@
   },
   {
    "EntityId": 4636,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": 177.28,
     "Y": 0.78,
@@ -57606,7 +58235,7 @@
   },
   {
    "EntityId": 4637,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": 178.72,
     "Y": 0.78,
@@ -57646,7 +58275,7 @@
   },
   {
    "EntityId": 4639,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": 177.28,
     "Y": 0.78,
@@ -57666,7 +58295,7 @@
   },
   {
    "EntityId": 4640,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": 178.72,
     "Y": 0.78,
@@ -57706,7 +58335,7 @@
   },
   {
    "EntityId": 4642,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": 177.28,
     "Y": 0.78,
@@ -57726,7 +58355,7 @@
   },
   {
    "EntityId": 4643,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": 178.72,
     "Y": 0.78,
@@ -57766,7 +58395,7 @@
   },
   {
    "EntityId": 4645,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": 177.28,
     "Y": 0.78,
@@ -57786,7 +58415,7 @@
   },
   {
    "EntityId": 4646,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": 178.72,
     "Y": 0.78,
@@ -57826,7 +58455,7 @@
   },
   {
    "EntityId": 4648,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": 177.28,
     "Y": 0.78,
@@ -57846,7 +58475,7 @@
   },
   {
    "EntityId": 4649,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": 178.72,
     "Y": 0.78,
@@ -57886,7 +58515,7 @@
   },
   {
    "EntityId": 4651,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": 177.28,
     "Y": 0.78,
@@ -57906,7 +58535,7 @@
   },
   {
    "EntityId": 4652,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": 178.72,
     "Y": 0.78,
@@ -57946,7 +58575,7 @@
   },
   {
    "EntityId": 4654,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": 177.28,
     "Y": 0.78,
@@ -57966,7 +58595,7 @@
   },
   {
    "EntityId": 4655,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": 178.72,
     "Y": 0.78,
@@ -58006,7 +58635,7 @@
   },
   {
    "EntityId": 4657,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": 177.28,
     "Y": 0.78,
@@ -58026,7 +58655,7 @@
   },
   {
    "EntityId": 4658,
-   "PrefabId": "metal_wall",
+   "PrefabId": "fence_palisade",
    "Position": {
     "X": 178.72,
     "Y": 0.78,
@@ -84691,21 +85320,6 @@
    "Name": "Airport verge"
   },
   {
-   "EntityId": 6508,
-   "PrefabId": "mower_riding",
-   "Position": {
-    "X": 154.0,
-    "Y": 0.62,
-    "Z": 92.0
-   },
-   "Scale": {
-    "X": 1,
-    "Y": 1,
-    "Z": 1
-   },
-   "Name": "Verge mower"
-  },
-  {
    "EntityId": 6509,
    "PrefabId": "foliage_hedge",
    "Position": {
@@ -89151,6 +89765,30 @@
     "Z": 1.2
    },
    "Name": "North Street, block 4"
+  }
+ ],
+ "Crossings": [
+  {
+   "Name": "Southgate west crossing",
+   "Position": {
+    "X": -160.0,
+    "Y": 0.95,
+    "Z": -180.0
+   },
+   "WarningSeconds": 20.0,
+   "ClearMetres": 35.0,
+   "Bell": "crossing_gong"
+  },
+  {
+   "Name": "Southgate east crossing",
+   "Position": {
+    "X": -40.0,
+    "Y": 0.95,
+    "Z": -180.0
+   },
+   "WarningSeconds": 20.0,
+   "ClearMetres": 35.0,
+   "Bell": "crossing_gong"
   }
  ]
 }

@@ -102,13 +102,21 @@ public class LocalPlayerState
             _ => "North West"
         };
         
+        // INCREASING PITCH LOOKS DOWN, and this readout had it the other way round.
+        //
+        // Rotation is built by Quaternion.CreateFromYawPitchRoll(yaw, pitch, 0), whose pitch is a
+        // right-handed rotation about +X — which takes forward (+Z) toward -Y. So a positive pitch
+        // aims at the ground. The same trap caught the K and O keys themselves once: the word
+        // "pitch" reads as "up" and the arithmetic does the opposite, and every step of it is
+        // individually plausible. Reported as "when I press O and I'm looking up, pressing f says
+        // looking down".
         float pitchDeg = Pitch * (180.0f / MathF.PI);
         string pitchStr = pitchDeg switch
         {
-            > 60.0f => "looking up",
-            > 15.0f => "looking slightly up",
-            < -60.0f => "looking down",
-            < -15.0f => "looking slightly down",
+            > 60.0f => "looking down",
+            > 15.0f => "looking slightly down",
+            < -60.0f => "looking up",
+            < -15.0f => "looking slightly up",
             _ => "looking straight"
         };
 

@@ -356,6 +356,11 @@ if (args.Contains("--machines"))
     Log.CloseAndFlush();
     Environment.Exit(mcode);
 }
+if (args.Contains("--voice-levels"))
+{
+    Environment.Exit(OpenFPS.Client.Core.AudioEngine.Fmod.EngineCostSpike.VoiceLevels(args));
+}
+
 if (args.Contains("--engine-levels"))
 {
     int lvcode = OpenFPS.Client.Core.AudioEngine.Fmod.EngineCostSpike.Levels(args);
@@ -423,6 +428,43 @@ if (args.Contains("--yard"))
     int yardCode = OpenFPS.Client.Core.AudioEngine.Fmod.YardSpike.Run(args);
     Log.CloseAndFlush();
     Environment.Exit(yardCode);
+}
+
+if (args.Contains("--bellcheck"))
+{
+    OpenFPS.Common.AcousticRegistry.Initialize();
+    foreach (var id in new[] { "crossing_gong", "loco_bell", "tram_gong" })
+    {
+        try
+        {
+            var b = OpenFPS.Common.ModelLibrary.Bell(id);
+            Console.WriteLine($"  ModelLibrary.Bell(\"{id}\") -> {b.Name}, {b.ReferenceDb:F0} dB, {b.DiameterMetres:F2} m");
+        }
+        catch (Exception ex) { Console.WriteLine($"  ModelLibrary.Bell(\"{id}\") THREW: {ex.GetType().Name}: {ex.Message}"); }
+    }
+    Console.WriteLine($"  ModelLibrary.Knows(Bell, crossing_gong) = {OpenFPS.Common.ModelLibrary.Knows(OpenFPS.Common.ModelLibrary.Kinds.Bell, "crossing_gong")}");
+    Console.WriteLine($"  ids: {string.Join(", ", OpenFPS.Common.ModelLibrary.Ids(OpenFPS.Common.ModelLibrary.Kinds.Bell))}");
+    Environment.Exit(0);
+}
+
+if (args.Contains("--earshot"))
+{
+    Environment.Exit(OpenFPS.Client.Core.AudioEngine.Fmod.EarshotSpike.Run(args));
+}
+
+if (args.Contains("--siren"))
+{
+    Environment.Exit(OpenFPS.Client.Core.AudioEngine.Fmod.SirenSpike.Run(args));
+}
+
+if (args.Contains("--landing"))
+{
+    Environment.Exit(OpenFPS.Client.Core.AudioEngine.Fmod.AircraftSpike.Landing(args));
+}
+
+if (args.Contains("--spool"))
+{
+    Environment.Exit(OpenFPS.Client.Core.AudioEngine.Fmod.AircraftSpike.Spool(args));
 }
 
 if (args.Contains("--aircraft"))

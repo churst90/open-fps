@@ -399,3 +399,371 @@ public sealed record StruckBellSpec
         => Presets.TryGetValue(key, out var make) ? make()
          : throw new ArgumentException($"No bell preset '{key}'. Known: {string.Join(", ", Presets.Keys)}");
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+//  THE ELECTRONIC SIREN
+//
+//  Everything above this line is a pneumatic instrument — air through a reed into a pipe. A police
+//  siren is not: it is an amplifier driving a compression driver into a horn, and every part of
+//  what it sounds like comes from that chain rather than from a recording of one.
+//
+//    THE OSCILLATOR. A siren amplifier's tone generator does not make a sine. The classic heads
+//    (and the DSP ones that imitate them) put out a sawtooth, because a sawtooth has every harmonic
+//    and a siren's whole job is to be heard through traffic — a sine at 900 Hz disappears behind a
+//    bus and a sawtooth at 900 Hz does not. What SWEEPS is that oscillator's frequency, and the
+//    different "sounds" on a siren head are nothing but different sweep rates over the same range.
+//
+//    THE DRIVER. A hundred watts into a one-inch compression driver is well past where the
+//    diaphragm moves linearly, so the wave is squashed on the way out. That is why a siren at full
+//    power has a hard, brassy edge that the same head at low volume does not.
+//
+//    THE HORN. This is the part that makes it a siren rather than a loudspeaker. A horn will not
+//    radiate below its flare cutoff — the mouth has to be about a wavelength over pi across before
+//    the air will take the energy — so everything under about five hundred hertz is simply gone,
+//    which is why a siren has no body at all and is all bite. At the top, the driver's diaphragm
+//    mass rolls it off above four or five kilohertz. What is left is a band from roughly 500 Hz to
+//    4 kHz: exactly where the ear is most sensitive and where engine and tyre noise are weakest.
+//    Nothing about that band is an equaliser setting; it is the geometry of the horn.
+//
+//    AND IT POINTS FORWARD. A horn under a bumper beams. Ten decibels front to back, which is why
+//    you hear one coming long before it is a problem and why it drops away so fast once past.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+
+/// <summary>Which sound the head is making. The hardware is identical; only the sweep rate changes.</summary>
+public enum SirenMode
+{
+    /// <summary>Off.</summary>
+    Off,
+    /// <summary>The long one: about twelve sweeps a minute. What a car uses on an open road.</summary>
+    Wail,
+    /// <summary>Three sweeps a second. What it changes to at a junction, because a fast sweep is far
+    /// easier to localise — the ear gets many onsets a second instead of one every five.</summary>
+    Yelp,
+    /// <summary>Ten sweeps a second: the hard stutter, for the last few metres when nobody has moved.</summary>
+    Phaser,
+    /// <summary>Two fixed tones a fifth apart, alternating about twice a second. The European voice.</summary>
+    HiLo,
+}
+
+/// <summary>
+/// An electronic siren head: an amplifier, a compression driver and a horn.
+///
+/// Levels are anchored the way certification anchors them — the legal figure is measured at TEN
+/// FEET on axis, not at a metre, because a metre from a horn mouth is inside its near field and
+/// means nothing. <see cref="ReferenceDbAt3m"/> holds the spec figure and the model converts.
+/// </summary>
+public sealed record SirenSpec
+{
+    public required string Name { get; init; }
+
+    /// <summary>
+    /// On-axis SPL at ten feet (3.05 m), dB — the figure sirens are actually specified and type-
+    /// approved at. California Title 13 and SAE J1849 want at least 110; a 100 W head on a modern
+    /// speaker makes 118-123, and that is what these presets carry.
+    /// </summary>
+    public float ReferenceDbAt3m { get; init; } = 120f;
+
+    /// <summary>Mouth diameter of the horn, metres. It SETS THE CUTOFF — see
+    /// <see cref="FlareCutoffHz"/> — so a bigger horn is not a louder siren, it is a deeper one.</summary>
+    public float HornMouthMetres { get; init; } = 0.20f;
+
+    /// <summary>Where the compression driver runs out, Hz: diaphragm mass and the phase plug.</summary>
+    public float DriverTopHz { get; init; } = 4500f;
+
+    /// <summary>
+    /// How hard the driver is being pushed, 0..1 — how much of the wave is squashed flat. A siren
+    /// head at full volume is well into this and it is most of the brassiness.
+    /// </summary>
+    public float Compression { get; init; } = 0.55f;
+
+    /// <summary>
+    /// Duty cycle of the oscillator, 0..1 — and this is what decides whether it is a SQUARE or a
+    /// sawtooth, which is the difference between a siren and a trumpet.
+    ///
+    /// The first version of this model used a sawtooth, on the reasoning that a sawtooth has every
+    /// harmonic and a siren's job is to be heard. That is true of the job and wrong about the
+    /// hardware. The instrument every electronic siren was built to imitate is a ROTARY CHOPPER —
+    /// a rotor spinning inside a stator, both cut with ports, so the airflow is switched fully on
+    /// and fully off once per port per revolution. Ports and lands are cut about equally wide, so
+    /// what comes out is very nearly a square wave at fifty per cent duty, and a square wave has
+    /// ODD HARMONICS ONLY: 1, 3, 5, 7, at 1/n. The analogue tone generators in the electronic heads
+    /// that replaced it were built to match, and the modern DSP ones to match those.
+    ///
+    /// Odd-harmonic and all-harmonic are not a subtle difference. A sawtooth's even harmonics fill
+    /// in the octave above every partial and the result reads as BRASSY — a horn, a trumpet. A
+    /// square leaves those gaps open and reads as hollow and hard, which is the siren sound.
+    /// Reported by ear before it was reasoned about: "are real sirens based on square waves or
+    /// sawtooth waves? Sounds like these are sawtooth."
+    ///
+    /// Exactly a half is a pure odd series. Real ports are not machined perfectly, and a hair off
+    /// centre puts a little of the even series back, which is what stops it sounding synthetic.
+    ///
+    /// A HAIR. The series amplitude is sin(pi k d)/(pi k), and how far d sits from a half is
+    /// multiplied by k — so a two per cent error that is inaudible on the 2nd harmonic has grown
+    /// eight times over by the 8th, and the odd-harmonic character quietly disappears up the
+    /// series. Measured with duty 0.48: the 3rd stood 14 dB over the 2nd and the 5th only 8.7 dB
+    /// over the 4th, which is halfway back to a sawtooth. One per cent holds it.
+    /// </summary>
+    public float Duty { get; init; } = 0.49f;
+
+    /// <summary>The sweep, Hz. A PA300 runs 650 to 1450.</summary>
+    public float SweepLowHz { get; init; } = 650f;
+    public float SweepHighHz { get; init; } = 1450f;
+
+    /// <summary>Seconds per complete up-and-down sweep, per mode.</summary>
+    public float WailSeconds { get; init; } = 5.0f;
+    public float YelpSeconds { get; init; } = 0.31f;
+    public float PhaserSeconds { get; init; } = 0.10f;
+
+    /// <summary>The two-tone: the low note and the interval above it, and how long each is held.</summary>
+    public float HiLoLowHz { get; init; } = 440f;
+    public float HiLoRatio { get; init; } = 1.5f;      // a fifth
+    public float HiLoHoldSeconds { get; init; } = 0.55f;
+
+    /// <summary>
+    /// The horn's flare cutoff, Hz — DERIVED, not declared. A horn radiates only once its mouth
+    /// circumference is comparable with the wavelength: f = c / (pi * D). A 0.2 m mouth cuts off at
+    /// 546 Hz, which is why a siren has no bottom end at all.
+    /// </summary>
+    public float FlareCutoffHz => 343f / (MathF.PI * MathF.Max(0.05f, HornMouthMetres));
+
+    /// <summary>The spec figure carried back to one metre, for the emitter placement that wants it
+    /// there. A near-field fiction, like a jet's, and honest about being one.</summary>
+    public float SourceLevelDb => ReferenceDbAt3m + 20f * MathF.Log10(3.05f);
+
+    /// <summary>Seconds per sweep for a mode, or zero if the mode does not sweep.</summary>
+    public float PeriodFor(SirenMode mode) => mode switch
+    {
+        SirenMode.Wail => WailSeconds,
+        SirenMode.Yelp => YelpSeconds,
+        SirenMode.Phaser => PhaserSeconds,
+        SirenMode.HiLo => HiLoHoldSeconds * 2f,
+        _ => 0f,
+    };
+
+    // ── Presets ─────────────────────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// The 100 W head on most North American patrol cars: a single driver in a 200 mm horn behind
+    /// the grille, 650-1450 Hz, 120 dB at ten feet. Wail, yelp and phaser off one oscillator.
+    /// </summary>
+    public static SirenSpec Patrol100W => new()
+    {
+        Name = "100 W patrol siren, grille horn",
+        ReferenceDbAt3m = 120f,
+        // An eleven-inch speaker assembly, which is what a 100 W siren is fitted with — not the
+        // eight inches the first version assumed. It matters twice over: the cutoff falls to
+        // 390 Hz, so the bottom of the wail actually radiates instead of being filtered away, and
+        // the beam is correspondingly wider at the low end.
+        HornMouthMetres = 0.28f,
+        DriverTopHz = 4500f,
+        Compression = 0.55f,
+        // 500 to 1500. The old 650 bottom sat only a quarter-octave over a 546 Hz cutoff, so the
+        // wail's descent ran straight into the horn's own high-pass and stopped sounding like it
+        // was going down — "on the down wail I think it should go a little lower".
+        SweepLowHz = 500f, SweepHighHz = 1500f,
+        WailSeconds = 5.0f, YelpSeconds = 0.31f, PhaserSeconds = 0.10f,
+    };
+
+    /// <summary>
+    /// A 200 W head with two horns, as fitted to fire apparatus and larger ambulances: a bigger
+    /// mouth, so it reaches lower, and six decibels more of it.
+    /// </summary>
+    public static SirenSpec Apparatus200W => new()
+    {
+        Name = "200 W apparatus siren, twin horn",
+        ReferenceDbAt3m = 126f,
+        HornMouthMetres = 0.38f,
+        DriverTopHz = 4000f,
+        Compression = 0.65f,
+        SweepLowHz = 420f, SweepHighHz = 1350f,
+        WailSeconds = 5.6f, YelpSeconds = 0.33f, PhaserSeconds = 0.11f,
+    };
+
+    /// <summary>The European two-tone: a smaller horn, and it never sweeps.</summary>
+    public static SirenSpec EuropeanTwoTone => new()
+    {
+        Name = "European two-tone",
+        ReferenceDbAt3m = 118f,
+        // Wide enough to radiate its own low note: a 435 Hz tone needs a cutoff below 435, and
+        // a 240 mm mouth cuts off at 455. Caught by TheBottomOfTheWailIsAboveTheHornsCutoff,
+        // which exists because a note under the cutoff does not sound low, it sounds absent.
+        HornMouthMetres = 0.30f,
+        DriverTopHz = 4200f,
+        Compression = 0.5f,
+        HiLoLowHz = 435f, HiLoRatio = 1.5f, HiLoHoldSeconds = 0.55f,
+    };
+
+    public static IReadOnlyDictionary<string, Func<SirenSpec>> Presets { get; } =
+        new Dictionary<string, Func<SirenSpec>>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["patrol"] = () => Patrol100W,
+            ["apparatus"] = () => Apparatus200W,
+            ["two_tone"] = () => EuropeanTwoTone,
+        };
+
+    public static SirenSpec ByName(string key)
+        => Presets.TryGetValue(key, out var make) ? make()
+         : throw new ArgumentException($"No siren preset '{key}'. Known: {string.Join(", ", Presets.Keys)}");
+}
+
+/// <summary>
+/// Which sound a siren head is making, decided from what the vehicle is DOING.
+///
+/// Nothing on the wire carries a siren mode and nothing scripts one, which is the same rule the
+/// aircraft power lever and the air brakes follow. But unlike those, this one is a PERSON'S
+/// decision, and a person's decision has hysteresis in it: a crew that switches to yelp for a
+/// junction holds it through the junction and out the other side. Read straight off the
+/// instantaneous deceleration it does not — on a city lap the racing line brakes for every corner,
+/// so the head flipped between wail and yelp several times a lap and sounded like it could not
+/// make up its mind. That is what "the sirens are still wrong on the map" was.
+///
+/// So this smooths what it is looking at, requires the braking to be SUSTAINED rather than
+/// momentary, and then holds whatever it chose. It lives here, in Common, rather than in the audio
+/// system because a decision with state in it is a thing a test can drive — see the siren tests,
+/// which run it against the city's own racing line and count the changes per lap.
+/// </summary>
+public sealed class SirenController
+{
+    /// <summary>Under this, the vehicle is parked and the head is off.</summary>
+    public float MovingMps { get; init; } = 2f;
+    /// <summary>
+    /// Deceleration that counts as "coming up on something", m/s².
+    ///
+    /// High on purpose. A racing line brakes for every corner, and taking every corner as a
+    /// junction is what made the head change character nine times in two laps — measured, in
+    /// ASirenDoesNotChangeItsMindEveryCorner. Only the hardest braking on the route is a crew
+    /// arriving somewhere; the rest is just driving round a block.
+    /// </summary>
+    public float BrakingMps2 { get; init; } = 2.3f;
+    /// <summary>How long it has to keep braking before the crew reaches for the switch.</summary>
+    public float SustainSeconds { get; init; } = 0.9f;
+    /// <summary>
+    /// The shortest a chosen mode lasts. Long enough to be recognised as a mode rather than as a
+    /// glitch, short enough that a junction gets its own sound.
+    /// </summary>
+    public float HoldSeconds { get; init; } = 6f;
+    /// <summary>Time constant on the speed the decision looks at. A network speed is a sampled,
+    /// dead-reckoned quantity and differencing it raw is mostly noise.</summary>
+    public float SmoothSeconds { get; init; } = 0.35f;
+
+    /// <summary>
+    /// How long a call lasts and how long the car goes about its business between calls, seconds.
+    ///
+    /// THIS IS THE ONE THAT MATTERS. A patrol car with its siren on for ever is not a patrol car,
+    /// and it is not what a street sounds like: the head is 130 dB and the car is 95, so a siren
+    /// that never stops means the engine never exists. Reported exactly — "the police cars sound
+    /// like they have no engine and they're all siren, just sounds like a siren driving by" — and
+    /// the answer is not to turn the siren down (it is the right level, it is a siren) but to turn
+    /// it OFF most of the time, which is what a real one is.
+    /// </summary>
+    public float CallSecondsMin { get; init; } = 35f;
+    public float CallSecondsMax { get; init; } = 80f;
+    public float QuietSecondsMin { get; init; } = 70f;
+    public float QuietSecondsMax { get; init; } = 160f;
+
+    public SirenMode Mode { get; private set; } = SirenMode.Off;
+    /// <summary>Whether the car is running a call at all. False most of the time.</summary>
+    public bool OnCall { get; private set; }
+    /// <summary>How many times the mode has changed. For tests and for the trace.</summary>
+    public int Changes { get; private set; }
+
+    private readonly Random _rng;
+    private float _speed = float.NaN, _decel, _braking, _held = float.MaxValue, _phaseLeft;
+
+    /// <summary>Seeded per vehicle, so two cars on the same street are never in step — and so the
+    /// same car does the same thing twice, which is what makes a fault reproducible.</summary>
+    public SirenController(int seed = 0)
+    {
+        _rng = new Random(seed * 2654435761u.GetHashCode() ^ 0x5f3a);
+        _phaseLeft = Lerp(QuietSecondsMin, QuietSecondsMax, (float)_rng.NextDouble()) * (float)_rng.NextDouble();
+    }
+
+    public SirenMode Update(float speedMps, float dt)
+    {
+        if (dt <= 0f) return Mode;
+        if (float.IsNaN(_speed)) _speed = speedMps;
+
+        float a = MathF.Min(1f, dt / MathF.Max(1e-3f, SmoothSeconds));
+        float prev = _speed;
+        _speed += (speedMps - _speed) * a;
+        _decel += (((prev - _speed) / dt) - _decel) * a;
+        _braking = _decel > BrakingMps2 ? _braking + dt : 0f;
+        _held += dt;
+
+        // On a call, or going about its business. Nothing observable decides this — a call is not
+        // a property of the road — so it is a clock, seeded per car so no two are in step.
+        _phaseLeft -= dt;
+        if (_phaseLeft <= 0f)
+        {
+            OnCall = !OnCall;
+            _phaseLeft = OnCall ? Lerp(CallSecondsMin, CallSecondsMax, (float)_rng.NextDouble())
+                                : Lerp(QuietSecondsMin, QuietSecondsMax, (float)_rng.NextDouble());
+            _held = float.MaxValue;   // let the mode change on the instant a call starts or ends
+        }
+
+        if (!OnCall || _speed < MovingMps) { Set(SirenMode.Off); return Mode; }
+        if (Mode == SirenMode.Off) { Set(Cruising()); return Mode; }
+        if (_held < HoldSeconds) return Mode;
+
+        // Coming up on a junction: the crew goes to a fast sweep, because a fast sweep is far
+        // easier for anyone in the way to place. WHICH fast sweep is a person's habit rather than
+        // a rule, so it is drawn rather than fixed — some crews yelp, some run the phaser.
+        Set(_braking >= SustainSeconds
+            ? (_rng.NextDouble() < 0.35 ? SirenMode.Phaser : SirenMode.Yelp)
+            : Cruising());
+        return Mode;
+    }
+
+    /// <summary>What it runs between junctions. Mostly the long one, occasionally not — a siren
+    /// held on one sound for a whole shift is as wrong as one that changes every corner.</summary>
+    private SirenMode Cruising() => _rng.NextDouble() < 0.22 ? SirenMode.Yelp : SirenMode.Wail;
+
+    private static float Lerp(float a, float b, float t) => a + (b - a) * t;
+
+    private void Set(SirenMode m)
+    {
+        if (m == Mode) return;
+        Mode = m;
+        _held = 0f;
+        Changes++;
+    }
+}
+
+/// <summary>
+/// The beeper on a bus door — the "beep beep beep" while it kneels and the doors are open.
+///
+/// It is not pneumatic and it is not part of the air system; it is a piezo disc with a square wave
+/// on it, behind a grille over the doorway. Which matters, because a piezo is a RESONATOR: it is
+/// driven at its own mechanical resonance (that is the only place it is efficient) and what comes
+/// out is very nearly a pure tone with a hard edge to it, not a buzzer's rasp. The frequency is
+/// chosen high — two and a half to three kilohertz — for exactly the reason the siren's band is
+/// chosen: it is where the ear is most sensitive and where a diesel is weakest, so it cuts through
+/// the bus it is bolted to.
+///
+/// And it answers a question that comes up whenever this sort of thing is added: NO, none of this
+/// is the inside of the bus. The kneel, the doors and this are all heard from the pavement — they
+/// are what a bus does at a stop, from outside it. What the cabin does to the engine when you are
+/// sitting IN one is a different model entirely.
+/// </summary>
+public sealed record DoorChimeSpec
+{
+    /// <summary>The piezo's own resonance, Hz. Everything it radiates is here and at its octave.</summary>
+    public float ToneHz { get; init; } = 2730f;
+    /// <summary>Beeps per second.</summary>
+    public float RateHz { get; init; } = 2.0f;
+    /// <summary>How much of each cycle is sounding, 0..1.</summary>
+    public float Duty { get; init; } = 0.45f;
+    /// <summary>Rise and fall of each beep, seconds. A piezo is light and starts fast, but not
+    /// instantly, and a truly instant edge is a click rather than a beep.</summary>
+    public float EdgeSeconds { get; init; } = 0.004f;
+    /// <summary>SPL at one metre. A door beeper is made to be heard across a pavement and no
+    /// further: 80 dB is the usual figure and it is what this is.</summary>
+    public float ReferenceDb { get; init; } = 80f;
+    /// <summary>How much of the square's second harmonic survives the disc. A piezo is a narrow
+    /// resonator, so not much — but enough to give it the edge that makes it a warning.</summary>
+    public float SecondHarmonic { get; init; } = 0.3f;
+
+    /// <summary>A transit bus's door beeper.</summary>
+    public static DoorChimeSpec TransitBus => new();
+}

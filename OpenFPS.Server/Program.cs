@@ -33,6 +33,8 @@ public class GameServer
     private readonly System.Collections.Concurrent.ConcurrentQueue<int> _dirtyAudioEntities = new();
     private readonly VehicleSystem _vehicles = new();
     private readonly RailSystem _rail = new();
+    private CrossingSystem _crossings = null!;
+
     private readonly OccupancySystem _occupancy = new();
     private readonly DoorSystem _doors = new();
     private CompositeService _composites = null!;
@@ -192,6 +194,12 @@ public class GameServer
         _composites.PlaceRecorded(_maps);
         _vehicles.Spawn(_maps);
         _rail.Spawn(_maps);
+        _crossings = new CrossingSystem(_rail, SyncAudioComponent);
+        // After the rail: a crossing derives its geometry from the lines the trains are on, so
+        // those lines have to exist first.
+        _crossings.Spawn(_maps);
+        // And the road has to be able to ask a crossing whether it is closed.
+        _vehicles.SetCrossings(_crossings);
         // Now that every sound source exists, size each map's broadcast radius from it.
         _maps.RefreshEarshotRanges();
         _seats = new OccupancyService(_maps);
@@ -381,6 +389,7 @@ public class GameServer
                     AISystem.Update(world, lookup, dt);
                     _vehicles.Update(entry.Key, world, dt);
                     _rail.Update(entry.Key, world, dt);
+                    _crossings.Update(entry.Key, world, dt);
 
                     // ...and the people watching them. Only a source with a place and a size: no
                     // loop, no bed, and nothing in it that knows what a car is.

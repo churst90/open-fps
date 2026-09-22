@@ -70,6 +70,9 @@ public class MapData
     /// <summary>Closed circuits the map's vehicles can lap. See TrackData.</summary>
     public List<TrackData>? Tracks { get; set; }
 
+    /// <summary>Where roads cross the railway on the level. See LevelCrossingData.</summary>
+    public List<LevelCrossingData>? Crossings { get; set; }
+
     /// <summary>
     /// Composites placed on this map — houses, stalls, barricades, anything built out of parts and
     /// saved. Instantiated at load in the order they appear.
@@ -118,6 +121,76 @@ public class TrackData
     /// for every car.
     /// </summary>
     public float BankingDegrees { get; set; } = 0f;
+
+    /// <summary>
+    /// Places on this route where a vehicle stops. Empty for a road nobody stops on.
+    ///
+    /// This is the one piece of route description the map had no way to express, and four separate
+    /// things were waiting on it: a bus's air brakes (the spring brakes and the doors only fire
+    /// after a vehicle has been STILL for a couple of seconds, and nothing on a track ever was), a
+    /// train halting at a platform, a vehicle giving way at a junction, and a crossing that knows
+    /// something is coming. One list, and all four fall out of a vehicle that actually stops.
+    /// </summary>
+    public List<TrackStopData> Stops { get; set; } = new();
+}
+
+/// <summary>
+/// A place where a road crosses the railway on the level.
+///
+/// Declared as a POINT and nothing else. Which rail line runs through it, which roads run through
+/// it, and how far round each of those the crossing sits are all things the server can work out
+/// from the geometry it already has — and working them out is much safer than writing them down,
+/// because a crossing whose declared offset has drifted from the track it names is a crossing that
+/// rings for nothing and stops nobody.
+/// </summary>
+public class LevelCrossingData
+{
+    public string? Name { get; set; }
+    /// <summary>Where the rails meet the road.</summary>
+    public Vector3 Position { get; set; }
+    /// <summary>
+    /// How far up the line a train starts the sequence, metres. Real crossings are timed rather
+    /// than placed: the circuit is set so the bells ring for a fixed WARNING TIME before arrival —
+    /// twenty seconds in most places — so a fast line needs a longer approach than a slow one. The
+    /// distance is derived from that time and the line's speed limit unless a map overrides it.
+    /// </summary>
+    public float WarningSeconds { get; set; } = 20f;
+    /// <summary>Overrides the derived distance, metres. Zero means work it out from the time.</summary>
+    public float WarningMetres { get; set; }
+    /// <summary>How far past the crossing the last vehicle must be before the road reopens.</summary>
+    public float ClearMetres { get; set; } = 30f;
+    /// <summary>Which bell hangs on it — a <c>StruckBellSpec</c> preset.</summary>
+    public string Bell { get; set; } = "crossing_gong";
+}
+
+/// <summary>Somewhere on a route that a vehicle stops: how far round, and for how long.</summary>
+public class TrackStopData
+{
+    /// <summary>Distance round the lap, metres.</summary>
+    public float AtMetres { get; set; }
+    /// <summary>How long it stands there. A bus stop is fifteen to thirty seconds; a platform is
+    /// longer; a junction is a few.</summary>
+    public float DwellSeconds { get; set; } = 18f;
+    /// <summary>
+    /// What kind of stop it is. Nothing about the SOUND is decided here — the voice makes what the
+    /// vehicle's own parts make when it halts — but it decides whether a bus kneels and opens its
+    /// doors or merely waits at a line.
+    /// </summary>
+    /// <summary>
+    /// What kind of stop it is. Nothing about the SOUND is decided here — the voice makes what the
+    /// vehicle's own parts make when it halts — but it decides how long it waits:
+    ///
+    ///   "bus_stop"  / "platform"  a fixed dwell, for passengers
+    ///   "give_way"                a fixed, short dwell at a junction
+    ///   "crossing"                CONDITIONAL — held only while the crossing is closed, and
+    ///                             driven straight through when it is not. A crossing that stopped
+    ///                             traffic on a timer would be a level crossing that has nothing to
+    ///                             do with the trains.
+    /// </summary>
+    public string Kind { get; set; } = "stop";
+    /// <summary>Only vehicles whose preset contains this stop here. Empty means everything does —
+    /// which is right for a junction and wrong for a bus stop, since a car does not use one.</summary>
+    public string? ForPreset { get; set; }
 }
 
 /// <summary>

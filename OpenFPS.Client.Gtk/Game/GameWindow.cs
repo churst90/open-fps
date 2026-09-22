@@ -13,7 +13,7 @@ internal sealed class GameWindow
 {
     private readonly InputStateBuffer _input;
     private readonly System.Action _onClose;
-    private ApplicationWindow _window = null!;
+    private ApplicationWindow? _window;
     private Widget? _focusTarget;
 
     /// <summary>True while this window is the active one — the GTK head's answer to
@@ -26,9 +26,29 @@ internal sealed class GameWindow
         _onClose = onClose;
     }
 
+    /// <summary>
+    /// Brings the in-game window up, building it the first time and only the first time.
+    ///
+    /// The shell keeps ONE GameWindow for the life of the session, but that was only half of it:
+    /// this method built a fresh <see cref="ApplicationWindow"/> on every call and dropped the old
+    /// one into the field, so the previous toplevel stayed mapped and stayed owned by the
+    /// Application — a window per spawn, and the server answers every <c>/tp</c> with one. Found by
+    /// alt-tab: a stack of "OpenFPS — In Game" windows behind the live one.
+    ///
+    /// Made once; afterwards Present only raises it and puts the focus back on the label.
+    /// </summary>
     public void Present(Application app)
     {
-        _window = ApplicationWindow.New(app);
+        if (_window != null)
+        {
+            _window.Present();
+            IsActive = true;
+            _focusTarget?.GrabFocus();
+            return;
+        }
+
+        var window = ApplicationWindow.New(app);
+        _window = window;
         _window.Title = "OpenFPS — In Game";
         _window.SetDefaultSize(480, 320);
 
@@ -74,7 +94,7 @@ internal sealed class GameWindow
         // held, so without this only the non-movement tap keys would respond.
         _window.OnStateFlagsChanged += (_, _) =>
         {
-            IsActive = !_window.GetStateFlags().HasFlag(StateFlags.Backdrop);
+            IsActive = !window.GetStateFlags().HasFlag(StateFlags.Backdrop);
             if (IsActive)
             {
                 _input.Clear();

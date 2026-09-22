@@ -142,6 +142,13 @@ public struct SpatialEmitter
     /// forward flight slaps, one in a hover does not. Ignored by anything without a rotor.</summary>
     public float RotorWake;
 
+    /// <summary>
+    /// An aeroplane's wheels are on the ground. Read off the flight path like the power lever is:
+    /// an aeroplane at runway height that has stopped going down has landed, and nothing scripts
+    /// it. The transition into it is the touchdown; see AircraftVoiceState.
+    /// </summary>
+    public bool OnGround;
+
     /// <summary>Road speed the engine follows, m/s.</summary>
     public float EngineSpeed;
     public bool EngineRunning;
