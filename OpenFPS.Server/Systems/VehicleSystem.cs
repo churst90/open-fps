@@ -92,7 +92,11 @@ public sealed class VehicleSystem
     private readonly List<DemoVehicle> _vehicles = new();
 
     /// <summary>Spawns every vehicle a map declares. Call once after the maps are loaded.</summary>
-    public void Spawn(MapManager maps)
+    /// <param name="shells">
+    /// Builds the body of a vehicle people can ride in. Without it (the tests that only want traffic)
+    /// every vehicle is a bare moving box, as it always was.
+    /// </param>
+    public void Spawn(MapManager maps, CompositeService? shells = null)
     {
         foreach (var entry in maps.GetAllMaps())
         {
@@ -189,7 +193,39 @@ public sealed class VehicleSystem
                                    : isMachine ? $"{displayKind}, being worked"
                                    : isWalker ? "walking"
                                    : $"{displayKind}, driving the road";
-                var e = isWalker
+                // ── A bus you can get on ────────────────────────────────────────────────────────
+                //
+                // A vehicle that stops at a BUS STOP is one that takes passengers, and that is the
+                // whole test — nothing on the map says "boardable". It gets a real body with seats,
+                // the same shell a parked car has, and a person waiting at the stop gets on when it
+                // stops. Everything else about it is the traffic it always was.
+                Entity e = Entity.Null;
+                if (shells != null && profile != null && line != null && TakesPassengers(data, vd)
+                    && maps.TryGetMap(mapId, out var shellWorld, out _, out _, out _))
+                {
+                    e = shells.InstantiateForTraffic(mapId, vd.Preset, start, Quaternion.CreateFromYawPitchRoll(heading, 0f, 0f));
+                    if (e != Entity.Null)
+                    {
+                        SetOrAdd(shellWorld, e, EntityType.NPC);
+                        SetOrAdd(shellWorld, e, new ColliderComponent { Shape = ColliderShape.Box, Size = hull, IsSolid = solid });
+                        SetOrAdd(shellWorld, e, new NameComponent { Name = vd.Name ?? displayKind });
+                        SetOrAdd(shellWorld, e, new IdentityComponent { Name = vd.Name ?? displayKind, Description = description, Announce = true });
+                        SetOrAdd(shellWorld, e, new VehicleComponent { VehicleType = vd.Preset, MaxSeats = shellWorld.Get<OccupancyComponent>(e).Seats.Count });
+                        SetOrAdd(shellWorld, e, new SoundEmitterComponent
+                        {
+                            IsSynth = true,
+                            SoundId = prefix + vd.Preset,
+                            Mode = PlaybackMode.LoopOne,
+                            Volume = 1f,
+                            Range = Loudness.AudibleRange(sourceLevelDb),
+                            MinDistance = 3f,
+                        });
+                        Log.Information("Map {Map}: {Name} takes passengers — {Seats} seat(s).",
+                                        mapId, vd.Name ?? displayKind, shellWorld.Get<OccupancyComponent>(e).Seats.Count);
+                    }
+                }
+                if (e == Entity.Null)
+                e = isWalker
                     ? maps.SpawnEntity(mapId, w => w.Create(
                     EntityType.NPC,
                     new Transform { Position = start, Rotation = Quaternion.CreateFromYawPitchRoll(heading, 0f, 0f) },
@@ -282,6 +318,20 @@ public sealed class VehicleSystem
                                     mapId, display, e.Id, vd.RoadStart, vd.RoadEnd, string.Join("/", speeds));
             }
         }
+    }
+
+    /// <summary>Whether a vehicle stops at a bus stop on its route, which is what taking passengers is.</summary>
+    private static bool TakesPassengers(MapData data, VehicleData vd)
+    {
+        var track = data.Tracks?.Find(tr => string.Equals(tr.Id, vd.Track, StringComparison.OrdinalIgnoreCase));
+        return track?.Stops != null && track.Stops.Any(sp =>
+            string.Equals(sp.Kind, "bus_stop", StringComparison.OrdinalIgnoreCase)
+            && (string.IsNullOrEmpty(sp.ForPreset) || vd.Preset.Contains(sp.ForPreset!, StringComparison.OrdinalIgnoreCase)));
+    }
+
+    private static void SetOrAdd<T>(World world, Entity e, T component)
+    {
+        if (world.Has<T>(e)) world.Set(e, component); else world.Add(e, component);
     }
 
     public void Update(string mapId, World world, float dt)

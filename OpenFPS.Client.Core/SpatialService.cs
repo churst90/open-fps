@@ -326,7 +326,7 @@ public class SpatialService
 
         // Find the nearest solid colliders
         var candidates = entitiesToTest
-            .Where(e => e.Definition.Collider.Size.X > 0 && e.Definition.Collider.IsSolid && e.Definition.Type == EntityType.StaticObject)
+            .Where(e => e.Definition.Collider.Size.X > 0 && e.Definition.Collider.IsSolid && e.Definition.Type == EntityType.StaticObject && !e.Definition.Moves)
             .Select(e => new { Id = e.Id, Pos = e.Transform.Position, Rot = e.Transform.Rotation, Size = e.Definition.Collider.Size, Shape = e.Definition.Collider.Shape, Dist = Vector3.Distance(position, e.Transform.Position), Def = e.Definition })
             .Where(c => c.Dist < maxDist + (c.Size.Length() / 2.0f))
             .OrderBy(c => c.Dist)

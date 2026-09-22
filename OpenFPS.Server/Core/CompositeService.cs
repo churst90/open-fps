@@ -423,6 +423,27 @@ public class CompositeService
     }
 
     /// <summary>
+    /// A vehicle shell for the map's own traffic to drive: a bus you can get on.
+    ///
+    /// The same shell a parked car is, with two differences. It has no engine of its own to drive —
+    /// VehicleSystem moves it along its route, exactly as it moves every other bus — so no
+    /// DriveComponent, which would have DrivingSystem trying to drive it too. And it has no seat that
+    /// drives: somebody is already driving it. Not recorded on the map: the route spawns it.
+    /// </summary>
+    public Entity InstantiateForTraffic(string mapId, string preset, Vector3 position, Quaternion rotation)
+    {
+        if (!TryGetTemplate(VehicleShell.Prefix + preset, out var shell)) return Entity.Null;
+        var passengers = new CompositeTemplate
+        {
+            Id = shell.Id, Name = shell.Name, Description = shell.Description, Anchored = false,
+            Parts = shell.Parts, Seats = shell.Seats.FindAll(s => !s.Controls), VehiclePreset = "",
+        };
+        int rootId = Instantiate(mapId, passengers, position, rotation, "", out _);
+        if (rootId < 0 || !_maps.TryGetMap(mapId, out _, out _, out _, out var lookup)) return Entity.Null;
+        return lookup.TryGetValue(rootId, out var root) ? root : Entity.Null;
+    }
+
+    /// <summary>
     /// Puts a saved composite into the world, and records that it is there.
     ///
     /// The recording is the important half. An instance that exists only in memory is a house until

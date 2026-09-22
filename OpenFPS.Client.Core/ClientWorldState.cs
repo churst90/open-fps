@@ -597,7 +597,7 @@ public class ClientWorldState
                 TyreDemand = _serverTyreDemand.GetValueOrDefault(id, 0f)
             };
             snap.Entities[id] = s;
-            if (s.Definition.Type != EntityType.StaticObject) snap.DynamicEntities.Add(s);
+            if (s.Definition.Type != EntityType.StaticObject || s.Definition.Moves) snap.DynamicEntities.Add(s);
         }
 
         snap.AudioEntityIds.AddRange(_audioEntityIds.Keys);
@@ -611,7 +611,7 @@ public class ClientWorldState
         _staticGrid.ClearAll(); // Clear both static and dynamic just in case, though it's the static grid.
         foreach (var kvp in _definitions)
         {
-            if (kvp.Value.Type == EntityType.StaticObject && kvp.Value.Collider.IsSolid)
+            if (kvp.Value.Type == EntityType.StaticObject && !kvp.Value.Moves && kvp.Value.Collider.IsSolid)
             {
                 _staticGrid.AddOverlapping(kvp.Value.Transform.Position, kvp.Value.Collider.Size, kvp.Value.Transform.Rotation, kvp.Key, isStatic: true);
             }

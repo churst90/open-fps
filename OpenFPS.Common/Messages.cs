@@ -203,6 +203,16 @@ public partial class EntityDefinition : IMessage
     public RegionComponent Region;
     public PortalComponent Portal;
     public Transform Transform;
+    /// <summary>
+    /// Whether this thing can move — the server's Velocity component, which its TYPE does not say.
+    ///
+    /// A car's panels are StaticObjects, because they are the same walls a house is built from, and
+    /// the client took the type at its word: it filed them in the static collision grid and baked
+    /// them into the acoustic scene where they stood at load. Driven away, they left their ghost
+    /// behind in both — a car-shaped box of glass and steel in an empty parking bay — and the car
+    /// itself was nothing to walk into. Appended last: the wire format is positional.
+    /// </summary>
+    public bool Moves;
 
     public EntityDefinition()
     {
@@ -341,6 +351,10 @@ public partial class ServerStateUpdate : IMessage
     /// sitting down travelling at ninety miles an hour would make a great many of.
     /// </summary>
     public int RidingEntityId = -1;
+
+    /// <summary>Whether the seat this client is in drives the thing. A driver hears the lane lines;
+    /// a passenger does not need them.</summary>
+    public bool RidingControls;
 }
 
 [MemoryPackable]

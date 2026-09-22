@@ -53,6 +53,9 @@ public sealed class SteamAudioScene : IDisposable
             // machines that emit sound are excluded from the acoustic mesh; they are small relative to
             // walls, so losing their occlusion of OTHER sources is negligible.
             if (!string.IsNullOrEmpty(def.SoundEmitter.SoundId)) continue;
+            // Nor anything that MOVES. The scene is built once, so a car's panels would stay where
+            // the car was parked — a ghost of glass and steel in the bay — after it drove away.
+            if (def.Moves) continue;
             var size = def.Collider.Size;
             if (size.X <= 0 || size.Y <= 0 || size.Z <= 0) continue;
             boxes.Add(new Box(snap.Transform.Position, size, snap.Transform.Rotation, def.Material.Material));

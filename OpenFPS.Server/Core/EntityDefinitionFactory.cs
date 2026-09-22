@@ -26,6 +26,7 @@ public static class EntityDefinitionFactory
         def.Region = world.Has<RegionComponent>(e) ? world.Get<RegionComponent>(e) : new RegionComponent();
         def.Portal = world.Has<PortalComponent>(e) ? world.Get<PortalComponent>(e) : new PortalComponent();
         def.Transform = world.Has<Transform>(e) ? world.Get<Transform>(e) : new Transform();
+        def.Moves = world.Has<Velocity>(e);
         return def;
     }
 

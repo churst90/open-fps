@@ -58,6 +58,19 @@ public class OccupancyService
     /// Nearest-with-seats rather than nearest outright: standing beside a car parked against a wall,
     /// "get in" means the car. A house you are also within thirty metres of is not what you meant.
     /// </summary>
+    /// <summary>
+    /// Whether a thing is going too fast to get on or off. A car somebody drives says so in its
+    /// DriveComponent; a bus the map drives says so in its VehicleComponent.
+    /// </summary>
+    public static bool Moving(World world, Entity root)
+    {
+        const float WalkingPace = 1.0f;
+        if (world.Has<DriveComponent>(root) && MathF.Abs(world.Get<DriveComponent>(root).Speed) > 2.0f) return true;
+        if (world.Has<VehicleComponent>(root) && !world.Has<DriveComponent>(root)
+            && MathF.Abs(world.Get<VehicleComponent>(root).Speed) > WalkingPace) return true;
+        return false;
+    }
+
     public int NearestEnterable(string mapId, Vector3 near, float radius)
     {
         if (!_maps.TryGetMap(mapId, out var world, out _, out _, out _)) return -1;
@@ -133,15 +146,26 @@ public class OccupancyService
         }
         else
         {
+            // The first free seat in the order they were declared — the driver's, in your own car —
+            // among the ones you can actually reach. A bus is eleven metres long, and "the first free
+            // seat" on it is at the front whichever door you are standing at.
+            int nearest = -1; float nearestD = float.MaxValue;
             for (int i = 0; i < seats.Count; i++)
             {
                 if (SeatTaken(world, rootId, i)) continue;
                 if (seats[i].Controls && !mayDrive) continue;
-                chosen = i;
-                break;
+                float d = Vector3.Distance(playerPos, SeatPosition(rootT, seats[i]));
+                if (d <= BoardingRange) { chosen = i; break; }
+                if (d < nearestD) { nearestD = d; nearest = i; }
             }
+            if (chosen < 0) chosen = nearest;
             if (chosen < 0) { message = $"There is nowhere free in {composite.Name}."; return false; }
         }
+
+        // Nobody steps on or off something that is going along the road. A bus you are waiting for
+        // opens its doors when it has stopped, and that is when you get on.
+        if (Moving(world, root))
+        { message = $"{composite.Name} is moving. Wait for it to stop."; return false; }
 
         var seat = seats[chosen];
         var seatPos = SeatPosition(rootT, seat);
@@ -225,7 +249,7 @@ public class OccupancyService
         if (lookup.TryGetValue(occupant.RootEntityId, out var root) && world.IsAlive(root))
         {
             if (world.Has<CompositeComponent>(root)) name = world.Get<CompositeComponent>(root).Name;
-            if (world.Has<DriveComponent>(root) && MathF.Abs(world.Get<DriveComponent>(root).Speed) > 2.0f)
+            if (Moving(world, root))
             {
                 message = $"{name} is still moving. Stop first.";
                 return false;

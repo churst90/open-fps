@@ -608,11 +608,11 @@ public class OccupancyTests : IDisposable
                                       "", out _, out string error);
         Assert.True(root >= 0, error);
         var e = f.Entity(root);
+        var driver = f.Player("driver_one", new Vector3(19, 0, 20));
+        Assert.True(f.Seats.Enter(driver, root, null, out string message), message);
         ref var d = ref f.World.Get<DriveComponent>(e);
         d.Speed = 25f;                               // ninety kilometres an hour
         d.Steer = 1f; d.SteerTarget = 1f; d.Throttle = 0.2f;
-        var driver = f.Player("driver_one", new Vector3(19, 0, 20));
-        Assert.True(f.Seats.Enter(driver, root, null, out string message), message);
         f.Hold(driver, forward: 0.2f, lateral: 1f);
         float h0 = f.World.Get<DriveComponent>(e).Heading;
         f.Tick(30);
