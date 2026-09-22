@@ -905,7 +905,56 @@ public sealed class EngineSynth
         // It is worth nothing on a petrol car — a muscle car's block is thirty decibels under its
         // exhaust either way — and it is most of a bus, whose block is the loudest thing on it.
         // That asymmetry is why it went unnoticed: "I can hardly hear the engines on those diesels."
-        Block = (knockOut + thud + mech + whine) * BlockRadiationGain;
+        Block = (knockOut + thud + mech + whine) * BlockRadiationGain + StarterSound(rpm);
+    }
+
+    // ── The starter motor ─────────────────────────────────────────────────────────────────────
+    //
+    // The engine turning over on the starter was always here — the compression pulses coming round
+    // with nothing lighting them is the chug of cranking, and it falls out of the cylinders. The
+    // STARTER was silent: it pushed, and made no noise doing it. A real one is the loudest part of
+    // starting a car for the first second: a solenoid slamming the pinion into the ring gear, then
+    // a small DC motor spinning through a big reduction, whose gear mesh whines and whose brushes
+    // buzz, all dragged down in pitch every time a cylinder comes up on compression.
+    //
+    // Its speed is the crank's times the reduction — the ring gear against a ten-tooth pinion, about
+    // twelve to one — so it is geared to the engine and slows exactly where the engine does.
+    private const float StarterReduction = 12f;
+    private const int PinionTeeth = 10, CommutatorBars = 24;
+    /// <summary>A starter at one metre, dB — a loud whirr, under a running engine and over an idle one's
+    /// valvetrain. The solenoid's clunk is a few decibels over it and gone in a hundredth of a second.</summary>
+    private const float StarterDbAtOneMetre = 82f;
+    private float _starterPhase, _starterBuzz, _solenoidEnv, _solenoidRing, _solenoidRing1;
+    private bool _starterWas;
+
+    private float StarterSound(float crankRpm)
+    {
+        if (Starter && !_starterWas) _solenoidEnv = 1f;
+        _starterWas = Starter;
+        float outPa = 0f;
+        float amp = 20e-6f * MathF.Pow(10f, StarterDbAtOneMetre / 20f) * 1.414f;
+        if (Starter)
+        {
+            float motorHz = MathF.Max(0f, crankRpm) / 60f * StarterReduction;
+            _starterPhase += motorHz * PinionTeeth * _dt;
+            _starterBuzz += motorHz * CommutatorBars * _dt;
+            _starterPhase -= MathF.Floor(_starterPhase);
+            _starterBuzz -= MathF.Floor(_starterBuzz);
+            float mesh = MathF.Sin(MathF.Tau * _starterPhase) + 0.35f * MathF.Sin(MathF.Tau * 2f * _starterPhase);
+            float brush = _starterBuzz < 0.15f ? 0.6f : -0.1f;        // a spiky, buzzy commutator
+            outPa += amp * (0.6f * mesh + 0.4f * brush);
+        }
+        if (_solenoidEnv > 1e-4f)
+        {
+            // A struck steel plunger: a short knock ringing near 1.2 kHz.
+            float w = MathF.Tau * 1200f * _dt, r = 0.994f;
+            float kick = _solenoidEnv > 0.999f ? 1f : 0f;
+            float y = kick + 2f * r * MathF.Cos(w) * _solenoidRing - r * r * _solenoidRing1;
+            _solenoidRing1 = _solenoidRing; _solenoidRing = y;
+            outPa += amp * 1.6f * y * _solenoidEnv * 0.05f;
+            _solenoidEnv *= MathF.Exp(-_dt / 0.025f);
+        }
+        return outPa;
     }
 
     private float StarterTorque()

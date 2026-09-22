@@ -779,6 +779,10 @@ public class CompositeService
             Volume = 1f,
             Range = Loudness.AudibleRange(profile.SourceLevelDb),
             MinDistance = 3f,
+            // Parked with the engine off. The key starts it (DrivingSystem.SetIgnition), and the
+            // client cranks it on the starter when this flips, because that is what Running does to
+            // an engine voice that was stopped.
+            SynthRunning = false,
         });
         // A body, so the grid carries it into earshot and a person can walk into it. Not solid: the
         // parts it is built from are the solid things, and they are already here.

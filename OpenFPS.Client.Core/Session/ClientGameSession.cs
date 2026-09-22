@@ -243,6 +243,8 @@ public sealed class ClientGameSession : IDisposable
         // without letting go of the movement ones. Naming a particular thing is what the console is
         // for; these are the ones you want under a finger.
         _bindings.Bind(InputContext.Gameplay, GameKey.G, () => _network.Send(new TextCommand { Command = "take" }));
+        // T turns the key: starts the engine from the driver's seat, or switches it off.
+        _bindings.Bind(InputContext.Gameplay, GameKey.T, () => _network.Send(new TextCommand { Command = "ignition" }));
         _bindings.Bind(InputContext.Gameplay, GameKey.Q, () => _network.Send(new TextCommand { Command = "drop" }));
         _bindings.Bind(InputContext.Gameplay, GameKey.R, () => _network.Send(new TextCommand { Command = "stow" }));
         _bindings.Bind(InputContext.Gameplay, GameKey.V, ToggleVoiceTransmission);
@@ -832,7 +834,7 @@ public sealed class ClientGameSession : IDisposable
     {
         var snapshot = _world.GetSnapshot();
         Vector3 forward = Vector3.Transform(new Vector3(0, 0, 1), _state.Rotation);
-        Vector3 eyePos = _state.Position + new Vector3(0, 1.7f, 0);
+        Vector3 eyePos = _state.Position + new Vector3(0, _state.EyeHeight, 0);
 
         if (_physics.Spatial.RaycastSingle(snapshot, eyePos, forward, 20.0f, out var hit, out float dist))
         {
@@ -1030,7 +1032,7 @@ public sealed class ClientGameSession : IDisposable
         bool isSheltered = false;
 
         // Same eye position as the audio system uses for the listener, so the two agree.
-        Vector3 visualEyePos = _state.VisualPosition + new Vector3(0, 1.7f, 0);
+        Vector3 visualEyePos = _state.VisualPosition + new Vector3(0, _state.EyeHeight, 0);
 
         // 1. Regional check: are we in an explicitly marked "indoor" region?
         if (snap.AcousticMap != null)

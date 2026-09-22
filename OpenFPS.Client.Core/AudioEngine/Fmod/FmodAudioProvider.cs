@@ -3390,6 +3390,14 @@ public class FmodAudioProvider : IAudioProvider
             highDb -= (totalMuffle * 40.0f); midDb -= (totalMuffle * 20.0f);
             lowDb += (active.CurrentBleed * 10.0f);
 
+            // Sitting in a car: everything OUTSIDE it comes through the glass and the doors. Not the
+            // car's own engine, whose voice already rendered its way through the same body, and not
+            // anything riding on the listener's head (the lane cues).
+            if (!active.FollowsListener && active.EngineState is not { Interior: true })
+            {
+                lowDb += _enclosureLowDb; midDb += _enclosureMidDb; highDb += _enclosureHighDb;
+            }
+
             // Directional-source timbre: off-axis, a projecting source (e.g. a megaphone) loses its highs
             // first, then mids — so to the sides it sounds DULL, not just quieter. Combined with the cone
             // volume attenuation above, this gives it a real "beamed" character (bright/present in front).
@@ -3593,6 +3601,12 @@ public class FmodAudioProvider : IAudioProvider
     }
 
     public void UpdateShelter(float shelterFactor) => _shelterFactor = shelterFactor;
+
+    private float _enclosureLowDb, _enclosureMidDb, _enclosureHighDb;
+    public void SetListenerEnclosure(float lowDb, float midDb, float highDb)
+    {
+        _enclosureLowDb = lowDb; _enclosureMidDb = midDb; _enclosureHighDb = highDb;
+    }
 
     /// <summary>
     /// Hands the mixer what the space immediately around the listener's head looks like: one probe per

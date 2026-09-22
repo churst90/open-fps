@@ -548,6 +548,11 @@ public partial struct DriveComponent
     /// <summary>How much of the tyres' grip this tick asked for, before the friction circle cut it
     /// back; over 1 is sliding. The same number traffic reports, and what the client squeals on.</summary>
     public float TyreDemand { get; set; }
+    /// <summary>Whether the ignition is on. A parked car's is not: it starts with the key.</summary>
+    public bool EngineOn { get; set; }
+    /// <summary>Seconds since the key was turned. The engine is cranking, not pulling, for the first
+    /// second or so — the client hears the same cranking the server is waiting out.</summary>
+    public float EngineOnFor { get; set; }
     public DriveComponent() { Preset = ""; }
 }
 

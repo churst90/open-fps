@@ -88,25 +88,30 @@ public class NetworkService : INetEventListener
                             peer.GetMaxSinglePacketSize(deliveryMethod));
                 return;
             }
+            // Each half is a whole update, with everything the client is told about ITSELF — not just
+            // the entity states. The halves used to be rebuilt from three fields, so RidingEntityId
+            // arrived as its default of -1 in every split update: on a map big enough to split every
+            // tick, which the city is, a player in a driving seat was told every tick that they were
+            // standing in the road. They heard their own footsteps, their own car from outside, no
+            // cabin and no lane lines, and the client walked their ears away from the seat.
             int half = update.States.Count / 2;
-            SendStateUpdate(peer, new ServerStateUpdate
-            {
-                Tick = update.Tick,
-                LastProcessedSequenceId = update.LastProcessedSequenceId,
-                States = update.States.GetRange(0, half),
-            }, deliveryMethod);
-            SendStateUpdate(peer, new ServerStateUpdate
-            {
-                Tick = update.Tick,
-                LastProcessedSequenceId = update.LastProcessedSequenceId,
-                States = update.States.GetRange(half, update.States.Count - half),
-            }, deliveryMethod);
+            SendStateUpdate(peer, Half(update, 0, half), deliveryMethod);
+            SendStateUpdate(peer, Half(update, half, update.States.Count - half), deliveryMethod);
         }
         catch (Exception ex)
         {
             Log.Error(ex, "FAILED to send a world state update of {Count} entities to peer {Id}", update.States.Count, peer.Id);
         }
     }
+
+    public static ServerStateUpdate Half(ServerStateUpdate whole, int from, int count) => new()
+    {
+        Tick = whole.Tick,
+        LastProcessedSequenceId = whole.LastProcessedSequenceId,
+        States = whole.States.GetRange(from, count),
+        RidingEntityId = whole.RidingEntityId,
+        RidingControls = whole.RidingControls,
+    };
 
     public void BroadcastToMap(IEnumerable<NetPeer?> peers, IMessage message)
     {

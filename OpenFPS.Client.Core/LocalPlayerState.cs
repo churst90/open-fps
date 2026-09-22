@@ -42,6 +42,16 @@ public class LocalPlayerState
     public bool IsRiding => RidingEntityId >= 0;
     /// <summary>Whether the seat being ridden in is the one that drives.</summary>
     public bool RidingControls { get; set; }
+
+    /// <summary>
+    /// How high the ears are above where the body is, metres: standing, or sitting down.
+    ///
+    /// It was 1.7 everywhere, sitting or not — and a seat's position is its floor. A hatchback's roof
+    /// is 1.15 m above its floor, so a driver's ears were half a metre ABOVE THE ROOF: outside the
+    /// cabin's room, in the open air over the car, which is why the inside of a car did not sound
+    /// like the inside of anything. Seated, the eyes are about a metre up.
+    /// </summary>
+    public float EyeHeight => IsRiding ? 1.0f : 1.7f;
     public int Health { get; set; } = 100;
     public int MaxHealth { get; set; } = 100;
     public string CurrentMaterial { get; set; } = "Generic";

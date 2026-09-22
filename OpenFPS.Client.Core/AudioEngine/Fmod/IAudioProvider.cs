@@ -18,6 +18,9 @@ public interface IAudioProvider : IDisposable
     (double MeanMs, double MaxMs, int Calls, int Voices) TakeUpdateCost() => (0, 0, 0, 0);
     void UpdateListener(Vector3 position, Quaternion rotation, Vector3 velocity, int regionId);
     void UpdateShelter(float shelterFactor);
+    /// <summary>What the body of the vehicle the listener is sitting in takes off everything outside
+    /// it, dB per band (negative). Zero when on foot.</summary>
+    void SetListenerEnclosure(float lowDb, float midDb, float highDb) { }
     /// <summary>Describes the surfaces immediately around the listener's head — one probe per
     /// direction, in HEAD space — so the mixer can render each as its own early reflection.</summary>
     void UpdateBoundaries(ReadOnlySpan<BoundaryProbe> probes);

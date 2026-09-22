@@ -30,6 +30,8 @@ namespace OpenFPS.Tests;
 public class OccupancyTests : IDisposable
 {
     private readonly string _dir = Path.Combine(Path.GetTempPath(), $"openfps-occupancy-{Guid.NewGuid():N}");
+    private readonly Xunit.Abstractions.ITestOutputHelper _o;
+    public OccupancyTests(Xunit.Abstractions.ITestOutputHelper o) => _o = o;
 
     public void Dispose() { try { if (Directory.Exists(_dir)) Directory.Delete(_dir, true); } catch { } }
 
@@ -436,6 +438,7 @@ public class OccupancyTests : IDisposable
         // And it drives, as itself, with nobody having said so a second time.
         var session = f.Player("cody", new Vector3(-29, 0, -30));
         Assert.True(f.Seats.Enter(session, second, null, out string message), message);
+        f.StartEngine(second);                       // placed again, it is parked: key first
         f.Hold(session, forward: 1f);
         f.Tick(60);
         Assert.True(f.World.Get<DriveComponent>(placed).Speed > 5f);
@@ -559,6 +562,7 @@ public class OccupancyTests : IDisposable
         var driver = f.Player("driver_one", new Vector3(19, 0, 20));
         Assert.True(f.Seats.Enter(driver, root, null, out string message), message);
         Assert.True(f.World.Get<OccupantComponent>(driver.Entity).Controls);
+        f.StartEngine(root);
 
         f.Hold(driver, forward: 1f);
         f.Tick(90);
@@ -624,6 +628,63 @@ public class OccupancyTests : IDisposable
         Assert.True(MathF.Abs(after.Heading - h0) > 0.2f, "it did not turn");
     }
 
+    /// <summary>
+    /// A parked car is parked: the engine is off and W does nothing until the key is turned, and then
+    /// nothing for the second the starter spends turning it over. And the voice is told.
+    /// </summary>
+    [Fact]
+    public void AParkedCarNeedsTheKey()
+    {
+        var f = new Fixture(_dir);
+        int root = f.Composites.Place(f.MapId, "vehicle:i4_economy", new Vector3(20, 0, 20), Quaternion.Identity,
+                                      "", out _, out string error);
+        Assert.True(root >= 0, error);
+        var e = f.Entity(root);
+        Assert.False(f.World.Get<SoundEmitterComponent>(e).SynthRunning, "a parked car was left running");
+        var driver = f.Player("driver_one", new Vector3(19, 0, 20));
+        Assert.True(f.Seats.Enter(driver, root, null, out string message), message);
+
+        f.Hold(driver, forward: 1f);
+        f.Tick(60);
+        Assert.True(f.RootTransform(root).Position.Z - 20f < 0.05f, "it drove with the engine off");
+
+        int resent = -1;
+        DrivingSystem.SetIgnition(f.World, e, true, id => resent = id);
+        Assert.Equal(root, resent);
+        Assert.True(f.World.Get<SoundEmitterComponent>(e).SynthRunning);
+        f.Tick(15);                                  // half a second: still cranking
+        Assert.True(f.RootTransform(root).Position.Z - 20f < 0.05f, "it pulled away on the starter");
+        f.Tick(90);
+        Assert.True(f.RootTransform(root).Position.Z - 20f > 2f, "the engine started and nothing happened");
+    }
+
+    /// <summary>
+    /// "I can't figure out how to get out of the garage." The cars are parked nose out between the
+    /// street-side piers; key, W, and it should be on Main Street in a few seconds without touching
+    /// anything. If this fails, it names what it hit.
+    /// </summary>
+    [Fact]
+    public void AParkedCarDrivesStraightOutOfTheGarage()
+    {
+        var f = new Fixture(_dir, "city");
+        f.Composites.PlaceRecorded(f.Maps);
+        int root = f.Composites.NearestRoot(f.MapId, new Vector3(-16f, 0.25f, 29f), 3f);
+        Assert.True(root >= 0, "no car in the first bay");
+        var driver = f.Player("driver_one", new Vector3(-16f, 0.3f, 31.2f));
+        Assert.True(f.Seats.Enter(driver, root, null, out string message), message);
+        f.StartEngine(root);
+        f.Hold(driver, forward: 1f);
+        float lastX = f.RootTransform(root).Position.X;
+        for (int second = 0; second < 5; second++)
+        {
+            f.Tick(30);
+            float x = f.RootTransform(root).Position.X;
+            _o.WriteLine($"t={second + 1}s x={x:F1} speed={f.World.Get<DriveComponent>(f.Entity(root)).Speed:F1}");
+            lastX = x;
+        }
+        Assert.True(lastX > -6f, $"five seconds of full throttle and the car is at x={lastX:F1}, still in or at the garage");
+    }
+
     /// <summary>You cannot walk through the side of it.</summary>
     [Fact]
     public void AParkedCarIsSolid()
@@ -652,7 +713,7 @@ public class OccupancyTests : IDisposable
         public readonly OccupancyService Seats;
         public readonly OccupancySystem Occupancy = new();
         public readonly SessionManager Sessions = new();
-        public readonly string MapId = "default";
+        public readonly string MapId;
 
         public World World = null!;
         public Dictionary<int, Entity> Lookup = null!;
@@ -662,8 +723,9 @@ public class OccupancyTests : IDisposable
         private int _nextConnection = 1;
         private readonly List<UserSession> _drivers = new();
 
-        public Fixture(string dir)
+        public Fixture(string dir, string mapId = "default")
         {
+            MapId = mapId;
             string mapDir = Path.Combine(dir, "maps");
             Directory.CreateDirectory(mapDir);
             foreach (string file in Directory.GetFiles(Path.Combine(AppContext.BaseDirectory, "maps"), "*.json"))
@@ -690,7 +752,16 @@ public class OccupancyTests : IDisposable
             Assert.True(Composites.AddSeat(MapId, root, "passenger", false, where + new Vector3(0.4f, 0, 0.5f), 0f,
                                            owner, true, out error), error);
             Assert.True(Composites.MakeDrivable(MapId, root, preset, owner, true, out error), error);
+            StartEngine(root);
             return root;
+        }
+
+        /// <summary>The key turned and the engine caught. A drivable thing is parked with it off.</summary>
+        public void StartEngine(int root)
+        {
+            ref var d = ref World.Get<DriveComponent>(Entity(root));
+            d.EngineOn = true;
+            d.EngineOnFor = 10f;
         }
 
         /// <summary>The same walls, fixed down. A house.</summary>

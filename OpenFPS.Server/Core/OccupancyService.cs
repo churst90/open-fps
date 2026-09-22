@@ -29,7 +29,54 @@ public class OccupancyService
     /// <summary>How close you must be to a seat to get into it, metres. Arm's length plus a step.</summary>
     public const float BoardingRange = 5.0f;
 
-    public OccupancyService(MapManager maps) => _maps = maps;
+    private readonly Action<string, int, string, IReadOnlyList<TransientSound>>? _heard;
+
+    /// <param name="heard">Where the sounds of getting in and out go — the server's world-audio
+    /// channel. Null in tests that only care where people end up.</param>
+    public OccupancyService(MapManager maps, Action<string, int, string, IReadOnlyList<TransientSound>>? heard = null)
+    {
+        _maps = maps;
+        _heard = heard;
+    }
+
+    /// <summary>A car door is about a metre square of steel skin on a frame, and weighs about this.</summary>
+    private const float CarDoorKg = 22f;
+
+    /// <summary>
+    /// The door beside a seat, opened and shut: getting in or out of a car.
+    ///
+    /// The same door model a building's door uses (<see cref="DoorAcoustics"/>) — a steel skin, a
+    /// seal and a latch — so a car door is a thunk and a click and a shed door is a clatter without
+    /// either being told. It opens, and a second and a bit later, once you are in or out, it shuts.
+    /// Only for things that drive: a bus has its own doors, and they are air.
+    /// </summary>
+    private void CarDoor(string mapId, World world, Entity root, Seat seat)
+    {
+        if (_heard == null || !world.Has<DriveComponent>(root)) return;
+        var rootT = world.Get<Transform>(root);
+        float side = seat.LocalPosition.X < 0f ? -1f : 1f;
+        var right = Vector3.Transform(Vector3.UnitX, rootT.Rotation);
+        var forward = Vector3.Transform(Vector3.UnitZ, rootT.Rotation);
+        var seatPos = SeatPosition(rootT, seat);
+        // The door is in the side of the car beside the seat, at about the height of your hip.
+        var centre = seatPos + right * side * 0.75f + new Vector3(0f, 0.55f, 0f);
+        var hinge = centre + forward * 0.5f;
+        var latch = centre - forward * 0.5f;
+        var steel = AcousticRegistry.GetProperties("Metal");
+        const float width = 1.0f, height = 1.1f, skin = 0.0008f;
+
+        var sounds = new List<TransientSound>();
+        foreach (var s in DoorAcoustics.Opening(steel, latch, hinge, width, height, skin, 0.8f, 0f, hasSeal: true))
+            sounds.Add(s.ToTransient());
+        float closeSpeed = DoorAcoustics.EdgeSpeed(width, 1.1f, 0.5f);
+        foreach (var s in DoorAcoustics.Closing(steel, latch, centre, width, height, skin, CarDoorKg, closeSpeed, hasSeal: true))
+        {
+            var t = s.ToTransient();
+            t.DelaySeconds += 1.3f;
+            sounds.Add(t);
+        }
+        _heard(mapId, root.Id, "car door", sounds);
+    }
 
     /// <summary>Where a seat is in the world right now, given where its composite is.</summary>
     public static Vector3 SeatPosition(Transform rootTransform, Seat seat)
@@ -197,8 +244,10 @@ public class OccupancyService
         while (session.InputQueue.TryDequeue(out _)) { }
         session.GroundProbe.Invalidate();
 
+        CarDoor(session.CurrentMapId, world, root, seat);
+
         message = seat.Controls
-            ? $"You are in the {seat.Name} seat of {composite.Name}. Forward and back to drive, left and right to steer."
+            ? $"You are in the {seat.Name} seat of {composite.Name}. T turns the key. Forward and back to drive, left and right to steer."
             : $"You are in the {seat.Name} seat of {composite.Name}.";
         Log.Information("{User} took the '{Seat}' seat of composite {Root} ('{Name}').",
                         session.Username, seat.Name, rootId, composite.Name);
@@ -255,6 +304,8 @@ public class OccupancyService
                 return false;
             }
             spot = FindStandingRoom(world, grid, root, session.Entity, from, occupant.BoardedFrom);
+            if (world.Has<OccupancyComponent>(root) && occupant.SeatIndex < world.Get<OccupancyComponent>(root).Seats.Count)
+                CarDoor(session.CurrentMapId, world, root, world.Get<OccupancyComponent>(root).Seats[occupant.SeatIndex]);
         }
 
         CompositeService.Disembark(world, session.Entity);

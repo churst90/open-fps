@@ -177,6 +177,10 @@ public class CommandHandler
             //
             // Not elevated, any of it. Getting into things is what the world is FOR; building the
             // thing you get into is the part that needs a role.
+            case "ignition":
+            case "key":
+                HandleIgnition(session, args, reply);
+                break;
             case "enter":
             case "board":
             case "getin":
@@ -1255,6 +1259,26 @@ public class CommandHandler
         Say(reply, $"Map '{session.CurrentMapId}' saved. Anything you placed is now permanent.");
     }
 
+    /// <summary>
+    /// /ignition [on|off] — the key, from the driver's seat. No argument turns it the other way from
+    /// wherever it is, which is what a key does.
+    /// </summary>
+    private void HandleIgnition(UserSession session, string[] args, Action<IMessage> reply)
+    {
+        if (!_maps.TryGetMap(session.CurrentMapId, out var world, out _, out _, out var lookup)
+            || session.Entity == Entity.Null || !world.IsAlive(session.Entity))
+        { Say(reply, "You are not in the world yet."); return; }
+        if (!world.Has<OccupantComponent>(session.Entity))
+        { Say(reply, "You are not sitting in anything."); return; }
+        var occupant = world.Get<OccupantComponent>(session.Entity);
+        if (!occupant.Controls) { Say(reply, "The key is in front of the driver's seat."); return; }
+        if (!lookup.TryGetValue(occupant.RootEntityId, out var root) || !world.IsAlive(root))
+        { Say(reply, "There is nothing here to start."); return; }
+        bool on = world.Has<DriveComponent>(root) && !world.Get<DriveComponent>(root).EngineOn;
+        if (args.Length > 0) on = !args[0].Equals("off", StringComparison.OrdinalIgnoreCase);
+        Say(reply, DrivingSystem.SetIgnition(world, root, on, _server.SyncAudioComponent));
+    }
+
     private void HandleMove(UserSession session, string[] args, Action<IMessage> reply)
     {
         if (args.Length < 3)
@@ -1280,6 +1304,10 @@ public class CommandHandler
             Say(reply, "Cannot move there: Area is solid.");
             return;
         }
+
+        // Out of whatever you were sitting in first. The seat owns a passenger's position and puts
+        // them back in it every tick, so a teleport from a seat moved you for one tick and no further.
+        if (world.Has<OccupantComponent>(session.Entity)) CompositeService.Disembark(world, session.Entity);
 
         ref var t = ref world.Get<Transform>(session.Entity);
         t.Position = targetPos;

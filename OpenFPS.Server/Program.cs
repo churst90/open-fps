@@ -202,7 +202,7 @@ public class GameServer
         _vehicles.SetCrossings(_crossings);
         // Now that every sound source exists, size each map's broadcast radius from it.
         _maps.RefreshEarshotRanges();
-        _seats = new OccupancyService(_maps);
+        _seats = new OccupancyService(_maps, EmitWorldAudio);
         _hands = new HandsService(_maps);
         _commands = new CommandHandler(_sessions, _maps, this, _composites, _seats, _hands);
         

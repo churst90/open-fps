@@ -60,6 +60,32 @@ public static class DrivingSystem
     /// </summary>
     private const float SteerPastGrip = 1.15f;
 
+    /// <summary>How long a starter turns an engine over before it runs, seconds. The client's synth
+    /// finds its own moment of catching; this is the server not pulling away before it has.</summary>
+    private const float CrankingSeconds = 1.0f;
+
+    /// <summary>
+    /// Turns the key. Returns what the driver hears said: the engine starting, or stopping. A car
+    /// moving with the engine off still rolls and brakes — it just has no drive.
+    /// </summary>
+    public static string SetIgnition(World world, Entity root, bool on, Action<int>? resendDefinition)
+    {
+        if (!world.Has<DriveComponent>(root)) return "There is no engine in this.";
+        ref var drive = ref world.Get<DriveComponent>(root);
+        if (drive.EngineOn == on) return on ? "The engine is already running." : "The engine is already off.";
+        drive.EngineOn = on;
+        drive.EngineOnFor = 0f;
+        if (world.Has<SoundEmitterComponent>(root))
+        {
+            ref var em = ref world.Get<SoundEmitterComponent>(root);
+            em.SynthRunning = on;
+            // Running lives in the DEFINITION, which is sent once unless something asks again —
+            // the lesson of the crossing bell that rang on the server and nowhere else.
+            resendDefinition?.Invoke(root.Id);
+        }
+        return on ? "You turn the key." : "You switch the engine off.";
+    }
+
     /// <summary>How long held controls survive a silent client before they start decaying, seconds.
     /// A driver does not lift off because a packet was lost; a driver who has gone does coast to a
     /// stop rather than drive away forever.</summary>
@@ -174,6 +200,9 @@ public static class DrivingSystem
         float torque = profile.Engine.PeakTorqueNm * TorqueFraction(rpm, profile);
         float ratio = gb.Ratios[gear - 1] * gb.FinalDrive;
         float tractive = MathF.Abs(drive.Throttle) * torque * ratio / MathF.Max(0.05f, gb.WheelRadiusMetres);
+        // No engine, no drive: the ignition is off, or it is still turning over on the starter.
+        if (drive.EngineOn) drive.EngineOnFor += dt;
+        if (!drive.EngineOn || drive.EngineOnFor < CrankingSeconds) tractive = 0f;
         // Reverse is geared low and runs out early — you cannot reverse a car up to its top speed.
         if (drive.Throttle < 0f && speed > ReverseTopSpeed) tractive = 0f;
 

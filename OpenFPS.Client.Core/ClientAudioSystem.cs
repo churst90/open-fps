@@ -410,7 +410,7 @@ public class ClientAudioSystem
         _acousticWorker.UpdateWorld(world);
         
         // --- Use smoothed VisualPosition for the listener ---
-        Vector3 visualEyePos = _state.VisualPosition + new Vector3(0, 1.7f, 0);
+        Vector3 visualEyePos = _state.VisualPosition + new Vector3(0, _state.EyeHeight, 0);
 
         // 1. Resolve high-precision listener region (OBB check)
         int listenerRegionId = _acoustics.GetRegionAt(world, visualEyePos);
@@ -435,6 +435,9 @@ public class ClientAudioSystem
         _audio.UpdateShelter(_state.ShelterFactor);
         // The lane lines, if you are the one driving.
         _drivingAids.Update(world, _state);
+        // ...and the rest of the world through the glass, if you are sitting in anything with a roof.
+        var (encLow, encMid, encHigh) = CabinEnclosure(world);
+        _audio.SetListenerEnclosure(encLow, encMid, encHigh);
         // Temperature reaches the mix as the speed of sound: c = 331.3 + 0.606·T.
         _audio.SetAirTemperature(world.Temperature);
 
@@ -961,6 +964,39 @@ public class ClientAudioSystem
     /// plausibly be near the ground at all: one more than sixty metres over the listener's head is
     /// flying, and that is settled without touching the world.
     /// </summary>
+    /// <summary>Car glass, metres. The windows are most of a cabin's area and all of its weakest
+    /// panels, so the airborne path in is theirs.</summary>
+    private const float WindowThicknessM = 0.004f;
+
+    /// <summary>
+    /// What the body of the vehicle you are sitting in takes off everything outside it, dB per band.
+    ///
+    /// The same two paths the interior engine voice uses, the other way round: the windows by their
+    /// mass (transmission falls as rho*c / (pi*f*m)), and the seals, which have no mass and let a
+    /// little of everything through. At 150 Hz a hatchback's glass passes about a hundredth of the
+    /// power; by a kilohertz the seals are most of what gets in, so the top end sits about thirty
+    /// decibels down — which is the whole of "the traffic outside sounds like it is outside".
+    /// Nothing when you are on foot, or on something with no cabin: a motorcycle keeps the street.
+    /// </summary>
+    private (float Low, float Mid, float High) CabinEnclosure(WorldSnapshot world)
+    {
+        if (!_state.IsRiding || !world.Entities.TryGetValue(_state.RidingEntityId, out var ride)) return (0f, 0f, 0f);
+        string? sid = ride.Definition.SoundEmitter.SoundId;
+        if (sid == null || !sid.StartsWith("engine:", StringComparison.OrdinalIgnoreCase)
+            || !OpenFPS.Common.MachineRegistry.Knows(sid[7..])) return (0f, 0f, 0f);
+        var body = OpenFPS.Common.MachineRegistry.VehicleFor(sid[7..]).Body;
+        if (body == null || body.CabinLengthM <= 0f) return (0f, 0f, 0f);
+
+        float mass = MathF.Max(1f, OpenFPS.Common.AcousticRegistry.GetProperties("Glass").DensityKgM3 * WindowThicknessM);
+        float seal = body.SealLeak * body.SealLeak;
+        float Loss(float hz)
+        {
+            float t = 415f / (MathF.PI * hz * mass);
+            return 10f * MathF.Log10(MathF.Min(1f, t * t + seal));
+        }
+        return (Loss(150f), Loss(1000f), Loss(4000f));
+    }
+
     private bool OnTheWheels(EntitySnapshot snap, WorldSnapshot world, Vector3 eyePos)
     {
         var p = snap.Transform.Position;
@@ -2063,8 +2099,8 @@ public class ClientAudioSystem
     public void OnOwnFootstep(Vector3 pos, string mat, string var)
     {
         if (_footTrace) Log.Information("[FOOT] step on {Mat} at {Pos}", mat, pos);
-        Vector3 offset = (pos - _state.Position) + new Vector3(0, 0.1f - 1.7f, 0);   // the foot, from the eye
-        SubmitFootstep(_state.VisualPosition + new Vector3(0, 1.7f, 0) + offset, mat, follows: true, offset: offset,
+        Vector3 offset = (pos - _state.Position) + new Vector3(0, 0.1f - _state.EyeHeight, 0);   // the foot, from the eye
+        SubmitFootstep(_state.VisualPosition + new Vector3(0, _state.EyeHeight, 0) + offset, mat, follows: true, offset: offset,
                        boostDb: OwnFootstepBoneConductionDb);
     }
 
@@ -2162,7 +2198,7 @@ public class ClientAudioSystem
     {
         if (_engineEchoes.SurfaceCount == 0) return;
 
-        Vector3 ear = _state.VisualPosition + new Vector3(0, 1.7f, 0);
+        Vector3 ear = _state.VisualPosition + new Vector3(0, _state.EyeHeight, 0);
         Span<OpenFPS.Common.Reflection> found = stackalloc OpenFPS.Common.Reflection[OpenFPS.Common.EarlyReflections.MaxArrivals];
         int n = _engineEchoes.FindReflections(stepPos, ear, AudioPhysics.SpeedOfSound, found, diffuseTaps: 1);
         if (n <= 0) return;
@@ -2286,7 +2322,7 @@ public class ClientAudioSystem
         if (_lastAcousticMap == null) return;
         var snap = _lastSnapshot ?? _acousticWorker.GetLastWorld();
         if (snap == null) return;
-        int listenerRegionId = _acoustics.GetRegionAt(snap, _state.VisualPosition + new Vector3(0, 1.7f, 0));
+        int listenerRegionId = _acoustics.GetRegionAt(snap, _state.VisualPosition + new Vector3(0, _state.EyeHeight, 0));
         if (listenerRegionId == AcousticConstants.GlobalRegionId) return;
         if (!_lastAcousticMap.Regions.TryGetValue(listenerRegionId, out var region)) return;
 
@@ -2346,8 +2382,8 @@ public class ClientAudioSystem
     public void OnOwnLand(Vector3 pos, string mat, string var)
     {
         if (_footTrace) Log.Information("[FOOT] LANDED on {Mat} at {Pos}", mat, pos);
-        Vector3 offset = (pos - _state.Position) + new Vector3(0, 0.1f - 1.7f, 0);
-        SubmitLanding(_state.VisualPosition + new Vector3(0, 1.7f, 0) + offset, mat, follows: true, offset: offset);
+        Vector3 offset = (pos - _state.Position) + new Vector3(0, 0.1f - _state.EyeHeight, 0);
+        SubmitLanding(_state.VisualPosition + new Vector3(0, _state.EyeHeight, 0) + offset, mat, follows: true, offset: offset);
     }
 
     public void OnPlayerLand(Vector3 pos, string mat, string var)
