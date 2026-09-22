@@ -630,7 +630,7 @@ public class MapManager
         // a durable entry, and only the static half survives the per-tick Clear().
         bool isDynamic = world.Has<Velocity>(entity) || world.Has<PlayerComponent>(entity);
         if (!isDynamic && world.Has<ColliderComponent>(entity))
-            data.grid.AddOverlapping(t.Position, world.Get<ColliderComponent>(entity).Size, entity, isStatic: true);
+            data.grid.AddOverlapping(t.Position, world.Get<ColliderComponent>(entity).Size, t.Rotation, entity, isStatic: true);
     }
 
     /// <summary>
@@ -676,7 +676,7 @@ public class MapManager
             // harmless while nothing but players and traffic moved — both spawned after the last
             // refresh — and stops being harmless the moment a building can drive away.
             if (data.world.Has<Velocity>(e) || data.world.Has<PlayerComponent>(e)) return;
-            data.grid.AddOverlapping(t.Position, c.Size, e, isStatic: true);
+            data.grid.AddOverlapping(t.Position, c.Size, t.Rotation, e, isStatic: true);
             gridCount++;
         });
 

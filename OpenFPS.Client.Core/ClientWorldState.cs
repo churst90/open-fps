@@ -613,7 +613,7 @@ public class ClientWorldState
         {
             if (kvp.Value.Type == EntityType.StaticObject && kvp.Value.Collider.IsSolid)
             {
-                _staticGrid.AddOverlapping(kvp.Value.Transform.Position, kvp.Value.Collider.Size, kvp.Key, isStatic: true);
+                _staticGrid.AddOverlapping(kvp.Value.Transform.Position, kvp.Value.Collider.Size, kvp.Value.Transform.Rotation, kvp.Key, isStatic: true);
             }
         }
         _gridNeedsRebuild = false;

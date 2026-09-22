@@ -214,6 +214,9 @@ public class MachineTests
         Assert.Equal(a.IntakeOffsetZ, b.IntakeOffsetZ);
         Assert.Equal(a.IntakeHeight, b.IntakeHeight);
         Assert.Equal(a.FrontAxleZ, b.FrontAxleZ);
+        Assert.Equal(a.LengthMetres, b.LengthMetres);
+        Assert.Equal(a.WidthMetres, b.WidthMetres);
+        Assert.Equal(a.HeightMetres, b.HeightMetres);
         Assert.Equal(a.RearAxleZ, b.RearAxleZ);
         Assert.Equal(a.Tyres, b.Tyres);
         Assert.Equal(a.Gearbox.Ratios, b.Gearbox.Ratios);

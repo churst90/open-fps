@@ -79,10 +79,23 @@ public class ClientPhysicsSystem
         //
         // Only a MISSING grid — the seconds between a map arriving and the first rebuild — is a
         // reason to consider everything.
+        //
+        // ...and what is near enough to walk into and MOVING. The static grid holds only static
+        // objects, so a car or a bus was never a candidate here even once the server made it solid:
+        // the client walked straight through it and the server pulled it back out, every tick, which
+        // is a rubber band rather than a car. The moving set is tens of things, not thousands, and
+        // only those within reach are kept.
         IEnumerable<EntitySnapshot> candidates;
         var gridResults = snapshot.StaticGrid?.GetItemsInRadius(_state.Position, CollisionSearchRadius);
         if (gridResults != null)
-            candidates = gridResults.Select(id => snapshot.Entities[id]);
+        {
+            float reach = CollisionSearchRadius;
+            var moving = snapshot.DynamicEntities.Where(d =>
+                d.Definition.Collider.IsSolid
+                && Vector3.Distance(d.Transform.Position, _state.Position)
+                   <= reach + d.Definition.Collider.Size.Length() * 0.5f);
+            candidates = gridResults.Select(id => snapshot.Entities[id]).Concat(moving);
+        }
         else
             candidates = snapshot.Entities.Values;
 

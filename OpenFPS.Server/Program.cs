@@ -381,7 +381,7 @@ public class GameServer
                     // 3. Refresh Spatial Grid (Dynamic items)
                     grid.Clear();
                     world.Query(new QueryDescription().WithAll<Transform, ColliderComponent>().WithAny<Velocity, PlayerComponent>(), (Entity e, ref Transform t, ref ColliderComponent c) => {
-                        grid.AddOverlapping(t.Position, c.Size, e, false);
+                        grid.AddOverlapping(t.Position, c.Size, t.Rotation, e, false);
                     });
 
                     // 4. Update Simulation (Movement/AI)

@@ -192,6 +192,19 @@ public sealed record VehicleProfile
     public float FrontAxleZ { get; init; } = 1.25f;
     public float RearAxleZ { get; init; } = -1.35f;
 
+    /// <summary>
+    /// The body's outside size, metres: bumper to bumper, mirror-less width, ground to roof.
+    ///
+    /// It is what you walk into. Every road vehicle used to be given the same 4.6 m car-shaped box
+    /// by the server whatever it was, which was harmless while that box was only a way of carrying a
+    /// vehicle into earshot — nothing was solid — and is not harmless once it is: a school bus you
+    /// can walk through the back half of is not a bus. Declared, not derived, because nothing else
+    /// on the profile knows where the bumpers are; the axles and the outlets are inside the body.
+    /// </summary>
+    public float LengthMetres { get; init; } = 4.6f;
+    public float WidthMetres { get; init; } = 1.9f;
+    public float HeightMetres { get; init; } = 1.4f;
+
     /// <summary>The preset key of the engine, for a map or a command line to name. See EngineProfile.Presets.</summary>
     public string EngineKey { get; init; } = "";
 
@@ -428,6 +441,7 @@ public sealed record VehicleProfile
     /// </summary>
     public static VehicleProfile SportBike => new()
     {
+        LengthMetres = 2.1f, WidthMetres = 0.8f, HeightMetres = 1.15f,
         Name = "Litre sports bike",
         EngineKey = "sportbike",
         Engine = EngineProfile.SportBike,
@@ -474,6 +488,7 @@ public sealed record VehicleProfile
     /// </summary>
     public static VehicleProfile Charger440 => new()
     {
+        LengthMetres = 5.3f, WidthMetres = 1.95f, HeightMetres = 1.35f,
         // Two tons of Detroit steel with a full interior: a big, well-damped body, not a race shell.
         Body = VehicleBody.Saloon,
         Name = "1969 big-block Charger, Flowmasters",
@@ -520,6 +535,7 @@ public sealed record VehicleProfile
     /// <summary>A big-block muscle car: long cam, true duals, four-speed.</summary>
     public static VehicleProfile V8Muscle => new()
     {
+        LengthMetres = 4.9f, WidthMetres = 1.9f, HeightMetres = 1.35f,
         Name = "Big-block muscle car, true duals",
         EngineKey = "v8_muscle",
         SourceLevelDb = 122f,
@@ -549,6 +565,7 @@ public sealed record VehicleProfile
 
     public static VehicleProfile Supercar => new()
     {
+        LengthMetres = 4.6f, WidthMetres = 2.0f, HeightMetres = 1.2f,
         // Small aluminium panels, a tiny cabin, and an exhaust that barely touches the shell.
         Body = VehicleBody.Supercar,
         Name = "Flat-plane V8 supercar",
@@ -563,6 +580,7 @@ public sealed record VehicleProfile
 
     public static VehicleProfile Hatchback => new()
     {
+        LengthMetres = 4.1f, WidthMetres = 1.75f, HeightMetres = 1.45f,
         Name = "1.6 hatchback",
         EngineKey = "i4_economy",
         SourceLevelDb = 94f,
@@ -575,6 +593,7 @@ public sealed record VehicleProfile
 
     public static VehicleProfile HotHatch => new()
     {
+        LengthMetres = 4.25f, WidthMetres = 1.8f, HeightMetres = 1.45f,
         Name = "2.0 hot hatch",
         EngineKey = "i4_sport",
         SourceLevelDb = 119f,
@@ -595,6 +614,7 @@ public sealed record VehicleProfile
     /// </summary>
     public static VehicleProfile TurboHatch => new()
     {
+        LengthMetres = 4.3f, WidthMetres = 1.8f, HeightMetres = 1.45f,
         Name = "2.0 turbo hatch",
         EngineKey = "i4_turbo",
         // Measured, not guessed: EngineSynthTests renders every preset and holds its declared level
@@ -610,6 +630,7 @@ public sealed record VehicleProfile
 
     public static VehicleProfile Saloon6 => new()
     {
+        LengthMetres = 4.9f, WidthMetres = 1.85f, HeightMetres = 1.45f,
         Name = "3.0 straight-six saloon",
         EngineKey = "i6",
         SourceLevelDb = 117f,
@@ -621,6 +642,7 @@ public sealed record VehicleProfile
 
     public static VehicleProfile Sedan6 => new()
     {
+        LengthMetres = 4.9f, WidthMetres = 1.85f, HeightMetres = 1.45f,
         Name = "3.5 V6 sedan",
         EngineKey = "v6",
         // 105, not 100. Measured on the live voice (`--voice-levels`): the tailpipe bench
@@ -640,6 +662,7 @@ public sealed record VehicleProfile
 
     public static VehicleProfile Cruiser => new()
     {
+        LengthMetres = 2.45f, WidthMetres = 0.95f, HeightMetres = 1.15f,
         // A motorcycle has no body and no cabin: the pipes radiate into open air.
         Body = VehicleBody.OpenWheeler,
         Name = "V-twin cruiser motorcycle",
@@ -654,6 +677,7 @@ public sealed record VehicleProfile
 
     public static VehicleProfile DirtBike => new()
     {
+        LengthMetres = 2.2f, WidthMetres = 0.85f, HeightMetres = 1.25f,
         // Likewise, and even less of it.
         Body = VehicleBody.OpenWheeler,
         Name = "450 dirt bike",
@@ -668,6 +692,7 @@ public sealed record VehicleProfile
 
     public static VehicleProfile Pickup => new()
     {
+        LengthMetres = 5.3f, WidthMetres = 1.9f, HeightMetres = 1.8f,
         // A cab and an empty steel bed, which is the most resonant thing on the road.
         EngineBayLeakage = 0.30f,   // a pickup bonnet: less deadening, bigger grille
         Body = VehicleBody.Van,
@@ -686,6 +711,7 @@ public sealed record VehicleProfile
 
     public static VehicleProfile Truck => new()
     {
+        LengthMetres = 6.4f, WidthMetres = 2.5f, HeightMetres = 3.9f,
         // Big flat undeadened panels over a big box.
         Body = VehicleBody.Van,
         Name = "13 litre semi truck",
@@ -723,6 +749,7 @@ public sealed record VehicleProfile
     /// </summary>
     public static VehicleProfile DieselPickupLoud => new()
     {
+        LengthMetres = 5.9f, WidthMetres = 2.0f, HeightMetres = 1.95f,
         EngineBayLeakage = 0.30f,   // a pickup bonnet: less deadening, bigger grille
         Body = VehicleBody.Van,
         Name = "5.9 Cummins pickup, straight pipe",
@@ -754,6 +781,7 @@ public sealed record VehicleProfile
     /// </summary>
     public static VehicleProfile SchoolBus => new()
     {
+        LengthMetres = 10.9f, WidthMetres = 2.4f, HeightMetres = 3.2f,
         Body = VehicleBody.SchoolBus,
         Name = "school bus",
         EngineKey = "diesel_bus",
@@ -819,6 +847,7 @@ public sealed record VehicleProfile
 
     public static VehicleProfile Wagon => new()
     {
+        LengthMetres = 4.7f, WidthMetres = 1.8f, HeightMetres = 1.5f,
         // A long roof and a big rear volume — a wagon booms where a saloon does not.
         Body = VehicleBody.Van,
         Name = "2.5 flat-four wagon",
@@ -854,6 +883,7 @@ public sealed record VehicleProfile
     /// </summary>
     public static VehicleProfile StockCar => new()
     {
+        LengthMetres = 5.1f, WidthMetres = 1.95f, HeightMetres = 1.3f,
         // A stripped steel shell with side exits hard against it — hollow, and loud with it.
         Body = VehicleBody.RaceSaloon,
         Name = "NASCAR Cup stock car",
@@ -883,6 +913,7 @@ public sealed record VehicleProfile
     /// </summary>
     public static VehicleProfile FormulaCar => new()
     {
+        LengthMetres = 5.3f, WidthMetres = 1.9f, HeightMetres = 0.95f,
         // No panels worth the name and nothing enclosed at all.
         Body = VehicleBody.OpenWheeler,
         Name = "V10 formula car",
@@ -931,6 +962,7 @@ public sealed record VehicleProfile
     /// </summary>
     public static VehicleProfile PoliceInterceptor => new()
     {
+        LengthMetres = 5.1f, WidthMetres = 2.0f, HeightMetres = 1.55f,
         Body = VehicleBody.Saloon,
         Name = "Police interceptor, road",
         EngineKey = "police_interceptor",
@@ -961,6 +993,7 @@ public sealed record VehicleProfile
     /// </summary>
     public static VehicleProfile PoliceCar => new()
     {
+        LengthMetres = 5.1f, WidthMetres = 2.0f, HeightMetres = 1.55f,
         // A stripped interior: no carpet, no trim, a cage and a lot of bare steel.
         Body = VehicleBody.RaceSaloon,
         Name = "Police interceptor",
@@ -984,6 +1017,7 @@ public sealed record VehicleProfile
 
     public static VehicleProfile GrandTourer => new()
     {
+        LengthMetres = 4.9f, WidthMetres = 2.0f, HeightMetres = 1.3f,
         Name = "V12 grand tourer",
         EngineKey = "v12",
         // 124 on the live voice, against 128 at the tailpipe. This one declares itself

@@ -67,6 +67,31 @@ public class SpatialGrid<T>
     /// Adds an item to every cell that overlaps with its 3D bounding box (size).
     /// This is essential for large static objects like walls that span multiple cells.
     /// </summary>
+    /// <summary>
+    /// A box that is TURNED: indexed by the square footprint that contains it.
+    ///
+    /// The plain overload takes the size as if the box were lined up with the grid, and every caller
+    /// handed it a rotated box's own local size. A bus heading east is 10.9 m along X; indexed by its
+    /// local size it was filed as 10.9 m along Z, so the cells beside its front and back never knew
+    /// it was there and a player standing at its bumper was never tested against it. A wall turned a
+    /// few degrees off the grid is wrong by less, and wrong the same way.
+    /// </summary>
+    public void AddOverlapping(Vector3 pos, Vector3 size, Quaternion rotation, T item, bool isStatic = false)
+    {
+        // An unset rotation is all zeros, not the identity, and would squash the box to a point.
+        if (rotation == Quaternion.Identity || rotation.LengthSquared() < 1e-6f)
+        { AddOverlapping(pos, size, item, isStatic); return; }
+        var half = size * 0.5f;
+        var x = Vector3.Transform(new Vector3(half.X, 0f, 0f), rotation);
+        var y = Vector3.Transform(new Vector3(0f, half.Y, 0f), rotation);
+        var z = Vector3.Transform(new Vector3(0f, 0f, half.Z), rotation);
+        var bounds = 2f * new Vector3(
+            MathF.Abs(x.X) + MathF.Abs(y.X) + MathF.Abs(z.X),
+            MathF.Abs(x.Y) + MathF.Abs(y.Y) + MathF.Abs(z.Y),
+            MathF.Abs(x.Z) + MathF.Abs(y.Z) + MathF.Abs(z.Z));
+        AddOverlapping(pos, bounds, item, isStatic);
+    }
+
     public void AddOverlapping(Vector3 pos, Vector3 size, T item, bool isStatic = false)
     {
         // Add tiny epsilon to ensure boundary-aligned objects are indexed in the edge cells

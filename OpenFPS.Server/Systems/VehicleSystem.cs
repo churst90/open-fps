@@ -147,7 +147,14 @@ public sealed class VehicleSystem
                     ? new Vector3(air!.WingspanMetres, 6f, air.LengthMetres)
                     : isMachine ? new Vector3(0.6f, 1.0f, 0.9f)
                     : isWalker ? new Vector3(0.5f, 1.8f, 0.5f)
-                    : new Vector3(1.9f, 1.4f, 4.6f);
+                    : new Vector3(profile!.WidthMetres, profile.HeightMetres, profile.LengthMetres);
+                // SOLID, so you cannot walk through it. A car, a bus, a mower: all of them. Not an
+                // aeroplane, whose box is wingspan by length and would wall off the empty air under a
+                // wing, and not a pedestrian, who steps round you rather than shoving you along the
+                // pavement. A car that drives into you pushes you out of its way — the movement
+                // solver lifts a player out of whatever they are inside — and that is all for now:
+                // being hit hurting is its own piece of work.
+                bool solid = !isAircraft && !isWalker;
 
                 // A vehicle that names a track laps it; one that does not shuttles its road.
                 RaceLine? line = null;
@@ -194,7 +201,7 @@ public sealed class VehicleSystem
                     EntityType.NPC,
                     new Transform { Position = start, Rotation = Quaternion.CreateFromYawPitchRoll(heading, 0f, 0f) },
                     new Velocity { Linear = Vector3.Zero },
-                    new ColliderComponent { Shape = ColliderShape.Box, Size = hull, IsSolid = false },
+                    new ColliderComponent { Shape = ColliderShape.Box, Size = hull, IsSolid = solid },
                     new NameComponent { Name = vd.Name ?? displayKind },
                     new IdentityComponent { Name = vd.Name ?? displayKind, Description = description },
                     new VehicleComponent { VehicleType = vd.Preset, MaxSeats = isAircraft || isMachine ? 0 : 2 },
