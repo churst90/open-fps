@@ -40,6 +40,8 @@ public class LocalPlayerState
     public int RidingEntityId { get; set; } = -1;
 
     public bool IsRiding => RidingEntityId >= 0;
+    /// <summary>Whether the seat being ridden in is the one that drives.</summary>
+    public bool RidingControls { get; set; }
     public int Health { get; set; } = 100;
     public int MaxHealth { get; set; } = 100;
     public string CurrentMaterial { get; set; } = "Generic";

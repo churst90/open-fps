@@ -23,6 +23,7 @@ public class ClientAudioSystem
     private readonly AudioEngineFacade _audio;
     private readonly SoundMappingService _sounds;
     private readonly LocalPlayerState _state;
+    private readonly DrivingAids _drivingAids;
     private readonly SpatialService _spatial; 
     private readonly SpatialAcoustics _acoustics;
 
@@ -328,6 +329,7 @@ public class ClientAudioSystem
         _audio = audio;
         _sounds = sounds;
         _state = state;
+        _drivingAids = new DrivingAids(audio);
         _spatial = new SpatialService();
         _acoustics = new SpatialAcoustics(_spatial); // Share the same SpatialService instance
         // The short sounds the world reports. Shares this system's acoustics so a rendered latch
@@ -431,6 +433,8 @@ public class ClientAudioSystem
         Vector3 listenerVelocity = _state.Velocity + feltWind * 0.1f;
         _audio.UpdateListener(visualEyePos, _state.Rotation, listenerVelocity, listenerRegionId);
         _audio.UpdateShelter(_state.ShelterFactor);
+        // The lane lines, if you are the one driving.
+        _drivingAids.Update(world, _state);
         // Temperature reaches the mix as the speed of sound: c = 331.3 + 0.606·T.
         _audio.SetAirTemperature(world.Temperature);
 

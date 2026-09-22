@@ -53,6 +53,23 @@ circuit where both edges are the same kind of danger.
 The ticks are the important one. A dashed line is already a speedometer and a lane-keeping aid; it
 only has to be made audible.
 
+### What is built (2026-09-22)
+
+A first version, working from the asphalt box under the car rather than from road data, which does
+not exist yet (`OpenFPS.Common/LaneGuide.cs`, `OpenFPS.Client.Core/DrivingAids.cs`):
+
+- **Dash ticks** from the nearest broken line, one per 12.19 m dash period (the US 10 ft / 30 ft
+  pattern), placed on the line beside you and louder the nearer it is. On a road with one lane each
+  way, the centre line ticks.
+- **Edge tones:** a low triangle (196 Hz) for the kerb and a higher sine (523 Hz) for the centre
+  line, starting a metre from the side of the car and rising as you close. Over the line, the note
+  wobbles.
+- **Driver only:** the server now tells the client whether its seat drives (`RidingControls`).
+- A road 3 m per lane, two-way from two lanes up. Junction call-outs wait for the road graph.
+
+Also built for driving: parked cars in the garage (`vehicle:<profile>` shells), steering that turns
+at the pace of hands, cab sound through the body, and buses you can board at a stop.
+
 ### Aircraft
 
 Real aviation already has audio guidance, and it is the right thing to copy rather than invent:

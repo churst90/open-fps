@@ -192,7 +192,7 @@ public class GameServer
         // the acoustic scene, the spatial grid and the broadcast radius all have to account for.
         _composites = new CompositeService(_maps, prefabRepo, new CompositeRepository("composites"));
         _composites.PlaceRecorded(_maps);
-        _vehicles.Spawn(_maps);
+        _vehicles.Spawn(_maps, _composites);
         _rail.Spawn(_maps);
         _crossings = new CrossingSystem(_rail, SyncAudioComponent);
         // After the rail: a crossing derives its geometry from the lines the trains are on, so
@@ -652,14 +652,17 @@ public class GameServer
                     // its position is its own to predict, or a seat's to decide.
                     int riding = world.Has<OccupantComponent>(session.Entity)
                         ? world.Get<OccupantComponent>(session.Entity).RootEntityId : -1;
+                    bool driving = riding >= 0 && world.Get<OccupantComponent>(session.Entity).Controls;
 
                     _reusableBroadcast.Tick = tick;
                     _reusableBroadcast.LastProcessedSequenceId = session.LastProcessedSequenceId;
                     _reusableBroadcast.RidingEntityId = riding;
+                    _reusableBroadcast.RidingControls = driving;
                     _reusableBroadcast.States.Clear();
                     _reliableBroadcast.Tick = tick;
                     _reliableBroadcast.LastProcessedSequenceId = session.LastProcessedSequenceId;
                     _reliableBroadcast.RidingEntityId = riding;
+                    _reliableBroadcast.RidingControls = driving;
                     _reliableBroadcast.States.Clear();
                     _visibleBuffer.Clear();
                     _visibleDynamicBuffer.Clear();

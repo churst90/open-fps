@@ -717,6 +717,7 @@ public sealed class ClientGameSession : IDisposable
             case ServerStateUpdate update:
                 _world.SyncState(update);
                 NoteRiding(update.RidingEntityId);
+                _state.RidingControls = update.RidingEntityId >= 0 && update.RidingControls;
                 foreach (var s in update.States)
                     if (s.EntityId == _ownEntityId)
                         if (_reconciler.ApplyServerCorrection(s, update.LastProcessedSequenceId, _world.GetSnapshot()))
