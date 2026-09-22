@@ -129,6 +129,28 @@ public sealed record VehicleBody
     public float CabinLeak { get; init; } = 0.15f;
 
     /// <summary>
+    /// What gets IN round the doors and through the vents, as a fraction of the pressure outside —
+    /// the path the panels' mass law does not cover.
+    ///
+    /// A panel stops high frequencies by being heavy, and stops them very well: by two kilohertz a
+    /// steel door is forty decibels down. What is left inside a real car at that height comes through
+    /// the seals, the ventilation and the gaps round the glass, and it is broadband because a hole
+    /// has no mass. 0.03 is thirty decibels, which is a well-sealed saloon; a bus with folding doors
+    /// and a rattling old truck leak more, a stripped race car with no seals more still.
+    /// </summary>
+    public float SealLeak { get; init; } = 0.03f;
+
+    /// <summary>
+    /// Wind noise inside at 110 km/h, dB SPL — the one anchor the aero noise is hung off.
+    ///
+    /// It is turbulence over the mirrors, the pillars and the seals, and its power goes as the SIXTH
+    /// power of speed (a dipole source, like the tyres' tread), so it is nothing in town and most of
+    /// the sound at motorway speed. 64 dB is a quiet modern saloon at 110; a boxy van or a bus with
+    /// its windows open is louder, and the number is where that difference lives.
+    /// </summary>
+    public float WindNoiseDbAt110 { get; init; } = 64f;
+
+    /// <summary>
     /// How many modes to actually run, loudest first.
     ///
     /// A real body has thousands. The ones that carry the character are the low, strongly-driven
@@ -309,6 +331,7 @@ public sealed record VehicleBody
     /// back of one booms and rattles at anything.</summary>
     public static VehicleBody Van => new()
     {
+        SealLeak = 0.05f, WindNoiseDbAt110 = 68f,
         PanelThicknessM = 0.0010f,
         // Long flat sides with very few beads in them — the widest free spans on the road.
         PanelSpansM = new[] { 0.40f, 0.33f, 0.26f, 0.20f, 0.15f },
@@ -344,6 +367,7 @@ public sealed record VehicleBody
     /// </summary>
     public static VehicleBody SchoolBus => new()
     {
+        SealLeak = 0.08f, WindNoiseDbAt110 = 70f,
         PanelThicknessM = 0.0011f,
         // Ribs about two feet apart over a very long flat flank.
         PanelSpansM = new[] { 0.62f, 0.52f, 0.44f, 0.34f, 0.24f },
@@ -368,6 +392,7 @@ public sealed record VehicleBody
     /// the side right against it. Loud, and audibly hollow.</summary>
     public static VehicleBody RaceSaloon => new()
     {
+        SealLeak = 0.2f, WindNoiseDbAt110 = 74f,
         PanelThicknessM = 0.0009f,
         // Replacement panels with less pressed into them than the road car's had.
         PanelSpansM = new[] { 0.40f, 0.32f, 0.25f, 0.19f },

@@ -2119,6 +2119,7 @@ public class FmodAudioProvider : IAudioProvider
             {
                 TargetSpeed = emitter.EngineSpeed,
                 Running = emitter.EngineRunning,
+                Interior = emitter.Interior,
             };
             // The car is already doing this speed; start the engine in that state rather than
             // spinning it up from rest inside the first eighty milliseconds.
@@ -2469,6 +2470,7 @@ public class FmodAudioProvider : IAudioProvider
                 else if (emitter.IsSynth && active.EngineState != null)
                 {
                     active.EngineState.TargetSpeed = emitter.EngineSpeed;
+                    active.EngineState.Interior = emitter.Interior;
                     active.EngineState.Running = emitter.EngineRunning;
                     active.EngineState.RoadSlip = emitter.TyreSlip;
                     if (ListenerInMachineFrame(emitter.Position, emitter.Direction, emitter.Velocity, out var local))
@@ -2524,6 +2526,10 @@ public class FmodAudioProvider : IAudioProvider
             if (!_activeById.TryGetValue(entityId, out var voices)) return;
             foreach (var active in voices) 
             {
+                // The car you are sitting in: its voice already rendered what gets through the body,
+                // and a path traced from outside to your ear through that same body would take it
+                // away a second time. It keeps the listener's own room, which is the cabin.
+                if (active.EngineState is { Interior: true }) continue;
                 active.TargetOcclusion = path.Occlusion;
                 active.ApparentPosition = path.ApparentPosition;
                 active.EffectiveDistance = path.EffectiveDistance;

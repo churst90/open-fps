@@ -235,6 +235,8 @@ public class MachineTests
         Assert.Equal(a.Body?.CabinHeightM, b.Body?.CabinHeightM);
         Assert.Equal(a.Body?.CabinAbsorption, b.Body?.CabinAbsorption);
         Assert.Equal(a.Body?.CabinLeak, b.Body?.CabinLeak);
+        Assert.Equal(a.Body?.SealLeak, b.Body?.SealLeak);
+        Assert.Equal(a.Body?.WindNoiseDbAt110, b.Body?.WindNoiseDbAt110);
         Assert.Equal(a.Body?.SealedBox, b.Body?.SealedBox);
         Assert.Equal(a.Body?.MaxModes, b.Body?.MaxModes);
         Assert.True(true, key);

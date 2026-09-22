@@ -127,6 +127,10 @@ public struct SpatialEmitter
     /// borrowed voices hanging off it.
     /// </summary>
     public string PhysicalKey = "";
+
+    /// <summary>Whether the listener is sitting in this vehicle, so its engine voice renders what
+    /// gets through the body rather than what radiates from it. See EngineVoiceState.Interior.</summary>
+    public bool Interior;
     /// <summary>
     /// The power lever of anything that has one, 0..1 — an aircraft.
     ///

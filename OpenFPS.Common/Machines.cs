@@ -369,6 +369,8 @@ public static class MachineRegistry
                 CabinHeightM = bodyPart.Get("cabinHeight", body.CabinHeightM),
                 CabinAbsorption = bodyPart.Get("cabinAbsorption", body.CabinAbsorption),
                 CabinLeak = bodyPart.Get("cabinLeak", body.CabinLeak),
+                SealLeak = bodyPart.Get("sealLeak", body.SealLeak),
+                WindNoiseDbAt110 = bodyPart.Get("windNoiseDbAt110", body.WindNoiseDbAt110),
                 SealedBox = bodyPart.Get("sealedBox", body.SealedBox ? 1f : 0f) > 0.5f,
                 MaxModes = bodyPart.Get("maxModes", body.MaxModes),
             };
@@ -486,6 +488,8 @@ public static class MachineRegistry
                         ["cabinHeight"] = v.Body.CabinHeightM,
                         ["cabinAbsorption"] = v.Body.CabinAbsorption,
                         ["cabinLeak"] = v.Body.CabinLeak,
+                        ["sealLeak"] = v.Body.SealLeak,
+                        ["windNoiseDbAt110"] = v.Body.WindNoiseDbAt110,
                         ["sealedBox"] = v.Body.SealedBox ? 1f : 0f,
                         ["maxModes"] = v.Body.MaxModes,
                     },

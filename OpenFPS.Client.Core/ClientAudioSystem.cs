@@ -1118,6 +1118,8 @@ public class ClientAudioSystem
             float key = _liveEngines.Contains(entityId) ? d2 * (EngineKeepBias * EngineKeepBias) : d2;
             if (_engineStarted.TryGetValue(entityId, out double began) && now - began < EngineMinimumHoldSeconds)
                 key = -1f;
+            // The one you are sitting in is never ranked out: it is the loudest thing in your world.
+            if (entityId == _state.RidingEntityId) key = float.NegativeInfinity;
             _engineDistances.Add((entityId, key, d2));
         }
         _engineDistances.Sort((a, b) => a.Key.CompareTo(b.Key));
@@ -1308,6 +1310,8 @@ public class ClientAudioSystem
         foreach (var (id, _, d2) in _engineDistances)
         {
             if (!_liveEngines.Contains(id)) continue;
+            // From inside, the two ends of the car are not two sources: both come through the body.
+            if (id == _state.RidingEntityId) continue;
             if (!_carPreset.TryGetValue(id, out string? preset)) continue;
             float separation = OutletSeparation(preset);
             if (separation <= 0f) continue;
@@ -1670,6 +1674,7 @@ public class ClientAudioSystem
         }
 
         string resolvedSoundId = "";
+        bool interior = false;
         string engineKey = "";
         string physicalKey = "";
         float powerLever = 1f, rotorWake = 0f;
@@ -1779,6 +1784,20 @@ public class ClientAudioSystem
                 if (_frontVoiced.Contains(snap.Id))
                     emitterPosition = snap.Transform.Position
                                     + Vector3.Transform(ExhaustSlot(profile), snap.Transform.Rotation);
+
+                // ...unless you are SITTING in it. Then there is no distance and no direction to
+                // speak of: the whole machine arrives through the floor and the firewall, a little
+                // ahead of you and below, and the voice renders what gets through the body
+                // (EngineVoiceState.Interior). Its level is already pressure at the ear, so it is
+                // placed unwidened and played at the gain its reference distance would have had.
+                if (snap.Id == _state.RidingEntityId)
+                {
+                    interior = true;
+                    var (g0, r0) = OpenFPS.Common.Loudness.Place(level);
+                    engineVolume = MathF.Min(1f, g0 * r0) * def.SoundEmitter.Volume;
+                    engineMinDistance = 1f;
+                    engineExtent = 0f;
+                }
             }
         }
         else
@@ -1807,10 +1826,12 @@ public class ClientAudioSystem
             Position = emitterPosition,
             ApparentPosition = engineKey.Length > 0 || physicalKey.Length > 0
                              ? emitterPosition : acousticPath.ApparentPosition,
-            EffectiveDistance = acousticPath.EffectiveDistance,
-            Occlusion = acousticPath.Occlusion,
-            ApertureFactor = acousticPath.ApertureFactor,
-            TransmissionBleed = acousticPath.TransmissionBleed,
+            // Inside, the body IS the occluder, and the voice has already rendered what gets through
+            // it — the acoustic path would count the same panels twice.
+            EffectiveDistance = interior ? 0.7f : acousticPath.EffectiveDistance,
+            Occlusion = interior ? 0f : acousticPath.Occlusion,
+            ApertureFactor = interior ? 1f : acousticPath.ApertureFactor,
+            TransmissionBleed = interior ? 0f : acousticPath.TransmissionBleed,
             Velocity = snap.Velocity,
             PositionSampledAt = world.PositionsSampledAt,
             // The emitter aims along its own LOCAL direction, rotated into the world by the entity's
@@ -1826,7 +1847,8 @@ public class ClientAudioSystem
             Pitch = 1.0f,
             Type = EmitterType.EntityAttached,
             IsReflection = false,
-            TargetRegionId = acousticPath.RegionId,
+            // Inside, its room is yours — the cabin — whatever room the car's middle is in.
+            TargetRegionId = interior ? _listenerRegion : acousticPath.RegionId,
             EnableReverb = true,
             ConeInside = def.SoundEmitter.ConeInsideAngle,
             ConeOutside = def.SoundEmitter.ConeOutsideAngle,
@@ -1834,6 +1856,11 @@ public class ClientAudioSystem
             MinDistance = engineMinDistance,
             ExtentMetres = engineExtent,
             EngineKey = engineKey,
+            Interior = interior,
+            // Inside, the voice rides with your head, just ahead and below: where the firewall and
+            // the floor are. Turned with the car, so the engine stays in front of you through a corner.
+            FollowsListener = interior,
+            ListenerOffset = interior ? Vector3.Transform(new Vector3(0f, -0.4f, 0.6f), snap.Transform.Rotation) : Vector3.Zero,
             PhysicalKey = physicalKey,
             PowerLever = powerLever,
             RotorWake = rotorWake,

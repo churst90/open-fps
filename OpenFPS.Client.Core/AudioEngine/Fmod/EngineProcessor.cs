@@ -463,6 +463,17 @@ public sealed class EngineVoiceState : IRenderedVoice
         Driver = new VirtualDriver(Driveline, Engine);
         _rng = new Random(seed);
         _body = new BodyResonator(v.Body ?? VehicleBody.None, sampleRate);
+
+        // The inside: the cabin's own modes at full weight and nothing else — the panels' ringing is
+        // already in the outside body, and it is the AIR in the box that booms at the driver.
+        var shell = v.Body ?? VehicleBody.None;
+        _cabin = new BodyResonator(shell with { PanelSpansM = Array.Empty<float>(), CabinLeak = 1f, Coupling = 1f },
+                                   sampleRate);
+        var steel = AcousticRegistry.GetProperties(shell.PanelMaterial);
+        float surfaceMass = MathF.Max(0.5f, steel.DensityKgM3 * shell.PanelThicknessM);   // kg/m^2
+        _panelCorner = 415f / (MathF.PI * surfaceMass);                                   // rho*c / (pi*m)
+        _sealLeak = Math.Clamp(shell.SealLeak, 0f, 1f);
+        _windPaAt110 = 20e-6f * MathF.Pow(10f, shell.WindNoiseDbAt110 / 20f);
         if (!string.IsNullOrEmpty(v.AirSystem))
         {
             try { _air = new AirSystem(ModelLibrary.Air(v.AirSystem), sampleRate, seed + 17); }
@@ -486,6 +497,42 @@ public sealed class EngineVoiceState : IRenderedVoice
     /// <summary>The cooling fan's contribution, 0..1 — normally one. Writable so an instrument can
     /// mute it and read what it is worth, the same way the bay leak can be.</summary>
     public float FanMix = 1f;
+
+    // ── Sitting in it ───────────────────────────────────────────────────────────────────────────
+    //
+    // The same engine, heard from the driver's seat instead of the pavement. Nothing new is
+    // SYNTHESISED for it: the machine is the machine. What changes is the path — every source now
+    // reaches the ear through the body rather than round it — and that path is three mechanisms,
+    // each already declared on the vehicle:
+    //
+    //   * the PANELS, by their mass. A plate's transmission falls 6 dB an octave above
+    //     rho*c / (pi*m) (the mass law); for a 0.8 mm steel door that corner is about 20 Hz, so the
+    //     firing note gets through and the rasp does not. A first-order low-pass at that corner IS
+    //     the mass law, not an approximation of it.
+    //   * the SEALS, which have no mass and let everything through a little (VehicleBody.SealLeak).
+    //   * the CABIN, a small box of air whose axial modes boom — the same modes the outside voice
+    //     carries at CabinLeak, here at full weight, which is what that field's comment always said
+    //     an interior mix would do.
+    //
+    // Plus the one source you only hear from inside because outside it is lost under everything
+    // else: the wind over the body, whose power goes as the sixth power of speed.
+
+    /// <summary>
+    /// Whether the listener is sitting in this vehicle. Set from the game thread; read per block.
+    /// </summary>
+    public bool Interior
+    {
+        get => Volatile.Read(ref _interior) != 0;
+        set => Volatile.Write(ref _interior, value ? 1 : 0);
+    }
+    private int _interior;
+
+    private readonly BodyResonator _cabin;
+    private readonly float _panelCorner, _sealLeak, _windPaAt110;
+    private float _panelLp, _windLp, _windHp, _windHpIn, _interiorMix;
+
+    /// <summary>The speed the wind anchor is quoted at, m/s: 110 km/h.</summary>
+    private const float WindReferenceSpeed = 110f / 3.6f;
 
     /// <summary>How much of the car's own body ringing reaches the mix, 0..1. One normally;
     /// writable so an instrument can mute it and read what the panels are worth.</summary>
@@ -664,8 +711,15 @@ public sealed class EngineVoiceState : IRenderedVoice
         float envTarget = TargetEnvelope;
         int mask = _ring.Length - 1;
         long w = _written;
-        if (_listenerKnown)
+        bool inside = Interior;
+        // Inside, the listener is AT the machine, and the outside-listener geometry (which tailpipe
+        // is nearer, which way the fan blows) has nothing to say about a sound that comes through
+        // the floor.
+        if (_listenerKnown && !inside)
             Engine.SetListener(new Vector3(Volatile.Read(ref _listenerX), Volatile.Read(ref _listenerY), Volatile.Read(ref _listenerZ)));
+        float panelA = 1f - MathF.Exp(-2f * MathF.PI * _panelCorner * dt);
+        float windLpA = 1f - MathF.Exp(-2f * MathF.PI * 1200f * dt);
+        float windHpA = MathF.Exp(-2f * MathF.PI * 180f * dt);
         for (int i = 0; i < count; i++)
         {
             // Smooth the network's speed steps over about 80 ms.
@@ -738,6 +792,33 @@ public sealed class EngineVoiceState : IRenderedVoice
                 pa += _air.Step();
             }
             if (_chime != null) pa += StepChime();
+
+            // Crossfaded over ~60 ms rather than switched, so getting in or out is not a click.
+            _interiorMix += Math.Clamp((inside ? 1f : 0f) - _interiorMix, -envStep, envStep);
+            if (_interiorMix > 0f)
+            {
+                // What arrives at the outside of the cabin: the engine bay just ahead of the
+                // firewall, the exhaust along the floor to a tailpipe a couple of metres back, and
+                // all four tyres under the floor.
+                float atPanels = Engine.Block + Engine.Intake + 0.5f * Engine.Exhaust + tyre * 0.6f * TyreMix;
+                _panelLp += (atPanels - _panelLp) * panelA;
+                float inCabin = _panelLp + _sealLeak * atPanels;
+                inCabin += _cabin.Process(inCabin);
+
+                // The wind: broadband turbulence, most of it between a couple of hundred hertz and a
+                // kilohertz by the time it is through the glass. Pressure goes as speed cubed.
+                float vRatio = MathF.Abs(Driveline.Speed) / WindReferenceSpeed;
+                float windPa = _windPaAt110 * vRatio * vRatio * vRatio;
+                float n = (float)(_rng.NextDouble() * 2.0 - 1.0) * 1.7f;     // ~unit RMS
+                _windLp += (n - _windLp) * windLpA;
+                _windHp = windHpA * (_windHp + _windLp - _windHpIn);
+                _windHpIn = _windLp;
+                inCabin += _windHp * windPa * 3.78f;         // the band-limited noise is 0.265 RMS; this is its inverse
+
+                float k = _interiorMix;
+                pa = pa * (1f - k) + inCabin * k;
+                front *= 1f - k;
+            }
 
             _envelope += Math.Clamp(envTarget - _envelope, -envStep, envStep);
             // Written WITHOUT the soft ceiling, which now belongs to whoever sums the taps back up:
