@@ -404,6 +404,25 @@ public class CompositeService
     }
 
     /// <summary>
+    /// A composite by name: one saved to disk, or a vehicle built from its profile
+    /// ("vehicle:i4_economy" — see <see cref="VehicleShell"/>). A saved file of the same name wins,
+    /// so a map can still carry a hand-built car under that id if somebody wants one.
+    /// </summary>
+    public bool TryGetTemplate(string id, out CompositeTemplate template)
+    {
+        if (_composites.TryGet(id, out template)) return true;
+        if (VehicleShell.TryParse(id, out string preset))
+        {
+            template = VehicleShell.Build(preset, prefab =>
+                _prefabs.Prefabs.TryGetValue(prefab.ToLowerInvariant(), out var t) && t.ColliderSize.HasValue
+                    ? t.ColliderSize.Value : Vector3.One);
+            return true;
+        }
+        template = null!;
+        return false;
+    }
+
+    /// <summary>
     /// Puts a saved composite into the world, and records that it is there.
     ///
     /// The recording is the important half. An instance that exists only in memory is a house until
@@ -414,7 +433,7 @@ public class CompositeService
                      string owner, out int partCount, out string error)
     {
         partCount = 0; error = "";
-        if (!_composites.TryGet(templateId, out var template)) { error = $"no composite called '{templateId}'"; return -1; }
+        if (!TryGetTemplate(templateId, out var template)) { error = $"no composite called '{templateId}'"; return -1; }
         if (!_maps.TryGetMap(mapId, out var world, out _, out _, out _)) { error = "map not loaded"; return -1; }
 
         int rootId = Instantiate(mapId, template, position, rotation, owner, out partCount);
@@ -446,7 +465,7 @@ public class CompositeService
             int placed = 0, failed = 0;
             foreach (var p in data.Composites)
             {
-                if (!_composites.TryGet(p.TemplateId, out var template))
+                if (!TryGetTemplate(p.TemplateId, out var template))
                 {
                     Log.Error("Map '{Map}' places composite '{Id}', which does not exist. That building "
                             + "will be missing from the world.", mapId, p.TemplateId);

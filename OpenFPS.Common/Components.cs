@@ -539,6 +539,15 @@ public partial struct DriveComponent
     public float Heading { get; set; }
     /// <summary>Seconds since the driver last said anything. Held controls decay once this grows.</summary>
     public float ControlAge { get; set; }
+    /// <summary>
+    /// Where the driver's hands are asking the wheel to go, -1..1. <see cref="Steer"/> follows it at
+    /// the speed a pair of hands turns a wheel, so a key is a hand on the wheel rather than a switch
+    /// that throws it to full lock and back.
+    /// </summary>
+    public float SteerTarget { get; set; }
+    /// <summary>How much of the tyres' grip this tick asked for, before the friction circle cut it
+    /// back; over 1 is sliding. The same number traffic reports, and what the client squeals on.</summary>
+    public float TyreDemand { get; set; }
     public DriveComponent() { Preset = ""; }
 }
 

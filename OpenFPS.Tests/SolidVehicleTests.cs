@@ -101,6 +101,23 @@ public class SolidVehicleTests
         Assert.True(aircraft > 0 && walkers > 0, $"found {aircraft} aircraft and {walkers} walkers to check");
     }
 
+    /// <summary>The city parks four cars in the garage, and every one of them can be driven.</summary>
+    [Fact]
+    public void TheGarageHasCarsYouCanDrive()
+    {
+        var prefabs = new PrefabRepository(Path.Combine(AppContext.BaseDirectory, "prefabs"));
+        var manager = new MapManager(new MapRepository(Path.Combine(AppContext.BaseDirectory, "maps")), prefabs);
+        manager.Initialize();
+        var composites = new CompositeService(manager, prefabs,
+            new CompositeRepository(Path.Combine(Path.GetTempPath(), "openfps-no-composites-" + Guid.NewGuid())));
+        composites.PlaceRecorded(manager);
+        Assert.True(manager.TryGetMap("city", out World world, out _, out _, out _));
+        int drivable = 0;
+        world.Query(new QueryDescription().WithAll<DriveComponent, OccupancyComponent>(),
+            (ref DriveComponent d, ref OccupancyComponent o) => { if (o.Seats.Exists(s => s.Controls)) drivable++; });
+        Assert.Equal(4, drivable);
+    }
+
     private static bool TouchesOnly(World world, SpatialGrid<Entity> grid, Entity target, Vector3 feet)
     {
         // The server's own search radius, so a grid that files the bus in the wrong cells fails here the

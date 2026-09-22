@@ -585,11 +585,14 @@ public sealed class ClientGameSession : IDisposable
         // is consumed by the same drain, so it is paid exactly once however the two rates line up.
         bool Pressed(GameKey k) => held.Contains(k) || justPressed.Contains(k);
 
+        // The arrow keys are the same four, for anyone whose hand goes there first — which is most
+        // people the moment they are behind a wheel. Held together with WASD they do not add up to a
+        // double step: each direction counts once.
         Vector3 move = Vector3.Zero;
-        if (Pressed(GameKey.W)) move.Z += 1;
-        if (Pressed(GameKey.S)) move.Z -= 1;
-        if (Pressed(GameKey.A)) move.X -= 1;
-        if (Pressed(GameKey.D)) move.X += 1;
+        if (Pressed(GameKey.W) || Pressed(GameKey.Up)) move.Z += 1;
+        if (Pressed(GameKey.S) || Pressed(GameKey.Down)) move.Z -= 1;
+        if (Pressed(GameKey.A) || Pressed(GameKey.Left)) move.X -= 1;
+        if (Pressed(GameKey.D) || Pressed(GameKey.Right)) move.X += 1;
         if (move != Vector3.Zero) input.MoveDirection = Vector3.Normalize(move);
 
         if (held.Contains(GameKey.Space)) input.Jump = true;

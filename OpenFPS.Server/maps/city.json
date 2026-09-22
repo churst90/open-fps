@@ -89790,5 +89790,67 @@
    "ClearMetres": 35.0,
    "Bell": "crossing_gong"
   }
+ ],
+ "Composites": [
+  {
+   "TemplateId": "vehicle:i4_economy",
+   "Position": {
+    "X": -16.0,
+    "Y": 0.25,
+    "Z": 29.0
+   },
+   "Rotation": {
+    "X": 0,
+    "Y": 0.707107,
+    "Z": 0,
+    "W": 0.707107
+   },
+   "Owner": ""
+  },
+  {
+   "TemplateId": "vehicle:v6",
+   "Position": {
+    "X": -16.0,
+    "Y": 0.25,
+    "Z": 35.0
+   },
+   "Rotation": {
+    "X": 0,
+    "Y": 0.707107,
+    "Z": 0,
+    "W": 0.707107
+   },
+   "Owner": ""
+  },
+  {
+   "TemplateId": "vehicle:diesel_i4",
+   "Position": {
+    "X": -16.0,
+    "Y": 0.25,
+    "Z": 41.0
+   },
+   "Rotation": {
+    "X": 0,
+    "Y": 0.707107,
+    "Z": 0,
+    "W": 0.707107
+   },
+   "Owner": ""
+  },
+  {
+   "TemplateId": "vehicle:v8_muscle",
+   "Position": {
+    "X": -16.0,
+    "Y": 0.25,
+    "Z": 47.0
+   },
+   "Rotation": {
+    "X": 0,
+    "Y": 0.707107,
+    "Z": 0,
+    "W": 0.707107
+   },
+   "Owner": ""
+  }
  ]
 }

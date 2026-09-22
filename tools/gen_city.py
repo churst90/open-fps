@@ -1251,6 +1251,16 @@ VEHICLES.append({
     "WaitSeconds": 2.0, "StartDelaySeconds": 3.0,
 })
 
+# ── Parked cars you can get into ──────────────────────────────────────────────────────────────────
+#
+# On the ground deck of the garage, nose out between the street-side piers, so pulling away is
+# straight onto the pavement and Main Street. Each is "vehicle:<profile>": the server builds the shell
+# from the profile (VehicleShell) rather than from a file, so a car here cannot drift from the car.
+PARKED = []
+for preset, z in (("i4_economy", 29.0), ("v6", 35.0), ("diesel_i4", 41.0), ("v8_muscle", 47.0)):
+    PARKED.append({"TemplateId": "vehicle:" + preset, "Position": v3(GAR_X1 - 4.5, SLAB, z),
+                   "Rotation": {"X": 0, "Y": 0.707107, "Z": 0, "W": 0.707107}, "Owner": ""})
+
 # ── People ────────────────────────────────────────────────────────────────────────────────────
 #
 # Somebody walking is heard by their footsteps, which the client makes from the body's own
@@ -1392,6 +1402,7 @@ map_data = {
     "Tracks": TRACKS,
     "Vehicles": VEHICLES,
     "Trains": TRAINS,
+    "Composites": PARKED,
     "Entities": entities,
 }
 

@@ -693,6 +693,10 @@ public class GameServer
                         // as sliding. See EntityState.TyreDemand.
                         if (_vehicles.TryGetTyreDemand(e.Id, out float tyreDemand))
                             state.TyreDemand = NetworkEntityState.EncodeTyreDemand(tyreDemand);
+                        // ...and a car somebody is driving, which is not traffic and was never asked:
+                        // its tyres never squealed, however hard it was thrown into a corner.
+                        else if (world.Has<DriveComponent>(e))
+                            state.TyreDemand = NetworkEntityState.EncodeTyreDemand(world.Get<DriveComponent>(e).TyreDemand);
                         if (world.Has<BeaconComponent>(e))
                         {
                             var beacon = world.Get<BeaconComponent>(e);

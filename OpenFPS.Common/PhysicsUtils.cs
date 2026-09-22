@@ -30,6 +30,17 @@ public static class PhysicsUtils
     /// instead and pay for it only when the answer can actually have changed.
     /// </summary>
     public static float GetGroundHeight(World world, SpatialGrid<Entity> grid, Vector3 pos, out string material)
+        => GetGroundHeight(world, grid, pos, null, out material);
+
+    /// <summary>
+    /// The ground under a point, not counting <paramref name="ignore"/>.
+    ///
+    /// A driven vehicle asks where the road is under it, and its own floor is standing right there,
+    /// a quarter of a metre up and inside the step height. Counted, it is "ground": the car steps up
+    /// onto its own floor, and does it again the next tick from there, and climbs out of the world.
+    /// </summary>
+    public static float GetGroundHeight(World world, SpatialGrid<Entity> grid, Vector3 pos,
+                                        ICollection<Entity>? ignore, out string material)
     {
         const float stepHeight = 0.4f;
 
@@ -39,6 +50,7 @@ public static class PhysicsUtils
         var candidates = _entityScratch ??= new List<Entity>(64);
         var seen = _entitySeen ??= new HashSet<Entity>();
         grid.CollectInRadius(pos, 50.0f, candidates, seen);
+        if (ignore != null && ignore.Count > 0) candidates.RemoveAll(ignore.Contains);
 
         float ground = CalculateHeightFromCandidates(world, candidates, pos, stepHeight, out material);
 
@@ -49,7 +61,7 @@ public static class PhysicsUtils
         {
             var allStatic = new List<Entity>();
             world.Query(new QueryDescription().WithAll<Transform, ColliderComponent>(), (Entity e) => {
-                allStatic.Add(e);
+                if (ignore == null || !ignore.Contains(e)) allStatic.Add(e);
             });
             ground = CalculateHeightFromCandidates(world, allStatic, pos, stepHeight, out material);
         }

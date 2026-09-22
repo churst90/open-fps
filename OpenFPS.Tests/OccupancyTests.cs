@@ -513,6 +513,126 @@ public class OccupancyTests : IDisposable
         Assert.False(f.World.Get<OccupantComponent>(owner.Entity).Controls);
     }
 
+    // ── A car that was parked, not built ────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// "vehicle:i4_economy" is a hatchback built from its profile: a closed cabin that grows a room,
+    /// four seats with the driver's first, and an engine. Nobody wrote a file for it.
+    /// </summary>
+    [Fact]
+    public void AParkedCarIsBuiltFromItsProfile()
+    {
+        var f = new Fixture(_dir);
+        int root = f.Composites.Place(f.MapId, "vehicle:i4_economy", new Vector3(20, 0, 20), Quaternion.Identity,
+                                      "", out int parts, out string error);
+        Assert.True(root >= 0, error);
+        var e = f.Entity(root);
+        Assert.True(f.World.Has<DriveComponent>(e), "it does not drive");
+        var seats = f.World.Get<OccupancyComponent>(e).Seats;
+        Assert.Equal(4, seats.Count);
+        Assert.True(seats[0].Controls);
+        Assert.True(parts >= 9, $"only {parts} parts");
+
+        // The cabin is a room — which is the whole of what makes sitting in it sound like a car.
+        bool room = CompositeService.MembersOf(f.World, root).Exists(m => f.World.Has<RegionComponent>(m));
+        Assert.True(room, "the cabin did not enclose a room");
+    }
+
+    /// <summary>
+    /// Get in, hold W for three seconds: it goes, forwards, and stays on the road. The last half is
+    /// the one that matters — a car asking where the ground is used to find its own floor inside the
+    /// step height and climb onto it, every tick.
+    /// </summary>
+    [Fact]
+    public void AParkedCarDrivesAwayWithoutClimbingItsOwnFloor()
+    {
+        var f = new Fixture(_dir);
+        int root = f.Composites.Place(f.MapId, "vehicle:i4_economy", new Vector3(20, 0, 20), Quaternion.Identity,
+                                      "", out _, out string error);
+        Assert.True(root >= 0, error);
+        float startY = f.RootTransform(root).Position.Y;
+        var driver = f.Player("driver_one", new Vector3(19, 0, 20));
+        Assert.True(f.Seats.Enter(driver, root, null, out string message), message);
+        Assert.True(f.World.Get<OccupantComponent>(driver.Entity).Controls);
+
+        f.Hold(driver, forward: 1f);
+        f.Tick(90);
+        var at = f.RootTransform(root).Position;
+        Assert.True(at.Z - 20f > 3f, $"it moved {at.Z - 20f:F1} m forward in three seconds of full throttle");
+        Assert.True(MathF.Abs(at.Y - startY) < 0.1f, $"it rose from {startY:F2} to {at.Y:F2} — standing on its own floor");
+    }
+
+    /// <summary>
+    /// A tap on a steering key is a small correction, not a jolt of full lock; holding it tightens
+    /// the turn steadily; and letting go straightens up. Taps are how a lot of people steer.
+    /// </summary>
+    [Fact]
+    public void SteeringIsAHandOnTheWheelNotASwitch()
+    {
+        var f = new Fixture(_dir);
+        int root = f.Composites.Place(f.MapId, "vehicle:i4_economy", new Vector3(20, 0, 20), Quaternion.Identity,
+                                      "", out _, out string error);
+        Assert.True(root >= 0, error);
+        var driver = f.Player("driver_one", new Vector3(19, 0, 20));
+        Assert.True(f.Seats.Enter(driver, root, null, out string message), message);
+        float Steer() => f.World.Get<DriveComponent>(f.Entity(root)).Steer;
+
+        f.Hold(driver, lateral: 1f);
+        f.Tick(3);                                   // a tap: about a tenth of a second
+        float tap = Steer();
+        f.Tick(27);                                  // held for a second in all
+        float held = Steer();
+        f.Hold(driver);
+        f.Tick(20);                                  // let go for two thirds of a second
+        float released = Steer();
+
+        Assert.InRange(tap, 0.02f, 0.2f);
+        Assert.True(held > 0.9f, $"a second of holding turned the wheel to {held:F2} of lock");
+        Assert.True(MathF.Abs(released) < 0.05f, $"let go, the wheel stayed at {released:F2}");
+    }
+
+    /// <summary>
+    /// At speed, full lock on the keys is not full lock at the wheels: it is as far as the tyres can
+    /// hold, and a little more. Otherwise holding a key at seventy is a spin.
+    /// </summary>
+    [Fact]
+    public void FullLockAtSpeedIsWhatTheTyresCanHold()
+    {
+        var f = new Fixture(_dir);
+        int root = f.Composites.Place(f.MapId, "vehicle:i4_economy", new Vector3(20, 0, 20), Quaternion.Identity,
+                                      "", out _, out string error);
+        Assert.True(root >= 0, error);
+        var e = f.Entity(root);
+        ref var d = ref f.World.Get<DriveComponent>(e);
+        d.Speed = 25f;                               // ninety kilometres an hour
+        d.Steer = 1f; d.SteerTarget = 1f; d.Throttle = 0.2f;
+        var driver = f.Player("driver_one", new Vector3(19, 0, 20));
+        Assert.True(f.Seats.Enter(driver, root, null, out string message), message);
+        f.Hold(driver, forward: 0.2f, lateral: 1f);
+        float h0 = f.World.Get<DriveComponent>(e).Heading;
+        f.Tick(30);
+        var after = f.World.Get<DriveComponent>(e);
+        // Full lock at 25 m/s would ask the tyres for several times what they have — a demand of 2,
+        // the ceiling, every tick. Limited to what they can hold, it sits just over the edge: the
+        // tyres squeal a little and the car goes round.
+        Assert.InRange(after.TyreDemand, 0.9f, 1.4f);
+        Assert.True(MathF.Abs(after.Heading - h0) > 0.2f, "it did not turn");
+    }
+
+    /// <summary>You cannot walk through the side of it.</summary>
+    [Fact]
+    public void AParkedCarIsSolid()
+    {
+        var f = new Fixture(_dir);
+        int root = f.Composites.Place(f.MapId, "vehicle:i4_economy", new Vector3(20, 0, 20), Quaternion.Identity,
+                                      "", out _, out string error);
+        Assert.True(root >= 0, error);
+        f.Tick(1);
+        Assert.True(MovementSystem.CheckCollision(f.World, f.Grid, new Vector3(20.8f, 0f, 20f),
+                                                  PhysicsConstants.PlayerRadius, PhysicsConstants.PlayerHeight),
+                    "a player standing in the door is not touching the car");
+    }
+
     // ── Fixture ─────────────────────────────────────────────────────────────────────────────────
 
     /// <summary>

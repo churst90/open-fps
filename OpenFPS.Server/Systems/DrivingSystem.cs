@@ -34,6 +34,32 @@ public static class DrivingSystem
     /// <summary>Full steering lock, radians. A road car is about thirty-five degrees at the wheel.</summary>
     private const float MaxSteerAngle = 0.61f;
 
+    /// <summary>
+    /// Seconds for the wheel to go from straight ahead to full lock while a steering key is held.
+    ///
+    /// A key is on or off, and a wheel that followed it exactly went from straight to thirty-five
+    /// degrees in one tick and back in the next. Held, that is a car that can only go straight or
+    /// turn as hard as it can; TAPPED, which is how a lot of people steer with a keyboard, it is a
+    /// jolt of full lock for every tap. Turning the wheel at the pace hands turn one makes a tap a
+    /// small correction and a hold a steadily tightening turn — the way every keyboard driving game
+    /// has settled on, because it is the only way two keys can stand in for a wheel.
+    /// </summary>
+    private const float SteerSecondsToLock = 1.0f;
+
+    /// <summary>Seconds for the wheel to come back to the centre when the keys are let go. Faster
+    /// than turning it: a real wheel returns itself through the caster, and hands let it.</summary>
+    private const float SteerSecondsToCentre = 0.45f;
+
+    /// <summary>
+    /// How far past what the tyres can hold the wheel may be turned at speed, as a fraction.
+    ///
+    /// At walking pace full lock is fine. At seventy it is a spin, and nobody driving turns the
+    /// wheel that far at seventy, so the lock is limited to the angle at which the corner uses the
+    /// tyres' grip — worked out from the grip and the wheelbase, not tuned. A little over it, so
+    /// holding the key hard into a bend does reach the edge and the tyres say so.
+    /// </summary>
+    private const float SteerPastGrip = 1.15f;
+
     /// <summary>How long held controls survive a silent client before they start decaying, seconds.
     /// A driver does not lift off because a packet was lost; a driver who has gone does coast to a
     /// stop rather than drive away forever.</summary>
@@ -98,7 +124,7 @@ public static class DrivingSystem
             drive.Brake = input.Jump ? 1f : 0f;
         }
 
-        drive.Steer = lateral;
+        drive.SteerTarget = lateral;
         drive.ControlAge = 0f;
     }
 
@@ -131,9 +157,9 @@ public static class DrivingSystem
         {
             float fade = MathF.Max(0f, 1f - (drive.ControlAge - ControlHoldSeconds));
             drive.Throttle *= fade;
-            drive.Steer *= fade;
+            drive.SteerTarget *= fade;
         }
-        if (!HasDriver(world, root.Id)) { drive.Throttle = 0f; drive.Steer = 0f; }
+        if (!HasDriver(world, root.Id)) { drive.Throttle = 0f; drive.SteerTarget = 0f; }
 
         float v = drive.Speed;
         float speed = MathF.Abs(v);
@@ -169,8 +195,22 @@ public static class DrivingSystem
         //
         // The geometry gives a radius; the radius gives a lateral acceleration. Nothing yet says the
         // tyres can deliver it.
-        float steerAngle = Math.Clamp(drive.Steer, -1f, 1f) * MaxSteerAngle;
         float wheelbase = MathF.Max(1.2f, profile.FrontAxleZ - profile.RearAxleZ);
+
+        // The wheel, turned by hands rather than thrown by a switch: towards where the keys ask at
+        // the pace hands turn a wheel, and back to the middle faster when they let go.
+        float target = Math.Clamp(drive.SteerTarget, -1f, 1f);
+        bool returning = MathF.Abs(target) < MathF.Abs(drive.Steer) || MathF.Sign(target) != MathF.Sign(drive.Steer);
+        float rate = dt / (returning ? SteerSecondsToCentre : SteerSecondsToLock);
+        drive.Steer += Math.Clamp(target - drive.Steer, -rate, rate);
+
+        // ...and no further than the tyres can use at this speed. The angle whose corner needs all
+        // of the grip is atan(wheelbase / r) with r = v^2 / (grip g).
+        float usableLock = MaxSteerAngle;
+        if (speed > StandstillSpeed)
+            usableLock = MathF.Min(MaxSteerAngle,
+                SteerPastGrip * MathF.Atan(wheelbase * capacity / (speed * speed)));
+        float steerAngle = Math.Clamp(drive.Steer, -1f, 1f) * usableLock;
         float lateral = 0f;
         if (MathF.Abs(steerAngle) > 0.001f && speed > StandstillSpeed)
         {
@@ -184,6 +224,7 @@ public static class DrivingSystem
         // why braking hard into a turn makes a car run wide rather than merely making it slower: the
         // cornering it cannot do is the cornering the brakes are already using.
         float demand = TyreFriction.Demand(longitudinal, lateral, grip);
+        drive.TyreDemand = MathF.Min(2f, demand);
         if (demand > 1f)
         {
             longitudinal /= demand;
@@ -208,7 +249,11 @@ public static class DrivingSystem
         ref var transform = ref world.Get<Transform>(root);
         var heading = new Vector3(MathF.Sin(drive.Heading), 0f, MathF.Cos(drive.Heading));
         var wanted = transform.Position + heading * drive.Speed * dt;
-        wanted.Y = PhysicsUtils.GetGroundHeight(world, grid, wanted, out _);
+        // Its own parts are not the road, and nor is whoever is sitting in it. A car with a floor
+        // finds that floor inside the step height and would climb onto it every tick.
+        var aboard = CompositeService.MembersOf(world, root.Id);
+        aboard.AddRange(CompositeService.OccupantsOf(world, root.Id));
+        wanted.Y = PhysicsUtils.GetGroundHeight(world, grid, wanted, aboard, out _);
         wanted = Vector3.Clamp(wanted, mapMin, mapMax);
 
         // Hitting something stops it, and now it is audible. The IMPULSE and the damage are still to
