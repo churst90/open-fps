@@ -44,11 +44,11 @@ public static class DrivingSystem
     /// small correction and a hold a steadily tightening turn — the way every keyboard driving game
     /// has settled on, because it is the only way two keys can stand in for a wheel.
     /// </summary>
-    private const float SteerSecondsToLock = 1.0f;
+    private const float SteerSecondsToLock = 0.7f;
 
     /// <summary>Seconds for the wheel to come back to the centre when the keys are let go. Faster
     /// than turning it: a real wheel returns itself through the caster, and hands let it.</summary>
-    private const float SteerSecondsToCentre = 0.45f;
+    private const float SteerSecondsToCentre = 0.3f;
 
     /// <summary>
     /// How far past what the tyres can hold the wheel may be turned at speed, as a fraction.

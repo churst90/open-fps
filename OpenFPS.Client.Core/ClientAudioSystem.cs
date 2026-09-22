@@ -24,6 +24,8 @@ public class ClientAudioSystem
     private readonly SoundMappingService _sounds;
     private readonly LocalPlayerState _state;
     private readonly DrivingAids _drivingAids;
+    /// <summary>The driver's cues and readout. See DrivingAids.</summary>
+    public DrivingAids Driving => _drivingAids;
     private readonly SpatialService _spatial; 
     private readonly SpatialAcoustics _acoustics;
 
@@ -434,7 +436,7 @@ public class ClientAudioSystem
         _audio.UpdateListener(visualEyePos, _state.Rotation, listenerVelocity, listenerRegionId);
         _audio.UpdateShelter(_state.ShelterFactor);
         // The lane lines, if you are the one driving.
-        _drivingAids.Update(world, _state);
+        _drivingAids.Update(world, _state, _clock.Elapsed.TotalSeconds);
         // ...and the rest of the world through the glass, if you are sitting in anything with a roof.
         var (encLow, encMid, encHigh) = CabinEnclosure(world);
         _audio.SetListenerEnclosure(encLow, encMid, encHigh);

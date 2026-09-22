@@ -595,7 +595,7 @@ public class OccupancyTests : IDisposable
         f.Tick(20);                                  // let go for two thirds of a second
         float released = Steer();
 
-        Assert.InRange(tap, 0.02f, 0.2f);
+        Assert.InRange(tap, 0.02f, 0.25f);
         Assert.True(held > 0.9f, $"a second of holding turned the wheel to {held:F2} of lock");
         Assert.True(MathF.Abs(released) < 0.05f, $"let go, the wheel stayed at {released:F2}");
     }

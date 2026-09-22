@@ -144,6 +144,9 @@ public sealed class ClientGameSession : IDisposable
         // else's are sounds at places in the world.
         _controller.OnStepTriggered += _audioSystem.OnOwnFootstep;
         _controller.OnLandTriggered += _audioSystem.OnOwnLand;
+        // What the road says to a driver — its name, the junction ahead — spoken without cutting off
+        // whatever was being said, because two of them can arrive together at a corner.
+        _audioSystem.Driving.Announce += text => _speech.Speak(text, interrupt: false);
 
         // Everybody else's feet arrive through exactly the same two calls as your own. A footstep
         // does not care whose it was, and nothing downstream of here is told.
@@ -221,7 +224,9 @@ public sealed class ClientGameSession : IDisposable
             () => Say($"Coordinates: {OpenFPS.Common.PlayerCoordinates.Format(_state.Position)}"));
         _bindings.Bind(InputContext.Gameplay, GameKey.F, () => Say($"Facing: {_state.GetCompassDirection()}"));
         _bindings.Bind(InputContext.Gameplay, GameKey.H, () => Say($"Health: {_state.Health} percent"));
-        _bindings.Bind(InputContext.Gameplay, GameKey.Z, () => Say($"Area: {_state.CurrentRegion}"));
+        // Driving, Z is the road: which one, which way, which lane, how fast. On foot it is the area.
+        _bindings.Bind(InputContext.Gameplay, GameKey.Z, () =>
+            Say(_state.RidingControls && _audioSystem.Driving.Readout is { } road ? road : $"Area: {_state.CurrentRegion}"));
         _bindings.Bind(InputContext.Gameplay, GameKey.Comma, LookAhead);
         _bindings.Bind(InputContext.Gameplay, GameKey.B, () => Say(ExertionReadout()));
 
@@ -517,6 +522,10 @@ public sealed class ClientGameSession : IDisposable
     /// </summary>
     private Vector2 GatherLook(HashSet<GameKey> held, IReadOnlyCollection<GameKey> justPressed, bool fine, float dt)
     {
+        // In the driver's seat your head faces where the car points, and stays there. Every cue —
+        // the guide ahead, the centre line on your left — is placed relative to the car, and a head
+        // turned away with J or L would put them all somewhere else. A and D steer the car.
+        if (_state.RidingControls) { _turnDownAt.Clear(); return Vector2.Zero; }
         Vector2 look = Vector2.Zero;
         float perTick = PhysicsConstants.RotationSpeed * MathF.Max(dt, 1e-4f);
 
