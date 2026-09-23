@@ -252,6 +252,14 @@ public sealed class ClientGameSession : IDisposable
         // somebody who cannot tell whether the engine is already running switches it OFF half the
         // time — which is exactly what happened on the first drive with a key.
         _bindings.Bind(InputContext.Gameplay, GameKey.T, () => _network.Send(new TextCommand { Command = "ignition", Args = new[] { "on" } }));
+        // K: lane assist on or off, while driving. (On foot K looks down; that is read as a held key,
+        // not through this binding, so the two never meet.)
+        _bindings.Bind(InputContext.Gameplay, GameKey.K, () =>
+        {
+            if (!_state.RidingControls) return;
+            _audioSystem.Driving.AssistEnabled = !_audioSystem.Driving.AssistEnabled;
+            Say(_audioSystem.Driving.AssistEnabled ? "Lane assist on." : "Lane assist off.");
+        });
         _bindings.Bind(InputContext.Gameplay, GameKey.T, KeyModifiers.Shift,
             () => _network.Send(new TextCommand { Command = "ignition", Args = new[] { "off" } }));
         _bindings.Bind(InputContext.Gameplay, GameKey.Q, () => _network.Send(new TextCommand { Command = "drop" }));
@@ -608,7 +616,17 @@ public sealed class ClientGameSession : IDisposable
         if (Pressed(GameKey.S) || Pressed(GameKey.Down)) move.Z -= 1;
         if (Pressed(GameKey.A) || Pressed(GameKey.Left)) move.X -= 1;
         if (Pressed(GameKey.D) || Pressed(GameKey.Right)) move.X += 1;
-        if (move != Vector3.Zero) input.MoveDirection = Vector3.Normalize(move);
+        // Lane assist, when you are driving and not steering yourself: the car holds the middle of
+        // the lane. Your own A or D always wins — the moment you steer, it lets go.
+        if (_state.RidingControls && move.X == 0f && _audioSystem.Driving.AssistSteer is { } assist)
+            move.X = assist;
+        // Normalised on foot, so diagonal walking is not faster. Not while driving: there the two
+        // axes are throttle and steering, and shrinking one because the other is held would halve
+        // the throttle every time lane assist leaned on the wheel.
+        if (move != Vector3.Zero)
+            input.MoveDirection = _state.RidingControls
+                ? new Vector3(Math.Clamp(move.X, -1f, 1f), 0f, Math.Clamp(move.Z, -1f, 1f))
+                : Vector3.Normalize(move);
 
         if (held.Contains(GameKey.Space)) input.Jump = true;
 

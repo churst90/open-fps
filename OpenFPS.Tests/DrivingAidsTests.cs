@@ -41,6 +41,9 @@ public class DrivingAidsTests
     }
 
     private static (List<string> Said, DrivingAids Aids) Drive(ClientWorldState client, Vector3 at, float headingDegrees)
+        => Drive(client, at, headingDegrees, 0f);
+
+    private static (List<string> Said, DrivingAids Aids) Drive(ClientWorldState client, Vector3 at, float headingDegrees, float speed)
     {
         var car = new EntityDefinition
         {
@@ -52,6 +55,16 @@ public class DrivingAidsTests
         car.SoundEmitter.SoundId = "engine:i4_economy";
         car.SoundEmitter.IsSynth = true;
         client.RegisterDefinition(car);
+        if (speed > 0f)
+        {
+            float h = headingDegrees * MathF.PI / 180f;
+            client.SyncState(new[] { new EntityState
+            {
+                EntityId = CarId,
+                Transform = QuantizedTransform.FromTransform(car.Transform),
+                LinearVelocity = new Vector3(MathF.Sin(h), 0f, MathF.Cos(h)) * speed,
+            } });
+        }
 
         var said = new List<string>();
         var aids = new DrivingAids(new AudioEngineFacade());      // never initialised: every sound is a no-op
@@ -101,6 +114,31 @@ public class DrivingAidsTests
         var (_, north) = Drive(City(), new Vector3(-16f, 0.25f, 29f), 0f);
         _o.WriteLine("Z: " + north.Readout);
         Assert.Contains("to your right", north.Readout);
+    }
+
+    /// <summary>
+    /// "It's hard to know how far I'm turning, and I overshoot the lane." Pointed twenty degrees off
+    /// Main Street at town speed, lane assist steers back toward the middle of the lane — left if
+    /// you are pointing right of the road, right if left — and Z says how far off you are. Turned
+    /// sixty degrees away you are turning on purpose, and it keeps its hands off.
+    /// </summary>
+    [Theory]
+    [InlineData(20f, -1)]
+    [InlineData(-20f, +1)]
+    public void LaneAssistSteersBackToTheLane(float offNorth, int expectedSign)
+    {
+        var (_, aids) = Drive(City(), new Vector3(4.5f, 0.15f, -40f), offNorth, 10f);
+        _o.WriteLine($"{offNorth}: assist {aids.AssistSteer}, Z: {aids.Readout}");
+        Assert.NotNull(aids.AssistSteer);
+        Assert.Equal(expectedSign, MathF.Sign(aids.AssistSteer!.Value));
+        Assert.Contains($"pointing 20 degrees {(offNorth > 0 ? "right" : "left")} of the road", aids.Readout);
+    }
+
+    [Fact]
+    public void LaneAssistLetsGoWhenYouAreTurningOnPurpose()
+    {
+        var (_, aids) = Drive(City(), new Vector3(4.5f, 0.15f, -40f), 60f, 10f);
+        Assert.Null(aids.AssistSteer);
     }
 
     [Fact]

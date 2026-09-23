@@ -63,6 +63,31 @@ public sealed class DrivingAids
     private bool _announcedDeadEnd;
     private bool _toldWayBack;
 
+    // ── How far you have turned ──────────────────────────────────────────────────────────────
+    //
+    // "It's hard to know how far I'm turning, and I overshoot the lane." A driver who can see
+    // watches the road swing round the windscreen; nothing here said how far the car had turned
+    // until it was pointing somewhere else. So: a soft click for every fifteen degrees the car
+    // turns — count them, six is a right angle — and a rising chime when it comes into line with
+    // the road, which is the moment to straighten the wheel.
+    private const float TurnClickDegrees = 15f, AlignedDegrees = 4f, UnalignedDegrees = 8f;
+    private const int TurnBaseId = -965000, AlignId = -966001;
+    private const string TurnSound = "SYNTH/drive_turn", AlignSound = "SYNTH/drive_aligned";
+    private int _turnIdx, _lastClickSector = int.MinValue;
+    private bool _aligned;
+
+    /// <summary>
+    /// Lane assist: while you are roughly in line with the road and not steering, the car steers
+    /// itself to the middle of your lane — pure pursuit of the same point the guide beep sits on.
+    /// Null when it has nothing to say (off the road, in a junction, turning hard, stopped). K
+    /// switches it off and on; it starts on.
+    /// </summary>
+    public float? AssistSteer { get; private set; }
+    public bool AssistEnabled { get; set; } = true;
+    /// <summary>How far off the road's line assist will still correct, degrees. Beyond it you are
+    /// turning on purpose and it keeps its hands off.</summary>
+    private const float AssistWithinDegrees = 35f;
+
     public DrivingAids(AudioEngineFacade audio) => _audio = audio;
 
     public void Update(WorldSnapshot world, LocalPlayerState state, double now)
@@ -77,6 +102,7 @@ public sealed class DrivingAids
             // reaches a road, and then say which one.
             _wasOnRoad = false; _roadName = ""; _offRoadSince = -1;
             _announcedJunction = int.MinValue; _announcedDeadEnd = false;
+            _lastClickSector = int.MinValue; _aligned = false; AssistSteer = null;
             return;
         }
         EnsureSounds();
@@ -89,6 +115,9 @@ public sealed class DrivingAids
         if (car.Definition.SoundEmitter.SoundId is { } sid && sid.StartsWith("engine:", StringComparison.OrdinalIgnoreCase)
             && MachineRegistry.Knows(sid[7..]))
             halfWidth = MachineRegistry.VehicleFor(sid[7..]).WidthMetres * 0.5f;
+
+        TurnClicks(forward);
+        AssistSteer = null;
 
         bool onRoad = TryRoadAt(world, at, forward, out var road, out string name, out bool junction, out int roadId);
         // Looking ahead goes DOWN THE ROAD, not along the bonnet: a car a few degrees off the line
@@ -150,6 +179,31 @@ public sealed class DrivingAids
         var aim = dirAlong * lookAhead + driverRight * ((target - p.Across) * p.Facing);
         Guide(aim, speed);
 
+        // In line with the road? Signed: positive is pointing to the right of it.
+        float offRoadLine = SignedDegrees(dirAlong, forward);
+        if (!_aligned && MathF.Abs(offRoadLine) < AlignedDegrees)
+        {
+            _aligned = true;
+            Play(AlignSound, AlignId, forward * 3f, SensorVolume);
+        }
+        else if (_aligned && MathF.Abs(offRoadLine) > UnalignedDegrees) _aligned = false;
+
+        // Lane assist: pure pursuit of the aim point. Steering angle atan(2 L sin(alpha) / ld),
+        // as a fraction of full lock — the same law a driver's hands follow toward a point ahead.
+        if (AssistEnabled && speed > 1.5f && MathF.Abs(offRoadLine) < AssistWithinDegrees)
+        {
+            float wheelbase = 2.6f;
+            if (car.Definition.SoundEmitter.SoundId is { } s2 && s2.StartsWith("engine:", StringComparison.OrdinalIgnoreCase)
+                && MachineRegistry.Knows(s2[7..]))
+            {
+                var prof = MachineRegistry.VehicleFor(s2[7..]);
+                wheelbase = MathF.Max(1.2f, prof.FrontAxleZ - prof.RearAxleZ);
+            }
+            float alpha = SignedDegrees(forward, aim) * MathF.PI / 180f;
+            float steer = MathF.Atan(2f * wheelbase * MathF.Sin(alpha) / MathF.Max(1f, aim.Length()));
+            AssistSteer = Math.Clamp(steer / FullLockRadians, -1f, 1f);
+        }
+
         var (left, rightSide) = LaneGuide.Sides(p, halfWidth);
         Sensor(left, driverRight);
         Sensor(rightSide, driverRight);
@@ -165,7 +219,9 @@ public sealed class DrivingAids
                     : laneNumber == lanesMySide ? $"in the right lane of {lanesMySide}"
                     : laneNumber == 1 ? $"in the left lane of {lanesMySide}"
                     : $"in lane {laneNumber} of {lanesMySide} from the left";
-        Readout = $"{_roadName}, heading {Compass(forward)}, {lane}, {Kmh(speed)}.";
+        string line = MathF.Abs(offRoadLine) < AlignedDegrees ? "in line with the road"
+                    : $"pointing {MathF.Round(MathF.Abs(offRoadLine))} degrees {(offRoadLine > 0 ? "right" : "left")} of the road";
+        Readout = $"{_roadName}, heading {Compass(forward)}, {line}, {lane}, {Kmh(speed)}.";
         Trace(at, forward, speed, _roadName, p.Across, laneNumber, left.Gap, rightSide.Gap);
     }
 
@@ -290,6 +346,27 @@ public sealed class DrivingAids
         return a < 20f ? "ahead" : a < 70f ? $"ahead to your {side}" : a < 110f ? $"to your {side}" : a < 160f ? $"behind you to the {side}" : "behind you";
     }
 
+    /// <summary>Full lock at the wheels, radians — the server's DrivingSystem.MaxSteerAngle.</summary>
+    private const float FullLockRadians = 0.61f;
+
+    /// <summary>The angle from one direction to another on the ground, degrees; positive is to the right.</summary>
+    private static float SignedDegrees(Vector3 from, Vector3 to)
+    {
+        from.Y = 0f; to.Y = 0f;
+        if (from.LengthSquared() < 1e-6f || to.LengthSquared() < 1e-6f) return 0f;
+        from = Vector3.Normalize(from); to = Vector3.Normalize(to);
+        return MathF.Atan2(Vector3.Cross(from, to).Y, Vector3.Dot(from, to)) * 180f / MathF.PI;
+    }
+
+    private void TurnClicks(Vector3 forward)
+    {
+        float yaw = MathF.Atan2(forward.X, forward.Z) * 180f / MathF.PI;
+        int sector = (int)MathF.Floor(yaw / TurnClickDegrees);
+        if (_lastClickSector != int.MinValue && sector != _lastClickSector)
+            Play(TurnSound, TurnBaseId - (_turnIdx++ % Pool), forward * 2f, SensorVolume * 0.7f);
+        _lastClickSector = sector;
+    }
+
     // ── What is heard ────────────────────────────────────────────────────────────────────────
 
     private static float GuideDistance(float speed) => Math.Clamp(8f + speed * 0.8f, 8f, 30f);
@@ -386,7 +463,9 @@ public sealed class DrivingAids
         _registered =
             _audio.RegisterSynthesisedSound(GuideSound, TransientSynth.ToPcm16(Beep(rate, 1175f, 0.07f, 0f)), rate)
             & _audio.RegisterSynthesisedSound(CentreSound, TransientSynth.ToPcm16(Beep(rate, 660f, 0.06f, 0.3f)), rate)
-            & _audio.RegisterSynthesisedSound(KerbSound, TransientSynth.ToPcm16(Beep(rate, 220f, 0.08f, 0.6f)), rate);
+            & _audio.RegisterSynthesisedSound(KerbSound, TransientSynth.ToPcm16(Beep(rate, 220f, 0.08f, 0.6f)), rate)
+            & _audio.RegisterSynthesisedSound(TurnSound, TransientSynth.ToPcm16(Beep(rate, 1800f, 0.018f, 0f)), rate)
+            & _audio.RegisterSynthesisedSound(AlignSound, TransientSynth.ToPcm16(Chime(rate)), rate);
     }
 
     /// <summary>A beep: a tone with soft edges so it does not click, and some odd harmonics to make it
@@ -404,6 +483,17 @@ public sealed class DrivingAids
             buf[i] = 0.6f * s * env / (1f + buzz * 0.5f);
         }
         return buf;
+    }
+
+    /// <summary>Two notes going up, a fifth apart: "there".</summary>
+    private static float[] Chime(int rate)
+    {
+        var a = Beep(rate, 880f, 0.07f, 0f);
+        var b = Beep(rate, 1320f, 0.09f, 0f);
+        var both = new float[a.Length + b.Length];
+        a.CopyTo(both, 0);
+        b.CopyTo(both, a.Length);
+        return both;
     }
 
     // ── Finding the road ─────────────────────────────────────────────────────────────────────
