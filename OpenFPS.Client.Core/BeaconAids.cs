@@ -26,6 +26,7 @@ public sealed class BeaconAids
 {
     private readonly AudioEngineFacade _audio;
     private readonly BeaconPreferences _prefs;
+    private readonly OpenFPS.Client.AudioEngine.Acoustics.SpatialAcoustics? _acoustics;
     private Dictionary<string, Beacons.Policy> _policy = Beacons.ReadPolicies(null);
 
     private const int BaseId = -967000, Pool = 24;
@@ -37,9 +38,9 @@ public sealed class BeaconAids
     /// how many of it are heard at once.</summary>
     private static readonly Dictionary<string, (string Sound, float Hz, float Range, int Nearest)> Kinds = new()
     {
-        [Beacons.Door] = ("SYNTH/beacon_door", 1000f, 12f, 3),
-        [Beacons.Item] = ("SYNTH/beacon_item", 1500f, 10f, 3),
-        [Beacons.Vehicle] = ("SYNTH/beacon_vehicle", 660f, 25f, 2),
+        [Beacons.Door] = ("SYNTH/beacon_door_knock", 420f, 12f, 3),
+        [Beacons.Item] = ("SYNTH/beacon_item_bell", 1318f, 10f, 3),
+        [Beacons.Vehicle] = ("SYNTH/beacon_vehicle_low", 330f, 25f, 2),
     };
 
     /// <summary>How often one beacon blips, seconds.</summary>
@@ -48,11 +49,21 @@ public sealed class BeaconAids
     /// <summary>A blip at one metre, dB: a doorbell's worth, well under speech and footsteps' echo.</summary>
     private const float BlipDb = 66f;
 
-    public BeaconAids(AudioEngineFacade audio, BeaconPreferences? prefs = null)
+    public BeaconAids(AudioEngineFacade audio, BeaconPreferences? prefs = null,
+                      OpenFPS.Client.AudioEngine.Acoustics.SpatialAcoustics? acoustics = null)
     {
         _audio = audio;
         _prefs = prefs ?? BeaconPreferences.Load();
+        _acoustics = acoustics;
     }
+
+    /// <summary>
+    /// How blocked a beacon may be and still blip. A door in the room you are in, or round the corner
+    /// of it, is a door you can walk to; one on the far side of a wall is a door in somebody else's
+    /// flat, and blipping it through the brick made a corridor sound like one room full of doors —
+    /// "I hear other beacons through walls which sound like the same room".
+    /// </summary>
+    private const float MaxOcclusion = 0.5f;
 
     /// <summary>The map's policies, from its manifest.</summary>
     public void SetMapPolicy(IEnumerable<string>? entries) => _policy = Beacons.ReadPolicies(entries);
@@ -82,20 +93,34 @@ public sealed class BeaconAids
                 }
                 if (now < due) continue;
                 _next[id] = now + Period;
-                Blip(kind.Sound, at);
+                Blip(world, id, kind.Sound, at, listener);
             }
         }
     }
 
-    private void Blip(string sound, Vector3 at)
+    private void Blip(WorldSnapshot world, int sourceId, string sound, Vector3 at, Vector3 listener)
     {
         var (gain, reference) = Loudness.Place(BlipDb);
+        // Through the same acoustic path every one-off sound takes: blocked by what is in the way,
+        // bent round what it can bend round. The door's own leaf does not block its own blip.
+        OpenFPS.Client.AudioEngine.Data.AcousticPathData? path = null;
+        if (_acoustics != null)
+        {
+            try { path = _acoustics.CalculateAcousticPath(world, sourceId, listener, at); } catch { }
+            if (path is { } blocked && blocked.Occlusion > MaxOcclusion) return;
+        }
         _audio.Submit(new SpatialEmitter
         {
             EntityId = BaseId - (_idx++ % Pool),
             SoundId = sound,
             Mode = OpenFPS.Common.Components.PlaybackMode.Single,
             Position = at,
+            ApparentPosition = path?.ApparentPosition ?? at,
+            EffectiveDistance = path?.EffectiveDistance ?? Vector3.Distance(listener, at),
+            Occlusion = path?.Occlusion ?? 0f,
+            ApertureFactor = path?.ApertureFactor ?? 1f,
+            TransmissionBleed = path?.TransmissionBleed ?? 0f,
+            TargetRegionId = path?.RegionId ?? -1,
             Volume = gain,
             MinDistance = reference,
             Range = 40f,
@@ -142,13 +167,48 @@ public sealed class BeaconAids
         bool ok = true;
         foreach (var (category, kind) in Kinds)
         {
-            // An item blips twice, quickly; a door once; a car once, lower and longer.
-            float[] pcm = category == Beacons.Item
-                ? Twice(DrivingAids.Beep(rate, kind.Hz, 0.035f, 0f), rate)
-                : DrivingAids.Beep(rate, kind.Hz, category == Beacons.Vehicle ? 0.08f : 0.045f, 0.1f);
+            // Three sounds that cannot be taken for anything in the street. The first version was a
+            // clean high beep, and a clean high beep repeating by a doorway IS a pedestrian crossing's
+            // chirp — which is what it was heard as. So: a door is a soft wooden knock, an item a
+            // small bell, a car a low double tone. None of them is a pure beep.
+            float[] pcm = category switch
+            {
+                Beacons.Door => Knock(rate),
+                Beacons.Item => Bell(rate),
+                _ => Twice(DrivingAids.Beep(rate, 330f, 0.06f, 0.2f), rate),
+            };
             ok &= _audio.RegisterSynthesisedSound(kind.Sound, TransientSynth.ToPcm16(pcm), rate);
         }
         _registered = ok;
+    }
+
+    /// <summary>A knuckle on a wooden door: two damped modes of a panel, low and short.</summary>
+    private static float[] Knock(int rate)
+    {
+        int n = rate * 90 / 1000;
+        var buf = new float[n];
+        for (int i = 0; i < n; i++)
+        {
+            float t = i / (float)rate;
+            buf[i] = 0.6f * MathF.Sin(MathF.Tau * 420f * t) * MathF.Exp(-t / 0.018f)
+                   + 0.3f * MathF.Sin(MathF.Tau * 1150f * t) * MathF.Exp(-t / 0.008f);
+        }
+        return buf;
+    }
+
+    /// <summary>A small bell: two inharmonic partials and a ring that dies away.</summary>
+    private static float[] Bell(int rate)
+    {
+        int n = rate * 250 / 1000;
+        var buf = new float[n];
+        for (int i = 0; i < n; i++)
+        {
+            float t = i / (float)rate;
+            float attack = MathF.Min(1f, t / 0.002f);
+            buf[i] = attack * (0.5f * MathF.Sin(MathF.Tau * 1318f * t) * MathF.Exp(-t / 0.09f)
+                            + 0.25f * MathF.Sin(MathF.Tau * 3350f * t) * MathF.Exp(-t / 0.04f));
+        }
+        return buf;
     }
 
     private static float[] Twice(float[] beep, int rate)

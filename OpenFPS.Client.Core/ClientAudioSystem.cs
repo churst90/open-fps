@@ -172,10 +172,21 @@ public class ClientAudioSystem
     ///
     /// Unset is the normal behaviour. This is a diagnostic lever, not a setting anybody should need.
     /// </summary>
+    /// <remarks>
+    /// OFF by default since 2026-09-23. An engine echo is a COHERENT copy of the engine — the same
+    /// waveform, read later, placed at a mirror point through the full HRTF. Against the direct
+    /// sound it is a comb filter that sweeps as either moves (phasing, "inside out"); on its own it is
+    /// a point source beamed from a wall; and the budget moves echoes from car to car, so one cuts
+    /// out mid-sound. A bus's echo carried its air hiss to wherever the mirror was: "white noise off to
+    /// my right, then it suddenly disappears — is that a bus or a reflection?" What a street really
+    /// sends back off a steady engine is many surfaces at once, incoherent: a diffuse wash, which is
+    /// the reverb. One-off sounds keep their echoes (WorldAudioPlayer), where an echo IS an event.
+    /// OPENFPS_ENGINE_ECHOES=2 brings them back for comparison.
+    /// </remarks>
     public static readonly int EchoCeiling =
         int.TryParse(Environment.GetEnvironmentVariable("OPENFPS_ENGINE_ECHOES"), out int ec) && ec >= 0
             ? Math.Min(ec, EngineReflections.MaxEchoesPerEngine)
-            : EngineReflections.MaxEchoesPerEngine;
+            : 0;
 
     private int _adaptiveEchoes = EchoCeiling;
     private double _lastBudgetChange;
@@ -335,9 +346,10 @@ public class ClientAudioSystem
         _sounds = sounds;
         _state = state;
         _drivingAids = new DrivingAids(audio);
-        _beacons = new BeaconAids(audio);
         _spatial = new SpatialService();
         _acoustics = new SpatialAcoustics(_spatial); // Share the same SpatialService instance
+        // After the acoustics, which it needs: a beacon behind a wall is not blipped.
+        _beacons = new BeaconAids(audio, acoustics: _acoustics);
         // The short sounds the world reports. Shares this system's acoustics so a rendered latch
         // takes exactly the path a recorded one would.
         WorldAudio = new WorldAudioPlayer(_audio, _acoustics);

@@ -18,8 +18,16 @@ namespace OpenFPS.Tests;
 /// </summary>
 public class EstateDoorTests
 {
-    [Fact]
-    public void YouCanWalkThroughAnOpenFrontDoor()
+    /// <summary>
+    /// The estate house (a curtain across the doorway), the Union Building's entrance and an airport
+    /// terminal door (both stood at right angles to their own walls: shut, the doorway was open round
+    /// them; opened, the leaf swung across it — "it says the door is open and I can't walk out").
+    /// </summary>
+    [Theory]
+    [InlineData(-347f, -9.325f, 0f, -0.8f)]      // 24 Birch Street, through to the hall
+    [InlineData(9.675f, 28.08f, 0.8f, 0f)]       // the Union Building, into the stairwell
+    [InlineData(225.97f, 30.0f, -0.8f, 0f)]      // the terminal, out to the apron
+    public void YouCanWalkThroughAnOpenDoor(float x, float z, float stepX, float stepZ)
     {
         var prefabs = new PrefabRepository(Path.Combine(AppContext.BaseDirectory, "prefabs"));
         var maps = new MapManager(new MapRepository(Path.Combine(AppContext.BaseDirectory, "maps")), prefabs);
@@ -29,13 +37,13 @@ public class EstateDoorTests
         Entity door = Entity.Null;
         world.Query(new QueryDescription().WithAll<Transform, DoorComponent>(), (Entity e, ref Transform t) =>
         {
-            if (Vector3.Distance(t.Position, new Vector3(-347f, 1.09f, -9.325f)) < 0.5f) door = e;
+            if (Vector2.Distance(new Vector2(t.Position.X, t.Position.Z), new Vector2(x, z)) < 0.5f && t.Position.Y < 2f) door = e;
         });
         Assert.NotEqual(Entity.Null, door);
 
         // In the doorway and a step inside, beside where the leaf hinges.
-        var doorway = new Vector3(-347f, 0.1f, -9.3f);
-        var inside = new Vector3(-347f, 0.1f, -10.1f);
+        var doorway = new Vector3(x, 0.1f, z);
+        var inside = new Vector3(x + stepX, 0.1f, z + stepZ);
         Assert.True(MovementSystem.CheckCollision(world, grid, doorway, PhysicsConstants.PlayerRadius, PhysicsConstants.PlayerHeight),
             "the shut door is not in the doorway");
 
@@ -46,6 +54,6 @@ public class EstateDoorTests
         Assert.False(MovementSystem.CheckCollision(world, grid, doorway, PhysicsConstants.PlayerRadius, PhysicsConstants.PlayerHeight),
             "the door is open and the doorway is still solid");
         Assert.False(MovementSystem.CheckCollision(world, grid, inside, PhysicsConstants.PlayerRadius, PhysicsConstants.PlayerHeight),
-            "through the doorway there is something solid — the curtain was hung across it");
+            "through the doorway there is something solid");
     }
 }

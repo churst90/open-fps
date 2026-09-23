@@ -106,6 +106,38 @@ public class BeaconTests
     }
 
     /// <summary>
+    /// A door on the far side of a wall is somebody else's room: it does not blip through the brick.
+    /// Standing against the side of 24 Birch Street, both of its doors are round the corner.
+    /// </summary>
+    [Fact]
+    public void ADoorBehindAWallDoesNotBlip()
+    {
+        var prefabs = new PrefabRepository(Path.Combine(AppContext.BaseDirectory, "prefabs"));
+        var maps = new MapManager(new MapRepository(Path.Combine(AppContext.BaseDirectory, "maps")), prefabs);
+        maps.Initialize();
+        Assert.True(maps.TryGetMap("city", out World world, out _, out _, out _));
+        Assert.True(maps.TryGetMapData("city", out var data));
+        var client = new ClientWorldState();
+        client.Clear(data.Size, data.MinBound, data.MaxBound);
+        foreach (var def in EntityDefinitionFactory.StaticDefinitions(world)) client.RegisterDefinition(def);
+
+        var provider = new VoiceLifecycleTests.RecordingProvider();
+        var facade = new AudioEngineFacade(provider);
+        facade.InitializeForTest();
+        var ear = new Vector3(-340.8f, 1.6f, -13.45f);
+        facade.UpdateListener(ear, Quaternion.Identity, Vector3.Zero, -1);
+        var acoustics = new OpenFPS.Client.AudioEngine.Acoustics.SpatialAcoustics(new OpenFPS.Client.Core.SpatialService());
+        var aids = new BeaconAids(facade, BeaconPreferences.InMemory(), acoustics);
+        for (int i = 0; i < 6; i++)
+        {
+            aids.Update(client.GetSnapshot(), ear, 10.0 + i);
+            for (int k = 0; k < 3; k++) facade.PumpForTest();
+        }
+        _o.WriteLine("played: " + string.Join(", ", provider.PlayedSounds));
+        Assert.DoesNotContain(provider.PlayedSounds, s => s.Contains("beacon_door"));
+    }
+
+    /// <summary>
     /// Nobody placed a beacon on the city, and it is full of them: every door is a door beacon, and
     /// every parked car a vehicle beacon. Checked on the definitions the client is actually sent.
     /// </summary>

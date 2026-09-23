@@ -827,9 +827,11 @@ public sealed class EngineVoiceState : IRenderedVoice
             }
             if (_chime != null) { chimeOut = StepChime(); pa += chimeOut; }
 
-            // What the machine is radiating, before anything a listener's position does to it: the
-            // level the loudness law is applied to.
-            blockSum += (double)pa * pa;
+            // What the ENGINE is radiating, before anything a listener's position does to it: the
+            // level the loudness law is applied to. Not the brakes' air or the door beeper, which are
+            // their own sources at their own levels and are not what idles.
+            float engineOnly = pa - airOut - chimeOut;
+            blockSum += (double)engineOnly * engineOnly;
 
             // Crossfaded over ~60 ms rather than switched, so getting in or out is not a click.
             _interiorMix += Math.Clamp((inside ? 1f : 0f) - _interiorMix, -envStep, envStep);
@@ -871,7 +873,12 @@ public sealed class EngineVoiceState : IRenderedVoice
             // a limiter applied to each half separately is not the same limiter, and the single-voice
             // case has to come out bit for bit as it did before the machine had two outlets.
             _levelGain += liftStep;
-            _ring[(int)(w & mask)] = pa * gain * _envelope * _levelGain;
+            // The lift is the ENGINE's: an idling bus's air brake release is exactly as loud as it
+            // is, and lifting it with the idle made every bus stop audible across the city.
+            float extras = (1f - _interiorMix) * (airOut + chimeOut)
+                         + _interiorMix * (chimeOut + 0.5f * airOut);
+            pa = (pa - extras) * _levelGain + extras;
+            _ring[(int)(w & mask)] = pa * gain * _envelope;
             _front[(int)(w & mask)] = front * gain * _envelope * _levelGain;
             w++;
         }

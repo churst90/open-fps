@@ -458,7 +458,11 @@ def tower(label, x0, x1, z0, z1, storeys, street_side, ac_floors):
         if s == 0:
             ex, _, ez, _ = place(sx1 - WALL_T / 2 if side > 0 else sx0 + WALL_T / 2, 0,
                                  (stair_b[0] + stair_b[1]) / 2, 0)
-            door(ex, 0.02, ez, stair_id, -1, facing_z=vertical, prefab="steel_door")
+            # The same line as the flats' doors: the facade runs the same way as the corridor wall.
+            # It was `facing_z=vertical`, which stood every tower's entrance at right angles to its
+            # own facade — shut, the doorway was open round it; opened, the leaf swung across it.
+            # city.json's doors were re-fitted to their openings on 2026-09-23 (turned and sized).
+            door(ex, 0.02, ez, stair_id, -1, facing_z=not vertical, prefab="steel_door")
 
         # ── The air conditioners ───────────────────────────────────────────────────────────────
         #
@@ -800,9 +804,9 @@ for k in range(3):
     term_ids.append(region(f"Terminal concourse, {['south', 'middle', 'north'][k]} end",
                            TERM_X0 + 0.4, TERM_X1 - 0.06, 0.08, TERM_H, a, b))
 for dz, rid in zip(TERM_DOORS, (term_ids[0], term_ids[1])):
-    door(TERM_X1 - 0.03, 0.08, dz, rid, -1, facing_z=True, prefab="door")
+    door(TERM_X1 - 0.03, 0.08, dz, rid, -1, facing_z=False, prefab="door")   # the wall runs along z
 # ...and a way in from the road side.
-door(TERM_X0 + 0.2, 0.08, 62.0, term_ids[1], -1, facing_z=True, prefab="steel_door")
+door(TERM_X0 + 0.2, 0.08, 62.0, term_ids[1], -1, facing_z=False, prefab="steel_door")
 
 # ── The hangar: a steel box the size of a church ──────────────────────────────────────────────────
 #
