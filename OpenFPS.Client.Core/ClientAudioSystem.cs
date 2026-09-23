@@ -435,6 +435,7 @@ public class ClientAudioSystem
         Vector3 listenerVelocity = _state.Velocity + feltWind * 0.1f;
         _audio.UpdateListener(visualEyePos, _state.Rotation, listenerVelocity, listenerRegionId);
         _audio.UpdateShelter(_state.ShelterFactor);
+        WorldAudio.ListenerVehicleId = _state.RidingEntityId;
         // The lane lines, if you are the one driving.
         _drivingAids.Update(world, _state, _clock.Elapsed.TotalSeconds);
         // ...and the rest of the world through the glass, if you are sitting in anything with a roof.

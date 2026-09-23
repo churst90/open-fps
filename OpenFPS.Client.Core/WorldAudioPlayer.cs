@@ -146,6 +146,9 @@ public sealed class WorldAudioPlayer
     /// by itself — the leaf is solid and sits exactly where its own latch is, so without this every
     /// door would be heard through a door.
     /// </summary>
+    /// <summary>The vehicle the listener is sitting in, or -1. Its own sounds are not heard through its glass.</summary>
+    public int ListenerVehicleId { get; set; } = -1;
+
     public void Update(WorldSnapshot world, Vector3 listenerPosition, double now,
                        EngineReflections? reflections = null)
     {
@@ -227,6 +230,7 @@ public sealed class WorldAudioPlayer
                 // playing it later — see VoiceManager.Process, which drops one that did not win a slot
                 // rather than keeping it queued to fire from a stale position minutes afterwards.
                 IsEvent = true,
+                InsideListenersVehicle = item.SourceEntityId >= 0 && item.SourceEntityId == ListenerVehicleId,
             });
         }
     }

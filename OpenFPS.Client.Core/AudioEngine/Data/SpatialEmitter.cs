@@ -58,6 +58,12 @@ public struct SpatialEmitter
     /// <summary>A sound that is part of the listener — their own feet — and is placed at
     /// <see cref="ListenerOffset"/> from the listener's head every tick, whatever Position says.</summary>
     public bool FollowsListener;
+
+    /// <summary>
+    /// Made by the vehicle the listener is sitting in — its own door, its own latch — and so not
+    /// heard through that vehicle's glass. Everything else outside the car is.
+    /// </summary>
+    public bool InsideListenersVehicle;
     public Vector3 ListenerOffset;
     public float DelayMs; 
     /// <summary>For a reflection: the entity whose sound this is a copy of. The provider starts the copy

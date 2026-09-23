@@ -516,6 +516,7 @@ public class FmodAudioProvider : IAudioProvider
         public int TargetRegionId = -1; 
         public bool IsReflection; 
         public bool FollowsListener;
+        public bool InsideListenersVehicle;
         public Vector3 ListenerOffset;
         public float ConeInside;
         public float ConeOutside;
@@ -2342,6 +2343,7 @@ public class FmodAudioProvider : IAudioProvider
                 TargetHigh = emitter.EqHigh, CurrentHigh = emitter.EqHigh,
                 TargetRegionId = emitter.TargetRegionId, IsReflection = emitter.IsReflection,
                 FollowsListener = emitter.FollowsListener, ListenerOffset = emitter.ListenerOffset,
+                InsideListenersVehicle = emitter.InsideListenersVehicle,
                 RoomGain = 1.0f,
                 ConeInside = emitter.ConeInside, ConeOutside = emitter.ConeOutside, ConeOutsideVolume = emitter.ConeOutsideVolume,
                 ReflectionSpread = emitter.ReflectionSpread,
@@ -3396,7 +3398,7 @@ public class FmodAudioProvider : IAudioProvider
             // Sitting in a car: everything OUTSIDE it comes through the glass and the doors. Not the
             // car's own engine, whose voice already rendered its way through the same body, and not
             // anything riding on the listener's head (the lane cues).
-            if (!active.FollowsListener && active.EngineState is not { Interior: true })
+            if (!active.FollowsListener && !active.InsideListenersVehicle && active.EngineState is not { Interior: true })
             {
                 lowDb += _enclosureLowDb; midDb += _enclosureMidDb; highDb += _enclosureHighDb;
             }

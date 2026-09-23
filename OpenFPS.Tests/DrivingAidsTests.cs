@@ -141,6 +141,40 @@ public class DrivingAidsTests
         Assert.Null(aids.AssistSteer);
     }
 
+    /// <summary>
+    /// "I'm not hearing any cues." None of them played: a cue follows the listener's head but was
+    /// left at the default position, the middle of the map, and the voice manager drops anything
+    /// more than one and a half ranges from the listener — everywhere past 120 m from the centre,
+    /// which is most of Main Street. Two hundred metres up Main Street, the guide must reach the mixer.
+    /// </summary>
+    [Fact]
+    public void TheGuideBeepIsPlayedFarFromTheMiddleOfTheMap()
+    {
+        var client = City();
+        var provider = new VoiceLifecycleTests.RecordingProvider();
+        var facade = new AudioEngineFacade(provider);
+        facade.InitializeForTest();
+
+        var at = new Vector3(4.5f, 0.15f, 200f);
+        var car = new EntityDefinition
+        {
+            EntityId = CarId, Type = EntityType.NPC, Moves = true,
+            Transform = new Transform { Position = at, Rotation = Quaternion.Identity },
+        };
+        car.SoundEmitter.SoundId = "engine:i4_economy";
+        client.RegisterDefinition(car);
+        var aids = new DrivingAids(facade);
+        var state = new LocalPlayerState { RidingEntityId = CarId, RidingControls = true, Position = at };
+        facade.UpdateListener(at + new Vector3(0f, 1f, 0f), Quaternion.Identity, Vector3.Zero, -1);
+        for (int i = 0; i < 5; i++)
+        {
+            aids.Update(client.GetSnapshot(), state, 1.0 + i);
+            for (int k = 0; k < 3; k++) facade.PumpForTest();
+        }
+        _o.WriteLine("played: " + string.Join(", ", provider.PlayedSounds));
+        Assert.Contains(provider.PlayedSounds, s => s.Contains("drive_guide"));
+    }
+
     [Fact]
     public void InTheGarageYouAreOffTheRoadAndNobodySaysSoUntilYouHaveBeenOnOne()
     {

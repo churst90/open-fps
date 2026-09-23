@@ -27,9 +27,10 @@ namespace OpenFPS.Tests;
 public class VoiceLifecycleTests
 {
     /// <summary>Records what actually reached the provider. Everything else is a no-op.</summary>
-    private sealed class RecordingProvider : IAudioProvider
+    internal sealed class RecordingProvider : IAudioProvider
     {
         public readonly List<int> Played = new();
+        public readonly List<string> PlayedSounds = new();
         public readonly List<int> Stopped = new();
         public readonly HashSet<int> Live = new();
 
@@ -42,7 +43,7 @@ public class VoiceLifecycleTests
         public void SetAmbientBedVolume(string id, float v) { }
         public void StopAmbientBed(string id) { }
         public void SetAcousticMap(AcousticMap map) { }
-        public void PlaySpatialSound(SpatialEmitter e) { Played.Add(e.EntityId); Live.Add(e.EntityId); }
+        public void PlaySpatialSound(SpatialEmitter e) { Played.Add(e.EntityId); PlayedSounds.Add(e.SoundId); Live.Add(e.EntityId); }
         public void UpdateSpatialAttributes(SpatialEmitter e) { }
         public void SetAcousticPath(int id, AcousticPathData p) { }
         public void SetSimulatedReverbDecay(float ms, float enclosure, float hf, float lf) { }

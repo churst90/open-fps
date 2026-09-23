@@ -55,6 +55,13 @@ public sealed class DrivingAids
 
     private const float GuideVolume = 0.28f, SensorVolume = 0.32f, OverToneVolume = 0.16f;
 
+    /// <summary>
+    /// Where the listener's head is. Every cue follows the head, but it still needs a real position
+    /// in the world: the voice manager drops anything more than one and a half times its range from
+    /// the listener, and a cue left at the default position (the middle of the map) was dropped
+    /// everywhere more than 120 m from it — which is most of Main Street. None of them ever played.
+    /// </summary>
+    private Vector3 _ear;
     private double _now, _nextGuide, _nextCentre, _nextKerb, _nextTrace;
     private string _roadName = "";
     private bool _wasOnRoad;
@@ -93,6 +100,7 @@ public sealed class DrivingAids
     public void Update(WorldSnapshot world, LocalPlayerState state, double now)
     {
         _now = now;
+        _ear = state.VisualPosition + new Vector3(0f, state.EyeHeight, 0f);
         if (!state.IsRiding || !state.RidingControls
             || !world.Entities.TryGetValue(state.RidingEntityId, out var car))
         {
@@ -413,6 +421,7 @@ public sealed class DrivingAids
             Mode = OpenFPS.Common.Components.PlaybackMode.Single,
             FollowsListener = true,
             ListenerOffset = offset,
+            Position = _ear + offset,
             Volume = volume,
             MinDistance = 40f,          // no distance attenuation: where it is, not how far
             Range = 80f,
@@ -435,6 +444,7 @@ public sealed class DrivingAids
             SynthFilterCutoff = 1f,
             FollowsListener = true,
             ListenerOffset = offset,
+            Position = _ear + offset,
             Volume = OverToneVolume,
             MinDistance = 40f,
             Range = 80f,
