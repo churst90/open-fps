@@ -3872,6 +3872,11 @@ public class FmodAudioProvider : IAudioProvider
     }
 
     /// <summary>Brings a live engine voice back to full after a fade-out was started. Idempotent.</summary>
+    public bool EngineDoorsOpen(int entityId)
+    {
+        lock (_lock) return FindActive(entityId)?.EngineState?.DoorsOpen ?? false;
+    }
+
     public bool TryGetEngineTelemetry(int entityId, out float toldSpeed, out float ownSpeed, out float rpm, out int gear)
     {
         toldSpeed = ownSpeed = rpm = 0f; gear = 0;

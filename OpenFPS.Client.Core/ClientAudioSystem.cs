@@ -433,7 +433,19 @@ public class ClientAudioSystem
         // A fraction of the moving air rides on the listener velocity, so wind produces a subtle Doppler
         // on distant sounds — and a gust now audibly swells and drops it.
         Vector3 listenerVelocity = _state.Velocity + feltWind * 0.1f;
-        _audio.UpdateListener(visualEyePos, _state.Rotation, listenerVelocity, listenerRegionId);
+        // Sitting in something, you face the way it faces. Your own heading only reaches the client as
+        // a correction some ticks after the vehicle turned, so taking the ears' direction from it made
+        // a bus's engine swing round your head through every corner; the vehicle's own rotation
+        // arrives with its position and turns the cabin and your ears together.
+        var listenerRotation = _state.Rotation;
+        if (_state.IsRiding && world.Entities.TryGetValue(_state.RidingEntityId, out var carrying))
+        {
+            listenerRotation = carrying.Transform.Rotation;
+            // ...and you move at its speed. A passenger is not predicted, so their own velocity reads
+            // zero — which against the vehicle's moving voice is a Doppler shift on your own bus.
+            listenerVelocity = carrying.Velocity + feltWind * 0.1f;
+        }
+        _audio.UpdateListener(visualEyePos, listenerRotation, listenerVelocity, listenerRegionId);
         _audio.UpdateShelter(_state.ShelterFactor);
         WorldAudio.ListenerVehicleId = _state.RidingEntityId;
         // The lane lines, if you are the one driving.
@@ -971,6 +983,9 @@ public class ClientAudioSystem
     /// panels, so the airborne path in is theirs.</summary>
     private const float WindowThicknessM = 0.004f;
 
+    /// <summary>An open bus doorway's share of the cabin's wall area, as transmitted power.</summary>
+    private const float DoorwayPowerFraction = 0.0225f;
+
     /// <summary>
     /// What the body of the vehicle you are sitting in takes off everything outside it, dB per band.
     ///
@@ -992,6 +1007,10 @@ public class ClientAudioSystem
 
         float mass = MathF.Max(1f, OpenFPS.Common.AcousticRegistry.GetProperties("Glass").DensityKgM3 * WindowThicknessM);
         float seal = body.SealLeak * body.SealLeak;
+        // A bus at a stop with its doors open has a hole in its side: about 2.4 m^2 of doorway in a
+        // hundred-odd m^2 of cabin wall, which lets the street in at a couple of per cent of its
+        // power, at every frequency. The voice decides when the doors are open; ask it.
+        if (_audio.EngineDoorsOpen(_state.RidingEntityId)) seal += DoorwayPowerFraction;
         float Loss(float hz)
         {
             float t = 415f / (MathF.PI * hz * mass);

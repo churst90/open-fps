@@ -537,7 +537,7 @@ public sealed class ClientGameSession : IDisposable
         // In the driver's seat your head faces where the car points, and stays there. Every cue —
         // the guide ahead, the centre line on your left — is placed relative to the car, and a head
         // turned away with J or L would put them all somewhere else. A and D steer the car.
-        if (_state.RidingControls) { _turnDownAt.Clear(); return Vector2.Zero; }
+        if (_state.IsRiding) { _turnDownAt.Clear(); return Vector2.Zero; }
         Vector2 look = Vector2.Zero;
         float perTick = PhysicsConstants.RotationSpeed * MathF.Max(dt, 1e-4f);
 

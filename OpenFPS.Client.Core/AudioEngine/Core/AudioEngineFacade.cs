@@ -307,6 +307,8 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
         }
     }
 
+    public bool EngineDoorsOpen(int entityId) => _isInitialized && _provider.EngineDoorsOpen(entityId);
+
     public void SetListenerEnclosure(float lowDb, float midDb, float highDb)
     {
         if (_isInitialized) _provider.SetListenerEnclosure(lowDb, midDb, highDb);

@@ -550,6 +550,9 @@ public sealed class EngineVoiceState : IRenderedVoice
     private float _levelGain = 1f;
     private const float LevelSeconds = 0.5f, MaxLiftDb = 20f;
 
+    /// <summary>Pressure fraction through an open bus doorway: sqrt(2.4 m^2 / ~106 m^2) = 0.15.</summary>
+    private const float DoorwayLeak = 0.15f;
+
     /// <summary>The speed the wind anchor is quoted at, m/s: 110 km/h.</summary>
     private const float WindReferenceSpeed = 110f / 3.6f;
 
@@ -815,12 +818,14 @@ public sealed class EngineVoiceState : IRenderedVoice
             pa += _body.Process(Engine.Exhaust) * BodyMix;
             // What escapes the engine bay. Zero for a car; see VehicleProfile.EngineBayLeakage.
             if (_bayLeak > 0f) pa += (Engine.Block + 0.5f * Engine.Intake) * _bayLeak;
+            float airOut = 0f, chimeOut = 0f;
             if (_air != null)
             {
                 if ((i & 63) == 0) AirEvents(dt * 64f);
-                pa += _air.Step();
+                airOut = _air.Step();
+                pa += airOut;
             }
-            if (_chime != null) pa += StepChime();
+            if (_chime != null) { chimeOut = StepChime(); pa += chimeOut; }
 
             // What the machine is radiating, before anything a listener's position does to it: the
             // level the loudness law is applied to.
@@ -848,6 +853,14 @@ public sealed class EngineVoiceState : IRenderedVoice
                 _windHpIn = _windLp;
                 inCabin += _windHp * windPa * 3.78f;         // the band-limited noise is 0.265 RMS; this is its inverse
 
+                // What is INSIDE with you, not through the body: the door beeper hangs over the
+                // doorway, and the door engines vent into the step well — half of what the air
+                // system says is in here, the brakes under the floor are the other half.
+                inCabin += chimeOut + 0.5f * airOut;
+                // And with the doors open there is a hole in the side of the bus: the outside comes
+                // in through a doorway about 2.4 m^2 of a hundred-odd m^2 of cabin wall, which lets
+                // in a couple of per cent of the power (-16 dB), unfiltered.
+                if (_doorsOpen) inCabin += (pa - chimeOut - airOut) * DoorwayLeak;
                 float k = _interiorMix;
                 pa = pa * (1f - k) + inCabin * k;
                 front *= 1f - k;

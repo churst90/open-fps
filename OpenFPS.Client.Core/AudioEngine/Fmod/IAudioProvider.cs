@@ -103,6 +103,9 @@ public interface IAudioProvider : IDisposable
     /// the world is reporting a speed that is too low, the virtual driver is not holding the speed it
     /// was given, or the driver is shifting up. Reading the four numbers separates them in one line.
     /// </summary>
+    /// <summary>Whether a vehicle voice has its doors standing open (a bus at a stop). The voice decides
+    /// that from its own speed history, so it is the one to ask.</summary>
+    bool EngineDoorsOpen(int entityId) => false;
     bool TryGetEngineTelemetry(int entityId, out float toldSpeed, out float ownSpeed, out float rpm, out int gear)
     {
         toldSpeed = ownSpeed = rpm = 0f; gear = 0; return false;

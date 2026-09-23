@@ -71,15 +71,32 @@ public class BusStopTests
     }
 
     /// <summary>
+    /// "When I'm on the bus and it stops I should hear the beeping from inside too." The beeper hangs
+    /// over the doorway, inside; it was mixed into the part of the voice the interior path replaces
+    /// with what gets through the body, and a body's mass law takes a 2.7 kHz beep to nothing.
+    /// </summary>
+    [Fact]
+    public void TheDoorBeeperIsHeardFromInsideTheBus()
+    {
+        var bus = MachineRegistry.VehicleFor("school_bus_na");
+        var outside = Drive(bus).ChimeBand;
+        var inside = Drive(bus, inside: true);
+        var truck = Drive(MachineRegistry.VehicleFor("diesel_truck"), inside: true).ChimeBand;
+        _o.WriteLine($"beeper band: outside {outside:F1} dB, inside {inside.ChimeBand:F1} dB, a truck cab with none {truck:F1} dB");
+        Assert.True(inside.DoorsOpened);
+        Assert.True(inside.ChimeBand > truck + 6f, "inside the bus the door beeper is no louder than a cab that has none");
+    }
+
+    /// <summary>
     /// Drives a voice: rolling, then a deceleration to a dead stop, twelve seconds standing, then
     /// away again. Returns the level while standing, the level while rolling, and the energy in the
     /// door beeper's band while standing.
     /// </summary>
     private readonly record struct Run(float Arriving, float Settled, float Rolling, float ChimeBand, bool DoorsOpened, float PeakChimePa);
 
-    private static Run Drive(VehicleProfile v)
+    private static Run Drive(VehicleProfile v, bool inside = false)
     {
-        var voice = new EngineVoiceState(v, Rate, 5);
+        var voice = new EngineVoiceState(v, Rate, 5) { Interior = inside };
         voice.PlaceAtSpeed(12f);
         voice.Revive();
         var buf = new float[Block];
