@@ -50,7 +50,7 @@ public class SpatialAcoustics
         // the same every tick for the same geometry, and it needs no merging because a surface
         // produces one arrival by construction.
         _reflectionScratch ??= new List<EarlyReflections.Arrival>();
-        EarlyReflections.Find(sourcePos, listenerPos, ReflectionSolids(world), _reflectionScratch);
+        EarlyReflections.Find(sourcePos, listenerPos, ReflectionSolids(world), _reflectionScratch, separateFirst: true);
         for (int i = 0; i < _reflectionScratch.Count; i++)
         {
             var a = _reflectionScratch[i];

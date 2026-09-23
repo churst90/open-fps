@@ -40,7 +40,30 @@ public static class EarlyReflections
     /// one voice from frame to frame instead of being torn down and rebuilt.</param>
     public readonly record struct Arrival(Vector3 ImagePosition, Vector3 HitPoint, float PathLength,
                                           float ExtraDelaySeconds, float GainLow, float GainMid,
-                                          float GainHigh, float Scattering, int SurfaceId);
+                                          float GainHigh, float Scattering, int SurfaceId, int Order = 1);
+
+    /// <summary>
+    /// How many surfaces a copy may have come off on its way: one is the classic first-order image;
+    /// two and three are the copies of copies.
+    ///
+    /// Indoors they do not matter as separate events — a second bounce in a ten-metre room arrives
+    /// inside the fusion window and is the room's tail, which the reverb already is. Outdoors they are
+    /// the sound of the place: two facades across a street hand a clap back and forth, and each
+    /// crossing arrives a street's width later than the last. That flutter is second- and third-order
+    /// and nothing else in the model makes it.
+    /// </summary>
+    public const int MaxOrder = 3;
+
+    /// <summary>
+    /// How many surfaces the higher orders are built from: the loudest first-order mirrors.
+    ///
+    /// The count of images grows as K for first order, K² for second and K³ for third, and a city
+    /// has thousands of faces in range. The copies of copies that are loud enough to hear come off
+    /// the surfaces that already reflect the sound loudly once — a weak mirror's third-order copy has
+    /// lost three surfaces' worth — so the dozen strongest carry them, and the geometry prunes most of
+    /// the 1,700 chains before any line of sight is cast.
+    /// </summary>
+    public const int HigherOrderSurfaces = 8;
 
     /// <summary>
     /// How far the search looks, metres. A bound on the work, not a statement about audibility.
@@ -108,14 +131,23 @@ public static class EarlyReflections
     /// <paramref name="into"/> is cleared and filled, so a caller on the audio worker can keep one list
     /// and never allocate.
     /// </summary>
+    /// <param name="maxOrder">How many surfaces a copy may come off: 1 (the default) for first-order
+    /// only; up to <see cref="MaxOrder"/>. A caller asks for more only where the copies of copies are
+    /// SPARSE — out in the open, between facades — because in a room they are dense, they are the
+    /// room's tail, and the reverb already is that.</param>
+    /// <param name="separateFirst">Rank arrivals the ear hears as separate events ahead of fused ones
+    /// when the budget cuts. A renderer that only voices separate events wants this; one that renders
+    /// the near surfaces (your own footsteps off the ceiling a metre overhead) does not.</param>
     public static void Find(Vector3 source, Vector3 listener, IReadOnlyList<Solid> solids,
-                            List<Arrival> into, float speedOfSound = 343.0f)
+                            List<Arrival> into, float speedOfSound = 343.0f,
+                            int maxOrder = 1, bool separateFirst = false)
     {
         into.Clear();
         if (solids == null || solids.Count == 0) return;
 
         float direct = Vector3.Distance(source, listener);
         if (direct < 1e-3f) return;
+        (_mirrors ??= new List<(int, int, float)>()).Clear();
 
         for (int i = 0; i < solids.Count; i++)
         {
@@ -181,13 +213,25 @@ public static class EarlyReflections
                     gLow, gMid, gHigh,
                     Math.Clamp(p.Scattering, 0f, 1f),
                     SurfaceId(i, f)));
+                (_mirrors ??= new List<(int, int, float)>()).Add((i, f, gMid));
             }
         }
 
-        // Loudest first, and only as many as a listener can tell apart: a budget cut has to take the
-        // arrivals nobody would have heard.
-        into.Sort(static (a, b) =>
+        if (Math.Min(maxOrder, MaxOrder) >= 2)
+            FindHigherOrders(source, listener, direct, solids, into, speedOfSound, Math.Min(maxOrder, MaxOrder));
+
+        // Only as many as a listener can tell apart, and the ones they CAN tell apart first.
+        //
+        // The cap used to keep the loudest four — and the loudest are the ground and the nearest wall,
+        // a few milliseconds behind the direct sound, inside the fusion window: the room, which the
+        // renderer drops, because a fused copy is not a voice. So the cap spent its slots on arrivals
+        // that were never going to play, and the far facade's slapback and the flutter between two
+        // facades — the echoes you actually hear as echoes — were cut to make room for them. Separate
+        // events first, then loudest; a budget cut has to take what nobody would have heard.
+        into.Sort((a, b) =>
         {
+            bool sa = separateFirst && IsSeparateEvent(a), sb = separateFirst && IsSeparateEvent(b);
+            if (sa != sb) return sb.CompareTo(sa);
             float ea = MathF.Max(a.GainLow, MathF.Max(a.GainMid, a.GainHigh));
             float eb = MathF.Max(b.GainLow, MathF.Max(b.GainMid, b.GainHigh));
             return eb.CompareTo(ea);
@@ -204,6 +248,133 @@ public static class EarlyReflections
         // are answering, which is the whole of the time it matters.
         into.Sort(static (a, b) => a.SurfaceId.CompareTo(b.SurfaceId));
     }
+
+    /// <summary>One mirror a higher-order copy can come off: a face, and what it keeps per band.</summary>
+    private readonly record struct Mirror(int Solid, int Face, Vector3 Centre, Vector3 Normal,
+                                          Vector3 U, Vector3 V, float HalfU, float HalfV,
+                                          float KeepLow, float KeepMid, float KeepHigh, float Scattering);
+
+    [ThreadStatic] private static List<(Mirror M, float Score)>? _mirrorScratch;
+    [ThreadStatic] private static Vector3[]? _images, _hits;
+    [ThreadStatic] private static int[]? _chain;
+    [ThreadStatic] private static List<(int Solid, int Face, float Gain)>? _mirrors;
+
+    /// <summary>
+    /// The copies of copies: every chain of two or three surfaces, drawn from the nearest dozen, that
+    /// sends a sound from the source to the ear. The image-source method, applied again: mirror the
+    /// source through the first face, mirror THAT through the second, and so on; the ear hears the
+    /// last image, and the path is found by walking back from the ear through each face in turn. Any
+    /// step whose crossing point falls off its face, or whose leg is blocked, and the chain is not a
+    /// path.
+    /// </summary>
+    private static void FindHigherOrders(Vector3 source, Vector3 listener, float direct,
+                                         IReadOnlyList<Solid> solids, List<Arrival> into, float speedOfSound,
+                                         int maxOrder)
+    {
+        // The mirrors are the surfaces that already sent this sound to this ear once: every face that
+        // gave a valid first-order copy. That is the whole of "a surface that can take part", and it
+        // is found, not guessed — scoring faces by size and distance picked the ground and the floor
+        // slabs INSIDE the towers on Main Street (huge, near, and behind the facade), and not one
+        // chain survived. A face that cannot reflect the sound to you directly is either hidden or
+        // facing away, and a chain through it is very nearly always one or the other too.
+        var cand = _mirrorScratch ??= new List<(Mirror, float)>(64);
+        cand.Clear();
+        foreach (var (si, f, gain) in _mirrors ?? new List<(int, int, float)>())
+        {
+            var s = solids[si];
+            if (!FacePlane(s, f, out var c, out var n, out var u, out var v, out float hu, out float hv)) continue;
+            var p = AcousticRegistry.GetProperties(s.Material);
+            cand.Add((new Mirror(si, f, c, n, u, v, hu, hv,
+                                 1f - Math.Clamp(p.AbsorptionLow, 0f, 1f), 1f - Math.Clamp(p.AbsorptionMid, 0f, 1f),
+                                 1f - Math.Clamp(p.AbsorptionHigh, 0f, 1f), Math.Clamp(p.Scattering, 0f, 1f)), -gain));
+        }
+        if (cand.Count < 2) return;
+        cand.Sort(static (a, b) => a.Score.CompareTo(b.Score));
+        int k = Math.Min(HigherOrderSurfaces, cand.Count);
+
+        var images = _images ??= new Vector3[MaxOrder + 1];
+        var hits = _hits ??= new Vector3[MaxOrder + 1];
+        var chain = _chain ??= new int[MaxOrder];
+
+        void Try(int order)
+        {
+            // The images, forward from the source.
+            images[0] = source;
+            float keepL = 1f, keepM = 1f, keepH = 1f, scatter = 0f;
+            for (int j = 0; j < order; j++)
+            {
+                var m = cand[chain[j]].M;
+                float d = Vector3.Dot(images[j] - m.Centre, m.Normal);
+                if (d <= 0.01f) return;                       // mirrored from behind: no such copy
+                images[j + 1] = images[j] - 2f * d * m.Normal;
+                keepL *= m.KeepLow; keepM *= m.KeepMid; keepH *= m.KeepHigh;
+                scatter = MathF.Max(scatter, m.Scattering);
+            }
+            var last = cand[chain[order - 1]].M;
+            if (Vector3.Dot(listener - last.Centre, last.Normal) <= 0.01f) return;
+
+            float pathLength = Vector3.Distance(images[order], listener);
+            if (pathLength > RangeMetres || pathLength <= direct) return;
+            float spread = direct / pathLength;
+            if (MathF.Max(keepL, MathF.Max(keepM, keepH)) * spread < MinRelativeAmplitude) return;
+
+            // Back from the ear: where the line to each image crosses its face.
+            Vector3 toward = listener;
+            for (int j = order - 1; j >= 0; j--)
+            {
+                var m = cand[chain[j]].M;
+                Vector3 from = images[j + 1];
+                float denom = Vector3.Dot(toward - from, m.Normal);
+                if (MathF.Abs(denom) < 1e-5f) return;
+                float t = Vector3.Dot(m.Centre - from, m.Normal) / denom;
+                if (t <= 0f || t >= 1f) return;
+                Vector3 hit = from + (toward - from) * t;
+                Vector3 local = hit - m.Centre;
+                if (MathF.Abs(Vector3.Dot(local, m.U)) > m.HalfU || MathF.Abs(Vector3.Dot(local, m.V)) > m.HalfV) return;
+                hits[j] = hit;
+                toward = hit;
+            }
+
+            // Every leg clear of everything but the faces it runs between.
+            Vector3 prev = source;
+            for (int j = 0; j <= order; j++)
+            {
+                Vector3 next = j < order ? hits[j] : listener;
+                int skipA = j > 0 ? cand[chain[j - 1]].M.Solid : -1;
+                int skipB = j < order ? cand[chain[j]].M.Solid : -1;
+                if (!LegIsClear(prev, next, solids, skipA, skipB)) return;
+                prev = next;
+            }
+
+            int id = FirstOrderIdSpace;
+            for (int j = 0; j < order; j++)
+                id = unchecked(id * 31 + SurfaceId(cand[chain[j]].M.Solid, cand[chain[j]].M.Face) + 1);
+            id = FirstOrderIdSpace + (int)((uint)id % (uint)(int.MaxValue - FirstOrderIdSpace));
+
+            into.Add(new Arrival(images[order], hits[order - 1], pathLength,
+                                 (pathLength - direct) / MathF.Max(1f, speedOfSound),
+                                 keepL * spread, keepM * spread, keepH * spread, scatter, id, order));
+        }
+
+        for (int a = 0; a < k; a++)
+        for (int b = 0; b < k; b++)
+        {
+            if (b == a) continue;                              // a plane cannot mirror its own image
+            chain[0] = a; chain[1] = b;
+            Try(2);
+            if (maxOrder < 3) continue;
+            for (int c = 0; c < k; c++)
+            {
+                if (c == b) continue;
+                chain[2] = c;
+                Try(3);
+            }
+        }
+    }
+
+    /// <summary>First-order surface ids live below this; a chain's id is hashed above it, so the two
+    /// can never name the same voice.</summary>
+    private const int FirstOrderIdSpace = 1 << 28;
 
     /// <summary>A surface's identity, stable for the life of a scene: which box, which face. A wall's
     /// reflection has to keep the same voice as the listener moves, or it restarts every frame.</summary>
@@ -240,11 +411,11 @@ public static class EarlyReflections
 
     /// <summary>Is the straight run between two points clear of every solid except the one being
     /// reflected off? Its own face is the thing the sound is touching, so it cannot block itself.</summary>
-    private static bool LegIsClear(Vector3 a, Vector3 b, IReadOnlyList<Solid> solids, int skip)
+    private static bool LegIsClear(Vector3 a, Vector3 b, IReadOnlyList<Solid> solids, int skip, int skip2 = -1)
     {
         for (int i = 0; i < solids.Count; i++)
         {
-            if (i == skip) continue;
+            if (i == skip || i == skip2) continue;
             var s = solids[i];
             if (GeometryUtils.LineIntersectsOBB(a, b, s.Center, s.Size, s.Rotation)) return false;
         }

@@ -130,6 +130,11 @@ beacon is an entity with an emitter and nothing more.
 
 Doors are the obvious first category: a blip on the door leaf, heard only when the category is on.
 
+**Built 2026-09-23** exactly as above: `OpenFPS.Common/Beacons.cs`, `IdentityComponent.BeaconCategory`,
+`MapData.BeaconPolicy`, client `BeaconAids` and `/beacons`. Doors, items and drivable cars are beacons
+by being what they are (the city has 470 door beacons and nobody placed one); a door blips once at
+1 kHz, an item twice at 1.5 kHz, a car once, lower. See `docs/AUTHORING.md` for the map and prefab fields.
+
 ---
 
 ## 4. Roads, infrastructure and placement

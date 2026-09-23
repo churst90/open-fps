@@ -649,7 +649,11 @@ public class AsyncAcousticWorker : IDisposable
         if (solids.Count == 0) return;
 
         _reflectionScratch ??= new List<EarlyReflections.Arrival>();
-        EarlyReflections.Find(req.SourcePos, req.ListenerPos, solids, _reflectionScratch, AudioPhysics.SpeedOfSound);
+        // Up to third order out in the open — the flutter between two facades, the clap handed back
+        // across a street — and first order in a room, where the copies of copies are the tail and
+        // the reverb bus already is that. Separate events first: this renderer voices nothing else.
+        EarlyReflections.Find(req.SourcePos, req.ListenerPos, solids, _reflectionScratch, AudioPhysics.SpeedOfSound,
+                              maxOrder: listenerEnclosed ? 1 : EarlyReflections.MaxOrder, separateFirst: true);
 
         _lastReflectionCount = 0;
         for (int i = 0; i < _reflectionScratch.Count; i++)
