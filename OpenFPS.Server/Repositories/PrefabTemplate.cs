@@ -281,6 +281,13 @@ public class PrefabTemplate
     /// </summary>
     public bool? IsDoor { get; set; }
 
+    /// <summary>
+    /// The beacon category, for a prefab that is a beacon: "exit", "stairs", "waypoint"... Doors and
+    /// items need not say — they are door and item beacons by being doors and items. A Beacon that
+    /// says nothing is a waypoint. See OpenFPS.Common.Beacons.
+    /// </summary>
+    public string? BeaconCategory { get; set; }
+
     /// <summary>How long the full swing takes, seconds. Defaults to a little under a second.</summary>
     public float? SwingSeconds { get; set; }
 

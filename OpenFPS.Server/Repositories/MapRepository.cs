@@ -60,6 +60,12 @@ public class MapData
     /// e.g. "AMBIENCE/woods_mid_day". See MapManifest.AmbienceId.</summary>
     public string AmbienceId { get; set; } = string.Empty;
 
+    /// <summary>
+    /// Which beacon categories this map allows, category to policy: "default_on", "default_off",
+    /// "forced_on" or "forbidden". Anything not listed is default_on. See OpenFPS.Common.Beacons.
+    /// </summary>
+    public Dictionary<string, string>? BeaconPolicy { get; set; }
+
     public List<EntityData> Entities { get; set; } = new();
 
     /// <summary>Vehicles that drive the map's roads. See VehicleSystem.</summary>

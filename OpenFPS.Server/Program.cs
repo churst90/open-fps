@@ -535,6 +535,8 @@ public class GameServer
             manifest.MapMax = mapData.MaxBound;
             manifest.Gravity = mapData.Gravity;
             manifest.AmbienceId = mapData.AmbienceId ?? "";
+            manifest.BeaconPolicy = mapData.BeaconPolicy == null ? Array.Empty<string>()
+                : mapData.BeaconPolicy.Select(kv => $"{kv.Key}={kv.Value}").ToArray();
             manifest.Temperature = mapData.Temperature;
             manifest.Humidity = mapData.Humidity;
             manifest.AirPressure = mapData.AirPressure;

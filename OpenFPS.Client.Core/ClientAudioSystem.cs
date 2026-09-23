@@ -24,6 +24,9 @@ public class ClientAudioSystem
     private readonly SoundMappingService _sounds;
     private readonly LocalPlayerState _state;
     private readonly DrivingAids _drivingAids;
+    private readonly BeaconAids _beacons;
+    /// <summary>Beacon categories, policies and the player's switches. See BeaconAids.</summary>
+    public BeaconAids Beacons => _beacons;
     /// <summary>The driver's cues and readout. See DrivingAids.</summary>
     public DrivingAids Driving => _drivingAids;
     private readonly SpatialService _spatial; 
@@ -332,6 +335,7 @@ public class ClientAudioSystem
         _sounds = sounds;
         _state = state;
         _drivingAids = new DrivingAids(audio);
+        _beacons = new BeaconAids(audio);
         _spatial = new SpatialService();
         _acoustics = new SpatialAcoustics(_spatial); // Share the same SpatialService instance
         // The short sounds the world reports. Shares this system's acoustics so a rendered latch
@@ -448,6 +452,8 @@ public class ClientAudioSystem
         _audio.UpdateListener(visualEyePos, listenerRotation, listenerVelocity, listenerRegionId);
         _audio.UpdateShelter(_state.ShelterFactor);
         WorldAudio.ListenerVehicleId = _state.RidingEntityId;
+        // The doors, the things to pick up and the cars to get into around you.
+        _beacons.Update(world, visualEyePos, _clock.Elapsed.TotalSeconds);
         // The lane lines, if you are the one driving.
         _drivingAids.Update(world, _state, _clock.Elapsed.TotalSeconds);
         // ...and the rest of the world through the glass, if you are sitting in anything with a roof.
@@ -709,6 +715,13 @@ public class ClientAudioSystem
             if (entityId == OwnEntityId) continue;
             if (world.Entities.TryGetValue(entityId, out var snap))
             {
+                // An authored beacon whose category is switched off — by the map or by you — is not
+                // heard. (Doors, items and cars are blipped by BeaconAids; this is the placed kind.)
+                if (snap.Definition.Type == EntityType.Beacon && !_beacons.IsOn(snap.Definition.Identity.BeaconCategory))
+                {
+                    if (_audio.IsPlaying(entityId)) _audio.StopSound(entityId);
+                    continue;
+                }
                 ProcessAudioEmitter(world, snap, visualEyePos, engineDt);
             }
         }

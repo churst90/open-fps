@@ -154,6 +154,20 @@ public class PrefabRepository
     /// <param name="regionName">What to call the region this spawns, if it declares one. A prefab
     /// names a KIND of room ("Acoustic Region"); the map that places one names THAT room ("Pit lane").
     /// Without this every region in a map answers to its prefab's name, which is no name at all.</param>
+    /// <summary>
+    /// What kind of beacon a thing is by being what it is: a door is a door beacon, an item an item
+    /// beacon, and a Beacon says its own category or is a waypoint. Everything else is not a beacon.
+    /// </summary>
+    public static string BeaconCategoryOf(PrefabTemplate t)
+    {
+        if (!string.IsNullOrWhiteSpace(t.BeaconCategory) && OpenFPS.Common.Beacons.IsCategory(t.BeaconCategory))
+            return t.BeaconCategory!.ToLowerInvariant();
+        if (t.IsDoor == true) return OpenFPS.Common.Beacons.Door;
+        if (t.Type == EntityType.Item) return OpenFPS.Common.Beacons.Item;
+        if (t.Type == EntityType.Beacon) return OpenFPS.Common.Beacons.Waypoint;
+        return "";
+    }
+
     public Entity Spawn(World world, string prefabId, Vector3 position, Quaternion? rotation = null,
                         Vector3? scale = null, string? regionName = null)
     {
@@ -170,7 +184,8 @@ public class PrefabRepository
             new NameComponent { Name = t.Name },
             // PrefabId recorded on the instance so it can be written back out again: a composite saved
             // from a house somebody built has to know that this wall is a `concrete_wall`.
-            new IdentityComponent { Name = t.Name, Description = t.Description, Announce = AnnouncesByDefault(t), PrefabId = t.Id },
+            new IdentityComponent { Name = t.Name, Description = t.Description, Announce = AnnouncesByDefault(t), PrefabId = t.Id,
+                                    BeaconCategory = BeaconCategoryOf(t) },
             t.Type
         };
 

@@ -112,6 +112,12 @@ public partial struct IdentityComponent
     /// </summary>
     public string PrefabId { get; set; } = "";
 
+    /// <summary>
+    /// Which beacon category this thing belongs to — "door", "item", "vehicle"... — or empty for
+    /// none. See <see cref="OpenFPS.Common.Beacons"/>. Appended: the wire format is positional.
+    /// </summary>
+    public string BeaconCategory { get; set; } = "";
+
     public IdentityComponent() { }
 }
 

@@ -516,7 +516,13 @@ public class CompositeService
             new Transform { Position = position, Rotation = rotation, IsDirty = true },
             new CompositeComponent { Name = template.Name, Anchored = template.Anchored, TemplateId = template.Id, Owner = owner ?? "" },
             new NameComponent { Name = template.Name },
-            new IdentityComponent { Name = template.Name, Description = template.Description, Announce = true },
+            new IdentityComponent
+            {
+                Name = template.Name, Description = template.Description, Announce = true,
+                // Something you can get into and drive is a vehicle beacon: that is how you find
+                // the parked car.
+                BeaconCategory = string.IsNullOrWhiteSpace(template.VehiclePreset) ? "" : OpenFPS.Common.Beacons.Vehicle,
+            },
             EntityType.StaticObject));
         if (root == Entity.Null) return -1;
 

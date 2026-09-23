@@ -155,6 +155,10 @@ public partial class MapManifest : IMessage
     /// shelter, so walking into a building takes the world outside down rather than switching it off.</summary>
     public string AmbienceId = "";
 
+    /// <summary>The map's beacon policies, as "category=policy" — see Beacons.ReadPolicies. A
+    /// category the map does not mention is on by default and the player's to change.</summary>
+    public string[] BeaconPolicy = Array.Empty<string>();
+
     public MapManifest() { }
 }
 

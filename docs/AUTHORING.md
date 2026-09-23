@@ -231,6 +231,27 @@ Walls are geometry; the region is the acoustics; the portal is the hole. All thr
 purpose — the walls are what Steam Audio traces against, the region is what supplies the reverb, and the
 portal is what tells the engine the two rooms are coupled and where the sound comes through.
 
+## Beacons
+
+A beacon is a short blip that tells a player where something is. Every beacon has a **category**:
+`door`, `exit`, `stairs`, `item`, `vehicle`, `waypoint`.
+
+Most are not placed. A door prefab (`IsDoor`) is a door beacon, an `Item` is an item beacon, and a
+composite you can drive is a vehicle beacon, so a map with doors in it has door beacons without its
+author doing anything. A prefab of `"Type": "Beacon"` names its own category with
+`"BeaconCategory": "exit"` and defaults to `waypoint`.
+
+A map decides which categories its players may hear, with a policy per category:
+
+```json
+"BeaconPolicy": { "door": "forced_on", "item": "forbidden", "stairs": "default_off" }
+```
+
+`default_on` (the default for anything unlisted) and `default_off` leave the choice to each player;
+`forced_on` and `forbidden` do not. Players switch categories with `/beacons` (lists them and says
+why each is on or off), `/beacons door` (switches it) or `/beacons door on|off`. Their choices are
+kept on their own machine in `~/.config/openfps/beacons.json` and never reach the server.
+
 ## 4. What is checked at load, and what happens when it fails
 
 **Prefabs are rejected.** `PrefabValidator` runs on every file. A prefab with errors is not registered, each

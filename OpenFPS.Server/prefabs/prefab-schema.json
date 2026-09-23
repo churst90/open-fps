@@ -404,6 +404,11 @@
       "type": "boolean",
       "description": "Declares this a DOOR: a leaf that swings out of its own doorway. A door is the one thing that is legitimately a portal AND solid — the leaf blocks the opening while it is shut, which is what a door is for, and opening it moves the leaf aside rather than making it insubstantial. It needs a ColliderSize, because the leaf's own width is both what it blocks and the size of the hole it leaves. The opening it makes is not authored: it is however far the leaf has swung."
     },
+    "BeaconCategory": {
+      "type": "string",
+      "enum": ["door", "exit", "stairs", "item", "vehicle", "waypoint"],
+      "description": "The beacon category of a prefab of Type Beacon: which kind of place its blip marks. Doors and items need not say — they are door and item beacons by being doors and items. A Beacon that says nothing is a waypoint. Whether a category is heard is the map's BeaconPolicy and each player's /beacons switch."
+    },
     "SwingSeconds": {
       "type": "number",
       "exclusiveMinimum": 0,

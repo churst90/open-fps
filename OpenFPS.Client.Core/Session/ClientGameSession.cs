@@ -676,6 +676,7 @@ public sealed class ClientGameSession : IDisposable
                 // ducked by shelter rather than switched off, so a doorway is a change in the world
                 // rather than a boundary the world stops at.
                 _audioSystem.SetMapAmbience(manifest.AmbienceId);
+                _audioSystem.Beacons.SetMapPolicy(manifest.BeaconPolicy);
 
                 _expectedEntityCount = manifest.ExpectedEntityCount;
                 _voxelResolution = manifest.VoxelResolution;
@@ -1010,6 +1011,13 @@ public sealed class ClientGameSession : IDisposable
         {
             var parts = input[1..].Split(' ', StringSplitOptions.RemoveEmptyEntries);
             if (parts.Length == 0) return;
+            // Answered here, not by the server: which beacons YOU hear is yours, and nobody else's.
+            if (parts[0].Equals("beacons", StringComparison.OrdinalIgnoreCase)
+                || parts[0].Equals("beacon", StringComparison.OrdinalIgnoreCase))
+            {
+                Say(_audioSystem.Beacons.Command(parts.Skip(1).ToArray()));
+                return;
+            }
             _network.Send(new TextCommand { Command = parts[0].ToLowerInvariant(), Args = parts.Skip(1).ToArray() });
         }
         else
