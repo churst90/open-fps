@@ -222,9 +222,45 @@ public static class Enclosure
     {
         if (solids == null || solids.Count == 0)
             return new Survey(0f, 1f, ReverberantRangeMetres, 1f, 1f, 1f);
+        var scene = solids;
         solids = Nearby(listener, solids);
         if (solids.Count == 0)
             return new Survey(0f, 1f, ReverberantRangeMetres, 1f, 1f, 1f);
+
+        // ── Where the room ENDS ────────────────────────────────────────────────────────────────
+        //
+        // A ray that meets a surface is counted as this room's surface, however far away it is. For
+        // a small place in the open that is wrong: under a bus shelter the rays leave through the open
+        // front, cross the road, hit the building opposite, and come back recorded as the shelter's own
+        // hard walls — 612 m² of surface for a 65 m² box, and a two-second tail under a sheet of glass.
+        //
+        // Three distance-keyed fixes failed (see the a-small-room-inside-a-big-one note): anything that
+        // says "far means gone" also cuts a big flat room's own far wall. What actually marks the edge
+        // of a room is that the OPENNESS changes across it. So for every ray that goes a fair way before
+        // it strikes, the openness halfway along it is compared with the listener's own: a jump means
+        // the ray crossed out of this place into a much more open one, and it counts as escaped. Under
+        // the shelter (0 % open) a ray out of the front reaches the road (a third open) — gone. In the
+        // garage (1 %) a ray to its far wall stays in the garage (1 %) — kept. In the street (a third)
+        // a ray to a facade stays in the street — kept.
+        //
+        // Known limit, and it is the honest one: a small room opening onto a big ENCLOSED hall reads
+        // closed on both sides, so nothing jumps and it is surveyed as the hall.
+        var casts = _casts ??= new RayHit[Rays];
+        int misses = 0;
+        for (int k = 0; k < Rays; k++)
+        {
+            Vector3 dir = SphereDirection(k, Rays);
+            bool hit = Cast(listener, dir, solids, out float d, out Vector3 n, out float keep, out var pr);
+            casts[k] = new RayHit(hit, d, n, keep, pr);
+            if (!hit) misses++;
+        }
+        float ownOpenness = misses / (float)Rays;
+        for (int k = 0; k < Rays && ownOpenness < AlreadyOutside; k++)
+        {
+            if (!casts[k].Hit || casts[k].Distance < BoundaryMinMetres) continue;
+            Vector3 mid = listener + SphereDirection(k, Rays) * (casts[k].Distance * 0.5f);
+            if (Openness(mid, scene, solids) - ownOpenness > BoundaryJump) casts[k] = casts[k] with { Hit = false };
+        }
 
         float returned = 0f;
         Vector3 returnedFrom = Vector3.Zero;
@@ -239,7 +275,11 @@ public static class Enclosure
         for (int k = 0; k < Rays; k++)
         {
             Vector3 dir = SphereDirection(k, Rays);
-            if (!Cast(listener, dir, solids, out float d1, out Vector3 n1, out float keep1, out var props))
+            var c = casts[k];
+            float d1 = c.Distance, keep1 = c.Keep;
+            Vector3 n1 = c.Normal;
+            var props = c.Props;
+            if (!c.Hit)
             {
                 // Open in this direction: an opening absorbs everything that reaches it, and that is the
                 // whole of its contribution. It does NOT count toward the mean free path — the mean free
@@ -282,6 +322,64 @@ public static class Enclosure
             hits > 0 ? pathSum / hits : ReverberantRangeMetres,
             aLow / Rays, aMid / Rays, aHigh / Rays,
             centroid, anisotropy, surface);
+    }
+
+    private readonly record struct RayHit(bool Hit, float Distance, Vector3 Normal, float Keep, MaterialProperties Props);
+    [ThreadStatic] private static RayHit[]? _casts;
+
+    /// <summary>A ray has to go this far before the question "did it leave the room?" is asked: a
+    /// surface within three metres of you is your own.</summary>
+    private const float BoundaryMinMetres = 3f;
+
+    /// <summary>
+    /// How much more open the middle of a ray's path has to be than where you stand before the ray
+    /// counts as having left. The places it has to tell apart are a closed box (0-2 % open), a street
+    /// (about a third) and a field (a half), so a jump of fifteen points separates them with room to
+    /// spare either way.
+    /// </summary>
+    private const float BoundaryJump = 0.15f;
+
+    /// <summary>Rays per openness probe: a coarse sphere, because the question is "about how open",
+    /// and it is asked at up to a couple of hundred points per survey.</summary>
+    private const int OpennessRays = 14;
+
+    /// <summary>A listener this open is not inside anything small: most of the sky is already theirs,
+    /// and there is no room here to leave. The boundary is not looked for.</summary>
+    private const float AlreadyOutside = 0.35f;
+
+    /// <summary>
+    /// Openness probes are cached on a half-metre grid: the map does not move. The probe itself is
+    /// cast from the point that asked, never from the centre of its cell — a two-metre cell centred
+    /// three metres up put the probe for a 2.5 m garage inside its ceiling slab and above its roof,
+    /// in the open sky, and eleven per cent of a sealed garage read as having left it.
+    /// </summary>
+    private const float OpennessCell = 0.5f;
+
+    /// <summary>...and two metres across. Openness changes quickly with height (a floor, a ceiling,
+    /// a roofline) and slowly across the ground, and a listener walking down a street asks about
+    /// nearly the same points every survey: a half-metre cell in every direction missed the cache on
+    /// almost every probe and made the survey five times as costly as it had been.</summary>
+    private const float OpennessCellAcross = 2f;
+
+    [ThreadStatic] private static Dictionary<(int, int, int), float>? _openness;
+    [ThreadStatic] private static object? _opennessScene;
+
+    /// <summary>The fraction of directions from a point that meet nothing — how open a place is.</summary>
+    private static float Openness(Vector3 at, object scene, IReadOnlyList<Solid> solids)
+    {
+        if (!ReferenceEquals(_opennessScene, scene) || _openness == null)
+        {
+            _openness = new Dictionary<(int, int, int), float>();
+            _opennessScene = scene;
+        }
+        var key = ((int)MathF.Floor(at.X / OpennessCellAcross), (int)MathF.Floor(at.Y / OpennessCell), (int)MathF.Floor(at.Z / OpennessCellAcross));
+        if (_openness.TryGetValue(key, out float cached)) return cached;
+        int open = 0;
+        for (int k = 0; k < OpennessRays; k++)
+            if (!Cast(at, SphereDirection(k, OpennessRays), solids, out _, out _, out _)) open++;
+        float value = open / (float)OpennessRays;
+        _openness[key] = value;
+        return value;
     }
 
     /// <summary>

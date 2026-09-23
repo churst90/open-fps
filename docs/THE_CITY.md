@@ -91,10 +91,10 @@ crossing where it meets Main Street.
 | Residential street | `-300,1.6,-96` | 3 % | 49 % | 6.8 | 352 ms | 2 % |
 | Flat, Kestrel House | `20,1.6,-60` | 61 % | 0 % | 2.1 | 425 ms | 44 % |
 | Inside a house | `-325,1.6,-106` | 60 % | 0 % | 4.2 | 616 ms | 76 % |
-| Main Street | `0,1.6,-40` | 43 % | 19 % | 9.0 | 1314 ms | 16 % |
-| Bus shelter | `9,1.6,-60` | 90 % | **0 %** | 2.4 | **2204 ms** | **161 %** |
+| Main Street | `0,1.6,-40` | 42 % | 20 % | 8.8 | 1262 ms | 16 % |
+| Bus shelter | `9,1.6,-60` | 87 % | 4 % | 2.0 | 947 ms | 201 % |
 | Tunnel, middle | `0,1.6,-250` | 90 % | 1 % | 6.1 | 4805 ms | 59 % |
-| Garage, level 0 | `-20,1.6,60` | 93 % | 1 % | 5.0 | 5884 ms | 38 % |
+| Garage, level 0 | `-20,1.6,60` | 91 % | 3 % | 4.4 | 3175 ms | 34 % |
 | Hangar | `250,1.6,190` | 86 % | 2 % | 12.6 | 8870 ms | 34 % |
 
 The runway is the control and the reason the airport is on the map: it is the one place with nothing
@@ -148,9 +148,15 @@ lid on, measuring 2.4 % absorption and a **9.2 s** tail. An open-deck car park i
 ventilated by having no walls. Rebuilt as waist-high spandrels on piers it measures 5.9 s, which is
 the family the old 21 × 28 garage was in when it was approved by ear.
 
-It is still long. Real multi-storey car parks measure 2–4 s, and that gap is the open modelling
-question in `docs/NEXT_AFTER_THE_TAIL.md` §5 — the room equation uses ENCLOSURE, `e/(1−e)`, rather
-than measured absorption `(1−ᾱ)/ᾱ` — not a fault in this map.
+It was still long, and the reason was the survey, not the map. Since 2026-09-23 the survey knows where
+a room ENDS: a ray whose midpoint is much more open than the listener has crossed out of this place
+(`Enclosure.Look`, the openness boundary). Rays that run out through the garage's open sides now
+count as leaving it, and level 0 measures **3.2 s** — inside the 2–4 s real open-deck car parks
+measure. The same change took the bus shelter from 2.2 s to 0.95 s and Main Street from 1.31 to 1.26; a real one is about 0.4, and the
+rest is that absorption is averaged by solid angle from the listener rather than by area (from the
+back of a shelter its open front looks small). That refinement changes every mixed-material room,
+the approved rooms map included, so it waits for a listening session. Every other place in the table
+measured exactly as before. The survey costs 48 ms where it cost 30 (`EnclosureCostTests`).
 
 ---
 
