@@ -649,11 +649,14 @@ public class AsyncAcousticWorker : IDisposable
         if (solids.Count == 0) return;
 
         _reflectionScratch ??= new List<EarlyReflections.Arrival>();
-        // Up to third order out in the open — the flutter between two facades, the clap handed back
-        // across a street — and first order in a room, where the copies of copies are the tail and
-        // the reverb bus already is that. Separate events first: this renderer voices nothing else.
-        EarlyReflections.Find(req.SourcePos, req.ListenerPos, solids, _reflectionScratch, AudioPhysics.SpeedOfSound,
-                              maxOrder: listenerEnclosed ? 1 : EarlyReflections.MaxOrder, separateFirst: true);
+        // FIRST ORDER, and the old ranking, for a sound that goes on. Heard 2026-09-23 with third order
+        // and separate-events-first here: an aeroplane's jet and a bus's air hiss mirrored off the
+        // hangar and the facades became extra copies of themselves standing still in the distance,
+        // cutting in and out as each path came and went — "ghostly washes of white noise that stay in
+        // one place" — and a far siren's image put it in front of you. The echo of a SUSTAINED sound is
+        // not heard as an event; it is part of the field, which the reverb is. Copies of copies belong
+        // to one-off sounds (WorldAudioPlayer), where an echo happens once and is gone.
+        EarlyReflections.Find(req.SourcePos, req.ListenerPos, solids, _reflectionScratch, AudioPhysics.SpeedOfSound);
 
         _lastReflectionCount = 0;
         for (int i = 0; i < _reflectionScratch.Count; i++)

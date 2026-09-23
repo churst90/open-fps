@@ -886,7 +886,9 @@ def house(label, cx, cz, facing, two_storey=False):
     box("furniture_soft", x0 + 0.8, x0 + 2.6, 0.08, 0.95, zlo + 1.4, zhi - 1.4)
     box("furniture_soft", x1 - 2.4, x1 - 0.4, 0.08, 0.75, zlo + 1.2, zlo + 3.4)
     box("furniture_soft", x0 + 0.4, x0 + 1.0, 0.08, 2.0, zhi - 2.6, zhi - 0.6)
-    box("carpet_wall", cx - 1.6, cx + 1.6, 0.9, h - 0.15,
+    # The curtain hangs over the front WINDOW, beside the door — not across the doorway, which is
+    # where it hung until 2026-09-23: every front door on the estate opened onto a solid curtain.
+    box("carpet_wall", cx + 1.1, cx + 3.3, 0.9, h - 0.15,
         front_z0 + 0.25 if d > 0 else front_z1 - 0.3, front_z0 + 0.3 if d > 0 else front_z1 - 0.25)
     box("carpet_floor", cx - 1.0, x1 - 0.4, 0.08, 0.12, zlo + 0.4, zhi - 0.4)
     # PLASTER ON THE INSIDE OF THE BRICK, which is what a house is and is the missing membrane.

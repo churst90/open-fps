@@ -50,7 +50,7 @@ public class SpatialAcoustics
         // the same every tick for the same geometry, and it needs no merging because a surface
         // produces one arrival by construction.
         _reflectionScratch ??= new List<EarlyReflections.Arrival>();
-        EarlyReflections.Find(sourcePos, listenerPos, ReflectionSolids(world), _reflectionScratch, separateFirst: true);
+        EarlyReflections.Find(sourcePos, listenerPos, ReflectionSolids(world), _reflectionScratch);
         for (int i = 0; i < _reflectionScratch.Count; i++)
         {
             var a = _reflectionScratch[i];
@@ -88,7 +88,7 @@ public class SpatialAcoustics
     /// <summary>The world's solid boxes as the reflection model wants them, rebuilt only when the
     /// acoustic map changes. The same definition of "audio geometry" the simulator's scene uses, so the
     /// two paths cannot disagree about what a wall is.</summary>
-    private IReadOnlyList<EarlyReflections.Solid> ReflectionSolids(WorldSnapshot world)
+    public IReadOnlyList<EarlyReflections.Solid> ReflectionSolids(WorldSnapshot world)
     {
         if (ReferenceEquals(_reflectionSolidsFor, world.AcousticMap) && _reflectionSolids.Count > 0)
             return _reflectionSolids;

@@ -875,6 +875,11 @@ public class GameServer
                 return;
             }
 
+            // Nothing to get into, and an open door within reach: shut it. So beside a house, E opens
+            // the door and E again shuts it, the way a handle does; beside a car the sequence is still
+            // door, then in. Shutting is the loud half of a door, and it was only reachable by typing.
+            if (CloseDoorInReach(world, position, Say)) return;
+
             if (interact.TargetEntityId.HasValue
                 && _maps.TryGetMap(session.CurrentMapId, out var w, out _, out _, out var lookup)
                 && lookup.TryGetValue(interact.TargetEntityId.Value, out var target)
@@ -914,6 +919,30 @@ public class GameServer
         if (nearest == null) return false;
         if (!DoorSystem.Set(world, nearest.Value, open: true)) return false;
         say($"The {name} swings open.");
+        return true;
+    }
+
+    /// <summary>Shuts the nearest open door within arm's length, if there is one.</summary>
+    private static bool CloseDoorInReach(World world, Vector3 position, Action<string> say)
+    {
+        Entity? nearest = null;
+        float best = PhysicsConstants.InteractionRange;
+        string name = "door";
+        world.Query(new QueryDescription().WithAll<Transform, DoorComponent>(), (Entity e, ref Transform t, ref DoorComponent d) =>
+        {
+            if (d.Target <= 0f) return;                   // already shut, or on its way
+            // Measured to where the door SHUTS, not where the leaf has swung to: that is the doorway,
+            // which is what somebody standing in front of it is next to.
+            float distance = MathF.Min(Vector3.Distance(position, t.Position),
+                                       d.Captured ? Vector3.Distance(position, d.ShutPosition) : float.MaxValue);
+            if (distance > best) return;
+            best = distance; nearest = e;
+            name = world.Has<IdentityComponent>(e) && !string.IsNullOrWhiteSpace(world.Get<IdentityComponent>(e).Name)
+                 ? world.Get<IdentityComponent>(e).Name : "door";
+        });
+        if (nearest == null) return false;
+        if (!DoorSystem.Set(world, nearest.Value, open: false)) return false;
+        say($"You shut the {name}.");
         return true;
     }
 

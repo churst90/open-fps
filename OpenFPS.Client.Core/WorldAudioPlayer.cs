@@ -181,7 +181,11 @@ public sealed class WorldAudioPlayer
                     item.SoundId, item.IsReflection ? " (echo)" : "", item.Sound.LevelDb,
                     Vector3.Distance(listenerPosition, item.Sound.Position), now - item.DueAt, _pending.Count);
 
-            if (!item.IsReflection) QueueReflections(item, reflections, listenerPosition, now);
+            if (!item.IsReflection)
+            {
+                QueueReflections(item, reflections, listenerPosition, now);
+                QueueHigherOrderEchoes(item, world, listenerPosition);
+            }
 
             var path = _acoustics.CalculateAcousticPath(world, item.SourceEntityId,
                                                         listenerPosition, item.Sound.Position);
@@ -294,6 +298,58 @@ public sealed class WorldAudioPlayer
     /// itself. Leaving it in applies it twice, which is a wall that answers a near source and goes
     /// silent for a far one.
     /// </summary>
+    /// <summary>How many copies-of-copies one event may add. A clap between two facades comes back as a
+    /// short train; past three the train is the tail.</summary>
+    private const int MaxHigherOrderEchoes = 3;
+    private readonly List<EarlyReflections.Arrival> _higher = new();
+
+    /// <summary>
+    /// The second and third bounces of a ONE-OFF sound, out in the open: the clap handed back and
+    /// forth between two facades, each crossing a street's width later than the last.
+    ///
+    /// Only here, and only outdoors. A one-off sound's echo is an event — it happens once and is gone —
+    /// which is exactly what a separate voice can render. A sustained sound's echo is not (see
+    /// AsyncAcousticWorker.AddEarlyReflections), and in a room the copies of copies are the dense
+    /// tail, which the reverb already is. First order stays with QueueReflections.
+    /// </summary>
+    private void QueueHigherOrderEchoes(in Pending item, WorldSnapshot world, Vector3 listenerPosition)
+    {
+        if (world.AcousticMap != null
+            && world.AcousticMap.Regions.TryGetValue(_acoustics.GetRegionAt(world, listenerPosition), out var room)
+            && RoomAcoustics.IsEnclosure(room)) return;
+
+        var solids = _acoustics.ReflectionSolids(world);
+        if (solids.Count == 0) return;
+        EarlyReflections.Find(item.Sound.Position, listenerPosition, solids, _higher, AudioPhysics.SpeedOfSound,
+                              maxOrder: EarlyReflections.MaxOrder, separateFirst: true);
+        float direct = MathF.Max(1f, Vector3.Distance(item.Sound.Position, listenerPosition));
+        int added = 0;
+        foreach (var a in _higher)
+        {
+            if (a.Order < 2 || !EarlyReflections.IsSeparateEvent(a)) continue;
+            // Loud enough against the sound it is a copy of to be heard as a second event at all.
+            if (a.GainMid < ImageSource.EchoAudibleRatio) continue;
+            // Placed at the image, which is the path length away: undo the spreading the engine will
+            // apply there, as QueueReflections does, so it is not applied twice.
+            float gain = Math.Clamp(a.GainMid * a.PathLength / direct, 0f, 1f);
+            if (gain < ImageSource.MinGain) continue;
+            var echo = item.Sound;
+            echo.Position = a.ImagePosition;
+            echo.LevelDb = item.Sound.LevelDb + 20f * MathF.Log10(gain);
+            _pending.Add(new Pending
+            {
+                Sound = echo,
+                SoundId = item.SoundId,
+                SourceEntityId = item.SourceEntityId,
+                // Not delayed here: see QueueReflections — the facade delays every submission by its
+                // own distance, and the image is the whole path length away.
+                DueAt = item.DueAt,
+                IsReflection = true,
+            });
+            if (++added >= MaxHigherOrderEchoes) break;
+        }
+    }
+
     private void QueueReflections(in Pending item, EngineReflections? reflections,
                                   Vector3 listenerPosition, double now)
     {
@@ -327,15 +383,14 @@ public sealed class WorldAudioPlayer
                 Sound = echo,
                 SoundId = item.SoundId,
                 SourceEntityId = item.SourceEntityId,
-                // LATER THAN THE SOUND IT IS A COPY OF — by exactly the extra distance it travelled.
-                //
-                // This was `item.DueAt`, so every echo of every world event arrived on the same sample
-                // as the direct sound. Reflection.DelaySeconds says of itself "seconds later than the
-                // direct sound: this is the whole point", and it was being thrown away. What that
-                // produces is not an echo: it is the direct sound with three or four copies of itself
-                // summed onto its own transient — louder, smeared, and arriving as ONE bang. Near a
-                // building, where there are surfaces to find, that is every world sound.
-                DueAt = item.DueAt + Math.Max(0f, r.DelaySeconds),
+                // ON TIME, because it is already late. The facade delays every submission by its own
+                // distance over the speed of sound, and an echo is submitted at its mirrored position —
+                // the whole path length away — so it arrives exactly its extra path behind the direct
+                // sound with nothing added here. This used to add r.DelaySeconds as well, from when no
+                // delay in the engine was honoured at all (FMOD read the wrong clock; see the provider's
+                // setDelay). Once that was fixed both applied, and every echo of every world sound came
+                // twice as late as the wall it came off: a facade's slapback at 180 ms instead of 90.
+                DueAt = item.DueAt,
                 IsReflection = true,
             });
         }
