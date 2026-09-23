@@ -531,6 +531,25 @@ public sealed class EngineVoiceState : IRenderedVoice
     private readonly float _panelCorner, _sealLeak, _windPaAt110;
     private float _panelLp, _windLp, _windHp, _windHpIn, _interiorMix;
 
+    // ── The loudness law, applied to what the engine is doing now ─────────────────────────────
+    //
+    // The mix places every source by Loudness.Place, which compresses its DECLARED level toward the
+    // ceiling (x0.45), so a 59 dB air conditioner is lifted a long way and a 94 dB car a little. An
+    // engine's declared level is its loudest second — full load — and idling it is 25 dB under that,
+    // uncompressed. So an idling hatchback three metres away rendered ELEVEN decibels under a window
+    // air conditioner three metres away, when physically it is nine decibels over it: "I start the
+    // car, get out, and it doesn't sound like it's running." It was running, at 750 rpm, the whole
+    // time.
+    //
+    // The fix is the same law applied to the deficit: however far under its declared level the
+    // machine is running, the voice is lifted by (1 - 0.45) of that, slowly (half a second), so an
+    // idling car sits where an idling car's level would have been placed. On for live voices only
+    // (the provider sets it): offline renders — the lab, the tests — still measure true pascals.
+    public bool CompensateLevel;
+    private double _levelMs;
+    private float _levelGain = 1f;
+    private const float LevelSeconds = 0.5f, MaxLiftDb = 20f;
+
     /// <summary>The speed the wind anchor is quoted at, m/s: 110 km/h.</summary>
     private const float WindReferenceSpeed = 110f / 3.6f;
 
@@ -718,6 +737,16 @@ public sealed class EngineVoiceState : IRenderedVoice
         if (_listenerKnown && !inside)
             Engine.SetListener(new Vector3(Volatile.Read(ref _listenerX), Volatile.Read(ref _listenerY), Volatile.Read(ref _listenerZ)));
         float panelA = 1f - MathF.Exp(-2f * MathF.PI * _panelCorner * dt);
+        // The lift for this block, from the level the machine has been running at lately.
+        float liftTarget = 1f;
+        if (CompensateLevel && _levelMs > 0)
+        {
+            float nowDb = 10f * MathF.Log10((float)_levelMs / (20e-6f * 20e-6f) + 1e-12f);
+            float deficit = Math.Clamp(Vehicle.SourceLevelDb - nowDb, 0f, MaxLiftDb / (1f - Loudness.DynamicRangeCompression));
+            liftTarget = MathF.Pow(10f, deficit * (1f - Loudness.DynamicRangeCompression) / 20f);
+        }
+        float liftStep = MathF.Max(1e-4f, (liftTarget - _levelGain) / MathF.Max(1, count));
+        double blockSum = 0;
         float windLpA = 1f - MathF.Exp(-2f * MathF.PI * 1200f * dt);
         float windHpA = MathF.Exp(-2f * MathF.PI * 180f * dt);
         for (int i = 0; i < count; i++)
@@ -793,6 +822,10 @@ public sealed class EngineVoiceState : IRenderedVoice
             }
             if (_chime != null) pa += StepChime();
 
+            // What the machine is radiating, before anything a listener's position does to it: the
+            // level the loudness law is applied to.
+            blockSum += (double)pa * pa;
+
             // Crossfaded over ~60 ms rather than switched, so getting in or out is not a click.
             _interiorMix += Math.Clamp((inside ? 1f : 0f) - _interiorMix, -envStep, envStep);
             if (_interiorMix > 0f)
@@ -824,11 +857,16 @@ public sealed class EngineVoiceState : IRenderedVoice
             // Written WITHOUT the soft ceiling, which now belongs to whoever sums the taps back up:
             // a limiter applied to each half separately is not the same limiter, and the single-voice
             // case has to come out bit for bit as it did before the machine had two outlets.
-            _ring[(int)(w & mask)] = pa * gain * _envelope;
-            _front[(int)(w & mask)] = front * gain * _envelope;
+            _levelGain += liftStep;
+            _ring[(int)(w & mask)] = pa * gain * _envelope * _levelGain;
+            _front[(int)(w & mask)] = front * gain * _envelope * _levelGain;
             w++;
         }
         Volatile.Write(ref _written, w);
+        _levelGain = liftTarget;
+        float blockMs = (float)(blockSum / Math.Max(1, count));
+        float a = 1f - MathF.Exp(-count / (LevelSeconds * SampleRate));
+        _levelMs += (blockMs - _levelMs) * a;
         if (envTarget <= 0f && _envelope <= 1e-4f) FadedOut = true;
     }
 }

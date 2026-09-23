@@ -246,8 +246,13 @@ public class OccupancyService
 
         CarDoor(session.CurrentMapId, world, root, seat);
 
+        // Whether it is running, said out loud: the engine idling is quiet, and a driver who cannot
+        // see the dashboard should not have to guess before reaching for the key.
+        string engine = world.Has<DriveComponent>(root)
+            ? world.Get<DriveComponent>(root).EngineOn ? " The engine is running." : " The engine is off; T starts it."
+            : "";
         message = seat.Controls
-            ? $"You are in the {seat.Name} seat of {composite.Name}. T turns the key. Forward and back to drive, left and right to steer."
+            ? $"You are in the {seat.Name} seat of {composite.Name}.{engine} W and S to drive, A and D to steer, shift T switches it off."
             : $"You are in the {seat.Name} seat of {composite.Name}.";
         Log.Information("{User} took the '{Seat}' seat of composite {Root} ('{Name}').",
                         session.Username, seat.Name, rootId, composite.Name);
@@ -292,6 +297,7 @@ public class OccupancyService
 
         var occupant = world.Get<OccupantComponent>(session.Entity);
         string name = "it";
+        string left = "";
         Vector3 from = world.Get<Transform>(session.Entity).Position;
         Vector3 spot = from;
 
@@ -304,6 +310,8 @@ public class OccupancyService
                 return false;
             }
             spot = FindStandingRoom(world, grid, root, session.Entity, from, occupant.BoardedFrom);
+            if (occupant.Controls && world.Has<DriveComponent>(root) && world.Get<DriveComponent>(root).EngineOn)
+                left = " You left the engine running.";
             if (world.Has<OccupancyComponent>(root) && occupant.SeatIndex < world.Get<OccupancyComponent>(root).Seats.Count)
                 CarDoor(session.CurrentMapId, world, root, world.Get<OccupancyComponent>(root).Seats[occupant.SeatIndex]);
         }
@@ -317,7 +325,7 @@ public class OccupancyService
         while (session.InputQueue.TryDequeue(out _)) { }
         session.GroundProbe.Invalidate();
 
-        message = $"You get out of {name}.";
+        message = $"You get out of {name}.{left}";
         Log.Information("{User} got out of composite {Root}.", session.Username, occupant.RootEntityId);
         return true;
     }

@@ -61,6 +61,7 @@ public sealed class DrivingAids
     private double _offRoadSince = -1;
     private int _announcedJunction = int.MinValue;
     private bool _announcedDeadEnd;
+    private bool _toldWayBack;
 
     public DrivingAids(AudioEngineFacade audio) => _audio = audio;
 
@@ -102,11 +103,27 @@ public sealed class DrivingAids
 
         if (!onRoad)
         {
-            Silence();
-            Readout = $"Off the road, heading {Compass(forward)}, {Kmh(speed)}.";
+            // Off the asphalt, the guide leads BACK to it: it sits on the nearest road, a couple of
+            // metres in from its edge, and the voice says which road and which way. Silence here is
+            // how a whole drive was spent crossing open ground at seventy with no idea where any
+            // road was.
+            StopTones();
+            string where = "no road nearby";
+            if (NearestRoad(world, at, out var point, out string nearName, out float dist))
+            {
+                Guide(point - at, MathF.Max(speed, 3f));
+                where = $"{nearName} {Round(dist)} metres {Bearing(forward, point - at)}";
+                if (_offRoadSince >= 0 && _now - _offRoadSince > 0.4 && !_toldWayBack)
+                {
+                    Say($"The nearest road is {where}. Follow the beep.");
+                    _toldWayBack = true;
+                }
+            }
+            Readout = $"Off the road, heading {Compass(forward)}, {Kmh(speed)}. {where}.";
             Trace(at, forward, speed, "off road", 0f, 0, 0f, 0f);
             return;
         }
+        _toldWayBack = false;
 
         if (junction)
         {
@@ -163,20 +180,20 @@ public sealed class DrivingAids
             if (_offRoadSince < 0) _offRoadSince = _now;
             if (_wasOnRoad && _now - _offRoadSince > 0.4)
             {
-                Announce?.Invoke("Off the road.");
+                Say("Off the road.");
                 _wasOnRoad = false;
                 _roadName = "";
             }
             return;
         }
         _offRoadSince = -1;
-        if (!_wasOnRoad && junction) { Announce?.Invoke("Back on the road, in a junction."); _wasOnRoad = true; }
+        if (!_wasOnRoad && junction) { Say("Back on the road, in a junction."); _wasOnRoad = true; }
         _wasOnRoad = true;
 
         if (!junction && name != _roadName)
         {
             _roadName = name;
-            Announce?.Invoke($"{name}, heading {Compass(forward)}.");
+            Say($"{name}, heading {Compass(forward)}.");
             _announcedDeadEnd = false;
         }
 
@@ -191,7 +208,7 @@ public sealed class DrivingAids
             {
                 if (!_announcedDeadEnd)
                 {
-                    Announce?.Invoke($"Road ends in {Round(d)} metres.");
+                    Say($"Road ends in {Round(d)} metres.");
                     _announcedDeadEnd = true;
                 }
                 return;
@@ -201,7 +218,7 @@ public sealed class DrivingAids
                 if (jId != _announcedJunction)
                 {
                     _announcedJunction = jId;
-                    Announce?.Invoke($"Junction in {Round(d)} metres. {Exits(world, jRoad, forward, right, _roadName)}");
+                    Say($"Junction in {Round(d)} metres. {Exits(world, jRoad, forward, right, _roadName)}");
                 }
                 return;
             }
@@ -220,6 +237,57 @@ public sealed class DrivingAids
                 ways.Add(string.IsNullOrEmpty(n) || n == current ? word : $"{word} onto {n}");
         }
         return ways.Count == 0 ? "No way through." : $"You can go {string.Join(", ", ways)}.";
+    }
+
+    /// <summary>Spoken, and written to the log, so a drive can be read back with what was said in it.</summary>
+    private void Say(string text)
+    {
+        Log.Information("[DRIVE-SAY] {Text}", text);
+        Announce?.Invoke(text);
+    }
+
+    /// <summary>
+    /// The nearest point of road within sixty metres: which road, how far, and where. Junctions
+    /// count — they are road — and are named after a road that meets them.
+    /// </summary>
+    private static bool NearestRoad(WorldSnapshot world, Vector3 at, out Vector3 point, out string name, out float distance)
+    {
+        point = at; name = ""; distance = float.MaxValue;
+        if (world.StaticGrid == null) return false;
+        foreach (int eid in world.StaticGrid.GetItemsInRadius(at, 60f))
+        {
+            if (!world.Entities.TryGetValue(eid, out var e)) continue;
+            var def = e.Definition;
+            if (!string.Equals(def.Material.Material, "Asphalt", StringComparison.OrdinalIgnoreCase)) continue;
+            // The nearest point of the box's footprint, then two metres in from its edge so the beep
+            // is ON the road rather than at the kerb.
+            var inv = Quaternion.Inverse(e.Transform.Rotation);
+            var local = Vector3.Transform(at - e.Transform.Position, inv);
+            var half = def.Collider.Size * 0.5f;
+            var inset = new Vector3(MathF.Max(0f, half.X - 2f), 0f, MathF.Max(0f, half.Z - 2f));
+            var clamped = new Vector3(Math.Clamp(local.X, -inset.X, inset.X), 0f, Math.Clamp(local.Z, -inset.Z, inset.Z));
+            var world_ = e.Transform.Position + Vector3.Transform(clamped, e.Transform.Rotation);
+            world_.Y = at.Y;
+            float d = Vector3.Distance(at, world_);
+            if (d >= distance) continue;
+            distance = d; point = world_;
+            string n = def.Identity.Name ?? "";
+            name = IsJunction(def.Collider.Size, n) ? "a junction" : Clean(n);
+        }
+        return distance < float.MaxValue;
+    }
+
+    /// <summary>Where something is from the driver's seat, in words: ahead, ahead left, left, behind...</summary>
+    private static string Bearing(Vector3 forward, Vector3 to)
+    {
+        to.Y = 0f;
+        if (to.LengthSquared() < 1e-4f) return "here";
+        float angle = MathF.Atan2(Vector3.Cross(forward, Vector3.Normalize(to)).Y, Vector3.Dot(forward, Vector3.Normalize(to))) * 180f / MathF.PI;
+        // In this world +X is east and +Z north, so facing north, east (on your right) gives
+        // Cross(forward, to).Y = +1. Positive is RIGHT. (Increasing-pitch-looks-down has a sibling.)
+        float a = MathF.Abs(angle);
+        string side = angle > 0 ? "right" : "left";
+        return a < 20f ? "ahead" : a < 70f ? $"ahead to your {side}" : a < 110f ? $"to your {side}" : a < 160f ? $"behind you to the {side}" : "behind you";
     }
 
     // ── What is heard ────────────────────────────────────────────────────────────────────────

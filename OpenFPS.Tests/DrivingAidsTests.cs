@@ -84,6 +84,25 @@ public class DrivingAidsTests
         Assert.Contains("wrong side", aids.Readout);
     }
 
+    /// <summary>
+    /// Off the road, you are told where the road is. From the first garage bay, nose east, Main
+    /// Street is a few metres AHEAD — the garage opens onto it.
+    /// </summary>
+    [Fact]
+    public void OffTheRoadTheReadoutSaysWhereTheNearestRoadIs()
+    {
+        var client = City();
+        var (_, aids) = Drive(client, new Vector3(-16f, 0.25f, 29f), 90f);
+        _o.WriteLine("Z: " + aids.Readout);
+        Assert.Contains("Main Street", aids.Readout);
+        Assert.Contains("ahead", aids.Readout);
+
+        // Turned to face north in the same place, the road is on your RIGHT.
+        var (_, north) = Drive(City(), new Vector3(-16f, 0.25f, 29f), 0f);
+        _o.WriteLine("Z: " + north.Readout);
+        Assert.Contains("to your right", north.Readout);
+    }
+
     [Fact]
     public void InTheGarageYouAreOffTheRoadAndNobodySaysSoUntilYouHaveBeenOnOne()
     {

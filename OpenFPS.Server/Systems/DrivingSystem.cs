@@ -83,7 +83,7 @@ public static class DrivingSystem
             // the lesson of the crossing bell that rang on the server and nowhere else.
             resendDefinition?.Invoke(root.Id);
         }
-        return on ? "You turn the key." : "You switch the engine off.";
+        return on ? "You turn the key. The engine starts." : "You switch the engine off.";
     }
 
     /// <summary>How long held controls survive a silent client before they start decaying, seconds.

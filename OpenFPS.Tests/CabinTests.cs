@@ -50,6 +50,70 @@ public class CabinTests
         return new Heard(db, 10f * MathF.Log10((float)(high / Math.Max(1e-30, all))));
     }
 
+    /// <summary>
+    /// A voice made while the car is parked, engine off, and then the key is turned: it must crank,
+    /// catch and RUN. "I press T to start and the car doesn't sound like it's running."
+    /// </summary>
+    [Fact]
+    public void AVoiceStartedWithTheEngineOffStartsWhenTheKeyIsTurned()
+    {
+        var v = MachineRegistry.VehicleFor("i4_economy");
+        var voice = new EngineVoiceState(v, Rate, 7) { Running = false };
+        voice.PlaceAtSpeed(0f);
+        voice.TargetSpeed = 0f;
+        voice.Revive();
+        var buf = new float[1024];
+        float Db(int blocks)
+        {
+            double sum = 0; long n = 0;
+            for (int b = 0; b < blocks; b++)
+            {
+                voice.Render(buf);
+                foreach (float s in buf) { float pa = s * voice.PascalsAtFullScale; sum += pa * pa; n++; }
+            }
+            return 10f * MathF.Log10((float)(sum / n) / (20e-6f * 20e-6f) + 1e-12f);
+        }
+        float off = Db(Rate / 1024 * 2);
+        voice.Running = true;
+        float cranking = Db(Rate / 1024);
+        float running = Db(Rate / 1024 * 3);
+        _o.WriteLine($"off {off:F1} dB, first second after the key {cranking:F1} dB, then {running:F1} dB (rpm {voice.Engine.Rpm:F0})");
+        Assert.True(running > 60f, $"the engine was started and measures {running:F1} dB at 1 m");
+        Assert.True(voice.Engine.Rpm > v.Engine.IdleRpm * 0.7f, $"the engine is turning at {voice.Engine.Rpm:F0} rpm");
+    }
+
+    /// <summary>
+    /// The loudness law, applied to what the engine is doing NOW. The mix compresses a source's
+    /// declared level by 0.45, and a car is declared at full load; idling 25 dB under that it was
+    /// placed uncompressed, and came out under a window air conditioner. Live, the deficit is lifted
+    /// by the same law: idle ends up 0.45 of the way down, not all the way.
+    /// </summary>
+    [Fact]
+    public void AnIdlingEngineIsLiftedByTheLoudnessLaw()
+    {
+        var v = MachineRegistry.VehicleFor("i4_economy");
+        float Idle(bool live)
+        {
+            var voice = new EngineVoiceState(v, Rate, 7) { CompensateLevel = live };
+            voice.PlaceAtSpeed(0f);
+            voice.TargetSpeed = 0f;
+            voice.Revive();
+            var buf = new float[1024];
+            for (int i = 0; i < 2 * Rate / 1024; i++) voice.Render(buf);
+            double sum = 0; long n = 0;
+            for (int b = 0; b < 2 * Rate / 1024; b++)
+            {
+                voice.Render(buf);
+                foreach (float s in buf) { float pa = s * voice.PascalsAtFullScale; sum += pa * pa; n++; }
+            }
+            return 10f * MathF.Log10((float)(sum / n) / (20e-6f * 20e-6f));
+        }
+        float trueIdle = Idle(false), heard = Idle(true);
+        float expected = (v.SourceLevelDb - trueIdle) * (1f - Loudness.DynamicRangeCompression);
+        _o.WriteLine($"idle {trueIdle:F1} dB true, {heard:F1} dB live — lifted {heard - trueIdle:F1}, the law says {expected:F1}");
+        Assert.InRange(heard - trueIdle, expected - 3f, expected + 3f);
+    }
+
     [Fact]
     public void InsideIsQuieterAndDarkerThanOutside()
     {

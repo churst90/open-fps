@@ -248,8 +248,12 @@ public sealed class ClientGameSession : IDisposable
         // without letting go of the movement ones. Naming a particular thing is what the console is
         // for; these are the ones you want under a finger.
         _bindings.Bind(InputContext.Gameplay, GameKey.G, () => _network.Send(new TextCommand { Command = "take" }));
-        // T turns the key: starts the engine from the driver's seat, or switches it off.
-        _bindings.Bind(InputContext.Gameplay, GameKey.T, () => _network.Send(new TextCommand { Command = "ignition" }));
+        // T starts the engine; Shift+T switches it off. Two keys, not one toggle: a toggle pressed by
+        // somebody who cannot tell whether the engine is already running switches it OFF half the
+        // time — which is exactly what happened on the first drive with a key.
+        _bindings.Bind(InputContext.Gameplay, GameKey.T, () => _network.Send(new TextCommand { Command = "ignition", Args = new[] { "on" } }));
+        _bindings.Bind(InputContext.Gameplay, GameKey.T, KeyModifiers.Shift,
+            () => _network.Send(new TextCommand { Command = "ignition", Args = new[] { "off" } }));
         _bindings.Bind(InputContext.Gameplay, GameKey.Q, () => _network.Send(new TextCommand { Command = "drop" }));
         _bindings.Bind(InputContext.Gameplay, GameKey.R, () => _network.Send(new TextCommand { Command = "stow" }));
         _bindings.Bind(InputContext.Gameplay, GameKey.V, ToggleVoiceTransmission);

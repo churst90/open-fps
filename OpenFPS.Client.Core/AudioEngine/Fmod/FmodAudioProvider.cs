@@ -2120,6 +2120,9 @@ public class FmodAudioProvider : IAudioProvider
                 TargetSpeed = emitter.EngineSpeed,
                 Running = emitter.EngineRunning,
                 Interior = emitter.Interior,
+                // Live: the loudness law applies to what the engine is doing now, not just to its
+                // declared level. See EngineVoiceState.CompensateLevel.
+                CompensateLevel = true,
             };
             // The car is already doing this speed; start the engine in that state rather than
             // spinning it up from rest inside the first eighty milliseconds.
