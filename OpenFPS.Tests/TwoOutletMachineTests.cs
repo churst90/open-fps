@@ -108,6 +108,39 @@ public class TwoOutletMachineTests
     }
 
     /// <summary>
+    /// An engine bay is where the engine is. A school bus idling at a stop is its block — 97.7 dB of
+    /// clatter from under the bonnet against an 83 dB silenced pipe — and that clatter used to leave
+    /// by the tailpipe's voice, eleven metres from the engine: "the front of the bus and the exhaust
+    /// are in the same place". Idling, the nose must be the louder end.
+    /// </summary>
+    [Fact]
+    public void AnIdlingBusIsLouderAtItsEngineThanAtItsTailpipe()
+    {
+        var v = VehicleProfile.ByName("school_bus");
+        var engine = new EngineVoiceState(v, Rate, 7) { TargetSpeed = 0f, SplitVoices = true };
+        engine.PlaceAtSpeed(0f);
+        var front = new EngineTapState(engine);
+
+        var rear = new float[Block];
+        var nose = new float[Block];
+        double rearEnergy = 0, noseEnergy = 0;
+        for (int b = 0; b < Rate * 2 / Block; b++)
+        {
+            engine.Produce();
+            front.Render(nose);
+            engine.Consume(rear);
+            if (b < 8) continue;
+            for (int i = 0; i < Block; i++)
+            {
+                rearEnergy += rear[i] * rear[i];
+                noseEnergy += nose[i] * nose[i];
+            }
+        }
+        double db = 10.0 * Math.Log10(Math.Max(1e-12, noseEnergy) / Math.Max(1e-12, rearEnergy));
+        Assert.True(db > 3.0, $"the idling bus is {db:F1} dB louder at its nose than at its tail");
+    }
+
+    /// <summary>
     /// Two sources are two sources while the angle between them is wide enough, and one source after
     /// that — and it is the ANGLE, not the distance, because that is the thing an ear measures.
     /// </summary>

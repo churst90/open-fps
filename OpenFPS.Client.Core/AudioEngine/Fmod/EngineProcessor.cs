@@ -599,10 +599,8 @@ public sealed class EngineVoiceState : IRenderedVoice
     /// <summary>
     /// The intake as it leaves through the bay: the same noise as at the grille, but not the same
     /// waveform. What reaches the bay openings is the airbox and ducting heard off the block, the
-    /// bulkheads and the underside of the bonnet — scattered, a few milliseconds of paths. Written
-    /// raw, it was the intake's own samples at the tailpipe end as well as at the grille, and close
-    /// up, where the two ends are separate voices metres apart, one waveform from two places combs
-    /// against itself: a bus's hiss heard "inside out" as it passed. The tyres had the same fault.
+    /// bulkheads and the underside of the bonnet — scattered, a few milliseconds of paths, so it is
+    /// not the grille's waveform a second time.
     /// </summary>
     private readonly EchoDiffuser _bayIntake;
     /// <summary>How rough the bay is to the intake noise: a cluttered cavity, about brick
@@ -837,8 +835,14 @@ public sealed class EngineVoiceState : IRenderedVoice
             // one rule — a body that coloured one and not the other is how a change can be measured
             // as working and heard as nothing.
             pa += _body.Process(Engine.Exhaust) * BodyMix;
-            // What escapes the engine bay. Zero for a car; see VehicleProfile.EngineBayLeakage.
-            if (_bayLeak > 0f) pa += (Engine.Block + 0.5f * _bayIntake.Process(Engine.Intake)) * _bayLeak;
+            // What escapes the engine bay (VehicleProfile.EngineBayLeakage; 0.15 unless declared).
+            // It leaves from the BAY, which is where the engine is — the intake slot marks it, nose
+            // or mid-ship — so it goes out of the front tap. It used to go out of the back with the
+            // tailpipe: on the school bus the block is 97.7 dB against an 83 dB silenced pipe, so an
+            // idling bus at a stop, fan slowed, was one sound at its tail — "the front of the bus and
+            // the exhaust are in the same place". Once far enough to be one voice, nothing changes.
+            float bay = _bayLeak > 0f ? (Engine.Block + 0.5f * _bayIntake.Process(Engine.Intake)) * _bayLeak : 0f;
+            front += bay;
             float airOut = 0f, chimeOut = 0f;
             if (_air != null)
             {
@@ -851,7 +855,9 @@ public sealed class EngineVoiceState : IRenderedVoice
             // What the ENGINE is radiating, before anything a listener's position does to it: the
             // level the loudness law is applied to. Not the brakes' air or the door beeper, which are
             // their own sources at their own levels and are not what idles.
-            float engineOnly = pa - airOut - chimeOut;
+            // The bay is the engine radiating even though it now leaves by the front: the level the
+            // loudness law is applied to is the same machine it always was.
+            float engineOnly = pa - airOut - chimeOut + bay;
             blockSum += (double)engineOnly * engineOnly;
 
             // Crossfaded over ~60 ms rather than switched, so getting in or out is not a click.
@@ -884,7 +890,7 @@ public sealed class EngineVoiceState : IRenderedVoice
                 // And with the doors open there is a hole in the side of the bus: the outside comes
                 // in through a doorway about 2.4 m^2 of a hundred-odd m^2 of cabin wall, which lets
                 // in a couple of per cent of the power (-16 dB), unfiltered.
-                if (_doorsOpen) inCabin += (pa - chimeOut - airOut) * DoorwayLeak;
+                if (_doorsOpen) inCabin += (pa - chimeOut - airOut + bay) * DoorwayLeak;
                 float k = _interiorMix;
                 pa = pa * (1f - k) + inCabin * k;
                 front *= 1f - k;
