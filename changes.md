@@ -59,14 +59,6 @@ Recent work, newest first. `git log` has the rest.
 - Truck and bus horns have more body (the reed is open for less of each cycle).
 - Car horns swell in over about 20 ms and ring out over about 50 ms.
 
-### Doors
-- Opening a door now depends on the leaf's weight and material. A steel fire door and a hollow-core door no longer sound the same.
-- The latch knock is louder on a light door. Steel rings for about 0.7 s, wood for about 0.14 s.
-
-### Engines
-- Muffler chambers use the engine's own pipe setting. Live levels move by 0.6 dB at most.
-- The soft clipper on engine and machine voices no longer clicks on backfires and pops.
-
 ### Chat and menus
 - Chat messages carry their channel: map, all, private or server. Plain typing reaches your map. `/all` reaches everyone.
 - Command answers are no longer labelled "System". Only messages to everyone are labelled "Server".
