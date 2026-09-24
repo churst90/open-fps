@@ -2622,7 +2622,7 @@
    ]
   }
  ],
- "StreetLife": { "HornEverySeconds": 45, "HardBrakeEverySeconds": 120, "ParkEverySeconds": 90 },
+ "StreetLife": { "HornEverySeconds": 15, "HardBrakeEverySeconds": 60, "ParkEverySeconds": 90 },
  "Vehicles": [
   {
    "Name": "Civic 1",
