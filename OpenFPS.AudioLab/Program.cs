@@ -452,6 +452,11 @@ if (args.Contains("--earshot"))
     Environment.Exit(OpenFPS.Client.Core.AudioEngine.Fmod.EarshotSpike.Run(args));
 }
 
+if (args.Contains("--gun-spec"))
+{
+    Environment.Exit(OpenFPS.Client.Core.AudioEngine.Fmod.GunSpecSpike.Run(args));
+}
+
 if (args.Contains("--door-opening"))
 {
     Environment.Exit(OpenFPS.Client.Core.AudioEngine.Fmod.DoorOpeningSpike.Run(args));

@@ -54,6 +54,23 @@ the range's echo at about 150 ms). The shot is synthesized to match that spec, a
 acoustics make the place it is heard in. Demos compare the synthesis with the real shot with its
 echo cut away.
 
+### The spec (measured over the event, 2026-09-24)
+
+An early spectrum measurement used a Hann window starting at the onset, which is nearly zero over
+the first 3 ms where almost all of a shot is, and measured the tail instead. Corrected (flat-topped
+window from 1 ms before the onset to 20 ms after), side-on at 20 and 40 m, dB re the loudest band:
+
+| 125 Hz | 250 | 500 | 1 kHz | 2 kHz | 4 kHz | 8 kHz | 16 kHz |
+|---|---|---|---|---|---|---|---|
+| 0 | -2 to -8 | -5 to -9 | -2 to -9 | -7 to -14 | -17 to -23 | -20 to -22 | -35 |
+
+Envelope: positive phase 0.35-0.5 ms; down 10 dB in 0.75-1.5 ms, 20 dB in 2.5-3.5 ms, 30 dB in
+4-7 ms. The game's current synthetic shot takes 18-26 ms to fall 20 dB.
+
+First synthesis to spec (`--gun-spec`, OpenFPS.AudioLab/Spikes/GunSpecSpike.cs): a Friedlander
+pulse, a fast turbulent burst and a slower trail, one pole above 2.3-2.5 kHz. Matches 4-16 kHz within
+a few dB; about 8 dB short at 1-2 kHz, partly the modelled ground comb at 20 m.
+
 ## Plan
 
 1. An offline renderer: weapon, listener angle and distance in, what that listener hears out. Dry
