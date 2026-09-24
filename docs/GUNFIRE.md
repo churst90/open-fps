@@ -44,6 +44,13 @@ Matches for the game's weapons: WASR (AK, 7.62x39), M16 (5.56), Glock 9, Colt 19
 No clean close recording of these guns exists in the inbox; the clean material is the NIJ set at 20 m
 and beyond.
 
+## Decision (Cody, 2026-09-24): hybrid
+
+Real recordings give each gun its character; physics does everything distance and angle do (loss
+over distance, air absorption, the ground bounce, the crack ahead of the report downrange,
+reflections and reverb). Works at any distance and angle. A gun with no reference recording (the
+shotgun) borrows the nearest real one and is shaped by physics.
+
 ## Plan
 
 1. An offline renderer: weapon, listener angle and distance in, what that listener hears out. Dry
