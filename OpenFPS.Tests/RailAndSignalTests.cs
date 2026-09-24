@@ -72,6 +72,139 @@ public class RailAndSignalTests
         }
     }
 
+    public static TheoryData<string> AirHornKeys => new(ChimeHornSpec.Presets.Keys);
+
+    private static float[] Blow(ChimeHorn horn, params (float Sec, bool On)[] seq)
+    {
+        var buf = new System.Collections.Generic.List<float>();
+        foreach (var (sec, on) in seq)
+            for (int i = 0; i < (int)(sec * Sr); i++) { horn.Blowing = on; horn.Step(); buf.Add(horn.Out); }
+        return buf.ToArray();
+    }
+
+    private static double Rms(float[] x, int a, int b)
+    {
+        double e = 0; for (int i = a; i < b; i++) e += x[i] * (double)x[i];
+        return Math.Sqrt(e / Math.Max(1, b - a));
+    }
+
+    /// <summary>
+    /// Every air horn comes up and goes down in one smooth movement, like the electric horns. With a
+    /// 6.5% pitch bend and a slow valve the reed spent the whole swell and fade off the column's
+    /// resonances: the trucks broke up by 4-7 dB ("breaky, weak, cuts out on the fade in and fade
+    /// out") and the locomotive chimes took 190 ms to arrive and hung on 15-25 dB down for half a
+    /// second ("weak on the start and end"). In 20 ms windows (long enough to average over a chord's
+    /// beating), the level never falls back more than 3 dB while rising, never climbs back more
+    /// than 3 dB while falling, and reaches -6 dB within 70 ms (a K5LA's bells come in over 40) and
+    /// -20 dB after release within 150.
+    /// </summary>
+    [Theory, MemberData(nameof(AirHornKeys))]
+    public void AirHornsSwellAndFadeWithoutBreaking(string key)
+    {
+        var buf = Blow(new ChimeHorn(ChimeHornSpec.ByName(key), Sr, 11), (1.0f, true), (0.5f, false));
+        int rel = Sr, w = (int)(0.020f * Sr);
+        double steady = Rms(buf, (int)(0.5f * Sr), rel);
+        double Db(int i) => 20 * Math.Log10(Rms(buf, i, i + w) / steady + 1e-15);
+
+        double best = -999, worstRise = 0; float reachedMs = -1;
+        for (int i = 0; i < (int)(0.3f * Sr); i += w / 4)
+        {
+            double d = Db(i);
+            if (d < -40) continue;
+            if (reachedMs < 0 && d >= -6) reachedMs = (i + w) * 1000f / Sr;
+            best = Math.Max(best, d); worstRise = Math.Max(worstRise, best - d);
+        }
+        double low = 999, worstFall = 0; float quietMs = -1;
+        for (int i = rel; i + w < buf.Length; i += w / 4)
+        {
+            double d = Db(i);
+            if (quietMs < 0 && d < -20) quietMs = (i + w - rel) * 1000f / Sr;
+            if (d < -50) break;
+            low = Math.Min(low, d); worstFall = Math.Max(worstFall, d - low);
+        }
+        _o.WriteLine($"{key}: -6 dB at {reachedMs:F0} ms, -20 dB {quietMs:F0} ms after release; worst dip rising {worstRise:F1} dB, worst swell falling {worstFall:F1} dB");
+        Assert.InRange(reachedMs, 0f, 70f);
+        Assert.InRange(quietMs, 0f, 150f);
+        Assert.True(worstRise < 3, $"{key} breaks up by {worstRise:F1} dB on the way up");
+        Assert.True(worstFall < 3, $"{key} breaks up by {worstFall:F1} dB on the way down");
+    }
+
+    /// <summary>
+    /// When the air runs out the column is still ringing, and it rings down on its own. The model
+    /// used to stop computing the pipe the moment the supply fell below a thousandth, which cut
+    /// every horn off dead about 35 dB down. The last 5 ms before the output reaches zero must
+    /// already be below -70 dB of the steady blast.
+    /// </summary>
+    [Theory, MemberData(nameof(AirHornKeys))]
+    public void AnAirHornRingsOutInsteadOfStopping(string key)
+    {
+        var buf = Blow(new ChimeHorn(ChimeHornSpec.ByName(key), Sr, 11), (0.8f, true), (3.0f, false));
+        double steady = Rms(buf, (int)(0.5f * Sr), (int)(0.8f * Sr));
+        int last = Array.FindLastIndex(buf, v => v != 0f);
+        Assert.True(last < buf.Length - Sr / 10, $"{key} still sounding at the end of three seconds");
+        int w = (int)(0.005f * Sr);
+        double end = 20 * Math.Log10(Rms(buf, last - w, last + 1) / steady + 1e-15);
+        _o.WriteLine($"{key}: silent {(last - (int)(0.8f * Sr)) * 1000f / Sr:F0} ms after release, last 5 ms at {end:F0} dB");
+        Assert.True(end < -70, $"{key} stops dead at {end:F0} dB");
+    }
+
+    /// <summary>
+    /// A second blast after a long gap starts from a quiet pipe with the reed at rest. The column
+    /// used to be frozen, not emptied, when the air ran out, and the next press resumed it: whatever
+    /// the pipe was doing 35 dB down the last time came back at the start of the next blast. So a
+    /// second blast swells in the way a first one does: every 10 ms of the first 60 within 2 dB.
+    /// (Truck and bus only: a chime's reed is ragged at low pressure by design, and its first
+    /// milliseconds differ from blast to blast by a few decibels.)
+    /// </summary>
+    [Theory]
+    [InlineData("truck_dual")]
+    [InlineData("bus_horn")]
+    public void ASecondBlastStartsFromAQuietPipe(string key)
+    {
+        var buf = Blow(new ChimeHorn(ChimeHornSpec.ByName(key), Sr, 11), (0.5f, true), (2.5f, false), (0.5f, true));
+        int w = (int)(0.010f * Sr), second = (int)(3.0f * Sr);
+        var diffs = Enumerable.Range(0, 6)
+            .Select(k => 20 * Math.Log10(Rms(buf, second + k * w, second + (k + 1) * w) / Rms(buf, k * w, (k + 1) * w)))
+            .ToArray();
+        _o.WriteLine($"{key}: second blast against the first, per 10 ms: " + string.Join(" ", diffs.Select(d => $"{d:+0.0;-0.0}")));
+        Assert.All(diffs, d => Assert.InRange(d, -2, 2));
+    }
+
+    /// <summary>
+    /// A K5LA swells into its chord on EVERY blast: the air reaches the fifth bell 40 ms after the
+    /// first. The delay used to count from when the horn was built rather than from when the air
+    /// arrived, so only a blast in the first 40 ms of the horn's life ever had it. The top bell's
+    /// note in the first 30 ms of a second blast is no more than 3 dB above the first blast's.
+    /// </summary>
+    [Fact]
+    public void EveryBlastSwellsIntoItsChord()
+    {
+        var spec = ChimeHornSpec.NathanK5LA;
+        var buf = Blow(new ChimeHorn(spec, Sr, 11), (0.5f, true), (2.5f, false), (0.5f, true));
+        float top = spec.Bells[^1].Hz;
+        double Tone(float fromSec, float sec)
+        {
+            int a = (int)(fromSec * Sr), n = (int)(sec * Sr);
+            double best = 0;
+            // Peak-picked within 2% of the note: the loop settles a hertz or two off the design.
+            for (float hz = top * 0.98f; hz <= top * 1.02f; hz += 1f)
+            {
+                double wv = 2 * Math.PI * hz / Sr, c = 2 * Math.Cos(wv), s1 = 0, s2 = 0;
+                for (int i = 0; i < n; i++)
+                {
+                    double hann = 0.5 - 0.5 * Math.Cos(2 * Math.PI * i / (n - 1));
+                    double s0 = buf[a + i] * hann + c * s1 - s2; s2 = s1; s1 = s0;
+                }
+                best = Math.Max(best, s1 * s1 + s2 * s2 - c * s1 * s2);
+            }
+            return best;
+        }
+        double first = 10 * Math.Log10(Tone(0.0f, 0.030f) / Tone(0.3f, 0.030f) + 1e-15);
+        double second = 10 * Math.Log10(Tone(3.0f, 0.030f) / Tone(3.3f, 0.030f) + 1e-15);
+        _o.WriteLine($"top bell ({top:F0} Hz) in the first 30 ms, against settled: first blast {first:F0} dB, second {second:F0}");
+        Assert.True(second < first + 3, $"the top bell starts {second - first:F0} dB louder on a second blast: the chord arrived instead of swelling");
+    }
+
     // ── Whistles ────────────────────────────────────────────────────────────────────────────────
 
     [Fact]

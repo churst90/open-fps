@@ -11,7 +11,10 @@ namespace OpenFPS.Client.Core.AudioEngine.Fmod;
 /// <summary>
 /// Electric car horns on the bench, at a metre on axis, next to two air horns for comparison.
 ///
-///   --car-horn [preset ...] [out=DIR]
+///   --car-horn [preset ...] [out=DIR] [air=KEY,KEY] [bend=F] [rise=S] [fall=S] [tag=NAME]
+///
+/// air= picks which air horns to render; bend, rise and fall override their spec's PitchBend,
+/// RiseSeconds and FallSeconds, and tag= goes into the file names, for A/B renders.
 ///
 /// Each horn plays a tap (0.15 s), a double tap (0.15 on, 0.12 off, 0.2 on) and a 1.2 s hold. The
 /// hold's steady part is measured — note, crest, centroid, band balance, RMS at a metre against the
@@ -28,8 +31,12 @@ public static class CarHornSpike
         string dir = args.FirstOrDefault(a => a.StartsWith("out=", StringComparison.Ordinal))?.Substring(4)
                      ?? "/home/cody/external-rescue/Github/open-fps/inbox/car-horns-2026-09-24";
         Directory.CreateDirectory(dir);
+        string? Arg(string name) => args.FirstOrDefault(a => a.StartsWith(name + "=", StringComparison.Ordinal))?.Substring(name.Length + 1);
+        float? Num(string name) => Arg(name) is { } v ? float.Parse(v, System.Globalization.CultureInfo.InvariantCulture) : null;
+        var airKeys = Arg("air")?.Split(',') ?? AirHorns;
+        string tag = Arg("tag") is { } t ? "_" + t : "";
         var chosen = ElectricHornSpec.Presets.Keys.Where(args.Contains).ToList();
-        if (chosen.Count == 0) chosen = ElectricHornSpec.Presets.Keys.ToList();
+        if (chosen.Count == 0) chosen = Arg("air") != null ? new List<string>() : ElectricHornSpec.Presets.Keys.ToList();
 
         Console.WriteLine("\n  Electric horns at one metre, on axis.\n");
         int failures = 0;
@@ -40,21 +47,24 @@ public static class CarHornSpike
             Console.WriteLine($"  {key}");
             foreach (var l in horn.Describe()) Console.WriteLine($"    {l}");
             var patterns = Patterns(on => { horn.Blowing = on; horn.Step(); return horn.Out; });
-            if (!Check(patterns["hold"], spec.ReferenceDb, $"car_{key}")) failures++;
+            if (!Check(patterns["hold"], spec.ReferenceDb)) failures++;
             Write(dir, $"car_{key}", patterns);
         }
 
         Console.WriteLine("  Air horns for comparison.\n");
-        foreach (var key in AirHorns)
+        foreach (var key in airKeys)
         {
             var spec = ChimeHornSpec.ByName(key);
+            if (Num("bend") is { } bend) spec = spec with { PitchBend = bend };
+            if (Num("rise") is { } rise) spec = spec with { RiseSeconds = rise };
+            if (Num("fall") is { } fall) spec = spec with { FallSeconds = fall };
             var horn = new ChimeHorn(spec, Sr, 11);
             Console.WriteLine($"  {key}");
             foreach (var l in horn.Describe()) Console.WriteLine($"    {l}");
             var patterns = Patterns(on => { horn.Blowing = on; horn.Step(); return horn.Out; });
-            Check(patterns["hold"], spec.ReferenceDb, $"air_{key}", airHorn: true);
+            Check(patterns["hold"], spec.ReferenceDb, airHorn: true);
             Harmonics(patterns["hold"], spec.Bells.Select(bl => bl.Hz).ToArray());
-            Write(dir, $"air_{key}", patterns);
+            Write(dir, $"air_{key}{tag}", patterns);
         }
 
         Console.WriteLine(failures == 0 ? "  every electric horn within 1.5 dB of its anchor" : $"  {failures} electric horn(s) OFF their anchor");
@@ -80,7 +90,7 @@ public static class CarHornSpike
     }
 
     /// <summary>The hold's steady part: level against the anchor, band balance, onset and release.</summary>
-    private static bool Check(float[] hold, float referenceDb, string name, bool airHorn = false)
+    private static bool Check(float[] hold, float referenceDb, bool airHorn = false)
     {
         int s0 = (int)(0.4f * Sr), a = s0 + (int)(0.3f * Sr), b = s0 + (int)(1.1f * Sr), end = s0 + (int)(1.2f * Sr);
         double e = 0; float peak = 0f;

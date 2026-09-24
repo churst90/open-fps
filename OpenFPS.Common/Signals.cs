@@ -83,9 +83,18 @@ public sealed record ChimeHornSpec
     /// column, blatted instead of blown.
     /// </summary>
     public float ReedOpenFraction { get; init; } = 0.46f;
-    /// <summary>How long the valve takes to reach full pressure, seconds, and to fall.</summary>
-    public float RiseSeconds { get; init; } = 0.09f;
-    public float FallSeconds { get; init; } = 0.13f;
+    /// <summary>
+    /// How far flat the note sits when the air has only just reached the reed, as a fraction of the
+    /// note, and how ragged it goes there. Under 1%: the column's resonances are each about 3% wide,
+    /// and a larger bend drags every harmonic off its resonance while the air comes up and goes
+    /// down, so the level drops in and out and the horn sounds weak at both ends. (6.5% was tried
+    /// on every air horn and heard that way.)
+    /// </summary>
+    public float PitchBend { get; init; } = 0.008f;
+    /// <summary>How long the valve takes to reach full pressure, seconds, and to fall. A slow valve
+    /// is heard as a weak start and a tail that hangs on 15-25 dB down for half a second.</summary>
+    public float RiseSeconds { get; init; } = 0.025f;
+    public float FallSeconds { get; init; } = 0.03f;
     /// <summary>SPL at one metre on axis with every bell blowing. A locomotive horn is required to
     /// make 96-110 dBA at 100 feet ahead of it, which is 125-140 at a metre.</summary>
     public float ReferenceDb { get; init; } = 138f;
@@ -161,6 +170,7 @@ public sealed record ChimeHornSpec
             new ChimeBellSpec { LengthMetres = 0.352f, MouthDiameterMetres = 0.078f, ThroatDiameterMetres = 0.019f, StartDelaySeconds = 0.004f, LevelTrimDb = -1.5f },
         },
         SupplyKPa = 827f, ReferenceDb = 126f, ReedOpenFraction = 0.30f,
+        RiseSeconds = 0.02f, FallSeconds = 0.025f,
     };
 
     /// <summary>A transit bus: one small trumpet under the front, on the brake system's air.</summary>
@@ -171,7 +181,8 @@ public sealed record ChimeHornSpec
         {
             new ChimeBellSpec { LengthMetres = 0.300f, MouthDiameterMetres = 0.070f, ThroatDiameterMetres = 0.018f, StartDelaySeconds = 0f },
         },
-        SupplyKPa = 760f, ReferenceDb = 118f, RiseSeconds = 0.05f, FallSeconds = 0.07f, ReedOpenFraction = 0.30f,
+        SupplyKPa = 760f, ReferenceDb = 118f, ReedOpenFraction = 0.30f,
+        RiseSeconds = 0.02f, FallSeconds = 0.025f,
     };
 
     public static IReadOnlyDictionary<string, Func<ChimeHornSpec>> Presets { get; } =

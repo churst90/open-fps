@@ -28,9 +28,9 @@ namespace OpenFPS.Client.AudioEngine.Core.Signals;
 ///
 /// Three things fall out without being asked for:
 ///
-///   THE ATTACK BENDS UP, because while the supply is still building the reed is driven weakly and
-///   the loop settles flat, coming up to pitch over about a tenth of a second. Letting go does it in
-///   reverse, and adds the growl at the end where the reed can no longer beat cleanly.
+///   THE ATTACK BENDS UP, slightly, because while the supply is still building the reed is driven
+///   weakly and the loop settles flat. Letting go does it in reverse. The bend is kept under 1%
+///   (see ChimeHornSpec.PitchBend): any more and the harmonics leave the column's resonances.
 ///
 ///   THE BELLS DO NOT START TOGETHER. They are spread along a manifold and the air reaches them in
 ///   order, so a five-chime swells into its chord instead of arriving in it.
@@ -128,7 +128,7 @@ public sealed class ChimeHorn
     internal sealed class Bell
     {
         private readonly ChimeBellSpec _b;
-        private readonly float _rate, _dt, _trim, _startDelay, _openScale, _leak;
+        private readonly float _rate, _dt, _trim, _startDelay, _openScale, _leak, _bend, _ragged;
         private Mode[] _modes;
         private readonly Random _rng;
         private readonly float _hpA;
@@ -137,6 +137,7 @@ public sealed class ChimeHorn
         private double _t;
         private float _gain = 1f;
         private float _jitter;
+        private int _silentSamples = int.MaxValue;
 
         /// <summary>What the loop settled on, hertz.</summary>
         public float MeasuredHz { get; private set; }
@@ -161,6 +162,10 @@ public sealed class ChimeHorn
         {
             _b = b; _rate = rate; _dt = 1f / rate; _rng = new Random(seed);
             _startDelay = b.StartDelaySeconds;
+            // The raggedness at low pressure is the same reed failing to lift cleanly, so it scales
+            // with the bend: 8 at a bend of 6.5%.
+            _bend = Math.Clamp(spec.PitchBend, 0f, 0.2f);
+            _ragged = 8f * (_bend / 0.065f);
             // The chime's reed (0.46 open at full blow) is the reference the duty law was measured on.
             _openScale = Math.Clamp(spec.ReedOpenFraction, 0.05f, 0.95f) / 0.46f;
             // Air gets past a reed even while it is "shut" — it never quite seals on its seat — and
@@ -247,17 +252,21 @@ public sealed class ChimeHorn
         [MethodImpl(MethodImplOptions.AggressiveOptimization)]
         public float Step(float valve)
         {
-            _t += _dt;
+            // The delay is from when the air reached the manifold, so it restarts whenever the
+            // manifold empties: every blast swells into its chord, not only the first one. With no
+            // air the reed is back on its seat, so the next blast starts it from rest.
+            if (valve < 1e-3f) { _t = 0.0; _phase = 0.0; _jitter = 0f; }
+            else _t += _dt;
             float supply = _t < _startDelay ? 0f : valve;
-            if (supply < 1e-3f) return 0f;
+            if (supply < 1e-3f) return RingOut();
 
             // The note rides the pressure. A reed's stiffness is what the air has to overcome, so a
             // horn on a line that has not come up yet plays flat and climbs into pitch — the bend at
             // the start of every blast, and its mirror at the end, where it also goes ragged because
             // the swing can no longer lift the reed cleanly off its seat.
-            float f = _b.Hz * (0.935f + 0.065f * supply);
+            float f = _b.Hz * ((1f - _bend) + _bend * supply);
             _jitter += 0.002f * ((float)_rng.NextDouble() * 2f - 1f - _jitter);
-            f *= 1f + _jitter * (supply < 0.5f ? 8f * (0.5f - supply) : 0.2f);
+            f *= 1f + _jitter * (supply < 0.5f ? _ragged * (0.5f - supply) : 0.2f);
 
             _phase += f * _dt;
             if (_phase >= 1.0) _phase -= 1.0;
@@ -275,7 +284,28 @@ public sealed class ChimeHorn
             // What leaves the mouth is what is in the column, less what the flare will not carry.
             _hp1 += _hpA * (p - _hp1);
             _hp2 += _hpA * (_hp1 - _hp2);
+            _silentSamples = 0;
             return (p - _hp2 + hiss * 0.25f) * _trim * _gain;
+        }
+
+        /// <summary>
+        /// The air has stopped but the pipe has not: the column rings down on its own resonances, a
+        /// few tens of milliseconds at these Qs. Cutting the output to nothing the moment the supply
+        /// ran out stopped the horn dead about 35 dB down, which is heard as the sound cutting out
+        /// at the end of the fade. Once it has been below a millionth of full scale for a whole
+        /// cycle it is left alone.
+        /// </summary>
+        private float RingOut()
+        {
+            int period = (int)(_rate / _b.Hz) + 1;
+            if (_silentSamples > period) return 0f;
+            float p = 0f;
+            for (int k = 0; k < _modes.Length; k++) p += _modes[k].Process(0f);
+            _hp1 += _hpA * (p - _hp1);
+            _hp2 += _hpA * (_hp1 - _hp2);
+            float y = (p - _hp2) * _trim * _gain;
+            _silentSamples = MathF.Abs(y) < 1e-6f ? _silentSamples + 1 : 0;
+            return y;
         }
     }
 }
