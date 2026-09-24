@@ -33,6 +33,10 @@ public static class GunSpecSpike
 
     public static readonly BlastSpec M16 = new("m16", 0.40f, 2.4f, 0.45f, 0.18f, 1.8f, 2500f, 220f);
     public static readonly BlastSpec Akm = new("wasr", 0.44f, 2.4f, 0.50f, 0.20f, 1.9f, 2300f, 200f);
+    // Pistols: a short barrel lets the gas out at far higher pressure, so the burst is quicker and
+    // brighter and the pulse shorter.
+    public static readonly BlastSpec Glock9 = new("glock9", 0.30f, 2.4f, 0.40f, 0.15f, 1.5f, 3200f, 250f);
+    public static readonly BlastSpec Colt45 = new("colt1911", 0.34f, 2.4f, 0.45f, 0.18f, 1.6f, 2600f, 220f);
 
     public static int Run(string[] args)
     {
@@ -48,7 +52,7 @@ public static class GunSpecSpike
         };
         Console.WriteLine("\n  Rifle reports, synthesized to spec, against the real ones (echo cut away).");
         Console.WriteLine("  +phase ms, then ms to -10/-20/-30 dB, then octave bands 125..16k dB re the loudest.\n");
-        foreach (var spec in new[] { M16, Akm })
+        foreach (var spec in new[] { M16, Akm, Glock9, Colt45 })
         {
             Console.WriteLine($"  {spec.Name} source at 1 m: {Describe(Source(spec, 0.08f))}");
             Console.WriteLine($"  {spec.Name} at 20 m, no ground: {Describe(Air(Source(spec, 0.08f), 20f))}");

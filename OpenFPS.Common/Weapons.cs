@@ -117,30 +117,25 @@ public sealed record WeaponDefinition
     // BYTE-IDENTICAL. A 9 mm and a .45 are not the same sound, and in a game played by ear the whole
     // point of having five weapons is that they are five things to recognise.
 
-    /// <summary>Centre of the body resonance, Hz. Most of what reads as calibre: a 12 gauge sits near
-    /// 200 and a 9 mm near 470.</summary>
-    public required float BlastLowHz { get; init; }
-    /// <summary>How long the body rings, seconds.</summary>
-    public required float BlastDecaySeconds { get; init; }
-    /// <summary>The chest-punch fundamental, Hz. The part that survives distance and walls.</summary>
-    public required float ThumpHz { get; init; }
-    public required float ThumpDecaySeconds { get; init; }
-    /// <summary>Low-pass on the blast, Hz. Higher is sharper and more cracking.</summary>
-    public required float BrightnessHz { get; init; }
+    /// <summary>
+    /// The report, as measured: the positive phase of the blast pulse, milliseconds. 0.35-0.56 ms for
+    /// every rifle and pistol in the NIJ recordings at 20-40 m (docs/GUNFIRE.md); calibre shows in the
+    /// level far more than in this.
+    /// </summary>
+    public required float ReportPositivePhaseMs { get; init; }
+    /// <summary>The turbulent gas behind the shock: its time constant, ms. The first 10 dB of a real
+    /// shot goes in 0.75-1.5 ms.</summary>
+    public required float ReportBurstDecayMs { get; init; }
+    /// <summary>What trails after it, time constant ms: the fall from -20 to -30 dB, 2.5-7 ms.</summary>
+    public required float ReportTrailDecayMs { get; init; }
+    /// <summary>Where the report's spectrum starts to fall, Hz: about 6 dB an octave above it, as the
+    /// recordings fall 13 dB by 4 kHz and 20 by 8.</summary>
+    public required float ReportCornerHz { get; init; }
     /// <summary>When the action is heard after the shot, seconds. Zero for a weapon that does not
     /// cycle itself.</summary>
     public float MechanicalDelaySeconds { get; init; } = 0.045f;
     public float MechanicalLevel { get; init; } = 0.22f;
 
-    /// <summary>
-    /// How far the blast's brightness falls as it decays, as a fraction of <see cref="BrightnessHz"/>.
-    ///
-    /// The sweep from bright to dark is what makes a blast sound like a blast rather than a burst of
-    /// noise, but how FAR it falls is per-cartridge: a 5.56 keeps its top end much longer than a 12
-    /// gauge does. A fixed one-tenth for everything made the AR-15 dive to 850 Hz in eighteen
-    /// milliseconds, which is a big dull gun, not a sharp small one.
-    /// </summary>
-    public float BrightnessFloorFraction { get; init; } = 0.10f;
 
     /// <summary>
     /// How much of the recorded transient to mix under this weapon's blast, 0 to 1.
@@ -232,14 +227,8 @@ public static class WeaponRegistry
         FiringFolder = "WEAPONS/_FIRING/AKM/3m",
         MagazineVariant = "polymer",
         FiringTakeIndex = 0,
-        // 7.62x39: a big, low, barking blast. Less top end than the AR-15 and much more weight, which
-        // is why it is the one you still hear clearly through a wall two rooms away.
-        BlastLowHz = 280f,
-        BlastDecaySeconds = 0.030f,
-        ThumpHz = 68f,
-        ThumpDecaySeconds = 0.17f,
-        BrightnessHz = 6200f,
-        BrightnessFloorFraction = 0.09f,
+        // 7.62x39, measured on the WASR-10 (the same pattern).
+        ReportPositivePhaseMs = 0.44f, ReportBurstDecayMs = 0.50f, ReportTrailDecayMs = 1.9f, ReportCornerHz = 3000f,
     };
 
     /// <summary>5.56x45. Faster and much sharper than the AKM: a tighter Mach cone, so the crack is a
@@ -264,16 +253,8 @@ public static class WeaponRegistry
         SoundFolder = "WEAPONS/AR15",
         // An M16 — 5.56x45 at last, rather than a borrowed 7.62 take.
         FiringFolder = "WEAPONS/_FIRING/AR15/3m",
-        // 5.56x45: sharper, brighter, less body. A crack rather than a bark.
-        BlastLowHz = 430f,
-        BlastDecaySeconds = 0.019f,
-        ThumpHz = 95f,
-        ThumpDecaySeconds = 0.09f,
-        BrightnessHz = 11000f,
-        // A 5.56 barely darkens at all — it stays a sharp crack the whole way down. At the default
-        // tenth this dived to 850 Hz inside twenty milliseconds and came out sounding like a bigger,
-        // duller weapon than the AKM, which is backwards.
-        BrightnessFloorFraction = 0.30f,
+        // 5.56x45, measured on the M16.
+        ReportPositivePhaseMs = 0.40f, ReportBurstDecayMs = 0.45f, ReportTrailDecayMs = 1.8f, ReportCornerHz = 3200f,
         FiringTakeIndex = 0,
         // Full strength now. The 0.30 blend existed because the only rifle take in the drop was a
         // 7.62 and mixing it in at full level dragged the AR-15 towards the AKM's character. With a
@@ -302,13 +283,8 @@ public static class WeaponRegistry
         ChargeSeconds = 0.4f,
         SoundFolder = "WEAPONS/Glock",
         FiringFolder = "WEAPONS/_FIRING/Glock/3m",
-        // 9x19: small, high, snappy. The least body of anything here.
-        BlastLowHz = 470f,
-        BrightnessFloorFraction = 0.22f,
-        BlastDecaySeconds = 0.018f,
-        ThumpHz = 105f,
-        ThumpDecaySeconds = 0.085f,
-        BrightnessHz = 6000f,
+        // 9x19, measured on the Glock 9: no brighter than a rifle at 20 m, and no shorter.
+        ReportPositivePhaseMs = 0.42f, ReportBurstDecayMs = 0.40f, ReportTrailDecayMs = 1.5f, ReportCornerHz = 3000f,
     };
 
     /// <summary>.45 ACP from a hammer-fired service pistol: heavy, slow and SUBSONIC. It makes no crack
@@ -335,13 +311,8 @@ public static class WeaponRegistry
         SoundFolder = "WEAPONS/pistol",
         // A Colt 1911 — hammer-fired .45 ACP, which is exactly what this weapon is.
         FiringFolder = "WEAPONS/_FIRING/pistol/3m",
-        // .45 ACP: slow, heavy, dull. Noticeably deeper and darker than the 9 mm, and subsonic, so it
-        // is the one handgun with no crack to go with it — two independent tells for the same weapon.
-        BlastLowHz = 360f,
-        BlastDecaySeconds = 0.023f,
-        ThumpHz = 82f,
-        ThumpDecaySeconds = 0.115f,
-        BrightnessHz = 4200f,
+        // .45 ACP, measured on the Colt 1911. Subsonic, so it is the one handgun with no crack.
+        ReportPositivePhaseMs = 0.38f, ReportBurstDecayMs = 0.45f, ReportTrailDecayMs = 1.6f, ReportCornerHz = 2800f,
     };
 
     /// <summary>12 gauge buckshot from a pump gun. Nine pellets, marginally supersonic, and a reload
@@ -377,13 +348,9 @@ public static class WeaponRegistry
         // synthesizer, by choice. A real 12 gauge take is the open item.
         FiringFolder = "WEAPONS/_FIRING/rifle_single",
         RecordedBlend = 0f,
-        // 12 gauge: the biggest body and the lowest thump on the list, and no self-cycling action.
-        BlastLowHz = 205f,
-        BrightnessFloorFraction = 0.06f,
-        BlastDecaySeconds = 0.038f,
-        ThumpHz = 55f,
-        ThumpDecaySeconds = 0.22f,
-        BrightnessHz = 4800f,
+        // 12 gauge: no recording. The largest bore and charge here, so the longest pulse and the
+        // darkest report — an estimate from the physics, to be checked against a recording.
+        ReportPositivePhaseMs = 0.60f, ReportBurstDecayMs = 0.60f, ReportTrailDecayMs = 2.2f, ReportCornerHz = 2400f,
         MechanicalDelaySeconds = 0f,
         MechanicalLevel = 0f,
     };

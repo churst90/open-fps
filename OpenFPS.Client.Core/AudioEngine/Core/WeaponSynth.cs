@@ -10,72 +10,26 @@ namespace OpenFPS.Client.AudioEngine.Core;
 public readonly record struct WeaponProfile(
     string Name,
     float MuzzleVelocity,        // m/s. Decides whether there is a crack at all, and how tight it is.
-    float BlastLowHz,            // centre of the body resonance: the "size" of the gun
-    float BlastDecaySeconds,     // how long the blast body rings
-    float ThumpHz,               // the chest-punch fundamental
-    float ThumpDecaySeconds,
-    float BrightnessHz,          // low-pass on the blast: higher is sharper and more cracking
+    float PositivePhaseMs,       // the blast pulse's positive phase
+    float BurstDecayMs,          // the turbulent gas behind the shock
+    float TrailDecayMs,          // what trails after it
+    float CornerHz,              // where the spectrum starts to fall
     float MechanicalDelaySeconds,// when the action is heard after the shot
-    float MechanicalLevel,
-    float BrightnessFloorFraction = 0.10f)  // how far the brightness sweep falls
+    float MechanicalLevel)
 {
-    /// <summary>A 5.56 mm-ish service rifle: fast, bright, hard crack, modest body.</summary>
-    public static WeaponProfile Rifle => new(
-        Name: "rifle",
-        MuzzleVelocity: 880f,
-        BlastLowHz: 320f,
-        BlastDecaySeconds: 0.026f,
-        ThumpHz: 78f,
-        ThumpDecaySeconds: 0.14f,
-        BrightnessHz: 7200f,
-        MechanicalDelaySeconds: 0.045f,
-        MechanicalLevel: 0.22f);
-
-    /// <summary>A 12 gauge: the biggest body on the list and the lowest thump. A shotgun is mostly
-    /// low-frequency energy, which is why it is the one weapon you feel through a wall.</summary>
-    public static WeaponProfile Shotgun => new(
-        Name: "shotgun",
-        MuzzleVelocity: 400f,
-        BlastLowHz: 210f,
-        BlastDecaySeconds: 0.036f,
-        ThumpHz: 58f,
-        ThumpDecaySeconds: 0.20f,
-        BrightnessHz: 4800f,
-        MechanicalDelaySeconds: 0.0f,   // a pump gun does nothing on its own
-        MechanicalLevel: 0.0f);
-
-    /// <summary>
-    /// The profile for a weapon, taken from the weapon.
-    ///
-    /// This replaced a lookup by name, which was two sources of truth wearing one name and behaved
-    /// exactly as that arrangement always does: the Glock's definition said 375 m/s and the profile it
-    /// named said 340, so a crack was scheduled and silence was rendered into it — and because five
-    /// weapons shared three profiles, the Glock and the .45 came out identical. There is now one
-    /// place a weapon's sound is described, and it is the weapon.
-    /// </summary>
     public static WeaponProfile From(WeaponDefinition w) => new(
         Name: w.Id,
         MuzzleVelocity: w.MuzzleVelocity,
-        BlastLowHz: w.BlastLowHz,
-        BlastDecaySeconds: w.BlastDecaySeconds,
-        ThumpHz: w.ThumpHz,
-        ThumpDecaySeconds: w.ThumpDecaySeconds,
-        BrightnessHz: w.BrightnessHz,
+        PositivePhaseMs: w.ReportPositivePhaseMs,
+        BurstDecayMs: w.ReportBurstDecayMs,
+        TrailDecayMs: w.ReportTrailDecayMs,
+        CornerHz: w.ReportCornerHz,
         MechanicalDelaySeconds: w.MechanicalDelaySeconds,
-        MechanicalLevel: w.MechanicalLevel,
-        BrightnessFloorFraction: w.BrightnessFloorFraction);
+        MechanicalLevel: w.MechanicalLevel);
 
-    /// <summary>A 9 mm handgun: subsonic-ish, smaller body, no crack worth rendering.</summary>
-    public static WeaponProfile Pistol => new(
-        Name: "pistol",
-        MuzzleVelocity: 340f,
-        BlastLowHz: 430f,
-        BlastDecaySeconds: 0.019f,
-        ThumpHz: 95f,
-        ThumpDecaySeconds: 0.09f,
-        BrightnessHz: 5200f,
-        MechanicalDelaySeconds: 0.055f,
-        MechanicalLevel: 0.30f);
+    public static WeaponProfile Rifle => From(WeaponRegistry.Ar15);
+    public static WeaponProfile Pistol => From(WeaponRegistry.Glock);
+    public static WeaponProfile Shotgun => From(WeaponRegistry.Shotgun);
 }
 
 /// <summary>
@@ -102,118 +56,68 @@ public static class WeaponSynth
     public const int SampleRate = 44100;
 
     /// <summary>
-    /// The muzzle blast: a blast wave, not a drum.
+    /// The report, synthesized to the spec measured from real ones (docs/GUNFIRE.md).
     ///
-    /// The first version of this was built from a resonant band-pass and a sine, and it sounded like
-    /// someone hitting a bathtub — because that is what those two things are. A high-Q resonator
-    /// ringing at 300 Hz for sixty milliseconds IS a box, and a decaying 68 Hz sine IS a tonal boom.
-    /// Neither is what a gun does. A muzzle blast has no resonant frequency and no oscillation in it
-    /// at all; it is a pressure discontinuity, and it is over very quickly.
+    /// At 20-40 m every rifle and pistol in the NIJ recordings is a pulse with a positive phase of
+    /// 0.35-0.56 ms, down 10 dB within about a millisecond, 20 dB within 2.5-3.5 and 30 dB within
+    /// 4-7, with a spectrum roughly level from 125 Hz to 2 kHz that then falls about 6 dB an octave.
+    /// The shot before this one took 18-26 ms to fall 20 dB, five to ten times too long, and that
+    /// more than its tone was why it did not sound like a gun.
     ///
-    /// So the low end here is a FRIEDLANDER WAVE — p(t) = P(1 − t/T)·e^(−t/T) — which is the standard
-    /// model of a blast: an instantaneous jump to peak overpressure, a fall through zero into a
-    /// shallow negative phase, and back. One excursion, not a cycle, which is why it gives weight
-    /// without pitch. T sets where its energy sits, and that is the one number that separates a 12
-    /// gauge from a 9 mm at the bottom end.
-    ///
-    /// Over it sits broadband noise through a low-pass whose cutoff FALLS as the sound decays. That
-    /// sweep is most of what makes it read as an explosion rather than a burst of static: a real blast
-    /// loses its top end within milliseconds as the shock front degrades, so the sound opens bright
-    /// and closes dark. A fixed filter cannot do that and sounds synthetic no matter how it is tuned.
-    ///
-    /// And it is SHORT — around a tenth of a second. That is not a compromise either. Everything
-    /// after the first hundred milliseconds of a gunshot you have ever heard was the place you heard
-    /// it in, and this engine builds that itself. A synthesized tail is a second room competing with
-    /// the real one, which is the same mistake as shipping a recording with its field still attached.
+    /// So: a Friedlander pulse — p(t) = (1 - t/T) e^(-t/T), the jump, the fall through zero at T and
+    /// the shallow negative phase — for the shock; decaying noise for the turbulent gas behind it, a
+    /// fast burst and a slower trail; one pole above the corner and one below 80 Hz. Nothing after
+    /// that: what a shot sounds like after its first few milliseconds is the place it is heard in,
+    /// and the engine makes that itself — the echoes off each surface, the scatter off the ground
+    /// and the reverb.
     /// </summary>
     public static float[] MuzzleBlast(WeaponProfile w, int seed = 1)
     {
-        // The blast wave's time constant, from the thump fundamental. Longer than the textbook
-        // overpressure duration on purpose: at the muzzle a real blast wave is a millisecond or two,
-        // but what a listener twenty metres away experiences as the PUNCH of a gunshot is the larger,
-        // slower pressure disturbance behind it. Render only the fast part and the shot is accurate
-        // and weightless.
-        // A Friedlander wave of time constant T puts its energy around 1/(2*pi*T), NOT around 1/T.
-        // Getting that wrong by the factor of 2*pi is what made the first attempt at this thin: with
-        // T taken as 1/(1.2*ThumpHz) the AKM's sub-bass landed near THIRTEEN HERTZ — inaudible, and
-        // promptly removed by the DC-blocking high-pass in Finish. Two per cent of the rendered energy
-        // was below 200 Hz. The synthesis was generating the weight and then throwing it away.
-        float fastHz = MathF.Max(20f, w.ThumpHz) * 1.6f;
-        float T = 1f / (2f * MathF.PI * fastHz);
-
-        // And a second, slower blast wave under the first — three times the time constant, so its
-        // energy sits an octave and a half lower. This is the part you feel rather than hear, and it
-        // is why a shotgun reads as bigger than a rifle even when the rifle measures louder. It is
-        // safe to lean on now in a way the old model was not: a Friedlander wave has no resonant
-        // frequency, so adding low end adds WEIGHT, where adding it to a tuned band-pass added BOOM.
-        float subHz = MathF.Max(16f, w.ThumpHz * 0.7f);
-        float Tsub = 1f / (2f * MathF.PI * subHz);
-
-        // SIX time constants of the noise, not four. This file already carried a comment saying so and
-        // I overrode it: at four the layer is still at 1.8% when the buffer runs out, which is a step
-        // in the waveform at the end of every shot that an 8 ms fade can only paper over. The way to
-        // keep a blast short is to decay it faster, not to cut it off while it is still sounding.
-        float length = MathF.Max(Tsub * 8f, w.BlastDecaySeconds * 6f) + 0.012f;
-        int n = (int)(SampleRate * length);
+        float T = MathF.Max(0.05f, w.PositivePhaseMs) * 1e-3f;
+        float tau = MathF.Max(0.05f, w.BurstDecayMs) * 1e-3f;
+        float trail = MathF.Max(0.1f, w.TrailDecayMs) * 1e-3f;
+        int n = (int)((T * 10f + trail * 9f) * SampleRate) + 16;
         var buf = new float[n];
         var rng = new Random(seed);
-
-        // Where the noise starts and where it ends up. The sweep is the effect; the endpoints are
-        // taste. Starting at the profile's brightness and falling to a tenth of it covers about three
-        // and a half octaves, which is roughly what a shock front loses as it decays.
-        float startCut = w.BrightnessHz;
-        float endCut = MathF.Max(180f, w.BrightnessHz * Math.Clamp(w.BrightnessFloorFraction, 0.02f, 0.9f));
-
-        // A gentle high-pass keeps the noise layer out of the blast wave's way, so the two stack
-        // rather than fight. Its corner is the body centre — the profile's one remaining use for it.
-        float hpAlpha = 1f - MathF.Exp(-2f * MathF.PI * (w.BlastLowHz * 0.5f) / SampleRate);
-        float hpState = 0f;
-        float lp = 0f;
-
+        // PINK noise for the gas: the recordings' spectrum falls about 3 dB an octave from 125 Hz to
+        // 2 kHz before it falls steeply, and white noise piles its energy into the top octaves — a
+        // white burst put nine per cent of the shot below 500 Hz, the "burst of white noise" of an
+        // earlier listening test. (Paul Kellet's three-pole approximation.)
+        float p0 = 0f, p1 = 0f, p2 = 0f;
         for (int i = 0; i < n; i++)
         {
             float t = i / (float)SampleRate;
-
-            // 1. The blast wave, twice: a fast one for the punch and a slow one for the weight.
-            float u = t / T;
-            float friedlander = (1f - u) * MathF.Exp(-u);
-            float us = t / Tsub;
-            float sub = (1f - us) * MathF.Exp(-us);
-
-            // 2. Broadband noise, decaying fast, through a closing low-pass.
-            float noiseEnv = MathF.Exp(-t / MathF.Max(0.002f, w.BlastDecaySeconds * NoiseDecayFraction));
-            float noise = (float)(rng.NextDouble() * 2.0 - 1.0) * noiseEnv;
-
-            // Cutoff falls geometrically, which is how it is heard — as octaves, not as hertz.
-            float sweep = MathF.Exp(-t / MathF.Max(0.004f, w.BlastDecaySeconds * 0.8f));
-            float cutoff = endCut + (startCut - endCut) * sweep;
-            float alpha = 1f - MathF.Exp(-2f * MathF.PI * cutoff / SampleRate);
-            lp += alpha * (noise - lp);
-
-            // High-pass the noise so it sits above the blast wave rather than doubling its bottom.
-            hpState += hpAlpha * (lp - hpState);
-            float shaped = lp - hpState;
-
-            // 3. The very first instant: a hard broadband edge, gone in a millisecond or two. This is
-            //    what says "gun" rather than "explosion in the distance".
-            float spike = (float)(rng.NextDouble() * 2.0 - 1.0) * MathF.Exp(-t / 0.0012f);
-
-            float sample = friedlander * BlastWaveLevel
-                         + sub * SubWeightLevel
-                         + shaped * NoiseLayerLevel
-                         + spike * 0.5f;
-
-            // Soft clip, driven hard. This is doing real work rather than protecting against overflow:
-            // saturation is what lets the low end stay LOUD without simply owning the peak. Peak
-            // normalisation happens afterwards, so anything that merely raises the peak makes
-            // everything else quieter — the way to make a shot feel bigger is to make more of it sit
-            // near the top, which is what saturating it does. It is also what a microphone and an ear
-            // both do to something this loud.
-            buf[i] = MathF.Tanh(sample * SaturationDrive);
+            float shock = (1f - t / T) * MathF.Exp(-t / T);
+            float white = (float)(rng.NextDouble() * 2 - 1);
+            p0 = 0.99765f * p0 + white * 0.0990460f;
+            p1 = 0.96300f * p1 + white * 0.2965164f;
+            p2 = 0.57000f * p2 + white * 1.0526913f;
+            float pink = (p0 + p1 + p2 + white * 0.1848f) * 0.25f;
+            float env = MathF.Exp(-t / tau) + ReportTrailLevel * MathF.Exp(-t / trail);
+            buf[i] = shock + pink * ReportBurstLevel * env;
         }
-
+        float lp = 1f - MathF.Exp(-2f * MathF.PI * MathF.Max(200f, w.CornerHz) / SampleRate);
+        float hp = 1f - MathF.Exp(-2f * MathF.PI * ReportHighPassHz / SampleRate);
+        float l = 0f, h = 0f;
+        for (int i = 0; i < n; i++)
+        {
+            l += lp * (buf[i] - l);
+            h += hp * (l - h);
+            buf[i] = l - h;
+        }
+        // A short fade over the last tenth, so a buffer that ends on a sample above zero is not a click.
+        int fade = n / 10;
+        for (int i = 0; i < fade; i++) buf[n - 1 - i] *= i / (float)fade;
         return Finish(buf, 0.95f);
     }
+
+    /// <summary>The turbulent gas against the shock's peak. From the fit to the recordings.</summary>
+    public const float ReportBurstLevel = 2.4f;
+    /// <summary>The trail against the burst.</summary>
+    public const float ReportTrailLevel = 0.18f;
+    /// <summary>Below this the report falls away. Only where the recordings stop saying anything: a
+    /// handheld recorder's capsules roll off below about 80 Hz.</summary>
+    public const float ReportHighPassHz = 80f;
 
     /// <summary>
     /// The crack of a supersonic round passing the listener.
@@ -404,8 +308,7 @@ public static class WeaponSynth
         float sub = Math.Clamp(subLevel, 0f, 1f);
         if (sub > 0.001f)
         {
-            float subHz = MathF.Max(16f, w.ThumpHz * 0.7f);
-            float Tsub = 1f / (2f * MathF.PI * subHz);
+            float Tsub = 1f / (2f * MathF.PI * SubReinforcementHz);
             for (int i = 0; i < buf.Length; i++)
             {
                 float t = i / (float)SampleRate;
@@ -426,34 +329,9 @@ public static class WeaponSynth
     /// system; past about 0.5 it stops sounding like the gun in the recording.
     /// </summary>
     public const float SubReinforcementLevel = 0.25f;
+    /// <summary>The bottom octave a handheld recorder rolls off below, which the reinforcement restores.</summary>
+    public const float SubReinforcementHz = 60f;
 
-    /// <summary>Weight of the fast Friedlander blast wave — the punch.</summary>
-    public const float BlastWaveLevel = 1.45f;
-    /// <summary>Weight of the slow blast wave underneath it — the part you feel in your chest. This is
-    /// the knob for "I should be able to feel a gun fire".</summary>
-    public const float SubWeightLevel = 1.45f;
-    /// <summary>How hard the blast is driven into the soft clipper. Higher is denser and louder-feeling
-    /// at the same peak; far too high and it stops sounding like air moving.</summary>
-    public const float SaturationDrive = 2.1f;
-    /// <summary>
-    /// Weight of the swept broadband noise — the part that sounds like a gunshot rather than like a
-    /// drum. This is where the character is, and it was where ALL of it was.
-    ///
-    /// At 1.9 the noise carried more energy than both blast waves together: the first listening test
-    /// called the result "a burst of white noise", and measuring it agreed — barely a fifth of the
-    /// energy sat below 500 Hz, where nearly all of a real gunshot's does. The gas jet leaving a
-    /// muzzle is loud and it is BRIEF; what carries across a street is the pressure wave behind it.
-    /// </summary>
-    public const float NoiseLayerLevel = 0.85f;
-
-    /// <summary>
-    /// How much faster the noise dies than the blast body.
-    ///
-    /// The turbulent jet is over in a few milliseconds — far sooner than the pressure disturbance it
-    /// rode out on. Decaying both at the same rate left a couple of hundred milliseconds of hiss
-    /// under every shot, which is most of what made it read as noise rather than as a bang.
-    /// </summary>
-    public const float NoiseDecayFraction = 0.4f;
 
     /// <summary>Reads a 16-bit mono WAV back to floats. Enough to re-load what the ingest wrote; it
     /// is not a general decoder and says so by returning empty rather than guessing at a format it

@@ -120,38 +120,45 @@ public class BallisticsTests
     }
 
     /// <summary>
-    /// A gunshot is mostly LOW. Nearly all of a real one's energy is below a few hundred hertz — the
-    /// pressure wave — with a brief bright edge on top from the gas jet, and the jet is over in
-    /// milliseconds while the wave carries across a street.
+    /// A shot's energy is balanced the way a real one is: 20-45 per cent of it below 500 Hz.
     ///
-    /// This test exists because the first person to listen to it said "the muzzle sounds like a burst
-    /// of white noise", and measuring agreed: barely a fifth of the energy was under 500 Hz. Every
-    /// other test on this synthesis passed throughout — they checked that it was dry, centred,
-    /// deterministic and different per weapon, and none of them could tell a gunshot from a hiss.
+    /// Measured on the NIJ recordings, the first 20 ms of clean shots at 20-40 m: 16-40 per cent below
+    /// 500 Hz across the M16, the AK, the Glock and the Colt, about a quarter typically (a handheld
+    /// recorder rolls off below 80 Hz, so a little more in truth). This test used to demand MORE than
+    /// half, from a listening test that called a white-noise-heavy synthesis "a burst of white noise";
+    /// the complaint was right and the number it produced was not, and the measurement replaces it.
+    /// Both ends matter: under 20 per cent is a hiss, over 45 a thud. The shotgun, never recorded, is
+    /// the lowest-weighted of the five and still under 60.
     /// </summary>
     [Fact]
-    public void AShotIsMostlyLowEnergyAndNotABurstOfNoise()
+    public void AShotIsBalancedTheWayARealOneIs()
     {
-        var pcm = WeaponSynth.MuzzleBlast(WeaponProfile.Rifle);
-
-        float below500 = BandEnergy(pcm, 10f, 500f);
-        float above500 = BandEnergy(pcm, 500f, 20000f);
-        float total = below500 + above500;
-        Assert.True(total > 0f);
-
-        float lowShare = below500 / total;
-        Assert.True(lowShare > 0.5f,
-                    $"only {lowShare * 100f:F0} per cent of the shot's energy is below 500 Hz; it is a hiss");
-
-        // ...and it still has an edge. All weight and no edge is a door, not a gun.
-        Assert.True(BandEnergy(pcm, 2000f, 8000f) / total > 0.02f, "the shot has no bright edge at all");
+        float Share(WeaponDefinition w)
+        {
+            var pcm = WeaponSynth.MuzzleBlast(WeaponProfile.From(w));
+            float below500 = BandEnergy(pcm, 10f, 500f);
+            float above500 = BandEnergy(pcm, 500f, 20000f);
+            return below500 / (below500 + above500);
+        }
+        // The four that were measured, in the range they measured.
+        foreach (var w in new[] { WeaponRegistry.Akm, WeaponRegistry.Ar15, WeaponRegistry.Glock, WeaponRegistry.ServicePistol })
+        {
+            float share = Share(w);
+            Assert.True(share >= 0.20f && share <= 0.45f, $"{w.Id}: {share * 100f:F0}% of the energy below 500 Hz");
+        }
+        // The shotgun has no recording: the biggest bore and charge, so the lowest-weighted of all,
+        // and still not a thud.
+        float shotgun = Share(WeaponRegistry.Shotgun);
+        Assert.True(shotgun < 0.60f, $"shotgun: {shotgun * 100f:F0}% below 500 Hz");
+        foreach (var w in WeaponRegistry.All.Where(w => w != WeaponRegistry.Shotgun))
+            Assert.True(shotgun > Share(w), $"{w.Id} is weighted lower than a 12 gauge");
     }
 
     /// <summary>Energy in a band, by one-pole filtering. Crude and adequate: the question is whether
     /// two thirds of the energy is in the bottom two octaves, not where a notch sits.</summary>
     private static float BandEnergy(float[] pcm, float lowHz, float highHz)
     {
-        const float sampleRate = 48000f;
+        const float sampleRate = WeaponSynth.SampleRate;
         float a = 1f - MathF.Exp(-2f * MathF.PI * lowHz / sampleRate);
         float b = 1f - MathF.Exp(-2f * MathF.PI * highHz / sampleRate);
         float s1 = 0f, s2 = 0f, energy = 0f;
