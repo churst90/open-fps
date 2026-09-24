@@ -104,13 +104,50 @@ public static class VehicleShadow
         float Via(Vector3 p, Vector3 q) => Vector3.Distance(la, p) + Vector3.Distance(p, q) + Vector3.Distance(q, lb) - direct;
 
         var over = Via(new Vector3(entry.X, half.Y, entry.Z), new Vector3(exit.X, half.Y, exit.Z));
-        // Round an end: along the box's length, off whichever end is nearer the crossing point.
-        float endZ = (entry.Z + exit.Z) >= 0f ? half.Z : -half.Z;
-        var aroundEnd = Via(new Vector3(entry.X, entry.Y, endZ), new Vector3(exit.X, exit.Y, endZ));
-        // ...or its side, for a line running along it.
-        float sideX = (entry.X + exit.X) >= 0f ? half.X : -half.X;
-        var aroundSide = Via(new Vector3(sideX, entry.Y, entry.Z), new Vector3(sideX, exit.Y, exit.Z));
-        return MathF.Max(0f, MathF.Min(over, MathF.Min(aroundEnd, aroundSide)));
+        return MathF.Max(0f, MathF.Min(over, RoundInPlan(la, lb, half) - direct));
+    }
+
+    /// <summary>
+    /// The shortest way round the box seen from above: via its corners, each leg staying outside it.
+    ///
+    /// It used to push the points where the line enters and leaves out to a face along one axis. A
+    /// line crossing the box broadside already enters and leaves through exactly those faces, so the
+    /// "route round the side" was the straight line through the bus: a detour of nothing, a bus that
+    /// cast no shadow at all on a level line. Round a convex box the answer is a chain of at most
+    /// three of its corners, so every such chain is tried.
+    /// </summary>
+    private static float RoundInPlan(Vector3 a, Vector3 b, Vector3 half)
+    {
+        // Corner k of the footprint, counter-clockwise from (-x, -z).
+        float Cx(int k) => k == 1 || k == 2 ? half.X : -half.X;
+        float Cz(int k) => k >= 2 ? half.Z : -half.Z;
+        float total = Vector3.Distance(a, b);
+        // A point on the route at a corner, at the height the straight line has there.
+        Vector3 At(int k, float frac) => new(Cx(k), a.Y + (b.Y - a.Y) * frac, Cz(k));
+        var inner = half * 0.999f;
+        bool Clear(Vector3 p, Vector3 q) => !Clip(p, q, new Vector3(inner.X, float.MaxValue / 4, inner.Z), out _, out _);
+        float best = float.MaxValue;
+        for (int i = 0; i < 4; i++)
+        {
+            var p1 = At(i, 0.5f);
+            if (Clear(a, p1) && Clear(p1, b)) best = MathF.Min(best, Vector3.Distance(a, p1) + Vector3.Distance(p1, b));
+            for (int j = 0; j < 4; j++)
+            {
+                if (j == i) continue;
+                var q1 = At(i, 0.33f); var q2 = At(j, 0.67f);
+                if (Clear(a, q1) && Clear(q1, q2) && Clear(q2, b))
+                    best = MathF.Min(best, Vector3.Distance(a, q1) + Vector3.Distance(q1, q2) + Vector3.Distance(q2, b));
+                for (int k = 0; k < 4; k++)
+                {
+                    if (k == i || k == j) continue;
+                    var r1 = At(i, 0.25f); var r2 = At(j, 0.5f); var r3 = At(k, 0.75f);
+                    if (Clear(a, r1) && Clear(r1, r2) && Clear(r2, r3) && Clear(r3, b))
+                        best = MathF.Min(best, Vector3.Distance(a, r1) + Vector3.Distance(r1, r2)
+                                             + Vector3.Distance(r2, r3) + Vector3.Distance(r3, b));
+                }
+            }
+        }
+        return best == float.MaxValue ? total : best;
     }
 
     private static bool Clip(Vector3 a, Vector3 b, Vector3 half, out float t0, out float t1)
