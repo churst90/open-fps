@@ -220,21 +220,38 @@ public static class DoorAcoustics
     /// <summary>
     /// Opening, which is a quieter event and a different one.
     ///
-    /// The latch is worked and the leaf comes AWAY from the frame, so there is no impact and no
-    /// seal — but there is the seal PEELING, which is the small suck a well-sealed door makes when
-    /// you pull it, and there are the hinges for as long as it is moving.
+    /// The latch is worked and the leaf comes AWAY from the frame, so there is no impact on the frame
+    /// and no seal being squeezed — but there is the seal PEELING, which is the small suck a
+    /// well-sealed door makes when you pull it, and there are the hinges for as long as it is moving.
+    ///
+    /// The latch is not only a click. The bolt is sprung and bolted through the leaf, and when it is
+    /// withdrawn the whole leaf answers it, as it does on closing. The spring gives every leaf about
+    /// the same kick, so a light leaf is set moving harder than a heavy one: the energy it takes goes
+    /// as one over its mass. The leaf rings a little from that kick, by the same rule as when it
+    /// shuts: a steel one long enough to be the clank of a fire door's push bar, a wooden one barely.
     /// </summary>
     public static List<DoorSound> Opening(MaterialProperties material, Vector3 latchEdge, Vector3 hinge,
-                                          float width, float height, float thickness,
+                                          float width, float height, float thickness, float massKg,
                                           float swingSeconds, float hingeDryness, bool hasSeal)
     {
+        float leaf = MathF.Max(0.5f, massKg) / ReferenceLeafKg;
         // Levels raised from where they started, which was the level of a conversation and inaudible
         // at two metres. A handle worked at arm's length is a clearly audible thing, and the first
         // listening test heard none of this at all.
-        var sounds = new List<DoorSound>(3)
+        const float clickDb = 74f;
+        float bodyDb = clickDb - Math.Clamp(10f * MathF.Log10(leaf), -12f, 12f);
+        var sounds = new List<DoorSound>(5)
         {
-            new(DoorSoundKind.Latch, SoundCharacter.Knock, 0f, latchEdge, 74f, LatchHz, 0.03f, 0.2f),
+            new(DoorSoundKind.Latch, SoundCharacter.Knock, 0f, latchEdge, clickDb, LatchHz, 0.03f, 0.2f),
+            new(DoorSoundKind.Latch, SoundCharacter.Knock, 0.001f, latchEdge, bodyDb, 140f, 0.07f, 0.5f),
         };
+
+        float hz = PanelHz(material, width, height, thickness);
+        if (hz > 0f && PanelAcoustics.RingsAudibly(material, hz, HungPanelLoss))
+            // Still in its frame when the bolt lets go, so the frame takes most of the ring, as on
+            // closing.
+            sounds.Add(new DoorSound(DoorSoundKind.Panel, SoundCharacter.Ring, 0.004f, latchEdge,
+                                     bodyDb - 7f, hz, RingSeconds(material, hz) * 0.45f, 0.15f));
 
         if (hasSeal)
             sounds.Add(new DoorSound(DoorSoundKind.Seal, SoundCharacter.Hiss, 0.03f, latchEdge, 66f, 220f, 0.09f, 0.9f));
@@ -243,14 +260,18 @@ public static class DoorAcoustics
         // a dry knuckle. The same process as a tyre at its limit, and it sings for the same reason.
         if (hingeDryness > 0.05f)
         {
-            // A bigger, heavier pin groans lower — so the note comes off the leaf, not off a table.
-            float hz = Math.Clamp(900f / MathF.Max(0.3f, width * height), 120f, 2200f);
+            // The pin is a spring and the leaf is the mass on it, so a heavier leaf groans lower, as
+            // one over the root of its mass: 476 Hz for the reference door.
+            float hingeHz = Math.Clamp(476f / MathF.Sqrt(leaf), 120f, 2200f);
             sounds.Add(new DoorSound(DoorSoundKind.Hinge, SoundCharacter.Scrape, 0.05f, hinge,
-                                     60f + 16f * hingeDryness, hz,
+                                     60f + 16f * hingeDryness, hingeHz,
                                      MathF.Max(0.1f, swingSeconds * 0.8f), 0.35f));
         }
         return sounds;
     }
+
+    /// <summary>The door the opening sounds are levelled on: solid wood, 0.9 by 2.1 m, 40 mm thick.</summary>
+    private const float ReferenceLeafKg = 0.9f * 2.1f * 0.04f * 650f;
 
     /// <summary>
     /// How fast the latch edge of a door is travelling, given how long its whole swing takes.

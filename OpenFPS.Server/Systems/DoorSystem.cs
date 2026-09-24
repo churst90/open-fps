@@ -237,7 +237,7 @@ public sealed class DoorSystem
             // doors do not have one; rendering three quarters of a second of stick-slip on every
             // door made every door sound like a haunted house, which a listener heard as an
             // unexplained hiss either side of the thud. A gate or a cellar door can ask for it.
-            ? DoorAcoustics.Opening(material, latchEdge, hinge, size.X, size.Y, ringThickness,
+            ? DoorAcoustics.Opening(material, latchEdge, hinge, size.X, size.Y, ringThickness, massKg,
                                     door.SwingSeconds, hingeDryness: 0f, hasSeal)
             : DoorAcoustics.Closing(material, latchEdge, transform.Position, size.X, size.Y, ringThickness, massKg,
                                     DoorAcoustics.EdgeSpeed(size.X, door.SwingRadians, door.SwingSeconds), hasSeal);

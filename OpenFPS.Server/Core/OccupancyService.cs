@@ -77,7 +77,7 @@ public class OccupancyService
         const float width = 1.0f, height = 1.1f, skin = 0.0008f;
 
         var sounds = new List<TransientSound>();
-        foreach (var s in DoorAcoustics.Opening(steel, latch, hinge, width, height, skin, 0.8f, 0f, hasSeal: true))
+        foreach (var s in DoorAcoustics.Opening(steel, latch, hinge, width, height, skin, CarDoorKg, 0.8f, 0f, hasSeal: true))
             sounds.Add(s.ToTransient());
         float closeSpeed = DoorAcoustics.EdgeSpeed(width, 1.1f, 0.5f);
         foreach (var s in DoorAcoustics.Closing(steel, latch, centre, width, height, skin, CarDoorKg, closeSpeed, hasSeal: true))

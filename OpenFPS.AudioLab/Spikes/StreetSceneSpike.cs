@@ -224,7 +224,7 @@ public static class StreetSceneSpike
         float edge = DoorAcoustics.EdgeSpeed(0.9f, MathF.PI / 2f, 0.9f);
 
         var opening = DoorAcoustics.Opening(props, at, at + new Vector3(-0.9f, 0f, 0f),
-                                            0.9f, 2.1f, thickness, 0.9f, hingeDryness: 0f,
+                                            0.9f, 2.1f, thickness, mass, 0.9f, hingeDryness: 0f,
                                             hasSeal: material == "Metal");
         Schedule(provider, opening.Select(s => s.ToTransient()), seed);
         Wait(provider, 1400);

@@ -452,6 +452,11 @@ if (args.Contains("--earshot"))
     Environment.Exit(OpenFPS.Client.Core.AudioEngine.Fmod.EarshotSpike.Run(args));
 }
 
+if (args.Contains("--door-opening"))
+{
+    Environment.Exit(OpenFPS.Client.Core.AudioEngine.Fmod.DoorOpeningSpike.Run(args));
+}
+
 if (args.Contains("--car-horn"))
 {
     Environment.Exit(OpenFPS.Client.Core.AudioEngine.Fmod.CarHornSpike.Run(args));

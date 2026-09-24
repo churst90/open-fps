@@ -235,28 +235,63 @@ public class DoorSoundTests
 
     // ── Opening ─────────────────────────────────────────────────────────────────────────────────
 
+    private const float WoodDoorKg = 0.9f * 2.1f * 0.04f * 650f;
+
     /// <summary>
     /// Opening is a different event, not a quieter version of the same one: the leaf comes AWAY from
-    /// the frame, so there is no impact and nothing rings.
+    /// the frame, so nothing strikes the frame.
     /// </summary>
     [Fact]
     public void OpeningIsADifferentEventAndNotAQuieterClose()
     {
         var sounds = DoorAcoustics.Opening(Of("Metal"), Vector3.Zero, Vector3.One,
-                                           0.9f, 2.1f, 0.04f, 0.9f, hingeDryness: 0f, hasSeal: true);
+                                           0.9f, 2.1f, 0.004f, 45f, 0.9f, hingeDryness: 0f, hasSeal: true);
 
         Assert.Contains(sounds, s => s.Kind == DoorSoundKind.Latch);
         Assert.Contains(sounds, s => s.Kind == DoorSoundKind.Seal);
         Assert.DoesNotContain(sounds, s => s.Kind == DoorSoundKind.Impact);
-        Assert.DoesNotContain(sounds, s => s.Kind == DoorSoundKind.Panel);
+    }
+
+    /// <summary>
+    /// What the leaf is made of is heard when it opens. The leaf rings a little as the bolt lets go,
+    /// and a steel one rings several times longer than a wooden one of the same size (0.7 s against
+    /// 0.14) — the clank of a
+    /// fire door's push bar against the knock of a wooden door. Opening used to take the material
+    /// and ignore it, so the two were identical.
+    /// </summary>
+    [Fact]
+    public void ASteelLeafRingsLongerThanAWoodenOneWhenItsLatchIsWorked()
+    {
+        var steel = DoorAcoustics.Opening(Of("Metal"), Vector3.Zero, Vector3.One, 0.9f, 2.1f, 0.004f, 45f, 0.9f, 0f, true);
+        var wood = DoorAcoustics.Opening(Of("Wood"), Vector3.Zero, Vector3.One, 0.9f, 2.1f, 0.04f, WoodDoorKg, 0.9f, 0f, false);
+        float Ring(List<DoorSound> d) => d.Where(s => s.Kind == DoorSoundKind.Panel).Sum(s => s.DecaySeconds);
+        Assert.True(Ring(steel) > 3f * Ring(wood), $"steel rings {Ring(steel):F2} s, wood {Ring(wood):F2} s");
+    }
+
+    /// <summary>
+    /// The latch spring kicks every leaf about the same, so a light leaf answers it louder than a
+    /// heavy one: the energy goes as one over the mass, ten decibels for ten times the weight. And a
+    /// light leaf's dry hinge sings higher: the pin is a spring and the leaf the mass on it.
+    /// </summary>
+    [Fact]
+    public void ALightLeafAnswersTheLatchLouderAndCreaksHigher()
+    {
+        Vector3 z = Vector3.Zero, one = Vector3.One;
+        var light = DoorAcoustics.Opening(Of("Wood"), z, one, 0.9f, 2.1f, 0.04f, WoodDoorKg / 10f, 0.9f, 1f, false);
+        var heavy = DoorAcoustics.Opening(Of("Wood"), z, one, 0.9f, 2.1f, 0.04f, WoodDoorKg, 0.9f, 1f, false);
+        float Body(List<DoorSound> d) => d.Where(s => s.Kind == DoorSoundKind.Latch).MinBy(s => s.Hz)!.LevelDb;
+        Assert.InRange(Body(light) - Body(heavy), 9.5f, 10.5f);
+        float Hinge(List<DoorSound> d) => d.Single(s => s.Kind == DoorSoundKind.Hinge).Hz;
+        Assert.InRange(Hinge(heavy), 470f, 482f);                      // the reference door keeps its note
+        Assert.InRange(Hinge(light) / Hinge(heavy), 3.0f, 3.3f);       // root ten
     }
 
     /// <summary>Dry hinges sing, oiled ones do not, and the singing lasts as long as the swing.</summary>
     [Fact]
     public void OnlyDryHingesSing()
     {
-        var oiled = DoorAcoustics.Opening(Of("Wood"), Vector3.Zero, Vector3.One, 0.9f, 2.1f, 0.04f, 0.9f, 0f, false);
-        var dry = DoorAcoustics.Opening(Of("Wood"), Vector3.Zero, Vector3.One, 0.9f, 2.1f, 0.04f, 0.9f, 1f, false);
+        var oiled = DoorAcoustics.Opening(Of("Wood"), Vector3.Zero, Vector3.One, 0.9f, 2.1f, 0.04f, WoodDoorKg, 0.9f, 0f, false);
+        var dry = DoorAcoustics.Opening(Of("Wood"), Vector3.Zero, Vector3.One, 0.9f, 2.1f, 0.04f, WoodDoorKg, 0.9f, 1f, false);
 
         Assert.DoesNotContain(oiled, s => s.Kind == DoorSoundKind.Hinge);
         var hinge = dry.Single(s => s.Kind == DoorSoundKind.Hinge);
