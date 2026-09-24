@@ -170,6 +170,24 @@ public sealed class AirSystem
     public IReadOnlyDictionary<string, AirPort> Ports => _ports;
     public AirSystemSpec Spec => _s;
 
+    /// <summary>
+    /// The part of the last <see cref="Step"/> that came from the FRONT of the vehicle: the ports
+    /// <see cref="PlaceAtFront"/> named, and the compressor, which is bolted to the engine. The rest
+    /// is the back. Zero until something says where the front is.
+    /// </summary>
+    public float FrontOut { get; private set; }
+    private readonly HashSet<AirPort> _atFront = new();
+    private bool _compressorAtFront;
+
+    /// <summary>Which ports are nearer the front outlet than the back, and whether the engine (and
+    /// so the compressor) is. A vehicle is a body with two ends; its valves are on one or the other.</summary>
+    public void PlaceAtFront(Func<AirPortSpec, bool> atFront, bool compressorAtFront)
+    {
+        _atFront.Clear();
+        foreach (var p in _ports.Values) if (atFront(p.Spec)) _atFront.Add(p);
+        _compressorAtFront = compressorAtFront;
+    }
+
     public AirSystem(AirSystemSpec s, float rate = 44100f, int seed = 61)
     {
         _s = s; _dt = 1f / rate; _rng = new Random(seed);
@@ -225,8 +243,12 @@ public sealed class AirSystem
             if (_purgeArmed <= 0f && _ports.ContainsKey("dryer_purge")) Vent("dryer_purge");
         }
 
-        float y = 0f;
-        foreach (var p in _ports.Values) { p.Step(); y += p.Out; }
+        float y = 0f, front = 0f;
+        foreach (var p in _ports.Values)
+        {
+            p.Step(); y += p.Out;
+            if (_atFront.Contains(p)) front += p.Out;
+        }
 
         // The compressor: a little two-cylinder pump knocking away at twice the speed it is geared
         // to. Only while it is LOADED — when the governor unloads it, it goes quiet, and that change
@@ -240,9 +262,12 @@ public sealed class AirSystem
                 _compPhase -= 1.0;
                 _compKnock = _compAmp * (0.7f + 0.6f * (float)_rng.NextDouble());
             }
-            y += _comp.Process(_compKnock) * 5f;
+            float knock = _comp.Process(_compKnock) * 5f;
+            y += knock;
+            if (_compressorAtFront) front += knock;
             _compKnock *= 0.994f;
         }
+        FrontOut = front;
         return y;
     }
 

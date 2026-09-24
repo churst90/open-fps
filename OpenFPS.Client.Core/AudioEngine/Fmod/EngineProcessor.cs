@@ -477,7 +477,17 @@ public sealed class EngineVoiceState : IRenderedVoice
         _windPaAt110 = 20e-6f * MathF.Pow(10f, shell.WindNoiseDbAt110 / 20f);
         if (!string.IsNullOrEmpty(v.AirSystem))
         {
-            try { _air = new AirSystem(ModelLibrary.Air(v.AirSystem), sampleRate, seed + 17); }
+            try
+            {
+                _air = new AirSystem(ModelLibrary.Air(v.AirSystem), sampleRate, seed + 17);
+                // Each valve is where the spec says it is, measured back from the nose; it is heard
+                // from whichever outlet of this vehicle is nearer. The compressor is on the engine,
+                // and the engine is where the intake is.
+                float nose = v.LengthMetres * 0.5f;
+                _air.PlaceAtFront(p => NearerFront(v, nose - p.AlongMetres), compressorAtFront: true);
+                _chimeAtFront = _air.Ports.TryGetValue("door", out var door)
+                    ? NearerFront(v, nose - door.Spec.AlongMetres) : true;
+            }
             catch (Exception ex) { Serilog.Log.Warning("Vehicle '{Name}': air system '{Air}' — {Err}", v.Name, v.AirSystem, ex.Message); }
         }
         _bayLeak = Math.Clamp(v.EngineBayLeakage, 0f, 1f);
@@ -603,6 +613,13 @@ public sealed class EngineVoiceState : IRenderedVoice
     /// not the grille's waveform a second time.
     /// </summary>
     private readonly EchoDiffuser _bayIntake;
+    /// <summary>The door beeper hangs over the door, so it is heard from the end the door is at.</summary>
+    private readonly bool _chimeAtFront = true;
+
+    /// <summary>Is a point this far along the vehicle (its own frame, +Z forward) nearer the front
+    /// outlet than the back one?</summary>
+    internal static bool NearerFront(VehicleProfile v, float z)
+        => MathF.Abs(z - v.IntakeOffsetZ) < MathF.Abs(z - v.ExhaustOffsetZ);
     /// <summary>How rough the bay is to the intake noise: a cluttered cavity, about brick
     /// (EchoDiffuser's scale; roughly six milliseconds of smear).</summary>
     private const float BayScattering = 0.5f;
@@ -843,21 +860,31 @@ public sealed class EngineVoiceState : IRenderedVoice
             // the exhaust are in the same place". Once far enough to be one voice, nothing changes.
             float bay = _bayLeak > 0f ? (Engine.Block + 0.5f * _bayIntake.Process(Engine.Intake)) * _bayLeak : 0f;
             front += bay;
-            float airOut = 0f, chimeOut = 0f;
+            // The air and the door beeper are their own sources at their own levels, each at its own
+            // end of the vehicle: the door valve, the kneeling valve and the beeper at the front door,
+            // the brake releases at the axles. They all used to come out of the tailpipe.
+            float airOut = 0f, chimeOut = 0f, airFront = 0f, chimeFront = 0f;
             if (_air != null)
             {
                 if ((i & 63) == 0) AirEvents(dt * 64f);
                 airOut = _air.Step();
-                pa += airOut;
+                airFront = _air.FrontOut;
+                pa += airOut - airFront;
             }
-            if (_chime != null) { chimeOut = StepChime(); pa += chimeOut; }
+            if (_chime != null)
+            {
+                chimeOut = StepChime();
+                if (_chimeAtFront) chimeFront = chimeOut; else pa += chimeOut;
+            }
+            float frontExtras = airFront + chimeFront;
+            float rearExtras = airOut + chimeOut - frontExtras;
 
             // What the ENGINE is radiating, before anything a listener's position does to it: the
             // level the loudness law is applied to. Not the brakes' air or the door beeper, which are
             // their own sources at their own levels and are not what idles.
             // The bay is the engine radiating even though it now leaves by the front: the level the
             // loudness law is applied to is the same machine it always was.
-            float engineOnly = pa - airOut - chimeOut + bay;
+            float engineOnly = pa - rearExtras + bay;
             blockSum += (double)engineOnly * engineOnly;
 
             // Crossfaded over ~60 ms rather than switched, so getting in or out is not a click.
@@ -890,7 +917,7 @@ public sealed class EngineVoiceState : IRenderedVoice
                 // And with the doors open there is a hole in the side of the bus: the outside comes
                 // in through a doorway about 2.4 m^2 of a hundred-odd m^2 of cabin wall, which lets
                 // in a couple of per cent of the power (-16 dB), unfiltered.
-                if (_doorsOpen) inCabin += (pa - chimeOut - airOut + bay) * DoorwayLeak;
+                if (_doorsOpen) inCabin += (pa - rearExtras + bay) * DoorwayLeak;
                 float k = _interiorMix;
                 pa = pa * (1f - k) + inCabin * k;
                 front *= 1f - k;
@@ -903,11 +930,13 @@ public sealed class EngineVoiceState : IRenderedVoice
             _levelGain += liftStep;
             // The lift is the ENGINE's: an idling bus's air brake release is exactly as loud as it
             // is, and lifting it with the idle made every bus stop audible across the city.
-            float extras = (1f - _interiorMix) * (airOut + chimeOut)
+            // Inside, all of the air and the beeper arrive through the cabin (inCabin, in the back
+            // tap); outside, each end carries its own.
+            float extras = (1f - _interiorMix) * rearExtras
                          + _interiorMix * (chimeOut + 0.5f * airOut);
             pa = (pa - extras) * _levelGain + extras;
             _ring[(int)(w & mask)] = pa * gain * _envelope;
-            _front[(int)(w & mask)] = front * gain * _envelope * _levelGain;
+            _front[(int)(w & mask)] = (front * _levelGain + (1f - _interiorMix) * frontExtras) * gain * _envelope;
             w++;
         }
         Volatile.Write(ref _written, w);
