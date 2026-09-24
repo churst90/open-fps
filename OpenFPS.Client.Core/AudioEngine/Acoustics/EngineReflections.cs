@@ -236,7 +236,7 @@ public sealed class EngineReflections
         int want = Math.Clamp(EchoesPerEngine, 0, MaxEchoesPerEngine);
         if (want == 0 && mine.Count == 0) return;
         Span<Reflection> found = stackalloc Reflection[MaxEchoesPerEngine];
-        int n = want == 0 ? 0 : Math.Min(want, FirstOrderNear(source, listener, speedOfSound, found));
+        int n = want == 0 ? 0 : Math.Min(want, FirstOrderNear(source, listener, speedOfSound, found, nearestPart: false));
 
         for (int i = 0; i < n; i++)
         {
@@ -344,7 +344,7 @@ public sealed class EngineReflections
     /// </summary>
     public int FindReflections(Vector3 source, Vector3 listener, float speedOfSound, Span<Reflection> into,
                                int diffuseTaps = 0)
-        => FirstOrderNear(source, listener, speedOfSound, into, diffuseTaps);
+        => FirstOrderNear(source, listener, speedOfSound, into, diffuseTaps, nearestPart: true);
 
     /// <summary>
     /// How far a point is from the nearest part of a face, squared. Not from its centre: the city's
@@ -362,8 +362,12 @@ public sealed class EngineReflections
         return Vector3.DistanceSquared(nearest, p);
     }
 
+    /// <param name="nearestPart">Find faces by their nearest part (one-off sounds: the ground and long
+    /// facades count wherever you are) or by their centre (engines). Engines keep the centre until
+    /// their echoes stop phasing: counted along their whole length, long facades gave every passing
+    /// car a set of coherent echoes, heard as cars passing "inside out" where they had not been.</param>
     private int FirstOrderNear(Vector3 source, Vector3 listener, float speedOfSound, Span<Reflection> into,
-                               int diffuseTaps = 0)
+                               int diffuseTaps = 0, bool nearestPart = true)
     {
         // Only the faces near the path are worth mirroring through. Judged from the midpoint, which
         // is where a specular bounce off anything between the two has to land.
@@ -371,7 +375,7 @@ public sealed class EngineReflections
         float r2 = SurfaceSearchRadius * SurfaceSearchRadius;
         _near.Clear();
         foreach (var s in _surfaces)
-            if (DistanceSquaredToFace(s, mid) <= r2) _near.Add(s);
+            if ((nearestPart ? DistanceSquaredToFace(s, mid) : Vector3.DistanceSquared(s.Centre, mid)) <= r2) _near.Add(s);
         return ImageSource.FirstOrder(System.Runtime.InteropServices.CollectionsMarshal.AsSpan(_near),
                                       source, listener, speedOfSound, into, Blocked, diffuseTaps);
     }

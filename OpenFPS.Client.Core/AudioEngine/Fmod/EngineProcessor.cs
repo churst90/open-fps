@@ -25,6 +25,7 @@ public sealed class EngineVoiceState : IRenderedVoice
     public readonly VirtualDriver Driver;
     private readonly Random _rng;
     private VehicleSynth.TyreVoice _tyre;
+    private VehicleSynth.TyreVoice _tyreFront;
     private float _tyreChirp;
     private int _tyreGear;
 
@@ -770,11 +771,18 @@ public sealed class EngineVoiceState : IRenderedVoice
             }
             _tyreGear = Driveline.Gear;
             _tyreChirp *= 0.99985f;
-            float tyre = VehicleSynth.Tyre(Vehicle.Tyres, Driveline.Speed, RoadSlip + _tyreChirp, _rng, ref _tyre);
-            // Tyres are in arbitrary units; place them about 30 dB under a loud exhaust. Half at each
-            // end of the car, because that is where the wheels are: the two halves sum to the whole
-            // at any distance where the car is one thing, and separate as you walk up to it.
-            float halfTyre = tyre * 0.6f * TyreMix;
+            // Two axles, two tyre noises. They are different tyres on different patches of road, so
+            // their noise is INDEPENDENT; one signal written to both ends was the same roar coming
+            // from two places a few metres apart, which combs against itself as the car goes by —
+            // heard as a car passing "inside out".
+            float tyreRear = VehicleSynth.Tyre(Vehicle.Tyres, Driveline.Speed, RoadSlip + _tyreChirp, _rng, ref _tyre);
+            float tyreFront = VehicleSynth.Tyre(Vehicle.Tyres, Driveline.Speed, RoadSlip + _tyreChirp, _rng, ref _tyreFront);
+            // Tyres are in arbitrary units; place them about 30 dB under a loud exhaust. One axle at
+            // each end, at a level that keeps the POWER of the pair what the single coherent signal
+            // had (0.6 at each end, summed in phase: 1.2, so 0.6 x root 2 each).
+            const float PerAxle = 0.6f * 1.41421356f;
+            float rearTyre = tyreRear * PerAxle * TyreMix;
+            float frontTyre = tyreFront * PerAxle * TyreMix;
             // The front of the machine: the airbox, which breathes to the outside through the
             // grille, and the tyres at that end.
             //
@@ -790,7 +798,7 @@ public sealed class EngineVoiceState : IRenderedVoice
             // One mechanism, one route: the block gets outside through the bay, and how much of it
             // does is VehicleProfile.EngineBayLeakage, which every vehicle now declares from what is
             // actually around its engine.
-            float front = Engine.Intake * FrontMix + halfTyre;
+            float front = Engine.Intake * FrontMix + frontTyre;
             if (_fan != null)
             {
                 // The fan is geared to the crank and has no throttle: it turns at engine speed and
@@ -803,7 +811,7 @@ public sealed class EngineVoiceState : IRenderedVoice
                                       : Vector3.UnitZ);
                 front += _fan.Step() * FanMix;
             }
-            float pa = Engine.Exhaust + halfTyre;
+            float pa = Engine.Exhaust + rearTyre;
 
             // ...and then the car it is all bolted into. The body is driven by everything above and
             // rings on its own account, so it is ADDED to the direct sound rather than replacing it:
@@ -840,7 +848,8 @@ public sealed class EngineVoiceState : IRenderedVoice
                 // What arrives at the outside of the cabin: the engine bay just ahead of the
                 // firewall, the exhaust along the floor to a tailpipe a couple of metres back, and
                 // all four tyres under the floor.
-                float atPanels = Engine.Block + Engine.Intake + 0.5f * Engine.Exhaust + tyre * 0.6f * TyreMix;
+                // All four tyres, at the power the single signal had.
+                float atPanels = Engine.Block + Engine.Intake + 0.5f * Engine.Exhaust + (tyreRear + tyreFront) * 0.6f * 0.70710678f * TyreMix;
                 _panelLp += (atPanels - _panelLp) * panelA;
                 float inCabin = _panelLp + _sealLeak * atPanels;
                 inCabin += _cabin.Process(inCabin);
