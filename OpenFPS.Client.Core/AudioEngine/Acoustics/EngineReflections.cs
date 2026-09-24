@@ -346,6 +346,22 @@ public sealed class EngineReflections
                                int diffuseTaps = 0)
         => FirstOrderNear(source, listener, speedOfSound, into, diffuseTaps);
 
+    /// <summary>
+    /// How far a point is from the nearest part of a face, squared. Not from its centre: the city's
+    /// ground is one box a kilometre across whose centre is the middle of the city, so measured from
+    /// the centre the ground under anyone more than 260 m out was never considered at all, and
+    /// neither was the far half of any long facade.
+    /// </summary>
+    internal static float DistanceSquaredToFace(in ReflectingSurface s, Vector3 p)
+    {
+        Vector3 rel = p - s.Centre;
+        float hu = s.HalfU.Length(), hv = s.HalfV.Length();
+        Vector3 u = hu > 1e-6f ? s.HalfU / hu : Vector3.Zero, v = hv > 1e-6f ? s.HalfV / hv : Vector3.Zero;
+        float du = Vector3.Dot(rel, u), dv = Vector3.Dot(rel, v);
+        Vector3 nearest = s.Centre + u * Math.Clamp(du, -hu, hu) + v * Math.Clamp(dv, -hv, hv);
+        return Vector3.DistanceSquared(nearest, p);
+    }
+
     private int FirstOrderNear(Vector3 source, Vector3 listener, float speedOfSound, Span<Reflection> into,
                                int diffuseTaps = 0)
     {
@@ -355,7 +371,7 @@ public sealed class EngineReflections
         float r2 = SurfaceSearchRadius * SurfaceSearchRadius;
         _near.Clear();
         foreach (var s in _surfaces)
-            if (Vector3.DistanceSquared(s.Centre, mid) <= r2) _near.Add(s);
+            if (DistanceSquaredToFace(s, mid) <= r2) _near.Add(s);
         return ImageSource.FirstOrder(System.Runtime.InteropServices.CollectionsMarshal.AsSpan(_near),
                                       source, listener, speedOfSound, into, Blocked, diffuseTaps);
     }

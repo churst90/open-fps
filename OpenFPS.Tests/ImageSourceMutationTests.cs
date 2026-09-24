@@ -237,13 +237,15 @@ public class ImageSourceMutationTests
     /// A face scattering one per cent or less is a mirror: it sends no diffuse taps even when taps are
     /// asked for — though at this range a 60 m face at 1 % would still be loud enough to hear (its
     /// Lambert share times 0.01 is over MinGain), which is what makes the threshold matter. At 2 % the
-    /// tap is there, at its Lambert gain.
+    /// tap is there, at its Lambert gain. (Source and listener 8 m apart, so the 60 m face is not
+    /// "much larger than the scene"; one that is scatters from round the bounce point instead — see
+    /// GroundScatterTests.)
     /// </summary>
     [Fact]
     public void ANearlySmoothFaceSendsNoDiffuseTaps()
     {
-        var source = new Vector3(4f, 0, 1f);
-        var listener = new Vector3(4f, 0, 3f);
+        var source = new Vector3(5f, 0, -2f);
+        var listener = new Vector3(5f, 0, 6f);
         Span<Reflection> into = stackalloc Reflection[4];
 
         float lambertAtOnePercent = LambertGain(3600f, source, Vector3.Zero, listener, Vector3.UnitX, 0.01f);

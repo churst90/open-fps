@@ -239,6 +239,14 @@ public static class ImageSource
         float area = 4f * s.HalfU.Length() * s.HalfV.Length();
         if (area <= 0.01f) return n;
 
+        // A face far bigger than the scene — open ground most of all, a kilometre across under a
+        // listener twenty metres from a gunshot — does not scatter back from its far ends. What
+        // comes back is from the ground round the bounce point, later the further out it is: the
+        // short wash and the trail after it that a shot in open desert has. Spread across the face
+        // the taps landed hundreds of metres away and the ground returned nothing at all.
+        if (along.Length() > 4f * MathF.Max(direct, 5f))
+            return ScatterNearBounce(into, n, s, source, listener, direct, speedOfSound, returned, taps, occluded);
+
         for (int t = 0; t < taps; t++)
         {
             // Evenly across the face: two taps sit at a quarter and three quarters of its width.
@@ -266,6 +274,75 @@ public static class ImageSource
             // It radiates from the surface, so that is where it is heard from — not from an image
             // behind the wall. Identified apart from the specular arrival so a caller keeping one
             // voice per surface does not confuse the two.
+            n = Insert(into, n, new Reflection(tap, tap, delay, path, gain,
+                                               unchecked(s.SurfaceId * 397 + t + 1), true, 1f));
+        }
+        return n;
+    }
+
+    /// <summary>
+    /// Scatter from the part of a big face that matters: round the bounce point, at the distances
+    /// whose extra path puts the arrival 20 ms, 60 ms, 180 ms... after the direct sound, on alternate
+    /// sides. Each tap stands for the ring of the face around its own distance from the bounce point,
+    /// and returns that ring's energy by the same Lambert law.
+    /// </summary>
+    private static int ScatterNearBounce(Span<Reflection> into, int n, in ReflectingSurface s,
+                                         Vector3 source, Vector3 listener, float direct, float speedOfSound,
+                                         float returned, int taps, Func<Vector3, Vector3, bool>? occluded)
+    {
+        Vector3 nrm = s.Normal;
+        float hS = Vector3.Dot(source - s.Centre, nrm), hL = Vector3.Dot(listener - s.Centre, nrm);
+        if (hS <= 0.05f || hL <= 0.05f) return n;
+        // The specular point: where the line from the source to the listener's image meets the plane.
+        Vector3 image = listener - 2f * hL * nrm;
+        Vector3 bounce = source + (image - source) * (hS / (hS + hL));
+        // Across the source-listener direction, in the plane: the way the extra path grows fastest
+        // and the arrival stays out of the direct sound's line.
+        Vector3 along = (listener - source) - Vector3.Dot(listener - source, nrm) * nrm;
+        Vector3 side = along.LengthSquared() > 1e-6f ? Vector3.Normalize(Vector3.Cross(nrm, along))
+                                                    : Vector3.Normalize(s.HalfU);
+        float limitU = s.HalfU.Length(), limitV = s.HalfV.Length();
+        Vector3 uDir = Vector3.Normalize(s.HalfU), vDir = Vector3.Normalize(s.HalfV);
+        float c = MathF.Max(1f, speedOfSound);
+
+        for (int t = 0; t < taps; t++)
+        {
+            float wantDelay = 0.020f * MathF.Pow(3f, t);
+            float wantPath = direct + wantDelay * c;
+            Vector3 dir = t % 2 == 0 ? side : -side;
+            // The distance from the bounce point that gives that path: path grows with it, so bisect.
+            float lo = 0f, hi = MathF.Max(limitU, limitV);
+            float Path(float rho)
+            {
+                Vector3 q = bounce + dir * rho;
+                return Vector3.Distance(source, q) + Vector3.Distance(q, listener);
+            }
+            if (Path(hi) < wantPath) continue;
+            for (int it = 0; it < 40; it++) { float mid = 0.5f * (lo + hi); if (Path(mid) < wantPath) lo = mid; else hi = mid; }
+            float r = 0.5f * (lo + hi);
+            Vector3 tap = bounce + dir * r;
+            // Still on the face?
+            Vector3 rel = tap - s.Centre;
+            if (MathF.Abs(Vector3.Dot(rel, uDir)) > limitU || MathF.Abs(Vector3.Dot(rel, vDir)) > limitV) continue;
+
+            float rS = Vector3.Distance(source, tap), rL = Vector3.Distance(tap, listener);
+            float cosS = Math.Clamp(Vector3.Dot(Vector3.Normalize(source - tap), nrm), 0f, 1f);
+            float cosL = Math.Clamp(Vector3.Dot(Vector3.Normalize(listener - tap), nrm), 0f, 1f);
+            if (cosS <= 0f || cosL <= 0f) continue;
+            float path = rS + rL;
+            if (path > MaxPathLength || path <= direct) continue;
+            float delay = (path - direct) / c;
+            if (delay < MinDelaySeconds) continue;
+
+            // The ring this tap stands for. The delays triple from tap to tap, so the distances grow
+            // by about root three; each tap takes the ring from 3^-1/4 to 3^1/4 of its own distance,
+            // which tiles the face without counting any of it twice.
+            float ring = MathF.PI * (MathF.Sqrt(3f) - 1f / MathF.Sqrt(3f)) * r * r;
+            float energy = ring * cosS * cosL * direct * direct / (MathF.PI * rS * rS * rL * rL);
+            float gain = MathF.Sqrt(MathF.Max(0f, energy)) * returned;
+            if (gain < MinGain) continue;
+            if (occluded != null && (occluded(source, tap) || occluded(tap, listener))) continue;
+
             n = Insert(into, n, new Reflection(tap, tap, delay, path, gain,
                                                unchecked(s.SurfaceId * 397 + t + 1), true, 1f));
         }
