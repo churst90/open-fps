@@ -4,6 +4,53 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-09-24
 
+### What you hear from far away
+- Cars voiced from afar (twelve on the city) now go through the same occlusion, vehicle shadowing
+  and air absorption as everything else. Before, they reached the listener unblocked and bright at
+  any distance: the white-noise wash heard from the edge of the map.
+- A bus lying broadside between you and a car at ear height now blocks it. Before, the route round
+  it was computed as a straight line through it.
+- An engine's echo is darkened by the air over its own, longer path. Before, it was as bright as the
+  car, which could make a passing car seem to be on the far side of the street.
+
+### Echoes and the ground
+- The echo of a gunshot, a clap or a door is smeared by the roughness of what it came off, like
+  engine echoes: glass returns it almost intact, brick smears it over about 20 ms.
+- Open ground returns a short wash after a sharp sound, from the ground round the bounce point (about
+  -24 dB at 20 ms and -28 dB at 60 ms for a shot 20 m away over dirt). Before, open ground returned
+  nothing. Surfaces are now found by their nearest point, so the city's ground and long facades count
+  wherever you are.
+
+### Gunfire
+- The gunshot is synthesized to a spec measured from real recordings (the NIJ gunshot dataset): a
+  pulse and a short burst that fall 20 dB in 2.5-3.5 ms. The old shot took 18-26 ms. Nothing
+  recorded is played; what follows the shot comes from the place it is heard in.
+- `docs/GUNFIRE.md` has the measurements and the plan.
+
+### Engines
+- Engines breathe only the air that comes past the throttle. Before, with the throttle shut, the
+  cylinders drew up to 18 times more, and every engine made power on the overrun. Engine braking
+  and idle are now physical; the sportbike reaches its shift point; automatic drivers change down
+  when floored. Levels at full throttle are unchanged.
+- The road V10 changes gear (its gearbox shifted above the engine's redline).
+- Mufflers use the engine's own steepening setting, and the engine voices' soft limiter no longer
+  clicks on backfires.
+
+### Doors
+- Opening a door depends on the leaf's weight and material: the leaf thumps under the latch, and a
+  steel door rings where a wooden one does not.
+
+### The map and the client
+- You can no longer walk off the edge of the map. Maps can declare where players can walk
+  (`PlayMin`, `PlayMax`); the city's is its built ground. The client says "Edge of the map".
+- Shift with `[` and `]` switches chat buffers on Linux.
+- Voice chat packets and the mic indicator are no longer cut off as they start.
+- Every 5 s the client log lists the sounds reaching you loudest, with level per band and route.
+
+### Testing
+- Coverage report (`docs/COVERAGE_2026-09-24.md`) and a first mutation-testing round with Stryker.NET
+  (`docs/MUTATION_2026-09-24.md`): 149 new tests, and four real defects found and fixed.
+
 ### Horns
 - Truck, bus and train air horns swell in and fade out cleanly. Before, they were weak and broke up at the start and end of each blast.
 - The low-pressure pitch bend is much smaller (6.5% down to 0.8%), and the valve opens in 25 ms and closes in 30 ms (truck and bus 20/25 ms).
