@@ -474,7 +474,30 @@ public sealed class ClientGameSession : IDisposable
 
         // ...and only then, because the region the audio system just worked out is the one to say.
         AnnounceZoneChanges();
+        AnnounceMapEdge();
     }
+
+    /// <summary>
+    /// Says so when you walk into the edge of the map. The edge is not a wall — nothing is there to
+    /// hear or touch — so stopping at it silently felt like the keys had stopped working. Said once
+    /// on arriving, and again only after you have stepped a metre back from it.
+    /// </summary>
+    private void AnnounceMapEdge()
+    {
+        if (_state.IsRiding) return;
+        var p = _state.Position;
+        Vector3 lo = _state.MapMin, hi = _state.MapMax;
+        float margin = OpenFPS.Common.PhysicsConstants.PlayerRadius + 0.05f;
+        float nearest = MathF.Min(MathF.Min(p.X - lo.X, hi.X - p.X), MathF.Min(p.Z - lo.Z, hi.Z - p.Z));
+        if (!_atMapEdge && nearest <= margin)
+        {
+            _atMapEdge = true;
+            _speech.Speak("Edge of the map.", interrupt: false);
+        }
+        else if (_atMapEdge && nearest > margin + 1f) _atMapEdge = false;
+    }
+
+    private bool _atMapEdge;
 
     // ── Turning ─────────────────────────────────────────────────────────────────────────────────
     //
@@ -726,15 +749,15 @@ public sealed class ClientGameSession : IDisposable
                 _occlusionFloor = manifest.OcclusionFloor;
                 _mapMin = manifest.MapMin;
 
-                _physics.MapMin = manifest.MapMin;
-                _physics.MapMax = manifest.MapMax;
+                _physics.MapMin = manifest.PlayMin;
+                _physics.MapMax = manifest.PlayMax;
                 _physics.Gravity = manifest.Gravity;
 
                 _state.Position = manifest.SpawnPoint.Position;
                 _state.Rotation = manifest.SpawnPoint.Rotation;
                 _state.MinimumY = manifest.MinimumY;
-                _state.MapMin = manifest.MapMin;
-                _state.MapMax = manifest.MapMax;
+                _state.MapMin = manifest.PlayMin;
+                _state.MapMax = manifest.PlayMax;
                 _state.MapSize = manifest.WorldSize;
 
                 _network.Send(new MapDataRequest { MapName = manifest.MapName });

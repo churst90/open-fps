@@ -1402,6 +1402,9 @@ map_data = {
     "Size": v3(MAP_MAX[0] - MAP_MIN[0], MAP_MAX[1], MAP_MAX[2] - MAP_MIN[2]),
     "MinBound": v3(*MAP_MIN),
     "MaxBound": v3(*MAP_MAX),
+    # Where a player can walk and drive: the ground, not the acoustic bounds.
+    "PlayMin": v3(BUILT_MIN[0], -20.0, BUILT_MIN[1]),
+    "PlayMax": v3(BUILT_MAX[0], MAP_MAX[1], BUILT_MAX[1]),
     "MinimumY": -20.0,
     "SpawnPoint": {"Position": v3(*SPAWN), "Rotation": {"X": 0, "Y": 0, "Z": 0, "W": 1}},
     # No ambience bed. See no-ambience-beds: a recorded loop has no source, no distance and no

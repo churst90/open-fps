@@ -163,6 +163,11 @@ public partial class MapManifest : IMessage
     /// category the map does not mention is on by default and the player's to change.</summary>
     public string[] BeaconPolicy = Array.Empty<string>();
 
+    /// <summary>Where a player can walk and drive. MapMin/MapMax are the acoustic grid's, which can
+    /// be much bigger than the ground. Appended last: the manifest serialises field by field.</summary>
+    public Vector3 PlayMin = new Vector3(-50, 0, -50);
+    public Vector3 PlayMax = new Vector3(50, 10, 50);
+
     public MapManifest() { }
 }
 

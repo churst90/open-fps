@@ -40,6 +40,17 @@ public class MapData
     public Vector3 Size { get; set; }
     public Vector3 MinBound { get; set; } = new Vector3(-50, 0, -50);
     public Vector3 MaxBound { get; set; } = new Vector3(50, 20, 50);
+    /// <summary>
+    /// Where a player, and anything a player drives, can go. MinBound and MaxBound are the acoustic
+    /// grid's, and they can be far bigger than the ground: the city's reach a kilometre out and nine
+    /// hundred metres up so that an approaching airliner is inside them. Walking was held to those,
+    /// so you could walk off the edge of the ground and fall. Leave these out and they are the same
+    /// as the bounds.
+    /// </summary>
+    public Vector3? PlayMin { get; set; }
+    public Vector3? PlayMax { get; set; }
+    [JsonIgnore] public Vector3 WalkMin => PlayMin ?? MinBound;
+    [JsonIgnore] public Vector3 WalkMax => PlayMax ?? MaxBound;
     public Transform SpawnPoint { get; set; } = new();
     public float MinimumY { get; set; } = -10.0f;
     public string Description { get; set; } = string.Empty;

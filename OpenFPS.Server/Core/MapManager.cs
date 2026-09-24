@@ -334,8 +334,11 @@ public class MapManager
         {
             Log.Information("MapManager: No foundation detected for '{Id}'. Injecting auto-scaled foundation.", m.Id);
             Vector3 mapSize = m.MaxBound - m.MinBound;
-            // Place floor so its top surface is at Y=0
-            var foundation = _prefabRepo.Spawn(world, "concrete_floor", new Vector3(0, -0.05f, 0), Quaternion.Identity, new Vector3(mapSize.X / 10f, 1f, mapSize.Z / 10f));
+            // Under the whole of the bounds, top surface at Y=0. Centred on the bounds, not on the
+            // origin: the speedway's bounds are not centred on 0, nor the city's, and a foundation
+            // centred on 0 left a strip along one edge with no floor — walk into it and you fell.
+            Vector3 centre = (m.MinBound + m.MaxBound) * 0.5f;
+            var foundation = _prefabRepo.Spawn(world, "concrete_floor", new Vector3(centre.X, -0.05f, centre.Z), Quaternion.Identity, new Vector3(mapSize.X / 10f, 1f, mapSize.Z / 10f));
             lookup[foundation.Id] = foundation;
             hasAnyFloor = true;
             foundMinimumY = 0f;

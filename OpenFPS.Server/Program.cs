@@ -438,7 +438,7 @@ public class GameServer
                     });
 
                     // 4. Update Simulation (Movement/AI)
-                    MovementSystem.Update(world, entry.Value.data.MinBound, entry.Value.data.MaxBound, grid, lookup, _sessions, _maps, dt);
+                    MovementSystem.Update(world, entry.Value.data.WalkMin, entry.Value.data.WalkMax, grid, lookup, _sessions, _maps, dt);
                     AISystem.Update(world, lookup, dt);
                     _vehicles.Update(entry.Key, world, dt);
                     _rail.Update(entry.Key, world, dt);
@@ -467,7 +467,7 @@ public class GameServer
                     // say, and BEFORE anything is carried: the order here is the whole contract.
                     // Parts are bolted to the root and follow it exactly; occupants are carried by it
                     // but keep their own heads, so they come last of all.
-                    DrivingSystem.Update(world, grid, entry.Value.data.MinBound, entry.Value.data.MaxBound, dt,
+                    DrivingSystem.Update(world, grid, entry.Value.data.WalkMin, entry.Value.data.WalkMax, dt,
                                          (id, label, sounds) => EmitWorldAudio(entry.Key, id, label, sounds));
                     // Doors swing BEFORE the parts are placed: a door in a building is one of its
                     // parts, and ParentSystem writes every part's world transform from its local one
@@ -586,6 +586,8 @@ public class GameServer
             manifest.MinimumY = mapData.MinimumY;
             manifest.MapMin = mapData.MinBound;
             manifest.MapMax = mapData.MaxBound;
+            manifest.PlayMin = mapData.WalkMin;
+            manifest.PlayMax = mapData.WalkMax;
             manifest.Gravity = mapData.Gravity;
             manifest.AmbienceId = mapData.AmbienceId ?? "";
             manifest.BeaconPolicy = mapData.BeaconPolicy == null ? Array.Empty<string>()
