@@ -305,7 +305,7 @@ public class AsyncAcousticWorker : IDisposable
         _lastDegradeLogTicks = now;
         string cause = wholeTickFailed
             ? "the simulation tick produced no results at all"
-            : "the simulator had no result for some sources (source pool exhausted or newly added)";
+            : $"the simulator had no result for some sources (more than {SaMaxSources} wanted in one tick)";
         Console.WriteLine($"[AcousticWorker] DEGRADED: {degraded}/{total} sources fell back to the hand-rolled ray-tracer — {cause}.");
     }
 
@@ -937,8 +937,44 @@ public class AsyncAcousticWorker : IDisposable
     {
         if (_saSources.TryGetValue(entityId, out var s)) return s;
         IntPtr src = _saSim!.AcquireSource();
-        if (src != IntPtr.Zero) _saSources[entityId] = src;
+        if (src == IntPtr.Zero)
+        {
+            // ── A full pool lends out the source nobody is asking about ──────────────────────
+            //
+            // A source is held for SaSourceTtlMs after its last request, so the pool fills with
+            // every id asked about in the last five seconds — on the city that is fifty-odd playing
+            // voices plus every live car and machine, and it crossed 64. The pool was first come,
+            // first served: whichever sound started LAST (a door, a footstep, the room you just
+            // walked into) was the one refused, and it was rendered by the hand-rolled tracer —
+            // different occlusion from its neighbours, until you walked out and something expired.
+            //
+            // Nothing a source carries between runs is needed: its inputs are staged fresh before
+            // every run it is read in. So only the sources asked about THIS tick need one, and a
+            // held source that is not among them can be handed over without anything losing an answer.
+            int victim = PickSourceToReclaim(_saSources, _saLastSeen, _pending);
+            if (victim != int.MinValue && _saSources.Remove(victim, out src))
+                _saLastSeen.Remove(victim);   // its last result stays in _results until it asks again
+            else
+                return IntPtr.Zero;
+        }
+        _saSources[entityId] = src;
         return src;
+    }
+
+    /// <summary>The held source that has gone longest without a request and is not wanted this tick,
+    /// or <see cref="int.MinValue"/> when every held source is wanted now.</summary>
+    internal static int PickSourceToReclaim<TSrc, TReq>(IReadOnlyDictionary<int, TSrc> held,
+        IReadOnlyDictionary<int, long> lastSeen, IReadOnlyDictionary<int, TReq> wantedThisTick)
+    {
+        int victim = int.MinValue;
+        long oldest = long.MaxValue;
+        foreach (var kv in held)
+        {
+            if (wantedThisTick.ContainsKey(kv.Key)) continue;
+            long seen = lastSeen.TryGetValue(kv.Key, out long t) ? t : long.MinValue;
+            if (seen < oldest || victim == int.MinValue) { oldest = seen; victim = kv.Key; }
+        }
+        return victim;
     }
 
     private void EvictStaleSources(long now)

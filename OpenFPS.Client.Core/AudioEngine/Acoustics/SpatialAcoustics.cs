@@ -17,6 +17,8 @@ namespace OpenFPS.Client.AudioEngine.Acoustics;
 public class SpatialAcoustics
 {
     private readonly SpatialService _spatial;
+    /// <summary>The geometry queries this answers from, for a caller that needs one plain ray.</summary>
+    public SpatialService Spatial => _spatial;
     private readonly AcousticPathfinder _pathfinder;
 
     public SpatialAcoustics() : this(new SpatialService()) { }

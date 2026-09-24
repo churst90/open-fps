@@ -1,9 +1,10 @@
 {
   "Id": "steel_door",
   "Name": "Steel Door",
-  "Description": "The same leaf in steel: heavier, slower on its hinges, and it lets almost nothing through while it is shut.",
+  "Description": "A hollow metal door: two skins of 1.2 mm steel over a core. Heavier than wood, slower on its hinges, and it lets almost nothing through while it is shut.",
   "Material": "Metal",
   "ColliderSize": { "X": 1.0, "Y": 2.1, "Z": 0.08 },
+  "DoorSkinMetres": 0.0012,
   "IsSolid": true,
   "Type": "StaticObject",
   "IsDoor": true,

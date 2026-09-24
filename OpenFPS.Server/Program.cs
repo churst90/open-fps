@@ -195,11 +195,17 @@ public class GameServer
         _vehicles.Spawn(_maps, _composites);
         _rail.Spawn(_maps);
         _crossings = new CrossingSystem(_rail, SyncAudioComponent);
+        _rail.CrossingsOn = _crossings.PositionsOn;
+        _rail.Heard = (map, id, label, sounds) => EmitWorldAudio(map, id, label, sounds);
         // After the rail: a crossing derives its geometry from the lines the trains are on, so
         // those lines have to exist first.
         _crossings.Spawn(_maps);
         // And the road has to be able to ask a crossing whether it is closed.
         _vehicles.SetCrossings(_crossings);
+        // Horns, and anything else the drivers do, go out on the one channel every short sound uses.
+        _vehicles.Heard = (map, id, label, sounds) => EmitWorldAudio(map, id, label, sounds);
+        _vehicles.Removed = BroadcastRemoval;
+        _vehicles.AudioChanged = SyncAudioComponent;
         // Now that every sound source exists, size each map's broadcast radius from it.
         _maps.RefreshEarshotRanges();
         _seats = new OccupancyService(_maps, EmitWorldAudio);

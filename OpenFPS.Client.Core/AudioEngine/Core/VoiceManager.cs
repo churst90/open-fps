@@ -166,9 +166,19 @@ public class VoiceManager
                 continue;
             }
 
-            float score = Audibility(e, dist, _audio.IsPlaying(id));
+            bool playing = _audio.IsPlaying(id);
+            float score = Audibility(e, dist, playing);
             // Below this nobody can hear it — not because of what it is, but because of where it is
             // and how loud it is. A one-shot that cannot be heard has missed nothing by being dropped.
+            //
+            // A continuous voice that is ALREADY PLAYING is not dropped here. Its level goes under
+            // the floor and back every time a distant car passes behind a building, and stopping it
+            // there meant rebuilding the engine from nothing each time it came back out — at 300 m,
+            // one car was rebuilt 45 times in nine minutes, heard as distant traffic stuttering. It
+            // is inaudible down there anyway; it stays at the floor and still competes for a slot,
+            // so the budget, not the occlusion, decides when it goes.
+            if (playing && !e.IsEvent && score < OpenFPS.Common.Loudness.SilenceGain)
+                score = OpenFPS.Common.Loudness.SilenceGain;
             if (score < OpenFPS.Common.Loudness.SilenceGain && !e.Essential)
             {
                 if (e.IsEvent) _keysToRemove.Add(id);

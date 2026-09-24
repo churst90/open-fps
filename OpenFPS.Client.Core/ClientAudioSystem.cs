@@ -182,11 +182,16 @@ public class ClientAudioSystem
     /// sends back off a steady engine is many surfaces at once, incoherent: a diffuse wash, which is
     /// the reverb. One-off sounds keep their echoes (WorldAudioPlayer), where an echo IS an event.
     /// OPENFPS_ENGINE_ECHOES=2 brings them back for comparison.
+    ///
+    /// ON again since the same evening, with the cause fixed rather than the effect removed: each echo
+    /// is smeared by the roughness of the wall it came off (EngineEchoState.Scattering), so it is the
+    /// same sound but no longer the same waveform, and it swells and fades over a few hundred
+    /// milliseconds instead of switching. OPENFPS_ENGINE_ECHOES=0 takes them out for an A/B.
     /// </remarks>
     public static readonly int EchoCeiling =
         int.TryParse(Environment.GetEnvironmentVariable("OPENFPS_ENGINE_ECHOES"), out int ec) && ec >= 0
             ? Math.Min(ec, EngineReflections.MaxEchoesPerEngine)
-            : 0;
+            : EngineReflections.MaxEchoesPerEngine;
 
     private int _adaptiveEchoes = EchoCeiling;
     private double _lastBudgetChange;
@@ -265,6 +270,8 @@ public class ClientAudioSystem
 
     /// <summary>Which physical models currently have a live voice, and when each started.</summary>
     private readonly HashSet<int> _liveMachines = new();
+    /// <summary>The ids whose acoustic path is asked for this frame. See step 5.</summary>
+    private readonly HashSet<int> _pathIds = new();
     private readonly Dictionary<int, double> _machineStarted = new();
     private readonly List<int> _machineRetiring = new();
     private readonly List<(int Id, float Key, float Level)> _machineOrder = new();
@@ -353,6 +360,9 @@ public class ClientAudioSystem
         // The short sounds the world reports. Shares this system's acoustics so a rendered latch
         // takes exactly the path a recorded one would.
         WorldAudio = new WorldAudioPlayer(_audio, _acoustics);
+        WorldAudio.HornReceived = StartHorn;
+        _birds = new BirdLife(audio, _acoustics);
+        WorldAudio.Received = message => _birds.Heard(message, OpenFPS.Common.AudioClock.Now);
         _acousticWorker = new AsyncAcousticWorker(_acoustics);
         _acousticWorker.Start();
     }
@@ -542,8 +552,21 @@ public class ClientAudioSystem
         Stage(0, ref stageTicks);     // everything up to here: region, listener, map, probes, ambience
 
         // 5. Update the acoustic path (occlusion/diffraction) for ALL active sounds in FMOD
-        var activeIds = _audio.GetActiveSpatialSoundIds();
-        foreach (var id in activeIds)
+        //
+        // And for every car and machine that holds a live slot, even one the mixer is not playing.
+        // The voice manager silences a voice whose OCCLUDED level falls under the silence floor, and
+        // asking only about playing voices then stopped asking about it: after the worker's 5 s TTL
+        // its result was evicted, the emitter fell back to an unoccluded path, and the voice was
+        // rebuilt at full level until the next answer silenced it again. Heard as ambience that
+        // "stutters and cuts out" — an air conditioner behind a tower and a car round a corner,
+        // each bursting back every five seconds.
+        _pathIds.Clear();
+        _pathIds.UnionWith(_audio.GetActiveSpatialSoundIds());
+        _pathIds.UnionWith(_liveEngines);
+        _pathIds.UnionWith(_liveMachines);
+        _pathIds.UnionWith(_horns.Keys);      // a horn takes its vehicle's path, borrowed voice or not
+        _pathIds.UnionWith(_sirenCars);       // and so does a siren
+        foreach (var id in _pathIds)
         {
             // --- CRITICAL FIX: Reflection Termination ---
             // IDs less than -10000 are reserved for synthesized reflections.
@@ -605,7 +628,15 @@ public class ClientAudioSystem
                 {
                     if (!path.IsReflection)
                     {
-                        _audio.SetAcousticPath(id, path);
+                        // What moves is not in the acoustic scene, so a bus between you and a car
+                        // is put back here as the barrier it is. See VehicleShadow.
+                        var shadowed = path;
+                        OpenFPS.Client.AudioEngine.Acoustics.VehicleShadow.Apply(
+                            ref shadowed, world, id, sourcePos, visualEyePos, _state.RidingEntityId);
+                        _audio.SetAcousticPath(id, shadowed);
+                        // A horn or a siren on this vehicle is behind the same bus.
+                        if (_horns.ContainsKey(id)) _audio.SetAcousticPath(HornVoiceBase - Math.Abs(id), shadowed);
+                        if (_sirenVoiced.Contains(id)) _audio.SetAcousticPath(SirenVoiceBase - Math.Abs(id), shadowed);
                         continue;
                     }
 
@@ -737,6 +768,10 @@ public class ClientAudioSystem
                 ProcessAudioEmitter(world, snap, visualEyePos, engineDt);
             }
         }
+
+        UpdateHorns(world, visualEyePos, OpenFPS.Common.AudioClock.Now);
+        _birds.Update(world, visualEyePos, OpenFPS.Common.AudioClock.Now);
+        UpdateSirens(world, visualEyePos);
 
         // Every source has now been offered to the reflection system; it can work out what the
         // next frame will demand of a reflection to be worth a voice.
@@ -1505,6 +1540,138 @@ public class ClientAudioSystem
         else _audio.PlayPhysicalSoundDirect(e);
     }
 
+    /// <summary>The birds: found from the map's foliage and roofs, not placed. See BirdLife.</summary>
+    private readonly BirdLife _birds;
+
+    /// <summary>Vehicles carrying a siren, found this frame.</summary>
+    private readonly HashSet<int> _sirenCars = new();
+    private readonly List<int> _sirensGone = new();
+
+    /// <summary>
+    /// Every siren on the map, placed every frame, whatever its car's engine is doing.
+    ///
+    /// It used to be placed from inside the car's own emitter pass, which only runs for a car whose
+    /// ENGINE won a voice — and a siren is thirty-five decibels louder than the engine under it, so it
+    /// is exactly the sound that must not depend on that. A patrol car that dropped out of the engine
+    /// budget left its siren wailing where the car had been, for twenty seconds at a time ("placed at
+    /// a position 19,700 ms old"), and nothing ever stopped it.
+    /// </summary>
+    private void UpdateSirens(WorldSnapshot world, Vector3 eyePos)
+    {
+        _sirenCars.Clear();
+        foreach (var snap in world.DynamicEntities)
+        {
+            string? sid = snap.Definition.SoundEmitter.SoundId;
+            if (sid == null || !sid.StartsWith("engine:", StringComparison.OrdinalIgnoreCase)) continue;
+            string preset = sid[7..];
+            if (!OpenFPS.Common.MachineRegistry.Knows(preset)
+                || OpenFPS.Common.MachineRegistry.VehicleFor(preset).Siren is not { } sirenKey) continue;
+            _sirenCars.Add(snap.Id);
+            AcousticPathData path;
+            if (_acousticWorker.TryGetResult(snap.Id, out var paths)) path = paths.FirstOrDefault(p => !p.IsReflection);
+            else
+            {
+                var at = OpenFPS.Common.AudioEmission.PointFor(snap);
+                path = new AcousticPathData(0f, at, Vector3.Distance(eyePos, at));
+            }
+            SirenVoice(snap, sirenKey, path, world.PositionsSampledAt);
+        }
+        _sirensGone.Clear();
+        foreach (int id in _sirenVoiced) if (!_sirenCars.Contains(id)) _sirensGone.Add(id);
+        foreach (int id in _sirensGone)
+        {
+            _sirenVoiced.Remove(id);
+            _audio.StopSound(SirenVoiceBase - Math.Abs(id));
+        }
+    }
+
+    /// <summary>Voice ids for a vehicle's horn, one per vehicle.</summary>
+    internal const int HornVoiceBase = -1_200_000;
+
+    /// <summary>Horns being sounded: the vehicle, the key its voice was built from, and when the
+    /// voice may be let go.</summary>
+    private readonly Dictionary<int, (string Key, double Until)> _horns = new();
+    private readonly List<int> _hornsDone = new();
+
+    /// <summary>
+    /// Somebody on the street sounded their horn. The voice is built on the next frame, on the
+    /// vehicle, where it stays for as long as the rhythm lasts. A second honk from the same car while
+    /// the first is still going replaces it — one horn, one hand.
+    /// </summary>
+    private void StartHorn(int entityId, string horn, float[] rhythm)
+    {
+        int voiceId = HornVoiceBase - Math.Abs(entityId);
+        if (_horns.Remove(entityId)) _audio.StopSound(voiceId);
+        _horns[entityId] = (OpenFPS.Common.Honk.Key(horn, rhythm),
+                            OpenFPS.Common.AudioClock.Now + OpenFPS.Common.Honk.Duration(rhythm) + 1.0);
+    }
+
+    /// <summary>
+    /// Places every horn that is sounding, at the front of its vehicle, through the vehicle's own
+    /// acoustic path — behind a building, a horn is behind the building too.
+    /// </summary>
+    private void UpdateHorns(WorldSnapshot world, Vector3 eyePos, double now)
+    {
+        if (_horns.Count == 0) return;
+        _hornsDone.Clear();
+        foreach (var (id, horn) in _horns)
+        {
+            int voiceId = HornVoiceBase - Math.Abs(id);
+            if (now > horn.Until || !world.Entities.TryGetValue(id, out var snap))
+            {
+                _hornsDone.Add(id);
+                continue;
+            }
+            AcousticPathData path;
+            if (_acousticWorker.TryGetResult(id, out var paths)) path = paths.FirstOrDefault(p => !p.IsReflection);
+            else
+            {
+                var at = OpenFPS.Common.AudioEmission.PointFor(snap);
+                path = new AcousticPathData(0f, at, Vector3.Distance(eyePos, at));
+            }
+            // Behind a car's grille, a little above the bumper; on a locomotive's cab roof.
+            bool rail = snap.Definition.SoundEmitter.SoundId?.StartsWith("rail:", StringComparison.OrdinalIgnoreCase) == true;
+            Vector3 pos = snap.Transform.Position
+                        + Vector3.Transform(rail ? new Vector3(0f, 4.2f, 0f) : new Vector3(0f, 0.6f, 1.9f),
+                                            snap.Transform.Rotation);
+            float levelDb = OpenFPS.Common.Honk.LevelDb(horn.Key[OpenFPS.Common.Honk.Prefix.Length..horn.Key.LastIndexOf(':')]);
+            var (gain, reference) = OpenFPS.Common.Loudness.Place(levelDb);
+            var e = new SpatialEmitter
+            {
+                EntityId = voiceId,
+                SoundId = "horn",
+                IsSynth = true,
+                PhysicalKey = horn.Key,
+                EngineKey = "",
+                Mode = PlaybackMode.LoopOne,
+                Type = EmitterType.EntityAttached,
+                Position = pos,
+                ApparentPosition = path.ApparentPosition == Vector3.Zero ? pos : path.ApparentPosition,
+                Velocity = snap.Velocity,
+                PositionSampledAt = world.PositionsSampledAt,
+                Direction = Vector3.Transform(Vector3.UnitZ, snap.Transform.Rotation),
+                Volume = gain,
+                MinDistance = reference,
+                Range = OpenFPS.Common.Loudness.AudibleRange(levelDb),
+                Pitch = 1f,
+                EngineRunning = true,
+                Occlusion = path.Occlusion,
+                ApertureFactor = path.ApertureFactor,
+                TransmissionBleed = path.TransmissionBleed,
+                EffectiveDistance = path.EffectiveDistance,
+                TargetRegionId = path.RegionId,
+                EnableReverb = true,
+            };
+            if (_audio.IsPlaying(voiceId)) _audio.UpdateSpatialAttributes(e);
+            else _audio.PlayPhysicalSoundDirect(e);
+        }
+        foreach (int id in _hornsDone)
+        {
+            _horns.Remove(id);
+            _audio.StopSound(HornVoiceBase - Math.Abs(id));
+        }
+    }
+
     /// <summary>
     /// The siren on a vehicle that carries one — its own voice at its own level, at the grille.
     ///
@@ -2021,10 +2188,7 @@ public class ClientAudioSystem
             FrontVoice(snap, def, OpenFPS.Common.MachineRegistry.VehicleFor(engineKey), acousticPath,
                        engineVolume, engineMinDistance, Math.Max(1.0f, engineRange), world.PositionsSampledAt);
 
-        // And the siren, for a vehicle that carries one.
-        if (engineKey.Length > 0
-            && OpenFPS.Common.MachineRegistry.VehicleFor(engineKey).Siren is { } sirenKey)
-            SirenVoice(snap, sirenKey, acousticPath, world.PositionsSampledAt);
+        // The siren is NOT placed here: see UpdateSirens.
 
         // 6.1. The walls answering this engine. A live engine has no file to replay, so its
         // reflections are read back out of the synthesis's own ring buffer at the delay the mirrored

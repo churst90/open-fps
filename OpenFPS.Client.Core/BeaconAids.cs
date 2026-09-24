@@ -62,6 +62,12 @@ public sealed class BeaconAids
     /// of it, is a door you can walk to; one on the far side of a wall is a door in somebody else's
     /// flat, and blipping it through the brick made a corridor sound like one room full of doors —
     /// "I hear other beacons through walls which sound like the same room".
+    ///
+    /// Asked only of a beacon you cannot SEE — see <see cref="InSight"/>. The occlusion figure alone
+    /// cannot tell a door round the corner from one in front of you at an angle: a door set into a
+    /// facade is partly hidden by its own jamb and reads 0.4 to 0.6 from a few metres off to one side,
+    /// and on that figure alone 162 of the city's 470 doors fell silent from four metres out and two
+    /// to the side — "I don't hear the beacons for doors now where I heard them before".
     /// </summary>
     private const float MaxOcclusion = 0.5f;
 
@@ -103,12 +109,7 @@ public sealed class BeaconAids
         var (gain, reference) = Loudness.Place(BlipDb);
         // Through the same acoustic path every one-off sound takes: blocked by what is in the way,
         // bent round what it can bend round. The door's own leaf does not block its own blip.
-        OpenFPS.Client.AudioEngine.Data.AcousticPathData? path = null;
-        if (_acoustics != null)
-        {
-            try { path = _acoustics.CalculateAcousticPath(world, sourceId, listener, at); } catch { }
-            if (path is { } blocked && blocked.Occlusion > MaxOcclusion) return;
-        }
+        if (!Reaches(world, sourceId, listener, at, out var path)) return;
         _audio.Submit(new SpatialEmitter
         {
             EntityId = BaseId - (_idx++ % Pool),
@@ -129,6 +130,46 @@ public sealed class BeaconAids
             EnableReverb = true,
         });
     }
+
+    /// <summary>Whether a blip from this beacon reaches you, and by what path. A beacon you can see
+    /// always does; one you cannot must be no more than half blocked — round a near corner, not
+    /// through a wall.</summary>
+    internal bool Reaches(WorldSnapshot world, int sourceId, Vector3 listener, Vector3 at,
+                          out OpenFPS.Client.AudioEngine.Data.AcousticPathData? path)
+    {
+        path = null;
+        if (_acoustics == null) return true;
+        try { path = _acoustics.CalculateAcousticPath(world, sourceId, listener, at); } catch { }
+        return path is not { } blocked || blocked.Occlusion <= MaxOcclusion || InSight(world, sourceId, listener, at);
+    }
+
+    /// <summary>
+    /// Whether nothing stands between you and the FACE of the thing on your side of it.
+    ///
+    /// One ray, from a point just off the face toward you, ignoring the thing itself. A door's face
+    /// is its thinnest side; stepping off it clears the jamb and the wall it is set into, which is
+    /// what made the path model call a door in plain view half-blocked.
+    /// </summary>
+    private bool InSight(WorldSnapshot world, int sourceId, Vector3 listener, Vector3 at)
+    {
+        if (_acoustics == null || !world.Entities.TryGetValue(sourceId, out var e)) return false;
+        var size = e.Definition.Collider.Size;
+        Vector3 axis = size.X <= size.Y && size.X <= size.Z ? Vector3.UnitX
+                     : size.Z <= size.Y ? Vector3.UnitZ : Vector3.UnitY;
+        float half = axis == Vector3.UnitX ? size.X : axis == Vector3.UnitZ ? size.Z : size.Y;
+        var normal = Vector3.Transform(axis, e.Transform.Rotation);
+        if (Vector3.Dot(listener - at, normal) < 0) normal = -normal;
+        var face = at + normal * (0.5f * half + FaceClearance);
+        var toEar = listener - face;
+        float dist = toEar.Length();
+        if (dist < 0.05f) return true;
+        return !_acoustics.Spatial.RaycastMaterial(world, face, toEar / dist, dist - 0.05f,
+                                                   out _, out _, out _, ignoreEntityId: sourceId);
+    }
+
+    /// <summary>How far off a face to start the sight line: past the half-thickness of any wall on
+    /// the city (brick is 175 mm), so the wall a door is set into is not what the ray hits.</summary>
+    private const float FaceClearance = 0.35f;
 
     /// <summary>The nearest things of a category within reach, and where to blip them from.</summary>
     private static List<(int Id, Vector3 At)> Nearest(WorldSnapshot world, Vector3 listener, string category, float range, int count)

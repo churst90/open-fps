@@ -2612,6 +2612,7 @@
    ]
   }
  ],
+ "StreetLife": { "HornEverySeconds": 45, "HardBrakeEverySeconds": 120, "ParkEverySeconds": 90 },
  "Vehicles": [
   {
    "Name": "Civic 1",

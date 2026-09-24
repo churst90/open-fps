@@ -37,7 +37,7 @@ namespace OpenFPS.Server.Systems;
 /// the car. Give two cars different grip and top speed and they lap at different rates, catch each
 /// other and pass, with no notion of racing anywhere in the code.
 /// </summary>
-public sealed class VehicleSystem
+public sealed partial class VehicleSystem
 {
     private sealed class DemoVehicle
     {
@@ -85,6 +85,25 @@ public sealed class VehicleSystem
         /// <summary>Flat-ground grip in g, from the map. Only the LONGITUDINAL half of the demand
         /// needs it; the lateral half comes out of the racing line, which already knows the bank.</summary>
         public float Grip = 1f;
+
+        /// <summary>The vehicle preset, and the horn that comes with it ("" for none).</summary>
+        public string Preset = "";
+        public string Horn = "";
+        /// <summary>A road vehicle on a street: something with a driver who can honk, brake hard or
+        /// park. Not an aircraft, a mower, a walker or a racing car.</summary>
+        public bool OnStreet;
+
+        /// <summary>Standing on the brakes: seconds left, the speed being braked to, and how hard.</summary>
+        public float HardBrakeLeft;
+        public float HardBrakeTo;
+        public float HardBrakeDecel;
+
+        /// <summary>A kerb this vehicle can pull in to, near a door somebody could be going to.</summary>
+        public List<ParkingSpot> Spots = new();
+        /// <summary>What it is doing about parking, or null when it is simply driving.</summary>
+        public ParkState? Park;
+        /// <summary>How far toward the kerb it is sitting off its lane, metres.</summary>
+        public float KerbShift;
     }
 
     private enum State { Waiting, Driving, Turning }
@@ -98,6 +117,7 @@ public sealed class VehicleSystem
     /// </param>
     public void Spawn(MapManager maps, CompositeService? shells = null)
     {
+        _maps = maps;
         foreach (var entry in maps.GetAllMaps())
         {
             string mapId = entry.Key;
@@ -309,6 +329,10 @@ public sealed class VehicleSystem
                     v.Speed = v0;
                     v.Current = State.Driving;
                 }
+                v.Preset = vd.Preset;
+                v.Horn = profile != null ? VehicleProfile.HornFor(profile) : "";
+                v.OnStreet = data.StreetLife != null && profile != null && !isAircraft && !isMachine && !isWalker;
+                if (data.StreetLife != null) _streetLife[mapId] = data.StreetLife;
                 _vehicles.Add(v);
                 if (line != null)
                     Log.Information("Map {Map}: {Name} (entity {Id}) laps '{Track}' — {Length:F0} m lap, {Min:F0}-{Max:F0} km/h, starting {At:F0} m round",
@@ -336,6 +360,7 @@ public sealed class VehicleSystem
 
     public void Update(string mapId, World world, float dt)
     {
+        UpdateStreetLife(mapId, world, dt);
         foreach (var v in _vehicles)
         {
             if (v.MapId != mapId || !world.IsAlive(v.Entity)) continue;
@@ -345,7 +370,7 @@ public sealed class VehicleSystem
 
             if (v.Line != null)
             {
-                UpdateRacer(v, ref t, ref vel, dt);
+                if (!HoldParked(v, world, ref t, ref vel, dt)) UpdateRacer(v, ref t, ref vel, dt);
                 // The same trace a shuttle gets — racers need it more, because a vehicle on a lap
                 // that fails to stop looks identical to one that has no stops declared.
                 if (Environment.GetEnvironmentVariable("OPENFPS_TRACE_SHUTTLE") is { } rtrace
@@ -507,6 +532,47 @@ public sealed class VehicleSystem
         // left and this much brake, v = sqrt(2 a s). So it slows the way a vehicle slows rather
         // than arriving and then stopping, and the deceleration is real — which is what the air
         // system reads to decide the service brakes have been used.
+        // ── Standing on the brakes ──────────────────────────────────────────────────────────────
+        //
+        // Somebody pulled out, or stepped off the kerb. The driver wants to be doing a lot less, now,
+        // and brakes at close to what the tyres will give — which is what makes them squeal: the
+        // demand below is worked out from the deceleration actually applied, and nothing here asks
+        // for a noise.
+        float brake = v.Brake;
+        if (v.HardBrakeLeft > 0f)
+        {
+            v.HardBrakeLeft -= dt;
+            want = MathF.Min(want, v.HardBrakeTo);
+            brake = MathF.Max(v.Brake, v.HardBrakeDecel);
+        }
+
+        // ── Pulling in to park ─────────────────────────────────────────────────────────────────
+        //
+        // The same v = sqrt(2 a s) as a bus stop, to a kerb beside a door; and over the last few car
+        // lengths it eases across toward the kerb, so it stops out of the lane rather than in it.
+        if (v.Park is { Phase: ParkPhase.Approach } pk)
+        {
+            float toPark = pk.Spot.At - v.Lap;
+            if (toPark < -1f) toPark += line.Length;
+            want = MathF.Min(want, MathF.Sqrt(MathF.Max(0f, 2f * brake * MathF.Max(0f, toPark))));
+            v.KerbShift = pk.Spot.Shift * Math.Clamp(1f - (toPark - 2f) / 22f, 0f, 1f);
+            if (toPark <= 0.6f && v.Speed < 1.2f)
+            {
+                v.Speed = 0f;
+                vel.Linear = Vector3.Zero;
+                pk.Phase = ParkPhase.Parked;
+                pk.Clock = 0f;
+                return;
+            }
+        }
+        else if (v.Park is { Phase: ParkPhase.PullOut } po)
+        {
+            float gone = v.Lap - po.Spot.At;
+            if (gone < 0f) gone += line.Length;
+            v.KerbShift = po.Spot.Shift * Math.Clamp(1f - gone / 18f, 0f, 1f);
+            if (gone > 18f) { v.KerbShift = 0f; v.Park = null; }
+        }
+
         float toStop = DistanceToNextStop(v, line);
         if (toStop < float.MaxValue)
         {
@@ -522,7 +588,7 @@ public sealed class VehicleSystem
 
         float wasSpeed = v.Speed;
         if (want > v.Speed) v.Speed = MathF.Min(want, v.Speed + v.Accel * dt);
-        else v.Speed = MathF.Max(want, v.Speed - v.Brake * dt);
+        else v.Speed = MathF.Max(want, v.Speed - brake * dt);
 
         // What the tyres are being asked for, as a fraction of what they have.
         //
@@ -563,7 +629,7 @@ public sealed class VehicleSystem
         else if (before > v.Lap) v.Laps++;
 
         line.Sample(v.Lap, out here, out heading, out _);
-        t.Position = here;
+        t.Position = here + (v.KerbShift != 0f ? RightOf(heading) * v.KerbShift : Vector3.Zero);
         t.Rotation = Quaternion.CreateFromYawPitchRoll(heading, 0f, 0f);
         t.IsDirty = true;
         vel.Linear = new Vector3(MathF.Sin(heading), 0f, MathF.Cos(heading)) * v.Speed;

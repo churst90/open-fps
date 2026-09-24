@@ -177,6 +177,159 @@ public sealed record ChimeHornSpec
          : throw new ArgumentException($"No horn preset '{key}'. Known: {string.Join(", ", Presets.Keys)}");
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+//  The electric horn: what nearly every car, pickup and motorcycle has under its grille.
+//
+//  Not an air horn. There is no air supply and no reed: it is a BUZZER — a coil, an iron armature
+//  riveted to a steel diaphragm, and a pair of contact points the armature itself pushes open. The
+//  coil pulls, the armature moves, the points open, the coil lets go, the diaphragm springs back, the
+//  points close, and the coil pulls again. The note is near the diaphragm's own resonance and is set
+//  at the factory with an adjusting screw on the points, which is why horns are sold as a nominal
+//  "H" and "L" and why the note here is DECLARED rather than derived: it is a setting, not a length.
+//
+//  What makes it a car horn rather than a doorbell is that the armature is set to STRIKE the pole
+//  piece every cycle. Steel on steel with almost no bounce, four or five hundred times a second: a
+//  hard stop is where the buzz comes from. Two ways of letting that out:
+//
+//    DISC — a flat spring-steel tone disc on the end of the armature, which rings at its own modes
+//    around 2-4 kHz each time the armature hits. That is the brassy, nasal formant of a normal car
+//    horn, and the reason two of them a third apart sound like a car and not like a chord.
+//
+//    TRUMPET (snail) — the diaphragm drives a coiled exponential horn instead. The column only lets
+//    out what is near its own resonances, n·c/2L, and nothing below its flare cutoff, so the strike
+//    is filtered into a rounder, louder note. The "European" horn on a Mercedes or a Fiat.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+
+/// <summary>How an electric horn lets the diaphragm's motion out.</summary>
+public enum ElectricHornKind
+{
+    /// <summary>A flat tone disc on the armature, ringing at its own modes: the brassy formant.</summary>
+    Disc,
+    /// <summary>A coiled exponential horn in front of the diaphragm: rounder and louder.</summary>
+    Trumpet,
+}
+
+/// <summary>One horn of a set: a coil, an armature on a diaphragm, and a pair of contact points.</summary>
+public sealed record ElectricHornUnitSpec
+{
+    /// <summary>
+    /// The note, hertz. Set at the factory by the screw on the contact points, near the
+    /// diaphragm-and-armature's own resonance; the label on the horn is "H" or "L" and this.
+    /// Declared, because it is a SETTING — nothing about the steel would tell you which way the
+    /// screw was turned.
+    /// </summary>
+    public required float Hz { get; init; }
+    /// <summary>Level of this horn against the others in the set, dB. The low horn of a pair is
+    /// usually the bigger and a decibel or two louder.</summary>
+    public float LevelTrimDb { get; init; }
+    /// <summary>The diaphragm, metres. Sets where the radiator starts to beam.</summary>
+    public float DiaphragmDiameterMetres { get; init; } = 0.090f;
+    /// <summary>
+    /// DISC horns: the tone disc's first ringing mode, hertz. A disc clamped at its centre and free
+    /// at its rim; its note depends on diameter, thickness and the dish pressed into it, and the
+    /// makers do not publish any of the three, so it is declared from what disc horns measure at:
+    /// 2-4 kHz. The disc's next axisymmetric mode is about 6.3 times higher (a clamped-free plate
+    /// behaves like a cantilever there), which is mostly past hearing.
+    /// </summary>
+    public float ToneDiscHz { get; init; } = 2600f;
+    /// <summary>TRUMPET horns: the mouth of the coiled horn, metres.</summary>
+    public float MouthDiameterMetres { get; init; } = 0.075f;
+    /// <summary>TRUMPET horns: the throat where the diaphragm's chamber opens into it, metres.</summary>
+    public float ThroatDiameterMetres { get; init; } = 0.010f;
+
+    /// <summary>TRUMPET horns: the length of the coiled column. It is cut to the note — a trumpet
+    /// horn's column and its diaphragm are made to agree — so this is c/2f less the mouth's end
+    /// correction.</summary>
+    [JsonIgnore]
+    public float ColumnLengthMetres => MathF.Max(0.05f, 343f / (2f * MathF.Max(50f, Hz)) - 0.3f * MouthDiameterMetres);
+}
+
+/// <summary>An electric horn: one or more buzzers on one relay, sounding together.</summary>
+public sealed record ElectricHornSpec
+{
+    public required string Name { get; init; }
+    public required ElectricHornUnitSpec[] Units { get; init; }
+    public ElectricHornKind Kind { get; init; } = ElectricHornKind.Disc;
+    /// <summary>The coil's L/R, seconds: how long the current takes to rise when the points close.
+    /// About a millisecond on a car horn, which is why the pull is rounded and the strike is not.</summary>
+    public float CoilRiseSeconds { get; init; } = 0.0010f;
+    /// <summary>How much of each cycle the points are closed. Wider points, harder pull.</summary>
+    public float ContactDuty { get; init; } = 0.5f;
+    /// <summary>
+    /// SPL, RMS, at one metre on axis with every horn in the set sounding. Legal horns are
+    /// 93-112 dBA at two metres (ECE R28, FMVSS), which is 99-118 at one. An anchor rather than a
+    /// radiation integral, for the same reason as the air horns: the law is a better number.
+    /// </summary>
+    public float ReferenceDb { get; init; } = 110f;
+
+    /// <summary>The notes of the set, hertz, in the order the units are declared.</summary>
+    [JsonIgnore]
+    public float[] Notes => Array.ConvertAll(Units, u => u.Hz);
+
+    // ── Presets ─────────────────────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// The pair behind the grille of most cars and pickups: a high and a low disc horn, about 510 and
+    /// 410 Hz, roughly a major third apart. They beat against each other, and that roughness is the
+    /// sound of a car horn as much as either note is.
+    /// </summary>
+    public static ElectricHornSpec DiscPair => new()
+    {
+        Name = "car disc horns, high and low",
+        Kind = ElectricHornKind.Disc,
+        Units = new[]
+        {
+            new ElectricHornUnitSpec { Hz = 410f, DiaphragmDiameterMetres = 0.095f, ToneDiscHz = 2400f, LevelTrimDb = 0f },
+            new ElectricHornUnitSpec { Hz = 510f, DiaphragmDiameterMetres = 0.090f, ToneDiscHz = 2900f, LevelTrimDb = -1f },
+        },
+        ReferenceDb = 112f,
+    };
+
+    /// <summary>A small or cheap car's single disc horn, about 420 Hz. The bleat.</summary>
+    public static ElectricHornSpec DiscSingle => new()
+    {
+        Name = "car disc horn, single",
+        Kind = ElectricHornKind.Disc,
+        Units = new[] { new ElectricHornUnitSpec { Hz = 420f, DiaphragmDiameterMetres = 0.085f, ToneDiscHz = 2600f } },
+        ReferenceDb = 108f,
+    };
+
+    /// <summary>A pair of snail (trumpet) horns, 400 and 500 Hz, a major third: rounder, louder.</summary>
+    public static ElectricHornSpec TrumpetPair => new()
+    {
+        Name = "trumpet (snail) horns, high and low",
+        Kind = ElectricHornKind.Trumpet,
+        Units = new[]
+        {
+            new ElectricHornUnitSpec { Hz = 400f, DiaphragmDiameterMetres = 0.080f, MouthDiameterMetres = 0.080f, ThroatDiameterMetres = 0.010f },
+            new ElectricHornUnitSpec { Hz = 500f, DiaphragmDiameterMetres = 0.075f, MouthDiameterMetres = 0.070f, ThroatDiameterMetres = 0.009f, LevelTrimDb = -1f },
+        },
+        ReferenceDb = 116f,
+    };
+
+    /// <summary>A motorcycle's horn: one small disc, about 450 Hz, with a small bright tone disc.</summary>
+    public static ElectricHornSpec MotoDisc => new()
+    {
+        Name = "motorcycle disc horn",
+        Kind = ElectricHornKind.Disc,
+        Units = new[] { new ElectricHornUnitSpec { Hz = 450f, DiaphragmDiameterMetres = 0.070f, ToneDiscHz = 3300f } },
+        ReferenceDb = 105f,
+    };
+
+    public static IReadOnlyDictionary<string, Func<ElectricHornSpec>> Presets { get; } =
+        new Dictionary<string, Func<ElectricHornSpec>>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["disc_pair"] = () => DiscPair,
+            ["disc_single"] = () => DiscSingle,
+            ["trumpet_pair"] = () => TrumpetPair,
+            ["moto_disc"] = () => MotoDisc,
+        };
+
+    public static ElectricHornSpec ByName(string key)
+        => Presets.TryGetValue(key, out var make) ? make()
+         : throw new ArgumentException($"No electric horn preset '{key}'. Known: {string.Join(", ", Presets.Keys)}");
+}
+
 /// <summary>One bell of a steam whistle: a tube closed at the top, blown across a gap at the bottom.</summary>
 public sealed record WhistleBellSpec
 {

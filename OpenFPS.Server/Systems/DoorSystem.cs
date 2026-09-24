@@ -209,6 +209,23 @@ public sealed class DoorSystem
         // Mass from the leaf's own volume and the density of what it is made of. A steel door is
         // heavy because steel is heavy, not because somebody typed a number.
         float massKg = MathF.Max(2f, size.X * size.Y * size.Z * MathF.Max(100f, material.DensityKgM3));
+        float ringThickness = size.Z;
+
+        // ...unless it is not solid. A steel door is two skins of sheet folded over a core — 1.2 mm
+        // of steel either side of forty-odd millimetres of honeycomb — and reckoned as a solid slab it
+        // weighed 2.4 tonnes and slammed seventeen decibels too hard. The prefab says so the way any
+        // door does, with its skin thickness. The skins weigh what they weigh; and bonded to a
+        // core they bend as a sandwich, stiff for their mass, so the note is that of a solid plate
+        // with the same stiffness-to-mass ratio: t = sqrt(6 rho s (d - s)^2 / m).
+        if (door.SkinMetres > 0f)
+        {
+            float skin = MathF.Min(door.SkinMetres, size.Z * 0.5f);
+            float area = size.X * size.Y;
+            float rho = MathF.Max(100f, material.DensityKgM3);
+            float perArea = 2f * skin * rho + MathF.Max(0f, size.Z - 2f * skin) * HollowCoreKgM3;
+            massKg = MathF.Max(2f, area * perArea);
+            ringThickness = MathF.Sqrt(6f * rho * skin * (size.Z - skin) * (size.Z - skin) / perArea);
+        }
 
         // A seal is a property of what the thing is FOR: anything that keeps weather or noise out has
         // one, and the material is the best evidence available. Metal and glass doors are sealed;
@@ -220,9 +237,9 @@ public sealed class DoorSystem
             // doors do not have one; rendering three quarters of a second of stick-slip on every
             // door made every door sound like a haunted house, which a listener heard as an
             // unexplained hiss either side of the thud. A gate or a cellar door can ask for it.
-            ? DoorAcoustics.Opening(material, latchEdge, hinge, size.X, size.Y, size.Z,
+            ? DoorAcoustics.Opening(material, latchEdge, hinge, size.X, size.Y, ringThickness,
                                     door.SwingSeconds, hingeDryness: 0f, hasSeal)
-            : DoorAcoustics.Closing(material, latchEdge, transform.Position, size.X, size.Y, size.Z, massKg,
+            : DoorAcoustics.Closing(material, latchEdge, transform.Position, size.X, size.Y, ringThickness, massKg,
                                     DoorAcoustics.EdgeSpeed(size.X, door.SwingRadians, door.SwingSeconds), hasSeal);
 
         var transients = new List<TransientSound>(sounds.Count);
@@ -232,6 +249,10 @@ public sealed class DoorSystem
             ? world.Get<IdentityComponent>(entity).Name : "door";
         heard(entity.Id, name, transients);
     }
+
+    /// <summary>What fills a hollow door between its skins, kg/m^3: kraft honeycomb or mineral core,
+    /// with the edge channels and the lock reinforcement averaged in.</summary>
+    private const float HollowCoreKgM3 = 150f;
 
     /// <summary>Asks a door to open or shut. Returns false if it is already going that way.</summary>
     public static bool Set(World world, Entity entity, bool open)

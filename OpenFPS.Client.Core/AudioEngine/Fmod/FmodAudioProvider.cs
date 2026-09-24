@@ -2039,6 +2039,8 @@ public class FmodAudioProvider : IAudioProvider
                 TargetDelaySeconds = emitter.EchoDelaySeconds,
                 TargetGain = emitter.EchoGain,
                 OwnCursor = !emitter.IsReflection,
+                Scattering = emitter.IsReflection ? emitter.EchoScattering : -1f,
+                Seed = emitter.EntityId,
             };
             if (EchoProcessor.CreateDSP(_system, echo, out engineDsp, out engineHandle) != RESULT.OK) return;
             engineDsp.setChannelFormat(0, 0, SPEAKERMODE.MONO);
@@ -2083,6 +2085,10 @@ public class FmodAudioProvider : IAudioProvider
                     // BellVoiceState for why this one cannot be worked out locally.
                     "bell" => new BellVoiceState(OpenFPS.Common.ModelLibrary.Bell(preset),
                                                  mrate, emitter.EntityId * 13 + 5),
+                    // A vehicle's horn, with the rhythm of the hand on it in the key. See Honk.
+                    "horn" => OpenFPS.Common.Honk.TryParse(emitter.PhysicalKey, out var hornKey, out var rhythm)
+                        ? new HornVoiceState(hornKey, rhythm, mrate, emitter.EntityId * 29 + 1)
+                        : null,
                     _ => null,
                 };
             }

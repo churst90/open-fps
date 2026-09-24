@@ -124,7 +124,7 @@ public abstract class PhysicalVoiceState : IRenderedVoice
     public bool Primed => _primed;
     private volatile bool _primed;
 
-    private const float WarmupSeconds = 0.08f;
+    protected const float WarmupSeconds = 0.08f;
     private bool _warmed;
 
     private float _listenerX, _listenerY, _listenerZ;
@@ -469,6 +469,60 @@ public sealed class SirenVoiceState : PhysicalVoiceState
     {
         Siren.Step();
         return Siren.Output;
+    }
+}
+
+/// <summary>
+/// A vehicle's horn, blown in the rhythm the server sent — see <see cref="Honk"/>.
+///
+/// The horn is the model the vehicle carries: an air horn is the approved <see cref="ChimeHorn"/>,
+/// an electric one <see cref="ElectricHorn"/>. The rhythm is played in the voice's own time, so a
+/// tap is exactly as long as the driver's thumb was on the button however the frames fall. The
+/// warm-up the voice discards before it is heard is taken off the front, or it would eat the first
+/// eighty milliseconds of every tap.
+/// </summary>
+public sealed class HornVoiceState : PhysicalVoiceState
+{
+    public readonly string Horn;
+    public readonly float[] Pattern;
+    private readonly ChimeHorn? _air;
+    private readonly ElectricHorn? _electric;
+
+    public HornVoiceState(string horn, float[] pattern, float sampleRate, int seed)
+        : base(Honk.LevelDb(horn), sampleRate)
+    {
+        Horn = horn;
+        Pattern = pattern;
+        int colon = horn.IndexOf(':');
+        string kind = colon > 0 ? horn[..colon] : "";
+        string preset = colon > 0 ? horn[(colon + 1)..] : horn;
+        if (string.Equals(kind, "air", StringComparison.OrdinalIgnoreCase))
+            _air = new ChimeHorn(ChimeHornSpec.ByName(preset), sampleRate, seed);
+        else
+            _electric = new ElectricHorn(ElectricHornSpec.ByName(preset), sampleRate, seed);
+    }
+
+    /// <summary>Seconds from the first audible sample to the last sound of the horn dying away.</summary>
+    public float Seconds => Honk.Duration(Pattern) + 0.3f;
+
+    protected override void PushListener(Vector3 frame)
+    {
+        _air?.SetListener(frame);
+        _electric?.SetListener(frame);
+    }
+
+    protected override void Control(float seconds, float dt)
+    {
+        bool on = Running && Honk.BlowingAt(Pattern, seconds - WarmupSeconds);
+        if (_air != null) _air.Blowing = on;
+        if (_electric != null) _electric.Blowing = on;
+    }
+
+    protected override float StepSynth()
+    {
+        if (_air != null) { _air.Step(); return _air.Out; }
+        _electric!.Step();
+        return _electric.Out;
     }
 }
 

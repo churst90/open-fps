@@ -358,6 +358,7 @@ public class PrefabRepository
                 SwingSeconds = t.SwingSeconds ?? 0.9f,
                 SwingRadians = (t.SwingDegrees ?? 90f) * (MathF.PI / 180f),
                 HingeSide = t.HingeSide is < 0 ? -1f : 1f,
+                SkinMetres = MathF.Max(0f, t.DoorSkinMetres ?? 0f),
                 // Left at zero so DoorSystem takes it from the leaf itself: a door makes a hole
                 // exactly its own size, and a second authored copy of that could only disagree.
                 Aperture = 0f,

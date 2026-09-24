@@ -264,9 +264,10 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
     /// queues deterministically; with the real thread running as well, the test and the engine race
     /// each other through the same state and the result is noise rather than a verdict.
     /// </summary>
-    internal void InitializeForTest()
+    internal void InitializeForTest(string? soundsPath = null)
     {
         if (!_provider.Initialize()) return;
+        if (soundsPath != null) _bank.Initialize(soundsPath);
         _isInitialized = true;
         _voiceManager = new VoiceManager(this, _bank, 256);
     }
@@ -477,6 +478,9 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
     public Vector3 GetSoundPosition(int entityId) => _isInitialized ? _provider.GetSoundPosition(entityId) : Vector3.Zero;
     public float GetPlaybackProgress(int entityId) => _isInitialized ? _provider.GetPlaybackProgress(entityId) : 0f;
     public bool HasCategory(string category) => _isInitialized && _bank.HasCategory(category);
+    /// <summary>The sounds in one folder of the bank, e.g. BIRDS/SPARROW.</summary>
+    public IReadOnlyList<string> SoundsIn(string category)
+        => _isInitialized ? _bank.Members(category) : Array.Empty<string>();
     public IEnumerable<int> GetActiveSpatialSoundIds() => _isInitialized ? _provider.GetActiveSpatialSoundIds() : Array.Empty<int>();
 
     /// <summary>

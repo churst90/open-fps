@@ -297,4 +297,9 @@ public class PrefabTemplate
     /// <summary>Which edge it is hinged on: -1 the left, +1 the right. Decides which way it sweeps,
     /// and therefore which side of the doorway an open leaf is heard on.</summary>
     public float? HingeSide { get; set; }
+
+    /// <summary>A hollow door's skin thickness, metres: two sheets over a core. Absent for a solid
+    /// leaf. Decides what it weighs and what note it rings at; it has nothing to do with how much it
+    /// lets through, which the transmission figures say.</summary>
+    public float? DoorSkinMetres { get; set; }
 }

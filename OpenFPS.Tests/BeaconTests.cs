@@ -106,6 +106,61 @@ public class BeaconTests
     }
 
     /// <summary>
+    /// A door you can see is a door you are told about. Standing where the door's face is in plain
+    /// view — a few metres out and off to one side, wherever the street or corridor leaves room — the
+    /// path model still calls many of them half blocked, because a door set into a wall is partly
+    /// hidden by its own jamb at an angle. On that figure alone doors fell silent as you approached
+    /// them: "I don't hear the beacons for doors now where I heard them before".
+    /// </summary>
+    [Fact]
+    public void ADoorInViewBlipsFromAnAngle()
+    {
+        var prefabs = new PrefabRepository(Path.Combine(AppContext.BaseDirectory, "prefabs"));
+        var maps = new MapManager(new MapRepository(Path.Combine(AppContext.BaseDirectory, "maps")), prefabs);
+        maps.Initialize();
+        Assert.True(maps.TryGetMap("city", out World world, out _, out _, out _));
+        Assert.True(maps.TryGetMapData("city", out var data));
+        var client = new ClientWorldState();
+        client.Clear(data.Size, data.MinBound, data.MaxBound);
+        var doors = new System.Collections.Generic.List<EntityDefinition>();
+        foreach (var def in EntityDefinitionFactory.StaticDefinitions(world))
+        {
+            client.RegisterDefinition(def);
+            if (def.Identity.BeaconCategory == Beacons.Door) doors.Add(def);
+        }
+        var snap = client.GetSnapshot();
+        var acoustics = new OpenFPS.Client.AudioEngine.Acoustics.SpatialAcoustics(new OpenFPS.Client.Core.SpatialService());
+        var aids = new BeaconAids(new AudioEngineFacade(new VoiceLifecycleTests.RecordingProvider()),
+                                  BeaconPreferences.InMemory(), acoustics);
+        int tried = 0, halfBlocked = 0, silent = 0;
+        foreach (var d in doors)
+        {
+            var p = d.Transform.Position;
+            var n = Vector3.Transform(Vector3.UnitZ, d.Transform.Rotation);
+            foreach (var normal in new[] { n, -n })
+            {
+                var face = p + normal * (0.5f * d.Collider.Size.Z + 0.35f);
+                var side = new Vector3(normal.Z, 0, -normal.X);
+                foreach (var ear in new[] { face + normal * 3f + side * 1.5f + Vector3.UnitY * 0.5f,
+                                            face + normal * 1.5f + side * 1.5f + Vector3.UnitY * 0.5f })
+                {
+                    // Only where the door is really in view: nothing between its face and the ear,
+                    // and nothing between the ear and a point straight out from the face.
+                    var dir = ear - face; float len = dir.Length();
+                    if (acoustics.Spatial.RaycastSingle(snap, face, dir / len, len, out _, out _)) continue;
+                    tried++;
+                    if (acoustics.CalculateAcousticPath(snap, d.EntityId, ear, p).Occlusion > 0.5f) halfBlocked++;
+                    if (!aids.Reaches(snap, d.EntityId, ear, p, out _)) silent++;
+                    break;
+                }
+            }
+        }
+        _o.WriteLine($"{tried} places a door is in view; {halfBlocked} read over half blocked; {silent} silent");
+        Assert.True(tried > doors.Count / 2);
+        Assert.Equal(0, silent);
+    }
+
+    /// <summary>
     /// A door on the far side of a wall is somebody else's room: it does not blip through the brick.
     /// Standing against the side of 24 Birch Street, both of its doors are round the corner.
     /// </summary>

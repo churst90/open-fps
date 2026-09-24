@@ -42,7 +42,12 @@ public readonly record struct Reflection(
     /// image: it radiates from the surface itself, so it arrives from the wall rather than from a
     /// point behind it, and several of them across the face is what makes a rough surface a wash
     /// instead of a copy.</summary>
-    bool IsDiffuse = false);
+    bool IsDiffuse = false,
+    /// <summary>How rough what it came off is, 0..1 (see <see cref="ReflectingSurface.Scattering"/>).
+    /// A renderer uses it to smear the arrival in time: a mirror hands the sound back intact, brick
+    /// hands it back from a patch a few metres across with every part of it a little later than the
+    /// next, and a copy that is identical to the direct sound is what phases against it.</summary>
+    float Scattering = 0f);
 
 /// <summary>
 /// First-order specular reflections, by the image-source method.
@@ -198,7 +203,7 @@ public static class ImageSource
 
                 if (path <= MaxPathLength && path > direct && gain >= MinGain && delay >= MinDelaySeconds
                     && (occluded == null || (!occluded(source, hit) && !occluded(hit, listener))))
-                    n = Insert(into, n, new Reflection(image, hit, delay, path, gain, s.SurfaceId));
+                    n = Insert(into, n, new Reflection(image, hit, delay, path, gain, s.SurfaceId, false, scatter));
             }
 
             if (diffuseTaps > 0 && scatter > 0.01f)
@@ -262,7 +267,7 @@ public static class ImageSource
             // behind the wall. Identified apart from the specular arrival so a caller keeping one
             // voice per surface does not confuse the two.
             n = Insert(into, n, new Reflection(tap, tap, delay, path, gain,
-                                               unchecked(s.SurfaceId * 397 + t + 1), true));
+                                               unchecked(s.SurfaceId * 397 + t + 1), true, 1f));
         }
         return n;
     }
@@ -390,7 +395,8 @@ public static class ImageSource
                     (occluded(source, p1) || occluded(p1, p2) || occluded(p2, listener))) continue;
 
                 n = Insert(into, n, new Reflection(image2, p2, delay, path, gain,
-                                                   A.SurfaceId * 31 + B.SurfaceId));
+                                                   A.SurfaceId * 31 + B.SurfaceId, false,
+                                                   MathF.Max(A.Scattering, B.Scattering)));
             }
         }
         return n;

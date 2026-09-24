@@ -145,10 +145,20 @@ public static class Enclosure
         for (int i = 0; i < solids.Count; i++)
         {
             var s = solids[i];
-            // Cheap reject first: a box whose bounding sphere is out of range cannot be struck within
-            // it, and on a map with a hundred walls most boxes fail here for every ray.
-            float reach = ReverberantRangeMetres + s.Size.Length() * 0.5f;
-            if (Vector3.DistanceSquared(origin, s.Center) > reach * reach) continue;
+            // Cheap rejects first, both on the box's bounding sphere. Out of range cannot be struck
+            // within it. And — the one that matters in a city — a sphere the ray's LINE does not pass
+            // through cannot be struck at all: every interior floor, partition and sofa of a tower
+            // sixty metres away is in range of every ray, and only a handful are anywhere near any
+            // one of them. Testing the range alone left the OBB test running against nearly every
+            // box for every ray, which is how the survey on Main Street drifted to 55 ms.
+            float radiusSq = s.Size.LengthSquared() * 0.25f;
+            Vector3 toCentre = s.Center - origin;
+            float along = Vector3.Dot(toCentre, direction);
+            if (along < 0f && along * along > radiusSq) continue;                  // wholly behind
+            float centreSq = toCentre.LengthSquared();
+            if (centreSq - along * along > radiusSq) continue;                     // off the line
+            float reach = ReverberantRangeMetres + MathF.Sqrt(radiusSq);
+            if (centreSq > reach * reach) continue;                                // out of range
             if (!GeometryUtils.RayHitsOBB(origin, direction, ReverberantRangeMetres,
                                           s.Center, s.Size, s.Rotation, out float t, out Vector3 n)) continue;
             if (t >= distance) continue;

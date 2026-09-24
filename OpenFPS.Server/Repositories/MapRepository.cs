@@ -76,6 +76,10 @@ public class MapData
     /// <summary>Closed circuits the map's vehicles can lap. See TrackData.</summary>
     public List<TrackData>? Tracks { get; set; }
 
+    /// <summary>What the people driving this map's traffic do besides drive — honk, stand on the
+    /// brakes, park. Null on a map whose traffic is racing, which is every map but a street.</summary>
+    public StreetLifeData? StreetLife { get; set; }
+
     /// <summary>Where roads cross the railway on the level. See LevelCrossingData.</summary>
     public List<LevelCrossingData>? Crossings { get; set; }
 
@@ -109,6 +113,25 @@ public class MapData
 /// changed rather than in a track-generator nobody can read. The points are the CENTRELINE; a
 /// vehicle picks its own line by offsetting sideways from it.
 /// </summary>
+/// <summary>
+/// How often, across the whole map, the drivers do the things drivers do. Averages: each is a
+/// random event with this mean interval, so the gaps are irregular the way real ones are, and
+/// which vehicle it happens to is chosen at random too — "every now and again, from different
+/// vehicles", not a timetable. Zero turns one off.
+/// </summary>
+public class StreetLifeData
+{
+    /// <summary>Somebody somewhere on the map sounds their horn, on average this often, seconds.</summary>
+    public float HornEverySeconds { get; set; }
+    /// <summary>Somebody has to stand on the brakes — a car pulling out, a pedestrian — on average
+    /// this often. The tyres squeal because the braking is past what they grip at, not because a
+    /// squeal was asked for; and often the horn follows.</summary>
+    public float HardBrakeEverySeconds { get; set; }
+    /// <summary>A car pulls in to the kerb near a door, the driver gets out and goes inside, and
+    /// later comes back and drives off — on average this often across the map.</summary>
+    public float ParkEverySeconds { get; set; }
+}
+
 public class TrackData
 {
     public string Id { get; set; } = string.Empty;

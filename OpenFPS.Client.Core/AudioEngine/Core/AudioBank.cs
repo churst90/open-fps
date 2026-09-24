@@ -43,6 +43,10 @@ public class AudioBank
         return "";
     }
 
+    /// <summary>Every sound in one folder, for a caller that chooses among them itself.</summary>
+    public IReadOnlyList<string> Members(string key)
+        => _sounds.TryGetValue(key.Replace('\\', '/').Trim('/'), out var list) ? list : Array.Empty<string>();
+
     public bool HasCategory(string key) 
     {
         if (string.IsNullOrEmpty(key)) return false;

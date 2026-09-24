@@ -897,6 +897,55 @@ public sealed class EngineVoiceState : IRenderedVoice
 /// than stepped, so as the car moves and the path length changes the echo glides in pitch — which is
 /// the Doppler of the reflection, and the reason its emitter carries no velocity of its own.
 /// </summary>
+/// <summary>
+/// The smear a rough surface puts on what it hands back: a short cascade of Schroeder all-passes,
+/// flat in level and wandering in phase, spread over a time that grows with the roughness. See
+/// <see cref="EngineEchoState.Scattering"/> for why an echo needs one.
+/// </summary>
+public sealed class EchoDiffuser
+{
+    private readonly float[][] _lines;
+    private readonly int[] _at;
+    private readonly float _g;
+
+    public EchoDiffuser(float scattering, int seed, float sampleRate)
+    {
+        float s = Math.Clamp(scattering, 0f, 1f);
+        var rng = new Random(seed * 7919 + 17);
+        // Mutually prime-ish bases, ms, stretched by the roughness: about a millisecond in all for
+        // polished steel, twenty or so for brick. Four stages leave no regular structure in the
+        // phase; more would start to sound like a room, which is the reverb's job and not this one.
+        //
+        // The delays are the whole of the smear's LENGTH, and they are also time the echo arrives
+        // late by, so a mirror must get almost none: under two milliseconds for polished metal and
+        // glass (s ~ 0.05), a dozen for brick, twenty for a crowd.
+        float[] baseMs = { 0.11f, 0.17f, 0.23f, 0.31f };
+        _lines = new float[baseMs.Length][];
+        _at = new int[baseMs.Length];
+        for (int k = 0; k < baseMs.Length; k++)
+        {
+            float ms = baseMs[k] * (1f + 24f * s) * (0.8f + 0.4f * (float)rng.NextDouble());
+            _lines[k] = new float[Math.Max(1, (int)(ms * 0.001f * sampleRate))];
+        }
+        _g = 0.45f + 0.2f * s;
+    }
+
+    public float Process(float x)
+    {
+        for (int k = 0; k < _lines.Length; k++)
+        {
+            var line = _lines[k];
+            int at = _at[k];
+            float delayed = line[at];
+            float y = -_g * x + delayed;
+            line[at] = x + _g * y;
+            _at[k] = at + 1 >= line.Length ? 0 : at + 1;
+            x = y;
+        }
+        return x;
+    }
+}
+
 public sealed class EngineEchoState
 {
     public readonly EngineVoiceState Source;
@@ -960,6 +1009,40 @@ public sealed class EngineEchoState
 
     public EngineEchoState(EngineVoiceState source) { Source = source; SampleRate = source.SampleRate; }
 
+    /// <summary>
+    /// How rough the surface was, 0..1, or below zero for a voice that is not a reflection at all
+    /// (a borrowed voice is a different car, not an echo, and is left exactly as it was). Set once,
+    /// before the first block.
+    ///
+    /// WHY AN ECHO IS SMEARED. A reflection read straight out of the source's ring is the source's
+    /// own waveform, sample for sample, a few milliseconds late — and a signal added to a delayed copy
+    /// of itself is a comb filter: evenly spaced notches that sweep as either end moves. That is the
+    /// phasing ("sirens inside out") and most of the "laser beam", and it is not what a wall does. A
+    /// real wall hands the sound back from a patch a few metres across (the Fresnel zone), every part
+    /// of it a slightly different distance away, and what faces the wall is not what faces you — the
+    /// tailpipe points one way and the intake another. So the copy that comes back is the same sound
+    /// but not the same waveform, and the notches, if any, fall at no regular spacing.
+    ///
+    /// Modelled as a short cascade of Schroeder all-passes: flat in level, so the echo is exactly as
+    /// loud as the image-source method says, but with a phase that wanders with frequency, spread over
+    /// a time that grows with the roughness — about a millisecond for polished steel or glass, up to
+    /// twenty or so for a brick facade or a crowd. The delays are different for every voice so no two
+    /// walls smear alike. The arrival time, and so the direction and the slapback, are untouched.
+    /// </summary>
+    public float Scattering = -1f;
+    /// <summary>Seeds the smear's delays, so each wall's is its own.</summary>
+    public int Seed;
+
+    private EchoDiffuser? _diffuser;
+
+    /// <summary>
+    /// How fast a reflection's level follows its target, per sample. A reflection comes and goes as
+    /// the geometry does — gradually, as the patch of wall that is lit slides off the end of it — so
+    /// it swells and dies over a few hundred milliseconds rather than switching. A borrowed voice
+    /// keeps the old, fast rate: it is a car, and a car's level is the car's business.
+    /// </summary>
+    private float GainSlew => Scattering >= 0f ? 1f / (0.18f * SampleRate) : 0.0015f;
+
     public void Render(Span<float> mono)
     {
         // The largest block we have ever been handed. Taking the maximum rather than the current
@@ -973,18 +1056,21 @@ public sealed class EngineEchoState
         float gTarget = TargetGain;
 
         if (OwnCursor) { RenderOwnCursor(mono, floorSamples, target, gTarget); return; }
+        if (Scattering >= 0f && _diffuser == null) _diffuser = new EchoDiffuser(Scattering, Seed, SampleRate);
+        float slew = GainSlew;
         // Slew: up to 12% per sample of drift, which covers the Doppler of a fast pass.
         for (int i = 0; i < mono.Length; i++)
         {
             double diff = target - _delay;
             _delay += Math.Clamp(diff * 0.002, -0.12, 0.12);
-            _gain += (gTarget - _gain) * 0.0015f;
+            _gain += (gTarget - _gain) * slew;
             // Reading "back" from the source's current write position: the source rendered its
             // block before or after this one; the minimum delay covers either order.
             // Clamped to the slack as well as the target, so a delay that is being slewed downward
             // can never cross into the block the source may not have written yet.
             double back = Math.Max(_delay, floorSamples) + (mono.Length - i);
-            mono[i] = Source.ReadBack(back) * _gain;
+            float y = Source.ReadBack(back) * _gain;
+            mono[i] = _diffuser != null ? _diffuser.Process(y) : y;
         }
     }
 

@@ -49,7 +49,9 @@ public class EnclosureCostTests
         // It runs on the acoustic worker a few times a second, not on the mixer; tens of milliseconds
         // is what that thread can spare.
         // Measured 30 ms before the openness boundary and 48 ms with it (14-ray probes, 2 m by 0.5 m
-        // cache cells, skipped for a listener already a third open).
+        // cache cells, skipped for a listener already a third open). It had crept to 55 ms as the city
+        // grew — every ray tested against every box within range — and is 33 ms since a box the ray's
+        // LINE cannot touch is rejected before the exact test (2026-09-24).
         Assert.True(total / n < 60, $"a survey costs {total / n:F1} ms on average");
     }
 }

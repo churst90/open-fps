@@ -42,7 +42,26 @@ public sealed class RailSystem
         public (float At, float Dwell, string Kind)[] Stops = System.Array.Empty<(float, float, string)>();
         public int NextStop;
         public float DwellLeft;
+
+        /// <summary>The horn on the leading unit, as "air:&lt;preset&gt;", or "" for a train with none.</summary>
+        public string Horn = "";
+        /// <summary>Crossings this train has already sounded for on its way in, by where they are
+        /// round the line; forgotten once it is past them.</summary>
+        public readonly HashSet<float> Sounded = new();
     }
+
+    /// <summary>How a sound leaves this system. Set by the server; null in tests.</summary>
+    public Action<string, int, string, IReadOnlyList<TransientSound>>? Heard { get; set; }
+
+    /// <summary>Where the level crossings are round a track, metres. Set by the server from the
+    /// crossing system, which already works that out for its bells.</summary>
+    public Func<string, string, IEnumerable<float>>? CrossingsOn { get; set; }
+
+    /// <summary>
+    /// How long before a crossing the horn starts. US rule (49 CFR 222.21): at least fifteen and no
+    /// more than twenty seconds before the lead reaches it, and it goes on until it does.
+    /// </summary>
+    private const float HornLeadSeconds = 18f;
 
     private readonly List<Consist> _trains = new();
 
@@ -114,6 +133,8 @@ public sealed class RailSystem
                         .Select(sp => (At: sp.AtMetres, Dwell: sp.DwellSeconds, Kind: sp.Kind ?? "platform"))
                         .ToArray(),
                     Track = td.Track,
+                    Horn = profile.Consist.Select(c => c.Vehicle.Traction?.HornKey).FirstOrDefault(h => h != null) is { } hk
+                        ? "air:" + hk : "",
                     Head = td.StartOffsetMetres, Speed = MathF.Min(v0, top), TopSpeed = top,
                     Accel = td.AccelerationMps2 > 0 ? td.AccelerationMps2 : 0.9f, Brake = brake,
                 });
@@ -169,7 +190,44 @@ public sealed class RailSystem
             tr.Head += tr.Speed * dt;
             if (tr.Head > tr.Line.Length) tr.Head -= tr.Line.Length;
 
+            SoundForCrossings(tr, world);
             PlaceConsist(tr, world);
+        }
+    }
+
+    /// <summary>
+    /// Long, long, short, long for every level crossing ahead, begun eighteen seconds out and held
+    /// until the train is on it — the pattern every North American train sounds, and the reason a
+    /// listener hears the train before the bells have told them anything. Worked out here because
+    /// this is where the train's speed and the distance to the crossing are both known.
+    /// </summary>
+    private void SoundForCrossings(Consist tr, World world)
+    {
+        if (tr.Horn.Length == 0 || Heard == null || CrossingsOn == null || tr.Speed < 2f) return;
+        foreach (float at in CrossingsOn(tr.MapId, tr.Track))
+        {
+            float toGo = at - tr.Head;
+            if (toGo < 0f) toGo += tr.Line.Length;
+            if (toGo > tr.Line.Length * 0.5f) { tr.Sounded.Remove(at); continue; }   // behind us now
+            float eta = toGo / tr.Speed;
+            if (eta > HornLeadSeconds || tr.Sounded.Contains(at)) continue;
+            tr.Sounded.Add(at);
+            var lead = Array.Find(tr.Entities, e => e != Entity.Null);
+            if (lead == Entity.Null || !world.IsAlive(lead)) continue;
+            // The first three blasts and their gaps take ten seconds; the last is held to arrival.
+            var pattern = Honk.Crossing(eta - 10f);
+            Log.Information("Rail: {Name} sounds for the crossing {ToGo:F0} m ahead ({Eta:F0} s).", tr.Name, toGo, eta);
+            Heard(tr.MapId, lead.Id, "horn", new[]
+            {
+                new TransientSound
+                {
+                    Character = SoundCharacter.Ring,
+                    Position = world.Get<Transform>(lead).Position + Vector3.UnitY * 4.5f,
+                    LevelDb = Honk.LevelDb(tr.Horn),
+                    DecaySeconds = Honk.Duration(pattern),
+                    SynthKey = Honk.Key(tr.Horn, pattern),
+                },
+            });
         }
     }
 

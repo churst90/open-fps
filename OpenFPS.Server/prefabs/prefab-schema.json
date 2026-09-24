@@ -422,6 +422,11 @@
       "type": "number",
       "description": "Which edge a door is hinged on: -1 the left, +1 the right. Not cosmetic — it decides which way the leaf sweeps, and therefore which side of the doorway an open leaf is heard on."
     },
+    "DoorSkinMetres": {
+      "type": "number",
+      "minimum": 0,
+      "description": "A hollow door's skin thickness in metres (two sheets over a core, e.g. 0.0012 for a steel door). Sets its mass and the note it rings at. Omit for a solid leaf."
+    },
     "Hands": {
       "type": "integer",
       "enum": [

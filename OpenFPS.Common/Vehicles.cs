@@ -239,6 +239,28 @@ public sealed record VehicleProfile
     public bool DoorChime { get; init; }
 
     /// <summary>
+    /// The horn, as "electric:&lt;ElectricHornSpec&gt;" or "air:&lt;ChimeHornSpec&gt;", or null to
+    /// take the one this vehicle would have anyway — see <see cref="HornFor"/>. Declared only where
+    /// the body does not say it: a motorcycle and a racing car share an open-wheeled body and only
+    /// one of them has a horn button.
+    /// </summary>
+    public string? Horn { get; init; }
+
+    /// <summary>
+    /// The horn a vehicle carries, from what it is. Anything on air brakes has air to blow a trumpet
+    /// with and does — a tractor unit its roof pair, a bus its single trumpet. Any road car, van or
+    /// pickup has the pair of electric disc horns behind the grille that nearly every one is built
+    /// with. (A racing car would have none; only a street map's traffic ever sounds one.)
+    /// </summary>
+    public static string HornFor(VehicleProfile p)
+    {
+        if (p.Horn != null) return p.Horn;
+        if (string.Equals(p.AirSystem, "tractor_trailer", StringComparison.OrdinalIgnoreCase)) return "air:truck_dual";
+        if (p.AirSystem != null) return "air:bus_horn";
+        return "electric:disc_pair";
+    }
+
+    /// <summary>
     /// How much of the engine's MECHANICAL noise — injection clatter, timing gears, the block —
     /// reaches the street, 0..1. A car's engine sits under a bonnet in a lined bay and next to none
     /// of it does; the exhaust is the car. A truck's engine hangs in the open air under a cab and a
@@ -441,6 +463,7 @@ public sealed record VehicleProfile
     /// </summary>
     public static VehicleProfile SportBike => new()
     {
+        Horn = "electric:moto_disc",
         LengthMetres = 2.1f, WidthMetres = 0.8f, HeightMetres = 1.15f,
         Name = "Litre sports bike",
         EngineKey = "sportbike",
@@ -488,6 +511,7 @@ public sealed record VehicleProfile
     /// </summary>
     public static VehicleProfile Charger440 => new()
     {
+        Horn = "electric:trumpet_pair",
         LengthMetres = 5.3f, WidthMetres = 1.95f, HeightMetres = 1.35f,
         // Two tons of Detroit steel with a full interior: a big, well-damped body, not a race shell.
         Body = VehicleBody.Saloon,
@@ -580,6 +604,7 @@ public sealed record VehicleProfile
 
     public static VehicleProfile Hatchback => new()
     {
+        Horn = "electric:disc_single",
         LengthMetres = 4.1f, WidthMetres = 1.75f, HeightMetres = 1.45f,
         Name = "1.6 hatchback",
         EngineKey = "i4_economy",
@@ -662,6 +687,7 @@ public sealed record VehicleProfile
 
     public static VehicleProfile Cruiser => new()
     {
+        Horn = "electric:moto_disc",
         LengthMetres = 2.45f, WidthMetres = 0.95f, HeightMetres = 1.15f,
         // A motorcycle has no body and no cabin: the pipes radiate into open air.
         Body = VehicleBody.OpenWheeler,
@@ -677,6 +703,7 @@ public sealed record VehicleProfile
 
     public static VehicleProfile DirtBike => new()
     {
+        Horn = "electric:moto_disc",
         LengthMetres = 2.2f, WidthMetres = 0.85f, HeightMetres = 1.25f,
         // Likewise, and even less of it.
         Body = VehicleBody.OpenWheeler,
@@ -1017,6 +1044,7 @@ public sealed record VehicleProfile
 
     public static VehicleProfile GrandTourer => new()
     {
+        Horn = "electric:trumpet_pair",
         LengthMetres = 4.9f, WidthMetres = 2.0f, HeightMetres = 1.3f,
         Name = "V12 grand tourer",
         EngineKey = "v12",

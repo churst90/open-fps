@@ -167,6 +167,9 @@ public struct SpatialEmitter
     public int EchoOfEntity;
     public float EchoDelaySeconds;
     public float EchoGain;
+    /// <summary>How rough the surface an echo came off is, 0..1 — how much the renderer smears it.
+    /// See EngineEchoState.Scattering.</summary>
+    public float EchoScattering;
     /// <summary>
     /// When non-zero, this voice is the FRONT OUTLET of that entity's live engine — what the machine
     /// breathes through, and the block behind it — placed at its own point on the machine.

@@ -640,6 +640,11 @@ public partial struct DoorComponent
     /// first time it is looked at, so a door placed anywhere by anything is shut where it was put.</summary>
     public bool Captured { get; set; }
 
+    /// <summary>For a hollow door, the thickness of each of its two skins, metres; zero for a solid
+    /// leaf. A steel door is sheet over a core, and reckoned as a solid slab it weighs tonnes.
+    /// Appended last: components serialise positionally.</summary>
+    public float SkinMetres { get; set; }
+
     public DoorComponent()
     {
         SwingSeconds = 0.9f;

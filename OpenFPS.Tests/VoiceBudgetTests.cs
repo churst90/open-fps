@@ -129,6 +129,28 @@ public class VoiceBudgetTests
     /// noise, and gets a voice again when one frees. Dropping those would be cars falling silent as
     /// they went round the back.
     /// </summary>
+    /// <summary>
+    /// A distant car passing behind buildings goes under the silence floor and back out, again and
+    /// again. It must not be stopped and rebuilt each time: a rebuilt engine is a fresh start, and at
+    /// 300 m one car was rebuilt 45 times in nine minutes — distant traffic heard as stuttering.
+    /// </summary>
+    [Fact]
+    public void AnEngineGoingBehindABuildingIsNotRebuilt()
+    {
+        var mixer = new FakeMixer();
+        var voices = new VoiceManager(mixer, new AudioBank(), maxVoices: 8);
+        var car = Engine(1, new Vector3(300, 0, 0), volume: 0.05f);
+        for (int frame = 0; frame < 40; frame++)
+        {
+            car.Occlusion = (frame / 5) % 2 == 0 ? 0f : 1f;   // in view, behind a tower, in view...
+            voices.Submit(car);
+            voices.Process(Vector3.Zero);
+        }
+        _o.WriteLine($"started {mixer.Started.Count} time(s), stopped {mixer.Stopped.Count}");
+        Assert.Single(mixer.Started);
+        Assert.Empty(mixer.Stopped);
+    }
+
     [Fact]
     public void AnEngineThatDoesNotWinAVoiceKeepsItsPlaceAndComesBack()
     {

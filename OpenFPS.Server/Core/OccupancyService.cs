@@ -60,6 +60,17 @@ public class OccupancyService
         var seatPos = SeatPosition(rootT, seat);
         // The door is in the side of the car beside the seat, at about the height of your hip.
         var centre = seatPos + right * side * 0.75f + new Vector3(0f, 0.55f, 0f);
+        _heard(mapId, root.Id, "car door", CarDoorSounds(centre, forward, 1.3f));
+    }
+
+    /// <summary>
+    /// A car door opening and, <paramref name="closeAfter"/> seconds later, shutting: a steel skin on
+    /// a frame with a rubber seal and a latch. <paramref name="centre"/> is the middle of the door at
+    /// hip height; <paramref name="forward"/> is the way the car points, which is where the hinge is.
+    /// Shared by anybody getting in or out of anything that drives — a player, or a driver parking.
+    /// </summary>
+    internal static List<TransientSound> CarDoorSounds(Vector3 centre, Vector3 forward, float closeAfter)
+    {
         var hinge = centre + forward * 0.5f;
         var latch = centre - forward * 0.5f;
         var steel = AcousticRegistry.GetProperties("Metal");
@@ -72,10 +83,10 @@ public class OccupancyService
         foreach (var s in DoorAcoustics.Closing(steel, latch, centre, width, height, skin, CarDoorKg, closeSpeed, hasSeal: true))
         {
             var t = s.ToTransient();
-            t.DelaySeconds += 1.3f;
+            t.DelaySeconds += closeAfter;
             sounds.Add(t);
         }
-        _heard(mapId, root.Id, "car door", sounds);
+        return sounds;
     }
 
     /// <summary>Where a seat is in the world right now, given where its composite is.</summary>

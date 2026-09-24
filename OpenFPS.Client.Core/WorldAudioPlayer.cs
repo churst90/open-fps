@@ -62,11 +62,23 @@ public sealed class WorldAudioPlayer
     /// them. The same reasoning that moved engine synthesis off the mixer callback applies here: the
     /// thread that must not be blocked is whichever one is holding the clock.
     ///
-    /// The event that discovers a new sound is dropped rather than delayed, because a one-shot belongs
-    /// to a moment and a rendered-too-late clap is a clap in the wrong place. Every one after it — the
-    /// same crowd a second later, the next door of the same kind — finds the buffer waiting.
+    /// The event that discovers a new sound WAITS for it, and is dropped only if the render comes back
+    /// too late to belong to its moment (see MaxRenderLateness): a rendered-too-late clap is a clap in
+    /// the wrong place, but a door latch that took four milliseconds to make is not late at all.
     /// </summary>
     private readonly HashSet<string> _rendering = new();
+
+    /// <summary>Sounds heard for the first time, waiting for the worker to hand back their buffer.</summary>
+    private readonly List<Pending> _awaitingRender = new();
+
+    /// <summary>
+    /// How late a first hearing may play once its buffer is back, seconds.
+    ///
+    /// A door's parts render in a few milliseconds, so they are never late; a stand of three hundred
+    /// people clapping takes about 170 ms and is. Past this the sound is a clap in the wrong place and
+    /// is dropped, which is what the drop was always for — but only for the ones that are actually late.
+    /// </summary>
+    internal const double MaxRenderLateness = 0.12;
     private readonly System.Collections.Concurrent.ConcurrentQueue<(string Id, float[] Pcm)> _rendered = new();
 
     /// <summary>
@@ -104,9 +116,27 @@ public sealed class WorldAudioPlayer
     /// </summary>
     private static readonly bool _trace = Environment.GetEnvironmentVariable("OPENFPS_AUDIO_DEBUG") == "1";
 
+    /// <summary>
+    /// A horn being sounded on a vehicle: the vehicle, which horn, and the rhythm. Not rendered here
+    /// — a horn is played ON its vehicle for as long as it is held, and moves with it — so it is
+    /// handed to whoever voices vehicles. See <see cref="Honk"/>.
+    /// </summary>
+    public Action<int, string, float[]>? HornReceived { get; set; }
+
+    /// <summary>Everything the world reports, before it is played — for whatever else is listening
+    /// (the birds, who go quiet at a bang).</summary>
+    public Action<WorldAudioEvent>? Received { get; set; }
+
     public void Receive(WorldAudioEvent message, double now)
     {
         if (message.Sounds == null) return;
+        Received?.Invoke(message);
+        if (HornReceived != null && message.Sounds.Count == 1
+            && Honk.TryParse(message.Sounds[0].SynthKey, out string horn, out float[] rhythm))
+        {
+            HornReceived(message.SourceEntityId, horn, rhythm);
+            return;
+        }
         if (_trace)
         {
             foreach (var s in message.Sounds)
@@ -127,6 +157,18 @@ public sealed class WorldAudioPlayer
                     int seed = message.Seed;
                     System.Threading.Tasks.Task.Run(() => _rendered.Enqueue((id, RenderOne(toRender, seed))));
                 }
+                // ...but it is not simply let go. It waits for its own buffer and plays if that comes
+                // back in time — see MaxRenderLateness. Dropping every first hearing silenced whatever
+                // is RARE: each sound has four seed variants and each is a first hearing once, so a
+                // door material used a handful of times a session was never heard at all. The city's
+                // seven steel doors were exactly that — "it just says the steel door swings open".
+                _awaitingRender.Add(new Pending
+                {
+                    Sound = sound,
+                    SoundId = id,
+                    SourceEntityId = message.SourceEntityId,
+                    DueAt = now + Math.Max(0f, sound.DelaySeconds),
+                });
                 continue;
             }
             _pending.Add(new Pending
@@ -165,6 +207,18 @@ public sealed class WorldAudioPlayer
                 // The engine is not up yet. Forget it was ever asked for, so the next event asks again.
                 _rendering.Remove(done.Id);
             }
+        }
+
+        // Sounds that were waiting on their first render: in time, they join the queue as if they
+        // had always been there; too late, they belong to a moment that has gone and are dropped.
+        for (int i = _awaitingRender.Count - 1; i >= 0; i--)
+        {
+            var item = _awaitingRender[i];
+            bool ready = _registered.Contains(item.SoundId);
+            bool late = now > item.DueAt + MaxRenderLateness;
+            if (!ready && !late && _rendering.Contains(item.SoundId)) continue;
+            _awaitingRender.RemoveAt(i);
+            if (ready && !late) _pending.Add(item);
         }
 
         if (_pending.Count == 0) return;
@@ -423,7 +477,7 @@ public sealed class WorldAudioPlayer
 
     /// <summary>Forgets everything queued. Called on a map change, where the positions mean nothing
     /// any more and the things that made them are gone.</summary>
-    public void Clear() => _pending.Clear();
+    public void Clear() { _pending.Clear(); _awaitingRender.Clear(); }
 
     /// <summary>
     /// A sound's parameters ARE its identity.

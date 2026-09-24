@@ -145,6 +145,17 @@ public sealed class CrossingSystem
     /// Whether the road at this point is being held. Asked by VehicleSystem for a stop of kind
     /// "crossing", which is the whole of how traffic learns about trains.
     /// </summary>
+    /// <summary>Where this map's crossings are round a rail track, metres.</summary>
+    public IEnumerable<float> PositionsOn(string mapId, string track)
+    {
+        foreach (var c in _crossings)
+        {
+            if (c.MapId != mapId) continue;
+            foreach (var (t, at) in c.OnRail)
+                if (string.Equals(t, track, StringComparison.OrdinalIgnoreCase)) yield return at;
+        }
+    }
+
     public bool IsClosedAt(string mapId, Vector3 where, float withinMetres = OnTrackMetres)
     {
         foreach (var c in _crossings)

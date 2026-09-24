@@ -115,7 +115,7 @@ public sealed class EngineReflections
 
     /// <summary>An echo that stops being found fades for this long before its voice is let go, so a
     /// car passing behind a gap in the wall does not click on the way out.</summary>
-    private const float ReleaseSeconds = 0.5f;
+    private const float ReleaseSeconds = 0.8f;
 
     private readonly List<ReflectingSurface> _surfaces = new();
     /// <summary>The solid boxes the surfaces came from, kept so a mirrored path can be asked whether
@@ -422,6 +422,7 @@ public sealed class EngineReflections
         EchoOfEntity = engineId,
         EchoDelaySeconds = r.DelaySeconds,
         EchoGain = gain,
+        EchoScattering = r.Scattering,
         EngineKey = "",
         Mode = PlaybackMode.LoopOne,
         Type = EmitterType.WorldLocked,
