@@ -721,7 +721,22 @@ public class FmodAudioProvider : IAudioProvider
     /// </summary>
     private readonly List<System.Runtime.InteropServices.GCHandle> _retiredHandles = new();
     private readonly List<SaVoice> _saAllVoices = new();
-    private const int SaPoolSize = 96;
+    /// <summary>
+    /// How many binaural voices exist. Idle ones cost memory only; the HRTF runs for a voice that
+    /// is playing. At 96 the city ran the pool dry — every region's reverb return holds one for the
+    /// life of its bus, and every echo takes one — and whatever started after that was placed by
+    /// FMOD's amplitude panner: level between the ears but no time difference, heard beside HRTF
+    /// voices as a sound inside the head or above it. The newest arrival is the car coming past you,
+    /// so it was always the CLOSE ones: "anything that passes close to me is inverted".
+    /// </summary>
+    private const int SaPoolSize = 160;
+
+    /// <summary>
+    /// Binaural voices only a direct sound may take. An echo or a reverb return that finds the pool
+    /// this low goes without: a wash placed a little less precisely is not heard as wrong, and a car
+    /// going past you with no interaural time difference is.
+    /// </summary>
+    private const int SaDirectReserve = 24;
 
     /// <summary>What is left of the binaural pool. See IAudioProvider.SpatialVoicesFree.</summary>
     public int SpatialVoicesFree { get { lock (_saPool) return _saPool.Count; } }
@@ -1046,13 +1061,14 @@ public class FmodAudioProvider : IAudioProvider
 
     /// <summary>Borrows a voice from the pool (no allocation). Returns false when the pool is empty —
     /// that sound then plays without HRTF rather than crashing.</summary>
-    private bool TryCreateSteamAudioVoice(out SteamAudioVoiceState? state, out FMOD.DSP dsp, out System.Runtime.InteropServices.GCHandle handle)
+    private bool TryCreateSteamAudioVoice(out SteamAudioVoiceState? state, out FMOD.DSP dsp, out System.Runtime.InteropServices.GCHandle handle,
+                                          int leave = 0)
     {
         state = null; dsp = default; handle = default;
         SaVoice v;
         lock (_saPool)
         {
-            if (_saPool.Count == 0) return false;
+            if (_saPool.Count <= leave) return false;
             v = _saPool.Pop();
         }
         // Reset transient state. Crucially, clear the binaural effect's internal overlap-add buffers:
@@ -1645,7 +1661,7 @@ public class FmodAudioProvider : IAudioProvider
         // end, so it binauralizes the finished reverb tail rather than the dry input — and is bypassed
         // while inside the room (reverb then fills the space as 2D stereo). The bus is switched to 2D so
         // FMOD doesn't also collapse the binaural pair. Voice is held for the bus lifetime.
-        if (_steamAudioEnabled && TryCreateSteamAudioVoice(out var rvState, out var rvDsp, out var rvHandle))
+        if (_steamAudioEnabled && TryCreateSteamAudioVoice(out var rvState, out var rvDsp, out var rvHandle, SaDirectReserve))
         {
             bus.getMode(out MODE bm);
             bus.setMode((bm & ~(MODE._3D | Rolloff.Either)) | MODE._2D);
@@ -2230,7 +2246,8 @@ public class FmodAudioProvider : IAudioProvider
                 diffractionDsp = GetDiffractionDsp();
                 channel.addDSP(CHANNELCONTROL_DSP_INDEX.TAIL, diffractionDsp);
             }
-            if (_steamAudioEnabled && TryCreateSteamAudioVoice(out saState, out saDsp, out saHandle))
+            if (_steamAudioEnabled && TryCreateSteamAudioVoice(out saState, out saDsp, out saHandle,
+                                                               emitter.IsReflection ? SaDirectReserve : 0))
             {
                 // Steam Audio binaural sits last in the chain (after occlusion EQ + diffraction),
                 // turning the filtered mono into an HRTF stereo pair.
@@ -2256,7 +2273,8 @@ public class FmodAudioProvider : IAudioProvider
                 // worse the more honest the range is. The HRTF path applies min/distance by hand in
                 // ApplyAcousticFilters; INVERSE is that same law, so the two agree and a voice that
                 // misses the pool is quieter and further away rather than louder and nearer.
-                _saPoolMisses++;
+                // Counted for DIRECT sounds only: an echo refused by the reserve is the policy working.
+                if (!emitter.IsReflection) _saPoolMisses++;
                 channel.getMode(out MODE fallbackMode);
                 channel.setMode((fallbackMode & ~Rolloff.Either) | MODE._3D | MODE._3D_INVERSEROLLOFF);
                 channel.set3DLevel(1.0f);
@@ -2747,7 +2765,7 @@ public class FmodAudioProvider : IAudioProvider
         }
 
         int noHrtf = 0;
-        foreach (var a in _activeSounds) if (a.SaState == null && a.Channel.hasHandle()) noHrtf++;
+        foreach (var a in _activeSounds) if (a.SaState == null && !a.IsReflection && a.Channel.hasHandle()) noHrtf++;
 
         int starves = EngineVoiceState.GlobalStarves;
         int gen2 = GC.CollectionCount(2);
@@ -2755,11 +2773,11 @@ public class FmodAudioProvider : IAudioProvider
         _system.getChannelsPlaying(out int playing, out int real);
         Log.Information("Mixer load: dsp {Dsp:F1}%, update {Update:F1}%, stream {Stream:F1}% — "
                       + "{Engines} engine/echo voice(s) of {Total} active, {Real}/{Playing} real channel(s), "
-                      + "{NoHrtf} without HRTF ({Misses} new since last), {Starve} starve(s), "
+                      + "{NoHrtf} direct voice(s) without HRTF ({Misses} new since last, {SaFree} binaural free), {Starve} starve(s), "
                       + "gc {Gen2} gen2 / {Pause:F0} ms paused, {Late} DSP(s) cut loose after their channel went, {Detach} stuck, "
                       + "{WrongBus} send drop(s) on the wrong bus",
                         cpu.dsp, cpu.update, cpu.stream, voices, _activeSounds.Count, real, playing,
-                        noHrtf, _saPoolMisses - _lastSaPoolMisses,
+                        noHrtf, _saPoolMisses - _lastSaPoolMisses, SpatialVoicesFree,
                         starves - _lastStarves, gen2 - _lastGen2, pauseMs - _lastPauseMs,
                         _lateDetaches - _lastLateDetaches, _failedDetaches - _lastFailedDetaches,
                         _sendDropsOnWrongBus);

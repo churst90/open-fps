@@ -220,7 +220,9 @@ public class ClientAudioSystem
     /// the FIRST thing given up when the mixer runs short, before reflections: a second outlet is the
     /// most expendable voice in the world, because the machine is still fully audible without it.
     /// </summary>
-    private const int FrontVoiceBudget = 6;
+    /// <remarks>OPENFPS_FRONT_VOICES=0 keeps every machine on one voice, for an A/B of the split.</remarks>
+    private static readonly int FrontVoiceBudget =
+        int.TryParse(Environment.GetEnvironmentVariable("OPENFPS_FRONT_VOICES"), out int fv) && fv >= 0 ? fv : 6;
     private int _adaptiveFront = FrontVoiceBudget;
 
     /// <summary>Which machines currently have their front outlet on a voice of its own.</summary>

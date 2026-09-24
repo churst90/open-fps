@@ -16,6 +16,7 @@
 #   ./run-gtk-client.sh quiet      both of the above off — the conservative, listenable session
 #   ./run-gtk-client.sh bare       EVERYTHING switchable off — is it the old engine or the new work?
 #   ./run-gtk-client.sh nohrtf     just the Steam Audio binaural stage off
+#   ./run-gtk-client.sh nosplit    every machine on one voice close up (no front outlet), mix captured
 #
 # `on` and `off` are the two halves of one A/B: walk the same route twice and the two logs sit side by
 # side afterwards, which is why each names its own file instead of overwriting one. The trace is opt-in
@@ -94,6 +95,14 @@ if [ $# -gt 0 ]; then
       export OPENFPS_AUDIO_DEBUG=1 OPENFPS_MACHINE_VOICES=0 OPENFPS_ENGINE_ECHOES=0 \
              OPENFPS_STEAMAUDIO_SIM=0 OPENFPS_HRTF=0
       LOG=/tmp/openfps-bare.log
+      shift ;;
+    nosplit)
+      # Every machine on ONE voice at every distance: no separate front outlet close up. The A/B for
+      # "things that pass close sound inside out, a little further away they are fine". Captures the
+      # mix too, so the pass can be measured afterwards.
+      MODE="front/rear split OFF (OPENFPS_FRONT_VOICES=0), mix captured to /tmp/openfps-capture-nosplit.wav"
+      export OPENFPS_FRONT_VOICES=0 OPENFPS_AUDIO_CAPTURE=/tmp/openfps-capture-nosplit.wav
+      LOG=/tmp/openfps-nosplit.log
       shift ;;
     nohrtf)
       # Just the binaural stage out, everything else as normal. The single-variable version of the

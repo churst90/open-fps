@@ -481,6 +481,7 @@ public sealed class EngineVoiceState : IRenderedVoice
             catch (Exception ex) { Serilog.Log.Warning("Vehicle '{Name}': air system '{Air}' — {Err}", v.Name, v.AirSystem, ex.Message); }
         }
         _bayLeak = Math.Clamp(v.EngineBayLeakage, 0f, 1f);
+        _bayIntake = new EchoDiffuser(BayScattering, seed + 71, sampleRate);
         if (!string.IsNullOrEmpty(v.AirSystem) && v.DoorChime)
         {
             _chime = OpenFPS.Common.DoorChimeSpec.TransitBus;
@@ -595,6 +596,18 @@ public sealed class EngineVoiceState : IRenderedVoice
     private readonly OpenFPS.Client.AudioEngine.Core.Aircraft.BladeRow? _fan;
     private readonly float _fanRatio;
     private float _bayLeak;
+    /// <summary>
+    /// The intake as it leaves through the bay: the same noise as at the grille, but not the same
+    /// waveform. What reaches the bay openings is the airbox and ducting heard off the block, the
+    /// bulkheads and the underside of the bonnet — scattered, a few milliseconds of paths. Written
+    /// raw, it was the intake's own samples at the tailpipe end as well as at the grille, and close
+    /// up, where the two ends are separate voices metres apart, one waveform from two places combs
+    /// against itself: a bus's hiss heard "inside out" as it passed. The tyres had the same fault.
+    /// </summary>
+    private readonly EchoDiffuser _bayIntake;
+    /// <summary>How rough the bay is to the intake noise: a cluttered cavity, about brick
+    /// (EchoDiffuser's scale; roughly six milliseconds of smear).</summary>
+    private const float BayScattering = 0.5f;
 
     /// <summary>
     /// What escapes the engine bay, 0..1 — normally the vehicle's own
@@ -825,7 +838,7 @@ public sealed class EngineVoiceState : IRenderedVoice
             // as working and heard as nothing.
             pa += _body.Process(Engine.Exhaust) * BodyMix;
             // What escapes the engine bay. Zero for a car; see VehicleProfile.EngineBayLeakage.
-            if (_bayLeak > 0f) pa += (Engine.Block + 0.5f * Engine.Intake) * _bayLeak;
+            if (_bayLeak > 0f) pa += (Engine.Block + 0.5f * _bayIntake.Process(Engine.Intake)) * _bayLeak;
             float airOut = 0f, chimeOut = 0f;
             if (_air != null)
             {
