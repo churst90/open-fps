@@ -129,20 +129,30 @@ def portal(x, y, z, a, b, aperture):
     })
 
 
-def door(x, y0, z, a, b, facing_z=True, prefab="door"):
+def door(x, y0, z, a, b, facing_z=True, prefab="door", opening=None):
     """A leaf in a doorway, joining two named places.
 
     A door is ALREADY a portal — PrefabRepository attaches one to anything with IsDoor — so a doorway
     needs a door and NOT a door plus a portal beside it.
+
+    `opening` is the width of the gap in the wall, when it is not the leaf's own. The leaf is made
+    to cover it and lap each jamb by DOOR_LAP: a leaf narrower than its opening leaves a slot you can
+    walk round shut, which is what 71 doors on this map did until they were refitted on 2026-09-23.
     """
     bx, by, bz = BASE[prefab]
-    entities.append({
+    e = {
         "EntityId": new_id(),
         "PrefabId": prefab,
         "Position": v3(x, y0 + by / 2, z),
         "Rotation": yaw(0.0) if facing_z else yaw(math.pi / 2),
         "RegionAId": a, "RegionBId": b,
-    })
+    }
+    if opening is not None:
+        e["Scale"] = v3(round((opening + 2 * DOOR_LAP) / bx, 4), 1, 1)
+    entities.append(e)
+
+
+DOOR_LAP = 0.05                          # how far a leaf overlaps each jamb, m
 
 
 # ══ Dimensions ════════════════════════════════════════════════════════════════════════════════════
@@ -196,6 +206,7 @@ RAIL_X_E, RAIL_X_W = 178.0, -466.0
 # more than twice what a railway can climb; north of the portal it crosses on the flat, which is a
 # LEVEL CROSSING — a better thing to have on the map than a bridge anyway.
 RAIL_Z_N, RAIL_Z_S = 452.0, -180.0
+SG_X0, SG_X1, SG_Z0, SG_Z1 = -160.0, -40.0, -260.0, -120.0     # Southgate's square of streets
 RAIL_CORNER = 26.0                       # radius of the four corners, m
 
 # ── The airport ───────────────────────────────────────────────────────────────────────────────────
@@ -462,7 +473,8 @@ def tower(label, x0, x1, z0, z1, storeys, street_side, ac_floors):
             # It was `facing_z=vertical`, which stood every tower's entrance at right angles to its
             # own facade — shut, the doorway was open round it; opened, the leaf swung across it.
             # city.json's doors were re-fitted to their openings on 2026-09-23 (turned and sized).
-            door(ex, 0.02, ez, stair_id, -1, facing_z=not vertical, prefab="steel_door")
+            door(ex, 0.02, ez, stair_id, -1, facing_z=not vertical, prefab="steel_door",
+                 opening=entrance[1] - entrance[0])
 
         # ── The air conditioners ───────────────────────────────────────────────────────────────
         #
@@ -683,9 +695,12 @@ for i, p in enumerate(RAIL):
     entities[-1] = {k: v for k, v in entities[-1].items() if v is not None}
     for rail_off in (-0.72, 0.72):
         ox, oz = math.cos(ang) * rail_off, -math.sin(ang) * rail_off
-        mbx, mby, mbz = BASE["metal_wall"]
+        # A rail stops a foot, not a wave: typed as the palisade, which is solid to a body and
+        # nearly transparent to sound. As sheet steel, 200 of them silenced every vehicle beyond
+        # the embankment (a-fence-is-not-a-wall, 2026-09-22).
+        mbx, mby, mbz = BASE["fence_palisade"]
         entities.append({
-            "EntityId": new_id(), "PrefabId": "metal_wall",
+            "EntityId": new_id(), "PrefabId": "fence_palisade",
             "Position": v3(mx + ox, 0.78, mz + oz), "Rotation": yaw(ang),
             "Scale": v3(0.14 / mbx, 0.16 / mby, (seg + 0.6) / mbz),
         })
@@ -804,7 +819,7 @@ for k in range(3):
     term_ids.append(region(f"Terminal concourse, {['south', 'middle', 'north'][k]} end",
                            TERM_X0 + 0.4, TERM_X1 - 0.06, 0.08, TERM_H, a, b))
 for dz, rid in zip(TERM_DOORS, (term_ids[0], term_ids[1])):
-    door(TERM_X1 - 0.03, 0.08, dz, rid, -1, facing_z=False, prefab="door")   # the wall runs along z
+    door(TERM_X1 - 0.03, 0.08, dz, rid, -1, facing_z=False, prefab="door", opening=2.2)   # the wall runs along z
 # ...and a way in from the road side.
 door(TERM_X0 + 0.2, 0.08, 62.0, term_ids[1], -1, facing_z=False, prefab="steel_door")
 
@@ -908,7 +923,7 @@ def house(label, cx, cz, facing, two_storey=False):
     box("plaster_wall", x0 + 0.25, x1 - 0.25, h - 0.06, h, zlo + 0.25, zhi - 0.25)
 
     hid = region(label, x0 + 0.25, x1 - 0.25, 0.08, h, zlo + 0.25, zhi - 0.25)
-    door(cx, 0.04, (front_z0 + front_z1) / 2, hid, -1, facing_z=True, prefab="door")
+    door(cx, 0.04, (front_z0 + front_z1) / 2, hid, -1, facing_z=True, prefab="door", opening=1.3)
     # The back door, which is how you get to the garden without going round.
     door(cx - 2.4, 0.04, (back_z0 + back_z1) / 2, hid, -1, facing_z=True, prefab="door")
 
@@ -981,6 +996,9 @@ for idx in (2, 9, 17, 26, 34, 41):
 # is a shuttle like the push mowers, not a prop: a mower standing still is not mowing, and a prop
 # never moves. The run keeps between the avenue's hedges (x 138) and the rail fence (x 177).
 box("grass_floor", 120.0, 190.0, 0.0, 0.09, 60.0, 122.0, name="Airport verge")
+# The id the verge mower PROP had (6508) before it became a shuttle. The shipped map deleted it
+# without renumbering, so it is spent here too and every id after it matches city.json.
+new_id()
 
 # ══ Street trees ══════════════════════════════════════════════════════════════════════════════════
 #
@@ -1138,7 +1156,70 @@ TRACKS = [
      "Waypoints": [v3(*p) for p in loop([(RES_LANES[0], RES_STREETS[0]), (RES_LANES[1], RES_STREETS[0]),
                                          (RES_LANES[1], RES_STREETS[-1]), (RES_LANES[0], RES_STREETS[-1])],
                                         corner=8.0)]},
+    # Southgate: a square of streets south of downtown that crosses the railway twice, at the two
+    # level crossings. Square corners, points about nine metres apart.
+    {"Id": "southgate", "WidthMetres": CARRIAGEWAY, "BankingDegrees": 0.0,
+     "Waypoints": [v3(x, 0.15, z) for x, z in
+                   [(SG_X0, SG_Z1 - (SG_Z1 - SG_Z0) * k / 16) for k in range(16)]
+                   + [(SG_X0 + (SG_X1 - SG_X0) * k / 14, SG_Z0) for k in range(14)]
+                   + [(SG_X1, SG_Z0 + (SG_Z1 - SG_Z0) * k / 16) for k in range(16)]
+                   + [(SG_X1 - (SG_X1 - SG_X0) * k / 14, SG_Z1) for k in range(14)]]},
 ]
+
+
+def lap_metres(track):
+    w = [(p["X"], p["Z"]) for p in track["Waypoints"]]
+    return sum(math.dist(w[i], w[(i + 1) % len(w)]) for i in range(len(w)))
+
+
+def metres_to(track, x, z):
+    """How far round a track, from its first waypoint, the point nearest (x, z) is."""
+    w = [(p["X"], p["Z"]) for p in track["Waypoints"]]
+    best, along, at = None, 0.0, 0.0
+    for i in range(len(w)):
+        a, b = w[i], w[(i + 1) % len(w)]
+        seg = math.dist(a, b)
+        t = max(0.0, min(1.0, ((x - a[0]) * (b[0] - a[0]) + (z - a[1]) * (b[1] - a[1])) / (seg * seg)))
+        d = math.dist((x, z), (a[0] + t * (b[0] - a[0]), a[1] + t * (b[1] - a[1])))
+        if best is None or d < best:
+            best, at = d, along + t * seg
+        along += seg
+    return at
+
+
+# ── Where things stop ─────────────────────────────────────────────────────────────────────────────
+#
+# Read by VehicleSystem (MapRepository's TrackStop). A bus stops at bus stops (ForPreset: a vehicle
+# whose preset contains "bus"); everything stops at a give-way; a train at a platform; a car at a
+# level crossing only while the crossing is closed. Bus stops sit a third of the way along each side
+# of a loop, the give-ways at two of its corners, as fractions of the lap.
+BUS_STOP_DWELL, GIVE_WAY_DWELL = 16.0, 3.5
+for t in TRACKS:
+    if t["Id"] in ("downtown_cw", "downtown_ccw", "north_block"):
+        lap = lap_metres(t)
+        stops = [(0.0875, "bus_stop"), (0.3375, "bus_stop"), (0.4, "give_way"),
+                 (0.5875, "bus_stop"), (0.8375, "bus_stop"), (0.9, "give_way")]
+        t["Stops"] = [dict({"AtMetres": round(f * lap, 1),
+                            "DwellSeconds": BUS_STOP_DWELL if kind == "bus_stop" else GIVE_WAY_DWELL,
+                            "Kind": kind}, **({"ForPreset": "bus"} if kind == "bus_stop" else {}))
+                      for f, kind in stops]
+    elif t["Id"] == "rail_loop":
+        t["Stops"] = [{"AtMetres": 400.0, "DwellSeconds": 26.0, "Kind": "platform"},
+                      {"AtMetres": 1200.0, "DwellSeconds": 26.0, "Kind": "platform"}]
+    elif t["Id"] == "southgate":
+        # Twelve metres short of each crossing, which is where a car waits for the barrier.
+        t["Stops"] = [{"AtMetres": round(metres_to(t, cx, RAIL_Z_S) - 12.0, 1), "DwellSeconds": 3.0,
+                       "Kind": "crossing"} for cx in (SG_X0, SG_X1)]
+
+# The two level crossings, where Southgate's streets cross the railway's south side.
+CROSSINGS = [
+    {"Name": f"Southgate {side} crossing", "Position": v3(cx, 0.95, RAIL_Z_S),
+     "WarningSeconds": 20.0, "ClearMetres": 35.0, "Bell": "crossing_gong"}
+    for side, cx in (("west", SG_X0), ("east", SG_X1))
+]
+
+# Mean seconds between events, map-wide; 0 is off. See MapData.StreetLife.
+STREET_LIFE = {"HornEverySeconds": 15, "HardBrakeEverySeconds": 60, "ParkEverySeconds": 90}
 
 # ── The field ─────────────────────────────────────────────────────────────────────────────────────
 #
@@ -1233,9 +1314,11 @@ CITY = [
     ("Sedan",        "v6",              50.0, 0.47, 1.8, "car"),    #  98
     ("Pickup",       "diesel_i4",       46.0, 0.40, 1.8, "van"),    #  88
     ("Box truck",    "diesel_truck",    38.0, 0.30, 1.8, "truck"),  #  93
-    ("Muscle car",   "v8_muscle",       58.0, 0.55, 1.8, "car"),    # 122 — one of them, on purpose
-    ("Police car",   "police_v8",       62.0, 0.60, 1.8, "car"),    # 132 — one of them, on purpose
-    ("Motorcycle",   "vtwin",           56.0, 0.60, 3.4, "bike"),   # 121 — one of them, on purpose
+    # The loud three, now road machines: a Charger on the street, the road interceptor rather
+    # than the 132 dB pace car (the-police-car-was-a-pace-car), a twin on slip-ons.
+    ("Muscle car",   "charger440",      58.0, 0.55, 1.8, "car"),
+    ("Police car",   "police_interceptor", 62.0, 0.60, 1.8, "car"),
+    ("Motorcycle",   "vtwin_slipon",    56.0, 0.60, 3.4, "bike"),
 ]
 for i, (nm, preset, top, g, lane, kind) in enumerate(CITY):
     VEHICLES.append(car(f"{nm} {i + 1}", preset, "downtown_cw", top, g, lane, i * 96.0, grip=kind))
@@ -1264,12 +1347,12 @@ for idx, gx, gz in MOWER_RUNS:
         "WaitSeconds": 1.5, "StartDelaySeconds": (idx % 7) * 2.0,
     })
 
-VEHICLES.append({
+VERGE_MOWER = {
     "Name": "Verge mower", "Preset": "mower_riding",
     "RoadStart": v3(156.0, 0.62, 66.0), "RoadEnd": v3(156.0, 0.62, 116.0),
     "SpeedsKmh": [7.0, 6.5], "AccelerationMps2": 0.8, "BrakingMps2": 1.2,
     "WaitSeconds": 2.0, "StartDelaySeconds": 3.0,
-})
+}
 
 # ── Parked cars you can get into ──────────────────────────────────────────────────────────────────
 #
@@ -1391,6 +1474,26 @@ AIR = [
 ]
 VEHICLES.extend(AIR)
 
+# ── More police and motorcycles, and Southgate's traffic ──────────────────────────────────────────
+#
+# Added to the shipped map by hand on 2026-09-22 and 2026-09-24 and brought back here. Southgate's six
+# are declared with car grip whatever they are, as they were shipped.
+VEHICLES += [
+    car("Police car 14", "police_interceptor", "downtown_ccw", 62.0, 0.60, 1.8, 240.0),
+    car("Police car 22", "police_interceptor", "north_block", 62.0, 0.60, 1.8, 96.0),
+    car("Motorcycle, stock twin", "vtwin_stock", "downtown_ccw", 56.0, 0.60, 3.4, 512.0, grip="bike"),
+    car("Motorcycle, slip-ons", "vtwin_slipon", "north_block", 56.0, 0.60, 3.4, 300.0, grip="bike"),
+    car("Motorcycle 31", "vtwin_slipon", "downtown_cw", 56.0, 0.60, 3.4, 120.0, grip="bike"),
+    car("Motorcycle 32", "vtwin_stock", "downtown_ccw", 56.0, 0.60, 3.4, 640.0, grip="bike"),
+    car("Motorcycle 33", "vtwin_slipon", "downtown_cw", 56.0, 0.60, 3.4, 560.0, grip="bike"),
+    car("Motorcycle 34", "vtwin_slipon", "north_block", 56.0, 0.60, 3.4, 180.0, grip="bike"),
+]
+for nm, preset, start in (("van", "diesel_i4", 0.0), ("saloon", "v6", 130.0), ("hatch", "i4_economy", 260.0),
+                          ("bus", "school_bus_na", 390.0), ("bike", "vtwin_slipon", 190.0),
+                          ("truck", "diesel_truck", 70.0)):
+    VEHICLES.append(car(f"Southgate {nm}", preset, "southgate", 48.0, 0.48, 1.8, start))
+VEHICLES.append(VERGE_MOWER)
+
 map_data = {
     "Id": "city",
     "IsDefault": False,
@@ -1423,10 +1526,12 @@ map_data = {
     "VoxelResolution": 1.0,
     "OcclusionFloor": 0.1,
     "Tracks": TRACKS,
+    "StreetLife": STREET_LIFE,
     "Vehicles": VEHICLES,
     "Trains": TRAINS,
-    "Composites": PARKED,
     "Entities": entities,
+    "Crossings": CROSSINGS,
+    "Composites": PARKED,
 }
 
 with open(OUT, "w") as f:
