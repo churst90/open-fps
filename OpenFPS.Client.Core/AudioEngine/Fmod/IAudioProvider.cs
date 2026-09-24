@@ -135,6 +135,8 @@ public interface IAudioProvider : IDisposable
     /// <summary>Plays a short interface sound in both ears, not in the world: no position, no room.
     /// The buffer is made once per id and kept; <paramref name="volume"/> is 0..1.</summary>
     void PlayUiSound(string id, Func<float[]> render, int sampleRate, float volume);
+    /// <summary>The voices reaching the listener loudest, most first. Diagnostic.</summary>
+    IReadOnlyList<VoiceLevel> LoudestVoices(int count);
     /// <summary>The output devices the system offers, by name, in driver order.</summary>
     IReadOnlyList<string> OutputDevices();
     /// <summary>The recording devices the system offers, by name.</summary>
@@ -148,3 +150,9 @@ public interface IAudioProvider : IDisposable
     void SetDiagnosticPosition(Vector3 position);
     void StopDiagnosticSound();
 }
+
+/// <summary>One voice as it reaches the listener: the volume last applied (dB, before the band EQ, times
+/// the strongest band), how much is blocked, the band gains, and whether it is a reflection or arriving
+/// from somewhere other than its source (round an edge).</summary>
+public readonly record struct VoiceLevel(int EntityId, string SoundId, float Distance, float Db, float Occlusion,
+                                         float Low, float Mid, float High, bool Reflection, bool Redirected);

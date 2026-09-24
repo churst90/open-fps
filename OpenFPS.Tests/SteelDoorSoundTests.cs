@@ -159,6 +159,7 @@ public class SteelDoorSoundTests
         public bool RegisterSynthesisedSound(string soundId, byte[] pcm16Mono, int sampleRate) => true;
         public readonly List<string> UiSounds = new();
         public void PlayUiSound(string id, Func<float[]> render, int sampleRate, float volume) { render(); UiSounds.Add(id); }
+        public IReadOnlyList<VoiceLevel> LoudestVoices(int count) => Array.Empty<VoiceLevel>();
         public IReadOnlyList<string> OutputDevices() => new[] { "Test output" };
         public IReadOnlyList<string> InputDevices() => new[] { "Test input" };
         public bool SetOutputDevice(string name) => true;

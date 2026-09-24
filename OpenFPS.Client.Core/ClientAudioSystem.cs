@@ -1412,6 +1412,19 @@ public class ClientAudioSystem
                                 id, _carPreset.GetValueOrDefault(id, "?"), MathF.Sqrt(_censusOrder[i].D2),
                                 told * 3.6f, own * 3.6f, rpm, gear);
             }
+
+            // What actually reaches you loudest, and by which route: the answer to "why can I still
+            // hear that bus two streets over". dB is the volume the mixer was given (0 = full scale)
+            // times the strongest band the occlusion EQ passes; "blocked" is the occlusion, the three
+            // numbers after it the low/mid/high band gains, and "round an edge" means the bearing has
+            // been moved to where the sound bends round something.
+            foreach (var v in _audio.LoudestVoices(5))
+            {
+                string name = _carPreset.TryGetValue(v.EntityId, out var preset) ? preset : v.SoundId;
+                Log.Information("  loudest: {Name} ({Id}) at {Dist:F0} m: {Db:F1} dB, blocked {Occ:P0}, bands {Low:F2}/{Mid:F2}/{High:F2}{Refl}{Edge}",
+                                name, v.EntityId, v.Distance, v.Db, v.Occlusion, v.Low, v.Mid, v.High,
+                                v.Reflection ? ", a reflection" : "", v.Redirected ? ", round an edge" : "");
+            }
         }
     }
 

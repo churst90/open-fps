@@ -513,6 +513,9 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
         if (_isInitialized) _provider.PlayVoice(senderId, position, pcmData);
     }
 
+    public IReadOnlyList<VoiceLevel> LoudestVoices(int count) =>
+        _isInitialized ? _provider.LoudestVoices(count) : Array.Empty<VoiceLevel>();
+
     public IReadOnlyList<string> OutputDevices() => _isInitialized ? _provider.OutputDevices() : Array.Empty<string>();
     public IReadOnlyList<string> InputDevices() => _isInitialized ? _provider.InputDevices() : Array.Empty<string>();
     public bool SetOutputDevice(string name) => _isInitialized && _provider.SetOutputDevice(name);

@@ -503,6 +503,8 @@ public class FmodAudioProvider : IAudioProvider
         public float Pitch;
         
         public float CurrentOcclusion;
+        /// <summary>The volume last handed to the channel, before the band EQ. For the census.</summary>
+        public float LastVolume;
         public float TargetOcclusion;
         public float CurrentAperture = 1.0f;
         public float TargetAperture = 1.0f;
@@ -3352,8 +3354,9 @@ public class FmodAudioProvider : IAudioProvider
         float fadeStep = dt / VoiceFadeSeconds;
         active.FadeGain += Math.Clamp(active.FadeTarget - active.FadeGain, -fadeStep, fadeStep);
 
-        active.Channel.setVolume(active.BaseVolume * finalVolFactor * roomGainBonus * distAtten * coneAtten
-                                 * active.FadeGain);
+        active.LastVolume = active.BaseVolume * finalVolFactor * roomGainBonus * distAtten * coneAtten
+                            * active.FadeGain;
+        active.Channel.setVolume(active.LastVolume);
 
         // Doppler: Steam Audio voices play on a 2D channel, so FMOD's own Doppler is bypassed — apply it
         // manually to the channel pitch from the real (not apparent) source/listener motion. Native-3D
@@ -4104,6 +4107,29 @@ public class FmodAudioProvider : IAudioProvider
     /// playing it, so a sound created, played and released at once is cut off almost before it
     /// starts. These are never released until shutdown.</summary>
     private readonly Dictionary<string, FMOD.Sound> _uiSounds = new();
+
+    /// <summary>
+    /// The voices reaching the listener loudest, by the volume last applied times the strongest band
+    /// the EQ lets through. Diagnostic: "why can I still hear that" needs the route and the numbers.
+    /// </summary>
+    public IReadOnlyList<VoiceLevel> LoudestVoices(int count)
+    {
+        var all = new List<VoiceLevel>();
+        lock (_lock)
+        {
+            foreach (var a in _activeSounds)
+            {
+                if (!a.Channel.hasHandle() || a.LastVolume <= 0f) continue;
+                float band = MathF.Max(a.CurrentLow, MathF.Max(a.CurrentMid, a.CurrentHigh));
+                float db = 20f * MathF.Log10(MathF.Max(1e-9f, a.LastVolume * band));
+                all.Add(new VoiceLevel(a.EntityId, a.SoundId, Vector3.Distance(_listenerPos, a.Position), db,
+                                       a.CurrentOcclusion, a.CurrentLow, a.CurrentMid, a.CurrentHigh,
+                                       a.IsReflection, Vector3.Distance(a.Position, a.CurrentApparentPosition) > 1f));
+            }
+        }
+        all.Sort(static (x, y) => y.Db.CompareTo(x.Db));
+        return all.Count > count ? all.GetRange(0, count) : all;
+    }
 
     public IReadOnlyList<string> OutputDevices()
     {
