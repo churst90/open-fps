@@ -246,7 +246,7 @@ public abstract class PhysicalVoiceState : IRenderedVoice
             float y = StepSynth() * gain * _envelope;
             // The soft ceiling the physics needs: a blade hitting something, or a compressor stall,
             // can spike past any fixed reference, and a step at full scale is a click.
-            _ring[(int)(w & mask)] = y > 0.8f || y < -0.8f ? MathF.Tanh(y) : y;
+            _ring[(int)(w & mask)] = SoftCeiling.Apply(y);
             w++;
         }
         Volatile.Write(ref _written, w);

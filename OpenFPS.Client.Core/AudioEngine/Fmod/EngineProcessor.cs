@@ -275,7 +275,7 @@ public sealed class EngineVoiceState : IRenderedVoice
     /// <summary>The soft ceiling the physics needs: a backfire can spike past any fixed reference,
     /// and a step at full scale is a click. Applied where the taps are summed, once.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static float Soft(float y) => y > 0.8f || y < -0.8f ? MathF.Tanh(y) : y;
+    private static float Soft(float y) => SoftCeiling.Apply(y);
 
     /// <summary>How much of the front tap this voice is still carrying, 0..1. Consumer-side.</summary>
     private float _frontShare = 1f;
@@ -902,6 +902,39 @@ public sealed class EngineVoiceState : IRenderedVoice
 /// flat in level and wandering in phase, spread over a time that grows with the roughness. See
 /// <see cref="EngineEchoState.Scattering"/> for why an echo needs one.
 /// </summary>
+/// <summary>
+/// The soft ceiling on a synthesized voice: untouched up to the knee, then bent smoothly towards a
+/// ceiling it never reaches.
+///
+/// It used to be tanh(y) past ±0.8 and y below it, which is not continuous: just under the knee it
+/// gave 0.8 and just over it tanh(0.8) = 0.664, so every backfire and overrun pop crossing the knee
+/// put a one-sample step of 0.14 into the output — a click, twice per pop. This joins the straight
+/// line at the knee with the same value and the same slope.
+///
+/// The ceiling sits two decibels above full scale. A unit sample is still the declared level plus
+/// <see cref="OpenFPS.Common.VehicleProfile.PeakHeadroomDb"/>, so nothing is placed any louder; the
+/// extra room is for the peakiest pulse in the fleet — a 450 single's blowdown, 1.6 dB over full
+/// scale at its 99.9th percentile — to be rounded rather than squared. The mix runs in floating
+/// point and ends in the master limiter, so a sample a little over 1.0 is safe.
+/// </summary>
+public static class SoftCeiling
+{
+    public const float Knee = 0.8f;
+    /// <summary>The ceiling above full scale, dB.</summary>
+    public const float CeilingDb = 2f;
+    public static readonly float Ceiling = MathF.Pow(10f, CeilingDb / 20f);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static float Apply(float y)
+    {
+        float a = MathF.Abs(y);
+        if (a <= Knee) return y;
+        float room = Ceiling - Knee;
+        float bent = Knee + room * MathF.Tanh((a - Knee) / room);
+        return y < 0f ? -bent : bent;
+    }
+}
+
 public sealed class EchoDiffuser
 {
     private readonly float[][] _lines;

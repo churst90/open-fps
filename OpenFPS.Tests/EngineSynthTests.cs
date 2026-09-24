@@ -231,6 +231,28 @@ public class EngineSynthTests
     }
 
     /// <summary>
+    /// The soft ceiling bends, it does not jump. It used to be tanh past ±0.8 and straight below,
+    /// which stepped from 0.8 to 0.664 at the knee — a click on both edges of every backfire. Swept
+    /// finely from -3 to +3, no step between neighbouring inputs is bigger than the input step, the
+    /// output never goes backwards, and it never reaches its ceiling.
+    /// </summary>
+    [Fact]
+    public void TheSoftCeilingIsContinuousAndMonotonic()
+    {
+        const float step = 1e-4f;
+        float prev = SoftCeiling.Apply(-3f);
+        for (float y = -3f + step; y <= 3f; y += step)
+        {
+            float v = SoftCeiling.Apply(y);
+            Assert.True(v - prev >= -1e-6f, $"goes backwards at {y:F4}");
+            Assert.True(v - prev <= step * 1.01f, $"jumps by {v - prev:F4} at {y:F4}");
+            Assert.True(MathF.Abs(v) < SoftCeiling.Ceiling, $"reaches the ceiling at {y:F4}");
+            prev = v;
+        }
+        Assert.Equal(0.5f, SoftCeiling.Apply(0.5f));     // untouched below the knee
+    }
+
+    /// <summary>
     /// Every preset must declare the level it actually measures, and must not peak so far above it
     /// that the synthesis clips.
     ///
@@ -280,9 +302,9 @@ public class EngineSynthTests
             float reference = v.PascalsAtFullScale;
 
             float sustainedOver = 20f * MathF.Log10(MathF.Max(1e-6f, sustained) / reference);
-            Assert.True(sustainedOver <= 1f,
-                $"{key}: sustained level is {sustainedOver:F1} dB over full scale — the tanh will "
-                + $"square the waveform, not round a transient. Raise VehicleProfile.PeakHeadroomDb "
+            Assert.True(sustainedOver <= SoftCeiling.CeilingDb,
+                $"{key}: sustained level is {sustainedOver:F1} dB over full scale, past the soft "
+                + $"ceiling — it will square the waveform, not round a transient. Raise VehicleProfile.PeakHeadroomDb "
                 + $"or re-measure with `--engine-levels`.");
 
             float peakOver = 20f * MathF.Log10(MathF.Max(1e-6f, peak) / reference);

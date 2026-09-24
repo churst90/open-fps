@@ -286,7 +286,14 @@ internal sealed class ExhaustNetwork
         return MathF.PI * r * r;
     }
 
-    /// <summary>Builds the muffler's internals onto the branch chain.</summary>
+    /// <summary>
+    /// Builds the muffler's internals onto the branch chain.
+    ///
+    /// Every section steepens by the same law as the pipes either side of it, with the profile's own
+    /// <see cref="ExhaustSpec.Steepening"/>. Steepening is a property of the gas and the size of the
+    /// wave, not of the pipe: a chamber steepens less because its wider area has already dropped
+    /// the pressure, which the law sees for itself.
+    /// </summary>
     private void BuildMuffler(Branch br, MufflerSpec m, float pipeArea, float wall, float steep)
     {
         switch (m.Kind)
@@ -303,7 +310,7 @@ internal sealed class ExhaustNetwork
                     // The chamber: an expansion to the can's area over its length. Baffles and
                     // deflectors inside take energy off every internal reflection, which broadens
                     // the chamber's notches — a clean expansion chamber rings, a Flowmaster does not.
-                    var chamber = new Pipe(m.ChamberLengthsMetres[i], canArea, _rate, wall, 0f);
+                    var chamber = new Pipe(m.ChamberLengthsMetres[i], canArea, _rate, wall, steep);
                     float baffle = Math.Clamp(m.BaffleLoss, 0f, 0.95f);
                     chamber.SetExtraLoss(1f - 0.5f * baffle, OnePole.AlphaFor(MathHelper.Lerp(12000f, 1500f, baffle), _rate));
                     br.Chain.Add(chamber);
@@ -312,18 +319,18 @@ internal sealed class ExhaustNetwork
                     br.ChamberIndices.Add(br.Chain.Count - 1);
                     // Between chambers, a short passage through the partition at pipe area.
                     if (i + 1 < m.ChamberLengthsMetres.Length)
-                        br.Chain.Add(new Pipe(0.04f, pipeArea, _rate, wall, 0f));
+                        br.Chain.Add(new Pipe(0.04f, pipeArea, _rate, wall, steep));
                 }
                 if (m.Kind == MufflerKind.Baffled)
                 {
-                    AddAbsorptive(br, m, pipeArea, wall);
+                    AddAbsorptive(br, m, pipeArea, wall, steep);
                     if (m.ResonatorHz > 0f) AddResonator(br, m, pipeArea, wall);
                 }
                 return;
             }
 
             case MufflerKind.Absorptive:
-                AddAbsorptive(br, m, pipeArea, wall);
+                AddAbsorptive(br, m, pipeArea, wall, steep);
                 if (m.ResonatorHz > 0f) AddResonator(br, m, pipeArea, wall);
                 return;
         }
@@ -331,9 +338,9 @@ internal sealed class ExhaustNetwork
 
     /// <summary>A perforated tube in packing: the pipe continues at its own area, and loses its top
     /// progressively along the length. Absorption 0.6 takes the corner down to about 700 Hz.</summary>
-    private void AddAbsorptive(Branch br, MufflerSpec m, float pipeArea, float wall)
+    private void AddAbsorptive(Branch br, MufflerSpec m, float pipeArea, float wall, float steep)
     {
-        var p = new Pipe(m.AbsorptiveLengthMetres, pipeArea, _rate, wall, 0.3f);
+        var p = new Pipe(m.AbsorptiveLengthMetres, pipeArea, _rate, wall, steep);
         float a = Math.Clamp(m.Absorption, 0f, 1f);
         float corner = MathHelper.Lerp(9000f, 450f, MathF.Pow(a, 0.8f));
         p.SetExtraLoss(1f - 0.35f * a, OnePole.AlphaFor(corner, _rate));
