@@ -128,7 +128,7 @@ public sealed class ChimeHorn
     internal sealed class Bell
     {
         private readonly ChimeBellSpec _b;
-        private readonly float _rate, _dt, _trim, _startDelay;
+        private readonly float _rate, _dt, _trim, _startDelay, _openScale, _leak;
         private Mode[] _modes;
         private readonly Random _rng;
         private readonly float _hpA;
@@ -161,6 +161,13 @@ public sealed class ChimeHorn
         {
             _b = b; _rate = rate; _dt = 1f / rate; _rng = new Random(seed);
             _startDelay = b.StartDelaySeconds;
+            // The chime's reed (0.46 open at full blow) is the reference the duty law was measured on.
+            _openScale = Math.Clamp(spec.ReedOpenFraction, 0.05f, 0.95f) / 0.46f;
+            // Air gets past a reed even while it is "shut" — it never quite seals on its seat — and
+            // that leak is a share of how far the reed lifts. A stiff reed that lifts a third as far
+            // leaks a third as much; holding the chime's leak constant under a shorter pulse would
+            // add five decibels of air to a horn for no reason but the arithmetic.
+            _leak = 0.25f * (1f - MathF.Cos(MathF.PI * 0.46f * _openScale)) / (1f - MathF.Cos(MathF.PI * 0.46f));
             _trim = MathF.Pow(10f, b.LevelTrimDb / 20f);
             _hpA = OnePole.AlphaFor(CutoffHz(b), rate);
             Build();
@@ -194,7 +201,7 @@ public sealed class ChimeHorn
             {
                 float y = Step(1f);
                 buf[i] = y; sum += y * (double)y; peak = MathF.Max(peak, MathF.Abs(y));
-                if (Opening((float)_phase, 1f) <= 0f) shut++;
+                if (Opening((float)_phase, 1f, _openScale) <= 0f) shut++;
             }
             ShutFraction = shut / (float)meas;
             float rms = (float)Math.Sqrt(sum / Math.Max(1, meas));
@@ -230,9 +237,9 @@ public sealed class ChimeHorn
         /// cycle, and harder blowing holds it open longer. That is the pulse, and the pulse is where
         /// every harmonic above the first comes from.
         /// </summary>
-        private static float Opening(float phase, float supply)
+        private static float Opening(float phase, float supply, float openScale)
         {
-            float open = 0.30f + 0.16f * Math.Clamp(supply, 0f, 1f);     // duty cycle
+            float open = (0.30f + 0.16f * Math.Clamp(supply, 0f, 1f)) * openScale;     // duty cycle
             float x = MathF.Sin(MathF.Tau * phase) - MathF.Cos(MathF.PI * open);
             return x > 0f ? x : 0f;
         }
@@ -255,12 +262,12 @@ public sealed class ChimeHorn
             _phase += f * _dt;
             if (_phase >= 1.0) _phase -= 1.0;
 
-            float x = Opening((float)_phase, supply);
+            float x = Opening((float)_phase, supply, _openScale);
             // Flow through the slit: the open area times the root of the pressure across it.
             float u = x * MathF.Sqrt(supply);
             // ...and the air tearing itself apart going through it. Most of the first few
             // milliseconds of a horn is this and nothing else.
-            float hiss = (float)(_rng.NextDouble() * 2 - 1) * 0.09f * MathF.Sqrt(supply) * (0.25f + x);
+            float hiss = (float)(_rng.NextDouble() * 2 - 1) * 0.09f * MathF.Sqrt(supply) * (_leak + x);
 
             float p = 0f;
             for (int k = 0; k < _modes.Length; k++) p += _modes[k].Process(u + hiss * 0.35f);

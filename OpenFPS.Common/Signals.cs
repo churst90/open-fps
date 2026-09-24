@@ -71,6 +71,18 @@ public sealed record ChimeHornSpec
     /// version of this model did, and the measured note in Describe() is what caught it.
     /// </summary>
     public float ReedRatio { get; init; } = 0.62f;
+    /// <summary>
+    /// How much of each cycle the diaphragm is off its seat at full blow, 0..1.
+    ///
+    /// A beating valve makes a pulse, and the pulse's width is its timbre: a wide pulse is little
+    /// more than a half-wave sine — fundamental, an octave, and almost nothing above the third
+    /// harmonic, the mellow round tone a locomotive CHIME is built to make, with its big soft
+    /// diaphragm over a wide port. A stiff small diaphragm over a narrow port lifts late and slams
+    /// back early; its pulse is short, and a short pulse keeps its harmonics level up to about the
+    /// reciprocal of its width. That is the difference between a chime and a trumpet: the same
+    /// column, blatted instead of blown.
+    /// </summary>
+    public float ReedOpenFraction { get; init; } = 0.46f;
     /// <summary>How long the valve takes to reach full pressure, seconds, and to fall.</summary>
     public float RiseSeconds { get; init; } = 0.09f;
     public float FallSeconds { get; init; } = 0.13f;
@@ -148,7 +160,7 @@ public sealed record ChimeHornSpec
             new ChimeBellSpec { LengthMetres = 0.470f, MouthDiameterMetres = 0.086f, ThroatDiameterMetres = 0.020f, StartDelaySeconds = 0f },
             new ChimeBellSpec { LengthMetres = 0.352f, MouthDiameterMetres = 0.078f, ThroatDiameterMetres = 0.019f, StartDelaySeconds = 0.004f, LevelTrimDb = -1.5f },
         },
-        SupplyKPa = 827f, ReferenceDb = 126f,
+        SupplyKPa = 827f, ReferenceDb = 126f, ReedOpenFraction = 0.30f,
     };
 
     /// <summary>A transit bus: one small trumpet under the front, on the brake system's air.</summary>
@@ -159,7 +171,7 @@ public sealed record ChimeHornSpec
         {
             new ChimeBellSpec { LengthMetres = 0.300f, MouthDiameterMetres = 0.070f, ThroatDiameterMetres = 0.018f, StartDelaySeconds = 0f },
         },
-        SupplyKPa = 760f, ReferenceDb = 118f, RiseSeconds = 0.05f, FallSeconds = 0.07f,
+        SupplyKPa = 760f, ReferenceDb = 118f, RiseSeconds = 0.05f, FallSeconds = 0.07f, ReedOpenFraction = 0.30f,
     };
 
     public static IReadOnlyDictionary<string, Func<ChimeHornSpec>> Presets { get; } =
@@ -255,6 +267,24 @@ public sealed record ElectricHornSpec
     public float CoilRiseSeconds { get; init; } = 0.0010f;
     /// <summary>How much of each cycle the points are closed. Wider points, harder pull.</summary>
     public float ContactDuty { get; init; } = 0.5f;
+    /// <summary>
+    /// How long the supply takes to come up at the horn when the button is pressed, seconds (a time
+    /// constant). The horn is not wired to the button: the button pulls in a relay, the relay's
+    /// armature travels, its contacts touch, bounce and seat, and the battery then pushes several
+    /// amps through the harness into a coil that is still settling. The diaphragm meanwhile builds
+    /// from rest over its first few cycles, swinging short of the pole until the pull is strong
+    /// enough to throw it all the way. Together that is a swell of a couple of dozen milliseconds —
+    /// short enough to be heard as instant, long enough not to be a click.
+    /// </summary>
+    public float RelayMakeSeconds { get; init; } = 0.010f;
+    /// <summary>
+    /// How long the supply takes to die away when the button is let go, seconds (a time constant).
+    /// A horn relay's coil carries a suppression diode, which lets its current — and so its grip —
+    /// decay slowly rather than snap; the contacts part while the arc between them still carries a
+    /// falling current; and the buzzer keeps interrupting all the way down, striking softer and then
+    /// not at all as the pull fades, until the diaphragm and the tone disc ring down on their own.
+    /// </summary>
+    public float RelayBreakSeconds { get; init; } = 0.018f;
     /// <summary>
     /// SPL, RMS, at one metre on axis with every horn in the set sounding. Legal horns are
     /// 93-112 dBA at two metres (ECE R28, FMVSS), which is 99-118 at one. An anchor rather than a

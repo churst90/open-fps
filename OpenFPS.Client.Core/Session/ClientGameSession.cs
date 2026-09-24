@@ -53,6 +53,13 @@ public sealed class ClientGameSession : IDisposable
     private readonly ClientAudioSystem _audioSystem;
     private readonly PredictionReconciler _reconciler;
     private readonly ChatManager _chat;
+
+    /// <summary>The interface's sounds — menus, chat, arriving in the world. Shared with the head's
+    /// menus so there is one switch for all of them.</summary>
+    public UiSounds Ui { get; }
+
+    /// <summary>The audio engine, for a head's settings (devices, interface sounds).</summary>
+    public AudioEngineFacade Audio => _audioEngine;
     private readonly InputCommandMapper _bindings = new();
 
     private long _sequenceId;
@@ -138,6 +145,15 @@ public sealed class ClientGameSession : IDisposable
         _sounds = new SoundMappingService(_state);
         _audioSystem = new ClientAudioSystem(_audioEngine, _sounds, _state);
         _chat = new ChatManager(_speech);
+        Ui = new UiSounds(audioEngine);
+        // Each kind of chat has its own sound, heard before the words.
+        _chat.Incoming += msg => Ui.Play(msg.FromStaff && msg.Channel != ChatChannel.Private ? UiCue.ChatAdmin : msg.Channel switch
+        {
+            ChatChannel.Private => UiCue.ChatPrivate,
+            ChatChannel.All => UiCue.ChatAll,
+            ChatChannel.Server => msg.Sender.Length == 0 ? UiCue.MenuMove : UiCue.ChatServer,
+            _ => UiCue.ChatMap,
+        });
 
         _sounds.Initialize();
         // Your own feet ride with your head (see ClientAudioSystem.OnOwnFootstep); everybody
@@ -745,6 +761,7 @@ public sealed class ClientGameSession : IDisposable
                 _shell.UpdateLoadingStatus("Entering World...", 100);
                 _shell.EnterGame();
                 GameJoined?.Invoke();
+                Ui.Play(UiCue.EnterWorld);
                 _speech.Speak("You have entered the world. Use W A S D to move, J and L to turn.", interrupt: true);
                 break;
 
@@ -1022,7 +1039,8 @@ public sealed class ClientGameSession : IDisposable
         }
         else
         {
-            _network.Send(new ChatMessage { Text = input });
+            // Plain typing is heard by your map; /all is for everyone on the server.
+            _network.Send(new ChatMessage { Text = input, Channel = ChatChannel.Map });
         }
     }
 

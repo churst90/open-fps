@@ -19,7 +19,7 @@ using OpenFPS.Client.Gtk.Game;      // GtkClientShell / GameWindow
 //
 // The network poll + fixed-step simulation run on one background thread (GameLoop); GTK widgets are
 // only ever touched on the main thread (the shell marshals through the captured UI context).
-internal static class GtkClientProgram
+internal static partial class GtkClientProgram
 {
     private static ISpeechOutput _speech = null!;
     private static ClientNetworkService _network = null!;
@@ -34,6 +34,8 @@ internal static class GtkClientProgram
 
     private static string _pendingUser = "";
     private static string _pendingPass = "";
+    private static string _pendingAddress = "";
+    private static bool _pendingRemember;
 
     // The connect form stays up until the server has answered. Closing it on the button press dropped
     // focus back onto the main menu, and that focus announcement — spoken with interrupt — cut off the
@@ -196,9 +198,15 @@ internal static class GtkClientProgram
         _shell.SetInput(_session.Input);
         // The session speaks the outcome; the head only moves the form out of the way, or puts focus
         // back where the player can correct the mistake.
-        _session.LoginSucceeded += _ => OnUi(CloseLoginDialog);
+        _session.LoginSucceeded += _ => OnUi(() =>
+        {
+            // A server you have just logged in to by hand is remembered, so Connect can go straight back.
+            if (_loginDialog != null) RememberServer(_pendingAddress, _pendingUser, _pendingPass, _pendingRemember);
+            CloseLoginDialog();
+        });
         _session.LoginFailed += reason => OnLoginOutcome($"Login failed. {reason}", success: false);
-        _session.BeginAudioInit();
+        _settings = ClientSettings.Load();
+        _session.BeginAudioInit(ApplyAudioSettings);
 
         var loop = new Thread(GameLoop) { IsBackground = true, Name = "GameLoop" };
         loop.Start();
@@ -386,8 +394,9 @@ internal static class GtkClientProgram
 
         var box = VBox(24);
         box.Append(Label.New("OpenFPS — Main Menu"));
-        box.Append(MenuButton("Connect to Server", ShowLoginDialog));
-        box.Append(MenuButton("Settings", () => _speech.Speak("Settings. Not yet implemented.")));
+        box.Append(MenuButton("Connect", ConnectPreferred));
+        box.Append(MenuButton("Saved Servers", ShowServers));
+        box.Append(MenuButton("Settings", ShowSettings));
         box.Append(MenuButton("Quit", () => { _speech.Speak("Goodbye."); _mainWindow.Close(); }));
         _mainWindow.SetChild(box);
 
@@ -397,7 +406,9 @@ internal static class GtkClientProgram
             _speech.Speak("Warning. " + _missingAudioReport);
     }
 
-    private static void ShowLoginDialog()
+    private static void ShowLoginDialog() => ShowLoginDialog(null);
+
+    private static void ShowLoginDialog(OpenFPS.Client.Core.SavedServer? saved)
     {
         if (_loginDialog != null) { _loginDialog.Present(); return; }
 
@@ -407,6 +418,7 @@ internal static class GtkClientProgram
         dialog.SetModal(true);
         dialog.SetDefaultSize(420, 320);
         dialog.OnCloseRequest += (_, _) => { _loginDialog = null; _loginUser = null; _loginStatus = null; return false; };
+        CloseOnEscape(dialog);
 
         var box = VBox(16);
 
@@ -419,25 +431,37 @@ internal static class GtkClientProgram
         SpeakOnFocus(_loginStatus, () => _loginStatusText.Length > 0 ? _loginStatusText : "No messages.");
         box.Append(_loginStatus);
 
-        var server = LabeledEntry(box, "Server address", "127.0.0.1:33288", false);
-        var user = LabeledEntry(box, "Username", "", false);
+        var server = LabeledEntry(box, "Server address", saved != null ? $"{saved.Host}:{saved.Port}" : "127.0.0.1:33288", false);
+        var user = LabeledEntry(box, "Username", saved?.Username ?? "", false);
         var pass = LabeledEntry(box, "Password", "", true);
+        var remember = CheckButton.NewWithLabel("Remember password");
+        remember.SetActive(saved?.RememberPassword ?? false);
+        SpeakOnFocus(remember, () => $"Remember password, {(remember.GetActive() ? "checked" : "not checked")}");
+        box.Append(remember);
         _loginUser = user;
 
         box.Append(MenuButton("Connect", () =>
         {
             string addr = server.GetText();
+            _pendingAddress = addr;
             _pendingUser = user.GetText();
             _pendingPass = pass.GetText();
+            _pendingRemember = remember.GetActive();
             // The dialog stays open: it closes only once the server has accepted the login.
             DoConnect(addr);
         }));
-        box.Append(MenuButton("Cancel", CloseLoginDialog));
+        box.Append(MenuButton("Cancel", () => { Cue(UiCue.MenuBack); CloseLoginDialog(); }));
 
         _loginDialog = dialog;
         dialog.SetChild(box);
         dialog.Present();
-        _speech.Speak("Connect dialog. Server address, username, and password fields.", true);
+        if (saved != null && saved.Username.Length > 0)
+        {
+            _suppressFocusSpeech = true;
+            pass.GrabFocus();
+            _speech.Speak($"Connect to {saved.Name} as {saved.Username}. Password.", true);
+        }
+        else _speech.Speak("Connect dialog. Server address, username, and password fields.", true);
     }
 
     /// <summary>Records a connect/login outcome on the still-open form and puts focus where the player
@@ -502,7 +526,7 @@ internal static class GtkClientProgram
     private static Button MenuButton(string label, Action onActivate)
     {
         var btn = Button.NewWithLabel(label);
-        btn.OnClicked += (_, _) => onActivate();
+        btn.OnClicked += (_, _) => { Cue(UiCue.MenuSelect); onActivate(); };
         SpeakOnFocus(btn, label);
         return btn;
     }
@@ -527,6 +551,7 @@ internal static class GtkClientProgram
         {
             // A programmatic focus move that already announced its reason must not speak over it.
             if (_suppressFocusSpeech) { _suppressFocusSpeech = false; return; }
+            Cue(UiCue.MenuMove);
             _speech.Speak(text(), true);
         };
         widget.AddController(focus);

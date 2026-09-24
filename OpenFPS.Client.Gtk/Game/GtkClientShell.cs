@@ -167,6 +167,18 @@ internal sealed class GtkClientShell : IClientShell
             return false;
         };
 
+        // Escape cancels, without tabbing to the Cancel button.
+        var keys = EventControllerKey.New();
+        keys.SetPropagationPhase(PropagationPhase.Capture);
+        keys.OnKeyPressed += (_, e) =>
+        {
+            if (e.Keyval != 0xff1b) return false;   // GDK_Escape
+            dialog.Close();
+            _speech.Speak("Cancelled.", interrupt: true);
+            return true;
+        };
+        dialog.AddController(keys);
+
         dialog.SetChild(box);
         dialog.Present();
         entry.GrabFocus();

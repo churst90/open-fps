@@ -69,6 +69,23 @@ public class CommandHandler
         {
             case "scan": HandleScan(session, reply); break;
             case "pm": HandlePrivateMessage(session, args, reply); break;
+            case "all":
+                if (args.Length == 0) { Say(reply, "Usage: /all [message] — says it to everyone on the server."); break; }
+                _server.Chat(session, string.Join(" ", args), ChatChannel.All);
+                break;
+            case "motd":
+                Say(reply, GameServer.ReadMotd() is { Length: > 0 } motd ? motd : "There is no message of the day.");
+                break;
+            case "setmotd":
+                if (!isElevated) { DenyCommand(reply); return; }
+                GameServer.WriteMotd(string.Join(" ", args));
+                Say(reply, args.Length == 0 ? "Message of the day cleared." : "Message of the day set.");
+                break;
+            case "announce":
+                if (!isElevated) { DenyCommand(reply); return; }
+                if (args.Length == 0) { Say(reply, "Usage: /announce [message]"); break; }
+                _server.Announce(string.Join(" ", args), fromStaff: true);
+                break;
             case "move":
             case "tp":
                 if (!isElevated) { DenyCommand(reply); return; }
@@ -1336,8 +1353,12 @@ public class CommandHandler
             return;
         }
 
-        _server.SendToSession(targetSession, new ChatMessage { Sender = $"[PM from {session.Username}]", Text = message });
-        reply(new ChatMessage { Sender = $"[PM to {targetUsername}]", Text = message });
+        _server.SendToSession(targetSession, new ChatMessage
+        {
+            Sender = session.Username, Text = message, Channel = ChatChannel.Private,
+            FromStaff = session.Role is UserRole.Admin or UserRole.Dev,
+        });
+        reply(new ChatMessage { Sender = session.Username, Text = message, Channel = ChatChannel.Private, To = targetSession.Username });
     }
 
     private static string GetRelativeDirection(Quaternion rotation, Vector3 targetDir)

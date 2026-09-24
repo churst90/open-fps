@@ -67,6 +67,11 @@ public class VoiceLifecycleTests
         /// every test here is about voice LIFECYCLE rather than about what a voice sounds like.</summary>
         public bool RegisterSynthesisedSound(string soundId, byte[] pcm16Mono, int sampleRate) => true;
         public void PlayUiBeep(float hz, float ms) { }
+        public readonly List<string> UiSounds = new();
+        public void PlayUiSound(string id, Func<float[]> render, int sampleRate, float volume) { render(); UiSounds.Add(id); }
+        public IReadOnlyList<string> OutputDevices() => new[] { "Test output" };
+        public IReadOnlyList<string> InputDevices() => new[] { "Test input" };
+        public bool SetOutputDevice(string name) => true;
         public void StartDiagnosticSound() { }
         public void SetDiagnosticPosition(Vector3 p) { }
         public void StopDiagnosticSound() { }

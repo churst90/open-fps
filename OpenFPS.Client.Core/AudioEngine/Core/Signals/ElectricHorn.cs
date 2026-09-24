@@ -35,10 +35,14 @@ namespace OpenFPS.Client.AudioEngine.Core.Signals;
 ///   formant. A trumpet horn couples the diaphragm into a coiled exponential column that passes only
 ///   what lies near n·c/2L and nothing below its flare cutoff: rounder and louder.
 ///
-/// Onset is immediate — the first pull is a full pull, there is no pressure to build — and release
-/// is the diaphragm ringing down on its own damping plus the tone disc's ring, a few tens of
-/// milliseconds to silence. No bend up and no bend down: that is an air horn's, and its absence is
-/// half of why an electric horn sounds electric.
+/// Onset is quick but not a step: the supply comes up through a relay and a harness over a few
+/// milliseconds, and the diaphragm swings short of the pole for its first few cycles until the pull
+/// can throw it all the way — a swell of a couple of dozen milliseconds. Release is the same in
+/// reverse: the relay lets go slowly, the buzzer strikes softer and then stops striking as the pull
+/// fades, and the diaphragm and the tone disc ring down, a few tens of milliseconds to silence. (It
+/// used to start in 2 ms and stop in 10, and the verdict was "perfect, but staccato".) No bend up and
+/// no bend down: the note is the adjusting screw's at every level, and that is half of why an
+/// electric horn sounds electric and an air horn does not.
 /// </summary>
 public sealed class ElectricHorn
 {
@@ -50,6 +54,8 @@ public sealed class ElectricHorn
     private float _lowGain = 1f, _highGain = 1f;
     private float _splitLp;
     private readonly float _splitAlpha;
+    private readonly float _makeK, _breakK;
+    private float _drive;
     private bool _wasBlowing;
 
     /// <summary>Whether the horn button is pressed.</summary>
@@ -73,6 +79,8 @@ public sealed class ElectricHorn
         float d = spec.Kind == ElectricHornKind.Trumpet ? spec.Units[0].MouthDiameterMetres : spec.Units[0].DiaphragmDiameterMetres;
         float a = 0.5f * MathF.Max(0.02f, d);
         _splitAlpha = OnePole.AlphaFor(Math.Clamp(343f / (2f * MathF.PI * a), 300f, 4000f), rate);
+        _makeK = 1f - MathF.Exp(-1f / (MathF.Max(1e-4f, spec.RelayMakeSeconds) * rate));
+        _breakK = 1f - MathF.Exp(-1f / (MathF.Max(1e-4f, spec.RelayBreakSeconds) * rate));
     }
 
     /// <summary>
@@ -93,12 +101,17 @@ public sealed class ElectricHorn
     public void Step()
     {
         bool blow = Blowing;
-        // The relay closes and the first pull starts NOW, from the top of a cycle: no supply to build.
-        if (blow && !_wasBlowing) foreach (var u in _units) u.Press();
+        // The relay closes and the contact clock starts from the top of a cycle; the supply behind
+        // it comes up through the relay and the harness, and goes down through them when let go.
+        if (blow && !_wasBlowing && _drive < 1e-3f) foreach (var u in _units) u.Press();
         _wasBlowing = blow;
+        float target = blow ? 1f : 0f;
+        _drive += (target - _drive) * (blow ? _makeK : _breakK);
+        if (MathF.Abs(target - _drive) < 1e-6f) _drive = target;
+        bool live = _drive > 1e-3f;
 
         float y = 0f;
-        for (int i = 0; i < _units.Length; i++) y += _units[i].Step(blow);
+        for (int i = 0; i < _units.Length; i++) y += _units[i].Step(live, _drive);
 
         _splitLp += _splitAlpha * (y - _splitLp);
         float low = _splitLp, high = y - _splitLp;
@@ -364,7 +377,7 @@ public sealed class ElectricHorn
         }
 
         [MethodImpl(MethodImplOptions.AggressiveOptimization)]
-        public float Step(bool blowing)
+        public float Step(bool blowing, float drive = 1f)
         {
             // The loop wanders a little: the points wear, the voltage sags. It is what makes a pair
             // of horns a third apart roll against each other instead of standing still.
@@ -384,7 +397,9 @@ public sealed class ElectricHorn
                 // toward the pole (or, at the latest, when the clock says so).
                 if (_x > BreakAt || _phase >= _duty) _open = true;
                 bool closed = blowing && !_open;
-                _i += closed ? _riseK * (1f - _i) : -_fallK * _i;
+                // The current rises toward what the supply will push through the coil, not toward
+                // a full amp regardless: a relay still seating delivers less, and so pulls less.
+                _i += closed ? _riseK * (drive - _i) : -_fallK * _i;
 
                 float gap = 1.25f * Gap - MathF.Min(_x, Gap);
                 float force = _pull * _i * _i / (gap * gap);

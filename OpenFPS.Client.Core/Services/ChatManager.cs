@@ -5,146 +5,133 @@ using OpenFPS.Client.Core.Platform;
 
 namespace OpenFPS.Client.Services;
 
+/// <summary>The four rings of chat, in the order Shift+[ and Shift+] walk them.</summary>
 public enum ChatBufferType
 {
-    Global,   // Public chat visible to everyone on the server
-    Map,      // Chat from players on the current map
-    Private,  // Direct/private messages
-    Server,   // Server-generated announcements and TextEvents
-    Error     // Error messages from the server or client systems
+    /// <summary>Everything, as it arrived.</summary>
+    All,
+    /// <summary>People on your map.</summary>
+    Map,
+    /// <summary>Every private message you received or sent — reply with /pm name text.</summary>
+    Private,
+    /// <summary>The server: its answers to your commands, the message of the day, announcements.</summary>
+    Server,
 }
 
 /// <summary>
-/// The player's message history, bucketed by kind and navigable by keyboard — the accessible
-/// equivalent of a scrollback pane. Speaks through <see cref="ISpeechOutput"/>, so it is shared by
-/// both heads; it used to be Windows-only and typed on that head's concrete TTS service, which is
-/// why the Linux client had no chat buffers at all.
+/// The player's message history as four rings, navigable by keyboard — the accessible equivalent of
+/// a scrollback pane. [ and ] walk the messages in the ring you are in; Shift+[ and Shift+] change
+/// ring. Speaks through <see cref="ISpeechOutput"/>, so it is shared by every client head.
+///
+/// Messages say which channel they are on; nothing is guessed from the sender's name any more. And
+/// nothing is labelled "System": an answer to your own command is just the answer, and only what the
+/// server says to everybody is "Server".
 /// </summary>
 public class ChatManager
 {
-    private readonly Dictionary<ChatBufferType, List<ChatMessage>> _buffers = new();
-    private readonly Dictionary<ChatBufferType, int> _bufferCursors = new();
-    private ChatBufferType _activeBuffer = ChatBufferType.Global;
+    private readonly Dictionary<ChatBufferType, List<string>> _buffers = new();
+    private readonly Dictionary<ChatBufferType, int> _cursors = new();
+    private ChatBufferType _active = ChatBufferType.All;
     private readonly ISpeechOutput _tts;
 
-    public ChatBufferType ActiveBuffer => _activeBuffer;
+    /// <summary>Most lines a ring keeps; the oldest go first.</summary>
+    public const int RingSize = 500;
+
+    public ChatBufferType ActiveBuffer => _active;
+
+    /// <summary>Every chat line as it arrives, before it is spoken — for the chat sounds.</summary>
+    public event Action<ChatMessage>? Incoming;
 
     public ChatManager(ISpeechOutput tts)
     {
         _tts = tts;
         foreach (ChatBufferType type in Enum.GetValues(typeof(ChatBufferType)))
         {
-            _buffers[type] = new List<ChatMessage>();
-            _bufferCursors[type] = -1;
+            _buffers[type] = new List<string>();
+            _cursors[type] = -1;
         }
     }
 
+    public static ChatBufferType BufferFor(ChatChannel channel) => channel switch
+    {
+        ChatChannel.Private => ChatBufferType.Private,
+        ChatChannel.Server => ChatBufferType.Server,
+        // Said to everyone lives in All only; there is no separate ring for it.
+        ChatChannel.All => ChatBufferType.All,
+        _ => ChatBufferType.Map,
+    };
+
+    /// <summary>How a line reads, spoken or reviewed.</summary>
+    public static string Format(ChatMessage msg) => msg.Channel switch
+    {
+        ChatChannel.Private when msg.To.Length > 0 => $"Private to {msg.To}: {msg.Text}",
+        ChatChannel.Private => $"Private from {msg.Sender}: {msg.Text}",
+        ChatChannel.All => $"{msg.Sender} to all: {msg.Text}",
+        ChatChannel.Server when msg.Sender.Length == 0 => msg.Text,
+        _ => msg.Sender.Length == 0 ? msg.Text : $"{msg.Sender}: {msg.Text}",
+    };
+
     /// <summary>
-    /// Routes an incoming message to the correct buffer and speaks it if it is addressed to you.
-    /// Sender prefixes drive routing:
-    ///   "[PM"    → Private
-    ///   "[Map]"  → Map
-    ///   "[Error" → Error
-    ///   "System" → Server
-    ///   anything else → Global
+    /// Files a message in its ring and in All, and speaks it if it is addressed to you or is in the
+    /// ring you are reading.
     /// </summary>
     public void AddMessage(ChatMessage msg)
     {
-        ChatBufferType target = ClassifyMessage(msg);
-        _buffers[target].Add(msg);
-        _bufferCursors[target] = _buffers[target].Count - 1;
+        Incoming?.Invoke(msg);
+        string line = Format(msg);
+        var ring = BufferFor(msg.Channel);
+        Add(ChatBufferType.All, line);
+        if (ring != ChatBufferType.All) Add(ring, line);
 
-        if (IsAddressedToYou(target) || target == _activeBuffer)
-            _tts.Speak($"{msg.Sender}: {msg.Text}", interrupt: false);
+        if (IsAddressedToYou(ring) || _active == ChatBufferType.All || ring == _active)
+            _tts.Speak(line, interrupt: false);
     }
 
     /// <summary>
-    /// Is this message an ANSWER, or is it other people talking?
-    ///
-    /// The distinction decides whether it is spoken regardless of which buffer the player is reading,
-    /// and getting it wrong made every command in the game silently unanswerable. A server reply is a
-    /// System message, System messages land in the Server buffer, and the Server buffer is not the
-    /// one anybody starts in — so "Moved to 40, 0, 120", "Cannot move there: area is solid" and "You
-    /// do not have permission" were all delivered to a buffer nobody was listening to. From the
-    /// player's side a command simply did nothing, with no way to tell whether it had failed, been
-    /// refused, or worked and moved them somewhere identical-sounding.
-    ///
-    /// Ambient chatter is different and SHOULD be gated: other players talking in a global channel is
-    /// exactly the thing a buffer exists to let you turn away from. What you can never turn away from
-    /// is the game answering a question you just asked it.
+    /// Private messages and the server's answers are spoken whichever ring you are in. Ambient chat
+    /// is not: turning away from it is what a ring is for. What you can never turn away from is the
+    /// game answering a command you just typed — that used to land in a buffer nobody was reading,
+    /// and a refused command sounded exactly like one that worked.
     /// </summary>
-    private static bool IsAddressedToYou(ChatBufferType target) => target
-        is ChatBufferType.Private     // someone sent it to you by name
-        or ChatBufferType.Error       // something went wrong, and it went wrong for you
-        or ChatBufferType.Server;     // the game replying to you
+    private static bool IsAddressedToYou(ChatBufferType ring) => ring is ChatBufferType.Private or ChatBufferType.Server;
 
-    /// <summary>
-    /// Posts a plain error string directly to the Error buffer and speaks it immediately.
-    /// </summary>
-    public void AddError(string text)
+    private void Add(ChatBufferType ring, string line)
     {
-        AddMessage(new ChatMessage { Sender = "[Error]", Text = text });
+        var list = _buffers[ring];
+        list.Add(line);
+        if (list.Count > RingSize) list.RemoveAt(0);
+        _cursors[ring] = list.Count - 1;
     }
 
-    /// <summary>
-    /// Posts a server announcement to the Server buffer.
-    /// </summary>
+    /// <summary>The server answering you: no name in front of it.</summary>
     public void AddServerMessage(string text)
-    {
-        AddMessage(new ChatMessage { Sender = "System", Text = text });
-    }
+        => AddMessage(new ChatMessage { Sender = "", Text = text, Channel = ChatChannel.Server });
+
+    /// <summary>Something went wrong for you. Filed with the server's answers, and spoken.</summary>
+    public void AddError(string text)
+        => AddMessage(new ChatMessage { Sender = "", Text = text, Channel = ChatChannel.Server });
 
     public void CycleBuffer(int direction)
     {
         int count = Enum.GetValues(typeof(ChatBufferType)).Length;
-        int current = (int)_activeBuffer;
-        current = (current + direction + count) % count;
-        _activeBuffer = (ChatBufferType)current;
-
-        _tts.Speak($"Switched to {_activeBuffer} buffer.", interrupt: true);
-
-        _bufferCursors[_activeBuffer] = _buffers[_activeBuffer].Count - 1;
-        ReadCursorMessage();
+        _active = (ChatBufferType)(((int)_active + direction + count) % count);
+        _cursors[_active] = _buffers[_active].Count - 1;
+        var list = _buffers[_active];
+        _tts.Speak(list.Count == 0 ? $"{_active}, empty." : $"{_active}. {list[^1]}", interrupt: true);
     }
 
     public void CycleMessage(int direction)
     {
-        var buffer = _buffers[_activeBuffer];
-        if (buffer.Count == 0)
+        var list = _buffers[_active];
+        if (list.Count == 0)
         {
-            _tts.Speak($"{_activeBuffer} buffer is empty.", interrupt: false);
+            _tts.Speak($"{_active} is empty.", interrupt: true);
             return;
         }
-
-        int current = _bufferCursors[_activeBuffer];
-        current = Math.Clamp(current + direction, 0, buffer.Count - 1);
-        _bufferCursors[_activeBuffer] = current;
-
-        ReadCursorMessage();
-    }
-
-    private void ReadCursorMessage()
-    {
-        var buffer = _buffers[_activeBuffer];
-        int idx = _bufferCursors[_activeBuffer];
-
-        if (idx >= 0 && idx < buffer.Count)
-        {
-            var msg = buffer[idx];
-            _tts.Speak($"{msg.Sender}: {msg.Text}", interrupt: false);
-        }
-        else
-        {
-            _tts.Speak($"{_activeBuffer} buffer is empty.", interrupt: false);
-        }
-    }
-
-    private static ChatBufferType ClassifyMessage(ChatMessage msg)
-    {
-        if (msg.Sender.Contains("[PM", StringComparison.OrdinalIgnoreCase)) return ChatBufferType.Private;
-        if (msg.Sender.StartsWith("[Map]", StringComparison.OrdinalIgnoreCase)) return ChatBufferType.Map;
-        if (msg.Sender.StartsWith("[Error", StringComparison.OrdinalIgnoreCase)) return ChatBufferType.Error;
-        if (msg.Sender.Equals("System", StringComparison.OrdinalIgnoreCase)) return ChatBufferType.Server;
-        return ChatBufferType.Global;
+        int at = _cursors[_active] + direction;
+        bool edge = at < 0 || at >= list.Count;
+        at = Math.Clamp(at, 0, list.Count - 1);
+        _cursors[_active] = at;
+        _tts.Speak(edge ? (direction < 0 ? "Top. " : "Bottom. ") + list[at] : list[at], interrupt: true);
     }
 }

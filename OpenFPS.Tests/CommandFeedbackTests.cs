@@ -47,7 +47,7 @@ public class CommandFeedbackTests
         var chat = new ChatManager(tts);
 
         // The buffer a player starts in. Nobody has cycled anywhere.
-        Assert.Equal(ChatBufferType.Global, chat.ActiveBuffer);
+        Assert.Equal(ChatBufferType.All, chat.ActiveBuffer);
 
         chat.AddServerMessage("Moved to 40.0, 0.0, 120.0");
         Assert.True(tts.Said("Moved to 40.0"),
@@ -56,7 +56,7 @@ public class CommandFeedbackTests
         chat.AddError("Cannot move there: Area is solid.");
         Assert.True(tts.Said("Area is solid"));
 
-        chat.AddMessage(new ChatMessage { Sender = "[PM from dev]", Text = "over here" });
+        chat.AddMessage(new ChatMessage { Sender = "dev", Text = "over here", Channel = ChatChannel.Private });
         Assert.True(tts.Said("over here"));
     }
 
@@ -70,11 +70,11 @@ public class CommandFeedbackTests
         var tts = new CapturedSpeech();
         var chat = new ChatManager(tts);
 
-        chat.CycleBuffer(1);   // away from Global
-        Assert.NotEqual(ChatBufferType.Global, chat.ActiveBuffer);
+        chat.CycleBuffer(1);   // away from All, to Map
+        Assert.NotEqual(ChatBufferType.All, chat.ActiveBuffer);
         tts.Spoken.Clear();
 
-        chat.AddMessage(new ChatMessage { Sender = "someone", Text = "global chatter" });
+        chat.AddMessage(new ChatMessage { Sender = "someone", Text = "global chatter", Channel = ChatChannel.All });
         Assert.False(tts.Said("global chatter"),
             "chatter in a channel the player has turned away from should stay in its buffer");
     }

@@ -4137,6 +4137,79 @@ public class FmodAudioProvider : IAudioProvider
         sound.release();
     }
 
+    /// <summary>Interface sounds, made once and kept. Releasing an FMOD sound stops every channel
+    /// playing it, so a sound created, played and released at once — which is what PlayUiBeep does —
+    /// is cut off almost before it starts. These are never released until shutdown.</summary>
+    private readonly Dictionary<string, FMOD.Sound> _uiSounds = new();
+
+    public IReadOnlyList<string> OutputDevices()
+    {
+        var names = new List<string>();
+        if (!_isInitialized || _system.getNumDrivers(out int n) != RESULT.OK) return names;
+        for (int i = 0; i < n; i++)
+            if (_system.getDriverInfo(i, out string name, 256, out _, out _, out _, out _) == RESULT.OK) names.Add(name);
+        return names;
+    }
+
+    public IReadOnlyList<string> InputDevices()
+    {
+        var names = new List<string>();
+        if (!_isInitialized || _system.getRecordNumDrivers(out int n, out _) != RESULT.OK) return names;
+        for (int i = 0; i < n; i++)
+            if (_system.getRecordDriverInfo(i, out string name, 256, out _, out _, out _, out _, out _) == RESULT.OK) names.Add(name);
+        return names;
+    }
+
+    public bool SetOutputDevice(string name)
+    {
+        if (!_isInitialized) return false;
+        int index = 0;
+        if (!string.IsNullOrEmpty(name))
+        {
+            var all = OutputDevices();
+            index = -1;
+            for (int i = 0; i < all.Count; i++) if (all[i] == name) { index = i; break; }
+            if (index < 0) return false;
+        }
+        var r = _system.setDriver(index);
+        if (r != RESULT.OK) { Log.Warning("Could not switch output to '{Name}': {R}", name, r); return false; }
+        Log.Information("Audio output: {Name}", string.IsNullOrEmpty(name) ? "system default" : name);
+        return true;
+    }
+
+    public void PlayUiSound(string id, Func<float[]> render, int sampleRate, float volume)
+    {
+        if (!_isInitialized) return;
+        lock (_uiSounds)
+        {
+        if (!_uiSounds.TryGetValue(id, out var sound))
+        {
+            var samples = render();
+            var pcm = new byte[samples.Length * 2];
+            for (int i = 0; i < samples.Length; i++)
+            {
+                short s = (short)(Math.Clamp(samples[i], -1f, 1f) * short.MaxValue);
+                pcm[i * 2] = (byte)(s & 0xFF);
+                pcm[i * 2 + 1] = (byte)((s >> 8) & 0xFF);
+            }
+            var info = new CREATESOUNDEXINFO
+            {
+                cbsize = System.Runtime.InteropServices.Marshal.SizeOf<CREATESOUNDEXINFO>(),
+                length = (uint)pcm.Length,
+                numchannels = 1,
+                defaultfrequency = sampleRate,
+                format = SOUND_FORMAT.PCM16,
+            };
+            if (_system.createSound(pcm, MODE.OPENMEMORY | MODE.OPENRAW | MODE.CREATESAMPLE | MODE.LOOP_OFF | MODE._2D,
+                                    ref info, out sound) != RESULT.OK) return;
+            _uiSounds[id] = sound;
+        }
+        if (_system.playSound(sound, default, true, out FMOD.Channel channel) != RESULT.OK) return;
+        channel.setVolume(Math.Clamp(volume, 0f, 1f));
+        channel.setPaused(false);
+        }
+    }
+
     // --- Step 1a diagnostic: a single isolated mono source for verifying HRTF / panning. ---
     // Deliberately bypasses the VoiceManager and the whole acoustics layer so we test ONLY
     // the renderer + listener path. Driven by AudioDiagnostics (`--audio-test`).

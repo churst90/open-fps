@@ -137,6 +137,16 @@ public interface IAudioProvider : IDisposable
     /// Used for voice-transmission indicators and accessibility cues.
     /// </summary>
     void PlayUiBeep(float frequencyHz, float durationMs);
+    /// <summary>Plays a short interface sound in both ears, not in the world: no position, no room.
+    /// The buffer is made once per id and kept; <paramref name="volume"/> is 0..1.</summary>
+    void PlayUiSound(string id, Func<float[]> render, int sampleRate, float volume);
+    /// <summary>The output devices the system offers, by name, in driver order.</summary>
+    IReadOnlyList<string> OutputDevices();
+    /// <summary>The recording devices the system offers, by name.</summary>
+    IReadOnlyList<string> InputDevices();
+    /// <summary>Switches output to the named device ("" for the system default). False if there is no
+    /// such device, in which case nothing changes.</summary>
+    bool SetOutputDevice(string name);
 
     // --- Diagnostics (Step 1a): an isolated mono source for verifying HRTF / 3D panning. ---
     void StartDiagnosticSound();

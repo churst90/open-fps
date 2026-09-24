@@ -9,7 +9,7 @@ namespace OpenFPS.Tests;
 
 /// <summary>
 /// The electric car horn, measured on the model and not asserted about the design: the note it
-/// actually plays, the level it actually makes at a metre, how fast it speaks and how fast it stops.
+/// actually plays, the level it actually makes at a metre, how it swells in and how it rings out.
 /// </summary>
 public class ElectricHornTests
 {
@@ -75,22 +75,38 @@ public class ElectricHornTests
         Assert.InRange(db, spec.ReferenceDb - 1.5, spec.ReferenceDb + 1.5);
     }
 
+    /// <summary>
+    /// Let go and it rings OUT, and then it is gone. The ring-out is deliberate: the relay lets go
+    /// through its suppression diode (RelayBreakSeconds) and the buzzer strikes softer and then not
+    /// at all before the diaphragm and tone disc ring down. The first version stopped dead in ten
+    /// milliseconds and was called "staccato", so this asserts both ends: still audibly fading
+    /// 10-20 ms after release (above -30 dB), well down by 50-60 ms (below -30 dB), and silent by
+    /// 100-110 ms (below -60 dB). A horn that hangs on is a fault as much as one that clicks off.
+    /// </summary>
     [Theory, MemberData(nameof(Keys))]
-    public void ItStopsWhenTheButtonIsReleased(string key)
+    public void ItRingsOutWhenTheButtonIsReleased(string key)
     {
         var spec = ElectricHornSpec.ByName(key);
         var buf = Render(new ElectricHorn(spec, Sr, 11), 0.6f, 0.2f);
         int rel = (int)(0.6f * Sr);
         double steady = Rms(buf, (int)(0.3f * Sr), rel);
-        // Everything from 50 ms after release onward: the diaphragm and the tone disc have rung down.
-        double tail = Rms(buf, rel + (int)(0.050f * Sr), rel + (int)(0.060f * Sr));
-        double rel50 = 20 * Math.Log10(tail / steady + 1e-15);
-        _o.WriteLine($"{key}: {rel50:F0} dB relative to steady, 50-60 ms after release");
-        Assert.True(rel50 < -60, $"{key} still sounding at {rel50:F0} dB 50 ms after release");
+        double Db(float fromMs, float toMs)
+            => 20 * Math.Log10(Rms(buf, rel + (int)(fromMs / 1000f * Sr), rel + (int)(toMs / 1000f * Sr)) / steady + 1e-15);
+        double early = Db(10, 20), mid = Db(50, 60), late = Db(100, 110);
+        _o.WriteLine($"{key}: {early:F0} dB at 10-20 ms after release, {mid:F0} at 50-60, {late:F0} at 100-110");
+        Assert.True(early > -30, $"{key} cut off at {early:F0} dB 10 ms after release: staccato, no ring-out");
+        Assert.True(mid < -30, $"{key} still at {mid:F0} dB 50 ms after release");
+        Assert.True(late < -60, $"{key} still sounding at {late:F0} dB 100 ms after release");
     }
 
+    /// <summary>
+    /// It swells in over a couple of dozen milliseconds: the relay seats (RelayMakeSeconds) and the
+    /// diaphragm swings short of the pole for its first cycles. Heard as instant, but not a click —
+    /// the 2 ms step it used to be was the other half of "staccato". So -6 dB of the steady level
+    /// is reached no sooner than 8 ms and no later than 30.
+    /// </summary>
     [Theory, MemberData(nameof(Keys))]
-    public void ItSpeaksAtOnce(string key)
+    public void ItSwellsInQuickly(string key)
     {
         var spec = ElectricHornSpec.ByName(key);
         var buf = Render(new ElectricHorn(spec, Sr, 11), 0.6f, 0f);
@@ -100,7 +116,7 @@ public class ElectricHornTests
         for (int i = 0; i + w < buf.Length; i += w)
             if (Rms(buf, i, i + w) >= steady * 0.5) { reachedMs = (i + w) * 1000f / Sr; break; }
         _o.WriteLine($"{key}: -6 dB of steady level by {reachedMs:F1} ms");
-        Assert.True(reachedMs <= 15f, $"{key} took {reachedMs:F1} ms to reach -6 dB");
+        Assert.InRange(reachedMs, 8f, 30f);
     }
 
     [Theory]

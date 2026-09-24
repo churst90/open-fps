@@ -261,7 +261,13 @@ public class MudGateway
             RegisterResponse r => r.Success ? "Registration successful." : "Registration failed: " + r.Message,
             PlayerSpawned => "You are now in the world. Try 'scan'.",
             TextEvent t => t.Text,
-            ChatMessage c => $"[{c.Sender}]: {c.Text}",
+            ChatMessage c => c.Channel switch
+            {
+                ChatChannel.Private when c.To.Length > 0 => $"[to {c.To}]: {c.Text}",
+                ChatChannel.Private => $"[from {c.Sender}]: {c.Text}",
+                ChatChannel.All => $"[{c.Sender}, to all]: {c.Text}",
+                _ => $"[{c.Sender}]: {c.Text}",
+            },
             _ => "" // Movement and world state updates are not converted to text for performance/verbosity reasons.
         };
     }

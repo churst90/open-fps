@@ -830,7 +830,6 @@ public class ClientAudioSystem
         _state.CurrentRegionId = regId;
         if (world.AcousticMap != null && world.AcousticMap.Regions.TryGetValue(regId, out var reg))
         {
-            _state.CurrentRegion = reg.FriendlyName;
             _state.IsIndoor = reg.IsIndoor;
             _state.RoomSize = reg.RoomSize;
             _state.RoomMaterials = reg.Materials;
@@ -840,27 +839,51 @@ public class ClientAudioSystem
         }
         else
         {
-            // Outdoors, name the place from WHAT YOU ARE STANDING ON.
-            //
-            // "Outside" is true and useless. A player working out where they are by ear needs to
-            // know they have stepped off the kerb, and the ground already knows — the same probe
-            // that chooses the footstep material. Concrete under the feet in the open air is a
-            // pavement; asphalt is the road; and the difference between them is the single most
-            // navigationally important fact on a city street.
-            //
-            // Derived, not authored: no map has to label a kerb, and a surface nobody has named
-            // still announces itself correctly.
-            _state.CurrentRegion = _state.ShelterFactor > 0.8f
-                ? "Under Shelter"
-                : OutdoorNameFor(_state.CurrentMaterial);
             _state.IsIndoor = false;
         }
+        _state.CurrentRegion = NameOfPlace(world.AcousticMap, regId, _state.CurrentMaterial, _state.ShelterFactor);
     }
+
+    /// <summary>
+    /// What to call where the listener is standing.
+    ///
+    /// A NAMED place says its name. Everywhere else is named from WHAT YOU ARE STANDING ON.
+    ///
+    /// "Outside" is true and useless. A player working out where they are by ear needs to know they
+    /// have stepped off the kerb, and the ground already knows — the same probe that chooses the
+    /// footstep material. Concrete under the feet in the open air is a pavement; asphalt is the
+    /// road; and the difference between them is the single most navigationally important fact on a
+    /// city street.
+    ///
+    /// The map-wide outdoor region is NOT a named place, although it has a name. It is always in
+    /// the acoustic map — the generator puts it there so the outdoors has a reverb and a size — so
+    /// the lookup that used to guard this fallback always succeeded, and every metre of open ground
+    /// no author had boxed was announced as "Outside": the fallback below had never once run. Its
+    /// name is kept only for ground the material table does not recognise.
+    ///
+    /// Derived, not authored: no map has to label a kerb, and a surface nobody has named still
+    /// announces itself correctly.
+    /// </summary>
+    internal static string NameOfPlace(AcousticMap? map, int regionId, string material, float shelter)
+    {
+        RegionComponent? global = null;
+        if (map != null && map.Regions.TryGetValue(regionId, out var reg))
+        {
+            if (regionId != AcousticConstants.GlobalRegionId && !string.IsNullOrWhiteSpace(reg.FriendlyName))
+                return reg.FriendlyName;
+            if (regionId == AcousticConstants.GlobalRegionId) global = reg;
+        }
+        if (shelter > 0.8f) return "Under Shelter";
+        string ground = OutdoorNameFor(material);
+        if (ground == "outside" && !string.IsNullOrWhiteSpace(global?.FriendlyName)) return global.Value.FriendlyName;
+        return ground;
+    }
+
     /// <summary>
     /// What to call a patch of open ground, from the surface underfoot. Falls back to "outside"
     /// for anything unrecognised, which is no worse than what it replaced.
     /// </summary>
-    private static string OutdoorNameFor(string material) => material switch
+    internal static string OutdoorNameFor(string material) => material switch
     {
         "Concrete" => "sidewalk",
         "Asphalt" => "road",

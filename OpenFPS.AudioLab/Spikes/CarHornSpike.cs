@@ -21,12 +21,12 @@ namespace OpenFPS.Client.Core.AudioEngine.Fmod;
 public static class CarHornSpike
 {
     private const int Sr = VehicleSynth.SampleRate;
-    private static readonly string[] AirHorns = { "truck_dual", "bus_horn" };
+    private static readonly string[] AirHorns = { "truck_dual", "bus_horn", "rs3l", "k5la" };
 
     public static int Run(string[] args)
     {
         string dir = args.FirstOrDefault(a => a.StartsWith("out=", StringComparison.Ordinal))?.Substring(4)
-                     ?? "/home/cody/external-rescue/Github/open-fps/inbox/car-horns-2026-09-23";
+                     ?? "/home/cody/external-rescue/Github/open-fps/inbox/car-horns-2026-09-24";
         Directory.CreateDirectory(dir);
         var chosen = ElectricHornSpec.Presets.Keys.Where(args.Contains).ToList();
         if (chosen.Count == 0) chosen = ElectricHornSpec.Presets.Keys.ToList();
@@ -53,6 +53,7 @@ public static class CarHornSpike
             foreach (var l in horn.Describe()) Console.WriteLine($"    {l}");
             var patterns = Patterns(on => { horn.Blowing = on; horn.Step(); return horn.Out; });
             Check(patterns["hold"], spec.ReferenceDb, $"air_{key}", airHorn: true);
+            Harmonics(patterns["hold"], spec.Bells.Select(bl => bl.Hz).ToArray());
             Write(dir, $"air_{key}", patterns);
         }
 
@@ -88,13 +89,19 @@ public static class CarHornSpike
         float db = 20f * MathF.Log10(MathF.Max(1e-12f, rms) / 2e-5f);
         bool ok = MathF.Abs(db - referenceDb) <= 1.5f;
         var bands = Spectrum.AverageBandsDb(hold.AsSpan(a, b - a), Sr, new[] { 0, 4096, 8192, 12288, 16384, 20480, 24576, 28672 });
-        float onsetMs = -1f, win = 0.002f;
-        int w = (int)(win * Sr);
-        for (int i = s0; i + w < b; i += w)
+        int w = (int)(0.002f * Sr);
+        float Reached(int from, int to, float relDb, bool rising)
         {
-            double we = 0; for (int j = i; j < i + w; j++) we += hold[j] * (double)hold[j];
-            if (Math.Sqrt(we / w) >= rms * 0.5f) { onsetMs = (i + w - s0) * 1000f / Sr; break; }
+            float lim = rms * MathF.Pow(10f, relDb / 20f);
+            for (int i = from; i + w < to; i += w)
+            {
+                double we = 0; for (int j = i; j < i + w; j++) we += hold[j] * (double)hold[j];
+                float r = (float)Math.Sqrt(we / w);
+                if (rising ? r >= lim : r < lim) return (i + w - from) * 1000f / Sr;
+            }
+            return -1f;
         }
+        float onsetMs = Reached(s0, b, -6f, true);
         float ReleaseDb(float fromMs, float toMs)
         {
             int p = end + (int)(fromMs * Sr / 1000f), q = end + (int)(toMs * Sr / 1000f);
@@ -103,9 +110,52 @@ public static class CarHornSpike
         }
         Console.WriteLine($"    hold: rms {db:F1} dB at 1 m (anchor {referenceDb:F0}, {(ok ? "OK" : "OFF")}), crest {peak / rms:F1}, "
                           + $"-6 dB reached {onsetMs:F0} ms after press");
-        Console.WriteLine($"    release: {ReleaseDb(0, 10):F0} dB rel in 0-10 ms, {ReleaseDb(20, 30):F0} at 20-30, {ReleaseDb(40, 50):F0} at 40-50");
+        Console.WriteLine($"    onset: -20 dB at {Reached(s0, b, -20f, true):F0} ms, -6 at {onsetMs:F0}, -1 at {Reached(s0, b, -1f, true):F0}");
+        Console.WriteLine($"    release: {ReleaseDb(0, 10):F0} dB rel in 0-10 ms, {ReleaseDb(20, 30):F0} at 20-30, {ReleaseDb(40, 50):F0} at 40-50; "
+                          + $"below -20 dB at {Reached(end, hold.Length, -20f, false):F0} ms, -40 at {Reached(end, hold.Length, -40f, false):F0}, -60 at {Reached(end, hold.Length, -60f, false):F0}");
         Console.WriteLine("    bands: " + string.Join("  ", bands.Select((d, i) => $"{Spectrum.BandEdges[i]:F0}:{d:F0}")));
         return ok || airHorn;
+    }
+
+    /// <summary>
+    /// What makes an air horn brassy or brittle: where its energy sits. Spectral centroid, and the
+    /// first ten harmonics of the lowest bell (Goertzel at k·f over the steady hold), relative to the
+    /// strongest of them.
+    /// </summary>
+    private static void Harmonics(float[] hold, float[] notes)
+    {
+        float f1 = notes[0];
+        int s0 = (int)(0.4f * Sr), a = s0 + (int)(0.3f * Sr), n = (int)(0.8f * Sr);
+        var x = hold.AsSpan(a, n).ToArray();
+        double Pow(float hz)
+        {
+            double w = 2 * Math.PI * hz / Sr, c = 2 * Math.Cos(w), s1 = 0, s2 = 0;
+            for (int i = 0; i < x.Length; i++)
+            {
+                double hann = 0.5 - 0.5 * Math.Cos(2 * Math.PI * i / (x.Length - 1));
+                double s = x[i] * hann + c * s1 - s2; s2 = s1; s1 = s;
+            }
+            return s1 * s1 + s2 * s2 - c * s1 * s2;
+        }
+        // Peak-picked within 2% of each k·f: the loop settles a hertz or so off the design note, and
+        // at the tenth harmonic that is further than a 0.8 s window's main lobe.
+        double Peak(float hz) { double best = 0; for (float d = -0.02f * hz; d <= 0.02f * hz; d += 0.5f) best = Math.Max(best, Pow(hz + d)); return best; }
+        var h = Enumerable.Range(1, 10).Select(k => Peak(f1 * k)).ToArray();
+        double top = h.Max();
+        // Centroid: a 0.2 s window (Hann main lobe +-10 Hz) swept in 5 Hz steps to 12 kHz, so no
+        // harmonic can fall between the steps and leave the noise to decide the answer.
+        x = x.AsSpan(0, (int)(0.2f * Sr)).ToArray();
+        // ...and the NOISE: everything further than 3% from every harmonic of every bell. A horn is
+        // a tone with some air in it; how much air is a number, not an impression.
+        double num = 0, den = 0, noise = 0;
+        for (float hz = 50f; hz < 12000f; hz += 5f)
+        {
+            double p = Pow(hz); num += hz * p; den += p;
+            bool near = notes.Any(f => { float k = MathF.Round(hz / f); return k >= 1 && MathF.Abs(hz - k * f) < 0.03f * f; });
+            if (!near) noise += p;
+        }
+        Console.WriteLine($"    centroid {num / Math.Max(1e-30, den):F0} Hz, noise {10 * Math.Log10(noise / Math.Max(1e-30, den) + 1e-12):F0} dB; bell 1 {f1:F0} Hz harmonics dB: "
+                          + string.Join(" ", h.Select(v => $"{10 * Math.Log10(v / top + 1e-12):F0}")));
     }
 
     private static void Write(string dir, string name, Dictionary<string, float[]> patterns)

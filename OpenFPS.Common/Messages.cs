@@ -382,8 +382,34 @@ public partial class ClientInputUpdate : IMessage
 [MemoryPackable]
 public partial class PlayerJoined : IMessage { public int ConnectionId; public string Username = string.Empty; }
 
+/// <summary>
+/// Who a line of chat is for. It used to be guessed from the sender's name ("[PM from x]",
+/// "System"), which is how every command reply in the game came to be spoken as "System: ...".
+/// </summary>
+public enum ChatChannel : byte
+{
+    /// <summary>Everyone on your map — what plain typing sends.</summary>
+    Map = 0,
+    /// <summary>Everyone on the server: /all.</summary>
+    All = 1,
+    /// <summary>To you by name, or your own message to someone: /pm.</summary>
+    Private = 2,
+    /// <summary>The server speaking to everyone — the message of the day, an announcement.</summary>
+    Server = 3,
+}
+
 [MemoryPackable]
-public partial class ChatMessage : IMessage { public string Sender = string.Empty; public string Text = string.Empty; }
+public partial class ChatMessage : IMessage
+{
+    public string Sender = string.Empty;
+    public string Text = string.Empty;
+    // Appended: messages serialise positionally.
+    public ChatChannel Channel;
+    /// <summary>Said by an admin or moderator, so it is heard as one.</summary>
+    public bool FromStaff;
+    /// <summary>For a private message YOU sent: who it went to. Empty otherwise.</summary>
+    public string To = string.Empty;
+}
 
 [MemoryPackable]
 public partial class LoginRequest : IMessage { public string Username = string.Empty; public string Password = string.Empty; }

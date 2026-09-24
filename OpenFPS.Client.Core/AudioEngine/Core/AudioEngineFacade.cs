@@ -521,6 +521,16 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
         if (_isInitialized) _provider.PlayUiBeep(frequencyHz, durationMs);
     }
 
+    public IReadOnlyList<string> OutputDevices() => _isInitialized ? _provider.OutputDevices() : Array.Empty<string>();
+    public IReadOnlyList<string> InputDevices() => _isInitialized ? _provider.InputDevices() : Array.Empty<string>();
+    public bool SetOutputDevice(string name) => _isInitialized && _provider.SetOutputDevice(name);
+
+    /// <summary>A short interface sound in both ears. See IAudioProvider.PlayUiSound.</summary>
+    public void PlayUiSound(string id, Func<float[]> render, int sampleRate, float volume)
+    {
+        if (_isInitialized) _provider.PlayUiSound(id, render, sampleRate, volume);
+    }
+
     // --- Step 1a diagnostics: drive an isolated mono source (see AudioDiagnostics). ---
     public void StartDiagnosticSound() { if (_isInitialized) _provider.StartDiagnosticSound(); }
     public void SetDiagnosticPosition(Vector3 position) { if (_isInitialized) _provider.SetDiagnosticPosition(position); }

@@ -1020,6 +1020,20 @@ for sz, sname, sx0, sx1 in ((STREETS[0], "Dock Street", ST_X0, ST_X1),
         a, b = sx0 + k * (sx1 - sx0) / n, sx0 + (k + 1) * (sx1 - sx0) / n
         region(f"{sname}, block {k + 1}", a, b, 0.0, 6.0, sz - KERB, sz + KERB)
 
+# The cross streets' pavements, named as the avenues' are. They were left out, so every metre of
+# footway along Dock, Central, Foundry and North Street fell into the map-wide outdoor region and was
+# announced as "Outside" — the one word a player cannot navigate by. Emitted after the carriageways,
+# in the same order, so the ids come out as they are in city.json.
+for sz, sname, sx0, sx1 in ((STREETS[0], "Dock Street", ST_X0, ST_X1),
+                            (STREETS[1], "Central Street", RES_X0, TERM_X0 - 6.0),
+                            (STREETS[2], "Foundry Street", ST_X0, APRON_X0),
+                            (STREETS[3], "North Street", ST_X0, ST_X1)):
+    n = max(1, int((sx1 - sx0) // 60))
+    for k in range(n):
+        a, b = sx0 + k * (sx1 - sx0) / n, sx0 + (k + 1) * (sx1 - sx0) / n
+        region(f"{sname} south pavement, block {k + 1}", a, b, 0.0, 4.0, sz - WALK, sz - KERB)
+        region(f"{sname} north pavement, block {k + 1}", a, b, 0.0, 4.0, sz + KERB, sz + WALK)
+
 # ══ Where the traffic runs ════════════════════════════════════════════════════════════════════════
 #
 # Roads are already data on this map, so a route round them is data too. Every loop below is a

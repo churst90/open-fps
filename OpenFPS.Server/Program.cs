@@ -261,6 +261,46 @@ public class GameServer
     /// Sends to a session over whichever transport it actually has. A MUD session has no UDP peer, which
     /// is why every gameplay reply used to vanish for telnet players — including chat aimed at them.
     /// </summary>
+    /// <summary>
+    /// Somebody saying something: to their own map, which is what plain typing does, or to everyone
+    /// on the server with /all. Private messages and the server's own announcements go elsewhere.
+    /// </summary>
+    public void Chat(UserSession from, string text, ChatChannel channel)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return;
+        Log.Information("[CHAT {Channel}] {User}: {Text}", channel, from.Username, text);
+        var line = new ChatMessage
+        {
+            Sender = from.Username, Text = text, Channel = channel,
+            FromStaff = from.Role is UserRole.Admin or UserRole.Dev,
+        };
+        var to = channel == ChatChannel.All ? _sessions.GetAllSessions() : _sessions.GetSessionsInMap(from.CurrentMapId);
+        foreach (var s in to) SendToSession(s, line);
+    }
+
+    /// <summary>The server speaking to everyone: an announcement, sent as "Server".</summary>
+    public void Announce(string text, bool fromStaff)
+    {
+        var line = new ChatMessage { Sender = "Server", Text = text, Channel = ChatChannel.Server, FromStaff = fromStaff };
+        foreach (var s in _sessions.GetAllSessions()) SendToSession(s, line);
+    }
+
+    /// <summary>
+    /// The message of the day: motd.txt in the server's working folder, beside maps/ and prefabs/ —
+    /// OpenFPS.Server/motd.txt under run-server.sh. Read when it is asked for, so an edit (or
+    /// /setmotd) takes effect without a restart. Sent to each player as they arrive in the world,
+    /// from "Server", into the server buffer, and spoken.
+    /// </summary>
+    public static string MotdPath => Path.GetFullPath("motd.txt");
+
+    public static string ReadMotd()
+    {
+        try { return File.Exists(MotdPath) ? File.ReadAllText(MotdPath).Trim() : ""; }
+        catch (IOException) { return ""; }
+    }
+
+    public static void WriteMotd(string text) => File.WriteAllText(MotdPath, text.Trim() + Environment.NewLine);
+
     public void SendToSession(UserSession session, IMessage message, DeliveryMethod delivery = DeliveryMethod.ReliableOrdered)
     {
         var peer = _network.GetPeer(session.ConnectionId);
@@ -306,12 +346,8 @@ public class GameServer
             else _commands.HandleTextCommand(id, req, reply);
         });
         _dispatcher.RegisterHandler<ChatMessage>((id, req, reply) => {
-            if (_sessions.TryGetSession(id, out var sess)) 
-            {
-                Log.Information("[CHAT] {User}: {Text}", sess.Username, req.Text);
-                var broadcast = new ChatMessage { Sender = sess.Username, Text = req.Text };
-                foreach (var s in _sessions.GetAllSessions()) SendToSession(s, broadcast);
-            }
+            if (_sessions.TryGetSession(id, out var sess))
+                Chat(sess, req.Text, req.Channel == ChatChannel.All ? ChatChannel.All : ChatChannel.Map);
         });
         _dispatcher.RegisterHandler<InteractRequest>((id, req, reply) => {
             var peer = _network.GetPeer(id);
@@ -620,6 +656,8 @@ public class GameServer
 
             var t = world.Get<Transform>(session.Entity);
             SendToSession(session, new PlayerSpawned { EntityId = session.Entity.Id, SpawnTransform = t });
+            if (ReadMotd() is { Length: > 0 } motd)
+                SendToSession(session, new ChatMessage { Sender = "Server", Text = motd, Channel = ChatChannel.Server });
             Log.Information("Spawned player {User} as Entity {Id}", session.Username, session.Entity.Id);
         });
     }

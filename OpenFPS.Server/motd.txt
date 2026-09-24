@@ -1,0 +1,1 @@
+Welcome to OpenFPS. Plain chat is heard on your map; type /all to talk to everyone. Use left and right brackets to read chat, and shift with them to change chat ring.
