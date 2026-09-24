@@ -271,7 +271,7 @@ public sealed class EngineReflections
             var e = Make(echo.VoiceId, entityId, direct, r, gain);
             if (audio.IsPlaying(echo.VoiceId)) audio.UpdateSpatialAttributes(e);
             else audio.PlayPhysicalSoundDirect(e);
-            ApplyPath(audio, echo.VoiceId, directPath, r, listener);
+            ApplyPath(audio, echo.VoiceId, directPath, r, listener, directDist);
             echo.Seen = true;
             echo.Silent = 0f;
             echo.Last = r;
@@ -301,7 +301,7 @@ public sealed class EngineReflections
             // faded, which is a whistle rather than a wall going quiet.
             float fade = 1f - echo.Silent / ReleaseSeconds;
             audio.UpdateSpatialAttributes(Make(echo.VoiceId, entityId, direct, echo.Last, echo.Gain * fade));
-            ApplyPath(audio, echo.VoiceId, directPath, echo.Last, listener);
+            ApplyPath(audio, echo.VoiceId, directPath, echo.Last, listener, directDist);
         }
         if (drop != null) foreach (int k in drop) mine.Remove(k);
     }
@@ -416,17 +416,38 @@ public sealed class EngineReflections
     /// acoustic model — never sent to the worker (their ids are below the threshold step 5 scans),
     /// never given a path, permanently unoccluded and full-bandwidth.
     ///
-    /// Distance and delay are the echo's OWN: it has travelled further, so it is placed at the
-    /// mirrored source and carries the length of the path it actually took.
+    /// Distance, delay and the AIR are the echo's OWN: it has travelled further, so it is placed at
+    /// the mirrored source, carries the length of the path it actually took, and has lost as much of
+    /// its top as that path costs. It used to keep the car's own air absorption, so an echo that
+    /// had come 120 m round a facade was as bright as a car 40 m away — brighter than the car, often,
+    /// and brightness is how the ear judges nearness. A passing car was heard on the far side of the
+    /// street: "inside out", "passing behind me".
     /// </summary>
     private static void ApplyPath(AudioEngineFacade audio, int voiceId, in AcousticPathData directPath,
-                                  in Reflection r, Vector3 listener)
+                                  in Reflection r, Vector3 listener, float directDist)
     {
         var p = directPath;
         p.ApparentPosition = r.ApparentPosition;
         p.EffectiveDistance = MathF.Max(r.PathLength, Vector3.Distance(listener, r.ApparentPosition));
+        p.AirAbsorption = EchoAir(directPath.AirAbsorption, directDist, r.PathLength);
         p.IsReflection = true;
         audio.SetAcousticPath(voiceId, p);
+    }
+
+    /// <summary>
+    /// The air absorption over the echo's path, from the direct path's. The game's air absorption
+    /// grows in proportion to the distance beyond <see cref="AcousticConstants.AirAbsorptionMinDist"/>
+    /// (see AudioPhysics.AirAbsorptionFor), so it scales by the ratio of the two excesses; a direct
+    /// path too short to have any uses the reference rate.
+    /// </summary>
+    internal static float EchoAir(float directAir, float directDist, float pathLength)
+    {
+        float min = AcousticConstants.AirAbsorptionMinDist;
+        float excess = MathF.Max(0f, pathLength - min);
+        float rate = directDist > min + 1f && directAir > 0f
+            ? directAir / (directDist - min)
+            : 1f / AcousticConstants.AirAbsorptionReferenceDist;
+        return Math.Clamp(MathF.Max(directAir, excess * rate), 0f, AcousticConstants.AirAbsorptionMaxMuffle);
     }
 
     private static SpatialEmitter Make(int voiceId, int engineId, in SpatialEmitter direct,
