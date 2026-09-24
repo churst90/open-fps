@@ -151,8 +151,9 @@ public interface IAudioProvider : IDisposable
     void StopDiagnosticSound();
 }
 
-/// <summary>One voice as it reaches the listener: the volume last applied (dB, before the band EQ, times
-/// the strongest band), how much is blocked, the band gains, and whether it is a reflection or arriving
-/// from somewhere other than its source (round an edge).</summary>
+/// <summary>One voice as it reaches the listener: its level in dB full scale in its loudest band, how much
+/// is blocked, the level in each of the low/mid/high bands (distance, occlusion, air, shelter and cone
+/// all applied), and whether it is a reflection or arriving from somewhere other than its source (round
+/// an edge).</summary>
 public readonly record struct VoiceLevel(int EntityId, string SoundId, float Distance, float Db, float Occlusion,
                                          float Low, float Mid, float High, bool Reflection, bool Redirected);

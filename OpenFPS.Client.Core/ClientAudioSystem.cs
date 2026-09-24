@@ -1414,14 +1414,14 @@ public class ClientAudioSystem
             }
 
             // What actually reaches you loudest, and by which route: the answer to "why can I still
-            // hear that bus two streets over". dB is the volume the mixer was given (0 = full scale)
-            // times the strongest band the occlusion EQ passes; "blocked" is the occlusion, the three
-            // numbers after it the low/mid/high band gains, and "round an edge" means the bearing has
-            // been moved to where the sound bends round something.
+            // hear that bus two streets over". Levels are dB full scale at the mixer, with distance,
+            // occlusion, air absorption, shelter and cone applied: the loudest band first, then each
+            // of low, mid and high. "round an edge" means the bearing has been moved to where the
+            // sound bends round something.
             foreach (var v in _audio.LoudestVoices(5))
             {
                 string name = _carPreset.TryGetValue(v.EntityId, out var preset) ? preset : v.SoundId;
-                Log.Information("  loudest: {Name} ({Id}) at {Dist:F0} m: {Db:F1} dB, blocked {Occ:P0}, bands {Low:F2}/{Mid:F2}/{High:F2}{Refl}{Edge}",
+                Log.Information("  loudest: {Name} ({Id}) at {Dist:F0} m: {Db:F1} dBFS, blocked {Occ:P0}, low/mid/high {Low:F0}/{Mid:F0}/{High:F0} dBFS{Refl}{Edge}",
                                 name, v.EntityId, v.Distance, v.Db, v.Occlusion, v.Low, v.Mid, v.High,
                                 v.Reflection ? ", a reflection" : "", v.Redirected ? ", round an edge" : "");
             }

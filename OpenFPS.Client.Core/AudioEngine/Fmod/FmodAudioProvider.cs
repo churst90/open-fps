@@ -505,6 +505,8 @@ public class FmodAudioProvider : IAudioProvider
         public float CurrentOcclusion;
         /// <summary>The volume last handed to the channel, before the band EQ. For the census.</summary>
         public float LastVolume;
+        /// <summary>The low/mid/high EQ last applied, dB: occlusion, air, shelter, cone. For the census.</summary>
+        public (float Low, float Mid, float High) LastEqDb;
         public float TargetOcclusion;
         public float CurrentAperture = 1.0f;
         public float TargetAperture = 1.0f;
@@ -3428,6 +3430,7 @@ public class FmodAudioProvider : IAudioProvider
             active.ThreeEqDsp.setParameterFloat(0, Math.Clamp(lowDb, -80.0f, 10.0f));
             active.ThreeEqDsp.setParameterFloat(1, Math.Clamp(midDb, -80.0f, 10.0f));
             active.ThreeEqDsp.setParameterFloat(2, Math.Clamp(highDb, -80.0f, 10.0f));
+            active.LastEqDb = (Math.Clamp(lowDb, -80f, 10f), Math.Clamp(midDb, -80f, 10f), Math.Clamp(highDb, -80f, 10f));
         }
 
         // Reverb send: a modest, roughly CONSTANT contribution per source. It must NOT grow with distance
@@ -4120,10 +4123,15 @@ public class FmodAudioProvider : IAudioProvider
             foreach (var a in _activeSounds)
             {
                 if (!a.Channel.hasHandle() || a.LastVolume <= 0f) continue;
-                float band = MathF.Max(a.CurrentLow, MathF.Max(a.CurrentMid, a.CurrentHigh));
-                float db = 20f * MathF.Log10(MathF.Max(1e-9f, a.LastVolume * band));
-                all.Add(new VoiceLevel(a.EntityId, a.SoundId, Vector3.Distance(_listenerPos, a.Position), db,
-                                       a.CurrentOcclusion, a.CurrentLow, a.CurrentMid, a.CurrentHigh,
+                float dist = Vector3.Distance(_listenerPos, a.CurrentApparentPosition);
+                // A voice without a Steam Audio state is panned by FMOD, which applies the distance
+                // law itself; LastVolume holds it only for the Steam Audio voices.
+                float law = a.SaState != null ? 1f : Loudness.RenderedGain(1f, a.MinDistance, a.Range, dist);
+                float db = 20f * MathF.Log10(MathF.Max(1e-9f, a.LastVolume * law));
+                var eq = a.LastEqDb;
+                all.Add(new VoiceLevel(a.EntityId, a.SoundId, Vector3.Distance(_listenerPos, a.Position),
+                                       db + MathF.Max(eq.Low, MathF.Max(eq.Mid, eq.High)),
+                                       a.CurrentOcclusion, db + eq.Low, db + eq.Mid, db + eq.High,
                                        a.IsReflection, Vector3.Distance(a.Position, a.CurrentApparentPosition) > 1f));
             }
         }
