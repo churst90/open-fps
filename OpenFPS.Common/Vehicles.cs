@@ -896,7 +896,7 @@ public sealed record VehicleProfile
         // takes about 280 ms and you hear the revs fall through the gap; this takes 60, which is too
         // short to hear as a gap at all — the note simply steps down, like a hammer. It is the same
         // mechanism as a racing box and it is why one sounds violent where a manual sounds smooth.
-        Gearbox = Gearbox.SixSpeedSports with { Ratios = new[] { 2.66f, 1.78f, 1.3f, 1.0f, 0.74f, 0.5f }, FinalDrive = 3.07f, ShiftSeconds = 0.06f, UpshiftRpm = 8200f, DownshiftRpm = 3000f },
+        Gearbox = Gearbox.SixSpeedSports with { Ratios = new[] { 2.66f, 1.78f, 1.3f, 1.0f, 0.74f, 0.5f }, FinalDrive = 3.07f, ShiftSeconds = 0.06f, UpshiftRpm = 5900f, DownshiftRpm = 3000f },
         Tyres = TyreProfile.SportsOnAsphalt,
         MassKg = 1560f, DragArea = 0.75f,
         ExhaustOffsetZ = 0.3f, IntakeOffsetZ = 1.3f,

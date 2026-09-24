@@ -231,6 +231,22 @@ public class EngineSynthTests
     }
 
     /// <summary>
+    /// No vehicle changes up above its own engine's redline. The road V10's gearbox said 8,200 rpm on
+    /// an engine that redlines at 6,200, so floored it never changed gear at all and sat at its power
+    /// limit in whatever gear it was in.
+    /// </summary>
+    [Fact]
+    public void EveryGearboxChangesUpBelowItsEnginesRedline()
+    {
+        foreach (var (key, make) in VehicleProfile.Presets)
+        {
+            var v = make();
+            Assert.True(v.Gearbox.UpshiftRpm <= v.Engine.RedlineRpm,
+                $"{key}: changes up at {v.Gearbox.UpshiftRpm:F0} rpm, above its redline of {v.Engine.RedlineRpm:F0}");
+        }
+    }
+
+    /// <summary>
     /// The soft ceiling bends, it does not jump. It used to be tanh past ±0.8 and straight below,
     /// which stepped from 0.8 to 0.664 at the knee — a click on both edges of every backfire. Swept
     /// finely from -3 to +3, no step between neighbouring inputs is bigger than the input step, the
