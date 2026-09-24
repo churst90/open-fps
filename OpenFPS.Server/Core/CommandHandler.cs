@@ -28,11 +28,16 @@ public class CommandHandler
     private readonly CompositeService? _composites;
     private readonly OccupancyService? _seats;
     private readonly HandsService? _hands;
+    private readonly IUserRepository? _users;
+    private readonly FriendRepository? _friends;
 
     public CommandHandler(SessionManager sessions, MapManager maps, GameServer server,
                           CompositeService? composites = null, OccupancyService? seats = null,
-                          HandsService? hands = null)
+                          HandsService? hands = null, IUserRepository? users = null,
+                          FriendRepository? friends = null)
     {
+        _users = users;
+        _friends = friends;
         _sessions = sessions;
         _maps = maps;
         _server = server;
@@ -243,6 +248,27 @@ public class CommandHandler
             case "i":
             case "inventory":
                 HandleInventory(session, reply);
+                break;
+            // ── People and places ───────────────────────────────────────────────────────────
+            case "friend":
+            case "unfriend":
+                HandleFriend(session, commandName, args, reply);
+                break;
+            case "friends":
+                if (_friends == null) { Say(reply, "Friends are not available on this server."); break; }
+                reply(OpenFPS.Server.Services.SocialService.BuildFriendList(session.Username, _friends, _sessions));
+                break;
+            case "profile":
+            case "whois":
+                HandleProfile(session, args, reply);
+                break;
+            case "where":
+            case "locate":
+                HandleWhere(session, args, reply);
+                break;
+            case "join":
+            case "travel":
+                HandleJoin(session, args, reply);
                 break;
             case "savemap":
                 if (!isElevated) { DenyCommand(reply); return; }
@@ -1359,6 +1385,203 @@ public class CommandHandler
             FromStaff = session.Role is UserRole.Admin or UserRole.Dev,
         });
         reply(new ChatMessage { Sender = session.Username, Text = message, Channel = ChatChannel.Private, To = targetSession.Username });
+    }
+
+    // ── People and places ───────────────────────────────────────────────────────────────────────
+
+    /// <summary>The online session of a user, if they are on.</summary>
+    private UserSession? OnlineSession(string username) =>
+        _sessions.GetAllSessions().FirstOrDefault(s => s.Username.Equals(username, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>
+    /// A user's name as the server stores it, and their role, if they are registered. Falls back on
+    /// who is online when there is no user store to ask (a test rig).
+    /// </summary>
+    private bool TryFindUser(string name, out string username, out UserRole role)
+    {
+        username = name; role = UserRole.Player;
+        var record = _users?.GetUser(name);
+        if (record != null) { username = record.Username; role = record.Role; return true; }
+        var online = OnlineSession(name);
+        if (online != null) { username = online.Username; role = online.Role; return true; }
+        return false;
+    }
+
+    private static string RoleWord(UserRole role) => role switch
+    {
+        UserRole.Admin => "administrator",
+        UserRole.Dev => "developer",
+        _ => "player",
+    };
+
+    /// <summary>/friend add NAME, /friend remove NAME, /friend NAME (add), /unfriend NAME.</summary>
+    private void HandleFriend(UserSession session, string commandName, string[] args, Action<IMessage> reply)
+    {
+        if (_friends == null) { Say(reply, "Friends are not available on this server."); return; }
+
+        bool remove = commandName == "unfriend";
+        string? name = null;
+        if (args.Length >= 1)
+        {
+            string verb = args[0].ToLowerInvariant();
+            if (!remove && verb is "add" or "remove" or "delete" or "rm")
+            {
+                remove = verb != "add";
+                name = args.Length >= 2 ? args[1] : null;
+            }
+            else name = args[0];
+        }
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            Say(reply, "Usage: /friend add [name], or /friend remove [name]. /friends lists them.");
+            return;
+        }
+
+        if (remove)
+        {
+            // Removal does not need the account to exist any more: a deleted account is exactly the
+            // friend somebody wants off their list.
+            string shown = TryFindUser(name, out var stored, out _) ? stored : name;
+            Say(reply, _friends.Remove(session.Username, shown)
+                ? $"{shown} removed from your friends."
+                : $"{shown} is not on your friends list.");
+            return;
+        }
+
+        if (!TryFindUser(name, out var username, out _)) { Say(reply, $"There is no player called {name}."); return; }
+        if (username.Equals(session.Username, StringComparison.OrdinalIgnoreCase))
+        {
+            Say(reply, "You cannot add yourself as a friend.");
+            return;
+        }
+        Say(reply, _friends.Add(session.Username, username)
+            ? $"{username} added to your friends."
+            : $"{username} is already your friend.");
+    }
+
+    /// <summary>/profile NAME — what the server knows about somebody, in a sentence or two.</summary>
+    private void HandleProfile(UserSession session, string[] args, Action<IMessage> reply)
+    {
+        if (args.Length < 1) { Say(reply, "Usage: /profile [name]"); return; }
+        if (!TryFindUser(args[0], out var username, out var role)) { Say(reply, $"There is no player called {args[0]}."); return; }
+
+        var target = OnlineSession(username);
+        string friend = _friends != null && _friends.IsFriend(session.Username, username) ? " On your friends list." : "";
+        string you = username.Equals(session.Username, StringComparison.OrdinalIgnoreCase) ? " (you)" : "";
+        if (target != null) role = target.Role;
+        string head = $"{username}{you}, {RoleWord(role)}.";
+
+        if (target == null) { Say(reply, $"{head} Not online.{friend}"); return; }
+        if (!target.CurrentMapId.Equals(session.CurrentMapId, StringComparison.OrdinalIgnoreCase))
+        {
+            Say(reply, $"{head} Online, on {target.CurrentMapId}.{friend}");
+            return;
+        }
+        string here = you.Length > 0 ? "" : RelativeTo(session, target);
+        Say(reply, $"{head} Online, here on {target.CurrentMapId}{(here.Length > 0 ? ", " + here : "")}.{friend}");
+    }
+
+    /// <summary>/where NAME — which way and how far, if they are on your map; which map otherwise.</summary>
+    private void HandleWhere(UserSession session, string[] args, Action<IMessage> reply)
+    {
+        if (args.Length < 1) { Say(reply, "Usage: /where [name]"); return; }
+        var target = OnlineSession(args[0]);
+        if (target == null)
+        {
+            Say(reply, TryFindUser(args[0], out var stored, out _) ? $"{stored} is not online." : $"There is no player called {args[0]}.");
+            return;
+        }
+        if (target.ConnectionId == session.ConnectionId)
+        {
+            string place = (_maps.TryGetMap(session.CurrentMapId, out var w, out _, out _, out _)
+                            && session.Entity != Entity.Null && w.IsAlive(session.Entity)
+                ? PlaceAt(w, w.Get<Transform>(session.Entity).Position) : null) ?? "";
+            Say(reply, $"You are on {session.CurrentMapId}{(place.Length > 0 ? ", at " + place : "")}.");
+            return;
+        }
+        if (!target.CurrentMapId.Equals(session.CurrentMapId, StringComparison.OrdinalIgnoreCase))
+        {
+            Say(reply, $"{target.Username} is on the map {target.CurrentMapId}.");
+            return;
+        }
+        string relative = RelativeTo(session, target);
+        Say(reply, relative.Length == 0
+            ? $"{target.Username} is on this map, but not in the world yet."
+            : $"{target.Username} is {relative}.");
+    }
+
+    /// <summary>
+    /// "25 metres away at 11 o'clock, 4 metres above you, at Main Street east pavement" — the other
+    /// player's bearing from the asker's facing, from the same clock face /scan uses. Empty if
+    /// either of them has no body yet.
+    /// </summary>
+    private string RelativeTo(UserSession asker, UserSession target)
+    {
+        if (!_maps.TryGetMap(asker.CurrentMapId, out var world, out _, out _, out _)) return "";
+        if (asker.Entity == Entity.Null || target.Entity == Entity.Null) return "";
+        if (!world.IsAlive(asker.Entity) || !world.IsAlive(target.Entity)) return "";
+
+        var me = world.Get<Transform>(asker.Entity);
+        var them = world.Get<Transform>(target.Entity).Position;
+        var offset = them - me.Position;
+        var flat = new Vector3(offset.X, 0, offset.Z);
+        float distance = flat.Length();
+
+        string where = distance < 1.5f
+            ? "right beside you"
+            : $"{MathF.Round(distance):0} metres away at {GetRelativeDirection(me.Rotation, Vector3.Normalize(flat))}";
+        if (MathF.Abs(offset.Y) > 2.5f)
+            where += $", {MathF.Abs(offset.Y):0} metres {(offset.Y > 0 ? "above" : "below")} you";
+        if (PlaceAt(world, them) is { Length: > 0 } place) where += $", at {place}";
+        return where;
+    }
+
+    /// <summary>
+    /// The name of the place a point is in: the smallest named region volume that contains it, the
+    /// same boxes the client names places from. Null where nowhere is named.
+    /// </summary>
+    public static string? PlaceAt(World world, Vector3 point)
+    {
+        string? best = null;
+        float bestVolume = float.MaxValue;
+        world.Query(new QueryDescription().WithAll<Transform, RegionComponent>(), (ref Transform t, ref RegionComponent r) =>
+        {
+            var size = r.RoomSize;
+            if (size.X <= 0 || size.Y <= 0 || size.Z <= 0 || string.IsNullOrWhiteSpace(r.FriendlyName)) return;
+            var local = Vector3.Transform(point - t.Position, Quaternion.Inverse(t.Rotation));
+            if (MathF.Abs(local.X) > size.X / 2 || MathF.Abs(local.Y) > size.Y / 2 || MathF.Abs(local.Z) > size.Z / 2) return;
+            float volume = size.X * size.Y * size.Z;
+            if (volume >= bestVolume) return;
+            bestVolume = volume;
+            best = r.FriendlyName;
+        });
+        return best;
+    }
+
+    /// <summary>/join MAP — go to another loaded map, if it is public, yours, or you are staff.</summary>
+    private void HandleJoin(UserSession session, string[] args, Action<IMessage> reply)
+    {
+        var enterable = _maps.LoadedMapIds.Where(id => OpenFPS.Server.Services.DiscoveryService.CanEnter(_maps, id, session))
+                                          .OrderBy(id => id, StringComparer.OrdinalIgnoreCase).ToList();
+        if (args.Length < 1) { Say(reply, $"Usage: /join [map]. Maps: {string.Join(", ", enterable)}."); return; }
+
+        string? mapId = _maps.LoadedMapIds.FirstOrDefault(id => id.Equals(args[0], StringComparison.OrdinalIgnoreCase));
+        if (mapId == null)
+        {
+            Say(reply, $"There is no map called {args[0]}. Maps: {string.Join(", ", enterable)}.");
+            return;
+        }
+        if (!OpenFPS.Server.Services.DiscoveryService.CanEnter(_maps, mapId, session))
+        {
+            Say(reply, $"{mapId} is private.");
+            return;
+        }
+        if (mapId.Equals(session.CurrentMapId, StringComparison.OrdinalIgnoreCase) && session.Entity != Entity.Null)
+        {
+            Say(reply, $"You are already on {mapId}.");
+            return;
+        }
+        _server.MoveToMap(session, mapId, reply);
     }
 
     private static string GetRelativeDirection(Quaternion rotation, Vector3 targetDir)

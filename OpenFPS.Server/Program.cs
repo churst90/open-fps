@@ -24,7 +24,7 @@ namespace OpenFPS.Server;
 public class GameServer
 {
     private readonly NetworkService _network = new();
-    private readonly SessionManager _sessions = new();
+    private SessionManager _sessions = new();
     private readonly WorldEnvironmentSystem _environment = new();
     private MapRepository _mapRepo = null!;
     private MapManager _maps = null!;
@@ -50,6 +50,7 @@ public class GameServer
     private readonly RateLimiter _authLimiter = new(capacity: 6, refillPerSecond: 0.2);
     private DiscoveryService _discovery = null!;
     private SocialService _social = null!;
+    private FriendRepository _friends = null!;
     private MapAuthorityService _mapAuthority = null!;
     private MudGateway _mudGateway = null!;
     private readonly ServerStateUpdate _reusableBroadcast = new();
@@ -61,6 +62,18 @@ public class GameServer
     }
 
     public void EnqueueCommand(Action action) => _commandBuffer.Enqueue(action);
+
+    /// <summary>
+    /// Gives an UNSTARTED server the maps and sessions a test built, so the paths that need the
+    /// world — <see cref="MoveToMap"/>, spawning — can run without a socket. Start() builds its own.
+    /// </summary>
+    public void Attach(MapManager maps, SessionManager sessions, OccupancyService? seats = null, HandsService? hands = null)
+    {
+        _maps = maps;
+        _sessions = sessions;
+        _seats = seats!;
+        _hands = hands!;
+    }
 
     /// <summary>
     /// Runs everything queued for the tick thread. This is the only place world mutations from other
@@ -210,11 +223,14 @@ public class GameServer
         _maps.RefreshEarshotRanges();
         _seats = new OccupancyService(_maps, EmitWorldAudio);
         _hands = new HandsService(_maps);
-        _commands = new CommandHandler(_sessions, _maps, this, _composites, _seats, _hands);
+        // Beside openfps.db and motd.txt, in the server's working folder. See FriendRepository for
+        // why this is a file and not a table.
+        _friends = new FriendRepository("friends.json");
+        _commands = new CommandHandler(_sessions, _maps, this, _composites, _seats, _hands, _userRepo, _friends);
         
         // Initialize new Service Architecture
         _discovery = new DiscoveryService(_dispatcher, _sessions, _maps);
-        _social = new SocialService(_dispatcher);
+        _social = new SocialService(_dispatcher, _sessions, _friends);
         _mapAuthority = new MapAuthorityService(_dispatcher);
         
         RegisterHandlers();
@@ -634,6 +650,11 @@ public class GameServer
         Transform spawnPoint = _maps.GetSpawnPoint(mapId);
 
         _commandBuffer.Enqueue(() => {
+            // Checked again here, where it counts: two 'ready's in one tick, or a 'ready' that raced a
+            // change of map, would otherwise put a second body in the world.
+            if (session.Entity != Entity.Null || session.CurrentMapId != mapId) return;
+            while (session.InputQueue.TryDequeue(out _)) { }
+            session.GroundProbe.Invalidate();
             session.Entity = world.Create();
             world.Add(session.Entity, new PlayerComponent { 
                     ConnectionId = connectionId, 
@@ -656,10 +677,89 @@ public class GameServer
 
             var t = world.Get<Transform>(session.Entity);
             SendToSession(session, new PlayerSpawned { EntityId = session.Entity.Id, SpawnTransform = t });
-            if (ReadMotd() is { Length: > 0 } motd)
+            // Once per session: a change of map spawns you again, and the MOTD is a greeting.
+            if (!session.Welcomed && ReadMotd() is { Length: > 0 } motd)
                 SendToSession(session, new ChatMessage { Sender = "Server", Text = motd, Channel = ChatChannel.Server });
+            session.Welcomed = true;
             Log.Information("Spawned player {User} as Entity {Id}", session.Username, session.Entity.Id);
         });
+    }
+
+    /// <summary>
+    /// Takes a player off the map they are on and puts them on another loaded one, at its spawn point.
+    ///
+    /// Runs on the tick thread. The old body is got out of any seat, made to put down what it was
+    /// carrying (things belong to the map they are on), destroyed and announced as gone; everything
+    /// the server remembers having sent the client is forgotten, so the new map's entities all go
+    /// out fresh. Then the new map is sent exactly as login sends one: a graphical client gets a
+    /// MapManifest and goes through map data, MapLoadComplete and 'ready' again; a text client has
+    /// no geometry to load and is spawned straight away. Access is checked by the caller
+    /// (see <see cref="DiscoveryService.CanEnter"/>).
+    /// </summary>
+    public void MoveToMap(UserSession session, string mapId, Action<IMessage>? reply = null)
+    {
+        EnqueueCommand(() => MoveToMapNow(session, mapId, reply));
+    }
+
+    private void MoveToMapNow(UserSession session, string mapId, Action<IMessage>? reply)
+    {
+        void Say(string text)
+        {
+            var message = new TextEvent { Text = text };
+            if (reply != null) reply(message); else SendToSession(session, message);
+        }
+
+        if (!_maps.TryGetMap(mapId, out _, out _, out _, out _))
+        {
+            Say($"There is no map called {mapId} on this server.");
+            return;
+        }
+        string from = session.CurrentMapId;
+        if (from.Equals(mapId, StringComparison.OrdinalIgnoreCase) && session.Entity != Entity.Null)
+        {
+            Say($"You are already on {mapId}.");
+            return;
+        }
+
+        if (session.Entity != Entity.Null && _maps.TryGetMap(from, out var oldWorld, out _, out _, out _))
+        {
+            var body = session.Entity;
+            if (oldWorld.IsAlive(body))
+            {
+                // Out of the seat first. Exit refuses while the vehicle is moving; leaving the map is
+                // not a request, so fall back to unseating without finding standing room.
+                if (oldWorld.Has<OccupantComponent>(body) && (_seats == null || !_seats.Exit(session, out _)))
+                    CompositeService.Disembark(oldWorld, body);
+                _hands?.Drop(session, "all", out _);
+            }
+            session.Entity = Entity.Null;
+            _maps.DestroyEntity(from, body);
+            BroadcastEntityRemoved(from, body.Id);
+        }
+        session.Entity = Entity.Null;
+
+        session.CurrentMapId = mapId;
+        session.KnownEntities.Clear();
+        session.VisibleDynamicEntities.Clear();
+        while (session.InputQueue.TryDequeue(out _)) { }
+        session.InputBudget = 0;
+        session.GroundProbe.Invalidate();
+        session.Build.Reset();
+
+        Log.Information("{User} moved from map '{From}' to '{To}'.", session.Username, from, mapId);
+
+        foreach (var other in _sessions.GetSessionsInMap(from))
+            if (other.ConnectionId != session.ConnectionId)
+                SendToSession(other, new ChatMessage { Sender = "Server", Text = $"{session.Username} left for {mapId}.", Channel = ChatChannel.Server });
+        foreach (var other in _sessions.GetSessionsInMap(mapId))
+            if (other.ConnectionId != session.ConnectionId)
+                SendToSession(other, new ChatMessage { Sender = "Server", Text = $"{session.Username} arrived from {from}.", Channel = ChatChannel.Server });
+
+        Say($"Travelling to {mapId}.");
+
+        var peer = _network.GetPeer(session.ConnectionId);
+        if (peer != null) SendManifest(peer, session);
+        else HandlePlayerReady(session.ConnectionId); // a text session has nothing to load
     }
 
     // Definition building lives in EntityDefinitionFactory so the streaming path and the map/acoustics

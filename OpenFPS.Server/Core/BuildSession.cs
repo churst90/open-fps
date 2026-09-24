@@ -57,6 +57,19 @@ public sealed class BuildSession
         Placed = true;
     }
 
+    /// <summary>
+    /// Forgets the origin and what was placed. For a change of map: the ids in
+    /// <see cref="Placed_Entities"/> name entities on the map just left, and /undo on the new one
+    /// would destroy whatever there happened to share an id.
+    /// </summary>
+    public void Reset()
+    {
+        Placed = false;
+        Cursor = Vector3.Zero;
+        LastStep = Vector3.UnitZ;
+        Placed_Entities.Clear();
+    }
+
     /// <summary>Turns a cursor position into a world one.</summary>
     public Vector3 ToWorld(Vector3 local)
         => Origin + Vector3.Transform(local, Quaternion.CreateFromYawPitchRoll(Yaw, 0f, 0f));

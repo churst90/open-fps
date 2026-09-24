@@ -60,6 +60,12 @@ public class UserSession
     public DateTime LastCollisionTime { get; set; } = DateTime.MinValue;
 
     /// <summary>
+    /// Set once this session has had its first spawn and the message of the day with it. A change of
+    /// map spawns you again, and the MOTD must not come round a second time.
+    /// </summary>
+    public bool Welcomed { get; set; }
+
+    /// <summary>
     /// Where this player is building, and what they have put there.
     ///
     /// Per-session and deliberately not persisted: a build cursor is a place you are working, like a

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.IO;
+using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -255,7 +256,9 @@ public class MudGateway
         return reply switch
         {
             PlayerListResponse p => "Players online: " + (p.Players.Length > 0 ? string.Join(", ", p.Players) : "None"),
-            FriendListResponse f => "Friends: " + (f.Friends.Length > 0 ? string.Join(", ", f.Friends) : "None"),
+            FriendListResponse f => "Friends: " + (f.Friends.Length > 0
+                ? string.Join(", ", f.Friends.Select((name, i) => i < f.Online.Length && f.Online[i] ? $"{name} (online)" : name))
+                : "None"),
             MapListResponse m => FormatMaps(m),
             LoginResponse l => l.Success ? "Login successful." : "Login failed: " + l.Message,
             RegisterResponse r => r.Success ? "Registration successful." : "Registration failed: " + r.Message,

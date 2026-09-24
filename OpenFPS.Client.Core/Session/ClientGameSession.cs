@@ -58,6 +58,9 @@ public sealed class ClientGameSession : IDisposable
     /// menus so there is one switch for all of them.</summary>
     public UiSounds Ui { get; }
 
+    /// <summary>The lists behind F5, F6 and F8: players, maps, friends, and what to do with each.</summary>
+    private readonly MenuStack _menus;
+
     /// <summary>The audio engine, for a head's settings (devices, interface sounds).</summary>
     public AudioEngineFacade Audio => _audioEngine;
     private readonly InputCommandMapper _bindings = new();
@@ -146,6 +149,7 @@ public sealed class ClientGameSession : IDisposable
         _audioSystem = new ClientAudioSystem(_audioEngine, _sounds, _state);
         _chat = new ChatManager(_speech);
         Ui = new UiSounds(audioEngine);
+        _menus = new MenuStack(_speech, Ui);
         // Each kind of chat has its own sound, heard before the words.
         _chat.Incoming += msg => Ui.Play(msg.FromStaff && msg.Channel != ChatChannel.Private ? UiCue.ChatAdmin : msg.Channel switch
         {
@@ -366,7 +370,14 @@ public sealed class ClientGameSession : IDisposable
         // must not fire, but the global ones (chat navigation, quit) still should.
         bool gameplayActive = _shell.IsGameInputActive;
         var context = gameplayActive ? InputContext.Gameplay : InputContext.UI;
-        foreach (var key in justPressed) _bindings.Execute(context, key, modifiers);
+        // An open list has the keyboard, except the F keys, which swap one list for another.
+        bool menuOpen = _menus.IsOpen && gameplayActive;
+        foreach (var key in justPressed)
+        {
+            if (menuOpen && key is not (GameKey.F5 or GameKey.F6 or GameKey.F8)) { _menus.HandleKey(key); continue; }
+            _bindings.Execute(context, key, modifiers);
+        }
+        if (menuOpen) gameplayActive = false;   // stand still while choosing
 
         _simTime += dt;
         var input = GatherInput(held, justPressed, dt);
@@ -678,6 +689,22 @@ public sealed class ClientGameSession : IDisposable
             case MapManifest manifest:
                 Serilog.Log.Information("MapManifest: {Map}, expecting {Count} entities, spawn {Spawn}.",
                     manifest.MapName, manifest.ExpectedEntityCount, manifest.SpawnPoint.Position);
+                // A second manifest is a journey to another map (/join, or a map chosen from F6). Everything
+                // the last map was making a sound for goes before the new one arrives, and the body goes
+                // too: until the server spawns us again there is nobody here to move.
+                if (IsInGame)
+                {
+                    _menus.Close();
+                    foreach (int id in _world.GetSnapshot().Entities.Keys.ToList()) _audioSystem.ForgetEntity(id);
+                    _ownEntityId = -1;
+                    _physics.OwnEntityId = -1;
+                    _physics.Spatial.OwnEntityId = -1;
+                    _audioSystem.OwnEntityId = -1;
+                    // The server got us out of any seat before we left; the old map's bus is gone.
+                    _state.RidingEntityId = -1;
+                    _state.RidingControls = false;
+                    _shell.ShowLoading($"Travelling to {manifest.MapName}...");
+                }
                 _shell.UpdateLoadingStatus($"Loading {manifest.MapName}...", 10);
                 _world.Clear(manifest.WorldSize, manifest.MapMin, manifest.MapMax);
                 // A new map's regions are numbered from scratch, so the last id announced describes
@@ -798,15 +825,15 @@ public sealed class ClientGameSession : IDisposable
                 break;
 
             case PlayerListResponse pList:
-                Say("Players online: " + (pList.Players.Length > 0 ? string.Join(", ", pList.Players) : "none"));
+                _menus.Show(PlayersMenu(pList));
                 break;
 
             case FriendListResponse fList:
-                Say("Friends: " + (fList.Friends.Length > 0 ? string.Join(", ", fList.Friends) : "none"));
+                _menus.Show(FriendsMenu(fList));
                 break;
 
             case MapListResponse mList:
-                Say(DescribeMaps(mList));
+                _menus.Show(MapsMenu(mList));
                 break;
 
             case TextEvent tEvent:
@@ -970,6 +997,63 @@ public sealed class ClientGameSession : IDisposable
     /// Ordered by how many people are on each, because that is the fact a player is actually asking
     /// for: a list of names tells you what exists, and the population tells you where the game is.
     /// </summary>
+    // ── The lists behind F5, F6 and F8 ──────────────────────────────────────────────────────────
+
+    private ListMenu PlayersMenu(PlayerListResponse list)
+    {
+        var items = new List<MenuItem>();
+        for (int i = 0; i < list.Players.Length; i++)
+        {
+            string name = i < list.Usernames.Length ? list.Usernames[i] : list.Players[i].Split(',')[0].Trim();
+            items.Add(new MenuItem(list.Players[i], Opens: () => PersonMenu(name, isFriend: false)));
+        }
+        return new ListMenu("Players", items);
+    }
+
+    private ListMenu FriendsMenu(FriendListResponse list)
+    {
+        var items = new List<MenuItem>();
+        for (int i = 0; i < list.Friends.Length; i++)
+        {
+            string name = list.Friends[i];
+            bool online = i < list.Online.Length && list.Online[i];
+            items.Add(new MenuItem($"{name}, {(online ? "online" : "offline")}", Opens: () => PersonMenu(name, isFriend: true)));
+        }
+        return new ListMenu("Friends", items);
+    }
+
+    /// <summary>What you can do with a person: all of it is a command the server answers aloud.</summary>
+    private ListMenu PersonMenu(string name, bool isFriend) => new(name, new List<MenuItem>
+    {
+        new("Private message", () => _shell.OpenCommandConsole($"/pm {name} ")),
+        new("Where is", () => Command("where", name)),
+        new("View profile", () => Command("profile", name)),
+        isFriend ? new("Remove friend", () => Command("friend", "remove", name))
+                 : new("Add friend", () => Command("friend", "add", name)),
+    });
+
+    private ListMenu MapsMenu(MapListResponse response)
+    {
+        var items = new List<MenuItem>();
+        foreach (var map in response.Maps)
+        {
+            string people = map.PlayerCount switch { 0 => "empty", 1 => "1 player", _ => $"{map.PlayerCount} players" };
+            string label = $"{map.Id}, {people}{(map.IsPublic ? "" : ", private")}{(map.IsCurrent ? ", you are here" : "")}";
+            string id = map.Id;
+            bool here = map.IsCurrent;
+            items.Add(new MenuItem(label, () =>
+            {
+                if (here) { Say($"You are already on {id}."); return; }
+                Say($"Going to {id}.");
+                Command("join", id);
+            }));
+        }
+        return new ListMenu(response.Scope == MapListScope.Mine ? "Your maps" : "Maps", items);
+    }
+
+    private void Command(string name, params string[] args)
+        => _network.Send(new TextCommand { Command = name, Args = args });
+
     private static string DescribeMaps(MapListResponse response)
     {
         string what = response.Scope == MapListScope.Mine ? "Your maps" : "Maps on this server";

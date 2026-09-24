@@ -121,7 +121,9 @@ internal sealed class GtkClientShell : IClientShell
         _menuWindow?.SetVisible(false);
     });
 
-    public void OpenCommandConsole() => OnUi(() =>
+    public void OpenCommandConsole() => OpenCommandConsole("");
+
+    public void OpenCommandConsole(string initialText) => OnUi(() =>
     {
         if (_consoleOpen) return;
         _consoleOpen = true;
@@ -141,6 +143,7 @@ internal sealed class GtkClientShell : IClientShell
 
         var entry = Entry.New();
         entry.SetActivatesDefault(false);
+        if (initialText.Length > 0) entry.SetText(initialText);
         box.Append(entry);
 
         void Commit()
@@ -182,7 +185,12 @@ internal sealed class GtkClientShell : IClientShell
         dialog.SetChild(box);
         dialog.Present();
         entry.GrabFocus();
-        _speech.Speak("Command entry. Type a command or message, then press Enter.", interrupt: true);
+        if (initialText.Length > 0)
+        {
+            entry.SetPosition(-1);   // cursor after what is already there
+            _speech.Speak($"Command entry: {initialText.Trim()}. Type the rest, then press Enter.", interrupt: true);
+        }
+        else _speech.Speak("Command entry. Type a command or message, then press Enter.", interrupt: true);
     });
 
     public void RequestQuit() => OnUi(() =>

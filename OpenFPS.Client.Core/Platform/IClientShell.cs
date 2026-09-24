@@ -29,6 +29,10 @@ public interface IClientShell
     /// was typed through <see cref="CommandEntered"/>.</summary>
     void OpenCommandConsole();
 
+    /// <summary>Opens the command console with text already typed — "/pm sean01 " from a player's
+    /// menu — and the cursor at its end. A head that cannot pre-fill opens it empty.</summary>
+    void OpenCommandConsole(string initialText) => OpenCommandConsole();
+
     /// <summary>The player asked to quit (escape). The shell confirms and, if confirmed, shuts down.</summary>
     void RequestQuit();
 

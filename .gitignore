@@ -503,3 +503,7 @@ inbox/
 # trims and resamples them, which does not belong in a source repository. Regenerate them with
 # tools/ingest_audio.py, or distribute them as a separate asset download.
 OpenFPS.Client/ASSETS/SOUNDS/AMBIENCE/
+
+# Per-server player data
+OpenFPS.Server/friends.json
+OpenFPS.Server/friends.json.bad

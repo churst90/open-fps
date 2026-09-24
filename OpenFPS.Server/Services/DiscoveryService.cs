@@ -49,13 +49,18 @@ public class DiscoveryService
         // A name on its own is not a status. Where somebody is, is the whole reason for asking:
         // a list of eight names tells you nothing, and "four of them are on the map you are on"
         // tells you where the game is.
-        var playerNames = targets
+        var ordered = targets
             .OrderBy(s => s.CurrentMapId != session.CurrentMapId)
             .ThenBy(s => s.Username, StringComparer.OrdinalIgnoreCase)
-            .Select(s => Describe(s, session))
             .ToArray();
 
-        reply(new PlayerListResponse { Players = playerNames });
+        reply(new PlayerListResponse
+        {
+            Players = ordered.Select(s => Describe(s, session)).ToArray(),
+            // The same people in the same order, as names a menu can act on: the sentences above
+            // are for reading out, and parsing a name back out of one is guessing.
+            Usernames = ordered.Select(s => s.Username).ToArray(),
+        });
     }
 
     private static string Describe(UserSession player, UserSession asker)
@@ -63,6 +68,18 @@ public class DiscoveryService
         if (player.ConnectionId == asker.ConnectionId) return $"{player.Username} (you), on {player.CurrentMapId}";
         if (player.CurrentMapId == asker.CurrentMapId) return $"{player.Username}, here on {player.CurrentMapId}";
         return $"{player.Username}, on {player.CurrentMapId}";
+    }
+
+    /// <summary>
+    /// Whether a session may walk into a loaded map: it is public, or it is theirs, or they are staff.
+    /// The one rule for both the chooser and /join, so a map is never offered and then refused.
+    /// </summary>
+    public static bool CanEnter(MapManager maps, string mapId, UserSession session)
+    {
+        if (session.Role is OpenFPS.Common.Components.UserRole.Admin or OpenFPS.Common.Components.UserRole.Dev) return true;
+        if (!maps.TryGetMapData(mapId, out var data)) return true;
+        if (data.IsPublic) return true;
+        return (data.OwnerId ?? "").Equals(session.Username, StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>

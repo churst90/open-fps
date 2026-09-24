@@ -55,6 +55,8 @@ public partial class PlayerListRequest : IMessage
 public partial class PlayerListResponse : IMessage
 {
     public string[] Players = Array.Empty<string>();
+    /// <summary>The bare usernames, parallel to <see cref="Players"/> (same order), for menus that act on a person.</summary>
+    public string[] Usernames = Array.Empty<string>();
     public PlayerListResponse() { }
 }
 
@@ -68,6 +70,8 @@ public partial class FriendListRequest : IMessage
 public partial class FriendListResponse : IMessage
 {
     public string[] Friends = Array.Empty<string>();
+    /// <summary>Whether each friend is connected now, parallel to <see cref="Friends"/>.</summary>
+    public bool[] Online = Array.Empty<bool>();
     public FriendListResponse() { }
 }
 
