@@ -46,6 +46,8 @@ public sealed class WorldAudioPlayer
         /// first-order model that reflects its own reflections is a second-order model with none of
         /// the geometry checks that go with one.</summary>
         public bool IsReflection { get; init; }
+        /// <summary>The seed the sound was rendered from, so an echo can render its diffused copy.</summary>
+        public int Seed { get; init; }
     }
 
     private readonly AudioEngineFacade _audio;
@@ -168,6 +170,7 @@ public sealed class WorldAudioPlayer
                     SoundId = id,
                     SourceEntityId = message.SourceEntityId,
                     DueAt = now + Math.Max(0f, sound.DelaySeconds),
+                    Seed = message.Seed,
                 });
                 continue;
             }
@@ -177,6 +180,7 @@ public sealed class WorldAudioPlayer
                 SoundId = id,
                 SourceEntityId = message.SourceEntityId,
                 DueAt = now + Math.Max(0f, sound.DelaySeconds),
+                Seed = message.Seed,
             });
         }
     }
@@ -390,15 +394,16 @@ public sealed class WorldAudioPlayer
             var echo = item.Sound;
             echo.Position = a.ImagePosition;
             echo.LevelDb = item.Sound.LevelDb + 20f * MathF.Log10(gain);
-            _pending.Add(new Pending
+            QueueEcho(new Pending
             {
                 Sound = echo,
-                SoundId = item.SoundId,
+                SoundId = DiffusedId(item, a.Scattering),
                 SourceEntityId = item.SourceEntityId,
                 // Not delayed here: see QueueReflections — the facade delays every submission by its
                 // own distance, and the image is the whole path length away.
                 DueAt = item.DueAt,
                 IsReflection = true,
+                Seed = item.Seed,
             });
             if (++added >= MaxHigherOrderEchoes) break;
         }
@@ -432,10 +437,11 @@ public sealed class WorldAudioPlayer
             var echo = item.Sound;
             echo.Position = r.ApparentPosition;
             echo.LevelDb = item.Sound.LevelDb + 20f * MathF.Log10(gain);
-            _pending.Add(new Pending
+            QueueEcho(new Pending
             {
                 Sound = echo,
-                SoundId = item.SoundId,
+                SoundId = DiffusedId(item, r.Scattering),
+                Seed = item.Seed,
                 SourceEntityId = item.SourceEntityId,
                 // ON TIME, because it is already late. The facade delays every submission by its own
                 // distance over the speed of sound, and an echo is submitted at its mirrored position —
@@ -473,6 +479,45 @@ public sealed class WorldAudioPlayer
             return Applause.Render(crowd, TransientSynth.SampleRate, seed);
 
         return TransientSynth.Render(sound, seed);
+    }
+
+    /// <summary>
+    /// The id of this sound as a surface of this roughness hands it back: not a copy, a WASH. Every
+    /// echo of a one-off sound used to be the sound itself, placed at the mirror point — a clean
+    /// second gunshot off a brick wall, which is not what a wall does. A rough surface returns the
+    /// sound from a patch of itself with every part a little later than the next, so the echo is
+    /// the sound smeared through the same diffuser the engine echoes use (EchoDiffuser: about a
+    /// millisecond for glass and polished steel, a dozen for brick). Five steps of roughness, each
+    /// rendered once per sound and seed and kept.
+    /// </summary>
+    private string DiffusedId(in Pending item, float scattering)
+    {
+        int step = (int)MathF.Round(Math.Clamp(scattering, 0f, 1f) * 4f);
+        string id = $"{item.SoundId}~wash{step}";
+        if (!_registered.Contains(id) && _rendering.Add(id))
+        {
+            var sound = item.Sound;
+            int seed = item.Seed;
+            System.Threading.Tasks.Task.Run(() => _rendered.Enqueue((id, Diffuse(RenderOne(sound, seed), step / 4f, seed))));
+        }
+        return id;
+    }
+
+    /// <summary>An echo joins the queue if its washed copy exists, or waits for it like a first hearing.</summary>
+    private void QueueEcho(Pending echo)
+    {
+        if (_registered.Contains(echo.SoundId)) _pending.Add(echo);
+        else _awaitingRender.Add(echo);
+    }
+
+    /// <summary>The sound through the diffuser, with room after it for the smear to ring out.</summary>
+    internal static float[] Diffuse(float[] pcm, float scattering, int seed)
+    {
+        var d = new OpenFPS.Client.AudioEngine.Fmod.EchoDiffuser(scattering, seed, TransientSynth.SampleRate);
+        int tail = (int)(0.004f * (1f + 24f * scattering) * TransientSynth.SampleRate);
+        var y = new float[pcm.Length + tail];
+        for (int i = 0; i < y.Length; i++) y[i] = d.Process(i < pcm.Length ? pcm[i] : 0f);
+        return y;
     }
 
     /// <summary>Forgets everything queued. Called on a map change, where the positions mean nothing
