@@ -32,7 +32,6 @@ public static class Honk
         string body = key[Prefix.Length..];
         int cut = body.LastIndexOf(':');
         if (cut <= 0) return false;
-        horn = body[..cut];
         var parts = body[(cut + 1)..].Split(',', StringSplitOptions.RemoveEmptyEntries);
         var values = new float[parts.Length];
         for (int i = 0; i < parts.Length; i++)
@@ -41,6 +40,9 @@ public static class Honk
             values[i] = Math.Clamp(values[i], 0f, 20f);
         }
         if (values.Length == 0) return false;
+        // Filled in only on success: a key with a good horn and a bad rhythm must not leave the
+        // horn behind for a caller that forgot to check.
+        horn = body[..cut];
         pattern = values;
         return true;
     }
