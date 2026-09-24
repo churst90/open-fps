@@ -325,9 +325,11 @@ public class ClientAudioSystem
     /// Called when a map starts loading and again when the player is spawned into it. See
     /// BudgetHoldSeconds: for the next few seconds the mixer's load reading cannot be trusted.
     /// </summary>
-    public void NoteSceneLoading() => _budgetHeldUntil = _clock.Elapsed.TotalSeconds + BudgetHoldSeconds;
+    public void NoteSceneLoading() => _budgetHeldUntil = _now() + BudgetHoldSeconds;
     private readonly UpdateThrottle _throttle = new(UpdateHz);
-    private readonly System.Diagnostics.Stopwatch _clock = System.Diagnostics.Stopwatch.StartNew();
+    /// <summary>Seconds since this system was built. A stopwatch in the game; a test hands in its
+    /// own, so it can tick the throttled update and step past the engine hold without sleeping.</summary>
+    private readonly Func<double> _now;
 
     /// <summary>Audio updates performed / skipped by the rate cap. Diagnostic.</summary>
     public (long Ran, long Skipped) UpdateCounts => (_throttle.Runs, _throttle.Skipped);
@@ -348,7 +350,13 @@ public class ClientAudioSystem
     private int _ambienceRegionId = int.MinValue;
 
     public ClientAudioSystem(AudioEngineFacade audio, SoundMappingService sounds, LocalPlayerState state)
+        : this(audio, sounds, state, StopwatchClock()) { }
+
+    /// <summary>For tests: the same system on a clock the caller controls.</summary>
+    internal ClientAudioSystem(AudioEngineFacade audio, SoundMappingService sounds, LocalPlayerState state,
+                               Func<double> clock)
     {
+        _now = clock;
         _audio = audio;
         _sounds = sounds;
         _state = state;
@@ -365,6 +373,12 @@ public class ClientAudioSystem
         WorldAudio.Received = message => _birds.Heard(message, OpenFPS.Common.AudioClock.Now);
         _acousticWorker = new AsyncAcousticWorker(_acoustics);
         _acousticWorker.Start();
+    }
+
+    private static Func<double> StopwatchClock()
+    {
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        return () => clock.Elapsed.TotalSeconds;
     }
 
     /// <summary>
@@ -401,7 +415,7 @@ public class ClientAudioSystem
     /// </summary>
     public void Update(WorldSnapshot world)
     {
-        if (!_throttle.ShouldRun(_clock.Elapsed.TotalSeconds)) return;
+        if (!_throttle.ShouldRun(_now())) return;
 
         using var _perf = PerfProbe.Measure("audio.update");
 
@@ -416,7 +430,7 @@ public class ClientAudioSystem
         //
         // Thirty cars is roughly four times the per-source work of eight — acoustic paths, occlusion,
         // reflections, emitter submission — all of it inside one game-loop iteration.
-        double nowSec = _clock.Elapsed.TotalSeconds;
+        double nowSec = _now();
         if (_lastUpdateAt > 0)
         {
             double gapMs = (nowSec - _lastUpdateAt) * 1000.0;
@@ -453,7 +467,7 @@ public class ClientAudioSystem
         // alias it into a stutter, so the swell is generated locally at audio rate from that scalar and
         // the local clock (see WindModel). Shelter attenuates it: indoors the air is still.
         Vector3 feltWind = WindModel.Felt(
-            world.WindVelocity, world.WindGustiness, _clock.Elapsed.TotalSeconds, _state.ShelterFactor);
+            world.WindVelocity, world.WindGustiness, _now(), _state.ShelterFactor);
         _state.FeltWind = feltWind;
 
         // A fraction of the moving air rides on the listener velocity, so wind produces a subtle Doppler
@@ -475,9 +489,9 @@ public class ClientAudioSystem
         _audio.UpdateShelter(_state.ShelterFactor);
         WorldAudio.ListenerVehicleId = _state.RidingEntityId;
         // The doors, the things to pick up and the cars to get into around you.
-        _beacons.Update(world, visualEyePos, _clock.Elapsed.TotalSeconds);
+        _beacons.Update(world, visualEyePos, _now());
         // The lane lines, if you are the one driving.
-        _drivingAids.Update(world, _state, _clock.Elapsed.TotalSeconds);
+        _drivingAids.Update(world, _state, _now());
         // ...and the rest of the world through the glass, if you are sitting in anything with a roof.
         var (encLow, encMid, encHigh) = CabinEnclosure(world);
         _audio.SetListenerEnclosure(encLow, encMid, encHigh);
@@ -747,8 +761,8 @@ public class ClientAudioSystem
         ChooseLiveMachines(world, visualEyePos);
         _engineEchoes.EchoesPerEngine = _adaptiveEchoes;
         _engineEchoes.SyncGeometry(world);
-        float engineDt = (float)Math.Max(1e-3, _clock.Elapsed.TotalSeconds - _lastEngineTime);
-        _lastEngineTime = _clock.Elapsed.TotalSeconds;
+        float engineDt = (float)Math.Max(1e-3, _now() - _lastEngineTime);
+        _lastEngineTime = _now();
 
         Stage(2, ref stageTicks);     // 5.5: who gets a voice
 
@@ -1123,7 +1137,7 @@ public class ClientAudioSystem
 
     private void ChooseLiveMachines(WorldSnapshot world, Vector3 eyePos)
     {
-        double now = _clock.Elapsed.TotalSeconds;
+        double now = _now();
         _machineOrder.Clear();
 
         foreach (int entityId in world.AudioEntityIds)
@@ -1202,7 +1216,7 @@ public class ClientAudioSystem
     /// </summary>
     private void ChooseLiveEngines(WorldSnapshot world, Vector3 eyePos)
     {
-        double now = _clock.Elapsed.TotalSeconds;
+        double now = _now();
 
         float load = _audio.MixerLoad;
         if (load > MixerLoadCeiling) { if (_overCeilingSince < 0) _overCeilingSince = now; }
@@ -1931,7 +1945,7 @@ public class ClientAudioSystem
 
     private void ProcessAudioEmitter(WorldSnapshot world, EntitySnapshot snap, Vector3 eyePos, float engineDt = 0f)
     {
-        double now = _clock.Elapsed.TotalSeconds;
+        double now = _now();
         var def = snap.Definition;
 
         // A physical model outside the budget is not heard, so it is not WORKED OUT either.
