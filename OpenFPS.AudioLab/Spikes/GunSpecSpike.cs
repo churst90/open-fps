@@ -139,7 +139,21 @@ public static class GunSpecSpike
                                         + 0.1068 * Math.Exp(-3352.0 / T) / (frN + f * f / frN)));
     }
 
-    private static float[] Air(float[] x, float metres)
+    /// <summary>
+    /// Air absorption applied in the frequency domain. Padded 40 ms either side and trimmed back:
+    /// a filter applied by DFT is circular, and without the pad the spread it adds wrapped round to
+    /// the END of the buffer, a faint copy of the shot 80 ms after it — heard as an echo.
+    /// </summary>
+    private static float[] Air(float[] x0, float metres)
+    {
+        int pad = Sr / 25;
+        var x = new float[x0.Length + 2 * pad];
+        Array.Copy(x0, 0, x, pad, x0.Length);
+        var full = AirCircular(x, metres);
+        return full.AsSpan(pad, x0.Length).ToArray();
+    }
+
+    private static float[] AirCircular(float[] x, float metres)
     {
         int n = x.Length;
         var re = new double[n]; var im = new double[n];
