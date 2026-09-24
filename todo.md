@@ -43,13 +43,11 @@ Every vehicle configured the same way, so its loudness is predictable.
 - Buses are about 5 dB under real life (95 dB at 1 m against 98-102).
 - The 2.8 turbo diesel is jet-heavy (89 dB total against 74 dB of engine).
 - `PortNoiseLevel` and `EvoTemperatureK` are declared and never read.
-- The engine model makes torque with the throttle shut at high revs. With physical friction the
-  sportbike holds 8,450 rpm unloaded at 3% throttle when it should fall to idle. Its friction is set
-  at 8.5 bar mean effective pressure (the fleet runs 2-4) to hide this, and that caps it at
-  11,200 rpm, short of its own 13,800 rpm shift point. Find the source of the torque first; then
-  set the sportbike's friction from its piston speed (about 26 Nm at 11,000 rpm).
-- Once that is fixed: a kickdown for the automatic driver. Floored at low revs it never changes
-  down, so the 450 single stays in 3rd at 3,300 rpm, lugging.
+- A big cam's idle lope: since the airflow fix (2026-09-24) a 308-degree cam idles no rougher
+  than a stock one, so `BigCam_IdlesRougherThanStockCam` is skipped. Burnt gas pushed back up the
+  runners still vanishes instead of mixing into the plenum (tracking it properly over-dilutes
+  every idle, so the model's reversion flow is too large); fix that and the lope comes back from
+  the physics.
 
 ### 5. Gunfire
 As realistic as possible.

@@ -40,6 +40,9 @@ internal sealed class IntakeNetwork
     private float _throttleOpen;
     private float _airboxPressure = Gas.Atmosphere;
     private float _throttleFlowMean, _plenumMean = Gas.Atmosphere;
+    private float _valveFlow, _valveFlowMean, _mouthFlowMean;
+    /// <summary>Two hertz: under the firing rate of anything that runs, so only the mean is corrected.</summary>
+    private readonly float _dcAlpha;
     private readonly float _meanAlpha;
     private float _runnerLossGain;
 
@@ -97,6 +100,7 @@ internal sealed class IntakeNetwork
         // The mean follows the throttle within about 15 ms, so a snapped pedal moves the mean flow
         // rather than arriving as one enormous gulp; what is left is the pulsation.
         _meanAlpha = OnePole.AlphaFor(12f, rate);
+        _dcAlpha = OnePole.AlphaFor(2f, rate);
         // Both kinds of forced induction put a rotor in the INTAKE path — a turbo's compressor and a
         // blower's rotors alike — so both get the barrier. Only the exhaust side distinguishes them.
         _compressorBarrier = e.Induction == Induction.NaturallyAspirated ? 1f : 0.1f;
@@ -142,6 +146,12 @@ internal sealed class IntakeNetwork
         _runnerLossGain = 0.94f;
     }
 
+    /// <summary>
+    /// The mass the cylinders pushed through their intake valves this sample, kg/s (positive into the
+    /// runners, negative drawn from them). The plenum's mean flow is held to this: see Step.
+    /// </summary>
+    public void SetValveFlow(float kgPerSecond) => _valveFlow = kgPerSecond;
+
     public float ArrivedAtValve(int cyl) => _runner[cyl].ArriveNear();
     public void PushFromValve(int cyl, float p) => _runner[cyl].PushForward(p);
 
@@ -165,6 +175,15 @@ internal sealed class IntakeNetwork
             float u = 2f * a / r.Impedance;             // volume flow into the plenum
             massIn += rho * u * _dt;
         }
+        // The waves carry the pulsation, but not the mean: the runners' losses and the 0.94 at the
+        // mouth take the steady part of a flow down with everything else, so a plenum charged only
+        // by the waves lost a fraction of what the cylinders drew. With the throttle shut the
+        // cylinders were still breathing 18 times what came past the plate, and every engine made
+        // torque on the overrun. So the mean crossing the mouths is held to the mean through the
+        // valves, which is conservation of mass, and the waves keep everything above it.
+        _mouthFlowMean += _dcAlpha * (massIn / _dt - _mouthFlowMean);
+        _valveFlowMean += _dcAlpha * (_valveFlow - _valveFlowMean);
+        massIn += (_valveFlowMean - _mouthFlowMean) * _dt;
 
         // ── The throttle: an orifice between the airbox and the plenum ───────────────────────
         float pPlenum = PlenumPressure;

@@ -447,13 +447,21 @@ public sealed class VirtualDriver
         _engine.Throttle = throttle;
 
         // Automatic shifting: up near the shift point under throttle, up early when cruising, down
-        // when the revs sag.
+        // when the revs sag — and down when floored and the gear below has room to rev (kickdown).
+        // Without the kickdown a bike asked for everything at 3,300 rpm in third stayed there,
+        // lugging, and never reached the band its power is in. The lower gear must land under 90%
+        // of the upshift point, so the change up that follows does not immediately undo it.
         float upAt = MathHelper.Lerp(e.PeakTorqueRpm * 0.85f, _gb.UpshiftRpm, throttle);
+        bool floored = need > available && err > 0.5f;
         if (_dl.Locked && _engine.Rpm > upAt && _dl.Gear < _gb.TopGear)
         {
             _shiftTo = _dl.Gear + 1; _shiftTimer = _gb.ShiftSeconds; _dl.Gear = 0;
         }
         else if (_dl.Gear > 1 && gearRpm < MathF.Max(_gb.DownshiftRpm, e.IdleRpm * 1.5f) && _dl.Locked)
+        {
+            _shiftTo = _dl.Gear - 1; _shiftTimer = _gb.ShiftSeconds * 0.7f; _dl.Gear = 0;
+        }
+        else if (floored && _dl.Gear > 1 && _dl.Locked && _dl.GearRpm(_dl.Gear - 1) < _gb.UpshiftRpm * 0.9f)
         {
             _shiftTo = _dl.Gear - 1; _shiftTimer = _gb.ShiftSeconds * 0.7f; _dl.Gear = 0;
         }

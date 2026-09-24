@@ -543,6 +543,7 @@ public sealed class EngineSynth
         float blockLow = 0f;
         float knockTempAcc = 0f, knockTempWgt = 0f;
         float massOut = 0f;
+        float intakeFlow = 0f;
         _map = _intake.PlenumPressure;
         float load = Math.Clamp((_map / Gas.Atmosphere - 0.3f) / 0.7f, 0f, 1f);
         if (e.Fuel == FuelType.Diesel) load = _pedal;
@@ -670,6 +671,7 @@ public sealed class EngineSynth
                 cy.IntakeB = bI;
                 cy.IntakeUMean += (mdotOut / Gas.Density(_map, intakeK) - cy.IntakeUMean) * _dt * MeanFlowRate;
                 cy.PortI = aI + bI; cy.FlowI = mdotOut;
+                intakeFlow += mdotOut;
                 float dm = mdotOut * _dt;                  // positive = cylinder to runner
                 // The runner is a mixed reservoir of fixed mass: what the cylinder pushes into it
                 // raises its burnt fraction and displaces the same mass on toward the plenum; what
@@ -761,6 +763,7 @@ public sealed class EngineSynth
 
         // ── Pipes ────────────────────────────────────────────────────────────────────────────
         _exhaust.Step();
+        _intake.SetValveFlow(intakeFlow);
         _intake.Step();
         Exhaust = _exhaust.Radiated;
         ExhaustShell = _exhaust.ShellRadiated;
@@ -1007,7 +1010,13 @@ public sealed class EngineSynth
             // high and adds it when it sags, which changes torque within a cycle where air takes a
             // fifth of a second to arrive. It is what stops the plenum's lag turning the idle into a
             // slow surge. A carburetted engine has none of it, and its low gain says so.
-            _idleSparkTrim = diesel ? 0f : Math.Clamp(e.IdleGovernorGain * (err * 18f - rising * 36f), -12f, 8f);
+            // Twelve degrees of retard is enough to steady an idle, and no more: a big cam's lope is
+            // the idle swinging a fifth either side of its speed, and more authority flattens it.
+            // A start flare is twice the idle speed, and there the ECU pulls the timing to about
+            // top dead centre — at 2,500 rpm the base advance is 30 degrees, and a 12-degree limit
+            // left the flare burning efficiently for seconds.
+            float retardLimit = _rpmSlow > 1.5f * e.IdleRpm ? -30f : -12f;
+            _idleSparkTrim = diesel ? 0f : Math.Clamp(e.IdleGovernorGain * (err * 18f - rising * 36f), retardLimit, 8f);
         }
         else
         {
@@ -1204,7 +1213,11 @@ public sealed class EngineSynth
 
         float Residual(float bb, out float m)
         {
-            float pPort = MathF.Max(0.05f * Gas.Atmosphere, pMean + a + bb);
+            // Floored so the density stays positive — at a share of the pressure the port sits at,
+            // not of the atmosphere. Against an atmospheric floor, a manifold pulled below 0.05 bar
+            // by a shut throttle at high revs still offered the cylinders air at 0.05 bar, from
+            // nowhere, and every engine made torque on the overrun.
+            float pPort = MathF.Max(0.05f * MathF.Max(pMean, 100f), pMean + a + bb);
             float rhoPort = Gas.Density(pPort, pipeK);
             if (pCyl >= pPort)
             {

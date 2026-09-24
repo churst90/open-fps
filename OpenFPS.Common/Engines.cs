@@ -725,14 +725,11 @@ public sealed record EngineProfile
         // reason; it is the low inertia that makes the stiffness necessary, not the revs.
         IdleRoughness = 0.15f, IdleGovernorGain = 14f,
         IdleRpm = 1300f, RedlineRpm = 14500f,
-        // Low inertia AND high losses, which is the whole of why a bike behaves as it does. The crank
-        // is a tenth of a big block's — 0.055 against 0.42 — so anything that pushes it moves it a
-        // long way, and the catch flare overshot to 4,500 rpm before the governor could get near it.
-        // What brings it back is friction: a 1000 cc four at speed is pumping and rubbing far harder
-        // for its size than a lazy V8 is, which is why a bike's revs FALL as fast as they rise and a
-        // big block's coast down. Raising the losses to match the inertia settles it without a
-        // governor stiff enough to be doing the physics' job for it.
-        InertiaKgM2 = 0.055f, FrictionNm = 12.5f, FrictionNmPerKrpm = 5.0f,
+        // Low inertia: the crank is a tenth of a big block's, 0.055 against 0.42, so the revs rise
+        // and fall fast. Friction is what a short-stroke four really loses: its 55 mm stroke at
+        // 11,000 rpm moves the pistons at 20 m/s, where the fleet's engines run 2-4 bar of friction
+        // mean effective pressure; this is 3.2 bar there, about 26 Nm.
+        InertiaKgM2 = 0.055f, FrictionNm = 6f, FrictionNmPerKrpm = 1.8f,
         PeakTorqueNm = 112f, PeakTorqueRpm = 11000f,
         // Sixteen valves at very high speed: a bike's top end is a large part of its voice.
         Mechanical = new MechanicalSpec { ValvetrainLevel = 1.0f, CombustionKnock = 0.08f, AccessoryWhineLevel = 0.15f, AccessoryWhineOrder = 2.5f },
