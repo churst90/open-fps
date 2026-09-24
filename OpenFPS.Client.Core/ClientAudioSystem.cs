@@ -566,6 +566,11 @@ public class ClientAudioSystem
         _pathIds.UnionWith(_liveMachines);
         _pathIds.UnionWith(_horns.Keys);      // a horn takes its vehicle's path, borrowed voice or not
         _pathIds.UnionWith(_sirenCars);       // and so does a siren
+        // ...and a car voiced from afar, whose borrowed voice id sits below the reflection range
+        // and so was never given a path of its own. Twelve of the city's cars, never occluded and
+        // never darkened by the air a kilometre away: the white-noise wash heard from the edge of
+        // the map, high band 10 dB under the low where every other far source had it 42 under.
+        _pathIds.UnionWith(_distantVoiced);
         foreach (var id in _pathIds)
         {
             // --- CRITICAL FIX: Reflection Termination ---
@@ -630,6 +635,8 @@ public class ClientAudioSystem
                         // A horn or a siren on this vehicle is behind the same bus.
                         if (_horns.ContainsKey(id)) _audio.SetAcousticPath(HornVoiceBase - Math.Abs(id), shadowed);
                         if (_sirenVoiced.Contains(id)) _audio.SetAcousticPath(SirenVoiceBase - Math.Abs(id), shadowed);
+                        // And so is its borrowed engine, if it is voiced from afar.
+                        if (_distantVoiced.Contains(id)) _audio.SetAcousticPath(DistantVoiceBase - Math.Abs(id), shadowed);
                         continue;
                     }
 

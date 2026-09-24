@@ -29,6 +29,8 @@ In this order.
 From [docs/COVERAGE_2026-09-24.md](docs/COVERAGE_2026-09-24.md):
 - `ClientAudioSystem`: which vehicles get a live voice and the level each is placed at (9% covered),
   through the fake audio provider.
+  Include which voices receive an acoustic path: the borrowed distant-car voices never did until
+  2026-09-24, and nothing could have caught it.
 - `VehicleShadow.Apply` and `EngineReflections`.
 - One test per DSP callback processor.
 - `AsyncAcousticWorker` paths that do not need Steam Audio.
