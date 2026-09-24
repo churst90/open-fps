@@ -44,12 +44,15 @@ Matches for the game's weapons: WASR (AK, 7.62x39), M16 (5.56), Glock 9, Colt 19
 No clean close recording of these guns exists in the inbox; the clean material is the NIJ set at 20 m
 and beyond.
 
-## Decision (Cody, 2026-09-24): hybrid
+## Decision (Cody, 2026-09-24): synthesis designed to a measured spec
 
-Real recordings give each gun its character; physics does everything distance and angle do (loss
-over distance, air absorption, the ground bounce, the crack ahead of the report downrange,
-reflections and reverb). Works at any distance and angle. A gun with no reference recording (the
-shotgun) borrows the nearest real one and is shaped by physics.
+First chosen: hybrid (recordings for character, physics for distance and angle). Revised the same
+day: nothing recorded goes into the game, above all not the recordings' echoes, which belong to the
+range they were made at. The recordings are the SPEC: the blast's duration, decay, spectrum against
+angle, and the crack's shape and timing, measured from the first 20-25 ms of the clean takes (before
+the range's echo at about 150 ms). The shot is synthesized to match that spec, and the game's own
+acoustics make the place it is heard in. Demos compare the synthesis with the real shot with its
+echo cut away.
 
 ## Plan
 
