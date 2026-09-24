@@ -231,10 +231,10 @@ public sealed partial class VehicleSystem
             case 0 when pk.Clock >= 1.2f:                      // key off
                 SetRunning(world, v, false); pk.Step++; break;
             case 1 when pk.Clock >= 2.2f:                      // door, out, door
-                Say(v, world, "car door", OccupancyService.CarDoorSounds(driverDoor, forward, 1.4f));
+                Say(v, "car door", OccupancyService.CarDoorSounds(driverDoor, forward, 1.4f));
                 pk.Step++; break;
             case 2 when pk.Clock >= 3.0f:                      // standing beside it
-                pk.Driver = SpawnPerson(v, world, standBy, heading);
+                pk.Driver = SpawnPerson(v, standBy, heading);
                 pk.Route = new[] { roadBehind, kerb, pk.Spot.Outside };
                 pk.Leg = 0; pk.Step++; break;
             case 3:                                            // round the back of it to the door
@@ -254,7 +254,7 @@ public sealed partial class VehicleSystem
                 DoorSystem.Set(world, pk.Spot.Door, true);
                 pk.Clock = 0f; pk.Step++; break;
             case 8 when pk.Clock >= 1.3f:
-                pk.Driver = SpawnPerson(v, world, pk.Spot.Inside, heading);
+                pk.Driver = SpawnPerson(v, pk.Spot.Inside, heading);
                 pk.Route = new[] { pk.Spot.Outside }; pk.Leg = 0; pk.Step++; break;
             case 9:
                 if (Walk(world, pk, dt)) { pk.Clock = 0f; pk.Step++; }
@@ -265,7 +265,7 @@ public sealed partial class VehicleSystem
             case 11:
                 if (Walk(world, pk, dt))
                 {
-                    Say(v, world, "car door", OccupancyService.CarDoorSounds(driverDoor, forward, 1.2f));
+                    Say(v, "car door", OccupancyService.CarDoorSounds(driverDoor, forward, 1.2f));
                     pk.Clock = 0f; pk.Step++;
                 }
                 break;
@@ -307,7 +307,7 @@ public sealed partial class VehicleSystem
         return true;
     }
 
-    private Entity SpawnPerson(DemoVehicle v, World world, Vector3 at, float heading)
+    private Entity SpawnPerson(DemoVehicle v, Vector3 at, float heading)
     {
         if (_maps == null) return Entity.Null;
         // The same body a walker on the map has: no sound of its own, heard by its feet.
@@ -338,7 +338,7 @@ public sealed partial class VehicleSystem
         AudioChanged?.Invoke(v.Entity.Id);
     }
 
-    private void Say(DemoVehicle v, World world, string label, IReadOnlyList<TransientSound> sounds)
+    private void Say(DemoVehicle v, string label, IReadOnlyList<TransientSound> sounds)
         => Heard?.Invoke(v.MapId, v.Entity.Id, label, sounds);
 
     /// <summary>A lot of cars answer the lock button with a touch of the horn.</summary>

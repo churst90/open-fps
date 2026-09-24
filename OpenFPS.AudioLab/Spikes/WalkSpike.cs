@@ -48,7 +48,7 @@ public static class WalkSpike
         }
 
         var world = World.Create();
-        var grid = new SpatialGrid<Entity>(new Vector2(-500, -500), new Vector2(500, 500), 10f);
+        var grid = new SpatialGrid<Entity>(10f);
         Vector3 spawn = LoadWorld(mapPath, prefabDir, world, grid, out int boxes);
         Console.WriteLine($"\n  {mapId}: {boxes} solid boxes, spawn {spawn}");
 

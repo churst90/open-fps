@@ -89,7 +89,7 @@ public class GranularBank : IDisposable
             Marshal.FreeHGlobal(ptr);
 
             // Convert to float array based on format
-            data = ConvertToFloatArray(rawBytes, format, channels);
+            data = ConvertToFloatArray(rawBytes, format);
             
             _pcmCache[soundId] = data;
             _channelsCache[soundId] = channels;
@@ -124,7 +124,7 @@ public class GranularBank : IDisposable
         return string.Empty;
     }
 
-    private float[] ConvertToFloatArray(byte[] rawBytes, SOUND_FORMAT format, int channels)
+    private float[] ConvertToFloatArray(byte[] rawBytes, SOUND_FORMAT format)
     {
         int bytesPerSample = format switch
         {

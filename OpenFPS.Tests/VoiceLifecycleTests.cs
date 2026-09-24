@@ -66,7 +66,6 @@ public class VoiceLifecycleTests
         /// <summary>Records nothing: this fake has no FMOD behind it to hand a buffer to, and
         /// every test here is about voice LIFECYCLE rather than about what a voice sounds like.</summary>
         public bool RegisterSynthesisedSound(string soundId, byte[] pcm16Mono, int sampleRate) => true;
-        public void PlayUiBeep(float hz, float ms) { }
         public readonly List<string> UiSounds = new();
         public void PlayUiSound(string id, Func<float[]> render, int sampleRate, float volume) { render(); UiSounds.Add(id); }
         public IReadOnlyList<string> OutputDevices() => new[] { "Test output" };

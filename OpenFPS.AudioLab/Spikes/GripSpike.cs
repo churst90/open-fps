@@ -26,7 +26,6 @@ namespace OpenFPS.Client.Core.AudioEngine.Fmod;
 /// </summary>
 public static class GripSpike
 {
-    private static readonly Vector3 Ear = new(6.0f, 1.7f, 0f);
 
     /// <summary>
     /// Three demands on one set of tyres, rendered offline so you can hear the curve itself.
@@ -62,7 +61,7 @@ public static class GripSpike
                 Console.Write($"{d:F1}:{TyreFriction.SquealAmount(d):F2}/{TyreFriction.SkidAmount(d):F2}  ");
             Console.WriteLine("   (squeal/skid)");
 
-            var render = VehicleSynth.Render(v, StandingStart(v), seed: 7);
+            var render = VehicleSynth.Render(v, StandingStart(), seed: 7);
             string path = Path.Combine(dir, $"grip_{key}_launch.wav");
             File.WriteAllBytes(path, VehicleSynth.ToWav16(Mix(render)));
             Console.WriteLine($"    launch + upshifts -> {Path.GetFileName(path)}  ({render.Seconds:F1} s)");
@@ -80,7 +79,7 @@ public static class GripSpike
 
     /// <summary>A standing start: the launch itself spins the driven wheels, and every upshift puts a
     /// ratio step through them. Both come out of the driveline, neither is scripted.</summary>
-    private static List<DriveOrder> StandingStart(VehicleProfile v) => new()
+    private static List<DriveOrder> StandingStart() => new()
     {
         new DriveOrder { Action = DriverAction.Idling, Seconds = 2.0f },
         new DriveOrder { Action = DriverAction.Accelerating, Seconds = 9.0f, TargetSpeed = 45f },

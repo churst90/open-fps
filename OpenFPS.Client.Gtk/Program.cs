@@ -406,8 +406,6 @@ internal static partial class GtkClientProgram
             _speech.Speak("Warning. " + _missingAudioReport);
     }
 
-    private static void ShowLoginDialog() => ShowLoginDialog(null);
-
     private static void ShowLoginDialog(OpenFPS.Client.Core.SavedServer? saved)
     {
         if (_loginDialog != null) { _loginDialog.Present(); return; }

@@ -10,6 +10,7 @@ public enum UiCue
     MenuMove, MenuSelect, MenuBack, MenuEdge,
     EnterWorld,
     ChatMap, ChatAll, ChatPrivate, ChatServer, ChatAdmin,
+    VoiceOn,
 }
 
 /// <summary>
@@ -66,6 +67,8 @@ public sealed class UiSounds
         UiCue.ChatServer => Notes(0.5f, (659.3f, 0f, 0.12f), (523.3f, 0.1f, 0.2f)),
         // An admin speaking: a bright rising triad, struck together then held.
         UiCue.ChatAdmin => Notes(0.45f, (880f, 0f, 0.25f), (1108.7f, 0.03f, 0.25f), (1318.5f, 0.06f, 0.3f)),
+        // Your microphone is live: one short A.
+        UiCue.VoiceOn => Notes(0.5f, (880f, 0f, 0.08f)),
         _ => Notes(0.4f, (1000f, 0f, 0.05f)),
     };
 

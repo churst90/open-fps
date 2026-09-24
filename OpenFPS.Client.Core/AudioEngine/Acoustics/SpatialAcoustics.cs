@@ -32,7 +32,7 @@ public class SpatialAcoustics
     /// <summary>
     /// Calculates the complex acoustic path sound takes through the world.
     /// </summary>
-    public List<AcousticPathData> CalculateAcousticPaths(WorldSnapshot world, int entityId, Vector3 listenerPos, Vector3 sourcePos, bool isImportant = true)
+    public List<AcousticPathData> CalculateAcousticPaths(WorldSnapshot world, int entityId, Vector3 listenerPos, Vector3 sourcePos)
     {
         var rawResults = new List<AcousticPathData>();
         var localPlayer = world.Entities.Values.FirstOrDefault(e => e.Definition.Type == EntityType.Player && Vector3.Distance(e.Transform.Position, listenerPos) < 2.0f);

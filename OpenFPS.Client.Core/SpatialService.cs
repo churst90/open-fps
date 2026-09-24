@@ -623,27 +623,5 @@ public class SpatialService
         return found;
     }
 
-    private bool RayIntersectsAABB(Vector3 start, Vector3 dir, Vector3 boxPos, Vector3 boxSize, out float distance)
-    {
-        Vector3 min = boxPos - (boxSize / 2.0f);
-        Vector3 max = boxPos + (boxSize / 2.0f);
-        float tmin = -float.MaxValue, tmax = float.MaxValue;
-        distance = 0;
-        if (Math.Abs(dir.X) > 0.000001f) {
-            float t1 = (min.X - start.X) / dir.X, t2 = (max.X - start.X) / dir.X;
-            tmin = Math.Max(tmin, Math.Min(t1, t2)); tmax = Math.Min(tmax, Math.Max(t1, t2));
-        } else if (start.X < min.X || start.X > max.X) return false;
-        if (Math.Abs(dir.Y) > 0.000001f) {
-            float t1 = (min.Y - start.Y) / dir.Y, t2 = (max.Y - start.Y) / dir.Y;
-            tmin = Math.Max(tmin, Math.Min(t1, t2)); tmax = Math.Min(tmax, Math.Max(t1, t2));
-        } else if (start.Y < min.Y || start.Y > max.Y) return false;
-        if (Math.Abs(dir.Z) > 0.000001f) {
-            float t1 = (min.Z - start.Z) / dir.Z, t2 = (max.Z - start.Z) / dir.Z;
-            tmin = Math.Max(tmin, Math.Min(t1, t2)); tmax = Math.Min(tmax, Math.Max(t1, t2));
-        } else if (start.Z < min.Z || start.Z > max.Z) return false;
-        if (tmax >= tmin && tmax > 0) { distance = tmin > 0 ? tmin : 0; return true; }
-        return false;
-    }
-
     public void InvalidateCache() { }
 }

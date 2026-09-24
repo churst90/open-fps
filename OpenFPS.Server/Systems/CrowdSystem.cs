@@ -26,9 +26,11 @@ public static class CrowdSystem
     /// <summary>How much of the crowd is actually clapping. Even a good pass does not get everybody.</summary>
     public const float ParticipationFloor = 0.25f;
 
-    private static readonly Dictionary<int, double> _lastReaction = new();
+    /// <summary>When each crowd last reacted, by map and entity id: every map is its own world, and
+    /// entity ids repeat between them.</summary>
+    private static readonly Dictionary<(string Map, int Id), double> _lastReaction = new();
 
-    public static void Update(string mapId, World world, Dictionary<int, Entity> lookup, double now,
+    public static void Update(string mapId, World world, double now,
                               Action<int, Vector3, CrowdApplause> react)
     {
         var crowds = new List<(int Id, Vector3 At, CrowdComponent C)>();
@@ -48,7 +50,7 @@ public static class CrowdSystem
 
         foreach (var (id, at, c) in crowds)
         {
-            double last = _lastReaction.GetValueOrDefault(id, double.NegativeInfinity);
+            double last = _lastReaction.GetValueOrDefault((mapId, id), double.NegativeInfinity);
             if (now - last < Math.Max(1f, c.CooldownSeconds)) continue;
 
             float radius = MathF.Max(5f, c.ReactRadiusMetres);
@@ -72,7 +74,7 @@ public static class CrowdSystem
             // worth watching gets most of it.
             int clapping = Math.Max(1, (int)(c.People * (ParticipationFloor + (1f - ParticipationFloor) * intensity)));
 
-            _lastReaction[id] = now;
+            _lastReaction[(mapId, id)] = now;
             // Quantised, because a rendered crowd is a cached BUFFER and two crowds whose numbers
             // differ by a person are the same sound. Unquantised, every reaction on the speedway was a
             // fresh render and a fresh sound registered with the mixer — ninety a minute, for ever.

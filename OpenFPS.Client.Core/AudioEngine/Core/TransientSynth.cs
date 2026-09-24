@@ -46,8 +46,8 @@ public static class TransientSynth
         switch (sound.Character)
         {
             case SoundCharacter.Ring: RenderRing(buffer, hz, seconds, sound.Noisiness, rng); break;
-            case SoundCharacter.Hiss: RenderHiss(buffer, hz, seconds, rng); break;
-            case SoundCharacter.Scrape: RenderScrape(buffer, hz, seconds, rng); break;
+            case SoundCharacter.Hiss: RenderHiss(buffer, hz, rng); break;
+            case SoundCharacter.Scrape: RenderScrape(buffer, hz, rng); break;
             default: RenderKnock(buffer, hz, seconds, sound.Noisiness, rng); break;
         }
 
@@ -153,7 +153,7 @@ public static class TransientSynth
 
     /// <summary>Air moving: band-limited noise with a soft edge on both ends, so it arrives and
     /// leaves rather than switching on.</summary>
-    private static void RenderHiss(float[] buffer, float hz, float seconds, Random rng)
+    private static void RenderHiss(float[] buffer, float hz, Random rng)
     {
         // ── TURBULENCE IS NOT A RESONANCE, AND A BREATH HAS NO TRANSIENT ────────────────────────
         //
@@ -209,7 +209,7 @@ public static class TransientSynth
     /// The same process as a tyre at its limit and a bow on a string. What makes it a groan rather
     /// than a tone is that the slips are irregular — a perfectly periodic one is a buzzer.
     /// </summary>
-    private static void RenderScrape(float[] buffer, float hz, float seconds, Random rng)
+    private static void RenderScrape(float[] buffer, float hz, Random rng)
     {
         var filter = new Resonator(hz, q: 14f);
         float slipsPerSecond = MathF.Max(8f, hz * 0.06f);

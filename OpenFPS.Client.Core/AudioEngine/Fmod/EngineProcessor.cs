@@ -1136,7 +1136,6 @@ public sealed class EngineTapState
 
     private float _gain;
     private double _cursor = -1;
-    private float _lastOut;
 
     public EngineTapState(EngineVoiceState source) { Source = source; }
 
@@ -1145,7 +1144,7 @@ public sealed class EngineTapState
         // Nothing until the engine has something to give. A tap that synthesized on demand would be
         // doing it on the mixer thread, which is the one thing the whole producer design exists to
         // prevent.
-        if (!Source.Primed) { mono.Clear(); _lastOut = 0f; return; }
+        if (!Source.Primed) { mono.Clear(); return; }
 
         long played = Source.Played;
         // Start in step with the voice we are the other half of, and resync outright only when there
@@ -1160,7 +1159,6 @@ public sealed class EngineTapState
             _gain += Math.Clamp(gTarget - _gain, -step, step);
             mono[i] = Source.ReadFrontAt(_cursor + i) * _gain;
         }
-        _lastOut = mono.Length > 0 ? mono[^1] : 0f;
 
         // Wall clock, plus an inaudible pull back toward where the other half of this machine has
         // got to. A hundredth of the block is about a sixth of a semitone, applied only while the

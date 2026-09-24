@@ -171,10 +171,7 @@ public class ClientWorldState
 
         lock (_gridLock)
         {
-            _staticGrid = new SpatialGrid<int>(
-                new Vector2(minBound.X, minBound.Z),
-                new Vector2(maxBound.X, maxBound.Z),
-                10.0f);
+            _staticGrid = new SpatialGrid<int>(10.0f);
             _gridNeedsRebuild = true;
         }
 

@@ -132,11 +132,6 @@ public interface IAudioProvider : IDisposable
     /// </summary>
     bool RegisterSynthesisedSound(string soundId, byte[] pcm16Mono, int sampleRate);
 
-    /// <summary>
-    /// Plays a short synthesized sine tone at a given frequency as a non-spatial UI sound.
-    /// Used for voice-transmission indicators and accessibility cues.
-    /// </summary>
-    void PlayUiBeep(float frequencyHz, float durationMs);
     /// <summary>Plays a short interface sound in both ears, not in the world: no position, no room.
     /// The buffer is made once per id and kept; <paramref name="volume"/> is 0..1.</summary>
     void PlayUiSound(string id, Func<float[]> render, int sampleRate, float volume);

@@ -101,7 +101,6 @@ public struct SpatialEmitter
     public float ApertureFactor;
     public float TransmissionBleed;
     public bool IsEvent; 
-    public bool IsImportant; // If true, receives high-fidelity 3rd-order reflection tracing.
     public float ReflectionSpread; // (0-360) How wide the reflection feels in 3D space.
 
     // Granular Synthesis Parameters

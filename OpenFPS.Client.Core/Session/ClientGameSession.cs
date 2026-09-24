@@ -527,7 +527,7 @@ public sealed class ClientGameSession : IDisposable
     /// <c>Pitch += LookDelta.Y * ...</c>, so a positive y (K) increases pitch. The step returned
     /// here is always a positive magnitude; the key's own axis sign carries the direction.
     /// </summary>
-    private float SnapDegrees(GameKey key, float ax, float ay)
+    private float SnapDegrees(float ax, float ay)
     {
         // Which way the angle itself moves, as against which way the key's axis points.
         float currentDeg, dir;
@@ -589,7 +589,7 @@ public sealed class ClientGameSession : IDisposable
                 // the direction pressed — which is a full step when you are already on the grid,
                 // and less than one when you are not. Shift is unchanged: one degree, off-grid on
                 // purpose, for lining something up by ear.
-                degrees = fine ? TurnFineDegrees : SnapDegrees(key, ax, ay);
+                degrees = fine ? TurnFineDegrees : SnapDegrees(ax, ay);
             }
             else if (_simTime - _turnDownAt.GetValueOrDefault(key, _simTime) >= TurnHoldBeforeSweep)
             {
@@ -1054,29 +1054,6 @@ public sealed class ClientGameSession : IDisposable
     private void Command(string name, params string[] args)
         => _network.Send(new TextCommand { Command = name, Args = args });
 
-    private static string DescribeMaps(MapListResponse response)
-    {
-        string what = response.Scope == MapListScope.Mine ? "Your maps" : "Maps on this server";
-        if (response.Maps.Length == 0)
-            return response.Scope == MapListScope.Mine ? "You have no maps of your own." : "No maps available.";
-
-        var parts = new List<string>(response.Maps.Length);
-        foreach (var map in response.Maps)
-        {
-            string people = map.PlayerCount switch
-            {
-                0 => "empty",
-                1 => "1 player",
-                _ => $"{map.PlayerCount} players",
-            };
-            string here = map.IsCurrent ? ", where you are" : "";
-            string visibility = map.IsPublic ? "" : ", private";
-            parts.Add($"{map.Id}, {people}{visibility}{here}");
-        }
-
-        return $"{what}: {string.Join("; ", parts)}.";
-    }
-
     private void ToggleVoiceTransmission()
     {
         if (!_microphone.IsAvailable)
@@ -1088,7 +1065,7 @@ public sealed class ClientGameSession : IDisposable
         if (!_microphone.IsCapturing)
         {
             _microphone.Start();
-            _audioSystem.PlayVoiceIndicator();
+            Ui.Play(UiCue.VoiceOn);
         }
         else
         {

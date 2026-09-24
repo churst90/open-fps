@@ -611,7 +611,7 @@ public static class Footsteps
         // ── 5. Loose pieces, if the ground is a heap of them.
         var (count, stoneMm) = LooseMaterial(step.Surface);
         if (count > 0)
-            Crunch(near, 0, amp, count, stoneMm, weight, ground, rng, sampleRate);
+            Crunch(near, 0, amp, count, stoneMm, weight, rng, sampleRate);
 
         // ── TWO PATHS OUT, and they are not alike.
         //
@@ -812,7 +812,7 @@ public static class Footsteps
     /// model with a different number, and so is a pile of dry leaves.
     /// </summary>
     private static void Crunch(float[] buf, int at, float amp, int count, float grainMm, float weight,
-                               MaterialProperties ground, Random rng, int sampleRate)
+                               Random rng, int sampleRate)
     {
         int pieces = Math.Max(1, (int)(count * Math.Clamp(weight, 0.05f, 1f)));
 

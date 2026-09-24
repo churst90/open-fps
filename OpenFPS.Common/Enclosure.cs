@@ -494,10 +494,6 @@ public static class Enclosure
         return 16f * MathF.PI * r * r * e / (s * (1f - e));
     }
 
-    /// <summary>16π over the surface area a box has per square metre of its mean free path
-    /// (S ≈ 13.5·MFP² for a cube: S = 6L², MFP = 4V/S = 2L/3).</summary>
-    private const float BoxSurfaceOverMfpSquared = 16f * MathF.PI / 13.5f;
-
     /// <summary>The surface a CUBE has per square metre of its mean free path: S = 6L² and
     /// MFP = 2L/3, so S = 13.5·MFP². This is the assumption <see cref="ReverberantToDirectPower"/>
     /// falls back on when nothing measured the real surface — and the assumption that was wrong by a

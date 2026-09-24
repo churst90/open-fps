@@ -513,14 +513,6 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
         if (_isInitialized) _provider.PlayVoice(senderId, position, pcmData);
     }
 
-    /// <summary>
-    /// Plays a non-spatial UI beep. Thread-safe.
-    /// </summary>
-    public void PlayUiBeep(float frequencyHz, float durationMs)
-    {
-        if (_isInitialized) _provider.PlayUiBeep(frequencyHz, durationMs);
-    }
-
     public IReadOnlyList<string> OutputDevices() => _isInitialized ? _provider.OutputDevices() : Array.Empty<string>();
     public IReadOnlyList<string> InputDevices() => _isInitialized ? _provider.InputDevices() : Array.Empty<string>();
     public bool SetOutputDevice(string name) => _isInitialized && _provider.SetOutputDevice(name);

@@ -12,8 +12,6 @@ namespace OpenFPS.Common;
 public class SpatialGrid<T>
 {
     private readonly float _cellSize;
-    private readonly Vector2 _min;
-    private readonly Vector2 _max;
     private readonly Dictionary<(int, int), List<T>> _staticGrid = new();
     private readonly Dictionary<(int, int), List<T>> _dynamicGrid = new();
 
@@ -27,15 +25,11 @@ public class SpatialGrid<T>
     public int StaticVersion { get; private set; }
 
     /// <summary>
-    /// Creates a new spatial grid with defined boundaries and cell resolution.
+    /// Creates a new spatial grid. It has no bounds: cells exist where something has been added.
     /// </summary>
-    /// <param name="min">The minimum world coordinates (X, Z).</param>
-    /// <param name="max">The maximum world coordinates (X, Z).</param>
     /// <param name="cellSize">The size (in meters) of each square cell in the grid.</param>
-    public SpatialGrid(Vector2 min, Vector2 max, float cellSize)
+    public SpatialGrid(float cellSize)
     {
-        _min = min;
-        _max = max;
         _cellSize = cellSize;
     }
 

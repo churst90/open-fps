@@ -369,7 +369,7 @@ internal sealed class BladeRow
     private readonly float[] _gainScatter, _trackScatter;
     private double _phase;               // revolutions
     private float _rpm, _rpmTarget, _loading = 1f;
-    private float _machToward, _inPlane, _offPlane, _bvi;
+    private float _inPlane, _offPlane, _bvi;
     private bool _forward = true;
     private readonly float _refAmp;
     private float _hp, _hpAlpha;
@@ -447,9 +447,6 @@ internal sealed class BladeRow
         _offPlane = MathF.Abs(alongAxis);
         _inPlane = MathF.Sqrt(MathF.Max(0f, 1f - _offPlane * _offPlane));
         _forward = alongAxis >= 0f;
-        // The tip Mach toward the listener is the in-plane component of the tip speed.
-        float tip = _s.TipSpeed(_rpm > 0 ? _rpm : _rpmTarget);
-        _machToward = MathF.Min(0.95f, tip / 340f * _inPlane);
         // A duct will not carry anything below about half the blade-passing rate — and it will not
         // carry much far ABOVE it either, which is the half that was missing.
         //

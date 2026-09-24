@@ -67,7 +67,7 @@ public class DegradationTests
         {
             worker.EnqueueRequest(new AcousticRequest
             {
-                EntityId = entityId, ListenerPos = listener, SourcePos = source, IsImportant = true,
+                EntityId = entityId, ListenerPos = listener, SourcePos = source,
             });
             if (worker.TryGetResult(entityId, out var paths)) return paths;
             Thread.Sleep(10);
@@ -123,7 +123,6 @@ public class DegradationTests
                     EntityId = 5000 + i,
                     ListenerPos = RoomACentre,
                     SourcePos = RoomBCentre + new Vector3(i * 0.25f, 0, 0),
-                    IsImportant = false,
                 });
 
             if (Enumerable.Range(0, sources).All(i => worker.TryGetResult(5000 + i, out _)))

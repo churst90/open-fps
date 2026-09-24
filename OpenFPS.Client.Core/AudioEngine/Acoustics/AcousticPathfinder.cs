@@ -16,8 +16,6 @@ public class AcousticPathfinder
     private Dictionary<int, float>? _portalApertures;
     private AcousticMap? _lastMap;
 
-    private readonly Dictionary<(int, int), (int firstPortalId, float portalToPortalDist, float minAperture, float mLow, float mMid, float mHigh)> _pathCache = new();
-
     public AcousticPathfinder() : this(new SpatialService()) { }
 
     public AcousticPathfinder(SpatialService spatial)

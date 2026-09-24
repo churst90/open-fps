@@ -21,7 +21,6 @@ namespace OpenFPS.Tests;
 /// </summary>
 public class AmbienceAndWeatherTests
 {
-    private static string PrefabDirectory => System.IO.Path.Combine(AppContext.BaseDirectory, "prefabs");
     private static string MapDirectory => System.IO.Path.Combine(AppContext.BaseDirectory, "maps");
 
     /// <summary>

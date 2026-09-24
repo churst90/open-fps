@@ -48,10 +48,7 @@ public class GameServer
     // one every five seconds, per remote address — generous for a person mistyping a password, useless
     // for guessing one.
     private readonly RateLimiter _authLimiter = new(capacity: 6, refillPerSecond: 0.2);
-    private DiscoveryService _discovery = null!;
-    private SocialService _social = null!;
     private FriendRepository _friends = null!;
-    private MapAuthorityService _mapAuthority = null!;
     private MudGateway _mudGateway = null!;
     private readonly ServerStateUpdate _reusableBroadcast = new();
     private readonly ServerStateUpdate _reliableBroadcast = new();
@@ -185,8 +182,6 @@ public class GameServer
 
     // The tick rate lives in PhysicsConstants — the client predicts against the same number.
     private const double TickTimeMs = 1000.0 / PhysicsConstants.TickRate;
-    /// <summary>Fallback only — the real radius is per map, from MapManager.GetEarshotRange.</summary>
-    private const float EarshotRange = 200.0f; 
 
     /// <summary>The map players land on, from <c>--map</c>; null leaves it to whichever claims IsDefault.</summary>
     public string? RequestedMapId { get; set; }
@@ -228,10 +223,10 @@ public class GameServer
         _friends = new FriendRepository("friends.json");
         _commands = new CommandHandler(_sessions, _maps, this, _composites, _seats, _hands, _userRepo, _friends);
         
-        // Initialize new Service Architecture
-        _discovery = new DiscoveryService(_dispatcher, _sessions, _maps);
-        _social = new SocialService(_dispatcher, _sessions, _friends);
-        _mapAuthority = new MapAuthorityService(_dispatcher);
+        // These register their handlers with the dispatcher, which is what keeps them alive.
+        _ = new DiscoveryService(_dispatcher, _sessions, _maps);
+        _ = new SocialService(_dispatcher, _sessions, _friends);
+        _ = new MapAuthorityService(_dispatcher);
         
         RegisterHandlers();
 
@@ -451,7 +446,7 @@ public class GameServer
 
                     // ...and the people watching them. Only a source with a place and a size: no
                     // loop, no bed, and nothing in it that knows what a car is.
-                    CrowdSystem.Update(entry.Key, world, lookup, AudioClock.Now, (crowdId, at, spec) =>
+                    CrowdSystem.Update(entry.Key, world, AudioClock.Now, (crowdId, at, spec) =>
                         EmitWorldAudio(entry.Key, crowdId, "crowd", new[]
                         {
                             new TransientSound

@@ -44,7 +44,7 @@ public sealed class SteamFrontEnd
     private readonly float[] _beatPhase;      // where in a revolution each beat happens
     private readonly float[] _beatGain;
     private Mode[] _stack;
-    private readonly float _blastAmp, _leakAmp, _motionAmp;
+    private readonly float _leakAmp, _motionAmp;
     private readonly float _decayTau;
     private double _rev;                      // driver revolutions
     private float _env;                       // the blast envelope now
@@ -96,8 +96,6 @@ public sealed class SteamFrontEnd
         float nozzleArea = MathF.PI * 0.25f * s.BlastNozzleMetres * s.BlastNozzleMetres;
         _decayTau = Math.Clamp(cylVol / MathF.Max(1e-4f, nozzleArea * 480f), 0.006f, 0.12f);
 
-        // The jet at full effort, by Lighthill, at the nozzle's size and steam's temperature.
-        _blastAmp = JetNoise.LighthillPressure(s.BlastNozzleMetres, 460f, 700f);
         _leakAmp = Db(s.LeakageDb);
         _motionAmp = Db(s.MotionDb);
         _clank = new Mode(420f, 14f, rate);

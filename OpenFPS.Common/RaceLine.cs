@@ -67,7 +67,6 @@ public sealed class RaceLine
     /// cornering grip, and a formula that cannot tell those apart reports it as sliding.</summary>
     private readonly float[] _corner;
     private readonly float[] _heading;         // radians, the way the line points at each node
-    private readonly float _spacing;           // node spacing of the resampled CENTRELINE, metres
 
     /// <summary>
     /// Arc length from node 0 to each node, with the closing segment as the last entry, so
@@ -106,9 +105,8 @@ public sealed class RaceLine
         if (centreline == null || centreline.Count < 3)
             throw new ArgumentException("A circuit needs at least three waypoints.", nameof(centreline));
 
-        var resampled = Resample(centreline, NodeSpacing, out float spacing);
+        var resampled = Resample(centreline, NodeSpacing, out _);
         Smooth(resampled, SmoothingPasses);
-        _spacing = spacing;
         int n = resampled.Count;
         _points = new Vector3[n];
         _heading = new float[n];

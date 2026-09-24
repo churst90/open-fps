@@ -109,7 +109,7 @@ public class HotPathTests
     [Fact]
     public void CollectInRadiusReturnsAMultiCellObjectOnce()
     {
-        var grid = new SpatialGrid<int>(new Vector2(-50, -50), new Vector2(50, 50), cellSize: 10f);
+        var grid = new SpatialGrid<int>(cellSize: 10f);
 
         // A 35 m wall spans four cells, so it is filed in four of them. The old iterator handed it back
         // four times and every caller then ray-tested it four times.
@@ -130,7 +130,7 @@ public class HotPathTests
     [Fact]
     public void CollectInRadiusFindsBothStaticAndDynamicItems()
     {
-        var grid = new SpatialGrid<int>(new Vector2(-50, -50), new Vector2(50, 50), cellSize: 10f);
+        var grid = new SpatialGrid<int>(cellSize: 10f);
         grid.AddOverlapping(new Vector3(0, 1, 0), new Vector3(2, 2, 2), item: 1, isStatic: true);
         grid.Add(new Vector3(3, 1, 3), item: 2, isStatic: false);
 
@@ -144,7 +144,7 @@ public class HotPathTests
     [Fact]
     public void StaticVersionMovesOnlyWithStaticGeometry()
     {
-        var grid = new SpatialGrid<int>(new Vector2(-50, -50), new Vector2(50, 50), cellSize: 10f);
+        var grid = new SpatialGrid<int>(cellSize: 10f);
 
         int version = grid.StaticVersion;
         grid.Add(new Vector3(1, 1, 1), item: 1, isStatic: false);
@@ -221,7 +221,7 @@ public class HotPathTests
         var world = World.Create();
         try
         {
-            var grid = new SpatialGrid<Entity>(new Vector2(-50, -50), new Vector2(50, 50), 10f);
+            var grid = new SpatialGrid<Entity>(10f);
             var floor = world.Create(
                 new Transform { Position = new Vector3(0, 0, 0), Rotation = Quaternion.Identity },
                 new ColliderComponent { Shape = ColliderShape.Box, Size = new Vector3(40, 1, 40), IsSolid = true },

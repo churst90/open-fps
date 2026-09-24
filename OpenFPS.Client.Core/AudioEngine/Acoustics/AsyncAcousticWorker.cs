@@ -21,7 +21,6 @@ public struct AcousticRequest
     /// <summary>How big a sphere to probe around it. Per source because it depends on how much room
     /// the emitter has above what it is resting on. See <see cref="AudioEmission.OcclusionRadiusFor"/>.</summary>
     public float SourceRadius;
-    public bool IsImportant;
 }
 
 public class AsyncAcousticWorker : IDisposable
@@ -251,7 +250,7 @@ public class AsyncAcousticWorker : IDisposable
     {
         try
         {
-            return _acoustics.CalculateAcousticPaths(world, req.EntityId, req.ListenerPos, req.SourcePos, req.IsImportant);
+            return _acoustics.CalculateAcousticPaths(world, req.EntityId, req.ListenerPos, req.SourcePos);
         }
         catch (Exception ex)
         {
@@ -744,12 +743,8 @@ public class AsyncAcousticWorker : IDisposable
     /// standing in the first one's shadow. What governs is the single worst detour, which is what the
     /// standards use and the only version that does not silence a source merely for having a lot of
     /// scenery near it.
-    /// </summary>
-    private float BarrierPathDifference(Vector3 source, Vector3 listener)
-        => BarrierPathDifference(source, listener, out _, out _);
-
-    /// <summary>
-    /// The same search, also reporting the point the sound left on its last leg to the ear — the
+    ///
+    /// It also reports the point the sound left on its last leg to the ear — the
     /// diffracting edge, which is where a blocked source is actually heard FROM.
     ///
     /// <paramref name="edgeVerified"/> is a claim about the EDGE alone, and it is deliberately not

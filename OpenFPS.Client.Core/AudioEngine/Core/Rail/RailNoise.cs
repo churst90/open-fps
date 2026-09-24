@@ -27,7 +27,6 @@ namespace OpenFPS.Client.AudioEngine.Core.Rail;
 /// </summary>
 internal sealed class TrackResponse
 {
-    private readonly float _rate;
     private Mode _pad, _pinned, _ballast;
     private float _sleeperLp1, _sleeperLp2;
     private float _railEff1, _railEff2, _sleepEff1, _sleepEff2;
@@ -39,7 +38,6 @@ internal sealed class TrackResponse
 
     public TrackResponse(TrackSpec t, float rate)
     {
-        _rate = rate;
         PinnedPinnedHz = Math.Clamp(t.PinnedPinnedHz, 400f, 2500f);
         // The pad: a stiff modern pad on concrete puts the rail's own bounce up near five hundred, a
         // soft one on timber leaves it down at two. Slab track is stiffer again.

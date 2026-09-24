@@ -186,7 +186,7 @@ public class MapManager
     private void CreateMapInstance(MapData m)
     {
         var world = World.Create();
-        var grid = new SpatialGrid<Entity>(new Vector2(m.MinBound.X, m.MinBound.Z), new Vector2(m.MaxBound.X, m.MaxBound.Z), 10.0f);
+        var grid = new SpatialGrid<Entity>(10.0f);
         var lookup = new Dictionary<int, Entity>();
         // Two id namespaces, kept apart on purpose. `lookup` is the map's RUNTIME index and is keyed by
         // the ECS entity id, which is what every component, every broadcast and every command carries.

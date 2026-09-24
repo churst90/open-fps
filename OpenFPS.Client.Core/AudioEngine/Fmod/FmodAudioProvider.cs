@@ -433,6 +433,9 @@ public class FmodAudioProvider : IAudioProvider
         public string SoundId = ""; 
         public EmitterType Type;
         public FMOD.Channel Channel; 
+        /// <summary>A sound made for this voice alone (a voice-chat packet). Released with the voice,
+        /// never before: releasing an FMOD sound stops every channel that is playing it.</summary>
+        public FMOD.Sound OwnedSound;
         public FMOD.DSP ThreeEqDsp; 
         public FMOD.DSP DiffractionDsp; 
         
@@ -2954,6 +2957,7 @@ public class FmodAudioProvider : IAudioProvider
         Detach(active.Channel, active.EngineDsp, "engine/machine");
         // Only once nothing at all is left on it does the channel stop...
         if (active.Channel.hasHandle()) active.Channel.stop();
+        if (active.OwnedSound.hasHandle()) { active.OwnedSound.release(); active.OwnedSound = default; }
         ReleaseGranularDsp(active.GranularDsp, active.GranularHandle, active.GranularState);
         ReleaseSynthDsp(active.SynthDsp, active.SynthHandle, active.SynthState);
         if (active.EngineDsp.hasHandle())
@@ -4072,8 +4076,8 @@ public class FmodAudioProvider : IAudioProvider
         }
         ch.setPaused(false);
 
-        // Release the sound object once it finishes — FMOD holds its own copy of the PCM.
-        // We queue a callback via the active sound list so it is released in the Update loop.
+        // The voice owns the sound and releases it when the channel has finished; releasing it here
+        // would stop the channel before the packet had played.
         lock (_lock)
         {
             AddActive(new ActiveSound
@@ -4090,56 +4094,15 @@ public class FmodAudioProvider : IAudioProvider
                 Range = 30.0f,
                 IsReflection = false,
                 TargetRegionId = -1,
-                SaState = vState, SaDsp = vDsp, SaHandle = vHandle
+                SaState = vState, SaDsp = vDsp, SaHandle = vHandle,
+                OwnedSound = sound,
             });
         }
-
-        // The sound handle is managed by FMOD; it auto-releases when playback ends.
-        sound.release();
-    }
-
-    /// <summary>
-    /// Plays a short synthesized sine tone as a non-spatial UI sound.
-    /// Generates PCM data directly rather than going through the full synth DSP pipeline.
-    /// </summary>
-    public void PlayUiBeep(float frequencyHz, float durationMs)
-    {
-        if (!_isInitialized) return;
-
-        int sampleRate = 44100;
-        int numSamples = (int)(sampleRate * durationMs / 1000.0f);
-        var pcm = new byte[numSamples * 2]; // 16-bit
-
-        for (int i = 0; i < numSamples; i++)
-        {
-            float t = (float)i / sampleRate;
-            // Sine wave with a fast fade-out envelope to avoid clicks
-            float envelope = Math.Clamp(1.0f - (float)i / numSamples * 2.0f, 0f, 1f);
-            float sample = MathF.Sin(2.0f * MathF.PI * frequencyHz * t) * envelope * 0.6f;
-            short s = (short)(sample * short.MaxValue);
-            pcm[i * 2]     = (byte)(s & 0xFF);
-            pcm[i * 2 + 1] = (byte)((s >> 8) & 0xFF);
-        }
-
-        var info = new CREATESOUNDEXINFO
-        {
-            cbsize = System.Runtime.InteropServices.Marshal.SizeOf<CREATESOUNDEXINFO>(),
-            length = (uint)pcm.Length,
-            numchannels = 1,
-            defaultfrequency = sampleRate,
-            format = SOUND_FORMAT.PCM16
-        };
-
-        RESULT res = _system.createSound(pcm, MODE.OPENMEMORY | MODE.OPENRAW | MODE.LOOP_OFF, ref info, out FMOD.Sound sound);
-        if (res != RESULT.OK) return;
-
-        _system.playSound(sound, default, false, out _);
-        sound.release();
     }
 
     /// <summary>Interface sounds, made once and kept. Releasing an FMOD sound stops every channel
-    /// playing it, so a sound created, played and released at once — which is what PlayUiBeep does —
-    /// is cut off almost before it starts. These are never released until shutdown.</summary>
+    /// playing it, so a sound created, played and released at once is cut off almost before it
+    /// starts. These are never released until shutdown.</summary>
     private readonly Dictionary<string, FMOD.Sound> _uiSounds = new();
 
     public IReadOnlyList<string> OutputDevices()

@@ -28,7 +28,7 @@ public class TickRateAndPredictionTests
     private static (World world, SpatialGrid<Entity> grid, SessionManager sessions, Entity player) BuildWorld()
     {
         var world = World.Create();
-        var grid = new SpatialGrid<Entity>(new Vector2(-100, -100), new Vector2(100, 100), 5f);
+        var grid = new SpatialGrid<Entity>(5f);
 
         var floor = world.Create(
             new Transform { Position = new Vector3(0, -0.5f, 0), Rotation = Quaternion.Identity, Scale = Vector3.One },

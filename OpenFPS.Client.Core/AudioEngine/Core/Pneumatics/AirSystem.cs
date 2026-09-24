@@ -152,7 +152,7 @@ public sealed class AirPort
 public sealed class AirSystem
 {
     private readonly AirSystemSpec _s;
-    private readonly float _rate, _dt;
+    private readonly float _dt;
     private readonly Dictionary<string, AirPort> _ports = new(StringComparer.OrdinalIgnoreCase);
     private readonly Random _rng;
     private float _reservoir;
@@ -172,7 +172,7 @@ public sealed class AirSystem
 
     public AirSystem(AirSystemSpec s, float rate = 44100f, int seed = 61)
     {
-        _s = s; _rate = rate; _dt = 1f / rate; _rng = new Random(seed);
+        _s = s; _dt = 1f / rate; _rng = new Random(seed);
         _reservoir = s.CutOutKPa;
         int i = 0;
         foreach (var p in s.Ports) _ports[p.Name] = new AirPort(p, s.JetTrimDb, rate, seed + 10 * ++i);

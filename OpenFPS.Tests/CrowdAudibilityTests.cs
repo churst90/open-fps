@@ -50,11 +50,11 @@ public class CrowdAudibilityTests
         return (manager, world, data, lookup);
     }
 
-    private static List<(Vector3 At, CrowdApplause Spec)> ReactionsOverASecond(World world, Dictionary<int, Entity> lookup, double now)
+    private static List<(Vector3 At, CrowdApplause Spec)> ReactionsOverASecond(World world, double now, string mapId = "speedway")
     {
         var got = new List<(Vector3, CrowdApplause)>();
         for (int tick = 0; tick < 30; tick++)
-            CrowdSystem.Update("speedway", world, lookup, now + tick / 30.0, (id, at, spec) => got.Add((at, spec)));
+            CrowdSystem.Update(mapId, world, now + tick / 30.0, (id, at, spec) => got.Add((at, spec)));
         return got;
     }
 
@@ -62,11 +62,27 @@ public class CrowdAudibilityTests
     [Fact]
     public void TheCrowdReactsToTheRealField()
     {
-        var (_, world, _, lookup) = LoadRace();
+        var (_, world, _, _) = LoadRace();
         CrowdSystem.Reset();
-        var reactions = ReactionsOverASecond(world, lookup, 1000.0);
+        var reactions = ReactionsOverASecond(world, 1000.0);
         Assert.NotEmpty(reactions);
         _o.WriteLine($"{reactions.Count} blocks reacted within a second of a real race");
+    }
+
+    /// <summary>
+    /// Each map is its own world and entity ids repeat between them, so a crowd's cooldown is kept per
+    /// map. Keyed by id alone, one map's grandstand reacting silenced the other's with the same id.
+    /// </summary>
+    [Fact]
+    public void TwoMapsDoNotShareACrowdsCooldown()
+    {
+        var (_, world, _, _) = LoadRace();
+        CrowdSystem.Reset();
+        var here = ReactionsOverASecond(world, 3000.0, "speedway");
+        var there = ReactionsOverASecond(world, 3000.0, "speedway-copy");
+        _o.WriteLine($"{here.Count} reactions on one map, {there.Count} on the other at the same moment");
+        Assert.NotEmpty(here);
+        Assert.Equal(here.Count, there.Count);
     }
 
     /// <summary>
@@ -95,9 +111,9 @@ public class CrowdAudibilityTests
     [Fact]
     public void AStandAcrossTheInfieldIsHeardAgainstTheCars()
     {
-        var (_, world, data, lookup) = LoadRace();
+        var (_, world, data, _) = LoadRace();
         CrowdSystem.Reset();
-        var reactions = ReactionsOverASecond(world, lookup, 2000.0);
+        var reactions = ReactionsOverASecond(world, 2000.0);
         Assert.NotEmpty(reactions);
 
         var spawn = data.SpawnPoint.Position;

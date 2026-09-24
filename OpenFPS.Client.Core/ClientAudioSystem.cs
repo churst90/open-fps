@@ -603,12 +603,6 @@ public class ClientAudioSystem
             if (dist > 50.0f) updateRate = 10;
             else if (dist > 15.0f) updateRate = 2;
             
-            bool isImportant = false;
-            if (world.Entities.TryGetValue(id, out var sourceSnap))
-            {
-                isImportant = sourceSnap.Definition.SoundEmitter.Volume >= 0.8f && sourceSnap.Definition.SoundEmitter.Range >= 20.0f;
-            }
-
             if (_frameCount % updateRate == Math.Abs(id) % updateRate)
             {
                 _acousticWorker.EnqueueRequest(new AcousticRequest
@@ -617,7 +611,6 @@ public class ClientAudioSystem
                     ListenerPos = visualEyePos,
                     SourcePos = sourcePos,
                     SourceRadius = sourceRadius,
-                    IsImportant = isImportant
                 });
             }
             
@@ -1522,8 +1515,7 @@ public class ClientAudioSystem
     /// position is the same as the machine's other voice, because it is the same machine — the same
     /// level reference, the same range, the same region, the same sampled time.
     /// </summary>
-    private void FrontVoice(EntitySnapshot snap, OpenFPS.Common.Networking.EntityDefinition def,
-                            OpenFPS.Common.VehicleProfile profile, in AcousticPathData path,
+    private void FrontVoice(EntitySnapshot snap, OpenFPS.Common.VehicleProfile profile, in AcousticPathData path,
                             float volume, float minDistance, float range, double sampledAt)
     {
         int voiceId = IntakeVoiceBase - Math.Abs(snap.Id);
@@ -1808,7 +1800,7 @@ public class ClientAudioSystem
     /// The offset per car matters: without it, every borrowed voice would be the same waveform at the
     /// same instant and they would sum coherently into one loud car rather than spreading into traffic.
     /// </summary>
-    private void DistantEngine(EntitySnapshot snap, OpenFPS.Common.Networking.EntityDefinition def, string preset, Vector3 eyePos, double sampledAt)
+    private void DistantEngine(EntitySnapshot snap, OpenFPS.Common.Networking.EntityDefinition def, string preset, double sampledAt)
     {
         if (!_distantVoiced.Contains(snap.Id)) return;
         if (!_engineSourceByPreset.TryGetValue(preset, out int sourceId)) return;
@@ -2029,7 +2021,7 @@ public class ClientAudioSystem
                 // Its own engine if it has one; a borrowed voice if the mixer is short. See DistantEngine.
                 if (!_liveEngines.Contains(snap.Id))
                 {
-                    DistantEngine(snap, def, resolvedSoundId[7..], eyePos, world.PositionsSampledAt);
+                    DistantEngine(snap, def, resolvedSoundId[7..], world.PositionsSampledAt);
                     return;
                 }
                 engineKey = resolvedSoundId[7..];
@@ -2208,7 +2200,7 @@ public class ClientAudioSystem
         // the machine's own voice, so an engine that has only just been built already exists for the
         // tap to read.
         if (engineKey.Length > 0 && _frontVoiced.Contains(snap.Id))
-            FrontVoice(snap, def, OpenFPS.Common.MachineRegistry.VehicleFor(engineKey), acousticPath,
+            FrontVoice(snap, OpenFPS.Common.MachineRegistry.VehicleFor(engineKey), acousticPath,
                        engineVolume, engineMinDistance, Math.Max(1.0f, engineRange), world.PositionsSampledAt);
 
         // The siren is NOT placed here: see UpdateSirens.
@@ -2270,11 +2262,6 @@ public class ClientAudioSystem
 
         _audio.PlayVoice(senderId, pos, pcmBytes);
     }
-
-    /// <summary>
-    /// Plays a short tone to indicate voice transmission has started.
-    /// </summary>
-    public void PlayVoiceIndicator() => _audio.PlayUiBeep(880f, 80f);
 
     private int _footstepPoolIndex = 0;
     // Larger pool so rapid footsteps rarely reuse an ID while the previous step is still playing — reusing

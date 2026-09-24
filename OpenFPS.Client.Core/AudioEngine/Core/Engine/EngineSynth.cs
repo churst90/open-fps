@@ -138,7 +138,6 @@ public sealed class EngineSynth
     private readonly float _cv, _cp;
     private readonly float _heatScale;
     private readonly float _torqueScale;
-    private readonly float _exhaustAreaMax, _intakeAreaMax;
 
     // Crank
     private double _theta;                     // degrees, [0, cycle)
@@ -159,7 +158,6 @@ public sealed class EngineSynth
 
     // Combustion instability shared by the engine: see Weakness().
     private float _mixtureWalk;
-    private float _lastLoad;
 
     // Block noise
     private float _blockLp, _knockHp;
@@ -246,8 +244,6 @@ public sealed class EngineSynth
         _clearanceVolume = swept / MathF.Max(1.5f, e.CompressionRatio - 1f);
         _cv = Gas.R / (_gammaCyl - 1f);
         _cp = _cv + Gas.R;
-        _exhaustAreaMax = ValveArea(e.ExhaustValve, e.ExhaustCam.MaxLiftMm * 1e-3f);
-        _intakeAreaMax = ValveArea(e.IntakeValve, e.IntakeCam.MaxLiftMm * 1e-3f);
 
         // THE MODES OF THE GAS IN THE CYLINDER, which is a cavity and not a tuned pipe.
         //
@@ -1047,7 +1043,6 @@ public sealed class EngineSynth
         float tau = wantK > _portK ? 1.2f : 3.5f;
         _portK += (wantK - _portK) * MathF.Min(1f, dtSlow / tau);
         _exhaust.UpdateGas(_portK, _massFlowLp);
-        _lastLoad = open;
     }
 
     /// <summary>

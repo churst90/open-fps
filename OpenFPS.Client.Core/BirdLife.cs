@@ -120,8 +120,8 @@ public sealed class BirdLife
             if (string.Equals(def.Material.Material, "Foliage", StringComparison.OrdinalIgnoreCase))
             {
                 // A sparrow group in one hedge in six, a dove in one in twelve.
-                if (hash < 0.16f) _perched.Add(Settle(BirdSpecies.HouseSparrow, e, size, hash, onTop: false));
-                else if (hash > 0.92f) _perched.Add(Settle(BirdSpecies.Dove, e, size, hash, onTop: false));
+                if (hash < 0.16f) _perched.Add(Settle(BirdSpecies.HouseSparrow, e, size, onTop: false));
+                else if (hash > 0.92f) _perched.Add(Settle(BirdSpecies.Dove, e, size, onTop: false));
                 continue;
             }
 
@@ -129,8 +129,8 @@ public sealed class BirdLife
             float top = e.Transform.Position.Y + size.Y * 0.5f;
             if (top < RoofMinHeight || size.X * size.Z < RoofMinArea) continue;
             if (!NothingAbove(world, e, top)) continue;
-            if (hash < 0.5f) _perched.Add(Settle(BirdSpecies.Pigeon, e, size, hash, onTop: true));
-            else if (hash > 0.85f) _perched.Add(Settle(BirdSpecies.Crow, e, size, hash, onTop: true));
+            if (hash < 0.5f) _perched.Add(Settle(BirdSpecies.Pigeon, e, size, onTop: true));
+            else if (hash > 0.85f) _perched.Add(Settle(BirdSpecies.Crow, e, size, onTop: true));
         }
         Serilog.Log.Information("Birds: {Census}", string.Join(", ", CensusText()));
     }
@@ -165,7 +165,7 @@ public sealed class BirdLife
 
     /// <summary>A group of one species on one perch. Deterministic in the perch, so every client and
     /// every visit finds the same birds in the same places.</summary>
-    private Group Settle(BirdSpecies species, EntitySnapshot perch, Vector3 size, float hash, bool onTop)
+    private Group Settle(BirdSpecies species, EntitySnapshot perch, Vector3 size, bool onTop)
     {
         var rng = new Random(perch.Id * 7349 + species.Folder.Length);
         // Bigger perches hold more of a flock, up to the species' own limit.

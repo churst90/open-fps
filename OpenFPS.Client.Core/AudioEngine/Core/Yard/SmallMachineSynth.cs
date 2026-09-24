@@ -69,7 +69,7 @@ public sealed class SmallMachineSynth
     private readonly Mode[] _panel = Array.Empty<Mode>();
     private readonly float[] _panelWeight = Array.Empty<float>();
     private readonly float[] _panelHz = Array.Empty<float>();
-    private readonly float _deckDry = 1f, _deckWet;
+    private readonly float _deckWet;
     private readonly float _cutAmp, _humAmp, _pulseAmp, _flowAmp, _casingAmp;
     private readonly float _swathMetres;
 
@@ -113,7 +113,6 @@ public sealed class SmallMachineSynth
             _deckDepth = new Mode(d.DepthModeHz, d.CavityQ, rate);
             _deckWidth = new Mode(d.WidthModeHz, d.CavityQ * 0.8f, rate);
             _deckWet = Math.Clamp(d.PanShare, 0f, 1f);
-            _deckDry = 1f - _deckWet;
             _swathMetres = d.DiameterMetres * Math.Max(1, spec.BladeRows);
         }
 
