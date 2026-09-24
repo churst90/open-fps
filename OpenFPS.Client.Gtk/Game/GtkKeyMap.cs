@@ -18,6 +18,10 @@ internal static class GtkKeyMap
     private const uint GDK_semicolon = 0x03b;
     private const uint GDK_bracketleft = 0x05b;
     private const uint GDK_bracketright = 0x05d;
+    // What the bracket keys report with Shift held on a US layout. Shift-[ and shift-] switch chat
+    // buffers, and with only the unshifted names mapped they arrived as nothing at all.
+    private const uint GDK_braceleft = 0x07b;
+    private const uint GDK_braceright = 0x07d;
     private const uint GDK_KP_Divide = 0xffaf;
     private const uint GDK_Return = 0xff0d;
     private const uint GDK_Escape = 0xff1b;
@@ -60,8 +64,8 @@ internal static class GtkKeyMap
             GDK_period => GameKey.Period,
             GDK_slash => GameKey.Slash,
             GDK_semicolon => GameKey.Semicolon,
-            GDK_bracketleft => GameKey.BracketLeft,
-            GDK_bracketright => GameKey.BracketRight,
+            GDK_bracketleft or GDK_braceleft => GameKey.BracketLeft,
+            GDK_bracketright or GDK_braceright => GameKey.BracketRight,
             GDK_KP_Divide => GameKey.NumpadDivide,
             GDK_Left => GameKey.Left,
             GDK_Right => GameKey.Right,
