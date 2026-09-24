@@ -37,6 +37,13 @@ Matches for the game's weapons: WASR (AK, 7.62x39), M16 (5.56), Glock 9, Colt 19
   bullet path with the Mach cone (muzzle velocity 930 and 715 m/s) predicts 25 and 17 ms; the
   shortfall is the bullet slowing over the first 30 m. The geometry model is right.
 
+### The close recordings are not dry
+
+`inbox/weapons/firing` (six takes): every file clips (194 to 2,892 samples) and rings for 500 to
+900 ms to -40 dB, so the place they were recorded in is part of them. They cannot be the dry source.
+No clean close recording of these guns exists in the inbox; the clean material is the NIJ set at 20 m
+and beyond.
+
 ## Plan
 
 1. An offline renderer: weapon, listener angle and distance in, what that listener hears out. Dry
