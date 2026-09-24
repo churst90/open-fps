@@ -1,73 +1,86 @@
-# OpenFPS (C# Migration)
+# OpenFPS
 
-A highly customizable, audio-first multiplayer game framework designed for blind and visually impaired players.
+OpenFPS is a multiplayer game engine played by ear. It is built for blind and visually impaired
+players first: there are no graphics to rely on, so everything the world does is heard, and the
+interface talks through your screen reader.
 
-## The Vision
-OpenFPS focuses on a rich **binaural landscape** and **spatial awareness** rather than graphics. It is built for 100% customizability, allowing creators to build maps, items, and NPCs using a high-performance, data-oriented architecture.
+The world is simulated on a server and heard on each player's client. Every sound is placed in 3D
+around your head (binaural), and every sound travels through the world the way real sound does: it
+gets quieter with distance, is blocked and bent by walls, reflects off buildings and fills rooms with
+reverb that comes from the room's actual size and materials.
 
-## Tech Stack
-- **Language:** C# (.NET 10.0)
-- **Networking:** LiteNetLib 1.2.0 (Reliable UDP)
-- **ECS:** Arch (High-performance Entity Component System)
-- **Serialization:** MemoryPack (Zero-allocation binary)
-- **Accessibility:** `ISpeechOutput` — NVDA direct bridge with SAPI fallback on Windows, speech-dispatcher (Orca / espeak-ng) on Linux
-- **Audio Engine:** FMOD Core engine with Steam Audio (phonon) HRTF binaural; environmental acoustics migrating to Steam Audio's geometry-driven simulator
+## What makes it different
 
-## Architecture (SRP Modular)
-- **OpenFPS.Common**: Shared ECS components, spatial partitioning (Uniform Grid), and binary network protocols. Contains the **SharedMovementEngine**, a stateless physics solver ensuring 100% deterministic parity between client and server.
-- **OpenFPS.Server**: Authoritative simulation. Features Behavior Tree AI, sub-tick precision movement, and dynamic material-based acoustics.
-- **OpenFPS.Client**: Accessible interface. Features **Client-Side Prediction**, **Server Reconciliation**, and advanced spatial rendering (Atmospheric Absorption & Diffraction).
+- **Sound from physics, not from sound files.** Engines, tyres, horns, sirens, trains, aircraft,
+  lawn mowers, air conditioners, doors, bells and footsteps are synthesised from how the real thing
+  works: cylinders firing into exhaust pipes, a reed on a horn, a wheel on a rail. Change a car's
+  exhaust or a door's material and it sounds different without anyone recording anything.
+- **Acoustics from geometry.** Rooms measure themselves from the map: their size, how enclosed they
+  are, and what their surfaces are made of. Reverb, echoes off facades, sound through doorways and
+  sound around corners all follow from that. Nothing is set per room by hand.
+- **Measured, not guessed.** Levels are anchored to real figures (a horn's legal loudness, a car's
+  pass-by level) and checked by tests. Sounds are compared against recordings where recordings exist.
+- **Accessible by design.** Speech through your screen reader, keys chosen so they do not clash with
+  screen reader keys, menus with distinct sounds, spoken coordinates, and audio aids for finding your
+  way, crossing roads and driving.
 
-## Performance & Optimization
-- **Zero-Allocation Hot Paths:** Critical simulation and networking loops use `System.Buffers.ArrayPool<T>` and `ReadOnlySpan<T>` to eliminate per-frame garbage collection.
-- **Sub-Tick Input Precision:** The server processes every individual client input packet within a single tick, preventing movement "glitches" and ensuring high-fidelity control.
-- **Lock-Free Audio Threading:** The client audio engine operates on a dedicated high-priority thread using `ConcurrentQueue` and atomic state snapshots to ensure glitch-free binaural rendering.
+## Features
 
-## Recent Improvements
-- **Performance Overhaul:** Eliminated Gen0 GC pressure in the server's movement and broadcasting systems.
-- **Deterministic Physics:** Implemented a unified `SharedMovementEngine` for sliding, step-climbing, and OBB collisions.
-- **Spatial Partitioning:** Implemented a Uniform Grid for O(1) collision and acoustic scanning.
-- **Networking:** Added Prediction and Reconciliation to eliminate movement jitter.
-- **Spatial Audio:** FMOD Core + Steam Audio HRTF binaural, with dynamic LPF-based atmospheric absorption and diffraction.
-- **Geometry-Driven Acoustics (in progress):** Migrating the hand-rolled occlusion/portal/reflection layer to Steam Audio's `iplSimulator`, so occlusion and transmission are ray-traced from real box-collider geometry on a background thread. See `docs/STEAM_AUDIO_MIGRATION.md`.
-- **Loud Degradation:** Nothing in the audio stack is allowed to fail quietly. A Steam Audio tick that
-  produces no result falls the affected sources back to the hand-rolled ray-tracer rather than reporting
-  "nothing is in the way"; the SIMD level handed to `libphonon` is read from the running CPU rather than
-  assumed; FMOD *and* Steam Audio are both required natives, and a missing one is named along with exactly
-  what it costs; connection, disconnect and protocol failures are logged and **spoken**; and a sound whose
-  asynchronous decode has not finished is retried instead of having its first play dropped. In a game played
-  entirely by ear, a component that quietly stops working is indistinguishable from one that is working.
-- **A Reliable Entity Lifecycle:** The server tells each client exactly which entities it can see and, just
-  as importantly, which have gone — `EntityRemoved` on destroy and on area-of-interest exit, tracked per
-  client in `KnownEntities`, so a player who disconnects does not leave a body that still blocks movement,
-  still answers scans and still makes noise. A static object that moves goes out on the reliable channel,
-  where delivery is the acknowledgement. Runtime spawns go through one path that registers, indexes and
-  broadcasts, so an object created by `/spawn` is solid, audible and scannable the moment it exists.
-- **A Server That Stops Cleanly:** Ctrl-C and SIGTERM finish the current tick and then tear down in order —
-  players notified, gateway stopped, socket closed, worlds destroyed. The loop clamps how much elapsed time
-  it will bank, so a long pause costs a few dropped ticks instead of a fast-forward.
-- **One Text-Command Path:** Telnet (MUD) sessions are ordinary sessions. Commands answer through a reply
-  callback rather than a UDP peer and every command body runs on the tick thread, which both unblocks the
-  text interface — login, `ready`, `scan`, `move`, `spawn`, and chat in both directions — and removes the
-  data race that the old peer-null guard was quietly standing in for.
-- **Authored Portals:** A map describes its doorways explicitly — a `portal` entity carries the two region ids it joins (`-1` = outside) and the width of the opening. Portals drive portal-aware occlusion, adjacent-room reverb coupling, doorway leakage, and the HRTF localization that makes a room's reverb arrive *through* its door. Boundaries with no portal are reported at load with the exact entry the map is missing; nothing is guessed by default.
-- **One Prefab Spec, Checked at Load:** `PrefabTemplate` is the prefab format — one class, documented field
-  by field, with the schema generated against it and a test that fails if they drift. A prefab that
-  describes something the engine cannot honour is **rejected** at load with the reason named: an unknown
-  field, emitter settings on an object whose emitter is switched off, an inside-out directivity cone, a room
-  volume that is also solid geometry, a doorway that blocks the doorway. Rooms name their six surface
-  materials instead of numbering them, emitters can be aimed and given spin-up/spin-down sounds, and
-  colliders can be shapes other than a box. Authoring guide: `docs/AUTHORING.md`.
-- **A Frame That Does Each Thing Once:** The client builds one copy of the world per frame instead of three
-  to six, the audio update is capped at 60 Hz rather than running at whatever rate the network poll spins
-  at, the server remembers where the floor was instead of re-probing it for every sub-tick input, spatial
-  queries walk their cells once and return a wall once however many cells it spans, and playing voices are
-  looked up by id rather than scanned for. `OPENFPS_PROFILE=1` turns on a report of what each of those
-  actually costs, including the Steam Audio ray budget — which says so, loudly, when a simulation run
-  outruns the audio frame it is feeding.
+### Playing
+- Walk, run and explore by sound. Footsteps change with the ground and your speed.
+- Maps: a generated city with streets, traffic, buses, a light rail loop, level crossings, an
+  airport, parks, birds and buildings you can enter; a speedway with a race; and a rooms map for
+  trying doors and materials.
+- Drive: get into a parked car and drive it, with lane tick and edge tones, a guide beep, parking
+  sensor tones and spoken road names. Ride the bus: it stops at bus stops and you can take a seat.
+- Beacons: sounds that mark doors, items and vehicles near you (a map can add exits, stairs and
+  waypoints). Choose which kinds you hear. Beacons behind a wall are not played.
+- Chat: map, all, private and server channels, each with its own sound. Voice chat on the Windows
+  client (not yet on Linux).
+- F-key lists of players, maps and friends, which you can act on. Travel between maps.
+- Saved servers and settings.
 
-## Current Engineering Priorities
-A full component-by-component audit of the rewrite (grades, ranked defects, sequenced remediation plan) lives at
-<https://claude.ai/code/artifact/2505b86c-2813-41c2-9a9d-fa9f1a22a1f9>. The active work list is tracked under
-**Engineering Audit Remediation** in `todo.md`.
-- **NPC System:** Integrated a Behavior Tree system for autonomous NPC logic.
+### The sound engine
+- Binaural 3D sound (Steam Audio HRTF) mixed by FMOD.
+- Occlusion, diffraction around edges, transmission through walls, and a moving vehicle blocking
+  another vehicle's sound.
+- Early reflections and second- and third-order echoes from nearby surfaces.
+- Reverb from each room's measured size, enclosure and materials, with rooms inside rooms (a bus
+  shelter inside a street, a garage inside a car park).
+- Doppler, air absorption over distance, and horn directivity.
+- Physical synthesis of: petrol and diesel engines with their exhaust and intake systems, turbos,
+  tyres, electric and air horns, sirens, trains and their horns and bells, air brakes, aircraft
+  (propellers, jets, helicopters), small machines, doors, footsteps, applause and crowds.
+
+### Running a server
+- One server can host several maps at once; players travel between them.
+- Maps are JSON files; objects are prefabs. Materials decide how things sound.
+- Accounts, staff roles, admin commands, a message of the day, and a text (MUD) interface for
+  testing a server without a client.
+
+## Platforms
+
+- **Server:** Linux. It is plain .NET 10, so other platforms should work but are not tested.
+- **Client:** the Linux GTK client is the current one. The Windows client works but is behind: it
+  does not yet have saved servers, the settings menu or the F-key lists.
+- Speech: speech-dispatcher (Orca, espeak-ng) on Linux; NVDA or SAPI on Windows.
+
+## Getting started
+
+- `./run-server.sh` starts a server (players land on the speedway); `./run-server.sh city` lands
+  them on the city. Every map is loaded either way.
+- `./run-gtk-client.sh` starts the Linux client.
+- The user manual is in [docs/MANUAL.md](docs/MANUAL.md): playing, and running a server.
+
+## For contributors
+
+- C# on .NET 10. Networking: LiteNetLib. Entities: Arch ECS. Serialisation: MemoryPack.
+  Audio: FMOD Core and Steam Audio (phonon). UI: GTK 4 (GirCore).
+- Projects: `OpenFPS.Common` (shared simulation, acoustics and sound models), `OpenFPS.Server`,
+  `OpenFPS.Client.Core` (client logic and the audio engine), `OpenFPS.Client.Gtk` (Linux client),
+  `OpenFPS.Client` (Windows client), `OpenFPS.AudioLab` (measurement and rendering tools),
+  `OpenFPS.Tests`.
+- Build with `--artifacts-path` pointing at a local disk (see the run scripts).
+- Tests: `dotnet test OpenFPS.Tests` (about 18 minutes, about 940 tests).
+- Map and prefab authoring: [docs/AUTHORING.md](docs/AUTHORING.md).
+- Planned work: [todo.md](todo.md). Recent changes: [changes.md](changes.md).
