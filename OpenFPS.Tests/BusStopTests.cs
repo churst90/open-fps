@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using OpenFPS.Common;
 using OpenFPS.Client.AudioEngine.Fmod;
 using Xunit;
@@ -88,15 +89,117 @@ public class BusStopTests
     }
 
     /// <summary>
+    /// At a junction a bus holds its service brake and goes again: no spring brakes, no kneel, no
+    /// doors — those are for a stop that takes passengers — and one short puff as the pedal comes up
+    /// to pull away. Reported: "at an intersection the air brakes are long bursts".
+    /// </summary>
+    [Fact]
+    public void AtAJunctionABusHoldsItsBrakeAndGoes()
+    {
+        var bus = MachineRegistry.VehicleFor("school_bus_na");
+        var ports = Vents(bus, busStop: false, stopFrom: 12f, brakeSeconds: 3f);
+        Assert.Equal(0, ports.GetValueOrDefault("parking"));
+        Assert.Equal(0, ports.GetValueOrDefault("kneel"));
+        Assert.Equal(0, ports.GetValueOrDefault("door"));
+        Assert.Equal(1, ports.GetValueOrDefault("service_release"));
+
+        var atStop = Vents(bus, busStop: true, stopFrom: 12f, brakeSeconds: 3f);
+        Assert.Equal(2, atStop.GetValueOrDefault("parking"));       // set, and released pulling away
+        Assert.Equal(1, atStop.GetValueOrDefault("kneel"));
+        Assert.Equal(2, atStop.GetValueOrDefault("door"));          // open, and shut
+    }
+
+    /// <summary>
+    /// A release vents what the chambers held, and they held what the braking asked for: a gentle
+    /// stop is a short puff, a hard one a longer, louder one. It used to go by how long the pedal
+    /// was down, so a slow stop dumped the full volume.
+    /// </summary>
+    [Fact]
+    public void AGentleStopsReleaseIsAPuff()
+    {
+        var bus = MachineRegistry.VehicleFor("school_bus_na");
+        float gentle = PeakServicePressure(bus, stopFrom: 12f, brakeSeconds: 8f);    // 1.5 m/s^2
+        float hard = PeakServicePressure(bus, stopFrom: 12f, brakeSeconds: 2.4f);    // 5 m/s^2
+        Assert.True(gentle > 0f && hard > 0f);
+        Assert.True(gentle < hard * 0.45f, $"a gentle stop vented {gentle:F0} kPa against a hard one's {hard:F0}");
+        Assert.True(gentle < 0.35f * AirSystemSpec.TransitBus.CutOutKPa, $"a gentle stop vented {gentle:F0} kPa");
+    }
+
+    /// <summary>Slowing for a corner is not a brake application: nothing vents.</summary>
+    [Fact]
+    public void EasingOffForACornerVentsNothing()
+    {
+        var bus = MachineRegistry.VehicleFor("school_bus_na");
+        var voice = new EngineVoiceState(bus, Rate, 5);
+        voice.PlaceAtSpeed(12f);
+        voice.Revive();
+        var buf = new float[Block];
+
+        for (int b = 0; b < (int)(12f * Rate / Block); b++)
+        {
+            float t = b * Block / (float)Rate;
+            // 12 -> 9 m/s over six seconds, 0.5 m/s^2, and back up.
+            voice.TargetSpeed = t < 2f ? 12f : t < 8f ? 12f - (t - 2f) * 0.5f : MathF.Min(12f, 9f + (t - 8f));
+            voice.Render(buf);
+        }
+        Assert.Equal(0, voice.Air!.Ports["service_release"].Opened);
+    }
+
+    /// <summary>Every port that started venting during a stop-and-go, and how many times.</summary>
+    private static Dictionary<string, int> Vents(VehicleProfile v, bool busStop, float stopFrom, float brakeSeconds)
+    {
+        var voice = new EngineVoiceState(v, Rate, 5) { ServingStop = busStop };
+        voice.PlaceAtSpeed(stopFrom);
+        voice.Revive();
+        var buf = new float[Block];
+
+        float stopAt = 3f + brakeSeconds;
+        for (int b = 0; b < (int)((stopAt + 18f) * Rate / Block); b++)
+        {
+            float t = b * Block / (float)Rate;
+            voice.TargetSpeed = t < 3f ? stopFrom
+                              : t < stopAt ? MathF.Max(0f, stopFrom * (1f - (t - 3f) / brakeSeconds))
+                              : t < stopAt + 12f ? 0f
+                              : MathF.Min(stopFrom, (t - stopAt - 12f) * 2f);
+            voice.Render(buf);
+        }
+        var counts = new Dictionary<string, int>();
+        foreach (var (name, port) in voice.Air!.Ports) counts[name] = port.Opened;
+        return counts;
+    }
+
+    /// <summary>The pressure behind the service release when it vented, kPa.</summary>
+    private static float PeakServicePressure(VehicleProfile v, float stopFrom, float brakeSeconds)
+    {
+        var voice = new EngineVoiceState(v, Rate, 5);
+        voice.PlaceAtSpeed(stopFrom);
+        voice.Revive();
+        var buf = new float[Block];
+        float stopAt = 3f + brakeSeconds, peak = 0f;
+        for (int b = 0; b < (int)((stopAt + 8f) * Rate / Block); b++)
+        {
+            float t = b * Block / (float)Rate;
+            voice.TargetSpeed = t < 3f ? stopFrom
+                              : t < stopAt ? MathF.Max(0f, stopFrom * (1f - (t - 3f) / brakeSeconds))
+                              : t < stopAt + 3f ? 0f
+                              : MathF.Min(stopFrom, (t - stopAt - 3f) * 2f);
+            voice.Render(buf);
+            var port = voice.Air!.Ports["service_release"];
+            if (port.Venting) peak = MathF.Max(peak, port.PressureKPa);
+        }
+        return peak;
+    }
+
+    /// <summary>
     /// Drives a voice: rolling, then a deceleration to a dead stop, twelve seconds standing, then
     /// away again. Returns the level while standing, the level while rolling, and the energy in the
     /// door beeper's band while standing.
     /// </summary>
     private readonly record struct Run(float Arriving, float Settled, float Rolling, float ChimeBand, bool DoorsOpened, float PeakChimePa);
 
-    private static Run Drive(VehicleProfile v, bool inside = false)
+    private static Run Drive(VehicleProfile v, bool inside = false, bool busStop = true)
     {
-        var voice = new EngineVoiceState(v, Rate, 5) { Interior = inside };
+        var voice = new EngineVoiceState(v, Rate, 5) { Interior = inside, ServingStop = busStop };
         voice.PlaceAtSpeed(12f);
         voice.Revive();
         var buf = new float[Block];

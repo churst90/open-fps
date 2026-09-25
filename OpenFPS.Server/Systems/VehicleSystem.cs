@@ -104,6 +104,8 @@ public sealed partial class VehicleSystem
         public ParkState? Park;
         /// <summary>How far toward the kerb it is sitting off its lane, metres.</summary>
         public float KerbShift;
+        /// <summary>Standing at a bus stop, as the client's air system needs to know.</summary>
+        public bool ServingStop;
     }
 
     private enum State { Waiting, Driving, Turning }
@@ -380,6 +382,14 @@ public sealed partial class VehicleSystem
             if (v.Line != null)
             {
                 if (!HoldParked(v, world, ref t, ref vel, dt)) UpdateRacer(v, ref t, ref vel, dt);
+                bool serving = v.DwellLeft > 0f && v.Stops.Length > 0
+                               && string.Equals(v.Stops[v.NextStop].Kind, "bus_stop", StringComparison.OrdinalIgnoreCase);
+                if (serving != v.ServingStop && world.Has<SoundEmitterComponent>(v.Entity))
+                {
+                    v.ServingStop = serving;
+                    world.Get<SoundEmitterComponent>(v.Entity).ServingStop = serving;
+                    AudioChanged?.Invoke(v.Entity.Id);
+                }
                 // The same trace a shuttle gets — racers need it more, because a vehicle on a lap
                 // that fails to stop looks identical to one that has no stops declared.
                 if (Environment.GetEnvironmentVariable("OPENFPS_TRACE_SHUTTLE") is { } rtrace

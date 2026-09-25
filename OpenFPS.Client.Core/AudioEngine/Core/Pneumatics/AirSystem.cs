@@ -61,7 +61,13 @@ public sealed class AirPort
     /// <summary>Open the port. Everything else follows.</summary>
     public void Vent(float fromKPaGauge)
     {
-        _pressure = MathF.Max(_pressure, fromKPaGauge);
+        // From the pressure it is given: what the braking put in the chambers, or what the springs
+        // and bags hold. It was the larger of that and whatever the vessel had, and every vessel is
+        // charged to reservoir pressure when a voice is made — so the first release of every
+        // vehicle that came into earshot was a full fourteen-litre dump, whatever the stop.
+        // Only a port still venting keeps the higher pressure it has.
+        _pressure = Venting ? MathF.Max(_pressure, fromKPaGauge) : MathF.Max(0f, fromKPaGauge);
+        Opened++;
         _open = true;
         // The valve moving, before the air has said anything. Two milliseconds ahead of the hiss and
         // it is what makes a release sound MECHANICAL rather than like a tap being turned on.
@@ -69,6 +75,9 @@ public sealed class AirPort
     }
 
     public void Close() => _open = false;
+
+    /// <summary>How many times this valve has opened. For tests and instruments.</summary>
+    public int Opened { get; private set; }
 
     /// <summary>How long this port takes to empty from full, seconds — volume over area over the
     /// choked-flow constant. Printed because it is the shape of the sound.</summary>
@@ -194,7 +203,10 @@ public sealed class AirSystem
         _reservoir = s.CutOutKPa;
         int i = 0;
         foreach (var p in s.Ports) _ports[p.Name] = new AirPort(p, s.JetTrimDb, rate, seed + 10 * ++i);
-        foreach (var p in _ports.Values) p.Charge(_reservoir);
+        // Charged as a vehicle on the move holds them: the spring-brake chambers, the door engines
+        // and the suspension bags full; the service chambers EMPTY, because nobody is braking.
+        foreach (var p in _ports.Values)
+            p.Charge(string.Equals(p.Spec.Name, "service_release", StringComparison.OrdinalIgnoreCase) ? 0f : _reservoir);
         _comp = new Mode(320f, 6f, rate);
         _compAmp = 20e-6f * MathF.Pow(10f, s.CompressorDb / 20f);
     }

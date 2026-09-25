@@ -2149,6 +2149,7 @@ public class FmodAudioProvider : IAudioProvider
             {
                 TargetSpeed = emitter.EngineSpeed,
                 Running = emitter.EngineRunning,
+                ServingStop = emitter.ServingStop,
                 Interior = emitter.Interior,
                 // Live: the loudness law applies to what the engine is doing now, not just to its
                 // declared level. See EngineVoiceState.CompensateLevel.
@@ -2508,6 +2509,7 @@ public class FmodAudioProvider : IAudioProvider
                     active.EngineState.TargetSpeed = emitter.EngineSpeed;
                     active.EngineState.Interior = emitter.Interior;
                     active.EngineState.Running = emitter.EngineRunning;
+                    active.EngineState.ServingStop = emitter.ServingStop;
                     active.EngineState.RoadSlip = emitter.TyreSlip;
                     if (ListenerInMachineFrame(emitter.Position, emitter.Direction, emitter.Velocity, out var local))
                         active.EngineState.SetListener(local);

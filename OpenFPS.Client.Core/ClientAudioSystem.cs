@@ -2178,6 +2178,7 @@ public class ClientAudioSystem
             // may be a kilometre from. So that one comes down the wire, and it defaults to true, so
             // every other emitter means exactly what it meant before.
             EngineRunning = def.SoundEmitter.SynthRunning,
+            ServingStop = def.SoundEmitter.ServingStop,
             // Straight from the server, which is the only thing that knows the corner.
             //
             // It used to be differentiated here from the interpolated velocity and divided by the

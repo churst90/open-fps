@@ -275,6 +275,14 @@ public partial struct SoundEmitterComponent
     /// that a peer which does not send it reads back as "sounding" rather than falling silent.
     /// </summary>
     public bool SynthRunning { get; set; } = true;
+
+    /// <summary>
+    /// Standing at a stop that takes passengers. A bus that stops at a junction holds its service
+    /// brake and goes again; at a bus stop it sets the spring brakes, kneels and opens its doors —
+    /// and the voice cannot tell the two apart from its speed, so the server says. APPENDED: the
+    /// wire format is positional (component-wire-format).
+    /// </summary>
+    public bool ServingStop { get; set; }
 }
 
 [MemoryPackable]

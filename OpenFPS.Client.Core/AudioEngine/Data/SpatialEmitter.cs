@@ -161,6 +161,8 @@ public struct SpatialEmitter
     /// <summary>Road speed the engine follows, m/s.</summary>
     public float EngineSpeed;
     public bool EngineRunning;
+    /// <summary>Standing at a stop that takes passengers; see SoundEmitterComponent.ServingStop.</summary>
+    public bool ServingStop;
     /// <summary>When non-zero, this emitter is a reflection of that entity's live engine: the same
     /// signal delayed by EchoDelaySeconds and scaled by EchoGain, placed at the mirrored source.</summary>
     public int EchoOfEntity;

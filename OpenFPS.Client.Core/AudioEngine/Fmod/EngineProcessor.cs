@@ -44,6 +44,11 @@ public sealed class EngineVoiceState : IRenderedVoice
     public volatile float RoadSlip;
     /// <summary>Whether the engine should be running. Game thread writes.</summary>
     public volatile bool Running = true;
+    /// <summary>Standing at a stop that takes passengers: set the spring brakes, kneel, open the
+    /// doors. Anywhere else a stopped vehicle just holds its service brake.</summary>
+    public volatile bool ServingStop;
+    /// <summary>The air system, for tests and instruments. Null on a vehicle without one.</summary>
+    internal AirSystem? Air => _air;
 
     // Where the listener stands, in the machine's own frame. Game thread writes, producer reads;
     // the three floats may tear against each other by one update, which the network's slew absorbs.
@@ -492,6 +497,8 @@ public sealed class EngineVoiceState : IRenderedVoice
         }
         _bayLeak = Math.Clamp(v.EngineBayLeakage, 0f, 1f);
         _bayIntake = new EchoDiffuser(BayScattering, seed + 71, sampleRate);
+        // Drums on anything heavy enough to need them; discs on the rest.
+        _squeal = new OpenFPS.Client.AudioEngine.Core.BrakeSqueal(sampleRate, drums: v.MassKg > 5000f, seed: seed + 97);
         if (!string.IsNullOrEmpty(v.AirSystem) && v.DoorChime)
         {
             _chime = OpenFPS.Common.DoorChimeSpec.TransitBus;
@@ -613,6 +620,12 @@ public sealed class EngineVoiceState : IRenderedVoice
     /// not the grille's waveform a second time.
     /// </summary>
     private readonly EchoDiffuser _bayIntake;
+    /// <summary>The front brakes singing at the end of a stop, on a vehicle whose brakes do. See
+    /// BrakeSqueal.</summary>
+    private readonly OpenFPS.Client.AudioEngine.Core.BrakeSqueal _squeal;
+    private float _squealDecel, _squealLastSpeed;
+    /// <summary>Whether this vehicle's brakes squeal, and at what. For tests and instruments.</summary>
+    internal OpenFPS.Client.AudioEngine.Core.BrakeSqueal Squeal => _squeal;
     /// <summary>The door beeper hangs over the door, so it is heard from the end the door is at.</summary>
     private readonly bool _chimeAtFront = true;
 
@@ -634,10 +647,16 @@ public sealed class EngineVoiceState : IRenderedVoice
     /// </summary>
     public float BayLeakage { get => _bayLeak; set => _bayLeak = Math.Clamp(value, 0f, 1f); }
     private float _lastSpeedForAir, _accelForAir;
-    private float _brakedSeconds, _stoppedSeconds;
-    private bool _parked, _doorsOpen;
-    private const float BrakingDecel = 0.45f;      // m/s²: a foot on the pedal, not drag
-    private const float ParkAfterSeconds = 2.5f;
+    private float _brakedSeconds, _stoppedSeconds, _peakBrake;
+    private bool _parked, _doorsOpen, _holding;
+    /// <summary>m/s²: a foot on the pedal. Lifting off at city speed is drag and engine braking,
+    /// a few tenths; slowing for a corner on the racing line is where the old 0.45 hissed.</summary>
+    private const float BrakingDecel = 0.7f;
+    /// <summary>What full service pressure stops a vehicle at, m/s². The chambers hold a pressure in
+    /// proportion to the braking asked for, and a release vents what they hold.</summary>
+    private const float FullServiceDecel = 6.0f;
+    /// <summary>How long after coming to rest at a bus stop the spring brakes go on.</summary>
+    private const float ParkAfterSeconds = 1.2f;
 
     private void AirEvents(float dt)
     {
@@ -648,12 +667,22 @@ public sealed class EngineVoiceState : IRenderedVoice
         _accelForAir += (accel - _accelForAir) * MathF.Min(1f, dt * 6f);
         bool moving = _speedSmooth > 0.15f;
         bool braking = moving && _accelForAir < -BrakingDecel;
-        if (braking) _brakedSeconds += dt;
+        if (braking)
+        {
+            _brakedSeconds += dt;
+            _peakBrake = MathF.Max(_peakBrake, -_accelForAir);
+        }
+        else if (!moving && _brakedSeconds > 0.25f)
+        {
+            // Came to rest on the brake: the driver keeps a foot on it. Nothing vents until the pedal
+            // comes up — pulling away, or the spring brakes going on at a bus stop.
+            _holding = true;
+            _brakedSeconds = 0f;
+        }
         else if (_brakedSeconds > 0.25f)
         {
-            // The pedal comes up: the service chambers exhaust. A longer application put more air
-            // in them, so a stop from speed hisses longer than a dab.
-            _air.Vent("service_release", MathF.Min(1f, 0.3f + _brakedSeconds / 3f));
+            // A dab while rolling: the pedal comes up and the chambers exhaust what they held.
+            ReleaseService();
             _brakedSeconds = 0f;
         }
         else _brakedSeconds = 0f;
@@ -661,9 +690,13 @@ public sealed class EngineVoiceState : IRenderedVoice
         if (!moving)
         {
             _stoppedSeconds += dt;
-            if (!_parked && _stoppedSeconds > ParkAfterSeconds)
+            // Only at a stop that takes passengers. At a junction or a crossing the driver holds the
+            // service brake and goes again; setting the park brake, kneeling and opening the doors
+            // there was every give-way on the city ending in a long blow of air.
+            if (!_parked && ServingStop && _stoppedSeconds > ParkAfterSeconds)
             {
                 _parked = true;
+                if (_holding) ReleaseService();             // foot off the pedal as the springs take it
                 _air.Vent("parking");                       // spring brakes: the chambers dump
                 // And then it kneels — the suspension bags on the kerb side dump and the body
                 // drops a hundred millimetres. A long, low hiss with a great deal of volume behind
@@ -684,8 +717,22 @@ public sealed class EngineVoiceState : IRenderedVoice
                 _air.Vent("parking", 0.35f);
                 _parked = false;
             }
+            else if (_holding) ReleaseService();            // off the brake and away
             _stoppedSeconds = 0f;
         }
+    }
+
+    /// <summary>
+    /// The service chambers exhausting, through the quick-release valve: a short puff, at the
+    /// pressure the braking put in them. A gentle stop is a quarter of full service and a quiet
+    /// "pssht"; it was vented by how LONG the pedal had been down, so a slow three-second stop to a
+    /// junction dumped the full fourteen litres.
+    /// </summary>
+    private void ReleaseService()
+    {
+        _air!.Vent("service_release", Math.Clamp(_peakBrake / FullServiceDecel, 0.1f, 1f));
+        _peakBrake = 0f;
+        _holding = false;
     }
 
     /// <summary>
@@ -876,8 +923,17 @@ public sealed class EngineVoiceState : IRenderedVoice
                 chimeOut = StepChime();
                 if (_chimeAtFront) chimeFront = chimeOut; else pa += chimeOut;
             }
-            float frontExtras = airFront + chimeFront;
-            float rearExtras = airOut + chimeOut - frontExtras;
+            // How hard it is braking, from its own speed, every 64 samples like the air.
+            if ((i & 63) == 0)
+            {
+                float rate = (_squealLastSpeed - _speedSmooth) / (64f * dt);
+                _squealLastSpeed = _speedSmooth;
+                _squealDecel += (rate - _squealDecel) * 0.3f;
+            }
+            // The front brakes do most of the stopping and most of the singing: the front tap.
+            float squealOut = _squeal.Step(_speedSmooth, _squealDecel);
+            float frontExtras = airFront + chimeFront + squealOut;
+            float rearExtras = airOut + chimeOut - (airFront + chimeFront);
 
             // What the ENGINE is radiating, before anything a listener's position does to it: the
             // level the loudness law is applied to. Not the brakes' air or the door beeper, which are
