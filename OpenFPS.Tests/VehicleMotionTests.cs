@@ -67,11 +67,11 @@ public class VehicleMotionTests : IDisposable
     }
 
     private Rig Build(List<Vector3> track, VehicleData vehicle, List<TrackStopData>? stops = null, float width = 12f,
-                      List<VehicleData>? more = null)
+                      List<VehicleData>? more = null, bool shuttle = false, StreetLifeData? life = null)
     {
         string maps = Path.Combine(_dir, "maps");
         Directory.CreateDirectory(maps);
-        vehicle.Track ??= "loop";
+        if (!shuttle) vehicle.Track ??= "loop";
         var vehicles = new List<VehicleData> { vehicle };
         if (more != null) vehicles.AddRange(more);
         var data = new MapData
@@ -81,6 +81,7 @@ public class VehicleMotionTests : IDisposable
             MaxBound = new Vector3(400, 50, 600),
             Tracks = new List<TrackData> { new() { Id = "loop", Waypoints = track, WidthMetres = width, Stops = stops ?? new() } },
             Vehicles = vehicles,
+            StreetLife = life,
         };
         File.WriteAllText(Path.Combine(maps, "motion.json"), JsonSerializer.Serialize(data, MapRepository.JsonOptions));
         var prefabs = new PrefabRepository(Path.Combine(AppContext.BaseDirectory, "prefabs"));
@@ -90,12 +91,23 @@ public class VehicleMotionTests : IDisposable
         system.Spawn(manager);
         Assert.True(manager.TryGetMap("motion", out World world, out _, out _, out _));
         Entity found = Entity.Null;
-        world.Query(new QueryDescription().WithAll<VehicleComponent, NameComponent>(), (Entity e, ref NameComponent n) =>
+        world.Query(new QueryDescription().WithAll<NameComponent>(), (Entity e, ref NameComponent n) =>
         {
             if (n.Name == vehicle.Name) found = e;
         });
         Assert.True(found != Entity.Null, "the vehicle was not spawned");
+        _lastWorld = world;
         return new Rig { Vehicles = system, World = world, Id = found.Id, Entity = found };
+    }
+
+    private World? _lastWorld;
+
+    /// <summary>Every entity the last map spawned, by name.</summary>
+    private Dictionary<string, Entity> Spawned()
+    {
+        var all = new Dictionary<string, Entity>();
+        _lastWorld!.Query(new QueryDescription().WithAll<NameComponent>(), (Entity e, ref NameComponent n) => all[n.Name] = e);
+        return all;
     }
 
     private static VehicleData Car(string name = "Car", float topKmh = 250f, float corneringG = 0.5f, float gripG = 0f,
@@ -336,5 +348,199 @@ public class VehicleMotionTests : IDisposable
         // ...and it is a moment, not a new speed limit: it gets going again.
         rig.Tick(30 * 12);
         Assert.True(rig.State.Speed > from * 0.9f, $"still at {rig.State.Speed:F1} m/s twelve seconds after a hard stop from {from:F1}");
+    }
+
+    // ── What a preset becomes ─────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// A map names a preset and gets the right kind of thing: a road vehicle, an aircraft, a small
+    /// machine or a person, each with its own voice prefix, size, solidity and description; and a
+    /// preset nobody knows, or a track that is missing or too short, spawns nothing.
+    /// </summary>
+    [Fact]
+    public void APresetBecomesTheRightKindOfThing()
+    {
+        var road = new Vector3(0, 0.1f, 0); var end = new Vector3(0, 0.1f, 50);
+        var rig = Build(Circle(60f), Car(name: "Car", corneringG: 1f), more: new()
+        {
+            new() { Name = "Plane", Preset = "airliner", RoadStart = road + new Vector3(0, 300, 0), RoadEnd = end + new Vector3(0, 300, 0) },
+            new() { Name = "Mower", Preset = "mower_push", RoadStart = road, RoadEnd = end },
+            new() { Name = "Person", Preset = "walker", RoadStart = road, RoadEnd = end },
+            new() { Name = "Nothing", Preset = "no_such_machine", RoadStart = road, RoadEnd = end },
+            new() { Name = "Lost", Preset = "i4_economy", Track = "no_such_track" },
+        });
+        var w = rig.World;
+        var all = Spawned();
+        Assert.False(all.ContainsKey("Nothing"));
+        Assert.False(all.ContainsKey("Lost"));
+
+        var car = all["Car"]; var plane = all["Plane"]; var mower = all["Mower"]; var person = all["Person"];
+        var profile = OpenFPS.Common.MachineRegistry.VehicleFor("i4_economy");
+        var air = OpenFPS.Common.AircraftProfile.ByName("airliner");
+
+        Assert.Equal("engine:i4_economy", w.Get<SoundEmitterComponent>(car).SoundId);
+        Assert.Equal("aircraft:airliner", w.Get<SoundEmitterComponent>(plane).SoundId);
+        Assert.Equal("machine:mower_push", w.Get<SoundEmitterComponent>(mower).SoundId);
+        Assert.False(w.Has<SoundEmitterComponent>(person));
+        Assert.False(w.Has<VehicleComponent>(person));
+        foreach (var e in new[] { car, plane, mower })
+        {
+            var em = w.Get<SoundEmitterComponent>(e);
+            Assert.True(em.IsSynth);
+            Assert.Equal(3f, em.MinDistance);
+            Assert.Equal(OpenFPS.Common.Components.PlaybackMode.LoopOne, em.Mode);
+        }
+        Assert.Equal(OpenFPS.Common.Loudness.AudibleRange(profile.SourceLevelDb), w.Get<SoundEmitterComponent>(car).Range);
+        Assert.Equal(OpenFPS.Common.Loudness.AudibleRange(air.SourceLevelDb), w.Get<SoundEmitterComponent>(plane).Range);
+
+        Assert.Equal(new Vector3(profile.WidthMetres, profile.HeightMetres, profile.LengthMetres), w.Get<ColliderComponent>(car).Size);
+        Assert.Equal(new Vector3(air.WingspanMetres, 6f, air.LengthMetres), w.Get<ColliderComponent>(plane).Size);
+        Assert.Equal(new Vector3(0.6f, 1.0f, 0.9f), w.Get<ColliderComponent>(mower).Size);
+        Assert.Equal(new Vector3(0.5f, 1.8f, 0.5f), w.Get<ColliderComponent>(person).Size);
+        Assert.True(w.Get<ColliderComponent>(car).IsSolid);
+        Assert.True(w.Get<ColliderComponent>(mower).IsSolid);
+        Assert.False(w.Get<ColliderComponent>(plane).IsSolid);
+        Assert.False(w.Get<ColliderComponent>(person).IsSolid);
+
+        Assert.Equal(2, w.Get<VehicleComponent>(car).MaxSeats);
+        Assert.Equal(0, w.Get<VehicleComponent>(plane).MaxSeats);
+        Assert.Equal(0, w.Get<VehicleComponent>(mower).MaxSeats);
+        Assert.Equal("i4_economy", w.Get<VehicleComponent>(car).VehicleType);
+
+        Assert.Equal($"{profile.Engine.Name}, driving the road", w.Get<IdentityComponent>(car).Description);
+        Assert.Equal($"{air.Name}, in the air", w.Get<IdentityComponent>(plane).Description);
+        Assert.EndsWith(", being worked", w.Get<IdentityComponent>(mower).Description);
+        Assert.Equal("walking", w.Get<IdentityComponent>(person).Description);
+        Assert.Equal("Person", w.Get<IdentityComponent>(person).Name);
+
+        // A shuttle starts at its road's start, facing its end.
+        var mt = w.Get<Transform>(mower);
+        Assert.Equal(road, mt.Position);
+        Assert.Equal(Quaternion.CreateFromYawPitchRoll(0f, 0f, 0f), mt.Rotation);
+    }
+
+    [Fact]
+    public void ATrackOfFewerThanThreePointsSpawnsNothing()
+    {
+        string maps = Path.Combine(_dir, "maps");
+        Directory.CreateDirectory(maps);
+        var data = new MapData
+        {
+            Id = "motion",
+            Tracks = new List<TrackData> { new() { Id = "loop", Waypoints = new() { Vector3.Zero, Vector3.UnitZ * 50 } } },
+            Vehicles = new List<VehicleData> { Car() },
+        };
+        data.Vehicles[0].Track = "loop";
+        File.WriteAllText(Path.Combine(maps, "motion.json"), JsonSerializer.Serialize(data, MapRepository.JsonOptions));
+        var manager = new MapManager(new MapRepository(maps), new PrefabRepository(Path.Combine(AppContext.BaseDirectory, "prefabs")));
+        manager.Initialize();
+        var system = new VehicleSystem();
+        system.Spawn(manager);
+        Assert.Equal(0, system.Count);
+    }
+
+    /// <summary>A road vehicle on a map with street life is on the street and carries its horn;
+    /// without street life, or as a mower, it is not.</summary>
+    [Fact]
+    public void OnlyRoadVehiclesOnAStreetMapAreOnTheStreet()
+    {
+        var road = new Vector3(0, 0.1f, 0); var end = new Vector3(0, 0.1f, 50);
+        var rig = Build(Circle(60f), Car(corneringG: 1f), life: new StreetLifeData(),
+                        more: new() { new() { Name = "Mower", Preset = "mower_push", RoadStart = road, RoadEnd = end } });
+        Assert.True(rig.Vehicles.TryInspect(rig.Id, out var car));
+        Assert.True(car.OnStreet);
+        Assert.Equal(OpenFPS.Common.VehicleProfile.HornFor(OpenFPS.Common.MachineRegistry.VehicleFor("i4_economy")), car.Horn);
+        Assert.True(rig.Vehicles.TryInspect(Spawned()["Mower"].Id, out var mower));
+        Assert.False(mower.OnStreet);
+        Assert.Equal("", mower.Horn);
+
+        var quiet = Build(Circle(60f), Car(corneringG: 1f));
+        Assert.False(quiet.State.OnStreet);
+    }
+
+    // ── Shuttles ──────────────────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Out and back along a straight road: up to the pass's speed at its acceleration, braking by
+    /// v = sqrt(2 a s) to stop at the end, turning round over 2.5 s, waiting, and coming back at the
+    /// next speed in its list.
+    /// </summary>
+    [Fact]
+    public void AShuttleRunsOutTurnsWaitsAndComesBack()
+    {
+        var a = new Vector3(0, 0.1f, 0); var b = new Vector3(0, 0.1f, 100);
+        var rig = Build(Circle(60f), new VehicleData
+        {
+            Name = "Van", Preset = "diesel_i4", RoadStart = a, RoadEnd = b, SpeedsKmh = new[] { 36f, 18f },
+            AccelerationMps2 = 2f, BrakingMps2 = 3f, WaitSeconds = 1f, StartDelaySeconds = 0.5f,
+        }, shuttle: true);
+        float prev = 0f, top = 0f, worstUp = 0f, worstDown = 0f;
+        int firstMove = -1, arrived = -1, leftAgain = -1;
+        float returnTop = 0f;
+        for (int i = 0; i < 30 * 40; i++)
+        {
+            rig.Tick();
+            var s = rig.State;
+            var p = rig.Position;
+            if (firstMove < 0 && s.Speed > 0f) firstMove = i;
+            worstUp = MathF.Max(worstUp, (s.Speed - prev) / Dt);
+            worstDown = MathF.Max(worstDown, (prev - s.Speed) / Dt);
+            if (arrived < 0) top = MathF.Max(top, s.Speed);
+            if (arrived < 0 && firstMove >= 0 && s.Speed == 0f)
+            {
+                arrived = i;
+                Assert.InRange(p.Z, 99.9f, 100.01f);
+            }
+            if (arrived >= 0 && leftAgain < 0 && s.Speed > 0f) leftAgain = i;
+            if (leftAgain >= 0) returnTop = MathF.Max(returnTop, s.Speed);
+            prev = s.Speed;
+        }
+        // The start delay, then the wait, before it moves at all.
+        Assert.InRange(firstMove * Dt, 1.5f - 0.1f, 1.5f + 0.1f);
+        Assert.InRange(top, 9.9f, 10.01f);
+        Assert.True(worstUp <= 2f + 0.01f, $"accelerated at {worstUp:F2} m/s^2 on 2");
+        Assert.True(worstDown <= 3f + 0.01f, $"braked at {worstDown:F2} m/s^2 on 3");
+        // 2.5 s turning round and 1 s waiting.
+        Assert.InRange((leftAgain - arrived) * Dt, 3.5f - 0.1f, 3.5f + 0.15f);
+        Assert.InRange(returnTop, 4.9f, 5.01f);
+        Assert.True(rig.Position.Z < 99f, "it did not come back");
+    }
+
+    /// <summary>Turned round, it faces the other way; half way through the turn it is side-on.</summary>
+    [Fact]
+    public void AShuttleTurnsRoundSmoothly()
+    {
+        var rig = Build(Circle(60f), new VehicleData
+        {
+            Name = "Van", Preset = "diesel_i4", RoadStart = new Vector3(0, 0.1f, 0), RoadEnd = new Vector3(0, 0.1f, 20),
+            SpeedsKmh = new[] { 18f }, AccelerationMps2 = 2f, BrakingMps2 = 3f, WaitSeconds = 0.1f,
+        }, shuttle: true);
+        float Yaw() { var q = rig.World.Get<Transform>(rig.Entity).Rotation; return MathF.Atan2(2f * (q.W * q.Y), 1f - 2f * q.Y * q.Y); }
+        for (int guard = 0; !(rig.State.Speed == 0f && rig.Position.Z > 19.9f); guard++) { Assert.True(guard < 30 * 20); rig.Tick(); }
+        Assert.InRange(MathF.Abs(Yaw()), 0f, 0.01f);
+        // A quarter of the way through it has turned less than a quarter: it eases in
+        // (smoothstep, 0.156 of the half-turn at a quarter of the time).
+        rig.Tick((int)(0.625f / Dt));
+        Assert.InRange(MathF.Abs(Yaw()), MathF.PI * 0.12f, MathF.PI * 0.2f);
+        rig.Tick((int)(0.625f / Dt));
+        Assert.InRange(MathF.Abs(Yaw()), MathF.PI / 2 - 0.1f, MathF.PI / 2 + 0.1f);
+        rig.Tick((int)(1.5f / Dt));
+        Assert.InRange(MathF.Abs(Yaw()), MathF.PI - 0.01f, MathF.PI + 0.01f);
+    }
+
+    /// <summary>A shuttle given no speeds or wait gets 30/60/90 km/h and four seconds.</summary>
+    [Fact]
+    public void AShuttlesDefaults()
+    {
+        var rig = Build(Circle(60f), new VehicleData
+        {
+            Name = "Van", Preset = "diesel_i4", RoadStart = new Vector3(0, 0.1f, 0), RoadEnd = new Vector3(0, 0.1f, 300),
+            AccelerationMps2 = 5f, BrakingMps2 = 5f,
+        }, shuttle: true);
+        Assert.Equal(4f, rig.State.Wait);
+        int moved = -1; float top = 0f;
+        for (int i = 0; i < 30 * 30; i++) { rig.Tick(); if (moved < 0 && rig.State.Speed > 0f) moved = i; top = MathF.Max(top, rig.State.Speed); }
+        Assert.InRange(moved * Dt, 3.9f, 4.1f);
+        Assert.InRange(top, 30f / 3.6f - 0.01f, 30f / 3.6f + 0.01f);
     }
 }

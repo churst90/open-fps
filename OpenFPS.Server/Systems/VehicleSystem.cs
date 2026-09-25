@@ -431,7 +431,9 @@ public sealed partial class VehicleSystem
                     var dir = Vector3.Normalize(v.To - v.From);
                     t.Position = v.From + dir * MathF.Min(v.Progress, total);
                     vel.Linear = dir * v.Speed;
-                    if (v.Progress >= total - 0.05f && CanHalt(v.Speed, v.Brake, dt))
+                    // Checked AFTER this tick's braking, so it waits for the brake to reach zero:
+                    // with no road left the target is nought and the speed gets there on its own.
+                    if (v.Progress >= total - 0.05f && v.Speed <= 1e-3f)
                     {
                         v.Speed = 0f;
                         vel.Linear = Vector3.Zero;
@@ -717,7 +719,8 @@ public sealed partial class VehicleSystem
     /// <summary>What a vehicle is doing right now, for tests: the physics is otherwise only visible
     /// through where it puts the entity.</summary>
     internal readonly record struct Inspection(float Speed, float Lap, int Laps, float DwellLeft, float KerbShift,
-                                               float TyreDemand, float LapLength, int NextStop, float Brake, float Accel);
+                                               float TyreDemand, float LapLength, int NextStop, float Brake, float Accel,
+                                               bool OnStreet, string Horn, float Wait);
 
     internal bool TryInspect(int entityId, out Inspection state)
     {
@@ -725,7 +728,7 @@ public sealed partial class VehicleSystem
             if (v.Entity.Id == entityId)
             {
                 state = new Inspection(v.Speed, v.Lap, v.Laps, v.DwellLeft, v.KerbShift, v.TyreDemand,
-                                       v.Line?.Length ?? 0f, v.NextStop, v.Brake, v.Accel);
+                                       v.Line?.Length ?? 0f, v.NextStop, v.Brake, v.Accel, v.OnStreet, v.Horn, v.WaitSeconds);
                 return true;
             }
         state = default;
