@@ -206,6 +206,15 @@ public sealed partial class VehicleSystem
                     }
                 }
 
+                // No track and no road: a shuttle from a point to the same point, whose direction is
+                // a zero vector normalised — NaN, written into its position and sent to every client.
+                if (line == null && Vector3.DistanceSquared(vd.RoadStart, vd.RoadEnd) < 0.01f)
+                {
+                    Log.Warning("Map {Map}: vehicle '{Name}' has neither a track nor a road (RoadStart and RoadEnd are the same point); it will not be spawned.",
+                                mapId, vd.Name ?? displayKind);
+                    continue;
+                }
+
                 var start = vd.RoadStart;
                 var heading = MathF.Atan2(vd.RoadEnd.X - vd.RoadStart.X, vd.RoadEnd.Z - vd.RoadStart.Z);
                 if (line != null) line.Sample(vd.StartOffsetMetres, out start, out heading, out _);

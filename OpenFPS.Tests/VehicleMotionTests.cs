@@ -5,6 +5,7 @@ using System.Linq;
 using System.Numerics;
 using System.Text.Json;
 using Arch.Core;
+using OpenFPS.Common;
 using OpenFPS.Common.Components;
 using OpenFPS.Server.Core;
 using OpenFPS.Server.Repositories;
@@ -371,11 +372,13 @@ public class VehicleMotionTests : IDisposable
             new() { Name = "Person", Preset = "walker", RoadStart = road, RoadEnd = end },
             new() { Name = "Nothing", Preset = "no_such_machine", RoadStart = road, RoadEnd = end },
             new() { Name = "Lost", Preset = "i4_economy", Track = "no_such_track" },
+            new() { Name = "Nowhere", Preset = "i4_economy", RoadStart = road, RoadEnd = road },
         });
         var w = rig.World;
         var all = Spawned();
         Assert.False(all.ContainsKey("Nothing"));
         Assert.False(all.ContainsKey("Lost"));
+        Assert.False(all.ContainsKey("Nowhere"));      // no track and no road: its heading would be NaN
 
         var car = all["Car"]; var plane = all["Plane"]; var mower = all["Mower"]; var person = all["Person"];
         var profile = OpenFPS.Common.MachineRegistry.VehicleFor("i4_economy");
@@ -658,5 +661,95 @@ public class VehicleMotionTests : IDisposable
                          entities: new() { DoorAt(64f, 100f), DoorAt(75f, 180f) });
         near.Tick(30 * 3);
         Assert.Equal(2, near.State.Spots);
+    }
+
+    // ── Street life ───────────────────────────────────────────────────────────────────────────
+
+    private (Rig Rig, List<(int Id, string Label, TransientSound Sound, int Tick)> Heard) Street(StreetLifeData life, int cars = 3)
+    {
+        var more = new List<VehicleData>();
+        for (int i = 1; i < cars; i++)
+        {
+            var c = Car(name: $"Car {i}", topKmh: 50f, corneringG: 1.0f, start: i * 90f);
+            c.Track = "loop";
+            more.Add(c);
+        }
+        var rig = Build(Circle(60f), Car(topKmh: 50f, corneringG: 1.0f), life: life, more: more);
+        var heard = new List<(int, string, TransientSound, int)>();
+        rig.Vehicles.Heard = (map, id, label, sounds) => { foreach (var x in sounds) heard.Add((id, label, x, _tick)); };
+        return (rig, heard);
+    }
+
+    private int _tick;
+
+    private void Run(Rig rig, int ticks)
+    {
+        for (int i = 0; i < ticks; i++) { _tick++; rig.Tick(); }
+    }
+
+    /// <summary>Horns at about the declared mean interval, from more than one vehicle, each carrying its
+    /// horn's own level, its pattern's length and a key the client can play, just above the car.</summary>
+    [Fact]
+    public void HornsComeAtTheDeclaredRateAndCarryTheirHorn()
+    {
+        var (rig, heard) = Street(new StreetLifeData { HornEverySeconds = 5f, HardBrakeEverySeconds = 0f, ParkEverySeconds = 0f });
+        Run(rig, 30 * 300);
+        var horns = heard.FindAll(h => h.Label == "horn");
+        // 60 expected in five minutes; random, so a band.
+        Assert.InRange(horns.Count, 35, 90);
+        Assert.True(horns.Select(h => h.Id).Distinct().Count() >= 2, "one car does all the honking");
+        string horn = OpenFPS.Common.VehicleProfile.HornFor(OpenFPS.Common.MachineRegistry.VehicleFor("i4_economy"));
+        foreach (var h in horns)
+        {
+            Assert.True(OpenFPS.Common.Honk.TryParse(h.Sound.SynthKey, out var kind, out var pattern), h.Sound.SynthKey);
+            Assert.Equal(horn, kind);
+            Assert.Equal(OpenFPS.Common.Honk.LevelDb(horn), h.Sound.LevelDb);
+            Assert.InRange(h.Sound.DecaySeconds - OpenFPS.Common.Honk.Duration(pattern), -0.01f, 0.01f);   // the key rounds the pattern
+            Assert.Equal(SoundCharacter.Ring, h.Sound.Character);
+            float r = MathF.Sqrt(h.Sound.Position.X * h.Sound.Position.X + h.Sound.Position.Z * h.Sound.Position.Z);
+            Assert.InRange(r, 55f, 65f);                                    // at a car on the circle
+            Assert.InRange(h.Sound.Position.Y, 0.65f, 0.75f);               // 0.6 m above its road
+        }
+    }
+
+    [Fact]
+    public void ARateOfZeroIsNever()
+    {
+        var (rig, heard) = Street(new StreetLifeData { HornEverySeconds = 0f, HardBrakeEverySeconds = 0f, ParkEverySeconds = 0f });
+        Run(rig, 30 * 120);
+        Assert.Empty(heard);
+    }
+
+    /// <summary>
+    /// A hard stop is chosen from moving traffic, takes it down to between a fifth and two fifths of
+    /// its speed (never under 1.5 m/s), and is answered by a startled honk a moment later about half
+    /// the time.
+    /// </summary>
+    [Fact]
+    public void AHardStopTakesTrafficDownAndIsOftenAnsweredWithTheHorn()
+    {
+        var (rig, heard) = Street(new StreetLifeData { HornEverySeconds = 0f, HardBrakeEverySeconds = 4f, ParkEverySeconds = 0f }, cars: 1);
+        int stops = 0; float before = rig.State.Speed; bool braking = false; float lowest = 99f; int began = 0;
+        var gaps = new List<float>();
+        for (int i = 0; i < 30 * 600; i++)
+        {
+            Run(rig, 1);
+            var s = rig.State;
+            bool now = s.Speed < before - 0.15f;             // shedding more than its service brake would in a tick
+            if (now && !braking) { stops++; began = _tick; lowest = s.Speed; }
+            if (braking) lowest = MathF.Min(lowest, s.Speed);
+            braking = now || (braking && s.Speed < before);
+            if (!braking && lowest < 99f)
+            {
+                Assert.InRange(lowest, 1.4f, 13.9f * 0.42f);
+                lowest = 99f;
+            }
+            before = s.Speed;
+        }
+        var horns = heard.FindAll(h => h.Label == "horn");
+        Assert.InRange(stops, 60, 240);
+        Assert.InRange((float)horns.Count / stops, 0.3f, 0.8f);
+        foreach (var h in horns)
+            Assert.True(OpenFPS.Common.Honk.TryParse(h.Sound.SynthKey, out _, out _));
     }
 }
