@@ -48,13 +48,26 @@ public class BrakeSquealTests
         return 20f * MathF.Log10(MathF.Max(1e-12f, rms) / 20e-6f);
     }
 
+    /// <summary>The seed is an entity id, and a street's ids are consecutive. Neighbours must not
+    /// share a pitch: unhashed, ids 5919, 5922 and 5949 all sang within 11 Hz of 6570.</summary>
     [Fact]
-    public void AboutAQuarterOfCarsAndAThirdOfBusesSqueal()
+    public void NeighbouringVehiclesDoNotShareAPitch()
+    {
+        var pitches = Enumerable.Range(5900, 400).Select(i => new BrakeSqueal(Rate, false, i))
+                                .Where(s => s.Squeals).Select(s => s.Hz).OrderBy(h => h).ToList();
+        Assert.True(pitches.Count > 60);
+        // Spread over the disc range rather than bunched: no 50 Hz window holds a fifth of them.
+        int worst = pitches.Select(p => pitches.Count(q => q >= p && q < p + 50f)).Max();
+        Assert.True(worst < pitches.Count / 5, $"{worst} of {pitches.Count} within 50 Hz of each other");
+    }
+
+    [Fact]
+    public void AboutAQuarterOfCarsAndMostBusesSqueal()
     {
         float cars = Enumerable.Range(0, 2000).Count(i => new BrakeSqueal(Rate, false, i).Squeals) / 2000f;
         float buses = Enumerable.Range(0, 2000).Count(i => new BrakeSqueal(Rate, true, i).Squeals) / 2000f;
         Assert.InRange(cars, 0.21f, 0.29f);
-        Assert.InRange(buses, 0.31f, 0.39f);
+        Assert.InRange(buses, 0.56f, 0.64f);
         // Discs sing high, drums low.
         Assert.InRange(Squealer(false).Hz, 2500f, 7000f);
         Assert.InRange(Squealer(true).Hz, 900f, 2200f);

@@ -398,6 +398,7 @@ public static class MachineRegistry
             WidthMetres = chassis?.Get("widthMetres", b?.WidthMetres ?? 1.9f) ?? b?.WidthMetres ?? 1.9f,
             HeightMetres = chassis?.Get("heightMetres", b?.HeightMetres ?? 1.4f) ?? b?.HeightMetres ?? 1.4f,
             SourceLevelDb = chassis?.Get("sourceLevelDb", b?.SourceLevelDb ?? 116f) ?? b?.SourceLevelDb ?? 116f,
+            TyreCount = (int)MathF.Round(chassis?.Get("tyreCount", b?.TyreCount ?? 4) ?? b?.TyreCount ?? 4),
             ExhaustOffsetZ = exhaust?.At.Z ?? b?.ExhaustOffsetZ ?? -2.05f,
             ExhaustHeight = exhaust?.At.Y ?? b?.ExhaustHeight ?? 0.3f,
             IntakeOffsetZ = intake?.At.Z ?? b?.IntakeOffsetZ ?? 1.35f,
@@ -521,6 +522,7 @@ public static class MachineRegistry
                     ["widthMetres"] = v.WidthMetres,
                     ["heightMetres"] = v.HeightMetres,
                     ["sourceLevelDb"] = v.SourceLevelDb,
+                    ["tyreCount"] = v.TyreCount,
                 },
             },
         };

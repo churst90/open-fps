@@ -156,7 +156,12 @@ public sealed class EngineVoiceState : IRenderedVoice
     /// tests in a row said "hardly noticeable" and "extremely dull", and the dullness was the same
     /// thing: what was audible of it was the low shoulder, because the rest was buried.
     /// </summary>
-    public float TyreMix = 1.4f;
+    public float TyreMix = DefaultTyreMix;
+    private const float DefaultTyreMix = 1.4f;
+    /// <summary>One axle at each end, at a level that keeps the POWER of the pair what the single
+    /// coherent signal had (0.6 at each end, summed in phase: 1.2, so 0.6 x root 2 each). The squeal
+    /// is still quoted against this; the rolling noise is anchored through it.</summary>
+    private const float PerAxle = 0.6f * 1.41421356f;
     public float SampleRate = 44100f;
 
     private float _speedSmooth;
@@ -511,12 +516,29 @@ public sealed class EngineVoiceState : IRenderedVoice
             // vehicle's. That is also why it belongs in the front tap and not with the tailpipe.
             _fan = new OpenFPS.Client.AudioEngine.Core.Aircraft.BladeRow(fan, sampleRate, Vector3.UnitZ, seed + 53);
             _fanRatio = v.FanDriveRatio > 0f ? v.FanDriveRatio : 1f;
+            if (v.FanClutch is { } clutch)
+                _cooling = new OpenFPS.Client.AudioEngine.Core.Engine.CoolingSystem(clutch, v.Engine, seed);
         }
+        // Rolling noise per axle, anchored: one tyre's declared level summed over the tyres at that
+        // end — the steered pair at the front (one on a motorcycle), the rest at the back. Divided
+        // by the gain the mix below applies to both tyre taps, which the squeal was set against and
+        // keeps.
+        int tyres = Math.Max(1, v.TyreCount);
+        int frontTyres = tyres <= 2 ? 1 : 2;
+        float perTyrePa = 20e-6f * MathF.Pow(10f, v.Tyres.ReferenceDb / 20f);
+        _rollingFrontPa = perTyrePa * MathF.Sqrt(frontTyres) / (PerAxle * DefaultTyreMix);
+        _rollingRearPa = perTyrePa * MathF.Sqrt(Math.Max(1, tyres - frontTyres)) / (PerAxle * DefaultTyreMix);
     }
 
     /// <summary>The cooling fan's contribution, 0..1 — normally one. Writable so an instrument can
     /// mute it and read what it is worth, the same way the bay leak can be.</summary>
     public float FanMix = 1f;
+
+    /// <summary>The coolant and the fan clutch, on a vehicle whose fan has one.</summary>
+    private readonly OpenFPS.Client.AudioEngine.Core.Engine.CoolingSystem? _cooling;
+    /// <summary>For instruments: the cooling system, or null.</summary>
+    public OpenFPS.Client.AudioEngine.Core.Engine.CoolingSystem? Cooling => _cooling;
+    private readonly float _rollingFrontPa, _rollingRearPa;
 
     // ── Sitting in it ───────────────────────────────────────────────────────────────────────────
     //
@@ -642,6 +664,9 @@ public sealed class EngineVoiceState : IRenderedVoice
     private float _squealDecel, _squealLastSpeed;
     /// <summary>Whether this vehicle's brakes squeal, and at what. For tests and instruments.</summary>
     internal OpenFPS.Client.AudioEngine.Core.BrakeSqueal Squeal => _squeal;
+    /// <summary>The brake squeal's contribution, 0..1; writable so an instrument can take it out and
+    /// read what it was.</summary>
+    public float SquealMix = 1f;
     /// <summary>The door beeper hangs over the door, so it is heard from the end the door is at.</summary>
     private readonly bool _chimeAtFront = true;
 
@@ -878,12 +903,8 @@ public sealed class EngineVoiceState : IRenderedVoice
             // their noise is INDEPENDENT; one signal written to both ends was the same roar coming
             // from two places a few metres apart, which combs against itself as the car goes by —
             // heard as a car passing "inside out".
-            float tyreRear = VehicleSynth.Tyre(Vehicle.Tyres, Driveline.Speed, RoadSlip + _tyreChirp, _rng, ref _tyre);
-            float tyreFront = VehicleSynth.Tyre(Vehicle.Tyres, Driveline.Speed, RoadSlip + _tyreChirp, _rng, ref _tyreFront);
-            // Tyres are in arbitrary units; place them about 30 dB under a loud exhaust. One axle at
-            // each end, at a level that keeps the POWER of the pair what the single coherent signal
-            // had (0.6 at each end, summed in phase: 1.2, so 0.6 x root 2 each).
-            const float PerAxle = 0.6f * 1.41421356f;
+            float tyreRear = VehicleSynth.Tyre(Vehicle.Tyres, Driveline.Speed, RoadSlip + _tyreChirp, _rng, ref _tyre, _rollingRearPa);
+            float tyreFront = VehicleSynth.Tyre(Vehicle.Tyres, Driveline.Speed, RoadSlip + _tyreChirp, _rng, ref _tyreFront, _rollingFrontPa);
             float rearTyre = tyreRear * PerAxle * TyreMix;
             float frontTyre = tyreFront * PerAxle * TyreMix;
             // The front of the machine: the airbox, which breathes to the outside through the
@@ -904,14 +925,18 @@ public sealed class EngineVoiceState : IRenderedVoice
             float front = Engine.Intake * FrontMix + frontTyre;
             if (_fan != null)
             {
-                // The fan is geared to the crank and has no throttle: it turns at engine speed and
-                // its loading is the air it is pushing, which is all it ever pushes. Its speed is
-                // set on the slow tick like everything else that does not change per sample.
+                // The fan is geared to the crank and has no throttle: it turns at engine speed through
+                // its clutch, if it has one (CoolingSystem), and its loading is the air it is pushing,
+                // which is all it ever pushes. Its speed is set on the slow tick like everything else
+                // that does not change per sample.
                 if ((i & 63) == 0)
-                    _fan.SetSpeed(Engine.Rpm * _fanRatio, 1f,
+                {
+                    _cooling?.Step(dt * 64f, Engine.Rpm, Engine.LoadTorque, Driveline.Speed);
+                    _fan.SetSpeed(Engine.Rpm * _fanRatio * (_cooling?.FanSpeedFraction ?? 1f), 1f,
                                   _listenerKnown
                                       ? new Vector3(Volatile.Read(ref _listenerX), Volatile.Read(ref _listenerY), Volatile.Read(ref _listenerZ))
                                       : Vector3.UnitZ);
+                }
                 front += _fan.Step() * FanMix;
             }
             // The pipe's radiation, thrown the way the pipe points and shaded by the body.
@@ -961,7 +986,7 @@ public sealed class EngineVoiceState : IRenderedVoice
                 _squealDecel += (rate - _squealDecel) * 0.3f;
             }
             // The front brakes do most of the stopping and most of the singing: the front tap.
-            float squealOut = _squeal.Step(_speedSmooth, _squealDecel);
+            float squealOut = _squeal.Step(_speedSmooth, _squealDecel) * SquealMix;
             float frontExtras = airFront + chimeFront + squealOut;
             float rearExtras = airOut + chimeOut - (airFront + chimeFront);
 
@@ -972,7 +997,9 @@ public sealed class EngineVoiceState : IRenderedVoice
             // loudness law is applied to is the same machine it always was.
             // Measured WITHOUT the pipe's directivity: a car facing away from you is not a car running
             // quietly, and the idle lift must not turn it back up.
-            float engineOnly = pa - rearExtras + bay + (Engine.Exhaust - exhaustOut);
+            // Both axles' tyres count: they are the machine radiating too, and at a cruise the larger
+            // part of it. Only the rear one used to, because only the rear one was in `pa`.
+            float engineOnly = pa - rearExtras + bay + frontTyre + (Engine.Exhaust - exhaustOut);
             blockSum += (double)engineOnly * engineOnly;
 
             // Crossfaded over ~60 ms rather than switched, so getting in or out is not a click.

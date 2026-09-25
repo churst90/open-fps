@@ -223,6 +223,62 @@ public static class VehicleSynth
         public float R1, R2, R1b, R2b;
         public float SlipSmooth;
         public float SlideLp;
+        /// <summary>The anchored rolling path's high-pass, which takes off the bass a real tyre
+        /// does not make (see <see cref="RollingHighPassHz"/>).</summary>
+        public float RollHp;
+        /// <summary>And its second lowpass pole.</summary>
+        public float RollLp;
+    }
+
+    /// <summary>
+    /// Where the anchored rolling roar is cut below. Tyre/road noise is a band round 1 kHz: in the
+    /// CNOSSOS-EU light-vehicle spectrum the 250 Hz octave is twelve decibels under the 1 kHz one, and
+    /// the lowpass alone left it flat all the way down, a rumble the tyre does not make. Above the
+    /// peak the same spectrum falls about ten decibels an octave, which is the lowpass taken twice;
+    /// once, it left the 8 kHz octave six decibels under the peak where it should be twenty-odd, and
+    /// that was a hiss.
+    /// </summary>
+    public const float RollingHighPassHz = 400f;
+
+    /// <summary>
+    /// The variance of white noise through the rolling lowpass (coefficient <paramref name="a"/>)
+    /// twice and the high-pass, over the input's. Integrated from the two filters' responses rather than
+    /// assumed, so the declared level is the level the roar really makes wherever the lowpass is.
+    /// </summary>
+    internal static float RollingBandGain(float a)
+    {
+        float b = 1f - MathF.Exp(-2f * MathF.PI * RollingHighPassHz / SampleRate);
+        const int N = 512;
+        double sum = 0;
+        for (int k = 0; k < N; k++)
+        {
+            double w = Math.PI * (k + 0.5) / N;
+            var z1 = System.Numerics.Complex.FromPolarCoordinates(1.0, -w);
+            var lp = a / (1.0 - (1.0 - a) * z1);
+            lp *= lp;
+            var hp = 1.0 - b / (1.0 - (1.0 - b) * z1);
+            sum += System.Numerics.Complex.Abs(lp * hp) * System.Numerics.Complex.Abs(lp * hp);
+        }
+        return (float)(sum / N);
+    }
+
+    /// <summary>The gains of <see cref="RollingBandGain"/> over the lowpass's range, filled once.</summary>
+    private static readonly float[] RollingBandTable = BuildRollingTable();
+    private const float RollA0 = 0.06f, RollA1 = 0.34f;
+
+    private static float[] BuildRollingTable()
+    {
+        var t = new float[65];
+        for (int i = 0; i < t.Length; i++) t[i] = RollingBandGain(RollA0 + (RollA1 - RollA0) * i / (t.Length - 1));
+        return t;
+    }
+
+    private static float RollingBand(float a)
+    {
+        float x = Math.Clamp((a - RollA0) / (RollA1 - RollA0), 0f, 1f) * (RollingBandTable.Length - 1);
+        int i = Math.Min((int)x, RollingBandTable.Length - 2);
+        float f = x - i;
+        return RollingBandTable[i] + (RollingBandTable[i + 1] - RollingBandTable[i]) * f;
     }
 
     /// <summary>
@@ -246,7 +302,12 @@ public static class VehicleSynth
     /// </summary>
     /// <param name="slip">Fraction of available grip in use. See <see cref="TyreFriction.Demand"/>.</param>
     [MethodImpl(MethodImplOptions.AggressiveOptimization)]
-    public static float Tyre(TyreProfile t, float speed, float slip, Random rng, ref TyreVoice v)
+    /// <param name="rollingPa">
+    /// The RMS pressure, pascals at 1 m, this call's rolling noise should make at 20 m/s, before the
+    /// caller's own gain; zero or less keeps the old unanchored rolling level, which the aircraft's
+    /// wheels still use.
+    /// </param>
+    public static float Tyre(TyreProfile t, float speed, float slip, Random rng, ref TyreVoice v, float rollingPa = 0f)
     {
         // The demand is smoothed, and asymmetrically: a tyre lets go quickly and settles slowly, so
         // a squeal starts on the instant and dies away over a couple of hundred milliseconds. Stepping
@@ -274,7 +335,27 @@ public static class VehicleSynth
             tone = (float)(Math.Sin(v.TreadPhase) * 0.34 + Math.Sin(v.TreadPhase * 2) * 0.16);
             tone *= 1f - t.SurfaceRoughness * 0.55f;
         }
-        float mix = (roar * 1.4f + tone) * level * 0.3f;
+        float mix;
+        if (rollingPa > 0f)
+        {
+            // Anchored: the roar is normalised to unit RMS from the filters' own response, the tread
+            // tone likewise, and the two are mixed in the proportion the unanchored path always had
+            // them at 20 m/s so the character of each tyre is unchanged. What comes out is the
+            // declared pressure times the speed law, divided by the output stage's small-signal gain
+            // (see the return) so that it is the level that leaves this function.
+            v.RollLp += cutoff * (roar - v.RollLp);
+            v.RollHp += RollHpAlpha * (v.RollLp - v.RollHp);
+            float band = v.RollLp - v.RollHp;
+            float bandRms = MathF.Sqrt(RollingBand(cutoff) / 3f) * (0.55f + 0.45f * t.SurfaceRoughness);
+            float roarW = 1.4f * (0.55f + 0.45f * t.SurfaceRoughness) * 0.19f;
+            float toneW = t.TreadBlocks > 0 ? 0.2657f * (1f - t.SurfaceRoughness * 0.55f) : 0f;
+            float norm = MathF.Sqrt(roarW * roarW + toneW * toneW);
+            float toneRms = 0.2657f * (1f - t.SurfaceRoughness * 0.55f);
+            float unit = (roarW / norm) * band / MathF.Max(1e-6f, bandRms)
+                       + (toneW > 0f ? (toneW / norm) * tone / toneRms : 0f);
+            mix = unit * rollingPa * level / OutputGain;
+        }
+        else mix = (roar * 1.4f + tone) * level * 0.3f;
 
         // ── Sliding ──
         float squeal = TyreFriction.SquealAmount(demand);
@@ -324,6 +405,11 @@ public static class VehicleSynth
         // normal case.
         return MathF.Tanh(y * 0.05f) * 26f;
     }
+
+    /// <summary>The output stage's gain for small signals: tanh(0.05 y) x 26.</summary>
+    private const float OutputGain = 0.05f * 26f;
+
+    private static readonly float RollHpAlpha = 1f - MathF.Exp(-2f * MathF.PI * RollingHighPassHz / SampleRate);
 
     /// <summary>
     /// How much louder a squeal is rendered than its sound pressure alone would suggest.

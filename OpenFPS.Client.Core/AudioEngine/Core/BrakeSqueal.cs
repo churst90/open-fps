@@ -38,9 +38,13 @@ public sealed class BrakeSqueal
     public BrakeSqueal(float sampleRate, bool drums, int seed)
     {
         _rate = sampleRate;
-        _rng = new Random(seed * 7349 + 11);
-        // About a quarter of cars on a street have brakes that sing, and rather more of the buses.
-        Squeals = _rng.NextDouble() < (drums ? 0.35 : 0.25);
+        // Hashed first. The seed is the vehicle's entity id, and neighbouring ids are consecutive
+        // integers; System.Random's first draws from nearby seeds are nearly the same, so a street's
+        // cars came out singing at 6567, 6568 and 6578 Hz — one set of brakes copied down the road.
+        _rng = new Random(Mix(seed));
+        // About a quarter of cars on a street have brakes that sing. Drum brakes on heavy vehicles
+        // are notorious for it: most city buses squeal coming in to a stop.
+        Squeals = _rng.NextDouble() < (drums ? 0.6 : 0.25);
         _f0 = drums ? 900f + 1300f * (float)_rng.NextDouble()       // drum: 0.9-2.2 kHz
                     : 2500f + 4500f * (float)_rng.NextDouble();     // disc: 2.5-7 kHz
         // A squeal is loud for its size; "nothing exaggerated" is the low end of what one measures.
@@ -51,6 +55,16 @@ public sealed class BrakeSqueal
         _damping = 20f;                  // 1/s: rings down to a tenth in about 0.1 s
         // ...and it settles where the cubic term balances the net gain, sqrt((g - d) / g) of full.
         _settle = MathF.Sqrt((_gain - _damping) / _gain);
+    }
+
+    /// <summary>A 32-bit integer hash (Murmur3's finaliser): neighbouring seeds, unrelated results.</summary>
+    internal static int Mix(int seed)
+    {
+        uint h = (uint)seed * 0x9E3779B1u + 0x7F4A7C15u;
+        h ^= h >> 16; h *= 0x85EBCA6Bu;
+        h ^= h >> 13; h *= 0xC2B2AE35u;
+        h ^= h >> 16;
+        return (int)(h & 0x7FFFFFFF);
     }
 
     /// <summary>

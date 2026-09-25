@@ -52,6 +52,31 @@ public sealed record Gearbox
 }
 
 /// <summary>The tyre and the road under it.</summary>
+/// <summary>
+/// A fan clutch: when the cooling fan is driven, from the coolant's temperature. See
+/// <see cref="VehicleProfile.FanClutch"/>, and the heat balance that decides the temperature in
+/// CoolingSystem.
+/// </summary>
+public sealed record FanClutchSpec
+{
+    /// <summary>Coolant temperature the clutch engages at, degrees C.</summary>
+    public float EngageCelsius { get; init; } = 95f;
+    /// <summary>And releases at, lower, so it does not chatter on the threshold.</summary>
+    public float ReleaseCelsius { get; init; } = 90f;
+    /// <summary>Fan speed over its driven speed while disengaged: bearing and fluid drag, and the air
+    /// through the grille windmilling it.</summary>
+    public float DisengagedFraction { get; init; } = 0.2f;
+    /// <summary>How long the fan takes to come up to speed once engaged, seconds.</summary>
+    public float EngageSeconds { get; init; } = 1f;
+
+    /// <summary>An air-actuated friction clutch, as on a heavy truck: a second to lock up.</summary>
+    public static FanClutchSpec OnOff => new();
+
+    /// <summary>A viscous (silicone fluid) clutch, as on most buses: it thickens as it warms, so the
+    /// fan comes up over several seconds, and disengaged it drags a little harder.</summary>
+    public static FanClutchSpec Viscous => new() { DisengagedFraction = 0.25f, EngageSeconds = 6f };
+}
+
 public sealed record TyreProfile
 {
     /// <summary>Tread blocks around the circumference. Their passing rate is a real tonal component of
@@ -61,9 +86,18 @@ public sealed record TyreProfile
     /// <summary>How rough the surface is, 0 = polished concrete, 1 = coarse chip seal. Drives how much
     /// broadband roar there is against the tonal component.</summary>
     public float SurfaceRoughness { get; init; } = 0.55f;
-    /// <summary>Level at a reference 20 m/s, dB SPL at 1 m. Tyres are the dominant sound of a car above
-    /// about fifty km/h, which surprises people who expect the engine to be.</summary>
-    public float ReferenceDb { get; init; } = 74f;
+    /// <summary>
+    /// One tyre's rolling noise at 20 m/s (72 km/h), dB SPL at 1 m. Tyres are the dominant sound of a
+    /// car above about forty km/h, which surprises people who expect the engine to be.
+    ///
+    /// Anchored on pass-by measurements: a car cruising at 70 km/h on dense asphalt is about 73 dB(A)
+    /// at 7.5 m, nearly all of it tyres, which is 90.5 dB at a metre for the four of them and 84 for
+    /// one. The CNOSSOS-EU rolling-noise sound power for a light vehicle (103 dB at 70 km/h) puts it
+    /// within two decibels of that. It used to be 74 and the live voice ignored it, rendering the
+    /// rolling noise in arbitrary units: ten to fifteen decibels short, which left the cars with no
+    /// roar at all and the trucks' fans the only broadband sound in the city.
+    /// </summary>
+    public float ReferenceDb { get; init; } = 84f;
 
     // ── Sliding ─────────────────────────────────────────────────────────────────────────────────
     //
@@ -109,7 +143,7 @@ public sealed record TyreProfile
     /// </summary>
     public static TyreProfile RaceSlick => new()
     {
-        TreadBlocks = 0, SurfaceRoughness = 0.35f, ReferenceDb = 78f,
+        TreadBlocks = 0, SurfaceRoughness = 0.35f, ReferenceDb = 82f,
         // EFFECTIVE grip, not the tyre's pure lateral figure, and the difference is worth writing
         // down. A slick does about 1.75 g on the flat. On a banked turn the load vector tilts, so the
         // same tyre delivers far more cornering than that — and the client measures a car's lateral
@@ -125,7 +159,7 @@ public sealed record TyreProfile
     /// <summary>A loaded truck tyre: coarse tread, a lot of roar, and it gives up early and groans.</summary>
     public static TyreProfile TruckOnAsphalt => new()
     {
-        TreadBlocks = 96, SurfaceRoughness = 0.72f, ReferenceDb = 82f,
+        TreadBlocks = 96, SurfaceRoughness = 0.72f, ReferenceDb = 85f,
         PeakGripG = 0.75f, SquealHz = 430f, SquealQ = 9f, SquealDb = 97f,
     };
 
@@ -313,6 +347,27 @@ public sealed record VehicleProfile
     public float FanDriveRatio { get; init; } = 1f;
 
     /// <summary>
+    /// The clutch between the crank and the cooling fan, or null for a fan bolted solid to the crank.
+    ///
+    /// Reported: "those trucks are so loud, when they're blocks away I can still hear the wooshing of
+    /// the engine fan ... the trucks are all fan." Measured at a city cruise, half the 1-4 kHz hiss of
+    /// the semi was its fan, turning at full crank speed all the time. No truck or bus fan does that.
+    /// It sits behind a clutch that engages on coolant temperature: an air-actuated on/off clutch on a
+    /// heavy truck, a viscous one on most buses. At a cruise the air coming through the grille does
+    /// the cooling and the fan is disengaged, slipping at a fraction of crank speed, and its broadband
+    /// falls about thirty decibels. It engages pulling a load up to speed, or idling hot, and the fan
+    /// coming in is a real and recognisable roar.
+    /// </summary>
+    public FanClutchSpec? FanClutch { get; init; }
+
+    /// <summary>
+    /// How many tyres are on the road. The rolling noise of the vehicle is one tyre's
+    /// (<see cref="TyreProfile.ReferenceDb"/>) summed over this many: a car four, a motorcycle two, a
+    /// bus six with its duals, an articulated truck eighteen.
+    /// </summary>
+    public int TyreCount { get; init; } = 4;
+
+    /// <summary>
     /// What this vehicle measures at one metre at full load, dB SPL — and the number the whole
     /// audio chain is hung off.
     ///
@@ -491,6 +546,7 @@ public sealed record VehicleProfile
         RollingResistance = 0.015f,
         // Nothing to radiate through: an open frame with the engine hanging in it.
         Body = VehicleBody.OpenWheeler,
+        TyreCount = 2,
         ExhaustOffsetZ = -0.75f, IntakeOffsetZ = 0.25f, ExhaustHeight = 0.55f,
         FrontAxleZ = 0.70f, RearAxleZ = -0.70f,
         SourceLevelDb = 118f,
@@ -616,7 +672,10 @@ public sealed record VehicleProfile
         LengthMetres = 4.1f, WidthMetres = 1.75f, HeightMetres = 1.45f,
         Name = "1.6 hatchback",
         EngineKey = "i4_economy",
-        SourceLevelDb = 94f,
+        // 99.7 on the live voice once the tyres were anchored (09-25): flat out near the redline this
+        // car is doing motorway speeds, and there a small car is mostly its tyres. It was 94 with
+        // the tyres in arbitrary units ten to fifteen decibels under a real one's.
+        SourceLevelDb = 99.5f,
         Engine = EngineProfile.Inline4Economy,
         Gearbox = Gearbox.SixSpeedSports with { Ratios = new[] { 3.6f, 2.0f, 1.36f, 1.03f, 0.82f }, FinalDrive = 4.2f, ShiftSeconds = 0.4f, UpshiftRpm = 5200f, DownshiftRpm = 1400f, WheelRadiusMetres = 0.30f },
         Tyres = TyreProfile.SportsOnAsphalt with { TreadBlocks = 60 },
@@ -699,6 +758,7 @@ public sealed record VehicleProfile
         LengthMetres = 2.45f, WidthMetres = 0.95f, HeightMetres = 1.15f,
         // A motorcycle has no body and no cabin: the pipes radiate into open air.
         Body = VehicleBody.OpenWheeler,
+        TyreCount = 2,
         Name = "V-twin cruiser motorcycle",
         EngineKey = "vtwin",
         SourceLevelDb = 121f,
@@ -715,6 +775,7 @@ public sealed record VehicleProfile
         LengthMetres = 2.2f, WidthMetres = 0.85f, HeightMetres = 1.25f,
         // Likewise, and even less of it.
         Body = VehicleBody.OpenWheeler,
+        TyreCount = 2,
         Name = "450 dirt bike",
         EngineKey = "single",
         SourceLevelDb = 118f,
@@ -733,10 +794,11 @@ public sealed record VehicleProfile
         Body = VehicleBody.Van,
         Name = "2.8 turbo-diesel pickup",
         EngineKey = "diesel_i4",
-        // 94 on the live voice, against 88 on the tailpipe bench. Five of the six decibels
-        // are the TYRES: this is a silenced turbo-diesel worked at motorway speed, where the tyres
-        // really are as loud as the engine, and they are as much a part of the vehicle as the pipe.
-        SourceLevelDb = 94f,
+        // 99.4 on the live voice, against 88 on the tailpipe bench, and nearly all of the difference
+        // is the TYRES: this is a silenced turbo-diesel worked at motorway speed, where the tyres
+        // really are louder than the engine, and they are as much a part of the vehicle as the pipe.
+        // It was 94 before the tyres were anchored (09-25) at a real tyre's level.
+        SourceLevelDb = 99.5f,
         Engine = EngineProfile.DieselPickupI4,
         Gearbox = Gearbox.SixSpeedSports with { Ratios = new[] { 4.31f, 2.33f, 1.52f, 1.13f, 0.86f, 0.68f }, FinalDrive = 3.73f, ShiftSeconds = 0.45f, UpshiftRpm = 3600f, DownshiftRpm = 1300f, WheelRadiusMetres = 0.38f },
         Tyres = TyreProfile.SportsOnAsphalt with { TreadBlocks = 48, SurfaceRoughness = 0.6f },
@@ -768,6 +830,8 @@ public sealed record VehicleProfile
             RpmMax = 2100f, RpmIdle = 0f, ReferenceDb = 88f, SelfNoiseDb = 93f, BladeScatter = 0.02f,
         },
         FanDriveRatio = 1.05f,
+        FanClutch = FanClutchSpec.OnOff,
+        TyreCount = 18,
         Engine = EngineProfile.DieselTruckI6,
         Gearbox = Gearbox.SixSpeedSports with { Ratios = new[] { 11.7f, 7.6f, 5.0f, 3.3f, 2.2f, 1.45f, 1.0f, 0.78f }, FinalDrive = 3.55f, ShiftSeconds = 0.8f, UpshiftRpm = 1800f, DownshiftRpm = 1100f, WheelRadiusMetres = 0.51f },
         Tyres = TyreProfile.TruckOnAsphalt,
@@ -838,6 +902,8 @@ public sealed record VehicleProfile
             RpmMax = 2600f, RpmIdle = 0f, ReferenceDb = 86f, SelfNoiseDb = 91f, BladeScatter = 0.02f,
         },
         FanDriveRatio = 1f,
+        FanClutch = FanClutchSpec.Viscous,
+        TyreCount = 6,
         Engine = EngineProfile.DieselBusI6,
         Gearbox = Gearbox.SixSpeedSports with
         {
@@ -971,7 +1037,7 @@ public sealed record VehicleProfile
             UpshiftRpm = 15100f,
             DownshiftRpm = 8500f,
         },
-        Tyres = TyreProfile.RaceSlick with { SurfaceRoughness = 0.3f, ReferenceDb = 76f, PeakGripG = 4.2f, SquealHz = 690f },
+        Tyres = TyreProfile.RaceSlick with { SurfaceRoughness = 0.3f, ReferenceDb = 80f, PeakGripG = 4.2f, SquealHz = 690f },
         MassKg = 620f,
         // OVAL TRIM, and it has to be. 1.35 m^2 is a road-course wing package, and with it this car
         // could not reach 230 km/h — the map asked it for 327, so it sat permanently flat out, a
@@ -1046,7 +1112,7 @@ public sealed record VehicleProfile
             UpshiftRpm = 6500f,
             DownshiftRpm = 2200f,
         },
-        Tyres = TyreProfile.SportsOnAsphalt with { TreadBlocks = 4, SurfaceRoughness = 0.4f, ReferenceDb = 74f },
+        Tyres = TyreProfile.SportsOnAsphalt with { TreadBlocks = 4, SurfaceRoughness = 0.4f },
         MassKg = 1980f, DragArea = 1.05f, RollingResistance = 0.013f,
         ExhaustOffsetZ = -2.2f, IntakeOffsetZ = 1.3f, FrontAxleZ = 1.5f, RearAxleZ = -1.5f,
     };
