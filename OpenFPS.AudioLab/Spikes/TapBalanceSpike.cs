@@ -17,8 +17,9 @@ public static class TapBalanceSpike
 
     public static int Run(string[] args)
     {
-        var names = args.Where(a => !a.StartsWith("--")).ToArray();
+        var names = args.Where(a => !a.StartsWith("--") && a != "parts").ToArray();
         if (names.Length == 0) names = VehicleProfile.Presets.Keys.OrderBy(k => k).ToArray();
+        if (args.Contains("parts")) return Parts(names);
         Console.WriteLine($"{"preset",-22} {"idle rear",9} {"front",7} {"r-f",6}   {"12 m/s rear",11} {"front",7} {"r-f",6}");
         foreach (var n in names)
         {
@@ -30,9 +31,27 @@ public static class TapBalanceSpike
         return 0;
     }
 
-    static (float Rear, float Front) Measure(VehicleProfile v, float speed)
+    /// <summary>At a city cruise (12 m/s): each end's level, and what the tyres, the fan and the
+    /// engine bay are each worth to it (the level lost when they are muted).</summary>
+    static int Parts(string[] names)
+    {
+        Console.WriteLine($"{"preset",-20} {"rear",6} {"front",6}   worth to rear: {"tyres",5}   to front: {"tyres",5} {"fan",5} {"bay",5}");
+        foreach (var n in names)
+        {
+            var v = VehicleProfile.ByName(n);
+            var (r, f) = Measure(v, 12f);
+            var (rT, fT) = Measure(v, 12f, s => s.TyreMix = 0f);
+            var (_, fF) = Measure(v, 12f, s => s.FanMix = 0f);
+            var (_, fB) = Measure(v, 12f, s => s.BayLeakage = 0f);
+            Console.WriteLine($"{n,-20} {r,6:F1} {f,6:F1}   {"",14}{r - rT,5:F1}   {"",10}{f - fT,5:F1} {f - fF,5:F1} {f - fB,5:F1}");
+        }
+        return 0;
+    }
+
+    static (float Rear, float Front) Measure(VehicleProfile v, float speed, Action<EngineVoiceState>? mute = null)
     {
         var voice = new EngineVoiceState(v, Rate, 11) { TargetSpeed = speed, SplitVoices = true };
+        mute?.Invoke(voice);
         voice.PlaceAtSpeed(speed);
         voice.Revive();
         var tap = new EngineTapState(voice);

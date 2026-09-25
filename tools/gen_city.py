@@ -667,13 +667,17 @@ CROSSING_HALF = WALK + 2.0          # where the line crosses Main Street, on the
 
 
 def on_the_crossing(x, z):
-    """True where Main Street's carriageway runs over the line rather than under it.
+    """True where a road runs over the line rather than under it: Main Street, and Southgate's two.
 
     A level crossing is PLANKED: the road surface is carried across the rails, not laid beside them.
     So the formation and the rails stop short either side and the asphalt runs through — which is
     also the difference between walking over a crossing and tripping over a sixteen-centimetre lip.
+    Southgate's crossings were added to the map by hand without their gap, so its traffic drove
+    through the embankment (GhostsAndStuttersTests.EveryShippedTrackIsDriveable).
     """
-    return abs(x) < CROSSING_HALF and abs(z - RAIL_Z_S) < 12.0
+    if abs(z - RAIL_Z_S) >= 12.0:
+        return False
+    return abs(x) < CROSSING_HALF or any(abs(x - cx) < KERB + 2.0 for cx in (SG_X0, SG_X1))
 
 
 for i, p in enumerate(RAIL):
@@ -684,12 +688,30 @@ for i, p in enumerate(RAIL):
     dx, dz = q[0] - p[0], q[2] - p[2]
     seg = math.hypot(dx, dz)
     ang = math.atan2(dx, dz)
+    extra = 0.6
+    # A segment whose END reaches into a crossing is trimmed back to the crossing's edge: its middle
+    # was clear, so it was laid whole, and 30 m of embankment ran straight across Southgate's road.
+    # Trimmed rather than split, so the map keeps one box per segment and every id after it.
+    steps = max(2, int(seg / 0.5))
+    clear = [not on_the_crossing(p[0] + dx * k / steps, p[2] + dz * k / steps) for k in range(steps + 1)]
+    if not all(clear):
+        # The longest run of clear samples, which for a crossing at one end is the rest of the segment.
+        best, run_start, t0, t1 = 0, None, 0, 0
+        for k, c in enumerate(clear + [False]):
+            if c and run_start is None:
+                run_start = k
+            elif not c and run_start is not None:
+                if k - run_start > best:
+                    best, t0, t1 = k - run_start, run_start / steps, (k - 1) / steps
+                run_start = None
+        mx, mz = p[0] + dx * (t0 + t1) / 2, p[2] + dz * (t0 + t1) / 2
+        seg, extra = seg * (t1 - t0), 0.0
     # Written as an axis-aligned box and then turned, because a box IS axis-aligned until it is.
     bx, by, bz = BASE["dirt_floor"]
     entities.append({
         "EntityId": new_id(), "PrefabId": "dirt_floor",
         "Position": v3(mx, 0.35, mz), "Rotation": yaw(ang),
-        "Scale": v3(RAIL_W / bx, 0.7 / by, (seg + 0.6) / bz),
+        "Scale": v3(RAIL_W / bx, 0.7 / by, (seg + extra) / bz),
         "Name": "Rail ballast" if i == 0 else None,
     })
     entities[-1] = {k: v for k, v in entities[-1].items() if v is not None}
@@ -702,7 +724,7 @@ for i, p in enumerate(RAIL):
         entities.append({
             "EntityId": new_id(), "PrefabId": "fence_palisade",
             "Position": v3(mx + ox, 0.78, mz + oz), "Rotation": yaw(ang),
-            "Scale": v3(0.14 / mbx, 0.16 / mby, (seg + 0.6) / mbz),
+            "Scale": v3(0.14 / mbx, 0.16 / mby, (seg + extra) / mbz),
         })
 
 
@@ -1467,13 +1489,14 @@ AIR = [
 ]
 VEHICLES.extend(AIR)
 
-# ── More police and motorcycles, and Southgate's traffic ──────────────────────────────────────────
+# ── More motorcycles, and Southgate's traffic ──────────────────────────────────────────────
 #
-# Added to the shipped map by hand on 2026-09-22 and 2026-09-24 and brought back here. Southgate's six
-# are declared with car grip whatever they are, as they were shipped.
+# ONE police car on the city (Cody, 2026-09-25): Police car 9, in the downtown field. The two
+# more that were added here are gone.
+#
+# Added to the shipped map by hand on 2026-09-22 and 2026-09-24 and brought back here. Southgate's
+# are declared with car grip whatever they are, as they were shipped (five, since the bus went).
 VEHICLES += [
-    car("Police car 14", "police_interceptor", "downtown_ccw", 62.0, 0.60, 1.8, 240.0),
-    car("Police car 22", "police_interceptor", "north_block", 62.0, 0.60, 1.8, 96.0),
     car("Motorcycle, stock twin", "vtwin_stock", "downtown_ccw", 56.0, 0.60, 3.4, 512.0, grip="bike"),
     car("Motorcycle, slip-ons", "vtwin_slipon", "north_block", 56.0, 0.60, 3.4, 300.0, grip="bike"),
     car("Motorcycle 31", "vtwin_slipon", "downtown_cw", 56.0, 0.60, 3.4, 120.0, grip="bike"),

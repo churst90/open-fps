@@ -105,7 +105,24 @@ public static class Loudness
     // are 60 to 95 dB and they are what the game is mostly made of, so that is the range the mix
     // should spend itself on. Gunfire now runs into the ceiling and clips, which is what a gunshot
     // does to an ear and to a microphone.
-    public const float RenderCeilingDb = 112f;
+    //
+    // And then a PIVOT (2026-09-25). With the compression a setting, a fixed 112 dB ceiling made "real"
+    // (1.0) mean everything below a jackhammer sat as far below the volume knob as it is below one: a
+    // street scene 40 dB down, footsteps and beacons all but gone, "like my ears are stopped up". The
+    // compression now turns about an everyday level instead: a sound 70 dB at its reference distance
+    // (the 1.2 m minimum, for anything that quiet) plays at the same level at
+    // any setting, and the level that reaches full scale follows — 112 dB at the shipped 0.45, where
+    // nothing has moved, and about 89 dB at 1.0, where a V8 floored beside you runs into the ceiling
+    // the way it does into an ear, and a door, a footstep and a beacon stay where they were.
+    public const float PivotDb = 70f;
+    private const float ShippedCeilingDb = 112f;
+
+    /// <summary>Where a <see cref="PivotDb"/> sound plays, dBFS at its reference: the level the shipped
+    /// mix gave it, held whatever the compression.</summary>
+    public static float PivotRenderedDb => (PivotDb - ShippedCeilingDb) * DefaultCompression;
+
+    /// <summary>The level at the ear that plays at full scale, for the compression in force.</summary>
+    public static float RenderCeilingDb => PivotDb - PivotRenderedDb / DynamicRangeCompression;
 
     /// <summary>
     /// How much of the real decibel difference survives into the mix. 1.0 is literal physics and
@@ -185,13 +202,14 @@ public static class Loudness
 
     public static (float Gain, float ReferenceDistance) Place(float sourceLevelDb)
     {
-        float ideal = MathF.Pow(10f, (sourceLevelDb - RenderCeilingDb) / 20f);
+        float ceiling = RenderCeilingDb;
+        float ideal = MathF.Pow(10f, (sourceLevelDb - ceiling) / 20f);
         float reference = Math.Clamp(ideal, MinReferenceDistance, MaxReferenceDistance);
 
         // What is left over after the clamp, compressed. For a loud source the clamp does nothing and
         // this comes out at unity; for a quiet one it is the whole of its quietness.
         float atReference = sourceLevelDb - 20f * MathF.Log10(MathF.Max(0.01f, reference));
-        float renderedDb = (atReference - RenderCeilingDb) * DynamicRangeCompression;
+        float renderedDb = (atReference - ceiling) * DynamicRangeCompression;
         return (MathF.Min(1f, MathF.Pow(10f, renderedDb / 20f)), reference);
     }
 

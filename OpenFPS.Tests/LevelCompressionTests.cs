@@ -91,4 +91,21 @@ public class LevelCompressionTests
         }
         finally { Loudness.DynamicRangeCompression = was; }
     }
+
+    /// <summary>
+    /// The compression turns about an everyday level: a 70 dB sound is placed the same at any setting,
+    /// and at real levels ordinary sounds are not pushed down — loud ones go up. It used to pivot on
+    /// the 112 dB ceiling, so "real" took footsteps and beacons to 60 dB under full scale.
+    /// </summary>
+    [Fact]
+    public void RealLevelsTurnAboutAnEverydaySound()
+    {
+        // 70 dB at its reference distance, which for a sound this quiet is the 1.2 m minimum.
+        float pivot = Loudness.PivotDb + 20f * MathF.Log10(Loudness.MinReferenceDistance);
+        Assert.Equal(With(0.45f, () => Loudness.PlacedDb(pivot)), With(1f, () => Loudness.PlacedDb(pivot)), 2);
+        Assert.Equal(112f, With(0.45f, () => Loudness.RenderCeilingDb), 2);                 // the shipped mix is unmoved
+        Assert.True(With(1f, () => Loudness.PlacedDb(88f)) > With(0.45f, () => Loudness.PlacedDb(88f)), "a door is quieter at real levels");
+        Assert.True(With(1f, () => Loudness.PlacedDb(66f)) > With(0.45f, () => Loudness.PlacedDb(66f)) - 4f, "a beacon fell away at real levels");
+        Assert.True(With(1f, () => Loudness.PlacedDb(122f)) > With(0.45f, () => Loudness.PlacedDb(122f)) + 15f, "a V8 is no louder at real levels");
+    }
 }
