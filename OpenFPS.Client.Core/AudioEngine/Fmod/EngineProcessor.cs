@@ -497,6 +497,7 @@ public sealed class EngineVoiceState : IRenderedVoice
         }
         _bayLeak = Math.Clamp(v.EngineBayLeakage, 0f, 1f);
         _bayIntake = new EchoDiffuser(BayScattering, seed + 71, sampleRate);
+        _radiation = new OpenFPS.Client.AudioEngine.Core.Engine.ExhaustRadiation(v, sampleRate);
         // Drums on anything heavy enough to need them; discs on the rest.
         _squeal = new OpenFPS.Client.AudioEngine.Core.BrakeSqueal(sampleRate, drums: v.MassKg > 5000f, seed: seed + 97);
         if (!string.IsNullOrEmpty(v.AirSystem) && v.DoorChime)
@@ -620,6 +621,11 @@ public sealed class EngineVoiceState : IRenderedVoice
     /// not the grille's waveform a second time.
     /// </summary>
     private readonly EchoDiffuser _bayIntake;
+    /// <summary>Which way the tailpipe throws its sound and what the body does to it, for where the
+    /// listener is. See ExhaustRadiation.</summary>
+    private readonly OpenFPS.Client.AudioEngine.Core.Engine.ExhaustRadiation _radiation;
+    /// <summary>The pipe's radiation, for tests and instruments.</summary>
+    internal OpenFPS.Client.AudioEngine.Core.Engine.ExhaustRadiation Radiation => _radiation;
     /// <summary>The front brakes singing at the end of a stop, on a vehicle whose brakes do. See
     /// BrakeSqueal.</summary>
     private readonly OpenFPS.Client.AudioEngine.Core.BrakeSqueal _squeal;
@@ -814,7 +820,15 @@ public sealed class EngineVoiceState : IRenderedVoice
         // is nearer, which way the fan blows) has nothing to say about a sound that comes through
         // the floor.
         if (_listenerKnown && !inside)
-            Engine.SetListener(new Vector3(Volatile.Read(ref _listenerX), Volatile.Read(ref _listenerY), Volatile.Read(ref _listenerZ)));
+        {
+            var heard = new Vector3(Volatile.Read(ref _listenerX), Volatile.Read(ref _listenerY), Volatile.Read(ref _listenerZ));
+            Engine.SetListener(heard);
+            // The listener arrives relative to where this voice is placed: the true tailpipe once the
+            // two ends have voices of their own, the compromise point before (VehicleProfile.ExhaustOffset).
+            var placedAt = SplitVoices ? new Vector3(0f, Vehicle.ExhaustHeight, Vehicle.ExhaustOffsetZ) : Vehicle.ExhaustOffset;
+            _radiation.Aim(heard + placedAt);
+        }
+        else _radiation.Aim(null);
         float panelA = 1f - MathF.Exp(-2f * MathF.PI * _panelCorner * dt);
         // The lift for this block, from the level the machine has been running at lately.
         float liftTarget = 1f;
@@ -886,7 +900,9 @@ public sealed class EngineVoiceState : IRenderedVoice
                                       : Vector3.UnitZ);
                 front += _fan.Step() * FanMix;
             }
-            float pa = Engine.Exhaust + rearTyre;
+            // The pipe's radiation, thrown the way the pipe points and shaded by the body.
+            float exhaustOut = _radiation.Process(Engine.Exhaust);
+            float pa = exhaustOut + rearTyre;
 
             // ...and then the car it is all bolted into. The body is driven by everything above and
             // rings on its own account, so it is ADDED to the direct sound rather than replacing it:
@@ -940,7 +956,9 @@ public sealed class EngineVoiceState : IRenderedVoice
             // their own sources at their own levels and are not what idles.
             // The bay is the engine radiating even though it now leaves by the front: the level the
             // loudness law is applied to is the same machine it always was.
-            float engineOnly = pa - rearExtras + bay;
+            // Measured WITHOUT the pipe's directivity: a car facing away from you is not a car running
+            // quietly, and the idle lift must not turn it back up.
+            float engineOnly = pa - rearExtras + bay + (Engine.Exhaust - exhaustOut);
             blockSum += (double)engineOnly * engineOnly;
 
             // Crossfaded over ~60 ms rather than switched, so getting in or out is not a click.

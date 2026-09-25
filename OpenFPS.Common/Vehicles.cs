@@ -166,6 +166,14 @@ public sealed record VehicleProfile
     public float ExhaustHeight { get; init; } = 0.3f;
 
     /// <summary>
+    /// Which way the tailpipe points, in the vehicle's own frame (x right, y up, z forward). Straight
+    /// back unless the vehicle says otherwise: a stock car's exits through the side behind the driver,
+    /// a truck's stack points at the sky. A pipe beams its high frequencies along this axis, and the
+    /// body stands in the way of everything on the other side of it (ExhaustRadiation).
+    /// </summary>
+    public Vector3 ExhaustAxis { get; init; } = new(0f, 0f, -1f);
+
+    /// <summary>
     /// How high the intake mouth is above the contact patch, metres.
     ///
     /// The other end of the rig, and it had no number at all while the car was one voice, because a
@@ -931,6 +939,8 @@ public sealed record VehicleProfile
         MassKg = 1450f, DragArea = 0.92f, RollingResistance = 0.011f,
         // Side exit, level with the driver; the airbox faces forward under the windscreen cowl.
         ExhaustOffsetZ = 0.1f, IntakeOffsetZ = 1.1f, FrontAxleZ = 1.4f, RearAxleZ = -1.4f,
+        // Out through the side behind the driver's door (left, in a Cup car), not the back.
+        ExhaustAxis = new Vector3(-1f, 0f, 0f),
     };
 
     /// <summary>
