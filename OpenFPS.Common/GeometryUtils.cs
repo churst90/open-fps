@@ -445,9 +445,15 @@ public static class GeometryUtils
         float b = 2 * (ox * dx + oz * dz - ratio * oy * dy);
         float c = ox * ox + oz * oz - ratio * oy * oy;
 
-        float tNear = -float.MaxValue;
-        float tFar = float.MaxValue;
-        bool hitSurface = false;
+        // A cone and its base are one convex solid, so a ray crosses its boundary at most twice: the
+        // path through it runs from the smallest valid crossing to the largest. The crossings used to
+        // be filed by their order in the quadratic — the first root as the entry, the second as the
+        // exit — and when one root lay on the mirror cone above the tip and was rightly thrown away,
+        // the one left was filed in the wrong place: a ray down through the slope got its entry at
+        // minus infinity (so "inside from the listener onward") and one up through the base an exit at
+        // infinity.
+        float tNear = float.MaxValue, tFar = -float.MaxValue;
+        void Cross(float t) { if (t < tNear) tNear = t; if (t > tFar) tFar = t; }
 
         if (Math.Abs(a) > 0.000001f)
         {
@@ -457,42 +463,31 @@ public static class GeometryUtils
                 float sqrtDiscr = MathF.Sqrt(discr);
                 float t1 = (-b - sqrtDiscr) / (2 * a);
                 float t2 = (-b + sqrtDiscr) / (2 * a);
-                if (t1 > t2) { float tmp = t1; t1 = t2; t2 = tmp; }
-                
-                // Ensure the intersection is on the correct nappe of the cone (below tip)
+                // Only the nappe below the tip, and only as far down as the base.
                 float y1 = start.Y + t1 * dy;
                 float y2 = start.Y + t2 * dy;
-                
-                if (y1 <= tipY && y1 >= baseY) { tNear = Math.Max(tNear, t1); hitSurface = true; }
-                if (y2 <= tipY && y2 >= baseY) { tFar = Math.Min(tFar, t2); hitSurface = true; }
+                if (y1 <= tipY && y1 >= baseY) Cross(t1);
+                if (y2 <= tipY && y2 >= baseY) Cross(t2);
             }
         }
         else if (Math.Abs(b) > 0.000001f)
         {
             float t = -c / b;
             float y = start.Y + t * dy;
-            if (y <= tipY && y >= baseY) { tNear = t; tFar = t; hitSurface = true; }
+            if (y <= tipY && y >= baseY) Cross(t);
         }
 
-        // Cap check
+        // The base.
         if (Math.Abs(dy) > 0.000001f)
         {
             float tCap = (baseY - start.Y) / dy;
             float px = start.X + tCap * dx - conePos.X;
             float pz = start.Z + tCap * dz - conePos.Z;
-            if (px * px + pz * pz <= radius * radius)
-            {
-                if (!hitSurface) { tNear = tCap; tFar = tCap; hitSurface = true; }
-                else
-                {
-                    if (tCap < tNear) tNear = tCap;
-                    if (tCap > tFar) tFar = tCap;
-                }
-            }
+            if (px * px + pz * pz <= radius * radius) Cross(tCap);
         }
 
-        if (!hitSurface || tNear > tFar || tFar < 0.0f) return false;
-        
+        if (tNear > tFar || tFar < 0.0f) return false;
+
         entry = tNear < 0.0f ? 0.0f : tNear;
         exit = tFar;
         return true;
