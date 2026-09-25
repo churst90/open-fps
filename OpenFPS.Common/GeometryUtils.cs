@@ -6,12 +6,6 @@ namespace OpenFPS.Common;
 public static class MathHelper
 {
     public static float Lerp(float a, float b, float t) => a + (b - a) * Math.Clamp(t, 0, 1);
-    public static float LerpAngle(float a, float b, float t)
-    {
-        float delta = ((b - a + MathF.PI) % (MathF.PI * 2)) - MathF.PI;
-        if (delta < -MathF.PI) delta += MathF.PI * 2;
-        return a + delta * Math.Clamp(t, 0, 1);
-    }
 
     /// <summary>Folds an angle into (-PI, PI], so two yaws can be compared by magnitude.</summary>
     public static float WrapAngle(float radians)
