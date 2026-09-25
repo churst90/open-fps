@@ -431,7 +431,7 @@ public sealed partial class VehicleSystem
                     var dir = Vector3.Normalize(v.To - v.From);
                     t.Position = v.From + dir * MathF.Min(v.Progress, total);
                     vel.Linear = dir * v.Speed;
-                    if (v.Progress >= total - 0.05f && v.Speed < 0.3f)
+                    if (v.Progress >= total - 0.05f && CanHalt(v.Speed, v.Brake, dt))
                     {
                         v.Speed = 0f;
                         vel.Linear = Vector3.Zero;
@@ -556,7 +556,7 @@ public sealed partial class VehicleSystem
             if (toPark < -1f) toPark += line.Length;
             want = MathF.Min(want, MathF.Sqrt(MathF.Max(0f, 2f * brake * MathF.Max(0f, toPark))));
             v.KerbShift = pk.Spot.Shift * Math.Clamp(1f - (toPark - 2f) / 22f, 0f, 1f);
-            if (toPark <= 0.6f && v.Speed < 1.2f)
+            if (toPark <= 0.6f && CanHalt(v.Speed, brake, dt))
             {
                 v.Speed = 0f;
                 vel.Linear = Vector3.Zero;
@@ -577,7 +577,7 @@ public sealed partial class VehicleSystem
         if (toStop < float.MaxValue)
         {
             want = MathF.Min(want, MathF.Sqrt(MathF.Max(0f, 2f * v.Brake * toStop)));
-            if (toStop <= 0.6f && v.Speed < 1.2f)
+            if (toStop <= 0.6f && CanHalt(v.Speed, v.Brake, dt))
             {
                 v.DwellLeft = MathF.Max(0.5f, v.Stops[v.NextStop].Dwell);
                 v.Speed = 0f;
@@ -634,6 +634,14 @@ public sealed partial class VehicleSystem
         t.IsDirty = true;
         vel.Linear = new Vector3(MathF.Sin(heading), 0f, MathF.Cos(heading)) * v.Speed;
     }
+
+    /// <summary>
+    /// Whether a vehicle this slow can be brought to rest in one tick on its own brake. It used to be
+    /// released at under 1.2 m/s (a shuttle, 0.3) and set to zero on the spot: 36 m/s^2 on a
+    /// 3 m/s^2 bus, a lurch at the end of every stop, and the engine was handed that as its target.
+    /// The approach curve, v = sqrt(2 a s), already brings the speed down to this as it arrives.
+    /// </summary>
+    private static bool CanHalt(float speed, float brake, float dt) => speed <= brake * dt + 1e-3f;
 
     /// <summary>
     /// Road left to the next stop this vehicle must actually make, metres, or MaxValue if there is
@@ -705,4 +713,22 @@ public sealed partial class VehicleSystem
     }
 
     public int Count => _vehicles.Count;
+
+    /// <summary>What a vehicle is doing right now, for tests: the physics is otherwise only visible
+    /// through where it puts the entity.</summary>
+    internal readonly record struct Inspection(float Speed, float Lap, int Laps, float DwellLeft, float KerbShift,
+                                               float TyreDemand, float LapLength, int NextStop, float Brake, float Accel);
+
+    internal bool TryInspect(int entityId, out Inspection state)
+    {
+        foreach (var v in _vehicles)
+            if (v.Entity.Id == entityId)
+            {
+                state = new Inspection(v.Speed, v.Lap, v.Laps, v.DwellLeft, v.KerbShift, v.TyreDemand,
+                                       v.Line?.Length ?? 0f, v.NextStop, v.Brake, v.Accel);
+                return true;
+            }
+        state = default;
+        return false;
+    }
 }

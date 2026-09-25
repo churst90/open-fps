@@ -56,9 +56,7 @@ public sealed partial class VehicleSystem
                                        && v.Speed >= HardBrakeMinSpeed) is { } braker)
         {
             // Down to a crawl or a third of the speed, whichever is more, as hard as the tyres allow.
-            braker.HardBrakeTo = MathF.Max(1.5f, braker.Speed * (0.2f + 0.2f * (float)_streetRng.NextDouble()));
-            braker.HardBrakeDecel = HardBrakeGripFraction * braker.Grip * 9.81f;
-            braker.HardBrakeLeft = (braker.Speed - braker.HardBrakeTo) / braker.HardBrakeDecel + 0.6f;
+            BrakeHard(braker, MathF.Max(1.5f, braker.Speed * (0.2f + 0.2f * (float)_streetRng.NextDouble())));
             Log.Information("Street: {Name} brakes hard, {From:F0} -> {To:F0} km/h at {Decel:F1} m/s^2.",
                             braker.DisplayName, braker.Speed * 3.6f, braker.HardBrakeTo * 3.6f, braker.HardBrakeDecel);
             if (braker.Horn.Length > 0 && _streetRng.NextDouble() < HonkAfterHardBrake)
@@ -75,6 +73,22 @@ public sealed partial class VehicleSystem
             _pendingHonks.RemoveAt(i);
             if (world.IsAlive(p.V.Entity)) Honk(mapId, world, p.V, p.Pattern);
         }
+    }
+
+    /// <summary>An emergency stop down to <paramref name="toSpeed"/>, at what the tyres will give.</summary>
+    private static void BrakeHard(DemoVehicle v, float toSpeed)
+    {
+        v.HardBrakeTo = toSpeed;
+        v.HardBrakeDecel = HardBrakeGripFraction * v.Grip * 9.81f;
+        v.HardBrakeLeft = (v.Speed - v.HardBrakeTo) / v.HardBrakeDecel + 0.6f;
+    }
+
+    /// <summary>The same stop, asked for by entity, for tests.</summary>
+    internal bool BrakeHard(int entityId, float toSpeed)
+    {
+        foreach (var v in _vehicles)
+            if (v.Entity.Id == entityId) { BrakeHard(v, toSpeed); return true; }
+        return false;
     }
 
     /// <summary>One draw of an event with this mean interval over this step. Zero or less is off.</summary>
