@@ -56,17 +56,19 @@ public static class MovementSystem
             session.InputBudget = MathF.Min(session.InputBudget + dt, FixedDeltaTime * MaxInputBudgetTicks);
 
             int processedInputs = 0;
-            while (processedInputs < MaxInputsPerTick
-                   && session.InputBudget > 0f
-                   && session.InputQueue.TryDequeue(out var input))
+            while (processedInputs < MaxInputsPerTick && session.InputQueue.TryPeek(out var next))
             {
+                // The client's claimed step is advisory: clamped. An input the budget cannot pay for
+                // IN FULL stays queued. It used to be trimmed to what was left and acknowledged, so
+                // the rest of that step was simply lost — and rounding left a sliver of budget after
+                // every whole tick's worth, so a second input arriving in the same tick was taken for
+                // almost no time and the client, which had predicted all of it, was pulled back.
+                float stepDt = next.DeltaTime > 0f ? MathF.Min(next.DeltaTime, MaxInputDeltaTime) : dt;
+                if (stepDt > session.InputBudget + 1e-5f) break;
+                session.InputQueue.TryDequeue(out var input);
                 processedInputs++;
                 session.LastProcessedSequenceId = input.SequenceId;
-
-                // The client's claimed step is advisory: clamp it, then trim it to the budget.
-                float stepDt = input.DeltaTime > 0f ? MathF.Min(input.DeltaTime, MaxInputDeltaTime) : dt;
-                stepDt = MathF.Min(stepDt, session.InputBudget);
-                session.InputBudget -= stepDt;
+                session.InputBudget = MathF.Max(0f, session.InputBudget - stepDt);
 
                 // 0. SITTING DOWN
                 //
