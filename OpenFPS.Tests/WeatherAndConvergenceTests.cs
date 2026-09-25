@@ -296,15 +296,16 @@ public class WeatherAndConvergenceTests
         var listener = new Vector3(0, 1.7f, 0);
         var source = new Vector3(0, 1.7f, 120);
 
-        // Dry, cold, thin air absorbs high frequencies over a shorter distance than warm damp air at
-        // sea level does; the model's job is only to move in that direction, consistently.
+        // ISO 9613-1, in the high band (8 kHz): dry air takes more than damp (77 against 61 dB/km at
+        // 25 C) — and at the same relative humidity COLD air takes less, 21 against 87 dB/km, because it
+        // holds so little water and the water is what drives the loss up there.
         float humid = AirAbsorptionFor(acoustics, listener, source, humidity: 0.95f, temperature: 25f, multiplier: 1f);
         float dry = AirAbsorptionFor(acoustics, listener, source, humidity: 0.05f, temperature: 25f, multiplier: 1f);
-        Assert.True(dry < humid, $"humidity did not shorten the absorption distance: dry {dry}, humid {humid}");
+        Assert.True(dry > humid, $"dry air should take more of the top: dry {dry}, humid {humid}");
 
         float cold = AirAbsorptionFor(acoustics, listener, source, humidity: 0.5f, temperature: -20f, multiplier: 1f);
         float warm = AirAbsorptionFor(acoustics, listener, source, humidity: 0.5f, temperature: 25f, multiplier: 1f);
-        Assert.True(cold < warm, $"temperature had no effect: cold {cold}, warm {warm}");
+        Assert.True(cold < warm, $"cold air at 50% should take less of the top: cold {cold}, warm {warm}");
 
         // A map that authors heavier absorption gets it; a map that authors nothing (0) gets the same
         // answer as one that authors 1, rather than a tenth of the absorption.
@@ -326,7 +327,7 @@ public class WeatherAndConvergenceTests
             AirPressure = 1013.25f,
             AirAbsorptionMultiplier = multiplier
         };
-        return acoustics.CalculateAcousticPath(world, entityId: 1, listener, source).AirAbsorption;
+        return acoustics.CalculateAcousticPath(world, entityId: 1, listener, source).AirHighDb;
     }
 
     // ── Temperature reaches the mix ─────────────────────────────────────────────────────────────

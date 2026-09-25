@@ -721,6 +721,7 @@ public class ClientAudioSystem
                         EqLow = path.EqLow,
                         EqMid = path.EqMid,
                         EqHigh = path.EqHigh,
+                        AirLowDb = path.AirLowDb, AirMidDb = path.AirMidDb, AirHighDb = path.AirHighDb,
                         ReflectionSpread = path.Spread,
                         // Feed leftover energy into the reverb bus
                         TransmissionBleed = path.MaterialAbsorption * 0.5f 
@@ -1581,6 +1582,8 @@ public class ClientAudioSystem
             Range = range,
             Pitch = 1f,
             Occlusion = path.Occlusion,
+            EqLow = path.EqLow, EqMid = path.EqMid, EqHigh = path.EqHigh,
+            AirLowDb = path.AirLowDb, AirMidDb = path.AirMidDb, AirHighDb = path.AirHighDb,
             ApertureFactor = path.ApertureFactor,
             TransmissionBleed = path.TransmissionBleed,
             EffectiveDistance = path.EffectiveDistance,
@@ -1707,6 +1710,8 @@ public class ClientAudioSystem
                 Pitch = 1f,
                 EngineRunning = true,
                 Occlusion = path.Occlusion,
+                EqLow = path.EqLow, EqMid = path.EqMid, EqHigh = path.EqHigh,
+                AirLowDb = path.AirLowDb, AirMidDb = path.AirMidDb, AirHighDb = path.AirHighDb,
                 ApertureFactor = path.ApertureFactor,
                 TransmissionBleed = path.TransmissionBleed,
                 EffectiveDistance = path.EffectiveDistance,
@@ -1785,6 +1790,8 @@ public class ClientAudioSystem
             PowerLever = (float)(int)mode,
             EngineRunning = true,
             Occlusion = path.Occlusion,
+            EqLow = path.EqLow, EqMid = path.EqMid, EqHigh = path.EqHigh,
+            AirLowDb = path.AirLowDb, AirMidDb = path.AirMidDb, AirHighDb = path.AirHighDb,
             ApertureFactor = path.ApertureFactor,
             TransmissionBleed = path.TransmissionBleed,
             EffectiveDistance = path.EffectiveDistance,
@@ -2135,6 +2142,8 @@ public class ClientAudioSystem
             // it — the acoustic path would count the same panels twice.
             EffectiveDistance = interior ? 0.7f : acousticPath.EffectiveDistance,
             Occlusion = interior ? 0f : acousticPath.Occlusion,
+            EqLow = interior ? 1f : acousticPath.EqLow, EqMid = interior ? 1f : acousticPath.EqMid, EqHigh = interior ? 1f : acousticPath.EqHigh,
+            AirLowDb = interior ? 0f : acousticPath.AirLowDb, AirMidDb = interior ? 0f : acousticPath.AirMidDb, AirHighDb = interior ? 0f : acousticPath.AirHighDb,
             ApertureFactor = interior ? 1f : acousticPath.ApertureFactor,
             TransmissionBleed = interior ? 0f : acousticPath.TransmissionBleed,
             Velocity = snap.Velocity,

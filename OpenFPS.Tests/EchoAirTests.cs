@@ -1,4 +1,5 @@
 using OpenFPS.Client.AudioEngine.Acoustics;
+using OpenFPS.Client.AudioEngine.Data;
 using OpenFPS.Common;
 using Xunit;
 
@@ -11,25 +12,27 @@ namespace OpenFPS.Tests;
 /// </summary>
 public class EchoAirTests
 {
+    private static AcousticPathData Direct(float low, float mid, float high)
+        => new() { AirLowDb = low, AirMidDb = mid, AirHighDb = high };
+
     [Fact]
     public void AnEchoIsDarkerThanTheCarByItsLongerPath()
     {
-        // A car 40 m away with the air absorption the game gives that distance at the reference rate.
-        float direct = (40f - AcousticConstants.AirAbsorptionMinDist) / AcousticConstants.AirAbsorptionReferenceDist;
-        float echo = EngineReflections.EchoAir(direct, 40f, 120f);
-        Assert.Equal((120f - AcousticConstants.AirAbsorptionMinDist) / AcousticConstants.AirAbsorptionReferenceDist, echo, 4);
-        Assert.True(echo > 4f * direct);
+        // The air's loss in dB is proportional to distance: an echo three times the car's distance
+        // has lost three times as much, in every band.
+        var (low, mid, high) = EngineReflections.EchoAir(Direct(0.04f, 0.23f, 4.2f), 40f, 120f);
+        Assert.Equal(0.12f, low, 4);
+        Assert.Equal(0.69f, mid, 4);
+        Assert.Equal(12.6f, high, 4);
     }
 
     [Fact]
     public void ANearCarsEchoStillPaysForItsPath()
     {
-        // Under 15 m the car itself has no air loss; its echo off a wall 60 m round does.
-        float echo = EngineReflections.EchoAir(0f, 8f, 60f);
-        Assert.Equal(45f / AcousticConstants.AirAbsorptionReferenceDist, echo, 4);
+        // Too close for a rate: the echo off a wall 60 m round takes the standard atmosphere's loss.
+        var (_, _, high) = EngineReflections.EchoAir(Direct(0f, 0f, 0f), 0.5f, 60f);
+        var (_, _, expected) = OpenFPS.Client.AudioEngine.Core.AudioPhysics.AirLossDb(60f, 0.5f, 20f, 1013.25f);
+        Assert.Equal(expected, high, 4);
+        Assert.True(high > 5f);
     }
-
-    [Fact]
-    public void NeverMoreThanTheAirCanTake()
-        => Assert.Equal(AcousticConstants.AirAbsorptionMaxMuffle, EngineReflections.EchoAir(0.5f, 100f, 2000f), 4);
 }

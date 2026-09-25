@@ -519,7 +519,8 @@ public class FmodAudioProvider : IAudioProvider
         public float CurrentHigh = 1.0f;
         public float TargetHigh = 1.0f;
         
-        public float AirAbsorption;
+        /// <summary>What the air takes over the path, dB per band (ISO 9613-1).</summary>
+        public float AirLowDb, AirMidDb, AirHighDb;
         public int TargetRegionId = -1; 
         public bool IsReflection; 
         public bool FollowsListener;
@@ -2369,7 +2370,7 @@ public class FmodAudioProvider : IAudioProvider
                 CurrentOcclusion = emitter.Occlusion,
                 TargetAperture = emitter.ApertureFactor, CurrentAperture = emitter.ApertureFactor,
                 TargetBleed = emitter.TransmissionBleed, CurrentBleed = emitter.TransmissionBleed,
-                AirAbsorption = 0.0f, 
+                AirLowDb = emitter.AirLowDb, AirMidDb = emitter.AirMidDb, AirHighDb = emitter.AirHighDb,
                 TargetLow = emitter.EqLow, CurrentLow = emitter.EqLow,
                 TargetMid = emitter.EqMid, CurrentMid = emitter.EqMid,
                 TargetHigh = emitter.EqHigh, CurrentHigh = emitter.EqHigh,
@@ -2573,7 +2574,7 @@ public class FmodAudioProvider : IAudioProvider
                 active.EffectiveDistance = path.EffectiveDistance;
                 active.TargetAperture = path.ApertureFactor;
                 active.TargetBleed = path.TransmissionBleed;
-                active.AirAbsorption = path.AirAbsorption;
+                active.AirLowDb = path.AirLowDb; active.AirMidDb = path.AirMidDb; active.AirHighDb = path.AirHighDb;
                 active.TargetRegionId = path.RegionId;
                 active.TargetLow = path.EqLow;
                 active.TargetMid = path.EqMid;
@@ -3299,6 +3300,17 @@ public class FmodAudioProvider : IAudioProvider
         active.Channel.set3DLevel(1.0f);
     }
 
+    /// <summary>
+    /// The EQ a path asks for, dB per band: each band's gain as a level, less what the air took. The
+    /// gains are linear and are the WHOLE of the path's blocking; see ApplyAcousticFilters.
+    /// </summary>
+    internal static (float Low, float Mid, float High) PathEqDb(float gainLow, float gainMid, float gainHigh,
+                                                               float airLowDb, float airMidDb, float airHighDb)
+    {
+        static float Db(float gain) => 20f * MathF.Log10(MathF.Max(1e-4f, gain));
+        return (Db(gainLow) - airLowDb, Db(gainMid) - airMidDb, Db(gainHigh) - airHighDb);
+    }
+
     private void ApplyAcousticFilters(ActiveSound active, Vector3 lPosVec)
     {
         float dt = 0.016f; 
@@ -3311,13 +3323,18 @@ public class FmodAudioProvider : IAudioProvider
         active.CurrentMid = MathHelper.Lerp(active.CurrentMid, active.TargetMid, lerpFactor);
         active.CurrentHigh = MathHelper.Lerp(active.CurrentHigh, active.TargetHigh, lerpFactor);
 
-        float totalMuffle = Math.Clamp(active.CurrentOcclusion + active.AirAbsorption, 0.0f, 0.80f);
-        
-        // Fix: Volume should be a combination of the 'dry' direct path and the 'bleed' through walls.
-        // We use a weighted model where bleed is significantly quieter than direct sound.
-        float dryVol = Math.Max(0.0f, 1.0f - active.CurrentOcclusion);
-        float bleedVol = active.CurrentBleed * AcousticConstants.TransmissionBleedFactor;
-        float finalVolFactor = Math.Max(dryVol, bleedVol * 0.5f); 
+        // ── What the path does, applied ONCE ────────────────────────────────────────────────────
+        //
+        // The band gains (CurrentLow/Mid/High) are the whole of what occlusion, transmission and
+        // diffraction do to each band — linear gains, from Steam Audio's visibility and transmission
+        // with the edge's diffraction merged in, or from the fallback tracer joined the same way — and
+        // they are applied as exactly that, 20 log10 of each, in the EQ below. Nothing else here
+        // blocks. It used to be three times over: a broadband (1 - occlusion) on the volume, the band
+        // gains read as interpolation weights in dB space (a gain of 0.2, -14 dB, came out at -32 in
+        // the high band), and an extra 40 dB high / 20 dB mid scaled by occlusion-plus-air. A bleed
+        // floor and a +10 dB bass lift then added back transmission the band gains already carry.
+        // The air is its own per-band loss, from the standard, subtracted there too.
+        float finalVolFactor = 1.0f;
         
         // --- Shelter Damping ---
         // Atmospheric sounds (Wind, Rain) are aggressively dampened when sheltered.
@@ -3414,9 +3431,8 @@ public class FmodAudioProvider : IAudioProvider
             Vector3 forward = Vector3.Transform(Vector3.UnitZ, _listenerRot);
             Vector3 right = Vector3.Transform(Vector3.UnitX, _listenerRot);
 
-            float lowDb = MathHelper.Lerp(AcousticConstants.OcclusionMaxLowMuffleDb, 0.0f, active.CurrentLow);
-            float midDb = MathHelper.Lerp(AcousticConstants.OcclusionMaxMidMuffleDb, 0.0f, active.CurrentMid);
-            float highDb = MathHelper.Lerp(AcousticConstants.OcclusionMaxHighMuffleDb, 0.0f, active.CurrentHigh);
+            var (lowDb, midDb, highDb) = PathEqDb(active.CurrentLow, active.CurrentMid, active.CurrentHigh,
+                                                  active.AirLowDb, active.AirMidDb, active.AirHighDb);
 
             // Extra muffle for environmental sounds when sheltered. "Environmental" means a sound that
             // belongs to the open air, which is a property of its region's boundary and not of the
@@ -3427,8 +3443,6 @@ public class FmodAudioProvider : IAudioProvider
                 midDb -= (InsulationFactor * 20.0f);
             }
 
-            highDb -= (totalMuffle * 40.0f); midDb -= (totalMuffle * 20.0f);
-            lowDb += (active.CurrentBleed * 10.0f);
 
             // Sitting in a car: everything OUTSIDE it comes through the glass and the doors. Not the
             // car's own engine, whose voice already rendered its way through the same body, and not

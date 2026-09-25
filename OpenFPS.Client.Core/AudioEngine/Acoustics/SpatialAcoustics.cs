@@ -157,22 +157,10 @@ public class SpatialAcoustics
             }
         }
 
-        // One law, in AudioPhysics, so the hand-rolled tracer and the Steam Audio path cannot drift.
-        // (The absent-multiplier trap is handled in there: an unset field means "no scaling", and the
-        // old Math.Max(0.1f, ...) turned it into a TEN-FOLD increase in the absorption distance.)
-        // Indoors is a closed boundary around the listener, not the mere fact that the map has a name
-        // for where they are standing. The speedway named its sectors and every car on it was suddenly
-        // being heard "indoors": the reference distance doubles in here, so two hundred metres of
-        // track kept its high frequencies and the field read as small and close.
         int listenerRegionId = GetRegionAt(world, listenerPos);
-        bool listenerEnclosed = world.AcousticMap != null
-            && world.AcousticMap.Regions.TryGetValue(listenerRegionId, out var listenerRegion)
-            && RoomAcoustics.IsEnclosure(listenerRegion);
-
-        float airAbsorption = AudioPhysics.AirAbsorptionFor(
-            finalEffectiveDist, world.Humidity, world.Temperature, world.AirPressure,
-            world.AirAbsorptionMultiplier,
-            listenerIndoors: listenerEnclosed);
+        // What the air took, per band (ISO 9613-1): the same law the Steam Audio path uses.
+        var air = AudioPhysics.AirLossDb(finalEffectiveDist, world.Humidity, world.Temperature,
+                                         world.AirPressure, world.AirAbsorptionMultiplier);
 
         int regionId = GetRegionAt(world, sourcePos + new Vector3(0, 0.5f, 0));
         float roomGain = 1.0f;
@@ -187,8 +175,20 @@ public class SpatialAcoustics
         }
 
         finalOcclusion = Math.Min(finalOcclusion, AcousticConstants.OcclusionCap);
-        var pathData = new AcousticPathData(finalOcclusion, apparentPos, finalEffectiveDist, 0f, finalAperture, finalBleed, airAbsorption, regionId, finalEqL, finalEqM, finalEqH);
+        // The mixer takes each band's gain as the WHOLE of what the path does to that band, applied
+        // once. This tracer's band values are weights (1 clear, 0 at the band's full muffle), and its
+        // occlusion a separate broadband share, so they are joined here into gains: the part that is
+        // not blocked — or what leaks through, if that is more — times the band's shaping. The mixer
+        // used to apply the occlusion as a volume, again as this shaping, and a third time as an
+        // extra high and mid cut.
+        float through = MathF.Max(1f - finalOcclusion, finalBleed * AcousticConstants.TransmissionBleedFactor * 0.5f);
+        static float Shape(float weight, float maxDb) => MathF.Pow(10f, (1f - Math.Clamp(weight, 0f, 1f)) * maxDb / 20f);
+        var pathData = new AcousticPathData(finalOcclusion, apparentPos, finalEffectiveDist, 0f, finalAperture, finalBleed, regionId,
+            through * Shape(finalEqL, AcousticConstants.OcclusionMaxLowMuffleDb),
+            through * Shape(finalEqM, AcousticConstants.OcclusionMaxMidMuffleDb),
+            through * Shape(finalEqH, AcousticConstants.OcclusionMaxHighMuffleDb));
         pathData.RoomGain = roomGain;
+        (pathData.AirLowDb, pathData.AirMidDb, pathData.AirHighDb) = air;
         return pathData;
     }
 

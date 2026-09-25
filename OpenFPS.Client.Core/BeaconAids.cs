@@ -119,6 +119,8 @@ public sealed class BeaconAids
             ApparentPosition = path?.ApparentPosition ?? at,
             EffectiveDistance = path?.EffectiveDistance ?? Vector3.Distance(listener, at),
             Occlusion = path?.Occlusion ?? 0f,
+            EqLow = path?.EqLow ?? 1f, EqMid = path?.EqMid ?? 1f, EqHigh = path?.EqHigh ?? 1f,
+            AirLowDb = path?.AirLowDb ?? 0f, AirMidDb = path?.AirMidDb ?? 0f, AirHighDb = path?.AirHighDb ?? 0f,
             ApertureFactor = path?.ApertureFactor ?? 1f,
             TransmissionBleed = path?.TransmissionBleed ?? 0f,
             TargetRegionId = path?.RegionId ?? -1,

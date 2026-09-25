@@ -263,7 +263,7 @@ public class AsyncAcousticWorker : IDisposable
                     Occlusion = 0f, EqLow = 1f, EqMid = 1f, EqHigh = 1f, TransmissionBleed = 0f,
                     ApparentPosition = req.SourcePos,
                     EffectiveDistance = Vector3.Distance(req.ListenerPos, req.SourcePos),
-                    ApertureFactor = 1f, RoomGain = 1f, AirAbsorption = 0f, RegionId = -1, IsReflection = false,
+                    ApertureFactor = 1f, RoomGain = 1f, RegionId = -1, IsReflection = false,
                 }
             };
         }
@@ -609,17 +609,15 @@ public class AsyncAcousticWorker : IDisposable
             // a different phenomenon — stays out of the way and is not a second filter over the top.
             ApertureFactor = 1f,
             RoomGain = 1f,
-            // Was a hard zero, described as "a later phenomena pass". The effect of that was that
-            // turning the simulator ON turned air absorption OFF for every source in the game, so a
-            // shot two streets away arrived with all its high frequency intact — quiet, but bright,
-            // which the ear reads as small-and-near rather than big-and-far.
-            AirAbsorption = AudioPhysics.AirAbsorptionFor(
-                dist, world.Humidity, world.Temperature,
-                world.AirPressure, world.AirAbsorptionMultiplier,
-                listenerIndoors: listenerEnclosed),
             RegionId = region,
             IsReflection = false,
         };
+        // What the air took on the way, per band (ISO 9613-1). Once a hard zero here, described as "a
+        // later phenomena pass": turning the simulator on turned air absorption off, and a shot two
+        // streets away arrived with its top end intact — quiet but bright, which reads as small and
+        // near rather than big and far.
+        (path.AirLowDb, path.AirMidDb, path.AirHighDb) = AudioPhysics.AirLossDb(
+            dist, world.Humidity, world.Temperature, world.AirPressure, world.AirAbsorptionMultiplier);
 
         var paths = new List<AcousticPathData>(1 + EarlyReflections.MaxArrivals) { path };
         AddEarlyReflections(paths, world, req, region, listenerEnclosed);
@@ -675,7 +673,7 @@ public class AsyncAcousticWorker : IDisposable
             // what they return is the room's tail — which is where a fused reflection belongs.
             if (!EarlyReflections.IsSeparateEvent(a)) continue;
 
-            into.Add(new AcousticPathData
+            var reflected = new AcousticPathData
             {
                 IsReflection = true,
                 // The surface's own identity, so a wall keeps one voice while the listener moves
@@ -699,12 +697,11 @@ public class AsyncAcousticWorker : IDisposable
                 ApertureFactor = 1f,
                 RoomGain = 1f,
                 TransmissionBleed = 0f,
-                AirAbsorption = AudioPhysics.AirAbsorptionFor(
-                    a.PathLength, world.Humidity, world.Temperature,
-                    world.AirPressure, world.AirAbsorptionMultiplier,
-                    listenerIndoors: listenerEnclosed),
                 RegionId = region,
-            });
+            };
+            (reflected.AirLowDb, reflected.AirMidDb, reflected.AirHighDb) = AudioPhysics.AirLossDb(
+                a.PathLength, world.Humidity, world.Temperature, world.AirPressure, world.AirAbsorptionMultiplier);
+            into.Add(reflected);
             _lastReflectionCount++;
         }
     }

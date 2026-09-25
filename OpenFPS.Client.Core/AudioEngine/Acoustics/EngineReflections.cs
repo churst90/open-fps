@@ -433,25 +433,28 @@ public sealed class EngineReflections
         var p = directPath;
         p.ApparentPosition = r.ApparentPosition;
         p.EffectiveDistance = MathF.Max(r.PathLength, Vector3.Distance(listener, r.ApparentPosition));
-        p.AirAbsorption = EchoAir(directPath.AirAbsorption, directDist, r.PathLength);
+        (p.AirLowDb, p.AirMidDb, p.AirHighDb) = EchoAir(directPath, directDist, r.PathLength);
+        // NOT the direct path's blocking. An echo exists only because both of its legs were found
+        // clear of every solid, so the wall or the bus that is muffling the car is not on
+        // its route (the legs are tested in Blocked); copying the direct path's occlusion and band gains muffled it a second time.
+        p.Occlusion = 0f;
+        p.EqLow = p.EqMid = p.EqHigh = 1f;
+        p.TransmissionBleed = 0f;
         p.IsReflection = true;
         audio.SetAcousticPath(voiceId, p);
     }
 
     /// <summary>
-    /// The air absorption over the echo's path, from the direct path's. The game's air absorption
-    /// grows in proportion to the distance beyond <see cref="AcousticConstants.AirAbsorptionMinDist"/>
-    /// (see AudioPhysics.AirAbsorptionFor), so it scales by the ratio of the two excesses; a direct
-    /// path too short to have any uses the reference rate.
+    /// What the air takes over the echo's path, per band. The ISO 9613-1 loss is proportional to
+    /// distance, so it is the direct path's per metre times the echo's length. A direct path too short
+    /// to give a rate uses the standard atmosphere.
     /// </summary>
-    internal static float EchoAir(float directAir, float directDist, float pathLength)
+    internal static (float Low, float Mid, float High) EchoAir(in AcousticPathData direct, float directDist, float pathLength)
     {
-        float min = AcousticConstants.AirAbsorptionMinDist;
-        float excess = MathF.Max(0f, pathLength - min);
-        float rate = directDist > min + 1f && directAir > 0f
-            ? directAir / (directDist - min)
-            : 1f / AcousticConstants.AirAbsorptionReferenceDist;
-        return Math.Clamp(MathF.Max(directAir, excess * rate), 0f, AcousticConstants.AirAbsorptionMaxMuffle);
+        if (directDist < 1f)
+            return OpenFPS.Client.AudioEngine.Core.AudioPhysics.AirLossDb(pathLength, 0.5f, 20f, 1013.25f);
+        float k = MathF.Max(0f, pathLength) / directDist;
+        return (direct.AirLowDb * k, direct.AirMidDb * k, direct.AirHighDb * k);
     }
 
     private static SpatialEmitter Make(int voiceId, int engineId, in SpatialEmitter direct,

@@ -272,6 +272,8 @@ public sealed class WorldAudioPlayer
                 ApparentPosition = path.ApparentPosition,
                 EffectiveDistance = path.EffectiveDistance,
                 Occlusion = path.Occlusion,
+                EqLow = path.EqLow, EqMid = path.EqMid, EqHigh = path.EqHigh,
+                AirLowDb = path.AirLowDb, AirMidDb = path.AirMidDb, AirHighDb = path.AirHighDb,
                 ApertureFactor = path.ApertureFactor,
                 TransmissionBleed = path.TransmissionBleed,
                 TargetRegionId = path.RegionId,

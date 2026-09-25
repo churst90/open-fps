@@ -73,7 +73,7 @@ public class ClientAudioSystemTests
 
         // A borrowed voice and a horn are behind whatever their car is behind: the car's own path.
         Assert.Equal(h.Mixer.LastPath(DistantNear).Occlusion, h.Mixer.LastPath(ClientAudioHarness.DistantVoice(DistantNear)).Occlusion);
-        Assert.Equal(h.Mixer.LastPath(DistantNear).AirAbsorption, h.Mixer.LastPath(ClientAudioHarness.DistantVoice(DistantNear)).AirAbsorption);
+        Assert.Equal(h.Mixer.LastPath(DistantNear).AirHighDb, h.Mixer.LastPath(ClientAudioHarness.DistantVoice(DistantNear)).AirHighDb);
     }
 
     /// <summary>
@@ -90,13 +90,13 @@ public class ClientAudioSystemTests
         Assert.True(h.TickUntil(() => h.Mixer.HasPath(nearVoice) && h.Mixer.HasPath(farVoice) && h.Mixer.HasPath(NearCar), 300),
             "the borrowed voices were never given a path");
 
-        float live = h.Mixer.LastPath(NearCar).AirAbsorption;
-        float at45 = h.Mixer.LastPath(nearVoice).AirAbsorption;
-        float at110 = h.Mixer.LastPath(farVoice).AirAbsorption;
-        _o.WriteLine($"air absorption: live at 20 m {live:F3}, borrowed at 45 m {at45:F3}, borrowed at 110 m {at110:F3}");
+        float live = h.Mixer.LastPath(NearCar).AirHighDb;
+        float at45 = h.Mixer.LastPath(nearVoice).AirHighDb;
+        float at110 = h.Mixer.LastPath(farVoice).AirHighDb;
+        _o.WriteLine($"air, high band: live at 20 m {live:F2} dB, borrowed at 45 m {at45:F2} dB, borrowed at 110 m {at110:F2} dB");
 
         Assert.True(at45 > live, $"45 m ({at45}) should be darker than 20 m ({live})");
-        Assert.True(at110 > at45 + 0.1f, $"110 m ({at110}) should be clearly darker than 45 m ({at45})");
+        Assert.True(at110 > at45 + 3f, $"110 m ({at110}) should be clearly darker than 45 m ({at45})");
     }
 
     /// <summary>

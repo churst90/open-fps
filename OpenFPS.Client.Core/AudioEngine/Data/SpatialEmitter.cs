@@ -197,10 +197,15 @@ public struct SpatialEmitter
     public float SynthFilterResonance; // Filter resonance (0.0 to 1.0)
     public float SynthPulseWidth; // For Square/Pulse waves
 
-    // 3-Band EQ Multipliers (1.0 = unity gain, 0.0 = mute)
+    // 3-Band EQ Multipliers (1.0 = unity gain, 0.0 = mute): the WHOLE of what the path does to each
+    // band — occlusion, transmission, diffraction — applied once by the mixer.
     public float EqLow;
     public float EqMid;
     public float EqHigh;
+
+    /// <summary>What the air takes over the path, dB per band (ISO 9613-1). A one-shot has no later
+    /// path update to bring these in, so they ride on the emitter from the start.</summary>
+    public float AirLowDb, AirMidDb, AirHighDb;
 
     public SpatialEmitter()
     {

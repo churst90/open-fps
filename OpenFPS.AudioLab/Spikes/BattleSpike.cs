@@ -321,7 +321,7 @@ public static class BattleSpike
         foreach (var sh in Fight)
         {
             float d = Vector3.Distance(sh.Position, Ear);
-            var b = AudioPhysics.AtmosphericBands(d, Humidity, TemperatureC, PressureMillibars, 1f, false);
+            var b = AirGains(d, Humidity, TemperatureC, PressureMillibars, 1f, false);
             static float Db(float g) => 20f * MathF.Log10(MathF.Max(1e-4f, g));
             Console.WriteLine($"    {d,5:F0} m  {Db(b.Low),6:F1}  {Db(b.Mid),6:F1}  {Db(b.High),6:F1}   ({sh.WeaponId})");
         }
@@ -613,7 +613,7 @@ public static class BattleSpike
             Console.WriteLine(parts.ToString());
 
             var at = new Vector3(0f, 1.5f, 40f);
-            var bands = AudioPhysics.AtmosphericBands(Vector3.Distance(at, listener), Humidity,
+            var bands = AirGains(Vector3.Distance(at, listener), Humidity,
                                                       TemperatureC, PressureMillibars, 1f, false);
             Fire(provider, ref voice, blast, at, gain, Loudness.AudibleRange(db), 0f, bands, reference);
 
@@ -727,7 +727,7 @@ public static class BattleSpike
             int rn = ImageSource.FirstOrder(_surfaces, pos, Ear, AudioPhysics.SpeedOfSound, refl);
             for (int i = 0; i < rn; i++)
             {
-                var bands = AudioPhysics.AtmosphericBands(refl[i].PathLength, Humidity, TemperatureC,
+                var bands = AirGains(refl[i].PathLength, Humidity, TemperatureC,
                                                           PressureMillibars, 1f, false);
                 Place(refl[i].ApparentPosition, gain * refl[i].Gain * ReflectionLevel,
                       refl[i].DelaySeconds * 1000f,
@@ -852,7 +852,7 @@ public static class BattleSpike
         {
             float db = Loudness.MuzzleBlastDb(w);
             float distance = Vector3.Distance(at, Ear);
-            var bands = AudioPhysics.AtmosphericBands(distance, Humidity, TemperatureC,
+            var bands = AirGains(distance, Humidity, TemperatureC,
                                                       PressureMillibars, 1f, listenerIndoors: false);
             var (gain, reference) = Loudness.Place(db);
             Fire(provider, ref voice, blast, at, gain, Loudness.AudibleRange(db),
@@ -873,7 +873,7 @@ public static class BattleSpike
                 // The reflected path is longer, so the air has taken more of its top end — and the
                 // concrete took a little more on the way past. Both matter: a reflection that is
                 // merely a quieter copy of the direct sound reads as an echo, not as a building.
-                var rb = AudioPhysics.AtmosphericBands(r.PathLength, Humidity, TemperatureC,
+                var rb = AirGains(r.PathLength, Humidity, TemperatureC,
                                                        PressureMillibars, 1f, listenerIndoors: false);
                 Fire(provider, ref voice, blast, r.ApparentPosition,
                      gain * r.Gain * ReflectionLevel, Loudness.AudibleRange(db),
@@ -1196,5 +1196,14 @@ public static class BattleSpike
     {
         Console.WriteLine($"  [{(held ? "PASS" : "FAIL")}] {what}");
         return held;
+    }
+
+    /// <summary>The air's ISO 9613-1 loss as linear band gains, for the spike's own filters.</summary>
+    private static (float Low, float Mid, float High) AirGains(float distance, float humidity, float temperatureC,
+                                                              float pressureMillibars, float multiplier, bool listenerIndoors)
+    {
+        var (l, m, h) = AudioPhysics.AirLossDb(distance, humidity, temperatureC, pressureMillibars, multiplier);
+        static float G(float db) => MathF.Pow(10f, -db / 20f);
+        return (G(l), G(m), G(h));
     }
 }

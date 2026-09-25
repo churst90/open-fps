@@ -59,100 +59,62 @@ public static class AudioPhysics
         return Math.Clamp(factor, min, max);
     }
 
+    // ── Atmospheric absorption: ISO 9613-1 ──────────────────────────────────────────────────────
+    //
+    // Air takes the top end off a sound by molecular relaxation of oxygen and nitrogen, and how much
+    // depends on the frequency, the temperature and — above all — the water in the air. ISO 9613-1
+    // gives it in closed form, and that is what this is: no fixed coefficients and no fudge.
+    //
+    // It replaced a straight-line "muffle" that reached its limit at about 135 m and took 32 dB off
+    // the high band and 16 off the mid there, where the standard says about 14 and under 1 — six
+    // times too much — so a hot rod a block away arrived as a dull rumble with its crackle gone. It
+    // also replaced a fixed-coefficient version that added an "urban excess" of up to 9 dB per
+    // 100 m for obstacles the game already models on their own (walls, vehicles, diffraction), and
+    // that halved the loss indoors. Air is air indoors too.
+
     /// <summary>
-    /// How much of a source's high frequency the air has taken by the time it arrives, 0 to
-    /// <see cref="AcousticConstants.AirAbsorptionMaxMuffle"/>.
-    ///
-    /// This is why a shot two streets away sounds like a distant thump and the same shot at twenty
-    /// metres sounds like a crack: air is a low-pass filter with distance, and it eats the top end
-    /// first. Without it, distance only changes loudness, and a quiet gunshot with all its highs
-    /// intact reads as a small gunshot nearby rather than a big one far away — which is the single
-    /// most misleading thing an audio-first game can do.
-    ///
-    /// Humidity, temperature and pressure all move it, which is why they are arguments rather than
-    /// constants: absorption is strongest in cold dry air. Indoors the path is short and mostly
-    /// wall rather than air, so the effective distance is doubled.
-    ///
-    /// Lifted verbatim out of <c>SpatialAcoustics</c> so that the Steam Audio path can use the same
-    /// law. It could not before: the simulator's path set AirAbsorption to a hard zero with a comment
-    /// calling it "a later phenomena pass", so switching the simulator on silently switched air
-    /// absorption off for every source in the game.
+    /// Absorption of sound in air, dB per metre, by ISO 9613-1 (the pure-tone formula).
     /// </summary>
-    public static float AirAbsorptionFor(float distance, float humidity, float temperatureC,
-                                         float airPressureMillibars, float multiplier, bool listenerIndoors)
+    /// <param name="frequency">Hz.</param>
+    /// <param name="temperatureC">Air temperature, °C.</param>
+    /// <param name="relativeHumidity">0..1.</param>
+    /// <param name="pressureMillibars">Ambient pressure, mbar (hPa).</param>
+    public static float AirAttenuationDbPerMetre(float frequency, float temperatureC, float relativeHumidity,
+                                                 float pressureMillibars = 1013.25f)
     {
-        // An absent or zero multiplier means "no scaling", not "scale by a tenth".
-        float m = multiplier > 0.01f ? multiplier : 1.0f;
-        float pressureNorm = Math.Clamp(airPressureMillibars / 1013.25f, 0.5f, 2.0f);
-        float effective = MathF.Max(50.0f,
-            (AcousticConstants.AirAbsorptionReferenceDist - (humidity * 100f)
-             + (MathF.Max(0f, 20f - temperatureC) * 2f)) / m * pressureNorm);
-        if (listenerIndoors) effective *= 2.0f;
-        return Math.Clamp((distance - AcousticConstants.AirAbsorptionMinDist) / effective,
-                          0.0f, AcousticConstants.AirAbsorptionMaxMuffle);
+        double f = Math.Max(1.0, frequency);
+        double t = Math.Clamp(temperatureC, -40f, 50f) + 273.15;
+        const double t0 = 293.15, t01 = 273.16, pr = 101.325;
+        double pa = Math.Clamp(pressureMillibars, 500f, 1100f) / 10.0;          // kPa
+        double hr = Math.Clamp(relativeHumidity, 0.001f, 1f) * 100.0;           // percent
+        // Molar concentration of water vapour, from the saturation pressure over ice/water.
+        double c = -6.8346 * Math.Pow(t01 / t, 1.261) + 4.6151;
+        double h = hr * Math.Pow(10.0, c) * (pr / pa);
+        // Relaxation frequencies of oxygen and nitrogen.
+        double frO = (pa / pr) * (24.0 + 4.04e4 * h * (0.02 + h) / (0.391 + h));
+        double frN = (pa / pr) * Math.Pow(t / t0, -0.5) * (9.0 + 280.0 * h * Math.Exp(-4.170 * (Math.Pow(t / t0, -1.0 / 3.0) - 1.0)));
+        double alpha = 8.686 * f * f * (1.84e-11 * (pr / pa) * Math.Sqrt(t / t0)
+                     + Math.Pow(t / t0, -2.5) * (0.01275 * Math.Exp(-2239.1 / t) / (frO + f * f / frO)
+                                               + 0.1068 * Math.Exp(-3352.0 / t) / (frN + f * f / frN)));
+        return (float)alpha;
     }
 
-    // ── Atmospheric absorption, per band ────────────────────────────────────────────────────────
-    //
-    // Air is a low-pass filter and the coefficients are published: these are the ISO 9613-1 figures
-    // at roughly 20 C and 50% humidity, in decibels per metre. They rise steeply with frequency,
-    // which is the whole point — at two hundred metres a gunshot has lost twenty decibels at 8 kHz
-    // and almost nothing at 60. That is why distance turns a crack into a thump.
-    public const float AirDbPerMetreLow = 0.0004f;    // ~125 Hz
-    public const float AirDbPerMetreMid = 0.0037f;    // ~1 kHz
-    public const float AirDbPerMetreHigh = 0.0328f;   // ~4 kHz
-
     /// <summary>
-    /// Extra high-frequency loss per 100 m in a built-up area, beyond what the air alone takes.
-    ///
-    /// Air absorption on its own does not account for how dull a distant shot in a city really is,
-    /// and the reason is that there is rarely a clean direct path. Between you and a shooter two
-    /// blocks away are parked cars, kerbs, street furniture and the ground itself, and what reaches
-    /// you has been scattered and diffracted rather than travelling straight. That excess attenuation
-    /// is strongly frequency-dependent — long wavelengths bend round obstacles and short ones do not —
-    /// so it lands almost entirely on the top end, which is exactly where it is wanted.
-    ///
-    /// This is the knob for "distant shots are too bright". It does nothing inside
-    /// <see cref="UrbanExcessOnsetMetres"/>, so close shots stay sharp.
+    /// What the air takes off a sound over <paramref name="distance"/> metres, in dB (positive), in the
+    /// game's three bands — the same band centres the diffraction model uses
+    /// (<see cref="OpenFPS.Common.Diffraction.LowBandHz"/> and its siblings), so the whole pipeline
+    /// agrees on what "the high band" is.
     /// </summary>
-    public const float UrbanExcessHighDbPer100M = 9.0f;
-    public const float UrbanExcessMidDbPer100M = 3.0f;
-    public const float UrbanExcessOnsetMetres = 40f;
-
-    /// <summary>
-    /// Per-band linear gains for a sound that has travelled <paramref name="distance"/> metres.
-    /// Low, mid and high, each 0-1, ready for <c>SpatialEmitter.EqLow/EqMid/EqHigh</c>.
-    ///
-    /// Cold dry air absorbs most, which is why temperature and humidity are arguments. Indoors the
-    /// path is short and mostly wall rather than air, so the atmospheric part is halved and the urban
-    /// term does not apply at all.
-    /// </summary>
-    public static (float Low, float Mid, float High) AtmosphericBands(
-        float distance, float humidity, float temperatureC, float airPressureMillibars,
-        float multiplier, bool listenerIndoors)
+    /// <param name="multiplier">The map's AirAbsorptionMultiplier: 1 is the standard atmosphere; an
+    /// unset (zero) field means 1, not "none".</param>
+    public static (float Low, float Mid, float High) AirLossDb(float distance, float humidity, float temperatureC,
+                                                             float airPressureMillibars, float multiplier = 1f)
     {
         float d = MathF.Max(0f, distance);
         float m = multiplier > 0.01f ? multiplier : 1.0f;
-
-        // Dry cold air absorbs more; the scaling here is a linear approximation over the range a
-        // playable map will see rather than the full ISO relaxation model.
-        float dryness = Math.Clamp(1.6f - humidity, 0.6f, 1.6f);
-        float cold = Math.Clamp(1f + MathF.Max(0f, 20f - temperatureC) * 0.012f, 1f, 1.5f);
-        float pressureNorm = Math.Clamp(airPressureMillibars / 1013.25f, 0.5f, 2.0f);
-        float scale = dryness * cold * m / pressureNorm * (listenerIndoors ? 0.5f : 1f);
-
-        float lowDb = AirDbPerMetreLow * d * scale;
-        float midDb = AirDbPerMetreMid * d * scale;
-        float highDb = AirDbPerMetreHigh * d * scale;
-
-        if (!listenerIndoors)
-        {
-            float beyond = MathF.Max(0f, d - UrbanExcessOnsetMetres) / 100f;
-            midDb += UrbanExcessMidDbPer100M * beyond;
-            highDb += UrbanExcessHighDbPer100M * beyond;
-        }
-
-        static float ToGain(float db) => MathF.Max(0.02f, MathF.Pow(10f, -db / 20f));
-        return (ToGain(lowDb), ToGain(midDb), ToGain(highDb));
+        float p = airPressureMillibars > 1f ? airPressureMillibars : 1013.25f;
+        return (AirAttenuationDbPerMetre(OpenFPS.Common.Diffraction.LowBandHz, temperatureC, humidity, p) * d * m,
+                AirAttenuationDbPerMetre(OpenFPS.Common.Diffraction.MidBandHz, temperatureC, humidity, p) * d * m,
+                AirAttenuationDbPerMetre(OpenFPS.Common.Diffraction.HighBandHz, temperatureC, humidity, p) * d * m);
     }
 }

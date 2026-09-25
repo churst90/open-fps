@@ -165,7 +165,7 @@ public static class RoomWalkSpike
                         Occlusion = 0f, EqLow = 1f, EqMid = 1f, EqHigh = 1f,
                         ApparentPosition = MegaphonePos, EffectiveDistance = dist,
                         ApertureFactor = 1f, RoomGain = 1f, TransmissionBleed = 0f,
-                        AirAbsorption = 0f, RegionId = RoomId, IsReflection = false,
+                        RegionId = RoomId, IsReflection = false,
                     });
                 }
 

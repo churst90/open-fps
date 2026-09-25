@@ -327,6 +327,7 @@ public sealed class BirdLife
             TransmissionBleed = path?.TransmissionBleed ?? 0f,
             TargetRegionId = path?.RegionId ?? -1,
             EqLow = path?.EqLow ?? 1f, EqMid = path?.EqMid ?? 1f, EqHigh = path?.EqHigh ?? 1f,
+            AirLowDb = path?.AirLowDb ?? 0f, AirMidDb = path?.AirMidDb ?? 0f, AirHighDb = path?.AirHighDb ?? 0f,
             Velocity = velocity,
             Volume = gain,
             MinDistance = reference,

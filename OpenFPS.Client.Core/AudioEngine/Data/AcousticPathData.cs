@@ -16,7 +16,9 @@ public struct AcousticPathData
     public float RoomGain;
     public float ApertureFactor;
     public float TransmissionBleed; 
-    public float AirAbsorption; 
+    /// <summary>What the air took over this path, dB (positive), per band — ISO 9613-1 at the band
+    /// centres the diffraction model uses. See AudioPhysics.AirLossDb.</summary>
+    public float AirLowDb, AirMidDb, AirHighDb;
     public int RegionId; 
 
     public float EqLow;
@@ -30,7 +32,7 @@ public struct AcousticPathData
     public float Scattering;
     public float Spread; // (0-360) Volumetric width of the sound
 
-    public AcousticPathData(float occlusion, Vector3 apparentPos, float effectiveDist, float materialAbsorption = 0.0f, float aperture = 1.0f, float bleed = 0.1f, float airAbs = 0.0f, int regionId = -1, float eqL = 1.0f, float eqM = 1.0f, float eqH = 1.0f)
+    public AcousticPathData(float occlusion, Vector3 apparentPos, float effectiveDist, float materialAbsorption = 0.0f, float aperture = 1.0f, float bleed = 0.1f, int regionId = -1, float eqL = 1.0f, float eqM = 1.0f, float eqH = 1.0f)
     {
         Occlusion = occlusion;
         ApparentPosition = apparentPos;
@@ -38,7 +40,6 @@ public struct AcousticPathData
         MaterialAbsorption = materialAbsorption;
         ApertureFactor = aperture;
         TransmissionBleed = bleed;
-        AirAbsorption = airAbs;
         RegionId = regionId;
         
         EqLow = eqL;
