@@ -206,6 +206,8 @@ internal static partial class GtkClientProgram
         });
         _session.LoginFailed += reason => OnLoginOutcome($"Login failed. {reason}", success: false);
         _settings = ClientSettings.Load();
+        if (!OpenFPS.Common.Loudness.CompressionFromEnvironment)
+            OpenFPS.Common.Loudness.DynamicRangeCompression = _settings.LevelCompression;
         _session.BeginAudioInit(ApplyAudioSettings);
 
         var loop = new Thread(GameLoop) { IsBackground = true, Name = "GameLoop" };

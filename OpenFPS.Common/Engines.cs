@@ -848,7 +848,11 @@ public sealed record EngineProfile
             CollectorDiameterMm = 63f, CollectorPipeMetres = 0.55f,
             Crossover = CrossoverKind.HPipe,
             MidPipeMetres = 1.6f,
-            Muffler = MufflerSpec.Stock,
+            // A pursuit exhaust: a straight-through performance can in place of the baffled factory
+            // one, so the V8 is heard working. Tuned on the live voice to 99.6 dB flat out: seven over
+            // the fully stock saloon it replaced (93), still fourteen under a mild muscle car. Cody,
+            // 2026-09-25: "I can hear the police car hit the gas but I have to be right next to it".
+            Muffler = MufflerSpec.Stock with { BaffleLoss = 0.04f, Absorption = 0.08f },
             Steepening = 0.9f,
             TailpipeMetres = new[] { 0.60f, 0.60f },
             TailpipeDiameterMm = 57f,

@@ -38,6 +38,13 @@ public sealed class ClientSettings
     public string InputDevice { get; set; } = "";
     public List<SavedServer> Servers { get; set; } = new();
 
+    /// <summary>
+    /// How much of the real difference in loudness between sounds reaches the mix: 1 is real life,
+    /// lower squeezes loud and quiet together (see Loudness.DynamicRangeCompression). Set with
+    /// `/levels` in game. The live value is the truth: <see cref="Save"/> records it.
+    /// </summary>
+    public float LevelCompression { get; set; } = OpenFPS.Common.Loudness.DefaultCompression;
+
     public SavedServer? Preferred => Servers.FirstOrDefault(s => s.Preferred) ?? (Servers.Count == 1 ? Servers[0] : null);
 
     public void SetPreferred(SavedServer server)
@@ -72,6 +79,9 @@ public sealed class ClientSettings
         path ??= DefaultPath;
         // A password is written only for a server that asked to remember it.
         foreach (var s in Servers) if (!s.RememberPassword) s.Password = "";
+        // What is playing, unless a run's environment chose it: that is not the player's choice.
+        if (!OpenFPS.Common.Loudness.CompressionFromEnvironment)
+            LevelCompression = OpenFPS.Common.Loudness.DynamicRangeCompression;
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         File.WriteAllText(path, JsonSerializer.Serialize(this, Json));
         if (!OperatingSystem.IsWindows())

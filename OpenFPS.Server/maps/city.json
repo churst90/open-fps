@@ -2845,18 +2845,6 @@
    "StartOffsetMetres": 0.0
   },
   {
-   "Name": "City bus 2",
-   "Preset": "school_bus_na",
-   "Track": "north_block",
-   "TopSpeedKmh": 40.0,
-   "CorneringG": 0.28,
-   "GripG": 0.7,
-   "AccelerationMps2": 1.4,
-   "BrakingMps2": 2.4,
-   "LaneOffsetMetres": 2.0,
-   "StartOffsetMetres": 280.0
-  },
-  {
    "Name": "Delivery diesel",
    "Preset": "diesel_cummins",
    "Track": "north_block",
@@ -3170,28 +3158,6 @@
    "StartDelaySeconds": 18.0
   },
   {
-   "Name": "Airport coach",
-   "Preset": "school_bus_na",
-   "RoadStart": {
-    "X": 188.0,
-    "Y": 0.15,
-    "Z": 128.5
-   },
-   "RoadEnd": {
-    "X": -29.5,
-    "Y": 0.15,
-    "Z": 128.5
-   },
-   "SpeedsKmh": [
-    44.0,
-    36.0
-   ],
-   "AccelerationMps2": 1.3,
-   "BrakingMps2": 0.96,
-   "WaitSeconds": 14.0,
-   "StartDelaySeconds": 6.0
-  },
-  {
    "Name": "Apron tug",
    "Preset": "diesel_i4",
    "RoadStart": {
@@ -3455,18 +3421,6 @@
    "BrakingMps2": 2.92,
    "LaneOffsetMetres": 1.8,
    "StartOffsetMetres": 260.0
-  },
-  {
-   "Name": "Southgate bus",
-   "Preset": "school_bus_na",
-   "Track": "southgate",
-   "TopSpeedKmh": 48.0,
-   "CorneringG": 0.48,
-   "GripG": 0.85,
-   "AccelerationMps2": 2.2,
-   "BrakingMps2": 2.92,
-   "LaneOffsetMetres": 1.8,
-   "StartOffsetMetres": 390.0
   },
   {
    "Name": "Southgate bike",

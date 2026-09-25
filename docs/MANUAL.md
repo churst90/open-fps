@@ -211,6 +211,20 @@ also place beacons for exits, stairs and waypoints.
 Each map decides, for each kind, whether it starts on or off, is always on, or is not allowed.
 Within that, use `/beacons` to choose. Your choices are saved.
 
+## How loud the world is
+
+Real sounds differ enormously in loudness: a hot rod is about 20 dB louder than an economy car, and
+flooring an engine raises it by 15 dB or more. `/levels` sets how much of that difference reaches
+you. At 100 percent it is the real difference, so loud things carry much further and quiet things
+fade sooner. Lower values squeeze loud and quiet together. It applies to every sound in the game.
+
+- `/levels`: the current setting.
+- `/levels 70`: set it to 70 percent. Any number from 20 to 100.
+- `/levels real`: 100 percent.
+- `/levels default`: 45 percent, the setting the game ships with.
+
+The setting is saved.
+
 ## Driving
 
 ### Getting in and out

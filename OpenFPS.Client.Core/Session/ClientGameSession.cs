@@ -348,6 +348,30 @@ public sealed class ClientGameSession : IDisposable
 
     private void Say(string text) => _speech.Speak(text, interrupt: true);
 
+    /// <summary>
+    /// /levels, /levels real, /levels default, /levels 0.7 (or 70): how much of the real difference in
+    /// loudness between sounds reaches the mix. Everything is placed by it — how far a thing carries,
+    /// how much louder a hot rod is than a hatchback, how much a car rises when it is floored.
+    /// </summary>
+    internal static string LevelsCommand(string[] args, Action? save = null)
+    {
+        string Now() => $"{MathF.Round(OpenFPS.Common.Loudness.DynamicRangeCompression * 100f)} percent";
+        if (args.Length == 0)
+            return $"Levels: {Now()} of real loudness differences. Say slash levels and a number from "
+                 + $"{OpenFPS.Common.Loudness.MinCompression * 100f:F0} to 100, real, or default.";
+        float value;
+        string a = args[0].Trim().TrimEnd('%');
+        if (a.Equals("real", StringComparison.OrdinalIgnoreCase)) value = 1f;
+        else if (a.Equals("default", StringComparison.OrdinalIgnoreCase)) value = OpenFPS.Common.Loudness.DefaultCompression;
+        else if (float.TryParse(a, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float v))
+            value = v > 1f ? v / 100f : v;
+        else return $"Levels: {args[0]} is not a level. Say a number from {OpenFPS.Common.Loudness.MinCompression * 100f:F0} to 100, real, or default.";
+        OpenFPS.Common.Loudness.DynamicRangeCompression = value;
+        (save ?? (() => ClientSettings.Load().Save()))();
+        string note = OpenFPS.Common.Loudness.CompressionFromEnvironment ? " For this run only: the environment sets it." : "";
+        return $"Levels set to {Now()}.{note}";
+    }
+
     private bool _shiftHeldThisStep;
     private void CycleChat(int direction)
     {
@@ -1117,6 +1141,12 @@ public sealed class ClientGameSession : IDisposable
                 || parts[0].Equals("beacon", StringComparison.OrdinalIgnoreCase))
             {
                 Say(_audioSystem.Beacons.Command(parts.Skip(1).ToArray()));
+                return;
+            }
+            // So is how loud the world is: yours, and saved.
+            if (parts[0].Equals("levels", StringComparison.OrdinalIgnoreCase))
+            {
+                Say(LevelsCommand(parts.Skip(1).ToArray()));
                 return;
             }
             _network.Send(new TextCommand { Command = parts[0].ToLowerInvariant(), Args = parts.Skip(1).ToArray() });

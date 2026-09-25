@@ -115,8 +115,32 @@ public static class Loudness
     ///
     /// This compresses SOURCE levels only. Distance is deliberately left literal — the engine's 1/r —
     /// because compressing that would flatten the range cues the whole game is built on.
+    ///
+    /// A SETTING now, not a constant (Cody, 2026-09-25): at 0.45 a hot rod 19 dB louder than an
+    /// economy car was placed 9 dB louder, and a car flooring it rose by under half its real surge
+    /// (the engine's idle lift follows this same number). It applies to every source in the game —
+    /// placement, how far it carries, the engine lift — so louder things always carry further, and
+    /// the less compression, the more so. The client sets it (`/levels`, saved in ClientSettings);
+    /// OPENFPS_LEVEL_COMPRESSION overrides it for a run. Held to 0.2..1.
     /// </summary>
-    public const float DynamicRangeCompression = 0.45f;
+    public static float DynamicRangeCompression
+    {
+        get => System.Threading.Volatile.Read(ref _compression);
+        set => System.Threading.Volatile.Write(ref _compression, Math.Clamp(value, MinCompression, 1f));
+    }
+
+    /// <summary>What the game shipped with, and what a player who has chosen nothing gets.</summary>
+    public const float DefaultCompression = 0.45f;
+    public const float MinCompression = 0.2f;
+    private static float _compression = FromEnvironment();
+
+    private static float FromEnvironment()
+        => float.TryParse(Environment.GetEnvironmentVariable("OPENFPS_LEVEL_COMPRESSION"),
+                          System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float v)
+           ? Math.Clamp(v, MinCompression, 1f) : DefaultCompression;
+
+    /// <summary>Whether the environment chose the compression for this run, over any saved setting.</summary>
+    public static bool CompressionFromEnvironment => Environment.GetEnvironmentVariable("OPENFPS_LEVEL_COMPRESSION") != null;
 
     /// <summary>Below this the engine should not bother playing the voice at all.</summary>
     public const float SilenceGain = 0.0002f;   // about -74 dBFS
@@ -148,6 +172,17 @@ public static class Loudness
     /// footstep reaches 130 dB nowhere at all, so it clamps to half a metre and takes its quietness
     /// from the gain instead.
     /// </summary>
+    /// <summary>
+    /// Where the law puts a source of this level, as one number: 20 log10 of gain times reference
+    /// distance, which is its rendered level at one metre's worth of 1/r. Two levels' difference in
+    /// this is how far apart the mix places them — what the engine's idle lift is computed from.
+    /// </summary>
+    public static float PlacedDb(float sourceLevelDb)
+    {
+        var (gain, reference) = Place(sourceLevelDb);
+        return 20f * MathF.Log10(MathF.Max(1e-9f, gain * reference));
+    }
+
     public static (float Gain, float ReferenceDistance) Place(float sourceLevelDb)
     {
         float ideal = MathF.Pow(10f, (sourceLevelDb - RenderCeilingDb) / 20f);

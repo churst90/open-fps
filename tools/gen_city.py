@@ -1324,10 +1324,10 @@ for i, (nm, preset, top, g, lane, kind) in enumerate(CITY):
     VEHICLES.append(car(f"{nm} {i + 1}", preset, "downtown_cw", top, g, lane, i * 96.0, grip=kind))
 for i, (nm, preset, top, g, lane, kind) in enumerate(CITY[:7]):
     VEHICLES.append(car(f"{nm} {i + 11}", preset, "downtown_ccw", top, g, lane, 40.0 + i * 130.0, grip=kind))
-# The buses go round the north block, stopping for nothing, which is what makes a ten-metre machine
-# worth having: its two ends are five metres apart and you hear it turn.
+# ONE bus (Cody, 2026-09-25: "we need only 1 city bus on the map, not a bunch"). It goes round the
+# north block and serves its bus stops, which is what makes it a bus you can get on; the second one
+# on this loop, the Southgate bus and the airport coach are gone.
 VEHICLES.append(car("City bus 1", "school_bus_na", "north_block", 40.0, 0.28, 2.0, 0.0, accel=1.4, grip="bus"))
-VEHICLES.append(car("City bus 2", "school_bus_na", "north_block", 40.0, 0.28, 2.0, 280.0, accel=1.4, grip="bus"))
 VEHICLES.append(car("Delivery diesel", "diesel_cummins", "north_block", 44.0, 0.34, 2.0, 140.0, grip="truck"))
 # The estate: slow, quiet, and the thing you hear over the mowers.
 for i, (nm, preset) in enumerate((("Civic", "i4_economy"), ("Wagon", "v6"), ("Pickup", "diesel_i4"))):
@@ -1411,13 +1411,6 @@ VEHICLES.append({
     "WaitSeconds": 7.0, "StartDelaySeconds": 18.0,
 })
 VEHICLES.append({
-    "Name": "Airport coach", "Preset": "school_bus_na",
-    "RoadStart": v3(APRON_X0 - 40.0, 0.15, STREETS[2] - LANE / 2),
-    "RoadEnd": v3(-WALK - 20.0, 0.15, STREETS[2] - LANE / 2),
-    "SpeedsKmh": [44.0, 36.0], "AccelerationMps2": 1.3, "BrakingMps2": brake_for(0.28),
-    "WaitSeconds": 14.0, "StartDelaySeconds": 6.0,
-})
-VEHICLES.append({
     "Name": "Apron tug", "Preset": "diesel_i4",
     "RoadStart": v3(APRON_X0 + 8.0, 0.15, APRON_Z0 + 10.0),
     "RoadEnd": v3(APRON_X1 - 8.0, 0.15, APRON_Z1 - 10.0),
@@ -1489,7 +1482,7 @@ VEHICLES += [
     car("Motorcycle 34", "vtwin_slipon", "north_block", 56.0, 0.60, 3.4, 180.0, grip="bike"),
 ]
 for nm, preset, start in (("van", "diesel_i4", 0.0), ("saloon", "v6", 130.0), ("hatch", "i4_economy", 260.0),
-                          ("bus", "school_bus_na", 390.0), ("bike", "vtwin_slipon", 190.0),
+                          ("bike", "vtwin_slipon", 190.0),
                           ("truck", "diesel_truck", 70.0)):
     VEHICLES.append(car(f"Southgate {nm}", preset, "southgate", 48.0, 0.48, 1.8, start))
 VEHICLES.append(VERGE_MOWER)

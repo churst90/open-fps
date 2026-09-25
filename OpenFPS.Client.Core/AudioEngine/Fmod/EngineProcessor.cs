@@ -570,6 +570,16 @@ public sealed class EngineVoiceState : IRenderedVoice
     private float _levelGain = 1f;
     private const float LevelSeconds = 0.5f, MaxLiftDb = 20f;
 
+    /// <summary>How far to lift a voice running at <paramref name="runningDb"/> that is placed as a
+    /// source of <paramref name="declaredDb"/>, so it is heard as the law places a source of the level
+    /// it is actually running at. See Synthesize.</summary>
+    internal static float LiftDb(float runningDb, float declaredDb)
+    {
+        float running = MathF.Min(runningDb, declaredDb);
+        float lift = Loudness.PlacedDb(running) - Loudness.PlacedDb(declaredDb) - (running - declaredDb);
+        return Math.Clamp(lift, 0f, MaxLiftDb);
+    }
+
     /// <summary>Pressure fraction through an open bus doorway: sqrt(2.4 m^2 / ~106 m^2) = 0.15.</summary>
     private const float DoorwayLeak = 0.15f;
 
@@ -835,8 +845,12 @@ public sealed class EngineVoiceState : IRenderedVoice
         if (CompensateLevel && _levelMs > 0)
         {
             float nowDb = 10f * MathF.Log10((float)_levelMs / (20e-6f * 20e-6f) + 1e-12f);
-            float deficit = Math.Clamp(Vehicle.SourceLevelDb - nowDb, 0f, MaxLiftDb / (1f - Loudness.DynamicRangeCompression));
-            liftTarget = MathF.Pow(10f, deficit * (1f - Loudness.DynamicRangeCompression) / 20f);
+            // The voice is placed as a source of its DECLARED level; running below that, it should be
+            // heard as the law places a source of the level it is actually running at. The difference is
+            // the lift. Below the mix's ceiling that is (1 - compression) of the shortfall, as it always
+            // was; above it the law is literal and the lift is nothing — it used to take the flat
+            // 55 % there too, and lifted a loud car idling nearly nine decibels too far.
+            liftTarget = MathF.Pow(10f, LiftDb(nowDb, Vehicle.SourceLevelDb) / 20f);
         }
         float liftStep = MathF.Max(1e-4f, (liftTarget - _levelGain) / MathF.Max(1, count));
         double blockSum = 0;

@@ -1003,11 +1003,10 @@ public sealed record VehicleProfile
         Body = VehicleBody.Saloon,
         Name = "Police interceptor, road",
         EngineKey = "police_interceptor",
-        // Measured on the live voice at 95.3: a stock-exhaust V8 saloon at full load, which is
-        // within a decibel of a city bus and of an economy hatchback. That is what a police car
-        // sounds like with the siren off, and it is 37 dB under the pace car it used to share a
-        // preset with.
-        SourceLevelDb = 95f,
+        // Measured on the live voice at 99.6 with the pursuit exhaust (EngineProfile.PoliceInterceptorV8):
+        // a V8 you hear working, where the fully stock one at 93 sat level with an economy hatchback.
+        // Still 32 dB under the pace car it used to share a preset with.
+        SourceLevelDb = 100f,
         Engine = EngineProfile.PoliceInterceptorV8,
         Siren = "patrol",
         Gearbox = Gearbox.SixSpeedSports with
