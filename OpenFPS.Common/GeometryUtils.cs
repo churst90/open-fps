@@ -36,28 +36,6 @@ public static class MathHelper
 
 public static class GeometryUtils
 {
-    public static bool AABBIntersectsOBB(Vector3 aabbMin, Vector3 aabbMax, Vector3 obbPos, Vector3 obbSize, Quaternion obbRot)
-    {
-        // 1. Point-in-OBB sampling (Fast & usually sufficient for voxelization)
-        // Sample center + all 8 corners of the AABB
-        if (IsPointInOBB((aabbMin + aabbMax) / 2f, obbPos, obbSize, obbRot)) return true;
-        if (IsPointInOBB(aabbMin, obbPos, obbSize, obbRot)) return true;
-        if (IsPointInOBB(aabbMax, obbPos, obbSize, obbRot)) return true;
-        if (IsPointInOBB(new Vector3(aabbMin.X, aabbMin.Y, aabbMax.Z), obbPos, obbSize, obbRot)) return true;
-        if (IsPointInOBB(new Vector3(aabbMax.X, aabbMin.Y, aabbMin.Z), obbPos, obbSize, obbRot)) return true;
-        if (IsPointInOBB(new Vector3(aabbMin.X, aabbMax.Y, aabbMin.Z), obbPos, obbSize, obbRot)) return true;
-        if (IsPointInOBB(new Vector3(aabbMax.X, aabbMax.Y, aabbMin.Z), obbPos, obbSize, obbRot)) return true;
-        if (IsPointInOBB(new Vector3(aabbMin.X, aabbMax.Y, aabbMax.Z), obbPos, obbSize, obbRot)) return true;
-        if (IsPointInOBB(new Vector3(aabbMax.X, aabbMin.Y, aabbMax.Z), obbPos, obbSize, obbRot)) return true;
-
-        // 2. Sampling midpoints of AABB edges for extremely thin walls
-        Vector3 center = (aabbMin + aabbMax) / 2f;
-        if (IsPointInOBB(new Vector3(center.X, aabbMin.Y, center.Z), obbPos, obbSize, obbRot)) return true;
-        if (IsPointInOBB(new Vector3(center.X, aabbMax.Y, center.Z), obbPos, obbSize, obbRot)) return true;
-
-        return false;
-    }
-
     public static BoxContainment GetBoxContainmentInOBB(Vector3 boxCenter, Vector3 boxSize, Vector3 obbCenter, Vector3 obbSize, Quaternion obbRot)
     {
         // Sample all 8 corners of the Box against the OBB
@@ -176,16 +154,6 @@ public static class GeometryUtils
         return (Math.Abs(localPoint.X) <= halfSize.X &&
                 Math.Abs(localPoint.Y) <= halfSize.Y &&
                 Math.Abs(localPoint.Z) <= halfSize.Z);
-    }
-
-    public static bool IsPointInCylinder(Vector3 point, Vector3 cylPos, float radius, float height)
-    {
-        float dy = Math.Abs(point.Y - cylPos.Y);
-        if (dy > height / 2.0f) return false;
-
-        float dx = point.X - cylPos.X;
-        float dz = point.Z - cylPos.Z;
-        return (dx * dx + dz * dz) <= (radius * radius);
     }
 
     public static bool RayIntersectsCylinder(Vector3 origin, Vector3 dir, Vector3 cylPos, float radius, float height, out float distance)
@@ -396,34 +364,6 @@ public static class GeometryUtils
         return (t1 >= 0 && t1 <= 1) || (t2 >= 0 && t2 <= 1);
     }
 
-    public static bool LineIntersectsCylinder(Vector3 start, Vector3 end, Vector3 basePos, float radius, float height)
-    {
-        Vector3 d = end - start;
-        float dx = d.X, dz = d.Z;
-        float fx = start.X - basePos.X, fz = start.Z - basePos.Z;
-        float a = dx * dx + dz * dz;
-        float b = 2 * (fx * dx + fz * dz);
-        float c = (fx * fx + fz * fz) - radius * radius;
-        if (a < 0.000001f) {
-            if (fx * fx + fz * fz > radius * radius) return false;
-            float tminY = Math.Min(start.Y, end.Y), tmaxY = Math.Max(start.Y, end.Y);
-            return tmaxY >= basePos.Y - height / 2.0f && tminY <= basePos.Y + height / 2.0f;
-        }
-        float discriminant = b * b - 4 * a * c;
-        if (discriminant < 0) return false;
-        discriminant = MathF.Sqrt(discriminant);
-        float t1 = (-b - discriminant) / (2 * a), t2 = (-b + discriminant) / (2 * a);
-        float y1 = start.Y + t1 * d.Y, y2 = start.Y + t2 * d.Y;
-        float cylMinY = basePos.Y - height / 2.0f, cylMaxY = basePos.Y + height / 2.0f;
-        if ((t1 >= 0 && t1 <= 1 && y1 >= cylMinY && y1 <= cylMaxY) || (t2 >= 0 && t2 <= 1 && y2 >= cylMinY && y2 <= cylMaxY)) return true;
-        if (d.Y != 0) {
-            float tB = (cylMinY - start.Y) / d.Y, tT = (cylMaxY - start.Y) / d.Y;
-            if (tB >= 0 && tB <= 1 && (start.X + tB * dx - basePos.X).Square() + (start.Z + tB * dz - basePos.Z).Square() <= radius * radius) return true;
-            if (tT >= 0 && tT <= 1 && (start.X + tT * dx - basePos.X).Square() + (start.Z + tT * dz - basePos.Z).Square() <= radius * radius) return true;
-        }
-        return false;
-    }
-
     private static float Square(this float f) => f * f;
 
     public static bool RayIntersectsSphere(Vector3 start, Vector3 dir, Vector3 center, float radius, out float entry, out float exit)
@@ -558,25 +498,6 @@ public static class GeometryUtils
         return true;
     }
 
-    public static bool AABBIntersectsAABB(Vector3 min1, Vector3 max1, Vector3 min2, Vector3 max2)
-    {
-        return (min1.X <= max2.X && max1.X >= min2.X) && (min1.Y <= max2.Y && max1.Y >= min2.Y) && (min1.Z <= max2.Z && max1.Z >= min2.Z);
-    }
-
-    public static bool AABBIntersectsAABB2D(Vector3 min1, Vector3 max1, Vector3 min2, Vector3 max2)
-    {
-        return (min1.X <= max2.X && max1.X >= min2.X) && (min1.Z <= max2.Z && max1.Z >= min2.Z);
-    }
-
-    public static bool AABBIntersectsSphere(Vector3 aabbMin, Vector3 aabbMax, Vector3 sphereCenter, float radius)
-    {
-        float x = Math.Max(aabbMin.X, Math.Min(sphereCenter.X, aabbMax.X));
-        float y = Math.Max(aabbMin.Y, Math.Min(sphereCenter.Y, aabbMax.Y));
-        float z = Math.Max(aabbMin.Z, Math.Min(sphereCenter.Z, aabbMax.Z));
-        float distSq = (x - sphereCenter.X).Square() + (y - sphereCenter.Y).Square() + (z - sphereCenter.Z).Square();
-        return distSq < radius * radius;
-    }
-
     public struct CollisionResult
     {
         public bool IsColliding;
@@ -641,8 +562,4 @@ public static class GeometryUtils
         return result;
     }
 
-    public static bool AABBIntersectsCone(Vector3 aabbMin, Vector3 aabbMax, Vector3 conePos, float radius, float height)
-    {
-        return AABBIntersectsCylinder(aabbMin, aabbMax, conePos, radius, height);
-    }
 }

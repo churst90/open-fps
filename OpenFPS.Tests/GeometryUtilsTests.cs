@@ -11,30 +11,6 @@ public class GeometryUtilsTests
 {
     // ─── AABB vs AABB ─────────────────────────────────────────────────────────────
 
-    [Fact]
-    public void AABB_Overlapping_ReturnsTrue()
-    {
-        var min1 = new Vector3(0, 0, 0); var max1 = new Vector3(2, 2, 2);
-        var min2 = new Vector3(1, 1, 1); var max2 = new Vector3(3, 3, 3);
-        Assert.True(GeometryUtils.AABBIntersectsAABB(min1, max1, min2, max2));
-    }
-
-    [Fact]
-    public void AABB_Separated_ReturnsFalse()
-    {
-        var min1 = new Vector3(0, 0, 0); var max1 = new Vector3(1, 1, 1);
-        var min2 = new Vector3(2, 2, 2); var max2 = new Vector3(3, 3, 3);
-        Assert.False(GeometryUtils.AABBIntersectsAABB(min1, max1, min2, max2));
-    }
-
-    [Fact]
-    public void AABB_TouchingEdge_ReturnsTrue()
-    {
-        var min1 = new Vector3(0, 0, 0); var max1 = new Vector3(1, 1, 1);
-        var min2 = new Vector3(1, 0, 0); var max2 = new Vector3(2, 1, 1);
-        Assert.True(GeometryUtils.AABBIntersectsAABB(min1, max1, min2, max2));
-    }
-
     // ─── Point in OBB ─────────────────────────────────────────────────────────────
 
     [Fact]
@@ -219,27 +195,6 @@ public class GeometryUtilsTests
     }
 
     // ─── Point in Cylinder ────────────────────────────────────────────────────────
-
-    [Fact]
-    public void PointInCylinder_InsidePoint_ReturnsTrue()
-    {
-        var cylPos = new Vector3(0, 0, 0);
-        Assert.True(GeometryUtils.IsPointInCylinder(new Vector3(0, 0, 0), cylPos, radius: 1f, height: 2f));
-    }
-
-    [Fact]
-    public void PointInCylinder_OutsideRadially_ReturnsFalse()
-    {
-        var cylPos = new Vector3(0, 0, 0);
-        Assert.False(GeometryUtils.IsPointInCylinder(new Vector3(2f, 0, 0), cylPos, radius: 1f, height: 2f));
-    }
-
-    [Fact]
-    public void PointInCylinder_AboveCap_ReturnsFalse()
-    {
-        var cylPos = new Vector3(0, 0, 0);
-        Assert.False(GeometryUtils.IsPointInCylinder(new Vector3(0, 5, 0), cylPos, radius: 1f, height: 2f));
-    }
 
     // ─── BoxContainment ───────────────────────────────────────────────────────────
 
