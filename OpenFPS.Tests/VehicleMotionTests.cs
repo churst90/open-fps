@@ -10,6 +10,7 @@ using OpenFPS.Server.Core;
 using OpenFPS.Server.Repositories;
 using OpenFPS.Server.Systems;
 using Xunit;
+using EntityData = OpenFPS.Server.Repositories.EntityData;
 
 namespace OpenFPS.Tests;
 
@@ -67,7 +68,8 @@ public class VehicleMotionTests : IDisposable
     }
 
     private Rig Build(List<Vector3> track, VehicleData vehicle, List<TrackStopData>? stops = null, float width = 12f,
-                      List<VehicleData>? more = null, bool shuttle = false, StreetLifeData? life = null)
+                      List<VehicleData>? more = null, bool shuttle = false, StreetLifeData? life = null,
+                      List<EntityData>? entities = null)
     {
         string maps = Path.Combine(_dir, "maps");
         Directory.CreateDirectory(maps);
@@ -82,6 +84,7 @@ public class VehicleMotionTests : IDisposable
             Tracks = new List<TrackData> { new() { Id = "loop", Waypoints = track, WidthMetres = width, Stops = stops ?? new() } },
             Vehicles = vehicles,
             StreetLife = life,
+            Entities = entities ?? new(),
         };
         File.WriteAllText(Path.Combine(maps, "motion.json"), JsonSerializer.Serialize(data, MapRepository.JsonOptions));
         var prefabs = new PrefabRepository(Path.Combine(AppContext.BaseDirectory, "prefabs"));
@@ -542,5 +545,118 @@ public class VehicleMotionTests : IDisposable
         for (int i = 0; i < 30 * 30; i++) { rig.Tick(); if (moved < 0 && rig.State.Speed > 0f) moved = i; top = MathF.Max(top, rig.State.Speed); }
         Assert.InRange(moved * Dt, 3.9f, 4.1f);
         Assert.InRange(top, 30f / 3.6f - 0.01f, 30f / 3.6f + 0.01f);
+    }
+
+    // ── Parking ───────────────────────────────────────────────────────────────────────────────
+
+    /// <summary>A door eight metres to the kerb side of the first straight of a 400 m stadium, facing
+    /// the road.</summary>
+    private static EntityData DoorAt(float x, float z, float y = 0.1f)
+        => new() { EntityId = 9000 + (int)z, PrefabId = "door", Position = new Vector3(x, y + 1.05f, z),
+                   Rotation = Quaternion.CreateFromYawPitchRoll(MathF.PI / 2, 0f, 0f) };
+
+    private static readonly StreetLifeData ParkNow = new() { ParkEverySeconds = 0.001f, HornEverySeconds = 0f, HardBrakeEverySeconds = 0f };
+
+    /// <summary>
+    /// Somebody parks by a door, goes in, and comes back, in order and on time: brakes to the spot and
+    /// pulls in two metres toward the kerb, key off, the car door, out and round the back of the car
+    /// at a walking pace, the building's door opens, in, shut; later the same the other way, key on,
+    /// and away — easing back out into the lane over eighteen metres.
+    /// </summary>
+    [Fact]
+    public void SomebodyParksGoesInAndComesBack()
+    {
+        var rig = Build(Stadium(60f, 400f), Car(topKmh: 40f, corneringG: 1.0f, brake: 3f), life: ParkNow,
+                        entities: new() { DoorAt(68f, 200f) });
+        var heard = new List<(string Label, int Tick)>();
+        int tick = 0;
+        rig.Vehicles.Heard = (map, id, label, sounds) => heard.Add((label, tick));
+        rig.Tick(66);                                            // doors are looked for two seconds in
+        Assert.Equal(1, rig.State.Spots);
+        var door = Spawned().Values.First(e => rig.World.Has<DoorComponent>(e));
+
+        // Pulling in.
+        float prev = rig.State.Speed, worstDecel = 0f;
+        for (; rig.State.Park != "Parked"; tick++)
+        {
+            Assert.True(tick < 30 * 120, "it never parked");
+            rig.Tick();
+            worstDecel = MathF.Max(worstDecel, (prev - rig.State.Speed) / Dt);
+            prev = rig.State.Speed;
+        }
+        var s = rig.State;
+        Assert.True(worstDecel <= 3.05f, $"it braked at {worstDecel:F2} m/s^2 to park");
+        Assert.InRange(s.Lap, s.SpotAt - 0.4f, s.SpotAt + 0.6f);
+        Assert.Equal(2f, s.KerbShift, 2);
+        Assert.InRange(rig.Position.X, 61.9f, 62.1f);           // two metres toward the kerb
+        int parked = tick;
+
+        // Everything after, timed from stopping.
+        int keyOff = -1, carDoor = -1, outOfCar = -1, doorOpen = -1, indoors = -1, doorShut = -1, keyOn = -1, pullOut = -1;
+        float walkTop = 0f, halfway = -1f; Vector3 lastPerson = default; bool hadPerson = false;
+        for (; rig.State.Park != "" && tick < parked + 30 * 400; tick++)
+        {
+            rig.Tick();
+            var st = rig.State;
+            bool running = rig.World.Get<SoundEmitterComponent>(rig.Entity).SynthRunning;
+            if (keyOff < 0 && !running) keyOff = tick;
+            if (keyOff >= 0 && keyOn < 0 && running) keyOn = tick;
+            if (carDoor < 0 && heard.Exists(h => h.Label == "car door")) carDoor = tick;
+            var person = Spawned().TryGetValue("driver of Car", out var pe) && rig.World.IsAlive(pe) ? pe : Entity.Null;
+            if (person != Entity.Null)
+            {
+                var pp = rig.World.Get<Transform>(person).Position;
+                if (outOfCar < 0) outOfCar = tick;
+                if (hadPerson) walkTop = MathF.Max(walkTop, Vector3.Distance(pp, lastPerson) / Dt);
+                lastPerson = pp; hadPerson = true;
+            }
+            else if (hadPerson && indoors < 0) { indoors = tick; hadPerson = false; }
+            else hadPerson = false;
+            float target = rig.World.Get<DoorComponent>(door).Target;
+            if (doorOpen < 0 && target > 0f) doorOpen = tick;
+            if (doorOpen >= 0 && doorShut < 0 && target <= 0f) doorShut = tick;
+            if (pullOut < 0 && st.Park == "PullOut") pullOut = tick;
+            if (st.Park == "PullOut" && halfway < 0f && st.Lap - st.SpotAt >= 9f) halfway = st.KerbShift;
+        }
+        float T(int t) => (t - parked) * Dt;
+        Assert.InRange(T(keyOff), 1.1f, 1.35f);
+        Assert.InRange(T(carDoor), 2.1f, 2.35f);
+        Assert.InRange(T(outOfCar), 2.9f, 3.15f);
+        Assert.InRange(walkTop, 1.3f, 1.4f);
+        Assert.True(doorOpen > outOfCar && doorShut > doorOpen && indoors > doorOpen,
+                    $"out {T(outOfCar):F1}, door open {T(doorOpen):F1}, indoors {T(indoors):F1}, shut {T(doorShut):F1}");
+        Assert.True(keyOn > doorShut && pullOut > keyOn, $"key on {T(keyOn):F1}, pulled out {T(pullOut):F1}");
+        // Away for sixty seconds or more.
+        Assert.True(T(keyOn) > 60f, $"back after only {T(keyOn):F0} s");
+        Assert.Equal(2, heard.FindAll(h => h.Label == "car door").Count);
+
+        // Back into the lane over eighteen metres — half way out at nine — then free of the spot.
+        Assert.InRange(halfway, 0.85f, 1.15f);
+        Assert.Equal("", rig.State.Park);
+        Assert.Equal(0f, rig.State.KerbShift);
+    }
+
+    /// <summary>A door is a place to park only on the kerb side, near enough, at street level, and
+    /// with nothing solid between the kerb and it.</summary>
+    [Fact]
+    public void OnlyAReachableStreetDoorIsAPlaceToPark()
+    {
+        var wall = new EntityData { EntityId = 9500, PrefabId = "brick_wall", Position = new Vector3(64.5f, 1.5f, 340f),
+                                    Scale = new Vector3(0.5f, 3f, 10f) };
+        var rig = Build(Stadium(60f, 400f), Car(topKmh: 40f, corneringG: 1.0f), life: ParkNow, entities: new()
+        {
+            DoorAt(52f, 100f),            // the other side of the road
+            DoorAt(80f, 180f),            // twenty metres off
+            DoorAt(68f, 260f, y: 4f),     // upstairs
+            DoorAt(68f, 340f),            // behind a wall
+            wall,
+        });
+        rig.Tick(30 * 3);
+        Assert.Equal(0, rig.State.Spots);
+
+        var near = Build(Stadium(60f, 400f), Car(topKmh: 40f, corneringG: 1.0f), life: ParkNow,
+                         entities: new() { DoorAt(64f, 100f), DoorAt(75f, 180f) });
+        near.Tick(30 * 3);
+        Assert.Equal(2, near.State.Spots);
     }
 }

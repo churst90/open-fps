@@ -720,7 +720,8 @@ public sealed partial class VehicleSystem
     /// through where it puts the entity.</summary>
     internal readonly record struct Inspection(float Speed, float Lap, int Laps, float DwellLeft, float KerbShift,
                                                float TyreDemand, float LapLength, int NextStop, float Brake, float Accel,
-                                               bool OnStreet, string Horn, float Wait);
+                                               bool OnStreet, string Horn, float Wait,
+                                               int Spots, string Park, int ParkStep, float SpotAt, float SpotShift);
 
     internal bool TryInspect(int entityId, out Inspection state)
     {
@@ -728,7 +729,9 @@ public sealed partial class VehicleSystem
             if (v.Entity.Id == entityId)
             {
                 state = new Inspection(v.Speed, v.Lap, v.Laps, v.DwellLeft, v.KerbShift, v.TyreDemand,
-                                       v.Line?.Length ?? 0f, v.NextStop, v.Brake, v.Accel, v.OnStreet, v.Horn, v.WaitSeconds);
+                                       v.Line?.Length ?? 0f, v.NextStop, v.Brake, v.Accel, v.OnStreet, v.Horn, v.WaitSeconds,
+                                       v.Spots.Count, v.Park?.Phase.ToString() ?? "", v.Park?.Step ?? -1,
+                                       v.Park?.Spot.At ?? -1f, v.Park?.Spot.Shift ?? 0f);
                 return true;
             }
         state = default;
