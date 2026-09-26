@@ -1243,9 +1243,9 @@ CROSSINGS = [
 # Mean seconds between events, map-wide; 0 is off. See MapData.StreetLife.
 # GunfireEverySeconds (Cody, 2026-09-25): "every now and then have an npc fire a couple round so I
 # can hear what they sound like periodically as I move around the city." One of the walkers fires two
-# or three rounds, on average every two minutes somewhere on the map.
+# to four rounds; every two minutes was "too few and far apart", so every 35 s on average.
 STREET_LIFE = {"HornEverySeconds": 15, "HardBrakeEverySeconds": 60, "ParkEverySeconds": 90,
-               "GunfireEverySeconds": 120}
+               "GunfireEverySeconds": 35}
 
 # ── The field ─────────────────────────────────────────────────────────────────────────────────────
 #
@@ -1403,6 +1403,16 @@ WALKERS = [
     ("Pedestrian, Foundry Street", v3(12.0, 0.15, STREETS[2] - KERB - 1.0), v3(118.0, 0.15, STREETS[2] - KERB - 1.0), 5.2, 8.0, 5.0),
     ("Pedestrian, Sycamore Lane", v3(RES_LANES[0] - RES_CARRIAGEWAY / 2 - 0.9, 0.15, -100.0),
                                   v3(RES_LANES[0] - RES_CARRIAGEWAY / 2 - 0.9, 0.15, 125.0), 4.4, 5.0, 3.0),
+    # More people about (Cody, 2026-09-25: "add some more with some more npc people walking around"):
+    # both pavements of the east and west avenues, and the cross streets either side of Main Street.
+    ("Pedestrian, East Avenue east", v3(AVENUES[2] + PAVEMENT_X, 0.15, -110.0), v3(AVENUES[2] + PAVEMENT_X, 0.15, 240.0), 5.1, 5.0, 7.0),
+    ("Pedestrian, East Avenue west", v3(AVENUES[2] - PAVEMENT_X, 0.15, 240.0), v3(AVENUES[2] - PAVEMENT_X, 0.15, -110.0), 4.7, 7.0, 19.0),
+    ("Pedestrian, West Avenue east", v3(AVENUES[0] + PAVEMENT_X, 0.15, -110.0), v3(AVENUES[0] + PAVEMENT_X, 0.15, 240.0), 4.9, 6.0, 2.0),
+    ("Pedestrian, West Avenue west", v3(AVENUES[0] - PAVEMENT_X, 0.15, 240.0), v3(AVENUES[0] - PAVEMENT_X, 0.15, -110.0), 5.3, 4.0, 14.0),
+    ("Pedestrian, cross street west", v3(-118.0, 0.15, STREETS[1] + PAVEMENT_X), v3(-12.0, 0.15, STREETS[1] + PAVEMENT_X), 4.8, 9.0, 6.0),
+    ("Pedestrian, cross street east", v3(118.0, 0.15, STREETS[1] - PAVEMENT_X), v3(12.0, 0.15, STREETS[1] - PAVEMENT_X), 5.0, 5.0, 9.0),
+    ("Pedestrian, south street", v3(12.0, 0.15, STREETS[0] - PAVEMENT_X), v3(118.0, 0.15, STREETS[0] - PAVEMENT_X), 4.5, 6.0, 12.0),
+    ("Pedestrian, north street", v3(-118.0, 0.15, STREETS[3] + PAVEMENT_X), v3(-12.0, 0.15, STREETS[3] + PAVEMENT_X), 5.2, 7.0, 4.0),
 ]
 for name, a, b, kmh, wait, delay in WALKERS:
     VEHICLES.append({

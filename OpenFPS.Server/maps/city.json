@@ -2626,7 +2626,7 @@
   "HornEverySeconds": 15,
   "HardBrakeEverySeconds": 60,
   "ParkEverySeconds": 90,
-  "GunfireEverySeconds": 120
+  "GunfireEverySeconds": 35
  },
  "Vehicles": [
   {
@@ -3112,6 +3112,182 @@
    "BrakingMps2": 1.0,
    "WaitSeconds": 5.0,
    "StartDelaySeconds": 3.0
+  },
+  {
+   "Name": "Pedestrian, East Avenue east",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 137.0,
+    "Y": 0.15,
+    "Z": -110.0
+   },
+   "RoadEnd": {
+    "X": 137.0,
+    "Y": 0.15,
+    "Z": 240.0
+   },
+   "SpeedsKmh": [
+    5.1,
+    4.692
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 5.0,
+   "StartDelaySeconds": 7.0
+  },
+  {
+   "Name": "Pedestrian, East Avenue west",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 123.0,
+    "Y": 0.15,
+    "Z": 240.0
+   },
+   "RoadEnd": {
+    "X": 123.0,
+    "Y": 0.15,
+    "Z": -110.0
+   },
+   "SpeedsKmh": [
+    4.7,
+    4.324000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 7.0,
+   "StartDelaySeconds": 19.0
+  },
+  {
+   "Name": "Pedestrian, West Avenue east",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -123.0,
+    "Y": 0.15,
+    "Z": -110.0
+   },
+   "RoadEnd": {
+    "X": -123.0,
+    "Y": 0.15,
+    "Z": 240.0
+   },
+   "SpeedsKmh": [
+    4.9,
+    4.508000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 6.0,
+   "StartDelaySeconds": 2.0
+  },
+  {
+   "Name": "Pedestrian, West Avenue west",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -137.0,
+    "Y": 0.15,
+    "Z": 240.0
+   },
+   "RoadEnd": {
+    "X": -137.0,
+    "Y": 0.15,
+    "Z": -110.0
+   },
+   "SpeedsKmh": [
+    5.3,
+    4.876
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 4.0,
+   "StartDelaySeconds": 14.0
+  },
+  {
+   "Name": "Pedestrian, cross street west",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -118.0,
+    "Y": 0.15,
+    "Z": 7.0
+   },
+   "RoadEnd": {
+    "X": -12.0,
+    "Y": 0.15,
+    "Z": 7.0
+   },
+   "SpeedsKmh": [
+    4.8,
+    4.416
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 9.0,
+   "StartDelaySeconds": 6.0
+  },
+  {
+   "Name": "Pedestrian, cross street east",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 118.0,
+    "Y": 0.15,
+    "Z": -7.0
+   },
+   "RoadEnd": {
+    "X": 12.0,
+    "Y": 0.15,
+    "Z": -7.0
+   },
+   "SpeedsKmh": [
+    5.0,
+    4.6000000000000005
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 5.0,
+   "StartDelaySeconds": 9.0
+  },
+  {
+   "Name": "Pedestrian, south street",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 12.0,
+    "Y": 0.15,
+    "Z": -137.0
+   },
+   "RoadEnd": {
+    "X": 118.0,
+    "Y": 0.15,
+    "Z": -137.0
+   },
+   "SpeedsKmh": [
+    4.5,
+    4.140000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 6.0,
+   "StartDelaySeconds": 12.0
+  },
+  {
+   "Name": "Pedestrian, north street",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -118.0,
+    "Y": 0.15,
+    "Z": 267.0
+   },
+   "RoadEnd": {
+    "X": -12.0,
+    "Y": 0.15,
+    "Z": 267.0
+   },
+   "SpeedsKmh": [
+    5.2,
+    4.784000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 7.0,
+   "StartDelaySeconds": 4.0
   },
   {
    "Name": "Tunnel truck",

@@ -68,14 +68,14 @@ public sealed partial class VehicleSystem
 
         MaybePark(mapId, world, life, dt, clock);
 
-        // Somebody on the pavement fires two or three rounds. Picked from the people walking, so
+        // Somebody on the pavement fires two to four rounds. Picked from the people walking, so
         // it comes from wherever they are — the street you are on, or three blocks over.
         if (Chance(life.GunfireEverySeconds, dt)
             && Pick(mapId, world, v => v.Preset.Equals("walker", StringComparison.OrdinalIgnoreCase), streetOnly: false) is { } shooter)
         {
             var guns = WeaponRegistry.All.ToList();
             var gun = guns[_streetRng.Next(guns.Count)];
-            int rounds = 2 + _streetRng.Next(2);
+            int rounds = 2 + _streetRng.Next(3);
             float yaw = (float)(_streetRng.NextDouble() * Math.PI * 2);
             double at = clock;
             for (int r = 0; r < rounds; r++)

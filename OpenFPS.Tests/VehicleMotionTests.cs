@@ -707,7 +707,7 @@ public class VehicleMotionTests : IDisposable
         Run(rig, 30 * 300);
         var shots = heard.FindAll(h => h.Sound.SynthKey.StartsWith("weapon:"));
         // Thirty bursts expected in five minutes, two or three rounds each; random, so a band.
-        Assert.InRange(shots.Count, 30, 130);
+        Assert.InRange(shots.Count, 30, 160);
         Assert.Single(shots.Select(h => h.Id).Distinct());
         Assert.DoesNotContain(heard, h => h.Label == "horn");
         foreach (var s in shots)
