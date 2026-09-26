@@ -31,6 +31,7 @@ public static class TapBalanceSpike
             }
             return 0;
         }
+        if (args.Contains("cost")) return Cost(names.Where(n => n != "cost").ToArray());
         if (args.Contains("knock")) return Knock(names.Where(n => n != "knock").ToArray());
         if (args.Contains("shifts")) return Shifts(names.Where(n => n != "shifts").ToArray());
         if (args.Contains("squeal")) return Squeal(names.Where(n => n != "squeal").ToArray());
@@ -217,6 +218,26 @@ public static class TapBalanceSpike
     /// rendered with and without knock (same seed), dumped for octave analysis as
     /// {name}.{speed}.engine.f32 and {name}.{speed}.noknock.f32 into OPENFPS_WHOOSH_DUMP.
     /// </summary>
+    /// <summary>What each engine costs to synthesize: seconds of one core per second of sound, at a
+    /// city cruise. Forty cars at 0.02 each is most of a core.</summary>
+    static int Cost(string[] names)
+    {
+        foreach (var n in names)
+        {
+            var v = VehicleProfile.ByName(n);
+            var voice = new EngineVoiceState(v, Rate, 3) { TargetSpeed = 12f };
+            voice.PlaceAtSpeed(12f); voice.Revive();
+            var buf = new float[Block];
+            for (int b = 0; b < Rate / Block; b++) voice.Render(buf);
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            int blocks = Rate * 5 / Block;
+            for (int b = 0; b < blocks; b++) voice.Render(buf);
+            double rt = sw.Elapsed.TotalSeconds / (blocks * (double)Block / Rate);
+            Console.WriteLine($"{n,-22} {rt,6:F3} core-seconds per second");
+        }
+        return 0;
+    }
+
     static int Knock(string[] names)
     {
         Action<EngineVoiceState> engineOnly = s => { s.TyreMix = 0f; s.FanMix = 0f; };

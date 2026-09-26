@@ -158,6 +158,12 @@ public class ClientAudioSystem
     /// The floor is two cars, not one. One engine on a racetrack is not a race.
     /// </summary>
     private int _adaptiveBudget = EngineVoiceBudget;
+
+    /// <summary>Producer starves per second above which live engines are given up.</summary>
+    private const float StarveCeilingPerSecond = 5f;
+    private float _starveRate;
+    private int _starvesSeen;
+    private double _starveSampledAt = -1;
     /// <summary>
     /// The ceiling on engine reflections, overridable with OPENFPS_ENGINE_ECHOES.
     ///
@@ -391,6 +397,7 @@ public class ClientAudioSystem
     /// </summary>
     public void ForgetEntity(int entityId)
     {
+        _groundCache.Remove(entityId);
         _audio.StopSound(entityId);
         _liveEngines.Remove(entityId);
         _engineStarted.Remove(entityId);
@@ -785,14 +792,23 @@ public class ClientAudioSystem
             }
         }
 
+        long partAt = System.Diagnostics.Stopwatch.GetTimestamp();
         UpdateHorns(world, visualEyePos, OpenFPS.Common.AudioClock.Now);
-        _birds.Update(world, visualEyePos, OpenFPS.Common.AudioClock.Now);
         UpdateSirens(world, visualEyePos);
+        _partMs[3] += Ms(partAt);
+        partAt = System.Diagnostics.Stopwatch.GetTimestamp();
+        _birds.Update(world, visualEyePos, OpenFPS.Common.AudioClock.Now);
+        _partMs[2] += Ms(partAt);
 
         // Every source has now been offered to the reflection system; it can work out what the
         // next frame will demand of a reflection to be worth a voice.
         _engineEchoes.EndFrame();
 
+        {
+            double pass = 0; foreach (var v in _partMs) pass += v;
+            if (pass > _partWorstPass) { _partWorstPass = pass; Array.Copy(_partMs, _partWorstMs, _partMs.Length); }
+            Array.Clear(_partMs);
+        }
         Stage(3, ref stageTicks);     // 6: building an emitter for everything that has a voice
 
         // 7. Execute the audio engine tick (mixing, DSP updates)
@@ -820,6 +836,17 @@ public class ClientAudioSystem
     /// guessing between those is how a session gets spent.
     /// </summary>
     private readonly double[] _stageWorstMs = new double[5];
+
+    /// <summary>
+    /// Inside the emitter stage, the pass that cost most, by part: the engines' echoes, the ground
+    /// rays, the birds, the horns and sirens, and everything else. The emitter stage alone ran to
+    /// 150-250 ms on the city on 2026-09-25 and every source froze for that long ("the reflections
+    /// step away ... a delay in when the reflections catch up"); this names which part.
+    /// </summary>
+    private readonly double[] _partMs = new double[4], _partWorstMs = new double[4];
+    private double _partWorstPass;
+    private static readonly string[] PartNames = { "echoes", "ground", "birds", "horns+sirens" };
+    private static double Ms(long from) => (System.Diagnostics.Stopwatch.GetTimestamp() - from) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
     private static readonly string[] StageNames =
         { "listener+map", "paths", "budget", "emitters", "mixer" };
 
@@ -1224,6 +1251,25 @@ public class ClientAudioSystem
         if (load > MixerLoadCeiling) { if (_overCeilingSince < 0) _overCeilingSince = now; }
         else _overCeilingSince = -1;
 
+        // THE PRODUCERS, as well as the mixer. Engines render on EngineRenderPool's threads, and when
+        // those cannot keep up a voice STARVES — its block is ramped to silence — which the mixer's
+        // load never sees. On the city on 2026-09-25 the pool was short by a core or two, 50-190
+        // starves a second went unanswered, and the car nearest you came out chopped ("really bad
+        // over sampling ... the v8 muscle car"). Starving gives up machines and then cars, the same
+        // way an overloaded mixer does; reflections and front taps cost the producers nothing.
+        int starves = OpenFPS.Client.AudioEngine.Fmod.EngineVoiceState.GlobalStarves + OpenFPS.Client.AudioEngine.Fmod.PhysicalVoiceState.GlobalStarves;
+        if (_starveSampledAt > 0 && now > _starveSampledAt)
+            _starveRate += ((starves - _starvesSeen) / (float)(now - _starveSampledAt) - _starveRate) * 0.3f;
+        _starvesSeen = starves; _starveSampledAt = now;
+        if (_starveRate > StarveCeilingPerSecond && now >= _budgetHeldUntil && now - _lastBudgetChange >= BudgetSettleSeconds)
+        {
+            if (_adaptiveMachines > MachineFloor) _adaptiveMachines--;
+            else if (_adaptiveBudget > MinEngineVoices) _adaptiveBudget--;
+            _lastBudgetChange = now;
+            Log.Information("Audio: engines starving at {Rate:F0}/s; {Cars} engine(s), {Machines} machine(s).",
+                            _starveRate, _adaptiveBudget, _adaptiveMachines);
+        }
+
         if (load > 0f && now >= _budgetHeldUntil && now - _lastBudgetChange >= BudgetSettleSeconds)
         {
             if (load > MixerLoadCeiling && now - _overCeilingSince >= OverCeilingSeconds)
@@ -1244,7 +1290,7 @@ public class ClientAudioSystem
                 Log.Information("Audio: mixer at {Load:P0}; {Cars} engine(s), {Distant} borrowed, {Echoes} reflection(s) each.",
                                 load, _adaptiveBudget, _adaptiveDistant, _adaptiveEchoes);
             }
-            else if (load < MixerLoadFloor)
+            else if (load < MixerLoadFloor && _starveRate < 1f)
             {
                 if (_adaptiveBudget < EngineVoiceBudget) _adaptiveBudget++;
                 else if (_adaptiveMachines < MachineVoiceBudget) _adaptiveMachines++;
@@ -1407,7 +1453,8 @@ public class ClientAudioSystem
             // 17 ms; anything over about 100 ms is long enough to hear a car passing in front of you
             // stop dead and then carry on, which is precisely what it was reported as.
             string stages = string.Join(", ",
-                StageNames.Select((n, i) => $"{n} {_stageWorstMs[i]:F0}"));
+                StageNames.Select((n, i) => $"{n} {_stageWorstMs[i]:F0}"))
+                + "; in the emitters' worst pass " + string.Join(", ", PartNames.Select((n, i) => $"{n} {_partWorstMs[i]:F0}"));
             if (_worstGapMs > 100)
                 Log.Warning("Audio placement stalled: every source held its position for up to {Gap:F0} ms "
                           + "in the last 5 s (the pass itself took at most {Work:F0} ms — {Stages}). A car in "
@@ -1417,6 +1464,7 @@ public class ClientAudioSystem
                               + "worst pass {Work:F0} ms ({Stages}).", _worstGapMs, _worstUpdateMs, stages);
             _worstGapMs = 0; _worstUpdateMs = 0;
             Array.Clear(_stageWorstMs);
+            Array.Clear(_partWorstMs); _partWorstPass = 0;
 
             // And what the three nearest engines are actually DOING, which is the only way to tell
             // apart the four things that sound identical from a chair: the cars really are slowing
@@ -2243,7 +2291,9 @@ public class ClientAudioSystem
         }
 
         // The road under a machine hands its sound back a moment later; see GroundReflection.
+        long groundAt = System.Diagnostics.Stopwatch.GetTimestamp();
         if (engineKey.Length > 0 || physicalKey != null) ApplyGround(ref emitter, world);
+        _partMs[1] += Ms(groundAt);
         _audio.Submit(emitter);
 
         // The other end of the machine, when it is close enough to be a second thing. Placed after
@@ -2259,7 +2309,11 @@ public class ClientAudioSystem
         // reflections are read back out of the synthesis's own ring buffer at the delay the mirrored
         // path implies — see EngineReflections.
         if (engineKey.Length > 0)
+        {
+            long echoAt = System.Diagnostics.Stopwatch.GetTimestamp();
             _engineEchoes.Update(snap.Id, emitter, acousticPath, eyePos, AudioPhysics.SpeedOfSound, engineDt, _audio);
+            _partMs[0] += Ms(echoAt);
+        }
 
         // No floor slapback and no "cone reflection" here any more, and the absence is the fix.
         //
@@ -2570,6 +2624,8 @@ public class ClientAudioSystem
     // ── The ground ─────────────────────────────────────────────────────────────────────────────
 
     private Vector3 _groundEar;
+    private struct GroundCache { public Vector3 Src, Ear; public double At; public bool Found; public float Height; public string Material; }
+    private readonly Dictionary<int, GroundCache> _groundCache = new();
     private WorldSnapshot? _groundWorld;
     private readonly Vector3[] _groundRay = { -Vector3.UnitY };
     private readonly float[] _groundDist = new float[1], _groundAbs = new float[1];
@@ -2593,15 +2649,33 @@ public class ClientAudioSystem
         Vector3 src = e.Position, ear = _groundEar;
         const float Reach = 30f;
 
-        _spatial.RaycastAll(world, src + new Vector3(0f, 0.05f, 0f), _groundRay, Reach, _groundDist, _groundAbs, _groundMat, staticOnly: true);
-        if (_groundDist[0] >= Reach) return;
-        float g = src.Y + 0.05f - _groundDist[0];
-        float hs = MathF.Max(0.02f, src.Y - g), hr = MathF.Max(0.02f, ear.Y - g);
-        float t = hs / (hs + hr);
-        var above = Vector3.Lerp(src, ear, t);
-        _spatial.RaycastAll(world, above + new Vector3(0f, 0.02f, 0f), _groundRay, Reach, _groundDist, _groundAbs, _groundMat, staticOnly: true);
-        if (_groundDist[0] >= Reach) return;
-        float gb = above.Y + 0.02f - _groundDist[0];
+        // The rays are the cost; the geometry after them is not. The ground under a car does not
+        // change from one frame to the next, so they are cast again only once the source or the ear
+        // has moved a metre, or a quarter of a second has gone.
+        double now = OpenFPS.Common.AudioClock.Now;
+        if (!_groundCache.TryGetValue(e.EntityId, out var c)
+            || Vector3.DistanceSquared(c.Src, src) > 1f || Vector3.DistanceSquared(c.Ear, ear) > 1f || now - c.At > 0.25)
+        {
+            c = new GroundCache { Src = src, Ear = ear, At = now, Found = false };
+            _spatial.RaycastAll(world, src + new Vector3(0f, 0.05f, 0f), _groundRay, Reach, _groundDist, _groundAbs, _groundMat, staticOnly: true);
+            if (_groundDist[0] < Reach)
+            {
+                float g0 = src.Y + 0.05f - _groundDist[0];
+                float hs0 = MathF.Max(0.02f, src.Y - g0), hr0 = MathF.Max(0.02f, ear.Y - g0);
+                var above0 = Vector3.Lerp(src, ear, hs0 / (hs0 + hr0));
+                _spatial.RaycastAll(world, above0 + new Vector3(0f, 0.02f, 0f), _groundRay, Reach, _groundDist, _groundAbs, _groundMat, staticOnly: true);
+                if (_groundDist[0] < Reach)
+                {
+                    c.Found = true;
+                    c.Height = above0.Y + 0.02f - _groundDist[0];
+                    c.Material = _groundMat[0] ?? "Generic";
+                }
+            }
+            _groundCache[e.EntityId] = c;
+        }
+        if (!c.Found) return;
+        float gb = c.Height;
+        _groundMat[0] = c.Material;
         if (gb > MathF.Min(src.Y, ear.Y)) return;                // nothing to bounce off below both
 
         var image = new Vector3(src.X, 2f * gb - src.Y, src.Z);

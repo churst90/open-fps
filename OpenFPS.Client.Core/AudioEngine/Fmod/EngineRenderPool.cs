@@ -66,7 +66,10 @@ public sealed class EngineRenderPool : IDisposable
         //
         // A real-time producer cannot share a scheduler with background work. These threads exist for
         // the life of the engine, are owned here, and nothing else can take them.
-        int count = Math.Clamp(Environment.ProcessorCount / 4, 2, 6);
+        // Half the machine, up to twelve. A quarter capped at six was the size when an engine cost
+        // a twentieth of a core; with forty on the city at 0.1-0.23 each (--tap-balance cost) six
+        // threads were short and the nearest cars starved.
+        int count = Math.Clamp(Environment.ProcessorCount / 2, 2, 12);
         _workers = new Thread[count];
         for (int i = 0; i < count; i++)
         {

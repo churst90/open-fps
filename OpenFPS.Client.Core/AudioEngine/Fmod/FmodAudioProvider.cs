@@ -903,9 +903,12 @@ public class FmodAudioProvider : IAudioProvider
             // presets to get overall loudness would undo exactly the work that made them agree.
             // Set it by ear; the limiter at the head of this chain catches the peaks.
             //
-            // SIX is the default, settled by ear: twelve was tried and was too much, zero was the
-            // old clipping-under-linear-rolloff world. OPENFPS_MASTER_DB overrides it.
-            const float DefaultMasterDb = 6f;
+            // SIX was the default, settled by ear: twelve was tried and was too much, zero was the
+            // old clipping-under-linear-rolloff world. TWO since 2026-09-25: with the ground
+            // reflection's energy and the limiter's makeup on top, a busy street read -7 to -12 LUFS
+            // momentary, where a game sits at -18 to -23, and "everything seems to be still too
+            // hot". OPENFPS_MASTER_DB overrides it.
+            const float DefaultMasterDb = 2f;
             float masterDb = float.TryParse(Environment.GetEnvironmentVariable("OPENFPS_MASTER_DB"),
                                             System.Globalization.NumberStyles.Float,
                                             System.Globalization.CultureInfo.InvariantCulture,
@@ -953,7 +956,10 @@ public class FmodAudioProvider : IAudioProvider
             // and never how loud the master is.
             _system.createDSPByType(DSP_TYPE.LIMITER, out _masterLimiter);
             _masterLimiter.setParameterFloat(0, 50.0f);            // release time (ms)
-            _masterLimiter.setParameterFloat(1, -1.0f);            // ceiling (dBFS)
+            // Two decibels under full scale, not one: FMOD's limiter does not look ahead, so a sharp
+            // transient — a shot, an exhaust crack — gets through for a moment before it reacts; the
+            // meter caught +1.6 dBFS leaving the mixer with the ceiling at -1.
+            _masterLimiter.setParameterFloat(1, -2.0f);            // ceiling (dBFS)
             _masterLimiter.setParameterFloat(2, MasterMakeupDb);   // maximizer gain (dB)
             master.addDSP(CHANNELCONTROL_DSP_INDEX.HEAD, _masterLimiter);
 
