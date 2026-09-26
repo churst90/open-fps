@@ -138,6 +138,13 @@ if (args.Contains("--sim-pathing"))
     Environment.Exit(code);
 }
 
+if (args.Contains("--traced-reverb"))
+{
+    int code = OpenFPS.Client.Core.AudioEngine.SteamAudio.TracedReverbSpike.Run();
+    Log.CloseAndFlush();
+    Environment.Exit(code);
+}
+
 if (args.Contains("--sim-scene"))
 {
     int code = SimSceneSpike.Run();

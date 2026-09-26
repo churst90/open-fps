@@ -353,6 +353,23 @@ public sealed class ClientGameSession : IDisposable
     /// loudness between sounds reaches the mix. Everything is placed by it — how far a thing carries,
     /// how much louder a hot rod is than a hatchback, how much a car rises when it is floored.
     /// </summary>
+    /// <summary>
+    /// /reverb traced | room: outdoors, the tail is the place's own impulse response traced through
+    /// the map (traced), or FMOD's room algorithm with its decay set from a ray survey (room). Plain
+    /// /reverb says which, and how the trace is doing. For listening to the two side by side.
+    /// </summary>
+    internal static string ReverbCommand(string[] args)
+    {
+        if (args.Length > 0)
+        {
+            string a = args[0].ToLowerInvariant();
+            if (a is "traced" or "trace" or "on") OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.TracedOutdoors = true;
+            else if (a is "room" or "off") OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.TracedOutdoors = false;
+            else return "Reverb: say /reverb traced or /reverb room.";
+        }
+        return OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.TracedReverbStatus(null);
+    }
+
     internal static string LevelsCommand(string[] args, Action? save = null)
     {
         string Now() => $"{MathF.Round(OpenFPS.Common.Loudness.DynamicRangeCompression * 100f)} percent";
@@ -1164,6 +1181,12 @@ public sealed class ClientGameSession : IDisposable
                 || parts[0].Equals("beacon", StringComparison.OrdinalIgnoreCase))
             {
                 Say(_audioSystem.Beacons.Command(parts.Skip(1).ToArray()));
+                return;
+            }
+            // Which tail the open air has — traced through the map's geometry, or the room algorithm.
+            if (parts[0].Equals("reverb", StringComparison.OrdinalIgnoreCase))
+            {
+                Say(ReverbCommand(parts.Skip(1).ToArray()));
                 return;
             }
             // So is how loud the world is: yours, and saved.

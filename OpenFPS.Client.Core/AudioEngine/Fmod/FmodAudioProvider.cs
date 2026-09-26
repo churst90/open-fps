@@ -1282,6 +1282,9 @@ public class FmodAudioProvider : IAudioProvider
     private void ApplySimulatedReverb(int listenerRegionId)
     {
         AdvanceListenerRoom();
+        // Outdoors in traced mode the tail is the trace; the room algorithm is passing its input
+        // through dry and must be left that way.
+        if (TracedActive && _traced.ContainsKey(listenerRegionId)) return;
 
         if (_simReverbDecayMs <= 0f) return;
         if (!_reverbDsps.TryGetValue(listenerRegionId, out var dsp) || !dsp.hasHandle()) return;
@@ -1497,6 +1500,7 @@ public class FmodAudioProvider : IAudioProvider
         ReturnReverbVoices(); // detach HRTF voices while the buses still exist, return them to the pool
         ReleaseReverbUnits();
         _reverbDsps.Clear(); _reverbBuses.Clear(); _reverbVolumes.Clear(); _dryReverbBuses.Clear();
+        _traced.Clear(); _tracedModeApplied = null;
     }
 
     private void UpdateActiveReverbs(Vector3 listenerPos)
@@ -1573,6 +1577,109 @@ public class FmodAudioProvider : IAudioProvider
     /// audible at once that costs nothing anybody can hear. Walking back towards a room that was
     /// refused builds it then, because by then it is near.
     /// </summary>
+    // ── Traced reverb outdoors ─────────────────────────────────────────────────────────────────
+    //
+    // "Is it necessary to use room reverb outside? ... why we even need to use reverb at all if that
+    // should fall out as a natural consequence of correct physics." Outdoors, the tail can be the
+    // place's own measured impulse response (SteamAudio.TracedReverb) instead of the SFXREVERB room
+    // algorithm. Each outdoor bus gets a traced stage right after its SFXREVERB: in traced mode the
+    // SFXREVERB passes its input through dry and the stage convolves it with the trace; in room mode
+    // the stage is bypassed and the room algorithm is the tail as it always was. `/reverb` switches.
+
+    /// <summary>Outdoor reverb from the traced IR (true) or the room algorithm (false). Any thread
+    /// may write; the audio update applies it. OPENFPS_REVERB=room starts in room mode.</summary>
+    public static volatile bool TracedOutdoors = !string.Equals(Environment.GetEnvironmentVariable("OPENFPS_REVERB"), "room", StringComparison.OrdinalIgnoreCase);
+
+    private readonly Dictionary<int, (TracedReverbState State, FMOD.DSP Dsp, System.Runtime.InteropServices.GCHandle Handle)> _traced = new();
+    private bool? _tracedModeApplied;
+
+    /// <summary>Whether traced mode is in force right now: asked for, and a trace to play.</summary>
+    private static bool TracedActive => TracedOutdoors && TracedReverb.Current != null;
+
+    /// <summary>For the /reverb readout: mode, trace runs and cost, and what the stages carry.</summary>
+    public static string TracedReverbStatus(FmodAudioProvider? p)
+    {
+        var t = TracedReverb.Current;
+        string mode = TracedOutdoors ? "traced" : "room";
+        if (t == null) return $"Reverb outdoors: {mode}. No trace yet — the scene is still being built.";
+        string stages = "";
+        if (p != null)
+        {
+            float inRms = 0, outRms = 0;
+            foreach (var st in p._traced.Values) { inRms = MathF.Max(inRms, st.State.InRms); outRms = MathF.Max(outRms, st.State.OutRms); }
+            stages = $", {p._traced.Count} bus(es), in {20 * MathF.Log10(inRms + 1e-9f):F0} dBFS, out {20 * MathF.Log10(outRms + 1e-9f):F0} dBFS";
+        }
+        return $"Reverb outdoors: {mode}. Traced {t.Runs} times, the last in {t.LastRunMs:F0} ms{stages}.";
+    }
+
+    /// <summary>Adds a traced stage to every outdoor bus that lacks one, and puts every outdoor bus in
+    /// the mode asked for. Audio update thread.</summary>
+    private void UpdateTracedStages()
+    {
+        var tr = TracedReverb.Current;
+        if (tr == null || !_steamAudioEnabled || _saContext == IntPtr.Zero) return;
+        foreach (var kv in _reverbDsps)
+        {
+            if (_traced.ContainsKey(kv.Key) || IsEnclosure(kv.Key)) continue;
+            if (!_reverbBuses.TryGetValue(kv.Key, out var bus)) continue;
+            AddTracedStage(kv.Key, bus, kv.Value, tr);
+            _tracedModeApplied = null;
+        }
+        bool want = TracedOutdoors;
+        if (_tracedModeApplied == want) return;
+        foreach (var kv in _traced)
+        {
+            if (!_reverbDsps.TryGetValue(kv.Key, out var sfx)) continue;
+            if (want)
+            {
+                sfx.setParameterFloat(12, 0f);      // dry: the sends pass straight to the trace
+                sfx.setParameterFloat(11, -80f);    // wet: the room algorithm is silent
+            }
+            else
+            {
+                sfx.setParameterFloat(12, -80f);
+                sfx.setParameterFloat(11, _dryReverbBuses.Contains(kv.Key) && kv.Key != _listenerRegionId ? -80f : _listenerWetDb);
+            }
+            kv.Value.Dsp.setBypass(!want);
+        }
+        _tracedModeApplied = want;
+        Log.Information("Reverb outdoors: {Mode} ({Count} outdoor bus(es)).", want ? "traced" : "room", _traced.Count);
+    }
+
+    private void AddTracedStage(int regionId, FMOD.ChannelGroup bus, FMOD.DSP sfx, TracedReverb tr)
+    {
+        var au = new Phonon.IPLAudioSettings { samplingRate = 44100, frameSize = _saFrameSize };
+        var es = new Phonon.IPLReflectionEffectSettings
+        {
+            type = Phonon.IPL_REFLECTIONEFFECTTYPE_CONVOLUTION, irSize = tr.IrSize, numChannels = TracedReverb.Channels,
+        };
+        if (Phonon.iplReflectionEffectCreate(tr.Context, ref au, ref es, out IntPtr effect) != Phonon.IPL_STATUS_SUCCESS)
+        { Log.Warning("Traced reverb: Steam Audio would not make a reflection effect for region {Id}.", regionId); return; }
+        var ds = new Phonon.IPLAmbisonicsDecodeEffectSettings { speakerLayout = Phonon.StereoLayout(), hrtf = _saHrtf, maxOrder = TracedReverb.Order };
+        if (Phonon.iplAmbisonicsDecodeEffectCreate(_saContext, ref au, ref ds, out IntPtr decode) != Phonon.IPL_STATUS_SUCCESS)
+        { Phonon.iplReflectionEffectRelease(ref effect); return; }
+        var st = new TracedReverbState
+        {
+            FrameSize = _saFrameSize, WorkerContext = tr.Context, ProviderContext = _saContext,
+            Effect = effect, Decode = decode, Hrtf = _saHrtf,
+            MonoScratch = new float[_saFrameSize], StereoScratch = new float[_saFrameSize * 2],
+            Orientation = Phonon.ListenerFrame(_listenerRot),
+        };
+        Phonon.iplAudioBufferAllocate(tr.Context, 1, _saFrameSize, ref st.Mono);
+        Phonon.iplAudioBufferAllocate(tr.Context, TracedReverb.Channels, _saFrameSize, ref st.Ambi);
+        Phonon.iplAudioBufferAllocate(_saContext, 2, _saFrameSize, ref st.Stereo);
+        if (TracedReverbDsp.Create(_system, st, out var dsp, out var handle) != RESULT.OK) return;
+        // Just downstream of the SFXREVERB: FMOD's index 0 is the output end, so inserting AT the
+        // reverb's index pushes the reverb one further from the output and puts this after it.
+        int at = -1;
+        bus.getNumDSPs(out int count);
+        for (int i = 0; i < count; i++)
+            if (bus.getDSP(i, out var d) == RESULT.OK && d.handle == sfx.handle) { at = i; break; }
+        if (at < 0 || bus.addDSP(at, dsp) != RESULT.OK) { dsp.release(); handle.Free(); return; }
+        dsp.setBypass(!TracedOutdoors);
+        _traced[regionId] = (st, dsp, handle);
+    }
+
     private bool CanAffordAnotherReverbBus(int regionId)
     {
         if (_reverbBuses.Count < MaxReverbBuses) return true;
@@ -2907,6 +3014,7 @@ public class FmodAudioProvider : IAudioProvider
             {
                 _dbgFrame++;
                 UpdateActiveReverbs(lPosVec);
+                UpdateTracedStages();
                 ApplySimulatedReverb(listenerRegionId);
 
                 for (int i = _activeSounds.Count - 1; i >= 0; i--)
@@ -3538,10 +3646,19 @@ public class FmodAudioProvider : IAudioProvider
         // THROUGH the room, and the send is undone by the cone here so that it can be.
         float radiated = 1f / MathF.Max(coneAtten, 0.05f);
         if (baseReverbMix > _worstSendThisInterval) { _worstSendThisInterval = baseReverbMix; _worstSendDist = sourceDist; }
+        // Into a TRACED bus the send is the sound as it arrives, at unity: the trace carries how much
+        // the place hands back and when, which the room equation was standing in for. A reflection
+        // does not send — the trace has the reflections in it.
+        float ownMix = baseReverbMix, crossMix = baseReverbMix * AcousticConstants.ReverbCrossSendScale;
+        if (TracedActive)
+        {
+            if (_traced.ContainsKey(active.TargetRegionId)) ownMix = active.IsReflection ? 0f : 1f;
+            if (_traced.ContainsKey(_listenerRegionId)) crossMix = active.IsReflection ? 0f : 1f;
+        }
         if (active.SourceReverbConnection.hasHandle())
-            active.SourceReverbConnection.setMix(baseReverbMix * radiated * active.SourceReverbMix);
+            active.SourceReverbConnection.setMix(ownMix * radiated * active.SourceReverbMix);
         if (active.ReverbConnection.hasHandle())
-            active.ReverbConnection.setMix(baseReverbMix * radiated * AcousticConstants.ReverbCrossSendScale * active.ReverbMix);
+            active.ReverbConnection.setMix(crossMix * radiated * active.ReverbMix);
 
         if (active.DiffractionDsp.hasHandle())
         {
@@ -3661,6 +3778,11 @@ public class FmodAudioProvider : IAudioProvider
         {
             var frame = Phonon.ListenerFrame(rotation);
             foreach (var bed in _ambientBeds.Values) bed.State.Orientation = frame;
+        }
+        if (_traced.Count > 0)
+        {
+            var frame = Phonon.ListenerFrame(rotation);
+            foreach (var t in _traced.Values) t.State.Orientation = frame;
         }
         FMOD.VECTOR fpos = FmodHelpers.ToFmodVec(position), fvel = FmodHelpers.ToFmodVec(velocity);
         Vector3 forward = Vector3.Transform(Vector3.UnitZ, rotation);

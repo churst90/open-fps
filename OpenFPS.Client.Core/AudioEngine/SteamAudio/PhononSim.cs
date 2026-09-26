@@ -243,6 +243,14 @@ internal static partial class Phonon
     [DllImport(Lib, CallingConvention = CC)] public static extern void iplSourceSetInputs(IntPtr source, int flags, ref IPLSimulationInputs inputs);
     [DllImport(Lib, CallingConvention = CC)] public static extern void iplSourceGetOutputs(IntPtr source, int flags, ref IPLSimulationOutputs outputs);
 
+    // reflections: the convolution effect that plays a sound through a simulated impulse response
+    [StructLayout(LayoutKind.Sequential)]
+    public struct IPLReflectionEffectSettings { public int type; public int irSize; public int numChannels; }
+    [DllImport(Lib, CallingConvention = CC)] public static extern int iplReflectionEffectCreate(IntPtr context, ref IPLAudioSettings audioSettings, ref IPLReflectionEffectSettings effectSettings, out IntPtr effect);
+    [DllImport(Lib, CallingConvention = CC)] public static extern void iplReflectionEffectRelease(ref IntPtr effect);
+    [DllImport(Lib, CallingConvention = CC)] public static extern void iplReflectionEffectReset(IntPtr effect);
+    [DllImport(Lib, CallingConvention = CC)] public static extern int iplReflectionEffectApply(IntPtr effect, ref IPLReflectionEffectParams effectParams, ref IPLAudioBuffer inBuf, ref IPLAudioBuffer outBuf, IntPtr mixer);
+
     // probes / pathing
     [DllImport(Lib, CallingConvention = CC)] public static extern int iplProbeArrayCreate(IntPtr context, out IntPtr probeArray);
     [DllImport(Lib, CallingConvention = CC)] public static extern void iplProbeArrayRelease(ref IntPtr probeArray);
