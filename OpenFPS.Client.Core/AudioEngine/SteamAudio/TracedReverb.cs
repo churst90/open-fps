@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Numerics;
 using System.Threading;
 
@@ -31,10 +32,14 @@ internal sealed class TracedReverb : IDisposable
     public const float DurationSeconds = 2.0f;
     public const int Order = 1;
     public const int Channels = (Order + 1) * (Order + 1);
-    private const int Rays = 8192, Bounces = 16;
+    /// <summary>Rays and bounces per trace. Sixty-four bounces, not sixteen: in a twelve-metre room
+    /// sixteen bounces is a quarter of a second of travel, and the tail stopped dead at half a second
+    /// (--traced-reverb) where a hard room rings on.</summary>
+    private const int Rays = 8192, Bounces = 64;
     /// <summary>How often the trace is refreshed. Walking is a metre and a half a second; a quarter
     /// second is a third of a metre, and the IR crossfades inside the effect.</summary>
-    private const int RefreshMs = 250;
+    private const int DefaultRefreshMs = 250;
+    private readonly int _refreshMs;
 
     public IntPtr Context { get; }
     public int SampleRate { get; }
@@ -52,8 +57,11 @@ internal sealed class TracedReverb : IDisposable
     public int Runs;
     public double LastRunMs;
 
-    public TracedReverb(IntPtr context, int sampleRate = 44100, int frameSize = 1024)
+    /// <param name="refreshMs">How often the trace is redone: a quarter second for the listener,
+    /// who walks; a second for a room traced from its middle, which does not move.</param>
+    public TracedReverb(IntPtr context, int sampleRate = 44100, int frameSize = 1024, int refreshMs = DefaultRefreshMs)
     {
+        _refreshMs = refreshMs;
         Context = context; SampleRate = sampleRate; FrameSize = frameSize;
         var s = new Phonon.IPLSimulationSettings
         {
@@ -115,7 +123,7 @@ internal sealed class TracedReverb : IDisposable
                 long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
                 lock (_gate)
                 {
-                    if (!_haveScene) { Thread.Sleep(RefreshMs); continue; }
+                    if (!_haveScene) { Thread.Sleep(_refreshMs); continue; }
                     var coord = Coord(at);
                     var shared = new Phonon.IPLSimulationSharedInputs
                     {
@@ -136,7 +144,7 @@ internal sealed class TracedReverb : IDisposable
                 Runs++;
             }
             catch (Exception ex) { Serilog.Log.Warning(ex, "Traced reverb: a trace failed."); }
-            Thread.Sleep(RefreshMs);
+            Thread.Sleep(_refreshMs);
         }
     }
 
@@ -172,6 +180,84 @@ internal sealed class TracedReverb : IDisposable
         {
             if (_source != IntPtr.Zero) Phonon.iplSourceRelease(ref _source);
             if (_simulator != IntPtr.Zero) Phonon.iplSimulatorRelease(ref _simulator);
+        }
+    }
+}
+
+/// <summary>
+/// Every traced place in use: the listener's own (traced from where they stand, following them) and
+/// each other room that can be heard (traced from its own middle, so a sound through a doorway rings
+/// with the room it is in, not the one you are in). Built on the acoustic worker's context and scene;
+/// asked for by the provider's reverb buses.
+/// </summary>
+internal static class TracedReverbSet
+{
+    private static readonly object Gate = new();
+    private static IntPtr _context;
+    private static SteamAudioScene? _scene;
+    private static TracedReverb? _listener;
+    private static readonly Dictionary<int, (TracedReverb Trace, Vector3 At)> Rooms = new();
+    /// <summary>At most this many rooms traced besides the listener's; the mixer only ever hears four.</summary>
+    private const int MaxRooms = 6;
+
+    /// <summary>The worker, once its scene is built (and again after every rebuild).</summary>
+    public static void Configure(IntPtr context, SteamAudioScene scene)
+    {
+        lock (Gate)
+        {
+            _context = context; _scene = scene;
+            _listener ??= new TracedReverb(context);
+            if (_listener.IsValid) _listener.SetScene(scene);
+            foreach (var r in Rooms.Values) r.Trace.SetScene(scene);
+        }
+    }
+
+    public static void SetListener(Vector3 at) { lock (Gate) _listener?.SetListener(at); }
+
+    /// <summary>The listener's own trace, or null before the scene exists.</summary>
+    public static TracedReverb? Listener { get { lock (Gate) return _listener is { IsValid: true } l && l.Source != IntPtr.Zero ? l : null; } }
+
+    /// <summary>A room's trace from a point in it, made on first asking. Null before the scene exists
+    /// or past the cap (then the room is played through the listener's trace).</summary>
+    public static TracedReverb? ForRoom(int regionId, Vector3 at)
+    {
+        lock (Gate)
+        {
+            if (_scene == null || _context == IntPtr.Zero) return null;
+            if (Rooms.TryGetValue(regionId, out var r))
+            {
+                if (Vector3.DistanceSquared(r.At, at) > 1f) { r.Trace.SetListener(at); Rooms[regionId] = (r.Trace, at); }
+                return r.Trace;
+            }
+            if (Rooms.Count >= MaxRooms) return null;
+            var t = new TracedReverb(_context, refreshMs: 1000);
+            if (!t.IsValid) { t.Dispose(); return null; }
+            t.SetScene(_scene);
+            t.SetListener(at);
+            Rooms[regionId] = (t, at);
+            return t;
+        }
+    }
+
+    /// <summary>Everything traced so far, for the /reverb readout.</summary>
+    public static (int Rooms, int Runs, double LastMs) Stats()
+    {
+        lock (Gate)
+        {
+            int runs = _listener?.Runs ?? 0;
+            foreach (var r in Rooms.Values) runs += r.Trace.Runs;
+            return (Rooms.Count, runs, _listener?.LastRunMs ?? 0);
+        }
+    }
+
+    public static void Dispose()
+    {
+        lock (Gate)
+        {
+            _listener?.Dispose(); _listener = null;
+            foreach (var r in Rooms.Values) r.Trace.Dispose();
+            Rooms.Clear();
+            _scene = null; _context = IntPtr.Zero;
         }
     }
 }

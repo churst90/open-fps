@@ -241,6 +241,7 @@ public sealed class WorldAudioPlayer
 
             if (!item.IsReflection)
             {
+                _enclosedNow = ListenerEnclosed(world, listenerPosition);
                 QueueReflections(item, reflections, listenerPosition, now);
                 QueueHigherOrderEchoes(item, world, listenerPosition);
             }
@@ -381,6 +382,8 @@ public sealed class WorldAudioPlayer
     /// AsyncAcousticWorker.AddEarlyReflections), and in a room the copies of copies are the dense
     /// tail, which the reverb already is. First order stays with QueueReflections.
     /// </summary>
+    private bool _enclosedNow;
+
     /// <summary>A short impact — a shot, a slam, a clap — rather than a sustained sound.</summary>
     private static bool IsImpulse(in TransientSound s) => s.Character == SoundCharacter.Knock && s.DecaySeconds <= 1f;
 
@@ -435,6 +438,9 @@ public sealed class WorldAudioPlayer
                                   Vector3 listenerPosition, double now)
     {
         if (reflections == null || reflections.SurfaceCount == 0) return;
+        // Traced, indoors: the room's traced response carries these; outdoors a short sound's own
+        // echoes stay, because a shot up the street is not where you stand.
+        if (OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.TracedActive && _enclosedNow) return;
 
         Span<Reflection> found = stackalloc Reflection[MaxEchoes];
         // Sampled across a scattering face as well as mirrored through it.

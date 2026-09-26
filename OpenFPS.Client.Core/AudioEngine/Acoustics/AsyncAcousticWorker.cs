@@ -428,7 +428,7 @@ public class AsyncAcousticWorker : IDisposable
             }
             if (!haveListener) return null;   // nothing pending; not a degradation
             // The traced reverb follows the ear; it runs its own trace on its own thread.
-            _traced?.SetListener(listener);
+            OpenFPS.Client.Core.AudioEngine.SteamAudio.TracedReverbSet.SetListener(listener);
 
             _saSim.SetListener(listener);
             _saSim.Run();
@@ -801,8 +801,6 @@ public class AsyncAcousticWorker : IDisposable
         return true;
     }
 
-    private OpenFPS.Client.Core.AudioEngine.SteamAudio.TracedReverb? _traced;
-
     private void EnsureSteamAudio()
     {
         if (_saTried) return;
@@ -859,14 +857,9 @@ public class AsyncAcousticWorker : IDisposable
         if (_saScene.IsBuilt)
         {
             _saSim.SetScene(_saScene);
-            // The place itself, traced: one impulse response from the listener's own position, for
-            // everything outdoors to be played through (SteamAudio.TracedReverb).
-            if (_traced == null)
-            {
-                _traced = new OpenFPS.Client.Core.AudioEngine.SteamAudio.TracedReverb(_saContext);
-                if (!_traced.IsValid) { _traced.Dispose(); _traced = null; Console.WriteLine("[AcousticWorker] Traced reverb unavailable: Steam Audio would not make its simulator."); }
-            }
-            _traced?.SetScene(_saScene);
+            // The places themselves, traced: an impulse response from where the listener stands, and
+            // one from the middle of each other room that can be heard (SteamAudio.TracedReverbSet).
+            OpenFPS.Client.Core.AudioEngine.SteamAudio.TracedReverbSet.Configure(_saContext, _saScene);
             // Off the worker thread and out of the way. This is the work that used to sit inside
             // SetScene and take a hundred seconds of a single core before ANY source got an occlusion
             // value — a hundred seconds in which the whole world was rendered as if nothing were in
@@ -1007,7 +1000,7 @@ public class AsyncAcousticWorker : IDisposable
         _cts.Cancel();
         _workerThread?.Join(); // after this, no other thread touches the Phonon sim objects
 
-        if (_traced != null) { _traced.Dispose(); _traced = null; }
+        OpenFPS.Client.Core.AudioEngine.SteamAudio.TracedReverbSet.Dispose();
         if (_saSim != null) { _saSim.Dispose(); _saSim = null; }
         if (_saScene != null) { _saScene.Dispose(); _saScene = null; }
         if (_saContext != IntPtr.Zero) Phonon.iplContextRelease(ref _saContext);

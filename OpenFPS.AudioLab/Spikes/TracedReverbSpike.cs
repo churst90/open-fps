@@ -40,7 +40,15 @@ public static class TracedReverbSpike
             new(new Vector3(0, 3.15f, 0), new Vector3(12, 0.3f, 12), q, "Concrete"),
         };
 
-        foreach (var (name, boxes) in new[] { ("open ground", open), ("street, 20 m", street), ("concrete room", room) })
+        List<SteamAudioScene.Box> Room(string walls, string floor) => new()
+        {
+            new(new Vector3(0, -0.25f, 0), new Vector3(600, 0.5f, 600), q, floor),
+            new(new Vector3(0, 1.5f, -6), new Vector3(12, 3, 0.3f), q, walls), new(new Vector3(0, 1.5f, 6), new Vector3(12, 3, 0.3f), q, walls),
+            new(new Vector3(-6, 1.5f, 0), new Vector3(0.3f, 3, 12), q, walls), new(new Vector3(6, 1.5f, 0), new Vector3(0.3f, 3, 12), q, walls),
+            new(new Vector3(0, 3.15f, 0), new Vector3(12, 0.3f, 12), q, walls),
+        };
+        foreach (var (name, boxes) in new[] { ("open ground", open), ("street, 20 m", street), ("concrete room", room),
+                                              ("tiled room", Room("Tile", "Tile")), ("wood, carpet", Room("Wood", "Carpet")) })
         {
             using var scene = new SteamAudioScene(ctx);
             scene.Build(boxes);

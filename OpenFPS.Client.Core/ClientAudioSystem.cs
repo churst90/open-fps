@@ -692,6 +692,8 @@ public class ClientAudioSystem
                         || sourceSound.StartsWith("engine:", StringComparison.OrdinalIgnoreCase)
                         || sourceSound.StartsWith("ENGINE/", StringComparison.OrdinalIgnoreCase)) continue;
                     if ((uint)path.ReflectionIndex >= (uint)EarlyReflections.MaxArrivals) continue;
+                    // Traced, indoors: the room's traced response has these arrivals in it.
+                    if (OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.TracedActive && ListenerEnclosed(world, visualEyePos)) continue;
                     _slotLive[path.ReflectionIndex] = true;
 
                     // One voice per slot, and the slots are ordered by the SURFACE each arrival
@@ -2519,9 +2521,18 @@ public class ClientAudioSystem
     /// distance is applied by the engine when it places the copy at the image position, so a copy off
     /// a far wall is quiet because it is far, not because anybody scaled it.
     /// </summary>
+    /// <summary>Is the listener in a room (a closed boundary) rather than out of doors?</summary>
+    private bool ListenerEnclosed(WorldSnapshot world, Vector3 at)
+        => world.AcousticMap != null
+           && world.AcousticMap.Regions.TryGetValue(_listenerRegion, out var room)
+           && RoomAcoustics.IsEnclosure(room);
+
     private void SubmitStepReflections(Vector3 stepPos, string soundId, float stepGain, float stepReference)
     {
         if (_engineEchoes.SurfaceCount == 0) return;
+        // Traced: your own step is a sound where you stand, and the traced response from where you
+        // stand is exactly its reflections, off every surface round you, with their materials.
+        if (OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.TracedActive) return;
 
         Vector3 ear = _state.VisualPosition + new Vector3(0, _state.EyeHeight, 0);
         Span<OpenFPS.Common.Reflection> found = stackalloc OpenFPS.Common.Reflection[OpenFPS.Common.EarlyReflections.MaxArrivals];
