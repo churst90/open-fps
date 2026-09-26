@@ -47,14 +47,34 @@ public static class TracedReverbSpike
             new(new Vector3(-6, 1.5f, 0), new Vector3(0.3f, 3, 12), q, walls), new(new Vector3(6, 1.5f, 0), new Vector3(0.3f, 3, 12), q, walls),
             new(new Vector3(0, 3.15f, 0), new Vector3(12, 0.3f, 12), q, walls),
         };
-        foreach (var (name, boxes) in new[] { ("open ground", open), ("street, 20 m", street), ("concrete room", room),
-                                              ("tiled room", Room("Tile", "Tile")), ("wood, carpet", Room("Wood", "Carpet")) })
+        List<SteamAudioScene.Box> Cabin(string preset)
+        {
+            var v = MachineRegistry.VehicleFor(preset);
+            var g = VehicleCabin.Measure(v)!.Value;
+            var b = new List<SteamAudioScene.Box>();
+            foreach (var (prefab, at, size) in VehicleCabin.Shell(v, g))
+                b.Add(new(at, size, q, VehicleCabin.MaterialOf(prefab)));
+            return b;
+        }
+        Vector3 Seat(string preset)
+        {
+            var g = VehicleCabin.Measure(MachineRegistry.VehicleFor(preset))!.Value;
+            return new Vector3(0.3f, g.FloorTop + 1.1f, g.Cz);
+        }
+        var places = new List<(string, List<SteamAudioScene.Box>, Vector3)>
+        {
+            ("open ground", open, new Vector3(2f, 1.6f, 0f)), ("street, 20 m", street, new Vector3(2f, 1.6f, 0f)),
+            ("concrete room", room, new Vector3(2f, 1.6f, 0f)), ("tiled room", Room("Tile", "Tile"), new Vector3(2f, 1.6f, 0f)),
+            ("wood, carpet", Room("Wood", "Carpet"), new Vector3(2f, 1.6f, 0f)),
+            ("bus cabin", Cabin("school_bus_na"), Seat("school_bus_na")), ("hatchback cabin", Cabin("i4_economy"), Seat("i4_economy")),
+        };
+        foreach (var (name, boxes, ear) in places)
         {
             using var scene = new SteamAudioScene(ctx);
             scene.Build(boxes);
             using var tr = new TracedReverb(ctx);
             tr.SetScene(scene);
-            tr.SetListener(new Vector3(2f, 1.6f, 0f));
+            tr.SetListener(ear);
             var until = DateTime.UtcNow.AddSeconds(20);
             while (tr.Runs < 2 && DateTime.UtcNow < until) Thread.Sleep(50);
             if (!tr.TryGetParams(out var prm)) { Console.WriteLine($"{name}: no IR"); continue; }

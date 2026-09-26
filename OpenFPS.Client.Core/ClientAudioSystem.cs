@@ -463,6 +463,19 @@ public class ClientAudioSystem
         // --- Use smoothed VisualPosition for the listener ---
         Vector3 visualEyePos = _state.VisualPosition + new Vector3(0, _state.EyeHeight, 0);
         _groundEar = visualEyePos;
+        // The cabin you are sitting in, for the traced reverb: which vehicle, and where your ear is in
+        // its own frame.
+        {
+            string? preset = null; Vector3 local = default;
+            if (_state.IsRiding && world.Entities.TryGetValue(_state.RidingEntityId, out var ride)
+                && ride.Definition.SoundEmitter.SoundId is { } rideSound
+                && rideSound.StartsWith("engine:", StringComparison.OrdinalIgnoreCase))
+            {
+                preset = rideSound[7..];
+                local = Vector3.Transform(visualEyePos - ride.Transform.Position, Quaternion.Inverse(ride.Transform.Rotation));
+            }
+            OpenFPS.Client.Core.AudioEngine.SteamAudio.TracedReverbSet.RideIn(preset, local);
+        }
         _groundWorld = world;
 
         // 1. Resolve high-precision listener region (OBB check)

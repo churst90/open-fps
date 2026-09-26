@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Numerics;
 using System.Threading;
+using OpenFPS.Common;
 
 namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 
@@ -239,6 +240,54 @@ internal static class TracedReverbSet
         }
     }
 
+    // ── The vehicle you are riding in ────────────────────────────────────────────────────────
+    //
+    // "That means even inside vehicles like buses too, use reflections, not what we've been doing."
+    // A vehicle moves, so it is not in the map's traced scene — traced from a bus seat, the world
+    // scene answers with the street outside. But from inside, the cabin does not move relative to
+    // you: it is traced as a scene of its own, in the vehicle's frame, from the same geometry the
+    // server builds the shell from (VehicleCabin) — its floor, its steel below the waist and glass
+    // above, its length.
+    private static string? _cabinPreset;
+    private static SteamAudioScene? _cabinScene;
+    private static TracedReverb? _cabin;
+    private static bool _riding;
+
+    /// <summary>The cabin's trace while riding in something that has a cabin, else null.</summary>
+    public static TracedReverb? Cabin { get { lock (Gate) return _riding && _cabin is { IsValid: true } c && c.Source != IntPtr.Zero ? c : null; } }
+
+    /// <summary>Riding in <paramref name="preset"/> (null: on foot), with the ear at
+    /// <paramref name="local"/> in the vehicle's own frame.</summary>
+    public static void RideIn(string? preset, Vector3 local)
+    {
+        lock (Gate)
+        {
+            if (preset == null || _context == IntPtr.Zero || !MachineRegistry.Knows(preset)) { _riding = false; return; }
+            if (!string.Equals(preset, _cabinPreset, StringComparison.OrdinalIgnoreCase))
+            {
+                _cabin?.Dispose(); _cabin = null;
+                _cabinScene?.Dispose(); _cabinScene = null;
+                _cabinPreset = preset;
+                var v = MachineRegistry.VehicleFor(preset);
+                if (VehicleCabin.Measure(v) is { } g)
+                {
+                    var boxes = new List<SteamAudioScene.Box>();
+                    foreach (var (prefab, at, size) in VehicleCabin.Shell(v, g))
+                        boxes.Add(new SteamAudioScene.Box(at, size, Quaternion.Identity, VehicleCabin.MaterialOf(prefab)));
+                    _cabinScene = new SteamAudioScene(_context);
+                    _cabinScene.Build(boxes);
+                    if (_cabinScene.IsBuilt)
+                    {
+                        _cabin = new TracedReverb(_context, refreshMs: 1000);
+                        if (_cabin.IsValid) _cabin.SetScene(_cabinScene); else { _cabin.Dispose(); _cabin = null; }
+                    }
+                }
+            }
+            _cabin?.SetListener(local);
+            _riding = _cabin != null;
+        }
+    }
+
     /// <summary>Everything traced so far, for the /reverb readout.</summary>
     public static (int Rooms, int Runs, double LastMs) Stats()
     {
@@ -255,6 +304,7 @@ internal static class TracedReverbSet
         lock (Gate)
         {
             _listener?.Dispose(); _listener = null;
+            _cabin?.Dispose(); _cabin = null; _cabinScene?.Dispose(); _cabinScene = null; _cabinPreset = null; _riding = false;
             foreach (var r in Rooms.Values) r.Trace.Dispose();
             Rooms.Clear();
             _scene = null; _context = IntPtr.Zero;

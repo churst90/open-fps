@@ -1628,9 +1628,11 @@ public class FmodAudioProvider : IAudioProvider
 
         // Which place each bus is heard as. The room you are in: yours. Any other ROOM: its own,
         // from its middle. Open ground elsewhere: yours too — the open air has no middle to trace.
+        var cabin = TracedReverbSet.Cabin;
         foreach (var kv in _traced)
         {
-            TracedReverb? trace = listenerTrace;
+            // Riding in something with a cabin, your room is the cabin, traced as itself.
+            TracedReverb? trace = kv.Key == _listenerRegionId && cabin != null ? cabin : listenerTrace;
             if (kv.Key != _listenerRegionId && IsEnclosure(kv.Key) && _acousticMap != null
                 && _acousticMap.RegionPositions.TryGetValue(kv.Key, out var centre)
                 && _reverbVolumes.TryGetValue(kv.Key, out float vol) && vol > 0.001f)
