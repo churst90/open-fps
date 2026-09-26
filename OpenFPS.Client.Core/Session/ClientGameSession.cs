@@ -462,6 +462,42 @@ public sealed class ClientGameSession : IDisposable
         else if (!_state.IsRiding) Serilog.Log.Information("No longer riding.");
     }
 
+    /// <summary>
+    /// Sitting in something that turns, you turn with it.
+    ///
+    /// The server already carries a rider's heading round with the vehicle (OccupancySystem), but
+    /// that only reaches the client as a correction once the two disagree by three degrees, so on its
+    /// own it arrives as a stepped turn. Worse, the listener used to be pinned to the VEHICLE's
+    /// rotation while riding, so your own heading was ignored altogether — J and L did nothing to
+    /// what you heard, and when you got off you were facing wherever your own heading had been left.
+    /// Here the vehicle's turn since the last frame is added to your heading as it happens, the same
+    /// rule the server applies, so the two agree and the ears can follow YOUR heading: the bus turns
+    /// you, and you can still look round in your seat.
+    /// </summary>
+    private void FollowRide(WorldSnapshot snapshot)
+    {
+        if (!_state.IsRiding || !snapshot.Entities.TryGetValue(_state.RidingEntityId, out var ride))
+        {
+            _rideYaw = float.NaN;
+            return;
+        }
+        MathHelper.ToYawPitch(ride.Transform.Rotation, out float yaw, out _);
+        if (!float.IsNaN(_rideYaw) && _rideId == _state.RidingEntityId)
+        {
+            float turned = MathHelper.WrapAngle(yaw - _rideYaw);
+            if (turned != 0f)
+            {
+                _state.Yaw = MathHelper.WrapAngle(_state.Yaw + turned);
+                _state.Rotation = Quaternion.CreateFromYawPitchRoll(_state.Yaw, _state.Pitch, 0f);
+            }
+        }
+        _rideYaw = yaw;
+        _rideId = _state.RidingEntityId;
+    }
+
+    private float _rideYaw = float.NaN;
+    private int _rideId = -1;
+
     /// <summary>Render-rate update: footstep generation + spatial audio listener/emitters.</summary>
     public void ContinuousUpdate()
     {
@@ -485,6 +521,7 @@ public sealed class ClientGameSession : IDisposable
         else _controller.Update(_state.Position, _state.Velocity);
 
         var snapshot = _world.GetSnapshot();
+        FollowRide(snapshot);
 
         // ...and everybody else, off the same snapshot. A passenger needs no exemption here the way
         // the local player does above: the server zeroes an occupant's velocity and its movement

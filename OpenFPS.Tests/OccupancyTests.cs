@@ -204,6 +204,26 @@ public class OccupancyTests : IDisposable
         Assert.Equal(quarterTurn, MathHelper.WrapAngle(after - before), 2);
     }
 
+    /// <summary>
+    /// "When I get out I should be facing that direction": you step off facing the way the vehicle
+    /// was going, whichever way your head was turned in the seat.
+    /// </summary>
+    [Fact]
+    public void GettingOutFacesTheWayItWasGoing()
+    {
+        var f = new Fixture(_dir);
+        int root = f.BuildCar(new Vector3(20, 0, 20));
+        var session = f.Player("rider", new Vector3(21, 0, 20));
+        Assert.True(f.Seats.Enter(session, root, null, out _));
+        float heading = 2.1f;
+        f.World.Get<Transform>(f.Entity(root)).Rotation = Quaternion.CreateFromYawPitchRoll(heading, 0f, 0f);
+        f.World.Get<PlayerComponent>(session.Entity).Yaw = -1.3f;           // looking out of the side
+        Assert.True(f.Seats.Exit(session, out string message), message);
+        Assert.Equal(heading, f.World.Get<PlayerComponent>(session.Entity).Yaw, 3);
+        MathHelper.ToYawPitch(f.World.Get<Transform>(session.Entity).Rotation, out float yaw, out _);
+        Assert.Equal(heading, yaw, 3);
+    }
+
     /// <summary>The floor disappearing is not the same as getting out, and neither is silent.</summary>
     [Fact]
     public void LosingTheThingYouAreInsidePutsYouOut()

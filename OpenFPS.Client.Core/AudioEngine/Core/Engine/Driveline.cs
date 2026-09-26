@@ -403,7 +403,13 @@ public sealed class VirtualDriver
         if (_shiftTimer > 0f)
         {
             _shiftTimer -= dt;
-            _engine.Throttle = 0f;
+            // Going up, the revs fall on their own toward the next gear's speed, which is what the
+            // pause is for. Going DOWN they have to rise to it, and with the throttle shut they fell
+            // to idle instead — then the clutch yanked them from 780 to 1,600 in one go, the hard
+            // step heard on the tunnel truck coming down from 54. A driver blips the throttle to
+            // match the revs, and so does an automated box; so does this.
+            float match = _shiftTo >= 1 ? _dl.GearRpm(_shiftTo) : 0f;
+            _engine.Throttle = match > _engine.Rpm ? Math.Clamp((match - _engine.Rpm) / 400f, 0f, 0.7f) : 0f;
             _dl.Clutch = 0f;
             if (_shiftTimer <= 0f) { _dl.Gear = _shiftTo; _dl.Clutch = 1f; }
             return;

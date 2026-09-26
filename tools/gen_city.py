@@ -1241,7 +1241,11 @@ CROSSINGS = [
 ]
 
 # Mean seconds between events, map-wide; 0 is off. See MapData.StreetLife.
-STREET_LIFE = {"HornEverySeconds": 15, "HardBrakeEverySeconds": 60, "ParkEverySeconds": 90}
+# GunfireEverySeconds (Cody, 2026-09-25): "every now and then have an npc fire a couple round so I
+# can hear what they sound like periodically as I move around the city." One of the walkers fires two
+# or three rounds, on average every two minutes somewhere on the map.
+STREET_LIFE = {"HornEverySeconds": 15, "HardBrakeEverySeconds": 60, "ParkEverySeconds": 90,
+               "GunfireEverySeconds": 120}
 
 # ── The field ─────────────────────────────────────────────────────────────────────────────────────
 #
@@ -1455,32 +1459,10 @@ VEHICLES.append({
 # The one dishonest moment is the far end, where a shuttle brakes to a stop and waits. An aeroplane
 # does not stop in the sky. It is parked at a kilometre and a half of slant range at idle, which is
 # under anything else on this map, and it waits there for most of its cycle.
+# Only the helicopter now (Cody, 2026-09-25): "the planes are getting to be a bit much ... keep the
+# helicopter that flies over every now and then but remove the props." The two airliners, the
+# turboprop and the light single are gone; the airport is still there for when they come back.
 AIR = [
-    # An airliner on final for runway 18, and climbing out again. 3.9 degrees, which is a degree
-    # steeper than a real glideslope and is what fits inside the bounds.
-    {"Name": "Airliner, runway 18", "Preset": "airliner",
-     "RoadStart": v3(RUNWAY_X, 92.0, 1320.0), "RoadEnd": v3(RUNWAY_X, 3.0, RUNWAY_Z0 + 120.0),
-     "SpeedsKmh": [270.0, 250.0], "AccelerationMps2": 1.9, "BrakingMps2": 2.4,
-     "WaitSeconds": 26.0, "StartDelaySeconds": 8.0},
-    # ...and one that does not land: a cruise pass straight over the city, high and fast. This is the
-    # one the whole map is the test of — an aeroplane you hear for half a minute, moving, with five
-    # towers and a tunnel between you and it depending on where you stand.
-    {"Name": "Airliner overhead", "Preset": "airliner",
-     "RoadStart": v3(-620.0, 760.0, -1080.0), "RoadEnd": v3(420.0, 830.0, 1280.0),
-     "SpeedsKmh": [820.0, 780.0], "AccelerationMps2": 1.2, "BrakingMps2": 1.6,
-     "WaitSeconds": 40.0, "StartDelaySeconds": 0.0},
-    # A regional turboprop on the parallel taxiway approach, lower and much slower — the aircraft a
-    # listener can actually follow across the sky.
-    {"Name": "Turboprop, inbound", "Preset": "turboprop",
-     "RoadStart": v3(RUNWAY_X - 40.0, 240.0, 980.0), "RoadEnd": v3(RUNWAY_X, 3.0, RUNWAY_Z0 + 200.0),
-     "SpeedsKmh": [210.0, 180.0], "AccelerationMps2": 1.6, "BrakingMps2": 2.2,
-     "WaitSeconds": 20.0, "StartDelaySeconds": 40.0},
-    # A light single in the circuit, low and slow over the airfield — the only aircraft on this map
-    # you can hear the individual blade passes of.
-    {"Name": "Light single, circuit", "Preset": "piston_single",
-     "RoadStart": v3(RUNWAY_X + 120.0, 210.0, -260.0), "RoadEnd": v3(RUNWAY_X + 120.0, 210.0, 280.0),
-     "SpeedsKmh": [165.0, 150.0, 180.0], "AccelerationMps2": 1.1, "BrakingMps2": 1.4,
-     "WaitSeconds": 6.0, "StartDelaySeconds": 22.0},
     # A helicopter across the city at rooftop height, which is the one aircraft that is ever CLOSE.
     {"Name": "Helicopter, city transit", "Preset": "helicopter",
      "RoadStart": v3(-420.0, 118.0, -240.0), "RoadEnd": v3(300.0, 96.0, 340.0),

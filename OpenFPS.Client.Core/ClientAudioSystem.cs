@@ -475,14 +475,15 @@ public class ClientAudioSystem
         // A fraction of the moving air rides on the listener velocity, so wind produces a subtle Doppler
         // on distant sounds — and a gust now audibly swells and drops it.
         Vector3 listenerVelocity = _state.Velocity + feltWind * 0.1f;
-        // Sitting in something, you face the way it faces. Your own heading only reaches the client as
-        // a correction some ticks after the vehicle turned, so taking the ears' direction from it made
-        // a bus's engine swing round your head through every corner; the vehicle's own rotation
-        // arrives with its position and turns the cabin and your ears together.
+        // Sitting in something, you turn as it turns. Your own heading used to reach the client only
+        // as a correction some ticks after the vehicle turned, which swung a bus's engine round your
+        // head through every corner, so the ears were pinned to the vehicle — and then your own
+        // heading did nothing while you rode. The session now carries your heading round with the
+        // vehicle every frame (ClientGameSession.FollowRide), so the ears follow YOU: turned by the
+        // bus, and still yours to turn in the seat.
         var listenerRotation = _state.Rotation;
         if (_state.IsRiding && world.Entities.TryGetValue(_state.RidingEntityId, out var carrying))
         {
-            listenerRotation = carrying.Transform.Rotation;
             // ...and you move at its speed. A passenger is not predicted, so their own velocity reads
             // zero — which against the vehicle's moving voice is a Doppler shift on your own bus.
             listenerVelocity = carrying.Velocity + feltWind * 0.1f;

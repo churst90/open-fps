@@ -321,6 +321,15 @@ public class OccupancyService
                 return false;
             }
             spot = FindStandingRoom(world, grid, root, session.Entity, from, occupant.BoardedFrom);
+            // Off the way it was going: you step down facing the direction you were carried in,
+            // not whichever way your head happened to be turned in the seat.
+            if (world.Has<Transform>(root))
+            {
+                MathHelper.ToYawPitch(world.Get<Transform>(root).Rotation, out float heading, out _);
+                ref var p = ref world.Get<PlayerComponent>(session.Entity);
+                p.Yaw = heading;
+                world.Get<Transform>(session.Entity).Rotation = Quaternion.CreateFromYawPitchRoll(p.Yaw, p.Pitch, 0f);
+            }
             if (occupant.Controls && world.Has<DriveComponent>(root) && world.Get<DriveComponent>(root).EngineOn)
                 left = " You left the engine running.";
             if (world.Has<OccupancyComponent>(root) && occupant.SeatIndex < world.Get<OccupancyComponent>(root).Seats.Count)

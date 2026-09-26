@@ -141,6 +141,9 @@ public class StreetLifeData
     /// <summary>A car pulls in to the kerb near a door, the driver gets out and goes inside, and
     /// later comes back and drives off — on average this often across the map.</summary>
     public float ParkEverySeconds { get; set; }
+    /// <summary>Somebody on foot fires a few rounds, on average this often across the map: so the
+    /// guns are heard now and then, from wherever that person happens to be.</summary>
+    public float GunfireEverySeconds { get; set; }
 }
 
 public class TrackData

@@ -31,6 +31,7 @@ public static class TapBalanceSpike
             }
             return 0;
         }
+        if (args.Contains("shifts")) return Shifts(names.Where(n => n != "shifts").ToArray());
         if (args.Contains("squeal")) return Squeal(names.Where(n => n != "squeal").ToArray());
         if (args.Contains("whoosh")) return Whoosh(names.Where(n => n != "whoosh").ToArray());
         Console.WriteLine($"{"preset",-22} {"idle rear",9} {"front",7} {"r-f",6}   {"12 m/s rear",11} {"front",7} {"r-f",6}");
@@ -162,6 +163,50 @@ public static class TapBalanceSpike
                 if (db > best) { best = db; bestAll = dbAll; at = i / (float)Rate; }
             }
             Console.WriteLine($"; seed {first} at {hz:F0} Hz: loudest {best:F1} dB at 1 m, {at:F1} s into the stop, whole front tap {bestAll:F1} dB");
+        }
+        return 0;
+    }
+
+    /// <summary>
+    /// The tunnel truck's day: 40 km/h, up to 46 and 54 at 0.8 m/s², down to 40 at 1.03, on the
+    /// network's 20 Hz tick. Prints every gear change with the rpm either side of it.
+    /// </summary>
+    static int Shifts(string[] names)
+    {
+        foreach (var n in names)
+        {
+            var v = VehicleProfile.ByName(n);
+            var voice = new EngineVoiceState(v, Rate, 5961) { TargetSpeed = 40f / 3.6f };
+            voice.PlaceAtSpeed(40f / 3.6f);
+            voice.Revive();
+            var buf = new float[256];
+            float t = 0f, told = 40f / 3.6f;
+            int gear = voice.Driveline.Gear; float rpmBefore = voice.Engine.Rpm;
+            (float until, float kmh, float rate)[] legs = { (15f, 40f, 0.8f), (40f, 46f, 0.8f), (70f, 54f, 0.8f), (110f, 40f, 1.03f) };
+            Console.WriteLine($"{n}:");
+            int changes = 0, from = 0; float low = 0, high = 0, entered = 0;
+            foreach (var leg in legs)
+                while (t < leg.until)
+                {
+                    float want = leg.kmh / 3.6f, step = leg.rate * 0.05f;
+                    if (MathF.Abs(want - told) > 1e-3f && (int)(t * 20f) != (int)((t + 256f / Rate) * 20f))
+                        told += Math.Clamp(want - told, -step, step);
+                    voice.TargetSpeed = told;
+                    voice.Render(buf);
+                    t += 256f / Rate;
+                    int g = voice.Driveline.Gear;
+                    float rpm = voice.Engine.Rpm;
+                    if (g == 0 && gear != 0) { from = gear; low = high = rpm; entered = rpmBefore; }
+                    if (g == 0) { low = MathF.Min(low, rpm); high = MathF.Max(high, rpm); }
+                    if (g != 0 && gear == 0)
+                    {
+                        changes++;
+                        Console.WriteLine($"  {t,6:F1} s  {told * 3.6f,5:F1} km/h  gear {from} -> {g}: {entered,5:F0} rpm, in neutral {low,5:F0}-{high,5:F0}, clutch in at {rpmBefore,5:F0}, then {rpm,5:F0}");
+                    }
+                    gear = g;
+                    rpmBefore = rpm;
+                }
+            Console.WriteLine($"  {changes} shifts in {t:F0} s");
         }
         return 0;
     }

@@ -34,19 +34,21 @@ public class RailAndSignalTests
         var lines = horn.Describe().ToList();
         foreach (var l in lines) _o.WriteLine(l);
 
-        // The five bells of a K5LA are five lengths of brass, and the chord is a consequence.
-        var expect = new[] { 311f, 372f, 416f, 468f, 556f };
+        // The five bells of a K5LA are five lengths of brass, and the chord is a consequence:
+        // D#4 F#4 G#4 B4 D#5 (train-horn.com's K5LA guide).
+        var expect = new[] { 311f, 370f, 415f, 494f, 622f };
         for (int i = 0; i < spec.Bells.Length; i++)
         {
             float hz = spec.Bells[i].Hz;
             Assert.InRange(hz, expect[i] * 0.97f, expect[i] * 1.03f);
         }
-        // ...and they are a minor chord with a fourth in it, which is why it is mournful: the
-        // intervals in semitones from the lowest.
+        // ...a B major sixth over a D# bass: a minor third up to F#, and the top an octave over the
+        // bottom. The intervals in semitones from the lowest.
         var semis = spec.Bells.Select(b => 12f * MathF.Log2(b.Hz / spec.Bells[0].Hz)).ToArray();
         _o.WriteLine("semitones above the lowest: " + string.Join(", ", semis.Select(s => $"{s:F1}")));
         Assert.InRange(semis[1], 2.6f, 3.4f);     // a minor third
-        Assert.InRange(semis[4], 9.6f, 10.4f);    // a minor seventh
+        Assert.InRange(semis[3], 7.6f, 8.4f);     // a minor sixth, B over D#
+        Assert.InRange(semis[4], 11.6f, 12.4f);   // the octave
     }
 
     [Fact]
@@ -173,7 +175,7 @@ public class RailAndSignalTests
     /// <summary>
     /// A K5LA swells into its chord on EVERY blast: the air reaches the fifth bell 40 ms after the
     /// first. The delay used to count from when the horn was built rather than from when the air
-    /// arrived, so only a blast in the first 40 ms of the horn's life ever had it. The top bell's
+    /// arrived, so only a blast in the first 40 ms of the horn's life ever had it. A late bell's
     /// note in the first 30 ms of a second blast is no more than 3 dB above the first blast's.
     /// </summary>
     [Fact]
@@ -181,7 +183,10 @@ public class RailAndSignalTests
     {
         var spec = ChimeHornSpec.NathanK5LA;
         var buf = Blow(new ChimeHorn(spec, Sr, 11), (0.5f, true), (2.5f, false), (0.5f, true));
-        float top = spec.Bells[^1].Hz;
+        // The fourth bell, 30 ms late. Not the fifth: the K5LA's top bell is D#5, an octave over the
+        // D#4 that speaks first, so a filter on its note hears the bottom bell's second harmonic from
+        // the first millisecond and reads that as the chord arriving.
+        float top = spec.Bells[3].Hz;
         double Tone(float fromSec, float sec)
         {
             int a = (int)(fromSec * Sr), n = (int)(sec * Sr);

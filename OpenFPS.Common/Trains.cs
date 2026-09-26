@@ -544,7 +544,7 @@ public sealed record TrainProfile
                 PulseModes = new[] { 27, 15, 9, 5, 3, 1 },
                 InverterLevelDb = 86f, GearLevelDb = 90f, MotorHumDb = 82f, BlowerDb = 76f,
             },
-            HornKey = "two_tone", BellKey = "tram_gong",
+            HornKey = "lrv_two_chime", BellKey = "tram_gong",
         },
         BodyDrumDb = 70f, BodyDrumHz = 60f,
     };

@@ -103,10 +103,11 @@ public sealed record ChimeHornSpec
 
     /// <summary>
     /// The Nathan AirChime K5LA: the five-chime on most Amtrak power and a great many freight
-    /// locomotives, and the sound most people in North America mean by "train horn". Five bells from
-    /// 518 mm down to 282 mm, which come out as a D#-F#-G#-A#-C# — a minor chord with the fourth in
-    /// it, and the reason it is mournful rather than triumphant. The bells are spread across the
-    /// manifold and speak over about forty milliseconds, so it swells into the chord.
+    /// locomotives, and the sound most people in North America mean by "train horn". Five bells tuned
+    /// D#4 F#4 G#4 B4 D#5 (311, 370, 415, 494, 622 Hz): a B major sixth over a D# bass. The top two
+    /// were A#4 and C#5 until 2026-09-25, a D# minor seventh, which is a Leslie S-4T's chord and not
+    /// this horn's (train-horn.com's K3LA/K5LA and Nathan/Leslie guides). The bells are spread across
+    /// the manifold and speak over about forty milliseconds, so it swells into the chord.
     /// </summary>
     public static ChimeHornSpec NathanK5LA => new()
     {
@@ -116,8 +117,8 @@ public sealed record ChimeHornSpec
             new ChimeBellSpec { LengthMetres = 0.518f, MouthDiameterMetres = 0.110f, ThroatDiameterMetres = 0.024f, StartDelaySeconds = 0.000f, LevelTrimDb = 0f },
             new ChimeBellSpec { LengthMetres = 0.431f, MouthDiameterMetres = 0.102f, ThroatDiameterMetres = 0.023f, StartDelaySeconds = 0.012f, LevelTrimDb = -1f },
             new ChimeBellSpec { LengthMetres = 0.383f, MouthDiameterMetres = 0.098f, ThroatDiameterMetres = 0.022f, StartDelaySeconds = 0.020f, LevelTrimDb = -1.5f },
-            new ChimeBellSpec { LengthMetres = 0.338f, MouthDiameterMetres = 0.094f, ThroatDiameterMetres = 0.022f, StartDelaySeconds = 0.030f, LevelTrimDb = -2f },
-            new ChimeBellSpec { LengthMetres = 0.282f, MouthDiameterMetres = 0.088f, ThroatDiameterMetres = 0.021f, StartDelaySeconds = 0.040f, LevelTrimDb = -3f },
+            new ChimeBellSpec { LengthMetres = 0.319f, MouthDiameterMetres = 0.094f, ThroatDiameterMetres = 0.022f, StartDelaySeconds = 0.030f, LevelTrimDb = -2f },
+            new ChimeBellSpec { LengthMetres = 0.249f, MouthDiameterMetres = 0.088f, ThroatDiameterMetres = 0.021f, StartDelaySeconds = 0.040f, LevelTrimDb = -3f },
         },
         SupplyKPa = 965f, ReferenceDb = 139f,
     };
@@ -125,61 +126,87 @@ public sealed record ChimeHornSpec
     /// <summary>
     /// A Leslie three-chime, the other voice of North American railroading: fewer bells, wider
     /// spacing, and a harder edge because the bells are shorter for their mouths. Common on transit
-    /// and on older passenger power.
+    /// and on older passenger power. Leslie numbers its bells by pitch; the RS3L's 25, 31 and 44 sound
+    /// C4, D#4 and A4 (262, 311, 440 Hz — locomotivehorns.info). It was an A-C-E triad three to five
+    /// semitones under that until 2026-09-25.
     /// </summary>
     public static ChimeHornSpec LeslieRS3L => new()
     {
         Name = "Leslie RS3L, three chime",
         Bells = new[]
         {
-            new ChimeBellSpec { LengthMetres = 0.706f, MouthDiameterMetres = 0.125f, ThroatDiameterMetres = 0.026f, StartDelaySeconds = 0f },
-            new ChimeBellSpec { LengthMetres = 0.588f, MouthDiameterMetres = 0.116f, ThroatDiameterMetres = 0.025f, StartDelaySeconds = 0.010f, LevelTrimDb = -1f },
-            new ChimeBellSpec { LengthMetres = 0.459f, MouthDiameterMetres = 0.106f, ThroatDiameterMetres = 0.024f, StartDelaySeconds = 0.022f, LevelTrimDb = -2f },
+            new ChimeBellSpec { LengthMetres = 0.618f, MouthDiameterMetres = 0.125f, ThroatDiameterMetres = 0.026f, StartDelaySeconds = 0f },
+            new ChimeBellSpec { LengthMetres = 0.517f, MouthDiameterMetres = 0.116f, ThroatDiameterMetres = 0.025f, StartDelaySeconds = 0.010f, LevelTrimDb = -1f },
+            new ChimeBellSpec { LengthMetres = 0.358f, MouthDiameterMetres = 0.106f, ThroatDiameterMetres = 0.024f, StartDelaySeconds = 0.022f, LevelTrimDb = -2f },
         },
         SupplyKPa = 965f, ReferenceDb = 137f,
     };
 
     /// <summary>
-    /// A European two-tone: a high and a low a fourth apart, sounded together or alternately. Much
-    /// shorter bells than an American five-chime, so it sits an octave up and cuts rather than
-    /// mourns.
+    /// A European two-tone to UIC 644 / EN 15153-2: 370 Hz and 660 Hz, sounded together or
+    /// alternately. It was 642 and 842 Hz until 2026-09-25, the low tone nine and a half semitones
+    /// over the standard's.
     /// </summary>
     public static ChimeHornSpec TwoToneEuropean => new()
     {
         Name = "two-tone, high and low",
         Bells = new[]
         {
-            new ChimeBellSpec { LengthMetres = 0.243f, MouthDiameterMetres = 0.080f, ThroatDiameterMetres = 0.020f, StartDelaySeconds = 0f },
-            new ChimeBellSpec { LengthMetres = 0.182f, MouthDiameterMetres = 0.072f, ThroatDiameterMetres = 0.019f, StartDelaySeconds = 0.006f, LevelTrimDb = -1f },
+            new ChimeBellSpec { LengthMetres = 0.4365f, MouthDiameterMetres = 0.090f, ThroatDiameterMetres = 0.020f, StartDelaySeconds = 0f },
+            new ChimeBellSpec { LengthMetres = 0.2373f, MouthDiameterMetres = 0.075f, ThroatDiameterMetres = 0.019f, StartDelaySeconds = 0.006f, LevelTrimDb = -1f },
         },
         SupplyKPa = 800f, ReferenceDb = 131f,
     };
 
     /// <summary>
-    /// The pair of trumpets on the roof of a tractor unit, pulled with a lanyard: 0.47 m and 0.35 m,
-    /// a fifth apart, on 120 psi of the same air that works the brakes. Less pressure and smaller
-    /// mouths than a locomotive's, so it is louder in the top than at the bottom and carries nothing
-    /// like as far.
+    /// A North American light-rail vehicle's horn: a small two-chime on the car's own air, D#4 and
+    /// A4 (311 and 440 Hz), the pairing of the Leslie S-2M that transit work has long used. Reported:
+    /// the light rail's horn was higher than it should be — it had the European two-tone at 642 and
+    /// 842 Hz. No maker's figure was found for the S70, SD160 or Flexity; this is the documented
+    /// transit horn, and the European urban-rail standard (EN 15153-4) puts its low tone at 370.
+    /// </summary>
+    public static ChimeHornSpec LightRailTwoChime => new()
+    {
+        Name = "light rail, two chime",
+        Bells = new[]
+        {
+            new ChimeBellSpec { LengthMetres = 0.5213f, MouthDiameterMetres = 0.100f, ThroatDiameterMetres = 0.021f, StartDelaySeconds = 0f },
+            new ChimeBellSpec { LengthMetres = 0.3628f, MouthDiameterMetres = 0.090f, ThroatDiameterMetres = 0.020f, StartDelaySeconds = 0.008f, LevelTrimDb = -1f },
+        },
+        SupplyKPa = 760f, ReferenceDb = 124f,
+    };
+
+    /// <summary>
+    /// The pair of trumpets on the roof of a tractor unit, pulled with a lanyard, on 120 psi of the
+    /// same air that works the brakes. Less pressure than a locomotive's, so it is louder in the top
+    /// than at the bottom and carries nothing like as far.
+    ///
+    /// Pitched at 173 and 228 Hz. Real roof trumpets are 0.55-0.95 m long (Grover's common pair is
+    /// 24.5 and 21.5 in) and speak around 150-250 Hz; Leslie's own table puts a 24.9 in Tyfon at
+    /// 156 Hz. It was 346 and 457 Hz until 2026-09-25 — an octave up, as heard. A reed horn with a
+    /// flare speaks nearer c/3L than the c/2L of a plain cone, so these lengths are the model's
+    /// EFFECTIVE lengths for the measured notes, not the metal.
     /// </summary>
     public static ChimeHornSpec TruckDualTrumpet => new()
     {
         Name = "tractor unit, dual trumpet",
         Bells = new[]
         {
-            new ChimeBellSpec { LengthMetres = 0.470f, MouthDiameterMetres = 0.086f, ThroatDiameterMetres = 0.020f, StartDelaySeconds = 0f },
-            new ChimeBellSpec { LengthMetres = 0.352f, MouthDiameterMetres = 0.078f, ThroatDiameterMetres = 0.019f, StartDelaySeconds = 0.004f, LevelTrimDb = -1.5f },
+            new ChimeBellSpec { LengthMetres = 0.952f, MouthDiameterMetres = 0.130f, ThroatDiameterMetres = 0.022f, StartDelaySeconds = 0f },
+            new ChimeBellSpec { LengthMetres = 0.715f, MouthDiameterMetres = 0.120f, ThroatDiameterMetres = 0.021f, StartDelaySeconds = 0.004f, LevelTrimDb = -1.5f },
         },
         SupplyKPa = 827f, ReferenceDb = 126f, ReedOpenFraction = 0.30f,
         RiseSeconds = 0.02f, FallSeconds = 0.025f,
     };
 
-    /// <summary>A transit bus: one small trumpet under the front, on the brake system's air.</summary>
+    /// <summary>A transit bus: one small trumpet under the front, on the brake system's air. 400 Hz,
+    /// in the 340-440 Hz of a bus's electric horn and well under the 534 it was (2026-09-25).</summary>
     public static ChimeHornSpec BusAirHorn => new()
     {
         Name = "transit bus, single trumpet",
         Bells = new[]
         {
-            new ChimeBellSpec { LengthMetres = 0.300f, MouthDiameterMetres = 0.070f, ThroatDiameterMetres = 0.018f, StartDelaySeconds = 0f },
+            new ChimeBellSpec { LengthMetres = 0.408f, MouthDiameterMetres = 0.070f, ThroatDiameterMetres = 0.018f, StartDelaySeconds = 0f },
         },
         SupplyKPa = 760f, ReferenceDb = 118f, ReedOpenFraction = 0.30f,
         RiseSeconds = 0.02f, FallSeconds = 0.025f,
@@ -191,6 +218,7 @@ public sealed record ChimeHornSpec
             ["k5la"] = () => NathanK5LA,
             ["rs3l"] = () => LeslieRS3L,
             ["two_tone"] = () => TwoToneEuropean,
+            ["lrv_two_chime"] = () => LightRailTwoChime,
             ["truck_dual"] = () => TruckDualTrumpet,
             ["bus_horn"] = () => BusAirHorn,
         };

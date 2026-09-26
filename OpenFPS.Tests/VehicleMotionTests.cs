@@ -687,6 +687,36 @@ public class VehicleMotionTests : IDisposable
         for (int i = 0; i < ticks; i++) { _tick++; rig.Tick(); }
     }
 
+    /// <summary>
+    /// "Every now and then have an npc fire a couple round." Somebody walking fires two or three
+    /// rounds at about the declared rate, each the weapon's own synthesis at the cartridge's level —
+    /// and it is the walker who fires, never the traffic.
+    /// </summary>
+    [Fact]
+    public void SomebodyWalkingFiresAFewRoundsNowAndThen()
+    {
+        var walker = new VehicleData
+        {
+            Name = "Walker", Preset = "walker", RoadStart = new Vector3(20, 0.1f, 0), RoadEnd = new Vector3(20, 0.1f, 100),
+            SpeedsKmh = new[] { 5f }, AccelerationMps2 = 1f, BrakingMps2 = 1f,
+        };
+        var rig = Build(Circle(60f), Car(topKmh: 50f, corneringG: 1.0f),
+                        life: new StreetLifeData { GunfireEverySeconds = 10f }, more: new List<VehicleData> { walker });
+        var heard = new List<(int Id, string Label, TransientSound Sound)>();
+        rig.Vehicles.Heard = (map, id, label, sounds) => { foreach (var x in sounds) heard.Add((id, label, x)); };
+        Run(rig, 30 * 300);
+        var shots = heard.FindAll(h => h.Sound.SynthKey.StartsWith("weapon:"));
+        // Thirty bursts expected in five minutes, two or three rounds each; random, so a band.
+        Assert.InRange(shots.Count, 30, 130);
+        Assert.Single(shots.Select(h => h.Id).Distinct());
+        Assert.DoesNotContain(heard, h => h.Label == "horn");
+        foreach (var s in shots)
+        {
+            var gun = OpenFPS.Common.WeaponRegistry.All.First(w => "weapon:" + w.Id == s.Sound.SynthKey);
+            Assert.Equal(OpenFPS.Common.Loudness.MuzzleBlastDb(gun), s.Sound.LevelDb);
+        }
+    }
+
     /// <summary>Horns at about the declared mean interval, from more than one vehicle, each carrying its
     /// horn's own level, its pattern's length and a key the client can play, just above the car.</summary>
     [Fact]

@@ -823,13 +823,22 @@ public sealed class EngineVoiceState : IRenderedVoice
         Driveline.Teleport(_speedSmooth);
         Driver.TargetSpeed = _speedSmooth;
 
-        // The highest gear that keeps the engine under its upshift point — what a driver would be in.
+        // The highest gear that keeps the engine under its upshift point and over the point the
+        // driver would change down at — what a driver would be in. Without the second condition a
+        // truck placed at 40 km/h went in eighth at 600 rpm and changed down twice the moment its
+        // voice started, which is a burst of shifts every time a truck came within earshot.
         var gb = Vehicle.Gearbox;
-        int gear = 1;
-        for (int g = gb.TopGear; g >= 1; g--)
+        float downAt = MathF.Max(gb.DownshiftRpm, Vehicle.Engine.IdleRpm * 1.5f) * 1.1f;
+        int gear = 0;
+        for (int g = gb.TopGear; g >= 1 && gear == 0; g--)
         {
-            if (gb.RpmFor(_speedSmooth, g) <= gb.UpshiftRpm) { gear = g; break; }
+            float r = gb.RpmFor(_speedSmooth, g);
+            if (r <= gb.UpshiftRpm && r >= downAt) gear = g;
         }
+        if (gear == 0)
+            for (int g = gb.TopGear; g >= 1; g--)
+                if (gb.RpmFor(_speedSmooth, g) <= gb.UpshiftRpm) { gear = g; break; }
+        if (gear == 0) gear = 1;
         Driveline.Gear = gear;
         Driveline.Clutch = 1f;
         float rpm = MathF.Max(Vehicle.Engine.IdleRpm, gb.RpmFor(_speedSmooth, gear));

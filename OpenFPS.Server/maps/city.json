@@ -2625,7 +2625,8 @@
  "StreetLife": {
   "HornEverySeconds": 15,
   "HardBrakeEverySeconds": 60,
-  "ParkEverySeconds": 90
+  "ParkEverySeconds": 90,
+  "GunfireEverySeconds": 120
  },
  "Vehicles": [
   {
@@ -3178,95 +3179,6 @@
    "BrakingMps2": 1.2,
    "WaitSeconds": 12.0,
    "StartDelaySeconds": 0.0
-  },
-  {
-   "Name": "Airliner, runway 18",
-   "Preset": "airliner",
-   "RoadStart": {
-    "X": 380.0,
-    "Y": 92.0,
-    "Z": 1320.0
-   },
-   "RoadEnd": {
-    "X": 380.0,
-    "Y": 3.0,
-    "Z": -168.0
-   },
-   "SpeedsKmh": [
-    270.0,
-    250.0
-   ],
-   "AccelerationMps2": 1.9,
-   "BrakingMps2": 2.4,
-   "WaitSeconds": 26.0,
-   "StartDelaySeconds": 8.0
-  },
-  {
-   "Name": "Airliner overhead",
-   "Preset": "airliner",
-   "RoadStart": {
-    "X": -620.0,
-    "Y": 760.0,
-    "Z": -1080.0
-   },
-   "RoadEnd": {
-    "X": 420.0,
-    "Y": 830.0,
-    "Z": 1280.0
-   },
-   "SpeedsKmh": [
-    820.0,
-    780.0
-   ],
-   "AccelerationMps2": 1.2,
-   "BrakingMps2": 1.6,
-   "WaitSeconds": 40.0,
-   "StartDelaySeconds": 0.0
-  },
-  {
-   "Name": "Turboprop, inbound",
-   "Preset": "turboprop",
-   "RoadStart": {
-    "X": 340.0,
-    "Y": 240.0,
-    "Z": 980.0
-   },
-   "RoadEnd": {
-    "X": 380.0,
-    "Y": 3.0,
-    "Z": -88.0
-   },
-   "SpeedsKmh": [
-    210.0,
-    180.0
-   ],
-   "AccelerationMps2": 1.6,
-   "BrakingMps2": 2.2,
-   "WaitSeconds": 20.0,
-   "StartDelaySeconds": 40.0
-  },
-  {
-   "Name": "Light single, circuit",
-   "Preset": "piston_single",
-   "RoadStart": {
-    "X": 500.0,
-    "Y": 210.0,
-    "Z": -260.0
-   },
-   "RoadEnd": {
-    "X": 500.0,
-    "Y": 210.0,
-    "Z": 280.0
-   },
-   "SpeedsKmh": [
-    165.0,
-    150.0,
-    180.0
-   ],
-   "AccelerationMps2": 1.1,
-   "BrakingMps2": 1.4,
-   "WaitSeconds": 6.0,
-   "StartDelaySeconds": 22.0
   },
   {
    "Name": "Helicopter, city transit",

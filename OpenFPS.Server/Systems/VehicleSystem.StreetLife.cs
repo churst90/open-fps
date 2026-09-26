@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Numerics;
 using Arch.Core;
 using OpenFPS.Common;
@@ -33,6 +34,7 @@ public sealed partial class VehicleSystem
     private readonly Random _streetRng = new(20260923);
     private readonly List<(string Map, DemoVehicle V, double At, float[] Pattern)> _pendingHonks = new();
     private readonly Dictionary<string, double> _streetClocks = new(StringComparer.OrdinalIgnoreCase);
+    private readonly List<(string Map, DemoVehicle V, double At, WeaponDefinition Gun, float Yaw)> _pendingShots = new();
 
     /// <summary>Below this a car is not going fast enough for braking hard to be an event.</summary>
     private const float HardBrakeMinSpeed = 8f;
@@ -66,6 +68,32 @@ public sealed partial class VehicleSystem
 
         MaybePark(mapId, world, life, dt, clock);
 
+        // Somebody on the pavement fires two or three rounds. Picked from the people walking, so
+        // it comes from wherever they are — the street you are on, or three blocks over.
+        if (Chance(life.GunfireEverySeconds, dt)
+            && Pick(mapId, world, v => v.Preset.Equals("walker", StringComparison.OrdinalIgnoreCase), streetOnly: false) is { } shooter)
+        {
+            var guns = WeaponRegistry.All.ToList();
+            var gun = guns[_streetRng.Next(guns.Count)];
+            int rounds = 2 + _streetRng.Next(2);
+            float yaw = (float)(_streetRng.NextDouble() * Math.PI * 2);
+            double at = clock;
+            for (int r = 0; r < rounds; r++)
+            {
+                _pendingShots.Add((mapId, shooter, at, gun, yaw));
+                // A self-loader fired as fast as a finger goes, a pump or a pistol a little slower.
+                at += 0.14 + 0.4 * _streetRng.NextDouble();
+            }
+            Log.Information("Street: {Name} fires {Rounds} rounds from a {Gun}.", shooter.DisplayName, rounds, gun.DisplayName);
+        }
+        for (int i = _pendingShots.Count - 1; i >= 0; i--)
+        {
+            var p = _pendingShots[i];
+            if (p.Map != mapId || clock < p.At) continue;
+            _pendingShots.RemoveAt(i);
+            if (world.IsAlive(p.V.Entity)) Shoot(mapId, world, p.V, p.Gun, p.Yaw);
+        }
+
         for (int i = _pendingHonks.Count - 1; i >= 0; i--)
         {
             var p = _pendingHonks[i];
@@ -73,6 +101,29 @@ public sealed partial class VehicleSystem
             _pendingHonks.RemoveAt(i);
             if (world.IsAlive(p.V.Entity)) Honk(mapId, world, p.V, p.Pattern);
         }
+    }
+
+    /// <summary>
+    /// One round, the way a player's is sent (CommandHandler.HandleFire): the weapon's own synthesis
+    /// at the muzzle, a metre and a half up and half a metre out, at the cartridge's blast level. The
+    /// world's reflections and reverb make the place.
+    /// </summary>
+    private void Shoot(string mapId, World world, DemoVehicle v, WeaponDefinition gun, float yaw)
+    {
+        if (Heard == null) return;
+        var forward = new Vector3(MathF.Sin(yaw), 0f, MathF.Cos(yaw));
+        var muzzle = world.Get<Transform>(v.Entity).Position + new Vector3(0f, 1.5f, 0f) + forward * 0.5f;
+        Heard(mapId, v.Entity.Id, gun.DisplayName, new[]
+        {
+            new TransientSound
+            {
+                Character = SoundCharacter.Knock,
+                Position = muzzle,
+                LevelDb = Loudness.MuzzleBlastDb(gun),
+                SynthKey = "weapon:" + gun.Id,
+                DecaySeconds = 0.6f,
+            },
+        });
     }
 
     /// <summary>An emergency stop down to <paramref name="toSpeed"/>, at what the tyres will give.</summary>
@@ -95,13 +146,15 @@ public sealed partial class VehicleSystem
     private bool Chance(float everySeconds, float dt)
         => everySeconds > 0f && _streetRng.NextDouble() < dt / everySeconds;
 
-    private DemoVehicle? Pick(string mapId, World world, Func<DemoVehicle, bool> eligible)
+    /// <param name="streetOnly">Only the traffic (the default); false lets the people walking be
+    /// chosen, who are not traffic and never honk or park.</param>
+    private DemoVehicle? Pick(string mapId, World world, Func<DemoVehicle, bool> eligible, bool streetOnly = true)
     {
         int count = 0;
         DemoVehicle? chosen = null;
         foreach (var v in _vehicles)
         {
-            if (v.MapId != mapId || !v.OnStreet || !world.IsAlive(v.Entity) || !eligible(v)) continue;
+            if (v.MapId != mapId || (streetOnly && !v.OnStreet) || !world.IsAlive(v.Entity) || !eligible(v)) continue;
             // Reservoir sampling: every eligible vehicle equally likely, in one pass.
             if (_streetRng.Next(++count) == 0) chosen = v;
         }
