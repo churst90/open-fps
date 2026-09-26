@@ -296,7 +296,13 @@ public sealed class WorldAudioPlayer
                 // between two buildings sounded fired in a hall ("gunshots sound odd with the
                 // reverb"). Indoors the copies are too dense to hear apart and the reverb is right;
                 // a sustained sound's late field is the reverb's everywhere.
-                EnableReverb = !(IsImpulse(item.Sound) && !ListenerEnclosed(world, listenerPosition)),
+                //
+                // That was the ROOM algorithm. Traced, the tail is the street's own response —
+                // the facades handing the shot back again and again, the sky taking the rest — and
+                // it is what a real shot between buildings rolls on with: "I don't hear many echos".
+                // So in traced mode an outdoor impulse goes to it; in room mode it still does not.
+                EnableReverb = !(IsImpulse(item.Sound) && !ListenerEnclosed(world, listenerPosition))
+                               || OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.TracedActive,
                 // An EVENT: it belongs to a moment. If the budget has no room for it now there is no
                 // playing it later — see VoiceManager.Process, which drops one that did not win a slot
                 // rather than keeping it queued to fire from a stale position minutes afterwards.

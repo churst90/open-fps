@@ -223,8 +223,11 @@ public sealed class EngineReflections
     /// just submitted for the engine itself; the echoes copy its placement so they attenuate with
     /// distance the same way, and carry only the surface's own share in their volume.
     /// </summary>
+    /// <param name="traced">The source's echoes are traced from where it is (FmodAudioProvider
+    /// .HasTracedEchoes): its mirror images fade out, since the trace has them and every order past
+    /// them.</param>
     public void Update(int entityId, in SpatialEmitter direct, in AcousticPathData directPath,
-                       Vector3 listener, float speedOfSound, float dt, AudioEngineFacade audio)
+                       Vector3 listener, float speedOfSound, float dt, AudioEngineFacade audio, bool traced = false)
     {
         if (_surfaces.Count == 0) return;
         if (!_voices.TryGetValue(entityId, out var mine)) _voices[entityId] = mine = new Dictionary<int, Echo>();
@@ -233,7 +236,7 @@ public sealed class EngineReflections
         Vector3 source = direct.Position;
         float directDist = MathF.Max(1f, Vector3.Distance(source, listener));
 
-        int want = Math.Clamp(EchoesPerEngine, 0, MaxEchoesPerEngine);
+        int want = traced ? 0 : Math.Clamp(EchoesPerEngine, 0, MaxEchoesPerEngine);
         if (want == 0 && mine.Count == 0) return;
         Span<Reflection> found = stackalloc Reflection[MaxEchoesPerEngine];
         int n = want == 0 ? 0 : Math.Min(want, FirstOrderNear(source, listener, speedOfSound, found, nearestPart: false));

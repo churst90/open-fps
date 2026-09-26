@@ -2631,7 +2631,7 @@
  },
  "Vehicles": [
   {
-   "Name": "Civic 1",
+   "Name": "Hatchback 1",
    "Preset": "i4_economy",
    "Track": "downtown_cw",
    "TopSpeedKmh": 52.0,
@@ -2643,10 +2643,10 @@
    "StartOffsetMetres": 0.0
   },
   {
-   "Name": "Hatchback 2",
-   "Preset": "i4_economy",
+   "Name": "Compact 2",
+   "Preset": "i4_compact",
    "Track": "downtown_cw",
-   "TopSpeedKmh": 50.0,
+   "TopSpeedKmh": 52.0,
    "CorneringG": 0.48,
    "GripG": 0.85,
    "AccelerationMps2": 2.2,
@@ -2655,7 +2655,7 @@
    "StartOffsetMetres": 96.0
   },
   {
-   "Name": "Saloon 3",
+   "Name": "Sedan 3",
    "Preset": "v6",
    "Track": "downtown_cw",
    "TopSpeedKmh": 50.0,
@@ -2667,11 +2667,11 @@
    "StartOffsetMetres": 192.0
   },
   {
-   "Name": "Wagon 4",
-   "Preset": "boxer4",
+   "Name": "Sport compact 4",
+   "Preset": "i4_sport_street",
    "Track": "downtown_cw",
-   "TopSpeedKmh": 50.0,
-   "CorneringG": 0.46,
+   "TopSpeedKmh": 56.0,
+   "CorneringG": 0.52,
    "GripG": 0.85,
    "AccelerationMps2": 2.2,
    "BrakingMps2": 2.92,
@@ -2679,19 +2679,7 @@
    "StartOffsetMetres": 288.0
   },
   {
-   "Name": "Muscle car 5",
-   "Preset": "charger440",
-   "Track": "downtown_cw",
-   "TopSpeedKmh": 58.0,
-   "CorneringG": 0.55,
-   "GripG": 0.85,
-   "AccelerationMps2": 2.2,
-   "BrakingMps2": 2.92,
-   "LaneOffsetMetres": 1.8,
-   "StartOffsetMetres": 384.0
-  },
-  {
-   "Name": "Police car 6",
+   "Name": "Police car 5",
    "Preset": "police_interceptor",
    "Track": "downtown_cw",
    "TopSpeedKmh": 62.0,
@@ -2700,34 +2688,10 @@
    "AccelerationMps2": 2.2,
    "BrakingMps2": 2.92,
    "LaneOffsetMetres": 1.8,
-   "StartOffsetMetres": 480.0
+   "StartOffsetMetres": 384.0
   },
   {
-   "Name": "Pickup 7",
-   "Preset": "pickup_v8",
-   "Track": "downtown_cw",
-   "TopSpeedKmh": 50.0,
-   "CorneringG": 0.42,
-   "GripG": 0.75,
-   "AccelerationMps2": 2.2,
-   "BrakingMps2": 2.58,
-   "LaneOffsetMetres": 1.8,
-   "StartOffsetMetres": 576.0
-  },
-  {
-   "Name": "Power Stroke 8",
-   "Preset": "powerstroke73",
-   "Track": "downtown_cw",
-   "TopSpeedKmh": 48.0,
-   "CorneringG": 0.4,
-   "GripG": 0.75,
-   "AccelerationMps2": 2.2,
-   "BrakingMps2": 2.58,
-   "LaneOffsetMetres": 1.8,
-   "StartOffsetMetres": 672.0
-  },
-  {
-   "Name": "Twin-turbo Cummins 9",
+   "Name": "Twin-turbo Cummins 6",
    "Preset": "cummins_compound",
    "Track": "downtown_cw",
    "TopSpeedKmh": 52.0,
@@ -2735,6 +2699,42 @@
    "GripG": 0.75,
    "AccelerationMps2": 2.2,
    "BrakingMps2": 2.58,
+   "LaneOffsetMetres": 1.8,
+   "StartOffsetMetres": 480.0
+  },
+  {
+   "Name": "Mid-size 7",
+   "Preset": "i4_midsize",
+   "Track": "downtown_cw",
+   "TopSpeedKmh": 50.0,
+   "CorneringG": 0.46,
+   "GripG": 0.85,
+   "AccelerationMps2": 2.2,
+   "BrakingMps2": 2.92,
+   "LaneOffsetMetres": 1.8,
+   "StartOffsetMetres": 576.0
+  },
+  {
+   "Name": "Flat-four 8",
+   "Preset": "boxer4_street",
+   "Track": "downtown_cw",
+   "TopSpeedKmh": 54.0,
+   "CorneringG": 0.5,
+   "GripG": 0.85,
+   "AccelerationMps2": 2.2,
+   "BrakingMps2": 2.92,
+   "LaneOffsetMetres": 1.8,
+   "StartOffsetMetres": 672.0
+  },
+  {
+   "Name": "Hatchback 9",
+   "Preset": "i4_economy",
+   "Track": "downtown_cw",
+   "TopSpeedKmh": 50.0,
+   "CorneringG": 0.48,
+   "GripG": 0.85,
+   "AccelerationMps2": 2.2,
+   "BrakingMps2": 2.92,
    "LaneOffsetMetres": 1.8,
    "StartOffsetMetres": 768.0
   },
@@ -2751,8 +2751,8 @@
    "StartOffsetMetres": 864.0
   },
   {
-   "Name": "Civic 11",
-   "Preset": "i4_economy",
+   "Name": "Compact 11",
+   "Preset": "i4_compact",
    "Track": "downtown_ccw",
    "TopSpeedKmh": 52.0,
    "CorneringG": 0.48,
@@ -2763,7 +2763,7 @@
    "StartOffsetMetres": 40.0
   },
   {
-   "Name": "Hot hatch 12",
+   "Name": "Turbo hatch 12",
    "Preset": "i4_turbo",
    "Track": "downtown_ccw",
    "TopSpeedKmh": 56.0,
@@ -2787,11 +2787,11 @@
    "StartOffsetMetres": 260.0
   },
   {
-   "Name": "Muscle car 14",
-   "Preset": "v8_glasspack",
+   "Name": "Sport saloon 14",
+   "Preset": "i6_street",
    "Track": "downtown_ccw",
-   "TopSpeedKmh": 58.0,
-   "CorneringG": 0.55,
+   "TopSpeedKmh": 54.0,
+   "CorneringG": 0.5,
    "GripG": 0.85,
    "AccelerationMps2": 2.2,
    "BrakingMps2": 2.92,
@@ -2799,26 +2799,26 @@
    "StartOffsetMetres": 370.0
   },
   {
-   "Name": "Pickup 15",
-   "Preset": "pickup_v8_flowmaster",
+   "Name": "Hatchback 15",
+   "Preset": "i4_economy",
    "Track": "downtown_ccw",
    "TopSpeedKmh": 50.0,
-   "CorneringG": 0.42,
-   "GripG": 0.75,
+   "CorneringG": 0.48,
+   "GripG": 0.85,
    "AccelerationMps2": 2.2,
-   "BrakingMps2": 2.58,
+   "BrakingMps2": 2.92,
    "LaneOffsetMetres": 1.8,
    "StartOffsetMetres": 480.0
   },
   {
-   "Name": "Diesel pickup 16",
-   "Preset": "diesel_i4",
+   "Name": "Mid-size 16",
+   "Preset": "i4_midsize",
    "Track": "downtown_ccw",
-   "TopSpeedKmh": 46.0,
-   "CorneringG": 0.4,
-   "GripG": 0.75,
+   "TopSpeedKmh": 50.0,
+   "CorneringG": 0.46,
+   "GripG": 0.85,
    "AccelerationMps2": 2.2,
-   "BrakingMps2": 2.58,
+   "BrakingMps2": 2.92,
    "LaneOffsetMetres": 1.8,
    "StartOffsetMetres": 590.0
   },
@@ -2835,14 +2835,14 @@
    "StartOffsetMetres": 700.0
   },
   {
-   "Name": "Box truck 18",
-   "Preset": "diesel_truck",
+   "Name": "Compact 18",
+   "Preset": "i4_compact",
    "Track": "downtown_ccw",
-   "TopSpeedKmh": 38.0,
-   "CorneringG": 0.3,
-   "GripG": 0.7,
-   "AccelerationMps2": 2.06,
-   "BrakingMps2": 2.4,
+   "TopSpeedKmh": 50.0,
+   "CorneringG": 0.48,
+   "GripG": 0.85,
+   "AccelerationMps2": 2.2,
+   "BrakingMps2": 2.92,
    "LaneOffsetMetres": 1.8,
    "StartOffsetMetres": 810.0
   },
@@ -2860,7 +2860,7 @@
   },
   {
    "Name": "City bus 1",
-   "Preset": "school_bus_na",
+   "Preset": "transit_bus",
    "Track": "north_block",
    "TopSpeedKmh": 40.0,
    "CorneringG": 0.28,
@@ -2895,11 +2895,11 @@
    "StartOffsetMetres": 260.0
   },
   {
-   "Name": "Muscle car, big cam",
-   "Preset": "v8_bigcam",
+   "Name": "Sedan, north block",
+   "Preset": "i4_midsize",
    "Track": "north_block",
-   "TopSpeedKmh": 56.0,
-   "CorneringG": 0.55,
+   "TopSpeedKmh": 50.0,
+   "CorneringG": 0.46,
    "GripG": 0.85,
    "AccelerationMps2": 2.2,
    "BrakingMps2": 2.92,
@@ -2907,7 +2907,31 @@
    "StartOffsetMetres": 380.0
   },
   {
-   "Name": "Civic, Elm Street",
+   "Name": "Sports bike",
+   "Preset": "sportbike",
+   "Track": "north_block",
+   "TopSpeedKmh": 56.0,
+   "CorneringG": 0.6,
+   "GripG": 0.9,
+   "AccelerationMps2": 2.2,
+   "BrakingMps2": 3.09,
+   "LaneOffsetMetres": 3.4,
+   "StartOffsetMetres": 460.0
+  },
+  {
+   "Name": "Dirt bike",
+   "Preset": "single",
+   "Track": "downtown_cw",
+   "TopSpeedKmh": 50.0,
+   "CorneringG": 0.6,
+   "GripG": 0.9,
+   "AccelerationMps2": 2.2,
+   "BrakingMps2": 3.09,
+   "LaneOffsetMetres": 3.4,
+   "StartOffsetMetres": 968.0
+  },
+  {
+   "Name": "Hatchback, Elm Street",
    "Preset": "i4_economy",
    "Track": "estate",
    "TopSpeedKmh": 30.0,
@@ -2919,7 +2943,7 @@
    "StartOffsetMetres": 0.0
   },
   {
-   "Name": "Wagon, Elm Street",
+   "Name": "Sedan, Elm Street",
    "Preset": "v6",
    "Track": "estate",
    "TopSpeedKmh": 30.0,
@@ -2931,8 +2955,8 @@
    "StartOffsetMetres": 180.0
   },
   {
-   "Name": "Pickup, Elm Street",
-   "Preset": "diesel_i4",
+   "Name": "Compact, Elm Street",
+   "Preset": "i4_compact",
    "Track": "estate",
    "TopSpeedKmh": 30.0,
    "CorneringG": 0.35,
@@ -3431,7 +3455,7 @@
   },
   {
    "Name": "Southgate van",
-   "Preset": "diesel_i4",
+   "Preset": "step_van",
    "Track": "southgate",
    "TopSpeedKmh": 48.0,
    "CorneringG": 0.48,
@@ -3466,8 +3490,8 @@
    "StartOffsetMetres": 260.0
   },
   {
-   "Name": "Southgate pickup",
-   "Preset": "diesel_cummins_na",
+   "Name": "Southgate mid-size",
+   "Preset": "i4_midsize",
    "Track": "southgate",
    "TopSpeedKmh": 48.0,
    "CorneringG": 0.48,
@@ -3478,8 +3502,8 @@
    "StartOffsetMetres": 190.0
   },
   {
-   "Name": "Southgate truck",
-   "Preset": "diesel_truck",
+   "Name": "Southgate mail truck",
+   "Preset": "mail_truck",
    "Track": "southgate",
    "TopSpeedKmh": 48.0,
    "CorneringG": 0.48,
@@ -90910,7 +90934,7 @@
    "Owner": ""
   },
   {
-   "TemplateId": "vehicle:diesel_i4",
+   "TemplateId": "vehicle:i4_compact",
    "Position": {
     "X": -16.0,
     "Y": 0.25,
@@ -90925,7 +90949,7 @@
    "Owner": ""
   },
   {
-   "TemplateId": "vehicle:v8_muscle",
+   "TemplateId": "vehicle:i4_turbo",
    "Position": {
     "X": -16.0,
     "Y": 0.25,

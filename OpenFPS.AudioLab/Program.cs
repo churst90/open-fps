@@ -138,6 +138,19 @@ if (args.Contains("--sim-pathing"))
     Environment.Exit(code);
 }
 
+if (args.Contains("--dsp-order"))
+{
+    int code = DspOrderSpike.Run();
+    Environment.Exit(code);
+}
+
+if (args.Contains("--traced-echoes"))
+{
+    int code = OpenFPS.Client.Core.AudioEngine.SteamAudio.TracedEchoesSpike.Run();
+    Log.CloseAndFlush();
+    Environment.Exit(code);
+}
+
 if (args.Contains("--traced-reverb"))
 {
     int code = OpenFPS.Client.Core.AudioEngine.SteamAudio.TracedReverbSpike.Run();

@@ -519,6 +519,7 @@ public sealed class EngineVoiceState : IRenderedVoice
             catch (Exception ex) { Serilog.Log.Warning("Vehicle '{Name}': air system '{Air}' — {Err}", v.Name, v.AirSystem, ex.Message); }
         }
         _bayLeak = Math.Clamp(v.EngineBayLeakage, 0f, 1f);
+        _engineAtRear = v.EngineAtRear;
         _bayIntake = new EchoDiffuser(BayScattering, seed + 71, sampleRate);
         _radiation = new OpenFPS.Client.AudioEngine.Core.Engine.ExhaustRadiation(v, sampleRate);
         // Drums on anything heavy enough to need them; discs on the rest.
@@ -671,6 +672,7 @@ public sealed class EngineVoiceState : IRenderedVoice
     /// not the grille's waveform a second time.
     /// </summary>
     private readonly EchoDiffuser _bayIntake;
+    private readonly bool _engineAtRear;
     /// <summary>Which way the tailpipe throws its sound and what the body does to it, for where the
     /// listener is. See ExhaustRadiation.</summary>
     private readonly OpenFPS.Client.AudioEngine.Core.Engine.ExhaustRadiation _radiation;
@@ -691,7 +693,7 @@ public sealed class EngineVoiceState : IRenderedVoice
     /// <summary>Is a point this far along the vehicle (its own frame, +Z forward) nearer the front
     /// outlet than the back one?</summary>
     internal static bool NearerFront(VehicleProfile v, float z)
-        => MathF.Abs(z - v.IntakeOffsetZ) < MathF.Abs(z - v.ExhaustOffsetZ);
+        => MathF.Abs(z - v.FrontTapZ) < MathF.Abs(z - v.ExhaustOffsetZ);
     /// <summary>How rough the bay is to the intake noise: a cluttered cavity, about brick
     /// (EchoDiffuser's scale; roughly six milliseconds of smear).</summary>
     private const float BayScattering = 0.5f;
@@ -934,8 +936,7 @@ public sealed class EngineVoiceState : IRenderedVoice
             float tyreFront = VehicleSynth.Tyre(Vehicle.Tyres, Driveline.Speed, RoadSlip + _tyreChirp, _rng, ref _tyreFront, _rollingFrontPa);
             float rearTyre = tyreRear * PerAxle * TyreMix;
             float frontTyre = tyreFront * PerAxle * TyreMix;
-            // The front of the machine: the airbox, which breathes to the outside through the
-            // grille, and the tyres at that end.
+            // The front of the machine: the tyres at that end, the fan, and what the bay lets out.
             //
             // The BLOCK used to be in here as well, at 0.4 — and then again in the bay leak below.
             // Two routes out of the engine for one mechanism, one of them declared per vehicle from
@@ -949,7 +950,17 @@ public sealed class EngineVoiceState : IRenderedVoice
             // One mechanism, one route: the block gets outside through the bay, and how much of it
             // does is VehicleProfile.EngineBayLeakage, which every vehicle now declares from what is
             // actually around its engine.
-            float front = Engine.Intake * FrontMix + frontTyre;
+            //
+            // The INTAKE was the same mistake a second time. Its mouth went straight out of the
+            // front at the full orifice level, as if there were no bonnet over it, and then again
+            // through the bay. "The muscle car front end, I can really hear the air intake": at full
+            // throttle the intake was 10-18 dB of the front of every V8, and on a stock V6 it was
+            // what the front of the car sounded like. A snorkel draws from inside the wing or behind
+            // the grille, under the same bonnet as the block, and pass-by source separations find
+            // the block, not the intake, dominating a car's front microphone (ISMA 2014). So it
+            // leaves the way the block does, through the bay; a bike, with no bay, lets all of it out.
+            float front = frontTyre;
+            float fanOut = 0f;
             if (_fan != null)
             {
                 // The fan is geared to the crank and has no throttle: it turns at engine speed through
@@ -964,11 +975,15 @@ public sealed class EngineVoiceState : IRenderedVoice
                                       ? new Vector3(Volatile.Read(ref _listenerX), Volatile.Read(ref _listenerY), Volatile.Read(ref _listenerZ))
                                       : Vector3.UnitZ);
                 }
-                front += _fan.Step() * FanMix;
+                fanOut = _fan.Step() * FanMix;
+                if (!_engineAtRear) front += fanOut;
             }
             // The pipe's radiation, thrown the way the pipe points and shaded by the body.
             float exhaustOut = _radiation.Process(Engine.Exhaust);
             float pa = exhaustOut + rearTyre;
+            // An engine in the back (VehicleProfile.EngineAtRear) cools, breathes and leaks out of its
+            // compartment there, beside the tailpipe.
+            if (_engineAtRear) pa += fanOut;
 
             // ...and then the car it is all bolted into. The body is driven by everything above and
             // rings on its own account, so it is ADDED to the direct sound rather than replacing it:
@@ -987,8 +1002,8 @@ public sealed class EngineVoiceState : IRenderedVoice
             // tailpipe: on the school bus the block is 97.7 dB against an 83 dB silenced pipe, so an
             // idling bus at a stop, fan slowed, was one sound at its tail — "the front of the bus and
             // the exhaust are in the same place". Once far enough to be one voice, nothing changes.
-            float bay = _bayLeak > 0f ? (Engine.Block + 0.5f * _bayIntake.Process(Engine.Intake)) * _bayLeak : 0f;
-            front += bay;
+            float bay = _bayLeak > 0f ? (Engine.Block + FrontMix * _bayIntake.Process(Engine.Intake)) * _bayLeak : 0f;
+            if (_engineAtRear) pa += bay; else front += bay;
             // The air and the door beeper are their own sources at their own levels, each at its own
             // end of the vehicle: the door valve, the kneeling valve and the beeper at the front door,
             // the brake releases at the axles. They all used to come out of the tailpipe.
@@ -1026,7 +1041,7 @@ public sealed class EngineVoiceState : IRenderedVoice
             // quietly, and the idle lift must not turn it back up.
             // Both axles' tyres count: they are the machine radiating too, and at a cruise the larger
             // part of it. Only the rear one used to, because only the rear one was in `pa`.
-            float engineOnly = pa - rearExtras + bay + frontTyre + (Engine.Exhaust - exhaustOut);
+            float engineOnly = pa - rearExtras + (_engineAtRear ? -fanOut : bay) + frontTyre + (Engine.Exhaust - exhaustOut);
             blockSum += (double)engineOnly * engineOnly;
             tyreSum += (double)(rearTyre * rearTyre + frontTyre * frontTyre);
 

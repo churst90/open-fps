@@ -1635,9 +1635,10 @@ public class ClientAudioSystem
     private static Vector3 ExhaustSlot(OpenFPS.Common.VehicleProfile v)
         => new(0f, v.ExhaustHeight, v.ExhaustOffsetZ);
 
-    /// <summary>...and where it breathes.</summary>
+    /// <summary>...and the other end: where it breathes, or its nose when the engine is in the back
+    /// (VehicleProfile.FrontTapZ).</summary>
     private static Vector3 IntakeSlot(OpenFPS.Common.VehicleProfile v)
-        => new(0f, v.IntakeHeight, v.IntakeOffsetZ);
+        => new(0f, v.FrontTapHeight, v.FrontTapZ);
 
     /// <summary>
     /// The front outlet of a machine, placed and kept up to date.
@@ -2359,7 +2360,8 @@ public class ClientAudioSystem
         if (engineKey.Length > 0)
         {
             long echoAt = System.Diagnostics.Stopwatch.GetTimestamp();
-            _engineEchoes.Update(snap.Id, emitter, acousticPath, eyePos, AudioPhysics.SpeedOfSound, engineDt, _audio);
+            _engineEchoes.Update(snap.Id, emitter, acousticPath, eyePos, AudioPhysics.SpeedOfSound, engineDt, _audio,
+                                 traced: OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.HasTracedEchoes(snap.Id));
             _partMs[0] += Ms(echoAt);
         }
 

@@ -48,6 +48,17 @@ internal sealed class TracedReverb : IDisposable
     public int IrSize => (int)(DurationSeconds * SampleRate);
 
     private IntPtr _simulator, _source;
+    /// <summary>
+    /// One source per stage that plays this trace, all at the same point. A Steam Audio IR update is
+    /// taken by the FIRST effect that reads it after the trace (measured, --traced-echoes: a second
+    /// effect on the same IR stayed silent), and every outdoor bus played the listener's trace through
+    /// its own effect — so one bus had the street and the others a stale IR or none, and a car's
+    /// reverberation came and went as it crossed from one region's bus to another's: the reflections
+    /// "cutting out". Each reader has its own source, and its own copy of every trace.
+    /// </summary>
+    public const int MaxReaders = 24;
+    private readonly IntPtr[] _readers = new IntPtr[MaxReaders];
+    private bool _readersDirty;
     private readonly object _gate = new();
     private Thread? _thread;
     private volatile bool _running;
@@ -70,7 +81,7 @@ internal sealed class TracedReverb : IDisposable
             sceneType = Phonon.IPL_SCENETYPE_DEFAULT,
             reflectionType = Phonon.IPL_REFLECTIONEFFECTTYPE_CONVOLUTION,
             maxNumOcclusionSamples = 16, maxNumRays = Rays, numDiffuseSamples = 32,
-            maxDuration = DurationSeconds, maxOrder = Order, maxNumSources = 1, numThreads = 2,
+            maxDuration = DurationSeconds, maxOrder = Order, maxNumSources = MaxReaders, numThreads = 2,
             rayBatchSize = 16, numVisSamples = 4, samplingRate = sampleRate, frameSize = frameSize,
         };
         if (Phonon.iplSimulatorCreate(context, ref s, out _simulator) != Phonon.IPL_STATUS_SUCCESS)
@@ -97,6 +108,7 @@ internal sealed class TracedReverb : IDisposable
                 {
                     Phonon.iplSourceAdd(_source, _simulator);
                     Phonon.iplSimulatorCommit(_simulator);
+                    _readers[0] = _source;
                 }
             }
             _haveScene = _source != IntPtr.Zero;
@@ -108,6 +120,22 @@ internal sealed class TracedReverb : IDisposable
             _thread.Start();
         }
         Current = this;
+    }
+
+    /// <summary>Makes sure reader <paramref name="index"/> has its own source. Game thread; cheap
+    /// once it exists. The new source is committed before the next trace.</summary>
+    public void EnsureReader(int index)
+    {
+        if (index <= 0 || index >= MaxReaders || _readers[index] != IntPtr.Zero || !IsValid) return;
+        lock (_gate)
+        {
+            if (_readers[index] != IntPtr.Zero || !_haveScene) return;
+            var ss = new Phonon.IPLSourceSettings { flags = Phonon.IPL_SIMULATIONFLAGS_REFLECTIONS };
+            if (Phonon.iplSourceCreate(_simulator, ref ss, out IntPtr src) != Phonon.IPL_STATUS_SUCCESS) return;
+            Phonon.iplSourceAdd(src, _simulator);
+            _readersDirty = true;
+            _readers[index] = src;
+        }
     }
 
     /// <summary>Where the listener is. Game or worker thread.</summary>
@@ -137,7 +165,9 @@ internal sealed class TracedReverb : IDisposable
                         source = coord,
                         reverbScale0 = 1f, reverbScale1 = 1f, reverbScale2 = 1f,
                     };
-                    Phonon.iplSourceSetInputs(_source, Phonon.IPL_SIMULATIONFLAGS_REFLECTIONS, ref inputs);
+                    if (_readersDirty) { Phonon.iplSimulatorCommit(_simulator); _readersDirty = false; }
+                    foreach (var r in _readers)
+                        if (r != IntPtr.Zero) Phonon.iplSourceSetInputs(r, Phonon.IPL_SIMULATIONFLAGS_REFLECTIONS, ref inputs);
                     Phonon.iplSimulatorSetSharedInputs(_simulator, Phonon.IPL_SIMULATIONFLAGS_REFLECTIONS, ref shared);
                     Phonon.iplSimulatorRunReflections(_simulator);
                 }
@@ -150,12 +180,17 @@ internal sealed class TracedReverb : IDisposable
     }
 
     /// <summary>The latest traced IR, for the effect. Mixer thread; Steam Audio double-buffers it.</summary>
-    public bool TryGetParams(out Phonon.IPLReflectionEffectParams p)
+    public bool TryGetParams(out Phonon.IPLReflectionEffectParams p) => TryGetParams(0, out p);
+
+    /// <summary>The latest traced IR as reader <paramref name="reader"/> gets it. Each stage reads its
+    /// own; see <see cref="MaxReaders"/>.</summary>
+    public bool TryGetParams(int reader, out Phonon.IPLReflectionEffectParams p)
     {
         p = default;
-        if (_source == IntPtr.Zero) return false;
+        IntPtr src = reader >= 0 && reader < MaxReaders ? _readers[reader] : IntPtr.Zero;
+        if (src == IntPtr.Zero) return false;
         var outs = new Phonon.IPLSimulationOutputs();
-        Phonon.iplSourceGetOutputs(_source, Phonon.IPL_SIMULATIONFLAGS_REFLECTIONS, ref outs);
+        Phonon.iplSourceGetOutputs(src, Phonon.IPL_SIMULATIONFLAGS_REFLECTIONS, ref outs);
         p = outs.reflections;
         if (p.ir == IntPtr.Zero) return false;
         p.type = Phonon.IPL_REFLECTIONEFFECTTYPE_CONVOLUTION;
@@ -179,6 +214,9 @@ internal sealed class TracedReverb : IDisposable
         if (ReferenceEquals(Current, this)) Current = null;
         lock (_gate)
         {
+            for (int i = 1; i < MaxReaders; i++)
+                if (_readers[i] != IntPtr.Zero) { Phonon.iplSourceRelease(ref _readers[i]); _readers[i] = IntPtr.Zero; }
+            _readers[0] = IntPtr.Zero;
             if (_source != IntPtr.Zero) Phonon.iplSourceRelease(ref _source);
             if (_simulator != IntPtr.Zero) Phonon.iplSimulatorRelease(ref _simulator);
         }
@@ -197,6 +235,7 @@ internal static class TracedReverbSet
     private static IntPtr _context;
     private static SteamAudioScene? _scene;
     private static TracedReverb? _listener;
+    private static TracedEchoes? _echoes;
     private static readonly Dictionary<int, (TracedReverb Trace, Vector3 At)> Rooms = new();
     /// <summary>At most this many rooms traced besides the listener's; the mixer only ever hears four.</summary>
     private const int MaxRooms = 6;
@@ -209,11 +248,17 @@ internal static class TracedReverbSet
             _context = context; _scene = scene;
             _listener ??= new TracedReverb(context);
             if (_listener.IsValid) _listener.SetScene(scene);
+            // The few sources traced from where they are (TracedEchoes), on the same scene.
+            _echoes ??= new TracedEchoes(context);
+            if (_echoes.IsValid) _echoes.SetScene(scene);
             foreach (var r in Rooms.Values) r.Trace.SetScene(scene);
         }
     }
 
     public static void SetListener(Vector3 at) { lock (Gate) _listener?.SetListener(at); }
+
+    /// <summary>The per-source tracer, or null before the scene exists.</summary>
+    public static TracedEchoes? Echoes { get { lock (Gate) return _echoes is { IsValid: true } e ? e : null; } }
 
     /// <summary>The listener's own trace, or null before the scene exists.</summary>
     public static TracedReverb? Listener { get { lock (Gate) return _listener is { IsValid: true } l && l.Source != IntPtr.Zero ? l : null; } }
@@ -304,6 +349,7 @@ internal static class TracedReverbSet
         lock (Gate)
         {
             _listener?.Dispose(); _listener = null;
+            _echoes?.Dispose(); _echoes = null;
             _cabin?.Dispose(); _cabin = null; _cabinScene?.Dispose(); _cabinScene = null; _cabinPreset = null; _riding = false;
             foreach (var r in Rooms.Values) r.Trace.Dispose();
             Rooms.Clear();

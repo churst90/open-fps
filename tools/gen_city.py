@@ -1335,31 +1335,32 @@ def car(name, preset, track, top, g, lane, start, accel=2.2, brake=None, grip="c
 # school_bus (85 dB) is the silenced one and is wrong for a city bus, which is among the LOUDER
 # things on a street; school_bus_na, the naturally aspirated one, measures 98.
 VEHICLES = []
-# The field, rebuilt 2026-09-25 (Cody): fewer motorcycles, "a couple muscle cars of different exhaust
-# and specs, several economy cars, 1 bus, several gas and diesel pickups with different exhausts, maybe
-# a 90's Ford Power Stroke", two twin-turbo pickups "with a loud aggressive good sounding exhaust", and
-# delivery and mail trucks.
+# The field, rebuilt 2026-09-26 (Cody): "Remove the muscle cars, just have regular type vehicles
+# now, a city bus, a couple twin turbo pickups with some nice aggressive exhaust, some economy cars,
+# hondas toyotas that type of sounding stuff. a few cars with more aggressive sounding exhaust but
+# nothing too crazy." The street cars are the Vehicles.cs street presets: the same engines as the
+# speedway's with road exhausts, 98-104 dB at a metre flat out; the twin-turbo pickups 106-112.
 CITY_CW = [
-    ("Civic",        "i4_economy",           52.0, 0.48, 1.8, "car"),
-    ("Hatchback",    "i4_economy",           50.0, 0.48, 1.8, "car"),
-    ("Saloon",       "v6",                   50.0, 0.46, 1.8, "car"),
-    ("Wagon",        "boxer4",               50.0, 0.46, 1.8, "car"),
-    ("Muscle car",   "charger440",           58.0, 0.55, 1.8, "car"),
+    ("Hatchback",    "i4_economy",           52.0, 0.48, 1.8, "car"),
+    ("Compact",      "i4_compact",           52.0, 0.48, 1.8, "car"),
+    ("Sedan",        "v6",                   50.0, 0.46, 1.8, "car"),
+    ("Sport compact", "i4_sport_street",     56.0, 0.52, 1.8, "car"),
     ("Police car",   "police_interceptor",   62.0, 0.60, 1.8, "car"),
-    ("Pickup",       "pickup_v8",            50.0, 0.42, 1.8, "van"),
-    ("Power Stroke", "powerstroke73",        48.0, 0.40, 1.8, "van"),
     ("Twin-turbo Cummins", "cummins_compound", 52.0, 0.42, 1.8, "van"),
+    ("Mid-size",     "i4_midsize",           50.0, 0.46, 1.8, "car"),
+    ("Flat-four",    "boxer4_street",        54.0, 0.50, 1.8, "car"),
+    ("Hatchback",    "i4_economy",           50.0, 0.48, 1.8, "car"),
     ("Motorcycle",   "vtwin_slipon",         56.0, 0.60, 3.4, "bike"),
 ]
 CITY_CCW = [
-    ("Civic",        "i4_economy",           52.0, 0.48, 1.8, "car"),
-    ("Hot hatch",    "i4_turbo",             56.0, 0.52, 1.8, "car"),
+    ("Compact",      "i4_compact",           52.0, 0.48, 1.8, "car"),
+    ("Turbo hatch",  "i4_turbo",             56.0, 0.52, 1.8, "car"),
     ("Sedan",        "v6",                   50.0, 0.47, 1.8, "car"),
-    ("Muscle car",   "v8_glasspack",         58.0, 0.55, 1.8, "car"),
-    ("Pickup",       "pickup_v8_flowmaster", 50.0, 0.42, 1.8, "van"),
-    ("Diesel pickup", "diesel_i4",           46.0, 0.40, 1.8, "van"),
+    ("Sport saloon", "i6_street",            54.0, 0.50, 1.8, "car"),
+    ("Hatchback",    "i4_economy",           50.0, 0.48, 1.8, "car"),
+    ("Mid-size",     "i4_midsize",           50.0, 0.46, 1.8, "car"),
     ("Twin-turbo Duramax", "duramax_compound", 52.0, 0.42, 1.8, "van"),
-    ("Box truck",    "diesel_truck",         38.0, 0.30, 1.8, "truck"),
+    ("Compact",      "i4_compact",           50.0, 0.48, 1.8, "car"),
     ("Motorcycle",   "vtwin_stock",          56.0, 0.60, 3.4, "bike"),
 ]
 for i, (nm, preset, top, g, lane, kind) in enumerate(CITY_CW):
@@ -1368,12 +1369,18 @@ for i, (nm, preset, top, g, lane, kind) in enumerate(CITY_CCW):
     VEHICLES.append(car(f"{nm} {i + 11}", preset, "downtown_ccw", top, g, lane, 40.0 + i * 110.0, grip=kind))
 # ONE bus (Cody, 2026-09-25: "we need only 1 city bus on the map, not a bunch"). It goes round the
 # north block and serves its bus stops, which is what makes it a bus you can get on.
-VEHICLES.append(car("City bus 1", "school_bus_na", "north_block", 40.0, 0.28, 2.0, 0.0, accel=1.4, grip="bus"))
+# A transit bus: the engine in the back (Vehicles.cs TransitBus).
+VEHICLES.append(car("City bus 1", "transit_bus", "north_block", 40.0, 0.28, 2.0, 0.0, accel=1.4, grip="bus"))
 VEHICLES.append(car("Parcel van 1", "step_van", "north_block", 44.0, 0.32, 2.0, 140.0, grip="truck"))
 VEHICLES.append(car("Mail truck 1", "mail_truck", "north_block", 40.0, 0.36, 1.8, 260.0, grip="van"))
-VEHICLES.append(car("Muscle car, big cam", "v8_bigcam", "north_block", 56.0, 0.55, 1.8, 380.0, grip="car"))
+VEHICLES.append(car("Sedan, north block", "i4_midsize", "north_block", 50.0, 0.46, 1.8, 380.0, grip="car"))
+# Two more motorcycles, of other kinds than the cruisers (Cody, 2026-09-26: "add a couple motorcycle
+# back on the map"): a litre sports bike here, and a 450 single on the downtown loop, in the gap
+# after its last car (ten cars at 96 m on a 1,040 m loop).
+VEHICLES.append(car("Sports bike", "sportbike", "north_block", 56.0, 0.60, 3.4, 460.0, grip="bike"))
+VEHICLES.append(car("Dirt bike", "single", "downtown_cw", 50.0, 0.60, 3.4, 968.0, grip="bike"))
 # The estate: slow, quiet, and the thing you hear over the mowers.
-for i, (nm, preset) in enumerate((("Civic", "i4_economy"), ("Wagon", "v6"), ("Pickup", "diesel_i4"),
+for i, (nm, preset) in enumerate((("Hatchback", "i4_economy"), ("Sedan", "v6"), ("Compact", "i4_compact"),
                                   ("Mail truck", "mail_truck"), ("Parcel van", "step_van"))):
     VEHICLES.append(car(f"{nm}, Elm Street", preset, "estate", 30.0, 0.35, 1.2, i * 180.0,
                         accel=1.6, grip="car"))
@@ -1404,7 +1411,7 @@ VERGE_MOWER = {
 # straight onto the pavement and Main Street. Each is "vehicle:<profile>": the server builds the shell
 # from the profile (VehicleShell) rather than from a file, so a car here cannot drift from the car.
 PARKED = []
-for preset, z in (("i4_economy", 29.0), ("v6", 35.0), ("diesel_i4", 41.0), ("v8_muscle", 47.0)):
+for preset, z in (("i4_economy", 29.0), ("v6", 35.0), ("i4_compact", 41.0), ("i4_turbo", 47.0)):
     PARKED.append({"TemplateId": "vehicle:" + preset, "Position": v3(GAR_X1 - 4.5, SLAB, z),
                    "Rotation": {"X": 0, "Y": 0.707107, "Z": 0, "W": 0.707107}, "Owner": ""})
 
@@ -1505,9 +1512,10 @@ VEHICLES.extend(AIR)
 # are declared with car grip whatever they are, as they were shipped (five, since the bus went).
 # Two motorcycles on the whole map now, both in the downtown field above (Cody, 2026-09-25: "reduce
 # the number of bikes/motor cycles on the map").
-for nm, preset, start in (("van", "diesel_i4", 0.0), ("saloon", "v6", 130.0), ("hatch", "i4_economy", 260.0),
-                          ("pickup", "diesel_cummins_na", 190.0),
-                          ("truck", "diesel_truck", 70.0)):
+# Regular traffic since 2026-09-26: a parcel van, two saloons, a hatch and the mail.
+for nm, preset, start in (("van", "step_van", 0.0), ("saloon", "v6", 130.0), ("hatch", "i4_economy", 260.0),
+                          ("mid-size", "i4_midsize", 190.0),
+                          ("mail truck", "mail_truck", 70.0)):
     VEHICLES.append(car(f"Southgate {nm}", preset, "southgate", 48.0, 0.48, 1.8, start))
 VEHICLES.append(VERGE_MOWER)
 

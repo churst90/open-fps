@@ -35,6 +35,7 @@ public sealed class ExhaustRadiation
     private const float SlewSeconds = 0.05f;
 
     private readonly Vector3 _axis, _exit, _body;
+    private readonly bool _openFrame;
     private readonly float _radius;
     private readonly float _aLow, _aHigh, _slew;
     private float _lp1, _lp2;
@@ -52,7 +53,14 @@ public sealed class ExhaustRadiation
         _axis = v.ExhaustAxis.LengthSquared() > 1e-6f ? Vector3.Normalize(v.ExhaustAxis) : -Vector3.UnitZ;
         _radius = MathF.Max(0.005f, v.Engine.Exhaust.TailpipeDiameterMm * 0.0005f);
         _body = new Vector3(v.WidthMetres, v.HeightMetres, v.LengthMetres);
-        _exit = ExitPoint(new Vector3(0f, v.ExhaustHeight, v.ExhaustOffsetZ), _axis, _body);
+        // A motorcycle or an open-wheeler has no body round its pipe: the pipe ends where it ends,
+        // beside the wheel, in open air. Treating its length and height as a solid box pushed a
+        // cruiser's exit 0.8 m behind its own pipe, behind the rear tyre, and shaded it from anyone
+        // in front of the bike as if a car stood in the way — "I still think the exhaust is too
+        // long on the motor cycles".
+        _openFrame = (v.Body?.CabinLengthM ?? 0f) <= 0f;
+        var slot = new Vector3(0f, v.ExhaustHeight, v.ExhaustOffsetZ);
+        _exit = _openFrame ? slot + _axis * 0.05f : ExitPoint(slot, _axis, _body);
         float dt = 1f / sampleRate;
         _aLow = 1f - MathF.Exp(-2f * MathF.PI * CrossLowHz * dt);
         _aHigh = 1f - MathF.Exp(-2f * MathF.PI * CrossHighHz * dt);
@@ -91,7 +99,7 @@ public sealed class ExhaustRadiation
             return 1f - w * away;
         }
 
-        var (bL, bM, bH) = BodyShadow(_exit, l, _body, speedOfSound);
+        var (bL, bM, bH) = _openFrame ? (1f, 1f, 1f) : BodyShadow(_exit, l, _body, speedOfSound);
         _tL = Pipe(Diffraction.LowBandHz) * bL;
         _tM = Pipe(Diffraction.MidBandHz) * bM;
         _tH = Pipe(Diffraction.HighBandHz) * bH;

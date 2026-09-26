@@ -26,6 +26,8 @@ internal sealed class TracedReverbState
     /// <summary>Which place this bus is played through: the listener's trace for the room they are
     /// in, the room's own for any other. Game thread writes; the mixer reads it once a block.</summary>
     public volatile TracedReverb? Trace;
+    /// <summary>This stage's reader in whatever trace it plays (TracedReverb.MaxReaders).</summary>
+    public int Reader;
     /// <summary>Output trim, linear. Game thread writes.</summary>
     public volatile float Gain = 1f;
 
@@ -84,7 +86,7 @@ internal static class TracedReverbDsp
         TracedReverb? reverb = userData != IntPtr.Zero && GCHandle.FromIntPtr(userData).Target is TracedReverbState own ? own.Trace : null;
         if (userData == IntPtr.Zero || GCHandle.FromIntPtr(userData).Target is not TracedReverbState s
             || reverb == null || n != s.FrameSize || s.Effect == IntPtr.Zero
-            || !reverb.TryGetParams(out var prm))
+            || !reverb.TryGetParams(s.Reader, out var prm))
         {
             if (userData != IntPtr.Zero && GCHandle.FromIntPtr(userData).Target is TracedReverbState b) b.Bailed++;
             for (int k = 0; k < n * outCh; k++) o[k] = 0f;

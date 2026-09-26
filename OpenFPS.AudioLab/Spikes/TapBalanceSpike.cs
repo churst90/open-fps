@@ -2,6 +2,8 @@ using System.Collections.Generic;
 using System;
 using System.Linq;
 using OpenFPS.Common;
+using OpenFPS.Client.AudioEngine.Core;
+using OpenFPS.Client.AudioEngine.Core.Engine;
 
 namespace OpenFPS.Client.AudioEngine.Fmod;
 
@@ -31,8 +33,16 @@ public static class TapBalanceSpike
             }
             return 0;
         }
+        if (args.Contains("front")) return Front(names.Where(n => n != "front").ToArray());
         if (args.Contains("cost")) return Cost(names.Where(n => n != "cost").ToArray());
         if (args.Contains("knock")) return Knock(names.Where(n => n != "knock").ToArray());
+        if (args.Contains("pipe")) return Pipe(names.Where(n => n != "pipe").ToArray());
+        if (args.Contains("turbo")) return Turbo(names.Where(n => n != "turbo").ToArray());
+        if (args.Contains("frontparts")) return FrontParts(names.Where(n => n != "frontparts").ToArray());
+        if (args.Contains("nan")) return NanHunt(names.Where(n => n != "nan").ToArray());
+        if (args.Contains("audit")) return Audit(names.Where(n => n != "audit").ToArray());
+        if (args.Contains("placed")) return Placed();
+        if (args.Contains("port")) return Port(names.Where(n => n != "port").ToArray());
         if (args.Contains("shifts")) return Shifts(names.Where(n => n != "shifts").ToArray());
         if (args.Contains("squeal")) return Squeal(names.Where(n => n != "squeal").ToArray());
         if (args.Contains("whoosh")) return Whoosh(names.Where(n => n != "whoosh").ToArray());
@@ -49,6 +59,29 @@ public static class TapBalanceSpike
 
     /// <summary>At a city cruise (12 m/s): each end's level, and what the tyres, the fan and the
     /// engine bay are each worth to it (the level lost when they are muted).</summary>
+    /// <summary>
+    /// The front of each vehicle against its back, at idle and at a cruise, and what the intake and
+    /// the engine bay are each worth to the front: "I can really hear the air intake ... the intake
+    /// I don't think should be audible".
+    /// </summary>
+    static int Front(string[] names)
+    {
+        Console.WriteLine($"{"preset",-22} {"",7} {"rear",6} {"front",6} {"front-rear",10}  intake worth (all paths)  bay worth");
+        foreach (var n in names)
+        {
+            var v = VehicleProfile.ByName(n);
+            var quiet = v with { Engine = v.Engine with { Intake = v.Engine.Intake with { Level = 0f } } };
+            foreach (var (label, sp, from) in new[] { ("idle", 0f, -1f), ("cruise", 12f, -1f), ("floored", 30f, 3f) })
+            {
+                var (r, f) = Measure(v, sp, null, from);
+                var (ri, fi) = Measure(quiet, sp, null, from);
+                var (_, fb) = Measure(v, sp, s => s.BayLeakage = 0f, from);
+                Console.WriteLine($"{n,-22} {label,7} {r,6:F1} {f,6:F1} {f - r,10:F1}  front {f - fi,5:F1} rear {r - ri,5:F1}  {f - fb,9:F1}");
+            }
+        }
+        return 0;
+    }
+
     static int Parts(string[] names)
     {
         Console.WriteLine($"{"preset",-20} {"rear",6} {"front",6}   worth to rear: {"tyres",5}   to front: {"tyres",5} {"fan",5} {"bay",5}");
@@ -100,6 +133,74 @@ public static class TapBalanceSpike
             var st = BandsOf(flat, null, "steep0");
             cols.Add($"{b.M - st.M,5:F1}({b.H - st.H,4:F1})");
             Console.WriteLine($"{n,-18} {b.L,5:F1} {b.M,5:F1} {b.H,5:F1}   {"",34}" + string.Join(" ", cols));
+        }
+        return 0;
+    }
+
+    /// <summary>
+    /// The tailpipe alone at a city cruise, with the exhaust's silencing taken apart one piece at a
+    /// time: the packing, the wall loss, the long mid-pipe. Dumped (OPENFPS_WHOOSH_DUMP) for octave
+    /// analysis; printed here as the three bands.
+    /// </summary>
+    static int Pipe(string[] names)
+    {
+        Action<EngineVoiceState> bare = s => { s.TyreMix = 0f; s.FanMix = 0f; s.BayLeakage = 0f; s.FrontMix = 0f; s.BodyMix = 0f; };
+        foreach (var n in names)
+        {
+            var v = VehicleProfile.ByName(n) with { AirSystem = null };
+            var x = v.Engine.Exhaust;
+            var variants = new (string Tag, ExhaustSpec E)[]
+            {
+                ("base", x),
+                ("nopacking", x with { Muffler = x.Muffler with { Absorption = 0f } }),
+                ("wall1", x with { WallLossMultiplier = 1f }),
+                ("mid1", x with { MidPipeMetres = 1f }),
+                ("nopacking.wall1", x with { Muffler = x.Muffler with { Absorption = 0f }, WallLossMultiplier = 1f }),
+            };
+            foreach (var (tag, e) in variants)
+            {
+                var b = BandsOf(v with { Engine = v.Engine with { Exhaust = e } }, bare, "pipe." + tag);
+                Console.WriteLine($"{n,-18} {tag,-18} low {b.L,5:F1} mid {b.M,5:F1} high {b.H,5:F1}");
+            }
+        }
+        return 0;
+    }
+
+    /// <summary>The offline bench held at 60 % of the governed speed under load: the pressure at the
+    /// ports against what leaves the tailpipe, dumped for octave analysis.</summary>
+    static int Port(string[] names)
+    {
+        string dir = Environment.GetEnvironmentVariable("OPENFPS_WHOOSH_DUMP") ?? ".";
+        foreach (var n in names)
+        {
+            var v = VehicleProfile.ByName(n);
+            var orders = new List<DriveOrder>
+            {
+                new(DriverAction.Cranking, 0.8f), new(DriverAction.Idling, 1.5f),
+                new(DriverAction.Holding, 4f, MathF.Min(2100f, v.Engine.RedlineRpm * 0.85f), 1f),
+            };
+            if (Environment.GetEnvironmentVariable("OPENFPS_VALVE_K") is string ks) EngineSynth.ValveFlowNoiseK = float.Parse(ks);
+            var r = VehicleSynth.Render(v, orders, seed: 5);
+            int from = (int)(r.SampleRate * 3.5f);
+            void Dump(string tag, float[] x, float scale)
+            {
+                using var w = new BinaryWriter(File.Create(Path.Combine(dir, $"{n}.{tag}.f32")));
+                for (int i = from; i < x.Length; i++) w.Write(x[i] * scale);
+            }
+            Dump("port", r.Port, 1f);
+            Dump("tail", r.Exhaust, r.PascalsPerUnit);
+            Console.WriteLine($"{n}: exhaust {r.ExhaustDb:F1} dB");
+            EngineSynth.ValveJetNoise = false;
+            var q = VehicleSynth.Render(v, orders, seed: 5);
+            EngineSynth.ValveJetNoise = true;
+            Dump("port.nojet", q.Port, 1f);
+            Dump("tail.nojet", q.Exhaust, q.PascalsPerUnit);
+            Console.WriteLine($"{n}: exhaust without the valve jet {q.ExhaustDb:F1} dB");
+            var x = v.Engine.Exhaust;
+            var open = v with { Engine = v.Engine with { Exhaust = x with { Muffler = x.Muffler with { Kind = MufflerKind.None } } } };
+            var o = VehicleSynth.Render(open, orders, seed: 5);
+            Dump("tail.nomuffler", o.Exhaust, o.PascalsPerUnit);
+            Console.WriteLine($"{n}: dumped");
         }
         return 0;
     }
@@ -233,7 +334,16 @@ public static class TapBalanceSpike
             int blocks = Rate * 5 / Block;
             for (int b = 0; b < blocks; b++) voice.Render(buf);
             double rt = sw.Elapsed.TotalSeconds / (blocks * (double)Block / Rate);
-            Console.WriteLine($"{n,-22} {rt,6:F3} core-seconds per second");
+            // The same again with the exhaust valves' flow noise off: what that mechanism costs.
+            EngineSynth.ValveJetNoise = false;
+            var v2 = new EngineVoiceState(v, Rate, 3) { TargetSpeed = 12f };
+            v2.PlaceAtSpeed(12f); v2.Revive();
+            for (int b = 0; b < Rate / Block; b++) v2.Render(buf);
+            sw.Restart();
+            for (int b = 0; b < blocks; b++) v2.Render(buf);
+            double rtOff = sw.Elapsed.TotalSeconds / (blocks * (double)Block / Rate);
+            EngineSynth.ValveJetNoise = true;
+            Console.WriteLine($"{n,-22} {rt,6:F3} core-seconds per second ({rtOff:F3} without the valve flow noise)");
         }
         return 0;
     }
@@ -297,11 +407,172 @@ public static class TapBalanceSpike
         return outp.ToArray();
     }
 
-    static (float Rear, float Front) Measure(VehicleProfile v, float speed, Action<EngineVoiceState>? mute = null)
+    /// <summary>
+    /// What the turbo is worth: both ends of the live voice at idle, a cruise and floored, with the
+    /// whistle and without, dumped (OPENFPS_WHOOSH_DUMP) as {name}.{state}.{rear|front}[.noturbo].
+    /// </summary>
+    static int Turbo(string[] names)
+    {
+        string dir = Environment.GetEnvironmentVariable("OPENFPS_WHOOSH_DUMP") ?? ".";
+        foreach (var n in names)
+        {
+            var v = VehicleProfile.ByName(n);
+            var quiet = v with { Engine = v.Engine with { Mechanical = v.Engine.Mechanical with { TurboWhistleLevel = 0f } } };
+            foreach (var (state, sp, from) in new[] { ("idle", 0f, -1f), ("cruise", 12f, -1f), ("floored", 30f, 3f) })
+                foreach (var (tag, prof) in new[] { ("", v), (".noturbo", quiet) })
+                {
+                    var voice = new EngineVoiceState(prof, Rate, 11) { TargetSpeed = sp, SplitVoices = true };
+                    voice.PlaceAtSpeed(from >= 0f ? from : sp);
+                    voice.Revive();
+                    var tap = new EngineTapState(voice);
+                    var rear = new float[Block]; var front = new float[Block];
+                    using var wr = new BinaryWriter(File.Create(Path.Combine(dir, $"{n}.{state}.rear{tag}.f32")));
+                    using var wf = new BinaryWriter(File.Create(Path.Combine(dir, $"{n}.{state}.front{tag}.f32")));
+                    float scale = voice.PascalsAtFullScale;
+                    for (int b = 0; b < Rate * 4 / Block; b++)
+                    {
+                        voice.Produce();
+                        tap.Render(front);
+                        voice.Consume(rear);
+                        if (b < Rate / Block) continue;
+                        for (int i = 0; i < Block; i++) { wr.Write(rear[i] * scale); wf.Write(front[i] * scale); }
+                    }
+                }
+            Console.WriteLine($"{n}: dumped");
+        }
+        return 0;
+    }
+
+    /// <summary>The front tap alone at idle and a cruise, whole and with each part taken out,
+    /// dumped as {name}.{state}.front.{part}.f32 for octave analysis.</summary>
+    static int FrontParts(string[] names)
+    {
+        string dir = Environment.GetEnvironmentVariable("OPENFPS_WHOOSH_DUMP") ?? ".";
+        foreach (var n in names)
+        {
+            var v = VehicleProfile.ByName(n);
+            var m = v.Engine.Mechanical;
+            var parts = new (string Tag, VehicleProfile P, Action<EngineVoiceState>? Mute)[]
+            {
+                ("all", v, null),
+                ("nobay", v, s => s.BayLeakage = 0f),
+                ("nofan", v, s => s.FanMix = 0f),
+                ("notyres", v, s => s.TyreMix = 0f),
+                ("nointake", v, s => s.FrontMix = 0f),
+                ("noknock", v with { Engine = v.Engine with { Mechanical = m with { CombustionKnock = 0f } } }, null),
+                ("novalves", v with { Engine = v.Engine with { Mechanical = m with { ValvetrainLevel = 0f } } }, null),
+                ("noturbo", v with { Engine = v.Engine with { Mechanical = m with { TurboWhistleLevel = 0f } } }, null),
+            };
+            foreach (var (state, sp) in new[] { ("idle", 0f), ("cruise", 12f) })
+                foreach (var (tag, prof, mute) in parts)
+                {
+                    var voice = new EngineVoiceState(prof, Rate, 11) { TargetSpeed = sp, SplitVoices = true };
+                    mute?.Invoke(voice);
+                    voice.PlaceAtSpeed(sp);
+                    voice.Revive();
+                    var tap = new EngineTapState(voice);
+                    var rear = new float[Block]; var front = new float[Block];
+                    using var wf = new BinaryWriter(File.Create(Path.Combine(dir, $"{n}.{state}.front.{tag}.f32")));
+                    float scale = voice.PascalsAtFullScale;
+                    for (int b = 0; b < Rate * 4 / Block; b++)
+                    {
+                        voice.Produce();
+                        tap.Render(front);
+                        voice.Consume(rear);
+                        if (b < Rate / Block) continue;
+                        for (int i = 0; i < Block; i++) wf.Write(front[i] * scale);
+                    }
+                }
+            Console.WriteLine($"{n}: dumped");
+        }
+        return 0;
+    }
+
+    /// <summary>Full throttle from half the redline in first, as the level test drives it; says
+    /// where the first non-finite value appears and in which part.</summary>
+    static int NanHunt(string[] names)
+    {
+        foreach (var n in names)
+        {
+            var v = VehicleProfile.ByName(n);
+            var voice = new EngineVoiceState(v, Rate, 5);
+            float start = v.Engine.RedlineRpm * 0.5f / 60f * 2f * MathF.PI * v.Gearbox.WheelRadiusMetres
+                        / MathF.Max(0.1f, v.Gearbox.Ratios[0] * v.Gearbox.FinalDrive);
+            voice.PlaceAtSpeed(start);
+            voice.Revive();
+            voice.TargetSpeed = 200f;
+            var buf = new float[Block];
+            for (int b = 0; b < Rate * 25 / Block; b++)
+            {
+                voice.Render(buf);
+                var e = voice.Engine;
+                bool bad = false;
+                foreach (float x in buf) if (!float.IsFinite(x)) { bad = true; break; }
+                if (bad || !float.IsFinite(e.Exhaust) || !float.IsFinite(e.Block) || !float.IsFinite(e.Intake) || !float.IsFinite(e.Rpm))
+                {
+                    Console.WriteLine($"{n}: non-finite at {b * Block / (float)Rate:F2} s — speed {voice.Driveline.Speed:F1} m/s, rpm {e.Rpm:F0}, gear {voice.Driveline.Gear}; "
+                                    + $"buffer {(bad ? "NaN" : "ok")}, exhaust {e.Exhaust}, block {e.Block}, intake {e.Intake}");
+                    goto next;
+                }
+            }
+            Console.WriteLine($"{n}: finite for 25 s, ended at {voice.Driveline.Speed:F1} m/s, gear {voice.Driveline.Gear}");
+            next:;
+        }
+        return 0;
+    }
+
+    /// <summary>How each machine is put together, as the model sees it: where the engine and its
+    /// outlets are, what the exhaust is, what gets out of the bay. One line each.</summary>
+    static int Audit(string[] names)
+    {
+        Console.WriteLine($"{"preset",-20} {"engine",-44} {"L",4} {"cyl",3} {"ind",5} {"bay",4} {"rear",4} {"inZ",5} {"exZ",5} {"exH",4} {"len",4} {"exitZ",6} {"pipes",5} {"tailmm",6} {"muffler",-11} {"sys m",5} {"body",-10} {"fan",3} {"tyr",3} {"dB",5}");
+        foreach (var n in names)
+        {
+            var v = VehicleProfile.ByName(n);
+            var e = v.Engine; var x = e.Exhaust;
+            float litres = MathF.PI / 4f * e.BoreMm * e.BoreMm * e.StrokeMm * e.Cylinders * 1e-6f;
+            float prim = x.PrimaryLengthsMetres?.Max() ?? x.PrimaryLengthMetres;
+            float sys = prim + x.CollectorPipeMetres + x.MidPipeMetres + x.TailpipeMetres.Max()
+                      + (x.Muffler.Kind == MufflerKind.None ? 0f : x.Muffler.ChamberLengthsMetres.Sum() + x.Muffler.AbsorptiveLengthMetres);
+            int groups = e.CollectorGroups.Length;
+            var exit = new OpenFPS.Client.AudioEngine.Core.Engine.ExhaustRadiation(v, Rate).Exit;
+            string body = v.Body?.GetType().Name ?? "";
+            Console.WriteLine($"{n,-20} {e.Name,-44} {litres,4:F1} {e.Cylinders,3} {e.Induction.ToString()[..5],5} {v.EngineBayLeakage,4:F2} {(v.EngineAtRear ? "yes" : ""),4} {v.IntakeOffsetZ,5:F1} {v.ExhaustOffsetZ,5:F1} {v.ExhaustHeight,4:F1} {v.LengthMetres,4:F1} {exit.Z,6:F2} {x.TailpipeCount(groups),5} {x.TailpipeDiameterMm,6:F0} {x.Muffler.Kind,-11} {sys,5:F2} {v.TyreCount,3} {(v.CoolingFan != null ? "yes" : ""),3} {v.TyreCount,3} {v.SourceLevelDb,5:F1}");
+        }
+        return 0;
+    }
+
+    /// <summary>Where the loudness law puts a shot and a car in the mix: dB re full scale at a range
+    /// of distances, before the master makeup and limiter.</summary>
+    static int Placed()
+    {
+        Console.WriteLine($"ceiling {Loudness.RenderCeilingDb:F1} dB SPL, compression {Loudness.DynamicRangeCompression:F2}");
+        var rows = new List<(string, float, float)>
+        {
+            ("5.56 rifle", Loudness.Rifle556Db, 0f), ("7.62x39 rifle", Loudness.Rifle762Db, 0f),
+            ("9 mm pistol", Loudness.Pistol9mmDb, 0f), (".45 pistol", Loudness.Pistol45Db, 0f), ("12 ga", Loudness.Shotgun12GaugeDb, 0f),
+        };
+        foreach (var k in new[] { "i4_economy", "v6", "cummins_compound", "transit_bus", "police_interceptor" })
+        {
+            var v = VehicleProfile.ByName(k);
+            rows.Add((k, v.SourceLevelDb, MathF.Max(0f, v.LengthMetres * 0.3f)));
+        }
+        Console.WriteLine($"{"source",-20} {"dB@1m",6} {"gain",6} {"ref m",6} {"range",6}   dBFS at 1 / 10 / 30 / 100 / 300 m");
+        foreach (var (name, db, extent) in rows)
+        {
+            var (g, r) = extent > 0f ? Loudness.Place(db, extent) : Loudness.Place(db);
+            float range = Loudness.AudibleRange(db);
+            string At(float d) => $"{20f * MathF.Log10(MathF.Max(1e-9f, Loudness.RenderedGain(g, r, range, d))),6:F1}";
+            Console.WriteLine($"{name,-20} {db,6:F0} {20f * MathF.Log10(g),6:F1} {r,6:F1} {range,6:F0}   {At(1)} {At(10)} {At(30)} {At(100)} {At(300)}");
+        }
+        return 0;
+    }
+
+    static (float Rear, float Front) Measure(VehicleProfile v, float speed, Action<EngineVoiceState>? mute = null, float from = -1f)
     {
         var voice = new EngineVoiceState(v, Rate, 11) { TargetSpeed = speed, SplitVoices = true };
         mute?.Invoke(voice);
-        voice.PlaceAtSpeed(speed);
+        voice.PlaceAtSpeed(from >= 0f ? from : speed);
         voice.Revive();
         var tap = new EngineTapState(voice);
         var rear = new float[Block]; var front = new float[Block];

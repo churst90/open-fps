@@ -37,6 +37,11 @@ public static class WalkSpike
         float seconds = Num(args, "seconds", 12f);
         float stand = Num(args, "stand", 5f);
         bool sprint = args.Contains("sprint");
+        // taps=N: the key pressed for one tick and let go, N times, gap= ticks apart — the way Cody
+        // walks as often as he holds a key. y= starts the body at that height (an upper floor).
+        int taps = (int)Num(args, "taps", 0f);
+        int gap = (int)Num(args, "gap", 10f);
+        float startY = Num(args, "y", float.NaN);
 
         string? mapPath = FindUp(Path.Combine("OpenFPS.Server", "maps", mapId + ".json"));
         string? prefabDir = mapPath == null ? null
@@ -52,8 +57,10 @@ public static class WalkSpike
         Vector3 spawn = LoadWorld(mapPath, prefabDir, world, grid, out int boxes);
         Console.WriteLine($"\n  {mapId}: {boxes} solid boxes, spawn {spawn}");
 
-        Vector3 from = Vec2(Str(args, "from")) is { } f ? new Vector3(f.X, spawn.Y, f.Z) : spawn;
-        Vector3 to = Vec2(Str(args, "to")) is { } t ? new Vector3(t.X, spawn.Y, t.Z) : from + new Vector3(0, 0, 20f);
+        float y0 = float.IsNaN(startY) ? spawn.Y : startY;
+        Vector3 from = Vec2(Str(args, "from")) is { } f ? new Vector3(f.X, y0, f.Z) : spawn;
+        Vector3 to = Vec2(Str(args, "to")) is { } t ? new Vector3(t.X, y0, t.Z) : from + new Vector3(0, 0, 20f);
+        if (taps > 0) { seconds = (taps * gap + 60) * PhysicsConstants.FixedDeltaTime; stand = 0f; }
         Console.WriteLine($"  walking {from.X:F1},{from.Z:F1} -> {to.X:F1},{to.Z:F1}, then standing still {stand:F0} s\n");
 
         var dir = to - from; dir.Y = 0;
@@ -68,10 +75,22 @@ public static class WalkSpike
         float lastGround = float.NaN;
         var colliders = new List<SharedMovementEngine.Collider>();
 
+        int tapSteps = 0, tapIndex = -1, silentTaps = 0;
         for (int i = 0; i < ticks; i++)
         {
             bool moving = i < standFrom;
             Vector3 input = moving ? dir : Vector3.Zero;
+            if (taps > 0)
+            {
+                bool press = i % gap == 0 && i / gap < taps;
+                input = press ? dir : Vector3.Zero;
+                moving = true;
+                if (press)
+                {
+                    if (tapIndex >= 0 && tapSteps == 0) silentTaps++;
+                    tapIndex = i / gap; tapSteps = 0;
+                }
+            }
 
             float ground = PhysicsUtils.GetGroundHeight(world, grid, pos, out string material);
             if (!float.IsNaN(lastGround) && MathF.Abs(ground - lastGround) > 0.001f)
@@ -110,7 +129,9 @@ public static class WalkSpike
             pos = result.NewPosition; vel = result.NewVelocity;
 
             var fall = stride.Update(pos, vel, result.IsGrounded, Quaternion.Identity);
-            if (fall.Stepped) steps++;
+            if (fall.Stepped) { steps++; tapSteps++; }
+            if (taps > 0 && (i % gap) < 4 && i / gap < taps)
+                Console.WriteLine($"    tap {i / gap,2} tick {i % gap}: speed {new Vector2(vel.X, vel.Z).Length(),5:F2} m/s grounded {result.IsGrounded,-5} y {pos.Y:F3} ground {ground:F3} {(fall.Stepped ? "STEP" : "")}");
             if (fall.Landed)
             {
                 landings++;
@@ -123,6 +144,11 @@ public static class WalkSpike
                                 + $"{(moving ? "" : "   <-- WHILE STANDING STILL")}");
         }
 
+        if (taps > 0)
+        {
+            if (tapIndex >= 0 && tapSteps == 0) silentTaps++;
+            Console.WriteLine($"\n  {taps} taps, {gap} ticks apart: {steps} footsteps, {silentTaps} tap(s) with none.");
+        }
         Console.WriteLine($"\n  {seconds:F0} s: {steps} footsteps, {landings} landing(s) "
                         + $"({landingsWhileStill} of them standing still), the ground moved {groundMoves} time(s).");
         Console.WriteLine(landingsWhileStill > 0

@@ -173,7 +173,7 @@ public sealed class EngineSynth
     /// old total: that total was set with them ringing at 4 kHz, where they came out LOUDER than the
     /// combustion knock at idle, and a diesel's valvetrain sits under its combustion noise.
     /// </summary>
-    private const float StructureKnockGain = 0.30f, StructureValveGain = 5.5f;
+    private const float StructureKnockGain = 0.50f, StructureValveGain = 5.5f;
 
     /// <summary>
     /// One mode of the gas in the cylinder: a two-pole resonator with its zeros at DC and Nyquist,
@@ -219,8 +219,11 @@ public sealed class EngineSynth
     private float _knockTemp = 1100f, _knockBore = 0.1f;
     private int _knockRetune;
     private readonly ClickVoice _click;
-    private double _whinePhase, _blowerPhase, _turboPhase;
-    private float _turboNoiseLp;
+    private double _whinePhase, _blowerPhase, _turboPhase, _turbinePhase, _tcnPhase;
+    private float _tcnDrift;
+    private float _turbineTone;                 // the turbine's tone at a metre from the tailpipe, Pa
+    private float _whooshNorm = 1f, _wb1, _wb2, _wx1, _wx2;
+    private float _wB0, _wB2, _wA1, _wA2;         // the whoosh band's biquad
 
     private struct Cylinder
     {
@@ -237,6 +240,7 @@ public sealed class EngineSynth
         public float Premix;                   // diesel: fraction of the charge that burns premixed
         public bool Burning, ChargeDecided, Misfired;
         public float PopAmp; public int PopLeft, PopLength;
+        public float Pk0, Pk1, Pk2, PkHp, PkLp; // the valve flow noise's band (BlowdownJet)
         public float Trim;
         public bool EOpenWas, IOpenWas;
         public float PressurePrev;
@@ -248,6 +252,8 @@ public sealed class EngineSynth
         _rate = rate;
         _dt = 1f / rate;
         _rng = new Random(seed);
+        SetUpPinkBand();
+        SetUpWhooshBand();
         _n = e.Cylinders;
         _cycleDeg = e.CycleDegrees;
         _airboxLoss = MathF.Pow(10f, -e.Intake.AirboxLossDb / 20f);
@@ -304,10 +310,13 @@ public sealed class EngineSynth
         // iron's damping at these frequencies. The lowest is where that heavy engine's radiation
         // started to rise.
         float sizeScale = MathF.Sqrt(0.125f / MathF.Max(0.05f, bore));
-        _structLpA = OnePole.AlphaFor(4500f, rate);
+        _structLpA = OnePole.AlphaFor(5500f, rate);
         _valveLpA = OnePole.AlphaFor(2000f, rate);
-        float[] structHz = { 620f, 800f, 1300f, 1800f, 2700f };
-        float[] structWeight = { 0.70f, 1.00f, 0.95f, 0.95f, 0.90f };
+        // And one at 3.6 kHz: the head and the valve covers are small, stiff panels, and without them
+        // the clatter measured 24-28 dB down at 4 kHz where the research puts it at 18 — heard as the
+        // diesels sounding "choked ... like it's got its lips tightly shut".
+        float[] structHz = { 620f, 800f, 1300f, 1800f, 2700f, 3600f };
+        float[] structWeight = { 0.70f, 1.00f, 0.95f, 0.95f, 0.95f, 0.70f };
         _structKnock = new Mode[structHz.Length];
         _structValves = new Mode[structHz.Length];
         for (int i = 0; i < structHz.Length; i++)
@@ -390,6 +399,83 @@ public sealed class EngineSynth
     }
 
     /// <summary>Effective flow area of a valve set at a lift: the curtain, capped by the port.</summary>
+    /// <summary>Switch for <see cref="BlowdownJet"/>: the lab's A/B, and /valveflow in game.
+    /// Volatile because the engines render on the pool's threads.</summary>
+    internal static volatile bool ValveJetNoise = true;
+
+    /// <summary>
+    /// The rush of gas through the exhaust valve's gap, as broadband noise in the port.
+    ///
+    /// When the exhaust valve cracks open the cylinder is at several atmospheres and the gap is a
+    /// fraction of a millimetre, so the gas goes through it at the speed of sound and slams into the
+    /// seat, the valve's back and the port wall. It was the one thing the gas path did not make.
+    /// Without it the blowdown pulse is a smooth pressure bump, and a diesel — slow, with a long
+    /// gentle cam ramp — put out a tailpipe 40-50 dB down at 1 kHz from its firing octave before it
+    /// reached a muffler: "like it's being choked ... like it's got its lips tightly shut".
+    ///
+    /// Measured, the top of a diesel's exhaust is exactly this. The DOT's Noise Control Handbook for
+    /// Diesel-Powered Vehicles (Damkevala 1974, s. 4.2): flow over the exhaust valve "may be the
+    /// dominant source of high frequency exhaust noise" — a continuous hump flat per proportional
+    /// band from about 400 Hz to 3 kHz, 13-18 dB under the firing line in tenth-octaves, which puts
+    /// every octave from 1 to 4 kHz 8-15 dB under the peak octave of an unmuffled diesel.
+    ///
+    /// Flow past an obstruction in a duct is a dipole, not a free jet (Gordon, NASA 1969): power
+    /// K rho U^6 A / c^3, against Lighthill's U^8 for the tailpipe. Here U is the throat velocity
+    /// (choked, so no more than sonic), rho the throat density, A the curtain area, c the port gas's;
+    /// half the power travels down the primary as a plane wave. The one constant,
+    /// <see cref="ValveFlowNoiseK"/>, is set against the handbook's unmuffled NA Cummins (Fig 4.3);
+    /// the pipes and the muffler then do to it what they do to everything else, which is what gives
+    /// a muffled truck its flat, lower top (Donaldson US 6,082,487).
+    /// </summary>
+    private float BlowdownJet(ref Cylinder cy, float mdot, float area, float lift, float valveD, int c)
+    {
+        float rhoT = 0.63f * MathF.Max(1e-3f, cy.Mass / MathF.Max(1e-7f, cy.Volume));
+        float cCyl = Gas.SoundSpeed(cy.Temp, Gas.GammaExhaust);
+        float u = MathF.Min(mdot / (rhoT * MathF.Max(1e-7f, area)), 0.91f * cCyl);
+        float rhoP = Gas.Density(Gas.Atmosphere, _portK), cP = Gas.SoundSpeed(_portK, Gas.GammaExhaust);
+        double w = ValveFlowNoiseK * rhoT * Math.Pow(u, 6) * area / Math.Pow(cP, 3);
+        float p = MathF.Sqrt((float)(0.5 * w * rhoP * cP / MathF.Max(1e-6f, _primaryArea)));
+        return p * PinkBand(ref cy, (float)(_rng.NextDouble() * 2 - 1));
+    }
+
+    /// <summary>The valve flow noise's dipole constant. See <see cref="BlowdownJet"/>.</summary>
+    internal static float ValveFlowNoiseK = 1e-3f;
+
+    /// <summary>
+    /// Unit-RMS noise with equal energy per octave from about 300 Hz to 5 kHz, falling outside:
+    /// Kellet's three-pole pinking, a pole's high-pass below and a pole's low-pass above.
+    /// </summary>
+    private float PinkBand(ref Cylinder cy, float n)
+    {
+        cy.Pk0 = 0.99765f * cy.Pk0 + n * 0.0990460f;
+        cy.Pk1 = 0.96300f * cy.Pk1 + n * 0.2965164f;
+        cy.Pk2 = 0.57000f * cy.Pk2 + n * 1.0526913f;
+        float pink = cy.Pk0 + cy.Pk1 + cy.Pk2 + n * 0.1848f;
+        cy.PkHp += _pinkHpA * (pink - cy.PkHp);
+        cy.PkLp += _pinkLpA * ((pink - cy.PkHp) - cy.PkLp);
+        return cy.PkLp * _pinkNorm;
+    }
+
+    private float _pinkHpA, _pinkLpA, _pinkNorm = 1f;
+
+    private void SetUpPinkBand()
+    {
+        _pinkHpA = OnePole.AlphaFor(300f, _rate);
+        _pinkLpA = OnePole.AlphaFor(5000f, _rate);
+        // Normalise by measurement: two seconds of it, whatever the sample rate, on its own noise so
+        // the engine's random stream is untouched.
+        var probe = new Cylinder();
+        var rng = new Random(1);
+        _pinkNorm = 1f;
+        double e = 0; int n = (int)(_rate * 2f), skip = (int)(_rate * 0.2f);
+        for (int i = 0; i < n; i++)
+        {
+            float y = PinkBand(ref probe, (float)(rng.NextDouble() * 2 - 1));
+            if (i >= skip) e += y * (double)y;
+        }
+        _pinkNorm = 1f / MathF.Sqrt((float)(e / (n - skip)));
+    }
+
     private static float ValveArea(ValveSpec v, float lift)
     {
         float d = v.DiameterMm * 1e-3f;
@@ -683,6 +769,7 @@ public sealed class EngineSynth
                     cy.BurntMass += entering;
                 }
                 portPeak = MathF.Max(portPeak, MathF.Abs(aE + bE));
+                if (ValveJetNoise && mdot > 0f) bE += BlowdownJet(ref cy, mdot, area, liftE, e.ExhaustValve.DiameterMm * 1e-3f, c);
             }
             else
             {
@@ -814,7 +901,9 @@ public sealed class EngineSynth
         _exhaust.Step();
         _intake.SetValveFlow(intakeFlow);
         _intake.Step();
-        Exhaust = _exhaust.Radiated;
+        // The turbine's tone leaves by the tailpipe (see Turbo); last sample's, the turbo being
+        // worked out after the pipes.
+        Exhaust = _exhaust.Radiated + _turbineTone;
         ExhaustShell = _exhaust.ShellRadiated;
         ExhaustPipe = _exhaust.PipeRadiated;
         // ── The intake's silencer ──────────────────────────────────────────────────────────────
@@ -881,7 +970,8 @@ public sealed class EngineSynth
         float structRing = 0f;
         for (int i = 0; i < _structKnock.Length; i++) structRing += _structKnock[i].Step(knockDrive);
         // Above its modes the block falls away fast — 17 dB down by 6 kHz, 27 by 8 on the AVL curve —
-        // which a resonator's own skirt (6 dB an octave) does not do: two poles at 4.5 kHz.
+        // which a resonator's own skirt (6 dB an octave) does not do: two poles at 5.5 kHz, above the
+        // highest mode, so the steep top is the AVL curve's and not a lid on the head's own ringing.
         _structLpK1 += _structLpA * (structRing - _structLpK1);
         _structLpK2 += _structLpA * (_structLpK1 - _structLpK2);
         // The block's ringing, and the gas's a twentieth of it in pressure, the zing: well under the
@@ -937,19 +1027,6 @@ public sealed class EngineSynth
             whine += (float)(Math.Sin(_blowerPhase * 2 * Math.PI) + 0.5 * Math.Sin(_blowerPhase * 4 * Math.PI))
                    * m.BlowerWhineLevel * 0.12f * (0.3f + 0.7f * load);
         }
-        if (m.TurboWhistleLevel > 0f)
-        {
-            float shaftHz = 2000f + 9000f * _spool;
-            _turboPhase += shaftHz / _rate;
-            if (_turboPhase > 1.0) _turboPhase -= 1.0;
-            float n = (float)(_rng.NextDouble() * 2 - 1);
-            _turboNoiseLp += 0.08f * (n - _turboNoiseLp);
-            whine += ((float)Math.Sin(_turboPhase * 2 * Math.PI) * 0.4f + _turboNoiseLp * 2.5f)
-                   // A big truck turbo is not a detail you strain for: at 2.2 bar it is the loudest
-                   // single thing about the engine on the way out of a corner. It was rendering
-                   // about fifteen decibels under the block's thud, which is inaudible beside it.
-                   * m.TurboWhistleLevel * 0.28f * _spool * _spool;
-        }
         // ── The block's anchor ─────────────────────────────────────────────────────────────────
         //
         // Everything above is a MECHANISM with a shape: knock rings the bore at its own modes, the
@@ -970,7 +1047,157 @@ public sealed class EngineSynth
         // It is worth nothing on a petrol car — a muscle car's block is thirty decibels under its
         // exhaust either way — and it is most of a bus, whose block is the loudest thing on it.
         // That asymmetry is why it went unnoticed: "I can hardly hear the engines on those diesels."
-        Block = (knockOut + thud + mech + whine) * BlockRadiationGain + StarterSound(rpm);
+        Block = (knockOut + thud + mech + whine) * BlockRadiationGain + StarterSound(rpm) + Turbo();
+    }
+
+    // ── The turbocharger ──────────────────────────────────────────────────────────────────────
+    //
+    // "I'm not hearing any twin turbos ... the whine from the turbos I don't hear really." The old
+    // whistle was a sine at a made-up "shaft" frequency, 2 to 11 kHz, with noise under 600 Hz, at
+    // a hand-set fraction of the block, and all of it went out through the bay. Floored, a
+    // straight-piped compound Cummins was 112 dB at its tailpipe and the whistle thirty decibels
+    // under it: it vanished exactly when it should scream.
+    //
+    // Now three sources, each at its measured level, each out of the place it leaves by:
+    //
+    //   the COMPRESSOR's blade-pass tone: main blades x shaft speed, 81 dB at 60,000 rpm on a
+    //   heavy-duty diesel's compressor (7+7 blades, open inlet), rising as the fourth power of the
+    //   shaft speed (Sustainability 15, 11300, 2023). Its outlet is 30-35 dB louder than its inlet
+    //   in the duct (Tiikoja, KTH), so it leaves by the boost pipes: through the bay.
+    //
+    //   the WHOOSH: a diesel's is broadband at 1.5-3.5 kHz (Evans & Ward, SAE 2005-01-2485),
+    //   85-90 dB(A) at 10 cm from the boost duct near full speed (SAE 2009-01-2048): 68 at a metre.
+    //   Also the bay.
+    //
+    //   the TURBINE's blade-pass tone, out of the tailpipe: ten to twelve blades, so 4 kHz at an
+    //   idling shaft and past hearing at full boost. No measured level exists; owners of straight-
+    //   piped diesels report it "increased massively". It is put in the duct 10 dB under the
+    //   compressor outlet's and radiated from the pipe's mouth, which at these frequencies is large
+    //   against the wavelength: at a metre, the duct pressure times radius / sqrt 2. It does NOT go
+    //   through the waveguide: the pipes' losses above 5 kHz took a 150 dB tone to nothing, and
+    //   changing them would change every engine. A muffler takes 15 dB off it (industrial and
+    //   truck mufflers at 4-8 kHz: Lilly; Donaldson US 6,082,487).
+    //
+    // The shaft runs about 22,000 rpm with a truck idling and 110-120,000 pulling (engine-sensor
+    // readings), and it follows the spool. TurboWhistleLevel stays as the declared multiplier: one
+    // is a single turbo breathing through an open inlet, as the measurement was made.
+    //
+    // PITCH (2026-09-26, "the whistle/whine on the turbos is maybe an octave too high"). Two
+    // corrections, both measured, and together they are the octave:
+    //
+    //   what a compressor sings at part speed is not its blade-passing tone but TIP-CLEARANCE noise,
+    //   a narrow hump at about half of it: over "a large range of rotor speeds with subsonic flow,
+    //   radial compressor noise is dominated by tip clearance noise" (Raitor and Neise, JSV 314,
+    //   2008); an automotive wheel at design speed shows it at 0.53 x BPF under a BPF that has only
+    //   then become the strongest (Broatch et al. 2018). The blade-passing tone is kept, under the
+    //   hump at part speed and over it as the tips go supersonic near full boost — how much under and
+    //   over is not published, so the +-6 dB crossing is a setting.
+    //
+    //   and the shaft idles at 12-15,000 rpm on a truck turbo (logged speed sensors: HE351VE,
+    //   Power Stroke), cruises at 40-50,000 and makes 120-130,000 at full boost. It had idled at
+    //   22,000, which is where a light throttle starts to walk it up.
+    //
+    // A cruise came out at 5-7 kHz and is now 2.3-2.9 kHz.
+    private const float TurboShaftIdleRpm = 12000f, TurboShaftFullRpm = 125000f;
+    private const int CompressorBlades = 7, TurbineBlades = 11;
+    /// <summary>Tip-clearance noise sits at this share of the blade-passing frequency.</summary>
+    private const float TipClearanceShare = 0.5f;
+    private const float CompressorToneDb = 81f, CompressorAtRpm = 60000f;     // at a metre
+    /// <summary>The blade-passing tone against the tip-clearance hump: under it at part speed, over
+    /// it at full boost, crossing between these shaft speeds.</summary>
+    private const float BpfUnderDb = -6f, BpfOverDb = 6f, BpfCrossLowRpm = 60000f, BpfCrossHighRpm = 120000f;
+    private const float WhooshDb = 68f, WhooshAtRpm = 110000f;                // at a metre
+    /// <summary>In the duct. Ten decibels lower than first set: nothing measured shows a truck's
+    /// turbine tone getting out of the tailpipe past its aftertreatment and can (Tiikoja and Abom:
+    /// the turbine is an attenuator, significant only at very high blade-passing frequencies).</summary>
+    private const float TurbineDuctDb = 100f, TurbineAtRpm = 110000f;
+
+    private static float Pa(float db) => 20e-6f * MathF.Pow(10f, db / 20f);
+
+    private float _tailRadius = -1f, _turbineMuffler;
+
+    private float Turbo()
+    {
+        if (_tailRadius < 0f)
+        {
+            var x = Profile.Exhaust;
+            _tailRadius = MathF.Max(0.01f, x.TailpipeDiameterMm * 0.5e-3f);
+            _turbineMuffler = x.Muffler.Kind == MufflerKind.None ? 1f : Pa(-15f) / 20e-6f;
+        }
+        var m = Profile.Mechanical;
+        if (m.TurboWhistleLevel <= 0f || Profile.Induction != Induction.Turbocharged || _omega <= 1f)
+        {
+            _turbineTone = 0f;
+            return 0f;
+        }
+        // Shaft speed from the spool: the model's boost goes as the square of the spool, and a
+        // compressor's pressure ratio as the square of its speed, so the speed follows the spool —
+        // but a spool idling at 0.35 (a big turbo freewheeling) is a shaft at 12-25,000, not 44,000,
+        // so it rises as the square from the idle speed: 26,000 at 0.35, 40,000 at 0.5, 125,000 flat out.
+        float sp = Math.Clamp(_spool, 0f, 1f);
+        float shaft = TurboShaftIdleRpm + (TurboShaftFullRpm - TurboShaftIdleRpm) * sp * sp;
+        float rev = shaft / 60f;
+        // The fourth power of the shaft speed, as a pressure: the square of it.
+        float Scale(float atRpm) => (shaft / atRpm) * (shaft / atRpm);
+        float lvl = m.TurboWhistleLevel;
+
+        float nyq = _rate * 0.45f;
+        float comp = 0f, turb = 0f;
+        float fc = CompressorBlades * rev;
+        float compPa = 1.41421356f * Pa(CompressorToneDb) * Scale(CompressorAtRpm) * lvl;
+        // The hump: tip-clearance noise at half the blade-passing frequency, a narrow band rather than
+        // a line — its pitch wanders a per cent or two, the rotating instability that makes it.
+        _tcnDrift += (((float)_rng.NextDouble() * 2f - 1f) - _tcnDrift) * (40f / _rate);
+        float ft0 = TipClearanceShare * fc * (1f + 0.015f * _tcnDrift);
+        if (ft0 < nyq)
+        {
+            _tcnPhase += ft0 / _rate;
+            if (_tcnPhase > 1.0) _tcnPhase -= 1.0;
+            comp += (float)Math.Sin(_tcnPhase * 2 * Math.PI) * compPa;
+        }
+        if (fc < nyq)
+        {
+            _turboPhase += fc / _rate;
+            if (_turboPhase > 1.0) _turboPhase -= 1.0;
+            float x = Math.Clamp((shaft - BpfCrossLowRpm) / (BpfCrossHighRpm - BpfCrossLowRpm), 0f, 1f);
+            float bpfDb = BpfUnderDb + (BpfOverDb - BpfUnderDb) * x;
+            comp += (float)Math.Sin(_turboPhase * 2 * Math.PI) * compPa * MathF.Pow(10f, bpfDb / 20f);
+        }
+        float ft = TurbineBlades * rev;
+        if (ft < nyq)
+        {
+            _turbinePhase += ft / _rate;
+            if (_turbinePhase > 1.0) _turbinePhase -= 1.0;
+            turb = (float)Math.Sin(_turbinePhase * 2 * Math.PI) * 1.41421356f * Pa(TurbineDuctDb) * Scale(TurbineAtRpm) * lvl
+                 * _tailRadius * 0.70710678f * _turbineMuffler;
+        }
+        _turbineTone = turb;
+
+        float n = (float)(_rng.NextDouble() * 2 - 1);
+        float band = _wB0 * n + _wB2 * _wx2 - _wA1 * _wb1 - _wA2 * _wb2;
+        _wx2 = _wx1; _wx1 = n; _wb2 = _wb1; _wb1 = band;
+        float whoosh = band * _whooshNorm * Pa(WhooshDb) * Scale(WhooshAtRpm) * lvl;
+        return comp + whoosh;
+    }
+
+    /// <summary>The whoosh band: a band-pass biquad centred on 2.3 kHz spanning 1.5-3.5, normalised
+    /// to unit RMS by measurement on its own noise.</summary>
+    private void SetUpWhooshBand()
+    {
+        float f0 = 2300f, q = 1.15f;
+        float w0 = 2f * MathF.PI * f0 / _rate, alpha = MathF.Sin(w0) / (2f * q), a0 = 1f + alpha;
+        _wB0 = alpha / a0; _wB2 = -alpha / a0;
+        _wA1 = -2f * MathF.Cos(w0) / a0; _wA2 = (1f - alpha) / a0;
+        var rng = new Random(2);
+        double e = 0; float x1 = 0, x2 = 0, y1 = 0, y2 = 0; int count = (int)(_rate * 2f), skip = (int)(_rate * 0.1f);
+        for (int i = 0; i < count; i++)
+        {
+            float x = (float)(rng.NextDouble() * 2 - 1);
+            float y = _wB0 * x + _wB2 * x2 - _wA1 * y1 - _wA2 * y2;
+            x2 = x1; x1 = x; y2 = y1; y1 = y;
+            if (i >= skip) e += y * (double)y;
+        }
+        _whooshNorm = 1f / MathF.Sqrt((float)(e / (count - skip)));
     }
 
     // ── The starter motor ─────────────────────────────────────────────────────────────────────
@@ -1351,6 +1578,7 @@ public sealed class EngineSynth
     public void Reset()
     {
         _omega = 0f; _theta = 0; _idleAir = 0f; _spool = 0f; _massFlowLp = 0f;
+        _turbineTone = 0f; _wb1 = _wb2 = _wx1 = _wx2 = 0f;
     }
 
     /// <summary>Console lines about the built engine.</summary>

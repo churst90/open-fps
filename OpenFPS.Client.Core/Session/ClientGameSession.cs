@@ -370,6 +370,25 @@ public sealed class ClientGameSession : IDisposable
         return OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.TracedReverbStatus(null);
     }
 
+    /// <summary>
+    /// /valveflow on | off: the broadband rush of gas through each exhaust valve as it opens
+    /// (EngineSynth.BlowdownJet). New on 2026-09-26 and changes every engine, the loud V8s most, so it
+    /// can be switched live to hear what it does. Plain /valveflow says which.
+    /// </summary>
+    internal static string ValveFlowCommand(string[] args)
+    {
+        if (args.Length > 0)
+        {
+            string a = args[0].ToLowerInvariant();
+            if (a is "on") OpenFPS.Client.AudioEngine.Core.Engine.EngineSynth.ValveJetNoise = true;
+            else if (a is "off") OpenFPS.Client.AudioEngine.Core.Engine.EngineSynth.ValveJetNoise = false;
+            else return "Valve flow: say /valveflow on or /valveflow off.";
+        }
+        return OpenFPS.Client.AudioEngine.Core.Engine.EngineSynth.ValveJetNoise
+            ? "Valve flow on: the exhaust valves rush."
+            : "Valve flow off: the exhaust is pulses only, as before.";
+    }
+
     internal static string LevelsCommand(string[] args, Action? save = null)
     {
         string Now() => $"{MathF.Round(OpenFPS.Common.Loudness.DynamicRangeCompression * 100f)} percent";
@@ -1187,6 +1206,26 @@ public sealed class ClientGameSession : IDisposable
             if (parts[0].Equals("reverb", StringComparison.OrdinalIgnoreCase))
             {
                 Say(ReverbCommand(parts.Skip(1).ToArray()));
+                return;
+            }
+            if (parts[0].Equals("echoes", StringComparison.OrdinalIgnoreCase))
+            {
+                var a = parts.Skip(1).FirstOrDefault()?.ToLowerInvariant();
+                if (a is "on") OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.TracedEchoesOn = true;
+                else if (a is "off") OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.TracedEchoesOn = false;
+                else if (a != null && float.TryParse(a, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float db))
+                {
+                    // /echoes -12: on, twelve decibels under the traced level.
+                    OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.TracedEchoTrimDb = Math.Clamp(db, -40f, 0f);
+                    OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.TracedEchoesOn = true;
+                }
+                else if (a != null) { Say("Echoes: say /echoes on, /echoes off, or a level such as /echoes -12."); return; }
+                Say(OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.TracedEchoesStatus());
+                return;
+            }
+            if (parts[0].Equals("valveflow", StringComparison.OrdinalIgnoreCase))
+            {
+                Say(ValveFlowCommand(parts.Skip(1).ToArray()));
                 return;
             }
             // So is how loud the world is: yours, and saved.

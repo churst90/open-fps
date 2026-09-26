@@ -240,6 +240,7 @@ internal static partial class Phonon
     [DllImport(Lib, CallingConvention = CC)] public static extern int iplSourceCreate(IntPtr simulator, ref IPLSourceSettings settings, out IntPtr source);
     [DllImport(Lib, CallingConvention = CC)] public static extern void iplSourceRelease(ref IntPtr source);
     [DllImport(Lib, CallingConvention = CC)] public static extern void iplSourceAdd(IntPtr source, IntPtr simulator);
+    [DllImport(Lib, CallingConvention = CC)] public static extern void iplSourceRemove(IntPtr source, IntPtr simulator);
     [DllImport(Lib, CallingConvention = CC)] public static extern void iplSourceSetInputs(IntPtr source, int flags, ref IPLSimulationInputs inputs);
     [DllImport(Lib, CallingConvention = CC)] public static extern void iplSourceGetOutputs(IntPtr source, int flags, ref IPLSimulationOutputs outputs);
 

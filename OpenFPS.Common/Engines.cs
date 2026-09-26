@@ -743,12 +743,15 @@ public sealed record EngineProfile
         Mechanical = new MechanicalSpec { ValvetrainLevel = 1.0f, CombustionKnock = 0.08f, AccessoryWhineLevel = 0.15f, AccessoryWhineOrder = 2.5f },
         Exhaust = new ExhaustSpec
         {
-            PrimaryLengthMetres = 0.42f, PrimarySpread = 0.10f, PrimaryDiameterMm = 34f,
-            CollectorDiameterMm = 50f, CollectorPipeMetres = 0.30f,
+            // Shortened 2026-09-26 (Cody: "shorten the length of the exhaust on the motorcycle"):
+            // 1.23 m of system to 0.78, the cut taken from the headers and link pipes and not the
+            // can; and again, "I still think the exhaust is too long on the motor cycles".
+            PrimaryLengthMetres = 0.30f, PrimarySpread = 0.10f, PrimaryDiameterMm = 34f,
+            CollectorDiameterMm = 50f, CollectorPipeMetres = 0.12f,
             Crossover = CrossoverKind.None,
-            MidPipeMetres = 0.15f,
+            MidPipeMetres = 0.04f,
             Muffler = MufflerSpec.Glasspack with { Absorption = 0.25f, AbsorptiveLengthMetres = 0.24f },
-            TailpipeMetres = new[] { 0.12f },
+            TailpipeMetres = new[] { 0.08f },
             TailpipeDiameterMm = 50f,
             // Short, thin, hot pipes and a hard blowdown: a bike keeps its top end where a saloon's
             // long system loses it.
@@ -944,7 +947,7 @@ public sealed record EngineProfile
         Exhaust = VTwin45.Exhaust with
         {
             Muffler = MufflerSpec.Stock,
-            TailpipeMetres = new[] { 0.32f, 0.42f },
+            TailpipeMetres = new[] { 0.24f, 0.32f },
             TailpipeDiameterMm = 44f,
             OverrunPopRate = 1.0f,
         },
@@ -966,7 +969,7 @@ public sealed record EngineProfile
             // is not what a slip-on is: it is halfway between stock and straight, and the length
             // and density of the packing are what put it there.
             Muffler = MufflerSpec.Glasspack with { Absorption = 0.86f, AbsorptiveLengthMetres = 0.35f },
-            TailpipeMetres = new[] { 0.30f, 0.40f },
+            TailpipeMetres = new[] { 0.22f, 0.30f },
             TailpipeDiameterMm = 48f,
             OverrunPopRate = 6f,
         },
@@ -1262,11 +1265,12 @@ public sealed record EngineProfile
         PeakTorqueNm = 150f, PeakTorqueRpm = 3200f,
         Exhaust = new ExhaustSpec
         {
-            PrimaryLengthsMetres = new[] { 0.55f, 0.85f }, PrimaryDiameterMm = 45f,
+            // Shortened 2026-09-26, as the sports bike's: the rear pipe 1.65 m to 1.02.
+            PrimaryLengthsMetres = new[] { 0.38f, 0.52f }, PrimaryDiameterMm = 45f,
             CollectorGroups = new[] { new[] { 0 }, new[] { 1 } },
-            CollectorDiameterMm = 45f, CollectorPipeMetres = 0.25f,
+            CollectorDiameterMm = 45f, CollectorPipeMetres = 0.10f,
             Crossover = CrossoverKind.None,
-            MidPipeMetres = 0.2f,
+            MidPipeMetres = 0.05f,
             // STRAIGHT PIPES, which is what its own name has always said. It was carrying a
             // glasspack, and that was only part of why it came out as rumble.
             Muffler = MufflerSpec.StraightPipe,
@@ -1317,13 +1321,14 @@ public sealed record EngineProfile
         PeakTorqueNm = 48f, PeakTorqueRpm = 7000f,
         Exhaust = new ExhaustSpec
         {
-            PrimaryLengthMetres = 0.75f, PrimaryDiameterMm = 42f,
+            // Shortened 2026-09-26, as the sports bike's: 1.75 m of system to 1.07.
+            PrimaryLengthMetres = 0.45f, PrimaryDiameterMm = 42f,
             CollectorGroups = new[] { new[] { 0 } },
-            CollectorDiameterMm = 42f, CollectorPipeMetres = 0.3f,
+            CollectorDiameterMm = 42f, CollectorPipeMetres = 0.12f,
             Crossover = CrossoverKind.None,
-            MidPipeMetres = 0.2f,
+            MidPipeMetres = 0.05f,
             Muffler = MufflerSpec.Glasspack with { Absorption = 0.45f, AbsorptiveLengthMetres = 0.35f },
-            TailpipeMetres = new[] { 0.15f },
+            TailpipeMetres = new[] { 0.10f },
             TailpipeDiameterMm = 45f,
             GasCelsiusIdle = 350f, GasCelsiusFull = 850f,
             WallLossMultiplier = 1.3f,
@@ -1861,6 +1866,47 @@ public sealed record EngineProfile
         PeakTorqueNm = 450f, PeakTorqueRpm = 4000f,
     };
 
+    // ── Street engines (2026-09-26): the speedway engines with road exhausts; see Vehicles.cs "Street cars".
+
+    public static EngineProfile Inline4Compact18 => Inline4Economy with
+    {
+        Name = "1.8 inline-4, stock exhaust",
+        BoreMm = 80.5f, StrokeMm = 88.3f, PeakTorqueNm = 172f, PeakTorqueRpm = 4200f,
+    };
+
+    public static EngineProfile Inline4Midsize25 => Inline4Economy with
+    {
+        Name = "2.5 inline-4, stock exhaust",
+        BoreMm = 90f, StrokeMm = 98f, PeakTorqueNm = 240f, PeakTorqueRpm = 4000f, RedlineRpm = 6200f,
+        ExhaustValve = new ValveSpec { Count = 2, DiameterMm = 30f },
+        IntakeValve = new ValveSpec { Count = 2, DiameterMm = 36f },
+        Exhaust = EngineProfile.Inline4Economy.Exhaust with { PrimaryDiameterMm = 38f, CollectorDiameterMm = 55f, TailpipeDiameterMm = 54f },
+    };
+
+    public static EngineProfile Inline4SportStreet => Inline4Sport with
+    {
+        Name = "2.0 inline-4, sport cat-back",
+        Exhaust = EngineProfile.Inline4Sport.Exhaust with
+        {
+            Muffler = MufflerSpec.Stock with { Absorption = 0.15f, BaffleLoss = 0.35f, ResonatorHz = 0f },
+        },
+    };
+
+    public static EngineProfile Boxer4Street => Boxer4 with
+    {
+        Name = "2.5 flat-4, unequal headers, cat-back",
+        Exhaust = EngineProfile.Boxer4.Exhaust with
+        {
+            Muffler = MufflerSpec.Stock with { Absorption = 0.3f, ResonatorHz = 0f },
+        },
+    };
+
+    public static EngineProfile Inline6Street => Inline6 with
+    {
+        Name = "3.0 inline-6, stock exhaust",
+        Exhaust = EngineProfile.Inline6.Exhaust with { Muffler = MufflerSpec.Stock with { ResonatorHz = 110f } },
+    };
+
     /// <summary>
     /// The International DT466 out of a school bus.
     ///
@@ -2262,6 +2308,11 @@ public sealed record EngineProfile
             ["v8_sports"] = () => V8SportsFlowmaster40,
             ["v8_flatplane"] = () => V8FlatPlane,
             ["i4_economy"] = () => Inline4Economy,
+            ["i4_compact"] = () => Inline4Compact18,
+            ["i4_midsize"] = () => Inline4Midsize25,
+            ["i4_sport_street"] = () => Inline4SportStreet,
+            ["boxer4_street"] = () => Boxer4Street,
+            ["i6_street"] = () => Inline6Street,
             ["i4_sport"] = () => Inline4Sport,
             // Missing until a machine's parts list had to NAME the engine it holds: the turbo four
             // was reachable as a C# static and not as a key, so the one vehicle using it could not

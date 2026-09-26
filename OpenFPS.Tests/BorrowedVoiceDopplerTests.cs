@@ -21,6 +21,7 @@ namespace OpenFPS.Tests;
 /// channel pitched up for an approaching car makes the mixer ask for more input per block, and a
 /// borrowed voice reading from it. What comes out must be at the pitch the source was SYNTHESIZED at.
 /// </summary>
+[Collection(nameof(ValveFlowSwitch))]
 public class BorrowedVoiceDopplerTests
 {
     private readonly ITestOutputHelper _o;
@@ -85,10 +86,13 @@ public class BorrowedVoiceDopplerTests
         // 25 % faster consumption is what a channel pitched up for a car approaching at 70 m/s does.
         const double approaching = 1.25;
 
-        var truth = Run(ownCursor: true, consumeRate: 1.0, blocks: 24);
-        var control = Run(ownCursor: false, consumeRate: 1.0, blocks: 24);
-        var inherited = Run(ownCursor: false, consumeRate: approaching, blocks: 24);
-        var own = Run(ownCursor: true, consumeRate: approaching, blocks: 24);
+        // The period is found by autocorrelation, which the valves' broadband flow noise pulls about;
+        // the mechanism under test is the cursor, not the noise.
+        var (truth, control, inherited, own) = ValveFlowSwitch.Without(() => (
+            Run(ownCursor: true, consumeRate: 1.0, blocks: 24),
+            Run(ownCursor: false, consumeRate: 1.0, blocks: 24),
+            Run(ownCursor: false, consumeRate: approaching, blocks: 24),
+            Run(ownCursor: true, consumeRate: approaching, blocks: 24)));
 
         // A stock car at 200 km/h fires somewhere around 200-400 Hz; look for a period between.
         int from = (int)(Rate / 600f), to = (int)(Rate / 80f);

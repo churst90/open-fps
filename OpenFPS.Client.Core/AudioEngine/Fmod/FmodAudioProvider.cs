@@ -194,13 +194,7 @@ internal class FmodResourceManager : IDisposable
             return SoundLoadState.Loading;
         }
 
-        string path;
-        if (soundId.Contains("ASSETS", StringComparison.OrdinalIgnoreCase)) path = soundId;
-        else
-        {
-            string normId = soundId.Replace('/', Path.DirectorySeparatorChar).Replace('\\', Path.DirectorySeparatorChar);
-            path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ASSETS", "SOUNDS", normId);
-        }
+        string path = FmodAudioProvider.SoundFilePath(soundId);
 
         if (!File.Exists(path))
         {
@@ -565,6 +559,13 @@ public class FmodAudioProvider : IAudioProvider
         // Steam Audio per-voice binaural effect (null when SA disabled / falling back to FMOD pan).
         public SteamAudioVoiceState? SaState;
         public FMOD.DSP SaDsp;
+        /// <summary>This voice's traced echoes, while it is one of the few (UpdateTracedEchoes).</summary>
+        public TracedEchoRig? EchoRig;
+        /// <summary>How far over to the traced echoes this voice is, 0..1, slewed; and whether it is on
+        /// its way back to the ordinary paths.</summary>
+        public float EchoWeight;
+        public bool EchoLeaving;
+        public double EchoSince;
         public System.Runtime.InteropServices.GCHandle SaHandle;
     }
 
@@ -1605,6 +1606,283 @@ public class FmodAudioProvider : IAudioProvider
     /// <summary>Whether traced mode is in force right now: asked for, and a trace to play.</summary>
     internal static bool TracedActive => TracedOutdoors && TracedReverbSet.Listener != null;
 
+    // ── Traced echoes: a few sources traced from where they are ──────────────────────────────
+    //
+    // "When a cop car or the train passes, I hear the reflections bounce around from one building to
+    // another as the source of sound moves" — the mirror-image echoes jumping facade to facade. The
+    // loudest few sustained sources at the ear are traced from their own positions instead
+    // (TracedEchoes): every order of reflection, crossfaded as they move. "Only sources that the
+    // user can tell like loud sources but not everything, or sources that frequently recycle like
+    // passing cars" — so they are chosen by the level they render at, which a passing car reaches
+    // as it comes close and loses as it goes, and nothing else pays for them.
+    //
+    // Each one's rig (TracedEchoRig) is two units on its own channel: a capture at the input end,
+    // before the HRTF, and a mix at the output end, after the fader (index 0 is the output end:
+    // --dsp-order). The echoes therefore carry none of the direct path's distance law, occlusion or
+    // EQ — the trace has its own — and are added in the same block as the voice, not a block late.
+
+    /// <summary>/echoes on | off | a trim in dB. On by default at the level Cody set by ear (-24 dB,
+    /// 2026-09-26), for far sources only; OPENFPS_ECHOES=off starts with them off.</summary>
+    public static volatile bool TracedEchoesOn = !string.Equals(Environment.GetEnvironmentVariable("OPENFPS_ECHOES"), "off", StringComparison.OrdinalIgnoreCase);
+    /// <summary>Entities whose echoes are traced this frame, for the game side to stop making their
+    /// mirror images. Written by the audio update; read by ClientAudioSystem.</summary>
+    private static volatile int[] _tracedEchoIds = Array.Empty<int>();
+    public static bool HasTracedEchoes(int entityId)
+    {
+        var ids = _tracedEchoIds;
+        foreach (int id in ids) if (id == entityId) return true;
+        return false;
+    }
+
+    private readonly List<TracedEchoRig> _echoRigs = new();
+    private bool _echoRigsTried;
+    private readonly List<(ActiveSound A, float Score)> _echoCandidates = new();
+    /// <summary>A candidate must render within this much of the loudest voice to be worth a trace:
+    /// under it, its echoes are under everything else's.</summary>
+    private const float EchoWithinDb = 30f;
+    /// <summary>Held once chosen until it falls this far behind the one that would replace it, so a
+    /// pair of cars at the edge do not swap every frame.</summary>
+    private const float EchoHoldDb = 4f;
+    private const int MaxEchoTapsPerTrain = 2;
+    /// <summary>
+    /// Only FAR sources. Close to, a voice already has its direct sound, its ground bounce and the
+    /// near walls, all exactly; a traced response on top of that stacked a second set of strong early
+    /// reflections a few milliseconds behind the direct sound, and a copy that close is a comb:
+    /// "sources that are close to me sound boxy and flanged and reflections stack up. this should
+    /// only apply for sources far away and loud". In from this distance, out again inside the hold.
+    /// </summary>
+    private const float EchoEnterMetres = 30f, EchoHoldMetres = 22f;
+    /// <summary>How long the hand-over between the ordinary paths and the traced ones takes.</summary>
+    private const float EchoFadeSeconds = 0.6f;
+    private long _echoTickAt;
+    /// <summary>
+    /// The traced echoes against their physical level, dB; /echoes -12 sets it. Measured streets put
+    /// the multi-bounce energy about level with the direct sound at 30 m (Picaut and Simon 2005; an
+    /// image bound with 1 dB per facade, RLS-90), and that is what the trace gave — and it was "way
+    /// too strong ... coloring": a real facade SCATTERS each bounce, and the traced copies arrive
+    /// coherent, a few tens of milliseconds behind and a few degrees off the source, which is where
+    /// the ear hears colour (Barron; Zurek's diotic threshold is 10 dB lower). Until the copies are
+    /// decorrelated, a trim, set by ear.
+    /// </summary>
+    public static volatile float TracedEchoTrimDb = -24f;   // Cody, by ear, 2026-09-26
+    /// <summary>Once chosen, a source keeps its trace at least this long: no flicker as it passes
+    /// behind something.</summary>
+    private const float EchoMinHoldSeconds = 3f;
+    private double _echoLogAt;
+
+    private void MakeEchoRigs(TracedEchoes echoes)
+    {
+        _echoRigsTried = true;
+        if (_saContext == IntPtr.Zero || _saHrtf == IntPtr.Zero) return;
+        var au = new Phonon.IPLAudioSettings { samplingRate = 44100, frameSize = _saFrameSize };
+        for (int k = 0; k < TracedEchoes.MaxSources; k++)
+        {
+            var es = new Phonon.IPLReflectionEffectSettings
+            {
+                type = Phonon.IPL_REFLECTIONEFFECTTYPE_CONVOLUTION, irSize = echoes.IrSize, numChannels = TracedEchoes.Channels,
+            };
+            if (Phonon.iplReflectionEffectCreate(echoes.Context, ref au, ref es, out IntPtr effect) != Phonon.IPL_STATUS_SUCCESS) break;
+            if (Phonon.iplReflectionEffectCreate(echoes.Context, ref au, ref es, out IntPtr effectB) != Phonon.IPL_STATUS_SUCCESS) break;
+            var ds = new Phonon.IPLAmbisonicsDecodeEffectSettings { speakerLayout = Phonon.StereoLayout(), hrtf = _saHrtf, maxOrder = TracedEchoes.Order };
+            if (Phonon.iplAmbisonicsDecodeEffectCreate(_saContext, ref au, ref ds, out IntPtr decode) != Phonon.IPL_STATUS_SUCCESS) break;
+            var rig = new TracedEchoRig
+            {
+                FrameSize = _saFrameSize, WorkerContext = echoes.Context, ProviderContext = _saContext,
+                Effect = effect, EffectB = effectB, Decode = decode, Hrtf = _saHrtf,
+                Capture = new float[_saFrameSize], MonoScratch = new float[_saFrameSize], StereoScratch = new float[_saFrameSize * 2],
+                AmbiScratchA = new float[_saFrameSize * TracedEchoes.Channels], AmbiScratchB = new float[_saFrameSize * TracedEchoes.Channels],
+                Orientation = Phonon.ListenerFrame(_listenerRot),
+            };
+            Phonon.iplAudioBufferAllocate(echoes.Context, 1, _saFrameSize, ref rig.Mono);
+            Phonon.iplAudioBufferAllocate(echoes.Context, TracedEchoes.Channels, _saFrameSize, ref rig.Ambi);
+            Phonon.iplAudioBufferAllocate(echoes.Context, TracedEchoes.Channels, _saFrameSize, ref rig.AmbiB);
+            Phonon.iplAudioBufferAllocate(_saContext, 2, _saFrameSize, ref rig.Stereo);
+            if (TracedEchoDsp.Create(_system, rig) != RESULT.OK) break;
+            _echoRigs.Add(rig);
+        }
+        Log.Information("Traced echoes: {Count} rigs ready (IR {Ir:F1} s, first order).", _echoRigs.Count, TracedEchoes.DurationSeconds);
+    }
+
+    private void AttachEchoRig(ActiveSound a, TracedEchoRig rig, TracedEchoes echoes)
+    {
+        int slot = echoes.Acquire(a.CurrentApparentPosition);
+        if (slot < 0) return;
+        a.Channel.getNumDSPs(out int n);
+        // The capture at the input end, before the HRTF; the mix at the output end, after the fader.
+        if (a.Channel.addDSP(n, rig.CaptureDsp) != RESULT.OK) { echoes.Release(slot); return; }
+        if (a.Channel.addDSP(0, rig.MixDsp) != RESULT.OK)
+        {
+            a.Channel.removeDSP(rig.CaptureDsp);
+            echoes.Release(slot);
+            return;
+        }
+        rig.Owner = a.EntityId;
+        rig.AttachGeneration[0] = System.Threading.Volatile.Read(ref echoes.BankGeneration[0]);
+        rig.AttachGeneration[1] = System.Threading.Volatile.Read(ref echoes.BankGeneration[1]);
+        a.EchoWeight = 0f;
+        a.EchoLeaving = false;
+        a.EchoSince = System.Diagnostics.Stopwatch.GetTimestamp() / (double)System.Diagnostics.Stopwatch.Frequency;
+        rig.NeedsReset = true;
+        rig.Fresh = false;
+        rig.Slot = slot;
+        a.EchoRig = rig;
+    }
+
+    /// <summary>Takes a voice's rig off it — removeDSP blocks until a callback in flight returns —
+    /// and hands the rig back to the pool. The rig itself is never freed.</summary>
+    private void DetachEchoRig(ActiveSound a)
+    {
+        var rig = a.EchoRig;
+        if (rig == null) return;
+        a.EchoRig = null;
+        int slot = rig.Slot;
+        rig.Slot = -1;
+        if (a.Channel.hasHandle())
+        {
+            a.Channel.removeDSP(rig.MixDsp);
+            a.Channel.removeDSP(rig.CaptureDsp);
+        }
+        TracedReverbSet.Echoes?.Release(slot);
+        rig.Owner = 0;
+    }
+
+    private void UpdateTracedEchoes()
+    {
+        var echoes = TracedReverbSet.Echoes;
+        if (echoes == null || !TracedEchoesOn || !TracedActive || !_steamAudioEnabled)
+        {
+            foreach (var a in _activeSounds) if (a.EchoRig != null) DetachEchoRig(a);
+            if (_tracedEchoIds.Length > 0) _tracedEchoIds = Array.Empty<int>();
+            return;
+        }
+        if (!_echoRigsTried) MakeEchoRigs(echoes);
+        if (_echoRigs.Count == 0) return;
+        echoes.SetListener(_listenerPos);
+
+        // Who: sustained sources with a binaural voice of their own, by the level they render at.
+        _echoCandidates.Clear();
+        float loudest = 0f;
+        foreach (var a in _activeSounds)
+        {
+            if (!a.SaDsp.hasHandle() || a.IsReflection || a.EchoState != null || a.TapState != null) continue;
+            if (a.EngineState == null && a.MachineState == null) continue;
+            if (a.FadeTarget <= 0f || a.LastVolume <= 0f) continue;
+            float dist = Vector3.Distance(_listenerPos, a.CurrentApparentPosition);
+            if (dist < (a.EchoRig != null && !a.EchoLeaving ? EchoHoldMetres : EchoEnterMetres)) continue;
+            // Ranked by what it radiates at this distance, not by what gets through: LastVolume carries
+            // occlusion and the cone, which swing as a siren passes behind a building, and ranking on
+            // them flickered the trace in and out — "reflect, cut out, cut in, cut out".
+            float level = a.BaseVolume * Loudness.RenderedGain(1.0f, a.MinDistance, a.Range, dist);
+            bool held = a.EchoRig != null && !a.EchoLeaving;
+            float score = level * (held ? MathF.Pow(10f, EchoHoldDb / 20f) : 1f);
+            loudest = MathF.Max(loudest, level);
+            _echoCandidates.Add((a, score));
+        }
+        _echoCandidates.Sort((x, y) => y.Score.CompareTo(x.Score));
+        float floor = loudest * MathF.Pow(10f, -EchoWithinDb / 20f);
+        int allowed = _echoRigs.Count;
+        var keep = new HashSet<ActiveSound>();
+        // A train is a line of sources on one synth; its two loudest carry its echoes, so one train
+        // cannot take every rig from the cars and the siren.
+        var perTrain = new Dictionary<string, int>();
+        foreach (var (a, score) in _echoCandidates)
+        {
+            if (keep.Count >= allowed || score < floor) break;
+            if (a.MachineState is TrainTapState tap)
+            {
+                perTrain.TryGetValue(tap.Shared.Key, out int c);
+                if (c >= MaxEchoTapsPerTrain) continue;
+                perTrain[tap.Shared.Key] = c + 1;
+            }
+            keep.Add(a);
+        }
+        double nowS = System.Diagnostics.Stopwatch.GetTimestamp() / (double)System.Diagnostics.Stopwatch.Frequency;
+        foreach (var a in _activeSounds)
+        {
+            if (a.EchoRig == null) continue;
+            bool wanted = keep.Contains(a);
+            // A source not wanted any more still keeps its trace out the minimum hold, unless it
+            // has come close — close is where the trace does harm.
+            bool close = Vector3.Distance(_listenerPos, a.CurrentApparentPosition) < EchoHoldMetres;
+            if (!wanted && !close && nowS - a.EchoSince < EchoMinHoldSeconds) { keep.Add(a); wanted = true; }
+            a.EchoLeaving = !wanted;
+        }
+        foreach (var a in keep)
+        {
+            if (a.EchoRig != null) continue;
+            TracedEchoRig? free = null;
+            foreach (var r in _echoRigs) if (r.Slot < 0) { free = r; break; }
+            if (free == null) break;
+            AttachEchoRig(a, free, echoes);
+        }
+
+        // Each frame: where each one is, and its level at a metre with the same loudness law the
+        // direct sound gets, so the echoes stand to the direct sound as they would in the air.
+        long tick = System.Diagnostics.Stopwatch.GetTimestamp();
+        float dt = _echoTickAt == 0 ? 0f : Math.Clamp((tick - _echoTickAt) / (float)System.Diagnostics.Stopwatch.Frequency, 0f, 0.25f);
+        _echoTickAt = tick;
+        var orient = Phonon.ListenerFrame(_listenerRot);
+        var ids = new List<int>();
+        List<ActiveSound>? gone = null;
+        foreach (var a in _activeSounds)
+        {
+            var rig = a.EchoRig;
+            if (rig == null) continue;
+            float step = dt / EchoFadeSeconds;
+            a.EchoWeight = Math.Clamp(a.EchoWeight + (a.EchoLeaving ? -step : step), 0f, 1f);
+            if (a.EchoLeaving && a.EchoWeight <= 0f) { (gone ??= new()).Add(a); continue; }
+            float d = MathF.Max(1f, Vector3.Distance(_listenerPos, a.CurrentApparentPosition));
+            float law = Loudness.RenderedGain(1.0f, a.MinDistance, a.Range, d) * d;   // the law over 1/d
+            rig.InputGain = a.BaseVolume * a.FadeGain * law * a.EchoWeight * MathF.Pow(10f, TracedEchoTrimDb / 20f);
+            rig.Orientation = orient;
+            echoes.SetSource(rig.Slot, a.CurrentApparentPosition);
+            // The mirror images give way once the trace carries most of it, and come back first.
+            if (a.EchoWeight >= 0.5f && !a.EchoLeaving) ids.Add(a.EntityId);
+        }
+        if (gone != null) foreach (var a in gone) DetachEchoRig(a);
+        _tracedEchoIds = ids.ToArray();
+
+        double now = System.Diagnostics.Stopwatch.GetTimestamp() / (double)System.Diagnostics.Stopwatch.Frequency;
+        if (now >= _echoLogAt)
+        {
+            _echoLogAt = now + 5.0;
+            var parts = new List<string>();
+            foreach (var a in _activeSounds)
+                if (a.EchoRig is { } r)
+                    parts.Add($"{a.SoundId}#{a.EntityId} {20 * Math.Log10(Math.Max(1e-9, a.LastVolume)):F0} dB in {20 * Math.Log10(Math.Max(1e-9, r.InRms)):F0} out {20 * Math.Log10(Math.Max(1e-9, r.OutRms)):F0}");
+            if (parts.Count > 0)
+                Log.Information("Traced echoes: {N} source(s), trace {Ms:F0} ms: {List}", parts.Count, echoes.LastRunMs, string.Join("; ", parts));
+        }
+    }
+
+    public static string TracedEchoesStatus()
+    {
+        var e = TracedReverbSet.Echoes;
+        string mode = TracedEchoesOn ? "on" : "off";
+        if (e == null) return $"Echoes: {mode}. No tracer yet — the scene is still being built.";
+        return $"Echoes: {mode}, {TracedEchoTrimDb:F0} dB against physical. {_tracedEchoIds.Length} far source(s) traced from where they are; {e.Runs} traces, the last in {e.LastRunMs:F0} ms.";
+    }
+
+    /// <summary>Where a sound id's file is: the path the loader opens.</summary>
+    internal static string SoundFilePath(string soundId)
+    {
+        if (soundId.Contains("ASSETS", StringComparison.OrdinalIgnoreCase)) return soundId;
+        string normId = soundId.Replace('/', Path.DirectorySeparatorChar).Replace('\\', Path.DirectorySeparatorChar);
+        return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ASSETS", "SOUNDS", normId);
+    }
+
+    /// <summary>A recorded take's correction to its bank's median level (TakeLevels); 1 for anything
+    /// synthesized, and for a file that is not one of a bank.</summary>
+    private static float TakeGain(in SpatialEmitter emitter)
+    {
+        if (emitter.IsSynth || emitter.IsGranular || string.IsNullOrEmpty(emitter.SoundId)) return 1f;
+        string path = SoundFilePath(emitter.SoundId);
+        if (!File.Exists(path))
+            foreach (var ext in new[] { ".wav", ".ogg", ".mp3" })
+                if (File.Exists(path + ext)) { path += ext; break; }
+        return TakeLevels.GainFor(path);
+    }
+
     /// <summary>For the /reverb readout: mode, and how the tracing is doing.</summary>
     public static string TracedReverbStatus(FmodAudioProvider? p)
     {
@@ -1653,6 +1931,8 @@ public class FmodAudioProvider : IAudioProvider
         foreach (var kv in _traced)
         {
             bool audible = want && _reverbVolumes.TryGetValue(kv.Key, out float v) && v > 0.001f;
+            // A stage about to be heard needs its own copy of its trace.
+            if (audible) kv.Value.State.Trace?.EnsureReader(kv.Value.State.Reader);
             if (_tracedRunning.TryGetValue(kv.Key, out bool was) && was == audible && _tracedModeApplied == want) continue;
             kv.Value.Dsp.setBypass(!audible);
             _tracedRunning[kv.Key] = audible;
@@ -1696,6 +1976,8 @@ public class FmodAudioProvider : IAudioProvider
             Effect = effect, Decode = decode, Hrtf = _saHrtf, Trace = tr,
             MonoScratch = new float[_saFrameSize], StereoScratch = new float[_saFrameSize * 2],
             Orientation = Phonon.ListenerFrame(_listenerRot),
+            // Its own reader in every trace it will play: see TracedReverb.MaxReaders.
+            Reader = Math.Min(_traced.Count, TracedReverb.MaxReaders - 1),
         };
         Phonon.iplAudioBufferAllocate(tr.Context, 1, _saFrameSize, ref st.Mono);
         Phonon.iplAudioBufferAllocate(tr.Context, TracedReverb.Channels, _saFrameSize, ref st.Ambi);
@@ -2515,7 +2797,7 @@ public class FmodAudioProvider : IAudioProvider
                 LastAttributeAt = emitter.PositionSampledAt > 0 ? emitter.PositionSampledAt : OpenFPS.Common.AudioClock.Now,
                 CurrentApparentPosition = (emitter.ApparentPosition != Vector3.Zero) ? emitter.ApparentPosition : emitter.Position, 
                 EffectiveDistance = emitter.EffectiveDistance, Velocity = emitter.Velocity, Direction = emitter.Direction, 
-                Range = emitter.Range, MinDistance = emitter.MinDistance, BaseVolume = emitter.Volume, Pitch = emitter.Pitch,
+                Range = emitter.Range, MinDistance = emitter.MinDistance, BaseVolume = emitter.Volume * TakeGain(emitter), Pitch = emitter.Pitch,
                 TargetOcclusion = emitter.Occlusion, 
                 CurrentOcclusion = emitter.Occlusion,
                 TargetAperture = emitter.ApertureFactor, CurrentAperture = emitter.ApertureFactor,
@@ -2609,7 +2891,7 @@ public class FmodAudioProvider : IAudioProvider
                 active.FollowsListener = emitter.FollowsListener; active.ListenerOffset = emitter.ListenerOffset;
                 active.EffectiveDistance = emitter.EffectiveDistance; active.Velocity = emitter.Velocity; 
                 active.Direction = emitter.Direction; active.Range = emitter.Range; 
-                active.BaseVolume = emitter.Volume; 
+                active.BaseVolume = emitter.Volume * TakeGain(emitter); 
                 if (emitter.IsGranular && active.GranularState != null)
                 {
                     active.GranularState.Position = emitter.GranularPosition;
@@ -3047,6 +3329,7 @@ public class FmodAudioProvider : IAudioProvider
                 _dbgFrame++;
                 UpdateActiveReverbs(lPosVec);
                 UpdateTracedStages();
+                UpdateTracedEchoes();
                 ApplySimulatedReverb(listenerRegionId);
 
                 for (int i = _activeSounds.Count - 1; i >= 0; i--)
@@ -3118,6 +3401,7 @@ public class FmodAudioProvider : IAudioProvider
         // Every POOLED DSP has to come off while the channel is still alive. removeDSP is also the
         // call that blocks until an in-flight callback returns, which is the safety we actually want
         // here — so it has to be the first thing that happens, not something done to a corpse.
+        DetachEchoRig(active);
         ReleaseSteamAudioVoice(active);
         ReleaseThreeEqDsp(active.Channel, active.ThreeEqDsp);
         ReleaseDiffractionDsp(active.Channel, active.DiffractionDsp);
@@ -3687,6 +3971,8 @@ public class FmodAudioProvider : IAudioProvider
             if (_traced.ContainsKey(active.TargetRegionId)) ownMix = active.IsReflection ? 0f : 1f;
             if (_traced.ContainsKey(_listenerRegionId)) crossMix = active.IsReflection ? 0f : 1f;
         }
+        // A source traced from where it is carries its whole reverberation in its own IR.
+        if (active.EchoRig != null) { ownMix *= 1f - active.EchoWeight; crossMix *= 1f - active.EchoWeight; }
         if (active.SourceReverbConnection.hasHandle())
             active.SourceReverbConnection.setMix(ownMix * radiated * active.SourceReverbMix);
         if (active.ReverbConnection.hasHandle())

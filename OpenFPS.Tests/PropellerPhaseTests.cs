@@ -16,11 +16,32 @@ namespace OpenFPS.Tests;
 /// four-cylinder engine) slid past each other. Measured as how much the fine structure of the
 /// spectrum wanders from frame to frame with the listener still.
 /// </summary>
+/// <summary>
+/// Tests that measure a PERIODIC mechanism — a phase, a period — with the exhaust valves' flow noise
+/// switched off (EngineSynth.ValveJetNoise), because that noise is random by construction and a
+/// twelfth-octave band of noise wanders 2-3 dB from frame to frame on its own. The switch is process
+/// wide, so they run alone and put it back.
+/// </summary>
+[CollectionDefinition(nameof(ValveFlowSwitch), DisableParallelization = true)]
+public class ValveFlowSwitch
+{
+    public static T Without<T>(Func<T> f)
+    {
+        bool was = OpenFPS.Client.AudioEngine.Core.Engine.EngineSynth.ValveJetNoise;
+        OpenFPS.Client.AudioEngine.Core.Engine.EngineSynth.ValveJetNoise = false;
+        try { return f(); }
+        finally { OpenFPS.Client.AudioEngine.Core.Engine.EngineSynth.ValveJetNoise = was; }
+    }
+}
+
+[Collection(nameof(ValveFlowSwitch))]
 public class PropellerPhaseTests
 {
     private const int Sr = 44100;
 
-    private static double Wander(AircraftProfile p)
+    private static double Wander(AircraftProfile p) => ValveFlowSwitch.Without(() => WanderCore(p));
+
+    private static double WanderCore(AircraftProfile p)
     {
         var syn = new AircraftSynth(p, Sr, 3);
         syn.PlaceAtLever(0.7f); syn.Lever = 0.7f;

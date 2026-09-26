@@ -220,6 +220,19 @@ public sealed record VehicleProfile
     public float IntakeHeight { get; init; } = 0.7f;
 
     /// <summary>
+    /// The engine sits at the back, behind the passengers — a city transit bus. Declared, like
+    /// <see cref="EngineBayLeakage"/>, because it is a fact about the machine and not something to
+    /// guess from where the slots are. The bay, the fan and the intake then leave with the exhaust by
+    /// the rear voice, and the front voice is the nose: the front tyres, the door air and the chime.
+    /// </summary>
+    public bool EngineAtRear { get; init; }
+
+    /// <summary>Where the front voice sits: at the intake, over the engine, unless the engine is in
+    /// the back, when it is the front axle.</summary>
+    public float FrontTapZ => EngineAtRear ? FrontAxleZ : IntakeOffsetZ;
+    public float FrontTapHeight => EngineAtRear ? 0.8f : IntakeHeight;
+
+    /// <summary>
     /// How far back along <see cref="ExhaustOffsetZ"/> the single combined engine voice actually sits.
     ///
     /// A car heard as ONE voice is a compromise between an intake at the front and an exhaust at the
@@ -321,6 +334,9 @@ public sealed record VehicleProfile
     ///   0.30  a pickup or a van: the same bonnet with less deadening paid for and a bigger grille.
     ///   0.80  a truck or a bus: a doghouse ventilated by grilles, or an engine hanging in the open
     ///         air under a cab, with a radiator fan blowing straight through it at the street.
+    ///   1     a motorcycle: there is no bay.
+    ///
+    /// The intake leaves the same way. Its mouth is inside the bay, under the same bonnet.
     /// </summary>
     public float EngineBayLeakage { get; init; } = 0.15f;
 
@@ -456,6 +472,12 @@ public sealed record VehicleProfile
             ["v8_bigcam"] = () => BigCamMuscle,
             ["v8_blown"] = () => BlownMuscle,
             ["sportbike"] = () => SportBike,
+            ["i4_compact"] = () => Compact18,
+            ["i4_midsize"] = () => Midsize25,
+            ["i4_sport_street"] = () => SportCompact,
+            ["boxer4_street"] = () => FlatFourSedan,
+            ["i6_street"] = () => SportSaloon6,
+            ["transit_bus"] = () => TransitBus,
         };
 
     /// <summary>
@@ -555,6 +577,7 @@ public sealed record VehicleProfile
         Body = VehicleBody.OpenWheeler,
         TyreCount = 2,
         ExhaustOffsetZ = -0.75f, IntakeOffsetZ = 0.25f, ExhaustHeight = 0.55f,
+        EngineBayLeakage = 1f,     // no bay: the engine hangs in the frame and the airbox is under the tank
         FrontAxleZ = 0.70f, RearAxleZ = -0.70f,
         SourceLevelDb = 118f,
     };
@@ -611,7 +634,7 @@ public sealed record VehicleProfile
         Name = "V-twin cruiser, stock mufflers",
         EngineKey = "vtwin_stock",
         Engine = EngineProfile.VTwin45Stock,
-        SourceLevelDb = 98f,
+        SourceLevelDb = 101f,   // 101.1 with the shorter pipes (2026-09-26)
     };
 
     /// <summary>The same bike with slip-on cans, which is what most of them are wearing.</summary>
@@ -690,6 +713,67 @@ public sealed record VehicleProfile
         ExhaustOffsetZ = -1.8f, IntakeOffsetZ = 1.4f, FrontAxleZ = 1.2f, RearAxleZ = -1.3f,
     };
 
+    // ── Street cars ───────────────────────────────────────────────────────────────────────────
+    //
+    // The city's field (Cody, 2026-09-26): "just have regular type vehicles now ... some economy
+    // cars, hondas toyotas that type of sounding stuff, a few cars with more aggressive sounding
+    // exhaust but nothing too crazy." The sporty presets above were built for the speedway (the hot
+    // hatch is 119 dB, the flat four 118); these are the same engines with the exhausts a road car
+    // leaves the dealer with, or a cat-back on top. Nothing here is a new mechanism: displacement,
+    // headers, can and pipe are all data, and every level is measured on the live voice.
+
+    /// <summary>A 1.8 four in a compact saloon: the economy engine, stroked. Stock can.</summary>
+    public static VehicleProfile Compact18 => Hatchback with
+    {
+        Name = "1.8 compact saloon",
+        EngineKey = "i4_compact",
+        LengthMetres = 4.6f,
+        Engine = EngineProfile.Inline4Compact18,
+        SourceLevelDb = 99.5f,   // 99.7 measured (--voice-levels)
+    };
+
+    /// <summary>A 2.5 four in a mid-size saloon: long stroke, a lazy torque curve, a big quiet can.</summary>
+    public static VehicleProfile Midsize25 => Hatchback with
+    {
+        Name = "2.5 mid-size saloon",
+        EngineKey = "i4_midsize",
+        LengthMetres = 4.85f, WidthMetres = 1.84f, MassKg = 1500f,
+        Engine = EngineProfile.Inline4Midsize25,
+        Gearbox = Gearbox.SixSpeedSports with { Ratios = new[] { 4.1f, 2.4f, 1.55f, 1.15f, 0.86f, 0.67f }, FinalDrive = 3.3f, ShiftSeconds = 0.4f, UpshiftRpm = 5800f, DownshiftRpm = 1300f, WheelRadiusMetres = 0.33f },
+        SourceLevelDb = 98.5f,   // 98.4 measured
+    };
+
+    /// <summary>The hot hatch's engine behind a sport cat-back rather than a straight-through pack:
+    /// a baffled can with lighter packing and a small resonator. Raspy, not a race car.</summary>
+    public static VehicleProfile SportCompact => HotHatch with
+    {
+        Name = "2.0 sport compact, cat-back",
+        EngineKey = "i4_sport_street",
+        Engine = EngineProfile.Inline4SportStreet,
+        SourceLevelDb = 104f,   // 103.9 measured
+    };
+
+    /// <summary>The flat four with its unequal headers — the burble is the headers, not the can —
+    /// behind a chambered cat-back.</summary>
+    public static VehicleProfile FlatFourSedan => Wagon with
+    {
+        Name = "2.5 flat-four sedan, cat-back",
+        EngineKey = "boxer4_street",
+        Body = VehicleBody.Saloon,
+        LengthMetres = 4.6f,
+        Engine = EngineProfile.Boxer4Street,
+        SourceLevelDb = 103f,   // 103.3 measured
+    };
+
+    /// <summary>The straight six with the factory's can: smooth, and a little hard at the top.</summary>
+    public static VehicleProfile SportSaloon6 => Saloon6 with
+    {
+        Name = "3.0 straight-six sport saloon",
+        EngineKey = "i6_street",
+        Engine = EngineProfile.Inline6Street,
+        SourceLevelDb = 99f,   // 99.0 measured
+    };
+
     public static VehicleProfile HotHatch => new()
     {
         LengthMetres = 4.25f, WidthMetres = 1.8f, HeightMetres = 1.45f,
@@ -719,7 +803,7 @@ public sealed record VehicleProfile
         // Measured, not guessed: EngineSynthTests renders every preset and holds its declared level
         // to what it actually produces. A first guess of 101 was sixteen decibels light, which would
         // have put this car forty times too quiet next to the field it shares a track with.
-        SourceLevelDb = 100f,
+        SourceLevelDb = 103.5f,   // 103.5 on 2026-09-26, with the exhaust valves' flow noise
         Engine = EngineProfile.I4Turbo,
         Gearbox = Gearbox.SixSpeedSports with { Ratios = new[] { 3.4f, 2.05f, 1.42f, 1.06f, 0.84f, 0.68f }, FinalDrive = 3.7f, ShiftSeconds = 0.18f, UpshiftRpm = 6300f, DownshiftRpm = 2000f },
         Tyres = TyreProfile.SportsOnAsphalt with { TreadBlocks = 58, PeakGripG = 1.1f, SquealHz = 880f },
@@ -774,6 +858,7 @@ public sealed record VehicleProfile
         Tyres = TyreProfile.SportsOnAsphalt with { TreadBlocks = 40, SurfaceRoughness = 0.4f },
         MassKg = 380f, DragArea = 0.55f,
         ExhaustOffsetZ = -0.5f, IntakeOffsetZ = 0.1f, FrontAxleZ = 0.8f, RearAxleZ = -0.8f,
+        EngineBayLeakage = 1f,     // no bay: the engine hangs in the frame and the airbox is under the tank
     };
 
     public static VehicleProfile DirtBike => new()
@@ -785,12 +870,13 @@ public sealed record VehicleProfile
         TyreCount = 2,
         Name = "450 dirt bike",
         EngineKey = "single",
-        SourceLevelDb = 118f,
+        SourceLevelDb = 122f,   // 122.2 with the shorter pipes (2026-09-26)
         Engine = EngineProfile.Single450,
         Gearbox = Gearbox.SixSpeedSports with { Ratios = new[] { 2.4f, 1.8f, 1.4f, 1.15f, 0.96f }, FinalDrive = 3.8f, ShiftSeconds = 0.18f, UpshiftRpm = 10000f, DownshiftRpm = 3000f, WheelRadiusMetres = 0.33f },
         Tyres = TyreProfile.SportsOnAsphalt with { TreadBlocks = 28, SurfaceRoughness = 0.7f },
         MassKg = 190f, DragArea = 0.5f,
         ExhaustOffsetZ = -0.4f, IntakeOffsetZ = 0.1f, FrontAxleZ = 0.75f, RearAxleZ = -0.75f,
+        EngineBayLeakage = 1f,     // no bay: the engine hangs in the frame and the airbox is under the tank
     };
 
     /// <summary>A full-size gas pickup with the 5.3 V8, as it left the factory.</summary>
@@ -916,7 +1002,7 @@ public sealed record VehicleProfile
         // the tailpipe, the block through the bay, the body ringing, the fan and the tyres. The old
         // figure came off `--engine-levels`, which renders the TAILPIPE ALONE, and on a truck the
         // tailpipe is not the truck: the bay is worth 3.6 dB of this on its own.
-        SourceLevelDb = 100f,
+        SourceLevelDb = 104f,   // 104 on 2026-09-26: the exhaust valves' flow noise and the brighter clatter
         AirSystem = "tractor_trailer",
         EngineBayLeakage = 0.8f,   // engine in the open under a cab, behind an open grille
         // Nine plastic paddles of 0.81 m on the crank nose, a little over engine speed. At the
@@ -936,6 +1022,9 @@ public sealed record VehicleProfile
         Tyres = TyreProfile.TruckOnAsphalt,
         MassKg = 14000f, DragArea = 5.5f, RollingResistance = 0.008f,
         ExhaustOffsetZ = 1.0f, IntakeOffsetZ = 2.5f, FrontAxleZ = 3.5f, RearAxleZ = -3.0f,
+        // A stack behind the cab, pointing at the sky (audit 2026-09-26: it was 0.3 m up and pushed
+        // back to the rear bumper, a car's tailpipe on a tractor unit).
+        ExhaustHeight = 4.0f, ExhaustAxis = new Vector3(0f, 1f, 0f),
     };
 
     /// <summary>
@@ -989,7 +1078,7 @@ public sealed record VehicleProfile
         // the twelve decibels above its own tailpipe are those. Declaring the tailpipe figure for
         // the whole vehicle is why the buses could not be heard.
         // Re-measured on the live voice at 94.8 after the block got its anchor: the block is 97.7 dB of this bus and its silenced tailpipe 83, so anchoring the block moved the whole machine six decibels.
-        SourceLevelDb = 95f,
+        SourceLevelDb = 100f,   // 100.4 on 2026-09-26: the exhaust valves' flow noise and the brighter clatter
         AirSystem = "transit_bus",
         DoorChime = true,
         EngineBayLeakage = 0.8f,   // a doghouse ventilated by grilles, inside the cabin
@@ -1014,6 +1103,24 @@ public sealed record VehicleProfile
         MassKg = 11000f, DragArea = 5.8f, RollingResistance = 0.009f,
         // Nose to tail, which is what makes it read as a bus rather than a truck.
         ExhaustOffsetZ = -5.2f, IntakeOffsetZ = 4.6f, FrontAxleZ = 3.4f, RearAxleZ = -3.2f,
+    };
+
+    /// <summary>
+    /// A city transit bus: the engine in the BACK. The city's bus was the school bus — a conventional
+    /// with its engine under a bonnet at the front — and Cody, at the front of it: "it sounds like
+    /// that really small diesel all muffled". A transit bus's engine sits across the rear in its own
+    /// compartment, radiator and fan on the side, exhaust out at the back; the front of one is the
+    /// doors, the tyres and the air. Same engine, same body, the machinery moved to where it is.
+    /// </summary>
+    public static VehicleProfile TransitBus => SchoolBusNa with
+    {
+        Name = "city bus",
+        EngineKey = "diesel_bus_na",
+        LengthMetres = 12.2f, WidthMetres = 2.6f, HeightMetres = 3.2f,
+        EngineAtRear = true,
+        SourceLevelDb = 97f,   // 96.8 measured
+        IntakeOffsetZ = -4.9f, ExhaustOffsetZ = -6.0f, ExhaustHeight = 0.6f,
+        FrontAxleZ = 3.9f, RearAxleZ = -2.3f,
     };
 
     /// <summary>The same pickup with the turbo taken off, so the two can be run on one lap and the
@@ -1063,7 +1170,7 @@ public sealed record VehicleProfile
     {
         Name = "V10 coupe, side pipes",
         EngineKey = "v10",
-        SourceLevelDb = 116f,
+        SourceLevelDb = 120f,   // 120.0 on 2026-09-26: the exhaust valves' flow noise on side pipes
         Engine = EngineProfile.V10,
         // An automated single-clutch box, and the shift time is the whole character of it. A manual
         // takes about 280 ms and you hear the revs fall through the gap; this takes 60, which is too

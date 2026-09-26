@@ -46,7 +46,7 @@ public class SolidVehicleTests
     public void ABusIsSolidAndBusSized()
     {
         var (world, _) = LoadCityWithTraffic();
-        var bus = FindVehicle(world, "school_bus");
+        var bus = FindVehicle(world, "transit_bus");
         var c = world.Get<ColliderComponent>(bus);
         Assert.True(c.IsSolid, "a bus you can walk through");
         Assert.True(c.Size.Z > 10f, $"the bus is {c.Size.Z:F1} m long — the car box again");
@@ -64,7 +64,7 @@ public class SolidVehicleTests
     public void YouCannotWalkIntoTheBackOfABus(float headingDegrees)
     {
         var (world, grid) = LoadCityWithTraffic();
-        var bus = FindVehicle(world, "school_bus");
+        var bus = FindVehicle(world, "transit_bus");
         ref var turn = ref world.Get<Transform>(bus);
         turn.Rotation = Quaternion.CreateFromYawPitchRoll(headingDegrees * MathF.PI / 180f, 0f, 0f);
         RefreshDynamic(world, grid);
