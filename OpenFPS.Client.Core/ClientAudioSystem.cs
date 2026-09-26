@@ -1183,7 +1183,15 @@ public class ClientAudioSystem
     {
         double now = _now();
         _machineOrder.Clear();
+        _machineGroups.Clear();
 
+        // A TRAIN IS ONE MACHINE. Reported: "the train cuts in and cuts out as it passes even if I'm
+        // standing right next to it." A light-rail set is up to nine taps — one per bogie and source
+        // along it, all reading one shared synth — and each tap used to compete on its own for the
+        // machine voices against every air conditioner and mower. As the set passed, its near taps
+        // outranked the rest and its far ones fell below a window unit, so taps were dropped and
+        // re-admitted all the way along; and a set arriving was let in two taps an update. Now a
+        // train is ranked by its loudest tap, takes ONE place, and its taps come and go together.
         foreach (int entityId in world.AudioEntityIds)
         {
             if (entityId == OwnEntityId) continue;
@@ -1197,52 +1205,77 @@ public class ClientAudioSystem
             float range = MathF.Max(em.Range, OpenFPS.Common.Loudness.AudibleRange(levelDb));
             float level = OpenFPS.Common.Loudness.RenderedGain(gain * em.Volume, reference, range, d);
 
+            string group = OpenFPS.Client.AudioEngine.Fmod.TrainVoiceState.ParseKey(em.SoundId, out string preset, out string train, out _)
+                ? "rail:" + preset + "/" + train : "#" + entityId;
+            if (!_machineGroups.TryGetValue(group, out var g)) _machineGroups[group] = g = new MachineGroup();
+            g.Members.Add(entityId);
+            g.Level = MathF.Max(g.Level, level);
+            if (_liveMachines.Contains(entityId)) g.Live = true;
+            if (_machineStarted.TryGetValue(entityId, out double began) && now - began < EngineMinimumHoldSeconds) g.Held = true;
+        }
+        foreach (var g in _machineGroups.Values)
+        {
             // Louder sorts first, so the key is negated. The hold and the keep bias work on the key
             // exactly as they do for a car — a machine that already has a voice has to be beaten
             // decisively, not merely matched.
-            float key = _liveMachines.Contains(entityId) ? -level / (EngineKeepBias * EngineKeepBias) : -level;
-            if (_machineStarted.TryGetValue(entityId, out double began) && now - began < EngineMinimumHoldSeconds)
-                key = float.NegativeInfinity;
-            _machineOrder.Add((entityId, key, level));
+            float key = g.Live ? -g.Level / (EngineKeepBias * EngineKeepBias) : -g.Level;
+            if (g.Held) key = float.NegativeInfinity;
+            g.Key = key;
         }
-        _machineOrder.Sort((a, b) => a.Key.CompareTo(b.Key));
+        _groupOrder.Clear();
+        _groupOrder.AddRange(_machineGroups.Values);
+        _groupOrder.Sort((x, y) => x.Key.CompareTo(y.Key));
 
-        int keep = Math.Min(_adaptiveMachines, _machineOrder.Count);
+        int keepGroups = Math.Min(_adaptiveMachines, _groupOrder.Count);
+        _wantedMachines.Clear();
+        for (int i = 0; i < keepGroups; i++) foreach (int id in _groupOrder[i].Members) _wantedMachines.Add(id);
 
         foreach (int id in _liveMachines)
         {
-            bool survives = false;
-            for (int i = 0; i < keep; i++) if (_machineOrder[i].Id == id) { survives = true; break; }
-            if (survives) continue;
+            if (_wantedMachines.Contains(id)) continue;
             _machineStarted.Remove(id);
             if (!_machineRetiring.Contains(id)) _machineRetiring.Add(id);
         }
         for (int i = _machineRetiring.Count - 1; i >= 0; i--)
         {
             int id = _machineRetiring[i];
-            bool wanted = false;
-            for (int k = 0; k < keep; k++) if (_machineOrder[k].Id == id) { wanted = true; break; }
-            if (wanted) { _machineRetiring.RemoveAt(i); continue; }
+            if (_wantedMachines.Contains(id)) { _machineRetiring.RemoveAt(i); continue; }
             if (_audio.FadeOutEngine(id)) { _audio.StopSound(id); _machineRetiring.RemoveAt(i); }
         }
 
-        int admittedMachines = 0;
+        int admittedGroups = 0;
         _liveMachines.Clear();
-        for (int i = 0; i < keep; i++)
+        for (int i = 0; i < keepGroups; i++)
         {
-            int id = _machineOrder[i].Id;
-            if (!_machineStarted.ContainsKey(id))
+            var g = _groupOrder[i];
+            bool isNew = false;
+            foreach (int id in g.Members) if (!_machineStarted.ContainsKey(id)) { isNew = true; break; }
+            if (isNew)
             {
                 // Same reason as an engine: building one is a set of waveguides and resonators, and
-                // a map load presents all of them in the same instant.
-                if (admittedMachines >= NewEnginesPerUpdate) continue;
-                admittedMachines++;
+                // a map load presents all of them in the same instant. Counted per MACHINE: a train's
+                // taps share one synth and arrive together.
+                if (admittedGroups >= NewEnginesPerUpdate) continue;
+                admittedGroups++;
             }
-            _liveMachines.Add(id);
-            _audio.ReviveEngine(id);
-            if (!_machineStarted.ContainsKey(id)) _machineStarted[id] = now;
+            foreach (int id in g.Members)
+            {
+                _liveMachines.Add(id);
+                _audio.ReviveEngine(id);
+                if (!_machineStarted.ContainsKey(id)) _machineStarted[id] = now;
+            }
         }
     }
+
+    private sealed class MachineGroup
+    {
+        public readonly List<int> Members = new();
+        public float Level, Key;
+        public bool Live, Held;
+    }
+    private readonly Dictionary<string, MachineGroup> _machineGroups = new();
+    private readonly List<MachineGroup> _groupOrder = new();
+    private readonly HashSet<int> _wantedMachines = new();
 
     /// <summary>
     /// Decides which cars get their own engine, and which borrow one.

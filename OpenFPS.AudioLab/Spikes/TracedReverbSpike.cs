@@ -97,6 +97,29 @@ public static class TracedReverbSpike
                 Phonon.iplAudioBufferInterleave(ctx, ref outBuf, inter);
                 for (int k = 0; k < 1024; k++) w.Add(inter[k * TracedReverb.Channels]);
             }
+            // What one stage costs the mixer: the effect applied to live-ish input, per block.
+            var rngc = new Random(1);
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            for (int b = 0; b < 200; b++)
+            {
+                for (int k = 0; k < 1024; k++) mono[k] = (float)(rngc.NextDouble() * 2 - 1) * 0.1f;
+                Phonon.iplAudioBufferDeinterleave(ctx, mono, ref inBuf);
+                Phonon.iplReflectionEffectApply(effect, ref prm, ref inBuf, ref outBuf, IntPtr.Zero);
+            }
+            double blockMs = sw.Elapsed.TotalMilliseconds / 200;
+            // ...and with the trace refreshing underneath, as it does in the game: the worst block.
+            double worst = 0; int runs0 = tr.Runs;
+            for (int b = 0; b < 60; b++)
+            {
+                Thread.Sleep(23);
+                tr.TryGetParams(out prm);
+                for (int k = 0; k < 1024; k++) mono[k] = (float)(rngc.NextDouble() * 2 - 1) * 0.1f;
+                Phonon.iplAudioBufferDeinterleave(ctx, mono, ref inBuf);
+                var t0 = System.Diagnostics.Stopwatch.GetTimestamp();
+                Phonon.iplReflectionEffectApply(effect, ref prm, ref inBuf, ref outBuf, IntPtr.Zero);
+                worst = Math.Max(worst, (System.Diagnostics.Stopwatch.GetTimestamp() - t0) * 1000.0 / System.Diagnostics.Stopwatch.Frequency);
+            }
+            Console.WriteLine($"   one stage: {blockMs:F2} ms per block steady, worst {worst:F2} ms with {tr.Runs - runs0} re-traces underneath (deadline 23 ms)");
             double total = 0; foreach (var x in w) total += x * (double)x;
             var windows = new List<string>();
             for (int k = 0; k < 16; k++)

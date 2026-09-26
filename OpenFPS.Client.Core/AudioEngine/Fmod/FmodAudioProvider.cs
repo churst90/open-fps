@@ -1500,7 +1500,7 @@ public class FmodAudioProvider : IAudioProvider
         ReturnReverbVoices(); // detach HRTF voices while the buses still exist, return them to the pool
         ReleaseReverbUnits();
         _reverbDsps.Clear(); _reverbBuses.Clear(); _reverbVolumes.Clear(); _dryReverbBuses.Clear();
-        _traced.Clear(); _tracedModeApplied = null;
+        _traced.Clear(); _tracedModeApplied = null; _tracedRunning.Clear();
     }
 
     private void UpdateActiveReverbs(Vector3 listenerPos)
@@ -1599,6 +1599,8 @@ public class FmodAudioProvider : IAudioProvider
 
     private readonly Dictionary<int, (TracedReverbState State, FMOD.DSP Dsp, System.Runtime.InteropServices.GCHandle Handle)> _traced = new();
     private bool? _tracedModeApplied;
+    /// <summary>Which traced stages are running (not bypassed) right now.</summary>
+    private readonly Dictionary<int, bool> _tracedRunning = new();
 
     /// <summary>Whether traced mode is in force right now: asked for, and a trace to play.</summary>
     internal static bool TracedActive => TracedOutdoors && TracedReverbSet.Listener != null;
@@ -1641,6 +1643,21 @@ public class FmodAudioProvider : IAudioProvider
         }
 
         bool want = TracedOutdoors;
+
+        // ONLY WHERE IT CAN BE HEARD. A traced stage convolves and then decodes round the head, about
+        // half a millisecond a block, and FMOD runs a bus's chain whatever its volume. Twenty-four
+        // buses carrying one each took the mixer from 40 % to 77 %; the voice budget then shed the
+        // city down to two engines, and what was left was heard as "bit crushed" cars and a train
+        // that "cuts in and cuts out". Only four buses are ever audible (MaxActiveReverbBuses), so a
+        // silent bus's stage is bypassed and costs nothing.
+        foreach (var kv in _traced)
+        {
+            bool audible = want && _reverbVolumes.TryGetValue(kv.Key, out float v) && v > 0.001f;
+            if (_tracedRunning.TryGetValue(kv.Key, out bool was) && was == audible && _tracedModeApplied == want) continue;
+            kv.Value.Dsp.setBypass(!audible);
+            _tracedRunning[kv.Key] = audible;
+        }
+
         if (_tracedModeApplied == want) return;
         foreach (var kv in _traced)
         {
@@ -1656,7 +1673,6 @@ public class FmodAudioProvider : IAudioProvider
                 sfx.setParameterFloat(11, kv.Key == _listenerRegionId ? _listenerWetDb
                                           : _dryReverbBuses.Contains(kv.Key) ? -80f : 0f);
             }
-            kv.Value.Dsp.setBypass(!want);
         }
         _tracedModeApplied = want;
         Log.Information("Reverb: {Mode} ({Count} bus(es)).", want ? "traced" : "room", _traced.Count);
@@ -1692,7 +1708,7 @@ public class FmodAudioProvider : IAudioProvider
         for (int i = 0; i < count; i++)
             if (bus.getDSP(i, out var d) == RESULT.OK && d.handle == sfx.handle) { at = i; break; }
         if (at < 0 || bus.addDSP(at, dsp) != RESULT.OK) { dsp.release(); handle.Free(); return; }
-        dsp.setBypass(!TracedOutdoors);
+        dsp.setBypass(true);                 // UpdateTracedStages runs it once its bus is heard
         _traced[regionId] = (st, dsp, handle);
     }
 
