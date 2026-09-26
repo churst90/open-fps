@@ -2611,9 +2611,37 @@ public class ClientAudioSystem
         float spread = direct / MathF.Max(direct, mirrored);
         float low = MathF.Sqrt(Math.Clamp(1f - 0.5f * (m.AbsorptionLow + m.AbsorptionMid), 0f, 1f));
         float high = MathF.Sqrt(Math.Clamp(1f - m.AbsorptionHigh, 0f, 1f));
+        // At grazing incidence even asphalt is not a mirror at the top: its spherical-wave reflection
+        // falls with range (Delany-Bazley, 20,000 kPa s/m2, source 0.3 m: 0.88 at 10 m and 0.64 at
+        // 50 m at 4 kHz). And the air is never still: turbulence decorrelates the two paths, the
+        // Clifford-Lataitis coherence Tc = exp(-sigma2 (1 - Csp)) with a moderate <mu2> of 5e-6 and
+        // an outer scale of 1.1 m (Rietdijk, Chalmers 2017, eqs 2.55-2.58).
+        high *= Math.Clamp(0.94f - 0.0055f * direct, 0.45f, 1f);
+        float rho = 1f / (0.5f * (1f / MathF.Max(0.02f, src.Y - gb) + 1f / MathF.Max(0.02f, ear.Y - gb)));
+        low *= Coherence(250f, direct, rho);
+        high *= Coherence(2500f, direct, rho);
         e.GroundDelaySeconds = (mirrored - direct) / AudioPhysics.SpeedOfSound;
         e.GroundLowGain = low * spread;
         e.GroundHighGain = high * spread;
+    }
+
+    /// <summary>Turbulent coherence between the direct and ground paths (Clifford-Lataitis).</summary>
+    internal static float Coherence(float hz, float distance, float rho)
+    {
+        const float Mu2 = 5e-6f, OuterScale = 1.1f;
+        float k = 2f * MathF.PI * hz / AudioPhysics.SpeedOfSound;
+        float sigma2 = MathF.Sqrt(MathF.PI) * Mu2 * k * k * distance * OuterScale;
+        float x = MathF.Max(1e-4f, rho / OuterScale);
+        float csp = MathF.Sqrt(MathF.PI) * 0.5f * Erf(x) / x;
+        return MathF.Exp(-sigma2 * MathF.Max(0f, 1f - csp));
+    }
+
+    private static float Erf(float x)
+    {
+        // Abramowitz and Stegun 7.1.26, good to 1.5e-7.
+        float t = 1f / (1f + 0.3275911f * MathF.Abs(x));
+        float y = 1f - (((((1.061405429f * t - 1.453152027f) * t) + 1.421413741f) * t - 0.284496736f) * t + 0.254829592f) * t * MathF.Exp(-x * x);
+        return x < 0 ? -y : y;
     }
 
     private void UpdateBoundaryProbes(WorldSnapshot world, Vector3 visualEyePos)

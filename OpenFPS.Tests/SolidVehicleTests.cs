@@ -98,7 +98,9 @@ public class SolidVehicleTests
             {
                 if (n.Name.StartsWith("Pedestrian")) { walkers++; Assert.False(c.IsSolid); }
             });
-        Assert.True(aircraft > 0 && walkers > 0, $"found {aircraft} aircraft and {walkers} walkers to check");
+        // The city has had no aircraft since 2026-09-25 ("remove the planes ... remove the helicopter
+        // for now"); any that come back are held to the same rule above.
+        Assert.True(walkers > 0, $"found {aircraft} aircraft and {walkers} walkers to check");
     }
 
     /// <summary>The city parks four cars in the garage, and every one of them can be driven.</summary>

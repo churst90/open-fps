@@ -68,6 +68,15 @@ public sealed partial class VehicleSystem
 
         MaybePark(mapId, world, life, dt, clock);
 
+        // A car alarm, now and then: one of the cars standing empty at the kerb.
+        if (Chance(life.AlarmEverySeconds, dt)
+            && Pick(mapId, world, v => v.Horn.StartsWith("electric:") && v.Park is { Phase: ParkPhase.Parked, Step: 7 }) is { } alarmed)
+        {
+            var pattern = AlarmPattern(_streetRng);
+            Log.Information("Street: {Name}'s alarm goes off for {Seconds:F0} s.", alarmed.DisplayName, OpenFPS.Common.Honk.Duration(pattern));
+            Honk(mapId, world, alarmed, pattern);
+        }
+
         // Somebody on the pavement fires two to four rounds. Picked from the people walking, so
         // it comes from wherever they are — the street you are on, or three blocks over.
         if (Chance(life.GunfireEverySeconds, dt)

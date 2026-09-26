@@ -73,4 +73,26 @@ public class GroundReflectionTests
             Assert.Equal(x, g.Process(x));
         }
     }
+
+    /// <summary>A voice that is all tyre — two centimetres off the road — gets the lift and no notch;
+    /// half tyre, and the notch is a few decibels rather than twenty. A car is not one point.</summary>
+    [Fact]
+    public void TyresOnTheRoadFillTheNotch()
+    {
+        float delay = 0.0003f, notch = 1f / (2f * delay);
+        var tyres = Hard(delay); tyres.SetNear(1f);
+        Assert.InRange(GainDb(tyres, notch), 5.0, 6.1);
+        var half = Hard(delay); half.SetNear(0.5f);
+        Assert.InRange(GainDb(half, notch), -1.0, 4.0);
+    }
+
+    /// <summary>Turbulence decorrelates the two paths more at high frequency and long range.</summary>
+    [Fact]
+    public void TheAirDecorrelatesTheTopAtRange()
+    {
+        float nearLow = OpenFPS.Client.Core.ClientAudioSystem.Coherence(250f, 10f, 0.5f);
+        float farHigh = OpenFPS.Client.Core.ClientAudioSystem.Coherence(2500f, 100f, 0.5f);
+        Assert.True(nearLow > 0.99f);
+        Assert.True(farHigh < nearLow && farHigh > 0.5f);
+    }
 }

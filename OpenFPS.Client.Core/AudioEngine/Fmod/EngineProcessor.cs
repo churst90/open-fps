@@ -214,6 +214,9 @@ public sealed class EngineVoiceState : IRenderedVoice
     /// <summary>The ground between this voice and the listener; see GroundReflection. Applied to what
     /// the mixer takes, never to the ring, so echoes and borrowed voices read the car itself.</summary>
     public readonly OpenFPS.Client.AudioEngine.Acoustics.GroundReflection Ground;
+    private float _nearShare;
+    /// <summary>The front voice's ground, when there is one, so it hears the same tyre share.</summary>
+    internal OpenFPS.Client.AudioEngine.Acoustics.GroundReflection? _frontGround;
 
     /// <summary>Samples the mixer has taken — the position of "now" for anything reading back.</summary>
     public long Played => Volatile.Read(ref _played);
@@ -892,7 +895,7 @@ public sealed class EngineVoiceState : IRenderedVoice
             liftTarget = MathF.Pow(10f, LiftDb(nowDb, Vehicle.SourceLevelDb) / 20f);
         }
         float liftStep = MathF.Max(1e-4f, (liftTarget - _levelGain) / MathF.Max(1, count));
-        double blockSum = 0;
+        double blockSum = 0, tyreSum = 0;
         float windLpA = 1f - MathF.Exp(-2f * MathF.PI * 1200f * dt);
         float windHpA = MathF.Exp(-2f * MathF.PI * 180f * dt);
         for (int i = 0; i < count; i++)
@@ -1015,6 +1018,7 @@ public sealed class EngineVoiceState : IRenderedVoice
             // part of it. Only the rear one used to, because only the rear one was in `pa`.
             float engineOnly = pa - rearExtras + bay + frontTyre + (Engine.Exhaust - exhaustOut);
             blockSum += (double)engineOnly * engineOnly;
+            tyreSum += (double)(rearTyre * rearTyre + frontTyre * frontTyre);
 
             // Crossfaded over ~60 ms rather than switched, so getting in or out is not a click.
             _interiorMix += Math.Clamp((inside ? 1f : 0f) - _interiorMix, -envStep, envStep);
@@ -1070,6 +1074,15 @@ public sealed class EngineVoiceState : IRenderedVoice
         }
         Volatile.Write(ref _written, w);
         _levelGain = liftTarget;
+        // How much of it came off the road surface itself: the tyres' share of the pressure, for the
+        // ground reflection (GroundReflection.NearGroundShare). Smoothed over about half a second.
+        if (blockSum > 1e-12)
+        {
+            float share = MathF.Sqrt((float)Math.Clamp(tyreSum / blockSum, 0.0, 1.0));
+            _nearShare += (share - _nearShare) * MathF.Min(1f, count / (0.5f * SampleRate));
+            Ground.SetNear(_nearShare);
+            _frontGround?.SetNear(_nearShare);
+        }
         float blockMs = (float)(blockSum / Math.Max(1, count));
         float a = 1f - MathF.Exp(-count / (LevelSeconds * SampleRate));
         _levelMs += (blockMs - _levelMs) * a;
@@ -1356,7 +1369,7 @@ public sealed class EngineTapState
     private float _gain;
     private double _cursor = -1;
 
-    public EngineTapState(EngineVoiceState source) { Source = source; Ground = new(source.SampleRate); }
+    public EngineTapState(EngineVoiceState source) { Source = source; Ground = new(source.SampleRate); source._frontGround = Ground; }
 
     /// <summary>The ground between the front of the machine and the listener.</summary>
     public readonly OpenFPS.Client.AudioEngine.Acoustics.GroundReflection Ground;

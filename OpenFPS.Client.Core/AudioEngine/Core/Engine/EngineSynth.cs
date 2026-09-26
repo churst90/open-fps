@@ -1097,7 +1097,11 @@ public sealed class EngineSynth
         // pressure upstream of the throttle; the plenum then decides what the manifold sees.
         float wantSpool = e.Induction switch
         {
-            Induction.Turbocharged => Math.Clamp(Throttle * MathF.Min(1f, (rpm - e.IdleRpm) / (0.35f * e.RedlineRpm)), 0f, 1f),
+            // The exhaust spins the turbine even at idle: a big turbo freewheels there
+            // (MechanicalSpec.TurboIdleSpool), and the throttle takes it from there.
+            Induction.Turbocharged => Math.Clamp(MathF.Max(
+                Throttle * MathF.Min(1f, (rpm - e.IdleRpm) / (0.35f * e.RedlineRpm)),
+                e.Mechanical.TurboIdleSpool * Math.Clamp(rpm / MathF.Max(1f, e.IdleRpm), 0f, 1.5f)), 0f, 1f),
             Induction.Supercharged => Math.Clamp(rpm / e.RedlineRpm, 0f, 1f) * (0.3f + 0.7f * Throttle),
             _ => 0f,
         };

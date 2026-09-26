@@ -40,6 +40,8 @@ internal sealed class ParkState
     /// <summary>Which of the things along the way have happened.</summary>
     public int Step;
     public bool Chirp;
+    /// <summary>It was locked with a chirp, so it is unlocked with one.</summary>
+    public bool Chirped;
 }
 
 /// <summary>
@@ -238,7 +240,7 @@ public sealed partial class VehicleSystem
                 pk.Route = new[] { roadBehind, kerb, pk.Spot.Outside };
                 pk.Leg = 0; pk.Step++; break;
             case 3:                                            // round the back of it to the door
-                if (pk.Chirp && pk.Clock >= 5.0f) { pk.Chirp = false; ChirpLock(world, v); }
+                if (pk.Chirp && pk.Clock >= 5.0f) { pk.Chirp = false; pk.Chirped = true; ChirpLock(world, v); }
                 if (Walk(world, pk, dt)) { DoorSystem.Set(world, pk.Spot.Door, true); pk.Clock = 0f; pk.Step++; }
                 break;
             case 4 when pk.Clock >= 1.3f:                      // through it
@@ -261,6 +263,8 @@ public sealed partial class VehicleSystem
                 break;
             case 10 when pk.Clock >= 0.8f:
                 DoorSystem.Set(world, pk.Spot.Door, false);
+                // Unlocked from the pavement as they come back to it: two short chirps.
+                if (pk.Chirped && v.Horn.Length > 0) Honk(v.MapId, world, v, new[] { 0.04f, 0.12f, 0.04f });
                 pk.Route = new[] { kerb, roadBehind, standBy }; pk.Leg = 0; pk.Step++; break;
             case 11:
                 if (Walk(world, pk, dt))
@@ -342,6 +346,19 @@ public sealed partial class VehicleSystem
         => Heard?.Invoke(v.MapId, v.Entity.Id, label, sounds);
 
     /// <summary>A lot of cars answer the lock button with a touch of the horn.</summary>
+    /// <summary>
+    /// A factory alarm: the car's own horn, pulsed half a second on and half off, for about twenty-
+    /// five seconds, which is how most of them sound — the horn you already know that car by, not a
+    /// siren from somewhere else. Only a car standing empty at the kerb.
+    /// </summary>
+    internal static float[] AlarmPattern(Random rng)
+    {
+        int pulses = 22 + rng.Next(8);
+        var p = new float[pulses * 2 - 1];
+        for (int i = 0; i < p.Length; i++) p[i] = i % 2 == 0 ? 0.45f : 0.5f;
+        return p;
+    }
+
     private void ChirpLock(World world, DemoVehicle v)
     {
         if (v.Horn.Length == 0) return;

@@ -377,6 +377,14 @@ public sealed record MechanicalSpec
     /// <summary>Turbocharger: whistle level under boost and the lag of the shaft, seconds.</summary>
     public float TurboWhistleLevel { get; init; } = 0f;
     public float TurboLagSeconds { get; init; } = 0.8f;
+    /// <summary>
+    /// How fast the turbo's shaft turns at idle, as a fraction of its speed at full boost. A turbine
+    /// is spun by the exhaust, and an idling engine still has exhaust: a small turbo sized for
+    /// response barely turns, but a big one — or the pair on a compound setup — freewheels at a
+    /// third of its speed, and that whistle is heard with the truck sitting still ("even at idle you
+    /// could hear the whistle from the turbos"). Zero keeps the spool on the throttle alone.
+    /// </summary>
+    public float TurboIdleSpool { get; init; } = 0f;
 }
 
 /// <summary>
@@ -1741,6 +1749,119 @@ public sealed record EngineProfile
     };
 
     /// <summary>
+    /// The 7.3 Power Stroke (Navistar T444E) of the late-1990s Ford Super Duty: a 90-degree V8 diesel,
+    /// 104.4 x 106.2 mm, 17.5:1, one Garrett turbo fed by both banks' up-pipes, HEUI injectors, about
+    /// 500 lb-ft (680 Nm) at 1,600 and governed near 3,300. Stock exhaust: a muffler and a four-inch
+    /// pipe. What people know it by is the turbo's whistle, which is there at idle, and the clatter.
+    /// </summary>
+    public static EngineProfile PowerStroke73 => DieselCumminsI6 with
+    {
+        Name = "7.3 Power Stroke V8, stock exhaust",
+        Layout = EngineLayout.Vee,
+        FiringAngles = EvenFire(new[] { 1, 2, 7, 3, 4, 5, 6, 8 }),
+        Bank = AlternatingBanks(8),
+        BoreMm = 104.4f, StrokeMm = 106.2f, CompressionRatio = 17.5f,
+        BoostBar = 1.2f,
+        IdleRpm = 680f, RedlineRpm = 3300f,
+        InertiaKgM2 = 1.0f, FrictionNm = 85f, FrictionNmPerKrpm = 28f,
+        PeakTorqueNm = 680f, PeakTorqueRpm = 1600f,
+        Exhaust = DieselCumminsI6.Exhaust with
+        {
+            CollectorGroups = new[] { new[] { 0, 1, 2, 3, 4, 5, 6, 7 } },
+            CollectorDiameterMm = 95f,
+            Muffler = MufflerSpec.Stock,
+            TailpipeDiameterMm = 102f,
+        },
+        Mechanical = DieselCumminsI6.Mechanical with
+        {
+            CombustionKnock = 1.6f, TurboWhistleLevel = 1.4f, TurboLagSeconds = 1.1f, TurboIdleSpool = 0.25f,
+        },
+    };
+
+    /// <summary>
+    /// A 6.6 Duramax (LB7) with compound turbos and a four-inch straight pipe: 103 x 99 mm, four
+    /// valves a cylinder, firing 1-2-7-8-4-5-6-3, and the pair of turbos — a big atmospheric one
+    /// feeding the stock one — at about 3.2 bar. Built to around 900 lb-ft. Two big turbines
+    /// freewheel at idle, so it whistles standing still, and on the throttle they scream.
+    /// </summary>
+    public static EngineProfile DuramaxCompound => PowerStroke73 with
+    {
+        Name = "6.6 Duramax, compound turbos, straight pipe",
+        FiringAngles = EvenFire(new[] { 1, 2, 7, 8, 4, 5, 6, 3 }),
+        BoreMm = 103f, StrokeMm = 99f,
+        ExhaustValve = new ValveSpec { Count = 2, DiameterMm = 30f, DischargeCoefficient = 0.6f },
+        IntakeValve = new ValveSpec { Count = 2, DiameterMm = 34f, DischargeCoefficient = 0.6f },
+        BoostBar = 3.2f,
+        IdleRpm = 680f, RedlineRpm = 3400f,
+        PeakTorqueNm = 1220f, PeakTorqueRpm = 1900f,
+        Exhaust = PowerStroke73.Exhaust with { Muffler = MufflerSpec.StraightPipe, TailpipeDiameterMm = 102f },
+        Mechanical = PowerStroke73.Mechanical with
+        {
+            CombustionKnock = 1.3f, TurboWhistleLevel = 2.4f, TurboLagSeconds = 0.8f, TurboIdleSpool = 0.35f,
+        },
+    };
+
+    /// <summary>
+    /// The 5.9 Cummins with compound turbos and a five-inch straight pipe: the same engine as
+    /// <see cref="DieselCumminsI6"/>, with a big turbo feeding the HX35 at 3.5 bar and built to about
+    /// 950 lb-ft. Whistling at idle, screaming on the throttle.
+    /// </summary>
+    public static EngineProfile CumminsCompound => DieselCumminsI6 with
+    {
+        Name = "5.9 Cummins, compound turbos, straight pipe",
+        BoostBar = 3.5f,
+        RedlineRpm = 3200f,
+        PeakTorqueNm = 1290f, PeakTorqueRpm = 2000f,
+        Exhaust = DieselCumminsI6.Exhaust with { TailpipeDiameterMm = 127f },
+        Mechanical = DieselCumminsI6.Mechanical with
+        {
+            TurboWhistleLevel = 2.6f, TurboLagSeconds = 0.8f, TurboIdleSpool = 0.35f,
+        },
+    };
+
+    /// <summary>
+    /// The 5.9 Cummins ISB (24 valves) in a parcel step van: a muffler, a long pipe to the back, a
+    /// modest turbo. The engine behind a great many brown and white delivery trucks.
+    /// </summary>
+    public static EngineProfile CumminsIsbStepVan => DieselCumminsI6 with
+    {
+        Name = "5.9 Cummins ISB, step van",
+        ExhaustValve = new ValveSpec { Count = 2, DiameterMm = 30f, DischargeCoefficient = 0.6f },
+        IntakeValve = new ValveSpec { Count = 2, DiameterMm = 33f, DischargeCoefficient = 0.6f },
+        BoostBar = 1.8f,
+        IdleRpm = 700f, RedlineRpm = 2600f,
+        PeakTorqueNm = 800f, PeakTorqueRpm = 1600f,
+        Exhaust = DieselCumminsI6.Exhaust with { Muffler = MufflerSpec.Stock, MidPipeMetres = 3.2f, TailpipeDiameterMm = 102f },
+        Mechanical = DieselCumminsI6.Mechanical with { TurboWhistleLevel = 0.5f, CombustionKnock = 1.2f },
+    };
+
+    /// <summary>
+    /// GM's 2.5 "Iron Duke" four, as in the Grumman LLV mail truck: 101.6 x 76.2 mm, pushrods, two
+    /// valves a cylinder, about 180 Nm, and a three-speed automatic. A coarse, busy little engine.
+    /// </summary>
+    public static EngineProfile IronDuke25 => Inline4Economy with
+    {
+        Name = "2.5 Iron Duke four, mail truck",
+        BoreMm = 101.6f, StrokeMm = 76.2f, CompressionRatio = 8.3f,
+        ExhaustValve = new ValveSpec { Count = 1, DiameterMm = 38f },
+        IntakeValve = new ValveSpec { Count = 1, DiameterMm = 44f },
+        IdleRpm = 700f, RedlineRpm = 5000f,
+        PeakTorqueNm = 180f, PeakTorqueRpm = 3200f,
+        InertiaKgM2 = 0.22f,
+        Mechanical = Inline4Economy.Mechanical with { ValvetrainLevel = 0.6f, AccessoryWhineLevel = 0.25f },
+    };
+
+    /// <summary>A 5.3 small-block V8 as a full-size pickup has it: the road interceptor's stock
+    /// manifolds, catalyst and silencer, on a truck's bore and stroke (96 x 92 mm) and torque.</summary>
+    public static EngineProfile PickupV8Stock => PoliceInterceptorV8 with
+    {
+        Name = "5.3 V8 pickup, stock",
+        BoreMm = 96f, StrokeMm = 92f,
+        IdleRpm = 600f, RedlineRpm = 5600f,
+        PeakTorqueNm = 450f, PeakTorqueRpm = 4000f,
+    };
+
+    /// <summary>
     /// The International DT466 out of a school bus.
     ///
     /// Real numbers: 116.5 x 118.9 mm on six for 7.63 litres, 16.5:1, 800 lb-ft (1,085 Nm), governed
@@ -2153,6 +2274,12 @@ public sealed record EngineProfile
             ["diesel_i4"] = () => DieselPickupI4,
             ["diesel_truck"] = () => DieselTruckI6,
             ["diesel_cummins"] = () => DieselCumminsI6,
+            ["powerstroke73"] = () => PowerStroke73,
+            ["duramax_compound"] = () => DuramaxCompound,
+            ["cummins_compound"] = () => CumminsCompound,
+            ["cummins_isb"] = () => CumminsIsbStepVan,
+            ["iron_duke"] = () => IronDuke25,
+            ["pickup_v8"] = () => PickupV8Stock,
             ["diesel_bus"] = () => DieselBusI6,
             ["diesel_cummins_na"] = () => DieselCumminsNaI6,
             ["diesel_bus_na"] = () => DieselBusNaI6,

@@ -430,6 +430,13 @@ public sealed record VehicleProfile
             ["diesel_i4"] = () => Pickup,
             ["diesel_truck"] = () => Truck,
             ["diesel_cummins"] = () => DieselPickupLoud,
+            ["pickup_v8"] = () => PickupV8,
+            ["pickup_v8_flowmaster"] = () => PickupV8Flowmaster,
+            ["powerstroke73"] = () => PowerStrokePickup,
+            ["duramax_compound"] = () => DuramaxCompoundPickup,
+            ["cummins_compound"] = () => CumminsCompoundPickup,
+            ["step_van"] = () => StepVan,
+            ["mail_truck"] = () => MailTruck,
             ["school_bus"] = () => SchoolBus,
             ["diesel_cummins_na"] = () => DieselPickupNa,
             ["school_bus_na"] = () => SchoolBusNa,
@@ -784,6 +791,98 @@ public sealed record VehicleProfile
         Tyres = TyreProfile.SportsOnAsphalt with { TreadBlocks = 28, SurfaceRoughness = 0.7f },
         MassKg = 190f, DragArea = 0.5f,
         ExhaustOffsetZ = -0.4f, IntakeOffsetZ = 0.1f, FrontAxleZ = 0.75f, RearAxleZ = -0.75f,
+    };
+
+    /// <summary>A full-size gas pickup with the 5.3 V8, as it left the factory.</summary>
+    public static VehicleProfile PickupV8 => Pickup with
+    {
+        LengthMetres = 5.8f, WidthMetres = 2.0f, HeightMetres = 1.9f,
+        Name = "5.3 V8 pickup, stock",
+        EngineKey = "pickup_v8",
+        SourceLevelDb = 100f,
+        Engine = EngineProfile.PickupV8Stock,
+        Gearbox = Gearbox.SixSpeedSports with { Ratios = new[] { 4.03f, 2.36f, 1.53f, 1.15f, 0.85f, 0.67f }, FinalDrive = 3.42f, ShiftSeconds = 0.35f, UpshiftRpm = 4800f, DownshiftRpm = 1400f, WheelRadiusMetres = 0.39f },
+        MassKg = 2400f, DragArea = 1.3f,
+        ExhaustOffsetZ = -2.9f, IntakeOffsetZ = 2.0f, FrontAxleZ = 1.8f, RearAxleZ = -1.8f,
+    };
+
+    /// <summary>The same pickup with a 5.0 V8 on Flowmaster 40s: the burble people fit to be heard.</summary>
+    public static VehicleProfile PickupV8Flowmaster => PickupV8 with
+    {
+        Name = "5.0 V8 pickup, Flowmaster 40s",
+        EngineKey = "pickup_v8_flowmaster",
+        SourceLevelDb = 108f,
+        Engine = EngineProfile.V8SportsFlowmaster40,
+    };
+
+    /// <summary>A late-1990s Ford Super Duty with the 7.3 Power Stroke and the four-speed automatic.</summary>
+    public static VehicleProfile PowerStrokePickup => Pickup with
+    {
+        LengthMetres = 6.0f, WidthMetres = 2.0f, HeightMetres = 2.0f,
+        EngineBayLeakage = 0.35f,
+        Name = "1998 Ford F-250, 7.3 Power Stroke",
+        EngineKey = "powerstroke73",
+        SourceLevelDb = 102f,
+        Engine = EngineProfile.PowerStroke73,
+        Gearbox = Gearbox.SixSpeedSports with { Ratios = new[] { 2.71f, 1.54f, 1.00f, 0.71f }, FinalDrive = 3.73f, ShiftSeconds = 0.5f, UpshiftRpm = 2800f, DownshiftRpm = 1200f, WheelRadiusMetres = 0.40f },
+        MassKg = 3200f, DragArea = 1.6f,
+        ExhaustOffsetZ = -3.0f, IntakeOffsetZ = 2.1f, FrontAxleZ = 1.9f, RearAxleZ = -2.0f,
+    };
+
+    /// <summary>
+    /// A Duramax pickup with compound turbos and a straight pipe (Cody, 2026-09-25: "a twin turbo ...
+    /// even at idle you could hear the whistle from the turbos and when he stepped on the gas it
+    /// really screamed").
+    /// </summary>
+    public static VehicleProfile DuramaxCompoundPickup => PowerStrokePickup with
+    {
+        Name = "6.6 Duramax pickup, compound turbos, straight pipe",
+        EngineKey = "duramax_compound",
+        SourceLevelDb = 106f,     // measured on the live voice
+        Engine = EngineProfile.DuramaxCompound,
+        Gearbox = Gearbox.SixSpeedSports with { Ratios = new[] { 3.10f, 1.81f, 1.41f, 1.00f, 0.71f }, FinalDrive = 3.73f, ShiftSeconds = 0.45f, UpshiftRpm = 3100f, DownshiftRpm = 1300f, WheelRadiusMetres = 0.40f },
+    };
+
+    /// <summary>The same idea on a 5.9 Cummins: compound turbos and a five-inch straight pipe.</summary>
+    public static VehicleProfile CumminsCompoundPickup => DieselPickupLoud with
+    {
+        Name = "5.9 Cummins pickup, compound turbos, straight pipe",
+        EngineKey = "cummins_compound",
+        SourceLevelDb = 112f,
+        Engine = EngineProfile.CumminsCompound,
+        Gearbox = DieselPickupLoud.Gearbox with { UpshiftRpm = 3000f },
+    };
+
+    /// <summary>A parcel step van: aluminium box body, the ISB six, an automatic, duals at the back.</summary>
+    public static VehicleProfile StepVan => Pickup with
+    {
+        LengthMetres = 7.3f, WidthMetres = 2.4f, HeightMetres = 3.1f,
+        EngineBayLeakage = 0.5f,
+        Body = VehicleBody.Van,
+        Name = "parcel step van",
+        EngineKey = "step_van",
+        SourceLevelDb = 96f,      // measured on the live voice
+        Engine = EngineProfile.CumminsIsbStepVan,
+        Gearbox = Gearbox.SixSpeedSports with { Ratios = new[] { 3.10f, 1.81f, 1.41f, 1.00f, 0.71f }, FinalDrive = 4.88f, ShiftSeconds = 0.5f, UpshiftRpm = 2400f, DownshiftRpm = 1100f, WheelRadiusMetres = 0.42f },
+        Tyres = TyreProfile.TruckOnAsphalt,
+        TyreCount = 6,
+        MassKg = 7500f, DragArea = 4.5f, RollingResistance = 0.010f,
+        ExhaustOffsetZ = -3.5f, IntakeOffsetZ = 2.8f, FrontAxleZ = 2.6f, RearAxleZ = -1.9f,
+    };
+
+    /// <summary>The Grumman LLV mail truck: the Iron Duke four and a three-speed automatic.</summary>
+    public static VehicleProfile MailTruck => Pickup with
+    {
+        LengthMetres = 4.4f, WidthMetres = 2.0f, HeightMetres = 2.2f,
+        EngineBayLeakage = 0.25f,
+        Name = "mail truck (LLV)",
+        EngineKey = "mail_truck",
+        SourceLevelDb = 96f,
+        Engine = EngineProfile.IronDuke25,
+        Gearbox = Gearbox.SixSpeedSports with { Ratios = new[] { 2.84f, 1.60f, 1.00f }, FinalDrive = 3.73f, ShiftSeconds = 0.4f, UpshiftRpm = 3800f, DownshiftRpm = 1200f, WheelRadiusMetres = 0.34f },
+        Tyres = TyreProfile.SportsOnAsphalt,
+        MassKg = 1350f, DragArea = 1.5f,
+        ExhaustOffsetZ = -2.1f, IntakeOffsetZ = 1.4f, FrontAxleZ = 1.3f, RearAxleZ = -1.4f,
     };
 
     public static VehicleProfile Pickup => new()

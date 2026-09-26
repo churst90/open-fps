@@ -42,6 +42,18 @@ public sealed class GroundReflection
     /// extra spreading of the longer path. Zero is no ground at all. Game thread writes.</summary>
     public volatile float TargetLowGain, TargetHighGain;
 
+    /// <summary>
+    /// How much of what this voice carries comes from right on the road — tyres, two centimetres up
+    /// — as a share of its pressure, 0..1. The producer writes it from what it synthesized.
+    ///
+    /// A car is not one point. The tyres' reflection arrives with them, in phase, a broadband lift
+    /// with no notch below 8 kHz; only the pipe and the block, a third of a metre up, make the comb.
+    /// Rendering the whole car at the exhaust's height gave it a single source's 20 dB notches where a
+    /// real car at 10 m shows 3-8 (Harmonoise puts road sources at 0.01-0.05 and 0.3 m). So that share
+    /// of the reflection is added without the delay.
+    /// </summary>
+    public volatile float NearGroundShare;
+
     public GroundReflection(float sampleRate)
     {
         _rate = sampleRate;
@@ -57,6 +69,9 @@ public sealed class GroundReflection
         TargetLowGain = Math.Clamp(lowGain, 0f, 1f);
         TargetHighGain = Math.Clamp(highGain, 0f, 1f);
     }
+
+    /// <summary>Producer side: the tyre share, see <see cref="NearGroundShare"/>.</summary>
+    public void SetNear(float share) => NearGroundShare = Math.Clamp(share, 0f, 1f);
 
     /// <summary>The direct sample in; the direct sample plus what the ground sends back out.</summary>
     [MethodImpl(MethodImplOptions.AggressiveOptimization)]
@@ -76,7 +91,8 @@ public sealed class GroundReflection
             int i0 = (int)MathF.Floor(pos);
             float f = pos - i0;
             float a = _line[i0 & Mask], b = _line[(i0 + 1) & Mask];
-            float r = a + (b - a) * f;
+            float near = NearGroundShare;
+            float r = near * x + (1f - near) * (a + (b - a) * f);
             _lp += _lpA * (r - _lp);
             y += _high * r + (_low - _high) * _lp;
         }

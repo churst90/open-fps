@@ -144,6 +144,8 @@ public class StreetLifeData
     /// <summary>Somebody on foot fires a few rounds, on average this often across the map: so the
     /// guns are heard now and then, from wherever that person happens to be.</summary>
     public float GunfireEverySeconds { get; set; }
+    /// <summary>A car standing empty at the kerb has its alarm go off, on average this often.</summary>
+    public float AlarmEverySeconds { get; set; }
 }
 
 public class TrackData

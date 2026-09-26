@@ -2625,8 +2625,9 @@
  "StreetLife": {
   "HornEverySeconds": 15,
   "HardBrakeEverySeconds": 60,
-  "ParkEverySeconds": 90,
-  "GunfireEverySeconds": 35
+  "ParkEverySeconds": 45,
+  "GunfireEverySeconds": 20,
+  "AlarmEverySeconds": 150
  },
  "Vehicles": [
   {
@@ -2643,10 +2644,10 @@
   },
   {
    "Name": "Hatchback 2",
-   "Preset": "i4_turbo",
+   "Preset": "i4_economy",
    "Track": "downtown_cw",
-   "TopSpeedKmh": 56.0,
-   "CorneringG": 0.52,
+   "TopSpeedKmh": 50.0,
+   "CorneringG": 0.48,
    "GripG": 0.85,
    "AccelerationMps2": 2.2,
    "BrakingMps2": 2.92,
@@ -2666,11 +2667,11 @@
    "StartOffsetMetres": 192.0
   },
   {
-   "Name": "Estate 4",
-   "Preset": "i4_economy",
+   "Name": "Wagon 4",
+   "Preset": "boxer4",
    "Track": "downtown_cw",
-   "TopSpeedKmh": 48.0,
-   "CorneringG": 0.45,
+   "TopSpeedKmh": 50.0,
+   "CorneringG": 0.46,
    "GripG": 0.85,
    "AccelerationMps2": 2.2,
    "BrakingMps2": 2.92,
@@ -2678,43 +2679,7 @@
    "StartOffsetMetres": 288.0
   },
   {
-   "Name": "Sedan 5",
-   "Preset": "v6",
-   "Track": "downtown_cw",
-   "TopSpeedKmh": 50.0,
-   "CorneringG": 0.47,
-   "GripG": 0.85,
-   "AccelerationMps2": 2.2,
-   "BrakingMps2": 2.92,
-   "LaneOffsetMetres": 1.8,
-   "StartOffsetMetres": 384.0
-  },
-  {
-   "Name": "Pickup 6",
-   "Preset": "diesel_i4",
-   "Track": "downtown_cw",
-   "TopSpeedKmh": 46.0,
-   "CorneringG": 0.4,
-   "GripG": 0.75,
-   "AccelerationMps2": 2.2,
-   "BrakingMps2": 2.58,
-   "LaneOffsetMetres": 1.8,
-   "StartOffsetMetres": 480.0
-  },
-  {
-   "Name": "Box truck 7",
-   "Preset": "diesel_truck",
-   "Track": "downtown_cw",
-   "TopSpeedKmh": 38.0,
-   "CorneringG": 0.3,
-   "GripG": 0.7,
-   "AccelerationMps2": 2.06,
-   "BrakingMps2": 2.4,
-   "LaneOffsetMetres": 1.8,
-   "StartOffsetMetres": 576.0
-  },
-  {
-   "Name": "Muscle car 8",
+   "Name": "Muscle car 5",
    "Preset": "charger440",
    "Track": "downtown_cw",
    "TopSpeedKmh": 58.0,
@@ -2723,10 +2688,10 @@
    "AccelerationMps2": 2.2,
    "BrakingMps2": 2.92,
    "LaneOffsetMetres": 1.8,
-   "StartOffsetMetres": 672.0
+   "StartOffsetMetres": 384.0
   },
   {
-   "Name": "Police car 9",
+   "Name": "Police car 6",
    "Preset": "police_interceptor",
    "Track": "downtown_cw",
    "TopSpeedKmh": 62.0,
@@ -2734,6 +2699,42 @@
    "GripG": 0.85,
    "AccelerationMps2": 2.2,
    "BrakingMps2": 2.92,
+   "LaneOffsetMetres": 1.8,
+   "StartOffsetMetres": 480.0
+  },
+  {
+   "Name": "Pickup 7",
+   "Preset": "pickup_v8",
+   "Track": "downtown_cw",
+   "TopSpeedKmh": 50.0,
+   "CorneringG": 0.42,
+   "GripG": 0.75,
+   "AccelerationMps2": 2.2,
+   "BrakingMps2": 2.58,
+   "LaneOffsetMetres": 1.8,
+   "StartOffsetMetres": 576.0
+  },
+  {
+   "Name": "Power Stroke 8",
+   "Preset": "powerstroke73",
+   "Track": "downtown_cw",
+   "TopSpeedKmh": 48.0,
+   "CorneringG": 0.4,
+   "GripG": 0.75,
+   "AccelerationMps2": 2.2,
+   "BrakingMps2": 2.58,
+   "LaneOffsetMetres": 1.8,
+   "StartOffsetMetres": 672.0
+  },
+  {
+   "Name": "Twin-turbo Cummins 9",
+   "Preset": "cummins_compound",
+   "Track": "downtown_cw",
+   "TopSpeedKmh": 52.0,
+   "CorneringG": 0.42,
+   "GripG": 0.75,
+   "AccelerationMps2": 2.2,
+   "BrakingMps2": 2.58,
    "LaneOffsetMetres": 1.8,
    "StartOffsetMetres": 768.0
   },
@@ -2762,7 +2763,7 @@
    "StartOffsetMetres": 40.0
   },
   {
-   "Name": "Hatchback 12",
+   "Name": "Hot hatch 12",
    "Preset": "i4_turbo",
    "Track": "downtown_ccw",
    "TopSpeedKmh": 56.0,
@@ -2771,34 +2772,10 @@
    "AccelerationMps2": 2.2,
    "BrakingMps2": 2.92,
    "LaneOffsetMetres": 1.8,
-   "StartOffsetMetres": 170.0
+   "StartOffsetMetres": 150.0
   },
   {
-   "Name": "Saloon 13",
-   "Preset": "v6",
-   "Track": "downtown_ccw",
-   "TopSpeedKmh": 50.0,
-   "CorneringG": 0.46,
-   "GripG": 0.85,
-   "AccelerationMps2": 2.2,
-   "BrakingMps2": 2.92,
-   "LaneOffsetMetres": 1.8,
-   "StartOffsetMetres": 300.0
-  },
-  {
-   "Name": "Estate 14",
-   "Preset": "i4_economy",
-   "Track": "downtown_ccw",
-   "TopSpeedKmh": 48.0,
-   "CorneringG": 0.45,
-   "GripG": 0.85,
-   "AccelerationMps2": 2.2,
-   "BrakingMps2": 2.92,
-   "LaneOffsetMetres": 1.8,
-   "StartOffsetMetres": 430.0
-  },
-  {
-   "Name": "Sedan 15",
+   "Name": "Sedan 13",
    "Preset": "v6",
    "Track": "downtown_ccw",
    "TopSpeedKmh": 50.0,
@@ -2807,10 +2784,34 @@
    "AccelerationMps2": 2.2,
    "BrakingMps2": 2.92,
    "LaneOffsetMetres": 1.8,
-   "StartOffsetMetres": 560.0
+   "StartOffsetMetres": 260.0
   },
   {
-   "Name": "Pickup 16",
+   "Name": "Muscle car 14",
+   "Preset": "v8_glasspack",
+   "Track": "downtown_ccw",
+   "TopSpeedKmh": 58.0,
+   "CorneringG": 0.55,
+   "GripG": 0.85,
+   "AccelerationMps2": 2.2,
+   "BrakingMps2": 2.92,
+   "LaneOffsetMetres": 1.8,
+   "StartOffsetMetres": 370.0
+  },
+  {
+   "Name": "Pickup 15",
+   "Preset": "pickup_v8_flowmaster",
+   "Track": "downtown_ccw",
+   "TopSpeedKmh": 50.0,
+   "CorneringG": 0.42,
+   "GripG": 0.75,
+   "AccelerationMps2": 2.2,
+   "BrakingMps2": 2.58,
+   "LaneOffsetMetres": 1.8,
+   "StartOffsetMetres": 480.0
+  },
+  {
+   "Name": "Diesel pickup 16",
    "Preset": "diesel_i4",
    "Track": "downtown_ccw",
    "TopSpeedKmh": 46.0,
@@ -2819,10 +2820,22 @@
    "AccelerationMps2": 2.2,
    "BrakingMps2": 2.58,
    "LaneOffsetMetres": 1.8,
-   "StartOffsetMetres": 690.0
+   "StartOffsetMetres": 590.0
   },
   {
-   "Name": "Box truck 17",
+   "Name": "Twin-turbo Duramax 17",
+   "Preset": "duramax_compound",
+   "Track": "downtown_ccw",
+   "TopSpeedKmh": 52.0,
+   "CorneringG": 0.42,
+   "GripG": 0.75,
+   "AccelerationMps2": 2.2,
+   "BrakingMps2": 2.58,
+   "LaneOffsetMetres": 1.8,
+   "StartOffsetMetres": 700.0
+  },
+  {
+   "Name": "Box truck 18",
    "Preset": "diesel_truck",
    "Track": "downtown_ccw",
    "TopSpeedKmh": 38.0,
@@ -2831,7 +2844,19 @@
    "AccelerationMps2": 2.06,
    "BrakingMps2": 2.4,
    "LaneOffsetMetres": 1.8,
-   "StartOffsetMetres": 820.0
+   "StartOffsetMetres": 810.0
+  },
+  {
+   "Name": "Motorcycle 19",
+   "Preset": "vtwin_stock",
+   "Track": "downtown_ccw",
+   "TopSpeedKmh": 56.0,
+   "CorneringG": 0.6,
+   "GripG": 0.9,
+   "AccelerationMps2": 2.2,
+   "BrakingMps2": 3.09,
+   "LaneOffsetMetres": 3.4,
+   "StartOffsetMetres": 920.0
   },
   {
    "Name": "City bus 1",
@@ -2846,16 +2871,40 @@
    "StartOffsetMetres": 0.0
   },
   {
-   "Name": "Delivery diesel",
-   "Preset": "diesel_cummins",
+   "Name": "Parcel van 1",
+   "Preset": "step_van",
    "Track": "north_block",
    "TopSpeedKmh": 44.0,
-   "CorneringG": 0.34,
+   "CorneringG": 0.32,
    "GripG": 0.7,
    "AccelerationMps2": 2.06,
    "BrakingMps2": 2.4,
    "LaneOffsetMetres": 2.0,
    "StartOffsetMetres": 140.0
+  },
+  {
+   "Name": "Mail truck 1",
+   "Preset": "mail_truck",
+   "Track": "north_block",
+   "TopSpeedKmh": 40.0,
+   "CorneringG": 0.36,
+   "GripG": 0.75,
+   "AccelerationMps2": 2.2,
+   "BrakingMps2": 2.58,
+   "LaneOffsetMetres": 1.8,
+   "StartOffsetMetres": 260.0
+  },
+  {
+   "Name": "Muscle car, big cam",
+   "Preset": "v8_bigcam",
+   "Track": "north_block",
+   "TopSpeedKmh": 56.0,
+   "CorneringG": 0.55,
+   "GripG": 0.85,
+   "AccelerationMps2": 2.2,
+   "BrakingMps2": 2.92,
+   "LaneOffsetMetres": 1.8,
+   "StartOffsetMetres": 380.0
   },
   {
    "Name": "Civic, Elm Street",
@@ -2892,6 +2941,30 @@
    "BrakingMps2": 2.92,
    "LaneOffsetMetres": 1.2,
    "StartOffsetMetres": 360.0
+  },
+  {
+   "Name": "Mail truck, Elm Street",
+   "Preset": "mail_truck",
+   "Track": "estate",
+   "TopSpeedKmh": 30.0,
+   "CorneringG": 0.35,
+   "GripG": 0.85,
+   "AccelerationMps2": 1.6,
+   "BrakingMps2": 2.92,
+   "LaneOffsetMetres": 1.2,
+   "StartOffsetMetres": 540.0
+  },
+  {
+   "Name": "Parcel van, Elm Street",
+   "Preset": "step_van",
+   "Track": "estate",
+   "TopSpeedKmh": 30.0,
+   "CorneringG": 0.35,
+   "GripG": 0.85,
+   "AccelerationMps2": 1.6,
+   "BrakingMps2": 2.92,
+   "LaneOffsetMetres": 1.2,
+   "StartOffsetMetres": 720.0
   },
   {
    "Name": "Mower, garden 2",
@@ -3357,78 +3430,6 @@
    "StartDelaySeconds": 0.0
   },
   {
-   "Name": "Motorcycle, stock twin",
-   "Preset": "vtwin_stock",
-   "Track": "downtown_ccw",
-   "TopSpeedKmh": 56.0,
-   "CorneringG": 0.6,
-   "GripG": 0.9,
-   "AccelerationMps2": 2.2,
-   "BrakingMps2": 3.09,
-   "LaneOffsetMetres": 3.4,
-   "StartOffsetMetres": 512.0
-  },
-  {
-   "Name": "Motorcycle, slip-ons",
-   "Preset": "vtwin_slipon",
-   "Track": "north_block",
-   "TopSpeedKmh": 56.0,
-   "CorneringG": 0.6,
-   "GripG": 0.9,
-   "AccelerationMps2": 2.2,
-   "BrakingMps2": 3.09,
-   "LaneOffsetMetres": 3.4,
-   "StartOffsetMetres": 300.0
-  },
-  {
-   "Name": "Motorcycle 31",
-   "Preset": "vtwin_slipon",
-   "Track": "downtown_cw",
-   "TopSpeedKmh": 56.0,
-   "CorneringG": 0.6,
-   "GripG": 0.9,
-   "AccelerationMps2": 2.2,
-   "BrakingMps2": 3.09,
-   "LaneOffsetMetres": 3.4,
-   "StartOffsetMetres": 120.0
-  },
-  {
-   "Name": "Motorcycle 32",
-   "Preset": "vtwin_stock",
-   "Track": "downtown_ccw",
-   "TopSpeedKmh": 56.0,
-   "CorneringG": 0.6,
-   "GripG": 0.9,
-   "AccelerationMps2": 2.2,
-   "BrakingMps2": 3.09,
-   "LaneOffsetMetres": 3.4,
-   "StartOffsetMetres": 640.0
-  },
-  {
-   "Name": "Motorcycle 33",
-   "Preset": "vtwin_slipon",
-   "Track": "downtown_cw",
-   "TopSpeedKmh": 56.0,
-   "CorneringG": 0.6,
-   "GripG": 0.9,
-   "AccelerationMps2": 2.2,
-   "BrakingMps2": 3.09,
-   "LaneOffsetMetres": 3.4,
-   "StartOffsetMetres": 560.0
-  },
-  {
-   "Name": "Motorcycle 34",
-   "Preset": "vtwin_slipon",
-   "Track": "north_block",
-   "TopSpeedKmh": 56.0,
-   "CorneringG": 0.6,
-   "GripG": 0.9,
-   "AccelerationMps2": 2.2,
-   "BrakingMps2": 3.09,
-   "LaneOffsetMetres": 3.4,
-   "StartOffsetMetres": 180.0
-  },
-  {
    "Name": "Southgate van",
    "Preset": "diesel_i4",
    "Track": "southgate",
@@ -3465,8 +3466,8 @@
    "StartOffsetMetres": 260.0
   },
   {
-   "Name": "Southgate bike",
-   "Preset": "vtwin_slipon",
+   "Name": "Southgate pickup",
+   "Preset": "diesel_cummins_na",
    "Track": "southgate",
    "TopSpeedKmh": 48.0,
    "CorneringG": 0.48,
