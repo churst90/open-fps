@@ -423,7 +423,12 @@ public sealed class EngineVoiceState : IRenderedVoice
         {
             int j = (int)((at + i) & mask);
             _frontShare += Math.Clamp(shareTarget - _frontShare, -shareStep, shareStep);
-            mono[i] = Soft(Ground.Process(_ring[j] + _front[j] * _frontShare));
+            // The ground AFTER the ceiling. The ceiling guards the synthesis — a backfire past the
+            // voice's headroom — and the voice's headroom was set for the direct sound. With the
+            // road's up-to-six-decibel bass lift inside it, every exhaust pulse of a loud V8 ran
+            // into the knee and the car came out crunched ("really bad over sampling ... the v8
+            // muscle car"). The mixer is floating point; the lift has room there.
+            mono[i] = Ground.Process(Soft(_ring[j] + _front[j] * _frontShare));
         }
         if (take > 0)
         {
@@ -466,7 +471,12 @@ public sealed class EngineVoiceState : IRenderedVoice
         {
             int j = (int)((at + i) & mask);
             _frontShare += Math.Clamp(shareTarget - _frontShare, -shareStep, shareStep);
-            mono[i] = Soft(Ground.Process(_ring[j] + _front[j] * _frontShare));
+            // The ground AFTER the ceiling. The ceiling guards the synthesis — a backfire past the
+            // voice's headroom — and the voice's headroom was set for the direct sound. With the
+            // road's up-to-six-decibel bass lift inside it, every exhaust pulse of a loud V8 ran
+            // into the knee and the car came out crunched ("really bad over sampling ... the v8
+            // muscle car"). The mixer is floating point; the lift has room there.
+            mono[i] = Ground.Process(Soft(_ring[j] + _front[j] * _frontShare));
         }
         Volatile.Write(ref _played, at + mono.Length);
     }

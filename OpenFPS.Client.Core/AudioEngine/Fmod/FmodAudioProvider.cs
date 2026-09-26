@@ -668,10 +668,15 @@ public class FmodAudioProvider : IAudioProvider
     /// Raising it past about twelve is pointless — the table shows 22 dB is no louder than 12 — and
     /// the thing to do when a map sounds quiet is read the "Mix loudness" line before changing
     /// anything. Override with OPENFPS_MASTER_MAKEUP_DB.
+    ///
+    /// Seven since 2026-09-25: the ground reflection (GroundReflection) put about three decibels
+    /// on everything standing on a road — the energy of the second path, which is real — and the
+    /// whole mix came up by that much ("the general volume of everything is a little too loud").
+    /// The table above was measured without it.
     /// </summary>
     public static readonly float MasterMakeupDb =
         float.TryParse(Environment.GetEnvironmentVariable("OPENFPS_MASTER_MAKEUP_DB"), out float mk)
-            ? Math.Clamp(mk, 0f, 40f) : 10f;
+            ? Math.Clamp(mk, 0f, 40f) : 7f;
 
     private Vector3 _listenerPos = Vector3.Zero;
     private Vector3 _listenerVel = Vector3.Zero;
