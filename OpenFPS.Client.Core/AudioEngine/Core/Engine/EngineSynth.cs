@@ -161,6 +161,19 @@ public sealed class EngineSynth
 
     // Block noise
     private float _blockLp, _knockHp;
+    private float _structLpK1, _structLpK2, _structLpV1, _structLpV2, _valveLp;
+    private readonly float _structLpA, _valveLpA;
+    /// <summary>
+    /// Calibration of the structure's ringing (--tap-balance knock). The knock is held to the anchor
+    /// it always had, FULL LOAD — a heavy diesel's block at rated power, the declared levels that
+    /// DeclaredSourceLevelMatchesTheLiveVoice holds every preset to. A slow full-load pressure rise
+    /// puts more of itself on the block's modes than a light-load one does, so at idle and at a
+    /// cruise the knock now comes out about five decibels under where the old gas-mode model had it.
+    /// The valves are set six decibels under their
+    /// old total: that total was set with them ringing at 4 kHz, where they came out LOUDER than the
+    /// combustion knock at idle, and a diesel's valvetrain sits under its combustion noise.
+    /// </summary>
+    private const float StructureKnockGain = 0.30f, StructureValveGain = 5.5f;
 
     /// <summary>
     /// One mode of the gas in the cylinder: a two-pole resonator with its zeros at DC and Nyquist,
@@ -200,6 +213,9 @@ public sealed class EngineSynth
     }
 
     private Mode[] _knockModes = Array.Empty<Mode>();
+    /// <summary>The block and head, as the knock and the valves reach the air through them: one set of
+    /// structural modes, two copies because the two drives are in different units.</summary>
+    private Mode[] _structKnock = Array.Empty<Mode>(), _structValves = Array.Empty<Mode>();
     private float _knockTemp = 1100f, _knockBore = 0.1f;
     private int _knockRetune;
     private readonly ClickVoice _click;
@@ -268,6 +284,39 @@ public sealed class EngineSynth
         _knockModes[0].Set(1.841f * baseHz, ci ? 6f : 5f, rate, 1.00f);
         _knockModes[1].Set(3.054f * baseHz, ci ? 5f : 4f, rate, 0.55f);
         _knockModes[2].Set(3.832f * baseHz, ci ? 4.5f : 3.5f, rate, 0.40f);
+
+        // THE STRUCTURE THE KNOCK HAS TO GET OUT THROUGH.
+        //
+        // Reported on the buses: "zippy ... too harsh ... too fake sounding". Measured, the knock
+        // peaked at 2-4 kHz and was only six to thirteen decibels down at 8 kHz, and the valve clicks
+        // were one ring at 3.1-4.4 kHz louder than the knock. A diesel's clatter is neither. The
+        // premixed burn's pressure rise is an impulse, and what the air hears is that impulse
+        // RINGING THE BLOCK AND HEAD — panel and casting modes between about 0.6 and 3 kHz, each dying
+        // in a few milliseconds (a measured heavy engine: peaks at 1.03, 1.29 and 2.72 kHz). The
+        // block is a filter on the way out, the "structure attenuation" of Austen and Priede, and it
+        // passes least loss near 2 kHz and loses 5 dB by 4 kHz, 17 by 6 and 27 by 8. The gas
+        // ringing across the bore at 4-5 kHz is real, but through the metal it is a faint zing: it
+        // adds half a decibel to the level even in hard knock (Sandia, OSTI 1123537).
+        //
+        // So the knock and the valves both drive these modes. A valve landing on its seat is an
+        // impact on the same head. The modes are placed for a 125 mm bore and move up gently on a
+        // smaller engine, whose castings are smaller and stiffer; 6 ms of decay each, which is cast
+        // iron's damping at these frequencies. The lowest is where that heavy engine's radiation
+        // started to rise.
+        float sizeScale = MathF.Sqrt(0.125f / MathF.Max(0.05f, bore));
+        _structLpA = OnePole.AlphaFor(4500f, rate);
+        _valveLpA = OnePole.AlphaFor(2000f, rate);
+        float[] structHz = { 620f, 800f, 1300f, 1800f, 2700f };
+        float[] structWeight = { 0.70f, 1.00f, 0.95f, 0.95f, 0.90f };
+        _structKnock = new Mode[structHz.Length];
+        _structValves = new Mode[structHz.Length];
+        for (int i = 0; i < structHz.Length; i++)
+        {
+            float hz = structHz[i] * sizeScale;
+            float q = MathF.PI * hz * 0.006f;
+            _structKnock[i].Set(hz, q, rate, structWeight[i]);
+            _structValves[i].Set(hz, q, rate, structWeight[i]);
+        }
 
         _exhaust = new ExhaustNetwork(e, rate, seed);
         _intake = new IntakeNetwork(e, rate);
@@ -827,8 +876,17 @@ public sealed class EngineSynth
             _knockModes[1].Retune(3.054f * b, _rate);
             _knockModes[2].Retune(3.832f * b, _rate);
         }
-        knockRing = 0f;
-        for (int i = 0; i < _knockModes.Length; i++) knockRing += _knockModes[i].Step(knockDrive);
+        float gasRing = 0f;
+        for (int i = 0; i < _knockModes.Length; i++) gasRing += _knockModes[i].Step(knockDrive);
+        float structRing = 0f;
+        for (int i = 0; i < _structKnock.Length; i++) structRing += _structKnock[i].Step(knockDrive);
+        // Above its modes the block falls away fast — 17 dB down by 6 kHz, 27 by 8 on the AVL curve —
+        // which a resonator's own skirt (6 dB an octave) does not do: two poles at 4.5 kHz.
+        _structLpK1 += _structLpA * (structRing - _structLpK1);
+        _structLpK2 += _structLpA * (_structLpK1 - _structLpK2);
+        // The block's ringing, and the gas's a twentieth of it in pressure, the zing: well under the
+        // twenty decibels below the peak it is measured at.
+        knockRing = _structLpK2 * StructureKnockGain + gasRing * 0.05f;
         knockDone:
         // Scaled so a truck diesel under load radiates about 95 dB of knock at a metre and a petrol
         // engine's is buried; soft-limited because a misfire's pressure jump is not the block's sound.
@@ -853,7 +911,15 @@ public sealed class EngineSynth
         float bl = OnePole.AlphaFor(180f, _rate);
         _blockLp += bl * (blockLow - _blockLp);
         float thud = _blockLp * 5.0e-8f;
-        float mech = _click.Process() * e.Mechanical.ValvetrainLevel * 3.0f
+        // A seat's contact lasts a fraction of a millisecond, so its force has little above a couple
+        // of kilohertz; then the head rings, and the same steep top lets it out.
+        _valveLp += _valveLpA * (_click.Process() - _valveLp);
+        float valveRing = 0f;
+        for (int i = 0; i < _structValves.Length; i++) valveRing += _structValves[i].Step(_valveLp);
+        _structLpV1 += _structLpA * (valveRing - _structLpV1);
+        _structLpV2 += _structLpA * (_structLpV1 - _structLpV2);
+        valveRing = _structLpV2;
+        float mech = valveRing * StructureValveGain * e.Mechanical.ValvetrainLevel * 3.0f
                    * (0.6f + 0.4f * MathF.Min(1f, rpm / 3000f));
         float whine = 0f;
         var m = e.Mechanical;
@@ -1298,7 +1364,7 @@ public sealed class EngineSynth
     {
         private readonly float _rate;
         private readonly Random _rng;
-        private float _y1, _y2, _env, _freq = 3500f;
+        private float _env, _freq = 3500f;
         public ClickVoice(float rate, int seed) { _rate = rate; _rng = new Random(seed); }
         public void Trigger(float amp, float freq)
         {
@@ -1308,14 +1374,13 @@ public sealed class EngineSynth
         [MethodImpl(MethodImplOptions.AggressiveOptimization)]
         public float Process()
         {
+            // The impact alone: the seat's contact is a short burst of force, and what it RINGS is the
+            // head's structure (EngineSynth._structValves), not a resonance of its own. It used to
+            // ring its own pole at 3.1-4.4 kHz, the whole of the "zippy" valvetrain.
             if (_env < 1e-5f) return 0f;
-            float w = 2f * MathF.PI * _freq / _rate;
-            float r = 0.985f;
             float x = _env * ((float)_rng.NextDouble() * 2f - 1f);
-            float y = x + 2f * r * MathF.Cos(w) * _y1 - r * r * _y2;
-            _y2 = _y1; _y1 = y;
-            _env *= 0.994f;
-            return y * 0.012f;
+            _env *= 0.9f;
+            return x;
         }
     }
 }

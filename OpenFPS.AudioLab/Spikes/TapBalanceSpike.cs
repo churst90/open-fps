@@ -31,6 +31,7 @@ public static class TapBalanceSpike
             }
             return 0;
         }
+        if (args.Contains("knock")) return Knock(names.Where(n => n != "knock").ToArray());
         if (args.Contains("shifts")) return Shifts(names.Where(n => n != "shifts").ToArray());
         if (args.Contains("squeal")) return Squeal(names.Where(n => n != "squeal").ToArray());
         if (args.Contains("whoosh")) return Whoosh(names.Where(n => n != "whoosh").ToArray());
@@ -209,6 +210,47 @@ public static class TapBalanceSpike
             Console.WriteLine($"  {changes} shifts in {t:F0} s");
         }
         return 0;
+    }
+
+    /// <summary>
+    /// The combustion knock alone, at a city cruise and at idle: the engine with tyres and fan muted,
+    /// rendered with and without knock (same seed), dumped for octave analysis as
+    /// {name}.{speed}.engine.f32 and {name}.{speed}.noknock.f32 into OPENFPS_WHOOSH_DUMP.
+    /// </summary>
+    static int Knock(string[] names)
+    {
+        Action<EngineVoiceState> engineOnly = s => { s.TyreMix = 0f; s.FanMix = 0f; };
+        foreach (var n in names)
+        {
+            var v = VehicleProfile.ByName(n);
+            var quiet = v with { Engine = v.Engine with { Mechanical = v.Engine.Mechanical with { CombustionKnock = 0f } } };
+            foreach (float speed in new[] { 0f, 12f })
+            {
+                BandsAt(v with { AirSystem = null }, engineOnly, $"{speed:F0}.engine", speed);
+                BandsAt(quiet with { AirSystem = null }, engineOnly, $"{speed:F0}.noknock", speed);
+                var still = v with { Engine = v.Engine with { Mechanical = v.Engine.Mechanical with { ValvetrainLevel = 0f } } };
+                BandsAt(still with { AirSystem = null }, engineOnly, $"{speed:F0}.novalves", speed);
+            }
+            Console.WriteLine($"{n}: dumped");
+        }
+        return 0;
+    }
+
+    static void BandsAt(VehicleProfile v, Action<EngineVoiceState> mute, string tag, float speed)
+    {
+        string dir = Environment.GetEnvironmentVariable("OPENFPS_WHOOSH_DUMP") ?? "/tmp";
+        var voice = new EngineVoiceState(v, Rate, 11) { TargetSpeed = speed };
+        mute(voice);
+        voice.PlaceAtSpeed(speed);
+        voice.Revive();
+        var buf = new float[Block];
+        using var w = new BinaryWriter(File.Create(Path.Combine(dir, $"{v.EngineKey}.{tag}.f32")));
+        for (int b = 0; b < Rate * 5 / Block; b++)
+        {
+            voice.Render(buf);
+            if (b < Rate / Block) continue;
+            foreach (float x in buf) w.Write(x * voice.PascalsAtFullScale);
+        }
     }
 
     static float[] StopFront(VehicleProfile v, int seed, float squeal, float decel)
