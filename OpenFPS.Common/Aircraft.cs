@@ -236,6 +236,20 @@ public sealed record AircraftProfile
     public int Engines { get; init; } = 1;
 
     /// <summary>
+    /// The propellers are held to one speed by a synchrophaser, as on a regional turboprop.
+    ///
+    /// Two six-blade props half a per cent apart are two identical pulse trains sliding past each
+    /// other, and that is a flanger: one is the other delayed, with the delay sweeping through a
+    /// whole blade pitch every beat, so the comb's notches run up the spectrum faster the higher
+    /// they are. Reported: "the prop plane ... flange[s] when [it's] flying". Measured with
+    /// `--aircraft steady`, the twin's spectrum wandered 3.4 dB frame to frame against 1.1 for the
+    /// same aeroplane with one engine. It is also why the synchrophaser exists: the beat was
+    /// fatiguing in the cabin. Fans are left free — an airliner's fans are not phased, and their
+    /// beat is the throb of a twin jet.
+    /// </summary>
+    public bool Synchrophased { get; init; }
+
+    /// <summary>
     /// Between the outboard engines, metres — how far apart the noise-making ends actually are.
     ///
     /// A twin's two engines are eleven metres apart under the wings, so up close it is not a point
@@ -318,7 +332,10 @@ public sealed record AircraftProfile
         // the beat between the two is most of what it sounds like from the ground. Declared as two
         // rather than folded into the level, so both the three decibels and the throb are the same
         // fact. +3 dB on the anchor is exactly that second engine and nothing else has moved.
+        // The props are synchrophased, as on the aeroplanes this is: the throb is the fans' on a
+        // jet, not a regional turboprop's.
         Engines = 2,
+        Synchrophased = true,
         EngineSpanMetres = 8.1f,
         WingspanMetres = 27.05f, LengthMetres = 25.7f,
         Gear = new LandingGearSpec

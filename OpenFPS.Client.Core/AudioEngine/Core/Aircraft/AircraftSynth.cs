@@ -1,3 +1,4 @@
+using System.Linq;
 using System;
 using System.Numerics;
 using System.Runtime.CompilerServices;
@@ -46,6 +47,8 @@ public sealed class AircraftSynth
     /// <summary>Each engine's speed as a fraction of the commanded one. No two are ever trimmed
     /// closer than a few tenths of a per cent, and that difference is the throb.</summary>
     private readonly float[] _trim = Array.Empty<float>();
+    private readonly float[] _propTrim = Array.Empty<float>();
+    private double _lastCrank = double.NaN;
     /// <summary>What the jets and the combustor gain from there being more than one of them. They
     /// are independent broadband streams, so they add as power: sqrt(N) in pressure.</summary>
     private readonly float _incoherent = 1f;
@@ -85,6 +88,8 @@ public sealed class AircraftSynth
             // twin that is a beat of a cycle or two a second at the blade rate; on a single there is
             // only one of them and it is exactly on speed.
             _trim[e] = engines == 1 ? 1f : 1f + (float)(trimRng.NextDouble() * 2 - 1) * 0.005f;
+        // Props on a synchrophaser run at one speed; a turbofan's fans stay on their own trims.
+        _propTrim = p.Synchrophased ? new float[engines].Select(_ => 1f).ToArray() : _trim;
 
         if (p.Propeller != null)
         {
@@ -218,7 +223,7 @@ public sealed class AircraftSynth
                 _piston.SetListener(_listener);
                 Rpm = rpm * p.PropGearRatio;
                 for (int e = 0; e < _props.Length; e++)
-                    _props[e].SetSpeed(Rpm * _trim[e], Math.Clamp(0.25f + 0.75f * Lever, 0f, 1f), dir);
+                    _props[e].SetSpeed(Rpm * _propTrim[e], Math.Clamp(0.25f + 0.75f * Lever, 0f, 1f), dir);
                 break;
             case AircraftPower.Turboprop:
             {
@@ -228,7 +233,7 @@ public sealed class AircraftSynth
                 float frac = Math.Clamp((_spool - p.Turbine!.IdleFraction) / MathF.Max(0.01f, 1f - p.Turbine.IdleFraction), 0f, 1f);
                 Rpm = MathHelper.Lerp(row.RpmIdle, row.RpmMax, MathF.Min(1f, 0.6f + 0.4f * frac));
                 for (int e = 0; e < _props.Length; e++)
-                    _props[e].SetSpeed(Rpm * _trim[e], Math.Clamp(0.2f + 0.8f * Lever, 0f, 1f), dir);
+                    _props[e].SetSpeed(Rpm * _propTrim[e], Math.Clamp(0.2f + 0.8f * Lever, 0f, 1f), dir);
                 break;
             }
             case AircraftPower.Turboshaft:
@@ -237,7 +242,7 @@ public sealed class AircraftSynth
                 float up = Math.Clamp(_spool / MathF.Max(0.05f, p.Turbine!.IdleFraction), 0f, 1f);
                 Rpm = row.RpmMax * up;
                 for (int e = 0; e < _props.Length; e++)
-                    _props[e].SetSpeed(Rpm * _trim[e], Math.Clamp(0.5f + 0.5f * Lever, 0f, 1f), dir, Descending);
+                    _props[e].SetSpeed(Rpm * _propTrim[e], Math.Clamp(0.5f + 0.5f * Lever, 0f, 1f), dir, Descending);
                 _tail?.SetSpeed(p.TailRotor!.RpmMax * up, Math.Clamp(0.5f + 0.5f * Lever, 0f, 1f), dir);
                 break;
             }
@@ -261,6 +266,19 @@ public sealed class AircraftSynth
         {
             _piston.Step();
             engine = (_piston.Exhaust + _piston.Intake + _piston.Block) * _incoherent;
+            // The propeller IS the crank, through its gearing. Run on its own smoothed speed it
+            // lagged every wobble of the engine's, and a two-blade prop on a four-cylinder engine
+            // makes the same frequencies as the exhaust: the two series slid past each other, which
+            // is a flanger. It turns exactly as far as the crank did.
+            double theta = _piston.CrankAngle;
+            if (!double.IsNaN(_lastCrank))
+            {
+                double d = theta - _lastCrank;
+                if (d < 0) d += _piston.Profile.CycleDegrees;
+                double revs = d / 360.0 * Profile.PropGearRatio;
+                for (int e = 0; e < _props.Length; e++) _props[e].Driven = revs;
+            }
+            _lastCrank = theta;
         }
         // Every row is stepped. Two propellers a few rpm apart are two pulse trains drifting in and
         // out of phase, which is the beat; summing them is the whole of the model for it.
@@ -467,15 +485,23 @@ internal sealed class BladeRow
         }
     }
 
+    /// <summary>
+    /// Revolutions this sample, when the row is bolted to a shaft whose angle is known: a propeller
+    /// on a crank. NaN leaves it on its own smoothed speed. See AircraftSynth's piston case.
+    /// </summary>
+    public double Driven = double.NaN;
+
     [MethodImpl(MethodImplOptions.AggressiveOptimization)]
     public float Step()
     {
         // A rotor's speed changes slowly: its inertia is enormous against anything driving it.
-        _rpm += (_rpmTarget - _rpm) * MathF.Min(1f, _dt * 2f);
+        // Unless it is on the crank, in which case it turns exactly as far as the crank did.
+        if (double.IsNaN(Driven)) _rpm += (_rpmTarget - _rpm) * MathF.Min(1f, _dt * 2f);
+        else _rpm = (float)(Driven / _dt * 60.0);
         _t += _dt;
         if (_rpm > 1f)
         {
-            double dphi = _rpm / 60.0 * _dt;
+            double dphi = double.IsNaN(Driven) ? _rpm / 60.0 * _dt : Driven;
             double before = _phase;
             _phase += dphi;
             int b = _s.Blades;

@@ -174,3 +174,45 @@ public class FanClutchAndRollingNoiseTests
         Assert.Equal(2, VehicleProfile.ByName("sportbike").TyreCount);
     }
 }
+
+/// <summary>
+/// "One of the trucks steps the pitch when it goes by me ... the pitch steps hard, not smooth." The
+/// truck's automatic changed up at a light cruise at 1,020 rpm and down at 1,100, so it hunted
+/// between gears for good. Every vehicle, held at a steady city speed, must settle in a gear.
+/// </summary>
+public class GearHuntingTests
+{
+    public static TheoryData<string> Keys()
+    {
+        var d = new TheoryData<string>();
+        foreach (var k in OpenFPS.Common.VehicleProfile.Presets.Keys) d.Add(k);
+        return d;
+    }
+
+    [Theory]
+    [MemberData(nameof(Keys))]
+    public void AtASteadyCruiseItSettlesInAGear(string key)
+    {
+        var v = OpenFPS.Common.VehicleProfile.ByName(key);
+        foreach (float kmh in new[] { 30f, 45f })
+        {
+            float speed = kmh / 3.6f;
+            var voice = new OpenFPS.Client.AudioEngine.Fmod.EngineVoiceState(v, 44100, 7) { TargetSpeed = speed };
+            voice.PlaceAtSpeed(speed);
+            voice.Revive();
+            var buf = new float[1024];
+            int changes = 0, last = -1;
+            for (int b = 0; b < 44100 * 30 / 1024; b++)
+            {
+                voice.Render(buf);
+                if (b < 44100 * 10 / 1024) continue;              // ten seconds to settle
+                int g = voice.Driveline.Gear;
+                if (g != last && last >= 0) changes++;
+                last = g;
+            }
+            // Twenty seconds at a steady speed: nothing to change gear for. A change up and its
+            // landing are two readings; allow one.
+            Assert.True(changes <= 2, $"{key} at {kmh} km/h changed gear {changes} times in 20 s");
+        }
+    }
+}

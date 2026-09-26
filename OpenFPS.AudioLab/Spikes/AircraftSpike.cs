@@ -25,8 +25,113 @@ public static class AircraftSpike
 {
     private const int Sr = VehicleSynth.SampleRate;
 
+    /// <summary>
+    /// --aircraft steady [preset ...]: the synth alone, the listener fixed beside it, ten seconds.
+    /// Any comb that moves has to come from the machine, since nothing in the geometry does. Reports
+    /// how much the spectrum's fine structure wanders from frame to frame between 300 Hz and 4 kHz
+    /// (the flange index: the mean over 1/12-octave bands of each band's standard deviation over
+    /// time, dB), for the preset as it is and with one engine.
+    /// </summary>
+    static int Steady(string[] args)
+    {
+        var presets = args.Where(a => AircraftProfile.Presets.ContainsKey(a)).ToList();
+        if (presets.Count == 0) presets = AircraftProfile.Presets.Keys.ToList();
+        Console.WriteLine($"{"preset",-14} {"engines",7} {"flange",7}   {"single",7}");
+        foreach (var key in presets)
+        {
+            var p = AircraftProfile.Presets[key]();
+            float a = FlangeIndex(p), b = p.Engines > 1 ? FlangeIndex(p with { Engines = 1 }) : a;
+            if (p.TailRotor != null)
+                foreach (float hz in new[] { 170.5f, 341f, 682f })
+                    Console.WriteLine($"   {hz:F0} Hz: level swings {Swing(p, hz):F1} dB with the tail rotor, {Swing(p with { TailRotor = null }, hz):F1} without");
+            string tail = p.TailRotor != null ? $"   no tail rotor {FlangeIndex(p with { TailRotor = null }):F2}" : "";
+            Console.WriteLine($"{key,-14} {p.Engines,7} {a,7:F2}   {b,7:F2}{tail}");
+        }
+        return 0;
+    }
+
+    /// <summary>The spread (max minus min, 10th to 90th percentile) of the level in a 6 Hz band
+    /// round <paramref name="hz"/>, over 250 ms windows, steady listener.</summary>
+    static float Swing(AircraftProfile p, float hz)
+    {
+        var syn = new AircraftSynth(p, Sr, 3);
+        syn.PlaceAtLever(0.7f); syn.Lever = 0.7f;
+        syn.SetListener(new System.Numerics.Vector3(60f, -40f, 10f));
+        int n = Sr * 14, N = 16384;
+        var x = new float[n];
+        for (int i = 0; i < n; i++) { syn.Step(); x[i] = syn.Total; }
+        var lv = new List<double>();
+        var re = new double[N]; var im = new double[N];
+        for (int s0 = Sr * 2; s0 + N <= n; s0 += Sr / 4)
+        {
+            for (int i = 0; i < N; i++) { re[i] = x[s0 + i] * (0.5 - 0.5 * Math.Cos(2 * Math.PI * i / N)); im[i] = 0; }
+            Fft(re, im);
+            double e = 1e-30;
+            for (int k = (int)((hz - 3) * N / Sr); k <= (int)((hz + 3) * N / Sr); k++) e += re[k] * re[k] + im[k] * im[k];
+            lv.Add(10 * Math.Log10(e));
+        }
+        lv.Sort();
+        return (float)(lv[(int)(lv.Count * 0.9)] - lv[(int)(lv.Count * 0.1)]);
+    }
+
+    static float FlangeIndex(AircraftProfile p)
+    {
+        var syn = new AircraftSynth(p, Sr, 3);
+        syn.PlaceAtLever(0.7f);
+        syn.Lever = 0.7f;
+        syn.SetListener(new System.Numerics.Vector3(60f, -40f, 10f));
+        int n = Sr * 12;
+        var x = new float[n];
+        for (int i = 0; i < n; i++) { syn.Step(); x[i] = syn.Total; }
+        const int N = 4096, hop = 2048;
+        var bands = new List<(int lo, int hi)>();
+        for (double f = 300; f < 4000; f *= Math.Pow(2, 1.0 / 12))
+            bands.Add(((int)(f * N / Sr), Math.Max((int)(f * N / Sr) + 1, (int)(f * Math.Pow(2, 1.0 / 12) * N / Sr))));
+        var series = bands.Select(_ => new List<double>()).ToList();
+        var re = new double[N]; var im = new double[N];
+        for (int s0 = Sr * 2; s0 + N <= n; s0 += hop)
+        {
+            for (int i = 0; i < N; i++) { re[i] = x[s0 + i] * (0.5 - 0.5 * Math.Cos(2 * Math.PI * i / N)); im[i] = 0; }
+            Fft(re, im);
+            for (int b = 0; b < bands.Count; b++)
+            {
+                double e = 1e-30;
+                for (int k = bands[b].lo; k < bands[b].hi; k++) e += re[k] * re[k] + im[k] * im[k];
+                series[b].Add(10 * Math.Log10(e));
+            }
+        }
+        return (float)series.Average(sr => { double m = sr.Average(); return Math.Sqrt(sr.Average(v => (v - m) * (v - m))); });
+    }
+
+    static void Fft(double[] re, double[] im)
+    {
+        int n = re.Length;
+        for (int i = 1, j = 0; i < n; i++)
+        {
+            int bit = n >> 1;
+            for (; (j & bit) != 0; bit >>= 1) j ^= bit;
+            j ^= bit;
+            if (i < j) { (re[i], re[j]) = (re[j], re[i]); (im[i], im[j]) = (im[j], im[i]); }
+        }
+        for (int len = 2; len <= n; len <<= 1)
+        {
+            double ang = -2 * Math.PI / len;
+            for (int i = 0; i < n; i += len)
+                for (int k = 0; k < len / 2; k++)
+                {
+                    double c = Math.Cos(ang * k), s = Math.Sin(ang * k);
+                    double ur = re[i + k], ui = im[i + k];
+                    double vr = re[i + k + len / 2] * c - im[i + k + len / 2] * s;
+                    double vi = re[i + k + len / 2] * s + im[i + k + len / 2] * c;
+                    re[i + k] = ur + vr; im[i + k] = ui + vi;
+                    re[i + k + len / 2] = ur - vr; im[i + k + len / 2] = ui - vi;
+                }
+        }
+    }
+
     public static int Run(string[] args)
     {
+        if (args.Contains("steady")) return Steady(args);
         AcousticRegistry.Initialize();
         float alt = Arg(args, "alt", -1f), speed = Arg(args, "speed", -1f), offset = Arg(args, "offset", 60f);
         float seconds = Arg(args, "sec", 18f), lever = Arg(args, "lever", -1f), descend = Arg(args, "descend", -1f);

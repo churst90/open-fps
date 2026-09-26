@@ -451,13 +451,22 @@ public sealed class VirtualDriver
         // Without the kickdown a bike asked for everything at 3,300 rpm in third stayed there,
         // lugging, and never reached the band its power is in. The lower gear must land under 90%
         // of the upshift point, so the change up that follows does not immediately undo it.
+        //
+        // And a change up must LAND above the point the change down is taken at. On the 13 litre
+        // truck the light-throttle shift point (85 % of a 1,200 rpm torque peak, 1,020) sat under
+        // its 1,100 rpm change down: up at 1,050, landing at 750, straight back down, and round
+        // again — eight tenths of a second in neutral each time, so the truck spent most of a
+        // steady cruise between gears and its pitch stepped every couple of seconds ("the pitch
+        // steps hard, not smooth"). The same guard the kickdown has, the other way.
         float upAt = MathHelper.Lerp(e.PeakTorqueRpm * 0.85f, _gb.UpshiftRpm, throttle);
+        float downAt = MathF.Max(_gb.DownshiftRpm, e.IdleRpm * 1.5f);
         bool floored = need > available && err > 0.5f;
-        if (_dl.Locked && _engine.Rpm > upAt && _dl.Gear < _gb.TopGear)
+        if (_dl.Locked && _engine.Rpm > upAt && _dl.Gear < _gb.TopGear
+            && _engine.Rpm * _dl.Ratio(_dl.Gear + 1) / _dl.Ratio(_dl.Gear) > downAt * 1.1f)
         {
             _shiftTo = _dl.Gear + 1; _shiftTimer = _gb.ShiftSeconds; _dl.Gear = 0;
         }
-        else if (_dl.Gear > 1 && gearRpm < MathF.Max(_gb.DownshiftRpm, e.IdleRpm * 1.5f) && _dl.Locked)
+        else if (_dl.Gear > 1 && gearRpm < downAt && _dl.Locked)
         {
             _shiftTo = _dl.Gear - 1; _shiftTimer = _gb.ShiftSeconds * 0.7f; _dl.Gear = 0;
         }
