@@ -3357,28 +3357,6 @@
    "StartDelaySeconds": 0.0
   },
   {
-   "Name": "Helicopter, city transit",
-   "Preset": "helicopter",
-   "RoadStart": {
-    "X": -420.0,
-    "Y": 118.0,
-    "Z": -240.0
-   },
-   "RoadEnd": {
-    "X": 300.0,
-    "Y": 96.0,
-    "Z": 340.0
-   },
-   "SpeedsKmh": [
-    190.0,
-    150.0
-   ],
-   "AccelerationMps2": 1.4,
-   "BrakingMps2": 1.8,
-   "WaitSeconds": 24.0,
-   "StartDelaySeconds": 62.0
-  },
-  {
    "Name": "Motorcycle, stock twin",
    "Preset": "vtwin_stock",
    "Track": "downtown_ccw",

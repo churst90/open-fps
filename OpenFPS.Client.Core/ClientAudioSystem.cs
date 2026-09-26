@@ -455,6 +455,8 @@ public class ClientAudioSystem
         
         // --- Use smoothed VisualPosition for the listener ---
         Vector3 visualEyePos = _state.VisualPosition + new Vector3(0, _state.EyeHeight, 0);
+        _groundEar = visualEyePos;
+        _groundWorld = world;
 
         // 1. Resolve high-precision listener region (OBB check)
         int listenerRegionId = _acoustics.GetRegionAt(world, visualEyePos);
@@ -475,12 +477,8 @@ public class ClientAudioSystem
         // A fraction of the moving air rides on the listener velocity, so wind produces a subtle Doppler
         // on distant sounds — and a gust now audibly swells and drops it.
         Vector3 listenerVelocity = _state.Velocity + feltWind * 0.1f;
-        // Sitting in something, you turn as it turns. Your own heading used to reach the client only
-        // as a correction some ticks after the vehicle turned, which swung a bus's engine round your
-        // head through every corner, so the ears were pinned to the vehicle — and then your own
-        // heading did nothing while you rode. The session now carries your heading round with the
-        // vehicle every frame (ClientGameSession.FollowRide), so the ears follow YOU: turned by the
-        // bus, and still yours to turn in the seat.
+        // Sitting in something, you face the way it faces: the session sets your heading from the
+        // vehicle every frame (ClientGameSession.FollowRide), so the ears and the compass agree.
         var listenerRotation = _state.Rotation;
         if (_state.IsRiding && world.Entities.TryGetValue(_state.RidingEntityId, out var carrying))
         {
@@ -1591,6 +1589,7 @@ public class ClientAudioSystem
             TargetRegionId = path.RegionId,
             EnableReverb = true,
         };
+        ApplyGround(ref e, _groundWorld);
         if (_audio.IsPlaying(voiceId)) _audio.UpdateSpatialAttributes(e);
         else _audio.PlayPhysicalSoundDirect(e);
     }
@@ -1719,6 +1718,7 @@ public class ClientAudioSystem
                 TargetRegionId = path.RegionId,
                 EnableReverb = true,
             };
+            ApplyGround(ref e, _groundWorld);
             if (_audio.IsPlaying(voiceId)) _audio.UpdateSpatialAttributes(e);
             else _audio.PlayPhysicalSoundDirect(e);
         }
@@ -1799,6 +1799,7 @@ public class ClientAudioSystem
             TargetRegionId = path.RegionId,
             EnableReverb = true,
         };
+        ApplyGround(ref e, _groundWorld);
         if (_audio.IsPlaying(voiceId)) _audio.UpdateSpatialAttributes(e);
         else { _audio.PlayPhysicalSoundDirect(e); _sirenVoiced.Add(snap.Id); }
     }
@@ -2241,6 +2242,8 @@ public class ClientAudioSystem
             if (_audio.IsPlaying(snap.Id)) return;    // still saying the last one
         }
 
+        // The road under a machine hands its sound back a moment later; see GroundReflection.
+        if (engineKey.Length > 0 || physicalKey != null) ApplyGround(ref emitter, world);
         _audio.Submit(emitter);
 
         // The other end of the machine, when it is close enough to be a second thing. Placed after
@@ -2564,10 +2567,71 @@ public class ClientAudioSystem
     /// Probes the space around the listener's head and hands the result to the mixer. Head-relative,
     /// so the picture turns with the player.
     /// </summary>
+    // ── The ground ─────────────────────────────────────────────────────────────────────────────
+
+    private Vector3 _groundEar;
+    private WorldSnapshot? _groundWorld;
+    private readonly Vector3[] _groundRay = { -Vector3.UnitY };
+    private readonly float[] _groundDist = new float[1], _groundAbs = new float[1];
+    private readonly string[] _groundMat = new string[1];
+
+    /// <summary>
+    /// The ground reflection for one live voice: the source mirrored in the surface under the point
+    /// where its sound bounces on the way to the listener (GroundReflection has the why).
+    ///
+    /// Two rays straight down. The first finds the ground under the source, which fixes where the
+    /// bounce lands — the point between the two, in the ratio of their heights. The second is cast
+    /// from the direct path above that point, so it finds whatever is actually there to reflect off,
+    /// and what it is made of: a surface above the ground and below the line (a bonnet, a kerb, a
+    /// shelter roof) is what the sound bounces off, and anything higher would be in the way of the
+    /// direct sound, not under it. The surface's own absorption decides how much comes back.
+    /// </summary>
+    private void ApplyGround(ref SpatialEmitter e, WorldSnapshot? world)
+    {
+        e.GroundDelaySeconds = 0f; e.GroundLowGain = 0f; e.GroundHighGain = 0f;
+        if (world == null || _state.IsRiding) return;          // from inside a vehicle there is no road to hear
+        Vector3 src = e.Position, ear = _groundEar;
+        const float Reach = 30f;
+
+        _spatial.RaycastAll(world, src + new Vector3(0f, 0.05f, 0f), _groundRay, Reach, _groundDist, _groundAbs, _groundMat, staticOnly: true);
+        if (_groundDist[0] >= Reach) return;
+        float g = src.Y + 0.05f - _groundDist[0];
+        float hs = MathF.Max(0.02f, src.Y - g), hr = MathF.Max(0.02f, ear.Y - g);
+        float t = hs / (hs + hr);
+        var above = Vector3.Lerp(src, ear, t);
+        _spatial.RaycastAll(world, above + new Vector3(0f, 0.02f, 0f), _groundRay, Reach, _groundDist, _groundAbs, _groundMat, staticOnly: true);
+        if (_groundDist[0] >= Reach) return;
+        float gb = above.Y + 0.02f - _groundDist[0];
+        if (gb > MathF.Min(src.Y, ear.Y)) return;                // nothing to bounce off below both
+
+        var image = new Vector3(src.X, 2f * gb - src.Y, src.Z);
+        float direct = MathF.Max(0.1f, Vector3.Distance(src, ear));
+        float mirrored = Vector3.Distance(image, ear);
+        var m = OpenFPS.Common.AcousticRegistry.GetProperties(_groundMat[0] ?? "Generic");
+        float spread = direct / MathF.Max(direct, mirrored);
+        float low = MathF.Sqrt(Math.Clamp(1f - 0.5f * (m.AbsorptionLow + m.AbsorptionMid), 0f, 1f));
+        float high = MathF.Sqrt(Math.Clamp(1f - m.AbsorptionHigh, 0f, 1f));
+        e.GroundDelaySeconds = (mirrored - direct) / AudioPhysics.SpeedOfSound;
+        e.GroundLowGain = low * spread;
+        e.GroundHighGain = high * spread;
+    }
+
     private void UpdateBoundaryProbes(WorldSnapshot world, Vector3 visualEyePos)
     {
         var head = _state.Rotation;
         var directions = BoundaryModel.ProbeDirections;
+
+        // A passenger has no near field outside the vehicle. "The proximity to me from the outside
+        // objects isn't relevant" — a lamp post the bus brushes past is half a metre from the glass,
+        // not from your ear, and what the cabin does to sound is the interior model's (EngineVoiceState
+        // .Interior and the enclosure filter). So nothing is near while you ride.
+        if (_state.IsRiding)
+        {
+            for (int i = 0; i < directions.Length; i++)
+                _boundaryProbes[i] = new BoundaryProbe(directions[i], BoundaryModel.MaxDistance, "");
+            _audio.UpdateBoundaries(_boundaryProbes);
+            return;
+        }
 
         for (int i = 0; i < directions.Length; i++)
             _boundaryRays[i] = Vector3.Transform(directions[i], head);

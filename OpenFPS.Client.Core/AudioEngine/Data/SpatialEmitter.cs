@@ -171,6 +171,12 @@ public struct SpatialEmitter
     /// <summary>How rough the surface an echo came off is, 0..1 — how much the renderer smears it.
     /// See EngineEchoState.Scattering.</summary>
     public float EchoScattering;
+    /// <summary>The ground between this source and the listener (see GroundReflection): the extra
+    /// path in seconds, and the pressure it hands back below and above a kilohertz, spreading
+    /// included. All zero: no ground reflection.</summary>
+    public float GroundDelaySeconds;
+    public float GroundLowGain;
+    public float GroundHighGain;
     /// <summary>
     /// When non-zero, this voice is the FRONT OUTLET of that entity's live engine — what the machine
     /// breathes through, and the block behind it — placed at its own point on the machine.

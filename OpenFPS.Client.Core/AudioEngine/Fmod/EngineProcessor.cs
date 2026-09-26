@@ -211,6 +211,10 @@ public sealed class EngineVoiceState : IRenderedVoice
     /// </summary>
     private int _producing;
 
+    /// <summary>The ground between this voice and the listener; see GroundReflection. Applied to what
+    /// the mixer takes, never to the ring, so echoes and borrowed voices read the car itself.</summary>
+    public readonly OpenFPS.Client.AudioEngine.Acoustics.GroundReflection Ground;
+
     /// <summary>Samples the mixer has taken — the position of "now" for anything reading back.</summary>
     public long Played => Volatile.Read(ref _played);
 
@@ -416,7 +420,7 @@ public sealed class EngineVoiceState : IRenderedVoice
         {
             int j = (int)((at + i) & mask);
             _frontShare += Math.Clamp(shareTarget - _frontShare, -shareStep, shareStep);
-            mono[i] = Soft(_ring[j] + _front[j] * _frontShare);
+            mono[i] = Soft(Ground.Process(_ring[j] + _front[j] * _frontShare));
         }
         if (take > 0)
         {
@@ -459,13 +463,14 @@ public sealed class EngineVoiceState : IRenderedVoice
         {
             int j = (int)((at + i) & mask);
             _frontShare += Math.Clamp(shareTarget - _frontShare, -shareStep, shareStep);
-            mono[i] = Soft(_ring[j] + _front[j] * _frontShare);
+            mono[i] = Soft(Ground.Process(_ring[j] + _front[j] * _frontShare));
         }
         Volatile.Write(ref _played, at + mono.Length);
     }
 
     public EngineVoiceState(VehicleProfile v, float sampleRate, int seed)
     {
+        Ground = new OpenFPS.Client.AudioEngine.Acoustics.GroundReflection(sampleRate);
         Vehicle = v;
         PascalsAtFullScale = v.PascalsAtFullScale;
         SampleRate = sampleRate;
@@ -1351,7 +1356,10 @@ public sealed class EngineTapState
     private float _gain;
     private double _cursor = -1;
 
-    public EngineTapState(EngineVoiceState source) { Source = source; }
+    public EngineTapState(EngineVoiceState source) { Source = source; Ground = new(source.SampleRate); }
+
+    /// <summary>The ground between the front of the machine and the listener.</summary>
+    public readonly OpenFPS.Client.AudioEngine.Acoustics.GroundReflection Ground;
 
     public void Render(Span<float> mono)
     {
@@ -1371,7 +1379,7 @@ public sealed class EngineTapState
         for (int i = 0; i < mono.Length; i++)
         {
             _gain += Math.Clamp(gTarget - _gain, -step, step);
-            mono[i] = Source.ReadFrontAt(_cursor + i) * _gain;
+            mono[i] = Ground.Process(Source.ReadFrontAt(_cursor + i)) * _gain;
         }
 
         // Wall clock, plus an inaudible pull back toward where the other half of this machine has

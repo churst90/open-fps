@@ -241,7 +241,7 @@ public sealed class ClientGameSession : IDisposable
     {
         // Accessibility readouts — the game's HUD, spoken.
         _bindings.Bind(InputContext.Gameplay, GameKey.C,
-            () => Say($"Coordinates: {OpenFPS.Common.PlayerCoordinates.Format(_state.Position)}"));
+            () => Say(OpenFPS.Common.PlayerCoordinates.Format(_state.Position)));
         _bindings.Bind(InputContext.Gameplay, GameKey.F, () => Say($"Facing: {_state.GetCompassDirection()}"));
         _bindings.Bind(InputContext.Gameplay, GameKey.H, () => Say($"Health: {_state.Health} percent"));
         // Driving, Z is the road: which one, which way, which lane, how fast. On foot it is the area.
@@ -463,40 +463,26 @@ public sealed class ClientGameSession : IDisposable
     }
 
     /// <summary>
-    /// Sitting in something that turns, you turn with it.
+    /// Sitting in something, you face the way it faces.
     ///
-    /// The server already carries a rider's heading round with the vehicle (OccupancySystem), but
-    /// that only reaches the client as a correction once the two disagree by three degrees, so on its
-    /// own it arrives as a stepped turn. Worse, the listener used to be pinned to the VEHICLE's
-    /// rotation while riding, so your own heading was ignored altogether — J and L did nothing to
-    /// what you heard, and when you got off you were facing wherever your own heading had been left.
-    /// Here the vehicle's turn since the last frame is added to your heading as it happens, the same
-    /// rule the server applies, so the two agree and the ears can follow YOUR heading: the bus turns
-    /// you, and you can still look round in your seat.
+    /// Reported: "when the bus turns, the bus turns around my head, which is wrong. My head should
+    /// stay facing the direction of the bus, and when I press F it should tell me the correct
+    /// direction." A first attempt carried your own heading round with the vehicle's turns and let
+    /// the server's copy of it correct yours; but the server's copy arrives a network trip late, so
+    /// half way through every corner the two disagreed by more than the correction threshold and your
+    /// head was snapped back to where the bus had been — the bus swinging round you. Now, while you
+    /// ride, your heading IS the vehicle's, set every frame from the vehicle itself and never
+    /// corrected (PredictionReconciler skips the look while Riding). The ears, the compass on F and
+    /// the way you face when you step off all read the same number.
     /// </summary>
     private void FollowRide(WorldSnapshot snapshot)
     {
-        if (!_state.IsRiding || !snapshot.Entities.TryGetValue(_state.RidingEntityId, out var ride))
-        {
-            _rideYaw = float.NaN;
-            return;
-        }
+        if (!_state.IsRiding || !snapshot.Entities.TryGetValue(_state.RidingEntityId, out var ride)) return;
         MathHelper.ToYawPitch(ride.Transform.Rotation, out float yaw, out _);
-        if (!float.IsNaN(_rideYaw) && _rideId == _state.RidingEntityId)
-        {
-            float turned = MathHelper.WrapAngle(yaw - _rideYaw);
-            if (turned != 0f)
-            {
-                _state.Yaw = MathHelper.WrapAngle(_state.Yaw + turned);
-                _state.Rotation = Quaternion.CreateFromYawPitchRoll(_state.Yaw, _state.Pitch, 0f);
-            }
-        }
-        _rideYaw = yaw;
-        _rideId = _state.RidingEntityId;
+        _state.Yaw = MathHelper.WrapAngle(yaw);
+        _state.Rotation = Quaternion.CreateFromYawPitchRoll(_state.Yaw, _state.Pitch, 0f);
     }
 
-    private float _rideYaw = float.NaN;
-    private int _rideId = -1;
 
     /// <summary>Render-rate update: footstep generation + spatial audio listener/emitters.</summary>
     public void ContinuousUpdate()

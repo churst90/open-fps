@@ -35,7 +35,7 @@ public class SpatialService
     /// with it before starting another query — which every caller does; none nests a second query inside a
     /// walk of the first.
     /// </summary>
-    private List<EntitySnapshot> GetEntitiesToTest(WorldSnapshot world, Vector3 center, float radius)
+    private List<EntitySnapshot> GetEntitiesToTest(WorldSnapshot world, Vector3 center, float radius, bool staticOnly = false)
     {
         var candidates = _candidates ??= new List<EntitySnapshot>(64);
         candidates.Clear();
@@ -50,8 +50,9 @@ public class SpatialService
                 if (world.Entities.TryGetValue(ids[i], out var snap)) candidates.Add(snap);
 
             // Dynamic entities are not in the static grid, so they are always in play.
-            for (int i = 0; i < world.DynamicEntities.Count; i++)
-                if (seen.Add(world.DynamicEntities[i].Id)) candidates.Add(world.DynamicEntities[i]);
+            if (!staticOnly)
+                for (int i = 0; i < world.DynamicEntities.Count; i++)
+                    if (seen.Add(world.DynamicEntities[i].Id)) candidates.Add(world.DynamicEntities[i]);
 
             // AN EMPTY ANSWER FROM THE GRID IS AN ANSWER, and it used to be taken as a failure.
             //
@@ -262,8 +263,10 @@ public class SpatialService
     /// audio frame in one caller and every acoustic tick in another; three arrays per call, sixty times
     /// a second, is exactly the kind of steady garbage the profiling pass exists to remove.
     /// </summary>
+    /// <param name="staticOnly">Leave out everything that moves. The ground under a car is not the
+    /// car, and a ray that starts inside the car's own box would find it.</param>
     public void RaycastAll(WorldSnapshot world, Vector3 start, Vector3[] directions, float maxDist,
-                           float[] distances, float[] absorptions, string[] materials)
+                           float[] distances, float[] absorptions, string[] materials, bool staticOnly = false)
     {
         for (int i = 0; i < directions.Length; i++)
         {
@@ -272,7 +275,7 @@ public class SpatialService
             materials[i] = "Generic";
         }
 
-        var entitiesToTest = GetEntitiesToTest(world, start, maxDist);
+        var entitiesToTest = GetEntitiesToTest(world, start, maxDist, staticOnly);
 
         foreach (var entitySnap in entitiesToTest)
         {

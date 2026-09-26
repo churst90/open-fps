@@ -2535,6 +2535,9 @@ public class FmodAudioProvider : IAudioProvider
                     active.Pitch = emitter.Pitch;
                     active.Channel.setPitch(active.Pitch);
                 }
+                // The ground between it and the listener, for every live physical voice.
+                var ground = active.EngineState?.Ground ?? active.TapState?.Ground ?? active.MachineState?.Ground;
+                ground?.Set(emitter.GroundDelaySeconds, emitter.GroundLowGain, emitter.GroundHighGain);
                 active.MinDistance = emitter.MinDistance;
                 // Same again, and this one ran EVERY FRAME for EVERY voice — which is where the
                 // 113,228 came from. A voice with a binaural stage is 2D by design; see the note at

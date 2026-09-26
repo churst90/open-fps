@@ -133,6 +133,7 @@ public abstract class PhysicalVoiceState : IRenderedVoice
     protected PhysicalVoiceState(float sourceLevelDb, float sampleRate)
     {
         SampleRate = sampleRate;
+        Ground = new OpenFPS.Client.AudioEngine.Acoustics.GroundReflection(sampleRate);
         PascalsAtFullScale =
             20e-6f * MathF.Pow(10f, (sourceLevelDb + VehicleProfile.PeakHeadroomDb) / 20f);
     }
@@ -179,6 +180,10 @@ public abstract class PhysicalVoiceState : IRenderedVoice
         finally { Volatile.Write(ref _producing, 0); }
     }
 
+    /// <summary>The ground between this machine and the listener (see GroundReflection). Created on
+    /// first use, before any mixer call, at the voice's own rate.</summary>
+    public readonly OpenFPS.Client.AudioEngine.Acoustics.GroundReflection Ground;
+
     /// <summary>Hands the mixer its block out of what the producer has already rendered. Mixer
     /// thread. NOTHING IN HERE MAY BLOCK OR SYNTHESIZE.</summary>
     public void Consume(Span<float> mono)
@@ -187,7 +192,7 @@ public abstract class PhysicalVoiceState : IRenderedVoice
         long avail = _primed ? Volatile.Read(ref _written) - at : 0;
         int take = (int)Math.Clamp(avail, 0, mono.Length);
         int mask = _ring.Length - 1;
-        for (int i = 0; i < take; i++) mono[i] = _ring[(int)((at + i) & mask)];
+        for (int i = 0; i < take; i++) mono[i] = Ground.Process(_ring[(int)((at + i) & mask)]);
         if (take > 0)
         {
             _lastOut = mono[take - 1];

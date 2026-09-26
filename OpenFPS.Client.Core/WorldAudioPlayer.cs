@@ -289,7 +289,13 @@ public sealed class WorldAudioPlayer
                 // Nothing is ranked by WHAT IT IS any more. A reflection gives way first because it
                 // IS quieter — its Volume already carries what the surface kept and how far the
                 // mirrored path ran — and the budget ranks on the level a voice will deliver.
-                EnableReverb = true,
+                // Outdoors, an impulse's tail is the geometry's: the facades hand it back a crossing
+                // at a time (QueueHigherOrderEchoes) and the sky takes the rest. The reverb unit is a
+                // ROOM's tail — dense and smooth from the first milliseconds — and a shot sent to it
+                // between two buildings sounded fired in a hall ("gunshots sound odd with the
+                // reverb"). Indoors the copies are too dense to hear apart and the reverb is right;
+                // a sustained sound's late field is the reverb's everywhere.
+                EnableReverb = !(IsImpulse(item.Sound) && !ListenerEnclosed(world, listenerPosition)),
                 // An EVENT: it belongs to a moment. If the budget has no room for it now there is no
                 // playing it later — see VoiceManager.Process, which drops one that did not win a slot
                 // rather than keeping it queued to fire from a stale position minutes afterwards.
@@ -360,7 +366,10 @@ public sealed class WorldAudioPlayer
     /// </summary>
     /// <summary>How many copies-of-copies one event may add. A clap between two facades comes back as a
     /// short train; past three the train is the tail.</summary>
-    private const int MaxHigherOrderEchoes = 3;
+    /// <summary>How many copies of copies a one-off sound gets. Three kept only the first crossings
+    /// of a street; the flutter that follows a shot down it is a couple of dozen (EarlyReflections
+    /// .FindFlutter), and each is an event of its own, short-lived.</summary>
+    private const int MaxHigherOrderEchoes = EarlyReflections.MaxFlutterArrivals;
     private readonly List<EarlyReflections.Arrival> _higher = new();
 
     /// <summary>
@@ -372,16 +381,27 @@ public sealed class WorldAudioPlayer
     /// AsyncAcousticWorker.AddEarlyReflections), and in a room the copies of copies are the dense
     /// tail, which the reverb already is. First order stays with QueueReflections.
     /// </summary>
+    /// <summary>A short impact — a shot, a slam, a clap — rather than a sustained sound.</summary>
+    private static bool IsImpulse(in TransientSound s) => s.Character == SoundCharacter.Knock && s.DecaySeconds <= 1f;
+
+    /// <summary>Is the listener in a room, where copies of copies are dense and the reverb is the tail?</summary>
+    private bool ListenerEnclosed(WorldSnapshot world, Vector3 listenerPosition)
+        => world.AcousticMap != null
+           && world.AcousticMap.Regions.TryGetValue(_acoustics.GetRegionAt(world, listenerPosition), out var room)
+           && RoomAcoustics.IsEnclosure(room);
+
     private void QueueHigherOrderEchoes(in Pending item, WorldSnapshot world, Vector3 listenerPosition)
     {
-        if (world.AcousticMap != null
-            && world.AcousticMap.Regions.TryGetValue(_acoustics.GetRegionAt(world, listenerPosition), out var room)
-            && RoomAcoustics.IsEnclosure(room)) return;
+        if (ListenerEnclosed(world, listenerPosition)) return;
 
         var solids = _acoustics.ReflectionSolids(world);
         if (solids.Count == 0) return;
         EarlyReflections.Find(item.Sound.Position, listenerPosition, solids, _higher, AudioPhysics.SpeedOfSound,
-                              maxOrder: EarlyReflections.MaxOrder, separateFirst: true);
+                              maxOrder: EarlyReflections.MaxOrder, separateFirst: true,
+                              // The long roll down a street is for an IMPULSE: a shot, a slam, a clap.
+                              // Two dozen overlapping copies of a two-second horn are a cloud, not a
+                              // flutter — a sustained sound's copies of copies are the field.
+                              flutter: IsImpulse(item.Sound));
         float direct = MathF.Max(1f, Vector3.Distance(item.Sound.Position, listenerPosition));
         int added = 0;
         foreach (var a in _higher)

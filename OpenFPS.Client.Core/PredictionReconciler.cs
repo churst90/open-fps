@@ -90,7 +90,9 @@ public sealed class PredictionReconciler
         // Purge inputs the server has already folded into that state.
         _history.RemoveAll(i => i.SequenceId <= lastProcessedId);
 
-        ReconcileYaw(transform.Rotation);
+        // A passenger faces the way the vehicle faces; the session sets that every frame, and the
+        // server's copy of it is a network trip behind (see ClientGameSession.FollowRide).
+        if (!Riding) ReconcileYaw(transform.Rotation);
 
         // Replay only the movement of the still-unacknowledged inputs. Look is NOT replayed: the
         // local heading is already ahead of the server by exactly those inputs (see ReconcileYaw),

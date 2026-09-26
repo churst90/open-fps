@@ -1,3 +1,4 @@
+using System.Linq;
 using System;
 using System.Collections.Generic;
 using System.Numerics;
@@ -138,9 +139,13 @@ public static class EarlyReflections
     /// <param name="separateFirst">Rank arrivals the ear hears as separate events ahead of fused ones
     /// when the budget cuts. A renderer that only voices separate events wants this; one that renders
     /// the near surfaces (your own footsteps off the ceiling a metre overhead) does not.</param>
+    /// <param name="flutter">Also follow the sound back and forth between facing facades, past
+    /// <see cref="MaxOrder"/> (see <see cref="FindFlutter"/>), and keep up to
+    /// <see cref="MaxFlutterArrivals"/> arrivals rather than <see cref="MaxArrivals"/>. For one-off
+    /// sounds out of doors.</param>
     public static void Find(Vector3 source, Vector3 listener, IReadOnlyList<Solid> solids,
                             List<Arrival> into, float speedOfSound = 343.0f,
-                            int maxOrder = 1, bool separateFirst = false)
+                            int maxOrder = 1, bool separateFirst = false, bool flutter = false)
     {
         into.Clear();
         if (solids == null || solids.Count == 0) return;
@@ -219,6 +224,8 @@ public static class EarlyReflections
 
         if (Math.Min(maxOrder, MaxOrder) >= 2)
             FindHigherOrders(source, listener, direct, solids, into, speedOfSound, Math.Min(maxOrder, MaxOrder));
+        if (flutter)
+            FindFlutter(source, listener, direct, solids, into, speedOfSound);
 
         // Only as many as a listener can tell apart, and the ones they CAN tell apart first.
         //
@@ -236,7 +243,8 @@ public static class EarlyReflections
             float eb = MathF.Max(b.GainLow, MathF.Max(b.GainMid, b.GainHigh));
             return eb.CompareTo(ea);
         });
-        if (into.Count > MaxArrivals) into.RemoveRange(MaxArrivals, into.Count - MaxArrivals);
+        int keep = flutter ? MaxFlutterArrivals : MaxArrivals;
+        if (into.Count > keep) into.RemoveRange(keep, into.Count - keep);
 
         // ── Then back into surface order, and that is not cosmetic ──────────────────────────────
         //
@@ -371,6 +379,258 @@ public static class EarlyReflections
             }
         }
     }
+
+    // ── Flutter ─────────────────────────────────────────────────────────────────────────────────
+
+    /// <summary>Most crossings of a street a copy is followed through. At a street's width a crossing
+    /// apart, sixteen of them is the better part of a second on Main Street.</summary>
+    public const int FlutterMaxOrder = 16;
+
+    /// <summary>How many arrivals a flutter search keeps, loudest separate events first.</summary>
+    public const int MaxFlutterArrivals = 24;
+
+    /// <summary>How much face a cluster needs to count as a wall of the street, square metres: a
+    /// shopfront or two, not a railing.</summary>
+    public const float MinWallAreaSquareMetres = 150f;
+
+    /// <summary>Furthest a flutter copy is followed, metres: a second of sound.</summary>
+    public const float FlutterRangeMetres = 343f;
+
+    /// <summary>
+    /// The sound handed back and forth across a street: the flutter.
+    ///
+    /// Reported: "I heard gun shots but didn't really hear them reflect off walls, no wash like they
+    /// would in a real city" — and, asked what the wash IS: "a bunch of different cracks off every
+    /// surface all at slightly different times." It is. Two rows of facades across a street return a
+    /// shot to each other a crossing at a time, each copy a street's width of travel later and a
+    /// little weaker and more smeared than the last, until it is a roll rather than a train. The chain
+    /// search above stops at three surfaces and at the eight strongest single faces, and a street is
+    /// not eight faces — it is two PLANES, each made of every building along one side. A copy that
+    /// crosses the street a dozen times lands on a dozen different buildings.
+    ///
+    /// So this finds the planes: every vertical face in range with both ends in front of it, grouped
+    /// by where it lies. Pairs of planes that face each other are the streets. For each, the images
+    /// alternate from one side to the other; the path back from the ear has to land on SOME building
+    /// in each plane at every crossing — a gap between buildings is where the sound leaves the street,
+    /// and a chain through it is not a path — and every leg has to be clear. What each crossing keeps
+    /// is the building it actually hit. Each crossing also scatters: the copy is made a little more
+    /// diffuse per bounce, which is what turns a train of cracks into a wash.
+    /// </summary>
+    private static void FindFlutter(Vector3 source, Vector3 listener, float direct,
+                                    IReadOnlyList<Solid> solids, List<Arrival> into, float speedOfSound)
+    {
+        // Every vertical face with both ends in front of it, by the way it faces.
+        var byNormal = _planes ??= new Dictionary<long, List<(Mirror M, float Offset)>>();
+        foreach (var l in byNormal.Values) l.Clear();
+        for (int i = 0; i < solids.Count; i++)
+        {
+            var s = solids[i];
+            if (s.Size.X <= 0f || s.Size.Y <= 0f || s.Size.Z <= 0f) continue;
+            // A wall of the street the sound is in lies within half the widest street of the line
+            // from the source to the ear.
+            float reach = 60f + s.Size.Length() * 0.5f;
+            if (DistanceSquaredToSegment(s.Center, source, listener) > reach * reach) continue;
+            for (int f = 0; f < 6; f++)
+            {
+                if (f == 2 || f == 3) continue;                               // tops and bottoms
+                if (!FacePlane(s, f, out var c, out var n, out var u, out var v, out float hu, out float hv)) continue;
+                if (MathF.Abs(n.Y) > 0.2f) continue;                          // walls, not floors
+                if (Vector3.Dot(source - c, n) <= 0.01f || Vector3.Dot(listener - c, n) <= 0.01f) continue;
+                long key = ((long)MathF.Round(n.X * 20f) & 0xFF) | (((long)MathF.Round(n.Z * 20f) & 0xFF) << 8);
+                if (!byNormal.TryGetValue(key, out var list)) byNormal[key] = list = new List<(Mirror, float)>();
+                var p = AcousticRegistry.GetProperties(s.Material);
+                list.Add((new Mirror(i, f, c, n, u, v, hu, hv,
+                                     1f - Math.Clamp(p.AbsorptionLow, 0f, 1f), 1f - Math.Clamp(p.AbsorptionMid, 0f, 1f),
+                                     1f - Math.Clamp(p.AbsorptionHigh, 0f, 1f), Math.Clamp(p.Scattering, 0f, 1f)),
+                          Vector3.Dot(listener - c, n)));
+            }
+        }
+
+        // A WALL is every face facing that way within a metre and a half of the nearest: a street's
+        // facade is storeys stacked on each other, shopfront glass set back from the brick, a door
+        // in its reveal. Asked to be exactly coplanar it fell apart into dozens of little walls and a
+        // copy at head height landed on "nothing" at every shop window. For each direction, the wall
+        // that bounds the listener is the NEAREST one in front of them; the next street over is not
+        // the street they are standing in.
+        var walls = _planeList ??= new List<List<(Mirror M, float Offset)>>();
+        walls.Clear();
+        foreach (var l in byNormal.Values)
+        {
+            if (l.Count == 0) continue;
+            l.Sort(static (x, y) => x.Offset.CompareTo(y.Offset));
+            // Nearest first, in clusters a metre and a half deep; the first cluster with a wall's worth
+            // of face in it is the wall. A railing, a shelter's back panel or a bollard is nearer than
+            // the buildings and is not what the street is made of.
+            int i = 0;
+            while (i < l.Count)
+            {
+                int j = i;
+                float area = 0f;
+                while (j < l.Count && l[j].Offset <= l[i].Offset + 1.5f)
+                {
+                    area += 4f * l[j].M.HalfU * l[j].M.HalfV;
+                    j++;
+                }
+                if (area >= MinWallAreaSquareMetres)
+                {
+                    var wall = new List<(Mirror M, float Offset)>(j - i);
+                    for (int k = i; k < j; k++) wall.Add(l[k]);
+                    walls.Add(wall);
+                    break;
+                }
+                i = j;
+            }
+        }
+        var groups = walls;
+        if (groups.Count < 2) return;
+
+        var images = _flImages ??= new Vector3[FlutterMaxOrder + 1];
+        var hitFace = _flFaces ??= new Mirror[FlutterMaxOrder];
+        var hits = _flHits ??= new Vector3[FlutterMaxOrder];
+        var pairList = _pairScratch ??= new List<(int A, int B, float Width)>();
+        pairList.Clear();
+        for (int a = 0; a < groups.Count; a++)
+        for (int b = a + 1; b < groups.Count; b++)
+        {
+            var na0 = groups[a][0].M.Normal; var nb0 = groups[b][0].M.Normal;
+            if (Vector3.Dot(na0, nb0) > -0.97f) continue;                     // not facing each other
+            float w = groups[a][0].Offset + groups[b][0].Offset;              // listener to each wall
+            if (w < 3f || w > 120f) continue;
+            pairList.Add((a, b, w));
+        }
+        pairList.Sort(static (x, y) => x.Width.CompareTo(y.Width));
+        if (pairList.Count == 0) return;
+
+        // Every leg of every chain runs between the two walls and between the source and the ear, so
+        // only what stands in that stretch of street can block one. Found once here: testing each leg
+        // against every solid within range cost 30 ms a shot on Main Street, 160 at worst.
+        var legSolids = _legSolids ??= new List<Solid>();
+        var localIndex = _legIndex ??= new List<int>();
+        for (int pi = 0; pi < Math.Min(2, pairList.Count); pi++)
+        {
+            int a = pairList[pi].A, b = pairList[pi].B;
+            var na = groups[a][0].M.Normal;
+            float width = pairList[pi].Width;
+            // Only what stands IN this street — between its two walls, along the stretch between the
+            // source and the ear — can block a crossing. The buildings behind the walls cannot, and
+            // testing every storey of both facades for every leg was most of the cost.
+            legSolids.Clear(); localIndex.Clear();
+            {
+                var wa = groups[a][0].M; var wb = groups[b][0].M;
+                for (int i = 0; i < solids.Count; i++)
+                {
+                    var sd = solids[i];
+                    if (Vector3.Dot(sd.Center - wa.Centre, wa.Normal) <= 0.3f) continue;
+                    if (Vector3.Dot(sd.Center - wb.Centre, wb.Normal) <= 0.3f) continue;
+                    float r = sd.Size.Length() * 0.5f + width;
+                    if (DistanceSquaredToSegment(sd.Center, source, listener) > r * r) continue;
+                    legSolids.Add(sd); localIndex.Add(i);
+                }
+            }
+            FlutterTrace?.Invoke($"pair {a}/{b}: width {width:F1}, faces {groups[a].Count}/{groups[b].Count}, normal {na}");
+            for (int start = 0; start < 2; start++)
+            {
+                var first = start == 0 ? groups[a] : groups[b];
+                var second = start == 0 ? groups[b] : groups[a];
+                images[0] = source;
+                for (int n = 1; n <= FlutterMaxOrder; n++)
+                {
+                    var plane = (n % 2 == 1) ? first : second;
+                    var pm = plane[0].M;
+                    float d = Vector3.Dot(images[n - 1] - pm.Centre, pm.Normal);
+                    images[n] = images[n - 1] - 2f * d * pm.Normal;
+                    if (n <= MaxOrder) continue;                               // the chain search has these
+                    float path = Vector3.Distance(images[n], listener);
+                    if (path > FlutterRangeMetres) break;
+                    float spread = direct / path;
+                    if (spread < MinRelativeAmplitude) break;
+
+                    // Back from the ear, crossing by crossing: which building did it hit each time?
+                    Vector3 toward = listener;
+                    bool ok = true;
+                    float keepL = 1f, keepM = 1f, keepH = 1f, clean = 1f;
+                    for (int j = n; j >= 1 && ok; j--)
+                    {
+                        var pl = (j % 2 == 1) ? first : second;
+                        var m0 = pl[0].M;
+                        Vector3 from = images[j];
+                        float denom = Vector3.Dot(toward - from, m0.Normal);
+                        if (MathF.Abs(denom) < 1e-5f) { ok = false; break; }
+                        float t = Vector3.Dot(m0.Centre - from, m0.Normal) / denom;
+                        if (t <= 0f || t >= 1f) { ok = false; break; }
+                        Vector3 hit = from + (toward - from) * t;
+                        bool landed = false;
+                        foreach (var (m, _) in pl)
+                        {
+                            // In the face's own plane: a set-back shopfront catches the copy that
+                            // lands on its patch of the wall line.
+                            Vector3 local = hit - m.Centre;
+                            local -= Vector3.Dot(local, m.Normal) * m.Normal;
+                            if (MathF.Abs(Vector3.Dot(local, m.U)) > m.HalfU + 0.05f || MathF.Abs(Vector3.Dot(local, m.V)) > m.HalfV + 0.05f) continue;
+                            hitFace[j - 1] = m; landed = true;
+                            keepL *= m.KeepLow; keepM *= m.KeepMid; keepH *= m.KeepHigh;
+                            clean *= 1f - m.Scattering * 0.5f;
+                            break;
+                        }
+                        if (!landed) { FlutterTrace?.Invoke($"  start {start} order {n}: crossing {j} at {hit} landed on nothing"); ok = false; break; }
+                        hits[j - 1] = hit;
+                        toward = hit;
+                    }
+                    if (!ok) continue;
+                    if (MathF.Max(keepL, MathF.Max(keepM, keepH)) * spread < MinRelativeAmplitude) break;
+
+                    Vector3 prev = source;
+                    for (int j = 0; j <= n && ok; j++)
+                    {
+                        Vector3 next = j < n ? hits[j] : listener;
+                        int skipA = j > 0 ? hitFace[j - 1].Solid : -1;
+                        int skipB = j < n ? hitFace[j].Solid : -1;
+                        if (!LegIsClearAmong(prev, next, legSolids, localIndex, skipA, skipB)) { ok = false; FlutterTrace?.Invoke($"  start {start} order {n}: leg {j} blocked"); }
+                        prev = next;
+                    }
+                    if (!ok) continue;
+
+                    // Every crossing scatters some of what is left: a mirror at the first, a wash by
+                    // the tenth. What stays coherent is what the surfaces did not scatter.
+                    float scatter = Math.Clamp(1f - clean * MathF.Pow(0.85f, n), 0f, 1f);
+                    int id = FirstOrderIdSpace + (int)((uint)unchecked((a * 7919 + b) * 131 + start * 37 + n) % (uint)(int.MaxValue - FirstOrderIdSpace));
+                    into.Add(new Arrival(images[n], hits[n - 1], path, (path - direct) / MathF.Max(1f, speedOfSound),
+                                         keepL * spread, keepM * spread, keepH * spread, scatter, id, n));
+                }
+            }
+        }
+    }
+
+    /// <summary>Diagnostics for tests: what the flutter search made of the planes and why chains died.</summary>
+    public static Action<string>? FlutterTrace;
+
+    [ThreadStatic] private static Dictionary<long, List<(Mirror M, float Offset)>>? _planes;
+    [ThreadStatic] private static List<List<(Mirror M, float Offset)>>? _planeList;
+    [ThreadStatic] private static List<(int A, int B, float Width)>? _pairScratch;
+    [ThreadStatic] private static List<Solid>? _legSolids;
+    [ThreadStatic] private static List<int>? _legIndex;
+
+    private static float DistanceSquaredToSegment(Vector3 p, Vector3 a, Vector3 b)
+    {
+        Vector3 ab = b - a;
+        float t = Math.Clamp(Vector3.Dot(p - a, ab) / MathF.Max(1e-6f, ab.LengthSquared()), 0f, 1f);
+        return Vector3.DistanceSquared(p, a + ab * t);
+    }
+
+    /// <summary><see cref="LegIsClear"/> over a pre-filtered list, skipping by the original index.</summary>
+    private static bool LegIsClearAmong(Vector3 a, Vector3 b, List<Solid> local, List<int> index, int skip, int skip2)
+    {
+        for (int i = 0; i < local.Count; i++)
+        {
+            int k = index[i];
+            if (k == skip || k == skip2) continue;
+            var s = local[i];
+            if (GeometryUtils.LineIntersectsOBB(a, b, s.Center, s.Size, s.Rotation)) return false;
+        }
+        return true;
+    }
+    [ThreadStatic] private static Vector3[]? _flImages, _flHits;
+    [ThreadStatic] private static Mirror[]? _flFaces;
 
     /// <summary>First-order surface ids live below this; a chain's id is hashed above it, so the two
     /// can never name the same voice.</summary>

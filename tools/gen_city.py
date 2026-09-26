@@ -1472,12 +1472,9 @@ VEHICLES.append({
 # Only the helicopter now (Cody, 2026-09-25): "the planes are getting to be a bit much ... keep the
 # helicopter that flies over every now and then but remove the props." The two airliners, the
 # turboprop and the light single are gone; the airport is still there for when they come back.
+# No aircraft for now (Cody, 2026-09-25): the helicopter "sounds good too btw but you can remove it for
+# now". The airport is still there for when they come back.
 AIR = [
-    # A helicopter across the city at rooftop height, which is the one aircraft that is ever CLOSE.
-    {"Name": "Helicopter, city transit", "Preset": "helicopter",
-     "RoadStart": v3(-420.0, 118.0, -240.0), "RoadEnd": v3(300.0, 96.0, 340.0),
-     "SpeedsKmh": [190.0, 150.0], "AccelerationMps2": 1.4, "BrakingMps2": 1.8,
-     "WaitSeconds": 24.0, "StartDelaySeconds": 62.0},
 ]
 VEHICLES.extend(AIR)
 
