@@ -87,10 +87,15 @@ public sealed class GroundReflection
         float y = x;
         if (_low > 1e-4f || _high > 1e-4f)
         {
-            float pos = _w - _delay;
-            int i0 = (int)MathF.Floor(pos);
-            float f = pos - i0;
-            float a = _line[i0 & Mask], b = _line[(i0 + 1) & Mask];
+            // The read point is _w - _delay. Worked out as a FLOAT it was exact for 6.3 minutes:
+            // past 2^24 samples a float has no fraction left, the point snapped to every second
+            // sample, then every fourth, and each car's reflection came out stepped — the "high bit
+            // crushy frequencies" that came on "after a while". The whole samples stay an integer;
+            // only the fraction is a float.
+            int whole = (int)_delay;
+            float f = _delay - whole;                 // how far past the whole-sample delay
+            int iNear = _w - whole;                   // _delay == whole: this sample
+            float a = _line[iNear & Mask], b = _line[(iNear - 1) & Mask];
             float near = NearGroundShare;
             float r = near * x + (1f - near) * (a + (b - a) * f);
             _lp += _lpA * (r - _lp);

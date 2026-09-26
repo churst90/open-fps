@@ -95,4 +95,21 @@ public class GroundReflectionTests
         Assert.True(nearLow > 0.99f);
         Assert.True(farHigh < nearLow && farHigh > 0.5f);
     }
+
+    /// <summary>
+    /// "High bit crushy frequencies ... after a while." The read position was worked out as a float,
+    /// which has no fraction left past 2^24 samples (6.3 minutes): the reflection's delay snapped to
+    /// whole steps of 2, 4, 8 samples. Twenty minutes in, a half-sample delay must still interpolate.
+    /// </summary>
+    [Fact]
+    public void AfterTwentyMinutesTheDelayStillHasAFraction()
+    {
+        var g = Hard(0.5f / Sr);              // half a sample
+        int n = (int)(Sr * 60 * 20);
+        for (int i = 0; i < n; i++) g.Process(0f);
+        // A ramp: x[k] = k. Half a sample late, the copy is k - 0.5, so the output is 2k - 0.5.
+        float last = 0f;
+        for (int k = 0; k < 64; k++) last = g.Process(k);
+        Assert.InRange(last, 2 * 63 - 0.5f - 0.05f, 2 * 63 - 0.5f + 0.05f);
+    }
 }
