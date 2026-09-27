@@ -4,6 +4,12 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-09-27
 
+- The city's roads are data. Every road is a record (centreline, type, lanes with a direction,
+  width and speed limit, surface stretches) written by the same call that lays its asphalt, and the
+  27 junctions are found where centrelines meet. The server builds the network at load: every lane
+  cut into the stretches between junctions and where each can turn next, and logs any problem. No
+  traffic uses it yet. Southgate's streets, which its traffic had always driven on bare ground, are
+  laid (Mill Road, Kiln Street, Tanner Road), and its north side is now Dock Street.
 - Short recorded impacts hear the ground: a shot, a door, a knock get the surface's answer from
   their mirror image below it, through an HRTF of their own, worked out from the sound's height, the
   listener's and the surface between them. Sounds made at the ground (footsteps) get none: the

@@ -2310,17 +2310,12 @@
     {
      "X": -160.0,
      "Y": 0.15,
-     "Z": -120.0
+     "Z": -130.0
     },
     {
      "X": -160.0,
      "Y": 0.15,
-     "Z": -128.75
-    },
-    {
-     "X": -160.0,
-     "Y": 0.15,
-     "Z": -137.5
+     "Z": -138.125
     },
     {
      "X": -160.0,
@@ -2330,62 +2325,67 @@
     {
      "X": -160.0,
      "Y": 0.15,
-     "Z": -155.0
+     "Z": -154.375
     },
     {
      "X": -160.0,
      "Y": 0.15,
-     "Z": -163.75
+     "Z": -162.5
     },
     {
      "X": -160.0,
      "Y": 0.15,
-     "Z": -172.5
+     "Z": -170.625
     },
     {
      "X": -160.0,
      "Y": 0.15,
-     "Z": -181.25
+     "Z": -178.75
     },
     {
      "X": -160.0,
      "Y": 0.15,
-     "Z": -190.0
+     "Z": -186.875
     },
     {
      "X": -160.0,
      "Y": 0.15,
-     "Z": -198.75
+     "Z": -195.0
     },
     {
      "X": -160.0,
      "Y": 0.15,
-     "Z": -207.5
+     "Z": -203.125
     },
     {
      "X": -160.0,
      "Y": 0.15,
-     "Z": -216.25
+     "Z": -211.25
     },
     {
      "X": -160.0,
      "Y": 0.15,
-     "Z": -225.0
+     "Z": -219.375
     },
     {
      "X": -160.0,
      "Y": 0.15,
-     "Z": -233.75
+     "Z": -227.5
     },
     {
      "X": -160.0,
      "Y": 0.15,
-     "Z": -242.5
+     "Z": -235.625
     },
     {
      "X": -160.0,
      "Y": 0.15,
-     "Z": -251.25
+     "Z": -243.75
+    },
+    {
+     "X": -160.0,
+     "Y": 0.15,
+     "Z": -251.875
     },
     {
      "X": -160.0,
@@ -2465,62 +2465,67 @@
     {
      "X": -40.0,
      "Y": 0.15,
-     "Z": -251.25
+     "Z": -251.875
     },
     {
      "X": -40.0,
      "Y": 0.15,
-     "Z": -242.5
+     "Z": -243.75
     },
     {
      "X": -40.0,
      "Y": 0.15,
-     "Z": -233.75
+     "Z": -235.625
     },
     {
      "X": -40.0,
      "Y": 0.15,
-     "Z": -225.0
+     "Z": -227.5
     },
     {
      "X": -40.0,
      "Y": 0.15,
-     "Z": -216.25
+     "Z": -219.375
     },
     {
      "X": -40.0,
      "Y": 0.15,
-     "Z": -207.5
+     "Z": -211.25
     },
     {
      "X": -40.0,
      "Y": 0.15,
-     "Z": -198.75
+     "Z": -203.125
     },
     {
      "X": -40.0,
      "Y": 0.15,
-     "Z": -190.0
+     "Z": -195.0
     },
     {
      "X": -40.0,
      "Y": 0.15,
-     "Z": -181.25
+     "Z": -186.875
     },
     {
      "X": -40.0,
      "Y": 0.15,
-     "Z": -172.5
+     "Z": -178.75
     },
     {
      "X": -40.0,
      "Y": 0.15,
-     "Z": -163.75
+     "Z": -170.625
     },
     {
      "X": -40.0,
      "Y": 0.15,
-     "Z": -155.0
+     "Z": -162.5
+    },
+    {
+     "X": -40.0,
+     "Y": 0.15,
+     "Z": -154.375
     },
     {
      "X": -40.0,
@@ -2530,96 +2535,1073 @@
     {
      "X": -40.0,
      "Y": 0.15,
-     "Z": -137.5
+     "Z": -138.125
     },
     {
      "X": -40.0,
      "Y": 0.15,
-     "Z": -128.75
-    },
-    {
-     "X": -40.0,
-     "Y": 0.15,
-     "Z": -120.0
+     "Z": -130.0
     },
     {
      "X": -48.5714,
      "Y": 0.15,
-     "Z": -120.0
+     "Z": -130.0
     },
     {
      "X": -57.1429,
      "Y": 0.15,
-     "Z": -120.0
+     "Z": -130.0
     },
     {
      "X": -65.7143,
      "Y": 0.15,
-     "Z": -120.0
+     "Z": -130.0
     },
     {
      "X": -74.2857,
      "Y": 0.15,
-     "Z": -120.0
+     "Z": -130.0
     },
     {
      "X": -82.8571,
      "Y": 0.15,
-     "Z": -120.0
+     "Z": -130.0
     },
     {
      "X": -91.4286,
      "Y": 0.15,
-     "Z": -120.0
+     "Z": -130.0
     },
     {
      "X": -100.0,
      "Y": 0.15,
-     "Z": -120.0
+     "Z": -130.0
     },
     {
      "X": -108.5714,
      "Y": 0.15,
-     "Z": -120.0
+     "Z": -130.0
     },
     {
      "X": -117.1429,
      "Y": 0.15,
-     "Z": -120.0
+     "Z": -130.0
     },
     {
      "X": -125.7143,
      "Y": 0.15,
-     "Z": -120.0
+     "Z": -130.0
     },
     {
      "X": -134.2857,
      "Y": 0.15,
-     "Z": -120.0
+     "Z": -130.0
     },
     {
      "X": -142.8571,
      "Y": 0.15,
-     "Z": -120.0
+     "Z": -130.0
     },
     {
      "X": -151.4286,
      "Y": 0.15,
-     "Z": -120.0
+     "Z": -130.0
     }
    ],
    "Stops": [
     {
-     "AtMetres": 48.0,
+     "AtMetres": 38.0,
      "DwellSeconds": 3.0,
      "Kind": "crossing"
     },
     {
-     "AtMetres": 328.0,
+     "AtMetres": 318.0,
      "DwellSeconds": 3.0,
      "Kind": "crossing"
     }
    ]
+  }
+ ],
+ "Roads": [
+  {
+   "Id": "wharf_avenue",
+   "Name": "Wharf Avenue",
+   "Type": "collector",
+   "Centreline": [
+    {
+     "X": -130.0,
+     "Y": 0.05,
+     "Z": -140.0
+    },
+    {
+     "X": -130.0,
+     "Y": 0.05,
+     "Z": 272.0
+    }
+   ],
+   "WidthMetres": 12.0,
+   "Lanes": [
+    {
+     "OffsetMetres": 1.5,
+     "Direction": 1,
+     "WidthMetres": 3.0,
+     "SpeedLimitKmh": 50.0
+    },
+    {
+     "OffsetMetres": -1.5,
+     "Direction": -1,
+     "WidthMetres": 3.0,
+     "SpeedLimitKmh": 50.0
+    },
+    {
+     "OffsetMetres": 4.5,
+     "Direction": 1,
+     "WidthMetres": 3.0,
+     "SpeedLimitKmh": 50.0
+    },
+    {
+     "OffsetMetres": -4.5,
+     "Direction": -1,
+     "WidthMetres": 3.0,
+     "SpeedLimitKmh": 50.0
+    }
+   ],
+   "Surfaces": []
+  },
+  {
+   "Id": "main_street",
+   "Name": "Main Street",
+   "Type": "collector",
+   "Centreline": [
+    {
+     "X": 0.0,
+     "Y": 0.05,
+     "Z": -300.0
+    },
+    {
+     "X": 0.0,
+     "Y": 0.05,
+     "Z": 420.0
+    }
+   ],
+   "WidthMetres": 12.0,
+   "Lanes": [
+    {
+     "OffsetMetres": 1.5,
+     "Direction": 1,
+     "WidthMetres": 3.0,
+     "SpeedLimitKmh": 50.0
+    },
+    {
+     "OffsetMetres": -1.5,
+     "Direction": -1,
+     "WidthMetres": 3.0,
+     "SpeedLimitKmh": 50.0
+    },
+    {
+     "OffsetMetres": 4.5,
+     "Direction": 1,
+     "WidthMetres": 3.0,
+     "SpeedLimitKmh": 50.0
+    },
+    {
+     "OffsetMetres": -4.5,
+     "Direction": -1,
+     "WidthMetres": 3.0,
+     "SpeedLimitKmh": 50.0
+    }
+   ],
+   "Surfaces": []
+  },
+  {
+   "Id": "calder_avenue",
+   "Name": "Calder Avenue",
+   "Type": "collector",
+   "Centreline": [
+    {
+     "X": 130.0,
+     "Y": 0.05,
+     "Z": -140.0
+    },
+    {
+     "X": 130.0,
+     "Y": 0.05,
+     "Z": 272.0
+    }
+   ],
+   "WidthMetres": 12.0,
+   "Lanes": [
+    {
+     "OffsetMetres": 1.5,
+     "Direction": 1,
+     "WidthMetres": 3.0,
+     "SpeedLimitKmh": 50.0
+    },
+    {
+     "OffsetMetres": -1.5,
+     "Direction": -1,
+     "WidthMetres": 3.0,
+     "SpeedLimitKmh": 50.0
+    },
+    {
+     "OffsetMetres": 4.5,
+     "Direction": 1,
+     "WidthMetres": 3.0,
+     "SpeedLimitKmh": 50.0
+    },
+    {
+     "OffsetMetres": -4.5,
+     "Direction": -1,
+     "WidthMetres": 3.0,
+     "SpeedLimitKmh": 50.0
+    }
+   ],
+   "Surfaces": []
+  },
+  {
+   "Id": "dock_street",
+   "Name": "Dock Street",
+   "Type": "collector",
+   "Centreline": [
+    {
+     "X": -166.0,
+     "Y": 0.05,
+     "Z": -130.0
+    },
+    {
+     "X": 140.0,
+     "Y": 0.05,
+     "Z": -130.0
+    }
+   ],
+   "WidthMetres": 12.0,
+   "Lanes": [
+    {
+     "OffsetMetres": 1.5,
+     "Direction": 1,
+     "WidthMetres": 3.0,
+     "SpeedLimitKmh": 50.0
+    },
+    {
+     "OffsetMetres": -1.5,
+     "Direction": -1,
+     "WidthMetres": 3.0,
+     "SpeedLimitKmh": 50.0
+    },
+    {
+     "OffsetMetres": 4.5,
+     "Direction": 1,
+     "WidthMetres": 3.0,
+     "SpeedLimitKmh": 50.0
+    },
+    {
+     "OffsetMetres": -4.5,
+     "Direction": -1,
+     "WidthMetres": 3.0,
+     "SpeedLimitKmh": 50.0
+    }
+   ],
+   "Surfaces": []
+  },
+  {
+   "Id": "central_street",
+   "Name": "Central Street",
+   "Type": "collector",
+   "Centreline": [
+    {
+     "X": -448.0,
+     "Y": 0.05,
+     "Z": 0.0
+    },
+    {
+     "X": 190.0,
+     "Y": 0.05,
+     "Z": 0.0
+    }
+   ],
+   "WidthMetres": 12.0,
+   "Lanes": [
+    {
+     "OffsetMetres": 1.5,
+     "Direction": 1,
+     "WidthMetres": 3.0,
+     "SpeedLimitKmh": 50.0
+    },
+    {
+     "OffsetMetres": -1.5,
+     "Direction": -1,
+     "WidthMetres": 3.0,
+     "SpeedLimitKmh": 50.0
+    },
+    {
+     "OffsetMetres": 4.5,
+     "Direction": 1,
+     "WidthMetres": 3.0,
+     "SpeedLimitKmh": 50.0
+    },
+    {
+     "OffsetMetres": -4.5,
+     "Direction": -1,
+     "WidthMetres": 3.0,
+     "SpeedLimitKmh": 50.0
+    }
+   ],
+   "Surfaces": []
+  },
+  {
+   "Id": "foundry_street",
+   "Name": "Foundry Street",
+   "Type": "collector",
+   "Centreline": [
+    {
+     "X": -140.0,
+     "Y": 0.05,
+     "Z": 130.0
+    },
+    {
+     "X": 228.0,
+     "Y": 0.05,
+     "Z": 130.0
+    }
+   ],
+   "WidthMetres": 12.0,
+   "Lanes": [
+    {
+     "OffsetMetres": 1.5,
+     "Direction": 1,
+     "WidthMetres": 3.0,
+     "SpeedLimitKmh": 50.0
+    },
+    {
+     "OffsetMetres": -1.5,
+     "Direction": -1,
+     "WidthMetres": 3.0,
+     "SpeedLimitKmh": 50.0
+    },
+    {
+     "OffsetMetres": 4.5,
+     "Direction": 1,
+     "WidthMetres": 3.0,
+     "SpeedLimitKmh": 50.0
+    },
+    {
+     "OffsetMetres": -4.5,
+     "Direction": -1,
+     "WidthMetres": 3.0,
+     "SpeedLimitKmh": 50.0
+    }
+   ],
+   "Surfaces": []
+  },
+  {
+   "Id": "north_street",
+   "Name": "North Street",
+   "Type": "collector",
+   "Centreline": [
+    {
+     "X": -140.0,
+     "Y": 0.05,
+     "Z": 260.0
+    },
+    {
+     "X": 140.0,
+     "Y": 0.05,
+     "Z": 260.0
+    }
+   ],
+   "WidthMetres": 12.0,
+   "Lanes": [
+    {
+     "OffsetMetres": 1.5,
+     "Direction": 1,
+     "WidthMetres": 3.0,
+     "SpeedLimitKmh": 50.0
+    },
+    {
+     "OffsetMetres": -1.5,
+     "Direction": -1,
+     "WidthMetres": 3.0,
+     "SpeedLimitKmh": 50.0
+    },
+    {
+     "OffsetMetres": 4.5,
+     "Direction": 1,
+     "WidthMetres": 3.0,
+     "SpeedLimitKmh": 50.0
+    },
+    {
+     "OffsetMetres": -4.5,
+     "Direction": -1,
+     "WidthMetres": 3.0,
+     "SpeedLimitKmh": 50.0
+    }
+   ],
+   "Surfaces": []
+  },
+  {
+   "Id": "terminal_approach",
+   "Name": "Terminal Approach",
+   "Type": "service",
+   "Centreline": [
+    {
+     "X": 193.0,
+     "Y": 0.05,
+     "Z": 130.0
+    },
+    {
+     "X": 193.0,
+     "Y": 0.05,
+     "Z": 40.0
+    }
+   ],
+   "WidthMetres": 6.0,
+   "Lanes": [
+    {
+     "OffsetMetres": 1.5,
+     "Direction": 1,
+     "WidthMetres": 3.0,
+     "SpeedLimitKmh": 30.0
+    },
+    {
+     "OffsetMetres": -1.5,
+     "Direction": -1,
+     "WidthMetres": 3.0,
+     "SpeedLimitKmh": 30.0
+    }
+   ],
+   "Surfaces": []
+  },
+  {
+   "Id": "elm_street",
+   "Name": "Elm Street",
+   "Type": "residential",
+   "Centreline": [
+    {
+     "X": -424.0,
+     "Y": 0.05,
+     "Z": -96.0
+    },
+    {
+     "X": -168.0,
+     "Y": 0.05,
+     "Z": -96.0
+    }
+   ],
+   "WidthMetres": 7.0,
+   "Lanes": [
+    {
+     "OffsetMetres": 1.75,
+     "Direction": 1,
+     "WidthMetres": 3.5,
+     "SpeedLimitKmh": 40.0
+    },
+    {
+     "OffsetMetres": -1.75,
+     "Direction": -1,
+     "WidthMetres": 3.5,
+     "SpeedLimitKmh": 40.0
+    }
+   ],
+   "Surfaces": []
+  },
+  {
+   "Id": "birch_street",
+   "Name": "Birch Street",
+   "Type": "residential",
+   "Centreline": [
+    {
+     "X": -424.0,
+     "Y": 0.05,
+     "Z": -24.0
+    },
+    {
+     "X": -168.0,
+     "Y": 0.05,
+     "Z": -24.0
+    }
+   ],
+   "WidthMetres": 7.0,
+   "Lanes": [
+    {
+     "OffsetMetres": 1.75,
+     "Direction": 1,
+     "WidthMetres": 3.5,
+     "SpeedLimitKmh": 40.0
+    },
+    {
+     "OffsetMetres": -1.75,
+     "Direction": -1,
+     "WidthMetres": 3.5,
+     "SpeedLimitKmh": 40.0
+    }
+   ],
+   "Surfaces": []
+  },
+  {
+   "Id": "rowan_street",
+   "Name": "Rowan Street",
+   "Type": "residential",
+   "Centreline": [
+    {
+     "X": -424.0,
+     "Y": 0.05,
+     "Z": 48.0
+    },
+    {
+     "X": -168.0,
+     "Y": 0.05,
+     "Z": 48.0
+    }
+   ],
+   "WidthMetres": 7.0,
+   "Lanes": [
+    {
+     "OffsetMetres": 1.75,
+     "Direction": 1,
+     "WidthMetres": 3.5,
+     "SpeedLimitKmh": 40.0
+    },
+    {
+     "OffsetMetres": -1.75,
+     "Direction": -1,
+     "WidthMetres": 3.5,
+     "SpeedLimitKmh": 40.0
+    }
+   ],
+   "Surfaces": []
+  },
+  {
+   "Id": "alder_street",
+   "Name": "Alder Street",
+   "Type": "residential",
+   "Centreline": [
+    {
+     "X": -424.0,
+     "Y": 0.05,
+     "Z": 120.0
+    },
+    {
+     "X": -168.0,
+     "Y": 0.05,
+     "Z": 120.0
+    }
+   ],
+   "WidthMetres": 7.0,
+   "Lanes": [
+    {
+     "OffsetMetres": 1.75,
+     "Direction": 1,
+     "WidthMetres": 3.5,
+     "SpeedLimitKmh": 40.0
+    },
+    {
+     "OffsetMetres": -1.75,
+     "Direction": -1,
+     "WidthMetres": 3.5,
+     "SpeedLimitKmh": 40.0
+    }
+   ],
+   "Surfaces": []
+  },
+  {
+   "Id": "sycamore_lane",
+   "Name": "Sycamore Lane",
+   "Type": "residential",
+   "Centreline": [
+    {
+     "X": -296.0,
+     "Y": 0.05,
+     "Z": -109.3
+    },
+    {
+     "X": -296.0,
+     "Y": 0.05,
+     "Z": 133.3
+    }
+   ],
+   "WidthMetres": 7.0,
+   "Lanes": [
+    {
+     "OffsetMetres": 1.75,
+     "Direction": 1,
+     "WidthMetres": 3.5,
+     "SpeedLimitKmh": 40.0
+    },
+    {
+     "OffsetMetres": -1.75,
+     "Direction": -1,
+     "WidthMetres": 3.5,
+     "SpeedLimitKmh": 40.0
+    }
+   ],
+   "Surfaces": []
+  },
+  {
+   "Id": "willow_lane",
+   "Name": "Willow Lane",
+   "Type": "residential",
+   "Centreline": [
+    {
+     "X": -180.0,
+     "Y": 0.05,
+     "Z": -109.3
+    },
+    {
+     "X": -180.0,
+     "Y": 0.05,
+     "Z": 133.3
+    }
+   ],
+   "WidthMetres": 7.0,
+   "Lanes": [
+    {
+     "OffsetMetres": 1.75,
+     "Direction": 1,
+     "WidthMetres": 3.5,
+     "SpeedLimitKmh": 40.0
+    },
+    {
+     "OffsetMetres": -1.75,
+     "Direction": -1,
+     "WidthMetres": 3.5,
+     "SpeedLimitKmh": 40.0
+    }
+   ],
+   "Surfaces": []
+  },
+  {
+   "Id": "mill_road",
+   "Name": "Mill Road",
+   "Type": "collector",
+   "Centreline": [
+    {
+     "X": -160.0,
+     "Y": 0.05,
+     "Z": -130.0
+    },
+    {
+     "X": -160.0,
+     "Y": 0.05,
+     "Z": -260.0
+    }
+   ],
+   "WidthMetres": 12.0,
+   "Lanes": [
+    {
+     "OffsetMetres": 1.5,
+     "Direction": 1,
+     "WidthMetres": 3.0,
+     "SpeedLimitKmh": 50.0
+    },
+    {
+     "OffsetMetres": -1.5,
+     "Direction": -1,
+     "WidthMetres": 3.0,
+     "SpeedLimitKmh": 50.0
+    },
+    {
+     "OffsetMetres": 4.5,
+     "Direction": 1,
+     "WidthMetres": 3.0,
+     "SpeedLimitKmh": 50.0
+    },
+    {
+     "OffsetMetres": -4.5,
+     "Direction": -1,
+     "WidthMetres": 3.0,
+     "SpeedLimitKmh": 50.0
+    }
+   ],
+   "Surfaces": []
+  },
+  {
+   "Id": "kiln_street",
+   "Name": "Kiln Street",
+   "Type": "collector",
+   "Centreline": [
+    {
+     "X": -160.0,
+     "Y": 0.05,
+     "Z": -260.0
+    },
+    {
+     "X": -40.0,
+     "Y": 0.05,
+     "Z": -260.0
+    }
+   ],
+   "WidthMetres": 12.0,
+   "Lanes": [
+    {
+     "OffsetMetres": 1.5,
+     "Direction": 1,
+     "WidthMetres": 3.0,
+     "SpeedLimitKmh": 50.0
+    },
+    {
+     "OffsetMetres": -1.5,
+     "Direction": -1,
+     "WidthMetres": 3.0,
+     "SpeedLimitKmh": 50.0
+    },
+    {
+     "OffsetMetres": 4.5,
+     "Direction": 1,
+     "WidthMetres": 3.0,
+     "SpeedLimitKmh": 50.0
+    },
+    {
+     "OffsetMetres": -4.5,
+     "Direction": -1,
+     "WidthMetres": 3.0,
+     "SpeedLimitKmh": 50.0
+    }
+   ],
+   "Surfaces": []
+  },
+  {
+   "Id": "tanner_road",
+   "Name": "Tanner Road",
+   "Type": "collector",
+   "Centreline": [
+    {
+     "X": -40.0,
+     "Y": 0.05,
+     "Z": -260.0
+    },
+    {
+     "X": -40.0,
+     "Y": 0.05,
+     "Z": -130.0
+    }
+   ],
+   "WidthMetres": 12.0,
+   "Lanes": [
+    {
+     "OffsetMetres": 1.5,
+     "Direction": 1,
+     "WidthMetres": 3.0,
+     "SpeedLimitKmh": 50.0
+    },
+    {
+     "OffsetMetres": -1.5,
+     "Direction": -1,
+     "WidthMetres": 3.0,
+     "SpeedLimitKmh": 50.0
+    },
+    {
+     "OffsetMetres": 4.5,
+     "Direction": 1,
+     "WidthMetres": 3.0,
+     "SpeedLimitKmh": 50.0
+    },
+    {
+     "OffsetMetres": -4.5,
+     "Direction": -1,
+     "WidthMetres": 3.0,
+     "SpeedLimitKmh": 50.0
+    }
+   ],
+   "Surfaces": []
+  }
+ ],
+ "Junctions": [
+  {
+   "Id": "j_-130_-130",
+   "Name": "Dock Street and Wharf Avenue",
+   "Position": {
+    "X": -130.0,
+    "Y": 0.05,
+    "Z": -130.0
+   },
+   "RadiusMetres": 7.0,
+   "Control": "give_way"
+  },
+  {
+   "Id": "j_-130_0",
+   "Name": "Central Street and Wharf Avenue",
+   "Position": {
+    "X": -130.0,
+    "Y": 0.05,
+    "Z": 0.0
+   },
+   "RadiusMetres": 7.0,
+   "Control": "give_way"
+  },
+  {
+   "Id": "j_-130_130",
+   "Name": "Foundry Street and Wharf Avenue",
+   "Position": {
+    "X": -130.0,
+    "Y": 0.05,
+    "Z": 130.0
+   },
+   "RadiusMetres": 7.0,
+   "Control": "give_way"
+  },
+  {
+   "Id": "j_-130_260",
+   "Name": "North Street and Wharf Avenue",
+   "Position": {
+    "X": -130.0,
+    "Y": 0.05,
+    "Z": 260.0
+   },
+   "RadiusMetres": 7.0,
+   "Control": "give_way"
+  },
+  {
+   "Id": "j_0_-130",
+   "Name": "Dock Street and Main Street",
+   "Position": {
+    "X": 0.0,
+    "Y": 0.05,
+    "Z": -130.0
+   },
+   "RadiusMetres": 7.0,
+   "Control": "give_way"
+  },
+  {
+   "Id": "j_0_0",
+   "Name": "Central Street and Main Street",
+   "Position": {
+    "X": 0.0,
+    "Y": 0.05,
+    "Z": 0.0
+   },
+   "RadiusMetres": 7.0,
+   "Control": "give_way"
+  },
+  {
+   "Id": "j_0_130",
+   "Name": "Foundry Street and Main Street",
+   "Position": {
+    "X": 0.0,
+    "Y": 0.05,
+    "Z": 130.0
+   },
+   "RadiusMetres": 7.0,
+   "Control": "give_way"
+  },
+  {
+   "Id": "j_0_260",
+   "Name": "Main Street and North Street",
+   "Position": {
+    "X": 0.0,
+    "Y": 0.05,
+    "Z": 260.0
+   },
+   "RadiusMetres": 7.0,
+   "Control": "give_way"
+  },
+  {
+   "Id": "j_130_-130",
+   "Name": "Calder Avenue and Dock Street",
+   "Position": {
+    "X": 130.0,
+    "Y": 0.05,
+    "Z": -130.0
+   },
+   "RadiusMetres": 7.0,
+   "Control": "give_way"
+  },
+  {
+   "Id": "j_130_0",
+   "Name": "Calder Avenue and Central Street",
+   "Position": {
+    "X": 130.0,
+    "Y": 0.05,
+    "Z": 0.0
+   },
+   "RadiusMetres": 7.0,
+   "Control": "give_way"
+  },
+  {
+   "Id": "j_130_130",
+   "Name": "Calder Avenue and Foundry Street",
+   "Position": {
+    "X": 130.0,
+    "Y": 0.05,
+    "Z": 130.0
+   },
+   "RadiusMetres": 7.0,
+   "Control": "give_way"
+  },
+  {
+   "Id": "j_130_260",
+   "Name": "Calder Avenue and North Street",
+   "Position": {
+    "X": 130.0,
+    "Y": 0.05,
+    "Z": 260.0
+   },
+   "RadiusMetres": 7.0,
+   "Control": "give_way"
+  },
+  {
+   "Id": "j_-160_-130",
+   "Name": "Dock Street and Mill Road",
+   "Position": {
+    "X": -160.0,
+    "Y": 0.05,
+    "Z": -130.0
+   },
+   "RadiusMetres": 7.0,
+   "Control": "give_way"
+  },
+  {
+   "Id": "j_-40_-130",
+   "Name": "Dock Street and Tanner Road",
+   "Position": {
+    "X": -40.0,
+    "Y": 0.05,
+    "Z": -130.0
+   },
+   "RadiusMetres": 7.0,
+   "Control": "give_way"
+  },
+  {
+   "Id": "j_-296_0",
+   "Name": "Central Street and Sycamore Lane",
+   "Position": {
+    "X": -296.0,
+    "Y": 0.05,
+    "Z": 0.0
+   },
+   "RadiusMetres": 7.0,
+   "Control": "give_way"
+  },
+  {
+   "Id": "j_-180_0",
+   "Name": "Central Street and Willow Lane",
+   "Position": {
+    "X": -180.0,
+    "Y": 0.05,
+    "Z": 0.0
+   },
+   "RadiusMetres": 7.0,
+   "Control": "give_way"
+  },
+  {
+   "Id": "j_193_130",
+   "Name": "Foundry Street and Terminal Approach",
+   "Position": {
+    "X": 193.0,
+    "Y": 0.05,
+    "Z": 130.0
+   },
+   "RadiusMetres": 7.0,
+   "Control": "give_way"
+  },
+  {
+   "Id": "j_-296_-96",
+   "Name": "Elm Street and Sycamore Lane",
+   "Position": {
+    "X": -296.0,
+    "Y": 0.05,
+    "Z": -96.0
+   },
+   "RadiusMetres": 4.5,
+   "Control": "give_way"
+  },
+  {
+   "Id": "j_-180_-96",
+   "Name": "Elm Street and Willow Lane",
+   "Position": {
+    "X": -180.0,
+    "Y": 0.05,
+    "Z": -96.0
+   },
+   "RadiusMetres": 4.5,
+   "Control": "give_way"
+  },
+  {
+   "Id": "j_-296_-24",
+   "Name": "Birch Street and Sycamore Lane",
+   "Position": {
+    "X": -296.0,
+    "Y": 0.05,
+    "Z": -24.0
+   },
+   "RadiusMetres": 4.5,
+   "Control": "give_way"
+  },
+  {
+   "Id": "j_-180_-24",
+   "Name": "Birch Street and Willow Lane",
+   "Position": {
+    "X": -180.0,
+    "Y": 0.05,
+    "Z": -24.0
+   },
+   "RadiusMetres": 4.5,
+   "Control": "give_way"
+  },
+  {
+   "Id": "j_-296_48",
+   "Name": "Rowan Street and Sycamore Lane",
+   "Position": {
+    "X": -296.0,
+    "Y": 0.05,
+    "Z": 48.0
+   },
+   "RadiusMetres": 4.5,
+   "Control": "give_way"
+  },
+  {
+   "Id": "j_-180_48",
+   "Name": "Rowan Street and Willow Lane",
+   "Position": {
+    "X": -180.0,
+    "Y": 0.05,
+    "Z": 48.0
+   },
+   "RadiusMetres": 4.5,
+   "Control": "give_way"
+  },
+  {
+   "Id": "j_-296_120",
+   "Name": "Alder Street and Sycamore Lane",
+   "Position": {
+    "X": -296.0,
+    "Y": 0.05,
+    "Z": 120.0
+   },
+   "RadiusMetres": 4.5,
+   "Control": "give_way"
+  },
+  {
+   "Id": "j_-180_120",
+   "Name": "Alder Street and Willow Lane",
+   "Position": {
+    "X": -180.0,
+    "Y": 0.05,
+    "Z": 120.0
+   },
+   "RadiusMetres": 4.5,
+   "Control": "give_way"
+  },
+  {
+   "Id": "j_-160_-260",
+   "Name": "Kiln Street and Mill Road",
+   "Position": {
+    "X": -160.0,
+    "Y": 0.05,
+    "Z": -260.0
+   },
+   "RadiusMetres": 7.0,
+   "Control": "give_way"
+  },
+  {
+   "Id": "j_-40_-260",
+   "Name": "Kiln Street and Tanner Road",
+   "Position": {
+    "X": -40.0,
+    "Y": 0.05,
+    "Z": -260.0
+   },
+   "RadiusMetres": 7.0,
+   "Control": "give_way"
   }
  ],
  "StreetLife": {
@@ -5238,7 +6220,7 @@
    "Name": "Pedestrian, Dock Street, south side",
    "Preset": "walker",
    "RoadStart": {
-    "X": -139.5,
+    "X": -165.5,
     "Y": 0.15,
     "Z": -138.45
    },
@@ -5260,7 +6242,7 @@
    "Name": "Pedestrian, Dock Street, south side",
    "Preset": "walker",
    "RoadStart": {
-    "X": -139.5,
+    "X": -165.5,
     "Y": 0.15,
     "Z": -138.45
    },
@@ -5276,13 +6258,13 @@
    "AccelerationMps2": 0.8,
    "BrakingMps2": 1.0,
    "WaitSeconds": 5.0,
-   "StartDelaySeconds": 40.5
+   "StartDelaySeconds": 44.1
   },
   {
    "Name": "Pedestrian, Dock Street, south side",
    "Preset": "walker",
    "RoadStart": {
-    "X": -139.5,
+    "X": -165.5,
     "Y": 0.15,
     "Z": -138.45
    },
@@ -5298,13 +6280,13 @@
    "AccelerationMps2": 0.8,
    "BrakingMps2": 1.0,
    "WaitSeconds": 4.0,
-   "StartDelaySeconds": 79.9
+   "StartDelaySeconds": 87.1
   },
   {
    "Name": "Pedestrian, Dock Street, south side",
    "Preset": "walker",
    "RoadStart": {
-    "X": -139.5,
+    "X": -165.5,
     "Y": 0.15,
     "Z": -138.45
    },
@@ -5320,13 +6302,13 @@
    "AccelerationMps2": 0.8,
    "BrakingMps2": 1.0,
    "WaitSeconds": 5.0,
-   "StartDelaySeconds": 120.5
+   "StartDelaySeconds": 131.3
   },
   {
    "Name": "Pedestrian, Dock Street, south side",
    "Preset": "walker",
    "RoadStart": {
-    "X": -139.5,
+    "X": -165.5,
     "Y": 0.15,
     "Z": -138.45
    },
@@ -5342,7 +6324,7 @@
    "AccelerationMps2": 0.8,
    "BrakingMps2": 1.0,
    "WaitSeconds": 5.8,
-   "StartDelaySeconds": 157.2
+   "StartDelaySeconds": 171.6
   },
   {
    "Name": "Pedestrian, Dock Street, south side",
@@ -5353,7 +6335,7 @@
     "Z": -137.05
    },
    "RoadEnd": {
-    "X": -139.5,
+    "X": -165.5,
     "Y": 0.15,
     "Z": -137.05
    },
@@ -5375,7 +6357,7 @@
     "Z": -137.05
    },
    "RoadEnd": {
-    "X": -139.5,
+    "X": -165.5,
     "Y": 0.15,
     "Z": -137.05
    },
@@ -5386,7 +6368,7 @@
    "AccelerationMps2": 0.8,
    "BrakingMps2": 1.0,
    "WaitSeconds": 8.3,
-   "StartDelaySeconds": 47.0
+   "StartDelaySeconds": 51.1
   },
   {
    "Name": "Pedestrian, Dock Street, south side",
@@ -5397,7 +6379,7 @@
     "Z": -137.05
    },
    "RoadEnd": {
-    "X": -139.5,
+    "X": -165.5,
     "Y": 0.15,
     "Z": -137.05
    },
@@ -5408,7 +6390,7 @@
    "AccelerationMps2": 0.8,
    "BrakingMps2": 1.0,
    "WaitSeconds": 7.3,
-   "StartDelaySeconds": 79.3
+   "StartDelaySeconds": 86.7
   },
   {
    "Name": "Pedestrian, Dock Street, south side",
@@ -5419,7 +6401,7 @@
     "Z": -137.05
    },
    "RoadEnd": {
-    "X": -139.5,
+    "X": -165.5,
     "Y": 0.15,
     "Z": -137.05
    },
@@ -5430,7 +6412,7 @@
    "AccelerationMps2": 0.8,
    "BrakingMps2": 1.0,
    "WaitSeconds": 5.3,
-   "StartDelaySeconds": 117.5
+   "StartDelaySeconds": 127.9
   },
   {
    "Name": "Pedestrian, Dock Street, south side",
@@ -5441,7 +6423,7 @@
     "Z": -137.05
    },
    "RoadEnd": {
-    "X": -139.5,
+    "X": -165.5,
     "Y": 0.15,
     "Z": -137.05
    },
@@ -5452,13 +6434,13 @@
    "AccelerationMps2": 0.8,
    "BrakingMps2": 1.0,
    "WaitSeconds": 5.7,
-   "StartDelaySeconds": 162.3
+   "StartDelaySeconds": 177.3
   },
   {
    "Name": "Pedestrian, Dock Street, north side",
    "Preset": "walker",
    "RoadStart": {
-    "X": -139.5,
+    "X": -165.5,
     "Y": 0.15,
     "Z": -122.95
    },
@@ -5480,7 +6462,7 @@
    "Name": "Pedestrian, Dock Street, north side",
    "Preset": "walker",
    "RoadStart": {
-    "X": -139.5,
+    "X": -165.5,
     "Y": 0.15,
     "Z": -122.95
    },
@@ -5496,13 +6478,13 @@
    "AccelerationMps2": 0.8,
    "BrakingMps2": 1.0,
    "WaitSeconds": 4.8,
-   "StartDelaySeconds": 39.9
+   "StartDelaySeconds": 43.5
   },
   {
    "Name": "Pedestrian, Dock Street, north side",
    "Preset": "walker",
    "RoadStart": {
-    "X": -139.5,
+    "X": -165.5,
     "Y": 0.15,
     "Z": -122.95
    },
@@ -5518,13 +6500,13 @@
    "AccelerationMps2": 0.8,
    "BrakingMps2": 1.0,
    "WaitSeconds": 7.1,
-   "StartDelaySeconds": 83.2
+   "StartDelaySeconds": 90.5
   },
   {
    "Name": "Pedestrian, Dock Street, north side",
    "Preset": "walker",
    "RoadStart": {
-    "X": -139.5,
+    "X": -165.5,
     "Y": 0.15,
     "Z": -122.95
    },
@@ -5540,13 +6522,13 @@
    "AccelerationMps2": 0.8,
    "BrakingMps2": 1.0,
    "WaitSeconds": 3.3,
-   "StartDelaySeconds": 117.9
+   "StartDelaySeconds": 128.5
   },
   {
    "Name": "Pedestrian, Dock Street, north side",
    "Preset": "walker",
    "RoadStart": {
-    "X": -139.5,
+    "X": -165.5,
     "Y": 0.15,
     "Z": -122.95
    },
@@ -5562,7 +6544,7 @@
    "AccelerationMps2": 0.8,
    "BrakingMps2": 1.0,
    "WaitSeconds": 5.7,
-   "StartDelaySeconds": 183.3
+   "StartDelaySeconds": 199.9
   },
   {
    "Name": "Pedestrian, Dock Street, north side",
@@ -5573,7 +6555,7 @@
     "Z": -121.55
    },
    "RoadEnd": {
-    "X": -139.5,
+    "X": -165.5,
     "Y": 0.15,
     "Z": -121.55
    },
@@ -5595,7 +6577,7 @@
     "Z": -121.55
    },
    "RoadEnd": {
-    "X": -139.5,
+    "X": -165.5,
     "Y": 0.15,
     "Z": -121.55
    },
@@ -5606,7 +6588,7 @@
    "AccelerationMps2": 0.8,
    "BrakingMps2": 1.0,
    "WaitSeconds": 8.4,
-   "StartDelaySeconds": 44.8
+   "StartDelaySeconds": 48.7
   },
   {
    "Name": "Pedestrian, Dock Street, north side",
@@ -5617,7 +6599,7 @@
     "Z": -121.55
    },
    "RoadEnd": {
-    "X": -139.5,
+    "X": -165.5,
     "Y": 0.15,
     "Z": -121.55
    },
@@ -5628,7 +6610,7 @@
    "AccelerationMps2": 0.8,
    "BrakingMps2": 1.0,
    "WaitSeconds": 7.1,
-   "StartDelaySeconds": 94.3
+   "StartDelaySeconds": 102.6
   },
   {
    "Name": "Pedestrian, Dock Street, north side",
@@ -5639,7 +6621,7 @@
     "Z": -121.55
    },
    "RoadEnd": {
-    "X": -139.5,
+    "X": -165.5,
     "Y": 0.15,
     "Z": -121.55
    },
@@ -5650,7 +6632,7 @@
    "AccelerationMps2": 0.8,
    "BrakingMps2": 1.0,
    "WaitSeconds": 4.5,
-   "StartDelaySeconds": 114.0
+   "StartDelaySeconds": 124.6
   },
   {
    "Name": "Pedestrian, Dock Street, north side",
@@ -5661,7 +6643,7 @@
     "Z": -121.55
    },
    "RoadEnd": {
-    "X": -139.5,
+    "X": -165.5,
     "Y": 0.15,
     "Z": -121.55
    },
@@ -5672,7 +6654,7 @@
    "AccelerationMps2": 0.8,
    "BrakingMps2": 1.0,
    "WaitSeconds": 3.1,
-   "StartDelaySeconds": 180.2
+   "StartDelaySeconds": 196.4
   },
   {
    "Name": "Pedestrian, Central Street, south side",
@@ -10129,12 +11111,12 @@
    "EntityId": 1011,
    "PrefabId": "asphalt_road",
    "Position": {
-    "X": 0.0,
+    "X": -13.0,
     "Y": 0.025,
     "Z": -130.0
    },
    "Scale": {
-    "X": 28.0,
+    "X": 30.6,
     "Y": 0.5,
     "Z": 1.2
    },
@@ -10144,12 +11126,12 @@
    "EntityId": 1012,
    "PrefabId": "concrete_floor",
    "Position": {
-    "X": 0.0,
+    "X": -13.0,
     "Y": 0.06,
     "Z": -137.75
    },
    "Scale": {
-    "X": 28.0,
+    "X": 30.6,
     "Y": 1.2,
     "Z": 0.35
    }
@@ -10158,12 +11140,12 @@
    "EntityId": 1013,
    "PrefabId": "concrete_floor",
    "Position": {
-    "X": 0.0,
+    "X": -13.0,
     "Y": 0.06,
     "Z": -122.25
    },
    "Scale": {
-    "X": 28.0,
+    "X": 30.6,
     "Y": 1.2,
     "Z": 0.35
    }
@@ -97300,6 +98282,111 @@
     "Z": 0.35
    },
    "Name": "North Street north pavement, block 4"
+  },
+  {
+   "EntityId": 6868,
+   "PrefabId": "asphalt_road",
+   "Position": {
+    "X": -160.0,
+    "Y": 0.025,
+    "Z": -195.0
+   },
+   "Scale": {
+    "X": 1.2,
+    "Y": 0.5,
+    "Z": 14.2
+   },
+   "Name": "Mill Road carriageway"
+  },
+  {
+   "EntityId": 6869,
+   "PrefabId": "acoustic_region",
+   "Position": {
+    "X": -160.0,
+    "Y": 3.0,
+    "Z": -195.0
+   },
+   "Scale": {
+    "X": 1.2,
+    "Y": 1.2,
+    "Z": 14.2
+   },
+   "Name": "Mill Road"
+  },
+  {
+   "EntityId": 6870,
+   "PrefabId": "asphalt_road",
+   "Position": {
+    "X": -100.0,
+    "Y": 0.025,
+    "Z": -260.0
+   },
+   "Scale": {
+    "X": 13.2,
+    "Y": 0.5,
+    "Z": 1.2
+   },
+   "Name": "Kiln Street carriageway"
+  },
+  {
+   "EntityId": 6871,
+   "PrefabId": "acoustic_region",
+   "Position": {
+    "X": -100.0,
+    "Y": 3.0,
+    "Z": -260.0
+   },
+   "Scale": {
+    "X": 13.2,
+    "Y": 1.2,
+    "Z": 1.2
+   },
+   "Name": "Kiln Street"
+  },
+  {
+   "EntityId": 6872,
+   "PrefabId": "asphalt_road",
+   "Position": {
+    "X": -40.0,
+    "Y": 0.025,
+    "Z": -195.0
+   },
+   "Scale": {
+    "X": 1.2,
+    "Y": 0.5,
+    "Z": 14.2
+   },
+   "Name": "Tanner Road carriageway"
+  },
+  {
+   "EntityId": 6873,
+   "PrefabId": "acoustic_region",
+   "Position": {
+    "X": -40.0,
+    "Y": 3.0,
+    "Z": -195.0
+   },
+   "Scale": {
+    "X": 1.2,
+    "Y": 1.2,
+    "Z": 14.2
+   },
+   "Name": "Tanner Road"
+  },
+  {
+   "EntityId": 6874,
+   "PrefabId": "acoustic_region",
+   "Position": {
+    "X": -153.0,
+    "Y": 3.0,
+    "Z": -130.0
+   },
+   "Scale": {
+    "X": 2.6,
+    "Y": 1.2,
+    "Z": 1.2
+   },
+   "Name": "Dock Street, west end"
   }
  ],
  "Crossings": [

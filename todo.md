@@ -22,8 +22,13 @@ In this order.
 - A voice's ground reflection flanges, both summed into its direction and from its own direction
   below (heard 2026-09-27, `--ground-voice`), though the physics says it is strong (Acta Acustica
   2024, doi 10.1051/aacus/2024002). Voices have none until the missing part is found: whether the
-  HRTF has a torso shadowing sound from below, the talker's vertical radiation (the full paper), or
-  head and body movement. Get the paper's numbers first.
+  HRTF has a torso shadowing sound from below, the talker's vertical radiation, or head and body
+  movement. The paper (inbox/aacus230104.pdf, read 2026-09-27) rules out "too strong": with mouth
+  and ears at 1.5 m over a hard floor, the reflection is 0 to +2.6 dB against the direct sound below
+  800 Hz at 3-7 m (+4.6 dB for [i] and [l]), below it at 800 Hz-1.6 kHz, and it fades only at an
+  absorption of 0.4-0.6. What was rendered (-3.6 dB) was weaker than that. The paper says the
+  perceptual side has not been studied, and notes that talkers make small head movements all the
+  time (Munhall et al.). Next: a lab render with realistic head and body movement on both ends.
 - Listen: pedestrian voices with their new low end and loudness, and the ground's answer on shots
   and doors (built 2026-09-27).
 - Listen in the game to the traced reverb without the open ground (`/reverb traced`). The lab passes;

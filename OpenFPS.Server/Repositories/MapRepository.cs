@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Numerics;
+using OpenFPS.Common;
 using OpenFPS.Common.Components;
 using System.Security.Cryptography;
 using System.Text;
@@ -93,6 +94,12 @@ public class MapData
 
     /// <summary>Where roads cross the railway on the level. See LevelCrossingData.</summary>
     public List<LevelCrossingData>? Crossings { get; set; }
+
+    /// <summary>The map's roads: centrelines, lanes and surfaces. See OpenFPS.Common.Roads.</summary>
+    public List<RoadData>? Roads { get; set; }
+
+    /// <summary>Where the roads meet. The lanes through each are worked out from the roads.</summary>
+    public List<JunctionData>? Junctions { get; set; }
 
     /// <summary>
     /// Composites placed on this map — houses, stalls, barricades, anything built out of parts and

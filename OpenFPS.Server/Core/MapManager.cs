@@ -370,6 +370,7 @@ public class MapManager
         Log.Information("MapManager: Loaded map '{Id}' with {Count} entities. Void Plane (MinimumY): {MinY}", m.Id, m.Entities.Count, m.MinimumY);
         
         _maps[m.Id] = (world, m.Size, grid, lookup, m);
+        BuildRoads(m);
         ComputeEarshot(m, world);
         if (m.IsDefault)
         {
@@ -726,6 +727,26 @@ public class MapManager
         }
         catch (Exception ex) { error = ex.Message; return false; }
     }
+
+    private readonly Dictionary<string, RoadNetwork> _roads = new();
+
+    /// <summary>
+    /// The map's road network, from its roads and junctions. Its problems are logged at load, one line
+    /// each: a lane that arrives at a junction it cannot leave is traffic that stops for ever.
+    /// </summary>
+    private void BuildRoads(MapData m)
+    {
+        if (m.Roads == null || m.Roads.Count == 0) { _roads.Remove(m.Id); return; }
+        var net = new RoadNetwork(m.Roads, m.Junctions);
+        _roads[m.Id] = net;
+        Log.Information("MapManager: '{Map}' roads: {Roads} roads, {Junctions} junctions, {Segments} lane segments, {Dead} dead ends.",
+            m.Id, net.Roads.Count, net.Junctions.Count, net.Segments.Count, net.DeadEnds);
+        foreach (var problem in net.Problems)
+            Log.Warning("MapManager: '{Map}' roads: {Problem}", m.Id, problem);
+    }
+
+    /// <summary>A map's road network, if it has roads.</summary>
+    public bool TryGetRoads(string id, out RoadNetwork roads) => _roads.TryGetValue(id, out roads!);
 
     public bool TryGetMapData(string id, out MapData data)
     {

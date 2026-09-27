@@ -206,7 +206,9 @@ RAIL_X_E, RAIL_X_W = 178.0, -466.0
 # more than twice what a railway can climb; north of the portal it crosses on the flat, which is a
 # LEVEL CROSSING — a better thing to have on the map than a bridge anyway.
 RAIL_Z_N, RAIL_Z_S = 452.0, -180.0
-SG_X0, SG_X1, SG_Z0, SG_Z1 = -160.0, -40.0, -260.0, -120.0     # Southgate's square of streets
+# Southgate's square of streets. Its north side IS Dock Street (z = -130): it was a separate road ten
+# metres south of it, which as road data is two carriageways side by side.
+SG_X0, SG_X1, SG_Z0, SG_Z1 = -160.0, -40.0, -260.0, -130.0
 RAIL_CORNER = 26.0                       # radius of the four corners, m
 
 # ── The airport ───────────────────────────────────────────────────────────────────────────────────
@@ -275,6 +277,43 @@ def carriageway(x0, x1, z0, z1, name=None):
     box("asphalt_road", x0, x1, 0.0, 0.05, z0, z1, name=name)
 
 
+# ── Roads as data ─────────────────────────────────────────────────────────────────────────────────
+#
+# Every road is also a record: its centreline, its lanes and its type (OpenFPS.Common/Roads.cs). The
+# record is written by the same call that lays the asphalt, so the two cannot disagree. The server
+# works out the lanes between junctions and where each can go next; the junctions are found here,
+# wherever two centrelines meet.
+#
+# Traffic keeps to the right. A lane's offset is measured to the right of the centreline's own
+# direction, so the lanes going that way have positive offsets.
+ROAD_TYPES = {
+    # type: speed limit, km/h
+    "collector":   50.0,
+    "residential": 40.0,
+    "service":     30.0,
+}
+ROADS = []
+
+
+def record_road(name, rtype, a, b, width, surface=None):
+    """A straight road from a to b, (x, z), with as many LANE-wide lanes each way as fit."""
+    each_way = max(1, int(width / 2 // LANE))
+    lw = width / 2 / each_way
+    lanes = []
+    for k in range(each_way):
+        off = (k + 0.5) * lw
+        lanes.append({"OffsetMetres": round(off, 3), "Direction": 1, "WidthMetres": round(lw, 3),
+                      "SpeedLimitKmh": ROAD_TYPES[rtype]})
+        lanes.append({"OffsetMetres": round(-off, 3), "Direction": -1, "WidthMetres": round(lw, 3),
+                      "SpeedLimitKmh": ROAD_TYPES[rtype]})
+    rid = name.lower().replace(" ", "_")
+    ROADS.append({"Id": rid, "Name": name, "Type": rtype,
+                  "Centreline": [v3(a[0], 0.05, a[1]), v3(b[0], 0.05, b[1])],
+                  "WidthMetres": width, "Lanes": lanes,
+                  "Surfaces": [] if surface is None else surface})
+    return rid
+
+
 FOOTWAYS = []                            # every pavement, for the people who walk them
 
 
@@ -285,6 +324,7 @@ def footway(x0, x1, z0, z1, name=None, label=None):
 
 def avenue(x, z0, z1, label):
     """A north-south road: asphalt between two kerbed pavements."""
+    record_road(label, "collector", (x, z0), (x, z1), CARRIAGEWAY)
     carriageway(x - KERB, x + KERB, z0, z1, name=f"{label} carriageway")
     footway(x - WALK, x - KERB, z0, z1, label=f"{label}, west side")
     footway(x + KERB, x + WALK, z0, z1, label=f"{label}, east side")
@@ -292,6 +332,7 @@ def avenue(x, z0, z1, label):
 
 def street(z, x0, x1, label):
     """An east-west road."""
+    record_road(label, "collector", (x0, z), (x1, z), CARRIAGEWAY)
     carriageway(x0, x1, z - KERB, z + KERB, name=f"{label} carriageway")
     footway(x0, x1, z - WALK, z - KERB, label=f"{label}, south side")
     footway(x0, x1, z + KERB, z + WALK, label=f"{label}, north side")
@@ -300,7 +341,7 @@ def street(z, x0, x1, label):
 avenue(AVENUES[0], AVE_Z0, AVE_Z1, "Wharf Avenue")
 avenue(AVENUES[1], MAIN_Z0, MAIN_Z1, "Main Street")
 avenue(AVENUES[2], AVE_Z0, AVE_Z1, "Calder Avenue")
-street(STREETS[0], ST_X0, ST_X1, "Dock Street")
+street(STREETS[0], SG_X0 - KERB, ST_X1, "Dock Street")
 street(STREETS[1], RES_X0 - 24.0, TERM_X0 - 6.0, "Central Street")
 street(STREETS[2], ST_X0, APRON_X0, "Foundry Street")
 street(STREETS[3], ST_X0, ST_X1, "North Street")
@@ -874,6 +915,7 @@ prop("ac_condenser", HANGAR_X0 + 2.4, HANGAR_H + 0.6, HANGAR_Z0 + 6.0, name="Han
 # The airport road: Foundry Street carries on east to the terminal.
 carriageway(APRON_X0 - 46.0, TERM_X0 - 6.0, STREETS[2] - KERB, STREETS[2] + KERB, name="Airport Road")
 footway(APRON_X0 - 46.0, TERM_X0 - 6.0, STREETS[2] - WALK, STREETS[2] - KERB)
+record_road("Terminal Approach", "service", (TERM_X0 - 3.0, STREETS[2]), (TERM_X0 - 3.0, 40.0), 6.0)
 box("asphalt_road", TERM_X0 - 6.0, TERM_X0, 0.0, 0.05, 40.0, STREETS[2] + KERB, name="Terminal approach")
 
 # ══ The residential quarter ═══════════════════════════════════════════════════════════════════════
@@ -967,6 +1009,8 @@ def house(label, cx, cz, facing, two_storey=False):
 HOUSES = []
 for si, sz in enumerate(RES_STREETS):
     # The street itself.
+    record_road(f"{['Elm', 'Birch', 'Rowan', 'Alder'][si]} Street", "residential",
+                (RES_X0, sz), (RES_X1, sz), RES_CARRIAGEWAY)
     carriageway(RES_X0, RES_X1, sz - RES_CARRIAGEWAY / 2, sz + RES_CARRIAGEWAY / 2,
                 name=f"{['Elm', 'Birch', 'Rowan', 'Alder'][si]} Street carriageway")
     footway(RES_X0, RES_X1, sz - RES_WALK, sz - RES_CARRIAGEWAY / 2,
@@ -990,6 +1034,8 @@ for si, sz in enumerate(RES_STREETS):
 carriageway(RES_X1, -WALK, STREETS[1] - KERB, STREETS[1] + KERB)
 # ...and the two that run north-south through the estate, joining its streets into a grid.
 for li, lx in enumerate(RES_LANES):
+    record_road(f"{['Sycamore', 'Willow'][li]} Lane", "residential",
+                (lx, RES_STREETS[0] - RES_WALK - 8.0), (lx, RES_STREETS[-1] + RES_WALK + 8.0), RES_CARRIAGEWAY)
     carriageway(lx - RES_CARRIAGEWAY / 2, lx + RES_CARRIAGEWAY / 2,
                 RES_STREETS[0] - RES_WALK - 8.0, RES_STREETS[-1] + RES_WALK + 8.0,
                 name=f"{['Sycamore', 'Willow'][li]} Lane")
@@ -1599,6 +1645,55 @@ for nm, preset, start in (("van", "step_van", 0.0), ("saloon", "v6", 130.0), ("h
     VEHICLES.append(car(f"Southgate {nm}", preset, "southgate", 48.0, 0.48, 1.8, start))
 VEHICLES.append(VERGE_MOWER)
 
+# ── Southgate's streets ───────────────────────────────────────────────────────────────────────────
+#
+# Its traffic has always run a square here, on bare ground: the roads were never laid. Laid last, so
+# every entity before them keeps its id. Its north side is Dock Street. No pavements: the rail fences
+# stand where they would be at the crossings.
+for sg_name, a, b in (("Mill Road", (SG_X0, SG_Z1), (SG_X0, SG_Z0)),
+                      ("Kiln Street", (SG_X0, SG_Z0), (SG_X1, SG_Z0)),
+                      ("Tanner Road", (SG_X1, SG_Z0), (SG_X1, SG_Z1))):
+    record_road(sg_name, "collector", a, b, CARRIAGEWAY)
+    x0, x1 = sorted((a[0], b[0]))
+    z0, z1 = sorted((a[1], b[1]))
+    carriageway(x0 - KERB, x1 + KERB, z0 - KERB, z1 + KERB, name=f"{sg_name} carriageway")
+    region(sg_name, x0 - KERB, x1 + KERB, 0.0, 6.0, z0 - KERB, z1 + KERB)
+# Dock Street's new west end, where it meets Mill Road, named like the rest of it.
+region("Dock Street, west end", SG_X0 - KERB, ST_X0, 0.0, 6.0, STREETS[0] - KERB, STREETS[0] + KERB)
+
+
+def find_junctions(roads):
+    """Where two roads' centrelines meet, crossing or ending on the other, one junction each."""
+    out = {}
+    for i, r in enumerate(roads):
+        for q in roads[i + 1:]:
+            (ax0, _, az0), (ax1, _, az1) = [(p["X"], p["Y"], p["Z"]) for p in r["Centreline"]]
+            (bx0, _, bz0), (bx1, _, bz1) = [(p["X"], p["Y"], p["Z"]) for p in q["Centreline"]]
+            # Straight roads, each along x or along z.
+            r_ns, q_ns = ax0 == ax1, bx0 == bx1
+            if r_ns == q_ns:
+                continue                                   # parallel: they never meet
+            (nx, nz0, nz1, nw), (ez, ex0, ex1, ew) = (
+                ((ax0, az0, az1, r["WidthMetres"]), (bz0, bx0, bx1, q["WidthMetres"])) if r_ns
+                else ((bx0, bz0, bz1, q["WidthMetres"]), (az0, ax0, ax1, r["WidthMetres"])))
+            lo_z, hi_z = sorted((nz0, nz1))
+            lo_x, hi_x = sorted((ex0, ex1))
+            if not (lo_z - ew / 2 <= ez <= hi_z + ew / 2 and lo_x - nw / 2 <= nx <= hi_x + nw / 2):
+                continue
+            key = (round(nx, 1), round(ez, 1))
+            names = sorted({r["Name"], q["Name"]})
+            if key in out:
+                out[key]["Name"] = " and ".join(sorted(set(out[key]["Name"].split(" and ") + names)))
+                out[key]["RadiusMetres"] = max(out[key]["RadiusMetres"], max(nw, ew) / 2 + 1.0)
+                continue
+            out[key] = {"Id": f"j_{int(nx)}_{int(ez)}", "Name": " and ".join(names),
+                        "Position": v3(nx, 0.05, ez), "RadiusMetres": max(nw, ew) / 2 + 1.0,
+                        "Control": "give_way"}
+    return list(out.values())
+
+
+JUNCTIONS = find_junctions(ROADS)
+
 map_data = {
     "Id": "city",
     "IsDefault": False,
@@ -1631,6 +1726,8 @@ map_data = {
     "VoxelResolution": 1.0,
     "OcclusionFloor": 0.1,
     "Tracks": TRACKS,
+    "Roads": ROADS,
+    "Junctions": JUNCTIONS,
     "StreetLife": STREET_LIFE,
     "Vehicles": VEHICLES,
     "Trains": TRAINS,
