@@ -201,6 +201,38 @@ public sealed class RaceLine
     }
 
     /// <summary>
+    /// The lowest speed limit anywhere from <paramref name="distance"/> to <paramref name="span"/>
+    /// metres further on: every node in between and both ends.
+    ///
+    /// What a driver looking down the road reads. Sampling only the far end let the look-ahead point
+    /// pass over the tightest part of a bend while the car was still short of it: the far point read
+    /// the faster exit, the car accelerated, and braked again when the tight part came under it — on
+    /// the city's corners +2.2 then -2.2 m/s^2 within half a second, heard on the diesel pickups as
+    /// flooring it, lifting, and flooring it again.
+    /// </summary>
+    public float SlowestWithin(float distance, float span)
+    {
+        Sample(distance, out _, out _, out float slowest);
+        Sample(distance + MathF.Max(0f, span), out _, out _, out float end);
+        slowest = MathF.Min(slowest, end);
+        if (span <= 0f) return slowest;
+
+        float s = distance % Length;
+        if (s < 0f) s += Length;
+        Locate(s, out int i, out _);
+        int n = _points.Length;
+        float covered = _arc[i + 1] - s;          // road to the next node
+        for (int k = 1; k <= n && covered <= span; k++)
+        {
+            int node = (i + k) % n;
+            slowest = MathF.Min(slowest, _limit[node]);
+            int after = node + 1 <= n ? node + 1 : n;
+            covered += _arc[after] - _arc[node];
+        }
+        return slowest;
+    }
+
+    /// <summary>
     /// Which segment a distance round the lap falls in, and how far along it.
     ///
     /// A binary search over the arc-length table rather than a division, because the nodes are not

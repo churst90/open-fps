@@ -62,6 +62,8 @@ public class AsyncAcousticWorker : IDisposable
     private bool _saEnabled;
     private IntPtr _saContext;
     private SteamAudioScene? _saScene;
+    /// <summary>The same scene without its open ground, for the trace from the listener's head.</summary>
+    private SteamAudioScene? _saListenerScene;
     private SteamAudioSimulator? _saSim;
     private AcousticMap? _saSceneMap; // the map the current scene was built for (rebuild when it changes)
 
@@ -859,7 +861,18 @@ public class AsyncAcousticWorker : IDisposable
             _saSim.SetScene(_saScene);
             // The places themselves, traced: an impulse response from where the listener stands, and
             // one from the middle of each other room that can be heard (SteamAudio.TracedReverbSet).
-            OpenFPS.Client.Core.AudioEngine.SteamAudio.TracedReverbSet.Configure(_saContext, _saScene);
+            //
+            // The listener's own trace gets the scene without its open ground: see
+            // SteamAudioScene.WithoutOpenGround for why a trace from the listener's head must not hear
+            // the floor under their feet.
+            _saListenerScene ??= new SteamAudioScene(_saContext);
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var withoutGround = SteamAudioScene.WithoutOpenGround(boxes);
+            _saListenerScene.Build(withoutGround);
+            Console.WriteLine($"[AcousticWorker] Listener trace scene: {boxes.Count - withoutGround.Count} open-ground slab(s) left out "
+                            + $"of {boxes.Count} ({sw.ElapsedMilliseconds} ms).");
+            OpenFPS.Client.Core.AudioEngine.SteamAudio.TracedReverbSet.Configure(_saContext, _saScene,
+                _saListenerScene.IsBuilt ? _saListenerScene : null);
             // Off the worker thread and out of the way. This is the work that used to sit inside
             // SetScene and take a hundred seconds of a single core before ANY source got an occlusion
             // value — a hundred seconds in which the whole world was rendered as if nothing were in
@@ -1003,6 +1016,7 @@ public class AsyncAcousticWorker : IDisposable
         OpenFPS.Client.Core.AudioEngine.SteamAudio.TracedReverbSet.Dispose();
         if (_saSim != null) { _saSim.Dispose(); _saSim = null; }
         if (_saScene != null) { _saScene.Dispose(); _saScene = null; }
+        if (_saListenerScene != null) { _saListenerScene.Dispose(); _saListenerScene = null; }
         if (_saContext != IntPtr.Zero) Phonon.iplContextRelease(ref _saContext);
 
         _cts.Dispose();

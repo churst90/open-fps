@@ -77,6 +77,17 @@ public sealed class EngineSynth
     private readonly float _airboxLoss;
 
     public float Rpm => _omega * 60f / (2f * MathF.PI);
+    /// <summary>Where a turbo's spool is heading: its idle freewheel, plus the throttle's share of
+    /// what is left above it.</summary>
+    internal static float TurboTarget(float throttle, float rpm, EngineProfile e)
+    {
+        float freewheel = Math.Clamp(e.Mechanical.TurboIdleSpool * Math.Clamp(rpm / MathF.Max(1f, e.IdleRpm), 0f, 1.5f), 0f, 1f);
+        float driven = throttle * Math.Clamp((rpm - e.IdleRpm) / (0.35f * e.RedlineRpm), 0f, 1f);
+        return Math.Clamp(freewheel + (1f - freewheel) * driven, 0f, 1f);
+    }
+
+    /// <summary>The turbo or blower's spool, 0..1: how far up to full boost its shaft is. For tests.</summary>
+    internal float Spool => _spool;
 
     /// <summary>Crank angle, degrees through the cycle. For instruments: an artefact that recurs at
     /// the same angle every cycle is a different bug from one that recurs at the same time.</summary>
@@ -219,8 +230,9 @@ public sealed class EngineSynth
     private float _knockTemp = 1100f, _knockBore = 0.1f;
     private int _knockRetune;
     private readonly ClickVoice _click;
-    private double _whinePhase, _blowerPhase, _turboPhase, _turbinePhase, _tcnPhase;
+    private double _whinePhase, _blowerPhase, _turboPhase, _turbinePhase;
     private float _tcnDrift;
+    private float _humpS1, _humpS2, _humpPower;
     private float _turbineTone;                 // the turbine's tone at a metre from the tailpipe, Pa
     private float _whooshNorm = 1f, _wb1, _wb2, _wx1, _wx2;
     private float _wB0, _wB2, _wA1, _wA2;         // the whoosh band's biquad
@@ -1102,6 +1114,9 @@ public sealed class EngineSynth
     private const int CompressorBlades = 7, TurbineBlades = 11;
     /// <summary>Tip-clearance noise sits at this share of the blade-passing frequency.</summary>
     private const float TipClearanceShare = 0.5f;
+    /// <summary>How wide the tip-clearance hump is, as a share of its centre frequency (the filter's
+    /// 1/Q). Narrow enough to have a pitch, wide enough not to be a line.</summary>
+    private const float HumpWidth = 0.06f;
     private const float CompressorToneDb = 81f, CompressorAtRpm = 60000f;     // at a metre
     /// <summary>The blade-passing tone against the tip-clearance hump: under it at part speed, over
     /// it at full boost, crossing between these shaft speeds.</summary>
@@ -1145,15 +1160,27 @@ public sealed class EngineSynth
         float comp = 0f, turb = 0f;
         float fc = CompressorBlades * rev;
         float compPa = 1.41421356f * Pa(CompressorToneDb) * Scale(CompressorAtRpm) * lvl;
-        // The hump: tip-clearance noise at half the blade-passing frequency, a narrow band rather than
-        // a line — its pitch wanders a per cent or two, the rotating instability that makes it.
+        // The hump: tip-clearance noise at half the blade-passing frequency, a narrow BAND rather than
+        // a line — the rotating instability that makes it is noise, and a hump is what the spectra
+        // show (Raitor and Neise). It was a sine with a wandering pitch, which is a line all the same:
+        // "the whine seems a little too quiet and thin" (2026-09-27). Now white noise through a band
+        // HumpWidth of its centre wide, held at the power the sine had, so the level is unchanged.
         _tcnDrift += (((float)_rng.NextDouble() * 2f - 1f) - _tcnDrift) * (40f / _rate);
         float ft0 = TipClearanceShare * fc * (1f + 0.015f * _tcnDrift);
         if (ft0 < nyq)
         {
-            _tcnPhase += ft0 / _rate;
-            if (_tcnPhase > 1.0) _tcnPhase -= 1.0;
-            comp += (float)Math.Sin(_tcnPhase * 2 * Math.PI) * compPa;
+            // Zavalishin's state-variable filter: stable at any centre frequency, retuned each sample.
+            float g = MathF.Tan(MathF.PI * ft0 / _rate), k = HumpWidth;
+            float a1 = 1f / (1f + g * (g + k)), a2 = g * a1, a3 = g * a2;
+            float x = (float)_rng.NextDouble() * 2f - 1f;
+            float v3 = x - _humpS2;
+            float v1 = a1 * _humpS1 + a2 * v3;
+            float v2 = _humpS2 + a2 * _humpS1 + a3 * v3;
+            _humpS1 = 2f * v1 - _humpS1;
+            _humpS2 = 2f * v2 - _humpS2;
+            // Its own power, tracked over 50 ms, sets how much to scale it by to have the sine's.
+            _humpPower += (v1 * v1 - _humpPower) * (20f / _rate);
+            comp += v1 * (compPa * 0.70710678f) / MathF.Sqrt(_humpPower + 1e-12f);
         }
         if (fc < nyq)
         {
@@ -1325,10 +1352,12 @@ public sealed class EngineSynth
         float wantSpool = e.Induction switch
         {
             // The exhaust spins the turbine even at idle: a big turbo freewheels there
-            // (MechanicalSpec.TurboIdleSpool), and the throttle takes it from there.
-            Induction.Turbocharged => Math.Clamp(MathF.Max(
-                Throttle * MathF.Min(1f, (rpm - e.IdleRpm) / (0.35f * e.RedlineRpm)),
-                e.Mechanical.TurboIdleSpool * Math.Clamp(rpm / MathF.Max(1f, e.IdleRpm), 0f, 1.5f)), 0f, 1f),
+            // (MechanicalSpec.TurboIdleSpool), and the throttle takes it from there — ON TOP of that,
+            // not instead of it. It was the larger of the two, and the throttle's share only passed
+            // the freewheel at 1,300-1,700 rpm, so a compound truck pulling away gently held its
+            // whistle flat until then: "when it hits the gas the turbo doesn't spin up right away".
+            // With no freewheel declared this is the throttle's share alone, as it always was.
+            Induction.Turbocharged => TurboTarget(Throttle, rpm, e),
             Induction.Supercharged => Math.Clamp(rpm / e.RedlineRpm, 0f, 1f) * (0.3f + 0.7f * Throttle),
             _ => 0f,
         };

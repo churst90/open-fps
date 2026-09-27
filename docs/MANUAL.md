@@ -225,6 +225,27 @@ fade sooner. Lower values squeeze loud and quiet together. It applies to every s
 
 The setting is saved.
 
+## People in the street
+
+The pedestrians on the city talk. Each has a voice of their own.
+
+- Walk towards one and they may say hello. Some say nothing. The same person greets you once, then
+  not again for a minute and a half.
+- Some add a goodbye as you part.
+- Walk into one and they apologise, or tell you to watch it.
+- Stand in front of someone who has stopped and they ask if they can help you.
+- Now and then someone takes a phone call and you hear their half of it.
+- Two pedestrians passing each other may greet each other.
+- Some people tell a story on the phone.
+- Drivers yell when something goes wrong: a hard stop, a car crossing in front of them at a junction,
+  a car pulling out, a long wait at the level crossing. Stand in the road in front of a car and it
+  brakes, honks, and the driver yells at you.
+
+What they say fits the game's clock and weather: "Morning" only in the morning, "Looks like rain"
+only when rain is coming in, "Cold out here today" only when it is cold.
+
+In a text (MUD) session you are told the words of anything said within 10 metres.
+
 ## Driving
 
 ### Getting in and out
@@ -381,6 +402,19 @@ All in `OpenFPS.Server/`:
 
 A `materials.json` in the server folder would override the built-in acoustic materials. None ships
 with the server.
+
+### Pedestrian voices
+
+The recorded lines are in `OpenFPS.Client/ASSETS/SOUNDS/VOICES/<voice>/`, and the list the server
+picks from is `OpenFPS.Common/Speech/voices.csv`. Both are written by the importer from a folder with
+a `manifest.csv`:
+
+    tools/import_npc_voices.py inbox/npc-voices-2026-09-26 --clones=seanterry,jimdale,joeb,joel,tim,ben,alec,fluke,camel,tyler
+
+It encodes the lines to Ogg Vorbis. Voices cloned from real people are left out unless named with
+`--clones`. A voice whose folder is removed from the inbox is removed from the game. The recordings in
+a `<voice>_preview` folder become that voice's stories, with their words from `stories.json`. Rebuild the server
+and client afterwards, since the list is built into both.
 
 ## Accounts
 

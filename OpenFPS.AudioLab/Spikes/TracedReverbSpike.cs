@@ -1,3 +1,4 @@
+using System.Linq;
 using System;
 using System.Collections.Generic;
 using System.Numerics;
@@ -64,10 +65,15 @@ public static class TracedReverbSpike
         var places = new List<(string, List<SteamAudioScene.Box>, Vector3)>
         {
             ("open ground", open, new Vector3(2f, 1.6f, 0f)), ("street, 20 m", street, new Vector3(2f, 1.6f, 0f)),
+            // What the listener's own trace is given in the game: the same places without their open
+            // ground (SteamAudioScene.WithoutOpenGround). Nothing may come back inside 25 ms.
+            ("open, as traced", SteamAudioScene.WithoutOpenGround(open), new Vector3(2f, 1.6f, 0f)),
+            ("street, as traced", SteamAudioScene.WithoutOpenGround(street), new Vector3(2f, 1.6f, 0f)),
             ("concrete room", room, new Vector3(2f, 1.6f, 0f)), ("tiled room", Room("Tile", "Tile"), new Vector3(2f, 1.6f, 0f)),
             ("wood, carpet", Room("Wood", "Carpet"), new Vector3(2f, 1.6f, 0f)),
             ("bus cabin", Cabin("school_bus_na"), Seat("school_bus_na")), ("hatchback cabin", Cabin("i4_economy"), Seat("i4_economy")),
         };
+        int failures = 0;
         foreach (var (name, boxes, ear) in places)
         {
             using var scene = new SteamAudioScene(ctx);
@@ -131,10 +137,31 @@ public static class TracedReverbSpike
             // Where the energy has fallen 20 dB from its peak window, as a rough decay.
             Console.WriteLine($"{name,-14} tail {10 * Math.Log10(total + 1e-20),6:F1} dB re impulse, trace {tr.LastRunMs,5:F0} ms");
             Console.WriteLine($"   50 ms windows (dB): {string.Join(" ", windows)}");
+            // The first arrivals, to the tenth of a millisecond: when the place answers, and how loud.
+            // An impulse sent in at unity; a copy within 20 ms is heard as colour, not as an echo.
+            var arrivals = new List<(int At, double Db)>();
+            double peakAll = 0; foreach (var x in w) peakAll = Math.Max(peakAll, Math.Abs(x));
+            for (int j = 1; j < Math.Min(w.Count - 1, 44100 / 10); j++)
+            {
+                double v = Math.Abs(w[j]);
+                if (v > Math.Abs(w[j - 1]) && v >= Math.Abs(w[j + 1]) && v > peakAll * 0.05) arrivals.Add((j, 20 * Math.Log10(v + 1e-20)));
+            }
+            Console.WriteLine("   first arrivals (ms: dB re impulse): "
+                + string.Join(", ", arrivals.OrderByDescending(a => a.Db).Take(5).OrderBy(a => a.At).Select(a => $"{a.At / 44.1:F1}: {a.Db:F0}")));
+            // The listener's trace plays every sound as if it came from the listener's head. Anything it
+            // hands back inside 25 ms is a copy of a close sound right behind it: a small room.
+            if (name.EndsWith("as traced"))
+            {
+                double early = 0; for (int j = 0; j < Math.Min(w.Count, 44100 * 25 / 1000); j++) early += w[j] * (double)w[j];
+                double earlyDb = 10 * Math.Log10(early + 1e-20);
+                bool ok = earlyDb < -40;
+                if (!ok) failures++;
+                Console.WriteLine($"   {(ok ? "PASS" : "FAIL")}: {earlyDb:F0} dB back inside 25 ms (must be under -40)");
+            }
             Phonon.iplAudioBufferFree(ctx, ref inBuf); Phonon.iplAudioBufferFree(ctx, ref outBuf);
             Phonon.iplReflectionEffectRelease(ref effect);
         }
         Phonon.iplContextRelease(ref ctx);
-        return 0;
+        return failures == 0 ? 0 : 1;
     }
 }

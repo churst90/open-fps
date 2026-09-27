@@ -241,13 +241,15 @@ internal static class TracedReverbSet
     private const int MaxRooms = 6;
 
     /// <summary>The worker, once its scene is built (and again after every rebuild).</summary>
-    public static void Configure(IntPtr context, SteamAudioScene scene)
+    /// <param name="listenerScene">The scene the listener's own trace uses: the same geometry without
+    /// its open ground (SteamAudioScene.WithoutOpenGround). Null uses <paramref name="scene"/>.</param>
+    public static void Configure(IntPtr context, SteamAudioScene scene, SteamAudioScene? listenerScene = null)
     {
         lock (Gate)
         {
             _context = context; _scene = scene;
             _listener ??= new TracedReverb(context);
-            if (_listener.IsValid) _listener.SetScene(scene);
+            if (_listener.IsValid) _listener.SetScene(listenerScene ?? scene);
             // The few sources traced from where they are (TracedEchoes), on the same scene.
             _echoes ??= new TracedEchoes(context);
             if (_echoes.IsValid) _echoes.SetScene(scene);

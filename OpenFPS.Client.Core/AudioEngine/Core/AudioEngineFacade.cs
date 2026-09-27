@@ -484,6 +484,26 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
     public IEnumerable<int> GetActiveSpatialSoundIds() => _isInitialized ? _provider.GetActiveSpatialSoundIds() : Array.Empty<int>();
 
     /// <summary>
+    /// A recorded sound from the bank as mono float PCM, decoded on the calling thread and not cached.
+    /// Several channels are averaged down.
+    /// </summary>
+    public bool TryDecodeMono(string soundId, out float[] mono, out int sampleRate)
+    {
+        mono = Array.Empty<float>(); sampleRate = 0;
+        if (!_isInitialized || !_provider.TryDecode(soundId, out var pcm, out int channels, out sampleRate)
+            || channels < 1 || sampleRate <= 0) return false;
+        if (channels == 1) { mono = pcm; return true; }
+        mono = new float[pcm.Length / channels];
+        for (int i = 0; i < mono.Length; i++)
+        {
+            float sum = 0f;
+            for (int c = 0; c < channels; c++) sum += pcm[i * channels + c];
+            mono[i] = sum / channels;
+        }
+        return true;
+    }
+
+    /// <summary>
     /// Pre-decodes a sound into the granular buffer cache.
     /// </summary>
     public void Preload(string soundId)
@@ -496,7 +516,9 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
     {
         if (!_isInitialized) return;
         
-        var allIds = _bank.GetAllSoundIds().ToList();
+        // Not the spoken lines: they are decoded when somebody says one (WorldAudioPlayer.SpokenLine).
+        // Preloaded, fourteen hundred of them sat decoded in memory for the whole session, some 350 MB.
+        var allIds = _bank.GetAllSoundIds().Where(id => !id.StartsWith("VOICES/", StringComparison.OrdinalIgnoreCase)).ToList();
         for (int i = 0; i < allIds.Count; i++)
         {
             var id = allIds[i];

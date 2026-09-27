@@ -2892,6 +2892,12 @@ public class FmodAudioProvider : IAudioProvider
                 active.EffectiveDistance = emitter.EffectiveDistance; active.Velocity = emitter.Velocity; 
                 active.Direction = emitter.Direction; active.Range = emitter.Range; 
                 active.BaseVolume = emitter.Volume * TakeGain(emitter); 
+                if (emitter.CarriesPath)
+                {
+                    active.TargetLow = emitter.EqLow; active.TargetMid = emitter.EqMid; active.TargetHigh = emitter.EqHigh;
+                    active.AirLowDb = emitter.AirLowDb; active.AirMidDb = emitter.AirMidDb; active.AirHighDb = emitter.AirHighDb;
+                    active.TargetRegionId = emitter.TargetRegionId;
+                }
                 if (emitter.IsGranular && active.GranularState != null)
                 {
                     active.GranularState.Position = emitter.GranularPosition;
@@ -4504,6 +4510,12 @@ public class FmodAudioProvider : IAudioProvider
     }
     public IEnumerable<int> GetActiveSpatialSoundIds() { lock(_lock) return new List<int>(_activeById.Keys); }
     public Vector3 GetSoundPosition(int entityId) { lock(_lock) return FindActive(entityId)?.Position ?? Vector3.Zero; }
+
+    public bool TryDecode(string soundId, out float[] pcm, out int channels, out int sampleRate)
+    {
+        pcm = Array.Empty<float>(); channels = 0; sampleRate = 0;
+        return _isInitialized && _granularBank.TryDecode(soundId, out pcm, out channels, out sampleRate);
+    }
 
     public void Preload(string soundId)
     {

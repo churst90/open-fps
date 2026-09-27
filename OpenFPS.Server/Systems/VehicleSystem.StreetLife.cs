@@ -51,7 +51,12 @@ public sealed partial class VehicleSystem
 
         if (Chance(life.HornEverySeconds, dt)
             && Pick(mapId, world, v => v.Horn.Length > 0 && v.Park == null) is { } honker)
-            Honk(mapId, world, honker, OpenFPS.Common.Honk.Everyday(_streetRng));
+        {
+            var pattern = OpenFPS.Common.Honk.Everyday(_streetRng);
+            Honk(mapId, world, honker, pattern);
+            if (_streetRng.NextDouble() < YellAfterHonk)
+                Yell(mapId, world, honker, StreetLines.Impatient, OpenFPS.Common.Honk.Duration(pattern) + 0.2f, clock);
+        }
 
         if (Chance(life.HardBrakeEverySeconds, dt)
             && Pick(mapId, world, v => v.Line != null && v.Park == null && v.DwellLeft <= 0f && v.HardBrakeLeft <= 0f
@@ -64,9 +69,12 @@ public sealed partial class VehicleSystem
             if (braker.Horn.Length > 0 && _streetRng.NextDouble() < HonkAfterHardBrake)
                 _pendingHonks.Add((mapId, braker, clock + 0.4 + 0.5 * _streetRng.NextDouble(),
                                    OpenFPS.Common.Honk.Startled(_streetRng)));
+            if (_streetRng.NextDouble() < YellAfterHardBrake)
+                Yell(mapId, world, braker, StreetLines.Startled, 1.0f + 0.6f * (float)_streetRng.NextDouble(), clock);
         }
 
         MaybePark(mapId, world, life, dt, clock);
+        UpdateDrivers(mapId, world, clock);
 
         // A car alarm, now and then: one of the cars standing empty at the kerb.
         if (Chance(life.AlarmEverySeconds, dt)

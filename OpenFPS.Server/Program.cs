@@ -32,6 +32,7 @@ public class GameServer
     private CommandHandler _commands = null!;
     private readonly System.Collections.Concurrent.ConcurrentQueue<int> _dirtyAudioEntities = new();
     private readonly VehicleSystem _vehicles = new();
+    private readonly PedestrianSpeech _speech = new();
     private readonly RailSystem _rail = new();
     private CrossingSystem _crossings = null!;
 
@@ -166,7 +167,11 @@ public class GameServer
         foreach (var session in _sessions.GetSessionsInMap(mapId))
         {
             if (session.Entity == Entity.Null || !world.IsAlive(session.Entity)) continue;
-            if (Vector3.Distance(world.Get<Transform>(session.Entity).Position, at) > earshot) continue;
+            float apart = Vector3.Distance(world.Get<Transform>(session.Entity).Position, at);
+            if (apart > earshot) continue;
+            // A text player is told the words, so only the words they could make out.
+            if (session.IsTextClient && label.StartsWith("speech: ", StringComparison.Ordinal)
+                && apart > Speech.MadeOutMetres) continue;
             SendToSession(session, message);
         }
     }
@@ -443,6 +448,14 @@ public class GameServer
                     _vehicles.Update(entry.Key, world, dt);
                     _rail.Update(entry.Key, world, dt);
                     _crossings.Update(entry.Key, world, dt);
+
+                    // People in the street saying things to whoever they pass.
+                    var weather = _environment.GetStateForMap(_maps.TryGetMapData(entry.Key, out var speechMap)
+                        ? new MapAtmosphere(speechMap.Temperature, speechMap.Humidity, speechMap.AirPressure, speechMap.AirAbsorptionMultiplier)
+                        : MapAtmosphere.Default);
+                    _speech.Update(entry.Key, world, AudioClock.Now,
+                                   SpeechConditions.From(weather, _environment.CurrentScenario),
+                                   (id, label, sound) => EmitWorldAudio(entry.Key, id, label, new[] { sound }));
 
                     // ...and the people watching them. Only a source with a place and a size: no
                     // loop, no bed, and nothing in it that knows what a car is.

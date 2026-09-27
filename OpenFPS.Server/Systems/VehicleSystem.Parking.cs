@@ -281,6 +281,7 @@ public sealed partial class VehicleSystem
                 pk.Phase = ParkPhase.PullOut;
                 _doorsInUse.Remove(pk.Spot.Door.Id);
                 Log.Information("Street: {Name} pulls out.", v.DisplayName);
+                PulledOut(v.MapId, world, v, _streetClocks.GetValueOrDefault(v.MapId));
                 break;
         }
         return pk.Phase == ParkPhase.Parked;
@@ -314,14 +315,15 @@ public sealed partial class VehicleSystem
     private Entity SpawnPerson(DemoVehicle v, Vector3 at, float heading)
     {
         if (_maps == null) return Entity.Null;
-        // The same body a walker on the map has: no sound of its own, heard by its feet.
+        // The same body a walker on the map has: heard by its feet, and by its voice when it speaks.
         return _maps.SpawnEntity(v.MapId, w => w.Create(
             EntityType.NPC,
             new Transform { Position = at, Rotation = Quaternion.CreateFromYawPitchRoll(heading, 0f, 0f) },
             new Velocity { Linear = Vector3.Zero },
             new ColliderComponent { Shape = ColliderShape.Box, Size = new Vector3(0.5f, 1.75f, 0.35f), IsSolid = false },
             new NameComponent { Name = "driver of " + v.DisplayName },
-            new IdentityComponent { Name = "someone", Description = "on foot, from a parked car" }));
+            new IdentityComponent { Name = "someone", Description = "on foot, from a parked car" },
+            new Pedestrian { Voice = PedestrianSpeech.NextVoice(v.MapId) }));
     }
 
     private void RemovePerson(DemoVehicle v, ParkState pk)

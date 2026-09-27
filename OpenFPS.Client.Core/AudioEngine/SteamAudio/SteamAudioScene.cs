@@ -63,6 +63,87 @@ public sealed class SteamAudioScene : IDisposable
         return boxes;
     }
 
+    /// <summary>
+    /// The scene without its open ground: every thin, flat slab at ground level with open sky over
+    /// it — road, pavement, lawn, a plaza, the ground itself. Floors with a ceiling over them stay,
+    /// and so does everything higher up (a roof is a ceiling); they are part of a room.
+    ///
+    /// For the trace taken from the LISTENER's position (TracedReverb). That trace plays every sound
+    /// as if it came from where the listener stands, so its ground bounce is the one from their own
+    /// head to the floor and back — ten milliseconds, at a level set by nothing about the source —
+    /// plus the convolution's own block of delay. Every voice came back a moment later off the ground
+    /// under your feet, and a clean voice close by with a copy of itself 10-15 ms behind is a small
+    /// room: "they sound like they're in a room when they aren't" (measured from the capture,
+    /// 2026-09-27: -2 to -7 dB at 9-15 ms behind the direct voice). A source's own ground reflection,
+    /// at its own geometry's delay, is modelled with the source (engines' GroundReflection, the ground
+    /// wash after a shot); the ground's share of a place's tail is small, and the facades carry the
+    /// street's.
+    /// </summary>
+    public static List<Box> WithoutOpenGround(IReadOnlyList<Box> boxes)
+    {
+        var ext = new (Vector3 Min, Vector3 Max)[boxes.Count];
+        for (int i = 0; i < boxes.Count; i++) ext[i] = WorldExtents(boxes[i]);
+        var kept = new List<Box>(boxes.Count);
+        for (int i = 0; i < boxes.Count; i++)
+            if (!IsOpenGround(boxes[i], ext[i], ext)) kept.Add(boxes[i]);
+        return kept;
+    }
+
+    /// <summary>How thin a slab is to count as a floor rather than a block, metres.</summary>
+    private const float SlabThickness = 0.5f;
+    /// <summary>Anything this far over a slab's top covers it; less is laid on it (a road on the ground).</summary>
+    private const float Headroom = 1.5f;
+    /// <summary>
+    /// The highest a slab's top may be and still be the ground, metres. A roof is a thin slab with the
+    /// sky over it too, and it is the ceiling of the room under it: left out, a top-floor room would
+    /// lose its own ceiling from its sound.
+    /// </summary>
+    private const float GroundLevel = 1.0f;
+
+    internal static bool IsOpenGround(in Box b, (Vector3 Min, Vector3 Max) own, (Vector3 Min, Vector3 Max)[] all)
+    {
+        if (b.Size.Y > SlabThickness || b.Size.X < 1f || b.Size.Z < 1f) return false;
+        // Turned about anything but the vertical, it is not a floor.
+        var up = Vector3.Transform(Vector3.UnitY, b.Rotation);
+        if (MathF.Abs(up.Y) < 0.99f) return false;
+        var (min, max) = own;
+        float top = max.Y;
+        if (top > GroundLevel) return false;
+        // Open to the sky over most of it: the middle and four points halfway to the corners.
+        var c = (min + max) * 0.5f;
+        var q = (max - min) * 0.25f;
+        Span<Vector2> pts = stackalloc Vector2[]
+        {
+            new(c.X, c.Z), new(c.X - q.X, c.Z - q.Z), new(c.X + q.X, c.Z - q.Z),
+            new(c.X - q.X, c.Z + q.Z), new(c.X + q.X, c.Z + q.Z),
+        };
+        int open = 0;
+        foreach (var p in pts)
+        {
+            bool covered = false;
+            foreach (var (omin, omax) in all)
+            {
+                if (omin.Y < top + Headroom) continue;
+                if (p.X >= omin.X && p.X <= omax.X && p.Y >= omin.Z && p.Y <= omax.Z) { covered = true; break; }
+            }
+            if (!covered) open++;
+        }
+        return open >= 3;
+    }
+
+    private static (Vector3 Min, Vector3 Max) WorldExtents(in Box b)
+    {
+        var h = b.Size * 0.5f;
+        var min = new Vector3(float.MaxValue); var max = new Vector3(float.MinValue);
+        for (int i = 0; i < 8; i++)
+        {
+            var corner = new Vector3((i & 1) == 0 ? -h.X : h.X, (i & 2) == 0 ? -h.Y : h.Y, (i & 4) == 0 ? -h.Z : h.Z);
+            var w = b.Center + Vector3.Transform(corner, b.Rotation);
+            min = Vector3.Min(min, w); max = Vector3.Max(max, w);
+        }
+        return (min, max);
+    }
+
     public void Build(IReadOnlyList<Box> boxes)
     {
         Release();

@@ -118,6 +118,15 @@ public interface IAudioProvider : IDisposable
     void Preload(string soundId);
 
     /// <summary>
+    /// Decodes a sound from the bank to interleaved float PCM, without keeping it. False when there is
+    /// no such sound or nothing to decode it with.
+    /// </summary>
+    bool TryDecode(string soundId, out float[] pcm, out int channels, out int sampleRate)
+    {
+        pcm = Array.Empty<float>(); channels = 0; sampleRate = 0; return false;
+    }
+
+    /// <summary>
     /// Plays a decoded PCM voice packet as a one-shot 3D sound at the given world position.
     /// pcmData is 16-bit signed, mono, 48kHz.
     /// </summary>

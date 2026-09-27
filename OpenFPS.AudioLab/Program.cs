@@ -138,6 +138,19 @@ if (args.Contains("--sim-pathing"))
     Environment.Exit(code);
 }
 
+if (args.Contains("--siren-route"))
+{
+    int code = OpenFPS.Client.Core.AudioEngine.SteamAudio.SirenRouteSpike.Run(args);
+    Log.CloseAndFlush();
+    Environment.Exit(code);
+}
+
+if (args.Contains("--speech-lines"))
+{
+    int code = SpeechLinesSpike.Run();
+    Environment.Exit(code);
+}
+
 if (args.Contains("--dsp-order"))
 {
     int code = DspOrderSpike.Run();

@@ -1,0 +1,2534 @@
+voice,kind,category,line,text,seconds
+jimdale,cloned,greet,greet_hey_how_s_it_going,"Hey, how's it going?",1.45
+jimdale,cloned,greet,greet_yo_what_s_up,"Yo, what's up?",0.95
+jimdale,cloned,greet,greet_hey_good_morning,"Hey, good morning.",1.17
+jimdale,cloned,greet,greet_morning,Morning.,0.52
+jimdale,cloned,greet,greet_good_morning,Good morning!,0.63
+jimdale,cloned,greet,greet_afternoon,Afternoon.,0.85
+jimdale,cloned,greet,greet_good_afternoon,Good afternoon.,0.79
+jimdale,cloned,greet,greet_evening,Evening.,0.67
+jimdale,cloned,greet,greet_good_evening,Good evening.,0.88
+jimdale,cloned,greet,greet_hey_there,Hey there.,0.62
+jimdale,cloned,greet,greet_hi,Hi.,0.54
+jimdale,cloned,greet,greet_hello,Hello.,0.95
+jimdale,cloned,greet,greet_hey,Hey.,0.57
+jimdale,cloned,greet,greet_how_are_you_doing,How are you doing?,0.96
+jimdale,cloned,greet,greet_how_you_doing,How you doing?,0.97
+jimdale,cloned,greet,greet_what_s_going_on,What's going on?,1.18
+jimdale,cloned,greet,greet_hey_nice_to_see_you,"Hey, nice to see you.",1.29
+jimdale,cloned,greet,greet_long_time_no_see,Long time no see!,1.19
+jimdale,cloned,greet,greet_hey_man,Hey man.,0.55
+jimdale,cloned,greet,greet_what_s_new,What's new?,0.72
+jimdale,cloned,greet,greet_beautiful_day_huh,"Beautiful day, huh?",1.63
+jimdale,cloned,greet,greet_hot_one_today_isn_t_it,"Hot one today, isn't it?",1.35
+jimdale,cloned,greet,greet_cold_out_here_today,Cold out here today.,1.27
+jimdale,cloned,greet,greet_looks_like_rain,Looks like rain.,0.98
+jimdale,cloned,greet,greet_nice_day_for_a_walk,Nice day for a walk.,1.29
+jimdale,cloned,greet,greet_can_i_help_you,Can I help you?,0.79
+jimdale,cloned,greet,greet_need_something,Need something?,1.15
+jimdale,cloned,polite,polite_excuse_me,Excuse me.,0.83
+jimdale,cloned,polite,polite_pardon_me,Pardon me.,0.67
+jimdale,cloned,polite,polite_sorry_excuse_me,"Sorry, excuse me.",1.08
+jimdale,cloned,polite,polite_oh_sorry,"Oh, sorry.",0.84
+jimdale,cloned,polite,polite_watch_it,Watch it!,0.59
+jimdale,cloned,polite,polite_careful_there,Careful there.,0.89
+jimdale,cloned,polite,polite_thanks,Thanks.,0.65
+jimdale,cloned,polite,polite_thank_you,Thank you.,0.78
+jimdale,cloned,polite,polite_no_problem,No problem.,0.84
+jimdale,cloned,polite,polite_you_re_welcome,You're welcome.,0.68
+jimdale,cloned,polite,polite_sure_thing,Sure thing.,0.87
+jimdale,cloned,bye,bye_have_a_good_one,Have a good one.,0.75
+jimdale,cloned,bye,bye_take_care,Take care.,0.72
+jimdale,cloned,bye,bye_see_you_later,See you later.,0.72
+jimdale,cloned,bye,bye_see_ya,See ya.,0.72
+jimdale,cloned,bye,bye_catch_you_later,Catch you later.,0.93
+jimdale,cloned,bye,bye_have_a_good_day,Have a good day.,0.82
+jimdale,cloned,bye,bye_have_a_nice_day,Have a nice day!,0.93
+jimdale,cloned,bye,bye_have_a_good_night,Have a good night.,0.74
+jimdale,cloned,bye,bye_take_it_easy,Take it easy.,0.88
+jimdale,cloned,bye,bye_bye_now,Bye now.,0.93
+jimdale,cloned,bye,bye_later,Later.,0.46
+jimdale,cloned,bye,bye_stay_safe_out_there,Stay safe out there.,1.09
+jimdale,cloned,chatter,chatter_yeah_i_know_right,"Yeah, I know, right?",1.44
+jimdale,cloned,chatter,chatter_no_way_seriously,No way. Seriously?,1.96
+jimdale,cloned,chatter,chatter_i_told_him_that_already,I told him that already.,1.29
+jimdale,cloned,chatter,chatter_where_are_we_eating_tonight,Where are we eating tonight?,1.69
+jimdale,cloned,chatter,chatter_i_don_t_know_what_do_you_want,"I don't know, what do you want?",1.63
+jimdale,cloned,chatter,chatter_did_you_see_the_game_last_night,Did you see the game last night?,1.37
+jimdale,cloned,chatter,chatter_traffic_was_insane_this_morning,Traffic was insane this morning.,1.91
+jimdale,cloned,chatter,chatter_i_m_running_late_i_gotta_go,"I'm running late, I gotta go.",1.86
+jimdale,cloned,chatter,chatter_hang_on_let_me_call_you_back,"Hang on, let me call you back.",1.88
+jimdale,cloned,chatter,chatter_oh_my_god_that_s_hilarious,"Oh my God, that's hilarious.",2.12
+jimdale,cloned,chatter,chatter_yeah_yeah_totally,"Yeah, yeah, totally.",1.27
+jimdale,cloned,chatter,chatter_mm_hmm,Mm-hmm.,1.28
+jimdale,cloned,chatter,chatter_uh_huh,Uh-huh.,0.61
+jimdale,cloned,chatter,chatter_right_right,"Right, right.",0.82
+jimdale,cloned,chatter,chatter_that_s_what_i_m_saying,That's what I'm saying!,1.06
+jimdale,cloned,chatter,chatter_i_can_t_believe_it_s_already_friday,I can't believe it's already Friday.,1.76
+jimdale,cloned,chatter,chatter_we_should_grab_coffee_sometime,We should grab coffee sometime.,1.70
+jimdale,cloned,chatter,chatter_which_way_is_the_train_station,Which way is the train station?,1.76
+jimdale,cloned,chatter,chatter_it_s_just_up_the_street_on_the_left,It's just up the street on the left.,1.62
+jimdale,cloned,chatter,chatter_i_think_we_parked_on_the_other_side,I think we parked on the other side.,1.84
+jimdale,cloned,chatter,chatter_how_much_was_it,How much was it?,0.85
+jimdale,cloned,chatter,chatter_that_s_way_too_expensive,That's way too expensive.,1.46
+jimdale,cloned,chatter,chatter_hold_on_i_dropped_something,"Hold on, I dropped something.",1.83
+jimdale,cloned,chatter,chatter_wait_up,Wait up!,0.65
+jimdale,cloned,chatter,chatter_come_on_we_re_gonna_miss_it,"Come on, we're gonna miss it.",1.12
+jimdale,cloned,chatter,chatter_i_ll_meet_you_there,I'll meet you there.,1.01
+jimdale,cloned,chatter,chatter_did_you_get_my_text,Did you get my text?,1.23
+jimdale,cloned,chatter,chatter_my_phone_s_about_to_die,My phone's about to die.,1.40
+jimdale,cloned,chatter,chatter_it_s_supposed_to_storm_later,It's supposed to storm later.,2.07
+jimdale,cloned,chatter,chatter_i_m_so_tired_today,I'm so tired today.,1.38
+jimdale,cloned,chatter,chatter_honestly_i_have_no_idea,"Honestly, I have no idea.",1.77
+jimdale,cloned,chatter,chatter_anyway_like_i_was_saying,"Anyway, like I was saying...",1.67
+jimdale,cloned,chatter,chatter_oh_hey_over_here,"Oh, hey! Over here!",1.69
+jimdale,cloned,chatter,chatter_ha_yeah,Ha! Yeah.,0.92
+jimdale,cloned,chatter,chatter_okay_sounds_good,"Okay, sounds good.",1.13
+jimdale,cloned,chatter,chatter_nah_i_m_good_thanks,"Nah, I'm good, thanks.",2.39
+seanterry,cloned,greet,greet_hey_how_s_it_going,"Hey, how's it going?",1.22
+seanterry,cloned,greet,greet_yo_what_s_up,"Yo, what's up?",0.85
+seanterry,cloned,greet,greet_hey_good_morning,"Hey, good morning.",0.89
+seanterry,cloned,greet,greet_morning,Morning.,0.62
+seanterry,cloned,greet,greet_good_morning,Good morning!,0.65
+seanterry,cloned,greet,greet_afternoon,Afternoon.,1.07
+seanterry,cloned,greet,greet_good_afternoon,Good afternoon.,1.02
+seanterry,cloned,greet,greet_evening,Evening.,0.64
+seanterry,cloned,greet,greet_good_evening,Good evening.,0.69
+seanterry,cloned,greet,greet_hey_there,Hey there.,0.63
+seanterry,cloned,greet,greet_hi,Hi.,0.60
+seanterry,cloned,greet,greet_hello,Hello.,0.59
+seanterry,cloned,greet,greet_hey,Hey.,0.51
+seanterry,cloned,greet,greet_how_are_you_doing,How are you doing?,0.96
+seanterry,cloned,greet,greet_how_you_doing,How you doing?,0.80
+seanterry,cloned,greet,greet_what_s_going_on,What's going on?,1.00
+seanterry,cloned,greet,greet_hey_nice_to_see_you,"Hey, nice to see you.",1.32
+seanterry,cloned,greet,greet_long_time_no_see,Long time no see!,1.42
+seanterry,cloned,greet,greet_hey_man,Hey man.,0.73
+seanterry,cloned,greet,greet_what_s_new,What's new?,0.79
+seanterry,cloned,greet,greet_beautiful_day_huh,"Beautiful day, huh?",1.14
+seanterry,cloned,greet,greet_hot_one_today_isn_t_it,"Hot one today, isn't it?",1.55
+seanterry,cloned,greet,greet_cold_out_here_today,Cold out here today.,1.43
+seanterry,cloned,greet,greet_looks_like_rain,Looks like rain.,0.95
+seanterry,cloned,greet,greet_nice_day_for_a_walk,Nice day for a walk.,1.59
+seanterry,cloned,greet,greet_can_i_help_you,Can I help you?,0.91
+seanterry,cloned,greet,greet_need_something,Need something?,0.85
+seanterry,cloned,polite,polite_excuse_me,Excuse me.,1.00
+seanterry,cloned,polite,polite_pardon_me,Pardon me.,0.68
+seanterry,cloned,polite,polite_sorry_excuse_me,"Sorry, excuse me.",1.24
+seanterry,cloned,polite,polite_oh_sorry,"Oh, sorry.",1.22
+seanterry,cloned,polite,polite_watch_it,Watch it!,0.50
+seanterry,cloned,polite,polite_careful_there,Careful there.,0.78
+seanterry,cloned,polite,polite_thanks,Thanks.,0.64
+seanterry,cloned,polite,polite_thank_you,Thank you.,0.80
+seanterry,cloned,polite,polite_no_problem,No problem.,0.97
+seanterry,cloned,polite,polite_you_re_welcome,You're welcome.,0.75
+seanterry,cloned,polite,polite_sure_thing,Sure thing.,0.87
+seanterry,cloned,bye,bye_have_a_good_one,Have a good one.,0.92
+seanterry,cloned,bye,bye_take_care,Take care.,0.82
+seanterry,cloned,bye,bye_see_you_later,See you later.,1.20
+seanterry,cloned,bye,bye_see_ya,See ya.,0.60
+seanterry,cloned,bye,bye_catch_you_later,Catch you later.,0.99
+seanterry,cloned,bye,bye_have_a_good_day,Have a good day.,0.83
+seanterry,cloned,bye,bye_have_a_nice_day,Have a nice day!,1.16
+seanterry,cloned,bye,bye_have_a_good_night,Have a good night.,0.92
+seanterry,cloned,bye,bye_take_it_easy,Take it easy.,0.84
+seanterry,cloned,bye,bye_bye_now,Bye now.,0.91
+seanterry,cloned,bye,bye_later,Later.,0.56
+seanterry,cloned,bye,bye_stay_safe_out_there,Stay safe out there.,1.41
+seanterry,cloned,chatter,chatter_yeah_i_know_right,"Yeah, I know, right?",1.17
+seanterry,cloned,chatter,chatter_no_way_seriously,No way. Seriously?,1.61
+seanterry,cloned,chatter,chatter_i_told_him_that_already,I told him that already.,1.53
+seanterry,cloned,chatter,chatter_where_are_we_eating_tonight,Where are we eating tonight?,1.42
+seanterry,cloned,chatter,chatter_i_don_t_know_what_do_you_want,"I don't know, what do you want?",1.31
+seanterry,cloned,chatter,chatter_did_you_see_the_game_last_night,Did you see the game last night?,1.77
+seanterry,cloned,chatter,chatter_traffic_was_insane_this_morning,Traffic was insane this morning.,1.81
+seanterry,cloned,chatter,chatter_i_m_running_late_i_gotta_go,"I'm running late, I gotta go.",2.20
+seanterry,cloned,chatter,chatter_hang_on_let_me_call_you_back,"Hang on, let me call you back.",1.59
+seanterry,cloned,chatter,chatter_oh_my_god_that_s_hilarious,"Oh my God, that's hilarious.",1.79
+seanterry,cloned,chatter,chatter_yeah_yeah_totally,"Yeah, yeah, totally.",1.59
+seanterry,cloned,chatter,chatter_mm_hmm,Mm-hmm.,1.12
+seanterry,cloned,chatter,chatter_uh_huh,Uh-huh.,0.61
+seanterry,cloned,chatter,chatter_right_right,"Right, right.",0.92
+seanterry,cloned,chatter,chatter_that_s_what_i_m_saying,That's what I'm saying!,1.12
+seanterry,cloned,chatter,chatter_i_can_t_believe_it_s_already_friday,I can't believe it's already Friday.,1.72
+seanterry,cloned,chatter,chatter_we_should_grab_coffee_sometime,We should grab coffee sometime.,1.81
+seanterry,cloned,chatter,chatter_which_way_is_the_train_station,Which way is the train station?,1.88
+seanterry,cloned,chatter,chatter_it_s_just_up_the_street_on_the_left,It's just up the street on the left.,2.11
+seanterry,cloned,chatter,chatter_i_think_we_parked_on_the_other_side,I think we parked on the other side.,1.84
+seanterry,cloned,chatter,chatter_how_much_was_it,How much was it?,1.07
+seanterry,cloned,chatter,chatter_that_s_way_too_expensive,That's way too expensive.,1.52
+seanterry,cloned,chatter,chatter_hold_on_i_dropped_something,"Hold on, I dropped something.",1.71
+seanterry,cloned,chatter,chatter_wait_up,Wait up!,0.55
+seanterry,cloned,chatter,chatter_come_on_we_re_gonna_miss_it,"Come on, we're gonna miss it.",1.69
+seanterry,cloned,chatter,chatter_i_ll_meet_you_there,I'll meet you there.,0.95
+seanterry,cloned,chatter,chatter_did_you_get_my_text,Did you get my text?,1.33
+seanterry,cloned,chatter,chatter_my_phone_s_about_to_die,My phone's about to die.,1.55
+seanterry,cloned,chatter,chatter_it_s_supposed_to_storm_later,It's supposed to storm later.,1.67
+seanterry,cloned,chatter,chatter_i_m_so_tired_today,I'm so tired today.,1.48
+seanterry,cloned,chatter,chatter_honestly_i_have_no_idea,"Honestly, I have no idea.",1.67
+seanterry,cloned,chatter,chatter_anyway_like_i_was_saying,"Anyway, like I was saying...",1.77
+seanterry,cloned,chatter,chatter_oh_hey_over_here,"Oh, hey! Over here!",1.55
+seanterry,cloned,chatter,chatter_ha_yeah,Ha! Yeah.,1.13
+seanterry,cloned,chatter,chatter_okay_sounds_good,"Okay, sounds good.",1.37
+seanterry,cloned,chatter,chatter_nah_i_m_good_thanks,"Nah, I'm good, thanks.",1.72
+linda,designed,greet,greet_hey_how_s_it_going,"Hey, how's it going?",1.15
+linda,designed,greet,greet_yo_what_s_up,"Yo, what's up?",1.36
+linda,designed,greet,greet_hey_good_morning,"Hey, good morning.",1.14
+linda,designed,greet,greet_morning,Morning.,0.56
+linda,designed,greet,greet_good_morning,Good morning!,0.79
+linda,designed,greet,greet_afternoon,Afternoon.,0.79
+linda,designed,greet,greet_good_afternoon,Good afternoon.,1.08
+linda,designed,greet,greet_evening,Evening.,0.60
+linda,designed,greet,greet_good_evening,Good evening.,0.68
+linda,designed,greet,greet_hey_there,Hey there.,0.68
+linda,designed,greet,greet_hi,Hi.,0.64
+linda,designed,greet,greet_hello,Hello.,0.75
+linda,designed,greet,greet_hey,Hey.,0.63
+linda,designed,greet,greet_how_are_you_doing,How are you doing?,0.87
+linda,designed,greet,greet_how_you_doing,How you doing?,0.77
+linda,designed,greet,greet_what_s_going_on,What's going on?,0.91
+linda,designed,greet,greet_hey_nice_to_see_you,"Hey, nice to see you.",1.83
+linda,designed,greet,greet_long_time_no_see,Long time no see!,1.64
+linda,designed,greet,greet_hey_man,Hey man.,0.70
+linda,designed,greet,greet_what_s_new,What's new?,0.80
+linda,designed,greet,greet_beautiful_day_huh,"Beautiful day, huh?",1.35
+linda,designed,greet,greet_hot_one_today_isn_t_it,"Hot one today, isn't it?",1.45
+linda,designed,greet,greet_cold_out_here_today,Cold out here today.,1.14
+linda,designed,greet,greet_looks_like_rain,Looks like rain.,1.06
+linda,designed,greet,greet_nice_day_for_a_walk,Nice day for a walk.,1.91
+linda,designed,greet,greet_can_i_help_you,Can I help you?,0.74
+linda,designed,greet,greet_need_something,Need something?,0.90
+linda,designed,polite,polite_excuse_me,Excuse me.,0.83
+linda,designed,polite,polite_pardon_me,Pardon me.,0.71
+linda,designed,polite,polite_sorry_excuse_me,"Sorry, excuse me.",1.46
+linda,designed,polite,polite_oh_sorry,"Oh, sorry.",0.89
+linda,designed,polite,polite_watch_it,Watch it!,0.66
+linda,designed,polite,polite_careful_there,Careful there.,0.86
+linda,designed,polite,polite_thanks,Thanks.,0.58
+linda,designed,polite,polite_thank_you,Thank you.,0.76
+linda,designed,polite,polite_no_problem,No problem.,0.84
+linda,designed,polite,polite_you_re_welcome,You're welcome.,0.79
+linda,designed,polite,polite_sure_thing,Sure thing.,0.76
+linda,designed,bye,bye_have_a_good_one,Have a good one.,0.83
+linda,designed,bye,bye_take_care,Take care.,0.62
+linda,designed,bye,bye_see_you_later,See you later.,0.89
+linda,designed,bye,bye_see_ya,See ya.,0.49
+linda,designed,bye,bye_catch_you_later,Catch you later.,0.92
+linda,designed,bye,bye_have_a_good_day,Have a good day.,0.93
+linda,designed,bye,bye_have_a_nice_day,Have a nice day!,1.01
+linda,designed,bye,bye_have_a_good_night,Have a good night.,0.93
+linda,designed,bye,bye_take_it_easy,Take it easy.,0.86
+linda,designed,bye,bye_bye_now,Bye now.,0.81
+linda,designed,bye,bye_later,Later.,0.49
+linda,designed,bye,bye_stay_safe_out_there,Stay safe out there.,1.35
+linda,designed,chatter,chatter_yeah_i_know_right,"Yeah, I know, right?",1.90
+linda,designed,chatter,chatter_no_way_seriously,No way. Seriously?,1.89
+linda,designed,chatter,chatter_i_told_him_that_already,I told him that already.,1.69
+linda,designed,chatter,chatter_where_are_we_eating_tonight,Where are we eating tonight?,1.38
+linda,designed,chatter,chatter_i_don_t_know_what_do_you_want,"I don't know, what do you want?",2.13
+linda,designed,chatter,chatter_did_you_see_the_game_last_night,Did you see the game last night?,1.48
+linda,designed,chatter,chatter_traffic_was_insane_this_morning,Traffic was insane this morning.,2.49
+linda,designed,chatter,chatter_i_m_running_late_i_gotta_go,"I'm running late, I gotta go.",2.60
+linda,designed,chatter,chatter_hang_on_let_me_call_you_back,"Hang on, let me call you back.",1.95
+linda,designed,chatter,chatter_oh_my_god_that_s_hilarious,"Oh my God, that's hilarious.",2.08
+linda,designed,chatter,chatter_yeah_yeah_totally,"Yeah, yeah, totally.",1.70
+linda,designed,chatter,chatter_mm_hmm,Mm-hmm.,0.77
+linda,designed,chatter,chatter_uh_huh,Uh-huh.,0.47
+linda,designed,chatter,chatter_right_right,"Right, right.",0.99
+linda,designed,chatter,chatter_that_s_what_i_m_saying,That's what I'm saying!,1.33
+linda,designed,chatter,chatter_i_can_t_believe_it_s_already_friday,I can't believe it's already Friday.,2.04
+linda,designed,chatter,chatter_we_should_grab_coffee_sometime,We should grab coffee sometime.,1.70
+linda,designed,chatter,chatter_which_way_is_the_train_station,Which way is the train station?,1.81
+linda,designed,chatter,chatter_it_s_just_up_the_street_on_the_left,It's just up the street on the left.,1.76
+linda,designed,chatter,chatter_i_think_we_parked_on_the_other_side,I think we parked on the other side.,1.94
+linda,designed,chatter,chatter_how_much_was_it,How much was it?,0.95
+linda,designed,chatter,chatter_that_s_way_too_expensive,That's way too expensive.,1.49
+linda,designed,chatter,chatter_hold_on_i_dropped_something,"Hold on, I dropped something.",2.19
+linda,designed,chatter,chatter_wait_up,Wait up!,0.68
+linda,designed,chatter,chatter_come_on_we_re_gonna_miss_it,"Come on, we're gonna miss it.",1.61
+linda,designed,chatter,chatter_i_ll_meet_you_there,I'll meet you there.,0.92
+linda,designed,chatter,chatter_did_you_get_my_text,Did you get my text?,1.13
+linda,designed,chatter,chatter_my_phone_s_about_to_die,My phone's about to die.,1.52
+linda,designed,chatter,chatter_it_s_supposed_to_storm_later,It's supposed to storm later.,1.50
+linda,designed,chatter,chatter_i_m_so_tired_today,I'm so tired today.,1.50
+linda,designed,chatter,chatter_honestly_i_have_no_idea,"Honestly, I have no idea.",1.87
+linda,designed,chatter,chatter_anyway_like_i_was_saying,"Anyway, like I was saying...",1.63
+linda,designed,chatter,chatter_oh_hey_over_here,"Oh, hey! Over here!",1.33
+linda,designed,chatter,chatter_ha_yeah,Ha! Yeah.,1.21
+linda,designed,chatter,chatter_okay_sounds_good,"Okay, sounds good.",1.54
+linda,designed,chatter,chatter_nah_i_m_good_thanks,"Nah, I'm good, thanks.",1.79
+frank,designed,greet,greet_hey_how_s_it_going,"Hey, how's it going?",1.51
+frank,designed,greet,greet_yo_what_s_up,"Yo, what's up?",1.55
+frank,designed,greet,greet_hey_good_morning,"Hey, good morning.",1.06
+frank,designed,greet,greet_morning,Morning.,0.57
+frank,designed,greet,greet_good_morning,Good morning!,0.64
+frank,designed,greet,greet_afternoon,Afternoon.,0.96
+frank,designed,greet,greet_good_afternoon,Good afternoon.,1.04
+frank,designed,greet,greet_evening,Evening.,0.64
+frank,designed,greet,greet_good_evening,Good evening.,0.80
+frank,designed,greet,greet_hey_there,Hey there.,0.68
+frank,designed,greet,greet_hi,Hi.,0.67
+frank,designed,greet,greet_hello,Hello.,0.61
+frank,designed,greet,greet_hey,Hey.,0.50
+frank,designed,greet,greet_how_are_you_doing,How are you doing?,0.98
+frank,designed,greet,greet_how_you_doing,How you doing?,0.81
+frank,designed,greet,greet_what_s_going_on,What's going on?,0.90
+frank,designed,greet,greet_hey_nice_to_see_you,"Hey, nice to see you.",1.92
+frank,designed,greet,greet_long_time_no_see,Long time no see!,1.52
+frank,designed,greet,greet_hey_man,Hey man.,0.75
+frank,designed,greet,greet_what_s_new,What's new?,0.77
+frank,designed,greet,greet_beautiful_day_huh,"Beautiful day, huh?",1.16
+frank,designed,greet,greet_hot_one_today_isn_t_it,"Hot one today, isn't it?",1.76
+frank,designed,greet,greet_cold_out_here_today,Cold out here today.,1.24
+frank,designed,greet,greet_looks_like_rain,Looks like rain.,1.00
+frank,designed,greet,greet_nice_day_for_a_walk,Nice day for a walk.,1.43
+frank,designed,greet,greet_can_i_help_you,Can I help you?,0.89
+frank,designed,greet,greet_need_something,Need something?,0.98
+frank,designed,polite,polite_excuse_me,Excuse me.,0.96
+frank,designed,polite,polite_pardon_me,Pardon me.,0.76
+frank,designed,polite,polite_sorry_excuse_me,"Sorry, excuse me.",1.72
+frank,designed,polite,polite_oh_sorry,"Oh, sorry.",1.04
+frank,designed,polite,polite_watch_it,Watch it!,0.73
+frank,designed,polite,polite_careful_there,Careful there.,0.85
+frank,designed,polite,polite_thanks,Thanks.,0.63
+frank,designed,polite,polite_thank_you,Thank you.,0.69
+frank,designed,polite,polite_no_problem,No problem.,0.76
+frank,designed,polite,polite_you_re_welcome,You're welcome.,0.65
+frank,designed,polite,polite_sure_thing,Sure thing.,0.98
+frank,designed,bye,bye_have_a_good_one,Have a good one.,0.80
+frank,designed,bye,bye_take_care,Take care.,0.77
+frank,designed,bye,bye_see_you_later,See you later.,0.89
+frank,designed,bye,bye_see_ya,See ya.,0.61
+frank,designed,bye,bye_catch_you_later,Catch you later.,0.80
+frank,designed,bye,bye_have_a_good_day,Have a good day.,1.14
+frank,designed,bye,bye_have_a_nice_day,Have a nice day!,0.94
+frank,designed,bye,bye_have_a_good_night,Have a good night.,0.92
+frank,designed,bye,bye_take_it_easy,Take it easy.,0.85
+frank,designed,bye,bye_bye_now,Bye now.,0.77
+frank,designed,bye,bye_later,Later.,0.66
+frank,designed,bye,bye_stay_safe_out_there,Stay safe out there.,1.22
+frank,designed,chatter,chatter_yeah_i_know_right,"Yeah, I know, right?",1.80
+frank,designed,chatter,chatter_no_way_seriously,No way. Seriously?,1.89
+frank,designed,chatter,chatter_i_told_him_that_already,I told him that already.,1.37
+frank,designed,chatter,chatter_where_are_we_eating_tonight,Where are we eating tonight?,1.48
+frank,designed,chatter,chatter_i_don_t_know_what_do_you_want,"I don't know, what do you want?",2.02
+frank,designed,chatter,chatter_did_you_see_the_game_last_night,Did you see the game last night?,1.52
+frank,designed,chatter,chatter_traffic_was_insane_this_morning,Traffic was insane this morning.,2.09
+frank,designed,chatter,chatter_i_m_running_late_i_gotta_go,"I'm running late, I gotta go.",2.55
+frank,designed,chatter,chatter_hang_on_let_me_call_you_back,"Hang on, let me call you back.",2.20
+frank,designed,chatter,chatter_oh_my_god_that_s_hilarious,"Oh my God, that's hilarious.",2.06
+frank,designed,chatter,chatter_yeah_yeah_totally,"Yeah, yeah, totally.",1.70
+frank,designed,chatter,chatter_mm_hmm,Mm-hmm.,0.84
+frank,designed,chatter,chatter_uh_huh,Uh-huh.,0.65
+frank,designed,chatter,chatter_right_right,"Right, right.",1.12
+frank,designed,chatter,chatter_that_s_what_i_m_saying,That's what I'm saying!,1.31
+frank,designed,chatter,chatter_i_can_t_believe_it_s_already_friday,I can't believe it's already Friday.,2.25
+frank,designed,chatter,chatter_we_should_grab_coffee_sometime,We should grab coffee sometime.,1.83
+frank,designed,chatter,chatter_which_way_is_the_train_station,Which way is the train station?,1.79
+frank,designed,chatter,chatter_it_s_just_up_the_street_on_the_left,It's just up the street on the left.,2.00
+frank,designed,chatter,chatter_i_think_we_parked_on_the_other_side,I think we parked on the other side.,1.95
+frank,designed,chatter,chatter_how_much_was_it,How much was it?,0.96
+frank,designed,chatter,chatter_that_s_way_too_expensive,That's way too expensive.,1.61
+frank,designed,chatter,chatter_hold_on_i_dropped_something,"Hold on, I dropped something.",1.59
+frank,designed,chatter,chatter_wait_up,Wait up!,0.63
+frank,designed,chatter,chatter_come_on_we_re_gonna_miss_it,"Come on, we're gonna miss it.",1.38
+frank,designed,chatter,chatter_i_ll_meet_you_there,I'll meet you there.,1.11
+frank,designed,chatter,chatter_did_you_get_my_text,Did you get my text?,1.11
+frank,designed,chatter,chatter_my_phone_s_about_to_die,My phone's about to die.,1.77
+frank,designed,chatter,chatter_it_s_supposed_to_storm_later,It's supposed to storm later.,1.63
+frank,designed,chatter,chatter_i_m_so_tired_today,I'm so tired today.,1.39
+frank,designed,chatter,chatter_honestly_i_have_no_idea,"Honestly, I have no idea.",2.04
+frank,designed,chatter,chatter_anyway_like_i_was_saying,"Anyway, like I was saying...",1.49
+frank,designed,chatter,chatter_oh_hey_over_here,"Oh, hey! Over here!",1.53
+frank,designed,chatter,chatter_ha_yeah,Ha! Yeah.,1.36
+frank,designed,chatter,chatter_okay_sounds_good,"Okay, sounds good.",1.59
+frank,designed,chatter,chatter_nah_i_m_good_thanks,"Nah, I'm good, thanks.",1.83
+kyle,designed,greet,greet_hey_how_s_it_going,"Hey, how's it going?",1.17
+kyle,designed,greet,greet_yo_what_s_up,"Yo, what's up?",1.19
+kyle,designed,greet,greet_hey_good_morning,"Hey, good morning.",1.27
+kyle,designed,greet,greet_morning,Morning.,0.46
+kyle,designed,greet,greet_good_morning,Good morning!,0.67
+kyle,designed,greet,greet_afternoon,Afternoon.,0.60
+kyle,designed,greet,greet_good_afternoon,Good afternoon.,0.75
+kyle,designed,greet,greet_evening,Evening.,0.55
+kyle,designed,greet,greet_good_evening,Good evening.,0.53
+kyle,designed,greet,greet_hey_there,Hey there.,0.43
+kyle,designed,greet,greet_hi,Hi.,0.45
+kyle,designed,greet,greet_hello,Hello.,0.41
+kyle,designed,greet,greet_hey,Hey.,0.30
+kyle,designed,greet,greet_how_are_you_doing,How are you doing?,0.76
+kyle,designed,greet,greet_how_you_doing,How you doing?,0.63
+kyle,designed,greet,greet_what_s_going_on,What's going on?,0.89
+kyle,designed,greet,greet_hey_nice_to_see_you,"Hey, nice to see you.",1.88
+kyle,designed,greet,greet_long_time_no_see,Long time no see!,1.25
+kyle,designed,greet,greet_hey_man,Hey man.,0.53
+kyle,designed,greet,greet_what_s_new,What's new?,0.59
+kyle,designed,greet,greet_beautiful_day_huh,"Beautiful day, huh?",1.05
+kyle,designed,greet,greet_hot_one_today_isn_t_it,"Hot one today, isn't it?",1.16
+kyle,designed,greet,greet_cold_out_here_today,Cold out here today.,0.85
+kyle,designed,greet,greet_looks_like_rain,Looks like rain.,0.85
+kyle,designed,greet,greet_nice_day_for_a_walk,Nice day for a walk.,1.09
+kyle,designed,greet,greet_can_i_help_you,Can I help you?,0.66
+kyle,designed,greet,greet_need_something,Need something?,0.75
+kyle,designed,polite,polite_excuse_me,Excuse me.,0.64
+kyle,designed,polite,polite_pardon_me,Pardon me.,0.57
+kyle,designed,polite,polite_sorry_excuse_me,"Sorry, excuse me.",1.17
+kyle,designed,polite,polite_oh_sorry,"Oh, sorry.",1.35
+kyle,designed,polite,polite_watch_it,Watch it!,0.47
+kyle,designed,polite,polite_careful_there,Careful there.,0.62
+kyle,designed,polite,polite_thanks,Thanks.,0.54
+kyle,designed,polite,polite_thank_you,Thank you.,0.47
+kyle,designed,polite,polite_no_problem,No problem.,0.88
+kyle,designed,polite,polite_you_re_welcome,You're welcome.,0.63
+kyle,designed,polite,polite_sure_thing,Sure thing.,0.57
+kyle,designed,bye,bye_have_a_good_one,Have a good one.,0.64
+kyle,designed,bye,bye_take_care,Take care.,0.56
+kyle,designed,bye,bye_see_you_later,See you later.,0.65
+kyle,designed,bye,bye_see_ya,See ya.,0.49
+kyle,designed,bye,bye_catch_you_later,Catch you later.,0.66
+kyle,designed,bye,bye_have_a_good_day,Have a good day.,0.71
+kyle,designed,bye,bye_have_a_nice_day,Have a nice day!,0.93
+kyle,designed,bye,bye_have_a_good_night,Have a good night.,0.63
+kyle,designed,bye,bye_take_it_easy,Take it easy.,0.61
+kyle,designed,bye,bye_bye_now,Bye now.,0.55
+kyle,designed,bye,bye_later,Later.,0.44
+kyle,designed,bye,bye_stay_safe_out_there,Stay safe out there.,1.03
+kyle,designed,chatter,chatter_yeah_i_know_right,"Yeah, I know, right?",1.46
+kyle,designed,chatter,chatter_no_way_seriously,No way. Seriously?,1.70
+kyle,designed,chatter,chatter_i_told_him_that_already,I told him that already.,1.12
+kyle,designed,chatter,chatter_where_are_we_eating_tonight,Where are we eating tonight?,0.94
+kyle,designed,chatter,chatter_i_don_t_know_what_do_you_want,"I don't know, what do you want?",1.64
+kyle,designed,chatter,chatter_did_you_see_the_game_last_night,Did you see the game last night?,1.26
+kyle,designed,chatter,chatter_traffic_was_insane_this_morning,Traffic was insane this morning.,1.59
+kyle,designed,chatter,chatter_i_m_running_late_i_gotta_go,"I'm running late, I gotta go.",1.44
+kyle,designed,chatter,chatter_hang_on_let_me_call_you_back,"Hang on, let me call you back.",1.31
+kyle,designed,chatter,chatter_oh_my_god_that_s_hilarious,"Oh my God, that's hilarious.",1.83
+kyle,designed,chatter,chatter_yeah_yeah_totally,"Yeah, yeah, totally.",1.32
+kyle,designed,chatter,chatter_mm_hmm,Mm-hmm.,0.51
+kyle,designed,chatter,chatter_uh_huh,Uh-huh.,0.46
+kyle,designed,chatter,chatter_right_right,"Right, right.",0.92
+kyle,designed,chatter,chatter_that_s_what_i_m_saying,That's what I'm saying!,0.95
+kyle,designed,chatter,chatter_i_can_t_believe_it_s_already_friday,I can't believe it's already Friday.,1.69
+kyle,designed,chatter,chatter_we_should_grab_coffee_sometime,We should grab coffee sometime.,1.51
+kyle,designed,chatter,chatter_which_way_is_the_train_station,Which way is the train station?,1.54
+kyle,designed,chatter,chatter_it_s_just_up_the_street_on_the_left,It's just up the street on the left.,1.41
+kyle,designed,chatter,chatter_i_think_we_parked_on_the_other_side,I think we parked on the other side.,1.52
+kyle,designed,chatter,chatter_how_much_was_it,How much was it?,0.67
+kyle,designed,chatter,chatter_that_s_way_too_expensive,That's way too expensive.,1.45
+kyle,designed,chatter,chatter_hold_on_i_dropped_something,"Hold on, I dropped something.",1.80
+kyle,designed,chatter,chatter_wait_up,Wait up!,0.58
+kyle,designed,chatter,chatter_come_on_we_re_gonna_miss_it,"Come on, we're gonna miss it.",1.23
+kyle,designed,chatter,chatter_i_ll_meet_you_there,I'll meet you there.,0.83
+kyle,designed,chatter,chatter_did_you_get_my_text,Did you get my text?,0.89
+kyle,designed,chatter,chatter_my_phone_s_about_to_die,My phone's about to die.,1.38
+kyle,designed,chatter,chatter_it_s_supposed_to_storm_later,It's supposed to storm later.,1.31
+kyle,designed,chatter,chatter_i_m_so_tired_today,I'm so tired today.,1.21
+kyle,designed,chatter,chatter_honestly_i_have_no_idea,"Honestly, I have no idea.",1.33
+kyle,designed,chatter,chatter_anyway_like_i_was_saying,"Anyway, like I was saying...",2.07
+kyle,designed,chatter,chatter_oh_hey_over_here,"Oh, hey! Over here!",1.73
+kyle,designed,chatter,chatter_ha_yeah,Ha! Yeah.,0.98
+kyle,designed,chatter,chatter_okay_sounds_good,"Okay, sounds good.",1.25
+kyle,designed,chatter,chatter_nah_i_m_good_thanks,"Nah, I'm good, thanks.",1.64
+Ryan,builtin,greet,greet_hey_how_s_it_going,"Hey, how's it going?",1.35
+Ryan,builtin,greet,greet_yo_what_s_up,"Yo, what's up?",1.15
+Ryan,builtin,greet,greet_hey_good_morning,"Hey, good morning.",1.20
+Ryan,builtin,greet,greet_morning,Morning.,0.52
+Ryan,builtin,greet,greet_good_morning,Good morning!,1.18
+Ryan,builtin,greet,greet_afternoon,Afternoon.,0.95
+Ryan,builtin,greet,greet_good_afternoon,Good afternoon.,0.83
+Ryan,builtin,greet,greet_evening,Evening.,0.63
+Ryan,builtin,greet,greet_good_evening,Good evening.,0.76
+Ryan,builtin,greet,greet_hey_there,Hey there.,0.69
+Ryan,builtin,greet,greet_hi,Hi.,0.41
+Ryan,builtin,greet,greet_hello,Hello.,0.63
+Ryan,builtin,greet,greet_hey,Hey.,0.32
+Ryan,builtin,greet,greet_how_are_you_doing,How are you doing?,0.96
+Ryan,builtin,greet,greet_how_you_doing,How you doing?,0.95
+Ryan,builtin,greet,greet_what_s_going_on,What's going on?,2.28
+Ryan,builtin,greet,greet_hey_nice_to_see_you,"Hey, nice to see you.",1.73
+Ryan,builtin,greet,greet_long_time_no_see,Long time no see!,1.09
+Ryan,builtin,greet,greet_what_s_new,What's new?,0.68
+Ryan,builtin,greet,greet_hey_man,Hey man.,0.95
+Ryan,builtin,greet,greet_beautiful_day_huh,"Beautiful day, huh?",1.36
+Ryan,builtin,greet,greet_cold_out_here_today,Cold out here today.,1.07
+Ryan,builtin,greet,greet_hot_one_today_isn_t_it,"Hot one today, isn't it?",1.45
+Ryan,builtin,greet,greet_looks_like_rain,Looks like rain.,0.95
+Ryan,builtin,greet,greet_nice_day_for_a_walk,Nice day for a walk.,1.37
+Ryan,builtin,greet,greet_can_i_help_you,Can I help you?,0.90
+Ryan,builtin,greet,greet_need_something,Need something?,0.90
+Ryan,builtin,polite,polite_excuse_me,Excuse me.,0.91
+Ryan,builtin,polite,polite_pardon_me,Pardon me.,0.71
+Ryan,builtin,polite,polite_sorry_excuse_me,"Sorry, excuse me.",2.22
+Ryan,builtin,polite,polite_oh_sorry,"Oh, sorry.",0.91
+Ryan,builtin,polite,polite_watch_it,Watch it!,0.57
+Ryan,builtin,polite,polite_careful_there,Careful there.,1.37
+Ryan,builtin,polite,polite_thanks,Thanks.,0.65
+Ryan,builtin,polite,polite_thank_you,Thank you.,0.65
+Ryan,builtin,polite,polite_no_problem,No problem.,0.80
+Ryan,builtin,polite,polite_you_re_welcome,You're welcome.,0.92
+Ryan,builtin,polite,polite_sure_thing,Sure thing.,1.79
+Ryan,builtin,bye,bye_have_a_good_one,Have a good one.,0.90
+Ryan,builtin,bye,bye_take_care,Take care.,1.27
+Ryan,builtin,bye,bye_see_you_later,See you later.,0.85
+Ryan,builtin,bye,bye_see_ya,See ya.,0.59
+Ryan,builtin,bye,bye_catch_you_later,Catch you later.,1.07
+Ryan,builtin,bye,bye_have_a_good_day,Have a good day.,0.74
+Ryan,builtin,bye,bye_have_a_nice_day,Have a nice day!,1.00
+Ryan,builtin,bye,bye_have_a_good_night,Have a good night.,0.79
+Ryan,builtin,bye,bye_take_it_easy,Take it easy.,0.91
+Ryan,builtin,bye,bye_bye_now,Bye now.,0.54
+Ryan,builtin,bye,bye_later,Later.,0.57
+Ryan,builtin,bye,bye_stay_safe_out_there,Stay safe out there.,1.60
+Ryan,builtin,chatter,chatter_yeah_i_know_right,"Yeah, I know, right?",0.92
+Ryan,builtin,chatter,chatter_no_way_seriously,No way. Seriously?,2.52
+Ryan,builtin,chatter,chatter_i_told_him_that_already,I told him that already.,1.71
+Ryan,builtin,chatter,chatter_where_are_we_eating_tonight,Where are we eating tonight?,1.44
+Ryan,builtin,chatter,chatter_i_don_t_know_what_do_you_want,"I don't know, what do you want?",1.30
+Ryan,builtin,chatter,chatter_did_you_see_the_game_last_night,Did you see the game last night?,1.74
+Ryan,builtin,chatter,chatter_traffic_was_insane_this_morning,Traffic was insane this morning.,2.06
+Ryan,builtin,chatter,chatter_i_m_running_late_i_gotta_go,"I'm running late, I gotta go.",1.98
+Ryan,builtin,chatter,chatter_hang_on_let_me_call_you_back,"Hang on, let me call you back.",1.95
+Ryan,builtin,chatter,chatter_oh_my_god_that_s_hilarious,"Oh my God, that's hilarious.",5.70
+Ryan,builtin,chatter,chatter_yeah_yeah_totally,"Yeah, yeah, totally.",1.57
+Ryan,builtin,chatter,chatter_mm_hmm,Mm-hmm.,0.64
+Ryan,builtin,chatter,chatter_uh_huh,Uh-huh.,0.57
+Ryan,builtin,chatter,chatter_right_right,"Right, right.",1.33
+Ryan,builtin,chatter,chatter_that_s_what_i_m_saying,That's what I'm saying!,1.05
+Ryan,builtin,chatter,chatter_i_can_t_believe_it_s_already_friday,I can't believe it's already Friday.,2.26
+Ryan,builtin,chatter,chatter_we_should_grab_coffee_sometime,We should grab coffee sometime.,3.35
+Ryan,builtin,chatter,chatter_which_way_is_the_train_station,Which way is the train station?,1.57
+Ryan,builtin,chatter,chatter_it_s_just_up_the_street_on_the_left,It's just up the street on the left.,2.13
+Ryan,builtin,chatter,chatter_i_think_we_parked_on_the_other_side,I think we parked on the other side.,3.91
+Ryan,builtin,chatter,chatter_how_much_was_it,How much was it?,1.75
+Ryan,builtin,chatter,chatter_that_s_way_too_expensive,That's way too expensive.,2.38
+Ryan,builtin,chatter,chatter_hold_on_i_dropped_something,"Hold on, I dropped something.",1.61
+Ryan,builtin,chatter,chatter_wait_up,Wait up!,0.64
+Ryan,builtin,chatter,chatter_come_on_we_re_gonna_miss_it,"Come on, we're gonna miss it.",2.30
+Ryan,builtin,chatter,chatter_i_ll_meet_you_there,I'll meet you there.,1.06
+Ryan,builtin,chatter,chatter_did_you_get_my_text,Did you get my text?,1.19
+Ryan,builtin,chatter,chatter_my_phone_s_about_to_die,My phone's about to die.,2.19
+Ryan,builtin,chatter,chatter_it_s_supposed_to_storm_later,It's supposed to storm later.,2.03
+Ryan,builtin,chatter,chatter_i_m_so_tired_today,I'm so tired today.,1.72
+Ryan,builtin,chatter,chatter_honestly_i_have_no_idea,"Honestly, I have no idea.",2.02
+Ryan,builtin,chatter,chatter_anyway_like_i_was_saying,"Anyway, like I was saying...",1.81
+Ryan,builtin,chatter,chatter_oh_hey_over_here,"Oh, hey! Over here!",1.70
+Ryan,builtin,chatter,chatter_ha_yeah,Ha! Yeah.,1.26
+Ryan,builtin,chatter,chatter_okay_sounds_good,"Okay, sounds good.",1.23
+Ryan,builtin,chatter,chatter_nah_i_m_good_thanks,"Nah, I'm good, thanks.",1.65
+Vivian,builtin,greet,greet_hey_how_s_it_going,"Hey, how's it going?",1.75
+Vivian,builtin,greet,greet_yo_what_s_up,"Yo, what's up?",1.07
+Vivian,builtin,greet,greet_hey_good_morning,"Hey, good morning.",0.86
+Vivian,builtin,greet,greet_morning,Morning.,0.91
+Vivian,builtin,greet,greet_good_morning,Good morning!,0.81
+Vivian,builtin,greet,greet_afternoon,Afternoon.,0.90
+Vivian,builtin,greet,greet_good_afternoon,Good afternoon.,0.91
+Vivian,builtin,greet,greet_evening,Evening.,0.69
+Vivian,builtin,greet,greet_good_evening,Good evening.,0.81
+Vivian,builtin,greet,greet_hey_there,Hey there.,0.72
+Vivian,builtin,greet,greet_hi,Hi.,0.54
+Vivian,builtin,greet,greet_hello,Hello.,0.58
+Vivian,builtin,greet,greet_hey,Hey.,0.80
+Vivian,builtin,greet,greet_how_are_you_doing,How are you doing?,0.91
+Vivian,builtin,greet,greet_how_you_doing,How you doing?,0.93
+Vivian,builtin,greet,greet_what_s_going_on,What's going on?,1.11
+Vivian,builtin,greet,greet_hey_nice_to_see_you,"Hey, nice to see you.",1.88
+Vivian,builtin,greet,greet_long_time_no_see,Long time no see!,1.22
+Vivian,builtin,greet,greet_hey_man,Hey man.,0.65
+Vivian,builtin,greet,greet_what_s_new,What's new?,1.03
+Vivian,builtin,greet,greet_beautiful_day_huh,"Beautiful day, huh?",1.22
+Vivian,builtin,greet,greet_hot_one_today_isn_t_it,"Hot one today, isn't it?",1.71
+Vivian,builtin,greet,greet_cold_out_here_today,Cold out here today.,1.31
+Vivian,builtin,greet,greet_looks_like_rain,Looks like rain.,1.17
+Vivian,builtin,greet,greet_nice_day_for_a_walk,Nice day for a walk.,1.38
+Vivian,builtin,greet,greet_can_i_help_you,Can I help you?,0.79
+Vivian,builtin,greet,greet_need_something,Need something?,0.68
+Vivian,builtin,polite,polite_excuse_me,Excuse me.,0.86
+Vivian,builtin,polite,polite_pardon_me,Pardon me.,0.75
+Vivian,builtin,polite,polite_sorry_excuse_me,"Sorry, excuse me.",1.93
+Vivian,builtin,polite,polite_oh_sorry,"Oh, sorry.",1.23
+Vivian,builtin,polite,polite_watch_it,Watch it!,0.65
+Vivian,builtin,polite,polite_careful_there,Careful there.,0.80
+Vivian,builtin,polite,polite_thanks,Thanks.,0.55
+Vivian,builtin,polite,polite_thank_you,Thank you.,0.55
+Vivian,builtin,polite,polite_no_problem,No problem.,0.99
+Vivian,builtin,polite,polite_you_re_welcome,You're welcome.,0.85
+Vivian,builtin,polite,polite_sure_thing,Sure thing.,0.95
+Vivian,builtin,bye,bye_have_a_good_one,Have a good one.,0.76
+Vivian,builtin,bye,bye_take_care,Take care.,0.87
+Vivian,builtin,bye,bye_see_you_later,See you later.,0.81
+Vivian,builtin,bye,bye_see_ya,See ya.,0.55
+Vivian,builtin,bye,bye_catch_you_later,Catch you later.,0.85
+Vivian,builtin,bye,bye_have_a_good_day,Have a good day.,1.13
+Vivian,builtin,bye,bye_have_a_nice_day,Have a nice day!,1.02
+Vivian,builtin,bye,bye_have_a_good_night,Have a good night.,1.05
+Vivian,builtin,bye,bye_take_it_easy,Take it easy.,0.89
+Vivian,builtin,bye,bye_bye_now,Bye now.,0.61
+Vivian,builtin,bye,bye_later,Later.,0.48
+Vivian,builtin,bye,bye_stay_safe_out_there,Stay safe out there.,1.19
+Vivian,builtin,chatter,chatter_yeah_i_know_right,"Yeah, I know, right?",2.01
+Vivian,builtin,chatter,chatter_no_way_seriously,No way. Seriously?,2.29
+Vivian,builtin,chatter,chatter_i_told_him_that_already,I told him that already.,1.51
+Vivian,builtin,chatter,chatter_where_are_we_eating_tonight,Where are we eating tonight?,1.64
+Vivian,builtin,chatter,chatter_i_don_t_know_what_do_you_want,"I don't know, what do you want?",1.91
+Vivian,builtin,chatter,chatter_did_you_see_the_game_last_night,Did you see the game last night?,1.47
+Vivian,builtin,chatter,chatter_traffic_was_insane_this_morning,Traffic was insane this morning.,2.06
+Vivian,builtin,chatter,chatter_i_m_running_late_i_gotta_go,"I'm running late, I gotta go.",2.11
+Vivian,builtin,chatter,chatter_hang_on_let_me_call_you_back,"Hang on, let me call you back.",2.19
+Vivian,builtin,chatter,chatter_oh_my_god_that_s_hilarious,"Oh my God, that's hilarious.",2.89
+Vivian,builtin,chatter,chatter_yeah_yeah_totally,"Yeah, yeah, totally.",1.67
+Vivian,builtin,chatter,chatter_mm_hmm,Mm-hmm.,0.64
+Vivian,builtin,chatter,chatter_uh_huh,Uh-huh.,0.50
+Vivian,builtin,chatter,chatter_right_right,"Right, right.",1.10
+Vivian,builtin,chatter,chatter_that_s_what_i_m_saying,That's what I'm saying!,1.33
+Vivian,builtin,chatter,chatter_i_can_t_believe_it_s_already_friday,I can't believe it's already Friday.,2.37
+Vivian,builtin,chatter,chatter_we_should_grab_coffee_sometime,We should grab coffee sometime.,1.77
+Vivian,builtin,chatter,chatter_which_way_is_the_train_station,Which way is the train station?,1.46
+Vivian,builtin,chatter,chatter_it_s_just_up_the_street_on_the_left,It's just up the street on the left.,2.25
+Vivian,builtin,chatter,chatter_i_think_we_parked_on_the_other_side,I think we parked on the other side.,2.12
+Vivian,builtin,chatter,chatter_how_much_was_it,How much was it?,1.27
+Vivian,builtin,chatter,chatter_that_s_way_too_expensive,That's way too expensive.,1.96
+Vivian,builtin,chatter,chatter_hold_on_i_dropped_something,"Hold on, I dropped something.",2.23
+Vivian,builtin,chatter,chatter_wait_up,Wait up!,0.72
+Vivian,builtin,chatter,chatter_come_on_we_re_gonna_miss_it,"Come on, we're gonna miss it.",1.57
+Vivian,builtin,chatter,chatter_i_ll_meet_you_there,I'll meet you there.,1.19
+Vivian,builtin,chatter,chatter_did_you_get_my_text,Did you get my text?,1.10
+Vivian,builtin,chatter,chatter_my_phone_s_about_to_die,My phone's about to die.,1.76
+Vivian,builtin,chatter,chatter_it_s_supposed_to_storm_later,It's supposed to storm later.,2.13
+Vivian,builtin,chatter,chatter_i_m_so_tired_today,I'm so tired today.,3.23
+Vivian,builtin,chatter,chatter_honestly_i_have_no_idea,"Honestly, I have no idea.",2.34
+Vivian,builtin,chatter,chatter_anyway_like_i_was_saying,"Anyway, like I was saying...",1.97
+Vivian,builtin,chatter,chatter_oh_hey_over_here,"Oh, hey! Over here!",1.89
+Vivian,builtin,chatter,chatter_ha_yeah,Ha! Yeah.,1.06
+Vivian,builtin,chatter,chatter_okay_sounds_good,"Okay, sounds good.",1.45
+Vivian,builtin,chatter,chatter_nah_i_m_good_thanks,"Nah, I'm good, thanks.",2.13
+Sohee,builtin,greet,greet_hey_how_s_it_going,"Hey, how's it going?",0.80
+Sohee,builtin,greet,greet_yo_what_s_up,"Yo, what's up?",1.05
+Sohee,builtin,greet,greet_hey_good_morning,"Hey, good morning.",1.28
+Sohee,builtin,greet,greet_morning,Morning.,0.86
+Sohee,builtin,greet,greet_good_morning,Good morning!,0.62
+Sohee,builtin,greet,greet_afternoon,Afternoon.,0.69
+Sohee,builtin,greet,greet_good_afternoon,Good afternoon.,1.09
+Sohee,builtin,greet,greet_evening,Evening.,0.71
+Sohee,builtin,greet,greet_good_evening,Good evening.,0.68
+Sohee,builtin,greet,greet_hey_there,Hey there.,0.77
+Sohee,builtin,greet,greet_hi,Hi.,0.68
+Sohee,builtin,greet,greet_hello,Hello.,0.57
+Sohee,builtin,greet,greet_how_are_you_doing,How are you doing?,0.85
+Sohee,builtin,greet,greet_hey,Hey.,0.36
+Sohee,builtin,greet,greet_how_you_doing,How you doing?,0.59
+Sohee,builtin,greet,greet_what_s_going_on,What's going on?,1.54
+Sohee,builtin,greet,greet_hey_nice_to_see_you,"Hey, nice to see you.",1.09
+Sohee,builtin,greet,greet_long_time_no_see,Long time no see!,1.32
+Sohee,builtin,greet,greet_what_s_new,What's new?,1.34
+Sohee,builtin,greet,greet_beautiful_day_huh,"Beautiful day, huh?",0.97
+Sohee,builtin,greet,greet_hot_one_today_isn_t_it,"Hot one today, isn't it?",1.58
+Sohee,builtin,greet,greet_cold_out_here_today,Cold out here today.,1.05
+Sohee,builtin,greet,greet_looks_like_rain,Looks like rain.,1.91
+Sohee,builtin,greet,greet_nice_day_for_a_walk,Nice day for a walk.,1.49
+Sohee,builtin,greet,greet_can_i_help_you,Can I help you?,0.65
+Sohee,builtin,greet,greet_need_something,Need something?,0.74
+Sohee,builtin,polite,polite_excuse_me,Excuse me.,0.66
+Sohee,builtin,polite,polite_pardon_me,Pardon me.,0.50
+Sohee,builtin,polite,polite_sorry_excuse_me,"Sorry, excuse me.",1.17
+Sohee,builtin,polite,polite_oh_sorry,"Oh, sorry.",0.75
+Sohee,builtin,polite,polite_watch_it,Watch it!,0.69
+Sohee,builtin,polite,polite_careful_there,Careful there.,0.81
+Sohee,builtin,polite,polite_thanks,Thanks.,0.52
+Sohee,builtin,polite,polite_thank_you,Thank you.,0.60
+Sohee,builtin,polite,polite_no_problem,No problem.,0.59
+Sohee,builtin,polite,polite_you_re_welcome,You're welcome.,0.96
+Sohee,builtin,polite,polite_sure_thing,Sure thing.,1.25
+Sohee,builtin,bye,bye_have_a_good_one,Have a good one.,0.62
+Sohee,builtin,bye,bye_take_care,Take care.,0.54
+Sohee,builtin,bye,bye_see_you_later,See you later.,0.66
+Sohee,builtin,bye,bye_see_ya,See ya.,0.60
+Sohee,builtin,bye,bye_catch_you_later,Catch you later.,0.68
+Sohee,builtin,bye,bye_have_a_good_day,Have a good day.,0.75
+Sohee,builtin,bye,bye_have_a_nice_day,Have a nice day!,1.15
+Sohee,builtin,bye,bye_have_a_good_night,Have a good night.,0.58
+Sohee,builtin,bye,bye_take_it_easy,Take it easy.,0.71
+Sohee,builtin,bye,bye_bye_now,Bye now.,0.48
+Sohee,builtin,bye,bye_later,Later.,0.45
+Sohee,builtin,bye,bye_stay_safe_out_there,Stay safe out there.,1.05
+Sohee,builtin,chatter,chatter_yeah_i_know_right,"Yeah, I know, right?",1.49
+Sohee,builtin,chatter,chatter_no_way_seriously,No way. Seriously?,1.86
+Sohee,builtin,chatter,chatter_i_told_him_that_already,I told him that already.,1.30
+Sohee,builtin,chatter,chatter_where_are_we_eating_tonight,Where are we eating tonight?,1.38
+Sohee,builtin,chatter,chatter_i_don_t_know_what_do_you_want,"I don't know, what do you want?",1.52
+Sohee,builtin,chatter,chatter_did_you_see_the_game_last_night,Did you see the game last night?,1.27
+Sohee,builtin,chatter,chatter_traffic_was_insane_this_morning,Traffic was insane this morning.,2.52
+Sohee,builtin,chatter,chatter_i_m_running_late_i_gotta_go,"I'm running late, I gotta go.",1.85
+Sohee,builtin,chatter,chatter_hang_on_let_me_call_you_back,"Hang on, let me call you back.",2.00
+Sohee,builtin,chatter,chatter_oh_my_god_that_s_hilarious,"Oh my God, that's hilarious.",4.13
+Sohee,builtin,chatter,chatter_yeah_yeah_totally,"Yeah, yeah, totally.",1.01
+Sohee,builtin,chatter,chatter_mm_hmm,Mm-hmm.,2.50
+Sohee,builtin,chatter,chatter_uh_huh,Uh-huh.,0.39
+Sohee,builtin,chatter,chatter_right_right,"Right, right.",0.81
+Sohee,builtin,chatter,chatter_that_s_what_i_m_saying,That's what I'm saying!,0.92
+Sohee,builtin,chatter,chatter_i_can_t_believe_it_s_already_friday,I can't believe it's already Friday.,1.93
+Sohee,builtin,chatter,chatter_we_should_grab_coffee_sometime,We should grab coffee sometime.,1.50
+Sohee,builtin,chatter,chatter_which_way_is_the_train_station,Which way is the train station?,1.94
+Sohee,builtin,chatter,chatter_it_s_just_up_the_street_on_the_left,It's just up the street on the left.,3.48
+Sohee,builtin,chatter,chatter_i_think_we_parked_on_the_other_side,I think we parked on the other side.,2.16
+Sohee,builtin,chatter,chatter_how_much_was_it,How much was it?,0.65
+Sohee,builtin,chatter,chatter_that_s_way_too_expensive,That's way too expensive.,1.51
+Sohee,builtin,chatter,chatter_hold_on_i_dropped_something,"Hold on, I dropped something.",2.50
+Sohee,builtin,chatter,chatter_wait_up,Wait up!,0.41
+Sohee,builtin,chatter,chatter_come_on_we_re_gonna_miss_it,"Come on, we're gonna miss it.",2.00
+Sohee,builtin,chatter,chatter_i_ll_meet_you_there,I'll meet you there.,1.13
+Sohee,builtin,chatter,chatter_did_you_get_my_text,Did you get my text?,1.16
+Sohee,builtin,chatter,chatter_my_phone_s_about_to_die,My phone's about to die.,1.06
+Sohee,builtin,chatter,chatter_it_s_supposed_to_storm_later,It's supposed to storm later.,1.89
+Sohee,builtin,chatter,chatter_i_m_so_tired_today,I'm so tired today.,3.51
+Sohee,builtin,chatter,chatter_honestly_i_have_no_idea,"Honestly, I have no idea.",4.50
+Sohee,builtin,chatter,chatter_anyway_like_i_was_saying,"Anyway, like I was saying...",1.39
+Sohee,builtin,chatter,chatter_oh_hey_over_here,"Oh, hey! Over here!",1.51
+Sohee,builtin,chatter,chatter_ha_yeah,Ha! Yeah.,0.58
+Sohee,builtin,chatter,chatter_okay_sounds_good,"Okay, sounds good.",2.37
+Sohee,builtin,chatter,chatter_nah_i_m_good_thanks,"Nah, I'm good, thanks.",1.49
+Eric,builtin,greet,greet_hey_how_s_it_going,"Hey, how's it going?",1.49
+Eric,builtin,greet,greet_yo_what_s_up,"Yo, what's up?",1.02
+Eric,builtin,greet,greet_hey_good_morning,"Hey, good morning.",1.15
+Eric,builtin,greet,greet_morning,Morning.,0.61
+Eric,builtin,greet,greet_good_morning,Good morning!,1.91
+Eric,builtin,greet,greet_afternoon,Afternoon.,0.93
+Eric,builtin,greet,greet_good_afternoon,Good afternoon.,0.99
+Eric,builtin,greet,greet_evening,Evening.,0.91
+Eric,builtin,greet,greet_good_evening,Good evening.,1.03
+Eric,builtin,greet,greet_hey_there,Hey there.,0.47
+Eric,builtin,greet,greet_hello,Hello.,0.72
+Eric,builtin,greet,greet_hey,Hey.,0.35
+Eric,builtin,greet,greet_how_are_you_doing,How are you doing?,1.43
+Eric,builtin,greet,greet_how_you_doing,How you doing?,0.91
+Eric,builtin,greet,greet_what_s_going_on,What's going on?,1.24
+Eric,builtin,greet,greet_hey_nice_to_see_you,"Hey, nice to see you.",1.29
+Eric,builtin,greet,greet_long_time_no_see,Long time no see!,1.54
+Eric,builtin,greet,greet_hey_man,Hey man.,0.58
+Eric,builtin,greet,greet_what_s_new,What's new?,0.67
+Eric,builtin,greet,greet_hot_one_today_isn_t_it,"Hot one today, isn't it?",3.42
+Eric,builtin,greet,greet_beautiful_day_huh,"Beautiful day, huh?",1.07
+Eric,builtin,greet,greet_cold_out_here_today,Cold out here today.,1.24
+Eric,builtin,greet,greet_looks_like_rain,Looks like rain.,1.48
+Eric,builtin,greet,greet_nice_day_for_a_walk,Nice day for a walk.,1.61
+Eric,builtin,greet,greet_can_i_help_you,Can I help you?,0.83
+Eric,builtin,greet,greet_need_something,Need something?,0.80
+Eric,builtin,polite,polite_excuse_me,Excuse me.,1.04
+Eric,builtin,polite,polite_pardon_me,Pardon me.,0.53
+Eric,builtin,polite,polite_sorry_excuse_me,"Sorry, excuse me.",0.87
+Eric,builtin,polite,polite_oh_sorry,"Oh, sorry.",1.38
+Eric,builtin,polite,polite_watch_it,Watch it!,0.67
+Eric,builtin,polite,polite_careful_there,Careful there.,1.05
+Eric,builtin,polite,polite_thanks,Thanks.,0.74
+Eric,builtin,polite,polite_thank_you,Thank you.,0.85
+Eric,builtin,polite,polite_no_problem,No problem.,0.65
+Eric,builtin,polite,polite_you_re_welcome,You're welcome.,1.01
+Eric,builtin,polite,polite_sure_thing,Sure thing.,1.16
+Eric,builtin,bye,bye_have_a_good_one,Have a good one.,1.05
+Eric,builtin,bye,bye_take_care,Take care.,0.87
+Eric,builtin,bye,bye_see_you_later,See you later.,0.98
+Eric,builtin,bye,bye_see_ya,See ya.,0.39
+Eric,builtin,bye,bye_catch_you_later,Catch you later.,0.82
+Eric,builtin,bye,bye_have_a_good_day,Have a good day.,0.95
+Eric,builtin,bye,bye_have_a_nice_day,Have a nice day!,0.95
+Eric,builtin,bye,bye_have_a_good_night,Have a good night.,0.62
+Eric,builtin,bye,bye_take_it_easy,Take it easy.,0.77
+Eric,builtin,bye,bye_bye_now,Bye now.,0.87
+Eric,builtin,bye,bye_later,Later.,0.51
+Eric,builtin,bye,bye_stay_safe_out_there,Stay safe out there.,1.37
+Eric,builtin,chatter,chatter_yeah_i_know_right,"Yeah, I know, right?",1.75
+Eric,builtin,chatter,chatter_no_way_seriously,No way. Seriously?,2.92
+Eric,builtin,chatter,chatter_i_told_him_that_already,I told him that already.,1.03
+Eric,builtin,chatter,chatter_where_are_we_eating_tonight,Where are we eating tonight?,1.27
+Eric,builtin,chatter,chatter_i_don_t_know_what_do_you_want,"I don't know, what do you want?",1.44
+Eric,builtin,chatter,chatter_did_you_see_the_game_last_night,Did you see the game last night?,2.23
+Eric,builtin,chatter,chatter_traffic_was_insane_this_morning,Traffic was insane this morning.,2.20
+Eric,builtin,chatter,chatter_i_m_running_late_i_gotta_go,"I'm running late, I gotta go.",1.41
+Eric,builtin,chatter,chatter_hang_on_let_me_call_you_back,"Hang on, let me call you back.",2.61
+Eric,builtin,chatter,chatter_oh_my_god_that_s_hilarious,"Oh my God, that's hilarious.",2.67
+Eric,builtin,chatter,chatter_yeah_yeah_totally,"Yeah, yeah, totally.",0.83
+Eric,builtin,chatter,chatter_mm_hmm,Mm-hmm.,1.09
+Eric,builtin,chatter,chatter_uh_huh,Uh-huh.,0.50
+Eric,builtin,chatter,chatter_right_right,"Right, right.",0.59
+Eric,builtin,chatter,chatter_that_s_what_i_m_saying,That's what I'm saying!,1.50
+Eric,builtin,chatter,chatter_i_can_t_believe_it_s_already_friday,I can't believe it's already Friday.,1.92
+Eric,builtin,chatter,chatter_we_should_grab_coffee_sometime,We should grab coffee sometime.,1.62
+Eric,builtin,chatter,chatter_which_way_is_the_train_station,Which way is the train station?,1.57
+Eric,builtin,chatter,chatter_it_s_just_up_the_street_on_the_left,It's just up the street on the left.,2.37
+Eric,builtin,chatter,chatter_i_think_we_parked_on_the_other_side,I think we parked on the other side.,1.60
+Eric,builtin,chatter,chatter_how_much_was_it,How much was it?,0.69
+Eric,builtin,chatter,chatter_that_s_way_too_expensive,That's way too expensive.,2.12
+Eric,builtin,chatter,chatter_hold_on_i_dropped_something,"Hold on, I dropped something.",1.95
+Eric,builtin,chatter,chatter_wait_up,Wait up!,2.89
+Eric,builtin,chatter,chatter_come_on_we_re_gonna_miss_it,"Come on, we're gonna miss it.",2.13
+Eric,builtin,chatter,chatter_i_ll_meet_you_there,I'll meet you there.,1.13
+Eric,builtin,chatter,chatter_did_you_get_my_text,Did you get my text?,1.00
+Eric,builtin,chatter,chatter_my_phone_s_about_to_die,My phone's about to die.,1.17
+Eric,builtin,chatter,chatter_it_s_supposed_to_storm_later,It's supposed to storm later.,1.55
+Eric,builtin,chatter,chatter_i_m_so_tired_today,I'm so tired today.,2.20
+Eric,builtin,chatter,chatter_honestly_i_have_no_idea,"Honestly, I have no idea.",2.39
+Eric,builtin,chatter,chatter_anyway_like_i_was_saying,"Anyway, like I was saying...",3.74
+Eric,builtin,chatter,chatter_oh_hey_over_here,"Oh, hey! Over here!",2.11
+Eric,builtin,chatter,chatter_ha_yeah,Ha! Yeah.,0.71
+Eric,builtin,chatter,chatter_okay_sounds_good,"Okay, sounds good.",1.17
+Eric,builtin,chatter,chatter_nah_i_m_good_thanks,"Nah, I'm good, thanks.",1.88
+Sohee,builtin,greet,greet_hey_man,Hey man.,0.92
+Eric,builtin,greet,greet_hi,Hi.,0.38
+angry_dre,designed,yell,yell_the_gas_is_on_the_right_asshole,"The gas is on the right, asshole!",1.91
+angry_dre,designed,yell,yell_watch_where_you_re_going,Watch where you're going!,1.25
+angry_dre,designed,yell,yell_learn_how_to_drive,Learn how to drive!,1.35
+angry_dre,designed,yell,yell_get_off_your_phone,Get off your phone!,1.19
+angry_dre,designed,yell,yell_are_you_kidding_me,Are you kidding me?!,0.98
+angry_dre,designed,yell,yell_move_it,Move it!,0.69
+angry_dre,designed,yell,yell_it_s_green_go,It's green! Go!,1.53
+angry_dre,designed,yell,yell_use_your_blinker,Use your blinker!,1.08
+angry_dre,designed,yell,yell_who_taught_you_how_to_drive,Who taught you how to drive?!,1.47
+angry_dre,designed,yell,yell_pick_a_lane,Pick a lane!,0.93
+angry_dre,designed,yell,yell_what_are_you_doing,What are you doing?!,0.98
+angry_dre,designed,yell,yell_get_out_of_the_way,Get out of the way!,1.03
+angry_dre,designed,yell,yell_you_almost_hit_me,You almost hit me!,1.14
+angry_dre,designed,yell,yell_hey_watch_it_buddy,"Hey! Watch it, buddy!",1.17
+angry_dre,designed,yell,yell_come_on_come_on_let_s_go,"Come on, come on, let's go!",1.88
+angry_dre,designed,yell,yell_oh_you_ve_got_to_be_kidding_me,"Oh, you've got to be kidding me!",1.67
+angry_dre,designed,yell,yell_nice_parking_job_genius,"Nice parking job, genius!",2.53
+angry_dre,designed,yell,yell_get_off_the_road,Get off the road!,1.14
+angry_dre,designed,yell,yell_hey_dumbass_the_light_s_green,"Hey, dumbass, the light's green!",2.01
+angry_dre,designed,yell,yell_you_cut_me_off,You cut me off!,1.10
+angry_dre,designed,yell,yell_unbelievable,Unbelievable!,0.92
+angry_dre,designed,yell,yell_stay_in_your_lane,Stay in your lane!,1.23
+angry_dre,designed,yell,yell_move_your_car,Move your car!,1.14
+angry_dre,designed,yell,yell_go_around_idiot,"Go around, idiot!",1.16
+angry_dre,designed,yell,yell_what_s_wrong_with_you,What's wrong with you?!,1.19
+angry_vito,designed,yell,yell_the_gas_is_on_the_right_asshole,"The gas is on the right, asshole!",2.19
+angry_vito,designed,yell,yell_watch_where_you_re_going,Watch where you're going!,1.27
+angry_vito,designed,yell,yell_learn_how_to_drive,Learn how to drive!,1.26
+angry_vito,designed,yell,yell_get_off_your_phone,Get off your phone!,1.19
+angry_vito,designed,yell,yell_are_you_kidding_me,Are you kidding me?!,1.13
+angry_vito,designed,yell,yell_move_it,Move it!,0.85
+angry_vito,designed,yell,yell_it_s_green_go,It's green! Go!,2.02
+angry_vito,designed,yell,yell_use_your_blinker,Use your blinker!,1.12
+angry_vito,designed,yell,yell_who_taught_you_how_to_drive,Who taught you how to drive?!,1.78
+angry_vito,designed,yell,yell_pick_a_lane,Pick a lane!,1.00
+angry_vito,designed,yell,yell_what_are_you_doing,What are you doing?!,1.07
+angry_vito,designed,yell,yell_get_out_of_the_way,Get out of the way!,1.01
+angry_vito,designed,yell,yell_you_almost_hit_me,You almost hit me!,1.20
+angry_vito,designed,yell,yell_hey_watch_it_buddy,"Hey! Watch it, buddy!",1.59
+angry_vito,designed,yell,yell_come_on_come_on_let_s_go,"Come on, come on, let's go!",1.77
+angry_vito,designed,yell,yell_oh_you_ve_got_to_be_kidding_me,"Oh, you've got to be kidding me!",1.91
+angry_vito,designed,yell,yell_nice_parking_job_genius,"Nice parking job, genius!",1.85
+angry_vito,designed,yell,yell_get_off_the_road,Get off the road!,1.09
+angry_vito,designed,yell,yell_hey_dumbass_the_light_s_green,"Hey, dumbass, the light's green!",1.97
+angry_vito,designed,yell,yell_you_cut_me_off,You cut me off!,1.28
+angry_vito,designed,yell,yell_unbelievable,Unbelievable!,1.06
+angry_vito,designed,yell,yell_stay_in_your_lane,Stay in your lane!,1.27
+angry_vito,designed,yell,yell_move_your_car,Move your car!,1.05
+angry_vito,designed,yell,yell_go_around_idiot,"Go around, idiot!",1.38
+angry_vito,designed,yell,yell_what_s_wrong_with_you,What's wrong with you?!,1.17
+angry_ray,designed,yell,yell_the_gas_is_on_the_right_asshole,"The gas is on the right, asshole!",2.26
+angry_ray,designed,yell,yell_watch_where_you_re_going,Watch where you're going!,1.41
+angry_ray,designed,yell,yell_learn_how_to_drive,Learn how to drive!,1.33
+angry_ray,designed,yell,yell_get_off_your_phone,Get off your phone!,1.41
+angry_ray,designed,yell,yell_are_you_kidding_me,Are you kidding me?!,1.31
+angry_ray,designed,yell,yell_move_it,Move it!,0.73
+angry_ray,designed,yell,yell_it_s_green_go,It's green! Go!,2.18
+angry_ray,designed,yell,yell_use_your_blinker,Use your blinker!,1.45
+angry_ray,designed,yell,yell_who_taught_you_how_to_drive,Who taught you how to drive?!,1.73
+angry_ray,designed,yell,yell_pick_a_lane,Pick a lane!,1.12
+angry_ray,designed,yell,yell_what_are_you_doing,What are you doing?!,1.05
+angry_ray,designed,yell,yell_get_out_of_the_way,Get out of the way!,1.29
+angry_ray,designed,yell,yell_you_almost_hit_me,You almost hit me!,1.40
+angry_ray,designed,yell,yell_hey_watch_it_buddy,"Hey! Watch it, buddy!",1.56
+angry_ray,designed,yell,yell_come_on_come_on_let_s_go,"Come on, come on, let's go!",2.36
+angry_ray,designed,yell,yell_oh_you_ve_got_to_be_kidding_me,"Oh, you've got to be kidding me!",2.04
+angry_ray,designed,yell,yell_nice_parking_job_genius,"Nice parking job, genius!",2.11
+angry_ray,designed,yell,yell_get_off_the_road,Get off the road!,1.15
+angry_ray,designed,yell,yell_hey_dumbass_the_light_s_green,"Hey, dumbass, the light's green!",2.85
+angry_ray,designed,yell,yell_you_cut_me_off,You cut me off!,1.28
+angry_ray,designed,yell,yell_unbelievable,Unbelievable!,1.48
+angry_ray,designed,yell,yell_stay_in_your_lane,Stay in your lane!,1.35
+angry_ray,designed,yell,yell_move_your_car,Move your car!,1.32
+angry_ray,designed,yell,yell_go_around_idiot,"Go around, idiot!",1.37
+angry_ray,designed,yell,yell_what_s_wrong_with_you,What's wrong with you?!,1.28
+angry_tasha,designed,yell,yell_the_gas_is_on_the_right_asshole,"The gas is on the right, asshole!",2.26
+angry_tasha,designed,yell,yell_watch_where_you_re_going,Watch where you're going!,1.53
+angry_tasha,designed,yell,yell_learn_how_to_drive,Learn how to drive!,1.45
+angry_tasha,designed,yell,yell_get_off_your_phone,Get off your phone!,1.75
+angry_tasha,designed,yell,yell_are_you_kidding_me,Are you kidding me?!,1.24
+angry_tasha,designed,yell,yell_move_it,Move it!,0.74
+angry_tasha,designed,yell,yell_it_s_green_go,It's green! Go!,2.10
+angry_tasha,designed,yell,yell_use_your_blinker,Use your blinker!,1.35
+angry_tasha,designed,yell,yell_who_taught_you_how_to_drive,Who taught you how to drive?!,2.05
+angry_tasha,designed,yell,yell_pick_a_lane,Pick a lane!,1.03
+angry_tasha,designed,yell,yell_what_are_you_doing,What are you doing?!,1.22
+angry_tasha,designed,yell,yell_get_out_of_the_way,Get out of the way!,1.34
+angry_tasha,designed,yell,yell_you_almost_hit_me,You almost hit me!,1.25
+angry_tasha,designed,yell,yell_hey_watch_it_buddy,"Hey! Watch it, buddy!",1.29
+angry_tasha,designed,yell,yell_come_on_come_on_let_s_go,"Come on, come on, let's go!",2.42
+angry_tasha,designed,yell,yell_oh_you_ve_got_to_be_kidding_me,"Oh, you've got to be kidding me!",1.68
+angry_tasha,designed,yell,yell_nice_parking_job_genius,"Nice parking job, genius!",2.21
+angry_tasha,designed,yell,yell_get_off_the_road,Get off the road!,1.15
+angry_tasha,designed,yell,yell_hey_dumbass_the_light_s_green,"Hey, dumbass, the light's green!",2.24
+angry_tasha,designed,yell,yell_you_cut_me_off,You cut me off!,1.20
+angry_tasha,designed,yell,yell_unbelievable,Unbelievable!,1.12
+angry_tasha,designed,yell,yell_stay_in_your_lane,Stay in your lane!,1.44
+angry_tasha,designed,yell,yell_move_your_car,Move your car!,1.29
+angry_tasha,designed,yell,yell_go_around_idiot,"Go around, idiot!",2.00
+angry_tasha,designed,yell,yell_what_s_wrong_with_you,What's wrong with you?!,1.37
+angry_earl,designed,yell,yell_the_gas_is_on_the_right_asshole,"The gas is on the right, asshole!",1.83
+angry_earl,designed,yell,yell_watch_where_you_re_going,Watch where you're going!,1.24
+angry_earl,designed,yell,yell_learn_how_to_drive,Learn how to drive!,1.13
+angry_earl,designed,yell,yell_get_off_your_phone,Get off your phone!,1.16
+angry_earl,designed,yell,yell_are_you_kidding_me,Are you kidding me?!,0.92
+angry_earl,designed,yell,yell_move_it,Move it!,0.57
+angry_earl,designed,yell,yell_it_s_green_go,It's green! Go!,1.69
+angry_earl,designed,yell,yell_use_your_blinker,Use your blinker!,1.21
+angry_earl,designed,yell,yell_who_taught_you_how_to_drive,Who taught you how to drive?!,1.31
+angry_earl,designed,yell,yell_pick_a_lane,Pick a lane!,0.85
+angry_earl,designed,yell,yell_what_are_you_doing,What are you doing?!,0.97
+angry_earl,designed,yell,yell_get_out_of_the_way,Get out of the way!,1.03
+angry_earl,designed,yell,yell_you_almost_hit_me,You almost hit me!,1.16
+angry_earl,designed,yell,yell_hey_watch_it_buddy,"Hey! Watch it, buddy!",1.02
+angry_earl,designed,yell,yell_come_on_come_on_let_s_go,"Come on, come on, let's go!",1.60
+angry_earl,designed,yell,yell_oh_you_ve_got_to_be_kidding_me,"Oh, you've got to be kidding me!",1.39
+angry_earl,designed,yell,yell_nice_parking_job_genius,"Nice parking job, genius!",2.01
+angry_earl,designed,yell,yell_get_off_the_road,Get off the road!,0.99
+angry_earl,designed,yell,yell_hey_dumbass_the_light_s_green,"Hey, dumbass, the light's green!",2.04
+angry_earl,designed,yell,yell_you_cut_me_off,You cut me off!,0.97
+angry_earl,designed,yell,yell_unbelievable,Unbelievable!,1.14
+angry_earl,designed,yell,yell_stay_in_your_lane,Stay in your lane!,1.07
+angry_earl,designed,yell,yell_move_your_car,Move your car!,1.08
+angry_earl,designed,yell,yell_go_around_idiot,"Go around, idiot!",0.88
+angry_earl,designed,yell,yell_what_s_wrong_with_you,What's wrong with you?!,1.08
+Ryan,builtin,yell,yell_the_gas_is_on_the_right_asshole,"The gas is on the right, asshole!",2.18
+Ryan,builtin,yell,yell_watch_where_you_re_going,Watch where you're going!,1.09
+Ryan,builtin,yell,yell_learn_how_to_drive,Learn how to drive!,1.19
+Ryan,builtin,yell,yell_get_off_your_phone,Get off your phone!,1.10
+Ryan,builtin,yell,yell_are_you_kidding_me,Are you kidding me?!,1.25
+Ryan,builtin,yell,yell_move_it,Move it!,0.62
+Ryan,builtin,yell,yell_it_s_green_go,It's green! Go!,1.95
+Ryan,builtin,yell,yell_use_your_blinker,Use your blinker!,1.11
+Ryan,builtin,yell,yell_who_taught_you_how_to_drive,Who taught you how to drive?!,1.47
+Ryan,builtin,yell,yell_pick_a_lane,Pick a lane!,0.81
+Ryan,builtin,yell,yell_what_are_you_doing,What are you doing?!,1.21
+Ryan,builtin,yell,yell_get_out_of_the_way,Get out of the way!,1.01
+Ryan,builtin,yell,yell_you_almost_hit_me,You almost hit me!,1.25
+Ryan,builtin,yell,yell_hey_watch_it_buddy,"Hey! Watch it, buddy!",1.59
+Ryan,builtin,yell,yell_come_on_come_on_let_s_go,"Come on, come on, let's go!",2.25
+Ryan,builtin,yell,yell_oh_you_ve_got_to_be_kidding_me,"Oh, you've got to be kidding me!",2.07
+Ryan,builtin,yell,yell_nice_parking_job_genius,"Nice parking job, genius!",2.53
+Ryan,builtin,yell,yell_get_off_the_road,Get off the road!,0.98
+Ryan,builtin,yell,yell_hey_dumbass_the_light_s_green,"Hey, dumbass, the light's green!",2.15
+Ryan,builtin,yell,yell_you_cut_me_off,You cut me off!,1.62
+Ryan,builtin,yell,yell_unbelievable,Unbelievable!,1.85
+Ryan,builtin,yell,yell_stay_in_your_lane,Stay in your lane!,1.20
+Ryan,builtin,yell,yell_move_your_car,Move your car!,1.07
+Ryan,builtin,yell,yell_go_around_idiot,"Go around, idiot!",1.32
+Ryan,builtin,yell,yell_what_s_wrong_with_you,What's wrong with you?!,1.27
+jimdale,cloned,chatter,chatter_yeah_that_s_what_i_heard,"Yeah, that's what I heard.",1.60
+jimdale,cloned,chatter,chatter_i_m_not_sure_honestly,"I'm not sure, honestly.",1.88
+jimdale,cloned,chatter,chatter_we_ll_see_how_it_goes,We'll see how it goes.,1.80
+jimdale,cloned,chatter,chatter_did_you_call_your_mom_back,Did you call your mom back?,1.53
+jimdale,cloned,chatter,chatter_i_ve_got_to_pick_up_the_kids_at_three,I've got to pick up the kids at three.,2.12
+jimdale,cloned,chatter,chatter_what_time_is_it,What time is it?,1.11
+jimdale,cloned,chatter,chatter_it_s_been_a_long_week,It's been a long week.,1.17
+jimdale,cloned,chatter,chatter_i_ll_tell_you_about_it_later,I'll tell you about it later.,1.46
+jimdale,cloned,chatter,chatter_can_you_believe_that,Can you believe that?,1.04
+jimdale,cloned,chatter,chatter_oh_that_reminds_me,"Oh, that reminds me.",1.30
+jimdale,cloned,chatter,chatter_i_need_a_vacation,I need a vacation.,1.27
+jimdale,cloned,chatter,chatter_let_me_know_when_you_re_ready,Let me know when you're ready.,1.13
+jimdale,cloned,chatter,chatter_where_d_you_park,Where'd you park?,0.84
+jimdale,cloned,chatter,chatter_it_s_right_around_the_corner,It's right around the corner.,1.24
+jimdale,cloned,chatter,chatter_i_m_starving_you_want_to_grab_lunch,I'm starving. You want to grab lunch?,2.26
+jimdale,cloned,chatter,chatter_they_re_opening_a_new_place_down_the_str,They're opening a new place down the street.,2.25
+jimdale,cloned,chatter,chatter_i_haven_t_seen_him_in_forever,I haven't seen him in forever.,1.97
+jimdale,cloned,chatter,chatter_she_said_she_d_be_here_by_now,She said she'd be here by now.,1.77
+jimdale,cloned,chatter,chatter_hang_on_i_m_getting_a_call,"Hang on, I'm getting a call.",1.87
+jimdale,cloned,chatter,chatter_no_the_other_one,"No, the other one.",0.89
+jimdale,cloned,chatter,chatter_i_ll_think_about_it,I'll think about it.,0.93
+jimdale,cloned,chatter,chatter_that_s_crazy,That's crazy.,1.17
+jimdale,cloned,chatter,chatter_for_real,For real?,0.92
+jimdale,cloned,chatter,chatter_i_swear_every_single_time,"I swear, every single time.",2.13
+jimdale,cloned,chatter,chatter_whatever_it_s_fine,"Whatever, it's fine.",1.39
+jimdale,cloned,chatter,chatter_let_s_just_go,Let's just go.,0.96
+jimdale,cloned,chatter,chatter_you_go_ahead_i_ll_catch_up,"You go ahead, I'll catch up.",1.54
+jimdale,cloned,chatter,chatter_it_s_not_a_big_deal,It's not a big deal.,1.43
+jimdale,cloned,chatter,chatter_i_was_just_about_to_say_that,I was just about to say that.,1.96
+jimdale,cloned,chatter,chatter_my_car_s_in_the_shop,My car's in the shop.,1.32
+jimdale,cloned,chatter,chatter_rent_went_up_again,Rent went up again.,1.24
+jimdale,cloned,chatter,chatter_the_bus_is_late_again,The bus is late again.,1.41
+jimdale,cloned,chatter,chatter_i_don_t_even_know_anymore,I don't even know anymore.,1.50
+jimdale,cloned,chatter,chatter_oh_i_love_this_song,"Oh, I love this song.",1.41
+jimdale,cloned,chatter,chatter_we_should_head_back,We should head back.,1.22
+jimdale,cloned,chatter,chatter_okay_okay_i_hear_you,"Okay, okay, I hear you.",1.87
+jimdale,cloned,chatter,chatter_hold_on_a_second,Hold on a second.,1.04
+jimdale,cloned,chatter,chatter_exactly,Exactly.,0.77
+jimdale,cloned,chatter,chatter_yeah_no_i_get_it,"Yeah, no, I get it.",1.36
+jimdale,cloned,chatter,chatter_it_is_what_it_is,It is what it is.,1.27
+seanterry,cloned,chatter,chatter_yeah_that_s_what_i_heard,"Yeah, that's what I heard.",1.24
+seanterry,cloned,chatter,chatter_i_m_not_sure_honestly,"I'm not sure, honestly.",1.35
+seanterry,cloned,chatter,chatter_we_ll_see_how_it_goes,We'll see how it goes.,1.28
+seanterry,cloned,chatter,chatter_did_you_call_your_mom_back,Did you call your mom back?,1.37
+seanterry,cloned,chatter,chatter_i_ve_got_to_pick_up_the_kids_at_three,I've got to pick up the kids at three.,1.85
+seanterry,cloned,chatter,chatter_what_time_is_it,What time is it?,0.83
+seanterry,cloned,chatter,chatter_it_s_been_a_long_week,It's been a long week.,1.18
+seanterry,cloned,chatter,chatter_i_ll_tell_you_about_it_later,I'll tell you about it later.,1.38
+seanterry,cloned,chatter,chatter_can_you_believe_that,Can you believe that?,1.09
+seanterry,cloned,chatter,chatter_oh_that_reminds_me,"Oh, that reminds me.",1.15
+seanterry,cloned,chatter,chatter_i_need_a_vacation,I need a vacation.,1.27
+seanterry,cloned,chatter,chatter_let_me_know_when_you_re_ready,Let me know when you're ready.,1.31
+seanterry,cloned,chatter,chatter_where_d_you_park,Where'd you park?,0.88
+seanterry,cloned,chatter,chatter_it_s_right_around_the_corner,It's right around the corner.,1.53
+seanterry,cloned,chatter,chatter_i_m_starving_you_want_to_grab_lunch,I'm starving. You want to grab lunch?,2.00
+seanterry,cloned,chatter,chatter_they_re_opening_a_new_place_down_the_str,They're opening a new place down the street.,2.02
+seanterry,cloned,chatter,chatter_i_haven_t_seen_him_in_forever,I haven't seen him in forever.,1.65
+seanterry,cloned,chatter,chatter_she_said_she_d_be_here_by_now,She said she'd be here by now.,1.70
+seanterry,cloned,chatter,chatter_hang_on_i_m_getting_a_call,"Hang on, I'm getting a call.",1.56
+seanterry,cloned,chatter,chatter_no_the_other_one,"No, the other one.",1.60
+seanterry,cloned,chatter,chatter_i_ll_think_about_it,I'll think about it.,1.64
+seanterry,cloned,chatter,chatter_that_s_crazy,That's crazy.,0.88
+seanterry,cloned,chatter,chatter_for_real,For real?,0.72
+seanterry,cloned,chatter,chatter_i_swear_every_single_time,"I swear, every single time.",2.51
+seanterry,cloned,chatter,chatter_whatever_it_s_fine,"Whatever, it's fine.",1.47
+seanterry,cloned,chatter,chatter_let_s_just_go,Let's just go.,1.10
+seanterry,cloned,chatter,chatter_you_go_ahead_i_ll_catch_up,"You go ahead, I'll catch up.",1.33
+seanterry,cloned,chatter,chatter_it_s_not_a_big_deal,It's not a big deal.,1.04
+seanterry,cloned,chatter,chatter_i_was_just_about_to_say_that,I was just about to say that.,1.70
+seanterry,cloned,chatter,chatter_rent_went_up_again,Rent went up again.,1.21
+seanterry,cloned,chatter,chatter_my_car_s_in_the_shop,My car's in the shop.,1.21
+seanterry,cloned,chatter,chatter_the_bus_is_late_again,The bus is late again.,1.44
+seanterry,cloned,chatter,chatter_i_don_t_even_know_anymore,I don't even know anymore.,1.33
+seanterry,cloned,chatter,chatter_oh_i_love_this_song,"Oh, I love this song.",1.31
+seanterry,cloned,chatter,chatter_we_should_head_back,We should head back.,1.10
+seanterry,cloned,chatter,chatter_okay_okay_i_hear_you,"Okay, okay, I hear you.",1.57
+seanterry,cloned,chatter,chatter_hold_on_a_second,Hold on a second.,1.08
+seanterry,cloned,chatter,chatter_exactly,Exactly.,0.85
+seanterry,cloned,chatter,chatter_yeah_no_i_get_it,"Yeah, no, I get it.",1.12
+seanterry,cloned,chatter,chatter_it_is_what_it_is,It is what it is.,1.15
+tim,cloned,greet,greet_hey_how_s_it_going,"Hey, how's it going?",1.32
+tim,cloned,greet,greet_yo_what_s_up,"Yo, what's up?",0.87
+tim,cloned,greet,greet_hey_good_morning,"Hey, good morning.",1.01
+tim,cloned,greet,greet_morning,Morning.,0.72
+tim,cloned,greet,greet_good_morning,Good morning!,0.92
+tim,cloned,greet,greet_afternoon,Afternoon.,0.96
+tim,cloned,greet,greet_good_afternoon,Good afternoon.,1.45
+tim,cloned,greet,greet_evening,Evening.,0.66
+tim,cloned,greet,greet_good_evening,Good evening.,0.89
+tim,cloned,greet,greet_hey_there,Hey there.,0.80
+tim,cloned,greet,greet_hello,Hello.,0.78
+tim,cloned,greet,greet_hi,Hi.,0.74
+tim,cloned,greet,greet_hey,Hey.,0.70
+tim,cloned,greet,greet_how_are_you_doing,How are you doing?,1.10
+tim,cloned,greet,greet_how_you_doing,How you doing?,0.90
+tim,cloned,greet,greet_what_s_going_on,What's going on?,0.92
+tim,cloned,greet,greet_hey_nice_to_see_you,"Hey, nice to see you.",1.66
+tim,cloned,greet,greet_long_time_no_see,Long time no see!,1.36
+tim,cloned,greet,greet_hey_man,Hey man.,0.85
+tim,cloned,greet,greet_what_s_new,What's new?,1.16
+tim,cloned,greet,greet_beautiful_day_huh,"Beautiful day, huh?",1.22
+tim,cloned,greet,greet_hot_one_today_isn_t_it,"Hot one today, isn't it?",1.48
+tim,cloned,greet,greet_cold_out_here_today,Cold out here today.,1.32
+tim,cloned,greet,greet_looks_like_rain,Looks like rain.,1.37
+tim,cloned,greet,greet_nice_day_for_a_walk,Nice day for a walk.,1.30
+tim,cloned,greet,greet_can_i_help_you,Can I help you?,0.89
+tim,cloned,greet,greet_need_something,Need something?,0.99
+tim,cloned,polite,polite_excuse_me,Excuse me.,0.97
+tim,cloned,polite,polite_pardon_me,Pardon me.,1.12
+tim,cloned,polite,polite_sorry_excuse_me,"Sorry, excuse me.",1.02
+tim,cloned,polite,polite_oh_sorry,"Oh, sorry.",0.93
+tim,cloned,polite,polite_watch_it,Watch it!,1.06
+tim,cloned,polite,polite_careful_there,Careful there.,1.01
+tim,cloned,polite,polite_thanks,Thanks.,0.74
+tim,cloned,polite,polite_thank_you,Thank you.,0.94
+tim,cloned,polite,polite_no_problem,No problem.,0.92
+tim,cloned,polite,polite_you_re_welcome,You're welcome.,0.78
+tim,cloned,polite,polite_sure_thing,Sure thing.,0.93
+tim,cloned,bye,bye_have_a_good_one,Have a good one.,0.93
+tim,cloned,bye,bye_take_care,Take care.,1.02
+tim,cloned,bye,bye_see_you_later,See you later.,0.89
+tim,cloned,bye,bye_see_ya,See ya.,0.97
+tim,cloned,bye,bye_catch_you_later,Catch you later.,1.07
+tim,cloned,bye,bye_have_a_good_day,Have a good day.,0.81
+tim,cloned,bye,bye_have_a_nice_day,Have a nice day!,1.44
+tim,cloned,bye,bye_have_a_good_night,Have a good night.,1.24
+tim,cloned,bye,bye_take_it_easy,Take it easy.,0.97
+tim,cloned,bye,bye_bye_now,Bye now.,0.89
+tim,cloned,bye,bye_later,Later.,0.90
+tim,cloned,bye,bye_stay_safe_out_there,Stay safe out there.,1.40
+tim,cloned,chatter,chatter_yeah_i_know_right,"Yeah, I know, right?",1.01
+tim,cloned,chatter,chatter_no_way_seriously,No way. Seriously?,1.90
+tim,cloned,chatter,chatter_i_told_him_that_already,I told him that already.,1.35
+tim,cloned,chatter,chatter_where_are_we_eating_tonight,Where are we eating tonight?,1.35
+tim,cloned,chatter,chatter_i_don_t_know_what_do_you_want,"I don't know, what do you want?",1.55
+tim,cloned,chatter,chatter_did_you_see_the_game_last_night,Did you see the game last night?,1.44
+tim,cloned,chatter,chatter_traffic_was_insane_this_morning,Traffic was insane this morning.,1.65
+tim,cloned,chatter,chatter_i_m_running_late_i_gotta_go,"I'm running late, I gotta go.",1.87
+tim,cloned,chatter,chatter_hang_on_let_me_call_you_back,"Hang on, let me call you back.",1.97
+tim,cloned,chatter,chatter_oh_my_god_that_s_hilarious,"Oh my God, that's hilarious.",1.68
+tim,cloned,chatter,chatter_yeah_yeah_totally,"Yeah, yeah, totally.",1.14
+tim,cloned,chatter,chatter_mm_hmm,Mm-hmm.,1.15
+tim,cloned,chatter,chatter_uh_huh,Uh-huh.,1.15
+tim,cloned,chatter,chatter_right_right,"Right, right.",1.02
+tim,cloned,chatter,chatter_that_s_what_i_m_saying,That's what I'm saying!,1.24
+tim,cloned,chatter,chatter_i_can_t_believe_it_s_already_friday,I can't believe it's already Friday.,1.65
+tim,cloned,chatter,chatter_we_should_grab_coffee_sometime,We should grab coffee sometime.,1.72
+tim,cloned,chatter,chatter_which_way_is_the_train_station,Which way is the train station?,1.64
+tim,cloned,chatter,chatter_it_s_just_up_the_street_on_the_left,It's just up the street on the left.,1.68
+tim,cloned,chatter,chatter_i_think_we_parked_on_the_other_side,I think we parked on the other side.,1.80
+tim,cloned,chatter,chatter_how_much_was_it,How much was it?,0.97
+tim,cloned,chatter,chatter_that_s_way_too_expensive,That's way too expensive.,1.42
+tim,cloned,chatter,chatter_hold_on_i_dropped_something,"Hold on, I dropped something.",1.81
+tim,cloned,chatter,chatter_wait_up,Wait up!,0.83
+tim,cloned,chatter,chatter_come_on_we_re_gonna_miss_it,"Come on, we're gonna miss it.",1.36
+tim,cloned,chatter,chatter_i_ll_meet_you_there,I'll meet you there.,1.17
+tim,cloned,chatter,chatter_did_you_get_my_text,Did you get my text?,1.43
+tim,cloned,chatter,chatter_my_phone_s_about_to_die,My phone's about to die.,1.48
+tim,cloned,chatter,chatter_it_s_supposed_to_storm_later,It's supposed to storm later.,1.63
+tim,cloned,chatter,chatter_i_m_so_tired_today,I'm so tired today.,1.46
+tim,cloned,chatter,chatter_honestly_i_have_no_idea,"Honestly, I have no idea.",1.62
+tim,cloned,chatter,chatter_anyway_like_i_was_saying,"Anyway, like I was saying...",1.44
+tim,cloned,chatter,chatter_oh_hey_over_here,"Oh, hey! Over here!",1.42
+tim,cloned,chatter,chatter_ha_yeah,Ha! Yeah.,1.13
+tim,cloned,chatter,chatter_okay_sounds_good,"Okay, sounds good.",1.74
+tim,cloned,chatter,chatter_nah_i_m_good_thanks,"Nah, I'm good, thanks.",1.29
+tim,cloned,chatter,chatter_yeah_that_s_what_i_heard,"Yeah, that's what I heard.",1.23
+tim,cloned,chatter,chatter_i_m_not_sure_honestly,"I'm not sure, honestly.",1.72
+tim,cloned,chatter,chatter_we_ll_see_how_it_goes,We'll see how it goes.,1.15
+tim,cloned,chatter,chatter_did_you_call_your_mom_back,Did you call your mom back?,1.33
+tim,cloned,chatter,chatter_i_ve_got_to_pick_up_the_kids_at_three,I've got to pick up the kids at three.,1.95
+tim,cloned,chatter,chatter_what_time_is_it,What time is it?,1.05
+tim,cloned,chatter,chatter_it_s_been_a_long_week,It's been a long week.,1.06
+tim,cloned,chatter,chatter_i_ll_tell_you_about_it_later,I'll tell you about it later.,1.38
+tim,cloned,chatter,chatter_can_you_believe_that,Can you believe that?,1.39
+tim,cloned,chatter,chatter_oh_that_reminds_me,"Oh, that reminds me.",1.20
+tim,cloned,chatter,chatter_i_need_a_vacation,I need a vacation.,1.31
+tim,cloned,chatter,chatter_let_me_know_when_you_re_ready,Let me know when you're ready.,1.42
+tim,cloned,chatter,chatter_where_d_you_park,Where'd you park?,0.88
+tim,cloned,chatter,chatter_it_s_right_around_the_corner,It's right around the corner.,1.09
+tim,cloned,chatter,chatter_i_m_starving_you_want_to_grab_lunch,I'm starving. You want to grab lunch?,1.86
+tim,cloned,chatter,chatter_they_re_opening_a_new_place_down_the_str,They're opening a new place down the street.,2.12
+tim,cloned,chatter,chatter_i_haven_t_seen_him_in_forever,I haven't seen him in forever.,1.69
+tim,cloned,chatter,chatter_she_said_she_d_be_here_by_now,She said she'd be here by now.,1.72
+tim,cloned,chatter,chatter_hang_on_i_m_getting_a_call,"Hang on, I'm getting a call.",1.94
+tim,cloned,chatter,chatter_no_the_other_one,"No, the other one.",0.94
+tim,cloned,chatter,chatter_i_ll_think_about_it,I'll think about it.,0.98
+tim,cloned,chatter,chatter_that_s_crazy,That's crazy.,0.99
+tim,cloned,chatter,chatter_for_real,For real?,1.00
+tim,cloned,chatter,chatter_i_swear_every_single_time,"I swear, every single time.",2.11
+tim,cloned,chatter,chatter_whatever_it_s_fine,"Whatever, it's fine.",1.61
+tim,cloned,chatter,chatter_let_s_just_go,Let's just go.,1.08
+tim,cloned,chatter,chatter_you_go_ahead_i_ll_catch_up,"You go ahead, I'll catch up.",1.25
+tim,cloned,chatter,chatter_it_s_not_a_big_deal,It's not a big deal.,1.20
+tim,cloned,chatter,chatter_i_was_just_about_to_say_that,I was just about to say that.,1.73
+tim,cloned,chatter,chatter_rent_went_up_again,Rent went up again.,1.39
+tim,cloned,chatter,chatter_the_bus_is_late_again,The bus is late again.,1.53
+tim,cloned,chatter,chatter_my_car_s_in_the_shop,My car's in the shop.,1.15
+tim,cloned,chatter,chatter_i_don_t_even_know_anymore,I don't even know anymore.,1.31
+tim,cloned,chatter,chatter_oh_i_love_this_song,"Oh, I love this song.",1.22
+tim,cloned,chatter,chatter_we_should_head_back,We should head back.,1.15
+tim,cloned,chatter,chatter_okay_okay_i_hear_you,"Okay, okay, I hear you.",1.82
+tim,cloned,chatter,chatter_hold_on_a_second,Hold on a second.,1.07
+tim,cloned,chatter,chatter_exactly,Exactly.,1.02
+tim,cloned,chatter,chatter_yeah_no_i_get_it,"Yeah, no, I get it.",1.49
+tim,cloned,chatter,chatter_it_is_what_it_is,It is what it is.,1.31
+linda,designed,chatter,chatter_yeah_that_s_what_i_heard,"Yeah, that's what I heard.",1.59
+linda,designed,chatter,chatter_i_m_not_sure_honestly,"I'm not sure, honestly.",1.61
+linda,designed,chatter,chatter_we_ll_see_how_it_goes,We'll see how it goes.,1.21
+linda,designed,chatter,chatter_did_you_call_your_mom_back,Did you call your mom back?,1.29
+linda,designed,chatter,chatter_i_ve_got_to_pick_up_the_kids_at_three,I've got to pick up the kids at three.,2.04
+linda,designed,chatter,chatter_what_time_is_it,What time is it?,0.91
+linda,designed,chatter,chatter_it_s_been_a_long_week,It's been a long week.,1.23
+linda,designed,chatter,chatter_i_ll_tell_you_about_it_later,I'll tell you about it later.,1.81
+linda,designed,chatter,chatter_can_you_believe_that,Can you believe that?,1.00
+linda,designed,chatter,chatter_oh_that_reminds_me,"Oh, that reminds me.",1.28
+linda,designed,chatter,chatter_i_need_a_vacation,I need a vacation.,1.08
+linda,designed,chatter,chatter_let_me_know_when_you_re_ready,Let me know when you're ready.,1.24
+linda,designed,chatter,chatter_where_d_you_park,Where'd you park?,0.85
+linda,designed,chatter,chatter_it_s_right_around_the_corner,It's right around the corner.,1.32
+linda,designed,chatter,chatter_i_m_starving_you_want_to_grab_lunch,I'm starving. You want to grab lunch?,2.64
+linda,designed,chatter,chatter_they_re_opening_a_new_place_down_the_str,They're opening a new place down the street.,2.13
+linda,designed,chatter,chatter_i_haven_t_seen_him_in_forever,I haven't seen him in forever.,1.67
+linda,designed,chatter,chatter_she_said_she_d_be_here_by_now,She said she'd be here by now.,2.15
+linda,designed,chatter,chatter_hang_on_i_m_getting_a_call,"Hang on, I'm getting a call.",1.93
+linda,designed,chatter,chatter_no_the_other_one,"No, the other one.",1.30
+linda,designed,chatter,chatter_i_ll_think_about_it,I'll think about it.,1.04
+linda,designed,chatter,chatter_that_s_crazy,That's crazy.,0.92
+linda,designed,chatter,chatter_for_real,For real?,0.64
+linda,designed,chatter,chatter_i_swear_every_single_time,"I swear, every single time.",2.04
+linda,designed,chatter,chatter_whatever_it_s_fine,"Whatever, it's fine.",1.65
+linda,designed,chatter,chatter_let_s_just_go,Let's just go.,0.93
+linda,designed,chatter,chatter_you_go_ahead_i_ll_catch_up,"You go ahead, I'll catch up.",2.16
+linda,designed,chatter,chatter_it_s_not_a_big_deal,It's not a big deal.,1.20
+linda,designed,chatter,chatter_i_was_just_about_to_say_that,I was just about to say that.,1.99
+linda,designed,chatter,chatter_rent_went_up_again,Rent went up again.,1.15
+linda,designed,chatter,chatter_my_car_s_in_the_shop,My car's in the shop.,1.11
+linda,designed,chatter,chatter_the_bus_is_late_again,The bus is late again.,1.32
+linda,designed,chatter,chatter_i_don_t_even_know_anymore,I don't even know anymore.,1.36
+linda,designed,chatter,chatter_oh_i_love_this_song,"Oh, I love this song.",1.86
+linda,designed,chatter,chatter_we_should_head_back,We should head back.,1.02
+linda,designed,chatter,chatter_okay_okay_i_hear_you,"Okay, okay, I hear you.",1.96
+linda,designed,chatter,chatter_hold_on_a_second,Hold on a second.,1.13
+linda,designed,chatter,chatter_exactly,Exactly.,0.96
+linda,designed,chatter,chatter_yeah_no_i_get_it,"Yeah, no, I get it.",1.93
+linda,designed,chatter,chatter_it_is_what_it_is,It is what it is.,1.07
+frank,designed,chatter,chatter_yeah_that_s_what_i_heard,"Yeah, that's what I heard.",1.56
+frank,designed,chatter,chatter_i_m_not_sure_honestly,"I'm not sure, honestly.",1.55
+frank,designed,chatter,chatter_we_ll_see_how_it_goes,We'll see how it goes.,1.30
+frank,designed,chatter,chatter_did_you_call_your_mom_back,Did you call your mom back?,1.32
+frank,designed,chatter,chatter_i_ve_got_to_pick_up_the_kids_at_three,I've got to pick up the kids at three.,2.39
+frank,designed,chatter,chatter_what_time_is_it,What time is it?,0.96
+frank,designed,chatter,chatter_it_s_been_a_long_week,It's been a long week.,1.47
+frank,designed,chatter,chatter_i_ll_tell_you_about_it_later,I'll tell you about it later.,1.38
+frank,designed,chatter,chatter_can_you_believe_that,Can you believe that?,1.04
+frank,designed,chatter,chatter_oh_that_reminds_me,"Oh, that reminds me.",1.56
+frank,designed,chatter,chatter_i_need_a_vacation,I need a vacation.,1.24
+frank,designed,chatter,chatter_let_me_know_when_you_re_ready,Let me know when you're ready.,1.39
+frank,designed,chatter,chatter_where_d_you_park,Where'd you park?,0.96
+frank,designed,chatter,chatter_it_s_right_around_the_corner,It's right around the corner.,1.41
+frank,designed,chatter,chatter_i_m_starving_you_want_to_grab_lunch,I'm starving. You want to grab lunch?,2.93
+frank,designed,chatter,chatter_they_re_opening_a_new_place_down_the_str,They're opening a new place down the street.,2.20
+frank,designed,chatter,chatter_i_haven_t_seen_him_in_forever,I haven't seen him in forever.,1.62
+frank,designed,chatter,chatter_she_said_she_d_be_here_by_now,She said she'd be here by now.,1.76
+frank,designed,chatter,chatter_hang_on_i_m_getting_a_call,"Hang on, I'm getting a call.",1.69
+frank,designed,chatter,chatter_no_the_other_one,"No, the other one.",1.63
+frank,designed,chatter,chatter_i_ll_think_about_it,I'll think about it.,1.02
+frank,designed,chatter,chatter_that_s_crazy,That's crazy.,1.13
+frank,designed,chatter,chatter_for_real,For real?,0.72
+frank,designed,chatter,chatter_i_swear_every_single_time,"I swear, every single time.",2.43
+frank,designed,chatter,chatter_whatever_it_s_fine,"Whatever, it's fine.",1.81
+frank,designed,chatter,chatter_let_s_just_go,Let's just go.,0.93
+frank,designed,chatter,chatter_you_go_ahead_i_ll_catch_up,"You go ahead, I'll catch up.",1.93
+frank,designed,chatter,chatter_it_s_not_a_big_deal,It's not a big deal.,1.33
+frank,designed,chatter,chatter_i_was_just_about_to_say_that,I was just about to say that.,1.65
+frank,designed,chatter,chatter_rent_went_up_again,Rent went up again.,1.36
+frank,designed,chatter,chatter_my_car_s_in_the_shop,My car's in the shop.,1.43
+frank,designed,chatter,chatter_the_bus_is_late_again,The bus is late again.,1.36
+frank,designed,chatter,chatter_i_don_t_even_know_anymore,I don't even know anymore.,1.59
+frank,designed,chatter,chatter_oh_i_love_this_song,"Oh, I love this song.",1.88
+frank,designed,chatter,chatter_we_should_head_back,We should head back.,1.18
+frank,designed,chatter,chatter_okay_okay_i_hear_you,"Okay, okay, I hear you.",1.88
+frank,designed,chatter,chatter_hold_on_a_second,Hold on a second.,1.11
+frank,designed,chatter,chatter_exactly,Exactly.,0.81
+frank,designed,chatter,chatter_yeah_no_i_get_it,"Yeah, no, I get it.",1.58
+frank,designed,chatter,chatter_it_is_what_it_is,It is what it is.,1.09
+kyle,designed,chatter,chatter_yeah_that_s_what_i_heard,"Yeah, that's what I heard.",1.10
+kyle,designed,chatter,chatter_i_m_not_sure_honestly,"I'm not sure, honestly.",1.23
+kyle,designed,chatter,chatter_we_ll_see_how_it_goes,We'll see how it goes.,1.01
+kyle,designed,chatter,chatter_did_you_call_your_mom_back,Did you call your mom back?,1.09
+kyle,designed,chatter,chatter_i_ve_got_to_pick_up_the_kids_at_three,I've got to pick up the kids at three.,1.51
+kyle,designed,chatter,chatter_what_time_is_it,What time is it?,0.69
+kyle,designed,chatter,chatter_it_s_been_a_long_week,It's been a long week.,0.97
+kyle,designed,chatter,chatter_i_ll_tell_you_about_it_later,I'll tell you about it later.,1.14
+kyle,designed,chatter,chatter_can_you_believe_that,Can you believe that?,0.76
+kyle,designed,chatter,chatter_oh_that_reminds_me,"Oh, that reminds me.",1.83
+kyle,designed,chatter,chatter_i_need_a_vacation,I need a vacation.,1.02
+kyle,designed,chatter,chatter_let_me_know_when_you_re_ready,Let me know when you're ready.,1.06
+kyle,designed,chatter,chatter_where_d_you_park,Where'd you park?,0.73
+kyle,designed,chatter,chatter_it_s_right_around_the_corner,It's right around the corner.,1.22
+kyle,designed,chatter,chatter_i_m_starving_you_want_to_grab_lunch,I'm starving. You want to grab lunch?,2.08
+kyle,designed,chatter,chatter_they_re_opening_a_new_place_down_the_str,They're opening a new place down the street.,1.90
+kyle,designed,chatter,chatter_i_haven_t_seen_him_in_forever,I haven't seen him in forever.,1.54
+kyle,designed,chatter,chatter_she_said_she_d_be_here_by_now,She said she'd be here by now.,1.56
+kyle,designed,chatter,chatter_hang_on_i_m_getting_a_call,"Hang on, I'm getting a call.",1.62
+kyle,designed,chatter,chatter_no_the_other_one,"No, the other one.",1.07
+kyle,designed,chatter,chatter_i_ll_think_about_it,I'll think about it.,0.82
+kyle,designed,chatter,chatter_that_s_crazy,That's crazy.,0.77
+kyle,designed,chatter,chatter_for_real,For real?,0.46
+kyle,designed,chatter,chatter_i_swear_every_single_time,"I swear, every single time.",1.77
+kyle,designed,chatter,chatter_whatever_it_s_fine,"Whatever, it's fine.",1.32
+kyle,designed,chatter,chatter_let_s_just_go,Let's just go.,0.74
+kyle,designed,chatter,chatter_you_go_ahead_i_ll_catch_up,"You go ahead, I'll catch up.",1.64
+kyle,designed,chatter,chatter_it_s_not_a_big_deal,It's not a big deal.,0.96
+kyle,designed,chatter,chatter_i_was_just_about_to_say_that,I was just about to say that.,1.29
+kyle,designed,chatter,chatter_rent_went_up_again,Rent went up again.,0.95
+kyle,designed,chatter,chatter_my_car_s_in_the_shop,My car's in the shop.,1.09
+kyle,designed,chatter,chatter_the_bus_is_late_again,The bus is late again.,1.03
+kyle,designed,chatter,chatter_i_don_t_even_know_anymore,I don't even know anymore.,1.14
+kyle,designed,chatter,chatter_oh_i_love_this_song,"Oh, I love this song.",1.82
+kyle,designed,chatter,chatter_we_should_head_back,We should head back.,0.93
+kyle,designed,chatter,chatter_okay_okay_i_hear_you,"Okay, okay, I hear you.",1.81
+kyle,designed,chatter,chatter_hold_on_a_second,Hold on a second.,1.12
+kyle,designed,chatter,chatter_exactly,Exactly.,0.75
+kyle,designed,chatter,chatter_yeah_no_i_get_it,"Yeah, no, I get it.",1.22
+kyle,designed,chatter,chatter_it_is_what_it_is,It is what it is.,0.90
+andre,designed,greet,greet_hey_how_s_it_going,"Hey, how's it going?",1.05
+andre,designed,greet,greet_yo_what_s_up,"Yo, what's up?",1.12
+andre,designed,greet,greet_hey_good_morning,"Hey, good morning.",1.14
+andre,designed,greet,greet_morning,Morning.,0.45
+andre,designed,greet,greet_good_morning,Good morning!,0.59
+andre,designed,greet,greet_afternoon,Afternoon.,0.72
+andre,designed,greet,greet_good_afternoon,Good afternoon.,0.85
+andre,designed,greet,greet_evening,Evening.,0.51
+andre,designed,greet,greet_good_evening,Good evening.,0.59
+andre,designed,greet,greet_hey_there,Hey there.,0.57
+andre,designed,greet,greet_hi,Hi.,0.50
+andre,designed,greet,greet_hello,Hello.,0.53
+andre,designed,greet,greet_hey,Hey.,0.43
+andre,designed,greet,greet_how_are_you_doing,How are you doing?,0.72
+andre,designed,greet,greet_how_you_doing,How you doing?,0.60
+andre,designed,greet,greet_what_s_going_on,What's going on?,0.84
+andre,designed,greet,greet_hey_nice_to_see_you,"Hey, nice to see you.",1.44
+andre,designed,greet,greet_long_time_no_see,Long time no see!,1.31
+andre,designed,greet,greet_hey_man,Hey man.,0.65
+andre,designed,greet,greet_what_s_new,What's new?,0.50
+andre,designed,greet,greet_beautiful_day_huh,"Beautiful day, huh?",1.01
+andre,designed,greet,greet_hot_one_today_isn_t_it,"Hot one today, isn't it?",0.99
+andre,designed,greet,greet_cold_out_here_today,Cold out here today.,0.95
+andre,designed,greet,greet_looks_like_rain,Looks like rain.,0.79
+andre,designed,greet,greet_nice_day_for_a_walk,Nice day for a walk.,1.11
+andre,designed,greet,greet_can_i_help_you,Can I help you?,0.63
+andre,designed,greet,greet_need_something,Need something?,0.64
+andre,designed,polite,polite_excuse_me,Excuse me.,0.73
+andre,designed,polite,polite_pardon_me,Pardon me.,0.53
+andre,designed,polite,polite_sorry_excuse_me,"Sorry, excuse me.",1.06
+andre,designed,polite,polite_oh_sorry,"Oh, sorry.",0.77
+andre,designed,polite,polite_watch_it,Watch it!,0.42
+andre,designed,polite,polite_careful_there,Careful there.,0.69
+andre,designed,polite,polite_thanks,Thanks.,0.49
+andre,designed,polite,polite_thank_you,Thank you.,0.49
+andre,designed,polite,polite_no_problem,No problem.,1.07
+andre,designed,polite,polite_you_re_welcome,You're welcome.,0.55
+andre,designed,polite,polite_sure_thing,Sure thing.,0.66
+andre,designed,bye,bye_have_a_good_one,Have a good one.,0.68
+andre,designed,bye,bye_take_care,Take care.,0.55
+andre,designed,bye,bye_see_you_later,See you later.,0.69
+andre,designed,bye,bye_see_ya,See ya.,0.50
+andre,designed,bye,bye_catch_you_later,Catch you later.,0.67
+andre,designed,bye,bye_have_a_good_day,Have a good day.,0.75
+andre,designed,bye,bye_have_a_nice_day,Have a nice day!,0.83
+andre,designed,bye,bye_have_a_good_night,Have a good night.,0.75
+andre,designed,bye,bye_take_it_easy,Take it easy.,0.60
+andre,designed,bye,bye_bye_now,Bye now.,0.68
+andre,designed,bye,bye_later,Later.,0.43
+andre,designed,bye,bye_stay_safe_out_there,Stay safe out there.,1.04
+andre,designed,chatter,chatter_yeah_i_know_right,"Yeah, I know, right?",0.90
+andre,designed,chatter,chatter_no_way_seriously,No way. Seriously?,1.31
+andre,designed,chatter,chatter_i_told_him_that_already,I told him that already.,1.07
+andre,designed,chatter,chatter_where_are_we_eating_tonight,Where are we eating tonight?,1.03
+andre,designed,chatter,chatter_i_don_t_know_what_do_you_want,"I don't know, what do you want?",1.33
+andre,designed,chatter,chatter_did_you_see_the_game_last_night,Did you see the game last night?,1.25
+andre,designed,chatter,chatter_traffic_was_insane_this_morning,Traffic was insane this morning.,1.67
+andre,designed,chatter,chatter_i_m_running_late_i_gotta_go,"I'm running late, I gotta go.",1.40
+andre,designed,chatter,chatter_hang_on_let_me_call_you_back,"Hang on, let me call you back.",1.59
+andre,designed,chatter,chatter_oh_my_god_that_s_hilarious,"Oh my God, that's hilarious.",1.78
+andre,designed,chatter,chatter_yeah_yeah_totally,"Yeah, yeah, totally.",1.69
+andre,designed,chatter,chatter_mm_hmm,Mm-hmm.,0.50
+andre,designed,chatter,chatter_uh_huh,Uh-huh.,0.39
+andre,designed,chatter,chatter_right_right,"Right, right.",1.20
+andre,designed,chatter,chatter_that_s_what_i_m_saying,That's what I'm saying!,0.91
+andre,designed,chatter,chatter_i_can_t_believe_it_s_already_friday,I can't believe it's already Friday.,1.44
+andre,designed,chatter,chatter_we_should_grab_coffee_sometime,We should grab coffee sometime.,1.51
+andre,designed,chatter,chatter_which_way_is_the_train_station,Which way is the train station?,1.29
+andre,designed,chatter,chatter_it_s_just_up_the_street_on_the_left,It's just up the street on the left.,1.37
+andre,designed,chatter,chatter_i_think_we_parked_on_the_other_side,I think we parked on the other side.,1.45
+andre,designed,chatter,chatter_how_much_was_it,How much was it?,0.66
+andre,designed,chatter,chatter_that_s_way_too_expensive,That's way too expensive.,1.19
+andre,designed,chatter,chatter_hold_on_i_dropped_something,"Hold on, I dropped something.",1.34
+andre,designed,chatter,chatter_wait_up,Wait up!,0.71
+andre,designed,chatter,chatter_come_on_we_re_gonna_miss_it,"Come on, we're gonna miss it.",1.08
+andre,designed,chatter,chatter_i_ll_meet_you_there,I'll meet you there.,0.75
+andre,designed,chatter,chatter_did_you_get_my_text,Did you get my text?,0.89
+andre,designed,chatter,chatter_my_phone_s_about_to_die,My phone's about to die.,1.27
+andre,designed,chatter,chatter_it_s_supposed_to_storm_later,It's supposed to storm later.,1.29
+andre,designed,chatter,chatter_i_m_so_tired_today,I'm so tired today.,1.40
+andre,designed,chatter,chatter_honestly_i_have_no_idea,"Honestly, I have no idea.",1.75
+andre,designed,chatter,chatter_anyway_like_i_was_saying,"Anyway, like I was saying...",1.36
+andre,designed,chatter,chatter_oh_hey_over_here,"Oh, hey! Over here!",1.41
+andre,designed,chatter,chatter_ha_yeah,Ha! Yeah.,1.25
+andre,designed,chatter,chatter_okay_sounds_good,"Okay, sounds good.",1.30
+andre,designed,chatter,chatter_nah_i_m_good_thanks,"Nah, I'm good, thanks.",1.68
+andre,designed,chatter,chatter_yeah_that_s_what_i_heard,"Yeah, that's what I heard.",1.53
+andre,designed,chatter,chatter_i_m_not_sure_honestly,"I'm not sure, honestly.",1.28
+andre,designed,chatter,chatter_we_ll_see_how_it_goes,We'll see how it goes.,0.95
+andre,designed,chatter,chatter_did_you_call_your_mom_back,Did you call your mom back?,0.99
+andre,designed,chatter,chatter_i_ve_got_to_pick_up_the_kids_at_three,I've got to pick up the kids at three.,1.59
+andre,designed,chatter,chatter_what_time_is_it,What time is it?,0.69
+andre,designed,chatter,chatter_it_s_been_a_long_week,It's been a long week.,1.05
+andre,designed,chatter,chatter_i_ll_tell_you_about_it_later,I'll tell you about it later.,1.35
+andre,designed,chatter,chatter_can_you_believe_that,Can you believe that?,0.80
+andre,designed,chatter,chatter_oh_that_reminds_me,"Oh, that reminds me.",1.36
+andre,designed,chatter,chatter_i_need_a_vacation,I need a vacation.,1.15
+andre,designed,chatter,chatter_let_me_know_when_you_re_ready,Let me know when you're ready.,0.92
+andre,designed,chatter,chatter_where_d_you_park,Where'd you park?,0.70
+andre,designed,chatter,chatter_it_s_right_around_the_corner,It's right around the corner.,1.05
+andre,designed,chatter,chatter_i_m_starving_you_want_to_grab_lunch,I'm starving. You want to grab lunch?,2.33
+andre,designed,chatter,chatter_they_re_opening_a_new_place_down_the_str,They're opening a new place down the street.,1.68
+andre,designed,chatter,chatter_i_haven_t_seen_him_in_forever,I haven't seen him in forever.,1.33
+andre,designed,chatter,chatter_she_said_she_d_be_here_by_now,She said she'd be here by now.,1.39
+andre,designed,chatter,chatter_hang_on_i_m_getting_a_call,"Hang on, I'm getting a call.",1.51
+andre,designed,chatter,chatter_no_the_other_one,"No, the other one.",1.04
+andre,designed,chatter,chatter_i_ll_think_about_it,I'll think about it.,0.76
+andre,designed,chatter,chatter_that_s_crazy,That's crazy.,0.65
+andre,designed,chatter,chatter_for_real,For real?,0.54
+andre,designed,chatter,chatter_i_swear_every_single_time,"I swear, every single time.",1.76
+andre,designed,chatter,chatter_whatever_it_s_fine,"Whatever, it's fine.",0.90
+andre,designed,chatter,chatter_let_s_just_go,Let's just go.,0.89
+andre,designed,chatter,chatter_you_go_ahead_i_ll_catch_up,"You go ahead, I'll catch up.",1.48
+andre,designed,chatter,chatter_it_s_not_a_big_deal,It's not a big deal.,0.94
+andre,designed,chatter,chatter_i_was_just_about_to_say_that,I was just about to say that.,1.21
+andre,designed,chatter,chatter_rent_went_up_again,Rent went up again.,0.96
+andre,designed,chatter,chatter_my_car_s_in_the_shop,My car's in the shop.,1.04
+andre,designed,chatter,chatter_the_bus_is_late_again,The bus is late again.,1.03
+andre,designed,chatter,chatter_i_don_t_even_know_anymore,I don't even know anymore.,1.04
+andre,designed,chatter,chatter_oh_i_love_this_song,"Oh, I love this song.",1.50
+andre,designed,chatter,chatter_we_should_head_back,We should head back.,0.82
+andre,designed,chatter,chatter_okay_okay_i_hear_you,"Okay, okay, I hear you.",1.89
+andre,designed,chatter,chatter_hold_on_a_second,Hold on a second.,0.77
+andre,designed,chatter,chatter_exactly,Exactly.,0.75
+andre,designed,chatter,chatter_yeah_no_i_get_it,"Yeah, no, I get it.",1.58
+andre,designed,chatter,chatter_it_is_what_it_is,It is what it is.,1.06
+curtis,designed,greet,greet_hey_how_s_it_going,"Hey, how's it going?",1.21
+curtis,designed,greet,greet_yo_what_s_up,"Yo, what's up?",0.96
+curtis,designed,greet,greet_hey_good_morning,"Hey, good morning.",0.85
+curtis,designed,greet,greet_morning,Morning.,0.69
+curtis,designed,greet,greet_good_morning,Good morning!,0.73
+curtis,designed,greet,greet_afternoon,Afternoon.,0.79
+curtis,designed,greet,greet_good_afternoon,Good afternoon.,1.17
+curtis,designed,greet,greet_evening,Evening.,0.73
+curtis,designed,greet,greet_good_evening,Good evening.,0.76
+curtis,designed,greet,greet_hey_there,Hey there.,0.72
+curtis,designed,greet,greet_hi,Hi.,0.63
+curtis,designed,greet,greet_hello,Hello.,0.61
+curtis,designed,greet,greet_hey,Hey.,0.50
+curtis,designed,greet,greet_how_are_you_doing,How are you doing?,0.87
+curtis,designed,greet,greet_how_you_doing,How you doing?,0.74
+curtis,designed,greet,greet_what_s_going_on,What's going on?,1.09
+curtis,designed,greet,greet_hey_nice_to_see_you,"Hey, nice to see you.",1.33
+curtis,designed,greet,greet_long_time_no_see,Long time no see!,1.61
+curtis,designed,greet,greet_hey_man,Hey man.,0.73
+curtis,designed,greet,greet_what_s_new,What's new?,0.73
+curtis,designed,greet,greet_beautiful_day_huh,"Beautiful day, huh?",1.32
+curtis,designed,greet,greet_hot_one_today_isn_t_it,"Hot one today, isn't it?",1.31
+curtis,designed,greet,greet_cold_out_here_today,Cold out here today.,1.34
+curtis,designed,greet,greet_looks_like_rain,Looks like rain.,1.10
+curtis,designed,greet,greet_nice_day_for_a_walk,Nice day for a walk.,1.47
+curtis,designed,greet,greet_can_i_help_you,Can I help you?,0.87
+curtis,designed,greet,greet_need_something,Need something?,0.95
+curtis,designed,polite,polite_excuse_me,Excuse me.,0.91
+curtis,designed,polite,polite_pardon_me,Pardon me.,0.95
+curtis,designed,polite,polite_sorry_excuse_me,"Sorry, excuse me.",1.77
+curtis,designed,polite,polite_oh_sorry,"Oh, sorry.",0.88
+curtis,designed,polite,polite_watch_it,Watch it!,0.70
+curtis,designed,polite,polite_careful_there,Careful there.,0.85
+curtis,designed,polite,polite_thanks,Thanks.,0.70
+curtis,designed,polite,polite_thank_you,Thank you.,0.69
+curtis,designed,polite,polite_no_problem,No problem.,0.81
+curtis,designed,polite,polite_you_re_welcome,You're welcome.,0.90
+curtis,designed,polite,polite_sure_thing,Sure thing.,0.92
+curtis,designed,bye,bye_have_a_good_one,Have a good one.,0.88
+curtis,designed,bye,bye_take_care,Take care.,0.79
+curtis,designed,bye,bye_see_you_later,See you later.,0.95
+curtis,designed,bye,bye_see_ya,See ya.,0.70
+curtis,designed,bye,bye_catch_you_later,Catch you later.,0.92
+curtis,designed,bye,bye_have_a_good_day,Have a good day.,1.04
+curtis,designed,bye,bye_have_a_nice_day,Have a nice day!,1.00
+curtis,designed,bye,bye_have_a_good_night,Have a good night.,0.90
+curtis,designed,bye,bye_take_it_easy,Take it easy.,0.88
+curtis,designed,bye,bye_bye_now,Bye now.,0.65
+curtis,designed,bye,bye_later,Later.,0.58
+curtis,designed,bye,bye_stay_safe_out_there,Stay safe out there.,1.43
+curtis,designed,chatter,chatter_yeah_i_know_right,"Yeah, I know, right?",1.25
+curtis,designed,chatter,chatter_no_way_seriously,No way. Seriously?,2.05
+curtis,designed,chatter,chatter_i_told_him_that_already,I told him that already.,1.70
+curtis,designed,chatter,chatter_where_are_we_eating_tonight,Where are we eating tonight?,1.39
+curtis,designed,chatter,chatter_i_don_t_know_what_do_you_want,"I don't know, what do you want?",1.90
+curtis,designed,chatter,chatter_did_you_see_the_game_last_night,Did you see the game last night?,1.52
+curtis,designed,chatter,chatter_traffic_was_insane_this_morning,Traffic was insane this morning.,2.05
+curtis,designed,chatter,chatter_i_m_running_late_i_gotta_go,"I'm running late, I gotta go.",1.59
+curtis,designed,chatter,chatter_hang_on_let_me_call_you_back,"Hang on, let me call you back.",1.85
+curtis,designed,chatter,chatter_oh_my_god_that_s_hilarious,"Oh my God, that's hilarious.",2.35
+curtis,designed,chatter,chatter_yeah_yeah_totally,"Yeah, yeah, totally.",1.13
+curtis,designed,chatter,chatter_mm_hmm,Mm-hmm.,1.11
+curtis,designed,chatter,chatter_uh_huh,Uh-huh.,0.62
+curtis,designed,chatter,chatter_right_right,"Right, right.",1.14
+curtis,designed,chatter,chatter_that_s_what_i_m_saying,That's what I'm saying!,1.31
+curtis,designed,chatter,chatter_i_can_t_believe_it_s_already_friday,I can't believe it's already Friday.,2.05
+curtis,designed,chatter,chatter_we_should_grab_coffee_sometime,We should grab coffee sometime.,1.77
+curtis,designed,chatter,chatter_which_way_is_the_train_station,Which way is the train station?,1.82
+curtis,designed,chatter,chatter_it_s_just_up_the_street_on_the_left,It's just up the street on the left.,1.93
+curtis,designed,chatter,chatter_i_think_we_parked_on_the_other_side,I think we parked on the other side.,2.40
+curtis,designed,chatter,chatter_how_much_was_it,How much was it?,0.91
+curtis,designed,chatter,chatter_that_s_way_too_expensive,That's way too expensive.,1.70
+curtis,designed,chatter,chatter_hold_on_i_dropped_something,"Hold on, I dropped something.",1.98
+curtis,designed,chatter,chatter_wait_up,Wait up!,0.62
+curtis,designed,chatter,chatter_come_on_we_re_gonna_miss_it,"Come on, we're gonna miss it.",1.26
+curtis,designed,chatter,chatter_i_ll_meet_you_there,I'll meet you there.,0.94
+curtis,designed,chatter,chatter_did_you_get_my_text,Did you get my text?,1.19
+curtis,designed,chatter,chatter_my_phone_s_about_to_die,My phone's about to die.,1.41
+curtis,designed,chatter,chatter_it_s_supposed_to_storm_later,It's supposed to storm later.,1.80
+curtis,designed,chatter,chatter_i_m_so_tired_today,I'm so tired today.,1.69
+curtis,designed,chatter,chatter_honestly_i_have_no_idea,"Honestly, I have no idea.",1.78
+curtis,designed,chatter,chatter_anyway_like_i_was_saying,"Anyway, like I was saying...",2.10
+curtis,designed,chatter,chatter_oh_hey_over_here,"Oh, hey! Over here!",1.28
+curtis,designed,chatter,chatter_ha_yeah,Ha! Yeah.,1.32
+curtis,designed,chatter,chatter_okay_sounds_good,"Okay, sounds good.",1.44
+curtis,designed,chatter,chatter_nah_i_m_good_thanks,"Nah, I'm good, thanks.",2.56
+curtis,designed,chatter,chatter_yeah_that_s_what_i_heard,"Yeah, that's what I heard.",2.00
+curtis,designed,chatter,chatter_i_m_not_sure_honestly,"I'm not sure, honestly.",1.46
+curtis,designed,chatter,chatter_we_ll_see_how_it_goes,We'll see how it goes.,1.14
+curtis,designed,chatter,chatter_did_you_call_your_mom_back,Did you call your mom back?,1.52
+curtis,designed,chatter,chatter_i_ve_got_to_pick_up_the_kids_at_three,I've got to pick up the kids at three.,1.89
+curtis,designed,chatter,chatter_what_time_is_it,What time is it?,0.89
+curtis,designed,chatter,chatter_it_s_been_a_long_week,It's been a long week.,1.11
+curtis,designed,chatter,chatter_i_ll_tell_you_about_it_later,I'll tell you about it later.,1.41
+curtis,designed,chatter,chatter_can_you_believe_that,Can you believe that?,0.92
+curtis,designed,chatter,chatter_oh_that_reminds_me,"Oh, that reminds me.",1.38
+curtis,designed,chatter,chatter_i_need_a_vacation,I need a vacation.,1.31
+curtis,designed,chatter,chatter_let_me_know_when_you_re_ready,Let me know when you're ready.,1.34
+curtis,designed,chatter,chatter_where_d_you_park,Where'd you park?,0.95
+curtis,designed,chatter,chatter_it_s_right_around_the_corner,It's right around the corner.,1.48
+curtis,designed,chatter,chatter_i_m_starving_you_want_to_grab_lunch,I'm starving. You want to grab lunch?,2.08
+curtis,designed,chatter,chatter_they_re_opening_a_new_place_down_the_str,They're opening a new place down the street.,2.36
+curtis,designed,chatter,chatter_i_haven_t_seen_him_in_forever,I haven't seen him in forever.,1.57
+curtis,designed,chatter,chatter_she_said_she_d_be_here_by_now,She said she'd be here by now.,2.45
+curtis,designed,chatter,chatter_hang_on_i_m_getting_a_call,"Hang on, I'm getting a call.",1.72
+curtis,designed,chatter,chatter_no_the_other_one,"No, the other one.",1.36
+curtis,designed,chatter,chatter_i_ll_think_about_it,I'll think about it.,1.01
+curtis,designed,chatter,chatter_that_s_crazy,That's crazy.,0.96
+curtis,designed,chatter,chatter_for_real,For real?,0.76
+curtis,designed,chatter,chatter_i_swear_every_single_time,"I swear, every single time.",1.95
+curtis,designed,chatter,chatter_whatever_it_s_fine,"Whatever, it's fine.",2.02
+curtis,designed,chatter,chatter_let_s_just_go,Let's just go.,1.03
+curtis,designed,chatter,chatter_you_go_ahead_i_ll_catch_up,"You go ahead, I'll catch up.",1.75
+curtis,designed,chatter,chatter_it_s_not_a_big_deal,It's not a big deal.,1.35
+curtis,designed,chatter,chatter_i_was_just_about_to_say_that,I was just about to say that.,1.65
+curtis,designed,chatter,chatter_rent_went_up_again,Rent went up again.,1.23
+curtis,designed,chatter,chatter_my_car_s_in_the_shop,My car's in the shop.,1.31
+curtis,designed,chatter,chatter_the_bus_is_late_again,The bus is late again.,1.39
+curtis,designed,chatter,chatter_i_don_t_even_know_anymore,I don't even know anymore.,1.48
+curtis,designed,chatter,chatter_oh_i_love_this_song,"Oh, I love this song.",1.86
+curtis,designed,chatter,chatter_we_should_head_back,We should head back.,1.09
+curtis,designed,chatter,chatter_okay_okay_i_hear_you,"Okay, okay, I hear you.",1.60
+curtis,designed,chatter,chatter_hold_on_a_second,Hold on a second.,1.19
+curtis,designed,chatter,chatter_exactly,Exactly.,0.90
+curtis,designed,chatter,chatter_yeah_no_i_get_it,"Yeah, no, I get it.",1.32
+curtis,designed,chatter,chatter_it_is_what_it_is,It is what it is.,1.55
+walter,designed,greet,greet_hey_how_s_it_going,"Hey, how's it going?",1.11
+walter,designed,greet,greet_yo_what_s_up,"Yo, what's up?",1.32
+walter,designed,greet,greet_hey_good_morning,"Hey, good morning.",0.89
+walter,designed,greet,greet_morning,Morning.,0.48
+walter,designed,greet,greet_good_morning,Good morning!,0.53
+walter,designed,greet,greet_afternoon,Afternoon.,0.82
+walter,designed,greet,greet_good_afternoon,Good afternoon.,0.78
+walter,designed,greet,greet_evening,Evening.,0.58
+walter,designed,greet,greet_good_evening,Good evening.,0.63
+walter,designed,greet,greet_hey_there,Hey there.,0.52
+walter,designed,greet,greet_hi,Hi.,0.62
+walter,designed,greet,greet_hello,Hello.,0.78
+walter,designed,greet,greet_hey,Hey.,0.39
+walter,designed,greet,greet_how_are_you_doing,How are you doing?,0.69
+walter,designed,greet,greet_how_you_doing,How you doing?,0.80
+walter,designed,greet,greet_what_s_going_on,What's going on?,0.88
+walter,designed,greet,greet_hey_nice_to_see_you,"Hey, nice to see you.",1.81
+walter,designed,greet,greet_long_time_no_see,Long time no see!,1.22
+walter,designed,greet,greet_hey_man,Hey man.,0.67
+walter,designed,greet,greet_what_s_new,What's new?,0.68
+walter,designed,greet,greet_beautiful_day_huh,"Beautiful day, huh?",1.11
+walter,designed,greet,greet_hot_one_today_isn_t_it,"Hot one today, isn't it?",1.30
+walter,designed,greet,greet_cold_out_here_today,Cold out here today.,1.07
+walter,designed,greet,greet_looks_like_rain,Looks like rain.,0.90
+walter,designed,greet,greet_nice_day_for_a_walk,Nice day for a walk.,1.09
+walter,designed,greet,greet_can_i_help_you,Can I help you?,0.73
+walter,designed,greet,greet_need_something,Need something?,0.74
+walter,designed,polite,polite_excuse_me,Excuse me.,0.77
+walter,designed,polite,polite_pardon_me,Pardon me.,0.77
+walter,designed,polite,polite_sorry_excuse_me,"Sorry, excuse me.",1.47
+walter,designed,polite,polite_oh_sorry,"Oh, sorry.",0.71
+walter,designed,polite,polite_watch_it,Watch it!,0.50
+walter,designed,polite,polite_careful_there,Careful there.,0.75
+walter,designed,polite,polite_thanks,Thanks.,0.57
+walter,designed,polite,polite_thank_you,Thank you.,0.59
+walter,designed,polite,polite_no_problem,No problem.,0.85
+walter,designed,polite,polite_you_re_welcome,You're welcome.,0.58
+walter,designed,polite,polite_sure_thing,Sure thing.,0.83
+walter,designed,bye,bye_have_a_good_one,Have a good one.,0.71
+walter,designed,bye,bye_take_care,Take care.,0.67
+walter,designed,bye,bye_see_you_later,See you later.,0.74
+walter,designed,bye,bye_see_ya,See ya.,0.60
+walter,designed,bye,bye_catch_you_later,Catch you later.,0.73
+walter,designed,bye,bye_have_a_good_day,Have a good day.,0.90
+walter,designed,bye,bye_have_a_nice_day,Have a nice day!,0.90
+walter,designed,bye,bye_have_a_good_night,Have a good night.,0.81
+walter,designed,bye,bye_take_it_easy,Take it easy.,0.77
+walter,designed,bye,bye_bye_now,Bye now.,0.62
+walter,designed,bye,bye_later,Later.,0.52
+walter,designed,bye,bye_stay_safe_out_there,Stay safe out there.,1.16
+walter,designed,chatter,chatter_yeah_i_know_right,"Yeah, I know, right?",0.95
+walter,designed,chatter,chatter_no_way_seriously,No way. Seriously?,1.75
+walter,designed,chatter,chatter_i_told_him_that_already,I told him that already.,1.28
+walter,designed,chatter,chatter_where_are_we_eating_tonight,Where are we eating tonight?,1.17
+walter,designed,chatter,chatter_i_don_t_know_what_do_you_want,"I don't know, what do you want?",1.09
+walter,designed,chatter,chatter_did_you_see_the_game_last_night,Did you see the game last night?,1.44
+walter,designed,chatter,chatter_traffic_was_insane_this_morning,Traffic was insane this morning.,1.63
+walter,designed,chatter,chatter_i_m_running_late_i_gotta_go,"I'm running late, I gotta go.",2.23
+walter,designed,chatter,chatter_hang_on_let_me_call_you_back,"Hang on, let me call you back.",1.44
+walter,designed,chatter,chatter_oh_my_god_that_s_hilarious,"Oh my God, that's hilarious.",1.76
+walter,designed,chatter,chatter_yeah_yeah_totally,"Yeah, yeah, totally.",1.17
+walter,designed,chatter,chatter_mm_hmm,Mm-hmm.,0.63
+walter,designed,chatter,chatter_uh_huh,Uh-huh.,0.55
+walter,designed,chatter,chatter_right_right,"Right, right.",1.01
+walter,designed,chatter,chatter_that_s_what_i_m_saying,That's what I'm saying!,0.94
+walter,designed,chatter,chatter_i_can_t_believe_it_s_already_friday,I can't believe it's already Friday.,1.72
+walter,designed,chatter,chatter_we_should_grab_coffee_sometime,We should grab coffee sometime.,1.48
+walter,designed,chatter,chatter_which_way_is_the_train_station,Which way is the train station?,1.81
+walter,designed,chatter,chatter_it_s_just_up_the_street_on_the_left,It's just up the street on the left.,1.70
+walter,designed,chatter,chatter_i_think_we_parked_on_the_other_side,I think we parked on the other side.,1.79
+walter,designed,chatter,chatter_how_much_was_it,How much was it?,0.84
+walter,designed,chatter,chatter_that_s_way_too_expensive,That's way too expensive.,1.21
+walter,designed,chatter,chatter_hold_on_i_dropped_something,"Hold on, I dropped something.",2.42
+walter,designed,chatter,chatter_wait_up,Wait up!,0.48
+walter,designed,chatter,chatter_come_on_we_re_gonna_miss_it,"Come on, we're gonna miss it.",1.25
+walter,designed,chatter,chatter_i_ll_meet_you_there,I'll meet you there.,0.88
+walter,designed,chatter,chatter_did_you_get_my_text,Did you get my text?,1.01
+walter,designed,chatter,chatter_my_phone_s_about_to_die,My phone's about to die.,1.37
+walter,designed,chatter,chatter_it_s_supposed_to_storm_later,It's supposed to storm later.,1.47
+walter,designed,chatter,chatter_i_m_so_tired_today,I'm so tired today.,1.54
+walter,designed,chatter,chatter_honestly_i_have_no_idea,"Honestly, I have no idea.",1.91
+walter,designed,chatter,chatter_anyway_like_i_was_saying,"Anyway, like I was saying...",1.83
+walter,designed,chatter,chatter_oh_hey_over_here,"Oh, hey! Over here!",1.28
+walter,designed,chatter,chatter_ha_yeah,Ha! Yeah.,1.54
+walter,designed,chatter,chatter_okay_sounds_good,"Okay, sounds good.",1.02
+walter,designed,chatter,chatter_nah_i_m_good_thanks,"Nah, I'm good, thanks.",2.01
+walter,designed,chatter,chatter_yeah_that_s_what_i_heard,"Yeah, that's what I heard.",1.28
+walter,designed,chatter,chatter_i_m_not_sure_honestly,"I'm not sure, honestly.",1.55
+walter,designed,chatter,chatter_we_ll_see_how_it_goes,We'll see how it goes.,1.14
+walter,designed,chatter,chatter_did_you_call_your_mom_back,Did you call your mom back?,1.19
+walter,designed,chatter,chatter_i_ve_got_to_pick_up_the_kids_at_three,I've got to pick up the kids at three.,1.83
+walter,designed,chatter,chatter_what_time_is_it,What time is it?,0.82
+walter,designed,chatter,chatter_it_s_been_a_long_week,It's been a long week.,1.04
+walter,designed,chatter,chatter_i_ll_tell_you_about_it_later,I'll tell you about it later.,1.81
+walter,designed,chatter,chatter_can_you_believe_that,Can you believe that?,0.92
+walter,designed,chatter,chatter_oh_that_reminds_me,"Oh, that reminds me.",1.13
+walter,designed,chatter,chatter_i_need_a_vacation,I need a vacation.,1.08
+walter,designed,chatter,chatter_let_me_know_when_you_re_ready,Let me know when you're ready.,1.16
+walter,designed,chatter,chatter_where_d_you_park,Where'd you park?,0.83
+walter,designed,chatter,chatter_it_s_right_around_the_corner,It's right around the corner.,1.27
+walter,designed,chatter,chatter_i_m_starving_you_want_to_grab_lunch,I'm starving. You want to grab lunch?,1.94
+walter,designed,chatter,chatter_they_re_opening_a_new_place_down_the_str,They're opening a new place down the street.,1.73
+walter,designed,chatter,chatter_i_haven_t_seen_him_in_forever,I haven't seen him in forever.,1.38
+walter,designed,chatter,chatter_she_said_she_d_be_here_by_now,She said she'd be here by now.,1.48
+walter,designed,chatter,chatter_hang_on_i_m_getting_a_call,"Hang on, I'm getting a call.",1.58
+walter,designed,chatter,chatter_no_the_other_one,"No, the other one.",1.57
+walter,designed,chatter,chatter_i_ll_think_about_it,I'll think about it.,0.89
+walter,designed,chatter,chatter_that_s_crazy,That's crazy.,0.80
+walter,designed,chatter,chatter_for_real,For real?,0.64
+walter,designed,chatter,chatter_i_swear_every_single_time,"I swear, every single time.",1.71
+walter,designed,chatter,chatter_whatever_it_s_fine,"Whatever, it's fine.",1.33
+walter,designed,chatter,chatter_let_s_just_go,Let's just go.,0.94
+walter,designed,chatter,chatter_you_go_ahead_i_ll_catch_up,"You go ahead, I'll catch up.",1.45
+walter,designed,chatter,chatter_it_s_not_a_big_deal,It's not a big deal.,1.05
+walter,designed,chatter,chatter_i_was_just_about_to_say_that,I was just about to say that.,1.53
+walter,designed,chatter,chatter_rent_went_up_again,Rent went up again.,0.98
+walter,designed,chatter,chatter_my_car_s_in_the_shop,My car's in the shop.,1.05
+walter,designed,chatter,chatter_the_bus_is_late_again,The bus is late again.,1.24
+walter,designed,chatter,chatter_i_don_t_even_know_anymore,I don't even know anymore.,1.18
+walter,designed,chatter,chatter_oh_i_love_this_song,"Oh, I love this song.",1.28
+walter,designed,chatter,chatter_we_should_head_back,We should head back.,0.96
+walter,designed,chatter,chatter_okay_okay_i_hear_you,"Okay, okay, I hear you.",1.53
+walter,designed,chatter,chatter_hold_on_a_second,Hold on a second.,0.99
+walter,designed,chatter,chatter_exactly,Exactly.,0.84
+walter,designed,chatter,chatter_yeah_no_i_get_it,"Yeah, no, I get it.",1.27
+walter,designed,chatter,chatter_it_is_what_it_is,It is what it is.,0.97
+joel,cloned,greet,greet_hey_how_s_it_going,"Hey, how's it going?",1.51
+joel,cloned,greet,greet_yo_what_s_up,"Yo, what's up?",0.87
+joel,cloned,greet,greet_hey_good_morning,"Hey, good morning.",2.58
+joel,cloned,greet,greet_morning,Morning.,0.70
+joel,cloned,greet,greet_good_morning,Good morning!,1.15
+joel,cloned,greet,greet_afternoon,Afternoon.,1.40
+joel,cloned,greet,greet_good_afternoon,Good afternoon.,1.79
+joel,cloned,greet,greet_evening,Evening.,1.12
+joel,cloned,greet,greet_good_evening,Good evening.,1.14
+joel,cloned,greet,greet_hey_there,Hey there.,0.91
+joel,cloned,greet,greet_hi,Hi.,0.54
+joel,cloned,greet,greet_hello,Hello.,0.66
+joel,cloned,greet,greet_hey,Hey.,0.61
+joel,cloned,greet,greet_how_are_you_doing,How are you doing?,1.29
+joel,cloned,greet,greet_how_you_doing,How you doing?,1.16
+joel,cloned,greet,greet_what_s_going_on,What's going on?,1.13
+joel,cloned,greet,greet_hey_nice_to_see_you,"Hey, nice to see you.",1.91
+joel,cloned,greet,greet_long_time_no_see,Long time no see!,2.05
+joel,cloned,greet,greet_hey_man,Hey man.,1.61
+joel,cloned,greet,greet_what_s_new,What's new?,1.27
+joel,cloned,greet,greet_beautiful_day_huh,"Beautiful day, huh?",3.04
+joel,cloned,greet,greet_hot_one_today_isn_t_it,"Hot one today, isn't it?",2.34
+joel,cloned,greet,greet_cold_out_here_today,Cold out here today.,1.70
+joel,cloned,greet,greet_looks_like_rain,Looks like rain.,2.27
+joel,cloned,greet,greet_nice_day_for_a_walk,Nice day for a walk.,1.59
+joel,cloned,greet,greet_can_i_help_you,Can I help you?,1.01
+joel,cloned,greet,greet_need_something,Need something?,1.31
+joel,cloned,polite,polite_excuse_me,Excuse me.,1.70
+joel,cloned,polite,polite_pardon_me,Pardon me.,1.08
+joel,cloned,polite,polite_sorry_excuse_me,"Sorry, excuse me.",1.42
+joel,cloned,polite,polite_oh_sorry,"Oh, sorry.",1.06
+joel,cloned,polite,polite_watch_it,Watch it!,0.91
+joel,cloned,polite,polite_careful_there,Careful there.,1.30
+joel,cloned,polite,polite_thanks,Thanks.,0.77
+joel,cloned,polite,polite_thank_you,Thank you.,0.89
+joel,cloned,polite,polite_no_problem,No problem.,1.36
+joel,cloned,polite,polite_you_re_welcome,You're welcome.,0.88
+joel,cloned,polite,polite_sure_thing,Sure thing.,1.38
+joel,cloned,bye,bye_have_a_good_one,Have a good one.,1.71
+joel,cloned,bye,bye_take_care,Take care.,1.25
+joel,cloned,bye,bye_see_you_later,See you later.,1.22
+joel,cloned,bye,bye_see_ya,See ya.,1.07
+joel,cloned,bye,bye_catch_you_later,Catch you later.,1.35
+joel,cloned,bye,bye_have_a_good_day,Have a good day.,1.40
+joel,cloned,bye,bye_have_a_nice_day,Have a nice day!,1.31
+joel,cloned,bye,bye_have_a_good_night,Have a good night.,1.86
+joel,cloned,bye,bye_take_it_easy,Take it easy.,0.96
+joel,cloned,bye,bye_bye_now,Bye now.,2.01
+joel,cloned,bye,bye_later,Later.,0.75
+joel,cloned,bye,bye_stay_safe_out_there,Stay safe out there.,1.48
+joel,cloned,chatter,chatter_yeah_i_know_right,"Yeah, I know, right?",1.45
+joel,cloned,chatter,chatter_no_way_seriously,No way. Seriously?,1.87
+joel,cloned,chatter,chatter_i_told_him_that_already,I told him that already.,2.05
+joel,cloned,chatter,chatter_where_are_we_eating_tonight,Where are we eating tonight?,1.51
+joel,cloned,chatter,chatter_i_don_t_know_what_do_you_want,"I don't know, what do you want?",2.04
+joel,cloned,chatter,chatter_did_you_see_the_game_last_night,Did you see the game last night?,2.20
+joel,cloned,chatter,chatter_traffic_was_insane_this_morning,Traffic was insane this morning.,1.81
+joel,cloned,chatter,chatter_i_m_running_late_i_gotta_go,"I'm running late, I gotta go.",1.73
+joel,cloned,chatter,chatter_hang_on_let_me_call_you_back,"Hang on, let me call you back.",2.13
+joel,cloned,chatter,chatter_oh_my_god_that_s_hilarious,"Oh my God, that's hilarious.",2.00
+joel,cloned,chatter,chatter_yeah_yeah_totally,"Yeah, yeah, totally.",2.63
+joel,cloned,chatter,chatter_mm_hmm,Mm-hmm.,0.84
+joel,cloned,chatter,chatter_uh_huh,Uh-huh.,0.80
+joel,cloned,chatter,chatter_right_right,"Right, right.",1.03
+joel,cloned,chatter,chatter_that_s_what_i_m_saying,That's what I'm saying!,1.07
+joel,cloned,chatter,chatter_i_can_t_believe_it_s_already_friday,I can't believe it's already Friday.,2.22
+joel,cloned,chatter,chatter_we_should_grab_coffee_sometime,We should grab coffee sometime.,2.85
+joel,cloned,chatter,chatter_which_way_is_the_train_station,Which way is the train station?,1.80
+joel,cloned,chatter,chatter_it_s_just_up_the_street_on_the_left,It's just up the street on the left.,2.25
+joel,cloned,chatter,chatter_i_think_we_parked_on_the_other_side,I think we parked on the other side.,2.44
+joel,cloned,chatter,chatter_how_much_was_it,How much was it?,1.39
+joel,cloned,chatter,chatter_that_s_way_too_expensive,That's way too expensive.,1.36
+joel,cloned,chatter,chatter_hold_on_i_dropped_something,"Hold on, I dropped something.",2.21
+joel,cloned,chatter,chatter_wait_up,Wait up!,1.19
+joel,cloned,chatter,chatter_come_on_we_re_gonna_miss_it,"Come on, we're gonna miss it.",3.92
+joel,cloned,chatter,chatter_i_ll_meet_you_there,I'll meet you there.,1.67
+joel,cloned,chatter,chatter_did_you_get_my_text,Did you get my text?,1.29
+joel,cloned,chatter,chatter_my_phone_s_about_to_die,My phone's about to die.,1.95
+joel,cloned,chatter,chatter_it_s_supposed_to_storm_later,It's supposed to storm later.,1.63
+joel,cloned,chatter,chatter_i_m_so_tired_today,I'm so tired today.,2.05
+joel,cloned,chatter,chatter_honestly_i_have_no_idea,"Honestly, I have no idea.",1.71
+joel,cloned,chatter,chatter_anyway_like_i_was_saying,"Anyway, like I was saying...",1.80
+joel,cloned,chatter,chatter_oh_hey_over_here,"Oh, hey! Over here!",2.31
+joel,cloned,chatter,chatter_ha_yeah,Ha! Yeah.,2.47
+joel,cloned,chatter,chatter_okay_sounds_good,"Okay, sounds good.",1.09
+joel,cloned,chatter,chatter_nah_i_m_good_thanks,"Nah, I'm good, thanks.",1.95
+joel,cloned,chatter,chatter_yeah_that_s_what_i_heard,"Yeah, that's what I heard.",2.68
+joel,cloned,chatter,chatter_i_m_not_sure_honestly,"I'm not sure, honestly.",1.96
+joel,cloned,chatter,chatter_we_ll_see_how_it_goes,We'll see how it goes.,1.35
+joel,cloned,chatter,chatter_did_you_call_your_mom_back,Did you call your mom back?,1.29
+joel,cloned,chatter,chatter_i_ve_got_to_pick_up_the_kids_at_three,I've got to pick up the kids at three.,3.16
+joel,cloned,chatter,chatter_what_time_is_it,What time is it?,1.12
+joel,cloned,chatter,chatter_it_s_been_a_long_week,It's been a long week.,2.13
+joel,cloned,chatter,chatter_i_ll_tell_you_about_it_later,I'll tell you about it later.,1.63
+joel,cloned,chatter,chatter_can_you_believe_that,Can you believe that?,1.51
+joel,cloned,chatter,chatter_oh_that_reminds_me,"Oh, that reminds me.",1.67
+joel,cloned,chatter,chatter_i_need_a_vacation,I need a vacation.,1.90
+joel,cloned,chatter,chatter_let_me_know_when_you_re_ready,Let me know when you're ready.,1.35
+joel,cloned,chatter,chatter_where_d_you_park,Where'd you park?,1.16
+joel,cloned,chatter,chatter_it_s_right_around_the_corner,It's right around the corner.,1.96
+joel,cloned,chatter,chatter_i_m_starving_you_want_to_grab_lunch,I'm starving. You want to grab lunch?,2.33
+joel,cloned,chatter,chatter_they_re_opening_a_new_place_down_the_str,They're opening a new place down the street.,2.28
+joel,cloned,chatter,chatter_i_haven_t_seen_him_in_forever,I haven't seen him in forever.,2.04
+joel,cloned,chatter,chatter_she_said_she_d_be_here_by_now,She said she'd be here by now.,1.92
+joel,cloned,chatter,chatter_hang_on_i_m_getting_a_call,"Hang on, I'm getting a call.",1.75
+joel,cloned,chatter,chatter_no_the_other_one,"No, the other one.",1.47
+joel,cloned,chatter,chatter_i_ll_think_about_it,I'll think about it.,1.68
+joel,cloned,chatter,chatter_that_s_crazy,That's crazy.,2.07
+joel,cloned,chatter,chatter_for_real,For real?,1.27
+joel,cloned,chatter,chatter_i_swear_every_single_time,"I swear, every single time.",2.76
+joel,cloned,chatter,chatter_whatever_it_s_fine,"Whatever, it's fine.",2.74
+joel,cloned,chatter,chatter_let_s_just_go,Let's just go.,0.83
+joel,cloned,chatter,chatter_you_go_ahead_i_ll_catch_up,"You go ahead, I'll catch up.",1.33
+joel,cloned,chatter,chatter_it_s_not_a_big_deal,It's not a big deal.,1.69
+joel,cloned,chatter,chatter_i_was_just_about_to_say_that,I was just about to say that.,1.75
+joel,cloned,chatter,chatter_rent_went_up_again,Rent went up again.,1.48
+joel,cloned,chatter,chatter_my_car_s_in_the_shop,My car's in the shop.,1.54
+joel,cloned,chatter,chatter_the_bus_is_late_again,The bus is late again.,1.81
+joel,cloned,chatter,chatter_i_don_t_even_know_anymore,I don't even know anymore.,1.67
+joel,cloned,chatter,chatter_oh_i_love_this_song,"Oh, I love this song.",2.56
+joel,cloned,chatter,chatter_we_should_head_back,We should head back.,1.12
+joel,cloned,chatter,chatter_okay_okay_i_hear_you,"Okay, okay, I hear you.",2.57
+joel,cloned,chatter,chatter_hold_on_a_second,Hold on a second.,0.90
+joel,cloned,chatter,chatter_exactly,Exactly.,1.45
+joel,cloned,chatter,chatter_yeah_no_i_get_it,"Yeah, no, I get it.",1.85
+joel,cloned,chatter,chatter_it_is_what_it_is,It is what it is.,1.46
+joeb,cloned,greet,greet_hey_how_s_it_going,"Hey, how's it going?",0.81
+joeb,cloned,greet,greet_yo_what_s_up,"Yo, what's up?",0.59
+joeb,cloned,greet,greet_hey_good_morning,"Hey, good morning.",0.63
+joeb,cloned,greet,greet_morning,Morning.,0.59
+joeb,cloned,greet,greet_good_morning,Good morning!,0.76
+joeb,cloned,greet,greet_afternoon,Afternoon.,0.84
+joeb,cloned,greet,greet_good_afternoon,Good afternoon.,1.15
+joeb,cloned,greet,greet_evening,Evening.,0.70
+joeb,cloned,greet,greet_good_evening,Good evening.,0.62
+joeb,cloned,greet,greet_hey_there,Hey there.,0.74
+joeb,cloned,greet,greet_hi,Hi.,0.41
+joeb,cloned,greet,greet_hello,Hello.,0.85
+joeb,cloned,greet,greet_hey,Hey.,0.41
+joeb,cloned,greet,greet_how_are_you_doing,How are you doing?,0.68
+joeb,cloned,greet,greet_how_you_doing,How you doing?,0.69
+joeb,cloned,greet,greet_what_s_going_on,What's going on?,0.71
+joeb,cloned,greet,greet_hey_nice_to_see_you,"Hey, nice to see you.",1.21
+joeb,cloned,greet,greet_long_time_no_see,Long time no see!,1.16
+joeb,cloned,greet,greet_hey_man,Hey man.,0.63
+joeb,cloned,greet,greet_what_s_new,What's new?,0.97
+joeb,cloned,greet,greet_beautiful_day_huh,"Beautiful day, huh?",1.16
+joeb,cloned,greet,greet_hot_one_today_isn_t_it,"Hot one today, isn't it?",1.47
+joeb,cloned,greet,greet_cold_out_here_today,Cold out here today.,1.28
+joeb,cloned,greet,greet_looks_like_rain,Looks like rain.,1.05
+joeb,cloned,greet,greet_nice_day_for_a_walk,Nice day for a walk.,1.31
+joeb,cloned,greet,greet_can_i_help_you,Can I help you?,1.05
+joeb,cloned,greet,greet_need_something,Need something?,0.98
+joeb,cloned,polite,polite_excuse_me,Excuse me.,0.75
+joeb,cloned,polite,polite_pardon_me,Pardon me.,0.55
+joeb,cloned,polite,polite_sorry_excuse_me,"Sorry, excuse me.",0.98
+joeb,cloned,polite,polite_oh_sorry,"Oh, sorry.",0.74
+joeb,cloned,polite,polite_watch_it,Watch it!,0.49
+joeb,cloned,polite,polite_careful_there,Careful there.,0.83
+joeb,cloned,polite,polite_thanks,Thanks.,0.72
+joeb,cloned,polite,polite_thank_you,Thank you.,0.48
+joeb,cloned,polite,polite_no_problem,No problem.,0.76
+joeb,cloned,polite,polite_you_re_welcome,You're welcome.,0.57
+joeb,cloned,polite,polite_sure_thing,Sure thing.,0.66
+joeb,cloned,bye,bye_have_a_good_one,Have a good one.,0.69
+joeb,cloned,bye,bye_take_care,Take care.,0.92
+joeb,cloned,bye,bye_see_you_later,See you later.,0.64
+joeb,cloned,bye,bye_see_ya,See ya.,0.42
+joeb,cloned,bye,bye_catch_you_later,Catch you later.,0.85
+joeb,cloned,bye,bye_have_a_good_day,Have a good day.,1.06
+joeb,cloned,bye,bye_have_a_nice_day,Have a nice day!,1.46
+joeb,cloned,bye,bye_have_a_good_night,Have a good night.,0.77
+joeb,cloned,bye,bye_take_it_easy,Take it easy.,0.76
+joeb,cloned,bye,bye_bye_now,Bye now.,0.99
+joeb,cloned,bye,bye_later,Later.,0.69
+joeb,cloned,bye,bye_stay_safe_out_there,Stay safe out there.,1.09
+joeb,cloned,chatter,chatter_yeah_i_know_right,"Yeah, I know, right?",0.94
+joeb,cloned,chatter,chatter_no_way_seriously,No way. Seriously?,1.75
+joeb,cloned,chatter,chatter_i_told_him_that_already,I told him that already.,1.32
+joeb,cloned,chatter,chatter_where_are_we_eating_tonight,Where are we eating tonight?,1.47
+joeb,cloned,chatter,chatter_i_don_t_know_what_do_you_want,"I don't know, what do you want?",1.02
+joeb,cloned,chatter,chatter_did_you_see_the_game_last_night,Did you see the game last night?,1.52
+joeb,cloned,chatter,chatter_traffic_was_insane_this_morning,Traffic was insane this morning.,1.63
+joeb,cloned,chatter,chatter_i_m_running_late_i_gotta_go,"I'm running late, I gotta go.",1.64
+joeb,cloned,chatter,chatter_hang_on_let_me_call_you_back,"Hang on, let me call you back.",1.54
+joeb,cloned,chatter,chatter_oh_my_god_that_s_hilarious,"Oh my God, that's hilarious.",1.82
+joeb,cloned,chatter,chatter_yeah_yeah_totally,"Yeah, yeah, totally.",1.14
+joeb,cloned,chatter,chatter_mm_hmm,Mm-hmm.,0.59
+joeb,cloned,chatter,chatter_uh_huh,Uh-huh.,0.49
+joeb,cloned,chatter,chatter_right_right,"Right, right.",0.57
+joeb,cloned,chatter,chatter_that_s_what_i_m_saying,That's what I'm saying!,0.99
+joeb,cloned,chatter,chatter_i_can_t_believe_it_s_already_friday,I can't believe it's already Friday.,1.79
+joeb,cloned,chatter,chatter_we_should_grab_coffee_sometime,We should grab coffee sometime.,1.36
+joeb,cloned,chatter,chatter_which_way_is_the_train_station,Which way is the train station?,1.77
+joeb,cloned,chatter,chatter_it_s_just_up_the_street_on_the_left,It's just up the street on the left.,2.30
+joeb,cloned,chatter,chatter_i_think_we_parked_on_the_other_side,I think we parked on the other side.,1.84
+joeb,cloned,chatter,chatter_how_much_was_it,How much was it?,0.75
+joeb,cloned,chatter,chatter_that_s_way_too_expensive,That's way too expensive.,1.31
+joeb,cloned,chatter,chatter_hold_on_i_dropped_something,"Hold on, I dropped something.",1.61
+joeb,cloned,chatter,chatter_wait_up,Wait up!,0.44
+joeb,cloned,chatter,chatter_come_on_we_re_gonna_miss_it,"Come on, we're gonna miss it.",1.17
+joeb,cloned,chatter,chatter_i_ll_meet_you_there,I'll meet you there.,0.98
+joeb,cloned,chatter,chatter_did_you_get_my_text,Did you get my text?,1.12
+joeb,cloned,chatter,chatter_my_phone_s_about_to_die,My phone's about to die.,1.44
+joeb,cloned,chatter,chatter_it_s_supposed_to_storm_later,It's supposed to storm later.,1.60
+joeb,cloned,chatter,chatter_i_m_so_tired_today,I'm so tired today.,1.22
+joeb,cloned,chatter,chatter_honestly_i_have_no_idea,"Honestly, I have no idea.",1.39
+joeb,cloned,chatter,chatter_anyway_like_i_was_saying,"Anyway, like I was saying...",1.19
+joeb,cloned,chatter,chatter_oh_hey_over_here,"Oh, hey! Over here!",1.61
+joeb,cloned,chatter,chatter_ha_yeah,Ha! Yeah.,1.07
+joeb,cloned,chatter,chatter_okay_sounds_good,"Okay, sounds good.",1.54
+joeb,cloned,chatter,chatter_nah_i_m_good_thanks,"Nah, I'm good, thanks.",1.06
+joeb,cloned,chatter,chatter_yeah_that_s_what_i_heard,"Yeah, that's what I heard.",0.83
+joeb,cloned,chatter,chatter_i_m_not_sure_honestly,"I'm not sure, honestly.",1.46
+joeb,cloned,chatter,chatter_we_ll_see_how_it_goes,We'll see how it goes.,1.07
+joeb,cloned,chatter,chatter_did_you_call_your_mom_back,Did you call your mom back?,1.35
+joeb,cloned,chatter,chatter_i_ve_got_to_pick_up_the_kids_at_three,I've got to pick up the kids at three.,1.89
+joeb,cloned,chatter,chatter_what_time_is_it,What time is it?,1.29
+joeb,cloned,chatter,chatter_it_s_been_a_long_week,It's been a long week.,0.96
+joeb,cloned,chatter,chatter_i_ll_tell_you_about_it_later,I'll tell you about it later.,1.17
+joeb,cloned,chatter,chatter_can_you_believe_that,Can you believe that?,0.92
+joeb,cloned,chatter,chatter_oh_that_reminds_me,"Oh, that reminds me.",0.99
+joeb,cloned,chatter,chatter_i_need_a_vacation,I need a vacation.,1.00
+joeb,cloned,chatter,chatter_let_me_know_when_you_re_ready,Let me know when you're ready.,1.01
+joeb,cloned,chatter,chatter_where_d_you_park,Where'd you park?,0.88
+joeb,cloned,chatter,chatter_it_s_right_around_the_corner,It's right around the corner.,1.27
+joeb,cloned,chatter,chatter_i_m_starving_you_want_to_grab_lunch,I'm starving. You want to grab lunch?,1.69
+joeb,cloned,chatter,chatter_they_re_opening_a_new_place_down_the_str,They're opening a new place down the street.,2.09
+joeb,cloned,chatter,chatter_i_haven_t_seen_him_in_forever,I haven't seen him in forever.,1.44
+joeb,cloned,chatter,chatter_she_said_she_d_be_here_by_now,She said she'd be here by now.,1.78
+joeb,cloned,chatter,chatter_hang_on_i_m_getting_a_call,"Hang on, I'm getting a call.",1.53
+joeb,cloned,chatter,chatter_no_the_other_one,"No, the other one.",0.68
+joeb,cloned,chatter,chatter_i_ll_think_about_it,I'll think about it.,1.17
+joeb,cloned,chatter,chatter_that_s_crazy,That's crazy.,0.92
+joeb,cloned,chatter,chatter_for_real,For real?,0.77
+joeb,cloned,chatter,chatter_i_swear_every_single_time,"I swear, every single time.",1.63
+joeb,cloned,chatter,chatter_whatever_it_s_fine,"Whatever, it's fine.",1.20
+joeb,cloned,chatter,chatter_let_s_just_go,Let's just go.,0.49
+joeb,cloned,chatter,chatter_you_go_ahead_i_ll_catch_up,"You go ahead, I'll catch up.",1.13
+joeb,cloned,chatter,chatter_it_s_not_a_big_deal,It's not a big deal.,1.07
+joeb,cloned,chatter,chatter_i_was_just_about_to_say_that,I was just about to say that.,1.38
+joeb,cloned,chatter,chatter_rent_went_up_again,Rent went up again.,1.45
+joeb,cloned,chatter,chatter_my_car_s_in_the_shop,My car's in the shop.,1.11
+joeb,cloned,chatter,chatter_the_bus_is_late_again,The bus is late again.,2.04
+joeb,cloned,chatter,chatter_i_don_t_even_know_anymore,I don't even know anymore.,1.28
+joeb,cloned,chatter,chatter_oh_i_love_this_song,"Oh, I love this song.",1.21
+joeb,cloned,chatter,chatter_we_should_head_back,We should head back.,1.01
+joeb,cloned,chatter,chatter_okay_okay_i_hear_you,"Okay, okay, I hear you.",1.67
+joeb,cloned,chatter,chatter_hold_on_a_second,Hold on a second.,1.06
+joeb,cloned,chatter,chatter_exactly,Exactly.,0.68
+joeb,cloned,chatter,chatter_yeah_no_i_get_it,"Yeah, no, I get it.",1.05
+joeb,cloned,chatter,chatter_it_is_what_it_is,It is what it is.,0.99
+ben,cloned,greet,greet_hey_how_s_it_going,"Hey, how's it going?",0.85
+ben,cloned,greet,greet_yo_what_s_up,"Yo, what's up?",0.57
+ben,cloned,greet,greet_hey_good_morning,"Hey, good morning.",0.73
+ben,cloned,greet,greet_morning,Morning.,0.69
+ben,cloned,greet,greet_good_morning,Good morning!,0.47
+ben,cloned,greet,greet_afternoon,Afternoon.,1.28
+ben,cloned,greet,greet_good_afternoon,Good afternoon.,1.09
+ben,cloned,greet,greet_evening,Evening.,0.73
+ben,cloned,greet,greet_good_evening,Good evening.,0.52
+ben,cloned,greet,greet_hey_there,Hey there.,0.66
+ben,cloned,greet,greet_hi,Hi.,0.36
+ben,cloned,greet,greet_hello,Hello.,0.42
+ben,cloned,greet,greet_hey,Hey.,0.29
+ben,cloned,greet,greet_how_are_you_doing,How are you doing?,0.76
+ben,cloned,greet,greet_how_you_doing,How you doing?,0.55
+ben,cloned,greet,greet_what_s_going_on,What's going on?,0.74
+ben,cloned,greet,greet_hey_nice_to_see_you,"Hey, nice to see you.",1.95
+ben,cloned,greet,greet_long_time_no_see,Long time no see!,1.30
+ben,cloned,greet,greet_hey_man,Hey man.,0.71
+ben,cloned,greet,greet_what_s_new,What's new?,0.61
+ben,cloned,greet,greet_beautiful_day_huh,"Beautiful day, huh?",0.93
+ben,cloned,greet,greet_hot_one_today_isn_t_it,"Hot one today, isn't it?",1.03
+ben,cloned,greet,greet_cold_out_here_today,Cold out here today.,1.51
+ben,cloned,greet,greet_looks_like_rain,Looks like rain.,1.36
+ben,cloned,greet,greet_nice_day_for_a_walk,Nice day for a walk.,1.19
+ben,cloned,greet,greet_can_i_help_you,Can I help you?,0.75
+ben,cloned,greet,greet_need_something,Need something?,0.61
+ben,cloned,polite,polite_excuse_me,Excuse me.,0.99
+ben,cloned,polite,polite_pardon_me,Pardon me.,0.52
+ben,cloned,polite,polite_sorry_excuse_me,"Sorry, excuse me.",1.04
+ben,cloned,polite,polite_oh_sorry,"Oh, sorry.",0.65
+ben,cloned,polite,polite_watch_it,Watch it!,0.47
+ben,cloned,polite,polite_careful_there,Careful there.,0.59
+ben,cloned,polite,polite_thanks,Thanks.,0.40
+ben,cloned,polite,polite_thank_you,Thank you.,1.01
+ben,cloned,polite,polite_no_problem,No problem.,0.57
+ben,cloned,polite,polite_you_re_welcome,You're welcome.,0.49
+ben,cloned,polite,polite_sure_thing,Sure thing.,1.14
+ben,cloned,bye,bye_have_a_good_one,Have a good one.,0.49
+ben,cloned,bye,bye_take_care,Take care.,0.47
+ben,cloned,bye,bye_see_you_later,See you later.,0.60
+ben,cloned,bye,bye_see_ya,See ya.,0.42
+ben,cloned,bye,bye_catch_you_later,Catch you later.,0.64
+ben,cloned,bye,bye_have_a_good_day,Have a good day.,0.78
+ben,cloned,bye,bye_have_a_nice_day,Have a nice day!,0.93
+ben,cloned,bye,bye_have_a_good_night,Have a good night.,0.60
+ben,cloned,bye,bye_take_it_easy,Take it easy.,0.54
+ben,cloned,bye,bye_bye_now,Bye now.,0.49
+ben,cloned,bye,bye_later,Later.,0.33
+ben,cloned,bye,bye_stay_safe_out_there,Stay safe out there.,1.81
+ben,cloned,chatter,chatter_yeah_i_know_right,"Yeah, I know, right?",0.97
+ben,cloned,chatter,chatter_no_way_seriously,No way. Seriously?,1.57
+ben,cloned,chatter,chatter_i_told_him_that_already,I told him that already.,1.32
+ben,cloned,chatter,chatter_where_are_we_eating_tonight,Where are we eating tonight?,1.04
+ben,cloned,chatter,chatter_i_don_t_know_what_do_you_want,"I don't know, what do you want?",1.78
+ben,cloned,chatter,chatter_did_you_see_the_game_last_night,Did you see the game last night?,1.47
+ben,cloned,chatter,chatter_traffic_was_insane_this_morning,Traffic was insane this morning.,1.37
+ben,cloned,chatter,chatter_i_m_running_late_i_gotta_go,"I'm running late, I gotta go.",1.92
+ben,cloned,chatter,chatter_hang_on_let_me_call_you_back,"Hang on, let me call you back.",1.67
+ben,cloned,chatter,chatter_oh_my_god_that_s_hilarious,"Oh my God, that's hilarious.",1.75
+ben,cloned,chatter,chatter_yeah_yeah_totally,"Yeah, yeah, totally.",0.95
+ben,cloned,chatter,chatter_mm_hmm,Mm-hmm.,0.90
+ben,cloned,chatter,chatter_uh_huh,Uh-huh.,0.42
+ben,cloned,chatter,chatter_right_right,"Right, right.",1.14
+ben,cloned,chatter,chatter_that_s_what_i_m_saying,That's what I'm saying!,0.71
+ben,cloned,chatter,chatter_i_can_t_believe_it_s_already_friday,I can't believe it's already Friday.,1.64
+ben,cloned,chatter,chatter_we_should_grab_coffee_sometime,We should grab coffee sometime.,1.99
+ben,cloned,chatter,chatter_which_way_is_the_train_station,Which way is the train station?,1.91
+ben,cloned,chatter,chatter_it_s_just_up_the_street_on_the_left,It's just up the street on the left.,1.82
+ben,cloned,chatter,chatter_i_think_we_parked_on_the_other_side,I think we parked on the other side.,1.89
+ben,cloned,chatter,chatter_how_much_was_it,How much was it?,0.71
+ben,cloned,chatter,chatter_that_s_way_too_expensive,That's way too expensive.,1.20
+ben,cloned,chatter,chatter_hold_on_i_dropped_something,"Hold on, I dropped something.",1.93
+ben,cloned,chatter,chatter_wait_up,Wait up!,0.56
+ben,cloned,chatter,chatter_come_on_we_re_gonna_miss_it,"Come on, we're gonna miss it.",0.89
+ben,cloned,chatter,chatter_i_ll_meet_you_there,I'll meet you there.,0.66
+ben,cloned,chatter,chatter_did_you_get_my_text,Did you get my text?,0.90
+ben,cloned,chatter,chatter_my_phone_s_about_to_die,My phone's about to die.,1.78
+ben,cloned,chatter,chatter_it_s_supposed_to_storm_later,It's supposed to storm later.,2.01
+ben,cloned,chatter,chatter_i_m_so_tired_today,I'm so tired today.,1.51
+ben,cloned,chatter,chatter_honestly_i_have_no_idea,"Honestly, I have no idea.",1.83
+ben,cloned,chatter,chatter_anyway_like_i_was_saying,"Anyway, like I was saying...",1.92
+ben,cloned,chatter,chatter_oh_hey_over_here,"Oh, hey! Over here!",1.75
+ben,cloned,chatter,chatter_ha_yeah,Ha! Yeah.,1.20
+ben,cloned,chatter,chatter_okay_sounds_good,"Okay, sounds good.",1.40
+ben,cloned,chatter,chatter_yeah_that_s_what_i_heard,"Yeah, that's what I heard.",1.24
+ben,cloned,chatter,chatter_nah_i_m_good_thanks,"Nah, I'm good, thanks.",1.32
+ben,cloned,chatter,chatter_i_m_not_sure_honestly,"I'm not sure, honestly.",1.87
+ben,cloned,chatter,chatter_we_ll_see_how_it_goes,We'll see how it goes.,1.14
+ben,cloned,chatter,chatter_did_you_call_your_mom_back,Did you call your mom back?,1.61
+ben,cloned,chatter,chatter_i_ve_got_to_pick_up_the_kids_at_three,I've got to pick up the kids at three.,1.77
+ben,cloned,chatter,chatter_what_time_is_it,What time is it?,0.72
+ben,cloned,chatter,chatter_it_s_been_a_long_week,It's been a long week.,0.75
+ben,cloned,chatter,chatter_i_ll_tell_you_about_it_later,I'll tell you about it later.,0.87
+ben,cloned,chatter,chatter_can_you_believe_that,Can you believe that?,0.79
+ben,cloned,chatter,chatter_oh_that_reminds_me,"Oh, that reminds me.",1.30
+ben,cloned,chatter,chatter_i_need_a_vacation,I need a vacation.,1.18
+ben,cloned,chatter,chatter_let_me_know_when_you_re_ready,Let me know when you're ready.,0.88
+ben,cloned,chatter,chatter_where_d_you_park,Where'd you park?,0.57
+ben,cloned,chatter,chatter_it_s_right_around_the_corner,It's right around the corner.,1.53
+ben,cloned,chatter,chatter_they_re_opening_a_new_place_down_the_str,They're opening a new place down the street.,1.97
+ben,cloned,chatter,chatter_i_m_starving_you_want_to_grab_lunch,I'm starving. You want to grab lunch?,1.86
+ben,cloned,chatter,chatter_i_haven_t_seen_him_in_forever,I haven't seen him in forever.,1.96
+ben,cloned,chatter,chatter_she_said_she_d_be_here_by_now,She said she'd be here by now.,1.41
+ben,cloned,chatter,chatter_hang_on_i_m_getting_a_call,"Hang on, I'm getting a call.",1.43
+ben,cloned,chatter,chatter_no_the_other_one,"No, the other one.",1.53
+ben,cloned,chatter,chatter_i_ll_think_about_it,I'll think about it.,1.32
+ben,cloned,chatter,chatter_that_s_crazy,That's crazy.,0.65
+ben,cloned,chatter,chatter_for_real,For real?,0.48
+ben,cloned,chatter,chatter_i_swear_every_single_time,"I swear, every single time.",1.66
+ben,cloned,chatter,chatter_whatever_it_s_fine,"Whatever, it's fine.",1.09
+ben,cloned,chatter,chatter_let_s_just_go,Let's just go.,0.66
+ben,cloned,chatter,chatter_you_go_ahead_i_ll_catch_up,"You go ahead, I'll catch up.",1.70
+ben,cloned,chatter,chatter_it_s_not_a_big_deal,It's not a big deal.,1.08
+ben,cloned,chatter,chatter_i_was_just_about_to_say_that,I was just about to say that.,1.97
+ben,cloned,chatter,chatter_rent_went_up_again,Rent went up again.,1.45
+ben,cloned,chatter,chatter_my_car_s_in_the_shop,My car's in the shop.,1.78
+ben,cloned,chatter,chatter_the_bus_is_late_again,The bus is late again.,1.09
+ben,cloned,chatter,chatter_i_don_t_even_know_anymore,I don't even know anymore.,1.77
+ben,cloned,chatter,chatter_oh_i_love_this_song,"Oh, I love this song.",1.45
+ben,cloned,chatter,chatter_we_should_head_back,We should head back.,1.04
+ben,cloned,chatter,chatter_okay_okay_i_hear_you,"Okay, okay, I hear you.",1.91
+ben,cloned,chatter,chatter_hold_on_a_second,Hold on a second.,0.75
+ben,cloned,chatter,chatter_exactly,Exactly.,0.61
+ben,cloned,chatter,chatter_yeah_no_i_get_it,"Yeah, no, I get it.",1.10
+ben,cloned,chatter,chatter_it_is_what_it_is,It is what it is.,0.87
+camel,cloned,greet,greet_hey_how_s_it_going,"Hey, how's it going?",1.21
+camel,cloned,greet,greet_yo_what_s_up,"Yo, what's up?",0.80
+camel,cloned,greet,greet_hey_good_morning,"Hey, good morning.",0.77
+camel,cloned,greet,greet_morning,Morning.,0.60
+camel,cloned,greet,greet_good_morning,Good morning!,0.62
+camel,cloned,greet,greet_afternoon,Afternoon.,0.79
+camel,cloned,greet,greet_good_afternoon,Good afternoon.,0.82
+camel,cloned,greet,greet_evening,Evening.,0.50
+camel,cloned,greet,greet_good_evening,Good evening.,0.65
+camel,cloned,greet,greet_hey_there,Hey there.,0.51
+camel,cloned,greet,greet_hi,Hi.,0.40
+camel,cloned,greet,greet_hello,Hello.,0.53
+camel,cloned,greet,greet_hey,Hey.,0.59
+camel,cloned,greet,greet_how_are_you_doing,How are you doing?,0.84
+camel,cloned,greet,greet_how_you_doing,How you doing?,0.62
+camel,cloned,greet,greet_what_s_going_on,What's going on?,0.84
+camel,cloned,greet,greet_hey_nice_to_see_you,"Hey, nice to see you.",1.16
+camel,cloned,greet,greet_long_time_no_see,Long time no see!,1.26
+camel,cloned,greet,greet_hey_man,Hey man.,0.63
+camel,cloned,greet,greet_what_s_new,What's new?,0.85
+camel,cloned,greet,greet_beautiful_day_huh,"Beautiful day, huh?",0.99
+camel,cloned,greet,greet_hot_one_today_isn_t_it,"Hot one today, isn't it?",1.04
+camel,cloned,greet,greet_cold_out_here_today,Cold out here today.,1.11
+camel,cloned,greet,greet_looks_like_rain,Looks like rain.,1.02
+camel,cloned,greet,greet_nice_day_for_a_walk,Nice day for a walk.,1.14
+camel,cloned,greet,greet_can_i_help_you,Can I help you?,0.90
+camel,cloned,greet,greet_need_something,Need something?,0.99
+camel,cloned,polite,polite_excuse_me,Excuse me.,0.85
+camel,cloned,polite,polite_pardon_me,Pardon me.,0.57
+camel,cloned,polite,polite_sorry_excuse_me,"Sorry, excuse me.",1.01
+camel,cloned,polite,polite_oh_sorry,"Oh, sorry.",0.67
+camel,cloned,polite,polite_watch_it,Watch it!,0.62
+camel,cloned,polite,polite_careful_there,Careful there.,0.92
+camel,cloned,polite,polite_thanks,Thanks.,0.49
+camel,cloned,polite,polite_thank_you,Thank you.,0.56
+camel,cloned,polite,polite_no_problem,No problem.,0.76
+camel,cloned,polite,polite_you_re_welcome,You're welcome.,0.63
+camel,cloned,polite,polite_sure_thing,Sure thing.,0.75
+camel,cloned,bye,bye_have_a_good_one,Have a good one.,0.75
+camel,cloned,bye,bye_take_care,Take care.,0.62
+camel,cloned,bye,bye_see_you_later,See you later.,0.66
+camel,cloned,bye,bye_see_ya,See ya.,0.59
+camel,cloned,bye,bye_catch_you_later,Catch you later.,0.80
+camel,cloned,bye,bye_have_a_good_day,Have a good day.,0.80
+camel,cloned,bye,bye_have_a_nice_day,Have a nice day!,0.91
+camel,cloned,bye,bye_have_a_good_night,Have a good night.,0.75
+camel,cloned,bye,bye_take_it_easy,Take it easy.,0.73
+camel,cloned,bye,bye_bye_now,Bye now.,0.68
+camel,cloned,bye,bye_later,Later.,0.58
+camel,cloned,bye,bye_stay_safe_out_there,Stay safe out there.,1.08
+camel,cloned,chatter,chatter_yeah_i_know_right,"Yeah, I know, right?",0.96
+camel,cloned,chatter,chatter_no_way_seriously,No way. Seriously?,1.39
+camel,cloned,chatter,chatter_i_told_him_that_already,I told him that already.,1.05
+camel,cloned,chatter,chatter_where_are_we_eating_tonight,Where are we eating tonight?,1.14
+camel,cloned,chatter,chatter_i_don_t_know_what_do_you_want,"I don't know, what do you want?",1.14
+camel,cloned,chatter,chatter_did_you_see_the_game_last_night,Did you see the game last night?,1.26
+camel,cloned,chatter,chatter_traffic_was_insane_this_morning,Traffic was insane this morning.,1.64
+camel,cloned,chatter,chatter_i_m_running_late_i_gotta_go,"I'm running late, I gotta go.",1.56
+camel,cloned,chatter,chatter_hang_on_let_me_call_you_back,"Hang on, let me call you back.",1.01
+camel,cloned,chatter,chatter_oh_my_god_that_s_hilarious,"Oh my God, that's hilarious.",1.42
+camel,cloned,chatter,chatter_yeah_yeah_totally,"Yeah, yeah, totally.",0.88
+camel,cloned,chatter,chatter_mm_hmm,Mm-hmm.,0.54
+camel,cloned,chatter,chatter_uh_huh,Uh-huh.,0.53
+camel,cloned,chatter,chatter_right_right,"Right, right.",0.71
+camel,cloned,chatter,chatter_that_s_what_i_m_saying,That's what I'm saying!,0.81
+camel,cloned,chatter,chatter_i_can_t_believe_it_s_already_friday,I can't believe it's already Friday.,1.58
+camel,cloned,chatter,chatter_we_should_grab_coffee_sometime,We should grab coffee sometime.,1.97
+camel,cloned,chatter,chatter_which_way_is_the_train_station,Which way is the train station?,1.64
+camel,cloned,chatter,chatter_it_s_just_up_the_street_on_the_left,It's just up the street on the left.,1.38
+camel,cloned,chatter,chatter_i_think_we_parked_on_the_other_side,I think we parked on the other side.,1.81
+camel,cloned,chatter,chatter_how_much_was_it,How much was it?,0.89
+camel,cloned,chatter,chatter_that_s_way_too_expensive,That's way too expensive.,1.44
+camel,cloned,chatter,chatter_hold_on_i_dropped_something,"Hold on, I dropped something.",1.33
+camel,cloned,chatter,chatter_wait_up,Wait up!,0.58
+camel,cloned,chatter,chatter_come_on_we_re_gonna_miss_it,"Come on, we're gonna miss it.",1.20
+camel,cloned,chatter,chatter_i_ll_meet_you_there,I'll meet you there.,0.73
+camel,cloned,chatter,chatter_did_you_get_my_text,Did you get my text?,1.00
+camel,cloned,chatter,chatter_my_phone_s_about_to_die,My phone's about to die.,1.24
+camel,cloned,chatter,chatter_it_s_supposed_to_storm_later,It's supposed to storm later.,1.12
+camel,cloned,chatter,chatter_i_m_so_tired_today,I'm so tired today.,1.39
+camel,cloned,chatter,chatter_honestly_i_have_no_idea,"Honestly, I have no idea.",1.77
+camel,cloned,chatter,chatter_anyway_like_i_was_saying,"Anyway, like I was saying...",1.20
+camel,cloned,chatter,chatter_oh_hey_over_here,"Oh, hey! Over here!",1.29
+camel,cloned,chatter,chatter_ha_yeah,Ha! Yeah.,0.60
+camel,cloned,chatter,chatter_okay_sounds_good,"Okay, sounds good.",1.05
+camel,cloned,chatter,chatter_yeah_that_s_what_i_heard,"Yeah, that's what I heard.",1.15
+camel,cloned,chatter,chatter_i_m_not_sure_honestly,"I'm not sure, honestly.",1.18
+camel,cloned,chatter,chatter_nah_i_m_good_thanks,"Nah, I'm good, thanks.",1.43
+camel,cloned,chatter,chatter_we_ll_see_how_it_goes,We'll see how it goes.,1.07
+camel,cloned,chatter,chatter_did_you_call_your_mom_back,Did you call your mom back?,1.17
+camel,cloned,chatter,chatter_i_ve_got_to_pick_up_the_kids_at_three,I've got to pick up the kids at three.,1.45
+camel,cloned,chatter,chatter_what_time_is_it,What time is it?,0.76
+camel,cloned,chatter,chatter_it_s_been_a_long_week,It's been a long week.,0.86
+camel,cloned,chatter,chatter_i_ll_tell_you_about_it_later,I'll tell you about it later.,0.93
+camel,cloned,chatter,chatter_can_you_believe_that,Can you believe that?,0.98
+camel,cloned,chatter,chatter_oh_that_reminds_me,"Oh, that reminds me.",1.33
+camel,cloned,chatter,chatter_i_need_a_vacation,I need a vacation.,1.02
+camel,cloned,chatter,chatter_let_me_know_when_you_re_ready,Let me know when you're ready.,1.13
+camel,cloned,chatter,chatter_where_d_you_park,Where'd you park?,0.90
+camel,cloned,chatter,chatter_it_s_right_around_the_corner,It's right around the corner.,1.09
+camel,cloned,chatter,chatter_i_m_starving_you_want_to_grab_lunch,I'm starving. You want to grab lunch?,1.78
+camel,cloned,chatter,chatter_they_re_opening_a_new_place_down_the_str,They're opening a new place down the street.,1.79
+camel,cloned,chatter,chatter_i_haven_t_seen_him_in_forever,I haven't seen him in forever.,1.32
+camel,cloned,chatter,chatter_she_said_she_d_be_here_by_now,She said she'd be here by now.,1.49
+camel,cloned,chatter,chatter_hang_on_i_m_getting_a_call,"Hang on, I'm getting a call.",1.40
+camel,cloned,chatter,chatter_no_the_other_one,"No, the other one.",1.40
+camel,cloned,chatter,chatter_i_ll_think_about_it,I'll think about it.,0.87
+camel,cloned,chatter,chatter_that_s_crazy,That's crazy.,0.98
+camel,cloned,chatter,chatter_for_real,For real?,0.58
+camel,cloned,chatter,chatter_i_swear_every_single_time,"I swear, every single time.",1.69
+camel,cloned,chatter,chatter_whatever_it_s_fine,"Whatever, it's fine.",1.25
+camel,cloned,chatter,chatter_let_s_just_go,Let's just go.,0.60
+camel,cloned,chatter,chatter_you_go_ahead_i_ll_catch_up,"You go ahead, I'll catch up.",1.18
+camel,cloned,chatter,chatter_it_s_not_a_big_deal,It's not a big deal.,0.83
+camel,cloned,chatter,chatter_i_was_just_about_to_say_that,I was just about to say that.,1.21
+camel,cloned,chatter,chatter_rent_went_up_again,Rent went up again.,1.02
+camel,cloned,chatter,chatter_my_car_s_in_the_shop,My car's in the shop.,1.07
+camel,cloned,chatter,chatter_the_bus_is_late_again,The bus is late again.,1.24
+camel,cloned,chatter,chatter_i_don_t_even_know_anymore,I don't even know anymore.,1.20
+camel,cloned,chatter,chatter_oh_i_love_this_song,"Oh, I love this song.",1.06
+camel,cloned,chatter,chatter_we_should_head_back,We should head back.,0.74
+camel,cloned,chatter,chatter_okay_okay_i_hear_you,"Okay, okay, I hear you.",1.26
+camel,cloned,chatter,chatter_hold_on_a_second,Hold on a second.,0.82
+camel,cloned,chatter,chatter_exactly,Exactly.,0.76
+camel,cloned,chatter,chatter_yeah_no_i_get_it,"Yeah, no, I get it.",0.97
+camel,cloned,chatter,chatter_it_is_what_it_is,It is what it is.,1.14
+tyler,cloned,greet,greet_hey_how_s_it_going,"Hey, how's it going?",0.84
+tyler,cloned,greet,greet_yo_what_s_up,"Yo, what's up?",0.86
+tyler,cloned,greet,greet_hey_good_morning,"Hey, good morning.",0.90
+tyler,cloned,greet,greet_morning,Morning.,0.56
+tyler,cloned,greet,greet_good_morning,Good morning!,0.55
+tyler,cloned,greet,greet_afternoon,Afternoon.,1.11
+tyler,cloned,greet,greet_good_afternoon,Good afternoon.,0.97
+tyler,cloned,greet,greet_evening,Evening.,0.53
+tyler,cloned,greet,greet_good_evening,Good evening.,0.59
+tyler,cloned,greet,greet_hey_there,Hey there.,0.52
+tyler,cloned,greet,greet_hi,Hi.,0.51
+tyler,cloned,greet,greet_hello,Hello.,0.64
+tyler,cloned,greet,greet_hey,Hey.,0.52
+tyler,cloned,greet,greet_how_are_you_doing,How are you doing?,0.69
+tyler,cloned,greet,greet_how_you_doing,How you doing?,0.53
+tyler,cloned,greet,greet_what_s_going_on,What's going on?,0.80
+tyler,cloned,greet,greet_hey_nice_to_see_you,"Hey, nice to see you.",1.21
+tyler,cloned,greet,greet_long_time_no_see,Long time no see!,1.16
+tyler,cloned,greet,greet_hey_man,Hey man.,0.58
+tyler,cloned,greet,greet_what_s_new,What's new?,0.75
+tyler,cloned,greet,greet_beautiful_day_huh,"Beautiful day, huh?",1.04
+tyler,cloned,greet,greet_hot_one_today_isn_t_it,"Hot one today, isn't it?",1.23
+tyler,cloned,greet,greet_cold_out_here_today,Cold out here today.,1.08
+tyler,cloned,greet,greet_looks_like_rain,Looks like rain.,0.92
+tyler,cloned,greet,greet_nice_day_for_a_walk,Nice day for a walk.,1.50
+tyler,cloned,greet,greet_can_i_help_you,Can I help you?,0.67
+tyler,cloned,greet,greet_need_something,Need something?,0.65
+tyler,cloned,polite,polite_excuse_me,Excuse me.,0.60
+tyler,cloned,polite,polite_pardon_me,Pardon me.,0.58
+tyler,cloned,polite,polite_sorry_excuse_me,"Sorry, excuse me.",1.56
+tyler,cloned,polite,polite_oh_sorry,"Oh, sorry.",0.55
+tyler,cloned,polite,polite_watch_it,Watch it!,0.68
+tyler,cloned,polite,polite_careful_there,Careful there.,0.72
+tyler,cloned,polite,polite_thanks,Thanks.,0.50
+tyler,cloned,polite,polite_thank_you,Thank you.,0.45
+tyler,cloned,polite,polite_no_problem,No problem.,1.15
+tyler,cloned,polite,polite_you_re_welcome,You're welcome.,0.72
+tyler,cloned,polite,polite_sure_thing,Sure thing.,0.62
+tyler,cloned,bye,bye_have_a_good_one,Have a good one.,0.66
+tyler,cloned,bye,bye_take_care,Take care.,0.80
+tyler,cloned,bye,bye_see_you_later,See you later.,0.62
+tyler,cloned,bye,bye_see_ya,See ya.,0.68
+tyler,cloned,bye,bye_catch_you_later,Catch you later.,0.80
+tyler,cloned,bye,bye_have_a_good_day,Have a good day.,1.06
+tyler,cloned,bye,bye_have_a_nice_day,Have a nice day!,1.34
+tyler,cloned,bye,bye_have_a_good_night,Have a good night.,0.91
+tyler,cloned,bye,bye_take_it_easy,Take it easy.,0.66
+tyler,cloned,bye,bye_bye_now,Bye now.,0.85
+tyler,cloned,bye,bye_later,Later.,0.43
+tyler,cloned,bye,bye_stay_safe_out_there,Stay safe out there.,1.25
+tyler,cloned,chatter,chatter_yeah_i_know_right,"Yeah, I know, right?",0.78
+tyler,cloned,chatter,chatter_no_way_seriously,No way. Seriously?,1.42
+tyler,cloned,chatter,chatter_i_told_him_that_already,I told him that already.,1.02
+tyler,cloned,chatter,chatter_where_are_we_eating_tonight,Where are we eating tonight?,1.31
+tyler,cloned,chatter,chatter_i_don_t_know_what_do_you_want,"I don't know, what do you want?",0.87
+tyler,cloned,chatter,chatter_did_you_see_the_game_last_night,Did you see the game last night?,1.42
+tyler,cloned,chatter,chatter_traffic_was_insane_this_morning,Traffic was insane this morning.,1.84
+tyler,cloned,chatter,chatter_i_m_running_late_i_gotta_go,"I'm running late, I gotta go.",1.68
+tyler,cloned,chatter,chatter_hang_on_let_me_call_you_back,"Hang on, let me call you back.",2.03
+tyler,cloned,chatter,chatter_oh_my_god_that_s_hilarious,"Oh my God, that's hilarious.",2.39
+tyler,cloned,chatter,chatter_yeah_yeah_totally,"Yeah, yeah, totally.",1.86
+tyler,cloned,chatter,chatter_mm_hmm,Mm-hmm.,0.97
+tyler,cloned,chatter,chatter_uh_huh,Uh-huh.,0.49
+tyler,cloned,chatter,chatter_right_right,"Right, right.",1.25
+tyler,cloned,chatter,chatter_that_s_what_i_m_saying,That's what I'm saying!,0.95
+tyler,cloned,chatter,chatter_i_can_t_believe_it_s_already_friday,I can't believe it's already Friday.,1.40
+tyler,cloned,chatter,chatter_we_should_grab_coffee_sometime,We should grab coffee sometime.,1.48
+tyler,cloned,chatter,chatter_which_way_is_the_train_station,Which way is the train station?,1.47
+tyler,cloned,chatter,chatter_it_s_just_up_the_street_on_the_left,It's just up the street on the left.,1.99
+tyler,cloned,chatter,chatter_i_think_we_parked_on_the_other_side,I think we parked on the other side.,1.54
+tyler,cloned,chatter,chatter_how_much_was_it,How much was it?,0.92
+tyler,cloned,chatter,chatter_that_s_way_too_expensive,That's way too expensive.,1.22
+tyler,cloned,chatter,chatter_hold_on_i_dropped_something,"Hold on, I dropped something.",1.90
+tyler,cloned,chatter,chatter_wait_up,Wait up!,0.81
+tyler,cloned,chatter,chatter_come_on_we_re_gonna_miss_it,"Come on, we're gonna miss it.",1.31
+tyler,cloned,chatter,chatter_i_ll_meet_you_there,I'll meet you there.,0.68
+tyler,cloned,chatter,chatter_did_you_get_my_text,Did you get my text?,1.43
+tyler,cloned,chatter,chatter_my_phone_s_about_to_die,My phone's about to die.,1.46
+tyler,cloned,chatter,chatter_it_s_supposed_to_storm_later,It's supposed to storm later.,1.18
+tyler,cloned,chatter,chatter_i_m_so_tired_today,I'm so tired today.,1.35
+tyler,cloned,chatter,chatter_honestly_i_have_no_idea,"Honestly, I have no idea.",1.65
+tyler,cloned,chatter,chatter_anyway_like_i_was_saying,"Anyway, like I was saying...",1.01
+tyler,cloned,chatter,chatter_oh_hey_over_here,"Oh, hey! Over here!",1.43
+tyler,cloned,chatter,chatter_ha_yeah,Ha! Yeah.,1.70
+tyler,cloned,chatter,chatter_okay_sounds_good,"Okay, sounds good.",1.19
+tyler,cloned,chatter,chatter_yeah_that_s_what_i_heard,"Yeah, that's what I heard.",1.07
+tyler,cloned,chatter,chatter_nah_i_m_good_thanks,"Nah, I'm good, thanks.",1.62
+tyler,cloned,chatter,chatter_i_m_not_sure_honestly,"I'm not sure, honestly.",1.29
+tyler,cloned,chatter,chatter_we_ll_see_how_it_goes,We'll see how it goes.,1.20
+tyler,cloned,chatter,chatter_did_you_call_your_mom_back,Did you call your mom back?,1.56
+tyler,cloned,chatter,chatter_i_ve_got_to_pick_up_the_kids_at_three,I've got to pick up the kids at three.,1.79
+tyler,cloned,chatter,chatter_what_time_is_it,What time is it?,0.70
+tyler,cloned,chatter,chatter_it_s_been_a_long_week,It's been a long week.,1.05
+tyler,cloned,chatter,chatter_i_ll_tell_you_about_it_later,I'll tell you about it later.,1.04
+tyler,cloned,chatter,chatter_can_you_believe_that,Can you believe that?,0.80
+tyler,cloned,chatter,chatter_oh_that_reminds_me,"Oh, that reminds me.",1.47
+tyler,cloned,chatter,chatter_i_need_a_vacation,I need a vacation.,1.00
+tyler,cloned,chatter,chatter_let_me_know_when_you_re_ready,Let me know when you're ready.,1.02
+tyler,cloned,chatter,chatter_where_d_you_park,Where'd you park?,0.95
+tyler,cloned,chatter,chatter_it_s_right_around_the_corner,It's right around the corner.,1.10
+tyler,cloned,chatter,chatter_i_m_starving_you_want_to_grab_lunch,I'm starving. You want to grab lunch?,2.03
+tyler,cloned,chatter,chatter_they_re_opening_a_new_place_down_the_str,They're opening a new place down the street.,2.05
+tyler,cloned,chatter,chatter_i_haven_t_seen_him_in_forever,I haven't seen him in forever.,1.31
+tyler,cloned,chatter,chatter_she_said_she_d_be_here_by_now,She said she'd be here by now.,1.46
+tyler,cloned,chatter,chatter_hang_on_i_m_getting_a_call,"Hang on, I'm getting a call.",1.99
+tyler,cloned,chatter,chatter_no_the_other_one,"No, the other one.",0.92
+tyler,cloned,chatter,chatter_i_ll_think_about_it,I'll think about it.,0.75
+tyler,cloned,chatter,chatter_that_s_crazy,That's crazy.,0.80
+tyler,cloned,chatter,chatter_for_real,For real?,0.67
+tyler,cloned,chatter,chatter_i_swear_every_single_time,"I swear, every single time.",2.60
+tyler,cloned,chatter,chatter_whatever_it_s_fine,"Whatever, it's fine.",1.49
+tyler,cloned,chatter,chatter_let_s_just_go,Let's just go.,0.84
+tyler,cloned,chatter,chatter_you_go_ahead_i_ll_catch_up,"You go ahead, I'll catch up.",1.33
+tyler,cloned,chatter,chatter_it_s_not_a_big_deal,It's not a big deal.,0.88
+tyler,cloned,chatter,chatter_i_was_just_about_to_say_that,I was just about to say that.,1.22
+tyler,cloned,chatter,chatter_rent_went_up_again,Rent went up again.,0.99
+tyler,cloned,chatter,chatter_my_car_s_in_the_shop,My car's in the shop.,1.01
+tyler,cloned,chatter,chatter_the_bus_is_late_again,The bus is late again.,1.55
+tyler,cloned,chatter,chatter_i_don_t_even_know_anymore,I don't even know anymore.,1.03
+tyler,cloned,chatter,chatter_oh_i_love_this_song,"Oh, I love this song.",1.35
+tyler,cloned,chatter,chatter_we_should_head_back,We should head back.,0.95
+tyler,cloned,chatter,chatter_okay_okay_i_hear_you,"Okay, okay, I hear you.",2.89
+tyler,cloned,chatter,chatter_hold_on_a_second,Hold on a second.,0.70
+tyler,cloned,chatter,chatter_exactly,Exactly.,0.61
+tyler,cloned,chatter,chatter_yeah_no_i_get_it,"Yeah, no, I get it.",1.10
+tyler,cloned,chatter,chatter_it_is_what_it_is,It is what it is.,1.06
+alec,cloned,greet,greet_hey_how_s_it_going,"Hey, how's it going?",1.37
+alec,cloned,greet,greet_yo_what_s_up,"Yo, what's up?",0.79
+alec,cloned,greet,greet_hey_good_morning,"Hey, good morning.",1.17
+alec,cloned,greet,greet_morning,Morning.,0.52
+alec,cloned,greet,greet_good_morning,Good morning!,0.63
+alec,cloned,greet,greet_afternoon,Afternoon.,1.23
+alec,cloned,greet,greet_good_afternoon,Good afternoon.,1.18
+alec,cloned,greet,greet_evening,Evening.,0.77
+alec,cloned,greet,greet_good_evening,Good evening.,0.88
+alec,cloned,greet,greet_hey_there,Hey there.,0.44
+alec,cloned,greet,greet_hi,Hi.,0.43
+alec,cloned,greet,greet_hello,Hello.,0.75
+alec,cloned,greet,greet_hey,Hey.,0.73
+alec,cloned,greet,greet_how_are_you_doing,How are you doing?,0.81
+alec,cloned,greet,greet_how_you_doing,How you doing?,0.73
+alec,cloned,greet,greet_what_s_going_on,What's going on?,0.74
+alec,cloned,greet,greet_hey_nice_to_see_you,"Hey, nice to see you.",1.47
+alec,cloned,greet,greet_long_time_no_see,Long time no see!,1.43
+alec,cloned,greet,greet_hey_man,Hey man.,0.73
+alec,cloned,greet,greet_what_s_new,What's new?,0.65
+alec,cloned,greet,greet_beautiful_day_huh,"Beautiful day, huh?",1.07
+alec,cloned,greet,greet_hot_one_today_isn_t_it,"Hot one today, isn't it?",1.14
+alec,cloned,greet,greet_cold_out_here_today,Cold out here today.,1.59
+alec,cloned,greet,greet_looks_like_rain,Looks like rain.,1.03
+alec,cloned,greet,greet_nice_day_for_a_walk,Nice day for a walk.,1.29
+alec,cloned,greet,greet_can_i_help_you,Can I help you?,0.80
+alec,cloned,greet,greet_need_something,Need something?,1.45
+alec,cloned,polite,polite_excuse_me,Excuse me.,1.02
+alec,cloned,polite,polite_pardon_me,Pardon me.,1.11
+alec,cloned,polite,polite_sorry_excuse_me,"Sorry, excuse me.",0.99
+alec,cloned,polite,polite_oh_sorry,"Oh, sorry.",0.72
+alec,cloned,polite,polite_watch_it,Watch it!,0.69
+alec,cloned,polite,polite_careful_there,Careful there.,0.72
+alec,cloned,polite,polite_thanks,Thanks.,0.75
+alec,cloned,polite,polite_thank_you,Thank you.,0.55
+alec,cloned,polite,polite_no_problem,No problem.,0.77
+alec,cloned,polite,polite_you_re_welcome,You're welcome.,0.68
+alec,cloned,polite,polite_sure_thing,Sure thing.,1.22
+alec,cloned,bye,bye_have_a_good_one,Have a good one.,1.19
+alec,cloned,bye,bye_take_care,Take care.,1.03
+alec,cloned,bye,bye_see_you_later,See you later.,0.64
+alec,cloned,bye,bye_see_ya,See ya.,0.86
+alec,cloned,bye,bye_catch_you_later,Catch you later.,1.32
+alec,cloned,bye,bye_have_a_good_day,Have a good day.,0.87
+alec,cloned,bye,bye_have_a_nice_day,Have a nice day!,0.88
+alec,cloned,bye,bye_have_a_good_night,Have a good night.,0.88
+alec,cloned,bye,bye_take_it_easy,Take it easy.,1.22
+alec,cloned,bye,bye_bye_now,Bye now.,0.57
+alec,cloned,bye,bye_later,Later.,0.90
+alec,cloned,bye,bye_stay_safe_out_there,Stay safe out there.,1.04
+alec,cloned,chatter,chatter_yeah_i_know_right,"Yeah, I know, right?",0.80
+alec,cloned,chatter,chatter_no_way_seriously,No way. Seriously?,1.36
+alec,cloned,chatter,chatter_i_told_him_that_already,I told him that already.,1.36
+alec,cloned,chatter,chatter_where_are_we_eating_tonight,Where are we eating tonight?,1.28
+alec,cloned,chatter,chatter_i_don_t_know_what_do_you_want,"I don't know, what do you want?",1.68
+alec,cloned,chatter,chatter_did_you_see_the_game_last_night,Did you see the game last night?,1.64
+alec,cloned,chatter,chatter_traffic_was_insane_this_morning,Traffic was insane this morning.,2.22
+alec,cloned,chatter,chatter_i_m_running_late_i_gotta_go,"I'm running late, I gotta go.",2.56
+alec,cloned,chatter,chatter_hang_on_let_me_call_you_back,"Hang on, let me call you back.",1.57
+alec,cloned,chatter,chatter_oh_my_god_that_s_hilarious,"Oh my God, that's hilarious.",1.59
+alec,cloned,chatter,chatter_yeah_yeah_totally,"Yeah, yeah, totally.",1.59
+alec,cloned,chatter,chatter_mm_hmm,Mm-hmm.,1.04
+alec,cloned,chatter,chatter_uh_huh,Uh-huh.,0.58
+alec,cloned,chatter,chatter_right_right,"Right, right.",1.48
+alec,cloned,chatter,chatter_that_s_what_i_m_saying,That's what I'm saying!,0.94
+alec,cloned,chatter,chatter_i_can_t_believe_it_s_already_friday,I can't believe it's already Friday.,1.72
+alec,cloned,chatter,chatter_we_should_grab_coffee_sometime,We should grab coffee sometime.,1.88
+alec,cloned,chatter,chatter_which_way_is_the_train_station,Which way is the train station?,1.62
+alec,cloned,chatter,chatter_it_s_just_up_the_street_on_the_left,It's just up the street on the left.,1.76
+alec,cloned,chatter,chatter_i_think_we_parked_on_the_other_side,I think we parked on the other side.,1.80
+alec,cloned,chatter,chatter_how_much_was_it,How much was it?,0.89
+alec,cloned,chatter,chatter_that_s_way_too_expensive,That's way too expensive.,1.78
+alec,cloned,chatter,chatter_hold_on_i_dropped_something,"Hold on, I dropped something.",1.78
+alec,cloned,chatter,chatter_come_on_we_re_gonna_miss_it,"Come on, we're gonna miss it.",1.59
+alec,cloned,chatter,chatter_wait_up,Wait up!,1.09
+alec,cloned,chatter,chatter_i_ll_meet_you_there,I'll meet you there.,0.77
+alec,cloned,chatter,chatter_did_you_get_my_text,Did you get my text?,1.39
+alec,cloned,chatter,chatter_my_phone_s_about_to_die,My phone's about to die.,1.40
+alec,cloned,chatter,chatter_it_s_supposed_to_storm_later,It's supposed to storm later.,1.97
+alec,cloned,chatter,chatter_i_m_so_tired_today,I'm so tired today.,1.36
+alec,cloned,chatter,chatter_honestly_i_have_no_idea,"Honestly, I have no idea.",2.34
+alec,cloned,chatter,chatter_anyway_like_i_was_saying,"Anyway, like I was saying...",1.60
+alec,cloned,chatter,chatter_oh_hey_over_here,"Oh, hey! Over here!",1.69
+alec,cloned,chatter,chatter_ha_yeah,Ha! Yeah.,1.17
+alec,cloned,chatter,chatter_okay_sounds_good,"Okay, sounds good.",1.33
+alec,cloned,chatter,chatter_nah_i_m_good_thanks,"Nah, I'm good, thanks.",1.80
+alec,cloned,chatter,chatter_yeah_that_s_what_i_heard,"Yeah, that's what I heard.",1.08
+alec,cloned,chatter,chatter_i_m_not_sure_honestly,"I'm not sure, honestly.",1.43
+alec,cloned,chatter,chatter_we_ll_see_how_it_goes,We'll see how it goes.,0.92
+alec,cloned,chatter,chatter_did_you_call_your_mom_back,Did you call your mom back?,1.14
+alec,cloned,chatter,chatter_i_ve_got_to_pick_up_the_kids_at_three,I've got to pick up the kids at three.,1.99
+alec,cloned,chatter,chatter_what_time_is_it,What time is it?,0.93
+alec,cloned,chatter,chatter_it_s_been_a_long_week,It's been a long week.,1.84
+alec,cloned,chatter,chatter_i_ll_tell_you_about_it_later,I'll tell you about it later.,1.45
+alec,cloned,chatter,chatter_can_you_believe_that,Can you believe that?,0.97
+alec,cloned,chatter,chatter_oh_that_reminds_me,"Oh, that reminds me.",1.01
+alec,cloned,chatter,chatter_i_need_a_vacation,I need a vacation.,1.04
+alec,cloned,chatter,chatter_let_me_know_when_you_re_ready,Let me know when you're ready.,1.05
+alec,cloned,chatter,chatter_where_d_you_park,Where'd you park?,0.78
+alec,cloned,chatter,chatter_it_s_right_around_the_corner,It's right around the corner.,1.16
+alec,cloned,chatter,chatter_i_m_starving_you_want_to_grab_lunch,I'm starving. You want to grab lunch?,2.67
+alec,cloned,chatter,chatter_they_re_opening_a_new_place_down_the_str,They're opening a new place down the street.,2.28
+alec,cloned,chatter,chatter_i_haven_t_seen_him_in_forever,I haven't seen him in forever.,1.54
+alec,cloned,chatter,chatter_she_said_she_d_be_here_by_now,She said she'd be here by now.,2.05
+alec,cloned,chatter,chatter_hang_on_i_m_getting_a_call,"Hang on, I'm getting a call.",1.73
+alec,cloned,chatter,chatter_no_the_other_one,"No, the other one.",1.56
+alec,cloned,chatter,chatter_i_ll_think_about_it,I'll think about it.,0.76
+alec,cloned,chatter,chatter_that_s_crazy,That's crazy.,0.93
+alec,cloned,chatter,chatter_for_real,For real?,0.56
+alec,cloned,chatter,chatter_i_swear_every_single_time,"I swear, every single time.",1.94
+alec,cloned,chatter,chatter_whatever_it_s_fine,"Whatever, it's fine.",1.78
+alec,cloned,chatter,chatter_let_s_just_go,Let's just go.,1.30
+alec,cloned,chatter,chatter_you_go_ahead_i_ll_catch_up,"You go ahead, I'll catch up.",1.49
+alec,cloned,chatter,chatter_it_s_not_a_big_deal,It's not a big deal.,1.05
+alec,cloned,chatter,chatter_i_was_just_about_to_say_that,I was just about to say that.,1.33
+alec,cloned,chatter,chatter_rent_went_up_again,Rent went up again.,1.14
+alec,cloned,chatter,chatter_my_car_s_in_the_shop,My car's in the shop.,1.74
+alec,cloned,chatter,chatter_the_bus_is_late_again,The bus is late again.,1.79
+alec,cloned,chatter,chatter_i_don_t_even_know_anymore,I don't even know anymore.,1.33
+alec,cloned,chatter,chatter_oh_i_love_this_song,"Oh, I love this song.",1.49
+alec,cloned,chatter,chatter_we_should_head_back,We should head back.,1.03
+alec,cloned,chatter,chatter_okay_okay_i_hear_you,"Okay, okay, I hear you.",1.64
+alec,cloned,chatter,chatter_hold_on_a_second,Hold on a second.,1.30
+alec,cloned,chatter,chatter_exactly,Exactly.,1.23
+alec,cloned,chatter,chatter_yeah_no_i_get_it,"Yeah, no, I get it.",1.25
+alec,cloned,chatter,chatter_it_is_what_it_is,It is what it is.,1.01
+fluke,cloned,greet,greet_hey_how_s_it_going,"Hey, how's it going?",0.99
+fluke,cloned,greet,greet_yo_what_s_up,"Yo, what's up?",0.65
+fluke,cloned,greet,greet_hey_good_morning,"Hey, good morning.",0.85
+fluke,cloned,greet,greet_morning,Morning.,0.47
+fluke,cloned,greet,greet_good_morning,Good morning!,0.75
+fluke,cloned,greet,greet_afternoon,Afternoon.,0.75
+fluke,cloned,greet,greet_good_afternoon,Good afternoon.,0.80
+fluke,cloned,greet,greet_evening,Evening.,0.46
+fluke,cloned,greet,greet_good_evening,Good evening.,0.57
+fluke,cloned,greet,greet_hey_there,Hey there.,0.49
+fluke,cloned,greet,greet_hi,Hi.,0.45
+fluke,cloned,greet,greet_hello,Hello.,0.55
+fluke,cloned,greet,greet_hey,Hey.,0.34
+fluke,cloned,greet,greet_how_are_you_doing,How are you doing?,0.67
+fluke,cloned,greet,greet_how_you_doing,How you doing?,0.49
+fluke,cloned,greet,greet_what_s_going_on,What's going on?,0.66
+fluke,cloned,greet,greet_hey_nice_to_see_you,"Hey, nice to see you.",1.00
+fluke,cloned,greet,greet_long_time_no_see,Long time no see!,1.31
+fluke,cloned,greet,greet_hey_man,Hey man.,0.72
+fluke,cloned,greet,greet_what_s_new,What's new?,0.56
+fluke,cloned,greet,greet_beautiful_day_huh,"Beautiful day, huh?",0.90
+fluke,cloned,greet,greet_hot_one_today_isn_t_it,"Hot one today, isn't it?",1.04
+fluke,cloned,greet,greet_cold_out_here_today,Cold out here today.,1.07
+fluke,cloned,greet,greet_looks_like_rain,Looks like rain.,0.78
+fluke,cloned,greet,greet_nice_day_for_a_walk,Nice day for a walk.,0.93
+fluke,cloned,greet,greet_can_i_help_you,Can I help you?,0.72
+fluke,cloned,greet,greet_need_something,Need something?,0.81
+fluke,cloned,polite,polite_excuse_me,Excuse me.,0.67
+fluke,cloned,polite,polite_pardon_me,Pardon me.,0.59
+fluke,cloned,polite,polite_sorry_excuse_me,"Sorry, excuse me.",0.83
+fluke,cloned,polite,polite_oh_sorry,"Oh, sorry.",0.76
+fluke,cloned,polite,polite_watch_it,Watch it!,0.58
+fluke,cloned,polite,polite_careful_there,Careful there.,0.62
+fluke,cloned,polite,polite_thanks,Thanks.,0.49
+fluke,cloned,polite,polite_thank_you,Thank you.,0.51
+fluke,cloned,polite,polite_no_problem,No problem.,0.60
+fluke,cloned,polite,polite_you_re_welcome,You're welcome.,0.69
+fluke,cloned,polite,polite_sure_thing,Sure thing.,0.68
+fluke,cloned,bye,bye_have_a_good_one,Have a good one.,0.68
+fluke,cloned,bye,bye_take_care,Take care.,0.53
+fluke,cloned,bye,bye_see_you_later,See you later.,0.68
+fluke,cloned,bye,bye_see_ya,See ya.,0.43
+fluke,cloned,bye,bye_catch_you_later,Catch you later.,0.71
+fluke,cloned,bye,bye_have_a_good_day,Have a good day.,0.77
+fluke,cloned,bye,bye_have_a_nice_day,Have a nice day!,0.74
+fluke,cloned,bye,bye_have_a_good_night,Have a good night.,0.69
+fluke,cloned,bye,bye_take_it_easy,Take it easy.,0.76
+fluke,cloned,bye,bye_bye_now,Bye now.,0.58
+fluke,cloned,bye,bye_later,Later.,0.48
+fluke,cloned,bye,bye_stay_safe_out_there,Stay safe out there.,0.99
+fluke,cloned,chatter,chatter_yeah_i_know_right,"Yeah, I know, right?",0.79
+fluke,cloned,chatter,chatter_no_way_seriously,No way. Seriously?,1.49
+fluke,cloned,chatter,chatter_i_told_him_that_already,I told him that already.,1.17
+fluke,cloned,chatter,chatter_where_are_we_eating_tonight,Where are we eating tonight?,1.05
+fluke,cloned,chatter,chatter_i_don_t_know_what_do_you_want,"I don't know, what do you want?",1.64
+fluke,cloned,chatter,chatter_did_you_see_the_game_last_night,Did you see the game last night?,1.44
+fluke,cloned,chatter,chatter_traffic_was_insane_this_morning,Traffic was insane this morning.,1.77
+fluke,cloned,chatter,chatter_i_m_running_late_i_gotta_go,"I'm running late, I gotta go.",1.55
+fluke,cloned,chatter,chatter_hang_on_let_me_call_you_back,"Hang on, let me call you back.",1.19
+fluke,cloned,chatter,chatter_oh_my_god_that_s_hilarious,"Oh my God, that's hilarious.",1.42
+fluke,cloned,chatter,chatter_yeah_yeah_totally,"Yeah, yeah, totally.",0.94
+fluke,cloned,chatter,chatter_mm_hmm,Mm-hmm.,0.69
+fluke,cloned,chatter,chatter_uh_huh,Uh-huh.,0.44
+fluke,cloned,chatter,chatter_right_right,"Right, right.",0.66
+fluke,cloned,chatter,chatter_that_s_what_i_m_saying,That's what I'm saying!,0.74
+fluke,cloned,chatter,chatter_i_can_t_believe_it_s_already_friday,I can't believe it's already Friday.,1.49
+fluke,cloned,chatter,chatter_we_should_grab_coffee_sometime,We should grab coffee sometime.,1.52
+fluke,cloned,chatter,chatter_which_way_is_the_train_station,Which way is the train station?,1.60
+fluke,cloned,chatter,chatter_it_s_just_up_the_street_on_the_left,It's just up the street on the left.,1.71
+fluke,cloned,chatter,chatter_i_think_we_parked_on_the_other_side,I think we parked on the other side.,1.49
+fluke,cloned,chatter,chatter_how_much_was_it,How much was it?,0.72
+fluke,cloned,chatter,chatter_that_s_way_too_expensive,That's way too expensive.,1.23
+fluke,cloned,chatter,chatter_hold_on_i_dropped_something,"Hold on, I dropped something.",1.51
+fluke,cloned,chatter,chatter_wait_up,Wait up!,0.52
+fluke,cloned,chatter,chatter_come_on_we_re_gonna_miss_it,"Come on, we're gonna miss it.",0.97
+fluke,cloned,chatter,chatter_i_ll_meet_you_there,I'll meet you there.,0.90
+fluke,cloned,chatter,chatter_did_you_get_my_text,Did you get my text?,1.00
+fluke,cloned,chatter,chatter_my_phone_s_about_to_die,My phone's about to die.,1.19
+fluke,cloned,chatter,chatter_it_s_supposed_to_storm_later,It's supposed to storm later.,1.57
+fluke,cloned,chatter,chatter_i_m_so_tired_today,I'm so tired today.,1.07
+fluke,cloned,chatter,chatter_honestly_i_have_no_idea,"Honestly, I have no idea.",1.71
+fluke,cloned,chatter,chatter_anyway_like_i_was_saying,"Anyway, like I was saying...",1.17
+fluke,cloned,chatter,chatter_oh_hey_over_here,"Oh, hey! Over here!",1.07
+fluke,cloned,chatter,chatter_ha_yeah,Ha! Yeah.,1.04
+fluke,cloned,chatter,chatter_okay_sounds_good,"Okay, sounds good.",1.08
+fluke,cloned,chatter,chatter_nah_i_m_good_thanks,"Nah, I'm good, thanks.",1.55
+fluke,cloned,chatter,chatter_yeah_that_s_what_i_heard,"Yeah, that's what I heard.",0.89
+fluke,cloned,chatter,chatter_i_m_not_sure_honestly,"I'm not sure, honestly.",1.36
+fluke,cloned,chatter,chatter_we_ll_see_how_it_goes,We'll see how it goes.,1.22
+fluke,cloned,chatter,chatter_did_you_call_your_mom_back,Did you call your mom back?,1.24
+fluke,cloned,chatter,chatter_i_ve_got_to_pick_up_the_kids_at_three,I've got to pick up the kids at three.,1.45
+fluke,cloned,chatter,chatter_what_time_is_it,What time is it?,0.74
+fluke,cloned,chatter,chatter_it_s_been_a_long_week,It's been a long week.,0.87
+fluke,cloned,chatter,chatter_i_ll_tell_you_about_it_later,I'll tell you about it later.,1.05
+fluke,cloned,chatter,chatter_can_you_believe_that,Can you believe that?,0.74
+fluke,cloned,chatter,chatter_oh_that_reminds_me,"Oh, that reminds me.",1.12
+fluke,cloned,chatter,chatter_i_need_a_vacation,I need a vacation.,1.07
+fluke,cloned,chatter,chatter_let_me_know_when_you_re_ready,Let me know when you're ready.,1.13
+fluke,cloned,chatter,chatter_where_d_you_park,Where'd you park?,0.69
+fluke,cloned,chatter,chatter_it_s_right_around_the_corner,It's right around the corner.,1.39
+fluke,cloned,chatter,chatter_they_re_opening_a_new_place_down_the_str,They're opening a new place down the street.,1.47
+fluke,cloned,chatter,chatter_i_haven_t_seen_him_in_forever,I haven't seen him in forever.,1.39
+fluke,cloned,chatter,chatter_i_m_starving_you_want_to_grab_lunch,I'm starving. You want to grab lunch?,1.76
+fluke,cloned,chatter,chatter_she_said_she_d_be_here_by_now,She said she'd be here by now.,1.51
+fluke,cloned,chatter,chatter_hang_on_i_m_getting_a_call,"Hang on, I'm getting a call.",1.47
+fluke,cloned,chatter,chatter_no_the_other_one,"No, the other one.",1.07
+fluke,cloned,chatter,chatter_i_ll_think_about_it,I'll think about it.,0.81
+fluke,cloned,chatter,chatter_that_s_crazy,That's crazy.,0.75
+fluke,cloned,chatter,chatter_for_real,For real?,0.45
+fluke,cloned,chatter,chatter_i_swear_every_single_time,"I swear, every single time.",1.53
+fluke,cloned,chatter,chatter_whatever_it_s_fine,"Whatever, it's fine.",0.87
+fluke,cloned,chatter,chatter_let_s_just_go,Let's just go.,0.74
+fluke,cloned,chatter,chatter_you_go_ahead_i_ll_catch_up,"You go ahead, I'll catch up.",1.56
+fluke,cloned,chatter,chatter_it_s_not_a_big_deal,It's not a big deal.,0.85
+fluke,cloned,chatter,chatter_i_was_just_about_to_say_that,I was just about to say that.,1.23
+fluke,cloned,chatter,chatter_rent_went_up_again,Rent went up again.,1.29
+fluke,cloned,chatter,chatter_my_car_s_in_the_shop,My car's in the shop.,1.03
+fluke,cloned,chatter,chatter_the_bus_is_late_again,The bus is late again.,1.31
+fluke,cloned,chatter,chatter_i_don_t_even_know_anymore,I don't even know anymore.,0.93
+fluke,cloned,chatter,chatter_oh_i_love_this_song,"Oh, I love this song.",1.35
+fluke,cloned,chatter,chatter_we_should_head_back,We should head back.,0.89
+fluke,cloned,chatter,chatter_okay_okay_i_hear_you,"Okay, okay, I hear you.",1.67
+fluke,cloned,chatter,chatter_hold_on_a_second,Hold on a second.,0.70
+fluke,cloned,chatter,chatter_exactly,Exactly.,0.65
+fluke,cloned,chatter,chatter_yeah_no_i_get_it,"Yeah, no, I get it.",1.22
+fluke,cloned,chatter,chatter_it_is_what_it_is,It is what it is.,0.93
+alec,cloned,story,story_1_toaster,"Here's something most people never think about. When you push down the lever on a toaster, it doesn't actually know when your toast is done. It's just running a timer, and it has no idea what's happening to the bread. That's why the same setting gives you perfect toast in the morning and charcoal an hour later. The toaster is already warm, so the bread browns faster, but the timer doesn't know that. Which, frankly, is a little bit silly.",23.18
+alec,cloned,story,story_2_dishwasher,"I want to talk about the little cup on the dishwasher door, the one that pops open halfway through the cycle. A lot of people don't realize there's a second, smaller spot right next to it, and it's there for a reason. That's for the pre-wash. If you leave it empty, the first part of the cycle is basically just splashing water around. Put a little detergent in there, and suddenly your dishwasher works a whole lot better. You're welcome.",20.62
+ben,cloned,story,story_1_groceries,"So I went to the grocery store this weekend, and I have to say, the prices are just, they're a lot. I picked up the same things I always get, right? Eggs, bread, coffee. Nothing crazy. And the total was about thirty percent higher than it was a couple of years ago. Now, you could argue, well, that's just inflation, and that's fair. But it does raise the question, where do we go from here? Because at some point, people are going to start buying less, right?",24.05
+ben,cloned,story,story_2_sink,"My kitchen sink started leaking last week, and I thought, you know what, I can fix this. How hard can it be? So I watched a couple of videos, went to the hardware store, bought the part, and got to work. Three hours later, the sink was leaking in two places instead of one. So, you know, I called a plumber. He fixed it in about ten minutes. And honestly, I think that's a lesson in knowing where your edge is, right?",18.70
+ben,cloned,story,story_3_dog,"Every single day, around noon, the mail carrier comes by, and every single day, my dog acts like it's the first time he's ever seen this person. Barking, running to the window, the whole thing. And you would think, after about four years of data, he would have figured out the pattern by now. Same person, same time, never once a threat. But no. Every day, it's a brand new crisis. I admire the consistency, though.",19.97
+camel,cloned,story,story_1_flatpack,"So I finally sat down this weekend to build this flat-pack wardrobe for the spare room, right? Instructions look simple enough. Picture of a smiling man, a couple of screws, job done in an hour. That was the plan, anyway. Four hours later, I'm on the floor with two pieces left over and a door that only closes if you lean on it. Now, I'm not saying the instructions were wrong, but I am saying I have serious questions about that smiling man.",20.62
+camel,cloned,story,story_2_rain,"Popped out to the shops this morning. Sunny, blue skies, not a cloud in sight, so obviously I didn't bother with a coat. Rookie mistake. I know, I know, I should have known better by now. Halfway down the high street, the heavens just open. Absolutely chucking it down. And I'm standing there under a bus shelter, soaked through, with a loaf of bread and a pint of milk, having a proper think about my life choices.",19.66
+fluke,cloned,story,story_1_meeting,"So my manager schedules a mandatory one hour meeting. Everyone has to be there. Cameras on. And the entire meeting is him reading the slides out loud, word for word, slides he already emailed us the day before. Then at the end he goes, any questions? And nobody says anything, because what would we even ask? You just wasted an hour of eight people's time to read us an email. That meeting could have been nothing. Literally nothing.",23.02
+fluke,cloned,story,story_2_pizza,"Our team just finished this huge project. Months of overtime, weekends, the whole thing. And to celebrate, the company got us pizza. Two pizzas. For twenty people. In the break room. At four in the afternoon. And of course HR is standing there taking photos for LinkedIn. Look at our amazing culture. Meanwhile, half the team didn't even get a slice. But hey, at least we feel appreciated, right?",22.06
+jimdale,cloned,story,story_new,so i went down to the hardware store this morning to pick up a few things for the fence out back of course they were out of the one thing i actually needed so i ended up talking to the guy behind the counter for about twenty minutes instead he was telling me all about his grandson who'd just started college and how the kid already wants to change his major i told him you know that's pretty normal half the people i know change their minds two or three times anyway i never did get the part but it was a nice morning you you,31.02
+joeb,cloned,story,story_1_wawa,"So it's like two in the morning, right, and I'm starving, so I go to Wawa. And there's like fifteen people in there. At two in the morning. Where are all these people coming from? Like, what are we all doing here? And the guy in front of me orders the biggest hoagie I've ever seen in my life, and he's just standing there staring at the screen, waiting for it, like it's the most important moment of his whole week. And honestly? Respect. I get it.",22.38
+joeb,cloned,story,story_2_car,"My buddy just bought a used car off some guy online, right, and the guy swore up and down it had no problems. None. Perfect condition. He drives it home, and the check engine light comes on before he even gets off the street. So he calls the guy, and the guy's like, oh yeah, it does that sometimes, just ignore it. Just ignore it! Bro, that's not a feature. That's the car telling you it's about to die. I'm never letting him buy a car without me again.",25.90
+joeb,cloned,story,story_3_parkway,"You ever sit in traffic on the Parkway at like eleven at night and just look at the car next to you? There's some guy in there eating fries out of the bag, just vibing, and you're like, where is this man going? Like he's got a whole life, right? A job, a family, a dog maybe, problems I'll never know about. And for five minutes we're just two dudes stuck at the same toll. Then he takes the exit and I'm never gonna see him again. That's crazy to me.",23.26
+joeb,cloned,story,story_4_gym,"There's this one guy at my gym, I don't know his name, I've never talked to him, but every single time I walk in, we do the nod. Just the nod. Every time. It's been like two years. And the one day he wasn't there, I was genuinely worried about him. Like, is he okay? Did something happen? Then he shows up the next week, we do the nod, and everything's right in the world again. That's my guy.",20.46
+joeb,cloned,story,story_5_dmv,"So I had to go to the DMV last week, right, and I brought everything. Every document. Passport, two bills, my birth certificate, everything. I was ready. I was so ready. Four hours I'm in there. Four hours. I finally get to the window, and the lady looks at my paper and goes, oh, this is the wrong form. The wrong form! I just stood there, bro. I didn't even say anything. I just walked out.",21.42
+joel,cloned,story,story_1_bodega,"Yo, so check it. I was walking down to the bodega this morning, right, and it's mad cold out. I'm just trying to grab a coffee and a bacon egg and cheese, you know what I'm saying? And the line is out the door, bro, out the door. So I'm standing there like, all right, whatever. I got time. But then this dude walks in, skips everybody, and goes straight to the counter like he owned the place. And I'm like, nah, nah, nah, hold on. We not doing that today. Everybody in the line is looking at each other like, yo, you seeing this? Long story short, he went to the back of the line. Respect. You know what I'm saying?",31.76
+joel,cloned,story,story_2_subway,"Bro, the train this morning? Crazy. So I get on the A train, right, it's packed, everybody's pressed up on each other, and there's this dude with a whole bike. A whole bike, on the train, at rush hour. And he's acting like we the problem. Like, excuse me, can y'all move? Move where, bro? Where you want me to go? I'm already halfway inside this lady's purse. Then the train just stops. In the tunnel. No announcement, no nothing. Twenty minutes, bro. And the conductor finally comes on like, we are being held by the train dispatcher. Yeah, no kidding.",29.80
+joel,cloned,story,story_3_court,"So Saturday I'm at the court on a Hundred and Fifty Fifth, right, and I'm not even trying to play, I'm just watching. And this old head walks up, he gotta be like sixty, and he's like, y'all got next? Everybody's laughing, like, okay unc, you got next. Bro. This man hit like five jumpers in a row. Didn't even jump. Just flicked it. Nothing but net, every single time. And he's talking the whole time too. Like, that's buckets, young boy, that's buckets. I'm on the side dying laughing. Man walked off like it was nothing. That's New York right there.",28.68
+joel,cloned,story,story_4_ticket,"Yo, let me tell you about this parking ticket. I ran into the store for literally two minutes. Two minutes. I come back out and the lady is already writing it. I'm like, ma'am, I'm right here, I'm getting in the car right now. And she just looks at me, tears it off, puts it on the windshield, and walks away. Didn't say a word. Not one word. Sixty five dollars, bro. For a bag of chips and a Arizona. That was the most expensive iced tea of my life, you know what I'm saying? I'm framing that ticket.",29.08
+joel,cloned,story,story_5_grandma,"Sunday dinner at my grandma's house is not a game. You walk in and she's already like, you hungry? And it don't matter what you say, you getting a plate. Mac and cheese, collard greens, the chicken, the cornbread, everything. And if you don't go back for seconds she think something wrong with you. She'll be like, what, you don't like my food no more? And then she packing plates for you to take home. Aluminum foil, all that. I'm talking like three days of food. That's love right there, you know what I'm saying? That's real love.",28.92
+seanterry,cloned,story,story_new,"So, I went down to the hardware store this morning to pick up a few things for the fence out back. Of course, they were out of the one thing I actually needed, so I ended up talking to the guy behind the counter for about 20 minutes instead. He was telling me all about his grandson, who just started college, and how the kid already wants to change his major. I told him, you know, that's pretty normal. Half the people I know change their minds two or three times. Anyway, I never did get the part, but it was a nice morning.",27.82
+tyler,cloned,story,story_1_package,"So I ordered this flashlight online, right, and it said it would be here in two days. Two days. Perfect. Well, a week goes by, nothing. So I check the tracking, and it says it was delivered. Delivered where? Not here. I'm walking around the whole house, checking the porch, the back door, the mailbox, nothing. Then my neighbor comes over holding this box, and he's like, hey man, I think this is yours. It had been sitting on his porch for five days.",27.74
+tyler,cloned,story,story_2_grill,"I finally got a new grill for the back patio, and I was so excited, I didn't even read the instructions. Just put it together, fired it up, threw some burgers on there. Easy. About ten minutes later, there's smoke everywhere. I mean everywhere. The smoke alarm inside the house is going off, my dog is barking, and I'm standing there with a spatula like, okay, maybe I should have read the instructions.",21.34

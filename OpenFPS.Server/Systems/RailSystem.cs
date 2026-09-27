@@ -164,9 +164,8 @@ public sealed class RailSystem
             }
 
             float lookahead = MathF.Max(15f, tr.Speed * tr.Speed / (2f * tr.Brake));
-            tr.Line.Sample(tr.Head + lookahead, out _, out _, out float ahead);
-            tr.Line.Sample(tr.Head, out _, out _, out float now);
-            float want = MathF.Min(tr.TopSpeed, MathF.Min(now, ahead));
+            // The slowest of the whole stretch ahead, not its far end: see RaceLine.SlowestWithin.
+            float want = MathF.Min(tr.TopSpeed, tr.Line.SlowestWithin(tr.Head, lookahead));
 
             // Coming up on a platform. A train's braking rate is a tenth of a car's and its
             // approach is correspondingly long — which is most of why a train arriving sounds

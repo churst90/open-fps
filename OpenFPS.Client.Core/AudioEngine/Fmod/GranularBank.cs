@@ -37,6 +37,23 @@ public class GranularBank : IDisposable
             return true;
         }
 
+        if (!TryDecode(soundId, out data, out channels, out sampleRate)) return false;
+        _pcmCache[soundId] = data;
+        _channelsCache[soundId] = channels;
+        _sampleRateCache[soundId] = sampleRate;
+        Log.Information("GranularBank: Decoded {SoundId} -> {SampleCount} samples, {Channels} ch, {Rate} Hz",
+            soundId, data.Length / channels, channels, sampleRate);
+        return true;
+    }
+
+    /// <summary>
+    /// Decodes a sound file to interleaved float PCM WITHOUT keeping it. For a caller that keeps its
+    /// own copy, such as a spoken line registered as a world sound: caching it here as well would hold
+    /// every line anyone has said for the whole session, twice.
+    /// </summary>
+    public bool TryDecode(string soundId, out float[] data, out int channels, out int sampleRate)
+    {
+        data = Array.Empty<float>();
         channels = 0;
         sampleRate = 0;
 
@@ -90,15 +107,7 @@ public class GranularBank : IDisposable
 
             // Convert to float array based on format
             data = ConvertToFloatArray(rawBytes, format);
-            
-            _pcmCache[soundId] = data;
-            _channelsCache[soundId] = channels;
-            _sampleRateCache[soundId] = sampleRate;
-
-            Log.Information("GranularBank: Decoded {SoundId} -> {SampleCount} samples, {Channels} ch, {Rate} Hz", 
-                soundId, data.Length / channels, channels, sampleRate);
-
-            return true;
+            return channels > 0;
         }
         finally
         {

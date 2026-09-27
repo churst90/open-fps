@@ -26,11 +26,12 @@ public class SoundMappingService
         _state = state;
     }
 
-    public void Initialize()
+    /// <param name="basePath">The sound folder; the program's own ASSETS/SOUNDS when not given. A test
+    /// names the repository's.</param>
+    public void Initialize(string? basePath = null)
     {
         if (_initialized) return;
-        string basePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ASSETS", "SOUNDS");
-        _bank.Initialize(basePath);
+        _bank.Initialize(basePath ?? Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ASSETS", "SOUNDS"));
         _initialized = true;
     }
 

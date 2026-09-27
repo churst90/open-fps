@@ -2,6 +2,70 @@
 
 Recent work, newest first. `git log` has the rest.
 
+## 2026-09-26
+
+### People in the street talk
+- The city's pedestrians speak, using 17 recorded voices (1,462 lines). They greet you as you pass,
+  say goodbye as you part, apologise if you walk into them, ask if they can help when you stand in
+  front of them, talk on the phone, and greet each other.
+- Lines depend on the game clock and weather ("Good morning", "Looks like rain", "Cold out here
+  today").
+- A line is a world sound from the speaker's mouth, placed, blocked and reverberated like any other,
+  and it moves with the speaker while they talk. Levels are the ANSI S3.5 speech levels (62 dB at
+  1 m for normal speech, 68 dB raised).
+- A talker is duller and quieter behind than in front (about -2, -6 and -13 dB in the low, mid and
+  high bands straight behind). Speech gets no discrete echo copies, which made a person in the
+  street sound as if they were in a building.
+- A voice's tone, air loss and room now update while it plays and moves. Before, only its position,
+  level and blocking did.
+- Pedestrians greet each other only where a player could hear it (within 40 m).
+- Text (MUD) players are told the words of anything said within 10 m.
+- Of the three voices in the set cloned from real people, seanterry and jimdale are shipped; ben is not.
+- The city has 310 pedestrians, generated from the pavements themselves: every pavement is walked,
+  split wherever something solid stands on it, and given a person per 30 m, half each way.
+- 25 voices from the 2026-09-27 set: 20 people and 5 angry drivers. joel, seanterry, joeb, ben,
+  alec, fluke and camel are handed out twice as often. Eleven people have stories (23 in all), which
+  they sometimes tell during a phone call. 40 more everyday lines per voice.
+- Every car on the street has a driver with a voice. Drivers yell after a hard stop, at a car coming
+  across while they wait at a give-way, at anyone standing in the road ahead (they also brake and
+  honk), at a car pulling out in front of them, and when held at a level crossing for 25 s. Yells are
+  at shouting level (82 dB at 1 m) from the driver's window and move with the car. The Main Street walks stop at the bus
+  shelters, which the old walkers passed through.
+- `tools/import_npc_voices.py` imports a new set; `--speech-lines` in the lab decodes every line and
+  checks its level.
+
+### Turbos
+- A turbo spools as soon as the pedal goes down. On the compound-turbo pickups the spool's target
+  was the larger of the idle freewheel and the throttle's share, and the throttle's share only
+  passed the freewheel at 1,300-1,700 rpm: the whine held flat pulling away. The throttle's share
+  now adds to the freewheel. Turbos with no idle freewheel are unchanged.
+- The whine's tip-clearance hump is a narrow band of noise (6% wide) at the power the old sine had,
+  not a single line.
+
+### Voices sounded like they were in a room outdoors
+- The outdoor traced reverb is traced from the listener's head, so it heard the ground under their
+  own feet and handed every sound back 10-15 ms late, 2-7 dB under the direct sound (measured from a
+  capture). A close voice with a copy that close behind is a small room. The listener's trace is now
+  built without the open ground; sources keep their own ground reflection. Street tails come from the
+  facades, first arriving at their real delay (48 ms in a 20 m street).
+- `docs/WHO_RENDERS_WHAT.md`: which mechanism renders each part of a sound, so nothing is rendered twice.
+- `--traced-reverb` in the lab fails if the listener's trace hands anything back inside 25 ms.
+
+### Your own footsteps
+- Your footsteps were drowned out on the busy city: everybody's steps shared one pool of twelve
+  voices, taken in turn, and other people's steps took your slot before your step could play. Other
+  people's steps now have their own pool of 64, are only made within 15 m, compete for a voice by
+  level (only yours are pinned), and no longer take the pool for the echoes of your own steps.
+
+### Sirens and traffic
+- A distant siren no longer flutters. Its position was set twice a frame, from two places up to
+  300 ms apart, and swung between them. `--siren-route` in the lab drives the police car's route
+  past a fixed listener.
+- Traffic no longer surges through corners. A vehicle reading the speed limit a braking distance
+  ahead saw the corner exit before it reached the tightest point, so it accelerated and then braked
+  at every bend; it now takes the lowest limit over the whole look-ahead. Trains too. Most audible on
+  the diesel pickups.
+
 ## 2026-09-24
 
 ### What you hear from far away

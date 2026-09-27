@@ -669,7 +669,14 @@ public class ClientAudioSystem
                         _audio.SetAcousticPath(id, shadowed);
                         // A horn or a siren on this vehicle is behind the same bus.
                         if (_horns.ContainsKey(id)) _audio.SetAcousticPath(HornVoiceBase - Math.Abs(id), shadowed);
-                        if (_sirenVoiced.Contains(id)) _audio.SetAcousticPath(SirenVoiceBase - Math.Abs(id), shadowed);
+                        // Placed where the siren's own update places it, or the two writers pull
+                        // the image between two bearings every frame (see SirenApparent).
+                        if (_sirenVoiced.Contains(id) && world.Entities.TryGetValue(id, out var sirenCar))
+                        {
+                            var sirenPath = shadowed;
+                            sirenPath.ApparentPosition = SirenApparent(shadowed, SirenMouth(sirenCar), visualEyePos);
+                            _audio.SetAcousticPath(SirenVoiceBase - Math.Abs(id), sirenPath);
+                        }
                         // And so is its borrowed engine, if it is voiced from afar.
                         if (_distantVoiced.Contains(id)) _audio.SetAcousticPath(DistantVoiceBase - Math.Abs(id), shadowed);
                         continue;
@@ -1725,7 +1732,7 @@ public class ClientAudioSystem
                 var at = OpenFPS.Common.AudioEmission.PointFor(snap);
                 path = new AcousticPathData(0f, at, Vector3.Distance(eyePos, at));
             }
-            SirenVoice(snap, sirenKey, path, world.PositionsSampledAt);
+            SirenVoice(snap, sirenKey, path, world.PositionsSampledAt, eyePos);
         }
         _sirensGone.Clear();
         foreach (int id in _sirenVoiced) if (!_sirenCars.Contains(id)) _sirensGone.Add(id);
@@ -1841,7 +1848,7 @@ public class ClientAudioSystem
     /// with the traffic: off. Moving with purpose: wail. Hard on the brakes into a junction: yelp,
     /// which is what a real crew switches to, because a fast sweep is far easier to place.
     /// </summary>
-    private void SirenVoice(EntitySnapshot snap, string sirenKey, in AcousticPathData path, double sampledAt)
+    private void SirenVoice(EntitySnapshot snap, string sirenKey, in AcousticPathData path, double sampledAt, Vector3 eyePos)
     {
         OpenFPS.Common.SirenSpec spec;
         try { spec = OpenFPS.Common.SirenSpec.ByName(sirenKey); }
@@ -1856,9 +1863,7 @@ public class ClientAudioSystem
             return;
         }
 
-        // At the grille, which is where the horn is.
-        Vector3 pos = snap.Transform.Position
-                    + Vector3.Transform(new Vector3(0f, 0.4f, 1.9f), snap.Transform.Rotation);
+        Vector3 pos = SirenMouth(snap);
         var (gain, reference) = OpenFPS.Common.Loudness.Place(spec.SourceLevelDb, spec.HornMouthMetres);
 
         var e = new SpatialEmitter
@@ -1871,7 +1876,7 @@ public class ClientAudioSystem
             Mode = PlaybackMode.LoopOne,
             Type = EmitterType.EntityAttached,
             Position = pos,
-            ApparentPosition = pos,
+            ApparentPosition = SirenApparent(path, pos, eyePos),
             Velocity = snap.Velocity,
             PositionSampledAt = sampledAt,
             // Which way the horn points. Without it the machine frame falls back to the VELOCITY,
@@ -1899,6 +1904,31 @@ public class ClientAudioSystem
         ApplyGround(ref e, _groundWorld);
         if (_audio.IsPlaying(voiceId)) _audio.UpdateSpatialAttributes(e);
         else { _audio.PlayPhysicalSoundDirect(e); _sirenVoiced.Add(snap.Id); }
+    }
+
+    /// <summary>A siren head: at the grille, which is where the horn is.</summary>
+    internal static Vector3 SirenMouth(in EntitySnapshot snap)
+        => snap.Transform.Position + Vector3.Transform(new Vector3(0f, 0.4f, 1.9f), snap.Transform.Rotation);
+
+    /// <summary>
+    /// Where a siren is heard from: its own head, unless the car's path says the sound arrives round
+    /// something, in which case from that bearing at the head's distance.
+    ///
+    /// ONE answer, used by both things that place the voice. The siren's own update used to put it at
+    /// the grille while the car's acoustic path put it at the exhaust as of the last worker request
+    /// (up to ten frames old at range) or at the edge a blocked source is redirected to. The audio
+    /// thread applied whichever arrived last, and a game frame separates the two, so the image swung
+    /// between two bearings every frame — 3.6 degrees for a car crossing 100 m out in the open,
+    /// the whole redirection behind a building. Heard as a far siren "fluttering".
+    /// </summary>
+    internal static Vector3 SirenApparent(in AcousticPathData path, Vector3 mouth, Vector3 ear)
+    {
+        // A path with no source recorded is a stand-in (no result yet): nothing to redirect by.
+        if (path.SourcePosition == Vector3.Zero || path.ApparentPosition == Vector3.Zero) return mouth;
+        if (Vector3.DistanceSquared(path.ApparentPosition, path.SourcePosition) < 1f) return mouth;
+        var toApparent = path.ApparentPosition - ear;
+        if (toApparent.LengthSquared() < 1e-6f) return mouth;
+        return ear + Vector3.Normalize(toApparent) * Vector3.Distance(ear, mouth);
     }
 
     /// <summary>One mode decision per vehicle, kept between frames because the decision has
@@ -2438,9 +2468,28 @@ public class ClientAudioSystem
 
     private const int FOOTSTEP_BASE_ID = -100;
 
-    /// <summary>Somebody else's step: a sound at a place in the world, left there as they walk on.</summary>
+    /// <summary>
+    /// Everybody else's steps have voices of their own, apart from yours.
+    ///
+    /// They used to share your twelve. Each step takes the next id round, and a submission under an id
+    /// replaces whatever was waiting there, so with three hundred people walking the city their steps
+    /// came round the pool faster than yours could start: "I'm not hearing my own footsteps when I walk
+    /// outside". Nobody else's step can take your slot now.
+    /// </summary>
+    private const int OTHERS_FOOTSTEP_BASE_ID = -300;
+    private const int OTHERS_FOOTSTEP_POOL_SIZE = 64;
+    private int _othersFootstepIndex;
+
+    /// <summary>How far away another body's step can be heard at all, metres: a footstep's range.</summary>
+    private const float FootstepRange = 15f;
+
+    /// <summary>Somebody else's step: a sound at a place in the world, left there as they walk on.
+    /// Only one close enough to hear is made at all.</summary>
     public void OnPlayerFootstep(Vector3 pos, string mat, string var)
-        => SubmitFootstep(pos + new Vector3(0, 0.1f, 0), mat, follows: false, offset: Vector3.Zero, boostDb: 0f);
+    {
+        if (Vector3.Distance(pos, _state.VisualPosition) > FootstepRange) return;
+        SubmitFootstep(pos + new Vector3(0, 0.1f, 0), mat, follows: false, offset: Vector3.Zero, boostDb: 0f);
+    }
 
     /// <summary>
     /// How much louder your OWN footstep is to you than the same footstep is to a bystander standing
@@ -2481,8 +2530,10 @@ public class ClientAudioSystem
 
     private void SubmitFootstep(Vector3 nudgePos, string mat, bool follows, Vector3 offset, float boostDb)
     {
-        int id = FOOTSTEP_BASE_ID - (_footstepPoolIndex % FOOTSTEP_POOL_SIZE);
-        _footstepPoolIndex++;
+        // Your own feet ride with you (follows); anybody else's stay where they fell.
+        bool own = follows;
+        int id = own ? FOOTSTEP_BASE_ID - (_footstepPoolIndex++ % FOOTSTEP_POOL_SIZE)
+                     : OTHERS_FOOTSTEP_BASE_ID - (_othersFootstepIndex++ % OTHERS_FOOTSTEP_POOL_SIZE);
 
         string resolvedSoundId = _sounds.ResolvePath(_sounds.GetImpactSoundId(mat, 0f));
         if (string.IsNullOrEmpty(resolvedSoundId)) return;
@@ -2509,10 +2560,11 @@ public class ClientAudioSystem
             ListenerOffset = offset,
             Type = EmitterType.WorldLocked,
             Volume = stepGain,
-            Range = 15.0f,
+            Range = FootstepRange,
             // Your own feet, pinned above the physics: they are how you know you are moving, and on
-            // a loud map the arithmetic would rightly bury them under everything else.
-            Essential = true,
+            // a loud map the arithmetic would rightly bury them under everything else. Only yours:
+            // everybody else's compete for a voice by how loud they are, like any other sound.
+            Essential = own,
             IsEvent = true,
             MinDistance = stepReference,
             // The room the body is standing in, so its reverberation is THAT room's.
@@ -2520,7 +2572,8 @@ public class ClientAudioSystem
         };
         _audio.Submit(footstep);
 
-        SubmitStepReflections(nudgePos, resolvedSoundId, stepGain, stepReference);
+        // The walls answering YOUR footfalls. Other people's steps have none: their pool is yours.
+        if (own) SubmitStepReflections(nudgePos, resolvedSoundId, stepGain, stepReference);
     }
 
     /// <summary>Voices for the surfaces answering your own footfalls. Their own pool, so a wall's copy

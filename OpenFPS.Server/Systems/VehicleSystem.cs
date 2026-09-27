@@ -106,6 +106,15 @@ public sealed partial class VehicleSystem
         public float KerbShift;
         /// <summary>Standing at a bus stop, as the client's air system needs to know.</summary>
         public bool ServingStop;
+
+        /// <summary>The driver's voice ("" for none), what they last yelled and when, and how long
+        /// they have been held at a level crossing.</summary>
+        public string DriverVoice = "";
+        public string DriverLastLine = "";
+        public double LastYellAt = double.NegativeInfinity;
+        public double LastInTheWayAt = double.NegativeInfinity;
+        public double HeldSince = double.NaN;
+        public bool YelledThisHold;
     }
 
     private enum State { Waiting, Driving, Turning }
@@ -263,7 +272,8 @@ public sealed partial class VehicleSystem
                     new Velocity { Linear = Vector3.Zero },
                     new ColliderComponent { Shape = ColliderShape.Box, Size = hull, IsSolid = false },
                     new NameComponent { Name = vd.Name ?? displayKind },
-                    new IdentityComponent { Name = vd.Name ?? displayKind, Description = description }))
+                    new IdentityComponent { Name = vd.Name ?? displayKind, Description = description },
+                    new Pedestrian { Voice = PedestrianSpeech.NextVoice(mapId) }))
                     : maps.SpawnEntity(mapId, w => w.Create(
                     EntityType.NPC,
                     new Transform { Position = start, Rotation = Quaternion.CreateFromYawPitchRoll(heading, 0f, 0f) },
@@ -343,6 +353,7 @@ public sealed partial class VehicleSystem
                 v.Preset = vd.Preset;
                 v.Horn = profile != null ? VehicleProfile.HornFor(profile) : "";
                 v.OnStreet = data.StreetLife != null && profile != null && !isAircraft && !isMachine && !isWalker;
+                if (v.OnStreet) v.DriverVoice = PedestrianSpeech.NextDriverVoice(mapId);
                 if (data.StreetLife != null) _streetLife[mapId] = data.StreetLife;
                 _vehicles.Add(v);
                 if (line != null)
@@ -543,9 +554,9 @@ public sealed partial class VehicleSystem
         }
 
         float lookahead = MathF.Max(8f, v.Speed * v.Speed / (2f * v.Brake));
-        line.Sample(v.Lap + lookahead, out _, out _, out float ahead);
-        line.Sample(v.Lap, out Vector3 here, out float heading, out float now, out float cornerLimit);
-        float want = MathF.Min(now, ahead);
+        line.Sample(v.Lap, out Vector3 here, out float heading, out _, out float cornerLimit);
+        // The slowest of the whole stretch ahead, not its far end: see RaceLine.SlowestWithin.
+        float want = line.SlowestWithin(v.Lap, lookahead);
 
         // ── Coming up on one ───────────────────────────────────────────────────────────────────
         //

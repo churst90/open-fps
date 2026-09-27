@@ -59,6 +59,44 @@ public class StreetLifeTests
     }
 
     [Fact]
+    public void DriversYellAfterAHardStop()
+    {
+        var (_, world, vehicles) = LoadCity(new StreetLifeData { HardBrakeEverySeconds = 20 });
+        var yells = Run(vehicles, world, 5 * 60).Where(h => h.Label.StartsWith("speech: ")).ToList();
+        _o.WriteLine($"{yells.Count} yells: {string.Join(" | ", yells.Take(8).Select(y => y.Label))}");
+        Assert.NotEmpty(yells);
+        foreach (var y in yells)
+        {
+            Assert.Contains("/yell_", y.Sound.SynthKey);
+            Assert.Equal(Speech.LevelDb(Speech.ShoutDb), y.Sound.LevelDb, 2);
+        }
+    }
+
+    [Fact]
+    public void ACarBrakesHonksAndYellsAtSomebodyStandingInTheRoad()
+    {
+        var (_, world, vehicles) = LoadCity(new StreetLifeData());
+        Run(vehicles, world, 5);
+        // A car on the move, and somebody standing in its lane ten metres ahead.
+        Entity car = Entity.Null;
+        world.Query(new QueryDescription().WithAll<VehicleComponent, Transform>(), (Entity e, ref VehicleComponent vc) =>
+        {
+            if (car == Entity.Null && vc.Speed > 8f && vehicles.TryInspect(e.Id, out _)) car = e;
+        });
+        Assert.NotEqual(Entity.Null, car);
+        var t = world.Get<Transform>(car);
+        var ahead = t.Position + Vector3.Transform(Vector3.UnitZ, t.Rotation) * 10f;
+        world.Create(new Transform { Position = ahead }, new PlayerComponent { Username = "p" });
+        float before = world.Get<VehicleComponent>(car).Speed;
+
+        var heard = Run(vehicles, world, 2).Where(h => h.Id == car.Id).ToList();
+        _o.WriteLine(string.Join(" | ", heard.Select(h => h.Label)));
+        Assert.Contains(heard, h => h.Label == "horn");
+        Assert.Contains(heard, h => h.Label.StartsWith("speech: ") && h.Sound.SynthKey.Contains("/yell_"));
+        Assert.True(world.Get<VehicleComponent>(car).Speed < before, "it did not brake");
+    }
+
+    [Fact]
     public void HornsComeNowAndAgainFromDifferentVehicles()
     {
         var (_, world, vehicles) = LoadCity(new StreetLifeData { HornEverySeconds = 45 });

@@ -264,6 +264,10 @@ public class MudGateway
             RegisterResponse r => r.Success ? "Registration successful." : "Registration failed: " + r.Message,
             PlayerSpawned => "You are now in the world. Try 'scan'.",
             TextEvent t => t.Text,
+            // Somebody in the street saying something: the one world sound a text player can be told
+            // word for word.
+            WorldAudioEvent w when w.Label.StartsWith("speech: ", StringComparison.Ordinal)
+                => $"Someone nearby says: \"{w.Label["speech: ".Length..]}\"",
             ChatMessage c => c.Channel switch
             {
                 ChatChannel.Private when c.To.Length > 0 => $"[to {c.To}]: {c.Text}",

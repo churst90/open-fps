@@ -275,22 +275,26 @@ def carriageway(x0, x1, z0, z1, name=None):
     box("asphalt_road", x0, x1, 0.0, 0.05, z0, z1, name=name)
 
 
-def footway(x0, x1, z0, z1, name=None):
+FOOTWAYS = []                            # every pavement, for the people who walk them
+
+
+def footway(x0, x1, z0, z1, name=None, label=None):
     box("concrete_floor", x0, x1, 0.0, 0.12, z0, z1, name=name)
+    FOOTWAYS.append((x0, x1, z0, z1, label))
 
 
 def avenue(x, z0, z1, label):
     """A north-south road: asphalt between two kerbed pavements."""
     carriageway(x - KERB, x + KERB, z0, z1, name=f"{label} carriageway")
-    footway(x - WALK, x - KERB, z0, z1)
-    footway(x + KERB, x + WALK, z0, z1)
+    footway(x - WALK, x - KERB, z0, z1, label=f"{label}, west side")
+    footway(x + KERB, x + WALK, z0, z1, label=f"{label}, east side")
 
 
 def street(z, x0, x1, label):
     """An east-west road."""
     carriageway(x0, x1, z - KERB, z + KERB, name=f"{label} carriageway")
-    footway(x0, x1, z - WALK, z - KERB)
-    footway(x0, x1, z + KERB, z + WALK)
+    footway(x0, x1, z - WALK, z - KERB, label=f"{label}, south side")
+    footway(x0, x1, z + KERB, z + WALK, label=f"{label}, north side")
 
 
 avenue(AVENUES[0], AVE_Z0, AVE_Z1, "Wharf Avenue")
@@ -965,8 +969,10 @@ for si, sz in enumerate(RES_STREETS):
     # The street itself.
     carriageway(RES_X0, RES_X1, sz - RES_CARRIAGEWAY / 2, sz + RES_CARRIAGEWAY / 2,
                 name=f"{['Elm', 'Birch', 'Rowan', 'Alder'][si]} Street carriageway")
-    footway(RES_X0, RES_X1, sz - RES_WALK, sz - RES_CARRIAGEWAY / 2)
-    footway(RES_X0, RES_X1, sz + RES_CARRIAGEWAY / 2, sz + RES_WALK)
+    footway(RES_X0, RES_X1, sz - RES_WALK, sz - RES_CARRIAGEWAY / 2,
+            label=f"{['Elm', 'Birch', 'Rowan', 'Alder'][si]} Street, south side")
+    footway(RES_X0, RES_X1, sz + RES_CARRIAGEWAY / 2, sz + RES_WALK,
+            label=f"{['Elm', 'Birch', 'Rowan', 'Alder'][si]} Street, north side")
     region(f"{['Elm', 'Birch', 'Rowan', 'Alder'][si]} Street",
            RES_X0, RES_X1, 0.0, 5.0, sz - RES_WALK, sz + RES_WALK)
     for k in range(int((RES_X1 - RES_X0) // PLOT_W)):
@@ -988,9 +994,11 @@ for li, lx in enumerate(RES_LANES):
                 RES_STREETS[0] - RES_WALK - 8.0, RES_STREETS[-1] + RES_WALK + 8.0,
                 name=f"{['Sycamore', 'Willow'][li]} Lane")
     footway(lx - RES_WALK, lx - RES_CARRIAGEWAY / 2,
-            RES_STREETS[0] - RES_WALK - 8.0, RES_STREETS[-1] + RES_WALK + 8.0)
+            RES_STREETS[0] - RES_WALK - 8.0, RES_STREETS[-1] + RES_WALK + 8.0,
+            label=f"{['Sycamore', 'Willow'][li]} Lane, west side")
     footway(lx + RES_CARRIAGEWAY / 2, lx + RES_WALK,
-            RES_STREETS[0] - RES_WALK - 8.0, RES_STREETS[-1] + RES_WALK + 8.0)
+            RES_STREETS[0] - RES_WALK - 8.0, RES_STREETS[-1] + RES_WALK + 8.0,
+            label=f"{['Sycamore', 'Willow'][li]} Lane, east side")
     region(f"{['Sycamore', 'Willow'][li]} Lane", lx - RES_WALK, lx + RES_WALK, 0.0, 5.0,
            RES_STREETS[0] - RES_WALK, RES_STREETS[-1] + RES_WALK)
 
@@ -1417,28 +1425,97 @@ for preset, z in (("i4_economy", 29.0), ("v6", 35.0), ("i4_compact", 41.0), ("i4
 
 # ── People ────────────────────────────────────────────────────────────────────────────────────
 #
-# Somebody walking is heard by their footsteps, which the client makes from the body's own
-# movement, so a walker carries no sound of its own: it is a body on a line at a walking pace. Four
-# of them, on pavements, each with a wait at the end of the walk where they would stand at a
-# crossing or a door. The Main Street pair keep north of the tunnel, whose pavements are wall.
-PAVEMENT_X = KERB + 1.0                                # a metre off the kerb, clear of the shelter
-WALKERS = [
-    ("Pedestrian, Main Street east", v3(PAVEMENT_X, 0.15, -180.0), v3(PAVEMENT_X, 0.15, 115.0), 5.0, 6.0, 0.0),
-    ("Pedestrian, Main Street west", v3(-PAVEMENT_X, 0.15, 110.0), v3(-PAVEMENT_X, 0.15, -175.0), 4.6, 4.0, 11.0),
-    ("Pedestrian, Foundry Street", v3(12.0, 0.15, STREETS[2] - KERB - 1.0), v3(118.0, 0.15, STREETS[2] - KERB - 1.0), 5.2, 8.0, 5.0),
-    ("Pedestrian, Sycamore Lane", v3(RES_LANES[0] - RES_CARRIAGEWAY / 2 - 0.9, 0.15, -100.0),
-                                  v3(RES_LANES[0] - RES_CARRIAGEWAY / 2 - 0.9, 0.15, 125.0), 4.4, 5.0, 3.0),
-    # More people about (Cody, 2026-09-25: "add some more with some more npc people walking around"):
-    # both pavements of the east and west avenues, and the cross streets either side of Main Street.
-    ("Pedestrian, East Avenue east", v3(AVENUES[2] + PAVEMENT_X, 0.15, -110.0), v3(AVENUES[2] + PAVEMENT_X, 0.15, 240.0), 5.1, 5.0, 7.0),
-    ("Pedestrian, East Avenue west", v3(AVENUES[2] - PAVEMENT_X, 0.15, 240.0), v3(AVENUES[2] - PAVEMENT_X, 0.15, -110.0), 4.7, 7.0, 19.0),
-    ("Pedestrian, West Avenue east", v3(AVENUES[0] + PAVEMENT_X, 0.15, -110.0), v3(AVENUES[0] + PAVEMENT_X, 0.15, 240.0), 4.9, 6.0, 2.0),
-    ("Pedestrian, West Avenue west", v3(AVENUES[0] - PAVEMENT_X, 0.15, 240.0), v3(AVENUES[0] - PAVEMENT_X, 0.15, -110.0), 5.3, 4.0, 14.0),
-    ("Pedestrian, cross street west", v3(-118.0, 0.15, STREETS[1] + PAVEMENT_X), v3(-12.0, 0.15, STREETS[1] + PAVEMENT_X), 4.8, 9.0, 6.0),
-    ("Pedestrian, cross street east", v3(118.0, 0.15, STREETS[1] - PAVEMENT_X), v3(12.0, 0.15, STREETS[1] - PAVEMENT_X), 5.0, 5.0, 9.0),
-    ("Pedestrian, south street", v3(12.0, 0.15, STREETS[0] - PAVEMENT_X), v3(118.0, 0.15, STREETS[0] - PAVEMENT_X), 4.5, 6.0, 12.0),
-    ("Pedestrian, north street", v3(-118.0, 0.15, STREETS[3] + PAVEMENT_X), v3(-12.0, 0.15, STREETS[3] + PAVEMENT_X), 5.2, 7.0, 4.0),
+# Somebody walking is heard by their footsteps and their voice, which the client makes from the body's
+# own movement and the server's speech events, so a walker is a body on a line at a walking pace.
+#
+# Every pavement on the map gets people (Cody, 2026-09-27: "add 200 people or so on the map on all
+# streets"), found from the footways themselves rather than listed: each pavement's length is walked,
+# split wherever something solid stands on it (a bus shelter, a tunnel wall, a tree), and every clear
+# stretch of 25 m or more gets walkers in proportion to its length, half each way, keeping to their
+# own side of the pavement, spread along it by their start times.
+WALKER_SPACING = 30.0                    # metres of pavement per person
+WALK_MIN = 25.0                          # a stretch shorter than this is not a walk
+
+
+def _solid_boxes():
+    solid = {}
+    for path in glob.glob(os.path.join(PREFAB_DIR, "*.json")):
+        if path.endswith("prefab-schema.json"):
+            continue
+        with open(path) as f:
+            p = json.load(f)
+        solid[p["Id"]] = bool(p.get("IsSolid", False))
+    out = []
+    for e in entities:
+        pid = e.get("PrefabId")
+        if not solid.get(pid) or pid not in BASE:
+            continue
+        bx, by, bz = BASE[pid]
+        sc = e.get("Scale") or {"X": 1, "Y": 1, "Z": 1}
+        hx, hy, hz = bx * sc["X"] / 2, by * sc["Y"] / 2, bz * sc["Z"] / 2
+        if e.get("Rotation") and abs(e["Rotation"].get("Y", 0)) > 0.3:
+            hx = hz = max(hx, hz)            # turned: take the larger footprint both ways
+        q = e["Position"]
+        out.append((q["X"] - hx, q["X"] + hx, q["Y"] - hy, q["Y"] + hy, q["Z"] - hz, q["Z"] + hz))
+    return out
+
+
+def _clear_stretches(line_at, length, boxes, step=0.5, body=0.3):
+    """The parts of a line a person can walk along without passing through anything solid."""
+    n = int(length / step)
+    ok = []
+    for i in range(n + 1):
+        x, z = line_at(i * step)
+        hit = any(b[0] - body < x < b[1] + body and b[4] - body < z < b[5] + body
+                  and b[2] < 1.85 and b[3] > 0.45 for b in boxes
+                  if b[0] - 2 < x < b[1] + 2 and b[4] - 2 < z < b[5] + 2)
+        ok.append(not hit)
+    runs, start = [], None
+    for i, clear in enumerate(ok + [False]):
+        if clear and start is None:
+            start = i
+        elif not clear and start is not None:
+            runs.append((start * step + 0.5, (i - 1) * step - 0.5))
+            start = None
+    return [(a, b) for a, b in runs if b - a >= WALK_MIN]
+
+
+_rng = __import__("random").Random(2026_09_27)
+_boxes = _solid_boxes()
+WALKERS = []
+for x0, x1, z0, z1, label in FOOTWAYS:
+    along_z = (z1 - z0) >= (x1 - x0)
+    width = (x1 - x0) if along_z else (z1 - z0)
+    length = (z1 - z0) if along_z else (x1 - x0)
+    # Two tracks on a wide pavement, one either side of the middle; one down the middle of a narrow one.
+    offsets = (-0.7, 0.7) if width >= 3.0 else (0.0, 0.0)
+    mid = ((x0 + x1) / 2) if along_z else ((z0 + z1) / 2)
+    for side, off in enumerate(offsets):
+        def at(d, off=off):
+            return (mid + off, z0 + d) if along_z else (x0 + d, mid + off)
+        for a, b in _clear_stretches(at, length, _boxes):
+            n = max(1, round((b - a) / WALKER_SPACING / 2))
+            for k in range(n):
+                kmh = round(_rng.uniform(4.2, 5.4), 1)
+                walk_s = (b - a) / (kmh / 3.6)
+                pa, pb = at(a), at(b)
+                if side == 1:
+                    pa, pb = pb, pa              # the other track walks the other way
+                WALKERS.append((f"Pedestrian, {label or 'pavement'}", v3(pa[0], 0.15, pa[1]),
+                                v3(pb[0], 0.15, pb[1]), kmh, round(_rng.uniform(3, 9), 1),
+                                round(k * walk_s / n + _rng.uniform(0, 6), 1)))
+
+# The plaza, which has no pavement: people crossing it.
+PLAZA_WALKS = [
+    ("Pedestrian, Market Square, crossing west", v3(-112.0, 0.1, 190.0), v3(-36.0, 0.1, 190.0), 4.5, 8.0, 1.0),
+    ("Pedestrian, Market Square, crossing east", v3(-36.0, 0.1, 214.0), v3(-112.0, 0.1, 214.0), 4.3, 10.0, 6.0),
+    ("Pedestrian, Market Square, north and south", v3(-66.0, 0.1, 160.0), v3(-66.0, 0.1, 226.0), 4.1, 12.0, 4.0),
+    ("Pedestrian, Market Square, crossing west", v3(-100.0, 0.1, 170.0), v3(-40.0, 0.1, 228.0), 4.6, 7.0, 9.0),
 ]
+for name, a, b, kmh, wait, delay in PLAZA_WALKS:
+    WALKERS.append((name, a, b, kmh, wait, delay))
+    WALKERS.append((name + ", the other way", b, a, round(kmh * 0.94 + 0.3, 1), wait + 3.0, delay + 20.0))
+
 for name, a, b, kmh, wait, delay in WALKERS:
     VEHICLES.append({
         "Name": name, "Preset": "walker", "RoadStart": a, "RoadEnd": b,

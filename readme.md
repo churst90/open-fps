@@ -33,6 +33,8 @@ reverb that comes from the room's actual size and materials.
   trying doors and materials.
 - Drive: get into a parked car and drive it, with lane tick and edge tones, a guide beep, parking
   sensor tones and spoken road names. Ride the bus: it stops at bus stops and you can take a seat.
+- People: the city's pedestrians greet you, apologise when you bump into them and talk on the
+  phone; drivers yell when something goes wrong. Recorded lines, placed in the world like any sound.
 - Beacons: sounds that mark doors, items and vehicles near you (a map can add exits, stairs and
   waypoints). Choose which kinds you hear. Beacons behind a wall are not played.
 - Chat: map, all, private and server channels, each with its own sound. Voice chat on the Windows

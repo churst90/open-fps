@@ -225,6 +225,7 @@ public sealed class WorldAudioPlayer
             if (ready && !late) _pending.Add(item);
         }
 
+        FollowSpeakers(world, listenerPosition, now);
         if (_pending.Count == 0) return;
 
         for (int i = _pending.Count - 1; i >= 0; i--)
@@ -239,7 +240,11 @@ public sealed class WorldAudioPlayer
                     item.SoundId, item.IsReflection ? " (echo)" : "", item.Sound.LevelDb,
                     Vector3.Distance(listenerPosition, item.Sound.Position), now - item.DueAt, _pending.Count);
 
-            if (!item.IsReflection)
+            // A person talking gets no echo copies. Each copy is the whole line again from a fixed
+            // mirror point, while the speaker walks on: heard as a room passing you rather than a
+            // person. The street's answer to a voice comes from the reverb, which follows the listener.
+            bool spoken = Speech.TryParseKey(item.Sound.SynthKey, out _);
+            if (!item.IsReflection && !spoken)
             {
                 _enclosedNow = ListenerEnclosed(world, listenerPosition);
                 QueueReflections(item, reflections, listenerPosition, now);
@@ -253,7 +258,7 @@ public sealed class WorldAudioPlayer
             // source of the same power would, which is what the gain compensation in there is for.
             var placed = Loudness.Place(item.Sound.LevelDb, item.Sound.ExtentMetres);
 
-            _audio.Submit(new SpatialEmitter
+            var emitter = new SpatialEmitter
             {
                 // A voice of its own, every time.
                 //
@@ -308,7 +313,84 @@ public sealed class WorldAudioPlayer
                 // rather than keeping it queued to fire from a stale position minutes afterwards.
                 IsEvent = true,
                 InsideListenersVehicle = item.SourceEntityId >= 0 && item.SourceEntityId == ListenerVehicleId,
-            });
+            };
+            // Somebody talking faces a way: duller and quieter behind them.
+            bool follow = spoken && !item.IsReflection && item.SourceEntityId >= 0
+                          && world.Entities.TryGetValue(item.SourceEntityId, out _);
+            if (follow)
+            {
+                var speakerNow = world.Entities[item.SourceEntityId];
+                emitter.CarriesPath = true;
+                Facing(ref emitter, speakerNow.Transform.Rotation, listenerPosition);
+            }
+            _audio.Submit(emitter);
+
+            // Somebody talking while they walk carries their voice with them. A two-second line left
+            // where it started is three metres behind the footsteps by the end of it.
+            if (follow && world.Entities.TryGetValue(item.SourceEntityId, out var speaker))
+                _following.Add(new Following
+                {
+                    Emitter = emitter,
+                    SourceEntityId = item.SourceEntityId,
+                    Offset = item.Sound.Position - speaker.Transform.Position,
+                    // Stop a little before the line ends: a submission after the voice has finished
+                    // would start it again.
+                    Until = now + Math.Max(0f, item.Sound.DecaySeconds - 0.1f),
+                    StartedAt = now,
+                });
+        }
+    }
+
+    /// <summary>Folds which way the speaker faces into the path's band gains.</summary>
+    private static void Facing(ref SpatialEmitter e, Quaternion rotation, Vector3 listenerPosition)
+    {
+        var (low, mid, high) = Speech.Directivity(Vector3.Transform(Vector3.UnitZ, rotation), listenerPosition - e.Position);
+        e.EqLow *= low; e.EqMid *= mid; e.EqHigh *= high;
+    }
+
+    /// <summary>A line being said by a body that is moving, and where its mouth is on that body.</summary>
+    private struct Following
+    {
+        public SpatialEmitter Emitter;
+        public int SourceEntityId;
+        public Vector3 Offset;
+        public double Until;
+        public double StartedAt;
+    }
+
+    /// <summary>How long a voice has to start before following it stops. A line that lost the voice
+    /// budget must not be submitted again: that would start it late, from the top.</summary>
+    private const double StartGraceSeconds = 0.5;
+
+    private readonly List<Following> _following = new();
+
+    /// <summary>Moves every voice that is still talking to where its speaker is now.</summary>
+    private void FollowSpeakers(WorldSnapshot world, Vector3 listenerPosition, double now)
+    {
+        for (int i = _following.Count - 1; i >= 0; i--)
+        {
+            var f = _following[i];
+            if (now >= f.Until || !world.Entities.TryGetValue(f.SourceEntityId, out var speaker)
+                || (now - f.StartedAt > StartGraceSeconds && !_audio.IsPlaying(f.Emitter.EntityId)))
+            {
+                _following.RemoveAt(i);
+                continue;
+            }
+            var at = speaker.Transform.Position + f.Offset;
+            var path = _acoustics.CalculateAcousticPath(world, f.SourceEntityId, listenerPosition, at);
+            var e = f.Emitter;
+            e.Position = at;
+            e.Velocity = speaker.Velocity;
+            e.ApparentPosition = path.ApparentPosition;
+            e.EffectiveDistance = path.EffectiveDistance;
+            e.Occlusion = path.Occlusion;
+            e.EqLow = path.EqLow; e.EqMid = path.EqMid; e.EqHigh = path.EqHigh;
+            e.AirLowDb = path.AirLowDb; e.AirMidDb = path.AirMidDb; e.AirHighDb = path.AirHighDb;
+            e.ApertureFactor = path.ApertureFactor;
+            e.TransmissionBleed = path.TransmissionBleed;
+            e.TargetRegionId = path.RegionId;
+            Facing(ref e, speaker.Transform.Rotation, listenerPosition);
+            _audio.Submit(e);
         }
     }
 
@@ -498,8 +580,12 @@ public sealed class WorldAudioPlayer
     /// working, and flattening that to one knock would throw away a model that exists and is better.
     /// The routing is by prefix, exactly as engine emitters already route "engine:v8_sports".
     /// </summary>
-    private static float[] RenderOne(TransientSound sound, int seed)
+    private float[] RenderOne(TransientSound sound, int seed)
     {
+        // A person saying something: a recording, not a model. Decoded here, off the game thread, and
+        // then it is a world sound like any other.
+        if (Speech.TryParseKey(sound.SynthKey, out string line))
+            return SpokenLine(line);
         if (!string.IsNullOrEmpty(sound.SynthKey)
             && sound.SynthKey.StartsWith("weapon:", StringComparison.OrdinalIgnoreCase))
         {
@@ -513,6 +599,53 @@ public sealed class WorldAudioPlayer
             return Applause.Render(crowd, TransientSynth.SampleRate, seed);
 
         return TransientSynth.Render(sound, seed);
+    }
+
+    /// <summary>
+    /// A recorded line at the mixer's rate and at the level the server placed it from.
+    ///
+    /// The server sends a level on the basis that the line is at <see cref="Speech.BufferRmsDbfs"/>, so
+    /// it is rescaled to exactly that here: a take that came out quieter or hotter is not a person
+    /// talking quieter or louder. A line that is missing plays nothing and says so once.
+    /// </summary>
+    private float[] SpokenLine(string soundId)
+    {
+        if (!_audio.TryDecodeMono(soundId, out var pcm, out int rate) || pcm.Length == 0)
+        {
+            if (_missingLines.Add(soundId))
+                Serilog.Log.Warning("[SPEECH] no recording for {Line}; it is silent", soundId);
+            return new float[16];
+        }
+        if (rate != TransientSynth.SampleRate) pcm = Resample(pcm, rate, TransientSynth.SampleRate);
+        double sum = 0;
+        foreach (float v in pcm) sum += v * v;
+        float rms = (float)Math.Sqrt(sum / pcm.Length);
+        if (rms > 1e-6f)
+        {
+            float gain = MathF.Pow(10f, Speech.BufferRmsDbfs / 20f) / rms;
+            for (int i = 0; i < pcm.Length; i++) pcm[i] = Math.Clamp(pcm[i] * gain, -1f, 1f);
+        }
+        return pcm;
+    }
+
+    private readonly HashSet<string> _missingLines = new();
+
+    /// <summary>Linear interpolation. The shipped lines are already at the mixer's rate; this is for
+    /// a file that is not, so it plays at the right pitch rather than not at all.</summary>
+    internal static float[] Resample(float[] pcm, int from, int to)
+    {
+        int n = (int)((long)pcm.Length * to / from);
+        var y = new float[Math.Max(1, n)];
+        double step = (double)from / to;
+        for (int i = 0; i < y.Length; i++)
+        {
+            double x = i * step;
+            int k = (int)x;
+            float f = (float)(x - k);
+            float a = pcm[Math.Min(k, pcm.Length - 1)], b = pcm[Math.Min(k + 1, pcm.Length - 1)];
+            y[i] = a + (b - a) * f;
+        }
+        return y;
     }
 
     /// <summary>
@@ -556,7 +689,7 @@ public sealed class WorldAudioPlayer
 
     /// <summary>Forgets everything queued. Called on a map change, where the positions mean nothing
     /// any more and the things that made them are gone.</summary>
-    public void Clear() { _pending.Clear(); _awaitingRender.Clear(); }
+    public void Clear() { _pending.Clear(); _awaitingRender.Clear(); _following.Clear(); }
 
     /// <summary>
     /// A sound's parameters ARE its identity.
@@ -574,6 +707,8 @@ public sealed class WorldAudioPlayer
         int noise = (int)MathF.Round(sound.Noisiness * 20f);
         // The seed is coarse on purpose: a handful of variations of each sound, not one per event.
         // A named model is its own identity — two shots from one rifle are one buffer.
+        // A recording is one take: four seeds of it would be four identical buffers.
+        if (Speech.TryParseKey(sound.SynthKey, out _)) return $"synth:{sound.SynthKey}";
         if (!string.IsNullOrEmpty(sound.SynthKey)) return $"synth:{sound.SynthKey}:{seed & 3}";
         return $"synth:{sound.Character}:{hz}:{level}:{decay}:{noise}:{seed & 3}";
     }

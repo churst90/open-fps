@@ -64,6 +64,14 @@ public struct SpatialEmitter
     /// heard through that vehicle's glass. Everything else outside the car is.
     /// </summary>
     public bool InsideListenersVehicle;
+
+    /// <summary>
+    /// This emitter's band gains, air loss and room are its path, and a re-submission while it plays
+    /// updates them. Set by a caller that works the path out itself and moves the voice, such as a
+    /// person talking as they walk. Everything else gets its path from the acoustic worker, and its
+    /// re-submissions leave the tone alone.
+    /// </summary>
+    public bool CarriesPath;
     public Vector3 ListenerOffset;
     public float DelayMs; 
     /// <summary>For a reflection: the entity whose sound this is a copy of. The provider starts the copy

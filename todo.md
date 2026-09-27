@@ -1,19 +1,41 @@
 # To do
 
 Planned work in priority order. Finished work is in [changes.md](changes.md) and `git log`.
-Updated 2026-09-24.
+Updated 2026-09-27.
 
 ## Now
 
 In this order.
 
-### 1. Mutation testing
-- Stryker.NET is running on the core audio and acoustics maths (`Loudness`, `Enclosure`,
-  `ImageSource`, `EarlyReflections`, `TyreFriction`, `Honk`, `VoiceManager`, `VehicleShadow`,
-  `BeaconAids`, `BirdLife`, `EchoDiffuser`).
-- For every surviving mutant: write the test that kills it, or record why it is equivalent.
+### 1. Acoustics before moving on
+- Blocked sources jump between two bearings. A siren 150-300 m away behind buildings turned more
+  than 30 degrees between updates 68 times in 11 minutes (log of 2026-09-27 05:02) while the
+  listener stood still. The bearing alternates between the diffracting edge (exact) and Steam
+  Audio's pathing probes, which are 23.4 m apart on the city map.
+- Reverb per surface: in the default traced mode every room's tail is traced by Steam Audio from
+  the material of each surface, so it is already per surface. Not yet checked: the traced decay of
+  the tunnel and the garage against real figures for spaces like them, and the three-band
+  absorption of each material in the registry. The enclosure estimate (tunnel and garage too long,
+  no area weighting) only applies under `/reverb room`.
+- Sounds played from recordings (speech, footsteps, one-off world sounds) have no ground
+  reflection of their own. Only synthesised voices (engines, machines, sirens) carry one.
+- Birds stalled audio placement for up to 882 ms (29 stall warnings in the same log).
+- Listen in the game to the traced reverb without the open ground (`/reverb traced`). The lab passes;
+  `/reverb room` was confirmed by ear.
 
-### 2. Cleansing pass, the rest
+### 2. Mutation testing
+Results so far are in [docs/MUTATION_2026-09-24.md](docs/MUTATION_2026-09-24.md).
+- Shared maths (`Loudness`, `Enclosure`, `ImageSource`, `EarlyReflections`, `TyreFriction`,
+  `Honk`): 74.6%, survivors killed or recorded as equivalent.
+- Client (`VoiceManager`, `VehicleShadow`, `BeaconAids`, `BirdLife`): 39.2%, survivors not yet done.
+  `EchoDiffuser` was never mutated (its line range went stale).
+- Server and whole-Common runs (35.5% and 47.0%): not yet triaged.
+- Engine code (`Engine/*.cs`, `VehicleSynth`, `Pneumatics`, 2,827 mutants): running since
+  2026-09-25 12:17 on a copy of that day's tree. Map its survivors onto the current code.
+- For every surviving mutant: write the test that kills it, or record why it is equivalent.
+- Each test process leaves an `openfps-test-config-<pid>` folder in /tmp. Remove it on exit.
+
+### 3. Cleansing pass, the rest
 - `ChatManager` sender-prefix leftovers.
 - Lab spikes nothing uses.
 - The 18 `OPENFPS_*` switches: keep the ones still needed, remove the rest.
@@ -25,7 +47,7 @@ In this order.
 - `ClientWorldState.Clear` still takes grid bounds it no longer uses.
 - The unused `users.json` files (the server uses `openfps.db`).
 
-### 3. Tests for the untested audio code
+### 4. Tests for the untested audio code
 From [docs/COVERAGE_2026-09-24.md](docs/COVERAGE_2026-09-24.md):
 - `ClientAudioSystem`: which vehicles get a live voice and the level each is placed at (9% covered),
   through the fake audio provider.
@@ -35,7 +57,7 @@ From [docs/COVERAGE_2026-09-24.md](docs/COVERAGE_2026-09-24.md):
 - One test per DSP callback processor.
 - `AsyncAcousticWorker` paths that do not need Steam Audio.
 
-### 4. Vehicle consistency audit
+### 5. Vehicle consistency audit
 Every vehicle configured the same way, so its loudness is predictable.
 - One table for every preset: declared level, live level at 7.5 m pass-by and at idle, engine bay
   leakage, extent, level lift, air system, horn. Fix outliers in the configuration, not with trims.
@@ -51,7 +73,7 @@ Every vehicle configured the same way, so its loudness is predictable.
   every idle, so the model's reversion flow is too large); fix that and the lope comes back from
   the physics.
 
-### 5. Gunfire
+### 6. Gunfire
 As realistic as possible.
 - Source: close dry recordings of each weapon (`inbox/weapons`).
 - After the muzzle: distance loss and air absorption, forward directivity of the blast, the ground
@@ -62,17 +84,17 @@ As realistic as possible.
 - Also: a shotgun, an impact sound per material, casings that land and bounce where they fall,
   and a proper fire message in the protocol.
 
-### 6. Documentation
-- readme, todo and changes: rewritten 2026-09-24.
+### 7. Documentation
+- readme, todo and changes: rewritten 2026-09-24, brought up to date 2026-09-27.
 - User manual, one document in two parts (Playing; Running a server): `docs/MANUAL.md`.
 
 ## Next
 
 ### Listen and confirm
 Built but never heard in the game. Each needs a listen before it counts as done.
-- Street life: honks, hard stops, cars parking.
-- Engine echoes through the diffuser.
-- Vehicles blocking each other's sound.
+- Street life: honks, hard stops, cars parking. (Traffic as a whole was heard 2026-09-27 and is
+  fine as it is.)
+- Pedestrian and driver speech since the fix for the room-like copy.
 - Beacons.
 - Driving aids.
 - Bus air brakes; the airliner's whine.
@@ -97,12 +119,6 @@ Some may already be fixed; confirm before fixing again.
 - `/restart` and `/reloadmap` for admins.
 - The MUD interface is plain TCP on all interfaces, and the game port accepts any connection
   without a key. Decide what a public server needs.
-
-### Acoustics
-- The room equation uses the enclosure measure, not measured absorption: the tunnel and garage run
-  long.
-- Area-weighted absorption (the bus shelter would drop to about 0.4 s). Changes approved rooms, so
-  it needs a listen.
 
 ### Vehicles
 - A key for the siren when driving a police car.
@@ -142,7 +158,20 @@ Some may already be fixed; confirm before fixing again.
 - Car glass blocking outside sound (moving parts are not in the acoustic scene).
 
 ### World and gameplay
-- Pedestrians and crowds; gunfire as occasional world events.
+- The siren switches off at every short stop (below 2 m/s); real crews keep it on through a junction.
+- Elevators. Signal sounds are in `inbox/elevator sounds` (42 synthetic replicas of real ones:
+  arrival dings and chimes, button beeps, door buzzers, alarm bells, each named by its pitch). They
+  can be played as they are or rebuilt from their pitch and envelope. The machine itself (traction
+  motor, rope and guide-rail rumble, door operator, door panels, latch, the car's own ride) has to
+  be modelled; nothing recorded covers it.
+- Traffic lights at the downtown intersections: drivers could then say "It's green! Go!" (recorded,
+  unused), and the crossings could have accessible pedestrian signals.
+- Crowds; gunfire as occasional world events. Pedestrians talk since 2026-09-26; not yet heard.
+- A crowd murmur from the recorded chatter lines, for the grandstand and busy places: many voices
+  mixed into one extended source, like the applause. Measured 2026-09-26: at 8 or more talkers the
+  gaps between words are gone (envelope spread 3 dB, against 13 dB at 4 talkers).
+- Crowd reactions need lines the delivered set does not have: cheers, "whoa", "come on", gasps,
+  laughter, groans. Generate them with the same tool and import them the same way.
 - Glass: the pane falls after it is shot out; the fragment shower on the granular engine.
 - Rain that sounds different on each surface and under shelter.
 - Speedway crowd: three stand blocks never react; the first reaction of each kind is silent; the
@@ -162,7 +191,7 @@ Some may already be fixed; confirm before fixing again.
 
 - Shapes other than boxes: curved kerbs, round columns, trees, and acoustics that handle them.
 - Airport take-offs and landings; lifts; flats with things in them.
-- Recorded voices for crowds and people (cheers, gasps, babble).
+- Recorded crowd reactions (cheers, gasps); see Crowds under World and gameplay.
 - A real mourning dove; wing flaps when a flock is startled.
 - Walking speed: 4.5 m/s is a jog.
 - Mac client; a web version.

@@ -1,0 +1,287 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Numerics;
+using Arch.Core;
+using OpenFPS.Common;
+using OpenFPS.Common.Components;
+using OpenFPS.Server.Systems;
+using Xunit;
+
+namespace OpenFPS.Tests;
+
+/// <summary>People in the street talking: the catalogue, which lines fit when, and who says them.</summary>
+public class PedestrianSpeechTests
+{
+    private static readonly SpeechConditions Noon = new(12.5f, 20f, 0f, WeatherType.Clear);
+    private static readonly SpeechConditions Night = new(21f, 15f, 0f, WeatherType.Clear);
+
+    /// <summary>Always rolls the lowest number, so every "sometimes" happens.</summary>
+    private sealed class Yes : Random
+    {
+        public override double NextDouble() => 0.0;
+        public override int Next(int maxValue) => 0;
+    }
+
+    /// <summary>Always rolls the highest, so no "sometimes" happens.</summary>
+    private sealed class No : Random
+    {
+        public override double NextDouble() => 0.999;
+        public override int Next(int maxValue) => maxValue - 1;
+    }
+
+    [Fact]
+    public void The_catalogue_ships_the_voices_in_the_inbox_and_the_clones_chosen()
+    {
+        // Cody's set on 2026-09-27: twenty people and five angry drivers.
+        Assert.Equal(25, Speech.Voices.Count);
+        Assert.Equal(new[] { "alec", "ben", "camel", "fluke", "jimdale", "joeb", "joel", "seanterry", "tim", "tyler" },
+                     Speech.Takes.Where(t => t.Kind == "cloned").Select(t => t.Voice).Distinct().OrderBy(v => v));
+        Assert.Equal(20, Speech.VoicesWith("greet").Count);
+        Assert.Contains("angry_vito", Speech.VoicesWith("yell"));
+        Assert.DoesNotContain("angry_vito", PedestrianSpeech.WalkerVoices);
+    }
+
+    [Fact]
+    public void Every_line_the_street_can_ask_for_exists_in_every_voice()
+    {
+        // Every list, under every condition that changes one, so a misspelt line name fails here and
+        // not as a person who silently says nothing.
+        var lines = new HashSet<string>();
+        foreach (float hour in new[] { 3f, 9f, 14f, 19f })
+            foreach (float temp in new[] { 0f, 20f, 32f })
+                foreach (var weather in Enum.GetValues<WeatherType>())
+                {
+                    var c = new SpeechConditions(hour, temp, 0.1f, weather);
+                    lines.UnionWith(StreetLines.Greetings(c));
+                    lines.UnionWith(StreetLines.Partings(c));
+                    lines.UnionWith(StreetLines.PhoneTalk(c));
+                    for (int i = 0; i < 40; i++)
+                    {
+                        var (a, b) = StreetLines.Exchange(c, new Random(i));
+                        lines.UnionWith(a); lines.UnionWith(b);
+                    }
+                }
+        lines.UnionWith(StreetLines.Sorry);
+        lines.UnionWith(StreetLines.Annoyed);
+        lines.UnionWith(StreetLines.Help);
+        lines.UnionWith(StreetLines.Answer);
+        lines.UnionWith(StreetLines.Listening);
+        lines.UnionWith(StreetLines.RingOff);
+
+        lines.UnionWith(StreetLines.Startled);
+        lines.UnionWith(StreetLines.Impatient);
+        lines.UnionWith(StreetLines.Waiting);
+        lines.UnionWith(StreetLines.AtSomebodyInTheRoad);
+        lines.UnionWith(StreetLines.AtAParker);
+
+        // Every line is somebody's. Not everybody has every line (the three voices from the first set
+        // have 86, the rest 126, and the drivers only yell), and a person only picks what they have.
+        foreach (var line in lines)
+            Assert.True(Speech.Voices.Any(v => Speech.Find(v, line) != null), $"nobody has {line}");
+        // ...but everybody on foot can greet, apologise, say goodbye and answer the phone.
+        foreach (var voice in Speech.VoicesWith("greet"))
+            foreach (var line in StreetLines.Sorry.Concat(StreetLines.Answer).Concat(StreetLines.Partings(Noon)))
+                Assert.True(Speech.Find(voice, line) != null, $"{voice} has no take of {line}");
+    }
+
+    [Fact]
+    public void Every_take_in_the_catalogue_has_its_recording()
+    {
+        string root = SoundsRoot();
+        foreach (var t in Speech.Takes)
+            Assert.True(File.Exists(Path.Combine(root, "VOICES", t.Voice, t.Line + ".ogg")), $"{t.Voice}/{t.Line}.ogg");
+    }
+
+    [Fact]
+    public void Lines_that_need_something_true_are_only_offered_when_it_is()
+    {
+        Assert.DoesNotContain("greet_good_morning", StreetLines.Greetings(Night));
+        Assert.Contains("greet_good_evening", StreetLines.Greetings(Night));
+        Assert.Contains("greet_good_afternoon", StreetLines.Greetings(Noon));
+        Assert.Contains("greet_beautiful_day_huh", StreetLines.Greetings(Noon));
+        Assert.DoesNotContain("greet_beautiful_day_huh", StreetLines.Greetings(Noon with { Weather = WeatherType.Rain }));
+        Assert.DoesNotContain("greet_cold_out_here_today", StreetLines.Greetings(Noon));
+        Assert.Contains("greet_cold_out_here_today", StreetLines.Greetings(Noon with { TemperatureC = 2f }));
+        Assert.Contains("greet_looks_like_rain", StreetLines.Greetings(Noon with { Weather = WeatherType.Rain, Precipitation = 0.1f }));
+        Assert.DoesNotContain("greet_looks_like_rain", StreetLines.Greetings(Noon with { Weather = WeatherType.Rain, Precipitation = 0.8f }));
+        Assert.Contains("bye_have_a_good_night", StreetLines.Partings(Night));
+        Assert.DoesNotContain("bye_have_a_good_night", StreetLines.Partings(Noon));
+    }
+
+    [Fact]
+    public void Speech_is_placed_at_a_talkers_level_from_the_mouth()
+    {
+        Assert.Equal(90.35f, Speech.LevelDb(Speech.NormalDb), 2);
+        Assert.True(Speech.TryParseKey(Speech.Key("maria", "greet_hi"), out var id));
+        Assert.Equal("VOICES/maria/greet_hi", id);
+        Assert.False(Speech.TryParseKey("weapon:akm", out _));
+    }
+
+    // ── Behaviour ───────────────────────────────────────────────────────────────────────────────
+
+    private static (World World, Entity Walker) Street(Vector3 walkerAt, float heading)
+    {
+        var world = World.Create();
+        var walker = world.Create(
+            new Transform { Position = walkerAt, Rotation = Quaternion.CreateFromYawPitchRoll(heading, 0f, 0f) },
+            new Velocity { Linear = Vector3.Transform(Vector3.UnitZ, Quaternion.CreateFromYawPitchRoll(heading, 0f, 0f)) * 1.3f },
+            new Pedestrian { Voice = "linda" });
+        return (world, walker);
+    }
+
+    private static Entity Player(World world, Vector3 at)
+        => world.Create(new Transform { Position = at }, new Velocity(), new PlayerComponent { Username = "p" });
+
+    private static List<(int Id, string Label, TransientSound Sound)> Run(PedestrianSpeech speech, World world,
+        double from, double to, SpeechConditions c, Action<double>? each = null)
+    {
+        var said = new List<(int, string, TransientSound)>();
+        for (double t = from; t < to; t += 0.05)
+        {
+            each?.Invoke(t);
+            speech.Update("test", world, t, c, (id, label, s) => said.Add((id, label, s)));
+        }
+        return said;
+    }
+
+    [Fact]
+    public void A_walker_says_hello_to_a_player_they_are_walking_towards()
+    {
+        var (world, walker) = Street(Vector3.Zero, 0f);
+        Player(world, new Vector3(0.8f, 0f, 3f));
+        var said = Run(new PedestrianSpeech(new Yes()), world, 0, 0.5, Noon);
+
+        var (id, label, s) = Assert.Single(said);
+        Assert.Equal(walker.Id, id);
+        Assert.StartsWith("voice:linda/greet_", s.SynthKey);
+        Assert.StartsWith("speech: ", label);
+        Assert.Equal(Speech.MouthHeight, s.Position.Y, 1);
+        Assert.Equal(Speech.LevelDb(Speech.NormalDb), s.LevelDb, 2);
+    }
+
+    [Fact]
+    public void Nobody_greets_the_back_of_someone_they_cannot_see()
+    {
+        var (world, _) = Street(Vector3.Zero, 0f);
+        Player(world, new Vector3(0.5f, 0f, -3f));
+        Assert.Empty(Run(new PedestrianSpeech(new Yes()), world, 0, 2, Noon));
+    }
+
+    [Fact]
+    public void A_hello_is_said_once_per_meeting_not_every_tick()
+    {
+        var (world, _) = Street(Vector3.Zero, 0f);
+        Player(world, new Vector3(0.8f, 0f, 3f));
+        // Under five seconds: with every roll coming up "yes" a phone call starts at five, and answering
+        // it is a "hello" too.
+        var said = Run(new PedestrianSpeech(new Yes()), world, 0, 4.9, Noon);
+        Assert.Single(said, x => x.Sound.SynthKey.Contains("/greet_"));
+    }
+
+    [Fact]
+    public void Some_people_say_nothing()
+    {
+        var (world, _) = Street(Vector3.Zero, 0f);
+        Player(world, new Vector3(0.8f, 0f, 3f));
+        Assert.Empty(Run(new PedestrianSpeech(new No()), world, 0, 5, Noon));
+    }
+
+    [Fact]
+    public void Walking_into_someone_gets_an_apology_and_no_hello_after_it()
+    {
+        var (world, _) = Street(Vector3.Zero, 0f);
+        Player(world, new Vector3(0.3f, 0f, 0.3f));
+        var said = Run(new PedestrianSpeech(new Yes()), world, 0, 5, Noon);
+        Assert.Contains(said, x => x.Sound.SynthKey.Contains("/polite_"));
+        Assert.DoesNotContain(said, x => x.Sound.SynthKey.Contains("/greet_"));
+    }
+
+    [Fact]
+    public void A_goodbye_comes_as_you_part_not_while_you_approach()
+    {
+        var (world, walker) = Street(Vector3.Zero, 0f);
+        var player = Player(world, new Vector3(0.8f, 0f, 3.5f));
+        // The player walks south past the walker, who stands still.
+        world.Get<Velocity>(walker).Linear = Vector3.Zero;
+        var said = Run(new PedestrianSpeech(new Yes()), world, 0, 8, Noon, t =>
+            world.Get<Transform>(player).Position = new Vector3(0.8f, 0f, 3.5f - 1.3f * (float)t));
+
+        int hello = said.FindIndex(x => x.Sound.SynthKey.Contains("/greet_"));
+        int bye = said.FindIndex(x => x.Sound.SynthKey.Contains("/bye_"));
+        Assert.True(hello >= 0 && bye > hello, string.Join(", ", said.Select(x => x.Sound.SynthKey)));
+    }
+
+    [Fact]
+    public void Two_strangers_passing_can_greet_each_other_one_after_the_other()
+    {
+        var world = World.Create();
+        var a = world.Create(new Transform { Position = Vector3.Zero, Rotation = Quaternion.Identity },
+                             new Velocity(), new Pedestrian { Voice = "linda" });
+        var b = world.Create(new Transform { Position = new Vector3(0.5f, 0f, 3f), Rotation = Quaternion.CreateFromYawPitchRoll(MathF.PI, 0f, 0f) },
+                             new Velocity(), new Pedestrian { Voice = "frank" });
+        var said = Run(new PedestrianSpeech(new No()), world, 0, 0.2, Noon);
+        Assert.Empty(said);   // "No" never takes the chance
+
+        world = World.Create();
+        a = world.Create(new Transform { Position = Vector3.Zero, Rotation = Quaternion.Identity },
+                         new Velocity(), new Pedestrian { Voice = "linda" });
+        b = world.Create(new Transform { Position = new Vector3(0.5f, 0f, 3f), Rotation = Quaternion.CreateFromYawPitchRoll(MathF.PI, 0f, 0f) },
+                         new Velocity(), new Pedestrian { Voice = "frank" });
+        // Nobody within earshot: nothing is said.
+        Player(world, new Vector3(0f, 0f, 300f));
+        Assert.Empty(Run(new PedestrianSpeech(new Yes()), world, 0, 0.2, Noon));
+
+        // Somebody across the street, too far to be greeted themselves.
+        Player(world, new Vector3(20f, 0f, 1f));
+        said = Run(new PedestrianSpeech(new Yes()), world, 0, 0.2, Noon);
+        Assert.Equal(2, said.Count);
+        Assert.NotEqual(said[0].Id, said[1].Id);
+        Assert.True(said[1].Sound.DelaySeconds > said[0].Sound.DelaySeconds);
+    }
+
+    [Fact]
+    public void Somebody_with_stories_tells_one_on_the_phone_now_and_then()
+    {
+        var world = World.Create();
+        world.Create(new Transform { Position = Vector3.Zero, Rotation = Quaternion.Identity },
+                     new Velocity(), new Pedestrian { Voice = "joel" });
+        Player(world, new Vector3(0f, 0f, -20f));     // in earshot, behind them, so no hello
+        var said = Run(new PedestrianSpeech(new Random(7)), world, 0, 1800, Noon);
+        Assert.Contains(said, x => x.Sound.SynthKey.Contains("/story_"));
+        Assert.All(said.Where(x => x.Sound.SynthKey.Contains("/story_")), x => Assert.True(x.Sound.DecaySeconds > 15f));
+    }
+
+    [Fact]
+    public void A_talker_is_duller_and_quieter_behind_than_in_front()
+    {
+        var front = Speech.Directivity(Vector3.UnitZ, new Vector3(0f, 0f, 5f));
+        var side = Speech.Directivity(Vector3.UnitZ, new Vector3(5f, 0f, 0f));
+        var behind = Speech.Directivity(Vector3.UnitZ, new Vector3(0f, 0f, -5f));
+        Assert.Equal(1f, front.High, 3);
+        Assert.Equal(Speech.BehindHighDb, 20f * MathF.Log10(behind.High), 1);
+        Assert.Equal(Speech.BehindLowDb, 20f * MathF.Log10(behind.Low), 1);
+        Assert.True(side.High < front.High && side.High > behind.High);
+        Assert.True(behind.High < behind.Mid && behind.Mid < behind.Low);
+    }
+
+    [Fact]
+    public void A_street_of_people_gets_different_voices()
+    {
+        int n = PedestrianSpeech.WalkerVoices.Count;
+        var voices = Enumerable.Range(0, n).Select(_ => PedestrianSpeech.NextVoice("voices-test")).ToList();
+        Assert.Equal(20, voices.Distinct().Count());
+        // Cody's favourites come round twice as often.
+        Assert.Equal(2, voices.Count(v => v == "joel"));
+        Assert.Equal(1, voices.Count(v => v == "linda"));
+    }
+
+    private static string SoundsRoot()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir != null && !Directory.Exists(Path.Combine(dir.FullName, "OpenFPS.Client", "ASSETS", "SOUNDS"))) dir = dir.Parent;
+        return dir != null ? Path.Combine(dir.FullName, "OpenFPS.Client", "ASSETS", "SOUNDS")
+                           : "/home/cody/external-rescue/Github/open-fps/OpenFPS.Client/ASSETS/SOUNDS";
+    }
+}

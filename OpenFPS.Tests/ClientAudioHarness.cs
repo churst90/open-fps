@@ -34,12 +34,16 @@ internal sealed class ClientAudioHarness
     /// <summary>The system's clock, seconds. Advanced one audio frame per <see cref="Tick"/>.</summary>
     public double Now { get; private set; } = 1.0;
 
-    public ClientAudioHarness()
+    /// <param name="soundsPath">A sound bank to resolve recorded sounds from, such as footsteps. None by
+    /// default: the synthesised voices need no files.</param>
+    public ClientAudioHarness(string? soundsPath = null)
     {
         World.Clear(new Vector3(4000, 400, 4000), new Vector3(-2000, -100, -2000), new Vector3(2000, 300, 2000));
         Facade = new AudioEngineFacade(Mixer);
-        Facade.InitializeForTest();
-        Audio = new ClientAudioSystem(Facade, new SoundMappingService(Player), Player, () => Now);
+        Facade.InitializeForTest(soundsPath);
+        var sounds = new SoundMappingService(Player);
+        if (soundsPath != null) sounds.Initialize(soundsPath);
+        Audio = new ClientAudioSystem(Facade, sounds, Player, () => Now);
     }
 
     /// <summary>Stands the listener here, feet on the ground (the ear is EyeHeight above).</summary>

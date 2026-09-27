@@ -3123,17 +3123,61 @@
    "StartDelaySeconds": 12.0
   },
   {
-   "Name": "Pedestrian, Main Street east",
+   "Name": "Pedestrian, Wharf Avenue, west side",
    "Preset": "walker",
    "RoadStart": {
-    "X": 7.0,
+    "X": -138.45,
     "Y": 0.15,
-    "Z": -180.0
+    "Z": -139.5
    },
    "RoadEnd": {
-    "X": 7.0,
+    "X": -138.45,
     "Y": 0.15,
-    "Z": 115.0
+    "Z": 271.5
+   },
+   "SpeedsKmh": [
+    5.3,
+    4.876
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 5.9,
+   "StartDelaySeconds": 6.0
+  },
+  {
+   "Name": "Pedestrian, Wharf Avenue, west side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -138.45,
+    "Y": 0.15,
+    "Z": -139.5
+   },
+   "RoadEnd": {
+    "X": -138.45,
+    "Y": 0.15,
+    "Z": 271.5
+   },
+   "SpeedsKmh": [
+    4.3,
+    3.956
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 6.0,
+   "StartDelaySeconds": 54.9
+  },
+  {
+   "Name": "Pedestrian, Wharf Avenue, west side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -138.45,
+    "Y": 0.15,
+    "Z": -139.5
+   },
+   "RoadEnd": {
+    "X": -138.45,
+    "Y": 0.15,
+    "Z": 271.5
    },
    "SpeedsKmh": [
     5.0,
@@ -3141,21 +3185,43 @@
    ],
    "AccelerationMps2": 0.8,
    "BrakingMps2": 1.0,
-   "WaitSeconds": 6.0,
-   "StartDelaySeconds": 0.0
+   "WaitSeconds": 4.9,
+   "StartDelaySeconds": 85.7
   },
   {
-   "Name": "Pedestrian, Main Street west",
+   "Name": "Pedestrian, Wharf Avenue, west side",
    "Preset": "walker",
    "RoadStart": {
-    "X": -7.0,
+    "X": -138.45,
     "Y": 0.15,
-    "Z": 110.0
+    "Z": -139.5
    },
    "RoadEnd": {
-    "X": -7.0,
+    "X": -138.45,
     "Y": 0.15,
-    "Z": -175.0
+    "Z": 271.5
+   },
+   "SpeedsKmh": [
+    5.0,
+    4.6000000000000005
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 4.8,
+   "StartDelaySeconds": 126.9
+  },
+  {
+   "Name": "Pedestrian, Wharf Avenue, west side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -138.45,
+    "Y": 0.15,
+    "Z": -139.5
+   },
+   "RoadEnd": {
+    "X": -138.45,
+    "Y": 0.15,
+    "Z": 271.5
    },
    "SpeedsKmh": [
     4.6,
@@ -3163,21 +3229,417 @@
    ],
    "AccelerationMps2": 0.8,
    "BrakingMps2": 1.0,
-   "WaitSeconds": 4.0,
-   "StartDelaySeconds": 11.0
+   "WaitSeconds": 6.2,
+   "StartDelaySeconds": 189.1
   },
   {
-   "Name": "Pedestrian, Foundry Street",
+   "Name": "Pedestrian, Wharf Avenue, west side",
    "Preset": "walker",
    "RoadStart": {
-    "X": 12.0,
+    "X": -138.45,
     "Y": 0.15,
-    "Z": 123.0
+    "Z": -139.5
    },
    "RoadEnd": {
-    "X": 118.0,
+    "X": -138.45,
     "Y": 0.15,
-    "Z": 123.0
+    "Z": 271.5
+   },
+   "SpeedsKmh": [
+    5.0,
+    4.6000000000000005
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 4.2,
+   "StartDelaySeconds": 211.4
+  },
+  {
+   "Name": "Pedestrian, Wharf Avenue, west side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -138.45,
+    "Y": 0.15,
+    "Z": -139.5
+   },
+   "RoadEnd": {
+    "X": -138.45,
+    "Y": 0.15,
+    "Z": 271.5
+   },
+   "SpeedsKmh": [
+    4.8,
+    4.416
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 6.1,
+   "StartDelaySeconds": 269.8
+  },
+  {
+   "Name": "Pedestrian, Wharf Avenue, west side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -137.05,
+    "Y": 0.15,
+    "Z": 271.5
+   },
+   "RoadEnd": {
+    "X": -137.05,
+    "Y": 0.15,
+    "Z": -139.5
+   },
+   "SpeedsKmh": [
+    4.5,
+    4.140000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 6.7,
+   "StartDelaySeconds": 2.6
+  },
+  {
+   "Name": "Pedestrian, Wharf Avenue, west side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -137.05,
+    "Y": 0.15,
+    "Z": 271.5
+   },
+   "RoadEnd": {
+    "X": -137.05,
+    "Y": 0.15,
+    "Z": -139.5
+   },
+   "SpeedsKmh": [
+    4.7,
+    4.324000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 3.3,
+   "StartDelaySeconds": 48.6
+  },
+  {
+   "Name": "Pedestrian, Wharf Avenue, west side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -137.05,
+    "Y": 0.15,
+    "Z": 271.5
+   },
+   "RoadEnd": {
+    "X": -137.05,
+    "Y": 0.15,
+    "Z": -139.5
+   },
+   "SpeedsKmh": [
+    5.0,
+    4.6000000000000005
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 5.4,
+   "StartDelaySeconds": 85.3
+  },
+  {
+   "Name": "Pedestrian, Wharf Avenue, west side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -137.05,
+    "Y": 0.15,
+    "Z": 271.5
+   },
+   "RoadEnd": {
+    "X": -137.05,
+    "Y": 0.15,
+    "Z": -139.5
+   },
+   "SpeedsKmh": [
+    5.4,
+    4.968000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 6.6,
+   "StartDelaySeconds": 117.6
+  },
+  {
+   "Name": "Pedestrian, Wharf Avenue, west side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -137.05,
+    "Y": 0.15,
+    "Z": 271.5
+   },
+   "RoadEnd": {
+    "X": -137.05,
+    "Y": 0.15,
+    "Z": -139.5
+   },
+   "SpeedsKmh": [
+    5.4,
+    4.968000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 3.8,
+   "StartDelaySeconds": 157.4
+  },
+  {
+   "Name": "Pedestrian, Wharf Avenue, west side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -137.05,
+    "Y": 0.15,
+    "Z": 271.5
+   },
+   "RoadEnd": {
+    "X": -137.05,
+    "Y": 0.15,
+    "Z": -139.5
+   },
+   "SpeedsKmh": [
+    4.3,
+    3.956
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 3.2,
+   "StartDelaySeconds": 246.7
+  },
+  {
+   "Name": "Pedestrian, Wharf Avenue, west side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -137.05,
+    "Y": 0.15,
+    "Z": 271.5
+   },
+   "RoadEnd": {
+    "X": -137.05,
+    "Y": 0.15,
+    "Z": -139.5
+   },
+   "SpeedsKmh": [
+    4.8,
+    4.416
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 3.3,
+   "StartDelaySeconds": 269.5
+  },
+  {
+   "Name": "Pedestrian, Wharf Avenue, east side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -122.95,
+    "Y": 0.15,
+    "Z": -139.5
+   },
+   "RoadEnd": {
+    "X": -122.95,
+    "Y": 0.15,
+    "Z": 271.5
+   },
+   "SpeedsKmh": [
+    4.3,
+    3.956
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 6.8,
+   "StartDelaySeconds": 0.2
+  },
+  {
+   "Name": "Pedestrian, Wharf Avenue, east side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -122.95,
+    "Y": 0.15,
+    "Z": -139.5
+   },
+   "RoadEnd": {
+    "X": -122.95,
+    "Y": 0.15,
+    "Z": 271.5
+   },
+   "SpeedsKmh": [
+    4.6,
+    4.232
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 4.2,
+   "StartDelaySeconds": 50.9
+  },
+  {
+   "Name": "Pedestrian, Wharf Avenue, east side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -122.95,
+    "Y": 0.15,
+    "Z": -139.5
+   },
+   "RoadEnd": {
+    "X": -122.95,
+    "Y": 0.15,
+    "Z": 271.5
+   },
+   "SpeedsKmh": [
+    4.9,
+    4.508000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 8.5,
+   "StartDelaySeconds": 86.4
+  },
+  {
+   "Name": "Pedestrian, Wharf Avenue, east side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -122.95,
+    "Y": 0.15,
+    "Z": -139.5
+   },
+   "RoadEnd": {
+    "X": -122.95,
+    "Y": 0.15,
+    "Z": 271.5
+   },
+   "SpeedsKmh": [
+    5.1,
+    4.692
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 8.8,
+   "StartDelaySeconds": 127.2
+  },
+  {
+   "Name": "Pedestrian, Wharf Avenue, east side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -122.95,
+    "Y": 0.15,
+    "Z": -139.5
+   },
+   "RoadEnd": {
+    "X": -122.95,
+    "Y": 0.15,
+    "Z": 271.5
+   },
+   "SpeedsKmh": [
+    4.8,
+    4.416
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 4.6,
+   "StartDelaySeconds": 180.4
+  },
+  {
+   "Name": "Pedestrian, Wharf Avenue, east side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -122.95,
+    "Y": 0.15,
+    "Z": -139.5
+   },
+   "RoadEnd": {
+    "X": -122.95,
+    "Y": 0.15,
+    "Z": 271.5
+   },
+   "SpeedsKmh": [
+    5.1,
+    4.692
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 5.1,
+   "StartDelaySeconds": 212.6
+  },
+  {
+   "Name": "Pedestrian, Wharf Avenue, east side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -122.95,
+    "Y": 0.15,
+    "Z": -139.5
+   },
+   "RoadEnd": {
+    "X": -122.95,
+    "Y": 0.15,
+    "Z": 271.5
+   },
+   "SpeedsKmh": [
+    5.4,
+    4.968000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 3.9,
+   "StartDelaySeconds": 235.3
+  },
+  {
+   "Name": "Pedestrian, Wharf Avenue, east side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -121.55,
+    "Y": 0.15,
+    "Z": 271.5
+   },
+   "RoadEnd": {
+    "X": -121.55,
+    "Y": 0.15,
+    "Z": -139.5
+   },
+   "SpeedsKmh": [
+    4.3,
+    3.956
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 5.7,
+   "StartDelaySeconds": 1.9
+  },
+  {
+   "Name": "Pedestrian, Wharf Avenue, east side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -121.55,
+    "Y": 0.15,
+    "Z": 271.5
+   },
+   "RoadEnd": {
+    "X": -121.55,
+    "Y": 0.15,
+    "Z": -139.5
+   },
+   "SpeedsKmh": [
+    4.9,
+    4.508000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 3.4,
+   "StartDelaySeconds": 47.9
+  },
+  {
+   "Name": "Pedestrian, Wharf Avenue, east side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -121.55,
+    "Y": 0.15,
+    "Z": 271.5
+   },
+   "RoadEnd": {
+    "X": -121.55,
+    "Y": 0.15,
+    "Z": -139.5
    },
    "SpeedsKmh": [
     5.2,
@@ -3185,21 +3647,703 @@
    ],
    "AccelerationMps2": 0.8,
    "BrakingMps2": 1.0,
-   "WaitSeconds": 8.0,
-   "StartDelaySeconds": 5.0
+   "WaitSeconds": 3.1,
+   "StartDelaySeconds": 82.0
   },
   {
-   "Name": "Pedestrian, Sycamore Lane",
+   "Name": "Pedestrian, Wharf Avenue, east side",
    "Preset": "walker",
    "RoadStart": {
-    "X": -300.4,
+    "X": -121.55,
     "Y": 0.15,
-    "Z": -100.0
+    "Z": 271.5
    },
    "RoadEnd": {
-    "X": -300.4,
+    "X": -121.55,
     "Y": 0.15,
-    "Z": 125.0
+    "Z": -139.5
+   },
+   "SpeedsKmh": [
+    5.1,
+    4.692
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 5.5,
+   "StartDelaySeconds": 128.9
+  },
+  {
+   "Name": "Pedestrian, Wharf Avenue, east side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -121.55,
+    "Y": 0.15,
+    "Z": 271.5
+   },
+   "RoadEnd": {
+    "X": -121.55,
+    "Y": 0.15,
+    "Z": -139.5
+   },
+   "SpeedsKmh": [
+    4.8,
+    4.416
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 4.9,
+   "StartDelaySeconds": 178.5
+  },
+  {
+   "Name": "Pedestrian, Wharf Avenue, east side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -121.55,
+    "Y": 0.15,
+    "Z": 271.5
+   },
+   "RoadEnd": {
+    "X": -121.55,
+    "Y": 0.15,
+    "Z": -139.5
+   },
+   "SpeedsKmh": [
+    5.0,
+    4.6000000000000005
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 8.1,
+   "StartDelaySeconds": 215.7
+  },
+  {
+   "Name": "Pedestrian, Wharf Avenue, east side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -121.55,
+    "Y": 0.15,
+    "Z": 271.5
+   },
+   "RoadEnd": {
+    "X": -121.55,
+    "Y": 0.15,
+    "Z": -139.5
+   },
+   "SpeedsKmh": [
+    5.3,
+    4.876
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 8.8,
+   "StartDelaySeconds": 242.5
+  },
+  {
+   "Name": "Pedestrian, Main Street, west side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -8.45,
+    "Y": 0.15,
+    "Z": -299.5
+   },
+   "RoadEnd": {
+    "X": -8.45,
+    "Y": 0.15,
+    "Z": -104.5
+   },
+   "SpeedsKmh": [
+    5.1,
+    4.692
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 3.6,
+   "StartDelaySeconds": 4.3
+  },
+  {
+   "Name": "Pedestrian, Main Street, west side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -8.45,
+    "Y": 0.15,
+    "Z": -299.5
+   },
+   "RoadEnd": {
+    "X": -8.45,
+    "Y": 0.15,
+    "Z": -104.5
+   },
+   "SpeedsKmh": [
+    4.7,
+    4.324000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 3.4,
+   "StartDelaySeconds": 53.4
+  },
+  {
+   "Name": "Pedestrian, Main Street, west side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -8.45,
+    "Y": 0.15,
+    "Z": -299.5
+   },
+   "RoadEnd": {
+    "X": -8.45,
+    "Y": 0.15,
+    "Z": -104.5
+   },
+   "SpeedsKmh": [
+    4.9,
+    4.508000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 8.3,
+   "StartDelaySeconds": 97.2
+  },
+  {
+   "Name": "Pedestrian, Main Street, west side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -8.45,
+    "Y": 0.15,
+    "Z": -100.5
+   },
+   "RoadEnd": {
+    "X": -8.45,
+    "Y": 0.15,
+    "Z": 83.0
+   },
+   "SpeedsKmh": [
+    4.2,
+    3.8640000000000003
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 8.0,
+   "StartDelaySeconds": 3.3
+  },
+  {
+   "Name": "Pedestrian, Main Street, west side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -8.45,
+    "Y": 0.15,
+    "Z": -100.5
+   },
+   "RoadEnd": {
+    "X": -8.45,
+    "Y": 0.15,
+    "Z": 83.0
+   },
+   "SpeedsKmh": [
+    4.7,
+    4.324000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 7.2,
+   "StartDelaySeconds": 51.1
+  },
+  {
+   "Name": "Pedestrian, Main Street, west side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -8.45,
+    "Y": 0.15,
+    "Z": -100.5
+   },
+   "RoadEnd": {
+    "X": -8.45,
+    "Y": 0.15,
+    "Z": 83.0
+   },
+   "SpeedsKmh": [
+    4.8,
+    4.416
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 5.2,
+   "StartDelaySeconds": 94.2
+  },
+  {
+   "Name": "Pedestrian, Main Street, west side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -8.45,
+    "Y": 0.15,
+    "Z": 89.0
+   },
+   "RoadEnd": {
+    "X": -8.45,
+    "Y": 0.15,
+    "Z": 155.0
+   },
+   "SpeedsKmh": [
+    4.5,
+    4.140000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 4.3,
+   "StartDelaySeconds": 4.0
+  },
+  {
+   "Name": "Pedestrian, Main Street, west side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -8.45,
+    "Y": 0.15,
+    "Z": 159.0
+   },
+   "RoadEnd": {
+    "X": -8.45,
+    "Y": 0.15,
+    "Z": 419.5
+   },
+   "SpeedsKmh": [
+    4.2,
+    3.8640000000000003
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 4.5,
+   "StartDelaySeconds": 3.2
+  },
+  {
+   "Name": "Pedestrian, Main Street, west side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -8.45,
+    "Y": 0.15,
+    "Z": 159.0
+   },
+   "RoadEnd": {
+    "X": -8.45,
+    "Y": 0.15,
+    "Z": 419.5
+   },
+   "SpeedsKmh": [
+    4.6,
+    4.232
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 5.9,
+   "StartDelaySeconds": 56.6
+  },
+  {
+   "Name": "Pedestrian, Main Street, west side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -8.45,
+    "Y": 0.15,
+    "Z": 159.0
+   },
+   "RoadEnd": {
+    "X": -8.45,
+    "Y": 0.15,
+    "Z": 419.5
+   },
+   "SpeedsKmh": [
+    5.3,
+    4.876
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 4.5,
+   "StartDelaySeconds": 91.5
+  },
+  {
+   "Name": "Pedestrian, Main Street, west side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -8.45,
+    "Y": 0.15,
+    "Z": 159.0
+   },
+   "RoadEnd": {
+    "X": -8.45,
+    "Y": 0.15,
+    "Z": 419.5
+   },
+   "SpeedsKmh": [
+    4.9,
+    4.508000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 6.8,
+   "StartDelaySeconds": 145.6
+  },
+  {
+   "Name": "Pedestrian, Main Street, west side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -7.05,
+    "Y": 0.15,
+    "Z": 83.0
+   },
+   "RoadEnd": {
+    "X": -7.05,
+    "Y": 0.15,
+    "Z": -299.5
+   },
+   "SpeedsKmh": [
+    5.3,
+    4.876
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 6.3,
+   "StartDelaySeconds": 0.9
+  },
+  {
+   "Name": "Pedestrian, Main Street, west side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -7.05,
+    "Y": 0.15,
+    "Z": 83.0
+   },
+   "RoadEnd": {
+    "X": -7.05,
+    "Y": 0.15,
+    "Z": -299.5
+   },
+   "SpeedsKmh": [
+    5.2,
+    4.784000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 6.9,
+   "StartDelaySeconds": 46.3
+  },
+  {
+   "Name": "Pedestrian, Main Street, west side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -7.05,
+    "Y": 0.15,
+    "Z": 83.0
+   },
+   "RoadEnd": {
+    "X": -7.05,
+    "Y": 0.15,
+    "Z": -299.5
+   },
+   "SpeedsKmh": [
+    4.3,
+    3.956
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 4.4,
+   "StartDelaySeconds": 107.4
+  },
+  {
+   "Name": "Pedestrian, Main Street, west side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -7.05,
+    "Y": 0.15,
+    "Z": 83.0
+   },
+   "RoadEnd": {
+    "X": -7.05,
+    "Y": 0.15,
+    "Z": -299.5
+   },
+   "SpeedsKmh": [
+    5.2,
+    4.784000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 3.3,
+   "StartDelaySeconds": 133.7
+  },
+  {
+   "Name": "Pedestrian, Main Street, west side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -7.05,
+    "Y": 0.15,
+    "Z": 83.0
+   },
+   "RoadEnd": {
+    "X": -7.05,
+    "Y": 0.15,
+    "Z": -299.5
+   },
+   "SpeedsKmh": [
+    4.5,
+    4.140000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 7.5,
+   "StartDelaySeconds": 206.2
+  },
+  {
+   "Name": "Pedestrian, Main Street, west side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -7.05,
+    "Y": 0.15,
+    "Z": 83.0
+   },
+   "RoadEnd": {
+    "X": -7.05,
+    "Y": 0.15,
+    "Z": -299.5
+   },
+   "SpeedsKmh": [
+    4.7,
+    4.324000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 3.9,
+   "StartDelaySeconds": 244.8
+  },
+  {
+   "Name": "Pedestrian, Main Street, west side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -7.05,
+    "Y": 0.15,
+    "Z": 419.5
+   },
+   "RoadEnd": {
+    "X": -7.05,
+    "Y": 0.15,
+    "Z": 89.0
+   },
+   "SpeedsKmh": [
+    4.8,
+    4.416
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 8.0,
+   "StartDelaySeconds": 0.8
+  },
+  {
+   "Name": "Pedestrian, Main Street, west side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -7.05,
+    "Y": 0.15,
+    "Z": 419.5
+   },
+   "RoadEnd": {
+    "X": -7.05,
+    "Y": 0.15,
+    "Z": 89.0
+   },
+   "SpeedsKmh": [
+    5.0,
+    4.6000000000000005
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 4.5,
+   "StartDelaySeconds": 43.3
+  },
+  {
+   "Name": "Pedestrian, Main Street, west side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -7.05,
+    "Y": 0.15,
+    "Z": 419.5
+   },
+   "RoadEnd": {
+    "X": -7.05,
+    "Y": 0.15,
+    "Z": 89.0
+   },
+   "SpeedsKmh": [
+    5.2,
+    4.784000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 5.5,
+   "StartDelaySeconds": 76.6
+  },
+  {
+   "Name": "Pedestrian, Main Street, west side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -7.05,
+    "Y": 0.15,
+    "Z": 419.5
+   },
+   "RoadEnd": {
+    "X": -7.05,
+    "Y": 0.15,
+    "Z": 89.0
+   },
+   "SpeedsKmh": [
+    4.3,
+    3.956
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 6.9,
+   "StartDelaySeconds": 143.3
+  },
+  {
+   "Name": "Pedestrian, Main Street, west side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -7.05,
+    "Y": 0.15,
+    "Z": 419.5
+   },
+   "RoadEnd": {
+    "X": -7.05,
+    "Y": 0.15,
+    "Z": 89.0
+   },
+   "SpeedsKmh": [
+    4.9,
+    4.508000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 8.8,
+   "StartDelaySeconds": 163.7
+  },
+  {
+   "Name": "Pedestrian, Main Street, west side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -7.05,
+    "Y": 0.15,
+    "Z": 419.5
+   },
+   "RoadEnd": {
+    "X": -7.05,
+    "Y": 0.15,
+    "Z": 89.0
+   },
+   "SpeedsKmh": [
+    4.7,
+    4.324000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 8.3,
+   "StartDelaySeconds": 213.4
+  },
+  {
+   "Name": "Pedestrian, Main Street, east side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 7.05,
+    "Y": 0.15,
+    "Z": -299.5
+   },
+   "RoadEnd": {
+    "X": 7.05,
+    "Y": 0.15,
+    "Z": -63.0
+   },
+   "SpeedsKmh": [
+    4.9,
+    4.508000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 5.9,
+   "StartDelaySeconds": 1.3
+  },
+  {
+   "Name": "Pedestrian, Main Street, east side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 7.05,
+    "Y": 0.15,
+    "Z": -299.5
+   },
+   "RoadEnd": {
+    "X": 7.05,
+    "Y": 0.15,
+    "Z": -63.0
+   },
+   "SpeedsKmh": [
+    5.0,
+    4.6000000000000005
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 5.8,
+   "StartDelaySeconds": 47.0
+  },
+  {
+   "Name": "Pedestrian, Main Street, east side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 7.05,
+    "Y": 0.15,
+    "Z": -299.5
+   },
+   "RoadEnd": {
+    "X": 7.05,
+    "Y": 0.15,
+    "Z": -63.0
+   },
+   "SpeedsKmh": [
+    4.2,
+    3.8640000000000003
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 3.8,
+   "StartDelaySeconds": 106.5
+  },
+  {
+   "Name": "Pedestrian, Main Street, east side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 7.05,
+    "Y": 0.15,
+    "Z": -299.5
+   },
+   "RoadEnd": {
+    "X": 7.05,
+    "Y": 0.15,
+    "Z": -63.0
+   },
+   "SpeedsKmh": [
+    4.8,
+    4.416
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 3.6,
+   "StartDelaySeconds": 135.1
+  },
+  {
+   "Name": "Pedestrian, Main Street, east side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 7.05,
+    "Y": 0.15,
+    "Z": -57.0
+   },
+   "RoadEnd": {
+    "X": 7.05,
+    "Y": 0.15,
+    "Z": 419.5
    },
    "SpeedsKmh": [
     4.4,
@@ -3207,21 +4351,1539 @@
    ],
    "AccelerationMps2": 0.8,
    "BrakingMps2": 1.0,
+   "WaitSeconds": 5.1,
+   "StartDelaySeconds": 5.5
+  },
+  {
+   "Name": "Pedestrian, Main Street, east side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 7.05,
+    "Y": 0.15,
+    "Z": -57.0
+   },
+   "RoadEnd": {
+    "X": 7.05,
+    "Y": 0.15,
+    "Z": 419.5
+   },
+   "SpeedsKmh": [
+    4.9,
+    4.508000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 7.0,
+   "StartDelaySeconds": 47.0
+  },
+  {
+   "Name": "Pedestrian, Main Street, east side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 7.05,
+    "Y": 0.15,
+    "Z": -57.0
+   },
+   "RoadEnd": {
+    "X": 7.05,
+    "Y": 0.15,
+    "Z": 419.5
+   },
+   "SpeedsKmh": [
+    5.3,
+    4.876
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 6.5,
+   "StartDelaySeconds": 81.9
+  },
+  {
+   "Name": "Pedestrian, Main Street, east side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 7.05,
+    "Y": 0.15,
+    "Z": -57.0
+   },
+   "RoadEnd": {
+    "X": 7.05,
+    "Y": 0.15,
+    "Z": 419.5
+   },
+   "SpeedsKmh": [
+    4.8,
+    4.416
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 8.3,
+   "StartDelaySeconds": 137.6
+  },
+  {
+   "Name": "Pedestrian, Main Street, east side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 7.05,
+    "Y": 0.15,
+    "Z": -57.0
+   },
+   "RoadEnd": {
+    "X": 7.05,
+    "Y": 0.15,
+    "Z": 419.5
+   },
+   "SpeedsKmh": [
+    5.4,
+    4.968000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 6.6,
+   "StartDelaySeconds": 160.7
+  },
+  {
+   "Name": "Pedestrian, Main Street, east side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 7.05,
+    "Y": 0.15,
+    "Z": -57.0
+   },
+   "RoadEnd": {
+    "X": 7.05,
+    "Y": 0.15,
+    "Z": 419.5
+   },
+   "SpeedsKmh": [
+    4.7,
+    4.324000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 5.7,
+   "StartDelaySeconds": 233.0
+  },
+  {
+   "Name": "Pedestrian, Main Street, east side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 7.05,
+    "Y": 0.15,
+    "Z": -57.0
+   },
+   "RoadEnd": {
+    "X": 7.05,
+    "Y": 0.15,
+    "Z": 419.5
+   },
+   "SpeedsKmh": [
+    5.1,
+    4.692
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 8.9,
+   "StartDelaySeconds": 252.3
+  },
+  {
+   "Name": "Pedestrian, Main Street, east side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 7.05,
+    "Y": 0.15,
+    "Z": -57.0
+   },
+   "RoadEnd": {
+    "X": 7.05,
+    "Y": 0.15,
+    "Z": 419.5
+   },
+   "SpeedsKmh": [
+    5.3,
+    4.876
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 5.7,
+   "StartDelaySeconds": 287.3
+  },
+  {
+   "Name": "Pedestrian, Main Street, east side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 8.45,
+    "Y": 0.15,
+    "Z": -105.0
+   },
+   "RoadEnd": {
+    "X": 8.45,
+    "Y": 0.15,
+    "Z": -299.5
+   },
+   "SpeedsKmh": [
+    5.2,
+    4.784000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 3.5,
+   "StartDelaySeconds": 4.6
+  },
+  {
+   "Name": "Pedestrian, Main Street, east side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 8.45,
+    "Y": 0.15,
+    "Z": -105.0
+   },
+   "RoadEnd": {
+    "X": 8.45,
+    "Y": 0.15,
+    "Z": -299.5
+   },
+   "SpeedsKmh": [
+    4.6,
+    4.232
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 6.1,
+   "StartDelaySeconds": 54.4
+  },
+  {
+   "Name": "Pedestrian, Main Street, east side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 8.45,
+    "Y": 0.15,
+    "Z": -105.0
+   },
+   "RoadEnd": {
+    "X": 8.45,
+    "Y": 0.15,
+    "Z": -299.5
+   },
+   "SpeedsKmh": [
+    4.4,
+    4.048000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 6.0,
+   "StartDelaySeconds": 107.1
+  },
+  {
+   "Name": "Pedestrian, Main Street, east side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 8.45,
+    "Y": 0.15,
+    "Z": -63.0
+   },
+   "RoadEnd": {
+    "X": 8.45,
+    "Y": 0.15,
+    "Z": -101.0
+   },
+   "SpeedsKmh": [
+    4.9,
+    4.508000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 5.4,
+   "StartDelaySeconds": 0.7
+  },
+  {
+   "Name": "Pedestrian, Main Street, east side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 8.45,
+    "Y": 0.15,
+    "Z": 26.0
+   },
+   "RoadEnd": {
+    "X": 8.45,
+    "Y": 0.15,
+    "Z": -57.0
+   },
+   "SpeedsKmh": [
+    4.6,
+    4.232
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
    "WaitSeconds": 5.0,
+   "StartDelaySeconds": 0.1
+  },
+  {
+   "Name": "Pedestrian, Main Street, east side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 8.45,
+    "Y": 0.15,
+    "Z": 155.5
+   },
+   "RoadEnd": {
+    "X": 8.45,
+    "Y": 0.15,
+    "Z": 30.0
+   },
+   "SpeedsKmh": [
+    4.9,
+    4.508000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 4.7,
+   "StartDelaySeconds": 0.3
+  },
+  {
+   "Name": "Pedestrian, Main Street, east side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 8.45,
+    "Y": 0.15,
+    "Z": 155.5
+   },
+   "RoadEnd": {
+    "X": 8.45,
+    "Y": 0.15,
+    "Z": 30.0
+   },
+   "SpeedsKmh": [
+    4.2,
+    3.8640000000000003
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 5.3,
+   "StartDelaySeconds": 59.1
+  },
+  {
+   "Name": "Pedestrian, Main Street, east side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 8.45,
+    "Y": 0.15,
+    "Z": 419.5
+   },
+   "RoadEnd": {
+    "X": 8.45,
+    "Y": 0.15,
+    "Z": 159.5
+   },
+   "SpeedsKmh": [
+    4.9,
+    4.508000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 3.9,
+   "StartDelaySeconds": 2.5
+  },
+  {
+   "Name": "Pedestrian, Main Street, east side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 8.45,
+    "Y": 0.15,
+    "Z": 419.5
+   },
+   "RoadEnd": {
+    "X": 8.45,
+    "Y": 0.15,
+    "Z": 159.5
+   },
+   "SpeedsKmh": [
+    5.0,
+    4.6000000000000005
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 4.4,
+   "StartDelaySeconds": 47.7
+  },
+  {
+   "Name": "Pedestrian, Main Street, east side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 8.45,
+    "Y": 0.15,
+    "Z": 419.5
+   },
+   "RoadEnd": {
+    "X": 8.45,
+    "Y": 0.15,
+    "Z": 159.5
+   },
+   "SpeedsKmh": [
+    5.2,
+    4.784000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 3.9,
+   "StartDelaySeconds": 94.3
+  },
+  {
+   "Name": "Pedestrian, Main Street, east side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 8.45,
+    "Y": 0.15,
+    "Z": 419.5
+   },
+   "RoadEnd": {
+    "X": 8.45,
+    "Y": 0.15,
+    "Z": 159.5
+   },
+   "SpeedsKmh": [
+    5.3,
+    4.876
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 8.3,
+   "StartDelaySeconds": 134.8
+  },
+  {
+   "Name": "Pedestrian, Calder Avenue, west side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 121.55,
+    "Y": 0.15,
+    "Z": -139.5
+   },
+   "RoadEnd": {
+    "X": 121.55,
+    "Y": 0.15,
+    "Z": 271.5
+   },
+   "SpeedsKmh": [
+    5.0,
+    4.6000000000000005
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 4.1,
+   "StartDelaySeconds": 6.0
+  },
+  {
+   "Name": "Pedestrian, Calder Avenue, west side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 121.55,
+    "Y": 0.15,
+    "Z": -139.5
+   },
+   "RoadEnd": {
+    "X": 121.55,
+    "Y": 0.15,
+    "Z": 271.5
+   },
+   "SpeedsKmh": [
+    4.8,
+    4.416
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 4.1,
+   "StartDelaySeconds": 49.6
+  },
+  {
+   "Name": "Pedestrian, Calder Avenue, west side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 121.55,
+    "Y": 0.15,
+    "Z": -139.5
+   },
+   "RoadEnd": {
+    "X": 121.55,
+    "Y": 0.15,
+    "Z": 271.5
+   },
+   "SpeedsKmh": [
+    5.0,
+    4.6000000000000005
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 5.4,
+   "StartDelaySeconds": 88.1
+  },
+  {
+   "Name": "Pedestrian, Calder Avenue, west side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 121.55,
+    "Y": 0.15,
+    "Z": -139.5
+   },
+   "RoadEnd": {
+    "X": 121.55,
+    "Y": 0.15,
+    "Z": 271.5
+   },
+   "SpeedsKmh": [
+    4.6,
+    4.232
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 5.9,
+   "StartDelaySeconds": 139.7
+  },
+  {
+   "Name": "Pedestrian, Calder Avenue, west side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 121.55,
+    "Y": 0.15,
+    "Z": -139.5
+   },
+   "RoadEnd": {
+    "X": 121.55,
+    "Y": 0.15,
+    "Z": 271.5
+   },
+   "SpeedsKmh": [
+    5.3,
+    4.876
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 6.4,
+   "StartDelaySeconds": 162.6
+  },
+  {
+   "Name": "Pedestrian, Calder Avenue, west side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 121.55,
+    "Y": 0.15,
+    "Z": -139.5
+   },
+   "RoadEnd": {
+    "X": 121.55,
+    "Y": 0.15,
+    "Z": 271.5
+   },
+   "SpeedsKmh": [
+    4.3,
+    3.956
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 6.0,
+   "StartDelaySeconds": 248.5
+  },
+  {
+   "Name": "Pedestrian, Calder Avenue, west side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 121.55,
+    "Y": 0.15,
+    "Z": -139.5
+   },
+   "RoadEnd": {
+    "X": 121.55,
+    "Y": 0.15,
+    "Z": 271.5
+   },
+   "SpeedsKmh": [
+    4.9,
+    4.508000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 7.2,
+   "StartDelaySeconds": 264.1
+  },
+  {
+   "Name": "Pedestrian, Calder Avenue, west side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 122.95,
+    "Y": 0.15,
+    "Z": 271.5
+   },
+   "RoadEnd": {
+    "X": 122.95,
+    "Y": 0.15,
+    "Z": -139.5
+   },
+   "SpeedsKmh": [
+    5.0,
+    4.6000000000000005
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 7.0,
+   "StartDelaySeconds": 5.1
+  },
+  {
+   "Name": "Pedestrian, Calder Avenue, west side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 122.95,
+    "Y": 0.15,
+    "Z": 271.5
+   },
+   "RoadEnd": {
+    "X": 122.95,
+    "Y": 0.15,
+    "Z": -139.5
+   },
+   "SpeedsKmh": [
+    4.4,
+    4.048000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 4.2,
+   "StartDelaySeconds": 53.0
+  },
+  {
+   "Name": "Pedestrian, Calder Avenue, west side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 122.95,
+    "Y": 0.15,
+    "Z": 271.5
+   },
+   "RoadEnd": {
+    "X": 122.95,
+    "Y": 0.15,
+    "Z": -139.5
+   },
+   "SpeedsKmh": [
+    4.4,
+    4.048000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 6.8,
+   "StartDelaySeconds": 99.7
+  },
+  {
+   "Name": "Pedestrian, Calder Avenue, west side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 122.95,
+    "Y": 0.15,
+    "Z": 271.5
+   },
+   "RoadEnd": {
+    "X": 122.95,
+    "Y": 0.15,
+    "Z": -139.5
+   },
+   "SpeedsKmh": [
+    4.2,
+    3.8640000000000003
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 7.8,
+   "StartDelaySeconds": 154.2
+  },
+  {
+   "Name": "Pedestrian, Calder Avenue, west side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 122.95,
+    "Y": 0.15,
+    "Z": 271.5
+   },
+   "RoadEnd": {
+    "X": 122.95,
+    "Y": 0.15,
+    "Z": -139.5
+   },
+   "SpeedsKmh": [
+    5.1,
+    4.692
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 4.7,
+   "StartDelaySeconds": 170.7
+  },
+  {
+   "Name": "Pedestrian, Calder Avenue, west side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 122.95,
+    "Y": 0.15,
+    "Z": 271.5
+   },
+   "RoadEnd": {
+    "X": 122.95,
+    "Y": 0.15,
+    "Z": -139.5
+   },
+   "SpeedsKmh": [
+    4.9,
+    4.508000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 6.3,
+   "StartDelaySeconds": 221.3
+  },
+  {
+   "Name": "Pedestrian, Calder Avenue, west side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 122.95,
+    "Y": 0.15,
+    "Z": 271.5
+   },
+   "RoadEnd": {
+    "X": 122.95,
+    "Y": 0.15,
+    "Z": -139.5
+   },
+   "SpeedsKmh": [
+    5.4,
+    4.968000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 5.3,
+   "StartDelaySeconds": 236.2
+  },
+  {
+   "Name": "Pedestrian, Calder Avenue, east side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 137.05,
+    "Y": 0.15,
+    "Z": -139.5
+   },
+   "RoadEnd": {
+    "X": 137.05,
+    "Y": 0.15,
+    "Z": 271.5
+   },
+   "SpeedsKmh": [
+    4.8,
+    4.416
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 4.1,
+   "StartDelaySeconds": 1.9
+  },
+  {
+   "Name": "Pedestrian, Calder Avenue, east side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 137.05,
+    "Y": 0.15,
+    "Z": -139.5
+   },
+   "RoadEnd": {
+    "X": 137.05,
+    "Y": 0.15,
+    "Z": 271.5
+   },
+   "SpeedsKmh": [
+    4.6,
+    4.232
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 3.2,
+   "StartDelaySeconds": 51.4
+  },
+  {
+   "Name": "Pedestrian, Calder Avenue, east side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 137.05,
+    "Y": 0.15,
+    "Z": -139.5
+   },
+   "RoadEnd": {
+    "X": 137.05,
+    "Y": 0.15,
+    "Z": 271.5
+   },
+   "SpeedsKmh": [
+    4.6,
+    4.232
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 6.9,
+   "StartDelaySeconds": 93.8
+  },
+  {
+   "Name": "Pedestrian, Calder Avenue, east side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 137.05,
+    "Y": 0.15,
+    "Z": -139.5
+   },
+   "RoadEnd": {
+    "X": 137.05,
+    "Y": 0.15,
+    "Z": 271.5
+   },
+   "SpeedsKmh": [
+    4.3,
+    3.956
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 6.9,
+   "StartDelaySeconds": 152.3
+  },
+  {
+   "Name": "Pedestrian, Calder Avenue, east side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 137.05,
+    "Y": 0.15,
+    "Z": -139.5
+   },
+   "RoadEnd": {
+    "X": 137.05,
+    "Y": 0.15,
+    "Z": 271.5
+   },
+   "SpeedsKmh": [
+    4.5,
+    4.140000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 8.9,
+   "StartDelaySeconds": 188.1
+  },
+  {
+   "Name": "Pedestrian, Calder Avenue, east side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 137.05,
+    "Y": 0.15,
+    "Z": -139.5
+   },
+   "RoadEnd": {
+    "X": 137.05,
+    "Y": 0.15,
+    "Z": 271.5
+   },
+   "SpeedsKmh": [
+    4.2,
+    3.8640000000000003
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 7.3,
+   "StartDelaySeconds": 256.7
+  },
+  {
+   "Name": "Pedestrian, Calder Avenue, east side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 137.05,
+    "Y": 0.15,
+    "Z": -139.5
+   },
+   "RoadEnd": {
+    "X": 137.05,
+    "Y": 0.15,
+    "Z": 271.5
+   },
+   "SpeedsKmh": [
+    5.0,
+    4.6000000000000005
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 7.9,
+   "StartDelaySeconds": 255.4
+  },
+  {
+   "Name": "Pedestrian, Calder Avenue, east side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 138.45,
+    "Y": 0.15,
+    "Z": 271.5
+   },
+   "RoadEnd": {
+    "X": 138.45,
+    "Y": 0.15,
+    "Z": -139.5
+   },
+   "SpeedsKmh": [
+    4.9,
+    4.508000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 4.1,
+   "StartDelaySeconds": 0.4
+  },
+  {
+   "Name": "Pedestrian, Calder Avenue, east side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 138.45,
+    "Y": 0.15,
+    "Z": 271.5
+   },
+   "RoadEnd": {
+    "X": 138.45,
+    "Y": 0.15,
+    "Z": -139.5
+   },
+   "SpeedsKmh": [
+    4.3,
+    3.956
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 5.0,
+   "StartDelaySeconds": 51.1
+  },
+  {
+   "Name": "Pedestrian, Calder Avenue, east side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 138.45,
+    "Y": 0.15,
+    "Z": 271.5
+   },
+   "RoadEnd": {
+    "X": 138.45,
+    "Y": 0.15,
+    "Z": -139.5
+   },
+   "SpeedsKmh": [
+    5.3,
+    4.876
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 5.0,
+   "StartDelaySeconds": 82.4
+  },
+  {
+   "Name": "Pedestrian, Calder Avenue, east side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 138.45,
+    "Y": 0.15,
+    "Z": 271.5
+   },
+   "RoadEnd": {
+    "X": 138.45,
+    "Y": 0.15,
+    "Z": -139.5
+   },
+   "SpeedsKmh": [
+    5.2,
+    4.784000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 4.0,
+   "StartDelaySeconds": 124.6
+  },
+  {
+   "Name": "Pedestrian, Calder Avenue, east side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 138.45,
+    "Y": 0.15,
+    "Z": 271.5
+   },
+   "RoadEnd": {
+    "X": 138.45,
+    "Y": 0.15,
+    "Z": -139.5
+   },
+   "SpeedsKmh": [
+    5.2,
+    4.784000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 5.0,
+   "StartDelaySeconds": 167.2
+  },
+  {
+   "Name": "Pedestrian, Calder Avenue, east side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 138.45,
+    "Y": 0.15,
+    "Z": 271.5
+   },
+   "RoadEnd": {
+    "X": 138.45,
+    "Y": 0.15,
+    "Z": -139.5
+   },
+   "SpeedsKmh": [
+    5.2,
+    4.784000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 5.8,
+   "StartDelaySeconds": 205.9
+  },
+  {
+   "Name": "Pedestrian, Calder Avenue, east side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 138.45,
+    "Y": 0.15,
+    "Z": 271.5
+   },
+   "RoadEnd": {
+    "X": 138.45,
+    "Y": 0.15,
+    "Z": -139.5
+   },
+   "SpeedsKmh": [
+    5.2,
+    4.784000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 7.6,
+   "StartDelaySeconds": 248.0
+  },
+  {
+   "Name": "Pedestrian, Dock Street, south side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -139.5,
+    "Y": 0.15,
+    "Z": -138.45
+   },
+   "RoadEnd": {
+    "X": 139.5,
+    "Y": 0.15,
+    "Z": -138.45
+   },
+   "SpeedsKmh": [
+    4.6,
+    4.232
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 8.3,
+   "StartDelaySeconds": 3.3
+  },
+  {
+   "Name": "Pedestrian, Dock Street, south side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -139.5,
+    "Y": 0.15,
+    "Z": -138.45
+   },
+   "RoadEnd": {
+    "X": 139.5,
+    "Y": 0.15,
+    "Z": -138.45
+   },
+   "SpeedsKmh": [
+    5.1,
+    4.692
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 7.3,
+   "StartDelaySeconds": 40.0
+  },
+  {
+   "Name": "Pedestrian, Dock Street, south side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -139.5,
+    "Y": 0.15,
+    "Z": -138.45
+   },
+   "RoadEnd": {
+    "X": 139.5,
+    "Y": 0.15,
+    "Z": -138.45
+   },
+   "SpeedsKmh": [
+    5.4,
+    4.968000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 5.3,
+   "StartDelaySeconds": 80.3
+  },
+  {
+   "Name": "Pedestrian, Dock Street, south side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -139.5,
+    "Y": 0.15,
+    "Z": -138.45
+   },
+   "RoadEnd": {
+    "X": 139.5,
+    "Y": 0.15,
+    "Z": -138.45
+   },
+   "SpeedsKmh": [
+    5.0,
+    4.6000000000000005
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 5.7,
+   "StartDelaySeconds": 122.1
+  },
+  {
+   "Name": "Pedestrian, Dock Street, south side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -139.5,
+    "Y": 0.15,
+    "Z": -138.45
+   },
+   "RoadEnd": {
+    "X": 139.5,
+    "Y": 0.15,
+    "Z": -138.45
+   },
+   "SpeedsKmh": [
+    4.3,
+    3.956
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 3.4,
+   "StartDelaySeconds": 190.0
+  },
+  {
+   "Name": "Pedestrian, Dock Street, south side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 139.5,
+    "Y": 0.15,
+    "Z": -137.05
+   },
+   "RoadEnd": {
+    "X": -139.5,
+    "Y": 0.15,
+    "Z": -137.05
+   },
+   "SpeedsKmh": [
+    5.2,
+    4.784000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 4.8,
+   "StartDelaySeconds": 1.3
+  },
+  {
+   "Name": "Pedestrian, Dock Street, south side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 139.5,
+    "Y": 0.15,
+    "Z": -137.05
+   },
+   "RoadEnd": {
+    "X": -139.5,
+    "Y": 0.15,
+    "Z": -137.05
+   },
+   "SpeedsKmh": [
+    5.1,
+    4.692
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 7.1,
+   "StartDelaySeconds": 43.8
+  },
+  {
+   "Name": "Pedestrian, Dock Street, south side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 139.5,
+    "Y": 0.15,
+    "Z": -137.05
+   },
+   "RoadEnd": {
+    "X": -139.5,
+    "Y": 0.15,
+    "Z": -137.05
+   },
+   "SpeedsKmh": [
+    5.3,
+    4.876
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 3.3,
+   "StartDelaySeconds": 80.0
+  },
+  {
+   "Name": "Pedestrian, Dock Street, south side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 139.5,
+    "Y": 0.15,
+    "Z": -137.05
+   },
+   "RoadEnd": {
+    "X": -139.5,
+    "Y": 0.15,
+    "Z": -137.05
+   },
+   "SpeedsKmh": [
+    4.5,
+    4.140000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 5.7,
+   "StartDelaySeconds": 138.6
+  },
+  {
+   "Name": "Pedestrian, Dock Street, south side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 139.5,
+    "Y": 0.15,
+    "Z": -137.05
+   },
+   "RoadEnd": {
+    "X": -139.5,
+    "Y": 0.15,
+    "Z": -137.05
+   },
+   "SpeedsKmh": [
+    4.8,
+    4.416
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 3.1,
+   "StartDelaySeconds": 169.5
+  },
+  {
+   "Name": "Pedestrian, Dock Street, north side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -139.5,
+    "Y": 0.15,
+    "Z": -122.95
+   },
+   "RoadEnd": {
+    "X": 139.5,
+    "Y": 0.15,
+    "Z": -122.95
+   },
+   "SpeedsKmh": [
+    4.8,
+    4.416
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 8.4,
    "StartDelaySeconds": 3.0
   },
   {
-   "Name": "Pedestrian, East Avenue east",
+   "Name": "Pedestrian, Dock Street, north side",
    "Preset": "walker",
    "RoadStart": {
-    "X": 137.0,
+    "X": -139.5,
     "Y": 0.15,
-    "Z": -110.0
+    "Z": -122.95
    },
    "RoadEnd": {
-    "X": 137.0,
+    "X": 139.5,
     "Y": 0.15,
-    "Z": 240.0
+    "Z": -122.95
+   },
+   "SpeedsKmh": [
+    4.5,
+    4.140000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 7.1,
+   "StartDelaySeconds": 49.6
+  },
+  {
+   "Name": "Pedestrian, Dock Street, north side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -139.5,
+    "Y": 0.15,
+    "Z": -122.95
+   },
+   "RoadEnd": {
+    "X": 139.5,
+    "Y": 0.15,
+    "Z": -122.95
+   },
+   "SpeedsKmh": [
+    5.3,
+    4.876
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 4.5,
+   "StartDelaySeconds": 76.1
+  },
+  {
+   "Name": "Pedestrian, Dock Street, north side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -139.5,
+    "Y": 0.15,
+    "Z": -122.95
+   },
+   "RoadEnd": {
+    "X": 139.5,
+    "Y": 0.15,
+    "Z": -122.95
+   },
+   "SpeedsKmh": [
+    4.6,
+    4.232
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 3.1,
+   "StartDelaySeconds": 136.5
+  },
+  {
+   "Name": "Pedestrian, Dock Street, north side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -139.5,
+    "Y": 0.15,
+    "Z": -122.95
+   },
+   "RoadEnd": {
+    "X": 139.5,
+    "Y": 0.15,
+    "Z": -122.95
+   },
+   "SpeedsKmh": [
+    5.3,
+    4.876
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 6.3,
+   "StartDelaySeconds": 156.4
+  },
+  {
+   "Name": "Pedestrian, Dock Street, north side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 139.5,
+    "Y": 0.15,
+    "Z": -121.55
+   },
+   "RoadEnd": {
+    "X": -139.5,
+    "Y": 0.15,
+    "Z": -121.55
+   },
+   "SpeedsKmh": [
+    4.9,
+    4.508000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 5.2,
+   "StartDelaySeconds": 3.8
+  },
+  {
+   "Name": "Pedestrian, Dock Street, north side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 139.5,
+    "Y": 0.15,
+    "Z": -121.55
+   },
+   "RoadEnd": {
+    "X": -139.5,
+    "Y": 0.15,
+    "Z": -121.55
+   },
+   "SpeedsKmh": [
+    5.2,
+    4.784000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 9.0,
+   "StartDelaySeconds": 42.9
+  },
+  {
+   "Name": "Pedestrian, Dock Street, north side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 139.5,
+    "Y": 0.15,
+    "Z": -121.55
+   },
+   "RoadEnd": {
+    "X": -139.5,
+    "Y": 0.15,
+    "Z": -121.55
+   },
+   "SpeedsKmh": [
+    4.2,
+    3.8640000000000003
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 3.1,
+   "StartDelaySeconds": 97.5
+  },
+  {
+   "Name": "Pedestrian, Dock Street, north side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 139.5,
+    "Y": 0.15,
+    "Z": -121.55
+   },
+   "RoadEnd": {
+    "X": -139.5,
+    "Y": 0.15,
+    "Z": -121.55
+   },
+   "SpeedsKmh": [
+    4.5,
+    4.140000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 3.6,
+   "StartDelaySeconds": 138.2
+  },
+  {
+   "Name": "Pedestrian, Dock Street, north side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 139.5,
+    "Y": 0.15,
+    "Z": -121.55
+   },
+   "RoadEnd": {
+    "X": -139.5,
+    "Y": 0.15,
+    "Z": -121.55
+   },
+   "SpeedsKmh": [
+    5.3,
+    4.876
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 5.7,
+   "StartDelaySeconds": 153.0
+  },
+  {
+   "Name": "Pedestrian, Central Street, south side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -447.5,
+    "Y": 0.15,
+    "Z": -8.45
+   },
+   "RoadEnd": {
+    "X": 176.0,
+    "Y": 0.15,
+    "Z": -8.45
+   },
+   "SpeedsKmh": [
+    4.5,
+    4.140000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 7.8,
+   "StartDelaySeconds": 4.9
+  },
+  {
+   "Name": "Pedestrian, Central Street, south side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -447.5,
+    "Y": 0.15,
+    "Z": -8.45
+   },
+   "RoadEnd": {
+    "X": 176.0,
+    "Y": 0.15,
+    "Z": -8.45
+   },
+   "SpeedsKmh": [
+    4.5,
+    4.140000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 5.9,
+   "StartDelaySeconds": 52.0
+  },
+  {
+   "Name": "Pedestrian, Central Street, south side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -447.5,
+    "Y": 0.15,
+    "Z": -8.45
+   },
+   "RoadEnd": {
+    "X": 176.0,
+    "Y": 0.15,
+    "Z": -8.45
+   },
+   "SpeedsKmh": [
+    4.9,
+    4.508000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 3.9,
+   "StartDelaySeconds": 92.1
+  },
+  {
+   "Name": "Pedestrian, Central Street, south side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -447.5,
+    "Y": 0.15,
+    "Z": -8.45
+   },
+   "RoadEnd": {
+    "X": 176.0,
+    "Y": 0.15,
+    "Z": -8.45
    },
    "SpeedsKmh": [
     5.1,
@@ -3230,20 +5892,64 @@
    "AccelerationMps2": 0.8,
    "BrakingMps2": 1.0,
    "WaitSeconds": 5.0,
-   "StartDelaySeconds": 7.0
+   "StartDelaySeconds": 134.5
   },
   {
-   "Name": "Pedestrian, East Avenue west",
+   "Name": "Pedestrian, Central Street, south side",
    "Preset": "walker",
    "RoadStart": {
-    "X": 123.0,
+    "X": -447.5,
     "Y": 0.15,
-    "Z": 240.0
+    "Z": -8.45
    },
    "RoadEnd": {
-    "X": 123.0,
+    "X": 176.0,
     "Y": 0.15,
-    "Z": -110.0
+    "Z": -8.45
+   },
+   "SpeedsKmh": [
+    4.3,
+    3.956
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 5.8,
+   "StartDelaySeconds": 213.1
+  },
+  {
+   "Name": "Pedestrian, Central Street, south side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -447.5,
+    "Y": 0.15,
+    "Z": -8.45
+   },
+   "RoadEnd": {
+    "X": 176.0,
+    "Y": 0.15,
+    "Z": -8.45
+   },
+   "SpeedsKmh": [
+    4.3,
+    3.956
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 3.3,
+   "StartDelaySeconds": 265.4
+  },
+  {
+   "Name": "Pedestrian, Central Street, south side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -447.5,
+    "Y": 0.15,
+    "Z": -8.45
+   },
+   "RoadEnd": {
+    "X": 176.0,
+    "Y": 0.15,
+    "Z": -8.45
    },
    "SpeedsKmh": [
     4.7,
@@ -3251,43 +5957,65 @@
    ],
    "AccelerationMps2": 0.8,
    "BrakingMps2": 1.0,
-   "WaitSeconds": 7.0,
-   "StartDelaySeconds": 19.0
+   "WaitSeconds": 4.1,
+   "StartDelaySeconds": 291.6
   },
   {
-   "Name": "Pedestrian, West Avenue east",
+   "Name": "Pedestrian, Central Street, south side",
    "Preset": "walker",
    "RoadStart": {
-    "X": -123.0,
+    "X": -447.5,
     "Y": 0.15,
-    "Z": -110.0
+    "Z": -8.45
    },
    "RoadEnd": {
-    "X": -123.0,
+    "X": 176.0,
     "Y": 0.15,
-    "Z": 240.0
+    "Z": -8.45
    },
    "SpeedsKmh": [
-    4.9,
-    4.508000000000001
+    4.7,
+    4.324000000000001
    ],
    "AccelerationMps2": 0.8,
    "BrakingMps2": 1.0,
-   "WaitSeconds": 6.0,
-   "StartDelaySeconds": 2.0
+   "WaitSeconds": 6.9,
+   "StartDelaySeconds": 337.9
   },
   {
-   "Name": "Pedestrian, West Avenue west",
+   "Name": "Pedestrian, Central Street, south side",
    "Preset": "walker",
    "RoadStart": {
-    "X": -137.0,
+    "X": -447.5,
     "Y": 0.15,
-    "Z": 240.0
+    "Z": -8.45
    },
    "RoadEnd": {
-    "X": -137.0,
+    "X": 176.0,
     "Y": 0.15,
-    "Z": -110.0
+    "Z": -8.45
+   },
+   "SpeedsKmh": [
+    4.3,
+    3.956
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 8.3,
+   "StartDelaySeconds": 418.3
+  },
+  {
+   "Name": "Pedestrian, Central Street, south side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -447.5,
+    "Y": 0.15,
+    "Z": -8.45
+   },
+   "RoadEnd": {
+    "X": 176.0,
+    "Y": 0.15,
+    "Z": -8.45
    },
    "SpeedsKmh": [
     5.3,
@@ -3295,21 +6023,43 @@
    ],
    "AccelerationMps2": 0.8,
    "BrakingMps2": 1.0,
-   "WaitSeconds": 4.0,
-   "StartDelaySeconds": 14.0
+   "WaitSeconds": 6.9,
+   "StartDelaySeconds": 382.8
   },
   {
-   "Name": "Pedestrian, cross street west",
+   "Name": "Pedestrian, Central Street, south side",
    "Preset": "walker",
    "RoadStart": {
-    "X": -118.0,
+    "X": 176.0,
     "Y": 0.15,
-    "Z": 7.0
+    "Z": -7.05
    },
    "RoadEnd": {
-    "X": -12.0,
+    "X": -447.5,
     "Y": 0.15,
-    "Z": 7.0
+    "Z": -7.05
+   },
+   "SpeedsKmh": [
+    5.1,
+    4.692
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 3.6,
+   "StartDelaySeconds": 4.7
+  },
+  {
+   "Name": "Pedestrian, Central Street, south side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 176.0,
+    "Y": 0.15,
+    "Z": -7.05
+   },
+   "RoadEnd": {
+    "X": -447.5,
+    "Y": 0.15,
+    "Z": -7.05
    },
    "SpeedsKmh": [
     4.8,
@@ -3317,65 +6067,131 @@
    ],
    "AccelerationMps2": 0.8,
    "BrakingMps2": 1.0,
-   "WaitSeconds": 9.0,
-   "StartDelaySeconds": 6.0
+   "WaitSeconds": 4.9,
+   "StartDelaySeconds": 49.3
   },
   {
-   "Name": "Pedestrian, cross street east",
+   "Name": "Pedestrian, Central Street, south side",
    "Preset": "walker",
    "RoadStart": {
-    "X": 118.0,
+    "X": 176.0,
     "Y": 0.15,
-    "Z": -7.0
+    "Z": -7.05
    },
    "RoadEnd": {
-    "X": 12.0,
+    "X": -447.5,
     "Y": 0.15,
-    "Z": -7.0
+    "Z": -7.05
    },
    "SpeedsKmh": [
-    5.0,
-    4.6000000000000005
+    5.3,
+    4.876
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 8.4,
+   "StartDelaySeconds": 86.3
+  },
+  {
+   "Name": "Pedestrian, Central Street, south side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 176.0,
+    "Y": 0.15,
+    "Z": -7.05
+   },
+   "RoadEnd": {
+    "X": -447.5,
+    "Y": 0.15,
+    "Z": -7.05
+   },
+   "SpeedsKmh": [
+    4.4,
+    4.048000000000001
    ],
    "AccelerationMps2": 0.8,
    "BrakingMps2": 1.0,
    "WaitSeconds": 5.0,
-   "StartDelaySeconds": 9.0
+   "StartDelaySeconds": 153.8
   },
   {
-   "Name": "Pedestrian, south street",
+   "Name": "Pedestrian, Central Street, south side",
    "Preset": "walker",
    "RoadStart": {
-    "X": 12.0,
+    "X": 176.0,
     "Y": 0.15,
-    "Z": -137.0
+    "Z": -7.05
    },
    "RoadEnd": {
-    "X": 118.0,
+    "X": -447.5,
     "Y": 0.15,
-    "Z": -137.0
+    "Z": -7.05
    },
    "SpeedsKmh": [
-    4.5,
-    4.140000000000001
+    4.6,
+    4.232
    ],
    "AccelerationMps2": 0.8,
    "BrakingMps2": 1.0,
-   "WaitSeconds": 6.0,
-   "StartDelaySeconds": 12.0
+   "WaitSeconds": 8.7,
+   "StartDelaySeconds": 200.0
   },
   {
-   "Name": "Pedestrian, north street",
+   "Name": "Pedestrian, Central Street, south side",
    "Preset": "walker",
    "RoadStart": {
-    "X": -118.0,
+    "X": 176.0,
     "Y": 0.15,
-    "Z": 267.0
+    "Z": -7.05
    },
    "RoadEnd": {
-    "X": -12.0,
+    "X": -447.5,
     "Y": 0.15,
-    "Z": 267.0
+    "Z": -7.05
+   },
+   "SpeedsKmh": [
+    4.8,
+    4.416
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 8.2,
+   "StartDelaySeconds": 237.0
+  },
+  {
+   "Name": "Pedestrian, Central Street, south side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 176.0,
+    "Y": 0.15,
+    "Z": -7.05
+   },
+   "RoadEnd": {
+    "X": -447.5,
+    "Y": 0.15,
+    "Z": -7.05
+   },
+   "SpeedsKmh": [
+    4.7,
+    4.324000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 3.3,
+   "StartDelaySeconds": 288.2
+  },
+  {
+   "Name": "Pedestrian, Central Street, south side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 176.0,
+    "Y": 0.15,
+    "Z": -7.05
+   },
+   "RoadEnd": {
+    "X": -447.5,
+    "Y": 0.15,
+    "Z": -7.05
    },
    "SpeedsKmh": [
     5.2,
@@ -3383,8 +6199,3748 @@
    ],
    "AccelerationMps2": 0.8,
    "BrakingMps2": 1.0,
-   "WaitSeconds": 7.0,
+   "WaitSeconds": 4.4,
+   "StartDelaySeconds": 307.2
+  },
+  {
+   "Name": "Pedestrian, Central Street, south side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 176.0,
+    "Y": 0.15,
+    "Z": -7.05
+   },
+   "RoadEnd": {
+    "X": -447.5,
+    "Y": 0.15,
+    "Z": -7.05
+   },
+   "SpeedsKmh": [
+    4.2,
+    3.8640000000000003
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 5.2,
+   "StartDelaySeconds": 430.1
+  },
+  {
+   "Name": "Pedestrian, Central Street, south side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 176.0,
+    "Y": 0.15,
+    "Z": -7.05
+   },
+   "RoadEnd": {
+    "X": -447.5,
+    "Y": 0.15,
+    "Z": -7.05
+   },
+   "SpeedsKmh": [
+    5.2,
+    4.784000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 7.5,
+   "StartDelaySeconds": 393.1
+  },
+  {
+   "Name": "Pedestrian, Central Street, north side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -447.5,
+    "Y": 0.15,
+    "Z": 7.05
+   },
+   "RoadEnd": {
+    "X": 176.0,
+    "Y": 0.15,
+    "Z": 7.05
+   },
+   "SpeedsKmh": [
+    5.3,
+    4.876
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 5.2,
+   "StartDelaySeconds": 1.9
+  },
+  {
+   "Name": "Pedestrian, Central Street, north side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -447.5,
+    "Y": 0.15,
+    "Z": 7.05
+   },
+   "RoadEnd": {
+    "X": 176.0,
+    "Y": 0.15,
+    "Z": 7.05
+   },
+   "SpeedsKmh": [
+    4.8,
+    4.416
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 5.9,
+   "StartDelaySeconds": 52.5
+  },
+  {
+   "Name": "Pedestrian, Central Street, north side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -447.5,
+    "Y": 0.15,
+    "Z": 7.05
+   },
+   "RoadEnd": {
+    "X": 176.0,
+    "Y": 0.15,
+    "Z": 7.05
+   },
+   "SpeedsKmh": [
+    4.2,
+    3.8640000000000003
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 7.3,
+   "StartDelaySeconds": 112.4
+  },
+  {
+   "Name": "Pedestrian, Central Street, north side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -447.5,
+    "Y": 0.15,
+    "Z": 7.05
+   },
+   "RoadEnd": {
+    "X": 176.0,
+    "Y": 0.15,
+    "Z": 7.05
+   },
+   "SpeedsKmh": [
+    5.1,
+    4.692
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 4.6,
+   "StartDelaySeconds": 136.7
+  },
+  {
+   "Name": "Pedestrian, Central Street, north side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -447.5,
+    "Y": 0.15,
+    "Z": 7.05
+   },
+   "RoadEnd": {
+    "X": 176.0,
+    "Y": 0.15,
+    "Z": 7.05
+   },
+   "SpeedsKmh": [
+    4.5,
+    4.140000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 8.4,
+   "StartDelaySeconds": 200.7
+  },
+  {
+   "Name": "Pedestrian, Central Street, north side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -447.5,
+    "Y": 0.15,
+    "Z": 7.05
+   },
+   "RoadEnd": {
+    "X": 176.0,
+    "Y": 0.15,
+    "Z": 7.05
+   },
+   "SpeedsKmh": [
+    5.2,
+    4.784000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 7.3,
+   "StartDelaySeconds": 221.1
+  },
+  {
+   "Name": "Pedestrian, Central Street, north side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -447.5,
+    "Y": 0.15,
+    "Z": 7.05
+   },
+   "RoadEnd": {
+    "X": 176.0,
+    "Y": 0.15,
+    "Z": 7.05
+   },
+   "SpeedsKmh": [
+    4.6,
+    4.232
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 5.0,
+   "StartDelaySeconds": 298.2
+  },
+  {
+   "Name": "Pedestrian, Central Street, north side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -447.5,
+    "Y": 0.15,
+    "Z": 7.05
+   },
+   "RoadEnd": {
+    "X": 176.0,
+    "Y": 0.15,
+    "Z": 7.05
+   },
+   "SpeedsKmh": [
+    4.5,
+    4.140000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 5.9,
+   "StartDelaySeconds": 349.3
+  },
+  {
+   "Name": "Pedestrian, Central Street, north side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -447.5,
+    "Y": 0.15,
+    "Z": 7.05
+   },
+   "RoadEnd": {
+    "X": 176.0,
+    "Y": 0.15,
+    "Z": 7.05
+   },
+   "SpeedsKmh": [
+    4.6,
+    4.232
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 6.1,
+   "StartDelaySeconds": 392.7
+  },
+  {
+   "Name": "Pedestrian, Central Street, north side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -447.5,
+    "Y": 0.15,
+    "Z": 7.05
+   },
+   "RoadEnd": {
+    "X": 176.0,
+    "Y": 0.15,
+    "Z": 7.05
+   },
+   "SpeedsKmh": [
+    5.0,
+    4.6000000000000005
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 7.3,
+   "StartDelaySeconds": 405.1
+  },
+  {
+   "Name": "Pedestrian, Central Street, north side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 176.0,
+    "Y": 0.15,
+    "Z": 8.45
+   },
+   "RoadEnd": {
+    "X": -447.5,
+    "Y": 0.15,
+    "Z": 8.45
+   },
+   "SpeedsKmh": [
+    4.4,
+    4.048000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 5.6,
+   "StartDelaySeconds": 0.4
+  },
+  {
+   "Name": "Pedestrian, Central Street, north side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 176.0,
+    "Y": 0.15,
+    "Z": 8.45
+   },
+   "RoadEnd": {
+    "X": -447.5,
+    "Y": 0.15,
+    "Z": 8.45
+   },
+   "SpeedsKmh": [
+    4.8,
+    4.416
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 3.5,
+   "StartDelaySeconds": 52.5
+  },
+  {
+   "Name": "Pedestrian, Central Street, north side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 176.0,
+    "Y": 0.15,
+    "Z": 8.45
+   },
+   "RoadEnd": {
+    "X": -447.5,
+    "Y": 0.15,
+    "Z": 8.45
+   },
+   "SpeedsKmh": [
+    4.9,
+    4.508000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 8.5,
+   "StartDelaySeconds": 92.2
+  },
+  {
+   "Name": "Pedestrian, Central Street, north side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 176.0,
+    "Y": 0.15,
+    "Z": 8.45
+   },
+   "RoadEnd": {
+    "X": -447.5,
+    "Y": 0.15,
+    "Z": 8.45
+   },
+   "SpeedsKmh": [
+    4.6,
+    4.232
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 3.6,
+   "StartDelaySeconds": 151.9
+  },
+  {
+   "Name": "Pedestrian, Central Street, north side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 176.0,
+    "Y": 0.15,
+    "Z": 8.45
+   },
+   "RoadEnd": {
+    "X": -447.5,
+    "Y": 0.15,
+    "Z": 8.45
+   },
+   "SpeedsKmh": [
+    5.1,
+    4.692
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 7.5,
+   "StartDelaySeconds": 181.7
+  },
+  {
+   "Name": "Pedestrian, Central Street, north side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 176.0,
+    "Y": 0.15,
+    "Z": 8.45
+   },
+   "RoadEnd": {
+    "X": -447.5,
+    "Y": 0.15,
+    "Z": 8.45
+   },
+   "SpeedsKmh": [
+    5.3,
+    4.876
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 5.3,
+   "StartDelaySeconds": 213.8
+  },
+  {
+   "Name": "Pedestrian, Central Street, north side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 176.0,
+    "Y": 0.15,
+    "Z": 8.45
+   },
+   "RoadEnd": {
+    "X": -447.5,
+    "Y": 0.15,
+    "Z": 8.45
+   },
+   "SpeedsKmh": [
+    5.0,
+    4.6000000000000005
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 5.7,
+   "StartDelaySeconds": 271.0
+  },
+  {
+   "Name": "Pedestrian, Central Street, north side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 176.0,
+    "Y": 0.15,
+    "Z": 8.45
+   },
+   "RoadEnd": {
+    "X": -447.5,
+    "Y": 0.15,
+    "Z": 8.45
+   },
+   "SpeedsKmh": [
+    5.3,
+    4.876
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 6.6,
+   "StartDelaySeconds": 300.4
+  },
+  {
+   "Name": "Pedestrian, Central Street, north side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 176.0,
+    "Y": 0.15,
+    "Z": 8.45
+   },
+   "RoadEnd": {
+    "X": -447.5,
+    "Y": 0.15,
+    "Z": 8.45
+   },
+   "SpeedsKmh": [
+    4.3,
+    3.956
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 4.1,
+   "StartDelaySeconds": 419.7
+  },
+  {
+   "Name": "Pedestrian, Central Street, north side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 176.0,
+    "Y": 0.15,
+    "Z": 8.45
+   },
+   "RoadEnd": {
+    "X": -447.5,
+    "Y": 0.15,
+    "Z": 8.45
+   },
+   "SpeedsKmh": [
+    4.4,
+    4.048000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 7.7,
+   "StartDelaySeconds": 464.7
+  },
+  {
+   "Name": "Pedestrian, Foundry Street, south side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -139.5,
+    "Y": 0.15,
+    "Z": 121.55
+   },
+   "RoadEnd": {
+    "X": 176.0,
+    "Y": 0.15,
+    "Z": 121.55
+   },
+   "SpeedsKmh": [
+    4.4,
+    4.048000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 7.5,
+   "StartDelaySeconds": 4.2
+  },
+  {
+   "Name": "Pedestrian, Foundry Street, south side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -139.5,
+    "Y": 0.15,
+    "Z": 121.55
+   },
+   "RoadEnd": {
+    "X": 176.0,
+    "Y": 0.15,
+    "Z": 121.55
+   },
+   "SpeedsKmh": [
+    5.1,
+    4.692
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 4.5,
+   "StartDelaySeconds": 49.2
+  },
+  {
+   "Name": "Pedestrian, Foundry Street, south side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -139.5,
+    "Y": 0.15,
+    "Z": 121.55
+   },
+   "RoadEnd": {
+    "X": 176.0,
+    "Y": 0.15,
+    "Z": 121.55
+   },
+   "SpeedsKmh": [
+    5.1,
+    4.692
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 6.3,
+   "StartDelaySeconds": 94.9
+  },
+  {
+   "Name": "Pedestrian, Foundry Street, south side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -139.5,
+    "Y": 0.15,
+    "Z": 121.55
+   },
+   "RoadEnd": {
+    "X": 176.0,
+    "Y": 0.15,
+    "Z": 121.55
+   },
+   "SpeedsKmh": [
+    4.5,
+    4.140000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 5.6,
+   "StartDelaySeconds": 152.3
+  },
+  {
+   "Name": "Pedestrian, Foundry Street, south side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -139.5,
+    "Y": 0.15,
+    "Z": 121.55
+   },
+   "RoadEnd": {
+    "X": 176.0,
+    "Y": 0.15,
+    "Z": 121.55
+   },
+   "SpeedsKmh": [
+    4.4,
+    4.048000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 3.0,
+   "StartDelaySeconds": 207.0
+  },
+  {
+   "Name": "Pedestrian, Foundry Street, south side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 180.0,
+    "Y": 0.15,
+    "Z": 121.55
+   },
+   "RoadEnd": {
+    "X": 225.0,
+    "Y": 0.15,
+    "Z": 121.55
+   },
+   "SpeedsKmh": [
+    5.3,
+    4.876
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 3.2,
+   "StartDelaySeconds": 5.6
+  },
+  {
+   "Name": "Pedestrian, Foundry Street, south side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 176.0,
+    "Y": 0.15,
+    "Z": 122.95
+   },
+   "RoadEnd": {
+    "X": -139.5,
+    "Y": 0.15,
+    "Z": 122.95
+   },
+   "SpeedsKmh": [
+    4.7,
+    4.324000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 3.1,
+   "StartDelaySeconds": 2.5
+  },
+  {
+   "Name": "Pedestrian, Foundry Street, south side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 176.0,
+    "Y": 0.15,
+    "Z": 122.95
+   },
+   "RoadEnd": {
+    "X": -139.5,
+    "Y": 0.15,
+    "Z": 122.95
+   },
+   "SpeedsKmh": [
+    4.5,
+    4.140000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 4.4,
+   "StartDelaySeconds": 54.1
+  },
+  {
+   "Name": "Pedestrian, Foundry Street, south side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 176.0,
+    "Y": 0.15,
+    "Z": 122.95
+   },
+   "RoadEnd": {
+    "X": -139.5,
+    "Y": 0.15,
+    "Z": 122.95
+   },
+   "SpeedsKmh": [
+    5.3,
+    4.876
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 9.0,
+   "StartDelaySeconds": 86.0
+  },
+  {
+   "Name": "Pedestrian, Foundry Street, south side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 176.0,
+    "Y": 0.15,
+    "Z": 122.95
+   },
+   "RoadEnd": {
+    "X": -139.5,
+    "Y": 0.15,
+    "Z": 122.95
+   },
+   "SpeedsKmh": [
+    4.8,
+    4.416
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 5.7,
+   "StartDelaySeconds": 143.3
+  },
+  {
+   "Name": "Pedestrian, Foundry Street, south side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 176.0,
+    "Y": 0.15,
+    "Z": 122.95
+   },
+   "RoadEnd": {
+    "X": -139.5,
+    "Y": 0.15,
+    "Z": 122.95
+   },
+   "SpeedsKmh": [
+    4.7,
+    4.324000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 6.6,
+   "StartDelaySeconds": 196.9
+  },
+  {
+   "Name": "Pedestrian, Foundry Street, south side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 225.0,
+    "Y": 0.15,
+    "Z": 122.95
+   },
+   "RoadEnd": {
+    "X": 180.0,
+    "Y": 0.15,
+    "Z": 122.95
+   },
+   "SpeedsKmh": [
+    5.1,
+    4.692
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 5.0,
+   "StartDelaySeconds": 2.2
+  },
+  {
+   "Name": "Pedestrian, Foundry Street, north side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -139.5,
+    "Y": 0.15,
+    "Z": 137.05
+   },
+   "RoadEnd": {
+    "X": 176.0,
+    "Y": 0.15,
+    "Z": 137.05
+   },
+   "SpeedsKmh": [
+    5.1,
+    4.692
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 6.1,
+   "StartDelaySeconds": 2.5
+  },
+  {
+   "Name": "Pedestrian, Foundry Street, north side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -139.5,
+    "Y": 0.15,
+    "Z": 137.05
+   },
+   "RoadEnd": {
+    "X": 176.0,
+    "Y": 0.15,
+    "Z": 137.05
+   },
+   "SpeedsKmh": [
+    5.3,
+    4.876
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 5.5,
+   "StartDelaySeconds": 48.8
+  },
+  {
+   "Name": "Pedestrian, Foundry Street, north side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -139.5,
+    "Y": 0.15,
+    "Z": 137.05
+   },
+   "RoadEnd": {
+    "X": 176.0,
+    "Y": 0.15,
+    "Z": 137.05
+   },
+   "SpeedsKmh": [
+    4.7,
+    4.324000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 3.8,
+   "StartDelaySeconds": 100.0
+  },
+  {
+   "Name": "Pedestrian, Foundry Street, north side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -139.5,
+    "Y": 0.15,
+    "Z": 137.05
+   },
+   "RoadEnd": {
+    "X": 176.0,
+    "Y": 0.15,
+    "Z": 137.05
+   },
+   "SpeedsKmh": [
+    4.5,
+    4.140000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 3.5,
+   "StartDelaySeconds": 152.6
+  },
+  {
+   "Name": "Pedestrian, Foundry Street, north side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -139.5,
+    "Y": 0.15,
+    "Z": 137.05
+   },
+   "RoadEnd": {
+    "X": 176.0,
+    "Y": 0.15,
+    "Z": 137.05
+   },
+   "SpeedsKmh": [
+    5.0,
+    4.6000000000000005
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 6.6,
+   "StartDelaySeconds": 187.6
+  },
+  {
+   "Name": "Pedestrian, Foundry Street, north side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 180.0,
+    "Y": 0.15,
+    "Z": 137.05
+   },
+   "RoadEnd": {
+    "X": 225.0,
+    "Y": 0.15,
+    "Z": 137.05
+   },
+   "SpeedsKmh": [
+    4.3,
+    3.956
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 4.4,
+   "StartDelaySeconds": 4.3
+  },
+  {
+   "Name": "Pedestrian, Foundry Street, north side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 176.0,
+    "Y": 0.15,
+    "Z": 138.45
+   },
+   "RoadEnd": {
+    "X": -139.5,
+    "Y": 0.15,
+    "Z": 138.45
+   },
+   "SpeedsKmh": [
+    4.9,
+    4.508000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 3.0,
+   "StartDelaySeconds": 0.6
+  },
+  {
+   "Name": "Pedestrian, Foundry Street, north side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 176.0,
+    "Y": 0.15,
+    "Z": 138.45
+   },
+   "RoadEnd": {
+    "X": -139.5,
+    "Y": 0.15,
+    "Z": 138.45
+   },
+   "SpeedsKmh": [
+    4.3,
+    3.956
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 5.0,
+   "StartDelaySeconds": 54.8
+  },
+  {
+   "Name": "Pedestrian, Foundry Street, north side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 176.0,
+    "Y": 0.15,
+    "Z": 138.45
+   },
+   "RoadEnd": {
+    "X": -139.5,
+    "Y": 0.15,
+    "Z": 138.45
+   },
+   "SpeedsKmh": [
+    4.9,
+    4.508000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 8.6,
+   "StartDelaySeconds": 97.1
+  },
+  {
+   "Name": "Pedestrian, Foundry Street, north side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 176.0,
+    "Y": 0.15,
+    "Z": 138.45
+   },
+   "RoadEnd": {
+    "X": -139.5,
+    "Y": 0.15,
+    "Z": 138.45
+   },
+   "SpeedsKmh": [
+    4.9,
+    4.508000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 7.3,
+   "StartDelaySeconds": 142.0
+  },
+  {
+   "Name": "Pedestrian, Foundry Street, north side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 176.0,
+    "Y": 0.15,
+    "Z": 138.45
+   },
+   "RoadEnd": {
+    "X": -139.5,
+    "Y": 0.15,
+    "Z": 138.45
+   },
+   "SpeedsKmh": [
+    4.4,
+    4.048000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 8.4,
+   "StartDelaySeconds": 210.9
+  },
+  {
+   "Name": "Pedestrian, Foundry Street, north side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 225.0,
+    "Y": 0.15,
+    "Z": 138.45
+   },
+   "RoadEnd": {
+    "X": 180.0,
+    "Y": 0.15,
+    "Z": 138.45
+   },
+   "SpeedsKmh": [
+    5.0,
+    4.6000000000000005
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 8.4,
+   "StartDelaySeconds": 2.7
+  },
+  {
+   "Name": "Pedestrian, North Street, south side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -139.5,
+    "Y": 0.15,
+    "Z": 251.55
+   },
+   "RoadEnd": {
+    "X": 139.5,
+    "Y": 0.15,
+    "Z": 251.55
+   },
+   "SpeedsKmh": [
+    4.6,
+    4.232
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 6.7,
+   "StartDelaySeconds": 5.7
+  },
+  {
+   "Name": "Pedestrian, North Street, south side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -139.5,
+    "Y": 0.15,
+    "Z": 251.55
+   },
+   "RoadEnd": {
+    "X": 139.5,
+    "Y": 0.15,
+    "Z": 251.55
+   },
+   "SpeedsKmh": [
+    5.2,
+    4.784000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 4.5,
+   "StartDelaySeconds": 42.7
+  },
+  {
+   "Name": "Pedestrian, North Street, south side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -139.5,
+    "Y": 0.15,
+    "Z": 251.55
+   },
+   "RoadEnd": {
+    "X": 139.5,
+    "Y": 0.15,
+    "Z": 251.55
+   },
+   "SpeedsKmh": [
+    4.8,
+    4.416
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 3.4,
+   "StartDelaySeconds": 85.1
+  },
+  {
+   "Name": "Pedestrian, North Street, south side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -139.5,
+    "Y": 0.15,
+    "Z": 251.55
+   },
+   "RoadEnd": {
+    "X": 139.5,
+    "Y": 0.15,
+    "Z": 251.55
+   },
+   "SpeedsKmh": [
+    5.2,
+    4.784000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 6.6,
+   "StartDelaySeconds": 117.8
+  },
+  {
+   "Name": "Pedestrian, North Street, south side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -139.5,
+    "Y": 0.15,
+    "Z": 251.55
+   },
+   "RoadEnd": {
+    "X": 139.5,
+    "Y": 0.15,
+    "Z": 251.55
+   },
+   "SpeedsKmh": [
+    4.6,
+    4.232
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 8.2,
+   "StartDelaySeconds": 175.7
+  },
+  {
+   "Name": "Pedestrian, North Street, south side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 139.5,
+    "Y": 0.15,
+    "Z": 252.95
+   },
+   "RoadEnd": {
+    "X": -139.5,
+    "Y": 0.15,
+    "Z": 252.95
+   },
+   "SpeedsKmh": [
+    4.2,
+    3.8640000000000003
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 4.2,
+   "StartDelaySeconds": 4.9
+  },
+  {
+   "Name": "Pedestrian, North Street, south side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 139.5,
+    "Y": 0.15,
+    "Z": 252.95
+   },
+   "RoadEnd": {
+    "X": -139.5,
+    "Y": 0.15,
+    "Z": 252.95
+   },
+   "SpeedsKmh": [
+    5.3,
+    4.876
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 3.5,
+   "StartDelaySeconds": 40.9
+  },
+  {
+   "Name": "Pedestrian, North Street, south side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 139.5,
+    "Y": 0.15,
+    "Z": 252.95
+   },
+   "RoadEnd": {
+    "X": -139.5,
+    "Y": 0.15,
+    "Z": 252.95
+   },
+   "SpeedsKmh": [
+    4.4,
+    4.048000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 8.7,
+   "StartDelaySeconds": 93.7
+  },
+  {
+   "Name": "Pedestrian, North Street, south side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 139.5,
+    "Y": 0.15,
+    "Z": 252.95
+   },
+   "RoadEnd": {
+    "X": -139.5,
+    "Y": 0.15,
+    "Z": 252.95
+   },
+   "SpeedsKmh": [
+    5.3,
+    4.876
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 3.4,
+   "StartDelaySeconds": 115.5
+  },
+  {
+   "Name": "Pedestrian, North Street, south side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 139.5,
+    "Y": 0.15,
+    "Z": 252.95
+   },
+   "RoadEnd": {
+    "X": -139.5,
+    "Y": 0.15,
+    "Z": 252.95
+   },
+   "SpeedsKmh": [
+    5.1,
+    4.692
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 5.7,
+   "StartDelaySeconds": 163.0
+  },
+  {
+   "Name": "Pedestrian, North Street, north side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -139.5,
+    "Y": 0.15,
+    "Z": 267.05
+   },
+   "RoadEnd": {
+    "X": 139.5,
+    "Y": 0.15,
+    "Z": 267.05
+   },
+   "SpeedsKmh": [
+    4.9,
+    4.508000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 8.1,
+   "StartDelaySeconds": 5.6
+  },
+  {
+   "Name": "Pedestrian, North Street, north side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -139.5,
+    "Y": 0.15,
+    "Z": 267.05
+   },
+   "RoadEnd": {
+    "X": 139.5,
+    "Y": 0.15,
+    "Z": 267.05
+   },
+   "SpeedsKmh": [
+    4.3,
+    3.956
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 3.3,
+   "StartDelaySeconds": 49.2
+  },
+  {
+   "Name": "Pedestrian, North Street, north side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -139.5,
+    "Y": 0.15,
+    "Z": 267.05
+   },
+   "RoadEnd": {
+    "X": 139.5,
+    "Y": 0.15,
+    "Z": 267.05
+   },
+   "SpeedsKmh": [
+    4.5,
+    4.140000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 4.6,
+   "StartDelaySeconds": 94.9
+  },
+  {
+   "Name": "Pedestrian, North Street, north side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -139.5,
+    "Y": 0.15,
+    "Z": 267.05
+   },
+   "RoadEnd": {
+    "X": 139.5,
+    "Y": 0.15,
+    "Z": 267.05
+   },
+   "SpeedsKmh": [
+    4.5,
+    4.140000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 4.4,
+   "StartDelaySeconds": 134.5
+  },
+  {
+   "Name": "Pedestrian, North Street, north side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -139.5,
+    "Y": 0.15,
+    "Z": 267.05
+   },
+   "RoadEnd": {
+    "X": 139.5,
+    "Y": 0.15,
+    "Z": 267.05
+   },
+   "SpeedsKmh": [
+    5.3,
+    4.876
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 4.5,
+   "StartDelaySeconds": 154.2
+  },
+  {
+   "Name": "Pedestrian, North Street, north side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 139.5,
+    "Y": 0.15,
+    "Z": 268.45
+   },
+   "RoadEnd": {
+    "X": -139.5,
+    "Y": 0.15,
+    "Z": 268.45
+   },
+   "SpeedsKmh": [
+    4.5,
+    4.140000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 7.8,
+   "StartDelaySeconds": 2.2
+  },
+  {
+   "Name": "Pedestrian, North Street, north side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 139.5,
+    "Y": 0.15,
+    "Z": 268.45
+   },
+   "RoadEnd": {
+    "X": -139.5,
+    "Y": 0.15,
+    "Z": 268.45
+   },
+   "SpeedsKmh": [
+    5.0,
+    4.6000000000000005
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 4.2,
+   "StartDelaySeconds": 43.1
+  },
+  {
+   "Name": "Pedestrian, North Street, north side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 139.5,
+    "Y": 0.15,
+    "Z": 268.45
+   },
+   "RoadEnd": {
+    "X": -139.5,
+    "Y": 0.15,
+    "Z": 268.45
+   },
+   "SpeedsKmh": [
+    4.9,
+    4.508000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 5.2,
+   "StartDelaySeconds": 87.7
+  },
+  {
+   "Name": "Pedestrian, North Street, north side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 139.5,
+    "Y": 0.15,
+    "Z": 268.45
+   },
+   "RoadEnd": {
+    "X": -139.5,
+    "Y": 0.15,
+    "Z": 268.45
+   },
+   "SpeedsKmh": [
+    5.4,
+    4.968000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 3.2,
+   "StartDelaySeconds": 112.9
+  },
+  {
+   "Name": "Pedestrian, North Street, north side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": 139.5,
+    "Y": 0.15,
+    "Z": 268.45
+   },
+   "RoadEnd": {
+    "X": -139.5,
+    "Y": 0.15,
+    "Z": 268.45
+   },
+   "SpeedsKmh": [
+    4.8,
+    4.416
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 4.2,
+   "StartDelaySeconds": 168.8
+  },
+  {
+   "Name": "Pedestrian, Elm Street, south side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -423.5,
+    "Y": 0.15,
+    "Z": -100.4
+   },
+   "RoadEnd": {
+    "X": -168.5,
+    "Y": 0.15,
+    "Z": -100.4
+   },
+   "SpeedsKmh": [
+    4.6,
+    4.232
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 3.3,
+   "StartDelaySeconds": 3.3
+  },
+  {
+   "Name": "Pedestrian, Elm Street, south side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -423.5,
+    "Y": 0.15,
+    "Z": -100.4
+   },
+   "RoadEnd": {
+    "X": -168.5,
+    "Y": 0.15,
+    "Z": -100.4
+   },
+   "SpeedsKmh": [
+    4.3,
+    3.956
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 6.3,
+   "StartDelaySeconds": 56.4
+  },
+  {
+   "Name": "Pedestrian, Elm Street, south side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -423.5,
+    "Y": 0.15,
+    "Z": -100.4
+   },
+   "RoadEnd": {
+    "X": -168.5,
+    "Y": 0.15,
+    "Z": -100.4
+   },
+   "SpeedsKmh": [
+    4.6,
+    4.232
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 4.4,
+   "StartDelaySeconds": 99.9
+  },
+  {
+   "Name": "Pedestrian, Elm Street, south side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -423.5,
+    "Y": 0.15,
+    "Z": -100.4
+   },
+   "RoadEnd": {
+    "X": -168.5,
+    "Y": 0.15,
+    "Z": -100.4
+   },
+   "SpeedsKmh": [
+    5.3,
+    4.876
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 3.9,
+   "StartDelaySeconds": 133.7
+  },
+  {
+   "Name": "Pedestrian, Elm Street, south side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -168.5,
+    "Y": 0.15,
+    "Z": -100.4
+   },
+   "RoadEnd": {
+    "X": -423.5,
+    "Y": 0.15,
+    "Z": -100.4
+   },
+   "SpeedsKmh": [
+    4.2,
+    3.8640000000000003
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 5.5,
+   "StartDelaySeconds": 0.0
+  },
+  {
+   "Name": "Pedestrian, Elm Street, south side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -168.5,
+    "Y": 0.15,
+    "Z": -100.4
+   },
+   "RoadEnd": {
+    "X": -423.5,
+    "Y": 0.15,
+    "Z": -100.4
+   },
+   "SpeedsKmh": [
+    5.2,
+    4.784000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 5.7,
+   "StartDelaySeconds": 45.3
+  },
+  {
+   "Name": "Pedestrian, Elm Street, south side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -168.5,
+    "Y": 0.15,
+    "Z": -100.4
+   },
+   "RoadEnd": {
+    "X": -423.5,
+    "Y": 0.15,
+    "Z": -100.4
+   },
+   "SpeedsKmh": [
+    4.8,
+    4.416
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 3.4,
+   "StartDelaySeconds": 98.9
+  },
+  {
+   "Name": "Pedestrian, Elm Street, south side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -168.5,
+    "Y": 0.15,
+    "Z": -100.4
+   },
+   "RoadEnd": {
+    "X": -423.5,
+    "Y": 0.15,
+    "Z": -100.4
+   },
+   "SpeedsKmh": [
+    5.2,
+    4.784000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 3.2,
+   "StartDelaySeconds": 137.4
+  },
+  {
+   "Name": "Pedestrian, Elm Street, north side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -423.5,
+    "Y": 0.15,
+    "Z": -91.6
+   },
+   "RoadEnd": {
+    "X": -168.5,
+    "Y": 0.15,
+    "Z": -91.6
+   },
+   "SpeedsKmh": [
+    4.5,
+    4.140000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 7.1,
+   "StartDelaySeconds": 0.6
+  },
+  {
+   "Name": "Pedestrian, Elm Street, north side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -423.5,
+    "Y": 0.15,
+    "Z": -91.6
+   },
+   "RoadEnd": {
+    "X": -168.5,
+    "Y": 0.15,
+    "Z": -91.6
+   },
+   "SpeedsKmh": [
+    4.3,
+    3.956
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 7.9,
+   "StartDelaySeconds": 55.2
+  },
+  {
+   "Name": "Pedestrian, Elm Street, north side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -423.5,
+    "Y": 0.15,
+    "Z": -91.6
+   },
+   "RoadEnd": {
+    "X": -168.5,
+    "Y": 0.15,
+    "Z": -91.6
+   },
+   "SpeedsKmh": [
+    5.2,
+    4.784000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 3.7,
+   "StartDelaySeconds": 91.9
+  },
+  {
+   "Name": "Pedestrian, Elm Street, north side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -423.5,
+    "Y": 0.15,
+    "Z": -91.6
+   },
+   "RoadEnd": {
+    "X": -168.5,
+    "Y": 0.15,
+    "Z": -91.6
+   },
+   "SpeedsKmh": [
+    4.5,
+    4.140000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 4.8,
+   "StartDelaySeconds": 157.4
+  },
+  {
+   "Name": "Pedestrian, Elm Street, north side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -168.5,
+    "Y": 0.15,
+    "Z": -91.6
+   },
+   "RoadEnd": {
+    "X": -423.5,
+    "Y": 0.15,
+    "Z": -91.6
+   },
+   "SpeedsKmh": [
+    5.1,
+    4.692
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 6.5,
+   "StartDelaySeconds": 0.3
+  },
+  {
+   "Name": "Pedestrian, Elm Street, north side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -168.5,
+    "Y": 0.15,
+    "Z": -91.6
+   },
+   "RoadEnd": {
+    "X": -423.5,
+    "Y": 0.15,
+    "Z": -91.6
+   },
+   "SpeedsKmh": [
+    4.3,
+    3.956
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 4.7,
+   "StartDelaySeconds": 56.7
+  },
+  {
+   "Name": "Pedestrian, Elm Street, north side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -168.5,
+    "Y": 0.15,
+    "Z": -91.6
+   },
+   "RoadEnd": {
+    "X": -423.5,
+    "Y": 0.15,
+    "Z": -91.6
+   },
+   "SpeedsKmh": [
+    5.4,
+    4.968000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 5.7,
+   "StartDelaySeconds": 88.9
+  },
+  {
+   "Name": "Pedestrian, Elm Street, north side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -168.5,
+    "Y": 0.15,
+    "Z": -91.6
+   },
+   "RoadEnd": {
+    "X": -423.5,
+    "Y": 0.15,
+    "Z": -91.6
+   },
+   "SpeedsKmh": [
+    5.2,
+    4.784000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 6.0,
+   "StartDelaySeconds": 136.3
+  },
+  {
+   "Name": "Pedestrian, Birch Street, south side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -423.5,
+    "Y": 0.15,
+    "Z": -28.4
+   },
+   "RoadEnd": {
+    "X": -168.5,
+    "Y": 0.15,
+    "Z": -28.4
+   },
+   "SpeedsKmh": [
+    5.3,
+    4.876
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 7.4,
+   "StartDelaySeconds": 3.3
+  },
+  {
+   "Name": "Pedestrian, Birch Street, south side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -423.5,
+    "Y": 0.15,
+    "Z": -28.4
+   },
+   "RoadEnd": {
+    "X": -168.5,
+    "Y": 0.15,
+    "Z": -28.4
+   },
+   "SpeedsKmh": [
+    4.7,
+    4.324000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 4.4,
+   "StartDelaySeconds": 50.5
+  },
+  {
+   "Name": "Pedestrian, Birch Street, south side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -423.5,
+    "Y": 0.15,
+    "Z": -28.4
+   },
+   "RoadEnd": {
+    "X": -168.5,
+    "Y": 0.15,
+    "Z": -28.4
+   },
+   "SpeedsKmh": [
+    4.5,
+    4.140000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 4.9,
+   "StartDelaySeconds": 107.0
+  },
+  {
+   "Name": "Pedestrian, Birch Street, south side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -423.5,
+    "Y": 0.15,
+    "Z": -28.4
+   },
+   "RoadEnd": {
+    "X": -168.5,
+    "Y": 0.15,
+    "Z": -28.4
+   },
+   "SpeedsKmh": [
+    4.8,
+    4.416
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 4.4,
+   "StartDelaySeconds": 146.4
+  },
+  {
+   "Name": "Pedestrian, Birch Street, south side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -168.5,
+    "Y": 0.15,
+    "Z": -28.4
+   },
+   "RoadEnd": {
+    "X": -423.5,
+    "Y": 0.15,
+    "Z": -28.4
+   },
+   "SpeedsKmh": [
+    4.9,
+    4.508000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 5.6,
+   "StartDelaySeconds": 1.0
+  },
+  {
+   "Name": "Pedestrian, Birch Street, south side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -168.5,
+    "Y": 0.15,
+    "Z": -28.4
+   },
+   "RoadEnd": {
+    "X": -423.5,
+    "Y": 0.15,
+    "Z": -28.4
+   },
+   "SpeedsKmh": [
+    4.3,
+    3.956
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 3.2,
+   "StartDelaySeconds": 53.7
+  },
+  {
+   "Name": "Pedestrian, Birch Street, south side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -168.5,
+    "Y": 0.15,
+    "Z": -28.4
+   },
+   "RoadEnd": {
+    "X": -423.5,
+    "Y": 0.15,
+    "Z": -28.4
+   },
+   "SpeedsKmh": [
+    4.4,
+    4.048000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 5.3,
+   "StartDelaySeconds": 105.4
+  },
+  {
+   "Name": "Pedestrian, Birch Street, south side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -168.5,
+    "Y": 0.15,
+    "Z": -28.4
+   },
+   "RoadEnd": {
+    "X": -423.5,
+    "Y": 0.15,
+    "Z": -28.4
+   },
+   "SpeedsKmh": [
+    5.2,
+    4.784000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 4.3,
+   "StartDelaySeconds": 133.0
+  },
+  {
+   "Name": "Pedestrian, Birch Street, north side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -423.5,
+    "Y": 0.15,
+    "Z": -19.6
+   },
+   "RoadEnd": {
+    "X": -168.5,
+    "Y": 0.15,
+    "Z": -19.6
+   },
+   "SpeedsKmh": [
+    4.8,
+    4.416
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 8.6,
+   "StartDelaySeconds": 4.7
+  },
+  {
+   "Name": "Pedestrian, Birch Street, north side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -423.5,
+    "Y": 0.15,
+    "Z": -19.6
+   },
+   "RoadEnd": {
+    "X": -168.5,
+    "Y": 0.15,
+    "Z": -19.6
+   },
+   "SpeedsKmh": [
+    4.8,
+    4.416
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 8.5,
+   "StartDelaySeconds": 53.6
+  },
+  {
+   "Name": "Pedestrian, Birch Street, north side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -423.5,
+    "Y": 0.15,
+    "Z": -19.6
+   },
+   "RoadEnd": {
+    "X": -168.5,
+    "Y": 0.15,
+    "Z": -19.6
+   },
+   "SpeedsKmh": [
+    4.6,
+    4.232
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 3.4,
+   "StartDelaySeconds": 102.2
+  },
+  {
+   "Name": "Pedestrian, Birch Street, north side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -423.5,
+    "Y": 0.15,
+    "Z": -19.6
+   },
+   "RoadEnd": {
+    "X": -168.5,
+    "Y": 0.15,
+    "Z": -19.6
+   },
+   "SpeedsKmh": [
+    5.3,
+    4.876
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 4.3,
+   "StartDelaySeconds": 135.5
+  },
+  {
+   "Name": "Pedestrian, Birch Street, north side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -168.5,
+    "Y": 0.15,
+    "Z": -19.6
+   },
+   "RoadEnd": {
+    "X": -423.5,
+    "Y": 0.15,
+    "Z": -19.6
+   },
+   "SpeedsKmh": [
+    4.6,
+    4.232
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 8.5,
+   "StartDelaySeconds": 0.5
+  },
+  {
+   "Name": "Pedestrian, Birch Street, north side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -168.5,
+    "Y": 0.15,
+    "Z": -19.6
+   },
+   "RoadEnd": {
+    "X": -423.5,
+    "Y": 0.15,
+    "Z": -19.6
+   },
+   "SpeedsKmh": [
+    5.3,
+    4.876
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 3.9,
+   "StartDelaySeconds": 43.9
+  },
+  {
+   "Name": "Pedestrian, Birch Street, north side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -168.5,
+    "Y": 0.15,
+    "Z": -19.6
+   },
+   "RoadEnd": {
+    "X": -423.5,
+    "Y": 0.15,
+    "Z": -19.6
+   },
+   "SpeedsKmh": [
+    4.7,
+    4.324000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 7.1,
+   "StartDelaySeconds": 100.2
+  },
+  {
+   "Name": "Pedestrian, Birch Street, north side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -168.5,
+    "Y": 0.15,
+    "Z": -19.6
+   },
+   "RoadEnd": {
+    "X": -423.5,
+    "Y": 0.15,
+    "Z": -19.6
+   },
+   "SpeedsKmh": [
+    4.2,
+    3.8640000000000003
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 5.9,
+   "StartDelaySeconds": 168.4
+  },
+  {
+   "Name": "Pedestrian, Rowan Street, south side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -423.5,
+    "Y": 0.15,
+    "Z": 43.6
+   },
+   "RoadEnd": {
+    "X": -168.5,
+    "Y": 0.15,
+    "Z": 43.6
+   },
+   "SpeedsKmh": [
+    4.5,
+    4.140000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 5.8,
+   "StartDelaySeconds": 2.3
+  },
+  {
+   "Name": "Pedestrian, Rowan Street, south side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -423.5,
+    "Y": 0.15,
+    "Z": 43.6
+   },
+   "RoadEnd": {
+    "X": -168.5,
+    "Y": 0.15,
+    "Z": 43.6
+   },
+   "SpeedsKmh": [
+    4.3,
+    3.956
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 6.4,
+   "StartDelaySeconds": 56.4
+  },
+  {
+   "Name": "Pedestrian, Rowan Street, south side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -423.5,
+    "Y": 0.15,
+    "Z": 43.6
+   },
+   "RoadEnd": {
+    "X": -168.5,
+    "Y": 0.15,
+    "Z": 43.6
+   },
+   "SpeedsKmh": [
+    4.5,
+    4.140000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 5.5,
+   "StartDelaySeconds": 102.3
+  },
+  {
+   "Name": "Pedestrian, Rowan Street, south side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -423.5,
+    "Y": 0.15,
+    "Z": 43.6
+   },
+   "RoadEnd": {
+    "X": -168.5,
+    "Y": 0.15,
+    "Z": 43.6
+   },
+   "SpeedsKmh": [
+    5.3,
+    4.876
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 5.1,
+   "StartDelaySeconds": 135.3
+  },
+  {
+   "Name": "Pedestrian, Rowan Street, south side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -168.5,
+    "Y": 0.15,
+    "Z": 43.6
+   },
+   "RoadEnd": {
+    "X": -423.5,
+    "Y": 0.15,
+    "Z": 43.6
+   },
+   "SpeedsKmh": [
+    4.9,
+    4.508000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 5.5,
+   "StartDelaySeconds": 3.4
+  },
+  {
+   "Name": "Pedestrian, Rowan Street, south side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -168.5,
+    "Y": 0.15,
+    "Z": 43.6
+   },
+   "RoadEnd": {
+    "X": -423.5,
+    "Y": 0.15,
+    "Z": 43.6
+   },
+   "SpeedsKmh": [
+    5.0,
+    4.6000000000000005
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 8.3,
+   "StartDelaySeconds": 46.1
+  },
+  {
+   "Name": "Pedestrian, Rowan Street, south side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -168.5,
+    "Y": 0.15,
+    "Z": 43.6
+   },
+   "RoadEnd": {
+    "X": -423.5,
+    "Y": 0.15,
+    "Z": 43.6
+   },
+   "SpeedsKmh": [
+    5.4,
+    4.968000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 5.5,
+   "StartDelaySeconds": 87.4
+  },
+  {
+   "Name": "Pedestrian, Rowan Street, south side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -168.5,
+    "Y": 0.15,
+    "Z": 43.6
+   },
+   "RoadEnd": {
+    "X": -423.5,
+    "Y": 0.15,
+    "Z": 43.6
+   },
+   "SpeedsKmh": [
+    5.0,
+    4.6000000000000005
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 8.3,
+   "StartDelaySeconds": 141.8
+  },
+  {
+   "Name": "Pedestrian, Rowan Street, north side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -423.5,
+    "Y": 0.15,
+    "Z": 52.4
+   },
+   "RoadEnd": {
+    "X": -168.5,
+    "Y": 0.15,
+    "Z": 52.4
+   },
+   "SpeedsKmh": [
+    5.0,
+    4.6000000000000005
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 7.1,
+   "StartDelaySeconds": 2.4
+  },
+  {
+   "Name": "Pedestrian, Rowan Street, north side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -423.5,
+    "Y": 0.15,
+    "Z": 52.4
+   },
+   "RoadEnd": {
+    "X": -168.5,
+    "Y": 0.15,
+    "Z": 52.4
+   },
+   "SpeedsKmh": [
+    4.3,
+    3.956
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 4.2,
+   "StartDelaySeconds": 58.5
+  },
+  {
+   "Name": "Pedestrian, Rowan Street, north side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -423.5,
+    "Y": 0.15,
+    "Z": 52.4
+   },
+   "RoadEnd": {
+    "X": -168.5,
+    "Y": 0.15,
+    "Z": 52.4
+   },
+   "SpeedsKmh": [
+    4.8,
+    4.416
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 4.5,
+   "StartDelaySeconds": 96.3
+  },
+  {
+   "Name": "Pedestrian, Rowan Street, north side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -423.5,
+    "Y": 0.15,
+    "Z": 52.4
+   },
+   "RoadEnd": {
+    "X": -168.5,
+    "Y": 0.15,
+    "Z": 52.4
+   },
+   "SpeedsKmh": [
+    4.8,
+    4.416
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 6.2,
+   "StartDelaySeconds": 145.1
+  },
+  {
+   "Name": "Pedestrian, Rowan Street, north side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -168.5,
+    "Y": 0.15,
+    "Z": 52.4
+   },
+   "RoadEnd": {
+    "X": -423.5,
+    "Y": 0.15,
+    "Z": 52.4
+   },
+   "SpeedsKmh": [
+    5.1,
+    4.692
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 7.3,
+   "StartDelaySeconds": 5.8
+  },
+  {
+   "Name": "Pedestrian, Rowan Street, north side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -168.5,
+    "Y": 0.15,
+    "Z": 52.4
+   },
+   "RoadEnd": {
+    "X": -423.5,
+    "Y": 0.15,
+    "Z": 52.4
+   },
+   "SpeedsKmh": [
+    4.4,
+    4.048000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 6.2,
+   "StartDelaySeconds": 53.7
+  },
+  {
+   "Name": "Pedestrian, Rowan Street, north side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -168.5,
+    "Y": 0.15,
+    "Z": 52.4
+   },
+   "RoadEnd": {
+    "X": -423.5,
+    "Y": 0.15,
+    "Z": 52.4
+   },
+   "SpeedsKmh": [
+    4.6,
+    4.232
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 8.7,
+   "StartDelaySeconds": 103.6
+  },
+  {
+   "Name": "Pedestrian, Rowan Street, north side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -168.5,
+    "Y": 0.15,
+    "Z": 52.4
+   },
+   "RoadEnd": {
+    "X": -423.5,
+    "Y": 0.15,
+    "Z": 52.4
+   },
+   "SpeedsKmh": [
+    5.1,
+    4.692
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 8.2,
+   "StartDelaySeconds": 140.8
+  },
+  {
+   "Name": "Pedestrian, Alder Street, south side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -423.5,
+    "Y": 0.15,
+    "Z": 115.6
+   },
+   "RoadEnd": {
+    "X": -168.5,
+    "Y": 0.15,
+    "Z": 115.6
+   },
+   "SpeedsKmh": [
+    5.0,
+    4.6000000000000005
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 3.8,
+   "StartDelaySeconds": 0.3
+  },
+  {
+   "Name": "Pedestrian, Alder Street, south side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -423.5,
+    "Y": 0.15,
+    "Z": 115.6
+   },
+   "RoadEnd": {
+    "X": -168.5,
+    "Y": 0.15,
+    "Z": 115.6
+   },
+   "SpeedsKmh": [
+    4.6,
+    4.232
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 5.6,
+   "StartDelaySeconds": 50.3
+  },
+  {
+   "Name": "Pedestrian, Alder Street, south side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -423.5,
+    "Y": 0.15,
+    "Z": 115.6
+   },
+   "RoadEnd": {
+    "X": -168.5,
+    "Y": 0.15,
+    "Z": 115.6
+   },
+   "SpeedsKmh": [
+    5.2,
+    4.784000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 8.6,
+   "StartDelaySeconds": 89.5
+  },
+  {
+   "Name": "Pedestrian, Alder Street, south side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -423.5,
+    "Y": 0.15,
+    "Z": 115.6
+   },
+   "RoadEnd": {
+    "X": -168.5,
+    "Y": 0.15,
+    "Z": 115.6
+   },
+   "SpeedsKmh": [
+    4.9,
+    4.508000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 8.3,
+   "StartDelaySeconds": 141.1
+  },
+  {
+   "Name": "Pedestrian, Alder Street, south side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -168.5,
+    "Y": 0.15,
+    "Z": 115.6
+   },
+   "RoadEnd": {
+    "X": -423.5,
+    "Y": 0.15,
+    "Z": 115.6
+   },
+   "SpeedsKmh": [
+    4.7,
+    4.324000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 8.7,
+   "StartDelaySeconds": 1.2
+  },
+  {
+   "Name": "Pedestrian, Alder Street, south side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -168.5,
+    "Y": 0.15,
+    "Z": 115.6
+   },
+   "RoadEnd": {
+    "X": -423.5,
+    "Y": 0.15,
+    "Z": 115.6
+   },
+   "SpeedsKmh": [
+    5.3,
+    4.876
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 5.5,
+   "StartDelaySeconds": 45.0
+  },
+  {
+   "Name": "Pedestrian, Alder Street, south side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -168.5,
+    "Y": 0.15,
+    "Z": 115.6
+   },
+   "RoadEnd": {
+    "X": -423.5,
+    "Y": 0.15,
+    "Z": 115.6
+   },
+   "SpeedsKmh": [
+    4.4,
+    4.048000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 3.8,
+   "StartDelaySeconds": 105.0
+  },
+  {
+   "Name": "Pedestrian, Alder Street, south side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -168.5,
+    "Y": 0.15,
+    "Z": 115.6
+   },
+   "RoadEnd": {
+    "X": -423.5,
+    "Y": 0.15,
+    "Z": 115.6
+   },
+   "SpeedsKmh": [
+    5.1,
+    4.692
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 5.1,
+   "StartDelaySeconds": 138.6
+  },
+  {
+   "Name": "Pedestrian, Alder Street, north side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -423.5,
+    "Y": 0.15,
+    "Z": 124.4
+   },
+   "RoadEnd": {
+    "X": -168.5,
+    "Y": 0.15,
+    "Z": 124.4
+   },
+   "SpeedsKmh": [
+    4.4,
+    4.048000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 4.6,
+   "StartDelaySeconds": 3.8
+  },
+  {
+   "Name": "Pedestrian, Alder Street, north side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -423.5,
+    "Y": 0.15,
+    "Z": 124.4
+   },
+   "RoadEnd": {
+    "X": -168.5,
+    "Y": 0.15,
+    "Z": 124.4
+   },
+   "SpeedsKmh": [
+    5.3,
+    4.876
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 8.1,
+   "StartDelaySeconds": 47.3
+  },
+  {
+   "Name": "Pedestrian, Alder Street, north side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -423.5,
+    "Y": 0.15,
+    "Z": 124.4
+   },
+   "RoadEnd": {
+    "X": -168.5,
+    "Y": 0.15,
+    "Z": 124.4
+   },
+   "SpeedsKmh": [
+    4.6,
+    4.232
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 8.1,
+   "StartDelaySeconds": 101.3
+  },
+  {
+   "Name": "Pedestrian, Alder Street, north side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -423.5,
+    "Y": 0.15,
+    "Z": 124.4
+   },
+   "RoadEnd": {
+    "X": -168.5,
+    "Y": 0.15,
+    "Z": 124.4
+   },
+   "SpeedsKmh": [
+    4.6,
+    4.232
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 5.2,
+   "StartDelaySeconds": 152.8
+  },
+  {
+   "Name": "Pedestrian, Alder Street, north side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -168.5,
+    "Y": 0.15,
+    "Z": 124.4
+   },
+   "RoadEnd": {
+    "X": -423.5,
+    "Y": 0.15,
+    "Z": 124.4
+   },
+   "SpeedsKmh": [
+    4.9,
+    4.508000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 6.9,
+   "StartDelaySeconds": 1.4
+  },
+  {
+   "Name": "Pedestrian, Alder Street, north side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -168.5,
+    "Y": 0.15,
+    "Z": 124.4
+   },
+   "RoadEnd": {
+    "X": -423.5,
+    "Y": 0.15,
+    "Z": 124.4
+   },
+   "SpeedsKmh": [
+    4.8,
+    4.416
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 4.8,
+   "StartDelaySeconds": 49.3
+  },
+  {
+   "Name": "Pedestrian, Alder Street, north side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -168.5,
+    "Y": 0.15,
+    "Z": 124.4
+   },
+   "RoadEnd": {
+    "X": -423.5,
+    "Y": 0.15,
+    "Z": 124.4
+   },
+   "SpeedsKmh": [
+    5.1,
+    4.692
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 5.3,
+   "StartDelaySeconds": 92.3
+  },
+  {
+   "Name": "Pedestrian, Alder Street, north side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -168.5,
+    "Y": 0.15,
+    "Z": 124.4
+   },
+   "RoadEnd": {
+    "X": -423.5,
+    "Y": 0.15,
+    "Z": 124.4
+   },
+   "SpeedsKmh": [
+    4.4,
+    4.048000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 7.1,
+   "StartDelaySeconds": 156.6
+  },
+  {
+   "Name": "Pedestrian, Sycamore Lane, west side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -300.4,
+    "Y": 0.15,
+    "Z": -108.8
+   },
+   "RoadEnd": {
+    "X": -300.4,
+    "Y": 0.15,
+    "Z": 132.7
+   },
+   "SpeedsKmh": [
+    4.8,
+    4.416
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 3.9,
+   "StartDelaySeconds": 0.0
+  },
+  {
+   "Name": "Pedestrian, Sycamore Lane, west side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -300.4,
+    "Y": 0.15,
+    "Z": -108.8
+   },
+   "RoadEnd": {
+    "X": -300.4,
+    "Y": 0.15,
+    "Z": 132.7
+   },
+   "SpeedsKmh": [
+    5.2,
+    4.784000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 8.0,
+   "StartDelaySeconds": 42.2
+  },
+  {
+   "Name": "Pedestrian, Sycamore Lane, west side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -300.4,
+    "Y": 0.15,
+    "Z": -108.8
+   },
+   "RoadEnd": {
+    "X": -300.4,
+    "Y": 0.15,
+    "Z": 132.7
+   },
+   "SpeedsKmh": [
+    4.4,
+    4.048000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 3.4,
+   "StartDelaySeconds": 102.0
+  },
+  {
+   "Name": "Pedestrian, Sycamore Lane, west side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -300.4,
+    "Y": 0.15,
+    "Z": -108.8
+   },
+   "RoadEnd": {
+    "X": -300.4,
+    "Y": 0.15,
+    "Z": 132.7
+   },
+   "SpeedsKmh": [
+    5.0,
+    4.6000000000000005
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 6.3,
+   "StartDelaySeconds": 130.8
+  },
+  {
+   "Name": "Pedestrian, Sycamore Lane, west side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -300.4,
+    "Y": 0.15,
+    "Z": 132.7
+   },
+   "RoadEnd": {
+    "X": -300.4,
+    "Y": 0.15,
+    "Z": -108.8
+   },
+   "SpeedsKmh": [
+    4.8,
+    4.416
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 7.3,
+   "StartDelaySeconds": 2.7
+  },
+  {
+   "Name": "Pedestrian, Sycamore Lane, west side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -300.4,
+    "Y": 0.15,
+    "Z": 132.7
+   },
+   "RoadEnd": {
+    "X": -300.4,
+    "Y": 0.15,
+    "Z": -108.8
+   },
+   "SpeedsKmh": [
+    4.4,
+    4.048000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 9.0,
+   "StartDelaySeconds": 54.2
+  },
+  {
+   "Name": "Pedestrian, Sycamore Lane, west side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -300.4,
+    "Y": 0.15,
+    "Z": 132.7
+   },
+   "RoadEnd": {
+    "X": -300.4,
+    "Y": 0.15,
+    "Z": -108.8
+   },
+   "SpeedsKmh": [
+    4.6,
+    4.232
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 4.6,
+   "StartDelaySeconds": 98.6
+  },
+  {
+   "Name": "Pedestrian, Sycamore Lane, west side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -300.4,
+    "Y": 0.15,
+    "Z": 132.7
+   },
+   "RoadEnd": {
+    "X": -300.4,
+    "Y": 0.15,
+    "Z": -108.8
+   },
+   "SpeedsKmh": [
+    5.1,
+    4.692
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 7.1,
+   "StartDelaySeconds": 130.0
+  },
+  {
+   "Name": "Pedestrian, Sycamore Lane, east side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -291.6,
+    "Y": 0.15,
+    "Z": -108.8
+   },
+   "RoadEnd": {
+    "X": -291.6,
+    "Y": 0.15,
+    "Z": 132.7
+   },
+   "SpeedsKmh": [
+    5.2,
+    4.784000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 4.3,
+   "StartDelaySeconds": 3.9
+  },
+  {
+   "Name": "Pedestrian, Sycamore Lane, east side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -291.6,
+    "Y": 0.15,
+    "Z": -108.8
+   },
+   "RoadEnd": {
+    "X": -291.6,
+    "Y": 0.15,
+    "Z": 132.7
+   },
+   "SpeedsKmh": [
+    4.2,
+    3.8640000000000003
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 4.9,
+   "StartDelaySeconds": 56.3
+  },
+  {
+   "Name": "Pedestrian, Sycamore Lane, east side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -291.6,
+    "Y": 0.15,
+    "Z": -108.8
+   },
+   "RoadEnd": {
+    "X": -291.6,
+    "Y": 0.15,
+    "Z": 132.7
+   },
+   "SpeedsKmh": [
+    4.7,
+    4.324000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 6.3,
+   "StartDelaySeconds": 97.1
+  },
+  {
+   "Name": "Pedestrian, Sycamore Lane, east side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -291.6,
+    "Y": 0.15,
+    "Z": -108.8
+   },
+   "RoadEnd": {
+    "X": -291.6,
+    "Y": 0.15,
+    "Z": 132.7
+   },
+   "SpeedsKmh": [
+    5.2,
+    4.784000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 5.5,
+   "StartDelaySeconds": 126.7
+  },
+  {
+   "Name": "Pedestrian, Sycamore Lane, east side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -291.6,
+    "Y": 0.15,
+    "Z": 132.7
+   },
+   "RoadEnd": {
+    "X": -291.6,
+    "Y": 0.15,
+    "Z": -108.8
+   },
+   "SpeedsKmh": [
+    4.4,
+    4.048000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 4.2,
+   "StartDelaySeconds": 5.2
+  },
+  {
+   "Name": "Pedestrian, Sycamore Lane, east side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -291.6,
+    "Y": 0.15,
+    "Z": 132.7
+   },
+   "RoadEnd": {
+    "X": -291.6,
+    "Y": 0.15,
+    "Z": -108.8
+   },
+   "SpeedsKmh": [
+    5.0,
+    4.6000000000000005
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 5.6,
+   "StartDelaySeconds": 49.3
+  },
+  {
+   "Name": "Pedestrian, Sycamore Lane, east side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -291.6,
+    "Y": 0.15,
+    "Z": 132.7
+   },
+   "RoadEnd": {
+    "X": -291.6,
+    "Y": 0.15,
+    "Z": -108.8
+   },
+   "SpeedsKmh": [
+    4.6,
+    4.232
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 3.4,
+   "StartDelaySeconds": 95.8
+  },
+  {
+   "Name": "Pedestrian, Sycamore Lane, east side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -291.6,
+    "Y": 0.15,
+    "Z": 132.7
+   },
+   "RoadEnd": {
+    "X": -291.6,
+    "Y": 0.15,
+    "Z": -108.8
+   },
+   "SpeedsKmh": [
+    4.5,
+    4.140000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 5.1,
+   "StartDelaySeconds": 145.0
+  },
+  {
+   "Name": "Pedestrian, Willow Lane, west side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -184.4,
+    "Y": 0.15,
+    "Z": -108.8
+   },
+   "RoadEnd": {
+    "X": -184.4,
+    "Y": 0.15,
+    "Z": 132.7
+   },
+   "SpeedsKmh": [
+    4.7,
+    4.324000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 4.0,
+   "StartDelaySeconds": 0.2
+  },
+  {
+   "Name": "Pedestrian, Willow Lane, west side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -184.4,
+    "Y": 0.15,
+    "Z": -108.8
+   },
+   "RoadEnd": {
+    "X": -184.4,
+    "Y": 0.15,
+    "Z": 132.7
+   },
+   "SpeedsKmh": [
+    5.4,
+    4.968000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 8.4,
+   "StartDelaySeconds": 41.9
+  },
+  {
+   "Name": "Pedestrian, Willow Lane, west side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -184.4,
+    "Y": 0.15,
+    "Z": -108.8
+   },
+   "RoadEnd": {
+    "X": -184.4,
+    "Y": 0.15,
+    "Z": 132.7
+   },
+   "SpeedsKmh": [
+    4.8,
+    4.416
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 3.5,
+   "StartDelaySeconds": 94.7
+  },
+  {
+   "Name": "Pedestrian, Willow Lane, west side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -184.4,
+    "Y": 0.15,
+    "Z": -108.8
+   },
+   "RoadEnd": {
+    "X": -184.4,
+    "Y": 0.15,
+    "Z": 132.7
+   },
+   "SpeedsKmh": [
+    5.1,
+    4.692
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 3.9,
+   "StartDelaySeconds": 132.6
+  },
+  {
+   "Name": "Pedestrian, Willow Lane, west side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -184.4,
+    "Y": 0.15,
+    "Z": 132.7
+   },
+   "RoadEnd": {
+    "X": -184.4,
+    "Y": 0.15,
+    "Z": -108.8
+   },
+   "SpeedsKmh": [
+    5.1,
+    4.692
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 8.0,
+   "StartDelaySeconds": 4.4
+  },
+  {
+   "Name": "Pedestrian, Willow Lane, west side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -184.4,
+    "Y": 0.15,
+    "Z": 132.7
+   },
+   "RoadEnd": {
+    "X": -184.4,
+    "Y": 0.15,
+    "Z": -108.8
+   },
+   "SpeedsKmh": [
+    4.4,
+    4.048000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 5.9,
+   "StartDelaySeconds": 50.3
+  },
+  {
+   "Name": "Pedestrian, Willow Lane, west side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -184.4,
+    "Y": 0.15,
+    "Z": 132.7
+   },
+   "RoadEnd": {
+    "X": -184.4,
+    "Y": 0.15,
+    "Z": -108.8
+   },
+   "SpeedsKmh": [
+    4.7,
+    4.324000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 8.1,
+   "StartDelaySeconds": 96.3
+  },
+  {
+   "Name": "Pedestrian, Willow Lane, west side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -184.4,
+    "Y": 0.15,
+    "Z": 132.7
+   },
+   "RoadEnd": {
+    "X": -184.4,
+    "Y": 0.15,
+    "Z": -108.8
+   },
+   "SpeedsKmh": [
+    4.6,
+    4.232
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 6.7,
+   "StartDelaySeconds": 142.5
+  },
+  {
+   "Name": "Pedestrian, Willow Lane, east side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -175.6,
+    "Y": 0.15,
+    "Z": -108.8
+   },
+   "RoadEnd": {
+    "X": -175.6,
+    "Y": 0.15,
+    "Z": 132.7
+   },
+   "SpeedsKmh": [
+    5.1,
+    4.692
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 6.8,
+   "StartDelaySeconds": 5.6
+  },
+  {
+   "Name": "Pedestrian, Willow Lane, east side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -175.6,
+    "Y": 0.15,
+    "Z": -108.8
+   },
+   "RoadEnd": {
+    "X": -175.6,
+    "Y": 0.15,
+    "Z": 132.7
+   },
+   "SpeedsKmh": [
+    5.4,
+    4.968000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 4.2,
+   "StartDelaySeconds": 41.7
+  },
+  {
+   "Name": "Pedestrian, Willow Lane, east side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -175.6,
+    "Y": 0.15,
+    "Z": -108.8
+   },
+   "RoadEnd": {
+    "X": -175.6,
+    "Y": 0.15,
+    "Z": 132.7
+   },
+   "SpeedsKmh": [
+    4.6,
+    4.232
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 4.8,
+   "StartDelaySeconds": 98.3
+  },
+  {
+   "Name": "Pedestrian, Willow Lane, east side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -175.6,
+    "Y": 0.15,
+    "Z": -108.8
+   },
+   "RoadEnd": {
+    "X": -175.6,
+    "Y": 0.15,
+    "Z": 132.7
+   },
+   "SpeedsKmh": [
+    4.4,
+    4.048000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 3.9,
+   "StartDelaySeconds": 149.1
+  },
+  {
+   "Name": "Pedestrian, Willow Lane, east side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -175.6,
+    "Y": 0.15,
+    "Z": 132.7
+   },
+   "RoadEnd": {
+    "X": -175.6,
+    "Y": 0.15,
+    "Z": -108.8
+   },
+   "SpeedsKmh": [
+    5.0,
+    4.6000000000000005
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 4.9,
+   "StartDelaySeconds": 5.6
+  },
+  {
+   "Name": "Pedestrian, Willow Lane, east side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -175.6,
+    "Y": 0.15,
+    "Z": 132.7
+   },
+   "RoadEnd": {
+    "X": -175.6,
+    "Y": 0.15,
+    "Z": -108.8
+   },
+   "SpeedsKmh": [
+    5.0,
+    4.6000000000000005
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 7.2,
+   "StartDelaySeconds": 47.4
+  },
+  {
+   "Name": "Pedestrian, Willow Lane, east side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -175.6,
+    "Y": 0.15,
+    "Z": 132.7
+   },
+   "RoadEnd": {
+    "X": -175.6,
+    "Y": 0.15,
+    "Z": -108.8
+   },
+   "SpeedsKmh": [
+    5.3,
+    4.876
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 8.4,
+   "StartDelaySeconds": 86.7
+  },
+  {
+   "Name": "Pedestrian, Willow Lane, east side",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -175.6,
+    "Y": 0.15,
+    "Z": 132.7
+   },
+   "RoadEnd": {
+    "X": -175.6,
+    "Y": 0.15,
+    "Z": -108.8
+   },
+   "SpeedsKmh": [
+    4.9,
+    4.508000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 8.6,
+   "StartDelaySeconds": 134.8
+  },
+  {
+   "Name": "Pedestrian, Market Square, crossing west",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -112.0,
+    "Y": 0.1,
+    "Z": 190.0
+   },
+   "RoadEnd": {
+    "X": -36.0,
+    "Y": 0.1,
+    "Z": 190.0
+   },
+   "SpeedsKmh": [
+    4.5,
+    4.140000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 8.0,
+   "StartDelaySeconds": 1.0
+  },
+  {
+   "Name": "Pedestrian, Market Square, crossing west, the other way",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -36.0,
+    "Y": 0.1,
+    "Z": 190.0
+   },
+   "RoadEnd": {
+    "X": -112.0,
+    "Y": 0.1,
+    "Z": 190.0
+   },
+   "SpeedsKmh": [
+    4.5,
+    4.140000000000001
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 11.0,
+   "StartDelaySeconds": 21.0
+  },
+  {
+   "Name": "Pedestrian, Market Square, crossing east",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -36.0,
+    "Y": 0.1,
+    "Z": 214.0
+   },
+   "RoadEnd": {
+    "X": -112.0,
+    "Y": 0.1,
+    "Z": 214.0
+   },
+   "SpeedsKmh": [
+    4.3,
+    3.956
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 10.0,
+   "StartDelaySeconds": 6.0
+  },
+  {
+   "Name": "Pedestrian, Market Square, crossing east, the other way",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -112.0,
+    "Y": 0.1,
+    "Z": 214.0
+   },
+   "RoadEnd": {
+    "X": -36.0,
+    "Y": 0.1,
+    "Z": 214.0
+   },
+   "SpeedsKmh": [
+    4.3,
+    3.956
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 13.0,
+   "StartDelaySeconds": 26.0
+  },
+  {
+   "Name": "Pedestrian, Market Square, north and south",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -66.0,
+    "Y": 0.1,
+    "Z": 160.0
+   },
+   "RoadEnd": {
+    "X": -66.0,
+    "Y": 0.1,
+    "Z": 226.0
+   },
+   "SpeedsKmh": [
+    4.1,
+    3.772
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 12.0,
    "StartDelaySeconds": 4.0
+  },
+  {
+   "Name": "Pedestrian, Market Square, north and south, the other way",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -66.0,
+    "Y": 0.1,
+    "Z": 226.0
+   },
+   "RoadEnd": {
+    "X": -66.0,
+    "Y": 0.1,
+    "Z": 160.0
+   },
+   "SpeedsKmh": [
+    4.2,
+    3.8640000000000003
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 15.0,
+   "StartDelaySeconds": 24.0
+  },
+  {
+   "Name": "Pedestrian, Market Square, crossing west",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -100.0,
+    "Y": 0.1,
+    "Z": 170.0
+   },
+   "RoadEnd": {
+    "X": -40.0,
+    "Y": 0.1,
+    "Z": 228.0
+   },
+   "SpeedsKmh": [
+    4.6,
+    4.232
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 7.0,
+   "StartDelaySeconds": 9.0
+  },
+  {
+   "Name": "Pedestrian, Market Square, crossing west, the other way",
+   "Preset": "walker",
+   "RoadStart": {
+    "X": -40.0,
+    "Y": 0.1,
+    "Z": 228.0
+   },
+   "RoadEnd": {
+    "X": -100.0,
+    "Y": 0.1,
+    "Z": 170.0
+   },
+   "SpeedsKmh": [
+    4.6,
+    4.232
+   ],
+   "AccelerationMps2": 0.8,
+   "BrakingMps2": 1.0,
+   "WaitSeconds": 10.0,
+   "StartDelaySeconds": 29.0
   },
   {
    "Name": "Tunnel truck",
