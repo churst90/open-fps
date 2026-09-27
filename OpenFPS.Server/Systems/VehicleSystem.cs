@@ -57,6 +57,11 @@ public sealed partial class VehicleSystem
 
         // Racing. Null for a shuttling vehicle.
         public RaceLine? Line;
+        /// <summary>The track and lane it laps, which together say who is in front of it.</summary>
+        public string TrackId = "";
+        public float LaneOffset;
+        /// <summary>Bumper to bumper, metres, from the preset.</summary>
+        public float LengthMetres = 4.6f;
         public float Lap;                      // metres round the circuit
         public int Laps;
         public string DisplayName = "";
@@ -351,6 +356,9 @@ public sealed partial class VehicleSystem
                     v.Current = State.Driving;
                 }
                 v.Preset = vd.Preset;
+                v.TrackId = vd.Track ?? "";
+                v.LaneOffset = vd.LaneOffsetMetres;
+                if (profile != null) v.LengthMetres = profile.LengthMetres;
                 v.Horn = profile != null ? VehicleProfile.HornFor(profile) : "";
                 v.OnStreet = data.StreetLife != null && profile != null && !isAircraft && !isMachine && !isWalker;
                 if (v.OnStreet) v.DriverVoice = PedestrianSpeech.NextDriverVoice(mapId);
@@ -383,6 +391,7 @@ public sealed partial class VehicleSystem
     public void Update(string mapId, World world, float dt)
     {
         UpdateStreetLife(mapId, world, dt);
+        IndexLanes(mapId);
         foreach (var v in _vehicles)
         {
             if (v.MapId != mapId || !world.IsAlive(v.Entity)) continue;
@@ -621,6 +630,7 @@ public sealed partial class VehicleSystem
         float wasSpeed = v.Speed;
         if (want > v.Speed) v.Speed = MathF.Min(want, v.Speed + v.Accel * dt);
         else v.Speed = MathF.Max(want, v.Speed - brake * dt);
+        Follow(v, wasSpeed, dt);
 
         // What the tyres are being asked for, as a fraction of what they have.
         //

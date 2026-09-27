@@ -59,8 +59,9 @@ machine), so a new vehicle or person is a file, not code.
 ## Stage 1: roads as data
 
 Progress: the network as data is built (2026-09-27): `OpenFPS.Common/Roads.cs`, written by
-`gen_city.py`, loaded and checked by `MapManager`, tested by `RoadNetworkTests`. Next: car following,
-then traffic on lanes, then gap acceptance, then pedestrians crossing.
+`gen_city.py`, loaded and checked by `MapManager`, tested by `RoadNetworkTests`. Car following is in
+(`VehicleSystem.Following.cs`, `CarFollowingTests`). Next: traffic on lanes, then gap acceptance, then
+pedestrians crossing.
 
 A road network the server knows: roads, lanes, junctions, crossings and surfaces.
 

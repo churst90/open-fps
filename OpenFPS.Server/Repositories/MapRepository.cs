@@ -153,6 +153,16 @@ public class StreetLifeData
     public float GunfireEverySeconds { get; set; }
     /// <summary>A car standing empty at the kerb has its alarm go off, on average this often.</summary>
     public float AlarmEverySeconds { get; set; }
+
+    /// <summary>
+    /// How far behind the vehicle ahead a driver keeps, in seconds of their own speed: the IDM's
+    /// time headway T (Treiber, Hennecke and Helbing 2000). Treiber and Kesting's city value is
+    /// 1.0-1.5 s; the two-second rule is what drivers are taught and few keep.
+    /// </summary>
+    public float FollowHeadwaySeconds { get; set; } = 1.5f;
+    /// <summary>The gap left to a stopped vehicle ahead, metres: the IDM's s0. Two metres in the
+    /// same source.</summary>
+    public float FollowMinGapMetres { get; set; } = 2f;
 }
 
 public class TrackData

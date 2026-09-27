@@ -4,6 +4,13 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-09-27
 
+- Traffic keeps a gap to the vehicle in front, by the Intelligent Driver Model (Treiber, Hennecke and
+  Helbing 2000): it eases off to hold a time headway and stops two metres behind a stopped vehicle.
+  Before, no vehicle knew another was there, and over three minutes of city traffic 73 pairs drove
+  through each other; now none do. The headway and gap are map data (`StreetLife`). Street maps only:
+  the speedway still races.
+- `--ground-voice --ladder` in the lab renders a line with its ground reflection at the physical
+  level, 6, 12 and 20 dB below it, and with the talker and listener moving as standing people do.
 - The city's roads are data. Every road is a record (centreline, type, lanes with a direction,
   width and speed limit, surface stretches) written by the same call that lays its asphalt, and the
   27 junctions are found where centrelines meet. The server builds the network at load: every lane
