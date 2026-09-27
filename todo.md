@@ -45,6 +45,12 @@ Plan: [docs/NEXT_BODIES_WHEELS_ROADS.md](docs/NEXT_BODIES_WHEELS_ROADS.md) (agre
 - Traffic lights and accessible pedestrian signals.
 - No physical value hard-coded in a model or map; presets move to JSON.
 
+- Bump sounds when you walk into something. Demo in `~/openfps-listen/bumps` (a shoe toe and a
+  shoulder striking each surface's own plate modes, `--bumps` in the lab), waiting for a listen.
+  The absolute level is not right yet (82-105 dB at 1 m): a panel fixed at its edges radiates far
+  less than its moving face suggests. Anchor it to the footstep takes, or add radiation efficiency,
+  before it goes in the game.
+
 ### 3. Mutation testing
 Results so far are in [docs/MUTATION_2026-09-24.md](docs/MUTATION_2026-09-24.md).
 - Shared maths (`Loudness`, `Enclosure`, `ImageSource`, `EarlyReflections`, `TyreFriction`,

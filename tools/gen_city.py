@@ -35,10 +35,14 @@ is brick round it, a hangar is steel because it is made of steel, and a front la
 because there is nothing over it. The log line that says so is the first thing to read after a
 change.
 """
-import json, math, os, glob
+import json, math, os, glob, sys
 
+# Run from the repository root. The map it writes is exactly the one shipped: every choice that looks
+# random is seeded, and RoadNetworkTests.The_generator_reproduces_the_shipped_city checks it.
+#   python3 tools/gen_city.py                 writes OpenFPS.Server/maps/city.json
+#   python3 tools/gen_city.py --out=FILE      writes FILE instead
 PREFAB_DIR = "OpenFPS.Server/prefabs"
-OUT = "OpenFPS.Server/maps/city.json"
+OUT = next((a[len("--out="):] for a in sys.argv[1:] if a.startswith("--out=")), "OpenFPS.Server/maps/city.json")
 
 # ── The prefabs' own dimensions, read rather than remembered ──────────────────────────────────────
 #

@@ -495,6 +495,11 @@ if (args.Contains("--tap-balance"))
     Environment.Exit(OpenFPS.Client.AudioEngine.Fmod.TapBalanceSpike.Run(args));
 }
 
+if (args.Contains("--bumps"))
+{
+    Environment.Exit(OpenFPS.AudioLab.Spikes.BumpSpike.Run(args));
+}
+
 if (args.Contains("--ground-voice"))
 {
     Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.GroundVoiceSpike.Run(args));

@@ -126,4 +126,35 @@ public class RoadNetworkTests
         Assert.Equal("Concrete", RoadNetwork.SurfaceAt(road, 15f));
         Assert.Equal("Asphalt", RoadNetwork.SurfaceAt(road, 20f));
     }
+
+    /// <summary>
+    /// Anybody can rebuild the city: the generator, run from the repository, writes exactly the map
+    /// that ships, byte for byte. A change to the generator that is not regenerated, or a hand edit to
+    /// city.json that the generator would undo, fails here.
+    /// </summary>
+    [Fact]
+    public void The_generator_reproduces_the_shipped_city()
+    {
+        string repo = RepoRoot();
+        string outFile = Path.Combine(Path.GetTempPath(), $"city-{Guid.NewGuid():N}.json");
+        try
+        {
+            var psi = new System.Diagnostics.ProcessStartInfo("python3", $"tools/gen_city.py --out={outFile}")
+            {
+                WorkingDirectory = repo, RedirectStandardOutput = true, RedirectStandardError = true,
+            };
+            using var proc = System.Diagnostics.Process.Start(psi)!;
+            string err = proc.StandardError.ReadToEnd();
+            proc.StandardOutput.ReadToEnd();
+            proc.WaitForExit();
+            Assert.True(proc.ExitCode == 0, err);
+            var shipped = File.ReadAllBytes(Path.Combine(repo, "OpenFPS.Server", "maps", "city.json"));
+            var made = File.ReadAllBytes(outFile);
+            Assert.True(shipped.AsSpan().SequenceEqual(made), "city.json differs from what tools/gen_city.py makes");
+        }
+        finally { File.Delete(outFile); }
+    }
+
+    private static string RepoRoot([System.Runtime.CompilerServices.CallerFilePath] string here = "")
+        => Path.GetFullPath(Path.Combine(Path.GetDirectoryName(here)!, ".."));
 }
