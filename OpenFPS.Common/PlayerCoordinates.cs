@@ -17,7 +17,15 @@ public static class PlayerCoordinates
 {
     /// <summary>"150.0, 27.0, 0.1" — east, north, height.</summary>
     public static string Format(Vector3 world) =>
-        string.Format(CultureInfo.InvariantCulture, "{0:F1}, {1:F1}, {2:F1}", world.X, world.Z, world.Y);
+        $"{Tenths(world.X)}, {Tenths(world.Z)}, {Tenths(world.Y)}";
+
+    /// <summary>To the tenth, with no minus sign on zero. Walking due south moves x by sin(180 degrees),
+    /// which in floats is -8.7e-8 of a step, so an x of 0 drifts a hair below it and "F1" says "-0.0".</summary>
+    private static string Tenths(float v)
+    {
+        string s = v.ToString("F1", CultureInfo.InvariantCulture);
+        return s == "-0.0" ? "0.0" : s;
+    }
 
     /// <summary>A position a player typed, in their order, as an engine position.</summary>
     public static Vector3 ToWorld(float x, float y, float z) => new(x, z, y);

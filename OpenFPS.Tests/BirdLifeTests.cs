@@ -7,6 +7,7 @@ using Arch.Core;
 using OpenFPS.Client.AudioEngine.Core;
 using OpenFPS.Client.Core;
 using OpenFPS.Common;
+using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
 using OpenFPS.Server.Core;
 using OpenFPS.Server.Repositories;
@@ -79,6 +80,30 @@ public class BirdLifeTests
         Assert.True(census.GetValueOrDefault("house sparrow") > 100);
         Assert.True(census.GetValueOrDefault("pigeon") > 0);
         Assert.True(census.GetValueOrDefault("dove") > 0);
+    }
+
+    [Fact]
+    public void PeopleComingAndGoingDoNotMakeTheBirdsLookForHomesAgain()
+    {
+        var (world, birds, _, _) = City();
+        birds.Update(world, Vector3.Zero, 0);
+        int groups = birds.Groups.Count();
+        Assert.Equal(1, birds.SurveysRun);
+
+        // A pedestrian walks into range, and a car pulls up and stops: neither is somewhere to live.
+        world.Entities[-9001] = new EntitySnapshot { Id = -9001, Definition = new EntityDefinition { EntityId = -9001, Type = EntityType.NPC } };
+        world.Entities[-9002] = new EntitySnapshot { Id = -9002, Definition = new EntityDefinition { EntityId = -9002, Type = EntityType.StaticObject, Moves = true } };
+        birds.Update(world, Vector3.Zero, 5);
+        world.Entities.Remove(-9001);
+        birds.Update(world, Vector3.Zero, 10);
+        Assert.Equal(1, birds.SurveysRun);
+        Assert.Equal(groups, birds.Groups.Count());
+
+        // New scenery is looked at.
+        var roof = world.Entities.Values.First(e => e.Definition?.Type == EntityType.StaticObject && !e.Definition.Moves);
+        world.Entities[-9003] = roof with { Id = -9003 };
+        birds.Update(world, Vector3.Zero, 15);
+        Assert.Equal(2, birds.SurveysRun);
     }
 
     [Fact]

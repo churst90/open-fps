@@ -63,7 +63,10 @@ public sealed class BirdLife
     private readonly List<Group> _perched = new();
     private Group? _skein;
     private double _nextSkein = -1;
-    private int _foundFrom = -1;
+    private long _foundFrom = -1;
+
+    /// <summary>How many times the habitat has been looked for. Once per map.</summary>
+    internal int SurveysRun { get; private set; }
     private double _nextSurvey;
     private int _voice;
     private double _lastNow = -1;
@@ -102,17 +105,23 @@ public sealed class BirdLife
 
     // ── Where they live ────────────────────────────────────────────────────────────────────────
 
-    /// <summary>Looks for habitat once the map's static geometry has arrived, and again if it changes.</summary>
+    /// <summary>Looks for habitat once the map's static geometry has arrived, and again if it changes.
+    ///
+    /// Keyed on the scenery alone. It used to be keyed on how many entities there were, and on the city
+    /// that number changes every few seconds as people and cars come into and out of range: the whole
+    /// survey ran again, 16 rays over every roof on the game thread (150 ms, 850 ms the first time),
+    /// found the same birds, and threw away the ones already calling.</summary>
     private void Survey(WorldSnapshot world)
     {
-        int count = world.Entities.Count;
-        if (count == _foundFrom) return;
-        _foundFrom = count;
+        long scenery = ScenerySignature(world);
+        if (scenery == _foundFrom) return;
+        _foundFrom = scenery;
+        SurveysRun++;
         _perched.Clear();
         foreach (var e in world.Entities.Values)
         {
+            if (!IsScenery(e)) continue;
             var def = e.Definition;
-            if (def == null || def.Collider.Shape != ColliderShape.Box || e.Velocity != Vector3.Zero) continue;
             var size = def.Collider.Size;
             if (size.X <= 0f || size.Y <= 0f || size.Z <= 0f) continue;
             float hash = Hash(e.Id);
@@ -133,6 +142,25 @@ public sealed class BirdLife
             else if (hash > 0.85f) _perched.Add(Settle(BirdSpecies.Crow, e, size, onTop: true));
         }
         Serilog.Log.Information("Birds: {Census}", string.Join(", ", CensusText()));
+    }
+
+    /// <summary>A fixed box a bird could live on: not a vehicle, a person or anything else that moves.</summary>
+    private static bool IsScenery(EntitySnapshot e)
+    {
+        var def = e.Definition;
+        return def != null && def.Type == EntityType.StaticObject && !def.Moves && e.Velocity == Vector3.Zero
+            && def.Collider.Shape == ColliderShape.Box;
+    }
+
+    /// <summary>Which scenery is loaded, as one number: the count and the ids together, so a map swapped
+    /// for another of the same size still counts as a change. A sum, so the order entities are held in
+    /// does not matter.</summary>
+    internal static long ScenerySignature(WorldSnapshot world)
+    {
+        long count = 0, ids = 0;
+        foreach (var e in world.Entities.Values)
+            if (IsScenery(e)) { count++; ids = unchecked(ids + (long)Hash(e.Id).GetHashCode() * 2654435761L + e.Id); }
+        return unchecked(count * 1_000_003L ^ ids);
     }
 
     private IEnumerable<string> CensusText()

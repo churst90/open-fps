@@ -8,18 +8,20 @@ Updated 2026-09-27.
 In this order.
 
 ### 1. Acoustics before moving on
-- Blocked sources jump between two bearings. A siren 150-300 m away behind buildings turned more
-  than 30 degrees between updates 68 times in 11 minutes (log of 2026-09-27 05:02) while the
-  listener stood still. The bearing alternates between the diffracting edge (exact) and Steam
-  Audio's pathing probes, which are 23.4 m apart on the city map.
+- Blocked sources jump between bearings. A siren 150-300 m away behind buildings turned more than
+  30 degrees between updates 68 times in 11 minutes (2026-09-27) while the listener stood still. The
+  bearing comes from one edge of one building (the one with the longest detour), or from Steam
+  Audio's pathing probes 23.4 m apart when that edge is not in the clear, and it switches between
+  them. Real sound arrives round several edges at once: blend the routes by the energy each carries
+  and turn the bearing no faster than the geometry moves.
 - Reverb per surface: in the default traced mode every room's tail is traced by Steam Audio from
   the material of each surface, so it is already per surface. Not yet checked: the traced decay of
   the tunnel and the garage against real figures for spaces like them, and the three-band
   absorption of each material in the registry. The enclosure estimate (tunnel and garage too long,
   no area weighting) only applies under `/reverb room`.
 - Sounds played from recordings (speech, footsteps, one-off world sounds) have no ground
-  reflection of their own. Only synthesised voices (engines, machines, sirens) carry one.
-- Birds stalled audio placement for up to 882 ms (29 stall warnings in the same log).
+  reflection of their own. Only synthesised voices (engines, machines, sirens) carry one. Agreed
+  2026-09-27: give them the same one, from each sound's own height, distance and ground.
 - Listen in the game to the traced reverb without the open ground (`/reverb traced`). The lab passes;
   `/reverb room` was confirmed by ear.
 

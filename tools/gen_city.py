@@ -1444,7 +1444,10 @@ def _solid_boxes():
             continue
         with open(path) as f:
             p = json.load(f)
-        solid[p["Id"]] = bool(p.get("IsSolid", False))
+        # The server's rule (PrefabRepository): a prefab with a collider is solid unless it says it is
+        # not. Reading a missing IsSolid as false put the Main Street walks through the tunnel's
+        # concrete sides, where a player outside heard them walking inside the wall.
+        solid[p["Id"]] = "ColliderSize" in p and bool(p.get("IsSolid", True))
     out = []
     for e in entities:
         pid = e.get("PrefabId")

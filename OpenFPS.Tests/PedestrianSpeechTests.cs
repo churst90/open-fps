@@ -284,4 +284,43 @@ public class PedestrianSpeechTests
         return dir != null ? Path.Combine(dir.FullName, "OpenFPS.Client", "ASSETS", "SOUNDS")
                            : "/home/cody/external-rescue/Github/open-fps/OpenFPS.Client/ASSETS/SOUNDS";
     }
+
+    /// <summary>
+    /// No pedestrian walks through anything solid. The map generator once read a prefab with no IsSolid
+    /// as not solid, where the server reads it as solid, and routed the Main Street walks through the
+    /// tunnel's concrete sides: a player outside the tunnel heard people walking inside the wall.
+    /// Checked at knee and chest height, against the server's own entities.
+    /// </summary>
+    [Fact]
+    public void NoPedestrianWalksThroughAnythingSolid()
+    {
+        var prefabs = new OpenFPS.Server.Repositories.PrefabRepository(Path.Combine(AppContext.BaseDirectory, "prefabs"));
+        var maps = new OpenFPS.Server.Core.MapManager(new OpenFPS.Server.Repositories.MapRepository(Path.Combine(AppContext.BaseDirectory, "maps")), prefabs);
+        maps.Initialize();
+        Assert.True(maps.TryGetMap("city", out World world, out _, out _, out _));
+        Assert.True(maps.TryGetMapData("city", out var data));
+        var solids = OpenFPS.Server.Core.EntityDefinitionFactory.StaticDefinitions(world)
+            .Where(d => d.Collider.IsSolid && d.Collider.Shape == ColliderShape.Box && !d.Moves)
+            .ToList();
+
+        var walks = data.Vehicles!.Where(v => v.Preset == "walker").ToList();
+        Assert.True(walks.Count > 200);
+        var through = new List<string>();
+        foreach (var w in walks)
+        {
+            float length = Vector3.Distance(w.RoadStart, w.RoadEnd);
+            for (float d = 0f; d <= length; d += 0.5f)
+            {
+                var at = Vector3.Lerp(w.RoadStart, w.RoadEnd, length > 0f ? d / length : 0f);
+                foreach (float h in new[] { 0.5f, 1.3f })
+                {
+                    var p = new Vector3(at.X, h, at.Z);
+                    var hit = solids.FirstOrDefault(s => GeometryUtils.IsPointInOBB(p, s.Transform.Position, s.Collider.Size, s.Transform.Rotation));
+                    if (hit != null) { through.Add($"{w.Name} at ({p.X:F1}, {p.Z:F1}) inside {hit.Identity.Name} {hit.Material.Material}"); goto nextWalk; }
+                }
+            }
+            nextWalk:;
+        }
+        Assert.True(through.Count == 0, string.Join("\n", through.Take(10)));
+    }
 }

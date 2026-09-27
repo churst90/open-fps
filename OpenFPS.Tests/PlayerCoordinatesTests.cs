@@ -27,4 +27,11 @@ public class PlayerCoordinatesTests
         Assert.Equal(at.Y, back.Y, 1);
         Assert.Equal(at.Z, back.Z, 1);
     }
+
+    [Fact]
+    public void AHairBelowZeroIsSpokenAsZero()
+    {
+        Assert.Equal("0.0, -12.0, 0.0", PlayerCoordinates.Format(new Vector3(-0.0001f, -0.02f, -12f)));
+        Assert.Equal("-0.1, 0.0, 0.0", PlayerCoordinates.Format(new Vector3(-0.06f, 0f, 0f)));
+    }
 }

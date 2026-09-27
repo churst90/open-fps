@@ -2,6 +2,19 @@
 
 Recent work, newest first. `git log` has the rest.
 
+## 2026-09-27
+
+- Pedestrians no longer walk inside walls. The map generator read a prefab with no `IsSolid` as not
+  solid, where the server reads it as solid, so the Main Street walks ran through the tunnel's
+  concrete sides and a Wharf Avenue walk through a concrete wall. From outside the tunnel you heard
+  people walking inside the wall. The generator now uses the server's rule; 304 walks instead of 310.
+  A test checks every walk against the server's solid entities.
+- The birds no longer freeze the sound for up to a second. They looked for their homes again every
+  time a pedestrian or car came into or out of range: 16 rays over every roof on the city, up to
+  850 ms at once and about 150 ms every 10-30 s, and the flocks were reset each time. They now look
+  again only when the scenery changes.
+- C no longer says "-0.0". Walking due south moves x by a hair below zero.
+
 ## 2026-09-26
 
 ### People in the street talk
