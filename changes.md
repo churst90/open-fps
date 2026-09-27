@@ -4,6 +4,18 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-09-27
 
+- Short recorded impacts hear the ground: a shot, a door, a knock get the surface's answer from
+  their mirror image below it, through an HRTF of their own, worked out from the sound's height, the
+  listener's and the surface between them. Sounds made at the ground (footsteps) get none: the
+  recording has it. Speech was given it too and flanged, summed into the voice's direction and
+  again from below (heard 2026-09-27), so voices have none until the missing part is found (see
+  todo). `--ground-voice` in the lab renders a line all three ways.
+- Pedestrian voices have less low end where they had too much. Each voice's spectrum below 500 Hz is
+  compared with a real talker's at the same pitch (Byrne et al. 1994) and the excess cut: tim by up
+  to 11 dB below 100 Hz, linda by up to 8 dB below 160 Hz; the shouting drivers and the lighter
+  voices are unchanged. `OpenFPS.Common/Speech/voicing.csv` records what each voice was given.
+- Every line is matched by loudness (ITU-R BS.1770) instead of RMS. The voices were up to 2.6 dB
+  apart to the ear; now they are level, at the same average as before.
 - Pedestrians no longer walk inside walls. The map generator read a prefab with no `IsSolid` as not
   solid, where the server reads it as solid, so the Main Street walks ran through the tunnel's
   concrete sides and a Wharf Avenue walk through a concrete wall. From outside the tunnel you heard

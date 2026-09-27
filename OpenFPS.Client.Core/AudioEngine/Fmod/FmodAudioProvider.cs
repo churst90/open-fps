@@ -558,6 +558,8 @@ public class FmodAudioProvider : IAudioProvider
 
         // Steam Audio per-voice binaural effect (null when SA disabled / falling back to FMOD pan).
         public SteamAudioVoiceState? SaState;
+        /// <summary>The surface a recorded sound's ground reflection comes off, or null for none.</summary>
+        public float? GroundHeight;
         public FMOD.DSP SaDsp;
         /// <summary>This voice's traced echoes, while it is one of the few (UpdateTracedEchoes).</summary>
         public TracedEchoRig? EchoRig;
@@ -1045,6 +1047,13 @@ public class FmodAudioProvider : IAudioProvider
         catch (Exception ex) { Log.Warning(ex, "Steam Audio init failed; DEGRADED to FMOD panning — no HRTF binaural."); }
     }
 
+    /// <summary>The mixer's rate, which is the rate the binaural stage's input runs at.</summary>
+    private float SaGroundRate()
+    {
+        _system.getSoftwareFormat(out int rate, out _, out _);
+        return rate > 0 ? rate : 48000f;
+    }
+
     /// <summary>Allocates one pooled voice (effect + Phonon buffers + DSP). Called only at init.</summary>
     private bool CreatePooledVoice(out SaVoice voice)
     {
@@ -1056,20 +1065,43 @@ public class FmodAudioProvider : IAudioProvider
         var s = new SteamAudioVoiceState
         {
             Context = _saContext, Hrtf = _saHrtf, Effect = effect, FrameSize = _saFrameSize,
-            MonoScratch = new float[_saFrameSize], StereoScratch = new float[_saFrameSize * 2]
+            MonoScratch = new float[_saFrameSize], StereoScratch = new float[_saFrameSize * 2],
+            Ground = new OpenFPS.Client.AudioEngine.Acoustics.GroundReflection(SaGroundRate())
         };
         Phonon.iplAudioBufferAllocate(_saContext, 1, _saFrameSize, ref s.InBuf);
         Phonon.iplAudioBufferAllocate(_saContext, 2, _saFrameSize, ref s.OutBuf);
+        // The ground's own HRTF. Without it the stage still plays, with no ground.
+        if (Phonon.iplBinauralEffectCreate(_saContext, ref au, ref es, out IntPtr groundEffect) == Phonon.IPL_STATUS_SUCCESS)
+        {
+            s.GroundEffect = groundEffect;
+            Phonon.iplAudioBufferAllocate(_saContext, 1, _saFrameSize, ref s.GroundInBuf);
+            Phonon.iplAudioBufferAllocate(_saContext, 2, _saFrameSize, ref s.GroundOutBuf);
+            s.GroundMono = new float[_saFrameSize];
+            s.GroundStereo = new float[_saFrameSize * 2];
+        }
 
         if (SteamAudioDsp.CreateDSP(_system, s, out var dsp, out var handle) != RESULT.OK)
         {
             Phonon.iplAudioBufferFree(_saContext, ref s.InBuf);
             Phonon.iplAudioBufferFree(_saContext, ref s.OutBuf);
             Phonon.iplBinauralEffectRelease(ref effect);
+            FreeGroundPath(s);
             return false;
         }
         voice = new SaVoice { State = s, Dsp = dsp, Handle = handle };
         return true;
+    }
+
+    private static bool HasGround(in SpatialEmitter e) => e.GroundLowGain > 0f || e.GroundHighGain > 0f;
+
+    private void FreeGroundPath(SteamAudioVoiceState s)
+    {
+        if (s.GroundEffect == IntPtr.Zero) return;
+        Phonon.iplAudioBufferFree(_saContext, ref s.GroundInBuf);
+        Phonon.iplAudioBufferFree(_saContext, ref s.GroundOutBuf);
+        IntPtr g = s.GroundEffect;
+        Phonon.iplBinauralEffectRelease(ref g);
+        s.GroundEffect = IntPtr.Zero;
     }
 
     /// <summary>Borrows a voice from the pool (no allocation). Returns false when the pool is empty —
@@ -1089,6 +1121,9 @@ public class FmodAudioProvider : IAudioProvider
         // the previous sound produces an audible click/pop on the first frame. The DSP is detached from any
         // channel at this point (ReleaseSteamAudioVoice removed it), so resetting here is safe.
         Phonon.iplBinauralEffectReset(v.State.Effect);
+        if (v.State.GroundEffect != IntPtr.Zero) Phonon.iplBinauralEffectReset(v.State.GroundEffect);
+        v.State.Ground?.Reset();
+        v.State.GroundDirX = 0f; v.State.GroundDirY = -1f; v.State.GroundDirZ = 0f;
         v.State.DirX = 0f; v.State.DirY = 0f; v.State.DirZ = -1f;
         v.State.LastRms = v.State.LastRmsL = v.State.LastRmsR = 0f;
         v.State.ProducedAudio = false;
@@ -2814,6 +2849,11 @@ public class FmodAudioProvider : IAudioProvider
                 ReflectionSpread = emitter.ReflectionSpread,
                 SaState = saState, SaDsp = saDsp, SaHandle = saHandle
             };
+            if (engineState == null && tapState == null && machineState == null && !emitter.IsReflection)
+            {
+                saState?.Ground?.Set(emitter.GroundDelaySeconds, emitter.GroundLowGain, emitter.GroundHighGain);
+                activeSound.GroundHeight = HasGround(emitter) ? emitter.GroundHeight : null;
+            }
 
             if (_acousticMap != null && !activeSound.IsReflection) // Reflections should not feed back into reverb
             {
@@ -2976,6 +3016,13 @@ public class FmodAudioProvider : IAudioProvider
                 // The ground between it and the listener, for every live physical voice.
                 var ground = active.EngineState?.Ground ?? active.TapState?.Ground ?? active.MachineState?.Ground;
                 ground?.Set(emitter.GroundDelaySeconds, emitter.GroundLowGain, emitter.GroundHighGain);
+                // A recorded sound's, in its binaural stage. Never both: a synthesised voice that also
+                // ran through one would be answered by the ground twice.
+                if (ground == null && !active.IsReflection)
+                {
+                    active.SaState?.Ground?.Set(emitter.GroundDelaySeconds, emitter.GroundLowGain, emitter.GroundHighGain);
+                    active.GroundHeight = HasGround(emitter) ? emitter.GroundHeight : null;
+                }
                 active.MinDistance = emitter.MinDistance;
                 // Same again, and this one ran EVERY FRAME for EVERY voice — which is where the
                 // 113,228 came from. A voice with a binaural stage is 2D by design; see the note at
@@ -3703,6 +3750,20 @@ public class FmodAudioProvider : IAudioProvider
                 active.SaState.DirX = local.X / len;
                 active.SaState.DirY = local.Y / len;
                 active.SaState.DirZ = -local.Z / len;
+            }
+            // The ground's image: the placed source mirrored in the surface it bounces off.
+            if (active.GroundHeight is float gh)
+            {
+                var at = active.CurrentApparentPosition;
+                var image = new Vector3(at.X, 2f * gh - at.Y, at.Z);
+                Vector3 gl = Vector3.Transform(image - lPosVec, Quaternion.Conjugate(_listenerRot));
+                float glen = gl.Length();
+                if (glen > 1e-4f)
+                {
+                    active.SaState.GroundDirX = gl.X / glen;
+                    active.SaState.GroundDirY = gl.Y / glen;
+                    active.SaState.GroundDirZ = -gl.Z / glen;
+                }
             }
 
             if (_audioDebug && !active.IsReflection && _dbgFrame % 60 == 0)
@@ -4821,6 +4882,7 @@ public class FmodAudioProvider : IAudioProvider
                 Phonon.iplAudioBufferFree(_saContext, ref v.State.OutBuf);
                 IntPtr eff = v.State.Effect;
                 Phonon.iplBinauralEffectRelease(ref eff);
+                FreeGroundPath(v.State);
             }
             _saAllVoices.Clear();
             _saPool.Clear();

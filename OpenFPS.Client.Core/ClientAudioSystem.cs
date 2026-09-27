@@ -377,6 +377,7 @@ public class ClientAudioSystem
         // takes exactly the path a recorded one would.
         WorldAudio = new WorldAudioPlayer(_audio, _acoustics);
         WorldAudio.HornReceived = StartHorn;
+        WorldAudio.Ground = ApplyRecordedGround;
         _birds = new BirdLife(audio, _acoustics);
         WorldAudio.Received = message => _birds.Heard(message, OpenFPS.Common.AudioClock.Now);
         _acousticWorker = new AsyncAcousticWorker(_acoustics);
@@ -2754,7 +2755,24 @@ public class ClientAudioSystem
     /// shelter roof) is what the sound bounces off, and anything higher would be in the way of the
     /// direct sound, not under it. The surface's own absorption decides how much comes back.
     /// </summary>
-    private void ApplyGround(ref SpatialEmitter e, WorldSnapshot? world)
+    private void ApplyGround(ref SpatialEmitter e, WorldSnapshot? world) => ApplyGround(ref e, world, true, 0f);
+
+    /// <summary>
+    /// The same for a recorded sound, which WorldAudioPlayer plays under a fresh voice id each time, so
+    /// it asks once and keeps nothing.
+    ///
+    /// A recording made at the ground already has the ground in it. A footstep, a dropped can, a door
+    /// scraping — the microphone heard the bounce as part of the sound, a fraction of a millisecond
+    /// behind it, so adding it again would lift the whole thing six decibels. So a recorded sound
+    /// within <see cref="RecordedGroundMinHeight"/> of the surface under it gets none of its own.
+    /// </summary>
+    internal void ApplyRecordedGround(ref SpatialEmitter e, WorldSnapshot world)
+        => ApplyGround(ref e, world, false, RecordedGroundMinHeight);
+
+    /// <summary>Below this a recorded sound's own bounce is already in the recording, metres.</summary>
+    internal const float RecordedGroundMinHeight = 0.15f;
+
+    private void ApplyGround(ref SpatialEmitter e, WorldSnapshot? world, bool keep, float minHeight)
     {
         e.GroundDelaySeconds = 0f; e.GroundLowGain = 0f; e.GroundHighGain = 0f;
         if (world == null || _state.IsRiding) return;          // from inside a vehicle there is no road to hear
@@ -2783,12 +2801,13 @@ public class ClientAudioSystem
                     c.Material = _groundMat[0] ?? "Generic";
                 }
             }
-            _groundCache[e.EntityId] = c;
+            if (keep) _groundCache[e.EntityId] = c;
         }
         if (!c.Found) return;
         float gb = c.Height;
         _groundMat[0] = c.Material;
         if (gb > MathF.Min(src.Y, ear.Y)) return;                // nothing to bounce off below both
+        if (src.Y - gb < minHeight) return;                      // the recording has it already
 
         var image = new Vector3(src.X, 2f * gb - src.Y, src.Z);
         float direct = MathF.Max(0.1f, Vector3.Distance(src, ear));
@@ -2806,6 +2825,7 @@ public class ClientAudioSystem
         float rho = 1f / (0.5f * (1f / MathF.Max(0.02f, src.Y - gb) + 1f / MathF.Max(0.02f, ear.Y - gb)));
         low *= Coherence(250f, direct, rho);
         high *= Coherence(2500f, direct, rho);
+        e.GroundHeight = gb;
         e.GroundDelaySeconds = (mirrored - direct) / AudioPhysics.SpeedOfSound;
         e.GroundLowGain = low * spread;
         e.GroundHighGain = high * spread;

@@ -9,7 +9,7 @@ the same thing, you hear a copy: the same sound twice, a few milliseconds apart.
 | Part | Rendered by | Notes |
 |---|---|---|
 | Direct sound (level, direction, occlusion, air) | The source's own voice | Every source. |
-| Ground reflection | The source's own voice (engines: `GroundReflection`; shots, claps, doors: the ground wash) | Voices, footsteps, horns and sirens have none: at their distances it merges with the direct sound. |
+| Ground reflection | The source's own voice: `GroundReflection` inside synthesised voices (engines, machines, horns, sirens) and in the binaural stage for recorded sounds (speech, doors, shots) | Not for a recorded sound made within 15 cm of the ground (footsteps, impacts): the recording has it already. Not for echo copies, or sources with a size. The echo system's own ground arrival is under 12 ms and never gets a voice (`ImageSource.MinDelaySeconds`). |
 | Discrete echoes off walls and facades | Per-source: `EngineReflections`, one-off echoes and flutter (`WorldAudioPlayer`), `TracedEchoes` for the loudest engines | Not for speech, which moves while it plays. |
 | Late field (the place's tail) | The traced reverb (`TracedReverb`) | Traced from the listener's head, so it is only valid as a tail. |
 | Near-field walls round the head | Boundary probes | |

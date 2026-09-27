@@ -73,13 +73,26 @@ public sealed class GroundReflection
     /// <summary>Producer side: the tyre share, see <see cref="NearGroundShare"/>.</summary>
     public void SetNear(float share) => NearGroundShare = Math.Clamp(share, 0f, 1f);
 
+    /// <summary>Whether there is any ground to hear, now or still gliding away.</summary>
+    public bool Active => TargetLowGain > 1e-4f || TargetHighGain > 1e-4f || _low > 1e-4f || _high > 1e-4f;
+
+    /// <summary>Forgets the last sound: an empty line, no ground, and the next target taken at once
+    /// rather than glided to. For a pooled stage handed to a new sound, which must not start with the
+    /// previous one's delay or its tail. Only while nothing is processing.</summary>
+    public void Reset()
+    {
+        Array.Clear(_line);
+        _w = 0; _delay = -1f; _low = _high = _lp = 0f;
+        TargetDelaySamples = 0f; TargetLowGain = 0f; TargetHighGain = 0f; NearGroundShare = 0f;
+    }
+
     /// <summary>The direct sample in; the direct sample plus what the ground sends back out.</summary>
     [MethodImpl(MethodImplOptions.AggressiveOptimization)]
     public float Process(float x)
     {
         _line[_w & Mask] = x;
         float td = TargetDelaySamples;
-        if (_delay < 0f) _delay = td;
+        if (_delay < 0f) { _delay = td; _low = TargetLowGain; _high = TargetHighGain; }   // a new sound starts where it is
         _delay += (td - _delay) * _glide;
         _low += (TargetLowGain - _low) * _glide;
         _high += (TargetHighGain - _high) * _glide;

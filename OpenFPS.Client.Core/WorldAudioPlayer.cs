@@ -323,6 +323,7 @@ public sealed class WorldAudioPlayer
                 emitter.CarriesPath = true;
                 Facing(ref emitter, speakerNow.Transform.Rotation, listenerPosition);
             }
+            if (HearsTheGround(item, spoken)) Ground?.Invoke(ref emitter, world);
             _audio.Submit(emitter);
 
             // Somebody talking while they walk carries their voice with them. A two-second line left
@@ -340,6 +341,32 @@ public sealed class WorldAudioPlayer
                 });
         }
     }
+
+    /// <summary>The ground between a sound and the listener, worked out on the game thread (see
+    /// ClientAudioSystem.ApplyRecordedGround).</summary>
+    public delegate void GroundHandler(ref SpatialEmitter e, WorldSnapshot world);
+
+    /// <summary>Sets a recorded sound's ground reflection. Null leaves every sound without one.</summary>
+    public GroundHandler? Ground;
+
+    /// <summary>
+    /// Whether a sound gets a ground reflection of its own. Not an echo copy, which is already a path
+    /// off a surface; and not a source with a size, whose parts are at every height and distance at
+    /// once, so their bounces arrive spread out and add up to no comb at all.
+    ///
+    /// Impulses only, for now: a shot, a door, a knock, whose bounce lands inside the attack and is heard
+    /// as part of it. On anything that lasts it is a comb that stands still.
+    ///
+    /// Not speech. A voice three metres off on asphalt has a bounce 4 ms late at two thirds
+    /// of its pressure, and that is what the physics says (Acta Acustica 2024, doi
+    /// 10.1051/aacus/2024002: below 800 Hz it is stronger still). Rendered, it flanged, summed into
+    /// the voice's direction and again from its own direction below (heard 2026-09-27, both). A real
+    /// talker on a pavement does not sound like that, so something the ear uses is missing: the
+    /// torso's shadow on sound from below, the talker's own vertical radiation, or the small
+    /// movements that keep a comb from standing still. Until one is measured, a voice has none.
+    /// </summary>
+    private static bool HearsTheGround(in Pending item, bool spoken)
+        => !spoken && IsImpulse(item.Sound) && !item.IsReflection && item.Sound.ExtentMetres <= 1f;
 
     /// <summary>Folds which way the speaker faces into the path's band gains.</summary>
     private static void Facing(ref SpatialEmitter e, Quaternion rotation, Vector3 listenerPosition)
@@ -604,9 +631,9 @@ public sealed class WorldAudioPlayer
     /// <summary>
     /// A recorded line at the mixer's rate and at the level the server placed it from.
     ///
-    /// The server sends a level on the basis that the line is at <see cref="Speech.BufferRmsDbfs"/>, so
-    /// it is rescaled to exactly that here: a take that came out quieter or hotter is not a person
-    /// talking quieter or louder. A line that is missing plays nothing and says so once.
+    /// The server sends a level on the basis that every line is equally loud, so each is brought to
+    /// <see cref="Speech.BufferLoudnessLufs"/> here: a take that came out quieter or hotter is not a
+    /// person talking quieter or louder. A line that is missing plays nothing and says so once.
     /// </summary>
     private float[] SpokenLine(string soundId)
     {
@@ -617,12 +644,10 @@ public sealed class WorldAudioPlayer
             return new float[16];
         }
         if (rate != TransientSynth.SampleRate) pcm = Resample(pcm, rate, TransientSynth.SampleRate);
-        double sum = 0;
-        foreach (float v in pcm) sum += v * v;
-        float rms = (float)Math.Sqrt(sum / pcm.Length);
-        if (rms > 1e-6f)
+        double lufs = Speech.LoudnessLufs(pcm);
+        if (lufs > -90.0)
         {
-            float gain = MathF.Pow(10f, Speech.BufferRmsDbfs / 20f) / rms;
+            float gain = (float)Math.Pow(10.0, (Speech.BufferLoudnessLufs - lufs) / 20.0);
             for (int i = 0; i < pcm.Length; i++) pcm[i] = Math.Clamp(pcm[i] * gain, -1f, 1f);
         }
         return pcm;

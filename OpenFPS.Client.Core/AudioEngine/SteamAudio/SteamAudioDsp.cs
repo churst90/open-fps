@@ -32,6 +32,30 @@ internal sealed class SteamAudioVoiceState
     /// signal, and it clicks. Ramping this instead lets a listener cross a threshold silently.</summary>
     public volatile float SpatialBlend = 1f;
 
+    /// <summary>
+    /// The ground between a recorded sound and the listener, folded in before the HRTF. Recorded
+    /// sounds reach the ear only through this stage, and the synthesised voices carry their own
+    /// (EngineVoiceState and the rest), so the provider sets it for recorded sounds only and it stays
+    /// silent for everything else. Null when the stage was built without one.
+    /// </summary>
+    public OpenFPS.Client.AudioEngine.Acoustics.GroundReflection? Ground;
+
+    /// <summary>
+    /// The ground's answer is placed where it comes from: the source's mirror image below the surface,
+    /// through an HRTF of its own. A voice three metres off arrives from nearly level and its bounce
+    /// from forty-odd degrees below, and two arrivals from two directions are heard as a sound and its
+    /// setting; summed into ONE direction they are a comb in both ears at once, which is flanging
+    /// (heard 2026-09-27). The ear's decolouration of a reflection depends on it arriving from
+    /// somewhere else (Salomons 1995, Brueggen 2001).
+    /// </summary>
+    public IntPtr GroundEffect;
+    public Phonon.IPLAudioBuffer GroundInBuf;   // 1 channel, FrameSize
+    public Phonon.IPLAudioBuffer GroundOutBuf;  // 2 channels, FrameSize
+    public float[] GroundMono = Array.Empty<float>();
+    public float[] GroundStereo = Array.Empty<float>();
+    /// <summary>Where the image is, listener-relative, in Steam Audio's frame.</summary>
+    public volatile float GroundDirX, GroundDirY = -1f, GroundDirZ;
+
     // Diagnostics for the headless smoke test.
     public long CallbackCount;
     public volatile bool ProducedAudio;
@@ -142,6 +166,19 @@ internal static class SteamAudioDsp
             }
         }
 
+        // 1b. The ground's answer, on a point source only (a stereo input is a bus, not a place): the
+        // reflected part alone, to be placed at the image below.
+        // The line is fed even while there is no ground, so a ground that comes back does not replay
+        // what it held when it went.
+        var ground = state.Ground;
+        bool grounded = false;
+        if (ground != null && inchannels == 1 && state.GroundEffect != IntPtr.Zero)
+        {
+            float[] mono = state.MonoScratch, g = state.GroundMono;
+            for (int i = 0; i < n; i++) g[i] = ground.Process(mono[i]) - mono[i];
+            grounded = ground.Active;
+        }
+
         // 2. mono -> IPL input buffer
         Phonon.iplAudioBufferDeinterleave(state.Context, state.MonoScratch, ref state.InBuf);
 
@@ -163,6 +200,24 @@ internal static class SteamAudioDsp
 
         // 4. IPL stereo (deinterleaved) -> interleaved scratch
         Phonon.iplAudioBufferInterleave(state.Context, ref state.OutBuf, state.StereoScratch);
+
+        // 4b. The ground's answer from below, added to the placed sound.
+        if (grounded)
+        {
+            Phonon.iplAudioBufferDeinterleave(state.Context, state.GroundMono, ref state.GroundInBuf);
+            var gp = new Phonon.IPLBinauralEffectParams
+            {
+                direction = new Phonon.IPLVector3 { x = state.GroundDirX, y = state.GroundDirY, z = state.GroundDirZ },
+                interpolation = Phonon.IPL_HRTFINTERPOLATION_BILINEAR,
+                spatialBlend = 1f,
+                hrtf = state.Hrtf,
+                peakDelays = IntPtr.Zero
+            };
+            Phonon.iplBinauralEffectApply(state.GroundEffect, ref gp, ref state.GroundInBuf, ref state.GroundOutBuf);
+            Phonon.iplAudioBufferInterleave(state.Context, ref state.GroundOutBuf, state.GroundStereo);
+            float[] st = state.StereoScratch, gs = state.GroundStereo;
+            for (int i = 0; i < n * 2; i++) st[i] += gs[i];
+        }
 
         // 5. Write to FMOD's (interleaved) output buffer — the placed signal blended with the input.
         float blend = Math.Clamp(state.SpatialBlend, 0f, 1f);

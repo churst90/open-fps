@@ -19,13 +19,28 @@ In this order.
   the tunnel and the garage against real figures for spaces like them, and the three-band
   absorption of each material in the registry. The enclosure estimate (tunnel and garage too long,
   no area weighting) only applies under `/reverb room`.
-- Sounds played from recordings (speech, footsteps, one-off world sounds) have no ground
-  reflection of their own. Only synthesised voices (engines, machines, sirens) carry one. Agreed
-  2026-09-27: give them the same one, from each sound's own height, distance and ground.
+- A voice's ground reflection flanges, both summed into its direction and from its own direction
+  below (heard 2026-09-27, `--ground-voice`), though the physics says it is strong (Acta Acustica
+  2024, doi 10.1051/aacus/2024002). Voices have none until the missing part is found: whether the
+  HRTF has a torso shadowing sound from below, the talker's vertical radiation (the full paper), or
+  head and body movement. Get the paper's numbers first.
+- Listen: pedestrian voices with their new low end and loudness, and the ground's answer on shots
+  and doors (built 2026-09-27).
 - Listen in the game to the traced reverb without the open ground (`/reverb traced`). The lab passes;
   `/reverb room` was confirmed by ear.
 
-### 2. Mutation testing
+### 2. Bodies, wheels and roads
+Plan: [docs/NEXT_BODIES_WHEELS_ROADS.md](docs/NEXT_BODIES_WHEELS_ROADS.md) (agreed 2026-09-27).
+- Roads as data: lanes, junctions, crossings, surfaces; traffic follows lanes, keeps a gap, and
+  gives way by gap acceptance.
+- A physical body for everything: traffic cars from their panels, people as soft solid bodies,
+  moving bodies in the acoustic scene.
+- Per-wheel physics from the preset: load transfer, slip, wheel speed from the tyre size.
+- A tyre source at each wheel, reading the surface under it.
+- Traffic lights and accessible pedestrian signals.
+- No physical value hard-coded in a model or map; presets move to JSON.
+
+### 3. Mutation testing
 Results so far are in [docs/MUTATION_2026-09-24.md](docs/MUTATION_2026-09-24.md).
 - Shared maths (`Loudness`, `Enclosure`, `ImageSource`, `EarlyReflections`, `TyreFriction`,
   `Honk`): 74.6%, survivors killed or recorded as equivalent.
@@ -36,8 +51,10 @@ Results so far are in [docs/MUTATION_2026-09-24.md](docs/MUTATION_2026-09-24.md)
   2026-09-25 12:17 on a copy of that day's tree. Map its survivors onto the current code.
 - For every surviving mutant: write the test that kills it, or record why it is equivalent.
 - Each test process leaves an `openfps-test-config-<pid>` folder in /tmp. Remove it on exit.
+- `BirdLifeTests.AHedgeOfSparrowsChattersAndABangShutsItUp` fails now and then: BirdLife's random
+  generator is unseeded, so a minute of chirps can fall outside the test's range. Seed it in tests.
 
-### 3. Cleansing pass, the rest
+### 4. Cleansing pass, the rest
 - `ChatManager` sender-prefix leftovers.
 - Lab spikes nothing uses.
 - The 18 `OPENFPS_*` switches: keep the ones still needed, remove the rest.
@@ -49,7 +66,7 @@ Results so far are in [docs/MUTATION_2026-09-24.md](docs/MUTATION_2026-09-24.md)
 - `ClientWorldState.Clear` still takes grid bounds it no longer uses.
 - The unused `users.json` files (the server uses `openfps.db`).
 
-### 4. Tests for the untested audio code
+### 5. Tests for the untested audio code
 From [docs/COVERAGE_2026-09-24.md](docs/COVERAGE_2026-09-24.md):
 - `ClientAudioSystem`: which vehicles get a live voice and the level each is placed at (9% covered),
   through the fake audio provider.
@@ -59,7 +76,7 @@ From [docs/COVERAGE_2026-09-24.md](docs/COVERAGE_2026-09-24.md):
 - One test per DSP callback processor.
 - `AsyncAcousticWorker` paths that do not need Steam Audio.
 
-### 5. Vehicle consistency audit
+### 6. Vehicle consistency audit
 Every vehicle configured the same way, so its loudness is predictable.
 - One table for every preset: declared level, live level at 7.5 m pass-by and at idle, engine bay
   leakage, extent, level lift, air system, horn. Fix outliers in the configuration, not with trims.
@@ -75,7 +92,7 @@ Every vehicle configured the same way, so its loudness is predictable.
   every idle, so the model's reversion flow is too large); fix that and the lope comes back from
   the physics.
 
-### 6. Gunfire
+### 7. Gunfire
 As realistic as possible.
 - Source: close dry recordings of each weapon (`inbox/weapons`).
 - After the muzzle: distance loss and air absorption, forward directivity of the blast, the ground
@@ -86,7 +103,7 @@ As realistic as possible.
 - Also: a shotgun, an impact sound per material, casings that land and bounce where they fall,
   and a proper fire message in the protocol.
 
-### 7. Documentation
+### 8. Documentation
 - readme, todo and changes: rewritten 2026-09-24, brought up to date 2026-09-27.
 - User manual, one document in two parts (Playing; Running a server): `docs/MANUAL.md`.
 

@@ -182,6 +182,9 @@ public struct SpatialEmitter
     /// <summary>The ground between this source and the listener (see GroundReflection): the extra
     /// path in seconds, and the pressure it hands back below and above a kilohertz, spreading
     /// included. All zero: no ground reflection.</summary>
+    /// <summary>The height of the surface the ground reflection bounces off, world metres: where its
+    /// image is. Meaningful only when the ground gains are above zero.</summary>
+    public float GroundHeight;
     public float GroundDelaySeconds;
     public float GroundLowGain;
     public float GroundHighGain;

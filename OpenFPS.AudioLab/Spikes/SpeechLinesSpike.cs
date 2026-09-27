@@ -6,7 +6,7 @@ using OpenFPS.Common;
 
 /// <summary>--speech-lines: decodes every shipped voice line through the same FMOD path the client
 /// uses (GranularBank.TryDecode, on a NOSOUND system) and reports what came back: how many decoded,
-/// the rate, the length against the catalogue, and the peak once rescaled to Speech.BufferRmsDbfs. A line
+/// the rate, the length against the catalogue, and the peak once brought to Speech.BufferLoudnessLufs. A line
 /// that fails here is a person who says nothing in the game.</summary>
 public static class SpeechLinesSpike
 {
@@ -38,12 +38,13 @@ public static class SpeechLinesSpike
             rmsLo = ok == 1 ? rms : Math.Min(rmsLo, rms);
             rmsHi = Math.Max(rmsHi, rms);
             double peak = 20 * Math.Log10(pcm.Max(v => Math.Abs((double)v)) + 1e-12);
-            worstPeak = Math.Max(worstPeak, peak - rms + Speech.BufferRmsDbfs);
+            double lufs = rate == 48000 && ch == 1 ? Speech.LoudnessLufs(pcm) : rms;
+            worstPeak = Math.Max(worstPeak, peak - lufs + Speech.BufferLoudnessLufs);
         }
         Console.WriteLine($"{Speech.Voices.Count} voices, {Speech.Takes.Count} lines: {ok} decoded, {failed} failed, "
                         + $"{wrongRate} not mono 48 kHz");
         Console.WriteLine($"length off the catalogue by at most {worstLength * 1000:F0} ms");
-        Console.WriteLine($"RMS {rmsLo:F1} to {rmsHi:F1} dBFS as recorded; the client rescales every line to {Speech.BufferRmsDbfs}");
+        Console.WriteLine($"RMS {rmsLo:F1} to {rmsHi:F1} dBFS as recorded; the client brings every line to {Speech.BufferLoudnessLufs} LUFS");
         Console.WriteLine($"peak after rescaling at most {worstPeak:F1} dBFS (must stay under 0)");
         sys.release();
         return failed == 0 ? 0 : 1;
