@@ -15,7 +15,7 @@ using OpenFPS.Common.Networking;
 namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 
 /// <summary>
-/// --siren-route [map=city] [track=downtown_cw] [preset=police_interceptor] [lane=1.8]
+/// --siren-route [map=city] [track=downtown] [preset=police_interceptor] [lane=1.8]
 ///               [at=x,z] [from=metres] [sec=60] [every=10]
 ///
 /// The path a car's sound takes to a fixed listener, frame by frame, as the car drives its real racing
@@ -32,7 +32,7 @@ public static class SirenRouteSpike
         AcousticRegistry.Initialize();
         MachineRegistry.EnsureLoaded();
         string mapId = Str(args, "map") ?? "city";
-        string trackId = Str(args, "track") ?? "downtown_cw";
+        string trackId = Str(args, "track") ?? "downtown";
         string preset = Str(args, "preset") ?? "police_interceptor";
         float lane = Num(args, "lane", 1.8f);
         float seconds = Num(args, "sec", 60f);
@@ -141,6 +141,13 @@ public static class SirenRouteSpike
             id++;
         }
         RaceLine? line = null;
+        if (trackId == "downtown")
+        {
+            // The square as traffic drives it now: through its four corner junctions, by the lanes.
+            var net = RoadNetwork.FromMapJson(root);
+            var tour = net == null ? null : LaneRoutes.Via(net, RoadNetwork.DowntownCorners.Select(id => net.Junctions.First(j => j.Id == id)).ToList());
+            if (tour != null) line = new RaceLine(tour.Points, 0f, 62f / 3.6f, 0.6f, 2.92f);
+        }
         foreach (var t in root.GetProperty("Tracks").EnumerateArray())
         {
             if (!string.Equals(t.GetProperty("Id").GetString(), trackId, StringComparison.OrdinalIgnoreCase)) continue;

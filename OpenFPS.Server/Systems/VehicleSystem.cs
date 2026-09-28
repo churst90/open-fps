@@ -57,6 +57,15 @@ public sealed partial class VehicleSystem
 
         // Racing. Null for a shuttling vehicle.
         public RaceLine? Line;
+        /// <summary>The tour of lanes it drives, for a vehicle on a map's roads; null on a track.</summary>
+        public LaneRoute? Route;
+        /// <summary>The route's metres per metre of <see cref="Line"/>, which smoothing makes a little shorter.</summary>
+        public float RouteScale = 1f;
+        /// <summary>The junction it is standing at, giving way, and for how long.</summary>
+        public string? WaitingAt;
+        public float WaitedSeconds;
+        /// <summary>Waiting at a junction's line for somebody, this tick.</summary>
+        public bool Holding;
         /// <summary>The track and lane it laps, which together say who is in front of it.</summary>
         public string TrackId = "";
         public float LaneOffset;
@@ -136,6 +145,7 @@ public sealed partial class VehicleSystem
         _maps = maps;
         foreach (var entry in maps.GetAllMaps())
         {
+            int routeIndex = 0;
             string mapId = entry.Key;
             var data = entry.Value.data;
             if (data.Vehicles == null) continue;
@@ -198,6 +208,7 @@ public sealed partial class VehicleSystem
 
                 // A vehicle that names a track laps it; one that does not shuttles its road.
                 RaceLine? line = null;
+                LaneRoute? route = null;
                 float accel = vd.AccelerationMps2 > 0 ? vd.AccelerationMps2 : 3.2f;
                 float brake = vd.BrakingMps2 > 0 ? vd.BrakingMps2 : 5.5f;
                 if (!string.IsNullOrEmpty(vd.Track))
@@ -220,6 +231,14 @@ public sealed partial class VehicleSystem
                         Log.Warning("Map {Map}: track '{Track}' could not be turned into a racing line: {Error}", mapId, vd.Track, ex.Message);
                         continue;
                     }
+                }
+                else if (vd.Route != null)
+                {
+                    route = BuildRoute(maps, mapId, vd, routeIndex++);
+                    if (route == null) continue;
+                    float topSpeed = (vd.TopSpeedKmh > 0 ? vd.TopSpeedKmh : 200f) / 3.6f;
+                    float grip = vd.CorneringG > 0 ? vd.CorneringG : 1.0f;
+                    line = new RaceLine(route.Points, 0f, topSpeed, grip, brake, 0f, LaneLimits(route));
                 }
 
                 // No track and no road: a shuttle from a point to the same point, whose direction is
@@ -245,7 +264,7 @@ public sealed partial class VehicleSystem
                 // the same shell a parked car has, and a person waiting at the stop gets on when it
                 // stops. Everything else about it is the traffic it always was.
                 Entity e = Entity.Null;
-                if (shells != null && profile != null && line != null && TakesPassengers(data, vd)
+                if (shells != null && profile != null && line != null && TakesPassengers(data, vd, route, line)
                     && maps.TryGetMap(mapId, out var shellWorld, out _, out _, out _))
                 {
                     e = shells.InstantiateForTraffic(mapId, vd.Preset, start, Quaternion.CreateFromYawPitchRoll(heading, 0f, 0f));
@@ -355,6 +374,16 @@ public sealed partial class VehicleSystem
                     v.Speed = v0;
                     v.Current = State.Driving;
                 }
+                if (route != null && line != null)
+                {
+                    v.Route = route;
+                    v.RouteScale = route.Length / line.Length;
+                    v.Stops = RouteStops(route, line, data, vd.Preset);
+                    for (int si = 0; si < v.Stops.Length; si++)
+                        if (v.Stops[si].At >= v.Lap) { v.NextStop = si; break; }
+                    Log.Information("Map {Map}: {Name} drives {Legs} lanes of the roads, {Length:F0} m round, stopping at {Stops} place(s).",
+                                    mapId, display, route.Legs.Count, line.Length, v.Stops.Length);
+                }
                 v.Preset = vd.Preset;
                 v.TrackId = vd.Track ?? "";
                 v.LaneOffset = vd.LaneOffsetMetres;
@@ -375,8 +404,10 @@ public sealed partial class VehicleSystem
     }
 
     /// <summary>Whether a vehicle stops at a bus stop on its route, which is what taking passengers is.</summary>
-    private static bool TakesPassengers(MapData data, VehicleData vd)
+    private static bool TakesPassengers(MapData data, VehicleData vd, LaneRoute? route, RaceLine? line)
     {
+        if (route != null && line != null)
+            return RouteStops(route, line, data, vd.Preset).Any(sp => string.Equals(sp.Kind, "bus_stop", StringComparison.OrdinalIgnoreCase));
         var track = data.Tracks?.Find(tr => string.Equals(tr.Id, vd.Track, StringComparison.OrdinalIgnoreCase));
         return track?.Stops != null && track.Stops.Any(sp =>
             string.Equals(sp.Kind, "bus_stop", StringComparison.OrdinalIgnoreCase)
@@ -612,6 +643,23 @@ public sealed partial class VehicleSystem
             if (gone < 0f) gone += line.Length;
             v.KerbShift = po.Spot.Shift * Math.Clamp(1f - gone / 18f, 0f, 1f);
             if (gone > 18f) { v.KerbShift = 0f; v.Park = null; }
+        }
+
+        // ── A junction ─────────────────────────────────────────────────────────────────────────
+        //
+        // Arriving to look if it gives way, and standing at the line if something it must give way
+        // to is too close, or something it would hit is already in the junction. See Junctions.
+        var (toHold, look) = JunctionHold(v, dt);
+        if (look < float.MaxValue && toHold == float.MaxValue)
+        {
+            var (_, along) = WhereOnLane(v);
+            float toLine = v.Route!.Legs[WhereOnLane(v).Leg].Segment.LengthMetres - along;
+            want = MathF.Min(want, MathF.Sqrt(look * look + 2f * v.Brake * MathF.Max(0f, toLine)));
+        }
+        if (toHold < float.MaxValue)
+        {
+            want = MathF.Min(want, MathF.Sqrt(2f * v.Brake * toHold));
+            if (toHold <= 0.3f && CanHalt(v.Speed, v.Brake, dt)) { v.Speed = 0f; vel.Linear = Vector3.Zero; return; }
         }
 
         float toStop = DistanceToNextStop(v, line);

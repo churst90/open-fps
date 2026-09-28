@@ -194,7 +194,7 @@ public static class SirenSpike
 
 
     /// <summary>
-    /// The siren as the MAP drives it — `--siren drive [map=city] [track=downtown_cw] [sec=]`.
+    /// The siren as the MAP drives it — `--siren drive [map=city] [track=downtown] [sec=]`.
     ///
     /// The gap this closes is the one that let a fault through: the bench renders a head held in
     /// one mode and it sounded right, while on the map the same head was being switched between
@@ -207,7 +207,7 @@ public static class SirenSpike
     /// </summary>
     private static int Drive(string[] args, float seconds)
     {
-        string trackId = Str(args, "track") ?? "downtown_cw";
+        string trackId = Str(args, "track") ?? "downtown";
         var line = CityLine(Str(args, "map") ?? "city", trackId);
         if (line == null) { Console.WriteLine($"  FAIL: no track '{trackId}' on that map."); return 1; }
 
@@ -267,6 +267,13 @@ public static class SirenSpike
         }
         if (path == null) return null;
         using var doc = System.Text.Json.JsonDocument.Parse(File.ReadAllText(path));
+        if (trackId == "downtown")
+        {
+            // The square as traffic drives it now: through its four corner junctions, by the lanes.
+            var net = RoadNetwork.FromMapJson(doc.RootElement);
+            var tour = net == null ? null : LaneRoutes.Via(net, RoadNetwork.DowntownCorners.Select(id => net.Junctions.First(j => j.Id == id)).ToList());
+            return tour == null ? null : new RaceLine(tour.Points, 0f, 62f / 3.6f, 0.85f, 2.92f);
+        }
         if (!doc.RootElement.TryGetProperty("Tracks", out var tracks)) return null;
         foreach (var t in tracks.EnumerateArray())
         {

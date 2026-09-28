@@ -19,7 +19,7 @@ namespace OpenFPS.Server.Systems;
 /// Only on a map with street life. On the speedway the cars are racing; queueing behind a slower car
 /// would turn every race into a procession.
 /// </summary>
-public partial class VehicleSystem
+public sealed partial class VehicleSystem
 {
     /// <summary>Who laps which lane of which track, in order round it. Rebuilt every tick.</summary>
     private readonly Dictionary<(string Map, string Track, int Lane), List<DemoVehicle>> _lanes = new();
@@ -30,12 +30,14 @@ public partial class VehicleSystem
         if (!_streetLife.ContainsKey(mapId)) return;
         foreach (var v in _vehicles)
         {
-            if (v.MapId != mapId || v.Line == null || !InLane(v)) continue;
+            if (v.MapId != mapId || v.Line == null || v.Route != null || !InLane(v)) continue;
             var key = (mapId, v.TrackId, (int)MathF.Round(v.LaneOffset * 2f));
             if (!_lanes.TryGetValue(key, out var list)) _lanes[key] = list = new List<DemoVehicle>();
             list.Add(v);
         }
         foreach (var list in _lanes.Values) list.Sort((a, b) => a.Lap.CompareTo(b.Lap));
+        IndexSegments(mapId);
+        IndexJunctions(mapId);
     }
 
     /// <summary>Whether it occupies its lane: not parked at the kerb.</summary>
@@ -44,6 +46,7 @@ public partial class VehicleSystem
     /// <summary>The vehicle ahead in the same lane, and the gap to its tail, metres.</summary>
     private (DemoVehicle Lead, float Gap)? Ahead(DemoVehicle v)
     {
+        if (v.Route != null) return AheadOnRoute(v);
         if (!_lanes.TryGetValue((v.MapId, v.TrackId, (int)MathF.Round(v.LaneOffset * 2f)), out var list) || list.Count < 2)
             return null;
         int i = list.IndexOf(v);
@@ -63,12 +66,25 @@ public partial class VehicleSystem
         float s = MathF.Max(0.1f, ahead.Gap);
         float sStar = s0 + MathF.Max(0f, wasSpeed * headway + wasSpeed * (wasSpeed - ahead.Lead.Speed) / (2f * MathF.Sqrt(a * b)));
         float accel = a * (1f - (sStar / s) * (sStar / s));
-        // Never harder than the tyres give: past that, the IDM's number is not a thing a car can do.
-        accel = MathF.Max(accel, -MathF.Max(b, v.Grip * 9.81f));
+        // No harder than a driver stamping on the brakes can: the same share of the tyres a staged
+        // hard stop uses, which leaves them turning (a locked wheel is not a thing a driver chooses).
+        accel = MathF.Max(accel, -MathF.Max(b, HardBrakeGripFraction * v.Grip * 9.81f));
         float allowed = MathF.Max(0f, wasSpeed + accel * dt);
         if (allowed < v.Speed) v.Speed = allowed;
-        // Nose already at the tail: no faster than the vehicle in front.
-        if (ahead.Gap <= 0.5f) v.Speed = MathF.Min(v.Speed, ahead.Lead.Speed);
+    }
+
+    /// <summary>Tests: every vehicle driving a line, where it is in the world and which way it points.</summary>
+    internal IEnumerable<(string Name, string Preset, System.Numerics.Vector3 Position, float Heading, float Length, float Speed,
+                          int Laps, bool OnRoute, string StopKind, bool Dwelling)> DriversForTest(string mapId, Arch.Core.World world)
+    {
+        foreach (var v in _vehicles)
+        {
+            if (v.MapId != mapId || v.Line == null || !InLane(v) || !world.IsAlive(v.Entity)) continue;
+            var t = world.Get<OpenFPS.Common.Components.Transform>(v.Entity);
+            v.Line.Sample(v.Lap, out _, out float heading, out _);
+            string kind = v.Stops.Length > 0 ? v.Stops[v.NextStop].Kind : "";
+            yield return (v.DisplayName, v.Preset, t.Position, heading, v.LengthMetres, v.Speed, v.Laps, v.Route != null, kind, v.DwellLeft > 0f);
+        }
     }
 
     /// <summary>Tests: every lane's vehicles in order, with their positions round it.</summary>

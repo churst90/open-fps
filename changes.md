@@ -4,6 +4,23 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-09-27
 
+- Drivers take turns at junctions. A vehicle already in a junction, or too close to stop before the
+  line, has it: nobody enters on a path that crosses or joins its path. A driver giving way arrives
+  at walking pace to look and goes only if the priority traffic is further off than the Highway
+  Capacity Manual's critical gap (6.2 s turning right, 6.5 straight across, 7.1 turning left, 4.1 for a
+  left turn off the priority road across oncoming traffic), counted from when it reaches the line.
+  A left turn gives way to oncoming traffic; between equals the one on the right goes first; of two
+  side by side, the one further back; and if everyone is waiting for someone, one goes after a few
+  seconds. Waiting drivers stand with the front bumper at the line. The fixed two-second give-way
+  pause is gone. Over ten minutes of city traffic no two vehicles met inside a junction.
+- The city's traffic drives the roads. Each car is a tour of lanes and the turns between them, built
+  from the road network at load: a seeded wander, turning at random at each junction, so no two take
+  the same way and the city is the same every time. The bus has a fixed route that passes both
+  shelters on Main Street the right way and stops at them. Southgate's traffic goes round its square
+  and waits at both level crossings. Vehicles give way where their road does not have priority (the
+  higher class of road, then the longer one), keep to the kerb lane unless another saves distance,
+  keep to each lane's speed limit, and keep a gap to the vehicle in front on the same lane whatever
+  their route. The drawn downtown loops are gone; only the railway keeps a drawn track.
 - Traffic keeps a gap to the vehicle in front, by the Intelligent Driver Model (Treiber, Hennecke and
   Helbing 2000): it eases off to hold a time headway and stops two metres behind a stopped vehicle.
   Before, no vehicle knew another was there, and over three minutes of city traffic 73 pairs drove

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System;
 using System.IO;
 using System.Linq;
@@ -19,7 +20,17 @@ public class CarFollowingTests
     private readonly ITestOutputHelper _o;
     public CarFollowingTests(ITestOutputHelper o) => _o = o;
 
-    private static (World World, VehicleSystem Vehicles) City(bool streetLife)
+    /// <summary>Where the city's junctions are, and how far each reaches.</summary>
+    internal static List<(System.Numerics.Vector3 At, float Radius)> Junctions()
+    {
+        var prefabs = new PrefabRepository(Path.Combine(AppContext.BaseDirectory, "prefabs"));
+        var maps = new MapManager(new MapRepository(Path.Combine(AppContext.BaseDirectory, "maps")), prefabs);
+        maps.Initialize();
+        Assert.True(maps.TryGetRoads("city", out var net));
+        return net.Junctions.Select(j => (j.Position, j.RadiusMetres)).ToList();
+    }
+
+    internal static (World World, VehicleSystem Vehicles) City(bool streetLife)
     {
         var prefabs = new PrefabRepository(Path.Combine(AppContext.BaseDirectory, "prefabs"));
         var maps = new MapManager(new MapRepository(Path.Combine(AppContext.BaseDirectory, "maps")), prefabs);
@@ -33,10 +44,11 @@ public class CarFollowingTests
         return (world, vehicles);
     }
 
-    /// <summary>Pairs in one lane whose bodies overlap, counted once a second over the run.</summary>
-    private int Overlaps(bool streetLife, double seconds, out int samples)
+    /// <summary>Pairs whose bodies overlap in the same lane, counted once a second over the run: nose
+    /// to tail closer than their half-lengths, less than a lane apart sideways, pointing the same way.</summary>
+    internal static int Overlaps(World world, VehicleSystem vehicles, double seconds, out int samples, List<string>? where = null,
+                                 List<(System.Numerics.Vector3 At, float Radius)>? outside = null)
     {
-        var (world, vehicles) = City(streetLife);
         const float dt = 1f / 30f;
         int overlaps = 0;
         samples = 0;
@@ -45,31 +57,74 @@ public class CarFollowingTests
             vehicles.Update("city", world, dt);
             if (tick < 20 * 30 || tick % 30 != 0) continue;
             samples++;
-            foreach (var lane in vehicles.RacersForTest("city").GroupBy(r => (r.Track, MathF.Round(r.Lane * 2f))))
-            {
-                var cars = lane.OrderBy(r => r.Lap).ToList();
-                for (int i = 0; i + 1 < cars.Count; i++)
+            var cars = vehicles.DriversForTest("city", world).ToList();
+            for (int a = 0; a < cars.Count; a++)
+                for (int b = a + 1; b < cars.Count; b++)
                 {
-                    float gap = cars[i + 1].Lap - cars[i].Lap - 0.5f * (cars[i].Length + cars[i + 1].Length);
-                    if (gap < 0f) overlaps++;
+                    var (p, q) = (cars[a], cars[b]);
+                    float turn = MathF.Abs(MathF.IEEERemainder(p.Heading - q.Heading, 2 * MathF.PI));
+                    if (turn > 0.5f) continue;
+                    var fwd = new System.Numerics.Vector3(MathF.Sin(p.Heading), 0f, MathF.Cos(p.Heading));
+                    var d = q.Position - p.Position;
+                    float along = MathF.Abs(System.Numerics.Vector3.Dot(d, fwd));
+                    float side = MathF.Abs(d.X * fwd.Z - d.Z * fwd.X);
+                    // Inside a junction, two cars turning into the same lane is a question of who gives
+                    // way (gap acceptance), not of following: counted by its own test, not this one.
+                    if (outside != null && outside.Any(j => InJunction(p.Position, j) || InJunction(q.Position, j))) continue;
+                    if (side < 1.5f && along < 0.5f * (p.Length + q.Length))
+                    {
+                        overlaps++;
+                        where?.Add($"{p.Name} and {q.Name} at ({p.Position.X:F0}, {p.Position.Z:F0}), {p.Speed:F1} and {q.Speed:F1} m/s");
+                    }
                 }
-                if (cars.Count > 1)
-                {
-                    var (last, first) = (cars[^1], cars[0]);
-                    float wrap = first.Lap + last.LapLength - last.Lap - 0.5f * (first.Length + last.Length);
-                    if (wrap < 0f) overlaps++;
-                }
-            }
         }
         return overlaps;
     }
 
+    /// <summary>Along the lanes, no two vehicles overlap. Junctions are left to gap acceptance.</summary>
     [Fact]
     public void No_vehicle_drives_through_the_one_in_front()
     {
-        int without = Overlaps(streetLife: false, 180, out int n0);
-        int with = Overlaps(streetLife: true, 180, out int n1);
+        var (w0, v0) = City(streetLife: false);
+        int without = Overlaps(w0, v0, 180, out int n0);
+        var (w1, v1) = City(streetLife: true);
+        var where = new List<string>();
+        int with = Overlaps(w1, v1, 180, out int n1, where, Junctions());
+        foreach (var w in where.Take(12)) _o.WriteLine(w);
         _o.WriteLine($"overlapping pairs over {n0} one-second samples: {without} without following, {with} with it");
         Assert.Equal(0, with);
     }
+
+    /// <summary>
+    /// Inside a junction nobody meets anybody: two cars turning into one lane, or crossing each other's
+    /// path. Centres within 2.5 m whichever way they point, counted once a second over three minutes.
+    /// </summary>
+    [Fact]
+    public void No_two_vehicles_meet_inside_a_junction()
+    {
+        var (world, vehicles) = City(streetLife: true);
+        var junctions = Junctions();
+        const float dt = 1f / 30f;
+        var met = new List<string>();
+        for (int tick = 0; tick < 180 * 30; tick++)
+        {
+            vehicles.Update("city", world, dt);
+            if (tick < 20 * 30 || tick % 30 != 0) continue;
+            var cars = vehicles.DriversForTest("city", world).ToList();
+            for (int a = 0; a < cars.Count; a++)
+                for (int b = a + 1; b < cars.Count; b++)
+                {
+                    var (p, q) = (cars[a], cars[b]);
+                    if (!junctions.Any(j => InJunction(p.Position, j) && InJunction(q.Position, j))) continue;
+                    if (System.Numerics.Vector3.Distance(p.Position, q.Position) < 2.5f)
+                        met.Add($"{p.Name} ({p.Position.X:F1},{p.Position.Z:F1}) {p.Speed:F1} m/s hdg {p.Heading * 57.3f:F0} and "
+                              + $"{q.Name} ({q.Position.X:F1},{q.Position.Z:F1}) {q.Speed:F1} m/s hdg {q.Heading * 57.3f:F0}");
+                }
+        }
+        foreach (var m in met.Take(10)) _o.WriteLine(m);
+        Assert.True(met.Count == 0, $"{met.Count} meetings inside junctions");
+    }
+
+    private static bool InJunction(System.Numerics.Vector3 p, (System.Numerics.Vector3 At, float Radius) j)
+        => MathF.Abs(p.X - j.At.X) <= j.Radius + 2f && MathF.Abs(p.Z - j.At.Z) <= j.Radius + 2f;
 }

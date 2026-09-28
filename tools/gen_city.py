@@ -1224,26 +1224,6 @@ TRACKS = [
     # rails were laid along, so the two cannot drift apart.
     {"Id": "rail_loop", "WidthMetres": RAIL_W, "BankingDegrees": 0.0,
      "Waypoints": [v3(p[0], 0.95, p[2]) for p in RAIL]},
-    {"Id": "downtown_cw", "WidthMetres": CARRIAGEWAY, "BankingDegrees": 0.0,
-     "Waypoints": [v3(*p) for p in loop([(-130.0, -130.0), (130.0, -130.0), (130.0, 130.0), (-130.0, 130.0)])]},
-    {"Id": "downtown_ccw", "WidthMetres": CARRIAGEWAY, "BankingDegrees": 0.0,
-     "Waypoints": [v3(*p) for p in loop([(-130.0, 130.0), (130.0, 130.0), (130.0, -130.0), (-130.0, -130.0)])]},
-    {"Id": "north_block", "WidthMetres": CARRIAGEWAY, "BankingDegrees": 0.0,
-     "Waypoints": [v3(*p) for p in loop([(0.0, 130.0), (130.0, 130.0), (130.0, 260.0), (0.0, 260.0)])]},
-    # Round the estate, on the two lanes and the two outer streets — all four of which are roads,
-    # which is what the driveable test is for.
-    {"Id": "estate", "WidthMetres": RES_CARRIAGEWAY, "BankingDegrees": 0.0,
-     "Waypoints": [v3(*p) for p in loop([(RES_LANES[0], RES_STREETS[0]), (RES_LANES[1], RES_STREETS[0]),
-                                         (RES_LANES[1], RES_STREETS[-1]), (RES_LANES[0], RES_STREETS[-1])],
-                                        corner=8.0)]},
-    # Southgate: a square of streets south of downtown that crosses the railway twice, at the two
-    # level crossings. Square corners, points about nine metres apart.
-    {"Id": "southgate", "WidthMetres": CARRIAGEWAY, "BankingDegrees": 0.0,
-     "Waypoints": [v3(x, 0.15, z) for x, z in
-                   [(SG_X0, SG_Z1 - (SG_Z1 - SG_Z0) * k / 16) for k in range(16)]
-                   + [(SG_X0 + (SG_X1 - SG_X0) * k / 14, SG_Z0) for k in range(14)]
-                   + [(SG_X1, SG_Z0 + (SG_Z1 - SG_Z0) * k / 16) for k in range(16)]
-                   + [(SG_X1 - (SG_X1 - SG_X0) * k / 14, SG_Z1) for k in range(14)]]},
 ]
 
 
@@ -1273,23 +1253,21 @@ def metres_to(track, x, z):
 # whose preset contains "bus"); everything stops at a give-way; a train at a platform; a car at a
 # level crossing only while the crossing is closed. Bus stops sit a third of the way along each side
 # of a loop, the give-ways at two of its corners, as fractions of the lap.
-BUS_STOP_DWELL, GIVE_WAY_DWELL = 16.0, 3.5
+BUS_STOP_DWELL = 16.0
 for t in TRACKS:
-    if t["Id"] in ("downtown_cw", "downtown_ccw", "north_block"):
-        lap = lap_metres(t)
-        stops = [(0.0875, "bus_stop"), (0.3375, "bus_stop"), (0.4, "give_way"),
-                 (0.5875, "bus_stop"), (0.8375, "bus_stop"), (0.9, "give_way")]
-        t["Stops"] = [dict({"AtMetres": round(f * lap, 1),
-                            "DwellSeconds": BUS_STOP_DWELL if kind == "bus_stop" else GIVE_WAY_DWELL,
-                            "Kind": kind}, **({"ForPreset": "bus"} if kind == "bus_stop" else {}))
-                      for f, kind in stops]
-    elif t["Id"] == "rail_loop":
+    if t["Id"] == "rail_loop":
         t["Stops"] = [{"AtMetres": 400.0, "DwellSeconds": 26.0, "Kind": "platform"},
                       {"AtMetres": 1200.0, "DwellSeconds": 26.0, "Kind": "platform"}]
-    elif t["Id"] == "southgate":
-        # Twelve metres short of each crossing, which is where a car waits for the barrier.
-        t["Stops"] = [{"AtMetres": round(metres_to(t, cx, RAIL_Z_S) - 12.0, 1), "DwellSeconds": 3.0,
-                       "Kind": "crossing"} for cx in (SG_X0, SG_X1)]
+
+# The road traffic's stops are places on the roads (RoadStops): the bus stops, in the kerb lane
+# beside each shelter. Give-way lines come from the junctions, and a level crossing stops whatever
+# drives over it, both worked out by the server from the roads.
+ROAD_STOPS = [
+    {"Name": "Main Street northbound, by the shelter", "Position": v3(KERB - LANE / 2, 0.05, -60.0),
+     "Kind": "bus_stop", "DwellSeconds": BUS_STOP_DWELL, "ForPreset": "bus"},
+    {"Name": "Main Street southbound, by the shelter", "Position": v3(-(KERB - LANE / 2), 0.05, 86.0),
+     "Kind": "bus_stop", "DwellSeconds": BUS_STOP_DWELL, "ForPreset": "bus"},
+]
 
 # The two level crossings, where Southgate's streets cross the railway's south side.
 CROSSINGS = [
@@ -1366,12 +1344,34 @@ GRIP = {"car": 0.85, "van": 0.75, "truck": 0.70, "bus": 0.70, "bike": 0.90}
 
 
 def car(name, preset, track, top, g, lane, start, accel=2.2, brake=None, grip="car"):
+    """A vehicle on a track, or, with `track` a dict, on the roads by that route (see via, wander)."""
     grip_g = GRIP[grip]
-    return {"Name": name, "Preset": preset, "Track": track,
-            "TopSpeedKmh": top, "CorneringG": g, "GripG": grip_g,
-            "AccelerationMps2": accel_for(grip_g, accel),
-            "BrakingMps2": brake if brake is not None else brake_for(grip_g),
-            "LaneOffsetMetres": lane, "StartOffsetMetres": start}
+    v = {"Name": name, "Preset": preset,
+         "TopSpeedKmh": top, "CorneringG": g, "GripG": grip_g,
+         "AccelerationMps2": accel_for(grip_g, accel),
+         "BrakingMps2": brake if brake is not None else brake_for(grip_g),
+         "StartOffsetMetres": start}
+    if isinstance(track, dict):
+        v["Route"] = track
+    else:
+        v["Track"] = track
+        v["LaneOffsetMetres"] = lane
+    return v
+
+
+def jid(x, z):
+    """A junction's id, as find_junctions names it."""
+    return f"j_{int(x)}_{int(z)}"
+
+
+def via(*points):
+    """A fixed route through junctions, in order, and back to the first."""
+    return {"Via": [jid(x, z) for x, z in points]}
+
+
+def wander(road, direction, seed, metres=900.0):
+    """A seeded random tour from a road, turning at random, and back to where it began."""
+    return {"StartRoad": road, "Direction": direction, "Seed": seed, "WanderMetres": metres}
 
 
 # THE FIELD IS CHOSEN ON MEASURED LEVELS, and the first draft was not.
@@ -1421,27 +1421,38 @@ CITY_CCW = [
     ("Compact",      "i4_compact",           50.0, 0.48, 1.8, "car"),
     ("Motorcycle",   "vtwin_stock",          56.0, 0.60, 3.4, "bike"),
 ]
-for i, (nm, preset, top, g, lane, kind) in enumerate(CITY_CW):
-    VEHICLES.append(car(f"{nm} {i + 1}", preset, "downtown_cw", top, g, lane, i * 96.0, grip=kind))
-for i, (nm, preset, top, g, lane, kind) in enumerate(CITY_CCW):
-    VEHICLES.append(car(f"{nm} {i + 11}", preset, "downtown_ccw", top, g, lane, 40.0 + i * 110.0, grip=kind))
+# Since 2026-09-27 the traffic drives the roads (Roads, Junctions): each car a seeded wander through
+# the lanes from its own starting road, turning at random at the junctions, so no two follow the same
+# way. Starting roads and directions go round the downtown streets in turn.
+DOWNTOWN_STARTS = [("main_street", 1), ("dock_street", 1), ("calder_avenue", 1), ("foundry_street", -1),
+                   ("wharf_avenue", -1), ("north_street", -1), ("central_street", 1), ("main_street", -1)]
+for i, (nm, preset, top, g, lane, kind) in enumerate(CITY_CW + CITY_CCW):
+    road, direction = DOWNTOWN_STARTS[i % len(DOWNTOWN_STARTS)]
+    VEHICLES.append(car(f"{nm} {i + 1}", preset,
+                        wander(road, direction, 1000 + i), top, g, lane, (i // len(DOWNTOWN_STARTS)) * 60.0, grip=kind))
 # ONE bus (Cody, 2026-09-25: "we need only 1 city bus on the map, not a bunch"). It goes round the
 # north block and serves its bus stops, which is what makes it a bus you can get on.
 # A transit bus: the engine in the back (Vehicles.cs TransitBus).
-VEHICLES.append(car("City bus 1", "transit_bus", "north_block", 40.0, 0.28, 2.0, 0.0, accel=1.4, grip="bus"))
-VEHICLES.append(car("Parcel van 1", "step_van", "north_block", 44.0, 0.32, 2.0, 140.0, grip="truck"))
-VEHICLES.append(car("Mail truck 1", "mail_truck", "north_block", 40.0, 0.36, 1.8, 260.0, grip="van"))
-VEHICLES.append(car("Sedan, north block", "i4_midsize", "north_block", 50.0, 0.46, 1.8, 380.0, grip="car"))
+# Its route passes both shelters on Main Street the right way: up Main past the one at z -60 on the
+# east side, round the north block, down Main past the one at z 86 on the west side, and home by
+# Central Street and Wharf Avenue.
+BUS_ROUTE = via((-130.0, -130.0), (0.0, -130.0), (0.0, 130.0), (130.0, 130.0), (130.0, 260.0),
+                (0.0, 260.0), (0.0, 0.0), (-130.0, 0.0))
+VEHICLES.append(car("City bus 1", "transit_bus", BUS_ROUTE, 40.0, 0.28, 2.0, 0.0, accel=1.4, grip="bus"))
+VEHICLES.append(car("Parcel van 1", "step_van", wander("foundry_street", 1, 2001), 44.0, 0.32, 2.0, 0.0, grip="truck"))
+VEHICLES.append(car("Mail truck 1", "mail_truck", wander("north_street", 1, 2002), 40.0, 0.36, 1.8, 0.0, grip="van"))
+VEHICLES.append(car("Sedan, north block", "i4_midsize", wander("calder_avenue", -1, 2003), 50.0, 0.46, 1.8, 0.0, grip="car"))
 # Two more motorcycles, of other kinds than the cruisers (Cody, 2026-09-26: "add a couple motorcycle
 # back on the map"): a litre sports bike here, and a 450 single on the downtown loop, in the gap
 # after its last car (ten cars at 96 m on a 1,040 m loop).
-VEHICLES.append(car("Sports bike", "sportbike", "north_block", 56.0, 0.60, 3.4, 460.0, grip="bike"))
-VEHICLES.append(car("Dirt bike", "single", "downtown_cw", 50.0, 0.60, 3.4, 968.0, grip="bike"))
+VEHICLES.append(car("Sports bike", "sportbike", wander("north_street", -1, 2004), 56.0, 0.60, 3.4, 0.0, grip="bike"))
+VEHICLES.append(car("Dirt bike", "single", wander("dock_street", -1, 2005), 50.0, 0.60, 3.4, 0.0, grip="bike"))
 # The estate: slow, quiet, and the thing you hear over the mowers.
 for i, (nm, preset) in enumerate((("Hatchback", "i4_economy"), ("Sedan", "v6"), ("Compact", "i4_compact"),
                                   ("Mail truck", "mail_truck"), ("Parcel van", "step_van"))):
-    VEHICLES.append(car(f"{nm}, Elm Street", preset, "estate", 30.0, 0.35, 1.2, i * 180.0,
-                        accel=1.6, grip="car"))
+    VEHICLES.append(car(f"{nm}, Elm Street", preset,
+                        wander(["elm_street", "birch_street", "rowan_street", "alder_street", "sycamore_lane"][i], 1, 3000 + i, 600.0),
+                        30.0, 0.35, 1.2, 0.0, accel=1.6, grip="car"))
 
 # ── ...and the ones that shuttle rather than lap ──────────────────────────────────────────────────
 #
@@ -1646,7 +1657,9 @@ VEHICLES.extend(AIR)
 for nm, preset, start in (("van", "step_van", 0.0), ("saloon", "v6", 130.0), ("hatch", "i4_economy", 260.0),
                           ("mid-size", "i4_midsize", 190.0),
                           ("mail truck", "mail_truck", 70.0)):
-    VEHICLES.append(car(f"Southgate {nm}", preset, "southgate", 48.0, 0.48, 1.8, start))
+    VEHICLES.append(car(f"Southgate {nm}", preset,
+                        via((SG_X0, SG_Z1), (SG_X0, SG_Z0), (SG_X1, SG_Z0), (SG_X1, SG_Z1)),
+                        48.0, 0.48, 1.8, start))
 VEHICLES.append(VERGE_MOWER)
 
 # ── Southgate's streets ───────────────────────────────────────────────────────────────────────────
@@ -1661,7 +1674,9 @@ for sg_name, a, b in (("Mill Road", (SG_X0, SG_Z1), (SG_X0, SG_Z0)),
     x0, x1 = sorted((a[0], b[0]))
     z0, z1 = sorted((a[1], b[1]))
     carriageway(x0 - KERB, x1 + KERB, z0 - KERB, z1 + KERB, name=f"{sg_name} carriageway")
-    region(sg_name, x0 - KERB, x1 + KERB, 0.0, 6.0, z0 - KERB, z1 + KERB)
+    # The name stops at Dock Street's pavement: past it, walking along Dock Street was being called
+    # the side road's name (PlaceNameTests).
+    region(sg_name, x0 - KERB, x1 + KERB, 0.0, 6.0, z0 - KERB, min(z1 + KERB, SG_Z1 - WALK))
 # Dock Street's new west end, where it meets Mill Road, named like the rest of it.
 region("Dock Street, west end", SG_X0 - KERB, ST_X0, 0.0, 6.0, STREETS[0] - KERB, STREETS[0] + KERB)
 
@@ -1698,6 +1713,23 @@ def find_junctions(roads):
 
 JUNCTIONS = find_junctions(ROADS)
 
+# Who gives way. At each junction the road of the highest class has priority, and between roads of
+# the same class the longest (Main Street over the cross streets, the avenues over the streets);
+# everything else gives way. A rule rather than a list, so a new junction needs nothing written down.
+ROAD_RANK = {"collector": 3, "residential": 2, "service": 1}
+
+
+def road_length(r):
+    (a, b) = r["Centreline"][0], r["Centreline"][-1]
+    return math.dist((a["X"], a["Z"]), (b["X"], b["Z"]))
+
+
+for j in JUNCTIONS:
+    here = [r for r in ROADS if r["Name"] in j["Name"].split(" and ")]
+    top = max(here, key=lambda r: (ROAD_RANK[r["Type"]], road_length(r)))
+    j["PriorityRoads"] = [top["Id"]]
+    j["GiveWaySeconds"] = 2.0
+
 map_data = {
     "Id": "city",
     "IsDefault": False,
@@ -1732,6 +1764,7 @@ map_data = {
     "Tracks": TRACKS,
     "Roads": ROADS,
     "Junctions": JUNCTIONS,
+    "RoadStops": ROAD_STOPS,
     "StreetLife": STREET_LIFE,
     "Vehicles": VEHICLES,
     "Trains": TRAINS,

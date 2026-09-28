@@ -99,8 +99,11 @@ public sealed class RaceLine
     public float MinSpeed { get; }
     public float MaxSpeed { get; }
 
+    /// <param name="speedCapAt">An upper limit on the speed at a place, m/s: a road's speed limit, which
+    /// changes along a route through a town. Null for none.</param>
     public RaceLine(IReadOnlyList<Vector3> centreline, float lateralOffset, float topSpeed,
-                    float corneringG, float brake, float bankingDegrees = 0f)
+                    float corneringG, float brake, float bankingDegrees = 0f,
+                    Func<Vector3, float>? speedCapAt = null)
     {
         if (centreline == null || centreline.Count < 3)
             throw new ArgumentException("A circuit needs at least three waypoints.", nameof(centreline));
@@ -141,6 +144,7 @@ public sealed class RaceLine
             _corner[i] = float.IsInfinity(radius) ? float.PositiveInfinity
                                                   : CorneringSpeed(radius, corneringG, bankingDegrees);
             _limit[i] = MathF.Min(topSpeed, float.IsInfinity(radius) ? topSpeed : _corner[i]);
+            if (speedCapAt != null) _limit[i] = MathF.Min(_limit[i], MathF.Max(0.5f, speedCapAt(_points[i])));
         }
 
         // Braking, backwards, twice round — the second lap carries the wrap-around back to the start.

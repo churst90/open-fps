@@ -101,6 +101,9 @@ public class MapData
     /// <summary>Where the roads meet. The lanes through each are worked out from the roads.</summary>
     public List<JunctionData>? Junctions { get; set; }
 
+    /// <summary>Places on the roads where vehicles stop. See RoadStopData.</summary>
+    public List<RoadStopData>? RoadStops { get; set; }
+
     /// <summary>
     /// Composites placed on this map — houses, stalls, barricades, anything built out of parts and
     /// saved. Instantiated at load in the order they appear.
@@ -163,6 +166,23 @@ public class StreetLifeData
     /// <summary>The gap left to a stopped vehicle ahead, metres: the IDM's s0. Two metres in the
     /// same source.</summary>
     public float FollowMinGapMetres { get; set; } = 2f;
+
+    /// <summary>
+    /// The smallest gap in priority traffic a driver giving way will take, seconds: the Highway
+    /// Capacity Manual's base critical headways for two-way stop control (HCM 2010, exhibit 19-10).
+    /// A right turn from the minor road 6.2 s, straight across 6.5, a left turn across both streams
+    /// 7.1; a left turn off the major road across oncoming traffic 4.1.
+    /// </summary>
+    public float CriticalGapRightSeconds { get; set; } = 6.2f;
+    public float CriticalGapStraightSeconds { get; set; } = 6.5f;
+    public float CriticalGapLeftSeconds { get; set; } = 7.1f;
+    public float CriticalGapMajorLeftSeconds { get; set; } = 4.1f;
+    /// <summary>How fast a driver giving way arrives at the line to look, km/h. A clear junction is
+    /// taken at this without stopping.</summary>
+    public float GiveWayApproachKmh { get; set; } = 15f;
+    /// <summary>How long drivers at a junction where everyone is giving way to someone wait before one
+    /// of them goes anyway, seconds.</summary>
+    public float GiveWayPatienceSeconds { get; set; } = 6f;
 }
 
 public class TrackData
@@ -327,6 +347,44 @@ public class VehicleData
     /// <summary>The line this car takes, metres to the RIGHT of the centreline (negative is left,
     /// which on an anticlockwise oval is the inside). Clamped to the track width.</summary>
     public float LaneOffsetMetres { get; set; }
+
+    /// <summary>
+    /// A way round the map's roads instead of a Track: the vehicle drives the lanes, turning through
+    /// junctions, round a tour built from the road network at load. See RouteData.
+    /// </summary>
+    public RouteData? Route { get; set; }
+}
+
+/// <summary>
+/// Where a vehicle drives on a map with roads. Either a fixed tour (a bus route): the junctions in
+/// order, by id, and back to the first. Or a wander: from a road, turning at random at each junction,
+/// seeded so the map is the same every time it loads.
+/// </summary>
+public class RouteData
+{
+    /// <summary>Junction ids in order. Empty for a wander.</summary>
+    public List<string> Via { get; set; } = new();
+    /// <summary>A wander starts on this road (its id), going the way its centreline runs if
+    /// <see cref="Direction"/> is +1.</summary>
+    public string? StartRoad { get; set; }
+    public int Direction { get; set; } = 1;
+    public int Seed { get; set; }
+    /// <summary>How far a wander goes before it heads back to where it began, metres.</summary>
+    public float WanderMetres { get; set; } = 900f;
+}
+
+/// <summary>
+/// A place on a road where vehicles stop: a bus stop, a stop line. Declared as a point; every vehicle
+/// whose way passes within a lane's width of it, and whose preset matches, stops there.
+/// </summary>
+public class RoadStopData
+{
+    public string? Name { get; set; }
+    public Vector3 Position { get; set; }
+    /// <summary>As TrackStopData.Kind: "bus_stop", "give_way", "stop".</summary>
+    public string Kind { get; set; } = "bus_stop";
+    public float DwellSeconds { get; set; } = 16f;
+    public string? ForPreset { get; set; }
 }
 public class MapRepository
 {

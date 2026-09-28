@@ -178,8 +178,7 @@ public class SirenTests
     [Fact]
     public void ASirenDoesNotChangeItsMindEveryCorner()
     {
-        var line = CityLine("downtown_cw");
-        if (line == null) { _o.WriteLine("no city map here; skipped"); return; }
+        var line = new RaceLine(RouteTrafficTests.DowntownTour(), 0f, 62f / 3.6f, 0.85f, 2.92f);
 
         var siren = new SirenController(seed: 9);
         const float dt = 1f / 30f;                 // the rate the audio system sees positions at
@@ -271,26 +270,5 @@ public class SirenTests
         foreach (float v in x) { double g0 = v + cw * g1 - g2; g2 = g1; g1 = g0; }
         double mag = Math.Sqrt(g1 * g1 + g2 * g2 - cw * g1 * g2) * 2.0 / n;
         return mag * mag / 2.0 * n;
-    }
-
-    private static RaceLine? CityLine(string id)
-    {
-        // The maps are copied next to the test assembly, which is where every other test that
-        // needs one looks. Walking up from the working directory finds nothing: the tests run out
-        // of an artifacts path on tmpfs, nowhere near the repo.
-        string path = Path.Combine(AppContext.BaseDirectory, "maps", "city.json");
-        if (!File.Exists(path)) return null;
-        using var doc = JsonDocument.Parse(File.ReadAllText(path));
-        if (!doc.RootElement.TryGetProperty("Tracks", out var tracks)) return null;
-        foreach (var t in tracks.EnumerateArray())
-        {
-            if (!string.Equals(t.GetProperty("Id").GetString(), id, StringComparison.OrdinalIgnoreCase)) continue;
-            var wp = new List<Vector3>();
-            foreach (var w in t.GetProperty("Waypoints").EnumerateArray())
-                wp.Add(new Vector3(w.GetProperty("X").GetSingle(), w.GetProperty("Y").GetSingle(), w.GetProperty("Z").GetSingle()));
-            float bank = t.TryGetProperty("BankingDegrees", out var b) ? b.GetSingle() : 0f;
-            return wp.Count >= 3 ? new RaceLine(wp, 0f, 62f / 3.6f, 0.85f, 2.92f, bank) : null;
-        }
-        return null;
     }
 }

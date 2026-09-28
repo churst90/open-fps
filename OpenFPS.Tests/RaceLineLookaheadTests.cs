@@ -2,7 +2,6 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Numerics;
-using System.Text.Json;
 using OpenFPS.Common;
 using Xunit;
 
@@ -14,33 +13,28 @@ namespace OpenFPS.Tests;
 /// </summary>
 public class RaceLineLookaheadTests
 {
+    /// <summary>Twin-turbo Cummins 6, as the map declares it, round the downtown square as the roads
+    /// lay it out (RouteTrafficTests.DowntownTour).</summary>
     private static RaceLine DowntownPickupLine()
-    {
-        string dir = AppContext.BaseDirectory;
-        var d = new DirectoryInfo(dir);
-        while (d != null && !File.Exists(Path.Combine(d.FullName, "OpenFPS.Server", "maps", "city.json"))) d = d.Parent;
-        string path = d != null ? Path.Combine(d.FullName, "OpenFPS.Server", "maps", "city.json")
-                                : "/home/cody/external-rescue/Github/open-fps/OpenFPS.Server/maps/city.json";
-        using var doc = JsonDocument.Parse(File.ReadAllText(path));
-        var track = doc.RootElement.GetProperty("Tracks").EnumerateArray()
-                       .First(t => t.GetProperty("Id").GetString() == "downtown_cw");
-        var pts = track.GetProperty("Waypoints").EnumerateArray()
-                       .Select(p => new Vector3(p.GetProperty("X").GetSingle(), p.GetProperty("Y").GetSingle(), p.GetProperty("Z").GetSingle()))
-                       .ToList();
-        // Twin-turbo Cummins 6, as the map declares it.
-        return new RaceLine(pts, 1.8f, 52f / 3.6f, 0.42f, 2.58f);
-    }
+        => new RaceLine(RouteTrafficTests.DowntownTour(), 0f, 52f / 3.6f, 0.42f, 2.58f);
 
     [Fact]
     public void The_slowest_point_between_the_car_and_its_lookahead_is_seen()
     {
         var line = DowntownPickupLine();
-        // Mid-corner: the tightest point (about 9.0 m/s at 522 m) lies between the car at 513 m and
-        // its lookahead 17.5 m on, where the limit is already rising again.
-        line.Sample(513f + 17.5f, out _, out _, out float farEnd);
-        float slowest = line.SlowestWithin(513f, 17.5f);
-        Assert.True(farEnd > 9.5f, $"far end {farEnd:F2}");
-        Assert.True(slowest < 9.05f, $"slowest {slowest:F2}");
+        // The tightest point on the loop, found rather than remembered, and a car nine metres short of
+        // it looking 17.5 m on: the far end of its look is past the corner, where the limit is rising.
+        float tightest = 0f, lowest = float.MaxValue;
+        for (float d = 0f; d < line.Length; d += 0.5f)
+        {
+            line.Sample(d, out _, out _, out float lim);
+            if (lim < lowest) { lowest = lim; tightest = d; }
+        }
+        float car = tightest - 9f;
+        line.Sample(car + 17.5f, out _, out _, out float farEnd);
+        float slowest = line.SlowestWithin(car, 17.5f);
+        Assert.True(farEnd > lowest + 0.3f, $"far end {farEnd:F2} against {lowest:F2}");
+        Assert.True(slowest < lowest + 0.05f, $"slowest {slowest:F2} against {lowest:F2}");
     }
 
     [Fact]

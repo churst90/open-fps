@@ -387,10 +387,21 @@ Change the generator, not `city.json`: a hand edit is undone the next time the c
   and material settings.
 - `Vehicles`, `Trains`, `Tracks` (routes with waypoints, width, banking and stops), `Crossings`.
 - `Roads` (centreline, type, lanes with direction, width and speed limit, surface stretches) and
-  `Junctions` (where roads meet: a point, a radius and a control). The server works out the lanes
-  between junctions and which turns each can take, and logs any problem at load.
-- `StreetLife`: how often drivers honk, brake hard, park, and the gap they keep to the vehicle in
-  front (`FollowHeadwaySeconds`, `FollowMinGapMetres`).
+  `Junctions` (where roads meet: a point, a radius, a control, the `PriorityRoads` whose traffic
+  does not give way, and `GiveWaySeconds`). The server works out the lanes between junctions and
+  which turns each can take, and logs any problem at load.
+- `RoadStops`: places on the roads where vehicles stop (a bus stop: `Position`, `Kind`,
+  `DwellSeconds`, `ForPreset`). Every vehicle whose way passes one, and whose preset matches, stops.
+- A vehicle drives the roads with a `Route` instead of a `Track`: `Via` (junction ids in order, back to
+  the first: a bus route), or a wander (`StartRoad`, `Direction`, `Seed`, `WanderMetres`: turns chosen
+  at random, the same every time the map loads). It gives way where its road does not have priority,
+  stops at the road stops it passes and at level crossings on its way, and keeps a gap to the vehicle
+  in front on the same lane.
+- `StreetLife`: how often drivers honk, brake hard, park, the gap they keep to the vehicle in front
+  (`FollowHeadwaySeconds`, `FollowMinGapMetres`), and how they give way at junctions: the critical
+  gaps (`CriticalGapRightSeconds`, `CriticalGapStraightSeconds`, `CriticalGapLeftSeconds`,
+  `CriticalGapMajorLeftSeconds`), the speed they arrive at a give-way line (`GiveWayApproachKmh`) and
+  how long they wait before going anyway when everyone is waiting (`GiveWayPatienceSeconds`).
 - `StreetLife`: how often, on average, a horn sounds (`HornEverySeconds`), a car brakes hard
   (`HardBrakeEverySeconds`) and a car parks (`ParkEverySeconds`). 0 turns one off.
 - `Composites`: saved groups of objects.

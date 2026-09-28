@@ -62,6 +62,15 @@ public class JunctionData
     public float RadiusMetres { get; set; } = 8f;
     /// <summary>"give_way", "stop", "signal" or "none".</summary>
     public string Control { get; set; } = "give_way";
+    /// <summary>The roads (ids) whose traffic has priority here. Everything else gives way. Empty:
+    /// every approach gives way.</summary>
+    public List<string> PriorityRoads { get; set; } = new();
+    /// <summary>How long a vehicle waits at the line when it gives way, seconds.</summary>
+    public float GiveWaySeconds { get; set; } = 2f;
+
+    /// <summary>Whether traffic arriving along this road has to give way.</summary>
+    public bool GivesWay(RoadData road)
+        => Control is "give_way" or "stop" && !PriorityRoads.Contains(road.Id);
 }
 
 /// <summary>Which way a connection through a junction turns.</summary>
@@ -110,6 +119,20 @@ public sealed class RoadNetwork
     }
 
     public int DeadEnds => _segments.Count(s => s.Next.Count == 0);
+
+    /// <summary>The network a map file's Roads and Junctions describe, read straight from its JSON (for
+    /// tools that do not load a server). Null if it has none.</summary>
+    public static RoadNetwork? FromMapJson(System.Text.Json.JsonElement root)
+    {
+        var o = new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true, IncludeFields = true };
+        if (!root.TryGetProperty("Roads", out var r)) return null;
+        var roads = System.Text.Json.JsonSerializer.Deserialize<List<RoadData>>(r, o);
+        var junctions = root.TryGetProperty("Junctions", out var j) ? System.Text.Json.JsonSerializer.Deserialize<List<JunctionData>>(j, o) : null;
+        return roads is { Count: > 0 } ? new RoadNetwork(roads, junctions) : null;
+    }
+
+    /// <summary>The downtown square of the city, as traffic drives it, for tools and tests.</summary>
+    public static readonly string[] DowntownCorners = { "j_-130_-130", "j_-130_130", "j_130_130", "j_130_-130" };
 
     // ── Building ────────────────────────────────────────────────────────────────────────────
 
@@ -167,8 +190,15 @@ public sealed class RoadNetwork
         }
     }
 
-    /// <summary>At each junction, every lane that arrives can go into every lane that leaves on
-    /// another road, or straight on along its own; not back the way it came.</summary>
+    /// <summary>
+    /// At each junction, every lane that arrives can go into every lane that leaves on another road, or
+    /// straight on along its own; not back the way it came.
+    ///
+    /// No lane rules (right turns from the kerb lane, left from the inner one) until vehicles can change
+    /// lanes along a block: without that, a car in the kerb lane could never reach the inner lane it
+    /// needed for a left turn, and tours ran into dead ends (tried 2026-09-27). Two cars side by side
+    /// on one approach are kept apart at the junction instead: the one further back gives way.
+    /// </summary>
     private void Connect()
     {
         foreach (var j in Junctions)
@@ -184,6 +214,21 @@ public sealed class RoadNetwork
             }
         }
     }
+
+    /// <summary>The lane nearest the kerb for its direction of travel.</summary>
+    public static bool IsKerbLane(LaneSegment s) => LanePlace(s) == 0;
+
+    /// <summary>The lane nearest the middle of the road for its direction of travel.</summary>
+    public static bool IsInnermostLane(LaneSegment s) => LanePlace(s) == LaneCount(s) - 1;
+
+    /// <summary>0 for the kerb lane, counting inward.</summary>
+    private static int LanePlace(LaneSegment s)
+    {
+        float mine = MathF.Abs(s.Lane.OffsetMetres);
+        return s.Road.Lanes.Count(l => l.Direction == s.Lane.Direction && MathF.Abs(l.OffsetMetres) > mine + 0.01f);
+    }
+
+    private static int LaneCount(LaneSegment s) => s.Road.Lanes.Count(l => l.Direction == s.Lane.Direction);
 
     private void Check()
     {

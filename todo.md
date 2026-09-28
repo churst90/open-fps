@@ -45,11 +45,19 @@ Plan: [docs/NEXT_BODIES_WHEELS_ROADS.md](docs/NEXT_BODIES_WHEELS_ROADS.md) (agre
 - Traffic lights and accessible pedestrian signals.
 - No physical value hard-coded in a model or map; presets move to JSON.
 
-- Bump sounds when you walk into something. Demo in `~/openfps-listen/bumps` (a shoe toe and a
-  shoulder striking each surface's own plate modes, `--bumps` in the lab), waiting for a listen.
-  The absolute level is not right yet (82-105 dB at 1 m): a panel fixed at its edges radiates far
-  less than its moving face suggests. Anchor it to the footstep takes, or add radiation efficiency,
-  before it goes in the game.
+- Bump sounds when you walk into something (`--bumps` in the lab). Heard 2026-09-27: every one is
+  the same woofy, hollow thunk; a car door sounds like a bath tub, brick and concrete too. Two things
+  missing from the model: (1) radiation efficiency, since a panel below its critical frequency
+  hardly radiates its low modes, which is the boom; (2) a hard contact (hand, knuckle, ring) of about
+  a millisecond, which is what makes a knock on a car door or window a distinct transient. Then
+  anchor the level to the footstep takes. Demo again before it goes in the game.
+- Beacons as earcons: a family of bell-like chimes built on chords or intervals (root and fourth,
+  major chords), pleasant and unmistakably not a world sound; a different one for doors, vehicles,
+  items on the ground and general beacons; placed at the object. Render a set to choose from first.
+- Doors need work. References: `inbox/doors-2026-09-24`, "door open then close.mp3", "Door Latch
+  Sound Effect.mp3". Model the mechanism: latch bolt riding the strike and dropping in, hinge
+  stick-slip creak, the leaf swinging, the leaf striking the frame; recordings are the spec, as for
+  gunfire.
 
 ### 3. Mutation testing
 Results so far are in [docs/MUTATION_2026-09-24.md](docs/MUTATION_2026-09-24.md).

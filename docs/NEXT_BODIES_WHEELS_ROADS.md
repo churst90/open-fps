@@ -60,8 +60,12 @@ machine), so a new vehicle or person is a file, not code.
 
 Progress: the network as data is built (2026-09-27): `OpenFPS.Common/Roads.cs`, written by
 `gen_city.py`, loaded and checked by `MapManager`, tested by `RoadNetworkTests`. Car following is in
-(`VehicleSystem.Following.cs`, `CarFollowingTests`). Next: traffic on lanes, then gap acceptance, then
-pedestrians crossing.
+(`VehicleSystem.Following.cs`, `CarFollowingTests`). Traffic drives the lanes (`LaneRoutes.cs`,
+`VehicleSystem.Routes.cs`, `RouteTrafficTests`): seeded wanders and fixed routes, give-way lines from
+junction priority, road stops, level crossings, following by lane. Gap acceptance at junctions is in
+(`VehicleSystem.Junctions.cs`, `CarFollowingTests.No_two_vehicles_meet_inside_a_junction`). Lane rules
+(right turns from the kerb lane, left from the inner one) wait for lane changes along a block: without
+them tours ran into dead ends. Next: pedestrians crossing.
 
 A road network the server knows: roads, lanes, junctions, crossings and surfaces.
 
