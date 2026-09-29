@@ -372,13 +372,8 @@ public sealed class ClientGameSession : IDisposable
     /// </summary>
     internal static string ReverbCommand(string[] args)
     {
-        if (args.Length > 0)
-        {
-            string a = args[0].ToLowerInvariant();
-            if (a is "traced" or "trace" or "on") OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.TracedOutdoors = true;
-            else if (a is "room" or "off") OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.TracedOutdoors = false;
-            else return "Reverb: say /reverb traced or /reverb room.";
-        }
+        // The room algorithm is gone (2026-09-29); the tail is traced everywhere. Plain /reverb reports.
+        if (args.Length > 0) return "Reverb: traced everywhere now; there is no room mode. /reflections sets the level.";
         return OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.TracedReverbStatus(null);
     }
 
@@ -1232,22 +1227,23 @@ public sealed class ClientGameSession : IDisposable
                 else if (a is "off") OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.TracedEchoesOn = false;
                 else if (a != null && float.TryParse(a, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float db))
                 {
-                    // /echoes -12: on, twelve decibels under the traced level.
-                    OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.TracedEchoTrimDb = Math.Clamp(db, -40f, 0f);
+                    // /echoes -12: on, and the one reflections trim set — the echoes have no level of their own.
+                    OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.ReflectionsDb = Math.Clamp(db, -40f, 6f);
                     OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.TracedEchoesOn = true;
                 }
-                else if (a != null) { Say("Echoes: say /echoes on, /echoes off, or a level such as /echoes -12."); return; }
+                else if (a != null) { Say("Echoes: say /echoes on or /echoes off; /reflections sets the level."); return; }
                 Say(OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.TracedEchoesStatus());
                 return;
             }
-            // The room you are in against the sounds in it: /room -6. Rooms only.
-            if (parts[0].Equals("room", StringComparison.OrdinalIgnoreCase))
+            // Every reflected sound against the direct: /reflections -24. Everywhere. (Not /room: that is
+            // the server's "do the walls round you make a room", and for a day this shadowed it.)
+            if (parts[0].Equals("reflections", StringComparison.OrdinalIgnoreCase))
             {
                 var a = parts.Skip(1).FirstOrDefault();
                 if (a != null && float.TryParse(a, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float db))
-                    OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.RoomTrimDb = Math.Clamp(db, -40f, 6f);
-                else if (a != null) { Say("Room: say a level in decibels, such as /room -6. Zero is the traced level."); return; }
-                Say($"Room: {OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.RoomTrimDb:F0} dB against the traced level, on the placed reflections and the tail of the room you are in. Outdoors is unchanged.");
+                    OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.ReflectionsDb = Math.Clamp(db, -40f, 6f);
+                else if (a != null) { Say("Reflections: say a level in decibels, such as /reflections -24. Zero is the traced level."); return; }
+                Say($"Reflections: {OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.ReflectionsDb:F0} dB against the direct sound, on every placed reflection, every traced tail and the traced echoes, indoors and out.");
                 return;
             }
             if (parts[0].Equals("valveflow", StringComparison.OrdinalIgnoreCase))

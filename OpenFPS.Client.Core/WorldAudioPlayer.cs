@@ -268,10 +268,9 @@ public sealed class WorldAudioPlayer
             bool spoken = Speech.TryParseKey(item.Sound.SynthKey, out _);
             if (!item.IsReflection && !spoken)
             {
-                _enclosedNow = ListenerEnclosed(world, listenerPosition);
+                QueueEarlyEchoes(item, world, listenerPosition);
                 QueueReflections(item, reflections, listenerPosition, now);
                 QueueHigherOrderEchoes(item, world, listenerPosition);
-                QueueRoomEchoes(item, world, listenerPosition);
             }
 
             var path = _acoustics.CalculateAcousticPath(world, item.SourceEntityId,
@@ -371,9 +370,7 @@ public sealed class WorldAudioPlayer
                 // So in traced mode an outdoor impulse goes to it; in room mode it still does not.
                 // An echo is already the street answering; sent to the tail as well, it would be
                 // counted twice.
-                EnableReverb = !item.IsReflection
-                               && (!(IsImpulse(item.Sound) && !ListenerEnclosed(world, listenerPosition))
-                                   || OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.TracedActive),
+                EnableReverb = !item.IsReflection,
                 // An EVENT: it belongs to a moment. If the budget has no room for it now there is no
                 // playing it later — see VoiceManager.Process, which drops one that did not win a slot
                 // rather than keeping it queued to fire from a stale position minutes afterwards.
@@ -568,8 +565,6 @@ public sealed class WorldAudioPlayer
     /// AsyncAcousticWorker.AddEarlyReflections), and in a room the copies of copies are the dense
     /// tail, which the reverb already is. First order stays with QueueReflections.
     /// </summary>
-    private bool _enclosedNow;
-
     /// <summary>A short impact — a shot, a slam, a clap — rather than a sustained sound.</summary>
     private static bool IsImpulse(in TransientSound s) => s.Character == SoundCharacter.Knock && s.DecaySeconds <= 1f;
 
@@ -596,12 +591,14 @@ public sealed class WorldAudioPlayer
         foreach (var a in _higher)
         {
             if (a.Order < 2 || !EarlyReflections.IsSeparateEvent(a)) continue;
+            if (a.ExtraDelaySeconds <= RoomEchoWindowSeconds) continue;   // placed by QueueEarlyEchoes
             // Loud enough against the sound it is a copy of to be heard as a second event at all.
             if (a.GainMid < ImageSource.EchoAudibleRatio) continue;
             // Placed at the image, which is the path length away: undo the spreading the engine will
             // apply there, as QueueReflections does, so it is not applied twice.
             float gain = Math.Clamp(a.GainMid * a.PathLength / direct, 0f, 1f);
             if (gain < ImageSource.MinGain) continue;
+            gain *= OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.ReflectionsTrim;   // /reflections
             var echo = item.Sound;
             echo.Position = a.ImagePosition;
             echo.LevelDb = item.Sound.LevelDb + 20f * MathF.Log10(gain);
@@ -650,9 +647,8 @@ public sealed class WorldAudioPlayer
 
     private readonly List<EarlyReflections.Arrival> _room = new();
 
-    private void QueueRoomEchoes(in Pending item, WorldSnapshot world, Vector3 listenerPosition)
+    private void QueueEarlyEchoes(in Pending item, WorldSnapshot world, Vector3 listenerPosition)
     {
-        if (!OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.TracedActive || !_enclosedNow) return;
         var solids = _acoustics.ReflectionSolids(world);
         if (solids.Count == 0) return;
         Vector3 src = item.Sound.Position;
@@ -672,7 +668,7 @@ public sealed class WorldAudioPlayer
             if (a.Order == 1 && a.HitPoint.Y < MathF.Min(src.Y, listenerPosition.Y) - 0.2f) continue;
             float gain = Math.Clamp(a.GainMid * a.PathLength / direct, 0f, 1f);
             if (gain < ImageSource.MinGain) continue;
-            gain *= OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.RoomTrim;   // the room's trim, /room
+            gain *= OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.ReflectionsTrim;   // /reflections
             var echo = item.Sound;
             echo.Position = a.ImagePosition;
             echo.LevelDb = item.Sound.LevelDb + 20f * MathF.Log10(gain);
@@ -701,9 +697,6 @@ public sealed class WorldAudioPlayer
                                   Vector3 listenerPosition, double now)
     {
         if (reflections == null || reflections.SurfaceCount == 0) return;
-        // Traced, indoors: the room's traced response carries these; outdoors a short sound's own
-        // echoes stay, because a shot up the street is not where you stand.
-        if (OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.TracedActive && _enclosedNow) return;
 
         Span<Reflection> found = stackalloc Reflection[MaxEchoes];
         // Sampled across a scattering face as well as mirrored through it.
@@ -719,11 +712,15 @@ public sealed class WorldAudioPlayer
         for (int i = 0; i < n; i++)
         {
             var r = found[i];
+            // Inside the window the surface is already placed by QueueEarlyEchoes; this is the facade
+            // up the street, a separate event.
+            if (r.DelaySeconds <= RoomEchoWindowSeconds) continue;
             // Loud enough, against the sound it is a copy of, to be heard as a second event at all.
             if (r.Gain < ImageSource.EchoAudibleRatio) continue;
 
             float gain = Math.Clamp(r.Gain * r.PathLength / directDist, 0f, 1f);
             if (gain < ImageSource.MinGain) continue;
+            gain *= OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.ReflectionsTrim;   // /reflections
 
             var echo = item.Sound;
             echo.Position = r.ApparentPosition;

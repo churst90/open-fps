@@ -496,8 +496,7 @@ public static class BattleSpike
 
             // Let the last report finish crossing the street and coming back.
             WaitUntil(provider, clock, (float)clock.Elapsed.TotalSeconds + 3.5f);
-            Console.WriteLine($"\n  outdoor reverb bus settled at {provider.OutdoorReverbWetDb:F1} dB " +
-                              $"(-80 would mean open air)");
+            Console.WriteLine("\n  (the outdoor tail is traced; there is no wet level to report)");
             return 0;
         }
         finally { provider.Dispose(); }
@@ -542,7 +541,7 @@ public static class BattleSpike
         Console.WriteLine($"\n  Outdoor reverb bus during one shot:");
         Console.WriteLine($"    into the reverb  peak {inputPeak:F6}   (is the shot being SENT to it?)");
         Console.WriteLine($"    out of it        peak {peak:F6}, mean {mean:F6}   (is it answering?)");
-        Console.WriteLine($"    decay {provider.SimulatedReverbDecayMs:F0} ms, wet {provider.OutdoorReverbWetDb:F1} dB");
+        Console.WriteLine($"    ray-traced decay {provider.SimulatedReverbDecayMs:F0} ms");
         Console.WriteLine(inputPeak <= 1e-6f
             ? "  -> nothing is being SENT. The street cannot answer a shot it never receives."
             : peak > 1e-6f

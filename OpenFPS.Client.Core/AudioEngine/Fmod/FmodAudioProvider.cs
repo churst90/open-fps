@@ -590,7 +590,6 @@ public class FmodAudioProvider : IAudioProvider
     /// <summary>Buses built with their wet level muted because the region they belong to is not a closed
     /// boundary and so has no Sabine estimate behind it. These are the ones the ray-traced RT60 governs:
     /// it caps their decay and opens their wet level in proportion to what the rays actually found.</summary>
-    private readonly HashSet<int> _dryReverbBuses = new();
     // Per-bus Steam Audio voice (HRTF) used to localize a room's reverb to its doorway when the listener
     // is OUTSIDE. Bus-lifetime (no churn); borrowed from the voice pool, returned on bus teardown.
     private readonly Dictionary<int, SaVoice> _reverbSaVoices = new();
@@ -1177,21 +1176,6 @@ public class FmodAudioProvider : IAudioProvider
     /// follows. A mean would let every dropout drag the value down, and a floor-check could not tell
     /// a failed trace from an actual open field, because both report the same number.
     /// </summary>
-    /// <summary>Where the listener's reverberant field comes from and how one-sided it is; the
-    /// listener's own bus is steered by it (SetReverbDirection). See Enclosure.ReturnCentroid.</summary>
-    private Vector3 _listenerReturnDir;
-    private float _listenerAnisotropy, _listenerMfp;
-    public void SetListenerReverbField(Vector3 returnDirection, float anisotropy, float meanFreePathMetres,
-                                       float surfaceAreaSquareMetres = 0f)
-    {
-        _listenerReturnDir = returnDirection; _listenerAnisotropy = Math.Clamp(anisotropy, 0f, 1f);
-        _mfpTarget = meanFreePathMetres;
-        _surfaceTarget = surfaceAreaSquareMetres;
-        // The first measurement is not a move: nothing to walk from.
-        if (_listenerMfp <= 0f) _listenerMfp = meanFreePathMetres;
-        if (_listenerSurface <= 0f) _listenerSurface = surfaceAreaSquareMetres;
-    }
-
     /// <summary>A send may amplify (FMOD allows a mix above 1), and in a sealed hard room the law asks
     /// it to; this is the ceiling, 20 dB, past which the diffuse field of a whisper next to your ear
     /// is not a thing anyone needs.</summary>
@@ -1205,18 +1189,14 @@ public class FmodAudioProvider : IAudioProvider
     /// <summary>The largest reverb send any voice was given since the last report, and how far away
     /// that voice was. Reported rather than the constant, because the send has not been a constant
     /// since it became the room equation.</summary>
-    private float _worstSendThisInterval, _worstSendDist;
 
     /// <summary>Lab overrides for the reverb unit's early-reflection share (%) and late delay (ms);
     /// NaN means the constants. The AudioLab's room walk sets these to measure them.</summary>
-    public static float ReverbEarlyLateOverride = float.NaN, ReverbLateDelayOverride = float.NaN;
 
     public void SetSimulatedReverbDecay(float decayMs, float enclosure, float hfDecayRatio, float lfDecayRatio)
     {
         _enclosureTarget = enclosure;
         if (_listenerEnclosure < 0f) _listenerEnclosure = enclosure;   // the first measurement is not a move
-        _listenerHfRatio = hfDecayRatio;
-        _listenerLfRatio = lfDecayRatio;
         for (int i = _simReverbHistory.Length - 1; i > 0; i--)
             _simReverbHistory[i] = _simReverbHistory[i - 1];
         _simReverbHistory[0] = decayMs;
@@ -1237,16 +1217,14 @@ public class FmodAudioProvider : IAudioProvider
 
     /// <summary>The room's surface area as the rays measured it, m² — the term the room equation used
     /// to assume was a cube's. See Enclosure.ReverberantToDirectPower.</summary>
-    private float _listenerSurface;
 
     /// <summary>The last measurement of each, which the live values above walk toward.</summary>
-    private float _enclosureTarget, _mfpTarget, _surfaceTarget;
+    private float _enclosureTarget;
     private double _roomAdvancedAt;
 
     /// <summary>How the listener's room colours its tail, as ratios of the mid band's decay. This is
     /// what a material sounds like: carpet's top dies four times faster than its middle, concrete's
     /// barely tilts.</summary>
-    private float _listenerHfRatio = 1f, _listenerLfRatio = 1f;
 
     /// <summary>What the enclosure measure currently reads, for the spikes and the report line.</summary>
     public float ListenerEnclosure => _listenerEnclosure;
@@ -1259,20 +1237,6 @@ public class FmodAudioProvider : IAudioProvider
 
     /// <summary>The wet level of the bus for the room the listener is in, dB, moved toward its target
     /// rather than snapped to it. -80 is silence, which is where open ground sits.</summary>
-    private float _listenerWetDb = -80f;
-
-    /// <summary>The decay actually on the DSP, slewed toward the measurement. See ApplySimulatedReverb.</summary>
-    private float _appliedReverbMs;
-    private float _lastWrittenReverbMs = -1f;
-    private int _appliedReverbRegionId = int.MinValue;
-
-    /// <summary>What decay each bus was last driven to. A bus's decay belongs to the bus, so coming
-    /// back to a room resumes where that room was instead of jumping. See ApplySimulatedReverb.</summary>
-    private readonly Dictionary<int, float> _appliedPerRegion = new();
-
-    /// <summary>Smallest change in decay worth writing, ms. Below this the slew has converged and
-    /// restating it is a parameter change for no audible gain.</summary>
-    private const float ReverbWriteEpsilonMs = 2.0f;
 
     /// <summary>Overrides the listener-region reverb DSP decay with the simulated RT60-derived value when
     /// available, replacing the Sabine estimate for the room the listener is in. No-op when 0 (sim off).
@@ -1319,198 +1283,12 @@ public class FmodAudioProvider : IAudioProvider
         float tau = Math.Clamp(_simReverbDecayMs * 0.001f * 0.5f, 0.12f, 0.6f);
         float a = 1f - MathF.Exp(-dt / tau);
         _listenerEnclosure += (_enclosureTarget - _listenerEnclosure) * a;
-        if (_mfpTarget > 0f) _listenerMfp += (_mfpTarget - _listenerMfp) * a;
-        if (_surfaceTarget > 0f) _listenerSurface += (_surfaceTarget - _listenerSurface) * a;
     }
 
-    private void ApplySimulatedReverb(int listenerRegionId)
-    {
-        AdvanceListenerRoom();
-        // In traced mode the tail is the trace; the room algorithm is passing its input through dry
-        // and must be left that way.
-        if (TracedActive && _traced.ContainsKey(listenerRegionId)) return;
-
-        if (_simReverbDecayMs <= 0f) return;
-        if (!_reverbDsps.TryGetValue(listenerRegionId, out var dsp) || !dsp.hasHandle()) return;
-
-        // ── A decay time is a filter's state, and it cannot be rewritten under a running tail ────
-        //
-        // This used to write the measured decay straight onto the DSP every audio update. The
-        // measurement moves as the listener does — it is a ray trace of the surroundings, and walking
-        // up to a wall changes it a lot in a few steps — and an SFXREVERB whose decay is restated
-        // sixty times a second is a reverb whose internal delay network is being resized under a tail
-        // that is still sounding. Reported from the rooms map as "walking around lots of popping and
-        // clicking from the reverb as I walk near the walls".
-        //
-        // Slewed, and only written when it has actually moved. The median filter above rejects a bad
-        // READING; this rides out a real CHANGE, which is a different job — the value it is chasing is
-        // correct, and it is the discontinuity that is audible, not the destination.
-        float measured = Math.Clamp(_simReverbDecayMs, AcousticConstants.MinReverbDecayMs, AcousticConstants.MaxReverbDecayMs);
-        // The slew belongs to ONE bus. Stepping from a room to the open air is a different DSP, with its
-        // own tail and its own decay, so carrying the previous room's value across would write a large
-        // jump into a unit that was nowhere near it — the very discontinuity the slew exists to avoid.
-        if (listenerRegionId != _appliedReverbRegionId)
-        {
-            _appliedReverbRegionId = listenerRegionId;
-            // EACH BUS REMEMBERS ITS OWN. Crossing a boundary used to zero the slew and hard-write the
-            // new room's measurement on the next update — a jump straight onto a unit, every crossing.
-            // Walking PAST a doorway is not one crossing, it is a dozen: the region under your feet
-            // flips as the opening comes and goes, and each flip wrote a fresh decay. Reported as
-            // "just walking past an opening to a building causes it to pop in and pop out".
-            //
-            // A bus's decay is a property of that bus, so it is kept per bus. Coming back to a room
-            // you were in a second ago resumes where that room was, which is both what a listener
-            // expects and what the DSP is already sounding.
-            _appliedReverbMs = _appliedPerRegion.TryGetValue(listenerRegionId, out float was) ? was : 0f;
-            _lastWrittenReverbMs = _appliedReverbMs > 0f ? _appliedReverbMs : -1f;
-        }
-        if (_appliedReverbMs <= 0f) _appliedReverbMs = measured;   // first reading: no tail to protect
-        else _appliedReverbMs += (measured - _appliedReverbMs) * AcousticConstants.OutdoorWetBlendSpeed;
-        float ms = _appliedReverbMs;
-        if (MathF.Abs(ms - _lastWrittenReverbMs) > ReverbWriteEpsilonMs)
-        {
-            dsp.setParameterFloat(0, ms);
-            // ── What the tail is made of ────────────────────────────────────────────────────────
-            //
-            // A decay time on its own is a room shape. The COLOUR of the decay is the material, and
-            // it is the half a listener actually identifies a place by: a carpeted hall and a tiled
-            // one of identical size have similar decay times and sound nothing alike, because cloth
-            // takes the top of the spectrum four times harder than the bottom and tile takes none of
-            // it. FMOD's reverb carries exactly this as a per-band ratio against the mid decay, and
-            // the ray survey measures it from the materials the rays actually struck.
-            dsp.setParameterFloat(4, Math.Clamp(_listenerHfRatio * 100f, 10f, 100f));   // HF decay, %
-            dsp.setParameterFloat(3, 5000f);                                            // HF reference, Hz
-            // The low shelf is the same statement at the other end: a room whose bass rings longer
-            // than its middle is one with hard heavy walls, which is a fact about the walls.
-            dsp.setParameterFloat(7, 250f);                                             // LF reference, Hz
-            dsp.setParameterFloat(8, Math.Clamp(20f * MathF.Log10(MathF.Max(0.1f, _listenerLfRatio)), -12f, 12f));
-            // ── The unit renders the diffuse tail, not the early reflections ───────────────────
-            //
-            // Early reflections are geometry's: which wall, how far, what of — measured per source
-            // by the image-source pass. A unit's own are a fixed pattern of copies stamped onto every
-            // transient a tenth of a millisecond after it, the same in every room. Measured on a
-            // footstep in the wood room, they put the step 9 dB over its dry level and onto the master
-            // limiter's ceiling every time: "pop pop pop, four or five copies piling up, footsteps
-            // loud". So the unit is set to ALL LATE REVERB — EARLYLATEMIX is the blend of late to
-            // early, so that is 100, and the 0 it used to be asked for early reflections ONLY and got
-            // them: no tail at all, in any room, whatever decay was written a few lines above. See
-            // AcousticConstants.ReverbLateToEarlyMixPercent. The tail begins once the mean free path — the
-            // room's size as the rays found it — has been crossed a couple of times, which is when
-            // reflections are too dense to have a direction any more. A small room's tail starts
-            // sooner than a hall's, from the same rule.
-            float earlyLate = float.IsNaN(ReverbEarlyLateOverride) ? AcousticConstants.ReverbLateToEarlyMixPercent : ReverbEarlyLateOverride;
-            float lateDelayMs = float.IsNaN(ReverbLateDelayOverride)
-                ? Math.Clamp(AcousticConstants.ReverbLateDelayMeanFreePaths * _listenerMfp / _speedOfSound * 1000f, 0f, AcousticConstants.ReverbLateDelayMaxMs)
-                : ReverbLateDelayOverride;
-            dsp.setParameterFloat((int)DSP_SFXREVERB.EARLYLATEMIX, Math.Clamp(earlyLate, 0f, 100f));
-            dsp.setParameterFloat((int)DSP_SFXREVERB.LATEDELAY, lateDelayMs);
-            _lastWrittenReverbMs = ms;
-            _appliedPerRegion[listenerRegionId] = ms;
-        }
-
-        // The cap is on the TIME only: the estimator's tail can run long, and an uncapped two-second
-        // decay is what makes a street sound like a nave. A room with a real Sabine estimate behind it
-        // keeps its own, which is why this only trims what the rays produced.
-        // ...and only where the place is actually OPEN. See OutdoorEnclosureCeiling: the survey has
-        // the sky in it now, so nothing outdoors reaches this cap on its own, and all the cap was
-        // still doing was flattening the places built to ring — a tunnel measuring three seconds got
-        // 1.1 and was heard as dry.
-        if (_dryReverbBuses.Contains(listenerRegionId)
-            && _listenerEnclosure < AcousticConstants.OutdoorEnclosureCeiling
-            && ms > AcousticConstants.OutdoorMaxDecayMs)
-        {
-            ms = AcousticConstants.OutdoorMaxDecayMs;
-            dsp.setParameterFloat(0, ms);
-        }
-
-        // ── How loud the tail is, is not a question about how long it is ─────────────────────────
-        //
-        // This used to read the wet level off the decay time: a long decay meant an enclosed place,
-        // so it opened the bus in proportion. The premise is false, and measuring it is what settled
-        // it (AudioLab --sim-reverbfield). Steam Audio's parametric estimator fits an exponential to
-        // whatever energy its rays bring home and has no way to report that there was hardly any. A
-        // walled yard with NO CEILING fitted 1.00 s where the same walls with a roof on fitted 0.60 s
-        // — the roofless one reading as the MORE reverberant of the two. On the speedway's front
-        // straight the same arithmetic put a 1.1 s tail at -22 dB over a race in the open air, which
-        // is what was reported, and no threshold between "dry" and "full wet" could have separated
-        // them because the two places sit on the same side of every threshold.
-        //
-        // What does separate them is how enclosed the place is, which is measured from the geometry
-        // rather than inferred from a curve fit, and which runs the ladder in the right order:
-        // open field 15%, a grandstand across the track 23%, hard against a long wall 47%, a roofless
-        // yard 69%, a sealed room 98%. The reverberant field is the sum over every generation of
-        // return — e/(1-e) — so those become -7.7, -5.2, -0.6, +3.4 and +17.6 dB, and the level
-        // follows that directly: a place N decibels less reverberant than a sealed room sends N
-        // decibels less. No thresholds, no span, nothing about what kind of place it is.
-        //
-        // And it is applied to the listener's bus WHEREVER they are, indoors included. An enclosed
-        // region used to be built at 0 dB wet and never touched again, which is the blanket that was
-        // reported: "not sure why inside buildings there's lots of reverb, shouldn't it just be the
-        // natural reflections off the surfaces". Now that the surfaces answer for themselves
-        // (EarlyReflections), the diffuse tail is only what is LEFT after them — the copies of copies,
-        // too many and too close together to have a direction any more — and it has to sit well under
-        // the early arrivals rather than on top of them. A sealed hard room lands near the ceiling of
-        // this scale; a room of carpet lands far below it; open ground falls off the bottom and is
-        // silent. One law, every region, no authored levels.
-        // The level IS the ratio. It used to be that ratio pushed down by the distance between a sealed
-        // room and an arbitrary ceiling of -16 dB, which put a hard-walled courtyard at -35 dB — audible
-        // in a meter and not in the ear, and reported as "the room is basically dry". A reverberant
-        // field that is worth 60% of the direct sound should be heard as 60% of it. Sealed-and-hard
-        // tops out at full wet, a courtyard sits a couple of decibels under, carpet ten under, and open
-        // ground twenty — which is what one percent of the energy coming back actually is.
-        //
-        // ── And then it moved again: the LEVEL is in the sends now, per source ────────────────
-        //
-        // The ratio above is a room's, not a source's: it has no distance in it. A footstep at
-        // your feet and a car across the hall raised the same fraction of reverberation, there was
-        // no critical distance anywhere, and on top of that the UNIT's own gain was never measured
-        // — at 0 dB wet it put a footstep's reverberation twelve decibels over the step itself
-        // (AudioLab --room-walk: dry −13 dBFS, with the bus −1 dBFS, the limiter's ceiling, on every
-        // step). So the room equation with the distance in it is applied to each source's send
-        // (Enclosure.ReverberantToDirectPower), and this bus's wet level has one job left: to hold
-        // the unit's steady-state gain at unity, so that what the sends ask for is what comes out.
-        // FMOD meters the unit's input and output; the loop below reads them, averages slowly, and
-        // trims the wet level by the gain it finds. It converges in a couple of seconds and then
-        // only moves if the decay or the colour does.
-        // ── A LIVE ROOM IS LOUDER, AND THAT MUST NOT BE NORMALISED AWAY ─────────────────────────
-        //
-        // This measured the unit's own input and output and trimmed the wet level to hold its gain at
-        // unity, on the reasoning that the per-source send carries the level and the unit should add
-        // no arbitrary gain of its own. The reasoning is right about an ARBITRARY gain. The gain it
-        // was actually measuring is not arbitrary: a reverberation unit fed a steady signal
-        // accumulates energy in proportion to its decay time, so a long tail measures a higher output
-        // — and the loop pulled it back down by exactly that much.
-        //
-        // What that cancels is the whole difference between a car park and a corridor. Measured over
-        // a live session, the trim the loop settled on against the decay it was fed:
-        //
-        //     400- 800 ms (a corridor)  ->  -6.1 dB
-        //    2800-3200 ms (a tunnel)    ->  -8.1 dB
-        //    4800-5200 ms (a car park)  -> -10.5 dB
-        //    7200-7600 ms               -> -13.0 dB
-        //
-        // — a room with twelve times the tail handed back seven decibels quieter, which is most of
-        // the way to sounding identical. Reported, after every other cause had been chased out of the
-        // way: "all of those areas sound the same other than the tunnel and street... they all sound
-        // the same with the only difference being how far away the walls are." The walls' distance is
-        // the early reflections, which were the only part of the room still varying.
-        //
-        // So the wet level is a CONSTANT now. What a source raises is the send's job (the room
-        // equation, with distance and absorption in it); how long it rings is the decay's; and the
-        // unit's job is only to ring. Its one real arbitrary gain — the difference between FMOD's
-        // internal scaling and unity — is a property of the DSP rather than of the room, and is what
-        // this number is.
-        _listenerWetDb += (AcousticConstants.ReverbUnitWetDb - _listenerWetDb)
-                        * AcousticConstants.OutdoorWetBlendSpeed;
-        if (MathF.Abs(AcousticConstants.ReverbUnitWetDb - _listenerWetDb) < 0.05f)
-            _listenerWetDb = AcousticConstants.ReverbUnitWetDb;
-        dsp.setParameterFloat(11, _listenerWetDb);
-    }
-    /// <summary>The reverb unit's measured steady-state gain, dB, slowly tracked. See ApplySimulatedReverb.</summary>
-
-    /// <summary>What the listener's reverb bus is currently doing, for the spikes and the profiler. A
-    /// value of -80 means no reverberant field at all, which is open ground.</summary>
-    public float OutdoorReverbWetDb => _listenerWetDb;
+    /// <summary>The listener's measured enclosure, eased toward the survey's reading at the pace of
+    /// the room's own decay (AdvanceListenerRoom). It scales what the listener's own room hears of a
+    /// sound at a distance (the send). The room algorithm this used to drive is gone.</summary>
+    private void ApplySimulatedReverb(int listenerRegionId) => AdvanceListenerRoom();
 
     public void SetAcousticMap(AcousticMap map)
     {
@@ -1543,7 +1321,7 @@ public class FmodAudioProvider : IAudioProvider
     {
         ReturnReverbVoices(); // detach HRTF voices while the buses still exist, return them to the pool
         ReleaseReverbUnits();
-        _reverbDsps.Clear(); _reverbBuses.Clear(); _reverbVolumes.Clear(); _dryReverbBuses.Clear();
+        _reverbDsps.Clear(); _reverbBuses.Clear(); _reverbVolumes.Clear();
         // The buses are gone, so nothing is reading these any more: release what each stage made.
         foreach (var (st, dsp, handle) in _traced.Values)
         {
@@ -1558,7 +1336,7 @@ public class FmodAudioProvider : IAudioProvider
             if (dsp.hasHandle()) dsp.release();
             if (handle.IsAllocated) handle.Free();
         }
-        _traced.Clear(); _tracedModeApplied = null; _tracedRunning.Clear();
+        _traced.Clear(); _tracedRunning.Clear();
     }
 
     private void UpdateActiveReverbs(Vector3 listenerPos)
@@ -1646,22 +1424,31 @@ public class FmodAudioProvider : IAudioProvider
     // traced from where they stand, for the room they are in; each other audible room's own, traced
     // from its middle, so a sound through a doorway rings with the room it is in. The materials of
     // every surface are in the trace, so carpet and concrete and tile tell themselves apart, and the
-    // reverb is simply the late part of what comes back. Retired in traced mode: the room algorithm's
-    // tail, the Sabine and enclosure estimates, the wet-level loop, the room-equation sends, and the
-    // discrete copies of your own footsteps and of short sounds indoors. `/reverb room` restores all
-    // of it, for comparison.
-
-    /// <summary>The tail from traced impulse responses (true) or the room algorithm (false). Any
-    /// thread may write; the audio update applies it. OPENFPS_REVERB=room starts in room mode.</summary>
-    public static volatile bool TracedOutdoors = !string.Equals(Environment.GetEnvironmentVariable("OPENFPS_REVERB"), "room", StringComparison.OrdinalIgnoreCase);
+    // reverb is simply the late part of what comes back. The room algorithm — the SFXREVERB tail, the
+    // Sabine and enclosure estimates, the wet-level loop, the room-equation sends, the anisotropy
+    // steering and the first-order copies of your own footsteps — was retired on 2026-09-29, after
+    // the traced path had been judged by ear indoors and out. The SFXREVERB unit on each bus is kept
+    // as the point the traced stage is inserted at; it passes its input through dry.
+    //
+    // One rule for every place, since the same day: a one-off sound's first 80 ms are placed voices
+    // mirrored through the surfaces round it (WorldAudioPlayer.QueueEarlyEchoes and the steps'
+    // SubmitRoomStepEchoes), the listener's traced stage plays only the late tail (TailOnly, as a
+    // diffuse field), and every reflected path — placed copies, tails, traced echoes — sits at one
+    // trim against the direct sound (ReflectionsDb). Nothing decides by "indoors" any more except
+    // where physics does: past the window a room's copies are dense and are the tail; a street's are
+    // sparse and stay separate events (QueueHigherOrderEchoes).
 
     private readonly Dictionary<int, (TracedReverbState State, FMOD.DSP Dsp, System.Runtime.InteropServices.GCHandle Handle)> _traced = new();
-    private bool? _tracedModeApplied;
     /// <summary>Which traced stages are running (not bypassed) right now.</summary>
     private readonly Dictionary<int, bool> _tracedRunning = new();
 
-    /// <summary>Whether traced mode is in force right now: asked for, and a trace to play.</summary>
-    internal static bool TracedActive => TracedOutdoors && TracedReverbSet.Listener != null;
+    /// <summary>Whether there is a trace to play yet (the scene is built after the map loads).</summary>
+    internal static bool TracedActive => TracedReverbSet.Listener != null;
+
+    /// <summary>The listener's own stage plays the late tail alone everywhere, the early part being the
+    /// placed copies. OPENFPS_TAIL=full keeps the whole traced response outside enclosures, as it was
+    /// until 2026-09-29, for an A/B on the street.</summary>
+    internal static readonly bool TailEverywhere = !string.Equals(Environment.GetEnvironmentVariable("OPENFPS_TAIL"), "full", StringComparison.OrdinalIgnoreCase);
 
     // ── Traced echoes: a few sources traced from where they are ──────────────────────────────
     //
@@ -1713,35 +1500,27 @@ public class FmodAudioProvider : IAudioProvider
     private const float EchoFadeSeconds = 0.6f;
     private long _echoTickAt;
     /// <summary>
-    /// The traced echoes against their physical level, dB; /echoes -12 sets it. Measured streets put
-    /// the multi-bounce energy about level with the direct sound at 30 m (Picaut and Simon 2005; an
-    /// image bound with 1 dB per facade, RLS-90), and that is what the trace gave — and it was "way
-    /// too strong ... coloring": a real facade SCATTERS each bounce, and the traced copies arrive
-    /// coherent, a few tens of milliseconds behind and a few degrees off the source, which is where
-    /// the ear hears colour (Barron; Zurek's diotic threshold is 10 dB lower). Until the copies are
-    /// decorrelated, a trim, set by ear.
+    /// Every reflected sound against the direct sound, dB: the placed early copies of a one-off sound
+    /// (WorldAudioPlayer.QueueEarlyEchoes and its facade and flutter echoes, the steps'
+    /// SubmitRoomStepEchoes), every room's and every street's traced tail (the traced stages), and the
+    /// far sources' traced echoes (the rigs). One number, indoors and out; `/reflections -24` sets it,
+    /// OPENFPS_REFLECTIONS_DB starts it. Zero is the traced and image-source level, which is physical to
+    /// within a couple of decibels wherever it has been measured (--clap-room, --traced-reverb).
+    ///
+    /// -24 is Cody's, by ear, 2026-09-29, and it was reached three times on three mechanisms: the
+    /// traced echoes on 09-26 ("-24 is about there"), the flat's copies and tail on 09-29 ("-24 is
+    /// where it's at, just like outdoors"), and the tunnel the same night ("still needs to come down to
+    /// -24"). A carpeted plaster flat and a concrete tunnel wanting the same figure says the figure is
+    /// not about the room. What every trimmed path shares is that it is a copy of the source arriving a
+    /// few tens of milliseconds late; what the ear does with those in life (fuse them, suppress them)
+    /// it does less of through a generic HRTF in headphones, where a copy at its physical level is heard
+    /// as an event. The room's identity — its decay, its colour, where its walls are — survives the
+    /// trim; only its weight against the direct sound is set for the listener.
     /// </summary>
-    public static volatile float TracedEchoTrimDb = -24f;   // Cody, by ear, 2026-09-26
-
-    /// <summary>
-    /// The room you are in against the sounds in it, dB: one trim on both halves of a room's answer
-    /// — its placed early reflections (WorldAudioPlayer.QueueRoomEchoes, the steps' SubmitRoomStepEchoes)
-    /// and its late tail (the listener's TailOnly traced stage). Rooms only: outdoors, and under a
-    /// shelter that is not an enclosure, nothing here applies. `/room -6` sets it; OPENFPS_ROOM_DB
-    /// starts it. -24 is Cody's, by ear, 2026-09-29, and it is the same figure he set for the traced
-    /// echoes outdoors three days earlier (TracedEchoTrimDb): "-24 dB is where it's at, just like
-    /// outdoors... now everything sounds great and accurate". The copy-to-direct arithmetic was
-    /// checked to within 1.6 dB of physics and the flat's traced tail to within 3 dB of the room
-    /// equation, so this is not a level error in either path. What the two paths share, and the
-    /// accepted outdoor tail does not, is that their copies are COHERENT: a clean copy of the source
-    /// a few tens of milliseconds late, from a point. Real walls scatter, and a scattered copy at the
-    /// same energy is a wash, not a second event. See changes.md 2026-09-29; the next move is
-    /// diffusion by the wall's scattering, after which this should be able to come back up.
-    /// </summary>
-    public static volatile float RoomTrimDb =
-        float.TryParse(Environment.GetEnvironmentVariable("OPENFPS_ROOM_DB"), System.Globalization.NumberStyles.Float,
-                       System.Globalization.CultureInfo.InvariantCulture, out float roomDb) ? Math.Clamp(roomDb, -40f, 6f) : -24f;
-    public static float RoomTrim => MathF.Pow(10f, RoomTrimDb / 20f);
+    public static volatile float ReflectionsDb =
+        float.TryParse(Environment.GetEnvironmentVariable("OPENFPS_REFLECTIONS_DB"), System.Globalization.NumberStyles.Float,
+                       System.Globalization.CultureInfo.InvariantCulture, out float reflDb) ? Math.Clamp(reflDb, -40f, 6f) : -24f;
+    public static float ReflectionsTrim => MathF.Pow(10f, ReflectionsDb / 20f);
     /// <summary>Once chosen, a source keeps its trace at least this long: no flicker as it passes
     /// behind something.</summary>
     private const float EchoMinHoldSeconds = 3f;
@@ -1910,7 +1689,7 @@ public class FmodAudioProvider : IAudioProvider
             if (a.EchoLeaving && a.EchoWeight <= 0f) { (gone ??= new()).Add(a); continue; }
             float d = MathF.Max(1f, Vector3.Distance(_listenerPos, a.CurrentApparentPosition));
             float law = Loudness.RenderedGain(1.0f, a.MinDistance, a.Range, d) * d;   // the law over 1/d
-            rig.InputGain = a.BaseVolume * a.FadeGain * law * a.EchoWeight * MathF.Pow(10f, TracedEchoTrimDb / 20f);
+            rig.InputGain = a.BaseVolume * a.FadeGain * law * a.EchoWeight * ReflectionsTrim;
             rig.Orientation = orient;
             echoes.SetSource(rig.Slot, a.CurrentApparentPosition);
             // The mirror images give way once the trace carries most of it, and come back first.
@@ -1937,7 +1716,7 @@ public class FmodAudioProvider : IAudioProvider
         var e = TracedReverbSet.Echoes;
         string mode = TracedEchoesOn ? "on" : "off";
         if (e == null) return $"Echoes: {mode}. No tracer yet — the scene is still being built.";
-        return $"Echoes: {mode}, {TracedEchoTrimDb:F0} dB against physical. {_tracedEchoIds.Length} far source(s) traced from where they are; {e.Runs} traces, the last in {e.LastRunMs:F0} ms.";
+        return $"Echoes: {mode}, {ReflectionsDb:F0} dB against physical (the reflections trim). {_tracedEchoIds.Length} far source(s) traced from where they are; {e.Runs} traces, the last in {e.LastRunMs:F0} ms.";
     }
 
     /// <summary>Where a sound id's file is: the path the loader opens.</summary>
@@ -1963,10 +1742,9 @@ public class FmodAudioProvider : IAudioProvider
     /// <summary>For the /reverb readout: mode, and how the tracing is doing.</summary>
     public static string TracedReverbStatus(FmodAudioProvider? p)
     {
-        string mode = TracedOutdoors ? "traced" : "room";
-        if (TracedReverbSet.Listener == null) return $"Reverb: {mode}. No trace yet — the scene is still being built.";
+        if (TracedReverbSet.Listener == null) return "Reverb: no trace yet — the scene is still being built.";
         var (rooms, runs, ms) = TracedReverbSet.Stats();
-        return $"Reverb: {mode}. Traced from where you stand and from {rooms} other room(s); {runs} traces so far, the last of yours in {ms:F0} ms.";
+        return $"Reverb: traced from where you stand and from {rooms} other room(s); {runs} traces so far, the last of yours in {ms:F0} ms. Reflections {ReflectionsDb:F0} dB.";
     }
 
     /// <summary>Adds a traced stage to every bus that lacks one, points each at the place it should be
@@ -1980,7 +1758,6 @@ public class FmodAudioProvider : IAudioProvider
             if (_traced.ContainsKey(kv.Key)) continue;
             if (!_reverbBuses.TryGetValue(kv.Key, out var bus)) continue;
             AddTracedStage(kv.Key, bus, kv.Value, listenerTrace);
-            _tracedModeApplied = null;
         }
 
         // Which place each bus is heard as. The room you are in: yours. Any other ROOM: its own,
@@ -1995,14 +1772,13 @@ public class FmodAudioProvider : IAudioProvider
                 && _reverbVolumes.TryGetValue(kv.Key, out float vol) && vol > 0.001f)
                 trace = TracedReverbSet.ForRoom(kv.Key, centre) ?? listenerTrace;
             kv.Value.State.Trace = trace;
-            // The room you are standing in: its early part is placed reflections, so the stage plays
-            // the tail alone. See WorldAudioPlayer.QueueRoomEchoes. A cabin keeps its whole response.
-            kv.Value.State.TailOnly = kv.Key == _listenerRegionId && IsEnclosure(kv.Key) && !ReferenceEquals(trace, cabin);
-            // The room's tail at the room's trim (RoomTrimDb); every other stage as traced.
-            kv.Value.State.Gain = kv.Value.State.TailOnly ? RoomTrim : 1f;
+            // Your own place's stage: the late tail alone, the early part being placed copies
+            // (WorldAudioPlayer.QueueEarlyEchoes). A cabin keeps its whole response: nothing is placed
+            // inside a vehicle.
+            kv.Value.State.TailOnly = kv.Key == _listenerRegionId && !ReferenceEquals(trace, cabin)
+                                      && (TailEverywhere || IsEnclosure(kv.Key));
+            kv.Value.State.Gain = ReflectionsTrim;
         }
-
-        bool want = TracedOutdoors;
 
         // ONLY WHERE IT CAN BE HEARD. A traced stage convolves and then decodes round the head, about
         // half a millisecond a block, and FMOD runs a bus's chain whatever its volume. Twenty-four
@@ -2012,32 +1788,13 @@ public class FmodAudioProvider : IAudioProvider
         // silent bus's stage is bypassed and costs nothing.
         foreach (var kv in _traced)
         {
-            bool audible = want && _reverbVolumes.TryGetValue(kv.Key, out float v) && v > 0.001f;
+            bool audible = _reverbVolumes.TryGetValue(kv.Key, out float v) && v > 0.001f;
             // A stage about to be heard needs its own copy of its trace.
             if (audible) kv.Value.State.Trace?.EnsureReader(kv.Value.State.Reader);
-            if (_tracedRunning.TryGetValue(kv.Key, out bool was) && was == audible && _tracedModeApplied == want) continue;
+            if (_tracedRunning.TryGetValue(kv.Key, out bool was) && was == audible) continue;
             kv.Value.Dsp.setBypass(!audible);
             _tracedRunning[kv.Key] = audible;
         }
-
-        if (_tracedModeApplied == want) return;
-        foreach (var kv in _traced)
-        {
-            if (!_reverbDsps.TryGetValue(kv.Key, out var sfx)) continue;
-            if (want)
-            {
-                sfx.setParameterFloat(12, 0f);      // dry: the sends pass straight to the trace
-                sfx.setParameterFloat(11, -80f);    // wet: the room algorithm is silent
-            }
-            else
-            {
-                sfx.setParameterFloat(12, -80f);
-                sfx.setParameterFloat(11, kv.Key == _listenerRegionId ? _listenerWetDb
-                                          : _dryReverbBuses.Contains(kv.Key) ? -80f : 0f);
-            }
-        }
-        _tracedModeApplied = want;
-        Log.Information("Reverb: {Mode} ({Count} bus(es)).", want ? "traced" : "room", _traced.Count);
     }
 
     private void AddTracedStage(int regionId, FMOD.ChannelGroup bus, FMOD.DSP sfx, TracedReverb tr)
@@ -2148,31 +1905,11 @@ public class FmodAudioProvider : IAudioProvider
             return;
         }
         
-        // Sabine, from the region's own boundary — see OpenFPS.Common.RoomAcoustics, which owns the
-        // question so that this and the tests and anything else that needs it cannot drift. It comes
-        // back ZERO for a region that is not a closed boundary, and that is the whole of the outdoor
-        // rule: there is no diffuse field to estimate in a place with no ceiling, so nothing is
-        // estimated, and what reverberation the place does have is the ray tracer's to find.
-        float decayMs = RoomAcoustics.DecayMs(region);
-
-        reverbDsp.setParameterFloat(0, Math.Max(AcousticConstants.MinReverbDecayMs, decayMs));
-        reverbDsp.setParameterFloat(1, 0.1f);
-
-        // A bus with no estimate behind it is built MUTED and stays muted unless the simulator opens
-        // it (ApplySimulatedReverb). That used to be written as "is this the global region id", which
-        // meant the map only had to NAME a stretch of open ground for it to be treated as a room —
-        // and naming places is what a map has to do for a player who cannot see them.
-        bool dry = decayMs < AcousticConstants.MinReverbDecayMs;
-        if (!dry) {
-            reverbDsp.setParameterFloat(11, 0.0f); // Wet level normal
-        } else {
-            _dryReverbBuses.Add(regionId);
-            reverbDsp.setParameterFloat(11, -80.0f); // Mute (open air stays dry until the rays say otherwise)
-        }
-        // A region bus is an AUX SEND, not an insert: the only thing that should leave it is the
-        // reverberant field. Dry at 0 dB meant every send was ALSO an undirected copy of the source —
-        // a second, position-less image of the siren mixed in on top of its own HRTF voice.
-        reverbDsp.setParameterFloat(12, -80.0f); // Dry muted (send bus)
+        // The unit makes no tail of its own and passes its input through dry: the traced stage
+        // inserted at its index (AddTracedStage) is the room's answer, and a bus is an AUX SEND —
+        // the only thing that leaves it is that answer.
+        reverbDsp.setParameterFloat(11, -80.0f);
+        reverbDsp.setParameterFloat(12, 0.0f);
 
         // ORDER MATTERS, and it is the opposite of what it reads like. FMOD's chain runs TAIL (input) ->
         // HEAD (output), so the reverb must go at the TAIL for the fader — and the binaural stage added
@@ -2317,13 +2054,13 @@ public class FmodAudioProvider : IAudioProvider
             }
             else
             {
-                worldDir = _listenerReturnDir;
-                // Traced, the room's field is already round the head — its early part as placed
-                // reflections and its tail as a diffuse field (DiffuseTail) — and a mono copy of the
-                // whole bus placed at the survey's return centroid on top of that is a second,
-                // one-point room: heard as the reverb "consolidating" in one direction (2026-09-29).
-                // Only the room algorithm, whose stereo says nothing about direction, is steered.
-                targetBlend = TracedOutdoors ? 0f : _listenerAnisotropy;
+                // The room you are in: its field is already round the head — its early part as
+                // placed reflections and its tail as a diffuse field (DiffuseTail) — and a mono copy
+                // of the whole bus placed at one point on top of that was a second, one-point room:
+                // heard as the reverb "consolidating" in one direction (2026-09-29). The stage passes
+                // its stereo through.
+                worldDir = Vector3.Zero;
+                targetBlend = 0f;
             }
             float len = worldDir.Length();
             if (len > 1e-4f)
@@ -3393,22 +3130,15 @@ public class FmodAudioProvider : IAudioProvider
             Log.Error("A DSP callback faulted {Count} time(s) since the last report; the block(s) were "
                     + "silenced rather than taking the process down. First: {First}", dspFaults, dspFirst);
 
-        float listenerDecay = 0f, listenerWet = -80f;
-        TryGetReverbSettings(_listenerRegionId, out listenerDecay, out listenerWet);
         // The SEND a voice actually got, not the constant. This line used to print
         // AcousticConstants.ReverbSendMix — the flat 35 % the send stopped being when it became
         // Enclosure.ReverberantToDirectPower — so it reported a third of the signal going to the room
         // while a source at a metre and a half was sending two thirds of it. An instrument that
         // states a constant as if it were a measurement is worse than one that says nothing, and this
         // one cost an afternoon of looking for a bug in the wrong place.
-        Log.Information("Room: listener in region {Region} ({Kind}), reverb {Decay:F0} ms at {Wet:F0} dB wet; "
-                      + "ray-traced RT60 {Sim:F0} ms, outdoor bus {Outdoor:F0} dB; wettest voice sent {Send:P0} "
-                      + "(at {Dist:F1} m); enclosure {Enc:P0} ({Field:F1} dB of reverberant field)",
-                        _listenerRegionId, _dryReverbBuses.Contains(_listenerRegionId) ? "no Sabine estimate" : "enclosed",
-                        listenerDecay, listenerWet, _simReverbDecayMs, _listenerWetDb,
-                        _worstSendThisInterval, _worstSendDist, _listenerEnclosure,
-                        Enclosure.ReverberantGainDb(_listenerEnclosure));
-        _worstSendThisInterval = 0f; _worstSendDist = 0f;
+        Log.Information("Room: listener in region {Region}; ray-traced RT60 {Sim:F0} ms; enclosure {Enc:P0}; "
+                      + "reflections {Refl:F0} dB",
+                        _listenerRegionId, _simReverbDecayMs, _listenerEnclosure, ReflectionsDb);
 
         // One simulation step plus a comfortable margin. Below that a voice is being placed at a
         // position from the last step, which is exactly what the interpolation clock delivers and what
@@ -4129,79 +3859,18 @@ public class FmodAudioProvider : IAudioProvider
         // reverberant field this source should raise. The unit's own gain is held at unity by the
         // metering loop in ApplySimulatedReverb, so nothing else scales it.
         float sourceDist = Vector3.Distance(lPosVec, active.Position);
-        float ratio = Enclosure.ReverberantToDirectPower(_listenerEnclosure, _listenerMfp,
-                                                        _listenerSurface, sourceDist);
-        float baseReverbMix = MathF.Min(MaxReverbSend, MathF.Sqrt(ratio));
-
-        // ── A REFLECTION IS ALREADY THE ROOM ANSWERING ──────────────────────────────────────────
-        //
-        // The room equation above says how much reverberant field a SOURCE raises, and it counts
-        // every path from that source to the ear — the direct one, the first bounce, the second, all
-        // of it. So the source's own send already carries the whole tail. A reflection that sends as
-        // well is the same energy counted twice.
-        //
-        // And it is counted twice at the WRONG DISTANCE, which is what made it enormous rather than
-        // merely wrong. A reflection is placed at its IMAGE position, so `sourceDist` is the mirrored
-        // distance — sixteen, twenty-two metres inside a nine-metre flat — and the room equation
-        // quite correctly reads a source that far off as almost entirely reverberant. Measured in a
-        // live session: "wettest voice sent 507 % (at 16.2 m)", on every footfall, three times over,
-        // inside a carpeted room. Reported as "rather than reflections being emitted from the walls,
-        // it's like the whole room is reverby... every time I step, pop pop pop".
-        //
-        // What a reflection may still add is the share its surface SCATTERED rather than mirrored:
-        // that part has no direction left and belongs in the diffuse field. It is a fraction, and it
-        // can never be more than the reflection's own energy — a copy cannot raise more reverberation
-        // than it is loud.
-        if (active.IsReflection)
-            baseReverbMix = MathF.Min(baseReverbMix, 1f) * ReflectionScatteredShare
-                          * Math.Max(0.5f, active.RoomGain);
-
-        // The source's OWN room gets the primary send. The listener's room gets only a small cross-send,
-        // so a sound in an adjacent room doesn't smear reverb from many directions at once.
-        //
-        // Scaled by the crossfade fraction, and this is the ONLY place a live send's mix is written.
-        // It used to be written flat here every update, which silently undid the ramp a region change
-        // starts — two writers disagreeing, with the louder one winning every frame.
-        //
-        // And what excites a room is what the source radiates in EVERY direction, not what it
-        // beams at the ear. The send hangs off the channel's fader, which carries the cone
-        // attenuation — so from behind a megaphone the room's reverberation of it was down by the
-        // same 26 dB as the direct beam, and "if I'm behind the megaphone I can hardly hear it
-        // from the other side of the room". A directional source is heard from behind mostly
-        // THROUGH the room, and the send is undone by the cone here so that it can be.
         float radiated = 1f / MathF.Max(coneAtten, 0.05f);
-        if (baseReverbMix > _worstSendThisInterval) { _worstSendThisInterval = baseReverbMix; _worstSendDist = sourceDist; }
-        // Into a TRACED bus the send is the sound as it arrives, at unity: the trace carries how much
-        // the place hands back and when, which the room equation was standing in for. A reflection
-        // does not send — the trace has the reflections in it.
-        float ownMix = baseReverbMix, crossMix = baseReverbMix * AcousticConstants.ReverbCrossSendScale;
-        if (TracedActive)
-        {
-            // The listener's trace is a room answering a source AT the listener, normalised to one a
-            // metre off; the send carries the sound as it arrives. What a room hands back against the
-            // direct sound depends on the distance alone — the direct falls as 1/d², a diffuse field
-            // does not fall — so in a closed room the send is the arrival times d. In the open only
-            // the geometry round you answers, lit by what reaches it, and nearer than a metre the
-            // source is still where the trace put it. The measured enclosure blends the two.
-            //
-            // Without this every sound in a room was sent as if it stood a metre off whatever its
-            // distance: a clap half a metre from the ear came back 8 dB too loud against itself,
-            // and "a bathroom stall rather than a carpeted room" (2026-09-29, --clap-room).
-            float d = MathF.Max(0.1f, sourceDist);
-            float atDistance = MathF.Min(d, 1f) * MathF.Pow(MathF.Max(d, 1f), Math.Clamp(_listenerEnclosure, 0f, 1f));
-            //
-            // Only for a source IN the listener's room. A sound from outside reaches the room through
-            // its walls and doors, and what it excites there is what arrives, which is what the send
-            // carries. Scaled by its distance as well, a lorry fifty metres down the street was
-            // sent into the flat nineteen decibels hot and the mix ran at -8 LUFS, clipping.
-            bool here = active.TargetRegionId == _listenerRegionId;
-            if (_traced.ContainsKey(active.TargetRegionId)) ownMix = active.IsReflection ? 0f : (here ? atDistance : 1f);
-            if (_traced.ContainsKey(_listenerRegionId)) crossMix = active.IsReflection ? 0f : 1f;
-        }
-        // The cross-send is for a sound in ANOTHER room. In the listener's own room both sends go into
-        // the same unit, and the room heard the sound twice: in traced mode both at unity, so a clap
-        // went through the flat's response twice over, coherently, six decibels too wet ("a bathroom
-        // stall rather than a carpeted room", 2026-09-29).
+        // The sends carry the source to its room's traced stage at unity: the trace is the room's
+        // answer to a source at a metre, at its level. In the listener's own room the send is scaled
+        // by the distance the direct sound has already fallen over, so a sound across the room feeds
+        // the room what a source across the room would; through a doorway the other room's stage is
+        // fed as it is. A copy sends nothing: it is already the room answering. Nothing is sent until
+        // a stage exists to receive it.
+        float d = MathF.Max(0.1f, sourceDist);
+        float atDistance = MathF.Min(d, 1f) * MathF.Pow(MathF.Max(d, 1f), Math.Clamp(_listenerEnclosure, 0f, 1f));
+        bool here = active.TargetRegionId == _listenerRegionId;
+        float ownMix = active.IsReflection || !_traced.ContainsKey(active.TargetRegionId) ? 0f : (here ? atDistance : 1f);
+        float crossMix = active.IsReflection || !_traced.ContainsKey(_listenerRegionId) ? 0f : 1f;
         if (active.SourceReverbConnection.hasHandle() && active.ReverbConnection.hasHandle()
             && active.SourceReverbBus.handle == active.ReverbBus.handle)
             crossMix = 0f;

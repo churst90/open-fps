@@ -48,11 +48,6 @@ public static class RoomWalkSpike
         bool megaphone = !Off(args, "megaphone");
         bool still = Array.Exists(args, a => a == "still");
         bool echo = Array.Exists(args, a => a == "echo=on");
-        // Measurement knobs for the reverb unit's own early-reflection share and late delay.
-        if (float.TryParse(Str(args, "earlylate"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float el))
-            FmodAudioProvider.ReverbEarlyLateOverride = el;
-        if (float.TryParse(Str(args, "latedelay"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float ld))
-            FmodAudioProvider.ReverbLateDelayOverride = ld;
         bool echoStarted = false;
         string outPath = Str(args, "out") ?? "/tmp/openfps-roomwalk.wav";
 
@@ -179,8 +174,6 @@ public static class RoomWalkSpike
                     provider.SetSimulatedReverbDecay(lastDecayMs, survey.Enclosure,
                         Math.Clamp(high / MathF.Max(0.01f, mid), 0.1f, 2f),
                         Math.Clamp(low / MathF.Max(0.01f, mid), 0.1f, 4f));
-                    provider.SetListenerReverbField(survey.ReturnDirection, survey.Anisotropy,
-                                                    survey.MeanFreePathMetres, survey.SurfaceAreaSquareMetres);
                     surveys++;
                 }
 
@@ -262,7 +255,7 @@ public static class RoomWalkSpike
             }
 
             Console.WriteLine($"  {frames} frames, {surveys} surveys; last survey decay {lastDecayMs:F0} ms, enclosure {lastEnclosure:P0}; "
-                            + $"reverb applied {provider.SimulatedReverbDecayMs:F0} ms at {provider.OutdoorReverbWetDb:F1} dB wet");
+                            + $"ray-traced decay {provider.SimulatedReverbDecayMs:F0} ms");
             if (megaphone) provider.StopSound(MegaphoneId);
             provider.Update();
             return 0;

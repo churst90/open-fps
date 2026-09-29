@@ -528,9 +528,6 @@ public class ClientAudioSystem
             _audio.SetSimulatedReverbDecay(simReverbMs, _acousticWorker.ListenerEnclosure,
                                            _acousticWorker.ListenerHfDecayRatio,
                                            _acousticWorker.ListenerLfDecayRatio);
-            _audio.SetListenerReverbField(_acousticWorker.ListenerReturnDirection, _acousticWorker.ListenerAnisotropy,
-                                          _acousticWorker.ListenerMeanFreePath,
-                                          _acousticWorker.ListenerSurfaceArea);
         }
         
         // 3. Synchronize the acoustic map ONLY if it changed (optimization)
@@ -714,8 +711,8 @@ public class ClientAudioSystem
                         || sourceSound.StartsWith("engine:", StringComparison.OrdinalIgnoreCase)
                         || sourceSound.StartsWith("ENGINE/", StringComparison.OrdinalIgnoreCase)) continue;
                     if ((uint)path.ReflectionIndex >= (uint)EarlyReflections.MaxArrivals) continue;
-                    // Traced, indoors: the room's traced response has these arrivals in it.
-                    if (OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.TracedActive && ListenerEnclosed(world, visualEyePos)) continue;
+                    // Everywhere: the listener's traced stage plays the late tail alone, so a sustained
+                    // source's first bounces are these, indoors as out (one rule, 2026-09-29).
                     _slotLive[path.ReflectionIndex] = true;
 
                     // One voice per slot, and the slots are ordered by the SURFACE each arrival
@@ -2639,16 +2636,6 @@ public class ClientAudioSystem
     private int _stepEchoIndex;
 
     /// <summary>
-    /// How many surfaces answer one footfall.
-    ///
-    /// Few on purpose. What a listener needs from a room is the nearest two or three arrivals — the
-    /// floor, whatever is over your head, the wall you are walking along — because those are the ones
-    /// close enough and loud enough to say where they are. Past that the arrivals are too many and too
-    /// close together to have a direction any more, which is what the diffuse bus is for.
-    /// </summary>
-    private const int StepEchoTaps = 3;
-
-    /// <summary>
     /// The walls answering your own footsteps.
     ///
     /// Footsteps used to spawn none of these. The comment that stood here said per-step geometric
@@ -2686,68 +2673,20 @@ public class ClientAudioSystem
 
     private void SubmitStepReflections(Vector3 stepPos, string soundId, float stepGain, float stepReference)
     {
+        // The surfaces round your own footfall, placed as a clap's are (WorldAudioPlayer.QueueEarlyEchoes):
+        // mirrored through the walls to third order, the loudest first, inside the window before the
+        // tail. Everywhere: outdoors the floor is skipped (the voice has its own ground) and the
+        // facades within 27 m of extra path answer, as they do. This used to return at once in traced
+        // mode, from when the traced response carried the early part too; once the listener's stage
+        // was cut to its late tail your own steps had a direct sound, a tail 50 ms later, and nothing
+        // from the walls between ("the reverb produced by the reflections should be all around me... it's
+        // just concentrated in front", 2026-09-29). The first-order, three-tap version for the room
+        // algorithm went with the room algorithm.
         Vector3 ear = _state.VisualPosition + new Vector3(0, _state.EyeHeight, 0);
-        if (OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.TracedActive)
-        {
-            // Traced: the room's early answers are placed voices and its tail is the traced stage
-            // (WorldAudioPlayer.QueueRoomEchoes), and a footfall wants the same as a clap. This used
-            // to return here, from when the traced response carried the early part too; once the
-            // room's stage was cut to its late tail, your own steps were left with a direct sound
-            // and a tail that began 50 ms later and nothing from the walls between — the room
-            // heard while walking was a wash with no reflections in it ("the reverb produced by the
-            // reflections should be all around me... it's just concentrated in front", 2026-09-29).
-            // Outdoors the voice has its own ground, and the facades' answers are the trace's.
-            if (_groundWorld is not { } world || !ListenerEnclosed(world, ear)) return;
-            SubmitRoomStepEchoes(stepPos, ear, soundId, stepGain, stepReference, world);
-            return;
-        }
-        if (_engineEchoes.SurfaceCount == 0) return;
-
-        Span<OpenFPS.Common.Reflection> found = stackalloc OpenFPS.Common.Reflection[OpenFPS.Common.EarlyReflections.MaxArrivals];
-        int n = _engineEchoes.FindReflections(stepPos, ear, AudioPhysics.SpeedOfSound, found, diffuseTaps: 1);
-        if (n <= 0) return;
-
-        float direct = MathF.Max(0.5f, Vector3.Distance(stepPos, ear));
-        int taps = 0;
-        for (int i = 0; i < n && taps < StepEchoTaps; i++)
-        {
-            var r = found[i];
-            // What the SURFACE took, with the distance divided back out: the voice is placed at the
-            // image position, so the engine applies the path's own falloff. Multiplying both in would
-            // count the distance twice and is how a reflection ends up inaudible.
-            float surfaceGain = Math.Clamp(r.Gain * r.PathLength / direct, 0f, 1f);
-            if (surfaceGain < OpenFPS.Common.ImageSource.MinGain) continue;
-
-            int echoId = STEP_ECHO_BASE_ID - (_stepEchoIndex % STEP_ECHO_POOL_SIZE);
-            _stepEchoIndex++;
-            taps++;
-
-            _audio.Submit(new SpatialEmitter
-            {
-                EntityId = echoId,
-                SoundId = soundId,
-                Position = r.ApparentPosition,
-                ApparentPosition = r.ApparentPosition,
-                Type = EmitterType.WorldLocked,
-                Volume = stepGain * surfaceGain,
-                MinDistance = stepReference,
-                Range = 25f,
-                // From the wall, later than the step, and NOT pinned to the listener: a reflection
-                // stays where the wall is while you walk on, which is the whole of what makes it a
-                // wall rather than a part of you.
-                DelayMs = r.DelaySeconds * 1000f,
-                IsReflection = true,
-                IsEvent = true,
-                ReflectionSpread = r.IsDiffuse ? 1f : 0f,
-                TargetRegionId = _listenerRegion,
-            });
-        }
+        if (_groundWorld is not { } world) return;
+        SubmitRoomStepEchoes(stepPos, ear, soundId, stepGain, stepReference, world);
     }
 
-    /// <summary>
-    /// The map's outdoor ambience bed, from the manifest. Starting it is deferred to the audio update
-    /// so it happens on the audio thread with everything else.
-    /// </summary>
     /// <summary>The room's first answers to your own footfall, placed as WorldAudioPlayer.QueueRoomEchoes
     /// places a clap's: mirrored through the walls to third order, the loudest first, inside the
     /// window before the tail, each from its own wall's direction with that wall's colour.</summary>
@@ -2768,7 +2707,7 @@ public class ClientAudioSystem
             if (a.Order == 1 && a.HitPoint.Y < MathF.Min(stepPos.Y, ear.Y) - 0.2f) continue;
             float gain = Math.Clamp(a.GainMid * a.PathLength / direct, 0f, 1f);
             if (gain < OpenFPS.Common.ImageSource.MinGain) continue;
-            gain *= OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.RoomTrim;   // the room's trim, /room
+            gain *= OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.ReflectionsTrim;   // /reflections
             var loss = WorldAudioPlayer.SpecularLoss(a.Scattering, a.Order);
             float lowDb = 20f * MathF.Log10(MathF.Max(1e-4f, a.GainLow) / MathF.Max(1e-4f, a.GainMid));
             float highDb = 20f * MathF.Log10(MathF.Max(1e-4f, a.GainHigh) / MathF.Max(1e-4f, a.GainMid));
@@ -2801,6 +2740,10 @@ public class ClientAudioSystem
         }
     }
 
+    /// <summary>
+    /// The map's outdoor ambience bed, from the manifest. Starting it is deferred to the audio update
+    /// so it happens on the audio thread with everything else.
+    /// </summary>
     public void SetMapAmbience(string ambienceId)
     {
         _mapAmbienceId = ambienceId ?? "";

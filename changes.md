@@ -4,6 +4,25 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-09-29
 
+- One rule for every place, and the room algorithm is gone. A one-off sound's first 80 ms are
+  placed voices mirrored through the surfaces round it, indoors and out, for claps and shots and
+  your own footsteps alike. The listener's traced stage plays only the late tail, everywhere, as a
+  diffuse field; other rooms heard through their doorways and vehicle cabins keep their whole
+  traced response. Facade echoes and street flutter beyond the window stay separate events
+  outdoors; in a room the copies past the window are dense and are the tail. Nothing in the audio
+  path decides by "indoors" any more except that last, physical distinction.
+- `/reflections -24` is the one level for every reflected sound against the direct: placed copies,
+  every traced tail, and the traced echoes of far sources. `/room` and `/echoes -N` set the same
+  number. It was reached three times by ear on three mechanisms, in a carpeted flat, a concrete
+  tunnel and a street, which is why it is one number and not a per-place one. Zero is the physical
+  level, measured. `OPENFPS_REFLECTIONS_DB` starts it; `OPENFPS_TAIL=full` keeps the whole traced
+  response outdoors for an A/B against the tail-only rule.
+- Retired: `/reverb room`, `OPENFPS_REVERB`, the SFXREVERB tail (the unit stays as a dry
+  passthrough the traced stage is inserted at), the Sabine and enclosure estimates behind it, the
+  wet-level loop, the room-equation sends, the anisotropy steering of the listener's bus, the
+  first-order three-tap footstep echoes, and the labs `--open-air-reverb`, `--tailcheck` and
+  `--reverb-route`. The survey's return direction and mean free path are no longer sent to the mixer.
+
 - The reflection search only looks at the boxes that can matter. Every footstep and clap in a room
   searched the whole city (5,220 solids) and tested every leg against all of it: 73-90 ms per
   footstep on the game thread in the flat, which is five frames. A path no longer than the window

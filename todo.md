@@ -8,17 +8,19 @@ Updated 2026-09-28.
 In this order.
 
 ### 1. Acoustics before moving on
-- Why do coherent copies want -24 dB? Cody set `/room -24` and `/echoes -24` by ear, on different
-  days, and both sound right; the outdoor traced tail is accepted at its physical level. The placed
-  room echoes and the traced per-source echoes are clean copies of the source from a point; the tail
-  is a dense diffuse response. Next experiment: pass each placed room echo through EchoDiffuser at
-  its wall's Scattering (plaster 0.15, brick 0.45, carpet 0.6), measure with `--clap-room`, then see
-  how far `/room` can come back toward 0 by ear. Do not raise the default without that.
-- Hear flat 01F again after 2026-09-29 (restart the CLIENT; the server is unchanged): the end walls
-  are placed, other people's steps carry the wall, the traced soundfield faces the right way, and
-  the late tail is a diffuse field round the head (DiffuseTail) instead of one channel. Below 300 Hz
-  the tail is still the same in both ears, which is physical; if the room still gathers in front,
-  try the split lower (DiffuseTail.SplitHz) and measure with `--sa-encode` first.
+- Hear the one rule (2026-09-29, unheard): the street with the tail-only stage plus placed copies,
+  against `OPENFPS_TAIL=full` (the whole traced response, as before). A bus shelter and the station
+  platform, which used to fall on the "outdoors" side and get their roof twice. A machine indoors
+  (a flat's air conditioner), which now gets first-order copies off the walls as a sustained source.
+- Why -24? Three mechanisms, three places, one figure. The tunnel (concrete, scattering 0.1) wanting
+  the same trim as the flat rules out wall scattering as the cause. What is left is the listener:
+  a copy at its physical level through a generic HRTF in headphones is heard as an event where in
+  life it is fused or suppressed. If that is right, the number is a property of the listening chain
+  and belongs in a per-listener setting, saved like `/beacons every`. Measure before changing it.
+- The trim applies to every reflected path equally, so a room's weight against the direct sound is
+  set but its differences from other rooms are kept. If a place sounds dead at -24 (the open street's
+  tail is already 25 dB down by geometry), that is the case for a ceiling rather than a trim: reflected
+  energy compressed toward a level, the way Loudness compresses source levels. Not built.
 - The diffuse tail's level per band is within 5 dB of flat but not flat (+4.8 dB at 150-300 Hz,
   -3.5 at 2.4-4.8 kHz). A head in a diffuse field is a few dB UP at 2-5 kHz, so the top is about 5 dB
   shy. The decoder's virtual-speaker layout is Steam Audio's; if it matters by ear, weight the eight

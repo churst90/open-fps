@@ -163,6 +163,13 @@ Type these on the chat line. The `/` is optional and case does not matter.
 - `/doors`: doors within 20 m. `/open [name]`, `/close [name]` (or `/shut`).
 - `/room [radius]`: whether the walls around you form a room, and what is missing if not.
 
+### Hearing
+- `/reflections [dB]`: every reflected sound against the direct sound, indoors and out: the walls'
+  answers to a clap or a step, every room's and street's tail, and the echoes of far sources. Zero is
+  the measured physical level; the default is -24, set by ear. Plain `/reflections` reads it back.
+- `/reverb`: how the tracing is doing (the tail is traced from the geometry everywhere).
+- `/echoes on|off`: the traced echoes of far, loud sources.
+
 ### Vehicles
 - `/enter [seat]` (or `/board`, `/getin`): get in. `/exit` (or `/getout`): get out.
 - `/seats`: the seats and who is in them.
