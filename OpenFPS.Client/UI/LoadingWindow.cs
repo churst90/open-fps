@@ -1,78 +1,59 @@
-using System.Windows.Forms;
-using System.Drawing;
 using System;
+using System.Drawing;
+using System.Windows.Forms;
 using OpenFPS.Client.Services;
-using OpenFPS.Client.Core.Platform;
 
 namespace OpenFPS.Client.UI;
 
-public class LoadingWindow : Form
+/// <summary>
+/// The loading screen. Its status line is a read-only text field that holds focus, so NVDA reads it
+/// when the window appears and it can be re-read with the screen reader's own keys. Progress is shown,
+/// not spoken: a player needs to hear that they are in and where (the session says that on arrival),
+/// not every step of the load.
+/// </summary>
+public sealed class LoadingWindow : Form
 {
-    private readonly ISpeechOutput _tts;
-    private ProgressBar _progressBar = null!;
-    private Label _statusLabel = null!;
+    private readonly NvdaSpeechOutput _speech;
+    private readonly TextBox _status;
+    private readonly ProgressBar _progress;
 
-    public LoadingWindow(ISpeechOutput tts)
+    public LoadingWindow(NvdaSpeechOutput speech)
     {
-        _tts = tts;
-        InitializeComponent();
+        _speech = speech;
+        Text = "OpenFPS — Loading";
+        ClientSize = new Size(460, 140);
+        StartPosition = FormStartPosition.CenterScreen;
+        FormBorderStyle = FormBorderStyle.FixedDialog;
+        MaximizeBox = false;
+        MinimizeBox = false;
+
+        _status = new TextBox
+        {
+            Dock = DockStyle.Top,
+            ReadOnly = true,
+            Multiline = true,
+            Height = 60,
+            AccessibleName = "Loading status",
+            TabIndex = 0,
+        };
+        _progress = new ProgressBar { Dock = DockStyle.Top, Minimum = 0, Maximum = 100, AccessibleName = "Loading progress" };
+        Controls.Add(_progress);
+        Controls.Add(_status);
+        Shown += (_, _) => _status.Focus();
     }
 
-    private void InitializeComponent()
+    /// <summary>A new stage of the load: shown, and spoken once.</summary>
+    public void ShowStatus(string text)
     {
-        this.Text = "OpenFPS - Loading World";
-        this.Size = new Size(500, 300);
-        this.StartPosition = FormStartPosition.CenterScreen;
-        this.FormBorderStyle = FormBorderStyle.FixedDialog;
-        this.MaximizeBox = false;
-        this.MinimizeBox = false;
-
-        var layout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3 };
-        layout.RowStyles.Add(new RowStyle(SizeType.Percent, 33F));
-        layout.RowStyles.Add(new RowStyle(SizeType.Percent, 33F));
-        layout.RowStyles.Add(new RowStyle(SizeType.Percent, 33F));
-
-        _statusLabel = new Label 
-        { 
-            Text = "Preparing to connect...", 
-            Dock = DockStyle.Fill, 
-            TextAlign = ContentAlignment.MiddleCenter,
-            Font = new Font("Arial", 14),
-            AccessibleName = "Loading Status: Preparing to connect..."
-        };
-
-        _progressBar = new ProgressBar 
-        { 
-            Dock = DockStyle.Fill, 
-            Style = ProgressBarStyle.Continuous,
-            Minimum = 0,
-            Maximum = 100,
-            Value = 0 
-        };
-
-        layout.Controls.Add(_statusLabel, 0, 0);
-        layout.Controls.Add(_progressBar, 0, 1);
-
-        this.Controls.Add(layout);
-
-        this.Load += (s, e) => _tts.Speak("Loading screen. Please wait.");
+        _status.Text = text;
+        _progress.Value = 0;
+        // NVDA reads the field as it takes focus; SAPI has nobody reading it, so it is spoken.
+        if (!_speech.ScreenReaderRunning) _speech.Speak(text, interrupt: true);
     }
 
     public void UpdateStatus(string text, int percent)
     {
-        if (this.InvokeRequired)
-        {
-            this.Invoke(new Action(() => UpdateStatus(text, percent)));
-            return;
-        }
-
-        _statusLabel.Text = text;
-        _statusLabel.AccessibleName = "Loading Status: " + text;
-        _progressBar.Value = Math.Clamp(percent, 0, 100);
-        
-        // Immediate announcement for major status changes
-        // Speak only at quarter marks: a thousand-entity map produces a thousand of these, and a
-        // screen reader asked to read all of them ends up reading none.
-        if (percent % 25 == 0 || percent == 100) _tts.Speak(text, interrupt: false);
+        _status.Text = percent > 0 ? $"{text} {percent} percent." : text;
+        _progress.Value = Math.Clamp(percent, 0, 100);
     }
 }

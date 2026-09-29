@@ -4,6 +4,31 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-09-29
 
+- The Windows client is brought level with the GTK one. Main menu: Connect, Saved Servers,
+  Settings (output and input device, interface sounds), Open log folder, Quit, on the same
+  `client.json` format (`%APPDATA%\openfps`). Keys come from the game window instead of a global
+  hook, are cleared on every focus change, and Alt on its own no longer opens the system menu.
+  Speech goes through NVDA, checked per line, with SAPI when NVDA is not running; the menus speak
+  control names only when no screen reader is running. The connect form has Create account. It
+  ships `machines/*.json`, which it lacked, so vehicles have engines. Logs go to `logs\` beside
+  the exe, and a hang writes a dump there. Compiled from Linux, not yet run on Windows.
+- `publish-windows.sh` builds a self-contained Release zip, `publish-server.sh` a server tarball
+  for a VPS (no accounts database in it). Both build under `~/.cache/openfps-publish`, not /tmp.
+  See `docs/WINDOWS_AND_SERVER.md`.
+- Client and server must be built from the same `OpenFPS.Common`. Its sources are hashed at build
+  time (`WireContract.Hash`), the client sends the hash with its login, and the server refuses a
+  mismatch and says so. An old server cannot say so: it drops the login.
+- `OPENFPS_ADMIN_PASSWORD` sets the admin password on a new database and resets it on an existing
+  one. The server warns at every start while it is still admin123.
+- The cabin of the vehicle you ride in plays its traced response at its traced level again. The
+  reflections trim had taken it 24 dB down, and a bus ride was muffled, with the doors and the
+  street gone. `/cabin <dB>` sets it for judging by ear.
+- Engines are heard to start. Firing waits for the engine computer to synchronise
+  (`EngineProfile.RevolutionsBeforeFiring`: three revolutions for petrol, four for diesel), and the
+  driver holds the key until it catches. Every preset cranked for 0.02-0.09 s before; now 0.34-0.53 s.
+- A bus lets passengers off at its stops only. Stopped at a light or a junction the doors stay shut
+  and you are told so. Anything with a door chime works this way; the driver can always get out.
+
 - One rule for every place, and the room algorithm is gone. A one-off sound's first 80 ms are
   placed voices mirrored through the surfaces round it, indoors and out, for claps and shots and
   your own footsteps alike. The listener's traced stage plays only the late tail, everywhere, as a

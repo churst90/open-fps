@@ -1246,6 +1246,15 @@ public sealed class ClientGameSession : IDisposable
                 Say($"Reflections: {OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.ReflectionsDb:F0} dB against the direct sound, on every placed reflection, every traced tail and the traced echoes, indoors and out.");
                 return;
             }
+            if (parts[0].Equals("cabin", StringComparison.OrdinalIgnoreCase))
+            {
+                var a = parts.Skip(1).FirstOrDefault();
+                if (a != null && float.TryParse(a, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float db))
+                    OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.CabinDb = Math.Clamp(db, -80f, 6f);
+                else if (a != null) { Say("Cabin: say a level in decibels, such as /cabin -12. Zero is the traced level, -80 is off."); return; }
+                Say($"Cabin: {OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.CabinDb:F0} dB against the traced level, on the response of the vehicle you are sitting in.");
+                return;
+            }
             if (parts[0].Equals("valveflow", StringComparison.OrdinalIgnoreCase))
             {
                 Say(ValveFlowCommand(parts.Skip(1).ToArray()));

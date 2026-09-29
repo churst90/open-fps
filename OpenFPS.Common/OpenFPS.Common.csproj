@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -16,5 +16,62 @@
     <EmbeddedResource Include="Speech\voices.csv" LogicalName="OpenFPS.Common.Speech.voices.csv" />
     <EmbeddedResource Include="Speech\scripts.json" LogicalName="OpenFPS.Common.Speech.scripts.json" />
   </ItemGroup>
+
+  <!-- ── THE WIRE CONTRACT ────────────────────────────────────────────────────────────────────────
+       Messages and components serialise positionally, so a client and a server built from different
+       versions of this project do not fail: they misread each other. This hashes every source file
+       of this project (sorted by path, line endings normalised, so a Windows checkout hashes the
+       same) into WireContract.Hash. The client sends it with its login and the server refuses a
+       mismatch by name, instead of a friend's out-of-date build spawning into garbage. -->
+  <UsingTask TaskName="HashWireContract" TaskFactory="RoslynCodeTaskFactory"
+             AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll">
+    <ParameterGroup>
+      <Files ParameterType="Microsoft.Build.Framework.ITaskItem[]" Required="true" />
+      <Root ParameterType="System.String" Required="true" />
+      <Hash ParameterType="System.String" Output="true" />
+    </ParameterGroup>
+    <Task>
+      <Using Namespace="System.IO" />
+      <Using Namespace="System.Linq" />
+      <Using Namespace="System.Text" />
+      <Using Namespace="System.Security.Cryptography" />
+      <Code Type="Fragment" Language="cs"><![CDATA[
+        var root = Path.GetFullPath(Root).TrimEnd('/', '\\') + Path.DirectorySeparatorChar;
+        var paths = Files.Select(f => Path.GetFullPath(f.ItemSpec))
+                         // Only this project's own sources. The SDK also compiles generated files
+                         // (global usings, assembly info) from the output folder, which is somewhere
+                         // else for every build and would make two builds of the same code disagree.
+                         .Where(p => p.StartsWith(root))
+                         .Select(p => new { Full = p, Rel = p.Substring(root.Length).Replace('\\', '/') })
+                         .Where(p => !p.Rel.StartsWith("obj/") && !p.Rel.StartsWith("bin/"))
+                         .OrderBy(p => p.Rel, System.StringComparer.Ordinal);
+        using (var sha = SHA256.Create())
+        {
+            var all = new StringBuilder();
+            foreach (var p in paths)
+                all.Append(p.Rel).Append('\n').Append(File.ReadAllText(p.Full).Replace("\r\n", "\n")).Append('\n');
+            byte[] h = sha.ComputeHash(Encoding.UTF8.GetBytes(all.ToString()));
+            Hash = string.Concat(h.Take(6).Select(b => b.ToString("x2")));
+        }
+      ]]></Code>
+    </Task>
+  </UsingTask>
+
+  <!-- The project file is an input too: a change to how the hash is made must remake it, or a build
+       folder keeps the old answer while a fresh one gets the new, and the two refuse each other. -->
+  <Target Name="GenerateWireContract" BeforeTargets="CoreCompile" Inputs="@(Compile);$(MSBuildProjectFullPath)"
+          Outputs="$(IntermediateOutputPath)WireContract.g.cs">
+    <HashWireContract Files="@(Compile)" Root="$(MSBuildProjectDirectory)">
+      <Output TaskParameter="Hash" PropertyName="WireContractHash" />
+    </HashWireContract>
+    <WriteLinesToFile File="$(IntermediateOutputPath)WireContract.g.cs" Overwrite="true" WriteOnlyWhenDifferent="true"
+                      Lines="namespace OpenFPS.Common%3B;/// &lt;summary&gt;A hash of this project's sources: client and server must match it to talk.&lt;/summary&gt;;public static class WireContract { public const string Hash = &quot;$(WireContractHash)&quot;%3B }" />
+  </Target>
+  <Target Name="IncludeWireContract" BeforeTargets="CoreCompile" AfterTargets="GenerateWireContract">
+    <ItemGroup>
+      <Compile Include="$(IntermediateOutputPath)WireContract.g.cs" />
+      <FileWrites Include="$(IntermediateOutputPath)WireContract.g.cs" />
+    </ItemGroup>
+  </Target>
 
 </Project>

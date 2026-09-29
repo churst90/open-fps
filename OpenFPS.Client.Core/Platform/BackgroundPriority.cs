@@ -36,6 +36,15 @@ public static class BackgroundPriority
     /// </summary>
     public static void LowerThisThread(string what, int nice = 10)
     {
+        if (OperatingSystem.IsWindows())
+        {
+            // On Windows the managed priority is real and needs no privilege to lower, so the same
+            // lever is one assignment. BelowNormal is the loader at a disadvantage against the mixer
+            // and the engine producers without starving it.
+            try { Thread.CurrentThread.Priority = ThreadPriority.BelowNormal; }
+            catch (Exception ex) { Log.Debug(ex, "Could not lower {What}; the loader will compete with the mixer.", what); }
+            return;
+        }
         if (!OperatingSystem.IsLinux()) return;
         try
         {

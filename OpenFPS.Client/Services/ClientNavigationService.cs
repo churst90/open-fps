@@ -1,173 +1,110 @@
 using System;
-using System.Collections.Concurrent;
 using System.Windows.Forms;
 using OpenFPS.Client.UI;
-using OpenFPS.Client.Core.Platform;
 
 namespace OpenFPS.Client.Services;
 
 /// <summary>
-/// Centralizes Form management and provides a thread-safe way to update the UI
-/// without risking Invoke deadlocks from the network/game thread.
+/// Owns the Forms — main menu, loading screen, game window — and moves between them. Safe to call
+/// from any thread: every change is marshalled onto the UI thread first.
+///
+/// The marshal is a hidden control's BeginInvoke, which posts a window message and so wakes the UI
+/// thread. The queue it replaces was drained on Application.Idle, which only fires after some OTHER
+/// message has been handled — so a loading line or a login outcome posted from the game thread could
+/// sit unseen until the player happened to press a key.
 /// </summary>
-public class ClientNavigationService : ApplicationContext
+public sealed class ClientNavigationService : ApplicationContext
 {
-    private readonly ISpeechOutput _tts;
+    private readonly Control _marshal;
     private readonly Func<MenuWindow> _menuFactory;
-    
+    private readonly Func<MainWindow> _gameFactory;
+    private readonly Func<LoadingWindow> _loadingFactory;
+
     private MenuWindow? _menu;
     private LoadingWindow? _loading;
     private MainWindow? _gameWindow;
-    
-    // Thread-safe UI update queue
-    private readonly ConcurrentQueue<Action> _uiThreadQueue = new();
 
-    public ClientNavigationService(ISpeechOutput tts, Func<MenuWindow> menuFactory)
+    /// <summary>Must be constructed on the UI thread, before Application.Run.</summary>
+    public ClientNavigationService(Func<MenuWindow> menuFactory, Func<LoadingWindow> loadingFactory, Func<MainWindow> gameFactory)
     {
-        _tts = tts;
         _menuFactory = menuFactory;
-
-        // Drain the UI action queue when the application is idle
-        Application.Idle += (s, e) => ProcessUIQueue();
+        _loadingFactory = loadingFactory;
+        _gameFactory = gameFactory;
+        _marshal = new Control();
+        _marshal.CreateControl();
+        _ = _marshal.Handle;
     }
 
+    /// <summary>The menu window, once shown. Null in game.</summary>
+    public MenuWindow? Menu => _menu is { IsDisposed: false } m ? m : null;
+
+    /// <summary>Runs an action on the UI thread, now if already there.</summary>
     public void EnqueueUIAction(Action action)
     {
-        _uiThreadQueue.Enqueue(action);
-    }
-
-    private void ProcessUIQueue()
-    {
-        while (_uiThreadQueue.TryDequeue(out var action))
+        void Safe()
         {
-            try
-            {
-                action();
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[UI Queue Error] {ex}");
-            }
+            try { action(); }
+            catch (Exception ex) { Serilog.Log.Error(ex, "UI action failed."); }
         }
+        if (!_marshal.InvokeRequired) { Safe(); return; }
+        try { _marshal.BeginInvoke(new Action(Safe)); }
+        catch (InvalidOperationException) { /* shutting down: the handle is gone */ }
     }
 
-    /// <summary>Passes a connect/login outcome to the menu's auth form, if one is open. Safe from any
-    /// thread — it goes through the same idle-drained queue as every other UI change.</summary>
-    public void ReportLoginOutcome(string message, bool success)
-    {
-        EnqueueUIAction(() =>
-        {
-            if (_menu is { IsDisposed: false }) _menu.ReportLoginOutcome(message, success);
-        });
-    }
+    /// <summary>Passes a connect/login outcome to the menu's connect form, if one is open.</summary>
+    public void ReportLoginOutcome(string message, bool success) =>
+        EnqueueUIAction(() => Menu?.ReportLoginOutcome(message, success));
 
-    public void ShowMenu()
+    public void ShowMenu() => EnqueueUIAction(() =>
     {
-        if (this.MainForm != null && this.MainForm.InvokeRequired)
-        {
-            EnqueueUIAction(ShowMenu);
-            return;
-        }
-
         if (_menu == null || _menu.IsDisposed)
         {
             _menu = _menuFactory();
-            _menu.FormClosed += (s, e) => 
-            { 
-                if (_gameWindow == null && _loading == null) ExitThread(); 
+            _menu.FormClosed += (_, _) => { if (_gameWindow == null) ExitThread(); };
+        }
+        SwitchTo(_menu);
+    });
+
+    public void ShowLoading(string status) => EnqueueUIAction(() =>
+    {
+        if (_loading == null || _loading.IsDisposed) _loading = _loadingFactory();
+        _loading.ShowStatus(status);
+        // Over the menu, not instead of it: a login that fails after this goes back to the connect form.
+        if (!_loading.Visible) _loading.Show(Menu);
+        _loading.Activate();
+    });
+
+    public void UpdateLoadingStatus(string text, int percent) => EnqueueUIAction(() =>
+    {
+        if (_loading is { IsDisposed: false }) _loading.UpdateStatus(text, percent);
+    });
+
+    /// <summary>
+    /// Brings the game window up. ONE window for the life of the session: the server answers every
+    /// spawn with a PlayerSpawned, the first and every /tp after it, and a window per call leaves a
+    /// stack of them behind the live one.
+    /// </summary>
+    public void EnterGame(Action<MainWindow> setup) => EnqueueUIAction(() =>
+    {
+        if (_gameWindow == null || _gameWindow.IsDisposed)
+        {
+            _gameWindow = _gameFactory();
+            setup(_gameWindow);
+            _gameWindow.FormClosed += (_, _) =>
+            {
+                Serilog.Log.Information("Game window closed.");
+                ExitThread();
             };
         }
-        
-        var oldForm = this.MainForm;
-        this.MainForm = _menu;
-        _menu.Show();
-        _menu.Focus();
+        SwitchTo(_gameWindow);
+        if (_loading is { IsDisposed: false }) { _loading.Dispose(); _loading = null; }
+        _menu?.Hide();
+    });
 
-        if (oldForm != null && oldForm != _menu) 
-        {
-            oldForm.Hide();
-            // We don't dispose immediately to allow the message pump to settle
-            EnqueueUIAction(() => { if (!oldForm.IsDisposed) oldForm.Dispose(); });
-        }
-    }
-
-    public void ShowLoading(string initialStatus = "Connecting...")
+    private void SwitchTo(Form form)
     {
-        if (this.MainForm != null && this.MainForm.InvokeRequired)
-        {
-            EnqueueUIAction(() => ShowLoading(initialStatus));
-            return;
-        }
-
-        if (_loading == null || _loading.IsDisposed)
-        {
-            _loading = new LoadingWindow(_tts);
-            _loading.FormClosed += (s, e) => 
-            {
-                if (_gameWindow == null && _menu == null) ExitThread();
-            };
-        }
-
-        _loading.UpdateStatus(initialStatus, 0);
-        
-        var oldForm = this.MainForm;
-        this.MainForm = _loading;
-        _loading.Show();
-        _loading.Focus();
-
-        if (oldForm != null && oldForm != _loading) 
-        {
-            oldForm.Hide();
-            EnqueueUIAction(() => { if (!oldForm.IsDisposed) oldForm.Dispose(); });
-        }
-    }
-
-    public void UpdateLoadingStatus(string text, int percent)
-    {
-        if (_loading != null && !_loading.IsDisposed)
-        {
-            _loading.UpdateStatus(text, percent);
-        }
-    }
-
-    public void EnterGame(Action<MainWindow> setup)
-    {
-        if (this.MainForm != null && this.MainForm.InvokeRequired)
-        {
-            EnqueueUIAction(() => EnterGame(setup));
-            return;
-        }
-
-        try 
-        {
-            if (_gameWindow == null || _gameWindow.IsDisposed)
-            {
-                _gameWindow = new MainWindow(_tts);
-                setup(_gameWindow);
-                _gameWindow.FormClosed += (s, e) => ExitThread();
-            }
-
-            var oldForm = this.MainForm;
-            this.MainForm = _gameWindow;
-            _gameWindow.Show();
-            _gameWindow.Focus();
-            _tts.Speak("Game world entered.");
-
-            if (oldForm != null && oldForm != _gameWindow) 
-            {
-                oldForm.Hide();
-                // Delay disposal to ensure the switch is fully registered by the OS
-                EnqueueUIAction(() => { 
-                    if (!oldForm.IsDisposed) oldForm.Dispose(); 
-                    if (oldForm == _loading) _loading = null;
-                    if (oldForm == _menu) _menu = null;
-                });
-            }
-        }
-        catch (Exception ex)
-        {
-            _tts.Speak("Error switching to game window.");
-            Console.WriteLine($"[UI ERROR] EnterGame: {ex}");
-        }
+        MainForm = form;
+        if (!form.Visible) form.Show();
+        form.Activate();
     }
 }

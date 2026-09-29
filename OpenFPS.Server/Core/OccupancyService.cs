@@ -325,6 +325,19 @@ public class OccupancyService
                 message = $"{name} is still moving. Stop first.";
                 return false;
             }
+            // A vehicle with a passenger door that beeps (VehicleProfile.DoorChime) opens it at its
+            // stops and nowhere else: stopped at a light or a junction, a passenger stays on. It used
+            // to let you off wherever it stood still, without the doors or the beeper. The driver's
+            // own door is not that door.
+            if (!occupant.Controls && world.Has<SoundEmitterComponent>(root)
+                && world.Get<SoundEmitterComponent>(root) is { SoundId: { } sid } em
+                && sid.StartsWith("engine:", StringComparison.OrdinalIgnoreCase)
+                && MachineRegistry.Knows(sid[7..]) && MachineRegistry.VehicleFor(sid[7..]).DoorChime
+                && !em.ServingStop)
+            {
+                message = $"The doors of {name} are shut. It lets passengers off at its stops.";
+                return false;
+            }
             spot = FindStandingRoom(world, grid, root, session.Entity, from, occupant.BoardedFrom);
             // Off the way it was going: you step down facing the direction you were carried in,
             // not whichever way your head happened to be turned in the seat.

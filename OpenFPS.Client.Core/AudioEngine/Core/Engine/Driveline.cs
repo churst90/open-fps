@@ -404,7 +404,10 @@ public sealed class VirtualDriver
             return;
         }
         _engine.Ignition = true;
-        _engine.Starter = _engine.Rpm < e.CrankingRpm * 1.5f;
+        // The key is held until it catches: until it fires and pulls away from the starter's speed.
+        // Released on speed alone, the crank passed 1.5 times its cranking speed before the engine
+        // computer had synchronised, and the start was a starter blip and a silent coast.
+        _engine.Starter = !_engine.Firing || _engine.Rpm < e.CrankingRpm * 1.5f;
 
         // Estimate the target's acceleration, so the throttle can lead rather than lag.
         _accelEstimate += ((TargetSpeed - _lastTarget) / MathF.Max(dt, 1e-4f) - _accelEstimate) * MathF.Min(1f, dt * 4f);

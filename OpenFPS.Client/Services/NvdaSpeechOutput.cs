@@ -8,12 +8,13 @@ namespace OpenFPS.Client.Services;
 /// <summary>
 /// Windows speech output: NVDA's controller client if NVDA is running, SAPI 5 otherwise.
 ///
-/// This is the Windows implementation of <see cref="ISpeechOutput"/> — the same code that used to be
-/// <c>TolkService</c>, now behind the interface the shared session speaks through. It is kept in
-/// preference to <see cref="TolkSpeechOutput"/> (which covers JAWS, Window-Eyes, ZoomText and the
-/// rest) for one practical reason: <c>nvdaControllerClient64.dll</c> ships in this repo's <c>lib/</c>
-/// and <c>Tolk.dll</c> does not, so switching backends would trade a working screen reader for
-/// silence. Ship Tolk.dll and the swap is a one-line change in ClientRunner.
+/// Decided per line, not once: NVDA started (or restarted) after the game is heard through NVDA from
+/// the next line on, and NVDA quitting falls back to SAPI instead of going silent. The check is an
+/// RPC, so its answer is kept for two seconds.
+///
+/// Needs <c>nvdaControllerClient64.dll</c> next to the executable; the build copies it from lib/.
+/// JAWS and Narrator users get SAPI; Tolk (<see cref="TolkSpeechOutput"/>) would reach them, and
+/// needs Tolk.dll shipped.
 /// </summary>
 public sealed class NvdaSpeechOutput : ISpeechOutput
 {
@@ -29,61 +30,82 @@ public sealed class NvdaSpeechOutput : ISpeechOutput
         public static extern int nvdaController_cancelSpeech();
     }
 
-    private bool _nvdaActive;
+    private readonly object _gate = new();
+    private bool _controllerMissing;
+    private bool _nvda;
+    private long _checkedAt;
     private SpeechSynthesizer? _sapi;
 
-    public string BackendName { get; private set; } = "none";
+    public string BackendName => ScreenReaderRunning ? "NVDA" : "SAPI 5";
+
+    /// <summary>
+    /// True while NVDA is running. The menus use it: NVDA already announces every control that takes
+    /// focus, so the game speaking the same name on top would interrupt it, or be interrupted by it.
+    /// </summary>
+    public bool ScreenReaderRunning
+    {
+        get
+        {
+            lock (_gate)
+            {
+                if (_controllerMissing) return false;
+                long now = Environment.TickCount64;
+                if (_checkedAt != 0 && now - _checkedAt < 2000) return _nvda;
+                _checkedAt = now;
+                try { _nvda = NvdaNative.nvdaController_testIfRunning() == 0; }
+                catch (DllNotFoundException)
+                {
+                    _controllerMissing = true;
+                    _nvda = false;
+                    Serilog.Log.Warning("nvdaControllerClient64.dll is missing; speech goes through SAPI even when NVDA is running.");
+                }
+                catch (Exception ex) { _nvda = false; Serilog.Log.Debug(ex, "NVDA check failed."); }
+                return _nvda;
+            }
+        }
+    }
 
     public bool Initialize()
     {
+        bool nvda = ScreenReaderRunning;
+        Serilog.Log.Information("Speech output: {Backend}", nvda ? "NVDA" : "SAPI 5 (NVDA is not running)");
+        return nvda || Sapi() != null;
+    }
+
+    private SpeechSynthesizer? Sapi()
+    {
+        if (_sapi != null) return _sapi;
         try
         {
-            _nvdaActive = NvdaNative.nvdaController_testIfRunning() == 0;
+            _sapi = new SpeechSynthesizer();
+            _sapi.SetOutputToDefaultAudioDevice();
         }
-        catch
+        catch (Exception ex)
         {
-            _nvdaActive = false;
+            Serilog.Log.Error(ex, "SAPI failed to start: with NVDA not running there is no speech at all.");
+            _sapi = null;
         }
-
-        if (_nvdaActive)
-        {
-            BackendName = "NVDA";
-        }
-        else
-        {
-            try
-            {
-                _sapi = new SpeechSynthesizer();
-                _sapi.SetOutputToDefaultAudioDevice();
-                BackendName = "SAPI 5";
-            }
-            catch (Exception ex)
-            {
-                Serilog.Log.Error(ex, "No speech backend available: NVDA is not running and SAPI failed to start.");
-                return false;
-            }
-        }
-
-        Serilog.Log.Information("Speech output: {Backend}", BackendName);
-        Speak("Accessibility bridge ready.", interrupt: true);
-        return true;
+        return _sapi;
     }
 
     public void Speak(string text, bool interrupt = true)
     {
         if (string.IsNullOrEmpty(text)) return;
-
-        if (interrupt) Interrupt();
-
-        if (_nvdaActive) NvdaNative.nvdaController_speakText(text);
-        else _sapi?.SpeakAsync(text);
-
-        Console.WriteLine($"[TTS] {text}");
+        if (ScreenReaderRunning)
+        {
+            if (interrupt) NvdaNative.nvdaController_cancelSpeech();
+            NvdaNative.nvdaController_speakText(text);
+            return;
+        }
+        var sapi = Sapi();
+        if (sapi == null) return;
+        if (interrupt) sapi.SpeakAsyncCancelAll();
+        sapi.SpeakAsync(text);
     }
 
     public void Interrupt()
     {
-        if (_nvdaActive) NvdaNative.nvdaController_cancelSpeech();
+        if (ScreenReaderRunning) NvdaNative.nvdaController_cancelSpeech();
         else _sapi?.SpeakAsyncCancelAll();
     }
 

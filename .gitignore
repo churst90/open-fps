@@ -508,3 +508,6 @@ OpenFPS.Client/ASSETS/SOUNDS/AMBIENCE/
 # Per-server player data
 OpenFPS.Server/friends.json
 OpenFPS.Server/friends.json.bad
+
+# Built packages: publish-windows.sh and publish-server.sh
+dist/

@@ -509,7 +509,7 @@ internal static partial class GtkClientProgram
     {
         Log.Information("Connected to server; sending login for user '{User}'.", _pendingUser);
         _speech.Speak("Connected. Logging in.", true);
-        _network.Send(new LoginRequest { Username = _pendingUser, Password = _pendingPass });
+        _network.Send(new LoginRequest { Username = _pendingUser, Password = _pendingPass, Build = WireContract.Hash });
     }
 
     // ── Server messages (GameLoop thread) ───────────────────────────────────────

@@ -43,7 +43,7 @@ public static class FmodDebugLog
                   | FMOD.DEBUG_FLAGS.DISPLAY_TIMESTAMPS | FMOD.DEBUG_FLAGS.DISPLAY_THREAD;
         if (want == "all") flags |= FMOD.DEBUG_FLAGS.LOG | FMOD.DEBUG_FLAGS.TYPE_TRACE;
 
-        string path = Environment.GetEnvironmentVariable("OPENFPS_FMOD_DEBUG_FILE") ?? "/tmp/fmod-debug.log";
+        string path = Environment.GetEnvironmentVariable("OPENFPS_FMOD_DEBUG_FILE") ?? Path.Combine(Path.GetTempPath(), "fmod-debug.log");
         _out = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.ReadWrite,
                               bufferSize: 1, FileOptions.WriteThrough);
         _held = Write;

@@ -522,6 +522,19 @@ public class GameServer
             return;
         }
 
+        // A network client built from a different OpenFPS.Common reads every message after this one
+        // wrongly, and nothing downstream can say so: it spawns into nonsense. Refuse it here, by name.
+        // The MUD gateway speaks text, not MemoryPack, so it has no contract to match.
+        if (_network.GetPeer(connectionId) != null && request.Build != WireContract.Hash)
+        {
+            string theirs = request.Build.Length > 0 ? request.Build : "an older one";
+            Log.Warning("Login REFUSED for user '{User}' on connection {Id}: client build {Client}, server build {Server}.",
+                request.Username, connectionId, theirs, WireContract.Hash);
+            reply(new LoginResponse { Success = false, Message =
+                $"This client does not match the server. Your build is {theirs}, the server's is {WireContract.Hash}. Get the client built from the same version as the server." });
+            return;
+        }
+
         if (!_userRepo.VerifyPassword(request.Username, request.Password))
         {
             // A rejected login left no trace at all, which made "the client said nothing" impossible to

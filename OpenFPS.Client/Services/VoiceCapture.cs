@@ -24,6 +24,31 @@ public sealed class VoiceCapture : IMicrophoneCapture
     private readonly byte[] _frameBuffer = new byte[FrameSizeBytes];
     private int _framePos;
     private bool _capturing;
+    private readonly Func<string> _preferredDevice;
+
+    /// <param name="preferredDevice">The microphone chosen in Settings, by the name FMOD lists it
+    /// under; empty for the system default.</param>
+    public VoiceCapture(Func<string>? preferredDevice = null) => _preferredDevice = preferredDevice ?? (() => "");
+
+    /// <summary>
+    /// The NAudio device number for the chosen microphone, or -1 (the default device, WAVE_MAPPER).
+    /// Settings lists devices by FMOD's names, and the old waveIn API truncates a name to 31
+    /// characters, so a device matches when one name begins with the other.
+    /// </summary>
+    private int DeviceNumber()
+    {
+        string want = _preferredDevice();
+        if (want.Length == 0) return -1;
+        for (int i = 0; i < WaveInEvent.DeviceCount; i++)
+        {
+            string name = WaveInEvent.GetCapabilities(i).ProductName;
+            if (name.Length > 0 && (want.StartsWith(name, StringComparison.OrdinalIgnoreCase)
+                                    || name.StartsWith(want, StringComparison.OrdinalIgnoreCase)))
+                return i;
+        }
+        Serilog.Log.Warning("The chosen microphone, {Name}, is not connected; using the default.", want);
+        return -1;
+    }
 
     /// <summary>
     /// Raised on the NAudio capture thread each time a complete 20ms Opus packet is ready.
@@ -60,6 +85,7 @@ public sealed class VoiceCapture : IMicrophoneCapture
 
             _waveIn = new WaveInEvent
             {
+                DeviceNumber = DeviceNumber(),
                 WaveFormat = new WaveFormat(SampleRate, 16, Channels),
                 BufferMilliseconds = FrameSizeMs
             };

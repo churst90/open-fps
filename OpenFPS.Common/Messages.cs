@@ -421,7 +421,15 @@ public partial class ChatMessage : IMessage
 }
 
 [MemoryPackable]
-public partial class LoginRequest : IMessage { public string Username = string.Empty; public string Password = string.Empty; }
+public partial class LoginRequest : IMessage
+{
+    public string Username = string.Empty;
+    public string Password = string.Empty;
+    // Appended: messages serialise positionally.
+    /// <summary>The client's <see cref="WireContract.Hash"/>. The server refuses a network login whose
+    /// contract differs from its own, because the two would misread every message after this one.</summary>
+    public string Build = string.Empty;
+}
 
 [MemoryPackable]
 public partial class LoginResponse : IMessage

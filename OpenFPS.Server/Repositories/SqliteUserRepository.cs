@@ -28,20 +28,37 @@ public class SqliteUserRepository : IUserRepository
         Log.Information("UserRepository: SQLite database ready.");
     }
 
+    /// <summary>
+    /// The first run seeds an admin. With OPENFPS_ADMIN_PASSWORD set, that is its password — and on an
+    /// existing database the admin's password is RESET to it, which is the only way to change it
+    /// without a client. A server reachable from the internet must be started with it at least once:
+    /// admin/admin123 is written in this repository for anyone to read.
+    /// </summary>
     private void EnsureAdminSeed()
     {
+        string? chosen = Environment.GetEnvironmentVariable("OPENFPS_ADMIN_PASSWORD");
         using var ctx = CreateContext();
         if (!ctx.Users.Any())
         {
             ctx.Users.Add(new UserRecord
             {
                 Username = "admin",
-                PasswordHash = BCrypt.Net.BCrypt.HashPassword("admin123"),
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword(string.IsNullOrEmpty(chosen) ? "admin123" : chosen),
                 Role = UserRole.Admin
             });
             ctx.SaveChanges();
             Log.Information("UserRepository: Seeded default admin user.");
         }
+        else if (!string.IsNullOrEmpty(chosen) && ctx.Users.FirstOrDefault(u => u.Username == "admin") is { } admin)
+        {
+            admin.PasswordHash = BCrypt.Net.BCrypt.HashPassword(chosen);
+            ctx.SaveChanges();
+            Log.Information("UserRepository: admin password set from OPENFPS_ADMIN_PASSWORD.");
+        }
+        if (string.IsNullOrEmpty(chosen) && ctx.Users.FirstOrDefault(u => u.Username == "admin") is { } a
+            && BCrypt.Net.BCrypt.Verify("admin123", a.PasswordHash))
+            Log.Warning("UserRepository: the admin password is still the default, admin123. "
+                      + "Start once with OPENFPS_ADMIN_PASSWORD set before anyone else can reach this server.");
     }
 
     public UserData? GetUser(string username)

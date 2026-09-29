@@ -1,7 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <OutputType>Exe</OutputType>
+    <!-- WinExe: no console window. A console beside the game is a second window for the screen reader
+         to land in, and the log is written to a file anyway (see Program). -->
+    <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -22,7 +24,6 @@
   <ItemGroup>
     <PackageReference Include="Concentus" Version="2.2.2" />
     <PackageReference Include="LiteNetLib" Version="1.2.0" />
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.4" />
     <PackageReference Include="MemoryPack" Version="1.21.4" />
     <PackageReference Include="NAudio" Version="2.2.1" />
     <PackageReference Include="Serilog" Version="4.2.0" />
@@ -43,6 +44,12 @@
          OUTSIDE this project's cone. Items outside the cone must be Include'd with a Link,
          not Update'd — the previous "..\libs\*.dll" (wrong folder, Update) matched nothing,
          so the FMOD DLLs never landed next to the exe and the client failed to start. -->
+    <!-- The authored machine library. The client assembles a vehicle's engine itself from the name
+         the server sends, so it has to know the same machines the server does. Without these every
+         car, bus and aircraft has no engine to play. -->
+    <None Include="..\OpenFPS.Server\machines\*.json" Link="machines\%(Filename)%(Extension)">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <None Include="..\lib\*.dll" Link="%(Filename)%(Extension)">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>

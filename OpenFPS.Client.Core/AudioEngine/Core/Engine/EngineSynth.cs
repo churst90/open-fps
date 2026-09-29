@@ -44,6 +44,12 @@ public sealed class EngineSynth
     public bool Ignition { get; set; } = true;
     /// <summary>Whether the starter is engaged.</summary>
     public bool Starter { get; set; }
+    /// <summary>Crank degrees turned with the ignition on since the engine last stood still; firing
+    /// waits for <see cref="EngineProfile.FiringAfterRevolutions"/>. Infinite once placed running.</summary>
+    private float _syncDegrees = float.PositiveInfinity;
+    /// <summary>Whether the engine computer has synchronised and the cylinders are being fuelled —
+    /// what a driver holding the key is listening for.</summary>
+    public bool Firing => Ignition && _syncDegrees >= 360f * Profile.FiringAfterRevolutions;
     /// <summary>Torque resisting the crank from whatever it is connected to, Nm. Positive resists.</summary>
     public float LoadTorque { get; set; }
     /// <summary>Extra rotating inertia the crank has to carry, kg m^2 — the car, reflected through
@@ -109,6 +115,9 @@ public sealed class EngineSynth
     public void SpinTo(float rpm)
     {
         _omega = MathF.Max(0f, rpm) * 2f * MathF.PI / 60f;
+        // Placed already turning: already synchronised, so a car heard for the first time at speed
+        // does not go quiet for three revolutions.
+        _syncDegrees = rpm > 0f ? float.PositiveInfinity : 0f;
         _rpmSlow = Rpm;
         _rpmFast = Rpm;
     }
@@ -686,6 +695,10 @@ public sealed class EngineSynth
         double before = _theta;
         _theta += _omega * (180.0 / Math.PI) * _dt;
         if (_theta >= _cycleDeg) _theta -= _cycleDeg;
+        // The engine computer's count since the key was turned. Lost with the ignition, and with the
+        // crank stopping: a stalled engine has to find itself again.
+        if (!Ignition || _omega < 0.5f) _syncDegrees = 0f;
+        else if (_syncDegrees < float.PositiveInfinity) _syncDegrees += _omega * (180f / MathF.PI) * _dt;
 
         float gasTorque = 0f;
         float portPeak = 0f;
@@ -698,7 +711,7 @@ public sealed class EngineSynth
         float load = Math.Clamp((_map / Gas.Atmosphere - 0.3f) / 0.7f, 0f, 1f);
         if (e.Fuel == FuelType.Diesel) load = _pedal;
         float intakeK = _intakeK;
-        bool firing = Ignition && _omega > 5f;
+        bool firing = Ignition && _omega > 5f && _syncDegrees >= 360f * e.FiringAfterRevolutions;
 
         for (int c = 0; c < _n; c++)
         {
@@ -1611,7 +1624,7 @@ public sealed class EngineSynth
     /// <summary>Resets the engine to cold and still.</summary>
     public void Reset()
     {
-        _omega = 0f; _theta = 0; _idleAir = 0f; _spool = 0f; _massFlowLp = 0f;
+        _omega = 0f; _theta = 0; _idleAir = 0f; _spool = 0f; _massFlowLp = 0f; _syncDegrees = 0f;
         _turbineTone = 0f; _wb1 = _wb2 = _wx1 = _wx2 = 0f;
     }
 

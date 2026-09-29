@@ -141,7 +141,24 @@ public class BusBoardingTests
         Assert.False(c.Seats.Exit(rider, out string refused), "got off a moving bus");
         _o.WriteLine(refused);
 
-        UntilStopped(c, bus);
+        // Off at the next STOP. Standing still at a junction or behind a car is not one: the doors
+        // stay shut, and you are told why.
+        for (int stops = 0; ; stops++)
+        {
+            Assert.True(stops < 20, "the bus never served a stop");
+            UntilStopped(c, bus);
+            bool serving = false;
+            for (int i = 0; i < 90 && !serving; i++)
+            {
+                serving = c.World.Get<SoundEmitterComponent>(bus).ServingStop;
+                if (!serving) c.Tick(1);
+            }
+            if (serving) break;
+            Assert.False(c.Seats.Exit(rider, out string shut), "got off with the doors shut, away from a stop");
+            Assert.Contains("stops", shut);
+            _o.WriteLine(shut);
+            for (int i = 0; i < 60 * 30 && Speed(c, bus) < 3f; i++) c.Tick(1);
+        }
         Assert.True(c.Seats.Exit(rider, out string off), off);
         _o.WriteLine(off);
         Assert.False(c.World.Has<OccupantComponent>(rider.Entity));

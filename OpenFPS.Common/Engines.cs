@@ -454,6 +454,18 @@ public sealed record EngineProfile
     public required float IdleRpm { get; init; }
     public required float RedlineRpm { get; init; }
     public float CrankingRpm { get; init; } = 250f;
+    /// <summary>
+    /// Crank revolutions the starter turns before the first cylinder fires. An engine computer
+    /// fuels and sparks nothing until it has found the crank and the cam — up to a whole cycle, two
+    /// revolutions — and injects on the next intake stroke after that. A common-rail diesel must
+    /// also raise its rail to injection pressure. Without it the synthesis fired on the first
+    /// compression at cranking speed and caught in 50 ms, and nobody heard a car start
+    /// (2026-09-29). NaN takes the default for the fuel: three for petrol, four for diesel, which
+    /// at the declared cranking speeds is about 0.7 s for a car and two seconds for a bus.
+    /// </summary>
+    public float RevolutionsBeforeFiring { get; init; } = float.NaN;
+    public float FiringAfterRevolutions => float.IsNaN(RevolutionsBeforeFiring)
+        ? (Fuel == FuelType.Diesel ? 4f : 3f) : RevolutionsBeforeFiring;
     /// <summary>Rotating inertia of crank, flywheel, clutch and damper, kg m^2. A heavy flywheel
     /// is 0.35-0.5, a race one 0.1. It decides how fast a free rev climbs and how much the crank
     /// speed ripples between firings.</summary>

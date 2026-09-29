@@ -1521,6 +1521,10 @@ public class FmodAudioProvider : IAudioProvider
         float.TryParse(Environment.GetEnvironmentVariable("OPENFPS_REFLECTIONS_DB"), System.Globalization.NumberStyles.Float,
                        System.Globalization.CultureInfo.InvariantCulture, out float reflDb) ? Math.Clamp(reflDb, -40f, 6f) : -24f;
     public static float ReflectionsTrim => MathF.Pow(10f, ReflectionsDb / 20f);
+
+    /// <summary>The cabin's traced response against its physical level, dB: 0 is the traced level.
+    /// `/cabin <dB>` sets it, for judging a ride by ear; the reflections trim does not touch it.</summary>
+    public static volatile float CabinDb = 0f;
     /// <summary>Once chosen, a source keeps its trace at least this long: no flicker as it passes
     /// behind something.</summary>
     private const float EchoMinHoldSeconds = 3f;
@@ -1777,7 +1781,12 @@ public class FmodAudioProvider : IAudioProvider
             // inside a vehicle.
             kv.Value.State.TailOnly = kv.Key == _listenerRegionId && !ReferenceEquals(trace, cabin)
                                       && (TailEverywhere || IsEnclosure(kv.Key));
-            kv.Value.State.Gain = ReflectionsTrim;
+            // The trim is for reflections heard beside their direct sound. A cabin's response is not
+            // that: nothing is placed inside a vehicle, so it is the whole of the room you sit in,
+            // and it plays at its traced level as it did before the trim existed. Trimmed with the
+            // rest (2026-09-29) it sat 24 dB down, and a bus ride was "very very muffled", with the
+            // doors and the street gone and no way to tell the bus was stopping.
+            kv.Value.State.Gain = ReferenceEquals(trace, cabin) ? MathF.Pow(10f, CabinDb / 20f) : ReflectionsTrim;
         }
 
         // ONLY WHERE IT CAN BE HEARD. A traced stage convolves and then decodes round the head, about

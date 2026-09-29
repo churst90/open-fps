@@ -368,9 +368,13 @@ public sealed class BeaconPreferences
 
     public static BeaconPreferences Load()
     {
-        string dir = Environment.GetEnvironmentVariable("XDG_CONFIG_HOME") is { Length: > 0 } x
-            ? Path.Combine(x, "openfps")
-            : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".config", "openfps");
+        // Beside client.json (see ClientSettings.DefaultPath): %APPDATA%\openfps on Windows. Linux keeps
+        // the XDG folder it always used, which is the same place ClientSettings resolves to there.
+        string dir = OperatingSystem.IsWindows()
+            ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "openfps")
+            : Environment.GetEnvironmentVariable("XDG_CONFIG_HOME") is { Length: > 0 } x
+                ? Path.Combine(x, "openfps")
+                : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".config", "openfps");
         string path = Path.Combine(dir, "beacons.json");
         var choices = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
         double every = BeaconAids.DefaultEvery;
