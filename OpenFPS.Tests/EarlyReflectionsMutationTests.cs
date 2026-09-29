@@ -141,11 +141,14 @@ public class EarlyReflectionsMutationTests
     [Fact]
     public void ACopyOfACopyPastTheSearchRangeIsNotReported()
     {
-        var a = Box(new Vector3(-55.5f, 0, 15f), new Vector3(1f, 20f, 200f));
-        var b = Box(new Vector3(55.5f, 0, 15f), new Vector3(1f, 20f, 200f));
+        // The range counts the EXTRA path over the direct sound (2026-09-28): walls 220 m apart, so the
+        // first-order copies run 192 m further than the 30 m direct sound (kept) and the copy of a
+        // copy 411 m further (past the 200 m range).
+        var a = Box(new Vector3(-110.5f, 0, 15f), new Vector3(1f, 20f, 400f));
+        var b = Box(new Vector3(110.5f, 0, 15f), new Vector3(1f, 20f, 400f));
         var listener = new Vector3(0, 0, 30f);
-        // Loud enough to keep if it were in range: 30/222 of the direct sound, twice through concrete.
-        Assert.True(KeepMid * KeepMid * 30f / MathF.Sqrt(220f * 220f + 900f) > EarlyReflections.MinRelativeAmplitude);
+        // Loud enough to keep if it were in range: 30/441 of the direct sound, twice through concrete.
+        Assert.True(KeepMid * KeepMid * 30f / MathF.Sqrt(440f * 440f + 900f) > EarlyReflections.MinRelativeAmplitude);
 
         EarlyReflections.Find(Source, listener, new[] { a, b }, _found, maxOrder: 2);
         Assert.Equal(2, _found.Count);

@@ -80,7 +80,19 @@ internal sealed class TracedEchoes : IDisposable
     public const float CrossfadeSeconds = RefreshMs * 0.001f * 0.85f;
     private readonly bool[] _inUse = new bool[MaxSources];
     private readonly Vector3[] _at = new Vector3[MaxSources];
+    /// <summary>
+    /// Two locks, and the game thread only ever takes the first. <c>_gate</c> guards the requests —
+    /// which slots are in use, where each source and the listener are, which sources are waiting to
+    /// be added — and is held for microseconds. <c>_simGate</c> guards the simulator, and a trace holds
+    /// it for its whole run. With one lock, every per-frame SetSource and SetListener waited out the
+    /// trace in progress (see TracedReverb.SetListener: 680 ms stalls in the airport terminal).
+    /// </summary>
     private readonly object _gate = new();
+    private readonly object _simGate = new();
+    private readonly bool[] _pendingAdd = new bool[MaxSources];
+    // The loop thread's copy of the requests, so the trace runs without holding _gate.
+    private readonly Vector3[] _atSnap = new Vector3[MaxSources];
+    private readonly bool[] _addSnap = new bool[MaxSources];
     private Thread? _thread;
     private volatile bool _running;
     private Vector3 _listener;
@@ -110,7 +122,7 @@ internal sealed class TracedEchoes : IDisposable
     public void SetScene(SteamAudioScene scene)
     {
         if (!IsValid || !scene.IsBuilt) return;
-        lock (_gate)
+        lock (_simGate)
         {
             Phonon.iplSimulatorSetScene(_simulator, scene.Handle);
             for (int b = 0; b < Banks; b++)
@@ -142,12 +154,9 @@ internal sealed class TracedEchoes : IDisposable
             {
                 if (_inUse[i] || _sources[0, i] == IntPtr.Zero || _sources[1, i] == IntPtr.Zero) continue;
                 _inUse[i] = true; _at[i] = at;
-                if (!_added[i])
-                {
-                    for (int b = 0; b < Banks; b++) Phonon.iplSourceAdd(_sources[b, i], _simulator);
-                    _dirtyBank[0] = true;
-                    _added[i] = true;
-                }
+                // Added to the simulator by the trace thread, before its next run: adding needs the
+                // simulator, and the simulator may be mid-trace.
+                if (!_added[i]) _pendingAdd[i] = true;
                 return i;
             }
             return -1;
@@ -175,14 +184,33 @@ internal sealed class TracedEchoes : IDisposable
                 long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
                 bool ran = false;
                 int bank = _nextBank;
+                bool any = false;
+                Vector3 listener;
                 lock (_gate)
                 {
-                    bool any = false;
-                    for (int i = 0; i < MaxSources; i++) any |= _inUse[i];
+                    for (int i = 0; i < MaxSources; i++)
+                    {
+                        any |= _inUse[i];
+                        _atSnap[i] = _at[i];
+                        _addSnap[i] = _pendingAdd[i];
+                        _pendingAdd[i] = false;
+                    }
+                    listener = _listener;
+                }
+                lock (_simGate)
+                {
                     if (_haveScene && any)
                     {
                         IntPtr sim = _simulator;
-                        if (_dirtyBank[0]) { Phonon.iplSimulatorCommit(sim); _dirtyBank[0] = false; }
+                        bool added = false;
+                        for (int i = 0; i < MaxSources; i++)
+                        {
+                            if (!_addSnap[i] || _added[i]) continue;
+                            for (int b = 0; b < Banks; b++) Phonon.iplSourceAdd(_sources[b, i], sim);
+                            added = true;
+                        }
+                        if (added || _dirtyBank[0]) { Phonon.iplSimulatorCommit(sim); _dirtyBank[0] = false; }
+                        for (int i = 0; i < MaxSources; i++) if (_addSnap[i]) _added[i] = true;
                         for (int i = 0; i < MaxSources; i++)
                         {
                             if (!_added[i]) continue;
@@ -192,7 +220,7 @@ internal sealed class TracedEchoes : IDisposable
                                 {
                                     // The bank being refreshed is traced; the other keeps its IR.
                                     flags = b == bank ? Phonon.IPL_SIMULATIONFLAGS_REFLECTIONS : 0,
-                                    source = Coord(_at[i]),
+                                    source = Coord(_atSnap[i]),
                                     reverbScale0 = 1f, reverbScale1 = 1f, reverbScale2 = 1f,
                                 };
                                 Phonon.iplSourceSetInputs(_sources[b, i], Phonon.IPL_SIMULATIONFLAGS_REFLECTIONS, ref inputs);
@@ -200,7 +228,7 @@ internal sealed class TracedEchoes : IDisposable
                         }
                         var shared = new Phonon.IPLSimulationSharedInputs
                         {
-                            listener = Coord(_listener), numRays = Rays, numBounces = Bounces,
+                            listener = Coord(listener), numRays = Rays, numBounces = Bounces,
                             duration = DurationSeconds, order = Order, irradianceMinDistance = 1.0f,
                         };
                         Phonon.iplSimulatorSetSharedInputs(sim, Phonon.IPL_SIMULATIONFLAGS_REFLECTIONS, ref shared);
@@ -242,7 +270,7 @@ internal sealed class TracedEchoes : IDisposable
         right = new Phonon.IPLVector3 { x = 1, y = 0, z = 0 },
         up = new Phonon.IPLVector3 { x = 0, y = 1, z = 0 },
         ahead = new Phonon.IPLVector3 { x = 0, y = 0, z = -1 },
-        origin = new Phonon.IPLVector3 { x = origin.X, y = origin.Y, z = origin.Z },
+        origin = Phonon.World(origin),
     };
 
     public void Dispose()
@@ -250,6 +278,7 @@ internal sealed class TracedEchoes : IDisposable
         _running = false;
         _thread?.Join(2000);
         if (ReferenceEquals(Current, this)) Current = null;
+        lock (_simGate)
         lock (_gate)
         {
             for (int b = 0; b < Banks; b++)

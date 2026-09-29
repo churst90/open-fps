@@ -505,7 +505,11 @@ public static class GeometryUtils
         return distXZSq < radius * radius;
     }
 
-    public static CollisionResult GetCylinderAABBOverlap(Vector3 aabbMin, Vector3 aabbMax, Vector3 cylPos, float radius, float height)
+    /// <param name="canGoDown">Whether the body is off the ground, so that down is a way out of
+    /// something above it. Standing, a beam at head height is a wall to walk into, not a ceiling to
+    /// duck under.</param>
+    public static CollisionResult GetCylinderAABBOverlap(Vector3 aabbMin, Vector3 aabbMax, Vector3 cylPos, float radius, float height,
+                                                         bool canGoDown = false)
     {
         CollisionResult result = new CollisionResult { IsColliding = false, Normal = Vector3.Zero, Penetration = 0 };
 
@@ -535,17 +539,30 @@ public static class GeometryUtils
         }
         else
         {
-            // Center is exactly on/inside AABB edge in XZ. 
-            // We need a deterministic direction to push out.
-            // We'll use the direction from the AABB center to the cylinder center.
-            float midX = (aabbMin.X + aabbMax.X) / 2f;
-            float midZ = (aabbMin.Z + aabbMax.Z) / 2f;
-            
-            Vector3 toCyl = new Vector3(cylPos.X - midX, 0, cylPos.Z - midZ);
-            if (toCyl.LengthSquared() < 0.0001f) toCyl = Vector3.UnitX; // Fallback
-            
-            result.Normal = Vector3.Normalize(toCyl);
-            result.Penetration = radius; 
+            // The centre is inside the box's footprint: out by the NEAREST edge, the whole radius
+            // past it. This used to push out along the line from the box's centre, by one radius,
+            // which for a box much bigger than a body — a roof — is neither the way out nor far
+            // enough to get there, so it was applied again every pass of every tick.
+            float toMinX = cylPos.X - aabbMin.X, toMaxX = aabbMax.X - cylPos.X;
+            float toMinZ = cylPos.Z - aabbMin.Z, toMaxZ = aabbMax.Z - cylPos.Z;
+            float best = toMaxX; result.Normal = Vector3.UnitX;       // +X from the very middle
+            if (toMinX < best) { best = toMinX; result.Normal = -Vector3.UnitX; }
+            if (toMinZ < best) { best = toMinZ; result.Normal = -Vector3.UnitZ; }
+            if (toMaxZ < best) { best = toMaxZ; result.Normal = Vector3.UnitZ; }
+            result.Penetration = best + radius;
+        }
+
+        // A box above the middle of the body that the top of it reaches into is a CEILING, and the
+        // way out of a ceiling is down. Sideways-only, jumping in a house put the head into the roof
+        // slab, and the roof — the whole house wide — pushed the body out through the nearest wall
+        // (Cody, 64 Alder Street, 2026-09-28: "I can jump over the edge to get out but I can't jump
+        // back in"). Down is taken when it is the shallower way out, which for a head in a roof is
+        // always; a wall beside you is still a wall, and so is a beam you walk into.
+        float intoCeiling = cylMaxY - aabbMin.Y;
+        if (canGoDown && aabbMin.Y > cylPos.Y && intoCeiling < result.Penetration)
+        {
+            result.Normal = -Vector3.UnitY;
+            result.Penetration = intoCeiling;
         }
 
         return result;

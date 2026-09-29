@@ -148,6 +148,8 @@ public class GameServer
     {
         if (sounds.Count == 0) return;
         if (!_maps.TryGetMap(mapId, out var world, out _, out _, out var lookup)) return;
+        // People in the street hear it too, and some of them say so.
+        _speech.Heard(mapId, label, sounds, AudioClock.Now);
 
         // Where it happened, for the earshot test: the loudest of its own sounds.
         Vector3 at = sounds[0].Position;

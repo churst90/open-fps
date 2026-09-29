@@ -284,7 +284,7 @@ public class BeaconAidsMutationTests
             Assert.True(e.IsEvent);
             Assert.True(e.EnableReverb);
             Assert.Equal(PlaybackMode.Single, e.Mode);
-            Assert.Equal("SYNTH/beacon_door_knock", e.SoundId);
+            Assert.Equal("SYNTH/beacon_door_chime", e.SoundId);
             Assert.Equal(door, e.ApparentPosition);
             Assert.Equal(Vector3.Distance(Ear, door), e.EffectiveDistance, 4);
             Assert.Equal(0f, e.Occlusion);
@@ -325,7 +325,7 @@ public class BeaconAidsMutationTests
     {
         var world = Moving(Thing(1, new Vector3(2f, 1f, 0f), DoorSize, Beacons.Door));
         var rig = new Rig();
-        rig.Mixer.Refuse = "SYNTH/beacon_item_bell";
+        rig.Mixer.Refuse = "SYNTH/beacon_item_ring";
         Assert.Empty(rig.Run(world, Ear, 10, 4));
         Assert.True(rig.Mixer.Registrations > 3, "a refused sound was never asked for again");
 
@@ -464,78 +464,52 @@ public class BeaconAidsMutationTests
         return Math.Sqrt(e / (to - from));
     }
 
-    /// <summary>
-    /// A door is a knuckle on a wooden panel: 90 ms, two damped modes — 420 Hz the stronger, 1150 Hz
-    /// the other — dying away, not ringing on, and never clipping.
-    /// </summary>
-    [Fact]
-    public void TheDoorIsAShortWoodenKnock()
+    /// <summary>The shared shape of every beacon: never clipping, audible, silent at its first sample,
+    /// and dying away rather than ringing on (2026-09-29, the sine set).</summary>
+    private static void SoftAndDying(float[] x)
     {
-        var x = Sounds()["SYNTH/beacon_door_knock"];
-        Assert.Equal(48000 * 90 / 1000, x.Length);
         Assert.True(x.Max(MathF.Abs) < 0.99f, "clipped");
         Assert.True(x.Max(MathF.Abs) > 0.3f, "barely there");
         Assert.Equal(0f, x[0]);
-
-        int third = x.Length / 3;
-        Assert.True(Rms(x, 2 * third, x.Length) < 0.1 * Rms(x, 0, third), "it rings on rather than dying away");
-
-        double low = At(x, 420), high = At(x, 1150);
-        foreach (double other in new[] { 250.0, 700.0, 2000.0, 3000.0 })
-        {
-            Assert.True(low > 4 * At(x, other), $"420 Hz is not the knock's note against {other} Hz");
-            Assert.True(high > 2 * At(x, other), $"the 1150 Hz mode is missing against {other} Hz");
-        }
-        Assert.True(low > high);
-        // The upper mode dies faster: over the first 20 ms it is there, by the last 30 it is gone.
-        Assert.True(At(x, 1150, 0, 960) > 10 * At(x, 1150, x.Length - 1440, x.Length));
+        Assert.True(MathF.Abs(x[48]) < 0.2f, "a click: it did not rise over the first millisecond");
+        int fifth = x.Length / 5;
+        Assert.True(Rms(x, 4 * fifth, x.Length) < 0.3 * Rms(x, 0, 2 * fifth), "it rings on rather than dying away");
     }
 
-    /// <summary>
-    /// An item is a small bell: 250 ms, a 1318 Hz partial with an inharmonic one at 3350 Hz, a 2 ms
-    /// strike rather than a click, and a ring that dies away.
-    /// </summary>
+    /// <summary>A door is two soft notes rising a fourth: C5, then F5.</summary>
     [Fact]
-    public void TheItemIsASmallBell()
+    public void TheDoorIsTwoNotesRisingAFourth()
     {
-        var x = Sounds()["SYNTH/beacon_item_bell"];
-        Assert.Equal(48000 * 250 / 1000, x.Length);
-        Assert.True(x.Max(MathF.Abs) < 0.99f, "clipped");
-        Assert.True(x.Max(MathF.Abs) > 0.3f, "barely there");
-        // The strike ramps in over two milliseconds: the first sample is silent and the tenth small.
-        Assert.Equal(0f, x[0]);
-        Assert.True(MathF.Abs(x[10]) < 0.1f);
-
-        int quarter = x.Length / 4;
-        Assert.True(Rms(x, 3 * quarter, x.Length) < 0.3 * Rms(x, 0, quarter), "the bell does not die away");
-
-        double note = At(x, 1318), partial = At(x, 3350);
-        foreach (double other in new[] { 600.0, 900.0, 2200.0, 5000.0 })
-        {
-            Assert.True(note > 4 * At(x, other), $"1318 Hz is not the bell's note against {other} Hz");
-            Assert.True(partial > 2 * At(x, other), $"the 3350 Hz partial is missing against {other} Hz");
-        }
-        Assert.True(note > partial);
+        var x = Sounds()["SYNTH/beacon_door_chime"];
+        SoftAndDying(x);
+        int split = 48000 * 13 / 100;                             // the second note starts at 0.13 s
+        Assert.True(At(x, 523.25, 0, split) > 4 * At(x, 698.46, 0, split), "C5 is not the first note");
+        Assert.True(At(x, 698.46, split, x.Length) > 4 * At(x, 523.25, split, x.Length), "F5 is not the second");
+        foreach (double other in new[] { 330.0, 880.0, 2000.0 })
+            Assert.True(At(x, 523.25) > 10 * At(x, other), $"C5 does not stand over {other} Hz");
     }
 
-    /// <summary>
-    /// A vehicle is a low double tone: the same 60 ms beep twice, with 50 ms of silence between.
-    /// </summary>
+    /// <summary>An item is one small ring on C6 that dies away.</summary>
     [Fact]
-    public void TheVehicleIsALowToneTwice()
+    public void TheItemIsOneSmallRing()
     {
-        var x = Sounds()["SYNTH/beacon_vehicle_low"];
-        var one = DrivingAids.Beep(48000, 330f, 0.06f, 0.2f);
-        int gap = 48000 * 50 / 1000;
-        Assert.Equal(2 * one.Length + gap, x.Length);
-        var expected = TransientSynthRoundTrip(one);
-        for (int i = 0; i < one.Length; i++)
-        {
-            Assert.Equal(expected[i], x[i]);
-            Assert.Equal(expected[i], x[one.Length + gap + i]);
-        }
-        for (int i = one.Length; i < one.Length + gap; i++) Assert.Equal(0f, x[i]);
-        Assert.True(Rms(x, 0, one.Length) > 0.1);
+        var x = Sounds()["SYNTH/beacon_item_ring"];
+        SoftAndDying(x);
+        foreach (double other in new[] { 523.0, 784.0, 1568.0, 3000.0 })
+            Assert.True(At(x, 1046.5) > 10 * At(x, other), $"C6 does not stand over {other} Hz");
+    }
+
+    /// <summary>A vehicle is a low note twice, C4, with a dip between the two.</summary>
+    [Fact]
+    public void TheVehicleIsALowNoteTwice()
+    {
+        var x = Sounds()["SYNTH/beacon_vehicle_hum"];
+        SoftAndDying(x);
+        int ms = 48;
+        double first = Rms(x, 10 * ms, 60 * ms), between = Rms(x, 190 * ms, 215 * ms), second = Rms(x, 235 * ms, 285 * ms);
+        Assert.True(between < 0.3 * first && between < 0.3 * second, "no dip between the two");
+        foreach (double other in new[] { 196.0, 330.0, 392.0 })        // not 523: that is its own octave
+            Assert.True(At(x, 261.63) > 10 * At(x, other), $"C4 does not stand over {other} Hz");
     }
 
     private static float[] TransientSynthRoundTrip(float[] x)
@@ -552,8 +526,48 @@ public class BeaconAidsMutationTests
         var aids = new BeaconAids(new AudioEngineFacade(new EmitterRecordingProvider()), prefs);
         aids.SetMapPolicy(new[] { "door=forced_on", "item=forbidden" });
         Assert.Equal("Beacons: door on, always on for this map. exit on. stairs on. item off, not allowed on this map. "
-                   + "vehicle off. waypoint on. Say slash beacons and a name to switch one.",
+                   + "vehicle off. waypoint on. Each sounds every 1.6 seconds. Say slash beacons and a name to switch one, "
+                   + "or slash beacons every and a number of seconds.",
                      aids.Command(Array.Empty<string>()));
+    }
+
+    /// <summary>
+    /// How long between soundings is the player's (2026-09-29, "the time between soundings should be
+    /// able to be set by the player"): /beacons every N, held to half a second .. ten seconds.
+    /// </summary>
+    [Fact]
+    public void TheGapBetweenSoundingsIsThePlayers()
+    {
+        var prefs = BeaconPreferences.InMemory();
+        var aids = new BeaconAids(new AudioEngineFacade(new EmitterRecordingProvider()), prefs);
+        Assert.Equal("Beacons sound every 3 seconds.", aids.Command(new[] { "every", "3" }));
+        Assert.Equal(3.0, prefs.Every);
+        Assert.Equal("Beacons sound every 0.5 seconds.", aids.Command(new[] { "every", "0.1" }));
+        Assert.Equal("Beacons sound every 10 seconds.", aids.Command(new[] { "interval", "60" }));
+        Assert.StartsWith("Beacons sound every 10 seconds. Say", aids.Command(new[] { "every" }));
+    }
+
+    /// <summary>...and kept between sessions, beside the on/off choices, in the same file.</summary>
+    [Fact]
+    public void TheGapIsKeptBetweenSessions()
+    {
+        string dir = Path.Combine(Path.GetTempPath(), "openfps-beacon-every-" + Guid.NewGuid().ToString("N"));
+        string? was = Environment.GetEnvironmentVariable("XDG_CONFIG_HOME");
+        try
+        {
+            Environment.SetEnvironmentVariable("XDG_CONFIG_HOME", dir);
+            var first = BeaconPreferences.Load();
+            first.Set(Beacons.Door, false);
+            first.SetEvery(2.5);
+            var again = BeaconPreferences.Load();
+            Assert.Equal(2.5, again.Every);
+            Assert.False(again.Choice(Beacons.Door));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("XDG_CONFIG_HOME", was);
+            try { Directory.Delete(dir, true); } catch { }
+        }
     }
 
     /// <summary>

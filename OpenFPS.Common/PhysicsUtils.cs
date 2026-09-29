@@ -109,7 +109,9 @@ public static class PhysicsUtils
 
         foreach (var e in candidates)
         {
-            if (!world.Has<Transform>(e) || !world.Has<ColliderComponent>(e)) continue;
+            // Gone from the world but still in the grid: asking it anything throws (2026-09-28, 92
+            // "failed to move" errors from the parked cars after something was removed).
+            if (!world.IsAlive(e) || !world.Has<Transform>(e) || !world.Has<ColliderComponent>(e)) continue;
 
             ref var t = ref world.Get<Transform>(e);
             ref var c = ref world.Get<ColliderComponent>(e);

@@ -30,8 +30,22 @@ internal sealed class TracedReverb : IDisposable
     /// <summary>The one in use, for the provider's reverb buses to read. Null until the scene exists.</summary>
     public static volatile TracedReverb? Current;
 
+    /// <summary>
+    /// The block the traced response is convolved in, samples. The convolution answers one block
+    /// late, so this IS the room's pre-delay: at the mixer's 1,024 the first reflection of every room,
+    /// a hatchback's cabin included, came 20-23 ms after the sound, and a room answered as a separate
+    /// space off to one side instead of the one you stand in (the parking garage, a clap in a house:
+    /// "reflections centred not around me", 2026-09-28). At 256 it is 5-6 ms. The mixer's block is run
+    /// through in pieces of this size (TracedReverbDsp).
+    /// </summary>
+    public const int TracedFrame = 256;
+
     public const float DurationSeconds = 2.0f;
-    public const int Order = 1;
+
+    /// <summary>What the simulator produces: HYBRID gives the convolution IR AND the reverb times the
+    /// parametric tail is built from (TracedReverbState.TailEffect); CONVOLUTION the IR alone.</summary>
+    public static int SimulatedType = Phonon.IPL_REFLECTIONEFFECTTYPE_HYBRID;
+    public const int Order = 2;
     public const int Channels = (Order + 1) * (Order + 1);
     /// <summary>Rays and bounces per trace. Sixty-four bounces, not sixteen: in a twelve-metre room
     /// sixteen bounces is a quarter of a second of travel, and the tail stopped dead at half a second
@@ -71,7 +85,7 @@ internal sealed class TracedReverb : IDisposable
 
     /// <param name="refreshMs">How often the trace is redone: a quarter second for the listener,
     /// who walks; a second for a room traced from its middle, which does not move.</param>
-    public TracedReverb(IntPtr context, int sampleRate = 44100, int frameSize = 1024, int refreshMs = DefaultRefreshMs)
+    public TracedReverb(IntPtr context, int sampleRate = 44100, int frameSize = TracedFrame, int refreshMs = DefaultRefreshMs)
     {
         _refreshMs = refreshMs;
         Context = context; SampleRate = sampleRate; FrameSize = frameSize;
@@ -79,7 +93,7 @@ internal sealed class TracedReverb : IDisposable
         {
             flags = Phonon.IPL_SIMULATIONFLAGS_REFLECTIONS,
             sceneType = Phonon.IPL_SCENETYPE_DEFAULT,
-            reflectionType = Phonon.IPL_REFLECTIONEFFECTTYPE_CONVOLUTION,
+            reflectionType = SimulatedType,
             maxNumOcclusionSamples = 16, maxNumRays = Rays, numDiffuseSamples = 32,
             maxDuration = DurationSeconds, maxOrder = Order, maxNumSources = MaxReaders, numThreads = 2,
             rayBatchSize = 16, numVisSamples = 4, samplingRate = sampleRate, frameSize = frameSize,
@@ -138,8 +152,15 @@ internal sealed class TracedReverb : IDisposable
         }
     }
 
-    /// <summary>Where the listener is. Game or worker thread.</summary>
-    public void SetListener(Vector3 at) { lock (_gate) _listener = at; }
+    /// <summary>Where the listener is. Game or worker thread.
+    ///
+    /// Under its OWN lock, never the tracer's: the trace holds that one for the whole run, and in a
+    /// big hard hall a run takes hundreds of milliseconds. The game thread calls this every frame,
+    /// so it waited out each trace — in the airport terminal every sound stood still for 680 ms at a
+    /// time, the game loop ran at 8 Hz, footsteps and claps came late or not at all and the reverb
+    /// stepped ("fluttered") (2026-09-29).</summary>
+    public void SetListener(Vector3 at) { lock (_listenerGate) _listener = at; }
+    private readonly object _listenerGate = new();
 
     private void Loop()
     {
@@ -148,7 +169,7 @@ internal sealed class TracedReverb : IDisposable
             try
             {
                 Vector3 at;
-                lock (_gate) at = _listener;
+                lock (_listenerGate) at = _listener;
                 long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
                 lock (_gate)
                 {
@@ -164,6 +185,7 @@ internal sealed class TracedReverb : IDisposable
                         flags = Phonon.IPL_SIMULATIONFLAGS_REFLECTIONS,
                         source = coord,
                         reverbScale0 = 1f, reverbScale1 = 1f, reverbScale2 = 1f,
+                        hybridReverbTransitionTime = DurationSeconds, hybridReverbOverlapPercent = 0.25f,
                     };
                     if (_readersDirty) { Phonon.iplSimulatorCommit(_simulator); _readersDirty = false; }
                     foreach (var r in _readers)
@@ -204,7 +226,7 @@ internal sealed class TracedReverb : IDisposable
         right = new Phonon.IPLVector3 { x = 1, y = 0, z = 0 },
         up = new Phonon.IPLVector3 { x = 0, y = 1, z = 0 },
         ahead = new Phonon.IPLVector3 { x = 0, y = 0, z = -1 },
-        origin = new Phonon.IPLVector3 { x = origin.X, y = origin.Y, z = origin.Z },
+        origin = Phonon.World(origin),
     };
 
     public void Dispose()

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System;
 using System.IO;
 using System.Linq;
@@ -39,7 +40,9 @@ public class TakeLevelsTests
         Assert.NotNull(root);
         string dir = Path.Combine(root!, material);
         if (!Directory.Exists(dir)) return;
-        var raw = Directory.GetFiles(dir, "*.wav").Select(f => (File: f, Db: TakeLevels.ImpactDb(f)!.Value)).ToList();
+        // The bank is Vorbis since 2026-09-28, with each take's level in levels.json beside it.
+        var measured = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, float>>(File.ReadAllText(Path.Combine(dir, "levels.json")))!;
+        var raw = measured.Select(kv => (File: Path.Combine(dir, kv.Key), Db: (double)kv.Value)).ToList();
         double rawSpread = raw.Max(r => r.Db) - raw.Min(r => r.Db);
         var corrected = raw.Select(r => r.Db + 20 * Math.Log10(TakeLevels.GainFor(r.File))).ToList();
         double spread = corrected.Max() - corrected.Min();

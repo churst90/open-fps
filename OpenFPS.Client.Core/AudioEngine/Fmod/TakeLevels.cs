@@ -62,6 +62,14 @@ internal static class TakeLevels
     private static Dictionary<string, float> Measure(string dir)
     {
         var levels = new Dictionary<string, float>(StringComparer.OrdinalIgnoreCase);
+        // A compressed bank carries its takes' levels beside them (levels.json, written by
+        // tools/build_footstep_bank.py): the same loudest-20 ms figure, measured before encoding.
+        string sidecar = Path.Combine(dir, "levels.json");
+        if (File.Exists(sidecar))
+        {
+            var read = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, float>>(File.ReadAllText(sidecar));
+            if (read != null) foreach (var (k, v) in read) levels[k] = v;
+        }
         foreach (var f in Directory.GetFiles(dir, "*.wav"))
             if (ImpactDb(f) is float db) levels[Path.GetFileName(f)] = db;
         return levels;

@@ -106,6 +106,8 @@ public sealed partial class VehicleSystem
         /// <summary>A road vehicle on a street: something with a driver who can honk, brake hard or
         /// park. Not an aircraft, a mower, a walker or a racing car.</summary>
         public bool OnStreet;
+        /// <summary>Somebody on foot.</summary>
+        public bool IsWalker;
 
         /// <summary>Standing on the brakes: seconds left, the speed being braked to, and how hard.</summary>
         public float HardBrakeLeft;
@@ -129,11 +131,28 @@ public sealed partial class VehicleSystem
         public double LastInTheWayAt = double.NegativeInfinity;
         public double HeldSince = double.NaN;
         public bool YelledThisHold;
+
+        /// <summary>A walker: where its line crosses a road, metres from <see cref="A"/>, in order.</summary>
+        public (Crosswalk Cw, float From, float To)[] Crossings = System.Array.Empty<(Crosswalk, float, float)>();
+        /// <summary>The crossing a walker has decided to take, from the kerb until it is over.</summary>
+        public Crosswalk? ClearedFor;
+        /// <summary>The crossing a walker is standing at the kerb of, and for how long.</summary>
+        public Crosswalk? WaitingFor;
+        public float KerbWait;
+        /// <summary>Out on the road, between the kerbs.</summary>
+        public bool OnCarriageway;
+        /// <summary>A vehicle on a route: where its line crosses a crossing, in the line's metres.</summary>
+        public (float At, Crosswalk Cw)[] Crosswalks = System.Array.Empty<(float, Crosswalk)>();
+        /// <summary>The crossing it is stopping for this tick, if any.</summary>
+        public Crosswalk? StoppingFor;
+        public float CrosswalkWait;
     }
 
     private enum State { Waiting, Driving, Turning }
 
     private readonly List<DemoVehicle> _vehicles = new();
+    /// <summary>Walking pairs already given their first member's voice.</summary>
+    private readonly HashSet<(string, string)> PairSeen = new();
 
     /// <summary>Spawns every vehicle a map declares. Call once after the maps are loaded.</summary>
     /// <param name="shells">
@@ -297,7 +316,12 @@ public sealed partial class VehicleSystem
                     new ColliderComponent { Shape = ColliderShape.Box, Size = hull, IsSolid = false },
                     new NameComponent { Name = vd.Name ?? displayKind },
                     new IdentityComponent { Name = vd.Name ?? displayKind, Description = description },
-                    new Pedestrian { Voice = PedestrianSpeech.NextVoice(mapId) }))
+                    new Pedestrian
+                    {
+                        Voice = string.IsNullOrEmpty(vd.Pair) ? PedestrianSpeech.NextVoice(mapId)
+                              : PedestrianSpeech.PairVoice(mapId, vd.Pair, second: !PairSeen.Add((mapId, vd.Pair))),
+                        Pair = vd.Pair ?? "",
+                    }))
                     : maps.SpawnEntity(mapId, w => w.Create(
                     EntityType.NPC,
                     new Transform { Position = start, Rotation = Quaternion.CreateFromYawPitchRoll(heading, 0f, 0f) },
@@ -385,6 +409,7 @@ public sealed partial class VehicleSystem
                                     mapId, display, route.Legs.Count, line.Length, v.Stops.Length);
                 }
                 v.Preset = vd.Preset;
+                v.IsWalker = isWalker;
                 v.TrackId = vd.Track ?? "";
                 v.LaneOffset = vd.LaneOffsetMetres;
                 if (profile != null) v.LengthMetres = profile.LengthMetres;
@@ -400,6 +425,7 @@ public sealed partial class VehicleSystem
                     Log.Information("Map {Map}: spawned {Name} (entity {Id}) on the road {A} -> {B}, passes at {Speeds} km/h",
                                     mapId, display, e.Id, vd.RoadStart, vd.RoadEnd, string.Join("/", speeds));
             }
+            BuildCrosswalks(maps, mapId);
         }
     }
 
@@ -423,6 +449,7 @@ public sealed partial class VehicleSystem
     {
         UpdateStreetLife(mapId, world, dt);
         IndexLanes(mapId);
+        IndexCrosswalks(mapId);
         foreach (var v in _vehicles)
         {
             if (v.MapId != mapId || !world.IsAlive(v.Entity)) continue;
@@ -495,6 +522,7 @@ public sealed partial class VehicleSystem
                     // The speed the brakes allow with this much road left.
                     float allowed = MathF.Sqrt(MathF.Max(0f, 2f * v.Brake * remaining));
                     float want = MathF.Min(target, allowed);
+                    if (v.Crossings.Length > 0) want = MathF.Min(want, KerbHold(v, total, dt));
                     if (want > v.Speed) v.Speed = MathF.Min(want, v.Speed + v.Accel * dt);
                     else v.Speed = MathF.Max(want, v.Speed - v.Brake * dt);
                     v.Progress += v.Speed * dt;
@@ -513,6 +541,8 @@ public sealed partial class VehicleSystem
                         v.HeadingTo = v.Heading + MathF.PI;
                         (v.From, v.To) = (v.To, v.From);
                         v.Pass++;
+                        v.ClearedFor = v.WaitingFor = null;
+                        v.KerbWait = 0f;
                     }
                     break;
                 }
@@ -660,6 +690,14 @@ public sealed partial class VehicleSystem
         {
             want = MathF.Min(want, MathF.Sqrt(2f * v.Brake * toHold));
             if (toHold <= 0.3f && CanHalt(v.Speed, v.Brake, dt)) { v.Speed = 0f; vel.Linear = Vector3.Zero; return; }
+        }
+
+        // ── Somebody on a crossing ahead ───────────────────────────────────────────────────────
+        float toCrosswalk = CrosswalkHold(v, dt);
+        if (toCrosswalk < float.MaxValue)
+        {
+            want = MathF.Min(want, MathF.Sqrt(2f * v.Brake * toCrosswalk));
+            if (toCrosswalk <= 0.3f && CanHalt(v.Speed, v.Brake, dt)) { v.Speed = 0f; vel.Linear = Vector3.Zero; return; }
         }
 
         float toStop = DistanceToNextStop(v, line);

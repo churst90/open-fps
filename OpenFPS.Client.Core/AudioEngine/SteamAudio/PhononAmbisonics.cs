@@ -122,6 +122,26 @@ internal static partial class Phonon
     };
 
     /// <summary>
+    /// A point or direction of the game's world in Steam Audio's world: the same x and y, and z the
+    /// other way. The game's frame is +x right, +y up, +z forward (north); Steam Audio's is +x right,
+    /// +y up, -z forward. Every world coordinate handed to Steam Audio goes through here — the scene's
+    /// vertices, each trace's source and listener, the probe volume — so that its world is a true
+    /// image of the game's and ListenerFrame, which flips z the same way, reads it correctly.
+    ///
+    /// Until 2026-09-29 the scene and the sources were handed over unflipped while ListenerFrame was
+    /// flipped, so a traced response was decoded with the listener facing the wrong way along z: the
+    /// facade ahead of you answered from behind. Nothing else noticed — occlusion, transmission and
+    /// pathing do not care which way is forward — which is why it went unheard until a room's traced
+    /// tail was listened to for where it came from.
+    /// </summary>
+    /// <remarks>SA_MIRROR=0 restores the old unflipped world, for the lab's <c>--sa-frame</c> check
+    /// and nothing else.</remarks>
+    public static IPLVector3 World(System.Numerics.Vector3 v) => new IPLVector3 { x = v.X, y = v.Y, z = MirrorZ ? -v.Z : v.Z };
+    /// <summary>The z component of a Steam Audio world direction, in the game's world.</summary>
+    public static float WorldZ(float saZ) => MirrorZ ? -saZ : saZ;
+    internal static readonly bool MirrorZ = Environment.GetEnvironmentVariable("SA_MIRROR") != "0";
+
+    /// <summary>
     /// The listener's frame of reference in the SOUNDFIELD's coordinates, built from the game's
     /// listener rotation.
     ///

@@ -48,6 +48,8 @@ public sealed partial class VehicleSystem
     /// <summary>How far out a vehicle counts as coming to a junction, metres: far enough that the longest
     /// critical gap and the time to cross still cover a vehicle at city speed (7.1 s + 3 s at 14 m/s).</summary>
     private const float JunctionLookMetres = 150f;
+    /// <summary>A vehicle this few seconds from the line is arriving, whoever has been waiting longest.</summary>
+    private const float ImminentSeconds = 4f;
 
     /// <summary>Where each vehicle on a route is with respect to the junctions on its way, this tick.</summary>
     private void IndexJunctions(string mapId)
@@ -58,7 +60,7 @@ public sealed partial class VehicleSystem
             if (v.MapId != mapId || v.Route == null || v.Line == null || !InLane(v)) continue;
             var legs = v.Route.Legs;
             var (leg, along) = WhereOnLane(v);
-            if (along < 0f)
+            if (along < 0f && !ShortOfTheLine(v, ref leg, ref along))
             {
                 // In the junction between the leg before and this one.
                 var before = legs[(leg - 1 + legs.Count) % legs.Count].Segment;
@@ -98,7 +100,8 @@ public sealed partial class VehicleSystem
         if (v.Route == null || !_streetLife.TryGetValue(v.MapId, out var life)) return (float.MaxValue, float.MaxValue);
         var legs = v.Route.Legs;
         var (leg, along) = WhereOnLane(v);
-        if (along < 0f) { v.WaitingAt = null; v.Holding = false; return (float.MaxValue, float.MaxValue); }   // already in it: keep going
+        if (along < 0f && !ShortOfTheLine(v, ref leg, ref along))
+        { v.WaitingAt = null; v.Holding = false; return (float.MaxValue, float.MaxValue); }   // already in it: keep going
         var seg = legs[leg].Segment;
         var j = seg.To;
         float toLine = seg.LengthMetres - along;
@@ -108,8 +111,11 @@ public sealed partial class VehicleSystem
         float look = givesWay ? life.GiveWayApproachKmh / 3.6f : float.MaxValue;
 
         // Only decide once it is near enough to be committing; further out it simply drives.
+        // A crossing before the line moves where it stands further back, and so when it must decide.
+        float atLine = MathF.Max(0f, toLine - 1f - 0.5f * v.LengthMetres);
+        float holdAt = MathF.Min(atLine, ShortOfCrosswalk(v, toLine));
         float stopping = v.Speed * v.Speed / (2f * MathF.Max(0.1f, v.Brake)) + 6f;
-        if (toLine > stopping) return (float.MaxValue, look);
+        if (toLine - (atLine - holdAt) > stopping) return (float.MaxValue, look);
 
         var here = Slot(v.MapId, j);
         bool wait = false;
@@ -146,11 +152,14 @@ public sealed partial class VehicleSystem
         }
 
         // Everybody waiting for somebody: after a while, one goes.
-        if (wait && v.Speed < 0.3f && toLine < 3f + 0.5f * v.LengthMetres)
+        if (wait && v.Speed < 0.3f && toLine < 6f + 0.5f * v.LengthMetres)   // short of a crossing too
         {
             if (v.WaitingAt != j.Id) { v.WaitingAt = j.Id; v.WaitedSeconds = 0f; }
             v.WaitedSeconds += dt;
-            if (v.WaitedSeconds > life.GiveWayPatienceSeconds && !here.Inside.Any(x => x.V != v && Conflict(mine, x.M)))
+            // ...but not in front of somebody about to arrive: that is not a deadlock, it is traffic.
+            if (v.WaitedSeconds > life.GiveWayPatienceSeconds && !here.Inside.Any(x => x.V != v && Conflict(mine, x.M))
+                && !here.Coming.Any(x => x.V != v && x.M.In != mine.In && x.V.Speed > 0.5f
+                                         && x.ToLine / x.V.Speed < ImminentSeconds && Conflict(mine, x.M)))
                 wait = false;
         }
         else if (!wait) v.WaitingAt = null;
@@ -158,7 +167,27 @@ public sealed partial class VehicleSystem
         // Standing with the front bumper at the line, not the middle of the car: half a car further
         // back, or its nose is in the lane of the road it is waiting to cross.
         v.Holding = wait;
-        return (wait ? MathF.Max(0f, toLine - 1f - 0.5f * v.LengthMetres) : float.MaxValue, look);
+        // And short of a crossing that lies before the line, not on it.
+        return (wait ? holdAt : float.MaxValue, look);
+    }
+
+    /// <summary>
+    /// Whether a vehicle the lap puts in a junction is in fact still on the lane before it, short of the
+    /// line; if so, which leg and how far along. The smoothed line is shorter round corners than the lanes,
+    /// and the two drift apart by metres: a long truck holding at the line was taken to be in the junction
+    /// already, drove on, and met a car coming the other way (traced 2026-09-28).
+    /// </summary>
+    private static bool ShortOfTheLine(DemoVehicle v, ref int leg, ref float along)
+    {
+        var legs = v.Route!.Legs;
+        int prev = (leg - 1 + legs.Count) % legs.Count;
+        var before = legs[prev].Segment;
+        v.Line!.Sample(v.Lap, out var at, out _, out _);
+        var (a, off) = RoadNetwork.Project(before.Path, at);
+        if (off >= before.Lane.WidthMetres * 0.5f || a >= before.LengthMetres - 0.05f) return false;
+        leg = prev;
+        along = a;
+        return true;
     }
 
     /// <summary>Too close to the line to stop before it on its own brakes: it is going in.</summary>
@@ -203,10 +232,31 @@ public sealed partial class VehicleSystem
         if (_conflicts.TryGetValue(key, out bool c)) return c;
         var pa = LaneRoutes.Connector(a.In.Path, a.Out.Path);
         var pb = LaneRoutes.Connector(b.In.Path, b.Out.Path);
-        c = Cross(pa, pb);
+        // Crossing, or passing closer than two bodies' width: two turns into neighbouring lanes never
+        // cross, but a car stopped partway round the inner one is in the way of the outer one (traced
+        // 2026-09-28: 1.7 m apart, centre to centre, a truck and a police car).
+        c = Cross(pa, pb) || Closest(pa, pb) < BodyClearanceMetres;
         _conflicts[key] = c;
         _conflicts[(b.In.Index, b.Out.Index, a.In.Index, a.Out.Index)] = c;
         return c;
+    }
+
+    /// <summary>Two vehicles' paths closer than this, centre to centre, have their bodies touching:
+    /// two widths of about two metres, and the driven line cutting corners by several tenths of a
+    /// metre against the connector it is smoothed from.</summary>
+    private const float BodyClearanceMetres = 2.8f;
+
+    /// <summary>How close two paths come, metres, point to point (the connectors are sampled finely).</summary>
+    private static float Closest(List<Vector3> a, List<Vector3> b)
+    {
+        float best = float.MaxValue;
+        foreach (var p in a)
+            foreach (var q in b)
+            {
+                float dx = p.X - q.X, dz = p.Z - q.Z;
+                best = MathF.Min(best, dx * dx + dz * dz);
+            }
+        return MathF.Sqrt(best);
     }
 
     private static bool Cross(List<Vector3> a, List<Vector3> b)

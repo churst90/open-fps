@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Imports a folder of NPC voice lines into the game.
 
-    tools/import_npc_voices.py inbox/npc-voices-2026-09-26 \
-        --clones=seanterry,jimdale,joeb,joel,tim,ben,alec,fluke,camel,tyler
+    tools/import_npc_voices.py approved/voices/npc-voices-2026-09-26 \
+        --clones=seanterry,jimdale,joeb,joel,tim,ben,alec,fluke,camel,tyler,glenn,louis,steve,ethan,presidents_kid
 
 Reads the folder's manifest.csv (voice, kind, category, file, text, seconds, whisper_match) and:
 
@@ -10,13 +10,14 @@ Reads the folder's manifest.csv (voice, kind, category, file, text, seconds, whi
   the mixer's rate, so nothing is resampled at play time);
 - writes OpenFPS.Common/Speech/voices.csv, the list the server chooses lines from.
 
-Only voices whose folder is still in the inbox are imported: deleting a voice's folder takes it out
+Only voices whose folder is still in the source folder are imported: deleting a voice's folder takes it out
 of the game, and its recordings are removed from ASSETS. A manifest row whose file is gone is skipped.
 
 Cloned voices (kind "cloned") copy real people, so they are left out unless named with --clones.
-Cody's choice on 2026-09-27: seanterry, jimdale, joeb, joel, tim, ben, alec, fluke, camel, tyler.
+Cody's choice on 2026-09-27: seanterry, jimdale, joeb, joel, tim, ben, alec, fluke, camel, tyler; glenn and louis added 2026-09-28, then steve and two children (ethan, presidents_kid).
 
-Stories: every .wav in a <voice>_preview folder is imported as category "story" for that voice. The
+Stories: every .wav in a <voice>_preview folder is imported as category "story" for that voice, except
+the audition samples (a name with "sample" in it). The
 words come from stories.json in the source folder ({"<file name>": "<text>"}), for text players.
 
 Voicing: the low end of each voice is brought down to where a real talker at its pitch has it. The
@@ -173,7 +174,8 @@ def main():
         if not os.path.isdir(preview):
             continue
         for name in sorted(os.listdir(preview)):
-            if not name.endswith(".wav"):
+            # A sample is Cody's audition of the voice, not a story to tell on the phone.
+            if not name.endswith(".wav") or "sample" in name.lower():
                 continue
             stem = os.path.splitext(name)[0]
             path = os.path.join(preview, name)

@@ -446,7 +446,12 @@ public class SpatialService
     {
         if (world.AcousticMap == null) return AcousticConstants.GlobalRegionId;
 
-        // 1. High Precision: Check explicit region volumes
+        // 1. High Precision: Check explicit region volumes. Where they overlap, the SMALLEST one that
+        // holds the point wins: a named spot inside a bigger zone, a room inside a hall, a shop inside
+        // a block. It used to be whichever came first in the map's list, so which name you heard and
+        // which room you were acoustically in depended on authoring order (Cody, 2026-09-28).
+        int best = int.MinValue;
+        float bestVolume = float.MaxValue;
         foreach (var regId in world.AcousticMap.Regions.Keys)
         {
             if (regId == AcousticConstants.GlobalRegionId) continue; 
@@ -473,11 +478,32 @@ public class SpatialService
             }
 
             if (size.X > 0 && GeometryUtils.IsPointInOBB(position, pos, size, rot))
-                return regId;
+            {
+                float volume = size.X * size.Y * size.Z;
+                if (volume < bestVolume) { bestVolume = volume; best = regId; }
+            }
         }
+        if (best != int.MinValue) return best;
 
-        // 2. Low Precision Fallback: Voxel grid
-        return world.AcousticMap.VoxelGrid.GetRegionAt(position);
+        // 2. Low Precision Fallback: Voxel grid — for a region with no box of its own to ask. A region
+        // that HAS a box and did not contain the point is not where the point is, whatever the grid
+        // says: the grid is rasterised half a metre at a time, so a voxel straddling a wall carries
+        // the room into the first half-metre outside it. Standing against the outside of a house
+        // made you acoustically INSIDE it — the walkers on the pavement beside you in the room with
+        // you, everything else muffled through walls (Cody, 64 Alder Street, 2026-09-28).
+        int coarse = world.AcousticMap.VoxelGrid.GetRegionAt(position);
+        if (coarse != AcousticConstants.GlobalRegionId && HasBox(world, coarse))
+            return AcousticConstants.GlobalRegionId;
+        return coarse;
+    }
+
+    /// <summary>Whether a region has an explicit volume that <see cref="GetRegionAt"/> can test.</summary>
+    private static bool HasBox(WorldSnapshot world, int regId)
+    {
+        if (world.Entities.TryGetValue(regId, out var snap))
+            return snap.Definition.Collider.Size.X > 0 || snap.Definition.Region.RoomSize.X > 0;
+        return world.AcousticMap!.RegionPositions.ContainsKey(regId)
+            && world.AcousticMap.Regions.TryGetValue(regId, out var reg) && reg.RoomSize.X > 0;
     }
 
     public bool RaycastMaterial(WorldSnapshot world, Vector3 start, Vector3 dir, float maxDist, out float distance, out Vector3 normal, out string material, int ignoreEntityId = -1)

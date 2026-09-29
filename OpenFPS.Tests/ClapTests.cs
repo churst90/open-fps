@@ -43,7 +43,7 @@ public class ClapTests
     /// The band balance of a MEASURED clap, from a recording of one person clapping slowly.
     ///
     /// Averaged over the 67 clean claps that `tools/split_footsteps.py` cut out of
-    /// `inbox/Slow Clapping  HQ Sound Effects.mp3` (2026-09-19). Normalised to its own total, so this
+    /// `approved/applause/Slow Clapping  HQ Sound Effects.mp3` (2026-09-19). Normalised to its own total, so this
     /// is the SHAPE of a clap and says nothing about level — that is <see cref="Applause.SingleClapDb"/>'s
     /// job. Baked in so the test runs anywhere; re-measure with `--applause compare=DIR` if the
     /// reference recording is ever replaced.

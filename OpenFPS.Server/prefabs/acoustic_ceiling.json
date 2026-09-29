@@ -1,0 +1,12 @@
+{
+  "Id": "acoustic_ceiling",
+  "Name": "Suspended Ceiling",
+  "Description": "Mineral-fibre acoustic tiles on a grid, hung below the structure. Absorbs most of the middle and top of what reaches it and lets the bass through into the void above: what stops a big room ringing like the concrete box it is.",
+  "Material": "AcousticTile",
+  "ColliderSize": { "X": 10, "Y": 0.05, "Z": 10 },
+  "Type": "StaticObject",
+  "IsSolid": true,
+  "TransmissionLow": 0.55,
+  "TransmissionMid": 0.35,
+  "TransmissionHigh": 0.15
+}

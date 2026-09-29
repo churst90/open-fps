@@ -1,0 +1,795 @@
+[
+ {
+  "set": "16-27",
+  "pack": "16",
+  "tracks": [
+   "concrete - shoes - set 1 - walk 1",
+   "concrete - shoes - set 1 - walk 2"
+  ],
+  "material": "Concrete",
+  "shoe": "shoes"
+ },
+ {
+  "set": "16-29",
+  "pack": "16",
+  "tracks": [
+   "cement - shoes - set 1 - landing, jog and run",
+   "cement - shoes - set 1 - walk 1",
+   "cement - shoes - set 1 - walk 2"
+  ],
+  "material": "Cement",
+  "shoe": "shoes"
+ },
+ {
+  "set": "16-32",
+  "pack": "16",
+  "tracks": [
+   "cement - high heels - set 1 - landing, jog and run",
+   "cement - high heels - set 1 - walk 1",
+   "cement - high heels - set 1 - walk 2",
+   "cement - high heels - set 1 - walk 3",
+   "cement - high heels - set 1 - walk 4"
+  ],
+  "material": "Cement",
+  "shoe": "heels"
+ },
+ {
+  "set": "16-37",
+  "pack": "16",
+  "tracks": [
+   "cement - boots - set 1 - landing, jog and run",
+   "cement - boots - set 1 - walk 1",
+   "cement - boots - set 1 - walk 2"
+  ],
+  "material": "Cement",
+  "shoe": "boots"
+ },
+ {
+  "set": "16-40",
+  "pack": "16",
+  "tracks": [
+   "concrete - shoes - set 2 - landing, jog and run",
+   "concrete - shoes - set 2 - walk"
+  ],
+  "material": "Concrete",
+  "shoe": "shoes"
+ },
+ {
+  "set": "16-44",
+  "pack": "16",
+  "tracks": [
+   "creaky floorboards - shoes - set 1 - walk 1",
+   "creaky floorboards - shoes - set 1 - walk 2"
+  ],
+  "material": "Floorboards",
+  "shoe": "shoes"
+ },
+ {
+  "set": "16-46",
+  "pack": "16",
+  "tracks": [
+   "creaky floorboards - shoes - set 2 - landing, jog and run",
+   "creaky floorboards - shoes - set 2 - walk 1",
+   "creaky floorboards - shoes - set 2 - walk 2"
+  ],
+  "material": "Floorboards",
+  "shoe": "shoes"
+ },
+ {
+  "set": "16-49",
+  "pack": "16",
+  "tracks": [
+   "unlabelled, set 16-49 - set 1 - landing, jog and run",
+   "unlabelled, set 16-49 - set 1 - walk 1",
+   "unlabelled, set 16-49 - set 1 - walk 2"
+  ],
+  "material": null,
+  "shoe": null
+ },
+ {
+  "set": "16-52",
+  "pack": "16",
+  "tracks": [
+   "creaky floorboards - shoes - set 3 - landing, jog and run"
+  ],
+  "material": "Floorboards",
+  "shoe": "shoes"
+ },
+ {
+  "set": "16-54",
+  "pack": "16",
+  "tracks": [
+   "carpet over floorboards - shoes - set 1 - walk, jog and run"
+  ],
+  "material": "CarpetOnFloorboards",
+  "shoe": "shoes"
+ },
+ {
+  "set": "16-56",
+  "pack": "16",
+  "tracks": [
+   "carpet over floorboards - barefoot - set 1 - walk 1",
+   "carpet over floorboards - barefoot - set 1 - walk 2"
+  ],
+  "material": "CarpetOnFloorboards",
+  "shoe": "barefoot"
+ },
+ {
+  "set": "16-58",
+  "pack": "16",
+  "tracks": [
+   "carpet over floorboards - barefoot - set 2 - landing, jog and run",
+   "carpet over floorboards - barefoot - set 2 - walk 1",
+   "carpet over floorboards - barefoot - set 2 - walk 2"
+  ],
+  "material": "CarpetOnFloorboards",
+  "shoe": "barefoot"
+ },
+ {
+  "set": "16-61",
+  "pack": "16",
+  "tracks": [
+   "carpet over floorboards - barefoot - set 3 - landing, jog and run",
+   "carpet over floorboards - barefoot - set 3 - walk 1",
+   "carpet over floorboards - barefoot - set 3 - walk 2",
+   "carpet over floorboards - barefoot - set 3 - walk 3",
+   "carpet over floorboards - barefoot - set 3 - walk 4",
+   "carpet over floorboards - barefoot - set 3 - walk 5"
+  ],
+  "material": "CarpetOnFloorboards",
+  "shoe": "barefoot"
+ },
+ {
+  "set": "16-67",
+  "pack": "16",
+  "tracks": [
+   "carpet over floorboards - barefoot - set 4 - landing, jog and run",
+   "carpet over floorboards - barefoot - set 4 - walk 1",
+   "carpet over floorboards - barefoot - set 4 - walk 2"
+  ],
+  "material": "CarpetOnFloorboards",
+  "shoe": "barefoot"
+ },
+ {
+  "set": "16-70",
+  "pack": "16",
+  "tracks": [
+   "wood - dress shoes - set 1 - landing, jog and run",
+   "wood - dress shoes - set 1 - walk 1",
+   "wood - dress shoes - set 1 - walk 2"
+  ],
+  "material": "Wood",
+  "shoe": "dress"
+ },
+ {
+  "set": "16-73",
+  "pack": "16",
+  "tracks": [
+   "wood - shoes - set 1 - landing, jog and run",
+   "wood - shoes - set 1 - walk 1",
+   "wood - shoes - set 1 - walk 2"
+  ],
+  "material": "Wood",
+  "shoe": "shoes"
+ },
+ {
+  "set": "16-76",
+  "pack": "16",
+  "tracks": [
+   "wood - barefoot - set 1 - landing, jog and run",
+   "wood - barefoot - set 1 - walk 1",
+   "wood - barefoot - set 1 - walk 2"
+  ],
+  "material": "Wood",
+  "shoe": "barefoot"
+ },
+ {
+  "set": "16-79",
+  "pack": "16",
+  "tracks": [
+   "creaky floorboards - shoes - set 4 - landing, jog and run",
+   "creaky floorboards - shoes - set 4 - walk 1",
+   "creaky floorboards - shoes - set 4 - walk 2"
+  ],
+  "material": "Floorboards",
+  "shoe": "shoes"
+ },
+ {
+  "set": "16-82",
+  "pack": "16",
+  "tracks": [
+   "wood - barefoot - set 2 - landing, jog and run",
+   "wood - barefoot - set 2 - walk 1",
+   "wood - barefoot - set 2 - walk 2",
+   "wood - barefoot - set 2 - walk 3",
+   "wood - barefoot - set 2 - walk 4"
+  ],
+  "material": "Wood",
+  "shoe": "barefoot"
+ },
+ {
+  "set": "16-93",
+  "pack": "16",
+  "tracks": [
+   "gravel - shoes - set 1 - walk, jog and run"
+  ],
+  "material": "Gravel",
+  "shoe": "shoes"
+ },
+ {
+  "set": "16-94",
+  "pack": "16",
+  "tracks": [
+   "gravel - shoes - set 2 - walk, jog and run"
+  ],
+  "material": "Gravel",
+  "shoe": "shoes"
+ },
+ {
+  "set": "16-97",
+  "pack": "16",
+  "tracks": [
+   "leaves - shoes - set 1 - walk, jog and run"
+  ],
+  "material": "Leaves",
+  "shoe": "shoes"
+ },
+ {
+  "set": "17-04",
+  "pack": "17",
+  "tracks": [
+   "wood - shoes - set 2 - walk, jog and run"
+  ],
+  "material": "Wood",
+  "shoe": "shoes"
+ },
+ {
+  "set": "17-05",
+  "pack": "17",
+  "tracks": [
+   "wood - shoes - set 3 - landing, jog and run",
+   "wood - shoes - set 3 - walk 1",
+   "wood - shoes - set 3 - walk 2"
+  ],
+  "material": "Wood",
+  "shoe": "shoes"
+ },
+ {
+  "set": "17-08",
+  "pack": "17",
+  "tracks": [
+   "wood - barefoot - set 3 - landing, jog and run",
+   "wood - barefoot - set 3 - walk 1",
+   "wood - barefoot - set 3 - walk 2"
+  ],
+  "material": "Wood",
+  "shoe": "barefoot"
+ },
+ {
+  "set": "17-11",
+  "pack": "17",
+  "tracks": [
+   "wood - high heels - set 1 - landing, jog and run",
+   "wood - high heels - set 1 - walk 1",
+   "wood - high heels - set 1 - walk 2"
+  ],
+  "material": "Wood",
+  "shoe": "heels"
+ },
+ {
+  "set": "17-14",
+  "pack": "17",
+  "tracks": [
+   "unlabelled, set 17-14 - set 1 - landing, jog and run",
+   "unlabelled, set 17-14 - set 1 - walk 1",
+   "unlabelled, set 17-14 - set 1 - walk 2"
+  ],
+  "material": null,
+  "shoe": null
+ },
+ {
+  "set": "17-17",
+  "pack": "17",
+  "tracks": [
+   "wood - shoes - set 4 - landing, jog and run",
+   "wood - shoes - set 4 - walk 1",
+   "wood - shoes - set 4 - walk 2"
+  ],
+  "material": "Wood",
+  "shoe": "shoes"
+ },
+ {
+  "set": "17-20",
+  "pack": "17",
+  "tracks": [
+   "wood - barefoot - set 4 - landing, jog and run",
+   "wood - barefoot - set 4 - walk 1",
+   "wood - barefoot - set 4 - walk 2"
+  ],
+  "material": "Wood",
+  "shoe": "barefoot"
+ },
+ {
+  "set": "17-23",
+  "pack": "17",
+  "tracks": [
+   "wood - shoes - set 5 - landing, jog and run",
+   "wood - shoes - set 5 - walk"
+  ],
+  "material": "Wood",
+  "shoe": "shoes"
+ },
+ {
+  "set": "17-30",
+  "pack": "17",
+  "tracks": [
+   "unlabelled, set 17-30 - set 1 - walk 1",
+   "unlabelled, set 17-30 - set 1 - walk 2"
+  ],
+  "material": null,
+  "shoe": null
+ },
+ {
+  "set": "17-32",
+  "pack": "17",
+  "tracks": [
+   "carpet - shoes - set 1 - landing, jog and run",
+   "carpet - shoes - set 1 - walk"
+  ],
+  "material": "Carpet",
+  "shoe": "shoes"
+ },
+ {
+  "set": "17-35",
+  "pack": "17",
+  "tracks": [
+   "carpet - shoes - set 2 - landing, jog and run",
+   "carpet - shoes - set 2 - walk"
+  ],
+  "material": "Carpet",
+  "shoe": "shoes"
+ },
+ {
+  "set": "17-37",
+  "pack": "17",
+  "tracks": [
+   "carpet - shoes - set 3 - landing, jog and run",
+   "carpet - shoes - set 3 - walk 1",
+   "carpet - shoes - set 3 - walk 2"
+  ],
+  "material": "Carpet",
+  "shoe": "shoes"
+ },
+ {
+  "set": "17-40",
+  "pack": "17",
+  "tracks": [
+   "carpet - barefoot - set 1 - landing, jog and run",
+   "carpet - barefoot - set 1 - walk 1",
+   "carpet - barefoot - set 1 - walk 2"
+  ],
+  "material": "Carpet",
+  "shoe": "barefoot"
+ },
+ {
+  "set": "17-43",
+  "pack": "17",
+  "tracks": [
+   "tile - shoes - set 1 - landing, jog and run",
+   "tile - shoes - set 1 - walk 1",
+   "tile - shoes - set 1 - walk 2"
+  ],
+  "material": "Tile",
+  "shoe": "shoes"
+ },
+ {
+  "set": "17-46",
+  "pack": "17",
+  "tracks": [
+   "tile - shoes - set 2 - landing, jog and run",
+   "tile - shoes - set 2 - walk 1",
+   "tile - shoes - set 2 - walk 2"
+  ],
+  "material": "Tile",
+  "shoe": "shoes"
+ },
+ {
+  "set": "17-49",
+  "pack": "17",
+  "tracks": [
+   "tile - shoes - set 3 - landing, jog and run",
+   "tile - shoes - set 3 - walk 1",
+   "tile - shoes - set 3 - walk 2"
+  ],
+  "material": "Tile",
+  "shoe": "shoes"
+ },
+ {
+  "set": "17-52",
+  "pack": "17",
+  "tracks": [
+   "unlabelled, set 17-52 - set 1 - landing, jog and run",
+   "unlabelled, set 17-52 - set 1 - walk 1",
+   "unlabelled, set 17-52 - set 1 - walk 2",
+   "unlabelled, set 17-52 - set 1 - walk 3",
+   "unlabelled, set 17-52 - set 1 - walk 4",
+   "unlabelled, set 17-52 - set 1 - walk 5"
+  ],
+  "material": null,
+  "shoe": null
+ },
+ {
+  "set": "17-58",
+  "pack": "17",
+  "tracks": [
+   "unlabelled, set 17-58 - set 1 - landing, jog and run",
+   "unlabelled, set 17-58 - set 1 - walk 1",
+   "unlabelled, set 17-58 - set 1 - walk 2"
+  ],
+  "material": null,
+  "shoe": null
+ },
+ {
+  "set": "17-61",
+  "pack": "17",
+  "tracks": [
+   "unlabelled, set 17-61 - set 1 - landing, jog and run",
+   "unlabelled, set 17-61 - set 1 - walk 1",
+   "unlabelled, set 17-61 - set 1 - walk 2"
+  ],
+  "material": null,
+  "shoe": null
+ },
+ {
+  "set": "17-64",
+  "pack": "17",
+  "tracks": [
+   "unlabelled, set 17-64 - set 1 - landing, jog and run",
+   "unlabelled, set 17-64 - set 1 - walk 1",
+   "unlabelled, set 17-64 - set 1 - walk 2"
+  ],
+  "material": null,
+  "shoe": null
+ },
+ {
+  "set": "17-67",
+  "pack": "17",
+  "tracks": [
+   "tile - high heels - set 1 - landing, jog and run",
+   "tile - high heels - set 1 - walk 1",
+   "tile - high heels - set 1 - walk 2"
+  ],
+  "material": "Tile",
+  "shoe": "heels"
+ },
+ {
+  "set": "17-70",
+  "pack": "17",
+  "tracks": [
+   "concrete - high heels - set 1 - landing, jog and run",
+   "concrete - high heels - set 1 - walk 1",
+   "concrete - high heels - set 1 - walk 2",
+   "concrete - high heels - set 1 - walk 3",
+   "concrete - high heels - set 1 - walk 4"
+  ],
+  "material": "Concrete",
+  "shoe": "heels"
+ },
+ {
+  "set": "17-75",
+  "pack": "17",
+  "tracks": [
+   "unlabelled, set 17-75 - set 1 - landing, jog and run",
+   "unlabelled, set 17-75 - set 1 - walk 1",
+   "unlabelled, set 17-75 - set 1 - walk 2"
+  ],
+  "material": "Metal",
+  "shoe": "unknown"
+ },
+ {
+  "set": "17-78",
+  "pack": "17",
+  "tracks": [
+   "unlabelled, set 17-78 - set 1 - landing, jog and run",
+   "unlabelled, set 17-78 - set 1 - walk 1",
+   "unlabelled, set 17-78 - set 1 - walk 2"
+  ],
+  "material": "Metal",
+  "shoe": "unknown"
+ },
+ {
+  "set": "17-81",
+  "pack": "17",
+  "tracks": [
+   "unlabelled, set 17-81 - set 1 - landing, jog and run",
+   "unlabelled, set 17-81 - set 1 - walk 1",
+   "unlabelled, set 17-81 - set 1 - walk 2"
+  ],
+  "material": "Metal",
+  "shoe": "unknown"
+ },
+ {
+  "set": "17-84",
+  "pack": "17",
+  "tracks": [
+   "unlabelled, set 17-84 - set 1 - landing, jog and run",
+   "unlabelled, set 17-84 - set 1 - walk 1",
+   "unlabelled, set 17-84 - set 1 - walk 2"
+  ],
+  "material": "Metal",
+  "shoe": "unknown"
+ },
+ {
+  "set": "17-87",
+  "pack": "17",
+  "tracks": [
+   "metal - shoes - set 1 - landing, jog and run",
+   "metal - shoes - set 1 - walk"
+  ],
+  "material": "Metal",
+  "shoe": "shoes"
+ },
+ {
+  "set": "17-89",
+  "pack": "17",
+  "tracks": [
+   "mud - shoes - set 1 - walk, jog and run"
+  ],
+  "material": "Mud",
+  "shoe": "shoes"
+ },
+ {
+  "set": "17-90",
+  "pack": "17",
+  "tracks": [
+   "mud - shoes - set 2 - walk, jog and run"
+  ],
+  "material": "Mud",
+  "shoe": "shoes"
+ },
+ {
+  "set": "17-91",
+  "pack": "17",
+  "tracks": [
+   "sand - shoes - set 1 - walk, jog and run"
+  ],
+  "material": "Sand",
+  "shoe": "shoes"
+ },
+ {
+  "set": "17-92",
+  "pack": "17",
+  "tracks": [
+   "sand - shoes - set 2 - walk, jog and run"
+  ],
+  "material": "Sand",
+  "shoe": "shoes"
+ },
+ {
+  "set": "17-93",
+  "pack": "17",
+  "tracks": [
+   "snow - shoes - set 1 - walk, jog and run"
+  ],
+  "material": "Snow",
+  "shoe": "shoes"
+ },
+ {
+  "set": "17-94",
+  "pack": "17",
+  "tracks": [
+   "sand - shoes - set 3 - walk, jog and run"
+  ],
+  "material": "Sand",
+  "shoe": "shoes"
+ },
+ {
+  "set": "17-95",
+  "pack": "17",
+  "tracks": [
+   "sand - shoes - set 4 - walk, jog and run"
+  ],
+  "material": "Sand",
+  "shoe": "shoes"
+ },
+ {
+  "set": "17-96",
+  "pack": "17",
+  "tracks": [
+   "sand - barefoot - set 1 - walk, jog and run"
+  ],
+  "material": "Sand",
+  "shoe": "barefoot"
+ },
+ {
+  "set": "16-named-cement-heels",
+  "pack": "16",
+  "tracks": [
+   "cement - high heels - set 2 - walk 1",
+   "cement - high heels - set 2 - walk 2",
+   "cement - high heels - set 2 - walk 3"
+  ],
+  "material": "Cement",
+  "shoe": "heels"
+ },
+ {
+  "set": "16-named-cement-shoes",
+  "pack": "16",
+  "tracks": [
+   "cement - shoes - set 2 - walk",
+   "cement - shoes - set 2 - landing, jog and run"
+  ],
+  "material": "Cement",
+  "shoe": "shoes"
+ },
+ {
+  "set": "16-named-cement-sneakers",
+  "pack": "16",
+  "tracks": [
+   "cement - sneakers - set 1 - walk 1",
+   "cement - sneakers - set 1 - walk 2",
+   "cement - sneakers - set 1 - landing, jog and run",
+   "cement - sneakers - set 1 - walk 3"
+  ],
+  "material": "Cement",
+  "shoe": "sneakers"
+ },
+ {
+  "set": "16-named-concrete-barefoot",
+  "pack": "16",
+  "tracks": [
+   "concrete - barefoot - set 1 - walk 1",
+   "concrete - barefoot - set 1 - walk 2",
+   "concrete - barefoot - set 1 - landing, jog and run"
+  ],
+  "material": "Concrete",
+  "shoe": "barefoot"
+ },
+ {
+  "set": "16-named-concrete-heels",
+  "pack": "16",
+  "tracks": [
+   "concrete - high heels - set 2 - walk, jog and run"
+  ],
+  "material": "Concrete",
+  "shoe": "heels"
+ },
+ {
+  "set": "16-named-concrete-shoes",
+  "pack": "16",
+  "tracks": [
+   "concrete - shoes - set 3 - walk 1",
+   "concrete - shoes - set 3 - landing, jog and run",
+   "concrete - shoes - set 3 - walk 2",
+   "concrete - shoes - set 3 - walk 3",
+   "concrete - shoes - set 3 - walk 4"
+  ],
+  "material": "Concrete",
+  "shoe": "shoes"
+ },
+ {
+  "set": "16-named-concrete-sneakers",
+  "pack": "16",
+  "tracks": [
+   "concrete - sneakers - set 1 - walk 1",
+   "concrete - sneakers - set 1 - walk 2",
+   "concrete - sneakers - set 1 - landing, jog and run"
+  ],
+  "material": "Concrete",
+  "shoe": "sneakers"
+ },
+ {
+  "set": "16-named-dirt-shoes",
+  "pack": "16",
+  "tracks": [
+   "dirt - shoes - set 1 - walk 1",
+   "dirt - shoes - set 1 - walk 2"
+  ],
+  "material": "Dirt",
+  "shoe": "shoes"
+ },
+ {
+  "set": "16-named-floorboards-shoes",
+  "pack": "16",
+  "tracks": [
+   "creaky floorboards - shoes - set 5 - walk",
+   "creaky floorboards - shoes - set 5 - landing, jog and run"
+  ],
+  "material": "Floorboards",
+  "shoe": "shoes"
+ },
+ {
+  "set": "16-named-floorboards-sneakers",
+  "pack": "16",
+  "tracks": [
+   "creaky floorboards - sneakers - set 1 - walk 1",
+   "creaky floorboards - sneakers - set 1 - walk 2"
+  ],
+  "material": "Floorboards",
+  "shoe": "sneakers"
+ },
+ {
+  "set": "16-named-grass-shoes",
+  "pack": "16",
+  "tracks": [
+   "grass - shoes - set 1 - walk, jog and run"
+  ],
+  "material": "Grass",
+  "shoe": "shoes"
+ },
+ {
+  "set": "16-named-gravel-shoes",
+  "pack": "16",
+  "tracks": [
+   "gravel - shoes - set 3 - walk 1",
+   "gravel - shoes - set 3 - walk 2",
+   "gravel - shoes - set 3 - walk 3"
+  ],
+  "material": "Gravel",
+  "shoe": "shoes"
+ },
+ {
+  "set": "16-named-leaves-shoes",
+  "pack": "16",
+  "tracks": [
+   "leaves - shoes - set 2 - walk 1",
+   "leaves - shoes - set 2 - walk 2"
+  ],
+  "material": "Leaves",
+  "shoe": "shoes"
+ },
+ {
+  "set": "16-named-tile-barefoot",
+  "pack": "16",
+  "tracks": [
+   "tile - barefoot - set 1 - walk",
+   "tile - barefoot - set 1 - landing, jog and run"
+  ],
+  "material": "Tile",
+  "shoe": "barefoot"
+ },
+ {
+  "set": "16-named-tile-flipflops",
+  "pack": "16",
+  "tracks": [
+   "tile - flip-flops - set 1 - walk, jog and run"
+  ],
+  "material": "Tile",
+  "shoe": "flipflops"
+ },
+ {
+  "set": "16-named-tile-sneakers",
+  "pack": "16",
+  "tracks": [
+   "tile - sneakers - set 1 - walk 1",
+   "tile - sneakers - set 1 - walk 2"
+  ],
+  "material": "Tile",
+  "shoe": "sneakers"
+ },
+ {
+  "set": "17-named-carpet-shoes",
+  "pack": "17",
+  "tracks": [
+   "carpet - shoes - set 4 - walk 1",
+   "carpet - shoes - set 4 - landing, jog and run 1",
+   "carpet - shoes - set 4 - landing, jog and run 2",
+   "carpet - shoes - set 4 - walk 2",
+   "carpet - shoes - set 4 - walk 3",
+   "carpet - shoes - set 4 - walk 4"
+  ],
+  "material": "Carpet",
+  "shoe": "shoes"
+ },
+ {
+  "set": "17-named-wood-shoes",
+  "pack": "17",
+  "tracks": [
+   "wood - shoes - set 6 - walk 1",
+   "wood - shoes - set 6 - walk 2",
+   "wood - shoes - set 6 - walk 3"
+  ],
+  "material": "Wood",
+  "shoe": "shoes"
+ }
+]

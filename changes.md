@@ -2,6 +2,287 @@
 
 Recent work, newest first. `git log` has the rest.
 
+## 2026-09-29
+
+- `/room -6` trims the room you are in: its placed early reflections and its late tail together,
+  in decibels against the traced level. Rooms only; outdoors and open shelters are unchanged.
+  `OPENFPS_ROOM_DB` starts it. The default is -24, set by ear, the same figure as the traced echoes
+  outdoors ("-24 dB is where it's at, just like outdoors... everything sounds great and accurate").
+  The copy-to-direct arithmetic is within 1.6 dB of physics and the flat's tail within 3 dB of the
+  room equation, so the level is not where the 24 dB lives. Both trimmed paths render coherent
+  copies of the source from a point; the untrimmed outdoor tail, accepted at its physical level, is
+  a dense diffuse response. Next: scatter the placed copies by their wall's scattering, then see how
+  far the trim can come back.
+
+- Your own footsteps have the room's reflections again. In traced mode the step's reflections
+  returned early, from when the traced response carried the early part; once the room's stage was
+  cut to its late tail (parametric, silent for 50 ms) a step got a direct sound, then a tail, and
+  nothing from the walls between. Walking the flat was a wash with no reflections in it. Steps now
+  get what a clap gets: mirrored through the walls to third order, the twelve loudest inside 80 ms,
+  each from its own wall with that wall's colour. The step-echo pool is 48 voices.
+- The listener's own reverb bus is no longer re-placed at a point. In traced mode it blended a
+  mono copy of the whole bus at the survey's return direction, weighted by the survey's anisotropy,
+  on top of a field that is already round the head: a second, one-point room. Room mode keeps it.
+- The diffuse tail shares its bass between the ears below 120 Hz, not 300: a step on carpet is
+  nearly all below 300 Hz, and a tail identical in both ears there sits in the head whatever the
+  rest does. `--sa-encode` at 120 Hz: correlation 0.92 / 0.23 / 0.19 / 0.55 / 0.30 / 0.29 from
+  150 Hz to 4.8 kHz, level per band within 5 dB of the tail's (+4.8 at 150-300).
+
+- The room you are in is round you, not in your head. Its late tail (Steam Audio's parametric
+  reverb) is one channel, and one channel decoded is the same signal in both ears: heard inside the
+  head or straight ahead, and it stayed there when the head turned ("a consolidating of reverb in
+  front of me"). The tail is now rendered as the diffuse field it is: eight copies through eight
+  different all-pass chains, each encoded into the soundfield from a fixed direction in the world (the
+  corners of a cube round the head) and decoded through the HRTF in the listener's frame, so each ear
+  hears eight directions through eight head responses and the fine structure turns with the head.
+  Below 300 Hz the tail goes to both ears as it is, which is what a diffuse field is on a head there.
+  Measured (`--sa-encode`): interaural correlation 0.90 / 0.22 / 0.20 / 0.56 / 0.30 / 0.29 in the
+  bands from 150 Hz to 4.8 kHz, where a head in a real diffuse field measures about 0.9, 0.5, 0.2
+  and near 0; level per band within 3 dB of the tail's. `OPENFPS_DIFFUSE_TAIL=0` restores the
+  one-channel tail.
+- Two calibrations of Steam Audio's ambisonics, measured and taken out: its encoder writes W at
+  1/sqrt(4 pi) of the input (measured at creation by running noise through an encoder), and its
+  binaural decoder sums its virtual loudspeakers' head responses coherently for a signal that is
+  the same in all of them, which is +10 dB below 300 Hz and +8 dB to 600 Hz. The old one-channel
+  tail had that on it: every room's reverb carried ten decibels of extra bass, which is the boom.
+- The traced stages' Steam Audio effects and buffers are released with their buses (they leaked).
+
+- Steam Audio's world is now a true image of the game's. The scene, every trace's source and
+  listener and the probe volume were handed over with the game's z, while the listener's frame for
+  decoding was handed over with z the other way (Steam Audio's forward is -z). So every traced
+  response was decoded facing the wrong way along z: the wall ahead of you answered from behind, and
+  with you facing west the wall to the north landed in the left ear instead of the right. Measured
+  by `--sa-frame` (a wall to the left, a wall ahead): X/W -0.49 before, +0.49 after; all four
+  checks pass. Everything now goes through Phonon.World. Occlusion, transmission and pathing never
+  cared which way was forward, which is why it was never noticed.
+- In a room, the far walls answer a sound at arm's length. A copy's audibility was judged against
+  the direct sound at its true distance, so for your own clap half a metre from your ear any wall
+  past a twelve-metre round trip was dropped as inaudible. In Marlow flat 01F, 8.65 by 17.86 m,
+  the end walls were never placed; between the side walls' answers (25 ms) and the omnidirectional
+  tail (50 ms) there was a hole, then the tail arrived in the middle of the head at a level 3-8 dB
+  over the window before it, and held: "like there's a hallway in front of me". Audibility is now
+  judged against the direct sound as heard, never nearer than a metre; the gains are unchanged.
+  The end wall ahead is placed at 36 ms and its second and third orders fill the window to 50 ms.
+  The twelve loudest are voiced, not the first twelve in surface order.
+- Somebody else's footsteps start with the wall between you already on them. A step was submitted
+  with no occlusion, and the worker's answer for its pooled id came a tick or two later and eased
+  in — after the step was over. Every footfall outside a flat played its attack through the brick.
+  The step now takes the simulator's result for the nearest source it heard a moment ago, else the
+  hand-rolled tracer, at submission, and reverberates in the room the foot is in.
+- Read from the 02:53 capture in flat 01F, for the record: the direct clap is equal in both ears;
+  the placed reflections (5-50 ms) swing 4-9 dB between the ears with heading; the tail (50-200 ms)
+  is equal in both ears to 0.1 dB at every heading, with interaural correlation near 1 below
+  300 Hz falling to 0.2-0.3 above 2 kHz, which is what a diffuse field measures. Its decay is about
+  1.1 s. The flat is a bare 8.65 by 17.86 by 2.73 m room with plaster walls and ceiling and one
+  sofa, and the trace's decay for it is 0.7-0.8 s. That length is the geometry's.
+
+- Reflections are placed at their true level against their source. Every copy (echo, reflection,
+  flutter) was handed to the loudness placement as a quieter sound of its own. The placement keeps
+  45 % of a level difference, so a reflection 14 dB down came out 6 dB down. Every reflection in
+  the game was 4-8 dB too loud against what it copies. Copies now take their source's placement
+  and are scaled by what the surface and the longer path kept.
+- The room's tail no longer sits on the left. The ear decorrelator's right-ear chain summed to 32
+  samples more delay than the left's, so the tail reached the left ear 0.7 ms first on every sound.
+  Both chains now sum to 260 samples.
+- Walls stop sound by their weight. Transmission through an airtight wall now follows the mass
+  law from its density and the box's own thickness, per band, up to 55 dB. Porous materials
+  (fences, hedges, grass, crowds, carpet, acoustic tile) keep their table figures. Each face of a
+  box carries half its loss, and Steam Audio now counts up to eight surfaces, so two walls in a row
+  are both paid for.
+- A route round a wall only counts if it is clear. The barrier search measures one box at a time,
+  and when its route ran into another wall its level was kept anyway. Now what arrives is what the
+  wall lets through, from the source's own bearing. For an hour Steam Audio's pathing eq stood in
+  for the level: that is the colour of the bend, near 1.0 on a 150 m route, so sirens and walkers
+  behind walls played at full level from straight below (the probe grid's route), fixed in front
+  of the listener whichever way they turned.
+- The tower flats' doors have a wall over them and leaves that lap their jambs. The doorway cut ran
+  floor to ceiling, leaving a 65 cm slot over every shut door, and the 0.9 m leaf sat in a 1.0 m
+  opening. A shut flat door now passes -23/-35/-41 dB, where it passed -7/-11/-19.
+- `--path-probe ear=x,y,z src=x,y,z` shows what the occlusion worker hands the mixer.
+  `OPENFPS_AUDIO_DEBUG=1` adds the raw visibility, transmission and route.
+
+- A clap's early reflections play on time. They were queued while the clap played and sent a whole
+  frame later: every reflection in the log was 20-50 ms late. One due 6-25 ms after the clap
+  arrived 45-65 ms after it ("the clapping breaks up").
+- A sound that can only get round a building by going 156 m out of its way pays for the extra
+  distance. The barrier model's 24 dB ceiling left that route at -24 dB in every band, and it beat
+  the wall. Walkers outside Marlow flat 01F now come through the brick at the wall's own figures,
+  -24/-30/-36 dB, instead of a flat -24. That is still too loud for 35 cm of brick: wall
+  transmission comes from a table per material and does not know how thick a wall is.
+
+- A room is its walls first, then its tail. In the room you are in, a one-off sound's early
+  reflections (first to third order, the first 80 ms) now play as their own voices. Each is
+  mirrored off one wall and placed there through the HRTF, so they move as you turn. The traced
+  stage for that room plays only Steam Audio's parametric tail, built from the decay times the
+  trace measured, which starts about 50 ms in.
+  The traced response on its own is nearly omnidirectional: in Marlow flat 01F its directional
+  channels sit about 20 dB under the omni one. The capture showed the two ears 85-95 % alike after a
+  clap ("the room sounds narrow... I turn my head and nothing seems to move").
+  Other rooms and outdoors keep the full traced response. Sustained sounds (engines, speech) get
+  the tail but not the placed reflections.
+- Fixed: the distance scaling added earlier today also applied to sounds entering from outside.
+  A lorry down the street was sent into the flat's reverb about 19 dB hot, the mix ran at -8 LUFS
+  and clipped.
+
+- A room's answer to a sound close to you is quieter, measured through the whole mixer with a new
+  lab instrument (`--clap-room`, a clap in Marlow flat 01F). The room came back 1 dB over the clap
+  where physics puts it about 10 dB under. There were three causes:
+  - The traced reverb decoded through an HRTF made for 1024-sample blocks while running at 256.
+    That made it about 3.5 dB hot and the wrong colour. It has its own HRTF now.
+  - A sound in the room you are in was sent into that room twice, once as its room and once as
+    yours. It is sent once now.
+  - The trace is normalised to a source one metre off, and every sound was sent as if it stood
+    there. In a closed room the send is now the arriving sound times its distance. Outdoors it is
+    unchanged beyond a metre. The measured enclosure blends the two.
+  A clap now has the room 4.6 dB under it at game levels and 6.6 dB under with the limiter out of the
+  way.
+- Footsteps outside a building no longer come through the wall on their attack. A new one-shot
+  started on the old hand-rolled path's guess (for the pavement outside Marlow flat 01F, a route
+  through the flat's door at -4 dB) and slid to Steam Audio's answer (-24 dB through brick) after
+  the loudest part had played. It now starts from Steam Audio's answer for the nearest source it
+  heard a moment ago.
+- Rooms no longer sound like a stadium. The ear decorrelator added on 09-28 was itself a reverberator:
+  six all-passes of up to 13 ms at a feedback of 0.6 turned every click into 100 ms of build-up
+  peaking 20-45 ms late. It sat on top of every reflection the room handed back, flats, the
+  stairwell and the street alike. Measured on 52 claps in a capture, the room's answer peaked 48 ms
+  after the clap in a flat a few metres across. The delays are now 0.16-2.2 ms at 0.5: 90 % of a
+  click comes back inside 9 ms, and the ears stay apart (0.14 interaural correlation).
+- The airport terminal's acoustic ceiling was being heard as carpet. AcousticTile had the same
+  resonance index as Carpet, and region faces are stored by index. It has its own now, and a test
+  checks that no two materials share one.
+
+## 2026-09-28
+
+- A room is heard round you, not in the middle of your head. The traced reverb is rebuilt from an
+  energy field, and in a diffuse room that is all omnidirectional, so it reached both ears as one
+  signal: measured from a capture in 64 Alder Street, 0.8-0.99 interaural correlation in the tail
+  where a real room is 0.1-0.5. Each ear now gets its own all-pass chain above 300 Hz (the bottom
+  stays shared, as it is in a real room): 0.07 above 1 kHz, 0.87 below 150 Hz, level unchanged.
+- The time between beacon soundings is yours: `/beacons every 3`, half a second to ten, saved.
+- The airport terminal has a suspended acoustic ceiling (a new AcousticTile material): about 1.2 s
+  of reverb through the middle and 2.4 s at the bottom, where the bare concrete rang for 7-10 s.
+- Shift+E knocks on the nearest door: three knuckles on wood, built from shaped noise and fitted to a
+  recording of real knocks (within about a decibel per octave).
+- New beacon tones: soft sine notes, each kind its own shape. A door is two notes rising, an item one
+  small ring, a vehicle a low note twice. Exits, stairs and waypoints have designs rendered for
+  listening; the map places those beacons with their own sounds for now.
+- docs/LISTENING_SPOTS.md: places on the city to check rooms and reflections, with their /tp.
+- The sound no longer freezes in big rooms. The room tracer held its lock for the whole of a trace,
+  and the game asked it where you were every frame, so every frame waited out the trace: in the
+  airport terminal (a 9-second hall) every sound stood still for 680 ms at a time, the game loop ran
+  at 8 Hz, footsteps and claps came late or not at all, and the reverb stepped. Where you are is now
+  handed over without waiting, for the room tracer and the per-source echo tracer both.
+- Jumping indoors no longer throws you through the wall. Collision only pushed sideways, so a head in
+  a house's roof slab was pushed out of the roof's footprint through the nearest wall ("I can jump
+  over the edge to get out but I can't jump back in"). A body in the air now meets a ceiling and
+  stops rising; standing, a beam at head height is still a wall.
+- Standing right outside a building is outside it. The zone lookup fell back to a half-metre grid
+  that carries a room into the first half-metre past its wall, so against a house you were inside
+  it: the walkers beside you in the room, everything else muffled through walls.
+- Houses have their front doors on the street. Every house on the estate had its doorway in the
+  garden-side wall and a door standing inside its solid front wall; the back door now has a doorway
+  too.
+- A room answers when a room would: the traced reverb is convolved in 256-sample pieces, and the
+  convolution is one of its own blocks late, so a room's first reflection comes 5-8 ms after the
+  sound instead of 20-23 (in a car cabin too). With the mixer's 1,024-sample block every room had
+  been a separate space off to one side ("reflections centred not around me"). It is also
+  second-order ambisonics now (it was first), so the answer comes from round you.
+- Where two named zones overlap you are in the smaller one, whichever order the map lists them in,
+  for the name Z says and for the room you hear alike.
+- No sports bike on the city: the 600 supersport tried today did not sound like one and is gone,
+  preset and all. The litre bike stays in the registry with a stock silencer and its own tyres.
+- Turbocharged exhausts are heard: a turbine takes about 6 dB off the pulses evenly and scatters only
+  the top, where it had been a 260 Hz low-pass passing a third, so every turbo diesel was rumble and
+  turbo whine with the exhaust's bark gone before the pipe. The twin-turbo pickups' exhaust end is
+  now 21-25 dB over their engine bays at a cruise, and brighter; every turbo vehicle is louder.
+- Loud cars in traffic: four of the city's ordinary cars are now a sport compact, a turbo hatch, a
+  V8 pickup on Flowmasters and a mild small-block muscle car (94-104 dB at a metre cruising, against
+  the stock cars' 87-89). Measured, the other cars and the buses do not have the pickups' fault:
+  their exhausts are balanced, and at city speeds a stock car's tyres are as loud as its pipe.
+- A horn is heard from the car's front as it is now, not from where its exhaust was a few frames ago.
+- Echoes get duller with each bounce: a surface's roughness takes more of the top than the middle,
+  more off brick than glass, again at every surface in a chain.
+- Back gardens on the north side of Birch Street no longer run over Central Street's pavement and
+  road; with the smallest zone winning, 54 steps of that pavement had become "back garden".
+- The sports bike sounds like a small engine: a stock silencer (119 dB at a metre flat out to 101,
+  about what a stock litre bike makes) and the engine itself heard. A petrol engine's block now
+  keeps getting louder above 6,000 rpm, as measured engines do (Anderton's 50 log N); at a bike's
+  eleven thousand the engine is as loud as the pipe. Nothing changes at or below 6,000.
+- The twin-turbo pickups have the bigger pipes approved by ear (five-inch Duramax, six-inch Cummins)
+  and exit at the side ahead of the rear wheel, kerb side. Out of the rear bumper the truck's own
+  body stood between the pipe and the pavement until it had passed.
+- An echo of a shot, a clap or a slam is the crack itself, coming from the wall. Every echo went
+  through a diffuser, and off steel, concrete or glass (the shortest delays) that rang: a
+  "processed sounding" copy. The mirror share of a wall's return now plays the sound unchanged; the
+  scattered share still comes from points across the face, smeared, which is what gives the echo
+  the wall's size.
+- T on foot claps your hands, heard by everyone near and answered by the walls. In the driver's seat
+  T is still the key.
+- Lab: `--ride <preset>` renders the game's vehicle voice through a stop-go ride to a WAV, with
+  exhaust and mechanism knobs for trying variants; `--shot-echoes at=x,z [shot=x,z]` lists every echo
+  a shot makes on a real map and what each came off.
+- The traffic driver no longer lurches. Pulling away on a light throttle it held the clutch out while
+  the engine revved free, then closed it in one step: a bike jumped ten km/h in a tenth of a second.
+  The clutch is now let in over half a second whenever the engine and gear turn at different speeds,
+  the pull-away throttle is rolled on and eases off if the vehicle is ahead of where it should be, the
+  speed loop's integral no longer winds up during an overshoot, and slowing below what first gear does
+  at idle puts the clutch in instead of letting the idle drive the vehicle on. The muscle car and the
+  dirt bike had the same lurch, less often. `--shift-trace <preset>` in the lab prints gear, revs,
+  clutch and throttle through a stop-go drive.
+- The sports bike changes up in town. On a light throttle it changed up at 85 % of its 11,000 rpm
+  torque peak, so it never left first below 90 km/h. It short-shifts at 5,000 now, changes down at
+  3,000 rather than 5,000, and pulls away at 2,800 (`Gearbox.CruiseUpshiftRpm`, `Gearbox.LaunchRpm`).
+- A car door that sounds like a car door. Fitted to a recording and approved by ear: the slam is four
+  hits over 75 ms (first touch, the latch's two catches, a rebound), the cabin answering underneath,
+  and the body settling; opening is the handle, the latch letting go and the check strap's detent a
+  third of a second later. Every part is noise shaped per octave band. A first version built from
+  resonators matched the band levels and was rejected as sounding like an instrument, which is
+  what a few fixed modes ringing for half a second are. Used for every car door, player or driver.
+- Tests for what the engine mutation run found unchecked: the scripted driver's brake, gear, throttle,
+  launch clutch and shifts, the network driver switching the engine off, the valve solver at the ends
+  of its range, and the air compressor's knock. A gear shift now closes the throttle on its first
+  sample rather than its second.
+- Approved recordings and renders moved out of the inbox into `approved/`, with an index.
+- The footstep bank is Cody's two complete Foley packs: fifteen surfaces, walk, jog, run, scuff and
+  landing for each shoe recorded, about 14,000 takes, every source file named for what it is. The game
+  plays ordinary walking and landings from it now, a hair different in pitch and level each step;
+  the rest loads on first use. Grass has its own recordings.
+- Quieter arrival: the loading steps (preloading, receiving entities, acoustics) are shown and no
+  longer spoken; arriving says "Logged in. You are in <map>." and then the zone. A /tp no longer
+  replays the arrival; command replies make no chat sound; map and general chat keep their own
+  sounds when an admin talks.
+- Shift+P says what is in sight, nearest first, measured to the nearest part of each thing, in one
+  line; nothing behind a wall, and not the floor you stand on.
+- A siren or horn heard round a building no longer flutters: where it is heard from turns at a limited
+  rate instead of sliding through your head when the route round the building switches sides, and its
+  level comes from how far away it really is.
+- Gunshot echoes at their proper level: each echo was being muffled by the very wall it came off
+  (its line from you ran through that wall to the mirror image behind it), 40-60 dB down. The echo
+  search's distance limits now count the extra path over the direct one, so far shots echo too.
+- The sports bike and the dirt bike rev like bikes: their gearing lacked the reduction between crank
+  and gearbox, so at city speeds they lugged like a diesel. The dirt bike's exhaust is half a metre.
+- Steve joins the street, and two children wait for the schools.
+- More people and more to say: glenn and louis join (27 voices, 11,053 lines). A voice without the
+  original named lines speaks from its own lines in the same category. People on their own now and
+  then mutter, think aloud, read a text out or remark on the weather or the hour when it is true;
+  people near a shot or a leant-on horn react. Half the phone calls are recorded calls played
+  through, some go to voicemail; strangers passing make small talk or ask the way. About one walker
+  in four on a wide pavement walks with somebody, and the two talk to each other when you are near:
+  47 conversations between ten pairs of voices.
+
+- People on foot cross the roads. Wherever a walker's line passes over a carriageway (a side street's
+  mouth at a corner) is a crossing, found at load: 90 in the city. A walker stops at the kerb and
+  waits for a gap as long as the walk across plus 3 s (the Highway Capacity Manual's pedestrian
+  critical gap); drivers stop for anybody on a crossing, and a driver arriving at a junction stops for
+  somebody who has waited at the kerb for 8 s. After 30 s a walker takes any gap as long as the walk.
+  A driver waiting at a junction stands short of the crossing, not on it. Over five minutes of city
+  traffic nobody out in the road had a vehicle over them, the longest wait at a kerb was 40 s and the
+  longest any vehicle stood still was 30 s. The timings are map data (`StreetLife`).
+- Two junction faults the crossings brought out. A long truck holding at the line was taken to be in
+  the junction already, because the smoothed line drifts from the lanes by metres at corners, and
+  drove on into a car. And "everybody is waiting, one goes" could pull out in front of a car about to
+  arrive; it now waits for anything within 4 s.
+
 ## 2026-09-27
 
 - Drivers take turns at junctions. A vehicle already in a junction, or too close to stop before the

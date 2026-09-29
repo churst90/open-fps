@@ -498,6 +498,7 @@ default.json.bak
 # Raw audio drops. Source material, often hundreds of megabytes, and never what ships —
 # tools/ingest_audio.py reads it and writes the converted result into ASSETS.
 inbox/
+approved/
 
 # Ambience beds. Four-channel ambisonic recordings are tens of megabytes each even after the ingest
 # trims and resamples them, which does not belong in a source repository. Regenerate them with

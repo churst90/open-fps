@@ -120,4 +120,19 @@ public class ApplauseTests
         Assert.False(Applause.TryParseKey("", out _));
         Assert.False(Applause.TryParseKey("applause:nonsense", out _));
     }
+
+    /// <summary>
+    /// One clap is one clap: a single burst at the front of the buffer, near silence after it, and
+    /// not the crowd's swell (which would fade the only clap in).
+    /// </summary>
+    [Fact]
+    public void ASingleClapIsOneBurstAtTheStart()
+    {
+        var clap = Applause.RenderClap(Sr, 5);
+        float peak = clap.Max(MathF.Abs);
+        Assert.True(peak > 0.5f, $"peak {peak}");
+        Assert.True(clap.Take(Sr / 50).Max(MathF.Abs) >= 0.99f * peak, "the clap is not at the start");
+        Assert.True(clap.Skip(Sr / 8).Max(MathF.Abs) < 0.05f * peak, "something after the clap");
+        Assert.True(Applause.TryParseKey(Applause.ClapKey, out _) == false, "a clap is not a crowd");
+    }
 }

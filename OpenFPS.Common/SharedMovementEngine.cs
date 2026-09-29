@@ -127,7 +127,8 @@ public static class SharedMovementEngine
                 // Transform current cylinder center to local space
                 Vector3 localPos = Vector3.Transform(nextPos + cylinderCenterOffset, worldToLocal);
                 
-                var hit = GeometryUtils.GetCylinderAABBOverlap(-col.Size/2f, col.Size/2f, localPos, ctx.PlayerRadius, collisionHeight);
+                var hit = GeometryUtils.GetCylinderAABBOverlap(-col.Size/2f, col.Size/2f, localPos, ctx.PlayerRadius, collisionHeight,
+                                                              canGoDown: !isGrounded);
                 
                 if (hit.IsColliding)
                 {
@@ -188,6 +189,8 @@ public static class SharedMovementEngine
                 {
                     vel.X -= bestHit.Normal.X * velDot;
                     vel.Z -= bestHit.Normal.Z * velDot;
+                    // A head against a ceiling stops going up.
+                    if (bestHit.Normal.Y < 0f && vel.Y > 0f) vel.Y = 0f;
                 }
             }
         }

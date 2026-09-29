@@ -15,6 +15,8 @@ namespace OpenFPS.Server.Systems;
 public struct Pedestrian
 {
     public string Voice;
+    /// <summary>Two people walking together share this ("" for somebody on their own).</summary>
+    public string Pair;
 }
 
 /// <summary>What is true about the world right now that a person might remark on.</summary>
@@ -65,6 +67,23 @@ public sealed class PedestrianSpeech
     public const double StoryChance = 0.2;
     /// <summary>A beat between one person finishing and the other answering.</summary>
     public const float ReplyGapSeconds = 0.3f;
+    /// <summary>Of calls made, how many go to voicemail.</summary>
+    public const double VoicemailChance = 0.12;
+    /// <summary>Of calls made, how many are one of the recorded calls played through.</summary>
+    public const double ScriptedCallChance = 0.5;
+    /// <summary>Two people walking together start a conversation when somebody is near, then not
+    /// another for this long, seconds.</summary>
+    public const double TalkAgainSeconds = 90;
+    /// <summary>A gap between one person finishing and the other answering, seconds: in speech it is
+    /// usually a fifth of a second or so (Stivers et al. 2009).</summary>
+    public const float TurnGapSeconds = 0.25f;
+    /// <summary>Somebody on their own says something to nobody (mutters, reads a text out, remarks on
+    /// the weather) about this often, while somebody is near enough to hear, seconds.</summary>
+    public const double RemarkEverySeconds = 150;
+    /// <summary>Muttering is quieter than talking to someone: about 8 dB under a normal voice.</summary>
+    public const float MutterDb = Speech.NormalDb - 8f;
+    /// <summary>A remark to nobody is only made with somebody within this, metres.</summary>
+    public const float RemarkHeardMetres = 15f;
 
     private sealed class Person
     {
@@ -76,6 +95,10 @@ public sealed class PedestrianSpeech
         public double NextPhoneLine;
         public bool ToldStory;
         public Vector3 LastPosition;
+        public double NextRemark;
+        /// <summary>A scripted call in progress, and how far through it.</summary>
+        public IReadOnlyList<Speech.CallTurn>? Script;
+        public int ScriptAt;
     }
 
     private sealed class Encounter
@@ -116,6 +139,28 @@ public sealed class PedestrianSpeech
     /// </summary>
     public static string NextVoice(string mapId) => Next("walk:" + mapId, WalkerVoices);
 
+    private static readonly Dictionary<(string Map, string Pair), (string A, string B)> _pairVoices = new();
+
+    /// <summary>
+    /// The voice for one of two people walking together (<paramref name="second"/> false for the
+    /// first): the two voices of a recorded conversation, handed out in turn, so each pair of walkers
+    /// has things to say to each other.
+    /// </summary>
+    public static string PairVoice(string mapId, string pair, bool second)
+    {
+        lock (_pairVoices)
+        {
+            if (!_pairVoices.TryGetValue((mapId, pair), out var v))
+            {
+                var pairs = Speech.ConversationPairs;
+                if (pairs.Count == 0) return NextVoice(mapId);
+                int n = _nextVoice.GetValueOrDefault("pair:" + mapId); _nextVoice["pair:" + mapId] = n + 1;
+                _pairVoices[(mapId, pair)] = v = pairs[n % pairs.Count];
+            }
+            return second ? v.B : v.A;
+        }
+    }
+
     /// <summary>The next driver's voice: somebody with something to yell.</summary>
     public static string NextDriverVoice(string mapId) => Next("drive:" + mapId, Speech.VoicesWith("yell"));
 
@@ -136,10 +181,16 @@ public sealed class PedestrianSpeech
                        Action<int, string, TransientSound> say)
     {
         var people = new List<(int Id, Vector3 At, Vector3 Forward, float Speed, string Voice)>();
+        var pairs = new Dictionary<string, List<int>>();
         world.Query(new QueryDescription().WithAll<Transform, Velocity, Pedestrian>(),
             (Entity e, ref Transform t, ref Velocity v, ref Pedestrian p) =>
             {
                 if (string.IsNullOrEmpty(p.Voice)) return;
+                if (!string.IsNullOrEmpty(p.Pair))
+                {
+                    if (!pairs.TryGetValue(p.Pair, out var members)) pairs[p.Pair] = members = new List<int>();
+                    members.Add(people.Count);
+                }
                 var fwd = Vector3.Transform(Vector3.UnitZ, t.Rotation);
                 fwd.Y = 0f;
                 fwd = fwd.LengthSquared() > 1e-6f ? Vector3.Normalize(fwd) : Vector3.UnitZ;
@@ -164,7 +215,11 @@ public sealed class PedestrianSpeech
             foreach (var q in players)
                 Meet(mapId, p, me, q, now, cond, say);
             Phone(mapId, p, me, players, now, cond, say);
+            Remark(p, me, players, now, cond, say);
         }
+        React(mapId, people, players, now, say);
+        foreach (var (pair, members) in pairs)
+            if (members.Count == 2) Converse(mapId, pair, people[members[0]], people[members[1]], players, now, say);
 
         // Two strangers passing each other, where somebody could hear it. Everywhere else it would be
         // a hello sent to every client on the map from three hundred metres away.
@@ -181,7 +236,7 @@ public sealed class PedestrianSpeech
     {
         if (!_people.TryGetValue((mapId, id), out var me) || me.Voice != voice)
         {
-            me = new Person { Voice = voice, NextCallCheck = now + Uniform(5, 60) };
+            me = new Person { Voice = voice, NextCallCheck = now + Uniform(5, 60), NextRemark = now + Uniform(20, 2 * RemarkEverySeconds) };
             _people[(mapId, id)] = me;
         }
         return me;
@@ -234,7 +289,7 @@ public sealed class PedestrianSpeech
             enc.LastMet = now;            // walked into you: that is the meeting, no hello after it
             enc.WillPart = false;
             bool annoyed = _rng.NextDouble() < 0.15;
-            string line = Pick(me, annoyed ? StreetLines.Annoyed : StreetLines.Sorry);
+            string line = annoyed ? Pick(me, StreetLines.Annoyed, "annoyed") : Pick(me, StreetLines.Sorry, "polite");
             Say(p, me, line, line == "polite_watch_it" ? Speech.RaisedDb : Speech.NormalDb, 0f, now, say);
             return;
         }
@@ -246,7 +301,7 @@ public sealed class PedestrianSpeech
             enc.WillPart = false;
             if (!onPhone && _rng.NextDouble() < GreetChance)
             {
-                Say(p, me, Pick(me, StreetLines.Greetings(cond)), Speech.NormalDb, 0f, now, say);
+                Say(p, me, Pick(me, StreetLines.Greetings(cond), "greet"), Speech.NormalDb, 0f, now, say);
                 enc.WillPart = _rng.NextDouble() < PartChance;
             }
             return;
@@ -259,7 +314,7 @@ public sealed class PedestrianSpeech
             else if (free && d > enc.Closest + 1.5f && d > 2f)
             {
                 enc.WillPart = false;
-                Say(p, me, Pick(me, StreetLines.Partings(cond)), Speech.NormalDb, 0f, now, say);
+                Say(p, me, Pick(me, StreetLines.Partings(cond), "bye"), Speech.NormalDb, 0f, now, say);
             }
         }
 
@@ -282,6 +337,26 @@ public sealed class PedestrianSpeech
     private void Phone((int Id, Vector3 At, Vector3 Forward, float Speed, string Voice) p, Person me, double now,
                        SpeechConditions cond, Action<int, string, TransientSound> say, bool heard)
     {
+        if (now < me.CallUntil && me.Script != null)
+        {
+            if (now < me.NextPhoneLine || now < me.BusyUntil) return;
+            if (me.ScriptAt >= me.Script.Count) { me.Script = null; me.CallUntil = now; me.NextCallCheck = now + Uniform(60, 180); return; }
+            var turn = me.Script[me.ScriptAt++];
+            if (turn.Line == null)
+            {
+                // The far end talking. A long wait gets a noise of listening now and then.
+                me.NextPhoneLine = now + turn.Pause;
+                if (turn.Pause >= 3f && _rng.NextDouble() < 0.3 && heard)
+                {
+                    string mm = Pick(me, StreetLines.Listening, "phone_listen");
+                    if (mm.Length > 0) Say(p, me, mm, Speech.NormalDb, (float)Uniform(0.8, turn.Pause - 1.5), now, say);
+                }
+                return;
+            }
+            if (heard) Say(p, me, turn.Line, Speech.NormalDb, 0f, now, say);
+            me.NextPhoneLine = now + LengthOf(me.Voice, turn.Line) + Uniform(0.2, 0.6);
+            return;
+        }
         if (now < me.CallUntil)
         {
             if (now < me.NextPhoneLine || now < me.BusyUntil) return;
@@ -297,8 +372,10 @@ public sealed class PedestrianSpeech
                 me.NextPhoneLine = now + LengthOf(me.Voice, story) + Uniform(2, 5);
                 return;
             }
-            string line = Pick(me, last ? StreetLines.RingOff
-                                        : _rng.NextDouble() < 0.55 ? StreetLines.Listening : StreetLines.PhoneTalk(cond));
+            string line = last ? Pick(me, StreetLines.RingOff, "phone_end")
+                        : _rng.NextDouble() < 0.06 ? Pick(me, Array.Empty<string>(), "phone_signal")
+                        : _rng.NextDouble() < 0.55 ? Pick(me, StreetLines.Listening, "phone_listen")
+                        : Pick(me, StreetLines.PhoneTalk(cond), "chatter");
             if (heard) Say(p, me, line, Speech.NormalDb, 0f, now, say);
             if (last) { me.CallUntil = now; me.NextCallCheck = now + Uniform(60, 180); return; }
             me.NextPhoneLine = now + LengthOf(me.Voice, line) + Uniform(3, 10);
@@ -309,7 +386,26 @@ public sealed class PedestrianSpeech
         if (_rng.NextDouble() >= 0.35) return;
         me.CallUntil = now + Uniform(30, 90);
         me.ToldStory = false;
-        string hello = Pick(me, StreetLines.Answer);
+        // Now and then nobody answers, and it is a message after the tone.
+        if (_rng.NextDouble() < VoicemailChance && Speech.LinesOf(me.Voice, "phone_voicemail").Count > 0)
+        {
+            string message = Pick(me, Array.Empty<string>(), "phone_voicemail");
+            if (heard) Say(p, me, message, Speech.NormalDb, 0f, now, say);
+            me.CallUntil = now; me.NextCallCheck = now + Uniform(60, 180);
+            return;
+        }
+        // Half the calls are one of the recorded calls, start to finish.
+        var scripts = Speech.CallsFor(me.Voice);
+        if (scripts.Count > 0 && _rng.NextDouble() < ScriptedCallChance)
+        {
+            me.Script = scripts[_rng.Next(scripts.Count)];
+            me.ScriptAt = 0;
+            me.CallUntil = now + 600;           // until the script ends
+            me.NextPhoneLine = now;
+            return;
+        }
+        me.Script = null;
+        string hello = Pick(me, StreetLines.Answer, "phone_answer");
         if (heard) Say(p, me, hello, Speech.NormalDb, 0f, now, say);
         me.NextPhoneLine = now + LengthOf(me.Voice, hello) + Uniform(2, 5);
     }
@@ -320,6 +416,113 @@ public sealed class PedestrianSpeech
     {
         bool heard = players.Any(q => Vector3.Distance(q.At, p.At) < HeardMetres);
         Phone(p, me, now, cond, say, heard);
+    }
+
+    private readonly Dictionary<(string Map, string Pair), double> _nextTalk = new();
+
+    /// <summary>
+    /// Two people walking together, talking: when somebody is near enough to hear and neither is busy,
+    /// one of their recorded conversations, turn by turn, each line from the one who says it.
+    /// </summary>
+    private void Converse(string mapId, string pair, (int Id, Vector3 At, Vector3 Forward, float Speed, string Voice) x,
+                          (int Id, Vector3 At, Vector3 Forward, float Speed, string Voice) y,
+                          List<(int Id, Vector3 At, float Speed)> players, double now, Action<int, string, TransientSound> say)
+    {
+        if (now < _nextTalk.GetValueOrDefault((mapId, pair))) return;
+        if (Apart(x.At, y.At) > 3f || !players.Any(q => Apart(q.At, x.At) < HeardMetres)) return;
+        var px = _people[(mapId, x.Id)]; var py = _people[(mapId, y.Id)];
+        if (now < px.BusyUntil || now < py.BusyUntil || now < px.CallUntil || now < py.CallUntil) return;
+        var talks = Speech.ConversationsBetween(x.Voice, y.Voice);
+        if (talks.Count == 0) { _nextTalk[(mapId, pair)] = now + 600; return; }
+        var talk = talks[_rng.Next(talks.Count)];
+        float t = 0f;
+        foreach (var turn in talk.Turns)
+        {
+            bool isX = (turn.Who == "A") == (talk.A == x.Voice);
+            var (who, me) = isX ? (x, px) : (y, py);
+            if (turn.Line == null) { t += 0.8f; continue; }          // a laugh, a sigh: not recorded yet
+            if (turn.Cut) t = MathF.Max(0f, t - 0.3f);                  // cuts in before the other has quite finished
+            Say(who, me, turn.Line, Speech.NormalDb, t, now, say);
+            t += LengthOf(me.Voice, turn.Line) + TurnGapSeconds * (float)Uniform(0.6, 1.6);
+        }
+        px.BusyUntil = py.BusyUntil = now + t;
+        _nextTalk[(mapId, pair)] = now + t + TalkAgainSeconds * (0.7 + 0.6 * _rng.NextDouble());
+    }
+
+    /// <summary>Somebody on their own says something to nobody: muttered, so only when somebody is
+    /// close enough to catch it.</summary>
+    private void Remark((int Id, Vector3 At, Vector3 Forward, float Speed, string Voice) p, Person me,
+                        List<(int Id, Vector3 At, float Speed)> players, double now, SpeechConditions cond,
+                        Action<int, string, TransientSound> say)
+    {
+        if (now < me.NextRemark || now < me.BusyUntil || now < me.CallUntil) return;
+        me.NextRemark = now + RemarkEverySeconds * (0.5 + _rng.NextDouble());
+        if (!players.Any(q => Apart(q.At, p.At) < RemarkHeardMetres)) return;
+        var cats = StreetLines.Remarks(cond).Where(c => Speech.LinesOf(me.Voice, c).Count > 0).ToList();
+        if (p.Speed < 0.2f && Speech.LinesOf(me.Voice, "waiting").Count > 0) cats.Add("waiting");
+        if (cats.Count == 0) return;
+        string cat = cats[_rng.Next(cats.Count)];
+        var lines = Speech.LinesOf(me.Voice, cat).Where(l => l != me.LastLine).ToList();
+        if (lines.Count == 0) return;
+        float db = cat is "mutter" or "think_aloud" ? MutterDb : Speech.NormalDb;
+        Say(p, me, lines[_rng.Next(lines.Count)], db, 0f, now, say);
+    }
+
+    // ── Reactions ──────────────────────────────────────────────────────────────────────────────
+    //
+    // Something loud happens near people and one or two of them say something about it: a shot, close
+    // or far off, or a horn leant on beside them. Only what the server itself makes is heard here.
+
+    private readonly List<(string Map, string Kind, Vector3 At, double When)> _happened = new();
+
+    /// <summary>
+    /// Tells the street something happened: every sound event the server sends goes through here
+    /// (Program.EmitWorldAudio). A weapon's sound is a shot; a horn is a horn.
+    /// </summary>
+    public void Heard(string mapId, string label, IReadOnlyList<TransientSound> sounds, double now)
+    {
+        if (sounds.Count == 0) return;
+        string? kind = sounds.Any(s => s.SynthKey.StartsWith("weapon:", StringComparison.OrdinalIgnoreCase)) ? "shot"
+                     : string.Equals(label, "horn", StringComparison.OrdinalIgnoreCase) ? "horn" : null;
+        if (kind == null) return;
+        lock (_happened) _happened.Add((mapId, kind, sounds[0].Position, now));
+    }
+
+    /// <summary>A shot this close is "near": people duck and swear. Further, up to the far range, it is
+    /// somebody asking whether that was a gunshot.</summary>
+    public const float ShotNearMetres = 40f, ShotFarMetres = 400f, HornMetres = 20f;
+
+    private void React(string mapId, List<(int Id, Vector3 At, Vector3 Forward, float Speed, string Voice)> people,
+                       List<(int Id, Vector3 At, float Speed)> players, double now, Action<int, string, TransientSound> say)
+    {
+        List<(string Map, string Kind, Vector3 At, double When)> mine;
+        lock (_happened)
+        {
+            mine = _happened.Where(h => h.Map == mapId).ToList();
+            _happened.RemoveAll(h => h.Map == mapId || now - h.When > 5);
+        }
+        foreach (var h in mine)
+        {
+            float reach = h.Kind == "shot" ? ShotFarMetres : HornMetres;
+            var near = people.Where(p => Apart(p.At, h.At) < reach
+                                         && players.Any(q => Apart(q.At, p.At) < HeardMetres)
+                                         && _people.TryGetValue((mapId, p.Id), out var pp) && now >= pp.BusyUntil)
+                             .OrderBy(p => Apart(p.At, h.At)).Take(h.Kind == "shot" ? 3 : 1).ToList();
+            int said = 0;
+            foreach (var p in near)
+            {
+                var me = _people[(mapId, p.Id)];
+                bool close = Apart(p.At, h.At) < ShotNearMetres;
+                string cat = h.Kind == "horn" ? "react_horn" : close ? "react_gunshot_near" : "react_gunshot_far";
+                double chance = h.Kind == "horn" ? 0.25 : close ? 0.8 : 0.35;
+                if (_rng.NextDouble() >= chance || Speech.LinesOf(me.Voice, cat).Count == 0) continue;
+                var lines = Speech.LinesOf(me.Voice, cat);
+                float effort = h.Kind == "shot" && close ? Speech.RaisedDb : Speech.NormalDb;
+                // Speech after a startle comes a beat later, and not all at once.
+                Say(p, me, lines[_rng.Next(lines.Count)], effort, (float)Uniform(0.3, 1.2) + said * 0.8f, now, say);
+                said++;
+            }
+        }
     }
 
     /// <summary>Two people passing on a pavement; one may say hello and the other answer.</summary>
@@ -339,8 +542,9 @@ public sealed class PedestrianSpeech
         if (now < pa.CallUntil || now < pb.CallUntil || _rng.NextDouble() >= StrangerGreetChance) return;
 
         var (first, second) = StreetLines.Exchange(cond, _rng);
-        string l1 = Pick(pa, first);
-        string l2 = Pick(pb, second);
+        string l1 = Pick(pa, first.Lines, first.Categories);
+        string l2 = Pick(pb, second.Lines, second.Categories);
+        if (l1.Length == 0 || l2.Length == 0) return;
         float gap = LengthOf(pa.Voice, l1) + ReplyGapSeconds;
         Say(a, pa, l1, Speech.NormalDb, 0f, now, say);
         Say(b, pb, l2, Speech.NormalDb, gap, now, say);
@@ -371,10 +575,12 @@ public sealed class PedestrianSpeech
     private static float LengthOf(string voice, string line) => Speech.Find(voice, line)?.Seconds ?? 1f;
 
     /// <summary>A line from the list that this voice recorded, not the one this person said last if
-    /// there is any other.</summary>
-    private string Pick(Person me, IReadOnlyList<string> offered)
+    /// there is any other. With a category, the voice's other lines in it join the list, the ones
+    /// that are true at any time of day and in any weather (StreetLines.AnyTime): so a voice recorded
+    /// later, with none of the named lines, still has something to say.</summary>
+    private string Pick(Person me, IReadOnlyList<string> offered, params string[] categories)
     {
-        var lines = offered.Where(l => Speech.Find(me.Voice, l) != null).ToList();
+        var lines = StreetLines.Candidates(me.Voice, offered, categories);
         if (lines.Count == 0) return "";
         int last = -1;
         for (int i = 0; i < lines.Count; i++) if (lines[i] == me.LastLine) { last = i; break; }
@@ -526,16 +732,63 @@ public static class StreetLines
     /// <summary>Somebody pulling in to the kerb in front of them.</summary>
     public static readonly IReadOnlyList<string> AtAParker = new[] { "yell_nice_parking_job_genius", "yell_use_your_blinker", "yell_move_your_car" };
 
-    /// <summary>What two strangers say passing each other: a hello and a hello back, mostly.</summary>
-    public static (IReadOnlyList<string> First, IReadOnlyList<string> Second) Exchange(SpeechConditions c, Random rng)
+    /// <summary>Named lines, and categories whose any-time lines join them.</summary>
+    public readonly record struct Offer(IReadOnlyList<string> Lines, string[] Categories);
+
+    /// <summary>What two strangers say passing each other: a hello and a hello back, mostly; now and
+    /// then a remark and an answer, or the way somewhere.</summary>
+    public static (Offer First, Offer Second) Exchange(SpeechConditions c, Random rng)
     {
-        if (rng.NextDouble() < 0.06)
-            return (new[] { "chatter_which_way_is_the_train_station" },
-                    new[] { "chatter_it_s_just_up_the_street_on_the_left", "chatter_it_s_right_around_the_corner" });
+        double r = rng.NextDouble();
+        if (r < 0.06)
+            return (new Offer(new[] { "chatter_which_way_is_the_train_station" }, new[] { "ask_directions" }),
+                    new Offer(new[] { "chatter_it_s_just_up_the_street_on_the_left", "chatter_it_s_right_around_the_corner" }, new[] { "give_directions" }));
+        if (r < 0.16)
+            return (new Offer(Array.Empty<string>(), new[] { "smalltalk_open" }), new Offer(Array.Empty<string>(), new[] { "smalltalk_reply" }));
         var hello = new List<string> { "greet_hi", "greet_hey", "greet_hello", "greet_hey_there", "greet_how_you_doing" };
         if (IsMorning(c.Hour)) hello.AddRange(new[] { "greet_morning", "greet_good_morning" });
         if (IsAfternoon(c.Hour)) hello.Add("greet_afternoon");
         if (IsEvening(c.Hour)) hello.Add("greet_evening");
-        return (hello, hello);
+        return (new Offer(hello, new[] { "greet" }), new Offer(hello, new[] { "greet", "greet_reply" }));
+    }
+
+    /// <summary>
+    /// Whether a line can be said at any time of day and in any weather: it names no time, no season
+    /// and no weather. The lines that do are only said from the lists that check the clock and the sky.
+    /// </summary>
+    public static bool AnyTime(string text)
+        => !System.Text.RegularExpressions.Regex.IsMatch(text.ToLowerInvariant(),
+            @"\b(morning|afternoon|evening|tonight|night|noon|lunch|breakfast|dinner|today|tomorrow|yesterday|weekend|monday|tuesday|wednesday|thursday|friday|saturday|sunday|rain|raining|snow|snowing|cold|freezing|hot|heat|sun|sunny|storm|wind|windy|fog|foggy|beautiful day|nice day)\b");
+
+    /// <summary>The lines a voice can say from a list: the named ones it recorded, and its any-time
+    /// lines in the given categories.</summary>
+    public static List<string> Candidates(string voice, IReadOnlyList<string> offered, IReadOnlyList<string> categories)
+    {
+        var lines = offered.Where(l => Speech.Find(voice, l) != null).ToList();
+        foreach (var cat in categories)
+            foreach (var line in Speech.LinesOf(voice, cat))
+                if (!lines.Contains(line) && Speech.Find(voice, line) is { } t && AnyTime(t.Text)) lines.Add(line);
+        return lines;
+    }
+
+    /// <summary>
+    /// Somebody on their own, saying something to nobody in particular: under their breath, a thought
+    /// out loud, a text read out, a remark on the weather or the hour when it is true.
+    /// </summary>
+    public static string[] Remarks(SpeechConditions c)
+    {
+        var l = new List<string> { "mutter", "think_aloud", "read_text" };
+        bool wet = c.Weather is WeatherType.Rain or WeatherType.Storm && c.Precipitation >= 0.2f;
+        if (wet) l.Add("weather_rain");
+        if (c.Weather == WeatherType.Storm) l.Add("weather_storm");
+        if (c.Weather == WeatherType.Snow) l.Add("weather_snow");
+        if (c.TemperatureC <= 5f) l.Add("weather_cold");
+        if (c.TemperatureC >= 28f) l.Add("weather_hot");
+        if (IsFine(c)) l.Add("weather_fine");
+        if (c.Hour >= 5f && c.Hour < 11f) l.Add("time_morning");
+        else if (c.Hour >= 11f && c.Hour < 14f) l.Add("time_noon");
+        else if (c.Hour >= 17f && c.Hour < 22f) l.Add("time_evening");
+        else if (c.Hour >= 22f || c.Hour < 5f) l.Add("time_night");
+        return l.ToArray();
     }
 }

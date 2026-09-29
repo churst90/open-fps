@@ -192,14 +192,20 @@ internal sealed class ExhaustNetwork
             {
                 End = new OpenEnd(rate),
                 Jet = new JetNoise(rate, _x.TailpipeDiameterMm * 1e-3f, seed + 17 * b),
-                // A radial turbine passes the bottom of the band and scatters the rest: about a
-                // third of a low wave gets to the downpipe, the corner is a few hundred hertz, and
-                // half of what is stopped comes back up the manifold rather than becoming work.
+                // A radial turbine takes about six decibels off a wave passing through it, evenly
+                // across the plane-wave range, and only scatters the top — above a couple of
+                // kilohertz, where the blade passages are no longer short against the wavelength
+                // (Tiikoja and Abom's measurements: 5-10 dB of transmission loss, significant only at
+                // very high frequencies). Half of what is stopped comes back up the manifold rather
+                // than becoming work. It was a 260 Hz low-pass passing a third: everything above the
+                // firing note of a straight-piped diesel pickup was gone before the pipe, and the
+                // trucks were "all rumble, bass and turbo whine — I can hardly hear the exhaust"
+                // (Cody, 2026-09-28).
                 // TURBOCHARGED ONLY. A blower is belt-driven and has nothing in the exhaust at all —
                 // that is the whole difference between the two kinds of forced induction, and giving
                 // a supercharged V8 a turbine took 17 dB off it for no reason.
                 Turbine = e.Induction == Induction.Turbocharged
-                        ? new Turbine(rate, 260f, 0.34f, 0.5f) : null,
+                        ? new Turbine(rate, 2500f, 0.5f, 0.5f) : null,
             };
             // Mid pipe from the merge to the muffler.
             br.Chain.Add(new Pipe(_x.MidPipeMetres * (1f + 0.03f * b), tailArea, rate, wall, steep));

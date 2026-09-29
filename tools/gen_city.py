@@ -174,6 +174,7 @@ STOREY      = 3.0
 SLAB        = 0.25
 WALL_T      = 0.35
 DOOR_W      = 1.0
+DOOR_H      = 2.1                        # a door leaf's height (prefabs/door.json); the lintel starts here
 CORRIDOR    = 2.2
 FLAT_DEPTH  = 9.0
 FLATS       = 4                          # per side per storey, plus the stairwell slot
@@ -347,6 +348,8 @@ avenue(AVENUES[1], MAIN_Z0, MAIN_Z1, "Main Street")
 avenue(AVENUES[2], AVE_Z0, AVE_Z1, "Calder Avenue")
 street(STREETS[0], SG_X0 - KERB, ST_X1, "Dock Street")
 street(STREETS[1], RES_X0 - 24.0, TERM_X0 - 6.0, "Central Street")
+# The main streets that run through the housing estate, (z, x0, x1): a back garden stops at them.
+CROSSING_STREETS = [(STREETS[1], RES_X0 - 24.0, TERM_X0 - 6.0)]
 street(STREETS[2], ST_X0, APRON_X0, "Foundry Street")
 street(STREETS[3], ST_X0, ST_X1, "North Street")
 
@@ -451,6 +454,9 @@ def tower(label, x0, x1, z0, z1, storeys, street_side, ac_floors):
             for c0, c1 in cuts:
                 if c0 > at:
                     B("plaster_wall", wall_a, wall_a + WALL_T, floor_top, ceil, at, c0)
+                # The wall over the door. The cut ran floor to ceiling, so above every shut flat door
+                # was a 65 cm slot into the corridor (2026-09-29: a shut door passed -7/-11/-19 dB).
+                B("plaster_wall", wall_a, wall_a + WALL_T, floor_top + DOOR_H, ceil, c0, c1)
                 at = c1
             if at < sz1:
                 B("plaster_wall", wall_a, wall_a + WALL_T, floor_top, ceil, at, sz1)
@@ -493,7 +499,7 @@ def tower(label, x0, x1, z0, z1, storeys, street_side, ac_floors):
                 flat_id = R(f"{label} flat {s}{i}{which[0].upper()}", fa0, fa1, floor_top, ceil, b0, b1)
                 wall_a = near_wall if which == "front" else far_wall
                 dx0, _, dz0, _ = place(wall_a + WALL_T / 2, 0, db, 0)
-                door(dx0, floor_top, dz0, flat_id, corridor_id, facing_z=not vertical)
+                door(dx0, floor_top, dz0, flat_id, corridor_id, facing_z=not vertical, opening=DOOR_W)
 
         # ── The stairwell ──────────────────────────────────────────────────────────────────────
         sa0, sa1 = near_flat
@@ -865,6 +871,11 @@ region("Apron", APRON_X0, APRON_X1, 0.0, 8.0, APRON_Z0, APRON_Z1)
 box("concrete_floor", TERM_X0, TERM_X1, -0.15, 0.04, TERM_Z0, TERM_Z1)
 box("tile_floor", TERM_X0, TERM_X1, 0.02, 0.08, TERM_Z0, TERM_Z1)
 box("concrete_floor", TERM_X0, TERM_X1, TERM_H, TERM_H + 0.3, TERM_Z0, TERM_Z1, name="Terminal roof")
+# A suspended acoustic ceiling, 0.6 m below the slab, as every real concourse has. Without it the
+# terminal was concrete and tile on every side and rang for 7-10 s (2026-09-29, Cody: "give the
+# terminal an acoustic ceiling"); a real one is 2-3.
+box("acoustic_ceiling", TERM_X0 + 0.4, TERM_X1 - 0.06, TERM_H - 0.65, TERM_H - 0.6, TERM_Z0 + 0.4, TERM_Z1 - 0.4,
+    name="Terminal ceiling")
 box("concrete_wall", TERM_X0, TERM_X0 + 0.4, 0.0, TERM_H, TERM_Z0, TERM_Z1, name="Terminal west wall")
 box("concrete_wall", TERM_X0, TERM_X1, 0.0, TERM_H, TERM_Z0, TERM_Z0 + 0.4)
 box("concrete_wall", TERM_X0, TERM_X1, 0.0, TERM_H, TERM_Z1 - 0.4, TERM_Z1)
@@ -940,11 +951,33 @@ def house(label, cx, cz, facing, two_storey=False):
     zlo, zhi = min(front_z, back_z), max(front_z, back_z)
     h = HOUSE_H * 2 + 0.2 if two_storey else HOUSE_H
 
+    # The back garden runs fourteen metres out of the back door — unless a street crosses the plot
+    # first. Birch Street's north side backs onto Central Street, and its gardens ran straight over
+    # the pavement and onto the road: a lawn, a hedge and a place called "back garden" in the middle
+    # of a carriageway. Nothing noticed while the pavement's name happened to be found first; once the
+    # smaller of two overlapping places won, 54 steps of pavement were "30 Birch Street back garden".
+    # So a garden stops at the building line, and where there is no room for one there is none.
+    out = -d                                  # the way the garden runs, in z
+    garden_end = back_z + out * 14.0
+    for sz, sx0, sx1 in CROSSING_STREETS:
+        if cx + PLOT_W / 2 <= sx0 or cx - PLOT_W / 2 >= sx1:
+            continue
+        lo, hi = sz - WALK, sz + WALK         # the street between its two building lines
+        if lo < back_z < hi:
+            garden_end = back_z               # the back wall is already on the pavement
+        elif out > 0 and back_z <= lo < garden_end:
+            garden_end = lo
+        elif out < 0 and back_z >= hi > garden_end:
+            garden_end = hi
+    has_garden = (garden_end - back_z) * out >= 2.0
+    g0, g1 = min(back_z, garden_end), max(back_z, garden_end)
+
     # Lawns first, so the house sits on them and the ground probe still finds grass either side.
     box("grass_floor", cx - PLOT_W / 2 + 1.0, cx + PLOT_W / 2 - 1.0, 0.0, 0.09,
         min(front_z, front_z + d * 9.0), max(front_z, front_z + d * 9.0), name=f"{label} front lawn")
-    box("grass_floor", cx - PLOT_W / 2 + 1.0, cx + PLOT_W / 2 - 1.0, 0.0, 0.09,
-        min(back_z, back_z - d * 14.0), max(back_z, back_z - d * 14.0), name=f"{label} back garden")
+    if has_garden:
+        box("grass_floor", cx - PLOT_W / 2 + 1.0, cx + PLOT_W / 2 - 1.0, 0.0, 0.09, g0, g1,
+            name=f"{label} back garden")
     # The drive, up one side. Asphalt, so walking off the grass onto it is audible.
     dv0, dv1 = cx + PLOT_W / 2 - 4.6, cx + PLOT_W / 2 - 1.2
     box("asphalt_road", dv0, dv1, 0.0, 0.1, min(front_z, front_z + d * 9.0), max(front_z, front_z + d * 9.0))
@@ -959,9 +992,19 @@ def house(label, cx, cz, facing, two_storey=False):
     # the north side of a street had its front door in the back garden and its back door on the
     # pavement. Nothing complains about that — a door is a door to the code — and it is the kind of
     # thing only walking up to one finds.
-    front_z0, front_z1 = (zlo, zlo + 0.25) if d > 0 else (zhi - 0.25, zhi)
-    back_z0, back_z1 = (zhi - 0.25, zhi) if d > 0 else (zlo, zlo + 0.25)
-    box("brick_wall", x0, x1, 0.0, h, back_z0, back_z1)
+    #
+    # And it was still backwards after that (found 2026-09-28 walking 64 Alder Street): `facing` +1
+    # means the street is at LARGER z, so the front is zhi, and the doorway had gone into the garden
+    # side of every house on both sides of every street — the front wall solid, with the back door
+    # standing inside it. front_z (above) was always right; this now agrees with it.
+    front_z0, front_z1 = (zhi - 0.25, zhi) if d > 0 else (zlo, zlo + 0.25)
+    back_z0, back_z1 = (zlo, zlo + 0.25) if d > 0 else (zhi - 0.25, zhi)
+    # The back wall has a doorway too. It was one solid box with the back door standing inside it,
+    # so there was no way into the garden but the front, round the side.
+    bdx = cx - 2.4
+    box("brick_wall", x0, bdx - 0.45, 0.0, h, back_z0, back_z1)
+    box("brick_wall", bdx + 0.45, x1, 0.0, h, back_z0, back_z1)
+    box("brick_wall", bdx - 0.45, bdx + 0.45, 2.15, h, back_z0, back_z1)
     box("brick_wall", x0, cx - 0.65, 0.0, h, front_z0, front_z1)
     box("brick_wall", cx + 0.65, x1, 0.0, h, front_z0, front_z1)
     box("brick_wall", cx - 0.65, cx + 0.65, 2.15, h, front_z0, front_z1)
@@ -980,7 +1023,7 @@ def house(label, cx, cz, facing, two_storey=False):
     # The curtain hangs over the front WINDOW, beside the door — not across the doorway, which is
     # where it hung until 2026-09-23: every front door on the estate opened onto a solid curtain.
     box("carpet_wall", cx + 1.1, cx + 3.3, 0.9, h - 0.15,
-        front_z0 + 0.25 if d > 0 else front_z1 - 0.3, front_z0 + 0.3 if d > 0 else front_z1 - 0.25)
+        front_z0 - 0.05 if d > 0 else front_z1, front_z0 if d > 0 else front_z1 + 0.05)
     box("carpet_floor", cx - 1.0, x1 - 0.4, 0.08, 0.12, zlo + 0.4, zhi - 0.4)
     # PLASTER ON THE INSIDE OF THE BRICK, which is what a house is and is the missing membrane.
     #
@@ -990,23 +1033,23 @@ def house(label, cx, cz, facing, two_storey=False):
     # carpet in it keeps a bass tail no amount of soft furnishing touches.
     box("plaster_wall", x0 + 0.25, x0 + 0.31, 0.08, h, zlo + 0.25, zhi - 0.25)
     box("plaster_wall", x1 - 0.31, x1 - 0.25, 0.08, h, zlo + 0.25, zhi - 0.25)
-    box("plaster_wall", x0 + 0.25, x1 - 0.25, 0.08, h,
-        min(back_z0, back_z1) + (0.25 if d > 0 else -0.06), min(back_z0, back_z1) + (0.31 if d > 0 else 0.0))
+    pz0 = min(back_z0, back_z1) + (0.25 if d > 0 else -0.06)
+    pz1 = min(back_z0, back_z1) + (0.31 if d > 0 else 0.0)
+    box("plaster_wall", x0 + 0.25, bdx - 0.45, 0.08, h, pz0, pz1)
+    box("plaster_wall", bdx + 0.45, x1 - 0.25, 0.08, h, pz0, pz1)
     box("plaster_wall", x0 + 0.25, x1 - 0.25, h - 0.06, h, zlo + 0.25, zhi - 0.25)
 
     hid = region(label, x0 + 0.25, x1 - 0.25, 0.08, h, zlo + 0.25, zhi - 0.25)
     door(cx, 0.04, (front_z0 + front_z1) / 2, hid, -1, facing_z=True, prefab="door", opening=1.3)
     # The back door, which is how you get to the garden without going round.
-    door(cx - 2.4, 0.04, (back_z0 + back_z1) / 2, hid, -1, facing_z=True, prefab="door")
+    door(bdx, 0.04, (back_z0 + back_z1) / 2, hid, -1, facing_z=True, prefab="door", opening=0.9)
 
-    region(f"{label} back garden", cx - PLOT_W / 2 + 1.0, cx + PLOT_W / 2 - 1.0, 0.0, 3.0,
-           min(back_z, back_z - d * 14.0), max(back_z, back_z - d * 14.0))
-
-    # The fence between this garden and the next. Not solid: you can hear a mower through a fence,
-    # which is most of the point of putting one there.
-    for fx in (cx - PLOT_W / 2, cx + PLOT_W / 2):
-        box("foliage_hedge", fx - 0.4, fx + 0.4, 0.0, 1.8,
-            min(back_z, back_z - d * 14.0), max(back_z, back_z - d * 14.0))
+    if has_garden:
+        region(f"{label} back garden", cx - PLOT_W / 2 + 1.0, cx + PLOT_W / 2 - 1.0, 0.0, 3.0, g0, g1)
+        # The fence between this garden and the next. Not solid: you can hear a mower through a
+        # fence, which is most of the point of putting one there.
+        for fx in (cx - PLOT_W / 2, cx + PLOT_W / 2):
+            box("foliage_hedge", fx - 0.4, fx + 0.4, 0.0, 1.8, g0, g1)
     return hid
 
 
@@ -1398,6 +1441,11 @@ VEHICLES = []
 # hondas toyotas that type of sounding stuff. a few cars with more aggressive sounding exhaust but
 # nothing too crazy." The street cars are the Vehicles.cs street presets: the same engines as the
 # speedway's with road exhausts, 98-104 dB at a metre flat out; the twin-turbo pickups 106-112.
+# And, 2026-09-28, four of the ordinary cars swapped for loud ones — "loud cars in traffic": the
+# economy cars keep their stock silencers and their tyres as loud as their pipes, which is what real
+# ones do at thirty miles an hour, and now and then something with a real exhaust goes by. The
+# stock cars cruise at 87-89 dB at a metre; these at 94-104, and 101-109 pulling away. They drive
+# exactly as the cars they replaced did (speed, cornering, grip): only the sound is new.
 CITY_CW = [
     ("Hatchback",    "i4_economy",           52.0, 0.48, 1.8, "car"),
     ("Compact",      "i4_compact",           52.0, 0.48, 1.8, "car"),
@@ -1405,9 +1453,9 @@ CITY_CW = [
     ("Sport compact", "i4_sport_street",     56.0, 0.52, 1.8, "car"),
     ("Police car",   "police_interceptor",   62.0, 0.60, 1.8, "car"),
     ("Twin-turbo Cummins", "cummins_compound", 52.0, 0.42, 1.8, "van"),
-    ("Mid-size",     "i4_midsize",           50.0, 0.46, 1.8, "car"),
+    ("V8 pickup",    "pickup_v8_flowmaster", 50.0, 0.46, 1.8, "car"),
     ("Flat-four",    "boxer4_street",        54.0, 0.50, 1.8, "car"),
-    ("Hatchback",    "i4_economy",           50.0, 0.48, 1.8, "car"),
+    ("Sport compact", "i4_sport_street",     50.0, 0.48, 1.8, "car"),
     ("Motorcycle",   "vtwin_slipon",         56.0, 0.60, 3.4, "bike"),
 ]
 CITY_CCW = [
@@ -1415,10 +1463,10 @@ CITY_CCW = [
     ("Turbo hatch",  "i4_turbo",             56.0, 0.52, 1.8, "car"),
     ("Sedan",        "v6",                   50.0, 0.47, 1.8, "car"),
     ("Sport saloon", "i6_street",            54.0, 0.50, 1.8, "car"),
-    ("Hatchback",    "i4_economy",           50.0, 0.48, 1.8, "car"),
+    ("Turbo hatch",  "i4_turbo",             50.0, 0.48, 1.8, "car"),
     ("Mid-size",     "i4_midsize",           50.0, 0.46, 1.8, "car"),
     ("Twin-turbo Duramax", "duramax_compound", 52.0, 0.42, 1.8, "van"),
-    ("Compact",      "i4_compact",           50.0, 0.48, 1.8, "car"),
+    ("Muscle car",   "v8_mild",              50.0, 0.48, 1.8, "car"),
     ("Motorcycle",   "vtwin_stock",          56.0, 0.60, 3.4, "bike"),
 ]
 # Since 2026-09-27 the traffic drives the roads (Roads, Junctions): each car a seeded wander through
@@ -1445,7 +1493,8 @@ VEHICLES.append(car("Sedan, north block", "i4_midsize", wander("calder_avenue", 
 # Two more motorcycles, of other kinds than the cruisers (Cody, 2026-09-26: "add a couple motorcycle
 # back on the map"): a litre sports bike here, and a 450 single on the downtown loop, in the gap
 # after its last car (ten cars at 96 m on a 1,040 m loop).
-VEHICLES.append(car("Sports bike", "sportbike", wander("north_street", -1, 2004), 56.0, 0.60, 3.4, 0.0, grip="bike"))
+# No sports bike: the 600 was taken off the city by ear on 2026-09-28 ("sounds like a car stuck in
+# first gear"), and the preset with it.
 VEHICLES.append(car("Dirt bike", "single", wander("dock_street", -1, 2005), 50.0, 0.60, 3.4, 0.0, grip="bike"))
 # The estate: slow, quiet, and the thing you hear over the mowers.
 for i, (nm, preset) in enumerate((("Hatchback", "i4_economy"), ("Sedan", "v6"), ("Compact", "i4_compact"),
@@ -1547,6 +1596,7 @@ def _clear_stretches(line_at, length, boxes, step=0.5, body=0.3):
 _rng = __import__("random").Random(2026_09_27)
 _boxes = _solid_boxes()
 WALKERS = []
+PAIR_COUNT = [0]
 for x0, x1, z0, z1, label in FOOTWAYS:
     along_z = (z1 - z0) >= (x1 - x0)
     width = (x1 - x0) if along_z else (z1 - z0)
@@ -1557,6 +1607,11 @@ for x0, x1, z0, z1, label in FOOTWAYS:
     for side, off in enumerate(offsets):
         def at(d, off=off):
             return (mid + off, z0 + d) if along_z else (x0 + d, mid + off)
+        # Two people walking together keep 0.6 m apart, the companion on the side nearer the middle.
+        def beside(d, off=off):
+            o = off - 0.6 if off > 0 else off + 0.6
+            return (mid + o, z0 + d) if along_z else (x0 + d, mid + o)
+        companion_clear = _clear_stretches(beside, length, _boxes) if width >= 3.0 else []
         for a, b in _clear_stretches(at, length, _boxes):
             n = max(1, round((b - a) / WALKER_SPACING / 2))
             for k in range(n):
@@ -1565,9 +1620,20 @@ for x0, x1, z0, z1, label in FOOTWAYS:
                 pa, pb = at(a), at(b)
                 if side == 1:
                     pa, pb = pb, pa              # the other track walks the other way
+                wait, delay = round(_rng.uniform(3, 9), 1), round(k * walk_s / n + _rng.uniform(0, 6), 1)
+                # About one in four on a wide pavement walks with somebody (Cody, 2026-09-28: "two
+                # people walking down the street together"), where the companion's line is clear too.
+                pair = ""
+                if any(ca <= a and cb >= b for ca, cb in companion_clear) and _rng.random() < 0.25:
+                    PAIR_COUNT[0] += 1
+                    pair = f"pair {PAIR_COUNT[0]}"
+                    qa, qb = beside(a), beside(b)
+                    if side == 1:
+                        qa, qb = qb, qa
+                    WALKERS.append((f"Pedestrian, {label or 'pavement'}, walking with somebody", v3(qa[0], 0.15, qa[1]),
+                                    v3(qb[0], 0.15, qb[1]), kmh, wait, delay, pair))
                 WALKERS.append((f"Pedestrian, {label or 'pavement'}", v3(pa[0], 0.15, pa[1]),
-                                v3(pb[0], 0.15, pb[1]), kmh, round(_rng.uniform(3, 9), 1),
-                                round(k * walk_s / n + _rng.uniform(0, 6), 1)))
+                                v3(pb[0], 0.15, pb[1]), kmh, wait, delay, pair))
 
 # The plaza, which has no pavement: people crossing it.
 PLAZA_WALKS = [
@@ -1577,14 +1643,14 @@ PLAZA_WALKS = [
     ("Pedestrian, Market Square, crossing west", v3(-100.0, 0.1, 170.0), v3(-40.0, 0.1, 228.0), 4.6, 7.0, 9.0),
 ]
 for name, a, b, kmh, wait, delay in PLAZA_WALKS:
-    WALKERS.append((name, a, b, kmh, wait, delay))
-    WALKERS.append((name + ", the other way", b, a, round(kmh * 0.94 + 0.3, 1), wait + 3.0, delay + 20.0))
+    WALKERS.append((name, a, b, kmh, wait, delay, ""))
+    WALKERS.append((name + ", the other way", b, a, round(kmh * 0.94 + 0.3, 1), wait + 3.0, delay + 20.0, ""))
 
-for name, a, b, kmh, wait, delay in WALKERS:
+for name, a, b, kmh, wait, delay, pair in WALKERS:
     VEHICLES.append({
         "Name": name, "Preset": "walker", "RoadStart": a, "RoadEnd": b,
         "SpeedsKmh": [kmh, kmh * 0.92], "AccelerationMps2": 0.8, "BrakingMps2": 1.0,
-        "WaitSeconds": wait, "StartDelaySeconds": delay,
+        "WaitSeconds": wait, "StartDelaySeconds": delay, **({"Pair": pair} if pair else {}),
     })
 
 # ── Trains ────────────────────────────────────────────────────────────────────────────────────

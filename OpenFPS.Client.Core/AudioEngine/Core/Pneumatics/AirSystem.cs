@@ -138,6 +138,7 @@ public sealed class AirPort
         Out = y - _hp;
     }
 
+    // Stryker disable all : diagnostic text for the lab
     public IEnumerable<string> Describe()
     {
         float r = 1f + 827f / 101.3f;
@@ -146,6 +147,7 @@ public sealed class AirPort
                    + $"-> empties in {BlowdownSeconds:F2} s, jet Mach {u / 343f:F2} ({u:F0} m/s), "
                    + $"mixing peak {0.2f * u / _p.OrificeMetres:F0} Hz, muffler takes {_p.MufflerAbsorption * 100f:F0}% above {_p.MufflerCornerHz:F0} Hz";
     }
+    // Stryker restore all
 }
 
 /// <summary>
@@ -283,10 +285,12 @@ public sealed class AirSystem
         return y;
     }
 
+    // Stryker disable all : diagnostic text for the lab
     public IEnumerable<string> Describe()
     {
         yield return $"{_s.Name}: {_s.ReservoirLitres:F0} L reservoir, governor {_s.CutInKPa:F0}-{_s.CutOutKPa:F0} kPa "
                    + $"({_s.CutInKPa / 6.895f:F0}-{_s.CutOutKPa / 6.895f:F0} psi), jets {_s.JetTrimDb:F0} dB against Lighthill";
         foreach (var p in _ports.Values) foreach (var l in p.Describe()) yield return "  " + l;
     }
+    // Stryker restore all
 }

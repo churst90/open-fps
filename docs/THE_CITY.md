@@ -29,8 +29,10 @@ The recordings are physically right per material and plainly different from each
 everywhere above 250 Hz; gravel is a 500 Hz–4 kHz crunch with no bass at all. The model is not close
 enough to replace them, and it is not close on the materials where it would matter most.
 
-`tools/rebuild_footstep_bank.py` is the bank: recording → material folder, run it again after
-changing the map. 518 samples across twelve materials.
+`tools/build_footstep_bank.py` is the bank since 2026-09-28: Cody's two Foley packs
+(`approved/footsteps`), labelled by ear in `tools/footstep_sets.json`, cut into walk, jog, run, scuff
+and landing per surface and shoe. About 14,000 takes across fifteen surfaces. (Before that,
+`tools/rebuild_footstep_bank.py` built 518 samples across twelve materials from twelve recordings.)
 
 ### The splitter had two faults, both measured
 

@@ -7,11 +7,14 @@ namespace OpenFPS.Tests;
 public class SteamAudioMappingTests
 {
     // --- Pathing SH -> world arrival direction (convention pinned by SimPathDirSpike) ---
-    // Raw order-1 SH (ACN): [0]=W, [1]=m-1, [2]=m0, [3]=m+1. Signs below are the measured calibration data.
-
+    // Raw order-1 SH (ACN): [0]=W, [1]=m-1, [2]=m0, [3]=m+1. Signs below are the measured calibration data,
+    // taken when the scene was handed to Steam Audio in the game's frame. Since 2026-09-29 the scene and
+    // every source go through Phonon.World, which negates z (Steam Audio's forward is -z), so an arrival
+    // from the game's +z is Steam Audio's -z and its m+1 coefficient has the other sign. The x rows are
+    // untouched by the mirror.
     [Theory]
-    [InlineData(0f, 0f, -0.081f, 0f, 0f, 1f)]   // +z arrival
-    [InlineData(0f, 0f, 0.081f, 0f, 0f, -1f)]   // -z arrival
+    [InlineData(0f, 0f, 0.081f, 0f, 0f, 1f)]    // +z arrival (game): m+1 positive in the mirrored world
+    [InlineData(0f, 0f, -0.081f, 0f, 0f, -1f)]  // -z arrival
     [InlineData(-0.081f, 0f, 0f, 1f, 0f, 0f)]   // +x arrival
     [InlineData(0.081f, 0f, 0f, -1f, 0f, 0f)]   // -x arrival
     public void PathingWorldDirection_MapsShToExpectedAxis(float sh1, float sh2, float sh3,

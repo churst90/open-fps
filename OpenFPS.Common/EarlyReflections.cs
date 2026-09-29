@@ -95,6 +95,22 @@ public static class EarlyReflections
     public const float MinRelativeAmplitude = 0.05f;
 
     /// <summary>
+    /// The distance the direct sound is judged from when a copy is asked whether it is worth having.
+    ///
+    /// A copy's reported gain is the surface's loss times <c>direct / pathLength</c>, and that ratio
+    /// is what MinRelativeAmplitude used to be tested against. For a sound at arm's length that test
+    /// threw the room away: your own clap is half a metre from your ear, so a wall six metres off, a
+    /// twelve-metre round trip, came back at 0.5 / 12 = 0.04 and was dropped as inaudible, while the
+    /// engine renders the direct sound flat inside its reference distance (Loudness.Place, at least
+    /// 1.2 m) and would have played that wall's answer at -27 dB, a slap any ear picks out. In Marlow
+    /// flat 01F, 8.65 by 17.86 m, neither end wall was ever placed; the room's length was left to the
+    /// omnidirectional tail, which is heard in the middle of the head ("like there's a hallway in
+    /// front of me", 2026-09-29). So audibility is judged against the direct sound as it is heard,
+    /// never nearer than a metre; the gains themselves are unchanged.
+    /// </summary>
+    public static float HeardReference(float direct) => MathF.Max(direct, 1f);
+
+    /// <summary>
     /// How late a copy has to be before the ear hears it as a SEPARATE arrival, seconds.
     ///
     /// This is the line between a reflection and an echo, and it is a fact about hearing rather than
@@ -145,13 +161,14 @@ public static class EarlyReflections
     /// sounds out of doors.</param>
     public static void Find(Vector3 source, Vector3 listener, IReadOnlyList<Solid> solids,
                             List<Arrival> into, float speedOfSound = 343.0f,
-                            int maxOrder = 1, bool separateFirst = false, bool flutter = false)
+                            int maxOrder = 1, bool separateFirst = false, bool flutter = false, int keep = 0)
     {
         into.Clear();
         if (solids == null || solids.Count == 0) return;
 
         float direct = Vector3.Distance(source, listener);
         if (direct < 1e-3f) return;
+        float heard = HeardReference(direct);
         (_mirrors ??= new List<(int, int, float)>()).Clear();
 
         for (int i = 0; i < solids.Count; i++)
@@ -159,9 +176,11 @@ public static class EarlyReflections
             var s = solids[i];
             if (s.Size.X <= 0f || s.Size.Y <= 0f || s.Size.Z <= 0f) continue;
 
-            // Out of the horizon entirely: its own bounding sphere cannot reach.
+            // Out of the horizon entirely: its own bounding sphere cannot reach. Near the listener OR
+            // near the source: a distant shot's echoes come off the buildings round the shooter.
             float reach = RangeMetres + s.Size.Length() * 0.5f;
-            if (Vector3.DistanceSquared(listener, s.Center) > reach * reach) continue;
+            if (Vector3.DistanceSquared(listener, s.Center) > reach * reach
+                && Vector3.DistanceSquared(source, s.Center) > reach * reach) continue;
 
             var p = AcousticRegistry.GetProperties(s.Material);
             // What the surface sends back, per band. The registry's absorption is what it TAKES.
@@ -197,14 +216,14 @@ public static class EarlyReflections
                 if (MathF.Abs(Vector3.Dot(local, vAxis)) > halfV) continue;
 
                 float pathLength = Vector3.Distance(source, hit) + Vector3.Distance(hit, listener);
-                if (pathLength > RangeMetres) continue;
+                if (pathLength - direct > RangeMetres) continue;          // extra path, as ImageSource.MaxPathLength
 
                 // Spherical spreading: the copy travelled further than the direct sound, so it arrives
                 // quieter in exactly that proportion. Nothing else is applied here — air absorption and
                 // the distance model belong to whatever renders the arrival, which already does both.
                 float spread = direct / pathLength;
                 float gLow = keepLow * spread, gMid = keepMid * spread, gHigh = keepHigh * spread;
-                if (MathF.Max(gLow, MathF.Max(gMid, gHigh)) < MinRelativeAmplitude) continue;
+                if (MathF.Max(keepLow, MathF.Max(keepMid, keepHigh)) * heard / pathLength < MinRelativeAmplitude) continue;
 
                 // Both legs have to be clear of everything else, or this is a reflection off a wall
                 // with a building in front of it.
@@ -243,7 +262,7 @@ public static class EarlyReflections
             float eb = MathF.Max(b.GainLow, MathF.Max(b.GainMid, b.GainHigh));
             return eb.CompareTo(ea);
         });
-        int keep = flutter ? MaxFlutterArrivals : MaxArrivals;
+        if (keep <= 0) keep = flutter ? MaxFlutterArrivals : MaxArrivals;
         if (into.Count > keep) into.RemoveRange(keep, into.Count - keep);
 
         // ── Then back into surface order, and that is not cosmetic ──────────────────────────────
@@ -322,9 +341,9 @@ public static class EarlyReflections
             if (Vector3.Dot(listener - last.Centre, last.Normal) <= 0.01f) return;
 
             float pathLength = Vector3.Distance(images[order], listener);
-            if (pathLength > RangeMetres || pathLength <= direct) return;
+            if (pathLength - direct > RangeMetres || pathLength <= direct) return;
             float spread = direct / pathLength;
-            if (MathF.Max(keepL, MathF.Max(keepM, keepH)) * spread < MinRelativeAmplitude) return;
+            if (MathF.Max(keepL, MathF.Max(keepM, keepH)) * HeardReference(direct) / pathLength < MinRelativeAmplitude) return;
 
             // Back from the ear: where the line to each image crosses its face.
             Vector3 toward = listener;
@@ -541,9 +560,9 @@ public static class EarlyReflections
                     images[n] = images[n - 1] - 2f * d * pm.Normal;
                     if (n <= MaxOrder) continue;                               // the chain search has these
                     float path = Vector3.Distance(images[n], listener);
-                    if (path > FlutterRangeMetres) break;
+                    if (path - direct > FlutterRangeMetres) break;
                     float spread = direct / path;
-                    if (spread < MinRelativeAmplitude) break;
+                    if (HeardReference(direct) / path < MinRelativeAmplitude) break;
 
                     // Back from the ear, crossing by crossing: which building did it hit each time?
                     Vector3 toward = listener;
@@ -577,7 +596,7 @@ public static class EarlyReflections
                         toward = hit;
                     }
                     if (!ok) continue;
-                    if (MathF.Max(keepL, MathF.Max(keepM, keepH)) * spread < MinRelativeAmplitude) break;
+                    if (MathF.Max(keepL, MathF.Max(keepM, keepH)) * HeardReference(direct) / path < MinRelativeAmplitude) break;
 
                     Vector3 prev = source;
                     for (int j = 0; j <= n && ok; j++)

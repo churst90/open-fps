@@ -750,7 +750,12 @@ public sealed record EngineProfile
             CollectorDiameterMm = 50f, CollectorPipeMetres = 0.12f,
             Crossover = CrossoverKind.None,
             MidPipeMetres = 0.04f,
-            Muffler = MufflerSpec.Glasspack with { Absorption = 0.25f, AbsorptiveLengthMetres = 0.24f },
+            // A stock system: the pre-chamber under the engine (catalyst and two short expansions)
+            // and a packed can. It was a quarter-packed glasspack, 119 dB at a metre flat out —
+            // twenty over a stock litre bike, which passes at about 80 at 7.5 m — and nothing but
+            // pipe: "sounds like a huge V8" (Cody, 2026-09-28). The volume is under the bike, so
+            // the system is no longer for it.
+            Muffler = MufflerSpec.Stock with { ChamberLengthsMetres = new[] { 0.10f, 0.14f }, ExpansionRatio = 7f },
             TailpipeMetres = new[] { 0.08f },
             TailpipeDiameterMm = 50f,
             // Short, thin, hot pipes and a hard blowdown: a bike keeps its top end where a saloon's
@@ -760,6 +765,7 @@ public sealed record EngineProfile
             OverrunPopRate = 12f,
         },
     };
+
 
     /// <summary>
     /// A blown big block: 7.4 litres with a Roots supercharger sitting on top of it.
@@ -1322,13 +1328,15 @@ public sealed record EngineProfile
         Exhaust = new ExhaustSpec
         {
             // Shortened 2026-09-26, as the sports bike's: 1.75 m of system to 1.07.
-            PrimaryLengthMetres = 0.45f, PrimaryDiameterMm = 42f,
+            // About half a metre end to end (Cody, 2026-09-28: at 1.07 m it was "farting through a
+            // straw"). Header 0.22, collector 0.06, mid 0.02, silencer 0.15, tail 0.05.
+            PrimaryLengthMetres = 0.22f, PrimaryDiameterMm = 42f,
             CollectorGroups = new[] { new[] { 0 } },
-            CollectorDiameterMm = 42f, CollectorPipeMetres = 0.12f,
+            CollectorDiameterMm = 42f, CollectorPipeMetres = 0.06f,
             Crossover = CrossoverKind.None,
-            MidPipeMetres = 0.05f,
-            Muffler = MufflerSpec.Glasspack with { Absorption = 0.45f, AbsorptiveLengthMetres = 0.35f },
-            TailpipeMetres = new[] { 0.10f },
+            MidPipeMetres = 0.02f,
+            Muffler = MufflerSpec.Glasspack with { Absorption = 0.45f, AbsorptiveLengthMetres = 0.15f },
+            TailpipeMetres = new[] { 0.05f },
             TailpipeDiameterMm = 45f,
             GasCelsiusIdle = 350f, GasCelsiusFull = 850f,
             WallLossMultiplier = 1.3f,
@@ -1799,7 +1807,12 @@ public sealed record EngineProfile
         BoostBar = 3.2f,
         IdleRpm = 680f, RedlineRpm = 3400f,
         PeakTorqueNm = 1220f, PeakTorqueRpm = 1900f,
-        Exhaust = PowerStroke73.Exhaust with { Muffler = MufflerSpec.StraightPipe, TailpipeDiameterMm = 102f },
+        // A five-inch straight pipe, and less lost to its walls: approved by ear 2026-09-28 ("more
+        // aggressive, a little louder"; the five-inch was +3 dB over the four).
+        Exhaust = PowerStroke73.Exhaust with
+        {
+            Muffler = MufflerSpec.StraightPipe, TailpipeDiameterMm = 127f, Steepening = 1.5f, WallLossMultiplier = 0.8f,
+        },
         Mechanical = PowerStroke73.Mechanical with
         {
             CombustionKnock = 1.3f, TurboWhistleLevel = 2.4f, TurboLagSeconds = 0.8f, TurboIdleSpool = 0.35f,
@@ -1817,7 +1830,8 @@ public sealed record EngineProfile
         BoostBar = 3.5f,
         RedlineRpm = 3200f,
         PeakTorqueNm = 1290f, PeakTorqueRpm = 2000f,
-        Exhaust = DieselCumminsI6.Exhaust with { TailpipeDiameterMm = 127f },
+        // A six-inch stack and less lost to its walls: approved by ear 2026-09-28 with the Duramax's.
+        Exhaust = DieselCumminsI6.Exhaust with { TailpipeDiameterMm = 152f, Steepening = 1.5f, WallLossMultiplier = 0.8f },
         Mechanical = DieselCumminsI6.Mechanical with
         {
             TurboWhistleLevel = 2.6f, TurboLagSeconds = 0.8f, TurboIdleSpool = 0.35f,

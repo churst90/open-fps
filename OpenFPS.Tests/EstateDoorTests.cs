@@ -24,7 +24,8 @@ public class EstateDoorTests
     /// them; opened, the leaf swung across it — "it says the door is open and I can't walk out").
     /// </summary>
     [Theory]
-    [InlineData(-347f, -9.325f, 0f, -0.8f)]      // 24 Birch Street, through to the hall
+    [InlineData(-347f, -17.575f, 0f, 0.8f)]      // 24 Birch Street, in from the street
+    [InlineData(-349.4f, -9.325f, 0f, -0.8f)]    // ...and in by its back door, from the garden
     [InlineData(9.675f, 28.08f, 0.8f, 0f)]       // the Union Building, into the stairwell
     [InlineData(225.97f, 30.0f, -0.8f, 0f)]      // the terminal, out to the apron
     public void YouCanWalkThroughAnOpenDoor(float x, float z, float stepX, float stepZ)

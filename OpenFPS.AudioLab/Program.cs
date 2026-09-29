@@ -171,6 +171,23 @@ if (args.Contains("--traced-reverb"))
     Environment.Exit(code);
 }
 
+if (args.Contains("--sa-encode"))
+{
+    // --sa-encode: a field of eight directions against one channel — energy per ear and interaural correlation per band.
+    int code = OpenFPS.Client.Core.AudioEngine.SteamAudio.TracedReverbSpike.EncodeCheck();
+    Log.CloseAndFlush();
+    Environment.Exit(code);
+}
+if (args.Contains("--sa-frame"))
+{
+    // --sa-frame: which way Steam Audio's traced soundfield faces. A wall to the left and a wall ahead;
+    // the traced response must say left and ahead, and decode that way round the head. SA_MIRROR=0
+    // shows the unflipped world it used to be given (the wall ahead answered from behind).
+    int code = OpenFPS.Client.Core.AudioEngine.SteamAudio.TracedReverbSpike.FrameCheck();
+    Log.CloseAndFlush();
+    Environment.Exit(code);
+}
+
 if (args.Contains("--sim-scene"))
 {
     int code = SimSceneSpike.Run();
@@ -274,11 +291,6 @@ if (args.Contains("--engine-solver"))
     // The intake valve of the 1.6 at idle, as dumped: runner at 0.6 bar, cylinder at 0.18 bar.
     float mean = 0.6f * 101325f;
     float Z = 397000f, area = 8.8e-4f, pCyl = 18200f, tCyl = 386f, pipeK = 305f, gamma = 1.4f, uMean = -6e-4f, uCap = 0.107f;
-    for (float bb = 40000f; bb >= -50000f; bb -= 10000f)
-    {
-        float g = OpenFPS.Client.AudioEngine.Core.Engine.EngineSynth.ValveResidual(0f, bb, Z, area, pCyl, tCyl, pipeK, gamma, uMean, uCap, mean, out float m);
-        Console.WriteLine($"  b={bb,8:F0}  pPort={(mean + bb) / 1e5f:F3} bar  G={g,9:F5}  mdot={m * 1e3f,7:F1} g/s");
-    }
     float b = OpenFPS.Client.AudioEngine.Core.Engine.EngineSynth.SolveValve(0f, 1300f, Z, area, pCyl, tCyl, pipeK, gamma, 61.8e-6f, 1f / 44100f, uMean, uCap, mean, out float md);
     Console.WriteLine($"  solver: b={b:F0}  pPort={(mean + b) / 1e5f:F3} bar  mdot={md * 1e3f:F1} g/s");
     Log.CloseAndFlush();
@@ -400,6 +412,27 @@ if (args.Contains("--engine-levels"))
     Log.CloseAndFlush();
     Environment.Exit(lvcode);
 }
+if (args.Contains("--echo-ab"))
+{
+    // --echo-ab out=DIR: a shot and one wall echo, washed as now vs. clean crack plus scattered share.
+    Environment.Exit(OpenFPS.Client.Core.EchoAbSpike.Run(args));
+}
+if (args.Contains("--shot-echoes"))
+{
+    // --shot-echoes [map=city] at=x,z [shot=x,z]: every echo a shot makes there, and what it came off.
+    Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.ShotEchoSpike.Run(args));
+}
+if (args.Contains("--ride"))
+{
+    // --ride [preset] [steep= absorb= mufflen= prim= coll= mid= tail= knock= valve=] out=FILE.wav:
+    // the game's vehicle voice through a stop-go ride, at a fixed gain, for comparing variants by ear.
+    Environment.Exit(OpenFPS.Client.Core.AudioEngine.Fmod.RideSpike.Run(args));
+}
+if (args.Contains("--shift-trace"))
+{
+    // --shift-trace [preset] [top=50]: what the game's driver does with the gearbox in town.
+    Environment.Exit(OpenFPS.Client.Core.AudioEngine.Fmod.ShiftTraceSpike.Run(args));
+}
 if (args.Contains("--engine-cost"))
 {
     // --engine-cost [preset ...] [kmh=..] [sec=..]: what one live voice costs a core, so a grid
@@ -508,6 +541,98 @@ if (args.Contains("--ground-voice"))
 if (args.Contains("--pass-by"))
 {
     Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.PassBySpike.Run(args));
+}
+
+if (args.Contains("--car-door"))
+{
+    // --car-door [out=DIR] [seed=N]: the car door model (OpenFPS.Common.CarDoor) opening and shutting,
+    // one WAV each, to compare with its recording (tools/car_door_fit/cmp.py and tonal.py).
+    string dir = args.FirstOrDefault(a => a.StartsWith("out=", StringComparison.Ordinal))?.Substring(4) ?? ".";
+    int seed = int.TryParse(args.FirstOrDefault(a => a.StartsWith("seed="))?.Substring(5), out int sd) ? sd : 3;
+    System.IO.Directory.CreateDirectory(dir);
+    foreach (bool closing in new[] { false, true })
+    {
+        var pcm = OpenFPS.Common.CarDoor.Render(closing, 48000, seed);
+        string path = System.IO.Path.Combine(dir, closing ? "car_door_close.wav" : "car_door_open.wav");
+        using (var w = new System.IO.BinaryWriter(System.IO.File.Create(path)))
+        {
+            w.Write("RIFF"u8); w.Write(36 + pcm.Length * 2); w.Write("WAVEfmt "u8); w.Write(16); w.Write((short)1); w.Write((short)1);
+            w.Write(48000); w.Write(96000); w.Write((short)2); w.Write((short)16); w.Write("data"u8); w.Write(pcm.Length * 2);
+            foreach (float v in pcm) w.Write((short)Math.Clamp(v * 0.89f * 32767f, -32768f, 32767f));
+        }
+        Console.WriteLine($"  wrote {path}");
+    }
+    Environment.Exit(0);
+}
+
+if (args.Contains("--beacon-tones"))
+{
+    // --beacon-tones [out=DIR]: each beacon three times at its real 1.6 s period, one WAV each.
+    string dir = args.FirstOrDefault(a => a.StartsWith("out=", StringComparison.Ordinal))?.Substring(4) ?? ".";
+    System.IO.Directory.CreateDirectory(dir);
+    int rate = 44100, k = 0;
+    foreach (var cat in OpenFPS.Common.Beacons.Categories)
+    {
+        var tone = OpenFPS.Client.Core.BeaconAids.Tone(cat, rate);
+        var pcm = new float[(int)(1.6f * rate * 3)];
+        for (int r = 0; r < 3; r++)
+            for (int i = 0; i < tone.Length && (int)(r * 1.6f * rate) + i < pcm.Length; i++)
+                pcm[(int)(r * 1.6f * rate) + i] = tone[i] * 0.5f;
+        string path = System.IO.Path.Combine(dir, $"{++k} beacon {cat}.wav");
+        using var w = new System.IO.BinaryWriter(System.IO.File.Create(path));
+        w.Write("RIFF"u8); w.Write(36 + pcm.Length * 2); w.Write("WAVEfmt "u8); w.Write(16); w.Write((short)1); w.Write((short)1);
+        w.Write(rate); w.Write(rate * 2); w.Write((short)2); w.Write((short)16); w.Write("data"u8); w.Write(pcm.Length * 2);
+        foreach (float v in pcm) w.Write((short)Math.Clamp(v * 32767f, -32768f, 32767f));
+        Console.WriteLine($"  wrote {path}");
+    }
+    Environment.Exit(0);
+}
+
+if (args.Contains("--room-echoes"))
+{
+    // --room-echoes [map=city] ear=x,y,z src=x,y,z: the reflections a one-off sound is placed with, each with its box.
+    Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.RoomEchoesSpike.Run(args));
+}
+if (args.Contains("--path-probe"))
+{
+    // --path-probe [map=city] ear=x,y,z src=x,y,z ...: what the occlusion worker hands the mixer.
+    Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.PathProbeSpike.Run(args));
+}
+if (args.Contains("--clap-room"))
+{
+    // --clap-room [out=path] [claps=4]: a clap in Marlow flat 01F through the whole mixer, and the room against it.
+    Environment.Exit(OpenFPS.Client.Core.AudioEngine.Fmod.ClapRoomSpike.Run(args));
+}
+if (args.Contains("--clap-dry"))
+{
+    // --clap-dry: one synthesized clap, dry, its level in the windows the capture is read in.
+    var pcm = OpenFPS.Common.Applause.RenderClap(44100, 3);
+    double W(double a, double b) { int i0 = (int)(a * 44100), i1 = Math.Min(pcm.Length, (int)(b * 44100)); if (i1 <= i0) return -200; double e = 0; for (int i = i0; i < i1; i++) e += pcm[i] * (double)pcm[i]; return 10 * Math.Log10(e / (i1 - i0) + 1e-20); }
+    Console.WriteLine($"  clap {pcm.Length / 44.1:F0} ms: 0-10 ms {W(0, 0.01):F1} dB, 15-80 {W(0.015, 0.08):F1}, 80-300 {W(0.08, 0.3):F1}");
+    // Peak against the loudest 1 ms: a limiter shows in a capture as this ratio collapsing.
+    double pk = 0; foreach (var v in pcm) pk = Math.Max(pk, Math.Abs(v));
+    double best = -200; for (double t = 0; t < 0.02; t += 0.001) best = Math.Max(best, W(t, t + 0.001));
+    Console.WriteLine($"  peak {20 * Math.Log10(pk):F1} dB, loudest 1 ms {best:F1} dB: crest {20 * Math.Log10(pk) - best:F1} dB");
+    Environment.Exit(0);
+}
+
+if (args.Contains("--door-knock"))
+{
+    // --door-knock [out=DIR] [seed=N] [knocks=N]: knuckles on a wooden door (OpenFPS.Common.DoorKnock).
+    string dir = args.FirstOrDefault(a => a.StartsWith("out=", StringComparison.Ordinal))?.Substring(4) ?? ".";
+    int seed = int.TryParse(args.FirstOrDefault(a => a.StartsWith("seed="))?.Substring(5), out int sd) ? sd : 3;
+    int knocks = int.TryParse(args.FirstOrDefault(a => a.StartsWith("knocks="))?.Substring(7), out int kn) ? kn : 3;
+    System.IO.Directory.CreateDirectory(dir);
+    var pcm = OpenFPS.Common.DoorKnock.Render(knocks, 44100, seed);
+    string path = System.IO.Path.Combine(dir, $"door_knock_{knocks}_seed{seed}.wav");
+    using (var w = new System.IO.BinaryWriter(System.IO.File.Create(path)))
+    {
+        w.Write("RIFF"u8); w.Write(36 + pcm.Length * 2); w.Write("WAVEfmt "u8); w.Write(16); w.Write((short)1); w.Write((short)1);
+        w.Write(44100); w.Write(88200); w.Write((short)2); w.Write((short)16); w.Write("data"u8); w.Write(pcm.Length * 2);
+        foreach (float v in pcm) w.Write((short)Math.Clamp(v * 0.89f * 32767f, -32768f, 32767f));
+    }
+    Console.WriteLine($"  wrote {path}");
+    Environment.Exit(0);
 }
 
 if (args.Contains("--door-opening"))

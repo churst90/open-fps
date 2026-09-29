@@ -129,7 +129,7 @@ public static class FootstepSpike
     /// Point it at a folder of single-footstep WAVs — `tools/split_footsteps.py` makes them out of a
     /// recording of somebody walking.
     ///
-    ///   --footsteps compare=inbox/"foot steps sounds"/split/concrete_walk [surface=Concrete] [shoe=sneaker]
+    ///   --footsteps compare=approved/footsteps/split/concrete_walk [surface=Concrete] [shoe=sneaker]
     /// </summary>
     private static int Compare(string dir, string[] args)
     {

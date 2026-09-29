@@ -78,6 +78,10 @@ public class AsyncAcousticWorker : IDisposable
     /// stop spawning the hand-rolled discrete reflection emitters, since geometry-driven reverb covers them.</summary>
     public bool SteamAudioActive => _saEnabled;
 
+    /// <summary>The probe graph has been baked and pathing takes part in every tick. The lab waits on
+    /// this: a probe asked before the bake lands measures a different engine from the game's.</summary>
+    public bool PathingReady => _saSim?.PathingReady == true;
+
     /// <summary>The simulated reverb decay (FMOD SFXREVERB ms) for the listener's room, or false if SA
     /// simulation isn't producing one. Read from the game thread to drive the listener-region reverb.</summary>
     public bool TryGetListenerReverbDecayMs(out float ms)
@@ -166,6 +170,59 @@ public class AsyncAcousticWorker : IDisposable
             paths[i] = p;
         }
         _results[req.EntityId] = paths;
+        foreach (var p in paths)
+            if (!p.IsReflection) { Remember(req, p); break; }
+    }
+
+    // ── What was heard near here a moment ago ─────────────────────────────────────────────────
+    //
+    // A one-shot gets a voice id of its own, so the simulator has never been asked about it when it
+    // starts. It used to start on the hand-rolled tracer's guess and slide to the simulator's answer a
+    // frame or two later — after the attack, the loudest part, had already played. For a walker on the
+    // pavement outside a flat that guess was a route out of the flat's door (-4 dB) where the brick
+    // wall's answer was -24: every step's attack came through the wall ("I still hear people walking
+    // outside to my right"). The walker's previous step, 0.7 m back, has the real answer; so does the
+    // shot before this one. Nothing here knows what a footstep is: it is an answer for a nearby point.
+    private const int RecentCapacity = 256;
+    private const long RecentMaxAgeMs = 1500;
+    private readonly (Vector3 Listener, Vector3 Source, long At, AcousticPathData Path)[] _recent = new (Vector3, Vector3, long, AcousticPathData)[RecentCapacity];
+    private int _recentNext;
+    private readonly object _recentLock = new();
+
+    private void Remember(AcousticRequest req, AcousticPathData path)
+    {
+        lock (_recentLock)
+        {
+            _recent[_recentNext] = (req.ListenerPos, req.SourcePos, Environment.TickCount64, path);
+            _recentNext = (_recentNext + 1) % RecentCapacity;
+        }
+    }
+
+    /// <summary>
+    /// The simulator's direct-path answer for the nearest source it was asked about recently, if one
+    /// was near enough to stand for this one: the listener within half a metre of where they were, the
+    /// source within a metre (or a tenth of its distance, far off). False when nothing qualifies.
+    /// </summary>
+    public bool TryGetNearby(Vector3 listener, Vector3 source, out AcousticPathData path)
+    {
+        path = default;
+        if (!_saEnabled) return false;
+        long now = Environment.TickCount64;
+        float tolerance = MathF.Max(1f, 0.1f * Vector3.Distance(listener, source));
+        float best = float.MaxValue;
+        bool found = false;
+        lock (_recentLock)
+        {
+            foreach (var r in _recent)
+            {
+                if (r.At == 0 || now - r.At > RecentMaxAgeMs) continue;
+                if (Vector3.DistanceSquared(r.Listener, listener) > 0.25f) continue;
+                float d = Vector3.Distance(r.Source, source);
+                if (d > tolerance || d >= best) continue;
+                best = d; path = r.Path; found = true;
+            }
+        }
+        return found;
     }
 
     public bool TryGetResult(int entityId, out List<AcousticPathData> paths)
@@ -375,8 +432,13 @@ public class AsyncAcousticWorker : IDisposable
     /// <summary>What the simulator says about one source this tick. <c>BarrierDelta</c> is how far out of
     /// its way sound had to bend to get past the worst thing in the line (negative = nothing in the way),
     /// measured once here because BOTH the arrival direction and the per-band level are decided by it.</summary>
+    /// <param name="BarrierVerified">The route round the barrier box is clear of everything else. When it
+    /// is not, the route does not exist and its level must not be used (BuildSimPath).</param>
+    /// <param name="Path">Steam Audio's own route through the scene, when it found one.</param>
     private readonly record struct SaResult(SteamAudioSimulator.DirectResult Direct, Vector3 ApparentPosition,
-                                            bool HasApparent, float BarrierDelta);
+                                            bool HasApparent, float BarrierDelta,
+                                            bool BarrierVerified = true,
+                                            SteamAudioSimulator.PathResult Path = default);
 
     // Below this direct visibility a source is "occluded enough" that pathing should drive its apparent
     // position to the opening the sound arrives through (rather than the straight-through-wall direction).
@@ -479,6 +541,7 @@ public class AsyncAcousticWorker : IDisposable
                                                            out Vector3 edge, out bool edgeVerified);
                 Vector3 apparent = default;
                 bool hasApparent = false;
+                var route = default(SteamAudioSimulator.PathResult);
                 if (direct.Visibility < PathRedirectVisibility)
                 {
                     float dist = Vector3.Distance(kv.Value.ListenerPos, kv.Value.SourcePos);
@@ -495,17 +558,13 @@ public class AsyncAcousticWorker : IDisposable
                             hasApparent = true; viaEdge++;
                         }
                     }
-                    else
-                    {
-                        var path = _saSim.GetPathing(src);
-                        if (path.Found)
-                        {
-                            apparent = kv.Value.ListenerPos + path.WorldDirection * dist;
-                            hasApparent = true; viaProbe++;
-                        }
-                    }
+                    // No verified route: the level is what comes THROUGH the wall (BuildSimPath), so the
+                    // bearing is the source's own. The probe graph's direction used to be taken here with
+                    // the level from elsewhere, and from a flat on the ground floor the graph's route ran
+                    // down to its floor grid: a siren behind the wall was heard from straight below,
+                    // where turning the head changes nothing.
                 }
-                results[kv.Key] = new SaResult(direct, apparent, hasApparent, barrierDelta);
+                results[kv.Key] = new SaResult(direct, apparent, hasApparent, barrierDelta, edgeVerified, route);
                 if (direct.Visibility < PathRedirectVisibility) blocked++;
                 reflections += _lastReflectionCount;
             }
@@ -537,6 +596,7 @@ public class AsyncAcousticWorker : IDisposable
     private List<AcousticPathData> BuildSimPath(WorldSnapshot world, AcousticRequest req, SaResult sr)
     {
         var ap = SteamAudioSimulator.ToAcousticParams(sr.Direct);
+        if (_saDebug) Console.WriteLine($"[SAPATH] e{req.EntityId} vis {sr.Direct.Visibility:F3} trans {sr.Direct.TransLow:F3}/{sr.Direct.TransMid:F3}/{sr.Direct.TransHigh:F3} barrierDelta {sr.BarrierDelta:F3} verified {sr.BarrierVerified} route {(sr.Path.Found ? $"{sr.Path.EqLow:F3}/{sr.Path.EqMid:F3}/{sr.Path.EqHigh:F3}" : "none")}");
         float occ = Math.Clamp(ap.Occlusion, 0f, AcousticConstants.OcclusionCap);
         Vector3 apparent = sr.HasApparent ? sr.ApparentPosition : req.SourcePos;
         float dist = Vector3.Distance(req.ListenerPos, req.SourcePos);
@@ -562,9 +622,35 @@ public class AsyncAcousticWorker : IDisposable
             // source whose level says "over the wall" while its bearing says "through a door" is
             // exactly the fault this carrying was introduced to remove.
             float delta = sr.BarrierDelta;
+            // Only a route that EXISTS. The barrier search goes round one box at a time; round the edge
+            // of a shut door is eight centimetres out of the way and straight into the wall the door is
+            // hung in, and that route used to set the level anyway ("so a source behind a doorway keeps
+            // its relief") — a shut door between two rooms passed -7/-11/-19 dB (2026-09-29,
+            // --path-probe). When the route round is blocked, the level is Steam Audio's own route
+            // through the scene if it found one, and what the wall lets through if it did not.
+            // Only a route that EXISTS. The barrier search goes round one box at a time; round the edge
+            // of a shut door is eight centimetres out of the way and straight into the wall the door is
+            // hung in, and that route used to set the level anyway ("so a source behind a doorway keeps
+            // its relief") — a shut door between two rooms passed -7/-11/-19 dB (2026-09-29,
+            // --path-probe). When the route round is blocked, what arrives is what the wall lets
+            // through.
+            //
+            // NOT Steam Audio's pathing eq. That was tried the same night and is the colour of the
+            // bend, not the loss: about 1.0 for a route a hundred and fifty metres long, so every
+            // siren and walker behind a wall played at full level — and from below, where the probe
+            // grid's route pointed ("sirens are stationary in front of me no matter how I turn").
+            if (delta >= 0f && !sr.BarrierVerified) delta = -1f;
             if (delta >= 0f)
             {
                 var (dLow, dMid, dHigh) = Diffraction.BandGains(delta, AudioPhysics.SpeedOfSound);
+                // And the route round is LONGER, which the barrier's insertion loss does not pay for
+                // once it reaches its 24 dB ceiling. A walker on the pavement outside Marlow flat 01F
+                // is 8 m from the ear through a brick wall and 164 m round the building: capped, that
+                // route came out at -24 dB in every band and beat the wall's own -24/-30/-36, so
+                // every step was heard through the brick (2026-09-29). Spreading over the longer
+                // route costs 26 dB there, and under half a decibel for a half-metre kerb.
+                float spread = MathF.Max(0.5f, dist) / (MathF.Max(0.5f, dist) + delta);
+                dLow *= spread; dMid *= spread; dHigh *= spread;
                 // Per band, the better route wins. Transmission is what the material lets through;
                 // diffraction is what came round the edge regardless of what the material is.
                 ap = new SteamAudioSimulator.AcousticParams(

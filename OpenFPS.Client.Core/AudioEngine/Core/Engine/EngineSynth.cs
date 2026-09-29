@@ -71,6 +71,9 @@ public sealed class EngineSynth
     /// measured and why it is one number rather than one per engine.
     /// </summary>
     private const float BlockRadiationGain = 2.371f;   // 10^(7.5/20)
+    /// <summary>The speed the block's anchor was measured at (a car's rated speed); above it a petrol
+    /// engine's block grows by Anderton's 40 log N more than the mechanisms give.</summary>
+    private const float BlockLawReferenceRpm = 6000f;
 
     /// <summary>The airbox's own transmission loss as a gain, from its geometry. Built once: it is
     /// a property of the box, not of what the engine is doing. See IntakeSpec.AirboxLossDb.</summary>
@@ -965,7 +968,7 @@ public sealed class EngineSynth
         // Retuned every 32 samples, which is 0.7 ms: fast enough to follow the chirp, and 1/32 of
         // the cost of doing it per sample on the most expensive voice in the mixer.
         float knockRing;
-        if (DebugLegacyDiesel) { knockRing = knockDrive; goto knockDone; }
+        if (DebugLegacyDiesel) { knockRing = knockDrive; goto knockDone; }   // Stryker disable once all : lab A/B switch
         if (knockTempWgt > 1e-6f) _knockTemp = knockTempAcc / knockTempWgt;
         else _knockTemp += (1100f - _knockTemp) * 0.001f;
         if (++_knockRetune >= 32)
@@ -1059,7 +1062,19 @@ public sealed class EngineSynth
         // It is worth nothing on a petrol car — a muscle car's block is thirty decibels under its
         // exhaust either way — and it is most of a bus, whose block is the loudest thing on it.
         // That asymmetry is why it went unnoticed: "I can hardly hear the engines on those diesels."
-        Block = (knockOut + thud + mech + whine) * BlockRadiationGain + StarterSound(rpm) + Turbo();
+        //
+        // And the anchor holds at the speeds it was measured at, rated speed for a car or a truck —
+        // six thousand and under. Past that a petrol engine's radiated noise keeps climbing: Anderton's
+        // law for spark-ignition engines is 50 log N + 30 log B, where the mechanisms above grow by
+        // about 10 log N (one more event per revolution, each as hard as the last). The difference,
+        // 40 log N, is the valves seating harder, the pistons slapping, the gears and the chain, and
+        // it is what an engine sounds like at eleven thousand: a litre bike's block at a metre is as
+        // loud as its stock exhaust (engine 49 % of a motorcycle's noise at 5,000 rpm, exhaust 43 %;
+        // Lu & Jen, Inter-noise 2014), where it was thirty decibels under it and the bike was all pipe,
+        // "like a huge V8". Nothing at or below six thousand changes.
+        float overRated = e.Fuel == FuelType.Diesel ? 1f : MathF.Max(1f, rpm / BlockLawReferenceRpm);
+        Block = (knockOut + thud + mech + whine) * BlockRadiationGain * overRated * overRated
+              + StarterSound(rpm) + Turbo();
     }
 
     // ── The turbocharger ──────────────────────────────────────────────────────────────────────
@@ -1496,7 +1511,7 @@ public sealed class EngineSynth
     internal static float SolveValve(float a, float bStart, float Z, float area, float pCyl, float tCyl,
                                     float pipeK, float gamma, float cylMass, float dt, float uMean, float uCap, float pMean, out float mdot)
     {
-        if (DebugRigidValves) { mdot = 0f; return a; }
+        if (DebugRigidValves) { mdot = 0f; return a; }   // Stryker disable once all : lab switch
         // uMean is kept at zero: subtracting a running mean of the flow at the valve was tried to keep
         // the mean breathing out of the pipes, and it injects a spurious compression whenever the
         // instantaneous flow is below the mean — a false ram effect worth a quarter of the charge on
@@ -1561,18 +1576,6 @@ public sealed class EngineSynth
         }
     }
 
-    /// <summary>Diagnostic: evaluates the valve-boundary residual at a given outgoing wave.</summary>
-    internal static float ValveResidual(float a, float bb, float Z, float area, float pCyl, float tCyl, float pipeK, float gamma, float uMean, float uCap, float pMean, out float m)
-    {
-        float pPort = MathF.Max(0.05f * Gas.Atmosphere, pMean + a + bb);
-        float rhoPort = Gas.Density(pPort, pipeK);
-        if (pCyl >= pPort) m = OrificeFlow(pCyl, tCyl, pPort, area, gamma);
-        else m = -OrificeFlow(pPort, pipeK, pCyl, area, gamma);
-        float u = Math.Clamp(m / rhoPort, -uCap, uCap);
-        m = u * rhoPort;
-        return (bb - a) / Z - (u - uMean);
-    }
-
     /// <summary>Diagnostic: treat every valve as shut for the pipes, so the network can be tested
     /// on its own. Never set in a game.</summary>
     /// <summary>Diagnostic: put the diesel combustion model back to what it was before the ignition
@@ -1592,6 +1595,7 @@ public sealed class EngineSynth
     /// nobody has told sums its pipes at one point. See <see cref="ExhaustNetwork.SetListener"/>.</summary>
     public void SetListener(Vector3 machineFrame) => _exhaust.SetListener(machineFrame);
 
+    // Stryker disable all : diagnostic text for the lab, nothing audible depends on it
     /// <summary>Diagnostic: one line per cylinder.</summary>
     public System.Collections.Generic.IEnumerable<string> DescribeCylinders()
     {
@@ -1602,6 +1606,7 @@ public sealed class EngineSynth
         }
         yield return $"omega {_omega:F3} rad/s  starter {(Starter ? StarterTorque() : 0f):F0} Nm  theta {_theta:F2}";
     }
+    // Stryker restore all
 
     /// <summary>Resets the engine to cold and still.</summary>
     public void Reset()

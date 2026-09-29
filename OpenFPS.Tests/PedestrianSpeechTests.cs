@@ -32,13 +32,15 @@ public class PedestrianSpeechTests
     }
 
     [Fact]
-    public void The_catalogue_ships_the_voices_in_the_inbox_and_the_clones_chosen()
+    public void The_catalogue_ships_the_approved_voices_and_the_clones_chosen()
     {
-        // Cody's set on 2026-09-27: twenty people and five angry drivers.
-        Assert.Equal(25, Speech.Voices.Count);
-        Assert.Equal(new[] { "alec", "ben", "camel", "fluke", "jimdale", "joeb", "joel", "seanterry", "tim", "tyler" },
+        // Cody's set on 2026-09-27, and glenn, louis, steve and two children on 2026-09-28: twenty-three
+        // grown-ups who walk the streets, two children for the schools to come, and five angry drivers.
+        Assert.Equal(30, Speech.Voices.Count);
+        Assert.Equal(new[] { "alec", "ben", "camel", "ethan", "fluke", "glenn", "jimdale", "joeb", "joel", "louis", "presidents_kid", "seanterry", "steve", "tim", "tyler" },
                      Speech.Takes.Where(t => t.Kind == "cloned").Select(t => t.Voice).Distinct().OrderBy(v => v));
-        Assert.Equal(20, Speech.VoicesWith("greet").Count);
+        Assert.Equal(23, Speech.VoicesWith("greet").Count);
+        Assert.DoesNotContain("ethan", PedestrianSpeech.WalkerVoices);
         Assert.Contains("angry_vito", Speech.VoicesWith("yell"));
         Assert.DoesNotContain("angry_vito", PedestrianSpeech.WalkerVoices);
     }
@@ -60,7 +62,7 @@ public class PedestrianSpeechTests
                     for (int i = 0; i < 40; i++)
                     {
                         var (a, b) = StreetLines.Exchange(c, new Random(i));
-                        lines.UnionWith(a); lines.UnionWith(b);
+                        lines.UnionWith(a.Lines); lines.UnionWith(b.Lines);
                     }
                 }
         lines.UnionWith(StreetLines.Sorry);
@@ -80,10 +82,40 @@ public class PedestrianSpeechTests
         // have 86, the rest 126, and the drivers only yell), and a person only picks what they have.
         foreach (var line in lines)
             Assert.True(Speech.Voices.Any(v => Speech.Find(v, line) != null), $"nobody has {line}");
-        // ...but everybody on foot can greet, apologise, say goodbye and answer the phone.
-        foreach (var voice in Speech.VoicesWith("greet"))
-            foreach (var line in StreetLines.Sorry.Concat(StreetLines.Answer).Concat(StreetLines.Partings(Noon)))
-                Assert.True(Speech.Find(voice, line) != null, $"{voice} has no take of {line}");
+        // ...but everybody on foot can greet, apologise, say goodbye and answer the phone: from the
+        // named lines, or, for a voice recorded later, from its own lines in the same category.
+        foreach (var voice in PedestrianSpeech.WalkerVoices.Distinct())
+            foreach (var (list, cats) in new (IReadOnlyList<string>, string[])[]
+            {
+                (StreetLines.Greetings(Noon), new[] { "greet" }), (StreetLines.Sorry, new[] { "polite" }),
+                (StreetLines.Partings(Noon), new[] { "bye" }), (StreetLines.Answer, new[] { "phone_answer" }),
+            })
+                Assert.True(StreetLines.Candidates(voice, list, cats).Count > 0, $"{voice} has nothing for {cats[0]}");
+    }
+
+    [Fact]
+    public void Lines_filled_in_from_a_category_name_no_time_or_weather()
+    {
+        Assert.True(StreetLines.AnyTime("Hey, how's it going?"));
+        Assert.False(StreetLines.AnyTime("Good morning."));
+        Assert.False(StreetLines.AnyTime("Looks like rain."));
+        foreach (var voice in PedestrianSpeech.WalkerVoices.Distinct())
+            foreach (var line in StreetLines.Candidates(voice, Array.Empty<string>(), new[] { "greet", "bye" }))
+                Assert.True(StreetLines.AnyTime(Speech.Find(voice, line)!.Text), $"{voice}: {line}");
+    }
+
+    [Fact]
+    public void Every_scripted_call_and_conversation_is_recorded_line_for_line()
+    {
+        Assert.True(Speech.Calls.Count >= 30, $"{Speech.Calls.Count} calls");
+        foreach (var call in Speech.Calls)
+            foreach (var (voice, turns) in call.Voices)
+                foreach (var t in turns.Where(t => t.Line != null))
+                    Assert.True(Speech.Find(voice, t.Line!) != null, $"{call.Name}: {voice} has no {t.Line}");
+        Assert.True(Speech.Conversations.Count >= 40, $"{Speech.Conversations.Count} conversations");
+        foreach (var c in Speech.Conversations)
+            foreach (var t in c.Turns.Where(t => t.Line != null))
+                Assert.True(Speech.Find(t.Who == "A" ? c.A : c.B, t.Line!) != null, $"{c.Name}: {t.Who} has no {t.Line}");
     }
 
     [Fact]
@@ -248,7 +280,8 @@ public class PedestrianSpeechTests
         world.Create(new Transform { Position = Vector3.Zero, Rotation = Quaternion.Identity },
                      new Velocity(), new Pedestrian { Voice = "joel" });
         Player(world, new Vector3(0f, 0f, -20f));     // in earshot, behind them, so no hello
-        var said = Run(new PedestrianSpeech(new Random(7)), world, 0, 1800, Noon);
+        // Half the calls are recorded calls played through, which have no story in them: an hour.
+        var said = Run(new PedestrianSpeech(new Random(7)), world, 0, 3600, Noon);
         Assert.Contains(said, x => x.Sound.SynthKey.Contains("/story_"));
         Assert.All(said.Where(x => x.Sound.SynthKey.Contains("/story_")), x => Assert.True(x.Sound.DecaySeconds > 15f));
     }
@@ -271,7 +304,7 @@ public class PedestrianSpeechTests
     {
         int n = PedestrianSpeech.WalkerVoices.Count;
         var voices = Enumerable.Range(0, n).Select(_ => PedestrianSpeech.NextVoice("voices-test")).ToList();
-        Assert.Equal(20, voices.Distinct().Count());
+        Assert.Equal(23, voices.Distinct().Count());
         // Cody's favourites come round twice as often.
         Assert.Equal(2, voices.Count(v => v == "joel"));
         Assert.Equal(1, voices.Count(v => v == "linda"));

@@ -429,7 +429,7 @@ public class WeatherAndConvergenceTests
         Assert.True(session.IsInGame);
         Assert.Equal(42, session.OwnEntityId);
         Assert.Equal(1, shell.EnterGameCalls);
-        Assert.True(speech.Said("entered the world"));
+        Assert.True(speech.Said("Logged in. You are in default."));
     }
 
     [Fact]

@@ -74,9 +74,36 @@ public readonly record struct Reflection(
 /// </summary>
 public static class ImageSource
 {
-    /// <summary>Beyond this a first-order reflection has spread and weakened past the point of being a
-    /// distinct arrival; it belongs in the reverb tail instead.</summary>
+    /// <summary>A first-order reflection arriving this much further round than the direct sound (400 m,
+    /// about 1.2 s behind it) has spread past the point of being a distinct arrival; it belongs in the
+    /// reverb tail instead. Measured against the DIRECT path, not as a total: as a total, a shot 350 m
+    /// away could only echo off a wall almost on the line between, and one past 400 m not at all
+    /// (2026-09-28, "not really hearing reflections for gunshots, especially the far away ones").</summary>
     public const float MaxPathLength = 400f;
+
+    /// <summary>
+    /// What a surface's mirror copy loses at the bottom and the top, per bounce, in decibels (never
+    /// positive), relative to the broadband share the search already gave it.
+    ///
+    /// A surface's scattering coefficient is quoted at the middle of the range, and it is not flat:
+    /// it rises with frequency, because roughness a few centimetres deep is nothing to a two-metre
+    /// wave and everything to a four-centimetre one (the ISO 17497 curves climb about as the square
+    /// root of frequency). So the specular share — (1 - s), what comes back as a copy — keeps its bass
+    /// and loses its top, more for brick than for glass, and again at every bounce. That is why an
+    /// echo from down a street is a duller crack than the shot, and a flutter duller at each crossing
+    /// (Cody, 2026-09-28: "the reflections get duller the more it bounces").
+    /// </summary>
+    public static (float LowDb, float HighDb) SpecularBandLossDb(float scattering, int bounces)
+    {
+        float s = Math.Clamp(scattering, 0f, 1f);
+        if (s <= 0f || bounces <= 0) return (0f, 0f);
+        float mid = 1f - s;
+        // Band centres 200 Hz and 8 kHz against the quoted 1 kHz: sqrt(0.2) and sqrt(8).
+        float sLow = s * 0.447f, sHigh = MathF.Min(1f, s * 2.83f);
+        float low = MathF.Min(1f, (1f - sLow) / mid);
+        float high = MathF.Max(0.1f, (1f - sHigh) / mid);        // a floor: some top always survives
+        return (bounces * 20f * MathF.Log10(low), bounces * 20f * MathF.Log10(high));
+    }
 
     /// <summary>A reflection quieter than this relative to the direct sound is not worth a voice.</summary>
     public const float MinGain = 0.02f;
@@ -201,7 +228,7 @@ public static class ImageSource
                 float gain = (direct / path) * reflected * (1f - scatter)
                            * ApertureFactor(s, source, listener, hit);
 
-                if (path <= MaxPathLength && path > direct && gain >= MinGain && delay >= MinDelaySeconds
+                if (path - direct <= MaxPathLength && path > direct && gain >= MinGain && delay >= MinDelaySeconds
                     && (occluded == null || (!occluded(source, hit) && !occluded(hit, listener))))
                     n = Insert(into, n, new Reflection(image, hit, delay, path, gain, s.SurfaceId, false, scatter));
             }
@@ -260,7 +287,7 @@ public static class ImageSource
             if (cosS <= 0f || cosL <= 0f) continue;
 
             float path = rS + rL;
-            if (path > MaxPathLength || path <= direct) continue;
+            if (path - direct > MaxPathLength || path <= direct) continue;
             float delay = (path - direct) / MathF.Max(1f, speedOfSound);
             if (delay < MinDelaySeconds) continue;
 
@@ -330,7 +357,7 @@ public static class ImageSource
             float cosL = Math.Clamp(Vector3.Dot(Vector3.Normalize(listener - tap), nrm), 0f, 1f);
             if (cosS <= 0f || cosL <= 0f) continue;
             float path = rS + rL;
-            if (path > MaxPathLength || path <= direct) continue;
+            if (path - direct > MaxPathLength || path <= direct) continue;
             float delay = (path - direct) / c;
             if (delay < MinDelaySeconds) continue;
 
@@ -455,7 +482,7 @@ public static class ImageSource
                 if (!CrossesFace(A, image1, p2, out Vector3 p1)) continue;
 
                 float path = Vector3.Distance(image2, listener);
-                if (path > MaxPathLength || path <= direct) continue;
+                if (path - direct > MaxPathLength || path <= direct) continue;
 
                 float delay = (path - direct) / MathF.Max(1f, speedOfSound);
                 if (delay < MinDelaySeconds) continue;

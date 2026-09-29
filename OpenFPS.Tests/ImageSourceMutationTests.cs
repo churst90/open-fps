@@ -109,9 +109,10 @@ public class ImageSourceMutationTests
     }
 
     /// <summary>
-    /// <see cref="ImageSource.MaxPathLength"/> is an inclusive limit. A 3-4-5 triangle scaled by 80
-    /// gives a reflected path of exactly 400 m (kept, at the gain its 320 m direct path over 400 m
-    /// says); moving the pair ten metres further from the wall makes it 412 m, and it is gone.
+    /// <see cref="ImageSource.MaxPathLength"/> is an inclusive limit on how much further round the
+    /// reflection travels than the direct sound. A 3-4-5 triangle scaled by 100 gives a reflected path
+    /// of 1,000 m against a 600 m direct one — exactly 400 m further, kept at the gain 600 over 1,000
+    /// says; moving the pair ten metres further from the wall makes it 416 m further, and it is gone.
     /// </summary>
     [Fact]
     public void AMirrorReflectionIsKeptAtExactlyTheMaximumPathAndDroppedPastIt()
@@ -119,40 +120,40 @@ public class ImageSourceMutationTests
         var wall = WallX0(halfY: 50f, halfZ: 250f, absorption: 0.02f);
         Span<Reflection> into = stackalloc Reflection[4];
 
-        int n = ImageSource.FirstOrder(new[] { wall }, new Vector3(120f, 0, -160f), new Vector3(120f, 0, 160f), C, into);
+        int n = ImageSource.FirstOrder(new[] { wall }, new Vector3(400f, 0, -300f), new Vector3(400f, 0, 300f), C, into);
         Assert.Equal(1, n);
-        Assert.Equal(400f, into[0].PathLength);
-        // The Fresnel zone at 200 m + 200 m is sqrt(0.49 * 100) = 7 m: a 50 m face covers it fully.
-        Assert.Equal(320f / 400f * 0.98f, into[0].Gain, 4);
-        Assert.Equal(80f / C, into[0].DelaySeconds, 5);
+        Assert.Equal(1000f, into[0].PathLength);
+        // The Fresnel zone at 500 m + 500 m is sqrt(0.49 * 250) = 11 m: a 50 m face covers it fully.
+        Assert.Equal(600f / 1000f * 0.98f, into[0].Gain, 4);
+        Assert.Equal(400f / C, into[0].DelaySeconds, 5);
 
-        Assert.Equal(0, ImageSource.FirstOrder(new[] { wall }, new Vector3(130f, 0, -160f),
-                                               new Vector3(130f, 0, 160f), C, into));
+        Assert.Equal(0, ImageSource.FirstOrder(new[] { wall }, new Vector3(410f, 0, -300f),
+                                               new Vector3(410f, 0, 300f), C, into));
     }
 
     /// <summary>
-    /// The same limit on the scattered share. A single tap at the centre of a fully rough face, 200 m
-    /// from both source and listener, travels exactly 400 m and is kept at its Lambert gain; ten metres
-    /// further out it travels 412 m and there is nothing.
+    /// The same limit on the scattered share. A single tap at the centre of a fully rough face, 500 m
+    /// from both source and listener 600 m apart, travels exactly 400 m further than the direct sound
+    /// and is kept at its Lambert gain; ten metres further out it is 416 m, and there is nothing.
     /// </summary>
     [Fact]
     public void ADiffuseTapIsKeptAtExactlyTheMaximumPathAndDroppedPastIt()
     {
         var rough = WallX0(halfY: 50f, halfZ: 250f, absorption: 0.02f, scattering: 1f);
-        var source = new Vector3(120f, 0, -160f);
-        var listener = new Vector3(120f, 0, 160f);
+        var source = new Vector3(400f, 0, -300f);
+        var listener = new Vector3(400f, 0, 300f);
         Span<Reflection> into = stackalloc Reflection[4];
 
         int n = ImageSource.FirstOrder(new[] { rough }, source, listener, C, into, null, diffuseTaps: 1);
         Assert.Equal(1, n);
         Assert.True(into[0].IsDiffuse);
         Assert.Equal(Vector3.Zero, into[0].BouncePoint);
-        Assert.Equal(400f, into[0].PathLength);
+        Assert.Equal(1000f, into[0].PathLength);
         float area = 4f * 50f * 250f;
         Assert.Equal(LambertGain(area, source, Vector3.Zero, listener, Vector3.UnitX, 0.98f), into[0].Gain, 3);
 
-        Assert.Equal(0, ImageSource.FirstOrder(new[] { rough }, new Vector3(130f, 0, -160f),
-                                               new Vector3(130f, 0, 160f), C, into, null, 1));
+        Assert.Equal(0, ImageSource.FirstOrder(new[] { rough }, new Vector3(410f, 0, -300f),
+                                               new Vector3(410f, 0, 300f), C, into, null, 1));
     }
 
     /// <summary>
@@ -582,23 +583,26 @@ public class ImageSourceMutationTests
     }
 
     /// <summary>
-    /// The path limit is inclusive for the second order too. Walls 120 m apart and a listener 320 m
-    /// down the street put the second image 240 m across: a 240-320-400 triangle, kept. At 330 m the
-    /// path is 408 m, and neither chain is reported.
+    /// The path limit is inclusive for the second order too. Walls 400 m apart and a listener 600 m
+    /// down the street put the second image 800 m across: a 600-800-1,000 triangle, exactly 400 m
+    /// further round than the direct sound, kept. Walls 410 m apart make it 416 m, and neither chain
+    /// is reported.
     /// </summary>
     [Fact]
     public void ASecondOrderReflectionIsKeptAtExactlyTheMaximumPathAndDroppedPastIt()
     {
-        var a = WallAtX(-60f, 1f, 160f, 200f);
-        var b = WallAtX(60f, -1f, 160f, 200f);
+        var a = WallAtX(-200f, 1f, 300f, 400f, halfY: 50f);
+        var b = WallAtX(200f, -1f, 300f, 400f, halfY: 50f);
         Span<Reflection> into = stackalloc Reflection[4];
 
-        int n = ImageSource.SecondOrder(new[] { a, b }, Vector3.Zero, new Vector3(0, 0, 320f), C, into);
+        int n = ImageSource.SecondOrder(new[] { a, b }, Vector3.Zero, new Vector3(0, 0, 600f), C, into);
         Assert.Equal(2, n);
-        Assert.Equal(400f, into[0].PathLength);
-        Assert.Equal(400f, into[1].PathLength);
+        Assert.Equal(1000f, into[0].PathLength);
+        Assert.Equal(1000f, into[1].PathLength);
 
-        Assert.Equal(0, ImageSource.SecondOrder(new[] { a, b }, Vector3.Zero, new Vector3(0, 0, 330f), C, into));
+        var wideA = WallAtX(-205f, 1f, 300f, 400f, halfY: 50f);
+        var wideB = WallAtX(205f, -1f, 300f, 400f, halfY: 50f);
+        Assert.Equal(0, ImageSource.SecondOrder(new[] { wideA, wideB }, Vector3.Zero, new Vector3(0, 0, 600f), C, into));
     }
 
     /// <summary>In a corridor two metres wide the second-order path is only 2.5 m longer than the

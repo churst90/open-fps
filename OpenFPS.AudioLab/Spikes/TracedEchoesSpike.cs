@@ -197,7 +197,7 @@ public static class TracedEchoesSpike
         // Two stages on the listener's trace: sharing one reader (as every outdoor bus used to) and
         // with a reader each. What each stage's effect hands back, dB, after the traces have run.
         {
-            using var lt = new TracedReverb(ctx);
+            using var lt = new TracedReverb(ctx, 44100, 1024);   // this stage measures readers at the mixer's block
             lt.SetScene(scene);
             lt.SetListener(ear);
             lt.EnsureReader(1);

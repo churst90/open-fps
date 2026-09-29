@@ -65,7 +65,7 @@ public static class Applause
     // ── Fitted against a recording, 2026-09-19 ───────────────────────────────────────────────────
     //
     // Everything below was first settled by ear and then MEASURED against sixty-seven real claps
-    // (`inbox/Slow Clapping  HQ Sound Effects.mp3`, cut up by `tools/split_footsteps.py`, compared
+    // (`approved/applause/Slow Clapping  HQ Sound Effects.mp3`, cut up by `tools/split_footsteps.py`, compared
     // with `--applause compare=DIR`). The ear had put the cavity at 800 Hz "because hands are bigger
     // and softer than they sound"; the recording puts the peak of a clap squarely at 1-2 kHz, with the
     // flesh under it a broad plateau from 125 to 500 Hz about eight decibels down, almost nothing
@@ -485,6 +485,24 @@ public static class Applause
     private static float MathHelperLerp(float a, float b, float t) => a + (b - a) * Math.Clamp(t, 0f, 1f);
 
     // ── Naming, so it can travel as a SynthKey ───────────────────────────────────────────────────
+
+    /// <summary>The key for one person clapping once: the player's own hands (T, on foot).</summary>
+    public const string ClapKey = "clap";
+
+    /// <summary>
+    /// One clap by one person, at arm's length: a clapper drawn as the crowd draws them, but sitting
+    /// nowhere — no seat-distance loss — and a single pair of hands meeting once. Normalised; the
+    /// level is <see cref="SingleClapDb"/>, placed by whoever emits it.
+    /// </summary>
+    public static float[] RenderClap(int sampleRate, int seed)
+    {
+        var rng = new Random(seed);
+        var who = NewClapper(rng, 0.7f) with { DistanceGain = 1f };
+        var buffer = new float[(int)(0.25f * sampleRate)];
+        AddClap(buffer, 0, sampleRate, rng, who, 1f);
+        Normalise(buffer);
+        return buffer;
+    }
 
     /// <summary>The key a <see cref="TransientSound"/> carries to ask for this. Same escape hatch a
     /// gunshot uses, and for the same reason: four characters and seven numbers cannot describe a

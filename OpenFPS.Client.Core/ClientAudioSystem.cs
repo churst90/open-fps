@@ -381,6 +381,7 @@ public class ClientAudioSystem
         _birds = new BirdLife(audio, _acoustics);
         WorldAudio.Received = message => _birds.Heard(message, OpenFPS.Common.AudioClock.Now);
         _acousticWorker = new AsyncAcousticWorker(_acoustics);
+        WorldAudio.Worker = _acousticWorker;
         _acousticWorker.Start();
     }
 
@@ -1805,7 +1806,11 @@ public class ClientAudioSystem
                 Mode = PlaybackMode.LoopOne,
                 Type = EmitterType.EntityAttached,
                 Position = pos,
-                ApparentPosition = path.ApparentPosition == Vector3.Zero ? pos : path.ApparentPosition,
+                // Heard from the horn itself, where the car is NOW — only turned toward the edge the
+                // path goes round when something is in the way. It used to take the path's own point,
+                // which is the car's exhaust as of the worker's last answer (up to ten frames old at
+                // range): a moving car's horn trailed behind it, and came from its tailpipe.
+                ApparentPosition = SirenApparent(path, pos, eyePos),
                 Velocity = snap.Velocity,
                 PositionSampledAt = world.PositionsSampledAt,
                 Direction = Vector3.Transform(Vector3.UnitZ, snap.Transform.Rotation),
@@ -2529,6 +2534,9 @@ public class ClientAudioSystem
                        boostDb: OwnFootstepBoneConductionDb);
     }
 
+    /// <summary>How far a footstep take's pitch and level wander from one play to the next.</summary>
+    private const float FootstepPitchJitter = 0.03f, FootstepLevelJitterDb = 1f;
+
     private void SubmitFootstep(Vector3 nudgePos, string mat, bool follows, Vector3 offset, float boostDb)
     {
         // Your own feet ride with you (follows); anybody else's stay where they fell.
@@ -2560,7 +2568,10 @@ public class ClientAudioSystem
             FollowsListener = follows,
             ListenerOffset = offset,
             Type = EmitterType.WorldLocked,
-            Volume = stepGain,
+            // No two steps alike: a take is heard a hair higher or lower and a touch louder or softer
+            // each time, as the same foot never lands quite the same way twice.
+            Volume = stepGain * MathF.Pow(10f, (float)(Random.Shared.NextDouble() * 2.0 - 1.0) * FootstepLevelJitterDb / 20f),
+            Pitch = 1f + (float)(Random.Shared.NextDouble() * 2.0 - 1.0) * FootstepPitchJitter,
             Range = FootstepRange,
             // Your own feet, pinned above the physics: they are how you know you are moving, and on
             // a loud map the arithmetic would rightly bury them under everything else. Only yours:
@@ -2571,16 +2582,60 @@ public class ClientAudioSystem
             // The room the body is standing in, so its reverberation is THAT room's.
             TargetRegionId = _listenerRegion,
         };
+        if (!own) CarryThePath(ref footstep, nudgePos);
         _audio.Submit(footstep);
 
         // The walls answering YOUR footfalls. Other people's steps have none: their pool is yours.
         if (own) SubmitStepReflections(nudgePos, resolvedSoundId, stepGain, stepReference);
     }
 
+    /// <summary>
+    /// Somebody else's step starts with the wall between you already on it.
+    ///
+    /// A step is short. It is submitted with no occlusion, its pooled id is asked about on the
+    /// worker's next tick, and the answer comes back a tick or two later and is eased in over the
+    /// smoothing time — by which time the step is over. So every footfall outside a flat played its
+    /// attack through the brick unoccluded, and only its tail was dimmed: "I still hear people walking
+    /// outside through the wall" (2026-09-29), after the same fault had been fixed for every other
+    /// one-shot in WorldAudioPlayer, which this path never went through. The same answer as there: the
+    /// simulator's result for the nearest source it heard a moment ago (their voice, their last step),
+    /// moved to this one; failing that, the hand-rolled tracer. And the step reverberates in the room
+    /// the FOOT is in, not the room you are in.
+    /// </summary>
+    private void CarryThePath(ref SpatialEmitter step, Vector3 at)
+    {
+        if (_groundWorld is not { } world) return;
+        Vector3 ear = _state.VisualPosition + new Vector3(0, _state.EyeHeight, 0);
+        var path = _acoustics.CalculateAcousticPath(world, step.EntityId, ear, at);
+        if (_acousticWorker.TryGetNearby(ear, at, out var near))
+        {
+            Vector3 moved = at - near.SourcePosition;
+            float nearDist = MathF.Max(0.1f, Vector3.Distance(ear, near.SourcePosition));
+            float dist = Vector3.Distance(ear, at);
+            path = path with
+            {
+                Occlusion = near.Occlusion, EqLow = near.EqLow, EqMid = near.EqMid, EqHigh = near.EqHigh,
+                TransmissionBleed = near.TransmissionBleed, ApertureFactor = near.ApertureFactor,
+                ApparentPosition = near.ApparentPosition + moved,
+                EffectiveDistance = near.EffectiveDistance * dist / nearDist,
+            };
+        }
+        step.Occlusion = path.Occlusion;
+        step.EqLow = path.EqLow; step.EqMid = path.EqMid; step.EqHigh = path.EqHigh;
+        step.AirLowDb = path.AirLowDb; step.AirMidDb = path.AirMidDb; step.AirHighDb = path.AirHighDb;
+        step.ApertureFactor = path.ApertureFactor;
+        step.TransmissionBleed = path.TransmissionBleed;
+        step.ApparentPosition = path.ApparentPosition;
+        step.EffectiveDistance = path.EffectiveDistance;
+        if (path.RegionId >= 0) step.TargetRegionId = path.RegionId;
+        step.CarriesPath = true;
+    }
+
     /// <summary>Voices for the surfaces answering your own footfalls. Their own pool, so a wall's copy
     /// can never take the slot of the step it is a copy of.</summary>
     private const int STEP_ECHO_BASE_ID = -200;
-    private const int STEP_ECHO_POOL_SIZE = 16;
+    private const int STEP_ECHO_POOL_SIZE = 48;
+    private readonly List<OpenFPS.Common.EarlyReflections.Arrival> _stepArrivals = new();
     private int _stepEchoIndex;
 
     /// <summary>
@@ -2631,12 +2686,23 @@ public class ClientAudioSystem
 
     private void SubmitStepReflections(Vector3 stepPos, string soundId, float stepGain, float stepReference)
     {
-        if (_engineEchoes.SurfaceCount == 0) return;
-        // Traced: your own step is a sound where you stand, and the traced response from where you
-        // stand is exactly its reflections, off every surface round you, with their materials.
-        if (OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.TracedActive) return;
-
         Vector3 ear = _state.VisualPosition + new Vector3(0, _state.EyeHeight, 0);
+        if (OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.TracedActive)
+        {
+            // Traced: the room's early answers are placed voices and its tail is the traced stage
+            // (WorldAudioPlayer.QueueRoomEchoes), and a footfall wants the same as a clap. This used
+            // to return here, from when the traced response carried the early part too; once the
+            // room's stage was cut to its late tail, your own steps were left with a direct sound
+            // and a tail that began 50 ms later and nothing from the walls between — the room
+            // heard while walking was a wash with no reflections in it ("the reverb produced by the
+            // reflections should be all around me... it's just concentrated in front", 2026-09-29).
+            // Outdoors the voice has its own ground, and the facades' answers are the trace's.
+            if (_groundWorld is not { } world || !ListenerEnclosed(world, ear)) return;
+            SubmitRoomStepEchoes(stepPos, ear, soundId, stepGain, stepReference, world);
+            return;
+        }
+        if (_engineEchoes.SurfaceCount == 0) return;
+
         Span<OpenFPS.Common.Reflection> found = stackalloc OpenFPS.Common.Reflection[OpenFPS.Common.EarlyReflections.MaxArrivals];
         int n = _engineEchoes.FindReflections(stepPos, ear, AudioPhysics.SpeedOfSound, found, diffuseTaps: 1);
         if (n <= 0) return;
@@ -2682,6 +2748,58 @@ public class ClientAudioSystem
     /// The map's outdoor ambience bed, from the manifest. Starting it is deferred to the audio update
     /// so it happens on the audio thread with everything else.
     /// </summary>
+    /// <summary>The room's first answers to your own footfall, placed as WorldAudioPlayer.QueueRoomEchoes
+    /// places a clap's: mirrored through the walls to third order, the loudest first, inside the
+    /// window before the tail, each from its own wall's direction with that wall's colour.</summary>
+    private void SubmitRoomStepEchoes(Vector3 stepPos, Vector3 ear, string soundId, float stepGain, float stepReference, WorldSnapshot world)
+    {
+        var solids = _acoustics.ReflectionSolids(world);
+        if (solids.Count == 0) return;
+        OpenFPS.Common.EarlyReflections.Find(stepPos, ear, solids, _stepArrivals, AudioPhysics.SpeedOfSound,
+                                             maxOrder: OpenFPS.Common.EarlyReflections.MaxOrder, keep: WorldAudioPlayer.MaxRoomEchoes * 2);
+        _stepArrivals.Sort(static (a, b) => b.GainMid.CompareTo(a.GainMid));
+        float direct = MathF.Max(1f, Vector3.Distance(stepPos, ear));
+        int added = 0;
+        foreach (var a in _stepArrivals)
+        {
+            if (a.ExtraDelaySeconds > WorldAudioPlayer.RoomEchoWindowSeconds) continue;
+            // The floor the foot is on: the step is made of it already.
+            if (a.Order == 1 && a.HitPoint.Y < MathF.Min(stepPos.Y, ear.Y) - 0.2f) continue;
+            float gain = Math.Clamp(a.GainMid * a.PathLength / direct, 0f, 1f);
+            if (gain < OpenFPS.Common.ImageSource.MinGain) continue;
+            gain *= OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.RoomTrim;   // the room's trim, /room
+            var loss = WorldAudioPlayer.SpecularLoss(a.Scattering, a.Order);
+            float lowDb = 20f * MathF.Log10(MathF.Max(1e-4f, a.GainLow) / MathF.Max(1e-4f, a.GainMid));
+            float highDb = 20f * MathF.Log10(MathF.Max(1e-4f, a.GainHigh) / MathF.Max(1e-4f, a.GainMid));
+            int echoId = STEP_ECHO_BASE_ID - (_stepEchoIndex % STEP_ECHO_POOL_SIZE);
+            _stepEchoIndex++;
+            _audio.Submit(new SpatialEmitter
+            {
+                EntityId = echoId,
+                SoundId = soundId,
+                Position = a.ImagePosition,
+                ApparentPosition = a.ImagePosition,
+                Type = EmitterType.WorldLocked,
+                // Placed as the step and scaled by what the surfaces and the longer path kept; the
+                // engine's 1/r at the image is undone in `gain`, as for every other copy.
+                Volume = stepGain * gain,
+                MinDistance = stepReference,
+                Range = 25f,
+                // No DelayMs: the facade delays every submission by its distance, and the image is
+                // the whole path away.
+                IsReflection = true,
+                IsEvent = true,
+                // The path is this: clear both legs (checked when it was found), coloured by the walls.
+                CarriesPath = true,
+                Occlusion = 0f, ApertureFactor = 1f, TransmissionBleed = 0f,
+                EqLow = MathF.Pow(10f, (loss.LowDb + lowDb) / 20f), EqMid = 1f, EqHigh = MathF.Pow(10f, (loss.HighDb + highDb) / 20f),
+                EnableReverb = false,
+                TargetRegionId = _listenerRegion,
+            });
+            if (++added >= WorldAudioPlayer.MaxRoomEchoes) break;
+        }
+    }
+
     public void SetMapAmbience(string ambienceId)
     {
         _mapAmbienceId = ambienceId ?? "";

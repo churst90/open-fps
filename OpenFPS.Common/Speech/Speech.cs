@@ -7,7 +7,7 @@ namespace OpenFPS.Common;
 /// People talking: which voices exist, what each can say, and how loud a person says it.
 ///
 /// The lines are recordings, one take per voice per line, listed in <c>Speech/voices.csv</c> (written
-/// by <c>tools/import_npc_voices.py</c> from the inbox manifest). The server picks who says what; the
+/// by <c>tools/import_npc_voices.py</c> from the manifest in approved/voices). The server picks who says what; the
 /// client plays <c>VOICES/&lt;voice&gt;/&lt;line&gt;</c> through the ordinary world-sound path, so a greeting is
 /// placed, occluded, reflected and reverberated like any other sound.
 /// </summary>
@@ -159,9 +159,69 @@ public static class Speech
     public static IReadOnlyList<string> VoicesWith(string category)
         => Takes.Where(t => t.Category == category).Select(t => t.Voice).Distinct().ToArray();
 
+    private static Dictionary<(string, string), string[]>? _byVoiceCategory;
+
     /// <summary>A voice's lines in one category.</summary>
     public static IReadOnlyList<string> LinesOf(string voice, string category)
-        => Takes.Where(t => t.Voice == voice && t.Category == category).Select(t => t.Line).ToArray();
+    {
+        _byVoiceCategory ??= Takes.GroupBy(t => (t.Voice, t.Category)).ToDictionary(g => g.Key, g => g.Select(t => t.Line).ToArray());
+        return _byVoiceCategory.TryGetValue((voice, category), out var l) ? l : Array.Empty<string>();
+    }
+
+    // ── Scripts: phone calls and two people walking together ────────────────────────────────────
+    //
+    // The order of a call's lines and a conversation's turns, exported from the line lists by
+    // tools/export_speech_scripts.py into Speech/scripts.json. A call is one voice with pauses where
+    // the far end talks; a conversation is two voices taking turns.
+
+    /// <summary>One step of a call: a line, or a pause while the other end talks.</summary>
+    public sealed record CallTurn(string? Line, float Pause);
+    public sealed record Call(string Name, IReadOnlyDictionary<string, IReadOnlyList<CallTurn>> Voices);
+    /// <summary>One turn of a conversation: who ("A" or "B"), and the line, or a cue with no
+    /// recording yet ("laughs"); Cut when it interrupts the turn before.</summary>
+    public sealed record Turn(string Who, string? Line, string? Cue, bool Cut);
+    public sealed record Conversation(string Name, string A, string B, IReadOnlyList<Turn> Turns);
+
+    private static (IReadOnlyList<Call> Calls, IReadOnlyList<Conversation> Pairs)? _scripts;
+
+    public static IReadOnlyList<Call> Calls => (_scripts ??= LoadScripts()).Calls;
+    public static IReadOnlyList<Conversation> Conversations => (_scripts ??= LoadScripts()).Pairs;
+
+    /// <summary>The calls this voice recorded every line of.</summary>
+    public static IReadOnlyList<IReadOnlyList<CallTurn>> CallsFor(string voice)
+        => Calls.Where(c => c.Voices.ContainsKey(voice)).Select(c => c.Voices[voice]).ToArray();
+
+    /// <summary>The pairs of voices that have a conversation between them, each once.</summary>
+    public static IReadOnlyList<(string A, string B)> ConversationPairs
+        => Conversations.Select(c => (c.A, c.B)).Distinct().ToArray();
+
+    /// <summary>Conversations between these two voices, either way round.</summary>
+    public static IReadOnlyList<Conversation> ConversationsBetween(string x, string y)
+        => Conversations.Where(c => (c.A == x && c.B == y) || (c.A == y && c.B == x)).ToArray();
+
+    private static (IReadOnlyList<Call>, IReadOnlyList<Conversation>) LoadScripts()
+    {
+        using var stream = typeof(Speech).Assembly.GetManifestResourceStream("OpenFPS.Common.Speech.scripts.json");
+        if (stream == null) return (Array.Empty<Call>(), Array.Empty<Conversation>());
+        using var doc = System.Text.Json.JsonDocument.Parse(stream);
+        var calls = new List<Call>();
+        foreach (var c in doc.RootElement.GetProperty("calls").EnumerateArray())
+        {
+            var voices = new Dictionary<string, IReadOnlyList<CallTurn>>();
+            foreach (var v in c.GetProperty("voices").EnumerateObject())
+                voices[v.Name] = v.Value.EnumerateArray().Select(t => t.TryGetProperty("line", out var l)
+                    ? new CallTurn(l.GetString(), 0f) : new CallTurn(null, (float)t.GetProperty("pause").GetDouble())).ToArray();
+            calls.Add(new Call(c.GetProperty("name").GetString()!, voices));
+        }
+        var pairs = new List<Conversation>();
+        foreach (var c in doc.RootElement.GetProperty("pairs").EnumerateArray())
+            pairs.Add(new Conversation(c.GetProperty("name").GetString()!, c.GetProperty("a").GetString()!, c.GetProperty("b").GetString()!,
+                c.GetProperty("turns").EnumerateArray().Select(t => new Turn(t.GetProperty("who").GetString()!,
+                    t.TryGetProperty("line", out var l) ? l.GetString() : null,
+                    t.TryGetProperty("cue", out var q) ? q.GetString() : null,
+                    t.TryGetProperty("cut", out _))).ToArray()));
+        return (calls, pairs);
+    }
 
 
     private static Dictionary<(string, string), Take>? _byVoiceLine;

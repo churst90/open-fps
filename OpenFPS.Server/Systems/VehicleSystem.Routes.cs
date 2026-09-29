@@ -109,6 +109,7 @@ public sealed partial class VehicleSystem
         {
             if (v.MapId != mapId || v.Route == null || v.Line == null || !InLane(v)) continue;
             var (leg, along) = WhereOnLane(v);
+            if (along < 0f) ShortOfTheLine(v, ref leg, ref along);     // filed where the junctions file it
             var key = (mapId, v.Route.Legs[leg].Segment.Index);
             if (!_onSegment.TryGetValue(key, out var list)) _onSegment[key] = list = new();
             list.Add((v, along));

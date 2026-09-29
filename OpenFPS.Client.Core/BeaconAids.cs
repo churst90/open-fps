@@ -38,13 +38,15 @@ public sealed class BeaconAids
     /// how many of it are heard at once.</summary>
     private static readonly Dictionary<string, (string Sound, float Hz, float Range, int Nearest)> Kinds = new()
     {
-        [Beacons.Door] = ("SYNTH/beacon_door_knock", 420f, 12f, 3),
-        [Beacons.Item] = ("SYNTH/beacon_item_bell", 1318f, 10f, 3),
-        [Beacons.Vehicle] = ("SYNTH/beacon_vehicle_low", 330f, 25f, 2),
+        [Beacons.Door] = ("SYNTH/beacon_door_chime", 523f, 12f, 3),
+        [Beacons.Item] = ("SYNTH/beacon_item_ring", 1046f, 10f, 3),
+        [Beacons.Vehicle] = ("SYNTH/beacon_vehicle_hum", 262f, 25f, 2),
     };
 
-    /// <summary>How often one beacon blips, seconds.</summary>
-    private const double Period = 1.6;
+    /// <summary>How often one beacon sounds unless the player says otherwise, seconds.</summary>
+    public const double DefaultEvery = 1.6;
+    /// <summary>The range the player may set it in, seconds.</summary>
+    public const double MinEvery = 0.5, MaxEvery = 10.0;
 
     /// <summary>A blip at one metre, dB: a doorbell's worth, well under speech and footsteps' echo.</summary>
     private const float BlipDb = 66f;
@@ -94,11 +96,11 @@ public sealed class BeaconAids
                 {
                     // First heard: start on a beat of its own, so two doors side by side do not blip
                     // in unison for ever.
-                    _next[id] = now + (Math.Abs(id) % 16) / 16.0 * Period;
+                    _next[id] = now + (Math.Abs(id) % 16) / 16.0 * _prefs.Every;
                     continue;
                 }
                 if (now < due) continue;
-                _next[id] = now + Period;
+                _next[id] = now + _prefs.Every;
                 Blip(world, id, kind.Sound, at, listener);
             }
         }
@@ -210,57 +212,80 @@ public sealed class BeaconAids
         bool ok = true;
         foreach (var (category, kind) in Kinds)
         {
-            // Three sounds that cannot be taken for anything in the street. The first version was a
-            // clean high beep, and a clean high beep repeating by a doorway IS a pedestrian crossing's
-            // chirp — which is what it was heard as. So: a door is a soft wooden knock, an item a
-            // small bell, a car a low double tone. None of them is a pure beep.
-            float[] pcm = category switch
-            {
-                Beacons.Door => Knock(rate),
-                Beacons.Item => Bell(rate),
-                _ => Twice(DrivingAids.Beep(rate, 330f, 0.06f, 0.2f), rate),
-            };
+            float[] pcm = Tone(category, rate);
             ok &= _audio.RegisterSynthesisedSound(kind.Sound, TransientSynth.ToPcm16(pcm), rate);
         }
         _registered = ok;
     }
 
-    /// <summary>A knuckle on a wooden door: two damped modes of a panel, low and short.</summary>
-    private static float[] Knock(int rate)
+    /// <summary>
+    /// What each kind of beacon sounds like: soft sine notes, told apart by their SHAPE as much as their
+    /// pitch, so a glance of an ear says which it is (Cody, 2026-09-29: "unique sine, easy on the ears
+    /// ... unobtrusive but easily picked out when nearby").
+    ///
+    /// Two rules from the ones before. Nothing high and chirpy: a clean high beep repeating by a
+    /// doorway IS a pedestrian crossing's chirp, and was heard as one, so everything here sits between
+    /// middle C and the C two octaves up. And nothing clicks: every note rises over a few milliseconds
+    /// and dies away rather than stopping, with a quiet octave above it for warmth.
+    ///
+    ///   door      two notes rising a fourth, C5 then F5 — a soft ding-dong, upward
+    ///   vehicle   two low warm pulses on one note, C4 — a hum, twice
+    ///   item      one small ring, C6, that dies away — a glass tapped once
+    ///   exit      a rising major chord, C5 E5 G5 — the way out
+    ///   stairs    four quick notes climbing by tones, G4 A4 B4 C#5 — steps
+    ///   waypoint  one slow swell on A4 — somewhere to go
+    /// </summary>
+    internal static float[] Tone(string category, int rate) => category switch
     {
-        int n = rate * 90 / 1000;
-        var buf = new float[n];
-        for (int i = 0; i < n; i++)
+        Beacons.Door => Notes(rate, (523.25f, 0.00f, 0.16f, 1.0f), (698.46f, 0.13f, 0.22f, 0.9f)),
+        Beacons.Vehicle => Notes(rate, (261.63f, 0.00f, 0.16f, 1.0f), (261.63f, 0.22f, 0.16f, 0.85f)),
+        Beacons.Item => Notes(rate, (1046.5f, 0.00f, 0.35f, 0.8f)),
+        Beacons.Exit => Notes(rate, (523.25f, 0.00f, 0.13f, 0.9f), (659.25f, 0.10f, 0.13f, 0.9f), (783.99f, 0.20f, 0.25f, 1.0f)),
+        Beacons.Stairs => Notes(rate, (392.00f, 0.00f, 0.09f, 0.8f), (440.00f, 0.08f, 0.09f, 0.85f),
+                                      (493.88f, 0.16f, 0.09f, 0.9f), (554.37f, 0.24f, 0.14f, 1.0f)),
+        _ => Swell(rate, 440f, 0.45f),
+    };
+
+    /// <summary>Soft sine notes: (Hz, starts at s, rings for s, level). A 6 ms rise, an exponential
+    /// fall over the note, and the octave above at a tenth of the level.</summary>
+    private static float[] Notes(int rate, params (float Hz, float At, float Ring, float Level)[] notes)
+    {
+        float end = 0f;
+        foreach (var n in notes) end = MathF.Max(end, n.At + n.Ring * 1.6f);
+        var buf = new float[(int)(end * rate) + 1];
+        foreach (var n in notes)
         {
-            float t = i / (float)rate;
-            buf[i] = 0.6f * MathF.Sin(MathF.Tau * 420f * t) * MathF.Exp(-t / 0.018f)
-                   + 0.3f * MathF.Sin(MathF.Tau * 1150f * t) * MathF.Exp(-t / 0.008f);
+            int a = (int)(n.At * rate), len = (int)(n.Ring * 1.6f * rate);
+            for (int i = 0; i < len && a + i < buf.Length; i++)
+            {
+                float t = i / (float)rate;
+                float rise = MathF.Min(1f, t / 0.006f);
+                rise = rise * rise * (3f - 2f * rise);                        // smooth, no click
+                float fall = MathF.Exp(-t * 4.6f / n.Ring);                  // -40 dB at 1.0 x Ring
+                float tail = i > len - rate * 0.02f ? (len - i) / (rate * 0.02f) : 1f;
+                float ph = MathF.Tau * n.Hz * t;
+                buf[a + i] += n.Level * rise * fall * tail * (MathF.Sin(ph) + 0.1f * MathF.Sin(2f * ph));
+            }
         }
+        float peak = 1e-6f;
+        foreach (var v in buf) peak = MathF.Max(peak, MathF.Abs(v));
+        for (int i = 0; i < buf.Length; i++) buf[i] *= 0.9f / peak;
         return buf;
     }
 
-    /// <summary>A small bell: two inharmonic partials and a ring that dies away.</summary>
-    private static float[] Bell(int rate)
+    /// <summary>One note that swells in and out, raised-cosine, with a slight slow vibrato.</summary>
+    private static float[] Swell(int rate, float hz, float seconds)
     {
-        int n = rate * 250 / 1000;
-        var buf = new float[n];
-        for (int i = 0; i < n; i++)
+        var buf = new float[(int)(seconds * rate)];
+        double ph = 0;
+        for (int i = 0; i < buf.Length; i++)
         {
             float t = i / (float)rate;
-            float attack = MathF.Min(1f, t / 0.002f);
-            buf[i] = attack * (0.5f * MathF.Sin(MathF.Tau * 1318f * t) * MathF.Exp(-t / 0.09f)
-                            + 0.25f * MathF.Sin(MathF.Tau * 3350f * t) * MathF.Exp(-t / 0.04f));
+            float env = 0.5f - 0.5f * MathF.Cos(MathF.Tau * t / seconds);
+            ph += MathF.Tau * hz * (1f + 0.004f * MathF.Sin(MathF.Tau * 5f * t)) / rate;
+            buf[i] = 0.9f * env * (float)(Math.Sin(ph) + 0.1 * Math.Sin(2 * ph));
         }
         return buf;
-    }
-
-    private static float[] Twice(float[] beep, int rate)
-    {
-        int gap = rate * 50 / 1000;
-        var both = new float[beep.Length * 2 + gap];
-        beep.CopyTo(both, 0);
-        beep.CopyTo(both, beep.Length + gap);
-        return both;
     }
 
     // ── What the player says ────────────────────────────────────────────────────────────────
@@ -286,7 +311,20 @@ public sealed class BeaconAids
                 };
                 parts.Add($"{c} {state}{why}");
             }
-            return "Beacons: " + string.Join(". ", parts) + ". Say slash beacons and a name to switch one.";
+            return "Beacons: " + string.Join(". ", parts) + $". Each sounds every {_prefs.Every:0.#} seconds."
+                 + " Say slash beacons and a name to switch one, or slash beacons every and a number of seconds.";
+        }
+
+        // /beacons every 2.5 — how long between soundings, the player's own.
+        if (args[0].Equals("every", StringComparison.OrdinalIgnoreCase) || args[0].Equals("interval", StringComparison.OrdinalIgnoreCase))
+        {
+            if (args.Length < 2 || !double.TryParse(args[1], System.Globalization.NumberStyles.Float,
+                                                    System.Globalization.CultureInfo.InvariantCulture, out double every))
+                return $"Beacons sound every {_prefs.Every:0.#} seconds. Say slash beacons every and a number of seconds, "
+                     + $"from {MinEvery:0.#} to {MaxEvery:0}.";
+            _prefs.SetEvery(every);
+            _next.Clear();          // start the new rhythm now, not after the old gap
+            return $"Beacons sound every {_prefs.Every:0.#} seconds.";
         }
 
         string cat = args[0].ToLowerInvariant().TrimEnd('s');
@@ -315,10 +353,14 @@ public sealed class BeaconPreferences
     private readonly string? _path;
     private readonly Dictionary<string, bool> _choices;
 
-    private BeaconPreferences(string? path, Dictionary<string, bool> choices)
+    /// <summary>Seconds between one beacon's soundings, the player's choice.</summary>
+    public double Every { get; private set; } = BeaconAids.DefaultEvery;
+
+    private BeaconPreferences(string? path, Dictionary<string, bool> choices, double every = BeaconAids.DefaultEvery)
     {
         _path = path;
         _choices = choices;
+        Every = every;
     }
 
     /// <summary>An in-memory store that is never written — for tests.</summary>
@@ -331,14 +373,27 @@ public sealed class BeaconPreferences
             : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".config", "openfps");
         string path = Path.Combine(dir, "beacons.json");
         var choices = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
+        double every = BeaconAids.DefaultEvery;
         try
         {
+            // One object: a true or false per category, and "every", the seconds between soundings.
+            // A file from before the interval existed is the same object without it.
             if (File.Exists(path))
-                foreach (var (k, v) in JsonSerializer.Deserialize<Dictionary<string, bool>>(File.ReadAllText(path)) ?? new())
-                    choices[k] = v;
+                using (var doc = JsonDocument.Parse(File.ReadAllText(path)))
+                    foreach (var p in doc.RootElement.EnumerateObject())
+                    {
+                        if (p.Name == "every" && p.Value.ValueKind == JsonValueKind.Number) every = p.Value.GetDouble();
+                        else if (p.Value.ValueKind is JsonValueKind.True or JsonValueKind.False) choices[p.Name] = p.Value.GetBoolean();
+                    }
         }
         catch (Exception ex) { Log.Warning("Beacon preferences at {Path} could not be read: {Error}", path, ex.Message); }
-        return new BeaconPreferences(path, choices);
+        return new BeaconPreferences(path, choices, Math.Clamp(every, BeaconAids.MinEvery, BeaconAids.MaxEvery));
+    }
+
+    public void SetEvery(double seconds)
+    {
+        Every = Math.Clamp(seconds, BeaconAids.MinEvery, BeaconAids.MaxEvery);
+        Save();
     }
 
     public bool? Choice(string category) => _choices.TryGetValue(category, out bool on) ? on : null;
@@ -346,11 +401,19 @@ public sealed class BeaconPreferences
     public void Set(string category, bool on)
     {
         _choices[category] = on;
+        Save();
+    }
+
+    private void Save()
+    {
         if (_path == null) return;
         try
         {
             Directory.CreateDirectory(Path.GetDirectoryName(_path)!);
-            File.WriteAllText(_path, JsonSerializer.Serialize(_choices));
+            var all = new Dictionary<string, object>();
+            foreach (var (k, v) in _choices) all[k] = v;
+            all["every"] = Every;
+            File.WriteAllText(_path, JsonSerializer.Serialize(all));
         }
         catch (Exception ex) { Log.Warning("Beacon preferences could not be saved to {Path}: {Error}", _path, ex.Message); }
     }

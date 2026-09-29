@@ -105,7 +105,7 @@ public static class SirenRouteSpike
     private static float Db(float g) => 20f * MathF.Log10(MathF.Max(1e-5f, g));
     private static float Bearing(Vector3 ear, Vector3 p) => MathF.Atan2(p.X - ear.X, p.Z - ear.Z) * 180f / MathF.PI;
 
-    private static (WorldSnapshot, RaceLine?) Load(string mapPath, string prefabDir, string trackId, float lane)
+    internal static (WorldSnapshot, RaceLine?) Load(string mapPath, string prefabDir, string trackId, float lane)
     {
         var prefabs = new Dictionary<string, (Vector3 Size, string Material)>(StringComparer.OrdinalIgnoreCase);
         foreach (var file in Directory.GetFiles(prefabDir, "*.json"))

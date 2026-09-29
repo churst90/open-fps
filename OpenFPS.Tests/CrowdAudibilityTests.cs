@@ -126,9 +126,12 @@ public class CrowdAudibilityTests
         float crowdRendered = Loudness.RenderedGain(crowdPlaced.Gain, crowdPlaced.ReferenceDistance,
                                                     Loudness.AudibleRange(crowdLevel), crowdDist);
 
-        // A motorcycle on the track in front of you, placed the way ClientAudioSystem places one: its
-        // own measured level, and its own size as the reference distance.
-        var bike = VehicleProfile.ByName("sportbike");
+        // A car on the track in front of you, placed the way ClientAudioSystem places one: its own
+        // measured level, and its own size as the reference distance. One of the speedway's own field,
+        // at about the stand's level, because the mix's compression holds relative levels only between
+        // sources of like level: this used to be the sports bike, which passed while it was an open-
+        // piped 118 dB and failed when it got a stock silencer (107) for reasons that were not the crowd's.
+        var bike = VehicleProfile.ByName("v8_bigcam");
         float bikeDist = 60f;
         var bikePlaced = Loudness.Place(bike.SourceLevelDb);
         float bikeRendered = Loudness.RenderedGain(bikePlaced.Gain,

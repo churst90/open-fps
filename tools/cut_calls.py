@@ -2,7 +2,7 @@
 # Cuts single calls out of recordings into ASSETS/SOUNDS/<FOLDER>/ (used for the birds, 2026-09-23).
 # Paths and per-species settings are at the bottom. Needs ffmpeg and sox. To be generalised for footsteps.
 import subprocess, array, math, os, sys
-SRC='/home/cody/external-rescue/Github/open-fps/inbox/birds'
+SRC='/home/cody/external-rescue/Github/open-fps/approved/birds'
 DST='/home/cody/external-rescue/Github/open-fps/OpenFPS.Client/ASSETS/SOUNDS/BIRDS'
 SR=44100; N=220  # 5 ms frames
 def load(path, t0=0, dur=None):

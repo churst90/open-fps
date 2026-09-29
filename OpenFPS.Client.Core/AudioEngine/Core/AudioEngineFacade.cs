@@ -1,3 +1,4 @@
+using System.Linq;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -512,13 +513,24 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
         _provider.Preload(soundId);
     }
 
+    /// <summary>A take in the footstep bank below a material's own folder: a shoe's or a gait's.</summary>
+    internal static bool IsFootstepVariant(string id)
+        => (id.StartsWith("FOOTSTEPS/", StringComparison.OrdinalIgnoreCase) || id.StartsWith("LANDING/", StringComparison.OrdinalIgnoreCase))
+           && id.Count(c => c == '/') > 2;
+
     public void PreloadAll(Action<string, int> progressCallback)
     {
         if (!_isInitialized) return;
         
         // Not the spoken lines: they are decoded when somebody says one (WorldAudioPlayer.SpokenLine).
         // Preloaded, fourteen hundred of them sat decoded in memory for the whole session, some 350 MB.
-        var allIds = _bank.GetAllSoundIds().Where(id => !id.StartsWith("VOICES/", StringComparison.OrdinalIgnoreCase)).ToList();
+        // Nor the footstep bank's per-shoe and per-gait folders (FOOTSTEPS/<material>/<shoe>/<gait>/...):
+        // eleven thousand takes, some 800 MB decoded. The folders the game plays from today, a material's
+        // own walk and landing straight under it, are preloaded; the rest decode on first use.
+        var allIds = _bank.GetAllSoundIds()
+            .Where(id => !id.StartsWith("VOICES/", StringComparison.OrdinalIgnoreCase))
+            .Where(id => !IsFootstepVariant(id))
+            .ToList();
         for (int i = 0; i < allIds.Count; i++)
         {
             var id = allIds[i];

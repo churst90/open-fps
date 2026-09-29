@@ -59,8 +59,12 @@ public static class AcousticVolumeGenerator
         acousticMap.GlobalEnvironmentId = outsideRegionId;
 
         // 3. Process Explicit Regions
-        // We only voxelize the space INSIDE your defined rooms.
-        foreach (var def in entities)
+        // We only voxelize the space INSIDE your defined rooms. Largest first, so where two overlap
+        // the smaller one is written last and holds the overlap: a named spot inside a bigger zone, a
+        // room inside a hall. The same rule SpatialService.GetRegionAt applies to the boxes themselves;
+        // in entity order it was whichever the map happened to list last.
+        foreach (var def in entities.Where(d => d.Region.RoomSize.X > 0)
+                                    .OrderByDescending(d => d.Region.RoomSize.X * d.Region.RoomSize.Y * d.Region.RoomSize.Z))
         {
             if (def.Region.RoomSize.X > 0)
             {

@@ -65,7 +65,14 @@ Progress: the network as data is built (2026-09-27): `OpenFPS.Common/Roads.cs`, 
 junction priority, road stops, level crossings, following by lane. Gap acceptance at junctions is in
 (`VehicleSystem.Junctions.cs`, `CarFollowingTests.No_two_vehicles_meet_inside_a_junction`). Lane rules
 (right turns from the kerb lane, left from the inner one) wait for lane changes along a block: without
-them tours ran into dead ends. Next: pedestrians crossing.
+them tours ran into dead ends. Pedestrians cross (2026-09-28, `VehicleSystem.Crosswalks.cs`,
+`CrosswalkTests`): a crossing is wherever a walker's line passes over a carriageway, found at load;
+walkers wait at the kerb for the HCM pedestrian gap (walk time plus 3 s start-up), drivers stop for
+anybody on a crossing and, arriving at a junction, for somebody who has waited 8 s; after 30 s a
+walker takes a gap only as long as the walk. Two faults this exposed in the junction logic are fixed:
+a vehicle held near the line could be taken as already inside it (the smoothed line drifts from the
+lanes), and "everybody is waiting, one goes" could pull out in front of an arriving car. Next:
+stage 2, bodies.
 
 A road network the server knows: roads, lanes, junctions, crossings and surfaces.
 

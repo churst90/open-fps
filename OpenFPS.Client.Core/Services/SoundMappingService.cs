@@ -54,10 +54,6 @@ public class SoundMappingService
         ["Foliage"] = "Leaves",
         // A crowd is a floor with people standing on it; you are walking on whatever they are.
         ["Audience"] = "Concrete",
-        // A lawn is soft ground with a little swish on top, and of the twelve surfaces recorded the
-        // one a mown lawn is nearest is dirt. Measured: dirt carries a low shelf at 60-250 Hz under a
-        // broad mid, which is a footfall on something that gives.
-        ["Grass"] = "Dirt",
         // Polished stone is a hard tile with less grout in it.
         ["Marble"] = "Tile",
         // Rain on a hard floor: no wet recording exists, so it is the dry one rather than silence.

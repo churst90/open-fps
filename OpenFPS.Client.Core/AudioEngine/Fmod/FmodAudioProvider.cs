@@ -488,6 +488,8 @@ public class FmodAudioProvider : IAudioProvider
         public Vector3 Position; 
         public Vector3 ApparentPosition; 
         public Vector3 CurrentApparentPosition; 
+        /// <summary>When <see cref="CurrentApparentPosition"/> was last moved, for its turn rate.</summary>
+        public double LastTurnAt;
         public float EffectiveDistance;
         public Vector3 Velocity; 
         public Vector3 Direction;
@@ -698,6 +700,12 @@ public class FmodAudioProvider : IAudioProvider
     // Steam Audio (phonon) HRTF state — shared context + HRTF.
     private IntPtr _saContext;
     private IntPtr _saHrtf;
+    /// <summary>The HRTF the traced reverb decodes through, made for ITS block (TracedReverb.TracedFrame).
+    /// It used to decode through <see cref="_saHrtf"/>, made for the mixer's 1024: an HRTF built for
+    /// one frame size and run at another came out 2 dB hot in the lab and not the head it was meant
+    /// to be (2026-09-29, --traced-reverb with SA_HRTF_FRAME).</summary>
+    private IntPtr _saHrtfTraced;
+    private int _saHrtfTracedFrame;
     private int _saFrameSize = 1024;
     private bool _steamAudioEnabled;
 
@@ -1536,6 +1544,20 @@ public class FmodAudioProvider : IAudioProvider
         ReturnReverbVoices(); // detach HRTF voices while the buses still exist, return them to the pool
         ReleaseReverbUnits();
         _reverbDsps.Clear(); _reverbBuses.Clear(); _reverbVolumes.Clear(); _dryReverbBuses.Clear();
+        // The buses are gone, so nothing is reading these any more: release what each stage made.
+        foreach (var (st, dsp, handle) in _traced.Values)
+        {
+            st.Trace = null;
+            if (st.Effect != IntPtr.Zero) Phonon.iplReflectionEffectRelease(ref st.Effect);
+            if (st.TailEffect != IntPtr.Zero) Phonon.iplReflectionEffectRelease(ref st.TailEffect);
+            if (st.Decode != IntPtr.Zero) Phonon.iplAmbisonicsDecodeEffectRelease(ref st.Decode);
+            st.Diffuse?.Release(); st.Diffuse = null;
+            if (st.Mono.data != IntPtr.Zero) Phonon.iplAudioBufferFree(st.WorkerContext, ref st.Mono);
+            if (st.Ambi.data != IntPtr.Zero) Phonon.iplAudioBufferFree(st.WorkerContext, ref st.Ambi);
+            if (st.Stereo.data != IntPtr.Zero) Phonon.iplAudioBufferFree(st.ProviderContext, ref st.Stereo);
+            if (dsp.hasHandle()) dsp.release();
+            if (handle.IsAllocated) handle.Free();
+        }
         _traced.Clear(); _tracedModeApplied = null; _tracedRunning.Clear();
     }
 
@@ -1700,6 +1722,26 @@ public class FmodAudioProvider : IAudioProvider
     /// decorrelated, a trim, set by ear.
     /// </summary>
     public static volatile float TracedEchoTrimDb = -24f;   // Cody, by ear, 2026-09-26
+
+    /// <summary>
+    /// The room you are in against the sounds in it, dB: one trim on both halves of a room's answer
+    /// — its placed early reflections (WorldAudioPlayer.QueueRoomEchoes, the steps' SubmitRoomStepEchoes)
+    /// and its late tail (the listener's TailOnly traced stage). Rooms only: outdoors, and under a
+    /// shelter that is not an enclosure, nothing here applies. `/room -6` sets it; OPENFPS_ROOM_DB
+    /// starts it. -24 is Cody's, by ear, 2026-09-29, and it is the same figure he set for the traced
+    /// echoes outdoors three days earlier (TracedEchoTrimDb): "-24 dB is where it's at, just like
+    /// outdoors... now everything sounds great and accurate". The copy-to-direct arithmetic was
+    /// checked to within 1.6 dB of physics and the flat's traced tail to within 3 dB of the room
+    /// equation, so this is not a level error in either path. What the two paths share, and the
+    /// accepted outdoor tail does not, is that their copies are COHERENT: a clean copy of the source
+    /// a few tens of milliseconds late, from a point. Real walls scatter, and a scattered copy at the
+    /// same energy is a wash, not a second event. See changes.md 2026-09-29; the next move is
+    /// diffusion by the wall's scattering, after which this should be able to come back up.
+    /// </summary>
+    public static volatile float RoomTrimDb =
+        float.TryParse(Environment.GetEnvironmentVariable("OPENFPS_ROOM_DB"), System.Globalization.NumberStyles.Float,
+                       System.Globalization.CultureInfo.InvariantCulture, out float roomDb) ? Math.Clamp(roomDb, -40f, 6f) : -24f;
+    public static float RoomTrim => MathF.Pow(10f, RoomTrimDb / 20f);
     /// <summary>Once chosen, a source keeps its trace at least this long: no flicker as it passes
     /// behind something.</summary>
     private const float EchoMinHoldSeconds = 3f;
@@ -1953,6 +1995,11 @@ public class FmodAudioProvider : IAudioProvider
                 && _reverbVolumes.TryGetValue(kv.Key, out float vol) && vol > 0.001f)
                 trace = TracedReverbSet.ForRoom(kv.Key, centre) ?? listenerTrace;
             kv.Value.State.Trace = trace;
+            // The room you are standing in: its early part is placed reflections, so the stage plays
+            // the tail alone. See WorldAudioPlayer.QueueRoomEchoes. A cabin keeps its whole response.
+            kv.Value.State.TailOnly = kv.Key == _listenerRegionId && IsEnclosure(kv.Key) && !ReferenceEquals(trace, cabin);
+            // The room's tail at the room's trim (RoomTrimDb); every other stage as traced.
+            kv.Value.State.Gain = kv.Value.State.TailOnly ? RoomTrim : 1f;
         }
 
         bool want = TracedOutdoors;
@@ -1995,28 +2042,48 @@ public class FmodAudioProvider : IAudioProvider
 
     private void AddTracedStage(int regionId, FMOD.ChannelGroup bus, FMOD.DSP sfx, TracedReverb tr)
     {
-        var au = new Phonon.IPLAudioSettings { samplingRate = 44100, frameSize = _saFrameSize };
+        // In pieces of TracedReverb.TracedFrame: the convolution answers a block late, and the block
+        // it answers late by is ITS block, not the mixer's.
+        int sub = tr.FrameSize;
+        if (_saFrameSize % sub != 0) { Log.Warning("Traced reverb: mixer block {Block} is not a multiple of {Sub}.", _saFrameSize, sub); return; }
+        var au = new Phonon.IPLAudioSettings { samplingRate = 44100, frameSize = sub };
         var es = new Phonon.IPLReflectionEffectSettings
         {
             type = Phonon.IPL_REFLECTIONEFFECTTYPE_CONVOLUTION, irSize = tr.IrSize, numChannels = TracedReverb.Channels,
         };
         if (Phonon.iplReflectionEffectCreate(tr.Context, ref au, ref es, out IntPtr effect) != Phonon.IPL_STATUS_SUCCESS)
         { Log.Warning("Traced reverb: Steam Audio would not make a reflection effect for region {Id}.", regionId); return; }
-        var ds = new Phonon.IPLAmbisonicsDecodeEffectSettings { speakerLayout = Phonon.StereoLayout(), hrtf = _saHrtf, maxOrder = TracedReverb.Order };
+        var tes = es; tes.type = Phonon.IPL_REFLECTIONEFFECTTYPE_PARAMETRIC;
+        if (Phonon.iplReflectionEffectCreate(tr.Context, ref au, ref tes, out IntPtr tailEffect) != Phonon.IPL_STATUS_SUCCESS)
+            tailEffect = IntPtr.Zero;
+        if (_saHrtfTraced == IntPtr.Zero || _saHrtfTracedFrame != sub)
+        {
+            if (_saHrtfTraced != IntPtr.Zero) Phonon.iplHRTFRelease(ref _saHrtfTraced);
+            var hs = new Phonon.IPLHRTFSettings { type = Phonon.IPL_HRTFTYPE_DEFAULT, volume = 1f, normType = Phonon.IPL_HRTFNORMTYPE_NONE };
+            if (Phonon.iplHRTFCreate(_saContext, ref au, ref hs, out _saHrtfTraced) != Phonon.IPL_STATUS_SUCCESS)
+            { _saHrtfTraced = IntPtr.Zero; Phonon.iplReflectionEffectRelease(ref effect); return; }
+            _saHrtfTracedFrame = sub;
+        }
+        var ds = new Phonon.IPLAmbisonicsDecodeEffectSettings { speakerLayout = Phonon.StereoLayout(), hrtf = _saHrtfTraced, maxOrder = TracedReverb.Order };
         if (Phonon.iplAmbisonicsDecodeEffectCreate(_saContext, ref au, ref ds, out IntPtr decode) != Phonon.IPL_STATUS_SUCCESS)
         { Phonon.iplReflectionEffectRelease(ref effect); return; }
         var st = new TracedReverbState
         {
-            FrameSize = _saFrameSize, WorkerContext = tr.Context, ProviderContext = _saContext,
-            Effect = effect, Decode = decode, Hrtf = _saHrtf, Trace = tr,
-            MonoScratch = new float[_saFrameSize], StereoScratch = new float[_saFrameSize * 2],
+            FrameSize = _saFrameSize, SubFrame = sub, WorkerContext = tr.Context, ProviderContext = _saContext,
+            Effect = effect, TailEffect = tailEffect, Decode = decode, Hrtf = _saHrtfTraced, Trace = tr,
+            MonoScratch = new float[sub], StereoScratch = new float[sub * 2],
+            AmbiScratch = new float[sub * TracedReverb.Channels],
             Orientation = Phonon.ListenerFrame(_listenerRot),
             // Its own reader in every trace it will play: see TracedReverb.MaxReaders.
             Reader = Math.Min(_traced.Count, TracedReverb.MaxReaders - 1),
+            // The room you are in: its late tail as a field round the head, not one channel.
+            Diffuse = DiffuseTail.Enabled
+                ? DiffuseTail.Create(_saContext, sub, TracedReverb.Order, TracedReverb.Channels, decode, Phonon.ListenerFrame(_listenerRot), _saHrtfTraced)
+                : null,
         };
-        Phonon.iplAudioBufferAllocate(tr.Context, 1, _saFrameSize, ref st.Mono);
-        Phonon.iplAudioBufferAllocate(tr.Context, TracedReverb.Channels, _saFrameSize, ref st.Ambi);
-        Phonon.iplAudioBufferAllocate(_saContext, 2, _saFrameSize, ref st.Stereo);
+        Phonon.iplAudioBufferAllocate(tr.Context, 1, sub, ref st.Mono);
+        Phonon.iplAudioBufferAllocate(tr.Context, TracedReverb.Channels, sub, ref st.Ambi);
+        Phonon.iplAudioBufferAllocate(_saContext, 2, sub, ref st.Stereo);
         if (TracedReverbDsp.Create(_system, st, out var dsp, out var handle) != RESULT.OK) return;
         // Just downstream of the SFXREVERB: FMOD's index 0 is the output end, so inserting AT the
         // reverb's index pushes the reverb one further from the output and puts this after it.
@@ -2251,7 +2318,12 @@ public class FmodAudioProvider : IAudioProvider
             else
             {
                 worldDir = _listenerReturnDir;
-                targetBlend = _listenerAnisotropy;
+                // Traced, the room's field is already round the head — its early part as placed
+                // reflections and its tail as a diffuse field (DiffuseTail) — and a mono copy of the
+                // whole bus placed at the survey's return centroid on top of that is a second,
+                // one-point room: heard as the reverb "consolidating" in one direction (2026-09-29).
+                // Only the room algorithm, whose stereo says nothing about direction, is steered.
+                targetBlend = TracedOutdoors ? 0f : _listenerAnisotropy;
             }
             float len = worldDir.Length();
             if (len > 1e-4f)
@@ -2374,6 +2446,35 @@ public class FmodAudioProvider : IAudioProvider
         return true;
 
         static float ToDb(float peak) => peak <= 1e-6f ? -120f : 20f * MathF.Log10(peak);
+    }
+
+    /// <summary>Lab only: every send plugged into a region's unit — who feeds it, and at what mix.</summary>
+    internal string ListSends(int regionId)
+    {
+        if (!_reverbDsps.TryGetValue(regionId, out var dsp) || !dsp.hasHandle()) return "no unit";
+        dsp.getNumInputs(out int inputs);
+        var parts = new List<string>();
+        for (int i = 0; i < inputs; i++)
+        {
+            if (dsp.getInput(i, out var from, out var conn) != RESULT.OK || !conn.hasHandle()) continue;
+            conn.getMix(out float m);
+            string who = "?";
+            foreach (var a in _activeSounds)
+            {
+                if (!a.Channel.hasHandle()) continue;
+                if (a.Channel.getDSP(CHANNELCONTROL_DSP_INDEX.FADER, out var f) == RESULT.OK && f.handle == from.handle)
+                { who = $"{a.SoundId}#{a.EntityId}{(conn.handle == a.SourceReverbConnection.handle ? " own" : conn.handle == a.ReverbConnection.handle ? " cross" : conn.handle == a.FadingReverbConnection.handle || conn.handle == a.FadingSourceConnection.handle ? " fading" : " UNTRACKED")}"; break; }
+            }
+            parts.Add($"{who} {m:F2}");
+        }
+        return string.Join(", ", parts);
+    }
+
+    /// <summary>Lab only: the traced stage's last block in and out (rms) and the bus head's blend.</summary>
+    internal (double In, double Out, double PerChannel, int Channels, float Blend) TracedMeter(int regionId)
+    {
+        float blend = _reverbSaVoices.TryGetValue(regionId, out var v) ? v.State.SpatialBlend : -1f;
+        return _traced.TryGetValue(regionId, out var t) ? (t.State.InEnergy, t.State.OutEnergy, t.State.ChannelEnergy, t.State.Channels, blend) : (0, 0, 0, 0, blend);
     }
 
     public string DescribeReverbChain(int regionId)
@@ -3669,6 +3770,43 @@ public class FmodAudioProvider : IAudioProvider
     /// Carrying the source forward on its own velocity makes the vector vary continuously at the
     /// rate this loop actually runs at, which is what the loop was for.
     /// </summary>
+    /// <summary>Degrees a second the direction of a sound heard round an obstacle may turn.</summary>
+    private const float BlockedTurnDegPerSecond = 120f;
+    /// <summary>...and of one in the clear, which only has to keep up with a car passing close.</summary>
+    private const float ClearTurnDegPerSecond = 1500f;
+
+    /// <summary>
+    /// Moves where a voice is heard from toward where it should be, as a DIRECTION and a DISTANCE, not
+    /// in a straight line. A sound heard round a building can have its route switch from one side of it
+    /// to the other between two updates; eased in a straight line, the point it is heard from swept
+    /// through the listener's head, so it swapped ears and its level lumped by 5-10 dB two to five
+    /// times a second (the siren and horn "flutter", traced 2026-09-28). Turning at a limited rate, a
+    /// switch is a short turn, and one that switches back before it gets there hardly moves at all.
+    /// </summary>
+    private static Vector3 TurnToward(ActiveSound active, Vector3 listener, Vector3 target, double now)
+    {
+        float dt = active.LastTurnAt > 0 ? (float)Math.Clamp(now - active.LastTurnAt, 0.0, 0.1) : 0.1f;
+        active.LastTurnAt = now;
+        Vector3 cur = active.CurrentApparentPosition - listener, tgt = target - listener;
+        float dc = cur.Length(), dtg = tgt.Length();
+        if (dc < 0.05f || dtg < 0.05f) return Vector3.Lerp(active.CurrentApparentPosition, target, 0.15f);
+        Vector3 uc = cur / dc, ut = tgt / dtg;
+        float angle = MathF.Acos(Math.Clamp(Vector3.Dot(uc, ut), -1f, 1f));
+        bool blocked = active.ApparentPosition != Vector3.Zero && active.ApparentPosition != active.Position;
+        float maxTurn = (blocked ? BlockedTurnDegPerSecond : ClearTurnDegPerSecond) * (MathF.PI / 180f) * dt;
+        Vector3 dir = ut;
+        if (angle > maxTurn && angle > 1e-4f)
+        {
+            // Great-circle step of maxTurn from uc toward ut; straight opposite, round the listener's side.
+            Vector3 axis = Vector3.Cross(uc, ut);
+            if (axis.LengthSquared() < 1e-8f) axis = MathF.Abs(uc.Y) < 0.9f ? Vector3.Cross(uc, Vector3.UnitY) : Vector3.Cross(uc, Vector3.UnitX);
+            dir = Vector3.Transform(uc, Quaternion.CreateFromAxisAngle(Vector3.Normalize(axis), maxTurn));
+        }
+        // Distance eased as before (about 30 ms at the update rate); it no longer sets the level.
+        float d = dc + (dtg - dc) * MathF.Min(1f, dt / 0.03f);
+        return listener + Vector3.Normalize(dir) * d;
+    }
+
     private Vector3 DeadReckon(ActiveSound active, Vector3 position, double nowSec)
     {
         if (active.LastAttributeAt <= 0 || active.Velocity == Vector3.Zero) return position;
@@ -3723,7 +3861,7 @@ public class FmodAudioProvider : IAudioProvider
             active.Position = targetPos; active.ApparentPosition = targetPos;
             active.CurrentApparentPosition = targetPos;
         }
-        else active.CurrentApparentPosition = Vector3.Lerp(active.CurrentApparentPosition, targetPos, 0.15f);
+        else active.CurrentApparentPosition = TurnToward(active, lPosVec, targetPos, now);
 
         if (active.EntityId == _traceEntity)
         {
@@ -3866,8 +4004,11 @@ public class FmodAudioProvider : IAudioProvider
         {
             // One law, in Loudness, so a test can ask what this will do to two sources without a sound
             // card — which is the only way the balance between a crowd and a car can be checked at all.
+            // From where the source IS, not where it is heard from: round a building the heard point
+            // is only a direction, and its distance changes with the route (the obstruction's own loss
+            // is the occlusion's business).
             distAtten = Loudness.RenderedGain(1.0f, active.MinDistance, active.Range,
-                                              Vector3.Distance(lPosVec, active.CurrentApparentPosition));
+                                              Vector3.Distance(lPosVec, active.Position));
         }
 
         // Directional cone: Steam Audio channels are 2D, so FMOD's set3DConeSettings no longer fires.
@@ -3878,7 +4019,8 @@ public class FmodAudioProvider : IAudioProvider
         float coneOffAxis = 0.0f; // 0 = on-axis, 1 = fully outside the cone (drives the off-axis timbre)
         if (active.SaState != null && active.ConeInside < 360f && active.Direction != Vector3.Zero)
         {
-            Vector3 toListener = lPosVec - active.CurrentApparentPosition;
+            // Where the horn points is a fact about the horn, not about the route the sound took.
+            Vector3 toListener = lPosVec - active.Position;
             if (toListener.LengthSquared() > 1e-6f)
             {
                 float cos = Vector3.Dot(Vector3.Normalize(active.Direction), Vector3.Normalize(toListener));
@@ -3986,7 +4128,7 @@ public class FmodAudioProvider : IAudioProvider
         // distance; the square root of that ratio, applied here, makes the bus receive exactly the
         // reverberant field this source should raise. The unit's own gain is held at unity by the
         // metering loop in ApplySimulatedReverb, so nothing else scales it.
-        float sourceDist = Vector3.Distance(lPosVec, active.CurrentApparentPosition);
+        float sourceDist = Vector3.Distance(lPosVec, active.Position);
         float ratio = Enclosure.ReverberantToDirectPower(_listenerEnclosure, _listenerMfp,
                                                         _listenerSurface, sourceDist);
         float baseReverbMix = MathF.Min(MaxReverbSend, MathF.Sqrt(ratio));
@@ -4035,9 +4177,34 @@ public class FmodAudioProvider : IAudioProvider
         float ownMix = baseReverbMix, crossMix = baseReverbMix * AcousticConstants.ReverbCrossSendScale;
         if (TracedActive)
         {
-            if (_traced.ContainsKey(active.TargetRegionId)) ownMix = active.IsReflection ? 0f : 1f;
+            // The listener's trace is a room answering a source AT the listener, normalised to one a
+            // metre off; the send carries the sound as it arrives. What a room hands back against the
+            // direct sound depends on the distance alone — the direct falls as 1/d², a diffuse field
+            // does not fall — so in a closed room the send is the arrival times d. In the open only
+            // the geometry round you answers, lit by what reaches it, and nearer than a metre the
+            // source is still where the trace put it. The measured enclosure blends the two.
+            //
+            // Without this every sound in a room was sent as if it stood a metre off whatever its
+            // distance: a clap half a metre from the ear came back 8 dB too loud against itself,
+            // and "a bathroom stall rather than a carpeted room" (2026-09-29, --clap-room).
+            float d = MathF.Max(0.1f, sourceDist);
+            float atDistance = MathF.Min(d, 1f) * MathF.Pow(MathF.Max(d, 1f), Math.Clamp(_listenerEnclosure, 0f, 1f));
+            //
+            // Only for a source IN the listener's room. A sound from outside reaches the room through
+            // its walls and doors, and what it excites there is what arrives, which is what the send
+            // carries. Scaled by its distance as well, a lorry fifty metres down the street was
+            // sent into the flat nineteen decibels hot and the mix ran at -8 LUFS, clipping.
+            bool here = active.TargetRegionId == _listenerRegionId;
+            if (_traced.ContainsKey(active.TargetRegionId)) ownMix = active.IsReflection ? 0f : (here ? atDistance : 1f);
             if (_traced.ContainsKey(_listenerRegionId)) crossMix = active.IsReflection ? 0f : 1f;
         }
+        // The cross-send is for a sound in ANOTHER room. In the listener's own room both sends go into
+        // the same unit, and the room heard the sound twice: in traced mode both at unity, so a clap
+        // went through the flat's response twice over, coherently, six decibels too wet ("a bathroom
+        // stall rather than a carpeted room", 2026-09-29).
+        if (active.SourceReverbConnection.hasHandle() && active.ReverbConnection.hasHandle()
+            && active.SourceReverbBus.handle == active.ReverbBus.handle)
+            crossMix = 0f;
         // A source traced from where it is carries its whole reverberation in its own IR.
         if (active.EchoRig != null) { ownMix *= 1f - active.EchoWeight; crossMix *= 1f - active.EchoWeight; }
         if (active.SourceReverbConnection.hasHandle())
@@ -4887,6 +5054,7 @@ public class FmodAudioProvider : IAudioProvider
             _saAllVoices.Clear();
             _saPool.Clear();
             Phonon.iplHRTFRelease(ref _saHrtf);
+            if (_saHrtfTraced != IntPtr.Zero) Phonon.iplHRTFRelease(ref _saHrtfTraced);
             Phonon.iplContextRelease(ref _saContext);
             _steamAudioEnabled = false;
         }

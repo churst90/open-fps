@@ -150,14 +150,21 @@ public sealed class ClientGameSession : IDisposable
         _chat = new ChatManager(_speech);
         Ui = new UiSounds(audioEngine);
         _menus = new MenuStack(_speech, Ui);
-        // Each kind of chat has its own sound, heard before the words.
-        _chat.Incoming += msg => Ui.Play(msg.FromStaff && msg.Channel != ChatChannel.Private ? UiCue.ChatAdmin : msg.Channel switch
+        // Each kind of chat has its own sound, heard before the words. The channel decides it, whoever
+        // is talking: an admin's map chat is still map chat (with the admin cue in its place, an admin
+        // heard the same sound on every channel). The admin cue is for server announcements by staff.
+        // A reply to a command (no sender) is only spoken; a chat sound on "/tp" said a message came.
+        _chat.Incoming += msg =>
         {
-            ChatChannel.Private => UiCue.ChatPrivate,
-            ChatChannel.All => UiCue.ChatAll,
-            ChatChannel.Server => msg.Sender.Length == 0 ? UiCue.MenuMove : UiCue.ChatServer,
-            _ => UiCue.ChatMap,
-        });
+            if (msg.Channel == ChatChannel.Server && msg.Sender.Length == 0) return;
+            Ui.Play(msg.Channel switch
+            {
+                ChatChannel.Private => UiCue.ChatPrivate,
+                ChatChannel.All => UiCue.ChatAll,
+                ChatChannel.Server => msg.FromStaff ? UiCue.ChatAdmin : UiCue.ChatServer,
+                _ => UiCue.ChatMap,
+            });
+        };
 
         _sounds.Initialize();
         // Your own feet ride with your head (see ClientAudioSystem.OnOwnFootstep); everybody
@@ -220,7 +227,6 @@ public sealed class ClientGameSession : IDisposable
                 _audioEngine.Initialize();
                 Serilog.Log.Information("Audio engine initialized (background): {Init}.", _audioEngine.IsInitialized);
                 _audioEngine.PreloadAll((msg, pct) => _shell.UpdateLoadingStatus(msg, pct));
-                _speech.Speak("Sound library ready.", interrupt: false);
             }
             catch (Exception ex)
             {
@@ -252,6 +258,9 @@ public sealed class ClientGameSession : IDisposable
 
         // Interaction.
         _bindings.Bind(InputContext.Gameplay, GameKey.E, Interact);
+        // Shift+E: knock on the nearest door instead of opening it.
+        _bindings.Bind(InputContext.Gameplay, GameKey.E, KeyModifiers.Shift,
+            () => _network.Send(new TextCommand { Command = "knock" }));
         _bindings.Bind(InputContext.Gameplay, GameKey.Enter, Interact);
 
         // P is "what am I looking at", answered HERE rather than by the server. It used to send
@@ -271,7 +280,10 @@ public sealed class ClientGameSession : IDisposable
         // T starts the engine; Shift+T switches it off. Two keys, not one toggle: a toggle pressed by
         // somebody who cannot tell whether the engine is already running switches it OFF half the
         // time — which is exactly what happened on the first drive with a key.
-        _bindings.Bind(InputContext.Gameplay, GameKey.T, () => _network.Send(new TextCommand { Command = "ignition", Args = new[] { "on" } }));
+        // T: the key in a vehicle; on foot, clap your hands.
+        _bindings.Bind(InputContext.Gameplay, GameKey.T, () => _network.Send(_state.IsRiding
+            ? new TextCommand { Command = "ignition", Args = new[] { "on" } }
+            : new TextCommand { Command = "clap" }));
         // K: lane assist on or off, while driving. (On foot K looks down; that is read as a held key,
         // not through this binding, so the two never meet.)
         _bindings.Bind(InputContext.Gameplay, GameKey.K, () =>
@@ -780,7 +792,6 @@ public sealed class ClientGameSession : IDisposable
             case LoginResponse login:
                 if (login.Success)
                 {
-                    _speech.Speak($"Logged in as {login.Username}. Loading world.", interrupt: true);
                     _shell.ShowLoading("Authenticated. Preparing manifest...");
                     LoginSucceeded?.Invoke(login.Username);
                 }
@@ -795,6 +806,9 @@ public sealed class ClientGameSession : IDisposable
             case MapManifest manifest:
                 Serilog.Log.Information("MapManifest: {Map}, expecting {Count} entities, spawn {Spawn}.",
                     manifest.MapName, manifest.ExpectedEntityCount, manifest.SpawnPoint.Position);
+                _mapName = manifest.MapName;
+                _arrived = false;                  // the next spawn is an arrival, said out loud
+                _lastAnnouncedRegion = null;
                 // A second manifest is a journey to another map (/join, or a map chosen from F6). Everything
                 // the last map was making a sound for goes before the new one arrives, and the body goes
                 // too: until the server spawns us again there is nobody here to move.
@@ -891,11 +905,17 @@ public sealed class ClientGameSession : IDisposable
                 _controller.Teleported(); // ...and the stride accumulator, or the spawn walks for you
 
                 Serilog.Log.Information("PlayerSpawned: entity {Id} at {Pos}.", spawn.EntityId, spawn.SpawnTransform.Position);
+                // A spawn after arriving is a teleport (/tp): the server says where to, and the zone is
+                // announced as you land in it. Only arriving on a map is an entry into the world.
+                if (_arrived) break;
+                _arrived = true;
                 _shell.UpdateLoadingStatus("Entering World...", 100);
                 _shell.EnterGame();
                 GameJoined?.Invoke();
                 Ui.Play(UiCue.EnterWorld);
-                _speech.Speak("You have entered the world. Use W A S D to move, J and L to turn.", interrupt: true);
+                // What a player needs on arriving, and nothing else: that they are in, and where. The
+                // zone follows as soon as the body is placed in it (AnnounceZoneChanges).
+                _speech.Speak($"Logged in. You are in {_mapName}.", interrupt: true);
                 break;
 
             case ServerStateUpdate update:
@@ -968,14 +988,12 @@ public sealed class ClientGameSession : IDisposable
         }
         var snapshot = _world.GetSnapshot();
 
-        _speech.Speak($"Generating acoustics for {snapshot.Entities.Count} entities.", interrupt: false);
         try
         {
             var map = OpenFPS.Common.Systems.AcousticVolumeGenerator.GenerateRegions(
                 snapshot.Entities.Values.Select(e => e.Definition),
                 _world.CurrentMapSize, _mapMin, _voxelResolution, _occlusionFloor);
             _world.SetAcousticMap(map);
-            _speech.Speak("Acoustics ready.", interrupt: false);
         }
         catch (Exception ex)
         {
@@ -1085,16 +1103,15 @@ public sealed class ClientGameSession : IDisposable
         string name = _state.CurrentRegion;
         if (string.IsNullOrWhiteSpace(name) || name == _lastAnnouncedRegion) return;
 
-        // The first region after arriving on a map is where you spawned, not somewhere you walked
-        // into; the loading announcement has already said where you are.
-        bool first = _lastAnnouncedRegion == null;
+        // The first region after arriving is where you are: said after "Logged in. You are in <map>".
         _lastAnnouncedRegion = name;
-        if (first) return;
-
         _speech.Speak(name, interrupt: false);
     }
 
     private int _lastAnnouncedRegionId = int.MinValue;
+    private string _mapName = "";
+    /// <summary>Spawned on this map already: a further spawn is a teleport, not an arrival.</summary>
+    private bool _arrived;
     private string? _lastAnnouncedRegion;
 
     /// <summary>
@@ -1221,6 +1238,16 @@ public sealed class ClientGameSession : IDisposable
                 }
                 else if (a != null) { Say("Echoes: say /echoes on, /echoes off, or a level such as /echoes -12."); return; }
                 Say(OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.TracedEchoesStatus());
+                return;
+            }
+            // The room you are in against the sounds in it: /room -6. Rooms only.
+            if (parts[0].Equals("room", StringComparison.OrdinalIgnoreCase))
+            {
+                var a = parts.Skip(1).FirstOrDefault();
+                if (a != null && float.TryParse(a, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float db))
+                    OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.RoomTrimDb = Math.Clamp(db, -40f, 6f);
+                else if (a != null) { Say("Room: say a level in decibels, such as /room -6. Zero is the traced level."); return; }
+                Say($"Room: {OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.RoomTrimDb:F0} dB against the traced level, on the placed reflections and the tail of the room you are in. Outdoors is unchanged.");
                 return;
             }
             if (parts[0].Equals("valveflow", StringComparison.OrdinalIgnoreCase))

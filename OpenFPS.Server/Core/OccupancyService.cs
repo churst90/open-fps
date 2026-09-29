@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Numerics;
 using Arch.Core;
 using Arch.Core.Extensions;
@@ -76,17 +77,21 @@ public class OccupancyService
         var steel = AcousticRegistry.GetProperties("Metal");
         const float width = 1.0f, height = 1.1f, skin = 0.0008f;
 
-        var sounds = new List<TransientSound>();
-        foreach (var s in DoorAcoustics.Opening(steel, latch, hinge, width, height, skin, CarDoorKg, 0.8f, 0f, hasSeal: true))
-            sounds.Add(s.ToTransient());
+        // The waveform is the car door model's (CarDoor, fitted to a recording); the LEVEL is still the
+        // physics of this door: the loudest part of what DoorAcoustics works out for a 22 kg leaf
+        // opened, and shut at the edge speed of a firm push.
+        float openDb = DoorAcoustics.Opening(steel, latch, hinge, width, height, skin, CarDoorKg, 0.8f, 0f, hasSeal: true)
+                                    .Max(s => s.LevelDb);
         float closeSpeed = DoorAcoustics.EdgeSpeed(width, 1.1f, 0.5f);
-        foreach (var s in DoorAcoustics.Closing(steel, latch, centre, width, height, skin, CarDoorKg, closeSpeed, hasSeal: true))
+        float closeDb = DoorAcoustics.Closing(steel, latch, centre, width, height, skin, CarDoorKg, closeSpeed, hasSeal: true)
+                                     .Max(s => s.LevelDb);
+        return new List<TransientSound>
         {
-            var t = s.ToTransient();
-            t.DelaySeconds += closeAfter;
-            sounds.Add(t);
-        }
-        return sounds;
+            new() { Character = SoundCharacter.Knock, Position = latch, LevelDb = openDb, Hz = 500f,
+                    DecaySeconds = 0.95f, Noisiness = 1f, SynthKey = OpenFPS.Common.CarDoor.Key(closing: false) },
+            new() { Character = SoundCharacter.Knock, Position = latch, LevelDb = closeDb, Hz = 500f,
+                    DecaySeconds = 1.15f, Noisiness = 1f, SynthKey = OpenFPS.Common.CarDoor.Key(closing: true), DelaySeconds = closeAfter },
+        };
     }
 
     /// <summary>Where a seat is in the world right now, given where its composite is.</summary>

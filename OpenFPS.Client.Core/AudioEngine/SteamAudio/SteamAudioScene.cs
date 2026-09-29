@@ -159,7 +159,7 @@ public sealed class SteamAudioScene : IDisposable
         foreach (var b in boxes)
         {
             if (b.Size.X <= 0 || b.Size.Y <= 0 || b.Size.Z <= 0) continue;
-            int mi = MaterialIndex(b.Material, materials, matIndexByName);
+            int mi = MaterialIndex(b.Material, MathF.Min(b.Size.X, MathF.Min(b.Size.Y, b.Size.Z)), materials, matIndexByName);
             AppendBox(b, verts, tris, triMat, mi);
         }
         if (tris.Count == 0) { Phonon.iplSceneCommit(_scene); return; }
@@ -199,18 +199,30 @@ public sealed class SteamAudioScene : IDisposable
         Phonon.iplSceneCommit(_scene);
     }
 
-    private static int MaterialIndex(string name, List<Phonon.IPLMaterial> materials, Dictionary<string, int> byName)
+    /// <summary>
+    /// A material per (name, thickness to the centimetre): what a wall lets through depends on how
+    /// heavy it is, not only on what it is made of (AcousticRegistry.MassLawTransmission).
+    ///
+    /// Per FACE, and that is the square root. A box is crossed through two faces and Steam Audio
+    /// multiplies the transmission of every surface it counts (SteamAudioSimulator counts several, so
+    /// that two walls in a row are both paid for), so each face carries half the box's loss.
+    /// </summary>
+    private static int MaterialIndex(string name, float thickness, List<Phonon.IPLMaterial> materials, Dictionary<string, int> byName)
     {
-        if (byName.TryGetValue(name ?? "Generic", out int idx)) return idx;
-        var p = AcousticRegistry.GetProperties(string.IsNullOrEmpty(name) ? "Generic" : name);
+        name = string.IsNullOrEmpty(name) ? "Generic" : name;
+        float cm = MathF.Round(thickness * 100f);
+        string key = name + "@" + cm.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        if (byName.TryGetValue(key, out int idx)) return idx;
+        var p = AcousticRegistry.GetProperties(name);
+        var (tl, tm, th) = AcousticRegistry.MassLawTransmission(name, cm / 100f);
         materials.Add(new Phonon.IPLMaterial
         {
             absLow = p.AbsorptionLow, absMid = p.AbsorptionMid, absHigh = p.AbsorptionHigh,
             scattering = p.Scattering,
-            transLow = p.TransmissionLow, transMid = p.TransmissionMid, transHigh = p.TransmissionHigh,
+            transLow = MathF.Sqrt(tl), transMid = MathF.Sqrt(tm), transHigh = MathF.Sqrt(th),
         });
         idx = materials.Count - 1;
-        byName[name ?? "Generic"] = idx;
+        byName[key] = idx;
         return idx;
     }
 
@@ -238,7 +250,7 @@ public sealed class SteamAudioScene : IDisposable
         {
             Vector3 local = _corner[c] * half;
             Vector3 world = b.Center + Vector3.Transform(local, b.Rotation);
-            verts.Add(new PV { x = world.X, y = world.Y, z = world.Z });
+            verts.Add(Phonon.World(world));   // Steam Audio's z runs the other way: see Phonon.World
         }
         for (int f = 0; f < _faceIdx.Length; f += 3)
         {

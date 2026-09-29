@@ -21,6 +21,13 @@ public sealed record Gearbox
     public float UpshiftRpm { get; init; } = 6100f;
     /// <summary>...and drops to when coasting down.</summary>
     public float DownshiftRpm { get; init; } = 1500f;
+    /// <summary>RPM the driver changes up at on a light throttle. Unset, it is 85 % of the torque
+    /// peak — right for a car, but a litre bike peaks at 11,000 and its first gear runs to 150 km/h,
+    /// so in town it never left first. A rider short-shifts.</summary>
+    public float? CruiseUpshiftRpm { get; init; }
+    /// <summary>RPM held while the clutch slips pulling away. Unset, twice idle or 40 % of the torque
+    /// peak, whichever is higher.</summary>
+    public float? LaunchRpm { get; init; }
 
     public int TopGear => Ratios.Length;
 
@@ -135,6 +142,20 @@ public sealed record TyreProfile
 
     /// <summary>A decent road tyre on dry asphalt.</summary>
     public static TyreProfile SportsOnAsphalt => new();
+
+    /// <summary>
+    /// A sports motorcycle's road tyre: a few long grooves and no block pattern, so it rolls with roar
+    /// and no tread tone, and on a contact patch a third the width of a car's it is quieter. The road
+    /// bikes had the car tyre's 68 blocks, which at 90 km/h sang at 859 Hz and 1.7 kHz over the whole
+    /// bike (2026-09-28). A dirt bike's knobblies are another matter and keep their own.
+    /// </summary>
+    public static TyreProfile SportBikeRoad => new()
+    {
+        TreadBlocks = 0, SurfaceRoughness = 0.45f,
+        // Narrower than a car tyre (120-180 mm against 225): about 4 dB less rolling noise each.
+        ReferenceDb = 80f,
+        PeakGripG = 1.1f,
+    };
 
     /// <summary>
     /// A racing slick: no tread, so no block tone at all — the whole rolling sound is roar. Enormous
@@ -563,13 +584,18 @@ public sealed record VehicleProfile
         Gearbox = Gearbox.SixSpeedSports with
         {
             Ratios = new[] { 2.57f, 1.94f, 1.61f, 1.41f, 1.29f, 1.19f },
-            FinalDrive = 3.0f, WheelRadiusMetres = 0.31f,
+            // The chain's 3.0 times the primary reduction between crank and gearbox (1.63 on a litre
+            // four), which was missing: first gear overall was 7.7:1 where a real one is about 12, so
+            // at 50 km/h the bike turned 1,500-3,300 rpm, lugging like a diesel pickup, and sat under
+            // its own change-down point in every gear (Cody, 2026-09-28).
+            FinalDrive = 3.0f * 1.63f, WheelRadiusMetres = 0.31f,
             // A sequential box with a quickshifter: the clutch never opens and the ignition is cut
             // for the instant the dog rings move. A tenth of a second, and audible as a CUT rather
             // than a lift.
-            ShiftSeconds = 0.09f, UpshiftRpm = 13800f, DownshiftRpm = 5000f,
+            ShiftSeconds = 0.09f, UpshiftRpm = 13800f, DownshiftRpm = 3000f,
+            CruiseUpshiftRpm = 5000f, LaunchRpm = 2800f,
         },
-        Tyres = TyreProfile.SportsOnAsphalt,
+        Tyres = TyreProfile.SportBikeRoad,
         MassKg = 200f,
         DragArea = 0.42f,
         RollingResistance = 0.015f,
@@ -579,8 +605,11 @@ public sealed record VehicleProfile
         ExhaustOffsetZ = -0.75f, IntakeOffsetZ = 0.25f, ExhaustHeight = 0.55f,
         EngineBayLeakage = 1f,     // no bay: the engine hangs in the frame and the airbox is under the tank
         FrontAxleZ = 0.70f, RearAxleZ = -0.70f,
-        SourceLevelDb = 118f,
+        // 106.8 on the live voice with the stock system: the pipe 100.6, the engine itself 103.0
+        // (2026-09-28). It was 118, all of it pipe.
+        SourceLevelDb = 107f,
     };
+
 
     /// <summary>A blown big block: the whine of the rotors over the lope of the cam, and no lag at
     /// all, because a supercharger is geared to the crank and has nothing to spool.</summary>
@@ -803,7 +832,7 @@ public sealed record VehicleProfile
         // Measured, not guessed: EngineSynthTests renders every preset and holds its declared level
         // to what it actually produces. A first guess of 101 was sixteen decibels light, which would
         // have put this car forty times too quiet next to the field it shares a track with.
-        SourceLevelDb = 103.5f,   // 103.5 on 2026-09-26, with the exhaust valves' flow noise
+        SourceLevelDb = 111f,     // 111.1 with the turbine as a flat 6 dB loss (2026-09-28); 103.5 on 09-26
         Engine = EngineProfile.I4Turbo,
         Gearbox = Gearbox.SixSpeedSports with { Ratios = new[] { 3.4f, 2.05f, 1.42f, 1.06f, 0.84f, 0.68f }, FinalDrive = 3.7f, ShiftSeconds = 0.18f, UpshiftRpm = 6300f, DownshiftRpm = 2000f },
         Tyres = TyreProfile.SportsOnAsphalt with { TreadBlocks = 58, PeakGripG = 1.1f, SquealHz = 880f },
@@ -872,7 +901,9 @@ public sealed record VehicleProfile
         EngineKey = "single",
         SourceLevelDb = 122f,   // 122.2 with the shorter pipes (2026-09-26)
         Engine = EngineProfile.Single450,
-        Gearbox = Gearbox.SixSpeedSports with { Ratios = new[] { 2.4f, 1.8f, 1.4f, 1.15f, 0.96f }, FinalDrive = 3.8f, ShiftSeconds = 0.18f, UpshiftRpm = 10000f, DownshiftRpm = 3000f, WheelRadiusMetres = 0.33f },
+        // Final drive with the primary reduction in it (about 2.9 on a 450 single), which was missing:
+        // first gear overall was 9:1 where a real one is near 20, and the bike lugged at 3-4,000 rpm.
+        Gearbox = Gearbox.SixSpeedSports with { Ratios = new[] { 2.4f, 1.8f, 1.4f, 1.15f, 0.96f }, FinalDrive = 3.8f * 2.9f, ShiftSeconds = 0.18f, UpshiftRpm = 10000f, DownshiftRpm = 3000f, WheelRadiusMetres = 0.33f },
         Tyres = TyreProfile.SportsOnAsphalt with { TreadBlocks = 28, SurfaceRoughness = 0.7f },
         MassKg = 190f, DragArea = 0.5f,
         ExhaustOffsetZ = -0.4f, IntakeOffsetZ = 0.1f, FrontAxleZ = 0.75f, RearAxleZ = -0.75f,
@@ -924,9 +955,14 @@ public sealed record VehicleProfile
     {
         Name = "6.6 Duramax pickup, compound turbos, straight pipe",
         EngineKey = "duramax_compound",
-        SourceLevelDb = 106f,     // measured on the live voice
+        SourceLevelDb = 118f,     // 118.3 on the live voice: five-inch pipe, turbine a flat 6 dB (2026-09-28)
         Engine = EngineProfile.DuramaxCompound,
         Gearbox = Gearbox.SixSpeedSports with { Ratios = new[] { 3.10f, 1.81f, 1.41f, 1.00f, 0.71f }, FinalDrive = 3.73f, ShiftSeconds = 0.45f, UpshiftRpm = 3100f, DownshiftRpm = 1300f, WheelRadiusMetres = 0.40f },
+        // A side exit just ahead of the rear wheel, on the kerb side — how a straight-piped diesel is
+        // usually run. Out of the rear bumper the whole six-metre truck stood between the pipe and
+        // anyone on the pavement until it had gone by, and the body took the mids and the top off
+        // the pass-by: "when they drove by I couldn't really hear it" (Cody, 2026-09-28).
+        ExhaustOffsetZ = -1.3f, ExhaustAxis = new Vector3(1f, 0f, 0f),
     };
 
     /// <summary>The same idea on a 5.9 Cummins: compound turbos and a five-inch straight pipe.</summary>
@@ -934,9 +970,11 @@ public sealed record VehicleProfile
     {
         Name = "5.9 Cummins pickup, compound turbos, straight pipe",
         EngineKey = "cummins_compound",
-        SourceLevelDb = 112f,
+        SourceLevelDb = 120f,     // 119.8 on the live voice: six-inch stack, turbine a flat 6 dB (2026-09-28)
         Engine = EngineProfile.CumminsCompound,
         Gearbox = DieselPickupLoud.Gearbox with { UpshiftRpm = 3000f },
+        // Side exit ahead of the rear wheel, kerb side, as on the Duramax.
+        ExhaustOffsetZ = -1.3f, ExhaustAxis = new Vector3(1f, 0f, 0f),
     };
 
     /// <summary>A parcel step van: aluminium box body, the ISB six, an automatic, duals at the back.</summary>
@@ -1043,7 +1081,7 @@ public sealed record VehicleProfile
         // Measured with --engine-levels, not guessed: a straight-piped 5.9 is eleven decibels above
         // what a silenced pickup diesel makes.
         EngineKey = "diesel_cummins",
-        SourceLevelDb = 107f,
+        SourceLevelDb = 113f,     // 113.3 with the turbine as a flat 6 dB loss (2026-09-28); was 107
         Engine = EngineProfile.DieselCumminsI6,
         // Four ratios and a very tall final drive: this engine has no revs to give and does not need
         // any. Governed at 2,900, top gear runs out around 160 km/h.

@@ -116,6 +116,12 @@ public class CarFollowingTests
                 {
                     var (p, q) = (cars[a], cars[b]);
                     if (!junctions.Any(j => InJunction(p.Position, j) && InJunction(q.Position, j))) continue;
+                    // Side by side in neighbouring lanes, pointing the same way and a lane apart, is two
+                    // cars turning into two lanes, not a meeting (2026-09-28: 2.4 m apart mid-turn).
+                    float turnApart = MathF.Abs(MathF.IEEERemainder(p.Heading - q.Heading, 2 * MathF.PI));
+                    var fwd = new System.Numerics.Vector3(MathF.Sin(p.Heading), 0f, MathF.Cos(p.Heading));
+                    var dd = q.Position - p.Position;
+                    if (turnApart < 0.35f && MathF.Abs(dd.X * fwd.Z - dd.Z * fwd.X) >= 2.0f) continue;
                     if (System.Numerics.Vector3.Distance(p.Position, q.Position) < 2.5f)
                         met.Add($"{p.Name} ({p.Position.X:F1},{p.Position.Z:F1}) {p.Speed:F1} m/s hdg {p.Heading * 57.3f:F0} and "
                               + $"{q.Name} ({q.Position.X:F1},{q.Position.Z:F1}) {q.Speed:F1} m/s hdg {q.Heading * 57.3f:F0}");

@@ -167,7 +167,8 @@ public class AnnouncementAndLoginTests
         session.HandleMessage(new LoginResponse { Success = true, Username = "cody" });
 
         Assert.Equal("cody", accepted);
-        Assert.True(speech.Said("Logged in as cody"));
+        // Nothing spoken yet: logging in is said once, on arrival, with the map's name.
+        Assert.False(speech.Said("Logged in"));
         Assert.NotEmpty(shell.Loading);
     }
 

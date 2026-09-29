@@ -50,17 +50,21 @@ public class CylinderOverlapTests
         Assert.Equal(0f, hit.Normal.Y);
     }
 
-    /// <summary>A body whose centre has got inside the box is pushed away from the box's centre by
-    /// its radius — and along +X from the very middle, where there is no away.</summary>
+    /// <summary>A body whose centre has got inside the box leaves by the NEAREST edge, all the way
+    /// out — the edge's distance plus its radius — and along +X from the very middle, where no edge
+    /// is nearer. It used to be pushed away from the box's centre by its radius alone, which for a
+    /// roof slab over a house was the wrong way and not far enough, again and again, until it came
+    /// out through a wall (64 Alder Street, 2026-09-28).</summary>
     [Fact]
-    public void FromInsideItIsPushedAwayFromTheMiddle()
+    public void FromInsideItLeavesByTheNearestEdge()
     {
         var hit = At(0.5f, 0, 0);
         Assert.True(hit.IsColliding);
-        Assert.Equal(R, hit.Penetration);
+        Assert.Equal(0.5f + R, hit.Penetration, 4);
         Assert.Equal(Vector3.UnitX, hit.Normal);
         hit = At(0, 0, -0.4f);
         Assert.Equal(-Vector3.UnitZ, hit.Normal);
+        Assert.Equal(0.6f + R, hit.Penetration, 4);
         hit = At(0, 0, 0);
         Assert.Equal(Vector3.UnitX, hit.Normal);
         // An offset box: the middle is the box's, not the origin.

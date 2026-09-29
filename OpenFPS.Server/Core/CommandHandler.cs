@@ -166,6 +166,12 @@ public class CommandHandler
                 break;
             // Firing is no longer elevated when you are HOLDING the thing: a gun in your hands is
             // the permission. Naming a weapon out of the air still is — that is the dev trigger.
+            case "clap":
+                HandleClap(session, reply);
+                break;
+            case "knock":
+                HandleKnock(session, args, reply);
+                break;
             case "fire":
             case "shoot":
                 HandleFire(session, args, reply, isElevated);
@@ -445,41 +451,74 @@ public class CommandHandler
         Say(reply, $"Attached sound {args[0]} to nearest object.");
     }
 
+    /// <summary>
+    /// What is round you, nearest first: named things within 20 m that you could actually see or hear
+    /// directly, not through a wall, and measured to the nearest part of each, so a long wall beside
+    /// you is not placed at its middle. Said as one line, in order (Cody, 2026-09-28: "if items are
+    /// behind a wall you can't see them, shift P should not report them; the closest first").
+    /// </summary>
     private void HandleScan(UserSession session, Action<IMessage> reply)
     {
         if (!TryGetBody(session, reply, out var world, out _, out var playerPos)) return;
 
-        float scanRadius = 20.0f;
-        var results = new List<(string Name, float Distance, Vector3 Direction)>();
+        const float scanRadius = 20.0f;
+        Vector3 eye = playerPos + new Vector3(0f, 1.6f, 0f);
+        var solids = new List<(Entity E, Vector3 Pos, Vector3 Size, Quaternion Rot)>();
+        var results = new List<(string Name, float Distance, Vector3 Direction, Entity E)>();
 
         world.Query(new QueryDescription().WithAll<Transform>(), (Entity e, ref Transform t) =>
         {
             if (e.Id == session.Entity.Id) return;
+            Vector3 size = world.Has<ColliderComponent>(e) ? world.Get<ColliderComponent>(e).Size : Vector3.Zero;
+            bool solid = world.Has<ColliderComponent>(e) && world.Get<ColliderComponent>(e).IsSolid && size.X > 0f;
+            if (solid && Vector3.Distance(eye, t.Position) < scanRadius + size.Length()) solids.Add((e, t.Position, size, t.Rotation));
 
-            float dist = Vector3.Distance(playerPos, t.Position);
-            if (dist <= scanRadius && dist > 0.001f)
-            {
-                string name = "Unknown Object";
-                if (world.Has<IdentityComponent>(e)) name = world.Get<IdentityComponent>(e).Name;
-                else if (world.Has<PlayerComponent>(e)) name = world.Get<PlayerComponent>(e).Username;
-                else if (world.Has<BeaconComponent>(e)) name = "Beacon";
-
-                results.Add((name, dist, Vector3.Normalize(t.Position - playerPos)));
-            }
+            string? name = world.Has<IdentityComponent>(e) ? world.Get<IdentityComponent>(e).Name
+                         : world.Has<PlayerComponent>(e) ? world.Get<PlayerComponent>(e).Username
+                         : world.Has<BeaconComponent>(e) ? "Beacon" : null;
+            if (string.IsNullOrWhiteSpace(name)) return;
+            Vector3 nearest = NearestPointOf(t.Position, size, t.Rotation, eye);
+            // The floor you are standing on is not something near you.
+            if (size != Vector3.Zero && nearest.Y <= playerPos.Y + 0.3f && MathF.Abs(nearest.X - playerPos.X) < 0.3f
+                && MathF.Abs(nearest.Z - playerPos.Z) < 0.3f) return;
+            float dist = Vector3.Distance(eye, nearest);
+            if (dist <= scanRadius) results.Add((name!, dist, dist > 0.001f ? Vector3.Normalize(nearest - eye) : Vector3.UnitZ, e));
         });
 
-        if (results.Count == 0)
+        var seen = results.Where(r => !Blocked(eye, r.Direction, r.Distance, r.E, solids))
+                          .OrderBy(r => r.Distance).Take(5).ToList();
+        if (seen.Count == 0)
         {
-            Say(reply, "No objects detected nearby.");
+            Say(reply, "Nothing in sight nearby.");
             return;
         }
 
         var playerRotation = world.Get<Transform>(session.Entity).Rotation;
-        foreach (var item in results.OrderBy(r => r.Distance).Take(5))
+        Say(reply, string.Join(". ", seen.Select(r =>
+            $"{r.Name}, {GetRelativeDirection(playerRotation, r.Direction)}, {r.Distance:F0} {(MathF.Round(r.Distance) == 1f ? "metre" : "metres")}")) + ".");
+    }
+
+    /// <summary>The point of a turned box nearest to another point; the box's centre for a point.</summary>
+    private static Vector3 NearestPointOf(Vector3 centre, Vector3 size, Quaternion rot, Vector3 from)
+    {
+        if (size == Vector3.Zero) return centre;
+        var inv = Quaternion.Inverse(rot);
+        Vector3 local = Vector3.Transform(from - centre, inv), h = size * 0.5f;
+        local = Vector3.Clamp(local, -h, h);
+        return centre + Vector3.Transform(local, rot);
+    }
+
+    /// <summary>Whether something solid, other than the thing itself, stands between the eye and it.</summary>
+    private static bool Blocked(Vector3 eye, Vector3 dir, float dist, Entity target,
+                                List<(Entity E, Vector3 Pos, Vector3 Size, Quaternion Rot)> solids)
+    {
+        foreach (var s in solids)
         {
-            string direction = GetRelativeDirection(playerRotation, item.Direction);
-            Say(reply, $"{item.Name} at {direction}, {item.Distance:F1} meters.");
+            if (s.E == target) continue;
+            if (GeometryUtils.RayHitsOBB(eye, dir, dist - 0.05f, s.Pos, s.Size, s.Rot, out float d, out _) && d < dist - 0.05f)
+                return true;
         }
+        return false;
     }
 
     // ── Building ────────────────────────────────────────────────────────────────────────────────
@@ -1042,6 +1081,26 @@ public class CommandHandler
     /// It also happens to be the only thing in the game that can currently break a window, which is
     /// why the glass path hangs off it too.
     /// </summary>
+    /// <summary>Clapping your hands: one clap, in front of your chest, heard by everyone near and
+    /// answered by the walls like any other short sound. Nothing is said back.</summary>
+    private void HandleClap(UserSession session, Action<IMessage> reply)
+    {
+        if (!TryGetBody(session, reply, out var world, out _, out var position)) return;
+        var forward = Vector3.Transform(new Vector3(0, 0, 1), world.Get<Transform>(session.Entity).Rotation);
+        _server.EmitWorldAudio(session.CurrentMapId, session.Entity.Id, "clap", new[]
+        {
+            new TransientSound
+            {
+                Character = SoundCharacter.Knock,
+                Position = position + new Vector3(0, 1.25f, 0) + forward * 0.3f,
+                LevelDb = Applause.SingleClapDb,
+                SynthKey = Applause.ClapKey,
+                DecaySeconds = 0.15f,
+                Noisiness = 1f,
+            },
+        });
+    }
+
     private void HandleFire(UserSession session, string[] args, Action<IMessage> reply, bool isElevated)
     {
         if (!TryGetBody(session, reply, out var world, out var grid, out var position)) return;
@@ -1177,6 +1236,42 @@ public class CommandHandler
     /// has to author and keep in step. That is automatically right for a two-door, a four-door, a bus
     /// with a middle door, and whatever anybody invents next.
     /// </summary>
+    /// <summary>
+    /// Knocking on the nearest door: three knuckles on the wood, heard by whoever is on either side of
+    /// it (the door's own transmission carries it through). Nothing is said when it works — the knock
+    /// is the answer.
+    /// </summary>
+    private void HandleKnock(UserSession session, string[] args, Action<IMessage> reply)
+    {
+        if (!TryGetBody(session, reply, out var world, out _, out var position)) return;
+        var from = ReachingFrom(world, session.Entity, position);
+        string wanted = args.Length > 0 ? string.Join(" ", args) : "";
+        var door = NearestDoor(world, from, wanted, out _, out string name);
+        if (door == null)
+        {
+            var anywhere = NearestDoor(world, from, wanted, out float away, out string itsName, reach: 40f);
+            Say(reply, anywhere != null ? $"The nearest {itsName} is {away:F1} metres away. Get closer."
+                                        : "There is no door near you to knock on.");
+            return;
+        }
+        var at = world.Get<Transform>(door.Value).Position;
+        // On the face you are standing at, at knuckle height.
+        var toYou = new Vector3(from.X - at.X, 0f, from.Z - at.Z);
+        var face = toYou.LengthSquared() > 1e-6f ? Vector3.Normalize(toYou) * 0.08f : Vector3.Zero;
+        _server.EmitWorldAudio(session.CurrentMapId, session.Entity.Id, "knock", new[]
+        {
+            new TransientSound
+            {
+                Character = SoundCharacter.Knock,
+                Position = new Vector3(at.X, at.Y + 0.3f, at.Z) + face,   // the door's centre is 1.05 m up
+                LevelDb = DoorKnock.LevelDb,
+                SynthKey = DoorKnock.Key(3),
+                DecaySeconds = 0.9f,
+                Noisiness = 1f,
+            },
+        });
+    }
+
     private void HandleDoor(UserSession session, string[] args, Action<IMessage> reply, bool open)
     {
         if (!TryGetBody(session, reply, out var world, out _, out var position)) return;

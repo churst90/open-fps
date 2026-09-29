@@ -40,7 +40,11 @@ public sealed class SteamAudioSimulator : IDisposable
     /// <summary>Pathing arrival result for one source: the direction (world space) the sound comes FROM
     /// after routing through openings, and <see cref="Energy"/> (the SH omni term — 0 means no path found,
     /// so the caller should keep using the direct line to the source).</summary>
-    public readonly record struct PathResult(bool Found, Vector3 WorldDirection, float Energy)
+    /// <param name="EqLow">What the route through the scene takes per band (Steam Audio's pathing eq):
+    /// the level of a sound that has to find its way round, where the direct stage only knows it is
+    /// blocked.</param>
+    public readonly record struct PathResult(bool Found, Vector3 WorldDirection, float Energy,
+                                             float EqLow = 0f, float EqMid = 0f, float EqHigh = 0f)
     {
         public static readonly PathResult None = new(false, Vector3.Zero, 0f);
     }
@@ -116,7 +120,9 @@ public sealed class SteamAudioSimulator : IDisposable
     /// worldDir = normalize(-sh[1], sh[2], -sh[3]) (world X = -ACN(m=-1), Z = -ACN(m=+1), Y = ACN(m=0)).</summary>
     public static Vector3 PathingWorldDirection(float w, float shYm1, float shZm0, float shXp1)
     {
-        var d = new Vector3(-shYm1, shZm0, -shXp1);
+        // Ambisonic X is Steam Audio's ahead, which is its -z; the game's z runs the other way
+        // (Phonon.World), so the game's z component is +X.
+        var d = new Vector3(-shYm1, shZm0, Phonon.WorldZ(-shXp1));
         float len = d.Length();
         return len > 1e-6f ? d / len : Vector3.Zero;
     }
@@ -282,7 +288,9 @@ public sealed class SteamAudioSimulator : IDisposable
             {
                 type = Phonon.IPL_PROBEGENERATIONTYPE_UNIFORMFLOOR, spacing = spacing, height = 1.5f,
             };
-            SetBoxTransform(ref genP.transform, min.X, max.X, min.Y - 0.5f, max.Y, min.Z, max.Z);
+            // The scene's bounds are the game's; the probe volume is in Steam Audio's world (Phonon.World).
+            float zA = Phonon.World(min).z, zB = Phonon.World(max).z;
+            SetBoxTransform(ref genP.transform, min.X, max.X, min.Y - 0.5f, max.Y, MathF.Min(zA, zB), MathF.Max(zA, zB));
             Phonon.iplProbeArrayGenerateProbes(_probeArray, scene.Handle, ref genP);
             probes = Phonon.iplProbeArrayGetNumProbes(_probeArray);
             if (probes == 0)
@@ -361,7 +369,9 @@ public sealed class SteamAudioSimulator : IDisposable
             // probe sphere inside the ground it was standing on. See AudioEmission.OcclusionRadiusFor.
             occlusionRadius = MathF.Max(0.01f, occlusionRadius),
             numOcclusionSamples = 16,
-            numTransmissionRays = 1,
+            // Every surface up to eight, not the nearest one: a box's loss is split across its two
+            // faces (SteamAudioScene.MaterialIndex), and two walls in a row must both be paid for.
+            numTransmissionRays = 8,
         };
         if (_reflections)
         {
@@ -488,7 +498,10 @@ public sealed class SteamAudioSimulator : IDisposable
         if (energy <= 0.001f) return PathResult.None;
         Vector3 dir = PathingWorldDirection(sh[0], sh[1], sh[2], sh[3]);
         if (dir == Vector3.Zero) return PathResult.None;
-        return new PathResult(true, dir, energy);
+        return new PathResult(true, dir, energy,
+                              Math.Clamp(outputs.pathing.eqCoeffs0, 0f, 1f),
+                              Math.Clamp(outputs.pathing.eqCoeffs1, 0f, 1f),
+                              Math.Clamp(outputs.pathing.eqCoeffs2, 0f, 1f));
     }
 
     private static Phonon.IPLCoordinateSpace3 Coord(Vector3 origin) => new()
@@ -496,7 +509,7 @@ public sealed class SteamAudioSimulator : IDisposable
         right = new PV { x = 1, y = 0, z = 0 },
         up = new PV { x = 0, y = 1, z = 0 },
         ahead = new PV { x = 0, y = 0, z = -1 },
-        origin = new PV { x = origin.X, y = origin.Y, z = origin.Z },
+        origin = Phonon.World(origin),
     };
 
     // Row-major affine transform mapping the unit cube [0,1]^3 onto the given world box (for probe volume).

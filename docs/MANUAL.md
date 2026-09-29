@@ -90,11 +90,13 @@ when you come within 3 m of them.
 | Key | Action |
 |---|---|
 | E | Interact: open a door, get into or out of a vehicle, close a door |
+| Shift+E | Knock on the nearest door |
 | G | Pick up |
 | Q | Drop |
 | R | Put away (sling onto your back) |
 | Enter | Fire what you are holding (only works with a weapon) |
-| T / Shift+T | Engine on / off (driver's seat) |
+| T | Clap your hands. In the driver's seat: engine on |
+| Shift+T | Engine off (driver's seat) |
 | V | Voice chat on / off (not available on Linux yet) |
 | Escape | Quit dialog ("Quit" or "Keep playing"; the cursor starts on Keep playing) |
 
@@ -201,11 +203,13 @@ Beacons are sounds that mark useful things near you.
 
 | Kind | Sound | Heard |
 |---|---|---|
-| Door | A wooden knock | The 3 nearest within 12 m |
-| Item | A small bell | The 3 nearest within 10 m |
-| Vehicle | A low double tone | The 2 nearest within 25 m |
+| Door | Two soft notes rising (a gentle ding-dong, upward) | The 3 nearest within 12 m |
+| Item | One small ring that dies away | The 3 nearest within 10 m |
+| Vehicle | A low warm note, twice | The 2 nearest within 25 m |
 
-Each repeats every 1.6 seconds. A beacon that is mostly hidden behind a wall is not played. Maps can
+Each keeps sounding from the thing itself, every 1.6 seconds unless you choose otherwise:
+`/beacons every 3` sets the gap in seconds (half a second to ten), and it is saved. A beacon that is
+mostly hidden behind a wall is not played. Maps can
 also place beacons for exits, stairs and waypoints.
 
 Each map decides, for each kind, whether it starts on or off, is always on, or is not allowed.

@@ -238,7 +238,7 @@ public class FootstepTests
     /// <summary>
     /// The band balance of a MEASURED concrete footstep, from a recording of somebody walking.
     ///
-    /// Averaged over the 46 clean steps in `inbox/foot steps sounds/split/concrete_walk`, which
+    /// Averaged over the 46 clean steps in `approved/footsteps/split/concrete_walk`, which
     /// `tools/split_footsteps.py` cut out of a fifty-second recording. Normalised to its own total,
     /// so this is the SHAPE of a footstep and says nothing about level — level is
     /// <see cref="Footsteps.MeasuredLevelDb"/>'s job and a separate question.

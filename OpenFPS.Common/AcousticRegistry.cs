@@ -43,6 +43,15 @@ public struct MaterialProperties
     /// here by orders of magnitude and absorb airborne sound about the same.
     /// </summary>
     public float LossFactor { get; set; }
+
+    /// <summary>
+    /// Sound gets through it by its OPENINGS rather than by moving it: a fence, a hedge, a crowd, a
+    /// carpet. For these the Transmission figures are what leaks through the holes and stand as they
+    /// are. Everything else is an airtight panel, and what gets through one is decided by how heavy
+    /// it is per square metre — its density times its thickness (<see cref="AcousticRegistry.MassLawTransmission"/>),
+    /// so a map's 35 cm brick wall and a 10 cm one are not the same wall.
+    /// </summary>
+    public bool Porous { get; set; }
 }
 
 /// <summary>JSON override DTO — every field nullable so omitted fields don't clobber the
@@ -178,6 +187,14 @@ public static class AcousticRegistry
             // studs, and it is a fact about the construction rather than a preference.
             reg["Plaster"] = new MaterialProperties { Absorption = 0.12f, AbsorptionLow = 0.28f, AbsorptionMid = 0.10f, AbsorptionHigh = 0.05f, Scattering = 0.15f, TransmissionLow = 0.35f, TransmissionMid = 0.18f, TransmissionHigh = 0.08f, ResonanceIndex = 27, DensityKgM3 = 800f, YoungsModulusGPa = 3f, LossFactor = 0.03f };
 
+            // A suspended acoustic ceiling: mineral-fibre tiles on a grid, a void above. What keeps a
+            // concourse, an office or a shop from ringing like the concrete box it is built as. The
+            // published curve for a 16-19 mm tile (NRC 0.70): 0.35-0.40 at the bottom, 0.80-0.85
+            // through the middle and top. A light, porous panel, so the bass goes through into the
+            // void; flat, so it hardly scatters. The airport terminal was bare concrete overhead and
+            // rang for 7-10 s where a real one is 2-3 (2026-09-29).
+            reg["AcousticTile"] = new MaterialProperties { Absorption = 0.70f, AbsorptionLow = 0.38f, AbsorptionMid = 0.80f, AbsorptionHigh = 0.82f, Scattering = 0.10f, TransmissionLow = 0.55f, TransmissionMid = 0.35f, TransmissionHigh = 0.15f, ResonanceIndex = 30, DensityKgM3 = 250f, YoungsModulusGPa = 0.05f, LossFactor = 0.3f };
+
             // ── Soles ───────────────────────────────────────────────────────────────────────────
             //
             // A sole is a material like any other, and putting it in the same table as the ground is
@@ -200,6 +217,10 @@ public static class AcousticRegistry
             // A bare foot. Softer than any sole ever made, which is exactly why it slaps rather than
             // clicks on everything, however hard the floor is.
             reg["Skin"] = new MaterialProperties { Absorption = 0.30f, AbsorptionLow = 0.15f, AbsorptionMid = 0.30f, AbsorptionHigh = 0.45f, Scattering = 0.45f, TransmissionLow = 0.6f, TransmissionMid = 0.45f, TransmissionHigh = 0.3f, ResonanceIndex = 11, DensityKgM3 = 1050f, YoungsModulusGPa = 0.0015f, LossFactor = 0.45f };
+
+            // Porous: sound passes through the holes, not by moving the stuff. See MaterialProperties.Porous.
+            foreach (var porous in new[] { "Fence", "Foliage", "Grass", "Audience", "Dirt", "Gravel", "Carpet", "AcousticTile", "None" })
+                if (reg.TryGetValue(porous, out var pp)) { pp.Porous = true; reg[porous] = pp; }
 
             string path = "materials.json";
             if (File.Exists(path))
@@ -281,6 +302,38 @@ public static class AcousticRegistry
         index = props.ResonanceIndex;
         return true;
     }
+
+    /// <summary>
+    /// What an airtight panel of this material and thickness lets through, per band, as amplitude
+    /// gains 0..1 (the Transmission convention). The field-incidence mass law, TL = 20·log10(m·f) − 47
+    /// dB with m the surface density (kg/m², density × thickness), at the three band centres the rest
+    /// of the engine evaluates at (200 Hz, 1.25 kHz, 8 kHz), and no more than
+    /// <see cref="MaxWallLossDb"/>: past that, sound reaches the next room through the structure
+    /// round the wall, not through it. A porous material, or one with no density, keeps its table.
+    ///
+    /// The table's single figure per material said the same thing of every wall made of it. Brick was
+    /// -24/-30/-36 dB, which is a thin skin, and every 35 cm outer wall in the city let the street's
+    /// footsteps into the flats behind it ("I should not be able to hear anyone walking outside
+    /// through concrete", 2026-09-29). Here the same brick is 55 dB at 35 cm and 36/52/55 at 10 cm.
+    /// </summary>
+    public static (float Low, float Mid, float High) MassLawTransmission(string material, float thicknessMetres)
+    {
+        var p = GetProperties(material);
+        if (p.Porous || p.DensityKgM3 <= 0f || thicknessMetres <= 0f)
+            return (p.TransmissionLow, p.TransmissionMid, p.TransmissionHigh);
+        float m = p.DensityKgM3 * thicknessMetres;
+        static float Gain(float m, float hz)
+        {
+            float tl = Math.Clamp(20f * MathF.Log10(m * hz) - 47f, 0f, MaxWallLossDb);
+            return MathF.Pow(10f, -tl / 20f);
+        }
+        return (Gain(m, 200f), Gain(m, 1250f), Gain(m, 8000f));
+    }
+
+    /// <summary>The most any one wall takes, dB: the flanking limit. EN 12354-1 puts what a heavy
+    /// separating wall achieves between two real rooms, sound going round it through the floors and
+    /// side walls included, in the low fifties to about sixty.</summary>
+    public const float MaxWallLossDb = 55f;
 
     /// <summary>Every known material name, sorted — for naming the alternatives in an error message.</summary>
     public static IReadOnlyList<string> KnownMaterials()

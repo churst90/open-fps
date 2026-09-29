@@ -183,6 +183,20 @@ public class StreetLifeData
     /// <summary>How long drivers at a junction where everyone is giving way to someone wait before one
     /// of them goes anyway, seconds.</summary>
     public float GiveWayPatienceSeconds { get; set; } = 6f;
+    /// <summary>
+    /// A pedestrian crossing a road where nothing controls it takes a gap in the traffic of at least
+    /// the time to walk across plus this, seconds: the Highway Capacity Manual's pedestrian critical
+    /// headway t_c = L / S_p + t_s, where t_s is the start-up and end clearance time (HCM 2010,
+    /// chapter 19; 3 s, *to confirm* against the text).
+    /// </summary>
+    public float PedestrianStartUpSeconds { get; set; } = 3f;
+    /// <summary>How long somebody stands at the kerb before drivers who can stop comfortably stop for
+    /// them, seconds. Drivers always stop for somebody already on the crossing.</summary>
+    public float PedestrianAssertSeconds { get; set; } = 8f;
+    /// <summary>After this long at the kerb a pedestrian takes a gap only just long enough to walk across,
+    /// without the start-up margin, seconds. The HCM puts pedestrians' likelihood of taking risks as high
+    /// above 30 s of delay at an uncontrolled crossing (HCM 2010, chapter 19, *to confirm*).</summary>
+    public float PedestrianRiskSeconds { get; set; } = 30f;
 }
 
 public class TrackData
@@ -297,6 +311,8 @@ public class VehicleData
     public string? Name { get; set; }
     /// <summary>A VehicleProfile preset key: v8_muscle, i4_economy, diesel_truck, ...</summary>
     public string Preset { get; set; } = "v8_muscle";
+    /// <summary>Two walkers with the same Pair walk together and talk to each other ("" for none).</summary>
+    public string? Pair { get; set; }
     public Vector3 RoadStart { get; set; }
     public Vector3 RoadEnd { get; set; }
     /// <summary>Speed of each pass in turn, km/h; wraps round. Shuttle mode only.</summary>

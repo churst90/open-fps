@@ -341,12 +341,14 @@ public sealed class Driver
             _shiftTo = _dl.Gear + 1;
             _shiftTimer = _gb.ShiftSeconds;
             _dl.Gear = 0;
+            _engine.Throttle = 0f; _dl.Clutch = 0f;       // the shift starts with the foot off
         }
         else if (_dl.Gear > 1 && gearRpm < _gb.DownshiftRpm && _dl.Locked)
         {
             _shiftTo = _dl.Gear - 1;
             _shiftTimer = _gb.ShiftSeconds * 0.8f;
             _dl.Gear = 0;
+            _engine.Throttle = 0f; _dl.Clutch = 0f;
         }
     }
 }
@@ -364,17 +366,26 @@ public sealed class VirtualDriver
     private readonly Gearbox _gb;
     private float _shiftTimer;
     private int _shiftTo;
+    private int _shiftFrom;
     private float _integral;
     private float _lastTarget;
     private float _accelEstimate;
     private readonly float _launchRpm;
+    private const float ClutchLetInPerSecond = 2f;
+    private const float LaunchRollOnPerSecond = 3f;
+    private readonly float _launchBite;
 
     public VirtualDriver(Driveline dl, EngineSynth engine)
     {
         _dl = dl;
         _engine = engine;
         _gb = dl.Vehicle.Gearbox;
-        _launchRpm = MathF.Max(engine.Profile.IdleRpm * 2f, engine.Profile.PeakTorqueRpm * 0.4f);
+        // The least the clutch is held at while pulling away: the bite that pushes the vehicle at
+        // about one metre a second squared. Eight per cent was that for a car, and three for a bike —
+        // a light machine through a low first gear, where eight per cent drove it on at three.
+        _launchBite = Math.Clamp(dl.Vehicle.MassKg * 1f * _gb.WheelRadiusMetres
+                                 / MathF.Max(1f, dl.Ratio(1) * dl.ClutchCapacityNm), 0.02f, 0.08f);
+        _launchRpm = _gb.LaunchRpm ?? MathF.Max(engine.Profile.IdleRpm * 2f, engine.Profile.PeakTorqueRpm * 0.4f);
     }
 
     /// <summary>Target road speed, m/s, as reported from outside.</summary>
@@ -411,7 +422,17 @@ public sealed class VirtualDriver
             float match = _shiftTo >= 1 ? _dl.GearRpm(_shiftTo) : 0f;
             _engine.Throttle = match > _engine.Rpm ? Math.Clamp((match - _engine.Rpm) / 400f, 0f, 0.7f) : 0f;
             _dl.Clutch = 0f;
-            if (_shiftTimer <= 0f) { _dl.Gear = _shiftTo; _dl.Clutch = 1f; }
+            // A change up ends with the clutch in, as it always did. A change down ends with it in
+            // only if the blip landed the revs on the gear; otherwise it is let in like any other
+            // (below). A light bike's engine overshot the blip, and closing on it at once shoved the
+            // bike forward three km/h under braking.
+            if (_shiftTimer <= 0f)
+            {
+                float gr = _dl.GearRpm(_shiftTo);
+                bool down = _shiftTo < _shiftFrom;
+                _dl.Gear = _shiftTo;
+                _dl.Clutch = down && MathF.Abs(_engine.Rpm - gr) > 150f + 0.1f * gr ? 0f : 1f;
+            }
             return;
         }
 
@@ -427,29 +448,70 @@ public sealed class VirtualDriver
 
         // Throttle: proportional on the speed error plus what the acceleration demands, with a slow
         // integral so a cruise settles.
-        _integral = Math.Clamp(_integral + err * 0.08f * dt, -0.3f, 0.5f);
         float wantAccel = _accelEstimate + err * 0.9f;
         float mass = _dl.Vehicle.MassKg;
         float need = wantAccel * mass + 0.5f * 1.225f * _dl.Vehicle.DragArea * _dl.Speed * _dl.Speed
                    + _dl.Vehicle.RollingResistance * mass * 9.81f;
         float available = MathF.Max(50f, e.PeakTorqueNm * 0.85f * _dl.Ratio(_dl.Gear) / _gb.WheelRadiusMetres);
+        // The integral only while it can do something: in gear with the clutch in, and not pushing
+        // further past a throttle that is already shut or wide open. Overshooting a pull-away it
+        // wound to -0.3 and then held the throttle shut with the bike ten km/h slow for two seconds.
+        float unclamped = need / available + _integral;
+        if (_dl.Locked && !(unclamped <= 0f && err < 0f) && !(unclamped >= 1f && err > 0f))
+            _integral = Math.Clamp(_integral + err * 0.08f * dt, -0.3f, 0.5f);
         float throttle = Math.Clamp(need / available + _integral, 0f, 1f);
         float brake = 0f;
         if (wantAccel < -0.8f) { brake = Math.Clamp(-wantAccel / 6f, 0f, 1f); throttle = 0f; }
         _dl.Brake = brake;
 
         float gearRpm = _dl.GearRpm(_dl.Gear);
-        if (_dl.Gear == 1 && throttle > 0.05f && gearRpm < _launchRpm * 0.95f)
+        // Slowing to below what the gear does at idle: clutch in, or the idle drives the vehicle on.
+        // A bike asked to stop crept along at 12 km/h — first gear at 1,300 rpm — and never stopped.
+        bool stopping = throttle < 0.05f && wantAccel < -0.3f && (_accelEstimate < -0.1f || TargetSpeed < 0.3f)
+                        && _gb.RpmFor(TargetSpeed, _dl.Gear) < e.IdleRpm * 1.1f;
+        float clutchWas = _dl.Clutch;
+        if (stopping)
         {
+            _dl.Clutch = 0f;
+        }
+        // Pulling away, the clutch is let in by slipping — whatever the throttle asks. Only a
+        // clutch that is already in stays in. A light throttle used to take the other branch and
+        // hold the clutch OUT while the engine revved free (a bike to 7,000 rpm on five per cent),
+        // and then the plain `else` closed it in one step at a 5,000 rpm mismatch: the flywheel
+        // dumped into the wheels and the bike jumped ten km/h in a tenth of a second.
+        else if (_dl.Gear == 1 && gearRpm < _launchRpm * 0.95f && (throttle > 0.05f || !_dl.Locked))
+        {
+            // The clutch holds the revs at the launch speed and the throttle holds them there —
+            // unless the vehicle is already ahead of where it should be, when the foot comes off
+            // too. And no floor under it: a fifth of the throttle held open whatever the revs took a
+            // 200 kg bike to its limiter pulling away, the clutch unable to pass it without
+            // outrunning the target.
             float over = (_engine.Rpm - _launchRpm) / _launchRpm;
-            _dl.Clutch = Math.Clamp(0.25f + over * 3f, 0.08f, 1f);
-            throttle = Math.Clamp(0.4f + (_launchRpm - _engine.Rpm) / 1500f, 0.2f, 0.9f);
+            // Ahead of where it should be, the hand eases the clutch back toward the bite and the
+            // foot comes off with it — gradually, over a metre a second of lead. As a switch
+            // it hunted: a bike's revs swung 3,100 to 4,700 and back every eight tenths of a second.
+            float onPace = Math.Clamp(1f + err * 1f, 0f, 1f);
+            float hold = Math.Clamp(0.25f + over * 3f, _launchBite, 1f);
+            _dl.Clutch = MathHelper.Lerp(_launchBite, hold, onPace);
+            float toLaunch = Math.Clamp(0.4f + (_launchRpm - _engine.Rpm) / 1500f, 0f, 0.9f);
+            throttle = MathHelper.Lerp(MathF.Min(toLaunch, throttle), toLaunch, onPace);
+            // And rolled on, not snapped open: nine tenths of the throttle in the first instant of a
+            // pull-away flared a bike to 4,300 rpm and the clutch that caught it jolted it forward.
+            throttle = MathF.Min(throttle, _engine.Throttle + dt * LaunchRollOnPerSecond);
         }
         else if (gearRpm < e.IdleRpm * 0.9f && throttle < 0.05f)
         {
             _dl.Clutch = 0f;
         }
         else _dl.Clutch = 1f;
+        // A clutch is let in, not dropped. Closing it on an engine turning far from the gear's speed
+        // dumps the flywheel into the wheels: from the launch slip at 4,000 rpm with the gear at
+        // 1,400 the bike leapt eight km/h at once, overshot, and the speed loop spent the next
+        // seconds winding itself back — the lurching Cody heard as the shifting being "all weird".
+        // Half a second from open to shut unless the two sides already turn together.
+        float mismatch = MathF.Abs(_engine.Rpm - gearRpm);
+        if (_dl.Clutch > clutchWas && mismatch > 150f + 0.1f * gearRpm)
+            _dl.Clutch = MathF.Min(_dl.Clutch, clutchWas + dt * ClutchLetInPerSecond);
         _engine.Throttle = throttle;
 
         // Automatic shifting: up near the shift point under throttle, up early when cruising, down
@@ -464,21 +526,21 @@ public sealed class VirtualDriver
         // again — eight tenths of a second in neutral each time, so the truck spent most of a
         // steady cruise between gears and its pitch stepped every couple of seconds ("the pitch
         // steps hard, not smooth"). The same guard the kickdown has, the other way.
-        float upAt = MathHelper.Lerp(e.PeakTorqueRpm * 0.85f, _gb.UpshiftRpm, throttle);
+        float upAt = MathHelper.Lerp(_gb.CruiseUpshiftRpm ?? e.PeakTorqueRpm * 0.85f, _gb.UpshiftRpm, throttle);
         float downAt = MathF.Max(_gb.DownshiftRpm, e.IdleRpm * 1.5f);
         bool floored = need > available && err > 0.5f;
         if (_dl.Locked && _engine.Rpm > upAt && _dl.Gear < _gb.TopGear
             && _engine.Rpm * _dl.Ratio(_dl.Gear + 1) / _dl.Ratio(_dl.Gear) > downAt * 1.1f)
         {
-            _shiftTo = _dl.Gear + 1; _shiftTimer = _gb.ShiftSeconds; _dl.Gear = 0;
+            _shiftFrom = _dl.Gear; _shiftTo = _dl.Gear + 1; _shiftTimer = _gb.ShiftSeconds; _dl.Gear = 0;
         }
         else if (_dl.Gear > 1 && gearRpm < downAt && _dl.Locked)
         {
-            _shiftTo = _dl.Gear - 1; _shiftTimer = _gb.ShiftSeconds * 0.7f; _dl.Gear = 0;
+            _shiftFrom = _dl.Gear; _shiftTo = _dl.Gear - 1; _shiftTimer = _gb.ShiftSeconds * 0.7f; _dl.Gear = 0;
         }
         else if (floored && _dl.Gear > 1 && _dl.Locked && _dl.GearRpm(_dl.Gear - 1) < _gb.UpshiftRpm * 0.9f)
         {
-            _shiftTo = _dl.Gear - 1; _shiftTimer = _gb.ShiftSeconds * 0.7f; _dl.Gear = 0;
+            _shiftFrom = _dl.Gear; _shiftTo = _dl.Gear - 1; _shiftTimer = _gb.ShiftSeconds * 0.7f; _dl.Gear = 0;
         }
     }
 }

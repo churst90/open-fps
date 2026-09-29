@@ -33,7 +33,6 @@ internal sealed class GtkClientShell : IClientShell
     private Label? _loadingLabel;
     private GameWindow? _gameWindow;
     private bool _consoleOpen;
-    private int _lastSpokenDecile = -1;
 
     public event Action<string>? CommandEntered;
 
@@ -62,7 +61,6 @@ internal sealed class GtkClientShell : IClientShell
 
     public void ShowLoading(string status) => OnUi(() =>
     {
-        _lastSpokenDecile = -1;
         if (_loadingWindow == null)
         {
             _loadingWindow = Window.New();
@@ -93,14 +91,8 @@ internal sealed class GtkClientShell : IClientShell
         string line = percent > 0 ? $"{text} {percent} percent." : text;
         _loadingLabel?.SetText(line);
 
-        // Speak at each 25% step rather than on every update: a map with a thousand entities produces a
-        // thousand of these, and a screen reader reading all of them says nothing at all.
-        int decile = percent / 25;
-        if (decile != _lastSpokenDecile || percent >= 100)
-        {
-            _lastSpokenDecile = decile;
-            _speech.Speak(line, interrupt: false);
-        }
+        // Shown, not spoken: preloading this, receiving that. A player needs to hear that they are in
+        // and where (ClientGameSession, on arriving), not the loading steps.
     });
 
     public void EnterGame() => OnUi(() =>
