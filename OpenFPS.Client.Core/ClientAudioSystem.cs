@@ -2756,7 +2756,8 @@ public class ClientAudioSystem
         var solids = _acoustics.ReflectionSolids(world);
         if (solids.Count == 0) return;
         OpenFPS.Common.EarlyReflections.Find(stepPos, ear, solids, _stepArrivals, AudioPhysics.SpeedOfSound,
-                                             maxOrder: OpenFPS.Common.EarlyReflections.MaxOrder, keep: WorldAudioPlayer.MaxRoomEchoes * 2);
+                                             maxOrder: OpenFPS.Common.EarlyReflections.MaxOrder, keep: WorldAudioPlayer.MaxRoomEchoes * 2,
+                                             maxExtraPathMetres: WorldAudioPlayer.RoomEchoWindowSeconds * AudioPhysics.SpeedOfSound);
         _stepArrivals.Sort(static (a, b) => b.GainMid.CompareTo(a.GainMid));
         float direct = MathF.Max(1f, Vector3.Distance(stepPos, ear));
         int added = 0;

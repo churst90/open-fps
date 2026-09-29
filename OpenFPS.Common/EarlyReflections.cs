@@ -161,7 +161,8 @@ public static class EarlyReflections
     /// sounds out of doors.</param>
     public static void Find(Vector3 source, Vector3 listener, IReadOnlyList<Solid> solids,
                             List<Arrival> into, float speedOfSound = 343.0f,
-                            int maxOrder = 1, bool separateFirst = false, bool flutter = false, int keep = 0)
+                            int maxOrder = 1, bool separateFirst = false, bool flutter = false, int keep = 0,
+                            float maxExtraPathMetres = RangeMetres)
     {
         into.Clear();
         if (solids == null || solids.Count == 0) return;
@@ -171,16 +172,29 @@ public static class EarlyReflections
         float heard = HeardReference(direct);
         (_mirrors ??= new List<(int, int, float)>()).Clear();
 
+        // The solids that can matter, once. Any surface on a path no longer than direct + extra
+        // lies inside the ellipsoid with the source and the listener at its foci, and that sits
+        // inside a sphere of half that length about their midpoint. In a room asked for its first
+        // 80 ms (27 m of extra path) that is a few dozen boxes out of a city's five thousand, and
+        // every leg test below walks this list and not the city: 73 ms a footstep down to about 1.
+        var near = _local ??= new List<Solid>(256);
+        var nearIndex = _localIndex ??= new List<int>(256);
+        near.Clear(); nearIndex.Clear();
+        Vector3 mid = (source + listener) * 0.5f;
+        float half = (direct + maxExtraPathMetres) * 0.5f;
         for (int i = 0; i < solids.Count; i++)
         {
             var s = solids[i];
             if (s.Size.X <= 0f || s.Size.Y <= 0f || s.Size.Z <= 0f) continue;
+            float reach = half + s.Size.Length() * 0.5f;
+            if (Vector3.DistanceSquared(mid, s.Center) > reach * reach) continue;
+            near.Add(s); nearIndex.Add(i);
+        }
 
-            // Out of the horizon entirely: its own bounding sphere cannot reach. Near the listener OR
-            // near the source: a distant shot's echoes come off the buildings round the shooter.
-            float reach = RangeMetres + s.Size.Length() * 0.5f;
-            if (Vector3.DistanceSquared(listener, s.Center) > reach * reach
-                && Vector3.DistanceSquared(source, s.Center) > reach * reach) continue;
+        for (int li = 0; li < near.Count; li++)
+        {
+            int i = nearIndex[li];
+            var s = near[li];
 
             var p = AcousticRegistry.GetProperties(s.Material);
             // What the surface sends back, per band. The registry's absorption is what it TAKES.
@@ -216,7 +230,7 @@ public static class EarlyReflections
                 if (MathF.Abs(Vector3.Dot(local, vAxis)) > halfV) continue;
 
                 float pathLength = Vector3.Distance(source, hit) + Vector3.Distance(hit, listener);
-                if (pathLength - direct > RangeMetres) continue;          // extra path, as ImageSource.MaxPathLength
+                if (pathLength - direct > maxExtraPathMetres) continue;   // extra path, as ImageSource.MaxPathLength
 
                 // Spherical spreading: the copy travelled further than the direct sound, so it arrives
                 // quieter in exactly that proportion. Nothing else is applied here — air absorption and
@@ -227,8 +241,8 @@ public static class EarlyReflections
 
                 // Both legs have to be clear of everything else, or this is a reflection off a wall
                 // with a building in front of it.
-                if (!LegIsClear(source, hit, solids, i)) continue;
-                if (!LegIsClear(hit, listener, solids, i)) continue;
+                if (!LegIsClearAmong(source, hit, near, nearIndex, i, -1)) continue;
+                if (!LegIsClearAmong(hit, listener, near, nearIndex, i, -1)) continue;
 
 
                 into.Add(new Arrival(
@@ -242,7 +256,7 @@ public static class EarlyReflections
         }
 
         if (Math.Min(maxOrder, MaxOrder) >= 2)
-            FindHigherOrders(source, listener, direct, solids, into, speedOfSound, Math.Min(maxOrder, MaxOrder));
+            FindHigherOrders(source, listener, direct, solids, near, nearIndex, into, speedOfSound, Math.Min(maxOrder, MaxOrder), maxExtraPathMetres);
         if (flutter)
             FindFlutter(source, listener, direct, solids, into, speedOfSound);
 
@@ -285,6 +299,8 @@ public static class EarlyReflections
     [ThreadStatic] private static Vector3[]? _images, _hits;
     [ThreadStatic] private static int[]? _chain;
     [ThreadStatic] private static List<(int Solid, int Face, float Gain)>? _mirrors;
+    [ThreadStatic] private static List<Solid>? _local;
+    [ThreadStatic] private static List<int>? _localIndex;
 
     /// <summary>
     /// The copies of copies: every chain of two or three surfaces, drawn from the nearest dozen, that
@@ -295,8 +311,9 @@ public static class EarlyReflections
     /// path.
     /// </summary>
     private static void FindHigherOrders(Vector3 source, Vector3 listener, float direct,
-                                         IReadOnlyList<Solid> solids, List<Arrival> into, float speedOfSound,
-                                         int maxOrder)
+                                         IReadOnlyList<Solid> solids, List<Solid> local, List<int> index,
+                                         List<Arrival> into, float speedOfSound,
+                                         int maxOrder, float maxExtraPathMetres)
     {
         // The mirrors are the surfaces that already sent this sound to this ear once: every face that
         // gave a valid first-order copy. That is the whole of "a surface that can take part", and it
@@ -341,7 +358,7 @@ public static class EarlyReflections
             if (Vector3.Dot(listener - last.Centre, last.Normal) <= 0.01f) return;
 
             float pathLength = Vector3.Distance(images[order], listener);
-            if (pathLength - direct > RangeMetres || pathLength <= direct) return;
+            if (pathLength - direct > maxExtraPathMetres || pathLength <= direct) return;
             float spread = direct / pathLength;
             if (MathF.Max(keepL, MathF.Max(keepM, keepH)) * HeardReference(direct) / pathLength < MinRelativeAmplitude) return;
 
@@ -369,7 +386,7 @@ public static class EarlyReflections
                 Vector3 next = j < order ? hits[j] : listener;
                 int skipA = j > 0 ? cand[chain[j - 1]].M.Solid : -1;
                 int skipB = j < order ? cand[chain[j]].M.Solid : -1;
-                if (!LegIsClear(prev, next, solids, skipA, skipB)) return;
+                if (!LegIsClearAmong(prev, next, local, index, skipA, skipB)) return;
                 prev = next;
             }
 

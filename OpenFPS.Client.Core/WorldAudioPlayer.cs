@@ -657,7 +657,8 @@ public sealed class WorldAudioPlayer
         if (solids.Count == 0) return;
         Vector3 src = item.Sound.Position;
         EarlyReflections.Find(src, listenerPosition, solids, _room, AudioPhysics.SpeedOfSound,
-                              maxOrder: EarlyReflections.MaxOrder, keep: MaxRoomEchoes * 2);
+                              maxOrder: EarlyReflections.MaxOrder, keep: MaxRoomEchoes * 2,
+                              maxExtraPathMetres: RoomEchoWindowSeconds * AudioPhysics.SpeedOfSound);
         float direct = MathF.Max(1f, Vector3.Distance(src, listenerPosition));
         // Loudest first. Find hands its arrivals back in surface order, and with more inside the
         // window than there are voices (twenty-two in flat 01F, twelve voices) the first twelve BY

@@ -30,6 +30,16 @@ public static class RoomEchoesSpike
         Console.WriteLine($"  {solids.Count} solids; ear ({ear.X:F2}, {ear.Y:F2}, {ear.Z:F2}), source ({src.X:F2}, {src.Y:F2}, {src.Z:F2}), direct {Vector3.Distance(ear, src):F2} m");
         var into = new List<EarlyReflections.Arrival>();
         EarlyReflections.Find(src, ear, solids, into, AudioPhysics.SpeedOfSound, maxOrder: EarlyReflections.MaxOrder, keep: 48);
+        // What one search costs on the game thread, which is where every footstep runs it.
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        for (int i = 0; i < 20; i++) EarlyReflections.Find(src, ear, solids, into, AudioPhysics.SpeedOfSound, maxOrder: EarlyReflections.MaxOrder, keep: 48);
+        Console.WriteLine($"  search: {sw.Elapsed.TotalMilliseconds / 20:F1} ms per sound over {solids.Count} solids (order {EarlyReflections.MaxOrder}, 200 m)");
+        sw.Restart();
+        for (int i = 0; i < 20; i++) EarlyReflections.Find(src, ear, solids, into, AudioPhysics.SpeedOfSound, maxOrder: EarlyReflections.MaxOrder, keep: 48, maxExtraPathMetres: 0.08f * AudioPhysics.SpeedOfSound);
+        Console.WriteLine($"  search: {sw.Elapsed.TotalMilliseconds / 20:F2} ms per sound as the room echoes ask (80 ms window)");
+        sw.Restart();
+        for (int i = 0; i < 20; i++) EarlyReflections.Find(src, ear, solids, into, AudioPhysics.SpeedOfSound, maxOrder: 1, keep: 48);
+        Console.WriteLine($"  search: {sw.Elapsed.TotalMilliseconds / 20:F1} ms per sound, first order only");
         into.Sort((a, b) => a.ExtraDelaySeconds.CompareTo(b.ExtraDelaySeconds));
         float direct = MathF.Max(1f, Vector3.Distance(src, ear));
         foreach (var a in into)

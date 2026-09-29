@@ -4,6 +4,13 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-09-29
 
+- The reflection search only looks at the boxes that can matter. Every footstep and clap in a room
+  searched the whole city (5,220 solids) and tested every leg against all of it: 73-90 ms per
+  footstep on the game thread in the flat, which is five frames. A path no longer than the window
+  allows lies inside an ellipsoid round the source and the ear, so the search first keeps the boxes
+  within that reach and tests legs against those alone: 3.7 ms in the flat, 0.5 on the street.
+  `--room-echoes` prints the cost.
+
 - `/room -6` trims the room you are in: its placed early reflections and its late tail together,
   in decibels against the traced level. Rooms only; outdoors and open shelters are unchanged.
   `OPENFPS_ROOM_DB` starts it. The default is -24, set by ear, the same figure as the traced echoes
