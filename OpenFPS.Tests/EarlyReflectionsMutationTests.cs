@@ -23,7 +23,8 @@ public class EarlyReflectionsMutationTests
     private readonly List<EarlyReflections.Arrival> _found = new();
 
     // Concrete keeps 1 - absorption per band: 0.99 low, 0.98 mid, 0.98 high.
-    private const float KeepLow = 0.99f, KeepMid = 0.98f;
+    // Amplitudes, from the material's energy absorption of 0.01 and 0.02 (EarlyReflections.Keep).
+    private static readonly float KeepLow = MathF.Sqrt(0.99f), KeepMid = MathF.Sqrt(0.98f);
 
     private static EarlyReflections.Solid Box(Vector3 centre, Vector3 size, string material = "Concrete")
         => new(centre, size, Q, material);

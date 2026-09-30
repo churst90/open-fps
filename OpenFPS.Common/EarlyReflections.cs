@@ -121,6 +121,14 @@ public static class EarlyReflections
     /// gunshot's copies inside it came out 8-11 dB hotter than the surfaces allowed (2026-09-29).
     /// <paramref name="direct"/> is the true source-listener distance the relative gain was taken at.
     /// </summary>
+    /// <summary>
+    /// The AMPLITUDE a surface sends back, from the ENERGY it absorbs: sqrt(1 - alpha). An absorption
+    /// coefficient is a share of power, and every gain here is a pressure (they are summed as
+    /// 20·log10). It was 1 - alpha, which took twice the decibels it should: carpet 3 dB a bounce too
+    /// many, 9 at third order (2026-09-29).
+    /// </summary>
+    public static float Keep(float absorption) => MathF.Sqrt(1f - Math.Clamp(absorption, 0f, 1f));
+
     public static float PlacedCopyGain(float relative, float pathLength, float direct, float reference)
     {
         float r = MathF.Max(0.1f, reference);
@@ -215,9 +223,9 @@ public static class EarlyReflections
 
             var p = AcousticRegistry.GetProperties(s.Material);
             // What the surface sends back, per band. The registry's absorption is what it TAKES.
-            float keepLow = 1f - Math.Clamp(p.AbsorptionLow, 0f, 1f);
-            float keepMid = 1f - Math.Clamp(p.AbsorptionMid, 0f, 1f);
-            float keepHigh = 1f - Math.Clamp(p.AbsorptionHigh, 0f, 1f);
+            float keepLow = Keep(p.AbsorptionLow);
+            float keepMid = Keep(p.AbsorptionMid);
+            float keepHigh = Keep(p.AbsorptionHigh);
             if (MathF.Max(keepLow, MathF.Max(keepMid, keepHigh)) < MinRelativeAmplitude) continue;
 
             // Each of the six faces is a mirror. Only the one facing the listener can send anything
@@ -346,8 +354,8 @@ public static class EarlyReflections
             if (!FacePlane(s, f, out var c, out var n, out var u, out var v, out float hu, out float hv)) continue;
             var p = AcousticRegistry.GetProperties(s.Material);
             cand.Add((new Mirror(si, f, c, n, u, v, hu, hv,
-                                 1f - Math.Clamp(p.AbsorptionLow, 0f, 1f), 1f - Math.Clamp(p.AbsorptionMid, 0f, 1f),
-                                 1f - Math.Clamp(p.AbsorptionHigh, 0f, 1f), Math.Clamp(p.Scattering, 0f, 1f)), -gain));
+                                 Keep(p.AbsorptionLow), Keep(p.AbsorptionMid),
+                                 Keep(p.AbsorptionHigh), Math.Clamp(p.Scattering, 0f, 1f)), -gain));
         }
         if (cand.Count < 2) return;
         cand.Sort(static (a, b) => a.Score.CompareTo(b.Score));
@@ -493,8 +501,8 @@ public static class EarlyReflections
                 if (!byNormal.TryGetValue(key, out var list)) byNormal[key] = list = new List<(Mirror, float)>();
                 var p = AcousticRegistry.GetProperties(s.Material);
                 list.Add((new Mirror(i, f, c, n, u, v, hu, hv,
-                                     1f - Math.Clamp(p.AbsorptionLow, 0f, 1f), 1f - Math.Clamp(p.AbsorptionMid, 0f, 1f),
-                                     1f - Math.Clamp(p.AbsorptionHigh, 0f, 1f), Math.Clamp(p.Scattering, 0f, 1f)),
+                                     Keep(p.AbsorptionLow), Keep(p.AbsorptionMid),
+                                     Keep(p.AbsorptionHigh), Math.Clamp(p.Scattering, 0f, 1f)),
                           Vector3.Dot(listener - c, n)));
             }
         }

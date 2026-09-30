@@ -646,6 +646,23 @@ public sealed class WorldAudioPlayer
     /// and the loudest second orders follow.</summary>
     internal const int MaxRoomEchoes = 12;
 
+    /// <summary>
+    /// How many SECOND-order copies a sound's room gets as clean copies, beyond its first order. The
+    /// rest of the copies of copies are the room's tail, which the trace already is. Up to twelve
+    /// clean copies of one dry clap were twelve separate clicks to the ear, which hears copies of an
+    /// impulse as echoes from a few milliseconds on, where real reflections fuse; that, not their
+    /// level, is what -24 was paying for (2026-09-29).
+    /// </summary>
+    internal const int MaxSecondOrderCopies = 4;
+
+    /// <summary>
+    /// What a surface returns as a clean copy, of what it returns at all: the mirror share,
+    /// sqrt(1 - s) of the pressure per bounce. The scattered sqrt(s) is not a copy; it is the wash
+    /// (<see cref="EchoId"/>), and for a first-order wall it is placed beside the mirror.
+    /// </summary>
+    internal static float MirrorShare(float scattering, int order)
+        => MathF.Pow(MathF.Sqrt(1f - Math.Clamp(scattering, 0f, 1f)), Math.Max(1, order));
+
     private readonly List<EarlyReflections.Arrival> _room = new();
 
     private void QueueEarlyEchoes(in Pending item, WorldSnapshot world, Vector3 listenerPosition)
@@ -654,7 +671,7 @@ public sealed class WorldAudioPlayer
         if (solids.Count == 0) return;
         Vector3 src = item.Sound.Position;
         EarlyReflections.Find(src, listenerPosition, solids, _room, AudioPhysics.SpeedOfSound,
-                              maxOrder: EarlyReflections.MaxOrder, keep: MaxRoomEchoes * 2,
+                              maxOrder: 2, keep: MaxRoomEchoes * 2,
                               maxExtraPathMetres: RoomEchoWindowSeconds * AudioPhysics.SpeedOfSound);
         float direct = Vector3.Distance(src, listenerPosition);
         float reference = Loudness.Place(item.Sound.LevelDb, item.Sound.ExtentMetres).ReferenceDistance;
@@ -662,15 +679,23 @@ public sealed class WorldAudioPlayer
         // window than there are voices (twenty-two in flat 01F, twelve voices) the first twelve BY
         // SURFACE were taken, and which walls answered depended on their order in the map.
         _room.Sort(static (a, b) => b.GainMid.CompareTo(a.GainMid));
-        int added = 0;
+        int added = 0, secondOrder = 0;
         foreach (var a in _room)
         {
             if (a.ExtraDelaySeconds > RoomEchoWindowSeconds) continue;
             // The ground under the source: already inside the voice (GroundReflection).
             if (a.Order == 1 && a.HitPoint.Y < MathF.Min(src.Y, listenerPosition.Y) - 0.2f) continue;
-            float gain = EarlyReflections.PlacedCopyGain(a.GainMid, a.PathLength, direct, reference);
+            if (a.Order >= 2 && ++secondOrder > MaxSecondOrderCopies) continue;
+            float returned = EarlyReflections.PlacedCopyGain(a.GainMid, a.PathLength, direct, reference)
+                           * OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.CopiesTrim;   // /copies
+            // The scattered share of a first-order wall, as the wall's wash rather than a copy: the
+            // sound smeared by that surface's roughness, from the same place, carrying what the
+            // mirror does not. A wall that scatters little sends back almost all of it as the crack.
+            float s = Math.Clamp(a.Scattering, 0f, 1f);
+            if (a.Order == 1 && s > 0.05f && returned * MathF.Sqrt(s) >= ImageSource.MinGain)
+                QueueWash(item, a, returned * MathF.Sqrt(s));
+            float gain = returned * MirrorShare(s, a.Order);
             if (gain < ImageSource.MinGain) continue;
-            gain *= OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.CopiesTrim;   // /copies
             var echo = item.Sound;
             echo.Position = a.ImagePosition;
             echo.LevelDb = item.Sound.LevelDb + 20f * MathF.Log10(gain);
@@ -693,6 +718,29 @@ public sealed class WorldAudioPlayer
             });
             if (++added >= MaxRoomEchoes) break;
         }
+    }
+
+    /// <summary>A first-order wall's scattered share: the wash of the sound from where the wall
+    /// answers, coloured by what the wall absorbs but not by the mirror's loss.</summary>
+    private void QueueWash(in Pending item, in EarlyReflections.Arrival a, float gain)
+    {
+        var wash = item.Sound;
+        wash.Position = a.ImagePosition;
+        wash.LevelDb = item.Sound.LevelDb + 20f * MathF.Log10(gain);
+        float lowDb = 20f * MathF.Log10(MathF.Max(1e-4f, a.GainLow) / MathF.Max(1e-4f, a.GainMid));
+        float highDb = 20f * MathF.Log10(MathF.Max(1e-4f, a.GainHigh) / MathF.Max(1e-4f, a.GainMid));
+        QueueEcho(new Pending
+        {
+            Sound = wash,
+            CopyGain = gain, SourceLevelDb = item.Sound.LevelDb,
+            SoundId = EchoId(item, scattered: true, a.Scattering),
+            EchoLowDb = lowDb,
+            EchoHighDb = highDb,
+            SourceEntityId = item.SourceEntityId,
+            DueAt = item.DueAt,
+            IsReflection = true,
+            Seed = item.Seed,
+        });
     }
 
     private void QueueReflections(in Pending item, EngineReflections? reflections,

@@ -77,10 +77,11 @@ public class EarlyReflectionTests
         EarlyReflections.Find(source, listener, new[] { Wall(at, size, "Carpet") }, soft);
         var dull = Assert.Single(soft);
 
-        // Carpet takes half the mid band and concrete takes two percent of it, which is 5.9 dB between
-        // them — the registry's numbers, not a threshold picked to make this pass.
+        // Carpet takes half the mid band's ENERGY and concrete two percent of it, which is 2.9 dB
+        // between them (10·log10(0.5 / 0.98)) — the registry's numbers, not a threshold picked to make
+        // this pass. It read 5.9 while absorption was applied as an amplitude (EarlyReflections.Keep).
         float downDb = 20f * MathF.Log10(dull.GainMid / hard.GainMid);
-        Assert.True(downDb < -5f,
+        Assert.True(downDb < -2.5f,
             $"carpet returned {dull.GainMid:F3} against concrete's {hard.GainMid:F3} ({downDb:F1} dB)");
         // And it is duller, not merely quieter: carpet takes the top off hardest.
         Assert.True(dull.GainHigh / dull.GainLow < hard.GainHigh / hard.GainLow);

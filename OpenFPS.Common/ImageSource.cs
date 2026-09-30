@@ -215,7 +215,9 @@ public static class ImageSource
             float v = Vector3.Dot(rel, s.HalfV) / MathF.Max(1e-6f, s.HalfV.LengthSquared());
             bool specularLandsOnTheFace = MathF.Abs(u) <= 1f && MathF.Abs(v) <= 1f;
 
-            float reflected = 1f - Math.Clamp(s.Absorption, 0f, 1f);
+            // Amplitudes from energy shares (EarlyReflections.Keep): the surface returns sqrt(1 - a) of
+            // the pressure, the mirror sqrt(1 - s) of that and the scattered taps sqrt(s).
+            float reflected = EarlyReflections.Keep(s.Absorption);
             float scatter = Math.Clamp(s.Scattering, 0f, 1f);
 
             if (specularLandsOnTheFace)
@@ -225,7 +227,7 @@ public static class ImageSource
                 // Spreading loss, what the surface kept, and how much of it there is — and then only
                 // the share that leaves as a mirror image. A polished slab keeps nearly all of it
                 // here; a stand full of people almost none.
-                float gain = (direct / path) * reflected * (1f - scatter)
+                float gain = (direct / path) * reflected * MathF.Sqrt(1f - scatter)
                            * ApertureFactor(s, source, listener, hit);
 
                 if (path - direct <= MaxPathLength && path > direct && gain >= MinGain && delay >= MinDelaySeconds
@@ -234,7 +236,7 @@ public static class ImageSource
             }
 
             if (diffuseTaps > 0 && scatter > 0.01f)
-                n = Scatter(into, n, s, source, listener, direct, speedOfSound, reflected * scatter,
+                n = Scatter(into, n, s, source, listener, direct, speedOfSound, reflected * MathF.Sqrt(scatter),
                             diffuseTaps, occluded);
         }
         return n;
@@ -489,8 +491,8 @@ public static class ImageSource
 
                 // Two surfaces, so absorption and the size test both apply twice.
                 float gain = (direct / path)
-                           * (1f - Math.Clamp(A.Absorption, 0f, 1f))
-                           * (1f - Math.Clamp(B.Absorption, 0f, 1f))
+                           * EarlyReflections.Keep(A.Absorption)
+                           * EarlyReflections.Keep(B.Absorption)
                            * ApertureFactor(A, source, p2, p1)
                            * ApertureFactor(B, p1, listener, p2);
                 if (gain < MinGain) continue;

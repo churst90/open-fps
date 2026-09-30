@@ -4,6 +4,26 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-09-29
 
+- Reflections were measured at 0 dB before anything else was changed: a clap in flat 01F put its
+  placed copies at -14 dB and its traced tail at -17 dB against the direct sound, at or under what room
+  acoustics predicts. So -24 was not a level the rooms wanted, and three steps replace it.
+  1. Three bugs. A copy's gain used L/d, which is wrong inside the source's reference distance, so
+     loud sources' copies were 8-11 dB hot (now max(L,R)/max(d,R), EarlyReflections.PlacedCopyGain).
+     Far sources' traced echoes traced the open ground as well as carrying their own ground bounce,
+     a comb at about the direct level. The master-bus boundary copies sat outside the trim.
+  2. Two levels. `/tail` for everything traced (default 0, the traced level) and `/copies` for
+     everything placed as a copy (default -24 for now). `/reflections` sets both.
+  3. Copies as reflections. A surface keeps sqrt(1 - absorption) of the pressure, not 1 - absorption,
+     which took twice the decibels. A copy carries only the mirror share, sqrt(1 - scattering) per
+     bounce; a first-order wall's scattered share is played as its wash beside it. A room gets its
+     first order and at most four second-order copies; the rest is the tail. Your own steps get the
+     mirror share and the order limit, not yet the wash.
+  To judge: `/copies -80` and listen to the tail alone at 0, then bring the copies up in 6 dB steps.
+- Diffraction is the same both ways round an obstacle and exact over thin walls (open-fps-patches 7,
+  with a closed-form edge search: 20 us a call). Doorways and low walls lose less.
+- The material table is the only source of material values; `materials.json` is gone (a copy is in
+  `docs/retired/`).
+
 - The Windows client is brought level with the GTK one. Main menu: Connect, Saved Servers,
   Settings (output and input device, interface sounds), Open log folder, Quit, on the same
   `client.json` format (`%APPDATA%\openfps`). Keys come from the game window instead of a global

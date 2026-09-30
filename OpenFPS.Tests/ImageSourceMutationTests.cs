@@ -124,7 +124,7 @@ public class ImageSourceMutationTests
         Assert.Equal(1, n);
         Assert.Equal(1000f, into[0].PathLength);
         // The Fresnel zone at 500 m + 500 m is sqrt(0.49 * 250) = 11 m: a 50 m face covers it fully.
-        Assert.Equal(600f / 1000f * 0.98f, into[0].Gain, 4);
+        Assert.Equal(600f / 1000f * MathF.Sqrt(0.98f), into[0].Gain, 4);
         Assert.Equal(400f / C, into[0].DelaySeconds, 5);
 
         Assert.Equal(0, ImageSource.FirstOrder(new[] { wall }, new Vector3(410f, 0, -300f),
@@ -150,7 +150,7 @@ public class ImageSourceMutationTests
         Assert.Equal(Vector3.Zero, into[0].BouncePoint);
         Assert.Equal(1000f, into[0].PathLength);
         float area = 4f * 50f * 250f;
-        Assert.Equal(LambertGain(area, source, Vector3.Zero, listener, Vector3.UnitX, 0.98f), into[0].Gain, 3);
+        Assert.Equal(LambertGain(area, source, Vector3.Zero, listener, Vector3.UnitX, MathF.Sqrt(0.98f)), into[0].Gain, 3);
 
         Assert.Equal(0, ImageSource.FirstOrder(new[] { rough }, new Vector3(410f, 0, -300f),
                                                new Vector3(410f, 0, 300f), C, into, null, 1));
@@ -249,7 +249,7 @@ public class ImageSourceMutationTests
         var listener = new Vector3(5f, 0, 6f);
         Span<Reflection> into = stackalloc Reflection[4];
 
-        float lambertAtOnePercent = LambertGain(3600f, source, Vector3.Zero, listener, Vector3.UnitX, 0.01f);
+        float lambertAtOnePercent = LambertGain(3600f, source, Vector3.Zero, listener, Vector3.UnitX, MathF.Sqrt(0.01f));
         Assert.True(lambertAtOnePercent > ImageSource.MinGain);
 
         int n = ImageSource.FirstOrder(new[] { WallX0(30f, 30f, scattering: 0.01f) }, source, listener, C, into, null, 1);
@@ -258,7 +258,7 @@ public class ImageSourceMutationTests
         n = ImageSource.FirstOrder(new[] { WallX0(30f, 30f, scattering: 0.02f) }, source, listener, C, into, null, 1);
         var diffuse = into[..n].ToArray().Where(r => r.IsDiffuse).ToArray();
         var tap = Assert.Single(diffuse);
-        Assert.Equal(LambertGain(3600f, source, Vector3.Zero, listener, Vector3.UnitX, 0.02f), tap.Gain, 4);
+        Assert.Equal(LambertGain(3600f, source, Vector3.Zero, listener, Vector3.UnitX, MathF.Sqrt(0.02f)), tap.Gain, 4);
     }
 
     /// <summary>
@@ -396,10 +396,10 @@ public class ImageSourceMutationTests
         float aperture = MathF.Sqrt(MathF.Min(1f, 0.3f / zone) * MathF.Min(1f, 0.5f / zone));
         float direct = Vector3.Distance(source, listener);
         float path = Vector3.Distance(new Vector3(-4f, 0, -4f), listener);
-        Assert.Equal(direct / path * 0.98f, big, 4);
+        Assert.Equal(direct / path * MathF.Sqrt(0.98f), big, 4);
 
         Assert.Equal(1, ImageSource.FirstOrder(new[] { panel }, source, listener, C, into));
-        Assert.Equal(direct / path * 0.98f * aperture, into[0].Gain, 4);
+        Assert.Equal(direct / path * MathF.Sqrt(0.98f) * aperture, into[0].Gain, 4);
         Assert.InRange(aperture, 0.2f, 0.35f);
     }
 
@@ -567,7 +567,7 @@ public class ImageSourceMutationTests
         {
             Assert.Equal(path, r.PathLength, 3);
             Assert.Equal((path - 20f) / C, r.DelaySeconds, 5);
-            Assert.Equal(20f / path * 0.8f * 0.5f, r.Gain, 4);
+            Assert.Equal(20f / path * MathF.Sqrt(0.8f) * MathF.Sqrt(0.5f), r.Gain, 4);
             Assert.False(r.IsDiffuse);
             Assert.Equal(0.6f, r.Scattering);
         }
@@ -616,13 +616,13 @@ public class ImageSourceMutationTests
         Assert.Equal(0, ImageSource.SecondOrder(new[] { a, b }, Vector3.Zero, new Vector3(0, 0, 2f), C, into));
     }
 
-    /// <summary>Two walls that each keep five per cent: the double bounce keeps a quarter of one per
-    /// cent, far under MinGain, and there is nothing.</summary>
+    /// <summary>Two walls that each keep one per cent of the energy: the double bounce keeps a hundredth
+    /// of one per cent, an amplitude of 0.01, far under MinGain, and there is nothing.</summary>
     [Fact]
     public void AnAbsorbedSecondOrderReflectionIsDropped()
     {
-        var a = WallAtX(-5f, 1f, 10f, 20f, absorption: 0.95f);
-        var b = WallAtX(5f, -1f, 10f, 20f, absorption: 0.95f);
+        var a = WallAtX(-5f, 1f, 10f, 20f, absorption: 0.99f);
+        var b = WallAtX(5f, -1f, 10f, 20f, absorption: 0.99f);
         Span<Reflection> into = stackalloc Reflection[4];
         Assert.Equal(0, ImageSource.SecondOrder(new[] { a, b }, Vector3.Zero, new Vector3(0, 0, 20f), C, into));
     }

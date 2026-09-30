@@ -2695,17 +2695,21 @@ public class ClientAudioSystem
         var solids = _acoustics.ReflectionSolids(world);
         if (solids.Count == 0) return;
         OpenFPS.Common.EarlyReflections.Find(stepPos, ear, solids, _stepArrivals, AudioPhysics.SpeedOfSound,
-                                             maxOrder: OpenFPS.Common.EarlyReflections.MaxOrder, keep: WorldAudioPlayer.MaxRoomEchoes * 2,
+                                             maxOrder: 2, keep: WorldAudioPlayer.MaxRoomEchoes * 2,
                                              maxExtraPathMetres: WorldAudioPlayer.RoomEchoWindowSeconds * AudioPhysics.SpeedOfSound);
         _stepArrivals.Sort(static (a, b) => b.GainMid.CompareTo(a.GainMid));
         float direct = Vector3.Distance(stepPos, ear);
-        int added = 0;
+        int added = 0, secondOrder = 0;
         foreach (var a in _stepArrivals)
         {
             if (a.ExtraDelaySeconds > WorldAudioPlayer.RoomEchoWindowSeconds) continue;
             // The floor the foot is on: the step is made of it already.
             if (a.Order == 1 && a.HitPoint.Y < MathF.Min(stepPos.Y, ear.Y) - 0.2f) continue;
-            float gain = OpenFPS.Common.EarlyReflections.PlacedCopyGain(a.GainMid, a.PathLength, direct, stepReference);
+            if (a.Order >= 2 && ++secondOrder > WorldAudioPlayer.MaxSecondOrderCopies) continue;
+            // The mirror share only (WorldAudioPlayer.MirrorShare). A step is a bank sample, not a
+            // synthesised sound, so its scattered share has no wash to go to yet.
+            float gain = OpenFPS.Common.EarlyReflections.PlacedCopyGain(a.GainMid, a.PathLength, direct, stepReference)
+                       * WorldAudioPlayer.MirrorShare(a.Scattering, a.Order);
             if (gain < OpenFPS.Common.ImageSource.MinGain) continue;
             gain *= OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.CopiesTrim;   // /copies
             var loss = WorldAudioPlayer.SpecularLoss(a.Scattering, a.Order);
