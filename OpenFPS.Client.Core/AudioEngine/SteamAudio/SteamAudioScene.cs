@@ -26,8 +26,8 @@ public sealed class SteamAudioScene : IDisposable
     public IntPtr Handle => _scene;
     public bool IsBuilt => _scene != IntPtr.Zero;
 
-    /// <summary>World-space AABB of all built geometry (valid after <see cref="Build"/>). Used to size the
-    /// probe volume for pathing. Zero-sized when the scene is empty.</summary>
+    /// <summary>World-space AABB of all built geometry in the game's frame (valid after <see cref="Build"/>).
+    /// Used to size the probe volume for pathing. Zero-sized when the scene is empty.</summary>
     public Vector3 BoundsMin { get; private set; }
     public Vector3 BoundsMax { get; private set; }
 
@@ -172,10 +172,13 @@ public sealed class SteamAudioScene : IDisposable
 
         var min = new Vector3(float.MaxValue);
         var max = new Vector3(float.MinValue);
+        // In the game's frame: the vertices are already in Steam Audio's, and the probe bake converts
+        // these bounds itself (SteamAudioSimulator.BuildOrRebakeProbes).
         foreach (var v in vArr)
         {
-            min = Vector3.Min(min, new Vector3(v.x, v.y, v.z));
-            max = Vector3.Max(max, new Vector3(v.x, v.y, v.z));
+            var g = new Vector3(v.x, v.y, Phonon.WorldZ(v.z));
+            min = Vector3.Min(min, g);
+            max = Vector3.Max(max, g);
         }
         BoundsMin = min; BoundsMax = max;
 
