@@ -83,6 +83,26 @@ internal sealed class TracedReverb : IDisposable
     public int Runs;
     public double LastRunMs;
 
+    /// <summary>
+    /// Read the traced IR back after every trace and publish its late part (<see cref="Late"/>) for
+    /// the tail of the place you stand in (LateTailIr). The SDK keeps the IR opaque, so an impulse is
+    /// pushed through a private convolution on this thread, on a reader of its own
+    /// (<see cref="ExtractReader"/>): a trace update goes to the first effect that reads it, and the
+    /// mixer's stages must not lose theirs. Set before <see cref="SetScene"/>.
+    /// </summary>
+    public bool ExtractLate;
+    /// <summary>The latest trace's late part, time zero at the direct sound. Null until the first.</summary>
+    public volatile LateTailIr? Late;
+    /// <summary>What reading it back cost, last time.</summary>
+    public double LastExtractMs;
+    /// <summary>The reader the extraction uses, never a mixer stage's.</summary>
+    public const int ExtractReader = MaxReaders - 1;
+    /// <summary>Most partitions a late part may have: the whole trace in blocks of the traced frame.</summary>
+    public int MaxLatePartitions => IrSize / FrameSize + 1;
+    private IntPtr _extractEffect;
+    private Phonon.IPLAudioBuffer _extractIn, _extractOut;
+    private float[] _extractMono = Array.Empty<float>(), _extractInter = Array.Empty<float>();
+
     /// <param name="refreshMs">How often the trace is redone: a quarter second for the listener,
     /// who walks; a second for a room traced from its middle, which does not move.</param>
     public TracedReverb(IntPtr context, int sampleRate = 44100, int frameSize = TracedFrame, int refreshMs = DefaultRefreshMs)
@@ -126,6 +146,16 @@ internal sealed class TracedReverb : IDisposable
                 }
             }
             _haveScene = _source != IntPtr.Zero;
+            if (_haveScene && ExtractLate && _readers[ExtractReader] == IntPtr.Zero)
+            {
+                var es = new Phonon.IPLSourceSettings { flags = Phonon.IPL_SIMULATIONFLAGS_REFLECTIONS };
+                if (Phonon.iplSourceCreate(_simulator, ref es, out IntPtr xs) == Phonon.IPL_STATUS_SUCCESS)
+                {
+                    Phonon.iplSourceAdd(xs, _simulator);
+                    Phonon.iplSimulatorCommit(_simulator);
+                    _readers[ExtractReader] = xs;
+                }
+            }
         }
         if (_haveScene && _thread == null)
         {
@@ -195,6 +225,12 @@ internal sealed class TracedReverb : IDisposable
                 }
                 LastRunMs = (System.Diagnostics.Stopwatch.GetTimestamp() - t0) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
                 Runs++;
+                if (ExtractLate)
+                {
+                    long x0 = System.Diagnostics.Stopwatch.GetTimestamp();
+                    if (ReadBack() is { } w) Late = LateTailIr.Build(w, SampleRate, FrameSize, MaxLatePartitions);
+                    LastExtractMs = (System.Diagnostics.Stopwatch.GetTimestamp() - x0) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+                }
             }
             catch (Exception ex) { Serilog.Log.Warning(ex, "Traced reverb: a trace failed."); }
             Thread.Sleep(_refreshMs);
@@ -221,6 +257,41 @@ internal sealed class TracedReverb : IDisposable
         return true;
     }
 
+    /// <summary>
+    /// The latest trace's omnidirectional channel, read back through a private convolution: warmed
+    /// on silence (an effect crossfades a new IR in over its first block), then one impulse. Tracer
+    /// thread only. Null if there is nothing to read yet.
+    /// </summary>
+    private float[]? ReadBack()
+    {
+        if (!TryGetParams(ExtractReader, out var prm)) return null;
+        int frame = FrameSize, ch = Channels, frames = IrSize / frame;
+        if (_extractEffect == IntPtr.Zero)
+        {
+            var au = new Phonon.IPLAudioSettings { samplingRate = SampleRate, frameSize = frame };
+            var es = new Phonon.IPLReflectionEffectSettings { type = Phonon.IPL_REFLECTIONEFFECTTYPE_CONVOLUTION, irSize = IrSize, numChannels = ch };
+            if (Phonon.iplReflectionEffectCreate(Context, ref au, ref es, out _extractEffect) != Phonon.IPL_STATUS_SUCCESS)
+            { _extractEffect = IntPtr.Zero; return null; }
+            Phonon.iplAudioBufferAllocate(Context, 1, frame, ref _extractIn);
+            Phonon.iplAudioBufferAllocate(Context, ch, frame, ref _extractOut);
+            _extractMono = new float[frame];
+            _extractInter = new float[frame * ch];
+        }
+        Phonon.iplReflectionEffectReset(_extractEffect);
+        var w = new float[frames * frame];
+        for (int b = -4; b < frames; b++)
+        {
+            Array.Clear(_extractMono);
+            if (b == 0) _extractMono[0] = 1f;
+            Phonon.iplAudioBufferDeinterleave(Context, _extractMono, ref _extractIn);
+            Phonon.iplReflectionEffectApply(_extractEffect, ref prm, ref _extractIn, ref _extractOut, IntPtr.Zero);
+            if (b < 0) continue;
+            Phonon.iplAudioBufferInterleave(Context, ref _extractOut, _extractInter);
+            for (int k = 0; k < frame; k++) w[b * frame + k] = _extractInter[k * ch];
+        }
+        return w;
+    }
+
     private static Phonon.IPLCoordinateSpace3 Coord(Vector3 origin) => new()
     {
         right = new Phonon.IPLVector3 { x = 1, y = 0, z = 0 },
@@ -240,6 +311,12 @@ internal sealed class TracedReverb : IDisposable
                 if (_readers[i] != IntPtr.Zero) { Phonon.iplSourceRelease(ref _readers[i]); _readers[i] = IntPtr.Zero; }
             _readers[0] = IntPtr.Zero;
             if (_source != IntPtr.Zero) Phonon.iplSourceRelease(ref _source);
+            if (_extractEffect != IntPtr.Zero)
+            {
+                Phonon.iplReflectionEffectRelease(ref _extractEffect);
+                Phonon.iplAudioBufferFree(Context, ref _extractIn);
+                Phonon.iplAudioBufferFree(Context, ref _extractOut);
+            }
             if (_simulator != IntPtr.Zero) Phonon.iplSimulatorRelease(ref _simulator);
         }
     }
@@ -270,7 +347,7 @@ internal static class TracedReverbSet
         lock (Gate)
         {
             _context = context; _scene = scene;
-            _listener ??= new TracedReverb(context);
+            _listener ??= new TracedReverb(context) { ExtractLate = true };
             if (_listener.IsValid) _listener.SetScene(listenerScene ?? scene);
             // The few sources traced from where they are (TracedEchoes), on the scene WITHOUT its open
             // ground, as the listener's trace is. Every voice already carries its own ground bounce

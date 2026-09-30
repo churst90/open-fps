@@ -26,6 +26,11 @@ internal sealed class TracedReverbState
     public IntPtr TailEffect;
     /// <summary>Play the tail only. Game thread writes.</summary>
     public volatile bool TailOnly;
+    /// <summary>The tail: the trace's own late part (LateTailIr), convolved here. Null falls back to
+    /// the parametric reverb, as does OPENFPS_TAIL_PARAMETRIC=1 for an A/B.</summary>
+    public LateTailConvolver? LateConv;
+    public static readonly bool ParametricTail = Environment.GetEnvironmentVariable("OPENFPS_TAIL_PARAMETRIC") == "1";
+    public float[] LateOut = Array.Empty<float>();
     public IntPtr Decode;                 // IPLAmbisonicsDecodeEffect (provider context)
     public IntPtr Hrtf;
     public Phonon.IPLAudioBuffer Mono, Ambi, Stereo;
@@ -341,7 +346,24 @@ internal static class TracedReverbDsp
             }
             Phonon.iplAudioBufferDeinterleave(s.WorkerContext, mono, ref s.Mono);
             bool diffuse = false;
-            if (s.TailOnly && s.TailEffect != IntPtr.Zero)
+            if (s.TailOnly && !TracedReverbState.ParametricTail && s.LateConv is { } lc)
+            {
+                // The traced late part itself, convolved: its level, its envelope and its decay are
+                // the room's. Silent until the first trace has been read back, a fraction of a second.
+                lc.SetIr(reverb.Late);
+                if (s.LateOut.Length < sub) { for (int k = 0; k < n * outCh; k++) o[k] = 0f; return RESULT.OK; }
+                lc.Process(mono.AsSpan(0, sub), s.LateOut.AsSpan(0, sub));
+                Array.Clear(s.AmbiScratch, 0, sub * TracedReverb.Channels);
+                for (int k = 0; k < sub; k++) s.AmbiScratch[k * TracedReverb.Channels] = s.LateOut[k];
+                if (s.Diffuse is { Ready: true } dfl)
+                {
+                    dfl.Render(s.AmbiScratch, sub, TracedReverb.Channels, TracedReverb.Order);
+                    Phonon.iplAudioBufferDeinterleave(s.WorkerContext, dfl.Sum, ref s.Ambi);
+                    diffuse = true;
+                }
+                else Phonon.iplAudioBufferDeinterleave(s.WorkerContext, s.AmbiScratch, ref s.Ambi);
+            }
+            else if (s.TailOnly && s.TailEffect != IntPtr.Zero)
             {
                 var tail = prm;
                 tail.type = Phonon.IPL_REFLECTIONEFFECTTYPE_PARAMETRIC;

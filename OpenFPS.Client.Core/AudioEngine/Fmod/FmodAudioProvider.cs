@@ -1869,7 +1869,10 @@ public class FmodAudioProvider : IAudioProvider
             AmbiScratch = new float[sub * TracedReverb.Channels],
             Orientation = Phonon.ListenerFrame(_listenerRot),
             // Its own reader in every trace it will play: see TracedReverb.MaxReaders.
-            Reader = Math.Min(_traced.Count, TracedReverb.MaxReaders - 1),
+            // Never the last: that one is the tracer's own, for reading the late tail back.
+            Reader = Math.Min(_traced.Count, TracedReverb.ExtractReader - 1),
+            LateConv = new LateTailConvolver(sub, tr.MaxLatePartitions),
+            LateOut = new float[sub],
             // The room you are in: its late tail as a field round the head, not one channel.
             Diffuse = DiffuseTail.Enabled
                 ? DiffuseTail.Create(_saContext, sub, TracedReverb.Order, TracedReverb.Channels, decode, Phonon.ListenerFrame(_listenerRot), _saHrtfTraced)
