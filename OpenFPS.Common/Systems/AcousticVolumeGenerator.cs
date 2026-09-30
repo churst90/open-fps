@@ -146,6 +146,63 @@ public static class AcousticVolumeGenerator
             authoredCount++;
         }
 
+        // 4b. OPEN FACES — openings the geometry already describes.
+        // The region survey (MapManager.SurveyRegions) measures each face of a place from the walls
+        // actually round it, and a face with no wall keeps the open material. That face IS an opening,
+        // exactly where it is and exactly its size, which is what the guessed portals below never knew.
+        // A tunnel's sections and its two mouths are this: open at their ends, walled along their
+        // length, and until now coupled to nothing — standing at the mouth you heard none of the
+        // tunnel's reverb, walking along it the section behind you dropped out, and stepping out of it
+        // cut it off (2026-09-29). Buildings keep their doors, which are authored portals the door
+        // system opens and shuts.
+        //
+        // Only for STRUCTURES: a region with at least one wall. A named stretch of street is never
+        // surveyed, so all six of its faces read open, and coupling every patch of open ground to its
+        // neighbours is not what an opening is. Never the floor: that is the ground.
+        //
+        // The aperture is the width of a square of the face's area. The bus's leak goes as aperture
+        // over distance, and the pressure through an opening goes as the square root of its area.
+        var linkedByGeometry = new HashSet<(int, int)>();
+        foreach (var p in acousticMap.Portals.Values)
+            linkedByGeometry.Add(PairKey(p.Portal.RegionAId, p.Portal.RegionBId));
+        int openingId = -2000, openingCount = 0;
+        foreach (var (r1, region) in acousticMap.Regions)
+        {
+            if (r1 == acousticMap.GlobalEnvironmentId || region.RoomSize.X <= 0f) continue;
+            if (!acousticMap.RegionPositions.TryGetValue(r1, out var c1)) continue;
+            int open = RoomAcoustics.OpenFaceCount(region);
+            if (open == 0 || open == 6) continue;
+            Quaternion rot = acousticMap.RegionRotations.GetValueOrDefault(r1, Quaternion.Identity);
+            Span<float> areas = stackalloc float[6];
+            RoomAcoustics.FaceAreas(region.RoomSize, areas);
+            for (int f = 1; f < 6; f++)                       // 0 is the floor
+            {
+                if (!RoomAcoustics.FaceIsOpen(region.Materials, f)) continue;
+                (Vector3 axis, float half) = f switch
+                {
+                    1 => (Vector3.UnitY, region.RoomSize.Y / 2f),
+                    2 => (Vector3.UnitZ, region.RoomSize.Z / 2f),
+                    3 => (-Vector3.UnitZ, region.RoomSize.Z / 2f),
+                    4 => (Vector3.UnitX, region.RoomSize.X / 2f),
+                    _ => (-Vector3.UnitX, region.RoomSize.X / 2f),
+                };
+                Vector3 n = Vector3.Normalize(Vector3.Transform(axis, rot));
+                Vector3 at = c1 + n * half;
+                // Two voxels out: a region is voxelised up to one voxel past its face, so a probe half a
+                // metre out can land back in the region it left and miss the section next door.
+                int r2 = grid.GetRegionAt(at + n * (2f * voxelResolution + 0.01f));
+                if (r2 == AcousticConstants.GlobalRegionId) r2 = acousticMap.GlobalEnvironmentId;
+                if (r2 == r1 || r2 == 0) continue;
+                if (!linkedByGeometry.Add(PairKey(r1, r2))) continue;
+                acousticMap.Portals[openingId--] = (
+                    new PortalComponent { RegionAId = r1, RegionBId = r2, ApertureSize = MathF.Sqrt(areas[f]) },
+                    at);
+                openingCount++;
+            }
+        }
+        if (openingCount > 0)
+            Console.WriteLine($"[AcousticMap] {openingCount} opening(s) from open faces (tunnel mouths, open sides).");
+
         // 5. UNDESCRIBED BOUNDARY AUDIT (and, only on request, synthesis).
         // Report every region boundary the map did not describe. Optionally fill it with a guessed portal
         // at the centre of the face — see the autoDiscoverPortals remarks: the guess is almost never where
