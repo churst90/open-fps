@@ -1549,7 +1549,11 @@ public class FmodAudioProvider : IAudioProvider
     /// Two of those were found and one fixed: the ear filters were a comb (fixed), and the trace rings
     /// as long at 4 kHz as at 250 Hz (0.79 s) where Sabine from the same materials says 0.52 — the top
     /// hangs on. Until that is found, the tail sits where it sounds right.
-    public static volatile float TailDb = EnvDb("OPENFPS_TAIL_DB") ?? EnvDb("OPENFPS_REFLECTIONS_DB") ?? -24f;
+    ///
+    /// -12 by ear once the tail's first few hundred milliseconds came from the walls they came off
+    /// (SdmTailIr, 2026-09-30): "a world of difference ... 0 doesn't sound bad but it may be a little too
+    /// much". Twelve decibels from physical, where it had been twenty-four.
+    public static volatile float TailDb = EnvDb("OPENFPS_TAIL_DB") ?? EnvDb("OPENFPS_REFLECTIONS_DB") ?? -12f;
     /// <summary>See <see cref="TailDb"/>.</summary>
     /// 0 dB by ear, 2026-09-29, once the copies carry only the mirror share with the scattered share as
     /// the wall's wash, at energy-correct levels, and at most four second-order copies (step 3), with

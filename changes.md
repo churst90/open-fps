@@ -15,8 +15,12 @@ Recent work, newest first. `git log` has the rest.
   all round. Sources not traced follow the place's own fitted law.
 - The tail is different at the two ears, as a real diffuse field is: twenty directions through their
   own head responses, and each ear made independent above 400 Hz.
-- `/tail` is back to 0, the physical level. `/tail -24` for comparison; `OPENFPS_TAIL_PARAMETRIC=1`
-  plays the old reverb; `/reverb` reports the per-source traces.
+- The tail's first few hundred milliseconds come from the walls they came off (the Spatial
+  Decomposition Method): each moment of the traced response plays from the direction it arrives from,
+  fixed in the room, so it moves round your head as you turn. In flat 01F most of it comes from the
+  ceiling. After about 0.3 s it is spread evenly. `OPENFPS_TAIL_SDM=0` goes back.
+- Levels by ear with all of that in: `/tail -12`, `/copies -6` (zero is physical for both).
+  `OPENFPS_TAIL_PARAMETRIC=1` plays the old reverb; `/reverb` reports the per-source traces.
 - The tunnel's open ends are openings, and a room you walk out of keeps ringing at its own rate.
 
 ## 2026-09-29
