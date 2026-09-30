@@ -3,7 +3,7 @@
 #
 # The repo lives on an ntfs3 volume whose kernel driver stalls MSBuild's output-write phase, so a plain
 # `dotnet run` (which writes obj/bin onto ntfs3) hangs. This builds with --artifacts-path on tmpfs and then
-# runs the prebuilt DLL directly. The build copies ASSETS, materials.json and the FMOD/Steam-Audio .so libs
+# runs the prebuilt DLL directly. The build copies ASSETS and the FMOD/Steam-Audio .so libs
 # next to the DLL, so the tmpfs output is self-contained.
 #
 # Usage:
@@ -158,7 +158,7 @@ DOTNET_CLI_TELEMETRY_OPTOUT=1 DOTNET_NOLOGO=1 DOTNET_CLI_USE_MSBUILD_SERVER=0 \
 
 echo "Launching GTK client from $OUT ..."
 [ -n "$MODE" ] && echo "  mode: $MODE"
-cd "$OUT"                 # cwd so materials.json (loaded relative to cwd) resolves
+cd "$OUT"                 # cwd so machines/ (loaded relative to cwd) resolves
 
 # ── If it dies, leave something to read ──────────────────────────────────────────────────────────
 #

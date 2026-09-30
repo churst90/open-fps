@@ -26,9 +26,6 @@
     <None Include="..\OpenFPS.Client\ASSETS\**\*.*" Link="ASSETS\%(RecursiveDir)%(Filename)%(Extension)">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Include="..\OpenFPS.Client\materials.json" Link="materials.json">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
     <!-- The authored machine library. The client assembles a vehicle's engine itself from the name
          the server sends, so it has to know the same machines the server does. -->
     <None Include="..\OpenFPS.Server\machines\*.json" Link="machines\%(Filename)%(Extension)">

@@ -433,9 +433,6 @@ All in `OpenFPS.Server/`:
 | `friends.json` | Friends lists. |
 | `logs/` | Server logs, one file per day. |
 
-A `materials.json` in the server folder would override the built-in acoustic materials. None ships
-with the server.
-
 ### Pedestrian voices
 
 The recorded lines are in `OpenFPS.Client/ASSETS/SOUNDS/VOICES/<voice>/`, and the list the server

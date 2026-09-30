@@ -226,7 +226,7 @@ public static class MachineRegistry
     ///
     /// Called by whatever starts up — server, client, lab — because all three have to agree about
     /// what a machine name means. They resolve it relative to their own working directory, the same
-    /// way materials.json and prefabs/ already do.
+    /// way prefabs/ already does.
     /// </summary>
     public static void EnsureLoaded(string directory = "machines")
     {

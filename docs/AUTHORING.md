@@ -29,7 +29,6 @@ OpenFPS.Server/
   maps/<mapid>.json          one file per map, named after its Id
   prefabs/<prefabid>.json    one file per prefab, named after its Id
   prefabs/prefab-schema.json the schema (skipped by the loader)
-  materials.json             optional per-material acoustic overrides
 ```
 
 Both loaders accept `//` comments and trailing commas, so a map can be annotated in place — `maps/default.json`

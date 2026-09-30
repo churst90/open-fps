@@ -1,6 +1,4 @@
 using System.Collections.Generic;
-using System.IO;
-using System.Text.Json;
 
 namespace OpenFPS.Common;
 
@@ -54,24 +52,6 @@ public struct MaterialProperties
     public bool Porous { get; set; }
 }
 
-/// <summary>JSON override DTO — every field nullable so omitted fields don't clobber the
-/// hardcoded frequency-band defaults during the merge.</summary>
-internal sealed class MaterialOverride
-{
-    public float? Absorption { get; set; }
-    public float? AbsorptionLow { get; set; }
-    public float? AbsorptionMid { get; set; }
-    public float? AbsorptionHigh { get; set; }
-    public float? Scattering { get; set; }
-    public float? TransmissionLow { get; set; }
-    public float? TransmissionMid { get; set; }
-    public float? TransmissionHigh { get; set; }
-    public int? ResonanceIndex { get; set; }
-    public float? DensityKgM3 { get; set; }
-    public float? YoungsModulusGPa { get; set; }
-    public float? LossFactor { get; set; }
-}
-
 public static class AcousticRegistry
 {
     // Volatile + build-then-swap: the registry is read from many threads (game loop, audio worker, FMOD
@@ -89,7 +69,6 @@ public static class AcousticRegistry
         {
             var reg = new Dictionary<string, MaterialProperties>(System.StringComparer.OrdinalIgnoreCase);
 
-            // HARDCODED REALISM CONSTANTS: Ensuring these are ALWAYS used regardless of external JSON
             reg["Generic"] = new MaterialProperties { Absorption = 0.2f, AbsorptionLow = 0.1f, AbsorptionMid = 0.2f, AbsorptionHigh = 0.3f, Scattering = 0.2f, TransmissionLow = 0.4f, TransmissionMid = 0.3f, TransmissionHigh = 0.2f, ResonanceIndex = 22, DensityKgM3 = 1200f, YoungsModulusGPa = 5f, LossFactor = 0.02f };
             reg["Wood"] = new MaterialProperties { Absorption = 0.15f, AbsorptionLow = 0.1f, AbsorptionMid = 0.15f, AbsorptionHigh = 0.2f, Scattering = 0.4f, TransmissionLow = 0.6f, TransmissionMid = 0.4f, TransmissionHigh = 0.2f, ResonanceIndex = 21, DensityKgM3 = 650f, YoungsModulusGPa = 11f, LossFactor = 0.03f };
             reg["Metal"] = new MaterialProperties { Absorption = 0.05f, AbsorptionLow = 0.05f, AbsorptionMid = 0.05f, AbsorptionHigh = 0.1f, Scattering = 0.1f, TransmissionLow = 0.1f, TransmissionMid = 0.05f, TransmissionHigh = 0.02f, ResonanceIndex = 13, DensityKgM3 = 7850f, YoungsModulusGPa = 200f, LossFactor = 0.0002f };
@@ -222,40 +201,7 @@ public static class AcousticRegistry
             foreach (var porous in new[] { "Fence", "Foliage", "Grass", "Audience", "Dirt", "Gravel", "Carpet", "AcousticTile", "None" })
                 if (reg.TryGetValue(porous, out var pp)) { pp.Porous = true; reg[porous] = pp; }
 
-            string path = "materials.json";
-            if (File.Exists(path))
-            {
-                try {
-                    string json = File.ReadAllText(path);
-                    // MERGE, don't replace: materials.json typically carries only a subset of fields
-                    // (Absorption/Scattering/ResonanceIndex). Deserializing into the full struct and
-                    // overwriting would zero the frequency bands (Transmission*/Absorption{Low,Mid,High}),
-                    // collapsing occlusion EQ and wall transmission. Start from the hardcoded entry and
-                    // apply only the fields the JSON actually specifies.
-                    var loaded = JsonSerializer.Deserialize<Dictionary<string, MaterialOverride>>(json);
-                    if (loaded != null) {
-                        foreach (var kvp in loaded) {
-                            var p = reg.TryGetValue(kvp.Key, out var existing) ? existing : reg["Generic"];
-                            var o = kvp.Value;
-                            if (o.Absorption.HasValue) p.Absorption = o.Absorption.Value;
-                            if (o.AbsorptionLow.HasValue) p.AbsorptionLow = o.AbsorptionLow.Value;
-                            if (o.AbsorptionMid.HasValue) p.AbsorptionMid = o.AbsorptionMid.Value;
-                            if (o.AbsorptionHigh.HasValue) p.AbsorptionHigh = o.AbsorptionHigh.Value;
-                            if (o.Scattering.HasValue) p.Scattering = o.Scattering.Value;
-                            if (o.TransmissionLow.HasValue) p.TransmissionLow = o.TransmissionLow.Value;
-                            if (o.TransmissionMid.HasValue) p.TransmissionMid = o.TransmissionMid.Value;
-                            if (o.TransmissionHigh.HasValue) p.TransmissionHigh = o.TransmissionHigh.Value;
-                            if (o.ResonanceIndex.HasValue) p.ResonanceIndex = o.ResonanceIndex.Value;
-                            if (o.DensityKgM3.HasValue) p.DensityKgM3 = o.DensityKgM3.Value;
-                            if (o.YoungsModulusGPa.HasValue) p.YoungsModulusGPa = o.YoungsModulusGPa.Value;
-                            if (o.LossFactor.HasValue) p.LossFactor = o.LossFactor.Value;
-                            reg[kvp.Key] = p;
-                        }
-                    }
-                } catch {}
-            }
-
-            // Startup assertion: detect any ResonanceIndex collisions introduced by materials.json overrides.
+            // Every material needs its own ResonanceIndex; report any two that share one.
             var seen = new Dictionary<int, string>();
             foreach (var kvp in reg)
             {
@@ -275,7 +221,7 @@ public static class AcousticRegistry
     /// Initializes the table if nothing has yet — the server never called <see cref="Initialize"/>, so
     /// anything on the server side that needs to know what a material *is* (prefab validation, name to
     /// resonance-index resolution) would otherwise read an empty registry and reject every material name.
-    /// Idempotent; a caller that wants to re-read materials.json still calls <see cref="Initialize"/>.
+    /// Idempotent.
     /// </summary>
     public static void EnsureInitialized()
     {
