@@ -210,6 +210,9 @@ public sealed class SteamAudioScene : IDisposable
     /// multiplies the transmission of every surface it counts (SteamAudioSimulator counts several, so
     /// that two walls in a row are both paid for), so each face carries half the box's loss.
     /// </summary>
+    /// <summary>Steam Audio's three band centres (phonon.h, IPLMaterial).</summary>
+    public static readonly (float Low, float Mid, float High) SteamAudioBandsHz = (400f, 2500f, 15000f);
+
     private static int MaterialIndex(string name, float thickness, List<Phonon.IPLMaterial> materials, Dictionary<string, int> byName)
     {
         name = string.IsNullOrEmpty(name) ? "Generic" : name;
@@ -217,10 +220,14 @@ public sealed class SteamAudioScene : IDisposable
         string key = name + "@" + cm.ToString(System.Globalization.CultureInfo.InvariantCulture);
         if (byName.TryGetValue(key, out int idx)) return idx;
         var p = AcousticRegistry.GetProperties(name);
-        var (tl, tm, th) = AcousticRegistry.MassLawTransmission(name, cm / 100f);
+        // Steam Audio's bands are centred at 400 Hz, 2.5 kHz and 15 kHz (phonon.h); the table's at 200 Hz,
+        // 1.25 kHz and 8 kHz. They went across one to one, so the 2-4 kHz a room's top end is made of
+        // took the table's 1.25 kHz figure, and the mass law was a band low everywhere.
+        var (tl, tm, th) = AcousticRegistry.MassLawTransmission(name, cm / 100f, SteamAudioBandsHz);
+        float Abs(float hz) => AcousticRegistry.AtFrequency(p.AbsorptionLow, p.AbsorptionMid, p.AbsorptionHigh, hz);
         materials.Add(new Phonon.IPLMaterial
         {
-            absLow = p.AbsorptionLow, absMid = p.AbsorptionMid, absHigh = p.AbsorptionHigh,
+            absLow = Abs(SteamAudioBandsHz.Low), absMid = Abs(SteamAudioBandsHz.Mid), absHigh = Abs(SteamAudioBandsHz.High),
             scattering = p.Scattering,
             transLow = MathF.Sqrt(tl), transMid = MathF.Sqrt(tm), transHigh = MathF.Sqrt(th),
         });

@@ -37,7 +37,24 @@ public static class TailBandsSpike
             new(new Vector3(0, 1.4f, -9.0f), new Vector3(W, 2.73f, 0.2f), Q, "Plaster"),
             new(new Vector3(0, 1.4f, 9.0f), new Vector3(W, 2.73f, 0.2f), Q, "Plaster"),
         };
+        // The sofa, as in the research's flat: soft furnishing scatters the sideways-running sound into
+        // the absorbent floor. args "bare" leaves it out.
+        if (!args.Contains("bare")) boxes.Add(new(new Vector3(3.2f, 0.32f, -3.4f), new Vector3(1.8f, 0.6f, 1.8f), Q, "Audience"));
         var ear = new Vector3(0.175f, 1.7f, 0.16f);
+        if (args.Contains("corridor"))
+        {
+            // 60 m long (north-south), 3 m wide, 3 m high, concrete; standing in the middle.
+            boxes = new List<SteamAudioScene.Box>
+            {
+                new(new Vector3(0, -0.1f, 0), new Vector3(3.4f, 0.2f, 60f), Q, "Concrete"),
+                new(new Vector3(0, 3.1f, 0), new Vector3(3.4f, 0.2f, 60f), Q, "Concrete"),
+                new(new Vector3(-1.6f, 1.5f, 0), new Vector3(0.2f, 3f, 60f), Q, "Concrete"),
+                new(new Vector3(1.6f, 1.5f, 0), new Vector3(0.2f, 3f, 60f), Q, "Concrete"),
+                new(new Vector3(0, 1.5f, -30.1f), new Vector3(3.4f, 3f, 0.2f), Q, "Concrete"),
+                new(new Vector3(0, 1.5f, 30.1f), new Vector3(3.4f, 3f, 0.2f), Q, "Concrete"),
+            };
+            ear = new Vector3(0f, 1.6f, 0f);
+        }
         using var scene = new SteamAudioScene(ctx);
         scene.Build(boxes);
         using var tr = new TracedReverb(ctx) { ExtractLate = true };
@@ -57,7 +74,13 @@ public static class TailBandsSpike
         {
             float A = surfaces.Sum(x => { var p = AcousticRegistry.GetProperties(x.Mat); return x.Area * (b == 0 ? p.AbsorptionLow : b == 1 ? p.AbsorptionMid : p.AbsorptionHigh); });
             float sabine = 0.161f * V / A, eyring = 0.161f * V / (-S * MathF.Log(1f - A / S));
-            Console.WriteLine($"  {names[b],4}: mean absorption {A / S:F3}  Sabine {sabine:F2} s  Eyring {eyring:F2} s");
+            // Fitzroy: absorption concentrated on one pair of faces (the carpet) leaves the sound running
+            // between the hard ones living long; Sabine assumes it is spread evenly.
+            float Pair(float area, float a) => area / MathF.Max(1e-4f, -MathF.Log(1f - MathF.Min(0.99f, a)));
+            float Ab(string m) { var p = AcousticRegistry.GetProperties(m); return b == 0 ? p.AbsorptionLow : b == 1 ? p.AbsorptionMid : p.AbsorptionHigh; }
+            float floorCeil = (Ab("Carpet") + Ab("Plaster")) / 2f, eastWest = (Ab("Brick") + Ab("Plaster")) / 2f, northSouth = Ab("Plaster");
+            float fitzroy = 0.161f * V / (S * S) * (Pair(2 * W * D, floorCeil) + Pair(2 * D * H, eastWest) + Pair(2 * W * H, northSouth));
+            Console.WriteLine($"  {names[b],4}: mean absorption {A / S:F3}  Sabine {sabine:F2} s  Eyring {eyring:F2} s  Fitzroy {fitzroy:F2} s");
         }
         foreach (double f in new[] { 125.0, 250, 500, 1000, 2000, 4000 })
         {
@@ -82,7 +105,23 @@ public static class TailBandsSpike
             foreach (var i in order.Take(8)) Console.WriteLine($"    {sdm.Share[i],6:P1}  {Name(DiffuseTail.Direction(i))}");
             // Horizontal lean: net pull of the directional energy.
             var net = Vector3.Zero; for (int i = 0; i < sdm.Share.Length; i++) net += sdm.Share[i] * DiffuseTail.Direction(i);
-            Console.WriteLine($"    net pull {net.Length():F2} toward {Name(Vector3.Normalize(net))} (the ear is at x {ear.X:F2}, z {ear.Z:F2} in a {W} x {D} m room)");
+            Console.WriteLine($"    net pull {net.Length():F2} toward {Name(Vector3.Normalize(net))} (the ear is at x {ear.X:F2}, z {ear.Z:F2})");
+            // The remainder, by axis: how much of it runs north-south, east-west, up-down.
+            float ns = 0, ew = 0, ud = 0;
+            for (int i = 0; i < sdm.LateShare.Length; i++)
+            {
+                var d = DiffuseTail.Direction(i);
+                float ax = MathF.Abs(d.X), ay = MathF.Abs(d.Y), az = MathF.Abs(d.Z);
+                if (az >= ax && az >= ay) ns += sdm.LateShare[i]; else if (ax >= ay) ew += sdm.LateShare[i]; else ud += sdm.LateShare[i];
+            }
+            int nNs = 0, nEw = 0, nUd = 0;
+            for (int i = 0; i < sdm.LateShare.Length; i++)
+            {
+                var d = DiffuseTail.Direction(i);
+                float ax = MathF.Abs(d.X), ay = MathF.Abs(d.Y), az = MathF.Abs(d.Z);
+                if (az >= ax && az >= ay) nNs++; else if (ax >= ay) nEw++; else nUd++;
+            }
+            Console.WriteLine($"  remainder (after 0.3 s) by axis: north-south {ns:P0} ({nNs} directions), east-west {ew:P0} ({nEw}), up-down {ud:P0} ({nUd})");
         }
         else Console.WriteLine("  no directional part (OPENFPS_TAIL_SDM=0, or the ambisonic tail)");
         return 0;

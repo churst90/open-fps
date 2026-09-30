@@ -104,6 +104,75 @@ internal sealed class TracedReverb : IDisposable
     private System.Numerics.Vector3 _ax1, _ax2, _ax3;
     private bool _axesKnown;
     private float[] _c1 = Array.Empty<float>(), _c2 = Array.Empty<float>(), _c3 = Array.Empty<float>();
+
+    // ── Where the remainder arrives from ─────────────────────────────────────────────────────────
+    //
+    // Averaged over a stretch of the trace, W times each channel is the coefficient of the ENERGY
+    // arriving from each direction, expanded in the same spherical harmonics (for arrivals that do not
+    // interfere, the cross terms average out). At first order that is the intensity, and from the
+    // middle of a corridor the two ends cancel in it; at second order they add. So the remainder's
+    // distribution is rebuilt from all nine: f(u) = 1 + sum_c (<W ch_c> / <W W>) g_c(u) / <g_c^2>,
+    // with g_c(u) each channel's gain for a sound from u and <g_c^2> its mean over the sphere, both
+    // measured through Steam Audio's own encoder. Tried first, and wrong: a direction per sample, as
+    // the early part uses — in a 60 m corridor it put 25 % of the late energy along the axis, less
+    // than an even spread, because opposed arrivals cancel in it.
+    private readonly double[] _lateCov = new double[Channels];
+    private float[,]? _dirGains;          // [direction, channel]
+    private float[]? _chanPower;          // mean g_c^2 over the sphere
+
+    private void CalibrateSphere()
+    {
+        int k = DiffuseBranch.Count;
+        var au = new Phonon.IPLAudioSettings { samplingRate = SampleRate, frameSize = 64 };
+        var es = new Phonon.IPLAmbisonicsEncodeEffectSettings { maxOrder = Order };
+        if (Phonon.iplAmbisonicsEncodeEffectCreate(Context, ref au, ref es, out IntPtr enc) != Phonon.IPL_STATUS_SUCCESS) return;
+        var inB = new Phonon.IPLAudioBuffer(); var outB = new Phonon.IPLAudioBuffer();
+        Phonon.iplAudioBufferAllocate(Context, 1, 64, ref inB); Phonon.iplAudioBufferAllocate(Context, Channels, 64, ref outB);
+        var ones = new float[64]; Array.Fill(ones, 1f); var inter = new float[64 * Channels];
+        float[] Gains(System.Numerics.Vector3 gameDir)
+        {
+            var ep = new Phonon.IPLAmbisonicsEncodeEffectParams { direction = Phonon.World(gameDir), order = Order };
+            for (int rep = 0; rep < 3; rep++)
+            {
+                Phonon.iplAudioBufferDeinterleave(Context, ones, ref inB);
+                Phonon.iplAmbisonicsEncodeEffectApply(enc, ref ep, ref inB, ref outB);
+            }
+            Phonon.iplAudioBufferInterleave(Context, ref outB, inter);
+            var g = new float[Channels]; float w = inter[63 * Channels];
+            for (int c = 0; c < Channels; c++) g[c] = w != 0 ? inter[63 * Channels + c] / w : 0f;
+            return g;
+        }
+        var dg = new float[k, Channels];
+        for (int d = 0; d < k; d++) { var g = Gains(DiffuseTail.Direction(d)); for (int c = 0; c < Channels; c++) dg[d, c] = g[c]; }
+        var pw = new double[Channels]; const int N = 200;
+        for (int i = 0; i < N; i++)
+        {
+            double y = 1 - 2 * (i + 0.5) / N, r = Math.Sqrt(1 - y * y), th = i * Math.PI * (3 - Math.Sqrt(5));
+            var g = Gains(new System.Numerics.Vector3((float)(r * Math.Cos(th)), (float)y, (float)(r * Math.Sin(th))));
+            for (int c = 0; c < Channels; c++) pw[c] += g[c] * (double)g[c] / N;
+        }
+        _chanPower = new float[Channels]; for (int c = 0; c < Channels; c++) _chanPower[c] = (float)pw[c];
+        _dirGains = dg;
+        Phonon.iplAmbisonicsEncodeEffectRelease(ref enc);
+        Phonon.iplAudioBufferFree(Context, ref inB); Phonon.iplAudioBufferFree(Context, ref outB);
+    }
+
+    /// <summary>The remainder's energy at each direction, shares summing to one (see above).</summary>
+    private void FillLateShares(float[] into)
+    {
+        int k = into.Length;
+        if (_dirGains == null || _chanPower == null || _lateCov[0] <= 0) { for (int d = 0; d < k; d++) into[d] = 1f / k; return; }
+        double sum = 0;
+        var f = new double[k];
+        for (int d = 0; d < k; d++)
+        {
+            double v = 1.0;
+            for (int c = 1; c < Channels; c++)
+                if (_chanPower[c] > 1e-9f) v += _lateCov[c] / _lateCov[0] * _dirGains[d, c] / _chanPower[c];
+            f[d] = Math.Max(0, v); sum += f[d];
+        }
+        for (int d = 0; d < k; d++) into[d] = sum > 0 ? (float)(f[d] / sum) : 1f / k;
+    }
     /// <summary>What reading it back cost, last time.</summary>
     public double LastExtractMs;
     /// <summary>The reader the extraction uses, never a mixer stage's.</summary>
@@ -246,7 +315,9 @@ internal sealed class TracedReverb : IDisposable
                         {
                             var dirs = new System.Numerics.Vector3[DiffuseBranch.Count];
                             for (int d = 0; d < dirs.Length; d++) dirs[d] = DiffuseTail.Direction(d);
-                            LateSdm = SdmTailIr.Build(w, _c1, _c2, _c3, _ax1, _ax2, _ax3, dirs, SampleRate, FrameSize);
+                            var sdm = SdmTailIr.Build(w, _c1, _c2, _c3, _ax1, _ax2, _ax3, dirs, SampleRate, FrameSize);
+                            FillLateShares(sdm.LateShare);
+                            LateSdm = sdm;
                             Late = LateTailIr.Build(w, SampleRate, FrameSize, MaxLatePartitions,
                                                     SdmTailIr.EndFadeStart, SdmTailIr.EndFadeEnd);
                         }
@@ -300,11 +371,14 @@ internal sealed class TracedReverb : IDisposable
             _extractMono = new float[frame];
             _extractInter = new float[frame * ch];
             (_ax1, _ax2, _ax3) = AmbiAxes.Calibrate(Context, SampleRate);
+            CalibrateSphere();
             _axesKnown = _ax1 != System.Numerics.Vector3.Zero || _ax2 != System.Numerics.Vector3.Zero || _ax3 != System.Numerics.Vector3.Zero;
         }
         Phonon.iplReflectionEffectReset(_extractEffect);
         var w = new float[frames * frame];
         _c1 = new float[w.Length]; _c2 = new float[w.Length]; _c3 = new float[w.Length];
+        Array.Clear(_lateCov);
+        int lateFrom = (int)(SdmTailIr.EndFadeStart * SampleRate);
         for (int b = -4; b < frames; b++)
         {
             Array.Clear(_extractMono);
@@ -318,6 +392,8 @@ internal sealed class TracedReverb : IDisposable
                 int i = b * frame + k, o = k * ch;
                 w[i] = _extractInter[o];
                 _c1[i] = _extractInter[o + 1]; _c2[i] = _extractInter[o + 2]; _c3[i] = _extractInter[o + 3];
+                if (i >= lateFrom)
+                    for (int c = 0; c < ch; c++) _lateCov[c] += _extractInter[o] * (double)_extractInter[o + c];
             }
         }
         return w;

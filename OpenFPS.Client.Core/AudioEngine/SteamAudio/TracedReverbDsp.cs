@@ -142,13 +142,22 @@ internal sealed class DiffuseTail
     private readonly float[] _branchGain = System.Linq.Enumerable.Repeat(1f, DiffuseBranch.Count).ToArray();
     private readonly float[] _branchTarget = new float[DiffuseBranch.Count];
 
+    /// <summary>
+    /// Where the trace's own remainder arrives from, direction by direction (SdmTailIr.LateShare):
+    /// the diffuse part is weighted by it before the sources' lean, so a corridor's late sound runs
+    /// along it and a room's stays even. Null: even. Read once a block.
+    /// </summary>
+    public volatile float[]? LateShares;
+
     private void UpdateBranchGains(int sub)
     {
         var bias = new System.Numerics.Vector3(Volatile.Read(ref _biasX), Volatile.Read(ref _biasY), Volatile.Read(ref _biasZ));
+        var shares = LateShares;
         float sum = 0f;
         for (int b = 0; b < DiffuseBranch.Count; b++)
         {
-            float w = MathF.Max(0f, 1f + 3f * System.Numerics.Vector3.Dot(bias, Direction(b)));
+            float place = shares != null && shares.Length == DiffuseBranch.Count ? shares[b] * DiffuseBranch.Count : 1f;
+            float w = place * MathF.Max(0f, 1f + 3f * System.Numerics.Vector3.Dot(bias, Direction(b)));
             _branchTarget[b] = w; sum += w;
         }
         float norm = sum > 1e-6f ? DiffuseBranch.Count / sum : 1f;
@@ -651,6 +660,7 @@ internal static class TracedReverbDsp
                     // And the directional part from the walls it came off (SdmTailIr).
                     if (dfb.SdmReady && s.SdmConv is { } sc)
                     {
+                        dfb.LateShares = reverb.LateSdm?.LateShare;
                         sc.Set(reverb.LateSdm);
                         sc.Process(mono.AsSpan(0, sub), dfb.SdmOut);
                         dfb.AddDirectional(sub);

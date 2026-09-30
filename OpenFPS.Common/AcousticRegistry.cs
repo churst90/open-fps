@@ -263,6 +263,15 @@ public static class AcousticRegistry
     /// through concrete", 2026-09-29). Here the same brick is 55 dB at 35 cm and 36/52/55 at 10 cm.
     /// </summary>
     public static (float Low, float Mid, float High) MassLawTransmission(string material, float thicknessMetres)
+        => MassLawTransmission(material, thicknessMetres, BandCentresHz);
+
+    /// <summary>The table's three band centres, Hz: every Low/Mid/High figure in it means these.</summary>
+    public static readonly (float Low, float Mid, float High) BandCentresHz = (200f, 1250f, 8000f);
+
+    /// <summary>The same mass law at other band centres: Steam Audio's are 400 Hz, 2.5 kHz and 15 kHz
+    /// (phonon.h, IPLMaterial), not the table's.</summary>
+    public static (float Low, float Mid, float High) MassLawTransmission(string material, float thicknessMetres,
+                                                                        (float Low, float Mid, float High) centresHz)
     {
         var p = GetProperties(material);
         if (p.Porous || p.DensityKgM3 <= 0f || thicknessMetres <= 0f)
@@ -273,7 +282,20 @@ public static class AcousticRegistry
             float tl = Math.Clamp(20f * MathF.Log10(m * hz) - 47f, 0f, MaxWallLossDb);
             return MathF.Pow(10f, -tl / 20f);
         }
-        return (Gain(m, 200f), Gain(m, 1250f), Gain(m, 8000f));
+        return (Gain(m, centresHz.Low), Gain(m, centresHz.Mid), Gain(m, centresHz.High));
+    }
+
+    /// <summary>
+    /// A band figure of the table (at <see cref="BandCentresHz"/>) at another frequency: linear in
+    /// log-frequency between the two centres either side, held flat beyond the ends.
+    /// </summary>
+    public static float AtFrequency(float low, float mid, float high, float hz)
+    {
+        var c = BandCentresHz;
+        if (hz <= c.Low) return low;
+        if (hz >= c.High) return high;
+        if (hz <= c.Mid) return low + (mid - low) * MathF.Log(hz / c.Low) / MathF.Log(c.Mid / c.Low);
+        return mid + (high - mid) * MathF.Log(hz / c.Mid) / MathF.Log(c.High / c.Mid);
     }
 
     /// <summary>The most any one wall takes, dB: the flanking limit. EN 12354-1 puts what a heavy

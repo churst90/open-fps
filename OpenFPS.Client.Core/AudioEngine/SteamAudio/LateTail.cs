@@ -277,10 +277,16 @@ internal sealed class SdmTailIr
     public readonly int Block, MaxPartitions;
     /// <summary>Each direction's share of the directional part's energy, for the lab.</summary>
     public readonly float[] Share;
+    /// <summary>
+    /// Each direction's share of the energy AFTER the directional part (from <see cref="EndFadeStart"/>
+    /// to the end of the trace): the remainder's energy distribution to second order (TracedReverb
+    /// fills it). The diffuse remainder is weighted by these: even in a room, the two ends of a corridor.
+    /// </summary>
+    public readonly float[] LateShare;
 
     private SdmTailIr(int k, int block, int maxPartitions)
     {
-        PerDirection = new LateTailIr?[k]; Share = new float[k]; Block = block; MaxPartitions = maxPartitions;
+        PerDirection = new LateTailIr?[k]; Share = new float[k]; LateShare = new float[k]; Block = block; MaxPartitions = maxPartitions;
     }
 
     public static int PartitionsFor(int sampleRate, int block) => (int)(EndFadeEnd * sampleRate) / block + 2;
@@ -294,7 +300,8 @@ internal sealed class SdmTailIr
     {
         int k = directions.Length;
         int maxP = PartitionsFor(sampleRate, block);
-        int n = Math.Min(w.Length, maxP * block);
+        int full = Math.Min(w.Length, Math.Min(c1.Length, Math.Min(c2.Length, c3.Length)));
+        int n = Math.Min(full, maxP * block);
         var sdm = new SdmTailIr(k, block, maxP);
         int s0 = (int)(LateTailIr.FadeInStartSeconds * sampleRate), s1 = (int)(LateTailIr.FadeInEndSeconds * sampleRate);
         int e0 = (int)(EndFadeStart * sampleRate), e1 = (int)(EndFadeEnd * sampleRate);
@@ -329,6 +336,7 @@ internal sealed class SdmTailIr
             sdm.Share[d] = total > 0 ? (float)(energy[d] / total) : 0f;
             if (energy[d] > total * 1e-6) sdm.PerDirection[d] = LateTailIr.FromWindowed(parts[d], block, maxP);
         }
+
         return sdm;
     }
 }
