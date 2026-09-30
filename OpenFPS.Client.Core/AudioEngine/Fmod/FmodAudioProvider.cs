@@ -3206,6 +3206,11 @@ public class FmodAudioProvider : IAudioProvider
     {
         if (!_isInitialized) return;
 
+        long now = System.Diagnostics.Stopwatch.GetTimestamp();
+        _attributeDt = _attributeTickAt == 0 ? 0.004f
+            : Math.Clamp((now - _attributeTickAt) / (float)System.Diagnostics.Stopwatch.Frequency, 0f, 0.25f);
+        _attributeTickAt = now;
+
         _updateTimer.Restart();
         ReportMixerLoad();
 
@@ -3693,9 +3698,13 @@ public class FmodAudioProvider : IAudioProvider
         return (Db(gainLow) - airLowDb, Db(gainMid) - airMidDb, Db(gainHigh) - airHighDb);
     }
 
+    // Seconds since the previous attribute pass: the loop's real period, which varies with load.
+    private long _attributeTickAt;
+    private float _attributeDt;
+
     private void ApplyAcousticFilters(ActiveSound active, Vector3 lPosVec)
     {
-        float dt = 0.016f; 
+        float dt = _attributeDt;
         float lerpFactor = 1.0f - MathF.Exp(-dt / AcousticConstants.ParameterSmoothingTimeConstant); 
         
         active.CurrentOcclusion = MathHelper.Lerp(active.CurrentOcclusion, active.TargetOcclusion, lerpFactor);
