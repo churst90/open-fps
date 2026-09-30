@@ -21,7 +21,7 @@ namespace OpenFPS.Common;
 ///
 ///   WHAT OF, from both materials. The blow itself takes the character of the SOFTER of the pair
 ///   (hitting a carpeted wall is a dull thump whatever you hit it with), while the ring afterwards
-///   belongs to whichever of them actually rings — which is why a hammer on a bell is a bell.
+///   is the struck panel's — which is why a hammer on a bell is a bell.
 ///
 ///   HOW BIG, from the size of what was struck. The same blow on a wing mirror and on a garage door
 ///   are different sounds because the panels are different sizes, and neither needed authoring.
@@ -79,16 +79,14 @@ public static class ImpactAcoustics
             Noisiness = 0.85f,
         });
 
-        // ...and afterwards, whichever of the two actually rings does so. A hammer on a bell is a
-        // bell, not a hammer.
-        var ringer = hitter.LossFactor <= struck.LossFactor ? hitter : struck;
-        bool ringerIsTheStruck = !ReferenceEquals(ringer, hitter) || hitter.LossFactor == struck.LossFactor;
-        float hz = PanelAcoustics.RingHz(ringerIsTheStruck ? struck : hitter,
-                                         struckWidth, struckHeight, struckThickness);
+        // ...and afterwards the struck panel rings, at the note its own size gives it: a hammer on
+        // a bell is a bell. Only the struck body's dimensions are known here, so a caller that
+        // wants the hitter to ring passes it as the struck one.
+        float hz = PanelAcoustics.RingHz(struck, struckWidth, struckHeight, struckThickness);
         if (hz > 0f)
         {
             float mounting = struckIsFixed ? PanelAcoustics.MountedLoss : 0f;
-            var ringerMaterial = ringerIsTheStruck ? struck : hitter;
+            var ringerMaterial = struck;
             float seconds = PanelAcoustics.RingSeconds(ringerMaterial, hz, mounting);
             // A carpet has modes too, and very obviously does not ring. What tells a bell from a bag
             // of sand is not whether it has a note but whether the note outlasts the blow.
