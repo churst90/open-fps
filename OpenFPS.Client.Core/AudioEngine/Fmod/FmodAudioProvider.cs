@@ -1321,7 +1321,7 @@ public class FmodAudioProvider : IAudioProvider
     {
         ReturnReverbVoices(); // detach HRTF voices while the buses still exist, return them to the pool
         ReleaseReverbUnits();
-        _reverbDsps.Clear(); _reverbBuses.Clear(); _reverbVolumes.Clear();
+        _reverbDsps.Clear(); _reverbBuses.Clear(); _reverbVolumes.Clear(); _regionDecaySeconds.Clear();
         // The buses are gone, so nothing is reading these any more: release what each stage made.
         foreach (var (st, dsp, handle) in _traced.Values)
         {
@@ -3939,6 +3939,13 @@ public class FmodAudioProvider : IAudioProvider
     /// <summary>How many region reverb buses may be audible at once; the rest fade to silence.</summary>
     private const int MaxActiveReverbBuses = 4;
 
+    /// <summary>Each room's reverberation time as last measured from inside it, seconds.</summary>
+    private readonly Dictionary<int, float> _regionDecaySeconds = new();
+    /// <summary>A room never measured from inside decays as a middling room does.</summary>
+    private const float DefaultRoomDecaySeconds = 1.5f;
+    /// <summary>How fast a room's bus comes up as you enter it or its doorway opens to you.</summary>
+    private const float ReverbRiseSeconds = 0.1f;
+
     private void UpdateReverbBuses(Vector3 lPosVec, int listenerRegionId)
     {
         if (_acousticMap == null) return;
@@ -3993,7 +4000,20 @@ public class FmodAudioProvider : IAudioProvider
                 }
             }
 
-            _reverbVolumes[regionId] = MathHelper.Lerp(_reverbVolumes[regionId], targetVol, AcousticConstants.ReverbFadeSpeed);
+            // In seconds, not per pass. A fixed 0.15 a pass was a 25 ms fade at the loop's 4 ms, so
+            // walking out of the tunnel after a clap cut its ring off dead ("the reflections cut off hard
+            // and I don't hear the reflections from inside the tunnel when standing out of it",
+            // 2026-09-29). What is already ringing in a room goes on dying at the room's own rate after
+            // you leave it: a falling bus follows that room's decay (-60 dB over its RT60, measured while
+            // you were in it), and a rising one takes a tenth of a second.
+            if (regionId == listenerRegionId && _simReverbDecayMs > 0f)
+                _regionDecaySeconds[regionId] = _simReverbDecayMs / 1000f;
+            float current = _reverbVolumes[regionId];
+            float tau = targetVol >= current
+                ? ReverbRiseSeconds
+                : _regionDecaySeconds.GetValueOrDefault(regionId, DefaultRoomDecaySeconds) / 6.91f;
+            float dtBus = _attributeDt > 0f ? _attributeDt : 0.004f;
+            _reverbVolumes[regionId] = current + (targetVol - current) * (1f - MathF.Exp(-dtBus / MathF.Max(0.01f, tau)));
             bus.setVolume(_reverbVolumes[regionId]);
 
             if (_audioDebug && _dbgFrame % 60 == 0)
