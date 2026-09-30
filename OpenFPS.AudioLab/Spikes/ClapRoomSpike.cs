@@ -67,7 +67,11 @@ public static class ClapRoomSpike
         try
         {
             provider.SetAcousticMap(BuildMap());
-            var pcm = Applause.RenderClap(TransientSynth.SampleRate, 1);
+            // sound=click: one sample, flat in spectrum and with no resonance of its own, so whatever
+            // rings in the answer is the room's (or the renderer's), not the clap's.
+            float[] pcm;
+            if (Arg(args, "sound") == "click") { pcm = new float[TransientSynth.SampleRate / 10]; pcm[0] = 1f; }
+            else pcm = Applause.RenderClap(TransientSynth.SampleRate, 1);
             provider.RegisterSynthesisedSound("synth:clap:lab", TransientSynth.ToPcm16(pcm), TransientSynth.SampleRate);
 
             var sw = System.Diagnostics.Stopwatch.StartNew();

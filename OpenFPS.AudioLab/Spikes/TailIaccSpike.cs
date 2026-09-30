@@ -67,7 +67,16 @@ public static class TailIaccSpike
             double eIn = noise.Skip(Fs / 2).Sum(x => (double)x * x), eOut = L.Skip(Fs / 2).Zip(R.Skip(Fs / 2), (l, r) => ((double)l * l + (double)r * r) / 2).Sum();
             var bands = new[] { 125.0, 250, 500, 1000, 2000, 4000 };
             var iacc = bands.Select(f => Iacc(Band(L, f), Band(R, f))).ToArray();
-            Console.WriteLine($"{(binaural ? "per-direction HRTF " : "2nd-order ambisonic")} yaw {yaw,3:F0}: level {10 * Math.Log10(eOut / eIn):F1} dB; IACC "
+            // Ringing: how strongly an ear repeats itself at some lag from 0.2 to 10 ms, fed noise. A
+            // filter with a regular tap spacing is a comb and shows here as a peak (a metallic pitch).
+            var seg = L.Skip(Fs).Take(Fs).ToArray();
+            double e0 = seg.Sum(v => (double)v * v), ring = 0; int ringLag = 0;
+            for (int lag = 9; lag <= 441; lag++)
+            {
+                double c = 0; for (int i = 0; i + lag < seg.Length; i++) c += seg[i] * (double)seg[i + lag];
+                if (Math.Abs(c) / e0 > ring) { ring = Math.Abs(c) / e0; ringLag = lag; }
+            }
+            Console.WriteLine($"{(binaural ? "per-direction HRTF " : "2nd-order ambisonic")} yaw {yaw,3:F0}: level {10 * Math.Log10(eOut / eIn):F1} dB; ringing {ring:F2} at {ringLag * 1000.0 / Fs:F2} ms; IACC "
                             + string.Join("  ", bands.Select((f, i) => $"{f:F0}:{iacc[i]:F2}"))
                             + (binaural ? $"   (head's diffuse-field gain {df.DiffuseFieldGainDb:F1} dB)" : ""));
         }

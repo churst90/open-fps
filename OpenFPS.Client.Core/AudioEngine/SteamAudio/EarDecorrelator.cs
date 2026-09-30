@@ -52,33 +52,16 @@ internal sealed class DiffuseBranch
     }
 
     /// <summary>
-    /// A pair of ear filters that share nothing within a millisecond: slots of 2.7 ms alternate left,
-    /// right, left, and each tap sits in the first 0.7 ms of its slot, so no left tap is ever within
-    /// 2 ms of a right one. Two ears fed alike signals through these come out unlike at every lag a
-    /// head compares its ears over (about a millisecond), which randomly placed taps did not ensure:
-    /// they left 0.25-0.3 of coherence at 1 kHz (--tail-iacc, 2026-09-30).
+    /// A pair of ear filters: two independent velvet sequences, each tap anywhere in its own slot.
+    ///
+    /// Not interleaved. Forcing the ears' taps into alternate 2.7 ms slots, each tap in the first
+    /// 0.7 ms of its slot, made each ear's filter a near-regular pulse train 5.4 ms apart: a comb, a
+    /// pitch near 180 Hz, measured as the left ear repeating itself at 5.5-5.7 ms (0.32) on a click
+    /// (2026-09-30) and heard as "a metallic reverb, not natural". Taps free across their slots do not
+    /// ring; the ears are a little less unlike for it.
     /// </summary>
-    public static (DiffuseBranch Left, DiffuseBranch Right) EarPair(int seed, int span = 3528)
-    {
-        const int slot = 120, within = 30;
-        int slots = span / slot;
-        var rng = new Random(seed);
-        var l = new DiffuseBranch((slots + 1) / 2, span);
-        var r = new DiffuseBranch(slots / 2, span);
-        int li = 0, ri = 0;
-        double el = 0, er = 0;
-        for (int k = 0; k < slots; k++)
-        {
-            int pos = k * slot + rng.Next(within);
-            float sign = rng.Next(2) == 0 ? -1f : 1f;
-            float weight = MathF.Exp(-pos / (0.04f * 44100f));
-            if (k % 2 == 0) { l._pos[li] = pos; l._gain[li++] = sign * weight; el += weight * (double)weight; }
-            else { r._pos[ri] = pos; r._gain[ri++] = sign * weight; er += weight * (double)weight; }
-        }
-        for (int k = 0; k < li; k++) l._gain[k] *= (float)(1.0 / Math.Sqrt(el));
-        for (int k = 0; k < ri; k++) r._gain[k] *= (float)(1.0 / Math.Sqrt(er));
-        return (l, r);
-    }
+    public static (DiffuseBranch Left, DiffuseBranch Right) EarPair(int seed, int span = 1764, int taps = 96)
+        => (new DiffuseBranch(seed, taps, span), new DiffuseBranch(seed + 977, taps, span));
 
     private DiffuseBranch(int taps, int span)
     {

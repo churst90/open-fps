@@ -1544,12 +1544,18 @@ public class FmodAudioProvider : IAudioProvider
     /// the parametric reverb's error in the tunnel; at 0 the model now matches the source-side
     /// traces within about a decibel in the flat, the tunnel and the street. If 0 still sounds like
     /// a wash, something non-physical is left: say so rather than trim it.
-    public static volatile float TailDb = EnvDb("OPENFPS_TAIL_DB") ?? EnvDb("OPENFPS_REFLECTIONS_DB") ?? 0f;
+    ///
+    /// -24 by ear again the same night: at 0 "way too much reverb, too boomy", "centralised", "metallic".
+    /// Two of those were found and one fixed: the ear filters were a comb (fixed), and the trace rings
+    /// as long at 4 kHz as at 250 Hz (0.79 s) where Sabine from the same materials says 0.52 — the top
+    /// hangs on. Until that is found, the tail sits where it sounds right.
+    public static volatile float TailDb = EnvDb("OPENFPS_TAIL_DB") ?? EnvDb("OPENFPS_REFLECTIONS_DB") ?? -24f;
     /// <summary>See <see cref="TailDb"/>.</summary>
     /// 0 dB by ear, 2026-09-29, once the copies carry only the mirror share with the scattered share as
     /// the wall's wash, at energy-correct levels, and at most four second-order copies (step 3), with
     /// the tail at -24: the physical level. The -24 they had before was hiding replicas, not a level.
-    public static volatile float CopiesDb = EnvDb("OPENFPS_COPIES_DB") ?? EnvDb("OPENFPS_REFLECTIONS_DB") ?? 0f;
+    /// -6 by ear, 2026-09-30, with the tail at -24.
+    public static volatile float CopiesDb = EnvDb("OPENFPS_COPIES_DB") ?? EnvDb("OPENFPS_REFLECTIONS_DB") ?? -6f;
     public static float TailTrim => MathF.Pow(10f, TailDb / 20f);
     public static float CopiesTrim => MathF.Pow(10f, CopiesDb / 20f);
 

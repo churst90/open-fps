@@ -93,6 +93,8 @@ internal sealed class TracedReverb : IDisposable
     public bool ExtractLate;
     /// <summary>The latest trace's late part, time zero at the direct sound. Null until the first.</summary>
     public volatile LateTailIr? Late;
+    /// <summary>The last trace's omnidirectional channel as read back, whole and unwindowed: for the lab.</summary>
+    public volatile float[]? LastReadBack;
     /// <summary>What reading it back cost, last time.</summary>
     public double LastExtractMs;
     /// <summary>The reader the extraction uses, never a mixer stage's.</summary>
@@ -228,7 +230,7 @@ internal sealed class TracedReverb : IDisposable
                 if (ExtractLate)
                 {
                     long x0 = System.Diagnostics.Stopwatch.GetTimestamp();
-                    if (ReadBack() is { } w) Late = LateTailIr.Build(w, SampleRate, FrameSize, MaxLatePartitions);
+                    if (ReadBack() is { } w) { LastReadBack = w; Late = LateTailIr.Build(w, SampleRate, FrameSize, MaxLatePartitions); }
                     LastExtractMs = (System.Diagnostics.Stopwatch.GetTimestamp() - x0) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
                 }
             }
