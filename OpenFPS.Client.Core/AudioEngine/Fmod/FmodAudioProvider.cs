@@ -1526,13 +1526,18 @@ public class FmodAudioProvider : IAudioProvider
     /// kinds are now two numbers, so each is judged on its own:
     ///   TailDb   — everything TRACED: the listener's and other rooms' stages, far sources' traced
     ///              echoes. Convolved through the traced response, so already reflections, not copies.
-    ///              0 dB, the traced level. `/tail <dB>`, OPENFPS_TAIL_DB.
+    ///              -24 dB (see below). `/tail <dB>`, OPENFPS_TAIL_DB.
     ///   CopiesDb — everything PLACED as a copy of the source: early echoes, facade and higher-order
     ///              echoes, your own steps' echoes, the master-bus boundary copies. -24 until the copies
     ///              are rendered as reflections (step 3). `/copies <dB>`, OPENFPS_COPIES_DB.
     /// `/reflections <dB>` and OPENFPS_REFLECTIONS_DB set both.
     /// </summary>
-    public static volatile float TailDb = EnvDb("OPENFPS_TAIL_DB") ?? EnvDb("OPENFPS_REFLECTIONS_DB") ?? 0f;
+    ///
+    /// The tail is -24 by ear, again. At 0 (2026-09-29, step 2) it was "a general wash, like a mask over
+    /// where the reflections are coming from", in the tunnel and the flat alike, and it hid the copies so
+    /// completely that /copies from -6 to -80 made no audible difference. The measurement that said 0 was
+    /// physical compared levels; the ear judges whether a direction survives, and at 0 none did.
+    public static volatile float TailDb = EnvDb("OPENFPS_TAIL_DB") ?? EnvDb("OPENFPS_REFLECTIONS_DB") ?? -24f;
     /// <summary>See <see cref="TailDb"/>.</summary>
     public static volatile float CopiesDb = EnvDb("OPENFPS_COPIES_DB") ?? EnvDb("OPENFPS_REFLECTIONS_DB") ?? -24f;
     public static float TailTrim => MathF.Pow(10f, TailDb / 20f);
