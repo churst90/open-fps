@@ -65,6 +65,11 @@ internal sealed class TracedReverbState
 /// <summary>
 /// The late tail of the room you are in, rendered as the diffuse field it is.
 ///
+/// Since 2026-09-30: twenty directions, not eight (a dodecahedron, tilted off the game's axes), each
+/// through a velvet-noise branch and straight through its own head response (RenderBinaural) rather
+/// than a second-order soundfield, and each ear made its own above 400 Hz. The notes below on the
+/// encode and decode describe the fallback, OPENFPS_TAIL_AMBISONIC=1.
+///
 /// Steam Audio's parametric reverb, which plays that tail (TracedReverbState.TailEffect), writes
 /// one channel: W, the omnidirectional one. Decoded, one channel is the same signal in both ears,
 /// and a sound that is the same in both ears is heard inside the head, or straight ahead — and it
@@ -132,7 +137,7 @@ internal sealed class DiffuseTail
         Volatile.Write(ref _biasX, bias.X); Volatile.Write(ref _biasY, bias.Y); Volatile.Write(ref _biasZ, bias.Z);
     }
     private float _biasX, _biasY, _biasZ;
-    private readonly float[] _branchGain = { 1, 1, 1, 1, 1, 1, 1, 1 };
+    private readonly float[] _branchGain = System.Linq.Enumerable.Repeat(1f, DiffuseBranch.Count).ToArray();
     private readonly float[] _branchTarget = new float[DiffuseBranch.Count];
 
     private void UpdateBranchGains(int sub)
@@ -161,20 +166,211 @@ internal sealed class DiffuseTail
     private readonly float _lpA = 1f - MathF.Exp(-2f * MathF.PI * SplitHz / 44100f);
     private float _a1, _a2, _b1;
 
+    // ── Straight to the ears ─────────────────────────────────────────────────────────────────
+    //
+    // The eight directions used to be ENCODED into a second-order soundfield and decoded through the
+    // HRTF like every other field. At second order that decode cannot make two ears independent at
+    // high frequencies: measured, the tail's interaural coherence was 0.60 at 2 kHz and 0.34 at 4 kHz
+    // where a head in a diffuse field gets under about 0.15 (Zaunschirm et al. 2018, the order-limited
+    // binaural decode). Coherent ears put a sound in the middle of the head, over everything. So each
+    // direction goes through its OWN binaural effect, the head-related response of exactly that
+    // direction, turned into the head's frame every block; the ears are then eight independent
+    // signals through eight different responses, which is what a diffuse field is at a head.
+    // OPENFPS_TAIL_AMBISONIC=1 goes back to the encode and decode.
+    public static readonly bool Binaural = Environment.GetEnvironmentVariable("OPENFPS_TAIL_AMBISONIC") != "1";
+    public readonly IntPtr[] Ears = new IntPtr[DiffuseBranch.Count];
+    public Phonon.IPLAudioBuffer EarBuf;
+    public IntPtr EarContext, EarHrtf;
+    /// <summary>The eight directions' ears, summed, interleaved L/R, one block: the tail above the split.</summary>
+    public float[] Stereo = Array.Empty<float>();
+    private float[] _earScratch = Array.Empty<float>();
+    /// <summary>A trim on the ears; 1, see CalibrateBinaural.</summary>
+    public float BinauralTrim = 1f;
+    /// <summary>What the head's responses do to a field from everywhere, measured at creation.</summary>
+    public float DiffuseFieldGainDb;
+    public bool BinauralReady;
+    private float _rx, _ry, _rz, _rw = 1f;
+
+    /// <summary>
+    /// Above this each ear's share of the tail is made its own (<see cref="_earL"/>, <see cref="_earR"/>).
+    ///
+    /// Twenty independent directions leave the two ears about 1/sqrt(20) alike at high frequencies:
+    /// measured 0.2-0.3 from 1 to 4 kHz, where two hundred directions through the same head response
+    /// read 0.03 (--tail-iacc, 2026-09-30) — a real diffuse field is simply different at the two ears
+    /// up there. Two hundred head responses a block is too dear, so above the frequency where this
+    /// head's diffuse field stops being alike at both ears (0.70 at 250 Hz, 0.10 at 500) each ear's
+    /// half goes through a velvet filter of its own: independent fine structure, the same energy, so
+    /// the level difference that carries the tail's lean survives. Below it the twenty directions keep
+    /// the coherence they have, which is already the head's.
+    /// </summary>
+    public const float EarSplitHz = 400f;
+    // A fourth-order Linkwitz-Riley split (two Butterworth sections each side): steep, so the
+    // decorrelation above does not leak into the band below, where the ears should stay alike.
+    private readonly Biquad _loL1 = Biquad.LowPass(EarSplitHz), _loL2 = Biquad.LowPass(EarSplitHz);
+    private readonly Biquad _hiL1 = Biquad.HighPass(EarSplitHz), _hiL2 = Biquad.HighPass(EarSplitHz);
+    private readonly Biquad _loR1 = Biquad.LowPass(EarSplitHz), _loR2 = Biquad.LowPass(EarSplitHz);
+    private readonly Biquad _hiR1 = Biquad.HighPass(EarSplitHz), _hiR2 = Biquad.HighPass(EarSplitHz);
+    private readonly DiffuseBranch _earL, _earR;
+
+    /// <summary>A Butterworth biquad section, direct form I, allocation-free.</summary>
+    private sealed class Biquad
+    {
+        private readonly float _b0, _b1, _b2, _a1, _a2;
+        private float _x1, _x2, _y1, _y2;
+        private Biquad(float b0, float b1, float b2, float a1, float a2) { _b0 = b0; _b1 = b1; _b2 = b2; _a1 = a1; _a2 = a2; }
+        private static (double c, double al) W(float hz) { double w = 2 * Math.PI * hz / 44100.0; return (Math.Cos(w), Math.Sin(w) / (2 * Math.Sqrt(0.5))); }
+        public static Biquad LowPass(float hz) { var (c, al) = W(hz); double a0 = 1 + al; return new((float)((1 - c) / 2 / a0), (float)((1 - c) / a0), (float)((1 - c) / 2 / a0), (float)(-2 * c / a0), (float)((1 - al) / a0)); }
+        public static Biquad HighPass(float hz) { var (c, al) = W(hz); double a0 = 1 + al; return new((float)((1 + c) / 2 / a0), (float)(-(1 + c) / a0), (float)((1 + c) / 2 / a0), (float)(-2 * c / a0), (float)((1 - al) / a0)); }
+        public float Process(float x)
+        {
+            float y = _b0 * x + _b1 * _x1 + _b2 * _x2 - _a1 * _y1 - _a2 * _y2;
+            _x2 = _x1; _x1 = x; _y2 = _y1; _y1 = y;
+            return y;
+        }
+        public void Reset() { _x1 = _x2 = _y1 = _y2 = 0f; }
+    }
+
+    /// <summary>The listener's rotation, game world. Game thread writes; read once a block.</summary>
+    public void SetListenerRotation(System.Numerics.Quaternion q)
+    {
+        Volatile.Write(ref _rx, q.X); Volatile.Write(ref _ry, q.Y); Volatile.Write(ref _rz, q.Z); Volatile.Write(ref _rw, q.W);
+    }
+
+    private bool CreateEars(IntPtr context, int sub, IntPtr hrtf)
+    {
+        EarContext = context; EarHrtf = hrtf;
+        var au = new Phonon.IPLAudioSettings { samplingRate = 44100, frameSize = sub };
+        var bs = new Phonon.IPLBinauralEffectSettings { hrtf = hrtf };
+        for (int i = 0; i < DiffuseBranch.Count; i++)
+            if (Phonon.iplBinauralEffectCreate(context, ref au, ref bs, out Ears[i]) != Phonon.IPL_STATUS_SUCCESS) return false;
+        Phonon.iplAudioBufferAllocate(context, 2, sub, ref EarBuf);
+        Stereo = new float[sub * 2]; _earScratch = new float[sub * 2];
+        return true;
+    }
+
+    /// <summary>
+    /// The tail's W, one block, through the eight directions' own head responses into
+    /// <see cref="Stereo"/>; the part below the split into <see cref="Low"/> as before.
+    /// </summary>
+    public void RenderBinaural(float[] ambiInterleaved, int sub, int channels)
+    {
+        for (int k = 0; k < sub; k++)
+        {
+            float x = ambiInterleaved[k * channels];
+            _a1 += _lpA * (x - _a1);
+            _a2 += _lpA * (_a1 - _a2);
+            float h1 = x - _a1;
+            _b1 += _lpA * (h1 - _b1);
+            Low[k] = _a2;
+            W[k] = h1 - _b1;
+        }
+        Array.Clear(Stereo, 0, sub * 2);
+        UpdateBranchGains(sub);
+        var rot = new System.Numerics.Quaternion(Volatile.Read(ref _rx), Volatile.Read(ref _ry), Volatile.Read(ref _rz), Volatile.Read(ref _rw));
+        var toHead = System.Numerics.Quaternion.Conjugate(rot);
+        float baseGain = BinauralTrim / MathF.Sqrt(DiffuseBranch.Count);
+        for (int b = 0; b < DiffuseBranch.Count; b++)
+        {
+            var branch = Branches[b];
+            float gain = baseGain * _branchGain[b];
+            for (int k = 0; k < sub; k++) Branch[k] = branch.Process(W[k]) * gain;
+            Phonon.iplAudioBufferDeinterleave(EarContext, Branch, ref Mono);
+            // The branch's world direction in the head's frame, as a voice's is (Steam Audio: -z ahead).
+            var local = System.Numerics.Vector3.Transform(Direction(b), toHead);
+            var ep = new Phonon.IPLBinauralEffectParams
+            {
+                direction = new Phonon.IPLVector3 { x = local.X, y = local.Y, z = -local.Z },
+                interpolation = Phonon.IPL_HRTFINTERPOLATION_BILINEAR, spatialBlend = 1f, hrtf = EarHrtf,
+            };
+            Phonon.iplBinauralEffectApply(Ears[b], ref ep, ref Mono, ref EarBuf);
+            Phonon.iplAudioBufferInterleave(EarContext, ref EarBuf, _earScratch);
+            for (int i = 0; i < sub * 2; i++) Stereo[i] += _earScratch[i];
+        }
+        // Each ear its own above the split: low (two one-poles) plus the exact remainder, decorrelated.
+        for (int k = 0; k < sub; k++)
+        {
+            float l = Stereo[k * 2], r = Stereo[k * 2 + 1];
+            float lowL = _loL2.Process(_loL1.Process(l)), highL = _hiL2.Process(_hiL1.Process(l));
+            float lowR = _loR2.Process(_loR1.Process(r)), highR = _hiR2.Process(_hiR1.Process(r));
+            Stereo[k * 2] = lowL + _earL.Process(highL);
+            Stereo[k * 2 + 1] = lowR + _earR.Process(highR);
+        }
+    }
+
+    /// <summary>Noise through the whole binaural path, each ear's energy against the noise's: the trim
+    /// that makes the tail at the ears as strong as the tail that went in.</summary>
+    private void CalibrateBinaural(int sub, int channels)
+    {
+        var inter = new float[sub * channels];
+        var rng = new Random(17);
+        double eIn = 0, eEar = 0;
+        int blocks = Math.Max(12, 44100 / sub);
+        for (int b = 0; b < blocks; b++)
+        {
+            Array.Clear(inter);
+            for (int k = 0; k < sub; k++) inter[k * channels] = (float)(rng.NextDouble() * 2 - 1) * 0.3f;
+            RenderBinaural(inter, sub, channels);
+            if (b < 4) continue;
+            for (int k = 0; k < sub; k++)
+            {
+                eIn += inter[k * channels] * (double)inter[k * channels];
+                double l = Stereo[k * 2] + Low[k], r = Stereo[k * 2 + 1] + Low[k];
+                eEar += (l * l + r * r) / 2;
+            }
+        }
+        // Measured, and NOT applied. It is the head's diffuse-field gain — what the pinna does to sound
+        // from everywhere, a few decibels above 2 kHz — and the direct sounds keep theirs, so the tail
+        // keeps its: only the 1/sqrt(N) split between directions. Trimming it away (white noise, so the
+        // top end ruled) put the tail 2.5 dB under the voices it belongs to.
+        if (eEar > 0 && eIn > 0) DiffuseFieldGainDb = (float)(10 * Math.Log10(eEar / eIn));
+        BinauralTrim = 1f;
+        foreach (var e in Ears) if (e != IntPtr.Zero) Phonon.iplBinauralEffectReset(e);
+        foreach (var br in Branches) br.Reset();
+        _earL.Reset(); _earR.Reset();
+        foreach (var bq in new[] { _loL1, _loL2, _hiL1, _hiL2, _loR1, _loR2, _hiR1, _hiR2 }) bq.Reset();
+        _a1 = _a2 = _b1 = 0f;
+    }
+
     /// <summary>OPENFPS_DIFFUSE_TAIL=0 goes back to the one channel through the ear decorrelators.</summary>
     public static readonly bool Enabled = Environment.GetEnvironmentVariable("OPENFPS_DIFFUSE_TAIL") != "0";
 
-    /// <summary>The eight directions: the corners of a cube round the head, in the game's world,
-    /// handed to Steam Audio in its own (Phonon.World).</summary>
-    public static System.Numerics.Vector3 Direction(int i)
+    /// <summary>
+    /// The directions the tail arrives from: the twenty vertices of a regular dodecahedron round the
+    /// head, in the game's world — as even a spread over the sphere as twenty points get. It was the
+    /// eight corners of a cube, and N independent directions summed at two ears leave a coherence of
+    /// about 1/sqrt(N) at high frequencies: eight measured 0.4-0.6 above 1.2 kHz where a head in a real
+    /// diffuse field is far lower.
+    /// </summary>
+    public static System.Numerics.Vector3 Direction(int i) => Dodecahedron[i % Dodecahedron.Length];
+
+    private static readonly System.Numerics.Vector3[] Dodecahedron = MakeDodecahedron();
+
+    private static System.Numerics.Vector3[] MakeDodecahedron()
     {
-        float s = 1f / MathF.Sqrt(3f);
-        return new System.Numerics.Vector3((i & 1) == 0 ? -s : s, (i & 2) == 0 ? -s : s, (i & 4) == 0 ? -s : s);
+        float phi = (1f + MathF.Sqrt(5f)) / 2f, inv = 1f / phi;
+        var v = new System.Collections.Generic.List<System.Numerics.Vector3>();
+        for (int x = -1; x <= 1; x += 2) for (int y = -1; y <= 1; y += 2) for (int z = -1; z <= 1; z += 2) v.Add(new(x, y, z));
+        for (int a = -1; a <= 1; a += 2) for (int b = -1; b <= 1; b += 2)
+        {
+            v.Add(new(0, a * inv, b * phi));
+            v.Add(new(a * inv, b * phi, 0));
+            v.Add(new(a * phi, 0, b * inv));
+        }
+        // Tilted off every axis the game lines a head up with. As generated, four vertices lie exactly in
+        // the plane between the ears when you face north, and your turns snap to 45-degree steps, so the
+        // head sat on that alignment often: sound from the median plane is the same at both ears, and a
+        // fifth of the tail arriving from it held the ears' coherence up. 17 degrees about the vertical
+        // and 11 about east-west line nothing up with anything.
+        var tilt = System.Numerics.Quaternion.CreateFromYawPitchRoll(17f * MathF.PI / 180f, 11f * MathF.PI / 180f, 0f);
+        for (int i = 0; i < v.Count; i++) v[i] = System.Numerics.Vector3.Normalize(System.Numerics.Vector3.Transform(v[i], tilt));
+        return v.ToArray();
     }
 
     /// <param name="decode">The stage's decoder, with the HRTF it will use, for the level calibration;
     /// it is reset afterwards. Zero skips that calibration.</param>
     /// <param name="orientation">The listener frame the calibration decodes in.</param>
+    public DiffuseTail() { (_earL, _earR) = DiffuseBranch.EarPair(101); }
+
     public static DiffuseTail? Create(IntPtr context, int subFrame, int order, int channels,
                                       IntPtr decode = default, Phonon.IPLCoordinateSpace3 orientation = default, IntPtr hrtf = default)
     {
@@ -194,6 +390,11 @@ internal sealed class DiffuseTail
         Phonon.iplAudioBufferAllocate(context, channels, subFrame, ref d.Encoded);
         d.Calibrate(subFrame, channels, order);
         if (decode != IntPtr.Zero) d.CalibrateDecode(subFrame, channels, order, decode, orientation, hrtf);
+        if (Binaural && hrtf != IntPtr.Zero && d.CreateEars(context, subFrame, hrtf))
+        {
+            d.CalibrateBinaural(subFrame, channels);
+            d.BinauralReady = true;
+        }
         d.Ready = true;
         return d;
     }
@@ -293,6 +494,9 @@ internal sealed class DiffuseTail
         Ready = false;
         for (int i = 0; i < Encoders.Length; i++)
             if (Encoders[i] != IntPtr.Zero) Phonon.iplAmbisonicsEncodeEffectRelease(ref Encoders[i]);
+        for (int i = 0; i < Ears.Length; i++)
+            if (Ears[i] != IntPtr.Zero) Phonon.iplBinauralEffectRelease(ref Ears[i]);
+        if (EarBuf.data != IntPtr.Zero) Phonon.iplAudioBufferFree(EarContext, ref EarBuf);
         if (Mono.data != IntPtr.Zero) Phonon.iplAudioBufferFree(Context, ref Mono);
         if (Encoded.data != IntPtr.Zero) Phonon.iplAudioBufferFree(Context, ref Encoded);
     }
@@ -389,6 +593,21 @@ internal static class TracedReverbDsp
                 lc.Process(mono.AsSpan(0, sub), s.LateOut.AsSpan(0, sub));
                 Array.Clear(s.AmbiScratch, 0, sub * TracedReverb.Channels);
                 for (int k = 0; k < sub; k++) s.AmbiScratch[k * TracedReverb.Channels] = s.LateOut[k];
+                if (s.Diffuse is { Ready: true, BinauralReady: true } dfb)
+                {
+                    // Straight to the ears (DiffuseTail.RenderBinaural): no soundfield, no decode.
+                    dfb.RenderBinaural(s.AmbiScratch, sub, TracedReverb.Channels);
+                    for (int k = 0; k < sub; k++)
+                    {
+                        float l = (dfb.Stereo[k * 2] + dfb.Low[k]) * g, r = (dfb.Stereo[k * 2 + 1] + dfb.Low[k]) * g;
+                        outSum += l * (double)l + r * (double)r;
+                        int ok = (at + k) * outCh;
+                        o[ok] = l;
+                        if (outCh > 1) o[ok + 1] = r;
+                        for (int c = 2; c < outCh; c++) o[ok + c] = 0f;
+                    }
+                    continue;
+                }
                 if (s.Diffuse is { Ready: true } dfl)
                 {
                     dfl.Render(s.AmbiScratch, sub, TracedReverb.Channels, TracedReverb.Order);

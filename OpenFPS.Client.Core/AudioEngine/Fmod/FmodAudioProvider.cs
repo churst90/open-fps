@@ -4170,7 +4170,7 @@ public class FmodAudioProvider : IAudioProvider
         if (_traced.Count > 0)
         {
             var frame = Phonon.ListenerFrame(rotation);
-            foreach (var t in _traced.Values) t.State.Orientation = frame;
+            foreach (var t in _traced.Values) { t.State.Orientation = frame; t.State.Diffuse?.SetListenerRotation(rotation); }
         }
         FMOD.VECTOR fpos = FmodHelpers.ToFmodVec(position), fvel = FmodHelpers.ToFmodVec(velocity);
         Vector3 forward = Vector3.Transform(Vector3.UnitZ, rotation);

@@ -598,6 +598,11 @@ if (args.Contains("--path-probe"))
     // --path-probe [map=city] ear=x,y,z src=x,y,z ...: what the occlusion worker hands the mixer.
     Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.PathProbeSpike.Run(args));
 }
+if (args.Contains("--tail-iacc"))
+{
+    // --tail-iacc: the tail's spatial rendering alone, the two ears' coherence per octave.
+    Environment.Exit(OpenFPS.Client.Core.AudioEngine.Fmod.TailIaccSpike.Run(args));
+}
 if (args.Contains("--late-field"))
 {
     // --late-field [place=flat|tunnel|street]: each source's own late energy and direction, traced.

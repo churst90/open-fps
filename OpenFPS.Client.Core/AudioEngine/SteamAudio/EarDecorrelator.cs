@@ -3,56 +3,103 @@ using System;
 namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 
 /// <summary>
-/// One direction's share of a diffuse field: the late tail through a short all-pass chain of its
-/// own, so that eight of these fed the same tail are eight different signals with the same
-/// spectrum and envelope, as the field arriving from eight directions of a real room is.
+/// One direction's share of a diffuse field: the late tail through a sparse random filter of its own
+/// (velvet noise), so that the branches fed the same tail are different signals with the same
+/// spectrum and envelope, as the field arriving from each direction of a real room is.
 ///
-/// The delays are long — each chain sums to 14-18 ms — where the ear decorrelator's are kept under
-/// 2 ms. Two chains are different signals only at frequencies their phase responses have wound
-/// apart at, and with delays under 100 samples that is above a kilohertz: below it the eight
-/// branches were still one signal, summed coherently in the field and again in the decoder, and
-/// the tail came out with ten decibels of extra bass (--sa-encode, 2026-09-29). Delays a hundred
-/// samples and more apart tell the branches apart from about 300 Hz, where the low end is taken out
-/// of their hands anyway (DiffuseTail.SplitHz). The smearing that made the short delays necessary
-/// elsewhere does not apply: only the late tail comes through here, and it begins 50 ms after the
-/// sound, as a noise already a second long.
+/// It was a chain of three short all-passes, and the chains' first delays were neighbouring primes —
+/// 79, 83, 89 samples. Mostly each branch was the same input a few samples later, so the branches
+/// correlated with each other at small lags, and a head measures its two ears' correlation over lags
+/// of up to a millisecond: the tail's interaural coherence stayed 0.35-0.55 above 1.2 kHz with eight
+/// directions and with twenty (2026-09-30), where a head in a real diffuse field gets far less.
+///
+/// Velvet noise is independent in fine structure by construction: thirty-two taps at random places
+/// across 30 ms, random signs, a gently falling weight, energy one. Two branches share nothing but
+/// chance, so they are decorrelated at every lag and every frequency the tail has. The 30 ms smear is
+/// nothing on a tail that begins 50 ms after the sound and is already noise.
 /// </summary>
 internal sealed class DiffuseBranch
 {
-    private static readonly int[][] Delays =
-    {
-        new[] { 89, 181, 419 }, new[] { 131, 263, 311 }, new[] { 97, 331, 227 }, new[] { 149, 197, 397 },
-        new[] { 113, 307, 251 }, new[] { 173, 241, 353 }, new[] { 103, 277, 373 }, new[] { 157, 211, 431 },
-    };
-    public const int Count = 8;
-    private const float G = 0.5f;
-    private readonly float[][] _lines;
-    private readonly int[] _at;
+    public const int Count = 20;
+    private readonly int Taps;
+    private readonly int[] _pos;
+    private readonly float[] _gain;
+    private readonly float[] _line;
+    private int _at;
 
-    public DiffuseBranch(int index)
+    /// <param name="taps">How many taps; <paramref name="span"/> the samples they spread over (30 ms,
+    /// 32 taps for a direction's share). More taps closer together leave two filters fed alike signals
+    /// less alike: the ear decorrelation uses 128 over 40 ms.</param>
+    public DiffuseBranch(int index, int taps = 32, int span = 1323)
     {
-        var d = Delays[index % Delays.Length];
-        _lines = new float[d.Length][];
-        _at = new int[d.Length];
-        for (int k = 0; k < d.Length; k++) _lines[k] = new float[d[k]];
+        Taps = taps;
+        _pos = new int[taps]; _gain = new float[taps]; _line = new float[span + 1];
+        int Span = span;
+        var rng = new Random(7919 * (index + 1) + 13);
+        double energy = 0;
+        for (int k = 0; k < Taps; k++)
+        {
+            // One tap in each of Taps equal slots, somewhere in it: spread, never two together.
+            int slot = Span / Taps;
+            _pos[k] = k * slot + rng.Next(slot);
+            float sign = rng.Next(2) == 0 ? -1f : 1f;
+            float weight = MathF.Exp(-_pos[k] / (0.02f * 44100f));
+            _gain[k] = sign * weight;
+            energy += weight * (double)weight;
+        }
+        float norm = (float)(1.0 / Math.Sqrt(energy));
+        for (int k = 0; k < Taps; k++) _gain[k] *= norm;
+    }
+
+    /// <summary>
+    /// A pair of ear filters that share nothing within a millisecond: slots of 2.7 ms alternate left,
+    /// right, left, and each tap sits in the first 0.7 ms of its slot, so no left tap is ever within
+    /// 2 ms of a right one. Two ears fed alike signals through these come out unlike at every lag a
+    /// head compares its ears over (about a millisecond), which randomly placed taps did not ensure:
+    /// they left 0.25-0.3 of coherence at 1 kHz (--tail-iacc, 2026-09-30).
+    /// </summary>
+    public static (DiffuseBranch Left, DiffuseBranch Right) EarPair(int seed, int span = 3528)
+    {
+        const int slot = 120, within = 30;
+        int slots = span / slot;
+        var rng = new Random(seed);
+        var l = new DiffuseBranch((slots + 1) / 2, span);
+        var r = new DiffuseBranch(slots / 2, span);
+        int li = 0, ri = 0;
+        double el = 0, er = 0;
+        for (int k = 0; k < slots; k++)
+        {
+            int pos = k * slot + rng.Next(within);
+            float sign = rng.Next(2) == 0 ? -1f : 1f;
+            float weight = MathF.Exp(-pos / (0.04f * 44100f));
+            if (k % 2 == 0) { l._pos[li] = pos; l._gain[li++] = sign * weight; el += weight * (double)weight; }
+            else { r._pos[ri] = pos; r._gain[ri++] = sign * weight; er += weight * (double)weight; }
+        }
+        for (int k = 0; k < li; k++) l._gain[k] *= (float)(1.0 / Math.Sqrt(el));
+        for (int k = 0; k < ri; k++) r._gain[k] *= (float)(1.0 / Math.Sqrt(er));
+        return (l, r);
+    }
+
+    private DiffuseBranch(int taps, int span)
+    {
+        Taps = taps; _pos = new int[taps]; _gain = new float[taps]; _line = new float[span + 1];
     }
 
     public float Process(float x)
     {
-        for (int k = 0; k < _lines.Length; k++)
+        _line[_at] = x;
+        float y = 0f;
+        int n = _line.Length;
+        for (int k = 0; k < Taps; k++)
         {
-            var line = _lines[k];
-            int at = _at[k];
-            float delayed = line[at];
-            float y = -G * x + delayed;
-            line[at] = x + G * y;
-            _at[k] = at + 1 == line.Length ? 0 : at + 1;
-            x = y;
+            int i = _at - _pos[k]; if (i < 0) i += n;
+            y += _gain[k] * _line[i];
         }
-        return x;
+        _at = _at + 1 == n ? 0 : _at + 1;
+        return y;
     }
 
-    public void Reset() { foreach (var l in _lines) Array.Clear(l); Array.Clear(_at); }
+    public void Reset() { Array.Clear(_line); _at = 0; }
 }
 
 /// <summary>

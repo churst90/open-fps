@@ -1,0 +1,137 @@
+using System;
+using System.Linq;
+using OpenFPS.Client.Core.AudioEngine.SteamAudio;
+
+namespace OpenFPS.Client.Core.AudioEngine.Fmod;
+
+/// <summary>
+/// The tail's spatial rendering alone: three seconds of noise as the tail's omnidirectional channel,
+/// through DiffuseTail both ways (each direction straight through its own head response, and the old
+/// second-order encode and decode), and the two ears' coherence per octave — the maximum normalised
+/// cross-correlation within a millisecond either way, after an octave band-pass, as the research of
+/// 2026-09-29 measured it. A head in a real diffuse field: about 0.95 at 125 Hz, 0.8 at 250, 0.4 at
+/// 500, 0.2 at 1 kHz and under 0.15 above.
+///
+///   --tail-iacc
+/// </summary>
+public static class TailIaccSpike
+{
+    private const int Fs = 44100, Sub = 256;
+
+    public static int Run(string[] args)
+    {
+        var cs = Phonon.DefaultContextSettings();
+        if (Phonon.iplContextCreate(ref cs, out IntPtr ctx) != Phonon.IPL_STATUS_SUCCESS) { Console.WriteLine("FAIL: no context"); return 1; }
+        var au = new Phonon.IPLAudioSettings { samplingRate = Fs, frameSize = Sub };
+        var hs = new Phonon.IPLHRTFSettings { type = Phonon.IPL_HRTFTYPE_DEFAULT, volume = 1f, normType = Phonon.IPL_HRTFNORMTYPE_NONE };
+        Phonon.iplHRTFCreate(ctx, ref au, ref hs, out IntPtr hrtf);
+        var ds = new Phonon.IPLAmbisonicsDecodeEffectSettings { speakerLayout = Phonon.StereoLayout(), hrtf = hrtf, maxOrder = TracedReverb.Order };
+        Phonon.iplAmbisonicsDecodeEffectCreate(ctx, ref au, ref ds, out IntPtr dec);
+        var orient = Phonon.ListenerFrame(System.Numerics.Quaternion.Identity);
+        int ch = TracedReverb.Channels, n = Fs * 3;
+        var rng = new Random(5);
+        var noise = new float[n];
+        for (int i = 0; i < n; i++) noise[i] = (float)(rng.NextDouble() * 2 - 1) * 0.3f;
+
+        foreach (bool binaural in new[] { true, false })
+        foreach (float yaw in new[] { 0f, 23f, 45f, 90f })
+        {
+            var rot = System.Numerics.Quaternion.CreateFromYawPitchRoll(yaw * MathF.PI / 180f, 0f, 0f);
+            orient = Phonon.ListenerFrame(rot);
+            var df = DiffuseTail.Create(ctx, Sub, TracedReverb.Order, ch, dec, orient, hrtf)!;
+            df.SetListenerRotation(rot);
+            var L = new float[n]; var R = new float[n];
+            var inter = new float[Sub * ch];
+            var field = new Phonon.IPLAudioBuffer(); Phonon.iplAudioBufferAllocate(ctx, ch, Sub, ref field);
+            var ears = new Phonon.IPLAudioBuffer(); Phonon.iplAudioBufferAllocate(ctx, 2, Sub, ref ears);
+            var st = new float[Sub * 2];
+            var dp = new Phonon.IPLAmbisonicsDecodeEffectParams { order = TracedReverb.Order, hrtf = hrtf, orientation = orient, binaural = Phonon.IPL_TRUE };
+            for (int at = 0; at + Sub <= n; at += Sub)
+            {
+                Array.Clear(inter);
+                for (int k = 0; k < Sub; k++) inter[k * ch] = noise[at + k];
+                if (binaural && df.BinauralReady)
+                {
+                    df.RenderBinaural(inter, Sub, ch);
+                    for (int k = 0; k < Sub; k++) { L[at + k] = df.Stereo[k * 2] + df.Low[k]; R[at + k] = df.Stereo[k * 2 + 1] + df.Low[k]; }
+                }
+                else
+                {
+                    df.Render(inter, Sub, ch, TracedReverb.Order);
+                    Phonon.iplAudioBufferDeinterleave(ctx, df.Sum, ref field);
+                    Phonon.iplAmbisonicsDecodeEffectApply(dec, ref dp, ref field, ref ears);
+                    Phonon.iplAudioBufferInterleave(ctx, ref ears, st);
+                    for (int k = 0; k < Sub; k++) { L[at + k] = st[k * 2] + df.Low[k]; R[at + k] = st[k * 2 + 1] + df.Low[k]; }
+                }
+            }
+            double eIn = noise.Skip(Fs / 2).Sum(x => (double)x * x), eOut = L.Skip(Fs / 2).Zip(R.Skip(Fs / 2), (l, r) => ((double)l * l + (double)r * r) / 2).Sum();
+            var bands = new[] { 125.0, 250, 500, 1000, 2000, 4000 };
+            var iacc = bands.Select(f => Iacc(Band(L, f), Band(R, f))).ToArray();
+            Console.WriteLine($"{(binaural ? "per-direction HRTF " : "2nd-order ambisonic")} yaw {yaw,3:F0}: level {10 * Math.Log10(eOut / eIn):F1} dB; IACC "
+                            + string.Join("  ", bands.Select((f, i) => $"{f:F0}:{iacc[i]:F2}"))
+                            + (binaural ? $"   (head's diffuse-field gain {df.DiffuseFieldGainDb:F1} dB)" : ""));
+        }
+        // The best this head and this estimator can do: 200 directions spread evenly over the sphere
+        // (a Fibonacci lattice), each fed its OWN independent noise. Whatever this reads is the real
+        // target for this HRTF; the textbook figures are real heads.
+        {
+            const int N = 200;
+            var bs = new Phonon.IPLBinauralEffectSettings { hrtf = hrtf };
+            var fx = new IntPtr[N];
+            for (int b = 0; b < N; b++) Phonon.iplBinauralEffectCreate(ctx, ref au, ref bs, out fx[b]);
+            var mono = new Phonon.IPLAudioBuffer(); Phonon.iplAudioBufferAllocate(ctx, 1, Sub, ref mono);
+            var st2 = new Phonon.IPLAudioBuffer(); Phonon.iplAudioBufferAllocate(ctx, 2, Sub, ref st2);
+            var m = new float[Sub]; var s2 = new float[Sub * 2];
+            var L = new float[n]; var R = new float[n];
+            var rngs = Enumerable.Range(0, N).Select(i => new Random(1000 + i)).ToArray();
+            for (int at = 0; at + Sub <= n; at += Sub)
+                for (int b = 0; b < N; b++)
+                {
+                    double y = 1 - 2 * (b + 0.5) / N, rad = Math.Sqrt(1 - y * y), th = b * Math.PI * (3 - Math.Sqrt(5));
+                    var dir = new Phonon.IPLVector3 { x = (float)(rad * Math.Cos(th)), y = (float)y, z = (float)(rad * Math.Sin(th)) };
+                    for (int k = 0; k < Sub; k++) m[k] = (float)(rngs[b].NextDouble() * 2 - 1) * 0.3f / MathF.Sqrt(N);
+                    Phonon.iplAudioBufferDeinterleave(ctx, m, ref mono);
+                    var ep = new Phonon.IPLBinauralEffectParams { direction = dir, interpolation = Phonon.IPL_HRTFINTERPOLATION_BILINEAR, spatialBlend = 1f, hrtf = hrtf };
+                    Phonon.iplBinauralEffectApply(fx[b], ref ep, ref mono, ref st2);
+                    Phonon.iplAudioBufferInterleave(ctx, ref st2, s2);
+                    for (int k = 0; k < Sub; k++) { L[at + k] += s2[k * 2]; R[at + k] += s2[k * 2 + 1]; }
+                }
+            var bands = new[] { 125.0, 250, 500, 1000, 2000, 4000 };
+            Console.WriteLine("200 independent directions (this HRTF's diffuse field): IACC "
+                            + string.Join("  ", bands.Select(f => $"{f:F0}:{Iacc(Band(L, f), Band(R, f)):F2}")));
+        }
+        Console.WriteLine("head in a diffuse field:  125:0.95  250:0.80  500:0.40  1000:0.20  2000:<0.15  4000:<0.15");
+        return 0;
+    }
+
+    /// <summary>An octave band-pass (two RBJ biquads), from half a second in.</summary>
+    private static float[] Band(float[] x, double f0)
+    {
+        var y = x.Skip(Fs / 2).ToArray();
+        for (int pass = 0; pass < 2; pass++)
+        {
+            double w = 2 * Math.PI * f0 / Fs, q = Math.Sqrt(2) / 1.0, alpha = Math.Sin(w) / (2 * q);
+            double b0 = alpha, b2 = -alpha, a0 = 1 + alpha, a1 = -2 * Math.Cos(w), a2 = 1 - alpha;
+            double x1 = 0, x2 = 0, y1 = 0, y2 = 0;
+            for (int i = 0; i < y.Length; i++)
+            {
+                double xi = y[i], yi = (b0 * xi + b2 * x2 - a1 * y1 - a2 * y2) / a0;
+                x2 = x1; x1 = xi; y2 = y1; y1 = yi; y[i] = (float)yi;
+            }
+        }
+        return y;
+    }
+
+    private static double Iacc(float[] l, float[] r)
+    {
+        int lag = Fs / 1000;
+        double el = l.Sum(v => (double)v * v), er = r.Sum(v => (double)v * v), best = 0;
+        for (int d = -lag; d <= lag; d++)
+        {
+            double c = 0;
+            for (int i = Math.Max(0, -d); i < l.Length && i + d < r.Length; i++) c += l[i] * (double)r[i + d];
+            best = Math.Max(best, Math.Abs(c) / Math.Sqrt(el * er + 1e-30));
+        }
+        return best;
+    }
+}
