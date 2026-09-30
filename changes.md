@@ -11,14 +11,15 @@ Recent work, newest first. `git log` has the rest.
      loud sources' copies were 8-11 dB hot (now max(L,R)/max(d,R), EarlyReflections.PlacedCopyGain).
      Far sources' traced echoes traced the open ground as well as carrying their own ground bounce,
      a comb at about the direct level. The master-bus boundary copies sat outside the trim.
-  2. Two levels. `/tail` for everything traced (default 0, the traced level) and `/copies` for
-     everything placed as a copy (default -24 for now). `/reflections` sets both.
+  2. Two levels. `/tail` for everything traced and `/copies` for everything placed as a copy;
+     `/reflections` sets both. By ear after step 3: copies 0 dB, the physical level; the tail -24
+     (at 0 it was a wash that masked every direction).
   3. Copies as reflections. A surface keeps sqrt(1 - absorption) of the pressure, not 1 - absorption,
      which took twice the decibels. A copy carries only the mirror share, sqrt(1 - scattering) per
      bounce; a first-order wall's scattered share is played as its wash beside it. A room gets its
      first order and at most four second-order copies; the rest is the tail. Your own steps get the
      mirror share and the order limit, not yet the wash.
-  To judge: `/copies -80` and listen to the tail alone at 0, then bring the copies up in 6 dB steps.
+  Leaving a room no longer cuts its ring off: its bus falls at the room's own measured decay rate.
 - Diffraction is the same both ways round an obstacle and exact over thin walls (open-fps-patches 7,
   with a closed-form edge search: 20 us a call). Doorways and low walls lose less.
 - The material table is the only source of material values; `materials.json` is gone (a copy is in

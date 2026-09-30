@@ -1528,8 +1528,8 @@ public class FmodAudioProvider : IAudioProvider
     ///              echoes. Convolved through the traced response, so already reflections, not copies.
     ///              -24 dB (see below). `/tail <dB>`, OPENFPS_TAIL_DB.
     ///   CopiesDb — everything PLACED as a copy of the source: early echoes, facade and higher-order
-    ///              echoes, your own steps' echoes, the master-bus boundary copies. -24 until the copies
-    ///              are rendered as reflections (step 3). `/copies <dB>`, OPENFPS_COPIES_DB.
+    ///              echoes, your own steps' echoes, the master-bus boundary copies. 0 dB, the physical
+    ///              level, since step 3 (see below). `/copies <dB>`, OPENFPS_COPIES_DB.
     /// `/reflections <dB>` and OPENFPS_REFLECTIONS_DB set both.
     /// </summary>
     ///
@@ -1539,7 +1539,10 @@ public class FmodAudioProvider : IAudioProvider
     /// physical compared levels; the ear judges whether a direction survives, and at 0 none did.
     public static volatile float TailDb = EnvDb("OPENFPS_TAIL_DB") ?? EnvDb("OPENFPS_REFLECTIONS_DB") ?? -24f;
     /// <summary>See <see cref="TailDb"/>.</summary>
-    public static volatile float CopiesDb = EnvDb("OPENFPS_COPIES_DB") ?? EnvDb("OPENFPS_REFLECTIONS_DB") ?? -24f;
+    /// 0 dB by ear, 2026-09-29, once the copies carry only the mirror share with the scattered share as
+    /// the wall's wash, at energy-correct levels, and at most four second-order copies (step 3), with
+    /// the tail at -24: the physical level. The -24 they had before was hiding replicas, not a level.
+    public static volatile float CopiesDb = EnvDb("OPENFPS_COPIES_DB") ?? EnvDb("OPENFPS_REFLECTIONS_DB") ?? 0f;
     public static float TailTrim => MathF.Pow(10f, TailDb / 20f);
     public static float CopiesTrim => MathF.Pow(10f, CopiesDb / 20f);
 

@@ -140,6 +140,9 @@ public sealed class AircraftSynth
     public void PlaceAtLever(float lever)
     {
         Lever = Math.Clamp(lever, 0f, 1f);
+        // A piston aeroplane placed in flight is already running: at least at idle, synchronised, so
+        // it is not heard cranking over in mid-air. The prop's load brings it to the lever's speed.
+        if (_piston != null && _piston.Rpm < _piston.Profile.IdleRpm) _piston.SpinTo(_piston.Profile.IdleRpm);
         if (Profile.Turbine is not { } t) return;
         _spool = t.IdleFraction + (1f - t.IdleFraction) * Lever;
         float u = MathHelper.Lerp(t.CoreExitVelocityIdle, t.CoreExitVelocityMax,
@@ -219,7 +222,10 @@ public sealed class AircraftSynth
                 float rpm = _piston.Rpm;
                 float k = 0.9f * _piston.Profile.PeakTorqueNm / (_piston.Profile.RedlineRpm * _piston.Profile.RedlineRpm);
                 _piston.LoadTorque = k * rpm * rpm;
-                _piston.Starter = rpm < 300f;
+                // Held until it catches, as a driver holds the key (EngineSynth.Firing): released at
+                // 300 rpm alone, it let go before the engine computer had synchronised and the crank
+                // coasted down unfired.
+                _piston.Starter = !_piston.Firing || rpm < 300f;
                 _piston.SetListener(_listener);
                 Rpm = rpm * p.PropGearRatio;
                 for (int e = 0; e < _props.Length; e++)

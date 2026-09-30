@@ -318,21 +318,27 @@ public class ScatteringTests
                                            source, listener, 343f, got, null, 2);
         float slabSpecular = 0f, slabDiffuse = 0f;
         for (int i = 0; i < nSlab; i++)
-            if (got[i].IsDiffuse) slabDiffuse += got[i].Gain; else slabSpecular += got[i].Gain;
+            if (got[i].IsDiffuse) slabDiffuse += got[i].Gain * got[i].Gain; else slabSpecular += got[i].Gain * got[i].Gain;
 
         int nStand = ImageSource.FirstOrder(new[] { Wall("Audience", 20f, 4f, -20f) },
                                             source, listener, 343f, got, null, 2);
         float standSpecular = 0f, standDiffuse = 0f;
         for (int i = 0; i < nStand; i++)
-            if (got[i].IsDiffuse) standDiffuse += got[i].Gain; else standSpecular += got[i].Gain;
+            if (got[i].IsDiffuse) standDiffuse += got[i].Gain * got[i].Gain; else standSpecular += got[i].Gain * got[i].Gain;
 
+        // Energies: the taps and the image are separate arrivals, and separate arrivals add as power.
+        // Summed as amplitudes, the scattered share counted too much once gains became pressures
+        // (EarlyReflections.Keep, sqrt(s) for the taps).
         _o.WriteLine($"concrete slab: specular {slabSpecular:F3}, scattered {slabDiffuse:F3}");
         _o.WriteLine($"full stand:    specular {standSpecular:F3}, scattered {standDiffuse:F3}");
 
         // A slab is a mirror: nearly all of what it returns is the image.
         Assert.True(slabSpecular > slabDiffuse * 2f);
-        // A stand is not: what little it returns comes back scattered.
-        Assert.True(standDiffuse > standSpecular);
+        // A stand is not: of what little it returns, far more comes back scattered. Not MORE scattered
+        // than mirrored at a listener 300 m off, though: scattered energy spreads over a hemisphere and
+        // the mirror's does not, so the fair comparison is the share, stand against slab.
+        Assert.True(standDiffuse / standSpecular > 10f * (slabDiffuse / slabSpecular),
+            $"stand scattered/mirrored {standDiffuse / standSpecular:F3}, slab {slabDiffuse / slabSpecular:F3}");
         // And it returns much less of it either way.
         Assert.True(standSpecular < slabSpecular * 0.25f,
             $"a stand full of people reflected {standSpecular:F3} where a slab reflected {slabSpecular:F3}.");
