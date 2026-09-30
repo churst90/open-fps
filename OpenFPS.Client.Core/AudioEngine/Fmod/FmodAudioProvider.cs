@@ -1434,7 +1434,7 @@ public class FmodAudioProvider : IAudioProvider
     // mirrored through the surfaces round it (WorldAudioPlayer.QueueEarlyEchoes and the steps'
     // SubmitRoomStepEchoes), the listener's traced stage plays only the late tail (TailOnly, as a
     // diffuse field), and every reflected path — placed copies, tails, traced echoes — sits at one
-    // trim against the direct sound (ReflectionsDb). Nothing decides by "indoors" any more except
+    // trim against the direct sound (TailDb and CopiesDb). Nothing decides by "indoors" any more except
     // where physics does: past the window a room's copies are dense and are the tail; a street's are
     // sparse and stay separate events (QueueHigherOrderEchoes).
 
@@ -1516,11 +1516,31 @@ public class FmodAudioProvider : IAudioProvider
     /// it does less of through a generic HRTF in headphones, where a copy at its physical level is heard
     /// as an event. The room's identity — its decay, its colour, where its walls are — survives the
     /// trim; only its weight against the direct sound is set for the listener.
+    ///
+    /// SPLIT, 2026-09-29, after measuring the mixer at 0 dB: a clap in flat 01F put its placed copies
+    /// at -14 dB and its traced tail at -17 dB against the direct sound — at or under what room
+    /// acoustics predicts. So -24 was not a level the room wanted. It was paying for three bugs (the
+    /// copy law inside the reference distance, the ground traced twice for far sources, the boundary
+    /// copies outside the trim; fixed in step 1) and for the copies being sample-identical replicas of
+    /// a dry sound, which the ear hears as separate events where real reflections are not. The two
+    /// kinds are now two numbers, so each is judged on its own:
+    ///   TailDb   — everything TRACED: the listener's and other rooms' stages, far sources' traced
+    ///              echoes. Convolved through the traced response, so already reflections, not copies.
+    ///              0 dB, the traced level. `/tail <dB>`, OPENFPS_TAIL_DB.
+    ///   CopiesDb — everything PLACED as a copy of the source: early echoes, facade and higher-order
+    ///              echoes, your own steps' echoes, the master-bus boundary copies. -24 until the copies
+    ///              are rendered as reflections (step 3). `/copies <dB>`, OPENFPS_COPIES_DB.
+    /// `/reflections <dB>` and OPENFPS_REFLECTIONS_DB set both.
     /// </summary>
-    public static volatile float ReflectionsDb =
-        float.TryParse(Environment.GetEnvironmentVariable("OPENFPS_REFLECTIONS_DB"), System.Globalization.NumberStyles.Float,
-                       System.Globalization.CultureInfo.InvariantCulture, out float reflDb) ? Math.Clamp(reflDb, -40f, 6f) : -24f;
-    public static float ReflectionsTrim => MathF.Pow(10f, ReflectionsDb / 20f);
+    public static volatile float TailDb = EnvDb("OPENFPS_TAIL_DB") ?? EnvDb("OPENFPS_REFLECTIONS_DB") ?? 0f;
+    /// <summary>See <see cref="TailDb"/>.</summary>
+    public static volatile float CopiesDb = EnvDb("OPENFPS_COPIES_DB") ?? EnvDb("OPENFPS_REFLECTIONS_DB") ?? -24f;
+    public static float TailTrim => MathF.Pow(10f, TailDb / 20f);
+    public static float CopiesTrim => MathF.Pow(10f, CopiesDb / 20f);
+
+    private static float? EnvDb(string name) =>
+        float.TryParse(Environment.GetEnvironmentVariable(name), System.Globalization.NumberStyles.Float,
+                       System.Globalization.CultureInfo.InvariantCulture, out float db) ? Math.Clamp(db, -80f, 6f) : null;
 
     /// <summary>The cabin's traced response against its physical level, dB: 0 is the traced level.
     /// `/cabin <dB>` sets it, for judging a ride by ear; the reflections trim does not touch it.</summary>
@@ -1693,7 +1713,7 @@ public class FmodAudioProvider : IAudioProvider
             if (a.EchoLeaving && a.EchoWeight <= 0f) { (gone ??= new()).Add(a); continue; }
             float d = MathF.Max(1f, Vector3.Distance(_listenerPos, a.CurrentApparentPosition));
             float law = Loudness.RenderedGain(1.0f, a.MinDistance, a.Range, d) * d;   // the law over 1/d
-            rig.InputGain = a.BaseVolume * a.FadeGain * law * a.EchoWeight * ReflectionsTrim;
+            rig.InputGain = a.BaseVolume * a.FadeGain * law * a.EchoWeight * TailTrim;
             rig.Orientation = orient;
             echoes.SetSource(rig.Slot, a.CurrentApparentPosition);
             // The mirror images give way once the trace carries most of it, and come back first.
@@ -1720,7 +1740,7 @@ public class FmodAudioProvider : IAudioProvider
         var e = TracedReverbSet.Echoes;
         string mode = TracedEchoesOn ? "on" : "off";
         if (e == null) return $"Echoes: {mode}. No tracer yet — the scene is still being built.";
-        return $"Echoes: {mode}, {ReflectionsDb:F0} dB against physical (the reflections trim). {_tracedEchoIds.Length} far source(s) traced from where they are; {e.Runs} traces, the last in {e.LastRunMs:F0} ms.";
+        return $"Echoes: {mode}, {TailDb:F0} dB against physical (the tail level). {_tracedEchoIds.Length} far source(s) traced from where they are; {e.Runs} traces, the last in {e.LastRunMs:F0} ms.";
     }
 
     /// <summary>Where a sound id's file is: the path the loader opens.</summary>
@@ -1748,7 +1768,7 @@ public class FmodAudioProvider : IAudioProvider
     {
         if (TracedReverbSet.Listener == null) return "Reverb: no trace yet — the scene is still being built.";
         var (rooms, runs, ms) = TracedReverbSet.Stats();
-        return $"Reverb: traced from where you stand and from {rooms} other room(s); {runs} traces so far, the last of yours in {ms:F0} ms. Reflections {ReflectionsDb:F0} dB.";
+        return $"Reverb: traced from where you stand and from {rooms} other room(s); {runs} traces so far, the last of yours in {ms:F0} ms. Tail {TailDb:F0} dB, copies {CopiesDb:F0} dB.";
     }
 
     /// <summary>Adds a traced stage to every bus that lacks one, points each at the place it should be
@@ -1786,7 +1806,7 @@ public class FmodAudioProvider : IAudioProvider
             // and it plays at its traced level as it did before the trim existed. Trimmed with the
             // rest (2026-09-29) it sat 24 dB down, and a bus ride was "very very muffled", with the
             // doors and the street gone and no way to tell the bus was stopping.
-            kv.Value.State.Gain = ReferenceEquals(trace, cabin) ? MathF.Pow(10f, CabinDb / 20f) : ReflectionsTrim;
+            kv.Value.State.Gain = ReferenceEquals(trace, cabin) ? MathF.Pow(10f, CabinDb / 20f) : TailTrim;
         }
 
         // ONLY WHERE IT CAN BE HEARD. A traced stage convolves and then decodes round the head, about
@@ -3147,7 +3167,7 @@ public class FmodAudioProvider : IAudioProvider
         // one cost an afternoon of looking for a bug in the wrong place.
         Log.Information("Room: listener in region {Region}; ray-traced RT60 {Sim:F0} ms; enclosure {Enc:P0}; "
                       + "reflections {Refl:F0} dB",
-                        _listenerRegionId, _simReverbDecayMs, _listenerEnclosure, ReflectionsDb);
+                        _listenerRegionId, _simReverbDecayMs, _listenerEnclosure, TailDb);
 
         // One simulation step plus a comfortable margin. Below that a voice is being placed at a
         // position from the last step, which is exactly what the interpolation clock delivers and what
@@ -4091,7 +4111,7 @@ public class FmodAudioProvider : IAudioProvider
         // they sat outside the reflections level, on the master bus, on top of the walls
         // QueueEarlyEchoes already places: in flat 01F every sound had a -9 dB copy off the ceiling
         // 6 ms late that /reflections never touched (2026-09-29). Now the one level governs them too.
-        trim *= ReflectionsTrim;
+        trim *= CopiesTrim;
 
         for (int i = 0; i < BoundaryVoiceState.MaxTaps; i++)
         {

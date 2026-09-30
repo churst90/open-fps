@@ -104,7 +104,7 @@ public static class ClapRoomSpike
             var m = provider.TracedMeter(RoomId);
             Console.WriteLine($"  traced stage: {10 * Math.Log10(m.Out / Math.Max(1e-20, m.In)):F1} dB out per ear against its mono input; "
                             + $"{10 * Math.Log10(m.Out / Math.Max(1e-20, m.PerChannel)):F1} dB against the mean of its {m.Channels} input channels; head blend {m.Blend:F2}");
-            Console.WriteLine($"  reverb: traced, listener trace {(TracedReverbSet.Listener != null ? "ready" : "MISSING")}, reflections {FmodAudioProvider.ReflectionsDb:F0} dB, makeup {FmodAudioProvider.MasterMakeupDb:F0} dB");
+            Console.WriteLine($"  reverb: traced, listener trace {(TracedReverbSet.Listener != null ? "ready" : "MISSING")}, reflections {FmodAudioProvider.TailDb:F0} tail, {FmodAudioProvider.CopiesDb:F0} copies dB, makeup {FmodAudioProvider.MasterMakeupDb:F0} dB");
         }
         finally { provider.Dispose(); TracedReverbSet.Dispose(); scene.Dispose(); Phonon.iplContextRelease(ref ctx); }
 

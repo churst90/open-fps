@@ -1227,23 +1227,32 @@ public sealed class ClientGameSession : IDisposable
                 else if (a is "off") OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.TracedEchoesOn = false;
                 else if (a != null && float.TryParse(a, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float db))
                 {
-                    // /echoes -12: on, and the one reflections trim set — the echoes have no level of their own.
-                    OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.ReflectionsDb = Math.Clamp(db, -40f, 6f);
+                    // /echoes -12: on, at that level. They are traced, so theirs is the tail level.
+                    OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.TailDb = Math.Clamp(db, -80f, 6f);
                     OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.TracedEchoesOn = true;
                 }
-                else if (a != null) { Say("Echoes: say /echoes on or /echoes off; /reflections sets the level."); return; }
+                else if (a != null) { Say("Echoes: say /echoes on or /echoes off; /tail sets the level."); return; }
                 Say(OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.TracedEchoesStatus());
                 return;
             }
-            // Every reflected sound against the direct: /reflections -24. Everywhere. (Not /room: that is
-            // the server's "do the walls round you make a room", and for a day this shadowed it.)
-            if (parts[0].Equals("reflections", StringComparison.OrdinalIgnoreCase))
+            // Reflections against the direct sound, in two kinds (FmodAudioProvider.TailDb): /tail for
+            // everything traced, /copies for everything placed as a copy, /reflections for both.
+            // (Not /room: that is the server's "do the walls round you make a room".)
+            if (parts[0].Equals("reflections", StringComparison.OrdinalIgnoreCase)
+                || parts[0].Equals("tail", StringComparison.OrdinalIgnoreCase)
+                || parts[0].Equals("copies", StringComparison.OrdinalIgnoreCase))
             {
+                string which = parts[0].ToLowerInvariant();
                 var a = parts.Skip(1).FirstOrDefault();
                 if (a != null && float.TryParse(a, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float db))
-                    OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.ReflectionsDb = Math.Clamp(db, -40f, 6f);
-                else if (a != null) { Say("Reflections: say a level in decibels, such as /reflections -24. Zero is the traced level."); return; }
-                Say($"Reflections: {OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.ReflectionsDb:F0} dB against the direct sound, on every placed reflection, every traced tail and the traced echoes, indoors and out.");
+                {
+                    db = Math.Clamp(db, -80f, 6f);
+                    if (which != "copies") OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.TailDb = db;
+                    if (which != "tail") OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.CopiesDb = db;
+                }
+                else if (a != null) { Say($"Say a level in decibels, such as /{which} -12. Zero is the physical level, -80 is off."); return; }
+                Say($"Tail {OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.TailDb:F0} dB, the traced rooms and echoes. "
+                  + $"Copies {OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.CopiesDb:F0} dB, the placed reflections. Both against the direct sound; zero is physical.");
                 return;
             }
             if (parts[0].Equals("cabin", StringComparison.OrdinalIgnoreCase))

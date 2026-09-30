@@ -599,7 +599,7 @@ public sealed class WorldAudioPlayer
             // against what it does to the direct sound, as QueueReflections does.
             float gain = EarlyReflections.PlacedCopyGain(a.GainMid, a.PathLength, direct, reference);
             if (gain < ImageSource.MinGain) continue;
-            gain *= OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.ReflectionsTrim;   // /reflections
+            gain *= OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.CopiesTrim;   // /copies
             var echo = item.Sound;
             echo.Position = a.ImagePosition;
             echo.LevelDb = item.Sound.LevelDb + 20f * MathF.Log10(gain);
@@ -670,7 +670,7 @@ public sealed class WorldAudioPlayer
             if (a.Order == 1 && a.HitPoint.Y < MathF.Min(src.Y, listenerPosition.Y) - 0.2f) continue;
             float gain = EarlyReflections.PlacedCopyGain(a.GainMid, a.PathLength, direct, reference);
             if (gain < ImageSource.MinGain) continue;
-            gain *= OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.ReflectionsTrim;   // /reflections
+            gain *= OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.CopiesTrim;   // /copies
             var echo = item.Sound;
             echo.Position = a.ImagePosition;
             echo.LevelDb = item.Sound.LevelDb + 20f * MathF.Log10(gain);
@@ -723,7 +723,7 @@ public sealed class WorldAudioPlayer
 
             float gain = EarlyReflections.PlacedCopyGain(r.Gain, r.PathLength, directDist, reference);
             if (gain < ImageSource.MinGain) continue;
-            gain *= OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.ReflectionsTrim;   // /reflections
+            gain *= OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.CopiesTrim;   // /copies
 
             var echo = item.Sound;
             echo.Position = r.ApparentPosition;

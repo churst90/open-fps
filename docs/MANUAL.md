@@ -164,9 +164,12 @@ Type these on the chat line. The `/` is optional and case does not matter.
 - `/room [radius]`: whether the walls around you form a room, and what is missing if not.
 
 ### Hearing
-- `/reflections [dB]`: every reflected sound against the direct sound, indoors and out: the walls'
-  answers to a clap or a step, every room's and street's tail, and the echoes of far sources. Zero is
-  the measured physical level; the default is -24, set by ear. Plain `/reflections` reads it back.
+- `/tail [dB]`: everything traced, against the direct sound: every room's and street's tail and the
+  echoes of far sources. Zero is the physical level and the default.
+- `/copies [dB]`: every reflection placed as a copy of the sound: the walls' first answers to a clap
+  or a step, facade echoes, and the nearest walls and ceiling. Default -24 for now.
+- `/reflections [dB]`: sets both. Plain `/tail`, `/copies` or `/reflections` reads them back; -80 is off.
+- `/cabin [dB]`: the inside of the vehicle you are riding in, against its traced level (default 0).
 - `/reverb`: how the tracing is doing (the tail is traced from the geometry everywhere).
 - `/echoes on|off`: the traced echoes of far, loud sources.
 
