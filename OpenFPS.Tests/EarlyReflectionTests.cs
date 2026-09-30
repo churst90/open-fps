@@ -135,6 +135,19 @@ public class EarlyReflectionTests
     }
 
     /// <summary>
+    /// A listener just behind a thin wall, with the source well in front of it, hears nothing off its
+    /// front face. The case above is also guarded by the path test; this one only by the listener-side
+    /// plane test.
+    /// </summary>
+    [Fact]
+    public void AListenerBehindAWallHearsNoReflectionOffItsFront()
+    {
+        var slab = Wall(new Vector3(0f, 2f, 0f), new Vector3(0.5f, 6f, 40f));
+        EarlyReflections.Find(new Vector3(5f, 1.5f, -2f), new Vector3(-1f, 1.5f, 2f), new[] { slab }, _found);
+        Assert.Empty(_found);
+    }
+
+    /// <summary>
     /// A room answers from several directions at once, and a corridor from its two sides — the property
     /// that makes a space legible by ear rather than merely reverberant.
     /// </summary>
