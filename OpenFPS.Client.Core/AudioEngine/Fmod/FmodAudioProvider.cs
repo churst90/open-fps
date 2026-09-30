@@ -4087,6 +4087,11 @@ public class FmodAudioProvider : IAudioProvider
         float trim = total > AcousticConstants.MaxBoundaryReflectionSum
             ? AcousticConstants.MaxBoundaryReflectionSum / total
             : 1f;
+        // These are reflections too — the nearest walls and the ceiling, copies of the WHOLE mix — and
+        // they sat outside the reflections level, on the master bus, on top of the walls
+        // QueueEarlyEchoes already places: in flat 01F every sound had a -9 dB copy off the ceiling
+        // 6 ms late that /reflections never touched (2026-09-29). Now the one level governs them too.
+        trim *= ReflectionsTrim;
 
         for (int i = 0; i < BoundaryVoiceState.MaxTaps; i++)
         {

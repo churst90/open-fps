@@ -135,6 +135,27 @@ public class EarlyReflectionTests
     }
 
     /// <summary>
+    /// A copy placed at its image arrives, after the engine's own distance law, at exactly the share of
+    /// the direct sound the surfaces kept — inside the source's reference distance as well as past it.
+    /// L/d was right only past it, and a loud source's reference reaches 40 m: a gunshot's copies came
+    /// out 8-11 dB hot.
+    /// </summary>
+    [Theory]
+    [InlineData(40f, 2f, 5f)]     // a gunshot, both inside the reference
+    [InlineData(40f, 0.5f, 60f)]  // the copy past it, the direct inside
+    [InlineData(1.2f, 3f, 7f)]    // a clap, both past it
+    [InlineData(1.2f, 0.8f, 3f)]  // a step, the direct inside
+    public void ACopyArrivesAtTheShareTheSurfacesKept(float reference, float direct, float path)
+    {
+        float kept = 0.6f;
+        float relative = kept * direct / path;              // what Find reports
+        float placed = EarlyReflections.PlacedCopyGain(relative, path, direct, reference);
+        float atEarCopy = placed * Loudness.RenderedGain(1f, reference, 1000f, path);
+        float atEarDirect = Loudness.RenderedGain(1f, reference, 1000f, direct);
+        Assert.Equal(relative, atEarCopy / atEarDirect, 3);
+    }
+
+    /// <summary>
     /// A listener just behind a thin wall, with the source well in front of it, hears nothing off its
     /// front face. The case above is also guarded by the path test; this one only by the listener-side
     /// plane test.

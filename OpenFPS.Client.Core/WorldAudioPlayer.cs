@@ -586,7 +586,8 @@ public sealed class WorldAudioPlayer
                               // Two dozen overlapping copies of a two-second horn are a cloud, not a
                               // flutter — a sustained sound's copies of copies are the field.
                               flutter: IsImpulse(item.Sound));
-        float direct = MathF.Max(1f, Vector3.Distance(item.Sound.Position, listenerPosition));
+        float direct = Vector3.Distance(item.Sound.Position, listenerPosition);
+        float reference = Loudness.Place(item.Sound.LevelDb, item.Sound.ExtentMetres).ReferenceDistance;
         int added = 0;
         foreach (var a in _higher)
         {
@@ -594,9 +595,9 @@ public sealed class WorldAudioPlayer
             if (a.ExtraDelaySeconds <= RoomEchoWindowSeconds) continue;   // placed by QueueEarlyEchoes
             // Loud enough against the sound it is a copy of to be heard as a second event at all.
             if (a.GainMid < ImageSource.EchoAudibleRatio) continue;
-            // Placed at the image, which is the path length away: undo the spreading the engine will
-            // apply there, as QueueReflections does, so it is not applied twice.
-            float gain = Math.Clamp(a.GainMid * a.PathLength / direct, 0f, 1f);
+            // Placed at the image, which is the path length away: undo what the engine will do there
+            // against what it does to the direct sound, as QueueReflections does.
+            float gain = EarlyReflections.PlacedCopyGain(a.GainMid, a.PathLength, direct, reference);
             if (gain < ImageSource.MinGain) continue;
             gain *= OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.ReflectionsTrim;   // /reflections
             var echo = item.Sound;
@@ -655,7 +656,8 @@ public sealed class WorldAudioPlayer
         EarlyReflections.Find(src, listenerPosition, solids, _room, AudioPhysics.SpeedOfSound,
                               maxOrder: EarlyReflections.MaxOrder, keep: MaxRoomEchoes * 2,
                               maxExtraPathMetres: RoomEchoWindowSeconds * AudioPhysics.SpeedOfSound);
-        float direct = MathF.Max(1f, Vector3.Distance(src, listenerPosition));
+        float direct = Vector3.Distance(src, listenerPosition);
+        float reference = Loudness.Place(item.Sound.LevelDb, item.Sound.ExtentMetres).ReferenceDistance;
         // Loudest first. Find hands its arrivals back in surface order, and with more inside the
         // window than there are voices (twenty-two in flat 01F, twelve voices) the first twelve BY
         // SURFACE were taken, and which walls answered depended on their order in the map.
@@ -666,7 +668,7 @@ public sealed class WorldAudioPlayer
             if (a.ExtraDelaySeconds > RoomEchoWindowSeconds) continue;
             // The ground under the source: already inside the voice (GroundReflection).
             if (a.Order == 1 && a.HitPoint.Y < MathF.Min(src.Y, listenerPosition.Y) - 0.2f) continue;
-            float gain = Math.Clamp(a.GainMid * a.PathLength / direct, 0f, 1f);
+            float gain = EarlyReflections.PlacedCopyGain(a.GainMid, a.PathLength, direct, reference);
             if (gain < ImageSource.MinGain) continue;
             gain *= OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.ReflectionsTrim;   // /reflections
             var echo = item.Sound;
@@ -708,7 +710,8 @@ public sealed class WorldAudioPlayer
                                             AudioPhysics.SpeedOfSound, found, DiffuseTaps);
         if (n == 0) return;
 
-        float directDist = MathF.Max(1f, Vector3.Distance(item.Sound.Position, listenerPosition));
+        float directDist = Vector3.Distance(item.Sound.Position, listenerPosition);
+        float reference = Loudness.Place(item.Sound.LevelDb, item.Sound.ExtentMetres).ReferenceDistance;
         for (int i = 0; i < n; i++)
         {
             var r = found[i];
@@ -718,7 +721,7 @@ public sealed class WorldAudioPlayer
             // Loud enough, against the sound it is a copy of, to be heard as a second event at all.
             if (r.Gain < ImageSource.EchoAudibleRatio) continue;
 
-            float gain = Math.Clamp(r.Gain * r.PathLength / directDist, 0f, 1f);
+            float gain = EarlyReflections.PlacedCopyGain(r.Gain, r.PathLength, directDist, reference);
             if (gain < ImageSource.MinGain) continue;
             gain *= OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.ReflectionsTrim;   // /reflections
 

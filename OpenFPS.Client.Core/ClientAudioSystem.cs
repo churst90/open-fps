@@ -2698,14 +2698,14 @@ public class ClientAudioSystem
                                              maxOrder: OpenFPS.Common.EarlyReflections.MaxOrder, keep: WorldAudioPlayer.MaxRoomEchoes * 2,
                                              maxExtraPathMetres: WorldAudioPlayer.RoomEchoWindowSeconds * AudioPhysics.SpeedOfSound);
         _stepArrivals.Sort(static (a, b) => b.GainMid.CompareTo(a.GainMid));
-        float direct = MathF.Max(1f, Vector3.Distance(stepPos, ear));
+        float direct = Vector3.Distance(stepPos, ear);
         int added = 0;
         foreach (var a in _stepArrivals)
         {
             if (a.ExtraDelaySeconds > WorldAudioPlayer.RoomEchoWindowSeconds) continue;
             // The floor the foot is on: the step is made of it already.
             if (a.Order == 1 && a.HitPoint.Y < MathF.Min(stepPos.Y, ear.Y) - 0.2f) continue;
-            float gain = Math.Clamp(a.GainMid * a.PathLength / direct, 0f, 1f);
+            float gain = OpenFPS.Common.EarlyReflections.PlacedCopyGain(a.GainMid, a.PathLength, direct, stepReference);
             if (gain < OpenFPS.Common.ImageSource.MinGain) continue;
             gain *= OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.ReflectionsTrim;   // /reflections
             var loss = WorldAudioPlayer.SpecularLoss(a.Scattering, a.Order);

@@ -272,9 +272,13 @@ internal static class TracedReverbSet
             _context = context; _scene = scene;
             _listener ??= new TracedReverb(context);
             if (_listener.IsValid) _listener.SetScene(listenerScene ?? scene);
-            // The few sources traced from where they are (TracedEchoes), on the same scene.
+            // The few sources traced from where they are (TracedEchoes), on the scene WITHOUT its open
+            // ground, as the listener's trace is. Every voice already carries its own ground bounce
+            // (GroundReflection); traced over the ground as well, a car at 30 m had that bounce twice,
+            // the second at about the direct level and under a millisecond late — a comb that took
+            // twenty decibels of trim to hide (the first "-24", 2026-09-26; found 2026-09-29).
             _echoes ??= new TracedEchoes(context);
-            if (_echoes.IsValid) _echoes.SetScene(scene);
+            if (_echoes.IsValid) _echoes.SetScene(listenerScene ?? scene);
             foreach (var r in Rooms.Values) r.Trace.SetScene(scene);
         }
     }

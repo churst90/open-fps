@@ -111,6 +111,23 @@ public static class EarlyReflections
     public static float HeardReference(float direct) => MathF.Max(direct, 1f);
 
     /// <summary>
+    /// The gain a copy is placed with, at its image, for it to arrive <paramref name="relative"/> of
+    /// the direct sound (a reported gain: the surface's loss times direct / pathLength).
+    ///
+    /// The engine renders both the direct sound and the copy with the SOURCE's reference distance R
+    /// (Loudness.Place, a copy keeps its source's placement): flat inside R, 1/r beyond. So the copy
+    /// must be scaled by what the engine will do at the two distances, max(L,R)/max(d,R), not by L/d.
+    /// L/d is the same thing only when both are past R, and R reaches 40 m for a loud source: a
+    /// gunshot's copies inside it came out 8-11 dB hotter than the surfaces allowed (2026-09-29).
+    /// <paramref name="direct"/> is the true source-listener distance the relative gain was taken at.
+    /// </summary>
+    public static float PlacedCopyGain(float relative, float pathLength, float direct, float reference)
+    {
+        float r = MathF.Max(0.1f, reference);
+        return Math.Clamp(relative * MathF.Max(pathLength, r) / MathF.Max(direct, r), 0f, 1f);
+    }
+
+    /// <summary>
     /// How late a copy has to be before the ear hears it as a SEPARATE arrival, seconds.
     ///
     /// This is the line between a reflection and an echo, and it is a fact about hearing rather than
