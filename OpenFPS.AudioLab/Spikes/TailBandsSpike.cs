@@ -71,6 +71,20 @@ public static class TailBandsSpike
             double late = 0; for (int i = (int)(0.08 * Fs); i < x.Length; i++) late += x[i] * (double)x[i];
             Console.WriteLine($"  {f,5:F0} Hz: T20 {t20}, late energy (80 ms on) {10 * Math.Log10(late + 1e-30):F1} dB");
         }
+        // The directional part: which way the 50-300 ms of the tail arrives from, as SDM splits it.
+        for (int t = 0; t < 100 && tr.LateSdm == null; t++) Thread.Sleep(100);
+        if (tr.LateSdm is { } sdm)
+        {
+            var order = Enumerable.Range(0, sdm.Share.Length).OrderByDescending(i => sdm.Share[i]).ToArray();
+            string Name(Vector3 d) => $"{(d.X >= 0 ? "E" : "W")}{MathF.Abs(d.X):F1} {(d.Z >= 0 ? "N" : "S")}{MathF.Abs(d.Z):F1} {(d.Y >= 0 ? "up" : "down")}{MathF.Abs(d.Y):F1}";
+            float even = 1f / sdm.Share.Length;
+            Console.WriteLine($"  directional part (SDM), share per direction, even would be {even:P0}:");
+            foreach (var i in order.Take(8)) Console.WriteLine($"    {sdm.Share[i],6:P1}  {Name(DiffuseTail.Direction(i))}");
+            // Horizontal lean: net pull of the directional energy.
+            var net = Vector3.Zero; for (int i = 0; i < sdm.Share.Length; i++) net += sdm.Share[i] * DiffuseTail.Direction(i);
+            Console.WriteLine($"    net pull {net.Length():F2} toward {Name(Vector3.Normalize(net))} (the ear is at x {ear.X:F2}, z {ear.Z:F2} in a {W} x {D} m room)");
+        }
+        else Console.WriteLine("  no directional part (OPENFPS_TAIL_SDM=0, or the ambisonic tail)");
         return 0;
     }
 

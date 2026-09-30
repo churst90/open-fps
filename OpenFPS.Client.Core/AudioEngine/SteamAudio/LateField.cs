@@ -270,49 +270,7 @@ internal sealed class LateField : IDisposable
         return true;
     }
 
-    /// <summary>
-    /// Which world direction each first-order channel stands for, and with what sign, by encoding a
-    /// sound from each axis through Steam Audio's own encoder and reading the channels back. The
-    /// intensity vector is then sum(channel × its axis); nothing about the channel order or the
-    /// handedness of the frame is assumed.
-    /// </summary>
-    private void CalibrateAxes()
-    {
-        var au = new Phonon.IPLAudioSettings { samplingRate = SampleRate, frameSize = 64 };
-        var es = new Phonon.IPLAmbisonicsEncodeEffectSettings { maxOrder = Order };
-        if (Phonon.iplAmbisonicsEncodeEffectCreate(Context, ref au, ref es, out IntPtr enc) != Phonon.IPL_STATUS_SUCCESS) return;
-        var inB = new Phonon.IPLAudioBuffer(); var outB = new Phonon.IPLAudioBuffer();
-        Phonon.iplAudioBufferAllocate(Context, 1, 64, ref inB);
-        Phonon.iplAudioBufferAllocate(Context, Channels, 64, ref outB);
-        var ones = new float[64]; Array.Fill(ones, 1f);
-        var inter = new float[64 * Channels];
-        var axes = new[] { Vector3.UnitX, Vector3.UnitY, Vector3.UnitZ };
-        var gains = new float[3, 3];   // [axis, channel 1..3]
-        for (int a = 0; a < 3; a++)
-        {
-            var dir = new Phonon.IPLVector3 { x = axes[a].X, y = axes[a].Y, z = axes[a].Z };
-            var ep = new Phonon.IPLAmbisonicsEncodeEffectParams { direction = dir, order = Order };
-            for (int rep = 0; rep < 3; rep++)   // past any gain ramp
-            {
-                Phonon.iplAudioBufferDeinterleave(Context, ones, ref inB);
-                Phonon.iplAmbisonicsEncodeEffectApply(enc, ref ep, ref inB, ref outB);
-            }
-            Phonon.iplAudioBufferInterleave(Context, ref outB, inter);
-            float w = inter[(63) * Channels];
-            for (int c = 1; c < 4; c++) gains[a, c - 1] = w != 0 ? inter[63 * Channels + c] / w : 0f;
-        }
-        // Channel c's axis is the one it answers; normalised so a source straight down that axis
-        // reads as |I|/E = 1.
-        Vector3 Axis(int c)
-        {
-            var v = new Vector3(gains[0, c], gains[1, c], gains[2, c]);
-            float l2 = v.LengthSquared();
-            return l2 > 1e-9f ? v / l2 : Vector3.Zero;
-        }
-        _axisY = Axis(0); _axisZ = Axis(1); _axisX = Axis(2);
-        Phonon.iplAmbisonicsEncodeEffectRelease(ref enc);
-        Phonon.iplAudioBufferFree(Context, ref inB); Phonon.iplAudioBufferFree(Context, ref outB);
-    }
+    private void CalibrateAxes() => (_axisY, _axisZ, _axisX) = AmbiAxes.Calibrate(Context, SampleRate);
 
     private static Phonon.IPLCoordinateSpace3 Coord(Vector3 origin) => new()
     {

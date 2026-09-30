@@ -40,18 +40,23 @@ internal sealed class LateTailIr
     /// direct sound), windowed and cut where what remains is 70 dB under what was there, into
     /// partitions of <paramref name="block"/> samples. Worker thread: it allocates.
     /// </summary>
-    public static LateTailIr Build(float[] w, int sampleRate, int block, int maxPartitions)
+    public static LateTailIr Build(float[] w, int sampleRate, int block, int maxPartitions,
+                                   float fadeInStart = FadeInStartSeconds, float fadeInEnd = FadeInEndSeconds)
     {
         int n = w.Length;
-        int a = (int)(FadeInStartSeconds * sampleRate), b = (int)(FadeInEndSeconds * sampleRate);
+        int a = (int)(fadeInStart * sampleRate), b = (int)(fadeInEnd * sampleRate);
         var x = new float[n];
-        double total = 0;
         for (int i = a; i < n; i++)
-        {
-            float win = i >= b ? 1f : 0.5f - 0.5f * MathF.Cos(MathF.PI * (i - a) / Math.Max(1, b - a));
-            x[i] = w[i] * win;
-            total += x[i] * (double)x[i];
-        }
+            x[i] = w[i] * (i >= b ? 1f : 0.5f - 0.5f * MathF.Cos(MathF.PI * (i - a) / Math.Max(1, b - a)));
+        return FromWindowed(x, block, maxPartitions);
+    }
+
+    /// <summary>An IR already windowed as it is to be played, cut 70 dB down, into partitions.</summary>
+    public static LateTailIr FromWindowed(float[] x, int block, int maxPartitions)
+    {
+        int n = x.Length;
+        double total = 0;
+        for (int i = 0; i < n; i++) total += x[i] * (double)x[i];
         // Where the rest is 70 dB down: no partition past it is worth its cost.
         int end = n;
         double rest = 0;
@@ -239,5 +244,183 @@ internal sealed class Fft
                 }
             }
         }
+    }
+}
+
+/// <summary>
+/// The directional part of the tail, by the Spatial Decomposition Method (Tervo et al. 2013): the
+/// traced response split, sample by sample, by the direction its sound arrives from, snapped to the
+/// nearest of the tail's directions (DiffuseTail.Direction). Each direction then has its own
+/// response — only the samples that came from that way — and they sum back to the trace exactly.
+///
+/// Why. The tail was one channel spread over twenty directions by random filters: a field that is the
+/// same whichever way you face, so turning your head told you nothing and it sat in front of you as
+/// "a mass of reverb" (2026-09-30), which is where a generic head response puts anything without a
+/// direction. The trace knows better for its first few hundred milliseconds: the second and third
+/// bounces arrive off particular walls. From here they come from those walls, fixed in the room, and
+/// move round the head as it turns. Past <see cref="EndFadeStart"/>..<see cref="EndFadeEnd"/> the trace
+/// itself says the sound arrives from everywhere, and the diffuse rendering takes over; the two
+/// windows are complementary, so the parts add back to the trace.
+///
+/// Direction per sample: the intensity W x (first-order channels) summed over <see cref="DoaWindow"/>
+/// samples (about 0.7 ms), turned into the game's world through the measured channel axes
+/// (AmbiAxes). Snapping to a fixed set of directions is the published refinement that keeps each
+/// direction's response from being a comb of lone samples (Amengual Garí et al., BinauralSDM).
+/// </summary>
+internal sealed class SdmTailIr
+{
+    public const float EndFadeStart = 0.25f, EndFadeEnd = 0.35f;
+    public const int DoaWindow = 32;
+
+    /// <summary>One response per direction; null where nothing came from that way.</summary>
+    public readonly LateTailIr?[] PerDirection;
+    public readonly int Block, MaxPartitions;
+    /// <summary>Each direction's share of the directional part's energy, for the lab.</summary>
+    public readonly float[] Share;
+
+    private SdmTailIr(int k, int block, int maxPartitions)
+    {
+        PerDirection = new LateTailIr?[k]; Share = new float[k]; Block = block; MaxPartitions = maxPartitions;
+    }
+
+    public static int PartitionsFor(int sampleRate, int block) => (int)(EndFadeEnd * sampleRate) / block + 2;
+
+    /// <param name="w">The omnidirectional channel; <paramref name="c1"/>..<paramref name="c3"/> the
+    /// first-order ones, whose world axes (Steam Audio's) are <paramref name="a1"/>..<paramref name="a3"/>.</param>
+    /// <param name="directions">The directions to snap to, in the game's world.</param>
+    public static SdmTailIr Build(float[] w, float[] c1, float[] c2, float[] c3,
+                                  System.Numerics.Vector3 a1, System.Numerics.Vector3 a2, System.Numerics.Vector3 a3,
+                                  System.Numerics.Vector3[] directions, int sampleRate, int block)
+    {
+        int k = directions.Length;
+        int maxP = PartitionsFor(sampleRate, block);
+        int n = Math.Min(w.Length, maxP * block);
+        var sdm = new SdmTailIr(k, block, maxP);
+        int s0 = (int)(LateTailIr.FadeInStartSeconds * sampleRate), s1 = (int)(LateTailIr.FadeInEndSeconds * sampleRate);
+        int e0 = (int)(EndFadeStart * sampleRate), e1 = (int)(EndFadeEnd * sampleRate);
+        var parts = new float[k][];
+        for (int d = 0; d < k; d++) parts[d] = new float[n];
+        // Running intensity over the last DoaWindow samples, centred.
+        int half = DoaWindow / 2;
+        double iy = 0, iz = 0, ix = 0;
+        for (int i = 0; i < Math.Min(half, n); i++) { iy += w[i] * (double)c1[i]; iz += w[i] * (double)c2[i]; ix += w[i] * (double)c3[i]; }
+        double total = 0;
+        var energy = new double[k];
+        for (int i = 0; i < n; i++)
+        {
+            int add = i + half, drop = i - half - 1;
+            if (add < n) { iy += w[add] * (double)c1[add]; iz += w[add] * (double)c2[add]; ix += w[add] * (double)c3[add]; }
+            if (drop >= 0) { iy -= w[drop] * (double)c1[drop]; iz -= w[drop] * (double)c2[drop]; ix -= w[drop] * (double)c3[drop]; }
+            if (i < s0 || i >= e1) continue;
+            float win = i < s1 ? 0.5f - 0.5f * MathF.Cos(MathF.PI * (i - s0) / Math.Max(1, s1 - s0)) : 1f;
+            if (i >= e0) win *= 0.5f + 0.5f * MathF.Cos(MathF.PI * (i - e0) / Math.Max(1, e1 - e0));
+            var sa = (float)iy * a1 + (float)iz * a2 + (float)ix * a3;
+            var dir = AmbiAxes.ToGame(sa);
+            int best = 0; float bestDot = float.MinValue;
+            if (dir.LengthSquared() > 1e-20f)
+                for (int d = 0; d < k; d++) { float dot = System.Numerics.Vector3.Dot(dir, directions[d]); if (dot > bestDot) { bestDot = dot; best = d; } }
+            else best = i % k;                      // no direction at all: spread, not piled on one
+            float v = w[i] * win;
+            parts[best][i] = v;
+            energy[best] += v * (double)v; total += v * (double)v;
+        }
+        for (int d = 0; d < k; d++)
+        {
+            sdm.Share[d] = total > 0 ? (float)(energy[d] / total) : 0f;
+            if (energy[d] > total * 1e-6) sdm.PerDirection[d] = LateTailIr.FromWindowed(parts[d], block, maxP);
+        }
+        return sdm;
+    }
+}
+
+/// <summary>
+/// Many responses against one input: the input is transformed once and its spectra shared, and each
+/// response is a multiply-add and one inverse transform. For the directional tail (SdmTailIr), whose
+/// twenty responses all take the same send. Same handover rule as LateTailConvolver: a new set is
+/// crossfaded in over one block. Allocation-free after construction.
+/// </summary>
+internal sealed class SharedInputConvolver
+{
+    private readonly int _block, _bins, _maxPartitions, _k;
+    private readonly Fft _fft;
+    private readonly float[] _prev, _fdlRe, _fdlIm, _re, _im, _accRe, _accIm, _tmp;
+    private int _head;
+    private SdmTailIr? _cur;
+    private volatile SdmTailIr? _next;
+
+    public SharedInputConvolver(int block, int maxPartitions, int k)
+    {
+        _block = block; _bins = block + 1; _maxPartitions = maxPartitions; _k = k;
+        _fft = new Fft(2 * block);
+        _prev = new float[block];
+        _fdlRe = new float[maxPartitions * _bins]; _fdlIm = new float[maxPartitions * _bins];
+        _re = new float[2 * block]; _im = new float[2 * block];
+        _accRe = new float[_bins]; _accIm = new float[_bins];
+        _tmp = new float[block];
+    }
+
+    public void Set(SdmTailIr? ir)
+    {
+        if (ir != null && (ir.Block != _block || ir.MaxPartitions > _maxPartitions || ir.PerDirection.Length != _k)) return;
+        _next = ir;
+    }
+
+    /// <summary>One block of input into <paramref name="outputs"/>[d] for every direction d.</summary>
+    public void Process(ReadOnlySpan<float> input, float[][] outputs)
+    {
+        for (int k = 0; k < _block; k++) { _re[k] = _prev[k]; _re[_block + k] = input[k]; _im[k] = 0f; _im[_block + k] = 0f; }
+        input.Slice(0, _block).CopyTo(_prev);
+        _fft.Forward(_re, _im);
+        _head = (_head + 1) % _maxPartitions;
+        Array.Copy(_re, 0, _fdlRe, _head * _bins, _bins);
+        Array.Copy(_im, 0, _fdlIm, _head * _bins, _bins);
+
+        var cur = _cur; var next = _next;
+        bool swap = !ReferenceEquals(cur, next);
+        for (int d = 0; d < _k; d++)
+        {
+            var o = outputs[d];
+            var a = cur?.PerDirection[d];
+            if (a != null) Convolve(a, o); else Array.Clear(o, 0, _block);
+            if (swap)
+            {
+                var b = next?.PerDirection[d];
+                if (b != null) Convolve(b, _tmp); else Array.Clear(_tmp);
+                for (int i = 0; i < _block; i++)
+                {
+                    float up = 0.5f - 0.5f * MathF.Cos(MathF.PI * (i + 0.5f) / _block);
+                    o[i] = o[i] * (1f - up) + _tmp[i] * up;
+                }
+            }
+        }
+        if (swap) _cur = next;
+    }
+
+    private void Convolve(LateTailIr ir, float[] y)
+    {
+        Array.Clear(_accRe); Array.Clear(_accIm);
+        int bins = _bins, vec = System.Numerics.Vector<float>.Count;
+        for (int p = 0; p < ir.Partitions; p++)
+        {
+            int slot = _head - p; if (slot < 0) slot += _maxPartitions;
+            int xo = slot * bins, ho = p * bins, k = 0;
+            for (; k + vec <= bins; k += vec)
+            {
+                var xr = new System.Numerics.Vector<float>(_fdlRe, xo + k); var xi = new System.Numerics.Vector<float>(_fdlIm, xo + k);
+                var hr = new System.Numerics.Vector<float>(ir.Re, ho + k); var hi = new System.Numerics.Vector<float>(ir.Im, ho + k);
+                (new System.Numerics.Vector<float>(_accRe, k) + xr * hr - xi * hi).CopyTo(_accRe, k);
+                (new System.Numerics.Vector<float>(_accIm, k) + xr * hi + xi * hr).CopyTo(_accIm, k);
+            }
+            for (; k < bins; k++)
+            {
+                float xr = _fdlRe[xo + k], xi = _fdlIm[xo + k], hr = ir.Re[ho + k], hi = ir.Im[ho + k];
+                _accRe[k] += xr * hr - xi * hi; _accIm[k] += xr * hi + xi * hr;
+            }
+        }
+        int n = 2 * _block;
+        for (int k = 0; k < bins; k++) { _re[k] = _accRe[k]; _im[k] = _accIm[k]; }
+        for (int k = 1; k < _block; k++) { _re[n - k] = _accRe[k]; _im[n - k] = -_accIm[k]; }
+        _fft.Inverse(_re, _im);
+        for (int k = 0; k < _block; k++) y[k] = _re[_block + k];
     }
 }

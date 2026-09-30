@@ -1981,6 +1981,7 @@ public class FmodAudioProvider : IAudioProvider
             // Never the last: that one is the tracer's own, for reading the late tail back.
             Reader = Math.Min(_traced.Count, TracedReverb.ExtractReader - 1),
             LateConv = new LateTailConvolver(sub, tr.MaxLatePartitions),
+            SdmConv = TracedReverb.Sdm ? new SharedInputConvolver(sub, SdmTailIr.PartitionsFor(44100, sub), DiffuseBranch.Count) : null,
             LateOut = new float[sub],
             // The room you are in: its late tail as a field round the head, not one channel.
             Diffuse = DiffuseTail.Enabled

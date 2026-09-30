@@ -81,3 +81,45 @@ public class LateTailTests
         Assert.True(maxStep <= around * 1.2f, $"step {maxStep:F4} at the handover against {around:F4} elsewhere");
     }
 }
+
+/// <summary>The directional part of the tail (SdmTailIr): sample by sample, by where it came from.</summary>
+public class SdmTailTests
+{
+    private const int Rate = 44100, Block = 256;
+
+    private static System.Numerics.Vector3[] Dirs()
+    {
+        var d = new System.Numerics.Vector3[DiffuseBranch.Count];
+        for (int i = 0; i < d.Length; i++) d[i] = DiffuseTail.Direction(i);
+        return d;
+    }
+
+    /// <summary>A field arriving from one way (a plane wave: the first-order channels are the
+    /// pressure times the direction's components) all lands in the direction nearest it.</summary>
+    [Fact]
+    public void ASoundFromOneWayLandsThere()
+    {
+        var r = new Random(3); int n = Rate / 2;
+        var w = new float[n]; var y = new float[n]; var z = new float[n]; var x = new float[n];
+        var u = System.Numerics.Vector3.Normalize(new System.Numerics.Vector3(1f, 0.2f, 0f));   // z = 0: no mirror question
+        for (int i = 0; i < n; i++) { w[i] = (float)(r.NextDouble() * 2 - 1); y[i] = w[i] * u.Y; z[i] = w[i] * u.Z; x[i] = w[i] * u.X; }
+        var dirs = Dirs();
+        var sdm = SdmTailIr.Build(w, y, z, x, System.Numerics.Vector3.UnitY, System.Numerics.Vector3.UnitZ, System.Numerics.Vector3.UnitX, dirs, Rate, Block);
+        int nearest = 0; float best = float.MinValue;
+        for (int d = 0; d < dirs.Length; d++) { float dot = System.Numerics.Vector3.Dot(u, dirs[d]); if (dot > best) { best = dot; nearest = d; } }
+        Assert.True(sdm.Share[nearest] > 0.99f, $"share {sdm.Share[nearest]:F3} in the nearest direction");
+    }
+
+    /// <summary>The parts split the directional window's energy between them and lose none of it.</summary>
+    [Fact]
+    public void ThePartsShareAllTheEnergy()
+    {
+        var r = new Random(4); int n = Rate / 2;
+        var w = new float[n]; var y = new float[n]; var z = new float[n]; var x = new float[n];
+        for (int i = 0; i < n; i++) { w[i] = (float)(r.NextDouble() * 2 - 1); y[i] = (float)(r.NextDouble() * 2 - 1); z[i] = (float)(r.NextDouble() * 2 - 1); x[i] = (float)(r.NextDouble() * 2 - 1); }
+        var sdm = SdmTailIr.Build(w, y, z, x, System.Numerics.Vector3.UnitY, System.Numerics.Vector3.UnitZ, System.Numerics.Vector3.UnitX, Dirs(), Rate, Block);
+        Assert.Equal(1.0, sdm.Share.Sum(), 3);
+        // Random directions: spread over many, not piled on one.
+        Assert.True(sdm.Share.Count(s => s > 0.01f) >= 12, $"only {sdm.Share.Count(s => s > 0.01f)} directions used");
+    }
+}

@@ -29,6 +29,8 @@ internal sealed class TracedReverbState
     /// <summary>The tail: the trace's own late part (LateTailIr), convolved here. Null falls back to
     /// the parametric reverb, as does OPENFPS_TAIL_PARAMETRIC=1 for an A/B.</summary>
     public LateTailConvolver? LateConv;
+    /// <summary>The directional part's twenty responses against the send (SdmTailIr).</summary>
+    public SharedInputConvolver? SdmConv;
     public static readonly bool ParametricTail = Environment.GetEnvironmentVariable("OPENFPS_TAIL_PARAMETRIC") == "1";
     public float[] LateOut = Array.Empty<float>();
     public IntPtr Decode;                 // IPLAmbisonicsDecodeEffect (provider context)
@@ -331,6 +333,52 @@ internal sealed class DiffuseTail
         _a1 = _a2 = _b1 = 0f;
     }
 
+    // ── The directional part (SdmTailIr) ──────────────────────────────────────────────────────
+    //
+    // Each direction's own response, through that direction's own head response, turned with the head
+    // every block — and NOT through the ear decorrelation, which would scramble the very timing
+    // between the ears that says where it comes from. Its own twenty binaural effects: a binaural
+    // effect carries state, and the diffuse branches use theirs.
+    public readonly IntPtr[] SdmEars = new IntPtr[DiffuseBranch.Count];
+    public float[][] SdmOut = Array.Empty<float[]>();
+    public bool SdmReady;
+
+    private bool CreateSdmEars(int sub)
+    {
+        var au = new Phonon.IPLAudioSettings { samplingRate = 44100, frameSize = sub };
+        var bs = new Phonon.IPLBinauralEffectSettings { hrtf = EarHrtf };
+        for (int i = 0; i < DiffuseBranch.Count; i++)
+            if (Phonon.iplBinauralEffectCreate(EarContext, ref au, ref bs, out SdmEars[i]) != Phonon.IPL_STATUS_SUCCESS) return false;
+        SdmOut = new float[DiffuseBranch.Count][];
+        for (int i = 0; i < SdmOut.Length; i++) SdmOut[i] = new float[sub];
+        return true;
+    }
+
+    /// <summary>Adds the directional part (<see cref="SdmOut"/>, one block per direction) into
+    /// <see cref="Stereo"/>, each from its own direction in the head's frame.</summary>
+    public void AddDirectional(int sub)
+    {
+        var rot = new System.Numerics.Quaternion(Volatile.Read(ref _rx), Volatile.Read(ref _ry), Volatile.Read(ref _rz), Volatile.Read(ref _rw));
+        var toHead = System.Numerics.Quaternion.Conjugate(rot);
+        for (int b = 0; b < DiffuseBranch.Count; b++)
+        {
+            var src = SdmOut[b];
+            bool any = false;
+            for (int k = 0; k < sub && !any; k++) any = src[k] != 0f;
+            if (!any) continue;
+            Phonon.iplAudioBufferDeinterleave(EarContext, src, ref Mono);
+            var local = System.Numerics.Vector3.Transform(Direction(b), toHead);
+            var ep = new Phonon.IPLBinauralEffectParams
+            {
+                direction = new Phonon.IPLVector3 { x = local.X, y = local.Y, z = -local.Z },
+                interpolation = Phonon.IPL_HRTFINTERPOLATION_BILINEAR, spatialBlend = 1f, hrtf = EarHrtf,
+            };
+            Phonon.iplBinauralEffectApply(SdmEars[b], ref ep, ref Mono, ref EarBuf);
+            Phonon.iplAudioBufferInterleave(EarContext, ref EarBuf, _earScratch);
+            for (int i = 0; i < sub * 2; i++) Stereo[i] += _earScratch[i];
+        }
+    }
+
     /// <summary>OPENFPS_DIFFUSE_TAIL=0 goes back to the one channel through the ear decorrelators.</summary>
     public static readonly bool Enabled = Environment.GetEnvironmentVariable("OPENFPS_DIFFUSE_TAIL") != "0";
 
@@ -394,6 +442,7 @@ internal sealed class DiffuseTail
         {
             d.CalibrateBinaural(subFrame, channels);
             d.BinauralReady = true;
+            d.SdmReady = TracedReverb.Sdm && d.CreateSdmEars(subFrame);
         }
         d.Ready = true;
         return d;
@@ -496,6 +545,8 @@ internal sealed class DiffuseTail
             if (Encoders[i] != IntPtr.Zero) Phonon.iplAmbisonicsEncodeEffectRelease(ref Encoders[i]);
         for (int i = 0; i < Ears.Length; i++)
             if (Ears[i] != IntPtr.Zero) Phonon.iplBinauralEffectRelease(ref Ears[i]);
+        for (int i = 0; i < SdmEars.Length; i++)
+            if (SdmEars[i] != IntPtr.Zero) Phonon.iplBinauralEffectRelease(ref SdmEars[i]);
         if (EarBuf.data != IntPtr.Zero) Phonon.iplAudioBufferFree(EarContext, ref EarBuf);
         if (Mono.data != IntPtr.Zero) Phonon.iplAudioBufferFree(Context, ref Mono);
         if (Encoded.data != IntPtr.Zero) Phonon.iplAudioBufferFree(Context, ref Encoded);
@@ -597,6 +648,13 @@ internal static class TracedReverbDsp
                 {
                     // Straight to the ears (DiffuseTail.RenderBinaural): no soundfield, no decode.
                     dfb.RenderBinaural(s.AmbiScratch, sub, TracedReverb.Channels);
+                    // And the directional part from the walls it came off (SdmTailIr).
+                    if (dfb.SdmReady && s.SdmConv is { } sc)
+                    {
+                        sc.Set(reverb.LateSdm);
+                        sc.Process(mono.AsSpan(0, sub), dfb.SdmOut);
+                        dfb.AddDirectional(sub);
+                    }
                     for (int k = 0; k < sub; k++)
                     {
                         float l = (dfb.Stereo[k * 2] + dfb.Low[k]) * g, r = (dfb.Stereo[k * 2 + 1] + dfb.Low[k]) * g;

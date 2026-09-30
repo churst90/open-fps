@@ -95,6 +95,15 @@ internal sealed class TracedReverb : IDisposable
     public volatile LateTailIr? Late;
     /// <summary>The last trace's omnidirectional channel as read back, whole and unwindowed: for the lab.</summary>
     public volatile float[]? LastReadBack;
+    /// <summary>The tail's directional part (SdmTailIr), from the fade-in to ~0.3 s; <see cref="Late"/>
+    /// is then only the diffuse remainder after it. OPENFPS_TAIL_SDM=0: none, and Late is all of it.</summary>
+    public volatile SdmTailIr? LateSdm;
+    // Only with the binaural tail: the directional part is rendered there, and without it the
+    // remainder (which starts at 0.25 s when this is on) would leave 50-250 ms empty.
+    public static readonly bool Sdm = Environment.GetEnvironmentVariable("OPENFPS_TAIL_SDM") != "0" && DiffuseTail.Binaural;
+    private System.Numerics.Vector3 _ax1, _ax2, _ax3;
+    private bool _axesKnown;
+    private float[] _c1 = Array.Empty<float>(), _c2 = Array.Empty<float>(), _c3 = Array.Empty<float>();
     /// <summary>What reading it back cost, last time.</summary>
     public double LastExtractMs;
     /// <summary>The reader the extraction uses, never a mixer stage's.</summary>
@@ -230,7 +239,19 @@ internal sealed class TracedReverb : IDisposable
                 if (ExtractLate)
                 {
                     long x0 = System.Diagnostics.Stopwatch.GetTimestamp();
-                    if (ReadBack() is { } w) { LastReadBack = w; Late = LateTailIr.Build(w, SampleRate, FrameSize, MaxLatePartitions); }
+                    if (ReadBack() is { } w)
+                    {
+                        LastReadBack = w;
+                        if (Sdm && _axesKnown)
+                        {
+                            var dirs = new System.Numerics.Vector3[DiffuseBranch.Count];
+                            for (int d = 0; d < dirs.Length; d++) dirs[d] = DiffuseTail.Direction(d);
+                            LateSdm = SdmTailIr.Build(w, _c1, _c2, _c3, _ax1, _ax2, _ax3, dirs, SampleRate, FrameSize);
+                            Late = LateTailIr.Build(w, SampleRate, FrameSize, MaxLatePartitions,
+                                                    SdmTailIr.EndFadeStart, SdmTailIr.EndFadeEnd);
+                        }
+                        else Late = LateTailIr.Build(w, SampleRate, FrameSize, MaxLatePartitions);
+                    }
                     LastExtractMs = (System.Diagnostics.Stopwatch.GetTimestamp() - x0) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
                 }
             }
@@ -278,9 +299,12 @@ internal sealed class TracedReverb : IDisposable
             Phonon.iplAudioBufferAllocate(Context, ch, frame, ref _extractOut);
             _extractMono = new float[frame];
             _extractInter = new float[frame * ch];
+            (_ax1, _ax2, _ax3) = AmbiAxes.Calibrate(Context, SampleRate);
+            _axesKnown = _ax1 != System.Numerics.Vector3.Zero || _ax2 != System.Numerics.Vector3.Zero || _ax3 != System.Numerics.Vector3.Zero;
         }
         Phonon.iplReflectionEffectReset(_extractEffect);
         var w = new float[frames * frame];
+        _c1 = new float[w.Length]; _c2 = new float[w.Length]; _c3 = new float[w.Length];
         for (int b = -4; b < frames; b++)
         {
             Array.Clear(_extractMono);
@@ -289,7 +313,12 @@ internal sealed class TracedReverb : IDisposable
             Phonon.iplReflectionEffectApply(_extractEffect, ref prm, ref _extractIn, ref _extractOut, IntPtr.Zero);
             if (b < 0) continue;
             Phonon.iplAudioBufferInterleave(Context, ref _extractOut, _extractInter);
-            for (int k = 0; k < frame; k++) w[b * frame + k] = _extractInter[k * ch];
+            for (int k = 0; k < frame; k++)
+            {
+                int i = b * frame + k, o = k * ch;
+                w[i] = _extractInter[o];
+                _c1[i] = _extractInter[o + 1]; _c2[i] = _extractInter[o + 2]; _c3[i] = _extractInter[o + 3];
+            }
         }
         return w;
     }
