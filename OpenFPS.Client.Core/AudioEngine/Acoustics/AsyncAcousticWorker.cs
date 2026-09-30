@@ -158,6 +158,11 @@ public class AsyncAcousticWorker : IDisposable
         _requestQueue.Enqueue(req);
     }
 
+    /// <summary>Each source's last Steam Audio answer and when, for a tick the pool had no room for it.</summary>
+    private readonly Dictionary<int, (List<AcousticPathData> Paths, long At)> _lastSimPath = new();
+    /// <summary>How old a held answer may be: well past a tick, well short of anything moving far.</summary>
+    private const long HeldSimPathMs = 1000;
+
     /// <summary>Files a result under the entity it answers, stamped with where the source was when it
     /// was asked about, so the consumer can tell a result for THIS sound from one left behind by a
     /// previous occupant of a pooled id.</summary>
@@ -273,7 +278,30 @@ public class AsyncAcousticWorker : IDisposable
                     var req = kv.Value;
                     if (sim != null && sim.TryGetValue(req.EntityId, out var r))
                     {
-                        Store(req, BuildSimPath(world, req, r));
+                        var built = BuildSimPath(world, req, r);
+                        Store(req, built);
+                        _lastSimPath[req.EntityId] = (built, Environment.TickCount64);
+                    }
+                    else if (sim != null && _lastSimPath.TryGetValue(req.EntityId, out var held)
+                             && Environment.TickCount64 - held.At < HeldSimPathMs)
+                    {
+                        // The pool was full this tick, not the simulation broken: keep this source's
+                        // last Steam Audio answer, a tick or two old. Handing it to the hand-rolled
+                        // tracer instead gave it a DIFFERENT model for a moment, one that found a route
+                        // through a door at -4 dB where Steam Audio said -24 through brick: "sometimes
+                        // the sound just pops through" the walls (2026-09-30; 2-15 of ~70 sources a tick
+                        // on the city).
+                        //
+                        // Moved with the source: the answer's positions are where it WAS, and a bus at
+                        // 15 m/s held for a second would be heard 15 m behind itself.
+                        var moved = new List<AcousticPathData>(held.Paths.Count);
+                        foreach (var hp in held.Paths)
+                        {
+                            var m = hp;
+                            m.ApparentPosition += req.SourcePos - hp.SourcePosition;
+                            moved.Add(m);
+                        }
+                        Store(req, moved);
                     }
                     else
                     {
@@ -282,6 +310,13 @@ public class AsyncAcousticWorker : IDisposable
                     }
                 }
                 ReportSimCoverage(degraded, _pending.Count, sim == null);
+                // Transient sounds get a new id each time: drop the held answers nobody can use.
+                if (_lastSimPath.Count > 512)
+                {
+                    long stale = Environment.TickCount64 - HeldSimPathMs;
+                    foreach (var id in _lastSimPath.Where(e => e.Value.At < stale).Select(e => e.Key).ToList())
+                        _lastSimPath.Remove(id);
+                }
                 ReportRayBudget(_pending.Count);
             }
             else
@@ -847,11 +882,15 @@ public class AsyncAcousticWorker : IDisposable
         float worst = -1f;
         int worstBox = -1;
         edge = listener;
+        var routes = _routeScratch;
+        routes.Clear();
         for (int i = 0; i < boxes.Count; i++)
         {
             var b = boxes[i];
+            _boxRoutes.Clear();
             if (!Diffraction.PathDifferenceAroundBox(b.Center, b.Size, b.Rotation, source, listener,
-                                                     out float d, out Vector3 p)) continue;
+                                                     out float d, out Vector3 p, _boxRoutes)) continue;
+            foreach (var (rd, rs, re) in _boxRoutes) routes.Add((rd, rs, re, i));
             if (d <= worst) continue;
             worst = d; worstBox = i; edge = p;
         }
@@ -862,12 +901,40 @@ public class AsyncAcousticWorker : IDisposable
         // nothing about the rest of the scene. Round the end of one wall and straight into the next is
         // a perfectly good answer to "how far past THIS box" and a completely wrong answer to "which
         // way did it come" — two rooms apart, the nearest silhouette edge is inside the wall between
-        // them. So the last leg is checked against everything before its bearing is believed; when it
-        // fails, there is a route but we do not know where it runs, and Steam Audio's probe graph —
-        // which does know the whole scene — answers instead.
-        edgeVerified = worstBox >= 0 && RouteIsClear(source, edge, listener, worstBox);
+        // them. So each route's two legs are checked against everything before it is believed.
+        //
+        // And the route believed is the SHORTEST that is clear, not the worst box's: sound takes the
+        // way that exists. Only the worst box's shortest way round was ever tried, so standing in a
+        // flat with its door open, a walker in the corridor round the jamb got the wall's -54 dB: the
+        // shortest way past the storey-high wall was over its top, into the slab above, and the jamb
+        // of the open door beside it was never asked (2026-09-30, --path-probe open=). When no route is clear, there is a route but we do not know where it
+        // runs, and Steam Audio's probe graph — which knows the whole scene — answers instead.
+        // A route clear of every box is at least as long as the worst box's own shortest way round, so
+        // nothing shorter can be it.
+        routes.RemoveAll(r => r.D < worst - 1e-3f);
+        edgeVerified = false;
+        if (routes.Count > 1) routes.Sort((x, y) => x.D.CompareTo(y.D));
+        int tried = 0;
+        foreach (var (d, ps, p, i) in routes)
+        {
+            if (++tried > MaxRoutesTried) break;
+            if (!RouteIsClear(source, ps, p, listener, i)) continue;
+            edge = p; edgeVerified = true;
+            if (_saDebug)
+            {
+                var bx = boxes[i];
+                Console.WriteLine($"[ROUTE] {source} -> {listener}: {d:F2} m round box {bx.Center} size {bx.Size} {bx.Material}, edge {p}");
+            }
+            return d;
+        }
         return worst;
     }
+
+    private readonly List<(float D, Vector3 SourceSide, Vector3 Edge, int Box)> _routeScratch = new();
+    private readonly List<(float D, Vector3 SourceSide, Vector3 Edge)> _boxRoutes = new();
+    /// <summary>A route clear of the whole scene costs a pass over every box; past the few shortest,
+    /// the rest are ways round walls deeper in, and the probe graph answers for those.</summary>
+    private const int MaxRoutesTried = 6;
 
     /// <summary>Are BOTH legs of a diffracted route — source to edge, edge to ear — clear of every OTHER
     /// barrier? The diffracting box itself is skipped: the edge lies on its surface, so it always reports
@@ -876,15 +943,33 @@ public class AsyncAcousticWorker : IDisposable
     /// Both, not just the arriving one. Round the west end of a doorway's west leaf is the shortest way
     /// past THAT leaf and runs straight into the room's west wall — the leg that fails is the one leaving
     /// the source, and a bearing taken from it points at a corner the sound never reached.</summary>
-    private bool RouteIsClear(Vector3 source, Vector3 edge, Vector3 listener, int skipBox)
+    private const float RouteJointMetres = 0.05f;
+
+    private bool RouteIsClear(Vector3 source, Vector3 sourceSide, Vector3 edge, Vector3 listener, int skipBox)
     {
         var boxes = _barrierBoxes;
+        // Only boxes that can reach the route's bounds are tested exactly: up to six routes are tried
+        // per source now, and each exact pass over the city's five thousand boxes cost a millisecond.
+        var lo = Vector3.Min(Vector3.Min(source, sourceSide), Vector3.Min(edge, listener));
+        var hi = Vector3.Max(Vector3.Max(source, sourceSide), Vector3.Max(edge, listener));
         for (int i = 0; i < boxes.Count; i++)
         {
             if (i == skipBox) continue;
             var b = boxes[i];
-            if (GeometryUtils.LineIntersectsOBB(edge, listener, b.Center, b.Size, b.Rotation)) return false;
-            if (GeometryUtils.LineIntersectsOBB(source, edge, b.Center, b.Size, b.Rotation)) return false;
+            float reach = b.Size.Length() * 0.5f + RouteJointMetres;
+            var c = b.Center;
+            if (c.X + reach < lo.X || c.X - reach > hi.X || c.Y + reach < lo.Y || c.Y - reach > hi.Y
+                || c.Z + reach < lo.Z || c.Z - reach > hi.Z) continue;
+            // Every other box a hair larger: an edge flush against its neighbour — a wall's top under
+            // the slab it holds up — is not an edge, and a route along the joint is a crack between two
+            // boxes that the building does not have. Without it, a shut flat door passed the corridor at
+            // -14 dB over the top of its wall (2026-09-30).
+            var size = b.Size + new Vector3(2f * RouteJointMetres);
+            if (GeometryUtils.LineIntersectsOBB(edge, listener, b.Center, size, b.Rotation)) return false;
+            if (GeometryUtils.LineIntersectsOBB(source, sourceSide, b.Center, size, b.Rotation)) return false;
+            // Round a thick wall the route runs along its end between the two crossings, and a shut
+            // leaf hung in that opening sits exactly there.
+            if (sourceSide != edge && GeometryUtils.LineIntersectsOBB(sourceSide, edge, b.Center, size, b.Rotation)) return false;
         }
         return true;
     }
@@ -940,7 +1025,6 @@ public class AsyncAcousticWorker : IDisposable
     // simulator takes the new one as it does on a map change, and Steam Audio's reference counting
     // keeps the old alive until each has let go — at most every DoorRebuildSeconds while a door
     // swings, and once more when it settles. The pathing probes are not rebaked for a door.
-    private long _saDoorSig;
     private long _lastDoorRebuildTicks;
     private const double DoorRebuildSeconds = 0.3;
     /// <summary>Only doors this near the listener count: on the city walkers open doors all day, and a
@@ -949,22 +1033,48 @@ public class AsyncAcousticWorker : IDisposable
     private Vector3 _lastListenerPos;
     private bool _haveLastListener;
 
-    /// <summary>Where every door leaf is: a portal's solid box collider, its pose to the centimetre and
-    /// the degree, folded into one number.</summary>
-    private long DoorSignature(WorldSnapshot world)
+    /// <summary>Where each door leaf stood when the scene in use was built, by entity.</summary>
+    private readonly Dictionary<int, long> _builtDoorPoses = new();
+
+    /// <summary>A door leaf: a solid box that is also a portal. The server gives every door a portal
+    /// (PrefabRepository), with both sides the outside when the map names no rooms, so a door is told by
+    /// HAVING one, not by its two sides differing — that test missed every door on the city. Movers
+    /// are not in the scene at all.</summary>
+    private static bool IsDoorLeaf(OpenFPS.Common.Networking.EntityDefinition? def)
+        => def != null && def.Collider.IsSolid && !def.Moves
+           && (def.Portal.RegionAId != 0 || def.Portal.RegionBId != 0);
+
+    /// <summary>A leaf's pose to the centimetre and the degree, folded into one number.</summary>
+    private static long DoorPose(in EntitySnapshot snap)
     {
+        var p = snap.Transform.Position; var q = snap.Transform.Rotation;
         long h = 17;
+        h = h * 31 + (long)MathF.Round(p.X * 100f); h = h * 31 + (long)MathF.Round(p.Y * 100f); h = h * 31 + (long)MathF.Round(p.Z * 100f);
+        h = h * 31 + (long)MathF.Round(q.Y * 100f); h = h * 31 + (long)MathF.Round(q.W * 100f);
+        return h;
+    }
+
+    /// <summary>True when a leaf near the listener stands somewhere other than where the scene in use has
+    /// it. Only a leaf that MOVED counts: this was a hash of the doors within 50 m, which changed every
+    /// time one crossed that radius as you walked, and rebuilt the city's scene for nothing (477 times in
+    /// one session, 2026-09-30). A far leaf that moved is left as it is until you come near it.</summary>
+    private bool NearDoorMoved(WorldSnapshot world)
+    {
         foreach (var snap in world.Entities.Values)
         {
-            var def = snap.Definition;
-            if (def == null || def.Portal.RegionAId == def.Portal.RegionBId || !def.Collider.IsSolid) continue;
-            var p = snap.Transform.Position; var q = snap.Transform.Rotation;
-            if (_haveLastListener && Vector3.DistanceSquared(p, _lastListenerPos) > DoorNearMetres * DoorNearMetres) continue;
-            h = h * 31 + snap.Id;
-            h = h * 31 + (long)MathF.Round(p.X * 100f); h = h * 31 + (long)MathF.Round(p.Y * 100f); h = h * 31 + (long)MathF.Round(p.Z * 100f);
-            h = h * 31 + (long)MathF.Round(q.Y * 100f); h = h * 31 + (long)MathF.Round(q.W * 100f);
+            if (!IsDoorLeaf(snap.Definition)) continue;
+            if (_haveLastListener && Vector3.DistanceSquared(snap.Transform.Position, _lastListenerPos) > DoorNearMetres * DoorNearMetres) continue;
+            if (!_builtDoorPoses.TryGetValue(snap.Id, out long was) || was != DoorPose(snap)) return true;
         }
-        return h;
+        return false;
+    }
+
+    /// <summary>Records where every leaf is, for the scene about to be built from this world.</summary>
+    private void RecordDoorPoses(WorldSnapshot world)
+    {
+        _builtDoorPoses.Clear();
+        foreach (var snap in world.Entities.Values)
+            if (IsDoorLeaf(snap.Definition)) _builtDoorPoses[snap.Id] = DoorPose(snap);
     }
 
     // A door's rebuild is built OFF this thread and swapped in here when it is ready: on the city the
@@ -990,7 +1100,7 @@ public class AsyncAcousticWorker : IDisposable
         if (_saListenerScene != null) _retiredScenes.Add((_saListenerScene, now));
         _saScene = full; _saListenerScene = listener;
         _saSim.SetScene(full);
-        OpenFPS.Client.Core.AudioEngine.SteamAudio.TracedReverbSet.Configure(_saContext, full, listener.IsBuilt ? listener : null);
+        OpenFPS.Client.Core.AudioEngine.SteamAudio.TracedReverbSet.ConfigureInBackground(_saContext, full, listener.IsBuilt ? listener : null);
         _barrierBoxes = boxes;
         _lastSceneBoxes = boxes.Count;
         Console.WriteLine("[AcousticWorker] A door moved: the scene now has the leaves where they are.");
@@ -998,6 +1108,8 @@ public class AsyncAcousticWorker : IDisposable
 
     private void ReleaseRetiredScenes()
     {
+        // Not while the tracers are still being handed the new scenes: until then they trace the old.
+        if (OpenFPS.Client.Core.AudioEngine.SteamAudio.TracedReverbSet.Reconfiguring) return;
         long cutoff = DateTime.UtcNow.Ticks - 5 * TimeSpan.TicksPerSecond;
         for (int i = _retiredScenes.Count - 1; i >= 0; i--)
             if (_retiredScenes[i].At < cutoff) { _retiredScenes[i].Scene.Dispose(); _retiredScenes.RemoveAt(i); }
@@ -1009,13 +1121,13 @@ public class AsyncAcousticWorker : IDisposable
         SwapInDoorBuild();
         ReleaseRetiredScenes();
         bool mapChanged = !_saScene.IsBuilt || !ReferenceEquals(world.AcousticMap, _saSceneMap);
-        long doorSig = DoorSignature(world);
         if (!mapChanged)
         {
-            if (doorSig == _saDoorSig || _doorBuild != null) return;
+            if (_doorBuild != null) return;
             if ((DateTime.UtcNow.Ticks - _lastDoorRebuildTicks) < DoorRebuildSeconds * TimeSpan.TicksPerSecond) return;
-            _saDoorSig = doorSig;
+            if (!NearDoorMoved(world)) return;
             _lastDoorRebuildTicks = DateTime.UtcNow.Ticks;
+            RecordDoorPoses(world);
             var doorBoxes = SteamAudioScene.BoxesFromWorld(world);
             var ctx = _saContext; var forMap = _saSceneMap;
             _doorBuild = System.Threading.Tasks.Task.Run(() =>
@@ -1028,8 +1140,8 @@ public class AsyncAcousticWorker : IDisposable
             });
             return;
         }
-        _saDoorSig = doorSig;
         _lastDoorRebuildTicks = DateTime.UtcNow.Ticks;
+        RecordDoorPoses(world);
         var built = System.Diagnostics.Stopwatch.StartNew();
 
         var boxes = SteamAudioScene.BoxesFromWorld(world);

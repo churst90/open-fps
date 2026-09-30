@@ -4,6 +4,20 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-09-30
 
+- Sounds no longer freeze for up to a second at a time. Every scene rebuild for a door handed the new
+  scene to the tracers while holding the lock the game loop and the mixer take every frame, and the
+  late-field tracer holds its own for a whole run; both threads waited it out. Rebuilds are also no
+  longer set off by walking: only a leaf near you that has moved since the scene was built counts.
+- An open door lets in what is round its corner. The search for a way round an obstacle kept only the
+  shortest way round each box, and for a storey-high wall that is over its top, into the slab above;
+  the jamb beside it was never tried. Now every way round is tried, shortest first, and the first
+  that is clear of the whole scene is taken, all its legs checked. In flat 01F with the door open, a
+  walker in the corridor round the corner is -14/-22/-25 dB (low/mid/high); shut, it is the wall's -54.
+- When the voice pool is full, a source keeps its last Steam Audio answer for up to a second instead of
+  falling back to the hand-rolled tracer, which let highs through walls for a tick.
+- `/tail` defaults to -6, by ear.
+- `--path-probe ... open=R` measures each source with the doors near the ear shut, then swung open.
+
 - The tail of the place you stand in is its traced late response. It was Steam Audio's parametric
   reverb, which takes three decay times from the trace and nothing else: 14-20 dB too loud in the
   tunnel, silent to 60 ms and then a plateau ("a mask over where the reflections are coming from",

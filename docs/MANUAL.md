@@ -165,7 +165,7 @@ Type these on the chat line. The `/` is optional and case does not matter.
 
 ### Hearing
 - `/tail [dB]`: everything traced, against the direct sound: every room's and street's tail and the
-  echoes of far sources. Zero is the physical level; the default is -12, by ear.
+  echoes of far sources. Zero is the physical level; the default is -6, by ear.
 - `/copies [dB]`: every reflection placed as a copy of the sound: the walls' first answers to a clap
   or a step, facade echoes, and the nearest walls and ceiling. Zero is the physical level; the default is -6, by ear.
 - `/reflections [dB]`: sets both. Plain `/tail`, `/copies` or `/reflections` reads them back; -80 is off.

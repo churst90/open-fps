@@ -1553,7 +1553,10 @@ public class FmodAudioProvider : IAudioProvider
     /// -12 by ear once the tail's first few hundred milliseconds came from the walls they came off
     /// (SdmTailIr, 2026-09-30): "a world of difference ... 0 doesn't sound bad but it may be a little too
     /// much". Twelve decibels from physical, where it had been twenty-four.
-    public static volatile float TailDb = EnvDb("OPENFPS_TAIL_DB") ?? EnvDb("OPENFPS_REFLECTIONS_DB") ?? -12f;
+    ///
+    /// -6 by ear once the treble came from Steam Audio's own bands and the remainder from where the
+    /// trace says (2026-09-30): "I am happy with -6 and -6 now", with the copies at -6 too.
+    public static volatile float TailDb = EnvDb("OPENFPS_TAIL_DB") ?? EnvDb("OPENFPS_REFLECTIONS_DB") ?? -6f;
     /// <summary>See <see cref="TailDb"/>.</summary>
     /// 0 dB by ear, 2026-09-29, once the copies carry only the mirror share with the scattered share as
     /// the wall's wash, at energy-correct levels, and at most four second-order copies (step 3), with

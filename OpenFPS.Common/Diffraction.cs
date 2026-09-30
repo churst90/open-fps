@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Numerics;
 
 namespace OpenFPS.Common;
@@ -131,6 +132,19 @@ public static class Diffraction
     public static bool PathDifferenceAroundBox(Vector3 centre, Vector3 size, Quaternion rotation,
                                                Vector3 source, Vector3 listener, out float pathDifference,
                                                out Vector3 listenerSideEdge)
+        => PathDifferenceAroundBox(centre, size, rotation, source, listener, out pathDifference, out listenerSideEdge, null);
+
+    /// <summary>
+    /// The same search, and every way round that clears this box added to <paramref name="routes"/>
+    /// (path difference, source-side crossing, listener-side crossing — the same point for one edge),
+    /// shortest or not. The shortest round one box can run
+    /// straight into the next: over the top of a storey-high wall and into the floor slab above, while
+    /// round the jamb of the open door beside it — a few centimetres longer — is clear. Only the
+    /// caller, who has the rest of the scene, can tell which of them exists.
+    /// </summary>
+    public static bool PathDifferenceAroundBox(Vector3 centre, Vector3 size, Quaternion rotation,
+                                               Vector3 source, Vector3 listener, out float pathDifference,
+                                               out Vector3 listenerSideEdge, List<(float D, Vector3 SourceSide, Vector3 Edge)>? routes)
     {
         pathDifference = 0f;
         listenerSideEdge = listener;
@@ -175,10 +189,12 @@ public static class Diffraction
             float t = MinimiseOnEdge(a[e], b[e], source, listener);
             Vector3 p = Vector3.Lerp(a[e], b[e], t);
             float around = Vector3.Distance(source, p) + Vector3.Distance(p, listener);
-            if (around >= best) continue;
+            if (around >= best && routes == null) continue;
             if (p.Y < floorY) continue;
             if (!LegIsClear(source, p, centre, size, rotation)) continue;
             if (!LegIsClear(listener, p, centre, size, rotation)) continue;
+            routes?.Add((MathF.Max(0f, around - direct), p, p));
+            if (around >= best) continue;
             best = around;
             listenerSideEdge = p;
         }
@@ -209,10 +225,12 @@ public static class Diffraction
             Vector3 p = Vector3.Lerp(a[e1], b[e1], t);
             Vector3 r = Vector3.Lerp(a[e2], b[e2], u);
             float around = Vector3.Distance(source, p) + Vector3.Distance(p, r) + Vector3.Distance(r, listener);
-            if (around >= best) continue;
+            if (around >= best && routes == null) continue;
             if (p.Y < floorY || r.Y < floorY) continue;
             if (!LegIsClear(source, p, centre, size, rotation)) continue;
             if (!LegIsClear(listener, r, centre, size, rotation)) continue;
+            routes?.Add((MathF.Max(0f, around - direct), p, r));
+            if (around >= best) continue;
             // The run between the two crossings needs no test: the pairs are the edges that bound a
             // common face, a face is planar and convex, and the straight line between two points on
             // one stays on it. Testing it would fail every time for exactly that reason.

@@ -137,6 +137,9 @@ public static class SirenRouteSpike
                 Collider = new ColliderComponent { Shape = ColliderShape.Box, Size = p.Size * scale, IsSolid = true },
                 Material = new MaterialComponent { Material = p.Material },
             };
+            // A door's two rooms, as the server gives it (PrefabRepository): what makes a leaf a door.
+            if (e.TryGetProperty("RegionAId", out var ra) && e.TryGetProperty("RegionBId", out var rb))
+                def.Portal = new PortalComponent { RegionAId = ra.GetInt32(), RegionBId = rb.GetInt32() };
             world.Entities[id] = new EntitySnapshot { Id = id, Definition = def, Transform = new Transform { Position = pos, Rotation = rot, Scale = Vector3.One } };
             id++;
         }

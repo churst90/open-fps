@@ -175,4 +175,35 @@ public class DiffractedBearingTests
         Assert.True(Diffraction.PathDifferenceAroundBox(centre, size, Quaternion.Identity, source, listener, out float b, out _));
         Assert.Equal(a, b, 6);
     }
+    /// <summary>
+    /// Every way round a box, not only the shortest. A storey-high wall beside a doorway, the ear in the
+    /// flat and a walker in the corridor: the shortest way past the wall is over its top, which in a
+    /// building runs into the slab above, and round the jamb is a few centimetres longer. The search
+    /// only ever gave the first, so an open door let nothing round its corner (2026-09-30). The jamb
+    /// must be among the routes, with its crossings, so the caller can check the legs against a leaf
+    /// hung in the doorway.
+    /// </summary>
+    [Fact]
+    public void A_storey_wall_reports_the_jamb_as_well_as_the_top()
+    {
+        // The flat's wall at x = -18.7, 35 cm thick and 2.73 m high, from the doorway's edge north.
+        var centre = new Vector3(-18.675f, 1.385f, -75.93f);
+        var size = new Vector3(0.35f, 2.73f, 16.86f);
+        var ear = new Vector3(-14f, 1.6f, -85f);
+        var walker = new Vector3(-20f, 1.6f, -82f);
+        var routes = new System.Collections.Generic.List<(float D, Vector3 SourceSide, Vector3 Edge)>();
+        Assert.True(Diffraction.PathDifferenceAroundBox(centre, size, Quaternion.Identity, walker, ear,
+                                                         out float shortest, out _, routes));
+        var jamb = routes.FindAll(r => r.Edge.Z < -84.3f && MathF.Abs(r.Edge.Y - 1.6f) < 0.3f);
+        Assert.NotEmpty(jamb);
+        var best = jamb[0];
+        foreach (var r in jamb) if (r.D < best.D) best = r;
+        Assert.True(best.D < 1.0f, $"round the jamb {best.D:F2} m");
+        Assert.True(best.D >= shortest);
+        // On the wall's end, where the doorway is: the corridor corner, which is what the last leg
+        // leaves from across the doorway (the leg a shut leaf stands in).
+        Assert.True(MathF.Abs(best.SourceSide.Z + 84.36f) < 0.02f && MathF.Abs(best.Edge.Z + 84.36f) < 0.02f,
+                    $"crossings {best.SourceSide} then {best.Edge}");
+    }
 }
+

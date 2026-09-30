@@ -452,24 +452,45 @@ internal static class TracedReverbSet
     /// its open ground (SteamAudioScene.WithoutOpenGround). Null uses <paramref name="scene"/>.</param>
     public static void Configure(IntPtr context, SteamAudioScene scene, SteamAudioScene? listenerScene = null)
     {
+        // The tracers are handed the scene OUTSIDE the gate: each one's SetScene waits for its own
+        // trace to finish, and a late-field run holds that for hundreds of milliseconds. Under the
+        // gate, the game thread and the mixer — which take it for Listener, Echoes, LateField and
+        // Cabin every frame — waited with it: a door swinging within 50 m froze every sound for up to
+        // a second at a time (477 rebuilds in one session on 2026-09-30).
+        TracedReverb listener; TracedEchoes echoes; LateField late; List<TracedReverb> rooms;
         lock (Gate)
         {
             _context = context; _scene = scene;
-            _listener ??= new TracedReverb(context) { ExtractLate = true };
-            if (_listener.IsValid) _listener.SetScene(listenerScene ?? scene);
+            listener = _listener ??= new TracedReverb(context) { ExtractLate = true };
             // The few sources traced from where they are (TracedEchoes), on the scene WITHOUT its open
             // ground, as the listener's trace is. Every voice already carries its own ground bounce
             // (GroundReflection); traced over the ground as well, a car at 30 m had that bounce twice,
             // the second at about the direct level and under a millisecond late — a comb that took
             // twenty decibels of trim to hide (the first "-24", 2026-09-26; found 2026-09-29).
-            _echoes ??= new TracedEchoes(context);
-            if (_echoes.IsValid) _echoes.SetScene(listenerScene ?? scene);
-            foreach (var r in Rooms.Values) r.Trace.SetScene(scene);
+            echoes = _echoes ??= new TracedEchoes(context);
             // Each source's own late energy and its direction, on the listener's scene (LateField).
-            _late ??= new LateField(context);
-            if (_late.IsValid) _late.SetScene(listenerScene ?? scene);
+            late = _late ??= new LateField(context);
+            rooms = new List<TracedReverb>();
+            foreach (var r in Rooms.Values) rooms.Add(r.Trace);
         }
+        if (listener.IsValid) listener.SetScene(listenerScene ?? scene);
+        if (echoes.IsValid) echoes.SetScene(listenerScene ?? scene);
+        foreach (var r in rooms) r.SetScene(scene);
+        if (late.IsValid) late.SetScene(listenerScene ?? scene);
     }
+
+    /// <summary>A rebuild's scenes (a door moved), handed to the tracers on a thread of their own, one
+    /// rebuild after another, so neither the worker nor anyone else waits out a trace for them.</summary>
+    public static void ConfigureInBackground(IntPtr context, SteamAudioScene scene, SteamAudioScene? listenerScene)
+    {
+        lock (Gate)
+            _reconfigure = _reconfigure.ContinueWith(_ => Configure(context, scene, listenerScene),
+                System.Threading.Tasks.TaskScheduler.Default);
+    }
+    private static System.Threading.Tasks.Task _reconfigure = System.Threading.Tasks.Task.CompletedTask;
+
+    /// <summary>True while a rebuild is still being handed over: the scenes it replaces are in use.</summary>
+    public static bool Reconfiguring { get { lock (Gate) return !_reconfigure.IsCompleted; } }
 
     public static void SetListener(Vector3 at) { lock (Gate) _listener?.SetListener(at); }
 

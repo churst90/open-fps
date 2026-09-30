@@ -12,7 +12,10 @@ using OpenFPS.Common;
 namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 
 /// <summary>
-/// --path-probe [map=city] ear=x,y,z src=x,y,z [src=...]
+/// --path-probe [map=city] ear=x,y,z src=x,y,z [src=...] [open=R]
+///
+/// open=R measures every source twice: with the doors as the map has them, and again with every door
+/// leaf within R metres of the ear swung a quarter turn, as a rebuild in the game does when one swings.
 ///
 /// What the game's occlusion worker hands the mixer for one source and one ear on a real map: occlusion
 /// and the three band gains in dB. Game coordinates (y up), not /tp's. Written for "I hear people
@@ -44,6 +47,42 @@ public static class PathProbeSpike
         }
         Console.WriteLine($"  pathing {(worker.PathingReady ? "ready" : "NOT ready after 120 s")}");
         int id = 1;
+        Measure(worker, ear, srcs, ref id);
+        var openArg = args.FirstOrDefault(a => a.StartsWith("open="));
+        if (openArg != null)
+        {
+            float r = float.Parse(openArg[5..], CultureInfo.InvariantCulture);
+            foreach (var e in world.Entities.Values.ToList())
+            {
+                var def = e.Definition;
+                if (def == null || def.Portal.RegionAId == def.Portal.RegionBId || !def.Collider.IsSolid) continue;
+                if (Vector3.Distance(e.Transform.Position, ear) > r) continue;
+                Console.WriteLine($"  door {e.Id} at ({e.Transform.Position.X:F1}, {e.Transform.Position.Y:F1}, {e.Transform.Position.Z:F1}): opened");
+                // Swung a quarter turn on its hinge, as DoorSystem swings it: about the leaf's +X edge.
+                var moved = e;
+                var rot = e.Transform.Rotation;
+                var hinge = e.Transform.Position + Vector3.Transform(new Vector3(def.Collider.Size.X * 0.5f, 0, 0), rot);
+                var swung = rot * Quaternion.CreateFromAxisAngle(Vector3.UnitY, MathF.PI / 2f);
+                moved.Transform.Rotation = swung;
+                moved.Transform.Position = hinge + Vector3.Transform(new Vector3(-def.Collider.Size.X * 0.5f, 0, 0), swung);
+                world.Entities[e.Id] = moved;
+            }
+            worker.UpdateWorld(world);
+            // The worker only looks at the doors on a tick with something to answer, and the rebuild
+            // runs off it: keep it busy until the new scene has landed.
+            for (int i = 0; i < 30; i++)
+            {
+                worker.EnqueueRequest(new AcousticRequest { EntityId = 998, ListenerPos = ear, SourcePos = ear + Vector3.UnitX, SourceRadius = 0.1f });
+                Thread.Sleep(100);
+            }
+            Console.WriteLine("  --- doors open ---");
+            Measure(worker, ear, srcs, ref id);
+        }
+        return 0;
+    }
+
+    private static void Measure(AsyncAcousticWorker worker, Vector3 ear, List<Vector3> srcs, ref int id)
+    {
         foreach (var src in srcs)
         {
             List<AcousticPathData>? paths = null;
@@ -62,6 +101,5 @@ public static class PathProbeSpike
                             + $"apparent ({p.ApparentPosition.X:F1}, {p.ApparentPosition.Y:F1}, {p.ApparentPosition.Z:F1})");
             id++;
         }
-        return 0;
     }
 }
