@@ -598,6 +598,11 @@ if (args.Contains("--path-probe"))
     // --path-probe [map=city] ear=x,y,z src=x,y,z ...: what the occlusion worker hands the mixer.
     Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.PathProbeSpike.Run(args));
 }
+if (args.Contains("--scene-cost"))
+{
+    // --scene-cost [map=city]: what rebuilding the Steam Audio scenes costs, as a door opening does.
+    Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.SceneCostSpike.Run(args));
+}
 if (args.Contains("--tail-bands"))
 {
     // --tail-bands: the flat's traced tail per octave (T20, late energy) against Sabine and Eyring.

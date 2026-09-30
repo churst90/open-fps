@@ -3880,12 +3880,7 @@ public class FmodAudioProvider : IAudioProvider
         {
             finalVolFactor *= (1.0f - (_shelterFactor * 0.95f)); // Keep 5% for "interior rain" sense
         }
-        else if (InsulationFactor > 0.01f && active.TargetRegionId != _listenerRegionId)
-        {
-            // If we are sheltered and the sound is from another region, add a subtle extra damping
-            // to simulate the building's structural insulation.
-            finalVolFactor *= (1.0f - (InsulationFactor * 0.2f));
-        }
+        // Sounds are not damped here any more: the walls and the doors, where they are, do it in the geometry.
 
         float roomGainBonus = MathHelper.Lerp(1.0f, active.RoomGain, 0.5f);
 
@@ -3978,11 +3973,7 @@ public class FmodAudioProvider : IAudioProvider
             // Extra muffle for environmental sounds when sheltered. "Environmental" means a sound that
             // belongs to the open air, which is a property of its region's boundary and not of the
             // region's id — a named patch of open ground is still the open air.
-            if (!IsEnclosure(active.TargetRegionId))
-            {
-                highDb -= (InsulationFactor * 40.0f);
-                midDb -= (InsulationFactor * 20.0f);
-            }
+            // (The blanket muffle on outdoor sounds inside an enclosure is retired; see where _shelterFactor is set.)
 
 
             // Sitting in a car: everything OUTSIDE it comes through the glass and the doors. Not the
@@ -4199,22 +4190,12 @@ public class FmodAudioProvider : IAudioProvider
 
     public void UpdateShelter(float shelterFactor) => _shelterFactor = shelterFactor;
 
-    /// <summary>
-    /// How much the building you are in keeps the outside out — for SOUNDS, which is not the same
-    /// question as how much sky is over your head.
-    ///
-    /// Shelter is measured by casting rays upward, and that is the right answer for rain and wind: a
-    /// roof keeps both off you. It is the wrong one for a siren down the street. Standing at the back
-    /// of a bus shelter the roof, the back pane and the end panes catch nearly every upward ray, and
-    /// every outdoor sound had forty decibels taken off its top end as though you had gone indoors —
-    /// "at the back I can't hear through the opening; I have to stand right at it". The open front is
-    /// open; the direct path through it is the occlusion model's business, and it already knows.
-    ///
-    /// So the extra muffle for outdoor sounds applies only when you are in an ENCLOSURE — a room with
-    /// walls, whose boundary says so — and there the walls really are in the way. Rain and wind keep
-    /// the sky-ray shelter, which is what it measures.
-    /// </summary>
-    private float InsulationFactor => IsEnclosure(_listenerRegionId) ? _shelterFactor : 0f;
+    // The blanket muffle on outdoor sounds inside an enclosure (InsulationFactor, shelter x 40 dB off
+    // the top) is retired, 2026-09-30: it did not know about doors — "I open the door but I don't hear
+    // the outside world flow inside" — and it counted the walls twice on top of Steam Audio's
+    // transmission. Door leaves are geometry where they are now (AsyncAcousticWorker
+    // .RebuildSceneIfNeeded) and walls lose their full mass-law figure (SteamAudioScene.MaterialIndex).
+    // Rain and wind keep the sky-ray shelter, which is what it measures.
 
     private float _enclosureLowDb, _enclosureMidDb, _enclosureHighDb;
     public void SetListenerEnclosure(float lowDb, float midDb, float highDb)

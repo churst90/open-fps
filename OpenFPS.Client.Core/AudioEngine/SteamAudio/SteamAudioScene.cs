@@ -206,9 +206,14 @@ public sealed class SteamAudioScene : IDisposable
     /// A material per (name, thickness to the centimetre): what a wall lets through depends on how
     /// heavy it is, not only on what it is made of (AcousticRegistry.MassLawTransmission).
     ///
-    /// Per FACE, and that is the square root. A box is crossed through two faces and Steam Audio
-    /// multiplies the transmission of every surface it counts (SteamAudioSimulator counts several, so
-    /// that two walls in a row are both paid for), so each face carries half the box's loss.
+    /// Per FACE, and that is the power 2/3. Steam Audio's direct simulator casts its transmission
+    /// rays alternately from the listener and the source, multiplies the transmission of every face
+    /// they hit, and takes the square root of the product when there is more than one hit
+    /// (core/src/core/direct_simulator.cpp). The loop stops when either ray finds nothing, so a
+    /// single box is three hits, not four, and each face carries the box's transmission to the 2/3:
+    /// one wall then loses exactly its mass-law figure. Measured: with the square root per face a
+    /// wall lost 0.75 of it, and two walls 0.625 of theirs; with 2/3, two walls lose 5/3 of one.
+    /// (open-fps-patches 5, applied 2026-09-30 with the retirement of the blanket muffle.)
     /// </summary>
     /// <summary>Steam Audio's three band centres (phonon.h, IPLMaterial).</summary>
     public static readonly (float Low, float Mid, float High) SteamAudioBandsHz = (400f, 2500f, 15000f);
@@ -229,7 +234,7 @@ public sealed class SteamAudioScene : IDisposable
         {
             absLow = Abs(SteamAudioBandsHz.Low), absMid = Abs(SteamAudioBandsHz.Mid), absHigh = Abs(SteamAudioBandsHz.High),
             scattering = p.Scattering,
-            transLow = MathF.Sqrt(tl), transMid = MathF.Sqrt(tm), transHigh = MathF.Sqrt(th),
+            transLow = MathF.Pow(tl, 2f / 3f), transMid = MathF.Pow(tm, 2f / 3f), transHigh = MathF.Pow(th, 2f / 3f),
         });
         idx = materials.Count - 1;
         byName[key] = idx;

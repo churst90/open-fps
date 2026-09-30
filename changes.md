@@ -22,6 +22,14 @@ Recent work, newest first. `git log` has the rest.
 - Levels by ear with all of that in: `/tail -12`, `/copies -6` (zero is physical for both).
   `OPENFPS_TAIL_PARAMETRIC=1` plays the old reverb; `/reverb` reports the per-source traces.
 - The tunnel's open ends are openings, and a room you walk out of keeps ringing at its own rate.
+- Doors are geometry where they are. The sound scene was built once with every door shut, so an open
+  door was still a wall; now it is rebuilt with each leaf where it is whenever a door within 50 m
+  moves (in the background, about 120 ms on the city). The blanket muffle on outdoor sounds inside a
+  closed room is gone: a shut door blocks by its own mass, an open one lets the outside in. Walls lose
+  their full mass-law figure (they lost three quarters of it).
+- Steam Audio's materials use its own bands (400 Hz, 2.5 kHz, 15 kHz), interpolated from the table's.
+- The tail after 0.3 s comes from where the trace's own late sound arrives from: along a corridor,
+  along the flat's long axis.
 
 ## 2026-09-29
 

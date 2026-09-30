@@ -482,7 +482,7 @@ public class AsyncAcousticWorker : IDisposable
                 // The listener is the same for every request this tick, so take it from the first one —
                 // NOT only from requests that won a source. Otherwise an exhausted source pool would drop
                 // the whole tick instead of just the sources it could not fit.
-                if (!haveListener) { listener = kv.Value.ListenerPos; haveListener = true; }
+                if (!haveListener) { listener = kv.Value.ListenerPos; haveListener = true; _lastListenerPos = listener; _haveLastListener = true; }
 
                 IntPtr src = GetOrAcquireSource(kv.Key);
                 if (src == IntPtr.Zero) continue; // pool exhausted -> that source falls back to hand-rolled
@@ -930,10 +930,107 @@ public class AsyncAcousticWorker : IDisposable
 
     /// <summary>Rebuilds the simulator scene from the world's solid box colliders when the acoustic map
     /// changes (or on first use). Geometry is mostly static, so this is a per-map-load cost.</summary>
+    // ── Doors are part of the geometry, where they are now ────────────────────────────────────────
+    //
+    // The scene used to be built once per map with every door leaf where it stood at load — shut —
+    // and never again, so to occlusion, diffraction and the traces an open door was still a wall:
+    // "I press E, open the door but I don't hear the outside world flow inside, I have to step outside
+    // and there's a clear boundary" (2026-09-30). The server swings the leaf's real transform, so the
+    // world knows where it is. When any leaf has moved, the scene is rebuilt with it there — every
+    // simulator takes the new one as it does on a map change, and Steam Audio's reference counting
+    // keeps the old alive until each has let go — at most every DoorRebuildSeconds while a door
+    // swings, and once more when it settles. The pathing probes are not rebaked for a door.
+    private long _saDoorSig;
+    private long _lastDoorRebuildTicks;
+    private const double DoorRebuildSeconds = 0.3;
+    /// <summary>Only doors this near the listener count: on the city walkers open doors all day, and a
+    /// scene rebuild for one three hundred metres off is work nobody can hear.</summary>
+    private const float DoorNearMetres = 50f;
+    private Vector3 _lastListenerPos;
+    private bool _haveLastListener;
+
+    /// <summary>Where every door leaf is: a portal's solid box collider, its pose to the centimetre and
+    /// the degree, folded into one number.</summary>
+    private long DoorSignature(WorldSnapshot world)
+    {
+        long h = 17;
+        foreach (var snap in world.Entities.Values)
+        {
+            var def = snap.Definition;
+            if (def == null || def.Portal.RegionAId == def.Portal.RegionBId || !def.Collider.IsSolid) continue;
+            var p = snap.Transform.Position; var q = snap.Transform.Rotation;
+            if (_haveLastListener && Vector3.DistanceSquared(p, _lastListenerPos) > DoorNearMetres * DoorNearMetres) continue;
+            h = h * 31 + snap.Id;
+            h = h * 31 + (long)MathF.Round(p.X * 100f); h = h * 31 + (long)MathF.Round(p.Y * 100f); h = h * 31 + (long)MathF.Round(p.Z * 100f);
+            h = h * 31 + (long)MathF.Round(q.Y * 100f); h = h * 31 + (long)MathF.Round(q.W * 100f);
+        }
+        return h;
+    }
+
+    // A door's rebuild is built OFF this thread and swapped in here when it is ready: on the city the
+    // two scenes take about 120 ms (--scene-cost), and every source's occlusion would stand still for
+    // that, several times a swing. Replaced scenes are released a few seconds later, once every
+    // simulator has taken the new one.
+    private System.Threading.Tasks.Task<(SteamAudioScene Full, SteamAudioScene Listener, List<SteamAudioScene.Box> Boxes, AcousticMap? Map)>? _doorBuild;
+    private readonly List<(SteamAudioScene Scene, long At)> _retiredScenes = new();
+
+    private void SwapInDoorBuild()
+    {
+        if (_doorBuild is not { IsCompleted: true } t || _saSim == null) return;
+        _doorBuild = null;
+        if (t.Status != System.Threading.Tasks.TaskStatus.RanToCompletion) return;
+        var (full, listener, boxes, map) = t.Result;
+        if (!ReferenceEquals(map, _saSceneMap) || !full.IsBuilt)
+        {
+            full.Dispose(); listener.Dispose();        // the map changed meanwhile: it is not this map's
+            return;
+        }
+        long now = DateTime.UtcNow.Ticks;
+        if (_saScene != null) _retiredScenes.Add((_saScene, now));
+        if (_saListenerScene != null) _retiredScenes.Add((_saListenerScene, now));
+        _saScene = full; _saListenerScene = listener;
+        _saSim.SetScene(full);
+        OpenFPS.Client.Core.AudioEngine.SteamAudio.TracedReverbSet.Configure(_saContext, full, listener.IsBuilt ? listener : null);
+        _barrierBoxes = boxes;
+        _lastSceneBoxes = boxes.Count;
+        Console.WriteLine("[AcousticWorker] A door moved: the scene now has the leaves where they are.");
+    }
+
+    private void ReleaseRetiredScenes()
+    {
+        long cutoff = DateTime.UtcNow.Ticks - 5 * TimeSpan.TicksPerSecond;
+        for (int i = _retiredScenes.Count - 1; i >= 0; i--)
+            if (_retiredScenes[i].At < cutoff) { _retiredScenes[i].Scene.Dispose(); _retiredScenes.RemoveAt(i); }
+    }
+
     private void RebuildSceneIfNeeded(WorldSnapshot world)
     {
         if (_saScene == null || _saSim == null) return;
-        if (_saScene.IsBuilt && ReferenceEquals(world.AcousticMap, _saSceneMap)) return;
+        SwapInDoorBuild();
+        ReleaseRetiredScenes();
+        bool mapChanged = !_saScene.IsBuilt || !ReferenceEquals(world.AcousticMap, _saSceneMap);
+        long doorSig = DoorSignature(world);
+        if (!mapChanged)
+        {
+            if (doorSig == _saDoorSig || _doorBuild != null) return;
+            if ((DateTime.UtcNow.Ticks - _lastDoorRebuildTicks) < DoorRebuildSeconds * TimeSpan.TicksPerSecond) return;
+            _saDoorSig = doorSig;
+            _lastDoorRebuildTicks = DateTime.UtcNow.Ticks;
+            var doorBoxes = SteamAudioScene.BoxesFromWorld(world);
+            var ctx = _saContext; var forMap = _saSceneMap;
+            _doorBuild = System.Threading.Tasks.Task.Run(() =>
+            {
+                var full = new SteamAudioScene(ctx);
+                full.Build(doorBoxes);
+                var listener = new SteamAudioScene(ctx);
+                listener.Build(SteamAudioScene.WithoutOpenGround(doorBoxes));
+                return (full, listener, doorBoxes, forMap);
+            });
+            return;
+        }
+        _saDoorSig = doorSig;
+        _lastDoorRebuildTicks = DateTime.UtcNow.Ticks;
+        var built = System.Diagnostics.Stopwatch.StartNew();
 
         var boxes = SteamAudioScene.BoxesFromWorld(world);
         _lastSceneBoxes = boxes.Count;
@@ -955,20 +1052,21 @@ public class AsyncAcousticWorker : IDisposable
             var sw = System.Diagnostics.Stopwatch.StartNew();
             var withoutGround = SteamAudioScene.WithoutOpenGround(boxes);
             _saListenerScene.Build(withoutGround);
-            Console.WriteLine($"[AcousticWorker] Listener trace scene: {boxes.Count - withoutGround.Count} open-ground slab(s) left out "
-                            + $"of {boxes.Count} ({sw.ElapsedMilliseconds} ms).");
+            if (mapChanged)
+                Console.WriteLine($"[AcousticWorker] Listener trace scene: {boxes.Count - withoutGround.Count} open-ground slab(s) left out "
+                                + $"of {boxes.Count} ({sw.ElapsedMilliseconds} ms).");
             OpenFPS.Client.Core.AudioEngine.SteamAudio.TracedReverbSet.Configure(_saContext, _saScene,
                 _saListenerScene.IsBuilt ? _saListenerScene : null);
             // Off the worker thread and out of the way. This is the work that used to sit inside
             // SetScene and take a hundred seconds of a single core before ANY source got an occlusion
             // value — a hundred seconds in which the whole world was rendered as if nothing were in
             // the way, ending in every source receiving its first real occlusion in the same frame.
-            _saSim.BeginProbeBake(_saScene);
+            if (mapChanged) _saSim.BeginProbeBake(_saScene);
         }
         // The boxes the barrier model bends sound around. The same list the scene was built from, so
         // the diffraction path and the occlusion test can never disagree about what is in the world.
         _barrierBoxes = boxes;
-        Console.WriteLine($"[AcousticWorker] Built Steam Audio scene from {boxes.Count} solid box colliders.");
+        Console.WriteLine($"[AcousticWorker] Built Steam Audio scene from {boxes.Count} solid box colliders ({built.ElapsedMilliseconds} ms).");
     }
 
     /// <summary>Throttled: runs the reflections sim for a single probe at the listener to get the room's
@@ -1102,6 +1200,8 @@ public class AsyncAcousticWorker : IDisposable
         OpenFPS.Client.Core.AudioEngine.SteamAudio.TracedReverbSet.Dispose();
         if (_saSim != null) { _saSim.Dispose(); _saSim = null; }
         if (_saScene != null) { _saScene.Dispose(); _saScene = null; }
+        foreach (var (retired, _) in _retiredScenes) retired.Dispose();
+        _retiredScenes.Clear();
         if (_saListenerScene != null) { _saListenerScene.Dispose(); _saListenerScene = null; }
         if (_saContext != IntPtr.Zero) Phonon.iplContextRelease(ref _saContext);
 
