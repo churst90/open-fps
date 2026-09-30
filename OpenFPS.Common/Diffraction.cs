@@ -104,8 +104,8 @@ public static class Diffraction
     /// grandstand passes through the building itself and is correctly thrown out, leaving no route at
     /// all and a barrier that is once again a boolean.
     ///
-    /// The distance along an edge is convex, which is what makes a ternary search exact rather than a
-    /// guess; the two-edge case alternates between them until both settle. Candidates whose legs would
+    /// The best crossing of one edge has a closed form (MinimiseOnEdge); the two-edge case searches the
+    /// first crossing, which is convex, with the second solved exactly for each. Candidates whose legs would
     /// pass THROUGH the box are thrown out — without that test the shortest answer for a wall standing
     /// on the ground is always its buried bottom edge, which is a route sound cannot take.
     /// </summary>
@@ -193,18 +193,19 @@ public static class Diffraction
             4,5, 4,6, 5,7, 6,7,
             8,9, 8,10, 9,11, 10,11,
         };
-        for (int k = 0; k < 12; k++)
+        //
+        // Each pair both ways round: the route crosses the SOURCE's edge first, and which of the two that
+        // is depends on which side of the box the source stands. One order only made the answer depend on
+        // it: round a grandstand 5.1 m one way and 46.4 m the other, through a doorway's jamb 0.81 m one
+        // way and over its top corner 5.44 m the other.
+        for (int k = 0; k < 24; k++)
         {
-            int e1 = pairs[k * 2], e2 = pairs[k * 2 + 1];
-            float t = 0.5f, u = 0.5f;
-            // Alternating: hold one crossing still and solve the other, until both stop moving.
-            for (int round = 0; round < 8; round++)
-            {
-                Vector3 q = Vector3.Lerp(a[e2], b[e2], u);
-                t = MinimiseOnEdge(a[e1], b[e1], source, q);
-                Vector3 p0 = Vector3.Lerp(a[e1], b[e1], t);
-                u = MinimiseOnEdge(a[e2], b[e2], p0, listener);
-            }
+            int e1 = pairs[(k >> 1) * 2 + (k & 1)], e2 = pairs[(k >> 1) * 2 + 1 - (k & 1)];
+            // Nested, not alternating. The length is jointly convex in the two crossings, so the best
+            // second crossing for each first is convex too and nested ternary searches are exact.
+            // Alternating stalls when the edges are close — on an 11 cm wall it stopped at 5.6 m of
+            // detour where the answer is 0.77.
+            MinimiseOnPair(a[e1], b[e1], a[e2], b[e2], source, listener, out float t, out float u);
             Vector3 p = Vector3.Lerp(a[e1], b[e1], t);
             Vector3 r = Vector3.Lerp(a[e2], b[e2], u);
             float around = Vector3.Distance(source, p) + Vector3.Distance(p, r) + Vector3.Distance(r, listener);
@@ -224,20 +225,50 @@ public static class Diffraction
         return true;
     }
 
-    /// <summary>Where on the edge the detour is shortest. Convex in t, so ternary search converges.</summary>
+    /// <summary>
+    /// Where on the edge the detour from one point to the other is shortest, as a fraction along it.
+    ///
+    /// Exact, by unfolding. Each leg's length depends only on how far along the edge's line the
+    /// crossing is and how far each point stands off that line, so rotating one point about the line
+    /// into the plane of the other changes neither leg, and the shortest route is then the straight
+    /// line between them: it meets the edge at the point dividing the two along-line positions in the
+    /// ratio of the two off-line distances. The length is convex along the edge, so the best point on
+    /// the segment is that one clamped to its ends. This replaced a 24-step ternary search, which
+    /// the two-edge search below runs once per step of its own, 24 times over.
+    /// </summary>
     private static float MinimiseOnEdge(Vector3 a, Vector3 b, Vector3 from, Vector3 to)
     {
+        Vector3 ab = b - a;
+        float len2 = ab.LengthSquared();
+        if (len2 < 1e-12f) return 0.5f;
+        float sF = Vector3.Dot(from - a, ab) / len2;
+        float sT = Vector3.Dot(to - a, ab) / len2;
+        float rF = Vector3.Distance(from, a + ab * sF);
+        float rT = Vector3.Distance(to, a + ab * sT);
+        float s = rF + rT > 1e-9f ? sF + (sT - sF) * rF / (rF + rT) : 0.5f * (sF + sT);
+        return Math.Clamp(s, 0f, 1f);
+    }
+
+    /// <summary>Where on two edges the route over one, across the face and over the other is shortest.</summary>
+    private static void MinimiseOnPair(Vector3 a1, Vector3 b1, Vector3 a2, Vector3 b2, Vector3 from, Vector3 to,
+                                       out float t, out float u)
+    {
         float lo = 0f, hi = 1f;
-        // Twenty-four iterations narrow a hundred-metre edge to a hundredth of a millimetre, which is
-        // several orders finer than anything downstream can tell apart.
         for (int i = 0; i < 24; i++)
         {
-            float m1 = lo + (hi - lo) / 3f;
-            float m2 = hi - (hi - lo) / 3f;
-            if (Detour(a, b, m1, from, to) <= Detour(a, b, m2, from, to)) hi = m2;
+            float m1 = lo + (hi - lo) / 3f, m2 = hi - (hi - lo) / 3f;
+            if (BestVia(a1, b1, a2, b2, m1, from, to, out _) <= BestVia(a1, b1, a2, b2, m2, from, to, out _)) hi = m2;
             else lo = m1;
         }
-        return (lo + hi) * 0.5f;
+        t = (lo + hi) * 0.5f;
+        BestVia(a1, b1, a2, b2, t, from, to, out u);
+    }
+
+    private static float BestVia(Vector3 a1, Vector3 b1, Vector3 a2, Vector3 b2, float t, Vector3 from, Vector3 to, out float u)
+    {
+        Vector3 p = Vector3.Lerp(a1, b1, t);
+        u = MinimiseOnEdge(a2, b2, p, to);
+        return Vector3.Distance(from, p) + Detour(a2, b2, u, p, to);
     }
 
     private static float Detour(Vector3 a, Vector3 b, float t, Vector3 from, Vector3 to)

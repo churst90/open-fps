@@ -106,8 +106,10 @@ public class DiffractedBearingTests
         Assert.True(Diffraction.PathDifferenceAroundBox(centre, size, Quaternion.Identity,
                                                         source, listener, out _, out Vector3 edge));
 
-        // The east end of the leaf: the jamb of the opening, not the top and not the far end.
-        Assert.Equal(6f, edge.X, 1);
+        // A jamb of the opening, not the top and not the far end. The source is midway between the
+        // two jambs, so either is right; the east one was only ever chosen because the search went
+        // round one way. The route round a jamb is under a metre.
+        Assert.True(MathF.Abs(edge.X - 6f) < 0.1f || MathF.Abs(edge.X - 2f) < 0.1f, $"edge {edge}");
 
         Assert.True(BearingShiftDegrees(listener, source, edge) > 20f,
             "standing in front of a wall with a door beside it, the sound comes from the door");
@@ -120,6 +122,30 @@ public class DiffractedBearingTests
     /// depth — a stand, a building — the route climbs one edge, runs across the face and drops off the
     /// far one, and reporting the entry crossing would place the sound at the corner it went in by.
     /// </summary>
+    /// <summary>The way round is the way back: swapping source and listener cannot change the detour.</summary>
+    [Theory]
+    [InlineData(0f, 6f, 0f, 40f, 12f, 16f, 0f, 0.6f, -30f, 0f, 1.7f, 30f)]
+    [InlineData(4f, 2f, 10f, 4f, 4f, 0.5f, 4f, 1.5f, 15f, 4f, 1.6f, 5f)]
+    public void TheWayRoundIsTheSameInBothDirections(float cx, float cy, float cz, float sx, float sy, float sz,
+                                                      float ax, float ay, float az, float bx, float by, float bz)
+    {
+        Vector3 centre = new(cx, cy, cz), size = new(sx, sy, sz), a = new(ax, ay, az), b = new(bx, by, bz);
+        Assert.True(Diffraction.PathDifferenceAroundBox(centre, size, Quaternion.Identity, a, b, out float there));
+        Assert.True(Diffraction.PathDifferenceAroundBox(centre, size, Quaternion.Identity, b, a, out float back));
+        Assert.Equal(there, back, 2);
+    }
+
+    /// <summary>Over an 11 cm interior wall the route is the short one over its top.</summary>
+    [Fact]
+    public void OverAThinInteriorWallIsTheShortRoute()
+    {
+        var source = new Vector3(3f, 1.6f, 5f);
+        var listener = new Vector3(0f, 1.6f, 0f);
+        Assert.True(Diffraction.PathDifferenceAroundBox(new Vector3(0f, 1.5f, 3f), new Vector3(40f, 3f, 0.11f),
+                                                        Quaternion.Identity, source, listener, out float over));
+        Assert.True(over < 1f, $"detour {over:F2} m over a 3 m wall");
+    }
+
     [Fact]
     public void TheEdgeReportedIsTheOneNearestTheEar()
     {
