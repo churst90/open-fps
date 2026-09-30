@@ -1,0 +1,47 @@
+{
+  "Generic": {
+    "Absorption": 0.2,
+    "Scattering": 0.2,
+    "ResonanceIndex": 22
+  },
+  "Wood": {
+    "Absorption": 0.35,
+    "Scattering": 0.3,
+    "ResonanceIndex": 21
+  },
+  "Metal": {
+    "Absorption": 0.05,
+    "Scattering": 0.1,
+    "ResonanceIndex": 13
+  },
+  "Concrete": {
+    "Absorption": 0.2,
+    "Scattering": 0.2,
+    "ResonanceIndex": 18
+  },
+  "Marble": {
+    "Absorption": 0.02,
+    "Scattering": 0.05,
+    "ResonanceIndex": 12
+  },
+  "Carpet": {
+    "Absorption": 0.95,
+    "Scattering": 0.8,
+    "ResonanceIndex": 6
+  },
+  "Grass": {
+    "Absorption": 0.75,
+    "Scattering": 0.85,
+    "ResonanceIndex": 2
+  },
+  "Dirt": {
+    "Absorption": 0.60,
+    "Scattering": 0.60,
+    "ResonanceIndex": 4
+  },
+  "None": {
+    "Absorption": 0,
+    "Scattering": 0,
+    "ResonanceIndex": 0
+  }
+}
