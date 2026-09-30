@@ -335,6 +335,7 @@ internal static class TracedReverbSet
     private static SteamAudioScene? _scene;
     private static TracedReverb? _listener;
     private static TracedEchoes? _echoes;
+    private static LateField? _late;
     private static readonly Dictionary<int, (TracedReverb Trace, Vector3 At)> Rooms = new();
     /// <summary>At most this many rooms traced besides the listener's; the mixer only ever hears four.</summary>
     private const int MaxRooms = 6;
@@ -357,6 +358,9 @@ internal static class TracedReverbSet
             _echoes ??= new TracedEchoes(context);
             if (_echoes.IsValid) _echoes.SetScene(listenerScene ?? scene);
             foreach (var r in Rooms.Values) r.Trace.SetScene(scene);
+            // Each source's own late energy and its direction, on the listener's scene (LateField).
+            _late ??= new LateField(context);
+            if (_late.IsValid) _late.SetScene(listenerScene ?? scene);
         }
     }
 
@@ -364,6 +368,9 @@ internal static class TracedReverbSet
 
     /// <summary>The per-source tracer, or null before the scene exists.</summary>
     public static TracedEchoes? Echoes { get { lock (Gate) return _echoes is { IsValid: true } e ? e : null; } }
+
+    /// <summary>Each source's late energy and direction, traced from where it is. Null before the scene.</summary>
+    public static LateField? LateField { get { lock (Gate) return _late is { IsValid: true } l ? l : null; } }
 
     /// <summary>The listener's own trace, or null before the scene exists.</summary>
     public static TracedReverb? Listener { get { lock (Gate) return _listener is { IsValid: true } l && l.Source != IntPtr.Zero ? l : null; } }
@@ -455,6 +462,7 @@ internal static class TracedReverbSet
         {
             _listener?.Dispose(); _listener = null;
             _echoes?.Dispose(); _echoes = null;
+            _late?.Dispose(); _late = null;
             _cabin?.Dispose(); _cabin = null; _cabinScene?.Dispose(); _cabinScene = null; _cabinPreset = null; _riding = false;
             foreach (var r in Rooms.Values) r.Trace.Dispose();
             Rooms.Clear();

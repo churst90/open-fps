@@ -1634,6 +1634,102 @@ public class FmodAudioProvider : IAudioProvider
         rig.Owner = 0;
     }
 
+    // ── Each source's own late sound (LateField) ─────────────────────────────────────────────────
+    private readonly List<(ActiveSound A, float Level)> _lateCandidates = new();
+    private readonly int[] _lateIds = new int[LateField.MaxSources];
+    private readonly Vector3[] _lateAt = new Vector3[LateField.MaxSources];
+    private readonly LateField.Answer[] _lateAnswers = new LateField.Answer[LateField.MaxSources];
+    private readonly Dictionary<int, float> _lateLevel = new();
+    /// <summary>The place's own law for sources nobody traced: late energy against a source at the
+    /// listener goes as distance^-k, k fitted to the traced ones. NaN when there are too few.</summary>
+    private float _lateLawK = float.NaN;
+    private Vector3 _tailBias;
+    /// <summary>An answer older than this is a place you have left.</summary>
+    private const double LateAnswerSeconds = 3.0;
+
+    /// <summary>
+    /// The loudest sources in the place you stand in, handed to the tracer that measures each one's own
+    /// late energy and direction; its answers turned into the place's distance law (for everything
+    /// it did not trace, the one-off sounds above all) and the way the tail leans.
+    /// </summary>
+    private void UpdateLateField()
+    {
+        var lf = TracedReverbSet.LateField;
+        if (lf == null || !TracedActive || !_steamAudioEnabled) { _lateLawK = float.NaN; _tailBias = Vector3.Zero; return; }
+        _lateCandidates.Clear();
+        foreach (var a in _activeSounds)
+        {
+            if (a.IsReflection || a.FadeTarget <= 0f || a.TargetRegionId != _listenerRegionId) continue;
+            if (!a.SourceReverbConnection.hasHandle()) continue;
+            float dist = Vector3.Distance(_listenerPos, a.Position);
+            _lateCandidates.Add((a, a.BaseVolume * Loudness.RenderedGain(1f, a.MinDistance, a.Range, dist)));
+        }
+        _lateCandidates.Sort((x, y) => y.Level.CompareTo(x.Level));
+        int n = Math.Min(LateField.MaxSources, _lateCandidates.Count);
+        _lateLevel.Clear();
+        for (int i = 0; i < n; i++)
+        {
+            _lateIds[i] = _lateCandidates[i].A.EntityId;
+            _lateAt[i] = _lateCandidates[i].A.Position;
+            _lateLevel[_lateIds[i]] = _lateCandidates[i].Level;
+        }
+        lf.Want(_listenerPos, _lateIds.AsSpan(0, n), _lateAt.AsSpan(0, n));
+
+        // The law, through the origin in log-log (a source at a metre raises what one at the listener
+        // does), fitted to what was traced lately.
+        int m = lf.CopyAnswers(_lateAnswers);
+        long fresh = DateTime.UtcNow.Ticks - (long)(LateAnswerSeconds * TimeSpan.TicksPerSecond);
+        double sxy = 0, sxx = 0, wSum = 0;
+        Vector3 lean = Vector3.Zero;
+        int used = 0;
+        for (int i = 0; i < m; i++)
+        {
+            var ans = _lateAnswers[i];
+            if (ans.When < fresh || ans.Ratio <= 0f) continue;
+            float d = Vector3.Distance(_listenerPos, ans.At);
+            if (d > 1.5f) { double x = Math.Log(d), y = Math.Log(ans.Ratio); sxy += x * y; sxx += x * x; used++; }
+            // The lean: each source's late direction, weighted by the late energy it raises here.
+            float level = _lateLevel.TryGetValue(ans.Id, out float lv) ? lv : 0f;
+            double w = (double)ans.Ratio * level * level;
+            lean += (float)w * ans.Directivity * ans.Direction;
+            wSum += w;
+        }
+        _lateLawK = used >= 2 && sxx > 1e-6 ? Math.Clamp((float)(-sxy / sxx), 0f, 4f) : float.NaN;
+        var target = wSum > 1e-12 ? lean / (float)wSum : Vector3.Zero;
+        _tailBias += (target - _tailBias) * MathF.Min(1f, _attributeDt / 0.5f);
+        if (_traced.TryGetValue(_listenerRegionId, out var stage)) stage.State.Diffuse?.SetBias(_tailBias);
+        _lateLawKNow = _lateLawK; _tailLeanNow = _tailBias.Length();
+    }
+
+    private static volatile float _lateLawKNow = float.NaN, _tailLeanNow;
+
+    private static string LateFieldStatus()
+    {
+        var lf = TracedReverbSet.LateField;
+        if (lf == null) return "No per-source late trace yet.";
+        float k = _lateLawKNow;
+        string law = float.IsNaN(k) ? "no law fitted yet" : $"the place's tail falls as distance to the -{k:F1}";
+        return $"Late field: {lf.Runs} traces, last {lf.LastRunMs:F0} ms; {law}; the tail leans {_tailLeanNow:F2} toward the sources.";
+    }
+
+    /// <summary>
+    /// How much of the listener's traced tail a source in the same place raises, against its own
+    /// direct sound as the send already carries it: distance × sqrt(its late energy against a source at
+    /// the listener). From its own trace if it had one, else from the place's fitted law, else the
+    /// old stand-in (distance raised to the enclosure) — which made a car 45 m down the tunnel ring
+    /// nearly as loud as one at 5 m.
+    /// </summary>
+    private float LateSend(ActiveSound a, float d)
+    {
+        var lf = TracedReverbSet.LateField;
+        if (lf != null && lf.TryGet(a.EntityId, out var ans)
+            && ans.When >= DateTime.UtcNow.Ticks - (long)(LateAnswerSeconds * TimeSpan.TicksPerSecond))
+            return d * MathF.Sqrt(Math.Clamp(ans.Ratio, 1e-4f, 4f));
+        if (!float.IsNaN(_lateLawK))
+            return d * MathF.Pow(MathF.Max(d, 1f), -_lateLawK / 2f);
+        return MathF.Min(d, 1f) * MathF.Pow(MathF.Max(d, 1f), Math.Clamp(_listenerEnclosure, 0f, 1f));
+    }
+
     private void UpdateTracedEchoes()
     {
         var echoes = TracedReverbSet.Echoes;
@@ -1776,7 +1872,7 @@ public class FmodAudioProvider : IAudioProvider
     {
         if (TracedReverbSet.Listener == null) return "Reverb: no trace yet — the scene is still being built.";
         var (rooms, runs, ms) = TracedReverbSet.Stats();
-        return $"Reverb: traced from where you stand and from {rooms} other room(s); {runs} traces so far, the last of yours in {ms:F0} ms. Tail {TailDb:F0} dB, copies {CopiesDb:F0} dB.";
+        return $"Reverb: traced from where you stand and from {rooms} other room(s); {runs} traces so far, the last of yours in {ms:F0} ms. Tail {TailDb:F0} dB, copies {CopiesDb:F0} dB. {LateFieldStatus()}";
     }
 
     /// <summary>Adds a traced stage to every bus that lacks one, points each at the place it should be
@@ -3259,6 +3355,7 @@ public class FmodAudioProvider : IAudioProvider
                 UpdateActiveReverbs(lPosVec);
                 UpdateTracedStages();
                 UpdateTracedEchoes();
+                UpdateLateField();
                 ApplySimulatedReverb(listenerRegionId);
 
                 for (int i = _activeSounds.Count - 1; i >= 0; i--)
@@ -3916,8 +4013,9 @@ public class FmodAudioProvider : IAudioProvider
         // fed as it is. A copy sends nothing: it is already the room answering. Nothing is sent until
         // a stage exists to receive it.
         float d = MathF.Max(0.1f, sourceDist);
-        float atDistance = MathF.Min(d, 1f) * MathF.Pow(MathF.Max(d, 1f), Math.Clamp(_listenerEnclosure, 0f, 1f));
         bool here = active.TargetRegionId == _listenerRegionId;
+        float atDistance = here ? LateSend(active, d)
+                                : MathF.Min(d, 1f) * MathF.Pow(MathF.Max(d, 1f), Math.Clamp(_listenerEnclosure, 0f, 1f));
         float ownMix = active.IsReflection || !_traced.ContainsKey(active.TargetRegionId) ? 0f : (here ? atDistance : 1f);
         float crossMix = active.IsReflection || !_traced.ContainsKey(_listenerRegionId) ? 0f : 1f;
         if (active.SourceReverbConnection.hasHandle() && active.ReverbConnection.hasHandle()

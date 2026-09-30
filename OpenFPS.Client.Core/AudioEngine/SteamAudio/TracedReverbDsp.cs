@@ -120,6 +120,39 @@ internal sealed class DiffuseTail
     public float DecodeTrim = 1f;
     public float Gain => WScale * DecodeTrim / MathF.Sqrt(DiffuseBranch.Count);
 
+    /// <summary>
+    /// Which way the late energy leans, game world, length its |I|/E (0 from everywhere, 1 from one
+    /// way): set from each source's own trace (LateField). A room's is near zero and the eight
+    /// directions stay equal; in a tunnel or a street it points back toward the cars, and each
+    /// direction's share becomes max(0, 1 + 3 cos), renormalised so the tail's energy is unchanged.
+    /// Game thread writes; read once a block.
+    /// </summary>
+    public void SetBias(System.Numerics.Vector3 bias)
+    {
+        Volatile.Write(ref _biasX, bias.X); Volatile.Write(ref _biasY, bias.Y); Volatile.Write(ref _biasZ, bias.Z);
+    }
+    private float _biasX, _biasY, _biasZ;
+    private readonly float[] _branchGain = { 1, 1, 1, 1, 1, 1, 1, 1 };
+    private readonly float[] _branchTarget = new float[DiffuseBranch.Count];
+
+    private void UpdateBranchGains(int sub)
+    {
+        var bias = new System.Numerics.Vector3(Volatile.Read(ref _biasX), Volatile.Read(ref _biasY), Volatile.Read(ref _biasZ));
+        float sum = 0f;
+        for (int b = 0; b < DiffuseBranch.Count; b++)
+        {
+            float w = MathF.Max(0f, 1f + 3f * System.Numerics.Vector3.Dot(bias, Direction(b)));
+            _branchTarget[b] = w; sum += w;
+        }
+        float norm = sum > 1e-6f ? DiffuseBranch.Count / sum : 1f;
+        // A block is 6 ms; moving an eighth of the way each block is a 50 ms glide, no zipper.
+        for (int b = 0; b < DiffuseBranch.Count; b++)
+        {
+            float target = sum > 1e-6f ? MathF.Sqrt(_branchTarget[b] * norm) : 1f;
+            _branchGain[b] += (target - _branchGain[b]) * 0.125f;
+        }
+    }
+
     /// <summary>Below this the tail goes straight to both ears; see the class note. Set where the
     /// eight branches stop being distinct signals (their all-passes are 89-431 samples, so about
     /// 100 Hz), not at the ear decorrelator's 300: a step on carpet is nearly all below 300 Hz, and
@@ -241,10 +274,11 @@ internal sealed class DiffuseTail
             W[k] = h1 - _b1;                          // high, twice
         }
         Array.Clear(Sum, 0, sub * channels);
-        float gain = Gain;
+        UpdateBranchGains(sub);
         for (int b = 0; b < DiffuseBranch.Count; b++)
         {
             var branch = Branches[b];
+            float gain = Gain * _branchGain[b];
             for (int k = 0; k < sub; k++) Branch[k] = branch.Process(W[k]) * gain;
             Phonon.iplAudioBufferDeinterleave(Context, Branch, ref Mono);
             var ep = new Phonon.IPLAmbisonicsEncodeEffectParams { direction = Directions[b], order = order };

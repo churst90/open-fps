@@ -598,6 +598,11 @@ if (args.Contains("--path-probe"))
     // --path-probe [map=city] ear=x,y,z src=x,y,z ...: what the occlusion worker hands the mixer.
     Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.PathProbeSpike.Run(args));
 }
+if (args.Contains("--late-field"))
+{
+    // --late-field [place=flat|tunnel|street]: each source's own late energy and direction, traced.
+    Environment.Exit(OpenFPS.Client.Core.AudioEngine.Fmod.LateFieldSpike.Run(args));
+}
 if (args.Contains("--clap-room"))
 {
     // --clap-room [out=path] [claps=4]: a clap in Marlow flat 01F through the whole mixer, and the room against it.
