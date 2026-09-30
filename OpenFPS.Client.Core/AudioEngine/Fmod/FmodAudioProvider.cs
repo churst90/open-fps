@@ -1537,7 +1537,14 @@ public class FmodAudioProvider : IAudioProvider
     /// where the reflections are coming from", in the tunnel and the flat alike, and it hid the copies so
     /// completely that /copies from -6 to -80 made no audible difference. The measurement that said 0 was
     /// physical compared levels; the ear judges whether a direction survives, and at 0 none did.
-    public static volatile float TailDb = EnvDb("OPENFPS_TAIL_DB") ?? EnvDb("OPENFPS_REFLECTIONS_DB") ?? -24f;
+    ///
+    /// Back to 0 on 2026-09-30, once the tail was the trace itself (LateTailIr, not a parametric
+    /// reverb 14-20 dB too loud in the tunnel, silent to 60 ms then a plateau), each source's own
+    /// late level and side (LateField), and a field whose ears differ as a head's do. The -24 was
+    /// the parametric reverb's error in the tunnel; at 0 the model now matches the source-side
+    /// traces within about a decibel in the flat, the tunnel and the street. If 0 still sounds like
+    /// a wash, something non-physical is left: say so rather than trim it.
+    public static volatile float TailDb = EnvDb("OPENFPS_TAIL_DB") ?? EnvDb("OPENFPS_REFLECTIONS_DB") ?? 0f;
     /// <summary>See <see cref="TailDb"/>.</summary>
     /// 0 dB by ear, 2026-09-29, once the copies carry only the mirror share with the scattered share as
     /// the wall's wash, at energy-correct levels, and at most four second-order copies (step 3), with

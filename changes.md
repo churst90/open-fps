@@ -2,6 +2,23 @@
 
 Recent work, newest first. `git log` has the rest.
 
+## 2026-09-30
+
+- The tail of the place you stand in is its traced late response. It was Steam Audio's parametric
+  reverb, which takes three decay times from the trace and nothing else: 14-20 dB too loud in the
+  tunnel, silent to 60 ms and then a plateau ("a mask over where the reflections are coming from",
+  "an echo over top of the room"). The trace is read back after every run and its late part, faded in
+  from 50 to 100 ms, is convolved directly.
+- Each source raises its own late sound. The loudest sixteen in your place are traced from where
+  they are: how much late sound each raises where you stand, and from which side. A car down the
+  tunnel is quieter in the tail than a near one and its tail comes from its side; a room stays even
+  all round. Sources not traced follow the place's own fitted law.
+- The tail is different at the two ears, as a real diffuse field is: twenty directions through their
+  own head responses, and each ear made independent above 400 Hz.
+- `/tail` is back to 0, the physical level. `/tail -24` for comparison; `OPENFPS_TAIL_PARAMETRIC=1`
+  plays the old reverb; `/reverb` reports the per-source traces.
+- The tunnel's open ends are openings, and a room you walk out of keeps ringing at its own rate.
+
 ## 2026-09-29
 
 - Reflections were measured at 0 dB before anything else was changed: a clap in flat 01F put its
