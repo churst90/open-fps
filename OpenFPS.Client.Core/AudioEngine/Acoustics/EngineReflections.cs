@@ -46,9 +46,9 @@ public sealed class EngineReflections
     /// already filled) and expensive to PLACE: it carries the same HRTF convolution and filtering as
     /// any other source. Eight of them alongside four engines is most of a mixer.
     ///
-    /// Shedding them before shedding cars is the right order, and getting that order wrong was
-    /// audible: with the budget taking engines away first, cars entering the mix pushed out cars that
-    /// had not finished passing, so the field sounded like voices swapping rather than like traffic.
+    /// Shedding them before shedding cars is the right order, and the wrong order is audible: with
+    /// the budget taking engines away first, cars entering the mix push out cars that have not
+    /// finished passing, so the field sounds like voices swapping rather than like traffic.
     /// A listener notices a car vanishing. Nobody notices its second reflection.
     /// </summary>
     public int EchoesPerEngine { get; set; } = MaxEchoesPerEngine;
@@ -58,10 +58,9 @@ public sealed class EngineReflections
     ///
     /// A voice budget, which is a real resource — a reflection is cheap to generate and expensive to
     /// PLACE, carrying the same HRTF convolution and filtering as any other source — and not a rule
-    /// about racetracks. What it explicitly is NOT is a limit on how many CARS may be answered. That
-    /// was the first attempt and it was wrong: it made "loud things reflect more" a property of a
-    /// special case rather than of the physics, so it would have been right on this map and silently
-    /// wrong on the next one.
+    /// about racetracks. What it explicitly is NOT is a limit on how many CARS may be answered: that
+    /// would make "loud things reflect more" a property of a special case rather than of the physics,
+    /// right on one map and silently wrong on the next.
     ///
     /// The budget is spent on the reflections that are actually AUDIBLE, wherever they come from —
     /// see the audibility floor below. A single loud car beside a concrete wall can legitimately take
@@ -74,7 +73,7 @@ public sealed class EngineReflections
     /// The level a reflection has to reach to be worth a voice, set each frame so that about
     /// <see cref="MaxReflectionVoices"/> of them clear it.
     ///
-    /// This is the generalisation of what used to be a per-car cap. Every candidate reflection on the
+    /// One budget for the whole map, not a cap per car. Every candidate reflection on the
     /// map reports what it would actually deliver to the ear — the source's own level, times what the
     /// surface kept, spread over the path it took — and the budget goes to the loudest, whichever
     /// source they belong to. Nothing here knows what a car is, or that this map is a racetrack.
@@ -283,11 +282,9 @@ public sealed class EngineReflections
 
         // Walls that have stopped answering fade out and are let go.
         //
-        // FADE, not "wait half a second and then cut". The first version of this counted the silence
-        // down and then stopped the voice, which left the echo playing at its last gain for the whole
-        // release and ended it on a step — a click every time a car passed the end of a wall, which
-        // on an oval is several a lap. The gain is ramped to zero across the release instead, and the
-        // voice is only stopped once it is already silent.
+        // FADE, not "wait and then cut". Stopping a voice that is still at its last gain ends it on
+        // a step: a click every time a car passes the end of a wall, several a lap on an oval. The
+        // gain is ramped to zero across the release, and the voice is only stopped once it is silent.
         List<int>? drop = null;
         foreach (var kv in mine)
         {
@@ -425,10 +422,9 @@ public sealed class EngineReflections
     ///
     /// Distance, delay and the AIR are the echo's OWN: it has travelled further, so it is placed at
     /// the mirrored source, carries the length of the path it actually took, and has lost as much of
-    /// its top as that path costs. It used to keep the car's own air absorption, so an echo that
-    /// had come 120 m round a facade was as bright as a car 40 m away — brighter than the car, often,
-    /// and brightness is how the ear judges nearness. A passing car was heard on the far side of the
-    /// street: "inside out", "passing behind me".
+    /// its top as that path costs. With the car's own air absorption instead, an echo that has come
+    /// 120 m round a facade is as bright as a car 40 m away, often brighter than the car, and
+    /// brightness is how the ear judges nearness: the car would be heard on the far side of the street.
     /// </summary>
     private static void ApplyPath(AudioEngineFacade audio, int voiceId, in AcousticPathData directPath,
                                   in Reflection r, Vector3 listener, float directDist)

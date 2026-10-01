@@ -26,12 +26,10 @@ public struct SpatialEmitter
     /// Pinned above the physics because a player needs it, whatever the arithmetic says.
     ///
     /// A SHORT, explicit list on purpose — speech, the player's own footsteps, a warning tone — and
-    /// not a knob on every object. It replaces an authored `Priority` integer that ranked KINDS of
-    /// thing rather than what could be heard: engines were 1 and transients were 2, so a clap two
-    /// hundred metres away outranked a car at five metres by four to one, and the car that lost was
-    /// not faded but STOPPED and rebuilt the next frame. For a synthesized engine that means a fresh
-    /// ring, priming silence and an envelope fade — which is what "vehicles stop close in front of me
-    /// while going past" sounds like.
+    /// not a knob on every object. Ranking KINDS of thing rather than what can be heard would let a
+    /// clap two hundred metres away outrank a car at five metres, and the car that loses is not faded
+    /// but STOPPED and rebuilt the next frame. For a synthesized engine that means a fresh ring,
+    /// priming silence and an envelope fade: a vehicle that stops sounding as it goes past.
     ///
     /// Everything else is ranked on <see cref="OpenFPS.Common.Loudness.RenderedGain"/> times what the
     /// path lets through: the level this voice will actually deliver to the ear. See VoiceManager.
@@ -48,9 +46,8 @@ public struct SpatialEmitter
     /// the reference distance widens to the source's radius and the gain is paid down to match, so
     /// the FAR FIELD IS UNCHANGED and only the near field flattens.
     ///
-    /// It replaces `MathF.Max(reference, 3f)` in ClientAudioSystem, which widened a vehicle's
-    /// reference without paying anything back and so made every quiet vehicle up to eight decibels
-    /// louder than its own level said it was.
+    /// Widening a vehicle's reference without paying the gain back (a bare `MathF.Max(reference, 3f)`)
+    /// would make every quiet vehicle up to eight decibels louder than its own level says it is.
     /// </summary>
     public float ExtentMetres;
 

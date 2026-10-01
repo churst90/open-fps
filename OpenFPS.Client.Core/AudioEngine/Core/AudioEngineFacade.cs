@@ -113,7 +113,7 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
             // pass-by in the game. A car at 280 km/h going past eleven metres away swings its radial
             // speed at about v^2/d = 550 m/s^2, which at 60 Hz is a 2.7% pitch step sixty times a
             // second: not a swoop but a staircase, and clearly audible as one on anything with a
-            // high, pure note — which is exactly where it was first noticed, on the V10s.
+            // high, pure note, such as a V10.
             //
             // At 250 Hz the same pass steps by 0.65%, which is under the threshold where a pitch
             // change is heard as a step rather than a glide. The loop itself is cheap — it updates
@@ -446,9 +446,8 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
     public bool IsPlaying(int entityId) => _isInitialized && _provider.IsPlaying(entityId);
 
     /// <summary>How many submissions the budget is holding. A number that climbs and does not come
-    /// back down is one-shots being kept after their moment — see VoiceManager.Process. It has been
-    /// heard twice as "reflections piling up where nothing is happening", and both times there was no
-    /// gauge to look at.</summary>
+    /// back down is one-shots being kept after their moment — see VoiceManager.Process. It is heard
+    /// as reflections piling up where nothing is happening.</summary>
     public int PendingSubmissions => _voiceManager?.SubmissionCount ?? 0;
 
     /// <summary>

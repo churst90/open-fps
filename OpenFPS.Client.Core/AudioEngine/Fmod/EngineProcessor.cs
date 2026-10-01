@@ -96,11 +96,11 @@ public sealed class EngineVoiceState : IRenderedVoice
     /// <summary>
     /// Brings a voice that was fading back to full, and is the other half of FadeOutEngine.
     ///
-    /// Its absence was a silent car. A voice is faded when it loses its slot and, if it wins the slot
-    /// back before the fade finishes, it was simply taken off the retiring list — with its envelope
-    /// still heading for zero and nothing anywhere to turn it round. The car kept its engine, kept
-    /// its position, kept being updated every frame, and was inaudible for the rest of its life.
-    /// Heard as cars that stop passing in front of you while the rest of the field still circulates.
+    /// A voice is faded when it loses its slot. If it wins the slot back before the fade finishes it
+    /// is taken off the retiring list, but its envelope is still heading for zero; without this
+    /// nothing turns it round, and the car keeps its engine, its position and its updates and is
+    /// inaudible for the rest of its life: cars that stop passing in front of you while the rest of
+    /// the field still circulates.
     /// </summary>
     public void Revive()
     {
@@ -113,28 +113,18 @@ public sealed class EngineVoiceState : IRenderedVoice
     /// Output gain from pascals at one metre to full scale: one over the pressure that maps to
     /// 0 dBFS. The emitter's placement then handles distance and level.
     ///
-    /// It comes from the VEHICLE, and it has to. A fixed 40 Pa — 126 dB — was right for a road car
-    /// and wrong by more than an order of magnitude for a race one: an unsilenced V10 peaks at 149 dB
-    /// at a metre, thirteen times over that reference, and everything past it goes through the tanh
-    /// below. The result is not a loud engine, it is a square wave, and it was heard exactly that way
-    /// — "everything is overloaded, crackling and breaking up" — the first time a field of race cars
-    /// was put on a map.
+    /// It comes from the VEHICLE, and it has to. A fixed 40 Pa (126 dB) is right for a road car and
+    /// wrong by more than an order of magnitude for a race one: an unsilenced V10 peaks at 149 dB at
+    /// a metre, thirteen times over that reference, and everything past it goes through the tanh
+    /// below. The result is not a loud engine but a square wave: overloaded, crackling, breaking up.
     /// </summary>
     public float PascalsAtFullScale = 40f;
     /// <summary>
-    /// How much of the front of the car reaches this voice, 0..1 — and it is ONE now, because
-    /// there is nothing left for it to represent.
-    ///
-    /// It was 0.35: a fixed nine decibels taken off the intake on top of everything the intake
-    /// model already did. That was the third of these undeclared duplicates to turn up. The block
-    /// had one (a 0.4 in this same sum, alongside its declared bay leakage) and the intake had
-    /// this. In both cases a real, declared, per-vehicle path existed and a constant was quietly
-    /// attenuating on top of it.
-    ///
-    /// What an intake's route to the street is made of is now all declared and all derived:
-    /// IntakeSpec.AirboxLossDb (the box as an expansion chamber, from its own geometry) and
-    /// IntakeSpec.Level (what escapes the bay). Keeping a 0.35 in front of those would be saying
-    /// the same thing a third time, in a number nobody could look up.
+    /// How much of the front of the car reaches this voice, 0..1. It is ONE for a whole voice,
+    /// because there is nothing for it to represent: an intake's route to the street is all declared
+    /// and derived, IntakeSpec.AirboxLossDb (the box as an expansion chamber, from its own geometry)
+    /// and IntakeSpec.Level (what escapes the bay). A constant below one here would attenuate on top
+    /// of that declared path, saying the same thing again in a number nobody could look up.
     ///
     /// Still a field rather than a constant because a two-outlet vehicle hands its front to a
     /// SECOND voice when the listener is close enough to tell the ends apart, and that crossfade
@@ -144,17 +134,12 @@ public sealed class EngineVoiceState : IRenderedVoice
     /// <summary>
     /// How much of the tyre layer reaches the mix.
     ///
-    /// The tyre model already works in physical levels — a squeal is scaled from the tyre's own
-    /// SquealDb, which for a road tyre is 92 dB against a diesel truck's 104 — so halving it here was
-    /// scaling a derived quantity by a taste constant, and it put the squeal sixteen decibels under
-    /// the engine instead of twelve. The first person to listen to a truck launching hard heard the
-    /// revs and no tyres at all.
-    ///
-    /// Measured rather than guessed, in the end: rendering the tyre voice on its own put a full
-    /// squeal at an RMS of 0.89 where the exhaust runs in pascals and reaches tens, leaving the
-    /// squeal twenty-odd decibels under an engine it should be about seven under. Two listening
-    /// tests in a row said "hardly noticeable" and "extremely dull", and the dullness was the same
-    /// thing: what was audible of it was the low shoulder, because the rest was buried.
+    /// The tyre model already works in physical levels: a squeal is scaled from the tyre's own
+    /// SquealDb, which for a road tyre is 92 dB against a diesel truck's 104. This is not a taste
+    /// constant on top of that. It is measured: the tyre voice on its own puts a full squeal at an
+    /// RMS of 0.89 where the exhaust runs in pascals and reaches tens, which left the squeal
+    /// twenty-odd decibels under an engine it should be about seven under. Buried that far, only its
+    /// low shoulder is audible, and the tyres sound dull or absent.
     /// </summary>
     public float TyreMix = DefaultTyreMix;
     private const float DefaultTyreMix = 1.4f;
@@ -168,16 +153,14 @@ public sealed class EngineVoiceState : IRenderedVoice
 
     // ── Produced ahead on a worker, consumed by the mixer ───────────────────────────────────────
     //
-    // The engine used to be integrated INSIDE the FMOD callback, which meant every car in the world
-    // was synthesized one after another on a single thread while the mixer's deadline ran down. On a
-    // machine with twenty-four cores that is one core doing all of it, and it is the reason the
-    // number of cars had to be rationed at all.
+    // A worker renders ahead into this ring and the FMOD callback only copies out of it. Integrating
+    // the engine inside the callback would synthesize every car one after another on the mixer's
+    // single thread while its deadline ran down, one core doing all of it however many there are.
     //
-    // Now a worker renders ahead into this ring and the callback only copies out of it. The producer
-    // can be any thread and there can be as many of them as there are engines; the consumer is
-    // whatever the mixer is doing. Echo and borrowed voices read further back in the same ring, which
-    // they already did — they simply read behind the PLAY position now rather than behind the write
-    // position, so they no longer depend on which DSP the mixer happens to call first.
+    // The producer can be any thread and there can be as many of them as there are engines; the
+    // consumer is whatever the mixer is doing. Echo and borrowed voices read further back in the same
+    // ring, behind the PLAY position rather than the write position, so they do not depend on which
+    // DSP the mixer happens to call first.
     private const int RingBits = 17;                       // about three seconds at 44.1 kHz
 
     /// <summary>The back of the machine: the exhaust, and the body it shakes.</summary>
@@ -190,7 +173,7 @@ public sealed class EngineVoiceState : IRenderedVoice
     /// are written separately, so a car that earns two voices costs one more copy-out and no more
     /// synthesis — which is the only reason a two-voice car is affordable at all.
     ///
-    /// The two taps sum to exactly what the single voice used to be (see <see cref="Consume"/>), so
+    /// The two taps sum to exactly what a single voice plays (see <see cref="Consume"/>), so
     /// a car is the same loudness whether it is being heard through one voice or two. That is not a
     /// nicety: a level that changed when the mixer changed its mind about how many voices to spend
     /// would be heard as the car jumping, which is precisely the kind of thing a listener notices
@@ -237,13 +220,12 @@ public sealed class EngineVoiceState : IRenderedVoice
     /// <summary>
     /// How far ahead of the mixer THIS voice's producer tries to stay, in seconds.
     ///
-    /// Per voice, and that matters. It used to be one global figure that every voice shared, grown
-    /// by 35 % the moment ANY voice was caught short — so one car that had just been created, whose
-    /// ring was empty because it had existed for four milliseconds, made all thirty of the others
-    /// owe a third more audio, on a machine that was already behind. The lead ratcheted to its
-    /// ceiling within a second of a map load and stayed there. A voice now buys its own headroom
-    /// with its own starvation, and only after it has been playing for at least one lead — before
-    /// that there is nothing to diagnose, only a ring that is still filling.
+    /// Per voice, and that matters. A global figure grown whenever ANY voice was caught short would
+    /// let one car created four milliseconds ago, whose ring is empty only because it is new, make
+    /// all thirty of the others owe more audio on a machine that is already behind; the lead would
+    /// ratchet to its ceiling within a second of a map load and stay there. A voice buys its own
+    /// headroom with its own starvation, and only after it has been playing for at least one lead —
+    /// before that there is nothing to diagnose, only a ring that is still filling.
     ///
     /// Long enough to absorb a scheduling hiccup on a busy machine, short enough that a change the
     /// game thread makes — the throttle, the speed the car is doing — is not heard noticeably late.
@@ -321,7 +303,7 @@ public sealed class EngineVoiceState : IRenderedVoice
     /// PlaceAtSpeed sets the crank turning at the right rate, but it cannot fill the pipes: a new
     /// engine's waveguides start EMPTY, and the first thing that comes out of them is the transient
     /// of an exhaust system pressurising from silence. One car doing that is a click. Thirty cars
-    /// doing it at the instant a map loads is the second of mess this was heard as.
+    /// doing it at the instant a map loads is a second of mess.
     ///
     /// A tenth of a second is several engine cycles and more than the longest pipe's round trip, so
     /// by the time the ring holds anything the system is running as it would have been all along. It
@@ -334,15 +316,11 @@ public sealed class EngineVoiceState : IRenderedVoice
     /// <summary>
     /// Renders ahead until the producer is one lead in front of the mixer. Worker thread.
     ///
-    /// Takes no lock and holds nothing the mixer could ever want, which is the point. The previous
-    /// version held a lock for the WHOLE top-up — the warm-up plus every chunk up to the full lead,
-    /// which at load-time speed is around a hundred and seventy-five milliseconds of wall clock —
-    /// and the mixer callback took that same lock whenever it came up short. FMOD's buffer is
-    /// ninety-three milliseconds deep. One such wait was a dropout, and a deeper buffer made it
-    /// worse rather than better, because the top-up the mixer might have to wait for got longer with
-    /// every millisecond of lead. That is why buffer depth, thread priority and dedicated threads
-    /// all helped a little and none of them fixed it: the consumer was not short of audio, it was
-    /// frozen.
+    /// Takes no lock and holds nothing the mixer could ever want, which is the point. A lock held
+    /// for the whole top-up (the warm-up plus every chunk up to the full lead, around 175 ms of wall
+    /// clock at load-time speed) and taken by the mixer callback when it came up short would freeze
+    /// the mixer for longer than FMOD's 93 ms buffer: a dropout. A deeper buffer would make it worse,
+    /// not better, because the top-up the mixer might wait for grows with every millisecond of lead.
     /// </summary>
     public void Produce()
     {
@@ -403,7 +381,7 @@ public sealed class EngineVoiceState : IRenderedVoice
     /// audio, it sounds like every engine on the track winding down together. It also puts each
     /// car's sound progressively further behind where the car actually is — up to a lead, which at
     /// 250 km/h is fifty metres — so the field smears into a wash instead of thirty separate cars.
-    /// Both were heard on the speedway before this was fixed, and neither reads as "a dropout".
+    /// Neither reads as a dropout.
     /// </summary>
     public void Consume(Span<float> mono)
     {
@@ -901,9 +879,9 @@ public sealed class EngineVoiceState : IRenderedVoice
             float nowDb = 10f * MathF.Log10((float)_levelMs / (20e-6f * 20e-6f) + 1e-12f);
             // The voice is placed as a source of its DECLARED level; running below that, it should be
             // heard as the law places a source of the level it is actually running at. The difference is
-            // the lift. Below the mix's ceiling that is (1 - compression) of the shortfall, as it always
-            // was; above it the law is literal and the lift is nothing — it used to take the flat
-            // 55 % there too, and lifted a loud car idling nearly nine decibels too far.
+            // the lift. Below the mix's ceiling that is (1 - compression) of the shortfall; above it
+            // the law is literal and the lift is nothing. A flat share there too would lift a loud car
+            // idling nearly nine decibels too far.
             liftTarget = MathF.Pow(10f, LiftDb(nowDb, Vehicle.SourceLevelDb) / 20f);
         }
         float liftStep = MathF.Max(1e-4f, (liftTarget - _levelGain) / MathF.Max(1, count));
@@ -929,36 +907,27 @@ public sealed class EngineVoiceState : IRenderedVoice
             _tyreGear = Driveline.Gear;
             _tyreChirp *= 0.99985f;
             // Two axles, two tyre noises. They are different tyres on different patches of road, so
-            // their noise is INDEPENDENT; one signal written to both ends was the same roar coming
-            // from two places a few metres apart, which combs against itself as the car goes by —
-            // heard as a car passing "inside out".
+            // their noise is INDEPENDENT. One signal written to both ends would be the same roar
+            // coming from two places a few metres apart, which combs against itself as the car goes
+            // by and is heard as a car passing inside out.
             float tyreRear = VehicleSynth.Tyre(Vehicle.Tyres, Driveline.Speed, RoadSlip + _tyreChirp, _rng, ref _tyre, _rollingRearPa);
             float tyreFront = VehicleSynth.Tyre(Vehicle.Tyres, Driveline.Speed, RoadSlip + _tyreChirp, _rng, ref _tyreFront, _rollingFrontPa);
             float rearTyre = tyreRear * PerAxle * TyreMix;
             float frontTyre = tyreFront * PerAxle * TyreMix;
             // The front of the machine: the tyres at that end, the fan, and what the bay lets out.
             //
-            // The BLOCK used to be in here as well, at 0.4 — and then again in the bay leak below.
-            // Two routes out of the engine for one mechanism, one of them declared per vehicle from
-            // the geometry and one of them a constant applied to everything. That second path is
-            // what the block actually had: 0.4 x FrontMix = 0.14, a fixed 17 dB of attenuation with
-            // nothing behind it. On a car it does not matter, because a car is its exhaust. On a
-            // bus, whose block measures SEVEN DECIBELS ABOVE its silenced tailpipe (`--voice-levels
-            // parts`), it is most of the machine being thrown away, and that is what "I can hardly
-            // hear the engines on those diesels" was.
+            // The BLOCK is not added here directly. One mechanism, one route: the block gets outside
+            // through the bay, and how much of it does is VehicleProfile.EngineBayLeakage, which every
+            // vehicle declares from what is actually around its engine. A second, constant route
+            // here would be a fixed attenuation with nothing behind it; on a car that hardly matters,
+            // because a car is its exhaust, but a bus's block measures seven decibels above its
+            // silenced tailpipe (`--voice-levels parts`), so it is most of the machine.
             //
-            // One mechanism, one route: the block gets outside through the bay, and how much of it
-            // does is VehicleProfile.EngineBayLeakage, which every vehicle now declares from what is
-            // actually around its engine.
-            //
-            // The INTAKE was the same mistake a second time. Its mouth went straight out of the
-            // front at the full orifice level, as if there were no bonnet over it, and then again
-            // through the bay. "The muscle car front end, I can really hear the air intake": at full
-            // throttle the intake was 10-18 dB of the front of every V8, and on a stock V6 it was
-            // what the front of the car sounded like. A snorkel draws from inside the wing or behind
-            // the grille, under the same bonnet as the block, and pass-by source separations find
-            // the block, not the intake, dominating a car's front microphone (ISMA 2014). So it
-            // leaves the way the block does, through the bay; a bike, with no bay, lets all of it out.
+            // The INTAKE leaves the same way. A snorkel draws from inside the wing or behind the
+            // grille, under the same bonnet as the block, and pass-by source separations find the
+            // block, not the intake, dominating a car's front microphone (ISMA 2014). Straight out of
+            // the front at the full orifice level it would be 10-18 dB of the front of a V8 at full
+            // throttle. So it leaves through the bay; a bike, with no bay, lets all of it out.
             float front = frontTyre;
             float fanOut = 0f;
             if (_fan != null)
@@ -998,15 +967,14 @@ public sealed class EngineVoiceState : IRenderedVoice
             pa += _body.Process(Engine.Exhaust) * BodyMix;
             // What escapes the engine bay (VehicleProfile.EngineBayLeakage; 0.15 unless declared).
             // It leaves from the BAY, which is where the engine is — the intake slot marks it, nose
-            // or mid-ship — so it goes out of the front tap. It used to go out of the back with the
-            // tailpipe: on the school bus the block is 97.7 dB against an 83 dB silenced pipe, so an
-            // idling bus at a stop, fan slowed, was one sound at its tail — "the front of the bus and
-            // the exhaust are in the same place". Once far enough to be one voice, nothing changes.
+            // or mid-ship — so it goes out of the front tap, not the back with the tailpipe. On the
+            // school bus the block is 97.7 dB against an 83 dB silenced pipe, so out of the back an
+            // idling bus would be one sound at its tail. Once far enough to be one voice, nothing changes.
             float bay = _bayLeak > 0f ? (Engine.Block + FrontMix * _bayIntake.Process(Engine.Intake)) * _bayLeak : 0f;
             if (_engineAtRear) pa += bay; else front += bay;
             // The air and the door beeper are their own sources at their own levels, each at its own
             // end of the vehicle: the door valve, the kneeling valve and the beeper at the front door,
-            // the brake releases at the axles. They all used to come out of the tailpipe.
+            // the brake releases at the axles. None of them comes out of the tailpipe.
             float airOut = 0f, chimeOut = 0f, airFront = 0f, chimeFront = 0f;
             if (_air != null)
             {
@@ -1035,12 +1003,12 @@ public sealed class EngineVoiceState : IRenderedVoice
             // What the ENGINE is radiating, before anything a listener's position does to it: the
             // level the loudness law is applied to. Not the brakes' air or the door beeper, which are
             // their own sources at their own levels and are not what idles.
-            // The bay is the engine radiating even though it now leaves by the front: the level the
-            // loudness law is applied to is the same machine it always was.
+            // The bay is the engine radiating even though it leaves by the front: the loudness law is
+            // applied to the whole machine.
             // Measured WITHOUT the pipe's directivity: a car facing away from you is not a car running
             // quietly, and the idle lift must not turn it back up.
             // Both axles' tyres count: they are the machine radiating too, and at a cruise the larger
-            // part of it. Only the rear one used to, because only the rear one was in `pa`.
+            // part of it. Only the rear one is in `pa`, so the front one is added here.
             float engineOnly = pa - rearExtras + (_engineAtRear ? -fanOut : bay) + frontTyre + (Engine.Exhaust - exhaustOut);
             blockSum += (double)engineOnly * engineOnly;
             tyreSum += (double)(rearTyre * rearTyre + frontTyre * frontTyre);
@@ -1082,9 +1050,9 @@ public sealed class EngineVoiceState : IRenderedVoice
             }
 
             _envelope += Math.Clamp(envTarget - _envelope, -envStep, envStep);
-            // Written WITHOUT the soft ceiling, which now belongs to whoever sums the taps back up:
-            // a limiter applied to each half separately is not the same limiter, and the single-voice
-            // case has to come out bit for bit as it did before the machine had two outlets.
+            // Written WITHOUT the soft ceiling, which belongs to whoever sums the taps back up: a
+            // limiter applied to each half separately is not the same limiter, and the single-voice
+            // case has to come out bit for bit the same as the two taps summed.
             _levelGain += liftStep;
             // The lift is the ENGINE's: an idling bus's air brake release is exactly as loud as it
             // is, and lifting it with the idle made every bus stop audible across the city.
@@ -1116,24 +1084,13 @@ public sealed class EngineVoiceState : IRenderedVoice
 }
 
 /// <summary>
-/// One reflection of a live engine: the same signal, read back from the engine's ring buffer at
-/// the delay the mirrored path implies, and placed at the mirrored source. The delay is slewed rather
-/// than stepped, so as the car moves and the path length changes the echo glides in pitch — which is
-/// the Doppler of the reflection, and the reason its emitter carries no velocity of its own.
-/// </summary>
-/// <summary>
-/// The smear a rough surface puts on what it hands back: a short cascade of Schroeder all-passes,
-/// flat in level and wandering in phase, spread over a time that grows with the roughness. See
-/// <see cref="EngineEchoState.Scattering"/> for why an echo needs one.
-/// </summary>
-/// <summary>
 /// The soft ceiling on a synthesized voice: untouched up to the knee, then bent smoothly towards a
 /// ceiling it never reaches.
 ///
-/// It used to be tanh(y) past ±0.8 and y below it, which is not continuous: just under the knee it
-/// gave 0.8 and just over it tanh(0.8) = 0.664, so every backfire and overrun pop crossing the knee
-/// put a one-sample step of 0.14 into the output — a click, twice per pop. This joins the straight
-/// line at the knee with the same value and the same slope.
+/// The bend joins the straight line at the knee with the same value and the same slope. A plain
+/// tanh(y) past the knee is not continuous there (0.8 just under, tanh(0.8) = 0.664 just over), and
+/// every backfire and overrun pop crossing it would put a one-sample step into the output: a click,
+/// twice per pop.
 ///
 /// The ceiling sits two decibels above full scale. A unit sample is still the declared level plus
 /// <see cref="OpenFPS.Common.VehicleProfile.PeakHeadroomDb"/>, so nothing is placed any louder; the
@@ -1159,6 +1116,11 @@ public static class SoftCeiling
     }
 }
 
+/// <summary>
+/// The smear a rough surface puts on what it hands back: a short cascade of Schroeder all-passes,
+/// flat in level and wandering in phase, spread over a time that grows with the roughness. See
+/// <see cref="EngineEchoState.Scattering"/> for why an echo needs one.
+/// </summary>
 public sealed class EchoDiffuser
 {
     private readonly float[][] _lines;
@@ -1203,6 +1165,12 @@ public sealed class EchoDiffuser
     }
 }
 
+/// <summary>
+/// One reflection of a live engine: the same signal, read back from the engine's ring buffer at
+/// the delay the mirrored path implies, and placed at the mirrored source. The delay is slewed rather
+/// than stepped, so as the car moves and the path length changes the echo glides in pitch — which is
+/// the Doppler of the reflection, and the reason its emitter carries no velocity of its own.
+/// </summary>
 public sealed class EngineEchoState
 {
     public readonly EngineVoiceState Source;
@@ -1221,11 +1189,9 @@ public sealed class EngineEchoState
     /// a second. When the order flips, the echo reads a whole block early or late, and a block-sized
     /// jump in the read position is a click.
     ///
-    /// Two blocks of slack absorbs the flip either way. It used to be written as a fixed 26 ms,
-    /// which IS two blocks at the 512-sample size the lab rig was built against and only ONE AND A
-    /// TENTH at the 1024 FMOD actually chose — so on the real mixer the margin was not there, and
-    /// the clicks scaled with the number of echo voices. Derived from the block the mixer hands us,
-    /// so it cannot drift out of step with the buffer size again.
+    /// Two blocks of slack absorbs the flip either way. It is counted in blocks, from the block the
+    /// mixer hands us, because a fixed time cannot track the buffer size: 26 ms is two blocks at 512
+    /// samples but only 1.1 at the 1024 FMOD actually chooses.
     /// </summary>
     public const int MinDelayBlocks = 2;
 
@@ -1273,8 +1239,8 @@ public sealed class EngineEchoState
     ///
     /// WHY AN ECHO IS SMEARED. A reflection read straight out of the source's ring is the source's
     /// own waveform, sample for sample, a few milliseconds late — and a signal added to a delayed copy
-    /// of itself is a comb filter: evenly spaced notches that sweep as either end moves. That is the
-    /// phasing ("sirens inside out") and most of the "laser beam", and it is not what a wall does. A
+    /// of itself is a comb filter: evenly spaced notches that sweep as either end moves. That phasing
+    /// makes a source sound inside out or like a narrow beam, and it is not what a wall does. A
     /// real wall hands the sound back from a patch a few metres across (the Fresnel zone), every part
     /// of it a slightly different distance away, and what faces the wall is not what faces you — the
     /// tailpipe points one way and the intake another. So the copy that comes back is the same sound
@@ -1464,16 +1430,12 @@ public static class TapProcessor
     /// This runs on FMOD's mixer thread, called from native code. An exception that reaches the
     /// native frame is not a caught fault, it is a CLR FATAL ERROR: the runtime aborts the process
     /// on the spot, with no managed stack, no log line, and a core that reads
-    /// "libfmod -> libcoreclr -> abort". That is precisely the crash the city kept producing, and
-    /// the only reason it was ever reachable is that the guard below stopped one line short.
+    /// "libfmod -> libcoreclr -> abort".
     ///
-    /// The old body wrapped only `state.Render(mono)`. Everything before it was bare — and the line
-    /// that actually throws is `GCHandle.FromIntPtr(userData).Target`, which raises
-    /// InvalidOperationException the moment the handle it names is no longer allocated. So the one
-    /// statement most likely to fail was the one statement outside the net.
-    ///
-    /// GranularProcessor and SynthProcessor have always done it this way, one-shot log and all.
-    /// These four had not.
+    /// So the WHOLE body is inside the guard, not just `state.Render(mono)`. The line most likely to
+    /// throw is `GCHandle.FromIntPtr(userData).Target`, which raises InvalidOperationException the
+    /// moment the handle it names is no longer allocated. GranularProcessor and SynthProcessor guard
+    /// the same way, with the same one-shot log.
     /// </summary>
     private static RESULT ReadCallback(ref DSP_STATE dsp_state, IntPtr inbuffer, IntPtr outbuffer, uint length, int inchannels, ref int outchannels)
     {
@@ -1546,16 +1508,12 @@ public static class EchoProcessor
     /// This runs on FMOD's mixer thread, called from native code. An exception that reaches the
     /// native frame is not a caught fault, it is a CLR FATAL ERROR: the runtime aborts the process
     /// on the spot, with no managed stack, no log line, and a core that reads
-    /// "libfmod -> libcoreclr -> abort". That is precisely the crash the city kept producing, and
-    /// the only reason it was ever reachable is that the guard below stopped one line short.
+    /// "libfmod -> libcoreclr -> abort".
     ///
-    /// The old body wrapped only `state.Render(mono)`. Everything before it was bare — and the line
-    /// that actually throws is `GCHandle.FromIntPtr(userData).Target`, which raises
-    /// InvalidOperationException the moment the handle it names is no longer allocated. So the one
-    /// statement most likely to fail was the one statement outside the net.
-    ///
-    /// GranularProcessor and SynthProcessor have always done it this way, one-shot log and all.
-    /// These four had not.
+    /// So the WHOLE body is inside the guard, not just `state.Render(mono)`. The line most likely to
+    /// throw is `GCHandle.FromIntPtr(userData).Target`, which raises InvalidOperationException the
+    /// moment the handle it names is no longer allocated. GranularProcessor and SynthProcessor guard
+    /// the same way, with the same one-shot log.
     /// </summary>
     private static RESULT ReadCallback(ref DSP_STATE dsp_state, IntPtr inbuffer, IntPtr outbuffer, uint length, int inchannels, ref int outchannels)
     {
@@ -1633,16 +1591,12 @@ public static class EngineProcessor
     /// This runs on FMOD's mixer thread, called from native code. An exception that reaches the
     /// native frame is not a caught fault, it is a CLR FATAL ERROR: the runtime aborts the process
     /// on the spot, with no managed stack, no log line, and a core that reads
-    /// "libfmod -> libcoreclr -> abort". That is precisely the crash the city kept producing, and
-    /// the only reason it was ever reachable is that the guard below stopped one line short.
+    /// "libfmod -> libcoreclr -> abort".
     ///
-    /// The old body wrapped only `state.Render(mono)`. Everything before it was bare — and the line
-    /// that actually throws is `GCHandle.FromIntPtr(userData).Target`, which raises
-    /// InvalidOperationException the moment the handle it names is no longer allocated. So the one
-    /// statement most likely to fail was the one statement outside the net.
-    ///
-    /// GranularProcessor and SynthProcessor have always done it this way, one-shot log and all.
-    /// These four had not.
+    /// So the WHOLE body is inside the guard, not just `state.Render(mono)`. The line most likely to
+    /// throw is `GCHandle.FromIntPtr(userData).Target`, which raises InvalidOperationException the
+    /// moment the handle it names is no longer allocated. GranularProcessor and SynthProcessor guard
+    /// the same way, with the same one-shot log.
     /// </summary>
     private static RESULT ReadCallback(ref DSP_STATE dsp_state, IntPtr inbuffer, IntPtr outbuffer, uint length, int inchannels, ref int outchannels)
     {
