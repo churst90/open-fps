@@ -104,9 +104,9 @@ public sealed record ChimeHornSpec
     /// <summary>
     /// The Nathan AirChime K5LA: the five-chime on most Amtrak power and a great many freight
     /// locomotives, and the sound most people in North America mean by "train horn". Five bells tuned
-    /// D#4 F#4 G#4 B4 D#5 (311, 370, 415, 494, 622 Hz): a B major sixth over a D# bass. The top two
-    /// were A#4 and C#5 until 2026-09-25, a D# minor seventh, which is a Leslie S-4T's chord and not
-    /// this horn's (train-horn.com's K3LA/K5LA and Nathan/Leslie guides). The bells are spread across
+    /// D#4 F#4 G#4 B4 D#5 (311, 370, 415, 494, 622 Hz): a B major sixth over a D# bass. A#4 and C#5
+    /// on top would make a D# minor seventh, which is a Leslie S-4T's chord and not this horn's
+    /// (train-horn.com's K3LA/K5LA and Nathan/Leslie guides). The bells are spread across
     /// the manifold and speak over about forty milliseconds, so it swells into the chord.
     /// </summary>
     public static ChimeHornSpec NathanK5LA => new()
@@ -127,8 +127,7 @@ public sealed record ChimeHornSpec
     /// A Leslie three-chime, the other voice of North American railroading: fewer bells, wider
     /// spacing, and a harder edge because the bells are shorter for their mouths. Common on transit
     /// and on older passenger power. Leslie numbers its bells by pitch; the RS3L's 25, 31 and 44 sound
-    /// C4, D#4 and A4 (262, 311, 440 Hz — locomotivehorns.info). It was an A-C-E triad three to five
-    /// semitones under that until 2026-09-25.
+    /// C4, D#4 and A4 (262, 311, 440 Hz — locomotivehorns.info).
     /// </summary>
     public static ChimeHornSpec LeslieRS3L => new()
     {
@@ -144,8 +143,7 @@ public sealed record ChimeHornSpec
 
     /// <summary>
     /// A European two-tone to UIC 644 / EN 15153-2: 370 Hz and 660 Hz, sounded together or
-    /// alternately. It was 642 and 842 Hz until 2026-09-25, the low tone nine and a half semitones
-    /// over the standard's.
+    /// alternately.
     /// </summary>
     public static ChimeHornSpec TwoToneEuropean => new()
     {
@@ -160,9 +158,8 @@ public sealed record ChimeHornSpec
 
     /// <summary>
     /// A North American light-rail vehicle's horn: a small two-chime on the car's own air, D#4 and
-    /// A4 (311 and 440 Hz), the pairing of the Leslie S-2M that transit work has long used. Reported:
-    /// the light rail's horn was higher than it should be — it had the European two-tone at 642 and
-    /// 842 Hz. No maker's figure was found for the S70, SD160 or Flexity; this is the documented
+    /// A4 (311 and 440 Hz), the pairing of the Leslie S-2M that transit work has long used.
+    /// No maker's figure was found for the S70, SD160 or Flexity; this is the documented
     /// transit horn, and the European urban-rail standard (EN 15153-4) puts its low tone at 370.
     /// </summary>
     public static ChimeHornSpec LightRailTwoChime => new()
@@ -183,7 +180,7 @@ public sealed record ChimeHornSpec
     ///
     /// Pitched at 173 and 228 Hz. Real roof trumpets are 0.55-0.95 m long (Grover's common pair is
     /// 24.5 and 21.5 in) and speak around 150-250 Hz; Leslie's own table puts a 24.9 in Tyfon at
-    /// 156 Hz. It was 346 and 457 Hz until 2026-09-25 — an octave up, as heard. A reed horn with a
+    /// 156 Hz. A reed horn with a
     /// flare speaks nearer c/3L than the c/2L of a plain cone, so these lengths are the model's
     /// EFFECTIVE lengths for the measured notes, not the metal.
     /// </summary>
@@ -200,7 +197,7 @@ public sealed record ChimeHornSpec
     };
 
     /// <summary>A transit bus: one small trumpet under the front, on the brake system's air. 400 Hz,
-    /// in the 340-440 Hz of a bus's electric horn and well under the 534 it was (2026-09-25).</summary>
+    /// in the 340-440 Hz of a bus's electric horn.</summary>
     public static ChimeHornSpec BusAirHorn => new()
     {
         Name = "transit bus, single trumpet",
@@ -702,9 +699,8 @@ public sealed record SirenSpec
     /// Duty cycle of the oscillator, 0..1 — and this is what decides whether it is a SQUARE or a
     /// sawtooth, which is the difference between a siren and a trumpet.
     ///
-    /// The first version of this model used a sawtooth, on the reasoning that a sawtooth has every
-    /// harmonic and a siren's job is to be heard. That is true of the job and wrong about the
-    /// hardware. The instrument every electronic siren was built to imitate is a ROTARY CHOPPER —
+    /// Not a sawtooth, though a sawtooth has every harmonic and a siren's job is to be heard. That
+    /// is true of the job and wrong about the hardware. The instrument every electronic siren was built to imitate is a ROTARY CHOPPER —
     /// a rotor spinning inside a stator, both cut with ports, so the airflow is switched fully on
     /// and fully off once per port per revolution. Ports and lands are cut about equally wide, so
     /// what comes out is very nearly a square wave at fifty per cent duty, and a square wave has
@@ -714,8 +710,6 @@ public sealed record SirenSpec
     /// Odd-harmonic and all-harmonic are not a subtle difference. A sawtooth's even harmonics fill
     /// in the octave above every partial and the result reads as BRASSY — a horn, a trumpet. A
     /// square leaves those gaps open and reads as hollow and hard, which is the siren sound.
-    /// Reported by ear before it was reasoned about: "are real sirens based on square waves or
-    /// sawtooth waves? Sounds like these are sawtooth."
     ///
     /// Exactly a half is a pure odd series. Real ports are not machined perfectly, and a hair off
     /// centre puts a little of the even series back, which is what stops it sounding synthetic.
@@ -773,8 +767,8 @@ public sealed record SirenSpec
     {
         Name = "100 W patrol siren, grille horn",
         ReferenceDbAt3m = 120f,
-        // An eleven-inch speaker assembly, which is what a 100 W siren is fitted with — not the
-        // eight inches the first version assumed. It matters twice over: the cutoff falls to
+        // An eleven-inch speaker assembly, which is what a 100 W siren is fitted with, not an eight-
+        // inch one. It matters twice over: the cutoff falls to
         // 390 Hz, so the bottom of the wail actually radiates instead of being filtered away, and
         // the beam is correspondingly wider at the low end.
         HornMouthMetres = 0.28f,
@@ -874,10 +868,9 @@ public sealed class SirenController
     ///
     /// THIS IS THE ONE THAT MATTERS. A patrol car with its siren on for ever is not a patrol car,
     /// and it is not what a street sounds like: the head is 130 dB and the car is 95, so a siren
-    /// that never stops means the engine never exists. Reported exactly — "the police cars sound
-    /// like they have no engine and they're all siren, just sounds like a siren driving by" — and
-    /// the answer is not to turn the siren down (it is the right level, it is a siren) but to turn
-    /// it OFF most of the time, which is what a real one is.
+    /// that never stops means the engine is never heard. The answer is not to turn the siren down
+    /// (it is the right level, it is a siren) but to turn it OFF most of the time, which is what a
+    /// real one is.
     /// </summary>
     public float CallSecondsMin { get; init; } = 35f;
     public float CallSecondsMax { get; init; } = 80f;

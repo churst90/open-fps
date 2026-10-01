@@ -179,7 +179,6 @@ public static class TapBalanceSpike
                 new(DriverAction.Cranking, 0.8f), new(DriverAction.Idling, 1.5f),
                 new(DriverAction.Holding, 4f, MathF.Min(2100f, v.Engine.RedlineRpm * 0.85f), 1f),
             };
-            if (Environment.GetEnvironmentVariable("OPENFPS_VALVE_K") is string ks) EngineSynth.ValveFlowNoiseK = float.Parse(ks);
             var r = VehicleSynth.Render(v, orders, seed: 5);
             int from = (int)(r.SampleRate * 3.5f);
             void Dump(string tag, float[] x, float scale)

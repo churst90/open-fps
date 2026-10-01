@@ -11,13 +11,12 @@ namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 /// geometry from the listener's own position, a few times a second, for everything outdoors to be
 /// played through (TracedReverbDsp). Steam Audio's "listener-centric reverb".
 ///
-/// Why it exists. Outdoors the reverberation used to be FMOD's room algorithm with its decay set from
-/// a ray survey — a statistical ROOM tail, dense and smooth from the first milliseconds. A street is
-/// not that: its tail is the flutter between two facades, scatter off windows and cars, and most of
-/// the energy leaving through the open sky. Asked "why do we even need reverb at all if that should
-/// fall out as a natural consequence of correct physics", the honest answer was that we did not need
-/// the ALGORITHM — only something to stand for the thousands of copies of copies nobody can voice one
-/// by one. This is that, measured: rays from the listener, bouncing off the scene's own materials
+/// Why it exists. An algorithmic room reverb with its decay set from a ray survey is a statistical
+/// ROOM tail, dense and smooth from the first milliseconds. A street is not that: its tail is the
+/// flutter between two facades, scatter off windows and cars, and most of the energy leaving through
+/// the open sky. Reverb should fall out of the physics; what is needed is not an algorithm but
+/// something to stand for the thousands of copies of copies nobody can voice one by one. This is
+/// that, measured: rays from the listener, bouncing off the scene's own materials
 /// (absorption and scattering per band), collected back into a two-second first-order ambisonic IR.
 ///
 /// One simulation for everything, because the tracing is the cost. The approximation is Steam
@@ -33,9 +32,9 @@ internal sealed class TracedReverb : IDisposable
     /// <summary>
     /// The block the traced response is convolved in, samples. The convolution answers one block
     /// late, so this IS the room's pre-delay: at the mixer's 1,024 the first reflection of every room,
-    /// a hatchback's cabin included, came 20-23 ms after the sound, and a room answered as a separate
-    /// space off to one side instead of the one you stand in (the parking garage, a clap in a house:
-    /// "reflections centred not around me", 2026-09-28). At 256 it is 5-6 ms. The mixer's block is run
+    /// a hatchback's cabin included, comes 20-23 ms after the sound, and a room answers as a separate
+    /// space off to one side instead of the one you stand in, the reflections not centred on you.
+    /// At 256 it is 5-6 ms. The mixer's block is run
     /// through in pieces of this size (TracedReverbDsp).
     /// </summary>
     public const int TracedFrame = 256;
@@ -266,9 +265,9 @@ internal sealed class TracedReverb : IDisposable
     ///
     /// Under its OWN lock, never the tracer's: the trace holds that one for the whole run, and in a
     /// big hard hall a run takes hundreds of milliseconds. The game thread calls this every frame,
-    /// so it waited out each trace — in the airport terminal every sound stood still for 680 ms at a
-    /// time, the game loop ran at 8 Hz, footsteps and claps came late or not at all and the reverb
-    /// stepped ("fluttered") (2026-09-29).</summary>
+    /// so it would wait out each trace — in the airport terminal every sound would stand still for
+    /// 680 ms at a time, the game loop run at 8 Hz, footsteps and claps come late or not at all and
+    /// the reverb step.</summary>
     public void SetListener(Vector3 at) { lock (_listenerGate) _listener = at; }
     private readonly object _listenerGate = new();
 
@@ -464,9 +463,9 @@ internal static class TracedReverbSet
             listener = _listener ??= new TracedReverb(context) { ExtractLate = true };
             // The few sources traced from where they are (TracedEchoes), on the scene WITHOUT its open
             // ground, as the listener's trace is. Every voice already carries its own ground bounce
-            // (GroundReflection); traced over the ground as well, a car at 30 m had that bounce twice,
-            // the second at about the direct level and under a millisecond late — a comb that took
-            // twenty decibels of trim to hide (the first "-24", 2026-09-26; found 2026-09-29).
+            // (GroundReflection); traced over the ground as well, a car at 30 m has that bounce twice,
+            // the second at about the direct level and under a millisecond late — a comb that takes
+            // twenty decibels of trim to hide.
             echoes = _echoes ??= new TracedEchoes(context);
             // Each source's own late energy and its direction, on the listener's scene (LateField).
             late = _late ??= new LateField(context);
@@ -527,8 +526,7 @@ internal static class TracedReverbSet
 
     // ── The vehicle you are riding in ────────────────────────────────────────────────────────
     //
-    // "That means even inside vehicles like buses too, use reflections, not what we've been doing."
-    // A vehicle moves, so it is not in the map's traced scene — traced from a bus seat, the world
+    // Inside a vehicle the room is its cabin, heard by reflections like any other room. A vehicle moves, so it is not in the map's traced scene — traced from a bus seat, the world
     // scene answers with the street outside. But from inside, the cabin does not move relative to
     // you: it is traced as a scene of its own, in the vehicle's frame, from the same geometry the
     // server builds the shell from (VehicleCabin) — its floor, its steel below the waist and glass

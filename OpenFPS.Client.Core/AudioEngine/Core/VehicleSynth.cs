@@ -392,15 +392,15 @@ public static class VehicleSynth
         float y = 0.992f * (v.HpPrev + mix - v.Hp);
         v.Hp = mix; v.HpPrev = y;
 
-        // Shaped, not clipped, and with room above. At a drive of 0.8 a full squeal came out of the
-        // tanh at exactly the value a gentle scrub came out at — the shaper was erasing the whole
-        // difference between a tyre working and a tyre screaming, and no amount of turning the layer
-        // up afterwards could put it back. A gentle knee keeps the quiet case where it was and gives
-        // the loud one somewhere to go.
-        // The knee has to stay OUT OF THE WAY. At a drive of 0.13 a full squeal sat well up the
-        // curve, so the level was coming from saturation rather than from gain — and a listener
-        // described exactly that: "it sounds like it clips from the source". A gentler drive with
-        // the range restored afterwards leaves the same loudness with the waveform intact, and keeps
+        // Shaped, not clipped, and with room above. At a drive of 0.8 a full squeal comes out of the
+        // tanh at exactly the value a gentle scrub does — the shaper erases the whole difference
+        // between a tyre working and a tyre screaming, and no amount of turning the layer up
+        // afterwards can put it back. A gentle knee keeps the quiet case and gives the loud one
+        // somewhere to go.
+        // The knee has to stay OUT OF THE WAY. At a drive of 0.13 a full squeal sits well up the
+        // curve, so the level comes from saturation rather than from gain, and it sounds clipped at
+        // the source. A gentler drive with the range restored afterwards gives the same loudness
+        // with the waveform intact, and keeps
         // the tanh for what it is for, which is catching the rare extreme rather than shaping the
         // normal case.
         return MathF.Tanh(y * 0.05f) * 26f;

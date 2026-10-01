@@ -39,16 +39,17 @@ reverb that comes from the room's actual size and materials.
   waypoints). Choose which kinds you hear. Beacons behind a wall are not played.
 - Chat: map, all, private and server channels, each with its own sound. Voice chat on the Windows
   client (not yet on Linux).
-- F-key lists of players, maps and friends, which you can act on. Travel between maps.
+- F-key lists of players, maps and friends, which you can act on. Travel between maps with F6 or
+  `/join`.
 - Saved servers and settings.
 
 ### The sound engine
 - Binaural 3D sound (Steam Audio HRTF) mixed by FMOD.
 - Occlusion, diffraction around edges, transmission through walls, and a moving vehicle blocking
   another vehicle's sound.
-- Early reflections and second- and third-order echoes from nearby surfaces.
-- Reverb from each room's measured size, enclosure and materials, with rooms inside rooms (a bus
-  shelter inside a street, a garage inside a car park).
+- Early reflections from nearby surfaces, played from the walls they come off.
+- Reverb traced from the real geometry and materials around you, arriving from the directions it
+  comes from. Rooms inside rooms work (a bus shelter inside a street, a garage inside a car park).
 - Doppler, air absorption over distance, and horn directivity.
 - Physical synthesis of: petrol and diesel engines with their exhaust and intake systems, turbos,
   tyres, electric and air horns, sirens, trains and their horns and bells, air brakes, aircraft
@@ -63,8 +64,9 @@ reverb that comes from the room's actual size and materials.
 ## Platforms
 
 - **Server:** Linux. It is plain .NET 10, so other platforms should work but are not tested.
-- **Client:** the Linux GTK client is the current one. The Windows client works but is behind: it
-  does not yet have saved servers, the settings menu or the F-key lists.
+- **Client:** the Linux GTK client and the Windows client share the game, the keys and the main
+  menu. Only the Windows client can create an account and use voice chat. It is built from Linux
+  (`./publish-windows.sh`) and is less tested. See [docs/WINDOWS_AND_SERVER.md](docs/WINDOWS_AND_SERVER.md).
 - Speech: speech-dispatcher (Orca, espeak-ng) on Linux; NVDA or SAPI on Windows.
 
 ## Getting started
@@ -82,7 +84,8 @@ reverb that comes from the room's actual size and materials.
   `OpenFPS.Client.Core` (client logic and the audio engine), `OpenFPS.Client.Gtk` (Linux client),
   `OpenFPS.Client` (Windows client), `OpenFPS.AudioLab` (measurement and rendering tools),
   `OpenFPS.Tests`.
-- Build with `--artifacts-path` pointing at a local disk (see the run scripts).
+- Build with `--artifacts-path` pointing off the repository's volume (see the run scripts). Do not
+  use `dotnet run`: it writes `obj/` and `bin/` into the repository.
 - Tests: `dotnet test OpenFPS.Tests` (about 18 minutes, about 940 tests).
 - Map and prefab authoring: [docs/AUTHORING.md](docs/AUTHORING.md).
 - Planned work: [todo.md](todo.md). Recent changes: [changes.md](changes.md).

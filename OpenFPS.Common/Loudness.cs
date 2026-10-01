@@ -5,14 +5,13 @@ namespace OpenFPS.Common;
 /// <summary>
 /// How loud a thing is at its source, in decibels, and what that becomes in the mix.
 ///
-/// The engine did not have this concept, and its absence was audible. Every asset ships normalised to
-/// the same peak, and the only per-sound control was a 0-1 <c>Volume</c> multiplier that can make a
-/// sound quieter but never louder than anything else. Distance attenuation is correct — 1/r on the
-/// Steam Audio path — but it starts every source from the same place. The arithmetic that falls out:
-/// a gunshot ten metres away rendered FOURTEEN DECIBELS QUIETER than a footstep at one metre. In air
-/// those two differ by about eighty-five decibels in the other direction.
+/// Every asset ships normalised to the same peak, and a 0-1 <c>Volume</c> multiplier can make a
+/// sound quieter but never louder than anything else. Distance attenuation (1/r on the Steam Audio
+/// path) starts every source from the same place, so with volume alone a gunshot ten metres away
+/// renders FOURTEEN DECIBELS QUIETER than a footstep at one metre. In air those two differ by about
+/// eighty-five decibels in the other direction.
 ///
-/// So a sound now says how loud it is where it is made, and the engine works out the rest.
+/// So a sound says how loud it is where it is made, and the engine works out the rest.
 ///
 /// ── The honest part ────────────────────────────────────────────────────────────────────────────
 ///
@@ -73,12 +72,10 @@ public static class Loudness
     /// them radiated. They do not; a sole and a floor between them take most of it, which is the
     /// whole of what <see cref="Footsteps"/> models, and ten decibels is what that costs.
     ///
-    /// It was 55, and 55 is wrong twice over. It is a soft trainer on carpet heard from a metre away
-    /// — not a shoe on concrete under your own head — and against the rest of this table it made a
-    /// footstep TWENTY DECIBELS quieter than a spent cartridge case bouncing on the pavement
-    /// (<see cref="CasingDb"/>), which nobody has ever heard. Reported from the chair as "the
-    /// footsteps are so quiet it's hard to tell", and the mix meter agreed: a walk measured -26 LUFS
-    /// against the -18 to -23 a game mix belongs at.
+    /// Not 55: that is a soft trainer on carpet heard from a metre away, not a shoe on concrete under
+    /// your own head, and against the rest of this table it puts a footstep twenty decibels under a
+    /// spent cartridge case bouncing on the pavement (<see cref="CasingDb"/>). At 55 a walk measured
+    /// -26 LUFS against the -18 to -23 a game mix belongs at.
     /// </summary>
     public const float FootstepDb = 68f;
     public const float AmbienceBedDb = 48f;
@@ -92,24 +89,22 @@ public static class Loudness
     /// scale; the same rifle at ten metres arrives at 139 and is simply clipped, which is what happens
     /// to your ears as well.
     ///
-    /// Setting this to the source level instead — 165, the rifle's level at one metre — was the
-    /// mistake in the first version, and it is worth naming because it looks so reasonable. It makes
+    /// Setting this to the source level instead — 165, the rifle's level at one metre — is a mistake
+    /// worth naming because it looks so reasonable. It makes
     /// a gunshot full-scale only when you are standing AT the muzzle, and at any real distance the
     /// inverse-square law has already taken 30 dB off it before the mix sees it. Guns are very loud;
     /// they have to be loud at the ranges people actually shoot from.
     /// </summary>
-    // Lowered from 130. At 130 the only thing that ever reached full scale was gunfire: a door slam
-    // at 88 dB rendered at -28 dBFS, a pane of glass across a street at -41, and three separate
-    // listening tests in a row reported doors, glass and tyres as "weak", "quiet" and "dull" while
-    // every measurement said the physics was right. It was — the ANCHOR was wrong. Everyday sounds
-    // are 60 to 95 dB and they are what the game is mostly made of, so that is the range the mix
-    // should spend itself on. Gunfire now runs into the ceiling and clips, which is what a gunshot
-    // does to an ear and to a microphone.
+    // Not 130. At 130 the only thing that ever reaches full scale is gunfire: a door slam at 88 dB
+    // renders at -28 dBFS and a pane of glass across a street at -41, and they sound weak and dull
+    // while the physics is right. Everyday sounds are 60 to 95 dB and they are what the game is mostly
+    // made of, so that is the range the mix should spend itself on. Gunfire runs into the ceiling and
+    // clips, which is what a gunshot does to an ear and to a microphone.
     //
-    // And then a PIVOT (2026-09-25). With the compression a setting, a fixed 112 dB ceiling made "real"
-    // (1.0) mean everything below a jackhammer sat as far below the volume knob as it is below one: a
-    // street scene 40 dB down, footsteps and beacons all but gone, "like my ears are stopped up". The
-    // compression now turns about an everyday level instead: a sound 70 dB at its reference distance
+    // A PIVOT, not a fixed ceiling. With the compression a setting, a fixed 112 dB ceiling would make
+    // "real" (1.0) put everything below a jackhammer as far below the volume knob as it is below one:
+    // a street scene 40 dB down, footsteps and beacons all but gone. So the compression turns about
+    // an everyday level instead: a sound 70 dB at its reference distance
     // (the 1.2 m minimum, for anything that quiet) plays at the same level at
     // any setting, and the level that reaches full scale follows — 112 dB at the shipped 0.45, where
     // nothing has moved, and about 89 dB at 1.0, where a V8 floored beside you runs into the ceiling
@@ -133,8 +128,8 @@ public static class Loudness
     /// This compresses SOURCE levels only. Distance is deliberately left literal — the engine's 1/r —
     /// because compressing that would flatten the range cues the whole game is built on.
     ///
-    /// A SETTING now, not a constant (Cody, 2026-09-25): at 0.45 a hot rod 19 dB louder than an
-    /// economy car was placed 9 dB louder, and a car flooring it rose by under half its real surge
+    /// A SETTING, not a constant: at 0.45 a hot rod 19 dB louder than an economy car is placed only
+    /// 9 dB louder, and a car flooring it rises by under half its real surge
     /// (the engine's idle lift follows this same number). It applies to every source in the game —
     /// placement, how far it carries, the engine lift — so louder things always carry further, and
     /// the less compression, the more so. The client sets it (`/levels`, saved in ClientSettings);
@@ -165,19 +160,18 @@ public static class Loudness
     /// <summary>Largest reference distance we will hand out. Past this a source stops being a point
     /// and the 1/r model stops meaning much anyway.</summary>
     public const float MaxReferenceDistance = 40f;
-    // Raised from half a metre. The reference distance is where a sound stops getting louder as you
-    // approach, and beyond it everything falls away as 1/d — so a floor of 0.5 m meant a quiet source
-    // was already losing six decibels by the time you were a metre from it. Nothing in this game is
-    // heard from closer than about a metre anyway; a door at arm's length was being attenuated as
-    // though the listener's ear were pressed to the latch.
+    // Not half a metre. The reference distance is where a sound stops getting louder as you
+    // approach, and beyond it everything falls away as 1/d — so a floor of 0.5 m would have a quiet
+    // source already six decibels down a metre from it. Nothing in this game is heard from closer
+    // than about a metre; a door at arm's length must not be attenuated as though the listener's ear
+    // were pressed to the latch.
     public const float MinReferenceDistance = 1.2f;
 
     /// <summary>
     /// Where to put a sound of a given source level: the gain it plays at, and the reference distance
     /// inside which it does not get any louder.
     ///
-    /// These two have to be decided together, and that is the part the first version got wrong by
-    /// deciding them separately. The engine attenuates by <c>MinDistance / distance</c>, so the
+    /// These two have to be decided together, not separately. The engine attenuates by <c>MinDistance / distance</c>, so the
     /// reference distance is not a detail of the rolloff — it is what decides how loud the sound still
     /// is at the range it is actually heard from. With a fixed 2 m reference a muzzle blast is down to
     /// a fifteenth of its level by thirty metres, and no amount of source gain rescues it because the
@@ -185,9 +179,9 @@ public static class Loudness
     ///
     /// So the reference distance is derived: it is the distance at which this source's SPL falls to
     /// <see cref="RenderCeilingDb"/>. A 159 dB rifle reaches 130 dB at about twenty-eight metres, so
-    /// it plays at full scale out to twenty-eight metres and only then begins to fall. A 55 dB
-    /// footstep reaches 130 dB nowhere at all, so it clamps to half a metre and takes its quietness
-    /// from the gain instead.
+    /// it plays at full scale out to twenty-eight metres and only then begins to fall. A footstep
+    /// reaches the ceiling nowhere at all, so it clamps to <see cref="MinReferenceDistance"/> and
+    /// takes its quietness from the gain instead.
     /// </summary>
     /// <summary>
     /// Where the law puts a source of this level, as one number: 20 log10 of gain times reference

@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Numerics;
-using System.Reflection;
 using OpenFPS.Client.AudioEngine.Acoustics;
 using OpenFPS.Client.AudioEngine.Core;
 using OpenFPS.Client.AudioEngine.Data;
@@ -46,8 +45,7 @@ public class BirdLifeMutationTests
             }
             Audio = new AudioEngineFacade(Mixer);
             Audio.InitializeForTest(Bank);
-            Birds = new BirdLife(Audio, acoustics);
-            typeof(BirdLife).GetField("_rng", BindingFlags.NonPublic | BindingFlags.Instance)!.SetValue(Birds, new Random(seed));
+            Birds = new BirdLife(Audio, acoustics, seed);
             Birds.OnCall = (sp, at) => Calls.Add((sp, at, Now));
         }
 

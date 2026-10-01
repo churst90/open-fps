@@ -291,13 +291,12 @@ public partial struct EntityState
     /// corner from a flat one: a constant-radius turn at constant speed has a purely horizontal
     /// acceleration either way, and the bank shows up in the normal load, not in the kinematics. So
     /// a client dividing lateral acceleration by flat-ground grip reads a banked oval as though every
-    /// car were sliding — measured on the speedway it came out at 1.43 to 1.59 against a full-slide
+    /// car were sliding — measured on the speedway it comes out at 1.43 to 1.59 against a full-slide
     /// threshold of 1.45, which is every car in every corner rendering pure broadband skid noise for
-    /// the length of both turns. Heard, correctly, as "a long white noise tail travelling with the
-    /// vehicles".
+    /// the length of both turns: a long white-noise tail travelling with the vehicles.
     ///
-    /// One byte per dynamic entity per tick, and it replaces a numerical differentiation of an
-    /// interpolated velocity, which was fragile for its own reasons.
+    /// One byte per dynamic entity per tick, and no numerical differentiation of an interpolated
+    /// velocity, which is fragile for its own reasons.
     /// </summary>
     public byte TyreDemand;
 
@@ -392,8 +391,7 @@ public partial class ClientInputUpdate : IMessage
 public partial class PlayerJoined : IMessage { public int ConnectionId; public string Username = string.Empty; }
 
 /// <summary>
-/// Who a line of chat is for. It used to be guessed from the sender's name ("[PM from x]",
-/// "System"), which is how every command reply in the game came to be spoken as "System: ...".
+/// Who a line of chat is for. The client files and words a line by this, never by the sender's name.
 /// </summary>
 public enum ChatChannel : byte
 {

@@ -88,7 +88,7 @@ The sync **model** is correct (shared `SharedMovementEngine`, seq/ack prediction
 - [ ] **No graceful shutdown:** `_isRunning` is never set false; no `Console.CancelKeyPress`; worlds/sockets/DB torn down abruptly.
 - [ ] **Unauthenticated `RegisterRequest`** writes to the DB with no rate limit (DoS/account-spam vector).
 - [ ] **Delete dead `UserRepository`** (JSON impl, unused) — move the shared `UserData` DTO out first. Decide JSON-vs-SQLite once.
-- [ ] **Wire up or delete `PhysicsAcousticBridgeSystem`** (dead — portal apertures never update).
+- [x] **Delete `PhysicsAcousticBridgeSystem`** (it was never called; door portals are driven by the door itself).
 - [ ] Finish persistence (player progress/position; friends/map-ownership are hardcoded TODOs).
 
 ---

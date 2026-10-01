@@ -197,13 +197,12 @@ internal sealed class ExhaustNetwork
                 // kilohertz, where the blade passages are no longer short against the wavelength
                 // (Tiikoja and Abom's measurements: 5-10 dB of transmission loss, significant only at
                 // very high frequencies). Half of what is stopped comes back up the manifold rather
-                // than becoming work. It was a 260 Hz low-pass passing a third: everything above the
-                // firing note of a straight-piped diesel pickup was gone before the pipe, and the
-                // trucks were "all rumble, bass and turbo whine — I can hardly hear the exhaust"
-                // (Cody, 2026-09-28).
+                // than becoming work. Not a low-pass: a 260 Hz one passing a third takes everything
+                // above the firing note of a straight-piped diesel pickup off before the pipe, and
+                // leaves the truck all rumble and turbo whine.
                 // TURBOCHARGED ONLY. A blower is belt-driven and has nothing in the exhaust at all —
                 // that is the whole difference between the two kinds of forced induction, and giving
-                // a supercharged V8 a turbine took 17 dB off it for no reason.
+                // a supercharged V8 a turbine would take 17 dB off it for no reason.
                 Turbine = e.Induction == Induction.Turbocharged
                         ? new Turbine(rate, 2500f, 0.5f, 0.5f) : null,
             };
@@ -252,17 +251,16 @@ internal sealed class ExhaustNetwork
     /// Tells the network where the listener stands, in the machine's frame (x across, y up, z
     /// forward, origin at the exhaust part), so each tailpipe can radiate from its own place.
     ///
-    /// The exhaust used to be one source: every branch's radiated pressure added at a single point.
-    /// That is exactly right for a listener equidistant from every pipe — dead behind the car — and
-    /// systematically wrong everywhere else, because the components that DIFFER between banks are the
-    /// ones a coherent sum destroys. On an even-firing V10 the banks are anti-phase at the bank firing
-    /// rate, so the sum cancelled the engine's fundamental and the ear was handed the next harmonic
-    /// alone: a siren. Measured, order 2.5 read 12-19 dB under order 5 on the sum and level with it
-    /// on one pipe.
+    /// Not one source. Adding every branch's radiated pressure at a single point is exactly right for
+    /// a listener equidistant from every pipe — dead behind the car — and systematically wrong
+    /// everywhere else, because the components that DIFFER between banks are the ones a coherent sum
+    /// destroys. On an even-firing V10 the banks are anti-phase at the bank firing rate, so a single
+    /// sum cancels the engine's fundamental and leaves the next harmonic alone: a siren. Measured,
+    /// order 2.5 reads 12-19 dB under order 5 on the sum and level with it on one pipe.
     ///
-    /// Each branch now gets the path difference its exit implies — the extra distance to the listener
+    /// Each branch gets the path difference its exit implies — the extra distance to the listener
     /// against the nearest pipe, as a delay — and the ratio of spherical spreading, which only matters
-    /// up close. In the far field on the centre line this reduces to the old sum exactly; off it the
+    /// up close. In the far field on the centre line this reduces to the single sum exactly; off it the
     /// two pipes interfere as two sources do, and on a pass-by the balance sweeps with the bearing.
     /// Called a few hundred times a second at most; the delays slew, never step.
     /// </summary>

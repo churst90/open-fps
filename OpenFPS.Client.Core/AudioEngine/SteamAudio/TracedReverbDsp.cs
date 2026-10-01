@@ -67,19 +67,18 @@ internal sealed class TracedReverbState
 /// <summary>
 /// The late tail of the room you are in, rendered as the diffuse field it is.
 ///
-/// Since 2026-09-30: twenty directions, not eight (a dodecahedron, tilted off the game's axes), each
-/// through a velvet-noise branch and straight through its own head response (RenderBinaural) rather
-/// than a second-order soundfield, and each ear made its own above 400 Hz. The notes below on the
-/// encode and decode describe the fallback, OPENFPS_TAIL_AMBISONIC=1.
+/// Twenty directions (a dodecahedron, tilted off the game's axes), each through a velvet-noise
+/// branch and straight through its own head response (RenderBinaural) rather than a second-order
+/// soundfield, and each ear made its own above 400 Hz. The notes below on the encode and decode,
+/// with eight directions, describe the fallback, OPENFPS_TAIL_AMBISONIC=1.
 ///
 /// Steam Audio's parametric reverb, which plays that tail (TracedReverbState.TailEffect), writes
 /// one channel: W, the omnidirectional one. Decoded, one channel is the same signal in both ears,
 /// and a sound that is the same in both ears is heard inside the head, or straight ahead — and it
-/// stays there when the head turns, because there is nothing in it to turn. That was the room
-/// "in front of me no matter where I turn" (2026-09-29), after the placed early reflections had
-/// been put round the head and measured moving with it. Splitting the one channel into two ears
-/// with different all-pass chains (EarDecorrelator) lowered the correlation but not the place: the
-/// two ears' signals were still not anything from anywhere.
+/// stays there when the head turns, because there is nothing in it to turn: the room is in front
+/// of you whichever way you face. Splitting the one channel into two ears with different all-pass
+/// chains (EarDecorrelator) lowers the correlation but not the place: the two ears' signals are
+/// still not anything from anywhere.
 ///
 /// A real late tail is energy arriving from every direction at once, each direction's share a
 /// different signal with the same statistics. That is what is made here: the tail through eight
@@ -102,7 +101,7 @@ internal sealed class TracedReverbState
 /// - Its decoder sums its virtual loudspeakers' head responses, and for a signal that is the SAME in
 ///   all of them — a one-channel W field, or the eight branches below the frequency their all-passes
 ///   can tell apart — that sum is coherent: +10 dB below 300 Hz against unity for a diffuse field.
-///   The old one-channel tail had that ten decibels of bass on it, which is the "boom" of the room.
+///   A one-channel tail through the decoder carries those ten decibels of bass as a boom.
 ///   So the tail's low end, below 300 Hz, does not go through the decoder at all: it is added to both
 ///   ears as it is, which is what a diffuse field is at those frequencies on a head (interaural
 ///   correlation near 1, level equal to the field's). Only the part above goes round the eight
@@ -179,15 +178,15 @@ internal sealed class DiffuseTail
 
     // ── Straight to the ears ─────────────────────────────────────────────────────────────────
     //
-    // The eight directions used to be ENCODED into a second-order soundfield and decoded through the
-    // HRTF like every other field. At second order that decode cannot make two ears independent at
-    // high frequencies: measured, the tail's interaural coherence was 0.60 at 2 kHz and 0.34 at 4 kHz
+    // Not ENCODED into a second-order soundfield and decoded through the HRTF like every other
+    // field. At second order that decode cannot make two ears independent at high frequencies:
+    // measured, the tail's interaural coherence is 0.60 at 2 kHz and 0.34 at 4 kHz
     // where a head in a diffuse field gets under about 0.15 (Zaunschirm et al. 2018, the order-limited
     // binaural decode). Coherent ears put a sound in the middle of the head, over everything. So each
     // direction goes through its OWN binaural effect, the head-related response of exactly that
     // direction, turned into the head's frame every block; the ears are then eight independent
-    // signals through eight different responses, which is what a diffuse field is at a head.
-    // OPENFPS_TAIL_AMBISONIC=1 goes back to the encode and decode.
+    // signals through different responses, which is what a diffuse field is at a head.
+    // OPENFPS_TAIL_AMBISONIC=1 uses the encode and decode instead.
     public static readonly bool Binaural = Environment.GetEnvironmentVariable("OPENFPS_TAIL_AMBISONIC") != "1";
     public readonly IntPtr[] Ears = new IntPtr[DiffuseBranch.Count];
     public Phonon.IPLAudioBuffer EarBuf;
@@ -207,7 +206,7 @@ internal sealed class DiffuseTail
     ///
     /// Twenty independent directions leave the two ears about 1/sqrt(20) alike at high frequencies:
     /// measured 0.2-0.3 from 1 to 4 kHz, where two hundred directions through the same head response
-    /// read 0.03 (--tail-iacc, 2026-09-30) — a real diffuse field is simply different at the two ears
+    /// read 0.03 (--tail-iacc) — a real diffuse field is simply different at the two ears
     /// up there. Two hundred head responses a block is too dear, so above the frequency where this
     /// head's diffuse field stops being alike at both ears (0.70 at 250 Hz, 0.10 at 500) each ear's
     /// half goes through a velvet filter of its own: independent fine structure, the same energy, so
@@ -388,14 +387,14 @@ internal sealed class DiffuseTail
         }
     }
 
-    /// <summary>OPENFPS_DIFFUSE_TAIL=0 goes back to the one channel through the ear decorrelators.</summary>
+    /// <summary>OPENFPS_DIFFUSE_TAIL=0 plays the one channel through the ear decorrelators instead.</summary>
     public static readonly bool Enabled = Environment.GetEnvironmentVariable("OPENFPS_DIFFUSE_TAIL") != "0";
 
     /// <summary>
     /// The directions the tail arrives from: the twenty vertices of a regular dodecahedron round the
-    /// head, in the game's world — as even a spread over the sphere as twenty points get. It was the
-    /// eight corners of a cube, and N independent directions summed at two ears leave a coherence of
-    /// about 1/sqrt(N) at high frequencies: eight measured 0.4-0.6 above 1.2 kHz where a head in a real
+    /// head, in the game's world — as even a spread over the sphere as twenty points get. Not fewer:
+    /// N independent directions summed at two ears leave a coherence of about 1/sqrt(N) at high
+    /// frequencies, and eight (a cube's corners) measured 0.4-0.6 above 1.2 kHz where a head in a real
     /// diffuse field is far lower.
     /// </summary>
     public static System.Numerics.Vector3 Direction(int i) => Dodecahedron[i % Dodecahedron.Length];

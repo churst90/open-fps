@@ -23,9 +23,9 @@ public enum ChatBufferType
 /// a scrollback pane. [ and ] walk the messages in the ring you are in; Shift+[ and Shift+] change
 /// ring. Speaks through <see cref="ISpeechOutput"/>, so it is shared by every client head.
 ///
-/// Messages say which channel they are on; nothing is guessed from the sender's name any more. And
-/// nothing is labelled "System": an answer to your own command is just the answer, and only what the
-/// server says to everybody is "Server".
+/// Each message carries its channel; the ring and the wording come from that, never from the
+/// sender's name. An answer to your own command has no sender and is read as it is; only what the
+/// server says to everybody is prefixed "Server".
 /// </summary>
 public class ChatManager
 {
@@ -67,7 +67,6 @@ public class ChatManager
         ChatChannel.Private when msg.To.Length > 0 => $"Private to {msg.To}: {msg.Text}",
         ChatChannel.Private => $"Private from {msg.Sender}: {msg.Text}",
         ChatChannel.All => $"{msg.Sender} to all: {msg.Text}",
-        ChatChannel.Server when msg.Sender.Length == 0 => msg.Text,
         _ => msg.Sender.Length == 0 ? msg.Text : $"{msg.Sender}: {msg.Text}",
     };
 
@@ -89,9 +88,8 @@ public class ChatManager
 
     /// <summary>
     /// Private messages and the server's answers are spoken whichever ring you are in. Ambient chat
-    /// is not: turning away from it is what a ring is for. What you can never turn away from is the
-    /// game answering a command you just typed — that used to land in a buffer nobody was reading,
-    /// and a refused command sounded exactly like one that worked.
+    /// is not: turning away from it is what a ring is for. The answer to a command you just typed is
+    /// always spoken, or a refused command would sound exactly like one that worked.
     /// </summary>
     private static bool IsAddressedToYou(ChatBufferType ring) => ring is ChatBufferType.Private or ChatBufferType.Server;
 
@@ -108,8 +106,7 @@ public class ChatManager
         => AddMessage(new ChatMessage { Sender = "", Text = text, Channel = ChatChannel.Server });
 
     /// <summary>Something went wrong for you. Filed with the server's answers, and spoken.</summary>
-    public void AddError(string text)
-        => AddMessage(new ChatMessage { Sender = "", Text = text, Channel = ChatChannel.Server });
+    public void AddError(string text) => AddServerMessage(text);
 
     public void CycleBuffer(int direction)
     {

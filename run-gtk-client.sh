@@ -11,12 +11,17 @@
 #   ./run-gtk-client.sh on         the same, plus the acoustic trace, logged to /tmp/openfps-sa-on.log
 #   ./run-gtk-client.sh off        the OLD hand-rolled spatializer + trace, to /tmp/openfps-sa-off.log
 #   ./run-gtk-client.sh capture    as `on`, and tap the mix to /tmp/openfps-capture.wav while it plays
-#   ./run-gtk-client.sh noecho     as `on`, with engine reflections OFF — bisect (DONE: not them)
-#   ./run-gtk-client.sh nophys     as `on`, with machines and aircraft OFF — the next bisect
-#   ./run-gtk-client.sh quiet      both of the above off — the conservative, listenable session
-#   ./run-gtk-client.sh bare       EVERYTHING switchable off — is it the old engine or the new work?
+#   ./run-gtk-client.sh foot       as `on`, every footstep logged as [FOOT], to /tmp/openfps-foot.log
+#   ./run-gtk-client.sh fmodlog    FMOD's logging build (libfmodL.so); `fmodlog all` adds its trace
+#   ./run-gtk-client.sh noecho     as `on`, with engine reflections OFF
+#   ./run-gtk-client.sh nophys     as `on`, with machines and aircraft OFF
+#   ./run-gtk-client.sh quiet      both of the above off
+#   ./run-gtk-client.sh bare       everything switchable off: FMOD panning of positioned sounds only
 #   ./run-gtk-client.sh nohrtf     just the Steam Audio binaural stage off
 #   ./run-gtk-client.sh nosplit    every machine on one voice close up (no front outlet), mix captured
+#
+# noecho, nophys, quiet, bare and nohrtf exist to bisect a fault: take a part of the audio path out
+# and see whether the fault goes with it.
 #
 # `on` and `off` are the two halves of one A/B: walk the same route twice and the two logs sit side by
 # side afterwards, which is why each names its own file instead of overwriting one. The trace is opt-in
@@ -61,8 +66,7 @@ if [ $# -gt 0 ]; then
       # ── FMOD'S OWN LOGGING BUILD ────────────────────────────────────────────────────────────────
       #
       # libfmodL.so validates every call and NAMES what is wrong: a stale handle, an object still
-      # connected, the wrong thread. Three sessions went into reading fault addresses out of core
-      # files to learn things this build prints in a line.
+      # connected, the wrong thread. A core file only gives a fault address.
       #
       # It is a drop-in replacement, so the swap is a file copy — the binding does [DllImport("fmod")]
       # and takes whatever libfmod.so is next to the executable. The original is put back on exit,
@@ -85,12 +89,10 @@ if [ $# -gt 0 ]; then
       shift; [ $# -gt 0 ] && shift ;;
     bare)
       # Everything switchable, switched off: no machines, no aircraft, no engine reflections, no
-      # Steam Audio simulator, no HRTF. What is left is FMOD playing positioned sounds — the ground
-      # the engine stood on before any of this session's work, and before the speedway's.
+      # Steam Audio simulator, no HRTF. What is left is FMOD playing positioned sounds.
       #
-      # If THIS crashes, nothing added recently is responsible and the fault is in the oldest part of
-      # the audio path. If it survives, things come back one at a time and the first one that breaks
-      # it is the answer. Either result is worth more than another reading of the code.
+      # If a fault survives this, it is in the oldest part of the audio path. If it goes, bring the
+      # parts back one at a time and the first one that brings it back is the answer.
       MODE="BARE: no machines/aircraft, no reflections, no Steam Audio sim, no HRTF — FMOD panning only"
       export OPENFPS_AUDIO_DEBUG=1 OPENFPS_MACHINE_VOICES=0 OPENFPS_ENGINE_ECHOES=0 \
              OPENFPS_STEAMAUDIO_SIM=0 OPENFPS_HRTF=0
@@ -105,37 +107,29 @@ if [ $# -gt 0 ]; then
       LOG=/tmp/openfps-nosplit.log
       shift ;;
     nohrtf)
-      # Just the binaural stage out, everything else as normal. The single-variable version of the
-      # above, for once `bare` has said which half the fault is in.
+      # Just the binaural stage out, everything else as normal.
       MODE="Steam Audio binaural OFF (OPENFPS_HRTF=0) — FMOD panning; everything else normal"
       export OPENFPS_AUDIO_DEBUG=1 OPENFPS_HRTF=0
       LOG=/tmp/openfps-nohrtf.log
       shift ;;
     nophys)
-      # The second bisect. Machines and aircraft are the newest thing in the audio engine — a voice
-      # path written this session — and the line before the crash has repeatedly been one of them
-      # starting. This takes all 121 of them out: no air conditioners, no mowers, no aeroplanes.
+      # Every machine and aircraft voice out: no air conditioners, no mowers, no aeroplanes.
       # Everything else is untouched, so the city is still walkable and the traffic still runs.
-      MODE="physical voices OFF (OPENFPS_MACHINE_VOICES=0) — no machines, no aircraft; bisecting the mixer crash"
+      MODE="physical voices OFF (OPENFPS_MACHINE_VOICES=0) — no machines, no aircraft"
       export OPENFPS_AUDIO_DEBUG=1 OPENFPS_MACHINE_VOICES=0
       LOG=/tmp/openfps-nophys.log
       shift ;;
     quiet)
-      # Everything questionable off at once: the fastest way to a session that simply WORKS, so the
-      # city can be listened to while the crash is still open. If this one dies too, the fault is in
-      # ground that has been stable since the speedway.
-      MODE="physical voices AND engine reflections OFF — the conservative session"
+      # Machines, aircraft and engine reflections all off.
+      MODE="physical voices AND engine reflections OFF"
       export OPENFPS_AUDIO_DEBUG=1 OPENFPS_MACHINE_VOICES=0 OPENFPS_ENGINE_ECHOES=0
       LOG=/tmp/openfps-quiet.log
       shift ;;
     noecho)
-      # The bisect for the mixer-thread crash. Engine reflections are the highest-churn object in the
-      # audio system and the only one holding a reference into another voice's ring buffer — 256 of
-      # them were created in 98 seconds on the city. Turning them off is one run that either
-      # implicates them or clears them. A mode rather than an environment variable because a lever
-      # you have to remember is a lever that does not get set, and the last attempt at this ran with
-      # it unset and told us nothing.
-      MODE="engine reflections OFF (OPENFPS_ENGINE_ECHOES=0) — bisecting the mixer crash; walls stop answering cars"
+      # Engine reflections off. They are the highest-churn object in the audio system and the only
+      # one holding a reference into another voice's ring buffer. A mode rather than a bare
+      # environment variable, because a variable you have to remember is one that does not get set.
+      MODE="engine reflections OFF (OPENFPS_ENGINE_ECHOES=0) — walls stop answering cars"
       export OPENFPS_AUDIO_DEBUG=1 OPENFPS_ENGINE_ECHOES=0
       LOG=/tmp/openfps-noecho.log
       shift ;;
@@ -171,14 +165,13 @@ cd "$OUT"                 # cwd so machines/ (loaded relative to cwd) resolves
 # pipeline — signal deaths come back as 128+N, which is the difference between a segfault (139) and a
 # clean quit (0) stated in one number.
 # NOT ON /tmp. It is a tmpfs, it is where every build and every log already lives, and a dump is
-# hundreds of megabytes: the first crash this caught wrote "Error writing data to dump file: No
-# space left on device" and the stack was lost. The dump goes on real disk, which has room.
+# hundreds of megabytes: a full /tmp means "No space left on device" and the stack is lost. The dump
+# goes on real disk, which has room.
 CRASHDIR="${OPENFPS_CRASHDIR:-$HOME/openfps-crashes}"
 mkdir -p "$CRASHDIR"
 # NO raw core file. The runtime's minidump above is the readable one and it goes to real disk; a
 # core as well is a second copy of the same crash, one to two GIGABYTES of it, written into the
-# client's working directory — which is on the tmpfs. Two of them were sitting there unnoticed,
-# taking half the free space, put there by the first version of this line.
+# client's working directory, which is on the tmpfs.
 ulimit -c 0 2>/dev/null || true
 export DOTNET_DbgEnableMiniDump=1
 export DOTNET_DbgMiniDumpType=2                 # heap: big enough to hold the stacks, small enough to write
@@ -202,7 +195,7 @@ fi
 #               never go through Serilog: [SAWORKER], [SASUMMARY], and [createdump]'s account of a
 #               crash. Written by the tee below, so it stops if the terminal does.
 #   $CLIENTLOG  the client's own log, written by the CLIENT. Survives the terminal going away,
-#               which is the whole point: a closed console used to take the process with it.
+#               which is the point: closing the console does not lose the client's log.
 CLIENTLOG="${LOG%.log}-client.log"
 export OPENFPS_LOG="$CLIENTLOG"
 echo "(logging to $LOG; the client also writes its own to $CLIENTLOG)"
@@ -223,8 +216,7 @@ set +e
 STATUS=${PIPESTATUS[0]}
 set -e
 # ALWAYS, not only on failure. A client that exits 0 and one that is killed look identical from the
-# chair — the sound stops — and the first version of this printed nothing for the clean case, so a
-# session that ended without a crash was indistinguishable from one that did.
+# chair (the sound stops), so the clean case is stated too.
 {
     echo ""
     if [ -s "${OPENFPS_FMOD_DEBUG_FILE:-/nonexistent}" ]; then
