@@ -200,16 +200,17 @@ public sealed class DrivingAids
         // as a fraction of full lock — the same law a driver's hands follow toward a point ahead.
         if (AssistEnabled && speed > 1.5f && MathF.Abs(offRoadLine) < AssistWithinDegrees)
         {
-            float wheelbase = 2.6f;
-            if (car.Definition.SoundEmitter.SoundId is { } s2 && s2.StartsWith("engine:", StringComparison.OrdinalIgnoreCase)
-                && MachineRegistry.Knows(s2[7..]))
-            {
-                var prof = MachineRegistry.VehicleFor(s2[7..]);
-                wheelbase = MathF.Max(1.2f, prof.FrontAxleZ - prof.RearAxleZ);
-            }
+            // The car's own wheelbase and lock, from its preset's chassis; a car the client cannot
+            // name is driven as the default chassis would have it.
+            var chassis = car.Definition.SoundEmitter.SoundId is { } s2 && s2.StartsWith("engine:", StringComparison.OrdinalIgnoreCase)
+                          && MachineRegistry.Knows(s2[7..])
+                ? MachineRegistry.VehicleFor(s2[7..]).Running
+                : null;
+            float wheelbase = chassis != null ? MathF.Max(0.5f, chassis.Wheelbase) : DefaultWheelbase;
+            float fullLock = chassis?.MaxSteerAngleRad ?? DefaultLockRadians;
             float alpha = SignedDegrees(forward, aim) * MathF.PI / 180f;
             float steer = MathF.Atan(2f * wheelbase * MathF.Sin(alpha) / MathF.Max(1f, aim.Length()));
-            AssistSteer = Math.Clamp(steer / FullLockRadians, -1f, 1f);
+            AssistSteer = Math.Clamp(steer / fullLock, -1f, 1f);
         }
 
         var (left, rightSide) = LaneGuide.Sides(p, halfWidth);
@@ -354,8 +355,10 @@ public sealed class DrivingAids
         return a < 20f ? "ahead" : a < 70f ? $"ahead to your {side}" : a < 110f ? $"to your {side}" : a < 160f ? $"behind you to the {side}" : "behind you";
     }
 
-    /// <summary>Full lock at the wheels, radians — the server's DrivingSystem.MaxSteerAngle.</summary>
-    private const float FullLockRadians = 0.61f;
+    /// <summary>For a car whose preset the client does not know: the wheelbase and lock of the
+    /// default chassis (ChassisSpec.Default, on the default profile's axles at 1.25 and -1.35 m).</summary>
+    private const float DefaultWheelbase = 2.6f;
+    private static readonly float DefaultLockRadians = new ChassisSpec { Axles = Array.Empty<AxleSpec>() }.MaxSteerAngleRad;
 
     /// <summary>The angle from one direction to another on the ground, degrees; positive is to the right.</summary>
     private static float SignedDegrees(Vector3 from, Vector3 to)

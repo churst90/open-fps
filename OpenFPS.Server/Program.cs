@@ -870,6 +870,9 @@ public class GameServer
                         // its tyres never squealed, however hard it was thrown into a corner.
                         else if (world.Has<DriveComponent>(e))
                             state.TyreDemand = NetworkEntityState.EncodeTyreDemand(world.Get<DriveComponent>(e).TyreDemand);
+                        // Each wheel: its load, slip, speed and the surface under it (WheelDynamics).
+                        if (_vehicles.TryGetWheels(e.Id, out var wheels) || DrivingSystem.TryGetWheels(e.Id, out wheels))
+                            state.Wheels = wheels;
                         if (world.Has<BeaconComponent>(e))
                         {
                             var beacon = world.Get<BeaconComponent>(e);

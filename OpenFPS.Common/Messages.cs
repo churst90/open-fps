@@ -300,6 +300,13 @@ public partial struct EntityState
     /// </summary>
     public byte TyreDemand;
 
+    /// <summary>
+    /// Each wheel of a vehicle, front axle first and left before right; null for anything without
+    /// wheels. What the server's wheel model (WheelDynamics) worked out this tick: the load on it,
+    /// its slip, how fast it turns and what it is standing on. Eight bytes a wheel.
+    /// </summary>
+    public WheelState[]? Wheels;
+
     public EntityState()
     {
         EntityId = 0;
@@ -313,6 +320,42 @@ public partial struct EntityState
 
     public static byte EncodeTyreDemand(float fraction)
         => (byte)Math.Clamp((int)MathF.Round(fraction * 127.5f), 0, 255);
+}
+
+/// <summary>
+/// One wheel on the wire, quantised. An unmanaged struct, copied as its eight bytes.
+/// </summary>
+public struct WheelState
+{
+    /// <summary>Normal load, decanewtons (to 655 kN).</summary>
+    public ushort LoadDaN;
+    /// <summary>Angular speed, 1/50 rad/s (to 655 rad/s), forward positive.</summary>
+    public short AngularSpeed;
+    /// <summary>Slip ratio, -1..1 in 1/127ths.</summary>
+    public sbyte SlipRatio;
+    /// <summary>Slip angle, -0.5..0.5 rad in 1/254ths of a radian.</summary>
+    public sbyte SlipAngle;
+    /// <summary>The surface under it, an index into <see cref="OpenFPS.Common.RoadSurfaces"/>.</summary>
+    public byte Surface;
+    /// <summary>Its share of its grip in use, 0..2 with 1 the limit, as <see cref="EntityState.TyreDemand"/>.</summary>
+    public byte Demand;
+
+    public float LoadNewtons => LoadDaN * 10f;
+    public float AngularSpeedRadPerSec => AngularSpeed / 50f;
+    public float SlipRatioValue => SlipRatio / 127f;
+    public float SlipAngleRad => SlipAngle / 254f;
+    public float DemandFraction => Demand / 127.5f;
+
+    public static WheelState Encode(float loadNewtons, float angularSpeed, float slipRatio, float slipAngle, byte surface, float demand)
+        => new()
+        {
+            LoadDaN = (ushort)Math.Clamp((int)MathF.Round(loadNewtons / 10f), 0, ushort.MaxValue),
+            AngularSpeed = (short)Math.Clamp((int)MathF.Round(angularSpeed * 50f), short.MinValue, short.MaxValue),
+            SlipRatio = (sbyte)Math.Clamp((int)MathF.Round(slipRatio * 127f), -127, 127),
+            SlipAngle = (sbyte)Math.Clamp((int)MathF.Round(slipAngle * 254f), -127, 127),
+            Surface = surface,
+            Demand = EntityState.EncodeTyreDemand(demand),
+        };
 }
 
 /// <summary>

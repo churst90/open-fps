@@ -307,7 +307,10 @@ public static class VehicleSynth
     /// caller's own gain; zero or less keeps the old unanchored rolling level, which the aircraft's
     /// wheels still use.
     /// </param>
-    public static float Tyre(TyreProfile t, float speed, float slip, Random rng, ref TyreVoice v, float rollingPa = 0f)
+    /// <param name="rollingRadius">The tyre's rolling radius, metres, which sets how fast its tread
+    /// blocks pass. The aircraft's wheels, which declare none, keep the 0.337 m of a 255/40R19.</param>
+    public static float Tyre(TyreProfile t, float speed, float slip, Random rng, ref TyreVoice v, float rollingPa = 0f,
+                             float rollingRadius = 0.337f)
     {
         // The demand is smoothed, and asymmetrically: a tyre lets go quickly and settles slowly, so
         // a squeal starts on the instant and dies away over a couple of hundred milliseconds. Stepping
@@ -329,7 +332,7 @@ public static class VehicleSynth
         float tone = 0f;
         if (t.TreadBlocks > 0)
         {
-            float blockHz = speed / (2f * MathF.PI * 0.337f) * t.TreadBlocks;
+            float blockHz = speed / (2f * MathF.PI * MathF.Max(0.05f, rollingRadius)) * t.TreadBlocks;
             v.TreadPhase += 2.0 * Math.PI * blockHz / SampleRate;
             if (v.TreadPhase > 2.0 * Math.PI) v.TreadPhase -= 2.0 * Math.PI;
             tone = (float)(Math.Sin(v.TreadPhase) * 0.34 + Math.Sin(v.TreadPhase * 2) * 0.16);

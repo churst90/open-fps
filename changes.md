@@ -2,6 +2,23 @@
 
 Recent work, newest first. `git log` has the rest.
 
+## 2026-10-01
+
+- Vehicles stand on their wheels (stage 3 of docs/NEXT_BODIES_WHEELS_ROADS.md). Every preset declares
+  its running gear from a real vehicle: tyre sizes, tracks, which wheels drive, steer and brake,
+  weight split, centre of gravity height and the lock from its turning circle (`RunningGear.cs`, with
+  sources). Each wheel's load moves with braking and cornering, and its force comes from the Magic
+  Formula with load sensitivity and a friction circle.
+- City traffic is steered along its lanes by a driver and moves under its tyres, instead of being
+  placed on the line pointing along it. It takes a bend no faster than the bend really is and than
+  keeps its tyres quiet, and pulls away out of a bend with what the cornering leaves. Racers on the
+  speedway stay on their line as before.
+- Your own car runs on the same wheels.
+- Each wheel's load, slip, speed and surface go to the client. The tyre tone uses the tyre's real
+  rolling radius (it assumed 0.337 m for everything), and the front and rear tyre voices squeal by
+  how hard their own axle is working. Rebuild client and server together and restart the server: the
+  entity state on the wire has a new field.
+
 ## 2026-09-30
 
 - Mixer safety. A DSP callback with nothing to render writes silence instead of leaving the

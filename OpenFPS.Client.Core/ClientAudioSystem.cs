@@ -2307,6 +2307,7 @@ public class ClientAudioSystem
             // that reads 1.43 to 1.59 against a full-slide threshold of 1.45, so every car in every
             // corner would render pure broadband skid, a white-noise tail travelling with the field.
             TyreSlip = snap.TyreDemand,
+            Wheels = snap.Wheels,
 
             // Synthesis mapping
             IsGranular = def.SoundEmitter.IsGranular,

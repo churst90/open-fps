@@ -1,3 +1,4 @@
+using OpenFPS.Common;
 using OpenFPS.Server.Repositories;
 
 namespace OpenFPS.Server.Systems;
@@ -82,9 +83,21 @@ public sealed partial class VehicleSystem
             if (v.MapId != mapId || v.Line == null || !InLane(v) || !world.IsAlive(v.Entity)) continue;
             var t = world.Get<OpenFPS.Common.Components.Transform>(v.Entity);
             v.Line.Sample(v.Lap, out _, out float heading, out _);
+            if (v.Driver != null) heading += v.Driver.HeadingError;
             string kind = v.Stops.Length > 0 ? v.Stops[v.NextStop].Kind : "";
             yield return (v.DisplayName, v.Preset, t.Position, heading, v.LengthMetres, v.Speed, v.Laps, v.Route != null, kind, v.DwellLeft > 0f);
         }
+    }
+
+    /// <summary>Tests: every vehicle on its wheels, with the driver steering it (null where it is held
+    /// to its line).</summary>
+    internal IEnumerable<(string Name, string Preset, float Speed, float Lap, float TyreDemand, WheelDynamics Wheels, LineFollower? Driver,
+                          Arch.Core.Entity Entity, RaceLine? Line, float CorneringG, float KerbShift)>
+        WheelsForTest(string mapId)
+    {
+        foreach (var v in _vehicles)
+            if (v.MapId == mapId && v.Wheels != null)
+                yield return (v.DisplayName, v.Preset, v.Speed, v.Lap, v.TyreDemand, v.Wheels, v.Driver, v.Entity, v.Line, v.CorneringG, v.KerbShift);
     }
 
     /// <summary>Tests: every lane's vehicles in order, with their positions round it.</summary>

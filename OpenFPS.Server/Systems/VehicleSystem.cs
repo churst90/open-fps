@@ -146,11 +146,25 @@ public sealed partial class VehicleSystem
         /// <summary>The crossing it is stopping for this tick, if any.</summary>
         public Crosswalk? StoppingFor;
         public float CrosswalkWait;
+
+        /// <summary>The vehicle on its wheels (WheelDynamics), for anything with a chassis; null for
+        /// aircraft, machines and people.</summary>
+        public WheelDynamics? Wheels;
+        /// <summary>The driver steering it along its line, for a vehicle on the roads: its body moves
+        /// under its tyres. Null where the body is held to its line (a racing line, a shuttle) and
+        /// the wheels only report what holding it there asks of them.</summary>
+        public LineFollower? Driver;
+        /// <summary>The wheels as last sent, rewritten every tick.</summary>
+        public OpenFPS.Common.Networking.WheelState[]? WireWheels;
+        /// <summary>For a vehicle a driver steers: the fastest it takes a steady turn of a curvature
+        /// without its tyres starting to sing (WheelDynamics.SteadyTurnSpeed at the squeal onset).</summary>
+        public Func<float, float>? CornerSpeed;
     }
 
     private enum State { Waiting, Driving, Turning }
 
     private readonly List<DemoVehicle> _vehicles = new();
+    private readonly Dictionary<int, DemoVehicle> _byEntity = new();
     /// <summary>Walking pairs already given their first member's voice.</summary>
     private readonly HashSet<(string, string)> PairSeen = new();
 
@@ -228,6 +242,7 @@ public sealed partial class VehicleSystem
                 // A vehicle that names a track laps it; one that does not shuttles its road.
                 RaceLine? line = null;
                 LaneRoute? route = null;
+                float corneringG = vd.CorneringG > 0 ? vd.CorneringG : 1.0f;
                 float accel = vd.AccelerationMps2 > 0 ? vd.AccelerationMps2 : 3.2f;
                 float brake = vd.BrakingMps2 > 0 ? vd.BrakingMps2 : 5.5f;
                 if (!string.IsNullOrEmpty(vd.Track))
@@ -257,6 +272,14 @@ public sealed partial class VehicleSystem
                     if (route == null) continue;
                     float topSpeed = (vd.TopSpeedKmh > 0 ? vd.TopSpeedKmh : 200f) / 3.6f;
                     float grip = vd.CorneringG > 0 ? vd.CorneringG : 1.0f;
+                    // On its own tyres a driver corners no harder than keeps them quiet: the steady
+                    // turn in which the most-worked tyre reaches its squeal onset, from its chassis.
+                    if (profile != null)
+                    {
+                        var tyres = new WheelDynamics(profile, vd.GripG > 0 ? vd.GripG : grip);
+                        corneringG = MathF.Min(grip, tyres.SteadyLateralLimit(TyreFriction.SquealOnset) / WheelDynamics.G);
+                        grip = corneringG;
+                    }
                     line = new RaceLine(route.Points, 0f, topSpeed, grip, brake, 0f, LaneLimits(route));
                 }
 
@@ -362,7 +385,7 @@ public sealed partial class VehicleSystem
                     DisplayName = display,
                     // The friction circle, which is NOT the cornering number unless the map says so.
                     Grip = vd.GripG > 0 ? vd.GripG : (vd.CorneringG > 0 ? vd.CorneringG : 1.0f),
-                    CorneringG = vd.CorneringG > 0 ? vd.CorneringG : 1.0f,
+                    CorneringG = corneringG,
                 };
 
                 // Where this vehicle stops on its route. A stop names who uses it — a bus stop is
@@ -410,6 +433,22 @@ public sealed partial class VehicleSystem
                 }
                 v.Preset = vd.Preset;
                 v.IsWalker = isWalker;
+                if (profile != null)
+                {
+                    v.Wheels = new WheelDynamics(profile, v.Grip) { ForwardOnly = true };
+                    v.WireWheels = new OpenFPS.Common.Networking.WheelState[v.Wheels.Wheels.Length];
+                    if (route != null)
+                    {
+                        v.Wheels.Modulated = true;
+                        var body = v.Wheels;
+                        // A driver takes a bend no faster than keeps the tyres quiet: ordinary
+                        // driving does not make them squeal.
+                        v.CornerSpeed = k => body.SteadyTurnSpeed(k, TyreFriction.SquealOnset);
+                        v.Driver = new LineFollower(v.Wheels);
+                        v.Driver.Place(0f);
+                        v.Wheels.Vx = v.Speed;
+                    }
+                }
                 v.TrackId = vd.Track ?? "";
                 v.LaneOffset = vd.LaneOffsetMetres;
                 if (profile != null) v.LengthMetres = profile.LengthMetres;
@@ -418,6 +457,7 @@ public sealed partial class VehicleSystem
                 if (v.OnStreet) v.DriverVoice = PedestrianSpeech.NextDriverVoice(mapId);
                 if (data.StreetLife != null) _streetLife[mapId] = data.StreetLife;
                 _vehicles.Add(v);
+                _byEntity[e.Id] = v;
                 if (line != null)
                     Log.Information("Map {Map}: {Name} (entity {Id}) laps '{Track}' — {Length:F0} m lap, {Min:F0}-{Max:F0} km/h, starting {At:F0} m round",
                                     mapId, display, e.Id, vd.Track, line.Length, line.MinSpeed * 3.6f, line.MaxSpeed * 3.6f, vd.StartOffsetMetres);
@@ -564,6 +604,14 @@ public sealed partial class VehicleSystem
             }
             t.Rotation = Quaternion.CreateFromYawPitchRoll(v.Heading, 0f, 0f);
             t.IsDirty = true;
+            if (v.Wheels != null)
+            {
+                // A shuttle runs a straight road: the wheels carry its braking and pulling away, and
+                // nothing sideways.
+                v.Wheels.Hold(v.Speed, dt > 0f ? (v.Speed - v.Wheels.Vx) / dt : 0f, 0f);
+                v.TyreDemand = MathF.Min(2f, v.Wheels.MaxDemand);
+                EncodeWheels(v);
+            }
             if (world.Has<VehicleComponent>(v.Entity))
             {
                 ref var vc = ref world.Get<VehicleComponent>(v.Entity);
@@ -609,9 +657,10 @@ public sealed partial class VehicleSystem
                 v.DwellLeft = _crossings.IsClosedAt(v.MapId, gate) ? 1f : 0f;
             }
             v.DwellLeft -= dt;
-            v.Speed = 0f;
+            Halt(v);
             vel.Linear = Vector3.Zero;
             line.Sample(v.Lap, out Vector3 at, out float hdg, out _);
+            if (v.Driver != null) v.Driver.Pose(line, v.Lap, out at, out hdg);
             t.Position = at;
             t.Rotation = Quaternion.CreateFromYawPitchRoll(hdg, 0f, 0f);
             t.IsDirty = true;
@@ -627,6 +676,10 @@ public sealed partial class VehicleSystem
         line.Sample(v.Lap, out Vector3 here, out float heading, out _, out float cornerLimit);
         // The slowest of the whole stretch ahead, not its far end: see RaceLine.SlowestWithin.
         float want = line.SlowestWithin(v.Lap, lookahead);
+        // Steering itself round on its tyres, it has to take the bends the line really makes.
+        // It looks twice its straight-line braking distance ahead, because braking beside cornering
+        // sheds less.
+        if (v.Driver != null) want = MathF.Min(want, line.BendSpeedWithin(v.Lap, 2f * lookahead, v.CorneringG, v.Brake, v.CornerSpeed));
 
         // ── Coming up on one ───────────────────────────────────────────────────────────────────
         //
@@ -660,7 +713,7 @@ public sealed partial class VehicleSystem
             v.KerbShift = pk.Spot.Shift * Math.Clamp(1f - (toPark - 2f) / 22f, 0f, 1f);
             if (toPark <= 0.6f && CanHalt(v.Speed, brake, dt))
             {
-                v.Speed = 0f;
+                Halt(v);
                 vel.Linear = Vector3.Zero;
                 pk.Phase = ParkPhase.Parked;
                 pk.Clock = 0f;
@@ -689,7 +742,7 @@ public sealed partial class VehicleSystem
         if (toHold < float.MaxValue)
         {
             want = MathF.Min(want, MathF.Sqrt(2f * v.Brake * toHold));
-            if (toHold <= 0.3f && CanHalt(v.Speed, v.Brake, dt)) { v.Speed = 0f; vel.Linear = Vector3.Zero; return; }
+            if (toHold <= 0.3f && CanHalt(v.Speed, v.Brake, dt)) { Halt(v); vel.Linear = Vector3.Zero; return; }
         }
 
         // ── Somebody on a crossing ahead ───────────────────────────────────────────────────────
@@ -697,7 +750,7 @@ public sealed partial class VehicleSystem
         if (toCrosswalk < float.MaxValue)
         {
             want = MathF.Min(want, MathF.Sqrt(2f * v.Brake * toCrosswalk));
-            if (toCrosswalk <= 0.3f && CanHalt(v.Speed, v.Brake, dt)) { v.Speed = 0f; vel.Linear = Vector3.Zero; return; }
+            if (toCrosswalk <= 0.3f && CanHalt(v.Speed, v.Brake, dt)) { Halt(v); vel.Linear = Vector3.Zero; return; }
         }
 
         float toStop = DistanceToNextStop(v, line);
@@ -707,16 +760,49 @@ public sealed partial class VehicleSystem
             if (toStop <= 0.6f && CanHalt(v.Speed, v.Brake, dt))
             {
                 v.DwellLeft = MathF.Max(0.5f, v.Stops[v.NextStop].Dwell);
-                v.Speed = 0f;
+                Halt(v);
                 vel.Linear = Vector3.Zero;
                 return;
             }
         }
 
         float wasSpeed = v.Speed;
-        if (want > v.Speed) v.Speed = MathF.Min(want, v.Speed + v.Accel * dt);
+        float accel = v.Accel;
+        // In a bend on its own tyres, the driver pulls away only with what the cornering leaves of
+        // its friction circle (see RaceLine.BendSpeedWithin, which plans the braking the same way).
+        if (v.Driver != null)
+        {
+            float lateral = v.Speed * v.Speed * MathF.Abs(line.CurvatureAt(v.Lap));
+            float budget = v.CorneringG * WheelDynamics.G;
+            accel = MathF.Min(accel, MathF.Sqrt(MathF.Max(0f, budget * budget - lateral * lateral)));
+        }
+        if (want > v.Speed) v.Speed = MathF.Min(want, v.Speed + accel * dt);
         else v.Speed = MathF.Max(want, v.Speed - brake * dt);
         Follow(v, wasSpeed, dt);
+
+        // ── On the roads: steered, on its tyres ─────────────────────────────────────────────────
+        //
+        // The speed decided above is what the driver WANTS at the end of this tick. The driver
+        // steers for the lane (and the kerb, pulling in), asks the tyres for that speed, and gets
+        // what they give: the body moves under its tyres and where it ends up is read back against
+        // the line.
+        if (v.Driver != null)
+        {
+            SurfaceUnder(v);
+            float gained = v.Driver.Drive(line, v.Lap, v.Speed, v.KerbShift, dt);
+            var body = v.Wheels!;
+            v.Speed = body.Vx;
+            v.TyreDemand = MathF.Min(2f, body.MaxDemand);
+            Advance(v, line, gained);
+            v.Driver.Pose(line, v.Lap, out here, out heading);
+            t.Position = here;
+            t.Rotation = Quaternion.CreateFromYawPitchRoll(heading, 0f, 0f);
+            t.IsDirty = true;
+            var fwd = new Vector3(MathF.Sin(heading), 0f, MathF.Cos(heading));
+            vel.Linear = fwd * body.Vx + RightOf(heading) * body.Vy;
+            EncodeWheels(v);
+            return;
+        }
 
         // What the tyres are being asked for, as a fraction of what they have.
         //
@@ -751,16 +837,92 @@ public sealed partial class VehicleSystem
         float longFraction = v.Grip > 0.01f ? MathF.Abs(v.Speed - wasSpeed) / MathF.Max(1e-4f, dt) / (v.Grip * 9.81f) : 0f;
         v.TyreDemand = MathF.Min(2f, MathF.Sqrt(latFraction * latFraction + longFraction * longFraction));
 
-        float before = v.Lap;
-        v.Lap += v.Speed * dt;
-        if (v.Lap >= line.Length) { v.Lap -= line.Length; v.Laps++; }
-        else if (before > v.Lap) v.Laps++;
+        Advance(v, line, v.Speed * dt);
 
         line.Sample(v.Lap, out here, out heading, out _);
         t.Position = here + (v.KerbShift != 0f ? RightOf(heading) * v.KerbShift : Vector3.Zero);
         t.Rotation = Quaternion.CreateFromYawPitchRoll(heading, 0f, 0f);
         t.IsDirty = true;
         vel.Linear = new Vector3(MathF.Sin(heading), 0f, MathF.Cos(heading)) * v.Speed;
+        if (v.Wheels != null)
+        {
+            HoldWheels(v, line, (v.Speed - wasSpeed) / MathF.Max(1e-4f, dt));
+            EncodeWheels(v);
+        }
+    }
+
+    /// <summary>Moves a vehicle along its line, counting the laps.</summary>
+    private static void Advance(DemoVehicle v, RaceLine line, float metres)
+    {
+        float before = v.Lap;
+        v.Lap += metres;
+        if (v.Lap >= line.Length) { v.Lap -= line.Length; v.Laps++; }
+        else if (v.Lap < 0f) v.Lap += line.Length;
+        else if (before > v.Lap) v.Laps++;
+    }
+
+    /// <summary>Brought to rest where it is: the speed the logic reads and the body under it.</summary>
+    private static void Halt(DemoVehicle v)
+    {
+        v.Speed = 0f;
+        v.Wheels?.Halt();
+    }
+
+    /// <summary>
+    /// The wheels of a vehicle held to its racing line: the loads and slips that holding the line
+    /// at this speed asks of them, banking included. In the plane of a surface banked by theta
+    /// toward the inside of the turn, a car cornering at a = v^2 k needs a cos(theta) - g sin(theta)
+    /// from its tyres and is pressed into the road by g cos(theta) + a sin(theta): the balance
+    /// <see cref="RaceLine"/> already sets its corner speeds by.
+    /// </summary>
+    private static void HoldWheels(DemoVehicle v, RaceLine line, float accel)
+    {
+        float k = line.CurvatureAt(v.Lap);
+        float centripetal = v.Speed * v.Speed * MathF.Abs(k);
+        // The line banks any curve; the last few metres of curvature on a straight are not a turn.
+        float bank = MathF.Abs(k) > 1f / 2000f ? line.BankingDegrees * MathF.PI / 180f : 0f;
+        float inPlane = centripetal * MathF.Cos(bank) - WheelDynamics.G * MathF.Sin(bank);
+        float normal = WheelDynamics.G * MathF.Cos(bank) + centripetal * MathF.Sin(bank);
+        v.Wheels!.Hold(v.Speed, accel, MathF.Sign(k) * inPlane, normal);
+    }
+
+    /// <summary>The road under each wheel of a vehicle on the roads, from the road's surface data.</summary>
+    private static void SurfaceUnder(DemoVehicle v)
+    {
+        var body = v.Wheels!;
+        if (v.Route == null) return;
+        var (leg, along) = v.Route.LegAt(v.Lap * v.RouteScale);
+        var seg = v.Route.Legs[leg].Segment;
+        for (int i = 0; i < body.Wheels.Length; i++)
+        {
+            ref var w = ref body.Wheels[i];
+            float at = along + w.X;
+            // In the junction, before the lane starts or past its end: the junction's own surface.
+            string material = at < 0f || at > seg.LengthMetres
+                ? RoadData.DefaultSurface
+                : RoadNetwork.SurfaceAt(seg.Road, seg.StartAlongRoad + seg.Lane.Direction * at);
+            w.Surface = RoadSurfaces.IndexOf(material);
+            w.SurfaceGrip = RoadSurfaces.GripOf(w.Surface);
+        }
+    }
+
+    /// <summary>The wheels as the wire carries them.</summary>
+    private static void EncodeWheels(DemoVehicle v)
+    {
+        var body = v.Wheels!;
+        var wire = v.WireWheels!;
+        for (int i = 0; i < wire.Length; i++)
+        {
+            ref var w = ref body.Wheels[i];
+            wire[i] = OpenFPS.Common.Networking.WheelState.Encode(w.Load, w.AngularSpeed, w.SlipRatio, w.SlipAngle, w.Surface, w.Demand);
+        }
+    }
+
+    /// <summary>A vehicle's wheels as last worked out, or false for anything without them.</summary>
+    public bool TryGetWheels(int entityId, out OpenFPS.Common.Networking.WheelState[]? wheels)
+    {
+        wheels = _byEntity.TryGetValue(entityId, out var v) ? v.WireWheels : null;
+        return wheels != null;
     }
 
     /// <summary>
@@ -831,8 +993,7 @@ public sealed partial class VehicleSystem
     /// that is not one of ours.</summary>
     public bool TryGetTyreDemand(int entityId, out float demand)
     {
-        foreach (var v in _vehicles)
-            if (v.Entity.Id == entityId) { demand = v.TyreDemand; return true; }
+        if (_byEntity.TryGetValue(entityId, out var v)) { demand = v.TyreDemand; return true; }
         demand = 0f;
         return false;
     }

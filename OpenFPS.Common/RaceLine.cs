@@ -67,6 +67,9 @@ public sealed class RaceLine
     /// cornering grip, and a formula that cannot tell those apart reports it as sliding.</summary>
     private readonly float[] _corner;
     private readonly float[] _heading;         // radians, the way the line points at each node
+    /// <summary>Signed curvature at each node, 1/m, positive turning right (the way heading rises):
+    /// the heading's change across the neighbouring segments over the distance between their middles.</summary>
+    private readonly float[] _curvature;
 
     /// <summary>
     /// Arc length from node 0 to each node, with the closing segment as the last entry, so
@@ -90,6 +93,10 @@ public sealed class RaceLine
     /// teleporting forward across the seam. The speed was never wrong; only where the car was.
     /// </summary>
     private readonly float[] _arc;
+
+    /// <summary>The bank of the turns, degrees, as the line was built with: the surface tilts toward
+    /// the inside of every curve by this much.</summary>
+    public float BankingDegrees { get; }
 
     /// <summary>Total length of the lap, metres.</summary>
     public float Length { get; }
@@ -115,6 +122,8 @@ public sealed class RaceLine
         _heading = new float[n];
         _limit = new float[n];
         _corner = new float[n];
+        _curvature = new float[n];
+        BankingDegrees = bankingDegrees;
 
         // Offset sideways onto this car's line. The normal is the tangent turned 90 degrees in the
         // ground plane, so a positive offset is to the car's right.
@@ -145,6 +154,14 @@ public sealed class RaceLine
                                                   : CorneringSpeed(radius, corneringG, bankingDegrees);
             _limit[i] = MathF.Min(topSpeed, float.IsInfinity(radius) ? topSpeed : _corner[i]);
             if (speedCapAt != null) _limit[i] = MathF.Min(_limit[i], MathF.Max(0.5f, speedCapAt(_points[i])));
+        }
+
+        for (int i = 0; i < n; i++)
+        {
+            int p = (i - 1 + n) % n;
+            float turn = MathF.IEEERemainder(_heading[i] - _heading[p], 2f * MathF.PI);
+            float span = 0.5f * (_arc[i + 1] - _arc[i] + (p == n - 1 ? _arc[n] - _arc[n - 1] : _arc[p + 1] - _arc[p]));
+            _curvature[i] = span > 1e-4f ? turn / span : 0f;
         }
 
         // Braking, backwards, twice round — the second lap carries the wrap-around back to the start.
@@ -202,6 +219,84 @@ public sealed class RaceLine
         // take the finite answer rather than produce a NaN.
         float a = _corner[i], b = _corner[j];
         corneringLimit = float.IsInfinity(a) ? b : float.IsInfinity(b) ? a : a + (b - a) * f;
+    }
+
+    /// <summary>Signed curvature at a distance round the lap, 1/m, positive turning right.</summary>
+    public float CurvatureAt(float distance)
+    {
+        float s = distance % Length;
+        if (s < 0f) s += Length;
+        Locate(s, out int i, out float f);
+        int j = (i + 1) % _points.Length;
+        // A node's curvature belongs to the joint at it; between joints the line is straight, so
+        // spread each joint's turn over the segments either side.
+        return _curvature[i] + (_curvature[j] - _curvature[i]) * f;
+    }
+
+    /// <summary>
+    /// The fastest a car may be going now to take every bend in the next <paramref name="span"/>
+    /// metres with no more than <paramref name="corneringG"/> on its tyres, braking at up to
+    /// <paramref name="brake"/> to reach each, from the line's own curvature node by node.
+    ///
+    /// The g is a budget for braking and cornering together — the friction circle a driver keeps
+    /// inside, as a racing line's speed profile is built (Milliken and Milliken, Race Car Vehicle
+    /// Dynamics, 1995, chapter 2): v_c = sqrt(mu g / |k|) at each node, and coming back from the
+    /// furthest node toward the car the speed may rise by the braking the circle leaves beside the
+    /// cornering there, sqrt((mu g)^2 - (v^2 k)^2), no more than the brake. So the braking is done
+    /// before the bend, not in it.
+    ///
+    /// Not the same as the speed profile. That measures each corner's radius across a long baseline
+    /// (<see cref="CurvatureSpan"/>) so a coarsely drawn circuit is not read as a string of kinks, and
+    /// on a circuit that is right; but a junction turn on a town street is a few metres of radius, and
+    /// a forty-metre baseline reads it as a gentle bend. A car held to the line never noticed. A car
+    /// steering itself round it on its own tyres has to take the bend the line actually makes.
+    /// </summary>
+    /// <param name="cornerSpeed">The vehicle's own fastest speed round a steady turn of a curvature,
+    /// if it knows it (WheelDynamics.SteadyTurnSpeed); the lower of that and the cornering budget
+    /// holds at each node.</param>
+    public float BendSpeedWithin(float distance, float span, float corneringG, float brake, Func<float, float>? cornerSpeed = null)
+    {
+        float s = distance % Length;
+        if (s < 0f) s += Length;
+        Locate(s, out int i, out _);
+        int n = _points.Length;
+        float muG = MathF.Max(0.01f, corneringG) * 9.81f;
+
+        // The nodes ahead within the span, and how far each is.
+        Span<int> nodes = stackalloc int[64];
+        Span<float> at = stackalloc float[64];
+        int count = 0;
+        float ahead = _arc[i + 1] - s;
+        for (int k = 1; k <= n && ahead <= span && count < nodes.Length; k++)
+        {
+            int node = (i + k) % n;
+            nodes[count] = node; at[count] = ahead; count++;
+            int after = node + 1 <= n ? node + 1 : n;
+            ahead += _arc[after] - _arc[node];
+        }
+
+        // Backwards from the furthest: each node's limit, and what can still be shed before it,
+        // ending at the car (distance nought, the curvature of the node it is past).
+        float v = float.PositiveInfinity, beyond = 0f;
+        for (int c = count - 1; c >= -1; c--)
+        {
+            int node = c >= 0 ? nodes[c] : i;
+            float here = c >= 0 ? at[c] : 0f;
+            float curve = MathF.Abs(_curvature[node]);
+            if (float.IsFinite(v))
+            {
+                float lateral = v * v * curve;
+                float room = MathF.Min(brake, MathF.Sqrt(MathF.Max(0f, muG * muG - lateral * lateral)));
+                v = MathF.Sqrt(v * v + 2f * room * (beyond - here));
+            }
+            if (curve > 1e-5f)
+            {
+                v = MathF.Min(v, MathF.Sqrt(muG / curve));
+                if (cornerSpeed != null) v = MathF.Min(v, cornerSpeed(curve));
+            }
+            beyond = here;
+        }
+        return v;
     }
 
     /// <summary>

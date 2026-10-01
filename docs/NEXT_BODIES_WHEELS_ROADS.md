@@ -40,11 +40,11 @@ the default so nothing changes until a preset says otherwise.
 
 | Where | Value | Becomes |
 |---|---|---|
-| `VehicleSynth.cs:332` | wheel radius 0.337 m | the preset's tyre size |
-| `EngineProcessor.cs:545` | front tyres = 1 if 2 or fewer | the preset's axle list |
-| `EngineProcessor.cs:526` | drum brakes above 5 t | the preset's brake type |
-| `DrivingSystem.cs` | steering lock 0.61 rad, ground clearance 0.35 m, engine braking 0.15 | preset fields |
-| `DrivingAids.cs:203` | wheelbase fallback 2.6 m | the preset's axles |
+| `VehicleSynth.cs:332` | wheel radius 0.337 m | the preset's tyre size (done, stage 3) |
+| `EngineProcessor.cs:545` | front tyres = 1 if 2 or fewer | the preset's axle list (done, stage 3) |
+| `EngineProcessor.cs:526` | drum brakes above 5 t | the preset's brake type (done, stage 3) |
+| `DrivingSystem.cs` | steering lock 0.61 rad, ground clearance 0.35 m, engine braking 0.15 | preset fields (lock done, stage 3) |
+| `DrivingAids.cs:203` | wheelbase fallback 2.6 m | the preset's axles (done, stage 3) |
 | `VehicleSystem.cs:183-184` | machine hull 0.6 x 1.0 x 0.9, walker 0.5 x 1.8 x 0.5 | the body's own data |
 | `VehicleSystem.cs:196-197, 300, 308` | default accel/brake, speeds, turn time | preset or map fields |
 | `VehicleSystem.Parking.cs:69, 323` | walk speed 1.35 m/s, driver body 0.5 x 1.75 x 0.35 | one person definition |
@@ -111,6 +111,29 @@ Surface    { FromMetres, ToMetres, Material, Texture (joints, cobbles, manhole c
   still pass.
 
 ## Stage 3: per-wheel physics
+
+Progress (2026-10-01): built. Every preset declares its running gear (`OpenFPS.Common/RunningGear.cs`,
+one real vehicle each, sources in the comments): axles with track, tyre size code, driven, steered
+and brake type, the front weight share, centre of gravity height, yaw inertia index and a lock from
+the published turning circle. Where no figure is published a measured vehicle of the same class
+stands in (mostly Heydinger et al. 1999, the NHTSA inertial measurements), and a few are marked to
+confirm (the bus and truck centre of gravity heights, the NASCAR and F1 weight splits). The wheel model
+is `OpenFPS.Common/WheelDynamics.cs`: planar body, per-wheel loads with longitudinal and lateral
+transfer (lateral split by axle load: no roll stiffness is published for these vehicles), the Magic
+Formula with the 205/60R15 coefficients from Pacejka's book, load sensitivity, a friction circle for
+combined slip, and wheel speed from the rolling radius. Traffic on the roads is steered by a driver
+(`LineFollower.cs`, the Stanley law with curvature and sideslip fed forward) and its body moves under
+its tyres; its speed still comes from the old logic, now also held to the bends the line really makes
+and to what keeps its tyres below the squeal onset (`WheelDynamics.SteadyTurnSpeed`). Racers on a
+track stay held to their line: their grip figures (3.1 g slicks, 2.6 g for the formula car) stand in
+for banking and downforce the model does not have, so their wheels report what holding the line asks
+(`WheelDynamics.Hold`, banking included) and their tyre demand is the line's, as before. The player's
+car runs on the same model. Each wheel goes to the client (`EntityState.Wheels`); the tyre voices take
+their tread tone from the real rolling radius and share the squeal between the axles by their worst
+wheels. Checked by `WheelDynamicsTests` and `TrafficWheelsTests`. Open: turning paths on the 7 m
+estate roads still put a body corner over the kerb, and it is the route geometry (a body held exactly
+on its line does it too); the lane connectors through a junction need a kerb-aware radius. Next:
+stage 4.
 
 On the server, for every vehicle, from the preset:
 

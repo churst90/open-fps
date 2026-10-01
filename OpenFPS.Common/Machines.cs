@@ -399,6 +399,8 @@ public static class MachineRegistry
             HeightMetres = chassis?.Get("heightMetres", b?.HeightMetres ?? 1.4f) ?? b?.HeightMetres ?? 1.4f,
             SourceLevelDb = chassis?.Get("sourceLevelDb", b?.SourceLevelDb ?? 116f) ?? b?.SourceLevelDb ?? 116f,
             TyreCount = (int)MathF.Round(chassis?.Get("tyreCount", b?.TyreCount ?? 4) ?? b?.TyreCount ?? 4),
+            // The running gear comes with the base, its wheels placed where this machine's axles are.
+            Chassis = b?.Chassis,
             ExhaustOffsetZ = exhaust?.At.Z ?? b?.ExhaustOffsetZ ?? -2.05f,
             ExhaustHeight = exhaust?.At.Y ?? b?.ExhaustHeight ?? 0.3f,
             IntakeOffsetZ = intake?.At.Z ?? b?.IntakeOffsetZ ?? 1.35f,
