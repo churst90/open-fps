@@ -7,6 +7,7 @@ using OpenFPS.Common;
 using OpenFPS.Common.Networking;
 using OpenFPS.Client.AudioEngine.Core;
 using OpenFPS.Client.AudioEngine.Fmod;
+using OpenFPS.Client.Core.AudioEngine.SteamAudio;
 
 namespace OpenFPS.Client.Core.AudioEngine.Fmod;
 
@@ -34,6 +35,14 @@ public static class WheelSquealSpike
     /// <summary>Render with the axle voices squealing from the overall demand instead (no wheels to
     /// the voice), for comparison.</summary>
     public static bool AxleOnly;
+
+    /// <summary>
+    /// Heard from the pavement: the listener stands 7.5 m from the car's path, beside where its tyres
+    /// work hardest, facing the road, and each end of the car (the rear voice, the front tap) goes
+    /// through Steam Audio's binaural effect from where it is, with spherical spreading. No ground,
+    /// walls or air: those the game adds. Files end in -binaural.wav.
+    /// </summary>
+    public static bool Binaural;
 
     public static int Run(string? outDir)
     {
@@ -88,7 +97,7 @@ public static class WheelSquealSpike
         foreach (var (name, l, r) in Rendered)
         {
             for (int i = 0; i < l.Length; i++) { l[i] *= g; r[i] *= g; }
-            File.WriteAllBytes(Path.Combine(outDir, name + ".wav"), CrossingSpike.ToWav16Stereo(l, r, Sr));
+            File.WriteAllBytes(Path.Combine(outDir, name + (Binaural ? "-binaural" : "") + ".wav"), CrossingSpike.ToWav16Stereo(l, r, Sr));
         }
         report.Add($"one gain for every file: {20f * MathF.Log10(g):F1} dB");
         foreach (var (name, l, _) in Rendered)
@@ -98,7 +107,7 @@ public static class WheelSquealSpike
             report.Add($"{name}: {100.0 * over / l.Length:F1} % of the left channel's samples past the voice's soft-ceiling knee");
             Console.WriteLine("  " + report[^1]);
         }
-        File.WriteAllLines(Path.Combine(outDir, "measurements.txt"), report);
+        File.WriteAllLines(Path.Combine(outDir, Binaural ? "measurements-binaural.txt" : "measurements.txt"), report);
         Console.WriteLine($"\n  Written to {outDir}");
         return 0;
     }
@@ -112,6 +121,7 @@ public static class WheelSquealSpike
     private static void Scenario(string name, string preset, float grip, bool modulated, string outDir, List<string> report,
                                  Func<WheelDynamics, float, (float Speed, float Curvature)> plan, float startSpeed, float seconds)
     {
+        if (Binaural) { RoadsideBinaural(name, preset, grip, modulated, plan, startSpeed, seconds); return; }
         var profile = VehicleProfile.ByName(preset);
         var body = new WheelDynamics(profile, grip) { ForwardOnly = true, Modulated = modulated, Vx = startSpeed };
         var ears = new[] { new Vector3(-2.5f, 1.6f, 0f), new Vector3(2.5f, 1.6f, 0f) };
@@ -216,6 +226,85 @@ public static class WheelSquealSpike
         Console.WriteLine(lr);
         report.Add(lr);
         report.Add("    " + Report("whole render", mono));
+    }
+
+    private static void RoadsideBinaural(string name, string preset, float grip, bool modulated,
+                                         Func<WheelDynamics, float, (float Speed, float Curvature)> plan,
+                                         float startSpeed, float seconds)
+    {
+        var profile = VehicleProfile.ByName(preset);
+        var body = new WheelDynamics(profile, grip) { ForwardOnly = true, Modulated = modulated, Vx = startSpeed };
+        int ticks = (int)(seconds * 30);
+        // Pass 1: the drive, its pose (x east, z north; heading 0 = east, a left turn turns north) and wheels.
+        var poses = new (Vector3 At, float Heading, float Speed, WheelState[] Wire)[ticks];
+        Vector3 at = Vector3.Zero; float heading = 0f, steer = 0f, worst = -1f; int worstTick = ticks / 2;
+        for (int k = 0; k < ticks; k++)
+        {
+            float t = k / 30f;
+            var (want, curvature) = plan(body, t);
+            float target = MathF.Atan(body.Wheelbase * curvature) + body.UndersteerGradient * body.Vx * body.Vx * curvature;
+            steer += Math.Clamp(target - steer, -0.9f / 30f, 0.9f / 30f);
+            body.Step(1f / 30f, steer, (want - body.Vx) * 30f);
+            heading -= body.Vx * curvature / 30f;
+            at += new Vector3(MathF.Cos(heading), 0f, MathF.Sin(heading)) * body.Vx / 30f;
+            var wire = new WheelState[body.Wheels.Length];
+            for (int i = 0; i < wire.Length; i++)
+            {
+                ref var w = ref body.Wheels[i];
+                wire[i] = WheelState.Encode(w.Load, w.AngularSpeed, w.SlipRatio, w.SlipAngle, w.Surface, w.Demand);
+            }
+            poses[k] = (at, heading, body.Vx, wire);
+            float demand = body.MaxDemand;
+            // Where the tyres work hardest; a drive that never works them, mid-way through it.
+            if (demand > worst + 1e-3f) { worst = demand; worstTick = k; }
+        }
+        var (p0, h0, _, _) = poses[worstTick];
+        var right0 = new Vector3(MathF.Sin(h0), 0f, -MathF.Cos(h0));
+        var ear = p0 + right0 * 7.5f + new Vector3(0f, 1.6f, 0f);
+        // Facing the road: the listener's forward is back across to the path.
+        var faceFwd = -right0;
+        var faceRight = new Vector3(-faceFwd.Z, 0f, faceFwd.X);
+
+        // Pass 2: one voice, its two ends rendered apart as the game places them.
+        var voice = new EngineVoiceState(profile, Sr, 7) { TargetSpeed = startSpeed, SplitVoices = true };
+        voice.PlaceAtSpeed(startSpeed);
+        var front = new EngineTapState(voice);
+        int n = ticks * Tick;
+        var rear = new float[n]; var nose = new float[n];
+        var rearDirs = new Phonon.IPLVector3[n]; var noseDirs = new Phonon.IPLVector3[n];
+        var rb = new float[Tick]; var fb = new float[Tick];
+        var rearTap = new Vector3(0f, profile.ExhaustHeight, profile.ExhaustOffsetZ);
+        var frontTap = new Vector3(0f, profile.FrontTapHeight, profile.FrontTapZ);
+        for (int k = 0; k < ticks; k++)
+        {
+            var (p, h, v, wire) = poses[k];
+            var fwd = new Vector3(MathF.Cos(h), 0f, MathF.Sin(h));
+            var right = new Vector3(MathF.Sin(h), 0f, -MathF.Cos(h));
+            var d = ear - p;
+            var local = new Vector3(Vector3.Dot(d, right), d.Y, Vector3.Dot(d, fwd));
+            voice.TargetSpeed = v;
+            voice.RoadSlip = MathF.Min(2f, wire.Max(w => w.DemandFraction));
+            voice.Wheels = AxleOnly ? null : wire;
+            voice.SetListener(local - rearTap);
+            voice.Render(rb);
+            front.Render(fb);
+            foreach (var (tap, sig, dirs, outSig) in new[] { (rearTap, rb, rearDirs, rear), (frontTap, fb, noseDirs, nose) })
+            {
+                var world = p + right * tap.X + new Vector3(0f, tap.Y, 0f) + fwd * tap.Z;
+                var to = world - ear;
+                float r = MathF.Max(1f, to.Length());
+                var u = to / to.Length();
+                // Steam Audio's frame: +x right, +y up, -z forward.
+                var dir = new Phonon.IPLVector3 { x = Vector3.Dot(u, faceRight), y = u.Y, z = -Vector3.Dot(u, faceFwd) };
+                for (int i = 0; i < Tick; i++) { outSig[k * Tick + i] = sig[i] / r; dirs[k * Tick + i] = dir; }
+            }
+        }
+        var yr = PassBySpike.Render(rear, rearDirs, 256, Phonon.IPL_HRTFINTERPOLATION_BILINEAR);
+        var yf = PassBySpike.Render(nose, noseDirs, 256, Phonon.IPL_HRTFINTERPOLATION_BILINEAR);
+        var l = new float[n]; var rr = new float[n];
+        for (int i = 0; i < n; i++) { l[i] = yr[2 * i] + yf[2 * i]; rr[i] = yr[2 * i + 1] + yf[2 * i + 1]; }
+        Rendered.Add((name, l, rr));
+        Console.WriteLine($"  {name}: heard from the pavement 7.5 m off the car's path at {p0.X:F0},{p0.Z:F0} (tyres hardest at {worstTick / 30f:F1} s, {worst:F2} of grip)");
     }
 
     private static float Db(float[] x)

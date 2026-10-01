@@ -325,11 +325,12 @@ if (args.Contains("--tyres"))
 }
 if (args.Contains("--wheel-squeal"))
 {
-    // --wheel-squeal [out=DIR] [axle]: each wheel squealing for itself, measured, then four drives
+    // --wheel-squeal [out=DIR] [axle] [binaural]: each wheel squealing for itself, measured, then four drives
     // rendered (an ordinary stop, a hard stop, a fast turn, a wheelspin pull-away). `axle` renders
     // the same drives with the axle voices squealing from the overall demand, as before.
     string? outArg = args.FirstOrDefault(a => a.StartsWith("out="));
     OpenFPS.Client.Core.AudioEngine.Fmod.WheelSquealSpike.AxleOnly = args.Contains("axle");
+    OpenFPS.Client.Core.AudioEngine.Fmod.WheelSquealSpike.Binaural = args.Contains("binaural");
     int wcode = OpenFPS.Client.Core.AudioEngine.Fmod.WheelSquealSpike.Run(outArg?[4..]);
     Log.CloseAndFlush();
     Environment.Exit(wcode);

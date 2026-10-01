@@ -72,7 +72,7 @@ public static class PassBySpike
         }
     }
 
-    static float[] Render(float[] mono, Phonon.IPLVector3[] dirs, int frame, int interp)
+    internal static float[] Render(float[] mono, Phonon.IPLVector3[] dirs, int frame, int interp)
     {
         var cs = Phonon.DefaultContextSettings();
         Phonon.iplContextCreate(ref cs, out IntPtr ctx);
@@ -164,7 +164,7 @@ public static class PassBySpike
         return p;
     }
 
-    static void Wav(string path, float[] st)
+    internal static void Wav(string path, float[] st)
     {
         using var fs = new FileStream(path, FileMode.Create);
         using var w = new BinaryWriter(fs);
