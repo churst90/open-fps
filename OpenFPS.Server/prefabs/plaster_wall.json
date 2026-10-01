@@ -4,6 +4,8 @@
   "Description": "Plasterboard on studs — the inside of a building. The only common surface whose absorption goes DOWN with frequency: it is a membrane, so a long wavelength flexes it and a short one bounces off. That is the opposite of carpet, and the two together are what make a furnished room sound furnished.",
   "Material": "Plaster",
   "ColliderSize": { "X": 2, "Y": 3, "Z": 0.12 },
+  "LeafMetres": 0.0125,
+  "StudSpacingMetres": 0.6,
   "Type": "StaticObject",
   "IsSolid": true,
   "TransmissionLow": 0.35,
