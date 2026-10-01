@@ -44,7 +44,7 @@ public sealed class EngineVoiceState : IRenderedVoice
     private readonly Vector3[] _wheelAt;
     /// <summary>This block's drive for each wheel: demand, slip velocity, load share, and its gain
     /// against the tap it goes out through.</summary>
-    private readonly float[] _wheelDemand, _wheelSlipVelocity, _wheelLoad, _wheelGain;
+    private readonly float[] _wheelDemand, _wheelSlipVelocity, _wheelLoad, _wheelGain, _wheelStickSlip;
     /// <summary>The slip velocity at which one tyre at the limit squeals at its share of the declared
     /// level: a tyre at its peak slip angle at <see cref="SquealReferenceSpeed"/>.</summary>
     private readonly float _squealSlipVelocity;
@@ -546,6 +546,7 @@ public sealed class EngineVoiceState : IRenderedVoice
         _wheelFront = new bool[nw]; _wheelDriven = new bool[nw];
         _wheelStatic = new float[nw]; _wheelAt = new Vector3[nw];
         _wheelDemand = new float[nw]; _wheelSlipVelocity = new float[nw]; _wheelLoad = new float[nw]; _wheelGain = new float[nw];
+        _wheelStickSlip = new float[nw];
         float cogZ = chassis.CentreOfGravityZ;
         for (int i = 0; i < nw; i++)
         {
@@ -607,6 +608,7 @@ public sealed class EngineVoiceState : IRenderedVoice
             var w = wheels[i];
             float kappa = w.SlipRatioValue, tanAlpha = MathF.Tan(w.SlipAngleRad);
             _wheelDemand[i] = w.DemandFraction;
+            _wheelStickSlip[i] = OpenFPS.Common.RoadSurfaces.StickSlipOf(w.Surface);
             _wheelSlipVelocity[i] = u * MathF.Sqrt(kappa * kappa + tanAlpha * tanAlpha);
             _wheelLoad[i] = w.LoadNewtons / _wheelStatic[i];
             if (placed)
@@ -1038,7 +1040,7 @@ public sealed class EngineVoiceState : IRenderedVoice
                 {
                     float demand = _wheelDemand[k] + (_wheelDriven[k] ? _tyreChirp : 0f);
                     float sq = VehicleSynth.WheelSqueal(Vehicle.Tyres, demand, _wheelSlipVelocity[k], _wheelLoad[k], _squealSlipVelocity,
-                                                         _wheelSqueal.Length, _rng, ref _wheelSqueal[k]) * _wheelGain[k];
+                                                         _wheelSqueal.Length, _rng, ref _wheelSqueal[k], _wheelStickSlip[k]) * _wheelGain[k];
                     if (_wheelFront[k]) frontSliding += sq; else rearSliding += sq;
                 }
                 tyreRear = VehicleSynth.Tyre(Vehicle.Tyres, Driveline.Speed, 0f, _rng, ref _tyre, _rollingRearPa, _rearRadius, rearSliding);

@@ -54,6 +54,21 @@ public class TyreAndTurboTests
     /// to a broadband slide. They are not three sounds to be triggered — they are one curve sampled
     /// at three demands, and the handover has to be continuous or a corner entry clicks.
     /// </summary>
+    /// <summary>
+    /// On dry asphalt a locked or spinning tyre keeps screeching at its stick-slip note; only on a
+    /// loose or icy surface does the slide become broadband noise.
+    /// </summary>
+    [Fact]
+    public void AFullSlideStaysASquealOnDryAsphaltAndIsNoiseOnGravel()
+    {
+        float asphalt = RoadSurfaces.StickSlipOf(RoadSurfaces.IndexOf("Asphalt"));
+        float gravel = RoadSurfaces.StickSlipOf(RoadSurfaces.IndexOf("Gravel"));
+        Assert.True(TyreFriction.SquealAmount(1.8f, asphalt) > 0.95f);
+        Assert.True(TyreFriction.SkidAmount(1.8f, asphalt) < 0.05f);
+        Assert.True(TyreFriction.SquealAmount(1.8f, gravel) < 0.05f);
+        Assert.True(TyreFriction.SkidAmount(1.8f, gravel) > 0.95f);
+    }
+
     [Fact]
     public void TheSlideCurveIsContinuousAndHandsOver()
     {

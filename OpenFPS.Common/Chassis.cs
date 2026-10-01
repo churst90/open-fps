@@ -272,15 +272,21 @@ public static class RoadSurfaces
     /// <summary>Not on the ground, or a material the table does not know.</summary>
     public const byte Unknown = 0;
 
-    private static readonly (string Material, float Grip)[] Table =
+    // StickSlip: whether the rubber keeps sticking and slipping on the surface once the whole contact
+    // patch slides. On a coherent dry surface it does, and a locked or spinning tyre goes on screeching
+    // at its stick-slip note: under dry braking the squeal holds a fundamental near 800 Hz with its
+    // harmonic, rising as the tyre brakes harder (Tan Li, "Tire Braking/Cornering Noise Analysis:
+    // Stick/Slip Mechanism", NOISE-CON 2019), and the stick-snap is strongest on smooth, clean, dry
+    // surfaces. A loose or icy surface shears instead of gripping back, so the slide there is noise.
+    private static readonly (string Material, float Grip, float StickSlip)[] Table =
     {
-        ("", 1f),                 // 0: unknown
-        ("Asphalt", 1f),          // 1
-        ("Concrete", 1f),         // 2
-        ("Gravel", 0.6f / 0.85f), // 3
-        ("Dirt", 0.68f / 0.85f),  // 4: an earth road, dry
-        ("Snow", 0.2f / 0.85f),   // 5: hard-packed
-        ("Ice", 0.1f / 0.85f),    // 6
+        ("", 1f, 1f),                 // 0: unknown, rolls as asphalt
+        ("Asphalt", 1f, 1f),          // 1
+        ("Concrete", 1f, 1f),         // 2
+        ("Gravel", 0.6f / 0.85f, 0f), // 3
+        ("Dirt", 0.68f / 0.85f, 0f),  // 4: an earth road, dry
+        ("Snow", 0.2f / 0.85f, 0f),   // 5: hard-packed
+        ("Ice", 0.1f / 0.85f, 0f),    // 6
     };
 
     private static readonly Dictionary<string, byte> ByName = Build();
@@ -301,4 +307,8 @@ public static class RoadSurfaces
 
     /// <summary>Grip relative to dry asphalt.</summary>
     public static float GripOf(byte index) => index < Table.Length ? Table[index].Grip : 1f;
+
+    /// <summary>1 where a fully sliding tyre keeps its stick-slip note (dry, coherent surfaces), 0 where
+    /// the slide is broadband (loose or icy ones).</summary>
+    public static float StickSlipOf(byte index) => index < Table.Length ? Table[index].StickSlip : 1f;
 }

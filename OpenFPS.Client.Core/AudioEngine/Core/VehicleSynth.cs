@@ -484,7 +484,7 @@ public static class VehicleSynth
     /// level the two axle voices together made at the limit, so each of n wheels gets 2/n of its power.</param>
     [MethodImpl(MethodImplOptions.AggressiveOptimization)]
     public static float WheelSqueal(TyreProfile t, float demand, float slipVelocity, float loadShare, float referenceSlipVelocity,
-                                    int wheels, Random rng, ref WheelSquealVoice v)
+                                    int wheels, Random rng, ref WheelSquealVoice v, float stickSlip = 1f)
     {
         // Smoothed as the axle voice smooths its demand: a tyre lets go on the instant and settles
         // over a couple of hundred milliseconds.
@@ -492,8 +492,8 @@ public static class VehicleSynth
         v.Demand += (demand - v.Demand) * k;
         v.SlipVelocity += (slipVelocity - v.SlipVelocity) * 0.0016f;
         float d = v.Demand;
-        float squeal = TyreFriction.SquealAmount(d);
-        float skid = TyreFriction.SkidAmount(d);
+        float squeal = TyreFriction.SquealAmount(d, stickSlip);
+        float skid = TyreFriction.SkidAmount(d, stickSlip);
         if (squeal <= 1e-3f && skid <= 1e-3f) { v.R1 = v.R2 = v.R1b = v.R2b = v.SlideLp = 0f; v.Tick = 0; return 0f; }
 
         float sliding = d >= 1f ? 1f : 1f - MathF.Cbrt(1f - d);

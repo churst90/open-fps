@@ -53,14 +53,17 @@ public static class TyreFriction
     public const float FullSlide = 1.45f;
 
     /// <summary>How much tonal squeal there is, 0..1 — rising to the limit, then given up to the slide.</summary>
-    public static float SquealAmount(float demand)
+    public static float SquealAmount(float demand, float stickSlip = 0f)
     {
         float rise = Smoothstep(SquealOnset, SlideOnset, demand);
-        return rise * (1f - SkidAmount(demand));
+        return rise * (1f - SkidAmount(demand, stickSlip));
     }
 
-    /// <summary>How much of the noise is a broadband slide, 0..1.</summary>
-    public static float SkidAmount(float demand) => Smoothstep(SlideOnset, FullSlide, demand);
+    /// <summary>How much of the noise is a broadband slide, 0..1. On a surface where the rubber keeps
+    /// sticking and slipping (<paramref name="stickSlip"/> 1, <see cref="RoadSurfaces.StickSlipOf"/>)
+    /// a full slide stays a squeal.</summary>
+    public static float SkidAmount(float demand, float stickSlip = 0f)
+        => Smoothstep(SlideOnset, FullSlide, demand) * (1f - Math.Clamp(stickSlip, 0f, 1f));
 
     /// <summary>
     /// How far the squeal note bends, as a multiplier on the tyre's resonance.
