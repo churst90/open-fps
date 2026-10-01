@@ -4,6 +4,13 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-09-30
 
+- Mixer safety. A DSP callback with nothing to render writes silence instead of leaving the
+  buffer's old contents to be mixed (the master-bus unit passes the mix through). No callback logs or
+  allocates on the mixer thread. Pooled EQ, low-pass, synth and granular voices start from rest.
+  Shutdown, clearing the reverb buses, changing maps and changing vehicles no longer free Steam
+  Audio's native state while the mixer or a tracer may still read it.
+- open-fps-patches 0008: a silent late tail (outdoors) is one empty partition, not 2 s of zeros
+  convolved every block. All eight patches are in; the patch files were removed.
 - Walls let through what their material, thickness and build let through, band by band. Every wall
   heavier than about 50 kg/m2 was a flat 55 dB filter, so a wall made a sound quieter without making
   it duller. Now: the mass law, the coincidence dip from each material's stiffness and thickness
