@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -8,56 +9,86 @@ using System.Threading;
 using OpenFPS.Client.AudioEngine.Acoustics;
 using OpenFPS.Client.AudioEngine.Data;
 using OpenFPS.Common;
+using OpenFPS.Common.Systems;
+using OpenFPS.Server.Core;
+using OpenFPS.Server.Repositories;
 
 namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 
 /// <summary>
-/// --path-probe [map=city] ear=x,y,z src=x,y,z [src=...] [open=R]
-///
-/// open=R measures every source twice: with the doors as the map has them, and again with every door
-/// leaf within R metres of the ear swung a quarter turn, as a rebuild in the game does when one swings.
+/// --path-probe [map=city] ear=x,y,z src=x,y,z [src=...] [open=R] [door=x,y,z ...] [legcost] [root=DIR/]
 ///
 /// What the game's occlusion worker hands the mixer for one source and one ear on a real map: occlusion
-/// and the three band gains in dB. Game coordinates (y up), not /tp's. Written for "I hear people
-/// walking outside through concrete": the walkers' steps came through a 35 cm brick wall at a flat
-/// -24 dB in every band.
+/// and the three band gains in dB, with what each part of the answer says on its own — the one-shot
+/// path (SpatialAcoustics, which footsteps, birds, speech and beacons use), the routes by the openings
+/// (OpeningRoutes) with the openings they run through, and each wall on the straight line.
+///
+/// The map is loaded by the SERVER's loader and handed over as the client gets it — definitions, the
+/// regions with their surveyed surfaces, the portals, each door's opening — so the routes have the
+/// same graph they have in the game. Game coordinates (y up), not /tp's.
+///
+/// open=R measures every source again with every door leaf within R metres of the ear swung a quarter
+/// turn, as a rebuild in the game does when one swings; door=x,y,z swings the one leaf nearest that point.
+/// legcost times the straight leg from each source to the ear instead: the one-box barrier search and the
+/// whole leg, which is what a route query costs when its way to a door is blocked.
 /// </summary>
 public static class PathProbeSpike
 {
     public static int Run(string[] args)
     {
         AcousticRegistry.Initialize();
+        Serilog.Log.Logger = new Serilog.LoggerConfiguration().MinimumLevel.Warning().CreateLogger();
         string mapId = args.FirstOrDefault(a => a.StartsWith("map="))?[4..] ?? "city";
-        Vector3 P(string s) { var f = s.Split(',').Select(x => float.Parse(x, CultureInfo.InvariantCulture)).ToArray(); return new Vector3(f[0], f[1], f[2]); }
+        static Vector3 P(string s) { var f = s.Split(',').Select(x => float.Parse(x, CultureInfo.InvariantCulture)).ToArray(); return new Vector3(f[0], f[1], f[2]); }
         var ear = P(args.First(a => a.StartsWith("ear="))[4..]);
         var srcs = args.Where(a => a.StartsWith("src=")).Select(a => P(a[4..])).ToList();
-        // root=DIR/ reads the map and prefabs of another checkout (a worktree) than the main one.
-        string root = args.FirstOrDefault(a => a.StartsWith("root="))?[5..] ?? "/home/cody/external-rescue/Github/open-fps/OpenFPS.Server/";
-        var (world, _) = SirenRouteSpike.Load(root + "maps/" + mapId + ".json", root + "prefabs", "none", 0f);
-        using var worker = new AsyncAcousticWorker(new SpatialAcoustics());
+        string root = args.FirstOrDefault(a => a.StartsWith("root="))?[5..] ?? AppContext.BaseDirectory;
+
+        var sw = Stopwatch.StartNew();
+        var world = LoadAsClient(root, mapId);
+        Console.WriteLine($"  {mapId}: {world.Entities.Count} entities, {world.AcousticMap?.Regions.Count ?? 0} regions, "
+                        + $"{world.AcousticMap?.Portals.Count ?? 0} portals ({sw.ElapsedMilliseconds} ms)");
+
+        var acoustics = new SpatialAcoustics();
+        using var worker = new AsyncAcousticWorker(acoustics);
         worker.UpdateWorld(world);
         worker.Start();
-        // The game has had the probe graph for a while by the time anyone is standing in a flat: wait
-        // for it, or this measures an engine without pathing (2026-09-29: the probe said -41 dB while
-        // the game played the same walkers at full level through the route the graph found).
-        var ready = DateTime.UtcNow.AddSeconds(120);
-        while (!worker.PathingReady && DateTime.UtcNow < ready)
+        Settle(worker, ear);
+        Console.WriteLine($"  ear ({ear.X:F1}, {ear.Y:F1}, {ear.Z:F1}) in {RegionName(world, acoustics, ear)}; Steam Audio {(worker.SteamAudioActive ? "on" : "OFF")}");
+        DescribeOpenings(acoustics, world, ear);
+        if (args.Contains("legcost"))
         {
-            worker.EnqueueRequest(new AcousticRequest { EntityId = 999, ListenerPos = ear, SourcePos = ear + Vector3.UnitX, SourceRadius = 0.1f });
-            Thread.Sleep(200);
-        }
-        Console.WriteLine($"  pathing {(worker.PathingReady ? "ready" : "NOT ready after 120 s")}");
-        int id = 1;
-        Measure(worker, world, ear, srcs, ref id);
-        var openArg = args.FirstOrDefault(a => a.StartsWith("open="));
-        if (openArg != null)
-        {
-            float r = float.Parse(openArg[5..], CultureInfo.InvariantCulture);
-            foreach (var e in world.Entities.Values.ToList())
+            var routes = acoustics.RoutesFor(world)!;
+            foreach (var src in srcs)
             {
+                var t = Stopwatch.StartNew(); int n = 0;
+                while (t.ElapsedMilliseconds < 300) { routes.BarrierPathDifference(src, ear, out _, out _); n++; }
+                double bar = t.Elapsed.TotalMilliseconds * 1000 / n;
+                t.Restart(); n = 0;
+                while (t.ElapsedMilliseconds < 300) { routes.LegGains(src, ear, Array.Empty<int>(), Array.Empty<int>()); n++; }
+                double leg = t.Elapsed.TotalMilliseconds * 1000 / n;
+                float d = routes.BarrierPathDifference(src, ear, out _, out bool v);
+                Console.WriteLine($"  leg {src} -> ear: barrier search {bar:F0} µs (detour {d:F1} m, verified {v}), whole leg {leg:F0} µs");
+            }
+            return 0;
+        }
+        int id = 1;
+        Measure(worker, acoustics, world, ear, srcs, ref id);
+
+        var openArg = args.FirstOrDefault(a => a.StartsWith("open="));
+        var doorArgs = args.Where(a => a.StartsWith("door=")).Select(a => P(a[5..])).ToList();
+        if (openArg != null || doorArgs.Count > 0)
+        {
+            float r = openArg != null ? float.Parse(openArg[5..], CultureInfo.InvariantCulture) : -1f;
+            var leaves = world.Entities.Values.Where(e => OpeningGraph.IsDoorLeaf(e.Definition)).ToList();
+            var chosen = new HashSet<int>();
+            if (r > 0f) foreach (var e in leaves) if (Vector3.Distance(e.Transform.Position, ear) <= r) chosen.Add(e.Id);
+            foreach (var at in doorArgs)
+                if (leaves.Count > 0) chosen.Add(leaves.OrderBy(e => Vector3.Distance(e.Transform.Position, at)).First().Id);
+            foreach (int doorId in chosen)
+            {
+                var e = world.Entities[doorId];
                 var def = e.Definition;
-                if (def == null || def.Portal.RegionAId == def.Portal.RegionBId || !def.Collider.IsSolid) continue;
-                if (Vector3.Distance(e.Transform.Position, ear) > r) continue;
                 Console.WriteLine($"  door {e.Id} at ({e.Transform.Position.X:F1}, {e.Transform.Position.Y:F1}, {e.Transform.Position.Z:F1}): opened");
                 // Swung a quarter turn on its hinge, as DoorSystem swings it: about the leaf's +X edge.
                 var moved = e;
@@ -77,13 +108,81 @@ public static class PathProbeSpike
                 Thread.Sleep(100);
             }
             Console.WriteLine("  --- doors open ---");
-            Measure(worker, world, ear, srcs, ref id);
+            Measure(worker, acoustics, world, ear, srcs, ref id);
         }
+        Console.WriteLine($"  worker: {worker.RouteCostSummary}");
         return 0;
     }
 
-    private static void Measure(AsyncAcousticWorker worker, WorldSnapshot world, Vector3 ear, List<Vector3> srcs, ref int id)
+    /// <summary>The map as the client gets it: the server's loader, its static definitions, and the acoustic
+    /// map the client generates from them (ClientGameSession.GenerateAcoustics).</summary>
+    internal static WorldSnapshot LoadAsClient(string root, string mapId)
     {
+        var prefabs = new PrefabRepository(Path.Combine(root, "prefabs"));
+        var maps = new MapRepository(Path.Combine(root, "maps"));
+        var manager = new MapManager(maps, prefabs);
+        manager.Initialize();
+        if (!manager.TryGetMap(mapId, out var ecs, out Vector3 size, out _, out _) || !manager.TryGetMapData(mapId, out var data))
+            throw new InvalidOperationException($"no map '{mapId}' under {root}");
+        var defs = OpenFPS.Server.Core.EntityDefinitionFactory.StaticDefinitions(ecs);
+        var world = new WorldSnapshot { StaticGrid = new SpatialGrid<int>(10.0f) };
+        foreach (var def in defs)
+        {
+            world.Entities[def.EntityId] = new EntitySnapshot { Id = def.EntityId, Definition = def, Transform = def.Transform };
+            if (def.Type == OpenFPS.Common.Components.EntityType.StaticObject && !def.Moves && def.Collider.IsSolid)
+                world.StaticGrid.AddOverlapping(def.Transform.Position, def.Collider.Size, def.Transform.Rotation, def.EntityId, isStatic: true);
+            if (def.Region.RoomSize.X > 0) world.RegionEntityIds.Add(def.EntityId);
+        }
+        world.AcousticMap = AcousticVolumeGenerator.GenerateRegions(defs, size, data.MinBound, data.VoxelResolution, data.OcclusionFloor);
+        return world;
+    }
+
+    private static void Settle(AsyncAcousticWorker worker, Vector3 ear)
+    {
+        // The first request builds the scene; wait until the worker answers one.
+        var until = DateTime.UtcNow.AddSeconds(120);
+        while (DateTime.UtcNow < until)
+        {
+            worker.EnqueueRequest(new AcousticRequest { EntityId = 999, ListenerPos = ear, SourcePos = ear + Vector3.UnitX, SourceRadius = 0.1f });
+            Thread.Sleep(200);
+            if (worker.TryGetResult(999, out var p) && p.Count > 0) break;
+        }
+    }
+
+    private static string RegionName(WorldSnapshot world, SpatialAcoustics acoustics, Vector3 at)
+    {
+        int r = acoustics.GetRegionAt(world, at);
+        return world.AcousticMap != null && world.AcousticMap.Regions.TryGetValue(r, out var reg) && reg.FriendlyName.Length > 0
+            ? $"'{reg.FriendlyName}'" : $"region {r}";
+    }
+
+    /// <summary>The openings near the ear as the geometry has them, and the rooms they join.</summary>
+    private static void DescribeOpenings(SpatialAcoustics acoustics, WorldSnapshot world, Vector3 ear)
+    {
+        var routes = acoustics.RoutesFor(world);
+        if (routes == null) { Console.WriteLine("  no opening graph (no acoustic map)"); return; }
+        Console.WriteLine($"  {routes.Openings.Count} openings on the map, {routes.Problems.Count} disagreeing with the geometry");
+        string Room(int node)
+        {
+            if (node == OpeningRoutes.Outside) return "outdoors";
+            string name = world.AcousticMap!.Regions.TryGetValue(node, out var r) ? r.FriendlyName : node.ToString();
+            return routes.TryGetAbsorption(node, out var a) ? $"{name} (A {a.X:F0}/{a.Y:F0}/{a.Z:F0} m²)" : name;
+        }
+        foreach (var o in routes.Openings.Where(o => Vector3.Distance(o.Centre, ear) < 20f).OrderBy(o => Vector3.Distance(o.Centre, ear)))
+        {
+            static float TauDb(float t) => 10f * MathF.Log10(MathF.Max(1e-12f, t));
+            Console.WriteLine($"    {o.Kind} {o.Id} at ({o.Centre.X:F2}, {o.Centre.Y:F2}, {o.Centre.Z:F2}) facing ({o.Normal.X:F1}, {o.Normal.Y:F1}, {o.Normal.Z:F1}), "
+                            + $"{2 * o.HalfWidth:F2} x {2 * o.HalfHeight:F2} m, {2 * o.HalfDepth:F2} deep, passes {TauDb(o.Tau.X):F0}/{TauDb(o.Tau.Y):F0}/{TauDb(o.Tau.Z):F0} dB; "
+                            + $"{Room(o.NodeA)} - {Room(o.NodeB)}" + (o.Problem != null ? $"  PROBLEM: {o.Problem}" : ""));
+        }
+    }
+
+    private static float Db(float g) => 20f * MathF.Log10(MathF.Max(1e-5f, g));
+    private static string Bands(float l, float m, float h) => $"{Db(l),6:F1} {Db(m),6:F1} {Db(h),6:F1}";
+
+    private static void Measure(AsyncAcousticWorker worker, SpatialAcoustics acoustics, WorldSnapshot world, Vector3 ear, List<Vector3> srcs, ref int id)
+    {
+        Console.WriteLine("                                          low    mid   high  (dB)");
         foreach (var src in srcs)
         {
             List<AcousticPathData>? paths = null;
@@ -94,30 +193,48 @@ public static class PathProbeSpike
                 Thread.Sleep(50);
                 if (worker.TryGetResult(id, out paths) && paths.Count > 0 && paths[0].SourcePosition == src) break;
             }
-            if (paths == null || paths.Count == 0) { Console.WriteLine($"  src {src}: no answer"); continue; }
+            Console.WriteLine($"  src ({src.X:F1}, {src.Y:F1}, {src.Z:F1}) {Vector3.Distance(ear, src):F1} m, in {RegionName(world, acoustics, src)}");
+            if (paths == null || paths.Count == 0) { Console.WriteLine("      worker: no answer"); id++; continue; }
             var p = paths[0];
-            static float Db(float g) => 20f * MathF.Log10(MathF.Max(1e-5f, g));
-            Console.WriteLine($"  src ({src.X:F1}, {src.Y:F1}, {src.Z:F1}) {Vector3.Distance(ear, src):F1} m: occlusion {p.Occlusion:F2}, "
-                            + $"low {Db(p.EqLow):F1} mid {Db(p.EqMid):F1} high {Db(p.EqHigh):F1} dB, bleed {p.TransmissionBleed:F3}, "
-                            + $"apparent ({p.ApparentPosition.X:F1}, {p.ApparentPosition.Y:F1}, {p.ApparentPosition.Z:F1})");
-            // The fallback tracer's answer for the same pair, and what each box on the straight line
-            // takes by itself (WallTransmission: the figure Steam Audio's faces carry between them).
-            var h = new SpatialAcoustics().CalculateAcousticPath(world, -1, ear, src);
-            Console.WriteLine($"      tracer: occlusion {h.Occlusion:F2}, low {Db(h.EqLow):F1} mid {Db(h.EqMid):F1} high {Db(h.EqHigh):F1} dB");
+            Console.WriteLine($"      worker (sustained voices)  {Bands(p.EqLow, p.EqMid, p.EqHigh)}  occlusion {p.Occlusion:F2}, heard from {Bearing(ear, p.ApparentPosition)}");
+            var h = acoustics.CalculateAcousticPath(world, -1, ear, src);
+            Console.WriteLine($"      one-shot path              {Bands(h.EqLow, h.EqMid, h.EqHigh)}  occlusion {h.Occlusion:F2}, heard from {Bearing(ear, h.ApparentPosition)}");
+
+            var routes = acoustics.RoutesFor(world);
+            if (routes != null)
+            {
+                int sr = acoustics.GetRegionAt(world, src), lr = acoustics.GetRegionAt(world, ear);
+                if (routes.Route(src, sr, ear, lr, out var a))
+                {
+                    var t = Stopwatch.StartNew();
+                    int n = 0;
+                    while (t.ElapsedMilliseconds < 200) { routes.Route(src, sr, ear, lr, out _); n++; }
+                    double us = t.Elapsed.TotalMilliseconds * 1000.0 / n;
+                    Console.WriteLine($"      by the openings            {Bands(a.Low, a.Mid, a.High)}  {a.Routes} route(s), best {a.Length:F1} m via {a.Via}, "
+                                    + $"arrives from ({a.Apparent.X:F1}, {a.Apparent.Y:F1}, {a.Apparent.Z:F1}); {us:F0} µs a query");
+                }
+                else Console.WriteLine("      by the openings            none (same place, or nothing joins them)");
+            }
+
             Vector3 dir = Vector3.Normalize(src - ear);
             float len = Vector3.Distance(ear, src);
             float sl = 0, sm = 0, sh = 0;
+            int walls = 0;
             foreach (var b in SteamAudioScene.BoxesFromWorld(world))
             {
                 if (!GeometryUtils.RayIntersectsOBB(ear, dir, b.Center, b.Size, b.Rotation, out float at) || at > len) continue;
                 var (gl, gm, gh) = WallTransmission.BandGains(b.Material, b.Size, b.Build);
                 sl += Db(gl); sm += Db(gm); sh += Db(gh);
-                float t = MathF.Min(b.Size.X, MathF.Min(b.Size.Y, b.Size.Z));
-                Console.WriteLine($"      wall at {at,5:F2} m: {b.Material} {t * 100f:F1} cm" + (b.Build.LeafMetres > 0 ? $" (leaves {b.Build.LeafMetres * 1000f:F1} mm, studs {b.Build.StudSpacingMetres:F2} m)" : "")
-                                + $"  {Db(gl):F1} / {Db(gm):F1} / {Db(gh):F1} dB");
+                walls++;
             }
-            Console.WriteLine($"      walls on the line: {sl:F1} / {sm:F1} / {sh:F1} dB");
+            Console.WriteLine($"      {walls} wall(s) on the line        {sl,6:F1} {sm,6:F1} {sh,6:F1}");
             id++;
         }
+    }
+
+    private static string Bearing(Vector3 ear, Vector3 at)
+    {
+        float deg = MathF.Atan2(at.X - ear.X, at.Z - ear.Z) * 180f / MathF.PI;
+        return $"bearing {deg:F0}° ({at.X:F1}, {at.Y:F1}, {at.Z:F1})";
     }
 }
