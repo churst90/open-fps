@@ -56,7 +56,8 @@ public class LocalPlayerState
     public int MaxHealth { get; set; } = 100;
     public string CurrentMaterial { get; set; } = "Generic";
     public string CurrentVariant { get; set; } = "0";
-    public string CurrentRegion { get; set; } = "Unknown Area";
+    public const string UnknownArea = "Unknown Area";
+    public string CurrentRegion { get; set; } = UnknownArea;
 
     /// <summary>Which acoustic region the listener is in, or a negative id for none.
     ///

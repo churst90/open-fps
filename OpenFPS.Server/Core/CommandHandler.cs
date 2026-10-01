@@ -1606,7 +1606,7 @@ public class CommandHandler
     }
 
     /// <summary>
-    /// "25 metres away at 11 o'clock, 4 metres above you, at Main Street east pavement" — the other
+    /// "25 metres away at 11 o'clock, 4 metres above you, at Main Street sidewalk" — the other
     /// player's bearing from the asker's facing, from the same clock face /scan uses. Empty if
     /// either of them has no body yet.
     /// </summary>

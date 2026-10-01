@@ -384,7 +384,7 @@ public class WeatherAndConvergenceTests
         public bool IsGameInputActive { get; set; } = true;
         public event Action<string>? CommandEntered;
 
-        public void ShowLoading(string status) => Loading.Add(status);
+        public void ShowLoading(string status, bool speak = true) => Loading.Add(status);
         public void UpdateLoadingStatus(string text, int percent) => Loading.Add($"{text} ({percent})");
         public void EnterGame() => EnterGameCalls++;
         public void OpenCommandConsole() => ConsoleOpens++;
@@ -410,7 +410,7 @@ public class WeatherAndConvergenceTests
         var (session, speech, shell) = NewSession();
 
         session.HandleMessage(new LoginResponse { Success = true, Username = "cody" });
-        Assert.Contains(shell.Loading, l => l.Contains("manifest", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains("Logging in...", shell.Loading);
 
         session.HandleMessage(new MapManifest
         {
@@ -429,8 +429,22 @@ public class WeatherAndConvergenceTests
         Assert.True(session.IsInGame);
         Assert.Equal(42, session.OwnEntityId);
         Assert.Equal(1, shell.EnterGameCalls);
-        Assert.True(speech.Said("Logged in. You are in default."));
+        // Where you are is said once the body is placed, map and zone in one sentence. This map has
+        // no zones, and "at outside" names nothing, so the map alone is said, and said once.
+        Assert.False(speech.Said("You're in"));
+        Thread.Sleep(300);
+        session.ContinuousUpdate();
+        Assert.Equal("You're in default.", Assert.Single(speech.Spoken));
+        session.ContinuousUpdate();
+        Assert.Single(speech.Spoken);
     }
+
+    [Theory]
+    [InlineData("city", "sidewalk", "You're in city, at sidewalk.")]
+    [InlineData("city", "", "You're in city.")]
+    [InlineData("city", null, "You're in city.")]
+    public void TheArrivalLineNamesTheMapAndTheZone(string map, string? zone, string expected) =>
+        Assert.Equal(expected, ClientGameSession.ArrivalLine(map, zone));
 
     [Fact]
     public void GameplayBindingsFireOnceOnPressAndOnlyWhenTheShellSaysInputIsLive()

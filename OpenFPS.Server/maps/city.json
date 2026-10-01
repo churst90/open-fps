@@ -104969,7 +104969,7 @@
     "Y": 0.8,
     "Z": 6.8667
    },
-   "Name": "Wharf Avenue west pavement, block 1"
+   "Name": "Wharf Avenue sidewalk"
   },
   {
    "EntityId": 7260,
@@ -104984,7 +104984,7 @@
     "Y": 0.8,
     "Z": 6.8667
    },
-   "Name": "Wharf Avenue east pavement, block 1"
+   "Name": "Wharf Avenue sidewalk"
   },
   {
    "EntityId": 7261,
@@ -105014,7 +105014,7 @@
     "Y": 0.8,
     "Z": 6.8667
    },
-   "Name": "Wharf Avenue west pavement, block 2"
+   "Name": "Wharf Avenue sidewalk"
   },
   {
    "EntityId": 7263,
@@ -105029,7 +105029,7 @@
     "Y": 0.8,
     "Z": 6.8667
    },
-   "Name": "Wharf Avenue east pavement, block 2"
+   "Name": "Wharf Avenue sidewalk"
   },
   {
    "EntityId": 7264,
@@ -105059,7 +105059,7 @@
     "Y": 0.8,
     "Z": 6.8667
    },
-   "Name": "Wharf Avenue west pavement, block 3"
+   "Name": "Wharf Avenue sidewalk"
   },
   {
    "EntityId": 7266,
@@ -105074,7 +105074,7 @@
     "Y": 0.8,
     "Z": 6.8667
    },
-   "Name": "Wharf Avenue east pavement, block 3"
+   "Name": "Wharf Avenue sidewalk"
   },
   {
    "EntityId": 7267,
@@ -105104,7 +105104,7 @@
     "Y": 0.8,
     "Z": 6.8667
    },
-   "Name": "Wharf Avenue west pavement, block 4"
+   "Name": "Wharf Avenue sidewalk"
   },
   {
    "EntityId": 7269,
@@ -105119,7 +105119,7 @@
     "Y": 0.8,
     "Z": 6.8667
    },
-   "Name": "Wharf Avenue east pavement, block 4"
+   "Name": "Wharf Avenue sidewalk"
   },
   {
    "EntityId": 7270,
@@ -105149,7 +105149,7 @@
     "Y": 0.8,
     "Z": 6.8667
    },
-   "Name": "Wharf Avenue west pavement, block 5"
+   "Name": "Wharf Avenue sidewalk"
   },
   {
    "EntityId": 7272,
@@ -105164,7 +105164,7 @@
     "Y": 0.8,
     "Z": 6.8667
    },
-   "Name": "Wharf Avenue east pavement, block 5"
+   "Name": "Wharf Avenue sidewalk"
   },
   {
    "EntityId": 7273,
@@ -105194,7 +105194,7 @@
     "Y": 0.8,
     "Z": 6.8667
    },
-   "Name": "Wharf Avenue west pavement, block 6"
+   "Name": "Wharf Avenue sidewalk"
   },
   {
    "EntityId": 7275,
@@ -105209,7 +105209,7 @@
     "Y": 0.8,
     "Z": 6.8667
    },
-   "Name": "Wharf Avenue east pavement, block 6"
+   "Name": "Wharf Avenue sidewalk"
   },
   {
    "EntityId": 7276,
@@ -105239,7 +105239,7 @@
     "Y": 0.8,
     "Z": 6.0
    },
-   "Name": "Main Street west pavement, block 2"
+   "Name": "Main Street sidewalk"
   },
   {
    "EntityId": 7278,
@@ -105254,7 +105254,7 @@
     "Y": 0.8,
     "Z": 6.0
    },
-   "Name": "Main Street east pavement, block 2"
+   "Name": "Main Street sidewalk"
   },
   {
    "EntityId": 7279,
@@ -105284,7 +105284,7 @@
     "Y": 0.8,
     "Z": 6.0
    },
-   "Name": "Main Street west pavement, block 3"
+   "Name": "Main Street sidewalk"
   },
   {
    "EntityId": 7281,
@@ -105299,7 +105299,7 @@
     "Y": 0.8,
     "Z": 6.0
    },
-   "Name": "Main Street east pavement, block 3"
+   "Name": "Main Street sidewalk"
   },
   {
    "EntityId": 7282,
@@ -105329,7 +105329,7 @@
     "Y": 0.8,
     "Z": 6.0
    },
-   "Name": "Main Street west pavement, block 4"
+   "Name": "Main Street sidewalk"
   },
   {
    "EntityId": 7284,
@@ -105344,7 +105344,7 @@
     "Y": 0.8,
     "Z": 6.0
    },
-   "Name": "Main Street east pavement, block 4"
+   "Name": "Main Street sidewalk"
   },
   {
    "EntityId": 7285,
@@ -105374,7 +105374,7 @@
     "Y": 0.8,
     "Z": 6.0
    },
-   "Name": "Main Street west pavement, block 5"
+   "Name": "Main Street sidewalk"
   },
   {
    "EntityId": 7287,
@@ -105389,7 +105389,7 @@
     "Y": 0.8,
     "Z": 6.0
    },
-   "Name": "Main Street east pavement, block 5"
+   "Name": "Main Street sidewalk"
   },
   {
    "EntityId": 7288,
@@ -105419,7 +105419,7 @@
     "Y": 0.8,
     "Z": 6.0
    },
-   "Name": "Main Street west pavement, block 6"
+   "Name": "Main Street sidewalk"
   },
   {
    "EntityId": 7290,
@@ -105434,7 +105434,7 @@
     "Y": 0.8,
     "Z": 6.0
    },
-   "Name": "Main Street east pavement, block 6"
+   "Name": "Main Street sidewalk"
   },
   {
    "EntityId": 7291,
@@ -105464,7 +105464,7 @@
     "Y": 0.8,
     "Z": 6.0
    },
-   "Name": "Main Street west pavement, block 7"
+   "Name": "Main Street sidewalk"
   },
   {
    "EntityId": 7293,
@@ -105479,7 +105479,7 @@
     "Y": 0.8,
     "Z": 6.0
    },
-   "Name": "Main Street east pavement, block 7"
+   "Name": "Main Street sidewalk"
   },
   {
    "EntityId": 7294,
@@ -105509,7 +105509,7 @@
     "Y": 0.8,
     "Z": 6.0
    },
-   "Name": "Main Street west pavement, block 8"
+   "Name": "Main Street sidewalk"
   },
   {
    "EntityId": 7296,
@@ -105524,7 +105524,7 @@
     "Y": 0.8,
     "Z": 6.0
    },
-   "Name": "Main Street east pavement, block 8"
+   "Name": "Main Street sidewalk"
   },
   {
    "EntityId": 7297,
@@ -105554,7 +105554,7 @@
     "Y": 0.8,
     "Z": 6.0
    },
-   "Name": "Main Street west pavement, block 9"
+   "Name": "Main Street sidewalk"
   },
   {
    "EntityId": 7299,
@@ -105569,7 +105569,7 @@
     "Y": 0.8,
     "Z": 6.0
    },
-   "Name": "Main Street east pavement, block 9"
+   "Name": "Main Street sidewalk"
   },
   {
    "EntityId": 7300,
@@ -105599,7 +105599,7 @@
     "Y": 0.8,
     "Z": 6.0
    },
-   "Name": "Main Street west pavement, block 10"
+   "Name": "Main Street sidewalk"
   },
   {
    "EntityId": 7302,
@@ -105614,7 +105614,7 @@
     "Y": 0.8,
     "Z": 6.0
    },
-   "Name": "Main Street east pavement, block 10"
+   "Name": "Main Street sidewalk"
   },
   {
    "EntityId": 7303,
@@ -105644,7 +105644,7 @@
     "Y": 0.8,
     "Z": 6.0
    },
-   "Name": "Main Street west pavement, block 11"
+   "Name": "Main Street sidewalk"
   },
   {
    "EntityId": 7305,
@@ -105659,7 +105659,7 @@
     "Y": 0.8,
     "Z": 6.0
    },
-   "Name": "Main Street east pavement, block 11"
+   "Name": "Main Street sidewalk"
   },
   {
    "EntityId": 7306,
@@ -105689,7 +105689,7 @@
     "Y": 0.8,
     "Z": 6.0
    },
-   "Name": "Main Street west pavement, block 12"
+   "Name": "Main Street sidewalk"
   },
   {
    "EntityId": 7308,
@@ -105704,7 +105704,7 @@
     "Y": 0.8,
     "Z": 6.0
    },
-   "Name": "Main Street east pavement, block 12"
+   "Name": "Main Street sidewalk"
   },
   {
    "EntityId": 7309,
@@ -105734,7 +105734,7 @@
     "Y": 0.8,
     "Z": 6.8667
    },
-   "Name": "Calder Avenue west pavement, block 1"
+   "Name": "Calder Avenue sidewalk"
   },
   {
    "EntityId": 7311,
@@ -105749,7 +105749,7 @@
     "Y": 0.8,
     "Z": 6.8667
    },
-   "Name": "Calder Avenue east pavement, block 1"
+   "Name": "Calder Avenue sidewalk"
   },
   {
    "EntityId": 7312,
@@ -105779,7 +105779,7 @@
     "Y": 0.8,
     "Z": 6.8667
    },
-   "Name": "Calder Avenue west pavement, block 2"
+   "Name": "Calder Avenue sidewalk"
   },
   {
    "EntityId": 7314,
@@ -105794,7 +105794,7 @@
     "Y": 0.8,
     "Z": 6.8667
    },
-   "Name": "Calder Avenue east pavement, block 2"
+   "Name": "Calder Avenue sidewalk"
   },
   {
    "EntityId": 7315,
@@ -105824,7 +105824,7 @@
     "Y": 0.8,
     "Z": 6.8667
    },
-   "Name": "Calder Avenue west pavement, block 3"
+   "Name": "Calder Avenue sidewalk"
   },
   {
    "EntityId": 7317,
@@ -105839,7 +105839,7 @@
     "Y": 0.8,
     "Z": 6.8667
    },
-   "Name": "Calder Avenue east pavement, block 3"
+   "Name": "Calder Avenue sidewalk"
   },
   {
    "EntityId": 7318,
@@ -105869,7 +105869,7 @@
     "Y": 0.8,
     "Z": 6.8667
    },
-   "Name": "Calder Avenue west pavement, block 4"
+   "Name": "Calder Avenue sidewalk"
   },
   {
    "EntityId": 7320,
@@ -105884,7 +105884,7 @@
     "Y": 0.8,
     "Z": 6.8667
    },
-   "Name": "Calder Avenue east pavement, block 4"
+   "Name": "Calder Avenue sidewalk"
   },
   {
    "EntityId": 7321,
@@ -105914,7 +105914,7 @@
     "Y": 0.8,
     "Z": 6.8667
    },
-   "Name": "Calder Avenue west pavement, block 5"
+   "Name": "Calder Avenue sidewalk"
   },
   {
    "EntityId": 7323,
@@ -105929,7 +105929,7 @@
     "Y": 0.8,
     "Z": 6.8667
    },
-   "Name": "Calder Avenue east pavement, block 5"
+   "Name": "Calder Avenue sidewalk"
   },
   {
    "EntityId": 7324,
@@ -105959,7 +105959,7 @@
     "Y": 0.8,
     "Z": 6.8667
    },
-   "Name": "Calder Avenue west pavement, block 6"
+   "Name": "Calder Avenue sidewalk"
   },
   {
    "EntityId": 7326,
@@ -105974,7 +105974,7 @@
     "Y": 0.8,
     "Z": 6.8667
    },
-   "Name": "Calder Avenue east pavement, block 6"
+   "Name": "Calder Avenue sidewalk"
   },
   {
    "EntityId": 7327,
@@ -106349,7 +106349,7 @@
     "Y": 0.8,
     "Z": 0.35
    },
-   "Name": "Dock Street south pavement, block 1"
+   "Name": "Dock Street sidewalk"
   },
   {
    "EntityId": 7352,
@@ -106364,7 +106364,7 @@
     "Y": 0.8,
     "Z": 0.35
    },
-   "Name": "Dock Street north pavement, block 1"
+   "Name": "Dock Street sidewalk"
   },
   {
    "EntityId": 7353,
@@ -106379,7 +106379,7 @@
     "Y": 0.8,
     "Z": 0.35
    },
-   "Name": "Dock Street south pavement, block 2"
+   "Name": "Dock Street sidewalk"
   },
   {
    "EntityId": 7354,
@@ -106394,7 +106394,7 @@
     "Y": 0.8,
     "Z": 0.35
    },
-   "Name": "Dock Street north pavement, block 2"
+   "Name": "Dock Street sidewalk"
   },
   {
    "EntityId": 7355,
@@ -106409,7 +106409,7 @@
     "Y": 0.8,
     "Z": 0.35
    },
-   "Name": "Dock Street south pavement, block 3"
+   "Name": "Dock Street sidewalk"
   },
   {
    "EntityId": 7356,
@@ -106424,7 +106424,7 @@
     "Y": 0.8,
     "Z": 0.35
    },
-   "Name": "Dock Street north pavement, block 3"
+   "Name": "Dock Street sidewalk"
   },
   {
    "EntityId": 7357,
@@ -106439,7 +106439,7 @@
     "Y": 0.8,
     "Z": 0.35
    },
-   "Name": "Dock Street south pavement, block 4"
+   "Name": "Dock Street sidewalk"
   },
   {
    "EntityId": 7358,
@@ -106454,7 +106454,7 @@
     "Y": 0.8,
     "Z": 0.35
    },
-   "Name": "Dock Street north pavement, block 4"
+   "Name": "Dock Street sidewalk"
   },
   {
    "EntityId": 7359,
@@ -106469,7 +106469,7 @@
     "Y": 0.8,
     "Z": 0.35
    },
-   "Name": "Central Street south pavement, block 1"
+   "Name": "Central Street sidewalk"
   },
   {
    "EntityId": 7360,
@@ -106484,7 +106484,7 @@
     "Y": 0.8,
     "Z": 0.35
    },
-   "Name": "Central Street north pavement, block 1"
+   "Name": "Central Street sidewalk"
   },
   {
    "EntityId": 7361,
@@ -106499,7 +106499,7 @@
     "Y": 0.8,
     "Z": 0.35
    },
-   "Name": "Central Street south pavement, block 2"
+   "Name": "Central Street sidewalk"
   },
   {
    "EntityId": 7362,
@@ -106514,7 +106514,7 @@
     "Y": 0.8,
     "Z": 0.35
    },
-   "Name": "Central Street north pavement, block 2"
+   "Name": "Central Street sidewalk"
   },
   {
    "EntityId": 7363,
@@ -106529,7 +106529,7 @@
     "Y": 0.8,
     "Z": 0.35
    },
-   "Name": "Central Street south pavement, block 3"
+   "Name": "Central Street sidewalk"
   },
   {
    "EntityId": 7364,
@@ -106544,7 +106544,7 @@
     "Y": 0.8,
     "Z": 0.35
    },
-   "Name": "Central Street north pavement, block 3"
+   "Name": "Central Street sidewalk"
   },
   {
    "EntityId": 7365,
@@ -106559,7 +106559,7 @@
     "Y": 0.8,
     "Z": 0.35
    },
-   "Name": "Central Street south pavement, block 4"
+   "Name": "Central Street sidewalk"
   },
   {
    "EntityId": 7366,
@@ -106574,7 +106574,7 @@
     "Y": 0.8,
     "Z": 0.35
    },
-   "Name": "Central Street north pavement, block 4"
+   "Name": "Central Street sidewalk"
   },
   {
    "EntityId": 7367,
@@ -106589,7 +106589,7 @@
     "Y": 0.8,
     "Z": 0.35
    },
-   "Name": "Central Street south pavement, block 5"
+   "Name": "Central Street sidewalk"
   },
   {
    "EntityId": 7368,
@@ -106604,7 +106604,7 @@
     "Y": 0.8,
     "Z": 0.35
    },
-   "Name": "Central Street north pavement, block 5"
+   "Name": "Central Street sidewalk"
   },
   {
    "EntityId": 7369,
@@ -106619,7 +106619,7 @@
     "Y": 0.8,
     "Z": 0.35
    },
-   "Name": "Central Street south pavement, block 6"
+   "Name": "Central Street sidewalk"
   },
   {
    "EntityId": 7370,
@@ -106634,7 +106634,7 @@
     "Y": 0.8,
     "Z": 0.35
    },
-   "Name": "Central Street north pavement, block 6"
+   "Name": "Central Street sidewalk"
   },
   {
    "EntityId": 7371,
@@ -106649,7 +106649,7 @@
     "Y": 0.8,
     "Z": 0.35
    },
-   "Name": "Central Street south pavement, block 7"
+   "Name": "Central Street sidewalk"
   },
   {
    "EntityId": 7372,
@@ -106664,7 +106664,7 @@
     "Y": 0.8,
     "Z": 0.35
    },
-   "Name": "Central Street north pavement, block 7"
+   "Name": "Central Street sidewalk"
   },
   {
    "EntityId": 7373,
@@ -106679,7 +106679,7 @@
     "Y": 0.8,
     "Z": 0.35
    },
-   "Name": "Central Street south pavement, block 8"
+   "Name": "Central Street sidewalk"
   },
   {
    "EntityId": 7374,
@@ -106694,7 +106694,7 @@
     "Y": 0.8,
     "Z": 0.35
    },
-   "Name": "Central Street north pavement, block 8"
+   "Name": "Central Street sidewalk"
   },
   {
    "EntityId": 7375,
@@ -106709,7 +106709,7 @@
     "Y": 0.8,
     "Z": 0.35
    },
-   "Name": "Central Street south pavement, block 9"
+   "Name": "Central Street sidewalk"
   },
   {
    "EntityId": 7376,
@@ -106724,7 +106724,7 @@
     "Y": 0.8,
     "Z": 0.35
    },
-   "Name": "Central Street north pavement, block 9"
+   "Name": "Central Street sidewalk"
   },
   {
    "EntityId": 7377,
@@ -106739,7 +106739,7 @@
     "Y": 0.8,
     "Z": 0.35
    },
-   "Name": "Central Street south pavement, block 10"
+   "Name": "Central Street sidewalk"
   },
   {
    "EntityId": 7378,
@@ -106754,7 +106754,7 @@
     "Y": 0.8,
     "Z": 0.35
    },
-   "Name": "Central Street north pavement, block 10"
+   "Name": "Central Street sidewalk"
   },
   {
    "EntityId": 7379,
@@ -106769,7 +106769,7 @@
     "Y": 0.8,
     "Z": 0.35
    },
-   "Name": "Foundry Street south pavement, block 1"
+   "Name": "Foundry Street sidewalk"
   },
   {
    "EntityId": 7380,
@@ -106784,7 +106784,7 @@
     "Y": 0.8,
     "Z": 0.35
    },
-   "Name": "Foundry Street north pavement, block 1"
+   "Name": "Foundry Street sidewalk"
   },
   {
    "EntityId": 7381,
@@ -106799,7 +106799,7 @@
     "Y": 0.8,
     "Z": 0.35
    },
-   "Name": "Foundry Street south pavement, block 2"
+   "Name": "Foundry Street sidewalk"
   },
   {
    "EntityId": 7382,
@@ -106814,7 +106814,7 @@
     "Y": 0.8,
     "Z": 0.35
    },
-   "Name": "Foundry Street north pavement, block 2"
+   "Name": "Foundry Street sidewalk"
   },
   {
    "EntityId": 7383,
@@ -106829,7 +106829,7 @@
     "Y": 0.8,
     "Z": 0.35
    },
-   "Name": "Foundry Street south pavement, block 3"
+   "Name": "Foundry Street sidewalk"
   },
   {
    "EntityId": 7384,
@@ -106844,7 +106844,7 @@
     "Y": 0.8,
     "Z": 0.35
    },
-   "Name": "Foundry Street north pavement, block 3"
+   "Name": "Foundry Street sidewalk"
   },
   {
    "EntityId": 7385,
@@ -106859,7 +106859,7 @@
     "Y": 0.8,
     "Z": 0.35
    },
-   "Name": "Foundry Street south pavement, block 4"
+   "Name": "Foundry Street sidewalk"
   },
   {
    "EntityId": 7386,
@@ -106874,7 +106874,7 @@
     "Y": 0.8,
     "Z": 0.35
    },
-   "Name": "Foundry Street north pavement, block 4"
+   "Name": "Foundry Street sidewalk"
   },
   {
    "EntityId": 7387,
@@ -106889,7 +106889,7 @@
     "Y": 0.8,
     "Z": 0.35
    },
-   "Name": "Foundry Street south pavement, block 5"
+   "Name": "Foundry Street sidewalk"
   },
   {
    "EntityId": 7388,
@@ -106904,7 +106904,7 @@
     "Y": 0.8,
     "Z": 0.35
    },
-   "Name": "Foundry Street north pavement, block 5"
+   "Name": "Foundry Street sidewalk"
   },
   {
    "EntityId": 7389,
@@ -106919,7 +106919,7 @@
     "Y": 0.8,
     "Z": 0.35
    },
-   "Name": "Foundry Street south pavement, block 6"
+   "Name": "Foundry Street sidewalk"
   },
   {
    "EntityId": 7390,
@@ -106934,7 +106934,7 @@
     "Y": 0.8,
     "Z": 0.35
    },
-   "Name": "Foundry Street north pavement, block 6"
+   "Name": "Foundry Street sidewalk"
   },
   {
    "EntityId": 7391,
@@ -106949,7 +106949,7 @@
     "Y": 0.8,
     "Z": 0.35
    },
-   "Name": "North Street south pavement, block 1"
+   "Name": "North Street sidewalk"
   },
   {
    "EntityId": 7392,
@@ -106964,7 +106964,7 @@
     "Y": 0.8,
     "Z": 0.35
    },
-   "Name": "North Street north pavement, block 1"
+   "Name": "North Street sidewalk"
   },
   {
    "EntityId": 7393,
@@ -106979,7 +106979,7 @@
     "Y": 0.8,
     "Z": 0.35
    },
-   "Name": "North Street south pavement, block 2"
+   "Name": "North Street sidewalk"
   },
   {
    "EntityId": 7394,
@@ -106994,7 +106994,7 @@
     "Y": 0.8,
     "Z": 0.35
    },
-   "Name": "North Street north pavement, block 2"
+   "Name": "North Street sidewalk"
   },
   {
    "EntityId": 7395,
@@ -107009,7 +107009,7 @@
     "Y": 0.8,
     "Z": 0.35
    },
-   "Name": "North Street south pavement, block 3"
+   "Name": "North Street sidewalk"
   },
   {
    "EntityId": 7396,
@@ -107024,7 +107024,7 @@
     "Y": 0.8,
     "Z": 0.35
    },
-   "Name": "North Street north pavement, block 3"
+   "Name": "North Street sidewalk"
   },
   {
    "EntityId": 7397,
@@ -107039,7 +107039,7 @@
     "Y": 0.8,
     "Z": 0.35
    },
-   "Name": "North Street south pavement, block 4"
+   "Name": "North Street sidewalk"
   },
   {
    "EntityId": 7398,
@@ -107054,7 +107054,7 @@
     "Y": 0.8,
     "Z": 0.35
    },
-   "Name": "North Street north pavement, block 4"
+   "Name": "North Street sidewalk"
   },
   {
    "EntityId": 7399,

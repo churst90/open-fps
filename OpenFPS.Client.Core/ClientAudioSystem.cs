@@ -928,6 +928,10 @@ public class ClientAudioSystem
     /// Derived, not authored: no map has to label a kerb, and a surface nobody has named still
     /// announces itself correctly.
     /// </summary>
+    /// <summary>The name of a roofed spot no zone covers: a doorway between two rooms, a gap between
+    /// two zones' boxes. A condition, not a place, so it is never announced on its own.</summary>
+    internal const string UnderShelter = "Under Shelter";
+
     internal static string NameOfPlace(AcousticMap? map, int regionId, string material, float shelter)
     {
         RegionComponent? global = null;
@@ -937,9 +941,9 @@ public class ClientAudioSystem
                 return reg.FriendlyName;
             if (regionId == AcousticConstants.GlobalRegionId) global = reg;
         }
-        if (shelter > 0.8f) return "Under Shelter";
+        if (shelter > 0.8f) return UnderShelter;
         string ground = OutdoorNameFor(material);
-        if (ground == "outside" && !string.IsNullOrWhiteSpace(global?.FriendlyName)) return global.Value.FriendlyName;
+        if (ground == Outside && !string.IsNullOrWhiteSpace(global?.FriendlyName)) return global.Value.FriendlyName;
         return ground;
     }
 
@@ -958,8 +962,11 @@ public class ClientAudioSystem
         "Wood" => "boardwalk",
         "Metal" => "metal grating",
         "Water" => "water",
-        _ => "outside",
+        _ => Outside,
     };
+
+    /// <summary>Open ground of no recognised surface, outside every zone.</summary>
+    internal const string Outside = "outside";
 
     /// <summary>
     /// Decides which physical models run live — standing machines and aircraft — by picking the ones

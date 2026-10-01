@@ -31,7 +31,7 @@ public sealed class WinFormsClientShell : IClientShell
     /// command console nor the quit prompt is open — otherwise the player would walk while typing.</summary>
     public bool IsGameInputActive => _gameWindow is { IsWindowActive: true, IsModalOpen: false };
 
-    public void ShowLoading(string status) => _navigation.ShowLoading(status);
+    public void ShowLoading(string status, bool speak = true) => _navigation.ShowLoading(status);
 
     public void UpdateLoadingStatus(string text, int percent) => _navigation.UpdateLoadingStatus(text, percent);
 

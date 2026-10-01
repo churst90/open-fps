@@ -59,7 +59,7 @@ internal sealed class GtkClientShell : IClientShell
 
     // ── IClientShell ────────────────────────────────────────────────────────────
 
-    public void ShowLoading(string status) => OnUi(() =>
+    public void ShowLoading(string status, bool speak = true) => OnUi(() =>
     {
         if (_loadingWindow == null)
         {
@@ -83,7 +83,7 @@ internal sealed class GtkClientShell : IClientShell
         }
 
         _loadingWindow.Present();
-        _speech.Speak(status, interrupt: true);
+        if (speak) _speech.Speak(status, interrupt: true);
     });
 
     public void UpdateLoadingStatus(string text, int percent) => OnUi(() =>

@@ -43,7 +43,7 @@ public class ScreenReaderKeyTests
     {
         public bool IsGameInputActive { get; set; } = true;
         public event Action<string>? CommandEntered;
-        public void ShowLoading(string status) { }
+        public void ShowLoading(string status, bool speak = true) { }
         public void UpdateLoadingStatus(string text, int percent) { }
         public void EnterGame() { }
         public void OpenCommandConsole() { }
