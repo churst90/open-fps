@@ -1104,6 +1104,7 @@ public sealed class ClientGameSession : IDisposable
         int region = _state.CurrentRegionId;
         if (region == _lastAnnouncedRegionId) return;
         _lastAnnouncedRegionId = region;
+        Serilog.Log.Information("[ZONE] {Id} '{Name}' at {Pos}", region, _state.CurrentRegion, _state.Position);
 
         // ...and the NAME has to have changed too, which is the other half of it.
         //

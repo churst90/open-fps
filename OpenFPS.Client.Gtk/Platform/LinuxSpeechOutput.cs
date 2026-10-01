@@ -57,7 +57,12 @@ public sealed class LinuxSpeechOutput : ISpeechOutput
         return useOrca ? _orca : _dispatcher;
     }
 
-    public void Speak(string text, bool interrupt = true) => Current().Speak(text, interrupt);
+    public void Speak(string text, bool interrupt = true)
+    {
+        // Every spoken line in the log, so "what said that?" has an answer after a session.
+        Serilog.Log.Information("[SAY] {Text}", text);
+        Current().Speak(text, interrupt);
+    }
 
     public void Interrupt() => Current().Interrupt();
 
