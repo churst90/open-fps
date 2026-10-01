@@ -108,6 +108,44 @@ public sealed class WorldAudioPlayer
     /// <see cref="OpenFPS.Client.AudioEngine.Acoustics.AsyncAcousticWorker.TryGetNearby"/>.</summary>
     public OpenFPS.Client.AudioEngine.Acoustics.AsyncAcousticWorker? Worker { get; set; }
 
+    /// <summary>
+    /// The id the simulator files its answer for a sounding entity under: somebody talking, or the
+    /// thing a one-shot came from. Never a voice — only a question to the worker — and in a band of its
+    /// own below every voice band (the horns' at -1,200,000 is the lowest).
+    ///
+    /// A transient voice is never asked about by the per-frame loop (ClientAudioSystem skips ids below
+    /// -5000), so a voice and a one-shot from somewhere nothing else was sounding fell back to the
+    /// hand-rolled tracer for the whole of its life. Asked about by its source instead, a talker is
+    /// carried by the simulator from the line's first tick on, and so is the next sound from the
+    /// same place (<see cref="AsyncAcousticWorker.TryGetNearby"/>).
+    /// </summary>
+    internal const int SourceProbeBase = -3_000_000;
+    internal static int SourceProbeId(int entityId) => SourceProbeBase - entityId;
+
+    /// <summary>Asks the simulator about a sounding entity, at the point the sound leaves it.</summary>
+    private void AskAbout(int entityId, Vector3 listener, Vector3 at)
+        => Worker?.EnqueueRequest(new AcousticRequest
+        {
+            EntityId = SourceProbeId(entityId), ListenerPos = listener, SourcePos = at,
+            SourceRadius = AudioEmission.MinOcclusionRadius,
+        });
+
+    /// <summary>The simulator's answer for a sounding entity, if it has one for about this point,
+    /// moved to it.</summary>
+    private bool TryAsked(int entityId, Vector3 at, out AcousticPathData path)
+    {
+        path = default;
+        if (Worker == null || !Worker.TryGetResult(SourceProbeId(entityId), out var paths)) return false;
+        foreach (var p in paths)
+        {
+            if (p.IsReflection) continue;
+            if (Vector3.Distance(p.SourcePosition, at) > 1f) return false;
+            path = p with { ApparentPosition = p.ApparentPosition + (at - p.SourcePosition), SourcePosition = at };
+            return true;
+        }
+        return false;
+    }
+
     public WorldAudioPlayer(AudioEngineFacade audio, SpatialAcoustics acoustics)
     {
         _audio = audio;
@@ -288,8 +326,18 @@ public sealed class WorldAudioPlayer
                     EqLow = MathF.Pow(10f, item.EchoLowDb / 20f), EqHigh = MathF.Pow(10f, item.EchoHighDb / 20f),
                     ApertureFactor = 1f, TransmissionBleed = 0f, ApparentPosition = item.Sound.Position,
                 };
-            // Start where the simulator will put it, not where the hand-rolled tracer guesses: the
-            // simulator's answer for the nearest source it heard a moment ago, moved to this one.
+            // Start where the simulator will put it, not where the hand-rolled tracer guesses: its
+            // answer for this sound's source, or for the nearest source it heard a moment ago, moved
+            // to this one.
+            else if (item.SourceEntityId >= 0 && TryAsked(item.SourceEntityId, item.Sound.Position, out var asked))
+            {
+                path = path with
+                {
+                    Occlusion = asked.Occlusion, EqLow = asked.EqLow, EqMid = asked.EqMid, EqHigh = asked.EqHigh,
+                    TransmissionBleed = asked.TransmissionBleed, ApertureFactor = asked.ApertureFactor,
+                    ApparentPosition = asked.ApparentPosition, EffectiveDistance = asked.EffectiveDistance,
+                };
+            }
             else if (Worker != null && Worker.TryGetNearby(listenerPosition, item.Sound.Position, out var near))
             {
                 Vector3 moved = item.Sound.Position - near.SourcePosition;
@@ -306,6 +354,10 @@ public sealed class WorldAudioPlayer
             // Placed at its own SIZE if it has one. A grandstand full of people is eight metres
             // across, and inside that the level is flat; beyond it, it falls away exactly as a point
             // source of the same power would, which is what the gain compensation in there is for.
+            // And ask about where it came from, so the next sound from there — the rest of this line,
+            // the next step, the next shot — starts on the simulator's answer.
+            if (!item.IsReflection && item.SourceEntityId >= 0)
+                AskAbout(item.SourceEntityId, listenerPosition, item.Sound.Position);
             var placed = Loudness.Place(item.Sound.LevelDb, item.Sound.ExtentMetres);
             // A COPY keeps its source's placement. The placement compresses level differences between
             // sounds (Loudness.DynamicRangeCompression, 0.45 shipped) — right between a rifle and a
@@ -472,7 +524,11 @@ public sealed class WorldAudioPlayer
                 continue;
             }
             var at = speaker.Transform.Position + f.Offset;
-            var path = _acoustics.CalculateAcousticPath(world, f.SourceEntityId, listenerPosition, at);
+            // The simulator's answer for the speaker, as for any other source; the hand-rolled tracer
+            // only until it has one.
+            AskAbout(f.SourceEntityId, listenerPosition, at);
+            if (!TryAsked(f.SourceEntityId, at, out var path))
+                path = _acoustics.CalculateAcousticPath(world, f.SourceEntityId, listenerPosition, at);
             var e = f.Emitter;
             e.Position = at;
             e.Velocity = speaker.Velocity;
