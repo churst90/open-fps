@@ -19,14 +19,12 @@ public class SpatialAcoustics
     private readonly SpatialService _spatial;
     /// <summary>The geometry queries this answers from, for a caller that needs one plain ray.</summary>
     public SpatialService Spatial => _spatial;
-    private readonly AcousticPathfinder _pathfinder;
 
     public SpatialAcoustics() : this(new SpatialService()) { }
 
     public SpatialAcoustics(SpatialService spatial)
     {
         _spatial = spatial;
-        _pathfinder = new AcousticPathfinder(spatial);
     }
 
     /// <summary>
@@ -38,7 +36,7 @@ public class SpatialAcoustics
         var localPlayer = world.Entities.Values.FirstOrDefault(e => e.Definition.Type == EntityType.Player && Vector3.Distance(e.Transform.Position, listenerPos) < 2.0f);
         int localPlayerId = (localPlayer.Id != 0) ? localPlayer.Id : AcousticConstants.GlobalRegionId;
 
-        // 1. Main Direct Path (includes portal diffraction)
+        // 1. Main path: through the walls, or by the openings where that delivers more
         rawResults.Add(CalculateMainPath(world, entityId, listenerPos, sourcePos, localPlayerId));
 
         // 2. Early reflections — the copies the surfaces send back.
@@ -102,6 +100,48 @@ public class SpatialAcoustics
         return solids;
     }
 
+    // ── The routes through the openings ─────────────────────────────────────────────────────────
+    //
+    // One model for every voice: the occlusion worker builds it with each scene (the leaves where they
+    // stand) and hands it here, so a footstep, a bird or a word asks the same graph a car does. Until
+    // it has — or where there is no simulator at all — one is built here from the world, again whenever
+    // the map changes or a door leaf moves.
+    private volatile OpeningRoutes? _routes;
+    private OpeningRoutes? _localRoutes;
+    private object? _localRoutesMap;
+    private long _localRoutesDoors;
+    private readonly object _localRoutesLock = new();
+
+    /// <summary>The graph the occlusion worker built with its scene. Null hands it back to the local one.</summary>
+    public OpeningRoutes? Routes { get => _routes; set => _routes = value; }
+
+    /// <summary>The graph to ask: the worker's, or one built from this world.</summary>
+    public OpeningRoutes? RoutesFor(WorldSnapshot world)
+    {
+        var shared = _routes;
+        if (shared != null) return shared;
+        if (world.AcousticMap == null) return null;
+        long doors = 17;
+        foreach (var snap in world.Entities.Values)
+        {
+            if (!OpeningGraph.IsDoorLeaf(snap.Definition)) continue;
+            var p = snap.Transform.Position; var q = snap.Transform.Rotation;
+            doors = doors * 31 + snap.Id;
+            doors = doors * 31 + (long)MathF.Round(p.X * 100f); doors = doors * 31 + (long)MathF.Round(p.Z * 100f);
+            doors = doors * 31 + (long)MathF.Round(q.Y * 100f); doors = doors * 31 + (long)MathF.Round(q.W * 100f);
+        }
+        lock (_localRoutesLock)
+        {
+            if (_localRoutes != null && ReferenceEquals(_localRoutesMap, world.AcousticMap) && _localRoutesDoors == doors)
+                return _localRoutes;
+            var boxes = OpenFPS.Client.Core.AudioEngine.SteamAudio.SteamAudioScene.BoxesFromWorld(world);
+            _localRoutes = OpeningGraph.Build(world, boxes, p => GetRegionAt(world, p));
+            _localRoutesMap = world.AcousticMap;
+            _localRoutesDoors = doors;
+            return _localRoutes;
+        }
+    }
+
     private AcousticPathData CalculateMainPath(WorldSnapshot world, int entityId, Vector3 listenerPos, Vector3 sourcePos, int localPlayerId)
     {
         // C5: Both the emitter entity and the local player entity are excluded from all rays,
@@ -111,56 +151,28 @@ public class SpatialAcoustics
         _spatial.GetMultiPointOcclusionData(world, listenerPos, sourcePos, out float directOcclusion, out float directBleed, out float eqL, out float eqM, out float eqH, ignoreA, ignoreB);
 
         float directDist = Vector3.Distance(listenerPos, sourcePos);
-        var portalPath = _pathfinder.FindPath(world, listenerPos, sourcePos);
-
-        float finalOcclusion = directOcclusion;
         Vector3 apparentPos = sourcePos;
-        float finalEffectiveDist = directDist;
-        float finalAperture = 1.0f;
-        float finalBleed = directBleed;
         // Through the walls: the band gains themselves (SpatialService, WallTransmission).
         float gainL = eqL, gainM = eqM, gainH = eqH;
 
-        if (portalPath.Found)
+        // ...and by the openings, where those deliver more (OpeningRoutes): the same rule, and the same
+        // graph, as the simulator's path.
+        int listenerRegionId = GetRegionAt(world, listenerPos);
+        var routes = RoutesFor(world);
+        if (routes != null
+            && routes.Route(sourcePos, GetRegionAt(world, sourcePos), listenerPos, listenerRegionId, out var route))
         {
-            _spatial.GetOcclusionData(world, listenerPos, portalPath.ApparentPos, out float portalDirectOcclusion, out _, out _, out _, out _, localPlayerId);
-            
-            float detourFactor = portalPath.EffectiveDist / Math.Max(0.1f, directDist);
-            float detourPenalty = Math.Clamp((detourFactor - 1.0f) * AcousticConstants.DetourPenaltyMultiplier, 0.0f, AcousticConstants.DetourPenaltyCap);
-            
-            float distToPortal = Vector3.Distance(listenerPos, portalPath.ApparentPos);
-            float apertureRatio = portalPath.MinAperture / Math.Max(1.0f, distToPortal);
-            float aperturePenalty = Math.Clamp(1.0f - (apertureRatio * 1.5f), 0.0f, 0.7f);
-            
-            float indirectOcclusion = Math.Clamp(portalDirectOcclusion + detourPenalty + (aperturePenalty * AcousticConstants.AperturePenaltyMultiplier), 0.0f, 1.0f);
-
-            // The route through the opening, per band: the part of it that is not blocked, shaped by
-            // how much the opening muffles each band.
-            static float Shape(float weight, float maxDb) => MathF.Pow(10f, (1f - Math.Clamp(weight, 0f, 1f)) * maxDb / 20f);
-            float through = 1f - Math.Min(indirectOcclusion, AcousticConstants.OcclusionCap);
-            float pL = through * Shape(1.0f - (portalPath.MuffleL * 0.5f), AcousticConstants.OcclusionMaxLowMuffleDb);
-            float pM = through * Shape(1.0f - (portalPath.MuffleM * 0.7f), AcousticConstants.OcclusionMaxMidMuffleDb);
-            float pH = through * Shape(1.0f - portalPath.MuffleH, AcousticConstants.OcclusionMaxHighMuffleDb);
-
-            // Per band, the better route wins (as on the simulator's path: through the wall or round
-            // it); the route that delivers the most decides where the sound is heard from.
-            if (MathF.Max(pL, MathF.Max(pM, pH)) > MathF.Max(gainL, MathF.Max(gainM, gainH)))
-            {
-                finalOcclusion = indirectOcclusion;
-                float morphFactor = Math.Clamp(distToPortal / 5.0f, 0f, 1f);
-                apparentPos = Vector3.Lerp(portalPath.ApparentPos, portalPath.ApparentPos + new Vector3(0, 0.5f, 0), morphFactor * 0.2f);
-                finalEffectiveDist = portalPath.EffectiveDist;
-                finalAperture = Math.Clamp(apertureRatio * 2.0f, 0.1f, 1.0f);
-                // A small aperture passes less than a missing wall, even in plain view.
-                float apertureChoke = Math.Clamp(portalPath.MinAperture / 2.0f, 0.3f, 1.0f);
-                finalBleed = directBleed * 0.2f * apertureChoke;
-            }
-            gainL = MathF.Max(gainL, pL); gainM = MathF.Max(gainM, pM); gainH = MathF.Max(gainH, pH);
+            var g = OpeningRoutes.Better(new Vector3(gainL, gainM, gainH), route, out bool routeWins);
+            gainL = g.X; gainM = g.Y; gainH = g.Z;
+            // Heard from the opening it arrives through, at the source's own distance: the level has
+            // already paid for the longer way round.
+            Vector3 toOpening = route.Apparent - listenerPos;
+            if (routeWins && toOpening.LengthSquared() > 1e-6f)
+                apparentPos = listenerPos + Vector3.Normalize(toOpening) * directDist;
         }
 
-        int listenerRegionId = GetRegionAt(world, listenerPos);
         // What the air took, per band (ISO 9613-1): the same law the Steam Audio path uses.
-        var air = AudioPhysics.AirLossDb(finalEffectiveDist, world.Humidity, world.Temperature,
+        var air = AudioPhysics.AirLossDb(directDist, world.Humidity, world.Temperature,
                                          world.AirPressure, world.AirAbsorptionMultiplier);
 
         int regionId = GetRegionAt(world, sourcePos + new Vector3(0, 0.5f, 0));
@@ -176,11 +188,11 @@ public class SpatialAcoustics
         }
 
         // The mixer takes each band's gain as the WHOLE of what the path does to that band, applied
-        // once, and these are those gains: what came through the walls, or round by an opening where
-        // that delivers more. The broadband occlusion is read off them, for whatever ranks voices by it.
-        finalOcclusion = Math.Min(Math.Min(finalOcclusion, 1f - MathF.Max(gainL, MathF.Max(gainM, gainH))),
-                                  AcousticConstants.OcclusionCap);
-        var pathData = new AcousticPathData(finalOcclusion, apparentPos, finalEffectiveDist, 0f, finalAperture, finalBleed, regionId,
+        // once, and these are those gains: what came through the walls, or by the openings where that
+        // delivers more. The broadband occlusion is read off them, for whatever ranks voices by it.
+        float occlusion = Math.Min(Math.Min(directOcclusion, 1f - MathF.Max(gainL, MathF.Max(gainM, gainH))),
+                                   AcousticConstants.OcclusionCap);
+        var pathData = new AcousticPathData(occlusion, apparentPos, directDist, 0f, 1f, directBleed, regionId,
             gainL, gainM, gainH);
         pathData.RoomGain = roomGain;
         (pathData.AirLowDb, pathData.AirMidDb, pathData.AirHighDb) = air;

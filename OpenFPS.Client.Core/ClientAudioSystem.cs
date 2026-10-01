@@ -1705,13 +1705,7 @@ public class ClientAudioSystem
             if (!OpenFPS.Common.MachineRegistry.Knows(preset)
                 || OpenFPS.Common.MachineRegistry.VehicleFor(preset).Siren is not { } sirenKey) continue;
             _sirenCars.Add(snap.Id);
-            AcousticPathData path;
-            if (_acousticWorker.TryGetResult(snap.Id, out var paths)) path = paths.FirstOrDefault(p => !p.IsReflection);
-            else
-            {
-                var at = OpenFPS.Common.AudioEmission.PointFor(snap);
-                path = new AcousticPathData(0f, at, Vector3.Distance(eyePos, at));
-            }
+            var path = VehiclePath(world, snap, eyePos);
             SirenVoice(snap, sirenKey, path, world.PositionsSampledAt, eyePos);
         }
         _sirensGone.Clear();
@@ -1721,6 +1715,28 @@ public class ClientAudioSystem
             _sirenVoiced.Remove(id);
             _audio.StopSound(SirenVoiceBase - Math.Abs(id));
         }
+    }
+
+    /// <summary>
+    /// The path for a horn or a siren on a vehicle: the occlusion worker's answer for the vehicle. A
+    /// vehicle whose engine did not win a voice is not asked about by the per-voice pass, so it is asked
+    /// about here; and until an answer comes the one-shots' path stands in, which has the same walls and
+    /// the same routes by the openings. "No answer" is never "nothing in the way": that played a horn
+    /// behind three buildings at full level until the vehicle happened to be asked about.
+    /// </summary>
+    private AcousticPathData VehiclePath(WorldSnapshot world, EntitySnapshot snap, Vector3 eyePos)
+    {
+        var at = OpenFPS.Common.AudioEmission.PointFor(snap);
+        if (!_audio.IsPlaying(snap.Id))
+            _acousticWorker.EnqueueRequest(new AcousticRequest
+            {
+                EntityId = snap.Id, ListenerPos = eyePos, SourcePos = at,
+                SourceRadius = OpenFPS.Common.AudioEmission.OcclusionRadiusFor(snap),
+            });
+        if (_acousticWorker.TryGetResult(snap.Id, out var paths))
+            foreach (var p in paths)
+                if (!p.IsReflection) return p;
+        return _acoustics.CalculateAcousticPath(world, snap.Id, eyePos, at);
     }
 
     /// <summary>Voice ids for a vehicle's horn, one per vehicle.</summary>
@@ -1760,13 +1776,7 @@ public class ClientAudioSystem
                 _hornsDone.Add(id);
                 continue;
             }
-            AcousticPathData path;
-            if (_acousticWorker.TryGetResult(id, out var paths)) path = paths.FirstOrDefault(p => !p.IsReflection);
-            else
-            {
-                var at = OpenFPS.Common.AudioEmission.PointFor(snap);
-                path = new AcousticPathData(0f, at, Vector3.Distance(eyePos, at));
-            }
+            var path = VehiclePath(world, snap, eyePos);
             // Behind a car's grille, a little above the bumper; on a locomotive's cab roof.
             bool rail = snap.Definition.SoundEmitter.SoundId?.StartsWith("rail:", StringComparison.OrdinalIgnoreCase) == true;
             Vector3 pos = snap.Transform.Position

@@ -170,7 +170,6 @@ public class SpatialService
             {
                 var transform = entitySnap.Transform;
                 bool intersected = false;
-                Vector3 hitPoint = transform.Position; // updated in Box branch
                 // The panel the sound goes through (its smallest dimension is its thickness, the other
                 // two its face) and how many times it goes through it.
                 Vector3 panel = def.Collider.Size;
@@ -185,7 +184,6 @@ public class SpatialService
                         if (exitFromStart > entry)
                         {
                             intersected = true;
-                            hitPoint = nudgedStart + rayDir * entry;
                             if (def.Acoustics.IsHollow)
                             {
                                 // A hollow shell is walls of its shell thickness round an empty inside:
@@ -213,25 +211,16 @@ public class SpatialService
                     {
                         float clampedEx = Math.Min(ex, dist);
                         // A round thing is as thick as the chord the sound crosses it by.
-                        if (clampedEx > en) { panel = new Vector3(clampedEx - en, def.Collider.Size.X, def.Collider.Size.Y); hitPoint = nudgedStart + rayDir * en; }
+                        if (clampedEx > en) { panel = new Vector3(clampedEx - en, def.Collider.Size.X, def.Collider.Size.Y); }
                         else intersected = false;
                     }
                 }
 
-                // C4: Portal-aware occlusion.
-                // If the ray's hit point lies within a portal aperture, the opening is unobstructed — skip this wall.
-                if (intersected && world.AcousticMap != null)
-                {
-                    foreach (var kvp in world.AcousticMap.Portals.Values)
-                    {
-                        if (Vector3.Distance(hitPoint, kvp.Position) < kvp.Portal.ApertureSize)
-                        {
-                            intersected = false;
-                            break;
-                        }
-                    }
-                }
-
+                // A wall is charged wherever the ray meets it, however near a doorway. What comes in by the
+                // doorway is a ROUTE, with its own length, bend and what stands in it (OpeningRoutes); a
+                // wall skipped for being within an aperture's width of one passed every ray that grazed a
+                // facade near a door at full level, and five such rays averaged to a flat 20, 40, 60 or
+                // 80 % in every band.
                 if (intersected)
                 {
                     // ── What this wall lets through: the Steam Audio scene's panel model ──────────
