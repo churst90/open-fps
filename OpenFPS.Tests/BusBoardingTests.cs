@@ -148,14 +148,16 @@ public class BusBoardingTests
             Assert.True(stops < 20, "the bus never served a stop");
             UntilStopped(c, bus);
             bool serving = false;
-            for (int i = 0; i < 90 && !serving; i++)
+            for (int i = 0; i < 90 && !serving && Speed(c, bus) < 0.05f; i++)
             {
                 serving = c.World.Get<SoundEmitterComponent>(bus).ServingStop;
                 if (!serving) c.Tick(1);
             }
             if (serving) break;
             Assert.False(c.Seats.Exit(rider, out string shut), "got off with the doors shut, away from a stop");
-            Assert.Contains("stops", shut);
+            // Held in traffic a moment and moving off again before the wait was over: refused for
+            // that instead, which is as right.
+            Assert.Contains(OccupancyService.Moving(c.World, bus) ? "moving" : "stops", shut);
             _o.WriteLine(shut);
             for (int i = 0; i < 60 * 30 && Speed(c, bus) < 3f; i++) c.Tick(1);
         }
