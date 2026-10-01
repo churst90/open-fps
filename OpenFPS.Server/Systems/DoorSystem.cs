@@ -133,6 +133,16 @@ public sealed class DoorSystem
             var size = world.Get<ColliderComponent>(entity).Size;
             door.Aperture = MathF.Max(0.1f, MathF.Max(size.X, size.Z));
         }
+        // Where the hole is: the leaf's world pose now, shut, before anything has swung it. The client
+        // hears through the doorway, and the leaf's own transform stops saying where that is the moment
+        // it opens.
+        if (world.Has<PortalComponent>(entity))
+        {
+            var shut = world.Get<Transform>(entity);
+            ref var portal = ref world.Get<PortalComponent>(entity);
+            portal.OpeningCentre = shut.Position;
+            portal.OpeningRotation = shut.Rotation;
+        }
         if (door.SwingSeconds <= 0f) door.SwingSeconds = 0.9f;
         if (door.SwingRadians == 0f) door.SwingRadians = MathF.PI / 2f;
         if (door.HingeSide == 0f) door.HingeSide = 1f;
