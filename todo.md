@@ -19,7 +19,7 @@ In this order.
 - Steam Audio counts walls in a row as (2n+1)/3 of one; the tracer counts them exactly.
 - Diffraction is evaluated at 200/1250/8000 Hz, not the band averages transmission uses.
 
-### 2. Bodies and wheels (Cody, 2026-09-30: next after the walls)
+### 2. Bodies and wheels (per-wheel physics in progress from 2026-10-01)
 Plan: [docs/NEXT_BODIES_WHEELS_ROADS.md](docs/NEXT_BODIES_WHEELS_ROADS.md) (agreed 2026-09-27).
 Stage 1, roads as data, is done.
 - A physical body for every entity: mass and volume for vehicles (from their panels), people and NPCs
@@ -34,11 +34,11 @@ Stage 1, roads as data, is done.
 - Then traffic lights and accessible pedestrian signals.
 
 ### 3. Doors from the recordings
-The car door (`CarDoor.cs`) is done and approved. House and steel doors: `HouseDoor`, fitted to
-`inbox/door sounds/Door Opening Sound Effect.mp3`, is on branch `worktree-agent-a6e2f6e0e3da748cd`
-and goes in once Cody approves the listening set (`inbox/door sounds/synth-2026-09-30`).
-- The recording has no door shutting; the shut is built from the opening's parts. A shutting
-  recording would let it be fitted.
+The car door (`CarDoor.cs`) is done and approved. House and steel doors still use the generic model.
+- The fitted octave-band noise model (branch `worktree-agent-a6e2f6e0e3da748cd`) was rejected by ear
+  on 2026-10-01: scratchy and grainy, and wood and steel sounded the same. Not merged.
+- Next approach to be agreed with Cody: recorded takes played as a bank, or a contact and modal
+  model in which wood and steel differ by their own resonances.
 - The knock (`DoorKnock`) may be about 20 dB short at 1-2 kHz against both knock recordings.
 
 ### 4. Mutation testing
