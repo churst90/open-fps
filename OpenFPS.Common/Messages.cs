@@ -392,8 +392,7 @@ public partial class ClientInputUpdate : IMessage
 public partial class PlayerJoined : IMessage { public int ConnectionId; public string Username = string.Empty; }
 
 /// <summary>
-/// Who a line of chat is for. It used to be guessed from the sender's name ("[PM from x]",
-/// "System"), which is how every command reply in the game came to be spoken as "System: ...".
+/// Who a line of chat is for. The client files and words a line by this, never by the sender's name.
 /// </summary>
 public enum ChatChannel : byte
 {
