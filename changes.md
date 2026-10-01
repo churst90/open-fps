@@ -4,6 +4,17 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-09-30
 
+- Cleansing pass:
+  - Deleted: `PhysicsAcousticBridgeSystem` (never called), the unused `users.json` files, and the
+    lab's `--sim-roomdbg`, `--echo-ab`, `--blast-compare` and `--blast-probe`.
+  - Retired `OPENFPS_ROLLOFF` (the mixer always uses the inverse law Loudness is written for) and
+    `OPENFPS_VALVE_K`. Both clients log every set switch from one list, `DiagnosticSwitches`.
+  - `run-server.sh` checks and prints the port given with `--port`; `OPENFPS_PORT` is passed to the
+    server.
+  - Tests seed BirdLife (the sparrow test no longer fails now and then) and delete their
+    `/tmp/openfps-test-config-<pid>` folder on exit.
+  - Comments in the most-edited files state what the code does and why, without dates and quotes.
+    readme and the manual checked against the code; the Windows client is described as it is.
 - Sounds no longer freeze for up to a second at a time. Every scene rebuild for a door handed the new
   scene to the tracers while holding the lock the game loop and the mixer take every frame, and the
   late-field tracer holds its own for a whole run; both threads waited it out. Rebuilds are also no
