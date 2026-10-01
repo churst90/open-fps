@@ -2,8 +2,12 @@
 
 Part 1 is for players. Part 2 is for people running a server.
 
-This manual describes the Linux client. The Windows client is behind: it does not yet have saved
-servers, the settings dialog or the F-key lists.
+This manual describes the Linux (GTK) client. The Windows client has the same keys, lists and
+menus, with these differences:
+- Its main menu also has **Open log folder**, and its Connect dialog has **Create account**.
+- Voice chat works on Windows.
+- Its settings are in `%APPDATA%\openfps\client.json`. Its logs are in a `logs` folder beside the
+  game, or in `%LOCALAPPDATA%\openfps\logs` if the game folder cannot be written to.
 
 ---
 
@@ -161,7 +165,10 @@ Type these on the chat line. The `/` is optional and case does not matter.
 ### Around you
 - `/scan`: named things within 20 m.
 - `/doors`: doors within 20 m. `/open [name]`, `/close [name]` (or `/shut`).
-- `/room [radius]`: whether the walls around you form a room, and what is missing if not.
+- `/knock`: knock on the nearest door (the same as Shift+E).
+- `/clap`: clap your hands (the same as T on foot).
+- `/room [radius]`: whether the walls around you form a room, and what is missing if not. The
+  radius is 12 m unless you give one.
 
 ### Hearing
 - `/tail [dB]`: everything traced, against the direct sound: every room's and street's tail and the
@@ -171,7 +178,9 @@ Type these on the chat line. The `/` is optional and case does not matter.
 - `/reflections [dB]`: sets both. Plain `/tail`, `/copies` or `/reflections` reads them back; -80 is off.
 - `/cabin [dB]`: the inside of the vehicle you are riding in, against its traced level (default 0).
 - `/reverb`: how the tracing is doing (the tail is traced from the geometry everywhere).
-- `/echoes on|off`: the traced echoes of far, loud sources.
+- `/echoes on|off`: the traced echoes of far, loud sources. `/echoes -12` turns them on and sets
+  the tail level.
+- `/valveflow on|off`: the rush of gas through each exhaust valve as it opens, on every engine.
 
 ### Vehicles
 - `/enter [seat]` (or `/board`, `/getin`): get in. `/exit` (or `/getout`): get out.
@@ -196,7 +205,7 @@ Type these on the chat line. The `/` is optional and case does not matter.
   enter. You can enter public maps, your own maps, and, if you are staff, any map.
 
 ### Beacons
-- `/beacons`: each kind of beacon, whether it is on, and why.
+- `/beacons` (or `/beacon`): each kind of beacon, whether it is on, and why.
 - `/beacons door`: switch door beacons on or off. `/beacons door on` or `off` sets it.
 
 ### Building
@@ -217,17 +226,17 @@ Beacons are sounds that mark useful things near you.
 | Item | One small ring that dies away | The 3 nearest within 10 m |
 | Vehicle | A low warm note, twice | The 2 nearest within 25 m |
 
-Each keeps sounding from the thing itself, every 1.6 seconds unless you choose otherwise:
+Each keeps sounding from the thing itself, every 1.6 seconds unless you choose otherwise.
 `/beacons every 3` sets the gap in seconds (half a second to ten), and it is saved. A beacon that is
-mostly hidden behind a wall is not played. Maps can
-also place beacons for exits, stairs and waypoints.
+mostly hidden behind a wall is not played. Maps can also place beacons for exits, stairs and
+waypoints.
 
 Each map decides, for each kind, whether it starts on or off, is always on, or is not allowed.
 Within that, use `/beacons` to choose. Your choices are saved.
 
 ## How loud the world is
 
-Real sounds differ enormously in loudness: a hot rod is about 20 dB louder than an economy car, and
+Real sounds differ a lot in loudness: a hot rod is about 20 dB louder than an economy car, and
 flooring an engine raises it by 15 dB or more. `/levels` sets how much of that difference reaches
 you. At 100 percent it is the real difference, so loud things carry much further and quiet things
 fade sooner. Lower values squeeze loud and quiet together. It applies to every sound in the game.
@@ -317,8 +326,16 @@ by you. A password is saved only if you ticked "Remember password". Beacon choic
 
 ## If something goes wrong
 
-- The client's log is `/tmp/openfps-client.log`.
-- If the client crashes, a crash dump goes to `~/openfps-crashes`.
+- The client's log is `/tmp/openfps-client.log`. The client also writes its own copy to
+  `/tmp/openfps-client-client.log`, which survives the terminal closing.
+- If the client crashes, a crash dump goes to `~/openfps-crashes` (`OPENFPS_CRASHDIR` moves it).
+  When the client stops, the script says how: a clean exit, or the signal that killed it.
+- `./run-gtk-client.sh capture` records what you hear to `/tmp/openfps-capture.wav` while it plays.
+  Use it to catch a click, pop or dropout.
+- Other modes for tracking down a fault: `on` and `off` (the Steam Audio simulation on or off,
+  with an acoustic trace), `foot` (every footstep logged), `fmodlog` (FMOD's own logging build),
+  `nohrtf`, `noecho`, `nophys`, `quiet`, `bare` and `nosplit`. The top of the script says what each
+  one does.
 
 ---
 
@@ -352,9 +369,9 @@ Before starting, the script checks whether something is already listening on the
 prints that process and stops. Stop the old server first (`kill` and its process number), or run
 the new one on another port:
 
-    OPENFPS_PORT=33290 ./run-server.sh city --port 33290
+    ./run-server.sh city --port 33290
 
-`OPENFPS_PORT` only tells the script which port to check. `--port` is what sets the port.
+`OPENFPS_PORT=33290 ./run-server.sh city` does the same: the script passes it on as `--port`.
 
 ### Always restart after editing
 
@@ -411,13 +428,14 @@ Change the generator, not `city.json`: a hand edit is undone the next time the c
   at random, the same every time the map loads). It gives way where its road does not have priority,
   stops at the road stops it passes and at level crossings on its way, and keeps a gap to the vehicle
   in front on the same lane.
-- `StreetLife`: how often drivers honk, brake hard, park, the gap they keep to the vehicle in front
-  (`FollowHeadwaySeconds`, `FollowMinGapMetres`), and how they give way at junctions: the critical
-  gaps (`CriticalGapRightSeconds`, `CriticalGapStraightSeconds`, `CriticalGapLeftSeconds`,
-  `CriticalGapMajorLeftSeconds`), the speed they arrive at a give-way line (`GiveWayApproachKmh`) and
-  how long they wait before going anyway when everyone is waiting (`GiveWayPatienceSeconds`).
-- `StreetLife`: how often, on average, a horn sounds (`HornEverySeconds`), a car brakes hard
-  (`HardBrakeEverySeconds`) and a car parks (`ParkEverySeconds`). 0 turns one off.
+- `StreetLife`: how drivers behave.
+  - How often, on average, a horn sounds (`HornEverySeconds`), a car brakes hard
+    (`HardBrakeEverySeconds`) and a car parks (`ParkEverySeconds`). 0 turns one off.
+  - The gap they keep to the vehicle in front (`FollowHeadwaySeconds`, `FollowMinGapMetres`).
+  - How they give way at junctions: the critical gaps (`CriticalGapRightSeconds`,
+    `CriticalGapStraightSeconds`, `CriticalGapLeftSeconds`, `CriticalGapMajorLeftSeconds`), the
+    speed they arrive at a give-way line (`GiveWayApproachKmh`), and how long they wait before going
+    anyway when everyone is waiting (`GiveWayPatienceSeconds`).
 - `Composites`: saved groups of objects.
 
 Map and prefab authoring is described in more detail in [AUTHORING.md](AUTHORING.md).
@@ -453,8 +471,10 @@ and client afterwards, since the list is built into both.
 
 - Accounts are stored in `openfps.db`, created on first start if it is missing.
 - If there are no accounts, the server creates `admin` with the password `admin123`. **Change this
-  before letting anyone else connect.** There is no command for it yet: edit `openfps.db` with a
-  SQLite tool.
+  before letting anyone else connect.** Start the server once with `OPENFPS_ADMIN_PASSWORD` set:
+  on a new database that is the admin's password, and on an existing one it resets the admin's
+  password. After that you can leave it unset; the password stays. The server warns at every start
+  while the password is still `admin123`.
 - Anyone can register; new accounts are players.
 - User names are stored in lower case. A name that is taken is refused.
 - Logins and registrations are limited to 6 quick tries, then one every 5 seconds, per address.
@@ -500,7 +520,8 @@ execute this command."
 - `/start_state StartId LoopId`
 
 ### Other
-- `/fire weapon`: fire a named weapon from where you stand.
+- `/fire weapon`: fire a named weapon from where you stand. (Anyone can `/fire` a weapon they are
+  holding.)
 
 ## The text (MUD) interface
 
@@ -519,13 +540,29 @@ not expose it on a public network.
 - The server logs to the terminal and to `OpenFPS.Server/logs/server` plus the date `.log`.
 - If the server fails to start it prints `[FATAL ERROR] Server failed to start:` and the reason.
 
-## Diagnostic switches
+## Environment switches
 
-Set these in the environment before starting the server.
+Set these in the environment before starting the server or the client. The client logs a warning
+for each of its switches that is set, so a forgotten one shows up in the log.
+
+### Server
 
 | Variable | Effect |
 |---|---|
-| `OPENFPS_WEATHER=Clear\|Rain\|Snow\|Storm` | Fixes the weather |
+| `OPENFPS_ADMIN_PASSWORD=...` | Sets the admin password (see Accounts) |
+| `OPENFPS_WEATHER=Clear\|Rain\|Snow\|Storm` | Fixes the weather; no fronts roll in |
 | `OPENFPS_TRACE_SHUTTLE=name` | Logs where matching vehicles are, twice a second |
-| `OPENFPS_TRACE_CROSSING=name` | Logs a level crossing's state once a second |
-| `OPENFPS_PROFILE=1` | Logs a performance summary every 30 seconds |
+| `OPENFPS_TRACE_CROSSING=name` | Logs a matching level crossing's state once a second |
+| `OPENFPS_PROFILE=1` | Logs a performance summary every 30 seconds (the client too) |
+| `OPENFPS_PORT=N` | `run-server.sh` only: the port to check and to pass on as `--port` |
+
+### Client
+
+| Variable | Effect |
+|---|---|
+| `OPENFPS_AUDIO_DEBUG=1` | Logs the acoustic trace, your footsteps (`[FOOT]`) and world sounds (`[WAUDIO]`) |
+| `OPENFPS_AUDIO_CAPTURE=file.wav` | Records the mix to a file while it plays |
+| `OPENFPS_CRASHDIR=folder` | `run-gtk-client.sh` only: where crash dumps go |
+| `OPENFPS_TAIL=full` | Plays the whole traced response outdoors, not only the late tail |
+| `OPENFPS_TAIL_SDM=0` | The tail's first part is spread evenly instead of coming from the walls |
+| `OPENFPS_TAIL_PARAMETRIC=1` | Plays the parametric reverb instead of the traced tail |
