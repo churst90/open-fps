@@ -63,6 +63,37 @@ public class PlaceNameTests
     }
 
     /// <summary>
+    /// A doorway is the wall's thickness and in no zone. Standing in the one between Union Building's
+    /// ground-floor corridor and flat 00B (where the where-am-I key said "Under Shelter"), it is named
+    /// from the two zones either side of it.
+    /// </summary>
+    [Fact]
+    public void ADoorwayIsNamedFromTheZonesEitherSide()
+    {
+        var prefabs = new PrefabRepository(Path.Combine(AppContext.BaseDirectory, "prefabs"));
+        var maps = new MapManager(new MapRepository(Path.Combine(AppContext.BaseDirectory, "maps")), prefabs);
+        maps.Initialize();
+        Assert.True(maps.TryGetMap("city", out World world, out Vector3 size, out _, out _));
+        Assert.True(maps.TryGetMapData("city", out var data));
+        var client = new ClientWorldState();
+        client.Clear(data.Size);
+        var defs = EntityDefinitionFactory.StaticDefinitions(world).ToList();
+        foreach (var def in defs) client.RegisterDefinition(def);
+        client.SetAcousticMap(AcousticVolumeGenerator.GenerateRegions(defs, size, data.MinBound,
+                                                                      data.VoxelResolution, data.OcclusionFloor));
+        var snap = client.GetSnapshot();
+        var spatial = new SpatialService();
+
+        var eye = new Vector3(21.55f, 1.7f, 28.28f);
+        Assert.Equal(AcousticConstants.GlobalRegionId, spatial.GetRegionAt(snap, eye));
+        string? name = ClientAudioSystem.NameOfGap(snap, eye, p => spatial.GetRegionAt(snap, p));
+        Assert.NotNull(name);
+        Assert.StartsWith(ClientAudioSystem.DoorwayPrefix + " between", name);
+        Assert.Contains("Union Building corridor, floor 0", name);
+        Assert.Contains("Union Building flat 00B", name);
+    }
+
+    /// <summary>
     /// Walk both pavements of every east-west street on the real city map, through the same region
     /// lookup and ground probe the client uses, and every step is named as a pavement.
     /// </summary>

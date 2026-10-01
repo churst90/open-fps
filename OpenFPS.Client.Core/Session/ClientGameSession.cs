@@ -1093,7 +1093,8 @@ public sealed class ClientGameSession : IDisposable
             bool placed = waited > TimeSpan.FromSeconds(0.25) && here != LocalPlayerState.UnknownArea;
             if (!placed && waited < TimeSpan.FromSeconds(1.5)) return;
             // "at outside" and "at under shelter" name no place: the map alone is said.
-            if (here is LocalPlayerState.UnknownArea or ClientAudioSystem.UnderShelter or ClientAudioSystem.Outside) here = "";
+            if (here is LocalPlayerState.UnknownArea or ClientAudioSystem.UnderShelter or ClientAudioSystem.Outside
+                || here.StartsWith(ClientAudioSystem.DoorwayPrefix)) here = "";
             _arrivalPendingSince = null;
             _lastAnnouncedRegionId = _state.CurrentRegionId;
             _lastAnnouncedRegion = here;
@@ -1118,7 +1119,7 @@ public sealed class ClientGameSession : IDisposable
         // A doorway is roofed and in no zone, so stepping from a flat into its corridor passed through
         // "Under Shelter" on the way. Where you are is the zone on either side of it; the where-am-I
         // key still says it.
-        if (name == ClientAudioSystem.UnderShelter) return;
+        if (name == ClientAudioSystem.UnderShelter || name.StartsWith(ClientAudioSystem.DoorwayPrefix)) return;
 
         _lastAnnouncedRegion = name;
         _speech.Speak(name, interrupt: false);

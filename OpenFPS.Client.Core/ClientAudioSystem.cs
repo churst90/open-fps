@@ -887,8 +887,54 @@ public class ClientAudioSystem
         {
             _state.IsIndoor = false;
         }
-        _state.CurrentRegion = NameOfPlace(world.AcousticMap, regId, _state.CurrentMaterial, _state.ShelterFactor);
+        string name = NameOfPlace(world.AcousticMap, regId, _state.CurrentMaterial, _state.ShelterFactor);
+        // A zone stops at its walls, so a doorway, the wall's own thickness, is in none: it is named
+        // from the zones either side of it.
+        if (name == UnderShelter) name = DoorwayName(world, eyePos) ?? name;
+        _state.CurrentRegion = name;
     }
+
+    /// <summary>Start of the name of a roofed gap between zones, such as a doorway.</summary>
+    internal const string DoorwayPrefix = "doorway";
+
+    private Vector3 _doorwayAt = new(float.NaN);
+    private string? _doorwayName;
+
+    /// <summary>
+    /// "doorway between A and B" when named zones lie within a doorway's depth either side of the
+    /// listener, "doorway to A" for one, null for none. Looked up again only after a step.
+    /// </summary>
+    private string? DoorwayName(WorldSnapshot world, Vector3 at)
+    {
+        if (Vector3.DistanceSquared(at, _doorwayAt) < 0.01f) return _doorwayName;
+        _doorwayAt = at;
+        return _doorwayName = NameOfGap(world, at, p => _acoustics.GetRegionAt(world, p));
+    }
+
+    internal static string? NameOfGap(WorldSnapshot world, Vector3 at, Func<Vector3, int> regionAt)
+    {
+        if (world.AcousticMap == null) return null;
+        var names = new List<string>(2);
+        foreach (float reach in DoorwayProbeMetres)
+            foreach (var d in DoorwayProbeDirections)
+            {
+                int id = regionAt(at + d * reach);
+                if (id == AcousticConstants.GlobalRegionId || !world.AcousticMap.Regions.TryGetValue(id, out var r)
+                    || string.IsNullOrWhiteSpace(r.FriendlyName)) continue;
+                if (!names.Contains(r.FriendlyName)) names.Add(r.FriendlyName);
+            }
+        return names.Count switch
+        {
+            0 => null,
+            1 => $"{DoorwayPrefix} to {names[0]}",
+            _ => $"{DoorwayPrefix} between {names[0]} and {names[1]}",
+        };
+    }
+
+    // A door frame and the wall it is in are under half a metre deep; a vestibule a little more.
+    private static readonly float[] DoorwayProbeMetres = { 0.5f, 1.0f };
+    private static readonly Vector3[] DoorwayProbeDirections =
+        { Vector3.UnitX, -Vector3.UnitX, Vector3.UnitZ, -Vector3.UnitZ };
 
     /// <summary>
     /// What to call where the listener is standing.
