@@ -140,6 +140,41 @@ public sealed record TyreProfile
     /// way, and on a track it carries further than the engines because it is higher up the spectrum.</summary>
     public float SquealDb { get; init; } = 92f;
 
+    // ── Force ───────────────────────────────────────────────────────────────────────────────────
+    //
+    // What the tyre pushes on the road with, for the wheel model (WheelDynamics). Pacejka's Magic
+    // Formula, F = D sin(C atan(B x - E (B x - atan(B x)))), with the peak D = mu Fz from
+    // PeakGripG and the rest from a published parameter set: the 205/60R15 91V passenger tyre at
+    // 2.2 bar in Pacejka, Tire and Vehicle Dynamics (2nd ed. 2006, appendix 3), as reproduced in
+    // github.com/jcmadsen/PacTire_Matlab (205_60_R15_91V_2-2bar.tire). Only the first coefficient of
+    // each term is used (PCY1, PEY1, PKY1, PKY2, PCX1, PEX1, PKX1, PKX2, PDY2), so camber, the
+    // curvature's dependence on load and the curve offsets are left out. The nominal load those
+    // coefficients are relative to is taken as the wheel's own static load on its vehicle, which
+    // scales the passenger tyre to a truck's or a motorcycle's: no other tyre has published data.
+
+    /// <summary>Lateral shape factor C (PCY1).</summary>
+    public float LateralShape { get; init; } = 1.193f;
+    /// <summary>Lateral curvature factor E (PEY1).</summary>
+    public float LateralCurvature { get; init; } = -1.003f;
+    /// <summary>Cornering stiffness at the nominal load, over that load, before the saturation
+    /// (PKY1): K = PKY1 Fz0 sin(2 atan(Fz / (PKY2 Fz0))), per radian.</summary>
+    public float CorneringStiffness { get; init; } = 14.95f;
+    /// <summary>The load, in nominal loads, at which the cornering stiffness stops rising (PKY2).</summary>
+    public float CorneringStiffnessLoad { get; init; } = 2.130f;
+    /// <summary>Longitudinal shape factor C (PCX1).</summary>
+    public float LongitudinalShape { get; init; } = 1.685f;
+    /// <summary>Longitudinal curvature factor E (PEX1).</summary>
+    public float LongitudinalCurvature { get; init; } = 0.344f;
+    /// <summary>Longitudinal slip stiffness over load, per unit slip (PKX1), and its change with load (PKX2).</summary>
+    public float SlipStiffness { get; init; } = 21.51f;
+    public float SlipStiffnessLoad { get; init; } = -0.163f;
+    /// <summary>
+    /// How the friction coefficient changes with load, per nominal load over the nominal: PDY2 over
+    /// PDY1, 0.145 / 0.990, falling. A tyre loaded half as hard again grips about 7 % less per newton,
+    /// which is why moving load from one tyre to the other in a corner costs the axle grip.
+    /// </summary>
+    public float LoadSensitivity { get; init; } = -0.146f;
+
     /// <summary>A decent road tyre on dry asphalt.</summary>
     public static TyreProfile SportsOnAsphalt => new();
 
@@ -405,6 +440,17 @@ public sealed record VehicleProfile
     public int TyreCount { get; init; } = 4;
 
     /// <summary>
+    /// The running gear: axles, tyre sizes, which wheels drive, steer and brake, and where the
+    /// weight is (see <see cref="ChassisSpec"/>). Null for a preset that declares none, which then
+    /// runs on <see cref="ChassisSpec.Default"/>, built from the fields above so that nothing about
+    /// it changes.
+    /// </summary>
+    public ChassisSpec? Chassis { get; init; }
+
+    /// <summary>The chassis this vehicle runs on: its own, or the one its other fields imply.</summary>
+    public ChassisSpec Running => (Chassis ?? ChassisSpec.Default(this)).PlacedOn(this);
+
+    /// <summary>
     /// What this vehicle measures at one metre at full load, dB SPL — and the number the whole
     /// audio chain is hung off.
     ///
@@ -576,6 +622,7 @@ public sealed record VehicleProfile
     /// </summary>
     public static VehicleProfile SportBike => new()
     {
+        Chassis = RunningGear.YamahaR1,
         Horn = "electric:moto_disc",
         LengthMetres = 2.1f, WidthMetres = 0.8f, HeightMetres = 1.15f,
         Name = "Litre sports bike",
@@ -634,6 +681,7 @@ public sealed record VehicleProfile
     /// </summary>
     public static VehicleProfile Charger440 => new()
     {
+        Chassis = RunningGear.Charger69,
         Horn = "electric:trumpet_pair",
         LengthMetres = 5.3f, WidthMetres = 1.95f, HeightMetres = 1.35f,
         // Two tons of Detroit steel with a full interior: a big, well-damped body, not a race shell.
@@ -682,6 +730,7 @@ public sealed record VehicleProfile
     /// <summary>A big-block muscle car: long cam, true duals, four-speed.</summary>
     public static VehicleProfile V8Muscle => new()
     {
+        Chassis = RunningGear.Chevelle70,
         LengthMetres = 4.9f, WidthMetres = 1.9f, HeightMetres = 1.35f,
         Name = "Big-block muscle car, true duals",
         EngineKey = "v8_muscle",
@@ -702,6 +751,7 @@ public sealed record VehicleProfile
 
     public static VehicleProfile V8Sports => new()
     {
+        Chassis = RunningGear.MustangGt11,
         Name = "V8 sports car, Flowmaster 40s",
         EngineKey = "v8_sports",
         SourceLevelDb = 116f,
@@ -712,6 +762,7 @@ public sealed record VehicleProfile
 
     public static VehicleProfile Supercar => new()
     {
+        Chassis = RunningGear.Ferrari458,
         LengthMetres = 4.6f, WidthMetres = 2.0f, HeightMetres = 1.2f,
         // Small aluminium panels, a tiny cabin, and an exhaust that barely touches the shell.
         Body = VehicleBody.Supercar,
@@ -727,6 +778,7 @@ public sealed record VehicleProfile
 
     public static VehicleProfile Hatchback => new()
     {
+        Chassis = RunningGear.Golf4,
         Horn = "electric:disc_single",
         LengthMetres = 4.1f, WidthMetres = 1.75f, HeightMetres = 1.45f,
         Name = "1.6 hatchback",
@@ -754,6 +806,7 @@ public sealed record VehicleProfile
     /// <summary>A 1.8 four in a compact saloon: the economy engine, stroked. Stock can.</summary>
     public static VehicleProfile Compact18 => Hatchback with
     {
+        Chassis = RunningGear.CorollaE140,
         Name = "1.8 compact saloon",
         EngineKey = "i4_compact",
         LengthMetres = 4.6f,
@@ -764,6 +817,7 @@ public sealed record VehicleProfile
     /// <summary>A 2.5 four in a mid-size saloon: long stroke, a lazy torque curve, a big quiet can.</summary>
     public static VehicleProfile Midsize25 => Hatchback with
     {
+        Chassis = RunningGear.CamryXV40,
         Name = "2.5 mid-size saloon",
         EngineKey = "i4_midsize",
         LengthMetres = 4.85f, WidthMetres = 1.84f, MassKg = 1500f,
@@ -786,6 +840,7 @@ public sealed record VehicleProfile
     /// behind a chambered cat-back.</summary>
     public static VehicleProfile FlatFourSedan => Wagon with
     {
+        Chassis = RunningGear.Legacy,
         Name = "2.5 flat-four sedan, cat-back",
         EngineKey = "boxer4_street",
         Body = VehicleBody.Saloon,
@@ -805,6 +860,7 @@ public sealed record VehicleProfile
 
     public static VehicleProfile HotHatch => new()
     {
+        Chassis = RunningGear.CivicTypeR,
         LengthMetres = 4.25f, WidthMetres = 1.8f, HeightMetres = 1.45f,
         Name = "2.0 hot hatch",
         EngineKey = "i4_sport",
@@ -826,6 +882,7 @@ public sealed record VehicleProfile
     /// </summary>
     public static VehicleProfile TurboHatch => new()
     {
+        Chassis = RunningGear.GolfGti7,
         LengthMetres = 4.3f, WidthMetres = 1.8f, HeightMetres = 1.45f,
         Name = "2.0 turbo hatch",
         EngineKey = "i4_turbo",
@@ -842,6 +899,7 @@ public sealed record VehicleProfile
 
     public static VehicleProfile Saloon6 => new()
     {
+        Chassis = RunningGear.Bmw530iE60,
         LengthMetres = 4.9f, WidthMetres = 1.85f, HeightMetres = 1.45f,
         Name = "3.0 straight-six saloon",
         EngineKey = "i6",
@@ -854,6 +912,7 @@ public sealed record VehicleProfile
 
     public static VehicleProfile Sedan6 => new()
     {
+        Chassis = RunningGear.AccordV6,
         LengthMetres = 4.9f, WidthMetres = 1.85f, HeightMetres = 1.45f,
         Name = "3.5 V6 sedan",
         EngineKey = "v6",
@@ -874,6 +933,7 @@ public sealed record VehicleProfile
 
     public static VehicleProfile Cruiser => new()
     {
+        Chassis = RunningGear.RoadKing,
         Horn = "electric:moto_disc",
         LengthMetres = 2.45f, WidthMetres = 0.95f, HeightMetres = 1.15f,
         // A motorcycle has no body and no cabin: the pipes radiate into open air.
@@ -892,6 +952,7 @@ public sealed record VehicleProfile
 
     public static VehicleProfile DirtBike => new()
     {
+        Chassis = RunningGear.Crf450,
         Horn = "electric:moto_disc",
         LengthMetres = 2.2f, WidthMetres = 0.85f, HeightMetres = 1.25f,
         // Likewise, and even less of it.
@@ -913,6 +974,7 @@ public sealed record VehicleProfile
     /// <summary>A full-size gas pickup with the 5.3 V8, as it left the factory.</summary>
     public static VehicleProfile PickupV8 => Pickup with
     {
+        Chassis = RunningGear.Silverado1500,
         LengthMetres = 5.8f, WidthMetres = 2.0f, HeightMetres = 1.9f,
         Name = "5.3 V8 pickup, stock",
         EngineKey = "pickup_v8",
@@ -935,6 +997,7 @@ public sealed record VehicleProfile
     /// <summary>A late-1990s Ford Super Duty with the 7.3 Power Stroke and the four-speed automatic.</summary>
     public static VehicleProfile PowerStrokePickup => Pickup with
     {
+        Chassis = RunningGear.F250HD,
         LengthMetres = 6.0f, WidthMetres = 2.0f, HeightMetres = 2.0f,
         EngineBayLeakage = 0.35f,
         Name = "1998 Ford F-250, 7.3 Power Stroke",
@@ -953,6 +1016,7 @@ public sealed record VehicleProfile
     /// </summary>
     public static VehicleProfile DuramaxCompoundPickup => PowerStrokePickup with
     {
+        Chassis = RunningGear.Silverado2500HD,
         Name = "6.6 Duramax pickup, compound turbos, straight pipe",
         EngineKey = "duramax_compound",
         SourceLevelDb = 118f,     // 118.3 on the live voice: five-inch pipe, turbine a flat 6 dB (2026-09-28)
@@ -980,6 +1044,7 @@ public sealed record VehicleProfile
     /// <summary>A parcel step van: aluminium box body, the ISB six, an automatic, duals at the back.</summary>
     public static VehicleProfile StepVan => Pickup with
     {
+        Chassis = RunningGear.Mt45,
         LengthMetres = 7.3f, WidthMetres = 2.4f, HeightMetres = 3.1f,
         EngineBayLeakage = 0.5f,
         Body = VehicleBody.Van,
@@ -997,6 +1062,7 @@ public sealed record VehicleProfile
     /// <summary>The Grumman LLV mail truck: the Iron Duke four and a three-speed automatic.</summary>
     public static VehicleProfile MailTruck => Pickup with
     {
+        Chassis = RunningGear.Llv,
         LengthMetres = 4.4f, WidthMetres = 2.0f, HeightMetres = 2.2f,
         EngineBayLeakage = 0.25f,
         Name = "mail truck (LLV)",
@@ -1011,6 +1077,7 @@ public sealed record VehicleProfile
 
     public static VehicleProfile Pickup => new()
     {
+        Chassis = RunningGear.Hilux,
         LengthMetres = 5.3f, WidthMetres = 1.9f, HeightMetres = 1.8f,
         // A cab and an empty steel bed, which is the most resonant thing on the road.
         EngineBayLeakage = 0.30f,   // a pickup bonnet: less deadening, bigger grille
@@ -1031,6 +1098,7 @@ public sealed record VehicleProfile
 
     public static VehicleProfile Truck => new()
     {
+        Chassis = RunningGear.Cascadia6x4,
         LengthMetres = 6.4f, WidthMetres = 2.5f, HeightMetres = 3.9f,
         // Big flat undeadened panels over a big box.
         Body = VehicleBody.Van,
@@ -1074,6 +1142,7 @@ public sealed record VehicleProfile
     /// </summary>
     public static VehicleProfile DieselPickupLoud => new()
     {
+        Chassis = RunningGear.Ram2500,
         LengthMetres = 5.9f, WidthMetres = 2.0f, HeightMetres = 1.95f,
         EngineBayLeakage = 0.30f,   // a pickup bonnet: less deadening, bigger grille
         Body = VehicleBody.Van,
@@ -1106,6 +1175,7 @@ public sealed record VehicleProfile
     /// </summary>
     public static VehicleProfile SchoolBus => new()
     {
+        Chassis = RunningGear.BlueBirdVision,
         LengthMetres = 10.9f, WidthMetres = 2.4f, HeightMetres = 3.2f,
         Body = VehicleBody.SchoolBus,
         Name = "school bus",
@@ -1152,6 +1222,7 @@ public sealed record VehicleProfile
     /// </summary>
     public static VehicleProfile TransitBus => SchoolBusNa with
     {
+        Chassis = RunningGear.XcelsiorXD40,
         Name = "city bus",
         EngineKey = "diesel_bus_na",
         LengthMetres = 12.2f, WidthMetres = 2.6f, HeightMetres = 3.2f,
@@ -1192,6 +1263,7 @@ public sealed record VehicleProfile
 
     public static VehicleProfile Wagon => new()
     {
+        Chassis = RunningGear.Outback,
         LengthMetres = 4.7f, WidthMetres = 1.8f, HeightMetres = 1.5f,
         // A long roof and a big rear volume — a wagon booms where a saloon does not.
         Body = VehicleBody.Van,
@@ -1206,6 +1278,7 @@ public sealed record VehicleProfile
 
     public static VehicleProfile V10Coupe => new()
     {
+        Chassis = RunningGear.ViperSrt10,
         Name = "V10 coupe, side pipes",
         EngineKey = "v10",
         SourceLevelDb = 120f,   // 120.0 on 2026-09-26: the exhaust valves' flow noise on side pipes
@@ -1228,6 +1301,7 @@ public sealed record VehicleProfile
     /// </summary>
     public static VehicleProfile StockCar => new()
     {
+        Chassis = RunningGear.NascarNextGen,
         LengthMetres = 5.1f, WidthMetres = 1.95f, HeightMetres = 1.3f,
         // A stripped steel shell with side exits hard against it — hollow, and loud with it.
         Body = VehicleBody.RaceSaloon,
@@ -1260,6 +1334,7 @@ public sealed record VehicleProfile
     /// </summary>
     public static VehicleProfile FormulaCar => new()
     {
+        Chassis = RunningGear.F2004,
         LengthMetres = 5.3f, WidthMetres = 1.9f, HeightMetres = 0.95f,
         // No panels worth the name and nothing enclosed at all.
         Body = VehicleBody.OpenWheeler,
@@ -1309,6 +1384,7 @@ public sealed record VehicleProfile
     /// </summary>
     public static VehicleProfile PoliceInterceptor => new()
     {
+        Chassis = RunningGear.ChargerPursuit,
         LengthMetres = 5.1f, WidthMetres = 2.0f, HeightMetres = 1.55f,
         Body = VehicleBody.Saloon,
         Name = "Police interceptor, road",
@@ -1339,6 +1415,7 @@ public sealed record VehicleProfile
     /// </summary>
     public static VehicleProfile PoliceCar => new()
     {
+        Chassis = RunningGear.ChargerPursuit,
         LengthMetres = 5.1f, WidthMetres = 2.0f, HeightMetres = 1.55f,
         // A stripped interior: no carpet, no trim, a cage and a lot of bare steel.
         Body = VehicleBody.RaceSaloon,
@@ -1363,6 +1440,7 @@ public sealed record VehicleProfile
 
     public static VehicleProfile GrandTourer => new()
     {
+        Chassis = RunningGear.Db9,
         Horn = "electric:trumpet_pair",
         LengthMetres = 4.9f, WidthMetres = 2.0f, HeightMetres = 1.3f,
         Name = "V12 grand tourer",
