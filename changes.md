@@ -4,6 +4,30 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-01
 
+- Sound comes into a building through its openings. Doorways, open faces and the outdoors are a graph
+  (`OpeningRoutes.cs`), each opening sized from the walls round it, with whatever stands in it: a shut
+  door passes what its leaf's construction passes, an open one passes everything. A route is the few
+  shortest ways through the openings, and what comes along it is the bend at each opening
+  (Fresnel-Kirchhoff) plus each room's own sound passed on to the next opening (the building
+  acoustics room equation, from the room's surveyed surfaces). Cars, one-off sounds, speech,
+  footsteps, birds and beacons all use it, and it competes band by band with what comes through the
+  walls; the sound is heard from the doorway when the route wins. In Selby House's ground floor
+  corridor, a car 13 m from the front door: front door shut -28/-61/-70 dB (low/mid/high), was
+  -52/-89/-100 and did not change when the door opened; front door open -13/-10/-9, heard from the
+  stairwell doorway. Only the rooms between count their own sound here: the source's room and yours
+  are the reverb's, as before.
+- The old portal path is gone. It gave anything with a portal route a flat level in every band, and
+  the tracer skipped any wall hit within a doorway's width of a portal: a horn 280 m east of Selby
+  House came into the corridor at -1/-3/-6 dB, now -58/-100/-100 through the walls. A horn or siren on
+  a car that had not been asked about yet played at full level; it now starts on the one-off path.
+- Doors send where their doorway is (the leaf's pose when shut). Rebuild client and server together
+  and restart the server: the portal on the wire has new fields.
+- `--path-probe` loads the map the way the client gets it and prints the routes and the openings
+  near the ear. 14 of the city's 524 openings disagree with the walls (listed when the client loads
+  the map): two airport doors with no wall within half a metre of them, a terminal door whose far
+  side is another concourse rather than the outdoors, and tunnel and road open faces whose sides are
+  not the places they name.
+
 - Vehicles stand on their wheels (stage 3 of docs/NEXT_BODIES_WHEELS_ROADS.md). Every preset declares
   its running gear from a real vehicle: tyre sizes, tracks, which wheels drive, steer and brake,
   weight split, centre of gravity height and the lock from its turning circle (`RunningGear.cs`, with

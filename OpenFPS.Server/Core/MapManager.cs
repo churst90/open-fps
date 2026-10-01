@@ -298,6 +298,15 @@ public class MapManager
 
             if (entityData.ApertureSize.HasValue) p.ApertureSize = entityData.ApertureSize.Value;
 
+            // Where the opening is, as authored: a door is loaded shut, so its leaf's pose IS the
+            // doorway's. DoorSystem records it again when it first takes hold of the door.
+            if (world.Has<DoorComponent>(entity) && world.Has<Transform>(entity))
+            {
+                var t = world.Get<Transform>(entity);
+                p.OpeningCentre = t.Position;
+                p.OpeningRotation = t.Rotation;
+            }
+
             // An aperture of 0 means "no opening", which downstream reads as "not a portal at all".
             // Derive one from the doorway's own collider so an author can drop a portal prefab in a gap
             // and get the physically obvious opening size without restating it.

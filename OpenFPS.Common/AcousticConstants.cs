@@ -13,18 +13,11 @@ public static class AcousticConstants
     public const float DefaultVoxelResolution = 0.5f;
 
     // --- Propagation Settings ---
-    public const float PortalPathBias = 0.35f; // Easier to trigger portal paths over direct occlusion
-    public const float AperturePenaltyMultiplier = 0.25f; // Less volume loss from small openings
-    public const float DetourPenaltyMultiplier = 0.6f; // Around-corner sounds should carry better
-    public const float DetourPenaltyCap = 0.4f;
     public const float AirAbsorptionReferenceDist = 200.0f;
     public const float AirAbsorptionMinDist = 15.0f;
     public const float AirAbsorptionMaxMuffle = 0.8f;
     
     // --- Occlusion Settings ---
-    public const float OcclusionMaxHighMuffleDb = -40.0f;
-    public const float OcclusionMaxMidMuffleDb = -30.0f;
-    public const float OcclusionMaxLowMuffleDb = -20.0f;
     public const float OcclusionCap = 0.95f;
     
     // --- Reverb & Reflections ---

@@ -416,6 +416,19 @@ public partial struct PortalComponent
     public int RegionAId { get; set; }
     public int RegionBId { get; set; }
     public float ApertureSize { get; set; } 
+
+    // APPEND ONLY BELOW THIS LINE. MemoryPack writes these positionally with no names on the wire.
+
+    /// <summary>
+    /// Where the doorway is, in the world, and which way it faces: the leaf's pose when shut (its X
+    /// across the opening, Y up, its thin axis through). A door's own transform swings with the leaf,
+    /// so on its own it says where the LEAF is, not where the hole is; this is the hole. The default
+    /// (all-zero) rotation means not known — a portal with no leaf, which is placed where it stands.
+    /// </summary>
+    public Vector3 OpeningCentre { get; set; }
+    /// <inheritdoc cref="OpeningCentre"/>
+    public Quaternion OpeningRotation { get; set; }
+
     public PortalComponent() { }
 }
 

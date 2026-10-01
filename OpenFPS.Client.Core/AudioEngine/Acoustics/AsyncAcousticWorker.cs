@@ -470,10 +470,13 @@ public class AsyncAcousticWorker : IDisposable
     /// <param name="BarrierVerified">The route round the barrier box is clear of everything else. When it
     /// is not, the route does not exist and its level must not be used (BuildSimPath).</param>
     /// <param name="Path">Steam Audio's own route through the scene, when it found one.</param>
+    /// <param name="Route">What came by the openings (OpeningRoutes), when the source and the listener are
+    /// in different places and a route joins them.</param>
     private readonly record struct SaResult(SteamAudioSimulator.DirectResult Direct, Vector3 ApparentPosition,
                                             bool HasApparent, float BarrierDelta,
                                             bool BarrierVerified = true,
-                                            SteamAudioSimulator.PathResult Path = default);
+                                            SteamAudioSimulator.PathResult Path = default,
+                                            OpeningRoutes.Answer? Route = null);
 
     // Below this direct visibility a source is "occluded enough" that pathing should drive its apparent
     // position to the opening the sound arrives through (rather than the straight-through-wall direction).
@@ -533,6 +536,9 @@ public class AsyncAcousticWorker : IDisposable
             _saSim.Run();
 
             var results = new Dictionary<int, SaResult>(_pending.Count);
+            var routes = _routes;
+            _routeTicksThisTick = 0;
+            int listenerRegion = routes != null ? _acoustics.GetRegionAt(world, listener) : AcousticConstants.GlobalRegionId;
             foreach (var kv in _pending)
             {
                 if (!_saSources.TryGetValue(kv.Key, out var src) || src == IntPtr.Zero) continue;
@@ -572,8 +578,13 @@ public class AsyncAcousticWorker : IDisposable
                 // centimetres of detour, loses about five decibels, and wins — the car keeps its own
                 // direction. A grandstand gives a detour the barrier ceiling flattens to 24 dB down,
                 // and any real opening beats it. Nothing here knows what a wall or a doorway is.
-                float barrierDelta = BarrierPathDifference(kv.Value.SourcePos, kv.Value.ListenerPos,
-                                                           out Vector3 edge, out bool edgeVerified);
+                Vector3 edge = kv.Value.ListenerPos;
+                bool edgeVerified = false;
+                float barrierDelta = routes != null
+                    ? routes.BarrierPathDifference(kv.Value.SourcePos, kv.Value.ListenerPos, out edge, out edgeVerified)
+                    : -1f;
+                if (_saDebug && edgeVerified)
+                    Console.WriteLine($"[ROUTE] {kv.Value.SourcePos} -> {kv.Value.ListenerPos}: {barrierDelta:F2} m round one box, edge {edge}");
                 Vector3 apparent = default;
                 bool hasApparent = false;
                 var route = default(SteamAudioSimulator.PathResult);
@@ -599,7 +610,17 @@ public class AsyncAcousticWorker : IDisposable
                     // down to its floor grid: a siren behind the wall was heard from straight below,
                     // where turning the head changes nothing.
                 }
-                results[kv.Key] = new SaResult(direct, apparent, hasApparent, barrierDelta, edgeVerified, route);
+                // ── And by the openings ──────────────────────────────────────────────────────
+                //
+                // Through the walls and round one edge is all the above can find. From the street to a
+                // corridor by the front door, the stairwell and its doorway is a route with corners
+                // in it, and without it an open front door changed nothing ("only when a loud source
+                // passes does it come inside"). Asked whenever the source and the listener are in
+                // different places; BuildSimPath lets it compete band by band.
+                OpeningRoutes.Answer? viaOpenings = routes != null
+                    ? AskRoutes(routes, world, kv.Key, kv.Value.SourcePos, kv.Value.ListenerPos, listenerRegion)
+                    : null;
+                results[kv.Key] = new SaResult(direct, apparent, hasApparent, barrierDelta, edgeVerified, route, viaOpenings);
                 if (direct.Visibility < PathRedirectVisibility) blocked++;
                 reflections += _lastReflectionCount;
             }
@@ -699,6 +720,22 @@ public class AsyncAcousticWorker : IDisposable
                 float throughput = MathF.Max(dLow, MathF.Max(dMid, dHigh));
                 occ = Math.Clamp(MathF.Min(occ, 1f - throughput), 0f, AcousticConstants.OcclusionCap);
             }
+        }
+
+        // ── By the openings, where that delivers more ───────────────────────────────────────
+        //
+        // The same rule as the one-shots' path (SpatialAcoustics.CalculateMainPath) and the same graph:
+        // per band the better of the straight way and the way by the openings, and the openings decide
+        // where it is heard from when they deliver more over all — from the last one, at the source's
+        // own distance, the level having already paid for the longer way.
+        if (sr.Route is { } viaOpenings)
+        {
+            var g = OpeningRoutes.Better(new Vector3(ap.EqLow, ap.EqMid, ap.EqHigh), viaOpenings, out bool routeWins);
+            ap = new SteamAudioSimulator.AcousticParams(ap.Occlusion, g.X, g.Y, g.Z, ap.Bleed);
+            occ = Math.Clamp(MathF.Min(occ, 1f - MathF.Max(g.X, MathF.Max(g.Y, g.Z))), 0f, AcousticConstants.OcclusionCap);
+            Vector3 toOpening = viaOpenings.Apparent - req.ListenerPos;
+            if (routeWins && toOpening.LengthSquared() > 1e-6f)
+                apparent = req.ListenerPos + Vector3.Normalize(toOpening) * dist;
         }
 
         int region = -1;
@@ -857,121 +894,92 @@ public class AsyncAcousticWorker : IDisposable
     /// a scene rebuild and only ever read afterwards, so the worker needs no lock to walk it.</summary>
     private List<OpenFPS.Client.Core.AudioEngine.SteamAudio.SteamAudioScene.Box> _barrierBoxes = new();
 
+    // ── Routes by the openings, and what they cost ────────────────────────────────────────────
+    //
+    // The graph (OpeningRoutes) is built with each scene, so it has the door leaves where the scene has
+    // them, and handed to SpatialAcoustics so every other voice asks the same one. A route query is a
+    // few Dijkstra steps and a handful of segment tests, but there are dozens of sources a tick: an
+    // answer is kept while neither end has moved enough to change it.
+    private volatile OpeningRoutes? _routes;
+    private readonly Dictionary<int, (OpeningRoutes Model, Vector3 Source, Vector3 Listener, OpeningRoutes.Answer? Answer, long At)> _routeCache = new();
+    /// <summary>How far either end may move before a source's route is asked again, metres: well under a
+    /// doorway's width, so the crossing it reports cannot be a different opening.</summary>
+    private const float RouteReuseMetres = 0.25f;
+    private const long RouteReuseMs = 500;
     /// <summary>
-    /// How far out of its way sound had to go to get from the source to the listener, metres, or -1 if
-    /// nothing is in the way at all.
-    ///
-    /// Barriers do not add up: two screens in a row are not twice one screen, because the second is
-    /// standing in the first one's shadow. What governs is the single worst detour, which is what the
-    /// standards use and the only version that does not silence a source merely for having a lot of
-    /// scenery near it.
-    ///
-    /// It also reports the point the sound left on its last leg to the ear — the
-    /// diffracting edge, which is where a blocked source is actually heard FROM.
-    ///
-    /// <paramref name="edgeVerified"/> is a claim about the EDGE alone, and it is deliberately not
-    /// allowed to touch the returned path difference. The detour a barrier costs is an estimate either
-    /// way and a decent one — the standards' single-worst-screen rule — so a source behind a doorway
-    /// keeps the relief that stops it sounding like it is coming through the wall. Where the sound is
-    /// COMING FROM is not an estimate: it either is that corner or it is somewhere else entirely, and
-    /// a bearing that is wrong by thirty degrees is worse than no bearing at all.
+    /// How much of a tick route queries may take, milliseconds. A source whose ends are new costs a leg
+    /// search through the city (a millisecond or more when the way to a door is blocked); past this, a
+    /// source that has an answer keeps it for this tick, however far it has moved, and only a source
+    /// that has none is asked. A bound on cost, not on what is heard: the answer comes a tick later.
     /// </summary>
-    private float BarrierPathDifference(Vector3 source, Vector3 listener, out Vector3 edge, out bool edgeVerified)
-    {
-        var boxes = _barrierBoxes;
-        float worst = -1f;
-        int worstBox = -1;
-        edge = listener;
-        var routes = _routeScratch;
-        routes.Clear();
-        for (int i = 0; i < boxes.Count; i++)
-        {
-            var b = boxes[i];
-            _boxRoutes.Clear();
-            if (!Diffraction.PathDifferenceAroundBox(b.Center, b.Size, b.Rotation, source, listener,
-                                                     out float d, out Vector3 p, _boxRoutes)) continue;
-            foreach (var (rd, rs, re) in _boxRoutes) routes.Add((rd, rs, re, i));
-            if (d <= worst) continue;
-            worst = d; worstBox = i; edge = p;
-        }
+    private const double RouteBudgetMs = 4.0;
+    /// <summary>The oldest answer the budget may stand on, milliseconds.</summary>
+    private const long RouteHeldMaxMs = 2000;
+    private long _routeTicksThisTick;
+    private long _routeQueries, _routeTicks, _routeReused;
+    private long _lastRouteReport;
 
-        // ── An edge you cannot see is not where you are hearing it from ─────────────────────────
-        //
-        // The search above is per box: it guarantees the route clears the box it went round, and knows
-        // nothing about the rest of the scene. Round the end of one wall and straight into the next is
-        // a perfectly good answer to "how far past THIS box" and a completely wrong answer to "which
-        // way did it come" — two rooms apart, the nearest silhouette edge is inside the wall between
-        // them. So each route's two legs are checked against everything before it is believed.
-        //
-        // And the route believed is the SHORTEST that is clear, not the worst box's: sound takes the
-        // way that exists. Only the worst box's shortest way round was ever tried, so standing in a
-        // flat with its door open, a walker in the corridor round the jamb got the wall's -54 dB: the
-        // shortest way past the storey-high wall was over its top, into the slab above, and the jamb
-        // of the open door beside it was never asked (2026-09-30, --path-probe open=). When no route is clear, there is a route but we do not know where it
-        // runs, and Steam Audio's probe graph — which knows the whole scene — answers instead.
-        // A route clear of every box is at least as long as the worst box's own shortest way round, so
-        // nothing shorter can be it.
-        routes.RemoveAll(r => r.D < worst - 1e-3f);
-        edgeVerified = false;
-        if (routes.Count > 1) routes.Sort((x, y) => x.D.CompareTo(y.D));
-        int tried = 0;
-        foreach (var (d, ps, p, i) in routes)
+    /// <summary>The cost of the route queries so far: how many, and the mean per query.</summary>
+    public string RouteCostSummary =>
+        _routeQueries == 0 ? "no route queries yet"
+        : $"{_routeQueries} route queries, {_routeTicks * 1e6 / System.Diagnostics.Stopwatch.Frequency / _routeQueries:F0} µs each, {_routeReused} reused";
+
+    private OpeningRoutes.Answer? AskRoutes(OpeningRoutes routes, WorldSnapshot world, int id, Vector3 source, Vector3 listener, int listenerRegion)
+    {
+        long now = Environment.TickCount64;
+        if (_routeCache.TryGetValue(id, out var held) && ReferenceEquals(held.Model, routes))
         {
-            if (++tried > MaxRoutesTried) break;
-            if (!RouteIsClear(source, ps, p, listener, i)) continue;
-            edge = p; edgeVerified = true;
-            if (_saDebug)
+            bool still = now - held.At < RouteReuseMs
+                         && Vector3.DistanceSquared(held.Source, source) < RouteReuseMetres * RouteReuseMetres
+                         && Vector3.DistanceSquared(held.Listener, listener) < RouteReuseMetres * RouteReuseMetres;
+            bool overBudget = _routeTicksThisTick * 1000.0 / System.Diagnostics.Stopwatch.Frequency > RouteBudgetMs
+                              && now - held.At < RouteHeldMaxMs;
+            if (still || overBudget)
             {
-                var bx = boxes[i];
-                Console.WriteLine($"[ROUTE] {source} -> {listener}: {d:F2} m round box {bx.Center} size {bx.Size} {bx.Material}, edge {p}");
+                _routeReused++;
+                return held.Answer;
             }
-            return d;
         }
-        return worst;
+        long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
+        OpeningRoutes.Answer? answer = null;
+        try
+        {
+            if (routes.Route(source, _acoustics.GetRegionAt(world, source), listener, listenerRegion, out var a)) answer = a;
+        }
+        catch (Exception ex) { ReportTracerFailure(id, ex); }
+        long spent = System.Diagnostics.Stopwatch.GetTimestamp() - t0;
+        _routeTicks += spent;
+        _routeTicksThisTick += spent;
+        _routeQueries++;
+        _routeCache[id] = (routes, source, listener, answer, now);
+        if (_routeCache.Count > 1024)
+            foreach (var k in _routeCache.Where(e => now - e.Value.At > RouteReuseMs).Select(e => e.Key).ToList())
+                _routeCache.Remove(k);
+        if ((_saDebug || PerfProbe.Enabled) && now - _lastRouteReport > 30_000)
+        {
+            _lastRouteReport = now;
+            Console.WriteLine($"[AcousticWorker] routes: {RouteCostSummary}; {routes.Openings.Count} openings.");
+        }
+        return answer;
     }
 
-    private readonly List<(float D, Vector3 SourceSide, Vector3 Edge, int Box)> _routeScratch = new();
-    private readonly List<(float D, Vector3 SourceSide, Vector3 Edge)> _boxRoutes = new();
-    /// <summary>A route clear of the whole scene costs a pass over every box; past the few shortest,
-    /// the rest are ways round walls deeper in, and the probe graph answers for those.</summary>
-    private const int MaxRoutesTried = 6;
-
-    /// <summary>Are BOTH legs of a diffracted route — source to edge, edge to ear — clear of every OTHER
-    /// barrier? The diffracting box itself is skipped: the edge lies on its surface, so it always reports
-    /// a hit.
-    ///
-    /// Both, not just the arriving one. Round the west end of a doorway's west leaf is the shortest way
-    /// past THAT leaf and runs straight into the room's west wall — the leg that fails is the one leaving
-    /// the source, and a bearing taken from it points at a corner the sound never reached.</summary>
-    private const float RouteJointMetres = 0.05f;
-
-    private bool RouteIsClear(Vector3 source, Vector3 sourceSide, Vector3 edge, Vector3 listener, int skipBox)
+    /// <summary>Builds the graph for a scene. What the map's openings disagree with in the geometry is
+    /// said once, when the map arrives, not on every door's swing.</summary>
+    private OpeningRoutes BuildRoutes(WorldSnapshot world, List<SteamAudioScene.Box> boxes, bool report)
     {
-        var boxes = _barrierBoxes;
-        // Only boxes that can reach the route's bounds are tested exactly: up to six routes are tried
-        // per source now, and each exact pass over the city's five thousand boxes cost a millisecond.
-        var lo = Vector3.Min(Vector3.Min(source, sourceSide), Vector3.Min(edge, listener));
-        var hi = Vector3.Max(Vector3.Max(source, sourceSide), Vector3.Max(edge, listener));
-        for (int i = 0; i < boxes.Count; i++)
-        {
-            if (i == skipBox) continue;
-            var b = boxes[i];
-            float reach = b.Size.Length() * 0.5f + RouteJointMetres;
-            var c = b.Center;
-            if (c.X + reach < lo.X || c.X - reach > hi.X || c.Y + reach < lo.Y || c.Y - reach > hi.Y
-                || c.Z + reach < lo.Z || c.Z - reach > hi.Z) continue;
-            // Every other box a hair larger: an edge flush against its neighbour — a wall's top under
-            // the slab it holds up — is not an edge, and a route along the joint is a crack between two
-            // boxes that the building does not have. Without it, a shut flat door passed the corridor at
-            // -14 dB over the top of its wall (2026-09-30).
-            var size = b.Size + new Vector3(2f * RouteJointMetres);
-            if (GeometryUtils.LineIntersectsOBB(edge, listener, b.Center, size, b.Rotation)) return false;
-            if (GeometryUtils.LineIntersectsOBB(source, sourceSide, b.Center, size, b.Rotation)) return false;
-            // Round a thick wall the route runs along its end between the two crossings, and a shut
-            // leaf hung in that opening sits exactly there.
-            if (sourceSide != edge && GeometryUtils.LineIntersectsOBB(sourceSide, edge, b.Center, size, b.Rotation)) return false;
-        }
-        return true;
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        var model = OpeningGraph.Build(world, boxes, p => _acoustics.GetRegionAt(world, p));
+        if (!report) return model;
+        Console.WriteLine($"[AcousticWorker] Openings: {model.Openings.Count} from the map, {model.Problems.Count} disagreeing with the geometry ({sw.ElapsedMilliseconds} ms).");
+        foreach (var problem in model.Problems.Take(20)) Console.WriteLine($"[AcousticWorker]   opening {problem}");
+        if (model.Problems.Count > 20) Console.WriteLine($"[AcousticWorker]   ...and {model.Problems.Count - 20} more.");
+        return model;
+    }
+
+    private void PublishRoutes(OpeningRoutes model)
+    {
+        _routes = model;
+        _acoustics.Routes = model;
     }
 
     private void EnsureSteamAudio()
@@ -1043,9 +1051,7 @@ public class AsyncAcousticWorker : IDisposable
     /// (PrefabRepository), with both sides the outside when the map names no rooms, so a door is told by
     /// HAVING one, not by its two sides differing — that test missed every door on the city. Movers
     /// are not in the scene at all.</summary>
-    private static bool IsDoorLeaf(OpenFPS.Common.Networking.EntityDefinition? def)
-        => def != null && def.Collider.IsSolid && !def.Moves
-           && (def.Portal.RegionAId != 0 || def.Portal.RegionBId != 0);
+    private static bool IsDoorLeaf(OpenFPS.Common.Networking.EntityDefinition? def) => OpeningGraph.IsDoorLeaf(def);
 
     /// <summary>A leaf's pose to the centimetre and the degree, folded into one number.</summary>
     private static long DoorPose(in EntitySnapshot snap)
@@ -1084,7 +1090,7 @@ public class AsyncAcousticWorker : IDisposable
     // two scenes take about 120 ms (--scene-cost), and every source's occlusion would stand still for
     // that, several times a swing. Replaced scenes are released a few seconds later, once every
     // simulator has taken the new one.
-    private System.Threading.Tasks.Task<(SteamAudioScene Full, SteamAudioScene Listener, List<SteamAudioScene.Box> Boxes, AcousticMap? Map)>? _doorBuild;
+    private System.Threading.Tasks.Task<(SteamAudioScene Full, SteamAudioScene Listener, List<SteamAudioScene.Box> Boxes, AcousticMap? Map, OpeningRoutes Routes)>? _doorBuild;
     private readonly List<(SteamAudioScene Scene, long At)> _retiredScenes = new();
 
     private void SwapInDoorBuild()
@@ -1092,7 +1098,7 @@ public class AsyncAcousticWorker : IDisposable
         if (_doorBuild is not { IsCompleted: true } t || _saSim == null) return;
         _doorBuild = null;
         if (t.Status != System.Threading.Tasks.TaskStatus.RanToCompletion) return;
-        var (full, listener, boxes, map) = t.Result;
+        var (full, listener, boxes, map, routes) = t.Result;
         if (!ReferenceEquals(map, _saSceneMap) || !full.IsBuilt)
         {
             full.Dispose(); listener.Dispose();        // the map changed meanwhile: it is not this map's
@@ -1106,6 +1112,7 @@ public class AsyncAcousticWorker : IDisposable
         OpenFPS.Client.Core.AudioEngine.SteamAudio.TracedReverbSet.ConfigureInBackground(_saContext, full, listener.IsBuilt ? listener : null);
         _barrierBoxes = boxes;
         _lastSceneBoxes = boxes.Count;
+        PublishRoutes(routes);
         Console.WriteLine("[AcousticWorker] A door moved: the scene now has the leaves where they are.");
     }
 
@@ -1140,7 +1147,7 @@ public class AsyncAcousticWorker : IDisposable
                 full.Build(doorBoxes);
                 var listener = new SteamAudioScene(ctx);
                 listener.Build(SteamAudioScene.WithoutOpenGround(doorBoxes));
-                return (full, listener, doorBoxes, forMap);
+                return (full, listener, doorBoxes, forMap, BuildRoutes(world, doorBoxes, report: false));
             });
             return;
         }
@@ -1189,9 +1196,11 @@ public class AsyncAcousticWorker : IDisposable
             // the way, ending in every source receiving its first real occlusion in the same frame.
             if (mapChanged) _saSim.BeginProbeBake(_saScene);
         }
-        // The boxes the barrier model bends sound around. The same list the scene was built from, so
-        // the diffraction path and the occlusion test can never disagree about what is in the world.
+        // The boxes the barrier model bends sound around and the routes run through. The same list the
+        // scene was built from, so the diffraction path and the occlusion test can never disagree about
+        // what is in the world.
         _barrierBoxes = boxes;
+        PublishRoutes(BuildRoutes(world, boxes, report: mapChanged));
         Console.WriteLine($"[AcousticWorker] Built Steam Audio scene from {boxes.Count} solid box colliders ({built.ElapsedMilliseconds} ms).");
     }
 

@@ -17,9 +17,10 @@ namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 public sealed class SteamAudioScene : IDisposable
 {
     /// <summary>An axis-box collider in world space (size = full extents) with an acoustic material name,
-    /// and how it is built (solid, or two leaves over a cavity: <see cref="WallBuild"/>).</summary>
+    /// and how it is built (solid, or two leaves over a cavity: <see cref="WallBuild"/>). <paramref name="EntityId"/>
+    /// is the entity it was taken from, 0 for one made by hand.</summary>
     public readonly record struct Box(Vector3 Center, Vector3 Size, Quaternion Rotation, string Material,
-                                      WallBuild Build = default);
+                                      WallBuild Build = default, int EntityId = 0);
 
     private readonly IntPtr _context;
     private IntPtr _scene;
@@ -61,7 +62,7 @@ public sealed class SteamAudioScene : IDisposable
             var size = def.Collider.Size;
             if (size.X <= 0 || size.Y <= 0 || size.Z <= 0) continue;
             boxes.Add(new Box(snap.Transform.Position, size, snap.Transform.Rotation, def.Material.Material,
-                              new WallBuild(def.Acoustics.LeafMetres, def.Acoustics.StudSpacingMetres)));
+                              new WallBuild(def.Acoustics.LeafMetres, def.Acoustics.StudSpacingMetres), snap.Id));
         }
         return boxes;
     }

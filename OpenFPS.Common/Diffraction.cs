@@ -254,7 +254,7 @@ public static class Diffraction
     /// the segment is that one clamped to its ends. This replaced a 24-step ternary search, which
     /// the two-edge search below runs once per step of its own, 24 times over.
     /// </summary>
-    private static float MinimiseOnEdge(Vector3 a, Vector3 b, Vector3 from, Vector3 to)
+    internal static float MinimiseOnEdge(Vector3 a, Vector3 b, Vector3 from, Vector3 to)
     {
         Vector3 ab = b - a;
         float len2 = ab.LengthSquared();
