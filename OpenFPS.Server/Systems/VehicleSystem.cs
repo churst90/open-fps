@@ -441,9 +441,10 @@ public sealed partial class VehicleSystem
                     {
                         v.Wheels.Modulated = true;
                         var body = v.Wheels;
-                        // A driver takes a bend no faster than keeps the tyres quiet: ordinary
-                        // driving does not make them squeal.
-                        v.CornerSpeed = k => body.SteadyTurnSpeed(k, TyreFriction.SquealOnset);
+                        // A driver takes a bend no faster than is comfortable (the side friction at
+                        // which drivers ease off, DriverSteering.ComfortTurnSpeed), and never faster
+                        // than keeps the tyres quiet.
+                        v.CornerSpeed = k => MathF.Min(DriverSteering.ComfortTurnSpeed(k), body.SteadyTurnSpeed(k, TyreFriction.SquealOnset));
                         v.Driver = new LineFollower(v.Wheels);
                         v.Driver.Place(0f);
                         v.Wheels.Vx = v.Speed;
@@ -679,7 +680,8 @@ public sealed partial class VehicleSystem
         // Steering itself round on its tyres, it has to take the bends the line really makes.
         // It looks twice its straight-line braking distance ahead, because braking beside cornering
         // sheds less.
-        if (v.Driver != null) want = MathF.Min(want, line.BendSpeedWithin(v.Lap, 2f * lookahead, v.CorneringG, v.Brake, v.CornerSpeed));
+        if (v.Driver != null) want = MathF.Min(want, line.BendSpeedWithin(v.Lap, 2f * lookahead, v.CorneringG, v.Brake, v.CornerSpeed,
+                                                                         DriverSteering.ComfortSideFriction));
 
         // ── Coming up on one ───────────────────────────────────────────────────────────────────
         //
@@ -769,12 +771,15 @@ public sealed partial class VehicleSystem
         float wasSpeed = v.Speed;
         float accel = v.Accel;
         // In a bend on its own tyres, the driver pulls away only with what the cornering leaves of
-        // its friction circle (see RaceLine.BendSpeedWithin, which plans the braking the same way).
+        // the comfortable ellipse (see RaceLine.BendSpeedWithin, which plans the braking the same
+        // way). The cornering is what the driver feels: the body's own lateral acceleration,
+        // or the line's where that is more.
         if (v.Driver != null)
         {
-            float lateral = v.Speed * v.Speed * MathF.Abs(line.CurvatureAt(v.Lap));
-            float budget = v.CorneringG * WheelDynamics.G;
-            accel = MathF.Min(accel, MathF.Sqrt(MathF.Max(0f, budget * budget - lateral * lateral)));
+            float lateral = MathF.Max(v.Speed * v.Speed * MathF.Abs(line.CurvatureAt(v.Lap)), MathF.Abs(v.Wheels!.Ay));
+            float side = MathF.Min(v.CorneringG, DriverSteering.ComfortSideFriction(v.Speed)) * WheelDynamics.G;
+            float used = lateral / side;
+            accel *= MathF.Sqrt(MathF.Max(0f, 1f - used * used));
         }
         if (want > v.Speed) v.Speed = MathF.Min(want, v.Speed + accel * dt);
         else v.Speed = MathF.Max(want, v.Speed - brake * dt);

@@ -19,6 +19,54 @@ public sealed record DriverSteering
     public float SecondsToLock { get; init; } = 0.7f;
 
     public static DriverSteering Default { get; } = new();
+
+    /// <summary>
+    /// The side friction an ordinary driver takes a bend at, against speed: the lateral acceleration,
+    /// in g, at which drivers start to feel uncomfortable and ease off. Speeds in m/s.
+    ///
+    /// AASHTO, A Policy on Geometric Design of Highways and Streets (the Green Book), 2011, section
+    /// 3.3: for low-speed urban streets the side friction factor is set at the point of driver
+    /// discomfort, measured with ball-bank indicators (figure 3-6): 0.38 at 10 mph, 0.26 at 20 mph,
+    /// 0.20 at 30 mph, 0.17 at 40 mph; for high-speed design 0.14 at 50 mph, 0.12 at 60 mph and
+    /// 0.08 at 80 mph. Held flat outside the table.
+    /// </summary>
+    public static readonly (float Speed, float SideFriction)[] ComfortTable =
+    {
+        (10f * 0.44704f, 0.38f), (20f * 0.44704f, 0.26f), (30f * 0.44704f, 0.20f), (40f * 0.44704f, 0.17f),
+        (50f * 0.44704f, 0.14f), (60f * 0.44704f, 0.12f), (80f * 0.44704f, 0.08f),
+    };
+
+    /// <summary>The comfortable side friction at this speed (see <see cref="ComfortTable"/>).</summary>
+    public static float ComfortSideFriction(float speed)
+    {
+        var t = ComfortTable;
+        if (speed <= t[0].Speed) return t[0].SideFriction;
+        for (int i = 1; i < t.Length; i++)
+            if (speed <= t[i].Speed)
+            {
+                float f = (speed - t[i - 1].Speed) / (t[i].Speed - t[i - 1].Speed);
+                return t[i - 1].SideFriction + (t[i].SideFriction - t[i - 1].SideFriction) * f;
+            }
+        return t[^1].SideFriction;
+    }
+
+    /// <summary>
+    /// The speed an ordinary driver takes a steady bend of this curvature (1/m, either sign) at: the
+    /// speed where v^2 |k| reaches the comfortable side friction at that speed, m/s. The friction
+    /// falls as the speed rises, so v^2 |k| - f(v) g rises with v and is found by halving.
+    /// </summary>
+    public static float ComfortTurnSpeed(float curvature)
+    {
+        float k = MathF.Abs(curvature);
+        if (k < 1e-5f) return float.PositiveInfinity;
+        float lo = 0f, hi = 80f;
+        for (int i = 0; i < 30; i++)
+        {
+            float mid = 0.5f * (lo + hi);
+            if (mid * mid * k <= ComfortSideFriction(mid) * WheelDynamics.G) lo = mid; else hi = mid;
+        }
+        return lo;
+    }
 }
 
 /// <summary>

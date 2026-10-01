@@ -4,6 +4,10 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-01
 
+- The where-am-I key names a doorway from the zones either side of it ("doorway between <A> and
+  <B>"); a zone stops at its walls, so a doorway was in none and was called "Under Shelter". The client
+  log records every spoken line ([SAY]) and every zone change ([ZONE]).
+- Steam Audio's pathing bake is off: nothing read its answer and it cost a core at every map load.
 - Sound comes into a building through its openings. Doorways, open faces and the outdoors are a graph
   (`OpeningRoutes.cs`), each opening sized from the walls round it, with whatever stands in it: a shut
   door passes what its leaf's construction passes, an open one passes everything. A route is the few
@@ -28,6 +32,18 @@ Recent work, newest first. `git log` has the rest.
   side is another concourse rather than the outdoors, and tunnel and road open faces whose sides are
   not the places they name.
 
+- Traffic stopped skidding at every junction. On their own tyres the cars were taking bends at
+  0.46-0.6 g and braking into them at full service brake while the cornering built up, which put the
+  front tyres at 0.8-0.95 of their grip: audible squeal in 4 % of the city's driving, against none
+  before. Drivers now take a bend at the side friction ordinary drivers find comfortable (the AASHTO
+  Green Book's low-speed figures: 0.38 g at 10 mph down to 0.17 g at 40 mph), finish their braking
+  on the way in, and pull away out of it gently. Car following uses the ACC model, so creeping up a
+  queue no longer stamps on the brakes. Squeal in ordinary driving is back to none; braking stays at
+  1-3 m/s2. Server only.
+- Each tyre squeals for itself, from its own slip, slip angle and load, and from its own end of the
+  car (and louder on its own side for someone close by). A locked wheel dragged at speed is far louder
+  than a tyre at its cornering limit; an ordinary stop is silent. Rolling noise is still one voice per
+  axle. Client only: no wire change. Listening set in inbox/tyres-2026-10-01/.
 - Vehicles stand on their wheels (stage 3 of docs/NEXT_BODIES_WHEELS_ROADS.md). Every preset declares
   its running gear from a real vehicle: tyre sizes, tracks, which wheels drive, steer and brake,
   weight split, centre of gravity height and the lock from its turning circle (`RunningGear.cs`, with

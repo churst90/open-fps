@@ -254,7 +254,14 @@ public sealed class RaceLine
     /// <param name="cornerSpeed">The vehicle's own fastest speed round a steady turn of a curvature,
     /// if it knows it (WheelDynamics.SteadyTurnSpeed); the lower of that and the cornering budget
     /// holds at each node.</param>
-    public float BendSpeedWithin(float distance, float span, float corneringG, float brake, Func<float, float>? cornerSpeed = null)
+    /// <param name="comfortG">The side friction a driver finds comfortable at a speed, g
+    /// (DriverSteering.ComfortSideFriction), if the driver is an ordinary one. Braking and cornering
+    /// then share an ellipse with the brake on one axis and the comfortable side friction on the
+    /// other (the friction ellipse of Milliken and Milliken 1995, chapter 2, at a driver's comfort
+    /// rather than the tyre's limit), so in a bend taken at the comfortable side friction there is no
+    /// braking left over, and the slowing is done on the way in.</param>
+    public float BendSpeedWithin(float distance, float span, float corneringG, float brake, Func<float, float>? cornerSpeed = null,
+                                 Func<float, float>? comfortG = null)
     {
         float s = distance % Length;
         if (s < 0f) s += Length;
@@ -277,7 +284,12 @@ public sealed class RaceLine
 
         // Backwards from the furthest: each node's limit, and what can still be shed before it,
         // ending at the car (distance nought, the curvature of the node it is past).
-        float v = float.PositiveInfinity, beyond = 0f;
+        //
+        // The curvature runs linearly between nodes, so over a segment the cornering is greatest at
+        // its tighter end; the braking room is what the circle leaves there. Read at the nearer end,
+        // a bend whose curvature climbs over a few nodes would be entered braking at the full brake
+        // while the cornering built up under it, the two together past the circle.
+        float v = float.PositiveInfinity, beyond = 0f, beyondCurve = 0f;
         for (int c = count - 1; c >= -1; c--)
         {
             int node = c >= 0 ? nodes[c] : i;
@@ -285,8 +297,16 @@ public sealed class RaceLine
             float curve = MathF.Abs(_curvature[node]);
             if (float.IsFinite(v))
             {
-                float lateral = v * v * curve;
+                float lateral = v * v * MathF.Max(curve, beyondCurve);
                 float room = MathF.Min(brake, MathF.Sqrt(MathF.Max(0f, muG * muG - lateral * lateral)));
+                if (comfortG != null)
+                {
+                    // The comfortable ellipse: the brake on a straight, the comfortable side friction
+                    // in a steady bend, and between them (b_x / brake)^2 + (a_y / side)^2 = 1.
+                    float side = MathF.Min(muG, MathF.Max(0.01f, comfortG(v)) * 9.81f);
+                    float used = lateral / side;
+                    room *= MathF.Sqrt(MathF.Max(0f, 1f - used * used));
+                }
                 v = MathF.Sqrt(v * v + 2f * room * (beyond - here));
             }
             if (curve > 1e-5f)
@@ -295,6 +315,7 @@ public sealed class RaceLine
                 if (cornerSpeed != null) v = MathF.Min(v, cornerSpeed(curve));
             }
             beyond = here;
+            beyondCurve = curve;
         }
         return v;
     }
