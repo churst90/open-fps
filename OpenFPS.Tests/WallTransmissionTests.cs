@@ -173,4 +173,78 @@ public class WallTransmissionTests
         var (l, m, h) = WallTransmission.BandGains("Foliage", new Vector3(10f, 3f, 1f), WallBuild.Solid);
         Assert.Equal((p.TransmissionLow, p.TransmissionMid, p.TransmissionHigh), (l, m, h));
     }
+
+    // ── The hand-rolled tracer answers with the same model ─────────────────────────────────────
+
+    private static WorldSnapshot World(params (Vector3 Pos, Vector3 Size, string Material, WallBuild Build)[] boxes)
+    {
+        var world = new ClientWorldState();
+        world.Clear(new Vector3(200, 40, 200), new Vector3(-100, -10, -100), new Vector3(100, 30, 100));
+        int id = 1;
+        foreach (var b in boxes)
+            world.RegisterDefinition(new EntityDefinition
+            {
+                EntityId = id++,
+                Type = EntityType.StaticObject,
+                Transform = new Transform { Position = b.Pos, Rotation = Quaternion.Identity },
+                Collider = new ColliderComponent { Shape = ColliderShape.Box, Size = b.Size, IsSolid = true },
+                Material = new MaterialComponent { Material = b.Material },
+                Acoustics = new AcousticComponent { LeafMetres = b.Build.LeafMetres, StudSpacingMetres = b.Build.StudSpacingMetres },
+            });
+        return world.GetSnapshot();
+    }
+
+    [Fact]
+    public void TheTracerTakesWhatTheWallTakes()
+    {
+        var size = new Vector3(16.86f, 2.73f, 0.35f);
+        var world = World((new Vector3(0, 1.4f, 0), size, "Brick", WallBuild.Solid));
+        new SpatialService().GetOcclusionData(world, new Vector3(0, 1.6f, -4), new Vector3(0, 1.6f, 4),
+                                              out _, out _, out float l, out float m, out float h);
+        var (wl, wm, wh) = WallTransmission.BandGains("Brick", size, WallBuild.Solid);
+        Assert.Equal(Db(wl), Db(l), 2);
+        Assert.Equal(Db(wm), Db(m), 2);
+        Assert.Equal(Db(wh), Db(h), 2);
+    }
+
+    [Fact]
+    public void TwoWallsAreAlwaysQuieterThanOne()
+    {
+        var stud = new WallBuild(0.0125f, 0.6f);
+        var size = new Vector3(16.86f, 2.73f, 0.35f);
+        var one = World((new Vector3(0, 1.4f, 0), size, "Plaster", stud));
+        var two = World((new Vector3(0, 1.4f, 0), size, "Plaster", stud), (new Vector3(0, 1.4f, 3), size, "Plaster", stud));
+        var acoustics = new SpatialAcoustics();
+        var a = acoustics.CalculateAcousticPath(one, -1, new Vector3(0, 1.6f, -4), new Vector3(0, 1.6f, 6));
+        var b = acoustics.CalculateAcousticPath(two, -1, new Vector3(0, 1.6f, -4), new Vector3(0, 1.6f, 6));
+        Assert.True(Db(b.EqLow) > Db(a.EqLow) + 10f, $"low: one {Db(a.EqLow):F1}, two {Db(b.EqLow):F1}");
+        Assert.True(Db(b.EqMid) > Db(a.EqMid) + 10f, $"mid: one {Db(a.EqMid):F1}, two {Db(b.EqMid):F1}");
+        Assert.True(Db(b.EqHigh) > Db(a.EqHigh) + 10f, $"high: one {Db(a.EqHigh):F1}, two {Db(b.EqHigh):F1}");
+    }
+
+    [Fact]
+    public void ASlabStraightOverheadIsNotTransparent()
+    {
+        // A ray exactly vertical made the tracer's cross of sample rays NaN: four of the five hit
+        // nothing and a 25 cm concrete floor passed the room above at about -2 dB.
+        var slab = new Vector3(20f, 0.25f, 20f);
+        var world = World((new Vector3(0, 3f, 0), slab, "Concrete", WallBuild.Solid));
+        var p = new SpatialAcoustics().CalculateAcousticPath(world, -1, new Vector3(0, 1.6f, 0), new Vector3(0, 4.6f, 0));
+        var (sl, sm, sh) = WallTransmission.BandGains("Concrete", slab, WallBuild.Solid);
+        Assert.Equal(Db(sl), Db(p.EqLow), 1);
+        Assert.Equal(Db(sm), Db(p.EqMid), 1);
+        Assert.Equal(Db(sh), Db(p.EqHigh), 1);
+    }
+
+    [Fact]
+    public void NoMapFloorLetsSoundThroughAWall()
+    {
+        // The map's OcclusionFloor said "sounds never drop below this through walls". Walls decide.
+        var world = World((new Vector3(0, 1.4f, 0), StoreyWall, "Brick", WallBuild.Solid));
+        world.AcousticMap = new AcousticMap { OcclusionFloor = 0.5f };
+        new SpatialService().GetOcclusionData(world, new Vector3(0, 1.6f, -4), new Vector3(0, 1.6f, 4),
+                                              out float blocked, out float bleed, out float l, out _, out _);
+        Assert.True(Db(l) > 30f, $"low band {Db(l):F1} dB through 35 cm of brick");
+        Assert.True(bleed < 0.05f && blocked > 0.95f, $"bleed {bleed:F3}, blocked {blocked:F3}");
+    }
 }
