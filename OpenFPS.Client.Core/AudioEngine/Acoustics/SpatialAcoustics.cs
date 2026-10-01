@@ -104,42 +104,78 @@ public class SpatialAcoustics
     //
     // One model for every voice: the occlusion worker builds it with each scene (the leaves where they
     // stand) and hands it here, so a footstep, a bird or a word asks the same graph a car does. Until
-    // it has — or where there is no simulator at all — one is built here from the world, again whenever
-    // the map changes or a door leaf moves.
+    // it has — or where there is no simulator at all — one is built here from the world: at once for a
+    // new map, and in the background when a door leaf near the listener has moved, the old graph
+    // answering until the new one is ready (the city's takes a few hundred milliseconds, and on the
+    // city walkers open doors all day). The same rules as the worker's door rebuilds.
     private volatile OpeningRoutes? _routes;
-    private OpeningRoutes? _localRoutes;
+    private volatile OpeningRoutes? _localRoutes;
     private object? _localRoutesMap;
     private long _localRoutesDoors;
+    private long _localRoutesStartedAt;
+    private System.Threading.Tasks.Task? _localRoutesBuild;
     private readonly object _localRoutesLock = new();
+    /// <summary>Only doors this near the listener count, metres (as AsyncAcousticWorker's).</summary>
+    private const float DoorNearMetres = 50f;
+    /// <summary>The least time between two door rebuilds while a door swings, seconds (as the worker's).</summary>
+    private const double DoorRebuildSeconds = 0.3;
 
     /// <summary>The graph the occlusion worker built with its scene. Null hands it back to the local one.</summary>
     public OpeningRoutes? Routes { get => _routes; set => _routes = value; }
 
-    /// <summary>The graph to ask: the worker's, or one built from this world.</summary>
-    public OpeningRoutes? RoutesFor(WorldSnapshot world)
+    /// <summary>The graph to ask: the worker's, or one built from this world, with the door leaves near
+    /// <paramref name="listener"/> (all of them when not given) where they stand.</summary>
+    public OpeningRoutes? RoutesFor(WorldSnapshot world, Vector3? listener = null)
     {
         var shared = _routes;
         if (shared != null) return shared;
         if (world.AcousticMap == null) return null;
+        long doors = DoorPoses(world, listener);
+        lock (_localRoutesLock)
+        {
+            var current = _localRoutes;
+            if (current == null || !ReferenceEquals(_localRoutesMap, world.AcousticMap))
+            {
+                current = BuildLocalRoutes(world);
+                _localRoutes = current;
+                _localRoutesMap = world.AcousticMap;
+                _localRoutesDoors = doors;
+                return current;
+            }
+            if (_localRoutesDoors == doors || _localRoutesBuild is { IsCompleted: false }) return current;
+            long now = Environment.TickCount64;
+            if (now - _localRoutesStartedAt < DoorRebuildSeconds * 1000) return current;
+            _localRoutesStartedAt = now;
+            _localRoutesDoors = doors;
+            var map = world.AcousticMap;
+            _localRoutesBuild = System.Threading.Tasks.Task.Run(() =>
+            {
+                var built = BuildLocalRoutes(world);
+                lock (_localRoutesLock)
+                    if (ReferenceEquals(_localRoutesMap, map)) _localRoutes = built;
+            });
+            return current;
+        }
+    }
+
+    private OpeningRoutes BuildLocalRoutes(WorldSnapshot world)
+        => OpeningGraph.Build(world, OpenFPS.Client.Core.AudioEngine.SteamAudio.SteamAudioScene.BoxesFromWorld(world),
+                              p => GetRegionAt(world, p));
+
+    /// <summary>Where the door leaves near the listener stand, folded into one number.</summary>
+    private static long DoorPoses(WorldSnapshot world, Vector3? listener)
+    {
         long doors = 17;
         foreach (var snap in world.Entities.Values)
         {
             if (!OpeningGraph.IsDoorLeaf(snap.Definition)) continue;
             var p = snap.Transform.Position; var q = snap.Transform.Rotation;
+            if (listener is { } l && Vector3.DistanceSquared(p, l) > DoorNearMetres * DoorNearMetres) continue;
             doors = doors * 31 + snap.Id;
             doors = doors * 31 + (long)MathF.Round(p.X * 100f); doors = doors * 31 + (long)MathF.Round(p.Z * 100f);
             doors = doors * 31 + (long)MathF.Round(q.Y * 100f); doors = doors * 31 + (long)MathF.Round(q.W * 100f);
         }
-        lock (_localRoutesLock)
-        {
-            if (_localRoutes != null && ReferenceEquals(_localRoutesMap, world.AcousticMap) && _localRoutesDoors == doors)
-                return _localRoutes;
-            var boxes = OpenFPS.Client.Core.AudioEngine.SteamAudio.SteamAudioScene.BoxesFromWorld(world);
-            _localRoutes = OpeningGraph.Build(world, boxes, p => GetRegionAt(world, p));
-            _localRoutesMap = world.AcousticMap;
-            _localRoutesDoors = doors;
-            return _localRoutes;
-        }
+        return doors;
     }
 
     private AcousticPathData CalculateMainPath(WorldSnapshot world, int entityId, Vector3 listenerPos, Vector3 sourcePos, int localPlayerId)
@@ -158,7 +194,7 @@ public class SpatialAcoustics
         // ...and by the openings, where those deliver more (OpeningRoutes): the same rule, and the same
         // graph, as the simulator's path.
         int listenerRegionId = GetRegionAt(world, listenerPos);
-        var routes = RoutesFor(world);
+        var routes = RoutesFor(world, listenerPos);
         if (routes != null
             && routes.Route(sourcePos, GetRegionAt(world, sourcePos), listenerPos, listenerRegionId, out var route))
         {

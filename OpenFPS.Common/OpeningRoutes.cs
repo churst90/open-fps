@@ -31,16 +31,21 @@ namespace OpenFPS.Common;
 /// Epstein–Peterson construction (Epstein &amp; Peterson, Proc. IRE 41, 1953; ITU-R P.526-15 §4.5.1). The
 /// spreading is over the route's length.
 ///
-/// THE ROOMS' OWN FIELD. Sound that comes in by an opening fills the room it enters, and the room's
-/// reverberant field is what reaches the next opening — not a ray, which round two corners is nearly
-/// nothing. This is the transmission-room equation of building acoustics (ISO 12354-1 §4; Kuttruff,
-/// Room Acoustics, 6th ed., §5.1 and §9.6): power W into a room of absorption area A makes a diffuse
-/// field of mean square pressure 4ρcW/A, whose intensity on any surface is W/A; an opening of area S with
-/// transmission τ passes W·S·τ/A on, and a plane wave of intensity I meets it with I·S·cosθ. A room's
-/// absorption area is its surveyed surfaces' Σ S·α per band, every open face counted at α = 1 and every
-/// opening's leak at its own S·τ. An opening fed by a diffuse field radiates like a Lambert surface,
-/// W·cosθ/(πr²). Written that way the route gives the same answer both ways round: the listener's room
-/// field and the source's room field enter it symmetrically.
+/// THE FIELD OF THE ROOMS BETWEEN. Sound that comes in by an opening fills the room it enters, and that
+/// room's reverberant field is what reaches the next opening — not a ray, which round two corners is
+/// nearly nothing. This is the transmission-room equation of building acoustics (ISO 12354-1 §4;
+/// Kuttruff, Room Acoustics, 6th ed., §5.1 and §9.6): power W into a room of absorption area A makes a
+/// diffuse field whose intensity on any surface is W/A, so an opening of area S with transmission τ passes
+/// W·S·τ/A on; a plane wave of intensity I meets an opening with I·S·cosθ; and an opening fed by a diffuse
+/// field radiates like a Lambert surface, W·cosθ/(πr²). A room's absorption area is its surveyed surfaces'
+/// Σ S·α per band, every open face counted at α = 1 and every opening's leak at its own S·τ.
+///
+/// Only the rooms BETWEEN the two ends are counted so. The source's own room and the listener's own room
+/// have reverberant fields too, and those are the reverb's: the source's room bus, heard through its
+/// doorway, and the listener's room bus, fed by the voice itself. Counted here as well they would be
+/// heard twice, and the second time as a dry voice from the doorway. What arrives at the ear by a route
+/// is then its direct sound: the diffracted ray, and what the last room between radiates out of the last
+/// opening. Both ends are treated alike, so the route gives the same answer both ways round.
 ///
 /// Nothing here is a constant of a map, a building or a door: what passes is decided by where the
 /// openings are, how big they are, what stands in them and what the rooms are made of.
@@ -476,7 +481,7 @@ public sealed class OpeningRoutes
             foreach (var (o, _) in chain) key = key * 1_000_003 + o;
             if (!seen.Add(key)) continue;
             used++;
-            Vector3 e = Evaluate(source, listener, d, chain, sNode, lNode, scratch, out Vector3 lastCrossing, out float length);
+            Vector3 e = Evaluate(source, listener, d, chain, scratch, out Vector3 lastCrossing, out float length);
             total += e;
             float sumE = e.X + e.Y + e.Z;
             if (sumE > bestEnergy)
@@ -590,7 +595,7 @@ public sealed class OpeningRoutes
     // ── What one route delivers ───────────────────────────────────────────────────────────────
 
     private Vector3 Evaluate(Vector3 source, Vector3 listener, float d, List<(int Opening, int IntoNode)> chain,
-                             int sNode, int lNode, Scratch scratch, out Vector3 lastCrossing, out float length)
+                             Scratch scratch, out Vector3 lastCrossing, out float length)
     {
         int n = chain.Count;
         var x = scratch.Points;
@@ -635,35 +640,30 @@ public sealed class OpeningRoutes
             geo *= o.Tau * Aperture(o, x[k - 1], x[k + 1]);
         }
 
-        // ── The rooms' own field, relayed opening to opening ─────────────────────────────────────
+        // ── The field of the rooms between, relayed opening to opening ────────────────────────────
+        // Only when there is a room between: with one opening, the two rooms are the source's and the
+        // listener's, and their fields are the reverb's.
+        if (n < 2) return geo;
         // Free-field reference: W = 1 at d, so a mean-square pressure p²/ρc is compared with 1/(4πd²).
         float free = 1f / (4f * MathF.PI * d * d);
         var first = _openings[chain[0].Opening];
         float r1 = MathF.Max(0.1f, Vector3.Distance(source, x[1]));
         float cos1 = MathF.Abs(Vector3.Dot(Vector3.Normalize(x[1] - source), first.Normal));
-        Vector3 leg0 = legs[0] * legs[0];
-        // Into the first opening: the source's direct sound on its projected area, and its own room's
-        // field if it is in one.
-        Vector3 direct = leg0 * (cos1 / (4f * MathF.PI * r1 * r1)) * first.Area * first.Tau;
-        Vector3 diffuse = TryGetAbsorption(sNode, out var a0) ? first.Area * first.Tau / a0 : Vector3.Zero;
-        Vector3 power = direct + diffuse;
-        // Through each room between: its field on the next opening.
+        // Into the first room between: the source's direct sound on the opening's projected area.
+        Vector3 power = legs[0] * legs[0] * (cos1 / (4f * MathF.PI * r1 * r1)) * first.Area * first.Tau;
+        // Through each room between: its field on the next opening. The outdoors is no room: a route
+        // that leaves one building for another carries only its ray across.
         for (int k = 1; k < n; k++)
         {
-            int room = chain[k - 1].IntoNode;
-            if (!TryGetAbsorption(room, out var ak)) { power = Vector3.Zero; diffuse = Vector3.Zero; break; }
+            if (!TryGetAbsorption(chain[k - 1].IntoNode, out var ak)) return geo;
             var next = _openings[chain[k].Opening];
             power = power / ak * next.Area * next.Tau;
-            diffuse = power;          // from here on all of it is fed by a room's field
         }
-        Vector3 atEar = Vector3.Zero;
+        // And out of the last opening, as a Lambert surface, straight at the listener.
         var last = _openings[chain[n - 1].Opening];
-        // The listener's own room, filled by what came in.
-        if (TryGetAbsorption(lNode, out var an)) atEar += 4f * power / an;
-        // And the last opening, radiating what a room's field fed it, straight at the listener.
         float rn = MathF.Max(0.1f, Vector3.Distance(x[n], listener));
         float cosn = MathF.Abs(Vector3.Dot(Vector3.Normalize(listener - x[n]), last.Normal));
-        atEar += diffuse * (cosn / (MathF.PI * rn * rn)) * (legs[n] * legs[n]);
+        Vector3 atEar = power * (cosn / (MathF.PI * rn * rn)) * (legs[n] * legs[n]);
 
         return geo + atEar / free;
     }

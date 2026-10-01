@@ -12,9 +12,10 @@ Recent work, newest first. `git log` has the rest.
   acoustics room equation, from the room's surveyed surfaces). Cars, one-off sounds, speech,
   footsteps, birds and beacons all use it, and it competes band by band with what comes through the
   walls; the sound is heard from the doorway when the route wins. In Selby House's ground floor
-  corridor, a car 13 m from the front door: front door shut -27/-61/-70 dB (low/mid/high), was
-  -52/-89/-100 and did not change when the door opened; front door open -13/-10/-8, heard from the
-  stairwell doorway.
+  corridor, a car 13 m from the front door: front door shut -28/-61/-70 dB (low/mid/high), was
+  -52/-89/-100 and did not change when the door opened; front door open -13/-10/-9, heard from the
+  stairwell doorway. Only the rooms between count their own sound here: the source's room and yours
+  are the reverb's, as before.
 - The old portal path is gone. It gave anything with a portal route a flat level in every band, and
   the tracer skipped any wall hit within a doorway's width of a portal: a horn 280 m east of Selby
   House came into the corridor at -1/-3/-6 dB, now -58/-100/-100 through the walls. A horn or siren on
