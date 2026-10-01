@@ -65,7 +65,7 @@ shape of it.
 | Identity | `Id`, `Name`, `Description`, `Announce`, `Type`, `Material` | `NameComponent`, `IdentityComponent`, `EntityType`, `MaterialComponent` |
 | Collider | `ColliderSize`, `Shape`, `IsSolid` | `ColliderComponent` |
 | Health | `MaxHealth` | `HealthComponent` |
-| Acoustics | `Transmission{Low,Mid,High}`, `Absorption`, `Scattering`, `ShellThickness`, `FaceMask` / `MissingFaces` | `AcousticComponent` |
+| Acoustics | `Transmission{Low,Mid,High}`, `Absorption`, `Scattering`, `ShellThickness`, `LeafMetres`, `StudSpacingMetres`, `FaceMask` / `MissingFaces` | `AcousticComponent` |
 | Physics | `Mass`, `Friction`, `Restitution`, `Drag` | `PhysicsPropertyComponent` |
 | Emitter | `HasEmitter` + `SoundId`, `StartSoundId`, `StopSoundId`, `Volume`, `Range`, `MinDistance`, `Mode`, `EmitterDirection`, `Cone*` | `SoundEmitterComponent` |
 | Granular | `IsGranular`, `Granular*` | (same component) |

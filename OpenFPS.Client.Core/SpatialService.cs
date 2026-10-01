@@ -89,7 +89,18 @@ public class SpatialService
     public void GetMultiPointOcclusionData(WorldSnapshot world, Vector3 start, Vector3 end, out float maxBlock, out float cumulativeBleed, out float eqLow, out float eqMid, out float eqHigh, int ignoreEntityId = -1, int ignoreEntityId2 = -1)
     {
         Vector3 dir = end - start;
-        Vector3 right = Vector3.Normalize(Vector3.Cross(dir, Vector3.UnitY));
+        if (dir.LengthSquared() < 0.01f)
+        {
+            GetOcclusionData(world, start, end, out maxBlock, out cumulativeBleed, out eqLow, out eqMid, out eqHigh, ignoreEntityId, ignoreEntityId2);
+            return;
+        }
+        // The cross pattern is square to the ray. Straight up or down, the ray is parallel to the world's
+        // up and the cross product with it is zero: normalised, that is NaN, four of the five rays went
+        // nowhere and hit nothing, and a floor slab passed a sound from the room above at -2 dB. Any
+        // horizontal axis will do then.
+        Vector3 side = Vector3.Cross(dir, Vector3.UnitY);
+        if (side.LengthSquared() < 1e-8f * MathF.Max(1e-8f, dir.LengthSquared())) side = Vector3.Cross(dir, Vector3.UnitX);
+        Vector3 right = Vector3.Normalize(side);
         Vector3 up = Vector3.Normalize(Vector3.Cross(right, dir));
         // C6: Adaptive spread — scale offset by distance so nearby sounds use a narrow spread
         // and distant sounds use a wider one, matching the physical projection of the emitter.
@@ -159,8 +170,11 @@ public class SpatialService
             {
                 var transform = entitySnap.Transform;
                 bool intersected = false;
-                float thickness = 0.2f;
                 Vector3 hitPoint = transform.Position; // updated in Box branch
+                // The panel the sound goes through (its smallest dimension is its thickness, the other
+                // two its face) and how many times it goes through it.
+                Vector3 panel = def.Collider.Size;
+                int layers = 1;
 
                 if (def.Collider.Shape == ColliderShape.Box)
                 {
@@ -174,12 +188,13 @@ public class SpatialService
                             hitPoint = nudgedStart + rayDir * entry;
                             if (def.Acoustics.IsHollow)
                             {
+                                // A hollow shell is walls of its shell thickness round an empty inside:
+                                // one wall in and one out, or one if either end is inside it.
                                 float shell = def.Acoustics.ShellThickness > 0 ? def.Acoustics.ShellThickness : 0.2f;
-                                thickness = Math.Min(exitFromStart - entry, shell * 2.0f);
-                            }
-                            else
-                            {
-                                thickness = Math.Max(0.1f, exitFromStart - entry);
+                                var s = def.Collider.Size;
+                                float a = MathF.Max(s.X, MathF.Max(s.Y, s.Z)), b = s.X + s.Y + s.Z - a - MathF.Min(s.X, MathF.Min(s.Y, s.Z));
+                                panel = new Vector3(shell, a, b);
+                                layers = (entry > 0f ? 1 : 0) + (exitFromEnd > 0f ? 1 : 0);
                             }
                         }
                     }
@@ -197,7 +212,8 @@ public class SpatialService
                     if (intersected)
                     {
                         float clampedEx = Math.Min(ex, dist);
-                        if (clampedEx > en) { thickness = Math.Max(0.1f, clampedEx - en); hitPoint = nudgedStart + rayDir * en; }
+                        // A round thing is as thick as the chord the sound crosses it by.
+                        if (clampedEx > en) { panel = new Vector3(clampedEx - en, def.Collider.Size.X, def.Collider.Size.Y); hitPoint = nudgedStart + rayDir * en; }
                         else intersected = false;
                     }
                 }
@@ -218,33 +234,24 @@ public class SpatialService
 
                 if (intersected)
                 {
-                    float thicknessFactor = MathF.Log10(thickness + 1.0f) * 2.5f;
-
-                    float transLow = MathF.Pow(Math.Max(0.01f, def.Acoustics.TransmissionLow), thicknessFactor);
-                    float transMid = MathF.Pow(Math.Max(0.005f, def.Acoustics.TransmissionMid), thicknessFactor);
-                    float transHigh = MathF.Pow(Math.Max(0.001f, def.Acoustics.TransmissionHigh), thicknessFactor);
-
-                    // Multiplicative: Total transmission is the product of all layers
-                    cumulativeBleed *= (transLow + transMid + transHigh) / 3.0f;
-                    eqLow *= transLow;
-                    eqMid *= transMid;
-                    eqHigh *= transHigh;
+                    // ── What this wall lets through: the Steam Audio scene's panel model ──────────
+                    //
+                    // WallTransmission, from the material, the box and how it is built, so the
+                    // fallback and the simulator answer one question with one model. Walls in a row
+                    // multiply: two walls take twice what one does, in every band. The prefab's own
+                    // Transmission figures are not read; the scene never read them either.
+                    var (gl, gm, gh) = WallTransmission.BandGains(def.Material.Material, panel,
+                                                                  new WallBuild(def.Acoustics.LeafMetres, def.Acoustics.StudSpacingMetres));
+                    for (int k = 0; k < layers; k++) { eqLow *= gl; eqMid *= gm; eqHigh *= gh; }
                 }
             }
         }
 
-        // Final Occlusion is 1.0 - cumulative transmission
-        maxBlock = Math.Clamp(1.0f - cumulativeBleed, 0.0f, 1.0f);
-
-        // Clamp final EQ to safe ranges
-        eqLow = Math.Clamp(eqLow, 0.05f, 1.0f);
-        eqMid = Math.Clamp(eqMid, 0.01f, 1.0f);
-        eqHigh = Math.Clamp(eqHigh, 0.001f, 1.0f);
-
-        // Apply the Occlusion Floor from the map metadata to prevent total silence
-        float floor = world.AcousticMap?.OcclusionFloor ?? 0.05f;
-        maxBlock = Math.Min(maxBlock, 1.0f - floor);
-        cumulativeBleed = Math.Max(cumulativeBleed, floor);
+        // What is left, per band, is the whole answer: there is no floor that lets sound through
+        // whatever the walls are. The broadband figures are read off the bands: blocked is what the
+        // loudest band lost, bleed is the bands' mean.
+        cumulativeBleed = (eqLow + eqMid + eqHigh) / 3f;
+        maxBlock = Math.Clamp(1f - MathF.Max(eqLow, MathF.Max(eqMid, eqHigh)), 0f, 1f);
     }
 
     /// <summary>

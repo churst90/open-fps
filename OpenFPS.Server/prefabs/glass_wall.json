@@ -1,9 +1,10 @@
 {
   "Id": "glass_wall",
   "Name": "Glazing",
-  "Description": "A shopfront or a stairwell window. Hard and flat like tile, and the worst barrier in the city: glass passes seventy per cent of the low end, which is why you hear a bus through a window and not through the brick beside it.",
+  "Description": "A shopfront or a stairwell window. Hard and flat like tile, and the worst barrier in the city: glass passes seventy per cent of the low end, which is why you hear a bus through a window and not through the brick beside it. Built as two 6 mm panes with the depth of the box between them (LeafMetres): a pane is light, and goes thin at its coincidence near 2 kHz.",
   "Material": "Glass",
   "ColliderSize": { "X": 2, "Y": 3, "Z": 0.02 },
+  "LeafMetres": 0.006,
   "Type": "StaticObject",
   "IsSolid": true,
   "TransmissionLow": 0.7,

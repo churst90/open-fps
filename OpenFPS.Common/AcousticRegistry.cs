@@ -46,8 +46,8 @@ public struct MaterialProperties
     /// Sound gets through it by its OPENINGS rather than by moving it: a fence, a hedge, a crowd, a
     /// carpet. For these the Transmission figures are what leaks through the holes and stand as they
     /// are. Everything else is an airtight panel, and what gets through one is decided by how heavy
-    /// it is per square metre — its density times its thickness (<see cref="AcousticRegistry.MassLawTransmission"/>),
-    /// so a map's 35 cm brick wall and a 10 cm one are not the same wall.
+    /// it is per square metre, how stiff, how damped and how it is built (<see cref="WallTransmission"/>), so a
+    /// map's 35 cm brick wall and a 10 cm one are not the same wall.
     /// </summary>
     public bool Porous { get; set; }
 }
@@ -249,41 +249,8 @@ public static class AcousticRegistry
         return true;
     }
 
-    /// <summary>
-    /// What an airtight panel of this material and thickness lets through, per band, as amplitude
-    /// gains 0..1 (the Transmission convention). The field-incidence mass law, TL = 20·log10(m·f) − 47
-    /// dB with m the surface density (kg/m², density × thickness), at the three band centres the rest
-    /// of the engine evaluates at (200 Hz, 1.25 kHz, 8 kHz), and no more than
-    /// <see cref="MaxWallLossDb"/>: past that, sound reaches the next room through the structure
-    /// round the wall, not through it. A porous material, or one with no density, keeps its table.
-    ///
-    /// The table's single figure per material said the same thing of every wall made of it. Brick was
-    /// -24/-30/-36 dB, which is a thin skin, and every 35 cm outer wall in the city let the street's
-    /// footsteps into the flats behind it ("I should not be able to hear anyone walking outside
-    /// through concrete", 2026-09-29). Here the same brick is 55 dB at 35 cm and 36/52/55 at 10 cm.
-    /// </summary>
-    public static (float Low, float Mid, float High) MassLawTransmission(string material, float thicknessMetres)
-        => MassLawTransmission(material, thicknessMetres, BandCentresHz);
-
     /// <summary>The table's three band centres, Hz: every Low/Mid/High figure in it means these.</summary>
     public static readonly (float Low, float Mid, float High) BandCentresHz = (200f, 1250f, 8000f);
-
-    /// <summary>The same mass law at other band centres: Steam Audio's are 400 Hz, 2.5 kHz and 15 kHz
-    /// (phonon.h, IPLMaterial), not the table's.</summary>
-    public static (float Low, float Mid, float High) MassLawTransmission(string material, float thicknessMetres,
-                                                                        (float Low, float Mid, float High) centresHz)
-    {
-        var p = GetProperties(material);
-        if (p.Porous || p.DensityKgM3 <= 0f || thicknessMetres <= 0f)
-            return (p.TransmissionLow, p.TransmissionMid, p.TransmissionHigh);
-        float m = p.DensityKgM3 * thicknessMetres;
-        static float Gain(float m, float hz)
-        {
-            float tl = Math.Clamp(20f * MathF.Log10(m * hz) - 47f, 0f, MaxWallLossDb);
-            return MathF.Pow(10f, -tl / 20f);
-        }
-        return (Gain(m, centresHz.Low), Gain(m, centresHz.Mid), Gain(m, centresHz.High));
-    }
 
     /// <summary>
     /// A band figure of the table (at <see cref="BandCentresHz"/>) at another frequency: linear in
@@ -297,11 +264,6 @@ public static class AcousticRegistry
         if (hz <= c.Mid) return low + (mid - low) * MathF.Log(hz / c.Low) / MathF.Log(c.Mid / c.Low);
         return mid + (high - mid) * MathF.Log(hz / c.Mid) / MathF.Log(c.High / c.Mid);
     }
-
-    /// <summary>The most any one wall takes, dB: the flanking limit. EN 12354-1 puts what a heavy
-    /// separating wall achieves between two real rooms, sound going round it through the floors and
-    /// side walls included, in the low fifties to about sixty.</summary>
-    public const float MaxWallLossDb = 55f;
 
     /// <summary>Every known material name, sorted — for naming the alternatives in an error message.</summary>
     public static IReadOnlyList<string> KnownMaterials()

@@ -593,6 +593,11 @@ if (args.Contains("--room-echoes"))
     // --room-echoes [map=city] ear=x,y,z src=x,y,z: the reflections a one-off sound is placed with, each with its box.
     Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.RoomEchoesSpike.Run(args));
 }
+if (args.Contains("--wall-tl"))
+{
+    // --wall-tl: the city's walls, floors, doors and glass, transmission loss per third octave and per mixer band.
+    Environment.Exit(OpenFPS.AudioLab.Spikes.WallTlSpike.Run(args));
+}
 if (args.Contains("--path-probe"))
 {
     // --path-probe [map=city] ear=x,y,z src=x,y,z ...: what the occlusion worker hands the mixer.

@@ -25,7 +25,6 @@ public static class AcousticConstants
     public const float OcclusionMaxHighMuffleDb = -40.0f;
     public const float OcclusionMaxMidMuffleDb = -30.0f;
     public const float OcclusionMaxLowMuffleDb = -20.0f;
-    public const float TransmissionBleedFactor = 0.15f;
     public const float OcclusionCap = 0.95f;
     
     // --- Reverb & Reflections ---

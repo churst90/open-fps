@@ -107,7 +107,7 @@ public static class SirenRouteSpike
 
     internal static (WorldSnapshot, RaceLine?) Load(string mapPath, string prefabDir, string trackId, float lane)
     {
-        var prefabs = new Dictionary<string, (Vector3 Size, string Material)>(StringComparer.OrdinalIgnoreCase);
+        var prefabs = new Dictionary<string, (Vector3 Size, string Material, float Leaf, float Studs)>(StringComparer.OrdinalIgnoreCase);
         foreach (var file in Directory.GetFiles(prefabDir, "*.json"))
         {
             if (Path.GetFileName(file) == "prefab-schema.json") continue;
@@ -117,7 +117,12 @@ public static class SirenRouteSpike
             bool solid = !r.TryGetProperty("IsSolid", out var sj) || sj.ValueKind != JsonValueKind.False;
             if (!solid) continue;
             if (r.TryGetProperty("SoundId", out var snd) && snd.ValueKind == JsonValueKind.String && !string.IsNullOrEmpty(snd.GetString())) continue;
-            prefabs[idj.GetString()!] = (V(cs), r.TryGetProperty("Material", out var mj) ? mj.GetString() ?? "Generic" : "Generic");
+            // How it is built, as PrefabRepository reads it: a door's skins are its leaves.
+            float F(string k) => r.TryGetProperty(k, out var v) && v.ValueKind == JsonValueKind.Number ? v.GetSingle() : 0f;
+            bool door = r.TryGetProperty("IsDoor", out var dj) && dj.ValueKind == JsonValueKind.True;
+            float leaf = F("LeafMetres") > 0f ? F("LeafMetres") : door ? F("DoorSkinMetres") : 0f;
+            prefabs[idj.GetString()!] = (V(cs), r.TryGetProperty("Material", out var mj) ? mj.GetString() ?? "Generic" : "Generic",
+                                         leaf, F("StudSpacingMetres"));
         }
         using var doc = JsonDocument.Parse(File.ReadAllText(mapPath));
         var root = doc.RootElement;
@@ -136,6 +141,7 @@ public static class SirenRouteSpike
                 EntityId = id,
                 Collider = new ColliderComponent { Shape = ColliderShape.Box, Size = p.Size * scale, IsSolid = true },
                 Material = new MaterialComponent { Material = p.Material },
+                Acoustics = new AcousticComponent { LeafMetres = p.Leaf, StudSpacingMetres = p.Studs },
             };
             // A door's two rooms, as the server gives it (PrefabRepository): what makes a leaf a door.
             if (e.TryGetProperty("RegionAId", out var ra) && e.TryGetProperty("RegionBId", out var rb))

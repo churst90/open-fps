@@ -118,7 +118,8 @@ public class SpatialAcoustics
         float finalEffectiveDist = directDist;
         float finalAperture = 1.0f;
         float finalBleed = directBleed;
-        float finalEqL = eqL, finalEqM = eqM, finalEqH = eqH;
+        // Through the walls: the band gains themselves (SpatialService, WallTransmission).
+        float gainL = eqL, gainM = eqM, gainH = eqH;
 
         if (portalPath.Found)
         {
@@ -133,28 +134,28 @@ public class SpatialAcoustics
             
             float indirectOcclusion = Math.Clamp(portalDirectOcclusion + detourPenalty + (aperturePenalty * AcousticConstants.AperturePenaltyMultiplier), 0.0f, 1.0f);
 
-            // --- PHASE 3: Aperture Choking ---
-            // If the Doorway path is significantly clearer than the wall path,
-            // we "snap" to the doorway completely to avoid muffled double-audio.
-            if (indirectOcclusion < (directOcclusion - 0.15f) || directOcclusion > 0.8f)
+            // The route through the opening, per band: the part of it that is not blocked, shaped by
+            // how much the opening muffles each band.
+            static float Shape(float weight, float maxDb) => MathF.Pow(10f, (1f - Math.Clamp(weight, 0f, 1f)) * maxDb / 20f);
+            float through = 1f - Math.Min(indirectOcclusion, AcousticConstants.OcclusionCap);
+            float pL = through * Shape(1.0f - (portalPath.MuffleL * 0.5f), AcousticConstants.OcclusionMaxLowMuffleDb);
+            float pM = through * Shape(1.0f - (portalPath.MuffleM * 0.7f), AcousticConstants.OcclusionMaxMidMuffleDb);
+            float pH = through * Shape(1.0f - portalPath.MuffleH, AcousticConstants.OcclusionMaxHighMuffleDb);
+
+            // Per band, the better route wins (as on the simulator's path: through the wall or round
+            // it); the route that delivers the most decides where the sound is heard from.
+            if (MathF.Max(pL, MathF.Max(pM, pH)) > MathF.Max(gainL, MathF.Max(gainM, gainH)))
             {
-                finalOcclusion = indirectOcclusion; 
+                finalOcclusion = indirectOcclusion;
                 float morphFactor = Math.Clamp(distToPortal / 5.0f, 0f, 1f);
                 apparentPos = Vector3.Lerp(portalPath.ApparentPos, portalPath.ApparentPos + new Vector3(0, 0.5f, 0), morphFactor * 0.2f);
-                
-                finalEffectiveDist = portalPath.EffectiveDist; 
+                finalEffectiveDist = portalPath.EffectiveDist;
                 finalAperture = Math.Clamp(apertureRatio * 2.0f, 0.1f, 1.0f);
-                
-                // --- PHASE 3: Aperture Choking Logic ---
-                // Reduce volume if the sound is passing through a small aperture.
-                // Even with a clear LOS, a 1m door cannot pass the same energy as a missing wall.
+                // A small aperture passes less than a missing wall, even in plain view.
                 float apertureChoke = Math.Clamp(portalPath.MinAperture / 2.0f, 0.3f, 1.0f);
-                finalBleed = directBleed * 0.2f * apertureChoke; 
-                
-                finalEqL = 1.0f - (portalPath.MuffleL * 0.5f); 
-                finalEqM = 1.0f - (portalPath.MuffleM * 0.7f); 
-                finalEqH = 1.0f - portalPath.MuffleH;
+                finalBleed = directBleed * 0.2f * apertureChoke;
             }
+            gainL = MathF.Max(gainL, pL); gainM = MathF.Max(gainM, pM); gainH = MathF.Max(gainH, pH);
         }
 
         int listenerRegionId = GetRegionAt(world, listenerPos);
@@ -174,19 +175,13 @@ public class SpatialAcoustics
             if (region.IsIndoor && listenerRegionId == regionId) roomGain *= 1.25f;
         }
 
-        finalOcclusion = Math.Min(finalOcclusion, AcousticConstants.OcclusionCap);
         // The mixer takes each band's gain as the WHOLE of what the path does to that band, applied
-        // once. This tracer's band values are weights (1 clear, 0 at the band's full muffle), and its
-        // occlusion a separate broadband share, so they are joined here into gains: the part that is
-        // not blocked — or what leaks through, if that is more — times the band's shaping. The mixer
-        // used to apply the occlusion as a volume, again as this shaping, and a third time as an
-        // extra high and mid cut.
-        float through = MathF.Max(1f - finalOcclusion, finalBleed * AcousticConstants.TransmissionBleedFactor * 0.5f);
-        static float Shape(float weight, float maxDb) => MathF.Pow(10f, (1f - Math.Clamp(weight, 0f, 1f)) * maxDb / 20f);
+        // once, and these are those gains: what came through the walls, or round by an opening where
+        // that delivers more. The broadband occlusion is read off them, for whatever ranks voices by it.
+        finalOcclusion = Math.Min(Math.Min(finalOcclusion, 1f - MathF.Max(gainL, MathF.Max(gainM, gainH))),
+                                  AcousticConstants.OcclusionCap);
         var pathData = new AcousticPathData(finalOcclusion, apparentPos, finalEffectiveDist, 0f, finalAperture, finalBleed, regionId,
-            through * Shape(finalEqL, AcousticConstants.OcclusionMaxLowMuffleDb),
-            through * Shape(finalEqM, AcousticConstants.OcclusionMaxMidMuffleDb),
-            through * Shape(finalEqH, AcousticConstants.OcclusionMaxHighMuffleDb));
+            gainL, gainM, gainH);
         pathData.RoomGain = roomGain;
         (pathData.AirLowDb, pathData.AirMidDb, pathData.AirHighDb) = air;
         return pathData;
