@@ -309,6 +309,18 @@ public partial struct AcousticComponent
     /// Default is 63 (all faces active).
     /// </summary>
     public int FaceMask { get; set; }
+
+    // APPENDED (component-wire-format: positional, append only).
+
+    /// <summary>How the wall is built: the thickness of each of its two leaves, metres, with the rest of
+    /// the box's thickness the cavity between them. Zero for a solid panel. A door's skins are its
+    /// leaves. See <see cref="WallBuild"/>.</summary>
+    public float LeafMetres { get; set; }
+
+    /// <summary>The centres of the studs the two leaves are fixed to, metres; zero when they meet only
+    /// at the panel's edges. See <see cref="WallBuild"/>.</summary>
+    public float StudSpacingMetres { get; set; }
+
     public AcousticComponent() { FaceMask = 63; }
 }
 

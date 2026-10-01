@@ -266,6 +266,10 @@ public class FmodAudioProvider : IAudioProvider
     {
         if (_threeEqPool.TryPop(out var dsp)) { dsp.setBypass(false); return dsp; }
         _system.createDSPByType(DSP_TYPE.THREE_EQ, out dsp);
+        // The bands every path gain is computed for (OpenFPS.Common.AcousticBands), said here rather
+        // than left to FMOD's defaults, so the two cannot come apart.
+        dsp.setParameterFloat((int)DSP_THREE_EQ.LOWCROSSOVER, OpenFPS.Common.AcousticBands.LowCrossoverHz);
+        dsp.setParameterFloat((int)DSP_THREE_EQ.HIGHCROSSOVER, OpenFPS.Common.AcousticBands.HighCrossoverHz);
         return dsp;
     }
 
