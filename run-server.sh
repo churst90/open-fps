@@ -35,18 +35,23 @@ fi
 
 # ── Is one already running? ─────────────────────────────────────────────────────────────────────
 #
-# This is the trap that cost a whole session. The CLIENT script rebuilds every launch, so client
-# changes always take; the SERVER is long-running, and a server left up overnight goes on serving
-# the map and the presets it read when it started. A day's worth of work — new vehicles, new
-# levels, bus stops, platforms — was all in files a process from yesterday had no reason to re-read,
-# and the report was "nothing seems to be different on the city map", which was exactly true.
+# The client script rebuilds on every launch, so client changes always take. A server is
+# long-running, and one left up keeps serving the maps and presets it read when it started.
 #
-# Worse, the failure is quiet: a second server binds nothing, logs "Address already in use" in the
-# middle of a successful-looking startup — maps load, vehicles spawn, every line reads correctly —
-# and then sits there serving no one. Two smoke tests were read as passing on that output.
+# And the failure is quiet: a second server on the same port binds nothing, logs "Address already in
+# use" in the middle of a normal-looking startup (maps load, vehicles spawn) and then serves no one.
+# So say so, loudly, and stop. Starting a second one silently is never wanted.
 #
-# So: say so, loudly, and stop. There is no case where silently starting a second one is wanted.
-PORT="${OPENFPS_PORT:-33288}"
+# The port is --port if given, else OPENFPS_PORT, else 33288. OPENFPS_PORT alone is passed on to
+# the server as --port.
+PORT=""
+for ((i = 1; i <= $#; i++)); do
+  if [ "${!i}" = "--port" ]; then j=$((i + 1)); PORT="${!j}"; fi
+done
+if [ -z "$PORT" ]; then
+  PORT="${OPENFPS_PORT:-33288}"
+  [ -n "${OPENFPS_PORT:-}" ] && set -- "$@" --port "$PORT"
+fi
 EXISTING="$(ss -lunp 2>/dev/null | grep -E "[:.]${PORT}\b" | head -1)"
 if [ -n "$EXISTING" ]; then
   OLDPID="$(printf '%s' "$EXISTING" | grep -oE 'pid=[0-9]+' | head -1 | cut -d= -f2)"
@@ -57,7 +62,7 @@ if [ -n "$EXISTING" ]; then
   fi
   echo "   Starting another would bind nothing and serve nobody, which looks like success." >&2
   echo "   Stop it first:  kill ${OLDPID:-<pid>}" >&2
-  echo "   (or run this one elsewhere: OPENFPS_PORT=33289 ./run-server.sh $* --port 33289)" >&2
+  echo "   (or run this one elsewhere: ./run-server.sh $* --port 33289)" >&2
   exit 1
 fi
 
@@ -66,7 +71,7 @@ DOTNET_CLI_TELEMETRY_OPTOUT=1 DOTNET_NOLOGO=1 DOTNET_CLI_USE_MSBUILD_SERVER=0 \
   "$DOTNET" build "$REPO/OpenFPS.Server" --artifacts-path "$ART" \
   -nodeReuse:false -p:UseSharedCompilation=false -v minimal
 
-if [ ${#MAPARGS[@]} -gt 0 ]; then echo "Launching server on map '${MAPARGS[1]}' (cwd=OpenFPS.Server, port 33288) ..."
-else echo "Launching server (cwd=OpenFPS.Server, port 33288) ..."; fi
+if [ ${#MAPARGS[@]} -gt 0 ]; then echo "Launching server on map '${MAPARGS[1]}' (cwd=OpenFPS.Server, port $PORT) ..."
+else echo "Launching server (cwd=OpenFPS.Server, port $PORT) ..."; fi
 cd "$REPO/OpenFPS.Server"     # so maps/, prefabs/, openfps.db resolve
 exec "$DOTNET" "$OUT/OpenFPS.Server.dll" "${MAPARGS[@]}" "$@"
