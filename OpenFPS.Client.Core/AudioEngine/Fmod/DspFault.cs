@@ -22,6 +22,36 @@ namespace OpenFPS.Client.AudioEngine.Fmod;
 internal static class DspCallback
 {
     /// <summary>
+    /// The largest block a callback renders into its voice's own scratch buffer. The mixer runs 1,024
+    /// (FmodAudioProvider, setDSPBufferSize); a longer block is silenced rather than allocated for,
+    /// since an allocation on the mixer thread can start a collection there.
+    /// </summary>
+    public const int MaxBlock = 4096;
+
+    /// <summary>
+    /// Writes silence into a callback's output. A callback that returns without writing leaves
+    /// whatever the buffer last held, which FMOD then mixes: a stale block heard as a click or a
+    /// repeat. Clears only when FMOD has said how many channels the buffer holds.
+    /// </summary>
+    public static unsafe void Silence(IntPtr outbuffer, uint length, int outchannels)
+    {
+        if (outbuffer != IntPtr.Zero && outchannels > 0)
+            new Span<float>((void*)outbuffer, (int)length * outchannels).Clear();
+    }
+
+    /// <summary>
+    /// Copies the input to the output unchanged, for a unit on a bus that carries other sounds:
+    /// silencing it would silence them. Silence when the channel counts differ.
+    /// </summary>
+    public static unsafe void PassThrough(IntPtr inbuffer, IntPtr outbuffer, uint length, int inchannels, int outchannels)
+    {
+        if (inbuffer != IntPtr.Zero && outbuffer != IntPtr.Zero && inchannels > 0 && inchannels == outchannels)
+            new ReadOnlySpan<float>((void*)inbuffer, (int)length * inchannels)
+                .CopyTo(new Span<float>((void*)outbuffer, (int)length * outchannels));
+        else Silence(outbuffer, length, outchannels);
+    }
+
+    /// <summary>
     /// A DSP callback's userdata, fetched THROUGH THE CALLBACK'S OWN FUNCTION TABLE.
     ///
     /// THIS IS THE RULE FMOD STATES AND EVERY CALLBACK IN THIS ENGINE BROKE. The general API — the

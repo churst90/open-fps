@@ -19,6 +19,9 @@ namespace OpenFPS.Client.AudioEngine.Fmod;
 /// </summary>
 public sealed class EngineVoiceState : IRenderedVoice
 {
+    /// <summary>The mixer callback's mono buffer, made with the voice so the callback never allocates.</summary>
+    internal readonly float[] MixScratch = new float[DspCallback.MaxBlock];
+
     public readonly VehicleProfile Vehicle;
     public readonly EngineSynth Engine;
     public readonly Driveline Driveline;
@@ -1173,6 +1176,9 @@ public sealed class EchoDiffuser
 /// </summary>
 public sealed class EngineEchoState
 {
+    /// <summary>The mixer callback's mono buffer, made with the voice so the callback never allocates.</summary>
+    internal readonly float[] MixScratch = new float[DspCallback.MaxBlock];
+
     public readonly EngineVoiceState Source;
     public volatile float TargetDelaySeconds;
     public volatile float TargetGain;
@@ -1349,6 +1355,9 @@ public sealed class EngineEchoState
 /// </summary>
 public sealed class EngineTapState
 {
+    /// <summary>The mixer callback's mono buffer, made with the voice so the callback never allocates.</summary>
+    internal readonly float[] MixScratch = new float[DspCallback.MaxBlock];
+
     public readonly EngineVoiceState Source;
 
     /// <summary>Where this voice is heading, 0 or 1. Zero retires it; see <see cref="FadedOut"/>.</summary>
@@ -1422,8 +1431,6 @@ public static class TapProcessor
         return res;
     }
 
-    [ThreadStatic] private static float[]? _scratch;
-
     /// <summary>
     /// NOTHING MAY ESCAPE A DSP CALLBACK.
     ///
@@ -1459,13 +1466,13 @@ public static class TapProcessor
     private static RESULT ReadCallbackCore(ref DSP_STATE dsp_state, IntPtr inbuffer, IntPtr outbuffer, uint length, int inchannels, ref int outchannels)
     {
         IntPtr userData = DspCallback.UserData(ref dsp_state);
-        if (userData == IntPtr.Zero) return RESULT.OK;
+        if (userData == IntPtr.Zero) { DspCallback.Silence(outbuffer, length, outchannels); return RESULT.OK; }
         var state = (EngineTapState?)GCHandle.FromIntPtr(userData).Target;
-        if (state == null) return RESULT.OK;
+        if (state == null) { DspCallback.Silence(outbuffer, length, outchannels); return RESULT.OK; }
         if (outchannels == 0) outchannels = 1;
         int ch = outchannels, n = (int)length;
-        if (_scratch == null || _scratch.Length < n) _scratch = new float[Math.Max(n, 1024)];
-        var mono = _scratch.AsSpan(0, n);
+        if (n > state.MixScratch.Length) { DspCallback.Silence(outbuffer, length, outchannels); return RESULT.OK; }
+        var mono = state.MixScratch.AsSpan(0, n);
         try { state.Render(mono); } catch { mono.Clear(); }
         unsafe
         {
@@ -1499,8 +1506,6 @@ public static class EchoProcessor
         else handle = default;
         return res;
     }
-
-    [ThreadStatic] private static float[]? _scratch;
 
     /// <summary>
     /// NOTHING MAY ESCAPE A DSP CALLBACK.
@@ -1537,13 +1542,13 @@ public static class EchoProcessor
     private static RESULT ReadCallbackCore(ref DSP_STATE dsp_state, IntPtr inbuffer, IntPtr outbuffer, uint length, int inchannels, ref int outchannels)
     {
         IntPtr userData = DspCallback.UserData(ref dsp_state);
-        if (userData == IntPtr.Zero) return RESULT.OK;
+        if (userData == IntPtr.Zero) { DspCallback.Silence(outbuffer, length, outchannels); return RESULT.OK; }
         var state = (EngineEchoState?)GCHandle.FromIntPtr(userData).Target;
-        if (state == null) return RESULT.OK;
+        if (state == null) { DspCallback.Silence(outbuffer, length, outchannels); return RESULT.OK; }
         if (outchannels == 0) outchannels = 1;
         int ch = outchannels, n = (int)length;
-        if (_scratch == null || _scratch.Length < n) _scratch = new float[Math.Max(n, 1024)];
-        var mono = _scratch.AsSpan(0, n);
+        if (n > state.MixScratch.Length) { DspCallback.Silence(outbuffer, length, outchannels); return RESULT.OK; }
+        var mono = state.MixScratch.AsSpan(0, n);
         try { state.Render(mono); } catch { mono.Clear(); }
         unsafe
         {
@@ -1583,8 +1588,6 @@ public static class EngineProcessor
         return res;
     }
 
-    [ThreadStatic] private static float[]? _scratch;
-
     /// <summary>
     /// NOTHING MAY ESCAPE A DSP CALLBACK.
     ///
@@ -1620,15 +1623,15 @@ public static class EngineProcessor
     private static RESULT ReadCallbackCore(ref DSP_STATE dsp_state, IntPtr inbuffer, IntPtr outbuffer, uint length, int inchannels, ref int outchannels)
     {
         IntPtr userData = DspCallback.UserData(ref dsp_state);
-        if (userData == IntPtr.Zero) return RESULT.OK;
+        if (userData == IntPtr.Zero) { DspCallback.Silence(outbuffer, length, outchannels); return RESULT.OK; }
         var state = (EngineVoiceState?)GCHandle.FromIntPtr(userData).Target;
-        if (state == null) return RESULT.OK;
+        if (state == null) { DspCallback.Silence(outbuffer, length, outchannels); return RESULT.OK; }
 
         if (outchannels == 0) outchannels = 1;
         int ch = outchannels;
         int n = (int)length;
-        if (_scratch == null || _scratch.Length < n) _scratch = new float[Math.Max(n, 1024)];
-        var mono = _scratch.AsSpan(0, n);
+        if (n > state.MixScratch.Length) { DspCallback.Silence(outbuffer, length, outchannels); return RESULT.OK; }
+        var mono = state.MixScratch.AsSpan(0, n);
         try { state.Consume(mono); }
         catch { mono.Clear(); }
 

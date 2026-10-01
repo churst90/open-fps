@@ -228,7 +228,8 @@ public class FmodAudioProvider : IAudioProvider
 
     private FMOD.DSP GetThreeEqDsp()
     {
-        if (_threeEqPool.TryPop(out var dsp)) { dsp.setBypass(false); return dsp; }
+        // reset(): the filters keep the previous voice's history, heard as its tail on the new one.
+        if (_threeEqPool.TryPop(out var dsp)) { dsp.reset(); dsp.setBypass(false); return dsp; }
         _system.createDSPByType(DSP_TYPE.THREE_EQ, out dsp);
         // The bands every path gain is computed for (OpenFPS.Common.AcousticBands), said here rather
         // than left to FMOD's defaults, so the two cannot come apart.
@@ -239,7 +240,7 @@ public class FmodAudioProvider : IAudioProvider
 
     private FMOD.DSP GetDiffractionDsp()
     {
-        if (_diffractionPool.TryPop(out var dsp)) { dsp.setBypass(false); return dsp; }
+        if (_diffractionPool.TryPop(out var dsp)) { dsp.reset(); dsp.setBypass(false); return dsp; }
         _system.createDSPByType(DSP_TYPE.LOWPASS, out dsp);
         return dsp;
     }
@@ -346,6 +347,7 @@ public class FmodAudioProvider : IAudioProvider
     {
         if (_granularPool.TryPop(out var pooled))
         {
+            pooled.State.Reset();
             pooled.State.PcmData = pcm;
             pooled.State.Channels = ch;
             pooled.State.SampleRate = sr;
@@ -359,7 +361,7 @@ public class FmodAudioProvider : IAudioProvider
 
     private PooledSynthDsp? GetSynthDsp()
     {
-        if (_synthPool.TryPop(out var pooled)) return pooled;
+        if (_synthPool.TryPop(out var pooled)) { pooled.State.Reset(); return pooled; }
         var state = new SynthVoiceState();
         if (SynthProcessor.CreateDSP(_system, state, out var dsp, out var handle) == RESULT.OK)
         {
@@ -1273,10 +1275,19 @@ public class FmodAudioProvider : IAudioProvider
     private void ClearReverbBuses()
     {
         ReturnReverbVoices(); // detach HRTF voices while the buses still exist, return them to the pool
+        // Each traced stage off its bus while the bus exists: removeDSP waits out a callback in flight,
+        // so once it returns nothing reads the stage's native effects and buffers. A unit still
+        // attached cannot be released, and releasing its bus first left it in the graph.
+        foreach (var (regionId, (_, dsp, _)) in _traced)
+        {
+            if (!dsp.hasHandle()) continue;
+            if (_reverbBuses.TryGetValue(regionId, out var bus) && bus.hasHandle()
+                && bus.removeDSP(dsp) != RESULT.OK) _failedDetaches++;
+            dsp.release();
+        }
         ReleaseReverbUnits();
         _reverbDsps.Clear(); _reverbBuses.Clear(); _reverbVolumes.Clear(); _regionDecaySeconds.Clear();
-        // The buses are gone, so nothing is reading these any more: release what each stage made.
-        foreach (var (st, dsp, handle) in _traced.Values)
+        foreach (var (st, _, handle) in _traced.Values)
         {
             st.Trace = null;
             if (st.Effect != IntPtr.Zero) Phonon.iplReflectionEffectRelease(ref st.Effect);
@@ -1286,7 +1297,6 @@ public class FmodAudioProvider : IAudioProvider
             if (st.Mono.data != IntPtr.Zero) Phonon.iplAudioBufferFree(st.WorkerContext, ref st.Mono);
             if (st.Ambi.data != IntPtr.Zero) Phonon.iplAudioBufferFree(st.WorkerContext, ref st.Ambi);
             if (st.Stereo.data != IntPtr.Zero) Phonon.iplAudioBufferFree(st.ProviderContext, ref st.Stereo);
-            if (dsp.hasHandle()) dsp.release();
             if (handle.IsAllocated) handle.Free();
         }
         _traced.Clear(); _tracedRunning.Clear();
@@ -4758,21 +4768,29 @@ public class FmodAudioProvider : IAudioProvider
                 if (_masterLimiter.hasHandle()) masterOut.removeDSP(_masterLimiter);
             }
             if (_boundaryDsp.hasHandle()) _boundaryDsp.release();
-            if (_boundaryHandle.IsAllocated) _boundaryHandle.Free();
             _enginePool?.Dispose(); _enginePool = null;
             _masterTap?.Dispose(); _masterTap = null;
             if (_loudnessMeter.hasHandle()) _loudnessMeter.release();
             if (_masterLimiter.hasHandle()) _masterLimiter.release();
         } 
         StopDiagnosticSound();
+
+        // The FMOD side first, then close, then what the callbacks read. A released DSP can still be
+        // mid-callback until the mixer next syncs, and Steam Audio's buffers and effects are native:
+        // freeing one under a running callback is a crash no guard catches. close() stops the mixer
+        // thread, so after it nothing can be in flight.
+        if (_steamAudioEnabled)
+            foreach (var v in _saAllVoices)
+                if (v.Dsp.hasHandle()) v.Dsp.release();
+        _resources?.Dispose();
+        _granularBank?.Dispose();
+        if (_isInitialized) _system.close();   // FMOD requires close() before release()
+
         if (_steamAudioEnabled)
         {
-            // Free the whole voice pool (active sounds were returned to it above). Release each DSP
-            // first (detaches it from the mixer), then its Phonon effect/buffers, then the shared
-            // context. This is the ONLY place Phonon voice resources are freed.
+            // The ONLY place Phonon voice resources are freed.
             foreach (var v in _saAllVoices)
             {
-                if (v.Dsp.hasHandle()) v.Dsp.release();
                 if (v.Handle.IsAllocated) v.Handle.Free();
                 Phonon.iplAudioBufferFree(_saContext, ref v.State.InBuf);
                 Phonon.iplAudioBufferFree(_saContext, ref v.State.OutBuf);
@@ -4788,18 +4806,12 @@ public class FmodAudioProvider : IAudioProvider
             _steamAudioEnabled = false;
         }
 
-        // And the handles of every voice retired during the session. Here and nowhere else: by now
-        // the system is closed and no mixer callback can be in flight to resolve one.
+        // Every voice handle retired during the session, and the boundary unit's: the mixer is
+        // stopped, so no callback can resolve one.
+        if (_boundaryHandle.IsAllocated) _boundaryHandle.Free();
         foreach (var h in _retiredHandles) if (h.IsAllocated) h.Free();
         _retiredHandles.Clear();
-        _resources?.Dispose();
-        _granularBank?.Dispose();
-        if (_isInitialized) {
-            // FMOD requires close() BEFORE release(); the previous order made close() a
-            // use-after-free on an already-freed system handle.
-            _system.close();
-            _system.release();
-        }
+        if (_isInitialized) _system.release();
     }
 }
 

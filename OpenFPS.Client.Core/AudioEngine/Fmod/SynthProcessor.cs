@@ -29,6 +29,14 @@ public class SynthVoiceState
     public float Filter_v0;
     public float Filter_v1;
 
+    /// <summary>Starts the oscillators, envelope and filter from rest, for a pooled voice about to
+    /// play another sound. The DSP is out of the graph when this is called.</summary>
+    public void Reset()
+    {
+        Phase = 0f; LfoPhase = 0f; EnvValue = 1f;
+        Filter_v0 = 0f; Filter_v1 = 0f;
+    }
+
     public SynthVoiceState()
     {
     }
@@ -95,12 +103,12 @@ public static class SynthProcessor
     {
         IntPtr userData = DspCallback.UserData(ref dsp_state);
 
-        if (userData == IntPtr.Zero) return RESULT.OK;
+        if (userData == IntPtr.Zero) { DspCallback.Silence(outbuffer, length, outchannels); return RESULT.OK; }
 
         GCHandle handle = GCHandle.FromIntPtr(userData);
         SynthVoiceState state = (SynthVoiceState)handle.Target!;
 
-        if (state == null) return RESULT.OK;
+        if (state == null) { DspCallback.Silence(outbuffer, length, outchannels); return RESULT.OK; }
 
         if (outchannels == 0) outchannels = 2; 
         int outCh = outchannels;

@@ -491,7 +491,7 @@ internal static class TracedReverbSet
     /// <summary>True while a rebuild is still being handed over: the scenes it replaces are in use.</summary>
     public static bool Reconfiguring { get { lock (Gate) return !_reconfigure.IsCompleted; } }
 
-    public static void SetListener(Vector3 at) { lock (Gate) _listener?.SetListener(at); }
+    public static void SetListener(Vector3 at) { lock (Gate) { _listener?.SetListener(at); DisposeRetired(); } }
 
     /// <summary>The per-source tracer, or null before the scene exists.</summary>
     public static TracedEchoes? Echoes { get { lock (Gate) return _echoes is { IsValid: true } e ? e : null; } }
@@ -548,8 +548,12 @@ internal static class TracedReverbSet
             if (preset == null || _context == IntPtr.Zero || !MachineRegistry.Knows(preset)) { _riding = false; return; }
             if (!string.Equals(preset, _cabinPreset, StringComparison.OrdinalIgnoreCase))
             {
-                _cabin?.Dispose(); _cabin = null;
-                _cabinScene?.Dispose(); _cabinScene = null;
+                // Retired, not disposed: a reverb stage on the mixer thread may hold this trace until
+                // the audio update next hands it the new one. Disposed a few seconds on (DisposeRetired).
+                long now = DateTime.UtcNow.Ticks;
+                if (_cabin != null) _retiredCabins.Add((_cabin, now));
+                if (_cabinScene != null) _retiredCabins.Add((_cabinScene, now));
+                _cabin = null; _cabinScene = null;
                 _cabinPreset = preset;
                 var v = MachineRegistry.VehicleFor(preset);
                 if (VehicleCabin.Measure(v) is { } g)
@@ -571,6 +575,16 @@ internal static class TracedReverbSet
         }
     }
 
+    private static readonly List<(IDisposable Item, long At)> _retiredCabins = new();
+
+    /// <summary>Disposes cabin traces and scenes retired more than five seconds ago. Under the gate.</summary>
+    private static void DisposeRetired()
+    {
+        long cutoff = DateTime.UtcNow.Ticks - 5 * TimeSpan.TicksPerSecond;
+        for (int i = _retiredCabins.Count - 1; i >= 0; i--)
+            if (_retiredCabins[i].At < cutoff) { _retiredCabins[i].Item.Dispose(); _retiredCabins.RemoveAt(i); }
+    }
+
     /// <summary>Everything traced so far, for the /reverb readout.</summary>
     public static (int Rooms, int Runs, double LastMs) Stats()
     {
@@ -590,6 +604,8 @@ internal static class TracedReverbSet
             _echoes?.Dispose(); _echoes = null;
             _late?.Dispose(); _late = null;
             _cabin?.Dispose(); _cabin = null; _cabinScene?.Dispose(); _cabinScene = null; _cabinPreset = null; _riding = false;
+            foreach (var (item, _) in _retiredCabins) item.Dispose();
+            _retiredCabins.Clear();
             foreach (var r in Rooms.Values) r.Trace.Dispose();
             Rooms.Clear();
             _scene = null; _context = IntPtr.Zero;

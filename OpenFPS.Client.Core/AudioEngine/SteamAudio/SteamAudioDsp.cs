@@ -118,20 +118,19 @@ internal static class SteamAudioDsp
                 if (outbuffer != IntPtr.Zero)
                     new Span<float>((void*)outbuffer, (int)length * ch).Clear();
             }
-            if (!_faulted) { _faulted = true; Serilog.Log.Error(ex, "SteamAudioDsp DSP faulted; the block was silenced."); }
+            // Logged from the game thread (DspFault.TryDrain): the logger allocates and may block.
+            DspFault.Record("SteamAudioDsp", ex);
             return RESULT.OK;
         }
     }
 
-    private static bool _faulted;
-
     private static RESULT ReadCallbackCore(ref DSP_STATE dsp_state, IntPtr inbuffer, IntPtr outbuffer, uint length, int inchannels, ref int outchannels)
     {
         IntPtr userData = DspCallback.UserData(ref dsp_state);
-        if (userData == IntPtr.Zero) return RESULT.OK;
+        if (userData == IntPtr.Zero) { DspCallback.Silence(outbuffer, length, outchannels); return RESULT.OK; }
 
         var state = GCHandle.FromIntPtr(userData).Target as SteamAudioVoiceState;
-        if (state == null) return RESULT.OK;
+        if (state == null) { DspCallback.Silence(outbuffer, length, outchannels); return RESULT.OK; }
 
         if (outchannels == 0) outchannels = 2;
         int outCh = outchannels;
