@@ -215,6 +215,9 @@ public sealed partial class VehicleSystem
         t.Rotation = Quaternion.CreateFromYawPitchRoll(heading, 0f, 0f);
         t.IsDirty = true;
         v.Speed = 0f;
+        // Standing square to the kerb, where it pulled in to; it steers away from here.
+        v.Driver?.Place(v.KerbShift);
+        if (v.Wheels != null) { v.Wheels.Halt(); EncodeWheels(v); }
         vel.Linear = Vector3.Zero;
         v.TyreDemand = 0f;
         pk.Clock += dt;

@@ -63,4 +63,8 @@ public struct EntitySnapshot
     /// <summary>How hard this vehicle is working its tyres, 0..2 with 1 the limit — as the SERVER
     /// worked it out, because a listener cannot tell a banked corner from a flat one.</summary>
     public float TyreDemand;
+
+    /// <summary>Each wheel as the server last sent it (load, slip, speed, surface), front axle
+    /// first; null for anything without wheels.</summary>
+    public WheelState[]? Wheels;
 }

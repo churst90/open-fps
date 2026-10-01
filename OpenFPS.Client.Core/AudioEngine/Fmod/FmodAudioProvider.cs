@@ -2985,6 +2985,7 @@ public class FmodAudioProvider : IAudioProvider
                     active.EngineState.Running = emitter.EngineRunning;
                     active.EngineState.ServingStop = emitter.ServingStop;
                     active.EngineState.RoadSlip = emitter.TyreSlip;
+                    active.EngineState.Wheels = emitter.Wheels;
                     if (ListenerInMachineFrame(emitter.Position, emitter.Direction, emitter.Velocity, out var local))
                         active.EngineState.SetListener(local);
                 }

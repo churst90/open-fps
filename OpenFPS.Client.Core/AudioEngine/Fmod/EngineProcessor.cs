@@ -42,6 +42,13 @@ public sealed class EngineVoiceState : IRenderedVoice
     /// synthesis and lasts a tenth of a second.
     /// </summary>
     public volatile float RoadSlip;
+    /// <summary>
+    /// Each wheel as the server sent it, front axle first, or null. When there, the front tyre voice
+    /// takes the front axle's worst wheel and the rear voice the rest, each as its share of
+    /// <see cref="RoadSlip"/>: the overall level stays the server's, and the axle that is working
+    /// harder squeals harder. Game thread writes.
+    /// </summary>
+    public volatile OpenFPS.Common.Networking.WheelState[]? Wheels;
     /// <summary>Whether the engine should be running. Game thread writes.</summary>
     public volatile bool Running = true;
     /// <summary>Standing at a stop that takes passengers: set the spring brakes, kneel, open the
@@ -522,8 +529,12 @@ public sealed class EngineVoiceState : IRenderedVoice
         _engineAtRear = v.EngineAtRear;
         _bayIntake = new EchoDiffuser(BayScattering, seed + 71, sampleRate);
         _radiation = new OpenFPS.Client.AudioEngine.Core.Engine.ExhaustRadiation(v, sampleRate);
-        // Drums on anything heavy enough to need them; discs on the rest.
-        _squeal = new OpenFPS.Client.AudioEngine.Core.BrakeSqueal(sampleRate, drums: v.MassKg > 5000f, seed: seed + 97);
+        // Drums or discs, as the axle doing most of the stopping has.
+        var chassis = v.Running;
+        _squeal = new OpenFPS.Client.AudioEngine.Core.BrakeSqueal(sampleRate, drums: chassis.MainBrake == OpenFPS.Common.BrakeKind.Drum, seed: seed + 97);
+        _frontWheels = chassis.Axles.Length > 0 ? chassis.Axles[0].Wheels : 1;
+        _frontRadius = chassis.Axles.Length > 0 ? chassis.Axles[0].Tyre.RollingRadiusMetres : 0.337f;
+        _rearRadius = chassis.Axles.Length > 0 ? chassis.Axles[^1].Tyre.RollingRadiusMetres : 0.337f;
         if (!string.IsNullOrEmpty(v.AirSystem) && v.DoorChime)
         {
             _chime = OpenFPS.Common.DoorChimeSpec.TransitBus;
@@ -543,10 +554,31 @@ public sealed class EngineVoiceState : IRenderedVoice
         // by the gain the mix below applies to both tyre taps, which the squeal was set against and
         // keeps.
         int tyres = Math.Max(1, v.TyreCount);
-        int frontTyres = tyres <= 2 ? 1 : 2;
+        int frontTyres = Math.Clamp(chassis.SteeredTyres, 1, Math.Max(1, tyres - 1));
         float perTyrePa = 20e-6f * MathF.Pow(10f, v.Tyres.ReferenceDb / 20f);
         _rollingFrontPa = perTyrePa * MathF.Sqrt(frontTyres) / (PerAxle * DefaultTyreMix);
         _rollingRearPa = perTyrePa * MathF.Sqrt(Math.Max(1, tyres - frontTyres)) / (PerAxle * DefaultTyreMix);
+    }
+
+    /// <summary>
+    /// The slip each tyre voice plays: the server's overall demand, shared between the axles in the
+    /// proportion their worst wheels carry it. Without wheels (or not this vehicle's count of them)
+    /// both play the overall figure, as they always did.
+    /// </summary>
+    private void AxleSlip(float overall, OpenFPS.Common.Networking.WheelState[]? wheels, out float front, out float rear)
+    {
+        front = rear = overall;
+        if (wheels == null || wheels.Length <= _frontWheels) return;
+        float f = 0f, r = 0f;
+        for (int i = 0; i < wheels.Length; i++)
+        {
+            float d = wheels[i].DemandFraction;
+            if (i < _frontWheels) f = MathF.Max(f, d); else r = MathF.Max(r, d);
+        }
+        float worst = MathF.Max(f, r);
+        if (worst <= 1e-3f) return;
+        front = overall * f / worst;
+        rear = overall * r / worst;
     }
 
     /// <summary>The cooling fan's contribution, 0..1 — normally one. Writable so an instrument can
@@ -558,6 +590,9 @@ public sealed class EngineVoiceState : IRenderedVoice
     /// <summary>For instruments: the cooling system, or null.</summary>
     public OpenFPS.Client.AudioEngine.Core.Engine.CoolingSystem? Cooling => _cooling;
     private readonly float _rollingFrontPa, _rollingRearPa;
+    /// <summary>Wheel positions on the front axle, and each end's rolling radius (its tread tone).</summary>
+    private readonly int _frontWheels;
+    private readonly float _frontRadius, _rearRadius;
 
     // ── Sitting in it ───────────────────────────────────────────────────────────────────────────
     //
@@ -932,8 +967,9 @@ public sealed class EngineVoiceState : IRenderedVoice
             // their noise is INDEPENDENT; one signal written to both ends was the same roar coming
             // from two places a few metres apart, which combs against itself as the car goes by —
             // heard as a car passing "inside out".
-            float tyreRear = VehicleSynth.Tyre(Vehicle.Tyres, Driveline.Speed, RoadSlip + _tyreChirp, _rng, ref _tyre, _rollingRearPa);
-            float tyreFront = VehicleSynth.Tyre(Vehicle.Tyres, Driveline.Speed, RoadSlip + _tyreChirp, _rng, ref _tyreFront, _rollingFrontPa);
+            AxleSlip(RoadSlip, Wheels, out float frontSlip, out float rearSlip);
+            float tyreRear = VehicleSynth.Tyre(Vehicle.Tyres, Driveline.Speed, rearSlip + _tyreChirp, _rng, ref _tyre, _rollingRearPa, _rearRadius);
+            float tyreFront = VehicleSynth.Tyre(Vehicle.Tyres, Driveline.Speed, frontSlip + _tyreChirp, _rng, ref _tyreFront, _rollingFrontPa, _frontRadius);
             float rearTyre = tyreRear * PerAxle * TyreMix;
             float frontTyre = tyreFront * PerAxle * TyreMix;
             // The front of the machine: the tyres at that end, the fan, and what the bay lets out.

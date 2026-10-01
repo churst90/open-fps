@@ -24,16 +24,13 @@ namespace OpenFPS.Server.Systems;
 /// The one thing that IS decided here is how a person's two axes of input become throttle, brake and
 /// steering, because that is a question about players rather than about cars.
 ///
-/// The friction circle is shared with the tyre audio deliberately — <see cref="TyreFriction.Demand"/>
-/// is the same function the client uses to decide whether a tyre squeals. Ask for more cornering than
-/// is left after the braking and the car runs wide, and the noise it makes doing so is the same
-/// number that made it run wide. Neither half was written for the other.
+/// The car stands on the same per-wheel model traffic does (<see cref="WheelDynamics"/>): each
+/// wheel's load, slip and force, from the preset's chassis and tyres. Ask for more cornering than is
+/// left after the braking and the car runs wide, and the noise it makes doing so is the same number
+/// that made it run wide — the most-worked wheel's share of its grip, which the client squeals on.
 /// </summary>
 public static class DrivingSystem
 {
-    /// <summary>Full steering lock, radians. A road car is about thirty-five degrees at the wheel.</summary>
-    private const float MaxSteerAngle = 0.61f;
-
     /// <summary>
     /// Seconds for the wheel to go from straight ahead to full lock while a steering key is held.
     ///
@@ -98,6 +95,37 @@ public static class DrivingSystem
     private const float StandstillSpeed = 0.15f;
 
     private const float AirDensity = 1.225f;
+
+    /// <summary>
+    /// Each driven car on its wheels, by entity: the same per-wheel model traffic runs on
+    /// (WheelDynamics), so a traffic car and your car corner, brake and slide alike. Kept here rather
+    /// than on the component because it is a simulation, not something the wire or a save carries.
+    /// </summary>
+    private sealed class Running
+    {
+        public required string Preset;
+        public required WheelDynamics Body;
+        public required WheelState[] Wire;
+        public byte Surface = RoadSurfaces.IndexOf(RoadData.DefaultSurface);
+    }
+
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<int, Running> _running = new();
+
+    private static Running RunningFor(int id, string preset, VehicleProfile profile)
+    {
+        if (_running.TryGetValue(id, out var r) && r.Preset == preset) return r;
+        var body = new WheelDynamics(profile);
+        r = new Running { Preset = preset, Body = body, Wire = new WheelState[body.Wheels.Length] };
+        _running[id] = r;
+        return r;
+    }
+
+    /// <summary>A driven car's wheels as last worked out, for the wire.</summary>
+    public static bool TryGetWheels(int entityId, out WheelState[]? wheels)
+    {
+        wheels = _running.TryGetValue(entityId, out var r) ? r.Wire : null;
+        return wheels != null;
+    }
 
     /// <summary>How far a body is held off the floor when testing whether it has hit something.
     /// Everything drives over something; without this, everything is permanently crashed into it.</summary>
@@ -221,10 +249,11 @@ public static class DrivingSystem
         else if (MathF.Abs(drive.Throttle) < 0.01f) longitudinal = 0f;
 
         // ── What the steering is asking for ─────────────────────────────────────────────────────
-        //
-        // The geometry gives a radius; the radius gives a lateral acceleration. Nothing yet says the
-        // tyres can deliver it.
-        float wheelbase = MathF.Max(1.2f, profile.FrontAxleZ - profile.RearAxleZ);
+        var running = RunningFor(root.Id, drive.Preset, profile);
+        var body = running.Body;
+        var chassis = body.Chassis;
+        float wheelbase = MathF.Max(0.5f, body.Wheelbase);
+        float maxSteer = chassis.MaxSteerAngleRad;
 
         // The wheel, turned by hands rather than thrown by a switch: towards where the keys ask at
         // the pace hands turn a wheel, and back to the middle faster when they let go.
@@ -235,54 +264,52 @@ public static class DrivingSystem
 
         // ...and no further than the tyres can use at this speed. The angle whose corner needs all
         // of the grip is atan(wheelbase / r) with r = v^2 / (grip g).
-        float usableLock = MaxSteerAngle;
+        float usableLock = maxSteer;
         if (speed > StandstillSpeed)
-            usableLock = MathF.Min(MaxSteerAngle,
+            usableLock = MathF.Min(maxSteer,
                 SteerPastGrip * MathF.Atan(wheelbase * capacity / (speed * speed)));
         float steerAngle = Math.Clamp(drive.Steer, -1f, 1f) * usableLock;
-        float lateral = 0f;
-        if (MathF.Abs(steerAngle) > 0.001f && speed > StandstillSpeed)
-        {
-            float radius = wheelbase / MathF.Tan(MathF.Abs(steerAngle));
-            lateral = MathF.Sign(steerAngle) * v * v / MathF.Max(0.5f, radius);
-        }
 
-        // ── The friction circle ─────────────────────────────────────────────────────────────────
+        // ── On its tyres ────────────────────────────────────────────────────────────────────────
         //
-        // One contact patch, two demands. Ask for more than it has and BOTH are scaled back, which is
-        // why braking hard into a turn makes a car run wide rather than merely making it slower: the
-        // cornering it cannot do is the cornering the brakes are already using.
-        float demand = TyreFriction.Demand(longitudinal, lateral, grip);
-        drive.TyreDemand = MathF.Min(2f, demand);
-        if (demand > 1f)
-        {
-            longitudinal /= demand;
-            lateral /= demand;
-        }
-
-        // ── Integrate ───────────────────────────────────────────────────────────────────────────
-        float next = v + longitudinal * dt;
+        // The engine, the brakes and the air give the acceleration asked for; the wheels decide what
+        // of it, and of the cornering the steering asks for, the road will give — each wheel from its
+        // own load, slip and surface, so braking into a turn runs it wide and a light inside wheel
+        // lets go first. The same model the traffic is driven on.
+        body.Vx = v;
+        body.ForwardOnly = false;
+        body.SetSurface(running.Surface);
+        if (MathF.Abs(drive.Throttle) < 0.01f && speed <= StandstillSpeed && MathF.Abs(longitudinal) < 1e-3f)
+            body.Halt();
+        else
+            body.Step(dt, steerAngle, longitudinal);
+        float next = body.Vx;
         // Resistance may not drag a car backwards through a standstill; it can only stop it. And
         // below a crawl with nothing driving it, a car is stopped rather than creeping — otherwise it
         // rolls on forever at the speed where the resistances stopped being applied.
         if (MathF.Abs(drive.Throttle) < 0.01f
-            && (MathF.Sign(next) != MathF.Sign(v) || MathF.Abs(next) < StandstillSpeed)) next = 0f;
-        drive.Speed = next;
-
-        if (speed > StandstillSpeed)
+            && ((v != 0f && MathF.Sign(next) != MathF.Sign(v)) || MathF.Abs(next) < StandstillSpeed))
         {
-            float yawRate = lateral / v;                 // signed by v: reversing steers the other way
-            drive.Heading = MathHelper.WrapAngle(drive.Heading + yawRate * dt);
+            next = 0f;
+            body.Halt();
         }
+        drive.Speed = next;
+        drive.TyreDemand = MathF.Min(2f, body.MaxDemand);
 
         ref var transform = ref world.Get<Transform>(root);
+        float was = drive.Heading;
+        var forwardWas = new Vector3(MathF.Sin(was), 0f, MathF.Cos(was));
+        var rightWas = new Vector3(MathF.Cos(was), 0f, -MathF.Sin(was));
+        drive.Heading = MathHelper.WrapAngle(was + body.TickYaw);
         var heading = new Vector3(MathF.Sin(drive.Heading), 0f, MathF.Cos(drive.Heading));
-        var wanted = transform.Position + heading * drive.Speed * dt;
+        var right = new Vector3(MathF.Cos(drive.Heading), 0f, -MathF.Sin(drive.Heading));
+        var wanted = transform.Position + forwardWas * body.TickForward + rightWas * body.TickRight;
         // Its own parts are not the road, and nor is whoever is sitting in it. A car with a floor
         // finds that floor inside the step height and would climb onto it every tick.
         var aboard = CompositeService.MembersOf(world, root.Id);
         aboard.AddRange(CompositeService.OccupantsOf(world, root.Id));
-        wanted.Y = PhysicsUtils.GetGroundHeight(world, grid, wanted, aboard, out _);
+        wanted.Y = PhysicsUtils.GetGroundHeight(world, grid, wanted, aboard, out string ground);
+        running.Surface = RoadSurfaces.IndexOf(ground);
         wanted = Vector3.Clamp(wanted, mapMin, mapMax);
 
         // Hitting something stops it, and now it is audible. The IMPULSE and the damage are still to
@@ -293,6 +320,7 @@ public static class DrivingSystem
         {
             drive.Speed = 0f;
             drive.Throttle = 0f;
+            body.Halt();
             if (hitSpeed > ImpactAcoustics.MinimumSpeed && heard != null && struck != null)
                 Collision(world, root, struck.Value, wanted, hitSpeed, profile.MassKg, heard);
         }
@@ -305,7 +333,13 @@ public static class DrivingSystem
         transform.IsDirty = true;
 
         ref var velocity = ref world.Get<Velocity>(root);
-        velocity.Linear = heading * drive.Speed;
+        velocity.Linear = heading * drive.Speed + right * (drive.Speed == 0f ? 0f : body.Vy);
+
+        for (int i = 0; i < running.Wire.Length; i++)
+        {
+            ref var w = ref body.Wheels[i];
+            running.Wire[i] = WheelState.Encode(w.Load, w.AngularSpeed, w.SlipRatio, w.SlipAngle, w.Surface, w.Demand);
+        }
 
         // The client synthesises the engine from the speed this entity reports, and picks its own
         // gear from it with the same rule used above — so the gear you hear is the gear you are in.

@@ -2329,6 +2329,7 @@ public class ClientAudioSystem
             // car in every corner rendered pure broadband skid for the length of both turns. Heard as
             // a long white-noise tail travelling with the field.
             TyreSlip = snap.TyreDemand,
+            Wheels = snap.Wheels,
 
             // Synthesis mapping
             IsGranular = def.SoundEmitter.IsGranular,

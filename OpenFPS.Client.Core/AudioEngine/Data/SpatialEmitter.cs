@@ -206,6 +206,9 @@ public struct SpatialEmitter
     /// all get it on the same terms.
     /// </summary>
     public float TyreSlip;
+    /// <summary>Each wheel as the server sent it, front axle first, or null. The tyre voices take
+    /// each axle's share of <see cref="TyreSlip"/> from it.</summary>
+    public OpenFPS.Common.Networking.WheelState[]? Wheels;
     public SynthWaveType SynthWave;
     public float SynthFrequency; // Base frequency (e.g. 440.0f)
     public float SynthLfoRate; // Lfo speed in Hz
