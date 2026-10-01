@@ -66,12 +66,42 @@ public sealed partial class VehicleSystem
         float s0 = life.FollowMinGapMetres, headway = life.FollowHeadwaySeconds;
         float s = MathF.Max(0.1f, ahead.Gap);
         float sStar = s0 + MathF.Max(0f, wasSpeed * headway + wasSpeed * (wasSpeed - ahead.Lead.Speed) / (2f * MathF.Sqrt(a * b)));
-        float accel = a * (1f - (sStar / s) * (sStar / s));
+        float idm = a * (1f - (sStar / s) * (sStar / s));
+        float accel = Acc(idm, wasSpeed, ahead.Lead.Speed, ahead.Lead.Wheels?.Ax ?? 0f, s, a, b);
         // No harder than a driver stamping on the brakes can: the same share of the tyres a staged
         // hard stop uses, which leaves them turning (a locked wheel is not a thing a driver chooses).
         accel = MathF.Max(accel, -MathF.Max(b, HardBrakeGripFraction * v.Grip * 9.81f));
         float allowed = MathF.Max(0f, wasSpeed + accel * dt);
         if (allowed < v.Speed) v.Speed = allowed;
+    }
+
+    /// <summary>
+    /// The ACC model of Kesting, Treiber and Helbing ("Enhanced intelligent driver model to access the
+    /// impact of driving strategies on traffic capacity", Phil. Trans. R. Soc. A 368, 2010; Treiber and
+    /// Kesting, Traffic Flow Dynamics, 2013, section 11.3.6): the IDM's braking with its overreaction
+    /// taken out. Below its desired gap the IDM brakes as if the lead might stop dead at any moment,
+    /// so creeping up a queue at walking pace it stamps on the brakes. The constant-acceleration
+    /// heuristic says what the situation really asks, assuming the lead keeps its acceleration:
+    ///
+    ///   a_CAH = v^2 a~ / (v_l^2 - 2 s a~)            if v_l (v - v_l) &lt;= -2 s a~
+    ///         = a~ - (v - v_l)^2 Theta(v - v_l) / (2 s)   otherwise,        a~ = min(a_l, a)
+    ///
+    /// and where the IDM asks for more braking than that, the two are blended:
+    ///
+    ///   a_ACC = (1 - c) a_IDM + c [a_CAH + b tanh((a_IDM - a_CAH) / b)],   c = 0.99
+    ///
+    /// so the braking stays near the comfortable b unless the situation really is critical.
+    /// </summary>
+    internal static float Acc(float idm, float v, float vLead, float aLead, float s, float a, float b)
+    {
+        const float Coolness = 0.99f;
+        float at = MathF.Min(aLead, a);
+        float cah;
+        float denominator = vLead * vLead - 2f * s * at;
+        if (vLead * (v - vLead) <= -2f * s * at && denominator > 1e-3f) cah = v * v * at / denominator;
+        else cah = at - (v > vLead ? (v - vLead) * (v - vLead) : 0f) / (2f * MathF.Max(0.1f, s));
+        if (idm >= cah) return idm;
+        return (1f - Coolness) * idm + Coolness * (cah + b * MathF.Tanh((idm - cah) / b));
     }
 
     /// <summary>Tests: every vehicle driving a line, where it is in the world and which way it points.</summary>
