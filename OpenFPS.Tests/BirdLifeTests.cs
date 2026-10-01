@@ -50,7 +50,7 @@ public class BirdLifeTests
             && !Directory.Exists(Path.Combine(Sounds(), "BIRDS")))
             throw new InvalidOperationException("no bird samples");
         audio.InitializeForTest(Sounds());
-        var birds = new BirdLife(audio, new OpenFPS.Client.AudioEngine.Acoustics.SpatialAcoustics(new SpatialService()));
+        var birds = new BirdLife(audio, new OpenFPS.Client.AudioEngine.Acoustics.SpatialAcoustics(new SpatialService()), seed: 1);
         return (client.GetSnapshot(), birds, mixer, audio);
     }
 
