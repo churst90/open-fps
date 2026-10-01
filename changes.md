@@ -4,6 +4,21 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-09-30
 
+- Walls let through what their material, thickness and build let through, band by band. Every wall
+  heavier than about 50 kg/m2 was a flat 55 dB filter, so a wall made a sound quieter without making
+  it duller. Now: the mass law, the coincidence dip from each material's stiffness and thickness
+  (Sharp), two-leaf walls with their air gap (stud partitions, glazing), and flanking per band
+  (EN 12354-1). Each EQ band takes the figure for the frequencies it actually covers. A 35 cm brick
+  wall is -40/-62/-87 dB (low/mid/high), was -55 flat; a stud partition -18/-41/-50, was -54/-55/-55.
+- Speech and one-off sounds are occluded by Steam Audio like everything else. They used an older
+  tracer that let 10-20 dB more through, made two walls quieter than one and let sound straight down
+  through a floor. The tracer, still the fallback, uses the same wall model with no floor under it.
+- Partitions are plasterboard on studs and glazing is two panes, as prefab data (`LeafMetres`,
+  `StudSpacingMetres`). Lab: `--wall-tl`, and `--path-probe` prints each wall on the line.
+- Arriving says "You're in <map>, at <zone>." in one line. The login no longer speaks "Preparing
+  manifest". The city's footways are "<street> sidewalk", one name the whole length. "Under Shelter"
+  (a roofed gap between two zones, such as a doorway) is no longer announced on its own.
+- `ClientWorldState.Clear` takes only the map size.
 - Cleansing pass:
   - Deleted: `PhysicsAcousticBridgeSystem` (never called), the unused `users.json` files, and the
     lab's `--sim-roomdbg`, `--echo-ab`, `--blast-compare` and `--blast-probe`.

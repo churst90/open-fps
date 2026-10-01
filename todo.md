@@ -7,12 +7,17 @@ Updated 2026-09-30.
 
 In this order.
 
-### 1. Walls let the highs through
-Heard 2026-09-30 after the blanket muffle was retired: through a wall the highs come through, where
-a real wall passes the lows and the rumble and stops the top. Being measured: the transmission each
-wall gets per band against the mass law for its material and thickness, how the three bands reach
-the voice, and every path that could carry highs round or through a wall (diffraction, copies,
-traced echoes, the late tail, the held Steam Audio answer). Fix by physics, not by a trim.
+### 1. Walls, what is left (the panel model went in 2026-09-30, unheard)
+- Listen: through a wall the lows and the rumble should come through and the top should not.
+- A source just behind a building corner made of two boxes gets no diffraction route (the 5 cm joint
+  padding in `RouteIsClear` rejects the corner), so it drops to the wall alone. Fix without reopening
+  the shut-door crack leak.
+- Each floor is two overlapping 25 cm slabs, and carpet on a floor counts as a barrier: both are
+  panels in series, so upstairs is about 15 dB too quiet in the lows. Merge layers in contact.
+- No cavity resonances or air leaks: sealed glazing is about 10 dB optimistic in the mids, and door
+  gaps and seals are not modelled (wood door 41 dB at 2 kHz against about 32 measured).
+- Steam Audio counts walls in a row as (2n+1)/3 of one; the tracer counts them exactly.
+- Diffraction is evaluated at 200/1250/8000 Hz, not the band averages transmission uses.
 
 ### 2. Bodies and wheels (Cody, 2026-09-30: next after the walls)
 Plan: [docs/NEXT_BODIES_WHEELS_ROADS.md](docs/NEXT_BODIES_WHEELS_ROADS.md) (agreed 2026-09-27).
@@ -29,10 +34,12 @@ Stage 1, roads as data, is done.
 - Then traffic lights and accessible pedestrian signals.
 
 ### 3. Doors from the recordings
-The car door (`CarDoor.cs`) is done and approved. House and steel doors still use the generic model.
-In progress 2026-09-30: a door model fitted to `inbox/door sounds/Door Opening Sound Effect.mp3` the
-way the car door was (octave-band noise hits, not resonators), with the steel door from the same
-model by material and mass. Renders for Cody to judge before it goes in the game.
+The car door (`CarDoor.cs`) is done and approved. House and steel doors: `HouseDoor`, fitted to
+`inbox/door sounds/Door Opening Sound Effect.mp3`, is on branch `worktree-agent-a6e2f6e0e3da748cd`
+and goes in once Cody approves the listening set (`inbox/door sounds/synth-2026-09-30`).
+- The recording has no door shutting; the shut is built from the opening's parts. A shutting
+  recording would let it be fitted.
+- The knock (`DoorKnock`) may be about 20 dB short at 1-2 kHz against both knock recordings.
 
 ### 4. Mutation testing
 Results so far are in [docs/MUTATION_2026-09-24.md](docs/MUTATION_2026-09-24.md).
@@ -41,11 +48,14 @@ Results so far are in [docs/MUTATION_2026-09-24.md](docs/MUTATION_2026-09-24.md)
 - Shared maths: 74.6%, survivors done. Engine code: 93.7%, survivors done (`EngineMutationTests`).
 - Client (`VoiceManager`, `VehicleShadow`, `BeaconAids`, `BirdLife`): 39.2%, survivors not yet done.
 
-### 5. Cleansing pass
-In progress 2026-09-30: `ChatManager` sender prefixes, unused lab spikes, the `OPENFPS_*` switches,
-comments that tell history instead of what the code does, duplicates, `PhysicsAcousticBridgeSystem`,
-stale comments, `ClientWorldState.Clear`'s unused bounds, `users.json`, test config folders left in
-/tmp, the unseeded `BirdLife` random in tests, and the docs.
+### 5. Cleansing, what is left
+Done 2026-09-30 (see changes.md). Left:
+- The two client heads' startup handlers are near copies; about 25 lab spikes each find ASSETS
+  their own way.
+- `WeaponSynth.CompositeBlast`, `RecordedBlend` and `FiringTakeIndex` are used only by `BattleSpike`;
+  the game plays no recorded gunfire.
+- `ClientGameSession.cs`, `WorldAudioPlayer` and `AsyncAcousticWorker` still have dated comments.
+- The full test suite takes about 40 minutes for 1,415 tests; the readme says 18 minutes and 940.
 
 ### 6. Acoustics still open
 - The tail and the copies sit at -6 by ear (0 is physical). Cody is happy with that.
@@ -172,11 +182,10 @@ Some may already be fixed; confirm before fixing again.
 
 ### Server
 - Admin commands to change a password and a role. Today the only way is editing `openfps.db`.
-- The default admin account is `admin` / `admin123`: make the first run ask for a password.
+- The default admin account is `admin` / `admin123` unless `OPENFPS_ADMIN_PASSWORD` is set (the
+  server warns at start): make the first run ask for a password.
 - A failed port bind still logs "started". Fail loudly instead.
 - `/savemap` rewrites a map as plain JSON and loses its comments.
-- `run-server.sh` prints port 33288 even when `--port` says otherwise; `OPENFPS_PORT` only drives
-  its check.
 - `/restart` and `/reloadmap` for admins.
 - The MUD interface is plain TCP on all interfaces, and the game port accepts any connection
   without a key. Decide what a public server needs.
