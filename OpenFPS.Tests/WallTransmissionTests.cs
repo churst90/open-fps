@@ -179,7 +179,7 @@ public class WallTransmissionTests
     private static WorldSnapshot World(params (Vector3 Pos, Vector3 Size, string Material, WallBuild Build)[] boxes)
     {
         var world = new ClientWorldState();
-        world.Clear(new Vector3(200, 40, 200), new Vector3(-100, -10, -100), new Vector3(100, 30, 100));
+        world.Clear(new Vector3(200, 40, 200));
         int id = 1;
         foreach (var b in boxes)
             world.RegisterDefinition(new EntityDefinition

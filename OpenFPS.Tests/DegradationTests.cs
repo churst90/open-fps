@@ -48,7 +48,7 @@ public class DegradationTests
         AcousticRegistry.Initialize();
 
         var state = new ClientWorldState();
-        state.Clear(size, data.MinBound, data.MinBound + size);
+        state.Clear(size);
         foreach (var def in EntityDefinitionFactory.StaticDefinitions(world))
             state.RegisterDefinition(def);
         return state;

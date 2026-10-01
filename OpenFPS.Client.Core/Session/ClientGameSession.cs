@@ -821,7 +821,7 @@ public sealed class ClientGameSession : IDisposable
                     _shell.ShowLoading($"Travelling to {manifest.MapName}...");
                 }
                 _shell.UpdateLoadingStatus($"Loading {manifest.MapName}...", 10);
-                _world.Clear(manifest.WorldSize, manifest.MapMin, manifest.MapMax);
+                _world.Clear(manifest.WorldSize);
                 // A new map's regions are numbered from scratch, so the last id announced describes
                 // nowhere. Arriving somewhere is not crossing into it.
                 _lastAnnouncedRegionId = int.MinValue;

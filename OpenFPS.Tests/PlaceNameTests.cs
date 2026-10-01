@@ -76,7 +76,7 @@ public class PlaceNameTests
         Assert.True(maps.TryGetMapData("city", out var data));
 
         var client = new ClientWorldState();
-        client.Clear(data.Size, data.MinBound, data.MaxBound);
+        client.Clear(data.Size);
         var defs = EntityDefinitionFactory.StaticDefinitions(world).ToList();
         foreach (var def in defs) client.RegisterDefinition(def);
         client.SetAcousticMap(AcousticVolumeGenerator.GenerateRegions(defs, size, data.MinBound,

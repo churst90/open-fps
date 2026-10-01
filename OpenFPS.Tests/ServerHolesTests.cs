@@ -45,7 +45,7 @@ public class ServerHolesTests
     public void RemovedEntitiesLeaveTheClientWorldEntirely()
     {
         var world = new ClientWorldState();
-        world.Clear(new Vector3(100, 20, 100), new Vector3(-50, 0, -50), new Vector3(50, 20, 50));
+        world.Clear(new Vector3(100, 20, 100));
 
         world.RegisterDefinition(StaticWall(id: 42, new Vector3(5, 1, 5)));
         world.RegisterDefinition(NoisyProp(id: 43, new Vector3(6, 1, 6)));
@@ -66,7 +66,7 @@ public class ServerHolesTests
     public void RemovingAnEntityDropsItFromTheCollisionGrid()
     {
         var world = new ClientWorldState();
-        world.Clear(new Vector3(100, 20, 100), new Vector3(-50, 0, -50), new Vector3(50, 20, 50));
+        world.Clear(new Vector3(100, 20, 100));
         world.RegisterDefinition(StaticWall(id: 42, new Vector3(5, 1, 5)));
 
         var grid = world.GetSnapshot().StaticGrid!;
@@ -83,7 +83,7 @@ public class ServerHolesTests
     public void RemovingAnUnknownEntityReportsNothingRemoved()
     {
         var world = new ClientWorldState();
-        world.Clear(new Vector3(100, 20, 100), new Vector3(-50, 0, -50), new Vector3(50, 20, 50));
+        world.Clear(new Vector3(100, 20, 100));
 
         Assert.Empty(world.RemoveEntities(new[] { 999 }));
     }

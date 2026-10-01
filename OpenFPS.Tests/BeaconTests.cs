@@ -71,7 +71,7 @@ public class BeaconTests
         Assert.True(maps.TryGetMap("city", out World world, out _, out _, out _));
         Assert.True(maps.TryGetMapData("city", out var data));
         var client = new ClientWorldState();
-        client.Clear(data.Size, data.MinBound, data.MaxBound);
+        client.Clear(data.Size);
         EntityDefinition? door = null;
         foreach (var def in EntityDefinitionFactory.StaticDefinitions(world))
         {
@@ -121,7 +121,7 @@ public class BeaconTests
         Assert.True(maps.TryGetMap("city", out World world, out _, out _, out _));
         Assert.True(maps.TryGetMapData("city", out var data));
         var client = new ClientWorldState();
-        client.Clear(data.Size, data.MinBound, data.MaxBound);
+        client.Clear(data.Size);
         var doors = new System.Collections.Generic.List<EntityDefinition>();
         foreach (var def in EntityDefinitionFactory.StaticDefinitions(world))
         {
@@ -173,7 +173,7 @@ public class BeaconTests
         Assert.True(maps.TryGetMap("city", out World world, out _, out _, out _));
         Assert.True(maps.TryGetMapData("city", out var data));
         var client = new ClientWorldState();
-        client.Clear(data.Size, data.MinBound, data.MaxBound);
+        client.Clear(data.Size);
         foreach (var def in EntityDefinitionFactory.StaticDefinitions(world)) client.RegisterDefinition(def);
 
         var provider = new VoiceLifecycleTests.RecordingProvider();

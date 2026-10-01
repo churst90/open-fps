@@ -167,7 +167,7 @@ public class HotPathTests
         // The candidate query was rewritten; the thing it exists to answer must not have changed. A long
         // wall between the listener and the source still blocks.
         var world = new ClientWorldState();
-        world.Clear(new Vector3(100, 20, 100), new Vector3(-50, 0, -50), new Vector3(50, 20, 50));
+        world.Clear(new Vector3(100, 20, 100));
         world.RegisterDefinition(new EntityDefinition
         {
             EntityId = 1,
@@ -316,7 +316,7 @@ public class HotPathTests
     private static ClientWorldState LoadedWorld()
     {
         var world = new ClientWorldState();
-        world.Clear(new Vector3(100, 20, 100), new Vector3(-50, 0, -50), new Vector3(50, 20, 50));
+        world.Clear(new Vector3(100, 20, 100));
         world.RegisterDefinition(Wall(id: 1, new Vector3(5, 1, 5)));
         world.RegisterDefinition(Wall(id: 2, new Vector3(-5, 1, -5)));
         return world;

@@ -35,7 +35,7 @@ public class DrivingAidsTests
         Assert.True(maps.TryGetMap("city", out var world, out _, out _, out _));
         Assert.True(maps.TryGetMapData("city", out var data));
         var client = new ClientWorldState();
-        client.Clear(data.Size, data.MinBound, data.MaxBound);
+        client.Clear(data.Size);
         foreach (var def in EntityDefinitionFactory.StaticDefinitions(world)) client.RegisterDefinition(def);
         return client;
     }

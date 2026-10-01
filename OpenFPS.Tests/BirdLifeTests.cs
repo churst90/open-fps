@@ -42,7 +42,7 @@ public class BirdLifeTests
         Assert.True(maps.TryGetMap("city", out World world, out _, out _, out _));
         Assert.True(maps.TryGetMapData("city", out var data));
         var client = new ClientWorldState();
-        client.Clear(data.Size, data.MinBound, data.MaxBound);
+        client.Clear(data.Size);
         foreach (var def in EntityDefinitionFactory.StaticDefinitions(world)) client.RegisterDefinition(def);
         var mixer = new VoiceLifecycleTests.RecordingProvider();
         var audio = new AudioEngineFacade(mixer);
