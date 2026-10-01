@@ -57,9 +57,9 @@ internal sealed class LateTailIr
         double total = 0;
         for (int i = 0; i < n; i++) total += x[i] * (double)x[i];
         // Where the rest is 70 dB down: no partition past it is worth its cost.
-        int end = n;
+        int end = 0;   // silence is one empty partition, not the longest
         double rest = 0;
-        for (int i = n - 1; i >= 0; i--)
+        for (int i = n - 1; i >= 0 && total > 0; i--)
         {
             rest += x[i] * (double)x[i];
             if (rest > total * 1e-7) { end = i + 1; break; }
