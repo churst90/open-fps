@@ -323,6 +323,17 @@ if (args.Contains("--tyres"))
     Log.CloseAndFlush();
     Environment.Exit(tcode);
 }
+if (args.Contains("--wheel-squeal"))
+{
+    // --wheel-squeal [out=DIR] [axle]: each wheel squealing for itself, measured, then four drives
+    // rendered (an ordinary stop, a hard stop, a fast turn, a wheelspin pull-away). `axle` renders
+    // the same drives with the axle voices squealing from the overall demand, as before.
+    string? outArg = args.FirstOrDefault(a => a.StartsWith("out="));
+    OpenFPS.Client.Core.AudioEngine.Fmod.WheelSquealSpike.AxleOnly = args.Contains("axle");
+    int wcode = OpenFPS.Client.Core.AudioEngine.Fmod.WheelSquealSpike.Run(outArg?[4..]);
+    Log.CloseAndFlush();
+    Environment.Exit(wcode);
+}
 if (args.Contains("--turbo"))
 {
     // --turbo [preset ...]: the same 2.0 four with and without a turbocharger, then the truck.

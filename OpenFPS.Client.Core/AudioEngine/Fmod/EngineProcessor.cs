@@ -29,6 +29,28 @@ public sealed class EngineVoiceState : IRenderedVoice
     private readonly Random _rng;
     private VehicleSynth.TyreVoice _tyre;
     private VehicleSynth.TyreVoice _tyreFront;
+    /// <summary>
+    /// Every wheel's squeal, in the server's wheel order (see <see cref="WheelDynamics"/>): each is
+    /// driven by that wheel's own demand, slip and load, and goes out through the tap at its end of
+    /// the vehicle, weighted by how much nearer or further than that tap the wheel is from the
+    /// listener. So the loaded outside front of a corner sings first, from the front, and louder on
+    /// its own side.
+    /// </summary>
+    private readonly VehicleSynth.WheelSquealVoice[] _wheelSqueal;
+    /// <summary>Per wheel: on the front axle group, driven, its static load (N), and where its contact
+    /// patch is in the vehicle's frame (x right, y up, z forward).</summary>
+    private readonly bool[] _wheelFront, _wheelDriven;
+    private readonly float[] _wheelStatic;
+    private readonly Vector3[] _wheelAt;
+    /// <summary>This block's drive for each wheel: demand, slip velocity, load share, and its gain
+    /// against the tap it goes out through.</summary>
+    private readonly float[] _wheelDemand, _wheelSlipVelocity, _wheelLoad, _wheelGain;
+    /// <summary>The slip velocity at which one tyre at the limit squeals at its share of the declared
+    /// level: a tyre at its peak slip angle at <see cref="SquealReferenceSpeed"/>.</summary>
+    private readonly float _squealSlipVelocity;
+    /// <summary>The road speed at which the axle squeal reached its full level (its rub term saturated
+    /// at 12 m/s), so the declared squeal level means what it meant.</summary>
+    private const float SquealReferenceSpeed = 12f;
     private float _tyreChirp;
     private int _tyreGear;
 
@@ -46,10 +68,10 @@ public sealed class EngineVoiceState : IRenderedVoice
     /// </summary>
     public volatile float RoadSlip;
     /// <summary>
-    /// Each wheel as the server sent it, front axle first, or null. When there, the front tyre voice
-    /// takes the front axle's worst wheel and the rear voice the rest, each as its share of
-    /// <see cref="RoadSlip"/>: the overall level stays the server's, and the axle that is working
-    /// harder squeals harder. Game thread writes.
+    /// Each wheel as the server sent it, in <see cref="WheelDynamics"/>' order, or null. When there,
+    /// every wheel squeals for itself from its own demand, slip and load (see
+    /// <see cref="WheelsDrive"/>), and the axle voices only roll. Without it, both axle voices
+    /// squeal from <see cref="RoadSlip"/>. Game thread writes.
     /// </summary>
     public volatile OpenFPS.Common.Networking.WheelState[]? Wheels;
     /// <summary>Whether the engine should be running. Game thread writes.</summary>
@@ -516,6 +538,22 @@ public sealed class EngineVoiceState : IRenderedVoice
         _frontWheels = chassis.Axles.Length > 0 ? chassis.Axles[0].Wheels : 1;
         _frontRadius = chassis.Axles.Length > 0 ? chassis.Axles[0].Tyre.RollingRadiusMetres : 0.337f;
         _rearRadius = chassis.Axles.Length > 0 ? chassis.Axles[^1].Tyre.RollingRadiusMetres : 0.337f;
+        // The wheels as the server's model lays them out, so the wire's order, the static loads and
+        // the positions agree with what it sends.
+        var body = new WheelDynamics(v);
+        int nw = body.Wheels.Length;
+        _wheelSqueal = new VehicleSynth.WheelSquealVoice[nw];
+        _wheelFront = new bool[nw]; _wheelDriven = new bool[nw];
+        _wheelStatic = new float[nw]; _wheelAt = new Vector3[nw];
+        _wheelDemand = new float[nw]; _wheelSlipVelocity = new float[nw]; _wheelLoad = new float[nw]; _wheelGain = new float[nw];
+        float cogZ = chassis.CentreOfGravityZ;
+        for (int i = 0; i < nw; i++)
+        {
+            var w = body.Wheels[i];
+            _wheelFront[i] = w.Front; _wheelDriven[i] = w.Driven; _wheelStatic[i] = MathF.Max(1f, w.StaticLoad);
+            _wheelAt[i] = new Vector3(w.Y, 0.05f, w.X + cogZ);
+        }
+        _squealSlipVelocity = SquealReferenceSpeed * MathF.Tan(MathF.Max(0.01f, body.SteeredPeakSlip()));
         if (!string.IsNullOrEmpty(v.AirSystem) && v.DoorChime)
         {
             _chime = OpenFPS.Common.DoorChimeSpec.TransitBus;
@@ -539,6 +577,46 @@ public sealed class EngineVoiceState : IRenderedVoice
         float perTyrePa = 20e-6f * MathF.Pow(10f, v.Tyres.ReferenceDb / 20f);
         _rollingFrontPa = perTyrePa * MathF.Sqrt(frontTyres) / (PerAxle * DefaultTyreMix);
         _rollingRearPa = perTyrePa * MathF.Sqrt(Math.Max(1, tyres - frontTyres)) / (PerAxle * DefaultTyreMix);
+    }
+
+    /// <summary>
+    /// This block's drive for every wheel's squeal, from the wheels as the server sent them: the
+    /// demand, the speed the rubber is dragged over the road (u sqrt(kappa^2 + tan^2 alpha), with u
+    /// the vehicle's speed, so a locked wheel slides at the road speed), and the load over the static
+    /// load. And each wheel's gain against the tap it goes out through: the ratio of the listener's
+    /// distance from that tap to its distance from the wheel, spherical spreading from where the wheel
+    /// really is (distances held to half a metre, about the size of the source). False without
+    /// wheels, or not this vehicle's count of them: then the axle voices squeal from the overall
+    /// demand, as they always did.
+    /// </summary>
+    private bool WheelsDrive(OpenFPS.Common.Networking.WheelState[]? wheels, bool inside)
+    {
+        if (wheels == null || wheels.Length != _wheelSqueal.Length) return false;
+        float u = MathF.Abs(Driveline.Speed);
+        bool placed = _listenerKnown && !inside;
+        Vector3 heard = default, rearTap = default, frontTap = default;
+        if (placed)
+        {
+            var rel = new Vector3(Volatile.Read(ref _listenerX), Volatile.Read(ref _listenerY), Volatile.Read(ref _listenerZ));
+            rearTap = SplitVoices ? new Vector3(0f, Vehicle.ExhaustHeight, Vehicle.ExhaustOffsetZ) : Vehicle.ExhaustOffset;
+            frontTap = SplitVoices ? new Vector3(0f, Vehicle.FrontTapHeight, Vehicle.FrontTapZ) : rearTap;
+            heard = rel + rearTap;
+        }
+        for (int i = 0; i < wheels.Length; i++)
+        {
+            var w = wheels[i];
+            float kappa = w.SlipRatioValue, tanAlpha = MathF.Tan(w.SlipAngleRad);
+            _wheelDemand[i] = w.DemandFraction;
+            _wheelSlipVelocity[i] = u * MathF.Sqrt(kappa * kappa + tanAlpha * tanAlpha);
+            _wheelLoad[i] = w.LoadNewtons / _wheelStatic[i];
+            if (placed)
+            {
+                var tap = _wheelFront[i] ? frontTap : rearTap;
+                _wheelGain[i] = MathF.Max(0.5f, Vector3.Distance(heard, tap)) / MathF.Max(0.5f, Vector3.Distance(heard, _wheelAt[i]));
+            }
+            else _wheelGain[i] = 1f;
+        }
+        return true;
     }
 
     /// <summary>
@@ -923,6 +1001,8 @@ public sealed class EngineVoiceState : IRenderedVoice
             liftTarget = MathF.Pow(10f, LiftDb(nowDb, Vehicle.SourceLevelDb) / 20f);
         }
         float liftStep = MathF.Max(1e-4f, (liftTarget - _levelGain) / MathF.Max(1, count));
+        var wheels = Wheels;
+        bool perWheel = WheelsDrive(wheels, inside);
         double blockSum = 0, tyreSum = 0;
         float windLpA = 1f - MathF.Exp(-2f * MathF.PI * 1200f * dt);
         float windHpA = MathF.Exp(-2f * MathF.PI * 180f * dt);
@@ -948,9 +1028,28 @@ public sealed class EngineVoiceState : IRenderedVoice
             // their noise is INDEPENDENT. One signal written to both ends would be the same roar
             // coming from two places a few metres apart, which combs against itself as the car goes
             // by and is heard as a car passing inside out.
-            AxleSlip(RoadSlip, Wheels, out float frontSlip, out float rearSlip);
-            float tyreRear = VehicleSynth.Tyre(Vehicle.Tyres, Driveline.Speed, rearSlip + _tyreChirp, _rng, ref _tyre, _rollingRearPa, _rearRadius);
-            float tyreFront = VehicleSynth.Tyre(Vehicle.Tyres, Driveline.Speed, frontSlip + _tyreChirp, _rng, ref _tyreFront, _rollingFrontPa, _frontRadius);
+            float tyreRear, tyreFront;
+            if (perWheel)
+            {
+                // Each wheel squeals for itself; the axle voices roll, and carry the squeal of the
+                // wheels at their end out through the same output stage.
+                float frontSliding = 0f, rearSliding = 0f;
+                for (int k = 0; k < _wheelSqueal.Length; k++)
+                {
+                    float demand = _wheelDemand[k] + (_wheelDriven[k] ? _tyreChirp : 0f);
+                    float sq = VehicleSynth.WheelSqueal(Vehicle.Tyres, demand, _wheelSlipVelocity[k], _wheelLoad[k], _squealSlipVelocity,
+                                                         _wheelSqueal.Length, _rng, ref _wheelSqueal[k]) * _wheelGain[k];
+                    if (_wheelFront[k]) frontSliding += sq; else rearSliding += sq;
+                }
+                tyreRear = VehicleSynth.Tyre(Vehicle.Tyres, Driveline.Speed, 0f, _rng, ref _tyre, _rollingRearPa, _rearRadius, rearSliding);
+                tyreFront = VehicleSynth.Tyre(Vehicle.Tyres, Driveline.Speed, 0f, _rng, ref _tyreFront, _rollingFrontPa, _frontRadius, frontSliding);
+            }
+            else
+            {
+                AxleSlip(RoadSlip, wheels, out float frontSlip, out float rearSlip);
+                tyreRear = VehicleSynth.Tyre(Vehicle.Tyres, Driveline.Speed, rearSlip + _tyreChirp, _rng, ref _tyre, _rollingRearPa, _rearRadius);
+                tyreFront = VehicleSynth.Tyre(Vehicle.Tyres, Driveline.Speed, frontSlip + _tyreChirp, _rng, ref _tyreFront, _rollingFrontPa, _frontRadius);
+            }
             float rearTyre = tyreRear * PerAxle * TyreMix;
             float frontTyre = tyreFront * PerAxle * TyreMix;
             // The front of the machine: the tyres at that end, the fan, and what the bay lets out.

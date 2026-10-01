@@ -152,6 +152,22 @@ On the server, for every vehicle, from the preset:
 
 ## Stage 4: four tyre sources
 
+Progress (2026-10-01): the squeal is per wheel. Each wheel's squeal (`VehicleSynth.WheelSqueal`)
+runs from that wheel's own demand, slip velocity (u sqrt(kappa^2 + tan^2 alpha)) and load, at a level
+from the frictional power of the sliding part of the patch (brush model, Pacejka 2006 section 3.2),
+on the tyre's stick-slip resonance as before. It goes out through the engine voice's tap at its end of
+the vehicle, weighted by the listener's distance from the wheel against the tap's, so four tyres cost
+no extra voice. Not done: rolling noise per wheel (still per axle), left and right as separate
+directions (only the level differs), surface data and joints. Found on the way: in a steady turn the
+model's light inside front passes its peak slip angle before the loaded outside one (peak slip angle
+rises with load), so it starts to sing first, quietly; whether that sounds right is for the ear.
+Checked by `WheelSquealTests`; `--wheel-squeal` renders the listening set.
+
+Also fixed on the way: traffic on its own tyres skidded at junctions. Drivers now corner at the Green
+Book's comfortable side friction (`DriverSteering.ComfortSideFriction`), plan their braking with it
+(`RaceLine.BendSpeedWithin`, braking room read at the tighter end of each stretch), and follow with the
+ACC model. Checked by `TrafficTyreDemandTests`; `TrafficBrakingProbe` measures the city's traffic.
+
 - A tyre source at each wheel, played through the multi-tap voice the trains use (one voice in
   the budget, a tap per wheel).
 - Each wheel's rolling noise from its speed, load and the surface under it (*to confirm*: tyre-road
