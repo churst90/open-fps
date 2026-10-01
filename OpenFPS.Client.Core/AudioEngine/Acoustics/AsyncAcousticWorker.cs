@@ -991,7 +991,10 @@ public class AsyncAcousticWorker : IDisposable
             if (Phonon.iplContextCreate(ref cs, out _saContext) != Phonon.IPL_STATUS_SUCCESS)
             { _saContext = IntPtr.Zero; Console.WriteLine($"[AcousticWorker] DEGRADED: Steam Audio context create failed (SIMD {simd}); using the hand-rolled ray-tracer."); return; }
 
-            _saSim = new SteamAudioSimulator(_saContext, SaMaxSources, enablePathing: true);
+            // Pathing off: its probe grid is too coarse on a city (tens of metres) to say where a sound
+            // comes from, nothing reads its answer, and the bake cost a core for minutes at every map
+            // load. Routes round obstacles come from the barrier search (BarrierPathDifference).
+            _saSim = new SteamAudioSimulator(_saContext, SaMaxSources, enablePathing: false);
             if (!_saSim.IsValid)
             {
                 _saSim.Dispose(); _saSim = null;
