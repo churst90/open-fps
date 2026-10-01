@@ -10,61 +10,27 @@ using OpenFPS.Client.AudioEngine.Data;
 using OpenFPS.Client.AudioEngine.Core;
 using OpenFPS.Client.Core.AudioEngine.SteamAudio;
 using OpenFPS.Common;
-using OpenFPS.Client.Core.AudioEngine.SteamAudio;
 using OpenFPS.Client.Core.Platform;
 
 namespace OpenFPS.Client.AudioEngine.Fmod;
 
 /// <summary>
-/// How distance attenuates a voice, and it is NOT a detail.
+/// How distance attenuates a voice: FMOD's INVERSE rolloff, on every 3D channel and bus.
 ///
-/// Every channel in this file was created FMOD_3D_LINEARROLLOFF, which takes a voice from full
-/// volume at MinDistance to silence at Range in a straight line. <see cref="OpenFPS.Common.Loudness"/>'s
-/// <c>RenderedGain</c> — which says of itself that it is "the law the mixer actually applies, in one
-/// place", and which every balance decision and every test in this project is written against — is
-/// an INVERSE law with an edge fade. They are not the same law and they are not close.
+/// <see cref="OpenFPS.Common.Loudness"/>'s <c>RenderedGain</c> is an inverse law with an edge fade,
+/// and every balance in the game is set against it: the widening, the ranges, the level compression.
+/// The mixer has to apply the same law or none of those numbers mean what they say.
 ///
-/// What the difference costs, on the city's own numbers: a bus (placement gain -26.6 dBFS,
-/// reference 9.8 m, range 2,292 m) at thirty metres renders at -36.3 dBFS under the model and
-/// -26.7 under FMOD. Linear rolloff barely attenuates anything until the listener is near the range
-/// limit, so DISTANCE STOPS CARRYING INFORMATION: near and far sources sit at nearly the same
-/// level, and what is loud is decided entirely by each source's placement gain. That is why one
-/// over-declared vehicle could be "the only thing that's loud" everywhere on a two-kilometre map.
-/// On a world played by ear, distance is the cue that matters most.
-///
-/// AND IT IS WHY LONG VEHICLES WERE QUIET. This is the systematic fault behind "the buses are
-/// quiet", "the only thing that's loud is that police car" and "the radius of sound doesn't seem
-/// to be as far as it should", and it is one fault, not three.
-///
-/// <see cref="OpenFPS.Common.Loudness"/>'s <c>Widen</c> gives a source with a SIZE a reference
-/// distance equal to its own body, and pays its gain down by the same ratio so the product
-/// gain x reference is held — because under an inverse law that product IS the far field, so the
-/// near field goes flat and nothing else changes. Under a LINEAR law that product means nothing:
-/// the level at distance barely depends on the reference at all. So the payment was taken and the
-/// compensation never arrived, and every vehicle was attenuated in proportion to its own length:
-///
-///     motorcycle  1.0 m extent    0.0 dB      v8 muscle   3.5 m    -0.9 dB
-///     road police 3.5 m extent   -9.3 dB      school bus  9.8 m   -18.2 dB
-///
-/// Worse, it is uneven: a source loud enough to earn a reference distance BIGGER than its own body
-/// pays nothing, so the pace car at 132 dB (reference 10 m) was exempt while the same shape of car
-/// at 95 dB paid nine decibels. The loud got louder and the long got quieter, which is exactly the
-/// map that was reported.
-///
-/// So the default is INVERSE now: not as a preference, but because every piece of arithmetic in
-/// Loudness — the widening, the ranges, the compression, every balance ever measured against it —
-/// is written for that law, and the mixer was running a different one. Linear is kept for A/B:
-///
-///   OPENFPS_ROLLOFF=linear    what the game used to do
-///   OPENFPS_ROLLOFF=inverse   the default, and what Loudness models
+/// Linear rolloff in particular must not come back. It barely attenuates until the listener is near
+/// the range limit, so near and far sources sit at nearly the same level and distance stops carrying
+/// information. And it undoes <c>Widen</c>: a source with a size gets a reference distance equal to
+/// its body and pays its gain down by the same ratio, so gain x reference (the far field under an
+/// inverse law) is held. Under a linear law that product means nothing, so long vehicles would pay
+/// the gain and get nothing back, in proportion to their length.
 /// </summary>
 internal static class Rolloff
 {
-    public static readonly MODE Mode =
-        string.Equals(Environment.GetEnvironmentVariable("OPENFPS_ROLLOFF"), "linear",
-                      StringComparison.OrdinalIgnoreCase)
-            ? MODE._3D_LINEARROLLOFF
-            : MODE._3D_INVERSEROLLOFF;
+    public const MODE Mode = MODE._3D_INVERSEROLLOFF;
 
     /// <summary>Both laws' bits, for clearing the mode before setting 2D.</summary>
     public const MODE Either = MODE._3D_LINEARROLLOFF | MODE._3D_INVERSEROLLOFF;

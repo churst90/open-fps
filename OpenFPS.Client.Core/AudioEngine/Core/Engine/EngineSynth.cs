@@ -463,7 +463,7 @@ public sealed class EngineSynth
     }
 
     /// <summary>The valve flow noise's dipole constant. See <see cref="BlowdownJet"/>.</summary>
-    internal static float ValveFlowNoiseK = 1e-3f;
+    internal const float ValveFlowNoiseK = 1e-3f;
 
     /// <summary>
     /// Unit-RMS noise with equal energy per octave from about 300 Hz to 5 kHz, falling outside:

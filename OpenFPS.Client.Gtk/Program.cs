@@ -165,14 +165,7 @@ internal static partial class GtkClientProgram
         bool audioEnabled = NativeAudioLibraries.IsPresent(NativeAudioLibraries.FmodFileName);
         if (missingLibs.Count > 0) Serilog.Log.Warning("DEGRADED AUDIO. {Report}", _missingAudioReport);
 
-        // Say what the diagnostic levers are set to, every run. A session that behaved differently
-        // because an environment variable was still set from the last one is a day lost.
-        foreach (string key in new[] { "OPENFPS_ENGINE_ECHOES", "OPENFPS_ENGINE_VOICES",
-                                       "OPENFPS_MACHINE_VOICES", "OPENFPS_WEATHER", "OPENFPS_AUDIO_DEBUG" })
-        {
-            string? val = Environment.GetEnvironmentVariable(key);
-            if (!string.IsNullOrEmpty(val)) Serilog.Log.Warning("{Key}={Value} — a diagnostic lever is set.", key, val);
-        }
+        DiagnosticSwitches.LogSet();
 
         Serilog.Log.Information("Speech backend: {Backend}. Spatial audio: {Audio}.",
             _speech.BackendName, audioEnabled ? "enabled" : "disabled (no FMOD library)");
