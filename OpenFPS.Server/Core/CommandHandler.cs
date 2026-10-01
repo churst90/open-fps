@@ -293,7 +293,7 @@ public class CommandHandler
 
     /// <summary>
     /// Resolves the session's map and its body in it. A session that has authenticated but not yet sent
-    /// 'ready' has no entity, and every world command used to dereference it regardless.
+    /// 'ready' has no entity, so a world command must not dereference it.
     /// </summary>
     private bool TryGetBody(UserSession session, Action<IMessage> reply,
                             out World world, out SpatialGrid<Entity> grid, out Vector3 position)
@@ -408,9 +408,8 @@ public class CommandHandler
         Vector3 forward = Vector3.Transform(new Vector3(0, 0, 1), rot);
         Vector3 spawnPos = playerPos + (forward * 3.0f);
 
-        // Through the one spawn path: a bare world.Create left the object out of the map lookup and out
-        // of the spatial grid, so nothing could see it, hear it or walk into it — while this command
-        // cheerfully reported success.
+        // Through the one spawn path: a bare world.Create leaves the object out of the map lookup and
+        // out of the spatial grid, so nothing could see it, hear it or walk into it.
         var e = _maps.SpawnEntity(session.CurrentMapId, w => w.Create(
             new Transform { Position = spawnPos, Rotation = Quaternion.Identity },
             new ColliderComponent { Shape = shape, Size = new Vector3(sx, sy, sz), IsSolid = true },
@@ -454,8 +453,8 @@ public class CommandHandler
     /// <summary>
     /// What is round you, nearest first: named things within 20 m that you could actually see or hear
     /// directly, not through a wall, and measured to the nearest part of each, so a long wall beside
-    /// you is not placed at its middle. Said as one line, in order (Cody, 2026-09-28: "if items are
-    /// behind a wall you can't see them, shift P should not report them; the closest first").
+    /// you is not placed at its middle. Said as one line, closest first; what is behind a wall is not
+    /// reported.
     /// </summary>
     private void HandleScan(UserSession session, Action<IMessage> reply)
     {
@@ -1068,15 +1067,12 @@ public class CommandHandler
     /// <summary>
     /// /fire [weapon] — fires what is in your hands, at whatever is in front of you.
     ///
-    /// This used to be a DEV TRIGGER and nothing else, because nothing connected a gun to a player:
-    /// there was no equip, no held item and no trigger, so `WeaponSynth`, `ShotResolver`,
-    /// `WeaponMechanics` and `GlassBreak` were four tested models nobody had ever heard. Hands supply
-    /// the real join, and they supply it without an `EquippedWeaponComponent`: the weapon is the
+    /// Hands join a gun to a player, without an `EquippedWeaponComponent`: the weapon is the
     /// `ItemComponent.WeaponId` of the thing you are holding, so equipping a gun and picking one up
     /// are the same act, and putting it down disarms you with no bookkeeping anywhere.
     ///
-    /// Naming a weapon out of the air stays elevated, and stays the trigger it was — useful for
-    /// hearing a model without first building a world to find a gun in.
+    /// Naming a weapon out of the air is for elevated roles only — useful for hearing a model without
+    /// first building a world to find a gun in.
     ///
     /// It also happens to be the only thing in the game that can currently break a window, which is
     /// why the glass path hangs off it too.
@@ -1109,14 +1105,12 @@ public class CommandHandler
         bool armed = HandsService.TryGetHeldWeapon(world, session.Entity, lookup, out var weapon, out _);
 
         // Naming one overrides what you are holding, and only a dev may do that. Everyone else fires
-        // the thing in their hands or nothing, which is the rule the world should have had all along.
+        // the thing in their hands or nothing.
         //
-        // NAMING ONE IS THE WHOLE OF THE EXEMPTION. This used to read `isElevated && (args.Length > 0
-        // || !armed)`, so an admin who fired with EMPTY HANDS was handed an AKM out of the air — and
-        // then asked, quite reasonably, "why am I holding an unloaded AKM anyway?" They were not
-        // holding anything. A dev convenience that arms you silently is the same shape of fault as a
-        // trigger on a screen reader's key: the sound happens and the player cannot tell why.
-        // `/fire akm` still works and is what the convenience was for.
+        // NAMING ONE IS THE WHOLE OF THE EXEMPTION. An admin who fires with EMPTY HANDS must not be
+        // handed a weapon out of the air: a dev convenience that arms you silently is the same shape
+        // of fault as a trigger on a screen reader's key — the sound happens and the player cannot
+        // tell why. `/fire akm` is what the convenience is for.
         if (isElevated && args.Length > 0)
         {
             string id = args[0];
@@ -1534,8 +1528,8 @@ public class CommandHandler
 
         if (remove)
         {
-            // Removal does not need the account to exist any more: a deleted account is exactly the
-            // friend somebody wants off their list.
+            // Removal does not need the account to exist: a deleted account is exactly the friend
+            // somebody wants off their list.
             string shown = TryFindUser(name, out var stored, out _) ? stored : name;
             Say(reply, _friends.Remove(session.Username, shown)
                 ? $"{shown} removed from your friends."

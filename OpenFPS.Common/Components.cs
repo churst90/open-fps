@@ -152,9 +152,8 @@ public partial struct SoundEmitterComponent
     /// <summary>
     /// Replay this sound every N seconds. Zero (the default) means it is not a repeater.
     ///
-    /// Deliberately a property of ANY emitter rather than of a public-address system: the thing that
-    /// wanted it first was a PA announcing a racetrack, but a repeating one-shot from a fixed point
-    /// is also a foghorn, a station bell, a level-crossing, a dripping tap and a klaxon. Nothing
+    /// Deliberately a property of ANY emitter rather than of a public-address system: a repeating
+    /// one-shot from a fixed point is a PA announcement, and also a foghorn, a station bell, a level-crossing, a dripping tap and a klaxon. Nothing
     /// about it should know what a racetrack is.
     ///
     /// Distinct from LoopOne, which restarts the instant the sample ends and so has no gap. This is
@@ -239,13 +238,11 @@ public partial struct SoundEmitterComponent
     /// A method rather than a property on purpose: MemoryPack serialises properties, and this is a
     /// question ABOUT the data, not part of it. See the APPEND ONLY note above.
     ///
-    /// The client registers an entity for per-frame audio processing on the strength of this, and it
-    /// used to ask a narrower question — literally "is the mode LoopOne, or is it a synth" — which is
-    /// a list of two cases rather than a rule. Anything else was never registered and so was never
-    /// processed at all: no voice, no occlusion, no reverb, no log line. A public-address horn set to
-    /// play a single announcement every twenty seconds was simply not in the world as far as the
-    /// audio system was concerned, and the repeat logic written to serve it could never run. So were
-    /// Sequential and LoopFolder emitters, which nothing had happened to author yet.
+    /// The client registers an entity for per-frame audio processing on the strength of this, so it
+    /// must be a rule and not a list of cases ("is the mode LoopOne, or is it a synth"). Anything not
+    /// registered is never processed at all: no voice, no occlusion, no reverb, no log line. A
+    /// public-address horn that plays a single announcement every twenty seconds would not be in the
+    /// world as far as the audio system is concerned, nor would Sequential and LoopFolder emitters.
     ///
     /// The rule is about RESPONSIBILITY. A looping, folder-looping, sequential or synthesised emitter
     /// is producing sound continuously; a repeater is producing it on a schedule of its own. All of
@@ -338,9 +335,9 @@ public partial struct WorldEnvironmentComponent
     public float GameTime { get; set; }
     public int DayOfYear { get; set; }
 
-    // Defaulted to a still, temperate, sea-level day. A default-constructed instance used to describe a
-    // freezing near-vacuum with an air-absorption multiplier of zero, which is what the client's world
-    // state started at and handed to the acoustics until the first WorldStateUpdate arrived.
+    // Defaulted to a still, temperate, sea-level day, because a default-constructed instance is what
+    // the client's world state starts at and hands to the acoustics until the first WorldStateUpdate
+    // arrives. Zeros would describe a freezing near-vacuum with no air absorption.
     public float Temperature { get; set; } = 20.0f;
     public float Humidity { get; set; } = 0.5f;
     /// <summary>Millibars. Sea level is 1013.25.</summary>
@@ -372,7 +369,7 @@ public partial struct BeaconComponent { public float Frequency { get; set; } pub
 /// <summary>
 /// What a player has slung on them rather than in their hands.
 ///
-/// ENTITY IDS, and that was right from the first day it was written: a rifle on your back is the
+/// ENTITY IDS: a rifle on your back is the
 /// same entity the rifle on the floor was, still with a mass, a material and a position — it just
 /// happens to be parented to you at shoulder height. Which is why dropping it makes the noise that
 /// mass and that material make meeting that floor, from the height it actually fell from, through a

@@ -88,15 +88,14 @@ internal static partial class GtkClientProgram
     {
         // ── THE LOG IS WRITTEN BY THIS PROCESS, not by a pipe ────────────────────────────────────
         //
-        // It used to go to the console and be captured by `| tee` in the launcher, and that puts the
-        // client's life in the hands of whatever is reading its stdout. If the terminal goes away —
-        // closed, or an emulator that stops reading after you alt-tab — tee dies, the client gets
-        // SIGPIPE, and the process is gone: no exception, no core, no dump, and a log that ends
-        // mid-sentence. Which is indistinguishable from the crash we were actually hunting, and cost
-        // a session to tell apart.
+        // A log captured only by `| tee` in the launcher puts the client's life in the hands of
+        // whatever is reading its stdout. If the terminal goes away — closed, or an emulator that
+        // stops reading after you alt-tab — tee dies, the client gets SIGPIPE, and the process is
+        // gone: no exception, no core, no dump, and a log that ends mid-sentence, indistinguishable
+        // from a crash.
         //
         // So Serilog writes the file itself. The console sink stays for watching it live, and the
-        // tee in the launcher is now belt and braces rather than the only copy.
+        // tee in the launcher is belt and braces rather than the only copy.
         var logCfg = new Serilog.LoggerConfiguration()
             .MinimumLevel.Information()
             .WriteTo.Console();
@@ -126,12 +125,10 @@ internal static partial class GtkClientProgram
 
         // ── SAY WHY IT STOPPED ───────────────────────────────────────────────────────────────────
         //
-        // The client used to end its log mid-sentence whatever happened to it: a clean quit, an
-        // unhandled exception on a background thread, and a native crash all look identical from the
-        // chair, because what a player notices is the sound stopping. Four sessions were spent
-        // guessing between them.
+        // A clean quit, an unhandled exception on a background thread, and a native crash all look
+        // identical from the chair, because what a player notices is the sound stopping.
         //
-        // These cost nothing and answer it. A clean exit now says so; an exception says what it was
+        // These cost nothing and tell them apart. A clean exit says so; an exception says what it was
         // and on which thread; and a native crash still says nothing here — which is itself the
         // answer, because then the absence of these lines is what identifies it.
         AppDomain.CurrentDomain.ProcessExit += (_, _) =>
@@ -245,10 +242,10 @@ internal static partial class GtkClientProgram
     /// <summary>
     /// Notices when the client has STOPPED, which is the one failure it had no instrument for.
     ///
-    /// Three ways it can end were already covered — a native crash leaves a dump, a clean exit says
-    /// so, a dead terminal can no longer kill it. The fourth is a HANG: everything simply stops, the
-    /// log ends mid-stream, and from the chair that is identical to a crash because what you notice
-    /// is the sound stopping. It has been reported as "it crashed" at least twice.
+    /// Three ways it can end are covered elsewhere — a native crash leaves a dump, a clean exit says
+    /// so, a dead terminal cannot kill it. The fourth is a HANG: everything simply stops, the log ends
+    /// mid-stream, and from the chair that is identical to a crash because what you notice is the
+    /// sound stopping.
     ///
     /// A hang is almost always a deadlock, and the only useful evidence is what every thread was
     /// doing at the time — which is exactly what a dump holds. So this takes one, using the runtime's
@@ -271,10 +268,10 @@ internal static partial class GtkClientProgram
 
             Serilog.Log.Fatal("GAME LOOP STALLED for {Sec:F0} s — the client is hung, not crashed. "
                             + "Taking a dump of every thread so the deadlock can be read.", since);
-            // NOT CloseAndFlush. That SHUTS THE LOGGER DOWN, and the first version called it here —
-            // so from the moment the watchdog fired, nothing else was ever written to the file. The
-            // run it was watching went on for another ninety seconds and left no record of any of
-            // it. A diagnostic that destroys the evidence it exists to collect is worse than none.
+            // NOT CloseAndFlush. That SHUTS THE LOGGER DOWN, so from the moment the watchdog fired
+            // nothing else would be written to the file, and a client that recovers would leave no
+            // record of it. A diagnostic that destroys the evidence it exists to collect is worse
+            // than none.
 
             try
             {
@@ -339,9 +336,8 @@ internal static partial class GtkClientProgram
                     // ── What rate this loop is actually managing ──────────────────────────────
                     //
                     // ContinuousUpdate is where every sound in the world gets its position, so the
-                    // period of THIS loop is the resolution of every moving source. Nothing measured
-                    // it, and with thirty cars instead of eight there is four times the per-source
-                    // work inside one iteration. Reported next to the audio system's own figure, so
+                    // period of THIS loop is the resolution of every moving source, and the per-source
+                    // work inside one iteration grows with the number of cars. Reported next to the audio system's own figure, so
                     // a stall can be attributed to the loop or to the audio pass rather than guessed
                     // at: if the loop is slow, it is the loop; if the loop is fine and the placement
                     // gap is not, it is the audio pass.

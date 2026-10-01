@@ -60,9 +60,9 @@ public sealed class StrideAccumulator
     /// <summary>
     /// How far a body travels between footfalls at a given speed, metres.
     ///
-    /// This used to be HALF A METRE, FULL STOP — and that one constant is what a listener heard as
-    /// *"sounds like cockroaches running"*. The game walks at 4.5 m/s, so half a metre a footfall is
-    /// **nine footfalls a second**, and a sprint is fourteen. No animal has ever done that. A human
+    /// Not a constant. The game walks at 4.5 m/s, so a fixed half metre a footfall would be **nine
+    /// footfalls a second**, and a sprint fourteen: it sounds like insects running. No animal does
+    /// that. A human
     /// tops out near four a second however hard they are trying, because a leg has to swing forward
     /// and a leg is a pendulum: past a certain rate you cannot get it round any faster, so everything
     /// above that speed is bought with a LONGER STEP instead.
@@ -123,10 +123,10 @@ public sealed class StrideAccumulator
     ///
     /// You cannot land from a fall you were not falling in. A blip in the ground underfoot is not a
     /// fall — and blips happen: a map still streaming in has no floor yet, a probe straddling the
-    /// edge of two surfaces flips between them, a server correction moves you across a lip. Every one
-    /// of those used to sound a landing, which is a heavy sound gated to two a second, so it came out
-    /// as an irregular bang. Measured on arrival at the city map: five landings in two seconds, all
-    /// at the spawn point, before the player had taken a step.
+    /// edge of two surfaces flips between them, a server correction moves you across a lip. Without
+    /// this threshold every one of those sounds a landing, a heavy sound gated to two a second, so it
+    /// comes out as an irregular bang: five landings in two seconds at the city's spawn point, before
+    /// the player has taken a step.
     ///
     /// SPEED rather than time in the air, and that matters. Time needs a clock, and this is driven at
     /// whatever rate its caller manages — the same reason the distance rule is judged per update
@@ -215,12 +215,11 @@ public sealed class StrideAccumulator
         // when the walking starts — not half a stride into it, which is where counting distance from
         // a standstill puts it.
         //
-        // Reported as "each W A S D press should be a footstep, not every two or three presses", and
-        // that is exactly the arithmetic: a tap moves the player for one 30 Hz tick at 4.5 m/s, which
-        // is 15 cm, so three or four taps were needed to bank the half metre and the first two or
-        // three were silent. With the stride phased from the start of the walk a tap is one footfall,
-        // a longer press is that footfall and then one every half metre, and nothing about the walk
-        // itself has changed.
+        // Each tap of a movement key is a footstep. A tap moves the player for one 30 Hz tick at
+        // 4.5 m/s, which is 15 cm, so counting distance from a standstill would need three or four
+        // taps to bank a step and the first few would be silent. With the stride phased from the
+        // start of the walk a tap is one footfall, and a longer press is that footfall and then one
+        // every step length.
         //
         // Only a body on the GROUND can be said to have stopped: a run that ends in a jump has not put
         // its feet together, it has them in the air, so the latch is left alone until they are back
@@ -258,9 +257,7 @@ public sealed class StrideAccumulator
         // A step of ground is one footfall, and how long a step is comes from how fast the body is
         // going — see StepLength. There is deliberately no floor under the RATE.
         //
-        // There used to be one — no more than five steps a second — and it was quietly eating most of
-        // them. Taking it out was right; what was wrong was the half-metre constant beside it, which
-        // made a walk nine footfalls a second and a run fourteen. A cadence cap is a rule about the
+        // A cadence cap (say, five steps a second) silently eats footfalls. It is a rule about the
         // CLOCK standing in for a rule about the BODY, and the body's rule is the true one: a leg is
         // a pendulum, so a fast body takes longer steps rather than more of them, and the cadence
         // comes out under four a second on its own without anything watching a timer.
