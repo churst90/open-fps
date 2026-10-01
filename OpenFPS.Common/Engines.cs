@@ -1730,10 +1730,9 @@ public sealed record EngineProfile
     /// where a school bus's 116 mm bore puts it at 4.5 — the same mechanism, two different engines,
     /// nothing in either preset saying so.
     ///
-    /// KNOWN GAP, recorded rather than hidden: there is no TURBINE in the exhaust model. On a real
-    /// turbo diesel the turbo sits between the ports and the pipe and eats most of the pulse energy,
-    /// which is why one sounds more like rush than like beats. Here the pulses go straight out, so
-    /// this will be more pulsed than the real thing until the exhaust network grows a turbine stage.
+    /// The turbo sits between the ports and the pipe and eats most of the pulse energy, which is why
+    /// a turbo diesel sounds more like rush than like beats. That comes from the exhaust network's
+    /// turbine stage, which every <see cref="Induction.Turbocharged"/> engine gets.
     /// </summary>
     public static EngineProfile DieselCumminsI6 => new()
     {

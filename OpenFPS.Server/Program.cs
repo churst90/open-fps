@@ -1237,12 +1237,10 @@ public class Program
                 server.Stop();
             });
 
-            // --port lets a second server be brought up beside a running one, which is the only way
-            // to smoke-test a map change without taking someone's session down.
-            // --map picks the landing map. There is no runtime map change, so without this every map
-            // but the one claiming IsDefault is unreachable in play — the rooms-and-doorways map
-            // included, which is the only one that can answer whether pathing and portal reverb are
-            // right by ear.
+            // --port lets a second server be brought up beside a running one, to smoke-test a change
+            // without taking someone's session down.
+            // --map picks the landing map, where every player arrives at login. Without it the map
+            // claiming IsDefault is the landing map; players reach the others with /join.
             int port = 33288;
             for (int i = 0; i < args.Length - 1; i++)
             {

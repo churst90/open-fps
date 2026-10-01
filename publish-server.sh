@@ -5,7 +5,7 @@
 #   ./publish-server.sh                 -> dist/openfps-server-linux-x64-<build>.tar.gz
 #   ./publish-server.sh win-x64         -> the same for a Windows server
 #
-# Deliberately NOT included: openfps.db (accounts), friends.json and users.json. The VPS keeps its
+# Deliberately NOT included: openfps.db (accounts) and friends.json. The VPS keeps its
 # own accounts; overwriting them on every update would wipe everyone's. Unpack an update over the
 # old folder and they stay.
 #

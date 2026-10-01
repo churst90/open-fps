@@ -460,7 +460,6 @@ and client afterwards, since the list is built into both.
 - Logins and registrations are limited to 6 quick tries, then one every 5 seconds, per address.
 - There are three roles: Player, Dev and Admin. Dev and Admin can use every staff command. To
   change a role, edit `openfps.db`.
-- `users.json` is not used.
 
 ## The message of the day
 
