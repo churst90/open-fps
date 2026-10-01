@@ -248,10 +248,8 @@ public sealed class Driver
                     // nothing and turn in 0.035 kg m^2, so it gains rpm at five figures a second. A
                     // governor that waits until the needle is within a fixed band of the target has
                     // already lost — by the time the plate moves, the plenum empties and the next
-                    // charge burns, the crank has gone thousands of rpm past. That is why every blip
-                    // on this bench landed within a whisker of the limiter whatever it was asked for,
-                    // and why a rev bench built to compare an engine at four speeds compared it with
-                    // itself at one.
+                    // charge burns, the crank has gone thousands of rpm past, and every blip lands
+                    // within a whisker of the limiter whatever it was asked for.
                     //
                     // So the error is taken against the PREDICTED speed: where the crank will be when
                     // the throttle's answer actually arrives. That delay has two parts and the
@@ -478,28 +476,28 @@ public sealed class VirtualDriver
             _dl.Clutch = 0f;
         }
         // Pulling away, the clutch is let in by slipping — whatever the throttle asks. Only a
-        // clutch that is already in stays in. A light throttle used to take the other branch and
+        // clutch that is already in stays in. If a light throttle took the other branch it would
         // hold the clutch OUT while the engine revved free (a bike to 7,000 rpm on five per cent),
-        // and then the plain `else` closed it in one step at a 5,000 rpm mismatch: the flywheel
-        // dumped into the wheels and the bike jumped ten km/h in a tenth of a second.
+        // and then the plain `else` would close it in one step at a 5,000 rpm mismatch: the flywheel
+        // dumps into the wheels and the bike jumps ten km/h in a tenth of a second.
         else if (_dl.Gear == 1 && gearRpm < _launchRpm * 0.95f && (throttle > 0.05f || !_dl.Locked))
         {
             // The clutch holds the revs at the launch speed and the throttle holds them there —
             // unless the vehicle is already ahead of where it should be, when the foot comes off
-            // too. And no floor under it: a fifth of the throttle held open whatever the revs took a
+            // too. And no floor under it: a fifth of the throttle held open whatever the revs takes a
             // 200 kg bike to its limiter pulling away, the clutch unable to pass it without
             // outrunning the target.
             float over = (_engine.Rpm - _launchRpm) / _launchRpm;
             // Ahead of where it should be, the hand eases the clutch back toward the bite and the
-            // foot comes off with it — gradually, over a metre a second of lead. As a switch
-            // it hunted: a bike's revs swung 3,100 to 4,700 and back every eight tenths of a second.
+            // foot comes off with it — gradually, over a metre a second of lead. As a switch it
+            // hunts: a bike's revs swing 3,100 to 4,700 and back every eight tenths of a second.
             float onPace = Math.Clamp(1f + err * 1f, 0f, 1f);
             float hold = Math.Clamp(0.25f + over * 3f, _launchBite, 1f);
             _dl.Clutch = MathHelper.Lerp(_launchBite, hold, onPace);
             float toLaunch = Math.Clamp(0.4f + (_launchRpm - _engine.Rpm) / 1500f, 0f, 0.9f);
             throttle = MathHelper.Lerp(MathF.Min(toLaunch, throttle), toLaunch, onPace);
             // And rolled on, not snapped open: nine tenths of the throttle in the first instant of a
-            // pull-away flared a bike to 4,300 rpm and the clutch that caught it jolted it forward.
+            // pull-away flares a bike to 4,300 rpm and the clutch that catches it jolts it forward.
             throttle = MathF.Min(throttle, _engine.Throttle + dt * LaunchRollOnPerSecond);
         }
         else if (gearRpm < e.IdleRpm * 0.9f && throttle < 0.05f)
@@ -509,9 +507,8 @@ public sealed class VirtualDriver
         else _dl.Clutch = 1f;
         // A clutch is let in, not dropped. Closing it on an engine turning far from the gear's speed
         // dumps the flywheel into the wheels: from the launch slip at 4,000 rpm with the gear at
-        // 1,400 the bike leapt eight km/h at once, overshot, and the speed loop spent the next
-        // seconds winding itself back — the lurching Cody heard as the shifting being "all weird".
-        // Half a second from open to shut unless the two sides already turn together.
+        // 1,400 a bike leaps eight km/h at once, overshoots, and the speed loop spends the next
+        // seconds winding itself back, which is heard as a lurch. Half a second from open to shut unless the two sides already turn together.
         float mismatch = MathF.Abs(_engine.Rpm - gearRpm);
         if (_dl.Clutch > clutchWas && mismatch > 150f + 0.1f * gearRpm)
             _dl.Clutch = MathF.Min(_dl.Clutch, clutchWas + dt * ClutchLetInPerSecond);

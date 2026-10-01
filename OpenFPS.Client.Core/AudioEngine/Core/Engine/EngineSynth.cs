@@ -73,7 +73,7 @@ public sealed class EngineSynth
     public float Block { get; private set; }
 
     /// <summary>
-    /// The block's missing anchor, as a gain: +7.5 dB. See where Block is assembled for how it was
+    /// The block's absolute-level anchor, as a gain: +7.5 dB. See where Block is assembled for how it was
     /// measured and why it is one number rather than one per engine.
     /// </summary>
     private const float BlockRadiationGain = 2.371f;   // 10^(7.5/20)
@@ -187,14 +187,13 @@ public sealed class EngineSynth
     private float _structLpK1, _structLpK2, _structLpV1, _structLpV2, _valveLp;
     private readonly float _structLpA, _valveLpA;
     /// <summary>
-    /// Calibration of the structure's ringing (--tap-balance knock). The knock is held to the anchor
-    /// it always had, FULL LOAD — a heavy diesel's block at rated power, the declared levels that
+    /// Calibration of the structure's ringing (--tap-balance knock). The knock is held to its anchor
+    /// at FULL LOAD — a heavy diesel's block at rated power, the declared levels that
     /// DeclaredSourceLevelMatchesTheLiveVoice holds every preset to. A slow full-load pressure rise
     /// puts more of itself on the block's modes than a light-load one does, so at idle and at a
-    /// cruise the knock now comes out about five decibels under where the old gas-mode model had it.
-    /// The valves are set six decibels under their
-    /// old total: that total was set with them ringing at 4 kHz, where they came out LOUDER than the
-    /// combustion knock at idle, and a diesel's valvetrain sits under its combustion noise.
+    /// cruise the knock comes out lower, about five decibels under a gas-mode-only model. The valves
+    /// sit under the combustion knock at idle, as a diesel's valvetrain sits under its combustion
+    /// noise.
     /// </summary>
     private const float StructureKnockGain = 0.50f, StructureValveGain = 5.5f;
 
@@ -317,9 +316,9 @@ public sealed class EngineSynth
 
         // THE STRUCTURE THE KNOCK HAS TO GET OUT THROUGH.
         //
-        // Reported on the buses: "zippy ... too harsh ... too fake sounding". Measured, the knock
-        // peaked at 2-4 kHz and was only six to thirteen decibels down at 8 kHz, and the valve clicks
-        // were one ring at 3.1-4.4 kHz louder than the knock. A diesel's clatter is neither. The
+        // Without it the knock peaks at 2-4 kHz and is only six to thirteen decibels down at 8 kHz,
+        // and the valve clicks are one ring at 3.1-4.4 kHz louder than the knock: zippy, harsh and
+        // fake. A diesel's clatter is neither. The
         // premixed burn's pressure rise is an impulse, and what the air hears is that impulse
         // RINGING THE BLOCK AND HEAD — panel and casting modes between about 0.6 and 3 kHz, each dying
         // in a few milliseconds (a measured heavy engine: peaks at 1.03, 1.29 and 2.72 kHz). The
@@ -337,8 +336,8 @@ public sealed class EngineSynth
         _structLpA = OnePole.AlphaFor(5500f, rate);
         _valveLpA = OnePole.AlphaFor(2000f, rate);
         // And one at 3.6 kHz: the head and the valve covers are small, stiff panels, and without them
-        // the clatter measured 24-28 dB down at 4 kHz where the research puts it at 18 — heard as the
-        // diesels sounding "choked ... like it's got its lips tightly shut".
+        // the clatter measures 24-28 dB down at 4 kHz where the research puts it at 18, and a diesel
+        // sounds choked.
         float[] structHz = { 620f, 800f, 1300f, 1800f, 2700f, 3600f };
         float[] structWeight = { 0.70f, 1.00f, 0.95f, 0.95f, 0.95f, 0.70f };
         _structKnock = new Mode[structHz.Length];
@@ -392,8 +391,8 @@ public sealed class EngineSynth
         // Calibrate the heat released per kilogram of charge so that a full-load closed cycle at the
         // torque peak produces the profile's peak torque. Everything else — the pressure at exhaust
         // valve opening, and so the pulse — follows from the geometry and the cam timing, and is
-        // reported rather than asked for. (Scaling the torque afterwards was tried, and it scaled the
-        // compression resistance too, so the starter could not get a big block over top dead centre.)
+        // reported rather than asked for. (Not scaling the torque afterwards: that scales the
+        // compression resistance too, and the starter cannot get a big block over top dead centre.)
         _heatScale = CalibrateHeat();
         EvoPressureCalibratedBar = ClosedCycleEvoBar(_heatScale, e.PeakTorqueRpm, out _);
         _torqueScale = 1f;
@@ -937,10 +936,9 @@ public sealed class EngineSynth
         // ── The intake's silencer ──────────────────────────────────────────────────────────────
         //
         // Level is an ESCAPE FRACTION — how much of what the orifice makes gets out of the car —
-        // and it was carrying the whole job on its own, including the job of being a silencer.
-        // It cannot: no preset set it low enough, and the result was that every car with a
-        // silenced EXHAUST came out radiating more from its airbox than from its tailpipe, which
-        // is what a race car with velocity stacks does and not what a road car does. The airbox is
+        // and it cannot also do the job of being a silencer: no preset sets it low enough, and on
+        // its own every car with a silenced EXHAUST radiates more from its airbox than from its
+        // tailpipe, which is what a race car with velocity stacks does and not what a road car does. The airbox is
         // an expansion chamber and silences like one; see IntakeSpec.AirboxLossDb, which reads it
         // off the box and the snorkel and gives an economy four thirteen decibels where it gives a
         // big-block with an open element four.
@@ -957,9 +955,8 @@ public sealed class EngineSynth
         //
         // That makes it fall out rather than be declared. Hot burnt gas runs about 900 m/s, so a
         // 130 mm truck bore rings near 4 kHz and an 80 mm car bore near 6.6 — the big engine knocks
-        // DEEPER, which is most of what tells them apart by ear, and no preset has to say so.
-        // Previously this was a 600 Hz high-pass, which has no frequency of its own at all and gave
-        // every engine in the family the same colour of knock.
+        // DEEPER, which is most of what tells them apart by ear, and no preset has to say so. A plain
+        // high-pass has no frequency of its own and would give every engine the same colour of knock.
         //
         // What DRIVES the modes is the sharp part of the pressure rise, not the smooth part. The
         // smooth rise is the thud that goes through the mounts and is handled below; feeding it to
@@ -975,8 +972,7 @@ public sealed class EngineSynth
         // later. That is a 30 per cent fall in the speed of sound, so every knock CHIRPS DOWNWARD
         // through a third of its frequency while it decays. A fixed-frequency resonator struck a
         // hundred times a second gives the same pitch every time and the ear hears a tone; one that
-        // slides gives a knock. A listener caught exactly this — "a note, and I don't know what it
-        // is" — on a model that had the frequency right and held it still.
+        // slides gives a knock. A model with the frequency right and held still is heard as a note.
         //
         // Retuned every 32 samples, which is 0.7 ms: fast enough to follow the chirp, and 1/32 of
         // the cost of doing it per sample on the most expensive voice in the mixer.
@@ -1011,21 +1007,19 @@ public sealed class EngineSynth
         float knockRaw = knockRing * e.Mechanical.CombustionKnock * 4.0e-9f;
         float knockOut = 2f * MathF.Tanh(knockRaw * 0.5f);
 
-        // The low thud of the cylinders reaching the air through the block and the mounts — and it
-        // used to be most of what a block radiated, which had the diesels backwards.
+        // The low thud of the cylinders reaching the air through the block and the mounts. It must
+        // not be most of what a block radiates, or the diesels come out backwards.
         //
-        // Measured, a truck six's block came out 94 per cent below 200 Hz with 1.7 per cent between
-        // 800 Hz and 2.5 kHz. That is not what a big diesel sounds like: injector knock and
-        // valvetrain clatter live between about 500 Hz and 4 kHz and they are the whole of what makes
-        // one recognisable AS a diesel. Heard on the track it was a formless low roar with no engine
-        // in it — the listener's words were "loud white noise ... I expected to hear more of the
-        // engine", and the arithmetic agreed with him.
+        // A truck six's block with the thud weighted up measures 94 per cent below 200 Hz and 1.7 per
+        // cent between 800 Hz and 2.5 kHz. That is not what a big diesel sounds like: injector knock
+        // and valvetrain clatter live between about 500 Hz and 4 kHz and they are the whole of what
+        // makes one recognisable AS a diesel. Without them it is a formless low roar.
         //
-        // The two paths are not alike and should not have been scaled alike. The thud is
+        // The two paths are not alike and are not scaled alike. The thud is
         // STRUCTURE-BORNE: cylinder pressure into the block, through rubber mounts, into a chassis,
         // and every one of those junctions is a mismatch that reflects most of the energy back. The
         // knock and the clatter radiate straight off the block's own surfaces into the air. Weighting
-        // the indirect path above the direct one is what buried the engine.
+        // the indirect path above the direct one buries the engine.
         float bl = OnePole.AlphaFor(180f, _rate);
         _blockLp += bl * (blockLow - _blockLp);
         float thud = _blockLp * 5.0e-8f;
@@ -1059,22 +1053,20 @@ public sealed class EngineSynth
         //
         // Everything above is a MECHANISM with a shape: knock rings the bore at its own modes, the
         // thud is cylinder pressure through the mounts, the clatter is one event per valve, the
-        // whine is an accessory order. What none of them had was an absolute level. Every other
-        // source in this engine has one — the tyres declare SquealDb, a blade row ReferenceDb, a
-        // jet its Lighthill trim — and the block had four scale factors and no anchor, so where it
-        // landed was wherever the arithmetic put it.
+        // whine is an accessory order. None of them carries an absolute level. Every other source in
+        // this engine has one — the tyres declare SquealDb, a blade row ReferenceDb, a jet its
+        // Lighthill trim — so the block gets one too: BlockRadiationGain.
         //
-        // Measured with `--voice-levels parts`, it landed about seven and a half decibels low, and
-        // by the same amount at both ends of the range: a 13 litre truck six radiated 90.6 dB at a
-        // metre where published engine-surface figures for heavy-duty diesels at rated power are
-        // 97-100, and a 1.6 litre petrol four 76.1 where a small four is 82-86. The DISPLACEMENT
-        // scaling between them was already right (+3.7 dB over 4.6x the swept volume, against the
-        // +4.4 a two-thirds-power surface law gives), which is what says this is one anchor wrong
-        // for everybody rather than a preset needing a number.
+        // Without it, measured with `--voice-levels parts`, the block lands about seven and a half
+        // decibels low, and by the same amount at both ends of the range: a 13 litre truck six at
+        // 90.6 dB at a metre where published engine-surface figures for heavy-duty diesels at rated
+        // power are 97-100, and a 1.6 litre petrol four at 76.1 where a small four is 82-86. The
+        // DISPLACEMENT scaling between them is right (+3.7 dB over 4.6x the swept volume, against the
+        // +4.4 a two-thirds-power surface law gives), which says this is one anchor for everybody
+        // rather than a preset needing a number.
         //
         // It is worth nothing on a petrol car — a muscle car's block is thirty decibels under its
         // exhaust either way — and it is most of a bus, whose block is the loudest thing on it.
-        // That asymmetry is why it went unnoticed: "I can hardly hear the engines on those diesels."
         //
         // And the anchor holds at the speeds it was measured at, rated speed for a car or a truck —
         // six thousand and under. Past that a petrol engine's radiated noise keeps climbing: Anderton's
@@ -1083,8 +1075,8 @@ public sealed class EngineSynth
         // 40 log N, is the valves seating harder, the pistons slapping, the gears and the chain, and
         // it is what an engine sounds like at eleven thousand: a litre bike's block at a metre is as
         // loud as its stock exhaust (engine 49 % of a motorcycle's noise at 5,000 rpm, exhaust 43 %;
-        // Lu & Jen, Inter-noise 2014), where it was thirty decibels under it and the bike was all pipe,
-        // "like a huge V8". Nothing at or below six thousand changes.
+        // Lu & Jen, Inter-noise 2014); without this term it would be thirty decibels under it and the
+        // bike all pipe. Nothing at or below six thousand changes.
         float overRated = e.Fuel == FuelType.Diesel ? 1f : MathF.Max(1f, rpm / BlockLawReferenceRpm);
         Block = (knockOut + thud + mech + whine) * BlockRadiationGain * overRated * overRated
               + StarterSound(rpm) + Turbo();
@@ -1092,13 +1084,10 @@ public sealed class EngineSynth
 
     // ── The turbocharger ──────────────────────────────────────────────────────────────────────
     //
-    // "I'm not hearing any twin turbos ... the whine from the turbos I don't hear really." The old
-    // whistle was a sine at a made-up "shaft" frequency, 2 to 11 kHz, with noise under 600 Hz, at
-    // a hand-set fraction of the block, and all of it went out through the bay. Floored, a
-    // straight-piped compound Cummins was 112 dB at its tailpipe and the whistle thirty decibels
-    // under it: it vanished exactly when it should scream.
-    //
-    // Now three sources, each at its measured level, each out of the place it leaves by:
+    // A whistle set as a hand-set fraction of the block and sent out through the bay vanishes
+    // exactly when it should scream: floored, a straight-piped compound Cummins is 112 dB at its
+    // tailpipe. So the turbo is three sources, each at its measured level, each out of the place it
+    // leaves by:
     //
     //   the COMPRESSOR's blade-pass tone: main blades x shaft speed, 81 dB at 60,000 rpm on a
     //   heavy-duty diesel's compressor (7+7 blades, open inlet), rising as the fourth power of the
@@ -1122,8 +1111,8 @@ public sealed class EngineSynth
     // readings), and it follows the spool. TurboWhistleLevel stays as the declared multiplier: one
     // is a single turbo breathing through an open inlet, as the measurement was made.
     //
-    // PITCH (2026-09-26, "the whistle/whine on the turbos is maybe an octave too high"). Two
-    // corrections, both measured, and together they are the octave:
+    // PITCH. Two measured facts set it, and together they put it an octave under the plain
+    // blade-passing tone of a 22,000 rpm idle:
     //
     //   what a compressor sings at part speed is not its blade-passing tone but TIP-CLEARANCE noise,
     //   a narrow hump at about half of it: over "a large range of rotor speeds with subsonic flow,
@@ -1134,10 +1123,10 @@ public sealed class EngineSynth
     //   over is not published, so the +-6 dB crossing is a setting.
     //
     //   and the shaft idles at 12-15,000 rpm on a truck turbo (logged speed sensors: HE351VE,
-    //   Power Stroke), cruises at 40-50,000 and makes 120-130,000 at full boost. It had idled at
-    //   22,000, which is where a light throttle starts to walk it up.
+    //   Power Stroke), cruises at 40-50,000 and makes 120-130,000 at full boost. 22,000 is where
+    //   a light throttle starts to walk it up, not the idle.
     //
-    // A cruise came out at 5-7 kHz and is now 2.3-2.9 kHz.
+    // A cruise comes out at 2.3-2.9 kHz.
     private const float TurboShaftIdleRpm = 12000f, TurboShaftFullRpm = 125000f;
     private const int CompressorBlades = 7, TurbineBlades = 11;
     /// <summary>Tip-clearance noise sits at this share of the blade-passing frequency.</summary>
@@ -1150,7 +1139,7 @@ public sealed class EngineSynth
     /// it at full boost, crossing between these shaft speeds.</summary>
     private const float BpfUnderDb = -6f, BpfOverDb = 6f, BpfCrossLowRpm = 60000f, BpfCrossHighRpm = 120000f;
     private const float WhooshDb = 68f, WhooshAtRpm = 110000f;                // at a metre
-    /// <summary>In the duct. Ten decibels lower than first set: nothing measured shows a truck's
+    /// <summary>In the duct. Ten decibels under the compressor outlet: nothing measured shows a truck's
     /// turbine tone getting out of the tailpipe past its aftertreatment and can (Tiikoja and Abom:
     /// the turbine is an attenuator, significant only at very high blade-passing frequencies).</summary>
     private const float TurbineDuctDb = 100f, TurbineAtRpm = 110000f;
@@ -1190,9 +1179,9 @@ public sealed class EngineSynth
         float compPa = 1.41421356f * Pa(CompressorToneDb) * Scale(CompressorAtRpm) * lvl;
         // The hump: tip-clearance noise at half the blade-passing frequency, a narrow BAND rather than
         // a line — the rotating instability that makes it is noise, and a hump is what the spectra
-        // show (Raitor and Neise). It was a sine with a wandering pitch, which is a line all the same:
-        // "the whine seems a little too quiet and thin" (2026-09-27). Now white noise through a band
-        // HumpWidth of its centre wide, held at the power the sine had, so the level is unchanged.
+        // show (Raitor and Neise). A sine, even with a wandering pitch, is a line and sounds thin. So
+        // it is white noise through a band HumpWidth of its centre wide, held at the power a sine of
+        // the same amplitude would have.
         _tcnDrift += (((float)_rng.NextDouble() * 2f - 1f) - _tcnDrift) * (40f / _rate);
         float ft0 = TipClearanceShare * fc * (1f + 0.015f * _tcnDrift);
         if (ft0 < nyq)
@@ -1589,13 +1578,13 @@ public sealed class EngineSynth
         }
     }
 
-    /// <summary>Diagnostic: treat every valve as shut for the pipes, so the network can be tested
-    /// on its own. Never set in a game.</summary>
-    /// <summary>Diagnostic: put the diesel combustion model back to what it was before the ignition
-    /// delay and the chamber modes, so a listener can A/B the change against what it replaced.
-    /// Set by the `legacydiesel` knob on any of the vehicle render commands.</summary>
+    /// <summary>Diagnostic: the diesel combustion model without the ignition delay and the chamber
+    /// modes, for an A/B against the full model. Set by the `legacydiesel` knob on any of the
+    /// vehicle render commands.</summary>
     public static bool DebugLegacyDiesel;
 
+    /// <summary>Diagnostic: treat every valve as shut for the pipes, so the network can be tested
+    /// on its own. Never set in a game.</summary>
     public static bool DebugRigidValves;
 
     /// <summary>Diagnostic: hear ONE tailpipe on its own (0-based branch index), scaled up by the
@@ -1654,8 +1643,8 @@ public sealed class EngineSynth
         public float Process()
         {
             // The impact alone: the seat's contact is a short burst of force, and what it RINGS is the
-            // head's structure (EngineSynth._structValves), not a resonance of its own. It used to
-            // ring its own pole at 3.1-4.4 kHz, the whole of the "zippy" valvetrain.
+            // head's structure (EngineSynth._structValves), not a resonance of its own. A pole of its
+            // own at 3.1-4.4 kHz makes the valvetrain sound zippy.
             if (_env < 1e-5f) return 0f;
             float x = _env * ((float)_rng.NextDouble() * 2f - 1f);
             _env *= 0.9f;
