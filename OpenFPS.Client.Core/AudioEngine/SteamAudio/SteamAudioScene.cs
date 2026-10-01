@@ -16,8 +16,10 @@ namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 /// </summary>
 public sealed class SteamAudioScene : IDisposable
 {
-    /// <summary>An axis-box collider in world space (size = full extents) with an acoustic material name.</summary>
-    public readonly record struct Box(Vector3 Center, Vector3 Size, Quaternion Rotation, string Material);
+    /// <summary>An axis-box collider in world space (size = full extents) with an acoustic material name,
+    /// and how it is built (solid, or two leaves over a cavity: <see cref="WallBuild"/>).</summary>
+    public readonly record struct Box(Vector3 Center, Vector3 Size, Quaternion Rotation, string Material,
+                                      WallBuild Build = default);
 
     private readonly IntPtr _context;
     private IntPtr _scene;
@@ -58,7 +60,8 @@ public sealed class SteamAudioScene : IDisposable
             if (def.Moves) continue;
             var size = def.Collider.Size;
             if (size.X <= 0 || size.Y <= 0 || size.Z <= 0) continue;
-            boxes.Add(new Box(snap.Transform.Position, size, snap.Transform.Rotation, def.Material.Material));
+            boxes.Add(new Box(snap.Transform.Position, size, snap.Transform.Rotation, def.Material.Material,
+                              new WallBuild(def.Acoustics.LeafMetres, def.Acoustics.StudSpacingMetres)));
         }
         return boxes;
     }
@@ -159,7 +162,7 @@ public sealed class SteamAudioScene : IDisposable
         foreach (var b in boxes)
         {
             if (b.Size.X <= 0 || b.Size.Y <= 0 || b.Size.Z <= 0) continue;
-            int mi = MaterialIndex(b.Material, MathF.Min(b.Size.X, MathF.Min(b.Size.Y, b.Size.Z)), materials, matIndexByName);
+            int mi = MaterialIndex(b, materials, matIndexByName);
             AppendBox(b, verts, tris, triMat, mi);
         }
         if (tris.Count == 0) { Phonon.iplSceneCommit(_scene); return; }
@@ -202,33 +205,39 @@ public sealed class SteamAudioScene : IDisposable
         Phonon.iplSceneCommit(_scene);
     }
 
+    /// <summary>Steam Audio's three band centres (phonon.h, IPLMaterial): what its ABSORPTION figures
+    /// mean. Its transmission figures are the mixer's bands instead; see <see cref="MaterialIndex"/>.</summary>
+    public static readonly (float Low, float Mid, float High) SteamAudioBandsHz = (400f, 2500f, 15000f);
+
     /// <summary>
-    /// A material per (name, thickness to the centimetre): what a wall lets through depends on how
-    /// heavy it is, not only on what it is made of (AcousticRegistry.MassLawTransmission).
+    /// A material per (name, what the box lets through): what a wall lets through depends on how heavy
+    /// and stiff it is and how it is built, not only on what it is made of
+    /// (<see cref="WallTransmission.BandGains(string, Vector3, WallBuild)"/>, the model the hand-rolled
+    /// tracer uses too).
+    ///
+    /// The transmission triple is the MIXER's three bands (<see cref="AcousticBands"/>), not Steam
+    /// Audio's: the direct simulation only multiplies these figures along its rays, and the engine
+    /// applies the products in the mixer's three-band EQ. Absorption is read by the reflection
+    /// simulation at Steam Audio's own centres.
     ///
     /// Per FACE, and that is the power 2/3. Steam Audio's direct simulator casts its transmission
     /// rays alternately from the listener and the source, multiplies the transmission of every face
     /// they hit, and takes the square root of the product when there is more than one hit
     /// (core/src/core/direct_simulator.cpp). The loop stops when either ray finds nothing, so a
     /// single box is three hits, not four, and each face carries the box's transmission to the 2/3:
-    /// one wall then loses exactly its mass-law figure. Measured: with the square root per face a
-    /// wall lost 0.75 of it, and two walls 0.625 of theirs; with 2/3, two walls lose 5/3 of one.
-    /// (open-fps-patches 5, applied 2026-09-30 with the retirement of the blanket muffle.)
+    /// one wall then loses exactly its own figure, in every band. n boxes in a row are 2n + 1 hits and
+    /// lose (2n + 1)/3 of one each: two walls 5/3 of one (measured), not 2. (open-fps-patches 5.)
     /// </summary>
-    /// <summary>Steam Audio's three band centres (phonon.h, IPLMaterial).</summary>
-    public static readonly (float Low, float Mid, float High) SteamAudioBandsHz = (400f, 2500f, 15000f);
-
-    private static int MaterialIndex(string name, float thickness, List<Phonon.IPLMaterial> materials, Dictionary<string, int> byName)
+    private static int MaterialIndex(in Box b, List<Phonon.IPLMaterial> materials, Dictionary<string, int> byName)
     {
-        name = string.IsNullOrEmpty(name) ? "Generic" : name;
-        float cm = MathF.Round(thickness * 100f);
-        string key = name + "@" + cm.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        string name = string.IsNullOrEmpty(b.Material) ? "Generic" : b.Material;
+        var (tl, tm, th) = WallTransmission.BandGains(name, b.Size, b.Build);
+        // Keyed on what it does, to a hundredth of a decibel: boxes that let the same through share one.
+        static string Q(float g) => MathF.Round(20f * MathF.Log10(MathF.Max(1e-9f, g)), 2)
+                                        .ToString(System.Globalization.CultureInfo.InvariantCulture);
+        string key = name + "@" + Q(tl) + "/" + Q(tm) + "/" + Q(th);
         if (byName.TryGetValue(key, out int idx)) return idx;
         var p = AcousticRegistry.GetProperties(name);
-        // Steam Audio's bands are centred at 400 Hz, 2.5 kHz and 15 kHz (phonon.h); the table's at 200 Hz,
-        // 1.25 kHz and 8 kHz. They went across one to one, so the 2-4 kHz a room's top end is made of
-        // took the table's 1.25 kHz figure, and the mass law was a band low everywhere.
-        var (tl, tm, th) = AcousticRegistry.MassLawTransmission(name, cm / 100f, SteamAudioBandsHz);
         float Abs(float hz) => AcousticRegistry.AtFrequency(p.AbsorptionLow, p.AbsorptionMid, p.AbsorptionHigh, hz);
         materials.Add(new Phonon.IPLMaterial
         {

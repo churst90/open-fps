@@ -787,7 +787,7 @@ public sealed class ClientGameSession : IDisposable
             case LoginResponse login:
                 if (login.Success)
                 {
-                    _shell.ShowLoading("Authenticated. Preparing manifest...");
+                    _shell.ShowLoading("Logging in...", speak: false);
                     LoginSucceeded?.Invoke(login.Username);
                 }
                 else
@@ -821,7 +821,7 @@ public sealed class ClientGameSession : IDisposable
                     _shell.ShowLoading($"Travelling to {manifest.MapName}...");
                 }
                 _shell.UpdateLoadingStatus($"Loading {manifest.MapName}...", 10);
-                _world.Clear(manifest.WorldSize, manifest.MapMin, manifest.MapMax);
+                _world.Clear(manifest.WorldSize);
                 // A new map's regions are numbered from scratch, so the last id announced describes
                 // nowhere. Arriving somewhere is not crossing into it.
                 _lastAnnouncedRegionId = int.MinValue;
@@ -908,9 +908,9 @@ public sealed class ClientGameSession : IDisposable
                 _shell.EnterGame();
                 GameJoined?.Invoke();
                 Ui.Play(UiCue.EnterWorld);
-                // What a player needs on arriving, and nothing else: that they are in, and where. The
-                // zone follows as soon as the body is placed in it (AnnounceZoneChanges).
-                _speech.Speak($"Logged in. You are in {_mapName}.", interrupt: true);
+                // What a player needs on arriving, and nothing else: where they are. Said once the body
+                // is placed in a zone (AnnounceZoneChanges), so the map and the zone are one sentence.
+                _arrivalPendingSince = DateTime.UtcNow;
                 break;
 
             case ServerStateUpdate update:
@@ -1084,6 +1084,23 @@ public sealed class ClientGameSession : IDisposable
     /// </summary>
     private void AnnounceZoneChanges()
     {
+        if (_arrivalPendingSince is { } since)
+        {
+            string here = _state.CurrentRegion;
+            var waited = DateTime.UtcNow - since;
+            // The zone is placed by the audio update a few frames after the spawn, and until then the
+            // name is the previous map's or the default. Past a second and a half it is not coming.
+            bool placed = waited > TimeSpan.FromSeconds(0.25) && here != LocalPlayerState.UnknownArea;
+            if (!placed && waited < TimeSpan.FromSeconds(1.5)) return;
+            // "at outside" and "at under shelter" name no place: the map alone is said.
+            if (here is LocalPlayerState.UnknownArea or ClientAudioSystem.UnderShelter or ClientAudioSystem.Outside) here = "";
+            _arrivalPendingSince = null;
+            _lastAnnouncedRegionId = _state.CurrentRegionId;
+            _lastAnnouncedRegion = here;
+            _speech.Speak(ArrivalLine(_mapName, here), interrupt: true);
+            return;
+        }
+
         int region = _state.CurrentRegionId;
         if (region == _lastAnnouncedRegionId) return;
         _lastAnnouncedRegionId = region;
@@ -1097,12 +1114,21 @@ public sealed class ClientGameSession : IDisposable
         // of one region silent, which is what a player means by not having moved.
         string name = _state.CurrentRegion;
         if (string.IsNullOrWhiteSpace(name) || name == _lastAnnouncedRegion) return;
+        // A doorway is roofed and in no zone, so stepping from a flat into its corridor passed through
+        // "Under Shelter" on the way. Where you are is the zone on either side of it; the where-am-I
+        // key still says it.
+        if (name == ClientAudioSystem.UnderShelter) return;
 
-        // The first region after arriving is where you are: said after "Logged in. You are in <map>".
         _lastAnnouncedRegion = name;
         _speech.Speak(name, interrupt: false);
     }
 
+    /// <summary>"You're in city, at sidewalk." The zone is left out when there is none.</summary>
+    internal static string ArrivalLine(string map, string? zone) =>
+        string.IsNullOrWhiteSpace(zone) ? $"You're in {map}." : $"You're in {map}, at {zone}.";
+
+    /// <summary>Set on arriving on a map, until the arrival line has been said.</summary>
+    private DateTime? _arrivalPendingSince;
     private int _lastAnnouncedRegionId = int.MinValue;
     private string _mapName = "";
     /// <summary>Spawned on this map already: a further spawn is a teleport, not an arrival.</summary>

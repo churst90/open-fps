@@ -167,8 +167,8 @@ public class AnnouncementAndLoginTests
         session.HandleMessage(new LoginResponse { Success = true, Username = "cody" });
 
         Assert.Equal("cody", accepted);
-        // Nothing spoken yet: logging in is said once, on arrival, with the map's name.
-        Assert.False(speech.Said("Logged in"));
+        // Nothing spoken yet: where you are is said once, on arrival, with the map's name.
+        Assert.Empty(speech.Spoken);
         Assert.NotEmpty(shell.Loading);
     }
 
@@ -282,7 +282,7 @@ public class AnnouncementAndLoginTests
         public readonly List<string> Loading = new();
         public bool IsGameInputActive { get; set; } = true;
         public event Action<string>? CommandEntered;
-        public void ShowLoading(string status) => Loading.Add(status);
+        public void ShowLoading(string status, bool speak = true) => Loading.Add(status);
         public void UpdateLoadingStatus(string text, int percent) => Loading.Add($"{text} ({percent})");
         public void EnterGame() { }
         public void OpenCommandConsole() { }

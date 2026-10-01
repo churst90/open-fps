@@ -59,7 +59,7 @@ public sealed class BirdLife
 
     private readonly AudioEngineFacade _audio;
     private readonly SpatialAcoustics? _acoustics;
-    private readonly Random _rng = new();
+    private readonly Random _rng;
     private readonly List<Group> _perched = new();
     private Group? _skein;
     private double _nextSkein = -1;
@@ -80,10 +80,13 @@ public sealed class BirdLife
     /// <summary>A skein of geese goes over, on average, this often.</summary>
     private const float SkeinEverySeconds = 420f;
 
-    public BirdLife(AudioEngineFacade audio, SpatialAcoustics? acoustics)
+    /// <param name="seed">Seeds the timing of calls, bouts and skeins. Tests pass one so a run is
+    /// repeatable; the game leaves it null.</param>
+    public BirdLife(AudioEngineFacade audio, SpatialAcoustics? acoustics, int? seed = null)
     {
         _audio = audio;
         _acoustics = acoustics;
+        _rng = seed is int s ? new Random(s) : new Random();
     }
 
     /// <summary>Every perched group: its species and where it is. For tests.</summary>

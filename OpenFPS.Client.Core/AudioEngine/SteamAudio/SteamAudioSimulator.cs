@@ -235,6 +235,9 @@ public sealed class SteamAudioSimulator : IDisposable
     }
 
     private Thread? _bakeThread;
+
+    /// <summary>True while the pathing bake is still reading the scene it was given.</summary>
+    public bool Baking => _bakeThread is { IsAlive: true };
     private IntPtr _bakedBatchPending;
 
     /// <summary>

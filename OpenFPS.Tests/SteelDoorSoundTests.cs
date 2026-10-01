@@ -81,7 +81,7 @@ public class SteelDoorSoundTests
 
         // A client that has heard nothing yet, standing in front of the door.
         var client = new ClientWorldState();
-        client.Clear(data.Size, data.MinBound, data.MaxBound);
+        client.Clear(data.Size);
         foreach (var def in EntityDefinitionFactory.StaticDefinitions(world)) client.RegisterDefinition(def);
         var provider = new CapturingProvider();
         var facade = new AudioEngineFacade(provider);

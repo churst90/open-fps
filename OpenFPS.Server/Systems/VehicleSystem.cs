@@ -809,21 +809,21 @@ public sealed partial class VehicleSystem
         // LATERALLY it is (v / vlimit)^2, and that is not an approximation: the line's limit speed is
         // the one where lateral acceleration equals the available grip, a = v^2/R either way, so the
         // ratio of accelerations is the square of the ratio of speeds. Crucially the line's limit
-        // ALREADY has the banking in it — that was fixed when the cars were found to be lifting four
-        // semitones a lap — so a car tracking its line comes out at 1.0 rather than at 1.59.
+        // ALREADY has the banking in it, so a car tracking its line comes out at 1.0 rather than at
+        // 1.59.
         // LONGITUDINALLY it is whatever acceleration or braking is actually being applied against the
         // same grip. The two combine in quadrature, because a tyre has one contact patch and cornering
         // and braking come out of the same friction circle.
         // Against the CORNERING limit, not the speed limit. The speed limit is the top speed on a
-        // straight and whatever the braking pass allows into a turn, so measuring against it reported
-        // a car flat out down the back straight as being at the limit of its grip — which is how
-        // "they're all screeching" survived the first attempt at this.
+        // straight and whatever the braking pass allows into a turn, so measuring against it would
+        // report a car flat out down the back straight as being at the limit of its grip, and every
+        // car would screech.
         // AGAINST THE GRIP, not against the line's own limit.
         //
         // The line's limit is sqrt(CorneringG * 9.81 * R), so (v / cornerLimit)^2 is the fraction of
         // the CORNERING number being used — and a vehicle tracking its line is at 1.0 of that by
         // construction, in every corner, for ever. That is right for a racing line and wrong for a
-        // bus, and it is why every vehicle on a city map screeched through every junction.
+        // bus: every vehicle on a city map would screech through every junction.
         //
         // What the tyre is actually being asked for is the fraction of its GRIP. The radius drops
         // out: R = cornerLimit^2 / (CorneringG * g), so the grip-limited speed at the same corner is
@@ -926,10 +926,9 @@ public sealed partial class VehicleSystem
     }
 
     /// <summary>
-    /// Whether a vehicle this slow can be brought to rest in one tick on its own brake. It used to be
-    /// released at under 1.2 m/s (a shuttle, 0.3) and set to zero on the spot: 36 m/s^2 on a
-    /// 3 m/s^2 bus, a lurch at the end of every stop, and the engine was handed that as its target.
-    /// The approach curve, v = sqrt(2 a s), already brings the speed down to this as it arrives.
+    /// Whether a vehicle this slow can be brought to rest in one tick on its own brake. A fixed
+    /// release speed (say 1.2 m/s, set to zero on the spot) is 36 m/s^2 on a 3 m/s^2 bus: a lurch at
+    /// the end of every stop, and the engine is handed that as its target. The approach curve, v = sqrt(2 a s), already brings the speed down to this as it arrives.
     /// </summary>
     private static bool CanHalt(float speed, float brake, float dt) => speed <= brake * dt + 1e-3f;
 
@@ -937,12 +936,10 @@ public sealed partial class VehicleSystem
     /// Road left to the next stop this vehicle must actually make, metres, or MaxValue if there is
     /// none ahead. Sets <see cref="DemoVehicle.NextStop"/> to whichever that is.
     ///
-    /// It SCANS, every tick, rather than walking a stored index forward. The first version held an
-    /// index and only advanced it on arrival, which works for one stop and fails for two: a vehicle
-    /// locked on to a crossing three hundred metres ahead drove straight over the one under its
-    /// wheels, because that one was not the stop it was thinking about. Traced exactly that way —
-    /// "next stop 0 at 48 m" held for a whole lap while the van crossed the rails at 328 m at
-    /// thirteen metres a second with the bells going.
+    /// It SCANS, every tick, rather than walking a stored index forward. An index advanced only on
+    /// arrival works for one stop and fails for two: a vehicle locked on to a crossing three hundred
+    /// metres ahead drives straight over the one under its wheels, because that one is not the stop
+    /// it is thinking about.
     ///
     /// An OPEN crossing is not a stop at all and is skipped here, which is what makes traffic flow
     /// over it and queue at it without either being a special case further down.

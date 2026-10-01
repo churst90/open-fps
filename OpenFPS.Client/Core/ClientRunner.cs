@@ -62,13 +62,7 @@ public class ClientRunner
             return;
         }
 
-        // Say what the diagnostic levers are set to, every run.
-        foreach (string key in new[] { "OPENFPS_ENGINE_ECHOES", "OPENFPS_ENGINE_VOICES",
-                                       "OPENFPS_MACHINE_VOICES", "OPENFPS_WEATHER", "OPENFPS_AUDIO_DEBUG" })
-        {
-            string? val = Environment.GetEnvironmentVariable(key);
-            if (!string.IsNullOrEmpty(val)) Serilog.Log.Warning("{Key}={Value} — a diagnostic lever is set.", key, val);
-        }
+        DiagnosticSwitches.LogSet();
 
         _settings = ClientSettings.Load();
         if (!Loudness.CompressionFromEnvironment)

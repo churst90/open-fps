@@ -15,11 +15,10 @@ namespace OpenFPS.Common;
 /// path the reflection took. Nothing about it is a guess: the position is geometry, the delay is the
 /// extra distance over the speed of sound, and what is missing from it is what the wall absorbed.
 ///
-/// This exists because the alternative kept being wrong in both directions. A parametric reverb tail
-/// has no direction in it at all, so a room answered a sound from everywhere at once and a doorway
-/// could not be heard from outside — reported as "shouldn't it just be the natural reflections off the
-/// surfaces rather than a blanket reverb". And the ray-tracing generator it replaced jittered every
-/// surface normal with a fresh random seed per call, so a wall's reflection moved every frame.
+/// Why reflections and not a reverb. A parametric reverb tail has no direction in it at all, so a
+/// room answers a sound from everywhere at once and a doorway cannot be heard from outside. And it
+/// must be deterministic: a ray tracer that jitters every surface normal with a fresh random seed per
+/// call moves a wall's reflection every frame.
 ///
 /// One model, deterministic, driven by the boxes a map is built from and the materials they are made
 /// of. A corridor answers like a corridor because it has walls close on both sides, a field answers
@@ -98,14 +97,13 @@ public static class EarlyReflections
     /// The distance the direct sound is judged from when a copy is asked whether it is worth having.
     ///
     /// A copy's reported gain is the surface's loss times <c>direct / pathLength</c>, and that ratio
-    /// is what MinRelativeAmplitude used to be tested against. For a sound at arm's length that test
-    /// threw the room away: your own clap is half a metre from your ear, so a wall six metres off, a
-    /// twelve-metre round trip, came back at 0.5 / 12 = 0.04 and was dropped as inaudible, while the
+    /// must not be what MinRelativeAmplitude is tested against. For a sound at arm's length that test
+    /// throws the room away: your own clap is half a metre from your ear, so a wall six metres off, a
+    /// twelve-metre round trip, comes back at 0.5 / 12 = 0.04 and is dropped as inaudible, while the
     /// engine renders the direct sound flat inside its reference distance (Loudness.Place, at least
-    /// 1.2 m) and would have played that wall's answer at -27 dB, a slap any ear picks out. In Marlow
-    /// flat 01F, 8.65 by 17.86 m, neither end wall was ever placed; the room's length was left to the
-    /// omnidirectional tail, which is heard in the middle of the head ("like there's a hallway in
-    /// front of me", 2026-09-29). So audibility is judged against the direct sound as it is heard,
+    /// 1.2 m) and would play that wall's answer at -27 dB, a slap any ear picks out. In Marlow flat
+    /// 01F, 8.65 by 17.86 m, neither end wall would be placed; the room's length would be left to the
+    /// omnidirectional tail, which is heard in the middle of the head. So audibility is judged against the direct sound as it is heard,
     /// never nearer than a metre; the gains themselves are unchanged.
     /// </summary>
     public static float HeardReference(float direct) => MathF.Max(direct, 1f);
@@ -118,14 +116,14 @@ public static class EarlyReflections
     /// (Loudness.Place, a copy keeps its source's placement): flat inside R, 1/r beyond. So the copy
     /// must be scaled by what the engine will do at the two distances, max(L,R)/max(d,R), not by L/d.
     /// L/d is the same thing only when both are past R, and R reaches 40 m for a loud source: a
-    /// gunshot's copies inside it came out 8-11 dB hotter than the surfaces allowed (2026-09-29).
+    /// gunshot's copies inside it would come out 8-11 dB hotter than the surfaces allow.
     /// <paramref name="direct"/> is the true source-listener distance the relative gain was taken at.
     /// </summary>
     /// <summary>
     /// The AMPLITUDE a surface sends back, from the ENERGY it absorbs: sqrt(1 - alpha). An absorption
     /// coefficient is a share of power, and every gain here is a pressure (they are summed as
-    /// 20·log10). It was 1 - alpha, which took twice the decibels it should: carpet 3 dB a bounce too
-    /// many, 9 at third order (2026-09-29).
+    /// 20·log10). 1 - alpha would take twice the decibels it should: carpet 3 dB a bounce too many,
+    /// 9 at third order.
     /// </summary>
     public static float Keep(float absorption) => MathF.Sqrt(1f - Math.Clamp(absorption, 0f, 1f));
 
@@ -287,11 +285,11 @@ public static class EarlyReflections
 
         // Only as many as a listener can tell apart, and the ones they CAN tell apart first.
         //
-        // The cap used to keep the loudest four — and the loudest are the ground and the nearest wall,
-        // a few milliseconds behind the direct sound, inside the fusion window: the room, which the
-        // renderer drops, because a fused copy is not a voice. So the cap spent its slots on arrivals
-        // that were never going to play, and the far facade's slapback and the flutter between two
-        // facades — the echoes you actually hear as echoes — were cut to make room for them. Separate
+        // Not simply the loudest: those are the ground and the nearest wall, a few milliseconds
+        // behind the direct sound, inside the fusion window: the room, which the renderer drops,
+        // because a fused copy is not a voice. A loudest-first cap spends its slots on arrivals that
+        // never play, and cuts the far facade's slapback and the flutter between two facades — the
+        // echoes you actually hear as echoes — to make room for them. Separate
         // events first, then loudest; a budget cut has to take what nobody would have heard.
         into.Sort((a, b) =>
         {
@@ -460,9 +458,8 @@ public static class EarlyReflections
     /// <summary>
     /// The sound handed back and forth across a street: the flutter.
     ///
-    /// Reported: "I heard gun shots but didn't really hear them reflect off walls, no wash like they
-    /// would in a real city" — and, asked what the wash IS: "a bunch of different cracks off every
-    /// surface all at slightly different times." It is. Two rows of facades across a street return a
+    /// A shot in a city street has a wash after it: many cracks off every surface, all at slightly
+    /// different times. Two rows of facades across a street return a
     /// shot to each other a crossing at a time, each copy a street's width of travel later and a
     /// little weaker and more smeared than the last, until it is a roll rather than a train. The chain
     /// search above stops at three surfaces and at the eight strongest single faces, and a street is

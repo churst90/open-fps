@@ -42,7 +42,7 @@ public class BirdLifeTests
         Assert.True(maps.TryGetMap("city", out World world, out _, out _, out _));
         Assert.True(maps.TryGetMapData("city", out var data));
         var client = new ClientWorldState();
-        client.Clear(data.Size, data.MinBound, data.MaxBound);
+        client.Clear(data.Size);
         foreach (var def in EntityDefinitionFactory.StaticDefinitions(world)) client.RegisterDefinition(def);
         var mixer = new VoiceLifecycleTests.RecordingProvider();
         var audio = new AudioEngineFacade(mixer);
@@ -50,7 +50,7 @@ public class BirdLifeTests
             && !Directory.Exists(Path.Combine(Sounds(), "BIRDS")))
             throw new InvalidOperationException("no bird samples");
         audio.InitializeForTest(Sounds());
-        var birds = new BirdLife(audio, new OpenFPS.Client.AudioEngine.Acoustics.SpatialAcoustics(new SpatialService()));
+        var birds = new BirdLife(audio, new OpenFPS.Client.AudioEngine.Acoustics.SpatialAcoustics(new SpatialService()), seed: 1);
         return (client.GetSnapshot(), birds, mixer, audio);
     }
 

@@ -160,6 +160,16 @@
       "minimum": 0,
       "description": "Wall thickness in metres; > 0 marks the collider hollow."
     },
+    "LeafMetres": {
+      "type": "number",
+      "minimum": 0,
+      "description": "A wall built as two leaves of its material over a cavity: each leaf's thickness in metres (0.0125 for plasterboard). The rest of the box's thickness is the cavity. Omit for a solid wall. Decides how much gets through it, band by band."
+    },
+    "StudSpacingMetres": {
+      "type": "number",
+      "minimum": 0,
+      "description": "The centres of the studs a two-leaf wall's leaves are fixed to, metres (0.6 for standard framing). Omit when the leaves meet only at the edges of the panel."
+    },
     "FaceMask": {
       "type": "integer",
       "minimum": 0,

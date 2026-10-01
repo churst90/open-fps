@@ -21,6 +21,39 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-09-30
 
+- Mixer safety. A DSP callback with nothing to render writes silence instead of leaving the
+  buffer's old contents to be mixed (the master-bus unit passes the mix through). No callback logs or
+  allocates on the mixer thread. Pooled EQ, low-pass, synth and granular voices start from rest.
+  Shutdown, clearing the reverb buses, changing maps and changing vehicles no longer free Steam
+  Audio's native state while the mixer or a tracer may still read it.
+- open-fps-patches 0008: a silent late tail (outdoors) is one empty partition, not 2 s of zeros
+  convolved every block. All eight patches are in; the patch files were removed.
+- Walls let through what their material, thickness and build let through, band by band. Every wall
+  heavier than about 50 kg/m2 was a flat 55 dB filter, so a wall made a sound quieter without making
+  it duller. Now: the mass law, the coincidence dip from each material's stiffness and thickness
+  (Sharp), two-leaf walls with their air gap (stud partitions, glazing), and flanking per band
+  (EN 12354-1). Each EQ band takes the figure for the frequencies it actually covers. A 35 cm brick
+  wall is -40/-62/-87 dB (low/mid/high), was -55 flat; a stud partition -18/-41/-50, was -54/-55/-55.
+- Speech and one-off sounds are occluded by Steam Audio like everything else. They used an older
+  tracer that let 10-20 dB more through, made two walls quieter than one and let sound straight down
+  through a floor. The tracer, still the fallback, uses the same wall model with no floor under it.
+- Partitions are plasterboard on studs and glazing is two panes, as prefab data (`LeafMetres`,
+  `StudSpacingMetres`). Lab: `--wall-tl`, and `--path-probe` prints each wall on the line.
+- Arriving says "You're in <map>, at <zone>." in one line. The login no longer speaks "Preparing
+  manifest". The city's footways are "<street> sidewalk", one name the whole length. "Under Shelter"
+  (a roofed gap between two zones, such as a doorway) is no longer announced on its own.
+- `ClientWorldState.Clear` takes only the map size.
+- Cleansing pass:
+  - Deleted: `PhysicsAcousticBridgeSystem` (never called), the unused `users.json` files, and the
+    lab's `--sim-roomdbg`, `--echo-ab`, `--blast-compare` and `--blast-probe`.
+  - Retired `OPENFPS_ROLLOFF` (the mixer always uses the inverse law Loudness is written for) and
+    `OPENFPS_VALVE_K`. Both clients log every set switch from one list, `DiagnosticSwitches`.
+  - `run-server.sh` checks and prints the port given with `--port`; `OPENFPS_PORT` is passed to the
+    server.
+  - Tests seed BirdLife (the sparrow test no longer fails now and then) and delete their
+    `/tmp/openfps-test-config-<pid>` folder on exit.
+  - Comments in the most-edited files state what the code does and why, without dates and quotes.
+    readme and the manual checked against the code; the Windows client is described as it is.
 - Sounds no longer freeze for up to a second at a time. Every scene rebuild for a door handed the new
   scene to the tracers while holding the lock the game loop and the mixer take every frame, and the
   late-field tracer holds its own for a whole run; both threads waited it out. Rebuilds are also no

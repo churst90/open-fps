@@ -991,7 +991,10 @@ public class AsyncAcousticWorker : IDisposable
             if (Phonon.iplContextCreate(ref cs, out _saContext) != Phonon.IPL_STATUS_SUCCESS)
             { _saContext = IntPtr.Zero; Console.WriteLine($"[AcousticWorker] DEGRADED: Steam Audio context create failed (SIMD {simd}); using the hand-rolled ray-tracer."); return; }
 
-            _saSim = new SteamAudioSimulator(_saContext, SaMaxSources, enablePathing: true);
+            // Pathing off: its probe grid is too coarse on a city (tens of metres) to say where a sound
+            // comes from, nothing reads its answer, and the bake cost a core for minutes at every map
+            // load. Routes round obstacles come from the barrier search (BarrierPathDifference).
+            _saSim = new SteamAudioSimulator(_saContext, SaMaxSources, enablePathing: false);
             if (!_saSim.IsValid)
             {
                 _saSim.Dispose(); _saSim = null;
@@ -1110,6 +1113,7 @@ public class AsyncAcousticWorker : IDisposable
     {
         // Not while the tracers are still being handed the new scenes: until then they trace the old.
         if (OpenFPS.Client.Core.AudioEngine.SteamAudio.TracedReverbSet.Reconfiguring) return;
+        if (_saSim is { Baking: true }) return;                 // nor while the bake reads the old one
         long cutoff = DateTime.UtcNow.Ticks - 5 * TimeSpan.TicksPerSecond;
         for (int i = _retiredScenes.Count - 1; i >= 0; i--)
             if (_retiredScenes[i].At < cutoff) { _retiredScenes[i].Scene.Dispose(); _retiredScenes.RemoveAt(i); }
@@ -1146,6 +1150,16 @@ public class AsyncAcousticWorker : IDisposable
 
         var boxes = SteamAudioScene.BoxesFromWorld(world);
         _lastSceneBoxes = boxes.Count;
+        // A new map gets new scene objects; the old ones are retired, not rebuilt in place. The
+        // tracers' threads and the pathing bake may still be running on them, and freeing a native
+        // scene under a running trace is a crash.
+        if (_saScene.IsBuilt)
+        {
+            long now = DateTime.UtcNow.Ticks;
+            _retiredScenes.Add((_saScene, now));
+            _saScene = new SteamAudioScene(_saContext);
+            if (_saListenerScene != null) { _retiredScenes.Add((_saListenerScene, now)); _saListenerScene = null; }
+        }
         if (_saDebug)
             foreach (var b in boxes)
                 Console.WriteLine($"[SABOX] center=({b.Center.X:F1},{b.Center.Y:F1},{b.Center.Z:F1}) size=({b.Size.X:F1},{b.Size.Y:F1},{b.Size.Z:F1}) mat={b.Material}");

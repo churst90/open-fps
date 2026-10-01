@@ -36,6 +36,14 @@ public class GranularVoiceState
 
     public Grain[] Grains = new Grain[128]; // Max 128 overlapping grains to prevent CPU overload
     
+    /// <summary>Forgets the previous sound's grains, for a pooled voice about to play another. The
+    /// DSP is out of the graph when this is called, so the mixer is not reading it.</summary>
+    public void Reset()
+    {
+        Array.Clear(Grains);
+        SamplesSinceLastGrain = 0f;
+    }
+
     public GranularVoiceState(float[] pcm, int channels, int sampleRate)
     {
         PcmData = pcm;
@@ -120,12 +128,12 @@ public static class GranularProcessor
             userData = DspCallback.UserData(ref dsp_state);
         }
 
-        if (userData == IntPtr.Zero) return RESULT.OK;
+        if (userData == IntPtr.Zero) { DspCallback.Silence(outbuffer, length, outchannels); return RESULT.OK; }
 
         GCHandle handle = GCHandle.FromIntPtr(userData);
         GranularVoiceState state = (GranularVoiceState)handle.Target!;
 
-        if (state == null || state.PcmData == null || state.PcmData.Length == 0) return RESULT.OK;
+        if (state == null || state.PcmData == null || state.PcmData.Length == 0) { DspCallback.Silence(outbuffer, length, outchannels); return RESULT.OK; }
 
         if (outchannels == 0) outchannels = 2;
         int outCh = outchannels;

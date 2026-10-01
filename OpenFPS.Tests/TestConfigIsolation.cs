@@ -7,10 +7,10 @@ namespace OpenFPS.Tests;
 
 /// <summary>
 /// No test may write the player's own settings. BeaconPreferences and ClientSettings live under
-/// $XDG_CONFIG_HOME (or ~/.config), and on 2026-09-24 a mutation-testing run in the real home turned
-/// a player's door and vehicle beacons off: a mutant made in-memory preferences save to disk, and the
-/// two tests that switch those categories off wrote exactly that. Every test process now starts with
-/// a scratch config folder of its own, before any test runs.
+/// $XDG_CONFIG_HOME (or ~/.config), and a test that switches a beacon category off would otherwise
+/// switch it off for the player too, the moment anything (a mutant, a refactor) made preferences save
+/// to disk. Every test process starts with a scratch config folder of its own, before any test runs,
+/// and removes it when the process exits.
 /// </summary>
 internal static class TestConfigIsolation
 {
@@ -20,6 +20,12 @@ internal static class TestConfigIsolation
         string scratch = Path.Combine(Path.GetTempPath(), "openfps-test-config-" + Environment.ProcessId);
         Directory.CreateDirectory(scratch);
         Environment.SetEnvironmentVariable("XDG_CONFIG_HOME", scratch);
+        AppDomain.CurrentDomain.ProcessExit += (_, _) =>
+        {
+            try { Directory.Delete(scratch, recursive: true); }
+            catch (IOException) { }
+            catch (UnauthorizedAccessException) { }
+        };
     }
 }
 

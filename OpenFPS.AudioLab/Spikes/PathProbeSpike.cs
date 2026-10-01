@@ -31,7 +31,8 @@ public static class PathProbeSpike
         Vector3 P(string s) { var f = s.Split(',').Select(x => float.Parse(x, CultureInfo.InvariantCulture)).ToArray(); return new Vector3(f[0], f[1], f[2]); }
         var ear = P(args.First(a => a.StartsWith("ear="))[4..]);
         var srcs = args.Where(a => a.StartsWith("src=")).Select(a => P(a[4..])).ToList();
-        string root = "/home/cody/external-rescue/Github/open-fps/OpenFPS.Server/";
+        // root=DIR/ reads the map and prefabs of another checkout (a worktree) than the main one.
+        string root = args.FirstOrDefault(a => a.StartsWith("root="))?[5..] ?? "/home/cody/external-rescue/Github/open-fps/OpenFPS.Server/";
         var (world, _) = SirenRouteSpike.Load(root + "maps/" + mapId + ".json", root + "prefabs", "none", 0f);
         using var worker = new AsyncAcousticWorker(new SpatialAcoustics());
         worker.UpdateWorld(world);
@@ -47,7 +48,7 @@ public static class PathProbeSpike
         }
         Console.WriteLine($"  pathing {(worker.PathingReady ? "ready" : "NOT ready after 120 s")}");
         int id = 1;
-        Measure(worker, ear, srcs, ref id);
+        Measure(worker, world, ear, srcs, ref id);
         var openArg = args.FirstOrDefault(a => a.StartsWith("open="));
         if (openArg != null)
         {
@@ -76,12 +77,12 @@ public static class PathProbeSpike
                 Thread.Sleep(100);
             }
             Console.WriteLine("  --- doors open ---");
-            Measure(worker, ear, srcs, ref id);
+            Measure(worker, world, ear, srcs, ref id);
         }
         return 0;
     }
 
-    private static void Measure(AsyncAcousticWorker worker, Vector3 ear, List<Vector3> srcs, ref int id)
+    private static void Measure(AsyncAcousticWorker worker, WorldSnapshot world, Vector3 ear, List<Vector3> srcs, ref int id)
     {
         foreach (var src in srcs)
         {
@@ -99,6 +100,23 @@ public static class PathProbeSpike
             Console.WriteLine($"  src ({src.X:F1}, {src.Y:F1}, {src.Z:F1}) {Vector3.Distance(ear, src):F1} m: occlusion {p.Occlusion:F2}, "
                             + $"low {Db(p.EqLow):F1} mid {Db(p.EqMid):F1} high {Db(p.EqHigh):F1} dB, bleed {p.TransmissionBleed:F3}, "
                             + $"apparent ({p.ApparentPosition.X:F1}, {p.ApparentPosition.Y:F1}, {p.ApparentPosition.Z:F1})");
+            // The fallback tracer's answer for the same pair, and what each box on the straight line
+            // takes by itself (WallTransmission: the figure Steam Audio's faces carry between them).
+            var h = new SpatialAcoustics().CalculateAcousticPath(world, -1, ear, src);
+            Console.WriteLine($"      tracer: occlusion {h.Occlusion:F2}, low {Db(h.EqLow):F1} mid {Db(h.EqMid):F1} high {Db(h.EqHigh):F1} dB");
+            Vector3 dir = Vector3.Normalize(src - ear);
+            float len = Vector3.Distance(ear, src);
+            float sl = 0, sm = 0, sh = 0;
+            foreach (var b in SteamAudioScene.BoxesFromWorld(world))
+            {
+                if (!GeometryUtils.RayIntersectsOBB(ear, dir, b.Center, b.Size, b.Rotation, out float at) || at > len) continue;
+                var (gl, gm, gh) = WallTransmission.BandGains(b.Material, b.Size, b.Build);
+                sl += Db(gl); sm += Db(gm); sh += Db(gh);
+                float t = MathF.Min(b.Size.X, MathF.Min(b.Size.Y, b.Size.Z));
+                Console.WriteLine($"      wall at {at,5:F2} m: {b.Material} {t * 100f:F1} cm" + (b.Build.LeafMetres > 0 ? $" (leaves {b.Build.LeafMetres * 1000f:F1} mm, studs {b.Build.StudSpacingMetres:F2} m)" : "")
+                                + $"  {Db(gl):F1} / {Db(gm):F1} / {Db(gh):F1} dB");
+            }
+            Console.WriteLine($"      walls on the line: {sl:F1} / {sm:F1} / {sh:F1} dB");
             id++;
         }
     }

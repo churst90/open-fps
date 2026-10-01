@@ -11,13 +11,12 @@ namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 /// geometry from the listener's own position, a few times a second, for everything outdoors to be
 /// played through (TracedReverbDsp). Steam Audio's "listener-centric reverb".
 ///
-/// Why it exists. Outdoors the reverberation used to be FMOD's room algorithm with its decay set from
-/// a ray survey — a statistical ROOM tail, dense and smooth from the first milliseconds. A street is
-/// not that: its tail is the flutter between two facades, scatter off windows and cars, and most of
-/// the energy leaving through the open sky. Asked "why do we even need reverb at all if that should
-/// fall out as a natural consequence of correct physics", the honest answer was that we did not need
-/// the ALGORITHM — only something to stand for the thousands of copies of copies nobody can voice one
-/// by one. This is that, measured: rays from the listener, bouncing off the scene's own materials
+/// Why it exists. An algorithmic room reverb with its decay set from a ray survey is a statistical
+/// ROOM tail, dense and smooth from the first milliseconds. A street is not that: its tail is the
+/// flutter between two facades, scatter off windows and cars, and most of the energy leaving through
+/// the open sky. Reverb should fall out of the physics; what is needed is not an algorithm but
+/// something to stand for the thousands of copies of copies nobody can voice one by one. This is
+/// that, measured: rays from the listener, bouncing off the scene's own materials
 /// (absorption and scattering per band), collected back into a two-second first-order ambisonic IR.
 ///
 /// One simulation for everything, because the tracing is the cost. The approximation is Steam
@@ -33,9 +32,9 @@ internal sealed class TracedReverb : IDisposable
     /// <summary>
     /// The block the traced response is convolved in, samples. The convolution answers one block
     /// late, so this IS the room's pre-delay: at the mixer's 1,024 the first reflection of every room,
-    /// a hatchback's cabin included, came 20-23 ms after the sound, and a room answered as a separate
-    /// space off to one side instead of the one you stand in (the parking garage, a clap in a house:
-    /// "reflections centred not around me", 2026-09-28). At 256 it is 5-6 ms. The mixer's block is run
+    /// a hatchback's cabin included, comes 20-23 ms after the sound, and a room answers as a separate
+    /// space off to one side instead of the one you stand in, the reflections not centred on you.
+    /// At 256 it is 5-6 ms. The mixer's block is run
     /// through in pieces of this size (TracedReverbDsp).
     /// </summary>
     public const int TracedFrame = 256;
@@ -266,9 +265,9 @@ internal sealed class TracedReverb : IDisposable
     ///
     /// Under its OWN lock, never the tracer's: the trace holds that one for the whole run, and in a
     /// big hard hall a run takes hundreds of milliseconds. The game thread calls this every frame,
-    /// so it waited out each trace — in the airport terminal every sound stood still for 680 ms at a
-    /// time, the game loop ran at 8 Hz, footsteps and claps came late or not at all and the reverb
-    /// stepped ("fluttered") (2026-09-29).</summary>
+    /// so it would wait out each trace — in the airport terminal every sound would stand still for
+    /// 680 ms at a time, the game loop run at 8 Hz, footsteps and claps come late or not at all and
+    /// the reverb step.</summary>
     public void SetListener(Vector3 at) { lock (_listenerGate) _listener = at; }
     private readonly object _listenerGate = new();
 
@@ -464,9 +463,9 @@ internal static class TracedReverbSet
             listener = _listener ??= new TracedReverb(context) { ExtractLate = true };
             // The few sources traced from where they are (TracedEchoes), on the scene WITHOUT its open
             // ground, as the listener's trace is. Every voice already carries its own ground bounce
-            // (GroundReflection); traced over the ground as well, a car at 30 m had that bounce twice,
-            // the second at about the direct level and under a millisecond late — a comb that took
-            // twenty decibels of trim to hide (the first "-24", 2026-09-26; found 2026-09-29).
+            // (GroundReflection); traced over the ground as well, a car at 30 m has that bounce twice,
+            // the second at about the direct level and under a millisecond late — a comb that takes
+            // twenty decibels of trim to hide.
             echoes = _echoes ??= new TracedEchoes(context);
             // Each source's own late energy and its direction, on the listener's scene (LateField).
             late = _late ??= new LateField(context);
@@ -492,7 +491,7 @@ internal static class TracedReverbSet
     /// <summary>True while a rebuild is still being handed over: the scenes it replaces are in use.</summary>
     public static bool Reconfiguring { get { lock (Gate) return !_reconfigure.IsCompleted; } }
 
-    public static void SetListener(Vector3 at) { lock (Gate) _listener?.SetListener(at); }
+    public static void SetListener(Vector3 at) { lock (Gate) { _listener?.SetListener(at); DisposeRetired(); } }
 
     /// <summary>The per-source tracer, or null before the scene exists.</summary>
     public static TracedEchoes? Echoes { get { lock (Gate) return _echoes is { IsValid: true } e ? e : null; } }
@@ -527,8 +526,7 @@ internal static class TracedReverbSet
 
     // ── The vehicle you are riding in ────────────────────────────────────────────────────────
     //
-    // "That means even inside vehicles like buses too, use reflections, not what we've been doing."
-    // A vehicle moves, so it is not in the map's traced scene — traced from a bus seat, the world
+    // Inside a vehicle the room is its cabin, heard by reflections like any other room. A vehicle moves, so it is not in the map's traced scene — traced from a bus seat, the world
     // scene answers with the street outside. But from inside, the cabin does not move relative to
     // you: it is traced as a scene of its own, in the vehicle's frame, from the same geometry the
     // server builds the shell from (VehicleCabin) — its floor, its steel below the waist and glass
@@ -550,8 +548,12 @@ internal static class TracedReverbSet
             if (preset == null || _context == IntPtr.Zero || !MachineRegistry.Knows(preset)) { _riding = false; return; }
             if (!string.Equals(preset, _cabinPreset, StringComparison.OrdinalIgnoreCase))
             {
-                _cabin?.Dispose(); _cabin = null;
-                _cabinScene?.Dispose(); _cabinScene = null;
+                // Retired, not disposed: a reverb stage on the mixer thread may hold this trace until
+                // the audio update next hands it the new one. Disposed a few seconds on (DisposeRetired).
+                long now = DateTime.UtcNow.Ticks;
+                if (_cabin != null) _retiredCabins.Add((_cabin, now));
+                if (_cabinScene != null) _retiredCabins.Add((_cabinScene, now));
+                _cabin = null; _cabinScene = null;
                 _cabinPreset = preset;
                 var v = MachineRegistry.VehicleFor(preset);
                 if (VehicleCabin.Measure(v) is { } g)
@@ -573,6 +575,16 @@ internal static class TracedReverbSet
         }
     }
 
+    private static readonly List<(IDisposable Item, long At)> _retiredCabins = new();
+
+    /// <summary>Disposes cabin traces and scenes retired more than five seconds ago. Under the gate.</summary>
+    private static void DisposeRetired()
+    {
+        long cutoff = DateTime.UtcNow.Ticks - 5 * TimeSpan.TicksPerSecond;
+        for (int i = _retiredCabins.Count - 1; i >= 0; i--)
+            if (_retiredCabins[i].At < cutoff) { _retiredCabins[i].Item.Dispose(); _retiredCabins.RemoveAt(i); }
+    }
+
     /// <summary>Everything traced so far, for the /reverb readout.</summary>
     public static (int Rooms, int Runs, double LastMs) Stats()
     {
@@ -592,6 +604,8 @@ internal static class TracedReverbSet
             _echoes?.Dispose(); _echoes = null;
             _late?.Dispose(); _late = null;
             _cabin?.Dispose(); _cabin = null; _cabinScene?.Dispose(); _cabinScene = null; _cabinPreset = null; _riding = false;
+            foreach (var (item, _) in _retiredCabins) item.Dispose();
+            _retiredCabins.Clear();
             foreach (var r in Rooms.Values) r.Trace.Dispose();
             Rooms.Clear();
             _scene = null; _context = IntPtr.Zero;

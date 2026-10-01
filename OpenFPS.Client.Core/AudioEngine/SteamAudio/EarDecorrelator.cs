@@ -7,11 +7,10 @@ namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 /// (velvet noise), so that the branches fed the same tail are different signals with the same
 /// spectrum and envelope, as the field arriving from each direction of a real room is.
 ///
-/// It was a chain of three short all-passes, and the chains' first delays were neighbouring primes —
-/// 79, 83, 89 samples. Mostly each branch was the same input a few samples later, so the branches
-/// correlated with each other at small lags, and a head measures its two ears' correlation over lags
-/// of up to a millisecond: the tail's interaural coherence stayed 0.35-0.55 above 1.2 kHz with eight
-/// directions and with twenty (2026-09-30), where a head in a real diffuse field gets far less.
+/// Not a chain of short all-passes. With first delays a few samples apart (79, 83, 89), each branch
+/// is mostly the same input a few samples later, so the branches correlate at small lags, and a head
+/// measures its two ears' correlation over lags of up to a millisecond: the tail's interaural
+/// coherence measured 0.35-0.55 above 1.2 kHz, where a head in a real diffuse field gets far less.
 ///
 /// Velvet noise is independent in fine structure by construction: thirty-two taps at random places
 /// across 30 ms, random signs, a gently falling weight, energy one. Two branches share nothing but
@@ -55,10 +54,10 @@ internal sealed class DiffuseBranch
     /// A pair of ear filters: two independent velvet sequences, each tap anywhere in its own slot.
     ///
     /// Not interleaved. Forcing the ears' taps into alternate 2.7 ms slots, each tap in the first
-    /// 0.7 ms of its slot, made each ear's filter a near-regular pulse train 5.4 ms apart: a comb, a
-    /// pitch near 180 Hz, measured as the left ear repeating itself at 5.5-5.7 ms (0.32) on a click
-    /// (2026-09-30) and heard as "a metallic reverb, not natural". Taps free across their slots do not
-    /// ring; the ears are a little less unlike for it.
+    /// 0.7 ms of its slot, makes each ear's filter a near-regular pulse train 5.4 ms apart: a comb, a
+    /// pitch near 180 Hz (the left ear measured repeating itself at 5.5-5.7 ms, 0.32, on a click),
+    /// heard as a metallic reverb. Taps free across their slots do not ring; the ears are a little
+    /// less unlike for it.
     /// </summary>
     public static (DiffuseBranch Left, DiffuseBranch Right) EarPair(int seed, int span = 1764, int taps = 96)
         => (new DiffuseBranch(seed, taps, span), new DiffuseBranch(seed + 977, taps, span));
@@ -92,9 +91,10 @@ internal sealed class DiffuseBranch
 /// energy comes equally from every way — so every directional channel cancels and what is left is the
 /// omnidirectional one. Decoded round the head, that is the SAME signal in both ears: the room in the
 /// middle of the head, mono, with the floor-and-ceiling flutter of a low room sitting on top of it.
-/// Measured from a capture in 64 Alder Street (2026-09-29): 0.8-0.99 interaural correlation in the tail
+/// Measured from a capture in a city flat without this: 0.8-0.99 interaural correlation in the tail
 /// where a real room is 0.1-0.5; the traced IR's first-order channels 18-26 dB under the omni one where
-/// a diffuse field puts them 5 dB under ("fluttering centrally... I can't sense the actual room").
+/// a diffuse field puts them 5 dB under. It is heard as flutter in the middle of the head, with no
+/// sense of the room.
 ///
 /// A real tail differs at the two ears because every reflection reaches each by its own path. This
 /// gives each ear its own chain of all-passes — mutually prime delays, a different set per ear — which
@@ -110,16 +110,15 @@ internal sealed class EarDecorrelator
     /// <param name="ear">0 left, 1 right: which set of delays.</param>
     public EarDecorrelator(int ear)
     {
-        // Samples at 44.1 kHz, 0.16 to 2.2 ms. The first set ran to 13 ms at a feedback of 0.6, and
-        // six of those in a row are a reverberator: a click came out as 100 ms of build-up peaking
-        // 20-45 ms late, a hall laid over every room ("like I'm in a stadium", "ears cupped"). These
-        // hand 90 % of a click back inside 9 ms and still take the ears to 0.2-0.3 above 1 kHz.
+        // Samples at 44.1 kHz, 0.16 to 2.2 ms. Keep them short: six all-passes running to 13 ms at a
+        // feedback of 0.6 are a reverberator, turning a click into 100 ms of build-up peaking 20-45 ms
+        // late, a hall laid over every room. These hand 90 % of a click back inside 9 ms and still take
+        // the ears to 0.2-0.3 above 1 kHz.
         //
         // And the SAME total in each ear. A chain of all-passes delays a signal, on average, by the sum
-        // of its delays; the right set summed to 292 samples against the left's 260, so the tail
-        // reached the left ear 0.7 ms first on every sound — as large as the head ever makes that
-        // difference — and the ear put the whole room on the left whichever way you faced ("reverb
-        // stays static, sounds like to my left", 2026-09-29). Both sets now sum to 260.
+        // of its delays. A 32-sample difference (0.7 ms) is as large as the head ever makes between the
+        // ears, and the ear puts the whole room on the early side whichever way you face. Both sets
+        // sum to 260.
         int[] delays = ear == 0 ? new[] { 7, 19, 31, 47, 67, 89 } : new[] { 13, 17, 41, 43, 71, 75 };
         _lines = new float[delays.Length][];
         _at = new int[delays.Length];

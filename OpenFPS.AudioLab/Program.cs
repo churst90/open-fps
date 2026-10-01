@@ -19,7 +19,10 @@ using Serilog;
 // Cross-platform audio test runner. Compiles the platform-neutral OpenFPS audio engine
 // (FMOD + acoustics) into a plain net10.0 console app so it runs on Linux as well as Windows.
 //
-//   dotnet run --project OpenFPS.AudioLab
+//   dotnet build OpenFPS.AudioLab --artifacts-path <somewhere off the repo volume>
+//   dotnet <artifacts>/bin/OpenFPS.AudioLab/debug/OpenFPS.AudioLab.dll --<instrument> ...
+//
+// Not `dotnet run`: it writes obj/ and bin/ into the repo, and MSBuild hangs on the ntfs3 volume.
 //
 // Requires FMOD's native library next to the binary:
 //   Linux:   libfmod.so   (drop into repo-root lib/)
@@ -237,13 +240,6 @@ if (args.Contains("--sim-reverbfield"))
     Environment.Exit(code);
 }
 
-if (args.Contains("--sim-roomdbg"))
-{
-    int code = SimRoomDbgSpike.Run();
-    Log.CloseAndFlush();
-    Environment.Exit(code);
-}
-
 if (args.Contains("--ear-test"))
 {
     int code = EarTest.Run();
@@ -411,11 +407,6 @@ if (args.Contains("--engine-levels"))
     int lvcode = OpenFPS.Client.Core.AudioEngine.Fmod.EngineCostSpike.Levels(args);
     Log.CloseAndFlush();
     Environment.Exit(lvcode);
-}
-if (args.Contains("--echo-ab"))
-{
-    // --echo-ab out=DIR: a shot and one wall echo, washed as now vs. clean crack plus scattered share.
-    Environment.Exit(OpenFPS.Client.Core.EchoAbSpike.Run(args));
 }
 if (args.Contains("--shot-echoes"))
 {
@@ -593,6 +584,11 @@ if (args.Contains("--room-echoes"))
     // --room-echoes [map=city] ear=x,y,z src=x,y,z: the reflections a one-off sound is placed with, each with its box.
     Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.RoomEchoesSpike.Run(args));
 }
+if (args.Contains("--wall-tl"))
+{
+    // --wall-tl: the city's walls, floors, doors and glass, transmission loss per third octave and per mixer band.
+    Environment.Exit(OpenFPS.AudioLab.Spikes.WallTlSpike.Run(args));
+}
 if (args.Contains("--path-probe"))
 {
     // --path-probe [map=city] ear=x,y,z src=x,y,z ...: what the occlusion worker hands the mixer.
@@ -729,58 +725,6 @@ if (args.Contains("--vehicle") || args.Contains("--vehicle-live")
         knobs: args);
     Log.CloseAndFlush();
     Environment.Exit(code);
-}
-
-if (args.Contains("--blast-compare") || args.Contains("--blast-compare-live"))
-{
-    Console.WriteLine("--- Blast comparison: recording vs recording+sub vs synthesis ---");
-    int i = Array.FindIndex(args, a => a.StartsWith("--blast-compare"));
-    string? only = (i >= 0 && i + 1 < args.Length && !args[i + 1].StartsWith("--")) ? args[i + 1] : null;
-    int code = OpenFPS.Client.Core.AudioEngine.Fmod.BlastCompareSpike.Run(
-        args.Contains("--blast-compare-live"), only);
-    Log.CloseAndFlush();
-    Environment.Exit(code);
-}
-
-if (args.Contains("--blast-probe"))
-{
-    // Writes each weapon's blast three ways — synthesis only, recording only, and the composite — so
-    // the three can be compared spectrally. Which layer is carrying which part of the sound is not
-    // something to decide by argument.
-    string outDir = System.IO.Path.Combine(AppContext.BaseDirectory, "blast-probe");
-    System.IO.Directory.CreateDirectory(outDir);
-    string? assets = null;
-    var d = new System.IO.DirectoryInfo(AppContext.BaseDirectory);
-    for (int i = 0; i < 8 && d != null; i++, d = d.Parent)
-    {
-        string c = System.IO.Path.Combine(d.FullName, "OpenFPS.Client", "ASSETS", "SOUNDS");
-        if (System.IO.Directory.Exists(c)) { assets = c; break; }
-    }
-    foreach (var w in OpenFPS.Common.WeaponRegistry.All)
-    {
-        var prof = OpenFPS.Client.AudioEngine.Core.WeaponProfile.From(w);
-        var synth = OpenFPS.Client.AudioEngine.Core.WeaponSynth.MuzzleBlast(prof);
-        System.IO.File.WriteAllBytes(System.IO.Path.Combine(outDir, $"{w.Id}_synth.wav"),
-            OpenFPS.Client.AudioEngine.Core.WeaponSynth.ToWav16(synth));
-        if (assets != null)
-        {
-            string dir = System.IO.Path.Combine(assets, w.FiringFolder.Replace('/', System.IO.Path.DirectorySeparatorChar));
-            if (System.IO.Directory.Exists(dir))
-            {
-                var files = System.IO.Directory.GetFiles(dir, "*.wav");
-                if (files.Length > 0)
-                {
-                    var rec = OpenFPS.Client.AudioEngine.Core.WeaponSynth.ReadWav16Mono(System.IO.File.ReadAllBytes(files[0]));
-                    System.IO.File.WriteAllBytes(System.IO.Path.Combine(outDir, $"{w.Id}_composite.wav"),
-                        OpenFPS.Client.AudioEngine.Core.WeaponSynth.ToWav16(
-                            OpenFPS.Client.AudioEngine.Core.WeaponSynth.CompositeBlast(prof, rec)));
-                }
-            }
-        }
-    }
-    Console.WriteLine($"wrote {outDir}");
-    Log.CloseAndFlush();
-    Environment.Exit(0);
 }
 
 if (args.Contains("--battle") || args.Contains("--battle-live"))

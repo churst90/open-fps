@@ -110,8 +110,8 @@ public static class BoundaryProximityProcessor
         try
         {
             userData = DspCallback.UserData(ref dsp_state);
-            if (userData == IntPtr.Zero) return RESULT.OK;
-            if (GCHandle.FromIntPtr(userData).Target is not BoundaryVoiceState bs) return RESULT.OK;
+            if (userData == IntPtr.Zero) { DspCallback.PassThrough(inbuffer, outbuffer, length, inchannels, outchannels); return RESULT.OK; }
+            if (GCHandle.FromIntPtr(userData).Target is not BoundaryVoiceState bs) { DspCallback.PassThrough(inbuffer, outbuffer, length, inchannels, outchannels); return RESULT.OK; }
             s = bs;
         }
         catch

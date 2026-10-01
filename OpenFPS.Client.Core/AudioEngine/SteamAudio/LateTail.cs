@@ -7,12 +7,11 @@ namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 /// The late part of a traced impulse response, ready to convolve: the trace's own omnidirectional
 /// channel from where the placed early reflections end, faded in, in the frequency domain.
 ///
-/// Why it exists. The tail of the room you stand in used to be Steam Audio's PARAMETRIC reverb, a
-/// feedback delay network that takes three decay times from the trace and nothing else — not its
-/// level, not its envelope. Measured against traces from where the sources really are, it was
-/// 14-20 dB too loud in the tunnel, 8-11 in a street, 0-3 in flat 01F, silent until 60 ms and then a
-/// step onto a plateau to 150 ms, decaying slower than the room ("an echo over top of the room", "a
-/// mask over where the reflections are coming from", 2026-09-29). The trace itself is none of that:
+/// Why it exists. Steam Audio's PARAMETRIC reverb is a feedback delay network that takes three decay
+/// times from the trace and nothing else — not its level, not its envelope. Measured against traces
+/// from where the sources really are, it is 14-20 dB too loud in the tunnel, 8-11 in a street, 0-3 in
+/// flat 01F, silent until 60 ms and then a step onto a plateau to 150 ms, decaying slower than the
+/// room: an echo over the room that masks where the reflections come from. The trace itself is none of that:
 /// it is dense, its energy falls from the first reflection on, and its level is the room's. The SDK
 /// keeps the traced IR opaque, so the tracer pushes an impulse through a private convolution to read
 /// it back (TracedReverb.ExtractLate), and this plays it.
@@ -58,9 +57,9 @@ internal sealed class LateTailIr
         double total = 0;
         for (int i = 0; i < n; i++) total += x[i] * (double)x[i];
         // Where the rest is 70 dB down: no partition past it is worth its cost.
-        int end = n;
+        int end = 0;   // silence is one empty partition, not the longest
         double rest = 0;
-        for (int i = n - 1; i >= 0; i--)
+        for (int i = n - 1; i >= 0 && total > 0; i--)
         {
             rest += x[i] * (double)x[i];
             if (rest > total * 1e-7) { end = i + 1; break; }
@@ -253,10 +252,10 @@ internal sealed class Fft
 /// nearest of the tail's directions (DiffuseTail.Direction). Each direction then has its own
 /// response — only the samples that came from that way — and they sum back to the trace exactly.
 ///
-/// Why. The tail was one channel spread over twenty directions by random filters: a field that is the
-/// same whichever way you face, so turning your head told you nothing and it sat in front of you as
-/// "a mass of reverb" (2026-09-30), which is where a generic head response puts anything without a
-/// direction. The trace knows better for its first few hundred milliseconds: the second and third
+/// Why. One channel spread over twenty directions by random filters is a field that is the same
+/// whichever way you face, so turning your head tells you nothing and it sits in front of you as a
+/// mass of reverb, which is where a generic head response puts anything without a direction. The
+/// trace knows better for its first few hundred milliseconds: the second and third
 /// bounces arrive off particular walls. From here they come from those walls, fixed in the room, and
 /// move round the head as it turns. Past <see cref="EndFadeStart"/>..<see cref="EndFadeEnd"/> the trace
 /// itself says the sound arrives from everywhere, and the diffuse rendering takes over; the two

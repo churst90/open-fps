@@ -110,6 +110,10 @@ public static class PrefabValidator
         Unit(r, "Scattering", t.Scattering);
         if (t.ShellThickness is < 0)
             r.Errors.Add($"ShellThickness {t.ShellThickness} cannot be negative.");
+        if (t.LeafMetres is < 0)
+            r.Errors.Add($"LeafMetres {t.LeafMetres} cannot be negative.");
+        if (t.StudSpacingMetres is < 0)
+            r.Errors.Add($"StudSpacingMetres {t.StudSpacingMetres} cannot be negative.");
 
         if (t.FaceMask.HasValue && t.MissingFaces != null)
             r.Errors.Add("FaceMask and MissingFaces both set — they describe the same thing and MissingFaces silently wins. Keep one.");

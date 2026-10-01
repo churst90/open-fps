@@ -158,7 +158,7 @@ public class ClientWorldState
     private static float SanePressure(float mb) => mb is > 300f and < 1100f ? mb : 1013.25f;
     private static float SaneAbsorptionMultiplier(float m) => m > 0.01f ? m : 1.0f;
 
-    public void Clear(Vector3 size, Vector3 minBound, Vector3 maxBound)
+    public void Clear(Vector3 size)
     {
         _definitions.Clear();
         _serverTransforms.Clear();

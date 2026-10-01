@@ -38,7 +38,7 @@ internal sealed class ClientAudioHarness
     /// default: the synthesised voices need no files.</param>
     public ClientAudioHarness(string? soundsPath = null)
     {
-        World.Clear(new Vector3(4000, 400, 4000), new Vector3(-2000, -100, -2000), new Vector3(2000, 300, 2000));
+        World.Clear(new Vector3(4000, 400, 4000));
         Facade = new AudioEngineFacade(Mixer);
         Facade.InitializeForTest(soundsPath);
         var sounds = new SoundMappingService(Player);

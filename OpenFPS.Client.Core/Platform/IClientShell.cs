@@ -16,8 +16,8 @@ namespace OpenFPS.Client.Core.Platform;
 /// </summary>
 public interface IClientShell
 {
-    /// <summary>Shows the loading screen with an initial status line.</summary>
-    void ShowLoading(string status);
+    /// <summary>Shows the loading screen with an initial status line, spoken unless <paramref name="speak"/> is false.</summary>
+    void ShowLoading(string status, bool speak = true);
 
     /// <summary>Updates the loading screen's status line and progress (0-100).</summary>
     void UpdateLoadingStatus(string text, int percent);

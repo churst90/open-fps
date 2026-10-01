@@ -76,7 +76,7 @@ public class PlaceNameTests
         Assert.True(maps.TryGetMapData("city", out var data));
 
         var client = new ClientWorldState();
-        client.Clear(data.Size, data.MinBound, data.MaxBound);
+        client.Clear(data.Size);
         var defs = EntityDefinitionFactory.StaticDefinitions(world).ToList();
         foreach (var def in defs) client.RegisterDefinition(def);
         client.SetAcousticMap(AcousticVolumeGenerator.GenerateRegions(defs, size, data.MinBound,
@@ -117,13 +117,13 @@ public class PlaceNameTests
         }
         _o.WriteLine($"{walked} pavement steps on {carriageways.Count} blocks of cross street");
         Assert.True(walked > 100, $"only {walked} concrete steps found beside the cross streets");
-        Assert.True(wrong.Count == 0, $"{wrong.Count} pavement step(s) not named a pavement: {string.Join("  ", wrong.Take(12))}");
+        Assert.True(wrong.Count == 0, $"{wrong.Count} pavement step(s) not named a sidewalk: {string.Join("  ", wrong.Take(12))}");
 
         // And a street is not a room. The region prefab defaults to IsIndoor, which would read as
         // full shelter (rain off, "Under Shelter") — the load survey has to measure every cross
         // street and its pavements as open. (Main Street's block 2 is correctly covered: two-thirds
         // of it lies under the tunnel roof.)
-        var indoor = defs.Where(d => Regex.IsMatch(d.Region.FriendlyName ?? "", @"^(Dock|Central|Foundry|North) Street( \w+ pavement)?, block \d+$")
+        var indoor = defs.Where(d => Regex.IsMatch(d.Region.FriendlyName ?? "", @"^(Dock|Central|Foundry|North) Street(, block \d+| sidewalk)$")
                                      && d.Region.IsIndoor)
                          .Select(d => d.Region.FriendlyName).ToList();
         Assert.True(indoor.Count == 0, $"{indoor.Count} street region(s) marked indoor: {string.Join(", ", indoor.Take(8))}");

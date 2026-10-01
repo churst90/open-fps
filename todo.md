@@ -1,198 +1,103 @@
 # To do
 
 Planned work in priority order. Finished work is in [changes.md](changes.md) and `git log`.
-Updated 2026-09-28.
+Updated 2026-09-30.
 
 ## Now
 
 In this order.
 
-### 1. Acoustics before moving on
-- Hear the one rule (2026-09-29, unheard): the street with the tail-only stage plus placed copies,
-  against `OPENFPS_TAIL=full` (the whole traced response, as before). A bus shelter and the station
-  platform, which used to fall on the "outdoors" side and get their roof twice. A machine indoors
-  (a flat's air conditioner), which now gets first-order copies off the walls as a sustained source.
-- Why -24? Three mechanisms, three places, one figure. The tunnel (concrete, scattering 0.1) wanting
-  the same trim as the flat rules out wall scattering as the cause. What is left is the listener:
-  a copy at its physical level through a generic HRTF in headphones is heard as an event where in
-  life it is fused or suppressed. If that is right, the number is a property of the listening chain
-  and belongs in a per-listener setting, saved like `/beacons every`. Measure before changing it.
-- The trim applies to every reflected path equally, so a room's weight against the direct sound is
-  set but its differences from other rooms are kept. If a place sounds dead at -24 (the open street's
-  tail is already 25 dB down by geometry), that is the case for a ceiling rather than a trim: reflected
-  energy compressed toward a level, the way Loudness compresses source levels. Not built.
-- The diffuse tail's level per band is within 5 dB of flat but not flat (+4.8 dB at 150-300 Hz,
-  -3.5 at 2.4-4.8 kHz). A head in a diffuse field is a few dB UP at 2-5 kHz, so the top is about 5 dB
-  shy. The decoder's virtual-speaker layout is Steam Audio's; if it matters by ear, weight the eight
-  directions or add a measured diffuse-field equalisation.
-- The generated flats are bare rooms: 8.65 by 17.86 by 2.73 m, plaster walls and ceiling, carpet,
-  one sofa. Traced decay 0.7-0.8 s, heard 1.1 s. A furnished flat that size measures about 0.5 s.
-  Furnishing (beds, sofas, curtains, shelves as absorbent boxes) belongs in the generator, not in a
-  per-map constant.
-- The tail leads in the left ear by 5 samples (0.11 ms) at 150-300 Hz in every clap of the 02:53
-  capture. The two ear decorrelators sum to the same delay but not to the same group delay at low
-  frequencies. Small; measure before touching it.
-- Blocked sources jump between bearings. A siren 150-300 m away behind buildings turned more than
-  30 degrees between updates 68 times in 11 minutes (2026-09-27) while the listener stood still. The
-  bearing comes from one edge of one building (the one with the longest detour), or from Steam
-  Audio's pathing probes 23.4 m apart when that edge is not in the clear, and it switches between
-  them. Real sound arrives round several edges at once: blend the routes by the energy each carries
-  and turn the bearing no faster than the geometry moves.
-- Reverb per surface: in the default traced mode every room's tail is traced by Steam Audio from
-  the material of each surface, so it is already per surface. Not yet checked: the traced decay of
-  the tunnel and the garage against real figures for spaces like them, and the three-band
-  absorption of each material in the registry. The enclosure estimate (tunnel and garage too long,
-  no area weighting) only applies under `/reverb room`.
-- A voice's ground reflection flanges, both summed into its direction and from its own direction
-  below (heard 2026-09-27, `--ground-voice`), though the physics says it is strong (Acta Acustica
-  2024, doi 10.1051/aacus/2024002). Voices have none until the missing part is found: whether the
-  HRTF has a torso shadowing sound from below, the talker's vertical radiation, or head and body
-  movement. The paper (inbox/aacus230104.pdf, read 2026-09-27) rules out "too strong": with mouth
-  and ears at 1.5 m over a hard floor, the reflection is 0 to +2.6 dB against the direct sound below
-  800 Hz at 3-7 m (+4.6 dB for [i] and [l]), below it at 800 Hz-1.6 kHz, and it fades only at an
-  absorption of 0.4-0.6. What was rendered (-3.6 dB) was weaker than that. The paper says the
-  perceptual side has not been studied, and notes that talkers make small head movements all the
-  time (Munhall et al.). Next: a lab render with realistic head and body movement on both ends.
-- Listen: pedestrian voices with their new low end and loudness, and the ground's answer on shots
-  and doors (built 2026-09-27).
-- Listen in the game to the traced reverb without the open ground (`/reverb traced`). The lab passes;
-  `/reverb room` was confirmed by ear.
+### 1. Walls, what is left (the panel model went in 2026-09-30, unheard)
+- Listen: through a wall the lows and the rumble should come through and the top should not.
+- A source just behind a building corner made of two boxes gets no diffraction route (the 5 cm joint
+  padding in `RouteIsClear` rejects the corner), so it drops to the wall alone. Fix without reopening
+  the shut-door crack leak.
+- Each floor is two overlapping 25 cm slabs, and carpet on a floor counts as a barrier: both are
+  panels in series, so upstairs is about 15 dB too quiet in the lows. Merge layers in contact.
+- No cavity resonances or air leaks: sealed glazing is about 10 dB optimistic in the mids, and door
+  gaps and seals are not modelled (wood door 41 dB at 2 kHz against about 32 measured).
+- Steam Audio counts walls in a row as (2n+1)/3 of one; the tracer counts them exactly.
+- Diffraction is evaluated at 200/1250/8000 Hz, not the band averages transmission uses.
 
-### 2. Bodies, wheels and roads
+### 2. Bodies and wheels (per-wheel physics in progress from 2026-10-01)
 Plan: [docs/NEXT_BODIES_WHEELS_ROADS.md](docs/NEXT_BODIES_WHEELS_ROADS.md) (agreed 2026-09-27).
-- Roads as data: lanes, junctions, crossings, surfaces; traffic follows lanes, keeps a gap, and
-  gives way by gap acceptance. Pedestrians cross at the corners (2026-09-28): they wait at the kerb
-  for a gap, drivers stop for anybody on a crossing, and a driver arriving at a junction lets
-  somebody across who has waited 8 s. Not yet heard in the game.
-- Turning paths cut over the kerb on the 7 m estate roads: a van's body passed within a metre of
-  somebody standing on the corner (`CrosswalkTests`, 2026-09-28). The turn's curve should keep the
-  body inside the carriageway.
-- A physical body for everything: traffic cars from their panels, people as soft solid bodies,
-  moving bodies in the acoustic scene.
+Stage 1, roads as data, is done.
+- A physical body for every entity: mass and volume for vehicles (from their panels), people and NPCs
+  as soft solid bodies, props and machines. Moving bodies go into the acoustic scene, so a bus or a
+  crowd blocks sound like a wall of its size and material.
 - Per-wheel physics from the preset: load transfer, slip, wheel speed from the tyre size.
 - A tyre source at each wheel, reading the surface under it.
-- Traffic lights and accessible pedestrian signals.
 - No physical value hard-coded in a model or map; presets move to JSON.
+- Turning paths cut over the kerb on the 7 m estate roads: a van's body passed within a metre of
+  somebody standing on the corner (`CrosswalkTests`). The turn's curve should keep the body inside
+  the carriageway.
+- Then traffic lights and accessible pedestrian signals.
 
-- Bump sounds when you walk into something (`--bumps` in the lab). Heard 2026-09-27: every one is
-  the same woofy, hollow thunk; a car door sounds like a bath tub, brick and concrete too. Two things
-  missing from the model: (1) radiation efficiency, since a panel below its critical frequency
-  hardly radiates its low modes, which is the boom; (2) a hard contact (hand, knuckle, ring) of about
-  a millisecond, which is what makes a knock on a car door or window a distinct transient. Then
-  anchor the level to the footstep takes. Demo again before it goes in the game.
-- Beacons as earcons: a family of bell-like chimes built on chords or intervals (root and fourth,
-  major chords), pleasant and unmistakably not a world sound; a different one for doors, vehicles,
-  items on the ground and general beacons; placed at the object. Render a set to choose from first.
-- Doors need work. References are now in `inbox/door sounds` (a door opening, heavy knocking on
-  wooden inside doors, a clean car door opening and closing); the older latch and open-close files
-  are no longer in the inbox. The car door is done (2026-09-28): `CarDoor.cs`, fitted to a recording, approved by ear.
-  House and steel doors still use the generic model. Model the mechanism: latch bolt riding the strike and dropping in, hinge
-  stick-slip creak, the leaf swinging, the leaf striking the frame; recordings are the spec, as for
-  gunfire.
+### 3. Doors from the recordings
+The car door (`CarDoor.cs`) is done and approved. House and steel doors still use the generic model.
+- The fitted octave-band noise model (branch `worktree-agent-a6e2f6e0e3da748cd`) was rejected by ear
+  on 2026-10-01: scratchy and grainy, and wood and steel sounded the same. Not merged.
+- Next approach to be agreed with Cody: recorded takes played as a bank, or a contact and modal
+  model in which wood and steel differ by their own resonances.
+- The knock (`DoorKnock`) may be about 20 dB short at 1-2 kHz against both knock recordings.
 
-### 3. Speech and sounds at login and in chat (Cody, 2026-09-28)
-Done 2026-09-28 except the zone names below (loading steps silent, arrival line, /tp, chat cues).
-- On connecting, say only "Logged in. You are in <map>, <zone>." Stop speaking "Receiving
-  entities", "Preloading", "Geometry ready", "Acoustics ready" and the percentages
-  (`ClientGameSession.cs` 783-983, `GtkClientShell.cs` 91-104). Failures are still spoken.
-- `/tp` replays the whole entry into the world: the entry chord and "You have entered the world. Use
-  W A S D to move" (`ClientGameSession.cs` 878-898, the PlayerSpawned case has no teleport guard). A
-  teleport should only say where you are. Every command reply also plays a tick, because server text
-  comes in as a chat message with no sender.
-- Map chat and general chat sound the same for staff: a message from an admin plays the admin cue in
-  place of the channel's (`ClientGameSession.cs` 154-160). Keep the channel's cue and mark staff
-  some other way. Cody logs in as admin, so he hears this on every message.
-- Zone names: every street has a sidewalk on each side, and the zone is spoken as "sidewalk", not
-  "Main Street east pavement, block 2" (`tools/gen_city.py` 1101-1133). The street's name stays
-  available on the where-am-I key.
-
-### 4. Vehicles by ear (Cody, 2026-09-28)
-- Some of the gruffer exhausts sound as if a hand is over the tailpipe, and one or two cars lack low
-  end. Check the whole gas path on every preset: the exhaust leaves at the tailpipe exits, pointing
-  the right way, at the right level. Leads: `Steepening` is silently capped at 1.5
-  (`ExhaustNetwork.cs` 145), so the sports bike's 1.6 and the V-twin's 2.0 do nothing; a narrow
-  tailpipe radiates less bass (`Waveguide.cs` 419); stock mufflers with resonators.
-- A diesel pickup sounds backwards, like the driver jumps on the gas and then lets off, the reverse
-  of what it should be; the truck sounds like the driver cannot drive. Check turbo lag and boost-
-  limited fuelling against load, and the driver's gear changes. Find which preset first
-  (`diesel_i4`, `diesel_cummins`, `powerstroke73`, `duramax_compound`).
-- Motorbikes: the exhausts are too long, "farting into a bottle". The stock cruiser (`vtwin_stock`)
-  builds 1.88 m and 2.11 m; the others 0.78-1.33 m. Cody wants about 0.5 m. Shorten the headers,
-  collector, mid-pipe and muffler on the bike presets.
-- A Lamborghini V10, and a V12: the aggressive idle, the revs and the exhaust, built on the
-  Flowmaster exhaust work. The `v10` and `v12` presets are generic today. Take firing order, header
-  layout, exhaust valves and rev limit from sources.
-
-### 5. Mutation testing
+### 4. Mutation testing
 Results so far are in [docs/MUTATION_2026-09-24.md](docs/MUTATION_2026-09-24.md).
-- Shared maths (`Loudness`, `Enclosure`, `ImageSource`, `EarlyReflections`, `TyreFriction`,
-  `Honk`): 74.6%, survivors killed or recorded as equivalent.
+- Running from 2026-09-30: the code changed since 2026-09-25 (acoustics, engine, roads), and the
+  whole server. Then kill the survivors: a test for each, or a note on why it is equivalent.
+- Shared maths: 74.6%, survivors done. Engine code: 93.7%, survivors done (`EngineMutationTests`).
 - Client (`VoiceManager`, `VehicleShadow`, `BeaconAids`, `BirdLife`): 39.2%, survivors not yet done.
-  `EchoDiffuser` was never mutated (its line range went stale).
-- Server and whole-Common runs (35.5% and 47.0%): not yet triaged.
-- Engine code (`Engine/*.cs`, `VehicleSynth`, `Pneumatics`): finished 2026-09-28 after 2 days 19
-  hours, 93.7% (1,352 killed, 1,429 timed out, 46 survived, 140 not covered; report copied to
-  `~/openfps-scratch-archive/mutation-2026-09-28/`). Survivors: `Driveline` 28, `AirSystem` 18. Not covered: `EngineSynth` 56,
-  `AirSystem` 31, `Driveline` 21. The run was on the tree of 2026-09-25; eight commits have changed
-  these files since, and `ExhaustRadiation.cs` is new and was never mutated. Map the survivors onto
-  the current code, then re-run only the changed files.
-- For every surviving mutant: write the test that kills it, or record why it is equivalent.
-  Engine run done 2026-09-28 (`EngineMutationTests`): the driver's pedals, launch, clutch and shifts,
-  the network driver switching off, the valve solver's bracket ends, the compressor. Found a real one:
-  a shift left the throttle open for its first sample. `ValveResidual` (unused and stale) deleted;
-  diagnostic text marked for Stryker to skip. Next: re-run the changed engine files and
-  `ExhaustRadiation.cs`.
-- Each test process leaves an `openfps-test-config-<pid>` folder in /tmp. Remove it on exit.
-- `BirdLifeTests.AHedgeOfSparrowsChattersAndABangShutsItUp` fails now and then: BirdLife's random
-  generator is unseeded, so a minute of chirps can fall outside the test's range. Seed it in tests.
 
-### 6. Cleansing pass, the rest
-- `ChatManager` sender-prefix leftovers.
-- Lab spikes nothing uses.
-- The 18 `OPENFPS_*` switches: keep the ones still needed, remove the rest.
-- Comments that tell history instead of what the code does. The history belongs in `changes.md`.
-- Places where the same thing is done twice.
-- `PhysicsAcousticBridgeSystem` is never wired up.
-- Stale comments: "KNOWN GAP: no turbine" in `Engines.cs`; "no runtime map change" in
-  `run-server.sh` and the server's `Program.cs` (`/join` does it now).
-- `ClientWorldState.Clear` still takes grid bounds it no longer uses.
-- The unused `users.json` files (the server uses `openfps.db`).
+### 5. Cleansing, what is left
+Done 2026-09-30 (see changes.md). Left:
+- The two client heads' startup handlers are near copies; about 25 lab spikes each find ASSETS
+  their own way.
+- `WeaponSynth.CompositeBlast`, `RecordedBlend` and `FiringTakeIndex` are used only by `BattleSpike`;
+  the game plays no recorded gunfire.
+- `ClientGameSession.cs`, `WorldAudioPlayer` and `AsyncAcousticWorker` still have dated comments.
+- The full test suite takes about 40 minutes for 1,415 tests; the readme says 18 minutes and 940.
+
+### 6. Acoustics still open
+- The tail and the copies sit at -6 by ear (0 is physical). Cody is happy with that.
+- Below 120 Hz the tail is identical in both ears, so it sits in the head.
+- A voice's ground reflection flanges (heard 2026-09-27), though the physics says it is strong
+  (Acta Acustica 2024, doi 10.1051/aacus/2024002). Voices have none until the missing part is found:
+  the HRTF's torso, the talker's vertical radiation, or head and body movement. Next: a lab render
+  with realistic head and body movement on both ends.
+- Blocked sources come from one edge of one building at a time. Heard fine on the 2026-09-30 walk;
+  if a siren behind buildings wanders again, blend the routes by the energy each carries.
+- The traced echoes still convolve at the mixer's 1,024 samples and arrive about 20 ms late (the
+  reverb runs in 256-sample pieces).
+- The generated flats are bare rooms. Furnishing (beds, sofas, curtains, shelves as absorbent boxes)
+  belongs in the generator, not in a per-map constant.
+- The traced decay of the tunnel and the garage against real figures for spaces like them.
 
 ### 7. Tests for the untested audio code
 From [docs/COVERAGE_2026-09-24.md](docs/COVERAGE_2026-09-24.md):
 - `ClientAudioSystem`: which vehicles get a live voice and the level each is placed at (9% covered),
-  through the fake audio provider.
-  Include which voices receive an acoustic path: the borrowed distant-car voices never did until
-  2026-09-24, and nothing could have caught it.
+  through the fake audio provider, including which voices receive an acoustic path.
 - `VehicleShadow.Apply` and `EngineReflections`.
 - One test per DSP callback processor.
 - `AsyncAcousticWorker` paths that do not need Steam Audio.
 
-### 8. Vehicle consistency audit
-- Cody 2026-09-28: "all of the exhaust everywhere is just quiet ... the bassy rumble needs to come
-  down". Pickups done first (turbine). Cars next. A diesel at cruise fuel is nearly all bass on the
-  bench (centroid 83 Hz at 3-10 % fuel): check the blowdown against a recording before touching it.
-Every vehicle configured the same way, so its loudness is predictable.
-- One table for every preset: declared level, live level at 7.5 m pass-by and at idle, engine bay
-  leakage, extent, level lift, air system, horn. Fix outliers in the configuration, not with trims.
-- The motorbikes (`single`, `sportbike`) have never been measured on `--voice-levels`: they never
-  reach full load there.
-- The parking garage has columns only round its edge and nothing inside 110 x 84 m, so a sound there
-  echoes only off the floor and ceiling (4-20 ms, fused). A real garage has a column grid every
-  8-16 m; offered to Cody 2026-09-28.
-- The sports bike's pull-away (`--shift-trace sportbike`): for the first three seconds the revs swing
-  2,800-4,200 rpm. At the clutch's least bite the idle governor opens the air against the load, and a
-  200 kg bike then outpulls a 2 m/s^2 target on no throttle at all. Its 1-2 quickshift also surges
-  the bike 5 km/h (the engine is still 1,300 rpm above second when the dogs engage).
-- The intake has no level anchor: the i4 and V6 intakes measure louder than their exhausts.
-- Buses are about 5 dB under real life (95 dB at 1 m against 98-102).
+### 8. Vehicles (set aside 2026-09-30: they sound good)
+The louder exhaust since 2026-09-29 is mostly a real correction: the turbine was a 260 Hz low-pass
+that let a third of the wave through, and is now a flat loss that scatters the top, as measured
+turbines do. The rest is the reflections coming up from -24 to -6. Still open, for when vehicles are
+picked up again:
+- `Steepening` is silently capped at 1.5 (`ExhaustNetwork.cs` 145): the sports bike's 1.6 and the
+  V-twin's 2.0 do nothing.
+- The pickups' pipe size, steepening and wall loss were chosen by ear. `WallLossMultiplier` (0.8-2.5
+  per preset) has no anchor.
+- A narrow tailpipe radiates less bass (`Waveguide.cs` 419); not checked.
+- The motorbikes `single` and `vtwin_stock` have never been measured on `--voice-levels`.
 - The 2.8 turbo diesel is jet-heavy (89 dB total against 74 dB of engine).
-- `PortNoiseLevel` and `EvoTemperatureK` are declared and never read.
-- A big cam's idle lope: since the airflow fix (2026-09-24) a 308-degree cam idles no rougher
-  than a stock one, so `BigCam_IdlesRougherThanStockCam` is skipped. Burnt gas pushed back up the
-  runners still vanishes instead of mixing into the plenum (tracking it properly over-dilutes
-  every idle, so the model's reversion flow is too large); fix that and the lope comes back from
-  the physics.
+- Motorbike exhausts too long ("farting into a bottle"); Cody wants about 0.5 m.
+- The diesel pickup that sounds backwards (turbo lag, boost-limited fuelling, gear changes).
+- A Lamborghini V10 and a V12 from sourced firing orders, header layouts and exhaust valves.
+- One table for every preset: declared level, live level at 7.5 m and at idle, bay leakage, extent.
+- Buses about 5 dB under real life; `PortNoiseLevel` and `EvoTemperatureK` never read; a big cam's
+  idle lope; the sports bike's pull-away surge.
 
 ### 9. Gunfire
 As realistic as possible.
@@ -205,9 +110,18 @@ As realistic as possible.
 - Also: a shotgun, an impact sound per material, casings that land and bounce where they fall,
   and a proper fire message in the protocol.
 
-### 10. Documentation
-- readme, todo and changes: rewritten 2026-09-24, brought up to date 2026-09-27.
-- User manual, one document in two parts (Playing; Running a server): `docs/MANUAL.md`.
+### 10. Zones (discussed 2026-09-30, waiting on Cody)
+- Today a zone is a named box in the map (`acoustic_region`), placed by hand or by a generator; its
+  materials are measured from the walls round it, but its shape is not. The smallest box you stand
+  in is the one said.
+- Proposal: a room or a building names its own zone from its own walls, so most zones need no box;
+  a free-standing zone (a park, a plaza, a car park) stays a box in the map, named, with no entity
+  behind it; a zone inside a zone is said as the inner one, with the outer one on the where-am-I key.
+
+### 11. Bump sounds
+When you walk into something (`--bumps`): every one is the same woofy, hollow thunk. Missing:
+radiation efficiency (a panel below its critical frequency hardly radiates its low modes), and a
+hard contact of about a millisecond. Then anchor the level to the footstep takes.
 
 ## Next
 
@@ -248,6 +162,7 @@ in the game. Needs the roads and bodies work first.
 
 ### Listen and confirm
 Built but never heard in the game. Each needs a listen before it counts as done.
+- Arriving: "You're in <map>, at <zone>." The city's sidewalks; no "Under Shelter" at doorways.
 - Street life: honks, hard stops, cars parking. (Traffic as a whole was heard 2026-09-27 and is
   fine as it is.)
 - Pedestrian and driver speech since the fix for the room-like copy.
@@ -267,11 +182,10 @@ Some may already be fixed; confirm before fixing again.
 
 ### Server
 - Admin commands to change a password and a role. Today the only way is editing `openfps.db`.
-- The default admin account is `admin` / `admin123`: make the first run ask for a password.
+- The default admin account is `admin` / `admin123` unless `OPENFPS_ADMIN_PASSWORD` is set (the
+  server warns at start): make the first run ask for a password.
 - A failed port bind still logs "started". Fail loudly instead.
 - `/savemap` rewrites a map as plain JSON and loses its comments.
-- `run-server.sh` prints port 33288 even when `--port` says otherwise; `OPENFPS_PORT` only drives
-  its check.
 - `/restart` and `/reloadmap` for admins.
 - The MUD interface is plain TCP on all interfaces, and the game port accepts any connection
   without a key. Decide what a public server needs.
@@ -363,9 +277,6 @@ Some may already be fixed; confirm before fixing again.
 - Map authoring commands such as `/createmap`.
 - Engine braking, rev-matched downshifts, gear whine.
 
-### Zones that overlap
-Done 2026-09-28: the smallest zone wins. Still open: Z could say "<inner>, in <outer>".
-
 ### Traffic faults that come and go with the mix (2026-09-28)
 Any change to which cars drive reshuffles the city's traffic, and two tests fail or pass with it:
 - `CrosswalkTests.Walkers_wait_for_a_gap...`: one sample in 13,090 of a stopped car overlapping a
@@ -374,14 +285,3 @@ Any change to which cars drive reshuffles the city's traffic, and two tests fail
 - `CarFollowingTests.No_two_vehicles_meet_inside_a_junction`: two nearly stopped cars 1.9 m apart
   side by side at a junction entry (the test exempts side by side only from 2 m).
 Both passed on the mix before the four loud cars went in; neither involves those cars.
-
-### Traced echoes are still a mixer block late
-The traced REVERB runs in 256-sample pieces since 2026-09-28 (first reflection 5-8 ms, was 20-23).
-The per-source traced ECHOES (TracedEchoes, FmodAudioProvider ~1714) still convolve at the mixer's
-1,024 and so arrive about 20 ms late too; same change if they are heard as detached.
-
-### The terminal is a bare concrete box (2026-09-29)
-30 x 164 x 6.5 m of concrete walls and ceiling over tile: Sabine puts it near 20 s and the tracer
-measures 7-10 s. A real terminal has a suspended acoustic ceiling (alpha ~0.7), which is what keeps
-it to 2-3 s. Offered to Cody: an acoustic-tile ceiling material for the terminal (and the concourse
-of any big public building), not a reverb trim.

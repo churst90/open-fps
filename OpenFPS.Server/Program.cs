@@ -276,8 +276,8 @@ public class GameServer
     }
 
     /// <summary>
-    /// Sends to a session over whichever transport it actually has. A MUD session has no UDP peer, which
-    /// is why every gameplay reply used to vanish for telnet players — including chat aimed at them.
+    /// Sends to a session over whichever transport it actually has. A MUD session has no UDP peer, so a
+    /// reply sent only by UDP would vanish for telnet players — including chat aimed at them.
     /// </summary>
     /// <summary>
     /// Somebody saying something: to their own map, which is what plain typing does, or to everyone
@@ -357,9 +357,9 @@ public class GameServer
             s.InputQueue.Enqueue(req);
         });
         _dispatcher.RegisterHandler<TextCommand>((id, req, reply) => {
-            // No peer lookup here any more: that guard was the only thing keeping MUD commands out, and
-            // it dropped every one of them silently. Commands now run on the tick thread whatever the
-            // transport, so a telnet client is just another session.
+            // No UDP peer lookup here: a MUD session has none, so such a guard would drop every MUD
+            // command silently. Commands run on the tick thread whatever the transport, so a telnet
+            // client is just another session.
             if (req.Command.TrimStart('/').Equals("ready", StringComparison.OrdinalIgnoreCase)) HandlePlayerReady(id);
             else _commands.HandleTextCommand(id, req, reply);
         });
@@ -513,8 +513,7 @@ public class GameServer
 
     private void HandleLogin(int connectionId, LoginRequest request, Action<IMessage> reply)
     {
-        // One path for both transports. The MUD gateway used to have its own copy of this, which is how
-        // it ended up with neither the rate limit nor the spawn.
+        // One path for both transports, so the MUD gateway gets the same rate limit and spawn.
         if (!_authLimiter.TryConsume(RateKeyFor(connectionId)))
         {
             Log.Warning("Login rate limit hit for connection {Id} (user '{User}').", connectionId, request.Username);
@@ -1160,8 +1159,8 @@ public class GameServer
             return;
         }
 
-        // The reply used to be an unconditional Success = true, so a duplicate username told the player
-        // their account was created and then refused every login with it.
+        // The reply follows what AddUser did: a duplicate username must not be told its account was
+        // created.
         bool created = _userRepo.AddUser(request.Username, request.Password, UserRole.Player);
         reply(created
             ? new RegisterResponse { Success = true, Message = "Registration Successful." }
@@ -1240,12 +1239,10 @@ public class Program
                 server.Stop();
             });
 
-            // --port lets a second server be brought up beside a running one, which is the only way
-            // to smoke-test a map change without taking someone's session down.
-            // --map picks the landing map. There is no runtime map change, so without this every map
-            // but the one claiming IsDefault is unreachable in play — the rooms-and-doorways map
-            // included, which is the only one that can answer whether pathing and portal reverb are
-            // right by ear.
+            // --port lets a second server be brought up beside a running one, to smoke-test a change
+            // without taking someone's session down.
+            // --map picks the landing map, where every player arrives at login. Without it the map
+            // claiming IsDefault is the landing map; players reach the others with /join.
             int port = 33288;
             for (int i = 0; i < args.Length - 1; i++)
             {

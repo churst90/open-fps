@@ -25,15 +25,12 @@ public static class AcousticConstants
     public const float OcclusionMaxHighMuffleDb = -40.0f;
     public const float OcclusionMaxMidMuffleDb = -30.0f;
     public const float OcclusionMaxLowMuffleDb = -20.0f;
-    public const float TransmissionBleedFactor = 0.15f;
     public const float OcclusionCap = 0.95f;
     
     // --- Reverb & Reflections ---
     //
-    // MaxReflectionOrder and ReflectionMergeDistance used to live here and are gone with the generator
-    // that needed them. A recursive ray solve produced a scatter of near-duplicate reflections and then
-    // merged whatever landed within three metres to hide it; an image source produces exactly one
-    // arrival per surface, so there is nothing to merge and no order to cap. What a surface returns and
+    // No reflection order or merge distance: an image source produces exactly one arrival per
+    // surface, so there is nothing to merge and no order to cap. What a surface returns and
     // how wide it reads are properties of the surface — see OpenFPS.Common.EarlyReflections.
     public const float ReflectionEnergyThreshold = 0.05f; 
     public const float ReflectionMinSpread = 15.0f; // Minimum degrees of spread for a reflection
@@ -90,10 +87,9 @@ public static class AcousticConstants
     // for "the outdoors", which takes the whole map as one room, returns an enormous number, and
     // washes the entire world in undirected reverb; that estimate is why the outdoor bus is muted.
     //
-    // Steam Audio's ray-traced RT60 does not have that problem for the TIME. It does for the LEVEL, and
-    // two constants used to live here that tried to read one off the other — a decay below which
-    // outdoors stayed dry, and a decay at which the bus reached full wet. They are gone, because the
-    // premise under them is false: the estimator fits a curve to whatever energy its rays bring home
+    // Steam Audio's ray-traced RT60 does not have that problem for the TIME. It does for the LEVEL:
+    // the level must not be read off the decay (no "dry below this decay, full wet at that one"),
+    // because the estimator fits a curve to whatever energy its rays bring home
     // and cannot report that there was hardly any, so a roofless yard fits a LONGER tail than the same
     // walls with a roof on (1.00 s against 0.60 s, AudioLab --sim-reverbfield). No threshold can
     // separate places that sit on the same side of it. How loud the tail is comes from how enclosed
@@ -101,13 +97,11 @@ public static class AcousticConstants
     /// <summary>
     /// Loudest the reverb bus may get, dB — full wet, which is where a sealed hard room belongs.
     ///
-    /// It used to be -16, from a time when this wash was the only thing representing a room and had to
-    /// be kept out of the way of everything else. Both halves of that have changed: the surfaces answer
-    /// individually now (EarlyReflections), so this is only the diffuse remainder behind them, and the
-    /// LEVEL of that remainder is measured rather than chosen — it is the fraction of emitted energy
-    /// that comes back, which for open ground is one percent and for a sealed hard box is nearly all of
-    /// it. Holding the top of that scale 16 dB down put a hard-walled courtyard at -35 dB, which is
-    /// audible in a meter and not in the ear.
+    /// Zero, not a trim: the surfaces answer individually (EarlyReflections), so this is only the
+    /// diffuse remainder behind them, and the LEVEL of that remainder is measured rather than chosen —
+    /// it is the fraction of emitted energy that comes back, which for open ground is one percent and
+    /// for a sealed hard box is nearly all of it. Holding the top of that scale 16 dB down puts a
+    /// hard-walled courtyard at -35 dB, which is audible in a meter and not in the ear.
     /// </summary>
     public const float OutdoorMaxWetDb = 0.0f;
 
@@ -125,17 +119,15 @@ public static class AcousticConstants
     /// <summary>
     /// How enclosed a place may be and still have <see cref="OutdoorMaxDecayMs"/> applied to it.
     ///
-    /// The cap above was written against a ray tracer whose rays "do not all find the sky", and that
-    /// is no longer the estimator. Enclosure.Look treats a direction that hits nothing as a perfect
+    /// The cap above is for a ray tracer whose rays do not all find the sky. Enclosure.Look treats a direction that hits nothing as a perfect
     /// absorber, so the sky is IN the measurement: a street on the city map reads 525 ms and a
     /// pavement 627, with no cap involved at all. Nothing genuinely outdoors comes near 1,100.
     ///
-    /// What the cap had started doing instead was silencing the places that are supposed to ring. It
-    /// is applied to any region with no Sabine estimate, and a roofed tunnel has none — so a tunnel
-    /// measuring three seconds was served 1.1, and was reported as "tunnel sounds dry, but shouldn't
-    /// it sound echoy like reverby wet?". A car park's upper deck measured 4.5 s, a tiled stairwell 2.
+    /// Applied to every region with no Sabine estimate, the cap would silence the places that are
+    /// supposed to ring: a roofed tunnel has none, so a tunnel measuring three seconds would be served
+    /// 1.1 and sound dry. A car park's upper deck measures 4.5 s, a tiled stairwell 2.
     ///
-    /// So the cap now asks whether the place is actually open. Below this it is outdoors and the cap
+    /// So the cap asks whether the place is actually open. Below this it is outdoors and the cap
     /// is the safety net it was meant to be; above it, the rays found walls and a roof, and what they
     /// measured is what a listener should get.
     /// </summary>
@@ -150,14 +142,14 @@ public static class AcousticConstants
     /// unit is the difference between FMOD's internal scaling and unity, which is a property of the
     /// DSP and not of the place — so it is one number and does not move.
     ///
-    /// It used to be driven by a loop that metered the unit and held its gain at unity, and that loop
-    /// was cancelling the rooms: a reverberation unit accumulates energy in proportion to its decay,
-    /// so a long tail measures a higher output and was trimmed back down by exactly as much as it was
-    /// live. Six decibels for a corridor against thirteen for a seven-second hall. See the note in
+    /// Never a loop that meters the unit and holds its gain at unity: that cancels the rooms. A
+    /// reverberation unit accumulates energy in proportion to its decay, so a long tail measures a
+    /// higher output and would be trimmed back down by exactly as much as it is live: six decibels for
+    /// a corridor against thirteen for a seven-second hall. See the note in
     /// FmodAudioProvider.ApplySimulatedReverb for the measurements.
     ///
-    /// Minus six is where that loop settled for a mid-sized room, which is the one place it was
-    /// giving the right answer.
+    /// Minus six is where such a loop settles for a mid-sized room, the one place it gives the right
+    /// answer.
     /// </summary>
     public const float ReverbUnitWetDb = -6.0f;
 
@@ -167,31 +159,27 @@ public static class AcousticConstants
     // geometry — which wall, how far, what it is made of — and the image-source pass measures them
     // per source; a reverb unit's are a fixed pattern of copies stamped onto every transient a tenth
     // of a millisecond after it, whatever the room. Measured on a footstep in the wood room: with
-    // them the step peaked 9 dB louder than dry and sat on the master limiter's ceiling on every step;
-    // heard as "pop pop pop, like four or five copies of reflections piling up on every step, and the
-    // footsteps are loud". The unit renders the diffuse tail only, starting after the mean free path
+    // them the step peaks 9 dB louder than dry and sits on the master limiter's ceiling on every step,
+    // heard as four or five copies piling up on every step. The unit renders the diffuse tail only, starting after the mean free path
     // has been crossed a couple of times, which is when reflections become too dense to have a
     // direction (see FmodAudioProvider.ApplySimulatedReverb).
     //
     // ── AND THE NUMBER THAT SAYS SO IS NOT THE ONE IT LOOKS LIKE ────────────────────────────────
     //
     // FMOD's EARLYLATEMIX is the blend of LATE REVERB TO EARLY REFLECTIONS: 0 is all early, 100 is
-    // all late. This was 0, written to mean "early reflections off", and it means early reflections
-    // ONLY — the unit rendered its fixed stamped pattern and no tail whatever, in every room, however
-    // long that room's decay was measured and applied. Measured with AudioLab --tailcheck, one
-    // footstep in a room configured for six seconds: at 0 the mixer is at the noise floor 500 ms
-    // later; at 100 it is still 28 dB up two seconds later. Heard as *"the tail on the reverb is the
-    // same no matter where I am in the stairs, corridor or parking garage... just sounds like a
-    // metallic box, short reflections are not in a parking garage"* — which is an exact description of
-    // a fixed early-reflection pattern with the room removed from behind it.
+    // all late. 0 reads like "early reflections off", and it means early reflections ONLY — the unit
+    // renders its fixed stamped pattern and no tail whatever, in every room, however long that room's
+    // decay. Measured with AudioLab --tailcheck, one footstep in a room configured for six seconds: at
+    // 0 the mixer is at the noise floor 500 ms later; at 100 it is still 28 dB up two seconds later.
+    // At 0 every place sounds like the same metallic box: a fixed early-reflection pattern with the
+    // room removed from behind it.
     //
     // So it is named after the parameter it writes, because the trap is the name.
     public const float ReverbLateToEarlyMixPercent = 100.0f;
     public const float ReverbLateDelayMeanFreePaths = 2.0f;
     public const float ReverbLateDelayMaxMs = 100.0f;   // the unit's own ceiling for the parameter
     /// <summary>How fast the outdoor wet level moves toward its target, per audio update. Stepping it
-    /// in one frame is a step change in the signal, which is a click — the same fault that the region
-    /// bus's binaural bypass had when crossing a threshold.</summary>
+    /// in one frame is a step change in the signal, which is a click.</summary>
     public const float OutdoorWetBlendSpeed = 0.06f;
     
     // --- Panning & Volumetric ---

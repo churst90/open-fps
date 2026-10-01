@@ -117,6 +117,15 @@ public class PrefabTemplate
     /// <summary>Wall thickness in metres for a hollow shell; &gt; 0 marks the collider hollow.</summary>
     public float? ShellThickness { get; set; }
 
+    /// <summary>A wall built as two leaves of its material over a cavity: each leaf's thickness, metres
+    /// (0.0125 for plasterboard). The rest of the box's thickness is the cavity. Absent for a solid
+    /// wall. Decides how much gets through it, band by band (WallTransmission).</summary>
+    public float? LeafMetres { get; set; }
+
+    /// <summary>The centres of the studs a two-leaf wall's leaves are fixed to, metres (0.6 for
+    /// standard framing). Absent when the leaves meet only at the edges of the panel.</summary>
+    public float? StudSpacingMetres { get; set; }
+
     /// <summary>Which faces exist, as a bit mask: North 1, South 2, East 4, West 8, Top 16, Bottom 32
     /// (63 = closed box). Mutually exclusive with <see cref="MissingFaces"/> — set one or the other.</summary>
     public int? FaceMask { get; set; }

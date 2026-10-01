@@ -1141,6 +1141,8 @@ for ax in AVENUES:
 #
 # A street is a place and wants a name as much as a room does. None of these is indoors; the survey
 # will find one or two covered faces and say so, which is the point — "Outside" is not a location.
+# Both sides of a street are "<street> sidewalk", one name the whole length, so walking along it is
+# silent and stepping off it onto the carriageway ("<street>, block N") is said.
 for ax, aname in zip(AVENUES, ("Wharf Avenue", "Main Street", "Calder Avenue")):
     z0, z1 = (MAIN_Z0, MAIN_Z1) if ax == 0.0 else (AVE_Z0, AVE_Z1)
     n = max(1, int((z1 - z0) // 60))
@@ -1149,8 +1151,8 @@ for ax, aname in zip(AVENUES, ("Wharf Avenue", "Main Street", "Calder Avenue")):
         if ax == 0.0 and b <= TUNNEL_Z1:
             continue                                  # that stretch is the tunnel, already named
         region(f"{aname}, block {k + 1}", ax - KERB, ax + KERB, 0.0, 6.0, a, b)
-        region(f"{aname} west pavement, block {k + 1}", ax - WALK, ax - KERB, 0.0, 4.0, a, b)
-        region(f"{aname} east pavement, block {k + 1}", ax + KERB, ax + WALK, 0.0, 4.0, a, b)
+        region(f"{aname} sidewalk", ax - WALK, ax - KERB, 0.0, 4.0, a, b)
+        region(f"{aname} sidewalk", ax + KERB, ax + WALK, 0.0, 4.0, a, b)
 
 for sz, sname, sx0, sx1 in ((STREETS[0], "Dock Street", ST_X0, ST_X1),
                             (STREETS[1], "Central Street", RES_X0, TERM_X0 - 6.0),
@@ -1161,10 +1163,9 @@ for sz, sname, sx0, sx1 in ((STREETS[0], "Dock Street", ST_X0, ST_X1),
         a, b = sx0 + k * (sx1 - sx0) / n, sx0 + (k + 1) * (sx1 - sx0) / n
         region(f"{sname}, block {k + 1}", a, b, 0.0, 6.0, sz - KERB, sz + KERB)
 
-# The cross streets' pavements, named as the avenues' are. They were left out, so every metre of
-# footway along Dock, Central, Foundry and North Street fell into the map-wide outdoor region and was
-# announced as "Outside" — the one word a player cannot navigate by. Emitted after the carriageways,
-# in the same order, so the ids come out as they are in city.json.
+# The cross streets' sidewalks, named as the avenues' are. Without them the footway fell into the
+# map-wide outdoor region and was announced as "Outside". Emitted after the carriageways, in the same
+# order, so the ids come out as they are in city.json.
 for sz, sname, sx0, sx1 in ((STREETS[0], "Dock Street", ST_X0, ST_X1),
                             (STREETS[1], "Central Street", RES_X0, TERM_X0 - 6.0),
                             (STREETS[2], "Foundry Street", ST_X0, APRON_X0),
@@ -1172,8 +1173,8 @@ for sz, sname, sx0, sx1 in ((STREETS[0], "Dock Street", ST_X0, ST_X1),
     n = max(1, int((sx1 - sx0) // 60))
     for k in range(n):
         a, b = sx0 + k * (sx1 - sx0) / n, sx0 + (k + 1) * (sx1 - sx0) / n
-        region(f"{sname} south pavement, block {k + 1}", a, b, 0.0, 4.0, sz - WALK, sz - KERB)
-        region(f"{sname} north pavement, block {k + 1}", a, b, 0.0, 4.0, sz + KERB, sz + WALK)
+        region(f"{sname} sidewalk", a, b, 0.0, 4.0, sz - WALK, sz - KERB)
+        region(f"{sname} sidewalk", a, b, 0.0, 4.0, sz + KERB, sz + WALK)
 
 # ══ Where the traffic runs ════════════════════════════════════════════════════════════════════════
 #
