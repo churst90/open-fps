@@ -94,6 +94,45 @@ public class RailRunTests : IDisposable
         }
     }
 
+    // ── Stops ───────────────────────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// A line with one platform: the train stops, stands, and goes on round. With one stop the next
+    /// stop after it is itself, and the train was still standing at it at zero speed, so it began
+    /// dwelling again and never left.
+    /// </summary>
+    [Fact]
+    public void A_train_leaves_the_only_platform_on_its_line()
+    {
+        var f = new Fixture(_dir, topSpeedKmh: 30f, startMetres: 50f,
+                            stops: new[] { new TrackStopData { AtMetres = 150f, DwellSeconds = 5f, Kind = "platform" } });
+        var stands = f.RunAndRecordStands(240f);
+        foreach (var (at, seconds) in stands) _o.WriteLine($"stood {seconds:F1} s at {at:F0} m");
+        Assert.NotEmpty(stands);
+        Assert.InRange(stands[0].At, 147f, 152f);
+        Assert.True(stands[0].Seconds < 10f, $"stood {stands[0].Seconds:F0} s at a 5 s platform");
+        Assert.True(f.Distance > 300f, $"went {f.Distance:F0} m in four minutes");
+    }
+
+    /// <summary>
+    /// A train placed past the first platform stops at the next one ahead of it, rather than running
+    /// a lap to the first one in the list and passing everything on the way.
+    /// </summary>
+    [Fact]
+    public void A_train_stops_first_at_the_platform_ahead_of_it()
+    {
+        var f = new Fixture(_dir, topSpeedKmh: 30f, startMetres: 200f,
+                            stops: new[]
+                            {
+                                new TrackStopData { AtMetres = 100f, DwellSeconds = 5f, Kind = "platform" },
+                                new TrackStopData { AtMetres = 400f, DwellSeconds = 5f, Kind = "platform" },
+                            });
+        var stands = f.RunAndRecordStands(120f);
+        foreach (var (at, seconds) in stands) _o.WriteLine($"stood {seconds:F1} s at {at:F0} m");
+        Assert.NotEmpty(stands);
+        Assert.InRange(stands[0].At, 397f, 402f);
+    }
+
     // ── Fixture ─────────────────────────────────────────────────────────────────────────────────
 
     /// <summary>

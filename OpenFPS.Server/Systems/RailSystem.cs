@@ -46,6 +46,9 @@ public sealed class RailSystem
         public (float At, float Dwell, string Kind)[] Stops = System.Array.Empty<(float, float, string)>();
         public int NextStop;
         public float DwellLeft;
+        /// <summary>Metres run since the train last stood at a stop. A stop it has only just left is
+        /// not one to stop at again: on a line with one stop the next stop after it is itself.</summary>
+        public float SinceStop = float.PositiveInfinity;
 
         /// <summary>The horn on the leading unit, as "air:&lt;preset&gt;", or "" for a train with none.</summary>
         public string Horn = "";
@@ -129,7 +132,7 @@ public sealed class RailSystem
                         }));
                 }
                 line.Sample(td.StartOffsetMetres, out _, out _, out float v0);
-                _trains.Add(new Consist
+                var consist = new Consist
                 {
                     MapId = mapId, Name = name, Preset = td.Preset, Line = line, Entities = ents, Along = along, Heights = heights,
                     Stops = (data.Tracks?.Find(x => string.Equals(x.Id, td.Track, StringComparison.OrdinalIgnoreCase))?.Stops ?? new())
@@ -144,7 +147,9 @@ public sealed class RailSystem
                     Head = td.StartOffsetMetres, Speed = MathF.Min(v0, top), TopSpeed = top,
                     LengthMetres = profile.LengthMetres,
                     Accel = td.AccelerationMps2 > 0 ? td.AccelerationMps2 : 0.9f, Brake = brake,
-                });
+                };
+                consist.NextStop = FirstStopAhead(consist.Stops, consist.Head);
+                _trains.Add(consist);
                 int spawned = 0; foreach (var e in ents) if (e != Entity.Null) spawned++;
                 Log.Information("Map {Map}: {Name} ({Profile}) runs '{Track}' — {Length:F0} m loop, {Sources} source(s) over {Consist:F0} m, {Min:F0}-{Max:F0} km/h",
                                 mapId, name, profile.Name, td.Track, line.Length, spawned, profile.LengthMetres, line.MinSpeed * 3.6f, line.MaxSpeed * 3.6f);
@@ -166,7 +171,10 @@ public sealed class RailSystem
                 tr.Speed = 0f;
                 PlaceConsist(tr, world);
                 if (tr.DwellLeft <= 0f && tr.Stops.Length > 0)
+                {
                     tr.NextStop = (tr.NextStop + 1) % tr.Stops.Length;
+                    tr.SinceStop = 0f;
+                }
                 continue;
             }
 
@@ -177,13 +185,16 @@ public sealed class RailSystem
             // Coming up on a platform. A train's braking rate is a tenth of a car's and its
             // approach is correspondingly long — which is most of why a train arriving sounds
             // like an event rather than like a vehicle turning up.
-            if (tr.Stops.Length > 0)
+            // Until it has run clear of the stop it just left, which on a line with one stop is the
+            // next stop too: standing within a metre and a half of it at zero speed, it would start
+            // dwelling again and never leave.
+            if (tr.Stops.Length > 0 && tr.SinceStop > StopClearMetres)
             {
                 float d = tr.Stops[tr.NextStop].At - tr.Head;
                 if (d < -1f) d += tr.Line.Length;
                 d = MathF.Max(0f, d);
                 want = MathF.Min(want, MathF.Sqrt(MathF.Max(0f, 2f * tr.Brake * d)));
-                if (d <= 1.5f && tr.Speed < 1.5f)
+                if (d <= StopReachMetres && tr.Speed < 1.5f)
                 {
                     tr.DwellLeft = MathF.Max(1f, tr.Stops[tr.NextStop].Dwell);
                     tr.Speed = 0f;
@@ -194,11 +205,31 @@ public sealed class RailSystem
             if (want > tr.Speed) tr.Speed = MathF.Min(want, tr.Speed + tr.Accel * dt);
             else tr.Speed = MathF.Max(want, tr.Speed - tr.Brake * dt);
             tr.Head += tr.Speed * dt;
+            tr.SinceStop += tr.Speed * dt;
             if (tr.Head > tr.Line.Length) tr.Head -= tr.Line.Length;
 
             SoundForCrossings(tr, world);
             PlaceConsist(tr, world);
         }
+    }
+
+    /// <summary>How close to a stop a train has to have come to stand at it, metres.</summary>
+    private const float StopReachMetres = 1.5f;
+    /// <summary>How far a train runs from a stop before that stop can stop it again: past the
+    /// metre and a half it may have stood short, and the metre a stop still counts as ahead.</summary>
+    private const float StopClearMetres = 3f;
+
+    /// <summary>
+    /// The first stop at or ahead of a place round the line: where a train put there stops first.
+    /// Index 0 for every train ran one placed past the first platform a lap round to it, through
+    /// every platform on the way.
+    /// </summary>
+    private static int FirstStopAhead((float At, float Dwell, string Kind)[] stops, float head)
+    {
+        // A stop up to a metre behind still counts as here, the same allowance Update gives.
+        for (int i = 0; i < stops.Length; i++)
+            if (stops[i].At >= head - 1f) return i;
+        return 0;
     }
 
     /// <summary>
