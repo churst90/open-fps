@@ -40,6 +40,8 @@ public class MudGateway
     /// </summary>
     public const int MaxQueuedLines = 256;
 
+    private static readonly UTF8Encoding NoBom = new(encoderShouldEmitUTF8Identifier: false);
+
     /// <summary>
     /// Raised (on the connection's own task thread) when a MUD client goes away. The server uses it to
     /// end the session and remove the player's body — a telnet player can now spawn one, so without this
@@ -131,7 +133,8 @@ public class MudGateway
                     Id = id,
                     Client = client,
                     Reader = new StreamReader(stream, Encoding.UTF8),
-                    Writer = new StreamWriter(stream, Encoding.UTF8) { AutoFlush = true },
+                    // No byte-order mark: a telnet client prints it, and a screen reader reads it out.
+                    Writer = new StreamWriter(stream, NoBom) { AutoFlush = true },
                     LastSecondTimestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
                     Address = address,
                 };
@@ -156,7 +159,7 @@ public class MudGateway
         {
             using (client)
             {
-                var writer = new StreamWriter(client.GetStream(), Encoding.UTF8) { AutoFlush = true };
+                var writer = new StreamWriter(client.GetStream(), NoBom) { AutoFlush = true };
                 var write = writer.WriteLineAsync(reason);
                 await Task.WhenAny(write, Task.Delay(1000));
             }
