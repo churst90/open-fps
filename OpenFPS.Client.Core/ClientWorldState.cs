@@ -249,6 +249,12 @@ public class ClientWorldState
             map.Regions = new Dictionary<int, RegionComponent>(map.Regions) { [def.EntityId] = def.Region };
             map.RegionPositions = new Dictionary<int, Vector3>(map.RegionPositions) { [def.EntityId] = def.Transform.Position };
             map.RegionRotations = new Dictionary<int, Quaternion>(map.RegionRotations) { [def.EntityId] = def.Transform.Rotation };
+
+            // Its open sides are openings to whatever is beyond them, as a map room's are (the bake does
+            // the same for every room it was given). Not for a room that moves: an opening is a fixed
+            // place on the map, and the inside of a car would leave its windows behind at the kerb.
+            if (!def.Moves)
+                OpenFPS.Common.Systems.AcousticVolumeGenerator.AddFaceOpenings(map, _definitions.Values, new[] { def.EntityId });
         }
     }
 
@@ -299,6 +305,19 @@ public class ClientWorldState
             map.Regions = regions;
             map.RegionPositions = positions;
             map.RegionRotations = rotations;
+
+            // ...and the openings in its faces go with it.
+            List<int>? openings = null;
+            foreach (var (id, frame) in map.OpeningFrames)
+                if (present.Contains(frame.Room)) (openings ??= new List<int>()).Add(id);
+            if (openings != null)
+            {
+                var portals = new Dictionary<int, (PortalComponent Portal, Vector3 Position)>(map.Portals);
+                var frames = new Dictionary<int, OpeningFrame>(map.OpeningFrames);
+                foreach (int id in openings) { portals.Remove(id); frames.Remove(id); }
+                map.Portals = portals;
+                map.OpeningFrames = frames;
+            }
         }
     }
 

@@ -11,7 +11,7 @@ namespace OpenFPS.Client.AudioEngine.Acoustics;
 /// The world as <see cref="OpeningRoutes"/> wants it: the scene's boxes with the door leaves marked, and
 /// every opening the map declares — each door's doorway (where its leaf stands when shut, which the
 /// server sends in the portal: <see cref="OpenFPS.Common.Components.PortalComponent.OpeningRotation"/>),
-/// each authored portal, and each open face of a structure.
+/// each authored portal, and each gap in a structure's faces, as big as the gap.
 /// </summary>
 public static class OpeningGraph
 {
@@ -59,10 +59,16 @@ public static class OpeningGraph
         foreach (var (id, (portal, position)) in map.Portals)
         {
             if (leaves.Contains(id)) continue;
-            // Open faces (AcousticVolumeGenerator: tunnel mouths, open sides) are as big as the face; an
-            // authored portal is as wide as its author said.
-            bool face = id <= -2000;
-            yield return new OpeningRoutes.Declared(id, face ? "open face" : id > 0 ? "doorway" : "guessed opening",
+            // The gaps in rooms' faces (AcousticVolumeGenerator: open sides, tunnel mouths, doorways with
+            // no door) carry their own rectangle; an authored portal is as wide as its author said.
+            bool face = id <= OpenFPS.Common.Systems.AcousticVolumeGenerator.FirstFaceOpeningId;
+            if (face && map.OpeningFrames.TryGetValue(id, out var frame))
+            {
+                yield return new OpeningRoutes.Declared(id, OpeningRoutes.FaceKind, frame.Centre, frame.Rotation,
+                                                        frame.Size, 0f, portal.RegionAId, portal.RegionBId);
+                continue;
+            }
+            yield return new OpeningRoutes.Declared(id, face ? OpeningRoutes.FaceKind : id > 0 ? "doorway" : "guessed opening",
                                                     position, default, Vector3.Zero, face ? 0f : portal.ApertureSize,
                                                     portal.RegionAId, portal.RegionBId);
         }

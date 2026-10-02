@@ -21,6 +21,15 @@ public partial class AcousticMap
     public Dictionary<int, Quaternion> RegionRotations { get; set; } = new(); // Capture entity rotation
     public Dictionary<int, (PortalComponent Portal, Vector3 Position)> Portals { get; set; } = new();
 
+    /// <summary>
+    /// The frame of each opening found in a room's faces (AcousticVolumeGenerator: the gaps in its walls
+    /// and its open sides), by portal id: where the gap is, which way it faces (local X across, Y up, Z
+    /// through) and its width, height and the thickness of the wall it is cut through. Derived on load,
+    /// never sent.
+    /// </summary>
+    [MemoryPackIgnore]
+    public Dictionary<int, OpeningFrame> OpeningFrames { get; set; } = new();
+
     [MemoryPackConstructor]
     public AcousticMap()
     {
@@ -34,3 +43,7 @@ public partial class AcousticMap
         VoxelGrid = new SparseAcousticOctree(offset, mapSize, voxelSize);
     }
 }
+
+/// <summary>An opening's rectangle: the room whose face it is in, its centre, its frame (local X across,
+/// Y up, Z through) and its width, height and depth in that frame.</summary>
+public readonly record struct OpeningFrame(int Room, Vector3 Centre, Quaternion Rotation, Vector3 Size);

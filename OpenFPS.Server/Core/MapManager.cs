@@ -509,8 +509,10 @@ public class MapManager
     }
 
     /// <summary>How far outside a region's own box a wall may stand and still be that room's wall,
-    /// metres. A region is drawn to the INSIDE of a room; its walls are just beyond that.</summary>
-    private const float WallReach = 0.6f;
+    /// metres. A region is drawn to the INSIDE of a room; its walls are just beyond that. The same reach
+    /// the client's openings use (<see cref="OpenFPS.Common.Systems.FaceOpenings"/>), so the walls a
+    /// face is measured from and the gaps found in it are the same walls.</summary>
+    private const float WallReach = OpenFPS.Common.Systems.FaceOpenings.WallReachMetres;
 
     /// <summary>
     /// Writes a map entity's per-face room materials onto its RegionComponent. Six faces, in the order

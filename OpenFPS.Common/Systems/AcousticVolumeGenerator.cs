@@ -145,62 +145,24 @@ public static class AcousticVolumeGenerator
             authoredCount++;
         }
 
-        // 4b. OPEN FACES — openings the geometry already describes.
-        // The region survey (MapManager.SurveyRegions) measures each face of a place from the walls
-        // actually round it, and a face with no wall keeps the open material. That face IS an opening,
-        // exactly where it is and exactly its size, which is what the guessed portals below never knew.
-        // A tunnel's sections and its two mouths are this: open at their ends, walled along their
-        // length, and until now coupled to nothing — standing at the mouth you heard none of the
-        // tunnel's reverb, walking along it the section behind you dropped out, and stepping out of it
-        // cut it off (2026-09-29). Buildings keep their doors, which are authored portals the door
-        // system opens and shuts.
+        // 4b. OPENINGS FROM THE GEOMETRY — every side of a room that is not closed in.
+        // The walls round a room are real boxes, and wherever they leave a gap in one of its faces there
+        // is an opening, exactly where the gap is and exactly its size: a tunnel's open ends, a building's
+        // open side, a doorway with no door in it, a window with no glass. A door is the same opening with
+        // a leaf in it, and its leaf stands shut in the gap here, so it is the door's (an authored portal)
+        // and not found twice. See FaceOpenings.
+        //
+        // One opening per GAP, not one per pair of rooms. A lobby with a front door and an open side onto
+        // the same street has both, and the street is heard through each from where each is (2026-10-02).
+        // Until then only the first opening between two places was kept, so a building with a door to the
+        // outdoors lost its open side.
         //
         // Only for STRUCTURES: a region with at least one wall. A named stretch of street is never
         // surveyed, so all six of its faces read open, and coupling every patch of open ground to its
         // neighbours is not what an opening is. Never the floor: that is the ground.
-        //
-        // The aperture is the width of a square of the face's area. The bus's leak goes as aperture
-        // over distance, and the pressure through an opening goes as the square root of its area.
-        var linkedByGeometry = new HashSet<(int, int)>();
-        foreach (var p in acousticMap.Portals.Values)
-            linkedByGeometry.Add(PairKey(p.Portal.RegionAId, p.Portal.RegionBId));
-        int openingId = -2000, openingCount = 0;
-        foreach (var (r1, region) in acousticMap.Regions)
-        {
-            if (r1 == acousticMap.GlobalEnvironmentId || region.RoomSize.X <= 0f) continue;
-            if (!acousticMap.RegionPositions.TryGetValue(r1, out var c1)) continue;
-            int open = RoomAcoustics.OpenFaceCount(region);
-            if (open == 0 || open == 6) continue;
-            Quaternion rot = acousticMap.RegionRotations.GetValueOrDefault(r1, Quaternion.Identity);
-            Span<float> areas = stackalloc float[6];
-            RoomAcoustics.FaceAreas(region.RoomSize, areas);
-            for (int f = 1; f < 6; f++)                       // 0 is the floor
-            {
-                if (!RoomAcoustics.FaceIsOpen(region.Materials, f)) continue;
-                (Vector3 axis, float half) = f switch
-                {
-                    1 => (Vector3.UnitY, region.RoomSize.Y / 2f),
-                    2 => (Vector3.UnitZ, region.RoomSize.Z / 2f),
-                    3 => (-Vector3.UnitZ, region.RoomSize.Z / 2f),
-                    4 => (Vector3.UnitX, region.RoomSize.X / 2f),
-                    _ => (-Vector3.UnitX, region.RoomSize.X / 2f),
-                };
-                Vector3 n = Vector3.Normalize(Vector3.Transform(axis, rot));
-                Vector3 at = c1 + n * half;
-                // Two voxels out: a region is voxelised up to one voxel past its face, so a probe half a
-                // metre out can land back in the region it left and miss the section next door.
-                int r2 = grid.GetRegionAt(at + n * (2f * voxelResolution + 0.01f));
-                if (r2 == AcousticConstants.GlobalRegionId) r2 = acousticMap.GlobalEnvironmentId;
-                if (r2 == r1 || r2 == 0) continue;
-                if (!linkedByGeometry.Add(PairKey(r1, r2))) continue;
-                acousticMap.Portals[openingId--] = (
-                    new PortalComponent { RegionAId = r1, RegionBId = r2, ApertureSize = MathF.Sqrt(areas[f]) },
-                    at);
-                openingCount++;
-            }
-        }
+        int openingCount = AddFaceOpenings(acousticMap, entities);
         if (openingCount > 0)
-            Console.WriteLine($"[AcousticMap] {openingCount} opening(s) from open faces (tunnel mouths, open sides).");
+            Console.WriteLine($"[AcousticMap] {openingCount} opening(s) from the gaps in rooms' faces (open sides, tunnel mouths, doorways with no door).");
 
         // 5. UNDESCRIBED BOUNDARY AUDIT (and, only on request, synthesis).
         // Report every region boundary the map did not describe. Optionally fill it with a guessed portal
@@ -270,6 +232,129 @@ public static class AcousticVolumeGenerator
         Console.WriteLine($"[AcousticMap] {acousticMap.Regions.Count - 1} region(s), {authoredCount} authored portal(s), {discoveredCount} guessed.");
 
         return acousticMap;
+    }
+
+    /// <summary>The first id the openings found in faces take; each next one is one lower. OpeningGraph
+    /// tells them from authored portals by it.</summary>
+    public const int FirstFaceOpeningId = -2000;
+
+    /// <summary>
+    /// Puts on the map an opening for every gap in the faces of its structures (or of only
+    /// <paramref name="rooms"/>, replacing what those rooms had), from the solid boxes in
+    /// <paramref name="entities"/>. Returns how many it added.
+    ///
+    /// The aperture is the width of a square of the gap's area: the bus's leak goes as aperture over
+    /// distance, and the pressure through an opening goes as the square root of its area. The gap's own
+    /// rectangle is in <see cref="AcousticMap.OpeningFrames"/>.
+    /// </summary>
+    public static int AddFaceOpenings(AcousticMap map, IEnumerable<EntityDefinition> entities, IReadOnlyCollection<int>? rooms = null)
+    {
+        float res = map.VoxelResolution;
+
+        // The solid boxes, as the scene has them, with each door's leaf standing shut in its doorway.
+        var solids = new List<(FaceOpenings.Box Box, Vector3 Min, Vector3 Max)>();
+        foreach (var def in entities)
+        {
+            if (def == null || !def.Collider.IsSolid || def.Collider.Shape != ColliderShape.Box) continue;
+            if (def.Region.RoomSize.X > 0f || def.Moves) continue;
+            if (!string.IsNullOrEmpty(def.SoundEmitter.SoundId)) continue;
+            var size = def.Collider.Size;
+            if (size.X <= 0f || size.Y <= 0f || size.Z <= 0f) continue;
+            bool leaf = def.Portal.RegionAId != 0 || def.Portal.RegionBId != 0;
+            Vector3 at = def.Transform.Position;
+            Quaternion rot = def.Transform.Rotation == default ? Quaternion.Identity : def.Transform.Rotation;
+            if (leaf && def.Portal.OpeningRotation != default) { at = def.Portal.OpeningCentre; rot = def.Portal.OpeningRotation; }
+            var half = FaceOpenings.AxisAlignedHalfExtents(size * 0.5f, rot);
+            solids.Add((new FaceOpenings.Box(at, size, rot), at - half, at + half));
+        }
+
+        var places = new List<(FaceOpenings.Place Place, Vector3 Min, Vector3 Max)>();
+        foreach (var (id, region) in map.Regions)
+        {
+            if (id == AcousticConstants.GlobalRegionId || id == map.GlobalEnvironmentId || region.RoomSize.X <= 0f) continue;
+            if (!map.RegionPositions.TryGetValue(id, out var c)) continue;
+            var q = map.RegionRotations.GetValueOrDefault(id, Quaternion.Identity);
+            if (q == default) q = Quaternion.Identity;
+            var half = FaceOpenings.AxisAlignedHalfExtents(region.RoomSize * 0.5f, q);
+            places.Add((new FaceOpenings.Place(id, c, region.RoomSize, q), c - half, c + half));
+        }
+
+        // What is already there: the authored portals, and the openings of rooms not being redone.
+        var frames = new Dictionary<int, OpeningFrame>(map.OpeningFrames);
+        var portals = new Dictionary<int, (PortalComponent Portal, Vector3 Position)>(map.Portals);
+        if (rooms != null)
+            foreach (var (id, frame) in map.OpeningFrames)
+                if (rooms.Contains(frame.Room)) { frames.Remove(id); portals.Remove(id); }
+        int nextId = FirstFaceOpeningId;
+        foreach (int id in portals.Keys) if (id <= FirstFaceOpeningId) nextId = Math.Min(nextId, id - 1);
+
+        var known = new Dictionary<(int, int), List<(Vector3 Centre, OpeningFrame? Frame)>>();
+        foreach (var (id, (portal, position)) in portals)
+        {
+            OpeningFrame? frame = frames.TryGetValue(id, out var fr) ? fr : null;
+            Vector3 centre = frame?.Centre ?? (portal.OpeningRotation != default ? portal.OpeningCentre : position);
+            Known(known, portal.RegionAId, portal.RegionBId).Add((centre, frame));
+        }
+
+        int added = 0;
+        var nearSolids = new List<FaceOpenings.Box>();
+        var nearPlaces = new List<FaceOpenings.Place>();
+        foreach (var (room, rMin, rMax) in places)
+        {
+            if (rooms != null && !rooms.Contains(room.Id)) continue;
+            var region = map.Regions[room.Id];
+            if (RoomAcoustics.OpenFaceCount(region) == 6) continue;
+
+            float pad = FaceOpenings.WallReachMetres + 0.01f;
+            nearSolids.Clear();
+            foreach (var (box, min, max) in solids)
+                if (Overlaps(min, max, rMin - new Vector3(pad), rMax + new Vector3(pad))) nearSolids.Add(box);
+            // Beyond a face as far as the thickest wall near it and two voxels more.
+            float wall = 0f;
+            foreach (var b in nearSolids) wall = MathF.Max(wall, MathF.Min(b.Size.X, MathF.Min(b.Size.Y, b.Size.Z)));
+            float out_ = MathF.Min(wall, 10f) + FaceOpenings.WallReachMetres + 2f * res + 0.01f;
+            nearPlaces.Clear();
+            foreach (var (place, min, max) in places)
+                if (Overlaps(min, max, rMin - new Vector3(out_), rMax + new Vector3(out_))) nearPlaces.Add(place);
+
+            foreach (var gap in FaceOpenings.Find(room, region.Materials, nearSolids, nearPlaces, res, map.GlobalEnvironmentId))
+            {
+                var frame = new OpeningFrame(room.Id, gap.Centre, gap.Rotation, new Vector3(gap.Width, gap.Height, gap.Depth));
+                var list = Known(known, room.Id, gap.Beyond);
+                bool seen = false;
+                foreach (var (centre, other) in list)
+                    if (Inside(centre, frame, res) || (other is { } o && Inside(frame.Centre, o, res))) { seen = true; break; }
+                if (seen) continue;
+                list.Add((frame.Centre, frame));
+                int id = nextId--;
+                portals[id] = (new PortalComponent { RegionAId = room.Id, RegionBId = gap.Beyond, ApertureSize = MathF.Sqrt(gap.Area) }, gap.Centre);
+                frames[id] = frame;
+                added++;
+            }
+        }
+        map.OpeningFrames = frames;
+        map.Portals = portals;
+        return added;
+
+        static List<(Vector3, OpeningFrame?)> Known(Dictionary<(int, int), List<(Vector3, OpeningFrame?)>> known, int a, int b)
+        {
+            var key = PairKey(a, b);
+            if (!known.TryGetValue(key, out var l)) known[key] = l = new List<(Vector3, OpeningFrame?)>();
+            return l;
+        }
+        static bool Overlaps(Vector3 aMin, Vector3 aMax, Vector3 bMin, Vector3 bMax)
+            => aMin.X <= bMax.X && aMax.X >= bMin.X && aMin.Y <= bMax.Y && aMax.Y >= bMin.Y && aMin.Z <= bMax.Z && aMax.Z >= bMin.Z;
+    }
+
+    /// <summary>Whether a point lies in an opening's rectangle — within a voxel of it in its plane, and
+    /// within the wall's depth and two voxels of it through — so the same gap found from its other side,
+    /// or a doorway authored in it, is one opening.</summary>
+    private static bool Inside(Vector3 point, in OpeningFrame frame, float res)
+    {
+        var local = Vector3.Transform(point - frame.Centre, Quaternion.Inverse(frame.Rotation));
+        return MathF.Abs(local.X) <= frame.Size.X * 0.5f + res
+            && MathF.Abs(local.Y) <= frame.Size.Y * 0.5f + res
+            && MathF.Abs(local.Z) <= frame.Size.Z * 0.5f + 2f * res;
     }
 
     /// <summary>Order-independent key for a region boundary, so A→B and B→A are the same pair.</summary>

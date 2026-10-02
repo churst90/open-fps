@@ -238,6 +238,67 @@ public class CompositeRoomTests : IDisposable
     }
 
     /// <summary>
+    /// A shed with one side left off is still a room (five faces walled), and its open side is OPEN: no
+    /// material, no wall, and an opening to the outdoors exactly where it is. It used to be given the
+    /// material of whatever covered most of it however little, or Generic when nothing did, so a
+    /// composite's open side was a wall to everything that asked, and its only openings were its doors.
+    /// </summary>
+    [Fact]
+    public void ACompositesOpenSideIsAnOpeningAndNotAWall()
+    {
+        var f = new Fixture(_dir);
+        int root = f.Shed(Fixture.Clear, openEast: true);
+        var room = f.RoomOf(root);
+        Assert.NotNull(room);
+        const int east = 4;
+        Assert.Equal(RoomAcoustics.OpenFaceMaterial, room!.Value.Materials[east]);
+        for (int face = 0; face < 6; face++)
+            if (face != east) Assert.NotEqual(RoomAcoustics.OpenFaceMaterial, room.Value.Materials[face]);
+
+        var definitions = EntityDefinitionFactory.StaticDefinitions(f.World);
+        var map = AcousticVolumeGenerator.GenerateRegions(definitions, new Vector3(400, 60, 400),
+                                                          new Vector3(-200, -10, -200), 0.5f, 0.15f);
+        int roomId = f.RoomEntityId(root);
+        var (position, _, size) = f.RoomVolume(root);
+        var openings = map.Portals.Where(p => p.Key <= AcousticVolumeGenerator.FirstFaceOpeningId
+                                              && (p.Value.Portal.RegionAId == roomId || p.Value.Portal.RegionBId == roomId)).ToList();
+        var side = Assert.Single(openings);
+        int beyond = side.Value.Portal.RegionAId == roomId ? side.Value.Portal.RegionBId : side.Value.Portal.RegionAId;
+        Assert.Equal(map.GlobalEnvironmentId, beyond);
+        // On the east face, across most of it (the north and south walls' ends take a little of each edge).
+        var frame = map.OpeningFrames[side.Key];
+        Assert.Equal(position.X + size.X / 2f, frame.Centre.X, 1);
+        Assert.Equal(1f, Vector3.Transform(Vector3.UnitZ, frame.Rotation).X, 3);
+        Assert.True(frame.Size.X > size.Z - 1.1f, $"the open side is {frame.Size.X:F2} m wide of {size.Z:F2}");
+        Assert.True(frame.Size.Y > size.Y - 0.6f, $"the open side is {frame.Size.Y:F2} m high of {size.Y:F2}");
+    }
+
+    /// <summary>...and one put down after the bake gets its opening when its room arrives, and loses it
+    /// when the room goes.</summary>
+    [Fact]
+    public void AnOpenSidedRoomThatArrivesAfterTheBakeGetsItsOpening()
+    {
+        var f = new Fixture(_dir);
+        int root = f.Shed(Fixture.Clear, openEast: true);
+        int roomId = f.RoomEntityId(root);
+
+        var client = new ClientWorldState();
+        client.SetAcousticMap(AcousticVolumeGenerator.GenerateRegions(
+            new List<EntityDefinition>(), new Vector3(400, 60, 400), new Vector3(-200, -10, -200), 0.5f, 0.15f));
+        foreach (var part in CompositeService.PartsOf(f.World, root))
+            client.RegisterDefinition(EntityDefinitionFactory.From(f.World, part));
+        client.RegisterDefinition(EntityDefinitionFactory.From(f.World, f.Entity(roomId)));
+
+        var frame = Assert.Single(client.AcousticMap!.OpeningFrames.Values);
+        Assert.Equal(roomId, frame.Room);
+        Assert.Equal(1f, Vector3.Transform(Vector3.UnitZ, frame.Rotation).X, 3);
+
+        client.RemoveEntities(new[] { roomId });
+        Assert.Empty(client.AcousticMap!.OpeningFrames);
+        Assert.DoesNotContain(client.AcousticMap.Portals.Keys, id => id <= AcousticVolumeGenerator.FirstFaceOpeningId);
+    }
+
+    /// <summary>
     /// A room that turns up AFTER the bake.
     ///
     /// The client bakes its acoustic map once, from the static geometry the server streams at map
@@ -333,7 +394,8 @@ public class CompositeRoomTests : IDisposable
         }
 
         /// <summary>A shed: a floor, a roof, and walls all the way round.</summary>
-        public int Shed(Vector3 where, bool anchored = true, string wall = "concrete_wall", string floor = "concrete_floor")
+        public int Shed(Vector3 where, bool anchored = true, string wall = "concrete_wall", string floor = "concrete_floor",
+                        bool openEast = false)
         {
             const float half = ShedSpan / 2f;
             const float height = 3f;
@@ -349,13 +411,13 @@ public class CompositeRoomTests : IDisposable
                 float along = -half + 1f + i * 2f;
                 Spawn(wall, where + new Vector3(along, height / 2f, +half), acrossZ);
                 Spawn(wall, where + new Vector3(along, height / 2f, -half), acrossZ);
-                Spawn(wall, where + new Vector3(+half, height / 2f, along), acrossX);
+                if (!openEast) Spawn(wall, where + new Vector3(+half, height / 2f, along), acrossX);
                 Spawn(wall, where + new Vector3(-half, height / 2f, along), acrossX);
             }
 
             int root = Composites.Group(MapId, where, ShedSpan, "shed", anchored, "builder", out int parts);
             Assert.True(root >= 0, "the shed could not be grouped");
-            Assert.Equal(22, parts);
+            Assert.Equal(openEast ? 17 : 22, parts);
             return root;
         }
 
