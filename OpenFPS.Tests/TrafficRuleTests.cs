@@ -401,4 +401,27 @@ public class TrafficRuleTests : IDisposable
         Assert.True(w.Slowest["B"] < 0.5f, $"the bus never waited: {w}");
         Assert.True(w.Closest > 4f, $"they met: {w}");
     }
+
+    /// <summary>
+    /// A driver giving way comes to the line at the speed it looks at, 15 km/h, and no faster, however
+    /// far the lap it drives has run ahead of the lanes (docs/MUTATION_2026-10-01.md, item 9).
+    /// </summary>
+    [Theory]
+    [InlineData(0f)]
+    [InlineData(2f)]
+    public void A_driver_giving_way_comes_to_the_line_at_its_looking_speed(float winding)
+    {
+        var s = Build(new() { Car("B", East) }, priority: new() { "ns" }, winding: winding);
+        float prevX = float.NegativeInfinity, atLine = float.NaN;
+        Run(s, 20f, () =>
+        {
+            var b = s.Car("B");
+            if (prevX < -8f && b.Position.X >= -8f) atLine = b.Speed;
+            prevX = b.Position.X;
+        });
+        float look = new StreetLifeData().GiveWayApproachKmh / 3.6f;
+        _o.WriteLine($"at the line at {atLine:F2} m/s, looking at {look:F2}");
+        // Within a tick or two of the driver's lag (4.5 m/s measured); 6.2 and 10.9 m/s before 2026-10-02.
+        Assert.InRange(atLine, 0.5f * look, 1.15f * look);
+    }
 }
