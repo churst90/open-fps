@@ -876,7 +876,12 @@ box("concrete_floor", TERM_X0, TERM_X1, TERM_H, TERM_H + 0.3, TERM_Z0, TERM_Z1, 
 # terminal an acoustic ceiling"); a real one is 2-3.
 box("acoustic_ceiling", TERM_X0 + 0.4, TERM_X1 - 0.06, TERM_H - 0.65, TERM_H - 0.6, TERM_Z0 + 0.4, TERM_Z1 - 0.4,
     name="Terminal ceiling")
-box("concrete_wall", TERM_X0, TERM_X0 + 0.4, 0.0, TERM_H, TERM_Z0, TERM_Z1, name="Terminal west wall")
+# The road-side wall, with the steel door's doorway cut in it at z 62: a leaf in an uncut wall is a
+# door into nothing (the opening graph's "a wall stands in it", 2026-10-02).
+TERM_WEST_DOOR = 62.0
+box("concrete_wall", TERM_X0, TERM_X0 + 0.4, 0.0, TERM_H, TERM_Z0, TERM_WEST_DOOR - 0.45, name="Terminal west wall")
+box("concrete_wall", TERM_X0, TERM_X0 + 0.4, 0.0, TERM_H, TERM_WEST_DOOR + 0.45, TERM_Z1)
+box("concrete_wall", TERM_X0, TERM_X0 + 0.4, 0.08 + 2.1 - DOOR_LAP, TERM_H, TERM_WEST_DOOR - 0.45, TERM_WEST_DOOR + 0.45)
 box("concrete_wall", TERM_X0, TERM_X1, 0.0, TERM_H, TERM_Z0, TERM_Z0 + 0.4)
 box("concrete_wall", TERM_X0, TERM_X1, 0.0, TERM_H, TERM_Z1 - 0.4, TERM_Z1)
 # The apron face is glass, in bays, with two doorways cut out of it.
@@ -900,10 +905,11 @@ for k in range(3):
     b = TERM_Z0 + (k + 1) * (TERM_Z1 - TERM_Z0) / 3
     term_ids.append(region(f"Terminal concourse, {['south', 'middle', 'north'][k]} end",
                            TERM_X0 + 0.4, TERM_X1 - 0.06, 0.08, TERM_H, a, b))
-for dz, rid in zip(TERM_DOORS, (term_ids[0], term_ids[1])):
+# Each door joins the end it is in: z 30 is in the south end, z 92 in the north (it named the middle).
+for dz, rid in zip(TERM_DOORS, (term_ids[0], term_ids[2])):
     door(TERM_X1 - 0.03, 0.08, dz, rid, -1, facing_z=False, prefab="door", opening=2.2)   # the wall runs along z
 # ...and a way in from the road side.
-door(TERM_X0 + 0.2, 0.08, 62.0, term_ids[1], -1, facing_z=False, prefab="steel_door")
+door(TERM_X0 + 0.2, 0.08, TERM_WEST_DOOR, term_ids[1], -1, facing_z=False, prefab="steel_door")
 
 # ── The hangar: a steel box the size of a church ──────────────────────────────────────────────────
 #
@@ -912,7 +918,11 @@ door(TERM_X0 + 0.2, 0.08, 62.0, term_ids[1], -1, facing_z=False, prefab="steel_d
 # place on the map by a distance, and the one that most needs the survey to see that the door is a
 # door — it is the small-enclosure fault the other way up.
 box("concrete_floor", HANGAR_X0, HANGAR_X1, -0.2, 0.06, HANGAR_Z0, HANGAR_Z1)
-box("metal_wall", HANGAR_X0, HANGAR_X0 + 0.12, 0.0, HANGAR_H, HANGAR_Z0, HANGAR_Z1, name="Hangar back")
+# The back wall, with the personnel door's doorway cut in it (the door is below).
+HANGAR_BACK_DOOR = HANGAR_Z0 + 8.0
+box("metal_wall", HANGAR_X0, HANGAR_X0 + 0.12, 0.0, HANGAR_H, HANGAR_Z0, HANGAR_BACK_DOOR - 0.45, name="Hangar back")
+box("metal_wall", HANGAR_X0, HANGAR_X0 + 0.12, 0.0, HANGAR_H, HANGAR_BACK_DOOR + 0.45, HANGAR_Z1)
+box("metal_wall", HANGAR_X0, HANGAR_X0 + 0.12, 0.06 + 2.1 - DOOR_LAP, HANGAR_H, HANGAR_BACK_DOOR - 0.45, HANGAR_BACK_DOOR + 0.45)
 box("metal_wall", HANGAR_X0, HANGAR_X1, 0.0, HANGAR_H, HANGAR_Z1 - 0.12, HANGAR_Z1)
 box("metal_wall", HANGAR_X0, HANGAR_X1, 0.0, HANGAR_H, HANGAR_Z0, HANGAR_Z0 + 0.12)
 box("metal_wall", HANGAR_X0, HANGAR_X1, HANGAR_H, HANGAR_H + 0.15, HANGAR_Z0, HANGAR_Z1, name="Hangar roof")
@@ -924,7 +934,7 @@ hangar_id = region("Hangar", HANGAR_X0 + 0.12, HANGAR_X1 - 0.12, 0.06, HANGAR_H,
                    HANGAR_Z0 + 0.12, HANGAR_Z1 - 0.12)
 portal(HANGAR_X1 - 0.06, 4.0, (HANGAR_Z0 + HANGAR_Z1) / 2, hangar_id, -1, 26.0)
 # A steel personnel door in the back, which is the small opening the big one is measured against.
-door(HANGAR_X0 + 0.06, 0.06, HANGAR_Z0 + 8.0, hangar_id, -1, facing_z=False, prefab="steel_door")
+door(HANGAR_X0 + 0.06, 0.06, HANGAR_BACK_DOOR, hangar_id, -1, facing_z=False, prefab="steel_door")
 prop("ac_condenser", HANGAR_X0 + 2.4, HANGAR_H + 0.6, HANGAR_Z0 + 6.0, name="Hangar roof plant")
 
 # The airport road: Foundry Street carries on east to the terminal.

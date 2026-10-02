@@ -73224,14 +73224,42 @@
    "Position": {
     "X": 196.2,
     "Y": 3.25,
-    "Z": 58.0
+    "Z": 18.775
    },
    "Scale": {
     "X": 0.2,
     "Y": 2.1667,
-    "Z": 328.0
+    "Z": 171.1
    },
    "Name": "Terminal west wall"
+  },
+  {
+   "EntityId": 7406,
+   "PrefabId": "concrete_wall",
+   "Position": {
+    "X": 196.2,
+    "Y": 3.25,
+    "Z": 101.225
+   },
+   "Scale": {
+    "X": 0.2,
+    "Y": 2.1667,
+    "Z": 155.1
+   }
+  },
+  {
+   "EntityId": 7407,
+   "PrefabId": "concrete_wall",
+   "Position": {
+    "X": 196.2,
+    "Y": 4.315,
+    "Z": 62.0
+   },
+   "Scale": {
+    "X": 0.2,
+    "Y": 1.4567,
+    "Z": 1.8
+   }
   },
   {
    "EntityId": 5090,
@@ -73510,7 +73538,7 @@
     "Z": 0.0,
     "W": 0.707107
    },
-   "RegionAId": 5105,
+   "RegionAId": 5106,
    "RegionBId": -1,
    "Scale": {
     "X": 2.5556,
@@ -73555,14 +73583,42 @@
    "Position": {
     "X": 230.06,
     "Y": 5.5,
-    "Z": 190.0
+    "Z": 165.775
    },
    "Scale": {
     "X": 0.06,
     "Y": 3.6667,
-    "Z": 1120.0
+    "Z": 151.0
    },
    "Name": "Hangar back"
+  },
+  {
+   "EntityId": 7408,
+   "PrefabId": "metal_wall",
+   "Position": {
+    "X": 230.06,
+    "Y": 5.5,
+    "Z": 194.225
+   },
+   "Scale": {
+    "X": 0.06,
+    "Y": 3.6667,
+    "Z": 951.0
+   }
+  },
+  {
+   "EntityId": 7409,
+   "PrefabId": "metal_wall",
+   "Position": {
+    "X": 230.06,
+    "Y": 6.555,
+    "Z": 170.0
+   },
+   "Scale": {
+    "X": 0.06,
+    "Y": 2.9633,
+    "Z": 18.0
+   }
   },
   {
    "EntityId": 5112,
