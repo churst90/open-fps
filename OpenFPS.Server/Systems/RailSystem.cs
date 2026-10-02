@@ -211,8 +211,11 @@ public sealed class RailSystem
             float eta = toGo / tr.Speed;
             if (eta > HornLeadSeconds || tr.Sounded.Contains(at)) continue;
             tr.Sounded.Add(at);
-            var lead = Array.Find(tr.Entities, e => e != Entity.Null);
-            if (lead == Entity.Null || !world.IsAlive(lead)) continue;
+            // FindIndex and not Find: Find misses with default(Entity), id 0, which is not Entity.Null.
+            int leadAt = Array.FindIndex(tr.Entities, e => e != Entity.Null);
+            if (leadAt < 0) continue;
+            var lead = tr.Entities[leadAt];
+            if (!world.IsAlive(lead)) continue;
             // The first three blasts and their gaps take ten seconds; the last is held to arrival.
             var pattern = Honk.Crossing(eta - 10f);
             Log.Information("Rail: {Name} sounds for the crossing {ToGo:F0} m ahead ({Eta:F0} s).", tr.Name, toGo, eta);
