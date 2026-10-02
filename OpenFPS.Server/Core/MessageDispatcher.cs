@@ -31,6 +31,14 @@ public class MessageDispatcher : IMessageDispatcher
         // Phase 2: Sanity Gates & Anti-Cheat
         if (message is ClientInputUpdate input)
         {
+            // Finite first. NaN is not greater than one, so the length check alone let it through to
+            // the player's position; an infinite direction normalised to NaN; and Math.Clamp passes
+            // NaN, which a NaN look would have put into the yaw for good. Not a number is no input.
+            if (!IsFinite(input.MoveDirection)) input.MoveDirection = System.Numerics.Vector3.Zero;
+            if (!float.IsFinite(input.LookDelta.X) || !float.IsFinite(input.LookDelta.Y))
+                input.LookDelta = System.Numerics.Vector2.Zero;
+            if (float.IsNaN(input.DeltaTime)) input.DeltaTime = 0.001f;
+
             if (input.MoveDirection.Length() > 1.0f)
             {
                 input.MoveDirection = System.Numerics.Vector3.Normalize(input.MoveDirection);
@@ -55,4 +63,7 @@ public class MessageDispatcher : IMessageDispatcher
             Log.Warning("No handler registered for message type {Type}", type.Name);
         }
     }
+
+    private static bool IsFinite(System.Numerics.Vector3 v)
+        => float.IsFinite(v.X) && float.IsFinite(v.Y) && float.IsFinite(v.Z);
 }
