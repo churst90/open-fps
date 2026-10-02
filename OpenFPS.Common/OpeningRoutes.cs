@@ -217,6 +217,10 @@ public sealed class OpeningRoutes
         }
     }
 
+    /// <summary>What an opening in a room's face is called (<see cref="Declared.Kind"/>): an open side, a
+    /// tunnel mouth, a doorway with no door in it.</summary>
+    public const string FaceKind = "open face";
+
     /// <summary>How far past an opening's declared size the geometry is searched for its jambs, floor
     /// and lintel, metres: a doorway's leaf laps its frame by a few centimetres and an authored portal is
     /// placed by hand, so the walls are near but not exactly where the numbers say.</summary>
@@ -230,6 +234,23 @@ public sealed class OpeningRoutes
     {
         var o = new Opening { Id = d.Id, Kind = d.Kind, RegionA = d.RegionA, RegionB = d.RegionB, Centre = d.Centre };
         bool haveFrame = d.Rotation != default;
+        if (haveFrame && d.Kind == FaceKind)
+        {
+            // A gap measured from the walls round it (FaceOpenings): its rectangle is the geometry's
+            // already, to the edge of every box beside it, so there is nothing to search for. Its thin
+            // axis is the one through it whatever its proportions: a slot in a thick wall is deeper than
+            // it is wide and is still a slot.
+            var fq = Quaternion.Normalize(d.Rotation);
+            o.Across = Vector3.Normalize(Vector3.Transform(Vector3.UnitX, fq));
+            o.Up = Vector3.Normalize(Vector3.Transform(Vector3.UnitY, fq));
+            o.Normal = Vector3.Normalize(Vector3.Transform(Vector3.UnitZ, fq));
+            o.HalfWidth = MathF.Max(0.05f, d.Size.X * 0.5f);
+            o.HalfHeight = MathF.Max(0.05f, d.Size.Y * 0.5f);
+            o.HalfDepth = MathF.Max(0.01f, d.Size.Z * 0.5f);
+            MeasureContents(o);
+            if (o.Tau.Y < 0.5f && o.Contents.Length > 0) o.Problem = "a wall stands in it: it is not an opening";
+            return o;
+        }
         float halfW, halfH, searchW, searchH;
         if (haveFrame)
         {
@@ -279,10 +300,19 @@ public sealed class OpeningRoutes
         o.Centre += o.Across * (right - left) * 0.5f + o.Up * (top - bottom) * 0.5f;
         o.HalfWidth = MathF.Max(0.05f, (right + left) * 0.5f);
         o.HalfHeight = MathF.Max(0.05f, (top + bottom) * 0.5f);
-        // As deep as the wall it is cut through.
+        // As deep as the wall it is cut through. A box that runs THROUGH the opening rather than across
+        // it — a tunnel's side wall at its open end, a corridor wall beside an open side — is not that
+        // wall: its length along the normal is not a depth. Counted as one it was: the tunnel's openings
+        // were fifty metres deep, so the check of their sides and the test of what stands in them reached
+        // two sections away (2026-10-02).
         foreach (int j in new[] { jambR, jambL, lintel })
-            if (j >= 0) o.HalfDepth = MathF.Max(o.HalfDepth, HalfExtentAlong(_solids[j], o.Normal));
-        if (jambR < 0 && jambL < 0 && lintel < 0 && d.Kind != "open face")
+        {
+            if (j < 0) continue;
+            float through = HalfExtentAlong(_solids[j], o.Normal);
+            if (through > MathF.Min(HalfExtentAlong(_solids[j], o.Across), HalfExtentAlong(_solids[j], o.Up))) continue;
+            o.HalfDepth = MathF.Max(o.HalfDepth, through);
+        }
+        if (jambR < 0 && jambL < 0 && lintel < 0 && d.Kind != FaceKind)
             o.Problem ??= "no wall found round it: an opening in nothing";
 
         MeasureContents(o);

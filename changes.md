@@ -4,6 +4,21 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-02
 
+- Openings come from the geometry (docs/RESEARCH_2026-10-02.md, "Doors and open sides"):
+  - Every gap in a room's walls is an opening, as big as the gap and placed in it
+    (`FaceOpenings`): open sides, tunnel mouths, doorways with no door. A door is the same opening
+    with its leaf in it. Region boxes drawn a little off their walls no longer leave strips of
+    "gap" round a room.
+  - One opening per gap, not one per pair of rooms. A room with a door and an open side to the
+    street has both; two doorways between two rooms are two openings.
+  - A composite's uncovered sides and roof are open, not walls, and become openings the same way,
+    including for a building put down after the map loaded. The floor is never open.
+  - An opening's depth no longer counts a wall that runs through it (a tunnel's side wall made its
+    end 50 m deep).
+  - City: 524 openings and 14 that disagreed with the geometry before; 679 and none now. Three
+    were map faults, now fixed in city.json and gen_city.py: the terminal's road-side steel door and
+    the hangar's back door had no hole cut in their walls, and the terminal's north door was linked
+    to the middle concourse.
 - Server security, written up in docs/SERVER_SECURITY.md:
   - `/where` is for Dev and Admin only. `/profile` shows role, real name (`/realname`), online,
     away (`/afk`) or idle, and the map; never coordinates, direction or distance.
