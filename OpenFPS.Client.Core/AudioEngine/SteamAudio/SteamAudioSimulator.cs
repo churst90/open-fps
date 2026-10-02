@@ -116,7 +116,7 @@ public sealed class SteamAudioSimulator : IDisposable
     private Phonon.IPLBakedDataIdentifier _pathId;
 
     /// <summary>Converts Steam Audio's order-1 pathing SH (ACN: w, m=-1, m=0, m=+1) to a unit WORLD
-    /// arrival direction (where the sound comes FROM). Convention pinned empirically by SimPathDirSpike:
+    /// arrival direction (where the sound comes FROM). Convention measured from the simulator, held by SteamAudioMappingTests:
     /// worldDir = normalize(-sh[1], sh[2], -sh[3]) (world X = -ACN(m=-1), Z = -ACN(m=+1), Y = ACN(m=0)).</summary>
     public static Vector3 PathingWorldDirection(float w, float shYm1, float shZm0, float shXp1)
     {

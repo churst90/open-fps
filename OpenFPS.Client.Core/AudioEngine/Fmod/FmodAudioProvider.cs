@@ -2542,7 +2542,7 @@ public class FmodAudioProvider : IAudioProvider
 
                 // CRITICAL: a 3D channel treats the signal as a mono point source and downmixes the
                 // DSP's binaural stereo back to mono on the way to the master bus — set3DLevel(0) does
-                // NOT prevent this (verified by SteamAudioLiveTest.RunStereoCheck: 3D collapses L≈R,
+                // NOT prevent this (measured: 3D collapses L≈R,
                 // switching the channel to 2D restores full L/R separation). Swap the 3D flags for 2D
                 // while preserving loop/other flags. Distance falloff is applied manually below in
                 // ApplyAcousticFilters (distAtten), so we lose nothing by leaving FMOD's 3D path.

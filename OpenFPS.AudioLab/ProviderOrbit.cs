@@ -8,67 +8,13 @@ using OpenFPS.Client.AudioEngine.Data;
 using OpenFPS.Client.AudioEngine.Fmod;
 
 /// <summary>
-/// Drives the REAL FmodAudioProvider end-to-end: plays a synth-noise spatial emitter and orbits
-/// its world position around the listener. This exercises the full integrated path — FMOD channel
-/// + occlusion/EQ DSPs + the Steam Audio binaural DSP wired into the provider — not a parallel
-/// harness. interactive=true runs until Q; false runs `seconds` headless for a crash/init check.
+/// Drives the REAL FmodAudioProvider headless under load, to reproduce faults on the mixer thread:
+/// voices, machines, aircraft and reverb buses made and released while the listener moves, and
+/// probes of what FMOD itself does when a channel or a send is torn down. See
+/// docs/THE_MIXER_THREAD_CRASH.md.
 /// </summary>
 public static class ProviderOrbit
 {
-    public static int Run(bool interactive, double seconds = 3.0)
-    {
-        var provider = new FmodAudioProvider();
-        if (!provider.Initialize()) { Console.WriteLine("provider init failed"); return 1; }
-        provider.UpdateListener(Vector3.Zero, Quaternion.Identity, Vector3.Zero, -1);
-
-        var emitter = new SpatialEmitter
-        {
-            EntityId = 1,
-            Type = EmitterType.WorldLocked,
-            IsSynth = true,
-            SynthWave = SynthWaveType.Noise,
-            SynthFrequency = 200f,
-            SynthFilterCutoff = 1.0f,
-            SynthFilterResonance = 0.0f,
-            Volume = 0.6f,
-            Position = new Vector3(0, 0, 3),
-            Range = 100f,
-            MinDistance = 3f
-        };
-        provider.PlaySpatialSound(emitter);
-
-        bool running = true;
-        if (interactive)
-        {
-            Console.WriteLine("LIVE orbit through FmodAudioProvider + Steam Audio. HEADPHONES. Q to quit.");
-            Console.WriteLine("0-8s horizontal (front->right->back->left), 8-16s vertical (front->up->back->down), looping.");
-            var kt = new Thread(() => { while (running) if (Console.ReadKey(true).Key == ConsoleKey.Q) running = false; }) { IsBackground = true };
-            kt.Start();
-        }
-
-        var sw = System.Diagnostics.Stopwatch.StartNew();
-        while (running)
-        {
-            double t = sw.Elapsed.TotalSeconds;
-            if (!interactive && t >= seconds) break;
-
-            double tc = t % 16.0;
-            Vector3 pos;
-            if (tc < 8.0) { double th = 2 * Math.PI * (tc / 4.0); pos = new Vector3((float)Math.Sin(th) * 3f, 0f, (float)Math.Cos(th) * 3f); }
-            else { double ph = 2 * Math.PI * ((tc - 8.0) / 4.0); pos = new Vector3(0f, (float)Math.Sin(ph) * 3f, (float)Math.Cos(ph) * 3f); }
-
-            emitter.Position = pos;
-            provider.UpdateSpatialAttributes(emitter);
-            provider.Update();
-            Thread.Sleep(20);
-        }
-
-        provider.StopSound(1);
-        provider.Dispose();
-        if (!interactive) Console.WriteLine("RESULT: provider orbit ran to completion (see log for 'Steam Audio HRTF binaural enabled').");
-        return 0;
-    }
-
     /// <summary>
     /// Stress test: rapidly create and stop many transient spatial voices (footsteps + reflections)
     /// while the FMOD mixer thread runs the Steam Audio DSP callbacks — reproducing the native crash
@@ -882,59 +828,6 @@ public static class ProviderOrbit
         var r2 = reverb.disconnectFrom(k2f, s2); Tick(); Say($"fresh send removed honestly -> {r2}: inputs={Count()}");
         Console.WriteLine($"RESULT: SURVIVED scenario {scenario} — final inputs={Count()} (0 means no drift)");
         k2.stop(); Tick(); sys.close(); sys.release();
-        return 0;
-    }
-
-    /// <summary>
-    /// How many region reverb buses FMOD will actually give out, and what it does when it will not.
-    ///
-    /// A bus is a channel group with an SFXREVERB unit in it, and one was created for every region
-    /// any source had ever sent to. On the city that reached 185 and climbing — the number is bounded
-    /// by how far a player has walked, not by the map — and the two FMOD calls that make one had
-    /// their results ignored, so a refusal was a null dereference in native code with no exception
-    /// and no log line. This asks for many more than a map could ever need and says what happened.
-    /// </summary>
-    public static int RunReverbChurn(int regions = 400)
-    {
-        var provider = new FmodAudioProvider();
-        if (!provider.Initialize()) { Console.WriteLine("provider init failed"); return 1; }
-        provider.UpdateListener(Vector3.Zero, Quaternion.Identity, Vector3.Zero, -1);
-
-        var map = new OpenFPS.Common.AcousticMap(new Vector3(2000, 200, 2000), new Vector3(-1000, 0, -1000), 1f);
-        for (int i = 0; i < regions; i++)
-        {
-            // A closed room, so RoomAcoustics gives it a real decay and the bus is built wet.
-            map.Regions[9000 + i] = new OpenFPS.Common.Components.RegionComponent
-            {
-                FriendlyName = $"Room {i}", IsIndoor = true,
-                RoomSize = new Vector3(6f, 3f, 8f),
-                Materials = new[] { 18, 18, 18, 18, 18, 18 },
-            };
-            map.RegionPositions[9000 + i] = new Vector3((i % 20) * 40f - 400f, 1.6f, (i / 20) * 40f - 400f);
-        }
-        provider.SetAcousticMap(map);
-
-        // One voice per region, each sending to its own room: the thing that makes a bus.
-        for (int i = 0; i < regions; i++)
-        {
-            provider.PlaySpatialSound(new SpatialEmitter
-            {
-                EntityId = 900000 + i,
-                Type = EmitterType.WorldLocked,
-                IsSynth = true, SynthWave = SynthWaveType.Noise, SynthFrequency = 220f,
-                SynthFilterCutoff = 1f, Volume = 0.05f,
-                Position = map.RegionPositions[9000 + i],
-                Range = 60f, MinDistance = 1f,
-                EnableReverb = true, TargetRegionId = 9000 + i,
-            });
-            provider.Update();
-            if (i % 50 == 0) Console.WriteLine($"  {i} region(s) asked for a bus...");
-        }
-        for (int k = 0; k < 40; k++) { provider.Update(); Thread.Sleep(8); }
-
-        Console.WriteLine($"RESULT: SURVIVED — {regions} regions asked for a reverb bus. "
-                        + "Any refusal is logged above as 'FMOD would not make a bus'.");
-        provider.Dispose();
         return 0;
     }
 }
