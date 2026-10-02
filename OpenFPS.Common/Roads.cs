@@ -153,6 +153,11 @@ public sealed class RoadNetwork
     {
         if (road.Centreline.Count < 2) { _problems.Add($"road {road.Id}: fewer than two centreline points"); return; }
         if (road.Lanes.Count == 0) { _problems.Add($"road {road.Id}: no lanes"); return; }
+        // One NaN in the data is a NaN lane length, and the route search compares lengths: NaN is never
+        // shorter, so it re-queues the same lanes round a loop for ever.
+        if (!road.Centreline.All(p => float.IsFinite(p.X) && float.IsFinite(p.Y) && float.IsFinite(p.Z))
+            || !float.IsFinite(road.WidthMetres) || !road.Lanes.All(l => float.IsFinite(l.OffsetMetres)))
+        { _problems.Add($"road {road.Id}: a position, width or lane offset is not a number"); return; }
         float length = Length(road.Centreline);
         var stops = JunctionsOn(road);
         // The pieces between one junction (or end) and the next.
@@ -174,7 +179,7 @@ public sealed class RoadNetwork
             // Measured from the junction's own point, not from where the road happens to begin.
             float from = ja != null ? Project(road.Centreline, ja.Position).Along + ja.RadiusMetres : a;
             float to = jb != null ? Project(road.Centreline, jb.Position).Along - jb.RadiusMetres : b;
-            if (to - from < 1f) { _problems.Add($"road {road.Id}: {to - from:F1} m between {ja?.Id ?? "its start"} and {jb?.Id ?? "its end"}"); continue; }
+            if (!(to - from >= 1f)) { _problems.Add($"road {road.Id}: {to - from:F1} m between {ja?.Id ?? "its start"} and {jb?.Id ?? "its end"}"); continue; }
             foreach (var lane in road.Lanes)
             {
                 var path = Offset(Slice(road.Centreline, from, to), lane.OffsetMetres);
