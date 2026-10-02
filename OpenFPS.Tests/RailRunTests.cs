@@ -67,6 +67,33 @@ public class RailRunTests : IDisposable
         Assert.True(tailPastWhenReopened >= 28f, $"reopened with the tail only {tailPastWhenReopened:F1} m past");
     }
 
+    // ── Sources ─────────────────────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Every source rides at its own height above the rail, wherever the rail goes. The old
+    /// placement worked out to "keep the old absolute height", so on a slope a bogie stayed at the
+    /// height it was spawned at until it was six metres out, then snapped to half a metre.
+    /// </summary>
+    [Fact]
+    public void Every_source_keeps_its_height_above_a_sloping_rail()
+    {
+        // The rail climbs one in twenty eastward: fifteen metres between the two sides of the loop.
+        var f = new Fixture(_dir, topSpeedKmh: 40f, startMetres: 0f, slope: 0.05f);
+        var layout = TrainLayout.Sources(TrainProfile.ByName("light_rail"));
+
+        for (int s = 0; s < 60; s++)
+        {
+            for (int i = 0; i < (int)(1f / Dt); i++) f.Tick();
+            foreach (var (index, at) in f.Sources())
+            {
+                float rail = 0.05f * at.X;
+                Assert.True(MathF.Abs(at.Y - rail - layout[index].HeightMetres) < 0.05f,
+                    $"after {s + 1} s, source {index} ({layout[index].Label}) is {at.Y - rail:F2} m above the rail, "
+                  + $"not {layout[index].HeightMetres:F2}");
+            }
+        }
+    }
+
     // ── Fixture ─────────────────────────────────────────────────────────────────────────────────
 
     /// <summary>

@@ -34,6 +34,8 @@ public sealed class RailSystem
         public required RaceLine Line;
         public required Entity[] Entities;     // Entity.Null for the signal sources, which are not spawned
         public required float[] Along;
+        /// <summary>Each source's own height above the rail, metres.</summary>
+        public required float[] Heights;
         public float Head, Speed, TopSpeed, Accel, Brake;
         /// <summary>Head to tail, metres: the sum of the vehicles' lengths.</summary>
         public float LengthMetres;
@@ -99,10 +101,12 @@ public sealed class RailSystem
                 string trainKey = name.Replace('/', '-').Replace(' ', '_');
                 var ents = new Entity[layout.Count];
                 var along = new float[layout.Count];
+                var heights = new float[layout.Count];
                 for (int i = 0; i < layout.Count; i++)
                 {
                     var src = layout[i];
                     along[i] = src.AlongMetres;
+                    heights[i] = src.HeightMetres;
                     if (src.IsSignal) { ents[i] = Entity.Null; continue; }
                     line.Sample(td.StartOffsetMetres - src.AlongMetres, out var pos, out float heading, out _);
                     pos.Y += src.HeightMetres;
@@ -127,7 +131,7 @@ public sealed class RailSystem
                 line.Sample(td.StartOffsetMetres, out _, out _, out float v0);
                 _trains.Add(new Consist
                 {
-                    MapId = mapId, Name = name, Preset = td.Preset, Line = line, Entities = ents, Along = along,
+                    MapId = mapId, Name = name, Preset = td.Preset, Line = line, Entities = ents, Along = along, Heights = heights,
                     Stops = (data.Tracks?.Find(x => string.Equals(x.Id, td.Track, StringComparison.OrdinalIgnoreCase))?.Stops ?? new())
                         .Where(sp => string.IsNullOrEmpty(sp.ForPreset)
                                   || td.Preset.Contains(sp.ForPreset!, StringComparison.OrdinalIgnoreCase))
@@ -251,8 +255,11 @@ public sealed class RailSystem
             tr.Line.Sample(tr.Head - tr.Along[i], out var pos, out float heading, out _);
             ref var t = ref world.Get<Transform>(e);
             ref var vel = ref world.Get<Velocity>(e);
-            float height = t.Position.Y - pos.Y;            // keep the source's own height above the rail
-            pos.Y += MathF.Abs(height) < 6f ? height : 0.5f;
+            // The source's own height above the rail, wherever the rail goes. This used to be read
+            // back off the transform as "the old height less the rail's height here" and added to
+            // the rail's height, which is the old height again: on a slope the source stayed where
+            // it had been until it was six metres out.
+            pos.Y += tr.Heights[i];
             t.Position = pos;
             t.Rotation = Quaternion.CreateFromYawPitchRoll(heading, 0f, 0f);
             t.IsDirty = true;
