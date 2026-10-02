@@ -316,6 +316,59 @@ public class ServerHolesTests
         Assert.Contains("permission", text.Text, StringComparison.OrdinalIgnoreCase);
     }
 
+    // ── Movement input is finite ────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// A client's numbers reach the simulation only if they are numbers. The gate normalised a move
+    /// direction only when its length was over one, and NaN is not over anything, so a NaN or
+    /// infinite direction walked straight through to the player's position and from there into the
+    /// spatial grid. A NaN look turned the player's yaw to NaN for good, and Math.Clamp passes NaN.
+    /// </summary>
+    [Theory]
+    [InlineData(float.NaN)]
+    [InlineData(float.PositiveInfinity)]
+    [InlineData(float.NegativeInfinity)]
+    public void Input_that_is_not_a_number_reaches_nothing(float bad)
+    {
+        var dispatcher = new MessageDispatcher();
+        ClientInputUpdate? seen = null;
+        dispatcher.RegisterHandler<ClientInputUpdate>((_, input, _) => seen = input);
+
+        dispatcher.Dispatch(1, new ClientInputUpdate
+        {
+            SequenceId = 1,
+            MoveDirection = new Vector3(bad, 0f, 1f),
+            LookDelta = new Vector2(0.5f, bad),
+            DeltaTime = bad,
+        }, _ => { });
+
+        Assert.NotNull(seen);
+        Assert.Equal(Vector3.Zero, seen!.MoveDirection);
+        Assert.Equal(Vector2.Zero, seen.LookDelta);
+        Assert.True(float.IsFinite(seen.DeltaTime) && seen.DeltaTime > 0f, $"DeltaTime {seen.DeltaTime}");
+    }
+
+    [Fact]
+    public void Ordinary_input_passes_the_gate_as_it_was()
+    {
+        var dispatcher = new MessageDispatcher();
+        ClientInputUpdate? seen = null;
+        dispatcher.RegisterHandler<ClientInputUpdate>((_, input, _) => seen = input);
+
+        // A coarse turn is forty-five degrees in one tick, which is a LookDelta far over one: a look
+        // is a rate the client chose, not a stick position, and the gate must leave it alone.
+        var look = new Vector2(15.7f, -0.2f);
+        dispatcher.Dispatch(1, new ClientInputUpdate
+        {
+            SequenceId = 1, MoveDirection = new Vector3(3f, 0f, 4f), LookDelta = look, DeltaTime = 0.033f,
+        }, _ => { });
+
+        Assert.NotNull(seen);
+        Assert.Equal(1f, seen!.MoveDirection.Length(), 4);
+        Assert.Equal(look, seen.LookDelta);
+        Assert.Equal(0.033f, seen.DeltaTime);
+    }
+
     // ── Fixtures ────────────────────────────────────────────────────────────────────────────────
 
     private static MapManager LoadShippedMaps()

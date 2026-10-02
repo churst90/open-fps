@@ -176,17 +176,19 @@ public sealed class CrossingSystem
             bool wants = false;
             foreach (var (track, at) in c.OnRail)
             {
-                foreach (float head in _rail.HeadsOn(mapId, track, out float lapLength))
+                foreach (var (head, length) in _rail.TrainsOn(mapId, track, out float lapLength))
                 {
                     // How far the train still has to come. Round the loop, so a train just past
                     // the crossing is a whole lap away and not a metre behind.
                     float toGo = at - head;
                     if (toGo < 0f) toGo += lapLength;
                     if (toGo <= c.WarningMetres) { wants = true; break; }
-                    // And the tail: still closed until it is clear on the far side.
+                    // And the tail: still closed until it is clear on the far side. The tail is a
+                    // train's length behind the head; measuring the head against the clearance
+                    // reopened the road with 20 m of a 55 m tram still on it.
                     float past = head - at;
                     if (past < 0f) past += lapLength;
-                    if (past <= c.ClearMetres) { wants = true; break; }
+                    if (past <= length + c.ClearMetres) { wants = true; break; }
                 }
                 if (wants) break;
             }

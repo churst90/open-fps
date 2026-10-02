@@ -743,22 +743,7 @@ public class GameServer
             return;
         }
 
-        if (session.Entity != Entity.Null && _maps.TryGetMap(from, out var oldWorld, out _, out _, out _))
-        {
-            var body = session.Entity;
-            if (oldWorld.IsAlive(body))
-            {
-                // Out of the seat first. Exit refuses while the vehicle is moving; leaving the map is
-                // not a request, so fall back to unseating without finding standing room.
-                if (oldWorld.Has<OccupantComponent>(body) && (_seats == null || !_seats.Exit(session, out _)))
-                    CompositeService.Disembark(oldWorld, body);
-                _hands?.Drop(session, "all", out _);
-            }
-            session.Entity = Entity.Null;
-            _maps.DestroyEntity(from, body);
-            BroadcastEntityRemoved(from, body.Id);
-        }
-        session.Entity = Entity.Null;
+        LeaveWorld(session);
 
         session.CurrentMapId = mapId;
         session.KnownEntities.Clear();
@@ -948,21 +933,46 @@ public class GameServer
     }
 
     /// <summary>
-    /// Removes a session's body from the world and tells everyone who could see it. Without the second
-    /// half every other client keeps the corpse forever: it still occupies space, still answers scans,
-    /// and still plays whatever sound it carried.
+    /// Takes a disconnected session's body out of the world, on the tick thread.
+    ///
+    /// Queued even when the session has no body yet: a 'ready' queued just before the disconnect
+    /// spawns one when the buffer drains, and this runs after it and takes it away again.
     /// </summary>
-    private void DespawnSession(UserSession session)
+    internal void DespawnSession(UserSession session)
     {
-        if (session.Entity == Entity.Null) return;
-        var entity = session.Entity;
-        string mapId = session.CurrentMapId;
-        session.Entity = Entity.Null;
+        _commandBuffer.Enqueue(() => LeaveWorld(session));
+    }
 
-        _commandBuffer.Enqueue(() => {
-            _maps.DestroyEntity(mapId, entity);
-            BroadcastEntityRemoved(mapId, entity.Id);
-        });
+    /// <summary>
+    /// Takes a session's body off the map it is on: out of any seat, its things put down, destroyed,
+    /// and announced as gone. Runs on the tick thread. Changing map and disconnecting both come
+    /// through here, so a player who leaves either way leaves the same things behind.
+    ///
+    /// The seat and the things go first, while the body is still there to be got out and to drop
+    /// from. Destroyed while carrying, the things kept a HeldComponent naming a dead holder, so
+    /// nobody could pick them up again, and a ParentComponent naming an id Arch would reuse.
+    /// Without the announcement every other client keeps the corpse forever: it still occupies
+    /// space, still answers scans, and still plays whatever sound it carried.
+    /// </summary>
+    private void LeaveWorld(UserSession session)
+    {
+        var body = session.Entity;
+        string mapId = session.CurrentMapId;
+        if (body != Entity.Null && _maps.TryGetMap(mapId, out var world, out _, out _, out _))
+        {
+            if (world.IsAlive(body))
+            {
+                // Out of the seat first. Exit refuses while the vehicle is moving; leaving the map is
+                // not a request, so fall back to unseating without finding standing room.
+                if (world.Has<OccupantComponent>(body) && (_seats == null || !_seats.Exit(session, out _)))
+                    CompositeService.Disembark(world, body);
+                _hands?.Drop(session, "all", out _);
+            }
+            session.Entity = Entity.Null;
+            _maps.DestroyEntity(mapId, body);
+            BroadcastEntityRemoved(mapId, body.Id);
+        }
+        session.Entity = Entity.Null;
     }
 
     /// <summary>

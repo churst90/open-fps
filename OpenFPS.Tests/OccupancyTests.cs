@@ -719,6 +719,71 @@ public class OccupancyTests : IDisposable
                     "a player standing in the door is not touching the car");
     }
 
+    // ── Leaving ─────────────────────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Disconnecting sitting in a car with things in your hands and on your back leaves the things on
+    /// the map for somebody else, the way changing map always did. Before, the body was destroyed and
+    /// the things kept a HeldComponent pointing at it, so nobody could ever pick them up again, and a
+    /// ParentComponent pointing at an id Arch would hand to the next thing created.
+    /// </summary>
+    [Fact]
+    public void DisconnectingPutsDownWhatYouCarryAndGetsYouOut()
+    {
+        var f = new Fixture(_dir);
+        var hands = new HandsService(f.Maps);
+        var server = new OpenFPS.Server.GameServer(new NoUsers());
+        server.Attach(f.Maps, f.Sessions, f.Seats, hands);
+
+        int root = f.BuildCar(new Vector3(20, 0, 20));
+        var session = f.Player("leaver", new Vector3(21, 0, 20));
+        var torch = Item(f, "Torch", new Vector3(21.3f, 0, 20));
+        var crowbar = Item(f, "Crowbar", new Vector3(21.4f, 0, 20));
+        Assert.True(hands.Take(session, "torch", out string m), m);
+        Assert.True(hands.Stow(session, "", out m), m);
+        Assert.True(hands.Take(session, "crowbar", out m), m);
+        Assert.True(f.Seats.Enter(session, root, null, out m), m);
+        var body = session.Entity;
+
+        Assert.True(f.Sessions.TryRemoveSession(session.ConnectionId, out _));
+        server.DespawnSession(session);
+        server.DrainCommandBuffer();
+
+        Assert.False(f.World.IsAlive(body));
+        Assert.Equal(Arch.Core.Entity.Null, session.Entity);
+        foreach (var item in new[] { torch, crowbar })
+        {
+            Assert.True(f.World.IsAlive(item));
+            Assert.False(f.World.Has<HeldComponent>(item), $"{item.Id} is still held by a body that is gone");
+            Assert.False(f.World.Has<ParentComponent>(item), $"{item.Id} still rides on a body that is gone");
+        }
+
+        // And somebody else can pick them up.
+        var other = f.Player("finder", f.World.Get<Transform>(crowbar).Position);
+        Assert.True(hands.Take(other, "crowbar", out m), m);
+        Assert.True(hands.Take(other, "torch", out m), m);
+    }
+
+    private static Arch.Core.Entity Item(Fixture f, string name, Vector3 at)
+    {
+        var e = f.Maps.SpawnEntity(f.MapId, w => w.Create(
+            new Transform { Position = at, Rotation = Quaternion.Identity },
+            new ColliderComponent { Shape = ColliderShape.Box, Size = new Vector3(0.2f, 0.1f, 0.5f), IsSolid = false },
+            new MaterialComponent { Material = "Metal", Variant = "0" },
+            new IdentityComponent { Name = name },
+            new ItemComponent { MassKg = 1f, Hands = 1 },
+            EntityType.StaticObject));
+        Assert.NotEqual(Arch.Core.Entity.Null, e);
+        return e;
+    }
+
+    private sealed class NoUsers : IUserRepository
+    {
+        public UserData? GetUser(string username) => null;
+        public bool AddUser(string username, string password, UserRole role) => true;
+        public bool VerifyPassword(string username, string password) => false;
+    }
+
     // ── Fixture ─────────────────────────────────────────────────────────────────────────────────
 
     /// <summary>
