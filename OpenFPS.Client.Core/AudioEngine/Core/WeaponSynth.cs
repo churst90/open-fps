@@ -9,13 +9,11 @@ namespace OpenFPS.Client.AudioEngine.Core;
 /// </summary>
 public readonly record struct WeaponProfile(
     string Name,
-    float MuzzleVelocity,        // m/s. Decides whether there is a crack at all, and how tight it is.
+    float MuzzleVelocity,        // m/s
     float PositivePhaseMs,       // the blast pulse's positive phase
     float BurstDecayMs,          // the turbulent gas behind the shock
     float TrailDecayMs,          // what trails after it
-    float CornerHz,              // where the spectrum starts to fall
-    float MechanicalDelaySeconds,// when the action is heard after the shot
-    float MechanicalLevel)
+    float CornerHz)              // where the spectrum starts to fall
 {
     public static WeaponProfile From(WeaponDefinition w) => new(
         Name: w.Id,
@@ -23,9 +21,7 @@ public readonly record struct WeaponProfile(
         PositivePhaseMs: w.ReportPositivePhaseMs,
         BurstDecayMs: w.ReportBurstDecayMs,
         TrailDecayMs: w.ReportTrailDecayMs,
-        CornerHz: w.ReportCornerHz,
-        MechanicalDelaySeconds: w.MechanicalDelaySeconds,
-        MechanicalLevel: w.MechanicalLevel);
+        CornerHz: w.ReportCornerHz);
 
     public static WeaponProfile Rifle => From(WeaponRegistry.Ar15);
     public static WeaponProfile Pistol => From(WeaponRegistry.Glock);
@@ -41,12 +37,9 @@ public readonly record struct WeaponProfile(
 /// a recording with a tail and you hear two rooms at once. Synthesis sidesteps that entirely: what comes
 /// out of here has no room in it, so the room it ends up in is the one the player is standing in.
 ///
-/// There are three separate sounds here and they belong at different PLACES as well as different times:
-///
-///   * <see cref="MuzzleBlast"/> happens at the weapon.
-///   * <see cref="SupersonicCrack"/> happens at the LISTENER, as the round passes them, and arrives
-///     first. See <see cref="Ballistics"/> — the gap between the two is a distance cue.
-///   * <see cref="MechanicalAction"/> happens at the weapon, just after.
+/// The report is the one sound here, and it happens at the weapon. A supersonic round's crack happens
+/// somewhere else (where its Mach cone meets the listener, see <see cref="Ballistics"/>) and is not
+/// built yet; see docs/GUNFIRE.md.
 ///
 /// Deterministic given a seed, so the same shot renders identically on every machine and the tests can
 /// assert on the waveform rather than on a description of it.
@@ -118,99 +111,6 @@ public static class WeaponSynth
     /// <summary>Below this the report falls away. Only where the recordings stop saying anything: a
     /// handheld recorder's capsules roll off below about 80 Hz.</summary>
     public const float ReportHighPassHz = 80f;
-
-    /// <summary>
-    /// The crack of a supersonic round passing the listener.
-    ///
-    /// This is not a quieter gunshot, it is a different sound entirely: an N-wave, a near-instantaneous
-    /// pressure step up and back down, lasting a fraction of a millisecond. That is why it reads as a
-    /// whip rather than a bang, and why it is so easy to localize — almost all its energy is high and
-    /// broadband, which is exactly what the ears use to place a sound.
-    ///
-    /// It is rendered AT THE LISTENER, so it should be played unspatialized or at a point just off the
-    /// listener's position, never at the shooter's.
-    /// </summary>
-    public static float[] SupersonicCrack(WeaponProfile w, float missDistance,
-                                          float speedOfSound = AudioPhysics.SpeedOfSound, int seed = 2)
-    {
-        if (!Ballistics.MakesCrack(w.MuzzleVelocity, missDistance, speedOfSound))
-            return Array.Empty<float>();
-
-        float nWave = Ballistics.CrackDurationSeconds(missDistance, w.MuzzleVelocity, speedOfSound);
-        // The N-wave itself is the crack; what follows is the ground and the air smearing it out.
-        float tail = 0.045f + missDistance * 0.0025f;
-        int n = (int)(SampleRate * (nWave + tail));
-        if (n < 8) return Array.Empty<float>();
-
-        var buf = new float[n];
-        var rng = new Random(seed);
-        int nWaveSamples = Math.Max(2, (int)(nWave * SampleRate));
-
-        float lp = 0f;
-        // A near miss keeps everything; a distant one has lost its highs to the air on the way over.
-        float cutoff = MathHelper.Lerp(11000f, 2600f, Math.Clamp(missDistance / Ballistics.MaxCrackMissDistance, 0f, 1f));
-        float alpha = 1f - MathF.Exp(-2f * MathF.PI * cutoff / SampleRate);
-
-        for (int i = 0; i < n; i++)
-        {
-            float s;
-            if (i < nWaveSamples)
-            {
-                // The N: a linear ramp from +1 down through zero to −1. That shape is the whole
-                // character — it is why a crack sounds like a tear and not like a click.
-                float u = i / (float)nWaveSamples;
-                s = 1f - 2f * u;
-            }
-            else
-            {
-                float t = (i - nWaveSamples) / (float)SampleRate;
-                // Short decay relative to the buffer — a fifth of it, so the tail is over rather than
-                // merely quiet by the end. A crack that trails off slowly stops sounding like a whip
-                // and starts sounding like a firework, which is both wrong and much harder to place.
-                s = (float)(rng.NextDouble() * 2.0 - 1.0) * MathF.Exp(-t / (tail * 0.18f)) * 0.5f;
-            }
-            lp += alpha * (s - lp);
-            buf[i] = lp;
-        }
-
-        return Finish(buf, 0.9f);
-    }
-
-    /// <summary>
-    /// The action: bolt, extractor, casing. Quiet, close, and the part that tells a listener a weapon
-    /// was re-cocked rather than fired again — which in a game played by ear is information.
-    /// </summary>
-    public static float[] MechanicalAction(WeaponProfile w, int seed = 3)
-    {
-        int n = (int)(SampleRate * 0.16f);
-        var buf = new float[n];
-        var rng = new Random(seed);
-
-        // Two metallic clicks a few tens of milliseconds apart, each a short burst through a high
-        // resonance, plus a little ring.
-        AddClick(buf, 0.000f, 1900f, 0.012f, 1.0f, rng);
-        AddClick(buf, 0.038f, 3100f, 0.020f, 0.7f, rng);
-        AddClick(buf, 0.085f, 1200f, 0.035f, 0.4f, rng);
-
-        return Finish(buf, w.MechanicalLevel);
-    }
-
-    private static void AddClick(float[] buf, float atSeconds, float resonanceHz, float decay, float level, Random rng)
-    {
-        int start = (int)(atSeconds * SampleRate);
-        float f = 2f * MathF.PI * resonanceHz / SampleRate;
-        float bp1 = 0f, bp2 = 0f;
-        for (int i = start; i < buf.Length; i++)
-        {
-            float t = (i - start) / (float)SampleRate;
-            float env = MathF.Exp(-t / decay);
-            if (env < 1e-4f) break;
-            float input = (float)(rng.NextDouble() * 2.0 - 1.0) * env;
-            bp1 += f * (input - bp1 - 0.08f * bp2);
-            bp2 += f * bp1;
-            buf[i] += bp2 * 3f * level;
-        }
-    }
 
     /// <summary>
     /// Finishes a rendered layer: removes DC, fades the end to silence, then scales to a peak.

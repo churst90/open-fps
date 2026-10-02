@@ -29,14 +29,9 @@ public class WeaponSystemTests
                              $"{idA} and {idB} render an identical blast");
             }
 
-        // And the profile always carries the weapon's own velocity, so a crack that is scheduled is a
-        // crack that renders.
+        // And the profile always carries the weapon's own velocity.
         foreach (var w in WeaponRegistry.All)
-        {
             Assert.Equal(w.MuzzleVelocity, WeaponProfile.From(w).MuzzleVelocity);
-            if (w.IsSupersonic(C))
-                Assert.NotEmpty(WeaponSynth.SupersonicCrack(WeaponProfile.From(w), 2f));
-        }
     }
 
     /// <summary>

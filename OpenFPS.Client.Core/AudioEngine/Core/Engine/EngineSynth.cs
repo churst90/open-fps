@@ -1421,7 +1421,8 @@ public sealed class EngineSynth
         else if (_clunkKick > 0f) { thump = _clunkKick; _clunkKick = 0f; }
         float clunk = StruckMode(ref _clunk, ref _clunkB, thump, 220f, 4f);
 
-        return amp * (0.9f * noise + mesh + whine + 0.7f * clack + 0.6f * click + 1.2f * clunk);
+        // The noise 5 dB under what the recordings were fitted to: "still hear some white noise" (Cody, round 5).
+        return amp * (0.5f * noise + mesh + whine + 0.7f * clack + 0.6f * click + 1.2f * clunk);
     }
 
     /// <summary>A resonant mode struck by <paramref name="kick"/>: frequency and Q.</summary>

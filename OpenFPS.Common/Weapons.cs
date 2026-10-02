@@ -51,10 +51,6 @@ public sealed record WeaponDefinition
     /// <summary>Where the report's spectrum starts to fall, Hz: about 6 dB an octave above it, as the
     /// recordings fall 13 dB by 4 kHz and 20 by 8.</summary>
     public required float ReportCornerHz { get; init; }
-    /// <summary>When the action is heard after the shot, seconds. Zero for a weapon that does not
-    /// cycle itself.</summary>
-    public float MechanicalDelaySeconds { get; init; } = 0.045f;
-    public float MechanicalLevel { get; init; } = 0.22f;
 
     /// <summary>Whether this round outruns sound, and so cracks as it passes.</summary>
     public bool IsSupersonic(float speedOfSound) =>
@@ -132,8 +128,6 @@ public static class WeaponRegistry
         // 12 gauge: no recording. The largest bore and charge here, so the longest pulse and the
         // darkest report — an estimate from the physics, to be checked against a recording.
         ReportPositivePhaseMs = 0.60f, ReportBurstDecayMs = 0.60f, ReportTrailDecayMs = 2.2f, ReportCornerHz = 2400f,
-        MechanicalDelaySeconds = 0f,
-        MechanicalLevel = 0f,
     };
 
     static WeaponRegistry()

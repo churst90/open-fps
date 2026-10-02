@@ -357,8 +357,12 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
         Vector3 lPos;
         lock (_stateLock) { lPos = _listenerPos; }
         
-        float dist = Vector3.Distance(lPos, emitter.Position);
-        emitter.DelayMs += (dist / 343.0f) * 1000.0f;
+        // A cue in the head has no flight time.
+        if (emitter.Type != EmitterType.UI)
+        {
+            float dist = Vector3.Distance(lPos, emitter.Position);
+            emitter.DelayMs += (dist / 343.0f) * 1000.0f;
+        }
 
         _submissionQueue.Enqueue(emitter);
     }

@@ -44,10 +44,6 @@ public static class Loudness
     public const float Pistol45Db = 157f;
     public const float Shotgun12GaugeDb = 160f;
 
-    /// <summary>The N-wave of a round passing at a metre. Enormous, brief, and almost all of it high
-    /// frequency — which is why it localizes so well and why it does not carry.</summary>
-    public const float SupersonicCrackDb = 150f;
-
     /// <summary>A round striking concrete a few metres away.</summary>
     public const float BulletImpactDb = 120f;
     /// <summary>A pane failing. Loud, but nothing like a gunshot.</summary>

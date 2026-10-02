@@ -2589,7 +2589,18 @@ public class FmodAudioProvider : IAudioProvider
                 }
             }
         }
-        else { channel.set3DLevel(0.0f); }
+        else
+        {
+            // IN THE HEAD: a cue for the player (the driving aids), not a sound in the world. Panned
+            // by its direction from the listener and nothing else — no HRTF to put it out on the road,
+            // no distance, no room, no reverb, no echo. Head-relative, so it stays put as the head turns
+            // and is re-aimed only when its own direction changes.
+            channel.getMode(out MODE headMode);
+            channel.setMode((headMode & ~Rolloff.Either) | MODE._3D | MODE._3D_HEADRELATIVE);
+            channel.set3DMinMaxDistance(1000f, 10000f);
+            channel.set3DLevel(1.0f);
+            PlaceInHead(channel, emitter.FollowsListener ? emitter.ListenerOffset : emitter.Position - _listenerPos);
+        }
         
         channel.setVolume(emitter.Volume);
         channel.setPitch(emitter.IsGranular || emitter.IsSynth ? 1.0f : emitter.Pitch); 
@@ -2673,7 +2684,7 @@ public class FmodAudioProvider : IAudioProvider
                 activeSound.GroundHeight = HasGround(emitter) ? emitter.GroundHeight : null;
             }
 
-            if (_acousticMap != null && !activeSound.IsReflection) // Reflections should not feed back into reverb
+            if (_acousticMap != null && !activeSound.IsReflection && emitter.Type != EmitterType.UI) // Reflections should not feed back into reverb
             {
                 int sourceRegionId = activeSound.TargetRegionId;
                 // NOT "sourceRegionId != -1". Outdoors IS region -1, so that test — written to mean
@@ -3204,7 +3215,11 @@ public class FmodAudioProvider : IAudioProvider
                         RemoveActiveAt(i); continue; 
                     }
                     
-                    if (active.Type == EmitterType.UI) continue;
+                    if (active.Type == EmitterType.UI)
+                    {
+                        PlaceInHead(active.Channel, active.FollowsListener ? active.ListenerOffset : active.Position - _listenerPos);
+                        continue;
+                    }
 
                     UpdateReverbRouting(active, listenerRegionId);
                     UpdateSpatialPositioning(active, lPosVec);
@@ -3971,6 +3986,21 @@ public class FmodAudioProvider : IAudioProvider
         Vector3 d = _listenerPos - position;
         local = new Vector3(Vector3.Dot(d, right), d.Y, Vector3.Dot(d, fwd));
         return true;
+    }
+
+    /// <summary>
+    /// Puts a head-relative voice at <paramref name="offset"/> (world axes, from the listener) in the
+    /// listener's own frame. FMOD's listener space is right, up, forward, built from the same forward
+    /// and up given to set3DListenerAttributes, so right is up x forward in its vectors.
+    /// </summary>
+    private void PlaceInHead(FMOD.Channel channel, Vector3 offset)
+    {
+        Vector3 fwd = Vector3.Transform(Vector3.UnitZ, _listenerRot), up = Vector3.Transform(Vector3.UnitY, _listenerRot);
+        Vector3 right = Vector3.Cross(up, fwd);
+        if (offset.LengthSquared() < 1e-6f) offset = fwd;
+        var local = new FMOD.VECTOR { x = Vector3.Dot(offset, right), y = Vector3.Dot(offset, up), z = Vector3.Dot(offset, fwd) };
+        var still = new FMOD.VECTOR();
+        channel.set3DAttributes(ref local, ref still);
     }
 
     public void UpdateListener(Vector3 position, Quaternion rotation, Vector3 velocity, int regionId)

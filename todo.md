@@ -88,10 +88,9 @@ or a live instrument, or no longer applicable, is removed. Kept on purpose:
   four test suites measure with them.
 - `tools/cut_calls.py` and `tools/gen_announcements.py`: they regenerate the bird calls and the
   speedway's PA announcement.
-- Cody to decide: `WeaponSynth.SupersonicCrack` and `MechanicalAction` (with
-  `WeaponDefinition.Mechanical*`) are tested but the game plays neither; a shot is its report only.
-- Cody to decide: the driving aid tones and the lane ticks were marked dry, but the flag was never
-  read, so they send to the reverb like every direct sound. Unchanged.
+- Driving aid tones and lane ticks: Cody, 2026-10-02: dry, and in the player's head, not on the
+  road. The cues themselves need a design (he overshoots the road; something like Forza's); set
+  aside for now.
 
 **Left from the 2026-10-01 mutation triage** ([docs/MUTATION_2026-10-01.md](docs/MUTATION_2026-10-01.md))
 - A car stopped for a crossing on a turn (30-45° to the road) can have a front corner up to 0.36 m
