@@ -45,10 +45,20 @@ public class GameServer
 
     private readonly MessageDispatcher _dispatcher = new();
 
-    // Login and registration both verify a bcrypt hash on the tick thread. Six attempts in a burst, then
-    // one every five seconds, per remote address — generous for a person mistyping a password, useless
-    // for guessing one.
-    private readonly RateLimiter _authLimiter = new(capacity: 6, refillPerSecond: 0.2);
+    // Who may log in and create accounts, and how often: the limits and the lockout live there. See
+    // docs/SERVER_SECURITY.md.
+    private readonly AuthService _auth;
+
+    /// <summary>
+    /// Logins being checked off the tick thread right now. Past <see cref="MaxPendingLogins"/> a new
+    /// one is told the server is busy rather than queued: bcrypt is slow on purpose, and a queue
+    /// that grows with the number of addresses asking is a queue an attacker can fill.
+    /// </summary>
+    private int _pendingLogins;
+    public const int MaxPendingLogins = 8;
+
+    /// <summary>A connection that has not logged in by now is closed.</summary>
+    public static readonly TimeSpan LoginTimeout = TimeSpan.FromSeconds(120);
     private FriendRepository _friends = null!;
     private MudGateway _mudGateway = null!;
     private readonly ServerStateUpdate _reusableBroadcast = new();
@@ -57,7 +67,16 @@ public class GameServer
     public GameServer(IUserRepository userRepo)
     {
         _userRepo = userRepo;
+        _auth = new AuthService(userRepo);
+        // Nothing but a login or a registration is heard from a connection that has not logged in.
+        _dispatcher.IsAuthenticated = id => _sessions.TryGetSession(id, out _);
     }
+
+    /// <summary>The login rules and their state, for the admin's commands.</summary>
+    public AuthService Auth => _auth;
+
+    /// <summary>Every message sent to a session, as it is sent. Tests watch it; nothing else should.</summary>
+    internal Action<UserSession, IMessage>? Sent;
 
     public void EnqueueCommand(Action action) => _commandBuffer.Enqueue(action);
 
@@ -233,7 +252,6 @@ public class GameServer
         // These register their handlers with the dispatcher, which is what keeps them alive.
         _ = new DiscoveryService(_dispatcher, _sessions, _maps);
         _ = new SocialService(_dispatcher, _sessions, _friends);
-        _ = new MapAuthorityService(_dispatcher);
         
         RegisterHandlers();
 
@@ -321,17 +339,52 @@ public class GameServer
 
     public void SendToSession(UserSession session, IMessage message, DeliveryMethod delivery = DeliveryMethod.ReliableOrdered)
     {
+        Sent?.Invoke(session, message);
         var peer = _network.GetPeer(session.ConnectionId);
         if (peer != null) { _network.SendMessage(peer, message, delivery); return; }
         _mudGateway?.TrySend(session.ConnectionId, message);
     }
 
-    /// <summary>Rate-limit key: the remote address, which a reconnecting attacker cannot cycle for free.</summary>
-    private string RateKeyFor(int connectionId)
+    /// <summary>
+    /// The remote address of a connection, whichever transport it is on: what the rate limits count
+    /// and what the admin's commands show. A reconnecting attacker cannot cycle it for free.
+    /// </summary>
+    public string RemoteAddressOf(int connectionId)
     {
         var peer = _network.GetPeer(connectionId);
         if (peer != null) return peer.Address?.ToString() ?? $"peer:{connectionId}";
         return _mudGateway?.GetRemoteAddress(connectionId) ?? $"conn:{connectionId}";
+    }
+
+    /// <summary>One-way latency in milliseconds for a UDP session; null for a MUD session.</summary>
+    public int? PingOf(int connectionId) => _network.PingOf(connectionId);
+
+    /// <summary>When a connection was opened, by either transport; null if it is not open.</summary>
+    public DateTime? ConnectedSince(int connectionId)
+        => _network.ConnectedSince(connectionId) ?? _mudGateway?.ConnectedSince(connectionId);
+
+    /// <summary>Open connections, by either transport, that have not logged in.</summary>
+    public List<(int Id, string Transport, string Address, DateTime SinceUtc)> PendingConnections()
+    {
+        var list = new List<(int, string, string, DateTime)>();
+        foreach (var (id, since) in _network.Connections())
+            if (!HasSession(id)) list.Add((id, "UDP", RemoteAddressOf(id), since));
+        if (_mudGateway != null)
+            foreach (var (id, since) in _mudGateway.Connections())
+                if (!HasSession(id)) list.Add((id, "MUD", RemoteAddressOf(id), since));
+        list.Sort((a, b) => a.Item4.CompareTo(b.Item4));
+        return list;
+    }
+
+    /// <summary>
+    /// Marks a session as doing something, which is what /sessions reports as idle time and what
+    /// ends being away. Called for what a player does, not for what their client sends on its own.
+    /// </summary>
+    private void Touch(int connectionId)
+    {
+        if (!_sessions.TryGetSession(connectionId, out var s)) return;
+        s.LastActivityUtc = DateTime.UtcNow;
+        s.Away = false;
     }
 
     private void RegisterHandlers()
@@ -345,6 +398,9 @@ public class GameServer
         _dispatcher.RegisterHandler<ClientInputUpdate>((id, req, reply) => {
             if (!_sessions.TryGetSession(id, out var s)) return;
             if (req.SequenceId <= s.LastProcessedSequenceId) return;
+            // A client sends input every frame whether or not anyone is at the keys; only input that
+            // asks for something counts as the player being there.
+            if (req.MoveDirection != Vector3.Zero || req.LookDelta != Vector2.Zero || req.Jump) Touch(id);
             // Bound the backlog: a client that floods inputs cannot grow the queue without limit,
             // and gains nothing by trying — MovementSystem spends real time, not queue depth.
             if (s.InputQueue.Count >= MaxQueuedInputs)
@@ -364,15 +420,23 @@ public class GameServer
             else _commands.HandleTextCommand(id, req, reply);
         });
         _dispatcher.RegisterHandler<ChatMessage>((id, req, reply) => {
-            if (_sessions.TryGetSession(id, out var sess))
-                Chat(sess, req.Text, req.Channel == ChatChannel.All ? ChatChannel.All : ChatChannel.Map);
+            if (!_sessions.TryGetSession(id, out var sess)) return;
+            Touch(id);
+            Chat(sess, req.Text, req.Channel == ChatChannel.All ? ChatChannel.All : ChatChannel.Map);
         });
         _dispatcher.RegisterHandler<InteractRequest>((id, req, reply) => {
             var peer = _network.GetPeer(id);
+            Touch(id);
             if (peer != null) HandleInteract(peer, req);
         });
         _dispatcher.RegisterHandler<VoiceData>((id, req, reply) => {
             if (!_sessions.TryGetSession(id, out var senderSession)) return;
+            // The sender is who sent it, not who the packet says sent it: the client fills SenderId
+            // with its own entity id and the listeners place the voice at that entity, so a forged id
+            // would put your words in somebody else's mouth.
+            if (senderSession.Entity == Entity.Null || req.OpusData.Length > MaxVoiceBytes) return;
+            req.SenderId = senderSession.Entity.Id;
+            Touch(id);
             // Relay to all players on the same map within earshot
             foreach (var s in _sessions.GetAllSessions())
             {
@@ -384,6 +448,9 @@ public class GameServer
             }
         });
     }
+
+    /// <summary>One voice packet: an Opus frame is at most 1275 bytes, and a packet carries one.</summary>
+    public const int MaxVoiceBytes = 4000;
 
     private void RunLoop()
     {
@@ -444,9 +511,8 @@ public class GameServer
                         grid.AddOverlapping(t.Position, c.Size, t.Rotation, e, false);
                     });
 
-                    // 4. Update Simulation (Movement/AI)
+                    // 4. Update Simulation (Movement)
                     MovementSystem.Update(world, entry.Value.data.WalkMin, entry.Value.data.WalkMax, grid, lookup, _sessions, _maps, dt);
-                    AISystem.Update(world, lookup, dt);
                     _vehicles.Update(entry.Key, world, dt);
                     _rail.Update(entry.Key, world, dt);
                     _crossings.Update(entry.Key, world, dt);
@@ -500,7 +566,11 @@ public class GameServer
                 }
             }
 
-            if (tick % TickRate == 0) BroadcastEnvironment(); // once per second
+            if (tick % TickRate == 0)  // once per second
+            {
+                BroadcastEnvironment();
+                CloseConnectionsThatNeverLoggedIn();
+            }
 
             // 5. Broadcast World State
             BroadcastWorldState(tick);
@@ -512,40 +582,104 @@ public class GameServer
     }
 
     private void HandleLogin(int connectionId, LoginRequest request, Action<IMessage> reply)
+        => _ = Login(connectionId, request, reply);
+
+    /// <summary>
+    /// A login, from either transport. The cheap refusals happen here and now; the password is checked
+    /// on the thread pool, and the session is made back on the tick thread through the command buffer.
+    /// The returned task completes once that last step has been queued, which is what a test waits on.
+    ///
+    /// bcrypt used to run inline on the tick thread, so every login stalled the whole world for a
+    /// tenth of a second — and a few hundred addresses each spending their allowed burst could stall it
+    /// for minutes.
+    /// </summary>
+    internal Task Login(int connectionId, LoginRequest request, Action<IMessage> reply)
     {
-        // One path for both transports, so the MUD gateway gets the same rate limit and spawn.
-        if (!_authLimiter.TryConsume(RateKeyFor(connectionId)))
+        if (_sessions.TryGetSession(connectionId, out var already))
         {
-            Log.Warning("Login rate limit hit for connection {Id} (user '{User}').", connectionId, request.Username);
-            reply(new LoginResponse { Success = false, Message = "Too many attempts. Wait a few seconds and try again." });
-            return;
+            // A second login on a live session used to replace it, and the first body stayed in the
+            // world with nobody attached to it.
+            reply(new LoginResponse { Success = false, Message = $"You are already logged in as {already.Username}." });
+            return Task.CompletedTask;
+        }
+
+        string address = RemoteAddressOf(connectionId);
+        if (!_auth.Admit(address))
+        {
+            reply(new LoginResponse { Success = false, Message = AuthService.TooManyAttempts });
+            return Task.CompletedTask;
         }
 
         // A network client built from a different OpenFPS.Common reads every message after this one
         // wrongly, and nothing downstream can say so: it spawns into nonsense. Refuse it here, by name.
         // The MUD gateway speaks text, not MemoryPack, so it has no contract to match.
-        if (_network.GetPeer(connectionId) != null && request.Build != WireContract.Hash)
+        var peer = _network.GetPeer(connectionId);
+        if (peer != null && request.Build != WireContract.Hash)
         {
-            string theirs = request.Build.Length > 0 ? request.Build : "an older one";
+            string theirs = request.Build.Length > 0 ? AuthService.ForLog(request.Build) : "an older one";
             Log.Warning("Login REFUSED for user '{User}' on connection {Id}: client build {Client}, server build {Server}.",
-                request.Username, connectionId, theirs, WireContract.Hash);
+                AuthService.ForLog(request.Username), connectionId, theirs, WireContract.Hash);
             reply(new LoginResponse { Success = false, Message =
                 $"This client does not match the server. Your build is {theirs}, the server's is {WireContract.Hash}. Get the client built from the same version as the server." });
-            return;
+            return Task.CompletedTask;
         }
 
-        if (!_userRepo.VerifyPassword(request.Username, request.Password))
+        if (Interlocked.Increment(ref _pendingLogins) > MaxPendingLogins)
         {
-            // A rejected login left no trace at all, which made "the client said nothing" impossible to
-            // tell apart from "the client never asked". Log the attempt (never the password).
-            Log.Warning("Login REJECTED for user '{User}' on connection {Id}: invalid credentials.",
-                request.Username, connectionId);
-            reply(new LoginResponse { Success = false, Message = "Invalid Credentials" });
+            Interlocked.Decrement(ref _pendingLogins);
+            Log.Warning("Login from {Address} refused: {Max} logins already being checked.", address, MaxPendingLogins);
+            reply(new LoginResponse { Success = false, Message = "The server is busy. Try again in a few seconds." });
+            return Task.CompletedTask;
+        }
+
+        string username = request.Username ?? "", password = request.Password ?? "";
+        return Task.Run(() => _auth.Check(address, username, password)).ContinueWith(checking =>
+        {
+            Interlocked.Decrement(ref _pendingLogins);
+            AuthOutcome outcome;
+            if (checking.IsCompletedSuccessfully) outcome = checking.Result;
+            else
+            {
+                Log.Error(checking.Exception, "Login check for {Address} failed.", address);
+                outcome = new AuthOutcome(false, "The server could not check that login. Try again.");
+            }
+            EnqueueCommand(() => FinishLogin(connectionId, peer, address, outcome, reply));
+        }, TaskScheduler.Default);
+    }
+
+    /// <summary>The tick-thread half of a login: the session, the takeover, and the map.</summary>
+    private void FinishLogin(int connectionId, NetPeer? peer, string address, AuthOutcome outcome, Action<IMessage> reply)
+    {
+        // The connection may have gone while its password was being checked; a UDP id may even have
+        // been handed to somebody else.
+        bool gone = peer != null
+            ? !ReferenceEquals(_network.GetPeer(connectionId), peer)
+            : _mudGateway != null && !_mudGateway.IsMudConnection(connectionId);
+        if (gone) { Log.Information("Login for connection {Id} finished after it closed; dropped.", connectionId); return; }
+
+        if (!outcome.Success)
+        {
+            reply(new LoginResponse { Success = false, Message = outcome.Message });
+            return;
+        }
+        if (_sessions.TryGetSession(connectionId, out var already))
+        {
+            // Two logins sent on one connection before either finished.
+            reply(new LoginResponse { Success = false, Message = $"You are already logged in as {already.Username}." });
             return;
         }
 
-        var user = _userRepo.GetUser(request.Username)!;
-        var peer = _network.GetPeer(connectionId);
+        var user = outcome.User!;
+
+        // One session per account, and the newest wins. A dropped connection takes LiteNetLib several
+        // seconds to notice, and the player reconnecting in that time must not be told they are
+        // already here; and two bodies with one name make every command that finds a player by name
+        // pick one of them.
+        foreach (var old in _sessions.GetAllSessions()
+                     .Where(s => s.Username.Equals(user.Username, StringComparison.OrdinalIgnoreCase)).ToList())
+            EndSession(old, "Your account has logged in from somewhere else, so this session has been closed.");
+
+        var now = DateTime.UtcNow;
         var session = new UserSession
         {
             ConnectionId = connectionId,
@@ -554,11 +688,14 @@ public class GameServer
             IsTextClient = peer == null,
             // Where a new player lands: the map that claims IsDefault, not the one named "default".
             CurrentMapId = _maps.DefaultMapId,
+            RemoteAddress = address,
+            LoggedInUtc = now,
+            LastActivityUtc = now,
         };
         _sessions.AddSession(connectionId, session);
 
-        Log.Information("User {User} authenticated ({Transport}), landing on map '{Map}'.",
-                        user.Username, peer == null ? "MUD" : "UDP", session.CurrentMapId);
+        Log.Information("User {User} authenticated ({Transport}) from {Address}, landing on map '{Map}'.",
+                        user.Username, peer == null ? "MUD" : "UDP", address, session.CurrentMapId);
 
         reply(new LoginResponse
         {
@@ -577,6 +714,50 @@ public class GameServer
 
         SendManifest(peer, session);
     }
+
+    /// <summary>
+    /// Ends a session from the server's side: tells the player why, takes their body out of the world
+    /// the way a disconnect does, and closes the connection. The transport's own disconnect event then
+    /// finds no session and does nothing more.
+    /// </summary>
+    private void EndSession(UserSession session, string reason)
+    {
+        if (!_sessions.TryRemoveSession(session.ConnectionId, out _)) return;
+        Log.Information("Session {Id} ({User}) ended by the server: {Reason}", session.ConnectionId, session.Username, reason);
+        SendToSession(session, new TextEvent { Text = reason });
+        DespawnSession(session);
+        _network.Disconnect(session.ConnectionId);
+        _mudGateway?.Disconnect(session.ConnectionId);
+    }
+
+    /// <summary>
+    /// Closes connections, by either transport, that have been open for <see cref="LoginTimeout"/>
+    /// without logging in. A connection costs memory and a slot whether or not it ever says anything.
+    /// </summary>
+    private void CloseConnectionsThatNeverLoggedIn()
+    {
+        var now = DateTime.UtcNow;
+        foreach (int id in StaleUnauthenticated(_network.Connections(), HasSession, now))
+        {
+            Log.Information("Closing UDP connection {Id} from {Address}: no login within {Seconds} s.",
+                            id, RemoteAddressOf(id), LoginTimeout.TotalSeconds);
+            _network.Disconnect(id);
+        }
+        if (_mudGateway == null) return;
+        foreach (int id in StaleUnauthenticated(_mudGateway.Connections(), HasSession, now))
+        {
+            Log.Information("Closing MUD connection {Id} from {Address}: no login within {Seconds} s.",
+                            id, RemoteAddressOf(id), LoginTimeout.TotalSeconds);
+            _mudGateway.Disconnect(id, "No login within two minutes. Goodbye.");
+        }
+    }
+
+    private bool HasSession(int connectionId) => _sessions.TryGetSession(connectionId, out _);
+
+    /// <summary>The connections opened longer than <see cref="LoginTimeout"/> ago that have no session.</summary>
+    public static List<int> StaleUnauthenticated(IEnumerable<(int Id, DateTime SinceUtc)> connections,
+                                                 Func<int, bool> hasSession, DateTime nowUtc)
+        => connections.Where(c => nowUtc - c.SinceUtc > LoginTimeout && !hasSession(c.Id)).Select(c => c.Id).ToList();
 
     private void SendManifest(NetPeer peer, UserSession session)
     {
@@ -635,8 +816,11 @@ public class GameServer
 
     private void HandleMapDataRequest(NetPeer peer, MapDataRequest request)
     {
-        if (!_maps.TryGetMap(request.MapName, out var world, out var _, out var _, out var _)) return;
         if (!_sessions.TryGetSession(peer.Id, out var session)) return;
+        // Only the map you are on. Any loaded map could be asked for by name, and a private one would
+        // have streamed its whole layout to somebody it refuses at the door.
+        if (!string.Equals(request.MapName, session.CurrentMapId, StringComparison.OrdinalIgnoreCase)) return;
+        if (!_maps.TryGetMap(session.CurrentMapId, out var world, out var _, out var _, out var _)) return;
 
         var staticEntities = new List<Entity>();
         world.Query(new QueryDescription().WithAll<Transform>(), (Entity e, ref Transform t) => {
@@ -745,22 +929,7 @@ public class GameServer
             return;
         }
 
-        if (session.Entity != Entity.Null && _maps.TryGetMap(from, out var oldWorld, out _, out _, out _))
-        {
-            var body = session.Entity;
-            if (oldWorld.IsAlive(body))
-            {
-                // Out of the seat first. Exit refuses while the vehicle is moving; leaving the map is
-                // not a request, so fall back to unseating without finding standing room.
-                if (oldWorld.Has<OccupantComponent>(body) && (_seats == null || !_seats.Exit(session, out _)))
-                    CompositeService.Disembark(oldWorld, body);
-                _hands?.Drop(session, "all", out _);
-            }
-            session.Entity = Entity.Null;
-            _maps.DestroyEntity(from, body);
-            BroadcastEntityRemoved(from, body.Id);
-        }
-        session.Entity = Entity.Null;
+        LeaveWorld(session);
 
         session.CurrentMapId = mapId;
         session.KnownEntities.Clear();
@@ -873,11 +1042,6 @@ public class GameServer
                         // Each wheel: its load, slip, speed and the surface under it (WheelDynamics).
                         if (_vehicles.TryGetWheels(e.Id, out var wheels) || DrivingSystem.TryGetWheels(e.Id, out wheels))
                             state.Wheels = wheels;
-                        if (world.Has<BeaconComponent>(e))
-                        {
-                            var beacon = world.Get<BeaconComponent>(e);
-                            state.ExtraData = new BeaconData { Frequency = beacon.Frequency, Interval = beacon.Interval };
-                        }
 
                         // A dynamic entity is corrected by the next tick's packet, so losing one costs
                         // nothing. A static entity that moved is a one-off event that nothing will ever
@@ -955,21 +1119,46 @@ public class GameServer
     }
 
     /// <summary>
-    /// Removes a session's body from the world and tells everyone who could see it. Without the second
-    /// half every other client keeps the corpse forever: it still occupies space, still answers scans,
-    /// and still plays whatever sound it carried.
+    /// Takes a disconnected session's body out of the world, on the tick thread.
+    ///
+    /// Queued even when the session has no body yet: a 'ready' queued just before the disconnect
+    /// spawns one when the buffer drains, and this runs after it and takes it away again.
     /// </summary>
-    private void DespawnSession(UserSession session)
+    internal void DespawnSession(UserSession session)
     {
-        if (session.Entity == Entity.Null) return;
-        var entity = session.Entity;
-        string mapId = session.CurrentMapId;
-        session.Entity = Entity.Null;
+        _commandBuffer.Enqueue(() => LeaveWorld(session));
+    }
 
-        _commandBuffer.Enqueue(() => {
-            _maps.DestroyEntity(mapId, entity);
-            BroadcastEntityRemoved(mapId, entity.Id);
-        });
+    /// <summary>
+    /// Takes a session's body off the map it is on: out of any seat, its things put down, destroyed,
+    /// and announced as gone. Runs on the tick thread. Changing map and disconnecting both come
+    /// through here, so a player who leaves either way leaves the same things behind.
+    ///
+    /// The seat and the things go first, while the body is still there to be got out and to drop
+    /// from. Destroyed while carrying, the things kept a HeldComponent naming a dead holder, so
+    /// nobody could pick them up again, and a ParentComponent naming an id Arch would reuse.
+    /// Without the announcement every other client keeps the corpse forever: it still occupies
+    /// space, still answers scans, and still plays whatever sound it carried.
+    /// </summary>
+    private void LeaveWorld(UserSession session)
+    {
+        var body = session.Entity;
+        string mapId = session.CurrentMapId;
+        if (body != Entity.Null && _maps.TryGetMap(mapId, out var world, out _, out _, out _))
+        {
+            if (world.IsAlive(body))
+            {
+                // Out of the seat first. Exit refuses while the vehicle is moving; leaving the map is
+                // not a request, so fall back to unseating without finding standing room.
+                if (world.Has<OccupantComponent>(body) && (_seats == null || !_seats.Exit(session, out _)))
+                    CompositeService.Disembark(world, body);
+                _hands?.Drop(session, "all", out _);
+            }
+            session.Entity = Entity.Null;
+            _maps.DestroyEntity(mapId, body);
+            BroadcastEntityRemoved(mapId, body.Id);
+        }
+        session.Entity = Entity.Null;
     }
 
     /// <summary>
@@ -1139,32 +1328,44 @@ public class GameServer
     }
 
     private void HandleRegister(int connectionId, RegisterRequest request, Action<IMessage> reply)
+        => _ = Register(connectionId, request, reply);
+
+    /// <summary>
+    /// Creating an account: the same limits as a login, the account rules, and a limit of its own on
+    /// how many accounts one address may make. Hashed off the tick thread like a login.
+    /// </summary>
+    internal Task Register(int connectionId, RegisterRequest request, Action<IMessage> reply)
     {
-        if (!_authLimiter.TryConsume(RateKeyFor(connectionId)))
+        if (_sessions.TryGetSession(connectionId, out _))
         {
-            Log.Warning("Register rate limit hit for connection {Id}.", connectionId);
-            reply(new RegisterResponse { Success = false, Message = "Too many attempts. Wait a few seconds and try again." });
-            return;
+            reply(new RegisterResponse { Success = false, Message = "Log out before creating another account." });
+            return Task.CompletedTask;
+        }
+        string address = RemoteAddressOf(connectionId);
+        if (!_auth.Admit(address))
+        {
+            reply(new RegisterResponse { Success = false, Message = AuthService.TooManyAttempts });
+            return Task.CompletedTask;
+        }
+        if (Interlocked.Increment(ref _pendingLogins) > MaxPendingLogins)
+        {
+            Interlocked.Decrement(ref _pendingLogins);
+            reply(new RegisterResponse { Success = false, Message = "The server is busy. Try again in a few seconds." });
+            return Task.CompletedTask;
         }
 
-        if (string.IsNullOrWhiteSpace(request.Username))
+        string username = request.Username ?? "", password = request.Password ?? "";
+        return Task.Run(() => _auth.CheckRegistration(address, username, password)).ContinueWith(checking =>
         {
-            reply(new RegisterResponse { Success = false, Message = "A username is required." });
-            return;
-        }
-
-        if (string.IsNullOrEmpty(request.Password))
-        {
-            reply(new RegisterResponse { Success = false, Message = "A password is required." });
-            return;
-        }
-
-        // The reply follows what AddUser did: a duplicate username must not be told its account was
-        // created.
-        bool created = _userRepo.AddUser(request.Username, request.Password, UserRole.Player);
-        reply(created
-            ? new RegisterResponse { Success = true, Message = "Registration Successful." }
-            : new RegisterResponse { Success = false, Message = "That username is already taken." });
+            Interlocked.Decrement(ref _pendingLogins);
+            var outcome = checking.IsCompletedSuccessfully
+                ? checking.Result
+                : new AuthOutcome(false, "The server could not create that account. Try again.");
+            if (checking.IsFaulted) Log.Error(checking.Exception, "Registration check for {Address} failed.", address);
+            // The reply follows what the store did: a duplicate username must not be told its account
+            // was created.
+            EnqueueCommand(() => reply(new RegisterResponse { Success = outcome.Success, Message = outcome.Message }));
+        }, TaskScheduler.Default);
     }
 
     /// <summary>

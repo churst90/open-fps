@@ -7,7 +7,7 @@ _Authored 2026-06-19. Based on a full read of the .NET rewrite (Client, Common, 
 The git history is the **old Python** client/server (pygame / accessible_output2 / OpenAL). The working tree is a **complete, uncommitted rewrite into .NET 10 / C#**:
 
 - `OpenFPS.Common` — shared ECS components, messages, physics kernel, acoustic model (`net10.0`).
-- `OpenFPS.Server` — Arch ECS, LiteNetLib, MemoryPack, BepuPhysics, EF Core + SQLite (`net10.0`).
+- `OpenFPS.Server` — Arch ECS, LiteNetLib, MemoryPack, EF Core + SQLite (`net10.0`).
 - `OpenFPS.Client` — WinForms UI, FMOD audio engine, NVDA/SAPI speech (`net10.0-windows`).
 
 **The rewrite is not committed.** Everything under the new project folders is untracked. **First action, before any change: commit a baseline** so the work is recoverable and diffs are meaningful.
@@ -87,7 +87,7 @@ The sync **model** is correct (shared `SharedMovementEngine`, seq/ack prediction
 - [ ] **`HandleLogin` rethrows** (`Program.cs:307`) — one bad login aborts the whole tick for everyone. Don't rethrow.
 - [ ] **No graceful shutdown:** `_isRunning` is never set false; no `Console.CancelKeyPress`; worlds/sockets/DB torn down abruptly.
 - [ ] **Unauthenticated `RegisterRequest`** writes to the DB with no rate limit (DoS/account-spam vector).
-- [ ] **Delete dead `UserRepository`** (JSON impl, unused) — move the shared `UserData` DTO out first. Decide JSON-vs-SQLite once.
+- [x] **Delete dead `UserRepository`** (the JSON store is gone; SQLite is the one user store).
 - [x] **Delete `PhysicsAcousticBridgeSystem`** (it was never called; door portals are driven by the door itself).
 - [ ] Finish persistence (player progress/position; friends/map-ownership are hardcoded TODOs).
 

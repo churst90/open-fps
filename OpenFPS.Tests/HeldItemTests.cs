@@ -324,6 +324,34 @@ public class HeldItemTests : IDisposable
     }
 
     [Fact]
+    public void DrawingAThingYouDoNotCarryIsRefusedAndTakesNothing()
+    {
+        // FirstOrDefault on a list of entities answers default(Entity), id 0, when nothing matches,
+        // and Arch's Entity.Null is id -1. A guard against Entity.Null never fired, so a typo put
+        // whatever the map spawned first into the player's hands.
+        var f = new Fixture(_dir);
+        var player = f.Player("cody", new Vector3(20, 0, 20));
+        var rifle = f.Item("AKM", new Vector3(20.3f, 0, 20), massKg: 3.3f, hands: 2, weaponId: "akm");
+
+        Assert.True(f.Hands.Take(player, "akm", out _));
+        Assert.True(f.Hands.Stow(player, "", out _));
+        var handsBefore = f.World.Get<HandsComponent>(player.Entity);
+
+        Assert.False(f.Hands.Draw(player, "crowbar", out string refusal));
+        Assert.Contains("no crowbar", refusal);
+
+        var hands = f.World.Get<HandsComponent>(player.Entity);
+        Assert.Equal(handsBefore.RightEntityId, hands.RightEntityId);
+        Assert.Equal(handsBefore.LeftEntityId, hands.LeftEntityId);
+        Assert.Contains(rifle.Id, f.World.Get<InventoryComponent>(player.Entity).ItemEntityIds);
+
+        // The rifle on the back is the only thing anybody is holding.
+        var held = new List<int>();
+        f.World.Query(new QueryDescription().WithAll<HeldComponent>(), (Entity e) => held.Add(e.Id));
+        Assert.Equal(new[] { rifle.Id }, held);
+    }
+
+    [Fact]
     public void ABackIsLimitedByWeightAndNotByPockets()
     {
         var f = new Fixture(_dir);

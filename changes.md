@@ -2,6 +2,53 @@
 
 Recent work, newest first. `git log` has the rest.
 
+## 2026-10-02
+
+- Server security, written up in docs/SERVER_SECURITY.md:
+  - `/where` is for Dev and Admin only. `/profile` shows role, real name (`/realname`), online,
+    away (`/afk`) or idle, and the map; never coordinates, direction or distance.
+  - New Admin commands: `/sessions`, `/user`, `/throttled`, `/unlock`, `/setrole`.
+  - Logins: the rate limit's refill is pinned by a test; IPv6 counts by /64; 10 wrong passwords lock
+    a name for 15 minutes; bcrypt runs off the game loop at cost 12; an unknown name costs a bcrypt
+    check like a known one; one session per account (a new login closes the old one); a second
+    login on one connection is refused.
+  - New accounts: 3 to 20 plain characters, reserved names, passwords 8 characters to 72 bytes, and
+    3 accounts per address then one every 20 minutes.
+  - Connections: nothing but a login is accepted before login; per-address and total connection
+    caps on both ports; 2 minutes to log in; 16 KB message limit; MUD lines bounded as they are read
+    and written through a queue, so a telnet client that stops reading cannot stall the server.
+  - Voice is relayed as from the sender's own body; map data only for the map you are on.
+  - `openfps.db` gains seven columns (created, last login and address, failed logins, last failure
+    and address, real name). An older database is upgraded in place on first start, after a copy
+    is made beside it.
+- `StaffGateTests` runs every gated command as a Player and checks nothing changes.
+- The client hides "Where is" from players.
+- Bugs found by the 2026-10-01 mutation run (docs/MUTATION_2026-10-01.md), each with a test:
+  - `/draw` of a name you don't carry took entity 0 out of the map. It is now refused.
+  - Disconnecting now puts down what you carry and gets you out of your seat. Before, the items were
+    held by a body that no longer existed.
+  - "Have a good day." is no longer said at night.
+  - Every phone call ends with a goodbye; 11 of 71 calls used to stop mid-call.
+  - A level crossing reopens only when the back of the train is clear, not the front.
+  - Train sources ride at their own height on a sloping rail.
+  - A train leaves a line's only platform, and stops first at the platform ahead of it.
+  - Movement input that is not a number is ignored.
+- Traffic: `TrafficRuleTests` pins each rule of the road with a scene of its own (walkers at the
+  kerb, a car standing in a junction, priority, the car from the right, long vehicles, the deadlock
+  breaker). Two faults it found are fixed:
+  - a driver giving way reached the line at up to 10.9 m/s instead of its looking speed;
+  - the deadlock breaker let every waiting car go at once, and they met in the middle.
+- Walkers were driven through at crossings. Three faults, each fixed with a scene test:
+  - a car that had started stopping for walkers gave up when it overran its mark;
+  - a car stopped for the first crossing in its list, not the nearest;
+  - a walker timed a vehicle by its middle, so stepped out in front of a bus nosing up to the strip.
+- Map data with a NaN position, or two lanes a hair off parallel, is reported instead of looping
+  forever or allocating gigabytes.
+- Old code out: the JSON user store, the unused AI state machine, the map publish stub, beacon data
+  in every entity state, `PlayerJoined` and `CollisionEvent` messages, four unused components, about
+  400 lines of uncalled methods, and the BepuPhysics package.
+- `OpenFPS.Common` changed: the Windows client needs a new build, and the server needs a restart.
+
 ## 2026-10-01
 
 - The where-am-I key names a doorway from the zones either side of it ("doorway between <A> and

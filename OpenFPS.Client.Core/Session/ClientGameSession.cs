@@ -67,6 +67,10 @@ public sealed class ClientGameSession : IDisposable
 
     private long _sequenceId;
     private int _ownEntityId = -1;
+
+    /// <summary>The role the server gave this login. Only decides which menu items are offered; the
+    /// server checks every command itself.</summary>
+    private UserRole _role = UserRole.Player;
     private int _expectedEntityCount;
     private readonly bool _enableAudio;
 
@@ -787,6 +791,7 @@ public sealed class ClientGameSession : IDisposable
             case LoginResponse login:
                 if (login.Success)
                 {
+                    _role = login.Role;
                     _shell.ShowLoading("Logging in...", speak: false);
                     LoginSucceeded?.Invoke(login.Username);
                 }
@@ -847,7 +852,6 @@ public sealed class ClientGameSession : IDisposable
 
                 _state.Position = manifest.SpawnPoint.Position;
                 _state.Rotation = manifest.SpawnPoint.Rotation;
-                _state.MinimumY = manifest.MinimumY;
                 _state.MapMin = manifest.PlayMin;
                 _state.MapMax = manifest.PlayMax;
                 _state.MapSize = manifest.WorldSize;
@@ -936,7 +940,6 @@ public sealed class ClientGameSession : IDisposable
 
             case StatsUpdate stats:
                 _state.Health = stats.Health;
-                _state.MaxHealth = stats.MaxHealth;
                 _state.CurrentMaterial = stats.CurrentMaterial;
                 _state.CurrentVariant = stats.CurrentVariant;
                 // CurrentMaterial feeds the reverb bus material calculation via LocalPlayerState: when a
@@ -1168,15 +1171,19 @@ public sealed class ClientGameSession : IDisposable
         return new ListMenu("Friends", items);
     }
 
-    /// <summary>What you can do with a person: all of it is a command the server answers aloud.</summary>
-    private ListMenu PersonMenu(string name, bool isFriend) => new(name, new List<MenuItem>
+    /// <summary>
+    /// What you can do with a person: all of it is a command the server answers aloud. "Where is" is
+    /// for staff only (the server refuses /where to a player), so a player is not offered it.
+    /// </summary>
+    private ListMenu PersonMenu(string name, bool isFriend)
     {
-        new("Private message", () => _shell.OpenCommandConsole($"/pm {name} ")),
-        new("Where is", () => Command("where", name)),
-        new("View profile", () => Command("profile", name)),
-        isFriend ? new("Remove friend", () => Command("friend", "remove", name))
-                 : new("Add friend", () => Command("friend", "add", name)),
-    });
+        var items = new List<MenuItem> { new("Private message", () => _shell.OpenCommandConsole($"/pm {name} ")) };
+        if (_role is UserRole.Dev or UserRole.Admin) items.Add(new("Where is", () => Command("where", name)));
+        items.Add(new("View profile", () => Command("profile", name)));
+        items.Add(isFriend ? new("Remove friend", () => Command("friend", "remove", name))
+                           : new("Add friend", () => Command("friend", "add", name)));
+        return new ListMenu(name, items);
+    }
 
     private ListMenu MapsMenu(MapListResponse response)
     {

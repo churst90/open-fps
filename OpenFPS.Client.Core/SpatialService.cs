@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
-using System.Linq;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
 
@@ -314,127 +313,6 @@ public class SpatialService
     }
 
     /// <summary>
-    /// Searches for nearby large reflective surfaces (buildings) to calculate echo delays.
-    /// This implementation is geometric: it finds the nearest faces of the closest buildings.
-    /// </summary>
-    public void GetReflectionData(WorldSnapshot world, Vector3 position, float maxDist, out List<(Vector3 normal, float distance, float absorption, float scattering, int buildingId)> reflections)
-    {
-        reflections = new();
-
-        var entitiesToTest = GetEntitiesToTest(world, position, maxDist + 10.0f);
-
-        // Find the nearest solid colliders
-        var candidates = entitiesToTest
-            .Where(e => e.Definition.Collider.Size.X > 0 && e.Definition.Collider.IsSolid && e.Definition.Type == EntityType.StaticObject && !e.Definition.Moves)
-            .Select(e => new { Id = e.Id, Pos = e.Transform.Position, Rot = e.Transform.Rotation, Size = e.Definition.Collider.Size, Shape = e.Definition.Collider.Shape, Dist = Vector3.Distance(position, e.Transform.Position), Def = e.Definition })
-            .Where(c => c.Dist < maxDist + (c.Size.Length() / 2.0f))
-            .OrderBy(c => c.Dist)
-            .Take(8);
-
-        foreach (var c in candidates)
-        {
-            Matrix4x4 worldToLocal = Matrix4x4.CreateTranslation(-c.Pos) * Matrix4x4.CreateFromQuaternion(Quaternion.Inverse(c.Rot));
-            Vector3 localPos = Vector3.Transform(position, worldToLocal);
-            
-            float minDist = float.MaxValue;
-            Vector3 worldNormal = Vector3.Zero;
-            float shapeScattering = 0.0f;
-            bool valid = false;
-
-            if (c.Shape == ColliderShape.Box)
-            {
-                Vector3 halfSize = c.Size / 2.0f;
-                Vector3 localNormal = Vector3.Zero;
-                float faceArea = 0;
-
-                float dXp = Math.Abs(localPos.X - halfSize.X); if (dXp < minDist) { minDist = dXp; localNormal = Vector3.UnitX; faceArea = c.Size.Y * c.Size.Z; }
-                float dXn = Math.Abs(localPos.X + halfSize.X); if (dXn < minDist) { minDist = dXn; localNormal = -Vector3.UnitX; faceArea = c.Size.Y * c.Size.Z; }
-                float dYp = Math.Abs(localPos.Y - halfSize.Y); if (dYp < minDist) { minDist = dYp; localNormal = Vector3.UnitY; faceArea = c.Size.X * c.Size.Z; }
-                float dYn = Math.Abs(localPos.Y + halfSize.Y); if (dYn < minDist) { minDist = dYn; localNormal = -Vector3.UnitY; faceArea = c.Size.X * c.Size.Z; }
-                float dZp = Math.Abs(localPos.Z - halfSize.Z); if (dZp < minDist) { minDist = dZp; localNormal = Vector3.UnitZ; faceArea = c.Size.X * c.Size.Y; }
-                float dZn = Math.Abs(localPos.Z + halfSize.Z); if (dZn < minDist) { minDist = dZn; localNormal = -Vector3.UnitZ; faceArea = c.Size.X * c.Size.Y; }
-
-                if (minDist < maxDist && faceArea > 2.0f)
-                {
-                    bool isInside = Math.Abs(localPos.X) < halfSize.X && Math.Abs(localPos.Y) < halfSize.Y && Math.Abs(localPos.Z) < halfSize.Z;
-                    Vector3 finalLocalNormal = isInside ? -localNormal : localNormal;
-                    worldNormal = Vector3.TransformNormal(finalLocalNormal, Matrix4x4.CreateFromQuaternion(c.Rot));
-                    shapeScattering = 0.0f; // Flat wall = low scattering
-                    valid = true;
-                }
-            }
-            else if (c.Shape == ColliderShape.Sphere)
-            {
-                float radius = c.Size.X / 2f;
-                minDist = Math.Max(0, c.Dist - radius);
-                if (minDist < maxDist)
-                {
-                    Vector3 dir = position - c.Pos;
-                    if (dir.LengthSquared() > 0.0001f) worldNormal = Vector3.Normalize(dir);
-                    else worldNormal = Vector3.UnitY;
-                    shapeScattering = 0.6f; // Curved = high scattering
-                    valid = true;
-                }
-            }
-            else if (c.Shape == ColliderShape.Cylinder || c.Shape == ColliderShape.Cone)
-            {
-                float radius = c.Size.X / 2f;
-                float height = c.Size.Y;
-                
-                Vector3 localDir = new Vector3(localPos.X, 0, localPos.Z);
-                float distXZ = localDir.Length();
-                if (distXZ > 0.001f)
-                {
-                    Vector3 localNormal = localDir / distXZ;
-                    
-                    if (c.Shape == ColliderShape.Cone)
-                    {
-                        float angle = MathF.Atan2(radius, height);
-                        localNormal.Y = MathF.Sin(angle);
-                        localNormal = Vector3.Normalize(localNormal);
-                    }
-                    
-                    worldNormal = Vector3.TransformNormal(localNormal, Matrix4x4.CreateFromQuaternion(c.Rot));
-                    
-                    // Simple distance approximation for cylinder/cone reflection point
-                    minDist = Math.Max(0, c.Dist - radius);
-                    
-                    if (minDist < maxDist)
-                    {
-                        shapeScattering = 0.5f; // Curved
-                        valid = true;
-                    }
-                }
-            }
-
-            if (valid)
-            {
-                Vector3 dirToSurface = -worldNormal;
-                
-                if (Vector3.Dot(dirToSurface, worldNormal) > 0)
-                {
-                    valid = false;
-                }
-                else if (RaycastSingle(world, position, dirToSurface, minDist - 0.1f, out var hitEntity, out float hitDist))
-                {
-                    if (hitEntity.Id != c.Id) valid = false;
-                }
-            }
-
-            if (valid)
-            {
-                string matName = string.IsNullOrEmpty(c.Def.Material.Material) ? "Generic" : c.Def.Material.Material;
-                var props = AcousticRegistry.GetProperties(matName);
-                
-                float absorption = c.Def.Acoustics.Absorption > 0 ? c.Def.Acoustics.Absorption : props.Absorption;
-                float finalScattering = Math.Clamp(shapeScattering + props.Scattering, 0f, 1f);
-                
-                reflections.Add((worldNormal, minDist, absorption, finalScattering, c.Id));
-            }
-        }
-    }
-
-    /// <summary>
     /// Identifies which acoustic region a position resides in.
     /// Prefers high-precision OBB volumes, falls back to voxel grid.
     /// </summary>
@@ -647,6 +525,4 @@ public class SpatialService
         }
         return found;
     }
-
-    public void InvalidateCache() { }
 }

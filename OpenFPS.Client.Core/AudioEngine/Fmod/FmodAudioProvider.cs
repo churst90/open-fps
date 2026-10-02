@@ -1474,7 +1474,7 @@ public class FmodAudioProvider : IAudioProvider
     ///   CopiesDb — everything PLACED as a copy of the source: early echoes, facade and higher-order
     ///              echoes, your own steps' echoes, the master-bus boundary copies.
     ///              `/copies <dB>`, OPENFPS_COPIES_DB.
-    /// `/reflections <dB>` and OPENFPS_REFLECTIONS_DB set both.
+    /// `/reflections <dB>` sets both.
     ///
     /// Both are -6, set by ear in a flat, a tunnel and a street. A trim further down was hiding
     /// faults, not setting a level: with the tail parametric it was 14-20 dB too loud in the tunnel;
@@ -1483,10 +1483,10 @@ public class FmodAudioProvider : IAudioProvider
     /// non-physical before trimming. One is known: the trace rings as long at 4 kHz as at 250 Hz
     /// (0.79 s, where Sabine from the same materials says 0.52), so the top hangs on.
     /// </summary>
-    public static volatile float TailDb = EnvDb("OPENFPS_TAIL_DB") ?? EnvDb("OPENFPS_REFLECTIONS_DB") ?? -6f;
+    public static volatile float TailDb = EnvDb("OPENFPS_TAIL_DB") ?? -6f;
     /// <summary>See <see cref="TailDb"/>. The copies carry only the mirror share, with the scattered
     /// share as the wall's wash, at energy-correct levels, and at most four second-order copies.</summary>
-    public static volatile float CopiesDb = EnvDb("OPENFPS_COPIES_DB") ?? EnvDb("OPENFPS_REFLECTIONS_DB") ?? -6f;
+    public static volatile float CopiesDb = EnvDb("OPENFPS_COPIES_DB") ?? -6f;
     public static float TailTrim => MathF.Pow(10f, TailDb / 20f);
     public static float CopiesTrim => MathF.Pow(10f, CopiesDb / 20f);
 
@@ -2156,51 +2156,13 @@ public class FmodAudioProvider : IAudioProvider
         else bus.set3DLevel(0.0f);
     }
 
-    /// <summary>Diagnostics only (OpenFPS.AudioLab's `--reverb-route`): the live state of one region's
-    /// reverb bus. There is no way to see a DSP graph from outside FMOD, and the graph is exactly what
-    /// was wrong — the sends were injected at the bus HEAD, downstream of both the fader and the
-    /// binaural stage, so the gating and the doorway localization were connected to nothing.</summary>
-    /// <param name="doorwayBlend">How localized to the doorway the bus currently is: 1 outside, 0 when
-    /// it fills the listener's own room, and anything between while the crossing ramp runs.</param>
-    /// <param name="volume">The gated bus level — what the per-portal aperture/distance rule produced.</param>
-    /// <param name="rmsL">Left-ear energy of the last block the HRTF stage produced.</param>
-    /// <param name="rmsR">Right-ear energy of the last block the HRTF stage produced.</param>
-    internal bool TryGetReverbDiagnostics(int regionId, out float doorwayBlend, out float volume,
-                                          out float rmsL, out float rmsR)
-    {
-        doorwayBlend = 0f; volume = 0f; rmsL = 0f; rmsR = 0f;
-        if (!_reverbVolumes.TryGetValue(regionId, out volume)) return false;
-        if (_reverbSaVoices.TryGetValue(regionId, out var v) && v.Dsp.hasHandle())
-        {
-            v.Dsp.getBypass(out bool bypassed);
-            doorwayBlend = bypassed ? 0f : v.State.SpatialBlend;
-            // A bypassed stage is not running, so its last block is stale. Report nothing rather than
-            // the numbers it produced the last time the listener was somewhere else.
-            rmsL = bypassed ? 0f : v.State.LastRmsL;
-            rmsR = bypassed ? 0f : v.State.LastRmsR;
-        }
-        return true;
-    }
-
-    /// <summary>What a region's reverb DSP is actually set to, read back OUT of FMOD rather than off our
-    /// own bookkeeping — a measurement that cannot disagree with what we think we set is not one.</summary>
-    internal bool TryGetReverbSettings(int regionId, out float decayMs, out float wetDb)
-    {
-        decayMs = 0f; wetDb = -80f;
-        if (!_reverbDsps.TryGetValue(regionId, out var dsp) || !dsp.hasHandle()) return false;
-        if (dsp.getParameterFloat(0, out decayMs) != RESULT.OK) return false;
-        return dsp.getParameterFloat(11, out wetDb) == RESULT.OK;
-    }
-
     /// <summary>
     /// Peak level actually flowing through a region's reverb DSP, metered by FMOD itself.
     ///
-    /// <see cref="TryGetReverbDiagnostics"/> cannot answer this question and it is important to know
-    /// why: it reads the bus's binaural stage, which is BYPASSED whenever the listener is inside the
-    /// region — and outdoors the listener is always inside region -1. So it reports zero for the
-    /// outdoor bus whether that bus is carrying a firefight or nothing at all, which is exactly the
-    /// kind of measurement that makes you certain of something false. This meters the reverb DSP's own
-    /// input and output and is true regardless of what is bypassed downstream.
+    /// Reading the bus's binaural stage cannot answer this: that stage is BYPASSED whenever the
+    /// listener is inside the region — and outdoors the listener is always inside region -1. This
+    /// meters the reverb DSP's own input and output and is true regardless of what is bypassed
+    /// downstream.
     /// </summary>
     internal bool TryMeterReverbBus(int regionId, out float inputPeak, out float outputPeak)
     {
@@ -2213,47 +2175,6 @@ public class FmodAudioProvider : IAudioProvider
         for (int i = 0; i < outInfo.numchannels && i < 32; i++)
             outputPeak = Math.Max(outputPeak, outInfo.peaklevel[i]);
         return true;
-    }
-
-    /// <summary>
-    /// Every stage of a room bus at once: what went into the reverb, what came out of it, what came
-    /// out of the binaural stage that sits after it, and the fader that stage feeds.
-    ///
-    /// <see cref="TryMeterReverbBus"/> answers for the unit alone, and the unit was never the thing
-    /// that was wrong: a tail can be generated perfectly and still not reach the mix, because there
-    /// are two more stages and a fader after it. Measured with this, one footstep in a room configured
-    /// for six seconds of decay left the mixer at the noise floor half a second later. A chain is only
-    /// as loud as its quietest stage, and the only way to find which one is to meter all of them.
-    /// </summary>
-    public bool TryMeterReverbChain(int regionId, out float unitInDb, out float unitOutDb,
-                                    out float headOutDb, out float fader, out int sends)
-    {
-        unitInDb = unitOutDb = headOutDb = -120f; fader = 0f; sends = 0;
-        if (!_reverbDsps.TryGetValue(regionId, out var dsp) || !dsp.hasHandle()) return false;
-        if (!_reverbBuses.TryGetValue(regionId, out var bus) || !bus.hasHandle()) return false;
-        dsp.setMeteringEnabled(true, true);
-        if (dsp.getMeteringInfo(out var inI, out var outI) == RESULT.OK)
-        {
-            float a = 0f, b = 0f;
-            for (int i = 0; i < inI.numchannels && i < 32; i++) a = Math.Max(a, inI.peaklevel[i]);
-            for (int i = 0; i < outI.numchannels && i < 32; i++) b = Math.Max(b, outI.peaklevel[i]);
-            unitInDb = ToDb(a); unitOutDb = ToDb(b);
-        }
-        if (_reverbSaVoices.TryGetValue(regionId, out var v) && v.Dsp.hasHandle())
-        {
-            v.Dsp.setMeteringEnabled(true, true);
-            if (v.Dsp.getMeteringInfo(IntPtr.Zero, out var h) == RESULT.OK)
-            {
-                float c = 0f;
-                for (int i = 0; i < h.numchannels && i < 32; i++) c = Math.Max(c, h.peaklevel[i]);
-                headOutDb = ToDb(c);
-            }
-        }
-        bus.getVolume(out fader);
-        dsp.getNumInputs(out sends);
-        return true;
-
-        static float ToDb(float peak) => peak <= 1e-6f ? -120f : 20f * MathF.Log10(peak);
     }
 
     /// <summary>Lab only: every send plugged into a region's unit — who feeds it, and at what mix.</summary>

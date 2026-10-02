@@ -155,6 +155,78 @@ public class RoadNetworkTests
         finally { File.Delete(outFile); }
     }
 
+    // ── Bad map data ────────────────────────────────────────────────────────────────────────
+    // A NaN in a map, or a pair of lanes only just short of parallel, once meant a loop that never
+    // ended and grew a list until the machine ran out of memory (found by a mutation run, 2026-10-01).
+
+    private static RoadData Straight(string id, Vector3 from, Vector3 to) => new()
+    {
+        Id = id, WidthMetres = 7f, Centreline = new() { from, to },
+        Lanes = new() { new LaneData { OffsetMetres = 1.75f, Direction = 1 }, new LaneData { OffsetMetres = -1.75f, Direction = -1 } },
+    };
+
+    [Fact]
+    public void A_road_with_a_NaN_point_is_reported_and_left_out()
+    {
+        var good = Straight("good", new Vector3(0, 0, 0), new Vector3(100, 0, 0));
+        var bad = Straight("bad", new Vector3(0, 0, 20), new Vector3(float.NaN, 0, 20));
+        var net = new RoadNetwork(new[] { good, bad }, null);
+        Assert.Contains(net.Problems, p => p.StartsWith("road bad:"));
+        Assert.All(net.Segments, s => Assert.Equal("good", s.Road.Id));
+        Assert.All(net.Segments, s => Assert.True(float.IsFinite(s.LengthMetres)));
+    }
+
+    [Fact]
+    public void A_junction_with_a_NaN_radius_cuts_no_lane()
+    {
+        var road = Straight("r", new Vector3(0, 0, 0), new Vector3(100, 0, 0));
+        var j = new JunctionData { Id = "j", Position = new Vector3(50, 0, 0), RadiusMetres = float.NaN };
+        var net = new RoadNetwork(new[] { road }, new[] { j });
+        Assert.All(net.Segments, s => Assert.True(float.IsFinite(s.LengthMetres) && s.Path.All(p => float.IsFinite(p.X))));
+    }
+
+    [Fact]
+    public void Nearly_parallel_lanes_join_with_a_short_curve()
+    {
+        // Two lanes 3 m apart sideways, a hair off parallel: their lines meet kilometres away.
+        var inPath = new List<Vector3> { new(0, 0, 0), new(10, 0, 0) };
+        var outPath = new List<Vector3> { new(12, 0, 3), new(22, 0, 3.02f) };
+        var pts = LaneRoutes.Connector(inPath, outPath);
+        float len = 0f;
+        for (int i = 0; i + 1 < pts.Count; i++) len += Vector3.Distance(pts[i], pts[i + 1]);
+        Assert.True(pts.Count < 20, $"{pts.Count} points");
+        Assert.True(len < 2f * Vector3.Distance(inPath[^1], outPath[0]), $"{len:F1} m");
+        Assert.Equal(inPath[^1], pts[0]);
+        Assert.Equal(outPath[0], pts[^1]);
+    }
+
+    [Fact]
+    public void A_right_angle_turn_keeps_its_curve()
+    {
+        var inPath = new List<Vector3> { new(0, 0, 0), new(10, 0, 0) };
+        var outPath = new List<Vector3> { new(15, 0, 5), new(15, 0, 15) };
+        var pts = LaneRoutes.Connector(inPath, outPath);
+        // The curve bows towards the corner at (15, 0, 0): its middle is 1.8 m from it, where the
+        // straight chord's would be 3.5 m.
+        var mid = pts[pts.Count / 2];
+        Assert.True(Vector3.Distance(mid, new Vector3(15, 0, 0)) < 2.5f, $"middle at {mid}");
+    }
+
+    [Fact]
+    public void A_circuit_with_a_NaN_waypoint_says_which()
+    {
+        var pts = new List<Vector3> { new(0, 0, 0), new(100, 0, 0), new(100, 0, float.NaN), new(0, 0, 100) };
+        var e = Assert.Throws<ArgumentException>(() => new RaceLine(pts, 0f, 30f, 0.8f, 6f));
+        Assert.Contains("Waypoint 2", e.Message);
+    }
+
+    [Fact]
+    public void A_circuit_the_size_of_a_continent_is_refused()
+    {
+        var pts = new List<Vector3> { new(0, 0, 0), new(1e7f, 0, 0), new(1e7f, 0, 1e7f) };
+        Assert.Throws<ArgumentException>(() => new RaceLine(pts, 0f, 30f, 0.8f, 6f));
+    }
+
     private static string RepoRoot([System.Runtime.CompilerServices.CallerFilePath] string here = "")
         => Path.GetFullPath(Path.Combine(Path.GetDirectoryName(here)!, ".."));
 }

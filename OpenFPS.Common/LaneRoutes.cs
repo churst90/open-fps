@@ -241,6 +241,14 @@ public static class LaneRoutes
             control.Y = 0.5f * (a.Y + b.Y);
         }
         float len = Vector3.Distance(a, control) + Vector3.Distance(control, b);
+        // Two lanes only just short of parallel meet a long way off, and the curve through that point
+        // would be kilometres of points. A real junction's curve is a few times the gap it crosses.
+        float gap = Vector3.Distance(a, b);
+        if (!float.IsFinite(len) || len > 4f * gap + 10f)
+        {
+            control = Vector3.Lerp(a, b, 0.5f);
+            len = gap;
+        }
         int n = Math.Max(2, (int)MathF.Ceiling(len / Step));
         for (int k = 1; k < n; k++)
         {

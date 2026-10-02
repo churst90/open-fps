@@ -737,8 +737,11 @@ public sealed partial class VehicleSystem
         var (toHold, look) = JunctionHold(v, dt);
         if (look < float.MaxValue && toHold == float.MaxValue)
         {
-            var (_, along) = WhereOnLane(v);
-            float toLine = v.Route!.Legs[WhereOnLane(v).Leg].Segment.LengthMetres - along;
+            // Measured on the lane JunctionHold measured it on: the lap may already put a vehicle that is
+            // still short of the line in the junction, and the next lane's length is no distance to it.
+            var (leg, along) = WhereOnLane(v);
+            if (along < 0f) ShortOfTheLine(v, ref leg, ref along);
+            float toLine = v.Route!.Legs[leg].Segment.LengthMetres - along;
             want = MathF.Min(want, MathF.Sqrt(look * look + 2f * v.Brake * MathF.Max(0f, toLine)));
         }
         if (toHold < float.MaxValue)
@@ -748,11 +751,14 @@ public sealed partial class VehicleSystem
         }
 
         // ── Somebody on a crossing ahead ───────────────────────────────────────────────────────
-        float toCrosswalk = CrosswalkHold(v, dt);
+        // Its ordinary braking curve to where it stands, at whatever rate gets it there: past the curve,
+        // a driver who has started stopping brakes harder (see CrosswalkHold).
+        float toCrosswalk = CrosswalkHold(v, dt, out float crosswalkBrake);
         if (toCrosswalk < float.MaxValue)
         {
+            brake = MathF.Max(brake, crosswalkBrake);
             want = MathF.Min(want, MathF.Sqrt(2f * v.Brake * toCrosswalk));
-            if (toCrosswalk <= 0.3f && CanHalt(v.Speed, v.Brake, dt)) { Halt(v); vel.Linear = Vector3.Zero; return; }
+            if (toCrosswalk <= 0.3f && CanHalt(v.Speed, brake, dt)) { Halt(v); vel.Linear = Vector3.Zero; return; }
         }
 
         float toStop = DistanceToNextStop(v, line);

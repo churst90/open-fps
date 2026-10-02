@@ -160,11 +160,6 @@ public sealed record MachineDefinition
             if (string.Equals(Parts[i].Model, model, StringComparison.OrdinalIgnoreCase)) return Parts[i];
         return null;
     }
-
-    /// <summary>Every part of a model — a machine may have several of a kind (two rotors, four
-    /// tailpipes), and anything placing emitters wants all of them.</summary>
-    public IEnumerable<MachinePart> AllParts(string model)
-        => Parts.Where(p => string.Equals(p.Model, model, StringComparison.OrdinalIgnoreCase));
 }
 
 /// <summary>

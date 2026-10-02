@@ -153,6 +153,11 @@ public sealed class RoadNetwork
     {
         if (road.Centreline.Count < 2) { _problems.Add($"road {road.Id}: fewer than two centreline points"); return; }
         if (road.Lanes.Count == 0) { _problems.Add($"road {road.Id}: no lanes"); return; }
+        // One NaN in the data is a NaN lane length, and the route search compares lengths: NaN is never
+        // shorter, so it re-queues the same lanes round a loop for ever.
+        if (!road.Centreline.All(p => float.IsFinite(p.X) && float.IsFinite(p.Y) && float.IsFinite(p.Z))
+            || !float.IsFinite(road.WidthMetres) || !road.Lanes.All(l => float.IsFinite(l.OffsetMetres)))
+        { _problems.Add($"road {road.Id}: a position, width or lane offset is not a number"); return; }
         float length = Length(road.Centreline);
         var stops = JunctionsOn(road);
         // The pieces between one junction (or end) and the next.
@@ -174,7 +179,7 @@ public sealed class RoadNetwork
             // Measured from the junction's own point, not from where the road happens to begin.
             float from = ja != null ? Project(road.Centreline, ja.Position).Along + ja.RadiusMetres : a;
             float to = jb != null ? Project(road.Centreline, jb.Position).Along - jb.RadiusMetres : b;
-            if (to - from < 1f) { _problems.Add($"road {road.Id}: {to - from:F1} m between {ja?.Id ?? "its start"} and {jb?.Id ?? "its end"}"); continue; }
+            if (!(to - from >= 1f)) { _problems.Add($"road {road.Id}: {to - from:F1} m between {ja?.Id ?? "its start"} and {jb?.Id ?? "its end"}"); continue; }
             foreach (var lane in road.Lanes)
             {
                 var path = Offset(Slice(road.Centreline, from, to), lane.OffsetMetres);
@@ -218,17 +223,12 @@ public sealed class RoadNetwork
     /// <summary>The lane nearest the kerb for its direction of travel.</summary>
     public static bool IsKerbLane(LaneSegment s) => LanePlace(s) == 0;
 
-    /// <summary>The lane nearest the middle of the road for its direction of travel.</summary>
-    public static bool IsInnermostLane(LaneSegment s) => LanePlace(s) == LaneCount(s) - 1;
-
     /// <summary>0 for the kerb lane, counting inward.</summary>
     private static int LanePlace(LaneSegment s)
     {
         float mine = MathF.Abs(s.Lane.OffsetMetres);
         return s.Road.Lanes.Count(l => l.Direction == s.Lane.Direction && MathF.Abs(l.OffsetMetres) > mine + 0.01f);
     }
-
-    private static int LaneCount(LaneSegment s) => s.Road.Lanes.Count(l => l.Direction == s.Lane.Direction);
 
     private void Check()
     {
@@ -259,19 +259,6 @@ public sealed class RoadNetwork
         foreach (var s in road.Surfaces)
             if (alongMetres >= s.FromMetres && alongMetres < s.ToMetres) return s.Material;
         return RoadData.DefaultSurface;
-    }
-
-    /// <summary>The lane segment whose path passes nearest a point, within its own half-width.</summary>
-    public LaneSegment? SegmentAt(Vector3 point)
-    {
-        LaneSegment? best = null;
-        float bestOff = float.MaxValue;
-        foreach (var s in _segments)
-        {
-            var (_, off) = Project(s.Path, point);
-            if (off <= s.Lane.WidthMetres * 0.5f && off < bestOff) { best = s; bestOff = off; }
-        }
-        return best;
     }
 
     // ── Geometry, in the ground plane ───────────────────────────────────────────────────────

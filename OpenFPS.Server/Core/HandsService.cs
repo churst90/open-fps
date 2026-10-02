@@ -213,11 +213,14 @@ public class HandsService
         var carried = Stowed(world, session.Entity, lookup);
         if (carried.Count == 0) { message = "You have nothing on your back."; return false; }
 
-        var item = string.IsNullOrEmpty(named)
-            ? carried[^1]                                     // the last thing you put there
-            : carried.FirstOrDefault(e => NameOf(world, e).Contains(named, StringComparison.OrdinalIgnoreCase));
-        if (item == Entity.Null)
+        // An index and not FirstOrDefault: a miss there is default(Entity), id 0, which is not
+        // Entity.Null (id -1) but a real entity, the first one the map spawned.
+        int found = string.IsNullOrEmpty(named)
+            ? carried.Count - 1                               // the last thing you put there
+            : carried.FindIndex(e => NameOf(world, e).Contains(named, StringComparison.OrdinalIgnoreCase));
+        if (found < 0)
         { message = $"You have no {named} on your back. {WhatYouAreCarrying(world, session.Entity, lookup)}"; return false; }
+        var item = carried[found];
 
         if (!PutInHands(world, session.Entity, item, out string why))
         { message = $"{why} {Carrying(world, lookup, world.Get<HandsComponent>(session.Entity))}"; return false; }

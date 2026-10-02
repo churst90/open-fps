@@ -12,6 +12,34 @@ namespace OpenFPS.Server.Core;
 public class MessageDispatcher : IMessageDispatcher
 {
     private readonly Dictionary<Type, Action<int, IMessage, Action<IMessage>>> _handlers = new();
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<Type, bool> _warnedUnhandled = new();
+    private long _refusedBeforeLogin;
+
+    /// <summary>
+    /// Whether a connection has logged in. When set, a connection that has not hears nothing but a
+    /// login or a registration; everything else is refused here, before any handler sees it, so no
+    /// handler has to remember to check.
+    /// </summary>
+    public Func<int, bool>? IsAuthenticated { get; set; }
+
+    /// <summary>What a connection may send before it has logged in.</summary>
+    public static readonly IReadOnlySet<Type> AllowedBeforeLogin = new HashSet<Type>
+    {
+        typeof(LoginRequest), typeof(RegisterRequest),
+    };
+
+    /// <summary>
+    /// Refused messages that a person asked for, and so are answered. The rest — input, voice, the
+    /// server's own message types sent back at it — are dropped without a word.
+    /// </summary>
+    private static readonly HashSet<Type> AnsweredWhenRefused = new()
+    {
+        typeof(TextCommand), typeof(ChatMessage), typeof(PlayerListRequest), typeof(FriendListRequest),
+        typeof(MapListRequest),
+    };
+
+    /// <summary>Messages refused because their connection had not logged in.</summary>
+    public long RefusedBeforeLogin => System.Threading.Interlocked.Read(ref _refusedBeforeLogin);
 
     /// <summary>
     /// Registers a handler for a specific message type. 
@@ -31,6 +59,14 @@ public class MessageDispatcher : IMessageDispatcher
         // Phase 2: Sanity Gates & Anti-Cheat
         if (message is ClientInputUpdate input)
         {
+            // Finite first. NaN is not greater than one, so the length check alone let it through to
+            // the player's position; an infinite direction normalised to NaN; and Math.Clamp passes
+            // NaN, which a NaN look would have put into the yaw for good. Not a number is no input.
+            if (!IsFinite(input.MoveDirection)) input.MoveDirection = System.Numerics.Vector3.Zero;
+            if (!float.IsFinite(input.LookDelta.X) || !float.IsFinite(input.LookDelta.Y))
+                input.LookDelta = System.Numerics.Vector2.Zero;
+            if (float.IsNaN(input.DeltaTime)) input.DeltaTime = 0.001f;
+
             if (input.MoveDirection.Length() > 1.0f)
             {
                 input.MoveDirection = System.Numerics.Vector3.Normalize(input.MoveDirection);
@@ -39,6 +75,14 @@ public class MessageDispatcher : IMessageDispatcher
         }
 
         var type = message.GetType();
+        if (IsAuthenticated != null && !AllowedBeforeLogin.Contains(type) && !IsAuthenticated(connectionId))
+        {
+            System.Threading.Interlocked.Increment(ref _refusedBeforeLogin);
+            if (AnsweredWhenRefused.Contains(type))
+                replyAction(new TextEvent { Text = "You are not logged in. Type login, your name and your password." });
+            return;
+        }
+
         if (_handlers.TryGetValue(type, out var handler))
         {
             try
@@ -50,9 +94,14 @@ public class MessageDispatcher : IMessageDispatcher
                 Log.Error(ex, "Error handling message of type {Type} for connection {ConnectionId}", type.Name, connectionId);
             }
         }
-        else
+        else if (_warnedUnhandled.TryAdd(type, true))
         {
+            // Once per type: a client sending the server's own messages back at it would otherwise
+            // write a line to the log for every one.
             Log.Warning("No handler registered for message type {Type}", type.Name);
         }
     }
+
+    private static bool IsFinite(System.Numerics.Vector3 v)
+        => float.IsFinite(v.X) && float.IsFinite(v.Y) && float.IsFinite(v.Z);
 }

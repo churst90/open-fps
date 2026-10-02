@@ -72,6 +72,11 @@ to whatever the variable says. Until it has been set, the server logs a warning 
 **Ports.** UDP 33288 is the game. TCP 33289 is the MUD gateway (plain-text telnet, passwords in
 the clear). Block 33289 in the VPS firewall unless you want it.
 
+**Security.** Roles, login limits, lockouts, what is logged about connections and accounts, and the
+admin commands that show it (`/sessions`, `/user`, `/throttled`, `/unlock`, `/setrole`) are in
+`SERVER_SECURITY.md`. The first start of a server from 2026-10-02 or later upgrades an older
+`openfps.db` in place and leaves a copy of the old file beside it.
+
 ### As a service
 
 `/etc/systemd/system/openfps.service`:

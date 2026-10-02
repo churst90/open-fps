@@ -375,7 +375,6 @@ internal sealed class ExhaustNetwork
 
     /// <summary>Characteristic impedance of a cylinder's primary, Pa s/m^3 — the valve boundary needs it.</summary>
     public float PrimaryImpedance(int cyl) => _primary[cyl].Impedance;
-    public float PrimaryDensity(int cyl) => _primary[cyl].Density;
     public float PrimarySoundSpeed(int cyl) => _primary[cyl].SoundSpeed;
 
     /// <summary>The wave arriving back at the valve end of a cylinder's primary. Once per sample.</summary>

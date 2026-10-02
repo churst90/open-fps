@@ -104,10 +104,12 @@ public class SocialTravelTests : IDisposable
         Assert.Equal(new[] { "carol" }, new FriendRepository(_friendsPath).GetFriends("alice"));
     }
 
-    [Fact]
-    public void WhereSaysBearingDistanceMapOrOffline()
+    [Theory]
+    [InlineData(UserRole.Dev)]
+    [InlineData(UserRole.Admin)]
+    public void WhereSaysBearingDistanceMapOrOfflineToStaff(UserRole role)
     {
-        var alice = Player("alice", 1, new Vector3(0, 2, 0));
+        var alice = Player("alice", 1, new Vector3(0, 2, 0), role: role);
         var bob = Player("bob", 2, new Vector3(0, 2, 10));
 
         string where = Run(alice, "where", "bob");
@@ -120,16 +122,71 @@ public class SocialTravelTests : IDisposable
     }
 
     [Fact]
-    public void ProfileIsASentenceOrTwo()
+    public void WhereIsRefusedToAPlayer()
     {
         var alice = Player("alice", 1, new Vector3(0, 2, 0));
-        Player("bob", 2, new Vector3(10, 2, 0));
+        Player("bob", 2, new Vector3(0, 2, 10));
+
+        Assert.Equal("You do not have permission to execute this command.", Run(alice, "where", "bob"));
+        Assert.Equal("You do not have permission to execute this command.", Run(alice, "locate", "bob"));
+        // Not even yourself: the C key reads your own coordinates on the client.
+        Assert.Equal("You do not have permission to execute this command.", Run(alice, "where", "alice"));
+    }
+
+    [Fact]
+    public void ProfileSaysRankStatusAndMapButNeverWhereOnIt()
+    {
+        var alice = Player("alice", 1, new Vector3(0, 2, 0));
+        var bob = Player("bob", 2, new Vector3(10, 2, 0));
         Run(alice, "friend", "add", "bob");
 
-        string bob = Run(alice, "profile", "bob");
-        Assert.StartsWith("bob, player. Online, here on default, 10 metres away at 3 o'clock", bob);
-        Assert.EndsWith("On your friends list.", bob);
+        Assert.Equal("bob, player. Online, here on default. On your friends list.", Run(alice, "profile", "bob"));
         Assert.Equal("carol, player. Not online.", Run(alice, "profile", "carol"));
+
+        // Staff asking get the same: a profile is not a locator for anybody.
+        var admin = Player("dana", 3, new Vector3(-10, 2, 0), role: UserRole.Admin);
+        Assert.Equal("bob, player. Online, here on default.", Run(admin, "profile", "bob"));
+
+        bob.CurrentMapId = "speedway";
+        Assert.Equal("bob, player. Online, on speedway. On your friends list.", Run(alice, "profile", "bob"));
+
+        // A private map is not named to somebody it would turn away; its owner and staff hear it.
+        Assert.True(_maps.TryGetMapData("speedway", out var data));
+        data.IsPublic = false;
+        data.OwnerId = "carol";
+        Assert.Equal("bob, player. Online, on a private map. On your friends list.", Run(alice, "profile", "bob"));
+        Assert.Equal("bob, player. Online, on speedway.", Run(admin, "profile", "bob"));
+    }
+
+    [Fact]
+    public void ProfileSaysAwayAndIdle()
+    {
+        var alice = Player("alice", 1, new Vector3(0, 2, 0));
+        var bob = Player("bob", 2, new Vector3(10, 2, 0));
+
+        Assert.Equal("You are marked away. Anything you do clears it.", Run(bob, "afk"));
+        Assert.Equal("bob, player. Away, here on default.", Run(alice, "profile", "bob"));
+        Run(bob, "motd");                          // doing anything is being back
+        Assert.False(bob.Away);
+        Assert.Equal("bob, player. Online, here on default.", Run(alice, "profile", "bob"));
+
+        bob.LastActivityUtc = DateTime.UtcNow - TimeSpan.FromMinutes(12.5);
+        Assert.Equal("bob, player. Idle for 12 minutes, here on default.", Run(alice, "profile", "bob"));
+    }
+
+    [Fact]
+    public void ARealNameIsTheirsToSetAndShows()
+    {
+        var alice = Player("alice", 1, new Vector3(0, 2, 0));
+        var bob = Player("bob", 2, new Vector3(10, 2, 0));
+
+        Assert.StartsWith("Your profile shows no real name.", Run(bob, "realname"));
+        Assert.Equal("Your profile now shows the real name Robert Smith.", Run(bob, "realname", "Robert", "Smith"));
+        Assert.Equal("bob, player. Real name Robert Smith. Online, here on default.", Run(alice, "profile", "bob"));
+        Assert.Equal("A real name can be at most 64 characters, with no control characters.",
+                     Run(bob, "realname", new string('x', 65)));
+        Assert.Equal("Your profile no longer shows a real name.", Run(bob, "realname", "clear"));
+        Assert.Equal("bob, player. Online, here on default.", Run(alice, "profile", "bob"));
     }
 
     [Fact]
@@ -203,10 +260,19 @@ public class SocialTravelTests : IDisposable
     private sealed class KnownUsers : IUserRepository
     {
         private readonly HashSet<string> _names;
+        private readonly Dictionary<string, string> _realNames = new(StringComparer.OrdinalIgnoreCase);
         public KnownUsers(params string[] names) => _names = new HashSet<string>(names, StringComparer.OrdinalIgnoreCase);
         public UserData? GetUser(string username) =>
-            _names.Contains(username) ? new UserData { Username = username.ToLowerInvariant(), Role = UserRole.Player } : null;
+            _names.Contains(username)
+                ? new UserData { Username = username.ToLowerInvariant(), Role = UserRole.Player, RealName = _realNames.GetValueOrDefault(username) }
+                : null;
         public bool AddUser(string username, string password, UserRole role) => _names.Add(username);
         public bool VerifyPassword(string username, string password) => false;
+        public bool SetRealName(string username, string? realName)
+        {
+            if (string.IsNullOrEmpty(realName)) _realNames.Remove(username);
+            else _realNames[username] = realName;
+            return true;
+        }
     }
 }

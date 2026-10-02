@@ -8,7 +8,7 @@ namespace OpenFPS.Common.Networking;
 [MemoryPackable]
 [MemoryPackUnion(0, typeof(ServerStateUpdate))]
 [MemoryPackUnion(1, typeof(ClientInputUpdate))]
-[MemoryPackUnion(2, typeof(PlayerJoined))]
+// 2 was PlayerJoined, which the server never sent. Do not reuse the number.
 [MemoryPackUnion(3, typeof(ChatMessage))]
 [MemoryPackUnion(4, typeof(LoginRequest))]
 [MemoryPackUnion(5, typeof(LoginResponse))]
@@ -22,7 +22,7 @@ namespace OpenFPS.Common.Networking;
 [MemoryPackUnion(13, typeof(LogoutRequest))]
 [MemoryPackUnion(14, typeof(StatsUpdate))]
 [MemoryPackUnion(15, typeof(EntityDefinition))]
-[MemoryPackUnion(16, typeof(CollisionEvent))]
+// 16 was CollisionEvent, which nothing ever sent or handled. Do not reuse the number.
 [MemoryPackUnion(17, typeof(MapManifest))]
 [MemoryPackUnion(18, typeof(PlayerSpawned))]
 [MemoryPackUnion(19, typeof(MapLoadComplete))]
@@ -31,7 +31,7 @@ namespace OpenFPS.Common.Networking;
 [MemoryPackUnion(22, typeof(PlayerListResponse))]
 [MemoryPackUnion(23, typeof(FriendListRequest))]
 [MemoryPackUnion(24, typeof(FriendListResponse))]
-[MemoryPackUnion(25, typeof(MapPublishRequest))]
+// 25 was MapPublishRequest, which no client ever sent. Do not reuse the number.
 [MemoryPackUnion(26, typeof(EntityRemoved))]
 [MemoryPackUnion(27, typeof(WorldAudioEvent))]
 [MemoryPackUnion(28, typeof(MapListRequest))]
@@ -116,14 +116,6 @@ public partial class MapListResponse : IMessage
     public MapListScope Scope;
     public MapSummary[] Maps = Array.Empty<MapSummary>();
     public MapListResponse() { }
-}
-
-[MemoryPackable]
-public partial class MapPublishRequest : IMessage
-{
-    public string MapName = "";
-    public bool IsPublic;
-    public MapPublishRequest() { }
 }
 
 [MemoryPackable]
@@ -277,7 +269,6 @@ public partial struct EntityState
     public int EntityId;
     public QuantizedTransform Transform;
     public Vector3 LinearVelocity;
-    public BeaconData ExtraData;
 
     // APPEND ONLY BELOW THIS LINE. MemoryPack writes these positionally with no names on the wire.
 
@@ -312,7 +303,6 @@ public partial struct EntityState
         EntityId = 0;
         Transform = new QuantizedTransform();
         LinearVelocity = Vector3.Zero;
-        ExtraData = new BeaconData();
     }
 
     /// <summary>The demand as a fraction, 0..2.</summary>
@@ -356,26 +346,6 @@ public struct WheelState
             Surface = surface,
             Demand = EntityState.EncodeTyreDemand(demand),
         };
-}
-
-/// <summary>
-/// Deprecated. Retained in the protocol for wire-compatibility only.
-/// Sound-emitting entities use SoundEmitterComponent (loop/oneshot/periodic modes).
-/// A "beacon" is simply an entity whose SoundEmitter is enabled — no special handling required.
-/// </summary>
-[MemoryPackable]
-public partial struct BeaconData
-{
-    public float Frequency;
-    public float Interval;
-}
-[MemoryPackable]
-public partial class CollisionEvent : IMessage
-{
-    public int EntityId;
-    public Vector3 Position;
-    public string Material = "Generic";
-    public float ImpactForce; 
 }
 
 [MemoryPackable]
@@ -429,9 +399,6 @@ public partial class ClientInputUpdate : IMessage
     /// every stride mispredicts.</summary>
     public bool Sprint;
 }
-
-[MemoryPackable]
-public partial class PlayerJoined : IMessage { public int ConnectionId; public string Username = string.Empty; }
 
 /// <summary>
 /// Who a line of chat is for. The client files and words a line by this, never by the sender's name.

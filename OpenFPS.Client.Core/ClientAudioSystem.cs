@@ -878,10 +878,7 @@ public class ClientAudioSystem
         {
             _state.IsIndoor = reg.IsIndoor;
             _state.RoomSize = reg.RoomSize;
-            _state.RoomMaterials = reg.Materials;
-            _state.ReverbTimeScale = reg.ReverbTimeScale;
             _state.RoomCenter = world.AcousticMap.RegionPositions.GetValueOrDefault(regId, eyePos);
-            _state.RoomRotation = world.AcousticMap.RegionRotations.GetValueOrDefault(regId, Quaternion.Identity);
         }
         else
         {

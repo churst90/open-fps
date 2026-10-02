@@ -34,7 +34,11 @@ public sealed class RailSystem
         public required RaceLine Line;
         public required Entity[] Entities;     // Entity.Null for the signal sources, which are not spawned
         public required float[] Along;
+        /// <summary>Each source's own height above the rail, metres.</summary>
+        public required float[] Heights;
         public float Head, Speed, TopSpeed, Accel, Brake;
+        /// <summary>Head to tail, metres: the sum of the vehicles' lengths.</summary>
+        public float LengthMetres;
 
         /// <summary>Platforms on this route, in order round it. Same description a bus stop uses:
         /// a train halting at a platform and a bus halting at a kerb are the same fact about a
@@ -42,6 +46,9 @@ public sealed class RailSystem
         public (float At, float Dwell, string Kind)[] Stops = System.Array.Empty<(float, float, string)>();
         public int NextStop;
         public float DwellLeft;
+        /// <summary>Metres run since the train last stood at a stop. A stop it has only just left is
+        /// not one to stop at again: on a line with one stop the next stop after it is itself.</summary>
+        public float SinceStop = float.PositiveInfinity;
 
         /// <summary>The horn on the leading unit, as "air:&lt;preset&gt;", or "" for a train with none.</summary>
         public string Horn = "";
@@ -97,10 +104,12 @@ public sealed class RailSystem
                 string trainKey = name.Replace('/', '-').Replace(' ', '_');
                 var ents = new Entity[layout.Count];
                 var along = new float[layout.Count];
+                var heights = new float[layout.Count];
                 for (int i = 0; i < layout.Count; i++)
                 {
                     var src = layout[i];
                     along[i] = src.AlongMetres;
+                    heights[i] = src.HeightMetres;
                     if (src.IsSignal) { ents[i] = Entity.Null; continue; }
                     line.Sample(td.StartOffsetMetres - src.AlongMetres, out var pos, out float heading, out _);
                     pos.Y += src.HeightMetres;
@@ -123,9 +132,9 @@ public sealed class RailSystem
                         }));
                 }
                 line.Sample(td.StartOffsetMetres, out _, out _, out float v0);
-                _trains.Add(new Consist
+                var consist = new Consist
                 {
-                    MapId = mapId, Name = name, Preset = td.Preset, Line = line, Entities = ents, Along = along,
+                    MapId = mapId, Name = name, Preset = td.Preset, Line = line, Entities = ents, Along = along, Heights = heights,
                     Stops = (data.Tracks?.Find(x => string.Equals(x.Id, td.Track, StringComparison.OrdinalIgnoreCase))?.Stops ?? new())
                         .Where(sp => string.IsNullOrEmpty(sp.ForPreset)
                                   || td.Preset.Contains(sp.ForPreset!, StringComparison.OrdinalIgnoreCase))
@@ -136,8 +145,11 @@ public sealed class RailSystem
                     Horn = profile.Consist.Select(c => c.Vehicle.Traction?.HornKey).FirstOrDefault(h => h != null) is { } hk
                         ? "air:" + hk : "",
                     Head = td.StartOffsetMetres, Speed = MathF.Min(v0, top), TopSpeed = top,
+                    LengthMetres = profile.LengthMetres,
                     Accel = td.AccelerationMps2 > 0 ? td.AccelerationMps2 : 0.9f, Brake = brake,
-                });
+                };
+                consist.NextStop = FirstStopAhead(consist.Stops, consist.Head);
+                _trains.Add(consist);
                 int spawned = 0; foreach (var e in ents) if (e != Entity.Null) spawned++;
                 Log.Information("Map {Map}: {Name} ({Profile}) runs '{Track}' — {Length:F0} m loop, {Sources} source(s) over {Consist:F0} m, {Min:F0}-{Max:F0} km/h",
                                 mapId, name, profile.Name, td.Track, line.Length, spawned, profile.LengthMetres, line.MinSpeed * 3.6f, line.MaxSpeed * 3.6f);
@@ -159,7 +171,10 @@ public sealed class RailSystem
                 tr.Speed = 0f;
                 PlaceConsist(tr, world);
                 if (tr.DwellLeft <= 0f && tr.Stops.Length > 0)
+                {
                     tr.NextStop = (tr.NextStop + 1) % tr.Stops.Length;
+                    tr.SinceStop = 0f;
+                }
                 continue;
             }
 
@@ -170,13 +185,16 @@ public sealed class RailSystem
             // Coming up on a platform. A train's braking rate is a tenth of a car's and its
             // approach is correspondingly long — which is most of why a train arriving sounds
             // like an event rather than like a vehicle turning up.
-            if (tr.Stops.Length > 0)
+            // Until it has run clear of the stop it just left, which on a line with one stop is the
+            // next stop too: standing within a metre and a half of it at zero speed, it would start
+            // dwelling again and never leave.
+            if (tr.Stops.Length > 0 && tr.SinceStop > StopClearMetres)
             {
                 float d = tr.Stops[tr.NextStop].At - tr.Head;
                 if (d < -1f) d += tr.Line.Length;
                 d = MathF.Max(0f, d);
                 want = MathF.Min(want, MathF.Sqrt(MathF.Max(0f, 2f * tr.Brake * d)));
-                if (d <= 1.5f && tr.Speed < 1.5f)
+                if (d <= StopReachMetres && tr.Speed < 1.5f)
                 {
                     tr.DwellLeft = MathF.Max(1f, tr.Stops[tr.NextStop].Dwell);
                     tr.Speed = 0f;
@@ -187,11 +205,31 @@ public sealed class RailSystem
             if (want > tr.Speed) tr.Speed = MathF.Min(want, tr.Speed + tr.Accel * dt);
             else tr.Speed = MathF.Max(want, tr.Speed - tr.Brake * dt);
             tr.Head += tr.Speed * dt;
+            tr.SinceStop += tr.Speed * dt;
             if (tr.Head > tr.Line.Length) tr.Head -= tr.Line.Length;
 
             SoundForCrossings(tr, world);
             PlaceConsist(tr, world);
         }
+    }
+
+    /// <summary>How close to a stop a train has to have come to stand at it, metres.</summary>
+    private const float StopReachMetres = 1.5f;
+    /// <summary>How far a train runs from a stop before that stop can stop it again: past the
+    /// metre and a half it may have stood short, and the metre a stop still counts as ahead.</summary>
+    private const float StopClearMetres = 3f;
+
+    /// <summary>
+    /// The first stop at or ahead of a place round the line: where a train put there stops first.
+    /// Index 0 for every train ran one placed past the first platform a lap round to it, through
+    /// every platform on the way.
+    /// </summary>
+    private static int FirstStopAhead((float At, float Dwell, string Kind)[] stops, float head)
+    {
+        // A stop up to a metre behind still counts as here, the same allowance Update gives.
+        for (int i = 0; i < stops.Length; i++)
+            if (stops[i].At >= head - 1f) return i;
+        return 0;
     }
 
     /// <summary>
@@ -211,8 +249,11 @@ public sealed class RailSystem
             float eta = toGo / tr.Speed;
             if (eta > HornLeadSeconds || tr.Sounded.Contains(at)) continue;
             tr.Sounded.Add(at);
-            var lead = Array.Find(tr.Entities, e => e != Entity.Null);
-            if (lead == Entity.Null || !world.IsAlive(lead)) continue;
+            // FindIndex and not Find: Find misses with default(Entity), id 0, which is not Entity.Null.
+            int leadAt = Array.FindIndex(tr.Entities, e => e != Entity.Null);
+            if (leadAt < 0) continue;
+            var lead = tr.Entities[leadAt];
+            if (!world.IsAlive(lead)) continue;
             // The first three blasts and their gaps take ten seconds; the last is held to arrival.
             var pattern = Honk.Crossing(eta - 10f);
             Log.Information("Rail: {Name} sounds for the crossing {ToGo:F0} m ahead ({Eta:F0} s).", tr.Name, toGo, eta);
@@ -245,8 +286,11 @@ public sealed class RailSystem
             tr.Line.Sample(tr.Head - tr.Along[i], out var pos, out float heading, out _);
             ref var t = ref world.Get<Transform>(e);
             ref var vel = ref world.Get<Velocity>(e);
-            float height = t.Position.Y - pos.Y;            // keep the source's own height above the rail
-            pos.Y += MathF.Abs(height) < 6f ? height : 0.5f;
+            // The source's own height above the rail, wherever the rail goes. This used to be read
+            // back off the transform as "the old height less the rail's height here" and added to
+            // the rail's height, which is the old height again: on a slope the source stayed where
+            // it had been until it was six metres out.
+            pos.Y += tr.Heights[i];
             t.Position = pos;
             t.Rotation = Quaternion.CreateFromYawPitchRoll(heading, 0f, 0f);
             t.IsDirty = true;
@@ -271,8 +315,7 @@ public sealed class RailSystem
 
     /// <summary>
     /// How far round a given line each train's leading end currently is, metres, and how long the
-    /// lap is. The HEAD, because a crossing starts ringing for the front of a train and stops
-    /// ringing for the back of it, and those are different points.
+    /// lap is. See <see cref="TrainsOn"/> for the back of each train as well.
     /// </summary>
     public List<float> HeadsOn(string mapId, string track, out float lapLength)
     {
@@ -285,5 +328,23 @@ public sealed class RailSystem
             heads.Add(tr.Head);
         }
         return heads;
+    }
+
+    /// <summary>
+    /// Each train on a line: how far round its leading end is, and how long it is, metres. Both,
+    /// because a crossing starts ringing for the front of a train and stops ringing for the back of
+    /// it, and those are a train's length apart.
+    /// </summary>
+    public List<(float Head, float Length)> TrainsOn(string mapId, string track, out float lapLength)
+    {
+        lapLength = 1f;
+        var trains = new List<(float, float)>();
+        foreach (var tr in _trains)
+        {
+            if (tr.MapId != mapId || !string.Equals(tr.Track, track, StringComparison.OrdinalIgnoreCase)) continue;
+            lapLength = tr.Line.Length;
+            trains.Add((tr.Head, tr.LengthMetres));
+        }
+        return trains;
     }
 }

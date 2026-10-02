@@ -20,6 +20,9 @@ public class AppDbContext : DbContext
             b.Property(u => u.Username).HasMaxLength(64);
             b.Property(u => u.PasswordHash).IsRequired();
             b.Property(u => u.Role).HasConversion<string>();
+            b.Property(u => u.LastLoginAddress).HasMaxLength(64);
+            b.Property(u => u.LastFailedAddress).HasMaxLength(64);
+            b.Property(u => u.RealName).HasMaxLength(64);
         });
     }
 }
@@ -32,4 +35,14 @@ public class UserRecord
     public string Username { get; set; } = string.Empty;
     public string PasswordHash { get; set; } = string.Empty;
     public UserRole Role { get; set; } = UserRole.Player;
+
+    // Added 2026-10-02. EnsureCreated does not alter a table that already exists, so an older
+    // database gets these columns from SqliteUserRepository.UpgradeSchema; keep the two in step.
+    public DateTime? CreatedUtc { get; set; }
+    public DateTime? LastLoginUtc { get; set; }
+    public string? LastLoginAddress { get; set; }
+    public int FailedLogins { get; set; }
+    public DateTime? LastFailedUtc { get; set; }
+    public string? LastFailedAddress { get; set; }
+    public string? RealName { get; set; }
 }

@@ -40,6 +40,8 @@ public sealed partial class VehicleSystem
     {
         public readonly List<(DemoVehicle V, Movement M)> Inside = new();
         public readonly List<(DemoVehicle V, Movement M, float ToLine)> Coming = new();
+        /// <summary>The one driver the deadlock breaker has let go, until it is into the junction.</summary>
+        public DemoVehicle? LetGo;
     }
 
     private readonly Dictionary<(string Map, string Junction), AtJunction> _atJunction = new();
@@ -151,16 +153,25 @@ public sealed partial class VehicleSystem
             }
         }
 
-        // Everybody waiting for somebody: after a while, one goes.
+        // Everybody waiting for somebody: after a while, one goes. Only one: the others wait for it until
+        // it is into the junction, and are let go one at a time after it. Two that ran out of patience in
+        // the same quarter of a second both pulled away from the line, slower than the 0.5 m/s that makes
+        // one count as coming, and met in the middle (docs/MUTATION_2026-10-01.md, item 10).
+        if (here.LetGo is { } went && !here.Coming.Any(x => x.V == went && x.ToLine < 6f + 0.5f * went.LengthMetres))
+            here.LetGo = null;
         if (wait && v.Speed < 0.3f && toLine < 6f + 0.5f * v.LengthMetres)   // short of a crossing too
         {
             if (v.WaitingAt != j.Id) { v.WaitingAt = j.Id; v.WaitedSeconds = 0f; }
             v.WaitedSeconds += dt;
             // ...but not in front of somebody about to arrive: that is not a deadlock, it is traffic.
-            if (v.WaitedSeconds > life.GiveWayPatienceSeconds && !here.Inside.Any(x => x.V != v && Conflict(mine, x.M))
+            if (v.WaitedSeconds > life.GiveWayPatienceSeconds && (here.LetGo == null || here.LetGo == v)
+                && !here.Inside.Any(x => x.V != v && Conflict(mine, x.M))
                 && !here.Coming.Any(x => x.V != v && x.M.In != mine.In && x.V.Speed > 0.5f
                                          && x.ToLine / x.V.Speed < ImminentSeconds && Conflict(mine, x.M)))
+            {
                 wait = false;
+                here.LetGo = v;
+            }
         }
         else if (!wait) v.WaitingAt = null;
 

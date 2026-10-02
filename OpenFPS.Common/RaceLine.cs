@@ -114,6 +114,11 @@ public sealed class RaceLine
     {
         if (centreline == null || centreline.Count < 3)
             throw new ArgumentException("A circuit needs at least three waypoints.", nameof(centreline));
+        // A NaN or infinite waypoint makes the perimeter infinite, and the resampled line asks for an
+        // array the size of the address space. Say which point is wrong instead.
+        for (int i = 0; i < centreline.Count; i++)
+            if (!float.IsFinite(centreline[i].X) || !float.IsFinite(centreline[i].Y) || !float.IsFinite(centreline[i].Z))
+                throw new ArgumentException($"Waypoint {i} of the circuit is not a finite position.", nameof(centreline));
 
         var resampled = Resample(centreline, NodeSpacing, out _);
         Smooth(resampled, SmoothingPasses);
@@ -424,12 +429,17 @@ public sealed class RaceLine
     /// no short segment at the join. That is what lets Sample find a node by dividing instead of
     /// walking, and it removes the one place a lap could gain or lose a few centimetres a lap.
     /// </summary>
+    /// <summary>Longer than any map will be (the city is 10 km across); a bound on what Resample allocates.</summary>
+    private const float MaxPerimeterMetres = 1_000_000f;
+
     private static List<Vector3> Resample(IReadOnlyList<Vector3> loop, float wanted, out float spacing)
     {
         int n = loop.Count;
         float perimeter = 0f;
         for (int i = 0; i < n; i++) perimeter += Vector3.Distance(loop[i], loop[(i + 1) % n]);
 
+        if (perimeter > MaxPerimeterMetres)
+            throw new ArgumentException($"A circuit {perimeter / 1000f:F0} km round is not a map.", nameof(loop));
         int count = Math.Max(3, (int)MathF.Round(perimeter / MathF.Max(0.5f, wanted)));
         spacing = perimeter / count;
 

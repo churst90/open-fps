@@ -6,6 +6,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
+using System.Threading.Channels;
 using System.Threading.Tasks;
 using OpenFPS.Common.Networking;
 using Serilog;
@@ -26,6 +27,21 @@ public class MudGateway
     
     private readonly ConcurrentDictionary<int, MudConnection> _connections = new();
 
+    /// <summary>The longest line read. Anything longer is thrown away up to its newline.</summary>
+    public const int MaxLineLength = 512;
+    /// <summary>Connections from one address (an IPv6 /64) at once.</summary>
+    public const int MaxConnectionsPerAddress = 4;
+    /// <summary>Connections at once, all addresses together.</summary>
+    public const int MaxConnections = 64;
+    /// <summary>
+    /// Lines waiting to be written to one connection. A client that stops reading fills this, and is
+    /// then closed: the writes used to be synchronous on the tick thread, so one telnet window left
+    /// unread would have stopped the whole server once its socket buffer filled.
+    /// </summary>
+    public const int MaxQueuedLines = 256;
+
+    private static readonly UTF8Encoding NoBom = new(encoderShouldEmitUTF8Identifier: false);
+
     /// <summary>
     /// Raised (on the connection's own task thread) when a MUD client goes away. The server uses it to
     /// end the session and remove the player's body — a telnet player can now spawn one, so without this
@@ -44,9 +60,16 @@ public class MudGateway
         public StreamWriter Writer = null!;
         public int CommandsThisSecond;
         public long LastSecondTimestamp;
-        /// <summary>Serialises writes: replies now arrive from the game tick thread as well as this
-        /// connection's own reader task, and two interleaved WriteLine calls produce a garbled line.</summary>
-        public readonly object WriteLock = new();
+        public string Address = "";
+        public DateTime ConnectedUtc = DateTime.UtcNow;
+        /// <summary>
+        /// Everything written to this connection goes through here, to one writer task. Replies arrive
+        /// from the tick thread, the thread pool and the reader task alike; one writer means no two
+        /// lines interleave and no caller ever waits on the network.
+        /// </summary>
+        public readonly Channel<string> Outbox = Channel.CreateBounded<string>(
+            new BoundedChannelOptions(MaxQueuedLines) { SingleReader = true, FullMode = BoundedChannelFullMode.Wait });
+        public int Closed;
     }
 
     /// <summary>
@@ -90,6 +113,19 @@ public class MudGateway
             try
             {
                 var client = await _listener.AcceptTcpClientAsync();
+                string address = (client.Client.RemoteEndPoint as IPEndPoint)?.Address.ToString() ?? "unknown";
+                string key = RateLimiter.AddressKey(address);
+                int fromThere = _connections.Values.Count(c => RateLimiter.AddressKey(c.Address) == key);
+                string? refusal = _connections.Count >= MaxConnections ? "The server is full. Try again later."
+                                : fromThere >= MaxConnectionsPerAddress ? "Too many connections from your address."
+                                : null;
+                if (refusal != null)
+                {
+                    Log.Warning("MUD: refused a connection from {Address}: {Reason}", address, refusal);
+                    _ = RefuseAsync(client, refusal);
+                    continue;
+                }
+
                 int id = Interlocked.Increment(ref _nextConnectionId);
                 var stream = client.GetStream();
                 var conn = new MudConnection
@@ -97,20 +133,75 @@ public class MudGateway
                     Id = id,
                     Client = client,
                     Reader = new StreamReader(stream, Encoding.UTF8),
-                    Writer = new StreamWriter(stream, Encoding.UTF8) { AutoFlush = true },
-                    LastSecondTimestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds()
+                    // No byte-order mark: a telnet client prints it, and a screen reader reads it out.
+                    Writer = new StreamWriter(stream, NoBom) { AutoFlush = true },
+                    LastSecondTimestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
+                    Address = address,
                 };
                 _connections[id] = conn;
-                
-                await conn.Writer.WriteLineAsync("Welcome to OpenFPS MUD. Type 'who' to list players, 'friends' to list friends, or 'login [user] [pass]'.");
-                
+                Log.Information("MUD connection {Id} opened from {Address}.", id, address);
+
+                _ = Task.Run(() => WriteLoop(conn));
+                Enqueue(conn, "Welcome to OpenFPS MUD. Type 'login [user] [pass]' to log in. Then 'who' lists players and 'friends' your friends.");
+
                 _ = Task.Run(() => HandleConnection(conn));
             }
             catch (Exception ex)
             {
-                Log.Warning(ex, "MUD Gateway accept error.");
+                if (_isRunning) Log.Warning(ex, "MUD Gateway accept error.");
             }
         }
+    }
+
+    private static async Task RefuseAsync(TcpClient client, string reason)
+    {
+        try
+        {
+            using (client)
+            {
+                var writer = new StreamWriter(client.GetStream(), NoBom) { AutoFlush = true };
+                var write = writer.WriteLineAsync(reason);
+                await Task.WhenAny(write, Task.Delay(1000));
+            }
+        }
+        catch { /* gone already */ }
+    }
+
+    /// <summary>The one writer for a connection: drains its outbox, then closes it.</summary>
+    private static async Task WriteLoop(MudConnection conn)
+    {
+        try
+        {
+            await foreach (var line in conn.Outbox.Reader.ReadAllAsync())
+                await conn.Writer.WriteLineAsync(line);
+        }
+        catch
+        {
+            // The client went away mid-write; the reader notices too.
+        }
+        finally
+        {
+            Close(conn);
+        }
+    }
+
+    /// <summary>
+    /// Queues a line for a connection. A connection whose queue is full is not reading, and is closed
+    /// rather than waited for.
+    /// </summary>
+    private static void Enqueue(MudConnection conn, string text)
+    {
+        if (conn.Outbox.Writer.TryWrite(text)) return;
+        if (Volatile.Read(ref conn.Closed) == 0)
+            Log.Warning("MUD connection {Id} ({Address}) is not reading what it is sent; closing it.", conn.Id, conn.Address);
+        Close(conn);
+    }
+
+    private static void Close(MudConnection conn)
+    {
+        if (Interlocked.Exchange(ref conn.Closed, 1) == 1) return;
+        conn.Outbox.Writer.TryComplete();
+        try { conn.Client.Close(); } catch { }
     }
 
     /// <summary>
@@ -118,17 +209,19 @@ public class MudGateway
     /// </summary>
     private async Task HandleConnection(MudConnection conn)
     {
+        var lines = new BoundedLineReader(conn.Reader);
         try
         {
             while (conn.Client.Connected)
             {
-                var line = await conn.Reader.ReadLineAsync();
+                var (line, tooLong) = await lines.ReadLineAsync(MaxLineLength);
                 if (line == null) break;
 
-                // Robustness: Message length check
-                if (line.Length > 512)
+                // Robustness: Message length check. Bounded while reading, not after: ReadLine would
+                // have held a gigabyte with no newline in memory before anything could look at it.
+                if (tooLong)
                 {
-                    await conn.Writer.WriteLineAsync("Error: Command too long (max 512 chars).");
+                    Enqueue(conn, $"Error: Command too long (max {MaxLineLength} chars).");
                     continue;
                 }
 
@@ -142,10 +235,10 @@ public class MudGateway
                     conn.LastSecondTimestamp = now;
                     conn.CommandsThisSecond = 0;
                 }
-                
+
                 if (++conn.CommandsThisSecond > 5)
                 {
-                    await conn.Writer.WriteLineAsync("Error: Rate limit exceeded (max 5 commands per second).");
+                    Enqueue(conn, "Error: Rate limit exceeded (max 5 commands per second).");
                     continue;
                 }
 
@@ -159,28 +252,38 @@ public class MudGateway
                     }
                     else
                     {
-                        await conn.Writer.WriteLineAsync("Unknown command.");
+                        Enqueue(conn, "Unknown command.");
                     }
                 }
                 catch (Exception ex)
                 {
-                    Log.Error(ex, "Error processing MUD command '{Line}' for connection {Id}", line, conn.Id);
-                    await conn.Writer.WriteLineAsync("Internal error processing command.");
+                    Log.Error(ex, "Error processing MUD command '{Line}' for connection {Id}", Redact(line), conn.Id);
+                    Enqueue(conn, "Internal error processing command.");
                 }
             }
         }
         catch (Exception ex)
         {
-            Log.Error(ex, "MUD Connection {Id} experienced a fatal error.", conn.Id);
+            if (Volatile.Read(ref conn.Closed) == 0)
+                Log.Error(ex, "MUD Connection {Id} experienced a fatal error.", conn.Id);
         }
         finally
         {
             _connections.TryRemove(conn.Id, out _);
-            conn.Client.Close();
+            Close(conn);
             Log.Information("MUD Connection {Id} closed.", conn.Id);
             try { OnDisconnected?.Invoke(conn.Id); }
             catch (Exception ex) { Log.Warning(ex, "MUD disconnect handler failed for connection {Id}.", conn.Id); }
         }
+    }
+
+    /// <summary>A line fit for the log: a login keeps its name and loses its password.</summary>
+    public static string Redact(string line)
+    {
+        var parts = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length >= 3 && parts[0].Equals("login", StringComparison.OrdinalIgnoreCase))
+            return $"login {AuthService.ForLog(parts[1])} [password]";
+        return AuthService.ForLog(line);
     }
 
     /// <summary>
@@ -188,19 +291,9 @@ public class MudGateway
     /// </summary>
     private static void SendReply(MudConnection conn, IMessage reply)
     {
-        try
-        {
-            string text = FormatReply(reply);
-            if (string.IsNullOrEmpty(text)) return;
-            lock (conn.WriteLock)
-            {
-                conn.Writer.WriteLine(text);
-            }
-        }
-        catch
-        {
-            // Fail silently for disconnected clients
-        }
+        string text = FormatReply(reply);
+        if (string.IsNullOrEmpty(text)) return;
+        Enqueue(conn, text);
     }
 
     /// <summary>
@@ -220,10 +313,28 @@ public class MudGateway
 
     /// <summary>The remote address of a MUD connection, for rate limiting. Null if the id is not ours.</summary>
     public string? GetRemoteAddress(int connectionId)
+        => _connections.TryGetValue(connectionId, out var conn) ? conn.Address : null;
+
+    /// <summary>When a MUD connection was opened, or null if the id is not ours.</summary>
+    public DateTime? ConnectedSince(int connectionId)
+        => _connections.TryGetValue(connectionId, out var conn) ? conn.ConnectedUtc : null;
+
+    /// <summary>Every open MUD connection and when it was opened.</summary>
+    public IEnumerable<(int Id, DateTime SinceUtc)> Connections()
+        => _connections.Values.Select(c => (c.Id, c.ConnectedUtc));
+
+    /// <summary>
+    /// Closes a connection from this end, after writing <paramref name="finalLine"/> and whatever was
+    /// already queued. The usual disconnect follows when its reader notices.
+    /// </summary>
+    public void Disconnect(int connectionId, string? finalLine = null)
     {
-        if (!_connections.TryGetValue(connectionId, out var conn)) return null;
-        try { return (conn.Client.Client.RemoteEndPoint as IPEndPoint)?.Address.ToString(); }
-        catch { return null; }
+        if (!_connections.TryGetValue(connectionId, out var conn)) return;
+        if (finalLine != null) conn.Outbox.Writer.TryWrite(finalLine);
+        // Completing the outbox lets the writer finish what is queued and then close the socket; a
+        // client that is not reading gets five seconds of that before it is closed anyway.
+        conn.Outbox.Writer.TryComplete();
+        _ = Task.Delay(5000).ContinueWith(_ => Close(conn), TaskScheduler.Default);
     }
 
     /// <summary>Stops accepting connections and closes the open ones. Idempotent.</summary>
@@ -237,12 +348,8 @@ public class MudGateway
 
         foreach (var kv in _connections)
         {
-            try
-            {
-                lock (kv.Value.WriteLock) kv.Value.Writer.WriteLine("Server shutting down. Goodbye.");
-            }
-            catch { /* the client may already be gone */ }
-            try { kv.Value.Client.Close(); } catch { }
+            kv.Value.Outbox.Writer.TryWrite("Server shutting down. Goodbye.");
+            kv.Value.Outbox.Writer.TryComplete();
         }
         _connections.Clear();
         Log.Information("MUD Gateway stopped.");

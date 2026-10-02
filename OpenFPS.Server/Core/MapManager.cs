@@ -599,9 +599,6 @@ public class MapManager
         return new Transform { Position = new Vector3(0, 5, 0) };
     }
 
-    public void RegisterEntity(string mapId, Entity e) => _maps[mapId].lookup[e.Id] = e;
-    public void UnregisterEntity(string mapId, int entityId) => _maps[mapId].lookup.Remove(entityId);
-
     /// <summary>
     /// The one way anything enters a live map after load. <paramref name="create"/> builds the entity in
     /// the map's world; this then does the three things that made it real and that every ad-hoc

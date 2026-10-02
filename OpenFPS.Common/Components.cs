@@ -7,29 +7,6 @@ namespace OpenFPS.Common.Components;
 
 public enum UserRole { Player, Dev, Admin }
 public enum EntityType { None, Player, NPC, Beacon, StaticObject, Item, Projectile, Trigger }
-public enum AIState { Idle, Wander, Chase, Attack }
-public enum BTNodeStatus { Success, Failure, Running }
-public enum BTNodeType { Sequence, Selector, Action }
-public enum BTActionType { Wait, MoveTo, Attack, Patrol }
-
-[MemoryPackable]
-public partial struct BehaviorTreeComponent
-{
-    public AIState State { get; set; }
-    public string BehaviorId { get; set; }
-    public Vector3 TargetPosition { get; set; }
-    public int TargetEntityId { get; set; }
-    public float WaitTimer { get; set; }
-
-    public BehaviorTreeComponent()
-    {
-        State = AIState.Idle;
-        BehaviorId = "";
-        TargetPosition = Vector3.Zero;
-        TargetEntityId = -1;
-        WaitTimer = 0;
-    }
-}
 public enum WeatherType { Clear, Rain, Snow, Storm }
 public enum AcousticEnvironmentType { Atmospheric, Vacuum, Underwater, Digital, LargeOpen, SmallTight }
 public enum ColliderShape { Box, Sphere, Cylinder, Cone, Polygon } 
@@ -60,8 +37,6 @@ public partial struct PlayerComponent
 
 [MemoryPackable]
 public partial struct NameComponent { public string Name { get; set; } = ""; public NameComponent() { } }
-[MemoryPackable]
-public partial struct DescriptionComponent { public string Description { get; set; } = ""; public DescriptionComponent() { } }
 
 [MemoryPackable]
 public partial struct ZoneComponent 
@@ -120,9 +95,6 @@ public partial struct IdentityComponent
 
     public IdentityComponent() { }
 }
-
-[MemoryPackable]
-public partial struct DirtyComponent { public DirtyComponent() { } }
 
 [MemoryPackable]
 public partial struct MaterialComponent
@@ -322,16 +294,6 @@ public partial struct AcousticComponent
 }
 
 [MemoryPackable]
-public partial struct AcousticEnvironmentComponent
-{
-    public string ReverbType { get; set; } = "City";
-    public float AirAbsorption { get; set; } = 0.1f;
-    public string BackgroundAmbientLoop { get; set; } = "";
-    public int Priority { get; set; } = 0;
-    public AcousticEnvironmentComponent() { }
-}
-
-[MemoryPackable]
 public partial struct PhysicsPropertyComponent
 {
     public float Mass { get; set; }
@@ -374,9 +336,6 @@ public partial struct VehicleComponent
 
 [MemoryPackable]
 public partial struct Velocity { public Vector3 Linear { get; set; } public Velocity() { } }
-
-[MemoryPackable]
-public partial struct BeaconComponent { public float Frequency { get; set; } public float Interval { get; set; } public float LastPulseTime { get; set; } public BeaconComponent() { } }
 
 /// <summary>
 /// What a player has slung on them rather than in their hands.

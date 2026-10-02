@@ -53,41 +53,6 @@ public partial class SparseAcousticOctree
     public float Size { get => _size; set => _size = value; }
     public float MinVoxel { get => _minVoxel; set => _minVoxel = value; }
 
-    public void SetRegion(Vector3 pos, int regionId)
-    {
-        lock (_treeLock) SetRegionRecursive(_root, _min, _size, pos, regionId);
-    }
-
-    private void SetRegionRecursive(OctreeNode node, Vector3 nodeMin, float nodeSize, Vector3 targetPos, int regionId)
-    {
-        if (nodeSize <= _minVoxel)
-        {
-            node.RegionId = regionId;
-            node.Children = null;
-            return;
-        }
-
-        if (node.IsLeaf)
-        {
-            if (node.RegionId == regionId) return; // Already set
-            node.Children = new OctreeNode[8];
-            for (int i = 0; i < 8; i++) node.Children[i] = new OctreeNode { RegionId = node.RegionId };
-        }
-
-        float halfSize = nodeSize / 2f;
-        int index = 0;
-        Vector3 childMin = nodeMin;
-
-        if (targetPos.X >= nodeMin.X + halfSize) { index |= 1; childMin.X += halfSize; }
-        if (targetPos.Y >= nodeMin.Y + halfSize) { index |= 2; childMin.Y += halfSize; }
-        if (targetPos.Z >= nodeMin.Z + halfSize) { index |= 4; childMin.Z += halfSize; }
-
-        SetRegionRecursive(node.Children![index], childMin, halfSize, targetPos, regionId);
-        
-        // Post-process: If all 8 children are the same, collapse them
-        TryCollapse(node);
-    }
-
     public void SetRegionOBB(Vector3 center, Vector3 size, Quaternion rotation, int regionId)
     {
         lock (_treeLock) SetRegionOBBRecursive(_root, _min, _size, center, size, rotation, regionId);

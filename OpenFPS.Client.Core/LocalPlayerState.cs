@@ -53,7 +53,6 @@ public class LocalPlayerState
     /// </summary>
     public float EyeHeight => IsRiding ? 1.0f : 1.7f;
     public int Health { get; set; } = 100;
-    public int MaxHealth { get; set; } = 100;
     public string CurrentMaterial { get; set; } = "Generic";
     public string CurrentVariant { get; set; } = "0";
     public const string UnknownArea = "Unknown Area";
@@ -68,15 +67,9 @@ public class LocalPlayerState
     public bool IsIndoor { get; set; }
     public Vector3 RoomSize { get; set; }
     public Vector3 RoomCenter { get; set; }
-    public Quaternion RoomRotation { get; set; } = Quaternion.Identity;
-    public float ReverbTimeScale { get; set; } = 1.0f;
-    public int[] RoomMaterials { get; set; } = new int[6];
-    public string CurrentMapId { get; set; } = "default";
-    public string CurrentMapChecksum { get; set; } = "";
     public Vector3 MapMin { get; set; } = new Vector3(-50, 0, -50);
     public Vector3 MapMax { get; set; } = new Vector3(50, 10, 50);
     public Vector3 MapSize { get; set; } = new Vector3(100, 100, 100);
-    public float MinimumY { get; set; } = -10.0f;
     public float ShelterFactor { get; set; } = 0.0f;
 
     public float Temperature { get; set; } = 20.0f;
