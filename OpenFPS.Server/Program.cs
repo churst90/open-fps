@@ -233,7 +233,6 @@ public class GameServer
         // These register their handlers with the dispatcher, which is what keeps them alive.
         _ = new DiscoveryService(_dispatcher, _sessions, _maps);
         _ = new SocialService(_dispatcher, _sessions, _friends);
-        _ = new MapAuthorityService(_dispatcher);
         
         RegisterHandlers();
 
@@ -444,9 +443,8 @@ public class GameServer
                         grid.AddOverlapping(t.Position, c.Size, t.Rotation, e, false);
                     });
 
-                    // 4. Update Simulation (Movement/AI)
+                    // 4. Update Simulation (Movement)
                     MovementSystem.Update(world, entry.Value.data.WalkMin, entry.Value.data.WalkMax, grid, lookup, _sessions, _maps, dt);
-                    AISystem.Update(world, lookup, dt);
                     _vehicles.Update(entry.Key, world, dt);
                     _rail.Update(entry.Key, world, dt);
                     _crossings.Update(entry.Key, world, dt);

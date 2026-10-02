@@ -31,7 +31,7 @@ namespace OpenFPS.Common.Networking;
 [MemoryPackUnion(22, typeof(PlayerListResponse))]
 [MemoryPackUnion(23, typeof(FriendListRequest))]
 [MemoryPackUnion(24, typeof(FriendListResponse))]
-[MemoryPackUnion(25, typeof(MapPublishRequest))]
+// 25 was MapPublishRequest, which no client ever sent. Do not reuse the number.
 [MemoryPackUnion(26, typeof(EntityRemoved))]
 [MemoryPackUnion(27, typeof(WorldAudioEvent))]
 [MemoryPackUnion(28, typeof(MapListRequest))]
@@ -116,14 +116,6 @@ public partial class MapListResponse : IMessage
     public MapListScope Scope;
     public MapSummary[] Maps = Array.Empty<MapSummary>();
     public MapListResponse() { }
-}
-
-[MemoryPackable]
-public partial class MapPublishRequest : IMessage
-{
-    public string MapName = "";
-    public bool IsPublic;
-    public MapPublishRequest() { }
 }
 
 [MemoryPackable]

@@ -7,29 +7,6 @@ namespace OpenFPS.Common.Components;
 
 public enum UserRole { Player, Dev, Admin }
 public enum EntityType { None, Player, NPC, Beacon, StaticObject, Item, Projectile, Trigger }
-public enum AIState { Idle, Wander, Chase, Attack }
-public enum BTNodeStatus { Success, Failure, Running }
-public enum BTNodeType { Sequence, Selector, Action }
-public enum BTActionType { Wait, MoveTo, Attack, Patrol }
-
-[MemoryPackable]
-public partial struct BehaviorTreeComponent
-{
-    public AIState State { get; set; }
-    public string BehaviorId { get; set; }
-    public Vector3 TargetPosition { get; set; }
-    public int TargetEntityId { get; set; }
-    public float WaitTimer { get; set; }
-
-    public BehaviorTreeComponent()
-    {
-        State = AIState.Idle;
-        BehaviorId = "";
-        TargetPosition = Vector3.Zero;
-        TargetEntityId = -1;
-        WaitTimer = 0;
-    }
-}
 public enum WeatherType { Clear, Rain, Snow, Storm }
 public enum AcousticEnvironmentType { Atmospheric, Vacuum, Underwater, Digital, LargeOpen, SmallTight }
 public enum ColliderShape { Box, Sphere, Cylinder, Cone, Polygon } 
