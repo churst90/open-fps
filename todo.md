@@ -97,9 +97,9 @@ Suggested order. Research and file references for most of these: [docs/RESEARCH_
   `Season`, `RegionComponent.Environment`.
 
 **Left from the 2026-10-01 mutation triage** ([docs/MUTATION_2026-10-01.md](docs/MUTATION_2026-10-01.md))
-- `CrosswalkTests.Walkers_wait_for_a_gap…` fails on every run (the simulation is deterministic).
-  "Parcel van 1" at 0.5 m/s drives over walkers on Dock Street. Suspect: `GapToCross` treats any car
-  under 0.5 m/s as standing back, so walkers step out in front of a creeping van.
+- A car stopped for a crossing on a turn (30-45° to the road) can have a front corner up to 0.36 m
+  inside the walkers' strip. The stand point is measured along the driving line from the centre.
+  Work each stop out from the body's corners when the crossings are built.
 - A car the deadlock breaker lets go creeps at about 0.3 m/s for 6-9 s before it enters.
 - When the smoothed lap runs ahead of a car, a car in the middle of a junction can count as already
   on the next lane, and so not "inside".
@@ -417,5 +417,5 @@ Any change to which cars drive reshuffles the city's traffic, and two tests fail
   side by side at a junction entry (the test exempts side by side only from 2 m).
 Both passed on the mix before the four loud cars went in; neither involves those cars.
 2026-10-02: the junction test passes; the deadlock breaker could release several cars at once, now
-fixed. The crosswalk test fails on every run (see section 0). Each rule now also has a fixed scene of
+fixed. The crosswalk test failed on every run; three faults fixed the same day (changes.md). Each rule now also has a fixed scene of
 its own in `TrafficRuleTests`, so these two no longer guard the rules alone.

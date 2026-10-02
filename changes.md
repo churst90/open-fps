@@ -38,6 +38,10 @@ Recent work, newest first. `git log` has the rest.
   breaker). Two faults it found are fixed:
   - a driver giving way reached the line at up to 10.9 m/s instead of its looking speed;
   - the deadlock breaker let every waiting car go at once, and they met in the middle.
+- Walkers were driven through at crossings. Three faults, each fixed with a scene test:
+  - a car that had started stopping for walkers gave up when it overran its mark;
+  - a car stopped for the first crossing in its list, not the nearest;
+  - a walker timed a vehicle by its middle, so stepped out in front of a bus nosing up to the strip.
 - Map data with a NaN position, or two lanes a hair off parallel, is reported instead of looping
   forever or allocating gigabytes.
 - Old code out: the JSON user store, the unused AI state machine, the map publish stub, beacon data
