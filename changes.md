@@ -47,6 +47,28 @@ Recent work, newest first. `git log` has the rest.
 - Old code out: the JSON user store, the unused AI state machine, the map publish stub, beacon data
   in every entity state, `PlayerJoined` and `CollisionEvent` messages, four unused components, about
   400 lines of uncalled methods, and the BepuPhysics package.
+- More old code out (about 8,000 lines with the docs):
+  - the weapons runtime (`WeaponMechanics`, `ShotResolver`), the recorded-blast path
+    (`CompositeBlast`, `RecordedBlend`, `FiringTakeIndex`) and the weapon fields only they read
+    (magazines, handling times, damage, sound folders). The game fires `WeaponSynth.MuzzleBlast`.
+  - `PoliceSirenGenerator` (the siren is `SirenSpec`; its wav stays).
+  - the tail A/B switches `OPENFPS_TAIL=full`, `OPENFPS_TAIL_SDM`, `OPENFPS_TAIL_PARAMETRIC`,
+    `OPENFPS_TAIL_AMBISONIC` and `OPENFPS_DIFFUSE_TAIL`, with the parametric tail and the ambisonic
+    diffuse tail they selected. The default tail is unchanged.
+  - `SpatialEmitter.EnableReverb`, which nothing read. Direct sounds send to the reverb and
+    reflections do not, as before.
+  - `WorldStateUpdate.Season` and `RegionComponent.Environment` (and the prefab field `EnvType`),
+    which nothing read.
+  - lab spikes and flags: the Steam Audio migration spikes, `BattleSpike`, `GunshotSpike`,
+    `AmbientBedSpike`, `EarTest`, `BoundarySpike`, `StreetSceneSpike`, `GripSpike`, and 39 flags in
+    all. `AudioLab --help` lists every instrument left. The lab finds the repository one way
+    (`LabPaths`).
+  - tools: `sabotage-rooms.py`, the footstep synthesis scripts, the first car door fit.
+  - docs: STEAM_AUDIO_MIGRATION, CROSS_PLATFORM_PLAN, ROADMAP, NEXT_CLEANSING_PASS, NEXT_THE_CITY,
+    VOICES_MACHINES_AND_THE_CITY, NEXT_AFTER_THE_TAIL.
+- Both client heads log why they stopped through one helper (`ProcessLifeLog`).
+- Dated comments in `ClientGameSession`, `WorldAudioPlayer` and `AsyncAcousticWorker` now say what
+  the code does.
 - `OpenFPS.Common` changed: the Windows client needs a new build, and the server needs a restart.
 
 ## 2026-10-01

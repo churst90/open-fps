@@ -82,10 +82,10 @@ reverb that comes from the room's actual size and materials.
   Audio: FMOD Core and Steam Audio (phonon). UI: GTK 4 (GirCore).
 - Projects: `OpenFPS.Common` (shared simulation, acoustics and sound models), `OpenFPS.Server`,
   `OpenFPS.Client.Core` (client logic and the audio engine), `OpenFPS.Client.Gtk` (Linux client),
-  `OpenFPS.Client` (Windows client), `OpenFPS.AudioLab` (measurement and rendering tools),
-  `OpenFPS.Tests`.
+  `OpenFPS.Client` (Windows client), `OpenFPS.AudioLab` (measurement and rendering tools; `--help`
+  lists them), `OpenFPS.Tests`.
 - Build with `--artifacts-path` pointing off the repository's volume (see the run scripts). Do not
   use `dotnet run`: it writes `obj/` and `bin/` into the repository.
-- Tests: `dotnet test OpenFPS.Tests` (about 18 minutes, about 940 tests).
+- Tests: `dotnet test OpenFPS.Tests` (about 35 minutes, about 1,670 tests).
 - Map and prefab authoring: [docs/AUTHORING.md](docs/AUTHORING.md).
 - Planned work: [todo.md](todo.md). Recent changes: [changes.md](changes.md).

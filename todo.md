@@ -81,22 +81,17 @@ Suggested order. Research and file references for most of these: [docs/RESEARCH_
 - wind and temperature against height;
 - turbulence.
 
-**Old code** (the rest was removed 2026-10-02). Cody, 2026-10-02: anything not used by the game or a
-live instrument, or no longer applicable, is removed. Keep `MapManifest.Checksum` for map caching and
-the police siren wav.
-- The weapons runtime (`WeaponMechanics`, `ShotResolver`) is used only by the lab and tests.
-- `PoliceSirenGenerator`, superseded by `SirenSpec`; keep its wav.
-- `HeadShadow` and `Spectrum` are used only by the lab.
-- A/B switches for settled tails: `OPENFPS_TAIL_PARAMETRIC`, `_AMBISONIC`, `DIFFUSE_TAIL`, `TAIL_SDM`,
-  `OPENFPS_TAIL=full`.
-- The Steam Audio migration spikes (about 1,300 lines), `EarTest`, `AmbientBedSpike`, `GunshotSpike`,
-  and about 20 undocumented lab flags.
-- `tools/`: `sabotage-rooms.py`, the footstep synth scripts, `cut_calls.py`,
-  `gen_announcements.py`, old car door fits.
-- Stale docs: STEAM_AUDIO_MIGRATION, CROSS_PLATFORM_PLAN, ROADMAP, NEXT_CLEANSING_PASS,
-  NEXT_THE_CITY, VOICES_MACHINES_AND_THE_CITY, NEXT_AFTER_THE_TAIL.
-- Never-read fields still on the wire: `MapManifest.Checksum` (keep it if maps get cached),
-  `Season`, `RegionComponent.Environment`.
+**Old code** (removed 2026-10-02, see changes.md). Cody, 2026-10-02: anything not used by the game
+or a live instrument, or no longer applicable, is removed. Kept on purpose:
+- `MapManifest.Checksum`: for map caching.
+- `HeadShadow` and `Spectrum`: the lab's `--crossing`, `--train`, `--applause` and `--signals` and
+  four test suites measure with them.
+- `tools/cut_calls.py` and `tools/gen_announcements.py`: they regenerate the bird calls and the
+  speedway's PA announcement.
+- Cody to decide: `WeaponSynth.SupersonicCrack` and `MechanicalAction` (with
+  `WeaponDefinition.Mechanical*`) are tested but the game plays neither; a shot is its report only.
+- Cody to decide: the driving aid tones and the lane ticks were marked dry, but the flag was never
+  read, so they send to the reverb like every direct sound. Unchanged.
 
 **Left from the 2026-10-01 mutation triage** ([docs/MUTATION_2026-10-01.md](docs/MUTATION_2026-10-01.md))
 - A car stopped for a crossing on a turn (30-45° to the road) can have a front corner up to 0.36 m
@@ -170,13 +165,7 @@ Results: [docs/MUTATION_2026-09-24.md](docs/MUTATION_2026-09-24.md),
 - Client (`VoiceManager`, `VehicleShadow`, `BeaconAids`, `BirdLife`): 39.2%, survivors not yet done.
 
 ### 5. Cleansing, what is left
-Done 2026-09-30 (see changes.md). Left:
-- The two client heads' startup handlers are near copies; about 25 lab spikes each find ASSETS
-  their own way.
-- `WeaponSynth.CompositeBlast`, `RecordedBlend` and `FiringTakeIndex` are used only by `BattleSpike`;
-  the game plays no recorded gunfire.
-- `ClientGameSession.cs`, `WorldAudioPlayer` and `AsyncAcousticWorker` still have dated comments.
-- The full test suite takes about 40 minutes for 1,415 tests; the readme says 18 minutes and 940.
+Done 2026-10-02 (see changes.md). Nothing left.
 
 ### 6. Acoustics still open
 - The tail and the copies sit at -6 by ear (0 is physical). Cody is happy with that.
