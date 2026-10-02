@@ -157,7 +157,7 @@ ticks: NPC vehicles, signals, stop signs, pedestrian crossings, parked cars. Eac
 separate system reading the same road data, which is how the level crossing already works — it reads
 the tracks and writes to the road, and nothing else has to know about it.
 
-`docs/NEXT_THE_CITY.md` already names "roads as data + a lane follower" as the largest single piece
+The city plan already named "roads as data + a lane follower" as the largest single piece
 of the city plan. This section is the design for it.
 
 ### Placing things

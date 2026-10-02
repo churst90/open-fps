@@ -11,7 +11,7 @@ the whole of `ASSETS/SOUNDS/FOOTSTEPS`, and the old bank — forty folders, most
 three formats, with `ingest_*`, `peaks/` and bare numbers side by side and nothing anywhere saying
 where any of it came from — is gone.
 
-**The decision the plan was holding open (`docs/NEXT_AFTER_THE_TAIL.md` §3) is settled by
+**The decision the plan was holding open (footsteps from the model, or from the bank) is settled by
 measurement, not by preference.** `--footsteps compare=<dir> surface=<material>` puts the real steps
 and the synthesised ones side by side in bands:
 

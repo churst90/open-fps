@@ -169,8 +169,7 @@ public class EnclosureTests
     // 3.2 x 2.4 x 4.4 — and the reverb send goes from 8% in the street to 153% against the glass,
     // which is a cathedral opening up as you step under a bus shelter.
     //
-    // Three fixes were tried and all three reverted (see docs/NEXT_AFTER_THE_TAIL.md section 4),
-    // because every one of them keyed the escape on a DISTANCE and a distance cannot tell the far
+    // Three fixes were tried and all three reverted, because every one of them keyed the escape on a DISTANCE and a distance cannot tell the far
     // wall of a flat garage from a building across a street. These two tests are the pair that any
     // fourth attempt has to satisfy: the shelter must come down, and the garage must not move.
     // ------------------------------------------------------------------------------------------

@@ -1,6 +1,6 @@
 # Mowers and air conditioners, from the mechanism (2026-09-19)
 
-Two of the things `docs/NEXT_THE_CITY.md` says a city needs and the engine did not have: *"crowds,
+Two of the things the city plan said a city needs and the engine did not have: *"crowds,
 air conditioners, lawn mowers"*. Neither needed a new kind of sound. A mower is an engine under a
 governor with a blade in a pan; a condenser unit is a fan and a compressor in a box. Everything they
 are made of already existed for cars, aircraft and trains — what was missing was the combination, a
