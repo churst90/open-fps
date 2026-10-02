@@ -451,14 +451,17 @@ public sealed record EngineProfile
     // ── Rotating assembly and the way it is driven ──────────────────────────────────────────────
     public required float IdleRpm { get; init; }
     public required float RedlineRpm { get; init; }
-    public float CrankingRpm { get; init; } = 250f;
+    /// <summary>The speed the starter turns it at, rpm: 150-250 for a diesel, 200-300 for a petrol
+    /// engine (Pearson, Diesel Engine Starting Systems); six recorded starts beat at 150-225.</summary>
+    public float CrankingRpm { get; init; } = 200f;
     /// <summary>
     /// Crank revolutions the starter turns before the first cylinder fires. An engine computer
     /// fuels and sparks nothing until it has found the crank and the cam — up to a whole cycle, two
     /// revolutions — and injects on the next intake stroke after that. A common-rail diesel must
     /// also raise its rail to injection pressure. Without it the synthesis fires on the first
     /// compression at cranking speed and catches in 50 ms, too fast to hear a car start. NaN takes the default for the fuel: three for petrol, four for diesel, which
-    /// at the declared cranking speeds is about 0.7 s for a car and two seconds for a bus.
+    /// at the declared cranking speeds is about 0.9 s for a car and two seconds for a bus (a
+    /// port-injected engine starts in 0.66-0.95 s, US5088465).
     /// </summary>
     public float RevolutionsBeforeFiring { get; init; } = float.NaN;
     public float FiringAfterRevolutions => float.IsNaN(RevolutionsBeforeFiring)

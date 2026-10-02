@@ -20,9 +20,11 @@ public class StarterProbe
     const int Rate = 44100, Block = 441;
 
     public static string Split = "";
-    static (List<float> Wav, double CrankBand, double IdleBand, double CrankAll, float Rpm) Render(VehicleProfile v, bool inside, float corner = 150f)
+    static double LoadSum, RpmSum; static int LoadN;
+    static (List<float> Wav, double CrankBand, double IdleBand, double CrankAll, float Rpm) Render(VehicleProfile v, bool inside, float corner = 150f, float starter = 1f)
     {
         var voice = new EngineVoiceState(v, Rate, 3) { TargetSpeed = 0f, Running = false, Interior = inside, CompensateLevel = true, StarterPathCornerHz = corner };
+        voice.Engine.StarterMix = starter;
         voice.PlaceAtSpeed(0f); voice.Revive();
         var buf = new float[Block];
         for (int b = 0; b < 300; b++) voice.Render(buf);
@@ -42,7 +44,7 @@ public class StarterProbe
                 if (cr) { cb += lp * (double)lp; ca += x * (double)x; nc++; }
                 if (b >= 300) { ib += lp * (double)lp; ni++; }
             }
-            if (cr) rpm = voice.Engine.Rpm;
+            if (cr) { rpm = voice.Engine.Rpm; LoadSum += voice.Engine.StarterLoadNow; RpmSum += voice.Engine.Rpm; LoadN++; }
         }
         double Db(double e, int n) => 10 * Math.Log10(e / Math.Max(1, n) + 1e-30);
         // Bands of the whole render: crank 0..0.6 s and idle 3..4 s.
@@ -80,7 +82,9 @@ public class StarterProbe
         foreach (var key in new[] { "i4_economy", "i4_midsize", "v8_muscle", "pickup_v8", "police_interceptor", "transit_bus" })
         {
             var v = VehicleProfile.ByName(key);
+            LoadSum = RpmSum = 0; LoadN = 0;
             var kerb = Render(v, false);
+            _out.WriteLine($"{key,-20} cranking mean load {LoadSum / Math.Max(1, LoadN):F2}, mean {RpmSum / Math.Max(1, LoadN):F0} rpm (declared {v.Engine.CrankingRpm})");
             float peak = 1e-9f; foreach (float x in kerb.Wav) peak = MathF.Max(peak, MathF.Abs(x));
             float gain = 0.5f / peak;
             var probeVoice = new EngineVoiceState(v, Rate, 3);
@@ -88,6 +92,11 @@ public class StarterProbe
             _out.WriteLine($"{key,-20} full scale {fs:F1} dB SPL, declared {v.SourceLevelDb:F1}, {v.Engine.DisplacementLitres:F1} L, exhaust {v.Engine.Exhaust?.GetType().Name}");
             _out.WriteLine($"{key,-20} kerb        crank all {kerb.CrankAll,6:F1} band {kerb.CrankBand,6:F1}  idle band {kerb.IdleBand,6:F1}   {Split}");
             if (dir.Length > 0) Write(Path.Combine(dir, $"{key}-kerb.wav"), kerb.Wav, gain);
+            if (dir.Length > 0)
+            {
+                Write(Path.Combine(dir, $"{key}-kerb-nostarter.wav"), Render(v, false, 150f, 0f).Wav, gain);
+                Write(Path.Combine(dir, $"{key}-seat-150hz-nostarter.wav"), Render(v, true, 150f, 0f).Wav, gain);
+            }
             foreach (float corner in new[] { 150f, 300f, 600f })
             {
                 var seat = Render(v, true, corner);

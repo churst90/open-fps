@@ -688,6 +688,9 @@ public sealed class EngineVoiceState : IRenderedVoice
     private readonly BodyResonator _cabin;
     private readonly float _panelCorner, _sealLeak, _windPaAt110, _starterPath;
     private float _starterLp1, _starterLp2;
+    /// <summary>What of the starter reaches the kerb past the sill and the wheels, as a pressure
+    /// fraction: about six decibels of shielding.</summary>
+    private const float StarterUnderbody = 0.5f;
     /// <summary>Where the starter's path through the mounts and the floor loses its top, Hz. The
     /// mounts pass the gear mesh's low partials and the floor's damping mat soaks up the rest: from
     /// the seat a starter is a muffled whirr, not the buzz it is at the bellhousing. Writable so an
@@ -1118,7 +1121,11 @@ public sealed class EngineVoiceState : IRenderedVoice
             // or mid-ship — so it goes out of the front tap, not the back with the tailpipe. On the
             // school bus the block is 97.7 dB against an 83 dB silenced pipe, so out of the back an
             // idling bus would be one sound at its tail. Once far enough to be one voice, nothing changes.
-            float bay = _bayLeak > 0f ? (Engine.Block + FrontMix * _bayIntake.Process(Engine.Intake)) * _bayLeak : 0f;
+            float bay = _bayLeak > 0f ? (Engine.Block - Engine.StarterOut + FrontMix * _bayIntake.Process(Engine.Intake)) * _bayLeak : 0f;
+            // The starter is not in the bay: it hangs under the car on the bellhousing, behind the
+            // sill and the wheels but in no enclosure. Through the bay leak it was 16 dB down and a
+            // big V8's start could not be heard from the kerb at all.
+            bay += Engine.StarterOut * MathF.Max(_bayLeak, StarterUnderbody);
             if (_engineAtRear) pa += bay; else front += bay;
             // The air and the door beeper are their own sources at their own levels, each at its own
             // end of the vehicle: the door valve, the kneeling valve and the beeper at the front door,
