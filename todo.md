@@ -1,11 +1,121 @@
 # To do
 
 Planned work in priority order. Finished work is in [changes.md](changes.md) and `git log`.
-Updated 2026-09-30.
+Updated 2026-10-02.
 
 ## Now
 
 In this order.
+
+### 0. Cody's list, 2026-10-02
+Suggested order. Research and file references for most of these: [docs/RESEARCH_2026-10-02.md](docs/RESEARCH_2026-10-02.md).
+
+**Roles and permissions** (logins and staff gates are done; see docs/SERVER_SECURITY.md)
+- `/spawn`: devs and admins anywhere; map creators on their own maps. It should spawn entities and
+  NPCs, not only a box or cylinder.
+- `/tp` becomes a teleporter: an item in your inventory that moves you between maps or places.
+  Without one, `/tp` does nothing.
+- `/move` is the general move command. Admins move anyone; players move only themselves, even on
+  their own maps.
+- `/profile`: no location, only map name, role, status, real name. Done 2026-10-02. Level and stats
+  wait until they exist.
+- A spawned cylinder on the city could not be found. Check:
+  - it appears 3 m ahead at your body height;
+  - an unknown material name falls back silently to Generic;
+  - it makes no sound of its own;
+  - runtime objects are not added to the Steam Audio scene (only doors rebuild it);
+  - `/scan` may not report "Custom" objects.
+  Then document how to place a concrete wall, a cylinder and a prefab (`/place <prefab>`, `/spawn`).
+
+**Client**
+- Speak without prefixes. List with file:line in the research doc. Drop:
+  - "Facing:", "Area:", "Health:";
+  - the leftover "Interaction '…' received.";
+  - "Server: " before the message of the day and before arrived/left lines.
+- Disconnect: say so, retry connect and re-login every 3 s for about a minute with a soft tick, then
+  return to the main menu. Today the game window stays up with voices running. About 250 lines.
+- Escape: Keep playing / Main menu / Quit. The server needs a logout handler; the Windows client
+  sends one that nothing handles.
+- Loading: a rising tone with the progress that already exists. Fade the world in over about 1 s at
+  spawn, and out over 0.5 s on quit or return to menu. The VPS wait is 6,408 entity definitions
+  sent one message each; batch them (about 256 a message), or cache maps by checksum.
+- Create account in the GTK client, as on Windows (about 50 lines, no protocol change).
+- A draw key (Shift+R?). Today only `/draw`.
+
+**Sound**
+- Beacons:
+  - a rendered gain, +4 dB to start, set with `/beacons louder|quieter`;
+  - door range 12 m → 6 m with a 2 m fade at the edge;
+  - little or no reverb send;
+  - lift beacons up to 6 dB when a louder sound is near.
+- Car starter is not heard. Likely the level: the block reaches the cab about 30 dB down, the starter
+  cranks for 0.34-0.53 s against 0.9 s on the bench. Confirm from the client log, then give the
+  starter its own path (about -15 to -20 dB into the cab) and hold the key 0.6-0.8 s.
+- Open sides of buildings:
+  - every side that is not closed in becomes an opening, and a door is an opening with a leaf;
+  - composites' open faces count as walls today;
+  - only one opening is allowed per pair of rooms.
+- The city does not wash into the lobby through an open door. In order:
+  1. send to the reverb before route filtering and occlusion;
+  2. weight each room's reverb by the routes through openings;
+  3. trace the outdoor reverb from just outside the opening.
+- Wind adds 0.1 × wind to the listener's velocity, so gusts bend every pitch. Remove it.
+- Echoes use a fixed 343 m/s while Doppler uses the temperature's speed of sound. Use one.
+
+**Gunfire and new synthesis** (see the research doc)
+1. A .357 revolver from the NIJ Ruger .357 set. The inbox video's shots clip and are unusable.
+   Demo to judge: `inbox/gunfire-357-2026-10-02/demo/`.
+   - Also move the lab-fitted pistol values into the game (positive phase, high-pass).
+   - The game's Glock is 6-12 dB heavy at 125-250 Hz.
+   - An unknown cartridge falls back to 159 dB without a warning.
+2. Rain on surfaces, from materials and geometry.
+3. Wind at the ear and in foliage.
+4. Wet roads: tyres +4-7 dB above 2 kHz from a wetness state.
+5. Streams and surf, once maps have water.
+6. Explosions.
+7. Refraction past 150 m.
+
+**Weather:** pressure is not worth modelling. Worth adding:
+- rain rate in mm/h;
+- surface wetness that lasts after rain;
+- wind and temperature against height;
+- turbulence.
+
+**Old code, to ask Cody** (the rest was removed 2026-10-02):
+- The weapons runtime (`WeaponMechanics`, `ShotResolver`) is used only by the lab and tests.
+- `PoliceSirenGenerator`, superseded by `SirenSpec`; keep its wav.
+- `HeadShadow` and `Spectrum` are used only by the lab.
+- A/B switches for settled tails: `OPENFPS_TAIL_PARAMETRIC`, `_AMBISONIC`, `DIFFUSE_TAIL`, `TAIL_SDM`,
+  `OPENFPS_TAIL=full`.
+- The Steam Audio migration spikes (about 1,300 lines), `EarTest`, `AmbientBedSpike`, `GunshotSpike`,
+  and about 20 undocumented lab flags.
+- `tools/`: `sabotage-rooms.py`, the footstep synth scripts, `cut_calls.py`,
+  `gen_announcements.py`, old car door fits.
+- Stale docs: STEAM_AUDIO_MIGRATION, CROSS_PLATFORM_PLAN, ROADMAP, NEXT_CLEANSING_PASS,
+  NEXT_THE_CITY, VOICES_MACHINES_AND_THE_CITY, NEXT_AFTER_THE_TAIL.
+- Never-read fields still on the wire: `MapManifest.Checksum` (keep it if maps get cached),
+  `Season`, `RegionComponent.Environment`.
+
+**Left from the 2026-10-01 mutation triage** ([docs/MUTATION_2026-10-01.md](docs/MUTATION_2026-10-01.md))
+- `CrosswalkTests.Walkers_wait_for_a_gap…` fails on every run (the simulation is deterministic).
+  "Parcel van 1" at 0.5 m/s drives over walkers on Dock Street. Suspect: `GapToCross` treats any car
+  under 0.5 m/s as standing back, so walkers step out in front of a creeping van.
+- A car the deadlock breaker lets go creeps at about 0.3 m/s for 6-9 s before it enters.
+- When the smoothed lap runs ahead of a car, a car in the middle of a junction can count as already
+  on the next lane, and so not "inside".
+- Phone stories ("this morning", "eleven at night") have no time filter. Muttered remarks bypass
+  `AnyTime`.
+- A huge finite look turn drives yaw without bound; wrap it.
+- Test gaps still open:
+  - `/scan` output;
+  - door swing time and sound sets;
+  - composites walled solid, ghost collision, ungroup;
+  - parking door claims;
+  - your own car into a wall;
+  - pairs talking, reactions to shots and horns;
+  - crowd cooldown and radius;
+  - passenger view and velocity;
+  - the game clock at midnight.
 
 ### 1. Walls, what is left (the panel model went in 2026-09-30, unheard)
 - Listen: through a wall the lows and the rumble should come through and the top should not.
@@ -42,9 +152,18 @@ The car door (`CarDoor.cs`) is done and approved. House and steel doors still us
 - The knock (`DoorKnock`) may be about 20 dB short at 1-2 kHz against both knock recordings.
 
 ### 4. Mutation testing
-Results so far are in [docs/MUTATION_2026-09-24.md](docs/MUTATION_2026-09-24.md).
-- Running from 2026-09-30: the code changed since 2026-09-25 (acoustics, engine, roads), and the
-  whole server. Then kill the survivors: a test for each, or a note on why it is equivalent.
+Results: [docs/MUTATION_2026-09-24.md](docs/MUTATION_2026-09-24.md),
+[docs/MUTATION_2026-10-01.md](docs/MUTATION_2026-10-01.md).
+- Server, 2026-10-01: 53.67 %. Survivors triaged; seven bugs and the traffic rules fixed 2026-10-02.
+- Common, 2026-10-01: died at 81 % when one mutant grew a test host to 37 GB and froze the machine.
+  No per-mutant results. Client.Core never ran.
+- On hold (Cody, 2026-10-02). The harness in `~/.cache/openfps-stryker` now:
+  - caps each process at 8 GB of heap;
+  - runs a watchdog that kills the largest test host under 10 GB free;
+  - runs in sections (`section.sh server-people` and so on), each a few hours.
+  See its README. `emerge sys-apps/earlyoom` would add a system-wide guard.
+- When it resumes: Common in three sections, then Client.Core. Re-run server sections only for
+  files changed since (`--since`).
 - Shared maths: 74.6%, survivors done. Engine code: 93.7%, survivors done (`EngineMutationTests`).
 - Client (`VoiceManager`, `VehicleShadow`, `BeaconAids`, `BirdLife`): 39.2%, survivors not yet done.
 
@@ -271,7 +390,7 @@ Some may already be fixed; confirm before fixing again.
 - Windows client: saved servers, settings, F-key lists, and removing the global keyboard hook.
 - Saving player position, progress and world state.
 - A protocol version check on connect.
-- Player-owned maps (`MapPublishRequest` is a stub). Decided 2026-09-28: admins build anything;
+- Player-owned maps (the `MapPublishRequest` stub was removed 2026-10-02). Decided 2026-09-28: admins build anything;
   players make their own maps but cannot publish them; an owner can make others editors; a blank
   map is one slab of grass; placing by typed commands, relative or by coordinates. See
   docs/NEXT_CITY_10KM.md.
@@ -297,3 +416,6 @@ Any change to which cars drive reshuffles the city's traffic, and two tests fail
 - `CarFollowingTests.No_two_vehicles_meet_inside_a_junction`: two nearly stopped cars 1.9 m apart
   side by side at a junction entry (the test exempts side by side only from 2 m).
 Both passed on the mix before the four loud cars went in; neither involves those cars.
+2026-10-02: the junction test passes; the deadlock breaker could release several cars at once, now
+fixed. The crosswalk test fails on every run (see section 0). Each rule now also has a fixed scene of
+its own in `TrafficRuleTests`, so these two no longer guard the rules alone.
