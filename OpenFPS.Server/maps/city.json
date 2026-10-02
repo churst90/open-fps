@@ -66201,12 +66201,12 @@
    "EntityId": 4718,
    "PrefabId": "brick_floor",
    "Position": {
-    "X": -65.75,
+    "X": -76.375,
     "Y": 0.05,
     "Z": 190.0
    },
    "Scale": {
-    "X": 10.85,
+    "X": 8.725,
     "Y": 1.0,
     "Z": 8.4
    },
@@ -66311,43 +66311,15 @@
    }
   },
   {
-   "EntityId": 4726,
-   "PrefabId": "pillar_round",
-   "Position": {
-    "X": -32.0,
-    "Y": 2.5,
-    "Z": 151.35
-   },
-   "Scale": {
-    "X": 1.4,
-    "Y": 1.25,
-    "Z": 1.4
-   }
-  },
-  {
-   "EntityId": 4727,
-   "PrefabId": "pillar_round",
-   "Position": {
-    "X": -20.0,
-    "Y": 2.5,
-    "Z": 151.35
-   },
-   "Scale": {
-    "X": 1.4,
-    "Y": 1.25,
-    "Z": 1.4
-   }
-  },
-  {
    "EntityId": 4728,
    "PrefabId": "acoustic_region",
    "Position": {
-    "X": -65.75,
+    "X": -76.375,
     "Y": 3.0,
     "Z": 190.0
    },
    "Scale": {
-    "X": 10.85,
+    "X": 8.725,
     "Y": 1.2,
     "Z": 8.4
    },

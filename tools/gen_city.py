@@ -670,7 +670,9 @@ for shelter_z, shelter_x in ((-60.0, WALK), (86.0, -WALK)):
 # The one big hard open space downtown. Brick underfoot, a colonnade down one side and nothing over
 # it: a place with strong early reflections and almost no reverberant field, which is the pair a
 # street does not give you.
-PLZ_X0, PLZ_X1 = -120.0, -WALK - 2.0
+# It lies behind Brandt Court, which stands between it and Main Street: drawn to the building line it
+# ran through the tower, put a pillar in its stairwell and named the tower's wall gaps "Market Square".
+PLZ_X0, PLZ_X1 = -120.0, -WALK - BUILD_D - 2.0
 PLZ_Z0, PLZ_Z1 = 148.0, 232.0
 box("brick_floor", PLZ_X0, PLZ_X1, 0.0, 0.1, PLZ_Z0, PLZ_Z1, name="Market Square")
 for k in range(9):
