@@ -752,8 +752,24 @@ public sealed class OpeningRoutes
         {
             int[] ignoreA = k > 0 ? _openings[chain[k - 1].Opening].Contents : Array.Empty<int>();
             int[] ignoreB = k < n ? _openings[chain[k].Opening].Contents : Array.Empty<int>();
-            Vector3 from = k > 0 ? Face(_openings[chain[k - 1].Opening], x[k], x[k + 1]) : x[k];
-            Vector3 to = k < n ? Face(_openings[chain[k].Opening], x[k + 1], x[k]) : x[k + 1];
+            // Inside the opening's edges, not on them: a crossing hugs the edge it bends round, and that
+            // bend is the aperture's to charge (Aperture, below). A leg ending AT the jamb ends in the
+            // corner between the jamb and an open leaf hinged on it, with no way round the leaf.
+            Vector3 from = k > 0 ? Face(_openings[chain[k - 1].Opening], Inset(_openings[chain[k - 1].Opening], x[k]), x[k + 1]) : x[k];
+            Vector3 to = k < n ? Face(_openings[chain[k].Opening], Inset(_openings[chain[k].Opening], x[k + 1]), x[k]) : x[k + 1];
+            // Off the face, not on it. A leg ending ON the wall's surface touches the wall beside the
+            // doorway, and the clearance check pads every other box by a joint's width: every way round
+            // whatever stood in front of the door (its own leaf, swung open) was refused, and the leaf
+            // was charged as solid steel. A car down the street from an open front door came in at the
+            // shut-door level ("sound struggles through the door only when loud things pass").
+            Vector3 along = to - from;
+            float span = along.Length();
+            if (span > 4f * FaceClearance)
+            {
+                along /= span;
+                if (k > 0) from += along * FaceClearance;
+                if (k < n) to -= along * FaceClearance;
+            }
             legs.Add(Leg(k > 0 ? chain[k - 1].Opening : -1, from, k < n ? chain[k].Opening : -1, to, ignoreA, ignoreB));
         }
 
@@ -941,6 +957,22 @@ public sealed class OpeningRoutes
         _legCache[key] = gains;
         return gains;
     }
+
+    /// <summary>A point in an opening's plane held <see cref="EdgeClearance"/> inside its edges.</summary>
+    private static Vector3 Inset(Opening o, Vector3 p)
+    {
+        Vector3 d = p - o.Centre;
+        float n = Vector3.Dot(d, o.Normal), u = Vector3.Dot(d, o.Across), v = Vector3.Dot(d, o.Up);
+        float hu = MathF.Max(0f, o.HalfWidth - EdgeClearance), hv = MathF.Max(0f, o.HalfHeight - EdgeClearance);
+        return o.Centre + o.Normal * n + o.Across * Math.Clamp(u, -hu, hu) + o.Up * Math.Clamp(v, -hv, hv);
+    }
+
+    /// <summary>How far inside an opening's edges a leg is taken to end, metres.</summary>
+    private const float EdgeClearance = 0.15f;
+
+    /// <summary>How far off an opening's face a leg is taken to end, metres: past the joint padding of
+    /// <see cref="RouteJointMetres"/>, so the wall beside the doorway does not count as in the way.</summary>
+    private const float FaceClearance = 0.1f;
 
     /// <summary>The finest cell a leg is kept for, metres; coarser by powers of two with its length.</summary>
     private const float LegCellMetres = 0.25f;
