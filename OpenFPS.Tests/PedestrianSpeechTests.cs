@@ -310,6 +310,43 @@ public class PedestrianSpeechTests
         Assert.All(said.Where(x => x.Sound.SynthKey.Contains("/story_")), x => Assert.True(x.Sound.DecaySeconds > 15f));
     }
 
+    /// <summary>
+    /// Every call ends with a goodbye, and the next one waits. The ring-off used to come only if a
+    /// line happened to fall due in the last six seconds of the call; the gap to the next line is up
+    /// to ten seconds and more, so about three calls in ten ran past their end and stopped in
+    /// silence, and skipped the wait before the next call as well.
+    /// </summary>
+    [Fact]
+    public void Every_phone_call_ends_with_a_goodbye_and_the_next_one_waits()
+    {
+        // Linda has no recorded calls, no voicemail and no stories: every call she takes is an
+        // ordinary one, picked up with a hello and rung off with a goodbye.
+        var world = World.Create();
+        world.Create(new Transform { Position = Vector3.Zero, Rotation = Quaternion.Identity },
+                     new Velocity(), new Pedestrian { Voice = "linda" });
+        Player(world, new Vector3(0f, 0f, -20f));     // in earshot, behind them, so no hello to the player
+        Assert.Empty(Speech.CallsFor("linda"));
+
+        var ringOff = new HashSet<string>(StreetLines.RingOff);
+        var speech = new PedestrianSpeech(new Random(11));
+        var said = new List<(double At, string Line)>();
+        for (double t = 0; t < 6 * 3600; t += 0.05)
+            speech.Update("test", world, t, Noon, (_, _, s) =>
+                said.Add((t + s.DelaySeconds, s.SynthKey[(s.SynthKey.IndexOf('/') + 1)..])));
+
+        var answers = Enumerable.Range(0, said.Count).Where(i => said[i].Line.StartsWith("greet_")).ToList();
+        Assert.True(answers.Count >= 40, $"only {answers.Count} calls in six hours");
+        int silent = 0, early = 0;
+        foreach (int i in answers.Skip(1))
+        {
+            var before = said[i - 1];
+            if (!ringOff.Contains(before.Line)) silent++;
+            else if (said[i].At - before.At < 60) early++;
+        }
+        Assert.True(silent == 0, $"{silent} of {answers.Count - 1} calls ended without a goodbye");
+        Assert.True(early == 0, $"{early} calls started again within a minute of ringing off");
+    }
+
     [Fact]
     public void A_talker_is_duller_and_quieter_behind_than_in_front()
     {

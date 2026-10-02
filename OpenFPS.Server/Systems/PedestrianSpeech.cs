@@ -91,6 +91,9 @@ public sealed class PedestrianSpeech
         public double BusyUntil;
         public string LastLine = "";
         public double CallUntil = double.NegativeInfinity;
+        /// <summary>An ordinary call is open until its goodbye is said, whenever that falls. The
+        /// clock alone let a call whose next line fell due after CallUntil stop in silence.</summary>
+        public bool OnCall;
         public double NextCallCheck;
         public double NextPhoneLine;
         public bool ToldStory;
@@ -281,7 +284,7 @@ public sealed class PedestrianSpeech
         if (d > 8f) return;
         var enc = EncounterFor(mapId, p.Id, q.Id);
         bool free = now >= me.BusyUntil;
-        bool onPhone = now < me.CallUntil;
+        bool onPhone = OnPhone(me, now);
 
         if (d < BumpMetres && now - enc.LastBump > BumpAgainSeconds && free)
         {
@@ -357,7 +360,7 @@ public sealed class PedestrianSpeech
             me.NextPhoneLine = now + LengthOf(me.Voice, turn.Line) + Uniform(0.2, 0.6);
             return;
         }
-        if (now < me.CallUntil)
+        if (me.OnCall)
         {
             if (now < me.NextPhoneLine || now < me.BusyUntil) return;
             bool last = now + 6 > me.CallUntil;
@@ -377,8 +380,11 @@ public sealed class PedestrianSpeech
                         : _rng.NextDouble() < 0.55 ? Pick(me, StreetLines.Listening, "phone_listen")
                         : Pick(me, StreetLines.PhoneTalk(cond), "chatter");
             if (heard) Say(p, me, line, Speech.NormalDb, 0f, now, say);
-            if (last) { me.CallUntil = now; me.NextCallCheck = now + Uniform(60, 180); return; }
+            if (last) { me.OnCall = false; me.CallUntil = now; me.NextCallCheck = now + Uniform(60, 180); return; }
             me.NextPhoneLine = now + LengthOf(me.Voice, line) + Uniform(3, 10);
+            // A next line due after the call was meant to end is its goodbye, and the call lasts
+            // until then: everybody else goes on seeing somebody on the phone.
+            me.CallUntil = Math.Max(me.CallUntil, me.NextPhoneLine);
             return;
         }
         if (now < me.NextCallCheck || now < me.BusyUntil) return;
@@ -405,6 +411,7 @@ public sealed class PedestrianSpeech
             return;
         }
         me.Script = null;
+        me.OnCall = true;
         string hello = Pick(me, StreetLines.Answer, "phone_answer");
         if (heard) Say(p, me, hello, Speech.NormalDb, 0f, now, say);
         me.NextPhoneLine = now + LengthOf(me.Voice, hello) + Uniform(2, 5);
@@ -431,7 +438,7 @@ public sealed class PedestrianSpeech
         if (now < _nextTalk.GetValueOrDefault((mapId, pair))) return;
         if (Apart(x.At, y.At) > 3f || !players.Any(q => Apart(q.At, x.At) < HeardMetres)) return;
         var px = _people[(mapId, x.Id)]; var py = _people[(mapId, y.Id)];
-        if (now < px.BusyUntil || now < py.BusyUntil || now < px.CallUntil || now < py.CallUntil) return;
+        if (now < px.BusyUntil || now < py.BusyUntil || OnPhone(px, now) || OnPhone(py, now)) return;
         var talks = Speech.ConversationsBetween(x.Voice, y.Voice);
         if (talks.Count == 0) { _nextTalk[(mapId, pair)] = now + 600; return; }
         var talk = talks[_rng.Next(talks.Count)];
@@ -455,7 +462,7 @@ public sealed class PedestrianSpeech
                         List<(int Id, Vector3 At, float Speed)> players, double now, SpeechConditions cond,
                         Action<int, string, TransientSound> say)
     {
-        if (now < me.NextRemark || now < me.BusyUntil || now < me.CallUntil) return;
+        if (now < me.NextRemark || now < me.BusyUntil || OnPhone(me, now)) return;
         me.NextRemark = now + RemarkEverySeconds * (0.5 + _rng.NextDouble());
         if (!players.Any(q => Apart(q.At, p.At) < RemarkHeardMetres)) return;
         var cats = StreetLines.Remarks(cond).Where(c => Speech.LinesOf(me.Voice, c).Count > 0).ToList();
@@ -539,7 +546,7 @@ public sealed class PedestrianSpeech
         if (now < pa.BusyUntil || now < pb.BusyUntil) return;
         if (!InFront(a.At, a.Forward, b.At) || !InFront(b.At, b.Forward, a.At)) return;
         enc.LastMet = now;
-        if (now < pa.CallUntil || now < pb.CallUntil || _rng.NextDouble() >= StrangerGreetChance) return;
+        if (OnPhone(pa, now) || OnPhone(pb, now) || _rng.NextDouble() >= StrangerGreetChance) return;
 
         var (first, second) = StreetLines.Exchange(cond, _rng);
         string l1 = Pick(pa, first.Lines, first.Categories);
@@ -571,6 +578,8 @@ public sealed class PedestrianSpeech
             SynthKey = Speech.Key(me.Voice, line),
         });
     }
+
+    private static bool OnPhone(Person me, double now) => me.OnCall || now < me.CallUntil;
 
     private static float LengthOf(string voice, string line) => Speech.Find(voice, line)?.Seconds ?? 1f;
 
