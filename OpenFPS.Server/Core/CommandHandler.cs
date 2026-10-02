@@ -74,6 +74,10 @@ public class CommandHandler
 
     private void Execute(string commandName, string[] args, UserSession session, Action<IMessage> reply, bool isElevated)
     {
+        // Who may run what is in docs/SERVER_SECURITY.md; keep the table there in step with this.
+        // Elevated is Dev or Admin. The account and connection commands are Admin only: they show
+        // other people's addresses and change their accounts.
+        bool isAdmin = session.Role == UserRole.Admin;
         switch (commandName)
         {
             case "scan": HandleScan(session, reply); break;
@@ -289,6 +293,29 @@ public class CommandHandler
             case "realname":
                 HandleRealName(session, args, reply);
                 break;
+            // ── Administration ──────────────────────────────────────────────────────────────
+            case "sessions":
+                if (!isAdmin) { DenyCommand(reply); return; }
+                HandleSessions(reply);
+                break;
+            case "user":
+            case "account":
+                if (!isAdmin) { DenyCommand(reply); return; }
+                HandleUser(args, reply);
+                break;
+            case "throttled":
+            case "ratelimit":
+                if (!isAdmin) { DenyCommand(reply); return; }
+                HandleThrottled(reply);
+                break;
+            case "unlock":
+                if (!isAdmin) { DenyCommand(reply); return; }
+                HandleUnlock(args, reply);
+                break;
+            case "setrole":
+                if (!isAdmin) { DenyCommand(reply); return; }
+                HandleSetRole(session, args, reply);
+                break;
             case "join":
             case "travel":
                 HandleJoin(session, args, reply);
@@ -335,7 +362,7 @@ public class CommandHandler
 
     private void HandleSetAudioMode(UserSession session, string[] args, Action<IMessage> reply)
     {
-        if (args.Length < 1) { Say(reply, "Usage: /set_audio_mode [LoopOne|LoopFolder|OneShot|StateMachine]"); return; }
+        if (args.Length < 1) { Say(reply, $"Usage: /set_audio_mode [{string.Join("|", Enum.GetNames<PlaybackMode>())}]"); return; }
         if (!Enum.TryParse<PlaybackMode>(args[0], true, out var mode)) { Say(reply, $"Unknown playback mode '{args[0]}'."); return; }
         if (!TryGetBody(session, reply, out var world, out _, out var playerPos)) return;
 
@@ -1701,6 +1728,160 @@ public class CommandHandler
         });
         return best;
     }
+
+    // ── Administration ──────────────────────────────────────────────────────────────────────────
+    //
+    // What the server knows about connections and accounts, for whoever runs it. Every one of these is
+    // Admin only. They show remote addresses, which are personal data, and change other people's
+    // accounts. A developer builds the world; an administrator runs the server.
+
+    private static string When(DateTime? utc) => utc is { } t ? t.ToString("yyyy-MM-dd HH:mm") + " UTC" : "never";
+
+    /// <summary>"3 h 5 min", "12 min", "40 s".</summary>
+    public static string Span(TimeSpan span)
+    {
+        if (span < TimeSpan.Zero) span = TimeSpan.Zero;
+        if (span.TotalDays >= 1) return $"{(int)span.TotalDays} d {span.Hours} h";
+        if (span.TotalHours >= 1) return $"{(int)span.TotalHours} h {span.Minutes} min";
+        if (span.TotalMinutes >= 1) return $"{(int)span.TotalMinutes} min";
+        return $"{(int)span.TotalSeconds} s";
+    }
+
+    /// <summary>/sessions — everybody connected, and the connections that have not logged in.</summary>
+    private void HandleSessions(Action<IMessage> reply)
+    {
+        var now = DateTime.UtcNow;
+        var sessions = _sessions.GetAllSessions().OrderBy(s => s.Username, StringComparer.OrdinalIgnoreCase).ToList();
+        Say(reply, sessions.Count == 1 ? "1 session:" : $"{sessions.Count} sessions:");
+        foreach (var s in sessions)
+        {
+            int? ping = s.IsTextClient ? null : _server.PingOf(s.ConnectionId);
+            Say(reply, $"  {s.Username}, {RoleWord(s.Role)}, {(s.IsTextClient ? "MUD" : "UDP")} from {Address(s.RemoteAddress)}, "
+                     + $"on {s.CurrentMapId}{(s.Entity == Entity.Null ? ", not in the world yet" : "")}, "
+                     + $"logged in {When(s.LoggedInUtc)} ({Span(now - s.LoggedInUtc)} ago), "
+                     + $"{(s.Away ? "away" : $"idle {Span(now - s.LastActivityUtc)}")}"
+                     + (ping is { } p ? $", ping {p} ms" : "") + $", connection {s.ConnectionId}.");
+        }
+
+        var pending = _server.PendingConnections();
+        if (pending.Count > 0)
+        {
+            Say(reply, pending.Count == 1 ? "1 connection not logged in:" : $"{pending.Count} connections not logged in:");
+            foreach (var c in pending)
+                Say(reply, $"  {c.Transport} from {Address(c.Address)}, open {Span(now - c.SinceUtc)}, connection {c.Id}.");
+        }
+    }
+
+    private static string Address(string address) => string.IsNullOrEmpty(address) ? "an unknown address" : address;
+
+    /// <summary>/user NAME — an account's record: role, dates, addresses, failures, lock.</summary>
+    private void HandleUser(string[] args, Action<IMessage> reply)
+    {
+        if (args.Length < 1) { Say(reply, "Usage: /user [name]"); return; }
+        var record = _users?.GetUser(args[0]);
+        var (strikes, lockedUntil) = _server.Auth.StrikesFor(args[0]);
+        string lockText = lockedUntil is { } until
+            ? $" Locked for {Span(until - DateTime.UtcNow)} more after {strikes} failed logins in a row; /unlock {AuthService.Fold(args[0])} lifts it."
+            : strikes > 0 ? $" {strikes} failed login{(strikes == 1 ? "" : "s")} in a row since the server started." : "";
+
+        if (record == null)
+        {
+            Say(reply, $"There is no account called {args[0]}.{lockText}");
+            return;
+        }
+
+        string created = record.CreatedUtc is { } c ? $"Created {When(c)}." : "Created before the server kept dates.";
+        string login = record.LastLoginUtc is { } l
+            ? $"Last login {When(l)} from {Address(record.LastLoginAddress ?? "")}."
+            : "No login recorded.";
+        string failed = record.FailedLogins > 0
+            ? $" {record.FailedLogins} wrong password{(record.FailedLogins == 1 ? "" : "s")} since, the last {When(record.LastFailedUtc)} from {Address(record.LastFailedAddress ?? "")}."
+            : "";
+        var online = OnlineSession(record.Username);
+        string now = online != null
+            ? $" Online now, {(online.IsTextClient ? "MUD" : "UDP")} from {Address(online.RemoteAddress)}, on {online.CurrentMapId}."
+            : " Not online.";
+        string realName = string.IsNullOrEmpty(record.RealName) ? "" : $" Real name {record.RealName}.";
+        Say(reply, $"{record.Username}, {RoleWord(record.Role)}. {created} {login}{failed}{lockText}{now}{realName}");
+    }
+
+    /// <summary>/throttled — addresses over a limit now, and names locked now.</summary>
+    private void HandleThrottled(Action<IMessage> reply)
+    {
+        var auth = _server.Auth;
+        var attempts = auth.Attempts.Throttled();
+        var accounts = auth.NewAccounts.Throttled();
+        var locked = auth.LockedNames();
+        if (attempts.Count == 0 && accounts.Count == 0 && locked.Count == 0)
+        {
+            Say(reply, "Nothing is throttled and no name is locked.");
+            return;
+        }
+        foreach (var (key, wait) in attempts)
+            Say(reply, $"  {key}: over the login limit, next try in {Span(TimeSpan.FromSeconds(Math.Ceiling(wait)))}.");
+        foreach (var (key, wait) in accounts)
+            Say(reply, $"  {key}: over the new-account limit, next in {Span(TimeSpan.FromSeconds(Math.Ceiling(wait)))}.");
+        var now = DateTime.UtcNow;
+        foreach (var (name, failures, until) in locked)
+            Say(reply, $"  {name}: locked for {Span(until - now)} more after {failures} failed logins.");
+    }
+
+    /// <summary>/unlock NAME or /unlock ADDRESS — lifts a name's lock, or gives an address its limits back.</summary>
+    private void HandleUnlock(string[] args, Action<IMessage> reply)
+    {
+        if (args.Length < 1) { Say(reply, "Usage: /unlock [name or address]"); return; }
+        var auth = _server.Auth;
+        if (System.Net.IPAddress.TryParse(args[0], out var ip))
+        {
+            string key = RateLimiter.AddressKey(ip);
+            auth.Attempts.Reset(key);
+            auth.NewAccounts.Reset(key);
+            Log.Information("Admin: limits reset for {Address}.", key);
+            Say(reply, $"{key} may log in and create accounts again.");
+            return;
+        }
+        bool was = auth.Unlock(args[0]);
+        if (was) Log.Information("Admin: login lock lifted for '{User}'.", AuthService.ForLog(AuthService.Fold(args[0])));
+        Say(reply, was ? $"{AuthService.Fold(args[0])} is unlocked and its failures forgotten."
+                       : $"{AuthService.Fold(args[0])} was not locked.");
+    }
+
+    /// <summary>/setrole NAME player|dev|admin — changes an account's role, and the session's if they are on.</summary>
+    private void HandleSetRole(UserSession session, string[] args, Action<IMessage> reply)
+    {
+        if (args.Length < 2) { Say(reply, "Usage: /setrole [name] [player, dev or admin]"); return; }
+        UserRole? role = args[1].ToLowerInvariant() switch
+        {
+            "player" => UserRole.Player,
+            "dev" or "developer" => UserRole.Dev,
+            "admin" or "administrator" => UserRole.Admin,
+            _ => null,
+        };
+        if (role == null) { Say(reply, $"'{args[1]}' is not a role. Roles: player, dev, admin."); return; }
+        if (_users == null || _users.GetUser(args[0]) is not { } record) { Say(reply, $"There is no account called {args[0]}."); return; }
+        // Your own role is somebody else's to change: an admin who demoted themselves by a slip would
+        // have nobody left to put it back.
+        if (record.Username.Equals(session.Username, StringComparison.OrdinalIgnoreCase))
+        { Say(reply, "You cannot change your own role."); return; }
+        if (!_users.SetRole(record.Username, role.Value)) { Say(reply, "Roles cannot be changed on this server."); return; }
+
+        Log.Information("Admin: {Admin} set {User}'s role to {Role}.", session.Username, record.Username, role.Value);
+        var online = OnlineSession(record.Username);
+        if (online != null)
+        {
+            online.Role = role.Value;
+            if (_maps.TryGetMap(online.CurrentMapId, out var world, out _, out _, out _)
+                && online.Entity != Entity.Null && world.IsAlive(online.Entity) && world.Has<PlayerComponent>(online.Entity))
+            {
+                ref var player = ref world.Get<PlayerComponent>(online.Entity);
+                player.Role = role.Value;
+            }
+            _server.SendToSession(online, new TextEvent { Text = $"You are now {Article(role.Value)} {RoleWord(role.Value)}." });
+        }
+        Say(reply, $"{record.Username} is now {Article(role.Value)} {RoleWord(role.Value)}.");
+    }
+
+    private static string Article(UserRole role) => role == UserRole.Admin ? "an" : "a";
 
     /// <summary>/join MAP — go to another loaded map, if it is public, yours, or you are staff.</summary>
     private void HandleJoin(UserSession session, string[] args, Action<IMessage> reply)
