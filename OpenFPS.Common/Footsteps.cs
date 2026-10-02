@@ -339,24 +339,6 @@ public static class Footsteps
         => Math.Clamp(1f / MathF.Max(1e-4f, contactSeconds), 12f, 16000f);
 
     /// <summary>
-    /// How big the patch of sole actually touching the ground is, metres — the thing that radiates.
-    ///
-    /// A heel under load flattens against the floor, and how much depends on how soft it is: a
-    /// trainer spreads into a patch the size of a coin's diameter and more, a leather heel barely
-    /// spreads at all. Hertz gives the contact radius as (3FR/4E*)^(1/3), and taking F as the peak of
-    /// the impulse — momentum over contact time — makes it fall out of numbers already computed.
-    /// </summary>
-    public static float ContactPatchRadius(float effectiveMassKg, float velocityMps, float radiusM,
-                                           float modulusPa, float contactSeconds)
-    {
-        // Peak force of a half-sine impulse carrying this momentum.
-        float force = MathF.PI * 0.5f * effectiveMassKg * MathF.Max(0.05f, velocityMps)
-                    / MathF.Max(1e-4f, contactSeconds);
-        float a = MathF.Pow(3f * force * MathF.Max(0.002f, radiusM) / (4f * MathF.Max(1e5f, modulusPa)), 1f / 3f);
-        return Math.Clamp(a, 0.002f, 0.12f);
-    }
-
-    /// <summary>
     /// How well a source this small radiates at this frequency, 0 to 1.
     ///
     /// THE PIECE THAT WAS MISSING, and the one that made the first renders unlistenable. The model

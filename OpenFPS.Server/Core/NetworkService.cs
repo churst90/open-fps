@@ -113,19 +113,6 @@ public class NetworkService : INetEventListener
         RidingControls = whole.RidingControls,
     };
 
-    public void BroadcastToMap(IEnumerable<NetPeer?> peers, IMessage message)
-    {
-        try
-        {
-            byte[] data = MemoryPackSerializer.Serialize<IMessage>(message);
-            foreach (var peer in peers) peer?.Send(data, DeliveryMethod.Unreliable);
-        }
-        catch (Exception ex)
-        {
-            Log.Error(ex, "FAILED to broadcast message of type {Type}", message.GetType().Name);
-        }
-    }
-
     public NetPeer? GetPeer(int id) => _netManager?.GetPeerById(id);
 
     public void OnPeerConnected(NetPeer peer) => OnConnected?.Invoke(peer);

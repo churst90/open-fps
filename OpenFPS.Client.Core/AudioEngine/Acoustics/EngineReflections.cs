@@ -306,14 +306,6 @@ public sealed class EngineReflections
         if (drop != null) foreach (int k in drop) mine.Remove(k);
     }
 
-    /// <summary>Lets go of every echo for one car without forgetting the car itself — for when the
-    /// mixer has no room for reflections at all.</summary>
-    private static void ReleaseAll(AudioEngineFacade audio, Dictionary<int, Echo> mine)
-    {
-        foreach (var e in mine.Values) audio.StopSound(e.VoiceId);
-        mine.Clear();
-    }
-
     /// <summary>
     /// Everything this engine's echoes were using is released. Call when the car goes.
     ///

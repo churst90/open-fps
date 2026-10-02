@@ -77,9 +77,6 @@ public sealed record WheelsetSpec
     /// <summary>A flat spot worn on the tread, metres. It bangs once a revolution. Zero for a wheel
     /// in good order.</summary>
     public float FlatLengthMetres { get; init; }
-
-    /// <summary>Revolutions a second at this speed — the rate a flat spot bangs at.</summary>
-    public float RotationHz(float mps) => mps / (MathF.PI * MathF.Max(0.1f, DiameterMetres));
 }
 
 /// <summary>The track: what the wheels are running on, and how it is put together.</summary>

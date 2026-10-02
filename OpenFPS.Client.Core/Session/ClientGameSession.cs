@@ -847,7 +847,6 @@ public sealed class ClientGameSession : IDisposable
 
                 _state.Position = manifest.SpawnPoint.Position;
                 _state.Rotation = manifest.SpawnPoint.Rotation;
-                _state.MinimumY = manifest.MinimumY;
                 _state.MapMin = manifest.PlayMin;
                 _state.MapMax = manifest.PlayMax;
                 _state.MapSize = manifest.WorldSize;
@@ -936,7 +935,6 @@ public sealed class ClientGameSession : IDisposable
 
             case StatsUpdate stats:
                 _state.Health = stats.Health;
-                _state.MaxHealth = stats.MaxHealth;
                 _state.CurrentMaterial = stats.CurrentMaterial;
                 _state.CurrentVariant = stats.CurrentVariant;
                 // CurrentMaterial feeds the reverb bus material calculation via LocalPlayerState: when a

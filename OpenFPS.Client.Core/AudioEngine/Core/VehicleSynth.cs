@@ -49,9 +49,6 @@ public static class VehicleSynth
 {
     public const int SampleRate = 44100;
 
-    /// <summary>Speed of sound in exhaust gas at a temperature, m/s, for anyone printing resonances.</summary>
-    public static float GasSoundSpeed(float celsius) => Gas.SoundSpeed(celsius + 273.15f, Gas.GammaExhaust);
-
     /// <summary>Renders a whole drive. Deterministic given the seed.</summary>
     /// <param name="listener">Where the bench stands, in the machine's frame (x across, y up, z
     /// forward, origin at the exhaust). Null sums every tailpipe at one point, which is what a

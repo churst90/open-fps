@@ -215,9 +215,6 @@ public class MudGateway
         return true;
     }
 
-    /// <summary>True if the id belongs to a live MUD connection rather than a UDP peer.</summary>
-    public bool IsMudConnection(int connectionId) => _connections.ContainsKey(connectionId);
-
     /// <summary>The remote address of a MUD connection, for rate limiting. Null if the id is not ours.</summary>
     public string? GetRemoteAddress(int connectionId)
     {

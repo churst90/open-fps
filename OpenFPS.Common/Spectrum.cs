@@ -121,48 +121,6 @@ public static class Spectrum
         return db;
     }
 
-    /// <summary>
-    /// Where the events are in a buffer, by short-term energy — the onsets a band average wants.
-    ///
-    /// The same rule the footstep splitter uses on a recording: rising through a fraction of the
-    /// loudest thing present, with a refractory gap so one event is not counted as several.
-    /// </summary>
-    public static int[] Onsets(ReadOnlySpan<float> samples, int sampleRate,
-                               float threshold = 0.25f, float minGapSeconds = 0.12f, int max = 32)
-    {
-        int hop = Math.Max(1, sampleRate / 200);           // 5 ms
-        int win = Math.Max(hop, sampleRate / 100);         // 10 ms
-        int frames = Math.Max(0, (samples.Length - win) / hop);
-        if (frames <= 1) return Array.Empty<int>();
-
-        var env = new float[frames];
-        for (int f = 0; f < frames; f++)
-        {
-            double acc = 0;
-            int at = f * hop;
-            for (int i = 0; i < win; i++) { float v = samples[at + i]; acc += v * v; }
-            env[f] = (float)Math.Sqrt(acc / win);
-        }
-
-        float peak = 0f;
-        foreach (float v in env) if (v > peak) peak = v;
-        if (peak <= 0f) return Array.Empty<int>();
-
-        float level = peak * threshold;
-        int minGap = (int)(minGapSeconds * sampleRate / hop);
-        var found = new System.Collections.Generic.List<int>();
-        int last = -minGap * 2;
-        for (int f = 1; f < frames && found.Count < max; f++)
-        {
-            if (env[f] > level && env[f - 1] <= level && f - last >= minGap)
-            {
-                found.Add(f * hop);
-                last = f;
-            }
-        }
-        return found.ToArray();
-    }
-
     private static int NextPowerOfTwo(int v)
     {
         int n = 1;

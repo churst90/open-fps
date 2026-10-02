@@ -12,9 +12,7 @@ public enum InputContext
     /// <summary>Bindings that only make sense with a body in the world (look ahead, interact, scan).</summary>
     Gameplay,
     /// <summary>A modal text entry has focus; gameplay bindings must not fire.</summary>
-    UI,
-    /// <summary>Reserved for a future in-game chat mode with its own bindings.</summary>
-    Chat
+    UI
 }
 
 /// <summary>Modifier keys held alongside a binding. Shift-F5 is a different binding from F5.</summary>

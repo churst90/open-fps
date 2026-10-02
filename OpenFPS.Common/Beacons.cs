@@ -47,14 +47,6 @@ public static class Beacons
         }
     }
 
-    public static string Spell(Policy p) => p switch
-    {
-        Policy.DefaultOff => "default_off",
-        Policy.ForcedOn => "forced_on",
-        Policy.Forbidden => "forbidden",
-        _ => "default_on",
-    };
-
     /// <summary>
     /// Whether a category is heard: the map's policy, and within it the player's choice. A forced
     /// category is on whatever the player said, a forbidden one off; otherwise the player's word
