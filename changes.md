@@ -4,6 +4,31 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-02
 
+- The car starter, rebuilt over six rounds of renders (round 5 approved: "much much better"):
+  - It is a machine, not a tone: the motor has its own inertia and drives the crank through a
+    one-way clutch, which lets go as the crank springs off each compression and clacks picking it
+    up, and overruns when the engine catches. Nothing climbs in pitch at the end.
+  - Brush and gear noise, pink from 250 Hz to 6 kHz, swelling with load; the ring-gear mesh and an
+    11-slot armature whine stand 8-15 dB over it, as in six recorded starts (Freesound, kept in
+    inbox/starter-2026-10-02/round4/real/). The noise is 5 dB under that, at Cody's ask.
+  - Cranking speed 200 rpm by default (was 250, and the engines actually ran at 500); the key is
+    let go at 1.5 times cranking speed, where an engine computer cuts the starter.
+  - From the kerb it comes out from under the car, not through the engine bay; from the seat it
+    comes through the mounts and floor, low-passed at 150 Hz. Louder with displacement.
+  - Mowers fire on their first revolution (a magneto) and crank at 600 rpm (pull cord) and 300.
+- The street washes in through an open door:
+  - A voice rings its own room from before the walls: the send comes off the input end of its
+    chain at the fader's level, not after the route's EQ.
+  - Another place's reverb is set by `OpeningRoutes.FieldAt`: each opening radiates its share of
+    the field, straight or by the routes, plus what comes in builds the listener's own room's field.
+    It replaces a one-opening rule that gave a corridor two openings from the street nothing.
+  - Indoors, the street's reverb is traced from 2 m outside the opening it comes in by.
+- One speed of sound (the temperature's) for Doppler, echoes, the ground reflection and flight
+  time. The wind no longer rides on the listener's velocity and bends every pitch.
+- Driving aid tones and lane ticks play in the head: panned by direction, with no HRTF, distance,
+  room, reverb or echo.
+- The supersonic crack placeholder and the synthesised action clicks were removed; docs/GUNFIRE.md
+  says how the crack is to be built.
 - Server security, written up in docs/SERVER_SECURITY.md:
   - `/where` is for Dev and Admin only. `/profile` shows role, real name (`/realname`), online,
     away (`/afk`) or idle, and the map; never coordinates, direction or distance.

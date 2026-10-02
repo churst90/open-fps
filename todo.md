@@ -48,32 +48,34 @@ Suggested order. Research and file references for most of these: [docs/RESEARCH_
   - door range 12 m → 6 m with a 2 m fade at the edge;
   - little or no reverb send;
   - lift beacons up to 6 dB when a louder sound is near.
-- Car starter is not heard (Cody, 2026-10-02: do it). Likely the level: the block reaches the cab about 30 dB down, the starter
-  cranks for 0.34-0.53 s against 0.9 s on the bench. Confirm from the client log, then give the
-  starter its own path (about -15 to -20 dB into the cab) and hold the key 0.6-0.8 s.
 - Open sides of buildings (Cody, 2026-10-02: do it, with the doorway leak below):
   - every side that is not closed in becomes an opening, and a door is an opening with a leaf;
   - composites' open faces count as walls today;
   - only one opening is allowed per pair of rooms.
-- The city does not wash into the lobby through an open door. In order:
-  1. send to the reverb before route filtering and occlusion;
-  2. weight each room's reverb by the routes through openings;
-  3. trace the outdoor reverb from just outside the opening.
-- Wind adds 0.1 × wind to the listener's velocity, so gusts bend every pitch. Remove it.
-- Echoes use a fixed 343 m/s while Doppler uses the temperature's speed of sound. Use one.
+- In a car seat, cranking carries sub-20 Hz pressure 13-16 dB over everything audible (the
+  cylinders' slow swing through the panel path, whose low-pass passes DC). It costs the limiter
+  headroom. A high-pass at the panel corner fixed it but took 6 dB of unheard rumble off the
+  hatchback's motorway cabin level (`CabinTests`); decide with the cabin model, not the starter.
 
 **Gunfire and new synthesis** (see the research doc)
-1. A .357 revolver from the NIJ Ruger .357 set. The inbox video's shots clip and are unusable.
+1. Guns are not loud up close (Cody, 2026-10-02: "just a click"). Measured in the real mix at
+   0.5 m: a Glock is 4 dB under a hand clap. Three causes: `Loudness.Place` caps gain at 1 for
+   anything of 144 dB or more and flat to 40 m, so a shot in your hand equals one at 30 m; the blast
+   is 18 ms with its energy in 1-2 ms and normalised to peak (12 dB less energy than a clap); both
+   hit the same output ceiling. Its reverb is clap-sized for the same reason. Fix: normalise by
+   energy, a near field inside 40 m, and an ear-overload duck (everything else down for 0.3-1 s
+   past about 130 dB at the ear).
+2. A .357 revolver from the NIJ Ruger .357 set. The inbox video's shots clip and are unusable.
    Demo to judge: `inbox/gunfire-357-2026-10-02/demo/`.
    - Also move the lab-fitted pistol values into the game (positive phase, high-pass).
    - The game's Glock is 6-12 dB heavy at 125-250 Hz.
    - An unknown cartridge falls back to 159 dB without a warning.
-2. Rain on surfaces, from materials and geometry.
-3. Wind at the ear and in foliage.
-4. Wet roads: tyres +4-7 dB above 2 kHz from a wetness state.
-5. Streams and surf, once maps have water.
-6. Explosions.
-7. Refraction past 150 m.
+3. Rain on surfaces, from materials and geometry.
+4. Wind at the ear and in foliage.
+5. Wet roads: tyres +4-7 dB above 2 kHz from a wetness state.
+6. Streams and surf, once maps have water.
+7. Explosions.
+8. Refraction past 150 m.
 
 **Weather:** pressure is not worth modelling. Worth adding:
 - rain rate in mm/h;
@@ -276,7 +278,9 @@ Built but never heard in the game. Each needs a listen before it counts as done.
   fine as it is.)
 - Pedestrian and driver speech since the fix for the room-like copy.
 - Beacons.
-- Driving aids.
+- Driving aids, now in the head (dry, panned, no room; 2026-10-02).
+- The car starter in the game (round 6 renders approved 2026-10-02: inbox/starter-2026-10-02/).
+- The street washing into a lobby through an open door, and two rooms in (2026-10-02).
 - Bus air brakes; the airliner's whine.
 - A walk through the city block.
 - Chat, menus and saved servers.
