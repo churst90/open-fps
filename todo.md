@@ -48,10 +48,6 @@ Suggested order. Research and file references for most of these: [docs/RESEARCH_
   - door range 12 m → 6 m with a 2 m fade at the edge;
   - little or no reverb send;
   - lift beacons up to 6 dB when a louder sound is near.
-- Open sides of buildings (Cody, 2026-10-02: do it, with the doorway leak below):
-  - every side that is not closed in becomes an opening, and a door is an opening with a leaf;
-  - composites' open faces count as walls today;
-  - only one opening is allowed per pair of rooms.
 - In a car seat, cranking carries sub-20 Hz pressure 13-16 dB over everything audible (the
   cylinders' slow swing through the panel path, whose low-pass passes DC). It costs the limiter
   headroom. A high-pass at the panel corner fixed it but took 6 dB of unheard rumble off the
@@ -280,7 +276,8 @@ Built but never heard in the game. Each needs a listen before it counts as done.
 - Beacons.
 - Driving aids, now in the head (dry, panned, no room; 2026-10-02).
 - The car starter in the game (round 6 renders approved 2026-10-02: inbox/starter-2026-10-02/).
-- The street washing into a lobby through an open door, and two rooms in (2026-10-02).
+- The street washing into a lobby through an open door, and two rooms in; open sides of
+  buildings and composites as openings (2026-10-02).
 - Bus air brakes; the airliner's whine.
 - A walk through the city block.
 - Chat, menus and saved servers.
