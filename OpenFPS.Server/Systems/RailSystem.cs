@@ -35,6 +35,8 @@ public sealed class RailSystem
         public required Entity[] Entities;     // Entity.Null for the signal sources, which are not spawned
         public required float[] Along;
         public float Head, Speed, TopSpeed, Accel, Brake;
+        /// <summary>Head to tail, metres: the sum of the vehicles' lengths.</summary>
+        public float LengthMetres;
 
         /// <summary>Platforms on this route, in order round it. Same description a bus stop uses:
         /// a train halting at a platform and a bus halting at a kerb are the same fact about a
@@ -136,6 +138,7 @@ public sealed class RailSystem
                     Horn = profile.Consist.Select(c => c.Vehicle.Traction?.HornKey).FirstOrDefault(h => h != null) is { } hk
                         ? "air:" + hk : "",
                     Head = td.StartOffsetMetres, Speed = MathF.Min(v0, top), TopSpeed = top,
+                    LengthMetres = profile.LengthMetres,
                     Accel = td.AccelerationMps2 > 0 ? td.AccelerationMps2 : 0.9f, Brake = brake,
                 });
                 int spawned = 0; foreach (var e in ents) if (e != Entity.Null) spawned++;
@@ -274,8 +277,7 @@ public sealed class RailSystem
 
     /// <summary>
     /// How far round a given line each train's leading end currently is, metres, and how long the
-    /// lap is. The HEAD, because a crossing starts ringing for the front of a train and stops
-    /// ringing for the back of it, and those are different points.
+    /// lap is. See <see cref="TrainsOn"/> for the back of each train as well.
     /// </summary>
     public List<float> HeadsOn(string mapId, string track, out float lapLength)
     {
@@ -288,5 +290,23 @@ public sealed class RailSystem
             heads.Add(tr.Head);
         }
         return heads;
+    }
+
+    /// <summary>
+    /// Each train on a line: how far round its leading end is, and how long it is, metres. Both,
+    /// because a crossing starts ringing for the front of a train and stops ringing for the back of
+    /// it, and those are a train's length apart.
+    /// </summary>
+    public List<(float Head, float Length)> TrainsOn(string mapId, string track, out float lapLength)
+    {
+        lapLength = 1f;
+        var trains = new List<(float, float)>();
+        foreach (var tr in _trains)
+        {
+            if (tr.MapId != mapId || !string.Equals(tr.Track, track, StringComparison.OrdinalIgnoreCase)) continue;
+            lapLength = tr.Line.Length;
+            trains.Add((tr.Head, tr.LengthMetres));
+        }
+        return trains;
     }
 }
