@@ -16,6 +16,24 @@ public class NetworkService : INetEventListener
 {
     private NetManager _netManager = null!;
     private readonly ConcurrentQueue<(NetPeer peer, IMessage message)> _incomingMessages = new();
+
+    /// <summary>
+    /// The largest message a client may send. The biggest a client sends in play is a voice packet,
+    /// which is one unreliable datagram; LiteNetLib reassembles reliable messages of almost any size,
+    /// and anything over this is dropped before it is deserialised.
+    /// </summary>
+    public const int MaxMessageBytes = 16 * 1024;
+    /// <summary>Connections from one address (an IPv6 /64) at once. A household behind one router
+    /// fits; a script opening hundreds does not.</summary>
+    public const int MaxPeersPerAddress = 4;
+    /// <summary>Connections at once, all addresses together.</summary>
+    public const int MaxPeers = 200;
+
+    private readonly ConcurrentDictionary<int, DateTime> _connectedAt = new();
+    // New connections per address: a burst of 10, then one every 2 seconds.
+    private readonly RateLimiter _connectLimiter = new(capacity: 10, refillPerSecond: 0.5);
+    // One warning per address a minute, so a flood of refusals cannot flood the log as well.
+    private readonly RateLimiter _logLimiter = new(capacity: 1, refillPerSecond: 1.0 / 60);
     
     public Action<NetPeer>? OnConnected;
     public Action<NetPeer, DisconnectInfo>? OnDisconnected;
@@ -128,11 +146,42 @@ public class NetworkService : INetEventListener
 
     public NetPeer? GetPeer(int id) => _netManager?.GetPeerById(id);
 
-    public void OnPeerConnected(NetPeer peer) => OnConnected?.Invoke(peer);
-    public void OnPeerDisconnected(NetPeer peer, DisconnectInfo info) => OnDisconnected?.Invoke(peer, info);
-    
+    /// <summary>Closes a connection from this end. The usual disconnect event follows.</summary>
+    public void Disconnect(int id)
+    {
+        if (GetPeer(id) is { } peer) _netManager.DisconnectPeer(peer);
+    }
+
+    /// <summary>One-way latency in milliseconds, or null if there is no such connection.</summary>
+    public int? PingOf(int id) => GetPeer(id)?.Ping;
+
+    /// <summary>When a connection was accepted, or null if it is not open.</summary>
+    public DateTime? ConnectedSince(int id) => _connectedAt.TryGetValue(id, out var at) ? at : null;
+
+    /// <summary>Every open connection and when it was accepted.</summary>
+    public IEnumerable<(int Id, DateTime SinceUtc)> Connections() => _connectedAt.Select(kv => (kv.Key, kv.Value));
+
+    public void OnPeerConnected(NetPeer peer)
+    {
+        _connectedAt[peer.Id] = DateTime.UtcNow;
+        OnConnected?.Invoke(peer);
+    }
+
+    public void OnPeerDisconnected(NetPeer peer, DisconnectInfo info)
+    {
+        _connectedAt.TryRemove(peer.Id, out _);
+        OnDisconnected?.Invoke(peer, info);
+    }
+
     public void OnNetworkReceive(NetPeer peer, NetPacketReader reader, byte channel, DeliveryMethod delivery)
     {
+        if (reader.AvailableBytes > MaxMessageBytes)
+        {
+            if (_logLimiter.TryConsume("big:" + RateLimiter.AddressKey(peer.Address)))
+                Log.Warning("Dropped a {Bytes}-byte message from peer {Id} ({EndPoint}): over the {Max}-byte limit.",
+                    reader.AvailableBytes, peer.Id, peer.Address, MaxMessageBytes);
+            return;
+        }
         try
         {
             var msg = MemoryPackSerializer.Deserialize<IMessage>(reader.GetRemainingBytes());
@@ -140,13 +189,42 @@ public class NetworkService : INetEventListener
         }
         catch (Exception ex)
         {
-            Log.Warning("Malformed packet from peer {Id} ({EndPoint}) discarded: {Error}",
-                peer.Id, peer.Address, ex.Message);
+            if (_logLimiter.TryConsume("bad:" + RateLimiter.AddressKey(peer.Address)))
+                Log.Warning("Malformed packet from peer {Id} ({EndPoint}) discarded: {Error}",
+                    peer.Id, peer.Address, ex.Message);
         }
     }
 
     public void OnNetworkError(IPEndPoint endPoint, SocketError socketError) => Log.Error("Network Error {Error} on {EndPoint}", socketError, endPoint);
     public void OnNetworkReceiveUnconnected(IPEndPoint remoteEndPoint, NetPacketReader reader, UnconnectedMessageType messageType) { }
     public void OnNetworkLatencyUpdate(NetPeer peer, int latency) { }
-    public void OnConnectionRequest(ConnectionRequest request) => request.Accept();
+    /// <summary>
+    /// Accepts a connection unless its address is connecting too often, already has
+    /// <see cref="MaxPeersPerAddress"/> open, or the server is full. Every connection is a peer
+    /// LiteNetLib keeps state for, logged in or not.
+    /// </summary>
+    public void OnConnectionRequest(ConnectionRequest request)
+    {
+        string key = RateLimiter.AddressKey(request.RemoteEndPoint.Address);
+        int fromThere = 0;
+        foreach (var peer in _netManager.ConnectedPeerList)
+            if (RateLimiter.AddressKey(peer.Address) == key) fromThere++;
+
+        string? refusal = _connectLimiter.TryConsume(key)
+            ? Refusal(_netManager.ConnectedPeersCount, fromThere)
+            : "connecting too often";
+        if (refusal == null) { request.Accept(); return; }
+
+        request.Reject();
+        if (_logLimiter.TryConsume("refused:" + key))
+            Log.Warning("Refused a connection from {Address}: {Reason}.", request.RemoteEndPoint, refusal);
+    }
+
+    /// <summary>Why a new connection is refused given how many are open, or null to accept it.</summary>
+    public static string? Refusal(int connectedNow, int fromThisAddress)
+    {
+        if (connectedNow >= MaxPeers) return $"the server has {MaxPeers} connections";
+        if (fromThisAddress >= MaxPeersPerAddress) return $"{MaxPeersPerAddress} connections are already open from there";
+        return null;
+    }
 }

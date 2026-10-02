@@ -25,7 +25,8 @@ public class MapAuthorityService
     private void HandleMapPublish(int connectionId, MapPublishRequest request, Action<IMessage> reply)
     {
         // TODO: Implement permission check (Does this connectionId own this MapName?)
-        Log.Information("Received request to publish map {MapName} as {IsPublic}", request.MapName, request.IsPublic ? "Public" : "Private");
-        reply(new TextEvent { Text = $"Map '{request.MapName}' publish request received and is pending validation." });
+        string name = AuthService.ForLog(request.MapName);
+        Log.Information("Received request to publish map {MapName} as {IsPublic}", name, request.IsPublic ? "Public" : "Private");
+        reply(new TextEvent { Text = $"Map '{name}' publish request received and is pending validation." });
     }
 }
