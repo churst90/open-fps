@@ -58,6 +58,10 @@ public class CommandHandler
         string[] args = cmd.Args ?? Array.Empty<string>();
         bool isElevated = session.Role == UserRole.Dev || session.Role == UserRole.Admin;
 
+        // Typing anything is the player being here; /afk is the one thing that says otherwise.
+        session.LastActivityUtc = DateTime.UtcNow;
+        if (commandName != "afk") session.Away = false;
+
         _server.EnqueueCommand(() => {
             try { Execute(commandName, args, session, reply, isElevated); }
             catch (Exception ex)
@@ -270,7 +274,20 @@ public class CommandHandler
                 break;
             case "where":
             case "locate":
+                // Where somebody is standing is staff's to know, not every player's: a profile says
+                // which map, and that is all.
+                if (!isElevated) { DenyCommand(reply); return; }
                 HandleWhere(session, args, reply);
+                break;
+            case "afk":
+            case "away":
+                session.Away = !session.Away;
+                Say(reply, session.Away
+                    ? "You are marked away. Anything you do clears it."
+                    : "You are back.");
+                break;
+            case "realname":
+                HandleRealName(session, args, reply);
                 break;
             case "join":
             case "travel":
@@ -1548,7 +1565,11 @@ public class CommandHandler
             : $"{username} is already your friend.");
     }
 
-    /// <summary>/profile NAME — what the server knows about somebody, in a sentence or two.</summary>
+    /// <summary>
+    /// /profile NAME — who somebody is, in a sentence or two: their rank, the name they chose to show,
+    /// whether they are on, and which map. Never where on it: that is /where, and /where is staff's.
+    /// A private map the asker could not walk into is not named.
+    /// </summary>
     private void HandleProfile(UserSession session, string[] args, Action<IMessage> reply)
     {
         if (args.Length < 1) { Say(reply, "Usage: /profile [name]"); return; }
@@ -1558,16 +1579,50 @@ public class CommandHandler
         string friend = _friends != null && _friends.IsFriend(session.Username, username) ? " On your friends list." : "";
         string you = username.Equals(session.Username, StringComparison.OrdinalIgnoreCase) ? " (you)" : "";
         if (target != null) role = target.Role;
-        string head = $"{username}{you}, {RoleWord(role)}.";
+        string realName = _users?.GetUser(username)?.RealName is { Length: > 0 } rn ? $" Real name {rn}." : "";
+        string head = $"{username}{you}, {RoleWord(role)}.{realName}";
 
         if (target == null) { Say(reply, $"{head} Not online.{friend}"); return; }
-        if (!target.CurrentMapId.Equals(session.CurrentMapId, StringComparison.OrdinalIgnoreCase))
+
+        string status = target.Status(DateTime.UtcNow);
+        status = char.ToUpperInvariant(status[0]) + status[1..];
+        string map = target.CurrentMapId.Equals(session.CurrentMapId, StringComparison.OrdinalIgnoreCase)
+            ? $"here on {target.CurrentMapId}"
+            : OpenFPS.Server.Services.DiscoveryService.CanEnter(_maps, target.CurrentMapId, session)
+                ? $"on {target.CurrentMapId}"
+                : "on a private map";
+        Say(reply, $"{head} {status}, {map}.{friend}");
+    }
+
+    /// <summary>
+    /// /realname [name] — the name you want your profile to show. On its own it says what is set;
+    /// /realname clear takes it off.
+    /// </summary>
+    private void HandleRealName(UserSession session, string[] args, Action<IMessage> reply)
+    {
+        if (_users == null) { Say(reply, "Profiles are not kept on this server."); return; }
+        if (args.Length == 0)
         {
-            Say(reply, $"{head} Online, on {target.CurrentMapId}.{friend}");
+            string? current = _users.GetUser(session.Username)?.RealName;
+            Say(reply, string.IsNullOrEmpty(current)
+                ? "Your profile shows no real name. Set one with /realname followed by the name."
+                : $"Your profile shows the real name {current}. /realname clear takes it off.");
             return;
         }
-        string here = you.Length > 0 ? "" : RelativeTo(session, target);
-        Say(reply, $"{head} Online, here on {target.CurrentMapId}{(here.Length > 0 ? ", " + here : "")}.{friend}");
+
+        bool clear = args.Length == 1 && args[0].Equals("clear", StringComparison.OrdinalIgnoreCase);
+        string name = clear ? "" : string.Join(" ", args).Trim();
+        if (name.Length > 64 || name.Any(char.IsControl))
+        {
+            Say(reply, "A real name can be at most 64 characters, with no control characters.");
+            return;
+        }
+        if (!_users.SetRealName(session.Username, clear ? null : name))
+        {
+            Say(reply, "Profiles are not kept on this server.");
+            return;
+        }
+        Say(reply, clear ? "Your profile no longer shows a real name." : $"Your profile now shows the real name {name}.");
     }
 
     /// <summary>/where NAME — which way and how far, if they are on your map; which map otherwise.</summary>
