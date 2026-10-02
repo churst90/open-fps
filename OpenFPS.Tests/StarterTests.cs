@@ -51,10 +51,59 @@ public class StarterTests
             var v = make();
             var r = KeyOn(v);
             _out.WriteLine($"{key,-22} off {r.OffDb,7:F1} dB  crank {r.CrankDb,7:F1} dB for {r.CrankSeconds:F2} s  idle {r.IdleDb,7:F1} dB");
-            // Long enough to be heard as a start, and it does start.
-            Assert.True(r.CrankSeconds >= 0.25f, $"{key} cranked for only {r.CrankSeconds:F2} s");
+            // Long enough to be heard as a start, and it does start. The key is held until the driver
+            // hears it catch: it was let go on the first firing, 0.34 s in, and nobody heard a starter.
+            Assert.True(r.CrankSeconds >= 0.5f, $"{key} cranked for only {r.CrankSeconds:F2} s");
             Assert.True(r.CrankSeconds <= 3f, $"{key} was still cranking after {r.CrankSeconds:F2} s");
         }
+    }
+}
+
+/// <summary>
+/// From the driver's seat the starter comes through the mounts and the floor, not only through the
+/// firewall: "the car starter is not heard" (2026-10-02). Through the firewall alone its whirr was
+/// 22 dB under the cranking chug and 26-35 dB under its level at a metre.
+/// </summary>
+public class StarterInCabinTests
+{
+    private const int Rate = 44100, Block = 441;
+
+    /// <summary>The starter's band, 300 Hz to 2 kHz, from the seat while it cranks and before anything
+    /// fires, dB re full scale.</summary>
+    private static double CrankBandInSeat(VehicleProfile v)
+    {
+        var voice = new EngineVoiceState(v, Rate, 3) { TargetSpeed = 0f, Running = false, Interior = true };
+        voice.PlaceAtSpeed(0f);
+        voice.Revive();
+        var buf = new float[Block];
+        for (int b = 0; b < 300; b++) voice.Render(buf);
+        voice.Running = true;
+        float hpA = MathF.Exp(-2f * MathF.PI * 300f / Rate), lpA = 1f - MathF.Exp(-2f * MathF.PI * 2000f / Rate);
+        float hp = 0, hpIn = 0, lp = 0;
+        double sum = 0; int n = 0;
+        for (int b = 0; b < 300; b++)
+        {
+            voice.Render(buf);
+            bool cranking = voice.Engine.Starter && !voice.Engine.Firing;
+            foreach (float x in buf)
+            {
+                hp = hpA * (hp + x - hpIn); hpIn = x; lp += (hp - lp) * lpA;
+                if (cranking) { sum += lp * (double)lp; n++; }
+            }
+        }
+        return 10 * Math.Log10(sum / Math.Max(1, n) + 1e-30);
+    }
+
+    [Theory]
+    [InlineData("i4_economy")]
+    [InlineData("police_interceptor")]
+    [InlineData("transit_bus")]
+    public void The_starter_reaches_the_seat_by_its_own_path(string key)
+    {
+        var v = VehicleProfile.ByName(key);
+        double with = CrankBandInSeat(v);
+        double without = CrankBandInSeat(v with { Body = v.Body with { StarterPathLossDb = 200f } });
+        Assert.True(with - without >= 5.0, $"{key}: the starter path added only {with - without:F1} dB in the seat");
     }
 }
 

@@ -512,6 +512,7 @@ public sealed class EngineVoiceState : IRenderedVoice
         float surfaceMass = MathF.Max(0.5f, steel.DensityKgM3 * shell.PanelThicknessM);   // kg/m^2
         _panelCorner = 415f / (MathF.PI * surfaceMass);                                   // rho*c / (pi*m)
         _sealLeak = Math.Clamp(shell.SealLeak, 0f, 1f);
+        _starterPath = MathF.Pow(10f, -MathF.Max(0f, shell.StarterPathLossDb) / 20f);
         _windPaAt110 = 20e-6f * MathF.Pow(10f, shell.WindNoiseDbAt110 / 20f);
         if (!string.IsNullOrEmpty(v.AirSystem))
         {
@@ -685,7 +686,7 @@ public sealed class EngineVoiceState : IRenderedVoice
     private int _interior;
 
     private readonly BodyResonator _cabin;
-    private readonly float _panelCorner, _sealLeak, _windPaAt110;
+    private readonly float _panelCorner, _sealLeak, _windPaAt110, _starterPath;
     private float _panelLp, _windLp, _windHp, _windHpIn, _interiorMix;
 
     // ── The loudness law, applied to what the engine is doing now ─────────────────────────────
@@ -1164,6 +1165,8 @@ public sealed class EngineVoiceState : IRenderedVoice
                 float atPanels = Engine.Block + Engine.Intake + 0.5f * Engine.Exhaust + (tyreRear + tyreFront) * 0.6f * 0.70710678f * TyreMix;
                 _panelLp += (atPanels - _panelLp) * panelA;
                 float inCabin = _panelLp + _sealLeak * atPanels;
+                // The starter through the mounts and the floor (VehicleBody.StarterPathLossDb).
+                inCabin += Engine.StarterOut * _starterPath;
                 inCabin += _cabin.Process(inCabin);
 
                 // The wind: broadband turbulence, most of it between a couple of hundred hertz and a

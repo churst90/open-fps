@@ -368,6 +368,10 @@ public sealed class VirtualDriver
     private float _integral;
     private float _lastTarget;
     private float _accelEstimate;
+    /// <summary>How long the engine has been running on its own with the key still held, s.</summary>
+    private float _caughtFor;
+    /// <summary>A driver's reaction to hearing the engine catch: about a quarter of a second.</summary>
+    private const float KeyReleaseSeconds = 0.25f;
     private readonly float _launchRpm;
     private const float ClutchLetInPerSecond = 2f;
     private const float LaunchRollOnPerSecond = 3f;
@@ -399,13 +403,17 @@ public sealed class VirtualDriver
         {
             _engine.Ignition = false; _engine.Starter = false; _engine.Throttle = 0f;
             _dl.Gear = 0; _dl.Clutch = 1f; _dl.Brake = 1f;
+            _caughtFor = 0f;
             return;
         }
         _engine.Ignition = true;
         // The key is held until it catches: until it fires and pulls away from the starter's speed.
         // Released on speed alone, the crank passed 1.5 times its cranking speed before the engine
-        // computer had synchronised, and the start was a starter blip and a silent coast.
-        _engine.Starter = !_engine.Firing || _engine.Rpm < e.CrankingRpm * 1.5f;
+        // computer had synchronised, and the start was a starter blip and a silent coast. And a
+        // driver lets go when they HEAR it catch, a reaction time later, not on the first firing.
+        bool caught = _engine.Firing && _engine.Rpm >= e.CrankingRpm * 1.5f;
+        _caughtFor = caught ? MathF.Min(_caughtFor + dt, KeyReleaseSeconds) : 0f;
+        _engine.Starter = _caughtFor < KeyReleaseSeconds;
 
         // Estimate the target's acceleration, so the throttle can lead rather than lag.
         _accelEstimate += ((TargetSpeed - _lastTarget) / MathF.Max(dt, 1e-4f) - _accelEstimate) * MathF.Min(1f, dt * 4f);

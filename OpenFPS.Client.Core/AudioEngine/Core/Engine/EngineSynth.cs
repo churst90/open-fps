@@ -71,6 +71,9 @@ public sealed class EngineSynth
     public float Intake { get; private set; }
     /// <summary>Pressure at one metre from the block: valvetrain, combustion through the metal, accessories.</summary>
     public float Block { get; private set; }
+    /// <summary>The starter's own sound, Pa, already summed into <see cref="Block"/>. Apart because it
+    /// reaches a cabin by its own path: it is bolted to the bellhousing, not radiating off the block.</summary>
+    public float StarterOut { get; private set; }
 
     /// <summary>
     /// The block's absolute-level anchor, as a gain: +7.5 dB. See where Block is assembled for how it was
@@ -911,8 +914,7 @@ public sealed class EngineSynth
         if (Starter)
         {
             // A DC motor: full torque stalled, none at twice the cranking speed.
-            float free = e.CrankingRpm * 2.2f;
-            starter = StarterTorque() * MathF.Max(0f, 1f - rpm / free);
+            starter = StarterTorque() * MathF.Max(0f, 1f - rpm / StarterFreeRpm);
         }
         float net = gasTorque * _torqueScale + starter - friction - LoadTorque;
         float J = e.InertiaKgM2 + MathF.Max(0f, ExternalInertia);
@@ -1079,7 +1081,7 @@ public sealed class EngineSynth
         // bike all pipe. Nothing at or below six thousand changes.
         float overRated = e.Fuel == FuelType.Diesel ? 1f : MathF.Max(1f, rpm / BlockLawReferenceRpm);
         Block = (knockOut + thud + mech + whine) * BlockRadiationGain * overRated * overRated
-              + StarterSound(rpm) + Turbo();
+              + (StarterOut = StarterSound(rpm)) + Turbo();
     }
 
     // ── The turbocharger ──────────────────────────────────────────────────────────────────────
@@ -1263,6 +1265,10 @@ public sealed class EngineSynth
     private float _starterPhase, _starterBuzz, _solenoidEnv, _solenoidRing, _solenoidRing1;
     private bool _starterWas;
 
+    /// <summary>The engine speed at which the starter has no torque left: a DC motor's free speed,
+    /// through the reduction.</summary>
+    private float StarterFreeRpm => Profile.CrankingRpm * 2.2f;
+
     private float StarterSound(float crankRpm)
     {
         if (Starter && !_starterWas) _solenoidEnv = 1f;
@@ -1271,9 +1277,13 @@ public sealed class EngineSynth
         float amp = 20e-6f * MathF.Pow(10f, StarterDbAtOneMetre / 20f) * 1.414f;
         if (Starter)
         {
+            // The pinion stays in mesh with the ring gear and turns with it; once the engine runs
+            // faster than the motor can, the one-way clutch lets the armature freewheel at its own
+            // free speed, so the mesh climbs with the engine and the brushes do not.
             float motorHz = MathF.Max(0f, crankRpm) / 60f * StarterReduction;
+            float armatureHz = MathF.Min(motorHz, StarterFreeRpm / 60f * StarterReduction);
             _starterPhase += motorHz * PinionTeeth * _dt;
-            _starterBuzz += motorHz * CommutatorBars * _dt;
+            _starterBuzz += armatureHz * CommutatorBars * _dt;
             _starterPhase -= MathF.Floor(_starterPhase);
             _starterBuzz -= MathF.Floor(_starterBuzz);
             float mesh = MathF.Sin(MathF.Tau * _starterPhase) + 0.35f * MathF.Sin(MathF.Tau * 2f * _starterPhase);

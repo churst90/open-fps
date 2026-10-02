@@ -48,10 +48,10 @@ Suggested order. Research and file references for most of these: [docs/RESEARCH_
   - door range 12 m → 6 m with a 2 m fade at the edge;
   - little or no reverb send;
   - lift beacons up to 6 dB when a louder sound is near.
-- Car starter is not heard. Likely the level: the block reaches the cab about 30 dB down, the starter
+- Car starter is not heard (Cody, 2026-10-02: do it). Likely the level: the block reaches the cab about 30 dB down, the starter
   cranks for 0.34-0.53 s against 0.9 s on the bench. Confirm from the client log, then give the
   starter its own path (about -15 to -20 dB into the cab) and hold the key 0.6-0.8 s.
-- Open sides of buildings:
+- Open sides of buildings (Cody, 2026-10-02: do it, with the doorway leak below):
   - every side that is not closed in becomes an opening, and a door is an opening with a leaf;
   - composites' open faces count as walls today;
   - only one opening is allowed per pair of rooms.
@@ -81,7 +81,9 @@ Suggested order. Research and file references for most of these: [docs/RESEARCH_
 - wind and temperature against height;
 - turbulence.
 
-**Old code, to ask Cody** (the rest was removed 2026-10-02):
+**Old code** (the rest was removed 2026-10-02). Cody, 2026-10-02: anything not used by the game or a
+live instrument, or no longer applicable, is removed. Keep `MapManifest.Checksum` for map caching and
+the police siren wav.
 - The weapons runtime (`WeaponMechanics`, `ShotResolver`) is used only by the lab and tests.
 - `PoliceSirenGenerator`, superseded by `SirenSpec`; keep its wav.
 - `HeadShadow` and `Spectrum` are used only by the lab.
