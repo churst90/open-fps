@@ -39,6 +39,34 @@ public class UserSession
     /// <summary>True for a MUD (telnet) session: no UDP peer, so no state stream and no voice.</summary>
     public bool IsTextClient { get; set; }
 
+    /// <summary>Where the connection came from, as the transport reported it at login.</summary>
+    public string RemoteAddress { get; set; } = "";
+
+    /// <summary>When this session logged in.</summary>
+    public DateTime LoggedInUtc { get; set; } = DateTime.UtcNow;
+
+    /// <summary>
+    /// The last time the player did something: moved, looked, typed, spoke, used something. Input the
+    /// client sends with nobody at the keys does not count.
+    /// </summary>
+    public DateTime LastActivityUtc { get; set; } = DateTime.UtcNow;
+
+    /// <summary>Set by /afk, cleared by the next thing the player does.</summary>
+    public bool Away { get; set; }
+
+    /// <summary>Idle this long and a profile says so.</summary>
+    public static readonly TimeSpan IdleAfter = TimeSpan.FromMinutes(5);
+
+    /// <summary>"online", "away", or "idle for N minutes" — what other players are told.</summary>
+    public string Status(DateTime nowUtc)
+    {
+        if (Away) return "away";
+        var idle = nowUtc - LastActivityUtc;
+        if (idle < IdleAfter) return "online";
+        int minutes = (int)idle.TotalMinutes;
+        return $"idle for {minutes} minute{(minutes == 1 ? "" : "s")}";
+    }
+
     /// <summary>
     /// Simulated seconds this player is still owed. Each tick grants one tick's worth (capped),
     /// and every input consumes what it claims — so a client cannot buy extra distance by sending

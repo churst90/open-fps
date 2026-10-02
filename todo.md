@@ -181,14 +181,26 @@ Some may already be fixed; confirm before fixing again.
 - Vehicles stopping close in front of the player.
 
 ### Server
-- Admin commands to change a password and a role. Today the only way is editing `openfps.db`.
+- A command to change a password (your own, and an admin resetting someone's). `/setrole` exists
+  since 2026-10-02; passwords still need `OPENFPS_ADMIN_PASSWORD` (admin only) or editing `openfps.db`.
+- `/kick` and a ban list (by name and by address). docs/SERVER_SECURITY.md lists what exists.
+- Roles beyond Player/Dev/Admin (Cody, 2026-10-02): map creators who build only on their own maps,
+  teleporter items instead of `/tp` for players, and whether `/move` stays staff-only. Today every
+  building verb needs Dev.
+- `/profile` has no level, rank or game stats because none exist yet; it shows role, real name,
+  online/away/idle and the map. Add them to the profile when there is something to count.
+- Name locks and rate-limit counts are in memory and reset on restart.
+- The Windows client hides "Where is" from players only from the next build; the friend's current
+  build still offers it and the server refuses it.
 - The default admin account is `admin` / `admin123` unless `OPENFPS_ADMIN_PASSWORD` is set (the
   server warns at start): make the first run ask for a password.
 - A failed port bind still logs "started". Fail loudly instead.
 - `/savemap` rewrites a map as plain JSON and loses its comments.
 - `/restart` and `/reloadmap` for admins.
-- The MUD interface is plain TCP on all interfaces, and the game port accepts any connection
-  without a key. Decide what a public server needs.
+- The MUD interface is plain TCP on all interfaces, with passwords in the clear, and the game port
+  does not check the client's connection key. Both are capped per address and close a connection
+  that does not log in within 2 minutes (2026-10-02). Decide whether a public server should listen
+  for the MUD at all, or only on localhost.
 
 ### Vehicles
 - A key for the siren when driving a police car.

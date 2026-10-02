@@ -2,6 +2,28 @@
 
 Recent work, newest first. `git log` has the rest.
 
+## 2026-10-02
+
+- Server security, written up in docs/SERVER_SECURITY.md:
+  - `/where` is for Dev and Admin only. `/profile` shows role, real name (`/realname`), online,
+    away (`/afk`) or idle, and the map; never coordinates, direction or distance.
+  - New Admin commands: `/sessions`, `/user`, `/throttled`, `/unlock`, `/setrole`.
+  - Logins: the rate limit's refill is pinned by a test; IPv6 counts by /64; 10 wrong passwords lock
+    a name for 15 minutes; bcrypt runs off the game loop at cost 12; an unknown name costs a bcrypt
+    check like a known one; one session per account (a new login closes the old one); a second
+    login on one connection is refused.
+  - New accounts: 3 to 20 plain characters, reserved names, passwords 8 characters to 72 bytes, and
+    3 accounts per address then one every 20 minutes.
+  - Connections: nothing but a login is accepted before login; per-address and total connection
+    caps on both ports; 2 minutes to log in; 16 KB message limit; MUD lines bounded as they are read
+    and written through a queue, so a telnet client that stops reading cannot stall the server.
+  - Voice is relayed as from the sender's own body; map data only for the map you are on.
+  - `openfps.db` gains seven columns (created, last login and address, failed logins, last failure
+    and address, real name). An older database is upgraded in place on first start, after a copy
+    is made beside it.
+- `StaffGateTests` runs every gated command as a Player and checks nothing changes.
+- No change to `OpenFPS.Common`. The client hides "Where is" from players (client-only).
+
 ## 2026-10-01
 
 - The where-am-I key names a doorway from the zones either side of it ("doorway between <A> and
