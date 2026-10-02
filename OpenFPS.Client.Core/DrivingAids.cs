@@ -431,7 +431,6 @@ public sealed class DrivingAids
             Essential = true,
             IsEvent = true,
             Type = EmitterType.WorldLocked,
-            EnableReverb = false,
         });
     }
 
@@ -453,7 +452,6 @@ public sealed class DrivingAids
             Range = 80f,
             Essential = true,
             Type = EmitterType.WorldLocked,
-            EnableReverb = false,
         };
         if (_audio.IsPlaying(id)) _audio.UpdateSpatialAttributes(e);
         else _audio.PlayPhysicalSoundDirect(e);

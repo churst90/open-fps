@@ -287,10 +287,9 @@ public class AsyncAcousticWorker : IDisposable
                     {
                         // The pool was full this tick, not the simulation broken: keep this source's
                         // last Steam Audio answer, a tick or two old. Handing it to the hand-rolled
-                        // tracer instead gave it a DIFFERENT model for a moment, one that found a route
-                        // through a door at -4 dB where Steam Audio said -24 through brick: "sometimes
-                        // the sound just pops through" the walls (2026-09-30; 2-15 of ~70 sources a tick
-                        // on the city).
+                        // tracer instead would give it a DIFFERENT model for a moment, one that can find
+                        // a route through a door at -4 dB where Steam Audio says -24 through brick, and
+                        // the sound pops through the wall.
                         //
                         // Moved with the source: the answer's positions are where it WAS, and a bus at
                         // 15 m/s held for a second would be heard 15 m behind itself.
@@ -680,21 +679,13 @@ public class AsyncAcousticWorker : IDisposable
             float delta = sr.BarrierDelta;
             // Only a route that EXISTS. The barrier search goes round one box at a time; round the edge
             // of a shut door is eight centimetres out of the way and straight into the wall the door is
-            // hung in, and that route used to set the level anyway ("so a source behind a doorway keeps
-            // its relief") — a shut door between two rooms passed -7/-11/-19 dB (2026-09-29,
-            // --path-probe). When the route round is blocked, the level is Steam Audio's own route
-            // through the scene if it found one, and what the wall lets through if it did not.
-            // Only a route that EXISTS. The barrier search goes round one box at a time; round the edge
-            // of a shut door is eight centimetres out of the way and straight into the wall the door is
-            // hung in, and that route used to set the level anyway ("so a source behind a doorway keeps
-            // its relief") — a shut door between two rooms passed -7/-11/-19 dB (2026-09-29,
-            // --path-probe). When the route round is blocked, what arrives is what the wall lets
-            // through.
+            // hung in, and if that route set the level a shut door between two rooms would pass
+            // -7/-11/-19 dB (--path-probe shows it). When the route round is blocked, what arrives is
+            // what the wall lets through.
             //
-            // NOT Steam Audio's pathing eq. That was tried the same night and is the colour of the
-            // bend, not the loss: about 1.0 for a route a hundred and fifty metres long, so every
-            // siren and walker behind a wall played at full level — and from below, where the probe
-            // grid's route pointed ("sirens are stationary in front of me no matter how I turn").
+            // NOT Steam Audio's pathing eq. That is the colour of the bend, not the loss: about 1.0 for a
+            // route a hundred and fifty metres long, so every siren and walker behind a wall would play
+            // at full level, and from below, where the probe grid's route points.
             if (delta >= 0f && !sr.BarrierVerified) delta = -1f;
             if (delta >= 0f)
             {
@@ -702,8 +693,8 @@ public class AsyncAcousticWorker : IDisposable
                 // And the route round is LONGER, which the barrier's insertion loss does not pay for
                 // once it reaches its 24 dB ceiling. A walker on the pavement outside Marlow flat 01F
                 // is 8 m from the ear through a brick wall and 164 m round the building: capped, that
-                // route came out at -24 dB in every band and beat the wall's own -24/-30/-36, so
-                // every step was heard through the brick (2026-09-29). Spreading over the longer
+                // route would come out at -24 dB in every band and beat the wall's own -24/-30/-36, so
+                // every step would be heard through the brick. Spreading over the longer
                 // route costs 26 dB there, and under half a decibel for a half-metre kerb.
                 float spread = MathF.Max(0.5f, dist) / (MathF.Max(0.5f, dist) + delta);
                 dLow *= spread; dMid *= spread; dHigh *= spread;
@@ -808,13 +799,13 @@ public class AsyncAcousticWorker : IDisposable
         if (solids.Count == 0) return;
 
         _reflectionScratch ??= new List<EarlyReflections.Arrival>();
-        // FIRST ORDER, and the old ranking, for a sound that goes on. Heard 2026-09-23 with third order
-        // and separate-events-first here: an aeroplane's jet and a bus's air hiss mirrored off the
-        // hangar and the facades became extra copies of themselves standing still in the distance,
-        // cutting in and out as each path came and went — "ghostly washes of white noise that stay in
-        // one place" — and a far siren's image put it in front of you. The echo of a SUSTAINED sound is
-        // not heard as an event; it is part of the field, which the reverb is. Copies of copies belong
-        // to one-off sounds (WorldAudioPlayer), where an echo happens once and is gone.
+        // FIRST ORDER, in EarlyReflections' own order, for a sound that goes on. With third order and
+        // separate events first, an aeroplane's jet and a bus's air hiss mirrored off the hangar and
+        // the facades become extra copies of themselves standing still in the distance, cutting in
+        // and out as each path comes and goes, and a far siren's image puts it in front of you. The
+        // echo of a SUSTAINED sound is not heard as an event; it is part of the field, which the
+        // reverb is. Copies of copies belong to one-off sounds (WorldAudioPlayer), where an echo
+        // happens once and is gone.
         EarlyReflections.Find(req.SourcePos, req.ListenerPos, solids, _reflectionScratch, AudioPhysics.SpeedOfSound);
 
         _lastReflectionCount = 0;
@@ -1028,11 +1019,9 @@ public class AsyncAcousticWorker : IDisposable
     /// changes (or on first use). Geometry is mostly static, so this is a per-map-load cost.</summary>
     // ── Doors are part of the geometry, where they are now ────────────────────────────────────────
     //
-    // The scene used to be built once per map with every door leaf where it stood at load — shut —
-    // and never again, so to occlusion, diffraction and the traces an open door was still a wall:
-    // "I press E, open the door but I don't hear the outside world flow inside, I have to step outside
-    // and there's a clear boundary" (2026-09-30). The server swings the leaf's real transform, so the
-    // world knows where it is. When any leaf has moved, the scene is rebuilt with it there — every
+    // Built once per map with every door leaf where it stood at load, an open door would still be a
+    // wall to occlusion, diffraction and the traces. The server swings the leaf's real transform, so
+    // the world knows where it is. When any leaf has moved, the scene is rebuilt with it there — every
     // simulator takes the new one as it does on a map change, and Steam Audio's reference counting
     // keeps the old alive until each has let go — at most every DoorRebuildSeconds while a door
     // swings, and once more when it settles. The pathing probes are not rebaked for a door.
@@ -1064,9 +1053,9 @@ public class AsyncAcousticWorker : IDisposable
     }
 
     /// <summary>True when a leaf near the listener stands somewhere other than where the scene in use has
-    /// it. Only a leaf that MOVED counts: this was a hash of the doors within 50 m, which changed every
-    /// time one crossed that radius as you walked, and rebuilt the city's scene for nothing (477 times in
-    /// one session, 2026-09-30). A far leaf that moved is left as it is until you come near it.</summary>
+    /// it. Only a leaf that MOVED counts: a hash of the doors within 50 m would change every time one
+    /// crossed that radius as you walked, and rebuild the scene for nothing. A far leaf that moved is
+    /// left as it is until you come near it.</summary>
     private bool NearDoorMoved(WorldSnapshot world)
     {
         foreach (var snap in world.Entities.Values)

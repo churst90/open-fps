@@ -71,7 +71,6 @@ public static class VehicleSpike
                 MinDistance = MathF.Max(reference, 3f),
                 Pitch = 1f,
                 TargetRegionId = AcousticConstants.GlobalRegionId,
-                EnableReverb = true,
             };
             provider.PlaySpatialSound(Make(pos, Vector3.Zero, 0f));
 
@@ -177,7 +176,7 @@ public static class VehicleSpike
                     Position = p + Vector3.Transform(new Vector3(0f, 0.3f, v.ExhaustOffsetZ * 0.6f), Quaternion.CreateFromYawPitchRoll(heading, 0f, 0f)),
                     Velocity = vel, Volume = gain, Range = Loudness.AudibleRange(116f),
                     MinDistance = MathF.Max(reference, 3f), Pitch = 1f,
-                    TargetRegionId = AcousticConstants.GlobalRegionId, EnableReverb = true,
+                    TargetRegionId = AcousticConstants.GlobalRegionId,
                 };
                 SpatialEmitter Echo(int id, Reflection r, float g) => new()
                 {
@@ -187,7 +186,7 @@ public static class VehicleSpike
                     Position = r.ApparentPosition, Velocity = Vector3.Zero,
                     Volume = gain, Range = Loudness.AudibleRange(116f),
                     MinDistance = MathF.Max(reference, 3f), Pitch = 1f,
-                    TargetRegionId = AcousticConstants.GlobalRegionId, EnableReverb = false,
+                    TargetRegionId = AcousticConstants.GlobalRegionId,
                 };
 
                 var pos = new Vector3(laneX, 0.6f, roadStart);
@@ -360,7 +359,7 @@ public static class VehicleSpike
             Console.WriteLine("  Stationary: start, four blips up the rev range in neutral, shut off.\n");
             var r = VehicleSynth.Render(v, revs);
             foreach (var line in r.Log) Console.WriteLine($"    {line}");
-            string sd = Path.Combine(AppContext.BaseDirectory, "ASSETS", "SOUNDS", "VEHICLES");
+            string sd = OpenFPS.AudioLab.LabPaths.Output("VEHICLES");
             Directory.CreateDirectory(sd);
             File.WriteAllBytes(Path.Combine(sd, "v8_rev_exhaust.wav"), VehicleSynth.ToWav16(r.Exhaust));
             File.WriteAllBytes(Path.Combine(sd, "v8_rev_intake.wav"), VehicleSynth.ToWav16(r.Intake));
@@ -386,7 +385,7 @@ public static class VehicleSpike
         var render = VehicleSynth.Render(v, orders);
         foreach (var line in render.Log) Console.WriteLine($"    {line}");
 
-        string dir = Path.Combine(AppContext.BaseDirectory, "ASSETS", "SOUNDS", "VEHICLES");
+        string dir = OpenFPS.AudioLab.LabPaths.Output("VEHICLES");
         Directory.CreateDirectory(dir);
         File.WriteAllBytes(Path.Combine(dir, "v8_exhaust.wav"), VehicleSynth.ToWav16(render.Exhaust));
         File.WriteAllBytes(Path.Combine(dir, "v8_intake.wav"), VehicleSynth.ToWav16(render.Intake));
@@ -448,7 +447,6 @@ public static class VehicleSpike
                     MinDistance = MathF.Max(reference, 3f),
                     Pitch = 1.0f,
                     TargetRegionId = AcousticConstants.GlobalRegionId,
-                    EnableReverb = true,
                     IsEvent = true,
                 });
             }
@@ -548,7 +546,6 @@ public static class VehicleSpike
                     MinDistance = MathF.Max(reference, 3f),
                     Pitch = 1.0f,
                     TargetRegionId = AcousticConstants.GlobalRegionId,
-                    EnableReverb = true,
                     IsEvent = true,
                 });
             }
@@ -580,7 +577,6 @@ public static class VehicleSpike
                         MinDistance = MathF.Max(Loudness.Place(parts[i].Db).ReferenceDistance, 3f),
                         Pitch = 1.0f,
                         TargetRegionId = AcousticConstants.GlobalRegionId,
-                        EnableReverb = true,
                     });
                 }
 

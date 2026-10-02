@@ -210,10 +210,9 @@ public sealed class WorldAudioPlayer
                     System.Threading.Tasks.Task.Run(() => _rendered.Enqueue((id, RenderOne(toRender, seed))));
                 }
                 // ...but it is not simply let go. It waits for its own buffer and plays if that comes
-                // back in time — see MaxRenderLateness. Dropping every first hearing silenced whatever
-                // is RARE: each sound has four seed variants and each is a first hearing once, so a
-                // door material used a handful of times a session was never heard at all. The city's
-                // seven steel doors were exactly that — "it just says the steel door swings open".
+                // back in time — see MaxRenderLateness. Dropping every first hearing would silence
+                // whatever is RARE: each sound has four seed variants and each is a first hearing
+                // once, so a door material used only a handful of times would never be heard at all.
                 _awaitingRender.Add(new Pending
                 {
                     Sound = sound,
@@ -279,11 +278,10 @@ public sealed class WorldAudioPlayer
         if (_pending.Count == 0) return;
 
         // More than one pass: a sound's early reflections are queued WHILE it is played, at the end
-        // of the list this loop has already walked past, and left for the next update they went out
-        // a whole frame late. Each is delayed by its own path from the moment it is submitted, so a
-        // reflection due 6-25 ms after a clap arrived 45-65 ms after it: a cluster of slaps of its own
-        // ("the clapping breaks up", every one of 289 echoes in the log 0.02-0.05 s late, 2026-09-29).
-        // Played in the same pass, every copy starts from the same moment as its source.
+        // of the list this loop has already walked past, and left for the next update they would go
+        // out a whole frame late. Each is delayed by its own path from the moment it is submitted, so
+        // a reflection due 6-25 ms after a clap would arrive 45-65 ms after it, a cluster of slaps of
+        // its own. Played in the same pass, every copy starts from the same moment as its source.
         for (int pass = 0; pass < 3; pass++)
         {
         bool playedAny = false;
@@ -314,9 +312,8 @@ public sealed class WorldAudioPlayer
             var path = _acoustics.CalculateAcousticPath(world, item.SourceEntityId,
                                                         listenerPosition, item.Sound.Position);
             // An echo is placed at its mirror image, which is BEHIND the wall it came off, and the ray
-            // from the listener to that point goes through that very wall: every echo came out 40-60 dB
-            // down, even of a shot in plain view (traced 2026-09-28, "reflections for gunshots don't
-            // appear all that loud"). Both legs of an echo's route were already checked clear when it
+            // from the listener to that point goes through that very wall: traced like a direct sound,
+            // every echo would come out 40-60 dB down, even of a shot in plain view. Both legs of an echo's route were already checked clear when it
             // was found (ImageSource, EarlyReflections), so, as for the engines' echoes
             // (EngineReflections.ApplyPath), it keeps the air over its own path and nothing else.
             if (item.IsReflection)
@@ -361,9 +358,9 @@ public sealed class WorldAudioPlayer
             var placed = Loudness.Place(item.Sound.LevelDb, item.Sound.ExtentMetres);
             // A COPY keeps its source's placement. The placement compresses level differences between
             // sounds (Loudness.DynamicRangeCompression, 0.45 shipped) — right between a rifle and a
-            // footstep, wrong between a sound and its own reflection: an echo handed in 14 dB down
-            // came out 6 dB down, every reflection in the game 4-8 dB too loud against what it is a
-            // copy of ("all the reflections are piling up", 2026-09-29). Placed as the source and
+            // footstep, wrong between a sound and its own reflection: placed on its own, an echo
+            // handed in 14 dB down would come out 6 dB down, 4-8 dB too loud against what it is a
+            // copy of. Placed as the source and
             // scaled by what the surface and the longer path actually kept, it is exactly that much
             // under it; distance is the engine's literal 1/r either way.
             if (item.IsReflection && item.CopyGain > 0f)
@@ -409,20 +406,9 @@ public sealed class WorldAudioPlayer
                 // Nothing is ranked by WHAT IT IS any more. A reflection gives way first because it
                 // IS quieter — its Volume already carries what the surface kept and how far the
                 // mirrored path ran — and the budget ranks on the level a voice will deliver.
-                // Outdoors, an impulse's tail is the geometry's: the facades hand it back a crossing
-                // at a time (QueueHigherOrderEchoes) and the sky takes the rest. The reverb unit is a
-                // ROOM's tail — dense and smooth from the first milliseconds — and a shot sent to it
-                // between two buildings sounded fired in a hall ("gunshots sound odd with the
-                // reverb"). Indoors the copies are too dense to hear apart and the reverb is right;
-                // a sustained sound's late field is the reverb's everywhere.
-                //
-                // That was the ROOM algorithm. Traced, the tail is the street's own response —
-                // the facades handing the shot back again and again, the sky taking the rest — and
-                // it is what a real shot between buildings rolls on with: "I don't hear many echos".
-                // So in traced mode an outdoor impulse goes to it; in room mode it still does not.
-                // An echo is already the street answering; sent to the tail as well, it would be
-                // counted twice.
-                EnableReverb = !item.IsReflection,
+                // Every direct sound sends to the reverb, indoors and out; a reflection never does (the
+                // provider skips IsReflection voices). An echo is already the place answering, and
+                // sent to the tail as well it would be counted twice.
                 // An EVENT: it belongs to a moment. If the budget has no room for it now there is no
                 // playing it later — see VoiceManager.Process, which drops one that did not win a slot
                 // rather than keeping it queued to fire from a stale position minutes afterwards.
@@ -479,8 +465,8 @@ public sealed class WorldAudioPlayer
     ///
     /// Not speech. A voice three metres off on asphalt has a bounce 4 ms late at two thirds
     /// of its pressure, and that is what the physics says (Acta Acustica 2024, doi
-    /// 10.1051/aacus/2024002: below 800 Hz it is stronger still). Rendered, it flanged, summed into
-    /// the voice's direction and again from its own direction below (heard 2026-09-27, both). A real
+    /// 10.1051/aacus/2024002: below 800 Hz it is stronger still). Rendered, it flanges, summed into
+    /// the voice's direction and again from its own direction below. A real
     /// talker on a pavement does not sound like that, so something the ear uses is missing: the
     /// torso's shadow on sound from below, the talker's own vertical radiation, or the small
     /// movements that keep a comb from standing still. Until one is measured, a voice has none.
@@ -684,9 +670,8 @@ public sealed class WorldAudioPlayer
     // The traced response of a room is built round the listener's head from an energy field, and
     // what it hands back is almost all omnidirectional: in Marlow flat 01F its left-right, up-down
     // and front-back channels sit twenty decibels under the omni one. A room made of that is heard in
-    // the middle of the head and does not move when the head turns ("the room sounds narrow... I
-    // turn my head and nothing seems to move or change", 2026-09-29, interaural correlation 0.85-0.95
-    // in the capture). What places a real room round you is its first few reflections, each off one
+    // the middle of the head and does not move when the head turns (interaural correlation 0.85-0.95
+    // in a capture). What places a real room round you is its first few reflections, each off one
     // wall, each from that wall's direction.
     //
     // So in a room, a one-off sound's early reflections are voices of their own, mirrored through
@@ -706,8 +691,7 @@ public sealed class WorldAudioPlayer
     /// How many SECOND-order copies a sound's room gets as clean copies, beyond its first order. The
     /// rest of the copies of copies are the room's tail, which the trace already is. Up to twelve
     /// clean copies of one dry clap were twelve separate clicks to the ear, which hears copies of an
-    /// impulse as echoes from a few milliseconds on, where real reflections fuse; that, not their
-    /// level, is what -24 was paying for (2026-09-29).
+    /// impulse as echoes from a few milliseconds on, where real reflections fuse.
     /// </summary>
     internal const int MaxSecondOrderCopies = 4;
 
@@ -951,10 +935,9 @@ public sealed class WorldAudioPlayer
     /// wall: a shot off a facade is a crack, not a smear. The surface's roughness is already paid for
     /// in the geometry — the mirror carries (1 - scattering) of what the face returns and the rest is
     /// the diffuse taps spread across the face (ImageSource), which is what gives the echo the size of
-    /// the wall. Only those taps, the scattered share, are smeared. Every echo used to go through the
-    /// diffuser, so a shot off a steel panel or concrete — the shortest all-pass delays, a fraction of
-    /// a millisecond — came back as a ringing, "processed sounding" copy (Cody, 2026-09-28: "it should
-    /// be a crack, but a crack that comes from the wall, not smeared").
+    /// the wall. Only those taps, the scattered share, are smeared. Through the diffuser, a shot off
+    /// a steel panel or concrete — the shortest all-pass delays, a fraction of a millisecond — comes
+    /// back as a ringing, processed copy; it should be a crack that comes from the wall.
     /// </summary>
     internal static (float LowDb, float HighDb) SpecularLoss(float scattering, int bounces)
         => ImageSource.SpecularBandLossDb(scattering, bounces);

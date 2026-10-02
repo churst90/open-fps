@@ -1715,7 +1715,6 @@ public class ClientAudioSystem
             TransmissionBleed = path.TransmissionBleed,
             EffectiveDistance = path.EffectiveDistance,
             TargetRegionId = path.RegionId,
-            EnableReverb = true,
         };
         ApplyGround(ref e, _groundWorld);
         if (_audio.IsPlaying(voiceId)) _audio.UpdateSpatialAttributes(e);
@@ -1857,7 +1856,6 @@ public class ClientAudioSystem
                 TransmissionBleed = path.TransmissionBleed,
                 EffectiveDistance = path.EffectiveDistance,
                 TargetRegionId = path.RegionId,
-                EnableReverb = true,
             };
             ApplyGround(ref e, _groundWorld);
             if (_audio.IsPlaying(voiceId)) _audio.UpdateSpatialAttributes(e);
@@ -1936,7 +1934,6 @@ public class ClientAudioSystem
             TransmissionBleed = path.TransmissionBleed,
             EffectiveDistance = path.EffectiveDistance,
             TargetRegionId = path.RegionId,
-            EnableReverb = true,
         };
         ApplyGround(ref e, _groundWorld);
         if (_audio.IsPlaying(voiceId)) _audio.UpdateSpatialAttributes(e);
@@ -2055,7 +2052,6 @@ public class ClientAudioSystem
             ExtentMetres = extent,
             Pitch = 1f,
             TargetRegionId = AcousticConstants.GlobalRegionId,
-            EnableReverb = true,
         };
         if (_audio.IsPlaying(voiceId)) _audio.UpdateSpatialAttributes(e);
         else _audio.PlayPhysicalSoundDirect(e);
@@ -2327,7 +2323,6 @@ public class ClientAudioSystem
             IsReflection = false,
             // Inside, its room is yours — the cabin — whatever room the car's middle is in.
             TargetRegionId = interior ? _listenerRegion : acousticPath.RegionId,
-            EnableReverb = true,
             ConeInside = def.SoundEmitter.ConeInsideAngle,
             ConeOutside = def.SoundEmitter.ConeOutsideAngle,
             ConeOutsideVolume = def.SoundEmitter.ConeOutsideVolume,
@@ -2745,7 +2740,6 @@ public class ClientAudioSystem
                 CarriesPath = true,
                 Occlusion = 0f, ApertureFactor = 1f, TransmissionBleed = 0f,
                 EqLow = MathF.Pow(10f, (loss.LowDb + lowDb) / 20f), EqMid = 1f, EqHigh = MathF.Pow(10f, (loss.HighDb + highDb) / 20f),
-                EnableReverb = false,
                 TargetRegionId = _listenerRegion,
             });
             if (++added >= WorldAudioPlayer.MaxRoomEchoes) break;

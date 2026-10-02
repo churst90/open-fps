@@ -41,8 +41,8 @@ public static class SirenRouteSpike
         var atXz = (Str(args, "at") ?? "122.25,237.7").Split(',').Select(s => float.Parse(s, CultureInfo.InvariantCulture)).ToArray();
         var ear = new Vector3(atXz[0], 0.15f + 1.6f, atXz[1]);
 
-        string? mapPath = FindUp(Path.Combine("OpenFPS.Server", "maps", mapId + ".json"));
-        string? prefabDir = FindUp(Path.Combine("OpenFPS.Server", "prefabs"));
+        string? mapPath = OpenFPS.AudioLab.LabPaths.Existing(OpenFPS.AudioLab.LabPaths.Server("maps", mapId + ".json"));
+        string? prefabDir = OpenFPS.AudioLab.LabPaths.Existing(OpenFPS.AudioLab.LabPaths.Server("prefabs"));
         if (mapPath == null || prefabDir == null) { Console.WriteLine("FAIL: map or prefabs not found above cwd"); return 1; }
         var (world, line) = Load(mapPath, prefabDir, trackId, lane);
         if (line == null) { Console.WriteLine($"FAIL: no track {trackId}"); return 1; }
@@ -173,18 +173,6 @@ public static class SirenRouteSpike
         v.TryGetProperty("Y", out var y) ? y.GetSingle() : 0f,
         v.TryGetProperty("Z", out var z) ? z.GetSingle() : 0f);
 
-    private static string? FindUp(string relative)
-    {
-        var dir = new DirectoryInfo(Directory.GetCurrentDirectory());
-        while (dir != null)
-        {
-            string c = Path.Combine(dir.FullName, relative);
-            if (File.Exists(c) || Directory.Exists(c)) return c;
-            dir = dir.Parent;
-        }
-        string fallback = Path.Combine("/home/cody/external-rescue/Github/open-fps", relative);
-        return File.Exists(fallback) || Directory.Exists(fallback) ? fallback : null;
-    }
 
     private static string? Str(string[] a, string k) => a.FirstOrDefault(x => x.StartsWith(k + "=", StringComparison.Ordinal))?[(k.Length + 1)..];
     private static float Num(string[] a, string k, float f) => Str(a, k) is { } s && float.TryParse(s, NumberStyles.Float, CultureInfo.InvariantCulture, out float v) ? v : f;

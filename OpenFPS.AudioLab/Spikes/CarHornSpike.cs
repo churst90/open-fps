@@ -29,7 +29,7 @@ public static class CarHornSpike
     public static int Run(string[] args)
     {
         string dir = args.FirstOrDefault(a => a.StartsWith("out=", StringComparison.Ordinal))?.Substring(4)
-                     ?? "/home/cody/external-rescue/Github/open-fps/approved/horns/car-horns-2026-09-24";
+                     ?? OpenFPS.AudioLab.LabPaths.InRepo("approved", "horns", "car-horns-2026-09-24");
         Directory.CreateDirectory(dir);
         string? Arg(string name) => args.FirstOrDefault(a => a.StartsWith(name + "=", StringComparison.Ordinal))?.Substring(name.Length + 1);
         float? Num(string name) => Arg(name) is { } v ? float.Parse(v, System.Globalization.CultureInfo.InvariantCulture) : null;

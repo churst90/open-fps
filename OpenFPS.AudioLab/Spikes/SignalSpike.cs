@@ -23,7 +23,7 @@ public static class SignalSpike
         bool wantHorn = args.Contains("horn"), wantWhistle = args.Contains("whistle"), wantBell = args.Contains("bell");
         if (!wantHorn && !wantWhistle && !wantBell) wantHorn = wantWhistle = wantBell = true;
 
-        string dir = Path.Combine(AppContext.BaseDirectory, "ASSETS", "SOUNDS", "SIGNALS");
+        string dir = OpenFPS.AudioLab.LabPaths.Output("SIGNALS");
         Directory.CreateDirectory(dir);
         Console.WriteLine("\n  Horns, whistles and bells at one metre.\n");
 

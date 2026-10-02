@@ -341,7 +341,6 @@ public class BirdLifeMutationTests
         foreach (var e in played)
         {
             Assert.True(e.IsEvent);
-            Assert.True(e.EnableReverb);
             Assert.Equal(PlaybackMode.Single, e.Mode);
             Assert.Equal(Vector3.Zero, e.Velocity);
             Assert.Equal(e.Position, e.ApparentPosition);

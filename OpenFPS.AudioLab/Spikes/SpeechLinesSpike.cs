@@ -23,7 +23,7 @@ public static class SpeechLinesSpike
         {
             // By full path: the lab does not carry the client's ASSETS folder, and GranularBank takes a
             // path with ASSETS in it as it stands.
-            string id = System.IO.Path.Combine(Sounds(), "VOICES", t.Voice, t.Line + ".ogg");
+            string id = OpenFPS.AudioLab.LabPaths.Sounds("VOICES", t.Voice, t.Line + ".ogg");
             if (!bank.TryDecode(id, out var pcm, out int ch, out int rate) || pcm.Length == 0)
             {
                 failed++;
@@ -48,13 +48,5 @@ public static class SpeechLinesSpike
         Console.WriteLine($"peak after rescaling at most {worstPeak:F1} dBFS (must stay under 0)");
         sys.release();
         return failed == 0 ? 0 : 1;
-    }
-
-    private static string Sounds()
-    {
-        var dir = new System.IO.DirectoryInfo(Environment.CurrentDirectory);
-        while (dir != null && !System.IO.Directory.Exists(System.IO.Path.Combine(dir.FullName, "OpenFPS.Client", "ASSETS", "SOUNDS")))
-            dir = dir.Parent;
-        return System.IO.Path.Combine(dir?.FullName ?? "/home/cody/external-rescue/Github/open-fps", "OpenFPS.Client", "ASSETS", "SOUNDS");
     }
 }

@@ -469,9 +469,8 @@ public sealed class EngineReflections
         Range = direct.Range,
         MinDistance = direct.MinDistance,
         Pitch = 1f,
+        // Never sent to the reverb (the provider skips reflections): that would count the room twice.
         IsReflection = true,
         TargetRegionId = direct.TargetRegionId,
-        // A reflection is already a reflection; sending it to the reverb would count the room twice.
-        EnableReverb = false,
     };
 }

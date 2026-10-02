@@ -50,7 +50,7 @@ public static class SirenSpike
         }
         if (carried == 0) Console.WriteLine("    NONE — nothing on the map can sound one.");
 
-        string dir = Path.Combine(AppContext.BaseDirectory, "ASSETS", "SOUNDS", "SIRENS");
+        string dir = OpenFPS.AudioLab.LabPaths.Output("SIRENS");
         Directory.CreateDirectory(dir);
         Console.WriteLine("\n  Police sirens, on the horn's axis at one metre.\n");
 
@@ -248,7 +248,7 @@ public static class SirenSpike
         var wav = new float[n];
         float g = peak > 1e-9f ? 0.89f / peak : 0f;
         for (int i = 0; i < n; i++) wav[i] = pa[i] * g;
-        string dir = Path.Combine(AppContext.BaseDirectory, "ASSETS", "SOUNDS", "SIRENS");
+        string dir = OpenFPS.AudioLab.LabPaths.Output("SIRENS");
         Directory.CreateDirectory(dir);
         string path = Path.Combine(dir, $"siren_driven_{trackId}.wav");
         File.WriteAllBytes(path, VehicleSynth.ToWav16(wav));
@@ -258,13 +258,7 @@ public static class SirenSpike
 
     private static RaceLine? CityLine(string mapId, string trackId)
     {
-        var d = new DirectoryInfo(Environment.CurrentDirectory);
-        string? path = null;
-        for (int i = 0; i < 8 && d != null; i++, d = d.Parent)
-        {
-            string c = Path.Combine(d.FullName, "OpenFPS.Server", "maps", mapId + ".json");
-            if (File.Exists(c)) { path = c; break; }
-        }
+        string? path = OpenFPS.AudioLab.LabPaths.Existing(OpenFPS.AudioLab.LabPaths.Server("maps", mapId + ".json"));
         if (path == null) return null;
         using var doc = System.Text.Json.JsonDocument.Parse(File.ReadAllText(path));
         if (trackId == "downtown")
@@ -321,7 +315,7 @@ public static class SirenSpike
                         + $"{spec.ReferenceDbAt3m:F0} dB at 10 ft");
         Console.WriteLine("      mode        level dB    3rd/2nd    5th/4th   (odd over even: a square is positive)");
 
-        string dir = Path.Combine(AppContext.BaseDirectory, "ASSETS", "SOUNDS", "SIRENS");
+        string dir = OpenFPS.AudioLab.LabPaths.Output("SIRENS");
         Directory.CreateDirectory(dir);
 
         foreach (var mode in new[] { SirenMode.Wail, SirenMode.Yelp, SirenMode.Phaser })

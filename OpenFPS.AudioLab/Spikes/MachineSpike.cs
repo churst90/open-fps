@@ -155,7 +155,7 @@ public static class MachineSpike
             Type = EmitterType.WorldLocked, Mode = PlaybackMode.LoopOne,
             Position = Rear(p), ApparentPosition = Rear(p), Velocity = vel,
             Volume = gain, Range = range, MinDistance = MathF.Max(reference, 3f), Pitch = 1f,
-            TargetRegionId = AcousticConstants.GlobalRegionId, EnableReverb = true,
+            TargetRegionId = AcousticConstants.GlobalRegionId,
         };
         SpatialEmitter Intake(Vector3 p, Vector3 vel) => new()
         {
@@ -163,7 +163,7 @@ public static class MachineSpike
             Type = EmitterType.WorldLocked, Mode = PlaybackMode.LoopOne,
             Position = Front(p), ApparentPosition = Front(p), Velocity = vel,
             Volume = gain, Range = range, MinDistance = MathF.Max(reference, 3f), Pitch = 1f,
-            TargetRegionId = AcousticConstants.GlobalRegionId, EnableReverb = true,
+            TargetRegionId = AcousticConstants.GlobalRegionId,
         };
 
         var pos = new Vector3(side, 0.6f, from);

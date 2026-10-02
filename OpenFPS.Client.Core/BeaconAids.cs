@@ -131,7 +131,6 @@ public sealed class BeaconAids
             Range = 40f,
             IsEvent = true,
             Type = EmitterType.WorldLocked,
-            EnableReverb = true,
         });
     }
 

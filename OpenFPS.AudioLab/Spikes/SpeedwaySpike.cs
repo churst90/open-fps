@@ -244,7 +244,7 @@ public static class SpeedwaySpike
                         Position = p, Velocity = vel,
                         Volume = place[cars[i].Preset].Gain, Range = place[cars[i].Preset].Range,
                         MinDistance = place[cars[i].Preset].Reference, Pitch = 1f,
-                        TargetRegionId = AcousticConstants.GlobalRegionId, EnableReverb = true,
+                        TargetRegionId = AcousticConstants.GlobalRegionId,
                     };
                     if (live.Add(i)) { started[i] = now; provider.PlaySpatialSound(em); }
                     else provider.UpdateSpatialAttributes(em);
@@ -281,7 +281,7 @@ public static class SpeedwaySpike
                             Position = r.ApparentPosition, Velocity = Vector3.Zero,
                             Volume = place[cars[i].Preset].Gain, Range = place[cars[i].Preset].Range,
                             MinDistance = place[cars[i].Preset].Reference, Pitch = 1f,
-                            TargetRegionId = AcousticConstants.GlobalRegionId, EnableReverb = false,
+                            TargetRegionId = AcousticConstants.GlobalRegionId,
                         };
                         if (provider.IsPlaying(vid)) provider.UpdateSpatialAttributes(echo);
                         else provider.PlaySpatialSound(echo);

@@ -80,7 +80,6 @@ public struct SpatialEmitter
     public float ConeOutside; 
     public float ConeOutsideVolume;
     public float MinDistance;
-    public bool EnableReverb;
     public int TargetRegionId;
     public Vector3 Velocity;
     /// <summary>
@@ -248,7 +247,6 @@ public struct SpatialEmitter
         ConeOutside = 360f;
         ConeOutsideVolume = 1.0f;
         MinDistance = 3.0f;
-        EnableReverb = true;
         TargetRegionId = -1;
         Direction = Vector3.UnitZ;
         Velocity = Vector3.Zero;

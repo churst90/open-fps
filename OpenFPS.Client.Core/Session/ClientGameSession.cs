@@ -304,17 +304,10 @@ public sealed class ClientGameSession : IDisposable
 
         // ── Firing, on ENTER, and NEVER on a screen reader's key ────────────────────────────────
         //
-        // This was on both control keys, and the reasoning written here was that a player must be
-        // able to fire while they are moving. True, and the wrong key: CONTROL IS HOW A SCREEN READER
-        // USER SILENCES SPEECH. Every reader there is — NVDA, JAWS, Orca, VoiceOver — stops talking
-        // when you press it, so a blind player presses control constantly, reflexively, without ever
-        // thinking of it as input to anything.
-        //
-        // What that did was fire a rifle. Found in an audio log while chasing a report of "random
-        // banging... bang, wait a few seconds, bang, like someone closing a cabinet, I have no clue
-        // what the noise is": twenty-six `recv 'AKM' ... 159 dB` events in six minutes, in bursts
-        // minutes apart, each with its bullet's impact echoing off the buildings. Five sessions were
-        // spent looking for it in the acoustics. It was the trigger.
+        // Not on control. CONTROL IS HOW A SCREEN READER USER SILENCES SPEECH: every reader there is
+        // (NVDA, JAWS, Orca, VoiceOver) stops talking when you press it, so a blind player presses it
+        // constantly, reflexively, without thinking of it as input. Bound to firing, it fires a rifle
+        // every time they hush the reader, and the shots sound like random banging from nowhere.
         //
         // Enter, because a blind player finds it by touch without counting keys from a landmark, it
         // is under the right hand that is already on J K L O for turning, and no reader claims it in
@@ -345,8 +338,7 @@ public sealed class ClientGameSession : IDisposable
     /// CONTROL silences speech in every screen reader there is. ALT is the window manager's and opens
     /// menus. Both are pressed by a blind player dozens of times a minute as punctuation, not as
     /// input — so a game action on either is not a key that is hard to use, it is a key that fires by
-    /// itself. Control was the trigger, and it cost five sessions of hunting a "random banging" that
-    /// was the player's own rifle.
+    /// itself.
     ///
     /// Modified bindings are a different thing and are fine: shift-F5 is a chord somebody chose to
     /// press. What is forbidden is a screen reader's key AS the action.
@@ -365,26 +357,19 @@ public sealed class ClientGameSession : IDisposable
     private void Say(string text) => _speech.Speak(text, interrupt: true);
 
     /// <summary>
-    /// /levels, /levels real, /levels default, /levels 0.7 (or 70): how much of the real difference in
-    /// loudness between sounds reaches the mix. Everything is placed by it — how far a thing carries,
-    /// how much louder a hot rod is than a hatchback, how much a car rises when it is floored.
-    /// </summary>
-    /// <summary>
-    /// /reverb traced | room: outdoors, the tail is the place's own impulse response traced through
-    /// the map (traced), or FMOD's room algorithm with its decay set from a ray survey (room). Plain
-    /// /reverb says which, and how the trace is doing. For listening to the two side by side.
+    /// /reverb: how the trace is doing. The tail is the place's own impulse response traced through
+    /// the map, everywhere; there is no other mode to switch to.
     /// </summary>
     internal static string ReverbCommand(string[] args)
     {
-        // The room algorithm is gone (2026-09-29); the tail is traced everywhere. Plain /reverb reports.
         if (args.Length > 0) return "Reverb: traced everywhere now; there is no room mode. /reflections sets the level.";
         return OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.TracedReverbStatus(null);
     }
 
     /// <summary>
     /// /valveflow on | off: the broadband rush of gas through each exhaust valve as it opens
-    /// (EngineSynth.BlowdownJet). New on 2026-09-26 and changes every engine, the loud V8s most, so it
-    /// can be switched live to hear what it does. Plain /valveflow says which.
+    /// (EngineSynth.BlowdownJet). It changes every engine, the loud V8s most, so it can be switched
+    /// live to hear what it does. Plain /valveflow says which.
     /// </summary>
     internal static string ValveFlowCommand(string[] args)
     {
@@ -400,6 +385,11 @@ public sealed class ClientGameSession : IDisposable
             : "Valve flow off: the exhaust is pulses only, as before.";
     }
 
+    /// <summary>
+    /// /levels, /levels real, /levels default, /levels 0.7 (or 70): how much of the real difference in
+    /// loudness between sounds reaches the mix. Everything is placed by it — how far a thing carries,
+    /// how much louder a hot rod is than a hatchback, how much a car rises when it is floored.
+    /// </summary>
     internal static string LevelsCommand(string[] args, Action? save = null)
     {
         string Now() => $"{MathF.Round(OpenFPS.Common.Loudness.DynamicRangeCompression * 100f)} percent";

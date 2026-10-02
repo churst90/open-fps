@@ -107,7 +107,6 @@ public static class ProviderOrbit
                 MinDistance = reference,
                 ExtentMetres = flying ? 2f : 0.6f,
                 Range = OpenFPS.Common.Loudness.AudibleRange(levelDb),
-                EnableReverb = true,
                 TargetRegionId = -1,
             };
         }
@@ -370,7 +369,6 @@ public static class ProviderOrbit
                 Volume = gain, MinDistance = reference,
                 ExtentMetres = engine ? 3.5f : flying ? 2f : 0.6f,
                 Range = OpenFPS.Common.Loudness.AudibleRange(levelDb),
-                EnableReverb = true,
                 TargetRegionId = 9000 + region,
             };
         }
@@ -517,7 +515,6 @@ public static class ProviderOrbit
                     Volume = 0.2f,
                     Position = pos + new Vector3(rnd.Next(-2, 3), 0, rnd.Next(-3, 4)),
                     Range = 60f, MinDistance = 1f, IsEvent = true,
-                    EnableReverb = true,
                     TargetRegionId = target,
                 });
                 created++;

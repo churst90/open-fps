@@ -42,7 +42,7 @@ public static class YardSpike
         var presets = args.Where(a => SmallMachineSpec.Presets.ContainsKey(a)).ToList();
         if (presets.Count == 0) presets = SmallMachineSpec.Presets.Keys.ToList();
 
-        string dir = Path.Combine(AppContext.BaseDirectory, "ASSETS", "SOUNDS", "YARD");
+        string dir = OpenFPS.AudioLab.LabPaths.Output("YARD");
         Directory.CreateDirectory(dir);
         Console.WriteLine("\n  Small machines: what they are made of, what they measure, what they do.\n");
 
