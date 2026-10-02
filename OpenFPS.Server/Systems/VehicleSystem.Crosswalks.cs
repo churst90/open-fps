@@ -19,7 +19,8 @@ namespace OpenFPS.Server.Systems;
 ///   vehicle that is stopping for the crossing is not a vehicle in the way.
 /// - A driver stops for anybody on the crossing, and for somebody who has stood at the kerb for a while
 ///   (StreetLifeData.PedestrianAssertSeconds), if it can stop at its ordinary braking. One that cannot
-///   stop goes through; the walker's gap check is what keeps that from meeting anyone.
+///   stop goes through; the walker's gap check is what keeps that from meeting anyone. One that has
+///   started stopping keeps stopping, harder if it must.
 /// - A driver waiting at a junction's line stands short of a crossing there, not on it.
 /// </summary>
 public sealed partial class VehicleSystem
@@ -56,6 +57,9 @@ public sealed partial class VehicleSystem
     private const float SameCrossingMetres = 3f;
     /// <summary>How far past each kerb a vehicle's line still counts as crossing a crossing, metres.</summary>
     private const float KerbOverrunMetres = 1.5f;
+    /// <summary>How far past where it meant to stand a driver stopping for a crossing may run on its
+    /// ordinary braking before braking harder, metres: half the stand-off.</summary>
+    private const float StandOverrunMetres = 0.5f;
 
     private static Vector3 Flat(Vector3 v) => new(v.X, 0f, v.Z);
 
@@ -247,20 +251,34 @@ public sealed partial class VehicleSystem
             if (ahead <= reach) return false;                           // on it
             // Stopping for us; but one that has stood there a while gets its turn, and nobody new steps out.
             if (v.StoppingFor == cw) { if (v.CrosswalkWait > startUp + life.PedestrianAssertSeconds) return false; continue; }
-            if (v.Speed < 0.5f) continue;                               // standing well back
-            if (ahead / v.Speed < need) return false;
+            // The time until its body is on the strip, not its middle on the walkers' line: a bus
+            // crawling round a corner at half a metre a second with its nose at the strip is there at
+            // once, not in the sixteen seconds its middle takes, and is too close to stop for anybody
+            // stepping out (traced 2026-10-02). One standing still is not coming.
+            if ((ahead - reach) / MathF.Max(v.Speed, 1e-3f) < need) return false;
         }
         return true;
     }
 
     /// <summary>
     /// How far a route vehicle may still go before it must be standing short of a crossing somebody is
-    /// on, metres, or MaxValue.
+    /// on, metres, or MaxValue; and how hard it may brake to stand there, m/s^2.
+    ///
+    /// The nearest such crossing, of all of them. The list is in the line's metres, and across the
+    /// lap's seam the first in it is not the nearest: a driver stopping for somebody five metres ahead
+    /// let them go when somebody stepped out twenty metres on, first in the list, and drove at the
+    /// first (traced 2026-10-02).
+    ///
+    /// A driver already stopping for a crossing keeps stopping for it: the walkers stepped out because
+    /// it was. Coming round a corner or pulling away it can run past where it meant to stand (the body
+    /// lags the speed asked of it), and until 2026-10-02 it then took itself to be too close to stop and
+    /// drove through them. Now it brakes harder, up to an emergency stop, to stand short of them.
     /// </summary>
-    private float CrosswalkHold(DemoVehicle v, float dt)
+    private float CrosswalkHold(DemoVehicle v, float dt, out float decel)
     {
         var was = v.StoppingFor;
         v.StoppingFor = null;
+        decel = v.Brake;
         if (v.Crosswalks.Length == 0 || !_streetLife.TryGetValue(v.MapId, out var life)) return float.MaxValue;
         var line = v.Line!;
         float stopping = v.Speed * v.Speed / (2f * MathF.Max(0.1f, v.Brake));
@@ -274,6 +292,8 @@ public sealed partial class VehicleSystem
             var (leg, along) = WhereOnLane(v);
             if (along >= 0f) laneLeft = v.Route.Legs[leg].Segment.LengthMetres - along + 2f;
         }
+        Crosswalk? stopFor = null;
+        float nearest = float.MaxValue;
         foreach (var (at, cw) in v.Crosswalks)
         {
             float ahead = at - v.Lap;
@@ -285,15 +305,31 @@ public sealed partial class VehicleSystem
             bool somebody = cw.OnIt > 0 || letAcross;
             if (!somebody) continue;
             float stand = ahead - cw.HalfBand - CrosswalkStandOffMetres - 0.5f * v.LengthMetres;
-            if (stand < -0.5f) continue;                                 // its nose is already over
-            // Too close to stop at its ordinary braking: through it goes (the walker checked for this).
-            if (stand < stopping - 0.5f) continue;
-            v.StoppingFor = cw;
-            v.CrosswalkWait = was != null ? v.CrosswalkWait + (v.Speed < 0.3f ? dt : 0f) : 0f;
-            return MathF.Max(0f, stand);
+            float brake = v.Brake;
+            if (cw == was)
+            {
+                // Already stopping for it: as hard as standing no more than a little past its mark takes.
+                float room = stand + StandOverrunMetres;
+                float need = room > 0.05f ? v.Speed * v.Speed / (2f * room) : float.MaxValue;
+                brake = Math.Clamp(need, v.Brake, MathF.Max(v.Brake, HardBrakeGripFraction * v.Grip * 9.81f));
+            }
+            else
+            {
+                if (stand < -0.5f) continue;                             // its nose is already over
+                // Too close to stop at its ordinary braking: through it goes (the walker checked for this).
+                if (stand < stopping - 0.5f) continue;
+            }
+            if (stand < nearest) { nearest = stand; stopFor = cw; decel = brake; }
         }
-        v.CrosswalkWait = 0f;
-        return float.MaxValue;
+        if (stopFor == null)
+        {
+            v.CrosswalkWait = 0f;
+            decel = v.Brake;
+            return float.MaxValue;
+        }
+        v.StoppingFor = stopFor;
+        v.CrosswalkWait = was != null ? v.CrosswalkWait + (v.Speed < 0.3f ? dt : 0f) : 0f;
+        return MathF.Max(0f, nearest);
     }
 
     /// <summary>Where a vehicle waiting at a junction line must stand instead, to keep off a crossing

@@ -751,11 +751,14 @@ public sealed partial class VehicleSystem
         }
 
         // ── Somebody on a crossing ahead ───────────────────────────────────────────────────────
-        float toCrosswalk = CrosswalkHold(v, dt);
+        // Its ordinary braking curve to where it stands, at whatever rate gets it there: past the curve,
+        // a driver who has started stopping brakes harder (see CrosswalkHold).
+        float toCrosswalk = CrosswalkHold(v, dt, out float crosswalkBrake);
         if (toCrosswalk < float.MaxValue)
         {
+            brake = MathF.Max(brake, crosswalkBrake);
             want = MathF.Min(want, MathF.Sqrt(2f * v.Brake * toCrosswalk));
-            if (toCrosswalk <= 0.3f && CanHalt(v.Speed, v.Brake, dt)) { Halt(v); vel.Linear = Vector3.Zero; return; }
+            if (toCrosswalk <= 0.3f && CanHalt(v.Speed, brake, dt)) { Halt(v); vel.Linear = Vector3.Zero; return; }
         }
 
         float toStop = DistanceToNextStop(v, line);

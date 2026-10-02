@@ -146,7 +146,9 @@ public class BusBoardingTests
         for (int stops = 0; ; stops++)
         {
             Assert.True(stops < 20, "the bus never served a stop");
-            UntilStopped(c, bus);
+            // Long enough to drive round to the next stop without being held anywhere on the way,
+            // 137 s on 2026-10-02 (it used to be held by walkers stepping out in front of it).
+            UntilStopped(c, bus, 240);
             bool serving = false;
             for (int i = 0; i < 90 && !serving && Speed(c, bus) < 0.05f; i++)
             {

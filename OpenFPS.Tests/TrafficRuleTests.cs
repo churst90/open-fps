@@ -95,6 +95,13 @@ public class TrafficRuleTests : IDisposable
         SpeedsKmh = new[] { 5f }, AccelerationMps2 = 0.8f, BrakingMps2 = 1.0f, WaitSeconds = 1f, StartDelaySeconds = delay,
     };
 
+    /// <summary>Somebody walking from <paramref name="from"/> to <paramref name="to"/> at an amble.</summary>
+    private static VehicleData Walker(string name, Vector3 from, Vector3 to, float kmh, float delay = 0f) => new()
+    {
+        Name = name, Preset = "walker", RoadStart = from, RoadEnd = to,
+        SpeedsKmh = new[] { kmh }, AccelerationMps2 = 0.8f, BrakingMps2 = 1.0f, WaitSeconds = 1f, StartDelaySeconds = delay,
+    };
+
     // Ways round the square through the middle. Each starts on the lane 104 m from the middle's line,
     // except the late ones, which start a side of the square further back.
     private static readonly string[] North = { "s", "n", "ne", "se" };
@@ -289,6 +296,120 @@ public class TrafficRuleTests : IDisposable
         Assert.True(onRoad >= gone, $"the walker stepped into the road at {onRoad:F2} s with the car standing on the crossing until {gone:F2} s");
         Assert.True(hit.Count == 0, $"the walker was inside the car at {string.Join(", ", hit.Take(5))}");
         Assert.True(over < gone + 15f, $"the walker was not over the road 15 s after the car had gone (over at {over:F2} s)");
+    }
+
+    /// <summary>Each time a walker out on the road was inside a car's body (as CrosswalkTests measures it).</summary>
+    private static void Hits(Scene s, List<string> hit)
+    {
+        var cars = s.Vehicles.DriversForTest("rules", s.World).ToList();
+        foreach (var w in s.Vehicles.WalkersForTest("rules", s.World))
+        {
+            if (!w.OnCarriageway) continue;
+            foreach (var c in cars)
+            {
+                var fwd = new Vector3(MathF.Sin(c.Heading), 0f, MathF.Cos(c.Heading));
+                var d = w.Position - c.Position;
+                if (MathF.Abs(Vector3.Dot(d, fwd)) < 0.5f * c.Length + 0.25f && MathF.Abs(d.X * fwd.Z - d.Z * fwd.X) < 1.2f)
+                    hit.Add($"{c.Name} at {c.Speed:F1} m/s over {w.Name} at ({w.Position.X:F1}, {w.Position.Z:F1}), {s.Time:F1} s");
+            }
+        }
+    }
+
+    /// <summary>
+    /// A driver coming round a corner with somebody already on the crossing just past it stops short of
+    /// them. Braking in the bend it runs a little past where it meant to stand (the body lags the speed
+    /// asked of it); until 2026-10-02 it then took itself to be too close to stop and drove through them,
+    /// four of the city's nine walker-in-vehicle samples that day.
+    /// </summary>
+    [Fact]
+    public void A_driver_turning_toward_somebody_on_the_crossing_stops_short_of_them()
+    {
+        // B comes north up the west road and turns east onto "ew" at the corner; the walker is on the
+        // crossing 3.5 m past the corner's edge from the first second, and ambles over B's lane until
+        // about 13 s.
+        var s = Build(new()
+        {
+            Car("B", East, start: 640f),
+            Walker("Walker", new Vector3(-108.5f, 0.15f, -3.4f), new Vector3(-108.5f, 0.15f, 12f), 1f),
+        }, centre: "none");
+        var hit = new List<string>();
+        float stood = 0f;
+        Run(s, 25f, () =>
+        {
+            Hits(s, hit);
+            var b = s.Car("B");
+            if (b.Speed < 0.05f && b.Position.X < -108.5f) stood += Dt;
+        });
+        _o.WriteLine($"stood {stood:F1} s; {hit.Count} samples inside: {string.Join("; ", hit.Take(3))}");
+        Assert.True(hit.Count == 0, $"the walker was inside the car: {string.Join("; ", hit.Take(5))}");
+        Assert.True(stood > 1f, "the car never stood for the walker");
+    }
+
+    /// <summary>
+    /// A driver stopping for somebody on a crossing does not let them go for somebody on a crossing
+    /// further on. The crossings are in the order of the line's metres, and across the lap's seam the
+    /// first of them is not the nearest: until 2026-10-02 the driver stopped for whichever came first
+    /// in the list, and drove at the nearer one with somebody on it (one of the city's nine that day).
+    /// </summary>
+    [Fact]
+    public void A_driver_stopping_for_somebody_does_not_forget_them_for_somebody_further_on()
+    {
+        // B comes north up the west road and turns east at the corner, where its lap starts again.
+        // Before the corner one walker ambles east across B's lane on the west road until about 9 s;
+        // after it, on the first metres of the lap, another ambles north across "ew".
+        var s = Build(new()
+        {
+            Car("B", East, start: 640f),
+            Walker("Walker before the corner", new Vector3(-119.3f, 0.15f, -11.5f), new Vector3(-104f, 0.15f, -11.5f), 1f),
+            Walker("Walker after the corner", new Vector3(-108.5f, 0.15f, -3.4f), new Vector3(-108.5f, 0.15f, 12f), 1f),
+        }, centre: "none");
+        var hit = new List<string>();
+        float stood = 0f;
+        Run(s, 30f, () =>
+        {
+            Hits(s, hit);
+            var b = s.Car("B");
+            // Its nose short of the strip before the corner.
+            if (b.Speed < 0.05f && b.Position.Z + 0.5f * b.Length < -12f) stood += Dt;
+        });
+        _o.WriteLine($"stood short of the first crossing {stood:F1} s; {hit.Count} samples inside: {string.Join("; ", hit.Take(3))}");
+        Assert.True(hit.Count == 0, $"a walker was inside the car: {string.Join("; ", hit.Take(5))}");
+        Assert.True(stood > 1f, "the car never stood for the walker before the corner");
+    }
+
+    /// <summary>
+    /// Somebody coming to the kerb as a bus crawls round the corner toward the crossing waits for it. The
+    /// gap check timed the bus by its middle reaching the walkers' line, sixteen seconds off at half a
+    /// metre a second, when its nose was at the strip; the walker stepped out, and the bus, too close to
+    /// stop, went on into them (traced 2026-10-02, five samples in the city). The window is a tick or two
+    /// wide, so the walker comes to the kerb at every tick across a second and a half.
+    /// </summary>
+    [Fact]
+    public void A_walker_does_not_step_out_in_front_of_a_bus_crawling_up_to_the_crossing()
+    {
+        var hit = new List<string>();
+        float slowest = float.MaxValue;
+        for (int k = 0; k < 45; k++)
+        {
+            float delay = 6f + k * Dt;
+            var s = Build(new()
+            {
+                Car("B", East, start: 640f, preset: "transit_bus"),
+                Walker("Walker", new Vector3(-108.5f, 0.15f, -4.2f), new Vector3(-108.5f, 0.15f, 12f), 5f, delay),
+            }, centre: "none");
+            var here = new List<string>();
+            for (int t = 0; t < 15 * 30; t++)
+            {
+                s.Tick();
+                Hits(s, here);
+                var b = s.Car("B");
+                if (b.Position.X > -125f && b.Position.X < -108.5f && b.Position.Z > -20f) slowest = MathF.Min(slowest, b.Speed);
+            }
+            if (here.Count > 0) hit.Add($"walker {delay:F2} s late: {here[0]}");
+        }
+        _o.WriteLine($"the bus's slowest round the corner {slowest:F2} m/s; {hit.Count} of 45 with a walker inside it: {string.Join("; ", hit.Take(3))}");
+        Assert.True(slowest < 1f, $"the bus came round the corner at {slowest:F2} m/s, not crawling");
+        Assert.True(hit.Count == 0, $"the walker was inside the bus: {string.Join("; ", hit.Take(5))}");
     }
 
     // ── Junctions ─────────────────────────────────────────────────────────────────────────────
