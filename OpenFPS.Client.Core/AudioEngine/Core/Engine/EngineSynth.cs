@@ -1259,22 +1259,37 @@ public sealed class EngineSynth
     // twelve to one — so it is geared to the engine and slows exactly where the engine does.
     private const float StarterReduction = 12f;
     private const int PinionTeeth = 10, CommutatorBars = 24;
-    /// <summary>A starter at one metre, dB — a loud whirr, under a running engine and over an idle one's
-    /// valvetrain. The solenoid's clunk is a few decibels over it and gone in a hundredth of a second.</summary>
+    /// <summary>A small four's starter at one metre, dB — a loud whirr, under a running engine and over
+    /// an idle one's valvetrain. The solenoid's clunk is a few decibels over it and gone in a hundredth
+    /// of a second.</summary>
     private const float StarterDbAtOneMetre = 82f;
+    /// <summary>The displacement <see cref="StarterDbAtOneMetre"/> is for, litres. A starter is sized to
+    /// the engine it turns — about a kilowatt for a small four, two for a big V8, six or more for a
+    /// bus diesel — and its noise goes with its power, so with the swept volume it has to push over
+    /// compression.</summary>
+    private const float StarterReferenceLitres = 1.6f;
     private float _starterPhase, _starterBuzz, _solenoidEnv, _solenoidRing, _solenoidRing1;
     private bool _starterWas;
 
-    /// <summary>The engine speed at which the starter has no torque left: a DC motor's free speed,
-    /// through the reduction.</summary>
-    private float StarterFreeRpm => Profile.CrankingRpm * 2.2f;
+    /// <summary>The engine speed at which the starter has no torque left: a DC motor's free speed on
+    /// a battery sagging under it, through the reduction.
+    ///
+    /// A DC motor's torque falls in a straight line from stall to free speed, and it settles where
+    /// that line meets what it is turning: the engine's friction (compression gives back most of
+    /// what it takes). The declared cranking speed is that meeting point, so the free speed is
+    /// placed to put it there. At 2.2 times the cranking speed, as it was, a starter sized to push
+    /// a cylinder over compression barely felt the friction and spun the engine at twice its
+    /// cranking speed: an octave high.</summary>
+    private float StarterFreeRpm
+        => Profile.CrankingRpm / MathF.Max(0.2f, 1f - Friction(Profile.CrankingRpm) / StarterTorque());
 
     private float StarterSound(float crankRpm)
     {
         if (Starter && !_starterWas) _solenoidEnv = 1f;
         _starterWas = Starter;
         float outPa = 0f;
-        float amp = 20e-6f * MathF.Pow(10f, StarterDbAtOneMetre / 20f) * 1.414f;
+        float amp = 20e-6f * MathF.Pow(10f, StarterDbAtOneMetre / 20f) * 1.414f
+                  * MathF.Sqrt(MathF.Max(0.25f, Profile.DisplacementLitres / StarterReferenceLitres));
         if (Starter)
         {
             // The pinion stays in mesh with the ring gear and turns with it; once the engine runs

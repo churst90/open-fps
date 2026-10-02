@@ -687,6 +687,12 @@ public sealed class EngineVoiceState : IRenderedVoice
 
     private readonly BodyResonator _cabin;
     private readonly float _panelCorner, _sealLeak, _windPaAt110, _starterPath;
+    private float _starterLp1, _starterLp2;
+    /// <summary>Where the starter's path through the mounts and the floor loses its top, Hz. The
+    /// mounts pass the gear mesh's low partials and the floor's damping mat soaks up the rest: from
+    /// the seat a starter is a muffled whirr, not the buzz it is at the bellhousing. Writable so an
+    /// instrument can bracket it.</summary>
+    public float StarterPathCornerHz = 150f;
     private float _panelLp, _windLp, _windHp, _windHpIn, _interiorMix;
 
     // ── The loudness law, applied to what the engine is doing now ─────────────────────────────
@@ -991,6 +997,7 @@ public sealed class EngineVoiceState : IRenderedVoice
         }
         else _radiation.Aim(null);
         float panelA = 1f - MathF.Exp(-2f * MathF.PI * _panelCorner * dt);
+        float starterA = 1f - MathF.Exp(-2f * MathF.PI * StarterPathCornerHz * dt);
         // The lift for this block, from the level the machine has been running at lately.
         float liftTarget = 1f;
         if (CompensateLevel && _levelMs > 0)
@@ -1166,7 +1173,10 @@ public sealed class EngineVoiceState : IRenderedVoice
                 _panelLp += (atPanels - _panelLp) * panelA;
                 float inCabin = _panelLp + _sealLeak * atPanels;
                 // The starter through the mounts and the floor (VehicleBody.StarterPathLossDb).
-                inCabin += Engine.StarterOut * _starterPath;
+                // Through rubber and a damped floor the top is gone: two poles at the path's corner.
+                _starterLp1 += (Engine.StarterOut * _starterPath - _starterLp1) * starterA;
+                _starterLp2 += (_starterLp1 - _starterLp2) * starterA;
+                inCabin += _starterLp2;
                 inCabin += _cabin.Process(inCabin);
 
                 // The wind: broadband turbulence, most of it between a couple of hundred hertz and a
