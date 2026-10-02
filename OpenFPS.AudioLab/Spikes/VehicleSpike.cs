@@ -228,7 +228,7 @@ public static class VehicleSpike
     }
 
     /// <summary>
-    /// Concrete Row, with cars in it. The listener stands on the pavement of the battle spike's street
+    /// Concrete Row, with cars in it. The listener stands on the pavement of Concrete Row (ConcreteRow)
     /// — six-storey blocks both sides, side streets cut through — while vehicles drive past live.
     /// Each car's engine is the same DSP the game uses; the buildings answer it with first- and
     /// second-order image-source echoes, each a delayed copy of the engine placed at its mirrored
@@ -238,8 +238,8 @@ public static class VehicleSpike
     public static int RunStreet(string[] presets, float[]? speedsKmh)
     {
         AcousticRegistry.Initialize();
-        var boxes = BattleSpike.StreetBoxes();
-        var surfaces = BattleSpike.StreetSurfaces(boxes);
+        var boxes = ConcreteRow.Boxes();
+        var surfaces = ConcreteRow.Surfaces(boxes);
         var speeds = speedsKmh is { Length: > 0 } ? speedsKmh : new[] { 50f, 100f };
         const float C = 340f;
         var ear = new Vector3(-9f, 1.7f, 0f);                // the pavement, west side, near the wall
@@ -248,7 +248,7 @@ public static class VehicleSpike
         if (!provider.Initialize()) { Console.WriteLine("  (live playback unavailable)"); return 1; }
         try
         {
-            provider.SetAcousticMap(BattleSpike.StreetMap());
+            provider.SetAcousticMap(ConcreteRow.Map());
             provider.SetSimulatedReverbDecay(1400f, 0.62f, 0.9f, 1.1f);          // a road between buildings
             provider.UpdateListener(ear, Quaternion.Identity, Vector3.Zero, AcousticConstants.GlobalRegionId);
             var probes = new BoundaryProbe[8];
@@ -366,7 +366,7 @@ public static class VehicleSpike
                         lastReport = (float)now;
                         Console.WriteLine($"    {now,5:F1}s  {state,-5}  {Vector3.Distance(pos, ear),5:F0} m away  {speed * 3.6f,5:F0} km/h   {voices.Count} facades answering");
                     }
-                    int np = BattleSpike.Probes(ear, boxes, probes);
+                    int np = ConcreteRow.Probes(ear, boxes, probes);
                     provider.UpdateBoundaries(probes.AsSpan(0, np));
                     provider.UpdateListener(ear, Quaternion.Identity, Vector3.Zero, AcousticConstants.GlobalRegionId);
                     provider.Update();

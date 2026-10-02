@@ -11,9 +11,10 @@ muzzle, behind it, downrange of the bullet, indoors and outdoors.
 
 - The muzzle blast is fully synthetic (`WeaponSynth.MuzzleBlast`): a Friedlander wave plus filtered
   noise, about 0.1 s long. The world's reflections and reverb are added by the normal sound path.
-- A supersonic crack exists (`WeaponSynth.SupersonicCrack`) and is played when the bullet passes
-  close enough (`Ballistics.MakesCrack`, `ShotResolver`).
-- Handling, casing and reload recordings are in `OpenFPS.Client/ASSETS/SOUNDS/WEAPONS`.
+- A supersonic crack model exists (`WeaponSynth.SupersonicCrack`, `Ballistics.MakesCrack`), but the
+  game does not play it: a shot is heard as its report only.
+- Handling, casing and reload recordings are in `OpenFPS.Client/ASSETS/SOUNDS/WEAPONS`. Nothing plays
+  them yet.
 
 ## Reference recordings
 

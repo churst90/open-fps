@@ -240,46 +240,11 @@ if (args.Contains("--sim-reverbfield"))
     Environment.Exit(code);
 }
 
-if (args.Contains("--ear-test"))
-{
-    int code = EarTest.Run();
-    Log.CloseAndFlush();
-    Environment.Exit(code);
-}
-
-if (args.Contains("--make-siren"))
-{
-    // Emit a realistic police-siren wail WAV. Optional path after the flag; defaults to the client asset.
-    int idx = Array.IndexOf(args, "--make-siren");
-    string outPath = (idx >= 0 && idx + 1 < args.Length && !args[idx + 1].StartsWith("--"))
-        ? args[idx + 1]
-        : System.IO.Path.Combine("OpenFPS.Client", "ASSETS", "SOUNDS", "BEACONS", "siren.wav");
-    OpenFPS.Client.Core.AudioEngine.Tools.PoliceSirenGenerator.WriteWav(outPath);
-    Console.WriteLine($"Wrote police-siren wail to {outPath} ({new System.IO.FileInfo(outPath).Length} bytes).");
-    Log.CloseAndFlush();
-    return;
-}
-
 if (args.Contains("--steam-stereo"))
 {
     int code = SteamAudioLiveTest.RunStereoCheck();
     Log.CloseAndFlush();
     Environment.Exit(code);
-}
-
-if (args.Contains("--dry-check"))
-{
-    foreach (var prof in new[]{ OpenFPS.Client.AudioEngine.Core.WeaponProfile.Rifle,
-                                OpenFPS.Client.AudioEngine.Core.WeaponProfile.Pistol,
-                                OpenFPS.Client.AudioEngine.Core.WeaponProfile.Shotgun })
-    {
-        var pcm = OpenFPS.Client.AudioEngine.Core.WeaponSynth.MuzzleBlast(prof);
-        double mean = 0; foreach (var v in pcm) mean += v; mean /= pcm.Length;
-        float tail = 0; for (int i = pcm.Length - pcm.Length/10; i < pcm.Length; i++) tail = Math.Max(tail, Math.Abs(pcm[i]));
-        Console.WriteLine($"  {prof.Name,-8} len={pcm.Length} mean={mean:F6} tailPeak={tail:F4} last={pcm[^1]:F6}");
-    }
-    Log.CloseAndFlush();
-    Environment.Exit(0);
 }
 
 if (args.Contains("--engine-solver"))
@@ -739,37 +704,10 @@ if (args.Contains("--vehicle") || args.Contains("--vehicle-live")
     Environment.Exit(code);
 }
 
-if (args.Contains("--battle") || args.Contains("--battle-live"))
-{
-    Console.WriteLine("--- Concrete Row: a firefight in a street with sides ---");
-    int code = OpenFPS.Client.Core.AudioEngine.Fmod.BattleSpike.Run(args.Contains("--battle-live"));
-    Log.CloseAndFlush();
-    Environment.Exit(code);
-}
-
 if (args.Contains("--street") || args.Contains("--street-live"))
 {
     Console.WriteLine("--- A street: two doors, a window shot out, a truck, and a wall ---");
     int code = OpenFPS.Client.Core.AudioEngine.Fmod.StreetSceneSpike.Run(args.Contains("--street-live"));
-    Log.CloseAndFlush();
-    Environment.Exit(code);
-}
-
-if (args.Contains("--gunshot") || args.Contains("--gunshot-live"))
-{
-    Console.WriteLine("--- Weapons: a dry synthesized shot, and a crack-to-report gap that encodes range ---");
-    int code = OpenFPS.Client.Core.AudioEngine.Fmod.GunshotSpike.Run(args.Contains("--gunshot-live"), "");
-    Log.CloseAndFlush();
-    Environment.Exit(code);
-}
-
-if (args.Contains("--bed") || args.Contains("--bed-live"))
-{
-    int bi = Array.IndexOf(args, args.Contains("--bed-live") ? "--bed-live" : "--bed");
-    string bedId = (bi >= 0 && bi + 1 < args.Length && !args[bi + 1].StartsWith("--"))
-        ? args[bi + 1] : "AMBIENCE/woods_mid_day";
-    Console.WriteLine("--- Ambient bed: does a real recorded soundfield play and turn with the listener? ---");
-    int code = OpenFPS.Client.Core.AudioEngine.SteamAudio.AmbientBedSpike.Run(bedId, args.Contains("--bed-live"));
     Log.CloseAndFlush();
     Environment.Exit(code);
 }
