@@ -115,7 +115,7 @@ A train cannot be steered, so lane-keeping is not the job. Speed and stopping ar
 
 ## 3. Beacons
 
-**Exists:** `EntityType.Beacon`, `BeaconComponent`, and `chirp_beacon` in `docs/AUTHORING.md`. A
+**Exists:** `EntityType.Beacon` and `chirp_beacon` in `docs/AUTHORING.md`. A
 beacon is an entity with an emitter and nothing more.
 
 **Missing:** control over them. The shape:

@@ -871,11 +871,6 @@ public class GameServer
                         // Each wheel: its load, slip, speed and the surface under it (WheelDynamics).
                         if (_vehicles.TryGetWheels(e.Id, out var wheels) || DrivingSystem.TryGetWheels(e.Id, out wheels))
                             state.Wheels = wheels;
-                        if (world.Has<BeaconComponent>(e))
-                        {
-                            var beacon = world.Get<BeaconComponent>(e);
-                            state.ExtraData = new BeaconData { Frequency = beacon.Frequency, Interval = beacon.Interval };
-                        }
 
                         // A dynamic entity is corrected by the next tick's packet, so losing one costs
                         // nothing. A static entity that moved is a one-off event that nothing will ever

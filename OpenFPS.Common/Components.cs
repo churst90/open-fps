@@ -37,8 +37,6 @@ public partial struct PlayerComponent
 
 [MemoryPackable]
 public partial struct NameComponent { public string Name { get; set; } = ""; public NameComponent() { } }
-[MemoryPackable]
-public partial struct DescriptionComponent { public string Description { get; set; } = ""; public DescriptionComponent() { } }
 
 [MemoryPackable]
 public partial struct ZoneComponent 
@@ -97,9 +95,6 @@ public partial struct IdentityComponent
 
     public IdentityComponent() { }
 }
-
-[MemoryPackable]
-public partial struct DirtyComponent { public DirtyComponent() { } }
 
 [MemoryPackable]
 public partial struct MaterialComponent
@@ -299,16 +294,6 @@ public partial struct AcousticComponent
 }
 
 [MemoryPackable]
-public partial struct AcousticEnvironmentComponent
-{
-    public string ReverbType { get; set; } = "City";
-    public float AirAbsorption { get; set; } = 0.1f;
-    public string BackgroundAmbientLoop { get; set; } = "";
-    public int Priority { get; set; } = 0;
-    public AcousticEnvironmentComponent() { }
-}
-
-[MemoryPackable]
 public partial struct PhysicsPropertyComponent
 {
     public float Mass { get; set; }
@@ -351,9 +336,6 @@ public partial struct VehicleComponent
 
 [MemoryPackable]
 public partial struct Velocity { public Vector3 Linear { get; set; } public Velocity() { } }
-
-[MemoryPackable]
-public partial struct BeaconComponent { public float Frequency { get; set; } public float Interval { get; set; } public float LastPulseTime { get; set; } public BeaconComponent() { } }
 
 /// <summary>
 /// What a player has slung on them rather than in their hands.

@@ -473,8 +473,7 @@ public class CommandHandler
             if (solid && Vector3.Distance(eye, t.Position) < scanRadius + size.Length()) solids.Add((e, t.Position, size, t.Rotation));
 
             string? name = world.Has<IdentityComponent>(e) ? world.Get<IdentityComponent>(e).Name
-                         : world.Has<PlayerComponent>(e) ? world.Get<PlayerComponent>(e).Username
-                         : world.Has<BeaconComponent>(e) ? "Beacon" : null;
+                         : world.Has<PlayerComponent>(e) ? world.Get<PlayerComponent>(e).Username : null;
             if (string.IsNullOrWhiteSpace(name)) return;
             Vector3 nearest = NearestPointOf(t.Position, size, t.Rotation, eye);
             // The floor you are standing on is not something near you.
