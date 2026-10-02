@@ -22,7 +22,28 @@ Recent work, newest first. `git log` has the rest.
     and address, real name). An older database is upgraded in place on first start, after a copy
     is made beside it.
 - `StaffGateTests` runs every gated command as a Player and checks nothing changes.
-- No change to `OpenFPS.Common`. The client hides "Where is" from players (client-only).
+- The client hides "Where is" from players.
+- Bugs found by the 2026-10-01 mutation run (docs/MUTATION_2026-10-01.md), each with a test:
+  - `/draw` of a name you don't carry took entity 0 out of the map. It is now refused.
+  - Disconnecting now puts down what you carry and gets you out of your seat. Before, the items were
+    held by a body that no longer existed.
+  - "Have a good day." is no longer said at night.
+  - Every phone call ends with a goodbye; 11 of 71 calls used to stop mid-call.
+  - A level crossing reopens only when the back of the train is clear, not the front.
+  - Train sources ride at their own height on a sloping rail.
+  - A train leaves a line's only platform, and stops first at the platform ahead of it.
+  - Movement input that is not a number is ignored.
+- Traffic: `TrafficRuleTests` pins each rule of the road with a scene of its own (walkers at the
+  kerb, a car standing in a junction, priority, the car from the right, long vehicles, the deadlock
+  breaker). Two faults it found are fixed:
+  - a driver giving way reached the line at up to 10.9 m/s instead of its looking speed;
+  - the deadlock breaker let every waiting car go at once, and they met in the middle.
+- Map data with a NaN position, or two lanes a hair off parallel, is reported instead of looping
+  forever or allocating gigabytes.
+- Old code out: the JSON user store, the unused AI state machine, the map publish stub, beacon data
+  in every entity state, `PlayerJoined` and `CollisionEvent` messages, four unused components, about
+  400 lines of uncalled methods, and the BepuPhysics package.
+- `OpenFPS.Common` changed: the Windows client needs a new build, and the server needs a restart.
 
 ## 2026-10-01
 
