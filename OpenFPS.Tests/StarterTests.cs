@@ -60,50 +60,62 @@ public class StarterTests
 }
 
 /// <summary>
-/// From the driver's seat the starter comes through the mounts and the floor, not only through the
-/// firewall: "the car starter is not heard" (2026-10-02). Through the firewall alone its whirr was
-/// 22 dB under the cranking chug and 26-35 dB under its level at a metre.
+/// "Way too high pitch" and "the inside still plays the starter at full volume, not muffled"
+/// (2026-10-02). The starter spun every engine at twice its declared cranking speed, an octave
+/// high; and its path into the cabin through the mounts let the brushes' buzz in whole.
 /// </summary>
 public class StarterInCabinTests
 {
     private const int Rate = 44100, Block = 441;
 
-    /// <summary>The starter's band, 300 Hz to 2 kHz, from the seat while it cranks and before anything
-    /// fires, dB re full scale.</summary>
-    private static double CrankBandInSeat(VehicleProfile v)
+    /// <summary>While it cranks, before anything fires: the mean crank speed, and the level above
+    /// 300 Hz (the starter's whirr), dB re full scale.</summary>
+    private static (float Rpm, double TopDb) Crank(VehicleProfile v, bool inside)
     {
-        var voice = new EngineVoiceState(v, Rate, 3) { TargetSpeed = 0f, Running = false, Interior = true };
+        var voice = new EngineVoiceState(v, Rate, 3) { TargetSpeed = 0f, Running = false, Interior = inside };
         voice.PlaceAtSpeed(0f);
         voice.Revive();
         var buf = new float[Block];
         for (int b = 0; b < 300; b++) voice.Render(buf);
         voice.Running = true;
-        float hpA = MathF.Exp(-2f * MathF.PI * 300f / Rate), lpA = 1f - MathF.Exp(-2f * MathF.PI * 2000f / Rate);
-        float hp = 0, hpIn = 0, lp = 0;
-        double sum = 0; int n = 0;
+        float a = 1f - MathF.Exp(-2f * MathF.PI * 300f / Rate), lp = 0;
+        double sum = 0, rpm = 0; int n = 0, blocks = 0;
         for (int b = 0; b < 300; b++)
         {
             voice.Render(buf);
             bool cranking = voice.Engine.Starter && !voice.Engine.Firing;
+            if (cranking && b > 5) { rpm += voice.Engine.Rpm; blocks++; }
             foreach (float x in buf)
             {
-                hp = hpA * (hp + x - hpIn); hpIn = x; lp += (hp - lp) * lpA;
-                if (cranking) { sum += lp * (double)lp; n++; }
+                lp += (x - lp) * a;
+                if (cranking) { sum += (x - lp) * (double)(x - lp); n++; }
             }
         }
-        return 10 * Math.Log10(sum / Math.Max(1, n) + 1e-30);
+        return ((float)(rpm / Math.Max(1, blocks)), 10 * Math.Log10(sum / Math.Max(1, n) + 1e-30));
     }
 
     [Theory]
     [InlineData("i4_economy")]
+    [InlineData("v8_muscle")]
     [InlineData("police_interceptor")]
     [InlineData("transit_bus")]
-    public void The_starter_reaches_the_seat_by_its_own_path(string key)
+    public void It_cranks_near_its_declared_speed(string key)
     {
         var v = VehicleProfile.ByName(key);
-        double with = CrankBandInSeat(v);
-        double without = CrankBandInSeat(v with { Body = v.Body with { StarterPathLossDb = 200f } });
-        Assert.True(with - without >= 5.0, $"{key}: the starter path added only {with - without:F1} dB in the seat");
+        float rpm = Crank(v, false).Rpm;
+        Assert.InRange(rpm, v.Engine.CrankingRpm * 0.7f, v.Engine.CrankingRpm * 1.5f);
+    }
+
+    [Theory]
+    [InlineData("i4_economy")]
+    [InlineData("v8_muscle")]
+    [InlineData("police_interceptor")]
+    [InlineData("transit_bus")]
+    public void From_the_seat_the_whirr_is_muffled(string key)
+    {
+        var v = VehicleProfile.ByName(key);
+        double kerb = Crank(v, false).TopDb, seat = Crank(v, true).TopDb;
+        Assert.True(kerb - seat >= 6.0, $"{key}: the seat is only {kerb - seat:F1} dB under the kerb above 300 Hz");
     }
 }
 

@@ -74,6 +74,9 @@ public sealed class EngineSynth
     /// <summary>The starter's own sound, Pa, already summed into <see cref="Block"/>. Apart because it
     /// reaches a cabin by its own path: it is bolted to the bellhousing, not radiating off the block.</summary>
     public float StarterOut { get; private set; }
+    /// <summary>The starter's sound, 0..1 — normally one. Writable so an instrument can mute it and
+    /// hear what of a start is the starter.</summary>
+    public float StarterMix = 1f;
 
     /// <summary>
     /// The block's absolute-level anchor, as a gain: +7.5 dB. See where Block is assembled for how it was
@@ -487,6 +490,8 @@ public sealed class EngineSynth
     private void SetUpPinkBand()
     {
         _pinkHpA = OnePole.AlphaFor(300f, _rate);
+        _noiseHpA = MathF.Exp(-MathF.Tau * 250f / _rate);
+        _noiseLpA = 1f - MathF.Exp(-MathF.Tau * 7000f / _rate);
         _pinkLpA = OnePole.AlphaFor(5000f, _rate);
         // Normalise by measurement: two seconds of it, whatever the sample rate, on its own noise so
         // the engine's random stream is untouched.
@@ -910,15 +915,10 @@ public sealed class EngineSynth
 
         // ── Crank dynamics ───────────────────────────────────────────────────────────────────
         float friction = Friction(rpm) * (_omega > 0.5f ? 1f : 0f);
-        float starter = 0f;
-        if (Starter)
-        {
-            // A DC motor: full torque stalled, none at twice the cranking speed.
-            starter = StarterTorque() * MathF.Max(0f, 1f - rpm / StarterFreeRpm);
-        }
-        float net = gasTorque * _torqueScale + starter - friction - LoadTorque;
+        float net = gasTorque * _torqueScale - friction - LoadTorque;
         float J = e.InertiaKgM2 + MathF.Max(0f, ExternalInertia);
-        _omega += net / J * _dt;
+        if (Starter) CrankWithStarter(net, J);
+        else _omega += net / J * _dt;
         if (_omega < 0f) _omega = 0f;
         Torque = gasTorque * _torqueScale - friction;
         _rpmSlow += (Rpm - _rpmSlow) * MathF.Min(1f, _dt * 12f);
@@ -1081,7 +1081,7 @@ public sealed class EngineSynth
         // bike all pipe. Nothing at or below six thousand changes.
         float overRated = e.Fuel == FuelType.Diesel ? 1f : MathF.Max(1f, rpm / BlockLawReferenceRpm);
         Block = (knockOut + thud + mech + whine) * BlockRadiationGain * overRated * overRated
-              + (StarterOut = StarterSound(rpm)) + Turbo();
+              + (StarterOut = StarterSound() * StarterMix) + Turbo();
     }
 
     // ── The turbocharger ──────────────────────────────────────────────────────────────────────
@@ -1250,57 +1250,175 @@ public sealed class EngineSynth
     //
     // The engine turning over on the starter was always here — the compression pulses coming round
     // with nothing lighting them is the chug of cranking, and it falls out of the cylinders. The
-    // STARTER was silent: it pushed, and made no noise doing it. A real one is the loudest part of
-    // starting a car for the first second: a solenoid slamming the pinion into the ring gear, then
-    // a small DC motor spinning through a big reduction, whose gear mesh whines and whose brushes
-    // buzz, all dragged down in pitch every time a cylinder comes up on compression.
+    // starter is the rest: a solenoid slamming the pinion into the ring gear, then a small DC motor
+    // pushing through a planetary reduction and the pinion.
     //
-    // Its speed is the crank's times the reduction — the ring gear against a ten-tooth pinion, about
-    // twelve to one — so it is geared to the engine and slows exactly where the engine does.
-    private const float StarterReduction = 12f;
-    private const int PinionTeeth = 10, CommutatorBars = 24;
-    /// <summary>A starter at one metre, dB — a loud whirr, under a running engine and over an idle one's
-    /// valvetrain. The solenoid's clunk is a few decibels over it and gone in a hundredth of a second.</summary>
+    // It is modelled as a machine, not a tone. Six recordings of real starts (Freesound: a V8 van, a
+    // Volvo 245, an Aston V8, a Beetle, a Mazda 6 from the cabin, a diesel) are broadband from 500 Hz
+    // to 4 kHz, flat within a few decibels per octave, with weak, nearly steady gear lines under the
+    // noise and a swell and a clack on every compression. The noise is the brushes and the gears
+    // sliding (US10895239); the clack is the one-way clutch: the motor's own inertia, reflected
+    // through the whole reduction, cannot follow the crank as it springs off each compression, so
+    // the clutch lets go and picks it up again a moment later (US5086657). When the engine catches it
+    // runs away from the motor for good: the clutch overruns, the gears unload and go quiet, and the
+    // motor winds DOWN once the pinion is thrown out. Nothing in a starter climbs in pitch.
+    //
+    // Gearing: a 130-tooth ring against a 10-tooth pinion, and a 4.5:1 planetary set inside a
+    // permanent-magnet gear-reduction starter (Bosch quotes 13-16:1 at the ring, 4.4:1 inside).
+    private const int RingTeeth = 130, PinionTeeth = 10, CommutatorBars = 24;
+    private const float PlanetaryRatio = 4.5f;
+    private const float StarterReduction = (float)RingTeeth / PinionTeeth * PlanetaryRatio;
+    /// <summary>The armature's inertia, kg m^2, for the reference starter. Reflected through the whole
+    /// reduction it is about half a kilogram square metre at the crank: more than the flywheel, which
+    /// is why a cranking engine's speed ripples so much less than a free one's would.</summary>
+    private const float ArmatureKgM2 = 1.5e-4f;
+    /// <summary>How long the armature takes to wind down once the pinion is thrown out, s.</summary>
+    private const float ArmatureCoastSeconds = 0.4f;
+    /// <summary>A small four's starter at one metre, dB — a loud whirr, under a running engine and over
+    /// an idle one's valvetrain.</summary>
     private const float StarterDbAtOneMetre = 82f;
-    private float _starterPhase, _starterBuzz, _solenoidEnv, _solenoidRing, _solenoidRing1;
-    private bool _starterWas;
+    /// <summary>The displacement <see cref="StarterDbAtOneMetre"/> is for, litres. A starter is sized to
+    /// the engine it turns — about a kilowatt for a small four, two for a big V8, six or more for a
+    /// bus diesel — and its noise and its armature go with its power, so with the swept volume it
+    /// has to push over compression.</summary>
+    private const float StarterReferenceLitres = 1.6f;
+    private float StarterSize => MathF.Max(0.25f, Profile.DisplacementLitres / StarterReferenceLitres);
+    /// <summary>The armature's speed as the crank would see it through the reduction, rad/s.</summary>
+    private float _armOmega;
+    private bool _clutchLocked, _starterWas;
+    /// <summary>What the starter is pushing with this sample, as a fraction of its stall torque.</summary>
+    private float _starterLoad, _starterLoadLp;
+    /// <summary>For instruments: the starter's load now, 0..1, and its sound this sample before the
+    /// mix knob, Pa.</summary>
+    internal float StarterLoadNow => _starterLoadLp;
+    private float _meshPhase, _armPhase, _meshDrift;
+    private float _pink0, _pink1, _pink2, _noiseHp, _noiseHpIn, _noiseLp, _noiseLp2;
+    private float _noiseHpA, _noiseLpA;
+    private float _clackKick, _engageKick, _clunkKick, _clunkDelay;
+    private float _clack1, _clack1b, _clack2, _clack2b, _clack3, _clack3b, _clunk, _clunkB;
 
-    /// <summary>The engine speed at which the starter has no torque left: a DC motor's free speed,
-    /// through the reduction.</summary>
-    private float StarterFreeRpm => Profile.CrankingRpm * 2.2f;
+    /// <summary>The engine speed at which the starter has no torque left, rad/s: a DC motor's free
+    /// speed on a battery sagging under it, through the reduction.
+    ///
+    /// A DC motor's torque falls in a straight line from stall to free speed, and it settles where
+    /// that line meets what it is turning: the engine's friction (compression gives back most of
+    /// what it takes). The declared cranking speed is that meeting point, so the free speed is
+    /// placed to put it there.</summary>
+    private float StarterFreeOmega
+        => Profile.CrankingRpm * MathF.Tau / 60f / MathF.Max(0.2f, 1f - Friction(Profile.CrankingRpm) / StarterTorque());
 
-    private float StarterSound(float crankRpm)
+    /// <summary>
+    /// One sample of the crank while the starter is in: the motor and the crank locked together
+    /// through the one-way clutch, or apart while the crank runs ahead. Returns the crank's new speed.
+    /// </summary>
+    private float CrankWithStarter(float engineNet, float J)
     {
-        if (Starter && !_starterWas) _solenoidEnv = 1f;
+        float stall = StarterTorque();
+        float ja = ArmatureKgM2 * StarterSize * StarterReduction * StarterReduction;
+        if (!_starterWas)
+        {
+            // The pinion goes in against a standing (or coasting) motor: the clutch takes up as soon
+            // as the motor catches the crank.
+            _clutchLocked = false;
+            _engageKick = 1f;
+            _clunkDelay = 0.02f;
+        }
+        float motor = stall * MathF.Max(0f, 1f - _armOmega / StarterFreeOmega);
+        if (_clutchLocked)
+        {
+            float together = (motor + engineNet) / (J + ja);
+            // The crank springing off a compression faster than the motor can follow: the clutch lets go.
+            if (engineNet / J > together) _clutchLocked = false;
+            else
+            {
+                _omega += together * _dt;
+                _armOmega = _omega;
+                _starterLoad = motor / stall;
+                return _omega;
+            }
+        }
+        _omega += engineNet / J * _dt;
+        _armOmega += motor / ja * _dt;
+        _starterLoad = 0f;
+        if (_armOmega >= _omega)
+        {
+            // The clutch takes up again: what the two had between them is shared, and the jolt is the clack.
+            float gap = _armOmega - _omega;
+            float shared = (J * _omega + ja * _armOmega) / (J + ja);
+            _omega = _armOmega = shared;
+            _clutchLocked = true;
+            _clackKick = MathF.Min(1f, _clackKick + gap / MathF.Max(1f, StarterFreeOmega) * 4f);
+        }
+        return _omega;
+    }
+
+    private float StarterSound()
+    {
+        if (!Starter && _starterWas) { _clunkKick = 0.5f; _clunkDelay = 0f; }
+        bool engaged = Starter;
+        if (!engaged) _armOmega -= _armOmega * _dt / ArmatureCoastSeconds;   // thrown out: it winds down
         _starterWas = Starter;
-        float outPa = 0f;
-        float amp = 20e-6f * MathF.Pow(10f, StarterDbAtOneMetre / 20f) * 1.414f;
-        if (Starter)
-        {
-            // The pinion stays in mesh with the ring gear and turns with it; once the engine runs
-            // faster than the motor can, the one-way clutch lets the armature freewheel at its own
-            // free speed, so the mesh climbs with the engine and the brushes do not.
-            float motorHz = MathF.Max(0f, crankRpm) / 60f * StarterReduction;
-            float armatureHz = MathF.Min(motorHz, StarterFreeRpm / 60f * StarterReduction);
-            _starterPhase += motorHz * PinionTeeth * _dt;
-            _starterBuzz += armatureHz * CommutatorBars * _dt;
-            _starterPhase -= MathF.Floor(_starterPhase);
-            _starterBuzz -= MathF.Floor(_starterBuzz);
-            float mesh = MathF.Sin(MathF.Tau * _starterPhase) + 0.35f * MathF.Sin(MathF.Tau * 2f * _starterPhase);
-            float brush = _starterBuzz < 0.15f ? 0.6f : -0.1f;        // a spiky, buzzy commutator
-            outPa += amp * (0.6f * mesh + 0.4f * brush);
-        }
-        if (_solenoidEnv > 1e-4f)
-        {
-            // A struck steel plunger: a short knock ringing near 1.2 kHz.
-            float w = MathF.Tau * 1200f * _dt, r = 0.994f;
-            float kick = _solenoidEnv > 0.999f ? 1f : 0f;
-            float y = kick + 2f * r * MathF.Cos(w) * _solenoidRing - r * r * _solenoidRing1;
-            _solenoidRing1 = _solenoidRing; _solenoidRing = y;
-            outPa += amp * 1.6f * y * _solenoidEnv * 0.05f;
-            _solenoidEnv *= MathF.Exp(-_dt / 0.025f);
-        }
-        return outPa;
+        float free = StarterFreeOmega;
+        float spin = MathF.Min(1f, _armOmega / free);
+        if (spin < 1e-3f && _engageKick == 0f && _clunkKick == 0f && _clackKick == 0f && MathF.Abs(_clunk) < 1e-6f) return 0f;
+
+        // RMS pressure at a metre while it cranks steadily: everything below is scaled to come to
+        // about one there.
+        float amp = 20e-6f * MathF.Pow(10f, StarterDbAtOneMetre / 20f) * MathF.Sqrt(StarterSize);
+        _starterLoadLp += (_starterLoad - _starterLoadLp) * MathF.Min(1f, _dt * 200f);
+        // How hard it is pushing against how hard it pushes on average (the friction it settles
+        // against): one while it cranks steadily, more coming up on a compression, nothing while
+        // the clutch is overrunning.
+        float load = engaged ? MathF.Min(3f, _starterLoadLp * StarterTorque() / MathF.Max(1f, Friction(Profile.CrankingRpm))) : 0f;
+
+        // The brushes and the sliding teeth: broadband, as loud as the current (the load) makes it,
+        // rippling a little at the commutator. Pink, 250 Hz to about 6 kHz: flat per octave and
+        // falling above, like the recordings.
+        float w = (float)(_rng.NextDouble() * 2 - 1);
+        _pink0 = 0.99765f * _pink0 + w * 0.0990460f;
+        _pink1 = 0.96300f * _pink1 + w * 0.2965164f;
+        _pink2 = 0.57000f * _pink2 + w * 1.0526913f;
+        float pink = _pink0 + _pink1 + _pink2 + w * 0.1848f;
+        _noiseHp = _noiseHpA * (_noiseHp + pink - _noiseHpIn); _noiseHpIn = pink;
+        _noiseLp += (_noiseHp - _noiseLp) * _noiseLpA;
+        _noiseLp2 += (_noiseLp - _noiseLp2) * _noiseLpA;
+        float armHz = _armOmega / MathF.Tau * StarterReduction;
+        _armPhase += armHz * _dt; _armPhase -= MathF.Floor(_armPhase);
+        float ripple = 1f + 0.2f * MathF.Sin(MathF.Tau * CommutatorBars * _armPhase);
+        // Thrown out, no current flows: what is left is the armature's bearings and windage.
+        float noise = _noiseLp2 * ripple * (0.55f * spin * (engaged ? 1f : 0.3f) + 0.45f * load);
+
+        // The ring gear meshing with the pinion, and the armature: weak lines under the noise, louder
+        // under load, never quite steady (the teeth are not perfect, the speed wanders).
+        _meshDrift += ((float)(_rng.NextDouble() * 2 - 1) * 0.02f - _meshDrift) * _dt * 30f;
+        float meshHz = engaged ? _omega / MathF.Tau * RingTeeth * (1f + _meshDrift) : 0f;
+        _meshPhase += meshHz * _dt; _meshPhase -= MathF.Floor(_meshPhase);
+        float mesh = (MathF.Sin(MathF.Tau * _meshPhase) + 0.3f * MathF.Sin(MathF.Tau * 2f * _meshPhase)) * (0.05f + 0.25f * load);
+        float whine = (MathF.Sin(MathF.Tau * _armPhase) + 0.25f * MathF.Sin(MathF.Tau * 2f * _armPhase)) * 0.12f * spin * spin;
+
+        // The clutch taking up after each compression: a short knock through the housing's modes.
+        float k = _clackKick; _clackKick = 0f;
+        float clack = StruckMode(ref _clack1, ref _clack1b, k, 900f, 8f) + 0.6f * StruckMode(ref _clack2, ref _clack2b, k, 2300f, 8f)
+                    + 0.35f * StruckMode(ref _clack3, ref _clack3b, k, 4000f, 8f);
+        // Engaging: the plunger strikes (a click), and twenty milliseconds later the pinion lands on
+        // the ring gear (a clunk with a body). Thrown out: a softer clunk.
+        float click = _engageKick > 0f ? (float)(_rng.NextDouble() * 2 - 1) * _engageKick : 0f;
+        _engageKick = _engageKick > 0.02f ? _engageKick * MathF.Exp(-_dt / 0.002f) : 0f;
+        float thump = 0f;
+        if (_clunkDelay > 0f) { _clunkDelay -= _dt; if (_clunkDelay <= 0f) _clunkKick = 1f; }
+        else if (_clunkKick > 0f) { thump = _clunkKick; _clunkKick = 0f; }
+        float clunk = StruckMode(ref _clunk, ref _clunkB, thump, 220f, 4f);
+
+        return amp * (0.9f * noise + mesh + whine + 0.7f * clack + 0.6f * click + 1.2f * clunk);
+    }
+
+    /// <summary>A resonant mode struck by <paramref name="kick"/>: frequency and Q.</summary>
+    private float StruckMode(ref float y1, ref float y2, float kick, float hz, float q)
+    {
+        float r = MathF.Exp(-MathF.PI * hz / (q * _rate));
+        float y = kick * (1f - r) * 4f + 2f * r * MathF.Cos(MathF.Tau * hz * _dt) * y1 - r * r * y2;
+        y2 = y1; y1 = y;
+        return y;
     }
 
     private float StarterTorque()
@@ -1623,6 +1741,7 @@ public sealed class EngineSynth
     /// <summary>Resets the engine to cold and still.</summary>
     public void Reset()
     {
+        _armOmega = 0f; _clutchLocked = false;
         _omega = 0f; _theta = 0; _idleAir = 0f; _spool = 0f; _massFlowLp = 0f; _syncDegrees = 0f;
         _turbineTone = 0f; _wb1 = _wb2 = _wx1 = _wx2 = 0f;
     }
