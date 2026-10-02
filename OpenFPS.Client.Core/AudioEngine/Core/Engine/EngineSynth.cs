@@ -1265,7 +1265,7 @@ public sealed class EngineSynth
     //
     // Gearing: a 130-tooth ring against a 10-tooth pinion, and a 4.5:1 planetary set inside a
     // permanent-magnet gear-reduction starter (Bosch quotes 13-16:1 at the ring, 4.4:1 inside).
-    private const int RingTeeth = 130, PinionTeeth = 10, CommutatorBars = 24;
+    private const int RingTeeth = 130, PinionTeeth = 10, CommutatorBars = 24, ArmatureSlots = 11;
     private const float PlanetaryRatio = 4.5f;
     private const float StarterReduction = (float)RingTeeth / PinionTeeth * PlanetaryRatio;
     /// <summary>The armature's inertia, kg m^2, for the reference starter. Reflected through the whole
@@ -1291,7 +1291,10 @@ public sealed class EngineSynth
     /// <summary>For instruments: the starter's load now, 0..1, and its sound this sample before the
     /// mix knob, Pa.</summary>
     internal float StarterLoadNow => _starterLoadLp;
-    private float _meshPhase, _armPhase, _meshDrift;
+    private float _meshPhase, _armPhase, _slotPhase, _meshDrift;
+    /// <summary>The starter's whine lines against its noise, a gain — normally one. Writable so an
+    /// instrument can bracket it.</summary>
+    public float StarterToneMix = 1f;
     private float _pink0, _pink1, _pink2, _noiseHp, _noiseHpIn, _noiseLp, _noiseLp2;
     private float _noiseHpA, _noiseLpA;
     private float _clackKick, _engageKick, _clunkKick, _clunkDelay;
@@ -1390,11 +1393,20 @@ public sealed class EngineSynth
 
         // The ring gear meshing with the pinion, and the armature: weak lines under the noise, louder
         // under load, never quite steady (the teeth are not perfect, the speed wanders).
-        _meshDrift += ((float)(_rng.NextDouble() * 2 - 1) * 0.02f - _meshDrift) * _dt * 30f;
+        // The recordings put these lines 8-14 dB over the noise around them in a 5 Hz bin: the ring
+        // mesh (380-830 Hz) and, on a geared starter, the armature's slots passing the magnets near
+        // 2-2.5 kHz (a Volvo 245, an Aston V8, a diesel). They are what makes it a whine and not a hiss.
+        _meshDrift += ((float)(_rng.NextDouble() * 2 - 1) * 0.006f - _meshDrift) * _dt * 30f;
         float meshHz = engaged ? _omega / MathF.Tau * RingTeeth * (1f + _meshDrift) : 0f;
         _meshPhase += meshHz * _dt; _meshPhase -= MathF.Floor(_meshPhase);
-        float mesh = (MathF.Sin(MathF.Tau * _meshPhase) + 0.3f * MathF.Sin(MathF.Tau * 2f * _meshPhase)) * (0.05f + 0.25f * load);
-        float whine = (MathF.Sin(MathF.Tau * _armPhase) + 0.25f * MathF.Sin(MathF.Tau * 2f * _armPhase)) * 0.12f * spin * spin;
+        float mesh = (MathF.Sin(MathF.Tau * _meshPhase) + 0.3f * MathF.Sin(MathF.Tau * 2f * _meshPhase))
+                   * 1.6f * MathF.Min(2f, 0.4f + 0.6f * load) * StarterToneMix;
+        _slotPhase += armHz * ArmatureSlots * (1f + _meshDrift) * _dt; _slotPhase -= MathF.Floor(_slotPhase);
+        // The slot whine is magnetic: it rides on the speed, and on the current while it pushes, and
+        // goes on as the armature winds down after it is thrown out.
+        float slot = (MathF.Sin(MathF.Tau * _slotPhase) + 0.35f * MathF.Sin(MathF.Tau * 2f * _slotPhase))
+                   * 0.8f * spin * (engaged ? MathF.Min(2f, 0.5f + 0.5f * load) : 0.5f) * StarterToneMix;
+        float whine = (MathF.Sin(MathF.Tau * _armPhase) + 0.25f * MathF.Sin(MathF.Tau * 2f * _armPhase)) * 0.12f * spin * spin + slot;
 
         // The clutch taking up after each compression: a short knock through the housing's modes.
         float k = _clackKick; _clackKick = 0f;
