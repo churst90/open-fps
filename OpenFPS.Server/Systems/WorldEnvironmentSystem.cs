@@ -207,16 +207,6 @@ public class WorldEnvironmentSystem
         _env.DayOfYear = Math.Clamp(dayOfYear, 1, 365);
     }
 
-    public string GetSeason()
-    {
-        return _env.DayOfYear switch {
-            < 90 => "Winter",
-            < 180 => "Spring",
-            < 270 => "Summer",
-            _ => "Autumn"
-        };
-    }
-
     /// <summary>The global sky state, with no map applied. Callers that are about to send this to a
     /// player want <see cref="GetStateForMap"/> instead.</summary>
     public WorldEnvironmentComponent GetCurrentState() => _env;

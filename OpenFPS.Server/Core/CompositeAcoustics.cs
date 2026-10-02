@@ -138,7 +138,6 @@ public static class CompositeAcoustics
         {
             FriendlyName = string.IsNullOrWhiteSpace(name) ? "Inside" : name,
             IsIndoor = true,
-            Environment = AcousticEnvironmentType.Atmospheric,
             RoomSize = survey.Size,
             ReverbTimeScale = 1.0f,
             Materials = materials,
@@ -215,7 +214,6 @@ public static class CompositeAcoustics
         {
             FriendlyName = string.IsNullOrWhiteSpace(name) ? "Inside" : name,
             IsIndoor = true,
-            Environment = AcousticEnvironmentType.Atmospheric,
             RoomSize = survey.Size,
             ReverbTimeScale = 1.0f,
             Materials = materials,

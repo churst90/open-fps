@@ -8,7 +8,6 @@ namespace OpenFPS.Common.Components;
 public enum UserRole { Player, Dev, Admin }
 public enum EntityType { None, Player, NPC, Beacon, StaticObject, Item, Projectile, Trigger }
 public enum WeatherType { Clear, Rain, Snow, Storm }
-public enum AcousticEnvironmentType { Atmospheric, Vacuum, Underwater, Digital, LargeOpen, SmallTight }
 public enum ColliderShape { Box, Sphere, Cylinder, Cone, Polygon } 
 
 [MemoryPackable]
@@ -362,7 +361,6 @@ public partial struct RegionComponent
 {
     public string FriendlyName { get; set; } = "";
     public bool IsIndoor { get; set; }
-    public AcousticEnvironmentType Environment { get; set; } = AcousticEnvironmentType.Atmospheric;
     public Vector3 RoomSize { get; set; }
     public float ReverbTimeScale { get; set; } = 1.0f;
     public int[] Materials { get; set; } = new int[6]; 

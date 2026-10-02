@@ -473,7 +473,6 @@ public partial class VoiceData : IMessage { public int SenderId; public byte[] O
 public partial class WorldStateUpdate : IMessage
 {
     public float GameTime;
-    public string Season = "Spring";
     
     // Physical Atmospheric State
     public float Temperature; // Celsius

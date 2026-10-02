@@ -44,7 +44,6 @@ public static class AcousticVolumeGenerator
             acousticMap.Regions[outsideRegionId] = new RegionComponent {
                 FriendlyName = "Outside",
                 IsIndoor = false,
-                Environment = AcousticEnvironmentType.LargeOpen,
                 RoomSize = mapSize,
                 ReverbTimeScale = 0.0f, // Default to dry unless a GlobalEnvironment entity exists
                 // Six open faces, because that is what outdoors IS: the map-sized box has no surfaces

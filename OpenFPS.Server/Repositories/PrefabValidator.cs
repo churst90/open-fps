@@ -227,7 +227,7 @@ public static class PrefabValidator
         }
 
         // --- Region ---------------------------------------------------------------------------------
-        bool declaresRegion = t.IsIndoor.HasValue || t.EnvType.HasValue || t.RoomSize.HasValue ||
+        bool declaresRegion = t.IsIndoor.HasValue || t.RoomSize.HasValue ||
                               !string.IsNullOrEmpty(t.AmbienceId) || t.ReverbScale.HasValue || t.RoomMaterials != null;
 
         if (declaresRegion)

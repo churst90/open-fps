@@ -1380,7 +1380,6 @@ public class GameServer
     /// </summary>
     private void BroadcastEnvironment()
     {
-        string season = _environment.GetSeason();
         var perMap = new Dictionary<string, WorldStateUpdate>();
 
         foreach (var session in _sessions.GetAllSessions())
@@ -1395,7 +1394,7 @@ public class GameServer
 
                 var state = _environment.GetStateForMap(atmosphere);
                 update = new WorldStateUpdate {
-                    GameTime = state.GameTime, Season = season,
+                    GameTime = state.GameTime,
                     Temperature = state.Temperature, Humidity = state.Humidity,
                     AirPressure = state.AirPressure, AirAbsorptionMultiplier = state.AirAbsorptionMultiplier,
                     WindVelocity = state.WindVelocity,

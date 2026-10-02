@@ -149,7 +149,6 @@ public static class ConcreteRow
         {
             FriendlyName = "Concrete Row",
             IsIndoor = false,
-            Environment = AcousticEnvironmentType.LargeOpen,
             RoomSize = new Vector3(StreetHalfWidth * 2f, BlockHeight, 280f),
             ReverbTimeScale = 1.0f,
             Materials = new[] { 18, 18, 18, 18, 18, 18 },   // concrete on every face
