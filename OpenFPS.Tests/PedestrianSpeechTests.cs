@@ -126,6 +126,30 @@ public class PedestrianSpeechTests
             Assert.True(File.Exists(Path.Combine(root, "VOICES", t.Voice, t.Line + ".ogg")), $"{t.Voice}/{t.Line}.ogg");
     }
 
+    /// <summary>
+    /// "Have a good day." was said at night: Partings leaves it out after dark, but Candidates added
+    /// every "bye" line AnyTime let through, and AnyTime knew "nice day" and "beautiful day" but not
+    /// "good day". "How's your day going?" came back into the greetings the same way.
+    /// </summary>
+    [Fact]
+    public void Nobody_wishes_you_a_good_day_at_night()
+    {
+        var day = new System.Text.RegularExpressions.Regex(@"\bday\b|\bweather\b",
+                                                           System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        foreach (var voice in PedestrianSpeech.WalkerVoices.Distinct())
+        {
+            var said = StreetLines.Candidates(voice, StreetLines.Partings(Night), new[] { "bye" })
+                .Concat(StreetLines.Candidates(voice, StreetLines.Greetings(Night), new[] { "greet" }))
+                .Concat(StreetLines.Candidates(voice, Array.Empty<string>(), new[] { "smalltalk_open" }))
+                .Select(line => Speech.Find(voice, line)!.Text);
+            Assert.DoesNotContain(said, text => day.IsMatch(text));
+        }
+        Assert.False(StreetLines.AnyTime("Have a good day."));
+        Assert.False(StreetLines.AnyTime("How's your day going?"));
+        Assert.False(StreetLines.AnyTime("Crazy weather lately, huh?"));
+        Assert.True(StreetLines.AnyTime("Long time no see!"));
+    }
+
     [Fact]
     public void Lines_that_need_something_true_are_only_offered_when_it_is()
     {

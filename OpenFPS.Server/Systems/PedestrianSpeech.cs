@@ -755,10 +755,14 @@ public static class StreetLines
     /// <summary>
     /// Whether a line can be said at any time of day and in any weather: it names no time, no season
     /// and no weather. The lines that do are only said from the lists that check the clock and the sky.
+    ///
+    /// "Day" on its own, not only "nice day": "Have a good day." and "How's your day going?" are
+    /// daytime lines, and with only the two phrases they came back into the lists after dark.
+    /// "Weather" too, for "Crazy weather lately, huh?", which the sky has to agree with.
     /// </summary>
     public static bool AnyTime(string text)
         => !System.Text.RegularExpressions.Regex.IsMatch(text.ToLowerInvariant(),
-            @"\b(morning|afternoon|evening|tonight|night|noon|lunch|breakfast|dinner|today|tomorrow|yesterday|weekend|monday|tuesday|wednesday|thursday|friday|saturday|sunday|rain|raining|snow|snowing|cold|freezing|hot|heat|sun|sunny|storm|wind|windy|fog|foggy|beautiful day|nice day)\b");
+            @"\b(morning|afternoon|evening|tonight|night|noon|lunch|breakfast|dinner|day|days|today|tomorrow|yesterday|weekend|monday|tuesday|wednesday|thursday|friday|saturday|sunday|spring|summer|autumn|winter|weather|rain|raining|snow|snowing|cold|freezing|hot|heat|sun|sunny|storm|wind|windy|fog|foggy)\b");
 
     /// <summary>The lines a voice can say from a list: the named ones it recorded, and its any-time
     /// lines in the given categories.</summary>
