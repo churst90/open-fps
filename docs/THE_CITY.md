@@ -32,7 +32,7 @@ enough to replace them, and it is not close on the materials where it would matt
 `tools/build_footstep_bank.py` is the bank since 2026-09-28: Cody's two Foley packs
 (`approved/footsteps`), labelled by ear in `tools/footstep_sets.json`, cut into walk, jog, run, scuff
 and landing per surface and shoe. About 14,000 takes across fifteen surfaces. (Before that,
-`tools/rebuild_footstep_bank.py` built 518 samples across twelve materials from twelve recordings.)
+an earlier script, since removed, built 518 samples across twelve materials from twelve recordings.)
 
 ### The splitter had two faults, both measured
 
