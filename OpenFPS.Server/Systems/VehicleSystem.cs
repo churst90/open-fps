@@ -737,8 +737,11 @@ public sealed partial class VehicleSystem
         var (toHold, look) = JunctionHold(v, dt);
         if (look < float.MaxValue && toHold == float.MaxValue)
         {
-            var (_, along) = WhereOnLane(v);
-            float toLine = v.Route!.Legs[WhereOnLane(v).Leg].Segment.LengthMetres - along;
+            // Measured on the lane JunctionHold measured it on: the lap may already put a vehicle that is
+            // still short of the line in the junction, and the next lane's length is no distance to it.
+            var (leg, along) = WhereOnLane(v);
+            if (along < 0f) ShortOfTheLine(v, ref leg, ref along);
+            float toLine = v.Route!.Legs[leg].Segment.LengthMetres - along;
             want = MathF.Min(want, MathF.Sqrt(look * look + 2f * v.Brake * MathF.Max(0f, toLine)));
         }
         if (toHold < float.MaxValue)
