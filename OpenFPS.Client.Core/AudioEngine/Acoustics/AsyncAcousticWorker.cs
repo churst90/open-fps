@@ -689,7 +689,7 @@ public class AsyncAcousticWorker : IDisposable
             if (delta >= 0f && !sr.BarrierVerified) delta = -1f;
             if (delta >= 0f)
             {
-                var (dLow, dMid, dHigh) = Diffraction.BandGains(delta, AudioPhysics.SpeedOfSound);
+                var (dLow, dMid, dHigh) = Diffraction.BandGains(delta, AudioPhysics.CurrentSpeedOfSound);
                 // And the route round is LONGER, which the barrier's insertion loss does not pay for
                 // once it reaches its 24 dB ceiling. A walker on the pavement outside Marlow flat 01F
                 // is 8 m from the ear through a brick wall and 164 m round the building: capped, that
@@ -806,7 +806,7 @@ public class AsyncAcousticWorker : IDisposable
         // echo of a SUSTAINED sound is not heard as an event; it is part of the field, which the
         // reverb is. Copies of copies belong to one-off sounds (WorldAudioPlayer), where an echo
         // happens once and is gone.
-        EarlyReflections.Find(req.SourcePos, req.ListenerPos, solids, _reflectionScratch, AudioPhysics.SpeedOfSound);
+        EarlyReflections.Find(req.SourcePos, req.ListenerPos, solids, _reflectionScratch, AudioPhysics.CurrentSpeedOfSound);
 
         _lastReflectionCount = 0;
         for (int i = 0; i < _reflectionScratch.Count; i++)

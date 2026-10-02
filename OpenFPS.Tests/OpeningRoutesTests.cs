@@ -319,6 +319,51 @@ public class OpeningRoutesTests
         Assert.True(round.X > round.Y && round.Y > round.Z, $"{round}");
     }
 
+    // ── The street's reverberant field, indoors ─────────────────────────────────────────────────
+
+    /// <summary>In the stairwell, 3 m in from the open front door, the street's field is what a
+    /// diffuse field radiates through that opening: S tau / (8 pi r^2) of it, in pressure squared.</summary>
+    [Fact]
+    public void BesideTheDoorTheStreetsFieldIsWhatTheOpeningRadiates()
+    {
+        var world = Building(frontDoorOpen: true);
+        var (model, _) = Graph(world);
+        var door = model.Openings.Single(o => o.Id == FrontDoor);
+        var at = door.Centre + new Vector3(3f, 0.6f, 0f);
+        float field = model.FieldAt(AcousticConstants.GlobalRegionId, at, Stair, 60f, out var via);
+        float r = Vector3.Distance(at, door.Centre);
+        // Radiated straight from the doorway, plus what came in builds the stairwell's own field.
+        Assert.True(model.TryGetAbsorption(model.NodeOf(Stair), out var a));
+        float expected = MathF.Sqrt(door.Area * door.Tau.Y / (8f * MathF.PI * r * r) + door.Area * door.Tau.Y / a.Y);
+        Assert.Equal(expected, field, 2);
+        Assert.True(Vector3.Distance(via, door.Centre) < 0.01f, "the field should arrive from the doorway");
+    }
+
+    /// <summary>"The city does not wash into the lobby through an open door" (2026-10-02). Down the
+    /// corridor, two openings in from the street, the old rule gave the street's reverb nothing: it
+    /// only looked for an opening joining the listener's room straight to the outdoors.</summary>
+    [Fact]
+    public void TheStreetsFieldReachesTheCorridorTwoOpeningsIn()
+    {
+        var world = Building(frontDoorOpen: true);
+        var (model, _) = Graph(world);
+        float field = model.FieldAt(AcousticConstants.GlobalRegionId, InCorridor, Corridor, 60f, out _);
+        // The street's energy into the stairwell's field and on into the corridor's: about 25-35 dB down
+        // by the transmission-room equation with these rooms' absorption.
+        Assert.True(Db(field) > -45f && Db(field) < -15f, $"{Db(field):F1} dB");
+    }
+
+    [Fact]
+    public void AShutSteelDoorKeepsTheStreetsFieldOut()
+    {
+        var open = Graph(Building(frontDoorOpen: true)).Item1;
+        var shut = Graph(Building(frontDoorOpen: false)).Item1;
+        var at = new Vector3(2.5f, 1.6f, 3f);
+        float o = open.FieldAt(AcousticConstants.GlobalRegionId, at, Stair, 60f, out _);
+        float c = shut.FieldAt(AcousticConstants.GlobalRegionId, at, Stair, 60f, out _);
+        Assert.True(Db(o) - Db(c) > 15f, $"open {Db(o):F1} dB, shut {Db(c):F1} dB");
+    }
+
     private static float HalfPlaneOnTheBoundary()
     {
         OpeningRoutes.Fresnel(0f, out float c0, out float s0);

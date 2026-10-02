@@ -2212,6 +2212,9 @@ public sealed record EngineProfile
     {
         Name = "163 cc OHV single",
         Layout = EngineLayout.Inline,
+        // A pull cord spins it hard for a moment, and a magneto sparks on the first compression:
+        // nothing to synchronise, no rail to pressurise.
+        CrankingRpm = 600f, RevolutionsBeforeFiring = 1f,
         FiringAngles = new[] { 0f },
         Bank = new[] { 0 },
         BoreMm = 68f, StrokeMm = 45f, RodRatio = 1.9f, CompressionRatio = 8.5f,
@@ -2276,6 +2279,9 @@ public sealed record EngineProfile
     {
         Name = "500 cc air-cooled V-twin",
         Layout = EngineLayout.Vee,
+        // A small electric starter on a small engine turns it faster than a car's turns a car, and
+        // the magneto fires on the first compression.
+        CrankingRpm = 300f, RevolutionsBeforeFiring = 1f,
         // Both rods on one crankpin with 90 degrees between the cylinders: the rear fires 270
         // degrees after the front, and then there are 450 before the front comes round again. That
         // uneven pair is what a V-twin IS, and it is written here as the two intervals it is.

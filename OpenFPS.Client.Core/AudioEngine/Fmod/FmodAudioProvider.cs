@@ -225,6 +225,49 @@ public class FmodAudioProvider : IAudioProvider
 
     private readonly System.Collections.Concurrent.ConcurrentStack<FMOD.DSP> _threeEqPool = new();
     private readonly System.Collections.Concurrent.ConcurrentStack<FMOD.DSP> _diffractionPool = new();
+    private readonly System.Collections.Concurrent.ConcurrentStack<FMOD.DSP> _sendTapPool = new();
+
+    /// <summary>
+    /// A pass-through at the INPUT end of a voice's chain, ahead of the route EQ, the diffraction and
+    /// the HRTF: what the source radiates, before anything between it and the listener. A sound
+    /// rings its own room whatever stands between it and you, so its own room's reverb is fed from
+    /// here; the cross-send into the listener's room stays at the fader, since that room is rung by
+    /// what arrives. Fed from the fader, a street sound reached the street's reverb already through
+    /// the lobby wall, and the doorway then turned that reverb down a second time.
+    /// </summary>
+    private FMOD.DSP GetSendTapDsp()
+    {
+        if (_sendTapPool.TryPop(out var dsp)) { dsp.reset(); return dsp; }
+        _system.createDSPByType(DSP_TYPE.MIXER, out dsp);
+        return dsp;
+    }
+
+    /// <summary>Off the channel, then every connection it still has — the sends hang off it, and a
+    /// pooled tap that kept one would feed a room from the next voice it is given to.</summary>
+    private void ReleaseSendTapDsp(ActiveSound active)
+    {
+        var dsp = active.SendTap;
+        if (!dsp.hasHandle()) return;
+        active.SendTap = default;
+        bool off = Detach(active.Channel, dsp, "send tap");
+        dsp.disconnectAll(true, true);
+        active.SourceReverbConnection = default;
+        active.FadingSourceConnection = default;
+        if (off) _sendTapPool.Push(dsp);
+    }
+
+    /// <summary>The unit a voice's own-room send hangs off: its tap, or the fader on a voice without one.</summary>
+    private static FMOD.DSP SourceSendDsp(ActiveSound active)
+    {
+        if (active.SendTap.hasHandle()) return active.SendTap;
+        active.Channel.getDSP(CHANNELCONTROL_DSP_INDEX.FADER, out var fader);
+        return fader;
+    }
+
+    /// <summary>What the own-room send must add to stand where a send off the fader stood: the fader's
+    /// level, which the tap is ahead of. The route's EQ is the one thing deliberately left out.</summary>
+    private static float SourceSendLevel(ActiveSound active)
+        => active.SendTap.hasHandle() ? active.LastVolume : 1f;
 
     private FMOD.DSP GetThreeEqDsp()
     {
@@ -496,6 +539,8 @@ public class FmodAudioProvider : IAudioProvider
         public int CurrentSourceRegionId = -2;
         public FMOD.DSPConnection ReverbConnection;
         public FMOD.DSPConnection SourceReverbConnection;
+        /// <summary>The pass-through the own-room send is taken from. See GetSendTapDsp.</summary>
+        public FMOD.DSP SendTap;
         // The unit each live send actually feeds, kept BESIDE the connection. The bus a send fades
         // out of must be this unit and no other; looking it up again from a region id can find a
         // different unit. See DropSend for what FMOD does with the wrong unit.
@@ -1188,8 +1233,11 @@ public class FmodAudioProvider : IAudioProvider
     // Speed of sound, m/s, derived from the world's air temperature. Defaults to the 20 °C value so a
     // provider that is never told the weather behaves exactly as it did before.
     private float _speedOfSound = OpenFPS.Client.AudioEngine.Core.AudioPhysics.SpeedOfSound;
-    public void SetAirTemperature(float celsius) =>
+    public void SetAirTemperature(float celsius)
+    {
         _speedOfSound = OpenFPS.Client.AudioEngine.Core.AudioPhysics.SpeedOfSoundAt(celsius);
+        OpenFPS.Client.AudioEngine.Core.AudioPhysics.CurrentSpeedOfSound = _speedOfSound;
+    }
 
     /// <summary>The wet level of the bus for the room the listener is in, dB, moved toward its target
     /// rather than snapped to it. -80 is silence, which is where open ground sits.</summary>
@@ -1837,6 +1885,12 @@ public class FmodAudioProvider : IAudioProvider
                 && _acousticMap.RegionPositions.TryGetValue(kv.Key, out var centre)
                 && _reverbVolumes.TryGetValue(kv.Key, out float vol) && vol > 0.001f)
                 trace = TracedReverbSet.ForRoom(kv.Key, centre) ?? listenerTrace;
+            // Open ground heard from INDOORS: from just outside the opening it comes in by. Traced at
+            // the listener it was the street's sound with the lobby's echoes in it.
+            else if (kv.Key != _listenerRegionId && !IsEnclosure(kv.Key) && IsEnclosure(_listenerRegionId)
+                     && _fieldHere.TryGetValue(kv.Key, out var field) && field.Region == _listenerRegionId && field.Gain > 0f
+                     && _reverbVolumes.TryGetValue(kv.Key, out float openVol) && openVol > 0.001f)
+                trace = TracedReverbSet.ForRoom(kv.Key, field.InField) ?? listenerTrace;
             kv.Value.State.Trace = trace;
             // Your own place's stage: the late tail alone, the early part being placed copies
             // (WorldAudioPlayer.QueueEarlyEchoes). A cabin keeps its whole response: nothing is placed
@@ -2693,12 +2747,18 @@ public class FmodAudioProvider : IAudioProvider
                 // receive nothing: a street that measured a two-second reverberation time and sounded
                 // completely dead. TryGetReverbInput already returns false for a region with no bus,
                 // which is the test that was actually wanted.
+                // Last onto the TAIL, so it is the first thing the signal meets.
+                {
+                    var tap = GetSendTapDsp();
+                    if (activeSound.Channel.addDSP(CHANNELCONTROL_DSP_INDEX.TAIL, tap) == RESULT.OK) activeSound.SendTap = tap;
+                    else _sendTapPool.Push(tap);
+                }
                 if (TryGetReverbInput(sourceRegionId, out var sourceReverb))
                 {
-                    activeSound.Channel.getDSP(CHANNELCONTROL_DSP_INDEX.FADER, out var channelDsp);
-                    sourceReverb.addInput(channelDsp, out activeSound.SourceReverbConnection, DSPCONNECTION_TYPE.SEND);
+                    sourceReverb.addInput(SourceSendDsp(activeSound), out activeSound.SourceReverbConnection, DSPCONNECTION_TYPE.SEND);
                     activeSound.SourceReverbBus = sourceReverb;
-                    activeSound.SourceReverbConnection.setMix(AcousticConstants.ReverbSendMix);
+                    activeSound.SourceReverbConnection.setMix(AcousticConstants.ReverbSendMix
+                        * (activeSound.SendTap.hasHandle() ? emitter.Volume : 1f));
                     activeSound.SourceReverbMix = 1f;   // a new voice has no running signal to step
                     activeSound.CurrentSourceRegionId = sourceRegionId;
                 }
@@ -3283,6 +3343,7 @@ public class FmodAudioProvider : IAudioProvider
         ReleaseSteamAudioVoice(active);
         ReleaseThreeEqDsp(active.Channel, active.ThreeEqDsp);
         ReleaseDiffractionDsp(active.Channel, active.DiffractionDsp);
+        ReleaseSendTapDsp(active);
         // The OWNED units come off the same way, and for the same reason. FMOD's logging build says
         // this in one line where a core file does not:
         //
@@ -3368,13 +3429,14 @@ public class FmodAudioProvider : IAudioProvider
         if (!sourceChanged && !listenerChanged && !fading) return;
 
         active.Channel.getDSP(CHANNELCONTROL_DSP_INDEX.FADER, out var sourceFader);
+        var sourceTap = SourceSendDsp(active);
 
         // Update Source Reverb Send (the room the sound is in)
         if (sourceChanged)
         {
             // Whatever was already fading out has had its turn; a second change before the first
             // finished drops it outright rather than leaving connections to accumulate.
-            DropSend(ref active.FadingSourceConnection, active.FadingSourceBus, sourceFader);
+            DropSend(ref active.FadingSourceConnection, active.FadingSourceBus, sourceTap);
             // The bus it fades out of is the unit the send was made into — the handle stored with
             // the connection — NOT a fresh lookup by region id. The id recorded in CurrentRegionId
             // is a change detector and can legitimately differ from the bus (see crossRegionId);
@@ -3391,7 +3453,7 @@ public class FmodAudioProvider : IAudioProvider
 
             if (sourceRegionId != -2 && !active.IsReflection && TryGetReverbInput(sourceRegionId, out var sourceReverb))
             {
-                sourceReverb.addInput(sourceFader, out active.SourceReverbConnection, DSPCONNECTION_TYPE.SEND);
+                sourceReverb.addInput(sourceTap, out active.SourceReverbConnection, DSPCONNECTION_TYPE.SEND);
                 active.SourceReverbBus = sourceReverb;
                 active.SourceReverbConnection.setMix(0f);   // in at nothing, then ramped
             }
@@ -3426,13 +3488,13 @@ public class FmodAudioProvider : IAudioProvider
             active.CurrentRegionId = crossRegionId;
         }
 
-        AdvanceSendFade(active, sourceFader);
+        AdvanceSendFade(active, sourceFader, sourceTap);
     }
 
     /// <summary>Moves both sends one step along their crossfade and releases a connection that has
     /// finished fading out. The mixes here are FRACTIONS of each send's own target level, which
     /// <see cref="UpdateReverbRouting"/>'s callers may scale further.</summary>
-    private void AdvanceSendFade(ActiveSound active, FMOD.DSP sourceFader)
+    private void AdvanceSendFade(ActiveSound active, FMOD.DSP sourceFader, FMOD.DSP sourceTap)
     {
         float listenerTarget = AcousticConstants.ReverbSendMix * AcousticConstants.ReverbCrossSendScale;
         float sourceTarget = AcousticConstants.ReverbSendMix;
@@ -3447,8 +3509,8 @@ public class FmodAudioProvider : IAudioProvider
         if (active.FadingSourceConnection.hasHandle())
         {
             active.FadingSourceMix -= ReverbSendFadeStep;
-            if (active.FadingSourceMix <= 0f) DropSend(ref active.FadingSourceConnection, active.FadingSourceBus, sourceFader);
-            else active.FadingSourceConnection.setMix(sourceTarget * active.FadingSourceMix);
+            if (active.FadingSourceMix <= 0f) DropSend(ref active.FadingSourceConnection, active.FadingSourceBus, sourceTap);
+            else active.FadingSourceConnection.setMix(sourceTarget * active.FadingSourceMix * SourceSendLevel(active));
         }
         if (active.FadingReverbConnection.hasHandle())
         {
@@ -3860,7 +3922,7 @@ public class FmodAudioProvider : IAudioProvider
         // A source traced from where it is carries its whole reverberation in its own IR.
         if (active.EchoRig != null) { ownMix *= 1f - active.EchoWeight; crossMix *= 1f - active.EchoWeight; }
         if (active.SourceReverbConnection.hasHandle())
-            active.SourceReverbConnection.setMix(ownMix * radiated * active.SourceReverbMix);
+            active.SourceReverbConnection.setMix(ownMix * radiated * active.SourceReverbMix * SourceSendLevel(active));
         if (active.ReverbConnection.hasHandle())
             active.ReverbConnection.setMix(crossMix * radiated * active.ReverbMix);
 
@@ -3919,9 +3981,19 @@ public class FmodAudioProvider : IAudioProvider
                     targetVol = 1.0f;
                     SetReverbDirection(regionId, bus, default, outside: false, lPosVec); // fill the room
                 }
+                else if (_routesSource?.Invoke() is { } routes
+                         && routes.NodeOf(regionId) != routes.NodeOf(listenerRegionId))
+                {
+                    if (FieldHere(routes, regionId, lPosVec, listenerRegionId, out float gain, out Vector3 via))
+                    {
+                        targetVol = gain;
+                        SetReverbDirection(regionId, bus, via, outside: true, lPosVec);
+                    }
+                }
                 else
                 {
-                    // Leakage through portals
+                    // Leakage through portals: the old one-room rule, for a map with no openings yet and
+                    // for two outdoor places, which share the one unbounded node.
                     var portals = _acousticMap.Portals.Values.Where(p =>
                         (p.Portal.RegionAId == regionId && p.Portal.RegionBId == listenerRegionId) ||
                         (p.Portal.RegionAId == listenerRegionId && p.Portal.RegionBId == regionId) ||
@@ -3986,6 +4058,31 @@ public class FmodAudioProvider : IAudioProvider
         Vector3 d = _listenerPos - position;
         local = new Vector3(Vector3.Dot(d, right), d.Y, Vector3.Dot(d, fwd));
         return true;
+    }
+
+    /// <summary>The routes through openings, from whoever builds them (the acoustic worker).</summary>
+    private Func<OpenFPS.Common.OpeningRoutes?>? _routesSource;
+    public Func<OpenFPS.Common.OpeningRoutes?>? RoutesSource { set => _routesSource = value; }
+
+    /// <summary>Beyond this an opening's share of a room's field is under -45 dB and not asked about.</summary>
+    private const float FieldLeakRange = 60f;
+    private readonly Dictionary<int, (double At, Vector3 Where, int Region, float Gain, Vector3 Via, Vector3 InField)> _fieldHere = new();
+
+    /// <summary>Another room's reverberant field where the listener stands (OpeningRoutes.FieldAt),
+    /// asked at most every quarter second or half metre.</summary>
+    private bool FieldHere(OpenFPS.Common.OpeningRoutes routes, int regionId, Vector3 listener, int listenerRegion,
+                           out float gain, out Vector3 via)
+    {
+        double now = OpenFPS.Common.AudioClock.Now;
+        if (_fieldHere.TryGetValue(regionId, out var c) && c.Region == listenerRegion
+            && now - c.At < 0.25 && Vector3.DistanceSquared(c.Where, listener) < 0.25f)
+        {
+            gain = c.Gain; via = c.Via;
+            return gain > 0f;
+        }
+        gain = routes.FieldAt(regionId, listener, listenerRegion, FieldLeakRange, out via, out var inField);
+        _fieldHere[regionId] = (now, listener, listenerRegion, gain, via, inField);
+        return gain > 0f;
     }
 
     /// <summary>

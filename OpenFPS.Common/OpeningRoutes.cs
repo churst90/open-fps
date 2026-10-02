@@ -497,6 +497,103 @@ public sealed class OpeningRoutes
     }
 
     /// <summary>
+    /// How strong a place's reverberant field is at <paramref name="listener"/>, as an amplitude
+    /// against standing in it, and where the strongest part of it arrives from.
+    ///
+    /// A diffuse field of energy density E pushes E c S / 4 watts out of an opening of area S. Out of
+    /// the opening it spreads over a half space, so at r metres its pressure squared is S / (8 pi r^2)
+    /// of the field's inside: that, per opening, with the opening's own transmission (a shut leaf, a
+    /// door ajar). An opening into the listener's own place is heard straight; one into anywhere else
+    /// is followed by the routes through openings, as any other sound there would be. Summed over
+    /// every opening of the place within <paramref name="range"/>.
+    ///
+    /// It replaced (aperture / 2) / distance through the single nearest opening joining the two
+    /// places, which gave a room two openings away nothing and a lobby none of the street.
+    /// </summary>
+    public float FieldAt(int regionId, Vector3 listener, int listenerRegion, float range, out Vector3 via)
+        => FieldAt(regionId, listener, listenerRegion, range, out via, out _);
+
+    /// <summary><see cref="FieldAt(int, Vector3, int, float, out Vector3)"/>, and a point in the place
+    /// itself, two metres out from the opening most of it leaves by: where its field should be
+    /// heard (traced) from, for a listener who is not in it.</summary>
+    public float FieldAt(int regionId, Vector3 listener, int listenerRegion, float range, out Vector3 via, out Vector3 inField)
+    {
+        int node = NodeOf(regionId), lNode = NodeOf(listenerRegion);
+        via = listener; inField = listener;
+        if (node == lNode) return 1f;
+        double energy = FieldEnergy(node, listener, listenerRegion, lNode, range, ref via, ref inField);
+        // And what comes in builds the listener's own room's field, which they are standing in: the
+        // field just outside each of its openings times what that opening lets in, over the room's
+        // absorption (the transmission-room equation, E_room = sum E_out S tau / A). Down a corridor
+        // two openings from the street this is most of it; the openings' direct radiation is a
+        // little of it near each one.
+        if (lNode != Outside && TryGetAbsorption(lNode, out var absorption) && absorption.Y > 0f)
+        {
+            double into = 0;
+            foreach (var o in _openings)
+            {
+                bool onA = o.NodeA == lNode, onB = o.NodeB == lNode;
+                if (onA == onB) continue;
+                float sTau = o.Area * o.Tau.Y;
+                if (sTau <= 0f || Vector3.Distance(listener, o.Centre) > range) continue;
+                int outerNode = onA ? o.NodeB : o.NodeA;
+                double outside;
+                if (outerNode == node) outside = 1.0;
+                else
+                {
+                    Vector3 point = o.Centre + (onA ? -o.Normal : o.Normal) * (o.HalfDepth + 0.3f);
+                    Vector3 ignored = point, ignoredToo = point;
+                    outside = Math.Min(1.0, FieldEnergy(node, point, onA ? o.RegionB : o.RegionA, outerNode, range, ref ignored, ref ignoredToo));
+                }
+                into += outside * sTau / absorption.Y;
+            }
+            energy += Math.Min(1.0, into);
+        }
+        return MathF.Min(1f, MathF.Sqrt((float)energy));
+    }
+
+    /// <summary>The direct part of <see cref="FieldAt"/>: each opening of the place radiating its field
+    /// at <paramref name="listener"/>, straight or by the routes.</summary>
+    private double FieldEnergy(int node, Vector3 listener, int listenerRegion, int lNode, float range,
+                               ref Vector3 via, ref Vector3 inField)
+    {
+        double energy = 0; float best = -1f;
+        foreach (var o in _openings)
+        {
+            bool onA = o.NodeA == node, onB = o.NodeB == node;
+            if (onA == onB) continue;
+            float sTau = o.Area * o.Tau.Y;
+            if (sTau <= 0f) continue;
+            float toOpening = Vector3.Distance(listener, o.Centre);
+            if (toOpening > range) continue;
+            float part; Vector3 from;
+            if ((onA ? o.NodeB : o.NodeA) == lNode)
+            {
+                float r = MathF.Max(1f, toOpening);
+                part = sTau / (8f * MathF.PI * r * r);
+                from = o.Centre;
+            }
+            else
+            {
+                // Out of the opening into the place beyond it (its A side is along +Normal), then on.
+                Vector3 start = o.Centre + (onA ? -o.Normal : o.Normal) * (o.HalfDepth + 0.3f);
+                int beyond = onA ? o.RegionB : o.RegionA;
+                if (!Route(start, beyond, listener, listenerRegion, out var answer)) continue;
+                float r = MathF.Max(1f, Vector3.Distance(start, listener));
+                part = sTau / (8f * MathF.PI) * answer.Mid * answer.Mid / (r * r);
+                from = answer.Apparent;
+            }
+            energy += part;
+            if (part > best)
+            {
+                best = part; via = from;
+                inField = o.Centre + (onA ? o.Normal : -o.Normal) * (o.HalfDepth + 2f);
+            }
+        }
+        return energy;
+    }
+
+    /// <summary>
     /// What reaches the ear when the straight way (through the walls, or over one edge) and the way by the
     /// openings compete: per band, the one that delivers more; and whether the openings deliver more over
     /// all, which decides where the sound is heard from. One rule, used by every voice.

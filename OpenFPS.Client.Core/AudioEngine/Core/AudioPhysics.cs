@@ -12,6 +12,16 @@ public static class AudioPhysics
     /// <summary>Default speed of sound in air, m/s (~20 °C).</summary>
     public const float SpeedOfSound = 343f;
 
+    /// <summary>The speed of sound in the air the world has now (<see cref="SpeedOfSoundAt"/> of its
+    /// temperature), m/s. One figure for Doppler, echo delays, the ground reflection and flight time:
+    /// the echoes ran at a fixed 343 while Doppler followed the temperature.</summary>
+    public static float CurrentSpeedOfSound
+    {
+        get => System.Threading.Volatile.Read(ref _current);
+        set => System.Threading.Volatile.Write(ref _current, value);
+    }
+    private static float _current = SpeedOfSound;
+
     /// <summary>
     /// Speed of sound in dry air at a given temperature, m/s: c = 331.3 + 0.606·T(°C).
     ///

@@ -321,6 +321,12 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
         }
     }
 
+    /// <summary>The routes through openings, for the reverberant fields of the places beyond them.</summary>
+    public Func<OpenFPS.Common.OpeningRoutes?>? RoutesSource
+    {
+        set { if (_provider is OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider fmod) fmod.RoutesSource = value; }
+    }
+
     public void SetAcousticMap(AcousticMap map)
     {
         lock (_stateLock)
@@ -352,8 +358,7 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
     {
         if (!_isInitialized) return;
         
-        // Apply Speed of Sound delay (Wavefront delay)
-        // 343 m/s is standard speed of sound at sea level.
+        // Apply Speed of Sound delay (Wavefront delay), at the air's own speed of sound.
         Vector3 lPos;
         lock (_stateLock) { lPos = _listenerPos; }
         
@@ -361,7 +366,7 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
         if (emitter.Type != EmitterType.UI)
         {
             float dist = Vector3.Distance(lPos, emitter.Position);
-            emitter.DelayMs += (dist / 343.0f) * 1000.0f;
+            emitter.DelayMs += dist / AudioPhysics.CurrentSpeedOfSound * 1000.0f;
         }
 
         _submissionQueue.Enqueue(emitter);
