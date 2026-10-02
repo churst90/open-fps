@@ -1,0 +1,383 @@
+using System.Numerics;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
+using Arch.Core;
+using OpenFPS.Common.Components;
+using OpenFPS.Common.Networking;
+using OpenFPS.Server;
+using OpenFPS.Server.Core;
+using OpenFPS.Server.Repositories;
+
+namespace OpenFPS.Tests;
+
+/// <summary>
+/// Every command that needs a role, run by somebody without one.
+///
+/// The 2026-10-01 mutation run found that the role check could be deleted from eighteen of these and
+/// the suite still passed: only /tp and /spawn were ever tried as a Player. Each case here is run
+/// twice on a fresh world set up so the command has something to do: once as a Player, who must be
+/// refused with nothing anywhere changed and nothing sent to anybody, and once as staff, who must
+/// change something. The second half is what makes the first worth anything — a refusal of a command
+/// that would have done nothing anyway proves nothing.
+///
+/// The list is the switch in <see cref="CommandHandler"/>. <see cref="EveryGatedCommandIsListedHere"/>
+/// reads the source and fails if a gated case is added there and not here.
+/// </summary>
+public class StaffGateTests : IDisposable
+{
+    private readonly string _dir = Path.Combine(Path.GetTempPath(), "openfps-staffgate-" + Guid.NewGuid().ToString("N"));
+    private readonly string? _motdBefore = File.Exists(GameServer.MotdPath) ? File.ReadAllText(GameServer.MotdPath) : null;
+
+    public void Dispose()
+    {
+        // /setmotd as staff writes the real file in the working folder; put it back as it was.
+        try
+        {
+            if (_motdBefore == null) { if (File.Exists(GameServer.MotdPath)) File.Delete(GameServer.MotdPath); }
+            else File.WriteAllText(GameServer.MotdPath, _motdBefore);
+        }
+        catch { }
+        try { Directory.Delete(_dir, true); } catch { }
+    }
+
+    /// <summary>Command, arguments, and the role it needs: Dev covers Dev and Admin, Admin is Admin alone.</summary>
+    public static TheoryData<string, string[], UserRole> GatedCommands => new()
+    {
+        { "setmotd", new[] { "Closed", "for", "repairs." }, UserRole.Dev },
+        { "announce", new[] { "Everybody", "out." }, UserRole.Dev },
+        { "tp", new[] { "150", "150", "6" }, UserRole.Dev },
+        { "move", new[] { "150", "150", "6" }, UserRole.Dev },
+        { "spawn", new[] { "Box", "Metal", "1", "1", "1" }, UserRole.Dev },
+        { "set_sound", new[] { "BEACONS/low_osc", "1" }, UserRole.Dev },
+        { "set_audio_mode", new[] { "Sequential" }, UserRole.Dev },
+        { "play_folder", new[] { "BEACONS" }, UserRole.Dev },
+        { "start_state", new[] { "BEACONS/low_osc", "BEACONS/low_osc" }, UserRole.Dev },
+        { "group", new[] { "shed", "4" }, UserRole.Dev },
+        { "ungroup", Array.Empty<string>(), UserRole.Dev },
+        { "saveas", new[] { "shed_copy" }, UserRole.Dev },
+        { "place", new[] { "shed" }, UserRole.Dev },
+        { "origin", Array.Empty<string>(), UserRole.Dev },
+        { "at", new[] { "forward", "3" }, UserRole.Dev },
+        { "put", new[] { "concrete_wall" }, UserRole.Dev },
+        { "undo", Array.Empty<string>(), UserRole.Dev },
+        { "addseat", new[] { "driver", "drive" }, UserRole.Dev },
+        { "removeseat", new[] { "driver" }, UserRole.Dev },
+        { "drivable", new[] { "v8_sports" }, UserRole.Dev },
+        { "savemap", Array.Empty<string>(), UserRole.Dev },
+        { "where", new[] { "other" }, UserRole.Dev },
+        { "locate", new[] { "other" }, UserRole.Dev },
+        { "sessions", Array.Empty<string>(), UserRole.Admin },
+        { "user", new[] { "other" }, UserRole.Admin },
+        { "account", new[] { "other" }, UserRole.Admin },
+        { "throttled", Array.Empty<string>(), UserRole.Admin },
+        { "ratelimit", Array.Empty<string>(), UserRole.Admin },
+        { "unlock", new[] { "other" }, UserRole.Admin },
+        { "setrole", new[] { "other", "dev" }, UserRole.Admin },
+    };
+
+    private const string Denied = "You do not have permission to execute this command.";
+
+    [Theory]
+    [MemberData(nameof(GatedCommands))]
+    public void APlayerIsRefusedAndNothingChanges(string command, string[] args, UserRole needs)
+    {
+        _ = needs;
+        var rig = new Rig(_dir, UserRole.Player, command);
+        string before = rig.Fingerprint();
+
+        string said = rig.Run(command, args);
+
+        Assert.Equal(Denied, said);
+        Assert.Equal(before, rig.Fingerprint());
+        Assert.Empty(rig.Sent);
+    }
+
+    [Theory]
+    [MemberData(nameof(GatedCommands))]
+    public void TheRoleItNeedsIsNotRefusedAndDoesSomething(string command, string[] args, UserRole needs)
+    {
+        var rig = new Rig(_dir, needs, command);
+        string before = rig.Fingerprint();
+
+        string said = rig.Run(command, args);
+
+        Assert.NotEqual(Denied, said);
+        // Something happened: the world, the build cursor, a file, a role, or a message to somebody.
+        // The read-only admin commands change nothing, so for them the answer itself is the effect.
+        Assert.True(rig.Sent.Count > 0 || rig.Fingerprint() != before || ReadOnly(command),
+                    $"/{command} as {needs} changed nothing, so its refusal to a Player proves nothing. It said: {said}");
+    }
+
+    [Theory]
+    [InlineData("sessions")]
+    [InlineData("user")]
+    [InlineData("throttled")]
+    [InlineData("unlock")]
+    [InlineData("setrole")]
+    public void TheAccountCommandsAreAdminsAloneNotDevelopers(string command)
+    {
+        var rig = new Rig(_dir, UserRole.Dev, command);
+        string before = rig.Fingerprint();
+        Assert.Equal(Denied, rig.Run(command, "other", "dev"));
+        Assert.Equal(before, rig.Fingerprint());
+    }
+
+    private static bool ReadOnly(string command) => command is "sessions" or "user" or "account" or "throttled" or "ratelimit" or "where" or "locate";
+
+    [Fact]
+    public void APlayerWithEmptyHandsNamingAWeaponFiresNothing()
+    {
+        var rig = new Rig(_dir, UserRole.Player, "fire");
+        string before = rig.Fingerprint();
+
+        string said = rig.Run("fire", "akm");
+
+        Assert.Equal("You are not holding anything you can fire.", said);
+        Assert.Equal(before, rig.Fingerprint());
+        Assert.Empty(rig.Sent);
+    }
+
+    [Fact]
+    public void StaffNamingAWeaponFiresIt()
+    {
+        // The other half: the name is honoured for staff, so the refusal above is the gate and not
+        // a weapon that never fires.
+        var rig = new Rig(_dir, UserRole.Dev, "fire");
+        rig.Run("fire", "akm");
+        Assert.Contains(rig.Sent, m => m is WorldAudioEvent);
+    }
+
+    /// <summary>
+    /// Reads CommandHandler.cs and collects every case label that sits above a role check, so a new
+    /// gated command that is not added to <see cref="GatedCommands"/> fails here instead of slipping
+    /// through untested.
+    /// </summary>
+    [Fact]
+    public void EveryGatedCommandIsListedHere()
+    {
+        string source = File.ReadAllText(FindSource("OpenFPS.Server", "Core", "CommandHandler.cs"));
+        var gated = new HashSet<string>();
+        var pending = new List<string>();
+        foreach (string raw in source.Split('\n'))
+        {
+            string line = raw.Trim();
+            if (line.Length == 0 || line.StartsWith("//")) continue;
+            if (line.StartsWith("case \"") && line.EndsWith(":"))
+            {
+                pending.Add(line[6..line.IndexOf('"', 6)]);
+                continue;
+            }
+            if (line.StartsWith("if (!isElevated) { DenyCommand") || line.StartsWith("if (!isAdmin) { DenyCommand"))
+                gated.UnionWith(pending);
+            pending.Clear();
+        }
+
+        var listed = GatedCommands.Select(row => (string)row[0]).ToHashSet();
+        Assert.NotEmpty(gated);
+        Assert.Empty(gated.Except(listed));
+        Assert.Empty(listed.Except(gated));
+    }
+
+    private static string FindSource(params string[] parts)
+    {
+        for (var dir = new DirectoryInfo(AppContext.BaseDirectory); dir != null; dir = dir.Parent)
+        {
+            string candidate = Path.Combine(new[] { dir.FullName }.Concat(parts).ToArray());
+            if (File.Exists(candidate)) return candidate;
+        }
+        // The build output lives outside the repository (--artifacts-path); fall back on the source
+        // tree this file was compiled from.
+        string here = Path.GetDirectoryName(ThisFile())!;
+        return Path.Combine(new[] { here, ".." }.Concat(parts).ToArray());
+    }
+
+    private static string ThisFile([System.Runtime.CompilerServices.CallerFilePath] string path = "") => path;
+
+    /// <summary>
+    /// A small real world: the default map copied to a temporary folder (so /savemap writes there),
+    /// the real command handler, and a player standing in an empty corner, with whatever the command
+    /// under test needs set out in front of them.
+    /// </summary>
+    private sealed class Rig
+    {
+        public readonly List<IMessage> Sent = new();
+        private readonly MapManager _maps;
+        private readonly CompositeService _composites;
+        private readonly GameServer _server;
+        private readonly CommandHandler _commands;
+        private readonly UserSession _session;
+        private readonly UserSession _other;
+        private readonly Users _users = new();
+        private readonly string _mapDir;
+        private readonly string _compositeDir;
+        private const string MapId = "default";
+        private static readonly Vector3 Feet = new(140, 0, 140);
+
+        public Rig(string root, UserRole role, string command)
+        {
+            string dir = Path.Combine(root, Guid.NewGuid().ToString("N"));
+            _mapDir = Path.Combine(dir, "maps");
+            _compositeDir = Path.Combine(dir, "composites");
+            Directory.CreateDirectory(_mapDir);
+            File.Copy(Path.Combine(AppContext.BaseDirectory, "maps", "default.json"), Path.Combine(_mapDir, "default.json"));
+
+            var prefabs = new PrefabRepository(Path.Combine(AppContext.BaseDirectory, "prefabs"));
+            _maps = new MapManager(new MapRepository(_mapDir), prefabs);
+            _maps.Initialize();
+            _composites = new CompositeService(_maps, prefabs, new CompositeRepository(_compositeDir));
+
+            var sessions = new SessionManager();
+            _server = new GameServer(_users);
+            _server.Attach(_maps, sessions, new OccupancyService(_maps), new HandsService(_maps));
+            _server.Sent = (_, message) => Sent.Add(message);
+            _commands = new CommandHandler(sessions, _maps, _server, _composites, new OccupancyService(_maps),
+                                           new HandsService(_maps), _users);
+
+            _session = Body(sessions, 1, "tester", role, Feet);
+            _other = Body(sessions, 2, "other", UserRole.Player, Feet + new Vector3(0, 0, 8));
+            _users.Add("tester", role);
+            _users.Add("other", UserRole.Player);
+            Prepare(command, prefabs);
+            Sent.Clear();
+        }
+
+        private UserSession Body(SessionManager sessions, int id, string name, UserRole role, Vector3 at)
+        {
+            Assert.True(_maps.TryGetMap(MapId, out var world, out _, out _, out _));
+            var entity = world.Create(
+                new PlayerComponent { ConnectionId = id, Username = name, Role = role },
+                EntityType.Player,
+                new Transform { Position = at, Rotation = Quaternion.Identity },
+                new Velocity(), new MaterialComponent { Material = "Generic" });
+            _maps.IndexEntity(MapId, entity);
+            var session = new UserSession { ConnectionId = id, Username = name, Role = role, Entity = entity, CurrentMapId = MapId, Welcomed = true };
+            sessions.AddSession(id, session);
+            return session;
+        }
+
+        private void Prepare(string command, PrefabRepository prefabs)
+        {
+            Entity Spawn(string prefab, Vector3 at) =>
+                _maps.SpawnEntity(MapId, w => prefabs.Spawn(w, prefab, at, Quaternion.Identity, Vector3.One));
+
+            void Walls(Vector3 centre)
+            {
+                for (int i = 0; i < 4; i++) Spawn("concrete_wall", centre + new Vector3((i - 1.5f) * 1.4f, 0f, 0f));
+            }
+
+            int Composite()
+            {
+                Walls(Feet + new Vector3(0, 0, 2));
+                int root = _composites.Group(MapId, Feet + new Vector3(0, 0, 2), 4f, "shed", anchored: false, "someone", out _);
+                Assert.True(root >= 0);
+                return root;
+            }
+
+            switch (command)
+            {
+                case "group":
+                    Walls(Feet + new Vector3(0, 0, 2));
+                    break;
+                case "ungroup": case "saveas": case "addseat":
+                    Composite();
+                    break;
+                case "removeseat": case "drivable":
+                {
+                    int root = Composite();
+                    Assert.True(_composites.AddSeat(MapId, root, "driver", true, Feet + new Vector3(0, 0, 1), 0f, "someone", true, out string error), error);
+                    break;
+                }
+                case "place":
+                {
+                    int root = Composite();
+                    Assert.True(_composites.SaveAsTemplate(MapId, root, "shed", "someone", true, out _, out string error), error);
+                    break;
+                }
+                case "at": case "put":
+                    _session.Build.SetOrigin(Feet, 0f);
+                    _session.Build.Cursor = new Vector3(0, 1.5f, 4f);
+                    break;
+                case "undo":
+                {
+                    var e = Spawn("concrete_wall", Feet + new Vector3(3, 0, 3));
+                    _session.Build.SetOrigin(Feet, 0f);
+                    _session.Build.Placed_Entities.Add(e.Id);
+                    break;
+                }
+                case "set_sound": case "set_audio_mode": case "play_folder": case "start_state":
+                    Spawn("sword", Feet + new Vector3(1, 0, 0));
+                    break;
+                case "unlock":
+                    // A name with a lock to lift.
+                    for (int i = 0; i < AuthService.LockoutAfterFailures; i++) _server.Auth.Check("192.0.2.9", "other", "wrong-password");
+                    break;
+            }
+        }
+
+        public string Run(string command, params string[] args)
+        {
+            var replies = new List<string>();
+            _commands.HandleTextCommand(_session.ConnectionId, new TextCommand { Command = command, Args = args },
+                m => { if (m is TextEvent t) replies.Add(t.Text); else Sent.Add(m); });
+            _server.DrainCommandBuffer();
+            return string.Join(" | ", replies);
+        }
+
+        /// <summary>
+        /// Everything a command could change, as one string: every component of every entity on the
+        /// map, the builder's cursor, the files the world is saved in, the message of the day, every
+        /// online player's role, and every account's role.
+        /// </summary>
+        public string Fingerprint()
+        {
+            var text = new StringBuilder();
+            Assert.True(_maps.TryGetMap(MapId, out var world, out _, out _, out var lookup));
+            var options = new JsonSerializerOptions { IncludeFields = true };
+            foreach (int id in lookup.Keys.OrderBy(k => k))
+            {
+                var e = lookup[id];
+                if (!world.IsAlive(e)) continue;
+                text.Append(id).Append(':');
+                foreach (var component in world.GetAllComponents(e).Where(c => c != null)
+                                                .OrderBy(c => c!.GetType().FullName, StringComparer.Ordinal))
+                {
+                    text.Append(component!.GetType().Name).Append('=');
+                    try { text.Append(JsonSerializer.Serialize(component, component.GetType(), options)); }
+                    catch { text.Append(component); }
+                    text.Append(';');
+                }
+                text.Append('\n');
+            }
+
+            var b = _session.Build;
+            text.Append($"build {b.Placed} {b.Origin} {b.Yaw} {b.Cursor} {b.LastStep} {string.Join(",", b.Placed_Entities)}\n");
+            text.Append($"roles {_session.Role} {_other.Role} {_users.RoleOf("other")}\n");
+            text.Append($"locks {string.Join(",", _server.Auth.LockedNames().Select(l => l.Name))}\n");
+            foreach (string dir in new[] { _mapDir, _compositeDir })
+                if (Directory.Exists(dir))
+                    foreach (string file in Directory.GetFiles(dir).OrderBy(f => f, StringComparer.Ordinal))
+                        text.Append(Path.GetFileName(file)).Append(' ')
+                            .Append(Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(file)))).Append('\n');
+            text.Append("motd ").Append(GameServer.ReadMotd()).Append('\n');
+            return text.ToString();
+        }
+    }
+
+    private sealed class Users : IUserRepository
+    {
+        private readonly Dictionary<string, UserRole> _roles = new(StringComparer.OrdinalIgnoreCase);
+        public void Add(string name, UserRole role) => _roles[name] = role;
+        public UserRole? RoleOf(string name) => _roles.TryGetValue(name, out var r) ? r : null;
+        public UserData? GetUser(string username) =>
+            _roles.TryGetValue(username.Trim(), out var role) ? new UserData { Username = username.Trim().ToLowerInvariant(), Role = role } : null;
+        public bool AddUser(string username, string password, UserRole role) => false;
+        public bool VerifyPassword(string username, string password) => false;
+        public bool SetRole(string username, UserRole role)
+        {
+            if (!_roles.ContainsKey(username)) return false;
+            _roles[username] = role;
+            return true;
+        }
+    }
+}
