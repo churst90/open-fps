@@ -424,4 +424,45 @@ public class TrafficRuleTests : IDisposable
         // Within a tick or two of the driver's lag (4.5 m/s measured); 6.2 and 10.9 m/s before 2026-10-02.
         Assert.InRange(atLine, 0.5f * look, 1.15f * look);
     }
+
+    /// <summary>
+    /// Four cars arriving at once where everybody gives way each have somebody on their right, and all
+    /// four wait. After the patience one goes, and the others wait for it to be through before the
+    /// next does: never two in the middle at once (docs/MUTATION_2026-10-01.md, item 10).
+    /// </summary>
+    [Theory]
+    [InlineData("i4_economy")]
+    [InlineData("vtwin_stock")]
+    public void When_everybody_waits_for_somebody_one_goes_and_then_the_next(string preset)
+    {
+        var s = Build(new() { Car("A", North, preset: preset), Car("B", East, preset: preset), Car("C", West, preset: preset), Car("D", South, preset: preset) });
+        var names = new[] { "A", "B", "C", "D" };
+        // When each came to a standstill short of the middle, and first moved again.
+        var stood = new Dictionary<string, float>();
+        var moved = new Dictionary<string, float>();
+        var w = Run(s, 80f, () =>
+        {
+            foreach (var n in names)
+            {
+                var c = s.Car(n);
+                if (InJunction(c.Position) || MathF.Max(MathF.Abs(c.Position.X), MathF.Abs(c.Position.Z)) > 30f) continue;
+                if (!stood.ContainsKey(n) && c.Speed < 0.05f) stood[n] = s.Time;
+                else if (stood.ContainsKey(n) && !moved.ContainsKey(n) && c.Speed > 0.1f) moved[n] = s.Time;
+            }
+        });
+        foreach (var n in names)
+        {
+            Assert.False(float.IsNaN(w.OutAt(n)), $"{n} never got through: {w}");
+            Assert.True(stood.ContainsKey(n), $"{n} never stood still: {w}");
+        }
+        // Nobody moves again until all four have stood for the patience.
+        float allStood = stood.Values.Max(), firstMoved = moved.Values.Min();
+        _o.WriteLine($"all standing at {allStood:F1} s, the first moved again at {firstMoved:F1} s");
+        Assert.True(firstMoved - allStood > new StreetLifeData().GiveWayPatienceSeconds - 0.5f,
+                    $"all standing at {allStood:F1} s, the first moved again at {firstMoved:F1} s: {w}");
+        foreach (var a in names)
+            foreach (var b in names)
+                if (a != b && w.InAt(a) <= w.InAt(b))
+                    Assert.True(w.InAt(b) > w.OutAt(a), $"{b} came in at {w.InAt(b):F1} s with {a} in the junction until {w.OutAt(a):F1} s: {w}");
+    }
 }
