@@ -691,11 +691,11 @@ public sealed class WorldAudioPlayer
     //
     // So in a room, a one-off sound's early reflections are voices of their own, mirrored through
     // the walls round it (EarlyReflections, to third order), each placed at its image through the
-    // HRTF, and the room's traced stage plays only the late tail (TracedReverbDsp, parametric).
+    // HRTF, and the room's traced stage plays only the late tail (TracedReverbDsp, LateTailIr).
     // The floor under the source is left out: the voice already carries its own ground reflection.
 
-    /// <summary>How long the placed reflections run before the tail takes over, seconds. Steam Audio's
-    /// parametric tail comes in about 50 ms after the sound; the two overlap a little.</summary>
+    /// <summary>How long the placed reflections run before the tail takes over, seconds. The traced
+    /// tail fades in from 50 to 100 ms after the sound (LateTailIr); the two overlap a little.</summary>
     internal const float RoomEchoWindowSeconds = 0.08f;
 
     /// <summary>At most this many placed reflections per sound: the first order of a box room is six

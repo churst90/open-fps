@@ -563,6 +563,3 @@ for each of its switches that is set, so a forgotten one shows up in the log.
 | `OPENFPS_AUDIO_DEBUG=1` | Logs the acoustic trace, your footsteps (`[FOOT]`) and world sounds (`[WAUDIO]`) |
 | `OPENFPS_AUDIO_CAPTURE=file.wav` | Records the mix to a file while it plays |
 | `OPENFPS_CRASHDIR=folder` | `run-gtk-client.sh` only: where crash dumps go |
-| `OPENFPS_TAIL=full` | Plays the whole traced response outdoors, not only the late tail |
-| `OPENFPS_TAIL_SDM=0` | The tail's first part is spread evenly instead of coming from the walls |
-| `OPENFPS_TAIL_PARAMETRIC=1` | Plays the parametric reverb instead of the traced tail |

@@ -8,9 +8,9 @@ namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 
 /// <summary>
 /// One outdoor reverb bus's traced stage: what the bus's sends carry, played through the place's
-/// measured impulse response (TracedReverb) and decoded round the listener's head. It sits just
+/// measured impulse response (TracedReverb) and rendered round the listener's head. It sits just
 /// after the bus's SFXREVERB, which in traced mode passes its input through dry; in room mode this
-/// stage is bypassed and the SFXREVERB is the tail, as it always was.
+/// stage is bypassed and the SFXREVERB is the tail.
 /// </summary>
 internal sealed class TracedReverbState
 {
@@ -20,18 +20,13 @@ internal sealed class TracedReverbState
     public int SubFrame;
     public IntPtr WorkerContext;          // the tracer's context: the effect must be of the IR's context
     public IntPtr Effect;                 // IPLReflectionEffect (convolution: the whole traced response)
-    /// <summary>The same trace's late tail alone: Steam Audio's parametric reverb, built from the decay
-    /// times the trace measured, with nothing in its first ~50 ms. Played in the room the listener is
-    /// in, where the early part is placed reflections (WorldAudioPlayer.QueueRoomEchoes).</summary>
-    public IntPtr TailEffect;
-    /// <summary>Play the tail only. Game thread writes.</summary>
+    /// <summary>Play the tail only: the room the listener is in, where the early part is placed
+    /// reflections (WorldAudioPlayer.QueueRoomEchoes). Game thread writes.</summary>
     public volatile bool TailOnly;
-    /// <summary>The tail: the trace's own late part (LateTailIr), convolved here. Null falls back to
-    /// the parametric reverb, as does OPENFPS_TAIL_PARAMETRIC=1 for an A/B.</summary>
+    /// <summary>The tail: the trace's own late part (LateTailIr), convolved here.</summary>
     public LateTailConvolver? LateConv;
     /// <summary>The directional part's twenty responses against the send (SdmTailIr).</summary>
     public SharedInputConvolver? SdmConv;
-    public static readonly bool ParametricTail = Environment.GetEnvironmentVariable("OPENFPS_TAIL_PARAMETRIC") == "1";
     public float[] LateOut = Array.Empty<float>();
     public IntPtr Decode;                 // IPLAmbisonicsDecodeEffect (provider context)
     public IntPtr Hrtf;
@@ -57,8 +52,8 @@ internal sealed class TracedReverbState
     public int Channels;
     public volatile int Bailed;
 
-    /// <summary>The listener's own room's late tail as a field round the head; null renders it
-    /// through the ear decorrelators instead. See <see cref="DiffuseTail"/>.</summary>
+    /// <summary>The listener's own room's late tail as a field round the head; null (Steam Audio
+    /// would not make its ears) renders it through the ear decorrelators. See <see cref="DiffuseTail"/>.</summary>
     public DiffuseTail? Diffuse;
     /// <summary>The whole soundfield, interleaved, one block of <see cref="SubFrame"/>.</summary>
     public float[] AmbiScratch = Array.Empty<float>();
@@ -67,68 +62,39 @@ internal sealed class TracedReverbState
 /// <summary>
 /// The late tail of the room you are in, rendered as the diffuse field it is.
 ///
-/// Twenty directions (a dodecahedron, tilted off the game's axes), each through a velvet-noise
-/// branch and straight through its own head response (RenderBinaural) rather than a second-order
-/// soundfield, and each ear made its own above 400 Hz. The notes below on the encode and decode,
-/// with eight directions, describe the fallback, OPENFPS_TAIL_AMBISONIC=1.
+/// The traced late part is one channel: W, the omnidirectional one. The same signal in both ears is
+/// heard inside the head, or straight ahead, and it stays there when the head turns. Splitting it
+/// into two ears with different all-pass chains (EarDecorrelator) lowers the correlation but not the
+/// place. A real late tail is energy arriving from every direction at once, each direction's share a
+/// different signal with the same statistics.
 ///
-/// Steam Audio's parametric reverb, which plays that tail (TracedReverbState.TailEffect), writes
-/// one channel: W, the omnidirectional one. Decoded, one channel is the same signal in both ears,
-/// and a sound that is the same in both ears is heard inside the head, or straight ahead — and it
-/// stays there when the head turns, because there is nothing in it to turn: the room is in front
-/// of you whichever way you face. Splitting the one channel into two ears with different all-pass
-/// chains (EarDecorrelator) lowers the correlation but not the place: the two ears' signals are
-/// still not anything from anywhere.
+/// So the tail goes through twenty velvet-noise branches (DiffuseBranch), one per direction of a
+/// dodecahedron tilted off the game's axes, and each branch goes straight through its own head
+/// response for that direction (RenderBinaural), turned into the head's frame every block. Each ear
+/// then hears twenty independent signals through different responses, which is where a diffuse
+/// field's interaural correlation comes from in life, and when the head turns the tail's fine
+/// structure turns with it while its level and colour do not. Above <see cref="EarSplitHz"/> each
+/// ear's share is made its own as well.
 ///
-/// A real late tail is energy arriving from every direction at once, each direction's share a
-/// different signal with the same statistics. That is what is made here: the tail through eight
-/// short all-pass chains (DiffuseBranch), each encoded into the soundfield from one of eight fixed
-/// directions in the WORLD — the corners of a cube round the listener — and the field decoded
-/// through the HRTF in the listener's frame like every other soundfield. Each ear then hears eight
-/// directions through eight head-related responses, which is where a diffuse field's interaural
-/// correlation comes from in life (about 1 below 200 Hz, falling through 0.5 near 500 Hz to near 0
-/// above 2 kHz), and when the head turns each branch moves to a different response: the tail's fine
-/// structure turns with the head while its level and colour do not, as a room's does.
+/// The low end, below <see cref="SplitHz"/>, goes to both ears as it is: that is what a diffuse
+/// field is at those frequencies on a head (interaural correlation near 1, level equal to the
+/// field's).
 ///
-/// Eight directions, equal weight: the trace measures the flat's late field within a decibel or
-/// two of isotropic (its first-order channels 20 dB under W past 50 ms, --traced-reverb), and the
-/// parametric tail carries no direction to weight by.
-///
-/// Two calibrations, both measured rather than assumed (--sa-encode):
-/// - Steam Audio's encoder writes W at 1/sqrt(4 pi) of its input, not 1. The scale is measured at
-///   creation by running noise through one encoder and reading W back (<see cref="WScale"/>), and
-///   each branch is then scaled by 1/sqrt(8), so eight uncorrelated branches carry the tail's energy.
-/// - Its decoder sums its virtual loudspeakers' head responses, and for a signal that is the SAME in
-///   all of them — a one-channel W field, or the eight branches below the frequency their all-passes
-///   can tell apart — that sum is coherent: +10 dB below 300 Hz against unity for a diffuse field.
-///   A one-channel tail through the decoder carries those ten decibels of bass as a boom.
-///   So the tail's low end, below 300 Hz, does not go through the decoder at all: it is added to both
-///   ears as it is, which is what a diffuse field is at those frequencies on a head (interaural
-///   correlation near 1, level equal to the field's). Only the part above goes round the eight
-///   directions. The split is the EarDecorrelator's, two one-pole stages and their exact complement.
+/// The directional part of the tail (SdmTailIr) is added from the walls it came off
+/// (<see cref="AddDirectional"/>).
 /// </summary>
 internal sealed class DiffuseTail
 {
-    public readonly IntPtr[] Encoders = new IntPtr[DiffuseBranch.Count];
-    public readonly Phonon.IPLVector3[] Directions = new Phonon.IPLVector3[DiffuseBranch.Count];
     public readonly DiffuseBranch[] Branches = new DiffuseBranch[DiffuseBranch.Count];
-    public float[] W = Array.Empty<float>(), Branch = Array.Empty<float>(), Field = Array.Empty<float>(), Sum = Array.Empty<float>();
-    /// <summary>The tail below the split, one block: added to both ears past the decoder.</summary>
+    public float[] W = Array.Empty<float>(), Branch = Array.Empty<float>();
+    /// <summary>The tail below the split, one block: added to both ears as it is.</summary>
     public float[] Low = Array.Empty<float>();
-    public Phonon.IPLAudioBuffer Mono, Encoded;
+    public Phonon.IPLAudioBuffer Mono;
     public IntPtr Context;
-    public bool Ready;
-    /// <summary>What one encoder's W is, against its input: measured at creation.</summary>
-    public float WScale = 1f;
-    /// <summary>What the decoder makes of the eight-direction field, per ear, against the tail that
-    /// went in: measured at creation, and taken back out, so an ear gets the tail's energy — which
-    /// is what a diffuse field is at an ear, give or take the pinna's few decibels above 2 kHz.</summary>
-    public float DecodeTrim = 1f;
-    public float Gain => WScale * DecodeTrim / MathF.Sqrt(DiffuseBranch.Count);
 
     /// <summary>
     /// Which way the late energy leans, game world, length its |I|/E (0 from everywhere, 1 from one
-    /// way): set from each source's own trace (LateField). A room's is near zero and the eight
+    /// way): set from each source's own trace (LateField). A room's is near zero and the twenty
     /// directions stay equal; in a tunnel or a street it points back toward the cars, and each
     /// direction's share becomes max(0, 1 + 3 cos), renormalised so the tail's energy is unchanged.
     /// Game thread writes; read once a block.
@@ -169,7 +135,7 @@ internal sealed class DiffuseTail
     }
 
     /// <summary>Below this the tail goes straight to both ears; see the class note. Set where the
-    /// eight branches stop being distinct signals (their all-passes are 89-431 samples, so about
+    /// branches stop being distinct signals (their all-passes are 89-431 samples, so about
     /// 100 Hz), not at the ear decorrelator's 300: a step on carpet is nearly all below 300 Hz, and
     /// a tail that is the same in both ears there sits in the head however diffuse the rest is.</summary>
     public const float SplitHz = 120f;
@@ -178,27 +144,23 @@ internal sealed class DiffuseTail
 
     // ── Straight to the ears ─────────────────────────────────────────────────────────────────
     //
-    // Not ENCODED into a second-order soundfield and decoded through the HRTF like every other
+    // Not encoded into a second-order soundfield and decoded through the HRTF like every other
     // field. At second order that decode cannot make two ears independent at high frequencies:
-    // measured, the tail's interaural coherence is 0.60 at 2 kHz and 0.34 at 4 kHz
-    // where a head in a diffuse field gets under about 0.15 (Zaunschirm et al. 2018, the order-limited
-    // binaural decode). Coherent ears put a sound in the middle of the head, over everything. So each
-    // direction goes through its OWN binaural effect, the head-related response of exactly that
-    // direction, turned into the head's frame every block; the ears are then eight independent
-    // signals through different responses, which is what a diffuse field is at a head.
-    // OPENFPS_TAIL_AMBISONIC=1 uses the encode and decode instead.
-    public static readonly bool Binaural = Environment.GetEnvironmentVariable("OPENFPS_TAIL_AMBISONIC") != "1";
+    // measured, the tail's interaural coherence was 0.60 at 2 kHz and 0.34 at 4 kHz where a head in
+    // a diffuse field gets under about 0.15 (Zaunschirm et al. 2018, the order-limited binaural
+    // decode). Coherent ears put a sound in the middle of the head, over everything. So each
+    // direction goes through its own binaural effect, the head-related response of exactly that
+    // direction, turned into the head's frame every block.
     public readonly IntPtr[] Ears = new IntPtr[DiffuseBranch.Count];
     public Phonon.IPLAudioBuffer EarBuf;
     public IntPtr EarContext, EarHrtf;
-    /// <summary>The eight directions' ears, summed, interleaved L/R, one block: the tail above the split.</summary>
+    /// <summary>The directions' ears, summed, interleaved L/R, one block: the tail above the split.</summary>
     public float[] Stereo = Array.Empty<float>();
     private float[] _earScratch = Array.Empty<float>();
     /// <summary>A trim on the ears; 1, see CalibrateBinaural.</summary>
     public float BinauralTrim = 1f;
     /// <summary>What the head's responses do to a field from everywhere, measured at creation.</summary>
     public float DiffuseFieldGainDb;
-    public bool BinauralReady;
     private float _rx, _ry, _rz, _rw = 1f;
 
     /// <summary>
@@ -259,7 +221,7 @@ internal sealed class DiffuseTail
     }
 
     /// <summary>
-    /// The tail's W, one block, through the eight directions' own head responses into
+    /// The tail's W, one block, through the directions' own head responses into
     /// <see cref="Stereo"/>; the part below the split into <see cref="Low"/> as before.
     /// </summary>
     public void RenderBinaural(float[] ambiInterleaved, int sub, int channels)
@@ -387,9 +349,6 @@ internal sealed class DiffuseTail
         }
     }
 
-    /// <summary>OPENFPS_DIFFUSE_TAIL=0 plays the one channel through the ear decorrelators instead.</summary>
-    public static readonly bool Enabled = Environment.GetEnvironmentVariable("OPENFPS_DIFFUSE_TAIL") != "0";
-
     /// <summary>
     /// The directions the tail arrives from: the twenty vertices of a regular dodecahedron round the
     /// head, in the game's world — as even a spread over the sphere as twenty points get. Not fewer:
@@ -422,142 +381,30 @@ internal sealed class DiffuseTail
         return v.ToArray();
     }
 
-    /// <param name="decode">The stage's decoder, with the HRTF it will use, for the level calibration;
-    /// it is reset afterwards. Zero skips that calibration.</param>
-    /// <param name="orientation">The listener frame the calibration decodes in.</param>
     public DiffuseTail() { (_earL, _earR) = DiffuseBranch.EarPair(101); }
 
-    public static DiffuseTail? Create(IntPtr context, int subFrame, int order, int channels,
-                                      IntPtr decode = default, Phonon.IPLCoordinateSpace3 orientation = default, IntPtr hrtf = default)
+    /// <summary>The tail's renderer, or null when Steam Audio will not make its ears.</summary>
+    public static DiffuseTail? Create(IntPtr context, int subFrame, int channels, IntPtr hrtf)
     {
+        if (hrtf == IntPtr.Zero) return null;
         var d = new DiffuseTail { Context = context };
-        var au = new Phonon.IPLAudioSettings { samplingRate = 44100, frameSize = subFrame };
-        var es = new Phonon.IPLAmbisonicsEncodeEffectSettings { maxOrder = order };
-        for (int i = 0; i < DiffuseBranch.Count; i++)
-        {
-            if (Phonon.iplAmbisonicsEncodeEffectCreate(context, ref au, ref es, out d.Encoders[i]) != Phonon.IPL_STATUS_SUCCESS)
-            { d.Release(); return null; }
-            d.Directions[i] = Phonon.World(Direction(i));
-            d.Branches[i] = new DiffuseBranch(i);
-        }
+        for (int i = 0; i < DiffuseBranch.Count; i++) d.Branches[i] = new DiffuseBranch(i);
         d.W = new float[subFrame]; d.Branch = new float[subFrame]; d.Low = new float[subFrame];
-        d.Field = new float[subFrame * channels]; d.Sum = new float[subFrame * channels];
         Phonon.iplAudioBufferAllocate(context, 1, subFrame, ref d.Mono);
-        Phonon.iplAudioBufferAllocate(context, channels, subFrame, ref d.Encoded);
-        d.Calibrate(subFrame, channels, order);
-        if (decode != IntPtr.Zero) d.CalibrateDecode(subFrame, channels, order, decode, orientation, hrtf);
-        if (Binaural && hrtf != IntPtr.Zero && d.CreateEars(context, subFrame, hrtf))
-        {
-            d.CalibrateBinaural(subFrame, channels);
-            d.BinauralReady = true;
-            d.SdmReady = TracedReverb.Sdm && d.CreateSdmEars(subFrame);
-        }
-        d.Ready = true;
+        if (!d.CreateEars(context, subFrame, hrtf)) { d.Release(); return null; }
+        d.CalibrateBinaural(subFrame, channels);
+        d.SdmReady = d.CreateSdmEars(subFrame);
         return d;
-    }
-
-    /// <summary>Noise through the whole path — split, branches, encoders, the decoder — and each
-    /// ear's energy against the noise. The first blocks are skipped for the HRTF's latency and the
-    /// branches' fill; everything is reset afterwards.</summary>
-    private void CalibrateDecode(int sub, int channels, int order, IntPtr decode, Phonon.IPLCoordinateSpace3 orientation, IntPtr hrtf)
-    {
-        var field = new Phonon.IPLAudioBuffer(); Phonon.iplAudioBufferAllocate(Context, channels, sub, ref field);
-        var ears = new Phonon.IPLAudioBuffer(); Phonon.iplAudioBufferAllocate(Context, 2, sub, ref ears);
-        var inter = new float[sub * channels]; var st = new float[sub * 2];
-        var dp = new Phonon.IPLAmbisonicsDecodeEffectParams { order = order, hrtf = hrtf, orientation = orientation, binaural = Phonon.IPL_TRUE };
-        var rng = new Random(13);
-        double eIn = 0, eEar = 0;
-        int blocks = Math.Max(12, 44100 / sub);           // about a second
-        for (int b = 0; b < blocks; b++)
-        {
-            Array.Clear(inter);
-            for (int k = 0; k < sub; k++) inter[k * channels] = (float)(rng.NextDouble() * 2 - 1) * 0.3f;
-            Render(inter, sub, channels, order);
-            Phonon.iplAudioBufferDeinterleave(Context, Sum, ref field);
-            Phonon.iplAmbisonicsDecodeEffectApply(decode, ref dp, ref field, ref ears);
-            Phonon.iplAudioBufferInterleave(Context, ref ears, st);
-            if (b < 4) continue;
-            for (int k = 0; k < sub; k++)
-            {
-                eIn += inter[k * channels] * (double)inter[k * channels];
-                double l = st[k * 2] + Low[k], r = st[k * 2 + 1] + Low[k];
-                eEar += (l * l + r * r) / 2;
-            }
-        }
-        // The low end went round the decoder at unity; only the field's share is trimmed, so solve
-        // for the trim that brings the whole to unity: ear = low + trim² × (ear − low) ⇒ measured
-        // once more with the low alone would be exact; the low is a small share of white noise
-        // (about 1/70 of it below 300 Hz), so the whole is trimmed and the low end is left as it is.
-        if (eEar > 0 && eIn > 0) DecodeTrim = (float)Math.Sqrt(eIn / eEar);
-        Phonon.iplAmbisonicsDecodeEffectReset(decode);
-        foreach (var e in Encoders) if (e != IntPtr.Zero) Phonon.iplAmbisonicsEncodeEffectReset(e);
-        foreach (var br in Branches) br.Reset();
-        _a1 = _a2 = _b1 = 0f;
-        Phonon.iplAudioBufferFree(Context, ref field);
-        Phonon.iplAudioBufferFree(Context, ref ears);
-    }
-
-    /// <summary>Noise through one encoder: what comes back in W, against what went in. The first
-    /// block is skipped in case the encoder ramps its gains in.</summary>
-    private void Calibrate(int sub, int channels, int order)
-    {
-        var rng = new Random(11);
-        double eIn = 0, eW = 0;
-        var ep = new Phonon.IPLAmbisonicsEncodeEffectParams { direction = Directions[0], order = order };
-        for (int b = 0; b < 4; b++)
-        {
-            for (int k = 0; k < sub; k++) Branch[k] = (float)(rng.NextDouble() * 2 - 1);
-            Phonon.iplAudioBufferDeinterleave(Context, Branch, ref Mono);
-            Phonon.iplAmbisonicsEncodeEffectApply(Encoders[0], ref ep, ref Mono, ref Encoded);
-            Phonon.iplAudioBufferInterleave(Context, ref Encoded, Field);
-            if (b == 0) continue;
-            for (int k = 0; k < sub; k++) { eIn += Branch[k] * (double)Branch[k]; eW += Field[k * channels] * (double)Field[k * channels]; }
-        }
-        Phonon.iplAmbisonicsEncodeEffectReset(Encoders[0]);
-        WScale = eW > 0 ? (float)Math.Sqrt(eIn / eW) : 1f;
-    }
-
-    /// <summary>The field's W, one block, into the field of eight directions, interleaved into
-    /// <see cref="Sum"/>.</summary>
-    public void Render(float[] ambiInterleaved, int sub, int channels, int order)
-    {
-        for (int k = 0; k < sub; k++)
-        {
-            float x = ambiInterleaved[k * channels];
-            _a1 += _lpA * (x - _a1);                 // low, once
-            _a2 += _lpA * (_a1 - _a2);               // low, twice
-            float h1 = x - _a1;                       // high, once (a one-pole's complement is exact)
-            _b1 += _lpA * (h1 - _b1);
-            Low[k] = _a2;
-            W[k] = h1 - _b1;                          // high, twice
-        }
-        Array.Clear(Sum, 0, sub * channels);
-        UpdateBranchGains(sub);
-        for (int b = 0; b < DiffuseBranch.Count; b++)
-        {
-            var branch = Branches[b];
-            float gain = Gain * _branchGain[b];
-            for (int k = 0; k < sub; k++) Branch[k] = branch.Process(W[k]) * gain;
-            Phonon.iplAudioBufferDeinterleave(Context, Branch, ref Mono);
-            var ep = new Phonon.IPLAmbisonicsEncodeEffectParams { direction = Directions[b], order = order };
-            Phonon.iplAmbisonicsEncodeEffectApply(Encoders[b], ref ep, ref Mono, ref Encoded);
-            Phonon.iplAudioBufferInterleave(Context, ref Encoded, Field);
-            for (int i = 0; i < sub * channels; i++) Sum[i] += Field[i];
-        }
     }
 
     public void Release()
     {
-        Ready = false;
-        for (int i = 0; i < Encoders.Length; i++)
-            if (Encoders[i] != IntPtr.Zero) Phonon.iplAmbisonicsEncodeEffectRelease(ref Encoders[i]);
         for (int i = 0; i < Ears.Length; i++)
             if (Ears[i] != IntPtr.Zero) Phonon.iplBinauralEffectRelease(ref Ears[i]);
         for (int i = 0; i < SdmEars.Length; i++)
             if (SdmEars[i] != IntPtr.Zero) Phonon.iplBinauralEffectRelease(ref SdmEars[i]);
         if (EarBuf.data != IntPtr.Zero) Phonon.iplAudioBufferFree(EarContext, ref EarBuf);
         if (Mono.data != IntPtr.Zero) Phonon.iplAudioBufferFree(Context, ref Mono);
-        if (Encoded.data != IntPtr.Zero) Phonon.iplAudioBufferFree(Context, ref Encoded);
     }
 }
 
@@ -642,8 +489,7 @@ internal static class TracedReverbDsp
                 inSum += v * (double)v;
             }
             Phonon.iplAudioBufferDeinterleave(s.WorkerContext, mono, ref s.Mono);
-            bool diffuse = false;
-            if (s.TailOnly && !TracedReverbState.ParametricTail && s.LateConv is { } lc)
+            if (s.TailOnly && s.LateConv is { } lc)
             {
                 // The traced late part itself, convolved: its level, its envelope and its decay are
                 // the room's. Silent until the first trace has been read back, a fraction of a second.
@@ -652,7 +498,7 @@ internal static class TracedReverbDsp
                 lc.Process(mono.AsSpan(0, sub), s.LateOut.AsSpan(0, sub));
                 Array.Clear(s.AmbiScratch, 0, sub * TracedReverb.Channels);
                 for (int k = 0; k < sub; k++) s.AmbiScratch[k * TracedReverb.Channels] = s.LateOut[k];
-                if (s.Diffuse is { Ready: true, BinauralReady: true } dfb)
+                if (s.Diffuse is { } dfb)
                 {
                     // Straight to the ears (DiffuseTail.RenderBinaural): no soundfield, no decode.
                     dfb.RenderBinaural(s.AmbiScratch, sub, TracedReverb.Channels);
@@ -675,37 +521,15 @@ internal static class TracedReverbDsp
                     }
                     continue;
                 }
-                if (s.Diffuse is { Ready: true } dfl)
-                {
-                    dfl.Render(s.AmbiScratch, sub, TracedReverb.Channels, TracedReverb.Order);
-                    Phonon.iplAudioBufferDeinterleave(s.WorkerContext, dfl.Sum, ref s.Ambi);
-                    diffuse = true;
-                }
-                else Phonon.iplAudioBufferDeinterleave(s.WorkerContext, s.AmbiScratch, ref s.Ambi);
-            }
-            else if (s.TailOnly && s.TailEffect != IntPtr.Zero)
-            {
-                var tail = prm;
-                tail.type = Phonon.IPL_REFLECTIONEFFECTTYPE_PARAMETRIC;
-                Phonon.iplReflectionEffectApply(s.TailEffect, ref tail, ref s.Mono, ref s.Ambi, IntPtr.Zero);
-                // The one channel it wrote, made into a field from every direction: see DiffuseTail.
-                if (s.Diffuse is { Ready: true } df && s.AmbiScratch.Length >= sub * TracedReverb.Channels)
-                {
-                    Phonon.iplAudioBufferInterleave(s.WorkerContext, ref s.Ambi, s.AmbiScratch);
-                    df.Render(s.AmbiScratch, sub, TracedReverb.Channels, TracedReverb.Order);
-                    Phonon.iplAudioBufferDeinterleave(s.WorkerContext, df.Sum, ref s.Ambi);
-                    diffuse = true;
-                }
+                Phonon.iplAudioBufferDeinterleave(s.WorkerContext, s.AmbiScratch, ref s.Ambi);
             }
             else Phonon.iplReflectionEffectApply(s.Effect, ref prm, ref s.Mono, ref s.Ambi, IntPtr.Zero);
             Phonon.iplAmbisonicsDecodeEffectApply(s.Decode, ref dp, ref s.Ambi, ref s.Stereo);
             Phonon.iplAudioBufferInterleave(s.ProviderContext, ref s.Stereo, st);
             for (int k = 0; k < sub; k++)
             {
-                // A field decoded from eight directions is already two different ears; its low end
-                // did not go through the decoder and joins both ears here (DiffuseTail).
-                float l = diffuse ? (st[k * 2] + s.Diffuse!.Low[k]) * g : s.Left.Process(st[k * 2]) * g;
-                float r = diffuse ? (st[k * 2 + 1] + s.Diffuse!.Low[k]) * g : s.Right.Process(st[k * 2 + 1]) * g;
+                float l = s.Left.Process(st[k * 2]) * g;
+                float r = s.Right.Process(st[k * 2 + 1]) * g;
                 outSum += l * (double)l + r * (double)r;
                 int ok = (at + k) * outCh;
                 o[ok] = l;

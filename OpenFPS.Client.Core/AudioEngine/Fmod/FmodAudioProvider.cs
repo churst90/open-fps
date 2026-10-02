@@ -1291,7 +1291,6 @@ public class FmodAudioProvider : IAudioProvider
         {
             st.Trace = null;
             if (st.Effect != IntPtr.Zero) Phonon.iplReflectionEffectRelease(ref st.Effect);
-            if (st.TailEffect != IntPtr.Zero) Phonon.iplReflectionEffectRelease(ref st.TailEffect);
             if (st.Decode != IntPtr.Zero) Phonon.iplAmbisonicsDecodeEffectRelease(ref st.Decode);
             st.Diffuse?.Release(); st.Diffuse = null;
             if (st.Mono.data != IntPtr.Zero) Phonon.iplAudioBufferFree(st.WorkerContext, ref st.Mono);
@@ -1402,11 +1401,6 @@ public class FmodAudioProvider : IAudioProvider
 
     /// <summary>Whether there is a trace to play yet (the scene is built after the map loads).</summary>
     internal static bool TracedActive => TracedReverbSet.Listener != null;
-
-    /// <summary>The listener's own stage plays the late tail alone everywhere, the early part being the
-    /// placed copies. OPENFPS_TAIL=full keeps the whole traced response outside enclosures, for an A/B
-    /// on the street.</summary>
-    internal static readonly bool TailEverywhere = !string.Equals(Environment.GetEnvironmentVariable("OPENFPS_TAIL"), "full", StringComparison.OrdinalIgnoreCase);
 
     // ── Traced echoes: a few sources traced from where they are ──────────────────────────────
     //
@@ -1847,8 +1841,7 @@ public class FmodAudioProvider : IAudioProvider
             // Your own place's stage: the late tail alone, the early part being placed copies
             // (WorldAudioPlayer.QueueEarlyEchoes). A cabin keeps its whole response: nothing is placed
             // inside a vehicle.
-            kv.Value.State.TailOnly = kv.Key == _listenerRegionId && !ReferenceEquals(trace, cabin)
-                                      && (TailEverywhere || IsEnclosure(kv.Key));
+            kv.Value.State.TailOnly = kv.Key == _listenerRegionId && !ReferenceEquals(trace, cabin);
             // The trim is for reflections heard beside their direct sound. A cabin's response is not
             // that: nothing is placed inside a vehicle, so it is the whole of the room you sit in,
             // and it plays at its traced level. Trimmed with the rest, a bus ride is muffled, with the
@@ -1886,9 +1879,6 @@ public class FmodAudioProvider : IAudioProvider
         };
         if (Phonon.iplReflectionEffectCreate(tr.Context, ref au, ref es, out IntPtr effect) != Phonon.IPL_STATUS_SUCCESS)
         { Log.Warning("Traced reverb: Steam Audio would not make a reflection effect for region {Id}.", regionId); return; }
-        var tes = es; tes.type = Phonon.IPL_REFLECTIONEFFECTTYPE_PARAMETRIC;
-        if (Phonon.iplReflectionEffectCreate(tr.Context, ref au, ref tes, out IntPtr tailEffect) != Phonon.IPL_STATUS_SUCCESS)
-            tailEffect = IntPtr.Zero;
         if (_saHrtfTraced == IntPtr.Zero || _saHrtfTracedFrame != sub)
         {
             if (_saHrtfTraced != IntPtr.Zero) Phonon.iplHRTFRelease(ref _saHrtfTraced);
@@ -1903,7 +1893,7 @@ public class FmodAudioProvider : IAudioProvider
         var st = new TracedReverbState
         {
             FrameSize = _saFrameSize, SubFrame = sub, WorkerContext = tr.Context, ProviderContext = _saContext,
-            Effect = effect, TailEffect = tailEffect, Decode = decode, Hrtf = _saHrtfTraced, Trace = tr,
+            Effect = effect, Decode = decode, Hrtf = _saHrtfTraced, Trace = tr,
             MonoScratch = new float[sub], StereoScratch = new float[sub * 2],
             AmbiScratch = new float[sub * TracedReverb.Channels],
             Orientation = Phonon.ListenerFrame(_listenerRot),
@@ -1911,12 +1901,10 @@ public class FmodAudioProvider : IAudioProvider
             // Never the last: that one is the tracer's own, for reading the late tail back.
             Reader = Math.Min(_traced.Count, TracedReverb.ExtractReader - 1),
             LateConv = new LateTailConvolver(sub, tr.MaxLatePartitions),
-            SdmConv = TracedReverb.Sdm ? new SharedInputConvolver(sub, SdmTailIr.PartitionsFor(44100, sub), DiffuseBranch.Count) : null,
+            SdmConv = new SharedInputConvolver(sub, SdmTailIr.PartitionsFor(44100, sub), DiffuseBranch.Count),
             LateOut = new float[sub],
             // The room you are in: its late tail as a field round the head, not one channel.
-            Diffuse = DiffuseTail.Enabled
-                ? DiffuseTail.Create(_saContext, sub, TracedReverb.Order, TracedReverb.Channels, decode, Phonon.ListenerFrame(_listenerRot), _saHrtfTraced)
-                : null,
+            Diffuse = DiffuseTail.Create(_saContext, sub, TracedReverb.Channels, _saHrtfTraced),
         };
         Phonon.iplAudioBufferAllocate(tr.Context, 1, sub, ref st.Mono);
         Phonon.iplAudioBufferAllocate(tr.Context, TracedReverb.Channels, sub, ref st.Ambi);

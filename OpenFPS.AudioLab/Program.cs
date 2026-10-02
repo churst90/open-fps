@@ -174,13 +174,6 @@ if (args.Contains("--traced-reverb"))
     Environment.Exit(code);
 }
 
-if (args.Contains("--sa-encode"))
-{
-    // --sa-encode: a field of eight directions against one channel — energy per ear and interaural correlation per band.
-    int code = OpenFPS.Client.Core.AudioEngine.SteamAudio.TracedReverbSpike.EncodeCheck();
-    Log.CloseAndFlush();
-    Environment.Exit(code);
-}
 if (args.Contains("--sa-frame"))
 {
     // --sa-frame: which way Steam Audio's traced soundfield faces. A wall to the left and a wall ahead;
