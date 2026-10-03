@@ -186,6 +186,13 @@ public static class KnobDoor
     private const double KnobFriction = 0.015, KnobGrease = 2e-4;
     /// <summary>The bolt sliding in its housing, N.</summary>
     private const double BoltFriction = 0.3;
+    /// <summary>How hard a hand pulls on a knob while it turns it, N: the bolt's flat face drags on the
+    /// keeper under this until it clears, and then the door comes away. Round 1 pulled with a sixth of
+    /// it and the opening was a faint click.</summary>
+    private const double HandPull = 12;
+    /// <summary>The bolt's flat face and the keeper's edge: dry brass on steel, worn to a ridged track by
+    /// years of the same drag. The ridges, 0.1 mm apart, are what makes the drag a grind.</summary>
+    private const double KeeperRidges = 0.0001, KeeperRidgeDepth = 0.35;
     /// <summary>The rose's stop is a die-cast zinc lug against a nylon bush: a dead contact, not a bell.</summary>
     private const double RoseContactLambda = 1.0;
     /// <summary>Brass bolt on the zinc housing's stop: about half its speed comes back.</summary>
@@ -550,6 +557,7 @@ public static class KnobDoor
         private double bolt = Throw, boltRate, knob, knobRate;
         private bool boltInStrike = true, holdingKnob, holdingLeaf;
         private LuGre keeperFriction;
+        private double[] keeperSurface = Array.Empty<double>();
         private readonly Modes strike, housing;
         private double latchBody, latchBodyRate;
         private readonly Mount[] mouldings;
@@ -682,7 +690,8 @@ public static class KnobDoor
             strikeBody = new Mount(StrikeMass, StrikeScrewStiffness, 0.15);
             strikeSound = new SmallRadiator(StrikeArea, dt);
             latchSound = new SmallRadiator(FaceplateArea, dt);
-            keeperFriction = new LuGre { MuStatic = 0.3, MuSliding = 0.2, StribeckSpeed = 0.003, Viscous = 0 };
+            keeperFriction = new LuGre { MuStatic = 0.35, MuSliding = 0.2, StribeckSpeed = 0.01, Viscous = 0 };
+            keeperSurface = SurfaceProfile(rng, Throw, KeeperRidges);
 
             // Strike plate: 1.5 mm steel between screws 48 mm apart, clamped, and its lip a 10 mm tongue.
             strike = new Modes(new[] { Beam(0.048, 0.0015, 7850, 200e9, 4.730), Beam(0.048, 0.0015, 7850, 200e9, 7.853),
@@ -840,17 +849,19 @@ public static class KnobDoor
             double end = grip + turn + swingSeconds + 0.6;
             while (time < end)
             {
-                if (time > grip && cleared < 0) pullTorque = Math.Min(1.0, (time - grip) / 0.1) * 2.0;
+                if (time > grip && cleared < 0) pullTorque = Math.Min(1.0, (time - grip) / 0.1) * HandPull * (width - KnobInset);
                 if (cleared < 0 && !boltInStrike && time > grip)
                 {
                     cleared = time;
                     Log($"{time * 1000:F0} ms  bolt clear of the keeper; the hand swings the leaf");
-                    double a0 = theta, a1 = 85 * Math.PI / 180, t0 = time;
+                    // The hand carries on from wherever the door has jumped to, at the speed it jumped.
+                    double a0 = theta, w0 = omega, a1 = 85 * Math.PI / 180, t0 = time;
                     holdingLeaf = true; pullTorque = 0;
                     leafPath = t =>
                     {
                         double u = Math.Clamp((t - t0) / swingSeconds, 0, 1);
-                        return (a0 + (a1 - a0) * MinJerk(u), (a1 - a0) * MinJerkRate(u) / swingSeconds);
+                        var (pp, vv) = Hermite(u, a0, w0 * swingSeconds, a1, 0);
+                        return (pp, vv / swingSeconds);
                     };
                 }
                 if (cleared > 0 && released < 0 && time > cleared + 0.12)
@@ -1040,6 +1051,11 @@ public static class KnobDoor
                     strikeBody.F += fk;
                     if (fk > 0)
                     {
+                        double ridge = keeperSurface[(int)(Math.Clamp(bolt / Throw, 0, 0.9999) * keeperSurface.Length)];
+                        // A trough can only take the grip so far down; it never goes negative.
+                        double groove = Math.Max(0.3, 1 + KeeperRidgeDepth * ridge);
+                        keeperFriction.MuStatic = 0.35 * groove;
+                        keeperFriction.MuSliding = 0.2 * groove;
                         double ff = keeperFriction.Force(boltRate, fk, BoltMass, dt);
                         boltForce -= ff;
                         strikeForce += ff * 0.3;   // the keeper's edge is in the plate's plane
@@ -1099,7 +1115,7 @@ public static class KnobDoor
                 // The leaf's knuckle turning on the pin, which the frame's knuckles hold.
                 double slip = PinRadius * (omega + h.TwistRate);
                 h.Travel += slip * dt;
-                double patch = 1 + SurfacePatchiness * h.Wear * h.SurfaceAt(h.Travel);
+                double patch = Math.Max(0.3, 1 + SurfacePatchiness * h.Wear * h.SurfaceAt(h.Travel));
                 h.Friction.MuStatic = h.MuStatic * patch;
                 h.Friction.MuSliding = h.MuSliding * patch;
                 // The hand's push loads the hinges too, a share of its force at the knob.
