@@ -512,6 +512,10 @@ public class FmodAudioProvider : IAudioProvider
         public float LastVolume;
         /// <summary>The low/mid/high EQ last applied, dB: occlusion, air, shelter, cone. For the census.</summary>
         public (float Low, float Mid, float High) LastEqDb;
+        /// <summary>The pop detector's memory (WatchForPops): the level a while ago, when it rose, from where.</summary>
+        public float PopBaseDb = float.NaN, PopPeakDb;
+        public double PopBaseAt, PopRiseAt = -1, FirstSeenAt = -1, PopLoggedAt = -10;
+        public float PopFromOcclusion, PopFromMid;
         public float TargetOcclusion;
         public float CurrentAperture = 1.0f;
         public float TargetAperture = 1.0f;
@@ -3964,6 +3968,8 @@ public class FmodAudioProvider : IAudioProvider
             active.LastEqDb = (Math.Clamp(lowDb, -80f, 10f), Math.Clamp(midDb, -80f, 10f), Math.Clamp(highDb, -80f, 10f));
         }
 
+        WatchForPops(active, lPosVec);
+
         // The wet send must NOT grow with distance: then distant sounds drown in reverb and the room
         // seems to follow the listener. The dry path already rolls off with distance, so the
         // wet-to-dry ratio rises with distance on its own.
@@ -4156,6 +4162,45 @@ public class FmodAudioProvider : IAudioProvider
         gain = routes.FieldAt(regionId, listener, listenerRegion, FieldLeakRange, out via, out var inField);
         _fieldHere[regionId] = (now, listener, listenerRegion, gain, via, inField);
         return gain > 0f;
+    }
+
+    /// <summary>
+    /// "Now and then I hear sounds like a siren pop through for an instant when I'm deep inside a
+    /// building" (Cody, 2026-10-02). A sustained voice that jumps 15 dB or more within 150 ms and
+    /// falls back within 400 ms is logged as [POP] with what its path said before and during, so the
+    /// next one names its own cause. Not a fix: an instrument that runs in every session.
+    /// </summary>
+    private void WatchForPops(ActiveSound a, Vector3 listener)
+    {
+        if (a.Type == EmitterType.UI || a.IsReflection) return;
+        double now = OpenFPS.Common.AudioClock.Now;
+        if (a.FirstSeenAt < 0) a.FirstSeenAt = now;
+        float level = 20f * MathF.Log10(MathF.Max(1e-6f, a.LastVolume)) + a.LastEqDb.Mid;
+        if (float.IsNaN(a.PopBaseDb) || now - a.PopBaseAt > 0.15 || level < a.PopBaseDb)
+        {
+            if (a.PopRiseAt < 0) { a.PopBaseDb = level; a.PopBaseAt = now; a.PopFromOcclusion = a.CurrentOcclusion; a.PopFromMid = a.LastEqDb.Mid; }
+        }
+        if (a.PopRiseAt < 0)
+        {
+            if (now - a.FirstSeenAt > 0.5 && level > a.PopBaseDb + 15f && now - a.PopBaseAt <= 0.15)
+            { a.PopRiseAt = now; a.PopPeakDb = level; }
+            return;
+        }
+        a.PopPeakDb = MathF.Max(a.PopPeakDb, level);
+        if (now - a.PopRiseAt > 0.4) { a.PopRiseAt = -1; a.PopBaseDb = level; a.PopBaseAt = now; return; }   // it stayed: a real change
+        if (level < a.PopPeakDb - 12f)
+        {
+            if (now - a.PopLoggedAt > 2.0)
+            {
+                a.PopLoggedAt = now;
+                Log.Information("[POP] {Sound} e{Id} at {Dist:F0} m: {From:F0} -> {Peak:F0} dB and back in {Ms:F0} ms; "
+                              + "occlusion {Oc0:F2} -> {Oc1:F2}, mid EQ {M0:F0} -> {M1:F0} dB; listener region {Lr}, source region {Sr}",
+                                a.SoundId, a.EntityId, Vector3.Distance(listener, a.Position), a.PopBaseDb, a.PopPeakDb,
+                                (now - a.PopRiseAt) * 1000, a.PopFromOcclusion, a.CurrentOcclusion, a.PopFromMid, a.LastEqDb.Mid,
+                                _listenerRegionId, a.TargetRegionId);
+            }
+            a.PopRiseAt = -1; a.PopBaseDb = level; a.PopBaseAt = now;
+        }
     }
 
     /// <summary>
