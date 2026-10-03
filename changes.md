@@ -4,6 +4,23 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-02
 
+- Door types (Cody's list): a knob or lever, a steel push-bar door with a closer, a keyed glass
+  front door (bar inside, key outside, closer), a pulled glass door with a closer, an automatic
+  sliding door, a patio slider and a lift's doors. The kind is data on the prefab (`DoorKind`,
+  `Slides`, `Powered`, `SensorMetres`, `CloseAfterSeconds`, `CloseSeconds`, `KeyedSide`) and on
+  `DoorComponent` (fields appended; restart the server).
+  - Sliding leaves move along their own width; the opening follows, and the routes see the leaf
+    where it is (a shut slider blocks like a shut door).
+  - Closers shut 3 s after the doorway is clear, slowly and then at latch speed, and never on
+    anyone in the doorway. Automatic doors open for anyone within 2.5 m, either side, close 2 s
+    after, and reverse for anyone in the doorway. Parked drivers leave both to themselves.
+  - Each kind sends its mechanical events as `door:KIND:EVENT`, for now with the existing door
+    sounds or none. Every key is in docs/DOOR_TYPES_EVENTS.md. Synthesis follows.
+  - The city: knobs on the flats and house fronts (397), a keyed glass front door on each tower
+    (5), two pairs of automatic leaves at the terminal's apron entrances (4), a patio door onto
+    each back garden (64), push bars on the hangar and terminal service doors (2).
+  - Closing a door by E, and a parked driver checking for a player, measured to the doorway in
+    the building's own frame; both used to compare a world position with a building-local one.
 - The ear overloads: a sound louder at the ear than the output can play makes every other voice
   give way by the excess (`Loudness.OverloadDb`), held 50 ms and recovering over up to a second. The
   shot, its echoes and the reverb are left alone. Measured with `--clap-room sound=glock dist=N bed`:

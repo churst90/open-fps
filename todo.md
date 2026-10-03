@@ -46,11 +46,18 @@ Suggested order. Research and file references for most of these: [docs/RESEARCH_
 - Beacons (2026-10-02: +4 dB, `/beacons louder|quieter`, a door's on its face at face height ringing
   the room you are in; done). Still open from the proposal, not asked for: door range 12 m to 6 m,
   and lifting beacons when a louder sound is near.
-- Door types (Cody, 2026-10-02): a knob or lever, a push bar, sliding. Proposed: the type from the
-  door itself (flats knob, fire and stair doors push bar, shop and lobby entrances sliding), each
-  moving as it does (a slider along its track, a push bar opened by walking into it and closed by
-  its closer), and each sound built from its mechanism and fitted to recordings fetched first.
-  Waiting on Cody: go ahead, and are shop doors automatic.
+- Door types (Cody, 2026-10-02). Done 2026-10-02 (unheard): seven kinds with their motion,
+  closers, sensors and keyed side, on the city, each sending its events as `door:KIND:EVENT`
+  (docs/DOOR_TYPES_EVENTS.md). Next:
+  - synthesise each event from its mechanism, fitted to recordings fetched first; today each
+    plays the old latch-and-leaf sounds or nothing;
+  - a key item, so a keyed door can be locked to somebody without one;
+  - the towers' stairwells open onto their corridors with no door: push-bar fire doors there
+    would change every tower's acoustics, so they wait for Cody;
+  - the terminal's road-side door is a steel service door; if it is the public way in it wants
+    to be automatic;
+  - no aluminium material exists, so glass doors are glass leaves with no frame of their own;
+  - lifts (the elevator door kind is ready for them).
 - In a car seat, cranking carries sub-20 Hz pressure 13-16 dB over everything audible (the
   cylinders' slow swing through the panel path, whose low-pass passes DC). It costs the limiter
   headroom. A high-pass at the panel corner fixed it but took 6 dB of unheard rumble off the
