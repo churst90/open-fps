@@ -413,6 +413,7 @@ public sealed class WorldAudioPlayer
                 // playing it later — see VoiceManager.Process, which drops one that did not win a slot
                 // rather than keeping it queued to fire from a stale position minutes afterwards.
                 IsEvent = true,
+                LevelDb = item.IsReflection ? 0f : item.Sound.LevelDb,
                 InsideListenersVehicle = item.SourceEntityId >= 0 && item.SourceEntityId == ListenerVehicleId,
             };
             // Somebody talking faces a way: duller and quieter behind them.

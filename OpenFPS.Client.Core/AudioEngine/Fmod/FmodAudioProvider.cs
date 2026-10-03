@@ -528,6 +528,8 @@ public class FmodAudioProvider : IAudioProvider
         public float AirLowDb, AirMidDb, AirHighDb;
         public int TargetRegionId = -1; 
         public bool IsReflection; 
+        /// <summary>The overloading sound itself: everything else gives way to it, not this.</summary>
+        public bool OverloadExempt;
         public bool FollowsListener;
         public bool InsideListenersVehicle;
         public Vector3 ListenerOffset;
@@ -1863,6 +1865,66 @@ public class FmodAudioProvider : IAudioProvider
 
     /// <summary>Adds a traced stage to every bus that lacks one, points each at the place it should be
     /// played through, and puts every bus in the mode asked for. Audio update thread.</summary>
+    // ── The ear, overloaded ─────────────────────────────────────────────────────────────────
+    //
+    // The loudness law puts everything above about 112 dB at the ear at full scale (Loudness), so a
+    // pistol 1 m away and one 30 m away came out the same, and a shot beside you was "just a click":
+    // 1-2 ms of energy at the same peak a hand clap reaches. What does not fit under the ceiling has
+    // to show somewhere, and the ear shows where: a sound that loud sets off its protective reflex and
+    // leaves the world dulled for a moment after. So the excess is taken out of everything ELSE, by
+    // the same law that compresses the rest (the excess at the ear times the compression), and comes
+    // back over a few hundred milliseconds, longer the harder it was hit. The shot itself, its echoes
+    // and the room's reverb are left alone: what you hear in that moment is the shot and its room.
+    // About 20 dB for a pistol at a metre, 6 at 40 m, nothing from a jackhammer.
+
+    /// <summary>Most the world gives way by, dB.</summary>
+    private const float OverloadMaxDb = 24f;
+    private float _overloadDb, _overloadGain = 1f;
+    private double _overloadHoldUntil, _overloadTau = 0.3;
+    private readonly List<(double At, float Db)> _overloadPending = new();
+
+    /// <summary>How far over the output's ceiling a one-off arrives, in rendered dB (0 if it does not).</summary>
+    private float OverloadDb(SpatialEmitter e)
+    {
+        if (!e.IsEvent || e.IsReflection || e.LevelDb <= 0f || e.Type == EmitterType.UI) return 0f;
+        float d = e.EffectiveDistance > 0f ? e.EffectiveDistance : Vector3.Distance(_listenerPos, e.Position);
+        float path = (e.EqMid > 0f ? e.EqMid : 1f) * (1f - Math.Clamp(e.Occlusion, 0f, 0.99f));
+        return MathF.Min(OverloadMaxDb, Loudness.OverloadDb(e.LevelDb, d, path, e.AirMidDb));
+    }
+
+    /// <summary>Starts (or deepens) the world's giving way, <paramref name="afterSeconds"/> from now:
+    /// when the sound arrives, not when it was sent.</summary>
+    private void Overload(float db, double afterSeconds)
+    {
+        lock (_overloadPending) _overloadPending.Add((OpenFPS.Common.AudioClock.Now + Math.Max(0.0, afterSeconds), db));
+    }
+
+    /// <summary>One step of the overload: arrivals, the hold, the recovery. Audio update.</summary>
+    private void StepOverload(double now, float dt)
+    {
+        lock (_overloadPending)
+            for (int i = _overloadPending.Count - 1; i >= 0; i--)
+            {
+                var (at, db) = _overloadPending[i];
+                if (at > now) continue;
+                _overloadPending.RemoveAt(i);
+                if (db <= _overloadDb) continue;
+                _overloadDb = db;
+                // The reflex holds while the sound is still in the ear, and the world comes back the
+                // slower the harder it was hit: about a quarter of a second after a distant shot, most
+                // of a second after one beside you.
+                _overloadHoldUntil = now + 0.05;
+                _overloadTau = 0.15 + 0.03 * db;
+            }
+        if (_overloadDb > 0f && now > _overloadHoldUntil)
+            _overloadDb *= (float)Math.Exp(-dt / _overloadTau);
+        if (_overloadDb < 0.05f) _overloadDb = 0f;
+        _overloadGain = MathF.Pow(10f, -_overloadDb / 20f);
+    }
+
+    /// <summary>For the readouts and tests: how far the world is giving way right now, dB.</summary>
+    public float OverloadNowDb => _overloadDb;
+
     private void UpdateTracedStages()
     {
         var listenerTrace = TracedReverbSet.Listener;
@@ -2702,9 +2764,19 @@ public class FmodAudioProvider : IAudioProvider
             channel.setDelay(voiceStartClock, 0, false);
         }
 
+        // Louder at the ear than the output can go: the rest of the world gives way (Overload).
+        float overDb = OverloadDb(emitter);
+        if (overDb > 0f)
+        {
+            Overload(overDb, emitter.DelayMs / 1000.0);
+            Log.Information("[OVERLOAD] {Sound} at {Distance:F0} m: the rest gives way {Db:F1} dB", emitter.SoundId,
+                            emitter.EffectiveDistance > 0f ? emitter.EffectiveDistance : Vector3.Distance(_listenerPos, emitter.Position), overDb);
+        }
+
         lock (_lock) { 
             var activeSound = new ActiveSound { 
                 EntityId = emitter.EntityId, SoundId = emitter.SoundId, Type = emitter.Type, 
+                OverloadExempt = overDb > 0f,
                 Channel = channel, ThreeEqDsp = threeEqDsp, DiffractionDsp = diffractionDsp,
                 GranularDsp = granularDsp, GranularHandle = granularHandle, GranularState = granularState,
                 SynthDsp = synthDsp, SynthHandle = synthHandle, SynthState = synthState,
@@ -3245,6 +3317,7 @@ public class FmodAudioProvider : IAudioProvider
         _attributeDt = _attributeTickAt == 0 ? 0.004f
             : Math.Clamp((now - _attributeTickAt) / (float)System.Diagnostics.Stopwatch.Frequency, 0f, 0.25f);
         _attributeTickAt = now;
+        StepOverload(OpenFPS.Common.AudioClock.Now, _attributeDt);
 
         _updateTimer.Restart();
         ReportMixerLoad();
@@ -3822,7 +3895,7 @@ public class FmodAudioProvider : IAudioProvider
         active.FadeGain += Math.Clamp(active.FadeTarget - active.FadeGain, -fadeStep, fadeStep);
 
         active.LastVolume = active.BaseVolume * finalVolFactor * roomGainBonus * distAtten * coneAtten
-                            * active.FadeGain;
+                            * active.FadeGain * (active.OverloadExempt || active.IsReflection ? 1f : _overloadGain);
         active.Channel.setVolume(active.LastVolume);
 
         // Doppler: Steam Audio voices play on a 2D channel, so FMOD's own Doppler is bypassed — apply it
