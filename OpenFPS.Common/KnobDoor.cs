@@ -1,0 +1,1211 @@
+using System;
+using System.Collections.Generic;
+using System.Text;
+
+namespace OpenFPS.Common;
+
+/// <summary>
+/// A knob door, simulated as the object it is, and the sound is whatever the object does.
+///
+/// Cody, 2026-10-03: "are we modeling the doors or modeling the sound? ... we need to model the
+/// physical doors." The round before this one fitted a recipe to each event, and every open sounded
+/// the same whatever the door was doing. Here nothing is a recipe. There are parts, each with its
+/// mass, stiffness and loss, and contacts between them; a hand moves the leaf and turns the knob,
+/// and the pressure radiated by everything that vibrates is the sound.
+///
+/// The parts:
+///
+///   The LEAF: a rigid rotation about the hinge axis plus its bending modes, from its construction
+///   (a hollow-core leaf is two 3 mm fibreboard skins on a 28 mm core; a solid one is 40 mm of wood).
+///   The modes and how well each one radiates come from the plate's size, stiffness and mass, and the
+///   radiation from the Rayleigh integral over the face, so coincidence and the cancellation of the
+///   low modes are not assumed.
+///
+///   Three HINGES. Each knuckle turns on its pin with dry friction (LuGre), and the knuckle is held to
+///   the leaf by its screws, which makes it a small torsional resonator. Friction that falls with
+///   sliding speed (a dry or rusty pin) feeds that resonator, and it squeaks; an oiled pin's friction
+///   rises with speed and it is silent. Each hinge has its own wear and its own load (the top and
+///   bottom hinges carry the leaf's weight as a couple, the middle almost none), so each sings at its
+///   own pitch, and only when the leaf is moving slowly enough for its pin to stick.
+///
+///   The LATCH: a sprung bolt with a 45 degree bevel. Closing, the bevel meets the strike's lip, the
+///   lip drives the bolt in, and once past it the spring snaps the bolt out into the strike, against
+///   its own stop in the housing. The bolt sits in the strike with play, so a leaf that bounces off
+///   the stop hits the keeper with the bolt's flat face. Opening, the knob's spindle takes up its play,
+///   picks up the cam and draws the bolt in while the hand's pull presses its flat face on the keeper.
+///   Let go of the knob and the spring throws the bolt back out against its stop and the knob back
+///   against its rose.
+///
+///   The STOP: the leaf's face meets the frame's stop at five places (three down the latch edge, two
+///   along the head). A real leaf is not flat, so they land at different moments, which is why a shut
+///   door is a short flam rather than one tick.
+///
+///   The FRAME and WALL: what the stop and the strike are fixed to, a plasterboard panel beside the
+///   opening, takes every reaction and radiates as a plate.
+///
+///   HARDWARE: the strike plate, the latch faceplate and housing, and the knob's brass shell each ring
+///   at their own modes from their own dimensions. The knob is damped by the hand while it is held.
+///
+/// The simulation runs at four times the output rate, because metal on metal contacts last tens of
+/// microseconds, and is filtered down. Pressure is computed at a metre; <see cref="PascalsAtFullScale"/>
+/// converts to samples.
+/// </summary>
+public static class KnobDoor
+{
+    /// <summary>How a leaf is built.</summary>
+    public enum Construction
+    {
+        /// <summary>Two 3.2 mm fibreboard skins on a 28 mm paper core with a pine frame: most interior
+        /// doors in houses.</summary>
+        HollowCore,
+        /// <summary>40 mm of solid wood.</summary>
+        SolidWood,
+    }
+
+    /// <summary>How the door is shut: the latch edge's speed when the hand lets go, m/s.</summary>
+    public enum Shut { Gentle, Normal, Slam }
+
+    /// <summary>One particular door. The same door always sounds like itself.</summary>
+    public sealed class Door
+    {
+        public Construction Leaf = Construction.HollowCore;
+        public float Width = 0.9f, Height = 2.1f;
+        /// <summary>Hinge wear, top, middle, bottom: 0 oiled, 1 dry and rusty. Null draws them from
+        /// the seed.</summary>
+        public float[]? HingeWear;
+        public int Seed = 1;
+    }
+
+    /// <summary>A sample of 1.0 is this many pascals at a metre (120 dB SPL peak). Every render uses
+    /// it, so a slam and a gentle close keep their real difference.</summary>
+    public const double PascalsAtFullScale = 20.0;
+
+    /// <summary>The lab's instrument: when set, every render also writes each part's pressure alone,
+    /// at the internal rate, as PART.raw (float32) in this folder.</summary>
+    public static string? StemFolder;
+    /// <summary>The lab's instrument: when set, the bottom hinge's pin is traced here every fourth step.</summary>
+    public static List<string>? PinTrace;
+
+    /// <summary>What the render did, for the lab: when each contact happened and how hard.</summary>
+    public sealed class Report
+    {
+        public readonly List<string> Events = new();
+        public double PeakPascals;
+        public override string ToString()
+        {
+            var sb = new StringBuilder();
+            foreach (var e in Events) sb.AppendLine("    " + e);
+            sb.Append($"    peak {20 * Math.Log10(Math.Max(1e-9, PeakPascals) / 2e-5):F1} dB SPL at 1 m");
+            return sb.ToString();
+        }
+    }
+
+    /// <summary>Opening: grip, turn, pull, let the knob go, swing to about 85 degrees.</summary>
+    public static float[] RenderOpen(Door door, int sampleRate, double swingSeconds = 0.9, Report? report = null)
+    {
+        var sim = new Sim(door, sampleRate, report);
+        sim.StartShut();
+        sim.ScriptOpen(swingSeconds);
+        return sim.Output();
+    }
+
+    /// <summary>Closing from about 85 degrees: push, let go, the leaf coasts into the frame.</summary>
+    public static float[] RenderClose(Door door, Shut how, int sampleRate, Report? report = null)
+    {
+        var sim = new Sim(door, sampleRate, report);
+        sim.StartOpen(85.0 * Math.PI / 180.0);
+        sim.ScriptClose(how switch { Shut.Gentle => 0.35, Shut.Slam => 2.6, _ => 0.9 });
+        return sim.Output();
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // Constants, each a property of a part. None is a level or a tone.
+
+    private const double Rho0 = 1.21, C0 = 343.0;
+    private const double G = 9.81;
+    private const int Oversample = 4;
+
+    // Hollow core: HDF skins (E 4 GPa, 850 kg/m3), 3.2 mm, 28 mm apart; core and frame add 3.1 kg.
+    private const double SkinE = 4.0e9, SkinRho = 850, SkinT = 0.0032, CoreDepth = 0.028, CoreAndFrameKg = 3.1;
+    // Solid: wood across and along the grain averaged (sqrt of 11 and 0.9 GPa is 3.1), 40 mm.
+    private const double SolidE = 3.1e9, SolidRho = 650, SolidT = 0.04;
+    private const double Poisson = 0.3;
+    /// <summary>Loss a hung leaf has beyond its material: rubbing at hinges and stop, the paint.</summary>
+    private const double MountingLoss = 0.02;
+    private const double HollowLoss = 0.05;   // fibreboard, glued paper core, air pumped through its cells
+    private const double LeafModeMaxHz = 14000;
+
+    // Hinges: 3.5 in butt hinges, 1/4 in pin, three screws a leaf into wood.
+    private static readonly double[] HingeHeights = { 1.85, 1.05, 0.25 };
+    private const double PinRadius = 0.0032;
+    /// <summary>The knuckle's end face carries the leaf's weight; mean radius of that face.</summary>
+    private const double KnuckleFaceRadius = 0.0045;
+    /// <summary>Lateral stiffness of a No. 9 wood screw in pine, about 1.2 kN/mm, three per leaf, at a
+    /// mean 25 mm from the pin: the knuckle's torsional stiffness against the leaf.</summary>
+    private const double ScrewLateralStiffness = 1.2e6, ScrewArm = 0.025;
+    /// <summary>The knuckle and its steel hinge leaf, 60 g at the screw arm, twisting on the screws
+    /// against the door's edge (which is the ground here: it is far heavier). That puts the squeak's
+    /// resonator near 1.2 kHz.</summary>
+    private const double KnuckleMass = 0.06;
+    /// <summary>Steel screwed into wood: the joint is lossy.</summary>
+    private const double KnuckleLoss = 0.15;
+    /// <summary>LuGre bristle stiffness per newton of load, 1/m: about 50 nm of pre-sliding before a
+    /// hardened pin breaks away. Softer than this, a squeak never leaves the pre-slide and comes out a
+    /// pure tone.</summary>
+    private const double BristlePerNewton = 1.0e7;
+    private const double BristleDamping = 0.1;
+    /// <summary>How much a worn pin's grip varies round it (rust patches, grit), and over what length
+    /// one patch gives way to the next: the pin is 20 mm round.</summary>
+    private const double SurfacePatchiness = 0.3, SurfaceGrain = 0.0003;
+
+    // Latch: tubular 60 mm backset latch, 12 mm throw, brass bolt.
+    private const double BoltMass = 0.012, Throw = 0.012, SpringPreload = 3.5, SpringRate = 350;
+    /// <summary>How far the bolt reaches across the gap before it is over the strike.</summary>
+    private const double LatchGap = 0.003;
+    /// <summary>Play between the bolt's flat face and the keeper when the leaf is on its stop.</summary>
+    private const double KeeperPlay = 0.0015;
+    private const double LatchHeight = 0.95, KnobInset = 0.06;
+    /// <summary>The bolt moves in the leaf's plane, so a latch force bends the leaf only through how far
+    /// the mortise sits off the centre plane: about a millimetre in 35.</summary>
+    private const double LatchBending = 0.03;
+
+    // Knob: 55 mm brass knob, spindle play 10 degrees, full turn 50 degrees.
+    private const double KnobInertia = 6e-5, KnobPlay = 10 * Math.PI / 180, KnobFull = 50 * Math.PI / 180;
+    private const double KnobReturnPreload = 0.05, KnobReturnRate = 0.12, KnobStopArm = 0.010;
+    /// <summary>A torsional blow on the spindle does not drive an axisymmetric shell's ring modes; the
+    /// shank and the set screw make it not quite axisymmetric.</summary>
+    private const double KnobShellCoupling = 0.05;
+    private const double CamStiffness = 2e6, CamDamping = 40;
+    /// <summary>The spindle turning in its rose bushing and the latch's slide: dry friction, N m, and the
+    /// grease, N m s.</summary>
+    private const double KnobFriction = 0.015, KnobGrease = 2e-4;
+    /// <summary>The bolt sliding in its housing, N.</summary>
+    private const double BoltFriction = 0.3;
+    /// <summary>The rose's stop is a die-cast zinc lug against a nylon bush: a dead contact, not a bell.</summary>
+    private const double RoseContactLambda = 1.0;
+    /// <summary>Brass bolt on the zinc housing's stop: about half its speed comes back.</summary>
+    private const double BoltStopLambda = 0.3;
+    /// <summary>The latch body (housing and faceplate, 40 g) sits in its bore and mortise: wood
+    /// holding it (2e7 N/m) and wood taking its energy away as waves into the leaf's edge (the stile's
+    /// in-plane impedance, about 1500 N s/m). It thuds; it does not ring.</summary>
+    private const double LatchBodyMass = 0.04, LatchMountStiffness = 2e7, LatchMountDamping = 1500;
+    /// <summary>The faceplate's area, flush in the leaf's edge, which radiates the body's motion.</summary>
+    private const double FaceplateArea = 0.057 * 0.025;
+    /// <summary>The bolt meets the strike metal on metal, but each is held in wood: the bolt sideways
+    /// by its sliding fit and the housing's bore (1e7 N/m), the strike plate (25 g) by its two screws
+    /// into the jamb (2e7 N/m).</summary>
+    private const double BoltSideStiffness = 1e7, StrikeMass = 0.025, StrikeScrewStiffness = 2e7;
+    private const double StrikeArea = 0.07 * 0.028;
+
+    // Contacts (Hunt-Crossley): stiffness N/m^1.5 and damping s/m.
+    /// <summary>The stop is a 10 by 32 mm pine moulding, tacked and painted onto the jamb's face: each
+    /// stretch of it a 50 g strip that the leaf strikes (painted wood on painted wood, a hard contact)
+    /// and that is held to the solid jamb along a painted 32 mm wide joint, so it is close to part of
+    /// the jamb: wood across the grain, about 0.5 GPa, over that joint is about 150 N per micrometre for
+    /// each 300 mm. Against that the leaf's own give decides how long a shut lasts.</summary>
+    private const double StopMass = 0.05, StopStiffness = 1.5e8, StopMountDamping = 0.3, StopArea = 0.3 * 0.032;
+    /// <summary>Painted face on painted face: flat, so stiffer than a ball on a plate, and the paint
+    /// crushes, so about half the speed comes back.</summary>
+    private const double WoodContactK = 3e10, WoodContactLambda = 1.0;
+    private const double MetalContactK = 4e9, MetalContactLambda = 0.05;
+
+    // The frame: the latch jamb (30 by 110 mm pine) nailed to a 38 by 89 mm stud, 2.4 m between the
+    // plates, bending across the wall. The stop's force bends it on its strong axis.
+    private const double StudE = 10e9, StudDepth = 0.089, StudWidth = 0.038, StudRho = 500, StudLength = 2.4;
+    private const double JambKgPerM = 0.03 * 0.11 * 500;
+    /// <summary>Plasterboard (12.5 mm, 8.75 kg/m2) screwed to the stud moves with it for about half a
+    /// bending wavelength each side at the frequencies the stop drives (0.23 m at 200 Hz): the board
+    /// strip the stud carries, and what radiates.</summary>
+    private const double BoardKgPerM2 = 8.75, CarriedBoard = 0.25;
+    private const double FrameLoss = 0.06, FrameModeMaxHz = 5000;
+
+    // ---------------------------------------------------------------------------------------------
+
+    /// <summary>
+    /// Modes stepped exactly: each is a damped oscillator, and with the force held over a step its
+    /// state moves by a fixed 2x2 matrix, so a mode at 14 kHz is as accurate as one at 40 Hz.
+    /// </summary>
+    private sealed class Modes
+    {
+        public readonly int N;
+        public readonly double[] Q, V, F, Mass, Gain, GainQuad, Hz;
+        private readonly double[] a11, a12, a21, a22, b1, b2, w2, twoZw, w1;
+
+        /// <summary><paramref name="gainQuad"/> is the imaginary part of each mode's radiation at the
+        /// listener: the phase its pressure arrives with, applied to the quadrature (w times velocity).</summary>
+        public Modes(IList<double> hz, IList<double> loss, IList<double> mass, IList<double> gain, double dt,
+                     IList<double>? gainQuad = null)
+        {
+            N = hz.Count;
+            Q = new double[N]; V = new double[N]; F = new double[N];
+            Mass = new double[N]; Gain = new double[N]; GainQuad = new double[N]; Hz = new double[N]; w1 = new double[N];
+            a11 = new double[N]; a12 = new double[N]; a21 = new double[N]; a22 = new double[N];
+            b1 = new double[N]; b2 = new double[N]; w2 = new double[N]; twoZw = new double[N];
+            for (int k = 0; k < N; k++)
+            {
+                double w = 2 * Math.PI * hz[k], z = Math.Min(0.9, loss[k] / 2);
+                double s = z * w, wd = w * Math.Sqrt(1 - z * z);
+                double e = Math.Exp(-s * dt), c = Math.Cos(wd * dt), sn = Math.Sin(wd * dt);
+                a11[k] = e * (c + s / wd * sn); a12[k] = e * sn / wd;
+                a21[k] = -e * w * w / wd * sn; a22[k] = e * (c - s / wd * sn);
+                b1[k] = (1 - a11[k]) / (w * w); b2[k] = -a21[k] / (w * w);
+                w2[k] = w * w; twoZw[k] = 2 * z * w;
+                Mass[k] = mass[k]; Gain[k] = gain[k]; Hz[k] = hz[k]; w1[k] = w;
+                GainQuad[k] = gainQuad != null ? gainQuad[k] : 0;
+            }
+        }
+
+        /// <summary>Radiated pressure now, then one step, then the forces are cleared.</summary>
+        public double Step()
+        {
+            double p = 0;
+            for (int k = 0; k < N; k++)
+            {
+                double acc = F[k] / Mass[k] - twoZw[k] * V[k] - w2[k] * Q[k];
+                p += Gain[k] * acc - GainQuad[k] * w1[k] * V[k];
+                double a = F[k] / Mass[k];
+                double q = Q[k], v = V[k];
+                Q[k] = a11[k] * q + a12[k] * v + b1[k] * a;
+                V[k] = a21[k] * q + a22[k] * v + b2[k] * a;
+                F[k] = 0;
+            }
+            return p;
+        }
+
+        public void Push(double[] shape, double force)
+        {
+            for (int k = 0; k < N; k++) F[k] += shape[k] * force;
+        }
+
+        public double At(double[] shape)
+        {
+            double w = 0;
+            for (int k = 0; k < N; k++) w += shape[k] * Q[k];
+            return w;
+        }
+
+        public double RateAt(double[] shape)
+        {
+            double w = 0;
+            for (int k = 0; k < N; k++) w += shape[k] * V[k];
+            return w;
+        }
+    }
+
+    /// <summary>
+    /// A plate's modes from separable shapes, with what each radiates found by the Rayleigh integral
+    /// over the face (baffled, far field, averaged over the half space in front of it).
+    /// </summary>
+    private sealed class Plate
+    {
+        public readonly List<(int M, int N)> Index = new();
+        public readonly List<double> Hz = new(), Loss = new(), Mass = new(), Gain = new(), GainQuad = new();
+        private readonly double a, b;
+        private readonly bool hinged; // pinned at x = 0 and free at x = a (a leaf); else simply supported
+
+        public Plate(double a, double b, double d, double rhoH, double materialLoss, double maxHz,
+                     bool hingedLeaf, Random rng, double scatter)
+        {
+            this.a = a; this.b = b; hinged = hingedLeaf;
+            double root = Math.Sqrt(d / rhoH);
+            for (int m = 1; m < 400; m++)
+            {
+                bool any = false;
+                for (int n = hingedLeaf ? 0 : 1; n < 400; n++)
+                {
+                    if (hingedLeaf && m == 1 && n == 0) continue; // that is the rigid rotation
+                    double kx = Kx(m), ky = Ky(n);
+                    double f = root * (kx * kx + ky * ky) / (2 * Math.PI);
+                    if (f > maxHz) break;
+                    any = true;
+                    // Wood is not uniform and a hung leaf's edges are not ideal; each door's modes land a
+                    // little apart from the formula's.
+                    f *= 1 + scatter * (rng.NextDouble() * 2 - 1);
+                    Index.Add((m, n));
+                    Hz.Add(f);
+                    double modalMass = rhoH * (a / 2) * (hingedLeaf && n == 0 ? b : b / 2);
+                    Mass.Add(modalMass);
+                    double sigma = Radiation(m, n, f, out double gain, out double gainQuad);
+                    double w = 2 * Math.PI * f;
+                    // Radiation loss: the power the face sends out, against what the mode holds.
+                    double radLoss = Rho0 * C0 * sigma / (w * rhoH);
+                    Loss.Add(materialLoss + radLoss);
+                    Gain.Add(gain);
+                    GainQuad.Add(gainQuad);
+                }
+                if (!any) break;
+            }
+        }
+
+        private double Kx(int m) => hinged ? (2 * m - 1) * Math.PI / (2 * a) : m * Math.PI / a;
+        private double Ky(int n) => hinged ? n * Math.PI / b : n * Math.PI / b;
+        private double X(int m, double x) => Math.Sin(Kx(m) * x);
+        private double Y(int n, double y) => hinged ? Math.Cos(Ky(n) * y) : Math.Sin(Ky(n) * y);
+        /// <summary>The slope across the leaf at its hinge edge, which is what a hinge's moment drives.</summary>
+        public double SlopeAtHinge(int k, double y) => Kx(Index[k].M) * Y(Index[k].N, y);
+        public double ShapeAt(int k, double x, double y) => X(Index[k].M, x) * Y(Index[k].N, y);
+
+        public double[] Shape(double x, double y)
+        {
+            var s = new double[Index.Count];
+            for (int k = 0; k < s.Length; k++) s[k] = ShapeAt(k, x, y);
+            return s;
+        }
+
+        /// <summary>The listener: 35 degrees off the face's normal, a little towards the latch side and
+        /// above. The modes take their phases from here; summed all in step, as if each radiated
+        /// straight at the listener, a struck leaf came out 20 dB loud.</summary>
+        internal const double ListenerTheta = 35 * Math.PI / 180, ListenerPhi = 20 * Math.PI / 180;
+
+        /// <summary>
+        /// Radiation efficiency (power over the half space), and the complex pressure at a metre at the
+        /// listener per unit modal acceleration.
+        /// </summary>
+        private double Radiation(int m, int n, double f, out double gain, out double gainQuad)
+        {
+            double k = 2 * Math.PI * f / C0;
+            const int rings = 10, spokes = 16;
+            double sumP2 = 0, sumW = 0;
+            for (int i = 0; i < rings; i++)
+            {
+                double th = (i + 0.5) * (Math.PI / 2) / rings;
+                double wgt = Math.Sin(th) * (Math.PI / 2 / rings) * (2 * Math.PI / spokes);
+                for (int j = 0; j < spokes; j++)
+                {
+                    double ph = (j + 0.5) * 2 * Math.PI / spokes;
+                    double kxd = k * Math.Sin(th) * Math.Cos(ph), kyd = k * Math.Sin(th) * Math.Sin(ph);
+                    var ix = Integral(x => X(m, x), a, kxd, Kx(m));
+                    var iy = Integral(y => Y(n, y), b, kyd, Ky(n));
+                    double re = ix.re * iy.re - ix.im * iy.im, im = ix.re * iy.im + ix.im * iy.re;
+                    sumP2 += (re * re + im * im) * wgt;
+                    sumW += wgt;
+                }
+            }
+            double scale = Rho0 / (2 * Math.PI);
+            double meanP2 = sumP2 / sumW * scale * scale;     // |p|^2 at 1 m per unit acceleration
+            double lx = k * Math.Sin(ListenerTheta) * Math.Cos(ListenerPhi), ly = k * Math.Sin(ListenerTheta) * Math.Sin(ListenerPhi);
+            var cx = Integral(x => X(m, x), a, lx, Kx(m));
+            var cy = Integral(y => Y(n, y), b, ly, Ky(n));
+            // Its level is its power over the half space, which is what a room hears; its phase is the
+            // one it arrives with at the listener, so the modes still add as they would there and not
+            // all in step.
+            double pr = cx.re * cy.re - cx.im * cy.im, pi = cx.re * cy.im + cx.im * cy.re;
+            double mag = Math.Sqrt(pr * pr + pi * pi);
+            if (mag < 1e-30) { pr = 1; pi = 0; mag = 1; }
+            gain = Math.Sqrt(meanP2) * pr / mag;
+            gainQuad = Math.Sqrt(meanP2) * pi / mag;
+            // sigma = W / (rho c S <v^2>), with W = meanP2 * 2 pi / (2 rho c) for unit acceleration and
+            // <v^2> = (1/2)(1/w^2) mean(phi^2).
+            double w = 2 * Math.PI * f;
+            double meanPhi2 = (hinged && n == 0 ? 1.0 : 0.5) * 0.5;
+            double power = meanP2 * 2 * Math.PI / (2 * Rho0 * C0);
+            double sigma = power / (Rho0 * C0 * a * b * 0.5 * meanPhi2 / (w * w));
+            return Math.Min(sigma, 2.0);
+        }
+
+        internal static (double re, double im) Integral(Func<double, double> shape, double len, double kd, double km)
+        {
+            int pts = Math.Max(48, (int)(len * (Math.Abs(kd) + km) / (2 * Math.PI) * 16));
+            if ((pts & 1) == 1) pts++;
+            double h = len / pts, re = 0, im = 0;
+            for (int i = 0; i <= pts; i++)
+            {
+                double x = i * h, s = shape(x);
+                double wgt = (i == 0 || i == pts) ? 1 : ((i & 1) == 1 ? 4 : 2);
+                re += wgt * s * Math.Cos(kd * x);
+                im += wgt * s * Math.Sin(kd * x);
+            }
+            return (re * h / 3, im * h / 3);
+        }
+    }
+
+    /// <summary>A Hunt-Crossley contact: force for a penetration and its rate, never pulling.</summary>
+    private static double Contact(double k, double lambda, double depth, double rate)
+    {
+        if (depth <= 0) return 0;
+        double f = k * depth * Math.Sqrt(depth) * (1 + lambda * rate);
+        return f > 0 ? f : 0;
+    }
+
+    /// <summary>
+    /// LuGre friction: a bristle state that holds while the surfaces stick and lets go when the force
+    /// passes the static limit. Its exact update relaxes the bristle towards its sliding deflection, so
+    /// stiff bristles do not need a tiny step.
+    /// </summary>
+    private struct LuGre
+    {
+        public double Z, MuStatic, MuSliding, StribeckSpeed, Viscous, Bristle;
+
+        public double Force(double v, double load, double mass, double dt)
+        {
+            if (load <= 0) { Z = 0; return 0; }
+            // A bristle stiffer than the step can follow on this mass rings numerically; past that it is
+            // no stiffer for the sound, only for the arithmetic.
+            double sigma0 = Math.Min((Bristle > 0 ? Bristle : BristlePerNewton) * load, 0.25 * mass / (dt * dt));
+            double g = MuSliding + (MuStatic - MuSliding) * Math.Exp(-(v / StribeckSpeed) * (v / StribeckSpeed));
+            double zOld = Z;
+            double av = Math.Abs(v);
+            if (av < 1e-12) { /* stuck, bristle holds */ }
+            else
+            {
+                double perN = sigma0 / load;
+                double target = g * Math.Sign(v) / perN;
+                double rate = perN * av / g;
+                Z = target + (Z - target) * Math.Exp(-rate * dt);
+            }
+            double zDot = (Z - zOld) / dt;
+            double sigma1 = 2 * BristleDamping * Math.Sqrt(sigma0 * mass);
+            return sigma0 * Z + sigma1 * zDot + Viscous * load * v;
+        }
+    }
+
+    /// <summary>A small part held to a bigger body by a spring: a stop moulding on its brads, a strike
+    /// plate on its screws, a bolt in its bore. What it does to its host is its spring's force.</summary>
+    private sealed class Mount
+    {
+        public readonly double M, K, C;
+        public double X, V, F;
+        public double Acc;
+        public Mount(double mass, double k, double zeta) { M = mass; K = k; C = 2 * zeta * Math.Sqrt(k * mass); }
+        public double Reaction => K * X + C * V;
+        public void Step(double dt)
+        {
+            Acc = (F - K * X - C * V) / M;
+            V += Acc * dt; X += V * dt; F = 0;
+        }
+    }
+
+    /// <summary>A small rigid radiator: its swept volume's pressure at a metre, which follows its
+    /// acceleration below the frequency where it is a wavelength round and its velocity above.</summary>
+    private sealed class SmallRadiator
+    {
+        private readonly double gain, alpha;
+        private double low;
+        public SmallRadiator(double area, double dt)
+        {
+            gain = Rho0 / (2 * Math.PI) * area;
+            double corner = C0 / (2 * Math.PI * Math.Sqrt(area / Math.PI));
+            alpha = 1 - Math.Exp(-2 * Math.PI * corner * dt);
+        }
+        public double Pressure(double acc) { low += alpha * (acc - low); return gain * low; }
+    }
+
+    private sealed class Hinge
+    {
+        public double Height, Wear, Load, Twist, TwistRate;
+        public LuGre Friction;
+        public double MuStatic, MuSliding;
+        public double[] Slope = Array.Empty<double>();
+        /// <summary>The pin's surface round its circumference: how its grip varies from place to place,
+        /// RMS one. A worn pin is patchy with rust and grit, an oiled one is not.</summary>
+        public double[] Surface = Array.Empty<double>();
+        public double Travel;
+        public double PeakSlip, PeakMoment;
+
+        public double SurfaceAt(double travel)
+        {
+            double circ = 2 * Math.PI * PinRadius, at = (travel % circ + circ) % circ / circ * Surface.Length;
+            int i = (int)at; double f = at - i;
+            return Surface[i % Surface.Length] * (1 - f) + Surface[(i + 1) % Surface.Length] * f;
+        }
+    }
+
+    private sealed class Sim
+    {
+        private readonly Door door;
+        private readonly int outRate, rate;
+        private readonly double dt;
+        private readonly Report? report;
+        private readonly Random rng;
+
+        // Leaf
+        private readonly double width, height, mass, inertia;
+        private double theta, omega, prevOmega;
+        private readonly Modes leaf, frame;
+        private readonly double frameLength;
+        private readonly Plate leafPlate;
+        private readonly (double X, double Y, double Warp, double[] Shape)[] stops;
+        private readonly double[] latchShape, knobShape;
+        private readonly double rigidGain;
+        private double rigidLow; // the rigid rotation's acceleration, through the piston's corner
+
+        // Hinges
+        private readonly Hinge[] hinges;
+        private readonly double knuckleInertia, knuckleStiffness, knuckleDamping;
+
+        // Latch and knob
+        private double bolt = Throw, boltRate, knob, knobRate;
+        private bool boltInStrike = true, holdingKnob, holdingLeaf;
+        private LuGre keeperFriction;
+        private readonly Modes strike, housing;
+        private double latchBody, latchBodyRate;
+        private readonly Mount[] mouldings;
+        private readonly Mount boltSide, strikeBody;
+        private readonly SmallRadiator[] mouldingSound;
+        private readonly SmallRadiator strikeSound, latchSound;
+        private Modes knobShell;
+        private readonly double[] ones4 = { 1, 1, 1, 1, 1, 1, 1, 1 };
+        private readonly double knobHeldLoss = 0.3;
+        private readonly double[] knobFreeLoss;
+
+        // The hand
+        private Func<double, (double Angle, double Rate)>? leafPath;
+        private Func<double, double>? knobPath;
+        private double pullTorque, handK, handC;
+        private double time;
+
+        private readonly List<float> outHi = new();
+        private readonly Dictionary<string, (double Start, double Peak, bool On)> contactLog = new();
+
+        public Sim(Door door, int sampleRate, Report? report)
+        {
+            this.door = door; this.report = report;
+            outRate = sampleRate; rate = sampleRate * Oversample; dt = 1.0 / rate;
+            rng = new Random(door.Seed);
+            width = door.Width; height = door.Height;
+
+            double d, rhoH, loss;
+            if (door.Leaf == Construction.HollowCore)
+            {
+                double arm = (CoreDepth + SkinT) / 2;
+                d = 2 * SkinE * SkinT * arm * arm / (1 - Poisson * Poisson);
+                mass = 2 * SkinT * SkinRho * width * height + CoreAndFrameKg;
+                loss = HollowLoss + MountingLoss;
+            }
+            else
+            {
+                d = SolidE * Math.Pow(SolidT, 3) / (12 * (1 - Poisson * Poisson));
+                mass = SolidRho * SolidT * width * height;
+                loss = 0.03 + MountingLoss;
+            }
+            rhoH = mass / (width * height);
+            inertia = mass * width * width / 3;
+            leafPlate = new Plate(width, height, d, rhoH, loss, LeafModeMaxHz, true, rng, 0.04);
+            leaf = new Modes(leafPlate.Hz, leafPlate.Loss, leafPlate.Mass, leafPlate.Gain, dt, leafPlate.GainQuad);
+            // The rigid rotation radiates as a piston in the doorway: its pressure at a metre per unit
+            // angular acceleration is rho/(2 pi) times the face's first moment.
+            rigidGain = Rho0 / (2 * Math.PI) * height * width * width / 2;
+
+            frameLength = StudLength;
+            frame = FrameModes(dt, rng);
+
+            // A leaf is never flat: up to a millimetre of wind and bow, its own for each door.
+            stops = new (double, double, double, double[])[]
+            {
+                (width, 0.30, 0, Array.Empty<double>()),
+                (width, 1.05, 0, Array.Empty<double>()),
+                (width, 1.80, 0, Array.Empty<double>()),
+                (0.80, height - 0.01, 0, Array.Empty<double>()),
+                (0.45, height - 0.01, 0, Array.Empty<double>()),
+            };
+            for (int i = 0; i < stops.Length; i++)
+            {
+                double warp = (rng.NextDouble() - 0.3) * 0.0012;
+                stops[i] = (stops[i].X, stops[i].Y, warp, leafPlate.Shape(stops[i].X, stops[i].Y));
+            }
+            latchShape = leafPlate.Shape(width, LatchHeight);
+            knobShape = leafPlate.Shape(width - KnobInset, LatchHeight);
+
+            // Hinges: the weight's moment is a couple across the top and bottom hinges; the end faces
+            // share the weight. Expressed as load at the pin's radius.
+            knuckleInertia = KnuckleMass * ScrewArm * ScrewArm;
+            knuckleStiffness = 3 * ScrewLateralStiffness * ScrewArm * ScrewArm;
+            knuckleDamping = KnuckleLoss * Math.Sqrt(knuckleStiffness * knuckleInertia);
+            double couple = mass * G * (width / 2) / (HingeHeights[0] - HingeHeights[2]);
+            double axial = mass * G / 3 * KnuckleFaceRadius / PinRadius;
+            hinges = new Hinge[3];
+            for (int i = 0; i < 3; i++)
+            {
+                double wear = door.HingeWear != null ? door.HingeWear[i] : Math.Pow(rng.NextDouble(), 1.5);
+                var h = new Hinge
+                {
+                    Height = HingeHeights[i],
+                    Wear = wear,
+                    Load = (i == 1 ? 0.15 * couple : couple) + axial,
+                };
+                // Dry steel on steel breaks away at about 0.5 and slides at 0.2, the fall spread over the
+                // first few mm/s by rust and grit. Oil takes both to about 0.1 and makes friction rise
+                // with speed instead of falling. A pin squeaks when its friction falls faster with speed
+                // than the knuckle's own loss can hold: a dry pin sings whenever it turns slowly enough,
+                // an oiled one never.
+                h.Friction = new LuGre
+                {
+                    MuStatic = 0.12 + 0.38 * wear,
+                    MuSliding = 0.10 + 0.10 * wear,
+                    StribeckSpeed = 0.005 - 0.003 * wear,
+                    Viscous = 30 * (1 - wear) * (1 - wear),
+                };
+                h.MuStatic = h.Friction.MuStatic; h.MuSliding = h.Friction.MuSliding;
+                h.Surface = SurfaceProfile(rng, 2 * Math.PI * PinRadius, SurfaceGrain);
+                h.Slope = new double[leaf.N];
+                for (int k = 0; k < leaf.N; k++) h.Slope[k] = leafPlate.SlopeAtHinge(k, h.Height);
+                hinges[i] = h;
+            }
+
+            mouldings = new Mount[5]; mouldingSound = new SmallRadiator[5];
+            for (int i = 0; i < 5; i++) { mouldings[i] = new Mount(StopMass, StopStiffness, StopMountDamping); mouldingSound[i] = new SmallRadiator(StopArea, dt); }
+            boltSide = new Mount(BoltMass, BoltSideStiffness, 0.2);
+            strikeBody = new Mount(StrikeMass, StrikeScrewStiffness, 0.15);
+            strikeSound = new SmallRadiator(StrikeArea, dt);
+            latchSound = new SmallRadiator(FaceplateArea, dt);
+            keeperFriction = new LuGre { MuStatic = 0.3, MuSliding = 0.2, StribeckSpeed = 0.003, Viscous = 0 };
+
+            // Strike plate: 1.5 mm steel between screws 48 mm apart, clamped, and its lip a 10 mm tongue.
+            strike = new Modes(new[] { Beam(0.048, 0.0015, 7850, 200e9, 4.730), Beam(0.048, 0.0015, 7850, 200e9, 7.853),
+                                       Beam(0.010, 0.0015, 7850, 200e9, 1.875) },
+                               new[] { 0.05, 0.05, 0.03 }, new[] { 0.010, 0.010, 0.004 },
+                               new[] { SmallPlateGain(0.07 * 0.028, 0.52), SmallPlateGain(0.07 * 0.028, 0.05),
+                                       SmallPlateGain(0.010 * 0.028, 0.6) }, dt);
+            // Faceplate 2.5 mm steel between screws 45 mm apart; the housing a 0.8 mm tube of 22 mm.
+            // Both lie against the wood of the mortise, which takes their ring.
+            housing = new Modes(new[] { Ring(0.011, 0.0008, 7850, 200e9, 2), Ring(0.011, 0.0008, 7850, 200e9, 3) },
+                                new[] { 0.05, 0.05 }, new[] { 0.010, 0.010 },
+                                new[] { SmallPlateGain(FaceplateArea, 0.05), SmallPlateGain(FaceplateArea, 0.05) }, dt);
+            // The knob: a brass shell, 27 mm radius, 0.8 mm wall. Ring modes n = 2..7.
+            var kh = new List<double>(); var kg = new List<double>(); var km = new List<double>(); var kl = new List<double>();
+            for (int n = 2; n <= 7; n++)
+            {
+                double f = Ring(0.027, 0.0008, 8500, 100e9, n);
+                kh.Add(f); km.Add(0.06); kl.Add(knobHeldLoss);
+                double ka = 2 * Math.PI * f / C0 * 0.027;
+                kg.Add(Rho0 * (4 * Math.PI * 0.027 * 0.027 * 0.5) / (4 * Math.PI) * ka * ka / (1 + ka * ka) / n);
+            }
+            knobFreeLoss = new double[kh.Count];
+            // A knob on its spindle and rose is not a free bell: the joints take its ring in a few
+            // tenths of a second at its lowest mode.
+            for (int i = 0; i < kh.Count; i++) knobFreeLoss[i] = 0.006;
+            knobShell = new Modes(kh, kl, km, kg, dt);
+
+            handK = 170 * inertia;
+            handC = 2 * 0.7 * Math.Sqrt(handK * inertia);
+        }
+
+        /// <summary>A rough surface round a circumference: noise smoothed over the grain, wrapped, RMS one.</summary>
+        private static double[] SurfaceProfile(Random rng, double circumference, double grain)
+        {
+            int n = Math.Max(64, (int)(circumference / (grain / 8)));
+            var raw = new double[n];
+            for (int i = 0; i < n; i++) raw[i] = rng.NextDouble() * 2 - 1;
+            int w = Math.Max(1, (int)(n * grain / circumference));
+            var s = new double[n];
+            double sum2 = 0;
+            for (int i = 0; i < n; i++)
+            {
+                double acc = 0;
+                for (int j = -w; j <= w; j++) acc += raw[((i + j) % n + n) % n] * (1 - Math.Abs(j) / (double)(w + 1));
+                s[i] = acc; sum2 += acc * acc;
+            }
+            double rms = Math.Sqrt(sum2 / n);
+            for (int i = 0; i < n; i++) s[i] /= rms;
+            return s;
+        }
+
+        /// <summary>A clamped or free beam's mode: (beta L)^2 / (2 pi L^2) * sqrt(E I / rho A).</summary>
+        private static double Beam(double len, double t, double rho, double e, double betaL)
+            => betaL * betaL / (2 * Math.PI * len * len) * t * Math.Sqrt(e / (12 * rho));
+
+        /// <summary>A thin ring's bending mode n.</summary>
+        private static double Ring(double radius, double t, double rho, double e, int n)
+            => t / (2 * Math.PI * radius * radius) * Math.Sqrt(e / (12 * rho * (1 - Poisson * Poisson)))
+               * n * (n * n - 1) / Math.Sqrt(n * n + 1);
+
+        /// <summary>A small plate flush in a surface radiates as a baffled source of its swept volume.</summary>
+        private static double SmallPlateGain(double area, double volumeShare) => Rho0 / (2 * Math.PI) * area * volumeShare;
+
+        /// <summary>The stud and jamb as a pinned beam carrying its strip of board, radiating as that strip.</summary>
+        private static Modes FrameModes(double dt, Random rng)
+        {
+            double ei = StudE * StudWidth * Math.Pow(StudDepth, 3) / 12;
+            double mu = StudWidth * StudDepth * StudRho + JambKgPerM + BoardKgPerM2 * CarriedBoard;
+            var hz = new List<double>(); var loss = new List<double>(); var mass = new List<double>();
+            var gain = new List<double>(); var quad = new List<double>();
+            for (int n = 1; n < 60; n++)
+            {
+                double k = n * Math.PI / StudLength;
+                double f = k * k * Math.Sqrt(ei / mu) / (2 * Math.PI);
+                if (f > FrameModeMaxHz) break;
+                f *= 1 + 0.04 * (rng.NextDouble() * 2 - 1);
+                hz.Add(f); mass.Add(mu * StudLength / 2);
+                var (g, q, sigma) = StripRadiation(n, f);
+                loss.Add(FrameLoss + Rho0 * C0 * sigma * CarriedBoard / (2 * Math.PI * f * mu));
+                gain.Add(g); quad.Add(q);
+            }
+            return new Modes(hz, loss, mass, gain, dt, quad);
+        }
+
+        /// <summary>A strip CarriedBoard wide moving as sin(n pi y / L): its pressure at the listener and
+        /// its radiation efficiency, by the same Rayleigh integral as the leaf.</summary>
+        private static (double Gain, double Quad, double Sigma) StripRadiation(int n, double f)
+        {
+            double k = 2 * Math.PI * f / C0, kn = n * Math.PI / StudLength;
+            const int rings = 10, spokes = 16;
+            double sumP2 = 0, sumW = 0, scale = Rho0 / (2 * Math.PI);
+            (double re, double im) Face(double kx, double ky)
+            {
+                var ix = Plate.Integral(_ => 1.0, CarriedBoard, kx, 0);
+                var iy = Plate.Integral(y => Math.Sin(kn * y), StudLength, ky, kn);
+                return (ix.re * iy.re - ix.im * iy.im, ix.re * iy.im + ix.im * iy.re);
+            }
+            for (int i = 0; i < rings; i++)
+            {
+                double th = (i + 0.5) * (Math.PI / 2) / rings;
+                double wgt = Math.Sin(th) * (Math.PI / 2 / rings) * (2 * Math.PI / spokes);
+                for (int j = 0; j < spokes; j++)
+                {
+                    double ph = (j + 0.5) * 2 * Math.PI / spokes;
+                    var p = Face(k * Math.Sin(th) * Math.Cos(ph), k * Math.Sin(th) * Math.Sin(ph));
+                    sumP2 += (p.re * p.re + p.im * p.im) * wgt; sumW += wgt;
+                }
+            }
+            double meanP2 = sumP2 / sumW * scale * scale;
+            var at = Face(k * Math.Sin(Plate.ListenerTheta) * Math.Cos(Plate.ListenerPhi), k * Math.Sin(Plate.ListenerTheta) * Math.Sin(Plate.ListenerPhi));
+            double w = 2 * Math.PI * f;
+            double power = meanP2 * 2 * Math.PI / (2 * Rho0 * C0);
+            double sigma = power / (Rho0 * C0 * CarriedBoard * StudLength * 0.5 * 0.5 / (w * w));
+            double mag = Math.Sqrt(at.re * at.re + at.im * at.im);
+            if (mag < 1e-30) return (Math.Sqrt(meanP2), 0, Math.Min(sigma, 2.0));
+            return (Math.Sqrt(meanP2) * at.re / mag, Math.Sqrt(meanP2) * at.im / mag, Math.Min(sigma, 2.0));
+        }
+
+        private double[] FrameShape(double y)
+        {
+            var s = new double[frame.N];
+            for (int n = 0; n < s.Length; n++) s[n] = Math.Sin((n + 1) * Math.PI * Math.Clamp(y + 0.15, 0, frameLength) / frameLength);
+            return s;
+        }
+
+        public void StartShut()
+        {
+            // Resting on the stop at whichever point of the leaf stands proudest.
+            theta = 0;
+            foreach (var s in stops) theta = Math.Max(theta, -s.Warp / s.X);
+            omega = 0; bolt = Throw; boltInStrike = true;
+            holdingLeaf = false; holdingKnob = false;
+        }
+
+        public void StartOpen(double angle)
+        {
+            theta = angle; omega = 0; bolt = Throw; boltInStrike = false;
+            holdingLeaf = true; holdingKnob = false;
+            double a0 = angle;
+            leafPath = _ => (a0, 0);
+        }
+
+        public void ScriptOpen(double swingSeconds)
+        {
+            const double grip = 0.05, turn = 0.20;
+            holdingKnob = true;
+            knobPath = t => MinJerk(Math.Clamp((t - grip) / turn, 0, 1)) * KnobFull;
+            // While turning, the hand pulls gently: the leaf comes off its stop onto the keeper.
+            double cleared = -1, released = -1;
+            double end = grip + turn + swingSeconds + 0.6;
+            while (time < end)
+            {
+                if (time > grip && cleared < 0) pullTorque = Math.Min(1.0, (time - grip) / 0.1) * 2.0;
+                if (cleared < 0 && !boltInStrike && time > grip)
+                {
+                    cleared = time;
+                    Log($"{time * 1000:F0} ms  bolt clear of the keeper; the hand swings the leaf");
+                    double a0 = theta, a1 = 85 * Math.PI / 180, t0 = time;
+                    holdingLeaf = true; pullTorque = 0;
+                    leafPath = t =>
+                    {
+                        double u = Math.Clamp((t - t0) / swingSeconds, 0, 1);
+                        return (a0 + (a1 - a0) * MinJerk(u), (a1 - a0) * MinJerkRate(u) / swingSeconds);
+                    };
+                }
+                if (cleared > 0 && released < 0 && time > cleared + 0.12)
+                {
+                    released = time; holdingKnob = false;
+                    Log($"{time * 1000:F0} ms  knob let go");
+                }
+                Tick();
+            }
+        }
+
+        public void ScriptClose(double edgeSpeed)
+        {
+            double a0 = theta, w1 = edgeSpeed / width;
+            // The hand lets go earlier the harder it throws the door.
+            double a1 = (edgeSpeed < 0.5 ? 12 : edgeSpeed < 1.5 ? 25 : 40) * Math.PI / 180;
+            double push = 1.6 * (a0 - a1) / w1;
+            push = Math.Clamp(push, 0.35, 2.5);
+            double t0 = time;
+            leafPath = t =>
+            {
+                double u = Math.Clamp((t - t0) / push, 0, 1);
+                // Quintic from rest at a0 to a1 at -w1 with no acceleration at the end.
+                var (p, v) = Hermite(u, a0, 0, a1, -w1 * push);
+                return (p, v / push);
+            };
+            double released = -1, firstHit = -1;
+            double end = 30;
+            while (time < end)
+            {
+                if (released < 0 && time > t0 + push)
+                {
+                    released = time; holdingLeaf = false;
+                    Log($"{time * 1000:F0} ms  let go at {theta * 180 / Math.PI:F0} deg, edge {-omega * width:F2} m/s");
+                }
+                if (firstHit < 0 && contactLog.TryGetValue("stop", out var st)) { firstHit = st.Start; end = firstHit + 0.9; }
+                if (released > 0 && time > released + 6) break;
+                Tick();
+            }
+        }
+
+        private static double MinJerk(double u) => u * u * u * (10 - 15 * u + 6 * u * u);
+        private static double MinJerkRate(double u) => 30 * u * u * (1 - u) * (1 - u);
+
+        private static (double P, double V) Hermite(double u, double p0, double v0, double p1, double v1)
+        {
+            // Quintic with zero acceleration at both ends.
+            double u2 = u * u, u3 = u2 * u, u4 = u3 * u, u5 = u4 * u;
+            double h0 = 1 - 10 * u3 + 15 * u4 - 6 * u5, h1 = u - 6 * u3 + 8 * u4 - 3 * u5;
+            double h3 = -4 * u3 + 7 * u4 - 3 * u5, h5 = 10 * u3 - 15 * u4 + 6 * u5;
+            double d0 = -30 * u2 + 60 * u3 - 30 * u4, d1 = 1 - 18 * u2 + 32 * u3 - 15 * u4;
+            double d3 = -12 * u2 + 28 * u3 - 15 * u4, d5 = 30 * u2 - 60 * u3 + 30 * u4;
+            return (h0 * p0 + h1 * v0 + h3 * v1 + h5 * p1, d0 * p0 + d1 * v0 + d3 * v1 + d5 * p1);
+        }
+
+        private void Log(string s) => report?.Events.Add(s);
+
+        private void Note(string name, double force)
+        {
+            contactLog.TryGetValue(name, out var c);
+            if (force > 0)
+            {
+                if (!c.On) { c = (time, force, true); }
+                else c.Peak = Math.Max(c.Peak, force);
+                contactLog[name] = c;
+            }
+            else if (c.On)
+            {
+                Log($"{c.Start * 1000:F1} ms  {name}: peak {c.Peak:F1} N, {(time - c.Start) * 1e6:F0} us");
+                contactLog[name] = (c.Start, c.Peak, false);
+            }
+        }
+
+        private double[]? frameAtLatch, frameAtHead;
+        private double[][]? frameAtStops, frameAtHinges;
+
+        /// <summary>A contact through a spring: the compliance of what holds the parts, not of the parts.</summary>
+        private static double Sprung(double k, double c, double depth, double rate)
+            => depth > 0 ? Math.Max(0, k * depth + c * rate) : 0;
+
+        private void Tick()
+        {
+            frameAtLatch ??= FrameShape(LatchHeight);
+            frameAtHead ??= FrameShape(height);
+            if (frameAtHinges == null)
+            {
+                frameAtHinges = new double[hinges.Length][];
+                for (int i = 0; i < hinges.Length; i++) frameAtHinges[i] = FrameShape(hinges[i].Height);
+            }
+            if (frameAtStops == null)
+            {
+                frameAtStops = new double[stops.Length][];
+                for (int i = 0; i < stops.Length; i++) frameAtStops[i] = i < 3 ? FrameShape(stops[i].Y) : frameAtHead;
+            }
+
+            double torque = 0;        // on the leaf's rigid rotation
+            double handTorque = 0;
+            double latchEdgeForce = 0;   // through-thickness force on the leaf at the latch, + opens
+
+            // --- the hand on the leaf
+            if (holdingLeaf && leafPath != null)
+            {
+                var (a, r) = leafPath(time);
+                handTorque = handK * (a - theta) + handC * (r - omega);
+            }
+            handTorque += pullTorque;
+            torque += handTorque;
+            // Air: drag on a plate turning about one edge.
+            torque -= 0.5 * Rho0 * 1.2 * height * Math.Pow(width, 4) / 4 * omega * Math.Abs(omega);
+
+            bool nearShut = theta * width < 0.02;
+            double latchW = 0, latchWRate = 0;
+            if (nearShut) { latchW = leaf.At(latchShape); latchWRate = leaf.RateAt(latchShape); }
+
+            // --- the stop
+            double stopSum = 0, headSum = 0;
+            if (nearShut)
+            {
+                for (int i = 0; i < stops.Length; i++)
+                {
+                    var s = stops[i];
+                    double pos = s.X * theta + leaf.At(s.Shape) + s.Warp;
+                    double vel = s.X * omega + leaf.RateAt(s.Shape);
+                    // The moulding is pushed away from the leaf (its X towards the closed side).
+                    var m = mouldings[i];
+                    double f = Contact(WoodContactK, WoodContactLambda, -(pos + m.X), -(vel + m.V));
+                    if (f > 0)
+                    {
+                        torque += f * s.X;
+                        leaf.Push(s.Shape, f);
+                        m.F += f;
+                    }
+                    if (i < 3) stopSum += f; else headSum += f;
+                }
+            }
+            for (int i = 0; i < mouldings.Length; i++)
+            {
+                double r = mouldings[i].Reaction;
+                if (r != 0) frame.Push(frameAtStops[i], -r);
+            }
+            Note("stop", stopSum);
+            Note("stop-head", headSum);
+
+            // --- the latch
+            double edge = width * theta + latchW, edgeRate = width * omega + latchWRate;
+            double boltForce = SpringPreload + SpringRate * (Throw - bolt);   // the spring, outward
+            double latchBodyForce = 0; // along the bolt, outward, on the housing and faceplate
+            double strikeForce = 0;    // what reaches the strike plate, normal to it
+            double frameForce = 0;     // what the jamb takes at the strike, along the closing direction
+
+            if (bolt > LatchGap)
+            {
+                if (!boltInStrike)
+                {
+                    // On the bevel: how far the bolt reaches past where the lip lets it be. The bolt's
+                    // place across the gap is the leaf's edge plus its give in its bore; the lip's is the
+                    // strike plate's give on its screws.
+                    double across = edge + boltSide.X - strikeBody.X, acrossRate = edgeRate + boltSide.V - strikeBody.V;
+                    double over = (bolt - LatchGap) - (across - KeeperPlay);
+                    double overRate = boltRate - acrossRate;
+                    if (across > KeeperPlay && across < KeeperPlay + Throw)
+                    {
+                        double fn = Contact(MetalContactK, MetalContactLambda, over / Math.Sqrt(2), overRate / Math.Sqrt(2));
+                        double slide = (boltRate + acrossRate) / Math.Sqrt(2);
+                        double ft = 0.2 * fn * Math.Tanh(slide / 0.002);
+                        double onBolt = (-fn - ft) / Math.Sqrt(2);
+                        double sideways = (fn - ft) / Math.Sqrt(2);
+                        boltForce += onBolt;
+                        boltSide.F += sideways;
+                        strikeBody.F -= sideways;
+                        strikeForce += -onBolt;
+                        Note("bevel", fn);
+                    }
+                    else Note("bevel", 0);
+                    if (edge + boltSide.X - strikeBody.X <= KeeperPlay && bolt > LatchGap)
+                    {
+                        boltInStrike = true;
+                        Log($"{time * 1000:F1} ms  bolt over the strike");
+                    }
+                }
+                if (boltInStrike)
+                {
+                    // The flat face against the keeper when the leaf comes back.
+                    double fk = Contact(MetalContactK, MetalContactLambda, edge + boltSide.X - strikeBody.X - KeeperPlay,
+                                        edgeRate + boltSide.V - strikeBody.V);
+                    boltSide.F -= fk;
+                    strikeBody.F += fk;
+                    if (fk > 0)
+                    {
+                        double ff = keeperFriction.Force(boltRate, fk, BoltMass, dt);
+                        boltForce -= ff;
+                        strikeForce += ff * 0.3;   // the keeper's edge is in the plate's plane
+                    }
+                    else keeperFriction.Z = 0;
+                    Note("keeper", fk);
+                }
+            }
+            else if (boltInStrike)
+            {
+                Note("keeper", 0);
+                boltInStrike = false;
+                Log($"{time * 1000:F1} ms  bolt in: clear of the keeper");
+            }
+
+            // --- the knob and its cam
+            if (holdingKnob && knobPath != null)
+            {
+                double k1 = knobPath(time);
+                knobRate = (k1 - knob) / dt;
+                knob = k1;
+            }
+            double camArm = Throw / (KnobFull - KnobPlay);
+            double cam = Math.Clamp((knob - KnobPlay) * camArm, 0, Throw);
+            double camRate = knob > KnobPlay && cam < Throw ? knobRate * camArm : 0;
+            double camDepth = bolt - (Throw - cam);
+            double fCam = camDepth > 0 && knob > KnobPlay ? Math.Max(0, CamStiffness * camDepth + CamDamping * (boltRate + camRate)) : 0;
+            boltForce -= fCam;
+            latchBodyForce += fCam * 0.5;
+            Note("cam", fCam);
+            // The bolt's own stop in the housing, which sits in the wood on its mount.
+            double fStop = Contact(MetalContactK, BoltStopLambda, bolt - Throw - latchBody, boltRate - latchBodyRate);
+            boltForce -= fStop;
+            latchBodyForce += fStop;
+            Note("bolt-stop", fStop);
+
+            // Knob dynamics when free: return spring, cam, and its stop on the rose.
+            double fRose = 0;
+            if (!holdingKnob)
+            {
+                double tq = knob > 0 ? -(KnobReturnPreload + KnobReturnRate * knob) : 0;
+                tq -= fCam * camArm;
+                tq -= KnobFriction * Math.Tanh(knobRate / 0.5) + KnobGrease * knobRate;
+                fRose = Contact(MetalContactK, RoseContactLambda, -knob * KnobStopArm, -knobRate * KnobStopArm);
+                tq += fRose * KnobStopArm;
+                knobRate += tq / KnobInertia * dt;
+                knob += knobRate * dt;
+            }
+            Note("rose", fRose);
+
+            // --- hinges
+            double alphaAcc = (omega - prevOmega) / dt; // the leaf's angular acceleration, last step
+            prevOmega = omega;
+            for (int i = 0; i < hinges.Length; i++)
+            {
+                var h = hinges[i];
+                // The leaf's knuckle turning on the pin, which the frame's knuckles hold.
+                double slip = PinRadius * (omega + h.TwistRate);
+                h.Travel += slip * dt;
+                double patch = 1 + SurfacePatchiness * h.Wear * h.SurfaceAt(h.Travel);
+                h.Friction.MuStatic = h.MuStatic * patch;
+                h.Friction.MuSliding = h.MuSliding * patch;
+                // The hand's push loads the hinges too, a share of its force at the knob.
+                double load = h.Load + Math.Abs(handTorque) / width * 0.3;
+                double f = h.Friction.Force(slip, load, knuckleInertia / (PinRadius * PinRadius), dt);
+                double moment = knuckleStiffness * h.Twist + knuckleDamping * h.TwistRate;
+                double acc = (-f * PinRadius - moment) / knuckleInertia - alphaAcc;
+                h.TwistRate += acc * dt;
+                h.Twist += h.TwistRate * dt;
+                torque += moment;
+                leaf.Push(h.Slope, moment);
+                // The pin's grip goes straight into the frame's knuckles and the jamb, as a couple across
+                // the hinge leaf's screws: the unfiltered stick and slip, where its harmonics come from.
+                frame.Push(frameAtHinges![i], f * PinRadius / ScrewArm);
+                if (PinTrace != null && i == 2 && ((long)(time * rate)) % 4 == 0)
+                    PinTrace.Add($"{time:F5} {slip * 1000:F3} {f:F2} {h.Friction.Z * 1e6:F4} {moment:F4}");
+                h.PeakSlip = Math.Max(h.PeakSlip, Math.Abs(slip));
+                h.PeakMoment = Math.Max(h.PeakMoment, Math.Abs(moment));
+            }
+
+            // --- forces into the bodies
+            // The bolt's give in its bore pushes the leaf; the strike's on its screws pushes the jamb.
+            latchEdgeForce += boltSide.Reaction;
+            frameForce += strikeBody.Reaction;
+            if (latchEdgeForce != 0)
+            {
+                torque += latchEdgeForce * width;
+                leaf.Push(latchShape, latchEdgeForce);
+            }
+            // The latch body on its mount; what the mount passes on goes into the leaf's edge.
+            double mount = LatchMountStiffness * latchBody + LatchMountDamping * latchBodyRate;
+            double latchBodyAcc = (latchBodyForce - mount) / LatchBodyMass;
+            leaf.Push(latchShape, mount * LatchBending);
+            if (fStop != 0) housing.Push(ones4, fStop);
+            double spindle = fCam + fRose;
+            if (spindle != 0) knobShell.Push(ones4, spindle * KnobShellCoupling);
+            if (strikeForce != 0) strike.Push(ones4, strikeForce);
+            if (frameForce != 0) frame.Push(frameAtLatch, frameForce);
+
+            // Knob shell damping: the hand holds it.
+            SetKnobLoss(holdingKnob);
+
+            // --- rigid motion
+            double alpha = torque / inertia;
+            omega += alpha * dt;
+            theta += omega * dt;
+            boltForce -= BoltFriction * Math.Tanh(boltRate / 0.01);
+            double boltAcc = boltForce / BoltMass;
+            boltRate += boltAcc * dt;
+            bolt += boltRate * dt;
+            latchBodyRate += latchBodyAcc * dt;
+            latchBody += latchBodyRate * dt;
+            foreach (var m in mouldings) m.Step(dt);
+            boltSide.Step(dt);
+            strikeBody.Step(dt);
+
+            // --- radiate
+            double pLeaf = leaf.Step(), pFrame = frame.Step(), pStrike = strike.Step(), pKnob = knobShell.Step();
+            double pLatch = housing.Step() + latchSound.Pressure(latchBodyAcc);
+            pStrike += strikeSound.Pressure(strikeBody.Acc);
+            double pStop = 0;
+            for (int i = 0; i < mouldings.Length; i++) pStop += mouldingSound[i].Pressure(mouldings[i].Acc);
+            double p = pLeaf + pFrame + pStrike + pLatch + pKnob + pStop;
+            // The rigid rotation: a piston, whose pressure follows its acceleration only below the
+            // frequency where the leaf is a wavelength across; above that it follows velocity.
+            double corner = C0 / (2 * Math.PI * Math.Sqrt(width * height / Math.PI));
+            double aLp = 1 - Math.Exp(-2 * Math.PI * corner * dt);
+            rigidLow += aLp * (alpha - rigidLow);
+            // Only while the leaf closes its own opening: open, its two faces cancel.
+            double baffle = Math.Clamp(1 - theta / 0.15, 0, 1);
+            double pRigid = rigidGain * rigidLow * baffle;
+            p += pRigid;
+            Peak(0, pLeaf); Peak(1, pRigid); Peak(2, pFrame); Peak(3, pStrike); Peak(4, pLatch); Peak(5, pKnob); Peak(6, pStop);
+            if (StemFolder != null)
+            {
+                stems ??= new List<float>[7];
+                double[] parts = { pLeaf, pRigid, pFrame, pStrike, pLatch, pKnob, pStop };
+                for (int i = 0; i < 7; i++) (stems[i] ??= new List<float>()).Add((float)(parts[i] / PascalsAtFullScale));
+            }
+
+            outHi.Add((float)p);
+            time += dt;
+        }
+
+        private List<float>[]? stems;
+        private readonly double[] peaks = new double[7];
+        private static readonly string[] PeakNames = { "leaf", "piston", "frame", "strike", "latch", "knob", "stop" };
+        private void Peak(int i, double p) => peaks[i] = Math.Max(peaks[i], Math.Abs(p));
+
+        private bool knobHeldState = true;
+        private void SetKnobLoss(bool held)
+        {
+            if (held == knobHeldState) return;
+            knobHeldState = held;
+            // Rebuild the shell's step with the new loss, keeping its state.
+            var q = (double[])knobShell.Q.Clone(); var v = (double[])knobShell.V.Clone();
+            var loss = new double[knobShell.N];
+            for (int i = 0; i < loss.Length; i++) loss[i] = held ? knobHeldLoss : knobFreeLoss[i];
+            var fresh = new Modes(knobShell.Hz, loss, knobShell.Mass, knobShell.Gain, dt);
+            Array.Copy(q, fresh.Q, q.Length); Array.Copy(v, fresh.V, v.Length);
+            knobShell = fresh;
+        }
+
+        public float[] Output()
+        {
+            foreach (var kv in contactLog)
+                if (kv.Value.On) Log($"{kv.Value.Start * 1000:F1} ms  {kv.Key}: peak {kv.Value.Peak:F1} N (still touching)");
+            if (StemFolder != null && stems != null)
+                for (int i = 0; i < stems.Length; i++)
+                    using (var f = new System.IO.BinaryWriter(System.IO.File.Create(System.IO.Path.Combine(StemFolder, PeakNames[i] + ".raw"))))
+                        foreach (var v in stems[i]) f.Write(v);
+            var parts = new StringBuilder("peaks by part, dB SPL at 1 m:");
+            for (int i = 0; i < peaks.Length; i++) parts.Append($" {PeakNames[i]} {20 * Math.Log10(Math.Max(1e-9, peaks[i]) / 2e-5):F0}");
+            Log(parts.ToString());
+            for (int i = 0; i < hinges.Length; i++)
+                Log($"hinge {i} (wear {hinges[i].Wear:F2}, load {hinges[i].Load:F0} N): peak pin slip {hinges[i].PeakSlip * 1000:F1} mm/s, peak moment on the leaf {hinges[i].PeakMoment:F3} N m");
+            // Down to the output rate through a windowed-sinc low-pass at 20 kHz.
+            int taps = 96 * Oversample + 1, half = taps / 2;
+            var h = new double[taps];
+            double fc = 20000.0 / rate, sum = 0;
+            for (int i = 0; i < taps; i++)
+            {
+                double x = i - half;
+                double sinc = x == 0 ? 2 * fc : Math.Sin(2 * Math.PI * fc * x) / (Math.PI * x);
+                double w = 0.42 - 0.5 * Math.Cos(2 * Math.PI * i / (taps - 1)) + 0.08 * Math.Cos(4 * Math.PI * i / (taps - 1));
+                h[i] = sinc * w; sum += h[i];
+            }
+            for (int i = 0; i < taps; i++) h[i] /= sum;
+            int n = outHi.Count / Oversample;
+            var y = new float[n];
+            double peak = 0;
+            for (int j = 0; j < n; j++)
+            {
+                int c = j * Oversample;
+                double acc = 0;
+                for (int i = 0; i < taps; i++)
+                {
+                    int idx = c + i - half;
+                    if (idx >= 0 && idx < outHi.Count) acc += h[i] * outHi[idx];
+                }
+                peak = Math.Max(peak, Math.Abs(acc));
+                y[j] = (float)(acc / PascalsAtFullScale);
+            }
+            if (report != null) report.PeakPascals = peak;
+            return y;
+        }
+    }
+}
