@@ -1,7 +1,7 @@
 # To do
 
 Planned work in priority order. Finished work is in [changes.md](changes.md) and `git log`.
-Updated 2026-10-02.
+Updated 2026-10-03.
 
 ## Now
 
@@ -179,6 +179,21 @@ Results: [docs/MUTATION_2026-09-24.md](docs/MUTATION_2026-09-24.md),
 Done 2026-10-02 (see changes.md). Nothing left.
 
 ### 6. Acoustics still open
+- Listen for pops on the Main Street pavement and inside Selby House and Marlow Tower (2026-10-03,
+  branch path-pops). Restart the server. `--pop-hunt` gives the numbers. Cars behind buildings are
+  now heard over the roofs (about -25 dB) instead of 60-100 dB down. Is the city too busy now?
+- What `--pop-hunt` still finds (2026-10-03):
+  - Indoors, a car's straight line through one wall instead of three as it passes a gap between
+    other buildings: -80 to -62 dB for 200-400 ms. The line counts every wall on it; sound outside
+    goes round the other buildings. Quiet, but a true fix is the outdoor path to the outer wall
+    times that wall.
+  - Where the line meets a pier on a wall, the string goes over the pier: 3 dB down for about 1 m of
+    travel. Under the covered hall west of Main Street (ceiling at 2.5 m) the way between the piers
+    is found only sometimes: up to 19 dB between over the wall and over the roof.
+- The glass front doors (2026-10-02) let more in when shut than the steel doors they replaced:
+  glass 17/28/43 dB, steel 13/48/58 (`--wall-tl`). In the Marlow corridor a car 30 m out in Main
+  Street comes in by the front door and the stairwell at -60/-69/-85 dB; through a steel leaf that
+  would be about 20 dB less in the mid band and 13 less in the high.
 - Listen to the smoothed tail (2026-10-02, `SmoothTail`) in a main-street lobby and stairwell:
   does it still pulse or step? `--clap-room tail=raw` and `--tail-steady` give the A/B in the lab.
 - Listen to the late tail as a field (2026-10-03, `DiffuseLate`, branch tail-ring). The ring is gone
