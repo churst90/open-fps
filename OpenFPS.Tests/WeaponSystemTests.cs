@@ -35,24 +35,28 @@ public class WeaponSystemTests
     }
 
     /// <summary>
-    /// The reports are what the recordings say they are. Every rifle and pistol in the NIJ set has a
-    /// positive phase of 0.35-0.56 ms at 20-40 m and a spectrum that falls from somewhere near 2.5-3
-    /// kHz; the shotgun, with no recording, is the largest bore and charge here and so the longest
-    /// pulse and the darkest report. (This used to order a body resonance and a thump that no
-    /// recording measured.)
+    /// The reports are what the recordings say they are, and the shotgun is the biggest.
+    ///
+    /// Updated 2026-10-02. This held the positive phase to 0.35-0.56 ms and the corner to 2.5-3.5 kHz,
+    /// the values of the one-pole model; the bubble model (WeaponSynth.MuzzleBlast) sets its note from
+    /// the shock's own zero crossing, 0.20-0.28 ms for the five measured guns, which renders at 0.26-0.32
+    /// ms after 20-40 m (against 0.2-0.5 in the recordings), and its corner is the gas's alone. The band
+    /// balance itself is held against the recordings in GunfireSpecTests. The shotgun, never recorded,
+    /// is the largest bore and charge: the longest pulse, and the darkest render by spectral centroid.
     /// </summary>
     [Fact]
     public void TheReportsAreTheMeasuredOnesAndTheShotgunIsTheBiggest()
     {
-        foreach (var w in new[] { WeaponRegistry.Akm, WeaponRegistry.Ar15, WeaponRegistry.Glock, WeaponRegistry.ServicePistol })
+        foreach (var w in WeaponRegistry.All.Where(w => w != WeaponRegistry.Shotgun))
         {
-            Assert.InRange(w.ReportPositivePhaseMs, 0.35f, 0.56f);
-            Assert.InRange(w.ReportCornerHz, 2500f, 3500f);
+            Assert.InRange(w.ReportPositivePhaseMs, 0.2f, 0.3f);
+            Assert.InRange(w.ReportDamping, 0.2f, 0.7f);
         }
+        float Centroid(WeaponDefinition w) => ReportMeasure.Measure(WeaponSynth.MuzzleBlast(WeaponProfile.From(w)), WeaponSynth.SampleRate).CentroidHz;
         foreach (var w in WeaponRegistry.All.Where(w => w != WeaponRegistry.Shotgun))
         {
             Assert.True(WeaponRegistry.Shotgun.ReportPositivePhaseMs > w.ReportPositivePhaseMs, $"{w.Id} has a longer pulse than a 12 gauge");
-            Assert.True(WeaponRegistry.Shotgun.ReportCornerHz < w.ReportCornerHz, $"{w.Id} is darker than a 12 gauge");
+            Assert.True(Centroid(WeaponRegistry.Shotgun) < Centroid(w), $"{w.Id} is darker than a 12 gauge");
         }
     }
 
@@ -90,5 +94,7 @@ public class WeaponSystemTests
         Assert.True(WeaponRegistry.Akm.IsSupersonic(C));
         Assert.True(WeaponRegistry.Ar15.IsSupersonic(C));
         Assert.True(WeaponRegistry.Glock.IsSupersonic(C));
+        // 410 m/s from a 6-inch barrel: only just, like the 9 mm.
+        Assert.True(WeaponRegistry.Revolver357.IsSupersonic(C));
     }
 }

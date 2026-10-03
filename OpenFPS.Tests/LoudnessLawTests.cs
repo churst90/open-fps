@@ -39,6 +39,7 @@ public class LoudnessLawTests
         Assert.Equal(Loudness.Pistol9mmDb, For("9x19mm"));
         Assert.Equal(Loudness.Pistol45Db, For(".45 ACP"));
         Assert.Equal(Loudness.Shotgun12GaugeDb, For("12 gauge 00 buck"));
+        Assert.Equal(Loudness.Magnum357Db, For(".357 Magnum"));
         Assert.Equal(Loudness.Rifle762Db, For("a cartridge nobody has heard of"));
         Assert.NotEqual(Loudness.Rifle762Db, For("5.56x45mm"));
         Assert.NotEqual(Loudness.Rifle762Db, For(".45 ACP"));
