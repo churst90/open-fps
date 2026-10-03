@@ -58,7 +58,10 @@ Suggested order. Research and file references for most of these: [docs/RESEARCH_
     axis driven by hand, closer, motor; stick-slip hinge friction per hinge (each door its own
     wear); a spring latch riding the strike; the push bar's linkage with real clearances (rattle
     as impacts); a hydraulic closer; a DC motor, gearbox, belt and rollers on a rough track for
-    sliders; leaf and hardware modal. Pilot: a knob door, judged before the rest;
+    sliders; leaf and hardware modal. Pilot: a knob door, judged before the rest. Done
+    2026-10-03 (KnobDoor, in the game, unheard there). Open on it: the slam sounds small; a dry
+    hinge's squeak is purer than a real one; the model reads 10-15 dB loud (calibrated off).
+    Next: the push-bar door;
   - a key item, so a keyed door can be locked to somebody without one;
   - the towers' stairwells open onto their corridors with no door: push-bar fire doors there
     would change every tower's acoustics, so they wait for Cody;

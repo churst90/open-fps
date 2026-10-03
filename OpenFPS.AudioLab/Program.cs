@@ -90,6 +90,7 @@ string[] usage =
     "  --applause [people=] [intensity=] [sec=]      a crowd on its own; compare=DIR against recordings",
     "  --door-knock [out=] [seed=] [knocks=]         knuckles on a wooden door",
     "  --door-opening [out=]                         doors opening and shutting at a metre",
+    "  --knob-door [out=] [seed=] [only=] [stems=]   the physical knob door: opens and shuts, hinges worn and oiled",
     "  --beacon-tones [out=]                         each beacon three times at its real period",
     "  --gun-spec                                    synthesized shots against the NIJ recordings",
     "  --gun-fit [nij=DIR] [tag=] [wavs] [grid]      every weapon's report against its own NIJ takes",
@@ -598,6 +599,74 @@ if (args.Contains("--door-knock"))
         foreach (float v in pcm) w.Write((short)Math.Clamp(v * 0.89f * 32767f, -32768f, 32767f));
     }
     Console.WriteLine($"  wrote {path}");
+    Environment.Exit(0);
+}
+
+if (args.Contains("--knob-door"))
+{
+    // --knob-door [out=DIR] [seed=N]: the physical knob door (OpenFPS.Common.KnobDoor). One WAV per
+    // render, all on one scale (KnobDoor.PascalsAtFullScale), with what each contact did.
+    string dir = args.FirstOrDefault(a => a.StartsWith("out=", StringComparison.Ordinal))?.Substring(4) ?? ".";
+    int seed = int.TryParse(args.FirstOrDefault(a => a.StartsWith("seed="))?.Substring(5), out int sd) ? sd : 1;
+    System.IO.Directory.CreateDirectory(dir);
+    var renders = new List<(string Name, Func<OpenFPS.Common.KnobDoor.Report, float[]> Make)>();
+    OpenFPS.Common.KnobDoor.Door Make(OpenFPS.Common.KnobDoor.Construction c, float[]? wear)
+        => new() { Leaf = c, HingeWear = wear, Seed = seed };
+    var hollow = OpenFPS.Common.KnobDoor.Construction.HollowCore;
+    var solid = OpenFPS.Common.KnobDoor.Construction.SolidWood;
+    float[] oiled = { 0f, 0f, 0f }, worn = { 0.5f, 0.3f, 0.6f }, dry = { 0.95f, 0.8f, 1f };
+    renders.Add(("hollow-open-oiled", r => OpenFPS.Common.KnobDoor.RenderOpen(Make(hollow, oiled), 48000, 0.9, r)));
+    renders.Add(("hollow-open-worn", r => OpenFPS.Common.KnobDoor.RenderOpen(Make(hollow, worn), 48000, 0.9, r)));
+    renders.Add(("hollow-open-dry", r => OpenFPS.Common.KnobDoor.RenderOpen(Make(hollow, dry), 48000, 0.9, r)));
+    renders.Add(("hollow-open-dry-slow", r => OpenFPS.Common.KnobDoor.RenderOpen(Make(hollow, dry), 48000, 2.0, r)));
+    foreach (var how in new[] { OpenFPS.Common.KnobDoor.Shut.Gentle, OpenFPS.Common.KnobDoor.Shut.Normal, OpenFPS.Common.KnobDoor.Shut.Slam })
+        renders.Add(($"hollow-close-{how.ToString().ToLowerInvariant()}", r => OpenFPS.Common.KnobDoor.RenderClose(Make(hollow, worn), how, 48000, r)));
+    renders.Add(("solid-open-worn", r => OpenFPS.Common.KnobDoor.RenderOpen(Make(solid, worn), 48000, 0.9, r)));
+    renders.Add(("solid-close-normal", r => OpenFPS.Common.KnobDoor.RenderClose(Make(solid, worn), OpenFPS.Common.KnobDoor.Shut.Normal, 48000, r)));
+    renders.Add(("solid-close-slam", r => OpenFPS.Common.KnobDoor.RenderClose(Make(solid, worn), OpenFPS.Common.KnobDoor.Shut.Slam, 48000, r)));
+    // As the game sends them: the prefab door, its 0.9 s swing, each character.
+    for (int v = 0; v < OpenFPS.Common.KnobDoor.Variants; v++)
+    {
+        int vv = v;
+        renders.Add(($"game-open-v{v}", r => OpenFPS.Common.KnobDoor.RenderOpen(
+            new OpenFPS.Common.KnobDoor.Door { HingeWear = OpenFPS.Common.KnobDoor.WearOf(vv), Seed = 1 + vv }, 48000, 0.9, r)));
+        renders.Add(($"game-close-v{v}", r => OpenFPS.Common.KnobDoor.RenderGameClose(
+            new OpenFPS.Common.KnobDoor.Door { HingeWear = OpenFPS.Common.KnobDoor.WearOf(vv), Seed = 1 + vv }, 48000, 0.9, 1.0, r)));
+    }
+    string? only = args.FirstOrDefault(a => a.StartsWith("only=", StringComparison.Ordinal))?.Substring(5);
+    OpenFPS.Common.KnobDoor.StemFolder = args.FirstOrDefault(a => a.StartsWith("stems=", StringComparison.Ordinal))?.Substring(6);
+    if (args.Contains("pins")) OpenFPS.Common.KnobDoor.PinTrace = new List<string>();
+    // Every file on one gain, set by the loudest, so a slam and a gentle close keep their difference.
+    var made = new List<(string Name, float[] Pcm)>();
+    foreach (var (name, make) in renders)
+    {
+        if (only != null && !name.Contains(only)) continue;
+        var rep = new OpenFPS.Common.KnobDoor.Report();
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        var pcm = make(rep);
+        made.Add((name, pcm));
+        Console.WriteLine($"{name}  ({pcm.Length / 48000.0:F2} s, rendered in {sw.ElapsedMilliseconds} ms)");
+        if (OpenFPS.Common.KnobDoor.PinTrace != null)
+        {
+            System.IO.File.WriteAllLines(System.IO.Path.Combine(dir, name + ".pin.txt"), OpenFPS.Common.KnobDoor.PinTrace);
+            OpenFPS.Common.KnobDoor.PinTrace.Clear();
+        }
+        Console.WriteLine(rep);
+    }
+    float loudest = 1e-9f;
+    foreach (var (_, pcm) in made) foreach (float v in pcm) loudest = Math.Max(loudest, Math.Abs(v));
+    float gain = 0.89f / loudest;
+    foreach (var (name, pcm) in made)
+    {
+        string path = System.IO.Path.Combine(dir, name + ".wav");
+        using var w = new System.IO.BinaryWriter(System.IO.File.Create(path));
+        w.Write("RIFF"u8); w.Write(36 + pcm.Length * 2); w.Write("WAVEfmt "u8); w.Write(16); w.Write((short)1); w.Write((short)1);
+        w.Write(48000); w.Write(96000); w.Write((short)2); w.Write((short)16); w.Write("data"u8); w.Write(pcm.Length * 2);
+        foreach (float v in pcm) w.Write((short)Math.Clamp(v * gain * 32767f, -32768f, 32767f));
+    }
+    // Full scale in every file is this many pascals at a metre.
+    double fullScalePa = OpenFPS.Common.KnobDoor.PascalsAtFullScale / gain;
+    Console.WriteLine($"full scale = {fullScalePa:F1} Pa at 1 m ({20 * Math.Log10(fullScalePa / 2e-5):F1} dB SPL peak)");
     Environment.Exit(0);
 }
 

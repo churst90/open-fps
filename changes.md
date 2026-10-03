@@ -4,6 +4,31 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-03
 
+- Knob doors are a physical model (branch knob-door, `OpenFPS.Common/KnobDoor.cs`). Cody,
+  2026-10-03, after round 2: "I'd go with these sounds for these types of doors for now", with
+  the opening loud enough to hear down a corridor of flats.
+  - What is simulated: the leaf as a plate on its hinges (bending modes and their radiation from
+    its build: hollow core or solid wood); three hinges whose pins stick and slip when dry; a sprung
+    bevelled latch, the strike plate and its keeper; the stop moulding, struck at five points of a
+    leaf that is not flat; the stud and plasterboard of the frame; the knob on its cam and rose. A
+    hand turns the knob, pulls (12 N), swings the door and lets go.
+  - Round 1 faults Cody heard and what they were: the opening "like a clinking wine glass" was the
+    knob modelled as an open brass cylinder (a knob is a closed ball on a base disc; it rings near
+    10 kHz, briefly); "plastic" was leaf and frame losses twice wood's. The slam still sounds small;
+    a solid door slams bigger.
+  - In the game: the server sends `knobdoor:open|close:...` for knob (Hinged) doors, the opening on
+    the latch letting go and the whole close as the leaf starts back, so the frame is met when the
+    leaf arrives. A door's id picks one of four characters; one in four has worn hinges. The client
+    renders each in a few seconds of a core, so it renders the city's door sizes (0.9, 1.1, 1.4 m)
+    at start, four at a time, before anyone opens one.
+  - Levels: opening 71 dB and closing 104 dB at a metre are declared. That is the model's own
+    A-weighted level less 12 dB (`LevelCalibrationDb`), because it radiates about 2.5 % of the
+    leaf's energy where real impacts manage a tenth of that. `KnobDoorTests` renders and checks them.
+  - Lab: `--knob-door [only=] [stems=DIR] [pins]`. Listening sets: inbox/knob-door-2026-10-03 and
+    -round2.
+  - Not heard in the game yet. A door closed from part open, or of another size, renders when first
+    heard and so is silent that first time.
+
 - Nothing that is not a number gets into the mix (branch early-tail). Cody, in Marlow flat 00B
   through its door: "a pop ... and the audio just cut out". From that moment the master's loudness
   meter read NaN: one NaN had reached the master limiter, which then holds it for good.
