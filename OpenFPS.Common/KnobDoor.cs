@@ -131,8 +131,13 @@ public static class KnobDoor
     private const double SolidE = 3.1e9, SolidRho = 650, SolidT = 0.04;
     private const double Poisson = 0.3;
     /// <summary>Loss a hung leaf has beyond its material: rubbing at hinges and stop, the paint.</summary>
-    private const double MountingLoss = 0.02;
-    private const double HollowLoss = 0.05;   // fibreboard, glued paper core, air pumped through its cells
+    private const double MountingLoss = 0.01;
+    /// <summary>Fibreboard skins (about 0.02) on a glued paper core. Above 0.05 a leaf stops sounding like
+    /// wood and starts sounding like plastic, which is what Cody heard in the first round.</summary>
+    private const double HollowLoss = 0.03;
+    /// <summary>Timber along and across the grain, about 0.015. (The registry's 0.03 for Wood is a
+    /// fitted figure for wood as built, joints and all.)</summary>
+    private const double SolidWoodLoss = 0.015;
     private const double LeafModeMaxHz = 14000;
 
     // Hinges: 3.5 in butt hinges, 1/4 in pin, three screws a leaf into wood.
@@ -217,7 +222,12 @@ public static class KnobDoor
     /// bending wavelength each side at the frequencies the stop drives (0.23 m at 200 Hz): the board
     /// strip the stud carries, and what radiates.</summary>
     private const double BoardKgPerM2 = 8.75, CarriedBoard = 0.25;
-    private const double FrameLoss = 0.06, FrameModeMaxHz = 5000;
+    private const double FrameLoss = 0.03, FrameModeMaxHz = 5000;
+    /// <summary>The plasterboard panel beside the opening, between the jamb's stud and the next one
+    /// 0.4 m away. The stud carries its edge, and the rest of it lags behind as a plate: the boom of a
+    /// slammed door is this wall, not the door.</summary>
+    private const double PanelWidth = 0.4, PanelHeight = 2.4, BoardE = 2.5e9, BoardT = 0.0125;
+    private const double PanelLoss = 0.03, PanelModeMaxHz = 3000;
 
     // ---------------------------------------------------------------------------------------------
 
@@ -228,7 +238,7 @@ public static class KnobDoor
     private sealed class Modes
     {
         public readonly int N;
-        public readonly double[] Q, V, F, Mass, Gain, GainQuad, Hz;
+        public readonly double[] Q, V, F, Mass, Gain, GainQuad, Hz, Acc;
         private readonly double[] a11, a12, a21, a22, b1, b2, w2, twoZw, w1;
 
         /// <summary><paramref name="gainQuad"/> is the imaginary part of each mode's radiation at the
@@ -237,7 +247,7 @@ public static class KnobDoor
                      IList<double>? gainQuad = null)
         {
             N = hz.Count;
-            Q = new double[N]; V = new double[N]; F = new double[N];
+            Q = new double[N]; V = new double[N]; F = new double[N]; Acc = new double[N];
             Mass = new double[N]; Gain = new double[N]; GainQuad = new double[N]; Hz = new double[N]; w1 = new double[N];
             a11 = new double[N]; a12 = new double[N]; a21 = new double[N]; a22 = new double[N];
             b1 = new double[N]; b2 = new double[N]; w2 = new double[N]; twoZw = new double[N];
@@ -262,6 +272,7 @@ public static class KnobDoor
             for (int k = 0; k < N; k++)
             {
                 double acc = F[k] / Mass[k] - twoZw[k] * V[k] - w2[k] * Q[k];
+                Acc[k] = acc;
                 p += Gain[k] * acc - GainQuad[k] * w1[k] * V[k];
                 double a = F[k] / Mass[k];
                 double q = Q[k], v = V[k];
@@ -521,7 +532,9 @@ public static class KnobDoor
         // Leaf
         private readonly double width, height, mass, inertia;
         private double theta, omega, prevOmega;
-        private readonly Modes leaf, frame;
+        private readonly Modes leaf, frame, panel;
+        private readonly double[,] panelCoupling;
+        private readonly double panelRhoH;
         private readonly double frameLength;
         private readonly Plate leafPlate;
         private readonly (double X, double Y, double Warp, double[] Shape)[] stops;
@@ -576,7 +589,7 @@ public static class KnobDoor
             {
                 d = SolidE * Math.Pow(SolidT, 3) / (12 * (1 - Poisson * Poisson));
                 mass = SolidRho * SolidT * width * height;
-                loss = 0.03 + MountingLoss;
+                loss = SolidWoodLoss + MountingLoss;
             }
             rhoH = mass / (width * height);
             inertia = mass * width * width / 3;
@@ -588,6 +601,27 @@ public static class KnobDoor
 
             frameLength = StudLength;
             frame = FrameModes(dt, rng);
+            // The panel: simply supported between the studs, its jamb edge carried by the stud. Its
+            // own modes are driven by the inertia of the shape the stud drags it into, (1 - x/a) times
+            // the stud's deflection: -rho h times the overlap of each mode with that shape.
+            panelRhoH = BoardKgPerM2;
+            double boardD = BoardE * BoardT * BoardT * BoardT / (12 * (1 - Poisson * Poisson));
+            var panelPlate = new Plate(PanelWidth, PanelHeight, boardD, panelRhoH, PanelLoss, PanelModeMaxHz, false, rng, 0.04);
+            panel = new Modes(panelPlate.Hz, panelPlate.Loss, panelPlate.Mass, panelPlate.Gain, dt, panelPlate.GainQuad);
+            panelCoupling = new double[panel.N, frame.N];
+            for (int k = 0; k < panel.N; k++)
+            {
+                var (pm, pn) = panelPlate.Index[k];
+                var ix = Plate.Integral(x => Math.Sin(pm * Math.PI * x / PanelWidth) * (1 - x / PanelWidth), PanelWidth, 0, pm * Math.PI / PanelWidth);
+                for (int j = 0; j < frame.N; j++)
+                {
+                    int jn = j + 1;
+                    var iy = Plate.Integral(y => Math.Sin(pn * Math.PI * y / PanelHeight)
+                                                 * Math.Sin(jn * Math.PI * Math.Clamp(y, 0, StudLength) / StudLength),
+                                            PanelHeight, 0, (pn + jn) * Math.PI / PanelHeight);
+                    panelCoupling[k, j] = ix.re * iy.re;
+                }
+            }
 
             // A leaf is never flat: up to a millimetre of wind and bow, its own for each door.
             stops = new (double, double, double, double[])[]
@@ -653,27 +687,32 @@ public static class KnobDoor
             // Strike plate: 1.5 mm steel between screws 48 mm apart, clamped, and its lip a 10 mm tongue.
             strike = new Modes(new[] { Beam(0.048, 0.0015, 7850, 200e9, 4.730), Beam(0.048, 0.0015, 7850, 200e9, 7.853),
                                        Beam(0.010, 0.0015, 7850, 200e9, 1.875) },
-                               new[] { 0.05, 0.05, 0.03 }, new[] { 0.010, 0.010, 0.004 },
+                               new[] { 0.08, 0.08, 0.04 }, new[] { 0.010, 0.010, 0.004 },
                                new[] { SmallPlateGain(0.07 * 0.028, 0.52), SmallPlateGain(0.07 * 0.028, 0.05),
                                        SmallPlateGain(0.010 * 0.028, 0.6) }, dt);
-            // Faceplate 2.5 mm steel between screws 45 mm apart; the housing a 0.8 mm tube of 22 mm.
-            // Both lie against the wood of the mortise, which takes their ring.
+            // Faceplate 2.5 mm steel between screws 45 mm apart; the housing a 0.8 mm tube of 22 mm,
+            // tight in its bore. Both lie against the wood, which takes their ring.
             housing = new Modes(new[] { Ring(0.011, 0.0008, 7850, 200e9, 2), Ring(0.011, 0.0008, 7850, 200e9, 3) },
-                                new[] { 0.05, 0.05 }, new[] { 0.010, 0.010 },
+                                new[] { 0.15, 0.15 }, new[] { 0.010, 0.010 },
                                 new[] { SmallPlateGain(FaceplateArea, 0.05), SmallPlateGain(FaceplateArea, 0.05) }, dt);
-            // The knob: a brass shell, 27 mm radius, 0.8 mm wall. Ring modes n = 2..7.
+            // The knob: a closed brass ball crimped onto a base disc. A closed ball of 27 mm radius is far
+            // too stiff to ring below about 18 kHz (its membrane holds it), so what rings is the base
+            // disc, held at its rim by the crimp and at its centre by the shank: a 19 mm wide annulus of
+            // 1 mm brass clamped on both edges, which rings like a clamped beam that long, near 10 kHz,
+            // with its circumferential variants a little above. The first round modelled the knob as an
+            // open cylinder, which is a wine glass, and that is what it sounded like.
             var kh = new List<double>(); var kg = new List<double>(); var km = new List<double>(); var kl = new List<double>();
-            for (int n = 2; n <= 7; n++)
+            double annulus = 0.019, discT = 0.001;
+            double f0 = Beam(annulus, discT, 8500, 100e9, 4.730);
+            double[] circumferential = { 1.0, 1.12, 1.38 };   // n = 0, 1, 2 round the annulus
+            for (int n = 0; n < circumferential.Length; n++)
             {
-                double f = Ring(0.027, 0.0008, 8500, 100e9, n);
-                kh.Add(f); km.Add(0.06); kl.Add(knobHeldLoss);
-                double ka = 2 * Math.PI * f / C0 * 0.027;
-                kg.Add(Rho0 * (4 * Math.PI * 0.027 * 0.027 * 0.5) / (4 * Math.PI) * ka * ka / (1 + ka * ka) / n);
+                kh.Add(f0 * circumferential[n]); km.Add(0.005); kl.Add(knobHeldLoss);
+                kg.Add(SmallPlateGain(Math.PI * 0.025 * 0.025, 0.3 / (n + 1)));
             }
             knobFreeLoss = new double[kh.Count];
-            // A knob on its spindle and rose is not a free bell: the joints take its ring in a few
-            // tenths of a second at its lowest mode.
-            for (int i = 0; i < kh.Count; i++) knobFreeLoss[i] = 0.006;
+            // The crimp and the shank take the disc's ring in a few tens of milliseconds.
+            for (int i = 0; i < kh.Count; i++) knobFreeLoss[i] = 0.03;
             knobShell = new Modes(kh, kl, km, kg, dt);
 
             handK = 170 * inertia;
@@ -1118,7 +1157,13 @@ public static class KnobDoor
             strikeBody.Step(dt);
 
             // --- radiate
-            double pLeaf = leaf.Step(), pFrame = frame.Step(), pStrike = strike.Step(), pKnob = knobShell.Step();
+            for (int k = 0; k < panel.N; k++)
+            {
+                double drive = 0;
+                for (int j = 0; j < frame.N; j++) drive += panelCoupling[k, j] * frame.Acc[j];
+                panel.F[k] -= panelRhoH * drive;
+            }
+            double pLeaf = leaf.Step(), pFrame = frame.Step() + panel.Step(), pStrike = strike.Step(), pKnob = knobShell.Step();
             double pLatch = housing.Step() + latchSound.Pressure(latchBodyAcc);
             pStrike += strikeSound.Pressure(strikeBody.Acc);
             double pStop = 0;
