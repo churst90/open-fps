@@ -92,6 +92,7 @@ string[] usage =
     "  --door-opening [out=]                         doors opening and shutting at a metre",
     "  --beacon-tones [out=]                         each beacon three times at its real period",
     "  --gun-spec                                    synthesized shots against the NIJ recordings",
+    "  --gun-fit [nij=DIR] [tag=] [wavs] [grid]      every weapon's report against its own NIJ takes",
     "  --speech-lines                                decodes every shipped voice line as the client does",
     "  --ground-voice [--ladder]                     a talker's ground reflection three ways",
     "",
@@ -430,6 +431,11 @@ if (args.Contains("--yard"))
 if (args.Contains("--earshot"))
 {
     Environment.Exit(OpenFPS.Client.Core.AudioEngine.Fmod.EarshotSpike.Run(args));
+}
+
+if (args.Contains("--gun-fit"))
+{
+    Environment.Exit(OpenFPS.Client.Core.AudioEngine.Fmod.GunFitSpike.Run(args));
 }
 
 if (args.Contains("--gun-spec"))
