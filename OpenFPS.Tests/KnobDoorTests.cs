@@ -78,7 +78,8 @@ public class KnobDoorTests
         Assert.Equal(1, door.Variant);
         Assert.Equal(1.4f, swing, 2);
         double open = LafMax(PushBarDoor.RenderOpen(new PushBarDoor.Door { Variant = 1, Seed = 2 }, 48000, 1.4), PushBarDoor.PascalsAtFullScale);
-        Assert.InRange(open, PushBarDoor.OpenLevelDb(1) + KnobDoor.LevelCalibrationDb - 2.5, PushBarDoor.OpenLevelDb(1) + KnobDoor.LevelCalibrationDb + 2.5);
+        Assert.InRange(open, PushBarDoor.OpenLevelDb(1) + PushBarDoor.LevelCalibrationDb - 2.5, PushBarDoor.OpenLevelDb(1) + PushBarDoor.LevelCalibrationDb + 2.5);
+        Assert.InRange(PushBarDoor.OpenLevelDb(1), 73, 80);
     }
 
     /// <summary>LAFmax, dB re 20 uPa, of samples in units of <see cref="KnobDoor.PascalsAtFullScale"/>.</summary>

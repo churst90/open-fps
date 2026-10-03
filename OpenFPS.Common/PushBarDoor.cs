@@ -107,18 +107,25 @@ public static class PushBarDoor
 
     public const string KeyPrefix = "pushbardoor:";
 
-    /// <summary>Declared levels, dB at a metre, by character: the model's own LAFmax less the door model's
-    /// calibration (<see cref="KnobDoor.LevelCalibrationDb"/>), the same for every door. Opening is the
-    /// push; closing is the closer bringing it in, from a well-set closer (quiet) to a fast one onto bare
-    /// steel.</summary>
+    /// <summary>
+    /// The push-bar model over-radiates more than the knob door's: its push reads 105 dBA at a metre where
+    /// the only measurement (a patent: ordinary exit devices 29-35 dB over a 44 dB hospital background)
+    /// puts it at about 73-79. One figure for this model brings its push onto that, and its closes keep
+    /// their physical distance below it.
+    /// </summary>
+    public const float LevelCalibrationDb = 26f;
+
+    /// <summary>Declared levels, dB at a metre, by character: the model's own LAFmax less
+    /// <see cref="LevelCalibrationDb"/>. Opening is the push; closing is the closer bringing it in, from a
+    /// well-set closer (quiet) to a fast one onto bare steel.</summary>
     public static float OpenLevelDb(int variant) => (variant % Variants) switch
     {
         0 => 102.2f, 1 => 104.6f, 2 => 104.8f, _ => 105.6f,
-    } - KnobDoor.LevelCalibrationDb;
+    } - LevelCalibrationDb;
     public static float CloseLevelDb(int variant) => (variant % Variants) switch
     {
         0 => 81.5f, 1 => 83.2f, 2 => 102.5f, _ => 114.4f,
-    } - KnobDoor.LevelCalibrationDb;
+    } - LevelCalibrationDb;
 
     public static string Key(bool closing, int variant, float swingSeconds, float width, float height)
         => FormattableString.Invariant(
