@@ -108,8 +108,10 @@ internal static class DoorPhysics
         /// above the frequency where the core gives, the plate bends more easily than its skins' spacing
         /// says and its modes crowd together. Zero for a plate that is solid through.</param>
         public Plate(double a, double b, double d, double rhoH, double materialLoss, double maxHz,
-                     bool hingedLeaf, Random rng, double scatter, double shearStiffness = 0)
+                     bool hingedLeaf, Random rng, double scatter, double shearStiffness = 0,
+                     double minHz = 0, int keepEvery = 1)
         {
+            int counted = 0;
             this.a = a; this.b = b; hinged = hingedLeaf;
             double root = Math.Sqrt(d / rhoH);
             for (int m = 1; m < 400; m++)
@@ -124,6 +126,10 @@ internal static class DoorPhysics
                     if (shearStiffness > 0) f /= Math.Sqrt(1 + d * k2 / shearStiffness);
                     if (f > maxHz) break;
                     any = true;
+                    // A dense field thinned: one mode kept in every keepEvery above minHz, each carrying the
+                    // radiation of those it stands for (gain times the root of keepEvery).
+                    if (f < minHz) continue;
+                    if (keepEvery > 1 && (counted++ % keepEvery) != 0) continue;
                     // Wood is not uniform and a hung leaf's edges are not ideal; each door's modes land a
                     // little apart from the formula's.
                     f *= 1 + scatter * (rng.NextDouble() * 2 - 1);
@@ -136,8 +142,9 @@ internal static class DoorPhysics
                     // Radiation loss: the power the face sends out, against what the mode holds.
                     double radLoss = Rho0 * C0 * sigma / (w * rhoH);
                     Loss.Add(materialLoss + radLoss);
-                    Gain.Add(gain);
-                    GainQuad.Add(gainQuad);
+                    double share = Math.Sqrt(keepEvery);
+                    Gain.Add(gain * share);
+                    GainQuad.Add(gainQuad * share);
                 }
                 if (!any) break;
             }
@@ -340,6 +347,27 @@ internal static class DoorPhysics
         double d0 = -30 * u2 + 60 * u3 - 30 * u4, d1 = 1 - 18 * u2 + 32 * u3 - 15 * u4;
         double d3 = -12 * u2 + 28 * u3 - 15 * u4, d5 = 30 * u2 - 60 * u3 + 30 * u4;
         return (h0 * p0 + h1 * v0 + h3 * v1 + h5 * p1, d0 * p0 + d1 * v0 + d3 * v1 + d5 * p1);
+    }
+
+    /// <summary>A second-order Butterworth high-pass (RBJ), for splitting what a model covers from what a
+    /// simpler law carries above it.</summary>
+    internal sealed class HighPass
+    {
+        private readonly double b0, b1, b2, a1, a2;
+        private double x1, x2, y1, y2;
+        public HighPass(double hz, double rate)
+        {
+            double w = 2 * Math.PI * hz / rate, c = Math.Cos(w), alpha = Math.Sin(w) / (2 * Math.Sqrt(0.5));
+            double a0 = 1 + alpha;
+            b0 = (1 + c) / 2 / a0; b1 = -(1 + c) / a0; b2 = (1 + c) / 2 / a0;
+            a1 = -2 * c / a0; a2 = (1 - alpha) / a0;
+        }
+        public double Next(double x)
+        {
+            double y = b0 * x + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2;
+            x2 = x1; x1 = x; y2 = y1; y1 = y;
+            return y;
+        }
     }
 
     /// <summary>Down from the internal rate to the output rate through a windowed-sinc low-pass at 20 kHz,
