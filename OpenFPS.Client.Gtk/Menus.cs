@@ -83,6 +83,29 @@ internal static partial class GtkClientProgram
         ShowLoginDialog(server);
     }
 
+    /// <summary>
+    /// Create account goes to the preferred server too. With a username and password saved for it, it asks
+    /// the server for that account straight away; otherwise it opens the form for that server with Create
+    /// account first, asking for a username and password. With no server saved it opens the list.
+    /// </summary>
+    private static void CreateAccountPreferred()
+    {
+        var server = _settings.Preferred;
+        if (server == null)
+        {
+            _speech.Speak("No preferred server yet. Add one in Saved Servers.", true);
+            ShowServers();
+            return;
+        }
+        if (server.RememberPassword && server.Password.Length > 0 && server.Username.Length > 0)
+        {
+            _speech.Speak($"Creating the account {server.Username} on {(server.Name.Length > 0 ? server.Name : server.Host)}.", true);
+            _session.Connect($"{server.Host}:{server.Port}", server.Username, server.Password, register: true);
+            return;
+        }
+        ShowLoginDialog(server, register: true);
+    }
+
     /// <summary>After a successful login from the Connect dialog, the server is remembered.</summary>
     private static void RememberServer(string address, string user, string pass, bool rememberPassword)
         => _settings.Remember(address, user, pass, rememberPassword);
@@ -214,7 +237,7 @@ internal static partial class GtkClientProgram
 
     private static void ShowSettings()
     {
-        var window = Dialog("Settings", 460, 400);
+        var window = Dialog("Settings", 460, 450);
         var box = VBox(16);
 
         var outputs = new List<string> { "System default" };
@@ -236,6 +259,8 @@ internal static partial class GtkClientProgram
         volume.SetValue(Math.Round(_settings.UiVolume * 100));
         SpeakOnFocus(volume, () => $"Interface sound volume, {volume.GetValue():F0} percent");
         box.Append(volume);
+
+        box.Append(MenuButton("Open log folder", OpenLogFolder));
 
         box.Append(MenuButton("Save", () =>
         {
