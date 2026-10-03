@@ -65,61 +65,25 @@ public class SteelDoorSoundTests
         for (int i = 0; i < 90; i++)
             doors.Update(world, PhysicsConstants.FixedDeltaTime, _ => { }, (_, _, s) => closed.AddRange(s));
 
-        Assert.Contains(opened, s => s.Character == SoundCharacter.Knock);           // the latch
-        Assert.Contains(closed, s => s.Character == SoundCharacter.Knock);           // the blow and the latch
-        // The leaf rings, at the note a HOLLOW steel door of its size has: two 1.2 mm skins over a
-        // core bend as a sandwich, stiffer for their mass than an 80 mm slab of solid steel — which
-        // is what it was reckoned as, at 2.4 tonnes, before the prefab said what it is made of.
-        var ring = Assert.Single(closed, s => s.Character == SoundCharacter.Ring);
+        // The steel door is the physical push-bar door: one sound for the push, one for the closer's
+        // close, each naming its door, and each renders to a sound.
+        var push = Assert.Single(opened);
+        var shut = Assert.Single(closed);
+        Assert.True(PushBarDoor.TryParseKey(push.SynthKey, out bool pushCloses, out var pushDoor, out _));
+        Assert.True(PushBarDoor.TryParseKey(shut.SynthKey, out bool shutCloses, out _, out _));
+        Assert.False(pushCloses);
+        Assert.True(shutCloses);
         var size = world.Get<ColliderComponent>(door).Size;
-        float skin = world.Get<DoorComponent>(door).SkinMetres;
-        Assert.Equal(0.0012f, skin, 4);
-        float perArea = 2f * skin * 7850f + (size.Z - 2f * skin) * 150f;
-        float equivalent = MathF.Sqrt(6f * 7850f * skin * (size.Z - skin) * (size.Z - skin) / perArea);
-        Assert.Equal(DoorAcoustics.PanelHz(AcousticRegistry.GetProperties("Metal"), size.X, size.Y, equivalent), ring.Hz, 1);
-        Assert.True(ring.Hz > DoorAcoustics.PanelHz(AcousticRegistry.GetProperties("Metal"), size.X, size.Y, size.Z));
-
-        // A client that has heard nothing yet, standing in front of the door.
-        var client = new ClientWorldState();
-        client.Clear(data.Size);
-        foreach (var def in EntityDefinitionFactory.StaticDefinitions(world)) client.RegisterDefinition(def);
-        var provider = new CapturingProvider();
-        var facade = new AudioEngineFacade(provider);
-        facade.InitializeForTest();
-        var player = new WorldAudioPlayer(facade, new OpenFPS.Client.AudioEngine.Acoustics.SpatialAcoustics(new SpatialService()));
-
-        var t = world.Get<Transform>(door);
-        var ear = t.Position + Vector3.Transform(Vector3.UnitZ, t.Rotation) * 1.5f + Vector3.UnitY * 0.5f;
-        facade.UpdateListener(ear, Quaternion.Identity, Vector3.Zero, -1);
-
-        var clock = Stopwatch.StartNew();
-        // Which of the sounds sent were actually played, by the identity the player gives each one.
-        List<TransientSound> Missing(List<TransientSound> sounds, int seed)
+        Assert.Equal(size.X, pushDoor.Width, 2);
+        Assert.Equal(PushBarDoor.OpenLevelDb(door.Id), push.LevelDb, 1);
+        Assert.Equal(PushBarDoor.CloseLevelDb(door.Id), shut.LevelDb, 1);
+        foreach (var s in new[] { push, shut })
         {
-            provider.Emitters.Clear();
-            player.Receive(new WorldAudioEvent { SourceEntityId = door.Id, Label = "Steel Door", Sounds = sounds, Seed = seed },
-                           clock.Elapsed.TotalSeconds);
-            // A second of real time, ticking as the game does, so the worker's render races the clock
-            // exactly as it does in play.
-            double until = clock.Elapsed.TotalSeconds + 1.0;
-            while (clock.Elapsed.TotalSeconds < until)
-            {
-                player.Update(client.GetSnapshot(), ear, clock.Elapsed.TotalSeconds);
-                facade.PumpForTest();
-                System.Threading.Thread.Sleep(5);
-            }
-            return sounds.Where(s => !provider.Emitters.Any(e => e.SoundId.StartsWith(
-                $"synth:{s.Character}:{(int)MathF.Round(s.Hz)}:{(int)MathF.Round(s.LevelDb)}:"))).ToList();
+            var pcm = PushBarDoor.RenderKey(s.SynthKey!, 48000);
+            Assert.True(pcm.Length > 24000);
+            Assert.Equal(1f, pcm.Max(MathF.Abs), 3);
         }
-
-        var silentOpening = Missing(opened, seed: 1);
-        var silentClosing = Missing(closed, seed: 2);
-        _o.WriteLine($"first opening: {opened.Count - silentOpening.Count} of {opened.Count} sounds played; "
-                   + $"first closing: {closed.Count - silentClosing.Count} of {closed.Count}");
-
-        // Every part, the first time — the latch, the blow, the seal and the ring.
-        Assert.Empty(silentOpening);
-        Assert.Empty(silentClosing);
+        _o.WriteLine($"push {push.SynthKey} {push.LevelDb:F1} dB, shut {shut.SynthKey} {shut.LevelDb:F1} dB");
     }
 
     /// <summary>A mixer that records what it was asked to play, and nothing else.</summary>

@@ -55,7 +55,9 @@ Suggested order. Research and file references for most of these: [docs/RESEARCH_
     sliders; leaf and hardware modal. Pilot: a knob door, judged before the rest. Done
     2026-10-03 (KnobDoor, in the game, unheard there). Open on it: the slam sounds small; a dry
     hinge's squeak is purer than a real one; the model reads 10-15 dB loud (calibrated off).
-    Next: the push-bar door;
+    Round 4 (2026-10-03, after research): dense fields, ports, real closing speeds, jiggle, hollow
+    push bar, calibrated levels; in the game for knob and push-bar doors. Waiting on Cody. Open:
+    closes are darker than the recordings above 4 kHz;
   - a key item, so a keyed door can be locked to somebody without one;
   - the towers' stairwells open onto their corridors with no door: push-bar fire doors there
     would change every tower's acoustics, so they wait for Cody;
