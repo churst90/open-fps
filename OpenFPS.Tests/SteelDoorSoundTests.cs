@@ -123,7 +123,7 @@ public class SteelDoorSoundTests
     }
 
     /// <summary>A mixer that records what it was asked to play, and nothing else.</summary>
-    private sealed class CapturingProvider : IAudioProvider
+    internal sealed class CapturingProvider : IAudioProvider
     {
         public readonly List<SpatialEmitter> Emitters = new();
         private readonly HashSet<int> _live = new();

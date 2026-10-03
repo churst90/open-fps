@@ -1132,6 +1132,7 @@ public class CommandHandler
             {
                 Character = SoundCharacter.Knock,
                 Position = position + new Vector3(0, 1.25f, 0) + forward * 0.3f,
+                OnBody = true, BodyOffset = new Vector3(0f, 1.25f, 0.3f),
                 LevelDb = Applause.SingleClapDb,
                 SynthKey = Applause.ClapKey,
                 DecaySeconds = 0.15f,

@@ -500,6 +500,8 @@ public class ClientAudioSystem
         _audio.UpdateListener(visualEyePos, listenerRotation, listenerVelocity, listenerRegionId);
         _audio.UpdateShelter(_state.ShelterFactor);
         WorldAudio.ListenerVehicleId = _state.RidingEntityId;
+        WorldAudio.SelfId = OwnEntityId;
+        WorldAudio.Self ??= () => (_state.Position, _state.Rotation);
         // The doors, the things to pick up and the cars to get into around you.
         _beacons.Update(world, visualEyePos, _now());
         // The lane lines, if you are the one driving.
