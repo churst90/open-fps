@@ -121,11 +121,11 @@ public static class PushBarDoor
     /// well-set closer (quiet) to a fast one onto bare steel.</summary>
     public static float OpenLevelDb(int variant) => (variant % Variants) switch
     {
-        0 => 96.2f, 1 => 97.2f, 2 => 98.5f, _ => 101.0f,
+        0 => 95.3f, 1 => 96.5f, 2 => 98.0f, _ => 101.5f,
     } - LevelCalibrationDb;
     public static float CloseLevelDb(int variant) => (variant % Variants) switch
     {
-        0 => 89.2f, 1 => 99.7f, 2 => 107.8f, _ => 115.4f,
+        0 => 89.2f, 1 => 99.7f, 2 => 107.8f, _ => 114.9f,
     } - LevelCalibrationDb;
 
     public static string Key(bool closing, int variant, float swingSeconds, float width, float height)
@@ -219,13 +219,17 @@ public static class PushBarDoor
     private const double PortStiffness = 2e7, ChassisPatch = 0.1;
     /// <summary>Plastic on steel: E* about 2.8 GPa on a 3 mm rib edge gives about 2e8 N/m^1.5; a plastic
     /// gives back about half its speed (0.5 s/m).</summary>
-    private const double PlasticLambda = 0.5;
+    private const double PlasticLambda = 0.25;
+    /// <summary>The pad rides its guide rails with a quarter of a millimetre of play either side: a loose bar,
+    /// which knocks on its rails when it is shoved and when it lands. A hand never pushes quite square: a
+    /// tenth of the push goes sideways, and a landing jolts it sideways by a fifth of the blow.</summary>
+    private const double GuidePlay = 0.00025, SidePush = 0.1, SideJolt = 0.2, RailGrease = 0.3;
     /// <summary>The case is not an empty sheet: the drive bar, cranks, springs and their grease touch its
     /// walls, which takes its ring within a few tenths of a second (a bare sheet's 0.005 rang on and on).</summary>
-    private const double MechanismLoss = 0.02;
+    private const double MechanismLoss = 0.01;
     /// <summary>The pad lands on its stops through a damped slider, both ways: one clack, not a rattle.
     /// Cody: "the bar release on the opening rattles too much", "it needs a shorter clack".</summary>
-    private const double ReturnDamping = 0.9;
+    private const double ReturnDamping = 0.5;
     private const double LinkStiffness = 1e6, LinkDamping = 80;
     /// <summary>The case's two end brackets across the leaf, and how far across its push acts.</summary>
     private const double MountNear = 0.3, MountFar = 0.9;
@@ -275,6 +279,10 @@ public static class PushBarDoor
         private readonly double[] caseHit, padHit, driveHit;
         private readonly AccelerationNoise padNoise, driveNoise, boltNoise, strikeNoise;
         private double driveBar, driveRate, lastBarRate, hissState, boltAccNow;
+        private double padSide, padSideRate, padSideAcc, sideSign = 1;
+        private double[] padSideHit = Array.Empty<double>(), railHit = Array.Empty<double>();
+        private AccelerationNoise padSideNoise = null!;
+        private Port padSidePort = null!;
         private readonly SmallRadiator slotSound;
         private readonly Port padPort, casePad, caseDrive2;
         private readonly HighPass[] skinHigh;
@@ -370,6 +378,10 @@ public static class PushBarDoor
             for (int i = 0; i < CaseAirHz.Length; i++) { airLoss[i] = CaseAirLoss; airMass[i] = 0.002; airGain[i] = SmallPlateGain(CaseSlotArea, 1); }
             caseAir = new Modes(CaseAirHz, airLoss, airMass, airGain, dt);
             padNoise = new AccelerationNoise(BarMass / PadRho, dt);
+            padSideNoise = new AccelerationNoise(BarMass / PadRho, dt);
+            padSideHit = padField.Point(); railHit = caseField.Point();
+            padSidePort = new Port(Math.Max(padField.PatchMass, 0.02), PortStiffness, padField.Impedance);
+            sideSign = rng.NextDouble() < 0.5 ? -1 : 1;
             driveNoise = new AccelerationNoise(DriveBarMass / 7850, dt);
             boltNoise = new AccelerationNoise(BoltMass / 7850, dt);
             strikeNoise = new AccelerationNoise(StrikeMass / 7850, dt);
@@ -649,7 +661,7 @@ public static class PushBarDoor
             // The pad's stops are on the case's thin wall and the pad is a thin pressing: each side of the
             // blow is a patch that gives and passes into its panel through the panel's impedance.
             double padAt = bar + padPort.X, padAtRate = barRate + padPort.V;
-            double fIn = BarStop(padAt - BarTravel - casePad.X, padAtRate - casePad.V, ReturnDamping);
+            double fIn = BarStop(padAt - BarTravel - casePad.X, padAtRate - casePad.V);
             double fOut = BarStop(casePad.X - padAt, casePad.V - padAtRate, ReturnDamping);
             double padDrive = padPort.Step(fOut - fIn, dt, out double padHost);
             barForce += padHost;
@@ -662,6 +674,20 @@ public static class PushBarDoor
             caseForce += caseHost2;
             Note("bar-bottom", fIn); Note("bar-back", fOut); Note("drive-stop", dIn + dOut);
             padField.Modes.Push(padHit, padDrive);
+
+            // The loose pad on its rails: pushed a little sideways by the hand and jolted sideways by every
+            // landing, it knocks across its play.
+            double side = SidePush * palm * sideSign + SideJolt * (fIn + fOut) * sideSign;
+            double sideAt = padSide + padSidePort.X, sideAtRate = padSideRate + padSidePort.V;
+            double guide = Contact(bumper, PlasticLambda, Math.Abs(sideAt) - GuidePlay, Math.Sign(sideAt) * sideAtRate);
+            // The rails are greased: a loose pad knocks once or twice, it does not chatter on.
+            double onPad = side - 2 * RailGrease * Math.Sqrt(1e4 * BarMass) * padSideRate;
+            double sideDrive = padSidePort.Step(-Math.Sign(sideAt) * guide, dt, out double sideHost);
+            onPad += sideHost;
+            padSideAcc = onPad / BarMass;
+            padSideRate += padSideAcc * dt; padSide += padSideRate * dt;
+            padField.Modes.Push(padSideHit, sideDrive);
+            Note("rail", guide);
             caseField.Modes.Push(caseHit, caseDrive);
             caseField.Modes.Push(driveHit, caseDrive2Force);
             // The walls pump the air inside; it answers at the case's own air modes.
@@ -714,7 +740,7 @@ public static class PushBarDoor
             double pLeaf = leaf.Step(), pFrame = frame.Step() + frameWall.Step(), pStrike = strike.Step() + strikeSound.Pressure(strikeBody.Acc);
             double barAcc = (barRate - lastBarRate) / dt; lastBarRate = barRate;
             double pLatch = latchSound.Pressure(latchCase.Acc) + boltNoise.Pressure(boltAccNow);
-            double pBar = padField.Modes.Step() + padNoise.Pressure(barAcc) + driveNoise.Pressure(driveAcc);
+            double pBar = padField.Modes.Step() + padNoise.Pressure(barAcc) + padSideNoise.Pressure(padSideAcc) + driveNoise.Pressure(driveAcc);
             double pCase = caseField.Modes.Step() + caseAir.Step();
             pStrike += strikeNoise.Pressure(strikeBody.Acc);
             // The closer's oil through its latch valve: turbulence, its pressure going as the flow cubed.
