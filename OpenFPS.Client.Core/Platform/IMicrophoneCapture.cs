@@ -22,6 +22,10 @@ public interface IMicrophoneCapture : IDisposable
     /// <summary>Raised on the capture thread with one encoded Opus packet. Handlers must be thread-safe.</summary>
     event Action<byte[]>? PacketReady;
 
+    /// <summary>Raised on the capture thread with what the microphone heard, 48 kHz mono, before it is
+    /// encoded: what the player's own room answers with (OwnVoiceRing). Handlers must be thread-safe.</summary>
+    event Action<float[]>? SamplesCaptured;
+
     /// <summary>Begins capturing. A no-op when unavailable or already capturing.</summary>
     void Start();
 
@@ -44,6 +48,7 @@ public sealed class NullMicrophoneCapture : IMicrophoneCapture
 
 #pragma warning disable CS0067 // Never raised: that is the point of this implementation.
     public event Action<byte[]>? PacketReady;
+    public event Action<float[]>? SamplesCaptured;
 #pragma warning restore CS0067
 
     public void Start() { }

@@ -30,6 +30,7 @@ public sealed class FmodMicrophoneCapture : IMicrophoneCapture
 
     /// <summary>Raised on the capture thread with each 20 ms Opus packet.</summary>
     public event Action<byte[]>? PacketReady;
+    public event Action<float[]>? SamplesCaptured;
 
     public bool IsCapturing => _capturing;
 
@@ -74,19 +75,23 @@ public sealed class FmodMicrophoneCapture : IMicrophoneCapture
             var frame = new short[FrameSamples];
             int filled = 0;
             var packet = new byte[1275];
+            var heard = new List<float>(1024);
 
             while (_capturing)
             {
                 read.Clear();
+                heard.Clear();
                 _audio.ReadRecording(read);
                 foreach (float s in resampler.Process(read))
                 {
+                    heard.Add(s);
                     frame[filled++] = (short)(Math.Clamp(s, -1f, 1f) * short.MaxValue);
                     if (filled < FrameSamples) continue;
                     filled = 0;
                     int len = encoder.Encode(frame.AsSpan(), FrameSamples, packet.AsSpan(), packet.Length);
                     if (len > 0) PacketReady?.Invoke(packet.AsSpan(0, len).ToArray());
                 }
+                if (heard.Count > 0) SamplesCaptured?.Invoke(heard.ToArray());
                 Thread.Sleep(10);
             }
         }

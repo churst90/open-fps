@@ -55,6 +55,7 @@ public sealed class VoiceCapture : IMicrophoneCapture
     /// The callback must be thread-safe.
     /// </summary>
     public event Action<byte[]>? PacketReady;
+    public event Action<float[]>? SamplesCaptured;
 
     public bool IsCapturing => _capturing;
 
@@ -120,6 +121,13 @@ public sealed class VoiceCapture : IMicrophoneCapture
     private void OnDataAvailable(object? sender, WaveInEventArgs e)
     {
         if (!_capturing || _encoder == null) return;
+        // What was heard, as it was heard, for the player's own room to answer (OwnVoiceRing).
+        if (SamplesCaptured != null && e.BytesRecorded >= 2)
+        {
+            var heard = new float[e.BytesRecorded / 2];
+            for (int i = 0; i < heard.Length; i++) heard[i] = BitConverter.ToInt16(e.Buffer, i * 2) / 32768f;
+            SamplesCaptured(heard);
+        }
 
         int offset = 0;
         while (offset < e.BytesRecorded)

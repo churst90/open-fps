@@ -464,6 +464,8 @@ public class FmodAudioProvider : IAudioProvider
         /// shares <see cref="EngineDsp"/> and <see cref="EngineHandle"/> with an engine because a
         /// voice is one or the other and never both, and one release path is one release path.</summary>
         public PhysicalVoiceState? MachineState;
+        /// <summary>A voice of the player's own room answering their microphone (OwnVoiceTap).</summary>
+        public OwnVoiceTap? OwnVoice;
 
         /// <summary>When this voice's position was last TRUE, seconds on <see cref="OpenFPS.Common.AudioClock"/>
         /// — the sample time carried by the emitter, not the moment it was handed over.
@@ -610,6 +612,16 @@ public class FmodAudioProvider : IAudioProvider
     private HashSet<int> _activeRegionIds = new();
 
     private FMOD.ChannelGroup _reflectionGroup;
+    /// <summary>
+    /// The player's own voice feeding their room's reverberation: a group at zero, so nothing of the voice
+    /// itself is heard, while the channel's sends to the room (which leave from its own fader, not the
+    /// group's) carry it. You already hear your own voice; a copy of it late would be a slap-back.
+    /// </summary>
+    private FMOD.ChannelGroup _ownVoiceRoomGroup;
+
+    /// <summary>The physical keys of the player's own voice: the room's reverberation fed from their mouth,
+    /// and a copy off one surface round them (ClientAudioSystem.UpdateOwnVoice).</summary>
+    public const string OwnVoiceRoomKey = "ownvoice:room", OwnVoiceCopyKey = "ownvoice:copy";
     /// <summary>One playing ambisonic ambience bed. Several can be live at once so one region's
     /// ambience can cross-fade into another's rather than cutting.</summary>
     private sealed class AmbientBed
@@ -913,6 +925,9 @@ public class FmodAudioProvider : IAudioProvider
             _system.createChannelGroup("Reflections", out _reflectionGroup);
             _system.getMasterChannelGroup(out var master);
             master.addGroup(_reflectionGroup);
+            _system.createChannelGroup("Own voice, into the room only", out _ownVoiceRoomGroup);
+            master.addGroup(_ownVoiceRoomGroup);
+            _ownVoiceRoomGroup.setVolume(0f);
             // Interface sounds have their own group so a world fade can leave them alone.
             _system.createChannelGroup("Interface", out _uiGroup);
             master.addGroup(_uiGroup);
@@ -2434,6 +2449,7 @@ public class FmodAudioProvider : IAudioProvider
         EngineEchoState? echoState = null;
         EngineTapState? tapState = null;
         PhysicalVoiceState? machineState = null;
+        OwnVoiceTap? ownVoice = null;
 
         if (emitter.IsGranular)
         {
@@ -2511,6 +2527,25 @@ public class FmodAudioProvider : IAudioProvider
             }
             channel.setMode(MODE._3D | Rolloff.Mode);
             echoState = echo;
+        }
+        else if (emitter.IsSynth && emitter.PhysicalKey.StartsWith("ownvoice:", StringComparison.Ordinal))
+        {
+            // The player's own microphone, read back at a delay: their room answering them. The room
+            // feed plays into a group at zero, so only its sends to the room are heard.
+            if (!_isInitialized) return;
+            _system.getSoftwareFormat(out int orate, out _, out _);
+            var tap = new OwnVoiceTap(OwnVoiceRing.Shared, emitter.EchoDelaySeconds, orate);
+            if (OwnVoiceProcessor.CreateDSP(_system, tap, out engineDsp, out engineHandle) != RESULT.OK) return;
+            engineDsp.setChannelFormat(0, 0, SPEAKERMODE.MONO);
+            if (emitter.PhysicalKey == OwnVoiceRoomKey) targetGroup = _ownVoiceRoomGroup;
+            if (_system.playDSP(engineDsp, targetGroup, true, out channel) != RESULT.OK)
+            {
+                engineDsp.release();
+                engineHandle.Free();
+                return;
+            }
+            channel.setMode(MODE._3D | Rolloff.Mode);
+            ownVoice = tap;
         }
         else if (emitter.IsSynth && !string.IsNullOrEmpty(emitter.PhysicalKey))
         {
@@ -2817,6 +2852,7 @@ public class FmodAudioProvider : IAudioProvider
                 SynthDsp = synthDsp, SynthHandle = synthHandle, SynthState = synthState,
                 EngineDsp = engineDsp, EngineHandle = engineHandle, EngineState = engineState, EchoState = echoState,
                 MachineState = machineState,
+                OwnVoice = ownVoice,
                 TapState = tapState,
                 Position = emitter.Position, ApparentPosition = emitter.ApparentPosition,
                 LastAttributeAt = emitter.PositionSampledAt > 0 ? emitter.PositionSampledAt : OpenFPS.Common.AudioClock.Now,
@@ -2942,6 +2978,11 @@ public class FmodAudioProvider : IAudioProvider
                     active.GranularState.Pitch = emitter.GranularPitch;
                     active.GranularState.PositionJitter = emitter.GranularPositionJitter;
                     active.GranularState.PitchJitter = emitter.GranularPitchJitter;
+                }
+                else if (emitter.IsSynth && active.OwnVoice != null)
+                {
+                    // A copy's path changes as the player moves; the tap slews to it.
+                    active.OwnVoice.TargetDelay = emitter.EchoDelaySeconds;
                 }
                 else if (emitter.IsSynth && active.MachineState != null)
                 {
@@ -3502,6 +3543,7 @@ public class FmodAudioProvider : IAudioProvider
             active.EngineDsp = default;
             active.EngineState = null;
             active.MachineState = null;
+            active.OwnVoice = null;
             active.EchoState = null;
             // A machine whose second outlet has gone is a machine heard through one voice again, and
             // the front tap slews back into it. Without this the intake would simply disappear — the
