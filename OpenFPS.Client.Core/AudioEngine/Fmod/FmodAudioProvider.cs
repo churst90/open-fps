@@ -1961,7 +1961,13 @@ public class FmodAudioProvider : IAudioProvider
             // Your own place's stage: the late tail alone, the early part being placed copies
             // (WorldAudioPlayer.QueueEarlyEchoes). A cabin keeps its whole response: nothing is placed
             // inside a vehicle.
-            kv.Value.State.TailOnly = kv.Key == _listenerRegionId && !ReferenceEquals(trace, cabin);
+            bool tailOnly = kv.Key == _listenerRegionId && !ReferenceEquals(trace, cabin);
+            // The late field's convolver, made here and not on the mixer thread, and only for a stage
+            // that plays the room you are in: it holds a ring of half a second per direction.
+            if (tailOnly && kv.Value.State.DiffuseLateConv == null && trace != null && kv.Value.State.SubFrame > 0
+                && DiffuseLateNoise.Block % kv.Value.State.SubFrame == 0)
+                kv.Value.State.DiffuseLateConv = trace.NewDiffuseLateConvolver(kv.Value.State.SubFrame);
+            kv.Value.State.TailOnly = tailOnly;
             // The trim is for reflections heard beside their direct sound. A cabin's response is not
             // that: nothing is placed inside a vehicle, so it is the whole of the room you sit in,
             // and it plays at its traced level. Trimmed with the rest, a bus ride is muffled, with the

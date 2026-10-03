@@ -99,6 +99,10 @@ internal sealed class TracedReverb : IDisposable
     /// <summary>The tail's directional part (SdmTailIr), from the fade-in to ~0.3 s; <see cref="Late"/>
     /// is then only the diffuse remainder after it. Until the axes are known, Late is all of it.</summary>
     public volatile SdmTailIr? LateSdm;
+    /// <summary>The late part after the directional one as a field, one independent noise per
+    /// direction (DiffuseLate), from the traces' averaged energy. Null without directions or with
+    /// <see cref="RawTail"/>: then <see cref="Late"/> is played as one channel.</summary>
+    public volatile DiffuseLateIr? DiffuseLate;
     private System.Numerics.Vector3 _ax1, _ax2, _ax3;
     private bool _axesKnown;
 
@@ -110,6 +114,9 @@ internal sealed class TracedReverb : IDisposable
     private SmoothTail? _smooth;
     /// <summary>The lab's A/B: play each trace's own samples, as before SmoothTail. Never set in the game.</summary>
     public static bool RawTail;
+    /// <summary>The lab's A/B: the late part as one channel through the velvet branches, as before
+    /// DiffuseLate. Never set in the game.</summary>
+    public static bool OneChannelLate;
     /// <summary>The lab: also publish each trace's raw parts (<see cref="RawLate"/>, <see cref="RawLateSdm"/>).</summary>
     public bool KeepRaw;
     public volatile LateTailIr? RawLate;
@@ -196,6 +203,9 @@ internal sealed class TracedReverb : IDisposable
     public const int ExtractReader = MaxReaders - 1;
     /// <summary>Most partitions a late part may have: the whole trace in blocks of the traced frame.</summary>
     public int MaxLatePartitions => IrSize / FrameSize + 1;
+    /// <summary>The late field's convolver for a stage of <paramref name="sub"/>-sample pieces (DiffuseLate).</summary>
+    public DiffuseLateConvolver NewDiffuseLateConvolver(int sub)
+        => new(sub, DiffuseLateNoise.PartitionsFor(SampleRate, IrSize), DiffuseBranch.Count, DiffuseLateNoise.StartFor(SampleRate));
     private IntPtr _extractEffect;
     private Phonon.IPLAudioBuffer _extractIn, _extractOut;
     private float[] _extractMono = Array.Empty<float>(), _extractInter = Array.Empty<float>();
@@ -357,7 +367,7 @@ internal sealed class TracedReverb : IDisposable
                             }
                             else rawLate = LateTailIr.Build(w, SampleRate, FrameSize, MaxLatePartitions);
                             RawLateSdm = rawSdm; RawLate = rawLate;
-                            if (RawTail) { LateSdm = rawSdm; Late = rawLate; }
+                            if (RawTail) { LateSdm = rawSdm; Late = rawLate; DiffuseLate = null; }
                         }
                         if (!RawTail)
                         {
@@ -369,10 +379,11 @@ internal sealed class TracedReverb : IDisposable
                             {
                                 var sdm = _smooth.BuildDirectional(FrameSize);
                                 FillLateShares(_smooth.Cov, sdm.LateShare);
+                                DiffuseLate = OneChannelLate ? null : _smooth.BuildDiffuseLate(DiffuseLateNoise.Shared(SampleRate, IrSize, DiffuseBranch.Count));
                                 LateSdm = sdm;
                                 Late = _smooth.BuildLate(FrameSize, MaxLatePartitions, afterDirectional: true);
                             }
-                            else Late = _smooth.BuildLate(FrameSize, MaxLatePartitions, afterDirectional: false);
+                            else { Late = _smooth.BuildLate(FrameSize, MaxLatePartitions, afterDirectional: false); DiffuseLate = null; }
                             LastSmoothMs = (System.Diagnostics.Stopwatch.GetTimestamp() - s0) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
                         }
                     }

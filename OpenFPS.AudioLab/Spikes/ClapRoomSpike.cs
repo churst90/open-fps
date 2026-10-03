@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Numerics;
 using System.Threading;
 using OpenFPS.Client.AudioEngine.Core;
@@ -17,7 +18,8 @@ namespace OpenFPS.Client.Core.AudioEngine.Fmod;
 /// flat, the reverb sends, the decorrelator, the master limiter, written to a WAV and read back.
 ///
 ///   --clap-room [out=path] [claps=4] [sound=click|<weapon id>] [dist=0.5] [bed] [tail=raw]
-///   tail=raw plays each trace's own samples, as before SmoothTail, for the A/B.
+///   tail=raw plays each trace's own samples, as before SmoothTail, for the A/B. late=velvet plays the
+///   late part as one channel through the velvet branches, as before DiffuseLate.
 ///   A weapon id (glock, ar15, akm, ...) fires that gun at its own level from dist metres; bed plays a
 ///   quiet 150 Hz hum at 2 m under it all and prints its level through each shot: the ear overload.
 ///
@@ -38,6 +40,7 @@ public static class ClapRoomSpike
         string outPath = Arg(args, "out") ?? "/tmp/openfps-clap-room.wav";
         int claps = int.TryParse(Arg(args, "claps"), out int c) ? c : 4;
         TracedReverb.RawTail = Arg(args, "tail") == "raw";
+        TracedReverb.OneChannelLate = Arg(args, "late") == "velvet";
 
         // The flat, in its own frame: 8.65 x 17.86 x 2.7 m, carpet on concrete, plaster over, plaster
         // walls and the brick outer wall, a sofa. The ear where /tp -14 -85 0.5 puts it.
@@ -207,6 +210,21 @@ public static class ClapRoomSpike
             at = on + sr;       // the next clap is 1.5 s on
         }
         if (found == 0) Console.WriteLine("  FAIL: no clap in the capture");
+        // The late part alone (300-900 ms, DiffuseLate's), the two ears' IACC, mean over the claps.
+        if (decays.Count > 0)
+        {
+            var sum = new double[5]; int nc = 0;
+            foreach (int on in decays)
+            {
+                int a = on + (int)(0.3 * sr), b = Math.Min(l.Length, on + (int)(0.9 * sr));
+                if (b - a < sr / 2) continue;
+                int j = 0;
+                foreach (var (lo, hi) in new[] { (150f, 300f), (300f, 600f), (600f, 1200f), (1200f, 2400f), (2400f, 4800f) })
+                    sum[j++] += Iacc(Band(l, a, b, lo, hi, sr), Band(r, a, b, lo, hi, sr));
+                nc++;
+            }
+            if (nc > 0) Console.WriteLine($"  late part 300-900 ms, IACC mean over the claps: {string.Join(" ", sum.Select(v => (v / nc).ToString("F2")))}");
+        }
         // The tail's decay per octave, both ears' energy from 50 ms on (the clap itself and the placed
         // early reflections left out), to just before the next clap: EDT (0 to -10 dB) and T20 (-5 to
         // -25), Schroeder, the mean over the claps.

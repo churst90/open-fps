@@ -91,6 +91,64 @@ public static class TailIaccSpike
                             + string.Join("  ", bands.Select(f => $"{f:F0}:{Iacc(Band(L, f), Band(R, f)):F2}")));
         }
         Console.WriteLine("head in a diffuse field:  125:0.95  250:0.80  500:0.40  1000:0.20  2000:<0.15  4000:<0.15");
+
+        // The late part as it is played now (DiffuseLate): each direction its own noise, through its
+        // head response; against the one-channel way (above). Per octave: the level at the ears against the
+        // field's own (dB), and IACC. Four headings averaged.
+        {
+            var bands = new[] { 125.0, 250, 500, 1000, 2000, 4000 };
+            var yaws = new[] { 0f, 23f, 45f, 90f };
+            double InBand(double f) => Band(noise, f).Sum(v => (double)v * v);
+            var inBand = bands.Select(InBand).ToArray();
+            void Report(string what, Func<float, (float[] L, float[] R)> render)
+            {
+                var lv = new double[bands.Length]; var ic = new double[bands.Length];
+                foreach (float yaw in yaws)
+                {
+                    var (L, R) = render(yaw);
+                    for (int i = 0; i < bands.Length; i++)
+                    {
+                        var bl = Band(L, bands[i]); var br = Band(R, bands[i]);
+                        lv[i] += (bl.Sum(v => (double)v * v) + br.Sum(v => (double)v * v)) / 2 / inBand[i] / yaws.Length;
+                        ic[i] += Iacc(bl, br) / yaws.Length;
+                    }
+                }
+                Console.WriteLine($"  {what,-34} level " + string.Join(" ", lv.Select(v => $"{10 * Math.Log10(v),5:F1}"))
+                                + "   IACC " + string.Join(" ", ic.Select(v => $"{v:F2}")));
+            }
+            Console.WriteLine("per octave 125-4000 Hz, four headings: level at the ears against the field's (dB), and IACC:");
+            Report("one channel, velvet (as it was)", yaw =>
+            {
+                var df = DiffuseTail.Create(ctx, Sub, ch, hrtf)!;
+                df.SetListenerRotation(System.Numerics.Quaternion.CreateFromYawPitchRoll(yaw * MathF.PI / 180f, 0f, 0f));
+                var L = new float[n]; var R = new float[n]; var inter = new float[Sub * ch];
+                for (int at = 0; at + Sub <= n; at += Sub)
+                {
+                    Array.Clear(inter);
+                    for (int k = 0; k < Sub; k++) inter[k * ch] = noise[at + k];
+                    df.RenderBinaural(inter, Sub, ch);
+                    for (int k = 0; k < Sub; k++) { L[at + k] = df.Stereo[k * 2] + df.Low[k]; R[at + k] = df.Stereo[k * 2 + 1] + df.Low[k]; }
+                }
+                df.Release();
+                return (L, R);
+            });
+            Report("the field (DiffuseLate, the game)", yaw =>
+            {
+                var df = DiffuseTail.Create(ctx, Sub, ch, hrtf)!;
+                df.SetListenerRotation(System.Numerics.Quaternion.CreateFromYawPitchRoll(yaw * MathF.PI / 180f, 0f, 0f));
+                var L = new float[n]; var R = new float[n];
+                var rs = Enumerable.Range(0, DiffuseBranch.Count).Select(i => new Random(300 + i)).ToArray();
+                for (int at = 0; at + Sub <= n; at += Sub)
+                {
+                    for (int d = 0; d < DiffuseBranch.Count; d++)
+                        for (int k = 0; k < Sub; k++) df.LateIn[d][k] = (float)(rs[d].NextDouble() * 2 - 1) * 0.3f;
+                    df.RenderLate(Sub);
+                    for (int k = 0; k < Sub; k++) { L[at + k] = df.Stereo[k * 2] + df.Low[k]; R[at + k] = df.Stereo[k * 2 + 1] + df.Low[k]; }
+                }
+                df.Release();
+                return (L, R);
+            });
+        }
         return 0;
     }
 

@@ -181,15 +181,18 @@ Done 2026-10-02 (see changes.md). Nothing left.
 ### 6. Acoustics still open
 - Listen to the smoothed tail (2026-10-02, `SmoothTail`) in a main-street lobby and stairwell:
   does it still pulse or step? `--clap-room tail=raw` and `--tail-steady` give the A/B in the lab.
-- The late tail rings at the ear: measured with `--tail-steady`, 400-900 ms, 11 % of bins 10 dB over
-  their local median and a spectral flatness of 0.18 (noise: 0.1 % and 0.56). That is three random
-  spectra multiplied: the tail's own, the twenty velvet branches summed through their head
-  responses (all filtered copies of one W), and the ear decorrelator's velvet. The directional
-  part, whose twenty directions are independent noise, measures 0.1 % and 0.40. Likely fix: give
-  the late part independent signals per direction too, so the branches need no velvet; costs a
-  partitioned convolution per direction, so measure the mixer first.
+- Listen to the late tail as a field (2026-10-03, `DiffuseLate`, branch tail-ring). The ring is gone
+  by measurement (400-900 ms at the ear: 10.4-10.7 % of bins 10 dB over their median and a
+  flatness of 0.18; now 0.08-0.12 % and 0.52-0.55). Two things to listen for:
+  - The late part is 4-6 dB fuller from 125 to 500 Hz. The old one lost that at two crossovers
+    (`--tail-iacc` levels). T20 in the flat rose 15 % at 125 Hz and 10 % at 500 Hz. Is it boomy?
+  - Above 2 kHz the ears are a little more alike in some headings (clap in the flat, 300-900 ms,
+    2.4-4.8 kHz: 0.26, was 0.11 with the ear velvet; noise over four headings: 0.13, was 0.12). If
+    the tail sounds narrow up high: a second, independent noise per ear above 1 kHz. Costs a second
+    set of noise (25 MB) and twice the late convolution.
 - The tail and the copies sit at -6 by ear (0 is physical). Cody is happy with that.
-- Below 120 Hz the tail is identical in both ears, so it sits in the head.
+- Below 120 Hz the tail of a room you are NOT in (the decorrelator path) is identical in both ears,
+  so it sits in the head. The room you are in no longer splits there (DiffuseLate): 0.91 at 125 Hz.
 - A voice's ground reflection flanges (heard 2026-09-27), though the physics says it is strong
   (Acta Acustica 2024, doi 10.1051/aacus/2024002). Voices have none until the missing part is found:
   the HRTF's torso, the talker's vertical radiation, or head and body movement. Next: a lab render
