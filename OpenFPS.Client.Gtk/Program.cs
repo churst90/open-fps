@@ -402,7 +402,8 @@ internal static partial class GtkClientProgram
         box.Append(_loginStatus);
 
         var server = LabeledEntry(box, "Server address", saved != null ? $"{saved.Host}:{saved.Port}" : "127.0.0.1:33288", false);
-        var user = LabeledEntry(box, "Username", saved?.Username ?? "", false);
+        // A new account starts blank: the saved account's name is not the one being made.
+        var user = LabeledEntry(box, "Username", register ? "" : saved?.Username ?? "", false);
         var pass = LabeledEntry(box, "Password", "", true);
         var remember = CheckButton.NewWithLabel("Remember password");
         remember.SetActive(saved?.RememberPassword ?? false);
@@ -440,8 +441,7 @@ internal static partial class GtkClientProgram
         {
             _suppressFocusSpeech = true;
             user.GrabFocus();
-            _speech.Speak($"Create an account on {(saved.Name.Length > 0 ? saved.Name : saved.Host)}. Username"
-                          + (saved.Username.Length > 0 ? $", {saved.Username}." : "."), true);
+            _speech.Speak($"Create an account on {(saved.Name.Length > 0 ? saved.Name : saved.Host)}. Username.", true);
         }
         else if (saved != null && saved.Username.Length > 0)
         {

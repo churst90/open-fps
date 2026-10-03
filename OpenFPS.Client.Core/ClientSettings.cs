@@ -54,7 +54,9 @@ public sealed class ClientSettings
 
     /// <summary>
     /// A server logged in to by hand is remembered, so Connect can go straight back: added if it is
-    /// new (and preferred if it is the only one), its password kept only if asked. Saved.
+    /// new (and preferred if it is the only one), its password kept only if asked. Saved. Each account is
+    /// its own entry: a second account on a saved server is a second entry under the same name, and which
+    /// one is preferred stays the player's choice.
     /// </summary>
     public void Remember(string address, string user, string pass, bool rememberPassword, string? path = null)
     {
@@ -62,7 +64,8 @@ public sealed class ClientSettings
         var s = Servers.FirstOrDefault(x => x.Host == host && x.Port == port && x.Username == user);
         if (s == null)
         {
-            s = new SavedServer { Name = host, Host = host, Port = port, Username = user };
+            string name = Servers.FirstOrDefault(x => x.Host == host && x.Port == port)?.Name ?? host;
+            s = new SavedServer { Name = name.Length > 0 ? name : host, Host = host, Port = port, Username = user };
             Servers.Add(s);
             if (Servers.Count == 1) s.Preferred = true;
         }

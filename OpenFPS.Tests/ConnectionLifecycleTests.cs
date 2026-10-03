@@ -145,6 +145,46 @@ public class ConnectionLifecycleTests
         finally { File.Delete(path); }
     }
 
+    [Fact]
+    public void ASecondAccountOnASavedServerIsItsOwnEntryAndThePreferredOneStays()
+    {
+        // Cody: "you will have 2 entries for the same server and 2 different accounts ... pick the one you
+        // want preferred."
+        string path = Path.Combine(Path.GetTempPath(), $"openfps-remember-{Guid.NewGuid():N}.json");
+        try
+        {
+            var settings = new ClientSettings();
+            settings.Remember("example.org:4000", "cody", "secret", rememberPassword: true, path);
+            settings.Servers[0].Name = "Home";
+            settings.Remember("example.org:4000", "second", "other", rememberPassword: true, path);
+            Assert.Equal(2, settings.Servers.Count);
+            Assert.Equal("cody", settings.Preferred!.Username);
+            Assert.Equal("secret", settings.Servers[0].Password);
+            Assert.Equal(("Home", "second", "other"), (settings.Servers[1].Name, settings.Servers[1].Username, settings.Servers[1].Password));
+            Assert.False(settings.Servers[1].Preferred);
+        }
+        finally { File.Delete(path); }
+    }
+
+    [Fact]
+    public void AnAccountThatCannotBeMadeLeavesNothingConnected()
+    {
+        // Cody: "when I clicked quit, it said disconnected from server. huh? if I couldn't create an
+        // account, why did it connect?"
+        using var server = new FakeServer();
+        var (session, speech, shell, network) = NewSession();
+        string? failed = null;
+        session.ConnectFailed += reason => failed = reason;
+        session.Connect($"127.0.0.1:{server.Port}", "taken", "pw", register: true);
+        Assert.True(Pump(() => failed != null, server, network, session), "the refusal was never heard");
+        Assert.Contains("taken", failed);
+        Assert.True(Pump(() => !network.IsConnected, server, network, session), "still connected after the refusal");
+        // Nothing to announce afterwards: the drop was ours.
+        for (int i = 0; i < 40; i++) { server.Poll(); network.Poll(); session.Tick(); Thread.Sleep(5); }
+        Assert.DoesNotContain(speech.Spoken, s => s.Contains("Disconnected"));
+        Assert.Empty(server.Logins);
+    }
+
     // ── Harness ─────────────────────────────────────────────────────────────────────────────────
 
     private static void LogIn(ClientGameSession session, FakeServer server, ClientNetworkService network)
@@ -208,6 +248,13 @@ public class ConnectionLifecycleTests
                 Logins.Add(login.Username);
                 peer.Send(MemoryPackSerializer.Serialize<IMessage>(new LoginResponse { Success = true, Username = login.Username }),
                           DeliveryMethod.ReliableOrdered);
+            }
+            else if (msg is RegisterRequest register)
+            {
+                // "taken" is already an account here; any other name is made.
+                bool made = register.Username != "taken";
+                peer.Send(MemoryPackSerializer.Serialize<IMessage>(new RegisterResponse
+                          { Success = made, Message = made ? "" : "That username is taken." }), DeliveryMethod.ReliableOrdered);
             }
             else if (msg is LogoutRequest) LoggedOut = true;
         }

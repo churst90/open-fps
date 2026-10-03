@@ -4,9 +4,10 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-03
 
-- Both clients: **Create account** is on the main menu, for the preferred server: with a username and
-  password saved for it, it asks for that account at once; otherwise the form opens for that server
-  with Create account first and the cursor in Username. **Open log folder** moved from the main menu
+- Both clients: **Create account** is on the main menu. It opens a blank form for the preferred server
+  with Create account first (it never uses the saved account there); a new account is saved as its own
+  entry for that server, and the preferred one stays as it was. A refused account or login now drops
+  the connection: it stayed up, and quitting announced "Disconnected from the server". **Open log folder** moved from the main menu
   into Settings (Cody: "viewing the log should be an option in the settings dialog").
 
 - Patio and automatic sliding doors are physical models in the game (`OpenFPS.Common/SlidingDoor.cs`,
