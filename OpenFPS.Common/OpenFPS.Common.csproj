@@ -10,6 +10,7 @@
     <PackageReference Include="Arch" Version="2.1.0" />
     <PackageReference Include="LiteNetLib" Version="1.2.0" />
     <PackageReference Include="MemoryPack" Version="1.21.4" />
+    <PackageReference Include="Serilog" Version="4.2.0" />
   </ItemGroup>
 
   <ItemGroup>

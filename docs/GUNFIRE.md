@@ -9,7 +9,7 @@ muzzle, behind it, downrange of the bullet, indoors and outdoors.
 
 ## What the game does now
 
-- The muzzle blast is fully synthetic (`WeaponSynth.MuzzleBlast`): a Friedlander wave plus filtered
+- The muzzle blast is fully synthetic (`WeaponSynth.MuzzleBlast`): a damped gas-bubble pulse plus filtered
   noise, about 0.1 s long. The world's reflections and reverb are added by the normal sound path.
 - There is no supersonic crack yet: a shot is heard as its report only. `Ballistics` has the
   geometry (when the crack arrives, how long its N-wave lasts, whether a round cracks at all). The
@@ -73,6 +73,33 @@ Envelope: positive phase 0.35-0.5 ms; down 10 dB in 0.75-1.5 ms, 20 dB in 2.5-3.
 First synthesis to spec (`--gun-spec`, OpenFPS.AudioLab/Spikes/GunSpecSpike.cs): a Friedlander
 pulse, a fast turbulent burst and a slower trail, one pole above 2.3-2.5 kHz. Matches 4-16 kHz within
 a few dB; about 8 dB short at 1-2 kHz, partly the modelled ground comb at 20 m.
+
+### The bubble model (2026-10-02)
+
+`--gun-fit` (OpenFPS.AudioLab/Spikes/GunFitSpike.cs) measures every weapon against its own gun's
+clean NIJ takes (90, 130, 180 degrees at 20 and 40 m) with the ruler in `ReportMeasure`, which
+matches `inbox/gunfire-357-2026-10-02/nij.py`. `grid` searches a weapon's values.
+
+- The blast is a second-order band-pass on the gas outflow. Critically damped it is the Friedlander
+  pulse; the guns are fitted at damping 0.2-0.6, which makes the recordings' deep negative phase
+  (0.4-1.0 of the peak) and their peak at 1 kHz.
+- The turbulent burst goes through the same band-pass. The trail (the grown plume) does not.
+- Two corners: the gas's eddies (1.2-4 kHz, per weapon) and the shock's rise (12 kHz).
+- The separate high-pass is gone; the band-pass's lower skirt does that job.
+- The shot is rendered at 48 kHz. It was 44.1 and played at 48, 9 per cent fast.
+- Every report carries the same energy (`WeaponSynth.ReportEnergyDb`, -39 dB re 1 s full scale),
+  the most the sharpest report can carry under full scale. A clap carries -26.5.
+
+Band error 125 Hz-8 kHz, dB rms, before and after: Glock 8.1 to 1.6, .45 6.7 to 1.9, AR-15 6.6 to
+1.4, AK 4.4 to 1.9; the new .357 1.3. 16 kHz renders 5-7 dB under the recordings.
+
+Per-position errors are larger (2-6 dB) because the ground bounce assumed in `Propagate` (both 1.5 m
+up, coefficient 0.8) puts notches at 500 Hz (20 m) and 2 kHz (40 m) that the recordings do not show.
+The NIJ heights are not published.
+
+The .357 (`revolver357`): 410 m/s, 164 dB, a cylinder-gap blast at -10 dB leading the muzzle by
+0.46 ms. It falls 10 dB in 1.22 ms against the Glock's 0.88 (recorded 1.13 and 0.80, pooled). The
+gap level is the lab demo's guess; the recordings show no separate early zero crossing.
 
 ## Plan
 

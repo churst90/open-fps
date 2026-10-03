@@ -42,6 +42,10 @@ public static class Loudness
     public const float Rifle762Db = 159f;
     public const float Pistol9mmDb = 160f;
     public const float Pistol45Db = 157f;
+    /// <summary>.357 Magnum from a 6-inch revolver: about 164 dB at the shooter, among the loudest
+    /// handguns there are. Louder than the 9 mm for its bigger charge, and the cylinder gap vents
+    /// beside the shooter's hand as well as at the muzzle.</summary>
+    public const float Magnum357Db = 164f;
     public const float Shotgun12GaugeDb = 160f;
 
     /// <summary>A round striking concrete a few metres away.</summary>
@@ -285,16 +289,32 @@ public static class Loudness
     }
 
     /// <summary>The muzzle blast level for a weapon, from its cartridge. Falls back to the 7.62
-    /// figure — audible and plausible — rather than to silence or to the ceiling.</summary>
-    public static float MuzzleBlastDb(WeaponDefinition w) => w.Cartridge switch
+    /// figure — audible and plausible — rather than to silence or to the ceiling, and says so once
+    /// per cartridge: a new weapon whose cartridge is missing here would otherwise play at 159 dB
+    /// with nothing to show it was guessed.</summary>
+    public static float MuzzleBlastDb(WeaponDefinition w)
     {
-        "5.56x45mm" => Rifle556Db,
-        "7.62x39mm" => Rifle762Db,
-        "9x19mm" => Pistol9mmDb,
-        ".45 ACP" => Pistol45Db,
-        "12 gauge 00 buck" => Shotgun12GaugeDb,
-        _ => Rifle762Db,
-    };
+        switch (w.Cartridge)
+        {
+            case "5.56x45mm": return Rifle556Db;
+            case "7.62x39mm": return Rifle762Db;
+            case "9x19mm": return Pistol9mmDb;
+            case ".45 ACP": return Pistol45Db;
+            case ".357 Magnum": return Magnum357Db;
+            case "12 gauge 00 buck": return Shotgun12GaugeDb;
+        }
+        string cartridge = w.Cartridge ?? "";
+        if (_unknownCartridges.TryAdd(cartridge, 0))
+            Serilog.Log.Warning("Loudness: no blast level for cartridge {Cartridge} (weapon {Weapon}); using {Db} dB",
+                                cartridge, w.Id, Rifle762Db);
+        return Rifle762Db;
+    }
+
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, byte> _unknownCartridges =
+        new(StringComparer.Ordinal);
+
+    /// <summary>The cartridges <see cref="MuzzleBlastDb"/> has had to guess for so far.</summary>
+    public static System.Collections.Generic.ICollection<string> UnknownCartridges => _unknownCartridges.Keys;
 
     /// <summary>
     /// The distance at which a source of this level drops to the quietest thing worth rendering —
