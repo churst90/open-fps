@@ -43,29 +43,28 @@ Suggested order. Research and file references for most of these: [docs/RESEARCH_
 - A draw key (Shift+R?). Today only `/draw`.
 
 **Sound**
-- Beacons:
-  - a rendered gain, +4 dB to start, set with `/beacons louder|quieter`;
-  - door range 12 m → 6 m with a 2 m fade at the edge;
-  - little or no reverb send;
-  - lift beacons up to 6 dB when a louder sound is near.
+- Beacons (2026-10-02: +4 dB, `/beacons louder|quieter`, a door's on its face at face height ringing
+  the room you are in; done). Still open from the proposal, not asked for: door range 12 m to 6 m,
+  and lifting beacons when a louder sound is near.
+- Door types (Cody, 2026-10-02): a knob or lever, a push bar, sliding. Proposed: the type from the
+  door itself (flats knob, fire and stair doors push bar, shop and lobby entrances sliding), each
+  moving as it does (a slider along its track, a push bar opened by walking into it and closed by
+  its closer), and each sound built from its mechanism and fitted to recordings fetched first.
+  Waiting on Cody: go ahead, and are shop doors automatic.
 - In a car seat, cranking carries sub-20 Hz pressure 13-16 dB over everything audible (the
   cylinders' slow swing through the panel path, whose low-pass passes DC). It costs the limiter
   headroom. A high-pass at the panel corner fixed it but took 6 dB of unheard rumble off the
   hatchback's motorway cabin level (`CabinTests`); decide with the cabin model, not the starter.
 
 **Gunfire and new synthesis** (see the research doc)
-1. Guns are not loud up close (Cody, 2026-10-02: "just a click"). Measured in the real mix at
-   0.5 m: a Glock is 4 dB under a hand clap. Three causes: `Loudness.Place` caps gain at 1 for
-   anything of 144 dB or more and flat to 40 m, so a shot in your hand equals one at 30 m; the blast
-   is 18 ms with its energy in 1-2 ms and normalised to peak (12 dB less energy than a clap); both
-   hit the same output ceiling. Its reverb is clap-sized for the same reason. Fix: normalise by
-   energy, a near field inside 40 m, and an ear-overload duck (everything else down for 0.3-1 s
-   past about 130 dB at the ear).
-2. A .357 revolver from the NIJ Ruger .357 set. The inbox video's shots clip and are unusable.
-   Demo to judge: `inbox/gunfire-357-2026-10-02/demo/`.
-   - Also move the lab-fitted pistol values into the game (positive phase, high-pass).
-   - The game's Glock is 6-12 dB heavy at 125-250 Hz.
-   - An unknown cartridge falls back to 159 dB without a warning.
+1. Guns up close (2026-10-02, unheard): the ear overload (the rest of the world gives way by the
+   excess over the ceiling) and the shots refitted to the NIJ spectra, energy-normalised, with the
+   .357. Still: in the mix a Glock at 0.5 m carries 3.7 dB LESS energy than a hand clap over 300 ms
+   (-35.7 against -32.0 dB), because one-shots are registered as 16-bit and a 1-2 ms shot cannot
+   carry more under full scale. A float path for registered sounds would let it run into the master
+   limiter instead. Decide by ear first. The cylinder gap has no visible zero crossing in the
+   recordings: judge it by ear. The shotgun has no recording.
+2. (merged into 1)
 3. Rain on surfaces, from materials and geometry.
 4. Wind at the ear and in foliage.
 5. Wet roads: tyres +4-7 dB above 2 kHz from a wetness state.

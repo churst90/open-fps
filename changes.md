@@ -4,6 +4,20 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-02
 
+- The ear overloads: a sound louder at the ear than the output can play makes every other voice
+  give way by the excess (`Loudness.OverloadDb`), held 50 ms and recovering over up to a second. The
+  shot, its echoes and the reverb are left alone. Measured with `--clap-room sound=glock dist=N bed`:
+  16 dB at 0.5 m, 9 at 10 m, 5 at 30 m, 2 at 100 m. Logged as `[OVERLOAD]`.
+- Gunshots refitted to the NIJ recordings: a band-passed gas outflow (critically damped it is the
+  Friedlander pulse), the lab's positive phases, energy normalisation, and a 9 % speed error gone
+  (rendered at 44.1 kHz, played at 48). Band error against each gun's own takes: Glock 8.1 to 1.6
+  dB, .45 6.7 to 1.9, AR-15 6.6 to 1.4, AK 4.4 to 1.9. A .357 revolver (`revolver357`, 164 dB, a
+  cylinder-gap blast 0.46 ms ahead). An unknown cartridge warns once. Renders in
+  inbox/gunfire-2026-10-02/.
+- Beacons: a door's hangs on its face toward you at face height and rings the room you are in; 4 dB
+  louder by default; `/beacons louder` and `quieter`, 2 dB a step, saved.
+- Parking: a door found open is left open, none is shut with a player within 2 m, and a rider gets
+  off a motorbike without car-door sounds. A rider had shut Brandt Court's front door on Cody.
 - The car starter, rebuilt over six rounds of renders (round 5 approved: "much much better"):
   - It is a machine, not a tone: the motor has its own inertia and drives the crank through a
     one-way clutch, which lets go as the crank springs off each compression and clacks picking it
