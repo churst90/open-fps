@@ -104,8 +104,11 @@ internal static class DoorPhysics
         private readonly double a, b;
         private readonly bool hinged; // pinned at x = 0 and free at x = a (a leaf); else simply supported
 
+        /// <param name="shearStiffness">A sandwich's core shear stiffness (shear modulus times depth), N/m:
+        /// above the frequency where the core gives, the plate bends more easily than its skins' spacing
+        /// says and its modes crowd together. Zero for a plate that is solid through.</param>
         public Plate(double a, double b, double d, double rhoH, double materialLoss, double maxHz,
-                     bool hingedLeaf, Random rng, double scatter)
+                     bool hingedLeaf, Random rng, double scatter, double shearStiffness = 0)
         {
             this.a = a; this.b = b; hinged = hingedLeaf;
             double root = Math.Sqrt(d / rhoH);
@@ -116,7 +119,9 @@ internal static class DoorPhysics
                 {
                     if (hingedLeaf && m == 1 && n == 0) continue; // that is the rigid rotation
                     double kx = Kx(m), ky = Ky(n);
-                    double f = root * (kx * kx + ky * ky) / (2 * Math.PI);
+                    double k2 = kx * kx + ky * ky;
+                    double f = root * k2 / (2 * Math.PI);
+                    if (shearStiffness > 0) f /= Math.Sqrt(1 + d * k2 / shearStiffness);
                     if (f > maxHz) break;
                     any = true;
                     // Wood is not uniform and a hung leaf's edges are not ideal; each door's modes land a

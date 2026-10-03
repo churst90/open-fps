@@ -91,6 +91,7 @@ string[] usage =
     "  --door-knock [out=] [seed=] [knocks=]         knuckles on a wooden door",
     "  --door-opening [out=]                         doors opening and shutting at a metre",
     "  --knob-door [out=] [seed=] [only=] [stems=]   the physical knob door: opens and shuts, hinges worn and oiled",
+    "  --pushbar-door [out=] [only=] [stems=]        the physical push-bar door: each character opening and shutting on its closer",
     "  --beacon-tones [out=]                         each beacon three times at its real period",
     "  --gun-spec                                    synthesized shots against the NIJ recordings",
     "  --gun-fit [nij=DIR] [tag=] [wavs] [grid]      every weapon's report against its own NIJ takes",
@@ -666,6 +667,44 @@ if (args.Contains("--knob-door"))
     }
     // Full scale in every file is this many pascals at a metre.
     double fullScalePa = OpenFPS.Common.KnobDoor.PascalsAtFullScale / gain;
+    Console.WriteLine($"full scale = {fullScalePa:F1} Pa at 1 m ({20 * Math.Log10(fullScalePa / 2e-5):F1} dB SPL peak)");
+    Environment.Exit(0);
+}
+
+if (args.Contains("--pushbar-door"))
+{
+    // --pushbar-door [out=DIR] [only=] [stems=DIR]: the physical push-bar door (OpenFPS.Common.PushBarDoor),
+    // each character opening and shutting on its closer, all on one gain.
+    string dir = args.FirstOrDefault(a => a.StartsWith("out=", StringComparison.Ordinal))?.Substring(4) ?? ".";
+    string? only = args.FirstOrDefault(a => a.StartsWith("only=", StringComparison.Ordinal))?.Substring(5);
+    OpenFPS.Common.PushBarDoor.StemFolder = args.FirstOrDefault(a => a.StartsWith("stems=", StringComparison.Ordinal))?.Substring(6);
+    System.IO.Directory.CreateDirectory(dir);
+    var made = new List<(string Name, float[] Pcm)>();
+    for (int v = 0; v < OpenFPS.Common.PushBarDoor.Variants; v++)
+        foreach (bool closing in new[] { false, true })
+        {
+            string name = $"pushbar-{(closing ? "close" : "open")}-v{v}";
+            if (only != null && !name.Contains(only)) continue;
+            var door = new OpenFPS.Common.PushBarDoor.Door { Variant = v, Seed = 1 + v };
+            var rep = new OpenFPS.Common.PushBarDoor.Report();
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var pcm = closing ? OpenFPS.Common.PushBarDoor.RenderClose(door, 48000, 1.4, rep)
+                              : OpenFPS.Common.PushBarDoor.RenderOpen(door, 48000, 1.4, rep);
+            made.Add((name, pcm));
+            Console.WriteLine($"{name}  ({pcm.Length / 48000.0:F2} s, rendered in {sw.ElapsedMilliseconds} ms)");
+            Console.WriteLine(rep);
+        }
+    float loudest = 1e-9f;
+    foreach (var (_, pcm) in made) foreach (float x in pcm) loudest = Math.Max(loudest, Math.Abs(x));
+    float gain = 0.89f / loudest;
+    foreach (var (name, pcm) in made)
+    {
+        using var w = new System.IO.BinaryWriter(System.IO.File.Create(System.IO.Path.Combine(dir, name + ".wav")));
+        w.Write("RIFF"u8); w.Write(36 + pcm.Length * 2); w.Write("WAVEfmt "u8); w.Write(16); w.Write((short)1); w.Write((short)1);
+        w.Write(48000); w.Write(96000); w.Write((short)2); w.Write((short)16); w.Write("data"u8); w.Write(pcm.Length * 2);
+        foreach (float x in pcm) w.Write((short)Math.Clamp(x * gain * 32767f, -32768f, 32767f));
+    }
+    double fullScalePa = OpenFPS.Common.PushBarDoor.PascalsAtFullScale / gain;
     Console.WriteLine($"full scale = {fullScalePa:F1} Pa at 1 m ({20 * Math.Log10(fullScalePa / 2e-5):F1} dB SPL peak)");
     Environment.Exit(0);
 }

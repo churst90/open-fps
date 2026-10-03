@@ -1,0 +1,548 @@
+using System;
+using System.Collections.Generic;
+using System.Text;
+using static OpenFPS.Common.DoorPhysics;
+
+namespace OpenFPS.Common;
+
+/// <summary>
+/// A steel push-bar door with a closer, simulated as the object, the way <see cref="KnobDoor"/> is.
+///
+/// The parts:
+///
+///   The LEAF: a hollow metal door, two 1.2 mm steel skins on welded steel stiffeners with its edge
+///   channels, about 46 kg. A steel sandwich is stiff for its weight, so it radiates well from about
+///   180 Hz up: that is its boom. Above about 1.5 kHz the core shears and the modes crowd together.
+///
+///   The PUSH BAR: an aluminium touchpad on a spring in a steel case screwed to the leaf. Pushing it
+///   moves it 14 mm; after 4 mm of play its linkage draws the latch bolt in. It bottoms on its case and,
+///   let go, springs back against its outer stop. Every one of those forces is square to the leaf's
+///   face, which is why a push bar is heard through the whole door. The push is also what opens the
+///   door: before the bolt is clear it presses the bolt's flat face on the strike, which is the drag
+///   and then the lurch.
+///
+///   The LATCH and STRIKE: a rim latch, a heavier bolt and spring than a knob door's, into a steel rim
+///   strike on the frame.
+///
+///   The FRAME: a pressed steel channel set in the wall, with three rubber silencers on its stop that
+///   the leaf lands on before it can reach the steel. A door whose silencers are gone lands steel on
+///   steel.
+///
+///   The CLOSER: a spring pushing oil through a valve. In its last ten degrees it is the latch valve's
+///   speed and its spring that carry the door into the latch, and the spring keeps pressing after.
+///
+/// Hinges are ball-bearing butts: no squeak, no friction worth having.
+/// </summary>
+public static class PushBarDoor
+{
+    /// <summary>One particular door. Its character is its silencers and how worn its bar is.</summary>
+    public sealed class Door
+    {
+        public float Width = 1.0f, Height = 2.1f;
+        public int Variant;
+        public int Seed = 1;
+    }
+
+    public const double PascalsAtFullScale = 20.0;
+
+    /// <summary>The lab's instrument: when set, each part's pressure alone is written here as PART.raw.</summary>
+    public static string? StemFolder;
+
+    public sealed class Report
+    {
+        public readonly List<string> Events = new();
+        public double PeakPascals;
+        public override string ToString()
+        {
+            var sb = new StringBuilder();
+            foreach (var e in Events) sb.AppendLine("    " + e);
+            sb.Append($"    peak {20 * Math.Log10(Math.Max(1e-9, PeakPascals) / 2e-5):F1} dB SPL at 1 m");
+            return sb.ToString();
+        }
+    }
+
+    public const int Variants = 4;
+
+    /// <summary>
+    /// Each character: how far its silencers stand proud of the stop, and how dead the push bar's stops
+    /// are. New silencers and nylon-cushioned stops; the same; silencers worn half away and the cushions
+    /// hard; no silencers at all and a bar that clanks.
+    /// </summary>
+    private static (double SilencerMm, double BarStopLambda) Character(int variant) => (variant % Variants) switch
+    {
+        0 => (2.5, 0.8),
+        1 => (2.5, 0.5),
+        2 => (1.2, 0.3),
+        _ => (0.0, 0.1),
+    };
+
+    /// <summary>Opening: push the bar, the bolt draws back, the door goes, the bar is let go at 40 degrees.</summary>
+    public static float[] RenderOpen(Door door, int sampleRate, double swingSeconds = 1.4, Report? report = null)
+    {
+        var sim = new Sim(door, sampleRate, report);
+        sim.StartShut();
+        sim.ScriptOpen(swingSeconds);
+        return sim.Output();
+    }
+
+    /// <summary>
+    /// Shutting on the closer: the last few degrees at the latch valve's speed (the whole swing would take
+    /// <paramref name="latchSwingSeconds"/>), into the latch and the silencers. It starts a few hundredths
+    /// of a second before the bolt touches, so the server sends it when the leaf arrives.
+    /// </summary>
+    public static float[] RenderClose(Door door, int sampleRate, double latchSwingSeconds = 1.4, Report? report = null)
+    {
+        var sim = new Sim(door, sampleRate, report);
+        sim.ScriptCloserLatch(Math.PI / 2 / latchSwingSeconds);
+        return sim.Output();
+    }
+
+    // ── The game ─────────────────────────────────────────────────────────────────────────────────
+
+    public const string KeyPrefix = "pushbardoor:";
+
+    /// <summary>Declared levels, dB at a metre: the model's own LAFmax less the knob door's calibration
+    /// (<see cref="KnobDoor.LevelCalibrationDb"/>), which is the same over-radiation. Pinned by
+    /// PushBarDoorTests.</summary>
+    public const float OpenLevelDb = 96f - KnobDoor.LevelCalibrationDb, CloseLevelDb = 112f - KnobDoor.LevelCalibrationDb;
+
+    public static string Key(bool closing, int variant, float swingSeconds, float width, float height)
+        => FormattableString.Invariant(
+            $"{KeyPrefix}{(closing ? "close" : "open")}:{((variant % Variants) + Variants) % Variants}:{(int)MathF.Round(swingSeconds * 100f)}:{(int)MathF.Round(width * 100f)}:{(int)MathF.Round(height * 100f)}");
+
+    public static bool TryParseKey(string? key, out bool closing, out Door door, out float swingSeconds)
+    {
+        closing = false; door = new Door(); swingSeconds = 1.4f;
+        if (key == null || !key.StartsWith(KeyPrefix, StringComparison.Ordinal)) return false;
+        var p = key.Substring(KeyPrefix.Length).Split(':');
+        if (p.Length != 5 || (p[0] != "open" && p[0] != "close")) return false;
+        if (!int.TryParse(p[1], out int v) || !int.TryParse(p[2], out int s) || !int.TryParse(p[3], out int w)
+            || !int.TryParse(p[4], out int h)) return false;
+        closing = p[0] == "close";
+        swingSeconds = Math.Clamp(s / 100f, 0.3f, 5f);
+        door = new Door { Variant = v, Seed = 1 + v, Width = Math.Clamp(w / 100f, 0.5f, 1.5f), Height = Math.Clamp(h / 100f, 1.5f, 3f) };
+        return true;
+    }
+
+    /// <summary>The sound a key names, peak one.</summary>
+    public static float[] RenderKey(string key, int sampleRate)
+    {
+        if (!TryParseKey(key, out bool closing, out var door, out float swing)) return new float[16];
+        float[] pcm = closing ? RenderClose(door, sampleRate, swing) : RenderOpen(door, sampleRate, swing);
+        float peak = 1e-9f;
+        foreach (float v in pcm) peak = MathF.Max(peak, MathF.Abs(v));
+        for (int i = 0; i < pcm.Length; i++) pcm[i] /= peak;
+        return pcm;
+    }
+
+    // ── Constants, each a property of a part ─────────────────────────────────────────────────────
+
+    // Leaf: 1.2 mm steel skins, 44 mm between their centres, on welded steel stiffeners (hat sections
+    // every 150 mm, the usual fire door core), edge channels and stiffeners 7 kg. Its shear stiffness
+    // is that of the stiffeners, about 500 MPa through the depth: a paper honeycomb (40 MPa) would put
+    // nearly every mode in the core's shear and crowd sixteen thousand of them under 14 kHz.
+    private const double SkinE = 200e9, SkinRho = 7850, SkinT = 0.0012, SkinSpacing = 0.0444, CoreShearModulus = 500e6;
+    private const double CoreAndChannelsKg = 7.0;
+    /// <summary>Steel skins bonded to their stiffeners: the adhesive takes a little; steel doors ring.</summary>
+    private const double LeafLoss = 0.008, MountingLoss = 0.005, LeafModeMaxHz = 10000;
+
+    // Silencers: neoprene domes 12 mm across, E about 5 MPa; three on the strike jamb.
+    private static readonly double[] SilencerHeights = { 0.35, 1.05, 1.75 };
+    private const double SilencerK = 6.9e5, SilencerLambda = 1.5;
+    private const double SteelContactK = 2e10, SteelContactLambda = 0.2;
+
+    // Rim latch: 30 g bolt, 16 mm throw, stiff spring.
+    private const double BoltMass = 0.03, Throw = 0.016, SpringPreload = 8, SpringRate = 500;
+    private const double LatchGap = 0.004, LatchHeight = 1.0;
+    private const double MetalContactK = 4e9, MetalContactLambda = 0.05, BoltStopLambda = 0.3;
+    /// <summary>The bolt's side give in its rim case, and the steel rim strike on the steel frame.</summary>
+    private const double BoltSideStiffness = 2e7, StrikeMass = 0.1, StrikeMountStiffness = 5e7;
+    private const double LatchCaseMass = 0.25, LatchCaseStiffness = 3e7, LatchCaseDamping = 2500, LatchCaseArea = 0.12 * 0.05;
+    private const double LatchBending = 0.1;   // a rim case is on the face: its blows are not in the leaf's plane
+
+    // The push bar: touchpad 0.35 kg, 14 mm travel, 4 mm play, return spring 20 N preload and 2 N/mm.
+    private const double BarMass = 0.35, BarTravel = 0.014, BarPlay = 0.004, BarPreload = 20, BarRate = 2000;
+    private const double LinkStiffness = 1e6, LinkDamping = 80;
+    /// <summary>The case's two end brackets across the leaf, and how far across its push acts.</summary>
+    private const double MountNear = 0.3, MountFar = 0.9;
+    // The case: a 0.75 m pressed steel channel between screws 0.25 m apart; the bar an aluminium extrusion.
+    private const double CaseLoss = 0.02, BarLoss = 0.02;
+
+    // The frame: pressed 1.5 mm steel channel, about 2e-7 m^4, 2.9 kg/m, anchored every 0.7 m; it radiates
+    // as its 0.1 m face.
+    private const double FrameEI = 40000, FrameKgPerM = 2.9, FrameSpan = 0.7, FrameFace = 0.1, FrameLoss = 0.01;
+
+    // The closer: size 3, 18 N m at the latch and rising 6 N m per radian open; its latch valve sets the
+    // speed in the last ten degrees.
+    private const double CloserTorque = 18, CloserRate = 6, CloserShoeX = 0.25;
+    private const double CloserOpening = 2;   // N m s: the check valve lets it open easily
+
+    private const double HandPushRamp = 0.15, HandPush = 90, HandHold = 40;
+
+    // ─────────────────────────────────────────────────────────────────────────────────────────────
+
+    private sealed class Sim
+    {
+        private readonly Door door;
+        private readonly int rate;
+        private readonly double dt;
+        private readonly Report? report;
+        private readonly Random rng;
+        private readonly double width, height, mass, inertia;
+        private readonly double silencer, barStopLambda, keeperPlay;
+        private double theta, omega;
+
+        private readonly Modes leaf, frame, caseModes, barModes, strike;
+        private readonly double[] latchShape, nearShape, farShape, shoeShape;
+        private readonly (double X, double Y, double Warp, bool Rubber, double[] Shape, double[] Frame)[] stops;
+        private readonly double[] frameAtLatch;
+        private readonly double rigidGain;
+        private double rigidLow;
+
+        private double bolt = Throw, boltRate, bar, barRate;
+        private bool boltInStrike = true;
+        private LuGre keeperFriction;
+        private readonly Mount boltSide, strikeBody, latchCase;
+        private readonly SmallRadiator strikeSound, latchSound;
+        private readonly double[] ones = { 1, 1, 1, 1, 1, 1, 1, 1 };
+
+        private double handForce;
+        private Func<double, (double Angle, double Rate)>? leafPath;
+        private double handK, handC;
+        private bool closerLatchValve;
+        private double latchDamping;
+        private double time;
+
+        private readonly List<float> outHi = new();
+        private readonly Dictionary<string, (double Start, double Peak, bool On)> contactLog = new();
+        private readonly double[] peaks = new double[7];
+        private static readonly string[] PeakNames = { "leaf", "piston", "frame", "strike", "latch", "bar", "case" };
+        private List<float>[]? stems;
+
+        public Sim(Door door, int sampleRate, Report? report)
+        {
+            this.door = door; this.report = report;
+            rate = sampleRate * Oversample; dt = 1.0 / rate;
+            rng = new Random(door.Seed);
+            width = door.Width; height = door.Height;
+            (double silencerMm, barStopLambda) = Character(door.Variant);
+            silencer = silencerMm / 1000;
+            // The strike is set so the bolt drops in as the silencers take the closer's push.
+            keeperPlay = Math.Max(silencer - 0.0004, 0.001);
+
+            double area = width * height;
+            mass = 2 * SkinT * SkinRho * area + CoreAndChannelsKg;
+            double rhoH = mass / area;
+            double d = 2 * SkinE * SkinT * (SkinSpacing / 2) * (SkinSpacing / 2) / (1 - Poisson * Poisson);
+            inertia = mass * width * width / 3;
+            var plate = new Plate(width, height, d, rhoH, LeafLoss + MountingLoss, LeafModeMaxHz, true, rng, 0.03,
+                                  CoreShearModulus * SkinSpacing);
+            leaf = new Modes(plate.Hz, plate.Loss, plate.Mass, plate.Gain, dt, plate.GainQuad);
+            rigidGain = Rho0 / (2 * Math.PI) * height * width * width / 2;
+            latchShape = plate.Shape(width - 0.03, LatchHeight);
+            nearShape = plate.Shape(MountNear, LatchHeight);
+            farShape = plate.Shape(MountFar, LatchHeight);
+            shoeShape = plate.Shape(CloserShoeX, height - 0.05);
+
+            frame = StripModes(dt, rng);
+            frameAtLatch = FrameShape(LatchHeight);
+            var list = new List<(double, double, double, bool, double[], double[])>();
+            foreach (double y in SilencerHeights)
+                list.Add((width, y, (rng.NextDouble() - 0.4) * 0.0008, true, plate.Shape(width, y), FrameShape(y)));
+            foreach (double x in new[] { 0.85 * width, 0.5 * width })
+                list.Add((x, height - 0.01, silencer + (rng.NextDouble() - 0.4) * 0.0008, false, plate.Shape(x, height - 0.01), FrameShape(height)));
+            stops = list.ToArray();
+
+            // The case: pressed steel channel 60 by 40 mm, 1.5 mm: about 3000 N m^2 and 2 kg/m, clamped
+            // 0.25 m between screws. The bar: aluminium extrusion, 2100 N m^2 and 0.58 kg/m, free 0.6 m.
+            caseModes = BeamModes(new[] { 4.730, 7.853, 10.996 }, 0.25, 3000, 2.0, CaseLoss, 0.75 * 0.06, dt);
+            barModes = BeamModes(new[] { 4.730, 7.853, 10.996, 14.137 }, 0.6, 2100, 0.58, BarLoss, 0.6 * 0.05, dt);
+            // The rim strike: a steel block on the frame; what rings is its lip.
+            strike = new Modes(new[] { Beam(0.012, 0.003, 7850, 200e9, 1.875) }, new[] { 0.03 }, new[] { 0.01 },
+                               new[] { SmallPlateGain(0.012 * 0.03, 0.6) }, dt);
+
+            boltSide = new Mount(BoltMass, BoltSideStiffness, 0.2);
+            strikeBody = new Mount(StrikeMass, StrikeMountStiffness, 0.15);
+            latchCase = new Mount(LatchCaseMass, LatchCaseStiffness, LatchCaseDamping / (2 * Math.Sqrt(LatchCaseStiffness * LatchCaseMass)));
+            strikeSound = new SmallRadiator(0.03 * 0.08, dt);
+            latchSound = new SmallRadiator(LatchCaseArea, dt);
+            keeperFriction = new LuGre { MuStatic = 0.4, MuSliding = 0.25, StribeckSpeed = 0.01, Viscous = 0 };
+
+            handK = 170 * inertia;
+            handC = 2 * 0.7 * Math.Sqrt(handK * inertia);
+        }
+
+        private static Modes BeamModes(double[] betaL, double span, double ei, double mu, double loss, double area, double dt)
+        {
+            var hz = new double[betaL.Length]; var m = new double[betaL.Length];
+            var l = new double[betaL.Length]; var g = new double[betaL.Length];
+            for (int i = 0; i < betaL.Length; i++)
+            {
+                hz[i] = betaL[i] * betaL[i] / (2 * Math.PI * span * span) * Math.Sqrt(ei / mu);
+                m[i] = 0.4 * mu * span; l[i] = loss;
+                g[i] = SmallPlateGain(area, 0.4 / (i + 1));
+            }
+            return new Modes(hz, l, m, g, dt);
+        }
+
+        /// <summary>The frame channel between anchors, as a clamped beam radiating as its face.</summary>
+        private static Modes StripModes(double dt, Random rng)
+        {
+            var hz = new List<double>(); var l = new List<double>(); var m = new List<double>(); var g = new List<double>();
+            for (int n = 1; n < 40; n++)
+            {
+                double bl = (n + 0.5) * Math.PI;
+                double f = bl * bl / (2 * Math.PI * FrameSpan * FrameSpan) * Math.Sqrt(FrameEI / FrameKgPerM);
+                if (f > 8000) break;
+                f *= 1 + 0.03 * (rng.NextDouble() * 2 - 1);
+                hz.Add(f); m.Add(FrameKgPerM * FrameSpan / 2); l.Add(FrameLoss);
+                double ka = 2 * Math.PI * f / C0 * FrameFace;
+                g.Add(Rho0 / (2 * Math.PI) * FrameFace * FrameSpan * 0.5 / n * ka / Math.Sqrt(1 + ka * ka));
+            }
+            return new Modes(hz, l, m, g, dt);
+        }
+
+        private double[] FrameShape(double y)
+        {
+            var s = new double[frame.N];
+            double local = (y % FrameSpan) / FrameSpan;
+            for (int n = 0; n < s.Length; n++) s[n] = Math.Sin((n + 1) * Math.PI * Math.Clamp(local, 0.05, 0.95));
+            return s;
+        }
+
+        // ── Scripts ──────────────────────────────────────────────────────────────────────────────
+
+        public void StartShut()
+        {
+            // Resting on its silencers under the closer's push, the bolt in the strike.
+            double rest = Math.Max(0, silencer - 0.00042);
+            theta = rest / width; omega = 0; bolt = Throw; boltInStrike = true;
+        }
+
+        public void ScriptOpen(double swingSeconds)
+        {
+            const double reach = 0.05;
+            double cleared = -1, released = -1, end = 10;
+            double wRate = Math.PI / 2 / swingSeconds;
+            while (time < end)
+            {
+                if (time > reach && cleared < 0)
+                    handForce = Math.Min(1, (time - reach) / HandPushRamp) * HandPush;
+                if (cleared < 0 && !boltInStrike && time > reach)
+                {
+                    cleared = time;
+                    Log($"{time * 1000:F0} ms  bolt clear; the door goes");
+                    double a0 = theta, t0 = time;
+                    leafPath = t => (a0 + wRate * (t - t0), wRate);
+                }
+                if (cleared > 0 && released < 0)
+                {
+                    // Walking through: the hand keeps the bar down and the door going at the server's pace.
+                    var (a, r) = leafPath!(time);
+                    double need = (handK * (a - theta) + handC * (r - omega) + CloserTorque + CloserRate * theta) / (0.5 * (MountNear + MountFar));
+                    handForce = Math.Clamp(need, HandHold, 200);
+                    if (theta > 40 * Math.PI / 180)
+                    {
+                        released = time; handForce = 0;
+                        Log($"{time * 1000:F0} ms  bar let go");
+                        end = time + 0.6;
+                    }
+                }
+                Tick(opening: true);
+            }
+        }
+
+        public void ScriptCloserLatch(double latchRate)
+        {
+            // A few degrees out, coming in at the latch valve's speed under the closer.
+            theta = (keeperPlay + (Throw - LatchGap) + 0.004) / width;
+            omega = -latchRate;
+            closerLatchValve = true;
+            latchDamping = (CloserTorque + CloserRate * theta) / latchRate;
+            bolt = Throw; boltInStrike = false;
+            double firstHit = -1, end = 3;
+            while (time < end)
+            {
+                if (firstHit < 0 && (contactLog.ContainsKey("bevel") || contactLog.ContainsKey("silencer")))
+                {
+                    firstHit = time; end = time + 0.9;
+                }
+                Tick(opening: false);
+            }
+        }
+
+        // ── One step ─────────────────────────────────────────────────────────────────────────────
+
+        private void Tick(bool opening)
+        {
+            double torque = 0, latchEdgeForce = 0, frameLatch = 0;
+
+            // The closer, always: its spring toward shut, its oil against motion.
+            double closer = -(CloserTorque + CloserRate * Math.Max(0, theta));
+            if (omega > 0) closer -= CloserOpening * omega;
+            else if (closerLatchValve) closer -= latchDamping * omega;
+            torque += closer;
+            leaf.Push(shoeShape, closer / CloserShoeX);
+
+            // The stop: silencers, then steel.
+            bool near = theta * width < 0.02;
+            double silencerSum = 0, steelSum = 0;
+            if (near)
+                for (int i = 0; i < stops.Length; i++)
+                {
+                    var s = stops[i];
+                    double pos = s.X * theta + leaf.At(s.Shape) + s.Warp;
+                    double vel = s.X * omega + leaf.RateAt(s.Shape);
+                    double f = 0;
+                    if (s.Rubber && silencer > 0)
+                    {
+                        double fr = Contact(SilencerK, SilencerLambda, silencer - pos, -vel);
+                        f += fr; silencerSum += fr;
+                    }
+                    double fs = Contact(SteelContactK, SteelContactLambda, -pos, -vel);
+                    f += fs; steelSum += fs;
+                    if (f > 0)
+                    {
+                        torque += f * s.X;
+                        leaf.Push(s.Shape, f);
+                        frame.Push(s.Frame, -f);
+                    }
+                }
+            Note("silencer", silencerSum);
+            Note("steel", steelSum);
+
+            // The latch, as on the knob door but heavier.
+            double latchW = near ? leaf.At(latchShape) : 0, latchWRate = near ? leaf.RateAt(latchShape) : 0;
+            double edge = width * theta + latchW, edgeRate = width * omega + latchWRate;
+            double boltForce = SpringPreload + SpringRate * (Throw - bolt);
+            double strikeForce = 0;
+            double across = edge + boltSide.X - strikeBody.X, acrossRate = edgeRate + boltSide.V - strikeBody.V;
+            if (bolt > LatchGap)
+            {
+                if (!boltInStrike)
+                {
+                    double over = (bolt - LatchGap) - (across - keeperPlay);
+                    if (across > keeperPlay && across < keeperPlay + Throw)
+                    {
+                        double fn = Contact(MetalContactK, MetalContactLambda, over / Math.Sqrt(2), (boltRate - acrossRate) / Math.Sqrt(2));
+                        double ft = 0.2 * fn * Math.Tanh((boltRate + acrossRate) / Math.Sqrt(2) / 0.002);
+                        double onBolt = (-fn - ft) / Math.Sqrt(2), sideways = (fn - ft) / Math.Sqrt(2);
+                        boltForce += onBolt;
+                        boltSide.F += sideways; strikeBody.F -= sideways;
+                        strikeForce -= onBolt;
+                        Note("bevel", fn);
+                    }
+                    else Note("bevel", 0);
+                    if (across <= keeperPlay) { boltInStrike = true; Log($"{time * 1000:F1} ms  bolt over the strike"); }
+                }
+                if (boltInStrike)
+                {
+                    double fk = Contact(MetalContactK, MetalContactLambda, across - keeperPlay, acrossRate);
+                    boltSide.F -= fk; strikeBody.F += fk;
+                    if (fk > 0) boltForce -= keeperFriction.Force(boltRate, fk, BoltMass, dt);
+                    else keeperFriction.Z = 0;
+                    Note("keeper", fk);
+                }
+            }
+            else if (boltInStrike) { Note("keeper", 0); boltInStrike = false; Log($"{time * 1000:F1} ms  bolt in"); }
+
+            // The push bar and its linkage.
+            double barForce = handForce - (BarPreload + BarRate * Math.Max(0, bar));
+            double caseForce = BarPreload + BarRate * Math.Max(0, bar);           // on the case, toward the leaf: opens
+            double ratio = Throw / (BarTravel - BarPlay);
+            double drawn = Math.Clamp((bar - BarPlay) * ratio, 0, Throw);
+            double linkDepth = bolt - (Throw - drawn);
+            double fLink = linkDepth > 0 && bar > BarPlay
+                ? Math.Max(0, LinkStiffness * linkDepth + LinkDamping * (boltRate + (drawn < Throw ? barRate * ratio : 0))) : 0;
+            boltForce -= fLink;
+            barForce -= fLink * ratio;
+            caseForce += fLink * ratio;
+            Note("link", fLink);
+            double fIn = Contact(MetalContactK, barStopLambda, bar - BarTravel, barRate);
+            double fOut = Contact(MetalContactK, barStopLambda, -bar, -barRate);
+            barForce += fOut - fIn;
+            caseForce += fIn - fOut;
+            Note("bar-bottom", fIn); Note("bar-back", fOut);
+            if (fIn + fOut > 0) { barModes.Push(ones, fIn + fOut); caseModes.Push(ones, fIn + fOut); }
+
+            // The case pushes the leaf at its two brackets, square to the face.
+            torque += caseForce * 0.5 * (MountNear + MountFar);
+            leaf.Push(nearShape, caseForce * 0.5); leaf.Push(farShape, caseForce * 0.5);
+
+            // The bolt's own stop in its rim case.
+            double fStop = Contact(MetalContactK, BoltStopLambda, bolt - Throw - latchCase.X, boltRate - latchCase.V);
+            boltForce -= fStop;
+            latchCase.F += fStop + fLink * 0.5;
+            Note("bolt-stop", fStop);
+
+            // Mounts into their hosts.
+            latchEdgeForce += boltSide.Reaction;
+            frameLatch += strikeBody.Reaction;
+            torque += latchEdgeForce * width;
+            leaf.Push(latchShape, latchEdgeForce + latchCase.Reaction * LatchBending);
+            if (strikeForce != 0) strike.Push(ones, strikeForce);
+            if (frameLatch != 0) frame.Push(frameAtLatch, frameLatch);
+
+            // A hand on the leaf only while a script holds a path and the bar is not doing the work.
+            // (Opening drives through the bar; closing is the closer's.)
+
+            // Air.
+            torque -= 0.5 * Rho0 * 1.2 * height * Math.Pow(width, 4) / 4 * omega * Math.Abs(omega);
+
+            // Rigid motion.
+            double alpha = torque / inertia;
+            omega += alpha * dt; theta += omega * dt;
+            boltRate += (boltForce - 0.5 * Math.Tanh(boltRate / 0.01)) / BoltMass * dt; bolt += boltRate * dt;
+            barRate += barForce / BarMass * dt; bar += barRate * dt;
+            boltSide.Step(dt); strikeBody.Step(dt); latchCase.Step(dt);
+
+            // Radiate.
+            double pLeaf = leaf.Step(), pFrame = frame.Step(), pStrike = strike.Step() + strikeSound.Pressure(strikeBody.Acc);
+            double pLatch = latchSound.Pressure(latchCase.Acc), pBar = barModes.Step(), pCase = caseModes.Step();
+            double corner = C0 / (2 * Math.PI * Math.Sqrt(width * height / Math.PI));
+            rigidLow += (1 - Math.Exp(-2 * Math.PI * corner * dt)) * (alpha - rigidLow);
+            double pRigid = rigidGain * rigidLow * Math.Clamp(1 - theta / 0.15, 0, 1);
+            double p = pLeaf + pFrame + pStrike + pLatch + pBar + pCase + pRigid;
+            double[] parts = { pLeaf, pRigid, pFrame, pStrike, pLatch, pBar, pCase };
+            for (int i = 0; i < parts.Length; i++) peaks[i] = Math.Max(peaks[i], Math.Abs(parts[i]));
+            if (StemFolder != null)
+            {
+                stems ??= new List<float>[parts.Length];
+                for (int i = 0; i < parts.Length; i++) (stems[i] ??= new List<float>()).Add((float)(parts[i] / PascalsAtFullScale));
+            }
+            outHi.Add((float)p);
+            time += dt;
+        }
+
+        private void Log(string s) => report?.Events.Add(s);
+
+        private void Note(string name, double force)
+        {
+            contactLog.TryGetValue(name, out var c);
+            if (force > 0)
+            {
+                if (!c.On) c = (time, force, true); else c.Peak = Math.Max(c.Peak, force);
+                contactLog[name] = c;
+            }
+            else if (c.On)
+            {
+                Log($"{c.Start * 1000:F1} ms  {name}: peak {c.Peak:F1} N, {(time - c.Start) * 1e6:F0} us");
+                contactLog[name] = (c.Start, c.Peak, false);
+            }
+        }
+
+        public float[] Output()
+        {
+            var sb = new StringBuilder("peaks by part, dB SPL at 1 m:");
+            for (int i = 0; i < peaks.Length; i++) sb.Append($" {PeakNames[i]} {20 * Math.Log10(Math.Max(1e-9, peaks[i]) / 2e-5):F0}");
+            Log(sb.ToString());
+            if (StemFolder != null && stems != null)
+                for (int i = 0; i < stems.Length; i++)
+                    using (var f = new System.IO.BinaryWriter(System.IO.File.Create(System.IO.Path.Combine(StemFolder, "pb-" + PeakNames[i] + ".raw"))))
+                        foreach (var v in stems[i]) f.Write(v);
+            var y = Decimate(outHi, rate, PascalsAtFullScale, out double peak);
+            if (report != null) report.PeakPascals = peak;
+            return y;
+        }
+    }
+}
