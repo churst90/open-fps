@@ -42,6 +42,10 @@ internal sealed class ParkState
     public bool Chirp;
     /// <summary>It was locked with a chirp, so it is unlocked with one.</summary>
     public bool Chirped;
+    /// <summary>Ridden, not sat in: two tyres and no doors to open or a fob to chirp.</summary>
+    public bool Ridden;
+    /// <summary>Somebody had the door open already when they got to it, so they leave it open.</summary>
+    public bool FoundOpen;
 }
 
 /// <summary>
@@ -190,11 +194,13 @@ public sealed partial class VehicleSystem
         }
         if (chosen == null) return;
         _doorsInUse.Add(chosen.Door.Id);
+        bool ridden = VehicleProfile.Presets.ContainsKey(v.Preset) && VehicleProfile.ByName(v.Preset).TyreCount <= 2;
         v.Park = new ParkState
         {
             Spot = chosen,
             Away = 60f + 180f * (float)_streetRng.NextDouble(),
-            Chirp = _streetRng.NextDouble() < 0.4,
+            Chirp = !ridden && _streetRng.NextDouble() < 0.4,
+            Ridden = ridden,
         };
         Log.Information("Street: {Name} will pull in {Ahead:F0} m ahead, by the door of entity {Door}, for {Away:F0} s.",
                         v.DisplayName, nearest, chosen.Door.Id, v.Park.Away);
@@ -236,7 +242,7 @@ public sealed partial class VehicleSystem
             case 0 when pk.Clock >= 1.2f:                      // key off
                 SetRunning(world, v, false); pk.Step++; break;
             case 1 when pk.Clock >= 2.2f:                      // door, out, door
-                Say(v, "car door", OccupancyService.CarDoorSounds(driverDoor, forward, 1.4f));
+                if (!pk.Ridden) Say(v, "car door", OccupancyService.CarDoorSounds(driverDoor, forward, 1.4f));
                 pk.Step++; break;
             case 2 when pk.Clock >= 3.0f:                      // standing beside it
                 pk.Driver = SpawnPerson(v, standBy, heading);
@@ -244,7 +250,7 @@ public sealed partial class VehicleSystem
                 pk.Leg = 0; pk.Step++; break;
             case 3:                                            // round the back of it to the door
                 if (pk.Chirp && pk.Clock >= 5.0f) { pk.Chirp = false; pk.Chirped = true; ChirpLock(world, v); }
-                if (Walk(world, pk, dt)) { DoorSystem.Set(world, pk.Spot.Door, true); pk.Clock = 0f; pk.Step++; }
+                if (Walk(world, pk, dt)) { pk.FoundOpen = !DoorSystem.Set(world, pk.Spot.Door, true); pk.Clock = 0f; pk.Step++; }
                 break;
             case 4 when pk.Clock >= 1.3f:                      // through it
                 pk.Route = new[] { pk.Spot.Inside }; pk.Leg = 0; pk.Step++; break;
@@ -252,11 +258,14 @@ public sealed partial class VehicleSystem
                 if (Walk(world, pk, dt)) { pk.Clock = 0f; pk.Step++; }
                 break;
             case 6 when pk.Clock >= 1.0f:                      // shut it behind them, and they are in
-                DoorSystem.Set(world, pk.Spot.Door, false);
+                // As they found it: a door somebody else had open stays open, and nobody shuts a
+                // door on a person standing in it. A rider once shut Brandt Court's front door on
+                // Cody, who had opened it, and the street went to the shut-door level (2026-10-02).
+                if (!pk.FoundOpen && !SomeoneAt(world, pk.Spot.Door)) DoorSystem.Set(world, pk.Spot.Door, false);
                 RemovePerson(v, pk);
                 pk.Clock = 0f; pk.Step++; break;
             case 7 when pk.Clock >= pk.Away:                   // and back out
-                DoorSystem.Set(world, pk.Spot.Door, true);
+                pk.FoundOpen = !DoorSystem.Set(world, pk.Spot.Door, true);
                 pk.Clock = 0f; pk.Step++; break;
             case 8 when pk.Clock >= 1.3f:
                 pk.Driver = SpawnPerson(v, pk.Spot.Inside, heading);
@@ -265,14 +274,14 @@ public sealed partial class VehicleSystem
                 if (Walk(world, pk, dt)) { pk.Clock = 0f; pk.Step++; }
                 break;
             case 10 when pk.Clock >= 0.8f:
-                DoorSystem.Set(world, pk.Spot.Door, false);
+                if (!pk.FoundOpen && !SomeoneAt(world, pk.Spot.Door)) DoorSystem.Set(world, pk.Spot.Door, false);
                 // Unlocked from the pavement as they come back to it: two short chirps.
                 if (pk.Chirped && v.Horn.Length > 0) Honk(v.MapId, world, v, new[] { 0.04f, 0.12f, 0.04f });
                 pk.Route = new[] { kerb, roadBehind, standBy }; pk.Leg = 0; pk.Step++; break;
             case 11:
                 if (Walk(world, pk, dt))
                 {
-                    Say(v, "car door", OccupancyService.CarDoorSounds(driverDoor, forward, 1.2f));
+                    if (!pk.Ridden) Say(v, "car door", OccupancyService.CarDoorSounds(driverDoor, forward, 1.2f));
                     pk.Clock = 0f; pk.Step++;
                 }
                 break;
@@ -369,4 +378,22 @@ public sealed partial class VehicleSystem
         if (v.Horn.Length == 0) return;
         Honk(v.MapId, world, v, new[] { 0.045f });
     }
+
+    /// <summary>Whether a player stands within reach of a door's doorway: it is not shut on them.</summary>
+    private static bool SomeoneAt(World world, Entity door)
+    {
+        if (!world.IsAlive(door) || !world.Has<Transform>(door)) return false;
+        var at = world.Get<Transform>(door).Position;
+        if (world.Has<DoorComponent>(door) && world.Get<DoorComponent>(door).Captured)
+            at = world.Get<DoorComponent>(door).ShutPosition;
+        bool near = false;
+        world.Query(new QueryDescription().WithAll<Transform, PlayerComponent>(), (ref Transform t) =>
+        {
+            if (!near && Vector3.Distance(t.Position, at) < DoorwayReach) near = true;
+        });
+        return near;
+    }
+
+    /// <summary>How near a person has to be to a doorway for it not to be shut on them, metres.</summary>
+    private const float DoorwayReach = 2.0f;
 }

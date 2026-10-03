@@ -16,7 +16,9 @@ namespace OpenFPS.Client.Core.AudioEngine.Fmod;
 /// A clap in Marlow Tower flat 01F, through the whole mixer: the listener's traced response of the
 /// flat, the reverb sends, the decorrelator, the master limiter, written to a WAV and read back.
 ///
-///   --clap-room [out=path] [claps=4]
+///   --clap-room [out=path] [claps=4] [sound=click|<weapon id>] [dist=0.5] [bed]
+///   A weapon id (glock, ar15, akm, ...) fires that gun at its own level from dist metres; bed plays a
+///   quiet 150 Hz hum at 2 m under it all and prints its level through each shot: the ear overload.
 ///
 /// Written because "a bathroom stall rather than a carpeted room" was read off captures full of city
 /// noise, where the room's answer could only be estimated. Here nothing else is playing. What it
@@ -62,7 +64,14 @@ public static class ClapRoomSpike
         Environment.SetEnvironmentVariable("OPENFPS_FMOD_WAV", outPath);
         var provider = new FmodAudioProvider();
         if (!provider.Initialize()) { Console.WriteLine("FAIL: provider init failed."); return 1; }
-        var placed = Loudness.Place(92f);
+        string? soundArg = Arg(args, "sound");
+        bool gun = soundArg != null && WeaponRegistry.TryGet(soundArg, out _);
+        float levelDb = 92f;
+        if (gun) { WeaponRegistry.TryGet(soundArg!, out var w); levelDb = Loudness.MuzzleBlastDb(w); }
+        if (float.TryParse(Arg(args, "dist"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float dist))
+            hands = ear + new Vector3(0f, -0.2f, MathF.Max(0.3f, dist));
+        bool bed = args.Contains("bed");
+        var placed = Loudness.Place(levelDb);
         var clapTimes = new List<double>();
         try
         {
@@ -70,8 +79,26 @@ public static class ClapRoomSpike
             // sound=click: one sample, flat in spectrum and with no resonance of its own, so whatever
             // rings in the answer is the room's (or the renderer's), not the clap's.
             float[] pcm;
-            if (Arg(args, "sound") == "click") { pcm = new float[TransientSynth.SampleRate / 10]; pcm[0] = 1f; }
+            if (soundArg == "click") { pcm = new float[TransientSynth.SampleRate / 10]; pcm[0] = 1f; }
+            else if (gun) { WeaponRegistry.TryGet(soundArg!, out var w); pcm = WeaponSynth.MuzzleBlast(WeaponProfile.From(w), 1); }
             else pcm = Applause.RenderClap(TransientSynth.SampleRate, 1);
+            if (bed)
+            {
+                var hum = Loudness.Place(60f);
+                var bedAt = ear + new Vector3(2f, 0f, 0f);
+                var tone = new float[TransientSynth.SampleRate * 8];
+                for (int i = 0; i < tone.Length; i++) tone[i] = 0.5f * MathF.Sin(MathF.Tau * 150f * i / TransientSynth.SampleRate);
+                provider.RegisterSynthesisedSound("synth:lab:hum", TransientSynth.ToPcm16(tone), TransientSynth.SampleRate);
+                provider.PlaySpatialSound(new SpatialEmitter
+                {
+                    EntityId = -50, SoundId = "synth:lab:hum", Mode = PlaybackMode.Single, Type = EmitterType.WorldLocked,
+                    Position = bedAt, ApparentPosition = bedAt, Volume = hum.Gain, MinDistance = hum.ReferenceDistance,
+                    Range = 200f, Pitch = 1f, ConeInside = 360f, ConeOutside = 360f, ConeOutsideVolume = 1f,
+                    EqLow = 1f, EqMid = 1f, EqHigh = 1f, ApertureFactor = 1f, Essential = true, TargetRegionId = RoomId,
+                    // An event, so it plays without a voice budget to grant it a slot (there is none here).
+                    IsEvent = true,
+                });
+            }
             provider.RegisterSynthesisedSound("synth:clap:lab", TransientSynth.ToPcm16(pcm), TransientSynth.SampleRate);
 
             var sw = System.Diagnostics.Stopwatch.StartNew();
@@ -98,9 +125,11 @@ public static class ClapRoomSpike
                         ConeInside = 360f, ConeOutside = 360f, ConeOutsideVolume = 1f,
                         EqLow = 1f, EqMid = 1f, EqHigh = 1f, ApertureFactor = 1f,
                         IsEvent = true, Essential = true, TargetRegionId = RoomId,
+                        LevelDb = levelDb, EffectiveDistance = Vector3.Distance(ear, hands),
                     });
                 }
                 provider.Update();
+                if (bed && t > 1.0 && t < 1.012) Console.WriteLine($"  bed playing: {provider.IsPlaying(-50)}");
                 if (clapTimes.Count > 0 && t - clapTimes[^1] is > 0.02 and < 0.035) Console.WriteLine($"  clap {clapTimes.Count} sends: {provider.ListSends(RoomId)}");
 
                 Thread.Sleep(10);
@@ -112,7 +141,35 @@ public static class ClapRoomSpike
         }
         finally { provider.Dispose(); TracedReverbSet.Dispose(); scene.Dispose(); Phonon.iplContextRelease(ref ctx); }
 
-        return Measure(outPath);
+        int result = Measure(outPath);
+        if (bed) BedThroughShots(outPath, clapTimes.Count);
+        return result;
+    }
+
+    /// <summary>The 150 Hz bed's level in 50 ms steps from just before each shot: how far the world gave
+    /// way and how it came back.</summary>
+    private static void BedThroughShots(string path, int shots)
+    {
+        var (l, r, sr) = ReadStereo(path);
+        double Tone(int from, int n)
+        {
+            double w = 2 * Math.PI * 150.0 / sr, c = 2 * Math.Cos(w), s1 = 0, s2 = 0;
+            for (int i = from; i < Math.Min(l.Length, from + n); i++) { double s0 = (l[i] + r[i]) * 0.5 + c * s1 - s2; s2 = s1; s1 = s0; }
+            return 10 * Math.Log10((s1 * s1 + s2 * s2 - c * s1 * s2) / (n * (double)n) + 1e-20);
+        }
+        int at = 0;
+        for (int k = 0; k < shots; k++)
+        {
+            int on = -1;
+            for (int i = at; i < l.Length; i++) if (Math.Abs(l[i]) + Math.Abs(r[i]) > 0.3f) { on = i; break; }
+            if (on < 0) break;
+            int step = sr / 20;
+            double before = Tone(Math.Max(0, on - 4 * step), 3 * step);
+            var line = new System.Text.StringBuilder($"  shot {k + 1}: bed relative to before, 50 ms steps:");
+            for (int j = 0; j < 24; j++) line.Append($" {Tone(on + j * step, step) - before:F0}");
+            Console.WriteLine(line);
+            at = on + sr;
+        }
     }
 
     /// <summary>Each clap in the WAV: found by its onset, then the room's answer against it.</summary>

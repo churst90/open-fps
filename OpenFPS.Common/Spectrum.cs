@@ -129,7 +129,7 @@ public static class Spectrum
     }
 
     /// <summary>Iterative radix-2 Cooley-Tukey, in place. Length must be a power of two.</summary>
-    private static void Fft(Complex[] a)
+    public static void Fft(Complex[] a)
     {
         int n = a.Length;
         for (int i = 1, j = 0; i < n; i++)

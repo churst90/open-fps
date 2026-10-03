@@ -105,6 +105,9 @@ public struct SpatialEmitter
     public float ApertureFactor;
     public float TransmissionBleed;
     public bool IsEvent; 
+    /// <summary>A one-off's declared level at a metre, dB SPL, or 0 when it has none. What the ear
+    /// overload is worked out from: see FmodAudioProvider.Overload.</summary>
+    public float LevelDb;
     public float ReflectionSpread; // (0-360) How wide the reflection feels in 3D space.
 
     // Granular Synthesis Parameters

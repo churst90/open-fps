@@ -207,6 +207,8 @@ Type these on the chat line. The `/` is optional and case does not matter.
 ### Beacons
 - `/beacons` (or `/beacon`): each kind of beacon, whether it is on, and why.
 - `/beacons door`: switch door beacons on or off. `/beacons door on` or `off` sets it.
+- `/beacons louder` and `/beacons quieter`: every beacon 2 dB up or down, saved. They start 4 dB above
+  a doorbell's level.
 
 ### Building
 - `/prefabs`: the objects that can be placed. `/composites`: saved groups of objects.
@@ -226,7 +228,8 @@ Beacons are sounds that mark useful things near you.
 | Item | One small ring that dies away | The 3 nearest within 10 m |
 | Vehicle | A low warm note, twice | The 2 nearest within 25 m |
 
-Each keeps sounding from the thing itself, every 1.6 seconds unless you choose otherwise.
+Each keeps sounding from the thing itself, every 1.6 seconds unless you choose otherwise. A door's
+hangs on the door at face height, on your side of it, and rings the room you are in.
 `/beacons every 3` sets the gap in seconds (half a second to ten), and it is saved. A beacon that is
 mostly hidden behind a wall is not played. Maps can also place beacons for exits, stairs and
 waypoints.
