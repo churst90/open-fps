@@ -258,7 +258,8 @@ public class DoorTypeTests : IDisposable
     /// door model already renders carry its sounds; the rest are silent until they are synthesised.
     /// </summary>
     [Theory]
-    [InlineData("door", "latch-retract+ swing | swing latch+")]
+    // The knob door is simulated whole: its close, swing and frame, goes with the swing.
+    [InlineData("door", "latch-retract+ swing | swing+ latch")]
     [InlineData("steel_door", "bar+ swing | closer latch+")]
     [InlineData("glass_pull_door", "pull+ swing | closer latch+")]
     [InlineData("patio_door", "latch-retract+ rollers stop | rollers latch+")]

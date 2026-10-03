@@ -150,6 +150,35 @@ public sealed class WorldAudioPlayer
     {
         _audio = audio;
         _acoustics = acoustics;
+        PrewarmKnobDoors();
+    }
+
+    /// <summary>
+    /// A knob door is a simulation that takes a few seconds of a core to render, far longer than a
+    /// first hearing waits (<see cref="MaxRenderLateness"/>), so the first door anyone opened would be
+    /// silent. Each character's opening and closing is rendered at start, in the background, four at a
+    /// time and openings first, for the prefab's width and the two the city scales it to (1.1 and
+    /// 1.4 m). A door of another size, or one closed from part open, still renders when first heard.
+    /// </summary>
+    private void PrewarmKnobDoors()
+    {
+        var keys = new List<string>();
+        foreach (bool closing in new[] { false, true })
+            foreach (float width in new[] { 1.1f, 1.4f, 0.9f })
+                for (int v = 0; v < KnobDoor.Variants; v++)
+                    keys.Add(KnobDoor.Key(closing, KnobDoor.Construction.HollowCore, v, 0.9f, 1f, width, 2.1f));
+        var gate = new System.Threading.SemaphoreSlim(4);
+        foreach (string key in keys)
+        {
+            string id = $"synth:{key}";
+            if (!_rendering.Add(id)) continue;
+            System.Threading.Tasks.Task.Run(async () =>
+            {
+                await gate.WaitAsync();
+                try { _rendered.Enqueue((id, KnobDoor.RenderKey(key, TransientSynth.SampleRate))); }
+                finally { gate.Release(); }
+            });
+        }
     }
 
     /// <summary>How many are waiting to be heard. Diagnostics.</summary>
@@ -944,6 +973,9 @@ public sealed class WorldAudioPlayer
         // A car door: a mechanism fitted to a recording, which one knock and one ring could not be.
         if (CarDoor.TryParseKey(sound.SynthKey, out bool closing))
             return CarDoor.Render(closing, TransientSynth.SampleRate, seed);
+        // A knob door: the door simulated, its character named in the key.
+        if (sound.SynthKey != null && sound.SynthKey.StartsWith(KnobDoor.KeyPrefix, StringComparison.Ordinal))
+            return KnobDoor.RenderKey(sound.SynthKey, TransientSynth.SampleRate);
 
         return TransientSynth.Render(sound, seed);
     }
@@ -1069,6 +1101,9 @@ public sealed class WorldAudioPlayer
         // A named model is its own identity — two shots from one rifle are one buffer.
         // A recording is one take: four seeds of it would be four identical buffers.
         if (Speech.TryParseKey(sound.SynthKey, out _)) return $"synth:{sound.SynthKey}";
+        // A knob door's key already names its door; four seeds of it would be four identical renders.
+        if (sound.SynthKey != null && sound.SynthKey.StartsWith(KnobDoor.KeyPrefix, StringComparison.Ordinal))
+            return $"synth:{sound.SynthKey}";
         if (!string.IsNullOrEmpty(sound.SynthKey)) return $"synth:{sound.SynthKey}:{seed & 3}";
         return $"synth:{sound.Character}:{hz}:{level}:{decay}:{noise}:{seed & 3}";
     }

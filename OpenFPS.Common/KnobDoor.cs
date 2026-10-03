@@ -119,6 +119,99 @@ public static class KnobDoor
     }
 
     // ---------------------------------------------------------------------------------------------
+    // The game: what the server names and the client renders.
+
+    public const string KeyPrefix = "knobdoor:";
+
+    /// <summary>How many characters of door there are. A door's id picks one, so the same door always
+    /// sounds like itself and the next one along does not.</summary>
+    public const int Variants = 4;
+
+    /// <summary>
+    /// Each character's hinge wear, top, middle, bottom. Most doors are not squeaky: an earlier round
+    /// put a creak on every door and the building sounded haunted. Three in four are oiled or barely
+    /// worn; one in four is worn enough to sing when it moves slowly.
+    /// </summary>
+    public static float[] WearOf(int variant) => (variant % Variants) switch
+    {
+        0 => new[] { 0f, 0f, 0f },
+        1 => new[] { 0.1f, 0.05f, 0.15f },
+        2 => new[] { 0.2f, 0.1f, 0.3f },
+        _ => new[] { 0.55f, 0.3f, 0.65f },
+    };
+
+    /// <summary>
+    /// The level the server declares, dB at a metre, as the model measures its own renders (LAFmax) less
+    /// <see cref="LevelCalibrationDb"/>. Pinned by KnobDoorTests, which renders and measures them.
+    /// </summary>
+    public const float OpenLevelDb = 83f - LevelCalibrationDb, CloseLevelDb = 116f - LevelCalibrationDb;
+
+    /// <summary>
+    /// The model radiates about 2.5 % of the leaf's energy as sound where real impacts manage a tenth of
+    /// that or less, so it reads 10 to 15 dB loud. Until the cause is found, the levels it declares to
+    /// the game come down by this much, all together, so opening stays where Cody wants it against
+    /// shutting (heard down a corridor of flats).
+    /// </summary>
+    public const float LevelCalibrationDb = 12f;
+
+    /// <summary>
+    /// A door's sound for the game. Opening is grip, turn, pull, swing over <paramref name="swingSeconds"/>;
+    /// closing follows the server's swing from <paramref name="fromOpenness"/> at its steady speed and
+    /// meets the frame at its end, so it is sent when the leaf starts back, not when it arrives.
+    /// </summary>
+    public static string Key(bool closing, Construction leaf, int variant, float swingSeconds, float fromOpenness,
+                             float width, float height)
+        => FormattableString.Invariant(
+            $"{KeyPrefix}{(closing ? "close" : "open")}:{(leaf == Construction.SolidWood ? "solid" : "hollow")}:{((variant % Variants) + Variants) % Variants}:{(int)MathF.Round(swingSeconds * 100f)}:{(int)MathF.Round(Math.Clamp(fromOpenness, 0f, 1f) * 10f)}:{(int)MathF.Round(width * 100f)}:{(int)MathF.Round(height * 100f)}");
+
+    public static bool TryParseKey(string? key, out bool closing, out Door door, out float swingSeconds, out float fromOpenness)
+    {
+        closing = false; door = new Door(); swingSeconds = 0.9f; fromOpenness = 1f;
+        if (key == null || !key.StartsWith(KeyPrefix, StringComparison.Ordinal)) return false;
+        var p = key.Substring(KeyPrefix.Length).Split(':');
+        if (p.Length != 7 || (p[0] != "open" && p[0] != "close")) return false;
+        if (!int.TryParse(p[2], out int variant) || !int.TryParse(p[3], out int swing) || !int.TryParse(p[4], out int from)
+            || !int.TryParse(p[5], out int w) || !int.TryParse(p[6], out int h)) return false;
+        closing = p[0] == "close";
+        swingSeconds = Math.Clamp(swing / 100f, 0.2f, 5f);
+        fromOpenness = Math.Clamp(from / 10f, 0.1f, 1f);
+        door = new Door
+        {
+            Leaf = p[1] == "solid" ? Construction.SolidWood : Construction.HollowCore,
+            Width = Math.Clamp(w / 100f, 0.4f, 1.5f),
+            Height = Math.Clamp(h / 100f, 1.5f, 3f),
+            HingeWear = WearOf(variant),
+            Seed = 1 + variant,
+        };
+        return true;
+    }
+
+    /// <summary>The sound a key names, peak one, as the client's renderer wants it.</summary>
+    public static float[] RenderKey(string key, int sampleRate)
+    {
+        if (!TryParseKey(key, out bool closing, out var door, out float swing, out float from)) return new float[16];
+        float[] pcm = closing ? RenderGameClose(door, sampleRate, swing, from) : RenderOpen(door, sampleRate, swing);
+        float peak = 1e-9f;
+        foreach (float v in pcm) peak = MathF.Max(peak, MathF.Abs(v));
+        for (int i = 0; i < pcm.Length; i++) pcm[i] /= peak;
+        return pcm;
+    }
+
+    /// <summary>
+    /// Closing as the server moves it: from <paramref name="fromOpenness"/> of 90 degrees, at the steady
+    /// speed that takes the whole swing <paramref name="swingSeconds"/>, the hand letting go in the last
+    /// few degrees. The frame is met at about the swing's end.
+    /// </summary>
+    public static float[] RenderGameClose(Door door, int sampleRate, double swingSeconds, double fromOpenness, Report? report = null)
+    {
+        var sim = new Sim(door, sampleRate, report);
+        double swing = Math.PI / 2;
+        sim.StartOpen(swing * fromOpenness);
+        sim.ScriptSteadyClose(swing / swingSeconds);
+        return sim.Output();
+    }
+
+    // ---------------------------------------------------------------------------------------------
     // Constants, each a property of a part. None is a level or a tone.
 
     private const double Rho0 = 1.21, C0 = 343.0;
@@ -899,6 +992,26 @@ public static class KnobDoor
                 }
                 if (firstHit < 0 && contactLog.TryGetValue("stop", out var st)) { firstHit = st.Start; end = firstHit + 0.9; }
                 if (released > 0 && time > released + 6) break;
+                Tick();
+            }
+        }
+
+        /// <summary>The server's swing: straight back at a steady rate, let go a few degrees out.</summary>
+        public void ScriptSteadyClose(double rate)
+        {
+            double a0 = theta, t0 = time, letGo = 3 * Math.PI / 180;
+            leafPath = t => (Math.Max(letGo, a0 - rate * (t - t0)), theta > letGo ? -rate : 0);
+            double firstHit = -1, end = 30;
+            bool released = false;
+            while (time < end)
+            {
+                if (!released && theta <= letGo + 0.002)
+                {
+                    released = true; holdingLeaf = false;
+                    Log($"{time * 1000:F0} ms  let go at {theta * 180 / Math.PI:F1} deg, edge {-omega * width:F2} m/s");
+                }
+                if (firstHit < 0 && contactLog.TryGetValue("stop", out var st)) { firstHit = st.Start; end = firstHit + 0.8; }
+                if (time > t0 + 8) break;
                 Tick();
             }
         }

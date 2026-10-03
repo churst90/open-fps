@@ -211,6 +211,10 @@ public sealed class DoorSystem
         {
             if (door.Powered) { Emit(heard, entity, kind, DoorEvents.MotorStart, none); Emit(heard, entity, kind, DoorEvents.Rollers, none); }
             else if (door.Slides) Emit(heard, entity, kind, DoorEvents.Rollers, none);
+            else if (kind == DoorKind.Hinged && !door.SelfClosing)
+                // The knob door's whole close, swing and frame, is one simulation sent as it starts
+                // back: it meets the frame at the end of the swing, when the leaf does.
+                Emit(heard, entity, kind, DoorEvents.Swing, heard == null ? none : KnobDoorSound(world, entity, door, closing: true));
             else Emit(heard, entity, kind, door.SelfClosing ? DoorEvents.Closer : DoorEvents.Swing, none);
         }
 
@@ -222,7 +226,7 @@ public sealed class DoorSystem
                 float edge = door.Slides ? DoorAcoustics.EdgeSpeed(width, 1f, seconds)
                                          : DoorAcoustics.EdgeSpeed(width, door.SwingRadians, seconds);
                 Emit(heard, entity, kind, door.Powered ? DoorEvents.Shut : DoorEvents.Latch,
-                     heard == null ? none : Closing(world, entity, door, edge));
+                     heard == null || kind == DoorKind.Hinged ? none : Closing(world, entity, door, edge));
                 door.SelfClosing = false;
             }
             else if (door.Openness >= 1f && door.Slides)
@@ -261,6 +265,9 @@ public sealed class DoorSystem
                     break;
                 case DoorKind.GlassPull:
                     Emit(heard, entity, kind, DoorEvents.Pull, opening);
+                    break;
+                case DoorKind.Hinged:
+                    Emit(heard, entity, kind, DoorEvents.LatchRetract, KnobDoorSound(world, entity, door, closing: false));
                     break;
                 default:
                     Emit(heard, entity, kind, DoorEvents.LatchRetract, opening);
@@ -512,6 +519,33 @@ public sealed class DoorSystem
         var transients = new List<TransientSound>(sounds.Count);
         foreach (var sound in sounds) transients.Add(sound.ToTransient());
         return transients;
+    }
+
+    /// <summary>
+    /// The knob door as a physical model (<see cref="KnobDoor"/>): the server names it, the client
+    /// renders it. The door's id picks its character, so each door keeps its own hinges.
+    /// </summary>
+    private static IReadOnlyList<TransientSound> KnobDoorSound(World world, Entity entity, in DoorComponent door, bool closing)
+    {
+        var size = world.Has<ColliderComponent>(entity)
+            ? world.Get<ColliderComponent>(entity).Size
+            : new Vector3(0.9f, 2.1f, 0.05f);
+        var transform = world.Get<Transform>(entity);
+        var latchEdge = transform.Position
+                      + Vector3.Transform(new Vector3(size.X * 0.5f * -door.HingeSide, 0f, 0f), transform.Rotation);
+        // Wooden knob doors are interior doors, and interior doors are hollow-core.
+        string key = KnobDoor.Key(closing, KnobDoor.Construction.HollowCore, entity.Id, door.SwingSeconds,
+                                  closing ? door.Openness : 1f, size.X, size.Y);
+        return new[]
+        {
+            new TransientSound
+            {
+                Character = SoundCharacter.Knock, Position = latchEdge, Hz = 500f, Noisiness = 1f,
+                LevelDb = closing ? KnobDoor.CloseLevelDb : KnobDoor.OpenLevelDb,
+                DecaySeconds = closing ? door.SwingSeconds * door.Openness + 0.8f : door.SwingSeconds + 0.85f,
+                SynthKey = key,
+            },
+        };
     }
 
     /// <summary>What fills a hollow door between its skins, kg/m^3: kraft honeycomb or mineral core,
