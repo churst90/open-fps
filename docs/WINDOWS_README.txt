@@ -14,9 +14,10 @@ First connection
 1. Main menu, Connect. With no server saved it opens Saved Servers; choose Add.
 2. Name: anything. Server address: host:port as you were given it, for example
    example.com:33288. Username and password: the account you want.
-3. Save. If you have no account yet, choose Create account on the main menu: it opens the form
+3. Save. If you have no account yet, choose Create account on the main menu: it opens a blank form
    for your preferred server with Create account first. Type the username and password you want and
-   press Enter. It creates the account and logs you in. If you have an account, choose Connect.
+   press Enter. It creates the account, logs you in, and saves it as its own entry for that server.
+   If you have an account, choose Connect.
 4. Tick "Remember password" and later runs go straight in from Connect.
 
 In game

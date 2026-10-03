@@ -84,9 +84,9 @@ internal static partial class GtkClientProgram
     }
 
     /// <summary>
-    /// Create account goes to the preferred server too. With a username and password saved for it, it asks
-    /// the server for that account straight away; otherwise it opens the form for that server with Create
-    /// account first, asking for a username and password. With no server saved it opens the list.
+    /// Create account makes a new account on the preferred server: the form for that server, blank, with
+    /// Create account first. The saved account there is neither used nor touched; a new account is saved
+    /// as its own entry once it is made. With no server saved it opens the list.
     /// </summary>
     private static void CreateAccountPreferred()
     {
@@ -95,12 +95,6 @@ internal static partial class GtkClientProgram
         {
             _speech.Speak("No preferred server yet. Add one in Saved Servers.", true);
             ShowServers();
-            return;
-        }
-        if (server.RememberPassword && server.Password.Length > 0 && server.Username.Length > 0)
-        {
-            _speech.Speak($"Creating the account {server.Username} on {(server.Name.Length > 0 ? server.Name : server.Host)}.", true);
-            _session.Connect($"{server.Host}:{server.Port}", server.Username, server.Password, register: true);
             return;
         }
         ShowLoginDialog(server, register: true);

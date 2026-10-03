@@ -76,9 +76,9 @@ public sealed class MenuWindow : Form
         ConnectTo(server);
     }
 
-    /// <summary>Create account goes to the preferred server too: straight away with a username and password
-    /// saved for it, otherwise the form for that server with Create account first. With none saved yet it
-    /// opens the list to add one.</summary>
+    /// <summary>Create account makes a new account on the preferred server: the form for that server, blank,
+    /// with Create account first. The saved account there is neither used nor touched; a new account is
+    /// saved as its own entry once it is made. With none saved yet it opens the list to add one.</summary>
     private void CreateAccountPreferred()
     {
         var server = _settings.Preferred;
@@ -86,13 +86,6 @@ public sealed class MenuWindow : Form
         {
             _speech.Speak("No preferred server yet. Add one in Saved Servers.", true);
             ShowServers();
-            return;
-        }
-        if (server.RememberPassword && server.Password.Length > 0 && server.Username.Length > 0)
-        {
-            _pending = null;   // already saved: nothing to remember afterwards
-            _speech.Speak($"Creating the account {server.Username} on {(server.Name.Length > 0 ? server.Name : server.Host)}.", true);
-            _services.Connect($"{server.Host}:{server.Port}", server.Username, server.Password, true);
             return;
         }
         ShowLoginForm(server, register: true);
@@ -121,7 +114,8 @@ public sealed class MenuWindow : Form
         // The last outcome, in a field that can be focused and re-read rather than speech gone by.
         var status = Field(layout, "Status", "No messages.", readOnly: true);
         var server = Field(layout, "Server address", saved != null ? $"{saved.Host}:{saved.Port}" : "127.0.0.1:33288");
-        var user = Field(layout, "Username", saved?.Username ?? "");
+        // A new account starts blank: the saved account's name is not the one being made.
+        var user = Field(layout, "Username", register ? "" : saved?.Username ?? "");
         var pass = Field(layout, "Password", "", password: true);
         var remember = Check(layout, "Remember password", saved?.RememberPassword ?? false);
 

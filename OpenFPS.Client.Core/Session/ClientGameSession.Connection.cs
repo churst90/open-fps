@@ -132,6 +132,9 @@ public sealed partial class ClientGameSession
         string reason = $"Could not create the account. {reg.Message}";
         _speech.Speak(reason, interrupt: true);
         _link = LinkState.Idle;
+        // Nothing is logged in, so nothing stays connected. (It did, and quitting afterwards announced
+        // "Disconnected from the server" for a connection the player never had.)
+        DropConnection();
         ConnectFailed?.Invoke(reason);
     }
 
@@ -146,7 +149,7 @@ public sealed partial class ClientGameSession
         // Rejected while trying to get back in (a new build on the server, a changed password):
         // trying again cannot help, so back to the menu with the reason already said.
         if (_link == LinkState.Reconnecting) GiveUpReconnecting(speak: false);
-        else _link = LinkState.Idle;
+        else { _link = LinkState.Idle; DropConnection(); }
     }
 
     private void OnConnectFailed(string reason)
