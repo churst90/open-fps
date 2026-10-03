@@ -7,7 +7,9 @@ Recent work, newest first. `git log` has the rest.
 - Both clients: **Create account** is on the main menu. It opens a blank form for the preferred server
   with Create account first (it never uses the saved account there); a new account is saved as its own
   entry for that server, and the preferred one stays as it was. A refused account or login now drops
-  the connection: it stayed up, and quitting announced "Disconnected from the server". **Open log folder** moved from the main menu
+  the connection: it stayed up, and quitting announced "Disconnected from the server". The Create
+  Account form has only Create account and Cancel, says the 8-character password rule, and on a
+  refusal puts the cursor on the status line (on Username, Orca read the field over the reason). **Open log folder** moved from the main menu
   into Settings (Cody: "viewing the log should be an option in the settings dialog").
 
 - Patio and automatic sliding doors are physical models in the game (`OpenFPS.Common/SlidingDoor.cs`,
