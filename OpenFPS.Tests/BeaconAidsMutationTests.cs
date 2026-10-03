@@ -161,7 +161,11 @@ public class BeaconAidsMutationTests
 
     private static readonly Vector3 Ear = new(0f, 1.6f, 0f);
 
-    private static bool From(SpatialEmitter e, Vector3 at) => Vector3.Distance(e.Position, at) < 1e-3f;
+    /// <summary>Blipped from this thing: at it, or for a door on its face at face height (in plan within
+    /// its half-thickness and a little of where it stands).</summary>
+    private static bool From(SpatialEmitter e, Vector3 at)
+        => Vector3.Distance(e.Position, at) < 1e-3f
+        || Vector2.Distance(new Vector2(e.Position.X, e.Position.Z), new Vector2(at.X, at.Z)) < 0.3f;
 
     // ── When ────────────────────────────────────────────────────────────────────────────────
 
@@ -284,8 +288,10 @@ public class BeaconAidsMutationTests
             Assert.True(e.IsEvent);
             Assert.Equal(PlaybackMode.Single, e.Mode);
             Assert.Equal("SYNTH/beacon_door_chime", e.SoundId);
-            Assert.Equal(door, e.ApparentPosition);
-            Assert.Equal(Vector3.Distance(Ear, door), e.EffectiveDistance, 4);
+            // A door's blip hangs on its face toward you at face height (Cody, 2026-10-02).
+            Assert.True(From(e, door), $"blipped from {e.ApparentPosition}");
+            Assert.Equal(e.Position, e.ApparentPosition);
+            Assert.Equal(Vector3.Distance(Ear, e.Position), e.EffectiveDistance, 4);
             Assert.Equal(0f, e.Occlusion);
             Assert.Equal(1f, e.ApertureFactor);
             Assert.Equal(0f, e.TransmissionBleed);
@@ -423,7 +429,8 @@ public class BeaconAidsMutationTests
         var world = Fixed(things);
         var acoustics = new SpatialAcoustics(new SpatialService());
         var ear = new Vector3(3f, 1.6f, 3f);
-        var expected = acoustics.CalculateAcousticPath(world, 10, ear, new Vector3(0f, 1f, 0f));
+        Assert.True(BeaconAids.TryDoorFace(world, 10, ear, out var face, out var inRoom));
+        var expected = acoustics.CalculateAcousticPath(world, 10, ear, face);
         Assert.InRange(expected.Occlusion, 0.05f, 0.5f);
 
         var blips = new Rig(acoustics: acoustics).Run(world, ear, 10, 4);
@@ -434,7 +441,8 @@ public class BeaconAidsMutationTests
             Assert.Equal(expected.TransmissionBleed, e.TransmissionBleed, 4);
             Assert.Equal(expected.ApertureFactor, e.ApertureFactor, 4);
             Assert.Equal(expected.EffectiveDistance, e.EffectiveDistance, 3);
-            Assert.Equal(expected.RegionId, e.TargetRegionId);
+            // It rings the room it faces, not whichever zone the doorway falls to.
+            Assert.Equal(acoustics.GetRegionAt(world, inRoom), e.TargetRegionId);
         }
     }
 
@@ -517,6 +525,26 @@ public class BeaconAidsMutationTests
     // ── What the player says ────────────────────────────────────────────────────────────────
 
     /// <summary>/beacons lists every category, whether it is on, and why when the map decided.</summary>
+    /// <summary>"/beacons louder" and "quieter", 2 dB a step from +4, and every blip placed by it.</summary>
+    [Fact]
+    public void BeaconsLouderAndQuieterMoveEveryBlip()
+    {
+        var prefs = BeaconPreferences.InMemory();
+        var aids = new BeaconAids(new AudioEngineFacade(new EmitterRecordingProvider()), prefs);
+        Assert.Equal(4.0, prefs.LevelDb);
+        Assert.Equal("Beacons louder, +6 decibels.", aids.Command(new[] { "louder" }));
+        Assert.Equal("Beacons quieter, +4 decibels.", aids.Command(new[] { "quieter" }));
+        for (int i = 0; i < 20; i++) aids.Command(new[] { "louder" });
+        Assert.Equal("Beacons are as loud as they go.", aids.Command(new[] { "louder" }));
+
+        var quiet = BeaconPreferences.InMemory();
+        quiet.SetLevel(-6);
+        var door = new Vector3(3f, 1f, 4f);
+        var loud = new Rig().Run(Moving(Thing(1, door, DoorSize, Beacons.Door)), Ear, 10, 4);
+        var soft = new Rig(prefs: quiet).Run(Moving(Thing(1, door, DoorSize, Beacons.Door)), Ear, 10, 4);
+        Assert.True(loud[0].Volume > soft[0].Volume, $"+4 dB {loud[0].Volume:F3}, -6 dB {soft[0].Volume:F3}");
+    }
+
     [Fact]
     public void BeaconsListsEveryCategoryAndWhy()
     {
@@ -525,8 +553,8 @@ public class BeaconAidsMutationTests
         var aids = new BeaconAids(new AudioEngineFacade(new EmitterRecordingProvider()), prefs);
         aids.SetMapPolicy(new[] { "door=forced_on", "item=forbidden" });
         Assert.Equal("Beacons: door on, always on for this map. exit on. stairs on. item off, not allowed on this map. "
-                   + "vehicle off. waypoint on. Each sounds every 1.6 seconds. Say slash beacons and a name to switch one, "
-                   + "or slash beacons every and a number of seconds.",
+                   + "vehicle off. waypoint on. Each sounds every 1.6 seconds, at +4 decibels. Say slash beacons and a name to "
+                   + "switch one, slash beacons every and a number of seconds, or slash beacons louder or quieter.",
                      aids.Command(Array.Empty<string>()));
     }
 

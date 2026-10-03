@@ -50,6 +50,11 @@ public sealed class BeaconAids
 
     /// <summary>A blip at one metre, dB: a doorbell's worth, well under speech and footsteps' echo.</summary>
     private const float BlipDb = 66f;
+    /// <summary>The player's own lift on every beacon, dB: 4 up from the start (Cody, 2026-10-02: louder),
+    /// 2 a step with /beacons louder and quieter.</summary>
+    public const float DefaultLevelDb = 4f, LevelStepDb = 2f, MinLevelDb = -12f, MaxLevelDb = 18f;
+    /// <summary>Where a door's beacon hangs: on the face toward you, at face height above its threshold.</summary>
+    private const float FaceHeightMetres = 1.6f;
 
     public BeaconAids(AudioEngineFacade audio, BeaconPreferences? prefs = null,
                       OpenFPS.Client.AudioEngine.Acoustics.SpatialAcoustics? acoustics = null)
@@ -108,7 +113,16 @@ public sealed class BeaconAids
 
     private void Blip(WorldSnapshot world, int sourceId, string sound, Vector3 at, Vector3 listener)
     {
-        var (gain, reference) = Loudness.Place(BlipDb);
+        var (gain, reference) = Loudness.Place(BlipDb + (float)_prefs.LevelDb);
+        // A door's beacon is a thing fixed to the door at face height, on your side of it, and it rings
+        // the room it faces, the one you are in, with that room's reflections. From the middle of the
+        // doorway it was in no room at all, and the room it rang was whichever zone the doorway fell to.
+        int region = -1;
+        if (TryDoorFace(world, sourceId, listener, out var face, out var inRoom))
+        {
+            at = face;
+            if (_acoustics != null) region = _acoustics.GetRegionAt(world, inRoom);
+        }
         // Through the same acoustic path every one-off sound takes: blocked by what is in the way,
         // bent round what it can bend round. The door's own leaf does not block its own blip.
         if (!Reaches(world, sourceId, listener, at, out var path)) return;
@@ -125,7 +139,7 @@ public sealed class BeaconAids
             AirLowDb = path?.AirLowDb ?? 0f, AirMidDb = path?.AirMidDb ?? 0f, AirHighDb = path?.AirHighDb ?? 0f,
             ApertureFactor = path?.ApertureFactor ?? 1f,
             TransmissionBleed = path?.TransmissionBleed ?? 0f,
-            TargetRegionId = path?.RegionId ?? -1,
+            TargetRegionId = region != -1 ? region : path?.RegionId ?? -1,
             Volume = gain,
             MinDistance = reference,
             Range = 40f,
@@ -168,6 +182,29 @@ public sealed class BeaconAids
         if (dist < 0.05f) return true;
         return !_acoustics.Spatial.RaycastMaterial(world, face, toEar / dist, dist - 0.05f,
                                                    out _, out _, out _, ignoreEntityId: sourceId);
+    }
+
+    /// <summary>A door's face toward the listener at face height, and a point half a metre into the room
+    /// in front of it.</summary>
+    internal static bool TryDoorFace(WorldSnapshot world, int sourceId, Vector3 listener, out Vector3 face, out Vector3 inRoom)
+    {
+        face = inRoom = default;
+        if (!world.Entities.TryGetValue(sourceId, out var e)
+            || !string.Equals(e.Definition.Identity.BeaconCategory, Beacons.Door, StringComparison.OrdinalIgnoreCase)) return false;
+        var size = e.Definition.Collider.Size;
+        if (size.X <= 0f || size.Y <= 0f || size.Z <= 0f) return false;
+        Vector3 axis = size.X <= size.Z ? Vector3.UnitX : Vector3.UnitZ;
+        float thick = axis == Vector3.UnitX ? size.X : size.Z;
+        var normal = Vector3.Transform(axis, e.Transform.Rotation);
+        normal.Y = 0f;
+        if (normal.LengthSquared() < 1e-6f) return false;
+        normal = Vector3.Normalize(normal);
+        var centre = e.Transform.Position;
+        if (Vector3.Dot(listener - centre, normal) < 0f) normal = -normal;
+        float bottom = centre.Y - size.Y * 0.5f, top = centre.Y + size.Y * 0.5f;
+        face = new Vector3(centre.X, MathF.Min(bottom + FaceHeightMetres, top - 0.1f), centre.Z) + normal * (thick * 0.5f + 0.05f);
+        inRoom = face + normal * 0.5f;
+        return true;
     }
 
     /// <summary>How far off a face to start the sight line: past the half-thickness of any wall on
@@ -310,8 +347,22 @@ public sealed class BeaconAids
                 };
                 parts.Add($"{c} {state}{why}");
             }
-            return "Beacons: " + string.Join(". ", parts) + $". Each sounds every {_prefs.Every:0.#} seconds."
-                 + " Say slash beacons and a name to switch one, or slash beacons every and a number of seconds.";
+            return "Beacons: " + string.Join(". ", parts) + $". Each sounds every {_prefs.Every:0.#} seconds,"
+                 + $" at {_prefs.LevelDb:+0;-0;0} decibels."
+                 + " Say slash beacons and a name to switch one, slash beacons every and a number of seconds,"
+                 + " or slash beacons louder or quieter.";
+        }
+
+        // /beacons louder | quieter — 2 dB a step, kept with the rest.
+        if (args[0].Equals("louder", StringComparison.OrdinalIgnoreCase) || args[0].Equals("quieter", StringComparison.OrdinalIgnoreCase)
+            || args[0].Equals("softer", StringComparison.OrdinalIgnoreCase))
+        {
+            float step = args[0].Equals("louder", StringComparison.OrdinalIgnoreCase) ? LevelStepDb : -LevelStepDb;
+            double before = _prefs.LevelDb;
+            _prefs.SetLevel(before + step);
+            if (_prefs.LevelDb == before)
+                return step > 0 ? "Beacons are as loud as they go." : "Beacons are as quiet as they go.";
+            return $"Beacons {(step > 0 ? "louder" : "quieter")}, {_prefs.LevelDb:+0;-0;0} decibels.";
         }
 
         // /beacons every 2.5 — how long between soundings, the player's own.
@@ -354,12 +405,16 @@ public sealed class BeaconPreferences
 
     /// <summary>Seconds between one beacon's soundings, the player's choice.</summary>
     public double Every { get; private set; } = BeaconAids.DefaultEvery;
+    /// <summary>How much louder than the doorbell level every beacon is, dB, the player's choice.</summary>
+    public double LevelDb { get; private set; } = BeaconAids.DefaultLevelDb;
 
-    private BeaconPreferences(string? path, Dictionary<string, bool> choices, double every = BeaconAids.DefaultEvery)
+    private BeaconPreferences(string? path, Dictionary<string, bool> choices, double every = BeaconAids.DefaultEvery,
+                              double levelDb = BeaconAids.DefaultLevelDb)
     {
         _path = path;
         _choices = choices;
         Every = every;
+        LevelDb = levelDb;
     }
 
     /// <summary>An in-memory store that is never written — for tests.</summary>
@@ -376,7 +431,7 @@ public sealed class BeaconPreferences
                 : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".config", "openfps");
         string path = Path.Combine(dir, "beacons.json");
         var choices = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
-        double every = BeaconAids.DefaultEvery;
+        double every = BeaconAids.DefaultEvery, level = BeaconAids.DefaultLevelDb;
         try
         {
             // One object: a true or false per category, and "every", the seconds between soundings.
@@ -386,16 +441,24 @@ public sealed class BeaconPreferences
                     foreach (var p in doc.RootElement.EnumerateObject())
                     {
                         if (p.Name == "every" && p.Value.ValueKind == JsonValueKind.Number) every = p.Value.GetDouble();
+                        else if (p.Name == "level" && p.Value.ValueKind == JsonValueKind.Number) level = p.Value.GetDouble();
                         else if (p.Value.ValueKind is JsonValueKind.True or JsonValueKind.False) choices[p.Name] = p.Value.GetBoolean();
                     }
         }
         catch (Exception ex) { Log.Warning("Beacon preferences at {Path} could not be read: {Error}", path, ex.Message); }
-        return new BeaconPreferences(path, choices, Math.Clamp(every, BeaconAids.MinEvery, BeaconAids.MaxEvery));
+        return new BeaconPreferences(path, choices, Math.Clamp(every, BeaconAids.MinEvery, BeaconAids.MaxEvery),
+                                     Math.Clamp(level, BeaconAids.MinLevelDb, BeaconAids.MaxLevelDb));
     }
 
     public void SetEvery(double seconds)
     {
         Every = Math.Clamp(seconds, BeaconAids.MinEvery, BeaconAids.MaxEvery);
+        Save();
+    }
+
+    public void SetLevel(double db)
+    {
+        LevelDb = Math.Clamp(db, BeaconAids.MinLevelDb, BeaconAids.MaxLevelDb);
         Save();
     }
 
@@ -416,6 +479,7 @@ public sealed class BeaconPreferences
             var all = new Dictionary<string, object>();
             foreach (var (k, v) in _choices) all[k] = v;
             all["every"] = Every;
+            all["level"] = LevelDb;
             File.WriteAllText(_path, JsonSerializer.Serialize(all));
         }
         catch (Exception ex) { Log.Warning("Beacon preferences could not be saved to {Path}: {Error}", _path, ex.Message); }
