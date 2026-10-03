@@ -66,6 +66,11 @@ Suggested order. Research and file references for most of these: [docs/RESEARCH_
     to be automatic;
   - no aluminium material exists, so glass doors are glass leaves with no frame of their own;
   - lifts (the elevator door kind is ready for them).
+- Building services (corridor ventilation, fridges, extractor fans, pipes, lift machinery, electrical
+  hum) as physical sources placed by the generator: the background a real building has, which
+  masks faint street sound through a glass front door. Cody, 2026-10-03: later; each must be
+  modelled, not slapped on, and core sounds such as doors come first. Also open: an inner lobby
+  door (vestibule) in the towers.
 - In a car seat, cranking carries sub-20 Hz pressure 13-16 dB over everything audible (the
   cylinders' slow swing through the panel path, whose low-pass passes DC). It costs the limiter
   headroom. A high-pass at the panel corner fixed it but took 6 dB of unheard rumble off the
