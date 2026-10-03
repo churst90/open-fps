@@ -30,6 +30,27 @@ Recent work, newest first. `git log` has the rest.
     each back garden (64), push bars on the hangar and terminal service doors (2).
   - Closing a door by E, and a parked driver checking for a player, measured to the doorway in
     the building's own frame; both used to compare a world position with a building-local one.
+- The room's tail holds still while you do (unheard). The listener's trace is redone every 250 ms;
+  its omnidirectional channel is the same each time, but its directions are a Monte Carlo estimate
+  and the directional part (50-350 ms) was re-split every trace. At the ears a steady hum's
+  harmonics swung 2.4-3.9 dB from one 54 ms window to the next above 500 Hz (a held response: 0).
+  Now the tail is measured as energy per octave and per 5.8 ms frame, and its directions per
+  direction over six time cells and two band groups; these are averaged over traces (a quarter per
+  trace standing still, more past half a metre, a fresh start past a metre, in a new region, or 6 dB
+  off); and the tail is played through fixed noise per band and per direction under that energy
+  (`SmoothTail`). Below 355 Hz the directional part comes evenly from all twenty directions.
+  - Stairwell, hum swing per window, raw to smooth: 1.3/2.9/3.9 dB to 0.4/1.0/1.0 (100-500 Hz,
+    0.5-1.5 kHz, 1.5-4 kHz). Flat 01F: 0.8/2.9/3.6 to 0.4/0.7/0.9. The ear moved up to 30 cm at random
+    each trace: 6.0/5.3/5.3 to 0.9/1.2/1.7. Steady noise level and left-right spread: as a held response.
+  - `--clap-room`, raw to smooth: level 50-300 ms the same (within 0.2 dB); T20 within 7 % at every
+    octave; EDT within 9 % from 250 Hz up, 18 % longer at 125 Hz; IACC per band within 0.06.
+  - Costs 52-59 ms per trace on the tracer thread (the first 0.7 s, making the noise), 14 MB.
+  - `--tail-steady [room=stair|flat|corridor] [jitter=CM]` measures all of this, raw against smooth.
+    `--clap-room tail=raw` plays the old tail for the A/B.
+- The metallic ring is not in the trace (raw or smooth, the tail's spectrum is noise: 0.05 % of bins
+  10 dB over their neighbours). It is in the late renderer: at the ear, 400-900 ms, 11 % of bins
+  stand 10 dB over (21 dB at the 99.9th percentile), where the directional part, 60-240 ms, has
+  0.1 %. See todo, acoustics.
 - The ear overloads: a sound louder at the ear than the output can play makes every other voice
   give way by the excess (`Loudness.OverloadDb`), held 50 ms and recovering over up to a second. The
   shot, its echoes and the reverb are left alone. Measured with `--clap-room sound=glock dist=N bed`:

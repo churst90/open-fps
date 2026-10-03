@@ -174,6 +174,15 @@ Results: [docs/MUTATION_2026-09-24.md](docs/MUTATION_2026-09-24.md),
 Done 2026-10-02 (see changes.md). Nothing left.
 
 ### 6. Acoustics still open
+- Listen to the smoothed tail (2026-10-02, `SmoothTail`) in a main-street lobby and stairwell:
+  does it still pulse or step? `--clap-room tail=raw` and `--tail-steady` give the A/B in the lab.
+- The late tail rings at the ear: measured with `--tail-steady`, 400-900 ms, 11 % of bins 10 dB over
+  their local median and a spectral flatness of 0.18 (noise: 0.1 % and 0.56). That is three random
+  spectra multiplied: the tail's own, the twenty velvet branches summed through their head
+  responses (all filtered copies of one W), and the ear decorrelator's velvet. The directional
+  part, whose twenty directions are independent noise, measures 0.1 % and 0.40. Likely fix: give
+  the late part independent signals per direction too, so the branches need no velvet; costs a
+  partitioned convolution per direction, so measure the mixer first.
 - The tail and the copies sit at -6 by ear (0 is physical). Cody is happy with that.
 - Below 120 Hz the tail is identical in both ears, so it sits in the head.
 - A voice's ground reflection flanges (heard 2026-09-27), though the physics says it is strong

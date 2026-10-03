@@ -84,13 +84,15 @@ internal sealed class TracedReverb : IDisposable
 
     /// <summary>
     /// Read the traced IR back after every trace and publish its late part (<see cref="Late"/>) for
-    /// the tail of the place you stand in (LateTailIr). The SDK keeps the IR opaque, so an impulse is
+    /// the tail of the place you stand in: measured as energy, averaged over traces and played through
+    /// fixed noise (SmoothTail). The SDK keeps the IR opaque, so an impulse is
     /// pushed through a private convolution on this thread, on a reader of its own
     /// (<see cref="ExtractReader"/>): a trace update goes to the first effect that reads it, and the
     /// mixer's stages must not lose theirs. Set before <see cref="SetScene"/>.
     /// </summary>
     public bool ExtractLate;
-    /// <summary>The latest trace's late part, time zero at the direct sound. Null until the first.</summary>
+    /// <summary>The late part to play, time zero at the direct sound, from the traces' averaged energy
+    /// (SmoothTail). Null until the first trace.</summary>
     public volatile LateTailIr? Late;
     /// <summary>The last trace's omnidirectional channel as read back, whole and unwindowed: for the lab.</summary>
     public volatile float[]? LastReadBack;
@@ -99,6 +101,23 @@ internal sealed class TracedReverb : IDisposable
     public volatile SdmTailIr? LateSdm;
     private System.Numerics.Vector3 _ax1, _ax2, _ax3;
     private bool _axesKnown;
+
+    /// <summary>
+    /// The trace's tail as energy, averaged over traces and played through fixed noise (SmoothTail).
+    /// Played as each trace's own samples, the tail's directions were re-split four times a second
+    /// from a noisy estimate: a wavy, stepping tail. Made on the first read-back.
+    /// </summary>
+    private SmoothTail? _smooth;
+    /// <summary>The lab's A/B: play each trace's own samples, as before SmoothTail. Never set in the game.</summary>
+    public static bool RawTail;
+    /// <summary>The lab: also publish each trace's raw parts (<see cref="RawLate"/>, <see cref="RawLateSdm"/>).</summary>
+    public bool KeepRaw;
+    public volatile LateTailIr? RawLate;
+    public volatile SdmTailIr? RawLateSdm;
+    /// <summary>The smoothing, for the lab: the averaged energies and how the last trace counted.</summary>
+    public SmoothTail? Smooth => _smooth;
+    /// <summary>The scene changed since the last trace (a door moved): the average follows faster.</summary>
+    private volatile bool _sceneChanged;
     private float[] _c1 = Array.Empty<float>(), _c2 = Array.Empty<float>(), _c3 = Array.Empty<float>();
 
     // ── Where the remainder arrives from ─────────────────────────────────────────────────────────
@@ -153,24 +172,26 @@ internal sealed class TracedReverb : IDisposable
         Phonon.iplAudioBufferFree(Context, ref inB); Phonon.iplAudioBufferFree(Context, ref outB);
     }
 
-    /// <summary>The remainder's energy at each direction, shares summing to one (see above).</summary>
-    private void FillLateShares(float[] into)
+    /// <summary>The remainder's energy at each direction, shares summing to one (see above), from the
+    /// channel covariances <paramref name="cov"/>.</summary>
+    private void FillLateShares(double[] cov, float[] into)
     {
         int k = into.Length;
-        if (_dirGains == null || _chanPower == null || _lateCov[0] <= 0) { for (int d = 0; d < k; d++) into[d] = 1f / k; return; }
+        if (_dirGains == null || _chanPower == null || cov[0] <= 0) { for (int d = 0; d < k; d++) into[d] = 1f / k; return; }
         double sum = 0;
         var f = new double[k];
         for (int d = 0; d < k; d++)
         {
             double v = 1.0;
             for (int c = 1; c < Channels; c++)
-                if (_chanPower[c] > 1e-9f) v += _lateCov[c] / _lateCov[0] * _dirGains[d, c] / _chanPower[c];
+                if (_chanPower[c] > 1e-9f) v += cov[c] / cov[0] * _dirGains[d, c] / _chanPower[c];
             f[d] = Math.Max(0, v); sum += f[d];
         }
         for (int d = 0; d < k; d++) into[d] = sum > 0 ? (float)(f[d] / sum) : 1f / k;
     }
-    /// <summary>What reading it back cost, last time.</summary>
-    public double LastExtractMs;
+    /// <summary>What reading it back cost, last time; and of that, measuring, averaging and building
+    /// the smoothed tail (SmoothTail).</summary>
+    public double LastExtractMs, LastSmoothMs;
     /// <summary>The reader the extraction uses, never a mixer stage's.</summary>
     public const int ExtractReader = MaxReaders - 1;
     /// <summary>Most partitions a late part may have: the whole trace in blocks of the traced frame.</summary>
@@ -209,6 +230,8 @@ internal sealed class TracedReverb : IDisposable
         if (!IsValid || !scene.IsBuilt) return;
         lock (_gate)
         {
+            // A new scene is a changed room (a door moved): the averaged tail follows it faster.
+            if (_haveScene) _sceneChanged = true;
             Phonon.iplSimulatorSetScene(_simulator, scene.Handle);
             Phonon.iplSimulatorCommit(_simulator);
             if (_source == IntPtr.Zero)
@@ -266,7 +289,12 @@ internal sealed class TracedReverb : IDisposable
     /// 680 ms at a time, the game loop run at 8 Hz, footsteps and claps come late or not at all and
     /// the reverb step.</summary>
     public void SetListener(Vector3 at) { lock (_listenerGate) _listener = at; }
+
+    /// <summary>Where the listener is and the region they are in. A new region starts the averaged
+    /// tail again (SmoothTail): one room must not smear into the next.</summary>
+    public void SetListener(Vector3 at, int place) { lock (_listenerGate) { _listener = at; _place = place; } }
     private readonly object _listenerGate = new();
+    private int _place = int.MinValue;
 
     private void Loop()
     {
@@ -274,8 +302,8 @@ internal sealed class TracedReverb : IDisposable
         {
             try
             {
-                Vector3 at;
-                lock (_listenerGate) at = _listener;
+                Vector3 at; int place;
+                lock (_listenerGate) { at = _listener; place = _place; }
                 long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
                 lock (_gate)
                 {
@@ -307,17 +335,46 @@ internal sealed class TracedReverb : IDisposable
                     if (ReadBack() is { } w)
                     {
                         LastReadBack = w;
+                        System.Numerics.Vector3[]? dirs = null;
                         if (_axesKnown)
                         {
-                            var dirs = new System.Numerics.Vector3[DiffuseBranch.Count];
+                            dirs = new System.Numerics.Vector3[DiffuseBranch.Count];
                             for (int d = 0; d < dirs.Length; d++) dirs[d] = DiffuseTail.Direction(d);
-                            var sdm = SdmTailIr.Build(w, _c1, _c2, _c3, _ax1, _ax2, _ax3, dirs, SampleRate, FrameSize);
-                            FillLateShares(sdm.LateShare);
-                            LateSdm = sdm;
-                            Late = LateTailIr.Build(w, SampleRate, FrameSize, MaxLatePartitions,
-                                                    SdmTailIr.EndFadeStart, SdmTailIr.EndFadeEnd);
                         }
-                        else Late = LateTailIr.Build(w, SampleRate, FrameSize, MaxLatePartitions);
+                        bool sceneChanged = _sceneChanged;
+                        _sceneChanged = false;
+                        if (RawTail || KeepRaw)
+                        {
+                            // Each trace's own samples, as they were played before SmoothTail.
+                            SdmTailIr? rawSdm = null;
+                            LateTailIr rawLate;
+                            if (dirs != null)
+                            {
+                                rawSdm = SdmTailIr.Build(w, _c1, _c2, _c3, _ax1, _ax2, _ax3, dirs, SampleRate, FrameSize);
+                                FillLateShares(_lateCov, rawSdm.LateShare);
+                                rawLate = LateTailIr.Build(w, SampleRate, FrameSize, MaxLatePartitions,
+                                                           SdmTailIr.EndFadeStart, SdmTailIr.EndFadeEnd);
+                            }
+                            else rawLate = LateTailIr.Build(w, SampleRate, FrameSize, MaxLatePartitions);
+                            RawLateSdm = rawSdm; RawLate = rawLate;
+                            if (RawTail) { LateSdm = rawSdm; Late = rawLate; }
+                        }
+                        if (!RawTail)
+                        {
+                            // The tail as energy, averaged, through fixed noise (SmoothTail).
+                            long s0 = System.Diagnostics.Stopwatch.GetTimestamp();
+                            _smooth ??= new SmoothTail(SampleRate, IrSize, DiffuseBranch.Count);
+                            _smooth.Add(w, _c1, _c2, _c3, _ax1, _ax2, _ax3, dirs, _lateCov, at, place, sceneChanged);
+                            if (dirs != null)
+                            {
+                                var sdm = _smooth.BuildDirectional(FrameSize);
+                                FillLateShares(_smooth.Cov, sdm.LateShare);
+                                LateSdm = sdm;
+                                Late = _smooth.BuildLate(FrameSize, MaxLatePartitions, afterDirectional: true);
+                            }
+                            else Late = _smooth.BuildLate(FrameSize, MaxLatePartitions, afterDirectional: false);
+                            LastSmoothMs = (System.Diagnostics.Stopwatch.GetTimestamp() - s0) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+                        }
                     }
                     LastExtractMs = (System.Diagnostics.Stopwatch.GetTimestamp() - x0) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
                 }
@@ -488,7 +545,9 @@ internal static class TracedReverbSet
     /// <summary>True while a rebuild is still being handed over: the scenes it replaces are in use.</summary>
     public static bool Reconfiguring { get { lock (Gate) return !_reconfigure.IsCompleted; } }
 
-    public static void SetListener(Vector3 at) { lock (Gate) { _listener?.SetListener(at); DisposeRetired(); } }
+    /// <summary>Where the listener is, and the region they are in (a new one starts the averaged tail
+    /// again; int.MinValue: not known, and only distance counts).</summary>
+    public static void SetListener(Vector3 at, int place = int.MinValue) { lock (Gate) { _listener?.SetListener(at, place); DisposeRetired(); } }
 
     /// <summary>The per-source tracer, or null before the scene exists.</summary>
     public static TracedEchoes? Echoes { get { lock (Gate) return _echoes is { IsValid: true } e ? e : null; } }

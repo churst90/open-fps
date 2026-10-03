@@ -528,8 +528,10 @@ public class AsyncAcousticWorker : IDisposable
                 _saLastSeen[kv.Key] = now;
             }
             if (!haveListener) return null;   // nothing pending; not a degradation
-            // The traced reverb follows the ear; it runs its own trace on its own thread.
-            OpenFPS.Client.Core.AudioEngine.SteamAudio.TracedReverbSet.SetListener(listener);
+            // The traced reverb follows the ear; it runs its own trace on its own thread. The region
+            // tells it when you have gone into another room, so its averaged tail starts again.
+            int hereRegion = _acoustics.GetRegionAt(world, listener);
+            OpenFPS.Client.Core.AudioEngine.SteamAudio.TracedReverbSet.SetListener(listener, hereRegion);
 
             _saSim.SetListener(listener);
             _saSim.Run();
@@ -537,7 +539,7 @@ public class AsyncAcousticWorker : IDisposable
             var results = new Dictionary<int, SaResult>(_pending.Count);
             var routes = _routes;
             _routeTicksThisTick = 0;
-            int listenerRegion = routes != null ? _acoustics.GetRegionAt(world, listener) : AcousticConstants.GlobalRegionId;
+            int listenerRegion = routes != null ? hereRegion : AcousticConstants.GlobalRegionId;
             foreach (var kv in _pending)
             {
                 if (!_saSources.TryGetValue(kv.Key, out var src) || src == IntPtr.Zero) continue;

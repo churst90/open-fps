@@ -301,7 +301,6 @@ internal sealed class SdmTailIr
         int maxP = PartitionsFor(sampleRate, block);
         int full = Math.Min(w.Length, Math.Min(c1.Length, Math.Min(c2.Length, c3.Length)));
         int n = Math.Min(full, maxP * block);
-        var sdm = new SdmTailIr(k, block, maxP);
         int s0 = (int)(LateTailIr.FadeInStartSeconds * sampleRate), s1 = (int)(LateTailIr.FadeInEndSeconds * sampleRate);
         int e0 = (int)(EndFadeStart * sampleRate), e1 = (int)(EndFadeEnd * sampleRate);
         var parts = new float[k][];
@@ -310,8 +309,6 @@ internal sealed class SdmTailIr
         int half = DoaWindow / 2;
         double iy = 0, iz = 0, ix = 0;
         for (int i = 0; i < Math.Min(half, n); i++) { iy += w[i] * (double)c1[i]; iz += w[i] * (double)c2[i]; ix += w[i] * (double)c3[i]; }
-        double total = 0;
-        var energy = new double[k];
         for (int i = 0; i < n; i++)
         {
             int add = i + half, drop = i - half - 1;
@@ -326,16 +323,30 @@ internal sealed class SdmTailIr
             if (dir.LengthSquared() > 1e-20f)
                 for (int d = 0; d < k; d++) { float dot = System.Numerics.Vector3.Dot(dir, directions[d]); if (dot > bestDot) { bestDot = dot; best = d; } }
             else best = i % k;                      // no direction at all: spread, not piled on one
-            float v = w[i] * win;
-            parts[best][i] = v;
-            energy[best] += v * (double)v; total += v * (double)v;
+            parts[best][i] = w[i] * win;
+        }
+        return FromParts(parts, block, maxP);
+    }
+
+    /// <summary>Responses already windowed, one per direction, into partitions; each direction's
+    /// share of their energy. A direction with next to nothing is left out.</summary>
+    public static SdmTailIr FromParts(float[][] parts, int block, int maxPartitions)
+    {
+        int k = parts.Length;
+        var sdm = new SdmTailIr(k, block, maxPartitions);
+        double total = 0;
+        var energy = new double[k];
+        for (int d = 0; d < k; d++)
+        {
+            double e = 0; var x = parts[d];
+            for (int i = 0; i < x.Length; i++) e += x[i] * (double)x[i];
+            energy[d] = e; total += e;
         }
         for (int d = 0; d < k; d++)
         {
             sdm.Share[d] = total > 0 ? (float)(energy[d] / total) : 0f;
-            if (energy[d] > total * 1e-6) sdm.PerDirection[d] = LateTailIr.FromWindowed(parts[d], block, maxP);
+            if (energy[d] > total * 1e-6) sdm.PerDirection[d] = LateTailIr.FromWindowed(parts[d], block, maxPartitions);
         }
-
         return sdm;
     }
 }
