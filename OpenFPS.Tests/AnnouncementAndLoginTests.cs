@@ -209,6 +209,44 @@ public class AnnouncementAndLoginTests
     }
 
     [Fact]
+    public void ConnectingToAnotherServerLeavesTheFirst()
+    {
+        // A login refused by the VPS left the peer up; picking the dev server then "re-ran the
+        // handshake" down that same connection, so every retry went to the VPS and was refused with
+        // its build (Cody, 2026-10-02). A different server is a new connection.
+        var first = new NetManager(new AcceptingListener()) { AutoRecycle = true };
+        var second = new NetManager(new AcceptingListener()) { AutoRecycle = true };
+        Assert.True(first.Start(0));
+        Assert.True(second.Start(0));
+        var client = new ClientNetworkService();
+        var failures = new List<string>();
+        client.OnConnectionFailed += failures.Add;
+        client.Start();
+        try
+        {
+            client.Connect("127.0.0.1", first.LocalPort);
+            Assert.True(PumpUntil(() => client.IsConnected, first, client), "never connected to the first server");
+
+            client.Connect("127.0.0.1", second.LocalPort);
+            var deadline = DateTime.UtcNow.AddSeconds(5);
+            while (DateTime.UtcNow < deadline && !(second.ConnectedPeersCount == 1 && first.ConnectedPeersCount == 0 && client.IsConnected))
+            {
+                first.PollEvents(); second.PollEvents(); client.Poll();
+                Thread.Sleep(5);
+            }
+            Assert.Equal(1, second.ConnectedPeersCount);
+            Assert.Equal(0, first.ConnectedPeersCount);
+            Assert.True(client.IsConnected);
+            Assert.Empty(failures);   // leaving the first is not a disconnect worth announcing
+        }
+        finally
+        {
+            first.Stop();
+            second.Stop();
+        }
+    }
+
+    [Fact]
     public void ASecondConnectWhileOneIsStillInFlightIsReportedRatherThanQueued()
     {
         var client = new ClientNetworkService();

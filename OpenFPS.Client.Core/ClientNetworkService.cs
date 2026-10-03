@@ -14,6 +14,10 @@ public class ClientNetworkService : INetEventListener
     private NetManager _netManager = null!;
     private NetPeer? _serverPeer;
     private string _lastTarget = "";
+    /// <summary>The server the live peer was connected to, as asked for ("host port N").</summary>
+    private string _peerTarget = "", _pendingTarget = "";
+    /// <summary>A peer being left for another server: its disconnect is not news.</summary>
+    private NetPeer? _leaving;
 
     /// <summary>True from the moment a connect is started until the peer connects or the attempt ends.
     /// Without it, a second press of Connect during the handshake queues a second login.</summary>
@@ -75,9 +79,19 @@ public class ClientNetworkService : INetEventListener
         var existing = _serverPeer;
         if (existing != null && existing.ConnectionState == ConnectionState.Connected)
         {
-            Log.Information("Already connected to {Target}; re-running the connected handshake.", _lastTarget);
-            OnConnected?.Invoke();
-            return;
+            if (_peerTarget == _lastTarget)
+            {
+                Log.Information("Already connected to {Target}; re-running the connected handshake.", _lastTarget);
+                OnConnected?.Invoke();
+                return;
+            }
+            // A DIFFERENT server. The shortcut above once sent every login meant for the dev server down
+            // the connection a rejected login had left open to the VPS: "your build is X, the server's
+            // is Y" from a server that was never asked (Cody, 2026-10-02).
+            Log.Information("Leaving {Old} for {New}.", _peerTarget, _lastTarget);
+            _leaving = existing;
+            _serverPeer = null;
+            existing.Disconnect();
         }
 
         if (_connectPending)
@@ -91,6 +105,7 @@ public class ClientNetworkService : INetEventListener
         try
         {
             _connectPending = true;
+            _pendingTarget = _lastTarget;
             _netManager.Connect(ip, port, "OpenFPS_Key");
         }
         catch (Exception ex)
@@ -130,6 +145,7 @@ public class ClientNetworkService : INetEventListener
     {
         _connectPending = false;
         _serverPeer = peer;
+        _peerTarget = _pendingTarget;
         Log.Information("Connected to server {EndPoint}.", peer.Address);
         OnConnected?.Invoke();
     }
@@ -181,6 +197,13 @@ public class ClientNetworkService : INetEventListener
 
     public void OnPeerDisconnected(NetPeer peer, DisconnectInfo info)
     {
+        if (ReferenceEquals(peer, _leaving))
+        {
+            _leaving = null;
+            Log.Information("Left {Address}.", peer.Address);
+            return;
+        }
+        if (_serverPeer != null && !ReferenceEquals(peer, _serverPeer)) return;
         bool wasConnected = _serverPeer != null;
         _connectPending = false;
         _serverPeer = null;
