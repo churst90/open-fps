@@ -4,6 +4,34 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-03
 
+- Paths that popped for a third of a second (branch path-pops, unheard). The [POP] lines from the
+  Main Street pavement were cars 150-300 m away going from -80 dB to -20 in the mid band and back.
+  New lab `--pop-hunt ear=x,y,z`: 40 cars drive the city's streets, asked about at the game's
+  cadence through the real worker, and every answer watched as `[POP]` watches a voice (mid and
+  high band). Three causes, each fixed:
+  - The barrier search believed a route over or round a box only if it touched nothing else. Over
+    the park's 1.1 m wall is a few millimetres, but each pier on the wall, and each storey of a
+    building, threw the route out, and the answer fell to what comes through every wall on the line
+    (-61 to -100). Now a route that runs into another box bends round it too (up to 2 boxes), and the
+    way over the top of everything is always tried: the string pulled tight over every box in the
+    vertical plane, as ISO 9613-2 and CNOSSOS-EU draw it. It does not exist from under a roof. A route
+    round a door leaf is not bent on (that is the openings' job): it found the 5 cm gap over Selby
+    House's shut glass door. A blocked line that only grazes is 5 dB (Maekawa), not 0.
+  - A full source pool sent the same sources to the hand-rolled tracer every tick, for good: with 80
+    asked about and 64 places, the last 16 in line never got one. That model put a car at -15 where
+    the simulator said -63. Now whoever was refused goes first next tick, and keeps its last answer.
+  - An engine that won a voice with no worker answer yet started unoccluded, at full level, and was
+    pulled down a fifth of a second later. [POP] never saw it (it skips a voice's first half second).
+    It now starts on the answer for a source near it, or the one-shots' path.
+  - Main Street pavement, 40 s: 58 mid-band excursions before, 0 after. With 30 more sources on the
+    pool, 60 s: 21 before (up to 73 dB), 2 after (up to 19 dB: a pier on a wall, where the string
+    goes over the pier). Selby stairwell 28 to 7, Marlow corridor 7 to 5; the ones left peak at -49
+    to -62 dB, high band below -80 (see todo).
+  - Cars behind buildings are louder now: over the roofs at Maekawa's 24 dB ceiling plus spreading,
+    where they were 60-100 dB down through every wall.
+  - Route queries cost more where legs are blocked: 630-950 us each in the stairwell and the
+    corridor, was 250-470. The 4 ms route budget per tick still holds.
+
 - The late tail no longer rings (branch tail-ring, unheard). At the ear, 400-900 ms, with
   `--tail-steady`: 10.4-10.7 % of bins 10 dB over their local median and a flatness of 0.18 in the
   stairwell, the flat and the corridor; now 0.08-0.12 % and 0.52-0.55 (noise: 0.1 % and 0.56). The

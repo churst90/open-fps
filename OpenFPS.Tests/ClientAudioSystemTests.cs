@@ -194,6 +194,39 @@ public class ClientAudioSystemTests
     }
 
     /// <summary>
+    /// A car that wins a live voice starts behind whatever it is behind. The occlusion worker had not
+    /// been asked about it — nothing asks about a car with no voice, and its last answer is dropped five
+    /// seconds after — so its first frames used to go out on "no answer", built as nothing in the way:
+    /// a car behind a building started at full level and was pulled down only when the worker's answer
+    /// came, a fifth of a second later, and eased in after that. The [POP] detector never saw it (it
+    /// ignores a voice's first half second); the city's 359 engine starts in one session were each one.
+    /// </summary>
+    [Fact]
+    public void AnEngineStartsBehindTheWallItIsBehind()
+    {
+        var h = new ClientAudioHarness();
+        h.StandAt(Vector3.Zero);
+        // Brick, 60 m long and 10 m high, 10 m north of the listener; the car 40 m north.
+        h.AddWall(9001, new Vector3(0f, 5f, -10f), new Vector3(60f, 10f, 0.35f));
+        h.AddCar(NearCar, Preset, new Vector3(0f, 0f, -40f));
+        Assert.True(h.TickUntil(() => h.Mixer.WasStarted(NearCar), 120), "the car never got a voice");
+
+        var first = h.Mixer.Started.First(e => e.EntityId == NearCar);
+        _o.WriteLine($"started with occlusion {first.Occlusion:F2}, bands {Db(first.EqLow):F1}/{Db(first.EqMid):F1}/{Db(first.EqHigh):F1} dB");
+        Assert.True(Db(first.EqMid) < -15f, $"started at {Db(first.EqMid):F1} dB in the mid band behind a 10 m brick wall");
+        Assert.True(first.Occlusion > 0.5f, $"started with occlusion {first.Occlusion:F2}");
+
+        // And where the worker then puts it, so the start is not a different answer of its own.
+        Assert.True(h.TickUntil(() => h.Mixer.HasPath(NearCar), 300), "the worker never answered");
+        var worker = h.Mixer.LastPath(NearCar);
+        _o.WriteLine($"worker: occlusion {worker.Occlusion:F2}, bands {Db(worker.EqLow):F1}/{Db(worker.EqMid):F1}/{Db(worker.EqHigh):F1} dB");
+        Assert.True(Db(first.EqMid) <= Db(worker.EqMid) + 6f,
+            $"started {Db(first.EqMid) - Db(worker.EqMid):F1} dB above the worker's answer in the mid band");
+    }
+
+    private static float Db(float g) => 20f * MathF.Log10(MathF.Max(1e-5f, g));
+
+    /// <summary>
     /// When the server says a car is gone, every voice it had stops: its live engine and its borrowed
     /// voice at once, from ForgetEntity itself, and a horn that was still blowing on the next update —
     /// and none of them is started again. A voice keyed by an id the world no longer has plays for

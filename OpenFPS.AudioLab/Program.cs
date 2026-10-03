@@ -103,6 +103,7 @@ string[] usage =
     "  --enclosure [map= at= walk=]                  what the room round a listener measures, and its send",
     "  --path-probe [map=city] ear=x,y,z src=x,y,z   what the occlusion worker hands the mixer",
     "  --siren-route [map= track= at=]               a car's path to a fixed listener, frame by frame",
+    "  --pop-hunt [map=city] ear=x,y,z [sec= cars=]  cars driving the streets; paths that jump and come back",
     "  --room-echoes [map=city] ear= src=            the placed reflections a one-off sound gets",
     "  --shot-echoes [map=city] at=x,z               every echo a shot makes there, and what it came off",
     "  --wall-tl                                     the city's constructions' transmission loss per band",
@@ -519,6 +520,11 @@ if (args.Contains("--wall-tl"))
 {
     // --wall-tl: the city's walls, floors, doors and glass, transmission loss per third octave and per mixer band.
     Environment.Exit(OpenFPS.AudioLab.Spikes.WallTlSpike.Run(args));
+}
+if (args.Contains("--pop-hunt"))
+{
+    // --pop-hunt [map=city] ear=x,y,z [sec=60] [cars=40] [extra=30]: answers that jump 15 dB and come back.
+    Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.PopHuntSpike.Run(args));
 }
 if (args.Contains("--path-probe"))
 {

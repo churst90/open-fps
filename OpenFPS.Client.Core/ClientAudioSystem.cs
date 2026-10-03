@@ -1784,6 +1784,39 @@ public class ClientAudioSystem
         return _acoustics.CalculateAcousticPath(world, snap.Id, eyePos, at);
     }
 
+    /// <summary>
+    /// The path for a sounding entity the occlusion worker has no answer for yet — a car that has just
+    /// won a live voice, whose last answer was dropped while nothing asked about it. It was built as an
+    /// unoccluded line, and the voice was STARTED with it: a car behind a building came in at full
+    /// level for the fifth of a second until the worker answered, and then eased down (2026-10-03).
+    /// The worker's answer for a source it heard near this one a moment ago, moved to this one; failing
+    /// that, the one-shots' path, which has the same walls and the same routes by the openings. And the
+    /// worker is asked now, so the next frame has its own.
+    /// </summary>
+    private AcousticPathData FirstAnswer(WorldSnapshot world, EntitySnapshot snap, Vector3 eyePos)
+    {
+        var at = OpenFPS.Common.AudioEmission.PointFor(snap);
+        _acousticWorker.EnqueueRequest(new AcousticRequest
+        {
+            EntityId = snap.Id, ListenerPos = eyePos, SourcePos = at,
+            SourceRadius = OpenFPS.Common.AudioEmission.OcclusionRadiusFor(snap),
+        });
+        var path = _acoustics.CalculateAcousticPath(world, snap.Id, eyePos, at);
+        if (_acousticWorker.TryGetNearby(eyePos, at, out var near))
+        {
+            Vector3 moved = at - near.SourcePosition;
+            float nearDist = MathF.Max(0.1f, Vector3.Distance(eyePos, near.SourcePosition));
+            path = path with
+            {
+                Occlusion = near.Occlusion, EqLow = near.EqLow, EqMid = near.EqMid, EqHigh = near.EqHigh,
+                TransmissionBleed = near.TransmissionBleed, ApertureFactor = near.ApertureFactor,
+                ApparentPosition = near.ApparentPosition + moved,
+                EffectiveDistance = near.EffectiveDistance * Vector3.Distance(eyePos, at) / nearDist,
+            };
+        }
+        return path;
+    }
+
     /// <summary>Voice ids for a vehicle's horn, one per vehicle.</summary>
     internal const int HornVoiceBase = -1_200_000;
 
@@ -2136,18 +2169,11 @@ public class ClientAudioSystem
             return;
 
         // Use the async worker's last computed result rather than a synchronous per-frame calculation.
-        // On the first frame before the worker has a result, fall back to an unoccluded direct path.
-        AcousticPathData acousticPath;
-        if (_acousticWorker.TryGetResult(snap.Id, out var cachedPaths))
-        {
-            acousticPath = cachedPaths.FirstOrDefault(p => !p.IsReflection);
-        }
-        else
-        {
-            Vector3 fallbackSource = OpenFPS.Common.AudioEmission.PointFor(snap);
-            float directDist = Vector3.Distance(eyePos, fallbackSource);
-            acousticPath = new AcousticPathData(0f, fallbackSource, directDist);
-        }
+        // Until it has one, the answer it gave a moment ago for a source near this one, or failing that
+        // the one-shots' path (FirstAnswer). Never "nothing in the way".
+        AcousticPathData acousticPath = _acousticWorker.TryGetResult(snap.Id, out var cachedPaths)
+            ? cachedPaths.FirstOrDefault(p => !p.IsReflection)
+            : FirstAnswer(world, snap, eyePos);
 
         string resolvedSoundId = "";
         bool interior = false;
