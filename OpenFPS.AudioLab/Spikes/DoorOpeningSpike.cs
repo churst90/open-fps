@@ -28,7 +28,7 @@ public static class DoorOpeningSpike
     public static int Run(string[] args)
     {
         string dir = args.FirstOrDefault(a => a.StartsWith("out=", StringComparison.Ordinal))?.Substring(4)
-                     ?? "/home/cody/external-rescue/Github/open-fps/inbox/doors-2026-09-24";
+                     ?? OpenFPS.AudioLab.LabPaths.InRepo("inbox", "doors-2026-09-24");
         Directory.CreateDirectory(dir);
         // The hollow steel door as DoorSystem reckons one: 1.2 mm skins over a 45 mm core.
         const float skin = 0.0012f, depth = 0.045f, rho = 7850f;

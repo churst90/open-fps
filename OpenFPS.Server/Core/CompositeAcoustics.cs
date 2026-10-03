@@ -28,8 +28,9 @@ namespace OpenFPS.Server.Core;
 ///   of standing in a walled yard genuinely are closer to a room than to a field.
 ///
 /// What the room is MADE of comes from the parts too: each of the six faces takes the material of
-/// whichever part covers most of it. A glass-sided office is bright, a carpeted one is not, and a
-/// car with metal panels rings — because of what they are built from, not because anyone said so.
+/// whichever part covers most of it, and a side or roof nothing covers is open. A glass-sided office
+/// is bright, a carpeted one is not, and a car with metal panels rings — because of what they are
+/// built from, not because anyone said so.
 /// </summary>
 public static class CompositeAcoustics
 {
@@ -128,17 +129,12 @@ public static class CompositeAcoustics
         var survey = Survey(world, parts, out centre);
         if (!survey.IsRoom) return false;
 
-        var materials = new int[6];
-        for (int f = 0; f < 6; f++)
-            materials[f] = AcousticRegistry.TryGetResonanceIndex(survey.Materials[f], out int index)
-                ? index
-                : AcousticRegistry.TryGetResonanceIndex("Generic", out int fallback) ? fallback : 0;
+        var materials = FaceMaterials(survey);
 
         room = new RegionComponent
         {
             FriendlyName = string.IsNullOrWhiteSpace(name) ? "Inside" : name,
             IsIndoor = true,
-            Environment = AcousticEnvironmentType.Atmospheric,
             RoomSize = survey.Size,
             ReverbTimeScale = 1.0f,
             Materials = materials,
@@ -206,22 +202,43 @@ public static class CompositeAcoustics
         room = default;
         var survey = SurveyBox(Pieces(world, parts, loose: false), centre, size);
         if (!survey.IsRoom) return false;
-        var materials = new int[6];
-        for (int f = 0; f < 6; f++)
-            materials[f] = AcousticRegistry.TryGetResonanceIndex(survey.Materials[f], out int index)
-                ? index
-                : AcousticRegistry.TryGetResonanceIndex("Generic", out int fallback) ? fallback : 0;
+        var materials = FaceMaterials(survey);
         room = new RegionComponent
         {
             FriendlyName = string.IsNullOrWhiteSpace(name) ? "Inside" : name,
             IsIndoor = true,
-            Environment = AcousticEnvironmentType.Atmospheric,
             RoomSize = survey.Size,
             ReverbTimeScale = 1.0f,
             Materials = materials,
             AmbienceId = "",
         };
         return true;
+    }
+
+    /// <summary>
+    /// What each face of a surveyed room is made of: the material of the parts that cover it, or open
+    /// (<see cref="RoomAcoustics.OpenFaceMaterial"/>) where they do not. Never the floor: a building
+    /// with no floor of its own stands on the ground, and the ground is a surface.
+    ///
+    /// An uncovered face is NOT a wall. It used to be given the material of whatever covered the most of
+    /// it however little that was, or Generic when nothing did, so a shed with one side open was a
+    /// sealed box to everything that asked its boundary a question: no opening on that side, the
+    /// street outside unheard through it, and a reverberant field that the missing side would have let
+    /// out. A map's rooms have always been measured this way (MapManager.SurveyRegions); a composite
+    /// is the same thing built by a player. Its open faces are openings to whatever is beyond them,
+    /// found from the geometry like every other gap (AcousticVolumeGenerator.AddFaceOpenings).
+    /// </summary>
+    public static int[] FaceMaterials(in RoomSurvey survey)
+    {
+        var materials = new int[6];
+        for (int f = 0; f < 6; f++)
+        {
+            if (f != 0 && survey.Coverage[f] < FaceCoverage) { materials[f] = RoomAcoustics.OpenFaceMaterial; continue; }
+            materials[f] = AcousticRegistry.TryGetResonanceIndex(survey.Materials[f], out int index)
+                ? index
+                : AcousticRegistry.TryGetResonanceIndex("Generic", out int fallback) ? fallback : 0;
+        }
+        return materials;
     }
 
     private static RoomSurvey SurveyBox(List<Piece> pieces, Vector3 centre, Vector3 size)

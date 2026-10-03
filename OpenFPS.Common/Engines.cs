@@ -451,14 +451,17 @@ public sealed record EngineProfile
     // ── Rotating assembly and the way it is driven ──────────────────────────────────────────────
     public required float IdleRpm { get; init; }
     public required float RedlineRpm { get; init; }
-    public float CrankingRpm { get; init; } = 250f;
+    /// <summary>The speed the starter turns it at, rpm: 150-250 for a diesel, 200-300 for a petrol
+    /// engine (Pearson, Diesel Engine Starting Systems); six recorded starts beat at 150-225.</summary>
+    public float CrankingRpm { get; init; } = 200f;
     /// <summary>
     /// Crank revolutions the starter turns before the first cylinder fires. An engine computer
     /// fuels and sparks nothing until it has found the crank and the cam — up to a whole cycle, two
     /// revolutions — and injects on the next intake stroke after that. A common-rail diesel must
     /// also raise its rail to injection pressure. Without it the synthesis fires on the first
     /// compression at cranking speed and catches in 50 ms, too fast to hear a car start. NaN takes the default for the fuel: three for petrol, four for diesel, which
-    /// at the declared cranking speeds is about 0.7 s for a car and two seconds for a bus.
+    /// at the declared cranking speeds is about 0.9 s for a car and two seconds for a bus (a
+    /// port-injected engine starts in 0.66-0.95 s, US5088465).
     /// </summary>
     public float RevolutionsBeforeFiring { get; init; } = float.NaN;
     public float FiringAfterRevolutions => float.IsNaN(RevolutionsBeforeFiring)
@@ -2209,6 +2212,9 @@ public sealed record EngineProfile
     {
         Name = "163 cc OHV single",
         Layout = EngineLayout.Inline,
+        // A pull cord spins it hard for a moment, and a magneto sparks on the first compression:
+        // nothing to synchronise, no rail to pressurise.
+        CrankingRpm = 600f, RevolutionsBeforeFiring = 1f,
         FiringAngles = new[] { 0f },
         Bank = new[] { 0 },
         BoreMm = 68f, StrokeMm = 45f, RodRatio = 1.9f, CompressionRatio = 8.5f,
@@ -2273,6 +2279,9 @@ public sealed record EngineProfile
     {
         Name = "500 cc air-cooled V-twin",
         Layout = EngineLayout.Vee,
+        // A small electric starter on a small engine turns it faster than a car's turns a car, and
+        // the magneto fires on the first compression.
+        CrankingRpm = 300f, RevolutionsBeforeFiring = 1f,
         // Both rods on one crankpin with 90 degrees between the cylinders: the rear fires 270
         // degrees after the front, and then there are 450 before the front comes round again. That
         // uneven pair is what a V-twin IS, and it is written here as the two intervals it is.

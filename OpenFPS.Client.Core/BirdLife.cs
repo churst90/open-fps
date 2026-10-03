@@ -365,7 +365,6 @@ public sealed class BirdLife
             Range = range,
             Pitch = pitch,
             IsEvent = true,
-            EnableReverb = true,
         });
     }
 

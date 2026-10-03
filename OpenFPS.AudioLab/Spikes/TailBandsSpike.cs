@@ -123,7 +123,7 @@ public static class TailBandsSpike
             }
             Console.WriteLine($"  remainder (after 0.3 s) by axis: north-south {ns:P0} ({nNs} directions), east-west {ew:P0} ({nEw}), up-down {ud:P0} ({nUd})");
         }
-        else Console.WriteLine("  no directional part (OPENFPS_TAIL_SDM=0, or the ambisonic tail)");
+        else Console.WriteLine("  no directional part yet (the trace's axes are not known)");
         return 0;
     }
 

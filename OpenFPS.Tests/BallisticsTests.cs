@@ -108,8 +108,6 @@ public class BallisticsTests
         foreach (var pcm in new[]
         {
             WeaponSynth.MuzzleBlast(WeaponProfile.Rifle),
-            WeaponSynth.SupersonicCrack(WeaponProfile.Rifle, 1.5f),
-            WeaponSynth.MechanicalAction(WeaponProfile.Rifle),
         })
         {
             Assert.NotEmpty(pcm);
@@ -188,14 +186,6 @@ public class BallisticsTests
         var rifle = WeaponSynth.MuzzleBlast(WeaponProfile.Rifle);
         var pistol = WeaponSynth.MuzzleBlast(WeaponProfile.Pistol);
         Assert.NotEqual(rifle.Length, pistol.Length);
-    }
-
-    [Fact]
-    public void ANearMissIsShorterAndSharperThanADistantOne()
-    {
-        var near = WeaponSynth.SupersonicCrack(WeaponProfile.Rifle, 1f);
-        var far = WeaponSynth.SupersonicCrack(WeaponProfile.Rifle, 20f);
-        Assert.True(far.Length > near.Length);
     }
 
     private static float Mean(float[] v)

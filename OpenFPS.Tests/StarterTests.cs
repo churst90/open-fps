@@ -51,10 +51,71 @@ public class StarterTests
             var v = make();
             var r = KeyOn(v);
             _out.WriteLine($"{key,-22} off {r.OffDb,7:F1} dB  crank {r.CrankDb,7:F1} dB for {r.CrankSeconds:F2} s  idle {r.IdleDb,7:F1} dB");
-            // Long enough to be heard as a start, and it does start.
-            Assert.True(r.CrankSeconds >= 0.25f, $"{key} cranked for only {r.CrankSeconds:F2} s");
+            // Long enough to be heard as a start, and it does start. The key is held until the driver
+            // hears it catch: it was let go on the first firing, 0.34 s in, and nobody heard a starter.
+            Assert.True(r.CrankSeconds >= 0.5f, $"{key} cranked for only {r.CrankSeconds:F2} s");
             Assert.True(r.CrankSeconds <= 3f, $"{key} was still cranking after {r.CrankSeconds:F2} s");
         }
+    }
+}
+
+/// <summary>
+/// "Way too high pitch" and "the inside still plays the starter at full volume, not muffled"
+/// (2026-10-02). The starter spun every engine at twice its declared cranking speed, an octave
+/// high; and its path into the cabin through the mounts let the brushes' buzz in whole.
+/// </summary>
+public class StarterInCabinTests
+{
+    private const int Rate = 44100, Block = 441;
+
+    /// <summary>While it cranks, before anything fires: the mean crank speed, and the level above
+    /// 300 Hz (the starter's whirr), dB re full scale.</summary>
+    private static (float Rpm, double TopDb) Crank(VehicleProfile v, bool inside)
+    {
+        var voice = new EngineVoiceState(v, Rate, 3) { TargetSpeed = 0f, Running = false, Interior = inside };
+        voice.PlaceAtSpeed(0f);
+        voice.Revive();
+        var buf = new float[Block];
+        for (int b = 0; b < 300; b++) voice.Render(buf);
+        voice.Running = true;
+        float a = 1f - MathF.Exp(-2f * MathF.PI * 300f / Rate), lp = 0;
+        double sum = 0, rpm = 0; int n = 0, blocks = 0;
+        for (int b = 0; b < 300; b++)
+        {
+            voice.Render(buf);
+            bool cranking = voice.Engine.Starter && !voice.Engine.Firing;
+            if (cranking && b > 5) { rpm += voice.Engine.Rpm; blocks++; }
+            foreach (float x in buf)
+            {
+                lp += (x - lp) * a;
+                if (cranking) { sum += (x - lp) * (double)(x - lp); n++; }
+            }
+        }
+        return ((float)(rpm / Math.Max(1, blocks)), 10 * Math.Log10(sum / Math.Max(1, n) + 1e-30));
+    }
+
+    [Theory]
+    [InlineData("i4_economy")]
+    [InlineData("v8_muscle")]
+    [InlineData("police_interceptor")]
+    [InlineData("transit_bus")]
+    public void It_cranks_near_its_declared_speed(string key)
+    {
+        var v = VehicleProfile.ByName(key);
+        float rpm = Crank(v, false).Rpm;
+        Assert.InRange(rpm, v.Engine.CrankingRpm * 0.7f, v.Engine.CrankingRpm * 1.5f);
+    }
+
+    [Theory]
+    [InlineData("i4_economy")]
+    [InlineData("v8_muscle")]
+    [InlineData("police_interceptor")]
+    [InlineData("transit_bus")]
+    public void From_the_seat_the_whirr_is_muffled(string key)
+    {
+        var v = VehicleProfile.ByName(key);
+        double kerb = Crank(v, false).TopDb, seat = Crank(v, true).TopDb;
+        Assert.True(kerb - seat >= 6.0, $"{key}: the seat is only {kerb - seat:F1} dB under the kerb above 300 Hz");
     }
 }
 

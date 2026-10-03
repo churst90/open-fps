@@ -217,6 +217,10 @@ public sealed class OpeningRoutes
         }
     }
 
+    /// <summary>What an opening in a room's face is called (<see cref="Declared.Kind"/>): an open side, a
+    /// tunnel mouth, a doorway with no door in it.</summary>
+    public const string FaceKind = "open face";
+
     /// <summary>How far past an opening's declared size the geometry is searched for its jambs, floor
     /// and lintel, metres: a doorway's leaf laps its frame by a few centimetres and an authored portal is
     /// placed by hand, so the walls are near but not exactly where the numbers say.</summary>
@@ -230,6 +234,23 @@ public sealed class OpeningRoutes
     {
         var o = new Opening { Id = d.Id, Kind = d.Kind, RegionA = d.RegionA, RegionB = d.RegionB, Centre = d.Centre };
         bool haveFrame = d.Rotation != default;
+        if (haveFrame && d.Kind == FaceKind)
+        {
+            // A gap measured from the walls round it (FaceOpenings): its rectangle is the geometry's
+            // already, to the edge of every box beside it, so there is nothing to search for. Its thin
+            // axis is the one through it whatever its proportions: a slot in a thick wall is deeper than
+            // it is wide and is still a slot.
+            var fq = Quaternion.Normalize(d.Rotation);
+            o.Across = Vector3.Normalize(Vector3.Transform(Vector3.UnitX, fq));
+            o.Up = Vector3.Normalize(Vector3.Transform(Vector3.UnitY, fq));
+            o.Normal = Vector3.Normalize(Vector3.Transform(Vector3.UnitZ, fq));
+            o.HalfWidth = MathF.Max(0.05f, d.Size.X * 0.5f);
+            o.HalfHeight = MathF.Max(0.05f, d.Size.Y * 0.5f);
+            o.HalfDepth = MathF.Max(0.01f, d.Size.Z * 0.5f);
+            MeasureContents(o);
+            if (o.Tau.Y < 0.5f && o.Contents.Length > 0) o.Problem = "a wall stands in it: it is not an opening";
+            return o;
+        }
         float halfW, halfH, searchW, searchH;
         if (haveFrame)
         {
@@ -279,10 +300,19 @@ public sealed class OpeningRoutes
         o.Centre += o.Across * (right - left) * 0.5f + o.Up * (top - bottom) * 0.5f;
         o.HalfWidth = MathF.Max(0.05f, (right + left) * 0.5f);
         o.HalfHeight = MathF.Max(0.05f, (top + bottom) * 0.5f);
-        // As deep as the wall it is cut through.
+        // As deep as the wall it is cut through. A box that runs THROUGH the opening rather than across
+        // it — a tunnel's side wall at its open end, a corridor wall beside an open side — is not that
+        // wall: its length along the normal is not a depth. Counted as one it was: the tunnel's openings
+        // were fifty metres deep, so the check of their sides and the test of what stands in them reached
+        // two sections away (2026-10-02).
         foreach (int j in new[] { jambR, jambL, lintel })
-            if (j >= 0) o.HalfDepth = MathF.Max(o.HalfDepth, HalfExtentAlong(_solids[j], o.Normal));
-        if (jambR < 0 && jambL < 0 && lintel < 0 && d.Kind != "open face")
+        {
+            if (j < 0) continue;
+            float through = HalfExtentAlong(_solids[j], o.Normal);
+            if (through > MathF.Min(HalfExtentAlong(_solids[j], o.Across), HalfExtentAlong(_solids[j], o.Up))) continue;
+            o.HalfDepth = MathF.Max(o.HalfDepth, through);
+        }
+        if (jambR < 0 && jambL < 0 && lintel < 0 && d.Kind != FaceKind)
             o.Problem ??= "no wall found round it: an opening in nothing";
 
         MeasureContents(o);
@@ -497,6 +527,103 @@ public sealed class OpeningRoutes
     }
 
     /// <summary>
+    /// How strong a place's reverberant field is at <paramref name="listener"/>, as an amplitude
+    /// against standing in it, and where the strongest part of it arrives from.
+    ///
+    /// A diffuse field of energy density E pushes E c S / 4 watts out of an opening of area S. Out of
+    /// the opening it spreads over a half space, so at r metres its pressure squared is S / (8 pi r^2)
+    /// of the field's inside: that, per opening, with the opening's own transmission (a shut leaf, a
+    /// door ajar). An opening into the listener's own place is heard straight; one into anywhere else
+    /// is followed by the routes through openings, as any other sound there would be. Summed over
+    /// every opening of the place within <paramref name="range"/>.
+    ///
+    /// It replaced (aperture / 2) / distance through the single nearest opening joining the two
+    /// places, which gave a room two openings away nothing and a lobby none of the street.
+    /// </summary>
+    public float FieldAt(int regionId, Vector3 listener, int listenerRegion, float range, out Vector3 via)
+        => FieldAt(regionId, listener, listenerRegion, range, out via, out _);
+
+    /// <summary><see cref="FieldAt(int, Vector3, int, float, out Vector3)"/>, and a point in the place
+    /// itself, two metres out from the opening most of it leaves by: where its field should be
+    /// heard (traced) from, for a listener who is not in it.</summary>
+    public float FieldAt(int regionId, Vector3 listener, int listenerRegion, float range, out Vector3 via, out Vector3 inField)
+    {
+        int node = NodeOf(regionId), lNode = NodeOf(listenerRegion);
+        via = listener; inField = listener;
+        if (node == lNode) return 1f;
+        double energy = FieldEnergy(node, listener, listenerRegion, lNode, range, ref via, ref inField);
+        // And what comes in builds the listener's own room's field, which they are standing in: the
+        // field just outside each of its openings times what that opening lets in, over the room's
+        // absorption (the transmission-room equation, E_room = sum E_out S tau / A). Down a corridor
+        // two openings from the street this is most of it; the openings' direct radiation is a
+        // little of it near each one.
+        if (lNode != Outside && TryGetAbsorption(lNode, out var absorption) && absorption.Y > 0f)
+        {
+            double into = 0;
+            foreach (var o in _openings)
+            {
+                bool onA = o.NodeA == lNode, onB = o.NodeB == lNode;
+                if (onA == onB) continue;
+                float sTau = o.Area * o.Tau.Y;
+                if (sTau <= 0f || Vector3.Distance(listener, o.Centre) > range) continue;
+                int outerNode = onA ? o.NodeB : o.NodeA;
+                double outside;
+                if (outerNode == node) outside = 1.0;
+                else
+                {
+                    Vector3 point = o.Centre + (onA ? -o.Normal : o.Normal) * (o.HalfDepth + 0.3f);
+                    Vector3 ignored = point, ignoredToo = point;
+                    outside = Math.Min(1.0, FieldEnergy(node, point, onA ? o.RegionB : o.RegionA, outerNode, range, ref ignored, ref ignoredToo));
+                }
+                into += outside * sTau / absorption.Y;
+            }
+            energy += Math.Min(1.0, into);
+        }
+        return MathF.Min(1f, MathF.Sqrt((float)energy));
+    }
+
+    /// <summary>The direct part of <see cref="FieldAt"/>: each opening of the place radiating its field
+    /// at <paramref name="listener"/>, straight or by the routes.</summary>
+    private double FieldEnergy(int node, Vector3 listener, int listenerRegion, int lNode, float range,
+                               ref Vector3 via, ref Vector3 inField)
+    {
+        double energy = 0; float best = -1f;
+        foreach (var o in _openings)
+        {
+            bool onA = o.NodeA == node, onB = o.NodeB == node;
+            if (onA == onB) continue;
+            float sTau = o.Area * o.Tau.Y;
+            if (sTau <= 0f) continue;
+            float toOpening = Vector3.Distance(listener, o.Centre);
+            if (toOpening > range) continue;
+            float part; Vector3 from;
+            if ((onA ? o.NodeB : o.NodeA) == lNode)
+            {
+                float r = MathF.Max(1f, toOpening);
+                part = sTau / (8f * MathF.PI * r * r);
+                from = o.Centre;
+            }
+            else
+            {
+                // Out of the opening into the place beyond it (its A side is along +Normal), then on.
+                Vector3 start = o.Centre + (onA ? -o.Normal : o.Normal) * (o.HalfDepth + 0.3f);
+                int beyond = onA ? o.RegionB : o.RegionA;
+                if (!Route(start, beyond, listener, listenerRegion, out var answer)) continue;
+                float r = MathF.Max(1f, Vector3.Distance(start, listener));
+                part = sTau / (8f * MathF.PI) * answer.Mid * answer.Mid / (r * r);
+                from = answer.Apparent;
+            }
+            energy += part;
+            if (part > best)
+            {
+                best = part; via = from;
+                inField = o.Centre + (onA ? o.Normal : -o.Normal) * (o.HalfDepth + 2f);
+            }
+        }
+        return energy;
+    }
+
+    /// <summary>
     /// What reaches the ear when the straight way (through the walls, or over one edge) and the way by the
     /// openings compete: per band, the one that delivers more; and whether the openings deliver more over
     /// all, which decides where the sound is heard from. One rule, used by every voice.
@@ -625,8 +752,24 @@ public sealed class OpeningRoutes
         {
             int[] ignoreA = k > 0 ? _openings[chain[k - 1].Opening].Contents : Array.Empty<int>();
             int[] ignoreB = k < n ? _openings[chain[k].Opening].Contents : Array.Empty<int>();
-            Vector3 from = k > 0 ? Face(_openings[chain[k - 1].Opening], x[k], x[k + 1]) : x[k];
-            Vector3 to = k < n ? Face(_openings[chain[k].Opening], x[k + 1], x[k]) : x[k + 1];
+            // Inside the opening's edges, not on them: a crossing hugs the edge it bends round, and that
+            // bend is the aperture's to charge (Aperture, below). A leg ending AT the jamb ends in the
+            // corner between the jamb and an open leaf hinged on it, with no way round the leaf.
+            Vector3 from = k > 0 ? Face(_openings[chain[k - 1].Opening], Inset(_openings[chain[k - 1].Opening], x[k]), x[k + 1]) : x[k];
+            Vector3 to = k < n ? Face(_openings[chain[k].Opening], Inset(_openings[chain[k].Opening], x[k + 1]), x[k]) : x[k + 1];
+            // Off the face, not on it. A leg ending ON the wall's surface touches the wall beside the
+            // doorway, and the clearance check pads every other box by a joint's width: every way round
+            // whatever stood in front of the door (its own leaf, swung open) was refused, and the leaf
+            // was charged as solid steel. A car down the street from an open front door came in at the
+            // shut-door level ("sound struggles through the door only when loud things pass").
+            Vector3 along = to - from;
+            float span = along.Length();
+            if (span > 4f * FaceClearance)
+            {
+                along /= span;
+                if (k > 0) from += along * FaceClearance;
+                if (k < n) to -= along * FaceClearance;
+            }
             legs.Add(Leg(k > 0 ? chain[k - 1].Opening : -1, from, k < n ? chain[k].Opening : -1, to, ignoreA, ignoreB));
         }
 
@@ -814,6 +957,22 @@ public sealed class OpeningRoutes
         _legCache[key] = gains;
         return gains;
     }
+
+    /// <summary>A point in an opening's plane held <see cref="EdgeClearance"/> inside its edges.</summary>
+    private static Vector3 Inset(Opening o, Vector3 p)
+    {
+        Vector3 d = p - o.Centre;
+        float n = Vector3.Dot(d, o.Normal), u = Vector3.Dot(d, o.Across), v = Vector3.Dot(d, o.Up);
+        float hu = MathF.Max(0f, o.HalfWidth - EdgeClearance), hv = MathF.Max(0f, o.HalfHeight - EdgeClearance);
+        return o.Centre + o.Normal * n + o.Across * Math.Clamp(u, -hu, hu) + o.Up * Math.Clamp(v, -hv, hv);
+    }
+
+    /// <summary>How far inside an opening's edges a leg is taken to end, metres.</summary>
+    private const float EdgeClearance = 0.15f;
+
+    /// <summary>How far off an opening's face a leg is taken to end, metres: past the joint padding of
+    /// <see cref="RouteJointMetres"/>, so the wall beside the doorway does not count as in the way.</summary>
+    private const float FaceClearance = 0.1f;
 
     /// <summary>The finest cell a leg is kept for, metres; coarser by powers of two with its length.</summary>
     private const float LegCellMetres = 0.25f;

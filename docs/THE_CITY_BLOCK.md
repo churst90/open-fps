@@ -1,6 +1,6 @@
 # The city block, and rooms that measure themselves (2026-09-19)
 
-Step 1 of `docs/NEXT_THE_CITY.md`: *"two apartment blocks with interiors, a street between, a tunnel
+Step 1 of the city plan: *"two apartment blocks with interiors, a street between, a tunnel
 at one end, a garage, a bus shelter, a metro platform with overhang, zones under all of it."* Static —
 no traffic, no pedestrians, no rail, no aircraft. Each of those needs something this map is the test
 of, and the order they come in is in that document.
@@ -190,7 +190,7 @@ prefabs and nothing catches it in C#.
 
 ## Where this leaves the order
 
-Done: the block, and rooms that measure themselves. Next, in the order of `docs/NEXT_THE_CITY.md`:
+Done: the block, and rooms that measure themselves. Next, in the order of the city plan:
 
 1. **Walk it and listen** — `capture`, and `--room-walk` in the tunnel, the garage and a stairwell.
    Every number above is measured; none of it has been heard.

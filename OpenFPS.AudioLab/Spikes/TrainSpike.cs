@@ -41,7 +41,7 @@ public static class TrainSpike
         var presets = args.Where(a => ModelLibrary.Knows(ModelLibrary.Kinds.Train, a)).ToList();
         if (presets.Count == 0) presets = ModelLibrary.Ids(ModelLibrary.Kinds.Train).ToList();
 
-        string dir = Path.Combine(AppContext.BaseDirectory, "ASSETS", "SOUNDS", "TRAINS");
+        string dir = OpenFPS.AudioLab.LabPaths.Output("TRAINS");
         Directory.CreateDirectory(dir);
         Console.WriteLine("\n  Trains, from the lineside.\n");
 

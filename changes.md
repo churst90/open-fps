@@ -4,6 +4,46 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-02
 
+- The car starter, rebuilt over six rounds of renders (round 5 approved: "much much better"):
+  - It is a machine, not a tone: the motor has its own inertia and drives the crank through a
+    one-way clutch, which lets go as the crank springs off each compression and clacks picking it
+    up, and overruns when the engine catches. Nothing climbs in pitch at the end.
+  - Brush and gear noise, pink from 250 Hz to 6 kHz, swelling with load; the ring-gear mesh and an
+    11-slot armature whine stand 8-15 dB over it, as in six recorded starts (Freesound, kept in
+    inbox/starter-2026-10-02/round4/real/). The noise is 5 dB under that, at Cody's ask.
+  - Cranking speed 200 rpm by default (was 250, and the engines actually ran at 500); the key is
+    let go at 1.5 times cranking speed, where an engine computer cuts the starter.
+  - From the kerb it comes out from under the car, not through the engine bay; from the seat it
+    comes through the mounts and floor, low-passed at 150 Hz. Louder with displacement.
+  - Mowers fire on their first revolution (a magneto) and crank at 600 rpm (pull cord) and 300.
+- The street washes in through an open door:
+  - A voice rings its own room from before the walls: the send comes off the input end of its
+    chain at the fader's level, not after the route's EQ.
+  - Another place's reverb is set by `OpeningRoutes.FieldAt`: each opening radiates its share of
+    the field, straight or by the routes, plus what comes in builds the listener's own room's field.
+    It replaces a one-opening rule that gave a corridor two openings from the street nothing.
+  - Indoors, the street's reverb is traced from 2 m outside the opening it comes in by.
+- One speed of sound (the temperature's) for Doppler, echoes, the ground reflection and flight
+  time. The wind no longer rides on the listener's velocity and bends every pitch.
+- Driving aid tones and lane ticks play in the head: panned by direction, with no HRTF, distance,
+  room, reverb or echo.
+- The supersonic crack placeholder and the synthesised action clicks were removed; docs/GUNFIRE.md
+  says how the crack is to be built.
+- Openings come from the geometry (docs/RESEARCH_2026-10-02.md, "Doors and open sides"):
+  - Every gap in a room's walls is an opening, as big as the gap and placed in it
+    (`FaceOpenings`): open sides, tunnel mouths, doorways with no door. A door is the same opening
+    with its leaf in it. Region boxes drawn a little off their walls no longer leave strips of
+    "gap" round a room.
+  - One opening per gap, not one per pair of rooms. A room with a door and an open side to the
+    street has both; two doorways between two rooms are two openings.
+  - A composite's uncovered sides and roof are open, not walls, and become openings the same way,
+    including for a building put down after the map loaded. The floor is never open.
+  - An opening's depth no longer counts a wall that runs through it (a tunnel's side wall made its
+    end 50 m deep).
+  - City: 524 openings and 14 that disagreed with the geometry before; 679 and none now. Three
+    were map faults, now fixed in city.json and gen_city.py: the terminal's road-side steel door and
+    the hangar's back door had no hole cut in their walls, and the terminal's north door was linked
+    to the middle concourse.
 - Server security, written up in docs/SERVER_SECURITY.md:
   - `/where` is for Dev and Admin only. `/profile` shows role, real name (`/realname`), online,
     away (`/afk`) or idle, and the map; never coordinates, direction or distance.
@@ -47,6 +87,28 @@ Recent work, newest first. `git log` has the rest.
 - Old code out: the JSON user store, the unused AI state machine, the map publish stub, beacon data
   in every entity state, `PlayerJoined` and `CollisionEvent` messages, four unused components, about
   400 lines of uncalled methods, and the BepuPhysics package.
+- More old code out (about 8,000 lines with the docs):
+  - the weapons runtime (`WeaponMechanics`, `ShotResolver`), the recorded-blast path
+    (`CompositeBlast`, `RecordedBlend`, `FiringTakeIndex`) and the weapon fields only they read
+    (magazines, handling times, damage, sound folders). The game fires `WeaponSynth.MuzzleBlast`.
+  - `PoliceSirenGenerator` (the siren is `SirenSpec`; its wav stays).
+  - the tail A/B switches `OPENFPS_TAIL=full`, `OPENFPS_TAIL_SDM`, `OPENFPS_TAIL_PARAMETRIC`,
+    `OPENFPS_TAIL_AMBISONIC` and `OPENFPS_DIFFUSE_TAIL`, with the parametric tail and the ambisonic
+    diffuse tail they selected. The default tail is unchanged.
+  - `SpatialEmitter.EnableReverb`, which nothing read. Direct sounds send to the reverb and
+    reflections do not, as before.
+  - `WorldStateUpdate.Season` and `RegionComponent.Environment` (and the prefab field `EnvType`),
+    which nothing read.
+  - lab spikes and flags: the Steam Audio migration spikes, `BattleSpike`, `GunshotSpike`,
+    `AmbientBedSpike`, `EarTest`, `BoundarySpike`, `StreetSceneSpike`, `GripSpike`, and 39 flags in
+    all. `AudioLab --help` lists every instrument left. The lab finds the repository one way
+    (`LabPaths`).
+  - tools: `sabotage-rooms.py`, the footstep synthesis scripts, the first car door fit.
+  - docs: STEAM_AUDIO_MIGRATION, CROSS_PLATFORM_PLAN, ROADMAP, NEXT_CLEANSING_PASS, NEXT_THE_CITY,
+    VOICES_MACHINES_AND_THE_CITY, NEXT_AFTER_THE_TAIL.
+- Both client heads log why they stopped through one helper (`ProcessLifeLog`).
+- Dated comments in `ClientGameSession`, `WorldAudioPlayer` and `AsyncAcousticWorker` now say what
+  the code does.
 - `OpenFPS.Common` changed: the Windows client needs a new build, and the server needs a restart.
 
 ## 2026-10-01

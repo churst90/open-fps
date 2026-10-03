@@ -6,7 +6,7 @@ namespace OpenFPS.Tests;
 /// <summary>Unit tests for the pure Steam Audio mapping logic added in Phase 4 (no native libs needed).</summary>
 public class SteamAudioMappingTests
 {
-    // --- Pathing SH -> world arrival direction (convention pinned by SimPathDirSpike) ---
+    // --- Pathing SH -> world arrival direction (convention measured from the simulator) ---
     // Raw order-1 SH (ACN): [0]=W, [1]=m-1, [2]=m0, [3]=m+1. Signs below are the measured calibration data,
     // taken when the scene was handed to Steam Audio in the game's frame. Since 2026-09-29 the scene and
     // every source go through Phonon.World, which negates z (Steam Audio's forward is -z), so an arrival

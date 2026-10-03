@@ -141,6 +141,17 @@ public sealed record VehicleBody
     public float SealLeak { get; init; } = 0.03f;
 
     /// <summary>
+    /// How far down the starter is in the cabin, dB, against its level at a metre in the open.
+    ///
+    /// The starter is bolted to the bellhousing, so it does not reach the cabin the way the block's
+    /// airborne noise does, through the firewall's mass law (thirty-odd decibels down at its whine).
+    /// It shakes the gearbox, the mounts carry that into the floor and the tunnel, and they radiate
+    /// it inside. A normal starter drive is 60-70 dB, and from the seat it is the loudest thing in a
+    /// car for the second before the engine catches: an 82 dB starter about eighteen decibels down.
+    /// </summary>
+    public float StarterPathLossDb { get; init; } = 18f;
+
+    /// <summary>
     /// Wind noise inside at 110 km/h, dB SPL — the one anchor the aero noise is hung off.
     ///
     /// It is turbulence over the mirrors, the pillars and the seals, and its power goes as the SIXTH

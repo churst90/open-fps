@@ -430,8 +430,7 @@ public sealed class DrivingAids
             Range = 80f,
             Essential = true,
             IsEvent = true,
-            Type = EmitterType.WorldLocked,
-            EnableReverb = false,
+            Type = EmitterType.UI,           // in the head: dry, panned, not out on the road
         });
     }
 
@@ -452,8 +451,7 @@ public sealed class DrivingAids
             MinDistance = 40f,
             Range = 80f,
             Essential = true,
-            Type = EmitterType.WorldLocked,
-            EnableReverb = false,
+            Type = EmitterType.UI,           // in the head: dry, panned, not out on the road
         };
         if (_audio.IsPlaying(id)) _audio.UpdateSpatialAttributes(e);
         else _audio.PlayPhysicalSoundDirect(e);

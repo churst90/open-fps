@@ -97,7 +97,7 @@ public static class ClapRoomSpike
                         Volume = placed.Gain, Range = 200f, MinDistance = placed.ReferenceDistance, Pitch = 1f,
                         ConeInside = 360f, ConeOutside = 360f, ConeOutsideVolume = 1f,
                         EqLow = 1f, EqMid = 1f, EqHigh = 1f, ApertureFactor = 1f,
-                        IsEvent = true, Essential = true, EnableReverb = true, TargetRegionId = RoomId,
+                        IsEvent = true, Essential = true, TargetRegionId = RoomId,
                     });
                 }
                 provider.Update();

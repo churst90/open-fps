@@ -41,23 +41,7 @@ public static class Program
         string? fmodArmed = OpenFPS.Client.Core.AudioEngine.Fmod.FmodDebugLog.ArmFromEnvironment();
         if (fmodArmed != null) Log.Information("{Line}", fmodArmed);
 
-        // A clean exit, an exception on some thread and a native crash all look the same from the
-        // chair: the sound stops. These say which it was; a native crash is the one that says nothing.
-        AppDomain.CurrentDomain.ProcessExit += (_, _) =>
-        {
-            Log.Information("Client process exiting normally (ran {Sec:F0} s).", (DateTime.UtcNow - StartedUtc).TotalSeconds);
-            Log.CloseAndFlush();
-        };
-        AppDomain.CurrentDomain.UnhandledException += (_, e) =>
-        {
-            Log.Fatal(e.ExceptionObject as Exception, "UNHANDLED EXCEPTION on a background thread — terminating={T}.", e.IsTerminating);
-            Log.CloseAndFlush();
-        };
-        System.Threading.Tasks.TaskScheduler.UnobservedTaskException += (_, e) =>
-        {
-            Log.Error(e.Exception, "Unobserved task exception (the task was collected without anyone reading it).");
-            e.SetObserved();
-        };
+        ProcessLifeLog.Install(StartedUtc);
         Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
         Application.ThreadException += (_, e) => Log.Error(e.Exception, "Exception on the UI thread.");
 

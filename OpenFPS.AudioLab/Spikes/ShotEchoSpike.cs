@@ -25,7 +25,7 @@ public static class ShotEchoSpike
         var shotXz = S("shot") is { } sh ? P(sh) : new[] { at[0] + 0.5f, at[1] };
         var src = new Vector3(shotXz[0], 1.5f, shotXz[1]);
 
-        string root = "/home/cody/external-rescue/Github/open-fps/OpenFPS.Server/";
+        string root = OpenFPS.AudioLab.LabPaths.Server() + System.IO.Path.DirectorySeparatorChar;
         var (world, _) = SirenRouteSpike.Load(root + "maps/" + map + ".json", root + "prefabs", "none", 0f);
         var boxes = SteamAudioScene.BoxesFromWorld(world);
         var solids = boxes.Select(b => new EarlyReflections.Solid(b.Center, b.Size, b.Rotation, b.Material)).ToList();

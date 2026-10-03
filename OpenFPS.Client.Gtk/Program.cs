@@ -114,8 +114,7 @@ internal static partial class GtkClientProgram
         //
         // FMOD ships a LOGGING build, libfmodL.so, which validates every call and reports API misuse
         // by name — the handle that was stale, the object that was still connected, the thread it
-        // happened on. Three sessions went into reading fault addresses out of core files to learn
-        // things this build would have printed.
+        // happened on: things otherwise read out of fault addresses in core files.
         //
         // It must be armed BEFORE System::create or it does nothing at all, which is why it is here
         // and not in the audio provider. `run-gtk-client.sh fmodlog` swaps the library in and sets
@@ -124,30 +123,7 @@ internal static partial class GtkClientProgram
         if (fmodArmed != null) Serilog.Log.Information("{Line} Use `run-gtk-client.sh fmodlog`.", fmodArmed);
 
         // ── SAY WHY IT STOPPED ───────────────────────────────────────────────────────────────────
-        //
-        // A clean quit, an unhandled exception on a background thread, and a native crash all look
-        // identical from the chair, because what a player notices is the sound stopping.
-        //
-        // These cost nothing and tell them apart. A clean exit says so; an exception says what it was
-        // and on which thread; and a native crash still says nothing here — which is itself the
-        // answer, because then the absence of these lines is what identifies it.
-        AppDomain.CurrentDomain.ProcessExit += (_, _) =>
-        {
-            Serilog.Log.Information("Client process exiting normally (ran {Sec:F0} s).",
-                                    (DateTime.UtcNow - _startedUtc).TotalSeconds);
-            Serilog.Log.CloseAndFlush();
-        };
-        AppDomain.CurrentDomain.UnhandledException += (_, e) =>
-        {
-            Serilog.Log.Fatal(e.ExceptionObject as Exception,
-                              "UNHANDLED EXCEPTION on a background thread — terminating={T}.", e.IsTerminating);
-            Serilog.Log.CloseAndFlush();
-        };
-        System.Threading.Tasks.TaskScheduler.UnobservedTaskException += (_, e) =>
-        {
-            Serilog.Log.Error(e.Exception, "Unobserved task exception (the task was collected without anyone reading it).");
-            e.SetObserved();
-        };
+        ProcessLifeLog.Install(_startedUtc);
         Console.CancelKeyPress += (_, _) => Serilog.Log.Information("Interrupted at the keyboard.");
 
         // Orca when it is running, speech-dispatcher when it is not — decided per line, not once.

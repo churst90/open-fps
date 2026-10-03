@@ -30,7 +30,7 @@ public static class GroundVoiceSpike
     public static int Run(string[] args)
     {
         string line = Array.Find(args, a => a.EndsWith(".ogg") || a.EndsWith(".wav"))
-                      ?? Path.Combine(Repo(), "OpenFPS.Client/ASSETS/SOUNDS/VOICES/tim/greet_hey_how_s_it_going.ogg");
+                      ?? OpenFPS.AudioLab.LabPaths.Sounds("VOICES", "tim", "greet_hey_how_s_it_going.ogg");
         float at = Arg(args, "--at=", 3f), angle = Arg(args, "--angle=", 30f);
         string outDir = Array.Find(args, a => a.StartsWith("--out="))?[6..]
                         ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "openfps-listen", "ground-voice");
@@ -159,13 +159,6 @@ public static class GroundVoiceSpike
     }
 
     static float Elevation(Vector3 v) => MathF.Asin(Vector3.Normalize(v).Y) * 180f / MathF.PI;
-
-    static string Repo()
-    {
-        var dir = new DirectoryInfo(AppContext.BaseDirectory);
-        while (dir != null && !Directory.Exists(Path.Combine(dir.FullName, "OpenFPS.Client"))) dir = dir.Parent;
-        return dir?.FullName ?? "/home/cody/external-rescue/Github/open-fps";
-    }
 
     static float[] Decode(string path)
     {

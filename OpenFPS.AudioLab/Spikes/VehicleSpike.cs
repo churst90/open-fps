@@ -30,105 +30,6 @@ public static class VehicleSpike
     private static readonly Vector3 Ear = new(4.5f, 1.7f, 0f);
 
     /// <summary>
-    /// The same engine with three camshafts, back to back: stock, mild street, and a big lumpy one.
-    ///
-    /// The lope is not dialled in — it is DERIVED from the cam's duration, because that is where it
-    /// comes from. A long-duration cam has a lot of valve overlap, and at low engine speed there is not
-    /// enough exhaust velocity to stop reversion contaminating the intake charge, so cylinders fill
-    /// unevenly and some firing events come out weak. That unevenness is the lope. It fades as the revs
-    /// rise because above a couple of thousand the overlap starts helping rather than hurting, which is
-    /// exactly why a cammed engine is rough at idle and clean at the top.
-    ///
-    /// So a player building an engine picks a duration and gets the right idle for free.
-    /// </summary>
-    public static int RunCamComparison(bool live)
-    {
-        AcousticRegistry.Initialize();
-        var cams = new (string Name, float Duration)[]
-        {
-            ("stock", 268f),
-            ("mild street", 288f),
-            ("big and lumpy", 310f),
-        };
-
-        string dir = Path.Combine(AppContext.BaseDirectory, "ASSETS", "SOUNDS", "VEHICLES");
-        Directory.CreateDirectory(dir);
-        var files = new List<(string Name, string Path, float Lope)>();
-
-        Console.WriteLine("  The same 6.2 V8 with three camshafts. Idle, then one pull to 5500.\n");
-        foreach (var (name, duration) in cams)
-        {
-            var baseE = EngineProfile.V8SportsFlowmaster40;
-            var engine = baseE with
-            {
-                ExhaustCam = baseE.ExhaustCam with { DurationDegrees = duration },
-                IntakeCam = baseE.IntakeCam with { DurationDegrees = duration - 4f },
-            };
-            var v = VehicleProfile.V8Sports with { Engine = engine };
-            var orders = new List<DriveOrder>
-            {
-                new(DriverAction.Idling, 4.5f),
-                new(DriverAction.Revving, 2.6f, 5500f),
-                new(DriverAction.Idling, 1.8f),
-            };
-            var r = VehicleSynth.Render(v, orders, seed: 5);
-            string path = Path.Combine(dir, $"cam_{name.Replace(' ', '_')}.wav");
-            File.WriteAllBytes(path, VehicleSynth.ToWav16(r.Exhaust));
-            files.Add((name, path, engine.CamLope));
-            Console.WriteLine($"    {name,-14} {duration:F0} deg duration -> overlap {engine.OverlapDegrees:F0} deg, lope {engine.CamLope:F2}");
-            foreach (var line in r.Log)
-                if (line.Contains("Idling")) Console.WriteLine($"                   {line.Trim()}");
-        }
-
-        if (!live)
-        {
-            Console.WriteLine($"\n  wrote {dir}\n  --vehicle-cams-live plays them.");
-            return 0;
-        }
-
-        var provider = new FmodAudioProvider();
-        if (!provider.Initialize()) { Console.WriteLine("  (live playback unavailable)"); return 1; }
-        try
-        {
-            provider.UpdateListener(Ear, Quaternion.Identity, Vector3.Zero, AcousticConstants.GlobalRegionId);
-            for (int i = 0; i < 25; i++) { provider.Update(); Thread.Sleep(8); }
-
-            Console.WriteLine("\n  LIVE. HEADPHONES. Each one idles, then pulls to 5500.\n");
-            int id = -97000;
-            var (gain, reference) = Loudness.Place(110f);
-            foreach (var (name, path, lope) in files)
-            {
-                Console.WriteLine($"    {name} (lope {lope:F2})");
-                provider.PlaySpatialSound(new SpatialEmitter
-                {
-                    EntityId = id--,
-                    SoundId = path,
-                    Type = EmitterType.WorldLocked,
-                    Mode = PlaybackMode.Single,
-                    Position = new Vector3(0f, 0.55f, 6f),
-                    Volume = gain,
-                    Range = Loudness.AudibleRange(110f),
-                    MinDistance = MathF.Max(reference, 3f),
-                    Pitch = 1.0f,
-                    TargetRegionId = AcousticConstants.GlobalRegionId,
-                    EnableReverb = true,
-                    IsEvent = true,
-                });
-                var until = DateTime.UtcNow.AddSeconds(9.4);
-                while (DateTime.UtcNow < until)
-                {
-                    provider.UpdateListener(Ear, Quaternion.Identity, Vector3.Zero,
-                                            AcousticConstants.GlobalRegionId);
-                    provider.Update();
-                    Thread.Sleep(6);
-                }
-            }
-            return 0;
-        }
-        finally { provider.Dispose(); }
-    }
-
-    /// <summary>
     /// The GAME's path: the engine runs live inside an FMOD DSP and follows a road speed, exactly as
     /// a vehicle entity does in the world. The car idles up the road, then passes the listener three
     /// times at three speeds, turning round out of earshot each time. Nothing is pre-rendered.
@@ -170,7 +71,6 @@ public static class VehicleSpike
                 MinDistance = MathF.Max(reference, 3f),
                 Pitch = 1f,
                 TargetRegionId = AcousticConstants.GlobalRegionId,
-                EnableReverb = true,
             };
             provider.PlaySpatialSound(Make(pos, Vector3.Zero, 0f));
 
@@ -228,7 +128,7 @@ public static class VehicleSpike
     }
 
     /// <summary>
-    /// Concrete Row, with cars in it. The listener stands on the pavement of the battle spike's street
+    /// Concrete Row, with cars in it. The listener stands on the pavement of Concrete Row (ConcreteRow)
     /// — six-storey blocks both sides, side streets cut through — while vehicles drive past live.
     /// Each car's engine is the same DSP the game uses; the buildings answer it with first- and
     /// second-order image-source echoes, each a delayed copy of the engine placed at its mirrored
@@ -238,8 +138,8 @@ public static class VehicleSpike
     public static int RunStreet(string[] presets, float[]? speedsKmh)
     {
         AcousticRegistry.Initialize();
-        var boxes = BattleSpike.StreetBoxes();
-        var surfaces = BattleSpike.StreetSurfaces(boxes);
+        var boxes = ConcreteRow.Boxes();
+        var surfaces = ConcreteRow.Surfaces(boxes);
         var speeds = speedsKmh is { Length: > 0 } ? speedsKmh : new[] { 50f, 100f };
         const float C = 340f;
         var ear = new Vector3(-9f, 1.7f, 0f);                // the pavement, west side, near the wall
@@ -248,7 +148,7 @@ public static class VehicleSpike
         if (!provider.Initialize()) { Console.WriteLine("  (live playback unavailable)"); return 1; }
         try
         {
-            provider.SetAcousticMap(BattleSpike.StreetMap());
+            provider.SetAcousticMap(ConcreteRow.Map());
             provider.SetSimulatedReverbDecay(1400f, 0.62f, 0.9f, 1.1f);          // a road between buildings
             provider.UpdateListener(ear, Quaternion.Identity, Vector3.Zero, AcousticConstants.GlobalRegionId);
             var probes = new BoundaryProbe[8];
@@ -276,7 +176,7 @@ public static class VehicleSpike
                     Position = p + Vector3.Transform(new Vector3(0f, 0.3f, v.ExhaustOffsetZ * 0.6f), Quaternion.CreateFromYawPitchRoll(heading, 0f, 0f)),
                     Velocity = vel, Volume = gain, Range = Loudness.AudibleRange(116f),
                     MinDistance = MathF.Max(reference, 3f), Pitch = 1f,
-                    TargetRegionId = AcousticConstants.GlobalRegionId, EnableReverb = true,
+                    TargetRegionId = AcousticConstants.GlobalRegionId,
                 };
                 SpatialEmitter Echo(int id, Reflection r, float g) => new()
                 {
@@ -286,7 +186,7 @@ public static class VehicleSpike
                     Position = r.ApparentPosition, Velocity = Vector3.Zero,
                     Volume = gain, Range = Loudness.AudibleRange(116f),
                     MinDistance = MathF.Max(reference, 3f), Pitch = 1f,
-                    TargetRegionId = AcousticConstants.GlobalRegionId, EnableReverb = false,
+                    TargetRegionId = AcousticConstants.GlobalRegionId,
                 };
 
                 var pos = new Vector3(laneX, 0.6f, roadStart);
@@ -366,7 +266,7 @@ public static class VehicleSpike
                         lastReport = (float)now;
                         Console.WriteLine($"    {now,5:F1}s  {state,-5}  {Vector3.Distance(pos, ear),5:F0} m away  {speed * 3.6f,5:F0} km/h   {voices.Count} facades answering");
                     }
-                    int np = BattleSpike.Probes(ear, boxes, probes);
+                    int np = ConcreteRow.Probes(ear, boxes, probes);
                     provider.UpdateBoundaries(probes.AsSpan(0, np));
                     provider.UpdateListener(ear, Quaternion.Identity, Vector3.Zero, AcousticConstants.GlobalRegionId);
                     provider.Update();
@@ -459,7 +359,7 @@ public static class VehicleSpike
             Console.WriteLine("  Stationary: start, four blips up the rev range in neutral, shut off.\n");
             var r = VehicleSynth.Render(v, revs);
             foreach (var line in r.Log) Console.WriteLine($"    {line}");
-            string sd = Path.Combine(AppContext.BaseDirectory, "ASSETS", "SOUNDS", "VEHICLES");
+            string sd = OpenFPS.AudioLab.LabPaths.Output("VEHICLES");
             Directory.CreateDirectory(sd);
             File.WriteAllBytes(Path.Combine(sd, "v8_rev_exhaust.wav"), VehicleSynth.ToWav16(r.Exhaust));
             File.WriteAllBytes(Path.Combine(sd, "v8_rev_intake.wav"), VehicleSynth.ToWav16(r.Intake));
@@ -485,7 +385,7 @@ public static class VehicleSpike
         var render = VehicleSynth.Render(v, orders);
         foreach (var line in render.Log) Console.WriteLine($"    {line}");
 
-        string dir = Path.Combine(AppContext.BaseDirectory, "ASSETS", "SOUNDS", "VEHICLES");
+        string dir = OpenFPS.AudioLab.LabPaths.Output("VEHICLES");
         Directory.CreateDirectory(dir);
         File.WriteAllBytes(Path.Combine(dir, "v8_exhaust.wav"), VehicleSynth.ToWav16(render.Exhaust));
         File.WriteAllBytes(Path.Combine(dir, "v8_intake.wav"), VehicleSynth.ToWav16(render.Intake));
@@ -547,7 +447,6 @@ public static class VehicleSpike
                     MinDistance = MathF.Max(reference, 3f),
                     Pitch = 1.0f,
                     TargetRegionId = AcousticConstants.GlobalRegionId,
-                    EnableReverb = true,
                     IsEvent = true,
                 });
             }
@@ -647,7 +546,6 @@ public static class VehicleSpike
                     MinDistance = MathF.Max(reference, 3f),
                     Pitch = 1.0f,
                     TargetRegionId = AcousticConstants.GlobalRegionId,
-                    EnableReverb = true,
                     IsEvent = true,
                 });
             }
@@ -679,7 +577,6 @@ public static class VehicleSpike
                         MinDistance = MathF.Max(Loudness.Place(parts[i].Db).ReferenceDistance, 3f),
                         Pitch = 1.0f,
                         TargetRegionId = AcousticConstants.GlobalRegionId,
-                        EnableReverb = true,
                     });
                 }
 

@@ -365,17 +365,6 @@
       "type": "boolean",
       "description": "Any field in this block declares the entity an acoustic REGION — a room volume the listener stands inside. A region must not be solid and must carry a positive RoomSize."
     },
-    "EnvType": {
-      "type": "string",
-      "enum": [
-        "Atmospheric",
-        "Vacuum",
-        "Underwater",
-        "Digital",
-        "LargeOpen",
-        "SmallTight"
-      ]
-    },
     "RoomSize": {
       "$ref": "#/definitions/vector3",
       "description": "Interior dimensions in metres — the volume and surface areas the reverb time is computed from."

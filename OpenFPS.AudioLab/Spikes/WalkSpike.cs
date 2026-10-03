@@ -43,7 +43,7 @@ public static class WalkSpike
         int gap = (int)Num(args, "gap", 10f);
         float startY = Num(args, "y", float.NaN);
 
-        string? mapPath = FindUp(Path.Combine("OpenFPS.Server", "maps", mapId + ".json"));
+        string? mapPath = OpenFPS.AudioLab.LabPaths.Existing(OpenFPS.AudioLab.LabPaths.Server("maps", mapId + ".json"));
         string? prefabDir = mapPath == null ? null
             : Path.Combine(Directory.GetParent(mapPath)!.Parent!.FullName, "prefabs");
         if (mapPath == null || prefabDir == null || !Directory.Exists(prefabDir))
@@ -206,16 +206,6 @@ public static class WalkSpike
                            float.Parse(p[1], CultureInfo.InvariantCulture));
     }
 
-    private static string? FindUp(string relative)
-    {
-        var dir = new DirectoryInfo(Directory.GetCurrentDirectory());
-        for (int i = 0; i < 8 && dir != null; i++, dir = dir.Parent)
-        {
-            string c = Path.Combine(dir.FullName, relative);
-            if (File.Exists(c) || Directory.Exists(c)) return c;
-        }
-        return null;
-    }
 
     private static string? Str(string[] args, string name)
     {

@@ -6,8 +6,8 @@ namespace OpenFPS.Client.Core.AudioEngine.Fmod;
 
 /// <summary>
 /// The tail's spatial rendering alone: three seconds of noise as the tail's omnidirectional channel,
-/// through DiffuseTail both ways (each direction straight through its own head response, and the old
-/// second-order encode and decode), and the two ears' coherence per octave — the maximum normalised
+/// through DiffuseTail (each direction straight through its own head response), and the two ears'
+/// coherence per octave — the maximum normalised
 /// cross-correlation within a millisecond either way, after an octave band-pass, as the research of
 /// 2026-09-29 measured it. A head in a real diffuse field: about 0.95 at 125 Hz, 0.8 at 250, 0.4 at
 /// 500, 0.2 at 1 kHz and under 0.15 above.
@@ -25,44 +25,25 @@ public static class TailIaccSpike
         var au = new Phonon.IPLAudioSettings { samplingRate = Fs, frameSize = Sub };
         var hs = new Phonon.IPLHRTFSettings { type = Phonon.IPL_HRTFTYPE_DEFAULT, volume = 1f, normType = Phonon.IPL_HRTFNORMTYPE_NONE };
         Phonon.iplHRTFCreate(ctx, ref au, ref hs, out IntPtr hrtf);
-        var ds = new Phonon.IPLAmbisonicsDecodeEffectSettings { speakerLayout = Phonon.StereoLayout(), hrtf = hrtf, maxOrder = TracedReverb.Order };
-        Phonon.iplAmbisonicsDecodeEffectCreate(ctx, ref au, ref ds, out IntPtr dec);
-        var orient = Phonon.ListenerFrame(System.Numerics.Quaternion.Identity);
         int ch = TracedReverb.Channels, n = Fs * 3;
         var rng = new Random(5);
         var noise = new float[n];
         for (int i = 0; i < n; i++) noise[i] = (float)(rng.NextDouble() * 2 - 1) * 0.3f;
 
-        foreach (bool binaural in new[] { true, false })
         foreach (float yaw in new[] { 0f, 23f, 45f, 90f })
         {
             var rot = System.Numerics.Quaternion.CreateFromYawPitchRoll(yaw * MathF.PI / 180f, 0f, 0f);
-            orient = Phonon.ListenerFrame(rot);
-            var df = DiffuseTail.Create(ctx, Sub, TracedReverb.Order, ch, dec, orient, hrtf)!;
+            var df = DiffuseTail.Create(ctx, Sub, ch, hrtf);
+            if (df == null) { Console.WriteLine("FAIL: no binaural effects"); return 1; }
             df.SetListenerRotation(rot);
             var L = new float[n]; var R = new float[n];
             var inter = new float[Sub * ch];
-            var field = new Phonon.IPLAudioBuffer(); Phonon.iplAudioBufferAllocate(ctx, ch, Sub, ref field);
-            var ears = new Phonon.IPLAudioBuffer(); Phonon.iplAudioBufferAllocate(ctx, 2, Sub, ref ears);
-            var st = new float[Sub * 2];
-            var dp = new Phonon.IPLAmbisonicsDecodeEffectParams { order = TracedReverb.Order, hrtf = hrtf, orientation = orient, binaural = Phonon.IPL_TRUE };
             for (int at = 0; at + Sub <= n; at += Sub)
             {
                 Array.Clear(inter);
                 for (int k = 0; k < Sub; k++) inter[k * ch] = noise[at + k];
-                if (binaural && df.BinauralReady)
-                {
-                    df.RenderBinaural(inter, Sub, ch);
-                    for (int k = 0; k < Sub; k++) { L[at + k] = df.Stereo[k * 2] + df.Low[k]; R[at + k] = df.Stereo[k * 2 + 1] + df.Low[k]; }
-                }
-                else
-                {
-                    df.Render(inter, Sub, ch, TracedReverb.Order);
-                    Phonon.iplAudioBufferDeinterleave(ctx, df.Sum, ref field);
-                    Phonon.iplAmbisonicsDecodeEffectApply(dec, ref dp, ref field, ref ears);
-                    Phonon.iplAudioBufferInterleave(ctx, ref ears, st);
-                    for (int k = 0; k < Sub; k++) { L[at + k] = st[k * 2] + df.Low[k]; R[at + k] = st[k * 2 + 1] + df.Low[k]; }
-                }
+                df.RenderBinaural(inter, Sub, ch);
+                for (int k = 0; k < Sub; k++) { L[at + k] = df.Stereo[k * 2] + df.Low[k]; R[at + k] = df.Stereo[k * 2 + 1] + df.Low[k]; }
             }
             double eIn = noise.Skip(Fs / 2).Sum(x => (double)x * x), eOut = L.Skip(Fs / 2).Zip(R.Skip(Fs / 2), (l, r) => ((double)l * l + (double)r * r) / 2).Sum();
             var bands = new[] { 125.0, 250, 500, 1000, 2000, 4000 };
@@ -76,9 +57,9 @@ public static class TailIaccSpike
                 double c = 0; for (int i = 0; i + lag < seg.Length; i++) c += seg[i] * (double)seg[i + lag];
                 if (Math.Abs(c) / e0 > ring) { ring = Math.Abs(c) / e0; ringLag = lag; }
             }
-            Console.WriteLine($"{(binaural ? "per-direction HRTF " : "2nd-order ambisonic")} yaw {yaw,3:F0}: level {10 * Math.Log10(eOut / eIn):F1} dB; ringing {ring:F2} at {ringLag * 1000.0 / Fs:F2} ms; IACC "
+            Console.WriteLine($"yaw {yaw,3:F0}: level {10 * Math.Log10(eOut / eIn):F1} dB; ringing {ring:F2} at {ringLag * 1000.0 / Fs:F2} ms; IACC "
                             + string.Join("  ", bands.Select((f, i) => $"{f:F0}:{iacc[i]:F2}"))
-                            + (binaural ? $"   (head's diffuse-field gain {df.DiffuseFieldGainDb:F1} dB)" : ""));
+                            + $"   (head's diffuse-field gain {df.DiffuseFieldGainDb:F1} dB)");
         }
         // The best this head and this estimator can do: 200 directions spread evenly over the sphere
         // (a Fibonacci lattice), each fed its OWN independent noise. Whatever this reads is the real

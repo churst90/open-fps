@@ -512,6 +512,7 @@ public sealed class EngineVoiceState : IRenderedVoice
         float surfaceMass = MathF.Max(0.5f, steel.DensityKgM3 * shell.PanelThicknessM);   // kg/m^2
         _panelCorner = 415f / (MathF.PI * surfaceMass);                                   // rho*c / (pi*m)
         _sealLeak = Math.Clamp(shell.SealLeak, 0f, 1f);
+        _starterPath = MathF.Pow(10f, -MathF.Max(0f, shell.StarterPathLossDb) / 20f);
         _windPaAt110 = 20e-6f * MathF.Pow(10f, shell.WindNoiseDbAt110 / 20f);
         if (!string.IsNullOrEmpty(v.AirSystem))
         {
@@ -685,7 +686,16 @@ public sealed class EngineVoiceState : IRenderedVoice
     private int _interior;
 
     private readonly BodyResonator _cabin;
-    private readonly float _panelCorner, _sealLeak, _windPaAt110;
+    private readonly float _panelCorner, _sealLeak, _windPaAt110, _starterPath;
+    private float _starterLp1, _starterLp2;
+    /// <summary>What of the starter reaches the kerb past the sill and the wheels, as a pressure
+    /// fraction: about six decibels of shielding.</summary>
+    private const float StarterUnderbody = 0.5f;
+    /// <summary>Where the starter's path through the mounts and the floor loses its top, Hz. The
+    /// mounts pass the gear mesh's low partials and the floor's damping mat soaks up the rest: from
+    /// the seat a starter is a muffled whirr, not the buzz it is at the bellhousing. Writable so an
+    /// instrument can bracket it.</summary>
+    public float StarterPathCornerHz = 150f;
     private float _panelLp, _windLp, _windHp, _windHpIn, _interiorMix;
 
     // ── The loudness law, applied to what the engine is doing now ─────────────────────────────
@@ -990,6 +1000,7 @@ public sealed class EngineVoiceState : IRenderedVoice
         }
         else _radiation.Aim(null);
         float panelA = 1f - MathF.Exp(-2f * MathF.PI * _panelCorner * dt);
+        float starterA = 1f - MathF.Exp(-2f * MathF.PI * StarterPathCornerHz * dt);
         // The lift for this block, from the level the machine has been running at lately.
         float liftTarget = 1f;
         if (CompensateLevel && _levelMs > 0)
@@ -1110,7 +1121,11 @@ public sealed class EngineVoiceState : IRenderedVoice
             // or mid-ship — so it goes out of the front tap, not the back with the tailpipe. On the
             // school bus the block is 97.7 dB against an 83 dB silenced pipe, so out of the back an
             // idling bus would be one sound at its tail. Once far enough to be one voice, nothing changes.
-            float bay = _bayLeak > 0f ? (Engine.Block + FrontMix * _bayIntake.Process(Engine.Intake)) * _bayLeak : 0f;
+            float bay = _bayLeak > 0f ? (Engine.Block - Engine.StarterOut + FrontMix * _bayIntake.Process(Engine.Intake)) * _bayLeak : 0f;
+            // The starter is not in the bay: it hangs under the car on the bellhousing, behind the
+            // sill and the wheels but in no enclosure. Through the bay leak it was 16 dB down and a
+            // big V8's start could not be heard from the kerb at all.
+            bay += Engine.StarterOut * MathF.Max(_bayLeak, StarterUnderbody);
             if (_engineAtRear) pa += bay; else front += bay;
             // The air and the door beeper are their own sources at their own levels, each at its own
             // end of the vehicle: the door valve, the kneeling valve and the beeper at the front door,
@@ -1164,6 +1179,11 @@ public sealed class EngineVoiceState : IRenderedVoice
                 float atPanels = Engine.Block + Engine.Intake + 0.5f * Engine.Exhaust + (tyreRear + tyreFront) * 0.6f * 0.70710678f * TyreMix;
                 _panelLp += (atPanels - _panelLp) * panelA;
                 float inCabin = _panelLp + _sealLeak * atPanels;
+                // The starter through the mounts and the floor (VehicleBody.StarterPathLossDb).
+                // Through rubber and a damped floor the top is gone: two poles at the path's corner.
+                _starterLp1 += (Engine.StarterOut * _starterPath - _starterLp1) * starterA;
+                _starterLp2 += (_starterLp1 - _starterLp2) * starterA;
+                inCabin += _starterLp2;
                 inCabin += _cabin.Process(inCabin);
 
                 // The wind: broadband turbulence, most of it between a couple of hundred hertz and a

@@ -33,7 +33,7 @@ public static class EarshotSpike
         string law = Str(args, "law") ?? "both";
         var at = Vec(Str(args, "at")) ?? new Vector3(0f, 1.6f, -40f);
 
-        string? mapPath = FindUp(System.IO.Path.Combine("OpenFPS.Server", "maps", mapId + ".json"));
+        string? mapPath = OpenFPS.AudioLab.LabPaths.Existing(OpenFPS.AudioLab.LabPaths.Server("maps", mapId + ".json"));
         if (mapPath == null) { Console.WriteLine($"  FAIL: no maps/{mapId}.json above {Environment.CurrentDirectory}"); return 1; }
         var data = System.Text.Json.JsonSerializer.Deserialize<MapFile>(System.IO.File.ReadAllText(mapPath),
             new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
@@ -187,15 +187,5 @@ public static class EarshotSpike
         var p = s.Split(',');
         return p.Length >= 2 && float.TryParse(p[0], out float x) && float.TryParse(p[^1], out float z)
              ? new Vector3(x, 1.6f, z) : null;
-    }
-    private static string? FindUp(string rel)
-    {
-        var d = new System.IO.DirectoryInfo(Environment.CurrentDirectory);
-        for (int i = 0; i < 8 && d != null; i++, d = d.Parent)
-        {
-            string c = System.IO.Path.Combine(d.FullName, rel);
-            if (System.IO.File.Exists(c)) return c;
-        }
-        return null;
     }
 }

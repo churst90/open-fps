@@ -402,9 +402,11 @@ public sealed class VirtualDriver
             return;
         }
         _engine.Ignition = true;
-        // The key is held until it catches: until it fires and pulls away from the starter's speed.
-        // Released on speed alone, the crank passed 1.5 times its cranking speed before the engine
-        // computer had synchronised, and the start was a starter blip and a silent coast.
+        // The key is held until it catches: until it fires and pulls away from the starter's speed,
+        // which is where an engine computer cuts the starter (about 300 rpm). Released on speed
+        // alone, the crank passed 1.5 times its cranking speed before the engine computer had
+        // synchronised, and the start was a starter blip and a silent coast. Held longer, the
+        // starter's clutch only overruns: the engine has already left it.
         _engine.Starter = !_engine.Firing || _engine.Rpm < e.CrankingRpm * 1.5f;
 
         // Estimate the target's acceleration, so the throttle can lead rather than lag.

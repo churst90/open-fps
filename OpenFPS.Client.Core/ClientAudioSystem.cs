@@ -368,6 +368,7 @@ public class ClientAudioSystem
         WorldAudio.Ground = ApplyRecordedGround;
         _birds = new BirdLife(audio, _acoustics);
         WorldAudio.Received = message => _birds.Heard(message, OpenFPS.Common.AudioClock.Now);
+        _audio.RoutesSource = () => _acoustics.Routes;
         _acousticWorker = new AsyncAcousticWorker(_acoustics);
         WorldAudio.Worker = _acousticWorker;
         _acousticWorker.Start();
@@ -484,9 +485,9 @@ public class ClientAudioSystem
             world.WindVelocity, world.WindGustiness, _now(), _state.ShelterFactor);
         _state.FeltWind = feltWind;
 
-        // A fraction of the moving air rides on the listener velocity, so wind produces a subtle Doppler
-        // on distant sounds — and a gust now audibly swells and drops it.
-        Vector3 listenerVelocity = _state.Velocity + feltWind * 0.1f;
+        // Not the wind: a uniform wind moves the source, the listener and the air together and shifts
+        // no pitch. A share of it added here bent every pitch in the world with each gust.
+        Vector3 listenerVelocity = _state.Velocity;
         // Sitting in something, you face the way it faces: the session sets your heading from the
         // vehicle every frame (ClientGameSession.FollowRide), so the ears and the compass agree.
         var listenerRotation = _state.Rotation;
@@ -494,7 +495,7 @@ public class ClientAudioSystem
         {
             // ...and you move at its speed. A passenger is not predicted, so their own velocity reads
             // zero — which against the vehicle's moving voice is a Doppler shift on your own bus.
-            listenerVelocity = carrying.Velocity + feltWind * 0.1f;
+            listenerVelocity = carrying.Velocity;
         }
         _audio.UpdateListener(visualEyePos, listenerRotation, listenerVelocity, listenerRegionId);
         _audio.UpdateShelter(_state.ShelterFactor);
@@ -1715,7 +1716,6 @@ public class ClientAudioSystem
             TransmissionBleed = path.TransmissionBleed,
             EffectiveDistance = path.EffectiveDistance,
             TargetRegionId = path.RegionId,
-            EnableReverb = true,
         };
         ApplyGround(ref e, _groundWorld);
         if (_audio.IsPlaying(voiceId)) _audio.UpdateSpatialAttributes(e);
@@ -1857,7 +1857,6 @@ public class ClientAudioSystem
                 TransmissionBleed = path.TransmissionBleed,
                 EffectiveDistance = path.EffectiveDistance,
                 TargetRegionId = path.RegionId,
-                EnableReverb = true,
             };
             ApplyGround(ref e, _groundWorld);
             if (_audio.IsPlaying(voiceId)) _audio.UpdateSpatialAttributes(e);
@@ -1936,7 +1935,6 @@ public class ClientAudioSystem
             TransmissionBleed = path.TransmissionBleed,
             EffectiveDistance = path.EffectiveDistance,
             TargetRegionId = path.RegionId,
-            EnableReverb = true,
         };
         ApplyGround(ref e, _groundWorld);
         if (_audio.IsPlaying(voiceId)) _audio.UpdateSpatialAttributes(e);
@@ -2055,7 +2053,6 @@ public class ClientAudioSystem
             ExtentMetres = extent,
             Pitch = 1f,
             TargetRegionId = AcousticConstants.GlobalRegionId,
-            EnableReverb = true,
         };
         if (_audio.IsPlaying(voiceId)) _audio.UpdateSpatialAttributes(e);
         else _audio.PlayPhysicalSoundDirect(e);
@@ -2327,7 +2324,6 @@ public class ClientAudioSystem
             IsReflection = false,
             // Inside, its room is yours — the cabin — whatever room the car's middle is in.
             TargetRegionId = interior ? _listenerRegion : acousticPath.RegionId,
-            EnableReverb = true,
             ConeInside = def.SoundEmitter.ConeInsideAngle,
             ConeOutside = def.SoundEmitter.ConeOutsideAngle,
             ConeOutsideVolume = def.SoundEmitter.ConeOutsideVolume,
@@ -2425,7 +2421,7 @@ public class ClientAudioSystem
         if (engineKey.Length > 0)
         {
             long echoAt = System.Diagnostics.Stopwatch.GetTimestamp();
-            _engineEchoes.Update(snap.Id, emitter, acousticPath, eyePos, AudioPhysics.SpeedOfSound, engineDt, _audio,
+            _engineEchoes.Update(snap.Id, emitter, acousticPath, eyePos, AudioPhysics.CurrentSpeedOfSound, engineDt, _audio,
                                  traced: OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.HasTracedEchoes(snap.Id));
             _partMs[0] += Ms(echoAt);
         }
@@ -2702,9 +2698,9 @@ public class ClientAudioSystem
     {
         var solids = _acoustics.ReflectionSolids(world);
         if (solids.Count == 0) return;
-        OpenFPS.Common.EarlyReflections.Find(stepPos, ear, solids, _stepArrivals, AudioPhysics.SpeedOfSound,
+        OpenFPS.Common.EarlyReflections.Find(stepPos, ear, solids, _stepArrivals, AudioPhysics.CurrentSpeedOfSound,
                                              maxOrder: 2, keep: WorldAudioPlayer.MaxRoomEchoes * 2,
-                                             maxExtraPathMetres: WorldAudioPlayer.RoomEchoWindowSeconds * AudioPhysics.SpeedOfSound);
+                                             maxExtraPathMetres: WorldAudioPlayer.RoomEchoWindowSeconds * AudioPhysics.CurrentSpeedOfSound);
         _stepArrivals.Sort(static (a, b) => b.GainMid.CompareTo(a.GainMid));
         float direct = Vector3.Distance(stepPos, ear);
         int added = 0, secondOrder = 0;
@@ -2745,7 +2741,6 @@ public class ClientAudioSystem
                 CarriesPath = true,
                 Occlusion = 0f, ApertureFactor = 1f, TransmissionBleed = 0f,
                 EqLow = MathF.Pow(10f, (loss.LowDb + lowDb) / 20f), EqMid = 1f, EqHigh = MathF.Pow(10f, (loss.HighDb + highDb) / 20f),
-                EnableReverb = false,
                 TargetRegionId = _listenerRegion,
             });
             if (++added >= WorldAudioPlayer.MaxRoomEchoes) break;
@@ -2900,7 +2895,7 @@ public class ClientAudioSystem
         low *= Coherence(250f, direct, rho);
         high *= Coherence(2500f, direct, rho);
         e.GroundHeight = gb;
-        e.GroundDelaySeconds = (mirrored - direct) / AudioPhysics.SpeedOfSound;
+        e.GroundDelaySeconds = (mirrored - direct) / AudioPhysics.CurrentSpeedOfSound;
         e.GroundLowGain = low * spread;
         e.GroundHighGain = high * spread;
     }
@@ -2909,7 +2904,7 @@ public class ClientAudioSystem
     internal static float Coherence(float hz, float distance, float rho)
     {
         const float Mu2 = 5e-6f, OuterScale = 1.1f;
-        float k = 2f * MathF.PI * hz / AudioPhysics.SpeedOfSound;
+        float k = 2f * MathF.PI * hz / AudioPhysics.CurrentSpeedOfSound;
         float sigma2 = MathF.Sqrt(MathF.PI) * Mu2 * k * k * distance * OuterScale;
         float x = MathF.Max(1e-4f, rho / OuterScale);
         float csp = MathF.Sqrt(MathF.PI) * 0.5f * Erf(x) / x;

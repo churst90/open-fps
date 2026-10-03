@@ -41,8 +41,8 @@ internal sealed class TracedReverb : IDisposable
 
     public const float DurationSeconds = 2.0f;
 
-    /// <summary>What the simulator produces: HYBRID gives the convolution IR AND the reverb times the
-    /// parametric tail is built from (TracedReverbState.TailEffect); CONVOLUTION the IR alone.</summary>
+    /// <summary>What the simulator produces: HYBRID gives the convolution IR and the reverb times;
+    /// CONVOLUTION the IR alone.</summary>
     public static int SimulatedType = Phonon.IPL_REFLECTIONEFFECTTYPE_HYBRID;
     public const int Order = 2;
     public const int Channels = (Order + 1) * (Order + 1);
@@ -95,11 +95,8 @@ internal sealed class TracedReverb : IDisposable
     /// <summary>The last trace's omnidirectional channel as read back, whole and unwindowed: for the lab.</summary>
     public volatile float[]? LastReadBack;
     /// <summary>The tail's directional part (SdmTailIr), from the fade-in to ~0.3 s; <see cref="Late"/>
-    /// is then only the diffuse remainder after it. OPENFPS_TAIL_SDM=0: none, and Late is all of it.</summary>
+    /// is then only the diffuse remainder after it. Until the axes are known, Late is all of it.</summary>
     public volatile SdmTailIr? LateSdm;
-    // Only with the binaural tail: the directional part is rendered there, and without it the
-    // remainder (which starts at 0.25 s when this is on) would leave 50-250 ms empty.
-    public static readonly bool Sdm = Environment.GetEnvironmentVariable("OPENFPS_TAIL_SDM") != "0" && DiffuseTail.Binaural;
     private System.Numerics.Vector3 _ax1, _ax2, _ax3;
     private bool _axesKnown;
     private float[] _c1 = Array.Empty<float>(), _c2 = Array.Empty<float>(), _c3 = Array.Empty<float>();
@@ -310,7 +307,7 @@ internal sealed class TracedReverb : IDisposable
                     if (ReadBack() is { } w)
                     {
                         LastReadBack = w;
-                        if (Sdm && _axesKnown)
+                        if (_axesKnown)
                         {
                             var dirs = new System.Numerics.Vector3[DiffuseBranch.Count];
                             for (int d = 0; d < dirs.Length; d++) dirs[d] = DiffuseTail.Direction(d);

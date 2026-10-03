@@ -248,9 +248,6 @@ public class PrefabTemplate
     /// listener can be inside. A region must not be solid, and must carry a non-zero
     /// <see cref="RoomSize"/>, because its reverb is computed from that volume.</summary>
     public bool? IsIndoor { get; set; }
-    /// <summary>AcousticEnvironmentType by NAME: "Atmospheric", "Vacuum", "Underwater", "Digital",
-    /// "LargeOpen", "SmallTight".</summary>
-    public AcousticEnvironmentType? EnvType { get; set; }
     /// <summary>Interior dimensions in metres, used for the room's volume and surface areas.</summary>
     public Vector3? RoomSize { get; set; }
     /// <summary>Ambience loop crossfaded in while the listener is inside this region.</summary>

@@ -40,7 +40,7 @@ public static class GunSpecSpike
 
     public static int Run(string[] args)
     {
-        string root = "/home/cody/external-rescue/Github/open-fps/inbox";
+        string root = OpenFPS.AudioLab.LabPaths.InRepo("inbox");
         string dir = Arg(args, "out") ?? Path.Combine(root, "gunfire-spec-2026-09-24");
         string refs = Arg(args, "refs") ?? Path.Combine(root, "gunfire-references-2026-09-24");
         Directory.CreateDirectory(dir);

@@ -70,7 +70,7 @@ shape of it.
 | Emitter | `HasEmitter` + `SoundId`, `StartSoundId`, `StopSoundId`, `Volume`, `Range`, `MinDistance`, `Mode`, `EmitterDirection`, `Cone*` | `SoundEmitterComponent` |
 | Granular | `IsGranular`, `Granular*` | (same component) |
 | Synth | `IsSynth`, `Synth*` | (same component) |
-| Region | `IsIndoor`, `EnvType`, `RoomSize`, `AmbienceId`, `ReverbScale`, `RoomMaterials` | `RegionComponent` |
+| Region | `IsIndoor`, `RoomSize`, `AmbienceId`, `ReverbScale`, `RoomMaterials` | `RegionComponent` |
 | Portal | `RegionAId`, `RegionBId`, `ApertureSize` | `PortalComponent` |
 
 `ColliderSize` is **full extents in metres**, multiplied by the map instance's `Scale`. So a

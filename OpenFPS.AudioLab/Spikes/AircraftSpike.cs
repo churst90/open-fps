@@ -138,7 +138,7 @@ public static class AircraftSpike
         var presets = args.Where(a => AircraftProfile.Presets.ContainsKey(a)).ToList();
         if (presets.Count == 0) presets = AircraftProfile.Presets.Keys.ToList();
 
-        string dir = Path.Combine(AppContext.BaseDirectory, "ASSETS", "SOUNDS", "AIRCRAFT");
+        string dir = OpenFPS.AudioLab.LabPaths.Output("AIRCRAFT");
         Directory.CreateDirectory(dir);
         Console.WriteLine("\n  Aircraft, flying past a listener on the ground.\n");
 
@@ -339,7 +339,7 @@ public static class AircraftSpike
             presets = AircraftProfile.Presets.Where(kv => kv.Value().Gear != null).Select(kv => kv.Key).ToList();
         float offset = Arg(args, "offset", 120f), seconds = Arg(args, "sec", 22f);
 
-        string dir = Path.Combine(AppContext.BaseDirectory, "ASSETS", "SOUNDS", "AIRCRAFT");
+        string dir = OpenFPS.AudioLab.LabPaths.Output("AIRCRAFT");
         Directory.CreateDirectory(dir);
         Console.WriteLine("\n  Landings, heard from beside the runway.\n");
 

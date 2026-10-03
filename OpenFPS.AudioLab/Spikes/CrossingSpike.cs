@@ -37,7 +37,7 @@ public static class CrossingSpike
         AcousticRegistry.Initialize();
         var keys = args.Where(a => ModelLibrary.Knows(ModelLibrary.Kinds.Air, a)).ToList();
         if (keys.Count == 0) keys = ModelLibrary.Ids(ModelLibrary.Kinds.Air).ToList();
-        string dir = Path.Combine(AppContext.BaseDirectory, "ASSETS", "SOUNDS", "AIR");
+        string dir = OpenFPS.AudioLab.LabPaths.Output("AIR");
         Directory.CreateDirectory(dir);
         Console.WriteLine("\n  Compressed air, at three metres.\n");
 
@@ -297,7 +297,7 @@ public static class CrossingSpike
         var offs = Enumerable.Range(1, 40).Select(i => (int)(chL.Length * i / 42f)).ToArray();
         Console.WriteLine("    bands: " + string.Join("  ", Spectrum.AverageBandsDb(chL, Sr, offs).Select((d, i) => $"{Spectrum.BandEdges[i]:F0}:{d:F0}")));
 
-        string dir = Path.Combine(AppContext.BaseDirectory, "ASSETS", "SOUNDS", "SCENE");
+        string dir = OpenFPS.AudioLab.LabPaths.Output("SCENE");
         Directory.CreateDirectory(dir);
         float g = peak > 1e-12f ? 0.89f / peak : 0f;
         var wl = new float[chL.Length]; var wr = new float[chR.Length];

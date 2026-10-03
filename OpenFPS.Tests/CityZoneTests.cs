@@ -1,0 +1,104 @@
+using System;
+using System.IO;
+using System.Linq;
+using System.Numerics;
+using OpenFPS.Client.AudioEngine.Acoustics;
+using OpenFPS.Client.AudioEngine.Data;
+using OpenFPS.Common;
+using OpenFPS.Common.Systems;
+using OpenFPS.Server.Core;
+using OpenFPS.Server.Repositories;
+using Xunit;
+using Xunit.Abstractions;
+
+namespace OpenFPS.Tests;
+
+/// <summary>
+/// An outdoor zone's box must not run through a building. Market Square was drawn to the building line
+/// across Brandt Court, and the wall gaps between the tower's rooms, in no room's box, were named
+/// "Market Square" (Cody, 2026-10-02) and heard as the open air for a step.
+/// </summary>
+public class CityZoneTests
+{
+    private readonly ITestOutputHelper _o;
+    public CityZoneTests(ITestOutputHelper o) => _o = o;
+
+    private static WorldSnapshot City()
+    {
+        AcousticRegistry.Initialize();
+        var prefabs = new PrefabRepository(Path.Combine(AppContext.BaseDirectory, "prefabs"));
+        var maps = new MapManager(new MapRepository(Path.Combine(AppContext.BaseDirectory, "maps")), prefabs);
+        maps.Initialize();
+        Assert.True(maps.TryGetMap("city", out var ecs, out Vector3 size, out _, out _));
+        Assert.True(maps.TryGetMapData("city", out var data));
+        var defs = EntityDefinitionFactory.StaticDefinitions(ecs);
+        var world = new WorldSnapshot();
+        foreach (var def in defs)
+            world.Entities[def.EntityId] = new EntitySnapshot { Id = def.EntityId, Definition = def, Transform = def.Transform };
+        world.AcousticMap = AcousticVolumeGenerator.GenerateRegions(defs, size, data.MinBound, data.VoxelResolution, data.OcclusionFloor);
+        return world;
+    }
+
+    [Fact]
+    public void NoOutdoorZoneRunsThroughABuilding()
+    {
+        var world = City();
+        var map = world.AcousticMap!;
+        var bad = new System.Collections.Generic.List<string>();
+        foreach (var (id, o) in map.Regions)
+        {
+            if (o.IsIndoor || id == AcousticConstants.GlobalRegionId || !map.RegionPositions.TryGetValue(id, out var oc)) continue;
+            var orot = map.RegionRotations.GetValueOrDefault(id, Quaternion.Identity);
+            foreach (var (jd, r) in map.Regions)
+            {
+                if (!r.IsIndoor || !map.RegionPositions.TryGetValue(jd, out var rc)) continue;
+                if (GeometryUtils.IsPointInOBB(rc, oc, o.RoomSize, orot))
+                    bad.Add($"'{o.FriendlyName}' ({o.RoomSize}) holds the room '{r.FriendlyName}'");
+            }
+        }
+        foreach (var b in bad.Distinct().Take(40)) _o.WriteLine(b);
+        Assert.True(bad.Count == 0, $"{bad.Count} rooms lie inside an outdoor zone");
+
+        // The gap in the wall between Brandt Court's stairwell and corridor, where it was heard.
+        var spatial = new OpenFPS.Client.Core.SpatialService();
+        int at = spatial.GetRegionAt(world, new Vector3(-18.64f, 1.7f, 156.975f));
+        Assert.NotEqual("Market Square", map.Regions.TryGetValue(at, out var here) ? here.FriendlyName : "");
+    
+    }
+
+    /// <summary>
+    /// "Sound struggles to come through the door only when loud things pass by" (Cody, 2026-10-02).
+    /// Brandt Court's front door swung open, heard 2.5 m inside: a car 17 m down Main Street on the
+    /// leaf's side and one 18 m up it. The route's legs ended on the door's edge, in the corner between
+    /// the jamb and the leaf hinged on it, so every way round the open leaf was refused and it was
+    /// charged as solid steel: the leaf's side came in at -68 dB in the mids, the other at -18.
+    /// </summary>
+    [Fact]
+    public void AnOpenFrontDoorLetsTheStreetInFromBothSides()
+    {
+        var world = City();
+        var leaf = world.Entities.Values.Where(e => OpeningGraph.IsDoorLeaf(e.Definition))
+                        .OrderBy(e => Vector3.Distance(e.Transform.Position, new Vector3(-9.68f, 1.1f, 157.08f))).First();
+        var def = leaf.Definition;
+        var rot = leaf.Transform.Rotation;
+        var hinge = leaf.Transform.Position + Vector3.Transform(new Vector3(def.Collider.Size.X * 0.5f, 0, 0), rot);
+        var swung = rot * Quaternion.CreateFromAxisAngle(Vector3.UnitY, MathF.PI / 2f);
+        var moved = leaf;
+        moved.Transform.Rotation = swung;
+        moved.Transform.Position = hinge + Vector3.Transform(new Vector3(-def.Collider.Size.X * 0.5f, 0, 0), swung);
+        world.Entities[leaf.Id] = moved;
+
+        var acoustics = new SpatialAcoustics();
+        var routes = acoustics.RoutesFor(world)!;
+        var ear = new Vector3(-12f, 1.6f, 157f);
+        int earRegion = acoustics.GetRegionAt(world, ear);
+        float Mid(Vector3 src)
+        {
+            Assert.True(routes.Route(src, acoustics.GetRegionAt(world, src), ear, earRegion, out var a), $"no route from {src}");
+            return 20f * MathF.Log10(MathF.Max(1e-6f, a.Mid));
+        }
+        float south = Mid(new Vector3(2f, 0.6f, 140f)), north = Mid(new Vector3(2f, 0.6f, 175f));
+        _o.WriteLine($"mid: south {south:F1} dB, north {north:F1} dB");
+        Assert.True(MathF.Min(south, north) > -45f, $"mid: south {south:F1} dB, north {north:F1} dB");
+    }
+}

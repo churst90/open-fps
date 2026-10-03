@@ -11,9 +11,12 @@ muzzle, behind it, downrange of the bullet, indoors and outdoors.
 
 - The muzzle blast is fully synthetic (`WeaponSynth.MuzzleBlast`): a Friedlander wave plus filtered
   noise, about 0.1 s long. The world's reflections and reverb are added by the normal sound path.
-- A supersonic crack exists (`WeaponSynth.SupersonicCrack`) and is played when the bullet passes
-  close enough (`Ballistics.MakesCrack`, `ShotResolver`).
-- Handling, casing and reload recordings are in `OpenFPS.Client/ASSETS/SOUNDS/WEAPONS`.
+- There is no supersonic crack yet: a shot is heard as its report only. `Ballistics` has the
+  geometry (when the crack arrives, how long its N-wave lasts, whether a round cracks at all). The
+  placeholder crack and the synthesised action clicks were removed on 2026-10-02; see "The crack"
+  below for how the crack is to be built.
+- Handling, casing and reload recordings are in `OpenFPS.Client/ASSETS/SOUNDS/WEAPONS`. Nothing plays
+  them yet.
 
 ## Reference recordings
 
@@ -83,3 +86,21 @@ a few dB; about 8 dB short at 1-2 kHz, partly the modelled ground comb at 20 m.
 4. Render WAVs to judge by ear before anything goes into the game.
 5. Then: shotgun (no reference recording), an impact sound per material, casings that land and
    bounce where they fall, and a proper fire message in the protocol.
+
+## The crack
+
+A supersonic round drags a Mach cone. Downrange, a listener near the path hears the crack before
+the report: a sharp N-wave that arrives from the point on the trajectory where the cone met them,
+not from the shooter. That direction and the crack-to-report gap tell a listener where the shooter
+is and roughly how far (`Ballistics.CrackToReportSeconds`).
+
+To build it, once the protocol carries a shot's origin and direction:
+- per listener, find the emission point on the path (where the cone's angle, asin(c/v), meets
+  them) and the arrival time;
+- the N-wave's peak overpressure and duration from Whitham's law: peak falls as the miss
+  distance to the -3/4 power and the duration grows as its 1/4 power, both scaled by the
+  bullet's diameter, length and Mach number;
+- play it as a placed one-shot at the emission point with the normal reflections and reverb, so
+  the crack echoes off nearby walls the way it does in the NIJ recordings;
+- check the arrival times and the crack-report gap against the NIJ set (30 degrees at 40 m: M16
+  21 ms, AK 15.5 ms).

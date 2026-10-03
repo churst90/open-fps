@@ -393,7 +393,7 @@ public static class EngineOrderSpike
     /// <summary>Renders every preset at idle and at speed to WAV so the family can be auditioned.</summary>
     public static int Gallery(string[] args)
     {
-        string dir = Path.Combine(AppContext.BaseDirectory, "ASSETS", "SOUNDS", "VEHICLES", "GALLERY");
+        string dir = OpenFPS.AudioLab.LabPaths.Output("VEHICLES", "GALLERY");
         Directory.CreateDirectory(dir);
         Console.WriteLine($"\n  Every engine: cranks, idles, blips twice, and is shut off.\n");
         string? only = args.FirstOrDefault(a => VehicleProfile.Presets.ContainsKey(a));
@@ -534,7 +534,7 @@ public static class EngineOrderSpike
 
         if (wav)
         {
-            string dir = Path.Combine(AppContext.BaseDirectory, "ASSETS", "SOUNDS", "VEHICLES");
+            string dir = OpenFPS.AudioLab.LabPaths.Output("VEHICLES");
             Directory.CreateDirectory(dir);
             string path = Path.Combine(dir, $"bench_{v.EngineKey}_{rpm:F0}.wav");
             File.WriteAllBytes(path, VehicleSynth.ToWav16(x));

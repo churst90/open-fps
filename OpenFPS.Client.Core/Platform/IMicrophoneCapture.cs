@@ -8,7 +8,7 @@ namespace OpenFPS.Client.Core.Platform;
 /// Windows implements this over NAudio today; Linux has no implementation yet, which is exactly why
 /// the seam exists — <see cref="NullMicrophoneCapture"/> reports itself unavailable so the session
 /// can SAY so when the player presses the transmit key, rather than appearing to transmit into
-/// nothing. See <c>docs/CROSS_PLATFORM_PLAN.md</c>: the intended convergence is FMOD's own
+/// nothing. The intended convergence is FMOD's own
 /// <c>recordStart</c>, which is cross-platform and would let both heads share one implementation.
 /// </summary>
 public interface IMicrophoneCapture : IDisposable

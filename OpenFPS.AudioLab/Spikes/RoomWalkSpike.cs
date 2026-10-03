@@ -56,7 +56,7 @@ public static class RoomWalkSpike
 
         // The lab's build carries the synthesised sound sets, not the recorded ones, and a run with
         // no megaphone file is thirty seconds of a reverb reverberating silence. Say so up front.
-        string soundRoot = System.IO.Path.Combine(AppContext.BaseDirectory, "ASSETS", "SOUNDS");
+        string soundRoot = OpenFPS.AudioLab.LabPaths.Output();
         if (!System.IO.File.Exists(System.IO.Path.Combine(soundRoot, "BEACONS", "megaphone.wav")))
         {
             Console.WriteLine($"  FAIL: no BEACONS/megaphone.wav under {soundRoot}.");
@@ -100,7 +100,6 @@ public static class RoomWalkSpike
                 ConeOutsideVolume = cone ? 0.05f : 1f,
                 EqLow = 1f, EqMid = 1f, EqHigh = 1f,
                 ApertureFactor = 1f,
-                EnableReverb = true,
                 TargetRegionId = RoomId,
             };
             if (megaphone) provider.PlaySpatialSound(mega);
@@ -245,7 +244,7 @@ public static class RoomWalkSpike
                         ConeInside = 360f, ConeOutside = 360f, ConeOutsideVolume = 1f,
                         EqLow = 1f, EqMid = 1f, EqHigh = 1f, ApertureFactor = 1f,
                         IsEvent = true, Essential = true,
-                        EnableReverb = true, TargetRegionId = RoomId,
+                        TargetRegionId = RoomId,
                     });
                 }
 

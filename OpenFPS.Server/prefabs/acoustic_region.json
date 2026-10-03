@@ -11,7 +11,6 @@
   "Type": "StaticObject",
   "IsIndoor": true,
   "IsSolid": false,
-  "EnvType": "Atmospheric",
   "RoomSize": {
     "X": 10,
     "Y": 5,

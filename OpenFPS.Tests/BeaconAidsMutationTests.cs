@@ -282,7 +282,6 @@ public class BeaconAidsMutationTests
         foreach (var e in blips)
         {
             Assert.True(e.IsEvent);
-            Assert.True(e.EnableReverb);
             Assert.Equal(PlaybackMode.Single, e.Mode);
             Assert.Equal("SYNTH/beacon_door_chime", e.SoundId);
             Assert.Equal(door, e.ApparentPosition);

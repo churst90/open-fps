@@ -23,7 +23,7 @@ public static class RoomEchoesSpike
         Vector3 P(string s) { var f = s.Split(',').Select(x => float.Parse(x, CultureInfo.InvariantCulture)).ToArray(); return new Vector3(f[0], f[1], f[2]); }
         var ear = P(args.First(a => a.StartsWith("ear="))[4..]);
         var src = P(args.First(a => a.StartsWith("src="))[4..]);
-        string root = "/home/cody/external-rescue/Github/open-fps/OpenFPS.Server/";
+        string root = OpenFPS.AudioLab.LabPaths.Server() + System.IO.Path.DirectorySeparatorChar;
         var (world, _) = SirenRouteSpike.Load(root + "maps/" + mapId + ".json", root + "prefabs", "none", 0f);
         var boxes = SteamAudioScene.BoxesFromWorld(world);
         var solids = boxes.Select(b => new EarlyReflections.Solid(b.Center, b.Size, b.Rotation, b.Material)).ToList();

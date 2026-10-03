@@ -21,6 +21,7 @@ using Serilog;
 //
 //   dotnet build OpenFPS.AudioLab --artifacts-path <somewhere off the repo volume>
 //   dotnet <artifacts>/bin/OpenFPS.AudioLab/debug/OpenFPS.AudioLab.dll --<instrument> ...
+//   --help lists the instruments.
 //
 // Not `dotnet run`: it writes obj/ and bin/ into the repo, and MSBuild hangs on the ntfs3 volume.
 //
@@ -42,35 +43,91 @@ Console.WriteLine("=== OpenFPS AudioLab ===");
 Console.WriteLine($"Runtime: {RuntimeInformation.OSDescription} ({RuntimeInformation.ProcessArchitecture})");
 Console.WriteLine();
 
+// Every instrument, one line each. Keep this in step with the handlers below: a flag that is not
+// listed here is not an instrument, and goes.
+string[] usage =
+{
+    "With no flag: a source orbiting the head through the game's engine, to check the HRTF by ear.",
+    "",
+    "Vehicles",
+    "  --voice-levels [preset ...] [sweep] [parts]   the game's whole vehicle voice at 1 m against its declared level",
+    "  --engine-levels [preset ...]                  the tailpipe alone, offline: headroom and crest factor",
+    "  --engine-orders <preset> [rpm=] [thr=] [wav]  order content, band balance, centroid",
+    "  --engine-trace <preset> [idle|off] [rpm= ...] rpm, manifold pressure and torque each quarter second",
+    "  --engine-gallery [preset]                     every preset's orders side by side",
+    "  --engine-alias [preset] [rpm=] [rates=]       whether a breakdown at the redline is the engine's or the sample rate's",
+    "  --engine-solver                               the intake valve solver on one dumped state",
+    "  --engine-cost [preset ...] [kmh=] [sec=]      what one live voice costs a core",
+    "  --engine-jumps [preset ...] [kmh=] [sec=]     sample-to-sample jumps in the voice alone (crackle)",
+    "  --engine-live [preset] [kmh=]                 the game's real-time engine path driven past you",
+    "  --engine-street [preset ...] [kmh=]           cars down Concrete Row, the buildings answering",
+    "  --vehicle[-live] / --vehicle-rev[-live] / --muscle-rev[-live] <preset> [knobs]",
+    "                                                a drive in stems, a pass-by, or the stationary rev bench",
+    "  --ride [preset] [knobs] out=FILE.wav          the vehicle voice through a stop-go ride at a fixed gain",
+    "  --shift-trace [preset] [top=]                 what the game's driver does with the gearbox in town",
+    "  --tap-balance                                 each machine's rear voice against its front voice",
+    "  --body-ir [preset ...] [out=] [sec=]          a body's impulse response, modes and band balance",
+    "  --intake-ir [preset ...] [thr=] [sec=] [out=] the intake tract alone, thumped once",
+    "  --wheel-squeal [out=] [axle] [binaural]       each wheel squealing for itself, and four drives",
+    "  --speedway [map] [seconds=] [voices=] [probe] the shipped race heard from its spawn point",
+    "  --earshot [map=city] [at=x,z] [top=]          everything audible from a spot, ranked, under both distance laws",
+    "  --car-horn / --siren [preset] [sec=]          horns and the siren on the bench, measured and written",
+    "  --car-door [out=] [seed=]                     the car door opening and shutting, for tools/car_door_fit",
+    "",
+    "Machines, aircraft, rail",
+    "  --machines [id] [export=DIR]                  what a machine is made of, as the JSON an author writes",
+    "  --machine-levels [id ...] [kmh=]              how loud a machine is at a cruise, and what reaches you",
+    "  --machine-pass [id] [kmh=] [side=]            a machine driving past, as one voice and as two",
+    "  --yard [preset ...] [levels] [pass]           mowers and air conditioners, measured and walked past",
+    "  --models [export=DIR]                         the model library's ids, or each as JSON",
+    "  --aircraft / --landing / --spool [preset]     flyovers, arrivals, and an engine against its lever",
+    "  --train / --crossing / --airbrake / --signals trains, a level crossing, air brakes, horns and bells",
+    "",
+    "People and things",
+    "  --footsteps [surface ...] [shoe=] [run]       footsteps by surface, measured",
+    "  --breath [effort=] [seconds=] [out=]          the breathing model laid out at its own times and levels",
+    "  --bumps                                       a person walking into things",
+    "  --applause [people=] [intensity=] [sec=]      a crowd on its own; compare=DIR against recordings",
+    "  --door-knock [out=] [seed=] [knocks=]         knuckles on a wooden door",
+    "  --door-opening [out=]                         doors opening and shutting at a metre",
+    "  --beacon-tones [out=]                         each beacon three times at its real period",
+    "  --gun-spec                                    synthesized shots against the NIJ recordings",
+    "  --speech-lines                                decodes every shipped voice line as the client does",
+    "  --ground-voice [--ladder]                     a talker's ground reflection three ways",
+    "",
+    "Rooms, paths and the mixer",
+    "  --clap-room [out=] [claps=]                   a clap in Marlow flat 01F through the whole mixer",
+    "  --room-walk                                   the wood room walked with the megaphone on, captured",
+    "  --walk [map= from= to= sprint]                the real movement and ground probe over a real map",
+    "  --enclosure [map= at= walk=]                  what the room round a listener measures, and its send",
+    "  --path-probe [map=city] ear=x,y,z src=x,y,z   what the occlusion worker hands the mixer",
+    "  --siren-route [map= track= at=]               a car's path to a fixed listener, frame by frame",
+    "  --room-echoes [map=city] ear= src=            the placed reflections a one-off sound gets",
+    "  --shot-echoes [map=city] at=x,z               every echo a shot makes there, and what it came off",
+    "  --wall-tl                                     the city's constructions' transmission loss per band",
+    "  --traced-reverb / --traced-echoes             the traced reverb and per-source echoes, headless",
+    "  --sa-frame                                    which way Steam Audio's traced soundfield faces",
+    "  --tail-bands / --tail-iacc / --late-field     the tail per octave, its ears' coherence, each source's late energy",
+    "  --sim-reverbfield                             the simulator's reverb against enclosure across places",
+    "  --scene-cost [map=city]                       what rebuilding the Steam Audio scenes costs",
+    "  --pass-by [out=]                              noise driven past through the binaural effect, per block",
+    "  --ambisonic                                   ambisonic encode and decode come out of the right ear",
+    "  --dsp-order                                   where HEAD and TAIL put a unit in a channel's chain",
+    "",
+    "The mixer thread (docs/THE_MIXER_THREAD_CRASH.md)",
+    "  --scene-churn / --provider-churn / --physical-churn / --reap-churn / --send-churn",
+    "  --ended-channel / --foreign-disconnect / --send-drift scenario=N / --send-window",
+};
+if (args.Contains("--help"))
+{
+    foreach (string line in usage) Console.WriteLine(line);
+    return;
+}
+
 // The authored machine library, copied in beside the maps and prefabs, so a spike auditions the same
 // cars the game plays rather than only the built-in ones.
 OpenFPS.Common.MachineRegistry.EnsureLoaded();
 OpenFPS.Common.ModelLibrary.EnsureLoaded();
-
-if (args.Contains("--login-test"))
-{
-    var net = new OpenFPS.Client.Core.ClientNetworkService();
-    bool done = false, success = false; string detail = "";
-    net.OnConnected += () =>
-    {
-        Console.WriteLine("connected; sending login (admin)");
-        net.Send(new OpenFPS.Common.Networking.LoginRequest { Username = "admin", Password = "admin123" });
-    };
-    net.OnMessageReceived += m =>
-    {
-        if (m is OpenFPS.Common.Networking.LoginResponse lr)
-        { success = lr.Success; detail = $"user={lr.Username} role={lr.Role} msg='{lr.Message}'"; done = true; }
-    };
-    net.Start();
-    net.Connect("127.0.0.1", 33288);
-    var sw = System.Diagnostics.Stopwatch.StartNew();
-    while (!done && sw.Elapsed.TotalSeconds < 6) { net.Poll(); Thread.Sleep(15); }
-    Console.WriteLine(done
-        ? (success ? $"RESULT: PASSED — login OK ({detail})" : $"RESULT: login rejected ({detail})")
-        : "RESULT: TIMEOUT — no response (is the server running on 33288?)");
-    Log.CloseAndFlush();
-    Environment.Exit(success ? 0 : 1);
-}
 
 if (args.Contains("--models"))
 {
@@ -120,27 +177,6 @@ if (args.Contains("--signals"))
     Environment.Exit(code);
 }
 
-if (args.Contains("--steam-distance"))
-{
-    int code = SteamAudioLiveTest.RunDistanceCheck();
-    Log.CloseAndFlush();
-    Environment.Exit(code);
-}
-
-if (args.Contains("--sim-occlusion"))
-{
-    int code = SimOcclusionSpike.Run();
-    Log.CloseAndFlush();
-    Environment.Exit(code);
-}
-
-if (args.Contains("--sim-pathing"))
-{
-    int code = SimPathingSpike.Run();
-    Log.CloseAndFlush();
-    Environment.Exit(code);
-}
-
 if (args.Contains("--siren-route"))
 {
     int code = OpenFPS.Client.Core.AudioEngine.SteamAudio.SirenRouteSpike.Run(args);
@@ -174,13 +210,6 @@ if (args.Contains("--traced-reverb"))
     Environment.Exit(code);
 }
 
-if (args.Contains("--sa-encode"))
-{
-    // --sa-encode: a field of eight directions against one channel — energy per ear and interaural correlation per band.
-    int code = OpenFPS.Client.Core.AudioEngine.SteamAudio.TracedReverbSpike.EncodeCheck();
-    Log.CloseAndFlush();
-    Environment.Exit(code);
-}
 if (args.Contains("--sa-frame"))
 {
     // --sa-frame: which way Steam Audio's traced soundfield faces. A wall to the left and a wall ahead;
@@ -191,95 +220,11 @@ if (args.Contains("--sa-frame"))
     Environment.Exit(code);
 }
 
-if (args.Contains("--sim-scene"))
-{
-    int code = SimSceneSpike.Run();
-    Log.CloseAndFlush();
-    Environment.Exit(code);
-}
-
-if (args.Contains("--sim-perframe"))
-{
-    int code = SimPerFrameSpike.Run();
-    Log.CloseAndFlush();
-    Environment.Exit(code);
-}
-
-if (args.Contains("--sim-worldscene"))
-{
-    int code = SimWorldSceneSpike.Run();
-    Log.CloseAndFlush();
-    Environment.Exit(code);
-}
-
-if (args.Contains("--sim-pathdir"))
-{
-    int code = SimPathDirSpike.Run();
-    Log.CloseAndFlush();
-    Environment.Exit(code);
-}
-
-if (args.Contains("--sim-pathframe"))
-{
-    int code = SimPathFrameSpike.Run();
-    Log.CloseAndFlush();
-    Environment.Exit(code);
-}
-
-if (args.Contains("--sim-reflect"))
-{
-    int code = SimReflectSpike.Run();
-    Log.CloseAndFlush();
-    Environment.Exit(code);
-}
-
 if (args.Contains("--sim-reverbfield"))
 {
     int code = SimReverbFieldSpike.Run();
     Log.CloseAndFlush();
     Environment.Exit(code);
-}
-
-if (args.Contains("--ear-test"))
-{
-    int code = EarTest.Run();
-    Log.CloseAndFlush();
-    Environment.Exit(code);
-}
-
-if (args.Contains("--make-siren"))
-{
-    // Emit a realistic police-siren wail WAV. Optional path after the flag; defaults to the client asset.
-    int idx = Array.IndexOf(args, "--make-siren");
-    string outPath = (idx >= 0 && idx + 1 < args.Length && !args[idx + 1].StartsWith("--"))
-        ? args[idx + 1]
-        : System.IO.Path.Combine("OpenFPS.Client", "ASSETS", "SOUNDS", "BEACONS", "siren.wav");
-    OpenFPS.Client.Core.AudioEngine.Tools.PoliceSirenGenerator.WriteWav(outPath);
-    Console.WriteLine($"Wrote police-siren wail to {outPath} ({new System.IO.FileInfo(outPath).Length} bytes).");
-    Log.CloseAndFlush();
-    return;
-}
-
-if (args.Contains("--steam-stereo"))
-{
-    int code = SteamAudioLiveTest.RunStereoCheck();
-    Log.CloseAndFlush();
-    Environment.Exit(code);
-}
-
-if (args.Contains("--dry-check"))
-{
-    foreach (var prof in new[]{ OpenFPS.Client.AudioEngine.Core.WeaponProfile.Rifle,
-                                OpenFPS.Client.AudioEngine.Core.WeaponProfile.Pistol,
-                                OpenFPS.Client.AudioEngine.Core.WeaponProfile.Shotgun })
-    {
-        var pcm = OpenFPS.Client.AudioEngine.Core.WeaponSynth.MuzzleBlast(prof);
-        double mean = 0; foreach (var v in pcm) mean += v; mean /= pcm.Length;
-        float tail = 0; for (int i = pcm.Length - pcm.Length/10; i < pcm.Length; i++) tail = Math.Max(tail, Math.Abs(pcm[i]));
-        Console.WriteLine($"  {prof.Name,-8} len={pcm.Length} mean={mean:F6} tailPeak={tail:F4} last={pcm[^1]:F6}");
-    }
-    Log.CloseAndFlush();
-    Environment.Exit(0);
 }
 
 if (args.Contains("--engine-solver"))
@@ -314,15 +259,6 @@ if (args.Contains("--engine-live"))
     Log.CloseAndFlush();
     Environment.Exit(lcode);
 }
-if (args.Contains("--tyres"))
-{
-    // --tyres [preset ...]: a standing start with wheelspin and chirping upshifts, a lock-up under
-    // braking, and a corner tightened until the tyres let go. One curve, three demands.
-    var keys = args.Where(a => OpenFPS.Common.VehicleProfile.Presets.ContainsKey(a)).ToArray();
-    int tcode = OpenFPS.Client.Core.AudioEngine.Fmod.GripSpike.RunTyres(keys);
-    Log.CloseAndFlush();
-    Environment.Exit(tcode);
-}
 if (args.Contains("--wheel-squeal"))
 {
     // --wheel-squeal [out=DIR] [axle] [binaural]: each wheel squealing for itself, measured, then four drives
@@ -334,14 +270,6 @@ if (args.Contains("--wheel-squeal"))
     int wcode = OpenFPS.Client.Core.AudioEngine.Fmod.WheelSquealSpike.Run(outArg?[4..]);
     Log.CloseAndFlush();
     Environment.Exit(wcode);
-}
-if (args.Contains("--turbo"))
-{
-    // --turbo [preset ...]: the same 2.0 four with and without a turbocharger, then the truck.
-    var keys = args.Where(a => OpenFPS.Common.VehicleProfile.Presets.ContainsKey(a)).ToArray();
-    int bcode = OpenFPS.Client.Core.AudioEngine.Fmod.GripSpike.RunTurbo(keys);
-    Log.CloseAndFlush();
-    Environment.Exit(bcode);
 }
 if (args.Contains("--speedway"))
 {
@@ -499,23 +427,6 @@ if (args.Contains("--yard"))
     Environment.Exit(yardCode);
 }
 
-if (args.Contains("--bellcheck"))
-{
-    OpenFPS.Common.AcousticRegistry.Initialize();
-    foreach (var id in new[] { "crossing_gong", "loco_bell", "tram_gong" })
-    {
-        try
-        {
-            var b = OpenFPS.Common.ModelLibrary.Bell(id);
-            Console.WriteLine($"  ModelLibrary.Bell(\"{id}\") -> {b.Name}, {b.ReferenceDb:F0} dB, {b.DiameterMetres:F2} m");
-        }
-        catch (Exception ex) { Console.WriteLine($"  ModelLibrary.Bell(\"{id}\") THREW: {ex.GetType().Name}: {ex.Message}"); }
-    }
-    Console.WriteLine($"  ModelLibrary.Knows(Bell, crossing_gong) = {OpenFPS.Common.ModelLibrary.Knows(OpenFPS.Common.ModelLibrary.Kinds.Bell, "crossing_gong")}");
-    Console.WriteLine($"  ids: {string.Join(", ", OpenFPS.Common.ModelLibrary.Ids(OpenFPS.Common.ModelLibrary.Kinds.Bell))}");
-    Environment.Exit(0);
-}
-
 if (args.Contains("--earshot"))
 {
     Environment.Exit(OpenFPS.Client.Core.AudioEngine.Fmod.EarshotSpike.Run(args));
@@ -631,19 +542,6 @@ if (args.Contains("--clap-room"))
     // --clap-room [out=path] [claps=4]: a clap in Marlow flat 01F through the whole mixer, and the room against it.
     Environment.Exit(OpenFPS.Client.Core.AudioEngine.Fmod.ClapRoomSpike.Run(args));
 }
-if (args.Contains("--clap-dry"))
-{
-    // --clap-dry: one synthesized clap, dry, its level in the windows the capture is read in.
-    var pcm = OpenFPS.Common.Applause.RenderClap(44100, 3);
-    double W(double a, double b) { int i0 = (int)(a * 44100), i1 = Math.Min(pcm.Length, (int)(b * 44100)); if (i1 <= i0) return -200; double e = 0; for (int i = i0; i < i1; i++) e += pcm[i] * (double)pcm[i]; return 10 * Math.Log10(e / (i1 - i0) + 1e-20); }
-    Console.WriteLine($"  clap {pcm.Length / 44.1:F0} ms: 0-10 ms {W(0, 0.01):F1} dB, 15-80 {W(0.015, 0.08):F1}, 80-300 {W(0.08, 0.3):F1}");
-    // Peak against the loudest 1 ms: a limiter shows in a capture as this ratio collapsing.
-    double pk = 0; foreach (var v in pcm) pk = Math.Max(pk, Math.Abs(v));
-    double best = -200; for (double t = 0; t < 0.02; t += 0.001) best = Math.Max(best, W(t, t + 0.001));
-    Console.WriteLine($"  peak {20 * Math.Log10(pk):F1} dB, loudest 1 ms {best:F1} dB: crest {20 * Math.Log10(pk) - best:F1} dB");
-    Environment.Exit(0);
-}
-
 if (args.Contains("--door-knock"))
 {
     // --door-knock [out=DIR] [seed=N] [knocks=N]: knuckles on a wooden door (OpenFPS.Common.DoorKnock).
@@ -703,15 +601,6 @@ if (args.Contains("--engine-orders"))
     Environment.Exit(orderCode);
 }
 
-if (args.Contains("--vehicle-cams") || args.Contains("--vehicle-cams-live"))
-{
-    Console.WriteLine("--- The same V8 with three camshafts ---");
-    int camCode = OpenFPS.Client.Core.AudioEngine.Fmod.VehicleSpike.RunCamComparison(
-        args.Contains("--vehicle-cams-live"));
-    Log.CloseAndFlush();
-    Environment.Exit(camCode);
-}
-
 if (args.Contains("--vehicle") || args.Contains("--vehicle-live")
     || args.Contains("--vehicle-rev") || args.Contains("--vehicle-rev-live")
     || args.Contains("--muscle-rev") || args.Contains("--muscle-rev-live"))
@@ -739,53 +628,10 @@ if (args.Contains("--vehicle") || args.Contains("--vehicle-live")
     Environment.Exit(code);
 }
 
-if (args.Contains("--battle") || args.Contains("--battle-live"))
-{
-    Console.WriteLine("--- Concrete Row: a firefight in a street with sides ---");
-    int code = OpenFPS.Client.Core.AudioEngine.Fmod.BattleSpike.Run(args.Contains("--battle-live"));
-    Log.CloseAndFlush();
-    Environment.Exit(code);
-}
-
-if (args.Contains("--street") || args.Contains("--street-live"))
-{
-    Console.WriteLine("--- A street: two doors, a window shot out, a truck, and a wall ---");
-    int code = OpenFPS.Client.Core.AudioEngine.Fmod.StreetSceneSpike.Run(args.Contains("--street-live"));
-    Log.CloseAndFlush();
-    Environment.Exit(code);
-}
-
-if (args.Contains("--gunshot") || args.Contains("--gunshot-live"))
-{
-    Console.WriteLine("--- Weapons: a dry synthesized shot, and a crack-to-report gap that encodes range ---");
-    int code = OpenFPS.Client.Core.AudioEngine.Fmod.GunshotSpike.Run(args.Contains("--gunshot-live"), "");
-    Log.CloseAndFlush();
-    Environment.Exit(code);
-}
-
-if (args.Contains("--bed") || args.Contains("--bed-live"))
-{
-    int bi = Array.IndexOf(args, args.Contains("--bed-live") ? "--bed-live" : "--bed");
-    string bedId = (bi >= 0 && bi + 1 < args.Length && !args[bi + 1].StartsWith("--"))
-        ? args[bi + 1] : "AMBIENCE/woods_mid_day";
-    Console.WriteLine("--- Ambient bed: does a real recorded soundfield play and turn with the listener? ---");
-    int code = OpenFPS.Client.Core.AudioEngine.SteamAudio.AmbientBedSpike.Run(bedId, args.Contains("--bed-live"));
-    Log.CloseAndFlush();
-    Environment.Exit(code);
-}
-
 if (args.Contains("--ambisonic"))
 {
     Console.WriteLine("--- Ambisonics: does a recorded soundfield rotate with the listener and decode to the right ear? ---");
     int code = OpenFPS.Client.Core.AudioEngine.SteamAudio.AmbisonicSpike.Run();
-    Log.CloseAndFlush();
-    Environment.Exit(code);
-}
-
-if (args.Contains("--boundary") || args.Contains("--boundary-live"))
-{
-    Console.WriteLine("--- Near-field boundaries: does a nearby surface colour the mix, and does the colour track it? ---");
-    int code = OpenFPS.Client.Core.AudioEngine.Fmod.BoundarySpike.Run(args.Contains("--boundary-live"));
     Log.CloseAndFlush();
     Environment.Exit(code);
 }
@@ -798,29 +644,12 @@ if (args.Contains("--room-walk"))
     Environment.Exit(code);
 }
 
-if (args.Contains("--provider-orbit") || args.Contains("--provider-orbit-smoke"))
-{
-    int code = ProviderOrbit.Run(args.Contains("--provider-orbit"), seconds: 3.0);
-    Log.CloseAndFlush();
-    Environment.Exit(code);
-}
-
 if (args.Contains("--scene-churn"))
 {
     // --scene-churn [sec=]: engines, machines, aircraft and region reverb buses all at once, made
     // and released while the listener walks — the headless shape of a city. See RunSceneChurn.
     double secs = args.FirstOrDefault(a => a.StartsWith("sec=")) is { } sa && double.TryParse(sa[4..], out double sv) ? sv : 30.0;
     int code = ProviderOrbit.RunSceneChurn(secs);
-    Log.CloseAndFlush();
-    Environment.Exit(code);
-}
-
-if (args.Contains("--reverb-churn"))
-{
-    // --reverb-churn [n]: ask FMOD for n region reverb buses and report what it does when it will
-    // not give out another. See ProviderOrbit.RunReverbChurn.
-    int n = args.FirstOrDefault(a => a.StartsWith("n=")) is { } na && int.TryParse(na[2..], out int nv) ? nv : 400;
-    int code = ProviderOrbit.RunReverbChurn(n);
     Log.CloseAndFlush();
     Environment.Exit(code);
 }
@@ -899,56 +728,6 @@ if (args.Contains("--reap-churn"))
 if (args.Contains("--provider-churn"))
 {
     int code = ProviderOrbit.RunChurn(seconds: 12.0);
-    Log.CloseAndFlush();
-    Environment.Exit(code);
-}
-
-if (args.Contains("--steam-live") || args.Contains("--steam-live-smoke"))
-{
-    bool interactive = args.Contains("--steam-live");
-    int code = SteamAudioLiveTest.Run(interactive, seconds: 2.5);
-    Log.CloseAndFlush();
-    Environment.Exit(code);
-}
-
-if (args.Contains("--steam-test"))
-{
-    string wav = Path.Combine(Directory.GetCurrentDirectory(), "steam_orbit.wav");
-    Console.WriteLine("Rendering Steam Audio HRTF orbit (this is offline, takes a moment)...");
-    int code = SteamAudioSpike.RenderOrbitWav(wav);
-    if (code == 0)
-    {
-        Console.WriteLine($"\nWrote: {wav}");
-        Console.WriteLine("Play it on HEADPHONES, e.g.:  paplay steam_orbit.wav   (or mpv/aplay)");
-        Console.WriteLine("First 8s = horizontal circle; last 8s = VERTICAL circle (front/up/back/down).");
-        Console.WriteLine("If you now hear ABOVE vs BELOW, Steam Audio HRTF is working.");
-    }
-    Log.CloseAndFlush();
-    return;
-}
-
-if (args.Contains("--speech-test"))
-{
-    Console.WriteLine("Linux speech test via speech-dispatcher...");
-    using var speech = new SpeechDispatcherOutput();
-    if (speech.Initialize())
-    {
-        Console.WriteLine($"Backend: {speech.BackendName}");
-        speech.Speak("Open F P S. Linux speech output is working.");
-        Thread.Sleep(3000);
-        Console.WriteLine("RESULT: PASSED — speech-dispatcher connected and spoke.");
-    }
-    else
-    {
-        Console.WriteLine("RESULT: speech backend unavailable (is the speech-dispatcher daemon running?).");
-    }
-    Log.CloseAndFlush();
-    return;
-}
-
-if (args.Contains("--smoke"))
-{
-    int code = AudioDiagnostics.RunSmokeTest(seconds: 3);
     Log.CloseAndFlush();
     Environment.Exit(code);
 }

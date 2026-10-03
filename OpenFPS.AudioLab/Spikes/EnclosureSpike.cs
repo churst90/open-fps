@@ -35,8 +35,8 @@ public static class EnclosureSpike
         float dist = Num(args, "dist", 1.6f);
         float step = Num(args, "step", 2f);
 
-        string? mapPath = FindUp(Path.Combine("OpenFPS.Server", "maps", mapId + ".json"))
-                       ?? FindUp(Path.Combine("maps", mapId + ".json"));
+        string? mapPath = OpenFPS.AudioLab.LabPaths.Existing(OpenFPS.AudioLab.LabPaths.Server("maps", mapId + ".json"))
+                       ?? OpenFPS.AudioLab.LabPaths.Existing(Path.Combine(AppContext.BaseDirectory, "maps", mapId + ".json"));
         // BESIDE THE MAP, always. There is an empty `prefabs/` at the repo root, and searching for the
         // name alone found that one and built a world out of nothing — 0 solid boxes, every place on
         // the map reading as open field. The prefabs a map is made of are the ones the server loads
@@ -155,16 +155,6 @@ public static class EnclosureSpike
 
     private static float F(string s) => float.Parse(s, CultureInfo.InvariantCulture);
 
-    private static string? FindUp(string relative)
-    {
-        var dir = new DirectoryInfo(Directory.GetCurrentDirectory());
-        for (int i = 0; i < 8 && dir != null; i++, dir = dir.Parent)
-        {
-            string candidate = Path.Combine(dir.FullName, relative);
-            if (File.Exists(candidate) || Directory.Exists(candidate)) return candidate;
-        }
-        return null;
-    }
 
     private static string? Str(string[] args, string name)
     {

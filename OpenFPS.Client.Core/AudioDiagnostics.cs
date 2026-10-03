@@ -7,58 +7,13 @@ using Serilog;
 namespace OpenFPS.Client.Core;
 
 /// <summary>
-/// Step 1a diagnostic harness. Plays a single mono broadband source and orbits it around a
-/// stationary listener so HRTF / 3D panning can be verified BY EAR, completely isolated from
-/// the networking, simulation, and acoustics layers.
+/// Plays one broadband source and orbits it round a stationary listener, so the HRTF and 3D panning
+/// can be checked by ear apart from the networking, simulation and acoustics layers.
 ///
-/// This is the "ground truth" test: if a sound cannot be localized correctly here, no amount
-/// of reflection/portal/reverb work on top will help. Get this right first.
-///
-/// Run with:   dotnet run --project OpenFPS.Client -- --audio-test
-///        or:  OpenFPS.Client.exe --audio-test
+/// Run with `OpenFPS.Client.exe --audio-test`, or the AudioLab with no arguments.
 /// </summary>
 public static class AudioDiagnostics
 {
-    /// <summary>
-    /// Non-interactive smoke test: initializes the engine, runs the orbit for a fixed duration,
-    /// then exits. Lets CI / a headless box confirm FMOD loads and initializes on this platform
-    /// without needing a TTY or human ears. Returns 0 on success, 1 if the engine did not init.
-    /// </summary>
-    public static int RunSmokeTest(double seconds)
-    {
-        Console.WriteLine($"Smoke test: initializing audio engine, running {seconds:F0}s...");
-        var facade = new AudioEngineFacade();
-        facade.Initialize();
-
-        if (!facade.IsInitialized)
-        {
-            Console.WriteLine("RESULT: FAILED — audio engine did not initialize (see log above for the FMOD error).");
-            facade.Dispose();
-            return 1;
-        }
-
-        facade.UpdateListener(Vector3.Zero, Quaternion.Identity, Vector3.Zero, -1);
-        facade.StartDiagnosticSound();
-
-        var sw = System.Diagnostics.Stopwatch.StartNew();
-        double last = 0, angle = 0;
-        while (sw.Elapsed.TotalSeconds < seconds)
-        {
-            double now = sw.Elapsed.TotalSeconds;
-            angle += (Math.PI / 4) * (now - last);
-            last = now;
-            float a = (float)(angle % (Math.PI * 2));
-            facade.UpdateListener(Vector3.Zero, Quaternion.Identity, Vector3.Zero, -1);
-            facade.SetDiagnosticPosition(new Vector3(MathF.Sin(a) * 3f, 0f, MathF.Cos(a) * 3f));
-            Thread.Sleep(40);
-        }
-
-        facade.StopDiagnosticSound();
-        facade.Dispose();
-        Console.WriteLine($"RESULT: PASSED — FMOD initialized and ran for {seconds:F0}s on this platform.");
-        return 0;
-    }
-
     public static void RunOrbitTest()
     {
         Console.WriteLine("=== OpenFPS Audio Diagnostic: Orbiting Mono Source ===");
@@ -81,8 +36,7 @@ public static class AudioDiagnostics
         Console.WriteLine("Interpreting the result:");
         Console.WriteLine("  - LEFT/RIGHT swapped  -> handedness/listener-right vector is inverted.");
         Console.WriteLine("  - FRONT/BACK swapped  -> listener forward vector is inverted.");
-        Console.WriteLine("  - No height/front-back distinction at all -> NO real HRTF (expected today;");
-        Console.WriteLine("    plain FMOD only pans amplitude). This is the gap a binaural renderer fills.");
+        Console.WriteLine("  - No height/front-back distinction at all -> the HRTF is not running.");
         Console.WriteLine();
         Console.WriteLine("Press Q (or Ctrl+C) to quit.");
         Console.WriteLine();

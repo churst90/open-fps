@@ -308,16 +308,15 @@ public class PrefabRepository
         }
 
         // ANY region field declares a region. This used to key off IsIndoor/RoomSize alone, so a prefab
-        // that named only an AmbienceId or an EnvType got no RegionComponent at all and the setting
-        // vanished; the validator now also insists such a prefab carries the RoomSize the reverb needs.
-        if (t.IsIndoor.HasValue || t.EnvType.HasValue || t.RoomSize.HasValue ||
+        // that named only an AmbienceId got no RegionComponent at all and the setting vanished; the
+        // validator now also insists such a prefab carries the RoomSize the reverb needs.
+        if (t.IsIndoor.HasValue || t.RoomSize.HasValue ||
             !string.IsNullOrEmpty(t.AmbienceId) || t.ReverbScale.HasValue || t.RoomMaterials != null)
         {
             var region = new RegionComponent
             {
                 FriendlyName = string.IsNullOrWhiteSpace(regionName) ? t.Name : regionName,
                 IsIndoor = t.IsIndoor ?? true,
-                Environment = t.EnvType ?? AcousticEnvironmentType.Atmospheric,
                 // The ROOM follows the entity's scale, the same way the collider above already does.
                 // It did not, so a map could place a region of exactly one size — the prefab's — and
                 // scaling one gave you a big collider around a small room.
