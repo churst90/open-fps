@@ -8,8 +8,8 @@ namespace OpenFPS.Client.Services;
 
 /// <summary>
 /// Windows microphone capture (NAudio): 48 kHz mono 16-bit PCM encoded to Opus at 20 ms frames.
-/// The Windows implementation of <see cref="IMicrophoneCapture"/>; Linux has none yet and uses
-/// <see cref="NullMicrophoneCapture"/>, which says so out loud when the transmit key is pressed.
+/// The Windows implementation of <see cref="IMicrophoneCapture"/>; Linux records through FMOD
+/// (<see cref="FmodMicrophoneCapture"/>) and sends the same packets.
 /// </summary>
 public sealed class VoiceCapture : IMicrophoneCapture
 {

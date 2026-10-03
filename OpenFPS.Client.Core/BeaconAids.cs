@@ -347,7 +347,8 @@ public sealed class BeaconAids
                 };
                 parts.Add($"{c} {state}{why}");
             }
-            return "Beacons: " + string.Join(". ", parts) + $". Each sounds every {_prefs.Every:0.#} seconds,"
+            string list = string.Join(". ", parts);
+            return char.ToUpperInvariant(list[0]) + list[1..] + $". Each sounds every {_prefs.Every:0.#} seconds,"
                  + $" at {_prefs.LevelDb:+0;-0;0} decibels."
                  + " Say slash beacons and a name to switch one, slash beacons every and a number of seconds,"
                  + " or slash beacons louder or quieter.";

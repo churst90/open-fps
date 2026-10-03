@@ -47,7 +47,9 @@ public class ScreenReaderKeyTests
         public void UpdateLoadingStatus(string text, int percent) { }
         public void EnterGame() { }
         public void OpenCommandConsole() { }
-        public void RequestQuit() { }
+        public void ShowGameMenu(Action<GameMenuChoice> chosen) { }
+        public void ReturnToMenu() { }
+        public void Quit() { }
     }
 
     private static ClientGameSession NewSession()

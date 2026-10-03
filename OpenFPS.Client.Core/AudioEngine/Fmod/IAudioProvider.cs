@@ -140,6 +140,18 @@ public interface IAudioProvider : IDisposable
     /// <summary>Plays a short interface sound in both ears, not in the world: no position, no room.
     /// The buffer is made once per id and kept; <paramref name="volume"/> is 0..1.</summary>
     void PlayUiSound(string id, Func<float[]> render, int sampleRate, float volume);
+    /// <summary>Fades the world (everything but the interface sounds), 0..1. 1 is as authored.</summary>
+    void SetWorldFade(float gain) { }
+
+    /// <summary>True when a microphone is connected.</summary>
+    bool HasRecordingDevice => false;
+    /// <summary>Starts recording from the named input device (empty: the default). Gives the rate it
+    /// records at. False when there is no device or it would not open.</summary>
+    bool StartRecording(string deviceName, out int sampleRate) { sampleRate = 0; return false; }
+    /// <summary>Appends what has been recorded since the last call, mixed to mono, -1..1. Returns how many.</summary>
+    int ReadRecording(List<float> mono) => 0;
+    /// <summary>Stops recording and lets the device go.</summary>
+    void StopRecording() { }
     /// <summary>The voices reaching the listener loudest, most first. Diagnostic.</summary>
     IReadOnlyList<VoiceLevel> LoudestVoices(int count);
     /// <summary>The output devices the system offers, by name, in driver order.</summary>

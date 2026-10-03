@@ -60,7 +60,9 @@ public sealed class ClientNavigationService : ApplicationContext
         if (_menu == null || _menu.IsDisposed)
         {
             _menu = _menuFactory();
-            _menu.FormClosed += (_, _) => { if (_gameWindow == null) ExitThread(); };
+            // Closing the menu quits unless the game is what is showing (a hidden game window after
+            // Main menu does not count).
+            _menu.FormClosed += (_, _) => { if (_gameWindow is not { Visible: true }) ExitThread(); };
         }
         SwitchTo(_menu);
     });
@@ -99,6 +101,28 @@ public sealed class ClientNavigationService : ApplicationContext
         SwitchTo(_gameWindow);
         if (_loading is { IsDisposed: false }) { _loading.Dispose(); _loading = null; }
         _menu?.Hide();
+    });
+
+    /// <summary>
+    /// Leaves the game for the main menu: the game window is hidden (kept, for the next login) with
+    /// anything open over it closed, and the menu takes focus. NVDA reads the menu as it does; without
+    /// a screen reader the game says where you are.
+    /// </summary>
+    public void ReturnToMenu(Action? speak = null) => EnqueueUIAction(() =>
+    {
+        if (_loading is { IsDisposed: false }) { _loading.Dispose(); _loading = null; }
+        if (_gameWindow is { IsDisposed: false } game)
+        {
+            game.CloseModals();
+            game.Hide();
+        }
+        if (_menu == null || _menu.IsDisposed)
+        {
+            _menu = _menuFactory();
+            _menu.FormClosed += (_, _) => { if (_gameWindow is not { Visible: true }) ExitThread(); };
+        }
+        SwitchTo(_menu);
+        speak?.Invoke();
     });
 
     private void SwitchTo(Form form)

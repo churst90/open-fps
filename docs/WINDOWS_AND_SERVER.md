@@ -29,12 +29,14 @@ with FMOD 2.03.09, Steam Audio 4.8.1 and NVDA's controller client from `lib/`. S
 
 What the Windows client has, against the GTK client:
 
-- The same session, audio and menus in game (all of `OpenFPS.Client.Core`).
-- Main menu: Connect, Saved Servers, Settings, Open log folder, Quit. Settings and servers are
-  `%APPDATA%\openfps\client.json`, the same format as `~/.config/openfps/client.json`.
+- The same session, audio and menus in game (all of `OpenFPS.Client.Core`). Connecting, logging
+  in, creating an account, reconnecting after a drop, the game menu and logging out are in the
+  session too, so both clients behave the same.
+- Main menu: Connect, Saved Servers, Settings, Open log folder, Quit, as on Linux. Settings and
+  servers are `%APPDATA%\openfps\client.json`, the same format as `~/.config/openfps/client.json`.
   Beacon choices are `%APPDATA%\openfps\beacons.json`.
-- Create account on the connect form. The GTK client has no such button.
-- Voice chat through NAudio, on the microphone chosen in Settings. Linux has no voice chat yet.
+- Voice chat through NAudio, on the microphone chosen in Settings. Linux records through FMOD
+  and sends the same Opus packets.
 - Keys from the game window only, cleared on every focus change. Alt on its own does not open
   the system menu.
 - Speech through NVDA's controller client, checked per line; SAPI when NVDA is not running.

@@ -23,7 +23,6 @@ internal static partial class GtkClientProgram
 {
     private static ISpeechOutput _speech = null!;
     private static ClientNetworkService _network = null!;
-    private static volatile bool _networkStarted;
     private static Application _app = null!;
     private static ApplicationWindow _mainWindow = null!;
 
@@ -32,6 +31,7 @@ internal static partial class GtkClientProgram
     private static ClientGameSession _session = null!;
     private static string _missingAudioReport = "";
 
+    // What the connect form submitted, remembered as a saved server once the login is accepted.
     private static string _pendingUser = "";
     private static string _pendingPass = "";
     private static string _pendingAddress = "";
@@ -144,19 +144,15 @@ internal static partial class GtkClientProgram
             _speech.BackendName, audioEnabled ? "enabled" : "disabled (no FMOD library)");
 
         _network = new ClientNetworkService();
-        _network.OnConnected += OnServerConnected;
         _network.OnMessageReceived += OnServerMessage;
-        // Connection and protocol failures are spoken, not swallowed.
-        _network.OnConnectionFailed += reason => { _speech.Speak(reason, true); OnLoginOutcome(reason, success: false); };
-        _network.OnProtocolError += reason => _speech.Speak(reason, true);
-        _network.OnConnectionNotice += notice => _speech.Speak(notice, true);
 
         // The session is built up front (both heads do this now) so it can handle the login response
         // itself; audio initialization is deferred to a background thread inside BeginAudioInit.
         var audioEngine = new AudioEngineFacade();
-        _shell = new GtkClientShell(_speech, onQuit: () => _app?.Quit());
+        _shell = new GtkClientShell(_speech, onQuit: () => _app?.Quit(), onCue: cue => _session?.Ui.Play(cue));
         _session = new ClientGameSession(_network, _speech, _shell, audioEngine,
-            microphone: new NullMicrophoneCapture("Voice chat is not available on Linux yet."),
+            // FMOD's own recording, on the microphone chosen in Settings (Windows uses NAudio).
+            microphone: new FmodMicrophoneCapture(audioEngine, () => _settings.InputDevice),
             enableAudio: audioEnabled);
         // The shell needs the session's input buffer to clear held keys around modal dialogs; the
         // session needs the shell at construction. The buffer is created by the session, so it is
@@ -171,6 +167,8 @@ internal static partial class GtkClientProgram
             CloseLoginDialog();
         });
         _session.LoginFailed += reason => OnLoginOutcome($"Login failed. {reason}", success: false);
+        // Connecting, or creating the account, failed: already spoken; the form keeps the reason.
+        _session.ConnectFailed += reason => OnLoginOutcome(reason, success: false);
         _settings = ClientSettings.Load();
         if (!OpenFPS.Common.Loudness.CompressionFromEnvironment)
             OpenFPS.Common.Loudness.DynamicRangeCompression = _settings.LevelCompression;
@@ -292,7 +290,9 @@ internal static partial class GtkClientProgram
         {
             try
             {
-                if (_networkStarted) _network.Poll();
+                _network.Poll();
+                // Reconnects, the world fade and anything a menu handed over: in or out of the world.
+                _session.Tick();
 
                 if (_session.IsInGame)
                 {
@@ -364,8 +364,11 @@ internal static partial class GtkClientProgram
         box.Append(MenuButton("Connect", ConnectPreferred));
         box.Append(MenuButton("Saved Servers", ShowServers));
         box.Append(MenuButton("Settings", ShowSettings));
-        box.Append(MenuButton("Quit", () => { _speech.Speak("Goodbye."); _mainWindow.Close(); }));
+        box.Append(MenuButton("Open log folder", OpenLogFolder));
+        box.Append(MenuButton("Quit", () => { _speech.Speak("Goodbye."); _app.Quit(); }));
         _mainWindow.SetChild(box);
+        // The game window may be hidden behind it after Main menu; closing this one still quits.
+        _mainWindow.OnCloseRequest += (_, _) => { _app.Quit(); return false; };
 
         _mainWindow.Present();
         _speech.Speak("Open F P S main menu. Tab or arrow keys to move, Enter to select.", true);
@@ -405,16 +408,19 @@ internal static partial class GtkClientProgram
         box.Append(remember);
         _loginUser = user;
 
-        box.Append(MenuButton("Connect", () =>
+        void Submit(bool register)
         {
-            string addr = server.GetText();
-            _pendingAddress = addr;
-            _pendingUser = user.GetText();
+            _pendingAddress = server.GetText().Trim();
+            _pendingUser = user.GetText().Trim();
             _pendingPass = pass.GetText();
             _pendingRemember = remember.GetActive();
+            _loginStatusText = register ? "Creating the account..." : "Connecting...";
+            _loginStatus?.SetText(_loginStatusText);
             // The dialog stays open: it closes only once the server has accepted the login.
-            DoConnect(addr);
-        }));
+            _session.Connect(_pendingAddress, _pendingUser, _pendingPass, register);
+        }
+        box.Append(MenuButton("Connect", () => Submit(register: false)));
+        box.Append(MenuButton("Create account", () => Submit(register: true)));
         box.Append(MenuButton("Cancel", () => { Cue(UiCue.MenuBack); CloseLoginDialog(); }));
 
         _loginDialog = dialog;
@@ -457,24 +463,29 @@ internal static partial class GtkClientProgram
         else action();
     }
 
-    private static void DoConnect(string addr)
+    /// <summary>
+    /// The folder the log is written to (OPENFPS_LOG's, as run-gtk-client.sh sets it), opened in the
+    /// file manager. Without a log file it says so: the console is the only copy then.
+    /// </summary>
+    private static void OpenLogFolder()
     {
-        string host = "127.0.0.1";
-        int port = 33288;
-        var parts = addr.Split(':');
-        if (parts.Length >= 1 && parts[0].Length > 0) host = parts[0];
-        if (parts.Length >= 2 && int.TryParse(parts[1], out int p)) port = p;
-
-        if (!_networkStarted) { _network.Start(); _networkStarted = true; }
-        _speech.Speak($"Connecting to {host}, port {port}.", true);
-        _network.Connect(host, port);
-    }
-
-    private static void OnServerConnected()
-    {
-        Log.Information("Connected to server; sending login for user '{User}'.", _pendingUser);
-        _speech.Speak("Connected. Logging in.", true);
-        _network.Send(new LoginRequest { Username = _pendingUser, Password = _pendingPass, Build = WireContract.Hash });
+        string? log = Environment.GetEnvironmentVariable("OPENFPS_LOG");
+        string? dir = string.IsNullOrWhiteSpace(log) ? null : Path.GetDirectoryName(Path.GetFullPath(log));
+        if (dir == null || !Directory.Exists(dir))
+        {
+            _speech.Speak("This run is not writing a log file. Start it with run-gtk-client.sh to keep one.", true);
+            return;
+        }
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("xdg-open", $"\"{dir}\"") { UseShellExecute = false });
+            _speech.Speak($"Opening {dir}.", true);
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Could not open the log folder.");
+            _speech.Speak($"Could not open the log folder. It is {dir}", true);
+        }
     }
 
     // ── Server messages (GameLoop thread) ───────────────────────────────────────

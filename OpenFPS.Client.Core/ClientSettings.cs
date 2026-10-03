@@ -52,6 +52,25 @@ public sealed class ClientSettings
         foreach (var s in Servers) s.Preferred = ReferenceEquals(s, server);
     }
 
+    /// <summary>
+    /// A server logged in to by hand is remembered, so Connect can go straight back: added if it is
+    /// new (and preferred if it is the only one), its password kept only if asked. Saved.
+    /// </summary>
+    public void Remember(string address, string user, string pass, bool rememberPassword, string? path = null)
+    {
+        ServerAddress.Parse(address, out string host, out int port);
+        var s = Servers.FirstOrDefault(x => x.Host == host && x.Port == port && x.Username == user);
+        if (s == null)
+        {
+            s = new SavedServer { Name = host, Host = host, Port = port, Username = user };
+            Servers.Add(s);
+            if (Servers.Count == 1) s.Preferred = true;
+        }
+        s.RememberPassword = rememberPassword;
+        s.Password = rememberPassword ? pass : "";
+        Save(path);
+    }
+
     // ── The file ───────────────────────────────────────────────────────────────────────────────
 
     public static string DefaultPath =>
@@ -86,5 +105,20 @@ public sealed class ClientSettings
         File.WriteAllText(path, JsonSerializer.Serialize(this, Json));
         if (!OperatingSystem.IsWindows())
             try { File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.UserWrite); } catch (IOException) { }
+    }
+}
+
+/// <summary>"host:port" as typed into a connect form or saved, with the defaults filled in.</summary>
+public static class ServerAddress
+{
+    public const string DefaultHost = "127.0.0.1";
+    public const int DefaultPort = 33288;
+
+    public static void Parse(string address, out string host, out int port)
+    {
+        host = DefaultHost; port = DefaultPort;
+        var parts = (address ?? "").Trim().Split(':');
+        if (parts.Length >= 1 && parts[0].Length > 0) host = parts[0];
+        if (parts.Length >= 2 && int.TryParse(parts[1], out int p)) port = p;
     }
 }

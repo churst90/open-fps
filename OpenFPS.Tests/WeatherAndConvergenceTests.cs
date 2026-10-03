@@ -380,7 +380,7 @@ public class WeatherAndConvergenceTests
         public readonly List<string> Loading = new();
         public int EnterGameCalls;
         public int ConsoleOpens;
-        public int QuitRequests;
+        public int GameMenuRequests;
         public bool IsGameInputActive { get; set; } = true;
         public event Action<string>? CommandEntered;
 
@@ -388,7 +388,9 @@ public class WeatherAndConvergenceTests
         public void UpdateLoadingStatus(string text, int percent) => Loading.Add($"{text} ({percent})");
         public void EnterGame() => EnterGameCalls++;
         public void OpenCommandConsole() => ConsoleOpens++;
-        public void RequestQuit() => QuitRequests++;
+        public void ShowGameMenu(Action<GameMenuChoice> chosen) => GameMenuRequests++;
+        public void ReturnToMenu() { }
+        public void Quit() { }
         public void TypeCommand(string text) => CommandEntered?.Invoke(text);
     }
 
@@ -458,19 +460,19 @@ public class WeatherAndConvergenceTests
         session.SimStep(1f / 30f);
         session.SimStep(1f / 30f);
         session.SimStep(1f / 30f);
-        Assert.Equal(1, speech.Spoken.Count(s => s.StartsWith("Facing:")));
+        Assert.Equal(1, speech.Spoken.Count(s => s == session.PlayerState.GetCompassDirection()));
 
         // With a modal console open, gameplay bindings must not fire...
         session.Input.SetKey(GameKey.F, false);
         shell.IsGameInputActive = false;
         session.Input.SetKey(GameKey.F, true);
         session.SimStep(1f / 30f);
-        Assert.Equal(1, speech.Spoken.Count(s => s.StartsWith("Facing:")));
+        Assert.Equal(1, speech.Spoken.Count(s => s == session.PlayerState.GetCompassDirection()));
 
         // ...but the global ones still do, so the player can always get out.
         session.Input.SetKey(GameKey.Escape, true);
         session.SimStep(1f / 30f);
-        Assert.Equal(1, shell.QuitRequests);
+        Assert.Equal(1, shell.GameMenuRequests);
     }
 
     [Fact]

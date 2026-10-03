@@ -37,8 +37,7 @@ reverb that comes from the room's actual size and materials.
   phone; drivers yell when something goes wrong. Recorded lines, placed in the world like any sound.
 - Beacons: sounds that mark doors, items and vehicles near you (a map can add exits, stairs and
   waypoints). Choose which kinds you hear. Beacons behind a wall are not played.
-- Chat: map, all, private and server channels, each with its own sound. Voice chat on the Windows
-  client (not yet on Linux).
+- Chat: map, all, private and server channels, each with its own sound. Voice chat.
 - F-key lists of players, maps and friends, which you can act on. Travel between maps with F6 or
   `/join`.
 - Saved servers and settings.
@@ -65,7 +64,8 @@ reverb that comes from the room's actual size and materials.
 
 - **Server:** Linux. It is plain .NET 10, so other platforms should work but are not tested.
 - **Client:** the Linux GTK client and the Windows client share the game, the keys and the main
-  menu. Only the Windows client can create an account and use voice chat. It is built from Linux
+  menu, including creating an account, voice chat and reconnecting after a dropped connection.
+  The Windows client is built from Linux
   (`./publish-windows.sh`) and is less tested. See [docs/WINDOWS_AND_SERVER.md](docs/WINDOWS_AND_SERVER.md).
 - Speech: speech-dispatcher (Orca, espeak-ng) on Linux; NVDA or SAPI on Windows.
 

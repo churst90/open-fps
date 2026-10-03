@@ -356,7 +356,7 @@ public class HandsService
         float mass = 0f;
         var named = new List<string>();
         foreach (var item in carried) { mass += MassOf(world, item); named.Add(WithArticle(NameOf(world, item))); }
-        return $"On your back: {string.Join(", ", named)} — {mass:F1} of {CarryCapacityKg:F0} kilograms.";
+        return $"You have {string.Join(", ", named)} on your back, {mass:F1} of {CarryCapacityKg:F0} kilograms.";
     }
 
     /// <summary>What a player has slung on them weighs, kilograms. Hands do not count: hands are

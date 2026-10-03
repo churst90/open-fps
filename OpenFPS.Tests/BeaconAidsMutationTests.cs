@@ -552,7 +552,7 @@ public class BeaconAidsMutationTests
         prefs.Set(Beacons.Vehicle, false);
         var aids = new BeaconAids(new AudioEngineFacade(new EmitterRecordingProvider()), prefs);
         aids.SetMapPolicy(new[] { "door=forced_on", "item=forbidden" });
-        Assert.Equal("Beacons: door on, always on for this map. exit on. stairs on. item off, not allowed on this map. "
+        Assert.Equal("Door on, always on for this map. exit on. stairs on. item off, not allowed on this map. "
                    + "vehicle off. waypoint on. Each sounds every 1.6 seconds, at +4 decibels. Say slash beacons and a name to "
                    + "switch one, slash beacons every and a number of seconds, or slash beacons louder or quieter.",
                      aids.Command(Array.Empty<string>()));
