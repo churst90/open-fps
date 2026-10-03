@@ -4,6 +4,35 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-03
 
+- Doors rebuilt after Cody's round-3 verdict ("too quiet ... abbreviated ... too tonal and
+  synthetic ... the door and the latch are too close together ... push bar is usually hollow") and
+  a research round (reports/Realistic door sound synthesis.md, notes in research_notes/).
+  - Acceptance checks against the recordings, before anything is played to Cody: spectral flatness
+    of the hit, latch events ahead of it, a settle train after it, ring length, level.
+  - Dense fields (`DoorPhysics.DenseField`): a thin panel's modes at the density its geometry
+    gives (a mode every 1.7 Hz for 1.2 mm steel), stood in for by effective modes 40 Hz apart that
+    carry the energy of the modes they stand for, radiating by Maidanik's efficiency, with loss by
+    material (thin panel, sandwich, wood). Fed through `Port`s (a patch of panel on its backing,
+    passing energy in through the panel's point impedance), so a field never takes more than the
+    blow gives: fed one way, a thin case had radiated more than the pad that struck it.
+  - Acceleration noise for small hard parts (bolt, strike, latch body, pad, drive bar, knobs).
+  - Knob door: the hand closes at a real speed at the strike (gentle 0.08, normal 0.22, hard 0.4
+    m/s, slam thrown at 1.2), guided in to the latch, so the bevel's touch comes 50-150 ms before
+    the stop. The knobs rock in their play (the jiggle). The strike plate's give feeds back into the
+    bevel contact (re-strikes). The bevel scrapes on the lip's worn track. The game picks gentle,
+    normal or hard for each close and sends it when the leaf arrives.
+  - Push bar: the device is a hollow box (aluminium case and pad as dense fields, the air inside at
+    its length and cross modes), a drive bar with its own stops behind the pad, a 3/4 in latch, a
+    stroke of about 50 ms, the bar let go a third of a second after the bolt clears. The closer
+    brings the door in at its latch-zone speed (0.07-0.6 m/s by character), so a well-set closer
+    scrapes the bevel for half a second before the latch drops. In the game: the steel door sends
+    `pushbardoor:open|close`; the client pre-renders its four characters.
+  - Levels: one calibration for the door model (14 dB) puts it on the measured ranges: knob normal
+    close 77.5 dB at a metre, gentle 63, hard 94, opening 68; push bar opening 88-92, closer close
+    67-100 by character.
+  - Still failing the checks dry: knob normal and hard closes, and three of the push bar's closes,
+    are less noise-like than the recordings above 4 kHz.
+
 - Knob doors are a physical model (branch knob-door, `OpenFPS.Common/KnobDoor.cs`). Cody,
   2026-10-03, after round 2: "I'd go with these sounds for these types of doors for now", with
   the opening loud enough to hear down a corridor of flats.

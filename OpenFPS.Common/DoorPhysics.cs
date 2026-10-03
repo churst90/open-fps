@@ -349,6 +349,147 @@ internal static class DoorPhysics
         return (h0 * p0 + h1 * v0 + h3 * v1 + h5 * p1, d0 * p0 + d1 * v0 + d3 * v1 + d5 * p1);
     }
 
+    // ── Dense fields ─────────────────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// A thin panel's bending modes at the density its geometry gives them, n(f) = sqrt(3) S / (h c_L)
+    /// per hertz (Irvine), which for a 1 mm steel skin is a mode every 1.7 Hz: far too many to step one by
+    /// one, and where they overlap (modal overlap f n eta above one) the response to a blow is statistically
+    /// noise. So the field is stood in for by effective modes spaced at random about CapSpacing apart, each
+    /// carrying the energy of the real modes it stands for (modal mass M/K for K real modes), its radiation
+    /// from the panel's radiation efficiency (Maidanik), its loss from the panel's loss law. A sparse set of
+    /// modes rang as sines and the doors were heard as "tonal and synthetic": this is the count put right.
+    /// One-way: the field takes the contact forces and radiates; it does not push back on the contact.
+    /// </summary>
+    internal sealed class DenseField
+    {
+        public readonly Modes Modes;
+        private readonly Random rng;
+        public const double CapSpacing = 40;
+        /// <summary>The panel's point impedance as an infinite plate, 8 sqrt(D rho h), N s/m: what it takes in
+        /// at a point is this times the point's velocity, and no more.</summary>
+        public readonly double Impedance;
+        /// <summary>The patch a blow moves before the panel answers: a quarter bending wavelength round, at
+        /// 2 kHz, kg.</summary>
+        public readonly double PatchMass;
+
+        public DenseField(double width, double height, double thickness, double e, double rho, double poisson,
+                          Func<double, double> loss, double fLow, double fHigh, Random rng, double dt)
+        {
+            this.rng = rng;
+            double area = width * height, rhoH = rho * thickness;
+            double cL = Math.Sqrt(e / (rho * (1 - poisson * poisson)));
+            double perHz = Math.Sqrt(3) * area / (thickness * cL);
+            double d = e * thickness * thickness * thickness / (12 * (1 - poisson * poisson));
+            double fc = C0 * C0 / (2 * Math.PI) * Math.Sqrt(rhoH / d);
+            double mass = rhoH * area;
+            Impedance = 8 * Math.Sqrt(d * rhoH);
+            double kb = Math.Sqrt(2 * Math.PI * 2000) * Math.Pow(rhoH / d, 0.25);
+            double r = Math.PI / (2 * kb);
+            PatchMass = rhoH * Math.PI * r * r;
+            var hz = new List<double>(); var l = new List<double>(); var m = new List<double>(); var g = new List<double>();
+            double spacing = Math.Max(CapSpacing, 1 / perHz);
+            for (double f0 = fLow; f0 < fHigh; f0 += spacing)
+            {
+                double f = f0 + rng.NextDouble() * spacing;   // random within its slot: no regular comb
+                double k = Math.Max(1, perHz * spacing);      // real modes it stands for
+                double eta = loss(f);
+                double w = 2 * Math.PI * f;
+                double sigma = RadiationEfficiency(f, fc, width, height);
+                double mEff = mass / k;
+                // Radiated power eta_rad w E with eta_rad = rho c sigma / (w rho h), spread over the half
+                // space at a metre, gives the pressure per unit acceleration of the effective coordinate.
+                double gain = Rho0 * C0 / w * Math.Sqrt(sigma * mEff / (2 * Math.PI * rhoH));
+                hz.Add(f); m.Add(mEff); l.Add(eta + Rho0 * C0 * sigma / (w * rhoH));
+                g.Add(gain * (rng.NextDouble() < 0.5 ? -1 : 1));
+            }
+            Modes = new Modes(hz, l, m, g, dt);
+        }
+
+        /// <summary>A point on the panel: each mode's shape there, random in sign and size as a mode shape
+        /// at an unremarkable point is (RMS one, so the energy per real mode comes out right).</summary>
+        public double[] Point()
+        {
+            var s = new double[Modes.N];
+            for (int i = 0; i < s.Length; i++) s[i] = (rng.NextDouble() * 2 - 1) * Math.Sqrt(3);
+            return s;
+        }
+    }
+
+    /// <summary>
+    /// Where a contact meets a dense field: a patch of panel with its own mass, held to the structure behind
+    /// it by a spring and losing energy into the field through the panel's point impedance. What drives the
+    /// field is that impedance times the patch's velocity, so the field never takes more than the contact
+    /// gives. (Fed the full contact force one way, a thin case radiated more than the pad that struck it
+    /// ever had.)
+    /// </summary>
+    internal sealed class Port
+    {
+        private readonly double m, k, z;
+        public double X, V, Acc;
+        public Port(double mass, double stiffness, double impedance) { m = mass; k = stiffness; z = impedance; }
+        /// <summary>One step under <paramref name="force"/>: returns the force into the field; HostForce is what
+        /// the spring passes to the structure behind.</summary>
+        public double Step(double force, double dt, out double hostForce)
+        {
+            double drive = z * V;
+            hostForce = k * X;
+            Acc = (force - hostForce - drive) / m;
+            V += Acc * dt; X += V * dt;
+            return drive;
+        }
+    }
+
+    /// <summary>
+    /// Radiation efficiency of a simply supported panel (Maidanik, with Leppington's correction near
+    /// coincidence): edge and corner radiation below coincidence, about one above.
+    /// </summary>
+    internal static double RadiationEfficiency(double f, double fc, double a, double b)
+    {
+        double lc = C0 / fc, area = a * b, perimeter = 2 * (a + b);
+        if (f >= fc)
+        {
+            double above = 1 / Math.Sqrt(Math.Max(1e-3, 1 - fc / f));
+            double near = Math.Sqrt(a / lc) + Math.Sqrt(b / lc);
+            return Math.Min(above, near);
+        }
+        double alpha = Math.Sqrt(f / fc);
+        double g1 = f < fc / 2 ? 4 / Math.Pow(Math.PI, 4) * (1 - 2 * alpha * alpha) / (alpha * Math.Sqrt(1 - alpha * alpha)) : 0;
+        double g2 = ((1 - alpha * alpha) * Math.Log((1 + alpha) / (1 - alpha)) + 2 * alpha)
+                    / (4 * Math.PI * Math.PI * Math.Pow(1 - alpha * alpha, 1.5));
+        double sigma = lc * lc / area * g1 + perimeter * lc / area * g2;
+        return Math.Clamp(sigma, 1e-5, Math.Sqrt(a / lc) + Math.Sqrt(b / lc));
+    }
+
+    /// <summary>Loss of a bare thin metal panel or rail (Irvine's SEA figure).</summary>
+    internal static double ThinPanelLoss(double f) => Math.Max(0.002, 1.8 / Math.Pow(Math.Max(f, 10), 0.87));
+    /// <summary>A built-up sandwich (a cored steel door): 0.05 below 500 Hz, falling as 1/f above.</summary>
+    internal static double SandwichLoss(double f) => f < 500 ? 0.05 : 0.05 * 500 / f;
+    /// <summary>Wood (Ren, Yeh and Lin's fit, Rayleigh form): alpha/w + beta w.</summary>
+    internal static double WoodLoss(double f) => 2.14 / (2 * Math.PI * f) + 3.08e-6 * 2 * Math.PI * f;
+
+    /// <summary>
+    /// Acceleration noise: a small hard part (a bolt, a plunger, a crank) has its own modes above hearing,
+    /// and what is heard from it is its whole body being jerked in a contact a tenth of a millisecond long.
+    /// A compact body accelerating radiates as a dipole, p = rho V' (da/dt) / (c r) with V' = 3V/(8 pi) for
+    /// a sphere of the same volume (Chadwick, James et al. 2012). Feed it the part's acceleration each step.
+    /// </summary>
+    internal sealed class AccelerationNoise
+    {
+        private readonly double scale, dt;
+        private double last;
+        public AccelerationNoise(double volume, double dt)
+        {
+            this.dt = dt;
+            scale = Rho0 * 3 * volume / (8 * Math.PI) / C0 * 0.6;   // 0.6: cos of a typical bearing
+        }
+        public double Pressure(double acc)
+        {
+            double jerk = (acc - last) / dt; last = acc;
+            return scale * jerk;
+        }
+    }
+
     /// <summary>A second-order Butterworth high-pass (RBJ), for splitting what a model covers from what a
     /// simpler law carries above it.</summary>
     internal sealed class HighPass

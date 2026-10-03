@@ -211,10 +211,6 @@ public sealed class DoorSystem
         {
             if (door.Powered) { Emit(heard, entity, kind, DoorEvents.MotorStart, none); Emit(heard, entity, kind, DoorEvents.Rollers, none); }
             else if (door.Slides) Emit(heard, entity, kind, DoorEvents.Rollers, none);
-            else if (kind == DoorKind.Hinged && !door.SelfClosing)
-                // The knob door's whole close, swing and frame, is one simulation sent as it starts
-                // back: it meets the frame at the end of the swing, when the leaf does.
-                Emit(heard, entity, kind, DoorEvents.Swing, heard == null ? none : KnobDoorSound(world, entity, door, closing: true));
             else Emit(heard, entity, kind, door.SelfClosing ? DoorEvents.Closer : DoorEvents.Swing, none);
         }
 
@@ -226,7 +222,12 @@ public sealed class DoorSystem
                 float edge = door.Slides ? DoorAcoustics.EdgeSpeed(width, 1f, seconds)
                                          : DoorAcoustics.EdgeSpeed(width, door.SwingRadians, seconds);
                 Emit(heard, entity, kind, door.Powered ? DoorEvents.Shut : DoorEvents.Latch,
-                     heard == null || kind == DoorKind.Hinged ? none : Closing(world, entity, door, edge));
+                     heard == null ? none
+                     // The knob door's close is one simulation of a hand shutting it, sent as it arrives.
+                     : kind == DoorKind.Hinged ? KnobDoorSound(world, entity, door, closing: true)
+                     // The push-bar door's close is the closer bringing it into its latch.
+                     : kind == DoorKind.PushBar ? PushBarSound(world, entity, door, closing: true)
+                     : Closing(world, entity, door, edge));
                 door.SelfClosing = false;
             }
             else if (door.Openness >= 1f && door.Slides)
@@ -254,7 +255,7 @@ public sealed class DoorSystem
             switch (kind)
             {
                 case DoorKind.PushBar:
-                    Emit(heard, entity, kind, DoorEvents.Bar, opening);
+                    Emit(heard, entity, kind, DoorEvents.Bar, PushBarSound(world, entity, door, closing: false));
                     break;
                 case DoorKind.GlassPushBar when door.KeyTurned:
                     Emit(heard, entity, kind, DoorEvents.Key, none);
@@ -525,6 +526,31 @@ public sealed class DoorSystem
     /// The knob door as a physical model (<see cref="KnobDoor"/>): the server names it, the client
     /// renders it. The door's id picks its character, so each door keeps its own hinges.
     /// </summary>
+    private static readonly Random _shutDice = new();
+
+    /// <summary>The push-bar door as a physical model (<see cref="PushBarDoor"/>); its id picks its
+    /// character (silencers, bar stops, how its closer is set).</summary>
+    private static IReadOnlyList<TransientSound> PushBarSound(World world, Entity entity, in DoorComponent door, bool closing)
+    {
+        var size = world.Has<ColliderComponent>(entity)
+            ? world.Get<ColliderComponent>(entity).Size
+            : new Vector3(1.0f, 2.1f, 0.08f);
+        var transform = world.Get<Transform>(entity);
+        var latchEdge = transform.Position
+                      + Vector3.Transform(new Vector3(size.X * 0.5f * -door.HingeSide, 0f, 0f), transform.Rotation);
+        int variant = entity.Id;
+        return new[]
+        {
+            new TransientSound
+            {
+                Character = SoundCharacter.Knock, Position = latchEdge, Hz = 300f, Noisiness = 1f,
+                LevelDb = closing ? PushBarDoor.CloseLevelDb(variant) : PushBarDoor.OpenLevelDb(variant),
+                DecaySeconds = 1.8f,
+                SynthKey = PushBarDoor.Key(closing, variant, door.SwingSeconds, size.X, size.Y),
+            },
+        };
+    }
+
     private static IReadOnlyList<TransientSound> KnobDoorSound(World world, Entity entity, in DoorComponent door, bool closing)
     {
         var size = world.Has<ColliderComponent>(entity)
@@ -534,15 +560,21 @@ public sealed class DoorSystem
         var latchEdge = transform.Position
                       + Vector3.Transform(new Vector3(size.X * 0.5f * -door.HingeSide, 0f, 0f), transform.Rotation);
         // Wooden knob doors are interior doors, and interior doors are hollow-core.
-        string key = KnobDoor.Key(closing, KnobDoor.Construction.HollowCore, entity.Id, door.SwingSeconds,
-                                  closing ? door.Openness : 1f, size.X, size.Y);
+        // People shut a door differently each time: mostly guided in, sometimes eased, sometimes pushed.
+        var how = !closing ? KnobDoor.Shut.Normal : _shutDice.NextDouble() switch
+        {
+            < 0.25 => KnobDoor.Shut.Gentle,
+            < 0.80 => KnobDoor.Shut.Normal,
+            _ => KnobDoor.Shut.Hard,
+        };
+        string key = KnobDoor.Key(closing, KnobDoor.Construction.HollowCore, entity.Id, door.SwingSeconds, how, size.X, size.Y);
         return new[]
         {
             new TransientSound
             {
                 Character = SoundCharacter.Knock, Position = latchEdge, Hz = 500f, Noisiness = 1f,
-                LevelDb = closing ? KnobDoor.CloseLevelDb : KnobDoor.OpenLevelDb,
-                DecaySeconds = closing ? door.SwingSeconds * door.Openness + 0.8f : door.SwingSeconds + 0.85f,
+                LevelDb = closing ? KnobDoor.CloseLevelDb(how) : KnobDoor.OpenLevelDb,
+                DecaySeconds = closing ? 1.6f : door.SwingSeconds + 0.85f,
                 SynthKey = key,
             },
         };
