@@ -24,8 +24,7 @@ public enum ChatBufferType
 /// ring. Speaks through <see cref="ISpeechOutput"/>, so it is shared by every client head.
 ///
 /// Each message carries its channel; the ring and the wording come from that, never from the
-/// sender's name. An answer to your own command has no sender and is read as it is; only what the
-/// server says to everybody is prefixed "Server".
+/// sender's name. Nothing from the server is prefixed: its lines have their own sound.
 /// </summary>
 public class ChatManager
 {
@@ -67,6 +66,8 @@ public class ChatManager
         ChatChannel.Private when msg.To.Length > 0 => $"Private to {msg.To}: {msg.Text}",
         ChatChannel.Private => $"Private from {msg.Sender}: {msg.Text}",
         ChatChannel.All => $"{msg.Sender} to all: {msg.Text}",
+        // The server's lines carry their own cue; "Server:" in front of each said nothing new.
+        ChatChannel.Server => msg.Text,
         _ => msg.Sender.Length == 0 ? msg.Text : $"{msg.Sender}: {msg.Text}",
     };
 

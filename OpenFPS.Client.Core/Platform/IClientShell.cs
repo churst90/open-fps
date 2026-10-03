@@ -33,8 +33,20 @@ public interface IClientShell
     /// menu — and the cursor at its end. A head that cannot pre-fill opens it empty.</summary>
     void OpenCommandConsole(string initialText) => OpenCommandConsole();
 
-    /// <summary>The player asked to quit (escape). The shell confirms and, if confirmed, shuts down.</summary>
-    void RequestQuit();
+    /// <summary>
+    /// The player pressed Escape in game. Shows the game menu — Keep playing, Main menu, Quit, with
+    /// Keep playing focused so a stray Enter does nothing — and reports the choice. Escape or closing
+    /// the menu is <see cref="GameMenuChoice.KeepPlaying"/>. The session does the logging out; the
+    /// shell only asks.
+    /// </summary>
+    void ShowGameMenu(Action<GameMenuChoice> chosen);
+
+    /// <summary>Leaves the game: closes the game window and anything open over it, and puts the
+    /// player back on the main menu with focus on it.</summary>
+    void ReturnToMenu();
+
+    /// <summary>Closes the program. The session has already logged out.</summary>
+    void Quit();
 
     /// <summary>
     /// True when gameplay keys should be acted on: the game window has focus and no modal text entry
@@ -47,3 +59,6 @@ public interface IClientShell
     /// into a command or a chat message.</summary>
     event Action<string>? CommandEntered;
 }
+
+/// <summary>What the player chose from the game menu.</summary>
+public enum GameMenuChoice { KeepPlaying, MainMenu, Quit }

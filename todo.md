@@ -27,20 +27,14 @@ Suggested order. Research and file references for most of these: [docs/RESEARCH_
   - `/scan` may not report "Custom" objects.
   Then document how to place a concrete wall, a cylinder and a prefab (`/place <prefab>`, `/spawn`).
 
-**Client**
-- Speak without prefixes. List with file:line in the research doc. Drop:
-  - "Facing:", "Area:", "Health:";
-  - the leftover "Interaction '…' received.";
-  - "Server: " before the message of the day and before arrived/left lines.
-- Disconnect: say so, retry connect and re-login every 3 s for about a minute with a soft tick, then
-  return to the main menu. Today the game window stays up with voices running. About 250 lines.
-- Escape: Keep playing / Main menu / Quit. The server needs a logout handler; the Windows client
-  sends one that nothing handles.
-- Loading: a rising tone with the progress that already exists. Fade the world in over about 1 s at
-  spawn, and out over 0.5 s on quit or return to menu. The VPS wait is 6,408 entity definitions
-  sent one message each; batch them (about 256 a message), or cache maps by checksum.
-- Create account in the GTK client, as on Windows (about 50 lines, no protocol change).
-- A draw key (Shift+R?). Today only `/draw`.
+**Client** (done 2026-10-03 on branch client-parity, unheard; see changes.md)
+- Listen: the loading tone, the 1 s fade-in, the reconnect tick, and the game menu with Orca and
+  with NVDA.
+- Linux voice chat records through FMOD (`--mic` in the lab opened the default device at 48 kHz).
+  Not yet tried between two players.
+- The VPS load time with batched definitions is not measured yet (1.7 s on the loopback). If it is
+  still long, cache maps by `MapManifest.Checksum`.
+- The Windows head is compile-checked only.
 
 **Sound**
 - Beacons (2026-10-02: +4 dB, `/beacons louder|quieter`, a door's on its face at face height ringing

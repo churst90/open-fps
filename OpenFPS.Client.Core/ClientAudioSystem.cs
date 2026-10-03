@@ -410,6 +410,22 @@ public class ClientAudioSystem
     }
 
     /// <summary>
+    /// Silences the whole world, for leaving it: every entity forgotten, the ambience beds stopped,
+    /// and anything still playing stopped. Nothing here runs again until the next map, because
+    /// <see cref="Update"/> is only called in the world.
+    /// </summary>
+    public void LeaveWorld(IEnumerable<int> entityIds)
+    {
+        foreach (int id in entityIds) ForgetEntity(id);
+        if (_mapAmbienceId.Length > 0) _audio.StopAmbientBed(_mapAmbienceId);
+        if (_regionAmbienceId.Length > 0) _audio.StopAmbientBed(_regionAmbienceId);
+        _mapAmbienceId = "";
+        _regionAmbienceId = "";
+        _ambienceRegionId = int.MinValue;
+        _audio.StopAllWorldSounds();
+    }
+
+    /// <summary>
     /// Primary entry point called every frame from the Game Loop.
     /// Uses the VisualPosition for the listener to ensure smooth audio during server corrections.
     /// </summary>

@@ -324,7 +324,9 @@ public class AnnouncementAndLoginTests
         public void UpdateLoadingStatus(string text, int percent) => Loading.Add($"{text} ({percent})");
         public void EnterGame() { }
         public void OpenCommandConsole() { }
-        public void RequestQuit() { }
+        public void ShowGameMenu(Action<GameMenuChoice> chosen) { }
+        public void ReturnToMenu() { }
+        public void Quit() { }
         public void Raise(string text) => CommandEntered?.Invoke(text);
     }
 

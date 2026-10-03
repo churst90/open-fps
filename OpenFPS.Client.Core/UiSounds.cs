@@ -11,6 +11,7 @@ public enum UiCue
     EnterWorld,
     ChatMap, ChatAll, ChatPrivate, ChatServer, ChatAdmin,
     VoiceOn,
+    Reconnecting,
 }
 
 /// <summary>
@@ -42,6 +43,24 @@ public sealed class UiSounds
         _audio.PlayUiSound("ui:" + cue, () => Render(cue), SampleRate, Volume);
     }
 
+    /// <summary>How many steps the loading tone has between empty and full.</summary>
+    public const int ProgressSteps = 10;
+
+    /// <summary>
+    /// The loading tone: one soft note per step of progress, rising an octave from start to finish,
+    /// so a load can be followed without a word being spoken.
+    /// </summary>
+    public void PlayProgress(int percent)
+    {
+        if (!Enabled) return;
+        int step = Math.Clamp(percent * ProgressSteps / 100, 0, ProgressSteps);
+        _audio.PlayUiSound("ui:progress:" + step, () => RenderProgress(step), SampleRate, Volume);
+    }
+
+    /// <summary>The loading tone at a step, 0..<see cref="ProgressSteps"/>. Public so a test can measure it.</summary>
+    public static float[] RenderProgress(int step)
+        => Notes(0.3f, (440f * MathF.Pow(2f, Math.Clamp(step, 0, ProgressSteps) / (float)ProgressSteps), 0f, 0.09f));
+
     /// <summary>The waveform of a cue, peak about 0.8. Public so a test can measure it.</summary>
     public static float[] Render(UiCue cue) => cue switch
     {
@@ -69,6 +88,8 @@ public sealed class UiSounds
         UiCue.ChatAdmin => Notes(0.45f, (880f, 0f, 0.25f), (1108.7f, 0.03f, 0.25f), (1318.5f, 0.06f, 0.3f)),
         // Your microphone is live: one short A.
         UiCue.VoiceOn => Notes(0.5f, (880f, 0f, 0.08f)),
+        // Trying the server again: a quiet low tick, every few seconds until it answers.
+        UiCue.Reconnecting => Notes(0.25f, (587.3f, 0f, 0.04f)),
         _ => Notes(0.4f, (1000f, 0f, 0.05f)),
     };
 

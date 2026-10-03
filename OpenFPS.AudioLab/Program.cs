@@ -611,6 +611,33 @@ if (args.Contains("--car-horn"))
     Environment.Exit(OpenFPS.Client.Core.AudioEngine.Fmod.CarHornSpike.Run(args));
 }
 
+if (args.Contains("--mic"))
+{
+    // --mic [sec=3] [device=NAME]: records from the microphone through FMOD, the Linux head's voice
+    // chat path, and says whether the device opened, how many samples came, and how loud they were.
+    // Nothing is kept or sent.
+    float micSec = 3f;
+    string micDevice = "";
+    foreach (var a in args)
+    {
+        if (a.StartsWith("sec=")) float.TryParse(a[4..], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out micSec);
+        if (a.StartsWith("device=")) micDevice = a[7..];
+    }
+    var micAudio = new OpenFPS.Client.AudioEngine.Core.AudioEngineFacade();
+    micAudio.Initialize();
+    Console.WriteLine($"Input devices: {string.Join(" | ", micAudio.InputDevices())}");
+    if (!micAudio.StartRecording(micDevice, out int micRate)) { Console.WriteLine("  the microphone did not open"); Environment.Exit(1); }
+    var micSamples = new List<float>();
+    var micUntil = DateTime.UtcNow.AddSeconds(micSec);
+    while (DateTime.UtcNow < micUntil) { micAudio.ReadRecording(micSamples); Thread.Sleep(10); }
+    micAudio.StopRecording();
+    double micSum = 0; foreach (float v in micSamples) micSum += v * v;
+    double micRms = micSamples.Count > 0 ? Math.Sqrt(micSum / micSamples.Count) : 0;
+    Console.WriteLine($"  {micRate} Hz, {micSamples.Count} samples in {micSec:F1} s ({micSamples.Count / Math.Max(0.1, micSec):F0}/s), RMS {20 * Math.Log10(Math.Max(1e-9, micRms)):F1} dBFS");
+    micAudio.Dispose();
+    Environment.Exit(micSamples.Count > 0 ? 0 : 1);
+}
+
 if (args.Contains("--siren"))
 {
     Environment.Exit(OpenFPS.Client.Core.AudioEngine.Fmod.SirenSpike.Run(args));

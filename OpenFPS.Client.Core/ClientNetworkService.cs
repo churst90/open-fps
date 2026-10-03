@@ -46,11 +46,32 @@ public class ClientNetworkService : INetEventListener
     /// isn't one.</summary>
     public event Action<string>? OnConnectionNotice;
 
+    /// <summary>Raised when a connection that WAS up has gone — the server stopped, the network
+    /// dropped, or we disconnected. The argument is a speakable reason. A connect that never
+    /// succeeded raises <see cref="OnConnectionFailed"/> instead.</summary>
+    public event Action<string>? OnConnectionLost;
+
     /// <summary>True while a server peer is connected.</summary>
     public bool IsConnected => _serverPeer != null;
 
+    /// <summary>True while a connect has been started and has neither succeeded nor failed.</summary>
+    public bool IsConnecting => _connectPending;
+
+    /// <summary>True once <see cref="Start"/> has opened a socket.</summary>
+    public bool IsStarted => _netManager is { IsRunning: true };
+
+    /// <summary>Drops the connection to the server, if there is one. The peer's own disconnect event
+    /// follows, as <see cref="OnConnectionLost"/>.</summary>
+    public void Disconnect()
+    {
+        if (_netManager == null) return;
+        _connectPending = false;
+        _netManager.DisconnectAll();
+    }
+
     public void Start()
     {
+        if (IsStarted) return;
         _netManager = new NetManager(this) { AutoRecycle = true };
         if (!_netManager.Start())
         {
@@ -116,7 +137,8 @@ public class ClientNetworkService : INetEventListener
         }
     }
 
-    public void Poll() => _netManager.PollEvents();
+    /// <summary>Delivers network events on the calling thread. Does nothing before <see cref="Start"/>.</summary>
+    public void Poll() => _netManager?.PollEvents();
 
     public void Send(IMessage message, DeliveryMethod delivery = DeliveryMethod.ReliableOrdered)
     {
@@ -212,9 +234,8 @@ public class ClientNetworkService : INetEventListener
         Log.Warning("Disconnected from {Target}: {Reason} (LiteNetLib reason {Raw}, socket {Socket}).",
             _lastTarget.Length > 0 ? _lastTarget : peer.Address.ToString(), reason, info.Reason, info.SocketErrorCode);
 
-        OnConnectionFailed?.Invoke(wasConnected
-            ? $"Disconnected from the server. {reason}"
-            : $"Could not connect to {_lastTarget}. {reason}");
+        if (wasConnected) OnConnectionLost?.Invoke(reason);
+        else OnConnectionFailed?.Invoke($"Could not connect to {_lastTarget}. {reason}");
     }
 
     /// <summary>Turns LiteNetLib's disconnect enum into something worth hearing.</summary>

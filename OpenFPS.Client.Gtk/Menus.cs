@@ -77,9 +77,7 @@ internal static partial class GtkClientProgram
     {
         if (server.RememberPassword && server.Password.Length > 0 && server.Username.Length > 0)
         {
-            _pendingUser = server.Username;
-            _pendingPass = server.Password;
-            DoConnect($"{server.Host}:{server.Port}");
+            _session.Connect($"{server.Host}:{server.Port}", server.Username, server.Password, register: false);
             return;
         }
         ShowLoginDialog(server);
@@ -87,27 +85,7 @@ internal static partial class GtkClientProgram
 
     /// <summary>After a successful login from the Connect dialog, the server is remembered.</summary>
     private static void RememberServer(string address, string user, string pass, bool rememberPassword)
-    {
-        ParseAddress(address, out string host, out int port);
-        var s = _settings.Servers.FirstOrDefault(x => x.Host == host && x.Port == port && x.Username == user);
-        if (s == null)
-        {
-            s = new SavedServer { Name = host, Host = host, Port = port, Username = user };
-            _settings.Servers.Add(s);
-            if (_settings.Servers.Count == 1) s.Preferred = true;
-        }
-        s.RememberPassword = rememberPassword;
-        s.Password = rememberPassword ? pass : "";
-        _settings.Save();
-    }
-
-    private static void ParseAddress(string addr, out string host, out int port)
-    {
-        host = "127.0.0.1"; port = 33288;
-        var parts = addr.Trim().Split(':');
-        if (parts.Length >= 1 && parts[0].Length > 0) host = parts[0];
-        if (parts.Length >= 2 && int.TryParse(parts[1], out int p)) port = p;
-    }
+        => _settings.Remember(address, user, pass, rememberPassword);
 
     // ── Saved servers ──────────────────────────────────────────────────────────────────────────
 
@@ -210,7 +188,7 @@ internal static partial class GtkClientProgram
         box.Append(MenuButton("Save", () =>
         {
             var s = existing ?? new SavedServer();
-            ParseAddress(address.GetText(), out string host, out int port);
+            ServerAddress.Parse(address.GetText(), out string host, out int port);
             s.Host = host; s.Port = port;
             s.Name = name.GetText().Trim().Length > 0 ? name.GetText().Trim() : host;
             s.Username = user.GetText().Trim();

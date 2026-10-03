@@ -913,6 +913,9 @@ public class FmodAudioProvider : IAudioProvider
             _system.createChannelGroup("Reflections", out _reflectionGroup);
             _system.getMasterChannelGroup(out var master);
             master.addGroup(_reflectionGroup);
+            // Interface sounds have their own group so a world fade can leave them alone.
+            _system.createChannelGroup("Interface", out _uiGroup);
+            master.addGroup(_uiGroup);
 
             // How loud the whole world is, and the ONE place it belongs.
             //
@@ -933,9 +936,10 @@ public class FmodAudioProvider : IAudioProvider
                                             System.Globalization.NumberStyles.Float,
                                             System.Globalization.CultureInfo.InvariantCulture,
                                             out float mdb) ? Math.Clamp(mdb, -24f, 24f) : DefaultMasterDb;
+            _masterTrim = MathF.Pow(10f, masterDb / 20f);
             if (MathF.Abs(masterDb) > 0.01f)
             {
-                master.setVolume(MathF.Pow(10f, masterDb / 20f));
+                master.setVolume(_masterTrim);
                 Log.Information("Master trim: {Db:F1} dB (OPENFPS_MASTER_DB).", masterDb);
             }
 
@@ -1841,8 +1845,8 @@ public class FmodAudioProvider : IAudioProvider
     {
         var e = TracedReverbSet.Echoes;
         string mode = TracedEchoesOn ? "on" : "off";
-        if (e == null) return $"Echoes: {mode}. No tracer yet — the scene is still being built.";
-        return $"Echoes: {mode}, {TailDb:F0} dB against physical (the tail level). {_tracedEchoIds.Length} far source(s) traced from where they are; {e.Runs} traces, the last in {e.LastRunMs:F0} ms.";
+        if (e == null) return $"Echoes {mode}. No tracer yet — the scene is still being built.";
+        return $"Echoes {mode}, {TailDb:F0} dB against physical (the tail level). {_tracedEchoIds.Length} far source(s) traced from where they are; {e.Runs} traces, the last in {e.LastRunMs:F0} ms.";
     }
 
     /// <summary>Where a sound id's file is: the path the loader opens.</summary>
@@ -1868,9 +1872,9 @@ public class FmodAudioProvider : IAudioProvider
     /// <summary>For the /reverb readout: mode, and how the tracing is doing.</summary>
     public static string TracedReverbStatus(FmodAudioProvider? p)
     {
-        if (TracedReverbSet.Listener == null) return "Reverb: no trace yet — the scene is still being built.";
+        if (TracedReverbSet.Listener == null) return "No trace yet — the scene is still being built.";
         var (rooms, runs, ms) = TracedReverbSet.Stats();
-        return $"Reverb: traced from where you stand and from {rooms} other room(s); {runs} traces so far, the last of yours in {ms:F0} ms. Tail {TailDb:F0} dB, copies {CopiesDb:F0} dB. {LateFieldStatus()}";
+        return $"Traced from where you stand and from {rooms} other room(s); {runs} traces so far, the last of yours in {ms:F0} ms. Tail {TailDb:F0} dB, copies {CopiesDb:F0} dB. {LateFieldStatus()}";
     }
 
     /// <summary>Adds a traced stage to every bus that lacks one, points each at the place it should be
@@ -4763,6 +4767,31 @@ public class FmodAudioProvider : IAudioProvider
     /// starts. These are never released until shutdown.</summary>
     private readonly Dictionary<string, FMOD.Sound> _uiSounds = new();
 
+    /// <summary>The group interface sounds play in, under the master.</summary>
+    private FMOD.ChannelGroup _uiGroup;
+
+    /// <summary>The master's own level (OPENFPS_MASTER_DB), which a world fade scales.</summary>
+    private float _masterTrim = 1f;
+
+    /// <summary>The quietest a fade goes, 60 dB down. Never zero: the interface group is lifted by
+    /// the inverse, and that has to stay finite.</summary>
+    public const float WorldFadeFloor = 1e-3f;
+
+    /// <summary>
+    /// Fades everything heard in the world — voices, rooms, echoes — and not the interface sounds.
+    ///
+    /// Every group ends at the master, so the fade is the master's level. The interface group is
+    /// lifted by the inverse so a menu tick or the arrival chord plays at its own level throughout.
+    /// </summary>
+    public void SetWorldFade(float gain)
+    {
+        if (!_isInitialized) return;
+        float g = Math.Clamp(gain, WorldFadeFloor, 1f);
+        _system.getMasterChannelGroup(out var master);
+        master.setVolume(_masterTrim * g);
+        if (_uiGroup.hasHandle()) _uiGroup.setVolume(1f / g);
+    }
+
     /// <summary>
     /// The voices reaching the listener loudest, by the volume last applied times the strongest band
     /// the EQ lets through. Diagnostic: "why can I still hear that" needs the route and the numbers.
@@ -4809,6 +4838,121 @@ public class FmodAudioProvider : IAudioProvider
         return names;
     }
 
+    // ── The microphone ───────────────────────────────────────────────────────────────────────
+    //
+    // FMOD records as well as plays, on every platform it runs on, and Settings already lists the
+    // input devices by FMOD's names — so the Linux head's voice chat comes from here rather than
+    // from a second audio library. One second of looping buffer, read as the record cursor moves.
+
+    private readonly object _recLock = new();
+    private FMOD.Sound _recSound;
+    private int _recDriver = -1;
+    private int _recChannels;
+    private uint _recFrames;
+    private uint _recLast;
+
+    public bool HasRecordingDevice
+        => _isInitialized && _system.getRecordNumDrivers(out _, out int connected) == RESULT.OK && connected > 0;
+
+    public bool StartRecording(string deviceName, out int sampleRate)
+    {
+        sampleRate = 0;
+        if (!_isInitialized) return false;
+        lock (_recLock)
+        {
+            StopRecordingLocked();
+            if (_system.getRecordNumDrivers(out int n, out _) != RESULT.OK) return false;
+            int chosen = -1, fallback = -1, rate = 0, channels = 0;
+            for (int i = 0; i < n; i++)
+            {
+                if (_system.getRecordDriverInfo(i, out string name, 256, out _, out int r, out _, out int ch, out var state) != RESULT.OK) continue;
+                if ((state & DRIVER_STATE.CONNECTED) == 0) continue;
+                bool wanted = deviceName.Length > 0 ? name == deviceName : (state & DRIVER_STATE.DEFAULT) != 0;
+                if (wanted) { chosen = i; rate = r; channels = ch; break; }
+                if (fallback < 0) { fallback = i; rate = r; channels = ch; }
+            }
+            if (chosen < 0)
+            {
+                if (fallback < 0) return false;
+                if (deviceName.Length > 0) Log.Warning("The chosen microphone, {Name}, is not connected; using another.", deviceName);
+                chosen = fallback;
+                _system.getRecordDriverInfo(chosen, out _, 256, out _, out rate, out _, out channels, out _);
+            }
+            if (rate <= 0) rate = 48000;
+            if (channels <= 0) channels = 1;
+
+            var info = new CREATESOUNDEXINFO
+            {
+                cbsize = System.Runtime.InteropServices.Marshal.SizeOf<CREATESOUNDEXINFO>(),
+                numchannels = channels,
+                defaultfrequency = rate,
+                format = SOUND_FORMAT.PCM16,
+                length = (uint)(rate * channels * sizeof(short)),
+            };
+            if (_system.createSound(IntPtr.Zero, MODE.LOOP_NORMAL | MODE.OPENUSER, ref info, out _recSound) != RESULT.OK) return false;
+            var res = _system.recordStart(chosen, _recSound, true);
+            if (res != RESULT.OK)
+            {
+                Log.Warning("The microphone would not start: {R}", res);
+                _recSound.release();
+                _recSound = default;
+                return false;
+            }
+            _recDriver = chosen;
+            _recChannels = channels;
+            _recFrames = (uint)rate;
+            _recLast = 0;
+            sampleRate = rate;
+            Log.Information("Microphone recording from driver {Driver}: {Rate} Hz, {Ch} channel(s).", chosen, rate, channels);
+            return true;
+        }
+    }
+
+    public int ReadRecording(List<float> mono)
+    {
+        lock (_recLock)
+        {
+            if (_recDriver < 0 || !_recSound.hasHandle()) return 0;
+            if (_system.getRecordPosition(_recDriver, out uint pos) != RESULT.OK || pos == _recLast) return 0;
+            uint frames = (pos + _recFrames - _recLast) % _recFrames;
+            uint bpf = (uint)(_recChannels * sizeof(short));
+            if (_recSound.@lock(_recLast * bpf, frames * bpf, out IntPtr p1, out IntPtr p2, out uint l1, out uint l2) != RESULT.OK) return 0;
+            int before = mono.Count;
+            Append(p1, l1);
+            Append(p2, l2);
+            _recSound.unlock(p1, p2, l1, l2);
+            _recLast = pos;
+            return mono.Count - before;
+
+            void Append(IntPtr p, uint bytes)
+            {
+                if (p == IntPtr.Zero || bytes == 0) return;
+                int count = (int)(bytes / sizeof(short));
+                var buf = new short[count];
+                System.Runtime.InteropServices.Marshal.Copy(p, buf, 0, count);
+                for (int i = 0; i + _recChannels <= count; i += _recChannels)
+                {
+                    float sum = 0f;
+                    for (int c = 0; c < _recChannels; c++) sum += buf[i + c];
+                    mono.Add(sum / (_recChannels * 32768f));
+                }
+            }
+        }
+    }
+
+    public void StopRecording()
+    {
+        lock (_recLock) StopRecordingLocked();
+    }
+
+    private void StopRecordingLocked()
+    {
+        if (_recDriver >= 0 && _isInitialized) _system.recordStop(_recDriver);
+        if (_recSound.hasHandle()) _recSound.release();
+        _recSound = default;
+        _recDriver = -1;
+    }
+
     public bool SetOutputDevice(string name)
     {
         if (!_isInitialized) return false;
@@ -4853,7 +4997,7 @@ public class FmodAudioProvider : IAudioProvider
                                     ref info, out sound) != RESULT.OK) return;
             _uiSounds[id] = sound;
         }
-        if (_system.playSound(sound, default, true, out FMOD.Channel channel) != RESULT.OK) return;
+        if (_system.playSound(sound, _uiGroup, true, out FMOD.Channel channel) != RESULT.OK) return;
         channel.setVolume(Math.Clamp(volume, 0f, 1f));
         channel.setPaused(false);
         }
@@ -4933,6 +5077,7 @@ public class FmodAudioProvider : IAudioProvider
     }
 
     public void Dispose() {
+        StopRecording();
         lock (_lock) {
             foreach (var active in _activeSounds) {
                 ReleaseActiveSoundResources(active);

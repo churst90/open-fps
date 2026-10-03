@@ -35,10 +35,6 @@ public class ClientRunner
 
     private volatile bool _isRunning = true;
 
-    private string _pendingUser = "";
-    private string _pendingPass = "";
-    private bool _isRegistering;
-
     /// <summary>The game loop's last tick in UTC ticks; zero until it has ticked once. See <see cref="Watchdog"/>.</summary>
     private long _loopBeat;
 
@@ -69,23 +65,16 @@ public class ClientRunner
             Loudness.DynamicRangeCompression = _settings.LevelCompression;
         _microphone = new VoiceCapture(() => _settings.InputDevice);
 
-        // Subscribe BEFORE Start(): a socket that cannot open is reported from inside Start().
-        _network.OnConnectionFailed += reason =>
-        {
-            _speech.Speak(reason, true);
-            _navigation?.ReportLoginOutcome(reason, success: false);
-        };
-        _network.OnProtocolError += reason => _speech.Speak(reason, true);
-        _network.OnConnectionNotice += notice => _speech.Speak(notice, true);
-        _network.OnConnected += HandleConnectedToServer;
-        _network.OnMessageReceived += HandleMessage;
+        // Connecting, logging in, reconnecting and logging out are the session's (shared with Linux);
+        // the head only shows what it is told.
+        _network.OnMessageReceived += msg => _session.HandleMessage(msg);
 
         // Built on this (the UI) thread, before Application.Run: it owns the marshal every other
         // thread posts through.
         _navigation = new ClientNavigationService(
             menuFactory: () => new MenuWindow(_speech, _settings, new MenuServices
             {
-                Connect = Connect,
+                Connect = (address, user, pass, register) => _session.Connect(address, user, pass, register),
                 Cue = cue => _session?.Ui.Play(cue),
                 OutputDevices = () => _session.Audio.OutputDevices(),
                 InputDevices = () => _session.Audio.InputDevices(),
@@ -96,11 +85,8 @@ public class ClientRunner
             loadingFactory: () => new LoadingWindow(_speech),
             gameFactory: () => new MainWindow(_session.Input, _speech, cue => _session.Ui.Play(cue)));
 
-        var shell = new WinFormsClientShell(_navigation, () =>
-        {
-            _network.Send(new LogoutRequest());
-            _navigation.EnqueueUIAction(Application.Exit);
-        });
+        var shell = new WinFormsClientShell(_navigation, _speech, cue => _session?.Ui.Play(cue),
+                                            quit: () => _navigation.EnqueueUIAction(Application.Exit));
 
         _session = new ClientGameSession(_network, _speech, shell, _audio, _microphone);
         _session.GameJoined += () => Serilog.Log.Information("Entered the world as entity {Id}.", _session.OwnEntityId);
@@ -108,6 +94,7 @@ public class ClientRunner
         // focus back where the player can correct the mistake.
         _session.LoginSucceeded += _ => _navigation.ReportLoginOutcome("", success: true);
         _session.LoginFailed += reason => _navigation.ReportLoginOutcome($"Login failed. {reason}", success: false);
+        _session.ConnectFailed += reason => _navigation.ReportLoginOutcome(reason, success: false);
         // Preloading the sound library is the long pole; it runs on the session's audio thread and the
         // menu is usable meanwhile, as on Linux.
         _session.BeginAudioInit(ApplyAudioSettings);
@@ -137,49 +124,6 @@ public class ClientRunner
             _speech.Speak($"The saved output device, {_settings.OutputDevice}, is not connected. Using the default.", false);
     }
 
-    private void Connect(string address, string user, string pass, bool register)
-    {
-        MenuWindow.ParseAddress(address, out string host, out int port);
-        _isRegistering = register;
-        _pendingUser = user;
-        _pendingPass = pass;
-        _speech.Speak($"Connecting to {host}, port {port}.", true);
-        _network.Connect(host, port);
-    }
-
-    private void HandleConnectedToServer()
-    {
-        Serilog.Log.Information("Connected to server; sending {What} for user '{User}'.",
-                                _isRegistering ? "registration" : "login", _pendingUser);
-        if (_isRegistering)
-            _network.Send(new RegisterRequest { Username = _pendingUser, Password = _pendingPass });
-        else
-            _network.Send(new LoginRequest { Username = _pendingUser, Password = _pendingPass, Build = WireContract.Hash });
-    }
-
-    private void HandleMessage(IMessage msg)
-    {
-        // Creating an account is this head's alone (the connect form has the button), so its answer is
-        // handled here: said, and on success followed straight into a login with the same name.
-        if (msg is RegisterResponse reg)
-        {
-            _isRegistering = false;
-            if (reg.Success)
-            {
-                _speech.Speak("Account created. Logging in.", true);
-                _network.Send(new LoginRequest { Username = _pendingUser, Password = _pendingPass, Build = WireContract.Hash });
-            }
-            else
-            {
-                string reason = $"Could not create the account. {reg.Message}";
-                _speech.Speak(reason, true);
-                _navigation.ReportLoginOutcome(reason, success: false);
-            }
-            return;
-        }
-        _session.HandleMessage(msg);
-    }
-
     // ── Game / network loop (background thread) ─────────────────────────────────
 
     private void GameLoop()
@@ -196,6 +140,8 @@ public class ClientRunner
             try
             {
                 _network.Poll();
+                // Reconnects, the world fade and anything a menu handed over: in or out of the world.
+                _session.Tick();
 
                 if (_session.IsInGame)
                 {

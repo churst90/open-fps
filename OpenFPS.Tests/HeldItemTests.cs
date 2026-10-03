@@ -418,7 +418,7 @@ public class HeldItemTests : IDisposable
 
         string readout = f.Hands.Readout(player);
         Assert.Contains("Torch in your right hand", readout);
-        Assert.Contains("On your back", readout);
+        Assert.Contains("You have an Iron Sword on your back", readout);
         Assert.Contains("an Iron Sword", readout);   // spoken aloud, so "a Iron Sword" is a stumble
         // What it weighs and what is left, because the weight is the other limit.
         Assert.Contains("2.0 of 25 kilograms", readout);

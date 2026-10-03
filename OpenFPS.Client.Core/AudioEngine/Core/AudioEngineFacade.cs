@@ -552,6 +552,26 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
         if (_isInitialized) _provider.PlayUiSound(id, render, sampleRate, volume);
     }
 
+    /// <summary>Fades the world and not the interface sounds. See IAudioProvider.SetWorldFade.</summary>
+    public void SetWorldFade(float gain) { if (_isInitialized) _provider.SetWorldFade(gain); }
+
+    // The microphone, recorded through the same FMOD system. See IAudioProvider.StartRecording.
+    public bool HasRecordingDevice => _isInitialized && _provider.HasRecordingDevice;
+    public bool StartRecording(string deviceName, out int sampleRate)
+    {
+        sampleRate = 0;
+        return _isInitialized && _provider.StartRecording(deviceName, out sampleRate);
+    }
+    public int ReadRecording(List<float> mono) => _isInitialized ? _provider.ReadRecording(mono) : 0;
+    public void StopRecording() { if (_isInitialized) _provider.StopRecording(); }
+
+    /// <summary>Stops every voice in the world at once, for leaving it.</summary>
+    public void StopAllWorldSounds()
+    {
+        if (!_isInitialized) return;
+        foreach (int id in _provider.GetActiveSpatialSoundIds().ToList()) _provider.StopSound(id);
+    }
+
     // --- Step 1a diagnostics: drive an isolated mono source (see AudioDiagnostics). ---
     public void StartDiagnosticSound() { if (_isInitialized) _provider.StartDiagnosticSound(); }
     public void SetDiagnosticPosition(Vector3 position) { if (_isInitialized) _provider.SetDiagnosticPosition(position); }

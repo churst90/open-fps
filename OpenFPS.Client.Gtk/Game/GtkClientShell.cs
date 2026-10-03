@@ -1,6 +1,7 @@
 using System;
 using System.Threading;
 using Gtk;
+using OpenFPS.Client.Core;
 using OpenFPS.Client.Core.Input;
 using OpenFPS.Client.Core.Platform;
 
@@ -8,7 +9,7 @@ namespace OpenFPS.Client.Gtk.Game;
 
 /// <summary>
 /// The Linux half of <see cref="IClientShell"/>: GTK windows for the loading screen, the in-game
-/// focus target, the command console, and the quit confirmation.
+/// focus target, the command console, and the game menu.
 ///
 /// The shared session calls every one of these from the game-loop thread, so each one marshals onto
 /// the GTK main thread through the captured <see cref="SynchronizationContext"/> before touching a
@@ -19,6 +20,7 @@ internal sealed class GtkClientShell : IClientShell
 {
     private readonly ISpeechOutput _speech;
     private readonly Action _onQuit;
+    private readonly Action<UiCue> _cue;
 
     // The session creates the input buffer and needs the shell to construct, so the buffer arrives a
     // moment later via SetInput. The shell only ever uses it to clear held keys around modal dialogs,
@@ -31,15 +33,19 @@ internal sealed class GtkClientShell : IClientShell
 
     private Window? _loadingWindow;
     private Label? _loadingLabel;
+    private ProgressBar? _loadingBar;
     private GameWindow? _gameWindow;
     private bool _consoleOpen;
+    // Whatever modal is up over the game window (console or game menu), so leaving can close it.
+    private Window? _modal;
 
     public event Action<string>? CommandEntered;
 
-    public GtkClientShell(ISpeechOutput speech, Action onQuit)
+    public GtkClientShell(ISpeechOutput speech, Action onQuit, Action<UiCue> onCue)
     {
         _speech = speech;
         _onQuit = onQuit;
+        _cue = onCue;
     }
 
     /// <summary>Hands the shell the session's input buffer, immediately after the session is built.</summary>
@@ -75,12 +81,17 @@ internal sealed class GtkClientShell : IClientShell
             // Focusable so Orca lands on it and reads the status as it changes.
             _loadingLabel.SetFocusable(true);
             box.Append(_loadingLabel);
+            // The same progress the Windows head shows; the loading tone says it without looking.
+            _loadingBar = ProgressBar.New();
+            _loadingBar.SetShowText(true);
+            box.Append(_loadingBar);
             _loadingWindow.SetChild(box);
         }
         else
         {
             _loadingLabel?.SetText(status);
         }
+        _loadingBar?.SetFraction(0);
 
         _loadingWindow.Present();
         if (speak) _speech.Speak(status, interrupt: true);
@@ -90,6 +101,7 @@ internal sealed class GtkClientShell : IClientShell
     {
         string line = percent > 0 ? $"{text} {percent} percent." : text;
         _loadingLabel?.SetText(line);
+        _loadingBar?.SetFraction(Math.Clamp(percent, 0, 100) / 100.0);
 
         // Shown, not spoken: preloading this, receiving that. A player needs to hear that they are in
         // and where (ClientGameSession, on arriving), not the loading steps.
@@ -124,6 +136,7 @@ internal sealed class GtkClientShell : IClientShell
         _input.Clear();
 
         var dialog = Window.New();
+        _modal = dialog;
         dialog.Title = "Command";
         dialog.SetModal(true);
         dialog.SetDefaultSize(420, 140);
@@ -158,6 +171,7 @@ internal sealed class GtkClientShell : IClientShell
         dialog.OnCloseRequest += (_, _) =>
         {
             _consoleOpen = false;
+            _modal = null;
             _input.Clear();
             return false;
         };
@@ -180,42 +194,92 @@ internal sealed class GtkClientShell : IClientShell
         if (initialText.Length > 0)
         {
             entry.SetPosition(-1);   // cursor after what is already there
-            _speech.Speak($"Command entry: {initialText.Trim()}. Type the rest, then press Enter.", interrupt: true);
+            _speech.Speak($"{initialText.Trim()}. Type the rest, then press Enter.", interrupt: true);
         }
         else _speech.Speak("Command entry. Type a command or message, then press Enter.", interrupt: true);
     });
 
-    public void RequestQuit() => OnUi(() =>
+    public void ShowGameMenu(Action<GameMenuChoice> chosen) => OnUi(() =>
     {
         if (_consoleOpen) return;
-        _consoleOpen = true; // reuse the modal guard: gameplay keys pause while the prompt is up
+        _consoleOpen = true; // the modal guard: gameplay keys pause while the menu is up
         _input.Clear();
 
         var dialog = Window.New();
-        dialog.Title = "Quit";
+        _modal = dialog;
+        dialog.Title = "Game menu";
         dialog.SetModal(true);
-        dialog.SetDefaultSize(320, 120);
+        dialog.SetDefaultSize(320, 160);
         if (_gameWindow?.Toplevel != null) dialog.SetTransientFor(_gameWindow.Toplevel);
 
         var box = Box.New(Orientation.Vertical, 8);
         box.MarginTop = box.MarginBottom = box.MarginStart = box.MarginEnd = 16;
-        box.Append(Label.New("Quit OpenFPS?"));
 
-        var yes = Button.NewWithLabel("Quit");
-        yes.OnClicked += (_, _) => { dialog.Close(); _onQuit(); };
-        box.Append(yes);
+        // Answered once: closing the window after a choice must not also count as Keep playing.
+        bool answered = false;
+        void Choose(GameMenuChoice choice)
+        {
+            if (answered) return;
+            answered = true;
+            dialog.Close();
+            chosen(choice);
+        }
 
-        var no = Button.NewWithLabel("Keep playing");
-        no.OnClicked += (_, _) => dialog.Close();
-        box.Append(no);
+        Button Item(string label, GameMenuChoice choice)
+        {
+            var b = Button.NewWithLabel(label);
+            b.OnClicked += (_, _) => { if (choice != GameMenuChoice.KeepPlaying) _cue(UiCue.MenuSelect); Choose(choice); };
+            var focus = EventControllerFocus.New();
+            focus.OnEnter += (_, _) => { _cue(UiCue.MenuMove); _speech.Speak(label, interrupt: true); };
+            b.AddController(focus);
+            box.Append(b);
+            return b;
+        }
+        var keep = Item("Keep playing", GameMenuChoice.KeepPlaying);
+        Item("Main menu", GameMenuChoice.MainMenu);
+        Item("Quit", GameMenuChoice.Quit);
 
-        dialog.OnCloseRequest += (_, _) => { _consoleOpen = false; _input.Clear(); return false; };
+        // Escape, or closing the window, is Keep playing.
+        var keys = EventControllerKey.New();
+        keys.SetPropagationPhase(PropagationPhase.Capture);
+        keys.OnKeyPressed += (_, e) =>
+        {
+            if (e.Keyval != 0xff1b) return false;   // GDK_Escape
+            Choose(GameMenuChoice.KeepPlaying);
+            return true;
+        };
+        dialog.AddController(keys);
+        dialog.OnCloseRequest += (_, _) =>
+        {
+            _consoleOpen = false;
+            _modal = null;
+            _input.Clear();
+            if (!answered) { answered = true; chosen(GameMenuChoice.KeepPlaying); }
+            return false;
+        };
 
         dialog.SetChild(box);
         dialog.Present();
-        no.GrabFocus();
-        _speech.Speak("Quit OpenFPS? Tab to choose, Enter to confirm.", interrupt: true);
+        // The focus announcement is replaced by one line that says where you are and what is focused.
+        keep.GrabFocus();
+        _speech.Speak("Game menu. Keep playing. Tab or arrows to choose, Enter to confirm, Escape to go back.", interrupt: true);
     });
+
+    public void ReturnToMenu() => OnUi(() =>
+    {
+        _modal?.Close();
+        _modal = null;
+        _consoleOpen = false;
+        _input.Clear();
+        _gameWindow?.Hide();
+        _loadingWindow?.SetVisible(false);
+        if (_menuWindow == null) return;
+        _menuWindow.SetVisible(true);
+        _menuWindow.Present();
+        _speech.Speak("Main menu.", interrupt: false);
+    });
+
+    public void Quit() => OnUi(_onQuit);
 
     // ── Thread marshaling ───────────────────────────────────────────────────────
 

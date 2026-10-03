@@ -36,6 +36,7 @@ namespace OpenFPS.Common.Networking;
 [MemoryPackUnion(27, typeof(WorldAudioEvent))]
 [MemoryPackUnion(28, typeof(MapListRequest))]
 [MemoryPackUnion(29, typeof(MapListResponse))]
+[MemoryPackUnion(30, typeof(EntityDefinitionBatch))]
 public partial interface IMessage { }
 
 public enum PlayerListScope
@@ -172,6 +173,23 @@ public partial class MapDataRequest : IMessage
 
 [MemoryPackable]
 public partial class MapLoadComplete : IMessage { public MapLoadComplete() { } }
+
+/// <summary>
+/// Many entity definitions in one reliable message, for the map load.
+///
+/// One message per definition made the load bound by round trips, not bytes: a reliable channel
+/// keeps only so many packets in flight, and 6,408 small ones to a VPS took eight seconds. A batch
+/// fills each packet instead. The client files each definition exactly as if it had come alone.
+/// </summary>
+[MemoryPackable]
+public partial class EntityDefinitionBatch : IMessage
+{
+    /// <summary>How many definitions the server puts in one batch.</summary>
+    public const int Size = 256;
+
+    public List<EntityDefinition> Definitions = new();
+    public EntityDefinitionBatch() { }
+}
 
 /// <summary>
 /// Tells a client that entities it was told about are gone — destroyed, or left its area of interest.

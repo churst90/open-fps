@@ -26,11 +26,13 @@ public sealed class MainWindow : Form
 
     private volatile bool _active;
     private volatile bool _modalOpen;
+    // The console or game menu while one is up, so leaving the game can close it.
+    private Form? _openDialog;
 
     /// <summary>True while this window is the foreground window.</summary>
     public bool IsWindowActive => _active;
 
-    /// <summary>True while the command console or the quit prompt is up; gameplay keys wait.</summary>
+    /// <summary>True while the command console or the game menu is up; gameplay keys wait.</summary>
     public bool IsModalOpen => _modalOpen;
 
     public event Action<string>? OnCommandEntered;
@@ -51,9 +53,7 @@ public sealed class MainWindow : Form
         {
             Dock = DockStyle.Fill,
             Padding = new Padding(16),
-            Text = "In game. W A S D to move, J / L turn, O / K look up and down, Space jump.\r\n" +
-                   "C coordinates, F facing, H health, Z area, comma look ahead, E interact, P scan, I inventory.\r\n" +
-                   "V voice, F5 players, brackets to read chat, slash for the command console, Escape to quit.",
+            Text = OpenFPS.Client.Core.Session.ClientGameSession.KeyHelp,
         });
 
         Activated += (_, _) => { _active = true; _input.Clear(); };
@@ -166,13 +166,14 @@ public sealed class MainWindow : Form
             // NVDA reads the dialog and the field as they take focus; speaking over it would cut it off.
             if (!_speech.ScreenReaderRunning)
                 _speech.Speak(initialText.Length > 0
-                    ? $"Command entry: {initialText.Trim()}. Type the rest, then press Enter."
+                    ? $"{initialText.Trim()}. Type the rest, then press Enter."
                     : "Command entry. Type a command or message, then press Enter.", interrupt: true);
         };
 
         DialogResult result;
+        _openDialog = dialog;
         try { result = dialog.ShowDialog(this); }
-        finally { _modalOpen = false; _input.Clear(); }
+        finally { _modalOpen = false; _openDialog = null; _input.Clear(); }
 
         if (result == DialogResult.OK && !string.IsNullOrWhiteSpace(entry.Text))
             OnCommandEntered?.Invoke(entry.Text);
@@ -183,20 +184,68 @@ public sealed class MainWindow : Form
         }
     }
 
-    /// <summary>Asks before quitting. "Keep playing" is the default, so a stray Enter does not end the game.</summary>
-    public void ConfirmQuit(Action onQuit)
+    /// <summary>
+    /// The game menu: Keep playing, Main menu, Quit. Keep playing has the focus and is also what Enter
+    /// and Escape do on it, so a stray key does not end the game. NVDA reads the dialog and the focused
+    /// button itself; the game speaks only without it.
+    /// </summary>
+    public void ShowGameMenu(Action<GameMenuChoice> chosen)
     {
         if (_modalOpen) return;
         _modalOpen = true;
         _input.Clear();
-        DialogResult result;
-        try
+
+        var choice = GameMenuChoice.KeepPlaying;
+        using var dialog = new Form
         {
-            result = MessageBox.Show(this, "Quit OpenFPS?", "Quit", MessageBoxButtons.YesNo,
-                                     MessageBoxIcon.Question, MessageBoxDefaultButton.Button2);
+            Text = "Game menu",
+            FormBorderStyle = FormBorderStyle.FixedDialog,
+            StartPosition = FormStartPosition.CenterParent,
+            MinimizeBox = false,
+            MaximizeBox = false,
+            ShowInTaskbar = false,
+            ClientSize = new Size(320, 160),
+        };
+        var layout = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false, Padding = new Padding(12) };
+        Button Item(string text, GameMenuChoice value)
+        {
+            var b = new Button { Text = text, Width = 280, Height = 32, FlatStyle = FlatStyle.System };
+            b.Click += (_, _) =>
+            {
+                choice = value;
+                if (value != GameMenuChoice.KeepPlaying) _cue(UiCue.MenuSelect);
+                dialog.Close();
+            };
+            b.Enter += (_, _) =>
+            {
+                _cue(UiCue.MenuMove);
+                if (!_speech.ScreenReaderRunning) _speech.Speak(text, interrupt: true);
+            };
+            layout.Controls.Add(b);
+            return b;
         }
-        finally { _modalOpen = false; _input.Clear(); }
-        if (result == DialogResult.Yes) onQuit();
-        else _cue(UiCue.MenuBack);
+        var keep = Item("Keep playing", GameMenuChoice.KeepPlaying);
+        Item("Main menu", GameMenuChoice.MainMenu);
+        Item("Quit", GameMenuChoice.Quit);
+        dialog.Controls.Add(layout);
+        dialog.CancelButton = keep;
+        dialog.Shown += (_, _) =>
+        {
+            keep.Focus();
+            if (!_speech.ScreenReaderRunning)
+                _speech.Speak("Game menu. Keep playing. Tab or arrows to choose, Enter to confirm, Escape to go back.", interrupt: true);
+        };
+
+        _openDialog = dialog;
+        try { dialog.ShowDialog(this); }
+        finally { _modalOpen = false; _openDialog = null; _input.Clear(); }
+        chosen(choice);
+    }
+
+    /// <summary>Closes the console or game menu if one is open, for leaving the game.</summary>
+    public void CloseModals()
+    {
+        var open = _openDialog;
+        if (open is { IsDisposed: false }) open.Close();
     }
 }

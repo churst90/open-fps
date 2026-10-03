@@ -4,6 +4,35 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-03
 
+- Client fixes, so the Linux and Windows clients do the same things (branch client-parity).
+  Connecting, logging in, creating an account, reconnecting, the game menu and logging out moved
+  out of the two heads into the shared session (`ClientGameSession.Connection.cs`); each head now
+  only shows the windows it is asked for.
+  - No spoken prefixes: F says the direction, H the percent, Z the area. The server's lines (message
+    of the day, arrived and left) have no "Server:" in front; their sound marks them. Command
+    replies lost "Reverb:", "Levels:", "Echoes:", "Cabin:", "Beacons:", "Valve flow:" and "On your
+    back:". The "Interaction '...' received." placeholder is gone; out of reach says "Too far away."
+  - A dropped connection is said, every sound in the world stops, and the client logs back in
+    every 3 seconds with a quiet tick. It says "Reconnected" and loads the map again, or after a
+    minute says it could not and goes back to the main menu. A rejected login while reconnecting
+    (a new build on the server) goes back at once.
+  - Escape opens the game menu: Keep playing, Main menu, Quit, with Keep playing focused. Main menu
+    and Quit send a logout, which the server now handles (it disconnects the peer at once instead
+    of at the timeout), and fade the world out over half a second. Closing the window also tells
+    the server.
+  - Loading: a soft note at each tenth of the map load, rising an octave. The world fades in over a
+    second at arrival; interface sounds are not faded (they have their own FMOD group). The GTK
+    loading window has a progress bar like the Windows one.
+  - The server sends entity definitions 256 to a message (`EntityDefinitionBatch`) instead of one
+    each. The city loads in 1.7 s over the loopback.
+  - The GTK client has Create account and Open log folder, as the Windows client does.
+  - Shift+R draws the first thing on your back. The key help in both game windows is one shared
+    text.
+  - Linux voice chat: the GTK client records through FMOD on the microphone chosen in Settings and
+    sends the same 48 kHz Opus packets as Windows. `--mic` in the lab checks the device opens.
+  - OpenFPS.Common changed (a new message), so the build hash changed: the Windows zip and the VPS
+    server both need updating, and the server must be restarted.
+
 - Nothing that is not a number gets into the mix (branch early-tail). Cody, in Marlow flat 00B
   through its door: "a pop ... and the audio just cut out". From that moment the master's loudness
   meter read NaN: one NaN had reached the master limiter, which then holds it for good.
