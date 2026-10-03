@@ -76,10 +76,10 @@ public static class PushBarDoor
     /// drops well before the silencers; a latch valve opened up is the commercial slam.
     private static (double SilencerMm, double Bumper, double MetalLambda, double LatchSpeed) Character(int variant) => (variant % Variants) switch
     {
-        0 => (2.5, 3e6, 0.3, 0.07),
-        1 => (2.5, 1e7, 0.3, 0.15),
-        2 => (1.2, 1.5e7, 0.2, 0.3),
-        _ => (0.0, 1.5e7, 0.1, 0.6),
+        0 => (2.5, 1e7, 0.3, 0.07),
+        1 => (2.5, 3e7, 0.3, 0.15),
+        2 => (1.2, 5e7, 0.2, 0.3),
+        _ => (0.0, 5e7, 0.1, 0.6),
     };
 
     /// <summary>Opening: shove the bar, the bolt draws back, the door goes, the bar is let go at 20 degrees.</summary>
@@ -120,11 +120,11 @@ public static class PushBarDoor
     /// well-set closer (quiet) to a fast one onto bare steel.</summary>
     public static float OpenLevelDb(int variant) => (variant % Variants) switch
     {
-        0 => 102.2f, 1 => 104.6f, 2 => 104.8f, _ => 105.6f,
+        0 => 104.5f, 1 => 105.6f, 2 => 105.4f, _ => 111.2f,
     } - LevelCalibrationDb;
     public static float CloseLevelDb(int variant) => (variant % Variants) switch
     {
-        0 => 81.5f, 1 => 83.2f, 2 => 102.5f, _ => 114.4f,
+        0 => 81.5f, 1 => 83.1f, 2 => 103.1f, _ => 114.4f,
     } - LevelCalibrationDb;
 
     public static string Key(bool closing, int variant, float swingSeconds, float width, float height)
@@ -196,12 +196,21 @@ public static class PushBarDoor
     /// millimetre of play; the drive bar has its own stops at both ends of its stroke. Its knock against
     /// them, a moment apart from the pad's, is the second half of the ka-chunk.</summary>
     private const double DriveBarMass = 0.2, DriveBarPlay = 0.001, DriveBarLink = 2e5;
+    /// <summary>The cranks' pivots are greased and the return is damped with the pad's: the drive bar does
+    /// not swing on and drag the pad back off its stop (it did, three times, 30 ms apart).</summary>
+    private const double CrankDamping = 0.7;
     /// <summary>The air in the hollow case: its length modes (0.8 m, from 214 Hz) and its cross modes (845,
     /// 2450, 2860 Hz), pumped by the walls when the mechanism knocks and heard through the pad's slot.</summary>
     private static readonly double[] CaseAirHz = { 214, 428, 642, 845, 856, 1070, 1284, 1498, 2450, 2860 };
-    private const double CaseAirLoss = 0.05, CaseToAir = 0.02, CaseSlotArea = 0.6 * 0.005;
+    /// <summary>The air in the case leaks out of the pad's slot and round the mechanism that fills it: its
+    /// modes are broad (0.05 rang as clean tones).</summary>
+    private const double CaseAirLoss = 0.2, CaseToAir = 0.02, CaseSlotArea = 0.6 * 0.005;
+
     /// <summary>What holds a patch of the case's or pad's wall to the rest of it near a fold: N/m.</summary>
     private const double PortStiffness = 3e6;
+    /// <summary>The return stroke lands on a damped stop (the pad's return spring runs through a
+    /// cushioned guide): one clack, not a rattle. Cody: "the bar release on the opening rattles too much".</summary>
+    private const double ReturnDamping = 0.9;
     private const double LinkStiffness = 1e6, LinkDamping = 80;
     /// <summary>The case's two end brackets across the leaf, and how far across its push acts.</summary>
     private const double MountNear = 0.3, MountFar = 0.9;
@@ -229,8 +238,9 @@ public static class PushBarDoor
     /// unloaded device is allowed to need.</summary>
     private const double HandPushRamp = 0.05, HandPush = 250, HandHold = 40;
     /// <summary>The hand meets the bar through the palm, about 50 N/mm when it shoves, and the arm drives
-    /// it at 0.4 m/s, a 19 mm stroke in about 50 ms, until the palm carries what the arm wants.</summary>
-    private const double PalmStiffness = 5e4, PalmDamping = 150, ArmSpeed = 0.4;
+    /// it at 0.8 m/s, a 19 mm stroke in about 25 ms, until the palm carries what the arm wants: a person
+    /// going through a fire door shoves the bar, and its bottoming is a clack.</summary>
+    private const double PalmStiffness = 5e4, PalmDamping = 150, ArmSpeed = 0.8;
 
     // ─────────────────────────────────────────────────────────────────────────────────────────────
 
@@ -598,7 +608,7 @@ public static class PushBarDoor
             double driveForce = -DriveBarMass * leafAccAtBar;
             double rel = bar - driveBar, relDepth = Math.Abs(rel) - DriveBarPlay;
             double fCrank = relDepth > 0 ? Math.Sign(rel) * Math.Max(0, DriveBarLink * relDepth
-                            + 2 * 0.2 * Math.Sqrt(DriveBarLink * DriveBarMass) * Math.Sign(rel) * (barRate - driveRate)) : 0;
+                            + 2 * CrankDamping * Math.Sqrt(DriveBarLink * DriveBarMass) * Math.Sign(rel) * (barRate - driveRate)) : 0;
             barForce -= fCrank; driveForce += fCrank;
             Note("crank", Math.Abs(fCrank));
             double ratio = Throw / (BarTravel - BarPlay);
@@ -614,13 +624,13 @@ public static class PushBarDoor
             // blow is a patch that gives and passes into its panel through the panel's impedance.
             double padAt = bar + padPort.X, padAtRate = barRate + padPort.V;
             double fIn = BarStop(padAt - BarTravel - casePad.X, padAtRate - casePad.V);
-            double fOut = BarStop(casePad.X - padAt, casePad.V - padAtRate);
+            double fOut = BarStop(casePad.X - padAt, casePad.V - padAtRate, ReturnDamping);
             double padDrive = padPort.Step(fOut - fIn, dt, out double padHost);
             barForce += padHost;
             double caseDrive = casePad.Step(fIn - fOut, dt, out double caseHost);
             caseForce += caseHost;
             double dIn = BarStop(driveBar - BarTravel - caseDrive2.X, driveRate - caseDrive2.V);
-            double dOut = BarStop(caseDrive2.X - driveBar, caseDrive2.V - driveRate);
+            double dOut = BarStop(caseDrive2.X - driveBar, caseDrive2.V - driveRate, ReturnDamping);
             driveForce += dOut - dIn;
             double caseDrive2Force = caseDrive2.Step(dIn - dOut, dt, out double caseHost2);
             caseForce += caseHost2;
@@ -715,11 +725,13 @@ public static class PushBarDoor
         }
 
         /// <summary>The bar on one of its stops: a urethane pad, or bare metal on a worn-out device.</summary>
-        private double BarStop(double depth, double rate)
+        private double BarStop(double depth, double rate, double zeta = 0.3)
         {
-            if (bumper <= 0) return Contact(MetalContactK, metalLambda, depth, rate);
+            if (bumper <= 0) return Contact(MetalContactK, metalLambda * zeta / 0.3, depth, rate);
             if (depth <= 0) return 0;
-            return Math.Max(0, bumper * depth + 2 * 0.3 * Math.Sqrt(bumper * BarMass) * rate);
+            // Damped for the two masses that meet: the pad and the patch of case wall it lands on.
+            double reduced = 1 / (1 / BarMass + 1 / casePad.Mass);
+            return Math.Max(0, bumper * depth + 2 * zeta * Math.Sqrt(bumper * reduced) * rate);
         }
 
         private void Log(string s) => report?.Events.Add(s);

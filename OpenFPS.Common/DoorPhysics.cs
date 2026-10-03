@@ -427,6 +427,7 @@ internal static class DoorPhysics
     {
         private readonly double m, k, z;
         public double X, V, Acc;
+        public double Mass => m;
         public Port(double mass, double stiffness, double impedance) { m = mass; k = stiffness; z = impedance; }
         /// <summary>One step under <paramref name="force"/>: returns the force into the field; HostForce is what
         /// the spring passes to the structure behind.</summary>

@@ -150,21 +150,22 @@ public static class KnobDoor
     /// <summary>
     /// Each character's hinge wear, top, middle, bottom. Most doors are not squeaky: an earlier round
     /// put a creak on every door and the building sounded haunted. Three in four are oiled or barely
-    /// worn; one in four is worn enough to sing when it moves slowly.
+    /// worn; one in four is dry (a merely worn pin, 0.55, never stuck at a game's opening speed, and
+    /// Cody heard no squeak at all).
     /// </summary>
     public static float[] WearOf(int variant) => (variant % Variants) switch
     {
         0 => new[] { 0f, 0f, 0f },
         1 => new[] { 0.1f, 0.05f, 0.15f },
         2 => new[] { 0.2f, 0.1f, 0.3f },
-        _ => new[] { 0.55f, 0.3f, 0.65f },
+        _ => new[] { 0.95f, 0.8f, 1.0f },   // dry and rusty: it sings whenever it turns slowly
     };
 
     /// <summary>
     /// The level the server declares, dB at a metre, as the model measures its own renders (LAFmax) less
     /// <see cref="LevelCalibrationDb"/>. Pinned by KnobDoorTests, which renders and measures them.
     /// </summary>
-    public const float OpenLevelDb = 82.3f - LevelCalibrationDb;
+    public const float OpenLevelDb = 78.8f - LevelCalibrationDb;
     /// <summary>A close's declared level by how it was shut (the model's own LAFmax, less the calibration).</summary>
     public static float CloseLevelDb(Shut how) => how switch
     {
@@ -175,7 +176,7 @@ public static class KnobDoor
     /// The model radiates more than real doors: it puts a normal close at 91.5 dBA at a metre, where the
     /// measurements there are (patents and car-door studies, research note 2026-10-03) put a normal
     /// latching close at 70-82, a gentle one at 60-70 and a slam at 85-98. One figure for the whole model
-    /// brings it onto them: normal 77.5, gentle 63, hard 94, slam 102, opening 68. It is one number for
+    /// brings it onto them: normal 77.5, gentle 63, hard 94, slam 102, opening 65. It is one number for
     /// everything, so how events stand against each other is still the physics'.
     /// </summary>
     public const float LevelCalibrationDb = 14f;
@@ -281,6 +282,8 @@ public static class KnobDoor
     /// <summary>The knob on its spindle and the rose on its screws rock in a little play, a tenth of a
     /// millimetre or two; a shut throws them about in it, which is the jiggle after a door closes.</summary>
     private const double KnobPlayMetres = 0.00015, KnobMass = 0.12, KnobVolume = 4e-5;
+    /// <summary>The springs' hold on a free knob in its play, N/m (a few newtons over a tenth of a mm).</summary>
+    private const double SpindleCentring = 3e4;
     /// <summary>What holds a patch of skin to the stile under it where the stop lands: N/m.</summary>
     private const double SkinOverStile = 2e7;
     /// <summary>The stile's wood under that patch moves with it: 25 mm of a 30 by 35 mm pine stile, 13 g.</summary>
@@ -1024,13 +1027,18 @@ public static class KnobDoor
             for (int i = 0; i < 2; i++)
             {
                 double gap = knobY[i] - leafAtKnob, gapRate = knobV[i] - leafRateAtKnob;
+                // A hand on the knob holds the spindle, and with it both knobs: they go with the leaf.
+                if (holdingKnob) { knobY[i] = leafAtKnob; knobV[i] = leafRateAtKnob; knobAccNow[i] = 0; continue; }
                 double hit = Contact(MetalContactK, 0.3, Math.Abs(gap) - knobPlay[i], Math.Sign(gap) * gapRate);
-                double onKnob = -Math.Sign(gap) * hit;
+                // The latch's and the roses' springs load the spindle, so a free knob is centred in its play
+                // and only a real jolt throws it to the end.
+                double centring = -SpindleCentring * gap - 2 * 0.3 * Math.Sqrt(SpindleCentring * KnobMass) * gapRate;
+                double onKnob = -Math.Sign(gap) * hit + centring;
                 double knobAcc = onKnob / KnobMass;
                 knobV[i] += knobAcc * dt; knobY[i] += knobV[i] * dt;
+                torque -= onKnob * knobArm;
                 if (hit > 0)
                 {
-                    torque -= onKnob * knobArm;
                     leaf.Push(knobShape, -onKnob);
 
                     knobShell.Push(ones4, hit * 0.3);
