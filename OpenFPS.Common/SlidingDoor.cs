@@ -71,7 +71,8 @@ public static class SlidingDoor
     /// <summary>
     /// What wear does to a sliding door, by character: new, standard, worn, old.
     /// Grit: grains per metre of track and their mean size. Roughness: the rail's and the wheel's, RMS.
-    /// Flat: how deep a flat the wheel has. Tyre: nylon, polyurethane, or an old patio door's steel wheels
+    /// Flat: how deep a flat the wheel has (a polyurethane tyre left standing under a leaf takes a flat of a
+    /// tenth of a millimetre or so). Tyre: nylon, polyurethane, or an old patio door's steel wheels
     /// on a stainless cap (an old automatic door's polyurethane replaced with hard nylon). Pile: the weatherstrip's drag, N (a patio door takes 40-50 N to keep moving, nearly all of it
     /// the seals). Roll: rolling and bearing resistance as a share of the load.
     /// Tooth: an automatic door's gear transmission error, m.
@@ -87,9 +88,9 @@ public static class SlidingDoor
         (Kind.Patio, 1) => new(1, 120, 1.0, 4, 5, Tyre.Nylon, 42, 0.008, 0),
         (Kind.Patio, 2) => new(3, 150, 2.5, 8, 15, Tyre.Nylon, 50, 0.015, 0),
         (Kind.Patio, _) => new(4, 100, 4.0, 6, 3, Tyre.Steel, 45, 0.02, 0),
-        (Kind.Automatic, 0) => new(0.2, 40, 0.3, 1, 0, Tyre.Urethane, 8, 0.004, 3e-6),
-        (Kind.Automatic, 1) => new(0.5, 60, 0.6, 2, 5, Tyre.Urethane, 10, 0.006, 6e-6),
-        (Kind.Automatic, 2) => new(1, 80, 1.2, 5, 20, Tyre.Urethane, 12, 0.01, 12e-6),
+        (Kind.Automatic, 0) => new(0.2, 40, 0.3, 1, 5, Tyre.Urethane, 8, 0.004, 3e-6),
+        (Kind.Automatic, 1) => new(0.5, 60, 0.6, 2, 12, Tyre.Urethane, 10, 0.006, 6e-6),
+        (Kind.Automatic, 2) => new(1, 80, 1.2, 5, 45, Tyre.Urethane, 12, 0.01, 12e-6),
         _ => new(2, 100, 2.0, 6, 10, Tyre.Nylon, 10, 0.015, 20e-6),
     };
 
@@ -139,6 +140,11 @@ public static class SlidingDoor
     /// <summary>The track: the patio sill, aluminium 1.8 mm, about 0.12 m developed; the automatic door's
     /// header, 2.5 mm, 0.45 m round. Both bedded or bolted: they lose more than a bare sheet.</summary>
     private const double SillT = 0.0018, SillGirth = 0.12, HeaderT = 0.0025, HeaderGirth = 0.45, BeddedLoss = 0.01;
+    /// <summary>The header is not a sheet 0.45 m by 2 m: it is a box of walls 0.1-0.15 m wide screwed to the
+    /// wall along its length, under a cover, so its walls' modes start near 300 Hz (a 0.15 m strip of 2.5 mm
+    /// aluminium), and the cover, its screws and the drive's brackets take about 0.03. (As one big sheet
+    /// from 60 Hz with a bare sheet's loss it boomed: Cody, "a metallic tube".)</summary>
+    private const double HeaderFromHz = 300, HeaderLoss = 0.03;
     private const double PortStiffness = 2e7;
     /// <summary>Where a wheel bears: the rail's crown and web, about a gram, on the sill bedded below it
     /// (about 5e6 N/m under a wheel's footprint), passing into the sill plate through its impedance. Where a
@@ -161,16 +167,24 @@ public static class SlidingDoor
     /// drags about 5 m of pile at some 500 fibres a centimetre; an automatic leaf about 2 m. The drag is the
     /// sum of their sawtooth forces, so it flutters by about 0.3 / sqrt(fibres) of itself. (Half its mean,
     /// as if every fibre slipped together, made the frame hiss at 94 dBA.)</summary>
-    private const double PileSlip = 1.5e-4, PatioPileFibres = 250000, AutoPileFibres = 100000;
+    private const double PileSlip = 1.5e-4, PatioPileFibres = 250000, AutoPileFibres = 100000, AutoBrushShare = 0.2;
     /// <summary>Bumpers: a patio leaf's stile meets a vinyl bulb flattened on aluminium at each end of its
     /// travel; an automatic leaf meets rubber on the jamb. Hertz, stiff enough that a stile's own mass
     /// stops in a few milliseconds.</summary>
     private const double PatioBumperK = 5e7, AutoBumperK = 1e7, BumperLambda = 0.6;
+    /// <summary>A patio jamb's bumper is a hollow vinyl bulb in pile, and a leaf comes back off it with 0.1-0.5
+    /// of its speed: Hunt-Crossley loss of about 3 s/m. (At 0.6 the leaf bounced off at three quarters of
+    /// its speed and rolled back 43 mm: Cody, "the slide still plays after the door is shut".) Shutting, the
+    /// hand stays on the pull through the blow and holds the leaf home with about 80 N, more than the seals'
+    /// drag, while the latch is thrown; the arm behind it gives about 300 N s/m.</summary>
+    private const double PatioJambLambda = 3, HoldHome = 80, ArmDamping = 300;
     /// <summary>The end of a leaf that strikes: the stile and the glass edge near it, held to the rest of the
     /// leaf through the frame's corners and the glass in its gaskets, about 200 Hz. The stile stops first
     /// and the rest of the leaf arrives through that spring: two to five knocks in the first tenth of a
-    /// second, and a dark one. (A rigid 40 kg leaf on its bumper was a 40 ms push with nothing in it.)</summary>
-    private const double PatioStileKg = 1.5, AutoStileKg = 2.5, StileHz = 200, StileZeta = 0.05;
+    /// second, and a dark one. (A rigid 40 kg leaf on its bumper was a 40 ms push with nothing in it.)
+    /// The spring is the frame's crimped corners and the glass in its gaskets, which lose a fifth of critical:
+    /// at 0.05 the leaf came back off its stile as off a spring.</summary>
+    private const double PatioStileKg = 1.5, AutoStileKg = 2.5, StileHz = 200, StileZeta = 0.2;
     /// <summary>A sealed unit's panes on the air between them (4-16-4): they move against each other at about
     /// 200 Hz and ring for half a second. It is the note of a patio door hitting home.</summary>
     private const double UnitGap = 0.016, UnitLoss = 0.02;
@@ -202,20 +216,35 @@ public static class SlidingDoor
     /// moves by as much as it moves the wheel's rim (a 30 mm wheel under a 30 mm pulley). The motor and
     /// gearbox (1.5 kg) sit on rubber on the header, about 60 Hz.</summary>
     private const double MeshK = 2e6, WormWheelR = 0.03, DriveKg = 1.5, DriveMountHz = 60, DriveMountZeta = 0.15;
-    /// <summary>The motor: a 63 mm steel can, 1.5 mm, rung by its brushes crossing the commutator's bars (a
-    /// 2 g brush lifted by the step between bars, 5 um, at the rotor's surface speed) and by their friction
-    /// (0.3 of the 2 N brush spring, fluttering below a few kilohertz). A carbon brush lands on its bar over
-    /// about 0.2 ms. The header's aluminium cover over the drive passes less the higher it goes, by the mass
-    /// law: 6 dB an octave above about 800 Hz, and 6 dB below that for its gaps and ends.</summary>
-    private const double CanR = 0.0315, CanT = 0.0015, BrushKg = 0.002, BarStep = 5e-6, BarGap = 5e-4, BrushSpring = 2;
-    private const double BrushLanding = 2e-4, FlutterHz = 3000, Cover = 0.5, CoverHz = 800;
+    /// <summary>The motor: a 63 mm steel can, 1.5 mm, pulled out of round by its magnets' torque ripple at the
+    /// slot rate (a tenth of its torque) and knocked by its brushes crossing the commutator's bars (a 2 g
+    /// brush lifted by the step between bars, 5 um, at the rotor's surface speed, landing over about 0.2 ms).
+    /// The can and the gearbox are full of magnets, laminations and grease, bolted to brackets on rubber:
+    /// their walls lose about a tenth. (At 0.01 they rang at their own pitches, "too much resonance", and
+    /// the brushes' friction as white noise was the hiss.) The header's aluminium cover over the drive passes less the higher it goes, by
+    /// the mass law: 6 dB an octave above about 800 Hz.</summary>
+    private const double CanR = 0.0315, CanT = 0.0015, BrushKg = 0.002, BarStep = 5e-6, BarGap = 5e-4;
+    private const double BrushLanding = 2e-4, DriveHousingLoss = 0.1, Cover = 0.5, CoverHz = 800;
+    /// <summary>The belt is clamped to the carriage by its teeth in a toothed clamp, with about 0.8 mm of play.
+    /// When the belt starts or stops pulling, the leaf swings on the belt's spring (about 6 Hz) and the clamp
+    /// knocks across its play each half swing: the train of knocks 60-90 ms apart heard as a real one starts.
+    /// It is the belt's polyurethane teeth that land, about 5 MN/m and lossy, not steel on steel.</summary>
+    private const double ClampPlay = 0.0008, ClampKg = 0.1, LugK = 2.4e8, LugLambda = 1.0, ClampVolume = 1.3e-5;
+    /// <summary>A shop front's leaf: aluminium stiles and rails with the glass in rubber gaskets and brush seals
+    /// along its edges, losing about 0.03.</summary>
+    private const double StorefrontLoss = 0.03;
     /// <summary>A belt tooth seats in the idler's groove at the far end of the header each pitch: about a gram
-    /// of tooth arriving at a fifth of the belt's speed, bolted straight to the header.</summary>
-    private const double BeltToothKg = 0.001;
+    /// of tooth arriving at a twentieth of the belt's speed (the teeth are rounded and crowned to roll in),
+    /// bolted straight to the header. Each tooth's pitch and the belt's tension vary by a few per cent, so
+    /// no two seat alike. (At a fifth of the speed, all alike, they were a 37 Hz pulse train.)</summary>
+    private const double ToothSeat = 3e-4;
+    private const double BeltToothKg = 0.001, ToothSeatShare = 0.05, ToothPitchJitter = 0.03, ToothLevelJitter = 0.4;
     /// <summary>Speeds: open at 0.7 m/s (a common default), shut at 0.3 (ANSI/BHMA A156.10 allows no more for
     /// a leaf under 71 kg), slowing for the last 60 mm to 0.08 m/s opening and a 0.04 m/s creep shutting
     /// (the standard asks for the slow-down at least 51 mm out), 0.8 m/s^2 either side.</summary>
     private const double AutoOpenSpeed = 0.7, AutoCloseSpeed = 0.3, OpenCheckSpeed = 0.08, CloseCheckSpeed = 0.04, CheckZone = 0.06, AutoAccel = 0.8;
+    /// <summary>The controller ramps its acceleration over about a fifth of a second, m/s^3.</summary>
+    private const double AutoJerk = 4;
 
     private sealed class Grain { public double X, A, Target, LastCrush = -1; public bool Done; }
 
@@ -245,7 +274,7 @@ public static class SlidingDoor
         private readonly double[] railRough;
         private readonly double railStep, wheelStep;
         private readonly List<Grain> grit = new();
-        private double maxReach, sink;
+        private double maxReach, sink, restLoad;
         // Fields and ports.
         private readonly DenseField trackField, frameField, glassField;
         private readonly Port[] trackPort = new Port[Wheels], framePort = new Port[Wheels], glassPort = new Port[Wheels];
@@ -262,7 +291,7 @@ public static class SlidingDoor
         private static readonly double[] ones = { 1.0 };
         // Hand (patio).
         private double handX, handV, handA;
-        private bool handOn, handReleased;
+        private bool handOn, handReleased, holdingHome;
         // Hook latch (patio) or solenoid plunger (automatic): a small steel part between two stops.
         private double small, smallRate, smallForce;
         private readonly double smallKg, smallThrow;
@@ -272,13 +301,19 @@ public static class SlidingDoor
         private readonly SmallRadiator escutcheonSound;
         private readonly double[] handleHit;
         // Drive (automatic).
-        private double motorX, motorU, beltPhase, meshPhase, motorPhase;
+        private double motorA, motorX, motorU, beltPhase, meshPhase, motorPhase;
         private readonly Mount drive;
-        private readonly double[] toothError = new double[64];
+        private readonly double[] toothError = new double[(int)(GearRatio * WormStarts)];
+        private readonly double[] profilePhase = new double[10];
         private readonly Modes gearbox, motorCan;
         private readonly double[] gearShape, canShape;
         private readonly double[] idlerHit;
-        private double brushLeft, brushPeak, brushFlutter, lastBar, coverLow;
+        private double brushLeft, brushPeak, lastBar, coverLow, clamp, clampRate;
+        private double beltRun, nextTooth, seatLeft, seatPeak;
+        private readonly AccelerationNoise clampNoise;
+        private readonly double[] lugHit;
+        private readonly HighPass lugHigh;
+        private readonly Port lugPort;
         private readonly Dictionary<string, (double Start, double Peak, bool On)> contactLog = new();
 
         public Sim(Door door, int sampleRate, Report? report)
@@ -314,6 +349,7 @@ public static class SlidingDoor
             // less than twice the patch's length under the static load.
             double load0 = mass * G / Wheels + wheelKg * G;
             sink = Math.Pow(load0 / contactK, 2.0 / 3);
+            restLoad = load0;
             double patch = 2 * Math.Sqrt(wheelR * sink);
             railRough = SurfaceProfile(rng, trackLen, Math.Max(0.003, 2 * patch));
             for (int i = 0; i < railRough.Length; i++) railRough[i] *= ch.RailMicron * 1e-6;
@@ -346,10 +382,12 @@ public static class SlidingDoor
 
             // Fields.
             trackField = auto
-                ? new DenseField(HeaderGirth, trackLen, HeaderT, AlE, AlRho, Poisson, f => ThinPanelLoss(f) + BeddedLoss, 60, 16000, rng, dt)
+                ? new DenseField(HeaderGirth, trackLen, HeaderT, AlE, AlRho, Poisson, f => ThinPanelLoss(f) + HeaderLoss, HeaderFromHz, 16000, rng, dt)
                 : new DenseField(SillGirth, trackLen, SillT, AlE, AlRho, Poisson, f => ThinPanelLoss(f) + BeddedLoss, 60, 16000, rng, dt);
+            // A shop front's stiles and rails are tubes with faces 50-100 mm wide: their walls ring from about
+            // 300 Hz, as the header's do.
             frameField = new DenseField(FrameGirth, 2 * (width + height), FrameWallT, AlE, AlRho, Poisson,
-                                        f => ThinPanelLoss(f) + 0.005, 60, 16000, rng, dt);
+                                        f => ThinPanelLoss(f) + (auto ? StorefrontLoss : 0.005), auto ? HeaderFromHz : 60, 16000, rng, dt);
             // Glass in its gaskets: glass itself barely loses (0.002); the gaskets and the unit's edge seal
             // take about 0.02, and more low down, where a pane's edges move most (0.1 at 150 Hz).
             glassField = new DenseField(width - 0.1, height - 0.15, paneT, GlassE, GlassRho, 0.22,
@@ -391,14 +429,22 @@ public static class SlidingDoor
             handleHit = frameField.Point();
             double kd = DriveKg * Math.Pow(2 * Math.PI * DriveMountHz, 2);
             drive = new Mount(DriveKg, kd, DriveMountZeta);
-            for (int i = 0; i < toothError.Length; i++) toothError[i] = (rng.NextDouble() * 2 - 1) * 0.3;
+            // The worm's error is mostly its tooth profile, the same every tooth: a mesh-rate whine and its
+            // harmonics falling as 1/h. Each tooth's own spacing error is a tenth of that. (Random teeth at a
+            // third rang the housing's own modes instead of a whine.)
+            for (int i = 0; i < toothError.Length; i++) toothError[i] = (rng.NextDouble() * 2 - 1) * 0.1;
+            for (int h = 0; h < profilePhase.Length; h++) profilePhase[h] = rng.NextDouble() * 2 * Math.PI;
             idlerHit = trackField.Point();
+            lugHit = frameField.Point();
+            clampNoise = new AccelerationNoise(ClampVolume, dt);
+            lugHigh = new HighPass(300, rate);
+            lugPort = new Port(BracketPatchKg, BracketBacking, frameField.Impedance);
             // The gearbox housing's walls: sixteen modes from 1.2 kHz, 50 g each, radiating from about 100 cm2.
             var gh = new List<double>(); var gl = new List<double>(); var gm = new List<double>(); var gg = new List<double>();
             for (int i = 0; i < 16; i++)
             {
                 gh.Add(1200 * Math.Pow(6, i / 15.0) * (0.95 + 0.1 * rng.NextDouble()));
-                gl.Add(0.01); gm.Add(0.05); gg.Add(SmallPlateGain(0.01, 0.3) * (rng.NextDouble() < 0.5 ? -1 : 1));
+                gl.Add(DriveHousingLoss); gm.Add(0.05); gg.Add(SmallPlateGain(0.01, 0.3) * (rng.NextDouble() < 0.5 ? -1 : 1));
             }
             gearbox = new Modes(gh, gl, gm, gg, dt);
             gearShape = new double[gh.Count];
@@ -409,7 +455,7 @@ public static class SlidingDoor
                 foreach (double axial in new[] { 1.0, 1.25 })
                 {
                     ch2.Add(Ring(CanR, CanT, 7850, 200e9, n) * axial);
-                    cl.Add(0.01); cm.Add(0.05); cg.Add(SmallPlateGain(0.02, 0.2) * (rng.NextDouble() < 0.5 ? -1 : 1));
+                    cl.Add(DriveHousingLoss); cm.Add(0.05); cg.Add(SmallPlateGain(0.02, 0.2) * (rng.NextDouble() < 0.5 ? -1 : 1));
                 }
             motorCan = new Modes(ch2, cl, cm, cg, dt);
             canShape = new double[ch2.Count];
@@ -510,7 +556,8 @@ public static class SlidingDoor
                     handOn = !handReleased;
                 }
                 else if (t >= tStart + tRun) { handOn = false; }
-                if (!opening && tShut < 0 && x <= 0.0005) { tShut = t; Log($"{t * 1000:F0} ms  home"); }
+                if (!opening && tShut < 0 && x <= 0.003) { tShut = t; holdingHome = true; Log($"{t * 1000:F0} ms  home"); }
+                if (holdingHome && t > tShut + 0.6) holdingHome = false;
                 Step();
             }
         }
@@ -521,7 +568,7 @@ public static class SlidingDoor
             // motor follows its profile; the belt carries the leaf after it. Shutting, the lock drops a
             // quarter of a second after the leaf is home.
             x = opening ? 0.0 : travel - 0.002;
-            motorX = x;
+            motorX = x; clamp = x; clampRate = 0;
             small = opening && door.Locking ? 0 : smallThrow;
             // A door left unlocked by day: its plunger stays lifted and never moves.
             bool energised = !opening || !door.Locking;
@@ -547,12 +594,15 @@ public static class SlidingDoor
                     if (Math.Abs(motorU) > check && left - CheckZone < (motorU * motorU - check * check) / (2 * AutoAccel))
                         want = check;
                     want = Math.Min(want, Math.Sqrt(2 * AutoAccel * Math.Max(0, left)));
-                    double dv = Math.Clamp(want * dir - motorU, -AutoAccel * dt, AutoAccel * dt);
-                    motorU += dv;
+                    // An S-curve: the acceleration itself ramps (a step in it surged the leaf against the belt and
+                    // knocked the clamp mid-travel).
+                    double aWant = Math.Clamp(6 * (want * dir - motorU), -AutoAccel, AutoAccel);
+                    motorA += Math.Clamp(aWant - motorA, -AutoJerk * dt, AutoJerk * dt);
+                    motorU += motorA * dt;
                     motorX += motorU * dt;
                     if (left < 1e-5 && Math.Abs(motorU) < 1e-3)
                     {
-                        motorU = 0; done = t; end = t + (opening ? 0.6 : 0.9);
+                        motorU = 0; motorA = 0; done = t; end = t + (opening ? 0.6 : 0.9);
                         Log($"{t * 1000:F0} ms  {(opening ? "open" : "shut")}");
                     }
                 }
@@ -620,7 +670,10 @@ public static class SlidingDoor
                 }
                 // The rail's patch, the wheel, the bracket.
                 double trackDrive = trackPort[i].Step(f, dt, out _);
-                trackField.Modes.Push(trackHit[i], trackDrive);
+                // The header's wall takes a carriage wheel's force where it bears, as a plate does. (Through the
+                // stiff few-gram patch the drive rose 6 dB an octave to 4.6 kHz, and the header hissed.) The
+                // patio sill keeps its patch: that door was heard and kept as it is.
+                trackField.Modes.Push(trackHit[i], auto ? f - restLoad : trackDrive);
                 // The spring is to the frame's patch; its damping (the housings, the glazing) is to the leaf's
                 // body, not across a few grams of patch.
                 double leafAt = heave + pitch * arm[i] + framePort[i].X;
@@ -662,14 +715,18 @@ public static class SlidingDoor
             double pile = ch.Pile * moving;
             sideForce -= pile * Math.Sign(u);
             // (The one-pole leaves white noise with a1 / (2 - a1) of its variance: put it back to one.)
-            double flutter = pile * 0.3 / Math.Sqrt(auto ? AutoPileFibres : PatioPileFibres) * brushNoise / Math.Sqrt(a1 / (2 - a1));
+            // An automatic leaf's drag in travel is mostly its nylon floor guide sliding smoothly; its brush
+            // seals only wipe the jamb at the ends, about a fifth of it. (All of it as brushing fibres hissed.)
+            double brushing = auto ? AutoBrushShare : 1;
+            double flutter = pile * brushing * 0.3 / Math.Sqrt(auto ? AutoPileFibres : PatioPileFibres) * brushNoise / Math.Sqrt(a1 / (2 - a1));
             frameField.Modes.Push(brushFrameHit, flutter);
             trackField.Modes.Push(brushTrackHit, flutter);
 
             // ── The ends of the travel ──
             // Each end's stile meets its bumper; the leaf follows through the stile's spring.
-            double fShut = Contact(bumperK, BumperLambda, -(x + stileD[0]), -(u + stileV[0]));
-            double fOpen = Contact(bumperK, BumperLambda, x + stileD[1] - travel, u + stileV[1]);
+            double jamb = auto ? BumperLambda : PatioJambLambda;
+            double fShut = Contact(bumperK, jamb, -(x + stileD[0]), -(u + stileV[0]));
+            double fOpen = Contact(bumperK, jamb, x + stileD[1] - travel, u + stileV[1]);
             double leafAcc = lastLeafAcc;
             for (int k = 0; k < 2; k++)
             {
@@ -688,6 +745,7 @@ public static class SlidingDoor
             Note("shut-bumper", fShut); Note("open-bumper", fOpen);
             // A hand lets go when the leaf reaches its end: it does not lean on the bumper.
             if (fShut > 0 || fOpen > 0) handReleased = true;
+            if (holdingHome) sideForce -= HoldHome + ArmDamping * u;
 
             // ── Hand (patio) ──
             if (!auto)
@@ -709,13 +767,27 @@ public static class SlidingDoor
                 motorPhase += motorRev * MotorSlots * dt;
                 // The worm's transmission error: its tooth shape, and each tooth's own error blended across the
                 // mesh. It moves the belt's driven end, and it is a force between worm and wheel.
-                int tooth = (int)Math.Floor(meshPhase) & 63;
+                int teeth = toothError.Length;
+                int tooth = (int)(Math.Floor(meshPhase) % teeth + teeth) % teeth;
                 double frac = meshPhase - Math.Floor(meshPhase);
-                double te = ch.Tooth * (Math.Sin(2 * Math.PI * frac) + 0.5 * Math.Sin(4 * Math.PI * frac + 1) + 0.25 * Math.Sin(6 * Math.PI * frac + 2)
-                                        + toothError[tooth] * (1 - frac) + toothError[(tooth + 1) & 63] * frac);
+                double profile = 0;
+                for (int h = 0; h < profilePhase.Length; h++) profile += Math.Sin(2 * Math.PI * (h + 1) * frac + profilePhase[h]) / (h + 1);
+                double te = ch.Tooth * (profile + toothError[tooth] * (1 - frac) + toothError[(tooth + 1) % teeth] * frac);
                 double beltK = BeltK, beltC = 2 * BeltZeta * Math.Sqrt(BeltK * mass);
-                double belt = beltK * (motorX + te * PulleyD / 2 / WormWheelR - x) + beltC * (motorU - u);
-                sideForce += belt;
+                // The belt pulls the clamp; the clamp's lug pulls the carriage across its play.
+                double belt = beltK * (motorX + te * PulleyD / 2 / WormWheelR - clamp) + beltC * (motorU - clampRate);
+                double rel = clamp - x, relRate = clampRate - u;
+                double lug = Contact(LugK, LugLambda, rel - ClampPlay / 2, relRate) - Contact(LugK, LugLambda, -rel - ClampPlay / 2, -relRate);
+                double clampAcc = (belt - lug) / ClampKg;
+                clampRate += clampAcc * dt; clamp += clampRate * dt;
+                sideForce += lug;
+                // The knock rings the carriage and the leaf's top rail, stiff parts that pass the blow on to the
+                // leaf: what bends the rail's thin faces is what its patch gives at the rail's impedance. The
+                // belt's steady pull through the lug only carries the leaf. (Fed whole and straight into the
+                // faces, the leaf braking onto the clamp rang the frame at 82 dBA.)
+                frameField.Modes.Push(lugHit, lugPort.Step(lugHigh.Next(lug), dt, out _));
+                pDrive += clampNoise.Pressure(clampAcc);
+                Note("lug", Math.Abs(lug) > 0 && Math.Abs(rel) > ClampPlay / 2 ? Math.Abs(lug) : 0);
                 double load = Math.Abs(belt) + 5;
                 double turning = Math.Tanh(Math.Abs(motorRev) / 2);
                 gearbox.Push(gearShape, MeshK * te * turning * (0.5 + load / 100));
@@ -724,11 +796,20 @@ public static class SlidingDoor
                 drive.F += -belt + 0.1 * torque / 0.03 * Math.Sin(2 * Math.PI * motorPhase);
                 drive.Step(dt);
                 trackField.Modes.Push(driveHit, drive.Reaction);
-                // A belt tooth seating in the idler's groove each pitch.
-                double bf = beltPhase - Math.Floor(beltPhase);
-                double seat = 3e-4 * Math.Abs(motorU) / BeltPitch;          // of a pitch: 0.3 ms
-                if (bf < seat)
-                    trackField.Modes.Push(idlerHit, BeltToothKg * 0.2 * Math.Abs(motorU) * Math.PI / (2 * 3e-4) * Math.Sin(Math.PI * bf / seat));
+                // A belt tooth seating in the idler's groove each pitch, each a little unlike the last.
+                beltRun += Math.Abs(motorU) * dt;
+                if (beltRun >= nextTooth)
+                {
+                    nextTooth = beltRun + BeltPitch * (1 + ToothPitchJitter * (rng.NextDouble() * 2 - 1));
+                    seatLeft = ToothSeat;
+                    seatPeak = BeltToothKg * ToothSeatShare * Math.Abs(motorU) * Math.PI / (2 * ToothSeat)
+                               * (1 + ToothLevelJitter * (rng.NextDouble() * 2 - 1));
+                }
+                if (seatLeft > 0)
+                {
+                    trackField.Modes.Push(idlerHit, seatPeak * Math.Sin(Math.PI * (1 - seatLeft / ToothSeat)));
+                    seatLeft -= dt;
+                }
                 // The brushes: a knock as each bar passes under them, and their friction's flutter.
                 double surface = Math.Abs(motorRev) * 2 * Math.PI * 0.0125;
                 double bar = Math.Floor(motorPhase);
@@ -740,9 +821,8 @@ public static class SlidingDoor
                 }
                 double brush = 0;
                 if (brushLeft > 0) { brush = brushPeak * Math.Sin(Math.PI * (1 - brushLeft / BrushLanding)); brushLeft -= dt; }
-                double fa = 1 - Math.Exp(-2 * Math.PI * FlutterHz * dt);
-                brushFlutter += fa * ((rng.NextDouble() * 2 - 1) * Math.Sqrt(3) / Math.Sqrt(fa / (2 - fa)) - brushFlutter);
-                brush += 0.3 * BrushSpring * 0.3 * brushFlutter * Math.Tanh(surface / 0.5);
+                double ripple = 0.1 * torque / CanR;
+                brush += ripple * (Math.Sin(2 * Math.PI * motorPhase) + 0.5 * Math.Sin(4 * Math.PI * motorPhase + 0.7));
                 motorCan.Push(canShape, brush);
                 double inside = gearbox.Step() + motorCan.Step();
                 coverLow += (1 - Math.Exp(-2 * Math.PI * CoverHz * dt)) * (inside - coverLow);
