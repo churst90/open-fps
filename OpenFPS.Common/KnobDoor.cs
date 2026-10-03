@@ -81,6 +81,14 @@ public static class KnobDoor
     /// it, so a slam and a gentle close keep their real difference.</summary>
     public const double PascalsAtFullScale = 20.0;
 
+    /// <summary>
+    /// How much of the bolt's blow on the keeper bends the strike plate. The blow is along the plate, but
+    /// the keeper edge is the root of the plate's curved lip, so some of it bends the plate and rings it:
+    /// in a shut the door rebounds onto the bolt before it can snap out, so that blow is the latch's
+    /// click. The least known coupling in the door; the lab brackets it (--knob-door latch=X).
+    /// </summary>
+    public static double KeeperBendsStrike = 0.3;
+
     /// <summary>The lab's instrument: when set, every render also writes each part's pressure alone,
     /// at the internal rate, as PART.raw (float32) in this folder.</summary>
     public static string? StemFolder;
@@ -256,9 +264,11 @@ public static class KnobDoor
     /// <summary>Play between the bolt's flat face and the keeper when the leaf is on its stop.</summary>
     private const double KeeperPlay = 0.0015;
     private const double LatchHeight = 0.95, KnobInset = 0.06;
-    /// <summary>The bolt moves in the leaf's plane, so a latch force bends the leaf only through how far
-    /// the mortise sits off the centre plane: about a millimetre in 35.</summary>
-    private const double LatchBending = 0.03;
+    /// <summary>The bolt moves in the leaf's plane, but its housing sits in a stile whose faces are the
+    /// skins, glued on: a blow along the stile shears into the skins at the edge and bends them. A tenth of
+    /// it, against the mortise's eccentricity alone (a millimetre in 35, 0.03), which left the latch's
+    /// click inaudible under a shut.</summary>
+    private const double LatchBending = 0.1;
 
     // Knob: 55 mm brass knob, spindle play 10 degrees, full turn 50 degrees.
     private const double KnobInertia = 6e-5, KnobPlay = 10 * Math.PI / 180, KnobFull = 50 * Math.PI / 180;
@@ -509,16 +519,17 @@ public static class KnobDoor
             keeperFriction = new LuGre { MuStatic = 0.35, MuSliding = 0.2, StribeckSpeed = 0.01, Viscous = 0 };
             keeperSurface = SurfaceProfile(rng, Throw, KeeperRidges);
 
-            // Strike plate: 1.5 mm steel between screws 48 mm apart, clamped, and its lip a 10 mm tongue.
+            // Strike plate: 1.5 mm steel between screws 48 mm apart, clamped, and its curved lip a 20 mm
+            // tongue standing out into the opening, free to ring: the "tink" of a latch catching.
             strike = new Modes(new[] { Beam(0.048, 0.0015, 7850, 200e9, 4.730), Beam(0.048, 0.0015, 7850, 200e9, 7.853),
-                                       Beam(0.010, 0.0015, 7850, 200e9, 1.875) },
-                               new[] { 0.08, 0.08, 0.04 }, new[] { 0.010, 0.010, 0.004 },
+                                       Beam(0.020, 0.0015, 7850, 200e9, 1.875) },
+                               new[] { 0.08, 0.08, 0.03 }, new[] { 0.010, 0.010, 0.006 },
                                new[] { SmallPlateGain(0.07 * 0.028, 0.52), SmallPlateGain(0.07 * 0.028, 0.05),
-                                       SmallPlateGain(0.010 * 0.028, 0.6) }, dt);
+                                       SmallPlateGain(0.020 * 0.028, 0.6) }, dt);
             // Faceplate 2.5 mm steel between screws 45 mm apart; the housing a 0.8 mm tube of 22 mm,
             // tight in its bore. Both lie against the wood, which takes their ring.
             housing = new Modes(new[] { Ring(0.011, 0.0008, 7850, 200e9, 2), Ring(0.011, 0.0008, 7850, 200e9, 3) },
-                                new[] { 0.15, 0.15 }, new[] { 0.010, 0.010 },
+                                new[] { 0.05, 0.05 }, new[] { 0.010, 0.010 },
                                 new[] { SmallPlateGain(FaceplateArea, 0.05), SmallPlateGain(FaceplateArea, 0.05) }, dt);
             // The knob: a closed brass ball crimped onto a base disc. A closed ball of 27 mm radius is far
             // too stiff to ring below about 18 kHz (its membrane holds it), so what rings is the base
@@ -839,6 +850,7 @@ public static class KnobDoor
                                         edgeRate + boltSide.V - strikeBody.V);
                     boltSide.F -= fk;
                     strikeBody.F += fk;
+                    strikeForce += fk * KeeperBendsStrike;
                     if (fk > 0)
                     {
                         double ridge = keeperSurface[(int)(Math.Clamp(bolt / Throw, 0, 0.9999) * keeperSurface.Length)];

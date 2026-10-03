@@ -625,6 +625,8 @@ if (args.Contains("--knob-door"))
     renders.Add(("solid-open-worn", r => OpenFPS.Common.KnobDoor.RenderOpen(Make(solid, worn), 48000, 0.9, r)));
     renders.Add(("solid-close-normal", r => OpenFPS.Common.KnobDoor.RenderClose(Make(solid, worn), OpenFPS.Common.KnobDoor.Shut.Normal, 48000, r)));
     renders.Add(("solid-close-slam", r => OpenFPS.Common.KnobDoor.RenderClose(Make(solid, worn), OpenFPS.Common.KnobDoor.Shut.Slam, 48000, r)));
+    renders.Add(("game-slam-v0", r => OpenFPS.Common.KnobDoor.RenderClose(
+        new OpenFPS.Common.KnobDoor.Door { HingeWear = OpenFPS.Common.KnobDoor.WearOf(0), Seed = 1 }, OpenFPS.Common.KnobDoor.Shut.Slam, 48000, r)));
     // As the game sends them: the prefab door, its 0.9 s swing, each character.
     for (int v = 0; v < OpenFPS.Common.KnobDoor.Variants; v++)
     {
@@ -636,6 +638,9 @@ if (args.Contains("--knob-door"))
     }
     string? only = args.FirstOrDefault(a => a.StartsWith("only=", StringComparison.Ordinal))?.Substring(5);
     OpenFPS.Common.KnobDoor.StemFolder = args.FirstOrDefault(a => a.StartsWith("stems=", StringComparison.Ordinal))?.Substring(6);
+    if (double.TryParse(args.FirstOrDefault(a => a.StartsWith("latch=", StringComparison.Ordinal))?.Substring(6),
+                        System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double share))
+        OpenFPS.Common.KnobDoor.KeeperBendsStrike = share;
     if (args.Contains("pins")) OpenFPS.Common.KnobDoor.PinTrace = new List<string>();
     // Every file on one gain, set by the loudest, so a slam and a gentle close keep their difference.
     var made = new List<(string Name, float[] Pcm)>();

@@ -64,20 +64,22 @@ public static class PushBarDoor
     public const int Variants = 4;
 
     /// <summary>
-    /// Each character: how far its silencers stand proud of the stop, and the bumpers the bar lands on at
-    /// each end of its travel (N/m; zero is bare metal). A urethane pad 10 mm thick and a square
-    /// centimetre is about 2e5 N/m; hardened with age, ten times that. New silencers and soft pads; the
-    /// same, firmer; silencers worn half away and pads gone hard; no silencers and a bar that clanks.
+    /// Each character: how far its silencers stand proud of the stop, the nylon or acetal slider the bar
+    /// bottoms on (N/m; zero is the bar's metal on the case's), and how much of a metal blow comes back.
+    /// Round 1 put every bar on soft urethane and Cody heard no push at all; bare metal on every one rang
+    /// the case's walls at 134 dBA. A new device, nylon; a standard one, acetal; a worn one with its
+    /// silencers half gone and its slider worn thin; an old one with no silencers and its slider worn to
+    /// almost nothing (bare metal rang the case at 134 dBA: even old devices keep a slider).
     /// </summary>
-    private static (double SilencerMm, double Bumper) Character(int variant) => (variant % Variants) switch
+    private static (double SilencerMm, double Bumper, double MetalLambda) Character(int variant) => (variant % Variants) switch
     {
-        0 => (2.5, 2e5),
-        1 => (2.5, 5e5),
-        2 => (1.2, 2e6),
-        _ => (0.0, 1e7),   // pads long gone, the bar on its hard plastic guides
+        0 => (2.5, 3e6, 0.3),
+        1 => (2.5, 1e7, 0.3),
+        2 => (1.2, 1.5e7, 0.2),
+        _ => (0.0, 2.5e7, 0.1),
     };
 
-    /// <summary>Opening: push the bar, the bolt draws back, the door goes, the bar is let go at 40 degrees.</summary>
+    /// <summary>Opening: shove the bar, the bolt draws back, the door goes, the bar is let go at 20 degrees.</summary>
     public static float[] RenderOpen(Door door, int sampleRate, double swingSeconds = 1.4, Report? report = null)
     {
         var sim = new Sim(door, sampleRate, report);
@@ -173,12 +175,15 @@ public static class PushBarDoor
     /// <summary>The case's two end brackets across the leaf, and how far across its push acts.</summary>
     private const double MountNear = 0.3, MountFar = 0.9;
     // The case: a 0.75 m pressed steel channel between screws 0.25 m apart; the bar an aluminium extrusion.
-    private const double CaseLoss = 0.02, BarLoss = 0.02;
+    private const double CaseLoss = 0.02, BarLoss = 0.01;
 
     // The frame: pressed 1.5 mm steel channel, about 2e-7 m^4, 2.9 kg/m, anchored every 0.7 m; it radiates
     // as its 0.1 m face.
     // Anchored in masonry and partly filled with mortar where it is grouted: it does not ring like a bell.
     private const double FrameEI = 40000, FrameKgPerM = 2.9, FrameSpan = 0.7, FrameFace = 0.1, FrameLoss = 0.04;
+    /// <summary>The frame's own thin walls: 1.5 mm steel, its 0.1 m face between anchors. Their dense high
+    /// modes are the clang of a hollow metal frame; the beam's few modes cannot carry it. Part grouted.</summary>
+    private const double FrameWallT = 0.0015, FrameWallLoss = 0.02;
 
     // The closer: size 3, 18 N m at the latch and rising 6 N m per radian open; its latch valve sets the
     // speed in the last ten degrees.
@@ -187,11 +192,11 @@ public static class PushBarDoor
 
     /// <summary>What a hand will put on a bar, N: a door pressed on its latch takes more than the 67 N an
     /// unloaded device is allowed to need.</summary>
-    private const double HandPushRamp = 0.15, HandPush = 150, HandHold = 40;
-    /// <summary>The hand meets the bar through the palm, about 20 N/mm and well damped, and the arm
-    /// drives the hand at walking-push pace, 0.3 m/s, until the palm carries what the arm wants. A bare
-    /// force on a 0.35 kg bar flung it down at 2.4 m/s and the opening was as loud as a slam.</summary>
-    private const double PalmStiffness = 2e4, PalmDamping = 100, ArmSpeed = 0.3;
+    private const double HandPushRamp = 0.05, HandPush = 250, HandHold = 40;
+    /// <summary>The hand meets the bar through the palm, about 50 N/mm when it shoves, and the arm drives
+    /// it at a shove's pace, 1 m/s, until the palm carries what the arm wants. (A bare force flung the bar
+    /// at 2.4 m/s; a gentle 0.3 m/s press, round 1, was a push nobody heard.)</summary>
+    private const double PalmStiffness = 5e4, PalmDamping = 150, ArmSpeed = 1.0;
 
     // ─────────────────────────────────────────────────────────────────────────────────────────────
 
@@ -203,14 +208,17 @@ public static class PushBarDoor
         private readonly Report? report;
         private readonly Random rng;
         private readonly double width, height, mass, inertia;
-        private readonly double silencer, bumper, keeperPlay;
+        private readonly double silencer, bumper, metalLambda, keeperPlay;
         private double theta, omega;
 
         private readonly Modes leaf, frame, caseModes, barModes, strike;
+        private readonly double[] caseHit, barHit;
         private readonly double[] latchShape, nearShape, farShape, shoeShape;
         private readonly (double X, double Y, double Warp, bool Rubber, double[] Shape, double[] Frame)[] stops;
         private readonly Mount[] skinPatches;
         private readonly double[] frameAtLatch;
+        private readonly Modes frameWall;
+        private readonly Plate frameWallPlate;
         private readonly double rigidGain;
         private double rigidLow;
 
@@ -245,7 +253,7 @@ public static class PushBarDoor
             rate = sampleRate * Oversample; dt = 1.0 / rate;
             rng = new Random(door.Seed);
             width = door.Width; height = door.Height;
-            (double silencerMm, bumper) = Character(door.Variant);
+            (double silencerMm, bumper, metalLambda) = Character(door.Variant);
             silencer = silencerMm / 1000;
             // The strike is set so the bolt drops in as the silencers take the closer's push.
             keeperPlay = Math.Max(silencer - 0.0004, 0.001);
@@ -265,6 +273,10 @@ public static class PushBarDoor
             shoeShape = plate.Shape(CloserShoeX, height - 0.05);
 
             frame = StripModes(dt, rng);
+            double wallD = SkinE * Math.Pow(FrameWallT, 3) / (12 * (1 - Poisson * Poisson));
+            frameWallPlate = new Plate(FrameFace, FrameSpan, wallD, FrameWallT * SkinRho, FrameWallLoss, 16000, false, rng, 0.03,
+                                       0, 1000, 3);
+            frameWall = new Modes(frameWallPlate.Hz, frameWallPlate.Loss, frameWallPlate.Mass, frameWallPlate.Gain, dt, frameWallPlate.GainQuad);
             frameAtLatch = FrameShape(LatchHeight);
             var list = new List<(double, double, double, bool, double[], double[])>();
             foreach (double y in SilencerHeights)
@@ -275,10 +287,18 @@ public static class PushBarDoor
             skinPatches = new Mount[stops.Length];
             for (int i = 0; i < stops.Length; i++) skinPatches[i] = new Mount(SkinPatchMass, SkinPatchStiffness, 0.1);
 
-            // The case: pressed steel channel 60 by 40 mm, 1.5 mm: about 3000 N m^2 and 2 kg/m, clamped
-            // 0.25 m between screws. The bar: aluminium extrusion, 2100 N m^2 and 0.58 kg/m, free 0.6 m.
-            caseModes = BeamModes(new[] { 4.730, 7.853, 10.996 }, 0.25, 3000, 2.0, CaseLoss, 0.75 * 0.06, dt);
-            barModes = BeamModes(new[] { 4.730, 7.853, 10.996, 14.137 }, 0.6, 2100, 0.58, BarLoss, 0.6 * 0.05, dt);
+            // The case and the bar are thin-walled sections, and what rings when the bar bottoms is their
+            // walls: the case a 1.5 mm steel wall 60 mm deep along its 0.75 m, the bar a 2 mm aluminium wall
+            // 50 mm deep along 0.6 m. Thin plates, simply supported on their folds; above 500 Hz their dense
+            // modes are thinned one in three. (As three beam modes they rang at 2.2 kHz like a pipe.)
+            var casePlate = new Plate(0.06, 0.75, SkinE * Math.Pow(0.0015, 3) / (12 * (1 - Poisson * Poisson)), 0.0015 * SkinRho,
+                                      CaseLoss, 16000, false, rng, 0.03, 0, 500, 3);
+            caseModes = new Modes(casePlate.Hz, casePlate.Loss, casePlate.Mass, casePlate.Gain, dt, casePlate.GainQuad);
+            caseHit = casePlate.Shape(0.03, 0.12);
+            var barPlate = new Plate(0.05, 0.6, 70e9 * Math.Pow(0.002, 3) / (12 * (1 - 0.33 * 0.33)), 0.002 * 2700,
+                                     BarLoss, 16000, false, rng, 0.03, 0, 500, 3);
+            barModes = new Modes(barPlate.Hz, barPlate.Loss, barPlate.Mass, barPlate.Gain, dt, barPlate.GainQuad);
+            barHit = barPlate.Shape(0.025, 0.1);
             // The rim strike: a steel block on the frame; what rings is its lip.
             strike = new Modes(new[] { Beam(0.012, 0.003, 7850, 200e9, 1.875) }, new[] { 0.03 }, new[] { 0.01 },
                                new[] { SmallPlateGain(0.012 * 0.03, 0.6) }, dt);
@@ -339,6 +359,16 @@ public static class PushBarDoor
             return new Modes(hz, l, m, g, dt);
         }
 
+        private readonly Dictionary<double, double[]> wallShapes = new();
+        /// <summary>Where on the frame's wall a blow lands: near the stop's rebate, at its height within
+        /// its span between anchors.</summary>
+        private double[] WallShape(double y)
+        {
+            if (!wallShapes.TryGetValue(y, out var s))
+                wallShapes[y] = s = frameWallPlate.Shape(0.03, Math.Clamp(y % FrameSpan, 0.05, FrameSpan - 0.05));
+            return s;
+        }
+
         private double[] FrameShape(double y)
         {
             var s = new double[frame.N];
@@ -360,7 +390,7 @@ public static class PushBarDoor
 
         public void ScriptOpen(double swingSeconds)
         {
-            const double reach = 0.05;
+            const double reach = 0.02;
             double cleared = -1, released = -1, end = 10;
             double wRate = Math.PI / 2 / swingSeconds;
             while (time < end)
@@ -380,7 +410,9 @@ public static class PushBarDoor
                     var (a, r) = leafPath!(time);
                     double need = (handK * (a - theta) + handC * (r - omega) + CloserTorque + CloserRate * theta) / (0.5 * (MountNear + MountFar));
                     handForce = Math.Clamp(need, HandHold, 200);
-                    if (theta > 40 * Math.PI / 180)
+                    // The hand comes off the bar once the door is going, as in the recordings: about a
+                    // quarter of a second after the bolt clears.
+                    if (theta > 20 * Math.PI / 180)
                     {
                         released = time; handForce = 0;
                         Log($"{time * 1000:F0} ms  bar let go");
@@ -449,6 +481,7 @@ public static class PushBarDoor
                         faceForce += f;
                         skin.Push(skinAtStops[i], f);
                         frame.Push(s.Frame, -f);
+                        frameWall.Push(WallShape(s.Y), -f);
                     }
                 }
             for (int i = 0; i < stops.Length; i++)
@@ -531,7 +564,7 @@ public static class PushBarDoor
             barForce += fOut - fIn;
             caseForce += fIn - fOut;
             Note("bar-bottom", fIn); Note("bar-back", fOut);
-            if (fIn + fOut > 0) { barModes.Push(ones, fIn + fOut); caseModes.Push(ones, fIn + fOut); }
+            if (fIn + fOut > 0) { barModes.Push(barHit, fIn + fOut); caseModes.Push(caseHit, fIn + fOut); }
 
             // The case pushes the leaf at its two brackets, square to the face.
             torque += caseForce * 0.5 * (MountNear + MountFar);
@@ -553,7 +586,7 @@ public static class PushBarDoor
             faceForce += latchEdgeForce + latchCase.Reaction * LatchBending;
             skin.Push(skinAtLatch, latchEdgeForce + latchCase.Reaction * LatchBending);
             if (strikeForce != 0) strike.Push(ones, strikeForce);
-            if (frameLatch != 0) frame.Push(frameAtLatch, frameLatch);
+            if (frameLatch != 0) { frame.Push(frameAtLatch, frameLatch); frameWall.Push(WallShape(LatchHeight), frameLatch); }
 
             // A hand on the leaf only while a script holds a path and the bar is not doing the work.
             // (Opening drives through the bar; closing is the closer's.)
@@ -571,7 +604,7 @@ public static class PushBarDoor
             if (near) foreach (var patch in skinPatches) patch.Step(dt);
 
             // Radiate.
-            double pLeaf = leaf.Step(), pFrame = frame.Step(), pStrike = strike.Step() + strikeSound.Pressure(strikeBody.Acc);
+            double pLeaf = leaf.Step(), pFrame = frame.Step() + frameWall.Step(), pStrike = strike.Step() + strikeSound.Pressure(strikeBody.Acc);
             double pLatch = latchSound.Pressure(latchCase.Acc), pBar = barModes.Step(), pCase = caseModes.Step();
             double corner = C0 / (2 * Math.PI * Math.Sqrt(width * height / Math.PI));
             rigidLow += (1 - Math.Exp(-2 * Math.PI * corner * dt)) * (alpha - rigidLow);
@@ -594,7 +627,7 @@ public static class PushBarDoor
         /// <summary>The bar on one of its stops: a urethane pad, or bare metal on a worn-out device.</summary>
         private double BarStop(double depth, double rate)
         {
-            if (bumper <= 0) return Contact(MetalContactK, 0.1, depth, rate);
+            if (bumper <= 0) return Contact(MetalContactK, metalLambda, depth, rate);
             if (depth <= 0) return 0;
             return Math.Max(0, bumper * depth + 2 * 0.3 * Math.Sqrt(bumper * BarMass) * rate);
         }
