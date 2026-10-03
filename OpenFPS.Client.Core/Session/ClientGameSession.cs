@@ -36,7 +36,7 @@ namespace OpenFPS.Client.Core.Session;
 /// no extra locking. A head's UI thread only ever touches <see cref="Input"/> (thread-safe) and the
 /// shell it implements itself.
 /// </summary>
-public sealed class ClientGameSession : IDisposable
+public sealed partial class ClientGameSession : IDisposable
 {
     private readonly ClientNetworkService _network;
     private readonly ISpeechOutput _speech;
@@ -202,6 +202,7 @@ public sealed class ClientGameSession : IDisposable
 
         _shell.CommandEntered += HandleCommandEntered;
         _microphone.PacketReady += OnVoicePacketReady;
+        WireConnection();
 
         RegisterBindings();
     }
@@ -252,11 +253,11 @@ public sealed class ClientGameSession : IDisposable
         // Accessibility readouts — the game's HUD, spoken.
         _bindings.Bind(InputContext.Gameplay, GameKey.C,
             () => Say(OpenFPS.Common.PlayerCoordinates.Format(_state.Position)));
-        _bindings.Bind(InputContext.Gameplay, GameKey.F, () => Say($"Facing: {_state.GetCompassDirection()}"));
-        _bindings.Bind(InputContext.Gameplay, GameKey.H, () => Say($"Health: {_state.Health} percent"));
+        _bindings.Bind(InputContext.Gameplay, GameKey.F, () => Say(_state.GetCompassDirection()));
+        _bindings.Bind(InputContext.Gameplay, GameKey.H, () => Say($"{_state.Health} percent"));
         // Driving, Z is the road: which one, which way, which lane, how fast. On foot it is the area.
         _bindings.Bind(InputContext.Gameplay, GameKey.Z, () =>
-            Say(_state.RidingControls && _audioSystem.Driving.Readout is { } road ? road : $"Area: {_state.CurrentRegion}"));
+            Say(_state.RidingControls && _audioSystem.Driving.Readout is { } road ? road : _state.CurrentRegion));
         _bindings.Bind(InputContext.Gameplay, GameKey.Comma, LookAhead);
         _bindings.Bind(InputContext.Gameplay, GameKey.B, () => Say(ExertionReadout()));
 
@@ -300,6 +301,9 @@ public sealed class ClientGameSession : IDisposable
             () => _network.Send(new TextCommand { Command = "ignition", Args = new[] { "off" } }));
         _bindings.Bind(InputContext.Gameplay, GameKey.Q, () => _network.Send(new TextCommand { Command = "drop" }));
         _bindings.Bind(InputContext.Gameplay, GameKey.R, () => _network.Send(new TextCommand { Command = "stow" }));
+        // Shift+R: the reverse, the first thing on your back into your hand. Without a name the server
+        // takes whatever was slung first.
+        _bindings.Bind(InputContext.Gameplay, GameKey.R, KeyModifiers.Shift, () => _network.Send(new TextCommand { Command = "draw" }));
         _bindings.Bind(InputContext.Gameplay, GameKey.V, ToggleVoiceTransmission);
 
         // ── Firing, on ENTER, and NEVER on a screen reader's key ────────────────────────────────
@@ -329,7 +333,7 @@ public sealed class ClientGameSession : IDisposable
         // Shell.
         _bindings.Bind(GameKey.Slash, _shell.OpenCommandConsole);
         _bindings.Bind(GameKey.NumpadDivide, _shell.OpenCommandConsole);
-        _bindings.Bind(GameKey.Escape, _shell.RequestQuit);
+        _bindings.Bind(GameKey.Escape, ShowGameMenu);
     }
 
     /// <summary>
@@ -345,6 +349,14 @@ public sealed class ClientGameSession : IDisposable
     /// </summary>
     public static readonly GameKey[] ScreenReaderKeys =
         { GameKey.ControlLeft, GameKey.ControlRight, GameKey.AltLeft, GameKey.AltRight };
+
+    /// <summary>The keys, as the in-game window shows them. One text for both heads.</summary>
+    public static readonly string KeyHelp = string.Join(Environment.NewLine,
+        "In game. W A S D to move, J / L turn, O / K look up and down, Space jump, Enter fire.",
+        "C coordinates, F facing, H health, Z area, comma look ahead, E interact, P scan, I inventory.",
+        "G take, Q drop, R put on your back, Shift+R draw, T clap or ignition.",
+        "V voice, F5 players, F6 maps, F8 friends, brackets to read chat, slash for the command console.",
+        "Escape for the game menu: keep playing, main menu, or quit.");
 
     /// <summary>Rebinds a key. Exposed so a head (or a future settings screen) can re-map without
     /// touching the session.</summary>
@@ -362,7 +374,7 @@ public sealed class ClientGameSession : IDisposable
     /// </summary>
     internal static string ReverbCommand(string[] args)
     {
-        if (args.Length > 0) return "Reverb: traced everywhere now; there is no room mode. /reflections sets the level.";
+        if (args.Length > 0) return "Traced everywhere now; there is no room mode. /reflections sets the level.";
         return OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.TracedReverbStatus(null);
     }
 
@@ -378,7 +390,7 @@ public sealed class ClientGameSession : IDisposable
             string a = args[0].ToLowerInvariant();
             if (a is "on") OpenFPS.Client.AudioEngine.Core.Engine.EngineSynth.ValveJetNoise = true;
             else if (a is "off") OpenFPS.Client.AudioEngine.Core.Engine.EngineSynth.ValveJetNoise = false;
-            else return "Valve flow: say /valveflow on or /valveflow off.";
+            else return "Say /valveflow on or /valveflow off.";
         }
         return OpenFPS.Client.AudioEngine.Core.Engine.EngineSynth.ValveJetNoise
             ? "Valve flow on: the exhaust valves rush."
@@ -394,7 +406,7 @@ public sealed class ClientGameSession : IDisposable
     {
         string Now() => $"{MathF.Round(OpenFPS.Common.Loudness.DynamicRangeCompression * 100f)} percent";
         if (args.Length == 0)
-            return $"Levels: {Now()} of real loudness differences. Say slash levels and a number from "
+            return $"{Now()} of real loudness differences. Say slash levels and a number from "
                  + $"{OpenFPS.Common.Loudness.MinCompression * 100f:F0} to 100, real, or default.";
         float value;
         string a = args[0].Trim().TrimEnd('%');
@@ -402,7 +414,7 @@ public sealed class ClientGameSession : IDisposable
         else if (a.Equals("default", StringComparison.OrdinalIgnoreCase)) value = OpenFPS.Common.Loudness.DefaultCompression;
         else if (float.TryParse(a, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float v))
             value = v > 1f ? v / 100f : v;
-        else return $"Levels: {args[0]} is not a level. Say a number from {OpenFPS.Common.Loudness.MinCompression * 100f:F0} to 100, real, or default.";
+        else return $"{args[0]} is not a level. Say a number from {OpenFPS.Common.Loudness.MinCompression * 100f:F0} to 100, real, or default.";
         OpenFPS.Common.Loudness.DynamicRangeCompression = value;
         (save ?? (() => ClientSettings.Load().Save()))();
         string note = OpenFPS.Common.Loudness.CompressionFromEnvironment ? " For this run only: the environment sets it." : "";
@@ -782,6 +794,7 @@ public sealed class ClientGameSession : IDisposable
                 if (login.Success)
                 {
                     _role = login.Role;
+                    NoteLoggedIn();
                     _shell.ShowLoading("Logging in...", speak: false);
                     LoginSucceeded?.Invoke(login.Username);
                 }
@@ -789,8 +802,13 @@ public sealed class ClientGameSession : IDisposable
                 {
                     Serilog.Log.Warning("Login rejected by the server: {Reason}", login.Message);
                     _speech.Speak($"Login failed. {login.Message}", interrupt: true);
+                    NoteLoginRejected();
                     LoginFailed?.Invoke(login.Message);
                 }
+                break;
+
+            case RegisterResponse reg:
+                HandleRegisterResponse(reg);
                 break;
 
             case MapManifest manifest:
@@ -815,7 +833,8 @@ public sealed class ClientGameSession : IDisposable
                     _state.RidingControls = false;
                     _shell.ShowLoading($"Travelling to {manifest.MapName}...");
                 }
-                _shell.UpdateLoadingStatus($"Loading {manifest.MapName}...", 10);
+                _loadToneStep = -1;
+                LoadProgress($"Loading {manifest.MapName}...", 10);
                 _world.Clear(manifest.WorldSize);
                 // A new map's regions are numbered from scratch, so the last id announced describes
                 // nowhere. Arriving somewhere is not crossing into it.
@@ -851,12 +870,12 @@ public sealed class ClientGameSession : IDisposable
 
             case EntityDefinition def:
                 _world.RegisterDefinition(def);
-                if (_expectedEntityCount > 0)
-                {
-                    int count = _world.EntityCount;
-                    int pct = 10 + (int)((float)count / _expectedEntityCount * 60);
-                    _shell.UpdateLoadingStatus($"Receiving entities: {count}/{_expectedEntityCount}", pct);
-                }
+                ReportEntityProgress();
+                break;
+
+            case EntityDefinitionBatch batch:
+                foreach (var d in batch.Definitions) _world.RegisterDefinition(d);
+                ReportEntityProgress();
                 break;
 
             case EntityRemoved removed:
@@ -869,7 +888,7 @@ public sealed class ClientGameSession : IDisposable
 
             case MapLoadComplete:
                 Serilog.Log.Information("MapLoadComplete: {Count} entity definitions received.", _world.EntityCount);
-                _shell.UpdateLoadingStatus("Geometry ready. Finalizing acoustics...", 80);
+                LoadProgress("Geometry ready. Finalizing acoustics...", 80);
                 // Niced, and off the shared pool. The voxel bake is seconds of solid CPU that lands
                 // at the exact moment thirty engine voices are being created and primed; at equal
                 // priority on a pool that is also decoding samples, it takes its cores from the
@@ -898,10 +917,13 @@ public sealed class ClientGameSession : IDisposable
                 // announced as you land in it. Only arriving on a map is an entry into the world.
                 if (_arrived) break;
                 _arrived = true;
-                _shell.UpdateLoadingStatus("Entering World...", 100);
+                LoadProgress("Entering World...", 100);
                 _shell.EnterGame();
                 GameJoined?.Invoke();
                 Ui.Play(UiCue.EnterWorld);
+                // The world comes up over a second rather than starting mid-sentence; the chord above
+                // is an interface sound and is not faded.
+                FadeWorldIn();
                 // What a player needs on arriving, and nothing else: where they are. Said once the body
                 // is placed in a zone (AnnounceZoneChanges), so the map and the zone are one sentence.
                 _arrivalPendingSince = DateTime.UtcNow;
@@ -1256,7 +1278,7 @@ public sealed class ClientGameSession : IDisposable
                     OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.TailDb = Math.Clamp(db, -80f, 6f);
                     OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.TracedEchoesOn = true;
                 }
-                else if (a != null) { Say("Echoes: say /echoes on or /echoes off; /tail sets the level."); return; }
+                else if (a != null) { Say("Say /echoes on or /echoes off; /tail sets the level."); return; }
                 Say(OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.TracedEchoesStatus());
                 return;
             }
@@ -1285,8 +1307,8 @@ public sealed class ClientGameSession : IDisposable
                 var a = parts.Skip(1).FirstOrDefault();
                 if (a != null && float.TryParse(a, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float db))
                     OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.CabinDb = Math.Clamp(db, -80f, 6f);
-                else if (a != null) { Say("Cabin: say a level in decibels, such as /cabin -12. Zero is the traced level, -80 is off."); return; }
-                Say($"Cabin: {OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.CabinDb:F0} dB against the traced level, on the response of the vehicle you are sitting in.");
+                else if (a != null) { Say("Say a level in decibels, such as /cabin -12. Zero is the traced level, -80 is off."); return; }
+                Say($"{OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.CabinDb:F0} dB against the traced level, on the response of the vehicle you are sitting in.");
                 return;
             }
             if (parts[0].Equals("valveflow", StringComparison.OrdinalIgnoreCase))
@@ -1397,6 +1419,8 @@ public sealed class ClientGameSession : IDisposable
 
     public void Dispose()
     {
+        // The window was closed under us: tell the server now, not at its timeout.
+        if (_network.IsConnected) { _network.Send(new LogoutRequest()); _network.Disconnect(); }
         _shell.CommandEntered -= HandleCommandEntered;
         _microphone.PacketReady -= OnVoicePacketReady;
         _microphone.Dispose();

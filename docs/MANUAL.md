@@ -2,12 +2,12 @@
 
 Part 1 is for players. Part 2 is for people running a server.
 
-This manual describes the Linux (GTK) client. The Windows client has the same keys, lists and
-menus, with these differences:
-- Its main menu also has **Open log folder**, and its Connect dialog has **Create account**.
-- Voice chat works on Windows.
+This manual describes the Linux (GTK) client. The Windows client has the same keys, lists, menus
+and dialogs, with these differences:
 - Its settings are in `%APPDATA%\openfps\client.json`. Its logs are in a `logs` folder beside the
   game, or in `%LOCALAPPDATA%\openfps\logs` if the game folder cannot be written to.
+- With NVDA running, the game leaves NVDA to read menus and dialogs and only plays the interface
+  sounds.
 
 ---
 
@@ -18,8 +18,9 @@ menus, with these differences:
 Run `./run-gtk-client.sh` from the OpenFPS folder. It builds the client and starts it. Speech goes
 to Orca when Orca is running, and to speech-dispatcher otherwise.
 
-The main menu has four items: **Connect**, **Saved Servers**, **Settings** and **Quit**. Use Tab or
-the arrow keys to move and Enter to choose.
+The main menu has five items: **Connect**, **Saved Servers**, **Settings**, **Open log folder** and
+**Quit**. Use Tab or the arrow keys to move and Enter to choose. Open log folder opens the folder of
+the log file the client is writing (set by `run-gtk-client.sh`).
 
 ### Connecting
 
@@ -27,12 +28,12 @@ the arrow keys to move and Enter to choose.
   Otherwise the Connect dialog opens with the cursor in the password field. If you have no saved
   server yet, Saved Servers opens instead.
 - The **Connect dialog** has: a status line (it repeats the last message), Server address (for
-  example `127.0.0.1:33288`), Username, Password, a "Remember password" checkbox, Connect and
-  Cancel. Escape closes it. If the login fails, the cursor returns to Username.
+  example `127.0.0.1:33288`), Username, Password, a "Remember password" checkbox, Connect, Create
+  account and Cancel. Escape closes it. If the login fails, the cursor returns to Username.
+- **Create account** makes a new account with the username and password you typed and logs you in
+  with it.
 - After you log in by hand, the server is saved for you. The first server you save becomes your
   preferred one.
-- The Linux client cannot create a new account yet. Ask the server's admin for one, or register
-  with the Windows client.
 
 ### Saved servers
 
@@ -42,9 +43,19 @@ user name, and "preferred" if it is your preferred server.
 
 ### Entering the world
 
-After you log in the client says "Logged in as" your name and "Loading world", reads the loading
-progress every quarter, says "Generating acoustics" and "Acoustics ready", plays a rising chord and
-says "You have entered the world".
+While the map loads, a soft note sounds at every tenth of the way, rising an octave from start to
+finish; the loading window shows the same progress. Then a rising chord plays, the world fades in
+over about a second, and the client says the map and the place you are in.
+
+### Leaving, and losing the connection
+
+- **Escape** in game opens the game menu: **Keep playing**, **Main menu** and **Quit**. The cursor
+  starts on Keep playing, and Escape closes the menu. Main menu and Quit log you out first; the
+  world fades out over half a second.
+- If the connection drops, the client says "Disconnected from the server", stops every sound in the
+  world, and tries to log back in every 3 seconds with a quiet tick. When it gets back in it says
+  "Reconnected" and loads the map again. After a minute without success it says so and goes back
+  to the main menu. Escape during this opens the game menu.
 
 ## Keys
 
@@ -98,11 +109,12 @@ when you come within 3 m of them.
 | G | Pick up |
 | Q | Drop |
 | R | Put away (sling onto your back) |
+| Shift+R | Draw: take the first thing on your back into your hand |
 | Enter | Fire what you are holding (only works with a weapon) |
 | T | Clap your hands. In the driver's seat: engine on |
 | Shift+T | Engine off (driver's seat) |
-| V | Voice chat on / off (not available on Linux yet) |
-| Escape | Quit dialog ("Quit" or "Keep playing"; the cursor starts on Keep playing) |
+| V | Voice chat on / off, on the microphone chosen in Settings |
+| Escape | Game menu: Keep playing, Main menu, Quit (the cursor starts on Keep playing) |
 
 E works on things within about 3 m. For a door: E opens it; E again when it is open closes it.
 
@@ -156,7 +168,9 @@ Inside a list:
 
 - Moving in a list: a tick. At either end of a list: a low knock.
 - Choosing: two rising notes. Going back: two falling notes.
+- Loading a map: one soft note per tenth of the load, rising.
 - Entering the world: a rising chord.
+- Trying to reconnect: a quiet low tick every 3 seconds.
 - Chat: one soft note for your map, two rising notes for everyone, three rising notes for a
   private message to you, two falling notes for the server, a bright chord for an admin.
 - Voice chat switched on: one short note.
@@ -338,7 +352,7 @@ Press K to switch it off or on.
 
 Choose Settings from the main menu.
 - **Output device**: where the sound goes. Empty means the system default.
-- **Input device, for voice chat**: stored, but voice chat is not working on Linux yet.
+- **Input device, for voice chat**: the microphone voice chat uses. Empty means the system default.
 - **Interface sounds**: on or off.
 - **Interface sound volume**: 0 to 100.
 

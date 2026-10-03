@@ -52,10 +52,7 @@ internal sealed class GameWindow
         _window.Title = "OpenFPS — In Game";
         _window.SetDefaultSize(480, 320);
 
-        var label = Label.New(
-            "In game. W A S D to move, J / L turn, O / K look up and down, Space jump.\n" +
-            "C coordinates, F facing, H health, Z area, comma look ahead, E interact, P scan, I inventory.\n" +
-            "V voice, F5 players, brackets to read chat, slash for the command console, Escape to quit.");
+        var label = Label.New(OpenFPS.Client.Core.Session.ClientGameSession.KeyHelp);
         label.SetWrap(true);
         // A focusable child gives the toplevel a focus target, so key events keep being delivered —
         // notably after alt-tabbing away and back, when GTK would otherwise leave no widget focused
@@ -116,6 +113,14 @@ internal sealed class GameWindow
         _window.Present();
         IsActive = true;
         _focusTarget?.GrabFocus();
+    }
+
+    /// <summary>Hides the window for a return to the main menu. <see cref="Present"/> brings it back.</summary>
+    public void Hide()
+    {
+        IsActive = false;
+        _input.Clear();
+        _window?.SetVisible(false);
     }
 
     /// <summary>The toplevel, so dialogs can be made transient for it.</summary>

@@ -36,7 +36,8 @@ public class ChatRingTests
 
         Assert.DoesNotContain(tts.Spoken, s => s.Contains("System"));
         Assert.Contains("Moved to 40, 0, 120", tts.Spoken);
-        Assert.Contains("Server: Welcome", tts.Spoken);
+        Assert.Contains("Welcome", tts.Spoken);
+        Assert.DoesNotContain(tts.Spoken, s => s.StartsWith("Server"));
         Assert.Contains("sean01: hi", tts.Spoken);
         Assert.Contains("Private from sean01: psst", tts.Spoken);
         Assert.Contains("Private to sean01: hello", tts.Spoken);

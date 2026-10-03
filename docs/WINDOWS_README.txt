@@ -22,7 +22,10 @@ In game
 -------
 W A S D move, J and L turn, O and K look up and down, Space jump.
 C coordinates, F facing, H health, Z area, comma look ahead, E interact, P scan, I inventory.
-V voice chat, F5 players, the bracket keys read chat, slash opens the command console, Escape quits.
+G take, Q drop, R put on your back, Shift+R draw, Enter fire.
+V voice chat, F5 players, the bracket keys read chat, slash opens the command console.
+Escape opens the game menu: Keep playing, Main menu, Quit.
+If the connection drops the game tries to log back in for a minute, ticking every 3 seconds.
 /help in the command console lists the commands.
 
 Settings (main menu) chooses the output device, the microphone, and the interface sounds.

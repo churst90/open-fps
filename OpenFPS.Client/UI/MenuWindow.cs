@@ -154,28 +154,7 @@ public sealed class MenuWindow : Form
     }
 
     /// <summary>A server logged in to by hand is remembered, so Connect can go straight back.</summary>
-    private void RememberServer(PendingLogin login)
-    {
-        ParseAddress(login.Address, out string host, out int port);
-        var s = _settings.Servers.FirstOrDefault(x => x.Host == host && x.Port == port && x.Username == login.User);
-        if (s == null)
-        {
-            s = new SavedServer { Name = host, Host = host, Port = port, Username = login.User };
-            _settings.Servers.Add(s);
-            if (_settings.Servers.Count == 1) s.Preferred = true;
-        }
-        s.RememberPassword = login.Remember;
-        s.Password = login.Remember ? login.Pass : "";
-        _settings.Save();
-    }
-
-    public static void ParseAddress(string addr, out string host, out int port)
-    {
-        host = "127.0.0.1"; port = 33288;
-        var parts = addr.Trim().Split(':');
-        if (parts.Length >= 1 && parts[0].Length > 0) host = parts[0];
-        if (parts.Length >= 2 && int.TryParse(parts[1], out int p)) port = p;
-    }
+    private void RememberServer(PendingLogin login) => _settings.Remember(login.Address, login.User, login.Pass, login.Remember);
 
     // ── Saved servers ──────────────────────────────────────────────────────────────────────────
 
@@ -254,7 +233,7 @@ public sealed class MenuWindow : Form
         var save = MenuButton("Save", () =>
         {
             var s = existing ?? new SavedServer();
-            ParseAddress(address.Text, out string host, out int port);
+            ServerAddress.Parse(address.Text, out string host, out int port);
             s.Host = host; s.Port = port;
             s.Name = name.Text.Trim().Length > 0 ? name.Text.Trim() : host;
             s.Username = user.Text.Trim();

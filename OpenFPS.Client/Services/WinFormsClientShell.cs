@@ -1,5 +1,6 @@
 using System;
 using System.Windows.Forms;
+using OpenFPS.Client.Core;
 using OpenFPS.Client.Core.Platform;
 using OpenFPS.Client.UI;
 
@@ -16,19 +17,23 @@ namespace OpenFPS.Client.Services;
 public sealed class WinFormsClientShell : IClientShell
 {
     private readonly ClientNavigationService _navigation;
-    private readonly Action _onQuitConfirmed;
+    private readonly NvdaSpeechOutput _speech;
+    private readonly Action<UiCue> _cue;
+    private readonly Action _quit;
     private MainWindow? _gameWindow;
 
     public event Action<string>? CommandEntered;
 
-    public WinFormsClientShell(ClientNavigationService navigation, Action onQuitConfirmed)
+    public WinFormsClientShell(ClientNavigationService navigation, NvdaSpeechOutput speech, Action<UiCue> cue, Action quit)
     {
         _navigation = navigation;
-        _onQuitConfirmed = onQuitConfirmed;
+        _speech = speech;
+        _cue = cue;
+        _quit = quit;
     }
 
     /// <summary>Gameplay keys are live only while the game window is the active window and neither the
-    /// command console nor the quit prompt is open — otherwise the player would walk while typing.</summary>
+    /// command console nor the game menu is open — otherwise the player would walk while typing.</summary>
     public bool IsGameInputActive => _gameWindow is { IsWindowActive: true, IsModalOpen: false };
 
     public void ShowLoading(string status, bool speak = true) => _navigation.ShowLoading(status);
@@ -46,11 +51,19 @@ public sealed class WinFormsClientShell : IClientShell
 
     public void OpenCommandConsole(string initialText) => OnGameWindow(win => win.OpenCommandWindow(initialText));
 
-    public void RequestQuit()
+    public void ShowGameMenu(Action<GameMenuChoice> chosen)
     {
-        if (_gameWindow == null) { _navigation.EnqueueUIAction(_onQuitConfirmed); return; }
-        OnGameWindow(win => win.ConfirmQuit(_onQuitConfirmed));
+        if (_gameWindow == null) { chosen(GameMenuChoice.KeepPlaying); return; }
+        OnGameWindow(win => win.ShowGameMenu(chosen));
     }
+
+    // NVDA reads the menu as it takes focus; without it the game says where you are.
+    public void ReturnToMenu() => _navigation.ReturnToMenu(() =>
+    {
+        if (!_speech.ScreenReaderRunning) _speech.Speak("Main menu.", interrupt: false);
+    });
+
+    public void Quit() => _quit();
 
     private void OnGameWindow(Action<MainWindow> action)
     {

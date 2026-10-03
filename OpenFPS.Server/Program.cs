@@ -391,6 +391,13 @@ public class GameServer
     {
         _dispatcher.RegisterHandler<LoginRequest>(HandleLogin);
         _dispatcher.RegisterHandler<RegisterRequest>(HandleRegister);
+        // Leaving on purpose: the same clean-up as a dropped connection, now rather than at the timeout.
+        _dispatcher.RegisterHandler<LogoutRequest>((id, req, reply) => {
+            var peer = _network.GetPeer(id);
+            if (peer == null) return;
+            if (_sessions.TryGetSession(id, out var s)) Log.Information("Peer {Id} ({User}) logged out.", id, s.Username);
+            peer.Disconnect();
+        });
         _dispatcher.RegisterHandler<MapDataRequest>((id, req, reply) => {
             var peer = _network.GetPeer(id);
             if (peer != null) HandleMapDataRequest(peer, req);
@@ -835,11 +842,17 @@ public class GameServer
         session.KnownEntities.Clear();
         session.VisibleDynamicEntities.Clear();
 
+        // In batches: one reliable message per definition made the load wait on round trips.
+        var batch = new EntityDefinitionBatch();
         foreach (var e in staticEntities)
         {
-            _network.SendMessage(peer, CreateDefinition(world, e), DeliveryMethod.ReliableOrdered);
+            batch.Definitions.Add(CreateDefinition(world, e));
             session.KnownEntities.Add(e.Id);
+            if (batch.Definitions.Count < EntityDefinitionBatch.Size) continue;
+            _network.SendMessage(peer, batch, DeliveryMethod.ReliableOrdered);
+            batch = new EntityDefinitionBatch();
         }
+        if (batch.Definitions.Count > 0) _network.SendMessage(peer, batch, DeliveryMethod.ReliableOrdered);
 
         _network.SendMessage(peer, new MapLoadComplete(), DeliveryMethod.ReliableOrdered);
     }
@@ -1246,11 +1259,10 @@ public class GameServer
                 && w.Has<Transform>(target)
                 && Vector3.Distance(position, w.Get<Transform>(target).Position) > PhysicsConstants.InteractionRange)
             {
-                Say("Interaction rejected: Target too far away.");
+                Say("Too far away.");
                 return;
             }
 
-            Say($"Interaction '{interact.Action}' received.");
         });
     }
 
