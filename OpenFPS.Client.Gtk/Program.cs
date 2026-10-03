@@ -41,6 +41,9 @@ internal static partial class GtkClientProgram
     // focus back onto the main menu, and that focus announcement — spoken with interrupt — cut off the
     // rejection the session had just said, so a wrong password was indistinguishable from silence.
     private static Window? _loginDialog;
+    private static bool _loginRegister;
+    /// <summary>The server's shortest password (AuthService.MinPasswordLength).</summary>
+    private const int MinPassword = 8;
     private static Entry? _loginUser;
     private static Label? _loginStatus;
     private static string _loginStatusText = "";
@@ -376,11 +379,24 @@ internal static partial class GtkClientProgram
             _speech.Speak("Warning. " + _missingAudioReport);
     }
 
-    /// <summary>The Connect dialog; with <paramref name="register"/> it is the same form for making a new
-    /// account, with Create account first and focus on the username.</summary>
+    /// <summary>The Connect dialog; with <paramref name="register"/> it is the Create Account form instead:
+    /// blank, with only Create account and Cancel (a Connect button there logged in as the account that had
+    /// just failed to be made).</summary>
     private static void ShowLoginDialog(OpenFPS.Client.Core.SavedServer? saved, bool register = false)
     {
-        if (_loginDialog != null) { _loginDialog.Present(); return; }
+        if (_loginDialog != null)
+        {
+            // Asked for the other form: that one goes. Asked for the same one: it comes back and says so,
+            // rather than coming forward without a word.
+            if (_loginRegister != register) CloseLoginDialog();
+            else
+            {
+                _loginDialog.Present();
+                _speech.Speak($"{_loginDialog.Title}. {(_loginStatusText.Length > 0 ? _loginStatusText : "")}", true);
+                return;
+            }
+        }
+        _loginRegister = register;
 
         var dialog = Window.New();
         dialog.Title = register ? "Create Account" : "Connect to Server";
@@ -404,7 +420,8 @@ internal static partial class GtkClientProgram
         var server = LabeledEntry(box, "Server address", saved != null ? $"{saved.Host}:{saved.Port}" : "127.0.0.1:33288", false);
         // A new account starts blank: the saved account's name is not the one being made.
         var user = LabeledEntry(box, "Username", register ? "" : saved?.Username ?? "", false);
-        var pass = LabeledEntry(box, "Password", "", true);
+        // The server's own rule, said before it can refuse.
+        var pass = LabeledEntry(box, register ? $"Password, at least {MinPassword} characters" : "Password", "", true);
         var remember = CheckButton.NewWithLabel("Remember password");
         remember.SetActive(saved?.RememberPassword ?? false);
         SpeakOnFocus(remember, () => $"Remember password, {(remember.GetActive() ? "checked" : "not checked")}");
@@ -423,10 +440,7 @@ internal static partial class GtkClientProgram
             _session.Connect(_pendingAddress, _pendingUser, _pendingPass, register);
         }
         if (register)
-        {
             box.Append(MenuButton("Create account", () => Submit(register: true)));
-            box.Append(MenuButton("Connect", () => Submit(register: false)));
-        }
         else
         {
             box.Append(MenuButton("Connect", () => Submit(register: false)));
@@ -461,8 +475,10 @@ internal static partial class GtkClientProgram
         _loginStatusText = message;
         _loginStatus?.SetText(message);
         if (success) { CloseLoginDialog(); return; }
+        // Focus goes to the status line, which says the reason. (On Username, the screen reader read the
+        // field over the reason, and a refused password was never heard.)
         _suppressFocusSpeech = true;
-        _loginUser?.GrabFocus();
+        _loginStatus?.GrabFocus();
     });
 
     private static void CloseLoginDialog()

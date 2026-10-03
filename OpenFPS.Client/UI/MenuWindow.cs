@@ -30,6 +30,9 @@ public sealed class MenuWindow : Form
     private TextBox? _loginStatus;
     private TextBox? _loginUser;
     private PendingLogin? _pending;
+    private bool _loginRegister;
+    /// <summary>The server's shortest password (AuthService.MinPasswordLength).</summary>
+    private const int MinPassword = 8;
 
     private sealed record PendingLogin(string Address, string User, string Pass, bool Remember);
 
@@ -106,7 +109,13 @@ public sealed class MenuWindow : Form
     /// account, with Create account first (and the default) and focus on the username.</summary>
     private void ShowLoginForm(SavedServer? saved, bool register = false)
     {
-        if (_loginForm is { IsDisposed: false }) { _loginForm.Activate(); return; }
+        if (_loginForm is { IsDisposed: false })
+        {
+            // Asked for the other form: that one goes. Asked for the same one: it comes back.
+            if (_loginRegister != register) _loginForm.Close();
+            else { _loginForm.Activate(); return; }
+        }
+        _loginRegister = register;
 
         var form = Dialog(register ? "Create Account" : "Connect to Server", 440, 400);
         var layout = Column();
@@ -116,7 +125,8 @@ public sealed class MenuWindow : Form
         var server = Field(layout, "Server address", saved != null ? $"{saved.Host}:{saved.Port}" : "127.0.0.1:33288");
         // A new account starts blank: the saved account's name is not the one being made.
         var user = Field(layout, "Username", register ? "" : saved?.Username ?? "");
-        var pass = Field(layout, "Password", "", password: true);
+        // The server's own rule, said before it can refuse.
+        var pass = Field(layout, register ? $"Password, at least {MinPassword} characters" : "Password", "", password: true);
         var remember = Check(layout, "Remember password", saved?.RememberPassword ?? false);
 
         void Submit(bool register)
@@ -127,7 +137,9 @@ public sealed class MenuWindow : Form
         }
         var connect = MenuButton("Connect", () => Submit(register: false));
         var create = MenuButton("Create account", () => Submit(register: true));
-        if (register) { layout.Controls.Add(create); layout.Controls.Add(connect); }
+        // The Create Account form only creates: a Connect button there logged in as the account that had
+        // just failed to be made.
+        if (register) layout.Controls.Add(create);
         else { layout.Controls.Add(connect); layout.Controls.Add(create); }
         var cancel = MenuButton("Cancel", () => form.Close());
         layout.Controls.Add(cancel);

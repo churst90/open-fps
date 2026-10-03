@@ -30,11 +30,12 @@ The main menu has five items: **Connect**, **Create account**, **Saved Servers**
   example `127.0.0.1:33288`), Username, Password, a "Remember password" checkbox, Connect, Create
   account and Cancel. Escape closes it. If the login fails, the cursor returns to Username.
 - **Create account** on the main menu makes a new account on your preferred server. The Create
-  Account dialog opens for that server with Username and Password blank, the cursor in Username, and
-  Create account as the first button; the account already saved for that server is not used or
-  changed. Once the account is made you are logged in with it, and it is saved as a second entry for
+  Account dialog opens for that server with Username and Password blank and the cursor in Username.
+  It has only Create account and Cancel. A password must be at least 8 characters, a username 3 to 20.
+  The account already saved for that server is not used or changed. Once the account is made you are logged in with it, and it is saved as a second entry for
   that server; choose which entry is preferred in Saved Servers. With no saved server, Saved Servers
-  opens instead. If the account cannot be made, the reason is said and nothing stays connected.
+  opens instead. If the account cannot be made, the reason is said, the cursor goes to the status
+  line (which repeats it), and nothing stays connected.
 - **Create account** in the Connect dialog makes a new account with the username and password you
   typed.
 - After you log in by hand, the server is saved for you. The first server you save becomes your
