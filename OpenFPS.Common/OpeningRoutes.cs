@@ -1054,14 +1054,284 @@ public sealed class OpeningRoutes
         edgeVerified = false;
         if (routes.Count > 1) routes.Sort((x, y) => x.D.CompareTo(y.D));
         int tried = 0;
+        float best = float.MaxValue;
+        Vector3 bestEdge = edge;
+        scratch.ChainBudget = ChainBendsPerSearch;
         foreach (var (dd, ps, p, i) in routes)
         {
+            // Sorted, and bending round more boxes only ever adds: nothing after this can beat it.
+            if (dd >= best) break;
             if (++tried > MaxRoutesTried) break;
-            if (!RouteIsClear(source, ps, p, listener, i, ignoreA, ignoreB)) continue;
-            edge = p; edgeVerified = true;
-            return dd;
+            // Round a door leaf is through its doorway: believed only clear as it stands, as it always
+            // was, never bent on round the rest of the street (ClearedLeg). That found the crack over
+            // a shut glass front door and played the street through it at -21 dB.
+            int chain = _solids[i].IsLeaf ? 0 : MaxChainedBoxes;
+            float extra = ClearedRoute(source, ps, p, listener, i, chain, ignoreA, ignoreB, best - dd, out Vector3 last);
+            if (extra < 0f || dd + extra >= best) continue;
+            best = dd + extra;
+            bestEdge = last;
         }
-        return worst;
+        // Over the top of everything, as the standards draw it (ISO 9613-2, CNOSSOS-EU): the tight string
+        // over every obstacle in the vertical plane through the two points. It exists whenever neither end
+        // has something over its head, whatever the search round the sides found or missed.
+        if (worst >= 0f)
+        {
+            float over = OverTheTop(source, listener, ignoreA, ignoreB, out Vector3 overEdge);
+            if (over >= 0f && over < best) { best = over; bestEdge = overEdge; }
+        }
+        if (best == float.MaxValue) return worst;
+        edge = bestEdge; edgeVerified = true;
+        // Something IS in the way, so the least this can be is grazing it: Maekawa's 5 dB, not the
+        // nothing that a path difference of exactly zero reads as (Diffraction.InsertionLossDb). A car
+        // whose line just clipped a wall top came out at 0 dB at one position and -5 at the next.
+        return MathF.Max(best, GrazingMetres);
+    }
+
+    /// <summary>The path difference a route that only grazes what is in its way is given, metres:
+    /// small enough to be Maekawa's grazing figure in every band.</summary>
+    private const float GrazingMetres = 1e-5f;
+
+    /// <summary>
+    /// The path difference of the way over every box between the two points, in the vertical plane through
+    /// them: the upper convex hull of the boxes' tops where the plane crosses them, from one point to the
+    /// other — the string pulled tight over the profile, which is how road-traffic noise standards (ISO
+    /// 9613-2, CNOSSOS-EU) find the path over several screens. Each leg is then checked against the whole
+    /// scene: a box it cuts through joins the profile and the string is pulled again. -1 when there is no
+    /// way over — an end has a roof over it, so the string can only leave it upward through something.
+    /// <paramref name="lastEdge"/> is the top the last leg leaves from for the ear.
+    ///
+    /// Why it is here: the search round one box at a time (with ClearedLeg's bending) is bounded, and a
+    /// bounded search that finds the way round a building for one position of a car and misses it two
+    /// metres on hands the car -13 dB and then -76 (through the whole building) a third of a second
+    /// apart. Out in the open there is always a way over the roofs, and its level only changes as fast
+    /// as the profile does.
+    /// </summary>
+    private float OverTheTop(Vector3 source, Vector3 listener, int[]? ignoreA, int[]? ignoreB, out Vector3 lastEdge)
+        => OverTheTop(source, listener, ignoreA, ignoreB, out lastEdge, null);
+
+    private float OverTheTop(Vector3 source, Vector3 listener, int[]? ignoreA, int[]? ignoreB, out Vector3 lastEdge,
+                             System.Text.StringBuilder? explain)
+    {
+        lastEdge = listener;
+        var flat = new Vector2(listener.X - source.X, listener.Z - source.Z);
+        float run = flat.Length();
+        if (run < 0.1f) return -1f;
+        var scratch = Scratch.Get(this);
+        var cand = scratch.Clear;
+        _grid.Column(source, listener, MathF.Min(source.Y, listener.Y) - 1f, cand);
+
+        // ── The profile: what stands up from the ground in the plane ─────────────────────────
+        //
+        // A box is part of the profile if it reaches down to the straight line, or down onto the top of
+        // something that does: a building's storeys stacked one on another are one obstacle to go over,
+        // and a sign hung over the street that nothing holds up from below is not (the string passes
+        // under it unless something else lifts it there, which the leg test finds). Swept bottom-up
+        // through one-metre bins along the ground, so it costs one pass over what the plane cuts.
+        var crossings = scratch.Crossings;
+        crossings.Clear();
+        foreach (int i in cand)
+        {
+            if (ignoreA != null && Array.IndexOf(ignoreA, i) >= 0) continue;
+            if (ignoreB != null && Array.IndexOf(ignoreB, i) >= 0) continue;
+            if (!Crossing(i, source, listener, run, out float s0, out float s1, out float bottom, out float top)) continue;
+            float lineBottom = MathF.Min(Lerp(source.Y, listener.Y, s0 / run), Lerp(source.Y, listener.Y, s1 / run));
+            if (top < lineBottom) continue;   // under the line all the way across: never touched
+            crossings.Add((i, s0, s1, bottom, top));
+        }
+        if (crossings.Count == 0) return -1f;
+        crossings.Sort((x, y) => x.Bottom.CompareTo(y.Bottom));
+        int bins = Math.Clamp((int)MathF.Ceiling(run / ProfileBinMetres), 1, 4096);
+        var held = scratch.ProfileBins;
+        if (held.Length < bins) held = scratch.ProfileBins = new float[Math.Max(bins, 2 * held.Length)];
+        // What holds a box up at each bin: the line itself to begin with.
+        for (int k = 0; k < bins; k++)
+        {
+            float sMid = (k + 0.5f) * run / bins;
+            held[k] = Lerp(source.Y, listener.Y, sMid / run);
+        }
+        var included = scratch.Included;
+        included.Clear();
+        foreach (var c in crossings)
+        {
+            int k0 = Math.Clamp((int)(c.S0 / run * bins), 0, bins - 1), k1 = Math.Clamp((int)(c.S1 / run * bins), 0, bins - 1);
+            float support = float.MinValue;
+            for (int k = k0; k <= k1; k++) support = MathF.Max(support, held[k]);
+            if (c.Bottom > support + 2f * RouteJointMetres) continue;
+            included.Add(c.Box);
+            for (int k = k0; k <= k1; k++) held[k] = MathF.Max(held[k], c.Top);
+        }
+        if (included.Count == 0) return -1f;
+        // Something over an end's own head — a ceiling, a canopy, a balcony — and the string could only
+        // leave that end straight up through it. From under a roof the way out is sideways first, which
+        // is the search round the sides and the openings' business, not this.
+        bool OverAnEnd(float s0, float s1, float bottom)
+            => (s0 <= EndColumnMetres && bottom > source.Y) || (s1 >= run - EndColumnMetres && bottom > listener.Y);
+        foreach (var c in crossings)
+            if (included.Contains(c.Box) && OverAnEnd(c.S0, c.S1, c.Bottom)) return -1f;
+
+        var pts = scratch.Profile;
+        var hull = scratch.Hull;
+        Vector3 At(float s, float y) { var q = Vector3.Lerp(source, listener, s / run); q.Y = y; return q; }
+        for (int pass = 0; pass < OverTheTopPasses; pass++)
+        {
+            pts.Clear();
+            pts.Add((0f, source.Y, -1));
+            pts.Add((run, listener.Y, -1));
+            foreach (var c in crossings)
+            {
+                if (!included.Contains(c.Box)) continue;
+                // A box over an end's own column puts its top straight above that end: the string can
+                // only leave it upward through the box, which the leg test below finds.
+                pts.Add((MathF.Max(c.S0, 1e-3f), c.Top + RouteJointMetres, c.Box));
+                pts.Add((MathF.Min(c.S1, run - 1e-3f), c.Top + RouteJointMetres, c.Box));
+            }
+            pts.Sort((x, y) => x.S.CompareTo(y.S));
+            // Upper hull, left to right (Andrew's monotone chain).
+            hull.Clear();
+            foreach (var p in pts)
+            {
+                while (hull.Count >= 2)
+                {
+                    var o = hull[^2]; var a = hull[^1];
+                    float cross = (a.S - o.S) * (p.Y - o.Y) - (a.Y - o.Y) * (p.S - o.S);
+                    if (cross >= 0f) hull.RemoveAt(hull.Count - 1); else break;
+                }
+                hull.Add(p);
+            }
+            float length = 0f;
+            int blocker = -1;
+            for (int k = 0; k + 1 < hull.Count; k++)
+            {
+                Vector3 a = At(hull[k].S, hull[k].Y), b = At(hull[k + 1].S, hull[k + 1].Y);
+                int hit = FirstHit(a, b, hull[k].Box, hull[k + 1].Box, ignoreA, ignoreB);
+                if (hit >= 0) { blocker = hit; break; }
+                length += Vector3.Distance(a, b);
+            }
+            if (blocker < 0)
+            {
+                if (hull.Count > 2) lastEdge = At(hull[^2].S, hull[^2].Y);
+                if (explain != null)
+                    foreach (var h in hull)
+                        if (h.Box >= 0)
+                            explain.Append($"          over box {h.Box} {_solids[h.Box].Material} ({_solids[h.Box].Center.X:F1}, {_solids[h.Box].Center.Y:F2}, {_solids[h.Box].Center.Z:F1}) size ({_solids[h.Box].Size.X:F2}, {_solids[h.Box].Size.Y:F2}, {_solids[h.Box].Size.Z:F2}) at {h.S:F1} m, {h.Y:F2} m up\n");
+                return MathF.Max(0f, length - Vector3.Distance(source, listener));
+            }
+            explain?.Append($"          over the top, pass {pass}: cut by box {blocker} {_solids[blocker].Material} ({_solids[blocker].Center.X:F1}, {_solids[blocker].Center.Y:F2}, {_solids[blocker].Center.Z:F1}) size ({_solids[blocker].Size.X:F2}, {_solids[blocker].Size.Y:F2}, {_solids[blocker].Size.Z:F2})\n");
+            // Something the string was already over, still in its way: an end is under it.
+            if (!included.Add(blocker)) return -1f;
+            bool known = false;
+            foreach (var c in crossings) if (c.Box == blocker) { known = true; break; }
+            if (!known)
+            {
+                if (!Crossing(blocker, source, listener, run, out float s0, out float s1, out float bottom, out float top)) return -1f;
+                if (OverAnEnd(s0, s1, bottom)) return -1f;
+                crossings.Add((blocker, s0, s1, bottom, top));
+            }
+        }
+        return -1f;
+    }
+
+    /// <summary>How near an end, along the ground, a box's crossing must reach to stand over it, metres.</summary>
+    private const float EndColumnMetres = 0.01f;
+
+    /// <summary>Width of the bins the profile is swept through, metres.</summary>
+    private const float ProfileBinMetres = 1f;
+
+    /// <summary>Times the string over the top is pulled again over something hung above the line that it
+    /// was found to cut.</summary>
+    private const int OverTheTopPasses = 4;
+
+    private static float Lerp(float a, float b, float t) => a + (b - a) * t;
+
+    /// <summary>Where the vertical plane through the two points crosses box i, as distances along the
+    /// ground from the source, and the box's top there. False if it does not.</summary>
+    private bool Crossing(int i, Vector3 source, Vector3 listener, float run, out float s0, out float s1, out float bottom, out float top)
+    {
+        var f = _frames[i];
+        s0 = 0f; s1 = run; top = 0f; bottom = 0f;
+        // Grown by the joint, as every leg test is: a string that passes within it of a box is in it.
+        var half = f.Half + new Vector3(RouteJointMetres);
+        var rot = Quaternion.Inverse(f.Inverse);
+        Vector3 up = Vector3.Transform(Vector3.UnitY, rot);
+        if (MathF.Abs(up.Y) > 0.999f)
+        {
+            // Turned about the vertical only: its footprint is its own X and Z.
+            Vector3 la = Vector3.Transform(new Vector3(source.X, f.Centre.Y, source.Z) - f.Centre, f.Inverse);
+            Vector3 lb = Vector3.Transform(new Vector3(listener.X, f.Centre.Y, listener.Z) - f.Centre, f.Inverse);
+            float t0 = 0f, t1 = 1f;
+            if (!Slab(la.X, lb.X - la.X, half.X, ref t0, ref t1) || !Slab(la.Z, lb.Z - la.Z, half.Z, ref t0, ref t1)) return false;
+            s0 = t0 * run; s1 = t1 * run;
+            top = f.Centre.Y + f.Half.Y;
+            bottom = f.Centre.Y - f.Half.Y;
+            return true;
+        }
+        // Tilted: its world bounds, which is more than it covers and so never lets the string through it.
+        Vector3 min = new(float.MaxValue), max = new(float.MinValue);
+        for (int c = 0; c < 8; c++)
+        {
+            var corner = f.Centre + Vector3.Transform(new Vector3((c & 1) == 0 ? -f.Half.X : f.Half.X,
+                                                                  (c & 2) == 0 ? -f.Half.Y : f.Half.Y,
+                                                                  (c & 4) == 0 ? -f.Half.Z : f.Half.Z), rot);
+            min = Vector3.Min(min, corner); max = Vector3.Max(max, corner);
+        }
+        float u0 = 0f, u1 = 1f;
+        if (!Slab(source.X - (min.X + max.X) * 0.5f, listener.X - source.X, (max.X - min.X) * 0.5f + RouteJointMetres, ref u0, ref u1)
+            || !Slab(source.Z - (min.Z + max.Z) * 0.5f, listener.Z - source.Z, (max.Z - min.Z) * 0.5f + RouteJointMetres, ref u0, ref u1)) return false;
+        s0 = u0 * run; s1 = u1 * run;
+        top = max.Y;
+        bottom = min.Y;
+        return true;
+    }
+
+    private static bool Slab(float o, float d, float h, ref float t0, ref float t1)
+    {
+        if (MathF.Abs(d) < 1e-9f) return o >= -h && o <= h;
+        float ta = (-h - o) / d, tb = (h - o) / d;
+        if (ta > tb) (ta, tb) = (tb, ta);
+        t0 = MathF.Max(t0, ta); t1 = MathF.Min(t1, tb);
+        return t0 <= t1;
+    }
+
+    /// <summary>For the lab: the barrier search spelled out — every box on the line with its shortest way
+    /// round, and for the routes tried, which other box (if any) each one ran into.</summary>
+    public string ExplainBarrier(Vector3 source, Vector3 listener)
+    {
+        var sb = new System.Text.StringBuilder();
+        var cand = new List<int>();
+        _grid.Along(source, listener, cand);
+        var routes = new List<(float D, Vector3 S, Vector3 E, int Box)>();
+        var boxRoutes = new List<(float D, Vector3 SourceSide, Vector3 Edge)>();
+        float worst = -1f;
+        foreach (int i in cand)
+        {
+            ref readonly var b = ref _solids[i];
+            boxRoutes.Clear();
+            if (!Diffraction.PathDifferenceAroundBox(b.Center, b.Size, b.Rotation, source, listener, out float dd, out _, boxRoutes)) continue;
+            sb.Append($"        box {i} {b.Material} centre ({b.Center.X:F1}, {b.Center.Y:F2}, {b.Center.Z:F1}) size ({b.Size.X:F2}, {b.Size.Y:F2}, {b.Size.Z:F2}): round it {dd:F3} m\n");
+            foreach (var (rd, rs, re) in boxRoutes) routes.Add((rd, rs, re, i));
+            worst = MathF.Max(worst, dd);
+        }
+        routes.RemoveAll(r => r.D < worst - 1e-3f);
+        routes.Sort((x, y) => x.D.CompareTo(y.D));
+        foreach (var (dd, ps, p, i) in routes.Take(MaxRoutesTried))
+        {
+            string Hit(Vector3 a, Vector3 b2)
+            {
+                var c = new List<int>();
+                _grid.Along(a, b2, c);
+                foreach (int j in c)
+                    if (j != i && SegmentHits(j, a, b2, RouteJointMetres))
+                        return $"box {j} {_solids[j].Material} ({_solids[j].Center.X:F1}, {_solids[j].Center.Y:F2}, {_solids[j].Center.Z:F1}) size ({_solids[j].Size.X:F2}, {_solids[j].Size.Y:F2}, {_solids[j].Size.Z:F2})";
+                return "clear";
+            }
+            Scratch.Get(this).ChainBudget = ChainBendsPerSearch;
+            float extra = ClearedRoute(source, ps, p, listener, i, MaxChainedBoxes, null, null, float.MaxValue, out _);
+            sb.Append($"        route round {i}, {dd:F3} m via ({p.X:F2}, {p.Y:F2}, {p.Z:F2}): to ear {Hit(p, listener)}; from source {Hit(source, ps)}"
+                    + (ps != p ? $"; across {Hit(ps, p)}" : "") + $"; bent round the rest: {(extra < 0f ? "no way" : $"+{extra:F3} m")}\n");
+        }
+        float over = OverTheTop(source, listener, null, null, out var oe, sb);
+        sb.Append($"        over the top: {(over < 0f ? "no way" : $"{over:F3} m, last top ({oe.X:F1}, {oe.Y:F2}, {oe.Z:F1})")}\n");
+        return sb.ToString();
     }
 
     /// <summary>A route clear of the whole scene costs a pass over the boxes near it; past the few
@@ -1075,28 +1345,118 @@ public sealed class OpeningRoutes
     /// </summary>
     private const float RouteJointMetres = 0.05f;
 
-    /// <summary>Are the legs of a route round one box — source to its first crossing, along the box, and
-    /// from its last crossing to the ear — clear of every OTHER box?</summary>
-    private bool RouteIsClear(Vector3 source, Vector3 sourceSide, Vector3 edge, Vector3 listener, int skip,
-                              int[]? ignoreA, int[]? ignoreB)
+    /// <summary>
+    /// How many more boxes a route round one box may bend round on its way, when one of its legs runs into
+    /// them. "Pops" heard from the Main Street pavement (2026-10-03): a park's 1.1 m wall with a 0.5 m pier
+    /// every few metres along its top, a car 160 m beyond it. Over the wall is a few millimetres of
+    /// detour; whether that route was believed depended on whether its leg to the ear crossed the wall
+    /// line at a pier or between two, so as the car drove the answer flipped between -7 dB (over the
+    /// wall) and -80 (through the wall and everything after it) for a third of a second at a time. A
+    /// pier on a wall the sound is already bending over costs it a few millimetres more, not the route.
+    /// A box the leg is still blocked by after this many is a building, and its answer is what comes
+    /// through it.
+    /// </summary>
+    internal const int MaxChainedBoxes = 2;
+
+    /// <summary>Boxes one barrier search may bend its routes round in all, whichever routes they are on: a
+    /// bound on cost, spent first on the shortest routes.</summary>
+    private const int ChainBendsPerSearch = 6;
+
+    /// <summary>Ways round each box in the way that are tried, shortest first.</summary>
+    private const int ChainRoutesPerBox = 2;
+
+    /// <summary>
+    /// The extra length a route round box <paramref name="skip"/> needs to be clear of everything else —
+    /// its three legs, source to its first crossing, across the box, and from its last crossing to the
+    /// ear, each bent round whatever OTHER box it runs into — or -1 if no such route exists within
+    /// <paramref name="chain"/> more boxes. 0 is a route clear as it stands. <paramref name="lastEdge"/>
+    /// is where its last leg leaves for the ear.
+    /// </summary>
+    private float ClearedRoute(Vector3 source, Vector3 sourceSide, Vector3 edge, Vector3 listener, int skip,
+                               int chain, int[]? ignoreA, int[]? ignoreB, float limit, out Vector3 lastEdge)
+    {
+        lastEdge = edge;
+        float toEar = ClearedLeg(edge, listener, skip, -1, chain, ignoreA, ignoreB, limit, out var bend);
+        if (toEar < 0f) return -1f;
+        if (bend is { } b) lastEdge = b;
+        float fromSource = ClearedLeg(source, sourceSide, -1, skip, chain, ignoreA, ignoreB, limit - toEar, out _);
+        if (fromSource < 0f) return -1f;
+        float across = 0f;
+        if (sourceSide != edge)
+        {
+            across = ClearedLeg(sourceSide, edge, skip, skip, chain, ignoreA, ignoreB, limit - toEar - fromSource, out _);
+            if (across < 0f) return -1f;
+        }
+        return toEar + fromSource + across;
+    }
+
+    /// <summary>
+    /// The extra length the straight leg from <paramref name="a"/> to <paramref name="b"/> needs to get
+    /// past every box in its way — 0 when nothing is, -1 when it cannot within <paramref name="chain"/>
+    /// boxes or <paramref name="limit"/> metres. <paramref name="ownerA"/> and <paramref name="ownerB"/>
+    /// are the boxes the ends sit on the edge of, which the leg is allowed to touch. Each box in the way is
+    /// gone round by its own shortest ways (Diffraction.PathDifferenceAroundBox), grown by the joint, so a
+    /// route cannot slip through the crack between two boxes that meet.
+    /// </summary>
+    private float ClearedLeg(Vector3 a, Vector3 b, int ownerA, int ownerB, int chain,
+                             int[]? ignoreA, int[]? ignoreB, float limit, out Vector3? lastBend)
+    {
+        lastBend = null;
+        int hit = FirstHit(a, b, ownerA, ownerB, ignoreA, ignoreB);
+        if (hit < 0) return 0f;
+        var scratch = Scratch.Get(this);
+        if (chain <= 0 || scratch.ChainBudget <= 0 || limit <= 0f) return -1f;
+        // Round a door leaf is through its doorway, which is the openings' business (Route), with what
+        // the leaf passes. Bent round here it was a crack beside a shut glass door at -12 dB.
+        if (_solids[hit].IsLeaf) return -1f;
+        scratch.ChainBudget--;
+        ref readonly var box = ref _solids[hit];
+        // One list per depth: the loop below recurses while it walks this one.
+        var ways = scratch.Ways[chain];
+        ways.Clear();
+        if (!Diffraction.PathDifferenceAroundBox(box.Center, box.Size + new Vector3(2f * RouteJointMetres), box.Rotation,
+                                                 a, b, out _, out _, ways)) return -1f;
+        ways.Sort((x, y) => x.D.CompareTo(y.D));
+        float best = -1f;
+        int tried = 0;
+        foreach (var (d, ps, pe) in ways)
+        {
+            if (best >= 0f && d >= best) break;
+            if (d >= limit) break;
+            if (++tried > ChainRoutesPerBox) break;
+            float cap = (best >= 0f ? MathF.Min(best, limit) : limit) - d;
+            float x1 = ClearedLeg(a, ps, ownerA, hit, chain - 1, ignoreA, ignoreB, cap, out _);
+            if (x1 < 0f) continue;
+            float x2 = ps != pe ? ClearedLeg(ps, pe, hit, hit, chain - 1, ignoreA, ignoreB, cap - x1, out _) : 0f;
+            if (x2 < 0f) continue;
+            float x3 = ClearedLeg(pe, b, hit, ownerB, chain - 1, ignoreA, ignoreB, cap - x1 - x2, out var bend);
+            if (x3 < 0f) continue;
+            float total = d + x1 + x2 + x3;
+            if (best >= 0f && total >= best) continue;
+            best = total;
+            lastBend = bend ?? pe;
+        }
+        return best;
+    }
+
+    /// <summary>The first box, other than the two the ends belong to, that the segment runs into (grown by
+    /// the joint), or -1.</summary>
+    private int FirstHit(Vector3 a, Vector3 b, int ownerA, int ownerB, int[]? ignoreA, int[]? ignoreB)
     {
         var cand = Scratch.Get(this).Clear;
-        bool Blocked(Vector3 a, Vector3 b)
+        _grid.Along(a, b, cand);
+        int first = -1;
+        float nearest = float.MaxValue;
+        foreach (int i in cand)
         {
-            _grid.Along(a, b, cand);
-            foreach (int i in cand)
-            {
-                if (i == skip) continue;
-                if (ignoreA != null && Array.IndexOf(ignoreA, i) >= 0) continue;
-                if (ignoreB != null && Array.IndexOf(ignoreB, i) >= 0) continue;
-                if (SegmentHits(i, a, b, RouteJointMetres)) return true;
-            }
-            return false;
+            if (i == ownerA || i == ownerB) continue;
+            if (ignoreA != null && Array.IndexOf(ignoreA, i) >= 0) continue;
+            if (ignoreB != null && Array.IndexOf(ignoreB, i) >= 0) continue;
+            if (!SegmentHits(i, a, b, RouteJointMetres)) continue;
+            float at = Vector3.DistanceSquared(a, _solids[i].Center);
+            if (at < nearest) { nearest = at; first = i; }
         }
-        if (Blocked(edge, listener)) return false;
-        if (Blocked(source, sourceSide)) return false;
-        if (sourceSide != edge && Blocked(sourceSide, edge)) return false;
-        return true;
+        return first;
     }
 
     // ═══ Scratch, one per thread ═════════════════════════════════════════════════════════════════
@@ -1144,6 +1504,14 @@ public sealed class OpeningRoutes
         public readonly List<Vector3> Legs = new();
         public readonly List<(float D, Vector3 SourceSide, Vector3 Edge, int Box)> BarrierRoutes = new();
         public readonly List<(float D, Vector3 SourceSide, Vector3 Edge)> BoxRoutes = new();
+        /// <summary>Boxes the current barrier search may still bend a route round (ClearedLeg).</summary>
+        public int ChainBudget;
+        public readonly List<(float S, float Y, int Box)> Profile = new(), Hull = new();
+        public readonly List<(int Box, float S0, float S1, float Bottom, float Top)> Crossings = new();
+        public readonly HashSet<int> Included = new();
+        public float[] ProfileBins = new float[256];
+        public readonly List<(float D, Vector3 SourceSide, Vector3 Edge)>[] Ways =
+            System.Linq.Enumerable.ToArray(System.Linq.Enumerable.Select(System.Linq.Enumerable.Range(0, MaxChainedBoxes + 1), _ => new List<(float D, Vector3 SourceSide, Vector3 Edge)>()));
 
         public static Scratch Get(OpeningRoutes owner)
         {
@@ -1259,8 +1627,33 @@ public sealed class OpeningRoutes
             }
             int mark = ++_threadMark;
             if (mark == int.MaxValue) { Array.Clear(_threadStamp); _threadMark = mark = 1; }
-            var stamp = _threadStamp;
+            Walk(a, b, _threadStamp, mark, into);
+        }
 
+        /// <summary>Every box in the cells over the ground between the two points, from the height
+        /// <paramref name="fromY"/> up to the top of the grid, each once: what the vertical plane through
+        /// them can cut.</summary>
+        public void Column(Vector3 a, Vector3 b, float fromY, List<int> into)
+        {
+            into.Clear();
+            if (_count == 0) return;
+            if (!ReferenceEquals(_threadStampFor, this) || _threadStamp == null || _threadStamp.Length < _count)
+            {
+                _threadStamp = new int[_count];
+                _threadMark = 0;
+                _threadStampFor = this;
+            }
+            int mark = ++_threadMark;
+            if (mark == int.MaxValue) { Array.Clear(_threadStamp); _threadMark = mark = 1; }
+            for (int cy = Idx(fromY, _origin.Y, _ny); cy < _ny; cy++)
+            {
+                float y = _origin.Y + (cy + 0.5f) * Cell;
+                Walk(new Vector3(a.X, y, a.Z), new Vector3(b.X, y, b.Z), _threadStamp, mark, into);
+            }
+        }
+
+        private void Walk(Vector3 a, Vector3 b, int[] stamp, int mark, List<int> into)
+        {
             // Clip the segment to the grid's box, so the walk starts and ends inside it.
             Vector3 lo = _origin, hi = _origin + new Vector3(_nx, _ny, _nz) * Cell;
             Vector3 d = b - a;
