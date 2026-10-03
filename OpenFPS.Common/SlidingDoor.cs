@@ -112,6 +112,75 @@ public static class SlidingDoor
         return sim.Output();
     }
 
+    // ── The game ─────────────────────────────────────────────────────────────────────────────────
+
+    public const string KeyPrefix = "slidingdoor:";
+
+    /// <summary>
+    /// How long an automatic leaf of this width takes to run open or shut under its controller, seconds:
+    /// the server moves the door in this time, so the leaf and its sound arrive together. (The prefab's
+    /// 1.5 and 2.5 s were a guess; a real one opens at 0.7 m/s and shuts at the 0.3 m/s the standard allows.)
+    /// </summary>
+    public static float AutomaticSeconds(float width, bool opening)
+    {
+        double dt = 1e-3, travel = width;
+        double x = opening ? 0 : travel - 0.002, to = opening ? travel - 0.002 : -0.001, u = 0, a = 0, t = 0;
+        double dir = Math.Sign(to - x), vRun = opening ? AutoOpenSpeed : AutoCloseSpeed;
+        while (t < 30 && !Sim.Controller(opening, to, dir, vRun, dt, ref x, ref u, ref a)) t += dt;
+        return (float)t;
+    }
+
+    /// <summary>Declared levels, dB at a metre: the model's own LAFmax, by kind and character (new,
+    /// standard, worn, old). No calibration: the automatic door runs at 35-55 dBA, where the research puts
+    /// real ones (40-55), and a patio door pushed home at a walking pace is a slam of 78 dBA.</summary>
+    public static float OpenLevelDb(Kind kind, int variant) => (kind, ((variant % Variants) + Variants) % Variants) switch
+    {
+        (Kind.Patio, 0) => 62.7f, (Kind.Patio, 1) => 62.7f, (Kind.Patio, 2) => 68.6f, (Kind.Patio, _) => 74.6f,
+        (Kind.Automatic, 0) => 53.2f, (Kind.Automatic, 1) => 52.9f, (Kind.Automatic, 2) => 61.4f, _ => 70.1f,
+    };
+    public static float CloseLevelDb(Kind kind, int variant) => (kind, ((variant % Variants) + Variants) % Variants) switch
+    {
+        (Kind.Patio, 0) => 77.5f, (Kind.Patio, 1) => 78.2f, (Kind.Patio, 2) => 78.9f, (Kind.Patio, _) => 89.2f,
+        (Kind.Automatic, 0) => 35.1f, (Kind.Automatic, 1) => 37.5f, (Kind.Automatic, 2) => 49.4f, _ => 55.9f,
+    };
+
+    public static string Key(Kind kind, bool closing, int variant, float travelSeconds, float width, float height)
+        => FormattableString.Invariant(
+            $"{KeyPrefix}{(kind == Kind.Patio ? "patio" : "auto")}:{(closing ? "close" : "open")}:{((variant % Variants) + Variants) % Variants}:{(int)MathF.Round(travelSeconds * 100f)}:{(int)MathF.Round(width * 100f)}:{(int)MathF.Round(height * 100f)}");
+
+    public static bool TryParseKey(string? key, out bool closing, out Door door, out float travelSeconds)
+    {
+        closing = false; door = new Door(); travelSeconds = 1.4f;
+        if (key == null || !key.StartsWith(KeyPrefix, StringComparison.Ordinal)) return false;
+        var p = key.Substring(KeyPrefix.Length).Split(':');
+        if (p.Length != 6 || (p[0] != "patio" && p[0] != "auto") || (p[1] != "open" && p[1] != "close")) return false;
+        if (!int.TryParse(p[2], out int v) || !int.TryParse(p[3], out int s) || !int.TryParse(p[4], out int w)
+            || !int.TryParse(p[5], out int h)) return false;
+        closing = p[1] == "close";
+        travelSeconds = Math.Clamp(s / 100f, 0.3f, 10f);
+        door = new Door
+        {
+            Kind = p[0] == "patio" ? Kind.Patio : Kind.Automatic, Variant = v, Seed = 1 + v,
+            Width = Math.Clamp(w / 100f, 0.5f, 2f), Height = Math.Clamp(h / 100f, 1.5f, 3f),
+        };
+        return true;
+    }
+
+    /// <summary>The sound a key names, peak one.</summary>
+    public static float[] RenderKey(string key, int sampleRate)
+    {
+        if (!TryParseKey(key, out bool closing, out var door, out float travel)) return new float[16];
+        float[] pcm = closing ? RenderClose(door, sampleRate, travel) : RenderOpen(door, sampleRate, travel);
+        float peak = 1e-9f;
+        foreach (float v in pcm) peak = MathF.Max(peak, MathF.Abs(v));
+        for (int i = 0; i < pcm.Length; i++) pcm[i] /= peak;
+        return pcm;
+    }
+
+    /// <summary>How long a key's sound lasts, seconds: its travel and what follows it.</summary>
+    public static float Seconds(Kind kind, bool closing, float travelSeconds)
+        => kind == Kind.Patio ? travelSeconds + (closing ? 1.45f : 1.15f) : travelSeconds + (closing ? 1.0f : 0.8f);
+
     // ── Constants, each a property of a part ─────────────────────────────────────────────────────
 
     private const double G = 9.81;
@@ -587,20 +656,7 @@ public static class SlidingDoor
                 smallForce = (energised ? PlungerPull : 0) - PlungerSpring;
                 if (t >= tGo && done < 0)
                 {
-                    double left = (to - motorX) * dir;
-                    double check = opening ? OpenCheckSpeed : CloseCheckSpeed;
-                    double want = left > CheckZone ? vRun : check;
-                    // Brake in time to reach the check speed at the zone, and come to rest at the end.
-                    if (Math.Abs(motorU) > check && left - CheckZone < (motorU * motorU - check * check) / (2 * AutoAccel))
-                        want = check;
-                    want = Math.Min(want, Math.Sqrt(2 * AutoAccel * Math.Max(0, left)));
-                    // An S-curve: the acceleration itself ramps (a step in it surged the leaf against the belt and
-                    // knocked the clamp mid-travel).
-                    double aWant = Math.Clamp(6 * (want * dir - motorU), -AutoAccel, AutoAccel);
-                    motorA += Math.Clamp(aWant - motorA, -AutoJerk * dt, AutoJerk * dt);
-                    motorU += motorA * dt;
-                    motorX += motorU * dt;
-                    if (left < 1e-5 && Math.Abs(motorU) < 1e-3)
+                    if (Controller(opening, to, dir, vRun, dt, ref motorX, ref motorU, ref motorA))
                     {
                         motorU = 0; motorA = 0; done = t; end = t + (opening ? 0.6 : 0.9);
                         Log($"{t * 1000:F0} ms  {(opening ? "open" : "shut")}");
@@ -608,6 +664,28 @@ public static class SlidingDoor
                 }
                 Step();
             }
+        }
+
+        /// <summary>
+        /// One step of the controller: a run at its speed with a check zone into the end, its acceleration
+        /// ramped (an S-curve: a step in it surged the leaf against the belt and knocked the clamp
+        /// mid-travel). True once it has come to rest at the end.
+        /// </summary>
+        internal static bool Controller(bool opening, double to, double dir, double vRun, double dt,
+                                        ref double motorX, ref double motorU, ref double motorA)
+        {
+            double left = (to - motorX) * dir;
+            double check = opening ? OpenCheckSpeed : CloseCheckSpeed;
+            double want = left > CheckZone ? vRun : check;
+            // Brake in time to reach the check speed at the zone, and come to rest at the end.
+            if (Math.Abs(motorU) > check && left - CheckZone < (motorU * motorU - check * check) / (2 * AutoAccel))
+                want = check;
+            want = Math.Min(want, Math.Sqrt(2 * AutoAccel * Math.Max(0, left)));
+            double aWant = Math.Clamp(6 * (want * dir - motorU), -AutoAccel, AutoAccel);
+            motorA += Math.Clamp(aWant - motorA, -AutoJerk * dt, AutoJerk * dt);
+            motorU += motorA * dt;
+            motorX += motorU * dt;
+            return left < 1e-5 && Math.Abs(motorU) < 1e-3;
         }
 
         /// <summary>The leaf at rest where the script put it: each wheel carries a quarter of it on its contact

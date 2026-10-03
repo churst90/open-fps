@@ -150,17 +150,18 @@ public sealed class WorldAudioPlayer
     {
         _audio = audio;
         _acoustics = acoustics;
-        PrewarmKnobDoors();
+        PrewarmDoors();
     }
 
     /// <summary>
-    /// A knob door is a simulation that takes a few seconds of a core to render, far longer than a
-    /// first hearing waits (<see cref="MaxRenderLateness"/>), so the first door anyone opened would be
-    /// silent. Each character's opening and normal close is rendered at start, in the background, four at
-    /// a time and openings first, for the prefab's width and the two the city scales it to (1.1 and
-    /// 1.4 m). A gentle or hard close, or a door of another size, renders when first heard.
+    /// A door model is a simulation that takes seconds of a core to render, far longer than a first
+    /// hearing waits (<see cref="MaxRenderLateness"/>), so the first door anyone opened would be silent.
+    /// Each knob door character's opening and normal close is rendered at start, in the background, four
+    /// at a time and openings first, for the prefab's width and the two the city scales it to (1.1 and
+    /// 1.4 m); then the push bar's, and the patio and automatic doors' at the city's sizes. A gentle or
+    /// hard close, or a door of another size, renders when first heard.
     /// </summary>
-    private void PrewarmKnobDoors()
+    private void PrewarmDoors()
     {
         var keys = new List<string>();
         foreach (bool closing in new[] { false, true })
@@ -171,6 +172,14 @@ public sealed class WorldAudioPlayer
         foreach (bool closing in new[] { false, true })
             for (int v = 0; v < PushBarDoor.Variants; v++)
                 keys.Add(PushBarDoor.Key(closing, v, 1.4f, 1.0f, 2.1f));
+        // The sliding doors at the sizes the city builds them: a patio leaf 1.0 m wide slid in 1.4 s, an
+        // automatic leaf 1.15 m wide at its controller's own times.
+        foreach (bool closing in new[] { false, true })
+            for (int v = 0; v < SlidingDoor.Variants; v++)
+            {
+                keys.Add(SlidingDoor.Key(SlidingDoor.Kind.Patio, closing, v, 1.4f, 1.0f, 2.1f));
+                keys.Add(SlidingDoor.Key(SlidingDoor.Kind.Automatic, closing, v, SlidingDoor.AutomaticSeconds(1.15f, !closing), 1.15f, 2.1f));
+            }
         var gate = new System.Threading.SemaphoreSlim(4);
         foreach (string key in keys)
         {
@@ -179,11 +188,19 @@ public sealed class WorldAudioPlayer
             System.Threading.Tasks.Task.Run(async () =>
             {
                 await gate.WaitAsync();
-                try { _rendered.Enqueue((id, KnobDoor.RenderKey(key, TransientSynth.SampleRate))); }
+                try { _rendered.Enqueue((id, RenderDoorKey(key))); }
                 finally { gate.Release(); }
             });
         }
     }
+
+    /// <summary>A door model's sound by its key's prefix. (Every key went through the knob door's renderer,
+    /// which does not know a push bar's key and gave back sixteen samples of silence: the prewarmed push-bar
+    /// doors were silent.)</summary>
+    private static float[] RenderDoorKey(string key)
+        => key.StartsWith(PushBarDoor.KeyPrefix, StringComparison.Ordinal) ? PushBarDoor.RenderKey(key, TransientSynth.SampleRate)
+         : key.StartsWith(SlidingDoor.KeyPrefix, StringComparison.Ordinal) ? SlidingDoor.RenderKey(key, TransientSynth.SampleRate)
+         : KnobDoor.RenderKey(key, TransientSynth.SampleRate);
 
     /// <summary>How many are waiting to be heard. Diagnostics.</summary>
     public int Pending_Count => _pending.Count;
@@ -982,6 +999,8 @@ public sealed class WorldAudioPlayer
             return KnobDoor.RenderKey(sound.SynthKey, TransientSynth.SampleRate);
         if (sound.SynthKey != null && sound.SynthKey.StartsWith(PushBarDoor.KeyPrefix, StringComparison.Ordinal))
             return PushBarDoor.RenderKey(sound.SynthKey, TransientSynth.SampleRate);
+        if (sound.SynthKey != null && sound.SynthKey.StartsWith(SlidingDoor.KeyPrefix, StringComparison.Ordinal))
+            return SlidingDoor.RenderKey(sound.SynthKey, TransientSynth.SampleRate);
 
         return TransientSynth.Render(sound, seed);
     }
@@ -1109,7 +1128,8 @@ public sealed class WorldAudioPlayer
         if (Speech.TryParseKey(sound.SynthKey, out _)) return $"synth:{sound.SynthKey}";
         // A knob door's key already names its door; four seeds of it would be four identical renders.
         if (sound.SynthKey != null && (sound.SynthKey.StartsWith(KnobDoor.KeyPrefix, StringComparison.Ordinal)
-                                       || sound.SynthKey.StartsWith(PushBarDoor.KeyPrefix, StringComparison.Ordinal)))
+                                       || sound.SynthKey.StartsWith(PushBarDoor.KeyPrefix, StringComparison.Ordinal)
+                                       || sound.SynthKey.StartsWith(SlidingDoor.KeyPrefix, StringComparison.Ordinal)))
             return $"synth:{sound.SynthKey}";
         if (!string.IsNullOrEmpty(sound.SynthKey)) return $"synth:{sound.SynthKey}:{seed & 3}";
         return $"synth:{sound.Character}:{hz}:{level}:{decay}:{noise}:{seed & 3}";

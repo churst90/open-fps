@@ -14,7 +14,7 @@ exist, or with no sound. The next session synthesises each one from measured rec
 | `pushbar` | `steel_door` | swings 90°, 1.4 s | hand | closer: 3 s after the doorway is clear, sweep 4.5 s, latch at 1.4 s |
 | `glass-pushbar` | `glass_front_door` | swings 90°, 1.1 s | hand: key outside, bar inside | closer: 3 s, sweep 4.5 s, latch at 1.1 s |
 | `glass-pull` | `glass_pull_door` | swings 90°, 1.0 s | hand | closer: 3 s, sweep 4.0 s, latch at 1.0 s |
-| `auto-slide` | `auto_sliding_door` | slides its width, 1.5 s | anyone within 2.5 m in front, either side | shuts 2 s after clear, over 2.5 s; reverses for anyone in the doorway |
+| `auto-slide` | `auto_sliding_door` | slides its width at its controller's speeds (0.7 m/s open, 0.3 m/s shut, a creep into each end: about 3.3 s and 5.4 s for the city's 1.15 m leaves; `SlidingDoor.AutomaticSeconds`) | anyone within 2.5 m in front, either side | shuts 2 s after clear; reverses for anyone in the doorway |
 | `patio-slide` | `patio_door` | slides its width, 1.4 s | hand | nothing |
 | `elevator` | `elevator_door` | slides its width, 1.8 s | the lift (`DoorSystem.Set`), never by hand | shuts 4 s after clear, over 2.5 s; reverses for anyone in the doorway |
 
@@ -62,15 +62,15 @@ still fired (the server drops it before sending, as it does any empty sound).
 | `door:glass-pull:swing` | it starts moving by hand | none |
 | `door:glass-pull:closer` | the closer starts to shut it | none |
 | `door:glass-pull:latch` | it arrives shut | the existing closing sounds |
-| `door:auto-slide:motor-start` | the motor starts, opening or closing | none |
+| `door:auto-slide:motor-start` | the motor starts, opening or closing | the whole run, `SlidingDoor` (`slidingdoor:auto:...`) |
 | `door:auto-slide:rollers` | the leaf starts travelling (lasts the travel) | none |
 | `door:auto-slide:stop` | it arrives fully open | none |
 | `door:auto-slide:reopen` | it reverses for someone while closing | none |
-| `door:auto-slide:shut` | it arrives shut | the existing closing sounds |
-| `door:patio-slide:latch-retract` | a shut door starts to open (the thumb latch) | the existing opening sounds |
-| `door:patio-slide:rollers` | the leaf starts travelling, either way | none |
+| `door:auto-slide:shut` | it arrives shut | none (in the run) |
+| `door:patio-slide:latch-retract` | a shut door starts to open (the thumb latch) | the whole opening, `SlidingDoor` (`slidingdoor:patio:open:...`) |
+| `door:patio-slide:rollers` | the leaf starts travelling, either way | shutting: the whole shut, roll to latch, `SlidingDoor` |
 | `door:patio-slide:stop` | it arrives fully open | none |
-| `door:patio-slide:latch` | it arrives shut | the existing closing sounds |
+| `door:patio-slide:latch` | it arrives shut | none (in the run) |
 | `door:elevator:motor-start` | the motor starts, opening or closing | none |
 | `door:elevator:rollers` | the leaves start travelling | none |
 | `door:elevator:stop` | it arrives fully open | none |

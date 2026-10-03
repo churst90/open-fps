@@ -82,6 +82,36 @@ public class KnobDoorTests
         Assert.InRange(PushBarDoor.OpenLevelDb(1), 73, 80);
     }
 
+    [Fact]
+    public void ASlidingDoorKeyNamesItsDoorAndItsLevelsAreItsOwn()
+    {
+        string key = SlidingDoor.Key(SlidingDoor.Kind.Automatic, closing: true, variant: 5, travelSeconds: 4.9f, width: 1.15f, height: 2.1f);
+        Assert.True(SlidingDoor.TryParseKey(key, out bool closing, out var door, out float travel));
+        Assert.True(closing);
+        Assert.Equal(SlidingDoor.Kind.Automatic, door.Kind);
+        Assert.Equal(1, door.Variant);
+        Assert.Equal(4.9f, travel, 2);
+        Assert.Equal(1.15f, door.Width, 2);
+        Assert.False(SlidingDoor.TryParseKey("slidingdoor:garage:open:1:140:90:210", out _, out _, out _));
+        // The declared levels are what the model renders, at the lab's door sizes.
+        double patio = LafMax(SlidingDoor.RenderClose(new SlidingDoor.Door { Kind = SlidingDoor.Kind.Patio, Variant = 1, Seed = 2 }, 48000, 1.4),
+                              SlidingDoor.PascalsAtFullScale);
+        Assert.InRange(patio, SlidingDoor.CloseLevelDb(SlidingDoor.Kind.Patio, 1) - 2.5, SlidingDoor.CloseLevelDb(SlidingDoor.Kind.Patio, 1) + 2.5);
+        double auto = LafMax(SlidingDoor.RenderOpen(new SlidingDoor.Door { Kind = SlidingDoor.Kind.Automatic, Variant = 1, Seed = 2, Width = 1.0f, Height = 2.1f }, 48000),
+                             SlidingDoor.PascalsAtFullScale);
+        Assert.InRange(auto, SlidingDoor.OpenLevelDb(SlidingDoor.Kind.Automatic, 1) - 2.5, SlidingDoor.OpenLevelDb(SlidingDoor.Kind.Automatic, 1) + 2.5);
+    }
+
+    [Fact]
+    public void AnAutomaticDoorRunsAtItsControllersSpeeds()
+    {
+        // 0.7 m/s open and 0.3 m/s shut with a check zone into each end: a metre-wide leaf takes about 3 s
+        // to open and 5 s to shut, and a wider one longer.
+        Assert.InRange(SlidingDoor.AutomaticSeconds(1.0f, opening: true), 2.2, 3.6);
+        Assert.InRange(SlidingDoor.AutomaticSeconds(1.0f, opening: false), 4.0, 5.6);
+        Assert.True(SlidingDoor.AutomaticSeconds(1.15f, opening: false) > SlidingDoor.AutomaticSeconds(1.0f, opening: false));
+    }
+
     /// <summary>LAFmax, dB re 20 uPa, of samples in units of <see cref="KnobDoor.PascalsAtFullScale"/>.</summary>
     private static double LafMax(float[] x, double fullScale = KnobDoor.PascalsAtFullScale)
     {

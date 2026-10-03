@@ -4,6 +4,19 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-03
 
+- Patio and automatic sliding doors are physical models in the game (`OpenFPS.Common/SlidingDoor.cs`,
+  lab `--sliding-door`), round 2, the one Cody chose ("much better"; round 3 was too gritty and thin).
+  - Patio: four 1-1/4 in nylon wheels on a sill rail riding its roughness, their flats and grit; pile
+    drag; the hook latch; the stile meeting the jamb and the leaf arriving through it; the handle
+    knocking in its play; the hand holding the leaf home while the latch is thrown.
+  - Automatic: polyurethane carriage wheels in a header, a brushed motor and two-start worm to a
+    toothed belt with play at its clamp, an S-curve controller at 0.7 m/s open and 0.3 m/s shut.
+  - The server sends each run as it starts (`motor-start`, patio `latch-retract` and closing
+    `rollers`), and moves an automatic leaf in its controller's own time for its width.
+- The client prewarmed the push-bar door through the knob door's renderer, which gave sixteen samples
+  of silence: prewarmed push-bar doors were silent. Each key now goes to its own model.
+- `inbox/doors-approved-2026-10-03/`: every approved door side by side, dry.
+
 - Doors rebuilt after Cody's round-3 verdict ("too quiet ... abbreviated ... too tonal and
   synthetic ... the door and the latch are too close together ... push bar is usually hollow") and
   a research round (reports/Realistic door sound synthesis.md, notes in research_notes/).
