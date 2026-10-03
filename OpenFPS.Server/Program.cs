@@ -1269,6 +1269,7 @@ public class GameServer
         world.Query(new QueryDescription().WithAll<Transform, DoorComponent>(), (Entity e, ref Transform t, ref DoorComponent d) =>
         {
             if (d.Target > 0f) return;                    // already open, or on its way
+            if (!DoorSystem.OpensByHand(d)) return;       // it opens for you, or for the lift
             float distance = Vector3.Distance(position, t.Position);
             if (distance > best) return;
             best = distance; nearest = e;
@@ -1277,8 +1278,10 @@ public class GameServer
         });
 
         if (nearest == null) return false;
-        if (!DoorSystem.Set(world, nearest.Value, open: true)) return false;
-        say($"The {name} swings open.");
+        if (!DoorSystem.Set(world, nearest.Value, open: true, by: position)) return false;
+        var opened = world.Get<DoorComponent>(nearest.Value);
+        say(opened.KeyTurned ? $"You unlock the {name} and it {DoorSystem.Verb(opened)} open."
+                             : $"The {name} {DoorSystem.Verb(opened)} open.");
         return true;
     }
 
@@ -1291,10 +1294,12 @@ public class GameServer
         world.Query(new QueryDescription().WithAll<Transform, DoorComponent>(), (Entity e, ref Transform t, ref DoorComponent d) =>
         {
             if (d.Target <= 0f) return;                   // already shut, or on its way
+            if (!DoorSystem.OpensByHand(d)) return;
             // Measured to where the door SHUTS, not where the leaf has swung to: that is the doorway,
-            // which is what somebody standing in front of it is next to.
-            float distance = MathF.Min(Vector3.Distance(position, t.Position),
-                                       d.Captured ? Vector3.Distance(position, d.ShutPosition) : float.MaxValue);
+            // which is what somebody standing in front of it is next to. In the world's frame: a door
+            // in a building keeps its shut pose in the building's.
+            DoorSystem.Doorway(world, e, out var doorway, out _);
+            float distance = MathF.Min(Vector3.Distance(position, t.Position), Vector3.Distance(position, doorway));
             if (distance > best) return;
             best = distance; nearest = e;
             name = world.Has<IdentityComponent>(e) && !string.IsNullOrWhiteSpace(world.Get<IdentityComponent>(e).Name)
@@ -1302,7 +1307,7 @@ public class GameServer
         });
         if (nearest == null) return false;
         if (!DoorSystem.Set(world, nearest.Value, open: false)) return false;
-        say($"You shut the {name}.");
+        say($"You {(world.Get<DoorComponent>(nearest.Value).Slides ? "slide" : "shut")} the {name}{(world.Get<DoorComponent>(nearest.Value).Slides ? " shut" : "")}.");
         return true;
     }
 

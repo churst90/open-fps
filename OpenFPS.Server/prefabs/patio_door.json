@@ -1,0 +1,18 @@
+{
+  "Id": "patio_door",
+  "Name": "Patio Door",
+  "Description": "A sliding patio door: a double-glazed leaf (two 4 mm panes, LeafMetres) slid open and shut along its track by hand, with a thumb latch.",
+  "Material": "Glass",
+  "ColliderSize": { "X": 0.9, "Y": 2.1, "Z": 0.024 },
+  "LeafMetres": 0.004,
+  "IsSolid": true,
+  "Type": "StaticObject",
+  "IsDoor": true,
+  "DoorKind": "patio-slide",
+  "Slides": true,
+  "SwingSeconds": 1.4,
+  "HingeSide": 1,
+  "TransmissionLow": 0.7,
+  "TransmissionMid": 0.5,
+  "TransmissionHigh": 0.3
+}

@@ -264,6 +264,11 @@ public static class PrefabValidator
 
         bool isDoor = t.IsDoor == true;
 
+        if (!isDoor && (t.DoorKind != null || t.Slides.HasValue || t.Powered.HasValue || t.SensorMetres.HasValue
+                        || t.CloseAfterSeconds.HasValue || t.CloseSeconds.HasValue || t.KeyedSide.HasValue))
+            r.Warnings.Add("Door behaviour (DoorKind, Slides, Powered, SensorMetres, CloseAfterSeconds, CloseSeconds, "
+                         + "KeyedSide) is set on something that is not a door (IsDoor); it is ignored.");
+
         if (declaresPortal || t.ApertureSize.HasValue || isDoor)
         {
             // A DOOR is the one thing that is legitimately both. The leaf blocks the opening while it
@@ -277,6 +282,9 @@ public static class PrefabValidator
             if (isDoor && t.SwingSeconds is <= 0)
                 r.Errors.Add($"SwingSeconds {t.SwingSeconds} must be positive; a door that opens in no time is a door "
                            + "nobody can hear open.");
+            if (isDoor && t.DoorKind != null && !OpenFPS.Common.DoorEvents.TryParseKind(t.DoorKind, out _))
+                r.Errors.Add($"DoorKind '{t.DoorKind}' is not a door kind. Known: knob, pushbar, glass-pushbar, "
+                           + "glass-pull, auto-slide, patio-slide, elevator.");
             if (declaresRegion)
                 r.Errors.Add("The same entity declares both an acoustic REGION and a PORTAL. A portal joins two regions; " +
                              "it cannot be one of them. Split them into two entities.");
