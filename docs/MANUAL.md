@@ -119,7 +119,7 @@ when you come within 3 m of them.
 | Enter | Fire what you are holding (only works with a weapon) |
 | T | Clap your hands. In the driver's seat: engine on |
 | Shift+T | Engine off (driver's seat) |
-| V | Voice chat on / off, on the microphone chosen in Settings |
+| V | Voice chat on / off, on the microphone chosen in Settings. While it is on you hear your own voice in the room you are in: the surfaces round you answering it and the room's reverberation, never your voice itself. Use headphones. |
 | Escape | Game menu: Keep playing, Main menu, Quit (the cursor starts on Keep playing) |
 
 E works on things within about 3 m. For a door: E opens it; E again when it is open closes it.
@@ -179,7 +179,7 @@ Inside a list:
 - Trying to reconnect: a quiet low tick every 3 seconds.
 - Chat: one soft note for your map, two rising notes for everyone, three rising notes for a
   private message to you, two falling notes for the server, a bright chord for an admin.
-- Voice chat switched on: one short note.
+- Voice chat switched on: one short note. Switched off: the same note, then a lower one.
 
 You can turn these off or change their volume in Settings.
 

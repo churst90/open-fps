@@ -202,6 +202,8 @@ public sealed partial class ClientGameSession : IDisposable
 
         _shell.CommandEntered += HandleCommandEntered;
         _microphone.PacketReady += OnVoicePacketReady;
+        // What the microphone hears goes straight to the player's own room, not round the server.
+        _microphone.SamplesCaptured += OpenFPS.Client.AudioEngine.Fmod.OwnVoiceRing.Shared.Write;
         WireConnection();
 
         RegisterBindings();
@@ -1231,10 +1233,13 @@ public sealed partial class ClientGameSession : IDisposable
         {
             _microphone.Start();
             Ui.Play(UiCue.VoiceOn);
+            _audioSystem.OwnVoiceLive = _microphone.IsCapturing;
         }
         else
         {
             _microphone.Stop();
+            Ui.Play(UiCue.VoiceOff);
+            _audioSystem.OwnVoiceLive = false;
         }
     }
 
@@ -1423,6 +1428,7 @@ public sealed partial class ClientGameSession : IDisposable
         if (_network.IsConnected) { _network.Send(new LogoutRequest()); _network.Disconnect(); }
         _shell.CommandEntered -= HandleCommandEntered;
         _microphone.PacketReady -= OnVoicePacketReady;
+        _microphone.SamplesCaptured -= OpenFPS.Client.AudioEngine.Fmod.OwnVoiceRing.Shared.Write;
         _microphone.Dispose();
         _audioEngine.Dispose();
     }

@@ -10,7 +10,7 @@ public enum UiCue
     MenuMove, MenuSelect, MenuBack, MenuEdge,
     EnterWorld,
     ChatMap, ChatAll, ChatPrivate, ChatServer, ChatAdmin,
-    VoiceOn,
+    VoiceOn, VoiceOff,
     Reconnecting,
 }
 
@@ -88,6 +88,8 @@ public sealed class UiSounds
         UiCue.ChatAdmin => Notes(0.45f, (880f, 0f, 0.25f), (1108.7f, 0.03f, 0.25f), (1318.5f, 0.06f, 0.3f)),
         // Your microphone is live: one short A.
         UiCue.VoiceOn => Notes(0.5f, (880f, 0f, 0.08f)),
+        // Your microphone is off: the same A, then the E below it.
+        UiCue.VoiceOff => Notes(0.5f, (880f, 0f, 0.06f), (659.3f, 0.07f, 0.08f)),
         // Trying the server again: a quiet low tick, every few seconds until it answers.
         UiCue.Reconnecting => Notes(0.25f, (587.3f, 0f, 0.04f)),
         _ => Notes(0.4f, (1000f, 0f, 0.05f)),

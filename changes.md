@@ -4,6 +4,16 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-03
 
+- Your own voice in the room you are in (Cody: "I want to hear myself in the room I'm actually in").
+  While the microphone is open (V), what it hears goes straight into your room, not round the
+  server: up to eight surfaces answer it, each from its own direction after its own path (found as
+  your footsteps' echoes are, from your mouth to your ears), and the room's reverberation is fed
+  from you. Your voice itself is never played. Its level is your voice's: your usual talking level
+  on the microphone is taken as normal conversation, so a shout fills the room more. A surface
+  more than about ten metres of path away answers at its true time; nearer ones as soon as the
+  microphone's own 60 ms allows. V off now has its own cue. (`OwnVoiceRing`, `OwnVoiceTap`,
+  `ClientAudioSystem.UpdateOwnVoice`; unheard.)
+
 - Both clients: **Create account** is on the main menu. It opens a blank form for the preferred server
   with Create account first (it never uses the saved account there); a new account is saved as its own
   entry for that server, and the preferred one stays as it was. A refused account or login now drops
