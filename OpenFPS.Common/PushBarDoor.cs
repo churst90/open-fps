@@ -109,23 +109,23 @@ public static class PushBarDoor
     public const string KeyPrefix = "pushbardoor:";
 
     /// <summary>
-    /// The push-bar model over-radiates more than the knob door's: its push reads 97 dBA at a metre where
+    /// The push-bar model over-radiates more than the knob door's: its push reads 90 dBA at a metre where
     /// the only measurement (a patent: ordinary exit devices 29-35 dB over a 44 dB hospital background)
     /// puts it at about 73-79. One figure for this model brings its push onto that, and its closes keep
     /// their physical distance from it.
     /// </summary>
-    public const float LevelCalibrationDb = 20f;
+    public const float LevelCalibrationDb = 13f;
 
     /// <summary>Declared levels, dB at a metre, by character: the model's own LAFmax less
     /// <see cref="LevelCalibrationDb"/>. Opening is the push; closing is the closer bringing it in, from a
     /// well-set closer (quiet) to a fast one onto bare steel.</summary>
     public static float OpenLevelDb(int variant) => (variant % Variants) switch
     {
-        0 => 95.3f, 1 => 96.5f, 2 => 98.0f, _ => 101.5f,
+        0 => 89.8f, 1 => 89.9f, 2 => 90.0f, _ => 91.7f,
     } - LevelCalibrationDb;
     public static float CloseLevelDb(int variant) => (variant % Variants) switch
     {
-        0 => 89.2f, 1 => 99.7f, 2 => 107.8f, _ => 114.9f,
+        0 => 93.3f, 1 => 96.6f, 2 => 103.6f, _ => 112.3f,
     } - LevelCalibrationDb;
 
     public static string Key(bool closing, int variant, float swingSeconds, float width, float height)
@@ -207,6 +207,10 @@ public static class PushBarDoor
     /// <summary>The cranks' pivots are greased and the return is damped with the pad's: the drive bar does
     /// not swing on and drag the pad back off its stop (it did, three times, 30 ms apart).</summary>
     private const double CrankDamping = 0.7;
+    /// <summary>The drive bar slides in greased steel guides, pressed sideways by the cranks and the bolt's
+    /// spring: about a tenth of 30 N drags on it whichever way it goes. Without it the bar, drive bar and bolt
+    /// bounced between the bolt's stop and the return spring for 150 ms after the release.</summary>
+    private const double DriveSlide = 3;
     /// <summary>The air in the hollow case: its length modes (0.8 m, from 214 Hz) and its cross modes (845,
     /// 2450, 2860 Hz), pumped by the walls when the mechanism knocks and heard through the pad's slot.</summary>
     private static readonly double[] CaseAirHz = { 214, 428, 642, 845, 856, 1070, 1284, 1498, 2450, 2860 };
@@ -216,7 +220,9 @@ public static class PushBarDoor
 
     /// <summary>What holds a patch of the case's wall where the stops are: the stops sit on the chassis
     /// bolted through the door, so the blow goes into the door, N/m.</summary>
-    private const double PortStiffness = 2e7, ChassisPatch = 0.1;
+    /// <summary>The pad and the drive bar land on small steel stop tabs (about 20 g each) pressed out of the
+    /// chassis: the blow meets that much metal first.</summary>
+    private const double PortStiffness = 2e7, StopTab = 0.02, ChassisIsolationHz = 150;
     /// <summary>Plastic on steel: E* about 2.8 GPa on a 3 mm rib edge gives about 2e8 N/m^1.5; a plastic
     /// gives back about half its speed (0.5 s/m).</summary>
     private const double PlasticLambda = 0.25;
@@ -283,8 +289,12 @@ public static class PushBarDoor
         private double[] padSideHit = Array.Empty<double>(), railHit = Array.Empty<double>();
         private AccelerationNoise padSideNoise = null!;
         private Port padSidePort = null!;
+        private double chassisForce;
+        private LooseParts looseParts = null!;
+        private double[] partsHit = Array.Empty<double>();
         private readonly SmallRadiator slotSound;
-        private readonly Port padPort, casePad, caseDrive2;
+        private readonly Port padPort, casePad, caseDrive2, rimStop;
+        private readonly double[] rimHit;
         private readonly HighPass[] skinHigh;
         private readonly double[] latchShape, nearShape, farShape, shoeShape;
         private readonly (double X, double Y, double Warp, bool Rubber, double[] Shape, double[] Frame)[] stops;
@@ -381,6 +391,8 @@ public static class PushBarDoor
             padSideNoise = new AccelerationNoise(BarMass / PadRho, dt);
             padSideHit = padField.Point(); railHit = caseField.Point();
             padSidePort = new Port(Math.Max(padField.PatchMass, 0.02), PortStiffness, padField.Impedance);
+            looseParts = new LooseParts(rng, dt, 4);
+            partsHit = caseField.Point();
             sideSign = rng.NextDouble() < 0.5 ? -1 : 1;
             driveNoise = new AccelerationNoise(DriveBarMass / 7850, dt);
             boltNoise = new AccelerationNoise(BoltMass / 7850, dt);
@@ -389,8 +401,12 @@ public static class PushBarDoor
             padPort = new Port(padField.PatchMass, PortStiffness, padField.Impedance);
             // The stops sit on the device's steel chassis, not on its thin cover: the patch a stop moves is the
             // chassis under it, a tenth of a kilogram.
-            casePad = new Port(ChassisPatch, PortStiffness, caseField.Impedance);
-            caseDrive2 = new Port(ChassisPatch, PortStiffness, caseField.Impedance);
+            casePad = new Port(StopTab, PortStiffness, caseField.Impedance);
+            caseDrive2 = new Port(StopTab, PortStiffness, caseField.Impedance);
+            // The bolt's stops are the rim case's own steel, the end of the device's housing: the bolt's blow
+            // rings that sheet metal, not only the case as a lump.
+            rimStop = new Port(StopTab, PortStiffness, caseField.Impedance);
+            rimHit = caseField.Point();
             // The rim strike: a steel block on the frame; what rings is its lip.
             strike = new Modes(new[] { Beam(0.012, 0.003, 7850, 200e9, 1.875) }, new[] { 0.03 }, new[] { 0.01 },
                                new[] { SmallPlateGain(0.012 * 0.03, 0.6) }, dt);
@@ -643,7 +659,7 @@ public static class PushBarDoor
             double barForce = palm - (BarPreload + BarRate * Math.Max(0, bar)) - BarMass * leafAccAtBar;
             double caseForce = BarPreload + BarRate * Math.Max(0, bar);           // on the case, toward the leaf: opens
             // The pad drives the drive bar through the cranks' play; the drive bar draws the bolt.
-            double driveForce = -DriveBarMass * leafAccAtBar;
+            double driveForce = -DriveBarMass * leafAccAtBar - DriveSlide * Math.Tanh(driveRate / 0.005);
             double rel = bar - driveBar, relDepth = Math.Abs(rel) - DriveBarPlay;
             double fCrank = relDepth > 0 ? Math.Sign(rel) * Math.Max(0, DriveBarLink * relDepth
                             + 2 * CrankDamping * Math.Sqrt(DriveBarLink * DriveBarMass) * Math.Sign(rel) * (barRate - driveRate)) : 0;
@@ -674,6 +690,7 @@ public static class PushBarDoor
             caseForce += caseHost2;
             Note("bar-bottom", fIn); Note("bar-back", fOut); Note("drive-stop", dIn + dOut);
             padField.Modes.Push(padHit, padDrive);
+            looseParts.Watch(0, fIn); looseParts.Watch(1, fOut); looseParts.Watch(2, dIn); looseParts.Watch(3, dOut);
 
             // The loose pad on its rails: pushed a little sideways by the hand and jolted sideways by every
             // landing, it knocks across its play.
@@ -696,18 +713,24 @@ public static class PushBarDoor
             double driveAcc = driveForce / DriveBarMass;
 
             // The case pushes the leaf at its two brackets, square to the face.
-            torque += caseForce * 0.5 * (MountNear + MountFar);
-            leaf.Push(nearShape, caseForce * 0.5); leaf.Push(farShape, caseForce * 0.5);
-            faceForce += caseForce;
+            // The mechanism's chassis (about 1.5 kg) sits on its end brackets: the door takes the push, but
+            // the chassis's mass on the brackets keeps the clack out of the leaf above about 150 Hz. (Fed
+            // straight in, every knock in the bar rang the door, and Cody heard a hollow door, not a bar.)
+            chassisForce += (1 - Math.Exp(-2 * Math.PI * ChassisIsolationHz * dt)) * (caseForce - chassisForce);
+            torque += chassisForce * 0.5 * (MountNear + MountFar);
+            leaf.Push(nearShape, chassisForce * 0.5); leaf.Push(farShape, chassisForce * 0.5);
+            faceForce += chassisForce;
 
 
             // The bolt's own stops in its rim case: thrown out to full throw, and yanked back in against the
             // case's back when the bar is shoved (the "chunk" of the push: the pad's landing alone, under a
             // pressing palm, was 14 dB below the release).
-            double fStop = Contact(MetalContactK, BoltStopLambda, bolt - Throw - latchCase.X, boltRate - latchCase.V);
-            double fBack = Contact(MetalContactK, BoltStopLambda, -(bolt - RetractedAt) + latchCase.X, -(boltRate - latchCase.V));
+            double stopAt = latchCase.X + rimStop.X, stopRate = latchCase.V + rimStop.V;
+            double fStop = Contact(MetalContactK, BoltStopLambda, bolt - Throw - stopAt, boltRate - stopRate);
+            double fBack = Contact(MetalContactK, BoltStopLambda, -(bolt - RetractedAt) + stopAt, -(boltRate - stopRate));
             boltForce += fBack - fStop;
-            latchCase.F += fStop - fBack + fLink * 0.5;
+            caseField.Modes.Push(rimHit, rimStop.Step(fStop - fBack, dt, out double rimHost));
+            latchCase.F += rimHost + fLink * 0.5;
             Note("bolt-stop", fStop); Note("bolt-back", fBack);
 
             // Mounts into their hosts.
@@ -737,11 +760,18 @@ public static class PushBarDoor
             if (near) foreach (var patch in skinPatches) patch.Step(dt);
 
             // Radiate.
-            double pLeaf = leaf.Step(), pFrame = frame.Step() + frameWall.Step(), pStrike = strike.Step() + strikeSound.Pressure(strikeBody.Acc);
+            // The leaf's own bending modes still move it (the stops, the latch and the bar ride on them), but
+            // their ring is not heard: Cody, "the open and close sound slightly hollow. If you're including the
+            // hollowness of the door, don't." What a closing leaf is heard by is the thud of its mass stopping
+            // and the clank of its skins.
+            leaf.Step();
+            double pLeaf = 0, pFrame = frame.Step() + frameWall.Step(), pStrike = strike.Step() + strikeSound.Pressure(strikeBody.Acc);
             double barAcc = (barRate - lastBarRate) / dt; lastBarRate = barRate;
             double pLatch = latchSound.Pressure(latchCase.Acc) + boltNoise.Pressure(boltAccNow);
             double pBar = padField.Modes.Step() + padNoise.Pressure(barAcc) + padSideNoise.Pressure(padSideAcc) + driveNoise.Pressure(driveAcc);
-            double pCase = caseField.Modes.Step() + caseAir.Step();
+            double partsForce = looseParts.Step(out double partsPressure);
+            if (partsForce != 0) caseField.Modes.Push(partsHit, partsForce);
+            double pCase = caseField.Modes.Step() + caseAir.Step() + partsPressure;
             pStrike += strikeNoise.Pressure(strikeBody.Acc);
             // The closer's oil through its latch valve: turbulence, its pressure going as the flow cubed.
             if (!opening && omega < 0)
@@ -767,7 +797,10 @@ public static class PushBarDoor
             double vMid = 0.5 * (MountNear + MountFar) * omega + 0.5 * (leaf.RateAt(nearShape) + leaf.RateAt(farShape));
             skinField.Modes.Push(skinMid, skinField.Impedance * skinHigh[stops.Length + 1].Next(vMid));
             pLeaf += skinField.Modes.Step();
-            double p = pLeaf + pFrame + pStrike + pLatch + pBar + pCase + pRigid;
+            // Opening is the bar's sound: Cody, "I simply want to hear the push bar." The leaf still moves and
+            // takes the push, but nothing of it is heard on the opening: not its skins, the air it pumps or the
+            // frame. The close keeps the thud and the skins: that clunk is the door's.
+            double p = opening ? pStrike + pLatch + pBar + pCase : pLeaf + pFrame + pStrike + pLatch + pBar + pCase + pRigid;
             double[] parts = { pLeaf, pRigid, pFrame, pStrike, pLatch, pBar, pCase };
             for (int i = 0; i < parts.Length; i++) peaks[i] = Math.Max(peaks[i], Math.Abs(parts[i]));
             if (StemFolder != null)

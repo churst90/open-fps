@@ -4,6 +4,19 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-03
 
+- Push bar round 8 (Cody on round 7: "no clack ... like a heavily padded pushbar on a wooden hollow
+  door ... if you're including the hollowness of the door, don't. I simply want to hear the push bar").
+  - Opening is the device alone: pad, drive bar, latch bolt, steel case. The leaf still takes the
+    push but is not heard. On the close the leaf's bending modes are not heard either; its thud and
+    its skins are.
+  - The latch bolt's stops strike the rim case's sheet steel through a stop patch (`rimStop`), so
+    the bolt's 0.1 ms steel blow rings the case: the bright clack on the push and the release.
+  - `DoorPhysics.LooseParts`: a mechanism's small loose parts thrown by each blow (its impulse over
+    the first millisecond) and ticking on the housing for a few milliseconds.
+  - The drive bar drags 3 N in its guides.
+  - Push bar calibration 20 dB to 13: the model's push is 90 dBA at a metre without the leaf, and
+    still declares 77.
+
 - Doors rebuilt after Cody's round-3 verdict ("too quiet ... abbreviated ... too tonal and
   synthetic ... the door and the latch are too close together ... push bar is usually hollow") and
   a research round (reports/Realistic door sound synthesis.md, notes in research_notes/).

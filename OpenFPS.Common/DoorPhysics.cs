@@ -492,6 +492,74 @@ internal static class DoorPhysics
         }
     }
 
+    /// <summary>
+    /// The loose small parts of a mechanism (pins in their holes, spring ends, crank pivots with their
+    /// clearance): when the mechanism takes a blow they are all thrown and strike each other and their
+    /// housings within a few milliseconds, a burst of tiny steel collisions, each tens of microseconds
+    /// long. That burst is what makes a mechanical clack bright and noise-like; a single clean contact
+    /// is a "clunk" (van den Doel: one impulse sounds too clean; a burst within ~15 ms is heard as real).
+    /// Each collision radiates as a small part jolted (acceleration noise) and pushes the housing's field.
+    /// </summary>
+    internal sealed class LooseParts
+    {
+        private readonly Random rng;
+        private readonly double dt, partMass, partVolume, meanGap, decay;
+        private double speed, until, pulseLeft, pulseLength, pulseAcc;
+        private readonly double[] contactImpulse, contactTime;
+        private const double ThrowSeconds = 0.001;
+        public LooseParts(Random rng, double dt, int contacts, double partMass = 0.002, double meanGapSeconds = 0.0007,
+                          double decaySeconds = 0.005)
+        {
+            contactImpulse = new double[contacts]; contactTime = new double[contacts];
+            Array.Fill(contactTime, -1.0);
+            this.rng = rng; this.dt = dt; this.partMass = partMass; partVolume = partMass / 7850;
+            meanGap = meanGapSeconds; decay = decaySeconds;
+        }
+
+        /// <summary>Feed the force of each contact that strikes the mechanism, every step. A blow throws the parts at
+        /// the speed it gives a 1 kg mechanism: its impulse over the first millisecond, the time the parts take
+        /// to come off their seats. A force held after that (a hand on the bar) throws nothing.</summary>
+        public void Watch(int contact, double force)
+        {
+            ref double t = ref contactTime[contact];
+            if (force <= 0) { t = -1; return; }
+            if (t < 0) { t = 0; contactImpulse[contact] = 0; }
+            if (t > ThrowSeconds) return;
+            contactImpulse[contact] += force * dt; t += dt;
+            if (t > ThrowSeconds)
+            {
+                speed = Math.Max(speed, Math.Min(3, contactImpulse[contact] / 1.0));
+                until = 4 * decay;
+            }
+        }
+
+        /// <summary>One step: the force on the housing, and the pressure at a metre of the parts jolting.</summary>
+        public double Step(out double pressure)
+        {
+            pressure = 0;
+            double force = 0;
+            if (pulseLeft > 0)
+            {
+                // A half-sine collision: acceleration pi v / tau peak; its jerk is what radiates.
+                double phase = 1 - pulseLeft / pulseLength;
+                double acc = pulseAcc * Math.Sin(Math.PI * phase);
+                double jerk = pulseAcc * Math.PI / pulseLength * Math.Cos(Math.PI * phase);
+                pressure = Rho0 * 3 * partVolume / (8 * Math.PI) / C0 * 0.6 * jerk;
+                force = partMass * acc;
+                pulseLeft -= dt;
+            }
+            else if (until > 0 && rng.NextDouble() < dt / meanGap)
+            {
+                double v = speed * (0.3 + 0.7 * rng.NextDouble()) * (rng.NextDouble() < 0.5 ? -1 : 1);
+                pulseLength = 2e-5 + 4e-5 * rng.NextDouble();
+                pulseAcc = Math.PI * v / pulseLength;
+                pulseLeft = pulseLength;
+            }
+            if (until > 0) { until -= dt; speed *= Math.Exp(-dt / decay); }
+            return force;
+        }
+    }
+
     /// <summary>A second-order Butterworth high-pass (RBJ), for splitting what a model covers from what a
     /// simpler law carries above it.</summary>
     internal sealed class HighPass
