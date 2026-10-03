@@ -86,7 +86,7 @@ public static class SlidingDoor
         (Kind.Patio, 0) => new(0.3, 60, 0.5, 2, 0, Tyre.Nylon, 35, 0.005, 0),
         (Kind.Patio, 1) => new(1, 120, 1.0, 4, 5, Tyre.Nylon, 42, 0.008, 0),
         (Kind.Patio, 2) => new(3, 150, 2.5, 8, 15, Tyre.Nylon, 50, 0.015, 0),
-        (Kind.Patio, _) => new(4, 150, 4.0, 6, 3, Tyre.Steel, 45, 0.02, 0),
+        (Kind.Patio, _) => new(4, 100, 4.0, 6, 3, Tyre.Steel, 45, 0.02, 0),
         (Kind.Automatic, 0) => new(0.2, 40, 0.3, 1, 0, Tyre.Urethane, 8, 0.004, 3e-6),
         (Kind.Automatic, 1) => new(0.5, 60, 0.6, 2, 5, Tyre.Urethane, 10, 0.006, 6e-6),
         (Kind.Automatic, 2) => new(1, 80, 1.2, 5, 20, Tyre.Urethane, 12, 0.01, 12e-6),
@@ -143,8 +143,9 @@ public static class SlidingDoor
     /// <summary>Where a wheel bears: the rail's crown and web, about a gram, on the sill bedded below it
     /// (about 5e6 N/m under a wheel's footprint), passing into the sill plate through its impedance. Where a
     /// bracket bears: a couple of grams of the frame's bottom rail, on the rest of the leaf. (A 7 g patch on a
-    /// stiff spring rang at 8.5 kHz and made the roll a hiss up there.)</summary>
-    private const double RailPatchKg = 0.001, RailBedding = 5e6, BracketPatchKg = 0.002, BracketBacking = 1e7;
+    /// stiff spring rang at 8.5 kHz and made the roll a hiss up there.) A polyurethane wheel's contact is
+    /// several millimetres long and bears on about 6 g of the header's track.</summary>
+    private const double RailPatchKg = 0.001, UrethaneRailPatchKg = 0.006, RailBedding = 5e6, BracketPatchKg = 0.002, BracketBacking = 1e7;
     /// <summary>The pull handle's escutcheon: 30 g of zinc on two screws, about 1.3 kHz, rung by the handle and
     /// radiating from its own 40 cm2 as well as through the stile.</summary>
     private const double EscutcheonKg = 0.03, EscutcheonK = 2e6, EscutcheonArea = 0.004;
@@ -180,6 +181,9 @@ public static class SlidingDoor
     /// (about 0.5 N past the centre), onto the nylon of its housing at each end.</summary>
     private const double HookKg = 0.015, HookThrow = 0.008, HookSnap = 0.5, HookVolume = 2e-6;
     private const double HookStopK = 2e8, HookStopLambda = 2;
+    /// <summary>The hand is still on the lever as the hook seats: the hook moves with the lever and the hand's
+    /// grip, about 3 N s/m. (Free, it bounced a dozen times on its stop.)</summary>
+    private const double HookDrag = 3;
     /// <summary>The pull handle: 100 g of zinc on its spindle with a third of a millimetre of play each way
     /// along the travel, centred by its spring, knocking on its escutcheon. When the leaf stops dead it is
     /// thrown across its play: the bright part of a patio door hitting home. Held while a hand is on it.</summary>
@@ -352,7 +356,7 @@ public static class SlidingDoor
                                         f => 0.02 + 12 / f, 40, 16000, rng, dt);
             for (int i = 0; i < Wheels; i++)
             {
-                trackPort[i] = new Port(RailPatchKg, RailBedding, trackField.Impedance);
+                trackPort[i] = new Port(ch.Tyre == Tyre.Urethane ? UrethaneRailPatchKg : RailPatchKg, RailBedding, trackField.Impedance);
                 framePort[i] = new Port(BracketPatchKg, BracketBacking, frameField.Impedance);
                 glassPort[i] = new Port(glassField.PatchMass, GasketK, glassField.Impedance);
                 trackHit[i] = trackField.Point(); frameHit[i] = frameField.Point(); glassHit[i] = glassField.Point();
@@ -751,7 +755,7 @@ public static class SlidingDoor
                 double k = auto ? MetalK : HookStopK, lam = auto ? MetalLambda : HookStopLambda;
                 double low = Contact(k, lam, smallPort.X - small, smallPort.V - smallRate);
                 double high = Contact(k, lam, small - smallThrow - smallPort.X, smallRate - smallPort.V);
-                double fSmall = smallForce + low - high - smallRate * 0.5;
+                double fSmall = smallForce + low - high - smallRate * (auto ? 0.5 : HookDrag);
                 if (auto) fSmall -= smallKg * G;
                 double acc = fSmall / smallKg;
                 smallRate += acc * dt; small += smallRate * dt;
