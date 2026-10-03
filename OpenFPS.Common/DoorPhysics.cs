@@ -374,7 +374,8 @@ internal static class DoorPhysics
         public readonly double PatchMass;
 
         public DenseField(double width, double height, double thickness, double e, double rho, double poisson,
-                          Func<double, double> loss, double fLow, double fHigh, Random rng, double dt)
+                          Func<double, double> loss, double fLow, double fHigh, Random rng, double dt,
+                          double capSpacing = CapSpacing)
         {
             this.rng = rng;
             double area = width * height, rhoH = rho * thickness;
@@ -388,7 +389,7 @@ internal static class DoorPhysics
             double r = Math.PI / (2 * kb);
             PatchMass = rhoH * Math.PI * r * r;
             var hz = new List<double>(); var l = new List<double>(); var m = new List<double>(); var g = new List<double>();
-            double spacing = Math.Max(CapSpacing, 1 / perHz);
+            double spacing = Math.Max(capSpacing, 1 / perHz);
             for (double f0 = fLow; f0 < fHigh; f0 += spacing)
             {
                 double f = f0 + rng.NextDouble() * spacing;   // random within its slot: no regular comb
