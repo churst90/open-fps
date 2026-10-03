@@ -59,9 +59,10 @@ internal sealed class SmoothTail
     /// <summary>
     /// The time cells the directions are estimated over, seconds: shorter early, where separate
     /// reflections come from separate walls, longer later, where the trace's directions are mostly
-    /// noise. Each holds 1,100-5,100 samples.
+    /// noise. Each holds 1,100-5,100 samples. From the sound itself: the directional part starts at
+    /// the first reflection (EarlyCopies), no longer at 50 ms.
     /// </summary>
-    public static readonly float[] SegmentEdges = { 0.05f, 0.075f, 0.1f, 0.133f, 0.175f, 0.233f, 0.35f };
+    public static readonly float[] SegmentEdges = { 0f, 0.025f, 0.05f, 0.075f, 0.1f, 0.133f, 0.175f, 0.233f, 0.35f };
     public static int Segments => SegmentEdges.Length - 1;
 
     /// <summary>How much a new trace counts while you stand still. A quarter: a step change is
@@ -84,6 +85,23 @@ internal sealed class SmoothTail
     private Vector3 _where;
     private int _place = int.MinValue;
     private bool _empty = true;
+    /// <summary>The sample the response starts at: the first reflection (EarlyCopies.FirstArrival), or
+    /// the trace's own first sample when the geometry is not known.</summary>
+    private int _start;
+    public int Start => _start;
+    /// <summary>The lab's A/B: the response as it was before 2026-10-03, faded in at 50-100 ms with
+    /// nothing taken out for the copies. Never set in the game.</summary>
+    public static bool FromFiftyMs;
+    /// <summary>Where the played response starts, and where it is all the way in.</summary>
+    private (int From, int In) EarlyWindow()
+        => FromFiftyMs ? ((int)(LateTailIr.FadeInStartSeconds * SampleRate), (int)(LateTailIr.FadeInEndSeconds * SampleRate))
+                       : (_start, _start);
+    private static float FadeIn(int i, (int From, int In) w)
+        => i < w.From ? 0f : i >= w.In ? 1f : 0.5f - 0.5f * MathF.Cos(MathF.PI * (i - w.From) / Math.Max(1, w.In - w.From));
+    /// <summary>The last trace's early energy per band: what the placed copies carry, and how much of
+    /// it the trace had and gave up to them (EarlyCopies.TakeFrom). For the lab and the tests.</summary>
+    public double[] LastTook { get; } = new double[EdgesHz.Length + 1];
+    public double[] LastCopies { get; private set; } = new double[EdgesHz.Length + 1];
 
     /// <summary>What the last trace counted for (1: a fresh start). For the log and the lab.</summary>
     public double LastWeight { get; private set; }
@@ -229,12 +247,31 @@ internal sealed class SmoothTail
     /// directions: no directional part). <paramref name="cov"/> is the remainder's channel
     /// covariance (TracedReverb's), averaged with the rest. <paramref name="at"/> is where the
     /// trace was made from, <paramref name="place"/> the region it was in; <paramref name="sceneChanged"/>
-    /// says the geometry moved since the last trace. Tracer thread.
+    /// says the geometry moved since the last trace. <paramref name="copies"/>: the early energy the
+    /// placed copies carry from where the trace was made; it is taken out of this trace's energies, and
+    /// the response starts at its first reflection. Null: nothing is taken out and the response starts
+    /// where the trace does. Tracer thread.
     /// </summary>
     public void Add(float[] w, float[]? c1, float[]? c2, float[]? c3, Vector3 a1, Vector3 a2, Vector3 a3,
-                    Vector3[]? directions, double[]? cov, Vector3 at, int place, bool sceneChanged)
+                    Vector3[]? directions, double[]? cov, Vector3 at, int place, bool sceneChanged,
+                    EarlyCopies? copies = null)
     {
         Measure(w, c1, c2, c3, a1, a2, a3, directions);
+        Array.Clear(LastTook);
+        if (FromFiftyMs) { copies = null; _start = 0; Array.Clear(LastCopies); }
+        else if (copies != null)
+        {
+            copies.TakeFrom(_mOmni, Frames, Frame, SampleRate, LastTook);
+            LastCopies = copies.Total();
+            _start = Math.Min(copies.FirstArrival, Length - 1);
+        }
+        else
+        {
+            Array.Clear(LastCopies);
+            int first = 0;
+            while (first < w.Length - 1 && w[first] == 0f) first++;
+            _start = Math.Min(first, Length - 1);
+        }
 
         // How much this trace counts.
         double weight;
@@ -364,22 +401,24 @@ internal sealed class SmoothTail
 
     /// <summary>
     /// The late tail to convolve, windowed. Without a directional part (<paramref name="afterDirectional"/>
-    /// false) it fades in over the early reflections' handover, 50-100 ms, raised cosine, as
-    /// LateTailIr.Build. With one, it takes over from it over SdmTailIr's end fade, in energy: the
-    /// two are independent noise, so their windows' squares add to one, where the old windows (the
-    /// same samples) added in amplitude.
+    /// false) it is the whole response, from the first reflection (<see cref="Start"/>) on, with the
+    /// placed copies' energy already out of it. With one, it takes over from it over SdmTailIr's end
+    /// fade, in energy: the two are independent noise, so their windows' squares add to one, where the
+    /// old windows (the same samples) added in amplitude.
     /// </summary>
     public float[] LateWindowed(bool afterDirectional)
     {
         bool late = afterDirectional && DirCount > 0;
-        int i0 = (int)((late ? SdmTailIr.EndFadeStart : LateTailIr.FadeInStartSeconds) * SampleRate);
-        int i1 = (int)((late ? SdmTailIr.EndFadeEnd : LateTailIr.FadeInEndSeconds) * SampleRate);
+        var early = EarlyWindow();
+        int i0 = late ? (int)(SdmTailIr.EndFadeStart * SampleRate) : early.From;
+        int i1 = late ? (int)(SdmTailIr.EndFadeEnd * SampleRate) : early.In;
         var x = new float[Length];
-        for (int b = 0; b < Bands; b++) Shape(_omniCarrier[b], Smoothed(_omni, b * Frames, Frames, b), x, i0);
+        int f0 = _start / Frame;
+        for (int b = 0; b < Bands; b++) Shape(_omniCarrier[b], Smoothed(_omni, b * Frames, Frames, b), x, i0, f0);
         for (int i = i0; i < i1 && i < Length; i++)
         {
             float u = (i - i0) / (float)Math.Max(1, i1 - i0);
-            x[i] *= late ? MathF.Sin(0.5f * MathF.PI * u) : 0.5f - 0.5f * MathF.Cos(MathF.PI * u);
+            x[i] *= late ? MathF.Sin(0.5f * MathF.PI * u) : FadeIn(i, early);
         }
         return x;
     }
@@ -458,13 +497,14 @@ internal sealed class SmoothTail
     /// <summary>
     /// The directional part's windowed responses, one per direction, each on its own noise: per band,
     /// the band's averaged energy times the direction's averaged share (straight lines between the
-    /// time cells' middles); below <see cref="DirFromBand"/> an even share. Faded in at 50-100 ms, out
-    /// over SdmTailIr's end fade.
+    /// time cells' middles); below <see cref="DirFromBand"/> an even share. From the first reflection
+    /// (<see cref="Start"/>), out over SdmTailIr's end fade.
     /// </summary>
     public float[][] DirectionalWindowed(int length)
     {
         int nb = Bands, n = Math.Min(length, _dirLength);
-        int s0 = (int)(LateTailIr.FadeInStartSeconds * SampleRate), s1 = (int)(LateTailIr.FadeInEndSeconds * SampleRate);
+        var early = EarlyWindow();
+        int s0 = early.From, f0 = _start / Frame;
         int e0 = (int)(SdmTailIr.EndFadeStart * SampleRate), e1 = (int)(SdmTailIr.EndFadeEnd * SampleRate);
         // Each frame's place between the time cells' middles: the cell before it and how far on.
         var cell = new int[DirFrames]; var along = new double[DirFrames];
@@ -501,17 +541,14 @@ internal sealed class SmoothTail
                               : shares[o + cell[f] * DirCount] * (1 - along[f]) + shares[o + (cell[f] + 1) * DirCount] * along[f];
                     env[f] = omni[b][f] * sh;
                 }
-                Shape(_dirCarrier[d * nb + b], env, x, s0);
+                Shape(_dirCarrier[d * nb + b], env, x, s0, f0);
             }
             for (int i = 0; i < n; i++)
             {
+                // From the first reflection, at once: the room answers when its nearest surface does.
                 float win;
                 if (i < s0 || i >= e1) win = 0f;
-                else
-                {
-                    win = i < s1 ? 0.5f - 0.5f * MathF.Cos(MathF.PI * (i - s0) / Math.Max(1, s1 - s0)) : 1f;
-                    if (i >= e0) win *= MathF.Cos(0.5f * MathF.PI * (i - e0) / Math.Max(1, e1 - e0));
-                }
+                else win = FadeIn(i, early) * (i >= e0 ? MathF.Cos(0.5f * MathF.PI * (i - e0) / Math.Max(1, e1 - e0)) : 1f);
                 x[i] *= win;
             }
             parts[d] = x;
@@ -527,27 +564,33 @@ internal sealed class SmoothTail
     }
 
     /// <summary>One band's frame energies, smoothed over <see cref="SmoothFrames"/> (a centred box,
-    /// so the total is kept; at the ends, the mean of what there is).</summary>
+    /// so the total is kept; at the ends, the mean of what there is). Nothing before the first
+    /// reflection's frame: the smoothing does not reach back past it, or a low band would answer
+    /// before any surface could.</summary>
     private double[] Smoothed(double[] energy, int offset, int frames, int band)
     {
         int k = SmoothFrames(band, SampleRate) / 2;
+        int first = Math.Min(frames - 1, _start / Frame);
         var y = new double[frames];
-        for (int f = 0; f < frames; f++)
+        for (int f = first; f < frames; f++)
         {
             double s = 0; int c = 0;
-            for (int j = Math.Max(0, f - k); j <= Math.Min(frames - 1, f + k); j++) { s += energy[offset + j]; c++; }
+            for (int j = Math.Max(first, f - k); j <= Math.Min(frames - 1, f + k); j++) { s += energy[offset + j]; c++; }
             y[f] = s / c;
         }
         return y;
     }
 
     /// <summary>Adds carrier times sqrt(energy per sample), the energy at frame centres and straight
-    /// lines between, into <paramref name="x"/> from sample <paramref name="from"/> on.</summary>
-    private static void Shape(float[] carrier, double[] energy, float[] x, int from)
+    /// lines between, into <paramref name="x"/> from sample <paramref name="from"/> on. Before the
+    /// centre of frame <paramref name="first"/> (the first reflection's) it holds that frame's level:
+    /// the response starts at once, not on a ramp up from the silence before it.</summary>
+    private static void Shape(float[] carrier, double[] energy, float[] x, int from, int first = 0)
     {
         int n = Math.Min(x.Length, carrier.Length), frames = energy.Length;
         const int half = Frame / 2;
-        float Amp(int f) => (float)Math.Sqrt(Math.Max(0.0, energy[Math.Clamp(f, 0, frames - 1)]) / Frame);
+        first = Math.Clamp(first, 0, frames - 1);
+        float Amp(int f) => (float)Math.Sqrt(Math.Max(0.0, energy[Math.Clamp(f, first, frames - 1)]) / Frame);
         for (int i = Math.Max(0, from); i < n;)
         {
             // Between the centres of frames f and f + 1. Before the first centre and after the last,

@@ -4,6 +4,31 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-03
 
+- The room answers from its first reflection (branch early-tail, unheard). Cody: "a delay between
+  when I clap and when I hear the reflections". The traced response started at 50 ms, faded in to
+  100. Before that there were only the placed copies: a clap in flat 01F had them at 6-26 ms and
+  50 ms and next to nothing between (2 ms steps down to -54 dB at 46 ms with a click). Three changes:
+  - The traced response now starts where the nearest surface answers (the ceiling, 5.9 ms in the
+    flat). The copies' energy is taken out of it, band by band, from the frames the trace put it in
+    (`EarlyCopies`). Steam Audio's response has no peaks to cut: it is noise in 10 ms bins
+    (`--early-tail`). Copies plus what is left is what the trace had.
+  - The copies a room places are worked out in one place (`WorldAudioPlayer.PlanRoomEchoes`), for
+    the clap and for the trace.
+  - The reverb bus was 4.4 ms early. Steam Audio's binaural effect delays a sound 289 samples at
+    the voices' 1,024 and 97 at the traced stage's 256. The stage's input now waits the difference
+    (192 samples). A click 30 ms into the response landed 25.5 ms after the dry click; now 30.0.
+  - `--clap-room` now plays the copies, the washes and the clap's floor bounce as the game does, and
+    prints the energy in 2 ms steps, C50, C80 and D50. `early=old` gives the old response,
+    `copies=0` leaves the copies out, `probe=MS` measures the bus's timing.
+  - Flat 01F, click, 8 claps: the deepest 2 ms step between the first reflection and 80 ms was
+    -54.3 dB (46-48 ms); now -40.6 dB (20-22 ms). The level from 100 ms on is the same within 1 dB.
+    50-300 ms is 2-3 dB up: the old fade took the room's own energy out of 50-100 ms. EDT from 50 ms
+    is shorter (click, 2 kHz: 1.10 to 0.83 s): the fade made the decay start late. T20 within
+    0.07 s. IACC 300-900 ms unchanged.
+  - Not yet: own footsteps get copies but no washes, so the trace gives up a little more than their
+    copies carry. Speech and steady sounds get no copies at all, so they lose that share of the
+    first 20 ms.
+
 - Paths that popped for a third of a second (branch path-pops, unheard). The [POP] lines from the
   Main Street pavement were cars 150-300 m away going from -80 dB to -20 in the mid band and back.
   New lab `--pop-hunt ear=x,y,z`: 40 cars drive the city's streets, asked about at the game's

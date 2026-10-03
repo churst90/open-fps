@@ -117,6 +117,26 @@ internal sealed class TracedReverb : IDisposable
     /// <summary>The lab's A/B: the late part as one channel through the velvet branches, as before
     /// DiffuseLate. Never set in the game.</summary>
     public static bool OneChannelLate;
+    /// <summary>
+    /// The lab's latency probe: past zero, every trace publishes instead one click this many seconds
+    /// into the response, from one direction, and nothing else. Where it lands in a capture against
+    /// the dry sound is what the bus path adds. Never set in the game.
+    /// </summary>
+    public static float LabProbeSeconds;
+    /// <summary>The scene's boxes, for the placed copies' share of the early energy (EarlyCopies).</summary>
+    private IReadOnlyList<EarlyReflections.Solid> _solids = Array.Empty<EarlyReflections.Solid>();
+
+    private void PublishProbe(float seconds)
+    {
+        int at = (int)(seconds * SampleRate);
+        int k = DiffuseBranch.Count, maxP = SdmTailIr.PartitionsFor(SampleRate, FrameSize);
+        var parts = new float[k][];
+        for (int d = 0; d < k; d++) parts[d] = new float[maxP * FrameSize];
+        if (at < parts[0].Length) parts[0][at] = 1f;
+        LateSdm = SdmTailIr.FromParts(parts, FrameSize, maxP);
+        Late = LateTailIr.FromWindowed(new float[FrameSize], FrameSize, MaxLatePartitions);
+        DiffuseLate = null;
+    }
     /// <summary>The lab: also publish each trace's raw parts (<see cref="RawLate"/>, <see cref="RawLateSdm"/>).</summary>
     public bool KeepRaw;
     public volatile LateTailIr? RawLate;
@@ -242,6 +262,7 @@ internal sealed class TracedReverb : IDisposable
         {
             // A new scene is a changed room (a door moved): the averaged tail follows it faster.
             if (_haveScene) _sceneChanged = true;
+            _solids = scene.Solids;
             Phonon.iplSimulatorSetScene(_simulator, scene.Handle);
             Phonon.iplSimulatorCommit(_simulator);
             if (_source == IntPtr.Zero)
@@ -371,10 +392,12 @@ internal sealed class TracedReverb : IDisposable
                         }
                         if (!RawTail)
                         {
-                            // The tail as energy, averaged, through fixed noise (SmoothTail).
+                            // The tail as energy, averaged, through fixed noise (SmoothTail), from the
+                            // first reflection on, less what the placed copies carry (EarlyCopies).
                             long s0 = System.Diagnostics.Stopwatch.GetTimestamp();
                             _smooth ??= new SmoothTail(SampleRate, IrSize, DiffuseBranch.Count);
-                            _smooth.Add(w, _c1, _c2, _c3, _ax1, _ax2, _ax3, dirs, _lateCov, at, place, sceneChanged);
+                            var copies = _solids.Count > 0 ? EarlyCopies.From(_solids, at, SampleRate) : null;
+                            _smooth.Add(w, _c1, _c2, _c3, _ax1, _ax2, _ax3, dirs, _lateCov, at, place, sceneChanged, copies);
                             if (dirs != null)
                             {
                                 var sdm = _smooth.BuildDirectional(FrameSize);
@@ -386,6 +409,7 @@ internal sealed class TracedReverb : IDisposable
                             else { Late = _smooth.BuildLate(FrameSize, MaxLatePartitions, afterDirectional: false); DiffuseLate = null; }
                             LastSmoothMs = (System.Diagnostics.Stopwatch.GetTimestamp() - s0) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
                         }
+                        if (LabProbeSeconds > 0f) PublishProbe(LabProbeSeconds);
                     }
                     LastExtractMs = (System.Diagnostics.Stopwatch.GetTimestamp() - x0) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
                 }

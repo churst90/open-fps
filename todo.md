@@ -179,6 +179,15 @@ Results: [docs/MUTATION_2026-09-24.md](docs/MUTATION_2026-09-24.md),
 Done 2026-10-02 (see changes.md). Nothing left.
 
 ### 6. Acoustics still open
+- Listen for the room answering at once (2026-10-03, branch early-tail). Clap in a main-street lobby
+  and in flat 01F: the reflections should start with the clap, not 40 ms after it. Restart the
+  client. `--clap-room early=old` gives the old response in the lab. Things to check:
+  - Is the 20-100 ms part too strong now? It is the trace's own level at the tail's -6 dB.
+  - The bus now waits 192 samples for the voices (logged at start: "its input waits"). If the mixer
+    block changes from 1,024, the wait is measured again.
+  - Own footsteps: their copies have no washes, so the trace gives up the steps' scattered share
+    too. Speech and steady sounds get no copies, so they lose the copies' share of the first 20 ms.
+    A per-source early part would fix both; it needs the trace from each source (TracedEchoes).
 - Listen for pops on the Main Street pavement and inside Selby House and Marlow Tower (2026-10-03,
   branch path-pops). Restart the server. `--pop-hunt` gives the numbers. Cars behind buildings are
   now heard over the roofs (about -25 dB) instead of 60-100 dB down. Is the city too busy now?

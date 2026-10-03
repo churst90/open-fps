@@ -718,6 +718,8 @@ public class FmodAudioProvider : IAudioProvider
     /// --traced-reverb and SA_HRTF_FRAME).</summary>
     private IntPtr _saHrtfTraced;
     private int _saHrtfTracedFrame;
+    /// <summary>How long a traced stage's input waits, samples (TracedReverbDsp.StagePreDelay); -1 until measured.</summary>
+    private int _tracedPreDelay = -1;
     private int _saFrameSize = 1024;
     private bool _steamAudioEnabled;
 
@@ -2013,6 +2015,17 @@ public class FmodAudioProvider : IAudioProvider
             { _saHrtfTraced = IntPtr.Zero; Phonon.iplReflectionEffectRelease(ref effect); return; }
             _saHrtfTracedFrame = sub;
         }
+        // The voices' binaural rendering delays a sound more than the stage's own does (its frame is
+        // four times as long): the stage's input waits the difference, so the room answers after the
+        // sound and not 4 ms before it (TracedReverbDsp.StagePreDelay). Measured once.
+        if (_tracedPreDelay < 0)
+        {
+            int voice = TracedReverbDsp.BinauralOnset(_saContext, _saHrtf, _saFrameSize);
+            int stage = TracedReverbDsp.BinauralOnset(_saContext, _saHrtfTraced, sub);
+            _tracedPreDelay = TracedReverbDsp.StagePreDelay(voice, stage);
+            Log.Information("Traced reverb: voices render {Voice} samples late, the traced stage {Stage}; its input waits {Wait}.",
+                            voice, stage, _tracedPreDelay);
+        }
         var ds = new Phonon.IPLAmbisonicsDecodeEffectSettings { speakerLayout = Phonon.StereoLayout(), hrtf = _saHrtfTraced, maxOrder = TracedReverb.Order };
         if (Phonon.iplAmbisonicsDecodeEffectCreate(_saContext, ref au, ref ds, out IntPtr decode) != Phonon.IPL_STATUS_SUCCESS)
         { Phonon.iplReflectionEffectRelease(ref effect); return; }
@@ -2031,6 +2044,7 @@ public class FmodAudioProvider : IAudioProvider
             LateOut = new float[sub],
             // The room you are in: its late tail as a field round the head, not one channel.
             Diffuse = DiffuseTail.Create(_saContext, sub, TracedReverb.Channels, _saHrtfTraced),
+            Delay = _tracedPreDelay > 0 ? new PreDelay(_tracedPreDelay) : null,
         };
         Phonon.iplAudioBufferAllocate(tr.Context, 1, sub, ref st.Mono);
         Phonon.iplAudioBufferAllocate(tr.Context, TracedReverb.Channels, sub, ref st.Ambi);

@@ -731,6 +731,7 @@ public sealed class WorldAudioPlayer
         => MathF.Pow(MathF.Sqrt(1f - Math.Clamp(scattering, 0f, 1f)), Math.Max(1, order));
 
     private readonly List<EarlyReflections.Arrival> _room = new();
+    private readonly List<RoomEcho> _roomPlan = new();
 
     private void QueueEarlyEchoes(in Pending item, WorldSnapshot world, Vector3 listenerPosition)
     {
@@ -742,26 +743,17 @@ public sealed class WorldAudioPlayer
                               maxExtraPathMetres: RoomEchoWindowSeconds * AudioPhysics.CurrentSpeedOfSound);
         float direct = Vector3.Distance(src, listenerPosition);
         float reference = Loudness.Place(item.Sound.LevelDb, item.Sound.ExtentMetres).ReferenceDistance;
-        // Loudest first. Find hands its arrivals back in surface order, and with more inside the
-        // window than there are voices (twenty-two in flat 01F, twelve voices) the first twelve BY
-        // SURFACE were taken, and which walls answered depended on their order in the map.
-        _room.Sort(static (a, b) => b.GainMid.CompareTo(a.GainMid));
-        int added = 0, secondOrder = 0;
-        foreach (var a in _room)
+        PlanRoomEchoes(_room, src, listenerPosition, direct, reference,
+                       OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.CopiesTrim, audible: true, _roomPlan);   // /copies
+        foreach (var e in _roomPlan)
         {
-            if (a.ExtraDelaySeconds > RoomEchoWindowSeconds) continue;
-            // The ground under the source: already inside the voice (GroundReflection).
-            if (a.Order == 1 && a.HitPoint.Y < MathF.Min(src.Y, listenerPosition.Y) - 0.2f) continue;
-            if (a.Order >= 2 && ++secondOrder > MaxSecondOrderCopies) continue;
-            float returned = EarlyReflections.PlacedCopyGain(a.GainMid, a.PathLength, direct, reference)
-                           * OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.CopiesTrim;   // /copies
+            if (e.InVoice) continue;
+            var a = e.Arrival;
             // The scattered share of a first-order wall, as the wall's wash rather than a copy: the
             // sound smeared by that surface's roughness, from the same place, carrying what the
             // mirror does not. A wall that scatters little sends back almost all of it as the crack.
-            float s = Math.Clamp(a.Scattering, 0f, 1f);
-            if (a.Order == 1 && s > 0.05f && returned * MathF.Sqrt(s) >= ImageSource.MinGain)
-                QueueWash(item, a, returned * MathF.Sqrt(s));
-            float gain = returned * MirrorShare(s, a.Order);
+            if (e.WashGain >= ImageSource.MinGain) QueueWash(item, a, e.WashGain);
+            float gain = e.MirrorGain;
             if (gain < ImageSource.MinGain) continue;
             var echo = item.Sound;
             echo.Position = a.ImagePosition;
@@ -783,6 +775,59 @@ public sealed class WorldAudioPlayer
                 IsReflection = true,
                 Seed = item.Seed,
             });
+        }
+    }
+
+    /// <summary>
+    /// One placed reflection of a one-off sound in a room: the arrival, and what it returns with the
+    /// trim (EarlyReflections.PlacedCopyGain times /copies). <paramref name="InVoice"/>: the floor
+    /// under the source, which the voice carries itself (GroundReflection) and nothing places.
+    /// </summary>
+    internal readonly record struct RoomEcho(EarlyReflections.Arrival Arrival, float Returned, bool InVoice)
+    {
+        public float Scattering => Math.Clamp(Arrival.Scattering, 0f, 1f);
+        /// <summary>The clean copy: the mirror share of what the surfaces return.</summary>
+        public float MirrorGain => Returned * MirrorShare(Scattering, Arrival.Order);
+        /// <summary>A first-order wall's scattered share, placed beside the copy as its wash: zero for
+        /// a wall that scatters next to nothing, and for higher orders (their scatter is the tail).</summary>
+        public float WashGain => Arrival.Order == 1 && Scattering > 0.05f ? Returned * MathF.Sqrt(Scattering) : 0f;
+    }
+
+    /// <summary>
+    /// Which of <paramref name="found"/> (a search from <paramref name="src"/> to <paramref name="listener"/>
+    /// out to <see cref="RoomEchoWindowSeconds"/>) a room places, loudest first: every first-order
+    /// surface in the window, at most <see cref="MaxSecondOrderCopies"/> second orders, at most
+    /// <see cref="MaxRoomEchoes"/> copies in all, and the floor under the source marked as the voice's.
+    ///
+    /// One rule for the copies a sound gets (QueueEarlyEchoes, <paramref name="audible"/>: a copy under
+    /// ImageSource.MinGain is not placed and does not count against the cap) and for the early energy
+    /// the listener's trace leaves to them (EarlyCopies, not audible: the trace stands for a sound at
+    /// the listener, and every surface in the window counts). <paramref name="found"/> is sorted.
+    /// </summary>
+    internal static void PlanRoomEchoes(List<EarlyReflections.Arrival> found, Vector3 src, Vector3 listener,
+                                        float direct, float reference, float trim, bool audible, List<RoomEcho> into)
+    {
+        into.Clear();
+        // Loudest first. Find hands its arrivals back in surface order, and with more inside the
+        // window than there are voices (twenty-two in flat 01F, twelve voices) the first twelve BY
+        // SURFACE were taken, and which walls answered depended on their order in the map.
+        found.Sort(static (a, b) => b.GainMid.CompareTo(a.GainMid));
+        int added = 0, secondOrder = 0;
+        foreach (var a in found)
+        {
+            if (a.ExtraDelaySeconds > RoomEchoWindowSeconds) continue;
+            // The ground under the source: already inside the voice (GroundReflection).
+            if (a.Order == 1 && a.HitPoint.Y < MathF.Min(src.Y, listener.Y) - 0.2f)
+            {
+                into.Add(new RoomEcho(a, 0f, InVoice: true));
+                continue;
+            }
+            if (a.Order >= 2 && ++secondOrder > MaxSecondOrderCopies) continue;
+            float returned = audible ? EarlyReflections.PlacedCopyGain(a.GainMid, a.PathLength, direct, reference) * trim : trim;
+            var echo = new RoomEcho(a, returned, InVoice: false);
+            into.Add(echo);
+            // A copy too quiet to place is not one of the twelve (its wash may still play).
+            if (audible && echo.MirrorGain < ImageSource.MinGain) continue;
             if (++added >= MaxRoomEchoes) break;
         }
     }

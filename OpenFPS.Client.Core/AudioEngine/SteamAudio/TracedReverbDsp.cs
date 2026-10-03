@@ -44,6 +44,9 @@ internal sealed class TracedReverbState
     public int Reader;
     /// <summary>Output trim, linear. Game thread writes.</summary>
     public volatile float Gain = 1f;
+    /// <summary>What the bus's input waits so the room lines up with the voices it answers
+    /// (TracedReverbDsp.StagePreDelay). Null: none.</summary>
+    public PreDelay? Delay;
 
     /// <summary>One per ear: the tail the trace hands back is the same in both, and a room is not.</summary>
     public readonly EarDecorrelator Left = new(0), Right = new(1);
@@ -476,9 +479,83 @@ internal sealed class DiffuseTail
     }
 }
 
+/// <summary>A fixed delay, a sample at a time. Allocation-free after construction; never throws.</summary>
+internal sealed class PreDelay
+{
+    private readonly float[] _line;
+    private int _w;
+    public readonly int Samples;
+
+    public PreDelay(int samples) { Samples = Math.Max(0, samples); _line = new float[Samples + 1]; }
+
+    public float Process(float x)
+    {
+        if (Samples == 0) return x;
+        _line[_w] = x;
+        _w = _w + 1 == _line.Length ? 0 : _w + 1;
+        return _line[_w];       // written Samples samples ago
+    }
+}
+
 internal static class TracedReverbDsp
 {
     private static readonly FMOD.DSP_READ_CALLBACK _read = Read;
+
+    // ── Lining the room up with the voices ─────────────────────────────────────────────────────
+    //
+    // Steam Audio's binaural effect delays what it renders by an amount that depends on its frame:
+    // an impulse straight ahead comes out 289 samples later at the voices' 1,024 and 97 at the traced
+    // stage's 256 (--early-tail hrtf; the same within 15 samples for every direction tried). A voice
+    // and its send leave the channel together (the send tap is the first thing the signal meets), so
+    // the room came out 192 samples, 4.4 ms, BEFORE the sound it answers: measured with a click 30 ms
+    // into the traced response, it landed 25.5 ms after the dry click (--clap-room probe=30). While
+    // the response started at 50 ms nobody could hear that. Started at the first reflection, a room
+    // whose nearest surface answers in 6 ms would have answered in 1.5. So the stage's input waits the
+    // difference.
+
+    /// <summary>Where an impulse straight ahead first comes out of a binaural effect of this HRTF and
+    /// frame, samples: the first sample at a tenth of the peak. -1 if Steam Audio will not make one.</summary>
+    public static int BinauralOnset(IntPtr context, IntPtr hrtf, int frame)
+    {
+        if (context == IntPtr.Zero || hrtf == IntPtr.Zero || frame <= 0) return -1;
+        var au = new Phonon.IPLAudioSettings { samplingRate = 44100, frameSize = frame };
+        var bs = new Phonon.IPLBinauralEffectSettings { hrtf = hrtf };
+        if (Phonon.iplBinauralEffectCreate(context, ref au, ref bs, out IntPtr fx) != Phonon.IPL_STATUS_SUCCESS) return -1;
+        var inB = new Phonon.IPLAudioBuffer(); var outB = new Phonon.IPLAudioBuffer();
+        Phonon.iplAudioBufferAllocate(context, 1, frame, ref inB);
+        Phonon.iplAudioBufferAllocate(context, 2, frame, ref outB);
+        var mono = new float[frame]; var st = new float[2 * frame];
+        var y = new float[3 * frame];
+        for (int b = 0; b < 4; b++)
+        {
+            Array.Clear(mono);
+            if (b == 1) mono[0] = 1f;               // the first block warms the effect
+            Phonon.iplAudioBufferDeinterleave(context, mono, ref inB);
+            var p = new Phonon.IPLBinauralEffectParams
+            {
+                direction = new Phonon.IPLVector3 { x = 0, y = 0, z = -1 }, interpolation = Phonon.IPL_HRTFINTERPOLATION_BILINEAR,
+                spatialBlend = 1f, hrtf = hrtf,
+            };
+            Phonon.iplBinauralEffectApply(fx, ref p, ref inB, ref outB);
+            Phonon.iplAudioBufferInterleave(context, ref outB, st);
+            if (b == 0) continue;
+            for (int k = 0; k < frame; k++) y[(b - 1) * frame + k] = MathF.Abs(st[2 * k]) + MathF.Abs(st[2 * k + 1]);
+        }
+        Phonon.iplBinauralEffectRelease(ref fx);
+        Phonon.iplAudioBufferFree(context, ref inB); Phonon.iplAudioBufferFree(context, ref outB);
+        float pk = 0f; foreach (float v in y) pk = MathF.Max(pk, v);
+        if (pk <= 0f) return -1;
+        for (int i = 0; i < y.Length; i++) if (y[i] >= 0.1f * pk) return i;
+        return -1;
+    }
+
+    /// <summary>How long the traced stage's input waits, samples: what the voices' binaural rendering
+    /// delays a sound by, less what the stage's own does. Never negative; zero if either is unknown.</summary>
+    public static int StagePreDelay(int voiceOnset, int stageOnset)
+        => LabNoPreDelay || voiceOnset < 0 || stageOnset < 0 ? 0 : Math.Max(0, voiceOnset - stageOnset);
+
+    /// <summary>The lab's A/B: no wait, as before 2026-10-03. Never set in the game.</summary>
+    public static bool LabNoPreDelay;
 
     public static RESULT Create(FMOD.System system, TracedReverbState state, out FMOD.DSP dsp, out GCHandle handle)
     {
@@ -553,6 +630,7 @@ internal static class TracedReverbDsp
                 float v = 0f;
                 for (int c = 0; c < inCh; c++) { float x = i[(at + k) * inCh + c]; v += x; chSum += x * (double)x; }
                 v /= inCh;
+                if (s.Delay != null) v = s.Delay.Process(v);
                 mono[k] = v;
                 inSum += v * (double)v;
             }

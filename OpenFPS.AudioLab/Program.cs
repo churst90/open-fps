@@ -562,6 +562,11 @@ if (args.Contains("--late-field"))
     // --late-field [place=flat|tunnel|street]: each source's own late energy and direction, traced.
     Environment.Exit(OpenFPS.Client.Core.AudioEngine.Fmod.LateFieldSpike.Run(args));
 }
+if (args.Contains("--early-tail"))
+{
+    // --early-tail [room=flat|stair|corridor]: the trace's first 120 ms against the room's image sources.
+    Environment.Exit(OpenFPS.Client.Core.AudioEngine.Fmod.EarlyTailSpike.Run(args));
+}
 if (args.Contains("--clap-room"))
 {
     // --clap-room [out=path] [claps=4]: a clap in Marlow flat 01F through the whole mixer, and the room against it.

@@ -59,6 +59,8 @@ public static class TailSteadySpike
         // the ear velvet on the field too.
         Velvet = Arg(args, "late") == "velvet";
         DiffuseTail.LateEarVelvet = Arg(args, "earvelvet") == "1";
+        // early=old: the smooth tail as it was before 2026-10-03, from 50 ms (SmoothTail.FromFiftyMs).
+        SmoothTail.FromFiftyMs = Arg(args, "early") == "old";
         double seconds = double.TryParse(Arg(args, "seconds"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double s) ? s : 10;
         var (boxes, ear) = Scene(room);
 
@@ -175,7 +177,7 @@ public static class TailSteadySpike
             {
                 var qr = Ring(er[0], a, b); var qs = Ring(es[0], a, b);
                 Console.WriteLine($"  ring at the left ear, {what}: raw {qr.Over10 * 100:F2} % over 10 dB, 99.9th {qr.P999:F1} dB, flatness {qr.Flat:F2}, repeat {qr.Repeat:F2}"
-                                + $" | smooth {qs.Over10 * 100:F2} %, {qs.P999:F1} dB, {qs.Flat:F2}, {qs.Repeat:F2}");
+                                + $" | smooth {qs.Over10 * 100:F2} %, {qs.P999:F1} dB, {qs.Flat:F2}, {qs.Repeat:F2} at {qs.Lag:F1} ms");
                 var rr2 = Ring(es[1], a, b);
                 Console.WriteLine($"    right ear, smooth: {rr2.Over10 * 100:F2} %, {rr2.P999:F1} dB, flatness {rr2.Flat:F2}, repeat {rr2.Repeat:F2}");
             }
@@ -267,7 +269,7 @@ public static class TailSteadySpike
 
     // ── Places ─────────────────────────────────────────────────────────────────────────────────
 
-    private static (List<SteamAudioScene.Box>, Vector3) Scene(string room)
+    internal static (List<SteamAudioScene.Box>, Vector3) Scene(string room)
     {
         var b = new List<SteamAudioScene.Box>();
         if (room == "flat")
@@ -332,7 +334,7 @@ public static class TailSteadySpike
     // ── Rendering ──────────────────────────────────────────────────────────────────────────────
 
     /// <summary>The partitions of an IR back to time.</summary>
-    private static float[] ToTime(LateTailIr? ir)
+    internal static float[] ToTime(LateTailIr? ir)
     {
         if (ir == null) return Array.Empty<float>();
         int blk = ir.Block, nfft = 2 * blk;

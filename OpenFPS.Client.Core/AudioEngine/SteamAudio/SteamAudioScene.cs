@@ -34,6 +34,11 @@ public sealed class SteamAudioScene : IDisposable
     public Vector3 BoundsMin { get; private set; }
     public Vector3 BoundsMax { get; private set; }
 
+    /// <summary>The boxes the scene was built from, as the reflection search takes them
+    /// (EarlyReflections): the listener's trace works out from them which of its early energy the
+    /// placed copies carry (EarlyCopies). Empty before <see cref="Build"/>.</summary>
+    public IReadOnlyList<EarlyReflections.Solid> Solids { get; private set; } = Array.Empty<EarlyReflections.Solid>();
+
     public SteamAudioScene(IntPtr context) => _context = context;
 
     /// <summary>
@@ -153,6 +158,11 @@ public sealed class SteamAudioScene : IDisposable
         Release();
         if (Phonon.iplSceneCreate(_context, ref Defaults.SceneSettings, out _scene) != Phonon.IPL_STATUS_SUCCESS)
         { _scene = IntPtr.Zero; return; }
+
+        var solids = new List<EarlyReflections.Solid>(boxes.Count);
+        foreach (var b in boxes)
+            if (b.Size.X > 0 && b.Size.Y > 0 && b.Size.Z > 0) solids.Add(new EarlyReflections.Solid(b.Center, b.Size, b.Rotation, b.Material));
+        Solids = solids;
 
         var verts = new List<PV>();
         var tris = new List<Phonon.IPLTriangle>();
