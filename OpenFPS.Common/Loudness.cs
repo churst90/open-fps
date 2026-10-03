@@ -252,7 +252,8 @@ public static class Loudness
     /// world gives way by while the ear is overloaded (FmodAudioProvider). Its level at the ear is the
     /// declared level at a metre, spread over <paramref name="distance"/> (from a metre), less what
     /// the way to the ear took (<paramref name="pathGain"/>, an amplitude, and the air); the excess
-    /// over <see cref="RenderCeilingDb"/> is compressed by the same law as everything else.
+    /// over the shipped ceiling (112 dB) is compressed by the shipped law, independent of the player's
+    /// level setting: the reflex is the ear's.
     /// About 20 dB for a pistol at a metre, 11 at 10 m, 2 at 100 m; nothing from a jackhammer.
     /// </summary>
     public static float OverloadDb(float levelDb, float distance, float pathGain = 1f, float airDb = 0f)
@@ -260,7 +261,11 @@ public static class Loudness
         if (levelDb <= 0f) return 0f;
         float atEar = levelDb - 20f * MathF.Log10(MathF.Max(1f, distance))
                     + 20f * MathF.Log10(Math.Clamp(pathGain, 1e-4f, 1f)) + airDb;
-        return MathF.Max(0f, (atEar - RenderCeilingDb) * DynamicRangeCompression);
+        // The ear's, not the player's: fixed at the shipped ceiling and compression, whatever /levels
+        // is set to. Tied to the live setting, a player on "real" (1.0, a ceiling near 89 dB) had the
+        // world give way the full 24 dB for a revolver 260 m off, and a little for every hand clap
+        // and every "thank you" (Cody, 2026-10-02: "does the ducking mean the shooter is very close?").
+        return MathF.Max(0f, (atEar - ShippedCeilingDb) * DefaultCompression);
     }
 
     /// <summary>Just the gain, for a caller that is setting the reference distance itself.</summary>

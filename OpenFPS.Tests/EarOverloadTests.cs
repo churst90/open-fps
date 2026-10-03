@@ -29,6 +29,17 @@ public class EarOverloadTests
         Assert.Equal(At(c, () => Loudness.OverloadDb(157f, 1f)), At(c, () => Loudness.OverloadDb(157f, 0.3f)));
     }
 
+    /// <summary>The ear's reflex does not move with the player's level setting. On "real" (1.0) a
+    /// revolver 260 m off made the world give way 24 dB, and a hand clap 3.</summary>
+    [Fact]
+    public void ThePlayersLevelSettingDoesNotMoveIt()
+    {
+        float shipped = At(Loudness.DefaultCompression, () => Loudness.OverloadDb(157f, 10f));
+        Assert.Equal(shipped, At(1f, () => Loudness.OverloadDb(157f, 10f)), 3);
+        Assert.InRange(At(1f, () => Loudness.OverloadDb(164f, 262f)), 0f, 2f);   // 116 dB at the ear: a breath of it
+        Assert.Equal(0f, At(1f, () => Loudness.OverloadDb(92f, 1f)));
+    }
+
     [Fact]
     public void EverydayLoudThingsDoNotOverload()
     {
