@@ -7,8 +7,11 @@ namespace OpenFPS.Client.AudioEngine.Fmod;
 /// <summary>
 /// Responsibility: Holds the internal state for a single Granular Synthesis voice.
 /// </summary>
-public class GranularVoiceState
+public class GranularVoiceState : IGuardedUnit
 {
+    /// <summary>The non-finite guard's flag and name for this unit (NonFinite).</summary>
+    public NonFiniteUnit Guard { get; } = new();
+
     public float[] PcmData;
     public int Channels;
     public int SampleRate;
@@ -58,6 +61,9 @@ public class GranularVoiceState
 /// </summary>
 public static class GranularProcessor
 {
+    /// <summary>The non-finite guard's flag for a state that is not an IGuardedUnit.</summary>
+    private static int _nonFiniteOther;
+
     private static readonly FMOD.DSP_READ_CALLBACK _readCallback = ReadCallback;
 
     /// <summary>
@@ -100,7 +106,12 @@ public static class GranularProcessor
     private static RESULT ReadCallback(ref DSP_STATE dsp_state, IntPtr inbuffer, IntPtr outbuffer,
                                        uint length, int inchannels, ref int outchannels)
     {
-        try { return ReadCallbackCore(ref dsp_state, inbuffer, outbuffer, length, inchannels, ref outchannels); }
+        try
+        {
+            var r = ReadCallbackCore(ref dsp_state, inbuffer, outbuffer, length, inchannels, ref outchannels);
+            NonFinite.After(ref dsp_state, outbuffer, length, inchannels, outchannels, "granular voice", ref _nonFiniteOther);
+            return r;
+        }
         catch (Exception ex)
         {
             unsafe

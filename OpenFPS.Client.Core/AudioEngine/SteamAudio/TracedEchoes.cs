@@ -305,8 +305,12 @@ internal sealed class TracedEchoes : IDisposable
 /// in the same block, head first, so the echoes are not a block late — the reason the mirror-image
 /// echoes read their source two blocks behind (EngineEchoState.MinDelayBlocks) does not arise.
 /// </summary>
-internal sealed class TracedEchoRig
+internal sealed class TracedEchoRig : IGuardedUnit
 {
+    public NonFiniteUnit Guard { get; } = new();
+    /// <summary>After a non-finite block: both convolutions start again on the next one.</summary>
+    public void ResetAfterFault() { NeedsReset = true; Blend = -1f; }
+
     public int FrameSize;
     public IntPtr WorkerContext, ProviderContext;
     public IntPtr Effect, EffectB, Decode, Hrtf;
@@ -340,6 +344,7 @@ internal sealed class TracedEchoRig
 internal static class TracedEchoDsp
 {
     private static readonly FMOD.DSP_READ_CALLBACK _capture = CaptureRead, _mix = MixRead;
+    private static int _nonFiniteCapture, _nonFiniteMix;
 
     public static RESULT Create(FMOD.System system, TracedEchoRig rig)
     {
@@ -361,7 +366,21 @@ internal static class TracedEchoDsp
         return u != IntPtr.Zero && GCHandle.FromIntPtr(u).Target is TracedEchoRig r ? r : null;
     }
 
-    private static unsafe RESULT CaptureRead(ref DSP_STATE dsp_state, IntPtr inbuffer, IntPtr outbuffer, uint length, int inchannels, ref int outchannels)
+    private static RESULT CaptureRead(ref DSP_STATE dsp_state, IntPtr inbuffer, IntPtr outbuffer, uint length, int inchannels, ref int outchannels)
+    {
+        var r = CaptureReadCore(ref dsp_state, inbuffer, outbuffer, length, inchannels, ref outchannels);
+        NonFinite.After(ref dsp_state, outbuffer, length, inchannels, outchannels, "traced echo's capture (the voice it rides on)", ref _nonFiniteCapture);
+        return r;
+    }
+
+    private static RESULT MixRead(ref DSP_STATE dsp_state, IntPtr inbuffer, IntPtr outbuffer, uint length, int inchannels, ref int outchannels)
+    {
+        var r = MixReadCore(ref dsp_state, inbuffer, outbuffer, length, inchannels, ref outchannels);
+        NonFinite.After(ref dsp_state, outbuffer, length, inchannels, outchannels, "traced echo", ref _nonFiniteMix);
+        return r;
+    }
+
+    private static unsafe RESULT CaptureReadCore(ref DSP_STATE dsp_state, IntPtr inbuffer, IntPtr outbuffer, uint length, int inchannels, ref int outchannels)
     {
         try
         {
@@ -390,7 +409,7 @@ internal static class TracedEchoDsp
         return RESULT.OK;
     }
 
-    private static unsafe RESULT MixRead(ref DSP_STATE dsp_state, IntPtr inbuffer, IntPtr outbuffer, uint length, int inchannels, ref int outchannels)
+    private static unsafe RESULT MixReadCore(ref DSP_STATE dsp_state, IntPtr inbuffer, IntPtr outbuffer, uint length, int inchannels, ref int outchannels)
     {
         int n = (int)length;
         try

@@ -17,8 +17,11 @@ namespace OpenFPS.Client.AudioEngine.Fmod;
 /// fields are plain floats and bools, which are atomic on every platform this runs on, and they are
 /// smoothed inside the callback so a 30 Hz network update never steps the throttle.
 /// </summary>
-public sealed class EngineVoiceState : IRenderedVoice
+public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
 {
+    /// <summary>The non-finite guard's flag and name for this unit (NonFinite).</summary>
+    public NonFiniteUnit Guard { get; } = new();
+
     /// <summary>The mixer callback's mono buffer, made with the voice so the callback never allocates.</summary>
     internal readonly float[] MixScratch = new float[DspCallback.MaxBlock];
 
@@ -1331,8 +1334,11 @@ public sealed class EchoDiffuser
 /// than stepped, so as the car moves and the path length changes the echo glides in pitch — which is
 /// the Doppler of the reflection, and the reason its emitter carries no velocity of its own.
 /// </summary>
-public sealed class EngineEchoState
+public sealed class EngineEchoState : IGuardedUnit
 {
+    /// <summary>The non-finite guard's flag and name for this unit (NonFinite).</summary>
+    public NonFiniteUnit Guard { get; } = new();
+
     /// <summary>The mixer callback's mono buffer, made with the voice so the callback never allocates.</summary>
     internal readonly float[] MixScratch = new float[DspCallback.MaxBlock];
 
@@ -1510,8 +1516,11 @@ public sealed class EngineEchoState
 /// exhaust's Doppler arrives in the intake on top of the intake's own. It is nudged, never jumped,
 /// back into step — a rate correction is a pitch error, and a jump is a click.
 /// </summary>
-public sealed class EngineTapState
+public sealed class EngineTapState : IGuardedUnit
 {
+    /// <summary>The non-finite guard's flag and name for this unit (NonFinite).</summary>
+    public NonFiniteUnit Guard { get; } = new();
+
     /// <summary>The mixer callback's mono buffer, made with the voice so the callback never allocates.</summary>
     internal readonly float[] MixScratch = new float[DspCallback.MaxBlock];
 
@@ -1567,6 +1576,9 @@ public sealed class EngineTapState
 /// <summary>An FMOD DSP that is one outlet of a machine. Modelled on <see cref="EchoProcessor"/>.</summary>
 public static class TapProcessor
 {
+    /// <summary>The non-finite guard's flag for a state that is not an IGuardedUnit.</summary>
+    private static int _nonFiniteOther;
+
     private static readonly DSP_READ_CALLBACK _readCallback = ReadCallback;
 
     public static RESULT CreateDSP(FMOD.System system, EngineTapState state, out FMOD.DSP dsp, out GCHandle handle)
@@ -1603,7 +1615,12 @@ public static class TapProcessor
     /// </summary>
     private static RESULT ReadCallback(ref DSP_STATE dsp_state, IntPtr inbuffer, IntPtr outbuffer, uint length, int inchannels, ref int outchannels)
     {
-        try { return ReadCallbackCore(ref dsp_state, inbuffer, outbuffer, length, inchannels, ref outchannels); }
+        try
+        {
+            var r = ReadCallbackCore(ref dsp_state, inbuffer, outbuffer, length, inchannels, ref outchannels);
+            NonFinite.After(ref dsp_state, outbuffer, length, inchannels, outchannels, "engine tap", ref _nonFiniteOther);
+            return r;
+        }
         catch (Exception ex)
         {
             // Once. A DSP that faults faults every block, and a log line per block at 43 blocks a
@@ -1643,6 +1660,9 @@ public static class TapProcessor
 
 public static class EchoProcessor
 {
+    /// <summary>The non-finite guard's flag for a state that is not an IGuardedUnit.</summary>
+    private static int _nonFiniteOther;
+
     private static readonly DSP_READ_CALLBACK _readCallback = ReadCallback;
 
     public static RESULT CreateDSP(FMOD.System system, EngineEchoState state, out FMOD.DSP dsp, out GCHandle handle)
@@ -1679,7 +1699,12 @@ public static class EchoProcessor
     /// </summary>
     private static RESULT ReadCallback(ref DSP_STATE dsp_state, IntPtr inbuffer, IntPtr outbuffer, uint length, int inchannels, ref int outchannels)
     {
-        try { return ReadCallbackCore(ref dsp_state, inbuffer, outbuffer, length, inchannels, ref outchannels); }
+        try
+        {
+            var r = ReadCallbackCore(ref dsp_state, inbuffer, outbuffer, length, inchannels, ref outchannels);
+            NonFinite.After(ref dsp_state, outbuffer, length, inchannels, outchannels, "engine echo", ref _nonFiniteOther);
+            return r;
+        }
         catch (Exception ex)
         {
             // Once. A DSP that faults faults every block, and a log line per block at 43 blocks a
@@ -1724,6 +1749,9 @@ public static class EchoProcessor
 /// </summary>
 public static class EngineProcessor
 {
+    /// <summary>The non-finite guard's flag for a state that is not an IGuardedUnit.</summary>
+    private static int _nonFiniteOther;
+
     private static readonly DSP_READ_CALLBACK _readCallback = ReadCallback;
 
     public static RESULT CreateDSP(FMOD.System system, EngineVoiceState state, out FMOD.DSP dsp, out GCHandle handle)
@@ -1760,7 +1788,12 @@ public static class EngineProcessor
     /// </summary>
     private static RESULT ReadCallback(ref DSP_STATE dsp_state, IntPtr inbuffer, IntPtr outbuffer, uint length, int inchannels, ref int outchannels)
     {
-        try { return ReadCallbackCore(ref dsp_state, inbuffer, outbuffer, length, inchannels, ref outchannels); }
+        try
+        {
+            var r = ReadCallbackCore(ref dsp_state, inbuffer, outbuffer, length, inchannels, ref outchannels);
+            NonFinite.After(ref dsp_state, outbuffer, length, inchannels, outchannels, "engine voice", ref _nonFiniteOther);
+            return r;
+        }
         catch (Exception ex)
         {
             // Once. A DSP that faults faults every block, and a log line per block at 43 blocks a

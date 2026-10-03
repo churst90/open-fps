@@ -44,6 +44,31 @@ internal sealed class TracedReverbState
     public int Reader;
     /// <summary>Output trim, linear. Game thread writes.</summary>
     public volatile float Gain = 1f;
+    /// <summary>What the bus's input waits so the room lines up with the voices it answers
+    /// (TracedReverbDsp.StagePreDelay). Null: none.</summary>
+    public PreDelay? Delay;
+
+    /// <summary>The region this stage's bus is, for the [NONFINITE] line.</summary>
+    public int Region = int.MinValue;
+    /// <summary>Set once this stage (its output, its input) has been reported (NonFinite).</summary>
+    public int NonFiniteReported, NonFiniteInputReported;
+
+    /// <summary>
+    /// Everything the stage holds, forgotten: after a block that was not finite, so a NaN in a
+    /// convolution's input ring or a filter cannot come out again on every block after. Mixer thread;
+    /// allocation-free.
+    /// </summary>
+    public void ResetAfterFault()
+    {
+        LateConv?.Reset();
+        SdmConv?.Reset();
+        DiffuseLateConv?.Reset();
+        Left.Reset(); Right.Reset();
+        Diffuse?.Reset();
+        Delay?.Reset();
+        if (Effect != IntPtr.Zero) Phonon.iplReflectionEffectReset(Effect);
+        if (Decode != IntPtr.Zero) Phonon.iplAmbisonicsDecodeEffectReset(Decode);
+    }
 
     /// <summary>One per ear: the tail the trace hands back is the same in both, and a room is not.</summary>
     public readonly EarDecorrelator Left = new(0), Right = new(1);
@@ -255,7 +280,7 @@ internal sealed class DiffuseTail
             for (int k = 0; k < sub; k++) Branch[k] = branch.Process(W[k]) * gain;
             Phonon.iplAudioBufferDeinterleave(EarContext, Branch, ref Mono);
             // The branch's world direction in the head's frame, as a voice's is (Steam Audio: -z ahead).
-            var local = System.Numerics.Vector3.Transform(Direction(b), toHead);
+            var local = Phonon.SafeDirection(System.Numerics.Vector3.Transform(Direction(b), toHead));
             var ep = new Phonon.IPLBinauralEffectParams
             {
                 direction = new Phonon.IPLVector3 { x = local.X, y = local.Y, z = -local.Z },
@@ -314,7 +339,7 @@ internal sealed class DiffuseTail
             float gain = baseGain * _branchGain[b];
             for (int k = 0; k < sub; k++) Branch[k] = src[k] * gain;
             Phonon.iplAudioBufferDeinterleave(EarContext, Branch, ref Mono);
-            var local = System.Numerics.Vector3.Transform(Direction(b), toHead);
+            var local = Phonon.SafeDirection(System.Numerics.Vector3.Transform(Direction(b), toHead));
             var ep = new Phonon.IPLBinauralEffectParams
             {
                 direction = new Phonon.IPLVector3 { x = local.X, y = local.Y, z = -local.Z },
@@ -403,7 +428,7 @@ internal sealed class DiffuseTail
             for (int k = 0; k < sub && !any; k++) any = src[k] != 0f;
             if (!any) continue;
             Phonon.iplAudioBufferDeinterleave(EarContext, src, ref Mono);
-            var local = System.Numerics.Vector3.Transform(Direction(b), toHead);
+            var local = Phonon.SafeDirection(System.Numerics.Vector3.Transform(Direction(b), toHead));
             var ep = new Phonon.IPLBinauralEffectParams
             {
                 direction = new Phonon.IPLVector3 { x = local.X, y = local.Y, z = -local.Z },
@@ -449,6 +474,23 @@ internal sealed class DiffuseTail
 
     public DiffuseTail() { (_earL, _earR) = DiffuseBranch.EarPair(101); }
 
+    /// <summary>Forgets everything it holds: the branches, the split filters, the ears. Mixer thread
+    /// (after a non-finite block, NonFinite); allocation-free.</summary>
+    public void Reset()
+    {
+        foreach (var e in Ears) if (e != IntPtr.Zero) Phonon.iplBinauralEffectReset(e);
+        foreach (var e in SdmEars) if (e != IntPtr.Zero) Phonon.iplBinauralEffectReset(e);
+        foreach (var br in Branches) br?.Reset();
+        _earL.Reset(); _earR.Reset();
+        _loL1.Reset(); _loL2.Reset(); _hiL1.Reset(); _hiL2.Reset();
+        _loR1.Reset(); _loR2.Reset(); _hiR1.Reset(); _hiR2.Reset();
+        _a1 = _a2 = _b1 = 0f;
+        for (int b = 0; b < _branchGain.Length; b++) _branchGain[b] = 1f;
+        Array.Clear(Stereo); Array.Clear(Low);
+        foreach (var x in LateIn) Array.Clear(x);
+        foreach (var x in SdmOut) Array.Clear(x);
+    }
+
     /// <summary>The tail's renderer, or null when Steam Audio will not make its ears.</summary>
     public static DiffuseTail? Create(IntPtr context, int subFrame, int channels, IntPtr hrtf)
     {
@@ -476,9 +518,85 @@ internal sealed class DiffuseTail
     }
 }
 
+/// <summary>A fixed delay, a sample at a time. Allocation-free after construction; never throws.</summary>
+internal sealed class PreDelay
+{
+    private readonly float[] _line;
+    private int _w;
+    public readonly int Samples;
+
+    public PreDelay(int samples) { Samples = Math.Max(0, samples); _line = new float[Samples + 1]; }
+
+    public void Reset() { Array.Clear(_line); _w = 0; }
+
+    public float Process(float x)
+    {
+        if (Samples == 0) return x;
+        _line[_w] = x;
+        _w = _w + 1 == _line.Length ? 0 : _w + 1;
+        return _line[_w];       // written Samples samples ago
+    }
+}
+
 internal static class TracedReverbDsp
 {
     private static readonly FMOD.DSP_READ_CALLBACK _read = Read;
+
+    // ── Lining the room up with the voices ─────────────────────────────────────────────────────
+    //
+    // Steam Audio's binaural effect delays what it renders by an amount that depends on its frame:
+    // an impulse straight ahead comes out 289 samples later at the voices' 1,024 and 97 at the traced
+    // stage's 256 (--early-tail hrtf; the same within 15 samples for every direction tried). A voice
+    // and its send leave the channel together (the send tap is the first thing the signal meets), so
+    // the room came out 192 samples, 4.4 ms, BEFORE the sound it answers: measured with a click 30 ms
+    // into the traced response, it landed 25.5 ms after the dry click (--clap-room probe=30). While
+    // the response started at 50 ms nobody could hear that. Started at the first reflection, a room
+    // whose nearest surface answers in 6 ms would have answered in 1.5. So the stage's input waits the
+    // difference.
+
+    /// <summary>Where an impulse straight ahead first comes out of a binaural effect of this HRTF and
+    /// frame, samples: the first sample at a tenth of the peak. -1 if Steam Audio will not make one.</summary>
+    public static int BinauralOnset(IntPtr context, IntPtr hrtf, int frame)
+    {
+        if (context == IntPtr.Zero || hrtf == IntPtr.Zero || frame <= 0) return -1;
+        var au = new Phonon.IPLAudioSettings { samplingRate = 44100, frameSize = frame };
+        var bs = new Phonon.IPLBinauralEffectSettings { hrtf = hrtf };
+        if (Phonon.iplBinauralEffectCreate(context, ref au, ref bs, out IntPtr fx) != Phonon.IPL_STATUS_SUCCESS) return -1;
+        var inB = new Phonon.IPLAudioBuffer(); var outB = new Phonon.IPLAudioBuffer();
+        Phonon.iplAudioBufferAllocate(context, 1, frame, ref inB);
+        Phonon.iplAudioBufferAllocate(context, 2, frame, ref outB);
+        var mono = new float[frame]; var st = new float[2 * frame];
+        var y = new float[3 * frame];
+        for (int b = 0; b < 4; b++)
+        {
+            Array.Clear(mono);
+            if (b == 1) mono[0] = 1f;               // the first block warms the effect
+            Phonon.iplAudioBufferDeinterleave(context, mono, ref inB);
+            var p = new Phonon.IPLBinauralEffectParams
+            {
+                direction = new Phonon.IPLVector3 { x = 0, y = 0, z = -1 }, interpolation = Phonon.IPL_HRTFINTERPOLATION_BILINEAR,
+                spatialBlend = 1f, hrtf = hrtf,
+            };
+            Phonon.iplBinauralEffectApply(fx, ref p, ref inB, ref outB);
+            Phonon.iplAudioBufferInterleave(context, ref outB, st);
+            if (b == 0) continue;
+            for (int k = 0; k < frame; k++) y[(b - 1) * frame + k] = MathF.Abs(st[2 * k]) + MathF.Abs(st[2 * k + 1]);
+        }
+        Phonon.iplBinauralEffectRelease(ref fx);
+        Phonon.iplAudioBufferFree(context, ref inB); Phonon.iplAudioBufferFree(context, ref outB);
+        float pk = 0f; foreach (float v in y) pk = MathF.Max(pk, v);
+        if (pk <= 0f) return -1;
+        for (int i = 0; i < y.Length; i++) if (y[i] >= 0.1f * pk) return i;
+        return -1;
+    }
+
+    /// <summary>How long the traced stage's input waits, samples: what the voices' binaural rendering
+    /// delays a sound by, less what the stage's own does. Never negative; zero if either is unknown.</summary>
+    public static int StagePreDelay(int voiceOnset, int stageOnset)
+        => LabNoPreDelay || voiceOnset < 0 || stageOnset < 0 ? 0 : Math.Max(0, voiceOnset - stageOnset);
+
+    /// <summary>The lab's A/B: no wait, as before 2026-10-03. Never set in the game.</summary>
+    public static bool LabNoPreDelay;
 
     public static RESULT Create(FMOD.System system, TracedReverbState state, out FMOD.DSP dsp, out GCHandle handle)
     {
@@ -503,7 +621,12 @@ internal static class TracedReverbDsp
     private static RESULT Read(ref DSP_STATE dsp_state, IntPtr inbuffer, IntPtr outbuffer, uint length, int inchannels, ref int outchannels)
     {
         // A callback on FMOD's mixer thread must never throw: the process aborts.
-        try { return ReadCore(ref dsp_state, inbuffer, outbuffer, length, inchannels, ref outchannels); }
+        try
+        {
+            var r = ReadCore(ref dsp_state, inbuffer, outbuffer, length, inchannels, ref outchannels);
+            Guard(ref dsp_state, inbuffer, outbuffer, (int)length, inchannels, outchannels > 0 ? outchannels : 2);
+            return r;
+        }
         catch
         {
             unsafe
@@ -513,6 +636,27 @@ internal static class TracedReverbDsp
             }
             return RESULT.OK;
         }
+    }
+
+    /// <summary>
+    /// What the stage puts into the mix is always finite (NonFinite): a block with a NaN or an
+    /// infinity in it, in or out, is silence, and everything the stage holds is forgotten so the
+    /// next block starts clean.
+    /// </summary>
+    private static unsafe void Guard(ref DSP_STATE dsp_state, IntPtr inbuffer, IntPtr outbuffer, int n, int inCh, int outCh)
+    {
+        if (outbuffer == IntPtr.Zero) return;
+        IntPtr userData = DspCallback.UserData(ref dsp_state);
+        if (userData == IntPtr.Zero || GCHandle.FromIntPtr(userData).Target is not TracedReverbState s) return;
+        // A bad input is reported as the input: the fault is upstream, in whatever sent it.
+        bool badIn = inbuffer != IntPtr.Zero && !NonFinite.AllFinite((float*)inbuffer, n * Math.Max(1, inCh));
+        if (badIn)
+        {
+            new Span<float>((void*)outbuffer, n * outCh).Clear();
+            NonFinite.Report(ref s.NonFiniteInputReported, "traced reverb stage's input (a send into it)", null, s.Region);
+        }
+        if (NonFinite.Scrub((float*)outbuffer, n * outCh, ref s.NonFiniteReported, "traced reverb stage", null, s.Region) || badIn)
+            s.ResetAfterFault();
     }
 
     private static unsafe RESULT ReadCore(ref DSP_STATE dsp_state, IntPtr inbuffer, IntPtr outbuffer, uint length, int inchannels, ref int outchannels)
@@ -553,6 +697,7 @@ internal static class TracedReverbDsp
                 float v = 0f;
                 for (int c = 0; c < inCh; c++) { float x = i[(at + k) * inCh + c]; v += x; chSum += x * (double)x; }
                 v /= inCh;
+                if (s.Delay != null) v = s.Delay.Process(v);
                 mono[k] = v;
                 inSum += v * (double)v;
             }

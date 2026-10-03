@@ -141,6 +141,19 @@ internal static partial class Phonon
     public static extern int iplBinauralEffectApply(IntPtr effect, ref IPLBinauralEffectParams effectParams, ref IPLAudioBuffer inBuf, ref IPLAudioBuffer outBuf);
     [DllImport(Lib, CallingConvention = CC)]
     public static extern void iplBinauralEffectReset(IntPtr effect);
+
+    /// <summary>
+    /// A direction a binaural effect can take: unit length, finite. Steam Audio's binaural effect
+    /// puts out NaN for a zero, a vanishingly short (1e-20) or a NaN direction, at every frame size
+    /// (--early-tail hrtf), and keeps it in its overlap state: one such block and the stage is NaN
+    /// until reset. Anything it cannot normalise becomes the -z axis.
+    /// </summary>
+    public static System.Numerics.Vector3 SafeDirection(System.Numerics.Vector3 d)
+    {
+        float l2 = d.LengthSquared();
+        if (!(l2 > 1e-12f) || !float.IsFinite(l2)) return new System.Numerics.Vector3(0f, 0f, -1f);
+        return d / MathF.Sqrt(l2);
+    }
     [DllImport(Lib, CallingConvention = CC)]
     public static extern void iplBinauralEffectRelease(ref IntPtr effect);
 

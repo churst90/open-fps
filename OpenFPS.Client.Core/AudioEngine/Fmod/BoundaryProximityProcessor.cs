@@ -48,6 +48,15 @@ public sealed class BoundaryVoiceState
     /// <summary>Diagnostics: the loudest reflection currently being rendered.</summary>
     public volatile float LoudestGain;
 
+    /// <summary>The non-finite guard's flags: the mix arriving at the master, and this stage's output.</summary>
+    public int NonFiniteInputReported, NonFiniteReported;
+
+    /// <summary>Forgets the delay line and the tap filters. Mixer thread; allocation-free.</summary>
+    public void ResetAfterFault()
+    {
+        Array.Clear(Line); Array.Clear(FilterL); Array.Clear(FilterR);
+    }
+
     public BoundaryVoiceState(int sampleRate)
     {
         SampleRate = sampleRate <= 0 ? 44100 : sampleRate;
@@ -149,7 +158,18 @@ public static class BoundaryProximityProcessor
                 if (inbuffer == IntPtr.Zero || outbuffer == IntPtr.Zero) return RESULT.OK;
                 var input = new ReadOnlySpan<float>((void*)inbuffer, n * inCh);
                 var output = new Span<float>((void*)outbuffer, n * outCh);
+                // The whole mix comes through here on its way to the limiter. A NaN that got this far
+                // would put the limiter's state out for good and the game would go silent: the block
+                // is silence instead, and the line says something upstream is unguarded.
+                if (!NonFinite.AllFinite(input))
+                {
+                    output.Clear();
+                    NonFinite.Report(ref s.NonFiniteInputReported, "the mix arriving at the master bus");
+                    s.ResetAfterFault();
+                    return RESULT.OK;
+                }
                 Process(s, input, output, inCh, outCh);
+                if (NonFinite.Scrub(output, ref s.NonFiniteReported, "the master bus's boundary stage")) s.ResetAfterFault();
             }
         }
         catch (Exception ex)

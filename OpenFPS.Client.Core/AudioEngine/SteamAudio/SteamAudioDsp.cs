@@ -56,6 +56,19 @@ internal sealed class SteamAudioVoiceState
     /// <summary>Where the image is, listener-relative, in Steam Audio's frame.</summary>
     public volatile float GroundDirX, GroundDirY = -1f, GroundDirZ;
 
+    /// <summary>The sound this stage places, for the [NONFINITE] line (NonFinite); set when it is
+    /// handed to a sound. Its flags: reported for its output, for its input.</summary>
+    public volatile string? GuardName;
+    public int NonFiniteReported, NonFiniteInputReported;
+
+    /// <summary>Forgets what it holds after a non-finite block. Mixer thread; allocation-free.</summary>
+    public void ResetAfterFault()
+    {
+        if (Effect != IntPtr.Zero) Phonon.iplBinauralEffectReset(Effect);
+        if (GroundEffect != IntPtr.Zero) Phonon.iplBinauralEffectReset(GroundEffect);
+        Ground?.Reset();
+    }
+
     // Diagnostics for the headless smoke test.
     public long CallbackCount;
     public volatile bool ProducedAudio;
@@ -109,7 +122,12 @@ internal static class SteamAudioDsp
     private static RESULT ReadCallback(ref DSP_STATE dsp_state, IntPtr inbuffer, IntPtr outbuffer,
                                        uint length, int inchannels, ref int outchannels)
     {
-        try { return ReadCallbackCore(ref dsp_state, inbuffer, outbuffer, length, inchannels, ref outchannels); }
+        try
+        {
+            var r = ReadCallbackCore(ref dsp_state, inbuffer, outbuffer, length, inchannels, ref outchannels);
+            Guard(ref dsp_state, inbuffer, outbuffer, (int)length, inchannels, outchannels > 0 ? outchannels : 2);
+            return r;
+        }
         catch (Exception ex)
         {
             unsafe
@@ -123,6 +141,25 @@ internal static class SteamAudioDsp
             return RESULT.OK;
         }
     }
+
+    /// <summary>What a voice puts into the mix is always finite (NonFinite). A bad input is named as
+    /// the input: the fault is in whatever made the sound.</summary>
+    private static unsafe void Guard(ref DSP_STATE dsp_state, IntPtr inbuffer, IntPtr outbuffer, int n, int inCh, int outCh)
+    {
+        if (outbuffer == IntPtr.Zero) return;
+        IntPtr userData = DspCallback.UserData(ref dsp_state);
+        if (userData == IntPtr.Zero || GCHandle.FromIntPtr(userData).Target is not SteamAudioVoiceState s) return;
+        bool badIn = inbuffer != IntPtr.Zero && !NonFinite.AllFinite((float*)inbuffer, n * Math.Max(1, inCh));
+        if (badIn)
+        {
+            new Span<float>((void*)outbuffer, n * outCh).Clear();
+            NonFinite.Report(ref s.NonFiniteInputReported, "voice (what feeds its binaural stage)", s.GuardName);
+        }
+        if (NonFinite.Scrub((float*)outbuffer, n * outCh, ref s.NonFiniteReported, "voice's binaural stage", s.GuardName) || badIn)
+            s.ResetAfterFault();
+    }
+
+    private static Phonon.IPLVector3 Dir(System.Numerics.Vector3 v) => new() { x = v.X, y = v.Y, z = v.Z };
 
     private static RESULT ReadCallbackCore(ref DSP_STATE dsp_state, IntPtr inbuffer, IntPtr outbuffer, uint length, int inchannels, ref int outchannels)
     {
@@ -184,7 +221,8 @@ internal static class SteamAudioDsp
         // 3. Spatialize with the current direction.
         var prm = new Phonon.IPLBinauralEffectParams
         {
-            direction = new Phonon.IPLVector3 { x = state.DirX, y = state.DirY, z = state.DirZ },
+            // Never a zero or a NaN direction: Steam Audio answers those with NaN (Phonon.SafeDirection).
+            direction = Dir(Phonon.SafeDirection(new System.Numerics.Vector3(state.DirX, state.DirY, state.DirZ))),
             interpolation = Phonon.IPL_HRTFINTERPOLATION_BILINEAR,
             // Always fully placed here; the blend is applied below, against the stage's OWN input
             // rather than against Steam Audio's mono. For a point source the input is mono and the
@@ -206,7 +244,7 @@ internal static class SteamAudioDsp
             Phonon.iplAudioBufferDeinterleave(state.Context, state.GroundMono, ref state.GroundInBuf);
             var gp = new Phonon.IPLBinauralEffectParams
             {
-                direction = new Phonon.IPLVector3 { x = state.GroundDirX, y = state.GroundDirY, z = state.GroundDirZ },
+                direction = Dir(Phonon.SafeDirection(new System.Numerics.Vector3(state.GroundDirX, state.GroundDirY, state.GroundDirZ))),
                 interpolation = Phonon.IPL_HRTFINTERPOLATION_BILINEAR,
                 spatialBlend = 1f,
                 hrtf = state.Hrtf,

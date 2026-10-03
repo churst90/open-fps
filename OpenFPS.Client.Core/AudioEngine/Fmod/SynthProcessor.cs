@@ -8,8 +8,11 @@ namespace OpenFPS.Client.AudioEngine.Fmod;
 /// Responsibility: Holds the internal state for a single Synthesizer voice.
 /// Tracks phase, LFO position, and filter coefficients.
 /// </summary>
-public class SynthVoiceState
+public class SynthVoiceState : IGuardedUnit
 {
+    /// <summary>The non-finite guard's flag and name for this unit (NonFinite).</summary>
+    public NonFiniteUnit Guard { get; } = new();
+
     // Parameters from SpatialEmitter
     public OpenFPS.Client.AudioEngine.Data.SynthWaveType WaveType;
     public float Frequency; 
@@ -49,6 +52,9 @@ public class SynthVoiceState
 /// </summary>
 public static class SynthProcessor
 {
+    /// <summary>The non-finite guard's flag for a state that is not an IGuardedUnit.</summary>
+    private static int _nonFiniteOther;
+
     private static readonly FMOD.DSP_READ_CALLBACK _readCallback = ReadCallback;
 
     public static RESULT CreateDSP(FMOD.System system, SynthVoiceState state, out FMOD.DSP dsp, out GCHandle handle)
@@ -84,7 +90,12 @@ public static class SynthProcessor
     private static RESULT ReadCallback(ref DSP_STATE dsp_state, IntPtr inbuffer, IntPtr outbuffer,
                                        uint length, int inchannels, ref int outchannels)
     {
-        try { return ReadCallbackCore(ref dsp_state, inbuffer, outbuffer, length, inchannels, ref outchannels); }
+        try
+        {
+            var r = ReadCallbackCore(ref dsp_state, inbuffer, outbuffer, length, inchannels, ref outchannels);
+            NonFinite.After(ref dsp_state, outbuffer, length, inchannels, outchannels, "synth voice", ref _nonFiniteOther);
+            return r;
+        }
         catch (Exception ex)
         {
             unsafe

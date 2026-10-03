@@ -147,6 +147,14 @@ internal sealed class EarDecorrelator
         return _a2 - Scatter(h2);
     }
 
+    /// <summary>Forgets everything it holds. Mixer thread; allocation-free.</summary>
+    public void Reset()
+    {
+        foreach (var l in _lines) Array.Clear(l);
+        Array.Clear(_at);
+        _a1 = _a2 = _b1 = 0f;
+    }
+
     private float Scatter(float x)
     {
         for (int k = 0; k < _lines.Length; k++)
