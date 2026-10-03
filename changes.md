@@ -2,6 +2,30 @@
 
 Recent work, newest first. `git log` has the rest.
 
+## 2026-10-03
+
+- The late tail no longer rings (branch tail-ring, unheard). At the ear, 400-900 ms, with
+  `--tail-steady`: 10.4-10.7 % of bins 10 dB over their local median and a flatness of 0.18 in the
+  stairwell, the flat and the corridor; now 0.08-0.12 % and 0.52-0.55 (noise: 0.1 % and 0.56). The
+  late part was one noise spread over twenty directions by velvet filters, then a velvet filter per
+  ear: three random spectra multiplied. Now each direction has its own noise under the averaged
+  energy (`DiffuseLate`), straight through its head response. No velvet and no ear velvet.
+  - Cost. The late part starts at 250 ms, so it is convolved in 4,096-sample blocks; each block's
+    answer is worked out over the next block's mixer pieces and waits in a ring. The noise is made
+    once (25 MB). Each trace gives only the envelope: per block, the amplitude at its start and end
+    per frequency bin. `--tail-cost` (Release, one thread): 229 us a piece, the old way 242 us.
+    The shared FFT is twice as fast (each stage's twiddles in a row, eight at a time).
+  - Level. The old late part was 4-6 dB low from 125 to 500 Hz at the ears (`--tail-iacc`): its
+    120 Hz split and its 400 Hz ear split each added their halves out of phase, and the velvet's own
+    low end. The field is within 0.8 dB of flat (the head's own response). So the late tail is
+    fuller below 500 Hz. Clap in the flat: levels the same to 0.1 dB; T20 +15 % at 125 Hz, +10 % at
+    500 Hz, the rest within 6 %.
+  - No split at 120 Hz for the room you are in: the head makes the low end alike at the two ears
+    (0.91 at 125 Hz), not identical.
+  - New lab: `--tail-cost`; `--tail-steady late=velvet` and `--clap-room late=velvet` for the A/B;
+    `--tail-iacc` prints level and IACC per octave for both ways; `--clap-room` prints the late
+    part's IACC.
+
 ## 2026-10-02
 
 - Door sounds by mechanism (branch door-sounds, unheard): every `door:KIND:EVENT` now has its own

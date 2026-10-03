@@ -27,6 +27,9 @@ internal sealed class TracedReverbState
     public LateTailConvolver? LateConv;
     /// <summary>The directional part's twenty responses against the send (SdmTailIr).</summary>
     public SharedInputConvolver? SdmConv;
+    /// <summary>The late part as a field, one independent noise per direction (DiffuseLate). Made by
+    /// the game thread when this stage first plays the room you are in; null until then.</summary>
+    public volatile DiffuseLateConvolver? DiffuseLateConv;
     public float[] LateOut = Array.Empty<float>();
     public IntPtr Decode;                 // IPLAmbisonicsDecodeEffect (provider context)
     public IntPtr Hrtf;
@@ -82,6 +85,10 @@ internal sealed class TracedReverbState
 ///
 /// The directional part of the tail (SdmTailIr) is added from the walls it came off
 /// (<see cref="AddDirectional"/>).
+///
+/// Since 2026-10-03 the late part normally arrives already as twenty independent signals
+/// (DiffuseLate) and goes through <see cref="RenderLate"/>: no velvet, no splits. The velvet way
+/// above is kept for a trace without directions and for the lab's A/B.
 /// </summary>
 internal sealed class DiffuseTail
 {
@@ -269,6 +276,65 @@ internal sealed class DiffuseTail
         }
     }
 
+    // ── The late part as a field (DiffuseLate) ─────────────────────────────────────────────────
+    //
+    // Each direction's own independent late signal (DiffuseLateConvolver), so no velvet branch and
+    // no ear velvet: three random spectra multiplied were the ring. Twenty independent directions
+    // leave the ears as unlike as the velvet did (--tail-iacc, noise, four headings: 0.11 0.07 0.17
+    // 0.13 from 500 Hz to 4 kHz, against 0.25 0.16 0.16 0.12), so nothing more is done to them; an
+    // all-pass chain per ear (24 sections from 700 Hz) was tried and changed nothing measurable.
+    // And no split at SplitHz either:
+    // the directions are distinct signals all the way down, so the head alone makes the low end
+    // alike at the two ears, as alike as a head in a diffuse field hears it (0.91 at 125 Hz with this
+    // HRTF, --tail-iacc), not identical. Split as the one-channel tail is, the low part (two one-pole
+    // low-passes) and the rest (two one-pole high-passes) of the SAME signal met in phase opposition
+    // at 120 Hz: a notch, 1.3-2.5 dB out of the 125 Hz octave and its decay shortened.
+
+    /// <summary>One block per direction: the late field's signals, filled by DiffuseLateConvolver.</summary>
+    public float[][] LateIn = Array.Empty<float[]>();
+    /// <summary>The lab's A/B: the ear velvet on the field as well. Never set in the game.</summary>
+    public static bool LateEarVelvet;
+
+    /// <summary>
+    /// The late field (<see cref="LateIn"/>) through the directions' own head responses into
+    /// <see cref="Stereo"/>, each weighted as the branches are (where the late energy comes from,
+    /// and the sources' lean). <see cref="Low"/> is left silent: the low end is in the head responses.
+    /// </summary>
+    public void RenderLate(int sub)
+    {
+        Array.Clear(Stereo, 0, sub * 2);
+        Array.Clear(Low, 0, sub);
+        UpdateBranchGains(sub);
+        var rot = new System.Numerics.Quaternion(Volatile.Read(ref _rx), Volatile.Read(ref _ry), Volatile.Read(ref _rz), Volatile.Read(ref _rw));
+        var toHead = System.Numerics.Quaternion.Conjugate(rot);
+        float baseGain = BinauralTrim / MathF.Sqrt(DiffuseBranch.Count);
+        for (int b = 0; b < DiffuseBranch.Count; b++)
+        {
+            var src = LateIn[b];
+            float gain = baseGain * _branchGain[b];
+            for (int k = 0; k < sub; k++) Branch[k] = src[k] * gain;
+            Phonon.iplAudioBufferDeinterleave(EarContext, Branch, ref Mono);
+            var local = System.Numerics.Vector3.Transform(Direction(b), toHead);
+            var ep = new Phonon.IPLBinauralEffectParams
+            {
+                direction = new Phonon.IPLVector3 { x = local.X, y = local.Y, z = -local.Z },
+                interpolation = Phonon.IPL_HRTFINTERPOLATION_BILINEAR, spatialBlend = 1f, hrtf = EarHrtf,
+            };
+            Phonon.iplBinauralEffectApply(Ears[b], ref ep, ref Mono, ref EarBuf);
+            Phonon.iplAudioBufferInterleave(EarContext, ref EarBuf, _earScratch);
+            for (int i = 0; i < sub * 2; i++) Stereo[i] += _earScratch[i];
+        }
+        if (!LateEarVelvet) return;
+        for (int k = 0; k < sub; k++)
+        {
+            float l = Stereo[k * 2], r = Stereo[k * 2 + 1];
+            float lowL = _loL2.Process(_loL1.Process(l)), highL = _hiL2.Process(_hiL1.Process(l));
+            float lowR = _loR2.Process(_loR1.Process(r)), highR = _hiR2.Process(_hiR1.Process(r));
+            Stereo[k * 2] = lowL + _earL.Process(highL);
+            Stereo[k * 2 + 1] = lowR + _earR.Process(highR);
+        }
+    }
+
     /// <summary>Noise through the whole binaural path, each ear's energy against the noise's: the trim
     /// that makes the tail at the ears as strong as the tail that went in.</summary>
     private void CalibrateBinaural(int sub, int channels)
@@ -390,6 +456,8 @@ internal sealed class DiffuseTail
         var d = new DiffuseTail { Context = context };
         for (int i = 0; i < DiffuseBranch.Count; i++) d.Branches[i] = new DiffuseBranch(i);
         d.W = new float[subFrame]; d.Branch = new float[subFrame]; d.Low = new float[subFrame];
+        d.LateIn = new float[DiffuseBranch.Count][];
+        for (int i = 0; i < DiffuseBranch.Count; i++) d.LateIn[i] = new float[subFrame];
         Phonon.iplAudioBufferAllocate(context, 1, subFrame, ref d.Mono);
         if (!d.CreateEars(context, subFrame, hrtf)) { d.Release(); return null; }
         d.CalibrateBinaural(subFrame, channels);
@@ -489,6 +557,31 @@ internal static class TracedReverbDsp
                 inSum += v * (double)v;
             }
             Phonon.iplAudioBufferDeinterleave(s.WorkerContext, mono, ref s.Mono);
+            if (s.TailOnly && s.Diffuse is { } dff && s.DiffuseLateConv is { } lfc && reverb.DiffuseLate is { } field)
+            {
+                // The late part as a field: each direction its own noise (DiffuseLate), straight to
+                // the ears through its own head response, and the directional part as below.
+                lfc.Set(field);
+                lfc.Process(mono.AsSpan(0, sub), dff.LateIn);
+                dff.LateShares = reverb.LateSdm?.LateShare;
+                dff.RenderLate(sub);
+                if (dff.SdmReady && s.SdmConv is { } sc2)
+                {
+                    sc2.Set(reverb.LateSdm);
+                    sc2.Process(mono.AsSpan(0, sub), dff.SdmOut);
+                    dff.AddDirectional(sub);
+                }
+                for (int k = 0; k < sub; k++)
+                {
+                    float l = (dff.Stereo[k * 2] + dff.Low[k]) * g, r = (dff.Stereo[k * 2 + 1] + dff.Low[k]) * g;
+                    outSum += l * (double)l + r * (double)r;
+                    int ok = (at + k) * outCh;
+                    o[ok] = l;
+                    if (outCh > 1) o[ok + 1] = r;
+                    for (int c = 2; c < outCh; c++) o[ok + c] = 0f;
+                }
+                continue;
+            }
             if (s.TailOnly && s.LateConv is { } lc)
             {
                 // The traced late part itself, convolved: its level, its envelope and its decay are

@@ -189,19 +189,24 @@ internal sealed class LateTailConvolver
     }
 }
 
-/// <summary>An in-place radix-2 complex FFT of one fixed size. Allocation-free after construction.</summary>
+/// <summary>
+/// An in-place radix-2 complex FFT of one fixed size. Allocation-free after construction.
+///
+/// Each stage's twiddles are laid out in a row of their own, so a stage's butterflies run through
+/// memory in order and, from eight wide up, a vector at a time: the 8,192-point transforms of the
+/// late field (DiffuseLate) took 82 us read from one shared table at a stride.
+/// </summary>
 internal sealed class Fft
 {
     private readonly int _n;
-    private readonly float[] _cos, _sin;
     private readonly int[] _rev;
+    // Stage s (butterflies 2^(s+1) wide, half = 2^s) has its twiddles at [half - 1, 2 * half - 1).
+    private readonly float[] _twRe, _twIm;
 
     public Fft(int n)
     {
         if (n < 2 || (n & (n - 1)) != 0) throw new ArgumentException("FFT size must be a power of two.", nameof(n));
         _n = n;
-        _cos = new float[n / 2]; _sin = new float[n / 2];
-        for (int k = 0; k < n / 2; k++) { _cos[k] = MathF.Cos(2f * MathF.PI * k / n); _sin[k] = -MathF.Sin(2f * MathF.PI * k / n); }
         _rev = new int[n];
         int bits = 0; while ((1 << bits) < n) bits++;
         for (int i = 0; i < n; i++)
@@ -209,6 +214,13 @@ internal sealed class Fft
             int r = 0; for (int b = 0; b < bits; b++) if ((i & (1 << b)) != 0) r |= 1 << (bits - 1 - b);
             _rev[i] = r;
         }
+        _twRe = new float[n]; _twIm = new float[n];
+        for (int half = 1; half < n; half <<= 1)
+            for (int k = 0; k < half; k++)
+            {
+                double a = -Math.PI * k / half;
+                _twRe[half - 1 + k] = (float)Math.Cos(a); _twIm[half - 1 + k] = (float)Math.Sin(a);
+            }
     }
 
     public void Forward(float[] re, float[] im) => Run(re, im, false);
@@ -218,7 +230,14 @@ internal sealed class Fft
     {
         Run(re, im, true);
         float s = 1f / _n;
-        for (int i = 0; i < _n; i++) { re[i] *= s; im[i] *= s; }
+        int i = 0, vec = Vector<float>.Count;
+        var vs = new Vector<float>(s);
+        for (; i + vec <= _n; i += vec)
+        {
+            (new Vector<float>(re, i) * vs).CopyTo(re, i);
+            (new Vector<float>(im, i) * vs).CopyTo(im, i);
+        }
+        for (; i < _n; i++) { re[i] *= s; im[i] *= s; }
     }
 
     private void Run(float[] re, float[] im, bool inverse)
@@ -228,19 +247,37 @@ internal sealed class Fft
             int j = _rev[i];
             if (j > i) { (re[i], re[j]) = (re[j], re[i]); (im[i], im[j]) = (im[j], im[i]); }
         }
-        for (int size = 2; size <= _n; size <<= 1)
+        float sign = inverse ? -1f : 1f;
+        int vec = Vector<float>.Count;
+        var vsign = new Vector<float>(sign);
+        for (int half = 1; half < _n; half <<= 1)
         {
-            int half = size >> 1, step = _n / size;
-            for (int start = 0; start < _n; start += size)
+            int size = half << 1, t0 = half - 1;
+            if (half >= vec)
             {
-                for (int k = 0; k < half; k++)
-                {
-                    float wr = _cos[k * step], wi = inverse ? -_sin[k * step] : _sin[k * step];
-                    int a = start + k, b = a + half;
-                    float tr = re[b] * wr - im[b] * wi, ti = re[b] * wi + im[b] * wr;
-                    re[b] = re[a] - tr; im[b] = im[a] - ti;
-                    re[a] += tr; im[a] += ti;
-                }
+                for (int start = 0; start < _n; start += size)
+                    for (int k = 0; k < half; k += vec)
+                    {
+                        int a = start + k, b = a + half;
+                        var wr = new Vector<float>(_twRe, t0 + k); var wi = new Vector<float>(_twIm, t0 + k) * vsign;
+                        var br = new Vector<float>(re, b); var bi = new Vector<float>(im, b);
+                        var tr = br * wr - bi * wi; var ti = br * wi + bi * wr;
+                        var ar = new Vector<float>(re, a); var ai = new Vector<float>(im, a);
+                        (ar - tr).CopyTo(re, b); (ai - ti).CopyTo(im, b);
+                        (ar + tr).CopyTo(re, a); (ai + ti).CopyTo(im, a);
+                    }
+            }
+            else
+            {
+                for (int start = 0; start < _n; start += size)
+                    for (int k = 0; k < half; k++)
+                    {
+                        float wr = _twRe[t0 + k], wi = _twIm[t0 + k] * sign;
+                        int a = start + k, b = a + half;
+                        float tr = re[b] * wr - im[b] * wi, ti = re[b] * wi + im[b] * wr;
+                        re[b] = re[a] - tr; im[b] = im[a] - ti;
+                        re[a] += tr; im[a] += ti;
+                    }
             }
         }
     }

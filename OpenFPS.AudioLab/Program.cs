@@ -110,6 +110,7 @@ string[] usage =
     "  --sa-frame                                    which way Steam Audio's traced soundfield faces",
     "  --tail-bands / --tail-iacc / --late-field     the tail per octave, its ears' coherence, each source's late energy",
     "  --tail-steady [room=stair|flat|corridor]      does the tail hold still: pulsing, steps, decay, ring, raw vs smooth",
+    "  --tail-cost [t60=2]                           the late tail's cost per mixer piece: one channel against the field",
     "  --sim-reverbfield                             the simulator's reverb against enclosure across places",
     "  --scene-cost [map=city]                       what rebuilding the Steam Audio scenes costs",
     "  --pass-by [out=]                              noise driven past through the binaural effect, per block",
@@ -546,6 +547,11 @@ if (args.Contains("--tail-steady"))
     // --tail-steady [room=stair|flat|corridor] [seconds=10] [jitter=CM] [skip=4]: the tail standing still, each trace's own
     // samples against SmoothTail's averaged energy through fixed noise.
     Environment.Exit(OpenFPS.Client.Core.AudioEngine.Fmod.TailSteadySpike.Run(args));
+}
+if (args.Contains("--tail-cost"))
+{
+    // --tail-cost [t60=2] [seconds=20]: the late tail's cost per mixer piece, one channel against the field.
+    Environment.Exit(OpenFPS.Client.Core.AudioEngine.Fmod.TailCostSpike.Run(args));
 }
 if (args.Contains("--tail-iacc"))
 {

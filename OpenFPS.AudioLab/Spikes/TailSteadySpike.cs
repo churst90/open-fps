@@ -38,12 +38,15 @@ public static class TailSteadySpike
     private const int Fs = 44100, Block = TracedReverb.TracedFrame;
     private static readonly double[] Octaves = { 125, 250, 500, 1000, 2000, 4000 };
 
+    private static bool Velvet;
+
     private sealed class Trace
     {
         public float[] RawLate = Array.Empty<float>(), SmoothLate = Array.Empty<float>();
         public float[][] RawDirs = Array.Empty<float[]>(), SmoothDirs = Array.Empty<float[]>();
         public LateTailIr? RawLateIr, SmoothLateIr;
         public SdmTailIr? RawSdmIr, SmoothSdmIr;
+        public DiffuseLateIr? Field;
         public double Weight;
     }
 
@@ -51,6 +54,11 @@ public static class TailSteadySpike
     {
         AcousticRegistry.Initialize();
         string room = Arg(args, "room") ?? "stair";
+        // late=velvet: the smooth tail's late part as it was, one channel through the velvet branches
+        // and the ear velvet; the default is the game's, the late field (DiffuseLate). earvelvet=1 puts
+        // the ear velvet on the field too.
+        Velvet = Arg(args, "late") == "velvet";
+        DiffuseTail.LateEarVelvet = Arg(args, "earvelvet") == "1";
         double seconds = double.TryParse(Arg(args, "seconds"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double s) ? s : 10;
         var (boxes, ear) = Scene(room);
 
@@ -83,7 +91,7 @@ public static class TailSteadySpike
                 seen = late;
                 var t = new Trace
                 {
-                    SmoothLateIr = late, SmoothSdmIr = tr.LateSdm, RawLateIr = tr.RawLate, RawSdmIr = tr.RawLateSdm,
+                    SmoothLateIr = late, SmoothSdmIr = tr.LateSdm, RawLateIr = tr.RawLate, RawSdmIr = tr.RawLateSdm, Field = tr.DiffuseLate,
                     Weight = tr.Smooth?.LastWeight ?? 0,
                 };
                 traces.Add(t);
@@ -168,7 +176,21 @@ public static class TailSteadySpike
                 var qr = Ring(er[0], a, b); var qs = Ring(es[0], a, b);
                 Console.WriteLine($"  ring at the left ear, {what}: raw {qr.Over10 * 100:F2} % over 10 dB, 99.9th {qr.P999:F1} dB, flatness {qr.Flat:F2}, repeat {qr.Repeat:F2}"
                                 + $" | smooth {qs.Over10 * 100:F2} %, {qs.P999:F1} dB, {qs.Flat:F2}, {qs.Repeat:F2}");
+                var rr2 = Ring(es[1], a, b);
+                Console.WriteLine($"    right ear, smooth: {rr2.Over10 * 100:F2} %, {rr2.P999:F1} dB, flatness {rr2.Flat:F2}, repeat {rr2.Repeat:F2}");
             }
+            // How alike the two ears are, per octave, in the late part of the impulse (a diffuse
+            // field on this head: about 0.9 at 125 Hz, 0.7 at 250, 0.1 at 500, 0.03 above; --tail-iacc).
+            foreach (var (a, b, what) in new[] { (0.06, 0.24, "60-240 ms"), (0.4, 0.9, "400-900 ms") })
+            {
+                var line = new System.Text.StringBuilder($"  IACC at the ears, {what}: raw");
+                foreach (double f in Octaves) line.Append($" {Iacc(Band(er[0], f), Band(er[1], f), a, b):F2}");
+                line.Append(" | smooth");
+                foreach (double f in Octaves) line.Append($" {Iacc(Band(es[0], f), Band(es[1], f), a, b):F2}");
+                Console.WriteLine(line);
+            }
+            if (Pieces > 0)
+                Console.WriteLine($"  the smooth late part's cost per 256-sample piece ({(Velvet ? "one channel, velvet" : "field")}): convolution {FieldTicks * 1e6 / System.Diagnostics.Stopwatch.Frequency / Pieces:F0} us mean, worst {WorstFieldTicks * 1e6 / System.Diagnostics.Stopwatch.Frequency:F0} us; directions and ears {RenderTicks * 1e6 / System.Diagnostics.Stopwatch.Frequency / Pieces:F0} us mean");
         }
 
         // ── A steady hum through it: each harmonic's level, 50 ms at a time ──────────────────
@@ -346,6 +368,7 @@ public static class TailSteadySpike
     {
         var lc = new LateTailConvolver(Block, Fs * 2 / Block + 1);
         var sc = new SharedInputConvolver(Block, SdmTailIr.PartitionsFor(Fs, Block), DiffuseBranch.Count);
+        var lf = new DiffuseLateConvolver(Block, DiffuseLateNoise.PartitionsFor(Fs, 2 * Fs), DiffuseBranch.Count, DiffuseLateNoise.StartFor(Fs));
         var df = DiffuseTail.Create(ctx, Block, TracedReverb.Channels, hrtf) ?? throw new InvalidOperationException("no DiffuseTail");
         var ambi = new float[Block * TracedReverb.Channels];
         var y = new[] { new float[x.Length], new float[x.Length] };
@@ -354,12 +377,32 @@ public static class TailSteadySpike
         for (int at = 0; at + Block <= x.Length; at += Block)
         {
             var t = frozen ? use[^1] : use[Math.Min(use.Count - 1, at / per)];
-            lc.SetIr(smooth ? t.SmoothLateIr : t.RawLateIr);
             var sdm = smooth ? t.SmoothSdmIr : t.RawSdmIr;
-            lc.Process(x.AsSpan(at, Block), tmp);
-            Array.Clear(ambi);
-            for (int k = 0; k < Block; k++) ambi[k * TracedReverb.Channels] = tmp[k];
-            df.RenderBinaural(ambi, Block, TracedReverb.Channels);
+            if (smooth && !Velvet && t.Field != null)
+            {
+                // As the game plays it: the late part as a field (TracedReverbDsp).
+                lf.Set(t.Field);
+                long c0 = System.Diagnostics.Stopwatch.GetTimestamp();
+                lf.Process(x.AsSpan(at, Block), df.LateIn);
+                FieldTicks += System.Diagnostics.Stopwatch.GetTimestamp() - c0;
+                df.LateShares = sdm?.LateShare;
+                long r0 = System.Diagnostics.Stopwatch.GetTimestamp();
+                df.RenderLate(Block);
+                RenderTicks += System.Diagnostics.Stopwatch.GetTimestamp() - r0;
+                Pieces++;
+                WorstFieldTicks = Math.Max(WorstFieldTicks, lf.WorstTicks); lf.WorstTicks = 0;
+            }
+            else
+            {
+                lc.SetIr(smooth ? t.SmoothLateIr : t.RawLateIr);
+                long c0 = System.Diagnostics.Stopwatch.GetTimestamp();
+                lc.Process(x.AsSpan(at, Block), tmp);
+                long c1 = System.Diagnostics.Stopwatch.GetTimestamp();
+                Array.Clear(ambi);
+                for (int k = 0; k < Block; k++) ambi[k * TracedReverb.Channels] = tmp[k];
+                df.RenderBinaural(ambi, Block, TracedReverb.Channels);
+                if (smooth) { FieldTicks += c1 - c0; RenderTicks += System.Diagnostics.Stopwatch.GetTimestamp() - c1; Pieces++; WorstFieldTicks = Math.Max(WorstFieldTicks, c1 - c0); }
+            }
             if (df.SdmReady)
             {
                 df.LateShares = sdm?.LateShare;
@@ -376,6 +419,10 @@ public static class TailSteadySpike
         df.Release();
         return y;
     }
+
+    // What the smooth tail's late part cost to render, per 256-sample piece: its convolution, and
+    // the spreading over the directions and their head responses.
+    private static long FieldTicks, RenderTicks, Pieces, WorstFieldTicks;
 
     /// <summary>The s.d. of the left-right level difference over 50 ms windows (dB): where the tail
     /// seems to come from, moving.</summary>
@@ -553,6 +600,22 @@ public static class TailSteadySpike
             }
         }
         return y;
+    }
+
+    /// <summary>The largest normalised cross-correlation within 1 ms, over <paramref name="from"/>..<paramref name="to"/> seconds.</summary>
+    private static double Iacc(float[] l, float[] r, double from, double to)
+    {
+        int a = (int)(from * Fs), b = Math.Min(Math.Min(l.Length, r.Length), (int)(to * Fs)), lag = Fs / 1000;
+        double el = 0, er = 0;
+        for (int i = a; i < b; i++) { el += l[i] * (double)l[i]; er += r[i] * (double)r[i]; }
+        double best = 0;
+        for (int d = -lag; d <= lag; d++)
+        {
+            double c = 0;
+            for (int i = Math.Max(a, a - d); i < b && i + d < b; i++) c += l[i] * (double)r[i + d];
+            best = Math.Max(best, Math.Abs(c) / Math.Sqrt(el * er + 1e-30));
+        }
+        return best;
     }
 
     /// <summary>Both ears' energy in an octave from 50 ms: the total, T20, EDT, and the energy in

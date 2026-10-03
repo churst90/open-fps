@@ -148,6 +148,24 @@ internal sealed class SmoothTail
             _x2 = _x1; _x1 = x; _y2 = _y1; _y1 = y;
             return y;
         }
+        /// <summary>|H|^2 at <paramref name="w"/> radians per sample.</summary>
+        public double Power(double w)
+        {
+            double c1 = Math.Cos(w), s1 = Math.Sin(w), c2 = Math.Cos(2 * w), s2 = Math.Sin(2 * w);
+            double nr = _b0 + _b1 * c1 + _b2 * c2, ni = -_b1 * s1 - _b2 * s2;
+            double dr = 1 + _a1 * c1 + _a2 * c2, di = -_a1 * s1 - _a2 * s2;
+            return (nr * nr + ni * ni) / (dr * dr + di * di);
+        }
+    }
+
+    /// <summary>Band <paramref name="band"/>'s power gain at <paramref name="hz"/>: the filters a
+    /// band's measurement and its carrier go through (see <see cref="Carrier"/>).</summary>
+    public static double BandPower(int band, double hz, int rate)
+    {
+        double w = 2 * Math.PI * hz / rate, g = 1;
+        for (int e = 0; e < band; e++) g *= Biquad.Make(true, EdgesHz[e], Q1, rate).Power(w) * Biquad.Make(true, EdgesHz[e], Q2, rate).Power(w);
+        if (band < EdgesHz.Length) g *= Biquad.Make(false, EdgesHz[band], Q1, rate).Power(w) * Biquad.Make(false, EdgesHz[band], Q2, rate).Power(w);
+        return g;
     }
 
     // The two sections of a fourth-order Butterworth.
@@ -364,6 +382,73 @@ internal sealed class SmoothTail
             x[i] *= late ? MathF.Sin(0.5f * MathF.PI * u) : 0.5f - 0.5f * MathF.Cos(MathF.PI * u);
         }
         return x;
+    }
+
+    /// <summary>
+    /// The late tail as a field (DiffuseLate): what <see cref="LateWindowed"/> plays after the
+    /// directional part, given as an envelope over <paramref name="noise"/>'s fixed per-direction
+    /// noise. Per band and per block of DiffuseLateNoise.Block samples from the late part's start, the
+    /// amplitude at the block's start and end: the straight line nearest the windowed envelope, then
+    /// scaled so the block carries the band's energy exactly. Cut where what remains is 70 dB under
+    /// the whole.
+    /// </summary>
+    public DiffuseLateIr BuildDiffuseLate(DiffuseLateNoise noise)
+    {
+        int nb = Bands, B = DiffuseLateNoise.Block, start = noise.Start;
+        int maxP = Math.Min(noise.Partitions, Math.Max(1, (Length - start + B - 1) / B));
+        int i1 = (int)(SdmTailIr.EndFadeEnd * SampleRate);
+        double g00 = 0, g01 = 0, g11 = 0;
+        for (int t = 0; t < B; t++) { double u = (t + 0.5) / B; g00 += (1 - u) * (1 - u); g01 += (1 - u) * u; g11 += u * u; }
+        double det = g00 * g11 - g01 * g01;
+        var c0 = new float[nb * maxP]; var c1 = new float[nb * maxP];
+        var energy = new double[maxP];
+        for (int b = 0; b < nb; b++)
+        {
+            var e = Smoothed(_omni, b * Frames, Frames, b);
+            for (int p = 0; p < maxP; p++)
+            {
+                double r0 = 0, r1 = 0, tot = 0;
+                for (int t = 0; t < B; t++)
+                {
+                    int i = start + p * B + t;
+                    if (i >= Length) break;
+                    double a = Amp(e, i);
+                    if (i < i1) a *= Math.Sin(0.5 * Math.PI * (i - start) / Math.Max(1, i1 - start));
+                    double u = (t + 0.5) / B;
+                    r0 += a * (1 - u); r1 += a * u; tot += a * a;
+                }
+                double x0 = (g11 * r0 - g01 * r1) / det, x1 = (g00 * r1 - g01 * r0) / det;
+                if (x0 < 0) { x0 = 0; x1 = Math.Max(0, r1 / g11); }
+                else if (x1 < 0) { x1 = 0; x0 = Math.Max(0, r0 / g00); }
+                double fit = x0 * x0 * g00 + 2 * x0 * x1 * g01 + x1 * x1 * g11;
+                double k = fit > 0 ? Math.Sqrt(tot / fit) : 0;
+                c0[b * maxP + p] = (float)(x0 * k); c1[b * maxP + p] = (float)(x1 * k);
+                energy[p] += tot;
+            }
+        }
+        double total = 0; foreach (var v in energy) total += v;
+        int used = 1; double rest = 0;
+        for (int p = maxP - 1; p >= 0 && total > 0; p--) { rest += energy[p]; if (rest > total * 1e-7) { used = p + 1; break; } }
+        if (used < maxP)
+        {
+            var d0 = new float[nb * used]; var d1 = new float[nb * used];
+            for (int b = 0; b < nb; b++) { Array.Copy(c0, b * maxP, d0, b * used, used); Array.Copy(c1, b * maxP, d1, b * used, used); }
+            c0 = d0; c1 = d1;
+        }
+        return new DiffuseLateIr(noise, used, c0, c1, total);
+    }
+
+    /// <summary>One band's amplitude per sample at sample <paramref name="i"/>, as <see cref="Shape"/>
+    /// lays it: sqrt(energy per sample) at frame centres, straight lines between.</summary>
+    private static double Amp(double[] energy, int i)
+    {
+        const int half = Frame / 2;
+        int frames = energy.Length;
+        int f = i < half ? -1 : (i - half) / Frame;
+        double t = (i - (f * Frame + half)) / (double)Frame;
+        double ga = Math.Sqrt(Math.Max(0.0, energy[Math.Clamp(f, 0, frames - 1)]) / Frame);
+        double gb = Math.Sqrt(Math.Max(0.0, energy[Math.Clamp(f + 1, 0, frames - 1)]) / Frame);
+        return ga + (gb - ga) * t;
     }
 
     /// <summary>The late tail to convolve, in partitions; see <see cref="LateWindowed"/>.</summary>
