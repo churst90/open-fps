@@ -18,10 +18,22 @@ namespace OpenFPS.Client.Core.AudioEngine.Fmod;
 /// flat, the reverb sends, the decorrelator, the master limiter, written to a WAV and read back.
 ///
 ///   --clap-room [out=path] [claps=4] [sound=click|<weapon id>] [dist=0.5] [bed] [tail=raw]
+///               [copies=0] [early=old] [probe=MS]
 ///   tail=raw plays each trace's own samples, as before SmoothTail, for the A/B. late=velvet plays the
 ///   late part as one channel through the velvet branches, as before DiffuseLate.
 ///   A weapon id (glock, ar15, akm, ...) fires that gun at its own level from dist metres; bed plays a
 ///   quiet 150 Hz hum at 2 m under it all and prints its level through each shot: the ear overload.
+///   Each clap gets what the game gives it: its own floor bounce (the voice's ground) and the room's
+///   placed copies and washes (WorldAudioPlayer.PlanRoomEchoes over the same boxes), each delayed by
+///   its own path as the facade does. copies=0 leaves the copies out. early=old plays the traced
+///   response as it was before 2026-10-03 (from 50 ms, nothing taken out for the copies, and 4.4 ms
+///   early against the voices: no TracedReverbDsp.StagePreDelay).
+///   probe=MS replaces the traced response with one click MS milliseconds in and reports where it
+///   lands against the dry click: the latency of the reverb bus. Use with sound=click.
+///
+///   Printed besides: the energy after the clap in 2 ms steps (mean over the claps), and per octave
+///   C50, C80, D50 with the direct sound, and the room's own early-to-late ratios (from 3 ms) against
+///   an exponential decay at the band's T20 from the first reflection.
 ///
 /// Written because "a bathroom stall rather than a carpeted room" was read off captures full of city
 /// noise, where the room's answer could only be estimated. Here nothing else is playing. What it
@@ -41,6 +53,12 @@ public static class ClapRoomSpike
         int claps = int.TryParse(Arg(args, "claps"), out int c) ? c : 4;
         TracedReverb.RawTail = Arg(args, "tail") == "raw";
         TracedReverb.OneChannelLate = Arg(args, "late") == "velvet";
+        SmoothTail.FromFiftyMs = Arg(args, "early") == "old";
+        // early=old is the response as it was: from 50 ms, and without the wait for the voices (TracedReverbDsp.StagePreDelay).
+        TracedReverbDsp.LabNoPreDelay = SmoothTail.FromFiftyMs;
+        float probeMs = float.TryParse(Arg(args, "probe"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float pm) ? pm : 0f;
+        TracedReverb.LabProbeSeconds = probeMs / 1000f;
+        bool withCopies = Arg(args, "copies") != "0" && probeMs <= 0f;
 
         // The flat, in its own frame: 8.65 x 17.86 x 2.7 m, carpet on concrete, plaster over, plaster
         // walls and the brick outer wall, a sofa. The ear where /tp -14 -85 0.5 puts it.
@@ -78,6 +96,8 @@ public static class ClapRoomSpike
         bool bed = args.Contains("bed");
         var placed = Loudness.Place(levelDb);
         var clapTimes = new List<double>();
+        float[]? traceW = null;
+        double startMs = 0, firstMs = 0;
         try
         {
             provider.SetAcousticMap(BuildMap());
@@ -106,6 +126,75 @@ public static class ClapRoomSpike
             }
             provider.RegisterSynthesisedSound("synth:clap:lab", TransientSynth.ToPcm16(pcm), TransientSynth.SampleRate);
 
+            // The copies the game places round a clap (WorldAudioPlayer.QueueEarlyEchoes), over the same
+            // boxes, and the washes beside them, rendered as the game renders them.
+            var solids = boxes.Select(b => new EarlyReflections.Solid(b.Center, b.Size, b.Rotation, b.Material)).ToList();
+            var found = new List<EarlyReflections.Arrival>();
+            var plan = new List<OpenFPS.Client.Core.WorldAudioPlayer.RoomEcho>();
+            float c0 = AudioPhysics.CurrentSpeedOfSound;
+            EarlyReflections.Find(hands, ear, solids, found, c0, maxOrder: 2, keep: OpenFPS.Client.Core.WorldAudioPlayer.MaxRoomEchoes * 2,
+                                  maxExtraPathMetres: OpenFPS.Client.Core.WorldAudioPlayer.RoomEchoWindowSeconds * c0);
+            float direct0 = Vector3.Distance(hands, ear);
+            OpenFPS.Client.Core.WorldAudioPlayer.PlanRoomEchoes(found, hands, ear, direct0, placed.ReferenceDistance,
+                                                               FmodAudioProvider.CopiesTrim, audible: true, plan);
+            firstMs = plan.Count > 0 ? plan.Min(e => e.Arrival.ExtraDelaySeconds) * 1000.0 : 0.0;
+            var washIds = new HashSet<string>();
+            foreach (var e in plan)
+                if (!e.InVoice && e.WashGain >= ImageSource.MinGain)
+                {
+                    int step = (int)MathF.Round(e.Scattering * 4f);
+                    string id = $"synth:clap:lab~wash{step}";
+                    if (washIds.Add(id))
+                        provider.RegisterSynthesisedSound(id, TransientSynth.ToPcm16(OpenFPS.Client.Core.WorldAudioPlayer.Diffuse(pcm, step / 4f, 1)), TransientSynth.SampleRate);
+                }
+            if (withCopies)
+            {
+                Console.WriteLine($"  placed copies ({FmodAudioProvider.CopiesDb:F0} dB trim):");
+                foreach (var e in plan.OrderBy(e => e.Arrival.PathLength))
+                    Console.WriteLine($"    order {e.Arrival.Order} {e.Arrival.ExtraDelaySeconds * 1000,5:F1} ms after the clap, "
+                                    + (e.InVoice ? "the floor, in the voice" : $"copy {20 * MathF.Log10(MathF.Max(1e-6f, e.MirrorGain)),6:F1} dB, wash {(e.WashGain > 0 ? 20 * MathF.Log10(e.WashGain) : -999),6:F1} dB"));
+            }
+            int voice = -1000;
+            void PlayCopies(int clap)
+            {
+                if (!withCopies) return;
+                foreach (var e in plan)
+                {
+                    if (e.InVoice) continue;
+                    var a = e.Arrival;
+                    float lowDb = 20f * MathF.Log10(MathF.Max(1e-4f, a.GainLow) / MathF.Max(1e-4f, a.GainMid));
+                    float highDb = 20f * MathF.Log10(MathF.Max(1e-4f, a.GainHigh) / MathF.Max(1e-4f, a.GainMid));
+                    var loss = OpenFPS.Client.Core.WorldAudioPlayer.SpecularLoss(a.Scattering, a.Order);
+                    if (e.WashGain >= ImageSource.MinGain)
+                        Copy($"synth:clap:lab~wash{(int)MathF.Round(e.Scattering * 4f)}", a.ImagePosition, e.WashGain, lowDb, highDb);
+                    if (e.MirrorGain >= ImageSource.MinGain)
+                        Copy("synth:clap:lab", a.ImagePosition, e.MirrorGain, loss.LowDb + lowDb, loss.HighDb + highDb);
+                }
+            }
+            void Copy(string id, Vector3 at, float gain, float lowDb, float highDb)
+            {
+                float dist = Vector3.Distance(ear, at);
+                provider.PlaySpatialSound(new SpatialEmitter
+                {
+                    EntityId = voice--, SoundId = id, Mode = PlaybackMode.Single, Type = EmitterType.WorldLocked,
+                    Position = at, ApparentPosition = at, EffectiveDistance = dist,
+                    Volume = placed.Gain * gain, MinDistance = placed.ReferenceDistance, Range = 200f, Pitch = 1f,
+                    ConeInside = 360f, ConeOutside = 360f, ConeOutsideVolume = 1f,
+                    EqLow = MathF.Pow(10f, lowDb / 20f), EqMid = 1f, EqHigh = MathF.Pow(10f, highDb / 20f), ApertureFactor = 1f,
+                    // A copy: never sent to the reverb (LevelDb 0), delayed by its own path as the facade does.
+                    IsEvent = true, Essential = true, TargetRegionId = RoomId, LevelDb = 0f,
+                    DelayMs = dist / AudioPhysics.CurrentSpeedOfSound * 1000f,
+                });
+            }
+            // The clap's own floor bounce, as ClientAudioSystem.ApplyGround gives a one-off sound.
+            const float floorTop = 0.08f;
+            var floorImage = new Vector3(hands.X, 2f * floorTop - hands.Y, hands.Z);
+            var carpet = AcousticRegistry.GetProperties("Carpet");
+            float groundSpread = direct0 / MathF.Max(direct0, Vector3.Distance(floorImage, ear));
+            float groundLow = MathF.Sqrt(Math.Clamp(1f - 0.5f * (carpet.AbsorptionLow + carpet.AbsorptionMid), 0f, 1f)) * groundSpread;
+            float groundHigh = MathF.Sqrt(Math.Clamp(1f - carpet.AbsorptionHigh, 0f, 1f)) * Math.Clamp(0.94f - 0.0055f * direct0, 0.45f, 1f) * groundSpread;
+            float groundDelay = (Vector3.Distance(floorImage, ear) - direct0) / AudioPhysics.CurrentSpeedOfSound;
+
             var sw = System.Diagnostics.Stopwatch.StartNew();
             double next = 3.0;
             int played = 0;
@@ -131,7 +220,10 @@ public static class ClapRoomSpike
                         EqLow = 1f, EqMid = 1f, EqHigh = 1f, ApertureFactor = 1f,
                         IsEvent = true, Essential = true, TargetRegionId = RoomId,
                         LevelDb = levelDb, EffectiveDistance = Vector3.Distance(ear, hands),
+                        DelayMs = direct0 / AudioPhysics.CurrentSpeedOfSound * 1000f,
+                        GroundHeight = floorTop, GroundDelaySeconds = groundDelay, GroundLowGain = groundLow, GroundHighGain = groundHigh,
                     });
+                    PlayCopies(played);
                 }
                 provider.Update();
                 if (bed && t > 1.0 && t < 1.012) Console.WriteLine($"  bed playing: {provider.IsPlaying(-50)}");
@@ -143,10 +235,21 @@ public static class ClapRoomSpike
             Console.WriteLine($"  traced stage: {10 * Math.Log10(m.Out / Math.Max(1e-20, m.In)):F1} dB out per ear against its mono input; "
                             + $"{10 * Math.Log10(m.Out / Math.Max(1e-20, m.PerChannel)):F1} dB against the mean of its {m.Channels} input channels; head blend {m.Blend:F2}");
             Console.WriteLine($"  reverb: traced, listener trace {(TracedReverbSet.Listener != null ? "ready" : "MISSING")}, reflections {FmodAudioProvider.TailDb:F0} tail, {FmodAudioProvider.CopiesDb:F0} copies dB, makeup {FmodAudioProvider.MasterMakeupDb:F0} dB");
+            if (TracedReverbSet.Listener is { } lt)
+            {
+                traceW = lt.LastReadBack;
+                if (lt.Smooth is { } sm)
+                {
+                    startMs = sm.Start * 1000.0 / lt.SampleRate;
+                    double copiesE = sm.LastCopies.Sum(), took = sm.LastTook.Sum();
+                    Console.WriteLine($"  traced response starts {startMs:F1} ms after the sound{(SmoothTail.FromFiftyMs ? " (early=old: played from 50 ms)" : "")}; "
+                                    + $"the copies carry {10 * Math.Log10(copiesE + 1e-30):F1} dB (re a 1 m impulse), of which the trace had and gave up {10 * Math.Log10(took + 1e-30):F1} dB");
+                }
+            }
         }
         finally { provider.Dispose(); TracedReverbSet.Dispose(); scene.Dispose(); Phonon.iplContextRelease(ref ctx); }
 
-        int result = Measure(outPath);
+        int result = Measure(outPath, probeMs, traceW, startMs, firstMs);
         if (bed) BedThroughShots(outPath, clapTimes.Count);
         return result;
     }
@@ -178,8 +281,9 @@ public static class ClapRoomSpike
     }
 
     /// <summary>Each clap in the WAV: found by its onset, then the room's answer against it.</summary>
-    private static int Measure(string path)
+    private static int Measure(string path, float probeMs = 0f, float[]? traceW = null, double startMs = 0, double firstMs = 0)
     {
+        var t20s = new Dictionary<double, double>();
         if (!File.Exists(path)) { Console.WriteLine($"  FAIL: no {path}"); return 1; }
         var (l, r, sr) = ReadStereo(path);
         double Db(double e) => 10 * Math.Log10(e + 1e-20);
@@ -250,9 +354,113 @@ public static class ClapRoomSpike
                     if (i5 >= 0 && i25 > i5) { t20 += 3.0 * (i25 - i5) / sr; nt++; }
                 }
                 Console.WriteLine($"  {fc,44:F0} {(ne > 0 ? edt / ne : 0),7:F2} {(nt > 0 ? t20 / nt : 0),7:F2}   |{each}");
+                t20s[fc] = nt > 0 ? t20 / nt : 0;
             }
         }
+        if (decays.Count > 0) EarlyReport(l, r, sr, decays, probeMs, traceW, startMs, firstMs, t20s);
         return found == 0 ? 1 : 0;
+    }
+
+    private static readonly double[] Octaves = { 125.0, 250, 500, 1000, 2000, 4000 };
+
+    /// <summary>
+    /// What happens in the first tenth of a second after each clap: the energy in 2 ms steps against
+    /// the clap's own (0-6 ms), mean over the claps; per octave C50, C80 and D50 with the direct sound,
+    /// and the room's own early-to-late ratio (from 3 ms, the dry click over) against what the trace
+    /// says for the room and what an exponential decay at the band's T20 from the first reflection
+    /// gives; and, with a probe, where the probe lands.
+    /// </summary>
+    private static void EarlyReport(float[] l, float[] r, int sr, List<int> onsets, float probeMs, float[]? traceW,
+                                    double startMs, double firstMs, Dictionary<double, double> t20s)
+    {
+        double E(int from, double a, double b)
+        {
+            double e = 0; int i0 = Math.Max(0, from + (int)(a * sr)), i1 = Math.Min(l.Length, from + (int)(b * sr));
+            for (int i = i0; i < i1; i++) e += (l[i] * (double)l[i] + r[i] * (double)r[i]) / 2;
+            return e;
+        }
+        const int bins = 60;
+        var env = new double[bins]; double clap = 0;
+        foreach (int on in onsets)
+        {
+            clap += E(on, 0, 0.006);
+            for (int k = 0; k < bins; k++) env[k] += E(on, k * 0.002, (k + 1) * 0.002);
+        }
+        Console.WriteLine($"  energy after the clap, 2 ms steps, dB against the clap (0-6 ms), mean over {onsets.Count} claps (first reflection due {firstMs:F1} ms):");
+        for (int row = 0; row < bins / 10; row++)
+        {
+            var line = new System.Text.StringBuilder($"    {row * 20,3}-{row * 20 + 18,3} ms:");
+            for (int k = row * 10; k < row * 10 + 10; k++) line.Append($" {10 * Math.Log10(env[k] / clap + 1e-30),6:F1}");
+            Console.WriteLine(line);
+        }
+        int deepest = -1;
+        for (int k = (int)Math.Ceiling(firstMs / 2); k < 40; k++) if (deepest < 0 || env[k] < env[deepest]) deepest = k;
+        if (deepest >= 0)
+            Console.WriteLine($"  deepest 2 ms from the first reflection to 80 ms: {10 * Math.Log10(env[deepest] / clap + 1e-30):F1} dB at {deepest * 2}-{deepest * 2 + 2} ms");
+
+        // Per octave, both ears' energy summed over the claps.
+        Console.WriteLine("  octave |  C50   C80   D50 (with the direct) | room from 3 ms: R50  R80 | the trace: R50  R80 | decay at T20 from the first reflection: R50  R80");
+        foreach (double fc in Octaves)
+        {
+            float lo = (float)(fc / Math.Sqrt(2)), hi = (float)(fc * Math.Sqrt(2));
+            double e3 = 0, e50 = 0, e80 = 0, eAll = 0, e0 = 0;
+            foreach (int on in onsets)
+            {
+                int pre = (int)(0.02 * sr);   // the filters run in from before the clap
+                int a = Math.Max(0, on - pre), b = Math.Min(l.Length, on + (int)(1.45 * sr));
+                var bl = Band(l, a, b, lo, hi, sr); var br = Band(r, a, b, lo, hi, sr);
+                for (int i = 0; i < bl.Length; i++)
+                {
+                    double t = (a + i - on) / (double)sr, v = bl[i] * bl[i] + br[i] * br[i];
+                    if (t < 0) continue;
+                    eAll += v;
+                    if (t < 0.05) e50 += v;
+                    if (t < 0.08) e80 += v;
+                    if (t >= 0.003) { e3 += v; if (t < 0.05) e0 += v; }
+                }
+            }
+            double c50 = 10 * Math.Log10(e50 / (eAll - e50)), c80 = 10 * Math.Log10(e80 / (eAll - e80)), d50 = e50 / eAll;
+            // The room alone, from 3 ms: early (3-50 / 3-80 ms) against what follows.
+            double late50 = eAll - e50, late80 = eAll - e80;
+            double r50 = 10 * Math.Log10(e0 / late50 + 1e-30), r80 = 10 * Math.Log10(Math.Max(1e-30, e3 - late80) / late80);
+            string tr = "    -    -";
+            if (traceW != null)
+            {
+                var tb = Band(traceW, 0, traceW.Length, lo, hi, sr);
+                int t0 = (int)(startMs / 1000 * sr);
+                double a50 = 0, a80 = 0, all = 0;
+                for (int i = t0; i < tb.Length; i++) { double v = tb[i] * tb[i]; all += v; if (i < 0.05 * sr) a50 += v; if (i < 0.08 * sr) a80 += v; }
+                tr = $"{10 * Math.Log10(a50 / (all - a50)),5:F1} {10 * Math.Log10(a80 / (all - a80)),5:F1}";
+            }
+            string model = "    -    -";
+            if (t20s.TryGetValue(fc, out double T) && T > 0)
+            {
+                double R(double t) { double x = Math.Exp(-13.82 * (t - firstMs / 1000) / T); return 10 * Math.Log10((1 - x) / x); }
+                model = $"{R(0.05),5:F1} {R(0.08),5:F1}";
+            }
+            Console.WriteLine($"  {fc,6:F0} | {c50,5:F1} {c80,5:F1} {d50,5:F2}                    |                {r50,5:F1} {r80,5:F1} |           {tr} |                                        {model}");
+        }
+
+        if (probeMs > 0)
+        {
+            // The dry click's onset and the probe's, each where it first reaches a tenth of its own peak.
+            var offs = new List<double>();
+            foreach (int on in onsets)
+            {
+                int Onset(int a, int b)
+                {
+                    b = Math.Min(l.Length, b); double pk = 0;
+                    for (int i = a; i < b; i++) pk = Math.Max(pk, Math.Abs(l[i]) + Math.Abs(r[i]));
+                    for (int i = a; i < b; i++) if (Math.Abs(l[i]) + Math.Abs(r[i]) >= 0.1 * pk) return i;
+                    return -1;
+                }
+                int dry = Onset(on, on + (int)(0.004 * sr));
+                int wet = Onset(on + (int)((probeMs - 10) / 1000 * sr), on + (int)((probeMs + 60) / 1000 * sr));
+                if (dry >= 0 && wet >= 0) offs.Add((wet - dry) * 1000.0 / sr - probeMs);
+            }
+            Console.WriteLine($"  probe at {probeMs:F0} ms: lands {string.Join(" ", offs.Select(o => o.ToString("F2")))} ms late against the dry click"
+                            + (offs.Count > 0 ? $" (mean {offs.Average():F2} ms, {offs.Average() * sr / 1000:F0} samples)" : ""));
+        }
     }
 
     /// <summary>A band of one ear's tail: two second-order band-passes in a row, run forwards.</summary>

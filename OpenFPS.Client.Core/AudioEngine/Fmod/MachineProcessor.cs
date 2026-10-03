@@ -56,8 +56,11 @@ public interface IRenderedVoice
 ///   * NOTHING IN Consume MAY BLOCK OR SYNTHESIZE. It runs on the mixer thread with the deadline of
 ///     the whole mix running down.
 /// </summary>
-public abstract class PhysicalVoiceState : IRenderedVoice
+public abstract class PhysicalVoiceState : IRenderedVoice, IGuardedUnit
 {
+    /// <summary>The non-finite guard's flag and name for this unit (NonFinite).</summary>
+    public NonFiniteUnit Guard { get; } = new();
+
     /// <summary>The mixer callback's mono buffer, made with the voice so the callback never allocates.</summary>
     internal readonly float[] MixScratch = new float[DspCallback.MaxBlock];
 
@@ -575,6 +578,9 @@ public sealed class BellVoiceState : PhysicalVoiceState
 /// </summary>
 public static class MachineProcessor
 {
+    /// <summary>The non-finite guard's flag for a state that is not an IGuardedUnit.</summary>
+    private static int _nonFiniteOther;
+
     private static readonly DSP_READ_CALLBACK _readCallback = ReadCallback;
 
     public static RESULT CreateDSP(FMOD.System system, PhysicalVoiceState state, out FMOD.DSP dsp, out GCHandle handle)
@@ -604,7 +610,12 @@ public static class MachineProcessor
     private static RESULT ReadCallback(ref DSP_STATE dsp_state, IntPtr inbuffer, IntPtr outbuffer,
                                        uint length, int inchannels, ref int outchannels)
     {
-        try { return ReadCallbackCore(ref dsp_state, inbuffer, outbuffer, length, inchannels, ref outchannels); }
+        try
+        {
+            var r = ReadCallbackCore(ref dsp_state, inbuffer, outbuffer, length, inchannels, ref outchannels);
+            NonFinite.After(ref dsp_state, outbuffer, length, inchannels, outchannels, "machine voice", ref _nonFiniteOther);
+            return r;
+        }
         catch (Exception ex)
         {
             DspFault.Record("MachineProcessor", ex);

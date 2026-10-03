@@ -718,6 +718,8 @@ public class FmodAudioProvider : IAudioProvider
     /// --traced-reverb and SA_HRTF_FRAME).</summary>
     private IntPtr _saHrtfTraced;
     private int _saHrtfTracedFrame;
+    /// <summary>How long a traced stage's input waits, samples (TracedReverbDsp.StagePreDelay); -1 until measured.</summary>
+    private int _tracedPreDelay = -1;
     private int _saFrameSize = 1024;
     private bool _steamAudioEnabled;
 
@@ -1141,6 +1143,7 @@ public class FmodAudioProvider : IAudioProvider
         v.State.DirX = 0f; v.State.DirY = 0f; v.State.DirZ = -1f;
         v.State.LastRms = v.State.LastRmsL = v.State.LastRmsR = 0f;
         v.State.ProducedAudio = false;
+        v.State.GuardName = null; v.State.NonFiniteReported = 0; v.State.NonFiniteInputReported = 0;
         state = v.State; dsp = v.Dsp; handle = v.Handle;
         return true;
     }
@@ -1677,7 +1680,9 @@ public class FmodAudioProvider : IAudioProvider
         for (int i = 0; i < m; i++)
         {
             var ans = _lateAnswers[i];
-            if (ans.When < fresh || ans.Ratio <= 0f) continue;
+            // Not "Ratio <= 0" alone: a NaN passes that, and a NaN here is a NaN send into the bus.
+            if (ans.When < fresh || !(ans.Ratio > 0f) || !float.IsFinite(ans.Ratio) || !float.IsFinite(ans.Directivity)
+                || !float.IsFinite(ans.Direction.X + ans.Direction.Y + ans.Direction.Z)) continue;
             float d = Vector3.Distance(_listenerPos, ans.At);
             if (d > 1.5f) { double x = Math.Log(d), y = Math.Log(ans.Ratio); sxy += x * y; sxx += x * x; used++; }
             // The lean: each source's late direction, weighted by the late energy it raises here.
@@ -1715,7 +1720,8 @@ public class FmodAudioProvider : IAudioProvider
     {
         var lf = TracedReverbSet.LateField;
         if (lf != null && lf.TryGet(a.EntityId, out var ans)
-            && ans.When >= DateTime.UtcNow.Ticks - (long)(LateAnswerSeconds * TimeSpan.TicksPerSecond))
+            && ans.When >= DateTime.UtcNow.Ticks - (long)(LateAnswerSeconds * TimeSpan.TicksPerSecond)
+            && float.IsFinite(ans.Ratio))
             return d * MathF.Sqrt(Math.Clamp(ans.Ratio, 1e-4f, 4f));
         if (!float.IsNaN(_lateLawK))
             return d * MathF.Pow(MathF.Max(d, 1f), -_lateLawK / 2f);
@@ -2013,6 +2019,17 @@ public class FmodAudioProvider : IAudioProvider
             { _saHrtfTraced = IntPtr.Zero; Phonon.iplReflectionEffectRelease(ref effect); return; }
             _saHrtfTracedFrame = sub;
         }
+        // The voices' binaural rendering delays a sound more than the stage's own does (its frame is
+        // four times as long): the stage's input waits the difference, so the room answers after the
+        // sound and not 4 ms before it (TracedReverbDsp.StagePreDelay). Measured once.
+        if (_tracedPreDelay < 0)
+        {
+            int voice = TracedReverbDsp.BinauralOnset(_saContext, _saHrtf, _saFrameSize);
+            int stage = TracedReverbDsp.BinauralOnset(_saContext, _saHrtfTraced, sub);
+            _tracedPreDelay = TracedReverbDsp.StagePreDelay(voice, stage);
+            Log.Information("Traced reverb: voices render {Voice} samples late, the traced stage {Stage}; its input waits {Wait}.",
+                            voice, stage, _tracedPreDelay);
+        }
         var ds = new Phonon.IPLAmbisonicsDecodeEffectSettings { speakerLayout = Phonon.StereoLayout(), hrtf = _saHrtfTraced, maxOrder = TracedReverb.Order };
         if (Phonon.iplAmbisonicsDecodeEffectCreate(_saContext, ref au, ref ds, out IntPtr decode) != Phonon.IPL_STATUS_SUCCESS)
         { Phonon.iplReflectionEffectRelease(ref effect); return; }
@@ -2031,6 +2048,8 @@ public class FmodAudioProvider : IAudioProvider
             LateOut = new float[sub],
             // The room you are in: its late tail as a field round the head, not one channel.
             Diffuse = DiffuseTail.Create(_saContext, sub, TracedReverb.Channels, _saHrtfTraced),
+            Delay = _tracedPreDelay > 0 ? new PreDelay(_tracedPreDelay) : null,
+            Region = regionId,
         };
         Phonon.iplAudioBufferAllocate(tr.Context, 1, sub, ref st.Mono);
         Phonon.iplAudioBufferAllocate(tr.Context, TracedReverb.Channels, sub, ref st.Ambi);
@@ -2129,6 +2148,7 @@ public class FmodAudioProvider : IAudioProvider
         // FMOD doesn't also collapse the binaural pair. Voice is held for the bus lifetime.
         if (_steamAudioEnabled && TryCreateSteamAudioVoice(out var rvState, out var rvDsp, out var rvHandle, SaDirectReserve))
         {
+            rvState!.GuardName = "(a reverb bus's head)";
             bus.getMode(out MODE bm);
             bus.setMode((bm & ~(MODE._3D | Rolloff.Either)) | MODE._2D);
             bus.addDSP(CHANNELCONTROL_DSP_INDEX.HEAD, rvDsp);
@@ -2662,6 +2682,7 @@ public class FmodAudioProvider : IAudioProvider
             if (_steamAudioEnabled && TryCreateSteamAudioVoice(out saState, out saDsp, out saHandle,
                                                                emitter.IsReflection ? SaDirectReserve : 0))
             {
+                saState!.GuardName = emitter.SoundId;
                 // Steam Audio binaural sits last in the chain (after occlusion EQ + diffraction),
                 // turning the filtered mono into an HRTF stereo pair.
                 channel.addDSP(CHANNELCONTROL_DSP_INDEX.TAIL, saDsp);
@@ -3322,6 +3343,8 @@ public class FmodAudioProvider : IAudioProvider
     public void Update()
     {
         if (!_isInitialized) return;
+        // Any unit whose block was not finite and was zeroed (NonFinite), named here, once each.
+        NonFinite.Drain(static (kind, name, region) => Log.Warning("{Line}", NonFinite.Line(kind, name, region)));
 
         long now = System.Diagnostics.Stopwatch.GetTimestamp();
         _attributeDt = _attributeTickAt == 0 ? 0.004f
@@ -4705,6 +4728,7 @@ public class FmodAudioProvider : IAudioProvider
         System.Runtime.InteropServices.GCHandle vHandle = default;
         if (_steamAudioEnabled && TryCreateSteamAudioVoice(out vState, out vDsp, out vHandle))
         {
+            vState!.GuardName = "(voice chat)";
             ch.addDSP(CHANNELCONTROL_DSP_INDEX.TAIL, vDsp);
             ch.set3DLevel(0.0f);
         }

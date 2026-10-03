@@ -451,6 +451,12 @@ internal sealed class SharedInputConvolver
         if (swap) _cur = next;
     }
 
+    /// <summary>Forgets the input it holds. Mixer thread; allocation-free.</summary>
+    public void Reset()
+    {
+        Array.Clear(_prev); Array.Clear(_fdlRe); Array.Clear(_fdlIm);
+    }
+
     private void Convolve(LateTailIr ir, float[] y)
     {
         Array.Clear(_accRe); Array.Clear(_accIm);

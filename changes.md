@@ -4,6 +4,55 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-03
 
+- Nothing that is not a number gets into the mix (branch early-tail). Cody, in Marlow flat 00B
+  through its door: "a pop ... and the audio just cut out". From that moment the master's loudness
+  meter read NaN: one NaN had reached the master limiter, which then holds it for good.
+  - Not reproduced. The lab walked the same path over the city with the door opening, through
+    the whole mixer (`--nan-mix`), and traced from the walk, inside the door leaf and on its faces
+    (`--nan-walk`, `inside`). Every trace, every late-field answer and every built tail was finite.
+    So were degenerate traces (empty, all zero, shorter than the tail). The early-tail code
+    (`EarlyCopies`, the start at the first reflection, the 192-sample wait) produced none.
+  - Found: Steam Audio's binaural effect puts out NaN for a zero, a 1e-20 or a NaN direction,
+    and keeps it in its state (`--early-tail hrtf`). Every binaural call now takes its direction
+    through `Phonon.SafeDirection`.
+  - Found: the averaged tail (`SmoothTail`) is recursive. A trace with one NaN would have stayed in
+    it until the next fresh start, and every tail built from it would be NaN. Such a trace is now
+    left out. Late-field answers that are not finite are ignored; a NaN ratio used to pass the
+    `<= 0` test and become the send.
+  - Every custom DSP that writes into the mix now checks its block (`NonFinite`). A block with NaN
+    or infinity becomes silence, the unit forgets its state where it can, and the log names it once:
+    `[NONFINITE] <unit> <sound>, region <id>`. The units: the traced reverb stage (its input too), a
+    voice's binaural stage (and what feeds it), engine voices, taps and echoes, machine, synth and
+    granular voices, the ambisonic bed, the traced echoes, and the master's boundary stage, which
+    also zeroes a bad block of the whole mix before the limiter. So the limiter never sees one and
+    the game comes back on the next good block. No allocation or lock on the mixer thread.
+  - Main has all of this except the early-tail commit, so main could do it too.
+
+- The room answers from its first reflection (branch early-tail, unheard). Cody: "a delay between
+  when I clap and when I hear the reflections". The traced response started at 50 ms, faded in to
+  100. Before that there were only the placed copies: a clap in flat 01F had them at 6-26 ms and
+  50 ms and next to nothing between (2 ms steps down to -54 dB at 46 ms with a click). Three changes:
+  - The traced response now starts where the nearest surface answers (the ceiling, 5.9 ms in the
+    flat). The copies' energy is taken out of it, band by band, from the frames the trace put it in
+    (`EarlyCopies`). Steam Audio's response has no peaks to cut: it is noise in 10 ms bins
+    (`--early-tail`). Copies plus what is left is what the trace had.
+  - The copies a room places are worked out in one place (`WorldAudioPlayer.PlanRoomEchoes`), for
+    the clap and for the trace.
+  - The reverb bus was 4.4 ms early. Steam Audio's binaural effect delays a sound 289 samples at
+    the voices' 1,024 and 97 at the traced stage's 256. The stage's input now waits the difference
+    (192 samples). A click 30 ms into the response landed 25.5 ms after the dry click; now 30.0.
+  - `--clap-room` now plays the copies, the washes and the clap's floor bounce as the game does, and
+    prints the energy in 2 ms steps, C50, C80 and D50. `early=old` gives the old response,
+    `copies=0` leaves the copies out, `probe=MS` measures the bus's timing.
+  - Flat 01F, click, 8 claps: the deepest 2 ms step between the first reflection and 80 ms was
+    -54.3 dB (46-48 ms); now -40.6 dB (20-22 ms). The level from 100 ms on is the same within 1 dB.
+    50-300 ms is 2-3 dB up: the old fade took the room's own energy out of 50-100 ms. EDT from 50 ms
+    is shorter (click, 2 kHz: 1.10 to 0.83 s): the fade made the decay start late. T20 within
+    0.07 s. IACC 300-900 ms unchanged.
+  - Not yet: own footsteps get copies but no washes, so the trace gives up a little more than their
+    copies carry. Speech and steady sounds get no copies at all, so they lose that share of the
+    first 20 ms.
+
 - Paths that popped for a third of a second (branch path-pops, unheard). The [POP] lines from the
   Main Street pavement were cars 150-300 m away going from -80 dB to -20 in the mid band and back.
   New lab `--pop-hunt ear=x,y,z`: 40 cars drive the city's streets, asked about at the game's

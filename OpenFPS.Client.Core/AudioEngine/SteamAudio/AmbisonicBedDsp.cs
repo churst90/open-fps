@@ -11,8 +11,11 @@ namespace OpenFPS.Client.Core.AudioEngine.SteamAudio;
 /// One playing ambisonic ambience bed: the decoded soundfield, where the playhead is, and the
 /// listener's current orientation. Allocated once; nothing here allocates on the mixer thread.
 /// </summary>
-internal sealed class AmbisonicBedState
+internal sealed class AmbisonicBedState : IGuardedUnit
 {
+    /// <summary>The non-finite guard's flag and name for this unit (NonFinite).</summary>
+    public NonFiniteUnit Guard { get; } = new();
+
     /// <summary>Interleaved N3D/ACN sample data for the whole bed. Converted once at load, never
     /// per block — a 60-second first-order bed is four channels of float and perfectly affordable,
     /// and doing the normalization per block would be pure waste.</summary>
@@ -70,6 +73,9 @@ internal sealed class AmbisonicBedState
 /// </summary>
 internal static class AmbisonicBedDsp
 {
+    /// <summary>The non-finite guard's flag for a state that is not an IGuardedUnit.</summary>
+    private static int _nonFiniteOther;
+
     private static readonly FMOD.DSP_READ_CALLBACK _readCallback = ReadCallback;
 
     public static RESULT CreateDSP(FMOD.System system, AmbisonicBedState state, out FMOD.DSP dsp, out GCHandle handle)
@@ -104,7 +110,12 @@ internal static class AmbisonicBedDsp
     private static RESULT ReadCallback(ref DSP_STATE dsp_state, IntPtr inbuffer, IntPtr outbuffer,
                                        uint length, int inchannels, ref int outchannels)
     {
-        try { return ReadCallbackCore(ref dsp_state, inbuffer, outbuffer, length, inchannels, ref outchannels); }
+        try
+        {
+            var r = ReadCallbackCore(ref dsp_state, inbuffer, outbuffer, length, inchannels, ref outchannels);
+            NonFinite.After(ref dsp_state, outbuffer, length, inchannels, outchannels, "ambisonic bed", ref _nonFiniteOther);
+            return r;
+        }
         catch (Exception ex)
         {
             unsafe
