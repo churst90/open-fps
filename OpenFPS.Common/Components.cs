@@ -571,7 +571,11 @@ public partial struct DerivedRoomComponent
 }
 
 /// <summary>
-/// A door: a part that swings out of its own doorway.
+/// A door: a part that swings or slides out of its own doorway.
+///
+/// What kind of door it is (a knob, a push bar, a glass front door, an automatic slider, a patio
+/// slider, a lift's doors) is <see cref="Kind"/>, with the behaviour that comes with it in data:
+/// <see cref="Slides"/>, <see cref="Powered"/>, <see cref="SensorMetres"/>, <see cref="CloseAfterSeconds"/>.
 ///
 /// It is an ordinary part of a composite — a leaf like a wall is a leaf — and everything that makes
 /// it a door rather than a wall is here. Two things happen when it opens, and only one of them is
@@ -631,6 +635,50 @@ public partial struct DoorComponent
     /// leaf. A steel door is sheet over a core, and reckoned as a solid slab it weighs tonnes.
     /// Appended last: components serialise positionally.</summary>
     public float SkinMetres { get; set; }
+
+    // ── What kind of door it is, and how it moves. Appended: components serialise positionally,
+    // so these go after SkinMetres and new fields go after them. See docs/DOOR_TYPES_EVENTS.md.
+
+    /// <summary>The hardware: a <see cref="OpenFPS.Common.DoorKind"/> as an int. 0 is a hinged door
+    /// with a knob or lever, which is what every door saved before kinds existed was.</summary>
+    public int Kind { get; set; }
+
+    /// <summary>The leaf slides along its own width instead of swinging. <see cref="HingeSide"/> is
+    /// then the way it slides: +1 toward the leaf's own +X, -1 the other way.</summary>
+    public bool Slides { get; set; }
+
+    /// <summary>Moved by a motor (an automatic door, a lift's doors). Nobody opens it by hand, and it
+    /// reverses for anyone in the doorway while it is closing.</summary>
+    public bool Powered { get; set; }
+
+    /// <summary>Opens by itself when anyone is this close in front of it, either side, metres. 0 for
+    /// a door with no sensor.</summary>
+    public float SensorMetres { get; set; }
+
+    /// <summary>Closes by itself once the doorway has been clear this long with the door fully open,
+    /// seconds: a door closer, or an automatic door's hold-open time. 0 stays where it is left.</summary>
+    public float CloseAfterSeconds { get; set; }
+
+    /// <summary>How long closing by itself takes from fully open, seconds: the closer's sweep, or the
+    /// motor's closing speed. A swinging door's closer runs the last part at
+    /// <see cref="SwingSeconds"/> to snap the latch.</summary>
+    public float CloseSeconds { get; set; }
+
+    /// <summary>Which side needs a key to open it: +1 the leaf's own +Z side, -1 the other, 0 neither.
+    /// A building's front door is keyed outside and opened by its push bar inside.</summary>
+    public float KeyedSide { get; set; }
+
+    /// <summary>Running state: how long the doorway has been clear with the door fully open, seconds.</summary>
+    public float ClearSeconds { get; set; }
+
+    /// <summary>Running state: it is closing by itself (closer or motor), not by somebody's hand.</summary>
+    public bool SelfClosing { get; set; }
+
+    /// <summary>Running state: which way it was moving last tick: +1 opening, -1 closing, 0 still.</summary>
+    public int Travel { get; set; }
+
+    /// <summary>Running state: the last opening was from the keyed side, so a key was turned.</summary>
+    public bool KeyTurned { get; set; }
 
     public DoorComponent()
     {

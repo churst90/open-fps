@@ -106,6 +106,25 @@ when you come within 3 m of them.
 
 E works on things within about 3 m. For a door: E opens it; E again when it is open closes it.
 
+### Doors
+
+Doors come in kinds, and each works as the real one does.
+
+- A door with a knob or lever (houses, flats): E opens it and E shuts it. It stays as you leave it.
+- A steel door with a push bar (fire, stair and service doors): E opens it. Its closer shuts it
+  3 seconds after the doorway is clear, slowly and then quickly for the latch.
+- A glass front door (the towers' street doors): opened with a key from the street and by its
+  push bar from inside. Everyone has the key for now. A closer shuts it like a steel door.
+- A glass door you pull (some shops, none on the city yet): E opens it; a closer shuts it.
+- An automatic sliding door (the airport terminal's entrances): it opens by itself when anyone
+  comes within 2.5 m of it, from either side, and shuts 2 seconds after they have gone. E does
+  nothing to it.
+- A patio door (each house's garden side): E slides it open and E slides it shut.
+- A lift's doors: opened by the lift. There are no lifts yet.
+
+No door shuts by itself on anyone standing in the doorway. A closer waits; an automatic door
+opens again. People in the street use doors the same way.
+
 ### Lists
 
 | Key | List |

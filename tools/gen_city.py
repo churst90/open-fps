@@ -133,7 +133,7 @@ def portal(x, y, z, a, b, aperture):
     })
 
 
-def door(x, y0, z, a, b, facing_z=True, prefab="door", opening=None):
+def door(x, y0, z, a, b, facing_z=True, prefab="door", opening=None, turn=0.0):
     """A leaf in a doorway, joining two named places.
 
     A door is ALREADY a portal — PrefabRepository attaches one to anything with IsDoor — so a doorway
@@ -142,18 +142,42 @@ def door(x, y0, z, a, b, facing_z=True, prefab="door", opening=None):
     `opening` is the width of the gap in the wall, when it is not the leaf's own. The leaf is made
     to cover it and lap each jamb by DOOR_LAP: a leaf narrower than its opening leaves a slot you can
     walk round shut, which is what 71 doors on this map did until they were refitted on 2026-09-23.
+
+    `turn` turns the leaf about its own middle, radians: half a turn puts its +Z face (a front door's
+    key side) on the other side of the wall, and sends a sliding leaf the other way.
     """
     bx, by, bz = BASE[prefab]
     e = {
         "EntityId": new_id(),
         "PrefabId": prefab,
         "Position": v3(x, y0 + by / 2, z),
-        "Rotation": yaw(0.0) if facing_z else yaw(math.pi / 2),
+        "Rotation": yaw((0.0 if facing_z else math.pi / 2) + turn),
         "RegionAId": a, "RegionBId": b,
     }
     if opening is not None:
         e["Scale"] = v3(round((opening + 2 * DOOR_LAP) / bx, 4), 1, 1)
     entities.append(e)
+
+
+def bi_parting(x, y0, z, a, b, facing_z=True, prefab="auto_sliding_door", opening=2.0):
+    """Two sliding leaves meeting in the middle of a doorway, each sliding away from the other.
+
+    Each leaf covers half the opening and laps its own jamb by DOOR_LAP. A sliding leaf moves toward
+    its own +X, so the leaf on the far side is turned half a turn to slide the other way.
+    """
+    bx, by, bz = BASE[prefab]
+    base = 0.0 if facing_z else math.pi / 2
+    ux, uz = math.cos(base), -math.sin(base)      # the leaf's own +X, in (x, z)
+    w = opening / 2 + DOOR_LAP
+    for s in (+1, -1):
+        entities.append({
+            "EntityId": new_id(),
+            "PrefabId": prefab,
+            "Position": v3(x + s * ux * w / 2, y0 + by / 2, z + s * uz * w / 2),
+            "Rotation": yaw(base + (0.0 if s > 0 else math.pi)),
+            "RegionAId": a, "RegionBId": b,
+            "Scale": v3(round(w / bx, 4), 1, 1),
+        })
 
 
 DOOR_LAP = 0.05                          # how far a leaf overlaps each jamb, m
@@ -528,8 +552,10 @@ def tower(label, x0, x1, z0, z1, storeys, street_side, ac_floors):
             # It was `facing_z=vertical`, which stood every tower's entrance at right angles to its
             # own facade — shut, the doorway was open round it; opened, the leaf swung across it.
             # city.json's doors were re-fitted to their openings on 2026-09-23 (turned and sized).
-            door(ex, 0.02, ez, stair_id, -1, facing_z=not vertical, prefab="steel_door",
-                 opening=entrance[1] - entrance[0])
+            # A glass front door with a push bar inside and a key outside (Cody, 2026-10-02: like his
+            # own building's). Its key side is the leaf's +Z face, turned to the street.
+            door(ex, 0.02, ez, stair_id, -1, facing_z=not vertical, prefab="glass_front_door",
+                 opening=entrance[1] - entrance[0], turn=0.0 if side > 0 else math.pi)
 
         # ── The air conditioners ───────────────────────────────────────────────────────────────
         #
@@ -908,9 +934,11 @@ for k in range(3):
     term_ids.append(region(f"Terminal concourse, {['south', 'middle', 'north'][k]} end",
                            TERM_X0 + 0.4, TERM_X1 - 0.06, 0.08, TERM_H, a, b))
 # Each door joins the end it is in: z 30 is in the south end, z 92 in the north (it named the middle).
+# The public entrances are automatic: two glass leaves that part for anyone who comes up to them and
+# slide away into the glazing either side.
 for dz, rid in zip(TERM_DOORS, (term_ids[0], term_ids[2])):
-    door(TERM_X1 - 0.03, 0.08, dz, rid, -1, facing_z=False, prefab="door", opening=2.2)   # the wall runs along z
-# ...and a way in from the road side.
+    bi_parting(TERM_X1 - 0.03, 0.08, dz, rid, -1, facing_z=False, opening=2.2)   # the wall runs along z
+# ...and a service door from the road side: steel, with a push bar and a closer.
 door(TERM_X0 + 0.2, 0.08, TERM_WEST_DOOR, term_ids[1], -1, facing_z=False, prefab="steel_door")
 
 # ── The hangar: a steel box the size of a church ──────────────────────────────────────────────────
@@ -1053,8 +1081,9 @@ def house(label, cx, cz, facing, two_storey=False):
 
     hid = region(label, x0 + 0.25, x1 - 0.25, 0.08, h, zlo + 0.25, zhi - 0.25)
     door(cx, 0.04, (front_z0 + front_z1) / 2, hid, -1, facing_z=True, prefab="door", opening=1.3)
-    # The back door, which is how you get to the garden without going round.
-    door(bdx, 0.04, (back_z0 + back_z1) / 2, hid, -1, facing_z=True, prefab="door", opening=0.9)
+    # The back door, which is how you get to the garden without going round: a patio door, slid along
+    # its track into the wall toward the middle of the house.
+    door(bdx, 0.04, (back_z0 + back_z1) / 2, hid, -1, facing_z=True, prefab="patio_door", opening=0.9)
 
     if has_garden:
         region(f"{label} back garden", cx - PLOT_W / 2 + 1.0, cx + PLOT_W / 2 - 1.0, 0.0, 3.0, g0, g1)
@@ -1857,11 +1886,16 @@ with open(OUT, "w") as f:
 
 regions = sum(1 for e in entities if e["PrefabId"] == "acoustic_region")
 portals = sum(1 for e in entities if e["PrefabId"] == "portal")
-doors = sum(1 for e in entities if e["PrefabId"] in ("door", "steel_door"))
+DOOR_PREFABS = ("door", "steel_door", "glass_front_door", "glass_pull_door", "auto_sliding_door",
+                "patio_door", "elevator_door")
+doors = sum(1 for e in entities if e["PrefabId"] in DOOR_PREFABS)
+door_kinds = ", ".join(f"{p} {n}" for p in DOOR_PREFABS
+                       if (n := sum(1 for e in entities if e["PrefabId"] == p)))
 machines = sum(1 for e in entities if e["PrefabId"] in ("ac_window", "ac_condenser", "mower_push", "mower_riding"))
 solid = sum(1 for e in entities if e["PrefabId"] in BASE and e["PrefabId"] not in ("acoustic_region", "portal"))
 print(f"{OUT}: {len(entities)} entities — {regions} named places, {portals} portals, {doors} doors, "
       f"{machines} machines, {solid} boxes")
+print(f"  doors by kind: {door_kinds}")
 print(f"  bounds {MAP_MAX[0] - MAP_MIN[0]:.0f} x {MAP_MAX[1]:.0f} x {MAP_MAX[2] - MAP_MIN[2]:.0f} m, "
       f"{len(HOUSES)} houses, {len(TRACKS)} routes, {len(VEHICLES) - len(AIR)} vehicles, {len(AIR)} aircraft")
 print(f"  rail loop {sum(math.dist((RAIL[i][0], RAIL[i][2]), (RAIL[(i + 1) % len(RAIL)][0], RAIL[(i + 1) % len(RAIL)][2])) for i in range(len(RAIL))):.0f} m, "

@@ -214,6 +214,9 @@ public class CompositeService
             ref var door = ref world.Get<DoorComponent>(e);
             door.Openness = 0f;
             door.Target = 0f;
+            door.Travel = 0;
+            door.SelfClosing = false;
+            door.ClearSeconds = 0f;
             door.Captured = false;
             if (world.Has<PortalComponent>(e)) world.Get<PortalComponent>(e).ApertureSize = 0f;
         }

@@ -357,8 +357,16 @@ public class PrefabRepository
 
         if (isDoor)
         {
+            OpenFPS.Common.DoorEvents.TryParseKind(t.DoorKind, out var kind);
             components.Add(new DoorComponent
             {
+                Kind = (int)kind,
+                Slides = t.Slides ?? OpenFPS.Common.DoorEvents.SlidesByDefault(kind),
+                Powered = t.Powered ?? false,
+                SensorMetres = MathF.Max(0f, t.SensorMetres ?? 0f),
+                CloseAfterSeconds = MathF.Max(0f, t.CloseAfterSeconds ?? 0f),
+                CloseSeconds = MathF.Max(0f, t.CloseSeconds ?? 0f),
+                KeyedSide = t.KeyedSide is > 0 ? 1f : t.KeyedSide is < 0 ? -1f : 0f,
                 SwingSeconds = t.SwingSeconds ?? 0.9f,
                 SwingRadians = (t.SwingDegrees ?? 90f) * (MathF.PI / 180f),
                 HingeSide = t.HingeSide is < 0 ? -1f : 1f,
