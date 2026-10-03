@@ -209,8 +209,17 @@ public sealed class DoorSystem
         }
         else if (travel < 0 && door.Travel != -1)
         {
-            if (door.Powered) { Emit(heard, entity, kind, DoorEvents.MotorStart, none); Emit(heard, entity, kind, DoorEvents.Rollers, none); }
-            else if (door.Slides) Emit(heard, entity, kind, DoorEvents.Rollers, none);
+            // A sliding door's close is one simulation of its whole run, so it is sent as the run starts:
+            // sent on arrival, its roll played on after the leaf had shut.
+            if (door.Powered)
+            {
+                Emit(heard, entity, kind, DoorEvents.MotorStart,
+                     kind == DoorKind.AutoSliding && heard != null ? SlidingSound(world, entity, door, closing: true) : none);
+                Emit(heard, entity, kind, DoorEvents.Rollers, none);
+            }
+            else if (door.Slides)
+                Emit(heard, entity, kind, DoorEvents.Rollers,
+                     kind == DoorKind.PatioSliding && heard != null ? SlidingSound(world, entity, door, closing: true) : none);
             else Emit(heard, entity, kind, door.SelfClosing ? DoorEvents.Closer : DoorEvents.Swing, none);
         }
 
@@ -227,6 +236,8 @@ public sealed class DoorSystem
                      : kind == DoorKind.Hinged ? KnobDoorSound(world, entity, door, closing: true)
                      // The push-bar door's close is the closer bringing it into its latch.
                      : kind == DoorKind.PushBar ? PushBarSound(world, entity, door, closing: true)
+                     // A sliding door's arrival is already in the run it sent as it set off.
+                     : kind is DoorKind.PatioSliding or DoorKind.AutoSliding ? none
                      : Closing(world, entity, door, edge));
                 door.SelfClosing = false;
             }
@@ -243,7 +254,8 @@ public sealed class DoorSystem
         var none = Array.Empty<TransientSound>();
         if (door.Powered)
         {
-            Emit(heard, entity, kind, DoorEvents.MotorStart, none);
+            Emit(heard, entity, kind, DoorEvents.MotorStart,
+                 kind == DoorKind.AutoSliding && heard != null ? SlidingSound(world, entity, door, closing: false) : none);
             Emit(heard, entity, kind, DoorEvents.Rollers, none);
             return;
         }
@@ -269,6 +281,9 @@ public sealed class DoorSystem
                     break;
                 case DoorKind.Hinged:
                     Emit(heard, entity, kind, DoorEvents.LatchRetract, KnobDoorSound(world, entity, door, closing: false));
+                    break;
+                case DoorKind.PatioSliding:
+                    Emit(heard, entity, kind, DoorEvents.LatchRetract, SlidingSound(world, entity, door, closing: false));
                     break;
                 default:
                     Emit(heard, entity, kind, DoorEvents.LatchRetract, opening);
@@ -330,6 +345,13 @@ public sealed class DoorSystem
         if (door.SwingSeconds <= 0f) door.SwingSeconds = 0.9f;
         if (door.SwingRadians == 0f) door.SwingRadians = MathF.PI / 2f;
         if (door.HingeSide == 0f) door.HingeSide = 1f;
+        // An automatic leaf runs at its controller's speeds, so it moves as long as its sound says it does.
+        if ((DoorKind)door.Kind == DoorKind.AutoSliding)
+        {
+            float width = HalfWidth(world, entity, door) * 2f;
+            door.SwingSeconds = SlidingDoor.AutomaticSeconds(width, opening: true);
+            door.CloseSeconds = SlidingDoor.AutomaticSeconds(width, opening: false);
+        }
         door.Captured = true;
     }
 
@@ -547,6 +569,29 @@ public sealed class DoorSystem
                 LevelDb = closing ? PushBarDoor.CloseLevelDb(variant) : PushBarDoor.OpenLevelDb(variant),
                 DecaySeconds = 1.8f,
                 SynthKey = PushBarDoor.Key(closing, variant, door.SwingSeconds, size.X, size.Y),
+            },
+        };
+    }
+
+    /// <summary>The patio and automatic doors as physical models (<see cref="SlidingDoor"/>): each sound is
+    /// the whole run, sent as it starts. The door's id picks its character.</summary>
+    private static IReadOnlyList<TransientSound> SlidingSound(World world, Entity entity, in DoorComponent door, bool closing)
+    {
+        var kind = (DoorKind)door.Kind == DoorKind.AutoSliding ? SlidingDoor.Kind.Automatic : SlidingDoor.Kind.Patio;
+        var size = world.Has<ColliderComponent>(entity)
+            ? world.Get<ColliderComponent>(entity).Size
+            : new Vector3(kind == SlidingDoor.Kind.Patio ? 0.9f : 1.0f, 2.1f, 0.02f);
+        var transform = world.Get<Transform>(entity);
+        float travel = closing && door.CloseSeconds > 0f ? door.CloseSeconds : door.SwingSeconds;
+        int variant = entity.Id;
+        return new[]
+        {
+            new TransientSound
+            {
+                Character = SoundCharacter.Knock, Position = transform.Position, Hz = 300f, Noisiness = 1f,
+                LevelDb = closing ? SlidingDoor.CloseLevelDb(kind, variant) : SlidingDoor.OpenLevelDb(kind, variant),
+                DecaySeconds = SlidingDoor.Seconds(kind, closing, travel),
+                SynthKey = SlidingDoor.Key(kind, closing, variant, travel, size.X, size.Y),
             },
         };
     }

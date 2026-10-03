@@ -262,8 +262,9 @@ public class DoorTypeTests : IDisposable
     [InlineData("door", "latch-retract+ swing | swing latch+")]
     [InlineData("steel_door", "bar+ swing | closer latch+")]
     [InlineData("glass_pull_door", "pull+ swing | closer latch+")]
-    [InlineData("patio_door", "latch-retract+ rollers stop | rollers latch+")]
-    [InlineData("auto_sliding_door", "motor-start rollers stop | motor-start rollers shut+")]
+    // A sliding door's sound is its whole run, sent as the run starts, both ways.
+    [InlineData("patio_door", "latch-retract+ rollers stop | rollers+ latch")]
+    [InlineData("auto_sliding_door", "motor-start+ rollers stop | motor-start+ rollers shut")]
     [InlineData("elevator_door", "motor-start rollers stop | motor-start rollers shut+")]
     public void EachKindNamesItsEvents(string prefab, string expected)
     {
