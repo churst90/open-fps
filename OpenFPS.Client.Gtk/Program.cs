@@ -362,9 +362,9 @@ internal static partial class GtkClientProgram
         var box = VBox(24);
         box.Append(Label.New("OpenFPS — Main Menu"));
         box.Append(MenuButton("Connect", ConnectPreferred));
+        box.Append(MenuButton("Create account", CreateAccountPreferred));
         box.Append(MenuButton("Saved Servers", ShowServers));
         box.Append(MenuButton("Settings", ShowSettings));
-        box.Append(MenuButton("Open log folder", OpenLogFolder));
         box.Append(MenuButton("Quit", () => { _speech.Speak("Goodbye."); _app.Quit(); }));
         _mainWindow.SetChild(box);
         // The game window may be hidden behind it after Main menu; closing this one still quits.
@@ -376,12 +376,14 @@ internal static partial class GtkClientProgram
             _speech.Speak("Warning. " + _missingAudioReport);
     }
 
-    private static void ShowLoginDialog(OpenFPS.Client.Core.SavedServer? saved)
+    /// <summary>The Connect dialog; with <paramref name="register"/> it is the same form for making a new
+    /// account, with Create account first and focus on the username.</summary>
+    private static void ShowLoginDialog(OpenFPS.Client.Core.SavedServer? saved, bool register = false)
     {
         if (_loginDialog != null) { _loginDialog.Present(); return; }
 
         var dialog = Window.New();
-        dialog.Title = "Connect to Server";
+        dialog.Title = register ? "Create Account" : "Connect to Server";
         dialog.SetTransientFor(_mainWindow);
         dialog.SetModal(true);
         dialog.SetDefaultSize(420, 320);
@@ -419,14 +421,29 @@ internal static partial class GtkClientProgram
             // The dialog stays open: it closes only once the server has accepted the login.
             _session.Connect(_pendingAddress, _pendingUser, _pendingPass, register);
         }
-        box.Append(MenuButton("Connect", () => Submit(register: false)));
-        box.Append(MenuButton("Create account", () => Submit(register: true)));
+        if (register)
+        {
+            box.Append(MenuButton("Create account", () => Submit(register: true)));
+            box.Append(MenuButton("Connect", () => Submit(register: false)));
+        }
+        else
+        {
+            box.Append(MenuButton("Connect", () => Submit(register: false)));
+            box.Append(MenuButton("Create account", () => Submit(register: true)));
+        }
         box.Append(MenuButton("Cancel", () => { Cue(UiCue.MenuBack); CloseLoginDialog(); }));
 
         _loginDialog = dialog;
         dialog.SetChild(box);
         dialog.Present();
-        if (saved != null && saved.Username.Length > 0)
+        if (register && saved != null)
+        {
+            _suppressFocusSpeech = true;
+            user.GrabFocus();
+            _speech.Speak($"Create an account on {(saved.Name.Length > 0 ? saved.Name : saved.Host)}. Username"
+                          + (saved.Username.Length > 0 ? $", {saved.Username}." : "."), true);
+        }
+        else if (saved != null && saved.Username.Length > 0)
         {
             _suppressFocusSpeech = true;
             pass.GrabFocus();

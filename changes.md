@@ -4,6 +4,11 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-03
 
+- Both clients: **Create account** is on the main menu, for the preferred server: with a username and
+  password saved for it, it asks for that account at once; otherwise the form opens for that server
+  with Create account first and the cursor in Username. **Open log folder** moved from the main menu
+  into Settings (Cody: "viewing the log should be an option in the settings dialog").
+
 - Patio and automatic sliding doors are physical models in the game (`OpenFPS.Common/SlidingDoor.cs`,
   lab `--sliding-door`), round 2, the one Cody chose ("much better"; round 3 was too gritty and thin).
   - Patio: four 1-1/4 in nylon wheels on a sill rail riding its roughness, their flats and grit; pile

@@ -32,7 +32,8 @@ What the Windows client has, against the GTK client:
 - The same session, audio and menus in game (all of `OpenFPS.Client.Core`). Connecting, logging
   in, creating an account, reconnecting after a drop, the game menu and logging out are in the
   session too, so both clients behave the same.
-- Main menu: Connect, Saved Servers, Settings, Open log folder, Quit, as on Linux. Settings and
+- Main menu: Connect, Create account, Saved Servers, Settings, Quit, as on Linux. Open log folder is
+  in Settings. Settings and
   servers are `%APPDATA%\openfps\client.json`, the same format as `~/.config/openfps/client.json`.
   Beacon choices are `%APPDATA%\openfps\beacons.json`.
 - Voice chat through NAudio, on the microphone chosen in Settings. Linux records through FMOD

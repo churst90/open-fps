@@ -46,9 +46,9 @@ public sealed class MenuWindow : Form
         var layout = Column();
         layout.Controls.Add(new Label { Text = "OpenFPS — Main Menu", AutoSize = true });
         layout.Controls.Add(MenuButton("Connect", ConnectPreferred));
+        layout.Controls.Add(MenuButton("Create account", CreateAccountPreferred));
         layout.Controls.Add(MenuButton("Saved Servers", ShowServers));
         layout.Controls.Add(MenuButton("Settings", ShowSettings));
-        layout.Controls.Add(MenuButton("Open log folder", OpenLogFolder));
         layout.Controls.Add(MenuButton("Quit", () => { _speech.Speak("Goodbye."); Close(); }));
         Controls.Add(layout);
 
@@ -76,6 +76,28 @@ public sealed class MenuWindow : Form
         ConnectTo(server);
     }
 
+    /// <summary>Create account goes to the preferred server too: straight away with a username and password
+    /// saved for it, otherwise the form for that server with Create account first. With none saved yet it
+    /// opens the list to add one.</summary>
+    private void CreateAccountPreferred()
+    {
+        var server = _settings.Preferred;
+        if (server == null)
+        {
+            _speech.Speak("No preferred server yet. Add one in Saved Servers.", true);
+            ShowServers();
+            return;
+        }
+        if (server.RememberPassword && server.Password.Length > 0 && server.Username.Length > 0)
+        {
+            _pending = null;   // already saved: nothing to remember afterwards
+            _speech.Speak($"Creating the account {server.Username} on {(server.Name.Length > 0 ? server.Name : server.Host)}.", true);
+            _services.Connect($"{server.Host}:{server.Port}", server.Username, server.Password, true);
+            return;
+        }
+        ShowLoginForm(server, register: true);
+    }
+
     private void ConnectTo(SavedServer server)
     {
         if (server.RememberPassword && server.Password.Length > 0 && server.Username.Length > 0)
@@ -87,11 +109,13 @@ public sealed class MenuWindow : Form
         ShowLoginForm(server);
     }
 
-    private void ShowLoginForm(SavedServer? saved)
+    /// <summary>The Connect form; with <paramref name="register"/> it is the same form for making a new
+    /// account, with Create account first (and the default) and focus on the username.</summary>
+    private void ShowLoginForm(SavedServer? saved, bool register = false)
     {
         if (_loginForm is { IsDisposed: false }) { _loginForm.Activate(); return; }
 
-        var form = Dialog("Connect to Server", 440, 400);
+        var form = Dialog(register ? "Create Account" : "Connect to Server", 440, 400);
         var layout = Column();
 
         // The last outcome, in a field that can be focused and re-read rather than speech gone by.
@@ -108,11 +132,12 @@ public sealed class MenuWindow : Form
             _services.Connect(_pending.Address, _pending.User, _pending.Pass, register);
         }
         var connect = MenuButton("Connect", () => Submit(register: false));
-        layout.Controls.Add(connect);
-        layout.Controls.Add(MenuButton("Create account", () => Submit(register: true)));
+        var create = MenuButton("Create account", () => Submit(register: true));
+        if (register) { layout.Controls.Add(create); layout.Controls.Add(connect); }
+        else { layout.Controls.Add(connect); layout.Controls.Add(create); }
         var cancel = MenuButton("Cancel", () => form.Close());
         layout.Controls.Add(cancel);
-        form.AcceptButton = connect;
+        form.AcceptButton = register ? create : connect;
         form.CancelButton = cancel;
         form.Controls.Add(layout);
 
@@ -120,7 +145,13 @@ public sealed class MenuWindow : Form
         form.FormClosed += (_, _) => { _loginForm = null; _loginStatus = null; _loginUser = null; };
         form.Shown += (_, _) =>
         {
-            if (saved != null && saved.Username.Length > 0)
+            if (register && saved != null)
+            {
+                user.Focus();
+                if (!_speech.ScreenReaderRunning)
+                    _speech.Speak($"Create an account on {(saved.Name.Length > 0 ? saved.Name : saved.Host)}. Username.", true);
+            }
+            else if (saved != null && saved.Username.Length > 0)
             {
                 pass.Focus();
                 if (!_speech.ScreenReaderRunning) _speech.Speak($"Connect to {saved.Name} as {saved.Username}. Password.", true);
@@ -264,7 +295,7 @@ public sealed class MenuWindow : Form
 
     private void ShowSettings()
     {
-        var form = Dialog("Settings", 460, 380);
+        var form = Dialog("Settings", 460, 430);
         var layout = Column();
 
         var outputs = new List<string> { "System default" };
@@ -285,6 +316,8 @@ public sealed class MenuWindow : Form
         };
         volume.Enter += (_, _) => Cue(UiCue.MenuMove);
         layout.Controls.Add(volume);
+
+        layout.Controls.Add(MenuButton("Open log folder", OpenLogFolder));
 
         var save = MenuButton("Save", () =>
         {

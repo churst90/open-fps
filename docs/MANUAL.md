@@ -18,9 +18,8 @@ and dialogs, with these differences:
 Run `./run-gtk-client.sh` from the OpenFPS folder. It builds the client and starts it. Speech goes
 to Orca when Orca is running, and to speech-dispatcher otherwise.
 
-The main menu has five items: **Connect**, **Saved Servers**, **Settings**, **Open log folder** and
-**Quit**. Use Tab or the arrow keys to move and Enter to choose. Open log folder opens the folder of
-the log file the client is writing (set by `run-gtk-client.sh`).
+The main menu has five items: **Connect**, **Create account**, **Saved Servers**, **Settings** and
+**Quit**. Use Tab or the arrow keys to move and Enter to choose.
 
 ### Connecting
 
@@ -30,8 +29,12 @@ the log file the client is writing (set by `run-gtk-client.sh`).
 - The **Connect dialog** has: a status line (it repeats the last message), Server address (for
   example `127.0.0.1:33288`), Username, Password, a "Remember password" checkbox, Connect, Create
   account and Cancel. Escape closes it. If the login fails, the cursor returns to Username.
-- **Create account** makes a new account with the username and password you typed and logs you in
-  with it.
+- **Create account** on the main menu makes a new account on your preferred server and logs you in
+  with it. If that server has a username and password saved, it asks for that account straight away.
+  Otherwise the Create Account dialog opens for that server, the cursor in Username, with Create
+  account as the first button. With no saved server, Saved Servers opens instead.
+- **Create account** in the Connect dialog makes a new account with the username and password you
+  typed.
 - After you log in by hand, the server is saved for you. The first server you save becomes your
   preferred one.
 
@@ -355,6 +358,8 @@ Choose Settings from the main menu.
 - **Input device, for voice chat**: the microphone voice chat uses. Empty means the system default.
 - **Interface sounds**: on or off.
 - **Interface sound volume**: 0 to 100.
+- **Open log folder**: opens the folder of the log file the client is writing (set by
+  `run-gtk-client.sh`).
 
 Settings and saved servers are kept in `~/.config/openfps/client.json`. The file can only be read
 by you. A password is saved only if you ticked "Remember password". Beacon choices are kept in
