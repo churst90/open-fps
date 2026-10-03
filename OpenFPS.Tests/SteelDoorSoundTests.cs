@@ -65,19 +65,16 @@ public class SteelDoorSoundTests
         for (int i = 0; i < 90; i++)
             doors.Update(world, PhysicsConstants.FixedDeltaTime, _ => { }, (_, _, s) => closed.AddRange(s));
 
-        Assert.Contains(opened, s => s.Character == SoundCharacter.Knock);           // the latch
-        Assert.Contains(closed, s => s.Character == SoundCharacter.Knock);           // the blow and the latch
-        // The leaf rings, at the note a HOLLOW steel door of its size has: two 1.2 mm skins over a
-        // core bend as a sandwich, stiffer for their mass than an 80 mm slab of solid steel — which
-        // is what it was reckoned as, at 2.4 tonnes, before the prefab said what it is made of.
-        var ring = Assert.Single(closed, s => s.Character == SoundCharacter.Ring);
-        var size = world.Get<ColliderComponent>(door).Size;
-        float skin = world.Get<DoorComponent>(door).SkinMetres;
-        Assert.Equal(0.0012f, skin, 4);
-        float perArea = 2f * skin * 7850f + (size.Z - 2f * skin) * 150f;
-        float equivalent = MathF.Sqrt(6f * 7850f * skin * (size.Z - skin) * (size.Z - skin) / perArea);
-        Assert.Equal(DoorAcoustics.PanelHz(AcousticRegistry.GetProperties("Metal"), size.X, size.Y, equivalent), ring.Hz, 1);
-        Assert.True(ring.Hz > DoorAcoustics.PanelHz(AcousticRegistry.GetProperties("Metal"), size.X, size.Y, size.Z));
+        // The bar pushed, and the slam: each its own model, named by the leaf.
+        DoorMechanisms.Spec Spec(TransientSound s) => DoorMechanisms.TryParseKey(s.SynthKey, out var sp) ? sp : default;
+        Assert.Contains(opened, s => Spec(s).Event == DoorEvents.Bar);
+        var slam = Assert.Single(closed, s => Spec(s).Event == DoorEvents.Latch);
+        // The leaf is what the prefab says it is: a HOLLOW steel door, two 1.2 mm skins over a core,
+        // whose first mode is a sandwich's (the measured 129 Hz), not an 80 mm slab of solid steel's.
+        var leaf = Spec(slam);
+        Assert.Equal("Metal", leaf.Material);
+        Assert.Equal(0.0012f, leaf.SkinMetres, 4);
+        Assert.InRange(DoorMechanisms.LeafModes(leaf)[0].Hz, 100f, 210f);
 
         // A client that has heard nothing yet, standing in front of the door.
         var client = new ClientWorldState();
@@ -108,8 +105,7 @@ public class SteelDoorSoundTests
                 facade.PumpForTest();
                 System.Threading.Thread.Sleep(5);
             }
-            return sounds.Where(s => !provider.Emitters.Any(e => e.SoundId.StartsWith(
-                $"synth:{s.Character}:{(int)MathF.Round(s.Hz)}:{(int)MathF.Round(s.LevelDb)}:"))).ToList();
+            return sounds.Where(s => !provider.Emitters.Any(e => e.SoundId.StartsWith($"synth:{s.SynthKey}:"))).ToList();
         }
 
         var silentOpening = Missing(opened, seed: 1);
@@ -117,7 +113,7 @@ public class SteelDoorSoundTests
         _o.WriteLine($"first opening: {opened.Count - silentOpening.Count} of {opened.Count} sounds played; "
                    + $"first closing: {closed.Count - silentClosing.Count} of {closed.Count}");
 
-        // Every part, the first time — the latch, the blow, the seal and the ring.
+        // Every event, the first time — the bar, and the slam with its rattle.
         Assert.Empty(silentOpening);
         Assert.Empty(silentClosing);
     }

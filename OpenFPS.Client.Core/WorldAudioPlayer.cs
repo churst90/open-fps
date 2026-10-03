@@ -189,6 +189,16 @@ public sealed class WorldAudioPlayer
             HornReceived(message.SourceEntityId, horn, rhythm);
             return;
         }
+        // A door leaf setting off again (turned back for somebody, or pushed the other way) ends the
+        // travel it was making: that sound was rendered to run to the stop it will now never reach.
+        if (message.SourceEntityId >= 0 && _doorTravel.TryGetValue(message.SourceEntityId, out int travelVoice))
+            foreach (var s in message.Sounds)
+                if (DoorMechanisms.IsMotion(s.SynthKey))
+                {
+                    _doorTravel.Remove(message.SourceEntityId);
+                    _lettingGo.Add(travelVoice);
+                    break;
+                }
         if (_trace)
         {
             foreach (var s in message.Sounds)
@@ -275,6 +285,9 @@ public sealed class WorldAudioPlayer
         }
 
         FollowSpeakers(world, listenerPosition, now);
+        // Door travel being let go: faded over the budget's eighty milliseconds, then stopped.
+        for (int i = _lettingGo.Count - 1; i >= 0; i--)
+            if (_audio.FadeOut(_lettingGo[i])) { _audio.StopSound(_lettingGo[i]); _lettingGo.RemoveAt(i); }
         if (_pending.Count == 0) return;
 
         // More than one pass: a sound's early reflections are queued WHILE it is played, at the end
@@ -302,7 +315,12 @@ public sealed class WorldAudioPlayer
             // mirror point, while the speaker walks on: heard as a room passing you rather than a
             // person. The street's answer to a voice comes from the reverb, which follows the listener.
             bool spoken = Speech.TryParseKey(item.Sound.SynthKey, out _);
-            if (!item.IsReflection && !spoken)
+            // Nor does a door's travel (rollers, a motor, a seal wiping the frame). It is a steady
+            // noise seconds long, and a copy of it from a wall is the same noise again a few
+            // milliseconds later: a comb that stands still, which is what made sustained echoes ghosts.
+            // The room still answers it through the reverb.
+            bool travelling = DoorTravel(item.Sound.SynthKey);
+            if (!item.IsReflection && !spoken && !travelling)
             {
                 QueueEarlyEchoes(item, world, listenerPosition);
                 QueueReflections(item, reflections, listenerPosition, now);
@@ -427,6 +445,10 @@ public sealed class WorldAudioPlayer
             }
             if (HearsTheGround(item, spoken)) Ground?.Invoke(ref emitter, world);
             _audio.Submit(emitter);
+            // A door's travel is rendered for the whole travel; if the leaf turns back, it is let go.
+            if (travelling && !item.IsReflection && item.SourceEntityId >= 0
+                && DoorMechanisms.IsMotion(item.Sound.SynthKey))
+                _doorTravel[item.SourceEntityId] = emitter.EntityId;
 
             // Somebody talking while they walk carries their voice with them. A two-second line left
             // where it started is three metres behind the footsteps by the end of it.
@@ -448,6 +470,15 @@ public sealed class WorldAudioPlayer
         if (!dueLeft) break;
         }
     }
+
+    /// <summary>The voice playing each door's travel, by the door, so it can be let go.</summary>
+    private readonly Dictionary<int, int> _doorTravel = new();
+    /// <summary>Travel voices fading out.</summary>
+    private readonly List<int> _lettingGo = new();
+
+    /// <summary>A door sound that lasts the leaf's travel rather than happening once.</summary>
+    internal static bool DoorTravel(string? key)
+        => DoorMechanisms.TryParseKey(key, out var s) && (DoorMechanisms.IsMotionEvent(s.Event) || s.Event == DoorEvents.Closer);
 
     /// <summary>The ground between a sound and the listener, worked out on the game thread (see
     /// ClientAudioSystem.ApplyRecordedGround).</summary>
@@ -873,6 +904,9 @@ public sealed class WorldAudioPlayer
         // A car door: a mechanism fitted to a recording, which one knock and one ring could not be.
         if (CarDoor.TryParseKey(sound.SynthKey, out bool closing))
             return CarDoor.Render(closing, TransientSynth.SampleRate, seed);
+        // A building's door: each mechanical event its own model, from the leaf it names.
+        if (DoorMechanisms.TryParseKey(sound.SynthKey, out var door))
+            return DoorMechanisms.Render(door, TransientSynth.SampleRate, seed);
 
         return TransientSynth.Render(sound, seed);
     }
@@ -978,7 +1012,7 @@ public sealed class WorldAudioPlayer
 
     /// <summary>Forgets everything queued. Called on a map change, where the positions mean nothing
     /// any more and the things that made them are gone.</summary>
-    public void Clear() { _pending.Clear(); _awaitingRender.Clear(); _following.Clear(); }
+    public void Clear() { _pending.Clear(); _awaitingRender.Clear(); _following.Clear(); _doorTravel.Clear(); }
 
     /// <summary>
     /// A sound's parameters ARE its identity.
