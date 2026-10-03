@@ -4,6 +4,15 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-02
 
+- Door sounds by mechanism (branch door-sounds, unheard): every `door:KIND:EVENT` now has its own
+  sound from `DoorMechanisms`, to the spec in docs/DOOR_TYPES.md. Contacts into modes: the leaf's
+  plate modes from its material and size (one steel core value gives the fire door 127 Hz and the
+  lift leaf 178 Hz, measured 129 and 172; two panes on an air spring give the patio door its
+  200-300 Hz cluster), its edge members, and the measured hardware rings over a damped bed. Noise
+  only for rollers, motors and the brush seal. Dry, 48 kHz, levels against the door's main hit as
+  measured. Travel sounds are rendered for the whole travel and let go if the leaf turns back.
+  `AudioLab --door-sounds` renders and measures every kind through the real door system;
+  inbox/door-sounds-2026-10-02/ has the renders next to the recordings.
 - Door types (Cody's list): a knob or lever, a steel push-bar door with a closer, a keyed glass
   front door (bar inside, key outside, closer), a pulled glass door with a closer, an automatic
   sliding door, a patio slider and a lift's doors. The kind is data on the prefab (`DoorKind`,

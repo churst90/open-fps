@@ -36,8 +36,8 @@ public static class DoorSoundsSpike
     {
         ("door", "knob", false, true, 0.4f, 13f),                         // kyles light wood
         ("steel_door", "pushbar", false, false, 0.8f, 5f),                // berumen
-        ("glass_front_door", "glass-pushbar-key", true, false, 0.5f, 8f), // vaztur
-        ("glass_front_door", "glass-pushbar-bar", false, false, 0.5f, 8f),
+        ("glass_front_door", "glass-pushbar/outside-key", true, false, 0.5f, 8f), // vaztur
+        ("glass_front_door", "glass-pushbar/inside-bar", false, false, 0.5f, 8f),
         ("glass_pull_door", "glass-pull", false, false, 0.3f, 14f),       // kraftaggregat
         ("auto_sliding_door", "auto-slide", false, false, 0.6f, 8f),      // a shop entrance
         ("patio_door", "patio-slide", false, true, 0.5f, 8f),             // goblinjack, kijjaz
@@ -75,7 +75,9 @@ public static class DoorSoundsSpike
                 if (handShut) DoorSystem.Set(world, e, open: false);
                 Tick(d.CloseAfterSeconds + MathF.Max(d.CloseSeconds, d.SwingSeconds) + 3.5f);
 
-                string dir = Path.Combine(outDir, name);
+                // "kind/tag": a kind heard two ways shares its folder, each file named by the way.
+                string dir = Path.Combine(outDir, name.Split('/')[0]);
+                string tag = name.Contains('/') ? name.Split('/')[1] + "-" : "";
                 Directory.CreateDirectory(dir);
                 report.AppendLine($"== {name} ({prefab})");
                 var leafSpec = DoorSystem.Spec(world, e, world.Get<DoorComponent>(e), (DoorKind)world.Get<DoorComponent>(e).Kind);
@@ -94,7 +96,7 @@ public static class DoorSoundsSpike
                     float at = t - t0 + s.DelaySeconds;
                     rendered.Add((at, pcm, s.LevelDb));
                     string ev = key[(key.LastIndexOf(':') + 1)..];
-                    Wav(Path.Combine(dir, $"{k:00}-{ev}.wav"), pcm, 0.89f / MathF.Max(1e-6f, pcm.Max(MathF.Abs)));
+                    Wav(Path.Combine(dir, $"{tag}{k:00}-{ev}.wav"), pcm, 0.89f / MathF.Max(1e-6f, pcm.Max(MathF.Abs)));
                     report.AppendLine(Describe(k, at, ev, s, pcm, ms, roomT60, roomC50));
                     k++;
                 }
@@ -108,7 +110,7 @@ public static class DoorSoundsSpike
                     for (int i = 0; i < pcm.Length && a + i < seq.Length; i++) seq[a + i] += pcm[i] * g;
                 }
                 float peak = seq.Length == 0 ? 1f : MathF.Max(1e-6f, seq.Max(MathF.Abs));
-                Wav(Path.Combine(dir, "sequence.wav"), seq, 0.89f / peak);
+                Wav(Path.Combine(dir, $"{tag}sequence.wav"), seq, 0.89f / peak);
                 report.AppendLine($"   sequence {len:F2} s, events: " + string.Join(", ", rendered.Select((r, i) => $"{r.At:F2}s {r.Db - top:+0;-0} dB")));
             }
             finally { World.Destroy(world); }

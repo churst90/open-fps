@@ -49,8 +49,11 @@ Suggested order. Research and file references for most of these: [docs/RESEARCH_
 - Door types (Cody, 2026-10-02). Done 2026-10-02 (unheard): seven kinds with their motion,
   closers, sensors and keyed side, on the city, each sending its events as `door:KIND:EVENT`
   (docs/DOOR_TYPES_EVENTS.md). Next:
-  - synthesise each event from its mechanism, fitted to recordings fetched first; today each
-    plays the old latch-and-leaf sounds or nothing;
+  - each event synthesised from its mechanism (`DoorMechanisms`, branch door-sounds, unheard):
+    renders and references in inbox/door-sounds-2026-10-02/ for Cody to judge. Open there: line
+    prominence 20-31 dB against the recordings' 10-32, the steel slam's rattle makes it longer than
+    berumen's, the lift's travel times are the prefab's (1.8/2.5 s) not the recordings' (2.5-5 s),
+    no arrival chime (not a door event), a held closer's seal sweep keeps its first timing;
   - a key item, so a keyed door can be locked to somebody without one;
   - the towers' stairwells open onto their corridors with no door: push-bar fire doors there
     would change every tower's acoustics, so they wait for Cody;

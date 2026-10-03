@@ -606,7 +606,7 @@ public static class DoorMechanisms
         Mix.Accumulate(ridden, m.Strike(latch, rc), 0.15f);
         m.Add(ridden, -19f);
         // The leaf onto its silencers, and the bolt and edge onto the steel frame.
-        m.Add(m.Strike(leaf.Bank(), (hit, 1f, 3f)), -7f);
+        m.Add(m.Strike(leaf.Bank(), (hit, 1f, 3f)), -10f);
         var edge = m.Strike(leaf.Bank(), (hit + 0.001f, 1f, 0.05f));
         Mix.Accumulate(edge, m.Strike(latch, (hit + 0.002f, 1f, 0.05f)), 0.1f);
         m.Add(edge, 0f);
@@ -678,11 +678,11 @@ public static class DoorMechanisms
         var rattle = new List<(float, float, float)>();
         float span = 0.8f + 0.1f * m.U();
         // Densest while the leaf still has its swing in it, sparser as it settles.
-        for (float t = hit + 0.015f + 0.02f * m.U(); t < hit + 0.09f + span; )
+        for (float t = hit + 0.06f + 0.03f * m.U(); t < hit + 0.09f + span; )
         {
             float settled = MathF.Max(0f, t - hit - 0.09f) / span;
             rattle.Add((t, Gain(-28f * settled) * (0.3f + 0.7f * m.U()), 0.05f + 0.2f * m.U()));
-            t += 0.003f + (0.006f + 0.025f * settled) * m.U();
+            t += 0.008f + (0.008f + 0.014f * settled) * m.U();
         }
         var rattled = m.Strike(leaf.Frame().Sparse(2), rattle);
         Mix.Accumulate(rattled, m.Strike(latch, rattle), 0.1f);
