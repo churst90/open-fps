@@ -254,17 +254,16 @@ public class DoorTypeTests : IDisposable
     // ── Events ──────────────────────────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// One open and one shut of every kind, as the events its hardware makes, in order. Each carries
-    /// its own sound (DoorMechanisms) except a swing on dry hinges and a steel door's sealed closer,
-    /// which make none (docs/DOOR_TYPES.md).
+    /// One open and one shut of every kind, as the events its hardware makes, in order. The ones a
+    /// door model already renders carry its sounds; the rest are silent until they are synthesised.
     /// </summary>
     [Theory]
     [InlineData("door", "latch-retract+ swing | swing latch+")]
     [InlineData("steel_door", "bar+ swing | closer latch+")]
-    [InlineData("glass_pull_door", "pull+ swing | closer+ latch+")]
-    [InlineData("patio_door", "latch-retract+ rollers+ stop+ | rollers+ latch+")]
-    [InlineData("auto_sliding_door", "motor-start+ rollers+ stop+ | motor-start+ rollers+ shut+")]
-    [InlineData("elevator_door", "motor-start+ rollers+ stop+ | motor-start+ rollers+ shut+")]
+    [InlineData("glass_pull_door", "pull+ swing | closer latch+")]
+    [InlineData("patio_door", "latch-retract+ rollers stop | rollers latch+")]
+    [InlineData("auto_sliding_door", "motor-start rollers stop | motor-start rollers shut+")]
+    [InlineData("elevator_door", "motor-start rollers stop | motor-start rollers shut+")]
     public void EachKindNamesItsEvents(string prefab, string expected)
     {
         var e = Door(prefab);

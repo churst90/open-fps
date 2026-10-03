@@ -49,11 +49,16 @@ Suggested order. Research and file references for most of these: [docs/RESEARCH_
 - Door types (Cody, 2026-10-02). Done 2026-10-02 (unheard): seven kinds with their motion,
   closers, sensors and keyed side, on the city, each sending its events as `door:KIND:EVENT`
   (docs/DOOR_TYPES_EVENTS.md). Next:
-  - each event synthesised from its mechanism (`DoorMechanisms`, branch door-sounds, unheard):
-    renders and references in inbox/door-sounds-2026-10-02/ for Cody to judge. Open there: line
-    prominence 20-31 dB against the recordings' 10-32, the steel slam's rattle makes it longer than
-    berumen's, the lift's travel times are the prefab's (1.8/2.5 s) not the recordings' (2.5-5 s),
-    no arrival chime (not a door event), a held closer's seal sweep keeps its first timing;
+  - door SOUNDS: a physical door model, not modelled sounds. Cody, 2026-10-03: "are we modeling
+    the doors or modeling the sound? ... we need to model the physical doors ... dynamically
+    squeaky hinges, simulate the motor on the sliding door". The 2026-10-02 round (each event a
+    fitted modal recipe, docs/DOOR_TYPES.md) was rejected: lacked detail, push bars grainy, some
+    too tonal; reverted, the events play the map's existing door sounds. He is not sourcing
+    recordings: the model is the point. Plan to agree: the leaf as a rigid body on its hinge
+    axis driven by hand, closer, motor; stick-slip hinge friction per hinge (each door its own
+    wear); a spring latch riding the strike; the push bar's linkage with real clearances (rattle
+    as impacts); a hydraulic closer; a DC motor, gearbox, belt and rollers on a rough track for
+    sliders; leaf and hardware modal. Pilot: a knob door, judged before the rest;
   - a key item, so a keyed door can be locked to somebody without one;
   - the towers' stairwells open onto their corridors with no door: push-bar fire doors there
     would change every tower's acoustics, so they wait for Cody;

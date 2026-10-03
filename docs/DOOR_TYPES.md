@@ -1,8 +1,7 @@
 # Door types
 
-A measured spec for synthesising doors by mechanism. Written 2026-10-02. Synthesised by
-`OpenFPS.Common/DoorMechanisms.cs` (branch door-sounds); the renders against these recordings are
-in inbox/door-sounds-2026-10-02/ with their numbers.
+A measured spec for synthesising doors by mechanism. Written 2026-10-02. Nothing in the game uses
+it yet.
 
 Seven door types: an interior hinged door, a steel fire door with a push bar, a glass storefront
 door with a push bar and a lock, a pull-open glass box-store door, automatic sliding doors, a

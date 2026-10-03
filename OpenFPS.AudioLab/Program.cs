@@ -464,13 +464,6 @@ if (args.Contains("--pass-by"))
     Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.PassBySpike.Run(args));
 }
 
-if (args.Contains("--door-sounds"))
-{
-    // --door-sounds [out=DIR] [seed=N]: every door kind opened and shut through the real door system,
-    // each event rendered by OpenFPS.Common.DoorMechanisms, with measurements (DIR/measure.txt).
-    Environment.Exit(OpenFPS.Client.Core.AudioEngine.Fmod.DoorSoundsSpike.Run(args));
-}
-
 if (args.Contains("--car-door"))
 {
     // --car-door [out=DIR] [seed=N]: the car door model (OpenFPS.Common.CarDoor) opening and shutting,

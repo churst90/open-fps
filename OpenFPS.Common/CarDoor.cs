@@ -167,7 +167,7 @@ public static class CarDoor
     /// poles each become a pair about the (prewarped) centre, and the bilinear transform takes the six
     /// to z, as three biquads with their zeros at z = 1 and z = -1. Unity gain at the centre.
     /// </summary>
-    internal static void ButterworthBandPass(float[] x, float lo, float hi, float sr)
+    private static void ButterworthBandPass(float[] x, float lo, float hi, float sr)
     {
         double fs2 = 2.0 * sr;
         double w1 = fs2 * Math.Tan(Math.PI * lo / sr), w2 = fs2 * Math.Tan(Math.PI * hi / sr);

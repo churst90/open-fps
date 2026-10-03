@@ -199,96 +199,75 @@ public sealed class DoorSystem
     {
         int now = door.Target > door.Openness ? 1 : door.Target < door.Openness ? -1 : 0;
         var kind = (DoorKind)door.Kind;
+        var none = Array.Empty<TransientSound>();
 
         if (travel > 0 && (door.Travel != 1 || before <= 0f))
         {
             if (before <= 0f) OpenStart(world, entity, ref door, kind, heard);
-            else if (door.Powered)
-                // Turned back for somebody: the motor starts again and the leaves run open from where they are.
-                Emit(heard, entity, kind, DoorEvents.Reopen,
-                     Mech(heard, world, entity, door, kind, DoorEvents.Reopen, true, (1f - before) * door.SwingSeconds));
-            else if (door.Slides)
-                Emit(heard, entity, kind, DoorEvents.Rollers,
-                     Mech(heard, world, entity, door, kind, DoorEvents.Rollers, true, (1f - before) * door.SwingSeconds));
-            else Emit(heard, entity, kind, DoorEvents.Swing, Mech(heard, world, entity, door, kind, DoorEvents.Swing));
+            else if (door.Powered) Emit(heard, entity, kind, DoorEvents.Reopen, none);
+            else Emit(heard, entity, kind, door.Slides ? DoorEvents.Rollers : DoorEvents.Swing, none);
         }
         else if (travel < 0 && door.Travel != -1)
         {
-            float closing = ClosingSeconds(door, before);
-            if (door.Powered)
-            {
-                Emit(heard, entity, kind, DoorEvents.MotorStart, Mech(heard, world, entity, door, kind, DoorEvents.MotorStart, false));
-                Emit(heard, entity, kind, DoorEvents.Rollers, Mech(heard, world, entity, door, kind, DoorEvents.Rollers, false, closing));
-            }
-            else if (door.Slides)
-                Emit(heard, entity, kind, DoorEvents.Rollers, Mech(heard, world, entity, door, kind, DoorEvents.Rollers, false, closing));
-            else if (door.SelfClosing)
-                // The closer's brush seal wipes the frame over the last of the sweep, ending at the shut.
-                Emit(heard, entity, kind, DoorEvents.Closer,
-                     Mech(heard, world, entity, door, kind, DoorEvents.Closer, false, 0f,
-                          MathF.Max(0f, closing - DoorMechanisms.SealSweepSeconds)));
-            else Emit(heard, entity, kind, DoorEvents.Swing, Mech(heard, world, entity, door, kind, DoorEvents.Swing, false));
+            if (door.Powered) { Emit(heard, entity, kind, DoorEvents.MotorStart, none); Emit(heard, entity, kind, DoorEvents.Rollers, none); }
+            else if (door.Slides) Emit(heard, entity, kind, DoorEvents.Rollers, none);
+            else Emit(heard, entity, kind, door.SelfClosing ? DoorEvents.Closer : DoorEvents.Swing, none);
         }
 
         if (travel != 0 && now == 0)
         {
             if (door.Openness <= 0f)
             {
-                string ev = door.Powered ? DoorEvents.Shut : DoorEvents.Latch;
-                Emit(heard, entity, kind, ev, Mech(heard, world, entity, door, kind, ev, false));
+                float width = HalfWidth(world, entity, door) * 2f;
+                float edge = door.Slides ? DoorAcoustics.EdgeSpeed(width, 1f, seconds)
+                                         : DoorAcoustics.EdgeSpeed(width, door.SwingRadians, seconds);
+                Emit(heard, entity, kind, door.Powered ? DoorEvents.Shut : DoorEvents.Latch,
+                     heard == null ? none : Closing(world, entity, door, edge));
                 door.SelfClosing = false;
             }
             else if (door.Openness >= 1f && door.Slides)
-                Emit(heard, entity, kind, DoorEvents.Stop, Mech(heard, world, entity, door, kind, DoorEvents.Stop));
+                Emit(heard, entity, kind, DoorEvents.Stop, none);
         }
         door.Travel = now;
-    }
-
-    /// <summary>How long the leaf will take to shut from <paramref name="openness"/>, seconds, at the
-    /// speeds it shuts at: a motor's, a closer's sweep and then its latch speed, or a hand's.</summary>
-    internal static float ClosingSeconds(in DoorComponent door, float openness)
-    {
-        bool self = door.SelfClosing || door.Powered;
-        if (!self || door.CloseSeconds <= 0f) return openness * door.SwingSeconds;
-        if (door.Slides || door.Powered) return openness * door.CloseSeconds;
-        return MathF.Max(0f, openness - LatchZone) * door.CloseSeconds + MathF.Min(openness, LatchZone) * door.SwingSeconds;
     }
 
     /// <summary>The events of a shut door starting to open, by what is on it.</summary>
     private static void OpenStart(World world, Entity entity, ref DoorComponent door, DoorKind kind,
                                   Action<int, string, IReadOnlyList<TransientSound>>? heard)
     {
+        var none = Array.Empty<TransientSound>();
         if (door.Powered)
         {
-            Emit(heard, entity, kind, DoorEvents.MotorStart, Mech(heard, world, entity, door, kind, DoorEvents.MotorStart, true));
-            Emit(heard, entity, kind, DoorEvents.Rollers, Mech(heard, world, entity, door, kind, DoorEvents.Rollers, true, door.SwingSeconds));
+            Emit(heard, entity, kind, DoorEvents.MotorStart, none);
+            Emit(heard, entity, kind, DoorEvents.Rollers, none);
             return;
         }
-        // Each kind's first sound is its own mechanism letting go of the frame.
-        switch (kind)
+        // Each kind's first sound is its own mechanism letting go of the frame; until each has been
+        // synthesised from its recordings, all of them are the latch-and-leaf model every door had.
+        if (heard != null)
         {
-            case DoorKind.PushBar:
-                Emit(heard, entity, kind, DoorEvents.Bar, Mech(heard, world, entity, door, kind, DoorEvents.Bar));
-                break;
-            case DoorKind.GlassPushBar when door.KeyTurned:
-                Emit(heard, entity, kind, DoorEvents.Key, Mech(heard, world, entity, door, kind, DoorEvents.Key));
-                // The latch comes back once the key has turned.
-                Emit(heard, entity, kind, DoorEvents.LatchRetract,
-                     Mech(heard, world, entity, door, kind, DoorEvents.LatchRetract, true, 0f, DoorMechanisms.KeySeconds));
-                break;
-            case DoorKind.GlassPushBar:
-                Emit(heard, entity, kind, DoorEvents.Bar, Mech(heard, world, entity, door, kind, DoorEvents.Bar));
-                break;
-            case DoorKind.GlassPull:
-                Emit(heard, entity, kind, DoorEvents.Pull, Mech(heard, world, entity, door, kind, DoorEvents.Pull));
-                break;
-            default:
-                Emit(heard, entity, kind, DoorEvents.LatchRetract, Mech(heard, world, entity, door, kind, DoorEvents.LatchRetract));
-                break;
+            var opening = Opening(world, entity, door);
+            switch (kind)
+            {
+                case DoorKind.PushBar:
+                    Emit(heard, entity, kind, DoorEvents.Bar, opening);
+                    break;
+                case DoorKind.GlassPushBar when door.KeyTurned:
+                    Emit(heard, entity, kind, DoorEvents.Key, none);
+                    Emit(heard, entity, kind, DoorEvents.LatchRetract, opening);
+                    break;
+                case DoorKind.GlassPushBar:
+                    Emit(heard, entity, kind, DoorEvents.Bar, opening);
+                    break;
+                case DoorKind.GlassPull:
+                    Emit(heard, entity, kind, DoorEvents.Pull, opening);
+                    break;
+                default:
+                    Emit(heard, entity, kind, DoorEvents.LatchRetract, opening);
+                    break;
+            }
+            Emit(heard, entity, kind, door.Slides ? DoorEvents.Rollers : DoorEvents.Swing, none);
         }
-        if (door.Slides)
-            Emit(heard, entity, kind, DoorEvents.Rollers, Mech(heard, world, entity, door, kind, DoorEvents.Rollers, true, door.SwingSeconds));
-        else Emit(heard, entity, kind, DoorEvents.Swing, Mech(heard, world, entity, door, kind, DoorEvents.Swing));
         door.KeyTurned = false;
     }
 
@@ -468,68 +447,76 @@ public sealed class DoorSystem
     // ── What it sounds like ─────────────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// One event's sound: its model (<see cref="DoorMechanisms"/>), named by what the leaf is made of,
-    /// its size and how it is built, and placed where it happens at its measured level against the
-    /// door's main hit. Empty for an event that makes no sound of its own, and when nobody is
-    /// listening.
+    /// What the leaf and its latch sound like as it leaves the frame and as it meets it.
     ///
-    /// Everything the model needs is already on the leaf, so a door somebody builds out of a material
+    /// Everything the model needs is already on the leaf: what it is made of, how big it is, how
+    /// thick, and how fast its latch edge was travelling. So a door somebody builds out of a material
     /// somebody else invented is audible the first time it shuts, with nobody having recorded anything.
     /// </summary>
-    private static IReadOnlyList<TransientSound> Mech(Action<int, string, IReadOnlyList<TransientSound>>? heard,
-                                                      World world, Entity entity, in DoorComponent door, DoorKind kind,
-                                                      string ev, bool opening = true, float seconds = 0f, float delay = 0f)
-    {
-        float rel = DoorMechanisms.RelativeDb(kind, ev, opening);
-        if (heard == null || float.IsNaN(rel)) return Array.Empty<TransientSound>();
-        var spec = Spec(world, entity, door, kind) with { Event = ev, Seconds = seconds, Opening = opening };
+    private static IReadOnlyList<TransientSound> Opening(World world, Entity entity, in DoorComponent door)
+        => Sounds(world, entity, door, opening: true, edgeSpeed: 0f);
 
-        var transform = world.Get<Transform>(entity);
-        var acrossLeaf = Vector3.Transform(new Vector3(spec.Width * 0.5f * -door.HingeSide, 0f, 0f), transform.Rotation);
-        // A hinged door's hardware is at its latch edge; a sliding leaf is heard from itself.
-        var at = door.Slides ? transform.Position : transform.Position + acrossLeaf;
+    private static IReadOnlyList<TransientSound> Closing(World world, Entity entity, in DoorComponent door, float edgeSpeed)
+        => Sounds(world, entity, door, opening: false, edgeSpeed);
 
-        bool sustained = DoorMechanisms.IsMotionEvent(ev) || ev == DoorEvents.Closer;
-        return new[]
-        {
-            new TransientSound
-            {
-                Character = sustained ? SoundCharacter.Hiss : SoundCharacter.Knock,
-                DelaySeconds = delay,
-                Position = at,
-                LevelDb = MainHitDb(spec, door) + rel,
-                Hz = 1000f,
-                DecaySeconds = sustained ? MathF.Max(seconds, DoorMechanisms.SealSweepSeconds) : 0.9f,
-                Noisiness = sustained ? 1f : 0.3f,
-                SynthKey = DoorMechanisms.Key(spec),
-            },
-        };
-    }
-
-    /// <summary>The leaf, as the sound model needs it: material, size, how it is built.</summary>
-    public static DoorMechanisms.Spec Spec(World world, Entity entity, in DoorComponent door, DoorKind kind)
+    private static List<TransientSound> Sounds(World world, Entity entity, in DoorComponent door, bool opening, float edgeSpeed)
     {
         var size = world.Has<ColliderComponent>(entity)
             ? world.Get<ColliderComponent>(entity).Size
             : new Vector3(0.9f, 2.1f, 0.05f);
-        string material = world.Has<MaterialComponent>(entity) ? world.Get<MaterialComponent>(entity).Material ?? "Wood" : "Wood";
-        // An insulated pane's thickness is the leaf's acoustic leaf; a hollow door's skin is its skin.
-        float pane = door.SkinMetres <= 0f && world.Has<AcousticComponent>(entity) ? world.Get<AcousticComponent>(entity).LeafMetres : 0f;
-        return new DoorMechanisms.Spec(kind, "", material, size.X, size.Y, size.Z, door.SkinMetres, pane);
+        var material = AcousticRegistry.GetProperties(
+            world.Has<MaterialComponent>(entity) ? world.Get<MaterialComponent>(entity).Material ?? "Wood" : "Wood");
+
+        var transform = world.Get<Transform>(entity);
+        float halfWidth = size.X * 0.5f;
+        var acrossLeaf = Vector3.Transform(new Vector3(halfWidth * -door.HingeSide, 0f, 0f), transform.Rotation);
+        var latchEdge = transform.Position + acrossLeaf;
+        var hinge = transform.Position - acrossLeaf;
+
+        // Mass from the leaf's own volume and the density of what it is made of. A steel door is
+        // heavy because steel is heavy, not because somebody typed a number.
+        float massKg = MathF.Max(2f, size.X * size.Y * size.Z * MathF.Max(100f, material.DensityKgM3));
+        float ringThickness = size.Z;
+
+        // ...unless it is not solid. A steel door is two skins of sheet folded over a core — 1.2 mm
+        // of steel either side of forty-odd millimetres of honeycomb — and reckoned as a solid slab it
+        // weighed 2.4 tonnes and slammed seventeen decibels too hard. The prefab says so the way any
+        // door does, with its skin thickness. The skins weigh what they weigh; and bonded to a
+        // core they bend as a sandwich, stiff for their mass, so the note is that of a solid plate
+        // with the same stiffness-to-mass ratio: t = sqrt(6 rho s (d - s)^2 / m).
+        if (door.SkinMetres > 0f)
+        {
+            float skin = MathF.Min(door.SkinMetres, size.Z * 0.5f);
+            float area = size.X * size.Y;
+            float rho = MathF.Max(100f, material.DensityKgM3);
+            float perArea = 2f * skin * rho + MathF.Max(0f, size.Z - 2f * skin) * HollowCoreKgM3;
+            massKg = MathF.Max(2f, area * perArea);
+            ringThickness = MathF.Sqrt(6f * rho * skin * (size.Z - skin) * (size.Z - skin) / perArea);
+        }
+
+        // A seal is a property of what the thing is FOR: anything that keeps weather or noise out has
+        // one, and the material is the best evidence available. Metal and glass doors are sealed;
+        // a wooden one in a shed is not.
+        bool hasSeal = material.DensityKgM3 > 2000f;
+
+        var sounds = opening
+            // Hinges silent by default. A creak is a FAULT — a dry pin in a dry knuckle — and most
+            // doors do not have one; rendering three quarters of a second of stick-slip on every
+            // door made every door sound like a haunted house, which a listener heard as an
+            // unexplained hiss either side of the thud. A gate or a cellar door can ask for it.
+            ? DoorAcoustics.Opening(material, latchEdge, hinge, size.X, size.Y, ringThickness, massKg,
+                                    door.SwingSeconds, hingeDryness: 0f, hasSeal)
+            : DoorAcoustics.Closing(material, latchEdge, transform.Position, size.X, size.Y, ringThickness, massKg,
+                                    edgeSpeed, hasSeal);
+
+        var transients = new List<TransientSound>(sounds.Count);
+        foreach (var sound in sounds) transients.Add(sound.ToTransient());
+        return transients;
     }
 
-    /// <summary>
-    /// The door's main hit at a metre: the leaf's mass arriving at the speed it shuts at. A closer
-    /// brings a swinging leaf home at latch speed, which is its hand speed; a motor brakes first.
-    /// </summary>
-    private static float MainHitDb(in DoorMechanisms.Spec spec, in DoorComponent door)
-    {
-        float seconds = door.Powered && door.CloseSeconds > 0f ? door.CloseSeconds : door.SwingSeconds;
-        float average = door.Slides ? spec.Width / MathF.Max(0.1f, seconds)
-                                    : DoorAcoustics.EdgeSpeed(spec.Width, door.SwingRadians, seconds);
-        float arrival = DoorMechanisms.ArrivalSpeed(average, door.Slides, door.Powered);
-        return DoorMechanisms.MainHitDb(DoorMechanisms.LeafMassKg(spec), arrival, hinged: !door.Slides);
-    }
+    /// <summary>What fills a hollow door between its skins, kg/m^3: kraft honeycomb or mineral core,
+    /// with the edge channels and the lock reinforcement averaged in.</summary>
+    private const float HollowCoreKgM3 = 150f;
 
     // ── Asking a door to move ───────────────────────────────────────────────────────────────────
 
