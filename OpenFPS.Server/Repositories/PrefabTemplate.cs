@@ -308,4 +308,28 @@ public class PrefabTemplate
     /// leaf. Decides what it weighs and what note it rings at; it has nothing to do with how much it
     /// lets through, which the transmission figures say.</summary>
     public float? DoorSkinMetres { get; set; }
+
+    /// <summary>The door's hardware: "knob" (the default), "pushbar", "glass-pushbar", "glass-pull",
+    /// "auto-slide", "patio-slide" or "elevator". Names its sound events (docs/DOOR_TYPES_EVENTS.md).</summary>
+    public string? DoorKind { get; set; }
+
+    /// <summary>The leaf slides along its own width instead of swinging; HingeSide is the way it slides.
+    /// Defaults to true for the sliding kinds.</summary>
+    public bool? Slides { get; set; }
+
+    /// <summary>Moved by a motor: not opened by hand, and it reverses for anyone in the doorway.</summary>
+    public bool? Powered { get; set; }
+
+    /// <summary>Opens by itself when anyone is this close in front of it, either side, metres.</summary>
+    public float? SensorMetres { get; set; }
+
+    /// <summary>Closes by itself once the doorway has been clear this long, seconds (a closer, or an
+    /// automatic door's hold-open time).</summary>
+    public float? CloseAfterSeconds { get; set; }
+
+    /// <summary>How long closing by itself takes from fully open, seconds.</summary>
+    public float? CloseSeconds { get; set; }
+
+    /// <summary>Which side needs a key: +1 the leaf's own +Z side, -1 the other, 0 or absent neither.</summary>
+    public float? KeyedSide { get; set; }
 }

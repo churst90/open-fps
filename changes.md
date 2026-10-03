@@ -2,8 +2,98 @@
 
 Recent work, newest first. `git log` has the rest.
 
+## 2026-10-03
+
+- Paths that popped for a third of a second (branch path-pops, unheard). The [POP] lines from the
+  Main Street pavement were cars 150-300 m away going from -80 dB to -20 in the mid band and back.
+  New lab `--pop-hunt ear=x,y,z`: 40 cars drive the city's streets, asked about at the game's
+  cadence through the real worker, and every answer watched as `[POP]` watches a voice (mid and
+  high band). Three causes, each fixed:
+  - The barrier search believed a route over or round a box only if it touched nothing else. Over
+    the park's 1.1 m wall is a few millimetres, but each pier on the wall, and each storey of a
+    building, threw the route out, and the answer fell to what comes through every wall on the line
+    (-61 to -100). Now a route that runs into another box bends round it too (up to 2 boxes), and the
+    way over the top of everything is always tried: the string pulled tight over every box in the
+    vertical plane, as ISO 9613-2 and CNOSSOS-EU draw it. It does not exist from under a roof. A route
+    round a door leaf is not bent on (that is the openings' job): it found the 5 cm gap over Selby
+    House's shut glass door. A blocked line that only grazes is 5 dB (Maekawa), not 0.
+  - A full source pool sent the same sources to the hand-rolled tracer every tick, for good: with 80
+    asked about and 64 places, the last 16 in line never got one. That model put a car at -15 where
+    the simulator said -63. Now whoever was refused goes first next tick, and keeps its last answer.
+  - An engine that won a voice with no worker answer yet started unoccluded, at full level, and was
+    pulled down a fifth of a second later. [POP] never saw it (it skips a voice's first half second).
+    It now starts on the answer for a source near it, or the one-shots' path.
+  - Main Street pavement, 40 s: 58 mid-band excursions before, 0 after. With 30 more sources on the
+    pool, 60 s: 21 before (up to 73 dB), 2 after (up to 19 dB: a pier on a wall, where the string
+    goes over the pier). Selby stairwell 28 to 7, Marlow corridor 7 to 5; the ones left peak at -49
+    to -62 dB, high band below -80 (see todo).
+  - Cars behind buildings are louder now: over the roofs at Maekawa's 24 dB ceiling plus spreading,
+    where they were 60-100 dB down through every wall.
+  - Route queries cost more where legs are blocked: 630-950 us each in the stairwell and the
+    corridor, was 250-470. The 4 ms route budget per tick still holds.
+
+- The late tail no longer rings (branch tail-ring, unheard). At the ear, 400-900 ms, with
+  `--tail-steady`: 10.4-10.7 % of bins 10 dB over their local median and a flatness of 0.18 in the
+  stairwell, the flat and the corridor; now 0.08-0.12 % and 0.52-0.55 (noise: 0.1 % and 0.56). The
+  late part was one noise spread over twenty directions by velvet filters, then a velvet filter per
+  ear: three random spectra multiplied. Now each direction has its own noise under the averaged
+  energy (`DiffuseLate`), straight through its head response. No velvet and no ear velvet.
+  - Cost. The late part starts at 250 ms, so it is convolved in 4,096-sample blocks; each block's
+    answer is worked out over the next block's mixer pieces and waits in a ring. The noise is made
+    once (25 MB). Each trace gives only the envelope: per block, the amplitude at its start and end
+    per frequency bin. `--tail-cost` (Release, one thread): 229 us a piece, the old way 242 us.
+    The shared FFT is twice as fast (each stage's twiddles in a row, eight at a time).
+  - Level. The old late part was 4-6 dB low from 125 to 500 Hz at the ears (`--tail-iacc`): its
+    120 Hz split and its 400 Hz ear split each added their halves out of phase, and the velvet's own
+    low end. The field is within 0.8 dB of flat (the head's own response). So the late tail is
+    fuller below 500 Hz. Clap in the flat: levels the same to 0.1 dB; T20 +15 % at 125 Hz, +10 % at
+    500 Hz, the rest within 6 %.
+  - No split at 120 Hz for the room you are in: the head makes the low end alike at the two ears
+    (0.91 at 125 Hz), not identical.
+  - New lab: `--tail-cost`; `--tail-steady late=velvet` and `--clap-room late=velvet` for the A/B;
+    `--tail-iacc` prints level and IACC per octave for both ways; `--clap-room` prints the late
+    part's IACC.
+
 ## 2026-10-02
 
+- Door types (Cody's list): a knob or lever, a steel push-bar door with a closer, a keyed glass
+  front door (bar inside, key outside, closer), a pulled glass door with a closer, an automatic
+  sliding door, a patio slider and a lift's doors. The kind is data on the prefab (`DoorKind`,
+  `Slides`, `Powered`, `SensorMetres`, `CloseAfterSeconds`, `CloseSeconds`, `KeyedSide`) and on
+  `DoorComponent` (fields appended; restart the server).
+  - Sliding leaves move along their own width; the opening follows, and the routes see the leaf
+    where it is (a shut slider blocks like a shut door).
+  - Closers shut 3 s after the doorway is clear, slowly and then at latch speed, and never on
+    anyone in the doorway. Automatic doors open for anyone within 2.5 m, either side, close 2 s
+    after, and reverse for anyone in the doorway. Parked drivers leave both to themselves.
+  - Each kind sends its mechanical events as `door:KIND:EVENT`, for now with the existing door
+    sounds or none. Every key is in docs/DOOR_TYPES_EVENTS.md. Synthesis follows.
+  - The city: knobs on the flats and house fronts (397), a keyed glass front door on each tower
+    (5), two pairs of automatic leaves at the terminal's apron entrances (4), a patio door onto
+    each back garden (64), push bars on the hangar and terminal service doors (2).
+  - Closing a door by E, and a parked driver checking for a player, measured to the doorway in
+    the building's own frame; both used to compare a world position with a building-local one.
+- The room's tail holds still while you do (unheard). The listener's trace is redone every 250 ms;
+  its omnidirectional channel is the same each time, but its directions are a Monte Carlo estimate
+  and the directional part (50-350 ms) was re-split every trace. At the ears a steady hum's
+  harmonics swung 2.4-3.9 dB from one 54 ms window to the next above 500 Hz (a held response: 0).
+  Now the tail is measured as energy per octave and per 5.8 ms frame, and its directions per
+  direction over six time cells and two band groups; these are averaged over traces (a quarter per
+  trace standing still, more past half a metre, a fresh start past a metre, in a new region, or 6 dB
+  off); and the tail is played through fixed noise per band and per direction under that energy
+  (`SmoothTail`). Below 355 Hz the directional part comes evenly from all twenty directions.
+  - Stairwell, hum swing per window, raw to smooth: 1.3/2.9/3.9 dB to 0.4/1.0/1.0 (100-500 Hz,
+    0.5-1.5 kHz, 1.5-4 kHz). Flat 01F: 0.8/2.9/3.6 to 0.4/0.7/0.9. The ear moved up to 30 cm at random
+    each trace: 6.0/5.3/5.3 to 0.9/1.2/1.7. Steady noise level and left-right spread: as a held response.
+  - `--clap-room`, raw to smooth: level 50-300 ms the same (within 0.2 dB); T20 within 7 % at every
+    octave; EDT within 9 % from 250 Hz up, 18 % longer at 125 Hz; IACC per band within 0.06.
+  - Costs 52-59 ms per trace on the tracer thread (the first 0.7 s, making the noise), 14 MB.
+  - `--tail-steady [room=stair|flat|corridor] [jitter=CM]` measures all of this, raw against smooth.
+    `--clap-room tail=raw` plays the old tail for the A/B.
+- The metallic ring is not in the trace (raw or smooth, the tail's spectrum is noise: 0.05 % of bins
+  10 dB over their neighbours). It is in the late renderer: at the ear, 400-900 ms, 11 % of bins
+  stand 10 dB over (21 dB at the 99.9th percentile), where the directional part, 60-240 ms, has
+  0.1 %. See todo, acoustics.
 - The ear overloads: a sound louder at the ear than the output can play makes every other voice
   give way by the excess (`Loudness.OverloadDb`), held 50 ms and recovering over up to a second. The
   shot, its echoes and the reverb are left alone. Measured with `--clap-room sound=glock dist=N bed`:

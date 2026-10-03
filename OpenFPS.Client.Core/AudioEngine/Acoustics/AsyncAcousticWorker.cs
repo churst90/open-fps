@@ -158,10 +158,20 @@ public class AsyncAcousticWorker : IDisposable
         _requestQueue.Enqueue(req);
     }
 
+    /// <summary>Lab only (--pop-hunt): records what produced each source's last direct answer in
+    /// <see cref="Provenance"/>. Off in the game.</summary>
+    public static bool TraceProvenance;
+    /// <summary>What produced each source's last direct answer, when <see cref="TraceProvenance"/> is on.</summary>
+    public readonly ConcurrentDictionary<int, string> Provenance = new();
+
     /// <summary>Each source's last Steam Audio answer and when, for a tick the pool had no room for it.</summary>
     private readonly Dictionary<int, (List<AcousticPathData> Paths, long At)> _lastSimPath = new();
     /// <summary>How old a held answer may be: well past a tick, well short of anything moving far.</summary>
     private const long HeldSimPathMs = 1000;
+    /// <summary>Requests the pool had no room for this tick, asked first on the next.</summary>
+    private readonly List<AcousticRequest> _carried = new();
+    /// <summary>The sources given a place in the pool this tick: the first SaMaxSources in line.</summary>
+    private readonly HashSet<int> _served = new();
 
     /// <summary>Files a result under the entity it answers, stamped with where the source was when it
     /// was asked about, so the consumer can tell a result for THIS sound from one left behind by a
@@ -254,9 +264,18 @@ public class AsyncAcousticWorker : IDisposable
         {
             // Drain ALL queued requests for this tick; the latest request per entity wins. Batching lets
             // the Steam Audio direct stage run ONCE for every active source instead of once per request.
+            // What the pool had no room for last tick goes first: it was put back in _pending, ahead of
+            // anything asked since, and a newer request for the same source takes its place in the line.
             bool any = false;
-            while (_requestQueue.TryDequeue(out var req)) { _pending[req.EntityId] = req; any = true; }
-            if (!any) { Thread.Sleep(1); continue; }
+            AcousticRequest newest = default;
+            while (_requestQueue.TryDequeue(out var req)) { _pending[req.EntityId] = req; newest = req; any = true; }
+            if (!any && _pending.Count == 0) { Thread.Sleep(1); continue; }
+            // A request carried over was made for where the listener was a tick ago; it is answered for
+            // where they are now, as every other source this tick is.
+            if (any && _carried.Count > 0)
+                foreach (var c in _carried)
+                    if (_pending.TryGetValue(c.EntityId, out var held) && held.ListenerPos != newest.ListenerPos)
+                        _pending[c.EntityId] = held with { ListenerPos = newest.ListenerPos };
 
             WorldSnapshot? world;
             lock (_worldLock) { world = _latestWorld; }
@@ -273,6 +292,7 @@ public class AsyncAcousticWorker : IDisposable
                 // silently disappears and the player is told a lie about where sounds are.
                 Dictionary<int, SaResult>? sim = RunSteamAudio(world);
                 int degraded = 0;
+                _carried.Clear();
                 foreach (var kv in _pending)
                 {
                     var req = kv.Value;
@@ -282,29 +302,40 @@ public class AsyncAcousticWorker : IDisposable
                         Store(req, built);
                         _lastSimPath[req.EntityId] = (built, Environment.TickCount64);
                     }
-                    else if (sim != null && _lastSimPath.TryGetValue(req.EntityId, out var held)
-                             && Environment.TickCount64 - held.At < HeldSimPathMs)
+                    else if (sim != null && _lastSimPath.ContainsKey(req.EntityId))
                     {
-                        // The pool was full this tick, not the simulation broken: keep this source's
-                        // last Steam Audio answer, a tick or two old. Handing it to the hand-rolled
-                        // tracer instead would give it a DIFFERENT model for a moment, one that can find
-                        // a route through a door at -4 dB where Steam Audio says -24 through brick, and
-                        // the sound pops through the wall.
+                        // ── No room in the pool this tick: asked again first thing next tick ─────
                         //
-                        // Moved with the source: the answer's positions are where it WAS, and a bus at
-                        // 15 m/s held for a second would be heard 15 m behind itself.
-                        var moved = new List<AcousticPathData>(held.Paths.Count);
-                        foreach (var hp in held.Paths)
+                        // Not handed to the hand-rolled tracer. That is a different model, and from
+                        // the Main Street pavement it put a car behind a building at -15 dB where
+                        // Steam Audio and the barrier search say -63, until the source's turn in the
+                        // pool came round again (2026-10-03, --pop-hunt extra=40): a pop every time
+                        // the pool ran over. A source that has had an answer from the simulator
+                        // keeps it — moved with the source, below — and waits one tick for the next.
+                        _carried.Add(req);
+                        if (_lastSimPath.TryGetValue(req.EntityId, out var held)
+                            && Environment.TickCount64 - held.At < HeldSimPathMs)
                         {
-                            var m = hp;
-                            m.ApparentPosition += req.SourcePos - hp.SourcePosition;
-                            moved.Add(m);
+                            // Moved with the source: the answer's positions are where it WAS, and a bus
+                            // at 15 m/s held for a second would be heard 15 m behind itself.
+                            var moved = new List<AcousticPathData>(held.Paths.Count);
+                            foreach (var hp in held.Paths)
+                            {
+                                var m = hp;
+                                m.ApparentPosition += req.SourcePos - hp.SourcePosition;
+                                moved.Add(m);
+                            }
+                            Store(req, moved);
+                            if (TraceProvenance) Provenance[req.EntityId] = "held";
                         }
-                        Store(req, moved);
                     }
                     else
                     {
+                        // Never answered by the simulator: the tracer's answer stands in until it is,
+                        // first thing next tick if the pool was what refused it.
                         Store(req, HandRolledPath(world, req));
+                        if (TraceProvenance) Provenance[req.EntityId] = "hand-rolled";
+                        if (sim != null) _carried.Add(req);
                         degraded++;
                     }
                 }
@@ -317,6 +348,9 @@ public class AsyncAcousticWorker : IDisposable
                         _lastSimPath.Remove(id);
                 }
                 ReportRayBudget(_pending.Count);
+                _pending.Clear();
+                foreach (var c in _carried) _pending[c.EntityId] = c;
+                continue;
             }
             else
             {
@@ -514,6 +548,14 @@ public class AsyncAcousticWorker : IDisposable
             Vector3 listener = default;
             bool haveListener = false;
             int blocked = 0, viaEdge = 0, viaProbe = 0, reflections = 0;
+            // ── Who is served this tick when more are asked about than the pool holds ─────────────
+            //
+            // The first SaMaxSources in line, and the line starts with whoever was turned away last
+            // tick (WorkerLoop). A source held by someone further back is lent to someone served. Before,
+            // every source asked about this tick kept its own, so when eighty were asked about every
+            // tick the same sixteen were turned away every tick, for good, and heard through the
+            // hand-rolled tracer: cars behind a building popping between -63 and -15 dB.
+            Serve(_pending.Keys, SaMaxSources, _served);
             foreach (var kv in _pending)
             {
                 // The listener is the same for every request this tick, so take it from the first one —
@@ -521,15 +563,18 @@ public class AsyncAcousticWorker : IDisposable
                 // the whole tick instead of just the sources it could not fit.
                 if (!haveListener) { listener = kv.Value.ListenerPos; haveListener = true; _lastListenerPos = listener; _haveLastListener = true; }
 
+                if (!_served.Contains(kv.Key)) continue;   // asked first next tick (WorkerLoop)
                 IntPtr src = GetOrAcquireSource(kv.Key);
-                if (src == IntPtr.Zero) continue; // pool exhausted -> that source falls back to hand-rolled
+                if (src == IntPtr.Zero) continue;
                 float radius = kv.Value.SourceRadius > 0f ? kv.Value.SourceRadius : AudioEmission.DefaultOcclusionRadius;
                 _saSim.SetSourceInputs(src, kv.Value.SourcePos, radius);
                 _saLastSeen[kv.Key] = now;
             }
             if (!haveListener) return null;   // nothing pending; not a degradation
-            // The traced reverb follows the ear; it runs its own trace on its own thread.
-            OpenFPS.Client.Core.AudioEngine.SteamAudio.TracedReverbSet.SetListener(listener);
+            // The traced reverb follows the ear; it runs its own trace on its own thread. The region
+            // tells it when you have gone into another room, so its averaged tail starts again.
+            int hereRegion = _acoustics.GetRegionAt(world, listener);
+            OpenFPS.Client.Core.AudioEngine.SteamAudio.TracedReverbSet.SetListener(listener, hereRegion);
 
             _saSim.SetListener(listener);
             _saSim.Run();
@@ -537,7 +582,7 @@ public class AsyncAcousticWorker : IDisposable
             var results = new Dictionary<int, SaResult>(_pending.Count);
             var routes = _routes;
             _routeTicksThisTick = 0;
-            int listenerRegion = routes != null ? _acoustics.GetRegionAt(world, listener) : AcousticConstants.GlobalRegionId;
+            int listenerRegion = routes != null ? hereRegion : AcousticConstants.GlobalRegionId;
             foreach (var kv in _pending)
             {
                 if (!_saSources.TryGetValue(kv.Key, out var src) || src == IntPtr.Zero) continue;
@@ -651,6 +696,8 @@ public class AsyncAcousticWorker : IDisposable
     private List<AcousticPathData> BuildSimPath(WorldSnapshot world, AcousticRequest req, SaResult sr)
     {
         var ap = SteamAudioSimulator.ToAcousticParams(sr.Direct);
+        string? trace = TraceProvenance
+            ? $"sim vis {sr.Direct.Visibility:F2} through {Db(ap.EqLow):F0}/{Db(ap.EqMid):F0}/{Db(ap.EqHigh):F0}" : null;
         if (_saDebug) Console.WriteLine($"[SAPATH] e{req.EntityId} vis {sr.Direct.Visibility:F3} trans {sr.Direct.TransLow:F3}/{sr.Direct.TransMid:F3}/{sr.Direct.TransHigh:F3} barrierDelta {sr.BarrierDelta:F3} verified {sr.BarrierVerified} route {(sr.Path.Found ? $"{sr.Path.EqLow:F3}/{sr.Path.EqMid:F3}/{sr.Path.EqHigh:F3}" : "none")}");
         float occ = Math.Clamp(ap.Occlusion, 0f, AcousticConstants.OcclusionCap);
         Vector3 apparent = sr.HasApparent ? sr.ApparentPosition : req.SourcePos;
@@ -710,7 +757,9 @@ public class AsyncAcousticWorker : IDisposable
                 // whose energy is arriving round an edge is quieter, not absent.
                 float throughput = MathF.Max(dLow, MathF.Max(dMid, dHigh));
                 occ = Math.Clamp(MathF.Min(occ, 1f - throughput), 0f, AcousticConstants.OcclusionCap);
+                if (trace != null) trace += $"; over an edge {delta:F1} m {Db(dLow):F0}/{Db(dMid):F0}/{Db(dHigh):F0}";
             }
+            else if (trace != null && sr.BarrierDelta >= 0f) trace += $"; edge {sr.BarrierDelta:F1} m not verified";
         }
 
         // ── By the openings, where that delivers more ───────────────────────────────────────
@@ -722,6 +771,8 @@ public class AsyncAcousticWorker : IDisposable
         if (sr.Route is { } viaOpenings)
         {
             var g = OpeningRoutes.Better(new Vector3(ap.EqLow, ap.EqMid, ap.EqHigh), viaOpenings, out bool routeWins);
+            if (trace != null)
+                trace += $"; openings {Db(viaOpenings.Low):F0}/{Db(viaOpenings.Mid):F0}/{Db(viaOpenings.High):F0} via {viaOpenings.Via}{(routeWins ? " (wins)" : "")}";
             ap = new SteamAudioSimulator.AcousticParams(ap.Occlusion, g.X, g.Y, g.Z, ap.Bleed);
             occ = Math.Clamp(MathF.Min(occ, 1f - MathF.Max(g.X, MathF.Max(g.Y, g.Z))), 0f, AcousticConstants.OcclusionCap);
             Vector3 toOpening = viaOpenings.Apparent - req.ListenerPos;
@@ -772,6 +823,7 @@ public class AsyncAcousticWorker : IDisposable
         (path.AirLowDb, path.AirMidDb, path.AirHighDb) = AudioPhysics.AirLossDb(
             dist, world.Humidity, world.Temperature, world.AirPressure, world.AirAbsorptionMultiplier);
 
+        if (trace != null) Provenance[req.EntityId] = trace;
         var paths = new List<AcousticPathData>(1 + EarlyReflections.MaxArrivals) { path };
         AddEarlyReflections(paths, world, req, region, listenerEnclosed);
         return paths;
@@ -914,6 +966,8 @@ public class AsyncAcousticWorker : IDisposable
     public string RouteCostSummary =>
         _routeQueries == 0 ? "no route queries yet"
         : $"{_routeQueries} route queries, {_routeTicks * 1e6 / System.Diagnostics.Stopwatch.Frequency / _routeQueries:F0} µs each, {_routeReused} reused";
+
+    private static float Db(float gain) => 20f * MathF.Log10(MathF.Max(1e-5f, gain));
 
     private OpeningRoutes.Answer? AskRoutes(OpeningRoutes routes, WorldSnapshot world, int id, Vector3 source, Vector3 listener, int listenerRegion)
     {
@@ -1269,7 +1323,7 @@ public class AsyncAcousticWorker : IDisposable
             // Nothing a source carries between runs is needed: its inputs are staged fresh before
             // every run it is read in. So only the sources asked about THIS tick need one, and a
             // held source that is not among them can be handed over without anything losing an answer.
-            int victim = PickSourceToReclaim(_saSources, _saLastSeen, _pending);
+            int victim = PickSourceToReclaim(_saSources, _saLastSeen, _served);
             if (victim != int.MinValue && _saSources.Remove(victim, out src))
                 _saLastSeen.Remove(victim);   // its last result stays in _results until it asks again
             else
@@ -1279,16 +1333,38 @@ public class AsyncAcousticWorker : IDisposable
         return src;
     }
 
+    /// <summary>Who gets a place in the pool this tick: the first <paramref name="capacity"/> in line.
+    /// The line is the order sources were asked about in, with whoever was turned away last tick put at
+    /// its head (WorkerLoop), so nobody is turned away two ticks running.</summary>
+    internal static void Serve(IEnumerable<int> line, int capacity, HashSet<int> served)
+    {
+        served.Clear();
+        foreach (int id in line)
+        {
+            if (served.Count >= capacity) break;
+            served.Add(id);
+        }
+    }
+
     /// <summary>The held source that has gone longest without a request and is not wanted this tick,
     /// or <see cref="int.MinValue"/> when every held source is wanted now.</summary>
     internal static int PickSourceToReclaim<TSrc, TReq>(IReadOnlyDictionary<int, TSrc> held,
         IReadOnlyDictionary<int, long> lastSeen, IReadOnlyDictionary<int, TReq> wantedThisTick)
+        => PickSourceToReclaim(held, lastSeen, wantedThisTick.ContainsKey);
+
+    /// <summary>The same, for the sources served this tick (RunSteamAudio).</summary>
+    internal static int PickSourceToReclaim<TSrc>(IReadOnlyDictionary<int, TSrc> held,
+        IReadOnlyDictionary<int, long> lastSeen, IReadOnlySet<int> servedThisTick)
+        => PickSourceToReclaim(held, lastSeen, servedThisTick.Contains);
+
+    private static int PickSourceToReclaim<TSrc>(IReadOnlyDictionary<int, TSrc> held,
+        IReadOnlyDictionary<int, long> lastSeen, Func<int, bool> wantedThisTick)
     {
         int victim = int.MinValue;
         long oldest = long.MaxValue;
         foreach (var kv in held)
         {
-            if (wantedThisTick.ContainsKey(kv.Key)) continue;
+            if (wantedThisTick(kv.Key)) continue;
             long seen = lastSeen.TryGetValue(kv.Key, out long t) ? t : long.MinValue;
             if (seen < oldest || victim == int.MinValue) { oldest = seen; victim = kv.Key; }
         }

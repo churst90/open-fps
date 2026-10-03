@@ -65,7 +65,16 @@ public class VehicleMotionTests : IDisposable
             get { Assert.True(Vehicles.TryInspect(Id, out var s)); return s; }
         }
         public Vector3 Position => World.Get<Transform>(Entity).Position;
-        public void Tick(int n = 1) { for (int i = 0; i < n; i++) Vehicles.Update("motion", World, Dt); }
+        /// <summary>The map's doors, when a test needs them to move (a door with a sensor or a closer).</summary>
+        public DoorSystem? Doors;
+        public void Tick(int n = 1)
+        {
+            for (int i = 0; i < n; i++)
+            {
+                Vehicles.Update("motion", World, Dt);
+                Doors?.Update(World, Dt, _ => { });
+            }
+        }
     }
 
     private Rig Build(List<Vector3> track, VehicleData vehicle, List<TrackStopData>? stops = null, float width = 12f,
@@ -554,8 +563,8 @@ public class VehicleMotionTests : IDisposable
 
     /// <summary>A door eight metres to the kerb side of the first straight of a 400 m stadium, facing
     /// the road.</summary>
-    private static EntityData DoorAt(float x, float z, float y = 0.1f)
-        => new() { EntityId = 9000 + (int)z, PrefabId = "door", Position = new Vector3(x, y + 1.05f, z),
+    private static EntityData DoorAt(float x, float z, float y = 0.1f, string prefab = "door")
+        => new() { EntityId = 9000 + (int)z, PrefabId = prefab, Position = new Vector3(x, y + 1.05f, z),
                    Rotation = Quaternion.CreateFromYawPitchRoll(MathF.PI / 2, 0f, 0f) };
 
     private static readonly StreetLifeData ParkNow = new() { ParkEverySeconds = 0.001f, HornEverySeconds = 0f, HardBrakeEverySeconds = 0f };
@@ -662,6 +671,55 @@ public class VehicleMotionTests : IDisposable
         }
         Assert.True(wentIn);
         Assert.Equal("", rig.State.Park);
+    }
+
+    /// <summary>
+    /// An automatic door opens for the driver as they come up to it, going in and coming out, and
+    /// shuts itself behind them; nobody touches it. A door with a closer is left to its closer.
+    /// </summary>
+    [Theory]
+    [InlineData("auto_sliding_door")]
+    [InlineData("steel_door")]
+    [InlineData("glass_front_door")]
+    public void ADoorThatShutsItselfIsLeftToDoSo(string prefab)
+    {
+        var rig = Build(Stadium(60f, 400f), Car(topKmh: 40f, corneringG: 1.0f, brake: 3f), life: ParkNow,
+                        entities: new() { DoorAt(68f, 200f, prefab: prefab) });
+        rig.Doors = new DoorSystem();
+        rig.Tick(66);
+        Assert.Equal(1, rig.State.Spots);
+        var door = Spawned().Values.First(e => rig.World.Has<DoorComponent>(e));
+        for (int t = 0; rig.State.Park != "Parked"; t++) { Assert.True(t < 30 * 120, "it never parked"); rig.Tick(); }
+
+        int opened = 0;
+        bool wasOpen = false, wentIn = false, cameOut = false, shutWhileIndoors = false;
+        float openWhenThrough = 0f;
+        for (int t = 0; rig.State.Park != "" && t < 30 * 400; t++)
+        {
+            rig.Tick();
+            var d = rig.World.Get<DoorComponent>(door);
+            if (d.Openness >= 1f && !wasOpen) opened++;
+            wasOpen = d.Openness >= 1f || (wasOpen && d.Openness > 0f);
+            bool person = Spawned().TryGetValue("driver of Car", out var pe) && rig.World.IsAlive(pe);
+            if (person)
+            {
+                var at = rig.World.Get<Transform>(pe).Position;
+                DoorSystem.Doorway(rig.World, door, out var doorway, out var facing);
+                // Crossing the doorway's plane: the door must be open for them.
+                if (MathF.Abs(Vector3.Dot(at - doorway, Vector3.Transform(Vector3.UnitZ, facing))) < 0.1f)
+                    openWhenThrough = MathF.Max(openWhenThrough, d.Openness);
+                if (wentIn) cameOut = true;
+            }
+            else if (opened > 0 && !wentIn) wentIn = true;
+            if (wentIn && !cameOut && d.Openness <= 0f) shutWhileIndoors = true;
+        }
+        string said = $"{prefab}: opened {opened} time(s), open {openWhenThrough:F2} as they went through";
+        Assert.True(wentIn && cameOut, "the driver never went in and came back out; " + said);
+        Assert.True(shutWhileIndoors, "it never shut behind them; " + said);
+        Assert.True(opened >= 2, "it did not open for them on the way out; " + said);
+        Assert.True(openWhenThrough >= 0.9f, "they walked through a door not open; " + said);
+        Assert.Equal(0f, rig.World.Get<DoorComponent>(door).Openness);
+        Assert.Equal(prefab == "auto_sliding_door", !DoorSystem.OpensByHand(rig.World.Get<DoorComponent>(door)));
     }
 
     /// <summary>A door is a place to park only on the kerb side, near enough, at street level, and

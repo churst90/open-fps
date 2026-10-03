@@ -426,6 +426,38 @@
       "minimum": 0,
       "description": "A hollow door's skin thickness in metres (two sheets over a core, e.g. 0.0012 for a steel door). Sets its mass and the note it rings at. Omit for a solid leaf."
     },
+    "DoorKind": {
+      "type": "string",
+      "enum": ["knob", "pushbar", "glass-pushbar", "glass-pull", "auto-slide", "patio-slide", "elevator"],
+      "description": "A door's hardware. knob: hinged, knob or lever. pushbar: steel, push bar, closer. glass-pushbar: glass front door, push bar inside, key outside, closer. glass-pull: glass, pulled open, closer. auto-slide: automatic sliding leaf. patio-slide: glass leaf slid by hand. elevator: a lift's doors. Names the door's sound events (docs/DOOR_TYPES_EVENTS.md). Defaults to knob."
+    },
+    "Slides": {
+      "type": "boolean",
+      "description": "The leaf slides along its own width instead of swinging; HingeSide is then the way it slides. Defaults to true for auto-slide, patio-slide and elevator."
+    },
+    "Powered": {
+      "type": "boolean",
+      "description": "Moved by a motor: nobody opens it by hand, and it reverses for anyone in the doorway while closing."
+    },
+    "SensorMetres": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Opens by itself when anyone (a player or a person) is this close in front of it, either side, metres. 0 or absent: no sensor."
+    },
+    "CloseAfterSeconds": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Closes by itself once the doorway has been clear this long with the door fully open, seconds: a door closer, or an automatic door's hold-open time. Never on anyone standing in the doorway. 0 or absent: stays where it is left."
+    },
+    "CloseSeconds": {
+      "type": "number",
+      "minimum": 0,
+      "description": "How long closing by itself takes from fully open, seconds: a closer's sweep or a motor's closing speed. A swinging door's closer does the last part at SwingSeconds, to snap the latch."
+    },
+    "KeyedSide": {
+      "type": "number",
+      "description": "Which side needs a key to open it: 1 the leaf's own +Z side, -1 the other, 0 neither."
+    },
     "Hands": {
       "type": "integer",
       "enum": [

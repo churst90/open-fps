@@ -35,12 +35,14 @@ public class EstateDoorTests
         maps.Initialize();
         Assert.True(maps.TryGetMap("city", out World world, out _, out var grid, out _));
 
-        Entity door = Entity.Null;
+        // Every leaf in the doorway: the terminal's entrance is two sliding leaves since door types
+        // (2026-10-02), each half a metre and more from the middle of it.
+        var leaves = new System.Collections.Generic.List<Entity>();
         world.Query(new QueryDescription().WithAll<Transform, DoorComponent>(), (Entity e, ref Transform t) =>
         {
-            if (Vector2.Distance(new Vector2(t.Position.X, t.Position.Z), new Vector2(x, z)) < 0.5f && t.Position.Y < 2f) door = e;
+            if (Vector2.Distance(new Vector2(t.Position.X, t.Position.Z), new Vector2(x, z)) < 1.3f && t.Position.Y < 2f) leaves.Add(e);
         });
-        Assert.NotEqual(Entity.Null, door);
+        Assert.NotEmpty(leaves);
 
         // In the doorway and a step inside, beside where the leaf hinges.
         var doorway = new Vector3(x, 0.1f, z);
@@ -49,7 +51,7 @@ public class EstateDoorTests
             "the shut door is not in the doorway");
 
         var doors = new DoorSystem();
-        Assert.True(DoorSystem.Set(world, door, open: true));
+        foreach (var door in leaves) Assert.True(DoorSystem.Set(world, door, open: true));
         for (int i = 0; i < 90; i++) doors.Update(world, 1f / 30f, _ => { });
 
         Assert.False(MovementSystem.CheckCollision(world, grid, doorway, PhysicsConstants.PlayerRadius, PhysicsConstants.PlayerHeight),

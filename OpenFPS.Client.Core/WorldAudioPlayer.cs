@@ -243,6 +243,10 @@ public sealed class WorldAudioPlayer
     /// </summary>
     /// <summary>The vehicle the listener is sitting in, or -1. Its own sounds are not heard through its glass.</summary>
     public int ListenerVehicleId { get; set; } = -1;
+    /// <summary>The listener's own entity, and where the client has its body now (feet, facing): a
+    /// sound made on your own body is placed on you, not where the server last had you.</summary>
+    public int SelfId { get; set; } = -1;
+    public Func<(Vector3 Feet, Quaternion Rotation)>? Self { get; set; }
 
     public void Update(WorldSnapshot world, Vector3 listenerPosition, double now,
                        EngineReflections? reflections = null)
@@ -291,6 +295,12 @@ public sealed class WorldAudioPlayer
             if (now < item.DueAt) continue;
             playedAny = true;
             _pending.RemoveAt(i);
+            if (!item.IsReflection && item.Sound.OnBody && BodyNow(world, item.SourceEntityId, out var feet, out var facing))
+            {
+                var onBody = item.Sound;
+                onBody.Position = feet + Vector3.Transform(onBody.BodyOffset, facing);
+                item = item with { Sound = onBody };
+            }
 
             if (_trace)
                 Serilog.Log.Information("[WAUDIO] play {Id}{Echo} {Db:F0} dB at {Dist:F1} m, {Late:F2}s after it was due "
@@ -472,6 +482,22 @@ public sealed class WorldAudioPlayer
     /// torso's shadow on sound from below, the talker's own vertical radiation, or the small
     /// movements that keep a comb from standing still. Until one is measured, a voice has none.
     /// </summary>
+    /// <summary>Where a body is now and which way it faces (yaw only): yours from the client's own
+    /// prediction, anyone else's from the world as you hear it.</summary>
+    private bool BodyNow(WorldSnapshot world, int entityId, out Vector3 feet, out Quaternion facing)
+    {
+        feet = default; facing = Quaternion.Identity;
+        Quaternion rotation;
+        if (entityId == SelfId && Self != null) (feet, rotation) = Self();
+        else if (world.Entities.TryGetValue(entityId, out var e)) { feet = e.Transform.Position; rotation = e.Transform.Rotation; }
+        else return false;
+        var forward = Vector3.Transform(Vector3.UnitZ, rotation);
+        forward.Y = 0f;
+        if (forward.LengthSquared() > 1e-6f)
+            facing = Quaternion.CreateFromAxisAngle(Vector3.UnitY, MathF.Atan2(forward.X, forward.Z));
+        return true;
+    }
+
     private static bool HearsTheGround(in Pending item, bool spoken)
         => !spoken && IsImpulse(item.Sound) && !item.IsReflection && item.Sound.ExtentMetres <= 1f;
 

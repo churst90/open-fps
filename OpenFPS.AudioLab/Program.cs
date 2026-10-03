@@ -103,12 +103,15 @@ string[] usage =
     "  --enclosure [map= at= walk=]                  what the room round a listener measures, and its send",
     "  --path-probe [map=city] ear=x,y,z src=x,y,z   what the occlusion worker hands the mixer",
     "  --siren-route [map= track= at=]               a car's path to a fixed listener, frame by frame",
+    "  --pop-hunt [map=city] ear=x,y,z [sec= cars=]  cars driving the streets; paths that jump and come back",
     "  --room-echoes [map=city] ear= src=            the placed reflections a one-off sound gets",
     "  --shot-echoes [map=city] at=x,z               every echo a shot makes there, and what it came off",
     "  --wall-tl                                     the city's constructions' transmission loss per band",
     "  --traced-reverb / --traced-echoes             the traced reverb and per-source echoes, headless",
     "  --sa-frame                                    which way Steam Audio's traced soundfield faces",
     "  --tail-bands / --tail-iacc / --late-field     the tail per octave, its ears' coherence, each source's late energy",
+    "  --tail-steady [room=stair|flat|corridor]      does the tail hold still: pulsing, steps, decay, ring, raw vs smooth",
+    "  --tail-cost [t60=2]                           the late tail's cost per mixer piece: one channel against the field",
     "  --sim-reverbfield                             the simulator's reverb against enclosure across places",
     "  --scene-cost [map=city]                       what rebuilding the Steam Audio scenes costs",
     "  --pass-by [out=]                              noise driven past through the binaural effect, per block",
@@ -518,6 +521,11 @@ if (args.Contains("--wall-tl"))
     // --wall-tl: the city's walls, floors, doors and glass, transmission loss per third octave and per mixer band.
     Environment.Exit(OpenFPS.AudioLab.Spikes.WallTlSpike.Run(args));
 }
+if (args.Contains("--pop-hunt"))
+{
+    // --pop-hunt [map=city] ear=x,y,z [sec=60] [cars=40] [extra=30]: answers that jump 15 dB and come back.
+    Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.PopHuntSpike.Run(args));
+}
 if (args.Contains("--path-probe"))
 {
     // --path-probe [map=city] ear=x,y,z src=x,y,z ...: what the occlusion worker hands the mixer.
@@ -532,6 +540,17 @@ if (args.Contains("--tail-bands"))
 {
     // --tail-bands: the flat's traced tail per octave (T20, late energy) against Sabine and Eyring.
     Environment.Exit(OpenFPS.Client.Core.AudioEngine.Fmod.TailBandsSpike.Run(args));
+}
+if (args.Contains("--tail-steady"))
+{
+    // --tail-steady [room=stair|flat|corridor] [seconds=10] [jitter=CM] [skip=4]: the tail standing still, each trace's own
+    // samples against SmoothTail's averaged energy through fixed noise.
+    Environment.Exit(OpenFPS.Client.Core.AudioEngine.Fmod.TailSteadySpike.Run(args));
+}
+if (args.Contains("--tail-cost"))
+{
+    // --tail-cost [t60=2] [seconds=20]: the late tail's cost per mixer piece, one channel against the field.
+    Environment.Exit(OpenFPS.Client.Core.AudioEngine.Fmod.TailCostSpike.Run(args));
 }
 if (args.Contains("--tail-iacc"))
 {

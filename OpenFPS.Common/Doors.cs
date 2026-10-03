@@ -4,6 +4,87 @@ using System.Numerics;
 
 namespace OpenFPS.Common;
 
+/// <summary>
+/// What hardware a door has, which decides how it is opened, how it moves and what it sounds like.
+/// Stored as an int in <see cref="OpenFPS.Common.Components.DoorComponent.Kind"/>; 0 is the default.
+/// </summary>
+public enum DoorKind
+{
+    /// <summary>A hinged door with a knob or lever: houses and flats.</summary>
+    Hinged = 0,
+    /// <summary>A steel door with a push bar (panic bar) and a closer: fire and stair doors, service doors.</summary>
+    PushBar = 1,
+    /// <summary>An aluminium-and-glass front door: push bar inside, key cylinder outside, a closer.</summary>
+    GlassPushBar = 2,
+    /// <summary>A glass door opened by pulling its handle, with a closer: some shops.</summary>
+    GlassPull = 3,
+    /// <summary>An automatic sliding door, one leaf of a pair or on its own: opens for anyone who comes up to it.</summary>
+    AutoSliding = 4,
+    /// <summary>A patio door: a glass leaf slid open and shut by hand.</summary>
+    PatioSliding = 5,
+    /// <summary>A lift's doors: bi-parting, moved by the lift's motor.</summary>
+    Elevator = 6,
+}
+
+/// <summary>
+/// The names of the mechanical events a door makes, sent as the label of each door sound:
+/// "door:KIND:EVENT". Every key, and when it fires, is in docs/DOOR_TYPES_EVENTS.md.
+/// </summary>
+public static class DoorEvents
+{
+    public const string LatchRetract = "latch-retract";
+    public const string Bar = "bar";
+    public const string Key = "key";
+    public const string Pull = "pull";
+    public const string Swing = "swing";
+    public const string Closer = "closer";
+    public const string Latch = "latch";
+    public const string MotorStart = "motor-start";
+    public const string Rollers = "rollers";
+    public const string Stop = "stop";
+    public const string Shut = "shut";
+    public const string Reopen = "reopen";
+
+    /// <summary>The kind's name in event keys and in prefabs ("DoorKind").</summary>
+    public static string Slug(DoorKind kind) => kind switch
+    {
+        DoorKind.PushBar => "pushbar",
+        DoorKind.GlassPushBar => "glass-pushbar",
+        DoorKind.GlassPull => "glass-pull",
+        DoorKind.AutoSliding => "auto-slide",
+        DoorKind.PatioSliding => "patio-slide",
+        DoorKind.Elevator => "elevator",
+        _ => "knob",
+    };
+
+    /// <summary>A kind from its slug; false for a name that is not one.</summary>
+    public static bool TryParseKind(string? slug, out DoorKind kind)
+    {
+        foreach (DoorKind k in Enum.GetValues<DoorKind>())
+            if (string.Equals(Slug(k), slug?.Trim(), StringComparison.OrdinalIgnoreCase)) { kind = k; return true; }
+        kind = DoorKind.Hinged;
+        return false;
+    }
+
+    /// <summary>The event key: "door:pushbar:bar".</summary>
+    public static string Of(DoorKind kind, string ev) => $"door:{Slug(kind)}:{ev}";
+
+    /// <summary>Splits an event key; false for anything that is not one.</summary>
+    public static bool TryParse(string? key, out DoorKind kind, out string ev)
+    {
+        kind = DoorKind.Hinged; ev = "";
+        if (key == null || !key.StartsWith("door:", StringComparison.Ordinal)) return false;
+        int colon = key.IndexOf(':', 5);
+        if (colon < 0 || !TryParseKind(key[5..colon], out kind)) return false;
+        ev = key[(colon + 1)..];
+        return ev.Length > 0;
+    }
+
+    /// <summary>Kinds whose leaf slides rather than swings.</summary>
+    public static bool SlidesByDefault(DoorKind kind)
+        => kind is DoorKind.AutoSliding or DoorKind.PatioSliding or DoorKind.Elevator;
+}
+
 /// <summary>One of the sounds a door makes, and they are not one sound.</summary>
 public enum DoorSoundKind
 {

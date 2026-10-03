@@ -1,7 +1,7 @@
 # To do
 
 Planned work in priority order. Finished work is in [changes.md](changes.md) and `git log`.
-Updated 2026-10-02.
+Updated 2026-10-03.
 
 ## Now
 
@@ -46,11 +46,26 @@ Suggested order. Research and file references for most of these: [docs/RESEARCH_
 - Beacons (2026-10-02: +4 dB, `/beacons louder|quieter`, a door's on its face at face height ringing
   the room you are in; done). Still open from the proposal, not asked for: door range 12 m to 6 m,
   and lifting beacons when a louder sound is near.
-- Door types (Cody, 2026-10-02): a knob or lever, a push bar, sliding. Proposed: the type from the
-  door itself (flats knob, fire and stair doors push bar, shop and lobby entrances sliding), each
-  moving as it does (a slider along its track, a push bar opened by walking into it and closed by
-  its closer), and each sound built from its mechanism and fitted to recordings fetched first.
-  Waiting on Cody: go ahead, and are shop doors automatic.
+- Door types (Cody, 2026-10-02). Done 2026-10-02 (unheard): seven kinds with their motion,
+  closers, sensors and keyed side, on the city, each sending its events as `door:KIND:EVENT`
+  (docs/DOOR_TYPES_EVENTS.md). Next:
+  - door SOUNDS: a physical door model, not modelled sounds. Cody, 2026-10-03: "are we modeling
+    the doors or modeling the sound? ... we need to model the physical doors ... dynamically
+    squeaky hinges, simulate the motor on the sliding door". The 2026-10-02 round (each event a
+    fitted modal recipe, docs/DOOR_TYPES.md) was rejected: lacked detail, push bars grainy, some
+    too tonal; reverted, the events play the map's existing door sounds. He is not sourcing
+    recordings: the model is the point. Plan to agree: the leaf as a rigid body on its hinge
+    axis driven by hand, closer, motor; stick-slip hinge friction per hinge (each door its own
+    wear); a spring latch riding the strike; the push bar's linkage with real clearances (rattle
+    as impacts); a hydraulic closer; a DC motor, gearbox, belt and rollers on a rough track for
+    sliders; leaf and hardware modal. Pilot: a knob door, judged before the rest;
+  - a key item, so a keyed door can be locked to somebody without one;
+  - the towers' stairwells open onto their corridors with no door: push-bar fire doors there
+    would change every tower's acoustics, so they wait for Cody;
+  - the terminal's road-side door is a steel service door; if it is the public way in it wants
+    to be automatic;
+  - no aluminium material exists, so glass doors are glass leaves with no frame of their own;
+  - lifts (the elevator door kind is ready for them).
 - In a car seat, cranking carries sub-20 Hz pressure 13-16 dB over everything audible (the
   cylinders' slow swing through the panel path, whose low-pass passes DC). It costs the limiter
   headroom. A high-pass at the panel corner fixed it but took 6 dB of unheard rumble off the
@@ -164,8 +179,35 @@ Results: [docs/MUTATION_2026-09-24.md](docs/MUTATION_2026-09-24.md),
 Done 2026-10-02 (see changes.md). Nothing left.
 
 ### 6. Acoustics still open
+- Listen for pops on the Main Street pavement and inside Selby House and Marlow Tower (2026-10-03,
+  branch path-pops). Restart the server. `--pop-hunt` gives the numbers. Cars behind buildings are
+  now heard over the roofs (about -25 dB) instead of 60-100 dB down. Is the city too busy now?
+- What `--pop-hunt` still finds (2026-10-03):
+  - Indoors, a car's straight line through one wall instead of three as it passes a gap between
+    other buildings: -80 to -62 dB for 200-400 ms. The line counts every wall on it; sound outside
+    goes round the other buildings. Quiet, but a true fix is the outdoor path to the outer wall
+    times that wall.
+  - Where the line meets a pier on a wall, the string goes over the pier: 3 dB down for about 1 m of
+    travel. Under the covered hall west of Main Street (ceiling at 2.5 m) the way between the piers
+    is found only sometimes: up to 19 dB between over the wall and over the roof.
+- The glass front doors (2026-10-02) let more in when shut than the steel doors they replaced:
+  glass 17/28/43 dB, steel 13/48/58 (`--wall-tl`). In the Marlow corridor a car 30 m out in Main
+  Street comes in by the front door and the stairwell at -60/-69/-85 dB; through a steel leaf that
+  would be about 20 dB less in the mid band and 13 less in the high.
+- Listen to the smoothed tail (2026-10-02, `SmoothTail`) in a main-street lobby and stairwell:
+  does it still pulse or step? `--clap-room tail=raw` and `--tail-steady` give the A/B in the lab.
+- Listen to the late tail as a field (2026-10-03, `DiffuseLate`, branch tail-ring). The ring is gone
+  by measurement (400-900 ms at the ear: 10.4-10.7 % of bins 10 dB over their median and a
+  flatness of 0.18; now 0.08-0.12 % and 0.52-0.55). Two things to listen for:
+  - The late part is 4-6 dB fuller from 125 to 500 Hz. The old one lost that at two crossovers
+    (`--tail-iacc` levels). T20 in the flat rose 15 % at 125 Hz and 10 % at 500 Hz. Is it boomy?
+  - Above 2 kHz the ears are a little more alike in some headings (clap in the flat, 300-900 ms,
+    2.4-4.8 kHz: 0.26, was 0.11 with the ear velvet; noise over four headings: 0.13, was 0.12). If
+    the tail sounds narrow up high: a second, independent noise per ear above 1 kHz. Costs a second
+    set of noise (25 MB) and twice the late convolution.
 - The tail and the copies sit at -6 by ear (0 is physical). Cody is happy with that.
-- Below 120 Hz the tail is identical in both ears, so it sits in the head.
+- Below 120 Hz the tail of a room you are NOT in (the decorrelator path) is identical in both ears,
+  so it sits in the head. The room you are in no longer splits there (DiffuseLate): 0.91 at 125 Hz.
 - A voice's ground reflection flanges (heard 2026-09-27), though the physics says it is strong
   (Acta Acustica 2024, doi 10.1051/aacus/2024002). Voices have none until the missing part is found:
   the HRTF's torso, the talker's vertical radiation, or head and body movement. Next: a lab render

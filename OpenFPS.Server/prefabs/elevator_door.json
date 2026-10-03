@@ -1,0 +1,21 @@
+{
+  "Id": "elevator_door",
+  "Name": "Lift Door",
+  "Description": "One leaf of a lift's bi-parting doors (place the other turned half a turn): hollow stainless steel, moved by the lift's motor, never by hand. Once opened it closes 4 s after the doorway is clear, and reverses for anyone in the doorway. Ready for a lift; none is built yet.",
+  "Material": "Metal",
+  "ColliderSize": { "X": 0.55, "Y": 2.1, "Z": 0.04 },
+  "DoorSkinMetres": 0.0012,
+  "IsSolid": true,
+  "Type": "StaticObject",
+  "IsDoor": true,
+  "DoorKind": "elevator",
+  "Slides": true,
+  "Powered": true,
+  "CloseAfterSeconds": 4,
+  "CloseSeconds": 2.5,
+  "SwingSeconds": 1.8,
+  "HingeSide": 1,
+  "TransmissionLow": 0.15,
+  "TransmissionMid": 0.06,
+  "TransmissionHigh": 0.02
+}

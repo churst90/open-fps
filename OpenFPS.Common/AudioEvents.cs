@@ -94,6 +94,13 @@ public partial struct TransientSound
     /// </summary>
     public float ExtentMetres { get; set; }
 
+    /// <summary>A sound made on a body (a clap): placed by the listener on that body as it is NOW,
+    /// at <see cref="BodyOffset"/>, not at <see cref="Position"/>, which is where the server had the body
+    /// when it was made. Walking, the two are a step apart, and your own clap came from behind you.</summary>
+    public bool OnBody { get; set; }
+    /// <summary>Where on the body, metres, in the body's frame: x right, y up from the feet, z forward.</summary>
+    public Vector3 BodyOffset { get; set; }
+
     public TransientSound() { }
 }
 

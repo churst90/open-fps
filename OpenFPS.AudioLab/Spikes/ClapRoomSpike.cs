@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Numerics;
 using System.Threading;
 using OpenFPS.Client.AudioEngine.Core;
@@ -16,7 +17,9 @@ namespace OpenFPS.Client.Core.AudioEngine.Fmod;
 /// A clap in Marlow Tower flat 01F, through the whole mixer: the listener's traced response of the
 /// flat, the reverb sends, the decorrelator, the master limiter, written to a WAV and read back.
 ///
-///   --clap-room [out=path] [claps=4] [sound=click|<weapon id>] [dist=0.5] [bed]
+///   --clap-room [out=path] [claps=4] [sound=click|<weapon id>] [dist=0.5] [bed] [tail=raw]
+///   tail=raw plays each trace's own samples, as before SmoothTail, for the A/B. late=velvet plays the
+///   late part as one channel through the velvet branches, as before DiffuseLate.
 ///   A weapon id (glock, ar15, akm, ...) fires that gun at its own level from dist metres; bed plays a
 ///   quiet 150 Hz hum at 2 m under it all and prints its level through each shot: the ear overload.
 ///
@@ -36,6 +39,8 @@ public static class ClapRoomSpike
         AcousticRegistry.Initialize();
         string outPath = Arg(args, "out") ?? "/tmp/openfps-clap-room.wav";
         int claps = int.TryParse(Arg(args, "claps"), out int c) ? c : 4;
+        TracedReverb.RawTail = Arg(args, "tail") == "raw";
+        TracedReverb.OneChannelLate = Arg(args, "late") == "velvet";
 
         // The flat, in its own frame: 8.65 x 17.86 x 2.7 m, carpet on concrete, plaster over, plaster
         // walls and the brick outer wall, a sofa. The ear where /tp -14 -85 0.5 puts it.
@@ -186,6 +191,7 @@ public static class ClapRoomSpike
         }
         Console.WriteLine("  clap | peak dBFS | room against the clap (0-6 ms): 6-50 ms   50-300 ms   total | tail 50-200 ms: L/R dB, IACC 150-300 / 300-600 / 600-1200 / 1200-2400 / 2400-4800 Hz");
         int at = 0, found = 0;
+        var decays = new List<int>();
         while (at < l.Length && found < 20)
         {
             int on = -1;
@@ -200,9 +206,52 @@ public static class ClapRoomSpike
             foreach (var (lo, hi) in new[] { (150f, 300f), (300f, 600f), (600f, 1200f), (1200f, 2400f), (2400f, 4800f) })
                 iacc.Append($" {Iacc(Band(l, t0, t1, lo, hi, sr), Band(r, t0, t1, lo, hi, sr)),5:F2}");
             Console.WriteLine($"  {++found,4} | {20 * Math.Log10(pk + 1e-20),8:F1} | {Db(early) - Db(d),31:F1} {Db(late) - Db(d),11:F1} {Db(early + late) - Db(d),7:F1} | {Db(el) - Db(d),6:F1}/{Db(er) - Db(d),6:F1} {iacc}");
+            decays.Add(on);
             at = on + sr;       // the next clap is 1.5 s on
         }
         if (found == 0) Console.WriteLine("  FAIL: no clap in the capture");
+        // The late part alone (300-900 ms, DiffuseLate's), the two ears' IACC, mean over the claps.
+        if (decays.Count > 0)
+        {
+            var sum = new double[5]; int nc = 0;
+            foreach (int on in decays)
+            {
+                int a = on + (int)(0.3 * sr), b = Math.Min(l.Length, on + (int)(0.9 * sr));
+                if (b - a < sr / 2) continue;
+                int j = 0;
+                foreach (var (lo, hi) in new[] { (150f, 300f), (300f, 600f), (600f, 1200f), (1200f, 2400f), (2400f, 4800f) })
+                    sum[j++] += Iacc(Band(l, a, b, lo, hi, sr), Band(r, a, b, lo, hi, sr));
+                nc++;
+            }
+            if (nc > 0) Console.WriteLine($"  late part 300-900 ms, IACC mean over the claps: {string.Join(" ", sum.Select(v => (v / nc).ToString("F2")))}");
+        }
+        // The tail's decay per octave, both ears' energy from 50 ms on (the clap itself and the placed
+        // early reflections left out), to just before the next clap: EDT (0 to -10 dB) and T20 (-5 to
+        // -25), Schroeder, the mean over the claps.
+        if (decays.Count > 0)
+        {
+            Console.WriteLine("  tail from 50 ms, mean over the claps:  octave   EDT s   T20 s   | EDT per clap");
+            foreach (double fc in new[] { 125.0, 250, 500, 1000, 2000, 4000 })
+            {
+                double edt = 0, t20 = 0; int ne = 0, nt = 0;
+                var each = new System.Text.StringBuilder();
+                foreach (int on in decays)
+                {
+                    int a = on + (int)(0.05 * sr), b = Math.Min(l.Length, on + (int)(1.45 * sr));
+                    if (b - a < sr / 2) continue;
+                    var bl = Band(l, a, b, (float)(fc / Math.Sqrt(2)), (float)(fc * Math.Sqrt(2)), sr);
+                    var br2 = Band(r, a, b, (float)(fc / Math.Sqrt(2)), (float)(fc * Math.Sqrt(2)), sr);
+                    var e = new double[bl.Length]; double acc = 0;
+                    for (int i = bl.Length - 1; i >= 0; i--) { acc += bl[i] * bl[i] + br2[i] * br2[i]; e[i] = acc; }
+                    if (acc <= 0) continue;
+                    int Cross(double db) { for (int i = 0; i < e.Length; i++) if (10 * Math.Log10(e[i] / acc + 1e-30) <= db) return i; return -1; }
+                    int i10 = Cross(-10), i5 = Cross(-5), i25 = Cross(-25);
+                    if (i10 > 0) { edt += 6.0 * i10 / sr; ne++; each.Append($" {6.0 * i10 / sr:F2}"); }
+                    if (i5 >= 0 && i25 > i5) { t20 += 3.0 * (i25 - i5) / sr; nt++; }
+                }
+                Console.WriteLine($"  {fc,44:F0} {(ne > 0 ? edt / ne : 0),7:F2} {(nt > 0 ? t20 / nt : 0),7:F2}   |{each}");
+            }
+        }
         return found == 0 ? 1 : 0;
     }
 

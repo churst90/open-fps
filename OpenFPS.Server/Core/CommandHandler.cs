@@ -1132,6 +1132,7 @@ public class CommandHandler
             {
                 Character = SoundCharacter.Knock,
                 Position = position + new Vector3(0, 1.25f, 0) + forward * 0.3f,
+                OnBody = true, BodyOffset = new Vector3(0f, 1.25f, 0.3f),
                 LevelDb = Applause.SingleClapDb,
                 SynthKey = Applause.ClapKey,
                 DecaySeconds = 0.15f,
@@ -1332,14 +1333,21 @@ public class CommandHandler
         }
 
         var state = world.Get<DoorComponent>(door.Value);
-        if (!DoorSystem.Set(world, door.Value, open))
+        if (!DoorSystem.OpensByHand(state))
+        {
+            Say(reply, state.SensorMetres > 0f ? $"The {name} opens by itself when someone comes up to it."
+                                               : $"The {name} is moved by its motor, not by hand.");
+            return;
+        }
+        if (!DoorSystem.Set(world, door.Value, open, by: from))
         {
             Say(reply, state.Openness >= 1f ? $"The {name} is already open."
                      : state.Openness <= 0f ? $"The {name} is already shut."
                      : $"The {name} is already moving.");
             return;
         }
-        Say(reply, $"The {name} swings {(open ? "open" : "shut")}, {distance:F1} metres away.");
+        var moved = world.Get<DoorComponent>(door.Value);
+        Say(reply, $"{(moved.KeyTurned && open ? "You unlock it. " : "")}The {name} {DoorSystem.Verb(moved)} {(open ? "open" : "shut")}, {distance:F1} metres away.");
     }
 
     /// <summary>

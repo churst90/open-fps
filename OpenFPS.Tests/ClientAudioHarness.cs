@@ -78,6 +78,20 @@ internal sealed class ClientAudioHarness
         } });
     }
 
+    /// <summary>A solid box that stays where it is: a wall, as a map's static definitions give one.</summary>
+    public void AddWall(int id, Vector3 centre, Vector3 size, string material = "Brick")
+    {
+        var def = new EntityDefinition
+        {
+            EntityId = id,
+            Type = EntityType.StaticObject,
+            Transform = new Transform { Position = centre, Rotation = Quaternion.Identity, Scale = Vector3.One },
+            Collider = new ColliderComponent { Shape = ColliderShape.Box, Size = size, IsSolid = true },
+            Material = new MaterialComponent { Material = material },
+        };
+        World.RegisterDefinition(def);
+    }
+
     /// <summary>The server's word that this car sounded its horn.</summary>
     public void Honk(int carId, string horn = "electric:disc_pair", float seconds = 30f)
         => Audio.WorldAudio.HornReceived!(carId, horn, new[] { seconds });
