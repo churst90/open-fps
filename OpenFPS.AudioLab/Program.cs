@@ -562,6 +562,16 @@ if (args.Contains("--late-field"))
     // --late-field [place=flat|tunnel|street]: each source's own late energy and direction, traced.
     Environment.Exit(OpenFPS.Client.Core.AudioEngine.Fmod.LateFieldSpike.Run(args));
 }
+if (args.Contains("--nan-mix"))
+{
+    // --nan-mix [from= to= door= seconds=]: the walk into Marlow flat 00B through the whole mixer; what the non-finite guard caught.
+    Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.NanMixSpike.Run(args));
+}
+if (args.Contains("--nan-walk"))
+{
+    // --nan-walk [map=city] [from=x,y,z] [to=x,y,z] [steps=12]: the listener's trace walked over a real map, every response checked for non-finite values.
+    Environment.Exit(OpenFPS.Client.Core.AudioEngine.SteamAudio.NanWalkSpike.Run(args));
+}
 if (args.Contains("--early-tail"))
 {
     // --early-tail [room=flat|stair|corridor]: the trace's first 120 ms against the room's image sources.

@@ -124,7 +124,8 @@ public static class EarlyTailSpike
             var hs = new Phonon.IPLHRTFSettings { type = Phonon.IPL_HRTFTYPE_DEFAULT, volume = 1f, normType = Phonon.IPL_HRTFNORMTYPE_NONE };
             Phonon.iplHRTFCreate(ctx, ref au, ref hs, out IntPtr hrtf);
             var bs = new Phonon.IPLBinauralEffectSettings { hrtf = hrtf };
-            foreach (var dir in new[] { new Vector3(0, 0, -1), new Vector3(1, 0, 0), new Vector3(0, -0.8f, -0.6f), new Vector3(0, 1, 0) })
+            foreach (var dir in new[] { new Vector3(0, 0, -1), new Vector3(1, 0, 0), new Vector3(0, -0.8f, -0.6f), new Vector3(0, 1, 0),
+                                        Vector3.Zero, new Vector3(1e-20f, 0, 0), new Vector3(float.NaN, 0, 0) })
             {
                 Phonon.iplBinauralEffectCreate(ctx, ref au, ref bs, out IntPtr fx);
                 var inB = new Phonon.IPLAudioBuffer(); var outB = new Phonon.IPLAudioBuffer();
@@ -140,6 +141,7 @@ public static class EarlyTailSpike
                     Phonon.iplAudioBufferInterleave(ctx, ref outB, st);
                     for (int k = 0; k < frame; k++) y.Add(MathF.Abs(st[2 * k]) + MathF.Abs(st[2 * k + 1]));
                 }
+                if (y.Any(v => !float.IsFinite(v))) Console.WriteLine($"  frame {frame,4}, direction ({dir.X}, {dir.Y}, {dir.Z}): NOT FINITE output");
                 float pk = y.Max(); int peak = y.IndexOf(pk) - frame, onset = y.FindIndex(v => v >= 0.1f * pk) - frame;
                 Console.WriteLine($"  frame {frame,4}, direction ({dir.X:F1}, {dir.Y:F1}, {dir.Z:F1}): onset {onset} samples, peak {peak} samples after the impulse");
                 Phonon.iplBinauralEffectRelease(ref fx);

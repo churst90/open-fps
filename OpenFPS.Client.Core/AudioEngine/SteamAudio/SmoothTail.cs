@@ -256,6 +256,14 @@ internal sealed class SmoothTail
                     Vector3[]? directions, double[]? cov, Vector3 at, int place, bool sceneChanged,
                     EarlyCopies? copies = null)
     {
+        // A trace with a NaN or an infinity in it is not added. The average is recursive: added, it
+        // would hold the NaN until the next fresh start (a new room, a metre on), and the tail built
+        // from it would put NaN into the mix on every block, which silences the whole game.
+        if (!Finite(w) || (directions != null && (!Finite(c1) || !Finite(c2) || !Finite(c3))) || (cov != null && !Finite(cov)))
+        {
+            Rejected++;
+            return;
+        }
         Measure(w, c1, c2, c3, a1, a2, a3, directions);
         Array.Clear(LastTook);
         if (FromFiftyMs) { copies = null; _start = 0; Array.Clear(LastCopies); }
@@ -293,6 +301,22 @@ internal sealed class SmoothTail
         _where = weight >= 1.0 ? at : Vector3.Lerp(_where, at, (float)weight);
         _place = place;
         _empty = false;
+    }
+
+    /// <summary>Traces left out because something in them was not finite.</summary>
+    public int Rejected { get; private set; }
+
+    private static bool Finite(float[]? x)
+    {
+        if (x == null) return true;
+        foreach (float v in x) if (!float.IsFinite(v)) return false;
+        return true;
+    }
+
+    private static bool Finite(double[] x)
+    {
+        foreach (double v in x) if (!double.IsFinite(v)) return false;
+        return true;
     }
 
     private static void Blend(double[] avg, double[] m, double weight)

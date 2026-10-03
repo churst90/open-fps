@@ -179,6 +179,11 @@ Results: [docs/MUTATION_2026-09-24.md](docs/MUTATION_2026-09-24.md),
 Done 2026-10-02 (see changes.md). Nothing left.
 
 ### 6. Acoustics still open
+- The game went silent in Marlow flat 00B (2026-10-03, a NaN reached the master limiter). Not
+  reproduced in the lab. The mix is now guarded, so it should not go silent again. If it happens,
+  read the log for `[NONFINITE]`: the first line names the unit that made the NaN. If the only
+  line is "the mix arriving at the master bus", the NaN came from a parameter set on an FMOD
+  built-in (a volume, an EQ gain, a send mix), not from our DSP code.
 - Listen for the room answering at once (2026-10-03, branch early-tail). Clap in a main-street lobby
   and in flat 01F: the reflections should start with the clap, not 40 ms after it. Restart the
   client. `--clap-room early=old` gives the old response in the lab. Things to check:

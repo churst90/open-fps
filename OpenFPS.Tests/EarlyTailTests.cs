@@ -208,6 +208,60 @@ public class EarlyTailTests
         Assert.Equal(0.7f, none.Process(0.7f));
     }
 
+    /// <summary>
+    /// Whatever the trace and the geometry hand it, the responses are finite: an empty trace, a trace
+    /// with nothing early, a listener a millimetre from a wall, inside a box, in a doorway, nowhere
+    /// near anything; with and without directions; a fresh room after each.
+    /// </summary>
+    [Fact]
+    public void DegenerateTracesAndPlacesGiveFiniteResponses()
+    {
+        var flat = Flat();
+        var places = new[]
+        {
+            Ear,
+            new Vector3(4.32f - 0.001f, 1.7f, 0f),          // a millimetre off the brick wall's face
+            new Vector3(4.5f, 1.4f, 0f),                    // inside the brick wall
+            new Vector3(0.1f, 0.0805f, 0.1f),               // on the carpet
+            new Vector3(0f, 2.72f, 0f),                     // in the ceiling's face
+            new Vector3(500f, 1.7f, 500f),                  // nowhere near anything
+        };
+        var traces = new[]
+        {
+            new float[Length],                                          // nothing at all
+            Trace(1, 0.02f),
+            Trace(2).Select((v, i) => i < Rate / 5 ? 0f : v).ToArray(),  // nothing for 200 ms
+            Trace(3, 1e-20f),                                           // all but nothing
+            new float[Rate / 10],                                       // shorter than the tail
+        };
+        int place = 1;
+        foreach (var at in places)
+        {
+            var copies = EarlyCopies.From(flat, at, Rate);
+            if (copies != null) Assert.All(copies.Copies, c => Assert.All(c.Band, v => Assert.True(double.IsFinite(v) && v >= 0, $"copy energy {v} at {at}")));
+            foreach (var w in traces)
+                foreach (bool dirs in new[] { false, true })
+                {
+                    var s = new SmoothTail(Rate, Length, dirs ? DiffuseBranch.Count : 0);
+                    var y = w.Select(v => v * 0.3f).ToArray();
+                    s.Add(w, dirs ? y : null, dirs ? y : null, dirs ? y : null, Vector3.UnitY, Vector3.UnitZ, Vector3.UnitX,
+                          dirs ? Dirs() : null, dirs ? new double[TracedReverb.Channels] : null, at, place++, false, copies);
+                    for (int b = 0; b < SmoothTail.Bands; b++)
+                        for (int f = 0; f < s.Frames; f++) Assert.True(double.IsFinite(s.OmniEnergy(b, f)) && s.OmniEnergy(b, f) >= 0);
+                    Assert.All(s.LastTook, v => Assert.True(double.IsFinite(v)));
+                    var late = s.BuildLate(Block, Length / Block + 1, dirs);
+                    Assert.All(late.Re, v => Assert.True(float.IsFinite(v))); Assert.All(late.Im, v => Assert.True(float.IsFinite(v)));
+                    if (!dirs) continue;
+                    var sdm = s.BuildDirectional(Block);
+                    foreach (var d in sdm.PerDirection.Where(d => d != null))
+                    { Assert.All(d!.Re, v => Assert.True(float.IsFinite(v))); Assert.All(d.Im, v => Assert.True(float.IsFinite(v))); }
+                    Assert.All(sdm.Share, v => Assert.True(float.IsFinite(v)));
+                    var field = s.BuildDiffuseLate(DiffuseLateNoise.Shared(Rate, Length, DiffuseBranch.Count));
+                    Assert.All(field.C0, v => Assert.True(float.IsFinite(v))); Assert.All(field.C1, v => Assert.True(float.IsFinite(v)));
+                }
+        }
+    }
+
     /// <summary>A trace's per-band frame energies, as SmoothTail measures them.</summary>
     private static double[] Measure(float[] w, int frames)
     {
