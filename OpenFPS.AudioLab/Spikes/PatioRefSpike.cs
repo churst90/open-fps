@@ -145,20 +145,29 @@ public static class PatioRefSpike
                 onsets.Add((i, p));
             }
         }
-        // Slides: 10 ms frames 10 dB over the floor. A stop is a loud blow (within 20 dB of the loudest) with
-        // the slide sounding in the 300 ms before it; it and its ring, and the latch thrown after it, are not
-        // slide, for 0.8 s. Any other loud blow (a latch before the leaf moves) is not slide for 80 ms. A
-        // grain's tick is part of the slide.
+        // Slides: 10 ms frames 10 dB over the floor. A stop is the loudest blow in a stretch of sound, within
+        // 20 dB of the file's loudest, with the slide sounding in the 300 ms before it; it and its ring, and the
+        // latch thrown after it, are not slide, for 0.8 s. Any other loud blow (a latch before the leaf moves,
+        // a grain cracking) is not slide for 80 ms.
         var active = new bool[e10.Length];
         for (int i = 0; i < e10.Length; i++) active[i] = e10[i] > floor + 10;
+        var sounding = (bool[])active.Clone();
         var stops = new List<(double T, double P)>();
+        double Time(int frame) => (double)frame * f2 / rate;
+        int Run(double t)
+        {
+            int i = Math.Min(e10.Length - 1, (int)(t * 100));
+            while (i > 0 && (sounding[i - 1] || sounding[Math.Max(0, i - 2)] || sounding[Math.Max(0, i - 3)])) i--;
+            return i;
+        }
         foreach (var (frame, p) in onsets)
         {
-            double t = (double)frame * f2 / rate;
+            double t = Time(frame);
             if (p < max2 - 20) continue;
             int a = Math.Max(0, (int)((t - 0.35) * 100)), b = Math.Max(a, (int)((t - 0.05) * 100));
-            int on = 0; for (int i = a; i < b; i++) if (active[i]) on++;
-            bool stop = t >= 0.35 && on >= 0.6 * (b - a);
+            int on = 0; for (int i = a; i < b; i++) if (sounding[i]) on++;
+            bool louder = onsets.Any(o => o.Peak > p && Run(Time(o.Frame)) == Run(t) && Time(o.Frame) > t);
+            bool stop = t >= 0.35 && on >= 0.6 * (b - a) && !louder;
             if (stop) stops.Add((t, p));
             double after = stop ? 0.8 : 0.08;
             for (int i = Math.Max(0, (int)((t - 0.03) * 100)); i < Math.Min(e10.Length, (int)((t + after) * 100)); i++) active[i] = false;
