@@ -114,7 +114,7 @@ when you come within 3 m of them.
 
 | Key | Action |
 |---|---|
-| E | Interact: open a door, get into or out of a vehicle, close a door |
+| E | Interact. With an item within 2 m it picks one up: the one chosen with comma or period, else the one in front, else a list to choose from; it then says if others are still within reach. With no item in reach: open or close a door, get into or out of a vehicle |
 | Shift+E | Knock on the nearest door |
 | G | Pick up |
 | Q | Drop |
