@@ -1223,6 +1223,11 @@ public sealed partial class ClientGameSession : IDisposable
             case SightWatch.Act.Interrupt:
                 _speech.Interrupt();
                 break;
+            // Climbing a flight, the treads are ground and nothing else is ahead, so the walk up read out
+            // "Open, South"; the stairs say themselves, and the landing is said when you step off.
+            case SightWatch.Act.Say when result.Line != null && _stairs.OnFlight && result.Cause == "move"
+                                         && result.Line.StartsWith("Open, ", StringComparison.Ordinal):
+                break;
             case SightWatch.Act.Say when result.Line != null:
                 Serilog.Log.Information("[NARRATE] '{Line}' ({Cause}) facing {Deg:F0} at {Pos}", result.Line, result.Cause,
                     MathHelper.WrapAngle(_state.Yaw) * 180f / MathF.PI, _state.Position);
