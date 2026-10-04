@@ -70,6 +70,9 @@ public class ScopedFireTests : IDisposable
         Assert.Empty(r.HitsOn(walker));
         string call = Assert.Single(r.Said(), t => t.StartsWith("Miss"));
         Assert.Contains("low", call);
+        // This range lies off the default map's floor: the round has nothing to end in, and a round that
+        // ends in nothing says nothing more.
+        Assert.DoesNotContain(r.Said(), t => t.StartsWith("Hit "));
     }
 
     [Fact]

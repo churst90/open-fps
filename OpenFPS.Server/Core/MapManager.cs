@@ -348,6 +348,10 @@ public class MapManager
             // centred on 0 left a strip along one edge with no floor — walk into it and you fell.
             Vector3 centre = (m.MinBound + m.MaxBound) * 0.5f;
             var foundation = _prefabRepo.Spawn(world, "concrete_floor", new Vector3(centre.X, -0.05f, centre.Z), Quaternion.Identity, new Vector3(mapSize.X / 10f, 1f, mapSize.Z / 10f));
+            // It is the ground, and is called so: a round that ends in it was "Hit Concrete Floor at 9
+            // metres", out on the city's open grass.
+            if (world.Has<IdentityComponent>(foundation)) world.Get<IdentityComponent>(foundation).Name = "Ground";
+            if (world.Has<NameComponent>(foundation)) world.Get<NameComponent>(foundation).Name = "Ground";
             lookup[foundation.Id] = foundation;
             hasAnyFloor = true;
             foundMinimumY = 0f;

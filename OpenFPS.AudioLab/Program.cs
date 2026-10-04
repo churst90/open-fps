@@ -100,6 +100,7 @@ string[] usage =
     "  --reload-spec [refs=DIR] [only=]              the gun-handling recordings measured: contacts, falls, bands",
     "  --reload-sounds [out=DIR]                     every reload and dry fire rendered, measured the same way",
     "  --scope-sounds [out=DIR]                      the scope's guidance tone and breath as played, and the M700's sounds",
+    "  --bullet-pass [out=DIR]                       a round's crack or whizz going by a listener, then its report",
     "  --gun-fit [nij=DIR] [tag=] [wavs] [grid]      every weapon's report against its own NIJ takes",
     "  --speech-lines                                decodes every shipped voice line as the client does",
     "  --heard-levels [d=1.5] [wav=DIR]              doors, steps, speech: declared vs LAFmax at the ear",
@@ -195,6 +196,11 @@ if (args.Contains("--siren-route"))
     int code = OpenFPS.Client.Core.AudioEngine.SteamAudio.SirenRouteSpike.Run(args);
     Log.CloseAndFlush();
     Environment.Exit(code);
+}
+
+if (args.Contains("--bullet-pass"))
+{
+    Environment.Exit(OpenFPS.AudioLab.Spikes.BulletPassSpike.Run(args));
 }
 
 if (args.Contains("--heard-levels"))

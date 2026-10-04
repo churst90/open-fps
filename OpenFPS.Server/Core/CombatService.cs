@@ -137,7 +137,7 @@ public sealed class CombatService
 
         var rotation = world.Get<Transform>(session.Entity).Rotation;
         var forward = Vector3.Transform(new Vector3(0, 0, 1), rotation);
-        var muzzle = position + new Vector3(0, 1.5f, 0) + forward * 0.5f;
+        var muzzle = position + new Vector3(0, HipHeight, 0) + forward * 0.5f;
 
         if (!fromTheAir && !SpendRound(session, world, weapon, item, position, forward, reply)) return;
 
@@ -146,52 +146,48 @@ public sealed class CombatService
         //    exists and is better than four numbers.
         EmitReport(session, weapon, position, forward, muzzle, cycle: !fromTheAir);
 
-        // 2. What it hit, if anything: the nearest thing in front of the muzzle that stops a round.
-        //    A person is in front of you if they are within the cone measured flat, across the
-        //    ground: the round comes from chest height and a person's position is their feet, so a
-        //    cone in three dimensions missed anybody close enough to touch.
-        string hit = "nothing in the first hundred metres";
-        foreach (var candidate in grid.GetItemsInRadius(position, 100f).OrderBy(
-                     e => Vector3.Distance(position, world.Get<Transform>(e).Position)))
-        {
-            if (candidate.Id == session.Entity.Id || !world.IsAlive(candidate) || !world.Has<ColliderComponent>(candidate)) continue;
-            var t = world.Get<Transform>(candidate);
-            var c = world.Get<ColliderComponent>(candidate);
-            bool body = IsPerson(world, candidate);
-            if (body && world.Has<DeadComponent>(candidate)) continue;   // a body on the ground stops nothing
-            if (!c.IsSolid && !body) continue;
+        // 2. The round, flown like every other: along the aim, from the body's own axis at the height
+        //    the gun is held, so a wall between you and your muzzle is the first thing it meets. What it
+        //    hits is said when it gets there (FlyBullets). This was a hit-scan: the nearest entity by its
+        //    CENTRE inside a flat 14-degree cone, a body taking the hit and a solid stopping it. A long
+        //    wall's centre is metres away along it, so from the second floor of Brandt Court the floor's
+        //    own east wall (88 m long, its centre 40 m off) was never in the cone and the pedestrian
+        //    below in the street was (Cody, 2026-10-04).
+        Vector3 aim = Disperse(forward, HipDispersionRadians);
+        Vector3 from = position + new Vector3(0f, HipHeight, 0f);
+        Launch(session, world, grid, weapon, from, aim * weapon.MuzzleVelocity, from, forward, targetId: -1);
+        if (session.IsTextClient) Say(reply, $"You fire the {weapon.DisplayName}.");
+    }
 
-            var toTarget = t.Position - muzzle;
-            if (body) toTarget.Y = 0f;
-            float distance = toTarget.Length();
-            if (distance < 0.1f) { if (!body) continue; toTarget = forward; distance = 0.1f; }
-            var flatForward = body ? Vector3.Normalize(new Vector3(forward.X, 0f, forward.Z)) : forward;
-            if (Vector3.Dot(Vector3.Normalize(toTarget), flatForward) < 0.97f) continue;
+    /// <summary>How high above the feet a gun fired from the hip is held: where the report has always
+    /// come from.</summary>
+    public const float HipHeight = 1.5f;
 
-            if (body)
-            {
-                bool killed = Wound(session, world, grid, candidate, weapon.DamageAt(distance), weapon, reply);
-                // The chime says THAT you hit; the words say what and how far (Cody, 2026-10-04: "I'll hit
-                // things but I won't know what I hit"). Short, because it is said in the middle of a fight.
-                Say(reply, HitWords(world, candidate, killed, head: false, distance));
-                return;
-            }
+    /// <summary>
+    /// How far a shot from the hip strays from where the body points, radians, one standard deviation on
+    /// each axis. Point shooting (unsighted, the gun held where the body faces) is trained to an 8-inch
+    /// group at 7 yards, nearly all inside 10 cm of the point of aim at 6.4 m; a round Gaussian puts 90 %
+    /// inside 2.15 σ, so σ = 0.10 / 2.15 / 6.4 = 7 mrad, 0.4°. The gun's own precision (2-4 MOA, about
+    /// 1 mrad) is lost under it. A test sets its own.
+    /// </summary>
+    public float HipDispersionRadians { get; set; } = 0.007f;
 
-            string material = world.Has<MaterialComponent>(candidate)
-                ? world.Get<MaterialComponent>(candidate).Material ?? "Generic" : "Generic";
-            hit = $"{material.ToLowerInvariant()} at {distance:F0} metres";
+    /// <summary>The scatter's dice. A test sets its own.</summary>
+    public Random Scatter { get; set; } = new();
 
-            if (material.Equals("Glass", StringComparison.OrdinalIgnoreCase))
-                BreakGlass(session, world, candidate, t, c, weapon);
-            else
-                _server.EmitWorldAudio(session.CurrentMapId, candidate.Id, "impact",
-                    ImpactAcoustics.Between(AcousticRegistry.GetProperties("Metal"),
-                                            AcousticRegistry.GetProperties(material),
-                                            t.Position, weapon.MuzzleVelocity * 0.02f,
-                                            0.01f, 500f, c.Size.X, c.Size.Y, MathF.Max(0.02f, c.Size.Z)));
-            break;
-        }
-        Say(reply, hit.StartsWith("nothing") ? $"You fire the {weapon.DisplayName}. It hits {hit}." : $"Hit {hit}.");
+    /// <summary>A direction turned off by a Gaussian error of <paramref name="sigma"/> radians on each
+    /// of its two cross axes.</summary>
+    private Vector3 Disperse(Vector3 direction, float sigma) => Disperse(direction, sigma, Scatter);
+
+    internal static Vector3 Disperse(Vector3 direction, float sigma, Random scatter)
+    {
+        direction = Vector3.Normalize(direction);
+        if (sigma <= 0f) return direction;
+        Vector3 right = Vector3.Cross(Vector3.UnitY, direction);
+        right = right.LengthSquared() < 1e-8f ? Vector3.UnitX : Vector3.Normalize(right);
+        Vector3 up = Vector3.Cross(direction, right);
+        float Gauss() => (float)(Math.Sqrt(-2 * Math.Log(1 - scatter.NextDouble())) * Math.Cos(2 * Math.PI * scatter.NextDouble()));
+        return Vector3.Normalize(direction + right * (sigma * Gauss()) + up * (sigma * Gauss()));
     }
 
     /// <summary>
@@ -291,10 +287,11 @@ public sealed class CombatService
         public required int ShooterId;
         public required WeaponDefinition Weapon;
         public BulletState State;
-        public required Vector3 Eye;
+        public required Vector3 Eye;            // where it is measured from: the scope's eye, or the hip
         public required Vector3 Sight;          // the line of sight, unit
         public required double At;              // server time the state is true at
         public int TargetId = -1;               // whom the crosshair was nearest, for the spotter's call
+        public int RideId = -1;                 // what the shooter is riding in, which the round leaves
         public bool Called;
         public readonly HashSet<int> BrokenGlass = new();
     }
@@ -354,22 +351,124 @@ public sealed class CombatService
 
         EmitReport(session, weapon, position, flatForward, bore + sight * 0.7f, cycle: true);
 
+        _maps.TryGetMap(session.CurrentMapId, out _, out _, out SpatialGrid<Entity> grid, out _);
+        Launch(session, world, grid, weapon, bore, barrel * weapon.MuzzleVelocity, eye, sight,
+               NearestToCrosshair(world, session.Entity.Id, eye, yaw, pitch, scope.FieldOfViewDegrees(shot.Magnification)));
+        Log.Information("{User} fires the {Weapon} through the scope at {Mag}x, {Mil:F1} mil up; aim {Yaw:F4},{Pitch:F4}.",
+                        session.Username, weapon.DisplayName, shot.Magnification, elevation, yaw, pitch);
+    }
+
+    /// <summary>
+    /// A round leaves the gun: it is put in the air to be flown a tick at a time (FlyBullets), and
+    /// everybody else near where it is going is sent what they will hear of it go by.
+    /// </summary>
+    private void Launch(UserSession session, World world, SpatialGrid<Entity> grid, WeaponDefinition weapon,
+                        Vector3 from, Vector3 velocity, Vector3 eye, Vector3 sight, int targetId)
+    {
         var flight = new Flight
         {
             MapId = session.CurrentMapId,
             Shooter = session,
             ShooterId = session.Entity.Id,
             Weapon = weapon,
-            State = new BulletState { Position = bore, Velocity = barrel * weapon.MuzzleVelocity },
+            State = new BulletState { Position = from, Velocity = velocity },
             Eye = eye,
             Sight = sight,
             At = Clock(),
-            TargetId = NearestToCrosshair(world, session.Entity.Id, eye, yaw, pitch, scope.FieldOfViewDegrees(shot.Magnification)),
+            TargetId = targetId,
+            RideId = world.Has<OccupantComponent>(session.Entity) ? world.Get<OccupantComponent>(session.Entity).RootEntityId : -1,
         };
         _flights.Add(flight);
-        Log.Information("{User} fires the {Weapon} through the scope at {Mag}x, {Mil:F1} mil up; aim {Yaw:F4},{Pitch:F4}.",
-                        session.Username, weapon.DisplayName, shot.Magnification, elevation, yaw, pitch);
+        PassingSounds(flight, world, grid);
     }
+
+    // ── What the others hear go by ──────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// The crack or the whizz of a round going by, for every other player near its path, each sent
+    /// only to the one it is for and all of them NOW, with the trigger: the round is flown ahead here
+    /// against the world as it stands (<see cref="FlyAhead"/>), and each sound carries its own delay
+    /// from the shot (<see cref="BulletFlyby"/>). Sent with the report, the gap between the two is
+    /// exactly the physics; sent when the bullet got there, it would be a tick late and the report
+    /// would not be. A round that the real flight stops sooner than this one did (somebody stepped into
+    /// it) has already been heard further on: rare, and a crack that did not happen is the lesser fault.
+    /// </summary>
+    private void PassingSounds(Flight f, World world, SpatialGrid<Entity> grid)
+    {
+        List<UserSession>? listeners = null;
+        foreach (var s in _sessions.GetSessionsInMap(f.MapId))
+        {
+            if (s == f.Shooter || s.IsTextClient || s.Entity == Entity.Null || !world.IsAlive(s.Entity) || !world.Has<Transform>(s.Entity)) continue;
+            (listeners ??= new()).Add(s);
+        }
+        if (listeners == null) return;
+
+        var (air, wind) = AirOn(f.MapId);
+        var path = FlyAhead(f, world, grid, air, wind);
+        foreach (var s in listeners)
+        {
+            Vector3 ear = world.Get<Transform>(s.Entity).Position + new Vector3(0f, EyeHeight, 0f);
+            var sounds = BulletFlyby.Sounds(path, ear, f.Weapon, air);
+            if (sounds.Count == 0) continue;
+            _server.SendToSession(s, new WorldAudioEvent
+            {
+                SourceEntityId = -1,
+                Label = "a bullet going by",
+                Sounds = sounds,
+                Seed = _passSeed++,
+            });
+            Log.Information("{User} hears the {Weapon}'s round go by: {Keys}.", s.Username, f.Weapon.DisplayName,
+                            string.Join(", ", sounds.Select(x => $"{x.SynthKey} {x.LevelDb:F0} dB at +{x.DelaySeconds:F3} s")));
+        }
+    }
+
+    private int _passSeed = 1;
+
+    /// <summary>The air and the wind on a map now.</summary>
+    private (Air Air, Vector3 Wind) AirOn(string mapId)
+    {
+        var weather = Weather?.Invoke(mapId) ?? (15f, 1013.25f, Vector3.Zero, 0f);
+        // Out in the open, where a long shot is taken: the full wind, gusts and all.
+        return (new Air(weather.TemperatureC, weather.PressureMb), WindModel.Felt(weather.Wind, weather.Gustiness, Clock()));
+    }
+
+    /// <summary>
+    /// A round's whole flight, flown ahead of time against the world as it stands now (people carried on
+    /// at the pace they are walking), to where it stops or its time runs out: through glass, as the real
+    /// one goes, and with nothing broken or hurt.
+    /// </summary>
+    private List<FlightSample> FlyAhead(Flight f, World world, SpatialGrid<Entity> grid, Air air, Vector3 wind)
+    {
+        var state = f.State;
+        float t0 = state.Seconds;
+        var path = new List<FlightSample> { new(0f, state.Position, state.Velocity) };
+        var glass = new HashSet<int>();
+        float bc = ExternalBallistics.CoefficientOf(f.Weapon);
+        double now = f.At;
+        while (state.Seconds - t0 < MaxFlightSeconds && state.Position.Y >= PhysicsConstants.MapMinimumY)
+        {
+            var before = state;
+            ExternalBallistics.Advance(ref state, SegmentSeconds, bc, air, wind);
+            double segStart = now + (before.Seconds - t0);
+            if (FirstHit(f, world, grid, before.Position, state.Position, SegmentSeconds, segStart, now, glass,
+                         out var hit, out float along, out _, out _))
+            {
+                float length = Vector3.Distance(before.Position, state.Position);
+                float u = along / MathF.Max(1e-6f, length);
+                var at = new FlightSample(before.Seconds - t0 + u * SegmentSeconds,
+                                          Vector3.Lerp(before.Position, state.Position, u), Vector3.Lerp(before.Velocity, state.Velocity, u));
+                if (!IsGlass(world, hit)) { path.Add(at); return path; }
+                glass.Add(hit.Id);
+                state.Velocity *= 0.9f;
+            }
+            path.Add(new FlightSample(state.Seconds - t0, state.Position, state.Velocity));
+        }
+        return path;
+    }
+
+    private static bool IsGlass(World world, Entity e)
+        => world.Has<MaterialComponent>(e)
+           && string.Equals(world.Get<MaterialComponent>(e).Material, "Glass", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>The scope on a weapon: its own, for now. An attachment would be looked up here.</summary>
     public static string ScopeOf(WeaponDefinition weapon) => weapon.ScopeId;
@@ -396,10 +495,7 @@ public sealed class CombatService
         if (_flights.Count == 0) return;
         if (!_maps.TryGetMap(mapId, out var world, out _, out var grid, out var lookup)) return;
         double now = Clock();
-        var weather = Weather?.Invoke(mapId) ?? (15f, 1013.25f, Vector3.Zero, 0f);
-        var air = new Air(weather.TemperatureC, weather.PressureMb);
-        // Out in the open, where a long shot is taken: the full wind, gusts and all.
-        Vector3 wind = WindModel.Felt(weather.Wind, weather.Gustiness, now);
+        var (air, wind) = AirOn(mapId);
 
         for (int i = _flights.Count - 1; i >= 0; i--)
         {
@@ -417,11 +513,10 @@ public sealed class CombatService
                 if (!done && (f.State.Seconds > MaxFlightSeconds || f.State.Position.Y < PhysicsConstants.MapMinimumY))
                     done = true;
             }
-            if (done)
-            {
-                if (!f.Called) Spot(f, world, null);
-                _flights.RemoveAt(i);
-            }
+            // A round that flew its whole time, or out of the bottom of the map, without meeting
+            // anything says nothing: the silence after the shot is the answer, and every round that
+            // ends in something has already said what.
+            if (done) _flights.RemoveAt(i);
         }
     }
 
@@ -438,66 +533,35 @@ public sealed class CombatService
         if (length < 1e-5f) return false;
         Vector3 dir = path / length;
 
-        grid.CollectInRadius(a + path * 0.5f, length * 0.5f + 3f, _near, _nearSeen);
-        float nearest = float.MaxValue;
-        Entity hitEntity = Entity.Null;
-        bool hitBody = false;
-        float bodyHeight = 0f;
-        foreach (var e in _near)
-        {
-            if (e.Id == f.ShooterId || !world.IsAlive(e) || !world.Has<Transform>(e)) continue;
-            var t = world.Get<Transform>(e);
-            if (IsPerson(world, e))
-            {
-                if (world.Has<DeadComponent>(e)) continue;
-                Vector3 vel = world.Has<Velocity>(e) ? world.Get<Velocity>(e).Linear : Vector3.Zero;
-                // Where they stood when this stretch began: they have moved on to here by now.
-                Vector3 feet = t.Position - vel * (float)(now - segStart);
-                if (ExternalBallistics.SegmentHitsBody(a, b, dt, feet, vel, ExternalBallistics.BodyRadius,
-                                                       ExternalBallistics.BodyHeight, out float frac, out float h)
-                    && frac * length < nearest)
-                {
-                    nearest = frac * length; hitEntity = e; hitBody = true; bodyHeight = h;
-                }
-                continue;
-            }
-            if (!world.Has<ColliderComponent>(e)) continue;
-            var c = world.Get<ColliderComponent>(e);
-            if (!c.IsSolid || f.BrokenGlass.Contains(e.Id)) continue;
-            bool crossed; float d;
-            if (c.Shape == ColliderShape.Box)
-                crossed = GeometryUtils.RayIntersectsOBB(a, dir, t.Position, c.Size, t.Rotation, out d);
-            else if (c.Shape is ColliderShape.Cylinder or ColliderShape.Cone)
-                crossed = GeometryUtils.RayIntersectsCylinder(a, dir, t.Position, c.Size.X * 0.5f, c.Size.Y, out d);
-            else
-            {
-                crossed = GeometryUtils.RayIntersectsSphere(a, dir, t.Position, c.Size.X * 0.5f, out d, out _);
-            }
-            if (crossed && d >= 0f && d <= length && d < nearest) { nearest = d; hitEntity = e; hitBody = false; }
-        }
+        bool struck = FirstHit(f, world, grid, a, b, dt, segStart, now, f.BrokenGlass,
+                               out var hitEntity, out float nearest, out bool hitBody, out float bodyHeight);
         // The spotter watches where it passes the target, over as much of this stretch as it flew
         // before it struck anything. A hit on the target itself is answered by the chime instead.
         if (!f.Called && f.TargetId >= 0 && !(hitBody && hitEntity.Id == f.TargetId)
             && lookup.TryGetValue(f.TargetId, out var target) && world.IsAlive(target))
         {
-            float flown = hitEntity == Entity.Null ? 1f : nearest / length;
+            float flown = !struck ? 1f : nearest / length;
             WatchPass(f, world, target, a, a + path * flown, segStart, dt * flown, now);
         }
-        if (hitEntity == Entity.Null) return false;
+        if (!struck) return false;
 
         Vector3 at = a + dir * nearest;
-        float travelled = before.Travelled + nearest;
+        float metres = Vector3.Distance(f.Eye, at);
+        float seconds = before.Seconds + dt * nearest / length;
         if (hitBody)
         {
             bool head = bodyHeight >= ExternalBallistics.HeadFrom;
-            int damage = f.Weapon.DamageAt(Vector3.Distance(f.Eye, at)) * (head ? 2 : 1);
+            int damage = f.Weapon.DamageAt(metres) * (head ? 2 : 1);
             string whom = NameOf(world, hitEntity);
             var shooter = f.Shooter;
+            // The chime and the words when the bullet gets there, not when the trigger breaks: a person
+            // 400 m off is hit more than half a second after the shot.
             bool killed = Wound(shooter, world, grid, hitEntity, damage, f.Weapon,
                                 m => _server.SendToSession(shooter, m), head);
-            _server.SendToSession(shooter, new TextEvent { Text = HitWords(world, hitEntity, killed, head, travelled) });
+            _server.SendToSession(shooter, new TextEvent { Text = HitWords(world, hitEntity, killed, head, metres) });
             f.Called = true;   // the chime is the call
-            Log.Information("Scoped shot hit {Whom} at {Metres:F0} m after {Seconds:F2} s{Head}.", whom, travelled, after.Seconds, head ? ", in the head" : "");
+            Log.Information("{User}'s {Weapon} round hit {Whom} at {Metres:F0} m after {Seconds:F2} s{Head}.",
+                            f.Shooter.Username, f.Weapon.DisplayName, whom, metres, seconds, head ? ", in the head" : "");
             return true;
         }
 
@@ -519,9 +583,72 @@ public sealed class CombatService
                                     AcousticRegistry.GetProperties(material),
                                     at, speed * 0.02f,
                                     0.01f, 500f, col.Size.X, col.Size.Y, MathF.Max(0.02f, col.Size.Z)));
-        if (!f.Called) Spot(f, world, at);
+        // What it ended in, for the shooter alone: the ground, a roof, a wall, a car, by the name the
+        // map gives it ("Hit Kestrel House north wall at 22 metres"). This used to be the material,
+        // which is how a sofa came to be "audience": that is its acoustic material, soft and absorbent,
+        // the one a grandstand full of people is built of (Cody, 2026-10-04).
+        f.Called = true;
+        _server.SendToSession(f.Shooter, new TextEvent { Text = StruckWords(world, hitEntity, metres) });
+        Log.Information("{User}'s {Weapon} round hit {What} ({Id}) at {Metres:F0} m after {Seconds:F2} s.",
+                        f.Shooter.Username, f.Weapon.DisplayName, ThingName(world, hitEntity), hitEntity.Id, metres, seconds);
         return true;
     }
+
+    /// <summary>
+    /// What a stretch of a round's flight meets first, if anything: a person, where the path enters the
+    /// upright body (in the body's own frame, so one who is walking has to be led), or anything solid,
+    /// where the path enters its box, cylinder or sphere. Nearest along the path wins, whatever the
+    /// distance between centres. Not the shooter, not what they are riding in, not a carried thing, not
+    /// a body already down, and not a pane this round has already gone through.
+    /// </summary>
+    private bool FirstHit(Flight f, World world, SpatialGrid<Entity> grid, Vector3 a, Vector3 b, float dt,
+                          double segStart, double now, HashSet<int> passed,
+                          out Entity hit, out float nearest, out bool hitBody, out float bodyHeight)
+    {
+        hit = Entity.Null; nearest = float.MaxValue; hitBody = false; bodyHeight = 0f;
+        Vector3 path = b - a;
+        float length = path.Length();
+        if (length < 1e-5f) return false;
+        Vector3 dir = path / length;
+        grid.CollectInRadius(a + path * 0.5f, length * 0.5f + 3f, _near, _nearSeen);
+        foreach (var e in _near)
+        {
+            if (e.Id == f.ShooterId || !world.IsAlive(e) || !world.Has<Transform>(e)) continue;
+            if (f.RideId >= 0 && PartOf(world, e, f.RideId)) continue;
+            var t = world.Get<Transform>(e);
+            if (IsPerson(world, e))
+            {
+                if (world.Has<DeadComponent>(e)) continue;
+                Vector3 vel = world.Has<Velocity>(e) ? world.Get<Velocity>(e).Linear : Vector3.Zero;
+                // Where they stood when this stretch began: they have moved on to here by now (or, flown
+                // ahead, will have got there by then).
+                Vector3 feet = t.Position - vel * (float)(now - segStart);
+                if (ExternalBallistics.SegmentHitsBody(a, b, dt, feet, vel, ExternalBallistics.BodyRadius,
+                                                       ExternalBallistics.BodyHeight, out float frac, out float h)
+                    && frac * length < nearest)
+                {
+                    nearest = frac * length; hit = e; hitBody = true; bodyHeight = h;
+                }
+                continue;
+            }
+            if (!world.Has<ColliderComponent>(e) || world.Has<ItemComponent>(e)) continue;
+            var c = world.Get<ColliderComponent>(e);
+            if (!c.IsSolid || passed.Contains(e.Id)) continue;
+            bool crossed; float d;
+            if (c.Shape == ColliderShape.Box)
+                crossed = GeometryUtils.RayIntersectsOBB(a, dir, t.Position, c.Size, t.Rotation, out d);
+            else if (c.Shape is ColliderShape.Cylinder or ColliderShape.Cone)
+                crossed = GeometryUtils.RayIntersectsCylinder(a, dir, t.Position, c.Size.X * 0.5f, c.Size.Y, out d);
+            else
+                crossed = GeometryUtils.RayIntersectsSphere(a, dir, t.Position, c.Size.X * 0.5f, out d, out _);
+            if (crossed && d >= 0f && d <= length && d < nearest) { nearest = d; hit = e; hitBody = false; bodyHeight = 0f; }
+        }
+        return hit != Entity.Null;
+    }
+
+    /// <summary>Whether an entity is a composite or one of its parts.</summary>
+    private static bool PartOf(World world, Entity e, int rootId)
+        => e.Id == rootId || (world.Has<ParentComponent>(e) && world.Get<ParentComponent>(e).ParentEntityId == rootId);
 
     /// <summary>
     /// Watches the bullet pass the target's distance, and calls where it went against the target's
@@ -546,16 +673,6 @@ public sealed class CombatService
         _server.SendToSession(f.Shooter, new TextEvent { Text = SpotterCall(Vector3.Dot(off, right), Vector3.Dot(off, up)) });
     }
 
-    /// <summary>
-    /// The call for a bullet that stopped before it reached the target's distance (a wall in the way)
-    /// or never had a target: nothing for the second, and "short" for the first.
-    /// </summary>
-    private void Spot(Flight f, World world, Vector3? stoppedAt)
-    {
-        f.Called = true;
-        if (f.TargetId < 0 || stoppedAt == null) return;
-        _server.SendToSession(f.Shooter, new TextEvent { Text = "Miss. It hit something short of the target." });
-    }
 
     /// <summary>"Miss. 40 centimetres low, 20 left." Each part only when it is more than a few
     /// centimetres, and in metres past one.</summary>
@@ -901,6 +1018,26 @@ public sealed class CombatService
                     : world.Has<Pedestrian>(e) ? "pedestrian"
                     : NameOf(world, e);
         return $"{(killed ? "Killed" : "Hit")} {whom}{(head ? " in the head" : "")} at {MathF.Round(metres):F0} metres.";
+    }
+
+    /// <summary>"Hit the ground at 120 metres.", "Hit Brandt Court roof at 40 metres.": what a round
+    /// ended in that is not a person, by the name the map gives it.</summary>
+    internal static string StruckWords(World world, Entity e, float metres)
+        => $"Hit {ThingName(world, e)} at {MathF.Round(metres):F0} metres.";
+
+    /// <summary>
+    /// A thing by its name: the map's name for the part ("Kestrel House north wall"), or its prefab's
+    /// ("Brick Wall"), and "the ground" for the ground. Never its material, which is a property of the
+    /// thing and not what it is: a sofa's material is "Audience", and a bullet in one was "Hit audience".
+    /// </summary>
+    internal static string ThingName(World world, Entity e)
+    {
+        string? name = world.Has<IdentityComponent>(e) && !string.IsNullOrWhiteSpace(world.Get<IdentityComponent>(e).Name)
+            ? world.Get<IdentityComponent>(e).Name
+            : world.Has<NameComponent>(e) && !string.IsNullOrWhiteSpace(world.Get<NameComponent>(e).Name)
+                ? world.Get<NameComponent>(e).Name : null;
+        if (name == null) return "something";
+        return name.Trim().Equals("Ground", StringComparison.OrdinalIgnoreCase) ? "the ground" : name.Trim();
     }
 
     private static string NameOf(World world, Entity e)

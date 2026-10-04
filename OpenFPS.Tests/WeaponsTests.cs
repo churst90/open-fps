@@ -165,15 +165,19 @@ public class WeaponsTests : IDisposable
         var walker = r.Walker(r.Feet + new Vector3(0, 0, 10));
 
         string said = r.Run(r.Shooter, "fire");
+        // The round is in the air: nothing is hit, and nothing said, until it gets there.
+        Assert.Equal("", said);
+        Assert.Equal(100, r.World.Get<HealthComponent>(walker).Current);
+        r.Fly(0.1);
 
         Assert.Equal(75, r.World.Get<HealthComponent>(walker).Current);
-        var confirm = Assert.Single(r.Replies.OfType<HitConfirm>());
+        var confirm = Assert.Single(r.SentTo(r.Shooter).OfType<HitConfirm>());
         Assert.Equal(walker.Id, confirm.TargetEntityId);
         Assert.False(confirm.Killed);
         // After the chime, what and how far (Cody, 2026-10-04: the chime alone did not say what was hit).
-        Assert.Equal("Hit pedestrian at 10 metres.", said);
+        Assert.Contains("Hit pedestrian at 10 metres.", r.SaidTo(r.Shooter));
         // Nobody else hears of it but by the shot.
-        Assert.DoesNotContain(r.ServerSent, m => m.Message is HitConfirm);
+        Assert.DoesNotContain(r.ServerSent, m => m.Message is HitConfirm && m.To != r.Shooter);
     }
 
     [Fact]
@@ -183,9 +187,9 @@ public class WeaponsTests : IDisposable
         r.Arm(r.Shooter, "akm");
         var walker = r.Walker(r.Feet + new Vector3(0, 0, 10));
 
-        for (int i = 0; i < 5; i++) { r.Run(r.Shooter, "fire"); r.Now += 1; }
+        for (int i = 0; i < 5; i++) { r.Run(r.Shooter, "fire"); r.Fly(1); }
 
-        var confirms = r.Replies.OfType<HitConfirm>().ToList();
+        var confirms = r.SentTo(r.Shooter).OfType<HitConfirm>().ToList();
         Assert.Equal(3, confirms.Count);           // 45 a hit: 55, 10, dead; then nothing to hit
         Assert.Single(confirms, c => c.Killed);
         Assert.True(confirms[^1].Killed);
@@ -204,7 +208,7 @@ public class WeaponsTests : IDisposable
         r.Arm(r.Shooter, "akm");
         r.Place(r.Other, r.Feet + new Vector3(0, 0, 8));
 
-        for (int i = 0; i < 3; i++) { r.Run(r.Shooter, "fire"); r.Now += 1; }
+        for (int i = 0; i < 3; i++) { r.Run(r.Shooter, "fire"); r.Fly(1); }
 
         Assert.Contains(r.SentTo(r.Other).OfType<TextEvent>(), t => t.Text == "You died.");
         Assert.Contains(r.SentTo(r.Other).OfType<TextEvent>(), t => t.Text.StartsWith("You are hit."));
@@ -452,7 +456,8 @@ public class WeaponsTests : IDisposable
             Server = new GameServer(new NoUsers());
             Server.Attach(Maps, Sessions, new OccupancyService(Maps), Hands);
             Server.Sent = (to, m) => ServerSent.Add((to, m));
-            Combat = new CombatService(Maps, Server, Sessions) { Clock = () => Now };
+            // Aimed exactly: the scatter of a shot from the hip is its own test.
+            Combat = new CombatService(Maps, Server, Sessions) { Clock = () => Now, HipDispersionRadians = 0f };
             Commands = new CommandHandler(Sessions, Maps, Server, hands: Hands, combat: Combat);
             Shooter = Player("shooter", Feet);
             Other = Player("other", Feet + new Vector3(6, 0, 0));
@@ -540,6 +545,21 @@ public class WeaponsTests : IDisposable
         }
 
         public IEnumerable<IMessage> SentTo(UserSession who) => ServerSent.Where(s => s.To == who).Select(s => s.Message);
+
+        /// <summary>What a player has been told by the server since the start, in order.</summary>
+        public List<string> SaidTo(UserSession who) => SentTo(who).OfType<TextEvent>().Select(t => t.Text).ToList();
+
+        /// <summary>Runs the server's ticks for so many seconds: the rounds in the air fly on.</summary>
+        public void Fly(double seconds)
+        {
+            int ticks = (int)Math.Ceiling(seconds / PhysicsConstants.FixedDeltaTime);
+            for (int i = 0; i < ticks; i++)
+            {
+                Now += PhysicsConstants.FixedDeltaTime;
+                RefreshGrid();
+                Combat.Update(MapId, World);
+            }
+        }
 
         public IEnumerable<WorldAudioEvent> Events => ServerSent.Select(s => s.Message).OfType<WorldAudioEvent>();
 

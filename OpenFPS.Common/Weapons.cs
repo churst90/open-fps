@@ -152,6 +152,15 @@ public sealed record WeaponDefinition
     /// </summary>
     public float BallisticCoefficientG7 { get; init; }
 
+    /// <summary>The bullet's diameter, metres: its calibre. With its length it sets how hard its shock
+    /// wave cracks past a listener and how long that crack lasts (Whitham's law, see
+    /// <see cref="BulletFlyby"/>), and where the turbulence behind a subsonic one whizzes. Zero is a
+    /// 9 mm pistol bullet's.</summary>
+    public float BulletDiameterMetres { get; init; }
+
+    /// <summary>The bullet's length, metres, nose to base. Zero is a 9 mm pistol bullet's.</summary>
+    public float BulletLengthMetres { get; init; }
+
     /// <summary>The sight this gun comes with, a <see cref="ScopeRegistry"/> id, or "" for iron sights.
     /// On the weapon for now because the one scoped rifle comes scoped; a scope mounted later on an AKM
     /// or an AR-15 is looked up by the same id, so nothing that reads it has to change.</summary>
@@ -268,6 +277,8 @@ public static class WeaponRegistry
         RoundsPerMinute = 600f, Damage = 45, EffectiveRangeMetres = 300f,
         // The 123 grain steel-cored ball: G1 about 0.28, about 0.14 against the G7 shape.
         BallisticCoefficientG7 = 0.14f,
+        // The M43 bullet: 7.92 mm across, 26.5 mm long.
+        BulletDiameterMetres = 0.0079f, BulletLengthMetres = 0.0265f,
     };
 
     /// <summary>5.56x45. Faster and much sharper than the AKM: a tighter Mach cone, so the crack is a
@@ -287,6 +298,8 @@ public static class WeaponRegistry
         RoundsPerMinute = 750f, Damage = 35, EffectiveRangeMetres = 300f,
         // M193, 55 grain: G1 0.243, about 0.12 against G7.
         BallisticCoefficientG7 = 0.12f,
+        // M193: 5.70 mm across, 18.9 mm long.
+        BulletDiameterMetres = 0.0057f, BulletLengthMetres = 0.0189f,
     };
 
     /// <summary>9x19, and only just supersonic — Mach 1.09. The crack is there but it is small and
@@ -304,6 +317,8 @@ public static class WeaponRegistry
         // Seventeen in the standard magazine: the number in its name.
         AmmoId = "9mm", MagazineCapacity = 17, Feed = WeaponFeed.Magazine, Action = WeaponAction.Pistol,
         RoundsPerMinute = 600f, Damage = 25, EffectiveRangeMetres = 50f, PolymerFrame = true,
+        // 124 grain full metal jacket: 9.01 mm across, 15.6 mm long.
+        BulletDiameterMetres = 0.0090f, BulletLengthMetres = 0.0156f,
     };
 
     /// <summary>.45 ACP from a hammer-fired service pistol: heavy, slow and SUBSONIC. It makes no crack
@@ -322,6 +337,8 @@ public static class WeaponRegistry
         // A 1911's single-stack magazine holds seven.
         AmmoId = ".45", MagazineCapacity = 7, Feed = WeaponFeed.Magazine, Action = WeaponAction.Pistol,
         RoundsPerMinute = 500f, Damage = 30, EffectiveRangeMetres = 50f,
+        // 230 grain ball: 11.5 mm across, 17 mm long.
+        BulletDiameterMetres = 0.0115f, BulletLengthMetres = 0.017f,
     };
 
     /// <summary>12 gauge buckshot from a pump gun. Nine pellets, marginally supersonic.</summary>
@@ -341,6 +358,8 @@ public static class WeaponRegistry
         // for somebody practised: 70 a minute.
         AmmoId = "12 gauge", MagazineCapacity = 6, Feed = WeaponFeed.Tube, Action = WeaponAction.Pump,
         RoundsPerMinute = 70f, Damage = 12, EffectiveRangeMetres = 40f,
+        // One 00 buck pellet, a lead ball 8.4 mm across: the charge is flown as one, along its centre.
+        BulletDiameterMetres = 0.0084f, BulletLengthMetres = 0.0084f,
     };
 
     /// <summary>.357 Magnum from a 6-inch revolver, measured on the NIJ Ruger .357. About 410 m/s
@@ -368,6 +387,8 @@ public static class WeaponRegistry
         // Six in the cylinder. Double action, so the long trigger pull is the limit: about 0.2 s.
         AmmoId = ".357", MagazineCapacity = 6, Feed = WeaponFeed.Cylinder, Action = WeaponAction.Revolver,
         RoundsPerMinute = 300f, Damage = 40, EffectiveRangeMetres = 50f,
+        // 158 grain jacketed soft point: 9.07 mm across, 17.5 mm long.
+        BulletDiameterMetres = 0.0091f, BulletLengthMetres = 0.0175f,
     };
 
     /// <summary>
@@ -391,6 +412,8 @@ public static class WeaponRegistry
         RoundsPerMinute = 40f, Damage = 80, EffectiveRangeMetres = 800f,
         BallisticCoefficientG7 = 0.224f,
         ScopeId = "scope_4_12",
+        // The 168 grain MatchKing: 7.82 mm across, 30.9 mm (1.215 in) long.
+        BulletDiameterMetres = 0.0078f, BulletLengthMetres = 0.0309f,
     };
 
     static WeaponRegistry()
