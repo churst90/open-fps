@@ -389,7 +389,7 @@ internal static class DoorPhysics
 
         public DenseField(double width, double height, double thickness, double e, double rho, double poisson,
                           Func<double, double> loss, double fLow, double fHigh, Random rng, double dt,
-                          double capSpacing = CapSpacing)
+                          double capSpacing = CapSpacing, double faceWidth = 0)
         {
             this.rng = rng;
             double area = width * height, rhoH = rho * thickness;
@@ -410,7 +410,10 @@ internal static class DoorPhysics
                 double k = Math.Max(1, perHz * spacing);      // real modes it stands for
                 double eta = loss(f);
                 double w = 2 * Math.PI * f;
-                double sigma = RadiationEfficiency(f, fc, width, height);
+                // A folded part (a channel, a box) radiates from its faces between the folds: each fold is an
+                // edge, so below coincidence it radiates as strips of its face's width, not as one flat sheet.
+                double sigma = faceWidth > 0 ? RadiationEfficiency(f, fc, faceWidth, area / faceWidth)
+                                             : RadiationEfficiency(f, fc, width, height);
                 double mEff = mass / k;
                 // Radiated power eta_rad w E with eta_rad = rho c sigma / (w rho h), spread over the half
                 // space at a metre, gives the pressure per unit acceleration of the effective coordinate.

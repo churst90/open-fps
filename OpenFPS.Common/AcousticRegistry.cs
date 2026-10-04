@@ -197,6 +197,12 @@ public static class AcousticRegistry
             // clicks on everything, however hard the floor is.
             reg["Skin"] = new MaterialProperties { Absorption = 0.30f, AbsorptionLow = 0.15f, AbsorptionMid = 0.30f, AbsorptionHigh = 0.45f, Scattering = 0.45f, TransmissionLow = 0.6f, TransmissionMid = 0.45f, TransmissionHigh = 0.3f, ResonanceIndex = 11, DensityKgM3 = 1050f, YoungsModulusGPa = 0.0015f, LossFactor = 0.45f };
 
+            // Open water: a still surface is as hard a reflector as the air ever meets (its impedance is
+            // 3,500 times air's), absorbing a per cent or two, and almost nothing passes into it. A round
+            // skips off it below Birkhoff's angle and splashes into it above (Ricochet, BulletImpact).
+            // Its "Young's modulus" is its bulk modulus, 2.2 GPa; it does not ring.
+            reg["Water"] = new MaterialProperties { Absorption = 0.015f, AbsorptionLow = 0.01f, AbsorptionMid = 0.015f, AbsorptionHigh = 0.02f, Scattering = 0.05f, TransmissionLow = 0.01f, TransmissionMid = 0.005f, TransmissionHigh = 0.002f, ResonanceIndex = 31, DensityKgM3 = 1000f, YoungsModulusGPa = 2.2f, LossFactor = 0.5f };
+
             // Porous: sound passes through the holes, not by moving the stuff. See MaterialProperties.Porous.
             foreach (var porous in new[] { "Fence", "Foliage", "Grass", "Audience", "Dirt", "Gravel", "Carpet", "AcousticTile", "None" })
                 if (reg.TryGetValue(porous, out var pp)) { pp.Porous = true; reg[porous] = pp; }
