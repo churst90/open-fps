@@ -246,6 +246,27 @@ Type these on the chat line. The `/` is optional and case does not matter.
 - `/ammo`: what is in your gun and the spare ammunition you carry.
 - A player who is killed gets up at the spawn after 5 seconds.
 
+### The scope
+Only a scoped rifle has one; the M700 does. Turn Num Lock on: with it off your screen reader uses the
+keypad.
+
+| Key | While the scope is up |
+| --- | --- |
+| Numpad * | Raise or lower the scope |
+| Numpad 8 / 2 / 4 / 6 | Aim up / down / left / right. A tap is a small step, a held key sweeps; both get smaller as you zoom in. Without a keypad, J L K O do the same |
+| Numpad 5 | What the crosshair is on: what, how far, how high, how it is moving |
+| Numpad 7 / 9 | Previous / next person or vehicle in view; the aim does not move |
+| Numpad + / - | Zoom: 4, 8 or 12 power |
+| Numpad 1 / 3 | Turret down / up a click; says the distance you are zeroed for |
+| Numpad . | Rangefinder |
+| Numpad 0, held | Hold your breath: the crosshair steadies for about five seconds |
+| Numpad / or Enter | Fire |
+
+The guidance tone pulses faster and higher as you near someone and holds a note when you are on them;
+`/scope tone off` silences it. Bullets fall and drift with the wind and take about a second to reach
+600 metres: set the turret for the range and aim ahead of anyone walking. Commands: `/scope`,
+`/zoom in|out|N`, `/range`, `/zero N`.
+
 ### Carrying
 - `/take [name]` (or `/get`, `/grab`, `/pickup`).
 - `/drop [name|left|right|all]` (or `/putdown`).

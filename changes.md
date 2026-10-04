@@ -2,6 +2,20 @@
 
 Recent work, newest first. `git log` has the rest.
 
+## 2026-10-04
+
+- A rifle scope. The M700, a .308 bolt-action rifle with a 4-12 power scope (staff: /give m700).
+  Numpad star raises it; Num Lock must be on, and the game says so if it is off. Numpad 8, 2, 4 and 6
+  aim in small steps that get smaller as you zoom in; 5 says what is on the crosshair; 7 and 9 read
+  out the people and vehicles in view; plus and minus zoom; 1 and 3 set the elevation turret and say
+  the distance it is zeroed for; period is the rangefinder; hold 0 to hold your breath; slash or
+  Enter fires. A soft tone pulses faster and higher as the crosshair nears someone and holds a note
+  on them. Shots through the scope fly: they drop, the wind carries them and they take time to
+  arrive (about a second to 600 m), so aim high for distance and ahead of anyone moving. A miss on
+  your target is called out ("40 centimetres low"). A head shot does double damage. The bolt is
+  heard after every shot. Renders in inbox/scope-2026-10-04.
+- Gun handling recordings with the room taken out: inbox/weapons-dry (tools/dereverb_wpe.py).
+
 ## 2026-10-03
 
 - Car windows roll down and up: R in a vehicle, or /window, /window down, up or half. Anyone seated
