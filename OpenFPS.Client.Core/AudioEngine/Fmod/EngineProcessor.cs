@@ -82,6 +82,9 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
     /// <summary>Standing at a stop that takes passengers: set the spring brakes, kneel, open the
     /// doors. Anywhere else a stopped vehicle just holds its service brake.</summary>
     public volatile bool ServingStop;
+    /// <summary>How far down the side windows are, 0 shut to 1 fully down. Game thread writes; the
+    /// voice heard from inside lets the outside in through them (see the interior mix).</summary>
+    public volatile float WindowsOpen;
     /// <summary>The air system, for tests and instruments. Null on a vehicle without one.</summary>
     internal AirSystem? Air => _air;
 
@@ -517,6 +520,30 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
         _sealLeak = Math.Clamp(shell.SealLeak, 0f, 1f);
         _starterPath = MathF.Pow(10f, -MathF.Max(0f, shell.StarterPathLossDb) / 20f);
         _windPaAt110 = 20e-6f * MathF.Pow(10f, shell.WindNoiseDbAt110 / 20f);
+        // The side windows: what share of the cabin's wall they open fully down, how much louder the wind
+        // is outside the glass than the anchor heard through it, and the cabin's note as a resonator
+        // whose necks are the open windows.
+        if (v.Body is { CabinLengthM: > 0f } && CarWindow.Measure(v) is { } openings)
+        {
+            _windowShareFull = openings.Count * openings.AreaEachM2 / openings.CabinSurfaceM2;
+            // The wind anchor is what reaches the seat through shut glass and the seals at the wind's own
+            // pitch, about 500 Hz: the glass's mass law there, plus the seals. Outside the glass the
+            // turbulence is that much stronger, and an open window lets it in through the hole instead.
+            float glassMass = AcousticRegistry.GetProperties("Glass").DensityKgM3 * CarWindow.GlassThicknessM;
+            float t = 415f / (MathF.PI * 500f * MathF.Max(1f, glassMass));
+            _windOutside = 1f / MathF.Sqrt(t * t + _sealLeak * _sealLeak);
+            // Helmholtz: the cabin's air is the spring and the air in each open window the mass, its
+            // effective length about 1.7 radii of an opening that size (both ends flanged by the door).
+            float neck = 1.7f * MathF.Sqrt(openings.AreaEachM2 / MathF.PI);
+            _cabinHelmholtzHz = 343f / (2f * MathF.PI)
+                              * MathF.Sqrt(openings.Count * openings.AreaEachM2 / (openings.CabinVolumeM3 * neck));
+            _windowRunM = openings.AreaEachM2 / (openings.GlassHeightM * CarWindow.ShapeShare);
+            _windowCount = openings.Count;
+            // The machine's voice is its level a metre from each source; the windows are further than that
+            // from them, about half the vehicle's length from the engine bay, the pipe and the wheels taken
+            // together, and its pressure falls as one over the distance.
+            _windowFromSources = 1f / MathF.Max(1f, v.LengthMetres * 0.5f);
+        }
         if (!string.IsNullOrEmpty(v.AirSystem))
         {
             try
@@ -700,6 +727,25 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
     /// instrument can bracket it.</summary>
     public float StarterPathCornerHz = 150f;
     private float _panelLp, _windLp, _windHp, _windHpIn, _interiorMix;
+
+    // ── The windows down ──────────────────────────────────────────────────────────────────────────
+    //
+    // A side window rolled down is a hole in the cabin's wall: a tenth of a hatchback's whole wall area
+    // with all four down. A hole has no mass, so what is outside comes in through it at every frequency,
+    // at the share of the wall it is (as power): the engine and the tyres as the street hears them, and
+    // the wind as it is outside the glass rather than through it. And the cabin becomes a Helmholtz
+    // resonator, the air in the box the spring and the air in the open windows its mass: the shear layer
+    // over an opening sheds vortices at about 0.45 U / L, and where that meets the cabin's note it locks
+    // in and the whole cabin throbs. One window open, it does at motorway speed; every window open, the
+    // note climbs past anything the shear layer reaches on a road and the cabin only roars.
+    private readonly float _windowShareFull, _windOutside, _cabinHelmholtzHz, _windowRunM, _windowFromSources;
+    private readonly int _windowCount;
+    private float _windowsNow, _buffetY1, _buffetY2;
+    /// <summary>The shear layer's Strouhal number over an opening, by its length along the flow.</summary>
+    private const float ShearStrouhal = 0.45f;
+    /// <summary>A locked-in cabin at its worst is ten or twenty pascals (110-120 dB): about two per cent of
+    /// the dynamic pressure over the opening, at the resonance.</summary>
+    private const float BuffetShare = 0.02f;
 
     // ── The loudness law, applied to what the engine is doing now ─────────────────────────────
     //
@@ -1205,6 +1251,40 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
                 _windHp = windHpA * (_windHp + _windLp - _windHpIn);
                 _windHpIn = _windLp;
                 inCabin += _windHp * windPa * 3.78f;         // the band-limited noise is 0.265 RMS; this is its inverse
+
+                // The windows. Followed over about a tenth of a second, so a glass moving is a glide.
+                _windowsNow += (Math.Clamp(WindowsOpen, 0f, 1f) - _windowsNow) * MathF.Min(1f, dt * 10f);
+                if (_windowsNow > 0.001f && _windowShareFull > 0f)
+                {
+                    float share = _windowsNow * _windowShareFull;
+                    float hole = MathF.Sqrt(share);                // pressure through the opening
+                    // The outside, straight in: the engine bay, the exhaust, the tyres, as heard outside
+                    // at the windows.
+                    inCabin += (pa - rearExtras + bay) * hole * _windowFromSources;
+                    // The wind outside the glass, in through the hole: broader than through the glass,
+                    // because nothing has taken its bottom or its top away. (_windLp is low-passed
+                    // noise of about 0.6 RMS.)
+                    inCabin += _windLp * windPa * _windOutside * hole * 1.7f;
+                    // The cabin's throb, where the shear layer's shedding meets its note.
+                    float speed = MathF.Abs(Driveline.Speed);
+                    if (speed > 3f && _cabinHelmholtzHz > 0f)
+                    {
+                        float shedHz = ShearStrouhal * speed / MathF.Max(0.2f, _windowRunM);
+                        float off = MathF.Log(shedHz / _cabinHelmholtzHz) / 0.25f;
+                        float locked = MathF.Exp(-off * off);
+                        if (locked > 1e-3f)
+                        {
+                            // A resonator at the cabin's note, damped more the more windows vent it: each
+                            // opening radiates the cabin's energy away.
+                            float w0 = 2f * MathF.PI * _cabinHelmholtzHz * dt;
+                            float r = MathF.Exp(-w0 / (2f * (6f / MathF.Max(1, _windowCount))));
+                            float y = n * (1f - r) + 2f * r * MathF.Cos(w0) * _buffetY1 - r * r * _buffetY2;
+                            _buffetY2 = _buffetY1; _buffetY1 = y;
+                            float q = 0.5f * 1.2f * speed * speed;
+                            inCabin += y * locked * BuffetShare * q * _windowsNow;
+                        }
+                    }
+                }
 
                 // What is INSIDE with you, not through the body: the door beeper hangs over the
                 // doorway, and the door engines vent into the step well — half of what the air

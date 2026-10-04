@@ -29,8 +29,9 @@ public static class VehicleShell
     /// now, shared with the client that traces the same cabin for its sound.</summary>
     private const string Steel = VehicleCabin.Steel;
 
-    /// <summary>Front-to-back room one row of seats takes, metres.</summary>
-    private const float RowPitch = 0.85f;
+    /// <summary>Front-to-back room one row of seats takes, metres. Shared with the windows, one beside
+    /// each row.</summary>
+    private const float RowPitch = VehicleCabin.RowPitch;
 
     /// <summary>Whether an id names a generated vehicle shell, and which profile.</summary>
     public static bool TryParse(string id, out string preset)
@@ -79,7 +80,7 @@ public static class VehicleShell
             parts.Add(Box(prefab, at, size, prefabSize));
 
         // Seats, in rows from the front: the driver on the left, as on every vehicle on this map.
-        int rows = Math.Max(1, (int)((g.Lc - 0.3f) / RowPitch));
+        int rows = VehicleCabin.Rows(g);
         float firstRow = g.Front - 0.75f;
         float offset = g.Wc * 0.25f;
         for (int r = 0; r < rows; r++)

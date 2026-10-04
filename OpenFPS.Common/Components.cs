@@ -252,6 +252,15 @@ public partial struct SoundEmitterComponent
     /// wire format is positional (component-wire-format).
     /// </summary>
     public bool ServingStop { get; set; }
+
+    /// <summary>
+    /// Where a vehicle's side windows are GOING, 0 shut to 1 fully down. The glass travels there at its
+    /// motor's own pace (<see cref="OpenFPS.Common.CarWindow.Glide"/>), on the server and on every client
+    /// from this one number, so it is sent once per press rather than every tick while the glass moves.
+    /// Zero, the default, is shut: a parked car has its windows up. APPENDED: the wire format is
+    /// positional (component-wire-format).
+    /// </summary>
+    public float WindowsOpen { get; set; }
 }
 
 [MemoryPackable]

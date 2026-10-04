@@ -2632,6 +2632,7 @@ public class FmodAudioProvider : IAudioProvider
                 TargetSpeed = emitter.EngineSpeed,
                 Running = emitter.EngineRunning,
                 ServingStop = emitter.ServingStop,
+                WindowsOpen = emitter.WindowsOpen,
                 Interior = emitter.Interior,
                 // Live: the loudness law applies to what the engine is doing now, not just to its
                 // declared level. See EngineVoiceState.CompensateLevel.
@@ -2980,6 +2981,9 @@ public class FmodAudioProvider : IAudioProvider
                     active.TargetLow = emitter.EqLow; active.TargetMid = emitter.EqMid; active.TargetHigh = emitter.EqHigh;
                     active.AirLowDb = emitter.AirLowDb; active.AirMidDb = emitter.AirMidDb; active.AirHighDb = emitter.AirHighDb;
                     active.TargetRegionId = emitter.TargetRegionId;
+                    // Whether it is inside the vehicle you are sitting in is part of its path: a person
+                    // talking gets into your car, or you into theirs, while they are talking.
+                    active.InsideListenersVehicle = emitter.InsideListenersVehicle;
                 }
                 if (emitter.IsGranular && active.GranularState != null)
                 {
@@ -3037,6 +3041,7 @@ public class FmodAudioProvider : IAudioProvider
                     active.EngineState.Interior = emitter.Interior;
                     active.EngineState.Running = emitter.EngineRunning;
                     active.EngineState.ServingStop = emitter.ServingStop;
+                    active.EngineState.WindowsOpen = emitter.WindowsOpen;
                     active.EngineState.RoadSlip = emitter.TyreSlip;
                     active.EngineState.Wheels = emitter.Wheels;
                     if (ListenerInMachineFrame(emitter.Position, emitter.Direction, emitter.Velocity, out var local))

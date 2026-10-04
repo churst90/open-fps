@@ -93,6 +93,7 @@ string[] usage =
     "  --knob-door [out=] [seed=] [only=] [stems=]   the physical knob door: opens and shuts, hinges worn and oiled",
     "  --pushbar-door [out=] [only=] [stems=]        the physical push-bar door: each character opening and shutting on its closer",
     "  --sliding-door [out=] [only=] [stems=]        the physical sliding doors: a patio door and an automatic door, each character",
+    "  --car-window [out=] [only=]                    a car's power window going down, up and half way, each character",
     "  --beacon-tones [out=]                         each beacon three times at its real period",
     "  --gun-spec                                    synthesized shots against the NIJ recordings",
     "  --gun-fit [nij=DIR] [tag=] [wavs] [grid]      every weapon's report against its own NIJ takes",
@@ -754,6 +755,98 @@ if (args.Contains("--sliding-door"))
     double fullScalePa = OpenFPS.Common.SlidingDoor.PascalsAtFullScale / gain;
     Console.WriteLine($"full scale = {fullScalePa:F1} Pa at 1 m ({20 * Math.Log10(fullScalePa / 2e-5):F1} dB SPL peak)");
     Environment.Exit(0);
+}
+
+if (args.Contains("--car-window"))
+{
+    // --car-window [out=DIR] [only=]: the power window model (OpenFPS.Common.CarWindow), each character
+    // going fully down, fully up, half way down and back up from half way, all on one gain, with the
+    // model's own report: travel time, current, rotor speed, and each part's peak.
+    string dir = args.FirstOrDefault(a => a.StartsWith("out=", StringComparison.Ordinal))?.Substring(4)
+                 ?? OpenFPS.AudioLab.LabPaths.InRepo("inbox", "car-window-2026-10-03");
+    string? only = args.FirstOrDefault(a => a.StartsWith("only=", StringComparison.Ordinal))?.Substring(5);
+    System.IO.Directory.CreateDirectory(dir);
+    Console.WriteLine($"travel: down {OpenFPS.Common.CarWindow.DownSeconds:F2} s, up {OpenFPS.Common.CarWindow.UpSeconds:F2} s (what the server moves the glass by)");
+    var made = new List<(string Name, float[] Pcm)>();
+    var strokes = new (string Name, float From, float To)[] { ("down", 0f, 1f), ("up", 1f, 0f), ("half-down", 0f, 0.5f), ("half-up", 0.5f, 0f) };
+    for (int v = 0; v < OpenFPS.Common.CarWindow.Variants; v++)
+        foreach (var (stroke, from, to) in strokes)
+        {
+            string name = $"window-{stroke}-v{v}";
+            if (only != null && !name.Contains(only)) continue;
+            var rep = new OpenFPS.Common.CarWindow.Report();
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var pcm = OpenFPS.Common.CarWindow.Render(v, from, to, 48000, rep);
+            made.Add((name, pcm));
+            Console.WriteLine($"{name}  ({pcm.Length / 48000.0:F2} s, expected {OpenFPS.Common.CarWindow.Seconds(from, to):F2} s, rendered in {sw.ElapsedMilliseconds} ms)");
+            Console.WriteLine(rep);
+            CarWindowRunning(pcm, rep, OpenFPS.Common.CarWindow.PascalsAtFullScale);
+        }
+    float loudest = 1e-9f;
+    foreach (var (_, pcm) in made) foreach (float x in pcm) loudest = Math.Max(loudest, Math.Abs(x));
+    float gain = 0.89f / loudest;
+    foreach (var (name, pcm) in made)
+    {
+        using var w = new System.IO.BinaryWriter(System.IO.File.Create(System.IO.Path.Combine(dir, name + ".wav")));
+        w.Write("RIFF"u8); w.Write(36 + pcm.Length * 2); w.Write("WAVEfmt "u8); w.Write(16); w.Write((short)1); w.Write((short)1);
+        w.Write(48000); w.Write(96000); w.Write((short)2); w.Write((short)16); w.Write("data"u8); w.Write(pcm.Length * 2);
+        foreach (float x in pcm) w.Write((short)Math.Clamp(x * gain * 32767f, -32768f, 32767f));
+    }
+    double fullScalePa = OpenFPS.Common.CarWindow.PascalsAtFullScale / gain;
+    Console.WriteLine($"wrote {made.Count} to {dir}; full scale = {fullScalePa:F2} Pa at 1 m ({20 * Math.Log10(fullScalePa / 2e-5):F1} dB SPL peak)");
+    foreach (var (name, pcm) in made)
+    {
+        float pk = 0; foreach (float x in pcm) pk = Math.Max(pk, Math.Abs(x * gain));
+        Console.WriteLine($"  {name}.wav peak {20 * Math.Log10(Math.Max(1e-9, pk)):F1} dBFS");
+    }
+    Environment.Exit(0);
+
+    // While the glass is travelling (from 0.4 s after the switch to 0.2 s before it arrives): its level,
+    // its octave bands, how tonal it is (spectral flatness, 100 Hz-8 kHz: 1 is white noise, near 0 a set
+    // of lines), and its strongest spectral lines, against the rotor's rate and the commutator's.
+    static void CarWindowRunning(float[] pcm, OpenFPS.Common.CarWindow.Report rep, double fullScalePa)
+    {
+        int start = (int)((0.03 + 0.4) * 48000), stop = (int)((0.03 + rep.TravelSeconds - 0.2) * 48000);
+        if (stop - start < 8192) { Console.WriteLine("    (too short to measure running)"); return; }
+        var run = pcm.AsSpan(start, stop - start);
+        double sum = 0; foreach (float x in run) sum += (double)x * x;
+        double rmsPa = Math.Sqrt(sum / run.Length) * fullScalePa;
+        const int n = 8192;
+        var power = new double[n / 2];
+        int windows = 0;
+        for (int at = 0; at + n <= run.Length; at += n / 2, windows++)
+        {
+            var buf = new System.Numerics.Complex[n];
+            for (int i = 0; i < n; i++) buf[i] = run[at + i] * (0.5 - 0.5 * Math.Cos(2 * Math.PI * i / (n - 1)));
+            OpenFPS.Common.Spectrum.Fft(buf);
+            for (int k = 0; k < n / 2; k++) power[k] += buf[k].Real * buf[k].Real + buf[k].Imaginary * buf[k].Imaginary;
+        }
+        double hzPerBin = 48000.0 / n, logSum = 0, linSum = 0; int cnt = 0;
+        for (int k = (int)(100 / hzPerBin); k < (int)(8000 / hzPerBin); k++) { logSum += Math.Log(power[k] + 1e-30); linSum += power[k]; cnt++; }
+        double flatness = Math.Exp(logSum / cnt) / (linSum / cnt);
+        var peaks = new List<(double Hz, double Db)>();
+        for (int k = 3; k < n / 2 - 3; k++)
+        {
+            bool max = true;
+            for (int j = -3; j <= 3 && max; j++) if (j != 0 && power[k + j] >= power[k]) max = false;
+            if (max && k * hzPerBin > 40) peaks.Add((k * hzPerBin, 10 * Math.Log10(power[k] + 1e-30)));
+        }
+        peaks.Sort((p, q) => q.Db.CompareTo(p.Db));
+        double top = peaks.Count > 0 ? peaks[0].Db : 0;
+        var bands = OpenFPS.Common.Spectrum.BandsDb(run, 48000, 16384);
+        double rot = rep.RunningRpm / 60;
+        Console.WriteLine($"    running: {20 * Math.Log10(rmsPa / 2e-5):F1} dB SPL RMS at 1 m; rotor {rot:F0} Hz, bars {rot * 10:F0} Hz; flatness {flatness:F3}");
+        Console.WriteLine("    bands (dB re total): " + string.Join("  ", Enumerable.Range(0, bands.Length).Select(i => $"{OpenFPS.Common.Spectrum.BandEdges[i]:F0}:{bands[i]:F0}")));
+        Console.WriteLine("    lines (Hz, dB re strongest): " + string.Join("  ", peaks.Take(10).Select(p => $"{p.Hz:F0} {p.Db - top:F0}")));
+        // The level through the stroke, 100 ms at a time, dB SPL RMS at 1 m: the start, the run, the end.
+        var env = new List<string>();
+        for (int at = 0; at + 4800 <= pcm.Length; at += 4800)
+        {
+            double e = 0; for (int i = at; i < at + 4800; i++) e += (double)pcm[i] * pcm[i];
+            env.Add($"{20 * Math.Log10(Math.Max(1e-9, Math.Sqrt(e / 4800) * fullScalePa) / 2e-5):F0}");
+        }
+        Console.WriteLine("    every 100 ms: " + string.Join(" ", env));
+    }
 }
 
 if (args.Contains("--door-opening"))
