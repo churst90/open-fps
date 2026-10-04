@@ -894,8 +894,10 @@ public class ClientAudioSystem
         // Scale down precipitation intensity based on local shelter
         _state.PrecipitationIntensity = world.PrecipitationIntensity * (1.0f - _state.ShelterFactor);
 
-        // Update readable region for accessibility
-        _state.CurrentRegionId = regId;
+        // Update readable region for accessibility. Named by the boxes: in a doorway, which for sound is
+        // the room on your side of it, you are told you are in the doorway.
+        int zone = _acoustics.GetZoneAt(world, eyePos);
+        _state.CurrentRegionId = zone;
         if (world.AcousticMap != null && world.AcousticMap.Regions.TryGetValue(regId, out var reg))
         {
             _state.IsIndoor = reg.IsIndoor;
@@ -906,7 +908,7 @@ public class ClientAudioSystem
         {
             _state.IsIndoor = false;
         }
-        string name = NameOfPlace(world.AcousticMap, regId, _state.CurrentMaterial, _state.ShelterFactor);
+        string name = NameOfPlace(world.AcousticMap, zone, _state.CurrentMaterial, _state.ShelterFactor);
         // A zone stops at its walls, so a doorway, the wall's own thickness, is in none: it is named
         // from the zones either side of it.
         if (name == UnderShelter) name = DoorwayName(world, eyePos) ?? name;
@@ -927,7 +929,7 @@ public class ClientAudioSystem
     {
         if (Vector3.DistanceSquared(at, _doorwayAt) < 0.01f) return _doorwayName;
         _doorwayAt = at;
-        return _doorwayName = NameOfGap(world, at, p => _acoustics.GetRegionAt(world, p));
+        return _doorwayName = NameOfGap(world, at, p => _acoustics.GetZoneAt(world, p));
     }
 
     internal static string? NameOfGap(WorldSnapshot world, Vector3 at, Func<Vector3, int> regionAt)
