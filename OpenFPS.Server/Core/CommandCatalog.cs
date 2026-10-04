@@ -50,6 +50,7 @@ public static class CommandCatalog
         E("Doors and vehicles", "enter", "/enter [SEAT]", "get into the vehicle beside you", "board", "getin"),
         E("Doors and vehicles", "exit", "/exit", "get out", "getout"),
         E("Doors and vehicles", "seats", "/seats", "the seats of the vehicle beside you"),
+        E("Doors and vehicles", "window", "/window [down|up|half]", "roll the side windows the other way, or down, up or half way; R in a vehicle", "windows"),
         E("Doors and vehicles", "ignition", "/ignition [on|off]", "start or stop the engine from the driver's seat", "key"),
         E("People", "friend", "/friend add NAME, /friend remove NAME", "your friends list", "unfriend"),
         E("People", "friends", "/friends", "your friends and who is online"),

@@ -349,6 +349,13 @@ In a text (MUD) session you are told the words of anything said within 10 metres
 
 ## Driving
 
+### Windows
+- Press R in a vehicle, or type `/window`, to roll the side windows down; again to roll them up.
+  `/window down`, `/window up` and `/window half` also work. Anyone in the vehicle can do it.
+- With the windows down you hear the street, the wind and your engine much more, and people outside
+  hear you talking much more clearly. With them up, a person talking in a car sounds muffled from
+  outside.
+
 ### Getting in and out
 - Stand beside a car and press E to open its door, then E again to get in. You take the nearest
   free seat you are allowed, within 5 m.

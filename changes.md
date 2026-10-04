@@ -4,6 +4,15 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-03
 
+- Car windows roll down and up: R in a vehicle, or /window, /window down, up or half. Anyone seated
+  can do it and it moves every side window: about 2.5 s down and a little under 3 s up. The sound is
+  a simulated power window (motor, worm gear, the glass in its rubber channels, the seal at the top
+  and the stop at the bottom), each door's a little different, heard inside and quietly outside
+  (inbox/car-window-2026-10-03). With the windows down the street, the wind and your own engine come
+  in. Somebody on voice chat in a car is heard through the car: muffled from outside with the
+  windows shut, clearly with them down, so you can hear them as they drive by. Parked cars start
+  with their windows up.
+
 - Guns hold real magazines: AKM 30, AR-15 30, Glock 17, 1911 7, .357 revolver 6, pump shotgun 6
   shells. Each shot spends a round. An empty gun clicks and says "Empty. R to reload."
 - /reload takes as long as the hands take, and you cannot fire meanwhile. A reload from empty takes
