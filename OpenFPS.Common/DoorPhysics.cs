@@ -514,10 +514,12 @@ internal static class DoorPhysics
     }
 
     /// <summary>Down from the internal rate to the output rate through a windowed-sinc low-pass at 20 kHz,
-    /// in pascals divided by <paramref name="fullScale"/>.</summary>
-    internal static float[] Decimate(List<float> hi, int rate, double fullScale, out double peak)
+    /// in pascals divided by <paramref name="fullScale"/>. <paramref name="oversample"/> is how many internal
+    /// steps make one output sample: the doors run at four, a car window, whose stiffest part is a rubber
+    /// lip, at two.</summary>
+    internal static float[] Decimate(List<float> hi, int rate, double fullScale, out double peak, int oversample = Oversample)
     {
-        int taps = 96 * Oversample + 1, half = taps / 2;
+        int taps = 96 * oversample + 1, half = taps / 2;
         var h = new double[taps];
         double fc = 20000.0 / rate, sum = 0;
         for (int i = 0; i < taps; i++)
@@ -528,12 +530,12 @@ internal static class DoorPhysics
             h[i] = sinc * w; sum += h[i];
         }
         for (int i = 0; i < taps; i++) h[i] /= sum;
-        int n = hi.Count / Oversample;
+        int n = hi.Count / oversample;
         var y = new float[n];
         peak = 0;
         for (int j = 0; j < n; j++)
         {
-            int c = j * Oversample;
+            int c = j * oversample;
             double acc = 0;
             for (int i = 0; i < taps; i++)
             {

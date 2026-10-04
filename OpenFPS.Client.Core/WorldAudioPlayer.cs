@@ -180,6 +180,12 @@ public sealed class WorldAudioPlayer
                 keys.Add(SlidingDoor.Key(SlidingDoor.Kind.Patio, closing, v, 1.4f, 1.0f, 2.1f));
                 keys.Add(SlidingDoor.Key(SlidingDoor.Kind.Automatic, closing, v, SlidingDoor.AutomaticSeconds(1.15f, !closing), 1.15f, 2.1f));
             }
+        // A car's windows, each character, every stroke the window command makes from a window at rest:
+        // fully down and up, and to and from half way. A window turned round while it is moving starts
+        // from a quarter that is rendered when first heard.
+        for (int v = 0; v < CarWindow.Variants; v++)
+            foreach (var (from, to) in new[] { (0f, 1f), (1f, 0f), (0f, 0.5f), (0.5f, 0f), (0.5f, 1f), (1f, 0.5f) })
+                keys.Add(CarWindow.Key(v, from, to));
         var gate = new System.Threading.SemaphoreSlim(4);
         foreach (string key in keys)
         {
@@ -200,6 +206,7 @@ public sealed class WorldAudioPlayer
     private static float[] RenderDoorKey(string key)
         => key.StartsWith(PushBarDoor.KeyPrefix, StringComparison.Ordinal) ? PushBarDoor.RenderKey(key, TransientSynth.SampleRate)
          : key.StartsWith(SlidingDoor.KeyPrefix, StringComparison.Ordinal) ? SlidingDoor.RenderKey(key, TransientSynth.SampleRate)
+         : key.StartsWith(CarWindow.KeyPrefix, StringComparison.Ordinal) ? CarWindow.RenderKey(key, TransientSynth.SampleRate)
          : KnobDoor.RenderKey(key, TransientSynth.SampleRate);
 
     /// <summary>How many are waiting to be heard. Diagnostics.</summary>
@@ -362,7 +369,13 @@ public sealed class WorldAudioPlayer
             // mirror point, while the speaker walks on: heard as a room passing you rather than a
             // person. The street's answer to a voice comes from the reverb, which follows the listener.
             bool spoken = Speech.TryParseKey(item.Sound.SynthKey, out _);
-            if (!item.IsReflection && !spoken)
+            // Made inside a vehicle's cabin (a window's motor, in its door): it goes where the vehicle
+            // goes, and anyone outside hears it through the cabin's walls. Nor is it copied off the walls
+            // round about: the cabin is its room, and the street's walls are on the far side of the glass.
+            // Not a driver's yell, which is said out of the window they have wound down to say it.
+            bool inCabin = InCabin(world, item.SourceEntityId, item.Sound.Position, out var cabinCar, out var cabinVehicle)
+                           && !item.IsReflection && !spoken;
+            if (!item.IsReflection && !spoken && !inCabin)
             {
                 QueueEarlyEchoes(item, world, listenerPosition);
                 QueueReflections(item, reflections, listenerPosition, now);
@@ -485,8 +498,26 @@ public sealed class WorldAudioPlayer
                 emitter.CarriesPath = true;
                 Facing(ref emitter, speakerNow.Transform.Rotation, listenerPosition);
             }
-            if (HearsTheGround(item, spoken)) Ground?.Invoke(ref emitter, world);
+            if (inCabin)
+            {
+                emitter.CarriesPath = true;
+                ThroughCabin(ref emitter, cabinCar, cabinVehicle, now);
+            }
+            if (!inCabin && HearsTheGround(item, spoken)) Ground?.Invoke(ref emitter, world);
             _audio.Submit(emitter);
+
+            // A sound in a cabin rides with it, turning as it turns: a window's motor is in its door.
+            if (inCabin)
+                _following.Add(new Following
+                {
+                    Emitter = emitter,
+                    SourceEntityId = item.SourceEntityId,
+                    Offset = Vector3.Transform(item.Sound.Position - cabinCar.Transform.Position,
+                                               Quaternion.Inverse(cabinCar.Transform.Rotation)),
+                    InCabin = true,
+                    Until = now + Math.Max(0f, item.Sound.DecaySeconds - 0.1f),
+                    StartedAt = now,
+                });
 
             // Somebody talking while they walk carries their voice with them. A two-second line left
             // where it started is three metres behind the footsteps by the end of it.
@@ -558,14 +589,44 @@ public sealed class WorldAudioPlayer
         e.EqLow *= low; e.EqMid *= mid; e.EqHigh *= high;
     }
 
-    /// <summary>A line being said by a body that is moving, and where its mouth is on that body.</summary>
+    /// <summary>A line being said by a body that is moving, and where its mouth is on that body; or a
+    /// sound made inside a vehicle's cabin, and where in the vehicle's own frame.</summary>
     private struct Following
     {
         public SpatialEmitter Emitter;
         public int SourceEntityId;
+        /// <summary>From the body, in the world's frame; for a sound in a cabin, in the vehicle's.</summary>
         public Vector3 Offset;
+        public bool InCabin;
         public double Until;
         public double StartedAt;
+    }
+
+    /// <summary>Every vehicle's windows as this client has them. Without it a cabin's windows are taken
+    /// to be wherever the server last sent them.</summary>
+    public OpenFPS.Client.AudioEngine.Acoustics.CabinWalls? Cabins { get; set; }
+
+    /// <summary>Whether a sound was made inside the cabin of the vehicle that made it.</summary>
+    private static bool InCabin(WorldSnapshot world, int sourceId, Vector3 at, out EntitySnapshot car, out VehicleProfile vehicle)
+    {
+        car = default; vehicle = null!;
+        if (sourceId < 0 || !world.Entities.TryGetValue(sourceId, out car)) return false;
+        if (OpenFPS.Client.AudioEngine.Acoustics.CabinWalls.Vehicle(car) is not { } v
+            || !OpenFPS.Client.AudioEngine.Acoustics.CabinWalls.HasCabin(v)) return false;
+        vehicle = v;
+        return OpenFPS.Client.AudioEngine.Acoustics.CabinWalls.Contains(car, v, at);
+    }
+
+    /// <summary>A sound inside a cabin, heard from outside it: through the glass, the seals and whatever
+    /// windows are down. From inside the same vehicle, nothing is in the way.</summary>
+    private void ThroughCabin(ref SpatialEmitter e, EntitySnapshot car, VehicleProfile vehicle, double now)
+    {
+        if (car.Id == ListenerVehicleId) { e.InsideListenersVehicle = true; return; }
+        float open = Cabins?.WindowsOpen(car, now) ?? (car.Definition?.SoundEmitter.WindowsOpen ?? 0f);
+        var (low, mid, high) = OpenFPS.Client.AudioEngine.Acoustics.CabinWalls.LossDb(vehicle, open);
+        e.EqLow *= OpenFPS.Client.AudioEngine.Acoustics.CabinWalls.Gain(low);
+        e.EqMid *= OpenFPS.Client.AudioEngine.Acoustics.CabinWalls.Gain(mid);
+        e.EqHigh *= OpenFPS.Client.AudioEngine.Acoustics.CabinWalls.Gain(high);
     }
 
     /// <summary>How long a voice has to start before following it stops. A line that lost the voice
@@ -586,7 +647,8 @@ public sealed class WorldAudioPlayer
                 _following.RemoveAt(i);
                 continue;
             }
-            var at = speaker.Transform.Position + f.Offset;
+            var at = f.InCabin ? speaker.Transform.Position + Vector3.Transform(f.Offset, speaker.Transform.Rotation)
+                               : speaker.Transform.Position + f.Offset;
             // The simulator's answer for the speaker, as for any other source; the hand-rolled tracer
             // only until it has one.
             AskAbout(f.SourceEntityId, listenerPosition, at);
@@ -603,7 +665,15 @@ public sealed class WorldAudioPlayer
             e.ApertureFactor = path.ApertureFactor;
             e.TransmissionBleed = path.TransmissionBleed;
             e.TargetRegionId = path.RegionId;
-            Facing(ref e, speaker.Transform.Rotation, listenerPosition);
+            if (f.InCabin)
+            {
+                // Where the vehicle is now decides whether you are inside it with the sound: you may have
+                // got in, or out, while the window was moving.
+                e.InsideListenersVehicle = f.SourceEntityId == ListenerVehicleId;
+                if (OpenFPS.Client.AudioEngine.Acoustics.CabinWalls.Vehicle(speaker) is { } vehicle)
+                    ThroughCabin(ref e, speaker, vehicle, now);
+            }
+            else Facing(ref e, speaker.Transform.Rotation, listenerPosition);
             _audio.Submit(e);
         }
     }
@@ -1004,6 +1074,9 @@ public sealed class WorldAudioPlayer
             return PushBarDoor.RenderKey(sound.SynthKey, TransientSynth.SampleRate);
         if (sound.SynthKey != null && sound.SynthKey.StartsWith(SlidingDoor.KeyPrefix, StringComparison.Ordinal))
             return SlidingDoor.RenderKey(sound.SynthKey, TransientSynth.SampleRate);
+        // A car's power window: its motor, worm and glass simulated through the stroke the key names.
+        if (sound.SynthKey != null && sound.SynthKey.StartsWith(CarWindow.KeyPrefix, StringComparison.Ordinal))
+            return CarWindow.RenderKey(sound.SynthKey, TransientSynth.SampleRate);
 
         return TransientSynth.Render(sound, seed);
     }
@@ -1132,7 +1205,8 @@ public sealed class WorldAudioPlayer
         // A knob door's key already names its door; four seeds of it would be four identical renders.
         if (sound.SynthKey != null && (sound.SynthKey.StartsWith(KnobDoor.KeyPrefix, StringComparison.Ordinal)
                                        || sound.SynthKey.StartsWith(PushBarDoor.KeyPrefix, StringComparison.Ordinal)
-                                       || sound.SynthKey.StartsWith(SlidingDoor.KeyPrefix, StringComparison.Ordinal)))
+                                       || sound.SynthKey.StartsWith(SlidingDoor.KeyPrefix, StringComparison.Ordinal)
+                                       || sound.SynthKey.StartsWith(CarWindow.KeyPrefix, StringComparison.Ordinal)))
             return $"synth:{sound.SynthKey}";
         if (!string.IsNullOrEmpty(sound.SynthKey)) return $"synth:{sound.SynthKey}:{seed & 3}";
         return $"synth:{sound.Character}:{hz}:{level}:{decay}:{noise}:{seed & 3}";

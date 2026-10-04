@@ -31,6 +31,13 @@ public static class VehicleCabin
     /// <summary>Where the underside of the body is, metres off the road.</summary>
     public const float ChassisBottom = 0.15f;
 
+    /// <summary>Front-to-back room one row of seats takes, metres.</summary>
+    public const float RowPitch = 0.85f;
+
+    /// <summary>How many rows of seats the cabin holds: the shell seats people in these, and each row
+    /// has a side window beside it (<see cref="CarWindow"/>).</summary>
+    public static int Rows(Geometry g) => Math.Max(1, (int)((g.Lc - 0.3f) / RowPitch));
+
     public readonly record struct Geometry(float L, float W, float H, float Lc, float Wc, float Hc,
                                            float FloorTop, float Cz, float FrontLen, float RearLen)
     {

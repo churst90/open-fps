@@ -213,6 +213,10 @@ public class CommandHandler
             case "key":
                 HandleIgnition(session, args, reply);
                 break;
+            case "window":
+            case "windows":
+                HandleWindow(session, args, reply);
+                break;
             case "enter":
             case "board":
             case "getin":
@@ -1424,6 +1428,20 @@ public class CommandHandler
         bool on = world.Has<DriveComponent>(root) && !world.Get<DriveComponent>(root).EngineOn;
         if (args.Length > 0) on = !args[0].Equals("off", StringComparison.OrdinalIgnoreCase);
         Say(reply, DrivingSystem.SetIgnition(world, root, on, _server.SyncAudioComponent));
+    }
+
+    /// <summary>
+    /// /window [down|up|half] — the side windows, from any seat. No argument rolls them the other way
+    /// from wherever they are going, which is what R does in a vehicle.
+    /// </summary>
+    private void HandleWindow(UserSession session, string[] args, Action<IMessage> reply)
+    {
+        if (!_maps.TryGetMap(session.CurrentMapId, out var world, out _, out _, out var lookup)
+            || session.Entity == Entity.Null || !world.IsAlive(session.Entity))
+        { Say(reply, "You are not in the world yet."); return; }
+        string mapId = session.CurrentMapId;
+        Say(reply, WindowSystem.Command(world, session.Entity, lookup, args, _server.SyncAudioComponent,
+                                        (id, label, sounds) => _server.EmitWorldAudio(mapId, id, label, sounds)));
     }
 
     private void HandleMove(UserSession session, string[] args, Action<IMessage> reply)

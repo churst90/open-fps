@@ -517,6 +517,7 @@ public class ClientAudioSystem
         _audio.UpdateListener(visualEyePos, listenerRotation, listenerVelocity, listenerRegionId);
         _audio.UpdateShelter(_state.ShelterFactor);
         WorldAudio.ListenerVehicleId = _state.RidingEntityId;
+        WorldAudio.Cabins = _cabins;
         WorldAudio.SelfId = OwnEntityId;
         WorldAudio.Self ??= () => (_state.Position, _state.Rotation);
         // The doors, the things to pick up, the cars to get into and the people around you.
@@ -525,6 +526,8 @@ public class ClientAudioSystem
         _drivingAids.Update(world, _state, _now());
         // ...and the rest of the world through the glass, if you are sitting in anything with a roof.
         var (encLow, encMid, encHigh) = CabinEnclosure(world);
+        // Now and then, the windows of vehicles that have gone.
+        if (_frameCount % 600 == 0) _cabins.Forget(world.Entities.ContainsKey);
         _audio.SetListenerEnclosure(encLow, encMid, encHigh);
         // Temperature reaches the mix as the speed of sound: c = 331.3 + 0.606·T.
         _audio.SetAirTemperature(world.Temperature);
@@ -1180,44 +1183,34 @@ public class ClientAudioSystem
     /// plausibly be near the ground at all: one more than sixty metres over the listener's head is
     /// flying, and that is settled without touching the world.
     /// </summary>
-    /// <summary>Car glass, metres. The windows are most of a cabin's area and all of its weakest
-    /// panels, so the airborne path in is theirs.</summary>
-    private const float WindowThicknessM = 0.004f;
-
     /// <summary>An open bus doorway's share of the cabin's wall area, as transmitted power.</summary>
     private const float DoorwayPowerFraction = 0.0225f;
+
+    /// <summary>Every vehicle's windows as this client has them, and what a cabin's walls take off a
+    /// sound crossing them.</summary>
+    private readonly OpenFPS.Client.AudioEngine.Acoustics.CabinWalls _cabins = new();
 
     /// <summary>
     /// What the body of the vehicle you are sitting in takes off everything outside it, dB per band.
     ///
-    /// The same two paths the interior engine voice uses, the other way round: the windows by their
-    /// mass (transmission falls as rho*c / (pi*f*m)), and the seals, which have no mass and let a
-    /// little of everything through. At 150 Hz a hatchback's glass passes about a hundredth of the
-    /// power; by a kilohertz the seals are most of what gets in, so the top end sits about thirty
-    /// decibels down — which is the whole of "the traffic outside sounds like it is outside".
+    /// The same paths the interior engine voice uses, the other way round: the windows by their mass
+    /// (transmission falls as rho*c / (pi*f*m)), the seals, which have no mass and let a little of
+    /// everything through, and whatever is open (CarWindow.CabinLossDb). At 150 Hz a hatchback's glass
+    /// passes about a hundredth of the power; by a kilohertz the seals are most of what gets in, so the
+    /// top end sits about thirty decibels down — which is the whole of "the traffic outside sounds like
+    /// it is outside". With the windows down a tenth of the wall is a hole, and the street comes in at
+    /// a tenth of its power, at every frequency.
     /// Nothing when you are on foot, or on something with no cabin: a motorcycle keeps the street.
     /// </summary>
     private (float Low, float Mid, float High) CabinEnclosure(WorldSnapshot world)
     {
         if (!_state.IsRiding || !world.Entities.TryGetValue(_state.RidingEntityId, out var ride)) return (0f, 0f, 0f);
-        string? sid = ride.Definition.SoundEmitter.SoundId;
-        if (sid == null || !sid.StartsWith("engine:", StringComparison.OrdinalIgnoreCase)
-            || !OpenFPS.Common.MachineRegistry.Knows(sid[7..])) return (0f, 0f, 0f);
-        var body = OpenFPS.Common.MachineRegistry.VehicleFor(sid[7..]).Body;
-        if (body == null || body.CabinLengthM <= 0f) return (0f, 0f, 0f);
-
-        float mass = MathF.Max(1f, OpenFPS.Common.AcousticRegistry.GetProperties("Glass").DensityKgM3 * WindowThicknessM);
-        float seal = body.SealLeak * body.SealLeak;
+        if (OpenFPS.Client.AudioEngine.Acoustics.CabinWalls.Vehicle(ride) is not { } vehicle) return (0f, 0f, 0f);
         // A bus at a stop with its doors open has a hole in its side: about 2.4 m^2 of doorway in a
         // hundred-odd m^2 of cabin wall, which lets the street in at a couple of per cent of its
         // power, at every frequency. The voice decides when the doors are open; ask it.
-        if (_audio.EngineDoorsOpen(_state.RidingEntityId)) seal += DoorwayPowerFraction;
-        float Loss(float hz)
-        {
-            float t = 415f / (MathF.PI * hz * mass);
-            return 10f * MathF.Log10(MathF.Min(1f, t * t + seal));
-        }
-        return (Loss(150f), Loss(1000f), Loss(4000f));
+        float doorway = _audio.EngineDoorsOpen(_state.RidingEntityId) ? DoorwayPowerFraction : 0f;
+        return OpenFPS.Client.AudioEngine.Acoustics.CabinWalls.LossDb(vehicle, _cabins.WindowsOpen(ride, _now()), doorway);
     }
 
     private bool OnTheWheels(EntitySnapshot snap, WorldSnapshot world, Vector3 eyePos)
@@ -2399,6 +2392,8 @@ public class ClientAudioSystem
             // every other emitter.
             EngineRunning = def.SoundEmitter.SynthRunning,
             ServingStop = def.SoundEmitter.ServingStop,
+            // How far down its windows are: sitting in it, the outside comes in through them.
+            WindowsOpen = _cabins.WindowsOpen(snap, _now()),
             // Straight from the server, which is the only thing that knows the corner.
             //
             // Not differentiated here from the interpolated velocity and divided by the tyre's
@@ -2500,6 +2495,9 @@ public class ClientAudioSystem
         => OpenFPS.Client.AudioEngine.Fmod.Talkers.For(senderId).Receive(sequence, opusData, OpenFPS.Common.AudioClock.Now);
 
     internal const int TalkerVoiceBase = -1_400_000;
+    /// <summary>Where a seated person's mouth is above the floor under their feet, metres: a tenth below
+    /// a seated listener's eye (LocalPlayerState.EyeHeight).</summary>
+    internal const float SeatedMouthHeight = 0.9f;
     /// <summary>How long a talker's voice is kept after their last packet: the jitter buffer's longest
     /// margin and its fade, so the end of what they said is played out.</summary>
     private const double TalkerHoldSeconds = 1.0;
@@ -2536,7 +2534,13 @@ public class ClientAudioSystem
             var facing = Vector3.Transform(Vector3.UnitZ, snap.Transform.Rotation);
             facing.Y = 0f;
             facing = facing.LengthSquared() > 1e-6f ? Vector3.Normalize(facing) : Vector3.UnitZ;
-            Vector3 mouth = snap.Transform.Position + new Vector3(0f, OpenFPS.Common.Speech.MouthHeight, 0f) + facing * 0.1f;
+            // Sitting in a vehicle, their feet are on its floor and its cabin is round them: their mouth is
+            // a seated person's, and what they say reaches anyone outside through the glass, or through
+            // the windows if they are down.
+            bool seated = OpenFPS.Client.AudioEngine.Acoustics.CabinWalls.TryFind(world, snap.Transform.Position,
+                                                                                out var cabin, out var cabinVehicle);
+            float mouthHeight = seated ? SeatedMouthHeight : OpenFPS.Common.Speech.MouthHeight;
+            Vector3 mouth = snap.Transform.Position + new Vector3(0f, mouthHeight, 0f) + facing * 0.1f;
 
             float levelDb = OpenFPS.Common.Speech.NormalDb - stream.Ring.SpeechRmsDbfs;
             var (gain, reference) = OpenFPS.Common.Loudness.Place(levelDb);
@@ -2578,7 +2582,22 @@ public class ClientAudioSystem
                 TransmissionBleed = path.TransmissionBleed,
                 EffectiveDistance = path.EffectiveDistance,
                 TargetRegionId = path.RegionId,
+                // Worked out afresh every frame, so the path, and the cabin round them, follow them.
+                CarriesPath = true,
             };
+            if (seated)
+            {
+                // In the car you are in, nothing is between you; in any other, its walls are.
+                if (cabin.Id == _state.RidingEntityId) e.InsideListenersVehicle = true;
+                else
+                {
+                    var (low, mid, high) = OpenFPS.Client.AudioEngine.Acoustics.CabinWalls.LossDb(
+                        cabinVehicle, _cabins.WindowsOpen(cabin, now));
+                    e.EqLow *= OpenFPS.Client.AudioEngine.Acoustics.CabinWalls.Gain(low);
+                    e.EqMid *= OpenFPS.Client.AudioEngine.Acoustics.CabinWalls.Gain(mid);
+                    e.EqHigh *= OpenFPS.Client.AudioEngine.Acoustics.CabinWalls.Gain(high);
+                }
+            }
             if (_talkersVoiced.Contains(id) && _audio.IsPlaying(voiceId)) _audio.UpdateSpatialAttributes(e);
             else { _audio.PlayPhysicalSoundDirect(e); _talkersVoiced.Add(id); }
         }
