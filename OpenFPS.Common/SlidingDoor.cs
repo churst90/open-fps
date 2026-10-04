@@ -261,6 +261,16 @@ public static class SlidingDoor
     /// what stands above the sink lifts the wheel. A grain that does carries the wheel crushes at about
     /// 150 MPa over its own section, in a few steps of tens of microseconds each.</summary>
     private const double GritStrength = 150e6, CrushSeconds = 2e-5, PowderMicron = 3;
+    /// <summary>A patio tyre meets a grain at an angle whose tangent is sqrt(2 a / R); steeper than the grip of
+    /// nylon on sand (about 0.3), the wheel shoves the grain along and off the rib instead of climbing it.
+    /// On a 1-1/4 in wheel nothing over about 0.7 mm is climbed. (Climbed and crushed, a 1 mm grain from the
+    /// tail of the sizes struck the rail with 700 N and rang the sill at 127 dB.)</summary>
+    private const double GritGrip = 0.3;
+    /// <summary>Under a patio door's nylon tyre a grain does not shatter: nylon yields at about 80 MPa, long
+    /// before quartz cracks, so a grain pressed harder than that sinks into the tread, the nylon flowing round
+    /// it over a fraction of a millisecond, and the load stays on. (Shattered in 20 us steps, a half-millimetre
+    /// grain dropped a wheel carrying 300 N in a blink and the rail rang at 117 dB.)</summary>
+    private const double NylonYield = 80e6, EmbedSeconds = 3e-4;
     /// <summary>Pile weatherstrip: its fibres slip about their own width, 150 um, each on its own. A patio leaf
     /// drags about 5 m of pile at some 500 fibres a centimetre; an automatic leaf about 2 m. The drag is the
     /// sum of their sawtooth forces, so it flutters by about 0.3 / sqrt(fibres) of itself. (Half its mean,
@@ -652,7 +662,8 @@ public static class SlidingDoor
                 gx += -Math.Log(1 - rng.NextDouble()) / Math.Max(ch.GritPerMetre, 1e-6);
                 if (gx > trackLen) break;
                 double a = -Math.Log(1 - rng.NextDouble()) * ch.GritMicron * 1e-6;
-                if (a > PowderMicron * 1e-6) grit.Add(new Grain { X = gx - 0.1, A = a, Target = a });
+                bool shoved = !auto && Math.Sqrt(2 * a / wheelR) > GritGrip;
+                if (a > PowderMicron * 1e-6 && !shoved) grit.Add(new Grain { X = gx - 0.1, A = a, Target = a });
                 maxReach = Math.Max(maxReach, Math.Sqrt(2 * wheelR * a));
             }
 
@@ -960,7 +971,17 @@ public static class SlidingDoor
                 double f = Contact(contactK, contactLambda, depth, hRate - trackPort[i].V - vw[i]);
                 Note($"roller{i}", f > 1e-3 ? f : 0);
                 // A grain carrying the wheel gives way, a piece at a time.
-                if (grain != null && !grain.Done && f > GritStrength * 4 * grain.A * grain.A && time - grain.LastCrush > CrushSeconds)
+                if (!auto && ch.Tyre == Tyre.Nylon)
+                {
+                    // A patio tyre's tread yields round a grain loaded past what nylon holds, and takes it in.
+                    if (grain != null && !grain.Done && f > NylonYield * 4 * grain.A * grain.A)
+                    {
+                        grain.A -= grain.A * dt / EmbedSeconds * Math.Min(1, f / (NylonYield * 4 * grain.A * grain.A) - 1);
+                        grain.Target = grain.A;
+                        if (grain.A <= PowderMicron * 1e-6) grain.Done = true;
+                    }
+                }
+                else if (grain != null && !grain.Done && f > GritStrength * 4 * grain.A * grain.A && time - grain.LastCrush > CrushSeconds)
                 {
                     grain.LastCrush = time;
                     grain.Target = Math.Max(PowderMicron * 1e-6, grain.A * (0.25 + 0.5 * rng.NextDouble()));
