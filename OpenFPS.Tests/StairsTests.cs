@@ -47,6 +47,8 @@ public class StairsTests : IClassFixture<StairsTests.City>
         public readonly MapData Data;
         public readonly List<Marker> Markers = new();
         public readonly List<(string Name, int Id, Vector3 Min, Vector3 Max)> Regions = new();
+        /// <summary>The named parts of rooms: each flight and each landing (prefabs/named_place.json).</summary>
+        public readonly List<(string Name, int Id, Vector3 Min, Vector3 Max)> Places = new();
         public readonly List<(string Prefab, string Name, Vector3 Min, Vector3 Max)> Boxes = new();
         public readonly List<string> Towers = new();
 
@@ -88,6 +90,11 @@ public class StairsTests : IClassFixture<StairsTests.City>
                 if (!sizes.TryGetValue(prefab, out var size)) continue;
                 var scale = e.TryGetProperty("Scale", out var s) ? Vec(s) : Vector3.One;
                 var half = size * scale / 2;
+                if (prefab == NamedPlaces.PrefabId)
+                {
+                    Places.Add((name, e.GetProperty("EntityId").GetInt32(), at - half, at + half));
+                    continue;
+                }
                 if (prefab == "acoustic_region")
                 {
                     Regions.Add((name, e.GetProperty("EntityId").GetInt32(), at - half, at + half));
@@ -99,11 +106,17 @@ public class StairsTests : IClassFixture<StairsTests.City>
 
         private static Vector3 Vec(JsonElement v) => new(v.GetProperty("X").GetSingle(), v.GetProperty("Y").GetSingle(), v.GetProperty("Z").GetSingle());
 
-        /// <summary>The named place holding a point: the smallest box, as the client picks.</summary>
-        public string ZoneAt(Vector3 p) => Regions
+        /// <summary>The name you are told at a point, as the client picks it: the smallest named part
+        /// of a room holding it, or else the smallest region.</summary>
+        public string ZoneAt(Vector3 p) => Smallest(Places, p) ?? RoomAt(p);
+
+        /// <summary>The room a point is in for sound: the smallest region, named parts left out.</summary>
+        public string RoomAt(Vector3 p) => Smallest(Regions, p) ?? "";
+
+        private static string? Smallest(List<(string Name, int Id, Vector3 Min, Vector3 Max)> boxes, Vector3 p) => boxes
             .Where(r => p.X >= r.Min.X && p.Y >= r.Min.Y && p.Z >= r.Min.Z && p.X <= r.Max.X && p.Y <= r.Max.Y && p.Z <= r.Max.Z)
             .OrderBy(r => (r.Max.X - r.Min.X) * (r.Max.Y - r.Min.Y) * (r.Max.Z - r.Min.Z))
-            .Select(r => r.Name).FirstOrDefault() ?? "";
+            .Select(r => r.Name).FirstOrDefault();
 
         /// <summary>A tower's stair markers: the ones in its stairwell, under its roof access.</summary>
         public List<Marker> MarkersOf(string tower)
@@ -286,9 +299,11 @@ public class StairsTests : IClassFixture<StairsTests.City>
                 string to = s + 1 == flights.Count ? "the roof" : $"floor {s + 1}";
                 Assert.Matches($"^Stairs up, \\d+ steps, to {to}$", foot.Name);
                 Assert.Matches($"^Stairs down, \\d+ steps, to floor {s}$", top.Name);
-                Assert.Equal($"{tower} stairwell, floor {s}", _city.ZoneAt(foot.Floor + new Vector3(0, 1.7f, 0)));
-                Assert.Equal(s + 1 == flights.Count ? $"{tower} roof access" : $"{tower} stairwell, floor {s + 1}",
+                Assert.Equal($"{tower} landing, floor {s}", _city.ZoneAt(foot.Floor + new Vector3(0, 1.7f, 0)));
+                Assert.Equal(s + 1 == flights.Count ? $"{tower} roof access" : $"{tower} landing, floor {s + 1}",
                              _city.ZoneAt(top.Floor + new Vector3(0, 1.7f, 0)));
+                // ...and for sound, still the stairwell: a landing is a name, not a room.
+                Assert.Equal($"{tower} stairwell, floor {s}", _city.RoomAt(foot.Floor + new Vector3(0, 1.7f, 0)));
                 // A foot faces up its flight and the top faces down it, along the same line.
                 Assert.True(Vector3.Dot(foot.Along, top.Along) < -0.99f);
                 var run = top.At - foot.At; run.Y = 0;
@@ -559,6 +574,43 @@ public class StairsTests : IClassFixture<StairsTests.City>
     }
 
     /// <summary>
+    /// The cue speaks for the stairs it has just told you about, and their zones are said only when it
+    /// did not. Up to a flight facing it: the cue is said and stepping onto the flight is a flight it
+    /// announced, so the flight's name is not said after it; nor is a landing entered a moment before
+    /// the cue or while it was being said. Off the top and later back down it backwards, with no cue,
+    /// the flight's name is news. A room is not a named part of one, and is always said (the zone
+    /// announcer asks this only of a flight or a landing).
+    /// </summary>
+    [Fact]
+    public void TheCueSpeaksForAFlightAndItsLandingAndTheZoneForTheRest()
+    {
+        var world = OneFlight();
+        var cues = new StairCues();
+        var up = Facing(Vector3.UnitZ);
+        float top = Run + 2 * MarkerBack;
+
+        Assert.Equal("Stairs up, 17 steps, to floor 3", cues.Update(world, new Vector3(0, 0, -0.4f), up));
+        Assert.False(cues.FlightAnnounced);
+        cues.Update(world, new Vector3(0, TreadHeight(1.0f), 1.0f), up);
+        Assert.True(cues.OnFlight);
+        Assert.True(cues.FlightAnnounced);                                             // its cue was said
+        Assert.True(StairCues.CoversZone(cues.FlightAnnounced, double.NegativeInfinity, 100.0));
+        cues.Update(world, new Vector3(0, 3f, top), up);                               // off at the top
+        Assert.False(cues.FlightAnnounced);
+
+        // Back down it walking backwards, facing up it: no cue, so the flight's name is said.
+        Assert.Null(cues.Update(world, new Vector3(0, TreadHeight(top - 1.0f), top - 1.0f), up));
+        Assert.True(cues.OnFlight);
+        Assert.False(cues.FlightAnnounced);
+        Assert.False(StairCues.CoversZone(cues.FlightAnnounced, double.NegativeInfinity, 100.0));
+
+        // A landing: entered at 100 s. A cue at 99.5 s or after covers it; one at 98 s is another visit.
+        Assert.True(StairCues.CoversZone(false, 99.5, 100.0));
+        Assert.True(StairCues.CoversZone(false, 100.3, 100.0));
+        Assert.False(StairCues.CoversZone(false, 98.0, 100.0));
+    }
+
+    /// <summary>
     /// Where two flights meet, each is said once however you shuffle between them: up the first, turn,
     /// and the flight you came up is not news but the next one is, once, however many times you step
     /// across the well and back. Up the second and back down it — you have been on another floor — and
@@ -665,24 +717,28 @@ public class StairsTests : IClassFixture<StairsTests.City>
         var solid = MarkerSnap(9, "x", Vector3.Zero, Vector3.UnitZ).Definition;
         solid.Collider.IsSolid = true;
         Assert.False(ClientWorldState.IsMarker(solid));
+        // A named place is kept with them, for the zone lookup; it is not a beacon or a stair end.
+        var place = MarkerSnap(10, "Marlow Tower landing, floor 2", Vector3.Zero, Vector3.UnitZ).Definition;
+        place.Identity.BeaconCategory = "";
+        place.Identity.PrefabId = NamedPlaces.PrefabId;
+        place.Collider.Size = new Vector3(4f, 2.5f, 2f);
+        Assert.True(NamedPlaces.Is(place));
+        Assert.True(ClientWorldState.IsMarker(place));
     }
 
     /// <summary>
-    /// The stairs beacon blips from the bottom and the top of the stairwell only — "the stairs beacon
-    /// should only play for the top and bottom of that stairwell" (Cody, 2026-10-04) — and not from the
-    /// landing between, even standing on that landing with both ends of the stair in range. /beacons
-    /// stairs off and a map that forbids it both silence it.
+    /// The stairs beacon blips once a floor, from where you step onto the stairs to go up from it, and
+    /// on the roof from the top of the flight down: "how will you find the levels in between" with a
+    /// beacon only at the bottom and the top (Cody, 2026-10-04). On the landing where two flights meet
+    /// only the one going up blips, and only your own floor's: the floors above and below are open to
+    /// the stairwell and a few metres off. /beacons stairs off and a map that forbids it both silence it.
     /// </summary>
     [Fact]
-    public void TheStairsBeaconBlipsFromTheBottomAndTopOfTheStairwellOnly()
+    public void TheStairsBeaconBlipsFromYourFloorsWayUp()
     {
         var world = DogLeg();
-        Assert.True(StairCues.IsStairwellEnd(world, 1));
-        Assert.False(StairCues.IsStairwellEnd(world, 2));
-        Assert.False(StairCues.IsStairwellEnd(world, 3));
-        Assert.True(StairCues.IsStairwellEnd(world, 4));
-        var bottom = world.Entities[1].Transform.Position;
-        var top = world.Entities[4].Transform.Position;
+        Assert.Equal(new[] { 1, 3, 4 }, StairCues.FloorBeacons(world).OrderBy(i => i));
+        var wayUp = world.Entities[3].Transform.Position;                             // foot of the flight to the roof
         var ear = new Vector3(-1.2f, 4.6f, Run + 2 * MarkerBack);                    // on the landing between
 
         List<SpatialEmitter> Blips(BeaconPreferences prefs, IEnumerable<string>? policy = null)
@@ -703,10 +759,7 @@ public class StairsTests : IClassFixture<StairsTests.City>
 
         var blips = Blips(BeaconPreferences.InMemory());
         Assert.NotEmpty(blips);
-        Assert.All(blips, e => Assert.True(Vector3.Distance(e.Position, bottom) < 1e-3f || Vector3.Distance(e.Position, top) < 1e-3f,
-                                           $"a stairs blip from {e.Position}"));
-        Assert.Contains(blips, e => Vector3.Distance(e.Position, bottom) < 1e-3f);
-        Assert.Contains(blips, e => Vector3.Distance(e.Position, top) < 1e-3f);
+        Assert.All(blips, e => Assert.True(Vector3.Distance(e.Position, wayUp) < 1e-3f, $"a stairs blip from {e.Position}"));
 
         var off = BeaconPreferences.InMemory();
         off.Set(Beacons.Stairs, false);
@@ -714,24 +767,152 @@ public class StairsTests : IClassFixture<StairsTests.City>
         Assert.Empty(Blips(BeaconPreferences.InMemory(), new[] { "stairs=forbidden" }));
     }
 
-    /// <summary>Every tower's stairwell has exactly two ends for the beacon: the foot of the ground
-    /// floor's flight and the top of the flight onto the roof.</summary>
+    /// <summary>Every tower has one stairs beacon a floor: the foot of each floor's flight up, the ground
+    /// floor's included, and the top of the flight onto the roof. Never the top of a flight on a floor
+    /// that has a flight up beside it.</summary>
     [Fact]
-    public void EveryStairwellBeaconsFromItsBottomAndItsRoofOnly()
+    public void EveryFloorOfEveryTowerHasOneStairsBeacon()
     {
         foreach (var tower in _city.Towers)
         {
             var flights = _city.Flights(tower);
             var ms = _city.MarkersOf(tower);
             var world = Markers(ms.Select((m, i) => MarkerSnap(i + 1, m.Name, m.At, m.Along)).ToArray());
-            var ends = world.MarkerEntityIds.Where(id => StairCues.IsStairwellEnd(world, id))
-                            .Select(id => world.Entities[id].Transform.Position).ToList();
-            _o.WriteLine($"{tower}: ends at {string.Join(", ", ends)}");
-            Assert.Equal(2, ends.Count);
-            Assert.Contains(ends, p => Vector3.Distance(p, flights[0].Foot.At) < 1e-3f);
-            Assert.Contains(ends, p => Vector3.Distance(p, flights[^1].Top.At) < 1e-3f);
+            var beacons = StairCues.FloorBeacons(world).Select(id => world.Entities[id]).ToList();
+            _o.WriteLine($"{tower}: {string.Join(" / ", beacons.OrderBy(b => b.Transform.Position.Y).Select(b => b.Definition.Identity.Name))}");
+            Assert.Equal(flights.Count + 1, beacons.Count);
+            Assert.Equal(flights.Count + 1, beacons.Select(b => MathF.Round(b.Transform.Position.Y, 1)).Distinct().Count());
+            foreach (var (foot, _) in flights)
+                Assert.Contains(beacons, b => Vector3.Distance(b.Transform.Position, foot.At) < 1e-3f);
+            Assert.Contains(beacons, b => Vector3.Distance(b.Transform.Position, flights[^1].Top.At) < 1e-3f);
         }
     }
+
+    /// <summary>
+    /// Standing in the doorway from the corridor into the stairwell, on every floor of every tower,
+    /// the stairs beacon is heard, and from that floor's way up only: on every other floor that is at
+    /// the far end of the shaft, nearly twelve metres off, and the floors above and below are nearer.
+    /// </summary>
+    [Fact]
+    public void FromEveryStairwellDoorYouHearThatFloorsWayUp()
+    {
+        var doc = JsonDocument.Parse(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "maps", "city.json")));
+        var portals = doc.RootElement.GetProperty("Entities").EnumerateArray()
+            .Where(e => e.GetProperty("PrefabId").GetString() == "portal")
+            .Select(e => (A: e.GetProperty("RegionAId").GetInt32(), At: new Vector3(e.GetProperty("Position").GetProperty("X").GetSingle(),
+                          e.GetProperty("Position").GetProperty("Y").GetSingle(), e.GetProperty("Position").GetProperty("Z").GetSingle())))
+            .ToList();
+        foreach (var tower in _city.Towers)
+        {
+            var flights = _city.Flights(tower);
+            var ms = _city.MarkersOf(tower);
+            var world = Markers(ms.Select((m, i) => MarkerSnap(i + 1, m.Name, m.At, m.Along)).ToArray());
+            for (int s = 0; s < flights.Count; s++)
+            {
+                int stairwell = _city.Regions.Single(r => r.Name == $"{tower} stairwell, floor {s}").Id;
+                var door = portals.Single(p => p.A == stairwell).At;
+                var ear = door with { Y = flights[s].Foot.Floor.Y + 1.6f };
+                var wayUp = flights[s].Foot.At;
+
+                var mixer = new EmitterRecordingProvider();
+                var audio = new AudioEngineFacade(mixer);
+                audio.InitializeForTest();
+                var aids = new BeaconAids(audio, BeaconPreferences.InMemory());
+                for (int i = 0; i < 40; i++)
+                {
+                    audio.UpdateListener(ear, Quaternion.Identity, Vector3.Zero, -1);
+                    aids.Update(world, ear, 10.0 + i * 0.1);
+                    for (int k = 0; k < 3; k++) audio.PumpForTest();
+                }
+                var blips = mixer.Played.Where(e => e.SoundId == "SYNTH/beacon_stairs_steps").ToList();
+                Assert.True(blips.Count > 0, $"{tower} floor {s}: no stairs beacon from the door, {Vector3.Distance(ear, wayUp):F1} m from the way up");
+                Assert.All(blips, e => Assert.True(Vector3.Distance(e.Position, wayUp) < 1e-3f, $"{tower} floor {s}: a blip from {e.Position}"));
+            }
+        }
+    }
+
+    /// <summary>
+    /// Each flight is a named place of its own, from its first riser to its last, and the floor at each
+    /// end of it a landing: "the stairs themselves need a zone, then the landings need a zone" (Cody,
+    /// 2026-10-04). Up every flight of every tower at eye height, over the treads as they are built,
+    /// the name is the landing, then the flight, then the next landing — and the room you hear is the
+    /// stairwell all the way, as it was: a flight and a landing are names, not rooms.
+    /// </summary>
+    [Fact]
+    public void EveryFlightAndEveryLandingIsAZone()
+    {
+        foreach (var tower in _city.Towers)
+        {
+            var flights = _city.Flights(tower);
+            for (int s = 0; s < flights.Count; s++)
+            {
+                var (foot, top) = flights[s];
+                bool roof = s + 1 == flights.Count;
+                string flight = $"{tower} stairs, floor {s} to {(roof ? "the roof" : $"{s + 1}")}";
+                string above = roof ? $"{tower} roof access" : $"{tower} landing, floor {s + 1}";
+                var treads = _city.Boxes.Where(b => b.Name == flight).ToList();
+                Assert.NotEmpty(treads);
+                var rooms = new[] { $"{tower} stairwell, floor {s}", roof ? $"{tower} roof access" : $"{tower} stairwell, floor {s + 1}" };
+
+                float length = Vector3.Dot(top.At - foot.At, foot.Along);
+                var heard = new List<string>();
+                for (float a = 0f; a <= length + 1e-3f; a += 0.05f)
+                {
+                    var feet = foot.Floor + foot.Along * a;
+                    // On the tread under you, or on the floor at either end.
+                    var under = treads.Where(b => feet.X >= b.Min.X && feet.X <= b.Max.X && feet.Z >= b.Min.Z && feet.Z <= b.Max.Z).ToList();
+                    feet.Y = under.Count > 0 ? under.Max(b => b.Max.Y) : a > length / 2 ? top.Floor.Y : foot.Floor.Y;
+                    var eye = feet + new Vector3(0, 1.7f, 0);
+                    string zone = _city.ZoneAt(eye);
+                    if (heard.Count == 0 || heard[^1] != zone) heard.Add(zone);
+                    Assert.Contains(_city.RoomAt(eye), rooms);
+                }
+                _o.WriteLine($"{tower} flight {s}: {string.Join(" / ", heard)}");
+                Assert.Equal(new[] { $"{tower} landing, floor {s}", flight, above }, heard);
+            }
+        }
+    }
+
+    /// <summary>
+    /// "Are you sure when it says 19 steps that it's actually 19 actual steps, how is this
+    /// measured?" (Cody, 2026-10-04.) Counted from the map: the boxes each flight is built of, one box
+    /// a step. Every box's top is one riser over the one before it, the first one riser over the floor
+    /// you start from and the last level with the floor you arrive on — so the count is the number of
+    /// times you step up, the last of them onto the landing, and it is what both ends of the flight say.
+    /// </summary>
+    [Fact]
+    public void EveryFlightSaysHowManyStepsItIsBuiltOf()
+    {
+        foreach (var tower in _city.Towers)
+        {
+            var flights = _city.Flights(tower);
+            for (int s = 0; s < flights.Count; s++)
+            {
+                var (foot, top) = flights[s];
+                string flight = $"{tower} stairs, floor {s} to {(s + 1 == flights.Count ? "the roof" : $"{s + 1}")}";
+                var boxes = _city.Boxes.Where(b => b.Name == flight).OrderBy(b => b.Max.Y).ToList();
+                var tops = boxes.Select(b => MathF.Round(b.Max.Y, 3)).Distinct().ToList();
+                _o.WriteLine($"{flight}: {boxes.Count} boxes, {tops.Count} heights, from {foot.Floor.Y:F2} to {top.Floor.Y:F2}; "
+                             + $"'{foot.Name}', '{top.Name}'");
+
+                Assert.Equal(boxes.Count, tops.Count);                                  // one box a step
+                Assert.Equal(boxes.Count, Steps(foot));
+                Assert.Equal(boxes.Count, Steps(top));
+                float last = foot.Floor.Y;
+                foreach (float y in tops)
+                {
+                    Assert.InRange(y - last, 0.102f, 0.178f);                            // each a riser
+                    last = y;
+                }
+                Assert.Equal(top.Floor.Y, last, 2);                                      // the last onto the landing
+                // ...in a line from the foot to the top, a tread apart.
+                var along = boxes.Select(b => Vector3.Dot((b.Min + b.Max) / 2 - foot.At, foot.Along)).ToList();
+                for (int k = 1; k < along.Count; k++) Assert.Equal(Going, along[k] - along[k - 1], 2);
+            }
+        }
+    }
+
+    private static int Steps(Marker m) => int.Parse(m.Name.Split(' ')[2].TrimEnd(','));
 
     /// <summary>
     /// Every flight in every tower is built to the figures a real stair is (International Building

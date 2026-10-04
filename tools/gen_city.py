@@ -135,6 +135,20 @@ def region(name, x0, x1, y0, y1, z0, z1):
     return box("acoustic_region", x0, x1, y0, y1, z0, z1, name=name)
 
 
+named_places = []
+
+
+def named_place(name, x0, x1, y0, y1, z0, z1):
+    """A part of a room with a name of its own — a flight of stairs, a landing — and NOT a room.
+
+    A region is a name and a room for sound at once (region-is-not-a-room is about the name; the
+    sound is still keyed on the box), so cutting a stairwell into a region per flight would cut its
+    reverberation and its openings into pieces as well. A named place changes what you are told and
+    nothing you hear. Written after everything else, so adding one moves no other part's id.
+    """
+    named_places.append((name, x0, x1, y0, y1, z0, z1))
+
+
 def portal(x, y, z, a, b, aperture):
     """A hole between two named places. -1 is the outside."""
     entities.append({
@@ -253,6 +267,7 @@ RAIL_H      = 1.07                       # a guard: round an opening in a floor,
 RAIL_T      = 0.1
 GUARD_STEPS = 3                          # a flight's guard is stepped up it in pieces this many treads long
 MARKER_BACK = 0.5                        # a stair marker stands this far out from the end riser, clear of the well's guard
+FLIGHT_HEAD = 2.0                        # a flight's named place reaches this far over its top tread: an eye and some
 PARAPET_H   = 1.1                        # a roof's edge wall: the height building rules ask for
 BULK_H      = 2.6                        # clear height inside the stair housing on a roof
 BULK_T      = 0.2
@@ -725,13 +740,38 @@ def tower(label, x0, x1, z0, z1, storeys, street_side, ac_floors):
         px, _, pz, _ = place(near_wall + WALL_T / 2, 0, (stair_b[0] + stair_b[1]) / 2, 0)
         portal(px, floor_top + 1.0, pz, stair_id, corridor_id, 1.4)
 
-        # The flight up from this storey: to the next one, or from the top storey to the roof.
+        # The flight up from this storey: to the next one, or from the top storey to the roof. A box a
+        # step: box k stands on the slab and its top is k + 1 risers over this floor, so the last
+        # box's top is the floor above and the count of boxes is the count of risers — the steps up
+        # you take, the last of them the one onto the landing. That count is what the markers say.
         lo, hi, n, rise, la, d, foot_b, top_b = flight(s)
         going = STAIR_GOING
+        flight_name = f"{label} stairs, floor {s} to {'the roof' if s + 1 == storeys else s + 1}"
         for k in range(n):
             q0, q1 = foot_b + d * k * going, foot_b + d * (k + 1) * going
             B("concrete_floor", la[0], la[1], floor_top, lo + (k + 1) * rise, min(q0, q1), max(q0, q1),
-              name=f"{label} stairs, floor {s}")
+              name=flight_name)
+
+        # "The stairs themselves need a zone, then the landings need a zone" (Cody, 2026-10-04). The
+        # flight is a named place from its first riser to its last, up to a body's eye over its top
+        # tread; the landing is the floor at the end of it you get on and off at, both lanes and the
+        # well between them across, the depth of a landing out from the end risers. Named places, not
+        # regions: the stairwell stays one room for sound (see named_place).
+        #
+        # Every storey has a flight up (the top one's goes to the roof), so every storey's landing is
+        # at the foot of its flight up — and on every floor above the ground, the top of the flight
+        # from below is beside it, across the well. The roof's landing is the stair housing.
+        def NP(name, a0, a1, y_0, y_1, b0, b1):
+            px0, px1, pz0, pz1 = place(a0, a1, b0, b1)
+            named_place(name, px0, px1, y_0, y_1, pz0, pz1)
+        fb0, fb1 = sorted((foot_b, top_b))
+        NP(flight_name, la[0], la[1], lo, hi + FLIGHT_HEAD, fb0, fb1)
+        out = -d                                        # from the flight up, away along the building
+        edge = max([foot_b] + ([flight(s - 1)[7]] if s else []), key=lambda b: out * b)
+        lb0, lb1 = sorted((edge, edge + out * STAIR_LANDING))
+        both = span(street_a, 2 * STAIR_W + STAIR_WELL)
+        NP(f"{label} landing, floor {s}", both[0], both[1], floor_top, ceil,
+           max(lb0, stair_b[0]), min(lb1, stair_b[1]))
         # Its guards, along the well and, in the lane away from the street wall, along its open side
         # too: stepped up the flight a few treads a piece, each piece a guard's height over the highest
         # tread beside it and down to a riser under the lowest, so the pieces meet. The last flight's
@@ -749,9 +789,10 @@ def tower(label, x0, x1, z0, z1, storeys, street_side, ac_floors):
             for ge in guards:
                 B("concrete_wall", ge[0], ge[1], lo + k0 * rise, g1, min(q0, q1), max(q0, q1), name=railing)
 
-        # Each end of the flight says what it is, as data: a stairs beacon, and the line the client
-        # speaks when you reach it facing along the flight. Turned to face the way you walk to take
-        # the flight from that end.
+        # Each end of the flight says what it is, as data: the line the client speaks when you reach it
+        # facing along the flight, turned to face the way you walk to take the flight from that end.
+        # The client blips the stairs beacon from one of them a floor: the foot of each floor's flight
+        # up, and on the roof the top of the flight down (StairCues.FloorBeacons).
         ca = (la[0] + la[1]) / 2
         dest = "the roof" if s + 1 == storeys else f"floor {s + 1}"
         fx, fz = P(ca, foot_b - d * MARKER_BACK)
@@ -2152,6 +2193,10 @@ for j in JUNCTIONS:
     j["PriorityRoads"] = [top["Id"]]
     j["GiveWaySeconds"] = 2.0
 
+# The named places last, so that adding one moved no other part's id.
+for _name, *_span in named_places:
+    box("named_place", *_span, name=_name)
+
 map_data = {
     "Id": "city",
     "IsDefault": False,
@@ -2206,8 +2251,9 @@ doors = sum(1 for e in entities if e["PrefabId"] in DOOR_PREFABS)
 door_kinds = ", ".join(f"{p} {n}" for p in DOOR_PREFABS
                        if (n := sum(1 for e in entities if e["PrefabId"] == p)))
 machines = sum(1 for e in entities if e["PrefabId"] in ("ac_window", "ac_condenser", "mower_push", "mower_riding"))
-solid = sum(1 for e in entities if e["PrefabId"] in BASE and e["PrefabId"] not in ("acoustic_region", "portal"))
-print(f"{OUT}: {len(entities)} entities — {regions} named places, {portals} portals, {doors} doors, "
+solid = sum(1 for e in entities if e["PrefabId"] in BASE and e["PrefabId"] not in ("acoustic_region", "portal", "named_place"))
+parts_named = sum(1 for e in entities if e["PrefabId"] == "named_place")
+print(f"{OUT}: {len(entities)} entities — {regions} regions, {parts_named} named parts of rooms, {portals} portals, {doors} doors, "
       f"{machines} machines, {solid} boxes")
 print(f"  doors by kind: {door_kinds}")
 print(f"  bounds {MAP_MAX[0] - MAP_MIN[0]:.0f} x {MAP_MAX[1]:.0f} x {MAP_MAX[2] - MAP_MIN[2]:.0f} m, "

@@ -1,0 +1,14 @@
+{
+  "Id": "named_place",
+  "Name": "Named place",
+  "Description": "A part of a room with a name of its own, such as a flight of stairs or a landing: a box that says where you are as you walk into it, and nothing else. It is not a room. An acoustic_region is both a name and a room for sound, and cutting a stairwell into rooms a flight long would cut its sound into pieces too; a named place inside a room changes the name you hear and leaves the room, its reverberation and its openings exactly as they were. Where it overlaps a room the named place is the name; the smallest wins where named places overlap. Scale it to the space it names. Not solid, not a surface, not read out as a thing near you.",
+  "Material": "None",
+  "ColliderSize": {
+    "X": 1,
+    "Y": 1,
+    "Z": 1
+  },
+  "IsSolid": false,
+  "Type": "StaticObject",
+  "Announce": false
+}

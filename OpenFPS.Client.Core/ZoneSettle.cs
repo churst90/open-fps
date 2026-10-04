@@ -30,6 +30,10 @@ public sealed class ZoneSettle
     private double _since;
     private Vector3? _last;
 
+    /// <summary>When the zone now held began to be held, on the clock <see cref="Update"/> is given:
+    /// when you crossed into it, or last jumped while in it.</summary>
+    public double HeldSince => _since;
+
     /// <summary>
     /// One update: the zone the listener is in, where the body is, and the time in seconds. True when
     /// that zone has held, with the body moving no faster than a body moves, for <see cref="SettleSeconds"/>.

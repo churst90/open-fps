@@ -904,6 +904,7 @@ public class ClientAudioSystem
         // the room on your side of it, you are told you are in the doorway.
         int zone = _acoustics.GetZoneAt(world, eyePos);
         _state.CurrentRegionId = zone;
+        _state.CurrentRoomId = _acoustics.GetRoomAt(world, eyePos);
         if (world.AcousticMap != null && world.AcousticMap.Regions.TryGetValue(regId, out var reg))
         {
             _state.IsIndoor = reg.IsIndoor;
@@ -914,7 +915,8 @@ public class ClientAudioSystem
         {
             _state.IsIndoor = false;
         }
-        string name = NameOfPlace(world.AcousticMap, zone, _state.CurrentMaterial, _state.ShelterFactor);
+        string name = NamedPlaces.NameOf(world, zone)
+                      ?? NameOfPlace(world.AcousticMap, zone, _state.CurrentMaterial, _state.ShelterFactor);
         // A zone stops at its walls, so a doorway, the wall's own thickness, is in none: it is named
         // from the zones either side of it.
         if (name == UnderShelter) name = DoorwayName(world, eyePos) ?? name;
@@ -946,9 +948,10 @@ public class ClientAudioSystem
             foreach (var d in DoorwayProbeDirections)
             {
                 int id = regionAt(at + d * reach);
-                if (id == AcousticConstants.GlobalRegionId || !world.AcousticMap.Regions.TryGetValue(id, out var r)
-                    || string.IsNullOrWhiteSpace(r.FriendlyName)) continue;
-                if (!names.Contains(r.FriendlyName)) names.Add(r.FriendlyName);
+                string? name = NamedPlaces.NameOf(world, id);
+                if (name == null && id != AcousticConstants.GlobalRegionId && world.AcousticMap.Regions.TryGetValue(id, out var r)
+                    && !string.IsNullOrWhiteSpace(r.FriendlyName)) name = r.FriendlyName;
+                if (name != null && !names.Contains(name)) names.Add(name);
             }
         return names.Count switch
         {

@@ -71,6 +71,12 @@ public class LocalPlayerState
     /// fallback name flips between "Outside" and "Under Shelter" on a continuous shelter value, which
     /// would announce itself every time a cloud of geometry passed overhead.</summary>
     public int CurrentRegionId { get; set; } = int.MinValue;
+
+    /// <summary>The ROOM the listener is in: <see cref="CurrentRegionId"/> without the named parts of
+    /// rooms (a flight, a landing; see NamedPlaces). Walking from a landing onto the floor beside it is
+    /// a new name but not a new room, and what the stair cues count as having gone somewhere else is a
+    /// new room.</summary>
+    public int CurrentRoomId { get; set; } = int.MinValue;
     public bool IsIndoor { get; set; }
     public Vector3 RoomSize { get; set; }
     public Vector3 RoomCenter { get; set; }

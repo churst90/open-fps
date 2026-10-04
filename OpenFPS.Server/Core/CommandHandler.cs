@@ -608,7 +608,7 @@ public class CommandHandler
             // a region or the portal between two is a volume nobody can walk into (Cody, 2026-10-04:
             // a scan in a stairwell named the stairwell, and the one below it, at 0 metres). A door
             // carries a portal too, and a door is very much a thing.
-            if (world.Has<RegionComponent>(e)) return;
+            if (world.Has<RegionComponent>(e) || IsNamedPlace(world, e)) return;
             if (world.Has<PortalComponent>(e) && !world.Has<DoorComponent>(e)) return;
 
             string? name = world.Has<IdentityComponent>(e) ? world.Get<IdentityComponent>(e).Name
@@ -1965,19 +1965,38 @@ public class CommandHandler
     }
 
     /// <summary>
-    /// The name of the place a point is in: the smallest named region volume that contains it, the
-    /// same boxes the client names places from. Null where nowhere is named.
+    /// The name of the place a point is in: the named part of a room holding it if there is one (a
+    /// flight of stairs, a landing), or else the smallest named region volume that contains it — the
+    /// same boxes, in the same order, as the client names places from. Null where nowhere is named.
     /// </summary>
     public static string? PlaceAt(World world, Vector3 point)
     {
+        static bool Holds(Vector3 point, in Transform t, Vector3 size)
+        {
+            if (size.X <= 0 || size.Y <= 0 || size.Z <= 0) return false;
+            var local = Vector3.Transform(point - t.Position, Quaternion.Inverse(t.Rotation));
+            return MathF.Abs(local.X) <= size.X / 2 && MathF.Abs(local.Y) <= size.Y / 2 && MathF.Abs(local.Z) <= size.Z / 2;
+        }
+
+        string? part = null;
+        float partVolume = float.MaxValue;
+        world.Query(new QueryDescription().WithAll<Transform, IdentityComponent, ColliderComponent>(),
+            (ref Transform t, ref IdentityComponent id, ref ColliderComponent c) =>
+            {
+                if (id.PrefabId != NamedPlacePrefab || c.IsSolid || string.IsNullOrWhiteSpace(id.Name)) return;
+                var size = c.Size;
+                if (!Holds(point, t, size) || size.X * size.Y * size.Z >= partVolume) return;
+                partVolume = size.X * size.Y * size.Z;
+                part = id.Name;
+            });
+        if (part != null) return part;
+
         string? best = null;
         float bestVolume = float.MaxValue;
         world.Query(new QueryDescription().WithAll<Transform, RegionComponent>(), (ref Transform t, ref RegionComponent r) =>
         {
             var size = r.RoomSize;
-            if (size.X <= 0 || size.Y <= 0 || size.Z <= 0 || string.IsNullOrWhiteSpace(r.FriendlyName)) return;
-            var local = Vector3.Transform(point - t.Position, Quaternion.Inverse(t.Rotation));
-            if (MathF.Abs(local.X) > size.X / 2 || MathF.Abs(local.Y) > size.Y / 2 || MathF.Abs(local.Z) > size.Z / 2) return;
+            if (string.IsNullOrWhiteSpace(r.FriendlyName) || !Holds(point, t, size)) return;
             float volume = size.X * size.Y * size.Z;
             if (volume >= bestVolume) return;
             bestVolume = volume;
@@ -1985,6 +2004,14 @@ public class CommandHandler
         });
         return best;
     }
+
+    /// <summary>The prefab of a named part of a room — a flight of stairs, a landing — which is a name
+    /// and not a room (prefabs/named_place.json; the client's NamedPlaces).</summary>
+    public const string NamedPlacePrefab = "named_place";
+
+    /// <summary>Whether an entity is a named part of a room: a place you are in, not a thing near you.</summary>
+    private static bool IsNamedPlace(World world, Entity e)
+        => world.Has<IdentityComponent>(e) && world.Get<IdentityComponent>(e).PrefabId == NamedPlacePrefab;
 
     // ── Administration ──────────────────────────────────────────────────────────────────────────
     //

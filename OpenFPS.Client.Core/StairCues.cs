@@ -29,14 +29,23 @@ namespace OpenFPS.Client.Core;
 /// two-metre walk away and back said it again, nine times in three minutes; and arriving off a flight
 /// walking backwards — facing up it — announced the flight just walked down.
 ///
-/// <b>On a flight.</b> A storey's zone stops at its ceiling and the next one starts at its floor, so
-/// at eye height the name changes about halfway up the stairs — "stairwell, floor 3" while you are
-/// still climbing to it, and on the way down "floor 2" a few treads from the top. The zone
-/// announcer waits while <see cref="OnFlight"/> is true and says where you are when you step off.
+/// <b>On a flight.</b> Where the map names its flights and landings (NamedPlaces) the flight is a zone
+/// of its own, "Marlow Tower stairs, floor 2 to 3", and the landing at its end another. Where it does
+/// not, a storey's zone stops at its ceiling and the next one starts at its floor, so at eye height
+/// the name would change about halfway up the stairs; the zone announcer holds a ROOM's name while
+/// <see cref="OnFlight"/> is true and says where you are when you step off.
 ///
-/// <b>The ends of the stairwell.</b> A landing that only one flight reaches is the bottom or the top
-/// of the whole stair (<see cref="IsStairwellEnd"/>); the stairs beacon blips from those and not from
-/// every landing in between.
+/// <b>The cue speaks for the stairs.</b> Walking up to a flight facing it, the cue is said half a
+/// metre before the first riser, and stepping onto the flight a moment later is stepping into its
+/// zone; the landing you crossed to reach it is a zone too. Both lines would come together, and the
+/// cue says more — which way, how many steps, to where — so a flight's or a landing's name is not
+/// said when the cue has just been, or when the flight is one whose end the cue told you about
+/// (<see cref="CoversZone"/>, <see cref="FlightAnnounced"/>). The zone is said when the cue was not:
+/// stepping onto the stairs from the side, or backwards, or arriving on a landing off a flight.
+///
+/// <b>One beacon a floor.</b> The stairs beacon blips from the foot of every floor's flight up and,
+/// on the roof, from the top of the flight down (<see cref="FloorBeacons"/>): each floor's stairs can
+/// be found by ear, and a landing where two flights meet blips once, not twice.
 /// </summary>
 public sealed class StairCues
 {
@@ -55,6 +64,10 @@ public sealed class StairCues
     /// <summary>How far above or below a marker's floor you must be to be on another floor, metres:
     /// half a storey. A jump goes under a metre.</summary>
     public const float LeaveRiseMetres = 1.5f;
+
+    /// <summary>How far above or below your ear a floor's stairs beacon is on another floor, metres:
+    /// half a storey. Its marker stands a metre over its floor and your ear about 1.6.</summary>
+    public const float OtherFloorMetres = 1.5f;
 
     /// <summary>How square to the flight you must be facing: within about fifty degrees of along it.</summary>
     public const float FacingCos = 0.64f;
@@ -76,6 +89,27 @@ public sealed class StairCues
     /// <summary>True while your feet are on the treads of a flight: between its two ends, and between
     /// the two floors it joins.</summary>
     public bool OnFlight { get; private set; }
+
+    /// <summary>True while your feet are on a flight whose line was said as you came to it: you were
+    /// told where these stairs go, and telling you their name as you step on is saying it twice.</summary>
+    public bool FlightAnnounced => OnFlight && _flightEnds.Contains(_lastSaid);
+
+    /// <summary>How long before you entered a zone a cue still speaks for it, seconds. The cue is said
+    /// as you reach a marker, half a metre short of the flight; the landing round the marker can be
+    /// entered a stride before, and the flight a stride after.</summary>
+    public const double CueLeadSeconds = 1.0;
+
+    /// <summary>
+    /// Whether the stair cue has already said what a zone's name would: you are on a flight it told
+    /// you about, or it spoke since a moment before you entered the zone. <paramref name="lastCueAt"/>
+    /// is when the last cue was said, <paramref name="enteredAt"/> when you crossed into the zone, on
+    /// one clock. Only for named parts of rooms, a flight or a landing: a ROOM is always said.
+    /// </summary>
+    public static bool CoversZone(bool flightAnnounced, double lastCueAt, double enteredAt)
+        => flightAnnounced || lastCueAt >= enteredAt - CueLeadSeconds;
+
+    /// <summary>The marker whose line was said last, until you step off a flight.</summary>
+    private int _lastSaid = -1;
 
     /// <summary>
     /// One update. Returns the line to say, or null. <paramref name="feet"/> is the body's position
@@ -100,7 +134,11 @@ public sealed class StairCues
                 _flightEnds.Add(other);
             }
         }
+        bool wasOnFlight = OnFlight;
         OnFlight = _flightEnds.Count > 0;
+        // Off a flight, what you were told on the way to it is spent: coming back down it later,
+        // without a cue, is news.
+        if (wasOnFlight && !OnFlight) _lastSaid = -1;
 
         string? say = null;
         int sayId = -1;
@@ -135,7 +173,7 @@ public sealed class StairCues
             if (!world.Entities.ContainsKey(id)) _scratch.Add(id);
         foreach (int id in _scratch) _quiet.Remove(id);
 
-        if (sayId >= 0) _quiet[sayId] = place;
+        if (sayId >= 0) { _quiet[sayId] = place; _lastSaid = sayId; }
         return say;
     }
 
@@ -146,6 +184,7 @@ public sealed class StairCues
         _quiet.Clear();
         _flightEnds.Clear();
         OnFlight = false;
+        _lastSaid = -1;
     }
 
     /// <summary>A stair marker: where it stands, the way it faces (level, unit), and what it says.</summary>
@@ -177,6 +216,62 @@ public sealed class StairCues
                 return false;
         }
         return true;
+    }
+
+    /// <summary>
+    /// The markers the stairs beacon blips from: one a floor. The foot of every flight up, and the top
+    /// of the whole stair — on the city's towers, the top of the flight onto the roof.
+    ///
+    /// Cody, 2026-10-04: a beacon only at the bottom and the top leaves "the levels in between" to be
+    /// found without seeing where the stairs are. Every floor has a flight up but the top one, so the
+    /// beacon on each floor is where you step onto the stairs to go up from it, and where two flights
+    /// meet on a landing, only the one going up blips.
+    ///
+    /// Which end of a flight a marker is comes from the markers alone, paired from the bottom up. A
+    /// marker's position and facing do not say it: in a dog-leg every other flight is in the same lane,
+    /// so the top of one flight faces, along the same line, both its own foot a storey down and the
+    /// foot of the flight two up a storey up. But the lowest marker of a stair can only be a foot, and
+    /// it pairs with the nearest marker above facing back down its line, which is that flight's top;
+    /// taken in order of height, every marker not already the top of a flight from below is the foot
+    /// of the flight above it, or the top of the whole stair if nothing above faces back down to it.
+    /// </summary>
+    public static HashSet<int> FloorBeacons(WorldSnapshot world)
+    {
+        var ms = new List<(int Id, Vector3 At, Vector3 Along)>();
+        foreach (int id in world.MarkerEntityIds)
+            if (TryMarker(world, id, out var at, out var along, out _)) ms.Add((id, at, along));
+        ms.Sort((a, b) => a.At.Y != b.At.Y ? a.At.Y.CompareTo(b.At.Y) : a.Id.CompareTo(b.Id));
+
+        var tops = new HashSet<int>();
+        var beacons = new HashSet<int>();
+        foreach (var m in ms)
+        {
+            if (tops.Contains(m.Id)) continue;                       // reached from below: a top
+            var from = new Vector2(m.At.X, m.At.Z);
+            var dir = new Vector2(m.Along.X, m.Along.Z);
+            var side = new Vector2(-dir.Y, dir.X);
+            int top = -1;
+            float bestRise = float.MaxValue;
+            foreach (var o in ms)
+            {
+                if (o.Id == m.Id || tops.Contains(o.Id) || Vector3.Dot(o.Along, m.Along) > -0.9f) continue;
+                float rise = o.At.Y - m.At.Y;
+                if (rise < 0.5f || rise >= bestRise) continue;
+                var q = new Vector2(o.At.X, o.At.Z) - from;
+                float a = Vector2.Dot(q, dir);
+                if (a <= 0.5f || a > MaxFlightMetres || MathF.Abs(Vector2.Dot(q, side)) > 0.5f) continue;
+                bestRise = rise;
+                top = o.Id;
+            }
+            if (top >= 0) tops.Add(top);
+            // The foot of a flight up; or, with nothing above facing back down to it and nothing
+            // reaching it from below, a marker on its own, which is still a way onto some stairs.
+            beacons.Add(m.Id);
+        }
+        // ...and the top of the whole stair: a top with no foot beside it on its landing.
+        foreach (int id in tops)
+            if (IsStairwellEnd(world, id)) beacons.Add(id);
+        return beacons;
     }
 
     /// <summary>

@@ -34,7 +34,10 @@ public class CityZoneTests
         var defs = EntityDefinitionFactory.StaticDefinitions(ecs);
         var world = new WorldSnapshot();
         foreach (var def in defs)
+        {
             world.Entities[def.EntityId] = new EntitySnapshot { Id = def.EntityId, Definition = def, Transform = def.Transform };
+            if (OpenFPS.Client.Core.ClientWorldState.IsMarker(def)) world.MarkerEntityIds.Add(def.EntityId);
+        }
         world.AcousticMap = AcousticVolumeGenerator.GenerateRegions(defs, size, data.MinBound, data.VoxelResolution, data.OcclusionFloor);
         return world;
     }
@@ -85,6 +88,50 @@ public class CityZoneTests
         int at = spatial.GetRegionAt(world, new Vector3(-18.64f, 1.7f, 156.975f));
         Assert.NotEqual("Market Square", map.Regions.TryGetValue(at, out var here) ? here.FriendlyName : "");
     
+    }
+
+    /// <summary>
+    /// A flight of stairs and a landing are names, not rooms. Standing in the middle of each one in
+    /// every tower, the client names the flight or the landing — and the server, saying where another
+    /// player is, names the same — while the room for sound is the stairwell (or, at the top of the
+    /// last flight, the roof's stair housing) exactly as it was: no named place is a region in the
+    /// acoustic map, so the shaft's reverberation and its openings are untouched.
+    /// </summary>
+    [Fact]
+    public void AFlightAndALandingAreNamesNotRooms()
+    {
+        var world = City();
+        var map = world.AcousticMap!;
+        var places = world.MarkerEntityIds.Where(id => OpenFPS.Client.Core.NamedPlaces.Is(world.Entities[id].Definition)).ToList();
+        Assert.Equal(74, places.Count);                                     // a flight and a landing a storey, 37 storeys
+        var acoustics = new SpatialAcoustics();
+        Assert.NotNull(acoustics.RoutesFor(world));
+
+        AcousticRegistry.Initialize();
+        var maps = new MapManager(new MapRepository(Path.Combine(AppContext.BaseDirectory, "maps")),
+                                  new PrefabRepository(Path.Combine(AppContext.BaseDirectory, "prefabs")));
+        maps.Initialize();
+        Assert.True(maps.TryGetMap("city", out var ecs, out _, out _, out _));
+
+        foreach (int id in places)
+        {
+            var e = world.Entities[id];
+            string name = e.Definition.Identity.Name;
+            Assert.False(map.Regions.ContainsKey(id), $"'{name}' is a region");
+            // At eye height over the middle of its floor: the bottom of the box is the floor (a
+            // landing) or the floor at the foot (a flight, whose middle tread is half a storey up).
+            var size = e.Definition.Collider.Size;
+            var floorY = e.Transform.Position.Y - size.Y / 2;
+            bool flight = name.Contains(" stairs, ");
+            var eye = e.Transform.Position with { Y = floorY + (flight ? 1.5f : 0f) + 1.7f };
+            Assert.Equal(id, acoustics.GetZoneAt(world, eye));
+            Assert.Equal(name, CommandHandler.PlaceAt(ecs, eye));
+            int room = acoustics.GetRegionAt(world, eye);
+            string roomName = map.Regions.TryGetValue(room, out var r) ? r.FriendlyName : "";
+            Assert.True(roomName.Contains(" stairwell, floor ") || roomName.EndsWith(" roof access"),
+                        $"'{name}': the room for sound is '{roomName}'");
+            Assert.Equal(room, acoustics.GetRoomAt(world, eye));
+        }
     }
 
     /// <summary>

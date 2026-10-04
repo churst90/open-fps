@@ -288,8 +288,15 @@ public class SpatialAcoustics
     private const float InOpeningSlack = 0.15f;
 
     /// <summary>The place a point is in by the boxes alone: a doorway is in none. For naming where the
-    /// listener stands ("doorway between A and B"), not for sound.</summary>
-    public int GetZoneAt(WorldSnapshot world, Vector3 position) => _spatial.GetRegionAt(world, position);
+    /// listener stands ("doorway between A and B"), not for sound. A named part of a room — a flight
+    /// of stairs, a landing — is the place where it holds the point; it is not a room, so
+    /// <see cref="GetRegionAt"/> never answers one.</summary>
+    public int GetZoneAt(WorldSnapshot world, Vector3 position)
+        => NamedPlaces.At(world, position) ?? GetRoomAt(world, position);
+
+    /// <summary>The region a point is in by the boxes alone, leaving out named places: the room you are
+    /// in, as a crossing between rooms is counted. A doorway is in none.</summary>
+    public int GetRoomAt(WorldSnapshot world, Vector3 position) => _spatial.GetRegionAt(world, position);
 
     public AcousticPathData CalculateAcousticPath(WorldSnapshot world, int entityId, Vector3 listenerPos, Vector3 sourcePos)
     {

@@ -42,12 +42,14 @@ public sealed class BeaconAids
         [Beacons.Door] = ("SYNTH/beacon_door_chime", 523f, 12f, 3),
         [Beacons.Item] = ("SYNTH/beacon_item_ring", 1046f, 10f, 3),
         [Beacons.Vehicle] = ("SYNTH/beacon_vehicle_hum", 262f, 25f, 2),
-        // The bottom and the top of a stairwell: the foot of the flight from the ground floor and the
-        // top of the flight onto the roof, each a stair marker the map put on the landing (see
-        // StairCues.IsStairwellEnd). Not every flight's ends on every floor — "the stairs beacon
-        // should only play for the top and bottom of that stairwell" (Cody, 2026-10-04): between
-        // them the stair cues say where each flight goes as you reach it.
-        [Beacons.Stairs] = ("SYNTH/beacon_stairs_steps", 392f, 10f, 2),
+        // One a floor, and only your floor's: the foot of the flight up from it, a stair marker the map
+        // put on the landing, and on the roof the top of the flight down (StairCues.FloorBeacons).
+        // The bottom and the top of the stairwell alone left "the levels in between" to be found
+        // without seeing where the stairs are (Cody, 2026-10-04); every flight end on every floor
+        // was two blips a landing and a shaft full of them. Heard to 15 m: on the city's towers a
+        // floor's way up is as much as 11.7 m from the stairwell's door, at the far end of the shaft
+        // on every other floor, and from that door at 10 m it was silent.
+        [Beacons.Stairs] = ("SYNTH/beacon_stairs_steps", 392f, 15f, 2),
         [Beacons.Player] = ("SYNTH/beacon_player_call", 392f, 30f, 4),
     };
 
@@ -246,6 +248,7 @@ public sealed class BeaconAids
                                                       int skip = -1)
     {
         var found = new List<(int Id, Vector3 At, float D)>();
+        var floorBeacons = category == Beacons.Stairs ? StairCues.FloorBeacons(world) : null;
         void Consider(EntitySnapshot e)
         {
             if (e.Id == skip) return;
@@ -255,7 +258,11 @@ public sealed class BeaconAids
             var at = e.Transform.Position;
             float d = Vector3.Distance(listener, at);
             if (d > range) return;
-            if (category == Beacons.Stairs && !StairCues.IsStairwellEnd(world, e.Id)) return;
+            // A stairwell is open from bottom to top, so the floors above and below are in sight and
+            // a few metres off: nearer, from a corridor door, than your own floor's stairs at the far
+            // end of the landing. They are not the way up from here.
+            if (floorBeacons != null && (!floorBeacons.Contains(e.Id) || MathF.Abs(at.Y - listener.Y) > StairCues.OtherFloorMetres))
+                return;
             found.Add((e.Id, at, d));
         }
         if (world.StaticGrid != null)

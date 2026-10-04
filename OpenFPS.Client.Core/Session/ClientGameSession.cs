@@ -612,7 +612,7 @@ public sealed partial class ClientGameSession : IDisposable
 
         // ...and only then, because the region the audio system just worked out is the one to say.
         AnnounceStairs(snapshot);
-        AnnounceZoneChanges();
+        AnnounceZoneChanges(snapshot);
         AnnounceMapEdge();
     }
 
@@ -1280,12 +1280,12 @@ public sealed partial class ClientGameSession : IDisposable
     /// Spoken WITHOUT interrupting, because crossing a doorway must not cut off whatever you were
     /// already being told — very often the thing that made you walk through it.
     /// </summary>
-    private void AnnounceZoneChanges()
+    private void AnnounceZoneChanges(WorldSnapshot snapshot)
     {
         // Whether the zone you are in has held long enough, with the body moving as a body moves, to
         // be a place you have walked into rather than a flicker or a bounce. See ZoneSettle.
-        bool settled = _zoneSettle.Update(_state.CurrentRegionId, _state.Position,
-                                          (DateTime.UtcNow - DateTime.UnixEpoch).TotalSeconds);
+        double now = (DateTime.UtcNow - DateTime.UnixEpoch).TotalSeconds;
+        bool settled = _zoneSettle.Update(_state.CurrentRegionId, _state.Position, now);
 
         if (_arrivalPendingSince is { } since)
         {
@@ -1305,13 +1305,17 @@ public sealed partial class ClientGameSession : IDisposable
             return;
         }
 
-        // Not while you are on the stairs. A storey's zone ends at its ceiling and the next begins at
-        // its floor, so at eye height the next floor's name comes halfway up the flight — "floor 3"
-        // with five steps still to climb, and on the way down "floor 2" two treads from the top. Held
-        // until your feet are off the treads, it is said on the landing, which is where you arrive.
-        if (_stairs.OnFlight) return;
-
+        // A flight or a landing the map has named: a part of a room, not a room (see NamedPlaces).
         int region = _state.CurrentRegionId;
+        bool part = NamedPlaces.NameOf(snapshot, region) != null;
+
+        // Not a room's name while you are on the stairs. Where the map has not named its flights, a
+        // storey's zone ends at its ceiling and the next begins at its floor, so at eye height the next
+        // floor's name comes halfway up the flight — "floor 3" with five steps still to climb, and on
+        // the way down "floor 2" two treads from the top. Held until your feet are off the treads, it
+        // is said on the landing, which is where you arrive. A named flight is the stairs' own name.
+        if (_stairs.OnFlight && !part) return;
+
         if (region == _lastAnnouncedRegionId) return;
         // ...and not until it has held: a zone that changes back within a breath, or while the body is
         // thrown about faster than it walks, was never crossed into (Cody on Brandt Court's roof,
@@ -1335,8 +1339,22 @@ public sealed partial class ClientGameSession : IDisposable
         if (name == ClientAudioSystem.UnderShelter || name.StartsWith(ClientAudioSystem.DoorwayPrefix)) return;
 
         _lastAnnouncedRegion = name;
+        // The stair cue speaks for a flight or a landing it has just told you about: walking up to a
+        // flight facing it, "Stairs up, 17 steps, to floor 3" is said half a metre short of the first
+        // riser, and the landing you are on and the flight you step onto a moment later would each say
+        // their names straight after it. The cue says more — which way, how many, to where — and comes
+        // first. Their names are said when it did not speak: onto the stairs from the side or
+        // backwards, or off a flight onto a landing. See StairCues.CoversZone.
+        if (part && StairCues.CoversZone(_stairs.FlightAnnounced, _stairCueAt, _zoneSettle.HeldSince))
+        {
+            Serilog.Log.Information("[ZONE] '{Name}' not said: the stair cue spoke for it", name);
+            return;
+        }
         _speech.Speak(name, interrupt: false);
     }
+
+    /// <summary>When a stair cue was last said, on the zone announcer's clock.</summary>
+    private double _stairCueAt = double.NegativeInfinity;
 
     /// <summary>
     /// The foot or the top of a flight, said once as you reach it facing along it: "Stairs up, 17 steps,
@@ -1347,9 +1365,12 @@ public sealed partial class ClientGameSession : IDisposable
     private void AnnounceStairs(WorldSnapshot snapshot)
     {
         if (_state.IsRiding) { _stairs.Reset(); return; }
-        string? line = _stairs.Update(snapshot, _state.Position, _state.Rotation, _state.CurrentRegionId);
+        // The ROOM, not a flight's or a landing's name: stepping off a landing onto the floor beside it
+        // and back is not having been somewhere else, and must not say the flight again.
+        string? line = _stairs.Update(snapshot, _state.Position, _state.Rotation, _state.CurrentRoomId);
         if (line == null) return;
         Serilog.Log.Information("[STAIRS] '{Line}' at {Pos}", line, _state.Position);
+        _stairCueAt = (DateTime.UtcNow - DateTime.UnixEpoch).TotalSeconds;
         _speech.Speak(line, interrupt: false);
     }
 

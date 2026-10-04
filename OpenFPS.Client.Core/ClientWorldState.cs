@@ -33,7 +33,7 @@ public class ClientWorldState
     /// <summary>Everything that declares a region, so the moved-region check is not a walk over the
     /// whole map every frame. See WorldSnapshot.RegionEntityIds.</summary>
     private readonly ConcurrentDictionary<int, byte> _regionEntityIds = new();
-    /// <summary>Fixed beacons that are not solid, such as stair markers. See WorldSnapshot.MarkerEntityIds.</summary>
+    /// <summary>Fixed beacons that are not solid, such as stair markers, and named places. See IsMarker.</summary>
     private readonly ConcurrentDictionary<int, byte> _markerEntityIds = new();
 
     // --- Snapshot Interpolation ---
@@ -638,10 +638,12 @@ public class ClientWorldState
         return snap;
     }
 
-    /// <summary>A fixed beacon nothing can bump into: in neither the static grid nor the moving things.</summary>
+    /// <summary>A fixed thing nothing can bump into, in neither the static grid nor the moving things,
+    /// that something looks for near you: a beacon such as a stair marker, or a named place such as a
+    /// flight or a landing (<see cref="NamedPlaces"/>). Each consumer takes its own kind from the list.</summary>
     internal static bool IsMarker(EntityDefinition def)
         => def.Type == EntityType.StaticObject && !def.Moves && !def.Collider.IsSolid
-           && !string.IsNullOrEmpty(def.Identity.BeaconCategory);
+           && (!string.IsNullOrEmpty(def.Identity.BeaconCategory) || NamedPlaces.Is(def));
 
     private void RebuildGrid()
     {
