@@ -42,9 +42,11 @@ public sealed class BeaconAids
         [Beacons.Door] = ("SYNTH/beacon_door_chime", 523f, 12f, 3),
         [Beacons.Item] = ("SYNTH/beacon_item_ring", 1046f, 10f, 3),
         [Beacons.Vehicle] = ("SYNTH/beacon_vehicle_hum", 262f, 25f, 2),
-        // The two ends of a flight: its foot and its top, each a stair marker the map put on the
-        // landing. The nearest two, so standing at the top of one flight you hear the top you are at
-        // and the foot of the next one round the spine wall, and not the whole stairwell.
+        // The bottom and the top of a stairwell: the foot of the flight from the ground floor and the
+        // top of the flight onto the roof, each a stair marker the map put on the landing (see
+        // StairCues.IsStairwellEnd). Not every flight's ends on every floor — "the stairs beacon
+        // should only play for the top and bottom of that stairwell" (Cody, 2026-10-04): between
+        // them the stair cues say where each flight goes as you reach it.
         [Beacons.Stairs] = ("SYNTH/beacon_stairs_steps", 392f, 10f, 2),
         [Beacons.Player] = ("SYNTH/beacon_player_call", 392f, 30f, 4),
     };
@@ -252,7 +254,9 @@ public sealed class BeaconAids
             // door, not from the floor under it.
             var at = e.Transform.Position;
             float d = Vector3.Distance(listener, at);
-            if (d <= range) found.Add((e.Id, at, d));
+            if (d > range) return;
+            if (category == Beacons.Stairs && !StairCues.IsStairwellEnd(world, e.Id)) return;
+            found.Add((e.Id, at, d));
         }
         if (world.StaticGrid != null)
             foreach (int id in world.StaticGrid.GetItemsInRadius(listener, range))

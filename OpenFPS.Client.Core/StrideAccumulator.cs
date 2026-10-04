@@ -295,6 +295,15 @@ public sealed class StrideAccumulator
         bool treadNow = isGrounded && dy >= TreadJump && dy <= PhysicsConstants.StepHeight + 0.05f;
         if (treadNow) _treadsSinceStep++;
 
+        // How high the foot is, for whether this footfall went up or down: the lower of where the body
+        // is and where it was an update ago. The movement engine takes a step up by lifting the body
+        // the whole StepHeight and lets the ground probe settle it onto the tread on the next update,
+        // so for one update a body climbing stairs is 40 cm over the tread it came from. A footfall on
+        // that update measured from there put the next one, on the landing at the top, 22 cm BELOW it,
+        // and the last step of a flight of 17.6 cm risers went down as a heel drop (2026-10-04, the
+        // walk up Selby House). On the way down there is no such lift and the lower is where you are.
+        float footY = isGrounded && _lastPosition.HasValue ? MathF.Min(position.Y, _lastPosition.Value.Y) : position.Y;
+
         if (_lastPosition.HasValue)
         {
             if (isGrounded)
@@ -343,10 +352,10 @@ public sealed class StrideAccumulator
             // Up or down by how far the body climbed or dropped since its last footfall.
             if (_lastStepY is float before)
             {
-                float rise = position.Y - before;
+                float rise = footY - before;
                 slope = rise >= MinStairRise ? StepSlope.Up : rise <= -MinStairRise ? StepSlope.Down : StepSlope.Level;
             }
-            _lastStepY = position.Y;
+            _lastStepY = footY;
             _treadsSinceStep = 0;
             _stepCount++;
             float lateral = (_stepCount % 2 == 0) ? StepWidth : -StepWidth;

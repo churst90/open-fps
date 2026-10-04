@@ -203,22 +203,39 @@ CORRIDOR    = 2.2
 FLAT_DEPTH  = 9.0
 FLATS       = 4                          # per side per storey, plus the stairwell slot
 
-STAIR_RISE  = 0.3                        # under PhysicsConstants.StepHeight (0.4), or it is a wall
-STAIR_GOING = 0.32
-STAIR_W     = 1.6
-# Every flight covers the same ground, ten goings, whatever it climbs: the ground floor's flight
-# climbs 23 cm more than the others (its floor is laid on the ground, not on a slab) and takes an
-# eleventh, slightly shallower step to do it rather than a longer plan.
-FLIGHT_RUN  = round(STOREY / STAIR_RISE) * STAIR_GOING
-STAIR_LANDING = 1.6                      # floor between the stairwell's end wall and the flights
-STAIR_SPINE = 0.2                        # the wall between the up and the down flight of a dog-leg
+# A stair is built to the figures a real one is, from the International Building Code (2021),
+# chapter 10, the stairs a block of flats has to have:
+#   1011.5.2  a riser 4 to 7 in (102 to 178 mm); a tread at least 11 in (279 mm) deep
+#   1011.2    at least 44 in (1118 mm) wide where it serves fifty people or more
+#   1011.6    a landing top and bottom of every flight, as wide as the stair and as deep as it is wide
+#   1011.8    no flight rising more than 12 ft (3658 mm) without a landing: one flight a storey is allowed
+#   1015.3    a guard 42 in (1067 mm) high wherever the floor drops away more than 30 in
+#
+# Until 2026-10-04 a flight was ten 30 cm risers on 32 cm goings — a ladder of a stair, 43 degrees,
+# three metres long a storey — and the two flights of the dog-leg stood either side of a 20 cm wall,
+# each in a 1.6 m slot between brick and concrete. "The stairs also seem kind of short ... way too
+# narrow and close to each other" (Cody). Seventeen 17.6 cm risers on 28 cm goings is the ordinary
+# office stair, 32 degrees and 4.8 m a storey, and the two flights now have an open well between
+# them, guarded, so the whole shaft is one space, as it is in a real stairwell.
+STAIR_RISE  = 0.178                      # the steepest riser allowed; a flight takes as many as it needs
+STAIR_GOING = 0.28                       # the shallowest tread allowed, on every step
+STAIR_W     = 1.6                        # each flight; over the 1.12 m minimum and not narrowed from before
+STAIR_WELL  = 0.8                        # the open gap between the two flights, guarded both sides
+# A storey's flight covers this much ground. The ground floor's flight climbs 23 cm more (its floor is
+# laid on the ground, not on a slab) and takes the two extra steps it needs at its foot, on the
+# same 28 cm tread, rather than steeper ones.
+FLIGHT_RUN  = math.ceil(STOREY / STAIR_RISE - 1e-6) * STAIR_GOING
+STAIR_LANDING = 2.0                      # floor between the stairwell's end wall and the flights: the
+                                         # turn, deeper than the stair is wide, with room for the ground
+                                         # floor's two extra steps
 # How far the opening in the floor above runs back past the first riser. A body on a step has its
 # head 1.8 m up, and the movement engine checks a step-up 0.4 m higher still before taking it, so
-# the opening has to start behind the foot of the flight or the second step is a ceiling.
+# the opening has to start behind the foot of the flight or the fourth step is a ceiling.
 STAIR_HEAD  = 0.5
-RAIL_H      = 1.0                        # the upstand round an opening in a floor
+RAIL_H      = 1.07                       # a guard: round an opening in a floor, along the well (1015.3)
 RAIL_T      = 0.1
-MARKER_BACK = 0.4                        # a stair marker stands this far out from the end riser
+GUARD_STEPS = 3                          # a flight's guard is stepped up it in pieces this many treads long
+MARKER_BACK = 0.5                        # a stair marker stands this far out from the end riser, clear of the well's guard
 PARAPET_H   = 1.1                        # a roof's edge wall: the height building rules ask for
 BULK_H      = 2.6                        # clear height inside the stair housing on a roof
 BULK_T      = 0.2
@@ -480,9 +497,14 @@ def tower(label, x0, x1, z0, z1, storeys, street_side, ac_floors):
 
     # ── The stair plan: a dog-leg, the same on every storey ─────────────────────────────────────
     #
-    # Two lanes against the street wall with a spine wall between them, and the flights going up
+    # Two lanes against the street wall with an open well between them, and the flights going up
     # them alternately: one runs along the building, the next comes back beside it. At the top of a
-    # flight you turn round and the foot of the next one is beside you.
+    # flight you turn round and the foot of the next one is beside you, across the well.
+    #
+    # The well is open from the ground floor to the top storey — a gap in every floor between the
+    # flights, guarded along both flights and across both ends on every floor — so the stairwell is
+    # one tall space from bottom to top. It was a 20 cm wall floor to ceiling, which made each flight
+    # a corridor of its own.
     #
     # The flights used to be stacked straight above one another, every storey's flight in the same
     # place, under ceiling slabs laid whole across the stairwell. The movement engine could not get
@@ -500,9 +522,14 @@ def tower(label, x0, x1, z0, z1, storeys, street_side, ac_floors):
         return (min(start, end), max(start, end))
 
     def lane(i):
-        return span(street_a + inward * i * (STAIR_W + STAIR_SPINE), STAIR_W)
+        return span(street_a + inward * i * (STAIR_W + STAIR_WELL), STAIR_W)
 
-    spine = span(street_a + inward * STAIR_W, STAIR_SPINE)
+    well = span(street_a + inward * STAIR_W, STAIR_WELL)
+
+    def well_edge(i):
+        """The strip of the well along lane i, where that lane's flight has its guard."""
+        return span(street_a + inward * (STAIR_W if i == 0 else STAIR_W + STAIR_WELL - RAIL_T), RAIL_T)
+
     L0 = stair_b[0] + STAIR_LANDING
     L1 = L0 + FLIGHT_RUN
     roof_y = storeys * STOREY + SLAB
@@ -519,15 +546,28 @@ def tower(label, x0, x1, z0, z1, storeys, street_side, ac_floors):
     def flight_dir(s):
         return +1 if flight_lane(s) == 0 else -1
 
+    def flight(s):
+        """Flight s, from storey s up to the next or the roof: (lo, hi, risers, rise, lane, direction,
+        foot, top). Its top is at the turn, L1 going one way and L0 the other; a flight that needs more
+        risers than a storey's starts further back at its foot."""
+        lo, hi = level(s), level(s + 1)
+        n = math.ceil((hi - lo) / STAIR_RISE - 1e-6)
+        d = flight_dir(s)
+        top_b = L1 if d > 0 else L0
+        return lo, hi, n, (hi - lo) / n, lane(flight_lane(s)), d, top_b - d * n * STAIR_GOING, top_b
+
     def hole(s):
         """The opening flight s comes up through, in the floor above it: back past its foot by
-        STAIR_HEAD, and level with its top riser, where the floor carries on."""
+        STAIR_HEAD, and level with its top riser, where the floor carries on. In every floor up to the
+        top storey's the well beside it is open too; the roof is whole over the well."""
         if s < 0:
             return None
-        la = lane(flight_lane(s))
-        if flight_dir(s) > 0:
-            return (la[0], la[1], L0 - STAIR_HEAD, L1)
-        return (la[0], la[1], L0, L1 + STAIR_HEAD)
+        _, _, _, _, la, d, foot_b, top_b = flight(s)
+        a0, a1 = la
+        if s + 1 < storeys:
+            a0, a1 = min(a0, well[0]), max(a1, well[1])
+        b0, b1 = sorted((foot_b - d * STAIR_HEAD, top_b))
+        return (a0, a1, b0, b1)
 
     for s in range(storeys):
         y0 = s * STOREY
@@ -632,21 +672,26 @@ def tower(label, x0, x1, z0, z1, storeys, street_side, ac_floors):
         portal(px, floor_top + 1.0, pz, stair_id, corridor_id, 1.4)
 
         # The flight up from this storey: to the next one, or from the top storey to the roof.
-        lo, hi = level(s), level(s + 1)
-        n = math.ceil((hi - lo) / STAIR_RISE - 1e-6)
-        rise, going = (hi - lo) / n, FLIGHT_RUN / n
-        la, d = lane(flight_lane(s)), flight_dir(s)
-        foot_b = L0 if d > 0 else L1
-        top_b = foot_b + d * FLIGHT_RUN
+        lo, hi, n, rise, la, d, foot_b, top_b = flight(s)
+        going = STAIR_GOING
         for k in range(n):
             q0, q1 = foot_b + d * k * going, foot_b + d * (k + 1) * going
             B("concrete_floor", la[0], la[1], floor_top, lo + (k + 1) * rise, min(q0, q1), max(q0, q1))
-        # The spine wall closes the side of the opening the flight below came up through, and stops
-        # there: past it is the way across from the top of one flight to the foot of the next, a
-        # straight step sideways from marker to marker.
-        below = hole(s - 1)
-        sb0, sb1 = (below[2], below[3]) if below else (L0, L1)
-        B("concrete_wall", spine[0], spine[1], floor_top, ceil, sb0, sb1)
+        # Its guards, along the well and, in the lane away from the street wall, along its open side
+        # too: stepped up the flight a few treads a piece, each piece a guard's height over the highest
+        # tread beside it and down to a riser under the lowest, so the pieces meet. The last flight's
+        # stops at the roof, where the stair housing's wall stands on it.
+        guards = [well_edge(flight_lane(s))]
+        if flight_lane(s) == 1:
+            guards.append(span(la[1] if inward > 0 else la[0], RAIL_T))
+        for k0 in range(0, n, GUARD_STEPS):
+            k1 = min(n, k0 + GUARD_STEPS)
+            q0, q1 = foot_b + d * k0 * going, foot_b + d * k1 * going
+            g1 = lo + k1 * rise + RAIL_H
+            if s + 1 == storeys:
+                g1 = min(g1, roof_y)
+            for ge in guards:
+                B("concrete_wall", ge[0], ge[1], lo + k0 * rise, g1, min(q0, q1), max(q0, q1))
 
         # Each end of the flight says what it is, as data: a stairs beacon, and the line the client
         # speaks when you reach it facing along the flight. Turned to face the way you walk to take
@@ -658,18 +703,26 @@ def tower(label, x0, x1, z0, z1, storeys, street_side, ac_floors):
         tx, tz = P(ca, top_b + d * MARKER_BACK)
         prop("stair_marker", tx, hi + 1.0, tz, name=f"Stairs down, {n} steps, to floor {s}", facing=heading(-d))
 
-        # The opening this flight comes up through is a drop on the floor above. The spine wall
-        # closes one side of it and the street wall or the flight beside it the other; what is left
-        # open, except the end you step off the stairs at, gets an upstand. Not on the roof, where
-        # the stair housing's own walls close it.
+        # The opening this flight comes up through, and the well beside it, are a drop on the floor
+        # above. Everything round them is guarded except the end you step off the stairs at: across
+        # the back of the opening, across the well at the top, along lane 1's far side (lane 0's is
+        # the street wall), and along the well where the opening runs on past the end of the next
+        # flight up (whose own guard covers the rest). Not on the roof, where the stair housing's own
+        # walls close the opening and the well stops under the slab.
         if s + 1 < storeys:
-            if d > 0:
-                B("concrete_wall", la[0], la[1], hi, hi + RAIL_H, L0 - STAIR_HEAD - RAIL_T, L0 - STAIR_HEAD)
-            else:
-                B("concrete_wall", la[0], la[1], hi, hi + RAIL_H, L1 + STAIR_HEAD, L1 + STAIR_HEAD + RAIL_T)
-                edge = la[1] if inward > 0 else la[0]          # lane B's side away from the spine
-                ra = span(edge, RAIL_T)
-                B("concrete_wall", ra[0], ra[1], hi, hi + RAIL_H, L0, L1 + STAIR_HEAD + RAIL_T)
+            ha0, ha1, hb0, hb1 = hole(s)
+            back = (hb0 - RAIL_T, hb0) if d > 0 else (hb1, hb1 + RAIL_T)
+            B("concrete_wall", ha0, ha1, hi, hi + RAIL_H, back[0], back[1])
+            tb = sorted((top_b, top_b + d * RAIL_T))
+            B("concrete_wall", well[0], well[1], hi, hi + RAIL_H, tb[0], tb[1])
+            if flight_lane(s) == 1:
+                ra = span(la[1] if inward > 0 else la[0], RAIL_T)
+                B("concrete_wall", ra[0], ra[1], hi, hi + RAIL_H, min(back[0], hb0), max(back[1], hb1))
+            _, _, _, _, _, _, nf, nt = flight(s + 1)
+            ne = well_edge(flight_lane(s + 1))
+            for q0, q1 in ((hb0, min(nf, nt)), (max(nf, nt), hb1)):
+                if q1 - q0 > 1e-6:
+                    B("concrete_wall", ne[0], ne[1], hi, hi + RAIL_H, q0, q1)
 
         if s == 0:
             ex, _, ez, _ = place(sx1 - WALL_T / 2 if side > 0 else sx0 + WALL_T / 2, 0,
@@ -713,12 +766,12 @@ def tower(label, x0, x1, z0, z1, storeys, street_side, ac_floors):
     # The last flight comes up through the roof into a stair housing (a bulkhead): a small brick room
     # over the top of the flight with a landing and a steel door at the far end. Up the flight, keep
     # walking, and the door is in front of you. The housing's street side stands on the street wall,
-    # its other side on the line of the spine wall below.
-    la = lane(0)
+    # its other side on the well's edge below.
+    _, _, _, _, la, _, roof_foot, roof_top = flight(storeys - 1)
     ca = (la[0] + la[1]) / 2
     street_wall = (sx1 - WALL_T, sx1) if side > 0 else (sx0, sx0 + WALL_T)
     inner_wall = span(la[1] if inward > 0 else la[0], BULK_T)
-    hb0, hb1 = L0 - STAIR_HEAD, L1 + BULK_LANDING          # the housing's inside, along
+    hb0, hb1 = roof_foot - STAIR_HEAD, roof_top + BULK_LANDING   # the housing's inside, along
     ha0, ha1 = min(street_wall[0], inner_wall[0]), max(street_wall[1], inner_wall[1])
     top = roof_y + BULK_H
     B("brick_wall", street_wall[0], street_wall[1], roof_y, top, hb0 - BULK_T, hb1 + BULK_T)

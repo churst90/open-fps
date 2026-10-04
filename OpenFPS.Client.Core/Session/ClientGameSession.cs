@@ -873,6 +873,7 @@ public sealed partial class ClientGameSession : IDisposable
                 // A new map's regions are numbered from scratch, so the last id announced describes
                 // nowhere. Arriving somewhere is not crossing into it.
                 _lastAnnouncedRegionId = int.MinValue;
+                _zoneSettle.Reset();
                 _others.Clear();
                 // The map's authored atmosphere applies immediately: the world-state broadcast only
                 // arrives once a second, and until it does the acoustics would otherwise be computed for
@@ -1151,6 +1152,11 @@ public sealed partial class ClientGameSession : IDisposable
     /// </summary>
     private void AnnounceZoneChanges()
     {
+        // Whether the zone you are in has held long enough, with the body moving as a body moves, to
+        // be a place you have walked into rather than a flicker or a bounce. See ZoneSettle.
+        bool settled = _zoneSettle.Update(_state.CurrentRegionId, _state.Position,
+                                          (DateTime.UtcNow - DateTime.UnixEpoch).TotalSeconds);
+
         if (_arrivalPendingSince is { } since)
         {
             string here = _state.CurrentRegion;
@@ -1177,6 +1183,10 @@ public sealed partial class ClientGameSession : IDisposable
 
         int region = _state.CurrentRegionId;
         if (region == _lastAnnouncedRegionId) return;
+        // ...and not until it has held: a zone that changes back within a breath, or while the body is
+        // thrown about faster than it walks, was never crossed into (Cody on Brandt Court's roof,
+        // 2026-10-04: "Brandt Court roof", "sidewalk", eighteen times in three seconds).
+        if (!settled) return;
         _lastAnnouncedRegionId = region;
         Serilog.Log.Information("[ZONE] {Id} '{Name}' at {Pos}", region, _state.CurrentRegion, _state.Position);
 
@@ -1199,14 +1209,15 @@ public sealed partial class ClientGameSession : IDisposable
     }
 
     /// <summary>
-    /// The foot or the top of a flight, said once as you reach it facing along it: "Stairs up, 10 steps,
+    /// The foot or the top of a flight, said once as you reach it facing along it: "Stairs up, 17 steps,
     /// to floor 3". Without interrupting, like a zone: it is where you are, not an alarm. Not while you
-    /// ride anything, which carries you past stairs rather than up them.
+    /// ride anything, which carries you past stairs rather than up them. The zone is passed so that
+    /// leaving the stairwell and coming back is a new arrival and walking about inside it is not.
     /// </summary>
     private void AnnounceStairs(WorldSnapshot snapshot)
     {
         if (_state.IsRiding) { _stairs.Reset(); return; }
-        string? line = _stairs.Update(snapshot, _state.Position, _state.Rotation);
+        string? line = _stairs.Update(snapshot, _state.Position, _state.Rotation, _state.CurrentRegionId);
         if (line == null) return;
         Serilog.Log.Information("[STAIRS] '{Line}' at {Pos}", line, _state.Position);
         _speech.Speak(line, interrupt: false);
@@ -1219,6 +1230,7 @@ public sealed partial class ClientGameSession : IDisposable
     /// <summary>Set on arriving on a map, until the arrival line has been said.</summary>
     private DateTime? _arrivalPendingSince;
     private int _lastAnnouncedRegionId = int.MinValue;
+    private readonly ZoneSettle _zoneSettle = new();
     private string _mapName = "";
     /// <summary>Spawned on this map already: a further spawn is a teleport, not an arrival.</summary>
     private bool _arrived;
