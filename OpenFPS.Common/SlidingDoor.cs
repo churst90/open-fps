@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using static OpenFPS.Common.DoorPhysics;
 
@@ -136,16 +137,16 @@ public static class SlidingDoor
     /// <summary>Declared levels, dB at a metre: the model's own LAFmax, by kind and character (new,
     /// standard, worn, old). No calibration: the automatic door runs at 35-55 dBA, where the research puts
     /// real ones (40-55), and a patio door pushed home at a walking pace is a slam of 78 dBA. A patio leaf
-    /// rolls at about 73 dB at a metre, 30 dB under the blow when it is pushed home, as the recording's
-    /// slides stand under its stops.</summary>
+    /// rolls at 60-72 dB at a metre, new to old, some 30 dB under the blow when it is pushed home, as the
+    /// recording's slides stand under its stops.</summary>
     public static float OpenLevelDb(Kind kind, int variant) => (kind, ((variant % Variants) + Variants) % Variants) switch
     {
-        (Kind.Patio, 0) => 70.3f, (Kind.Patio, 1) => 75.0f, (Kind.Patio, 2) => 82.4f, (Kind.Patio, _) => 82.6f,
+        (Kind.Patio, 0) => 62.6f, (Kind.Patio, 1) => 68.4f, (Kind.Patio, 2) => 74.3f, (Kind.Patio, _) => 74.2f,
         (Kind.Automatic, 0) => 53.2f, (Kind.Automatic, 1) => 52.9f, (Kind.Automatic, 2) => 61.4f, _ => 70.1f,
     };
     public static float CloseLevelDb(Kind kind, int variant) => (kind, ((variant % Variants) + Variants) % Variants) switch
     {
-        (Kind.Patio, 0) => 80.0f, (Kind.Patio, 1) => 78.7f, (Kind.Patio, 2) => 79.7f, (Kind.Patio, _) => 80.8f,
+        (Kind.Patio, 0) => 78.5f, (Kind.Patio, 1) => 78.9f, (Kind.Patio, 2) => 76.1f, (Kind.Patio, _) => 77.5f,
         (Kind.Automatic, 0) => 35.1f, (Kind.Automatic, 1) => 37.5f, (Kind.Automatic, 2) => 49.4f, _ => 55.9f,
     };
 
@@ -267,10 +268,11 @@ public static class SlidingDoor
     /// tail of the sizes struck the rail with 700 N and rang the sill at 127 dB.)</summary>
     private const double GritGrip = 0.3;
     /// <summary>Under a patio door's nylon tyre a grain does not shatter: nylon yields at about 80 MPa, long
-    /// before quartz cracks, so a grain pressed harder than that sinks into the tread, the nylon flowing round
-    /// it over a fraction of a millisecond, and the load stays on. (Shattered in 20 us steps, a half-millimetre
-    /// grain dropped a wheel carrying 300 N in a blink and the rail rang at 117 dB.)</summary>
-    private const double NylonYield = 80e6, EmbedSeconds = 3e-4;
+    /// before quartz cracks, so a grain pressed harder than that sinks into the tread as the nylon flows round
+    /// it, a few milliseconds for its own size, and the load stays on. (Shattered in 20 us steps, a
+    /// half-millimetre grain dropped a wheel carrying 300 N in a blink and the rail rang at 117 dB; sunk in a
+    /// third of a millisecond, every grain was a click to 20 kHz.)</summary>
+    private const double NylonYield = 80e6, EmbedSeconds = 5e-3;
     /// <summary>Pile weatherstrip: its fibres slip about their own width, 150 um, each on its own. A patio leaf
     /// drags about 5 m of pile at some 500 fibres a centimetre; an automatic leaf about 2 m. The drag is the
     /// sum of their sawtooth forces, so it flutters by about 0.3 / sqrt(fibres) of itself. (Half its mean,
@@ -373,7 +375,7 @@ public static class SlidingDoor
     /// metal, its 5-10 kHz slip rate made an 8 kHz hiss over the roll.)</summary>
     private const double PileHeight = 0.007, PileFibreD = 1.0e-4, PpE = 1.5e9, PpRho = 900, PileZeta = 0.3;
 
-    private sealed class Grain { public double X, A, Target, LastCrush = -1; public bool Done; }
+    private sealed class Grain { public double X, A, Target, LastCrush = -1; public bool Done, Embedding; }
 
     /// <summary>
     /// A rolling surface as a roller feels it, <paramref name="n"/> heights round <paramref name="length"/>
@@ -526,7 +528,18 @@ public static class SlidingDoor
         private readonly double[] railRough;
         private readonly double railStep, wheelStep;
         private readonly List<Grain> grit = new();
-        private double maxReach, sink, restLoad;
+        private readonly Grain?[] lastGrain = new Grain?[Wheels];
+        private double maxReach, sink, restLoad, grainPatch;
+        /// <summary>Points across a contact patch, as fractions of its half-length, and their share of its
+        /// Hertz pressure (a half ellipse).</summary>
+        private static readonly double[] PatchPoints = Enumerable.Range(0, 9).Select(m => -1 + (m + 0.5) * 2 / 9.0).ToArray();
+        private static readonly double[] PatchWeights = PatchShares();
+        private static double[] PatchShares()
+        {
+            var w = PatchPoints.Select(u => Math.Sqrt(1 - u * u)).ToArray();
+            double sum = w.Sum();
+            return w.Select(v => v / sum).ToArray();
+        }
         // Fields and ports.
         private readonly DenseField trackField, frameField, glassField;
         private readonly Port[] trackPort = new Port[Wheels], framePort = new Port[Wheels], glassPort = new Port[Wheels];
@@ -642,6 +655,7 @@ public static class SlidingDoor
                 double c = Math.Cbrt(3 * load0 * re / (4 * (ch.Tyre == Tyre.Steel ? SteelOnAlEStar : NylonEStar)));
                 double aspect = Math.Pow(along / across, 2.0 / 3);
                 double halfPatch = c / Math.Sqrt(aspect), halfWidth = c * Math.Sqrt(aspect);
+                grainPatch = halfPatch;
                 railRough = RollingProfile(rng, 65536, trackLen, ch.RailMicron * 1e-6, RoughnessLongest, halfPatch, halfWidth, null);
                 for (int i = 0; i < Wheels; i++)
                 {
@@ -800,6 +814,33 @@ public static class SlidingDoor
             int k = Math.Clamp((int)f, 0, railRough.Length - 2); double t = Math.Clamp(f - k, 0, 1);
             double h = auto ? railRough[k] * (1 - t) + railRough[k + 1] * t
                             : Smooth(railRough[Math.Max(k - 1, 0)], railRough[k], railRough[k + 1], railRough[Math.Min(k + 2, railRough.Length - 1)], t);
+            if (!auto)
+            {
+                // A patio tyre meets a grain across its contact patch, not at a point: what lifts the wheel is
+                // the grain's rise averaged over the patch under its Hertz pressure, so the wheel starts up
+                // smoothly over the patch length instead of from a corner. (Met at a point, the corner where
+                // the wheel's curve first touched each grain was a click to 20 kHz, and with the roll no longer
+                // a hiss to hide them a worn door's grit was all that was heard: round 3's "gritty".)
+                double best = h;
+                for (int j = FirstGrain(at - maxReach - grainPatch); j < grit.Count && grit[j].X <= at + maxReach + grainPatch; j++)
+                {
+                    var g = grit[j];
+                    double proud = g.A - sink;
+                    if (proud <= 0 || g.Done) continue;
+                    double reach = Math.Sqrt(2 * wheelR * proud);
+                    double d = at - g.X;
+                    if (d < -reach - grainPatch || d > reach + grainPatch) continue;
+                    double lift = 0;
+                    for (int m = 0; m < PatchPoints.Length; m++)
+                    {
+                        double dd = d + PatchPoints[m] * grainPatch;
+                        double top = proud - dd * dd / (2 * wheelR);
+                        if (top > h) lift += PatchWeights[m] * (top - h);
+                    }
+                    if (h + lift > best) { best = h + lift; on = g; }
+                }
+                return best;
+            }
             for (int j = FirstGrain(at - maxReach); j < grit.Count && grit[j].X <= at + maxReach; j++)
             {
                 var g = grit[j];
@@ -973,13 +1014,19 @@ public static class SlidingDoor
                 // A grain carrying the wheel gives way, a piece at a time.
                 if (!auto && ch.Tyre == Tyre.Nylon)
                 {
-                    // A patio tyre's tread yields round a grain loaded past what nylon holds, and takes it in.
+                    // A patio tyre's tread yields round a grain loaded past what nylon holds, and takes it in. Once
+                    // it no longer carries the wheel it is in the tread, wrapped as the tyre wraps fine grit. (Left
+                    // on the rail, a half-sunk grain at the edge of the patch took the wheel and let it go again
+                    // every few steps as the leaf crept: a 4 kHz buzz at full scale.)
                     if (grain != null && !grain.Done && f > NylonYield * 4 * grain.A * grain.A)
                     {
                         grain.A -= grain.A * dt / EmbedSeconds * Math.Min(1, f / (NylonYield * 4 * grain.A * grain.A) - 1);
                         grain.Target = grain.A;
+                        grain.Embedding = true;
                         if (grain.A <= PowderMicron * 1e-6) grain.Done = true;
                     }
+                    if (lastGrain[i] != null && lastGrain[i] != grain && lastGrain[i]!.Embedding) lastGrain[i]!.Done = true;
+                    lastGrain[i] = grain;
                 }
                 else if (grain != null && !grain.Done && f > GritStrength * 4 * grain.A * grain.A && time - grain.LastCrush > CrushSeconds)
                 {
