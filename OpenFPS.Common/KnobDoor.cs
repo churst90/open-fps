@@ -162,24 +162,41 @@ public static class KnobDoor
     };
 
     /// <summary>
-    /// The level the server declares, dB at a metre, as the model measures its own renders (LAFmax) less
-    /// <see cref="LevelCalibrationDb"/>. Pinned by KnobDoorTests, which renders and measures them.
+    /// The level the server declares, dB at a metre. A world sound's level is its buffer's FULL SCALE at a
+    /// metre (<see cref="Speech.LevelDb"/>, <see cref="CarWindow.LevelDb"/>), and <see cref="RenderKey"/>
+    /// brings a render's peak to full scale, so what a door declares is its render's peak: the median, over
+    /// the four characters at the game's 1.1 and 1.4 m leaves, of the model's own (AudioLab --heard-levels
+    /// survey, 2026-10-04). The client puts each render's own peak in its place once it has rendered it
+    /// (WorldAudioPlayer), so the level heard is the model's to the decibel.
+    ///
+    /// These used to be the model's LAFmax less a 14 dB calibration. Played as full scale, a close whose
+    /// crack stands 21-29 dB over its own LAFmax came out that far under it as well: a normal close heard
+    /// at 51 dBA at 1.5 m (Cody on "real") where the model puts 86, under a pedestrian's greeting at 60.
+    /// Cody, 2026-10-03: "way way way too quiet ... if I'm 5 feet away from a door at these levels I'd
+    /// barely know someone opened a door", and no calibration taking level off the doors.
     /// </summary>
-    public const float OpenLevelDb = 78.8f - LevelCalibrationDb;
-    /// <summary>A close's declared level by how it was shut (the model's own LAFmax, less the calibration).</summary>
+    public const float OpenLevelDb = 105.5f;
+    /// <summary>A close's declared level by how it was shut: the model's peak, as <see cref="OpenLevelDb"/>.
+    /// (Slam is never sent: the game's close starts 12 degrees out, inside the 0.25 m where a slamming hand
+    /// lets go, so its game render is a door let drift shut, 39 dBA. Its figure is the hard close's.)</summary>
     public static float CloseLevelDb(Shut how) => how switch
     {
-        Shut.Gentle => 77f, Shut.Hard => 108f, Shut.Slam => 116f, _ => 91.5f,
-    } - LevelCalibrationDb;
+        Shut.Gentle => 106f, Shut.Hard => 128.5f, Shut.Slam => 128.5f, _ => 114f,
+    };
 
     /// <summary>
-    /// The model radiates more than real doors: it puts a normal close at 91.5 dBA at a metre, where the
-    /// measurements there are (patents and car-door studies, research note 2026-10-03) put a normal
-    /// latching close at 70-82, a gentle one at 60-70 and a slam at 85-98. One figure for the whole model
-    /// brings it onto them: normal 77.5, gentle 63, hard 94, slam 102, opening 65. It is one number for
-    /// everything, so how events stand against each other is still the physics'.
+    /// What the model puts at a metre, LAFmax (A-weighted, fast): what is heard, on "real", a metre from
+    /// the latch. Medians over the same survey. They are the model's own, not published figures: the
+    /// measurements there are (research note 2026-10-03) put a normal latching close at 70-82 dBA, a gentle
+    /// one at 60-70 and a slam at 85-98, so a normal close here is about ten decibels over them and a hard
+    /// one about fifteen. That is the physics' to answer for (how fast a hand brings the edge in, how much
+    /// of the stop's blow the skins radiate), not a calibration's.
     /// </summary>
-    public const float LevelCalibrationDb = 14f;
+    public const float OpenLafDb = 81f;
+    public static float CloseLafDb(Shut how) => how switch
+    {
+        Shut.Gentle => 79f, Shut.Hard => 105f, Shut.Slam => 105f, _ => 92f,
+    };
 
     /// <summary>
     /// A door's sound for the game. Opening is grip, turn, pull, swing over <paramref name="swingSeconds"/>;
@@ -213,13 +230,29 @@ public static class KnobDoor
     }
 
     /// <summary>The sound a key names, peak one, as the client's renderer wants it.</summary>
-    public static float[] RenderKey(string key, int sampleRate)
+    public static float[] RenderKey(string key, int sampleRate) => RenderKey(key, sampleRate, out _);
+
+    /// <summary>The same, and the level its full scale stands for: the render's own peak, dB SPL at a
+    /// metre, which is the level to place it at.</summary>
+    public static float[] RenderKey(string key, int sampleRate, out float fullScaleDb)
     {
+        fullScaleDb = 0f;
         if (!TryParseKey(key, out bool closing, out var door, out float swing, out Shut how)) return new float[16];
         float[] pcm = closing ? RenderGameClose(door, sampleRate, how) : RenderOpen(door, sampleRate, swing);
+        return PeakToFullScale(pcm, PascalsAtFullScale, out fullScaleDb);
+    }
+
+    /// <summary>
+    /// A model's render (pressure at a metre, in units of <paramref name="pascalsAtFullScale"/>) brought to a
+    /// peak of one, with the level that peak is, dB SPL at a metre: a world sound's level is its buffer's
+    /// full scale. Shared by the door models.
+    /// </summary>
+    public static float[] PeakToFullScale(float[] pcm, double pascalsAtFullScale, out float fullScaleDb)
+    {
         float peak = 1e-9f;
         foreach (float v in pcm) peak = MathF.Max(peak, MathF.Abs(v));
         for (int i = 0; i < pcm.Length; i++) pcm[i] /= peak;
+        fullScaleDb = (float)(20.0 * Math.Log10(peak * pascalsAtFullScale / 2e-5));
         return pcm;
     }
 

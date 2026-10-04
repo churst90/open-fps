@@ -92,6 +92,15 @@ public sealed class WorldAudioPlayer
     private readonly System.Collections.Concurrent.ConcurrentQueue<(string Id, float[] Pcm)> _rendered = new();
 
     /// <summary>
+    /// A door model's render's own peak, dB SPL at a metre, by its key: the level its buffer's full scale
+    /// stands for, and so the level it is placed at. The server declares a table figure for the key (the
+    /// median of the model's peaks over its characters and sizes); a render of a 1.4 m leaf or a worn
+    /// character peaks a few decibels either side of that, and played at the table figure it would be that
+    /// much off its physics. Written on the render worker, read when the sound plays.
+    /// </summary>
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, float> _fullScaleDb = new(StringComparer.Ordinal);
+
+    /// <summary>
     /// How far a transient carries at most.
     ///
     /// It is a bound on cost and nothing else, so it has to sit past anything anyone is meant to hear
@@ -194,7 +203,7 @@ public sealed class WorldAudioPlayer
             System.Threading.Tasks.Task.Run(async () =>
             {
                 await gate.WaitAsync();
-                try { _rendered.Enqueue((id, RenderDoorKey(key))); }
+                try { _rendered.Enqueue((id, RenderDoorKey(key, _fullScaleDb))); }
                 finally { gate.Release(); }
             });
         }
@@ -202,12 +211,26 @@ public sealed class WorldAudioPlayer
 
     /// <summary>A door model's sound by its key's prefix. (Every key went through the knob door's renderer,
     /// which does not know a push bar's key and gave back sixteen samples of silence: the prewarmed push-bar
-    /// doors were silent.)</summary>
-    private static float[] RenderDoorKey(string key)
-        => key.StartsWith(PushBarDoor.KeyPrefix, StringComparison.Ordinal) ? PushBarDoor.RenderKey(key, TransientSynth.SampleRate)
-         : key.StartsWith(SlidingDoor.KeyPrefix, StringComparison.Ordinal) ? SlidingDoor.RenderKey(key, TransientSynth.SampleRate)
-         : key.StartsWith(CarWindow.KeyPrefix, StringComparison.Ordinal) ? CarWindow.RenderKey(key, TransientSynth.SampleRate)
-         : KnobDoor.RenderKey(key, TransientSynth.SampleRate);
+    /// doors were silent.)
+    /// The door models also say what their render's full scale is (its own peak), into
+    /// <paramref name="fullScaleDb"/>, which is the level the sound is placed at.</summary>
+    internal static float[] RenderDoorKey(string key, System.Collections.Concurrent.ConcurrentDictionary<string, float> fullScaleDb)
+    {
+        if (key.StartsWith(CarWindow.KeyPrefix, StringComparison.Ordinal)) return CarWindow.RenderKey(key, TransientSynth.SampleRate);
+        float[] pcm = key.StartsWith(PushBarDoor.KeyPrefix, StringComparison.Ordinal) ? PushBarDoor.RenderKey(key, TransientSynth.SampleRate, out float db)
+                    : key.StartsWith(SlidingDoor.KeyPrefix, StringComparison.Ordinal) ? SlidingDoor.RenderKey(key, TransientSynth.SampleRate, out db)
+                    : KnobDoor.RenderKey(key, TransientSynth.SampleRate, out db);
+        if (db > 0f) fullScaleDb[key] = db;
+        return pcm;
+    }
+
+    /// <summary>A door model's sound as it plays: placed at its own render's full scale, where the client has
+    /// rendered it, instead of the table figure the server sent for the key.</summary>
+    internal static TransientSound AtOwnLevel(TransientSound sound, System.Collections.Concurrent.ConcurrentDictionary<string, float> fullScaleDb)
+    {
+        if (sound.SynthKey != null && fullScaleDb.TryGetValue(sound.SynthKey, out float db)) sound.LevelDb = db;
+        return sound;
+    }
 
     /// <summary>How many are waiting to be heard. Diagnostics.</summary>
     public int Pending_Count => _pending.Count;
@@ -352,6 +375,9 @@ public sealed class WorldAudioPlayer
             if (now < item.DueAt) continue;
             playedAny = true;
             _pending.RemoveAt(i);
+            // A door model plays at its own render's peak, the level its buffer's full scale stands for. A
+            // copy keeps the level it was given from its source, which already had this.
+            if (!item.IsReflection) item = item with { Sound = AtOwnLevel(item.Sound, _fullScaleDb) };
             if (!item.IsReflection && item.Sound.OnBody && BodyNow(world, item.SourceEntityId, out var feet, out var facing))
             {
                 var onBody = item.Sound;
@@ -1087,16 +1113,13 @@ public sealed class WorldAudioPlayer
         // A car door: a mechanism fitted to a recording, which one knock and one ring could not be.
         if (CarDoor.TryParseKey(sound.SynthKey, out bool closing))
             return CarDoor.Render(closing, TransientSynth.SampleRate, seed);
-        // A knob door: the door simulated, its character named in the key.
-        if (sound.SynthKey != null && sound.SynthKey.StartsWith(KnobDoor.KeyPrefix, StringComparison.Ordinal))
-            return KnobDoor.RenderKey(sound.SynthKey, TransientSynth.SampleRate);
-        if (sound.SynthKey != null && sound.SynthKey.StartsWith(PushBarDoor.KeyPrefix, StringComparison.Ordinal))
-            return PushBarDoor.RenderKey(sound.SynthKey, TransientSynth.SampleRate);
-        if (sound.SynthKey != null && sound.SynthKey.StartsWith(SlidingDoor.KeyPrefix, StringComparison.Ordinal))
-            return SlidingDoor.RenderKey(sound.SynthKey, TransientSynth.SampleRate);
-        // A car's power window: its motor, worm and glass simulated through the stroke the key names.
-        if (sound.SynthKey != null && sound.SynthKey.StartsWith(CarWindow.KeyPrefix, StringComparison.Ordinal))
-            return CarWindow.RenderKey(sound.SynthKey, TransientSynth.SampleRate);
+        // The door models (knob, push-bar, sliding), each simulated, its character named in the key; and a
+        // car's power window, its motor, worm and glass simulated through the stroke the key names.
+        if (sound.SynthKey != null && (sound.SynthKey.StartsWith(KnobDoor.KeyPrefix, StringComparison.Ordinal)
+                                       || sound.SynthKey.StartsWith(PushBarDoor.KeyPrefix, StringComparison.Ordinal)
+                                       || sound.SynthKey.StartsWith(SlidingDoor.KeyPrefix, StringComparison.Ordinal)
+                                       || sound.SynthKey.StartsWith(CarWindow.KeyPrefix, StringComparison.Ordinal)))
+            return RenderDoorKey(sound.SynthKey, _fullScaleDb);
 
         return TransientSynth.Render(sound, seed);
     }

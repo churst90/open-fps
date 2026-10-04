@@ -102,6 +102,7 @@ string[] usage =
     "  --scope-sounds [out=DIR]                      the scope's guidance tone and breath as played, and the M700's sounds",
     "  --gun-fit [nij=DIR] [tag=] [wavs] [grid]      every weapon's report against its own NIJ takes",
     "  --speech-lines                                decodes every shipped voice line as the client does",
+    "  --heard-levels [d=1.5] [wav=DIR]              doors, steps, speech: declared vs LAFmax at the ear",
     "  --ground-voice [--ladder]                     a talker's ground reflection three ways",
     "",
     "Rooms, paths and the mixer",
@@ -194,6 +195,11 @@ if (args.Contains("--siren-route"))
     int code = OpenFPS.Client.Core.AudioEngine.SteamAudio.SirenRouteSpike.Run(args);
     Log.CloseAndFlush();
     Environment.Exit(code);
+}
+
+if (args.Contains("--heard-levels"))
+{
+    Environment.Exit(HeardLevelsSpike.Run(args));
 }
 
 if (args.Contains("--speech-lines"))
