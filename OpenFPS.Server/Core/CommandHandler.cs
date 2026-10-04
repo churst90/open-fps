@@ -1939,7 +1939,7 @@ public class CommandHandler
     }
 
     /// <summary>
-    /// "25 metres away at 11 o'clock, 4 metres above you, at Main Street sidewalk" — the other
+    /// "25 metres away, left in front, 4 metres above you, at Main Street sidewalk" — the other
     /// player's bearing from the asker's facing, from the same clock face /scan uses. Empty if
     /// either of them has no body yet.
     /// </summary>
@@ -1957,7 +1957,7 @@ public class CommandHandler
 
         string where = distance < 1.5f
             ? "right beside you"
-            : $"{MathF.Round(distance):0} metres away at {GetRelativeDirection(me.Rotation, Vector3.Normalize(flat))}";
+            : $"{MathF.Round(distance):0} metres away, {GetRelativeDirection(me.Rotation, Vector3.Normalize(flat))}";
         if (MathF.Abs(offset.Y) > 2.5f)
             where += $", {MathF.Abs(offset.Y):0} metres {(offset.Y > 0 ? "above" : "below")} you";
         if (PlaceAt(world, them) is { Length: > 0 } place) where += $", at {place}";
@@ -2395,17 +2395,11 @@ public class CommandHandler
         _server.MoveToMap(session, mapId, reply);
     }
 
-    private static string GetRelativeDirection(Quaternion rotation, Vector3 targetDir)
-    {
-        Matrix4x4 rotMat = Matrix4x4.CreateFromQuaternion(Quaternion.Inverse(rotation));
-        Vector3 localDir = Vector3.Transform(targetDir, rotMat);
-        float angle = MathF.Atan2(localDir.X, localDir.Z) * (180.0f / MathF.PI);
-        if (angle < 0) angle += 360.0f;
-        return angle switch
-        {
-            < 22.5f or >= 337.5f => "12 o'clock", < 67.5f => "2 o'clock", < 112.5f => "3 o'clock",
-            < 157.5f => "5 o'clock", < 202.5f => "6 o'clock", < 247.5f => "8 o'clock",
-            < 292.5f => "9 o'clock", _ => "11 o'clock"
-        };
-    }
+    /// <summary>
+    /// Where something is from the way you face, in words: in front, right in front, right, right behind,
+    /// behind, left behind, left, left in front. Cody, 2026-10-04: a clock face made him work out that
+    /// 5 o'clock was behind him; the words say it.
+    /// </summary>
+    internal static string GetRelativeDirection(Quaternion rotation, Vector3 targetDir)
+        => OpenFPS.Common.DirectionWords.Relative(rotation, targetDir);
 }

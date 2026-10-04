@@ -49,6 +49,39 @@ internal sealed class GameWindow
     }
 
     /// <summary>
+    /// What a physical key types with nothing held, in the first layout, or 0 if GDK cannot say: so
+    /// Shift and comma is the comma KEY with Shift, whatever character the layout puts on it.
+    /// </summary>
+    private static uint Unshifted(uint keycode)
+    {
+        if (_noTranslate) return 0;
+        try
+        {
+            var display = gdk_display_get_default();
+            if (display != System.IntPtr.Zero
+                && gdk_display_translate_key(display, keycode, 0, 0, out uint keyval, out _, out _, out _))
+                return keyval;
+        }
+        catch (System.Exception ex) when (ex is System.DllNotFoundException or System.EntryPointNotFoundException)
+        {
+            _noTranslate = true;   // asked once; the reported character is used from then on
+        }
+        return 0;
+    }
+
+    private static bool _noTranslate;
+
+    // gir.core 0.6 does not expose gdk_display_translate_key, so it is called directly. GTK 4 is
+    // already loaded by the time a key arrives.
+    [System.Runtime.InteropServices.DllImport("libgtk-4.so.1")]
+    private static extern System.IntPtr gdk_display_get_default();
+
+    [System.Runtime.InteropServices.DllImport("libgtk-4.so.1")]
+    [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
+    private static extern bool gdk_display_translate_key(System.IntPtr display, uint keycode, uint state, int group,
+                                                         out uint keyval, out int effectiveGroup, out int level, out uint consumed);
+
+    /// <summary>
     /// Brings the in-game window up, building it the first time and only the first time.
     ///
     /// The shell keeps ONE GameWindow for the life of the session, but that was only half of it:
@@ -90,12 +123,12 @@ internal sealed class GameWindow
         keys.OnKeyPressed += (_, e) =>
         {
             NoteNumLock(e.Keyval);
-            _input.SetKey(GtkKeyMap.Map(e.Keyval), true);
+            _input.SetKey(GtkKeyMap.Map(e.Keyval, Unshifted(e.Keycode)), true);
             return false; // don't consume — keep AT-SPI / default handling alive
         };
         keys.OnKeyReleased += (_, e) =>
         {
-            _input.SetKey(GtkKeyMap.Map(e.Keyval), false);
+            _input.SetKey(GtkKeyMap.Map(e.Keyval, Unshifted(e.Keycode)), false);
         };
         _window.AddController(keys);
 

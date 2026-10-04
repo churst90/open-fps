@@ -113,7 +113,7 @@ public class SocialTravelTests : IDisposable
         var bob = Player("bob", 2, new Vector3(0, 2, 10));
 
         string where = Run(alice, "where", "bob");
-        Assert.StartsWith("bob is 10 metres away at 12 o'clock", where);
+        Assert.StartsWith("bob is 10 metres away, in front", where);
 
         bob.CurrentMapId = "speedway";
         Assert.Equal("bob is on the map speedway.", Run(alice, "where", "bob"));

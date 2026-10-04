@@ -150,7 +150,7 @@ public class CityPartNamesTests : IClassFixture<CityPartNamesTests.City>
         var rig = new Rig(feet);
         string reply = rig.Run("scan");
         _o.WriteLine(reply);
-        return Regex.Matches(reply, @"(?:^|\. )(.+?), (\d+ o'clock), (\d+) metres?")
+        return Regex.Matches(reply, @"(?:^|\. )(.+?), ((?:left |right )?(?:in front|behind)|left|right), (\d+) metres?")
                     .Select(m => m.Groups[1].Value).ToList();
     }
 
