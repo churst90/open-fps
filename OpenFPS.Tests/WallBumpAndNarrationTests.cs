@@ -306,7 +306,7 @@ public class WallBumpAndNarrationTests
     private static WorldSnapshot? _city;
     private static readonly object CityLock = new();
 
-    private static WorldSnapshot City()
+    internal static WorldSnapshot City()
     {
         lock (CityLock)
         {
