@@ -622,7 +622,11 @@ def tower(label, x0, x1, z0, z1, storeys, street_side, ac_floors):
 
         # ── The stairwell ──────────────────────────────────────────────────────────────────────
         sa0, sa1 = near_flat
-        stair_id = R(f"{label} stairwell, floor {s}", sa0, sa1, floor_top, ceil, stair_b[0], stair_b[1])
+        # The stairwell is one shaft: each storey's box runs through the slabs to the next one's, so
+        # the opening a flight comes up through is in a named place all the way and not, for the half
+        # metre of the slabs' thickness, out of doors (CityOpeningsTests).
+        stair_id = R(f"{label} stairwell, floor {s}", sa0, sa1, y0 if s else floor_top, y0 + STOREY,
+                     stair_b[0], stair_b[1])
         B_holed("tile_floor", sa0, sa1, floor_top - 0.02, floor_top + 0.03, stair_b[0], stair_b[1], hole(s - 1))
         px, _, pz, _ = place(near_wall + WALL_T / 2, 0, (stair_b[0] + stair_b[1]) / 2, 0)
         portal(px, floor_top + 1.0, pz, stair_id, corridor_id, 1.4)
@@ -724,7 +728,7 @@ def tower(label, x0, x1, z0, z1, storeys, street_side, ac_floors):
     B("brick_wall", la[1], ha1, roof_y, top, hb1, hb1 + BULK_T)
     B("brick_wall", la[0], la[1], roof_y + DOOR_H, top, hb1, hb1 + BULK_T)
     B("concrete_floor", ha0, ha1, top, top + SLAB, hb0 - BULK_T, hb1 + BULK_T, name=f"{label} roof access roof")
-    access_id = R(f"{label} roof access", la[0], la[1], roof_y, top, hb0, hb1)
+    access_id = R(f"{label} roof access", la[0], la[1], storeys * STOREY, top, hb0, hb1)
 
     # A parapet round the edge, on the outer walls, so walking about up here cannot take you over
     # the side. Not where the housing's own wall already stands on the street wall.
@@ -737,8 +741,14 @@ def tower(label, x0, x1, z0, z1, storeys, street_side, ac_floors):
 
     # The roof is a named place in the open air, so arriving on it is announced. Its boxes go round
     # the housing rather than over it: a place outdoors must not hold a room (CityZoneTests).
+    #
+    # Said to be outdoors rather than measured. The survey calls a place a room when four of its six
+    # faces are walled, and a strip of roof between the parapet and the housing's wall, under open
+    # sky, came out as one (2026-10-04). A roof has no ceiling whatever stands round its edge.
     def roof_piece(p0, p1, q0, q1):
-        return R(f"{label} roof", p0, p1, roof_y, roof_y + STOREY, q0, q1)
+        rid = R(f"{label} roof", p0, p1, roof_y, roof_y + STOREY, q0, q1)
+        entities[-1]["IsIndoor"] = False
+        return rid
     pieces = holed(roof_piece, sx0 + WALL_T, sx1 - WALL_T, sz0 + WALL_T, sz1 - WALL_T,
                    (ha0, ha1, hb0 - BULK_T, hb1 + BULK_T))
     outside = hb1 + BULK_T + 0.5

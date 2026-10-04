@@ -12093,12 +12093,12 @@
    "PrefabId": "acoustic_region",
    "Position": {
     "X": -14.175,
-    "Y": 1.385,
+    "Y": 1.51,
     "Z": -102.72
    },
    "Scale": {
     "X": 0.865,
-    "Y": 0.546,
+    "Y": 0.596,
     "Z": 1.786
    },
    "Name": "Marlow Tower stairwell, floor 0"
@@ -13755,7 +13755,7 @@
    },
    "Scale": {
     "X": 0.865,
-    "Y": 0.5,
+    "Y": 0.6,
     "Z": 1.786
    },
    "Name": "Marlow Tower stairwell, floor 1"
@@ -15418,7 +15418,7 @@
    },
    "Scale": {
     "X": 0.865,
-    "Y": 0.5,
+    "Y": 0.6,
     "Z": 1.786
    },
    "Name": "Marlow Tower stairwell, floor 2"
@@ -17067,7 +17067,7 @@
    },
    "Scale": {
     "X": 0.865,
-    "Y": 0.5,
+    "Y": 0.6,
     "Z": 1.786
    },
    "Name": "Marlow Tower stairwell, floor 3"
@@ -18730,7 +18730,7 @@
    },
    "Scale": {
     "X": 0.865,
-    "Y": 0.5,
+    "Y": 0.6,
     "Z": 1.786
    },
    "Name": "Marlow Tower stairwell, floor 4"
@@ -20379,7 +20379,7 @@
    },
    "Scale": {
     "X": 0.865,
-    "Y": 0.5,
+    "Y": 0.6,
     "Z": 1.786
    },
    "Name": "Marlow Tower stairwell, floor 5"
@@ -21958,7 +21958,7 @@
    },
    "Scale": {
     "X": 0.865,
-    "Y": 0.5,
+    "Y": 0.6,
     "Z": 1.786
    },
    "Name": "Marlow Tower stairwell, floor 6"
@@ -23523,7 +23523,7 @@
    },
    "Scale": {
     "X": 0.865,
-    "Y": 0.5,
+    "Y": 0.6,
     "Z": 1.786
    },
    "Name": "Marlow Tower stairwell, floor 7"
@@ -23956,12 +23956,12 @@
    "PrefabId": "acoustic_region",
    "Position": {
     "X": -10.65,
-    "Y": 25.55,
+    "Y": 25.425,
     "Z": -107.7
    },
    "Scale": {
     "X": 0.16,
-    "Y": 0.52,
+    "Y": 0.57,
     "Z": 0.57
    },
    "Name": "Marlow Tower roof access"
@@ -24049,7 +24049,8 @@
     "Y": 0.6,
     "Z": 0.09
    },
-   "Name": "Marlow Tower roof"
+   "Name": "Marlow Tower roof",
+   "IsIndoor": false
   },
   {
    "EntityId": 1915,
@@ -24064,7 +24065,8 @@
     "Y": 0.6,
     "Z": 8.23
    },
-   "Name": "Marlow Tower roof"
+   "Name": "Marlow Tower roof",
+   "IsIndoor": false
   },
   {
    "EntityId": 1916,
@@ -24079,7 +24081,8 @@
     "Y": 0.6,
     "Z": 0.61
    },
-   "Name": "Marlow Tower roof"
+   "Name": "Marlow Tower roof",
+   "IsIndoor": false
   },
   {
    "EntityId": 1917,
@@ -25395,12 +25398,12 @@
    "PrefabId": "acoustic_region",
    "Position": {
     "X": 14.35,
-    "Y": 1.385,
+    "Y": 1.51,
     "Z": -103.12
    },
    "Scale": {
     "X": 0.9,
-    "Y": 0.546,
+    "Y": 0.596,
     "Z": 1.706
    },
    "Name": "Kestrel House stairwell, floor 0"
@@ -27057,7 +27060,7 @@
    },
    "Scale": {
     "X": 0.9,
-    "Y": 0.5,
+    "Y": 0.6,
     "Z": 1.706
    },
    "Name": "Kestrel House stairwell, floor 1"
@@ -28720,7 +28723,7 @@
    },
    "Scale": {
     "X": 0.9,
-    "Y": 0.5,
+    "Y": 0.6,
     "Z": 1.706
    },
    "Name": "Kestrel House stairwell, floor 2"
@@ -30369,7 +30372,7 @@
    },
    "Scale": {
     "X": 0.9,
-    "Y": 0.5,
+    "Y": 0.6,
     "Z": 1.706
    },
    "Name": "Kestrel House stairwell, floor 3"
@@ -32032,7 +32035,7 @@
    },
    "Scale": {
     "X": 0.9,
-    "Y": 0.5,
+    "Y": 0.6,
     "Z": 1.706
    },
    "Name": "Kestrel House stairwell, floor 4"
@@ -33681,7 +33684,7 @@
    },
    "Scale": {
     "X": 0.9,
-    "Y": 0.5,
+    "Y": 0.6,
     "Z": 1.706
    },
    "Name": "Kestrel House stairwell, floor 5"
@@ -34198,12 +34201,12 @@
    "PrefabId": "acoustic_region",
    "Position": {
     "X": 10.65,
-    "Y": 19.55,
+    "Y": 19.425,
     "Z": -107.7
    },
    "Scale": {
     "X": 0.16,
-    "Y": 0.52,
+    "Y": 0.57,
     "Z": 0.57
    },
    "Name": "Kestrel House roof access"
@@ -34291,7 +34294,8 @@
     "Y": 0.6,
     "Z": 0.09
    },
-   "Name": "Kestrel House roof"
+   "Name": "Kestrel House roof",
+   "IsIndoor": false
   },
   {
    "EntityId": 2592,
@@ -34306,7 +34310,8 @@
     "Y": 0.6,
     "Z": 7.83
    },
-   "Name": "Kestrel House roof"
+   "Name": "Kestrel House roof",
+   "IsIndoor": false
   },
   {
    "EntityId": 2593,
@@ -34321,7 +34326,8 @@
     "Y": 0.6,
     "Z": 0.61
    },
-   "Name": "Kestrel House roof"
+   "Name": "Kestrel House roof",
+   "IsIndoor": false
   },
   {
    "EntityId": 2594,
@@ -35637,12 +35643,12 @@
    "PrefabId": "acoustic_region",
    "Position": {
     "X": 14.35,
-    "Y": 1.385,
+    "Y": 1.51,
     "Z": 28.08
    },
    "Scale": {
     "X": 0.9,
-    "Y": 0.546,
+    "Y": 0.596,
     "Z": 1.946
    },
    "Name": "Union Building stairwell, floor 0"
@@ -37299,7 +37305,7 @@
    },
    "Scale": {
     "X": 0.9,
-    "Y": 0.5,
+    "Y": 0.6,
     "Z": 1.946
    },
    "Name": "Union Building stairwell, floor 1"
@@ -38962,7 +38968,7 @@
    },
    "Scale": {
     "X": 0.9,
-    "Y": 0.5,
+    "Y": 0.6,
     "Z": 1.946
    },
    "Name": "Union Building stairwell, floor 2"
@@ -40611,7 +40617,7 @@
    },
    "Scale": {
     "X": 0.9,
-    "Y": 0.5,
+    "Y": 0.6,
     "Z": 1.946
    },
    "Name": "Union Building stairwell, floor 3"
@@ -42274,7 +42280,7 @@
    },
    "Scale": {
     "X": 0.9,
-    "Y": 0.5,
+    "Y": 0.6,
     "Z": 1.946
    },
    "Name": "Union Building stairwell, floor 4"
@@ -43923,7 +43929,7 @@
    },
    "Scale": {
     "X": 0.9,
-    "Y": 0.5,
+    "Y": 0.6,
     "Z": 1.946
    },
    "Name": "Union Building stairwell, floor 5"
@@ -45502,7 +45508,7 @@
    },
    "Scale": {
     "X": 0.9,
-    "Y": 0.5,
+    "Y": 0.6,
     "Z": 1.946
    },
    "Name": "Union Building stairwell, floor 6"
@@ -47067,7 +47073,7 @@
    },
    "Scale": {
     "X": 0.9,
-    "Y": 0.5,
+    "Y": 0.6,
     "Z": 1.946
    },
    "Name": "Union Building stairwell, floor 7"
@@ -48646,7 +48652,7 @@
    },
    "Scale": {
     "X": 0.9,
-    "Y": 0.5,
+    "Y": 0.6,
     "Z": 1.946
    },
    "Name": "Union Building stairwell, floor 8"
@@ -50211,7 +50217,7 @@
    },
    "Scale": {
     "X": 0.9,
-    "Y": 0.5,
+    "Y": 0.6,
     "Z": 1.946
    },
    "Name": "Union Building stairwell, floor 9"
@@ -50644,12 +50650,12 @@
    "PrefabId": "acoustic_region",
    "Position": {
     "X": 10.65,
-    "Y": 31.55,
+    "Y": 31.425,
     "Z": 22.3
    },
    "Scale": {
     "X": 0.16,
-    "Y": 0.52,
+    "Y": 0.57,
     "Z": 0.57
    },
    "Name": "Union Building roof access"
@@ -50737,7 +50743,8 @@
     "Y": 0.6,
     "Z": 0.09
    },
-   "Name": "Union Building roof"
+   "Name": "Union Building roof",
+   "IsIndoor": false
   },
   {
    "EntityId": 3687,
@@ -50752,7 +50759,8 @@
     "Y": 0.6,
     "Z": 9.03
    },
-   "Name": "Union Building roof"
+   "Name": "Union Building roof",
+   "IsIndoor": false
   },
   {
    "EntityId": 3688,
@@ -50767,7 +50775,8 @@
     "Y": 0.6,
     "Z": 0.61
    },
-   "Name": "Union Building roof"
+   "Name": "Union Building roof",
+   "IsIndoor": false
   },
   {
    "EntityId": 3689,
@@ -52083,12 +52092,12 @@
    "PrefabId": "acoustic_region",
    "Position": {
     "X": -14.175,
-    "Y": 1.385,
+    "Y": 1.51,
     "Z": 157.08
    },
    "Scale": {
     "X": 0.865,
-    "Y": 0.546,
+    "Y": 0.596,
     "Z": 1.746
    },
    "Name": "Brandt Court stairwell, floor 0"
@@ -53745,7 +53754,7 @@
    },
    "Scale": {
     "X": 0.865,
-    "Y": 0.5,
+    "Y": 0.6,
     "Z": 1.746
    },
    "Name": "Brandt Court stairwell, floor 1"
@@ -55408,7 +55417,7 @@
    },
    "Scale": {
     "X": 0.865,
-    "Y": 0.5,
+    "Y": 0.6,
     "Z": 1.746
    },
    "Name": "Brandt Court stairwell, floor 2"
@@ -57057,7 +57066,7 @@
    },
    "Scale": {
     "X": 0.865,
-    "Y": 0.5,
+    "Y": 0.6,
     "Z": 1.746
    },
    "Name": "Brandt Court stairwell, floor 3"
@@ -58720,7 +58729,7 @@
    },
    "Scale": {
     "X": 0.865,
-    "Y": 0.5,
+    "Y": 0.6,
     "Z": 1.746
    },
    "Name": "Brandt Court stairwell, floor 4"
@@ -60369,7 +60378,7 @@
    },
    "Scale": {
     "X": 0.865,
-    "Y": 0.5,
+    "Y": 0.6,
     "Z": 1.746
    },
    "Name": "Brandt Court stairwell, floor 5"
@@ -60886,12 +60895,12 @@
    "PrefabId": "acoustic_region",
    "Position": {
     "X": -10.65,
-    "Y": 19.55,
+    "Y": 19.425,
     "Z": 152.3
    },
    "Scale": {
     "X": 0.16,
-    "Y": 0.52,
+    "Y": 0.57,
     "Z": 0.57
    },
    "Name": "Brandt Court roof access"
@@ -60979,7 +60988,8 @@
     "Y": 0.6,
     "Z": 0.09
    },
-   "Name": "Brandt Court roof"
+   "Name": "Brandt Court roof",
+   "IsIndoor": false
   },
   {
    "EntityId": 4364,
@@ -60994,7 +61004,8 @@
     "Y": 0.6,
     "Z": 8.03
    },
-   "Name": "Brandt Court roof"
+   "Name": "Brandt Court roof",
+   "IsIndoor": false
   },
   {
    "EntityId": 4365,
@@ -61009,7 +61020,8 @@
     "Y": 0.6,
     "Z": 0.61
    },
-   "Name": "Brandt Court roof"
+   "Name": "Brandt Court roof",
+   "IsIndoor": false
   },
   {
    "EntityId": 4366,
@@ -62311,12 +62323,12 @@
    "PrefabId": "acoustic_region",
    "Position": {
     "X": 14.35,
-    "Y": 1.385,
+    "Y": 1.51,
     "Z": 157.48
    },
    "Scale": {
     "X": 0.9,
-    "Y": 0.546,
+    "Y": 0.596,
     "Z": 1.826
    },
    "Name": "Selby House stairwell, floor 0"
@@ -63973,7 +63985,7 @@
    },
    "Scale": {
     "X": 0.9,
-    "Y": 0.5,
+    "Y": 0.6,
     "Z": 1.826
    },
    "Name": "Selby House stairwell, floor 1"
@@ -65622,7 +65634,7 @@
    },
    "Scale": {
     "X": 0.9,
-    "Y": 0.5,
+    "Y": 0.6,
     "Z": 1.826
    },
    "Name": "Selby House stairwell, floor 2"
@@ -67285,7 +67297,7 @@
    },
    "Scale": {
     "X": 0.9,
-    "Y": 0.5,
+    "Y": 0.6,
     "Z": 1.826
    },
    "Name": "Selby House stairwell, floor 3"
@@ -68934,7 +68946,7 @@
    },
    "Scale": {
     "X": 0.9,
-    "Y": 0.5,
+    "Y": 0.6,
     "Z": 1.826
    },
    "Name": "Selby House stairwell, floor 4"
@@ -70597,7 +70609,7 @@
    },
    "Scale": {
     "X": 0.9,
-    "Y": 0.5,
+    "Y": 0.6,
     "Z": 1.826
    },
    "Name": "Selby House stairwell, floor 5"
@@ -72162,7 +72174,7 @@
    },
    "Scale": {
     "X": 0.9,
-    "Y": 0.5,
+    "Y": 0.6,
     "Z": 1.826
    },
    "Name": "Selby House stairwell, floor 6"
@@ -72595,12 +72607,12 @@
    "PrefabId": "acoustic_region",
    "Position": {
     "X": 10.65,
-    "Y": 22.55,
+    "Y": 22.425,
     "Z": 152.3
    },
    "Scale": {
     "X": 0.16,
-    "Y": 0.52,
+    "Y": 0.57,
     "Z": 0.57
    },
    "Name": "Selby House roof access"
@@ -72688,7 +72700,8 @@
     "Y": 0.6,
     "Z": 0.09
    },
-   "Name": "Selby House roof"
+   "Name": "Selby House roof",
+   "IsIndoor": false
   },
   {
    "EntityId": 5141,
@@ -72703,7 +72716,8 @@
     "Y": 0.6,
     "Z": 8.43
    },
-   "Name": "Selby House roof"
+   "Name": "Selby House roof",
+   "IsIndoor": false
   },
   {
    "EntityId": 5142,
@@ -72718,7 +72732,8 @@
     "Y": 0.6,
     "Z": 0.61
    },
-   "Name": "Selby House roof"
+   "Name": "Selby House roof",
+   "IsIndoor": false
   },
   {
    "EntityId": 5143,

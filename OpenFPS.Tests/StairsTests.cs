@@ -248,8 +248,9 @@ public class StairsTests : IClassFixture<StairsTests.City>
     }
 
     /// <summary>
-    /// The roof measures as the open air and its stair housing as a room, from the walls round them
-    /// (regions-measure-themselves): the parapet is a metre high and does not make a roof a courtyard.
+    /// The roof is the open air and its stair housing a room. The housing is measured from its walls
+    /// (regions-measure-themselves); the roof is said to be outdoors by the map, because a strip of it
+    /// between the parapet and the housing measured as a room.
     /// </summary>
     [Fact]
     public void TheRoofIsOutdoorsAndItsHousingIsARoom()
