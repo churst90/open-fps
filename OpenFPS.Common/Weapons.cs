@@ -75,6 +75,144 @@ public sealed record WeaponDefinition
     /// <summary>Whether this round outruns sound, and so cracks as it passes.</summary>
     public bool IsSupersonic(float speedOfSound) =>
         MuzzleVelocity > speedOfSound + Ballistics.SubsonicMarginMetresPerSecond;
+
+    // ── Carrying it and loading it ──────────────────────────────────────────────────────────────
+    //
+    // Real figures, for the same reason the velocities are real: a player who learns that a Glock
+    // holds seventeen and a pump gun is loaded a shell at a time has learned something true, and can
+    // plan a fight around it by ear.
+
+    /// <summary>Which ammunition it takes: a key into <see cref="Ammunition"/>.</summary>
+    public required string AmmoId { get; init; }
+
+    /// <summary>Rounds it holds when full: the magazine, the tube or the cylinder.</summary>
+    public required int MagazineCapacity { get; init; }
+
+    /// <summary>How it is loaded, which decides whether a reload is one act or one per round.</summary>
+    public required WeaponFeed Feed { get; init; }
+
+    /// <summary>Which hands-on routine reloading it is: what gets pressed, pulled and slammed, and so
+    /// what a reload sounds like and how long it takes (<see cref="WeaponHandling"/>).</summary>
+    public required WeaponAction Action { get; init; }
+
+    /// <summary>The fastest the action can be worked, rounds a minute. One shot per press of the
+    /// trigger key; this only refuses presses faster than the gun could follow.</summary>
+    public required float RoundsPerMinute { get; init; }
+
+    /// <summary>Health taken from a person by one hit inside the effective range: per pellet, for
+    /// buckshot. A person has 100.</summary>
+    public required int Damage { get; init; }
+
+    /// <summary>Out to here a hit does its full damage; beyond it a pistol bullet has slowed and
+    /// spread enough to do less (see <see cref="DamageAt"/>). For buckshot this is unused: the
+    /// pattern's spread decides how many pellets arrive.</summary>
+    public required float EffectiveRangeMetres { get; init; }
+
+    /// <summary>A polymer frame and magazine (a Glock) rather than steel (a 1911): the same routine of
+    /// hands, a few decibels softer where plastic meets plastic.</summary>
+    public bool PolymerFrame { get; init; }
+
+    /// <summary>A full reload from empty, seconds: the hands' routine, from
+    /// <see cref="WeaponHandling"/>, so the time and the sound can never disagree.</summary>
+    public float ReloadSeconds => WeaponHandling.ReloadSeconds(this, MagazineCapacity, fromEmpty: true);
+
+    /// <summary>The least time between two shots, seconds.</summary>
+    public float SecondsBetweenShots => 60f / MathF.Max(1f, RoundsPerMinute);
+
+    /// <summary>
+    /// What one shot does to a person this far away, in health.
+    ///
+    /// Buckshot spreads about 2.5 cm for every metre it travels (an inch a yard, the figure every
+    /// patterning board gives for a cylinder bore), so out to about 18 m all nine pellets land on a
+    /// body 45 cm across, and beyond that the share that does falls with the pattern's area. A bullet
+    /// does its full damage inside its effective range and falls to half at twice it.
+    /// </summary>
+    public int DamageAt(float metres)
+    {
+        if (PelletsPerShot > 1)
+        {
+            float pattern = MathF.Max(0.01f, 0.025f * metres);
+            float share = MathF.Min(1f, (BodyWidthMetres / pattern) * (BodyWidthMetres / pattern));
+            return (int)MathF.Round(Damage * PelletsPerShot * share);
+        }
+        float over = MathF.Max(0f, metres - EffectiveRangeMetres) / MathF.Max(1f, EffectiveRangeMetres);
+        return (int)MathF.Round(Damage * MathF.Max(0.5f, 1f - 0.5f * over));
+    }
+
+    /// <summary>The width of a person's torso, metres: what a shotgun's pattern has to land on.</summary>
+    public const float BodyWidthMetres = 0.45f;
+}
+
+/// <summary>How a weapon is fed.</summary>
+public enum WeaponFeed
+{
+    /// <summary>A detachable box: out with the old one, in with the new, all at once.</summary>
+    Magazine,
+    /// <summary>A tube under the barrel, loaded a shell at a time through the loading port.</summary>
+    Tube,
+    /// <summary>A revolver's cylinder: swung out, emptied, and filled from a speedloader.</summary>
+    Cylinder,
+}
+
+/// <summary>The routine of hands that reloads a weapon, which is what its reload sounds like.</summary>
+public enum WeaponAction
+{
+    /// <summary>Kalashnikov: paddle release, the magazine rocked out and rocked in, and the charging
+    /// handle on the right pulled and let go when the gun was empty.</summary>
+    Kalashnikov,
+    /// <summary>AR-15: a button drops the magazine free, a straight push seats the new one, and a slap
+    /// on the bolt catch sends the bolt home when it was locked back empty.</summary>
+    Stoner,
+    /// <summary>Self-loading pistol: magazine button, the new one palmed in, the slide released.</summary>
+    Pistol,
+    /// <summary>Revolver: the cylinder swung out, the empties pushed out by the ejector rod, a
+    /// speedloader, and the cylinder closed.</summary>
+    Revolver,
+    /// <summary>Pump gun: shells thumbed into the tube one at a time, and the action racked when the
+    /// chamber was empty.</summary>
+    Pump,
+}
+
+/// <summary>
+/// A kind of ammunition: what it is called when spoken, what a single one of it is called, and what
+/// a box of it holds when somebody is handed one without a count.
+/// </summary>
+public sealed record AmmoType(string Id, string SpokenName, string Unit, string UnitSingular, int BoxRounds, string[] Aliases);
+
+/// <summary>
+/// The ammunition that exists, by the names a player might type for it. A reserve is kept per kind,
+/// not per gun: two rifles in the same calibre draw on the same rounds, as they would from one belt.
+/// </summary>
+public static class Ammunition
+{
+    public static readonly AmmoType Rifle762 = new("7.62x39", "7.62x39", "rounds", "round", 30, new[] { "7.62x39", "7.62", "762", "7.62x39mm" });
+    public static readonly AmmoType Rifle556 = new("5.56", "5.56", "rounds", "round", 30, new[] { "5.56", "556", "5.56x45", "5.56x45mm", ".223", "223" });
+    public static readonly AmmoType Pistol9 = new("9mm", "9mm", "rounds", "round", 50, new[] { "9mm", "9x19", "9x19mm", "9" });
+    public static readonly AmmoType Acp45 = new(".45", ".45 ACP", "rounds", "round", 50, new[] { ".45", "45", ".45acp", "45acp", ".45 acp" });
+    public static readonly AmmoType Magnum357 = new(".357", ".357 Magnum", "rounds", "round", 50, new[] { ".357", "357", ".357magnum", "357magnum" });
+    public static readonly AmmoType Gauge12 = new("12 gauge", "12 gauge", "shells", "shell", 25, new[] { "12 gauge", "12gauge", "12ga", "12g", "12", "buckshot", "shells" });
+
+    public static IReadOnlyList<AmmoType> All { get; } = new[] { Rifle762, Rifle556, Pistol9, Acp45, Magnum357, Gauge12 };
+
+    /// <summary>The ammunition a name means, by its id or any of its aliases, ignoring case.</summary>
+    public static bool TryFind(string? name, out AmmoType ammo)
+    {
+        ammo = null!;
+        if (string.IsNullOrWhiteSpace(name)) return false;
+        string n = name.Trim();
+        foreach (var a in All)
+            if (a.Id.Equals(n, StringComparison.OrdinalIgnoreCase)
+                || Array.Exists(a.Aliases, x => x.Equals(n, StringComparison.OrdinalIgnoreCase)))
+            { ammo = a; return true; }
+        return false;
+    }
+
+    /// <summary>The ammunition by id, or null.</summary>
+    public static AmmoType? Get(string id) => TryFind(id, out var a) ? a : null;
+
+    /// <summary>"60 rounds of 9mm", "1 shell of 12 gauge".</summary>
+    public static string Count(AmmoType ammo, int count)
+        => $"{count} {(count == 1 ? ammo.UnitSingular : ammo.Unit)} of {ammo.SpokenName}";
 }
 
 /// <summary>
@@ -101,6 +239,9 @@ public static class WeaponRegistry
         // broadest bubble (damping 0.6) and the brightest peak, at 1-2 kHz, as recorded.
         ReportPositivePhaseMs = 0.24f, ReportBurstDecayMs = 0.40f, ReportTrailDecayMs = 3f, ReportCornerHz = 1500f,
         ReportDamping = 0.6f, ReportTrailLevel = 0.15f,
+        // The standard 30-round steel magazine; 600 rounds a minute cyclic.
+        AmmoId = "7.62x39", MagazineCapacity = 30, Feed = WeaponFeed.Magazine, Action = WeaponAction.Kalashnikov,
+        RoundsPerMinute = 600f, Damage = 45, EffectiveRangeMetres = 300f,
     };
 
     /// <summary>5.56x45. Faster and much sharper than the AKM: a tighter Mach cone, so the crack is a
@@ -115,6 +256,9 @@ public static class WeaponRegistry
         // is the bigger charge's gas, and what holds up its 125 Hz band.
         ReportPositivePhaseMs = 0.24f, ReportBurstDecayMs = 0.55f, ReportTrailDecayMs = 3f, ReportCornerHz = 2000f,
         ReportDamping = 0.3f, ReportTrailLevel = 0.2f,
+        // The 30-round STANAG magazine. Semi-automatic, so the rate is how fast the action cycles.
+        AmmoId = "5.56", MagazineCapacity = 30, Feed = WeaponFeed.Magazine, Action = WeaponAction.Stoner,
+        RoundsPerMinute = 750f, Damage = 35, EffectiveRangeMetres = 300f,
     };
 
     /// <summary>9x19, and only just supersonic — Mach 1.09. The crack is there but it is small and
@@ -129,6 +273,9 @@ public static class WeaponRegistry
         // 0.30 ms positive phase against 0.42 in the game; this renders at 0.31.
         ReportPositivePhaseMs = 0.26f, ReportBurstDecayMs = 0.55f, ReportTrailDecayMs = 4f, ReportCornerHz = 1500f,
         ReportDamping = 0.3f, ReportTrailLevel = 0.05f,
+        // Seventeen in the standard magazine: the number in its name.
+        AmmoId = "9mm", MagazineCapacity = 17, Feed = WeaponFeed.Magazine, Action = WeaponAction.Pistol,
+        RoundsPerMinute = 600f, Damage = 25, EffectiveRangeMetres = 50f, PolymerFrame = true,
     };
 
     /// <summary>.45 ACP from a hammer-fired service pistol: heavy, slow and SUBSONIC. It makes no crack
@@ -144,6 +291,9 @@ public static class WeaponRegistry
         // handgun with no crack.
         ReportPositivePhaseMs = 0.28f, ReportBurstDecayMs = 0.40f, ReportTrailDecayMs = 3f, ReportCornerHz = 4000f,
         ReportDamping = 0.3f, ReportTrailLevel = 0.1f,
+        // A 1911's single-stack magazine holds seven.
+        AmmoId = ".45", MagazineCapacity = 7, Feed = WeaponFeed.Magazine, Action = WeaponAction.Pistol,
+        RoundsPerMinute = 500f, Damage = 30, EffectiveRangeMetres = 50f,
     };
 
     /// <summary>12 gauge buckshot from a pump gun. Nine pellets, marginally supersonic.</summary>
@@ -159,6 +309,10 @@ public static class WeaponRegistry
         // a recording.
         ReportPositivePhaseMs = 0.32f, ReportBurstDecayMs = 0.60f, ReportTrailDecayMs = 4f, ReportCornerHz = 1200f,
         ReportDamping = 0.4f, ReportTrailLevel = 0.25f,
+        // A six-shell tube, loaded one at a time. A pump is worked by hand between shots, about 0.85 s
+        // for somebody practised: 70 a minute.
+        AmmoId = "12 gauge", MagazineCapacity = 6, Feed = WeaponFeed.Tube, Action = WeaponAction.Pump,
+        RoundsPerMinute = 70f, Damage = 12, EffectiveRangeMetres = 40f,
     };
 
     /// <summary>.357 Magnum from a 6-inch revolver, measured on the NIJ Ruger .357. About 410 m/s
@@ -183,6 +337,9 @@ public static class WeaponRegistry
         // recordings show no separate early zero crossing, and a render's measured positive phase is
         // the gap's (0.16 ms against 0.36 recorded).
         CylinderGapLeadMs = 0.46f, CylinderGapLevel = 0.32f,
+        // Six in the cylinder. Double action, so the long trigger pull is the limit: about 0.2 s.
+        AmmoId = ".357", MagazineCapacity = 6, Feed = WeaponFeed.Cylinder, Action = WeaponAction.Revolver,
+        RoundsPerMinute = 300f, Damage = 40, EffectiveRangeMetres = 50f,
     };
 
     static WeaponRegistry()

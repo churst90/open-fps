@@ -185,7 +185,7 @@ public sealed class PedestrianSpeech
     {
         var people = new List<(int Id, Vector3 At, Vector3 Forward, float Speed, string Voice)>();
         var pairs = new Dictionary<string, List<int>>();
-        world.Query(new QueryDescription().WithAll<Transform, Velocity, Pedestrian>(),
+        world.Query(new QueryDescription().WithAll<Transform, Velocity, Pedestrian>().WithNone<DeadComponent>(),
             (Entity e, ref Transform t, ref Velocity v, ref Pedestrian p) =>
             {
                 if (string.IsNullOrEmpty(p.Voice)) return;
@@ -203,7 +203,7 @@ public sealed class PedestrianSpeech
         if (people.Count == 0) return;
 
         var players = new List<(int Id, Vector3 At, float Speed)>();
-        world.Query(new QueryDescription().WithAll<Transform, PlayerComponent>(),
+        world.Query(new QueryDescription().WithAll<Transform, PlayerComponent>().WithNone<DeadComponent>(),
             (Entity e, ref Transform t, ref PlayerComponent pc) =>
             {
                 if (pc.IsInVehicle) return;

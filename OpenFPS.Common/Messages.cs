@@ -37,6 +37,7 @@ namespace OpenFPS.Common.Networking;
 [MemoryPackUnion(28, typeof(MapListRequest))]
 [MemoryPackUnion(29, typeof(MapListResponse))]
 [MemoryPackUnion(30, typeof(EntityDefinitionBatch))]
+[MemoryPackUnion(31, typeof(HitConfirm))]
 public partial interface IMessage { }
 
 public enum PlayerListScope
@@ -373,6 +374,30 @@ public partial class StatsUpdate : IMessage
     public int MaxHealth;
     public string CurrentMaterial = "Generic";
     public string CurrentVariant = "0";
+
+    // APPEND ONLY BELOW THIS LINE — members serialise positionally.
+
+    /// <summary>The weapon in the player's hands (a <see cref="OpenFPS.Common.WeaponRegistry"/> id), or
+    /// empty. The client needs it for its keys: Enter fires only a gun, and R reloads one.</summary>
+    public string HeldWeaponId = "";
+    /// <summary>Rounds in that weapon, or -1 with none.</summary>
+    public int HeldRounds = -1;
+}
+
+/// <summary>
+/// Your shot hit somebody: sent to the shooter alone, who hears a chime for it. Nobody else is told;
+/// they heard the shot.
+/// </summary>
+[MemoryPackable]
+public partial class HitConfirm : IMessage
+{
+    /// <summary>Who was hit.</summary>
+    public int TargetEntityId;
+    /// <summary>The hit killed them. Sent once: a body is not hit again.</summary>
+    public bool Killed;
+    /// <summary>Always false for now: hits are not placed on the body yet.</summary>
+    public bool Headshot;
+    public HitConfirm() { }
 }
 
 [MemoryPackable]

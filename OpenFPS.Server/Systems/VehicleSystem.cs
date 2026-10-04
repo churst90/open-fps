@@ -344,7 +344,8 @@ public sealed partial class VehicleSystem
                         Voice = string.IsNullOrEmpty(vd.Pair) ? PedestrianSpeech.NextVoice(mapId)
                               : PedestrianSpeech.PairVoice(mapId, vd.Pair, second: !PairSeen.Add((mapId, vd.Pair))),
                         Pair = vd.Pair ?? "",
-                    }))
+                    },
+                    new HealthComponent { Current = 100, Max = 100 }))
                     : maps.SpawnEntity(mapId, w => w.Create(
                     EntityType.NPC,
                     new Transform { Position = start, Rotation = Quaternion.CreateFromYawPitchRoll(heading, 0f, 0f) },
@@ -494,6 +495,13 @@ public sealed partial class VehicleSystem
         foreach (var v in _vehicles)
         {
             if (v.MapId != mapId || !world.IsAlive(v.Entity)) continue;
+            // Somebody shot dead lies where they fell until they are taken away (ReplaceWalker).
+            if (world.Has<DeadComponent>(v.Entity))
+            {
+                v.Speed = 0f;
+                world.Get<Velocity>(v.Entity).Linear = Vector3.Zero;
+                continue;
+            }
             ref var t = ref world.Get<Transform>(v.Entity);
             ref var vel = ref world.Get<Velocity>(v.Entity);
             v.Phase += dt;

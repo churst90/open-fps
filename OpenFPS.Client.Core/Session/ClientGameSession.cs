@@ -268,7 +268,6 @@ public sealed partial class ClientGameSession : IDisposable
         // Shift+E: knock on the nearest door instead of opening it.
         _bindings.Bind(InputContext.Gameplay, GameKey.E, KeyModifiers.Shift,
             () => _network.Send(new TextCommand { Command = "knock" }));
-        _bindings.Bind(InputContext.Gameplay, GameKey.Enter, Interact);
 
         // P is "what am I looking at", answered HERE rather than by the server. It used to send
         // `scan`, which is a different question — the five nearest things in any direction, most of
@@ -280,7 +279,7 @@ public sealed partial class ClientGameSession : IDisposable
         _bindings.Bind(InputContext.Gameplay, GameKey.I, () => _network.Send(new TextCommand { Command = "inv" }));
 
         // Carrying things. G takes whatever is within reach, Q puts down what is in your hand, and
-        // R swaps a hand for your back — the three verbs you use while moving, on keys you can find
+        // R (with no gun in hand) swaps a hand for your back — the three verbs you use while moving, on keys you can find
         // without letting go of the movement ones. Naming a particular thing is what the console is
         // for; these are the ones you want under a finger.
         _bindings.Bind(InputContext.Gameplay, GameKey.G, () => _network.Send(new TextCommand { Command = "take" }));
@@ -302,7 +301,11 @@ public sealed partial class ClientGameSession : IDisposable
         _bindings.Bind(InputContext.Gameplay, GameKey.T, KeyModifiers.Shift,
             () => _network.Send(new TextCommand { Command = "ignition", Args = new[] { "off" } }));
         _bindings.Bind(InputContext.Gameplay, GameKey.Q, () => _network.Send(new TextCommand { Command = "drop" }));
-        _bindings.Bind(InputContext.Gameplay, GameKey.R, () => _network.Send(new TextCommand { Command = "stow" }));
+        // R does what the moment calls for: in a seat it winds the window, with a gun in your hands it
+        // reloads it, and otherwise it slings what you hold onto your back. One key for the three,
+        // because they never apply at once, and a player should not have to remember which mode
+        // they are in to find the one that does.
+        _bindings.Bind(InputContext.Gameplay, GameKey.R, () => _network.Send(new TextCommand { Command = RKeyCommand(_state) }));
         // Shift+R: the reverse, the first thing on your back into your hand. Without a name the server
         // takes whatever was slung first.
         _bindings.Bind(InputContext.Gameplay, GameKey.R, KeyModifiers.Shift, () => _network.Send(new TextCommand { Command = "draw" }));
@@ -318,7 +321,10 @@ public sealed partial class ClientGameSession : IDisposable
         // Enter, because a blind player finds it by touch without counting keys from a landmark, it
         // is under the right hand that is already on J K L O for turning, and no reader claims it in
         // a focused game window. See ScreenReaderKeys: nothing in gameplay may be bound to one.
-        _bindings.Bind(InputContext.Gameplay, GameKey.Enter, Fire);
+        //
+        // Only with a gun in your hands. Without one, Enter is the interact key it always was: a
+        // player reaching for a door with empty hands must not be told they have nothing to fire.
+        _bindings.Bind(InputContext.Gameplay, GameKey.Enter, () => { if (EnterFires(_state)) Fire(); else Interact(); });
 
         // Social / discovery. The plain key is the wider question and shift narrows it to here —
         // the same relationship on both, so there is one thing to remember rather than two.
@@ -352,11 +358,30 @@ public sealed partial class ClientGameSession : IDisposable
     public static readonly GameKey[] ScreenReaderKeys =
         { GameKey.ControlLeft, GameKey.ControlRight, GameKey.AltLeft, GameKey.AltRight };
 
+    /// <summary>What R sends: wind the window in a seat, reload a gun in your hands, and otherwise
+    /// put what you hold on your back.</summary>
+    internal static string RKeyCommand(LocalPlayerState state)
+        => state.IsRiding ? "window"
+         : HoldsGun(state) ? "reload"
+         : "stow";
+
+    /// <summary>Whether Enter fires (a gun in your hands) or interacts (anything else).</summary>
+    internal static bool EnterFires(LocalPlayerState state) => HoldsGun(state);
+
+    private static bool HoldsGun(LocalPlayerState state)
+        => !string.IsNullOrEmpty(state.HeldWeaponId) && OpenFPS.Common.WeaponRegistry.TryGet(state.HeldWeaponId, out _);
+
+    /// <summary>Runs a gameplay key as if pressed, for tests.</summary>
+    internal bool Press(GameKey key, KeyModifiers modifiers = KeyModifiers.None)
+        => _bindings.Execute(InputContext.Gameplay, key, modifiers);
+
     /// <summary>The keys, as the in-game window shows them. One text for both heads.</summary>
     public static readonly string KeyHelp = string.Join(Environment.NewLine,
-        "In game. W A S D to move, J / L turn, O / K look up and down, Space jump, Enter fire.",
+        "In game. W A S D to move, J / L turn, O / K look up and down, Space jump.",
+        "Enter fires the gun in your hands; with no gun it interacts, like E.",
         "C coordinates, F facing, H health, Z area, comma look ahead, E interact, P scan, I inventory.",
-        "G take, Q drop, R put on your back, Shift+R draw, T clap or ignition.",
+        "G take, Q drop, Shift+R draw, T clap or ignition.",
+        "R: with a gun, reload; in a vehicle, the window; otherwise put what you hold on your back.",
         "V voice, F5 players, F6 maps, F8 friends, brackets to read chat, slash for the command console.",
         "Escape for the game menu: keep playing, main menu, or quit.");
 
@@ -952,8 +977,16 @@ public sealed partial class ClientGameSession : IDisposable
                 _world.UpdateAtmosphere(wsu);
                 break;
 
+            case HitConfirm confirm:
+                // Your shot landed. A chime and no words: the chime is the information, and a word
+                // on every hit would talk over the fight. A kill has its own.
+                Ui.Play(confirm.Killed ? UiCue.Kill : UiCue.Hit);
+                break;
+
             case StatsUpdate stats:
                 _state.Health = stats.Health;
+                _state.HeldWeaponId = stats.HeldWeaponId ?? "";
+                _state.HeldRounds = stats.HeldRounds;
                 _state.CurrentMaterial = stats.CurrentMaterial;
                 _state.CurrentVariant = stats.CurrentVariant;
                 // CurrentMaterial feeds the reverb bus material calculation via LocalPlayerState: when a
@@ -1067,9 +1100,8 @@ public sealed partial class ClientGameSession : IDisposable
     /// <summary>
     /// Firing what is in your hands, on a key rather than a typed command.
     ///
-    /// It is still a text command on the wire, and that is the honest state of it: there is no shot
-    /// message in the protocol yet, no round is resolved against what it hit, and nothing has ever
-    /// decremented a health component. What this changes is only that the trigger is a trigger.
+    /// Still a text command on the wire: the server spends the round, finds what it hit and takes the
+    /// health, and says back a HitConfirm when it was somebody.
     /// </summary>
     private void Fire() => _network.Send(new TextCommand { Command = "fire" });
 

@@ -12,6 +12,8 @@ public enum UiCue
     ChatMap, ChatAll, ChatPrivate, ChatServer, ChatAdmin,
     VoiceOn, VoiceOff,
     Reconnecting,
+    // Your shot landed on somebody; your shot killed them.
+    Hit, Kill,
 }
 
 /// <summary>
@@ -92,6 +94,13 @@ public sealed class UiSounds
         UiCue.VoiceOff => Notes(0.5f, (880f, 0f, 0.06f), (659.3f, 0.07f, 0.08f)),
         // Trying the server again: a quiet low tick, every few seconds until it answers.
         UiCue.Reconnecting => Notes(0.25f, (587.3f, 0f, 0.04f)),
+        // Your shot landed: a high A and the E above it struck together, short and bright. Higher
+        // than anything in the menus and over before the shot's own echoes, so it never sounds like
+        // part of the world.
+        UiCue.Hit => Notes(0.6f, (1760f, 0f, 0.07f), (2637f, 0f, 0.07f)),
+        // A kill: the same A, then up a fourth and up a fifth, quick, the last one left to ring.
+        // A leap and not the chat's steps, so it cannot be taken for a message.
+        UiCue.Kill => Notes(0.6f, (1760f, 0f, 0.07f), (2349.3f, 0.06f, 0.07f), (3520f, 0.12f, 0.3f)),
         _ => Notes(0.4f, (1000f, 0f, 0.05f)),
     };
 

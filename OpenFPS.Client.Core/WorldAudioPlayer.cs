@@ -983,6 +983,9 @@ public sealed class WorldAudioPlayer
             if (WeaponRegistry.TryGet(id, out var weapon))
                 return WeaponSynth.MuzzleBlast(WeaponProfile.From(weapon), seed);
         }
+        // A gun worked by hand: a reload's routine, or a trigger on an empty chamber.
+        if (WeaponHandling.TryParseKey(sound.SynthKey, out var handling))
+            return WeaponHandling.Render(handling, TransientSynth.SampleRate, seed);
         // A crowd, which is many impacts rather than one. Named for the same reason a gunshot is:
         // the four characters describe one event and a thousand people clapping is not one event.
         if (Applause.TryParseKey(sound.SynthKey, out var crowd))

@@ -95,6 +95,8 @@ string[] usage =
     "  --sliding-door [out=] [only=] [stems=]        the physical sliding doors: a patio door and an automatic door, each character",
     "  --beacon-tones [out=]                         each beacon three times at its real period",
     "  --gun-spec                                    synthesized shots against the NIJ recordings",
+    "  --reload-spec [refs=DIR] [only=]              the gun-handling recordings measured: contacts, falls, bands",
+    "  --reload-sounds [out=DIR]                     every reload and dry fire rendered, measured the same way",
     "  --gun-fit [nij=DIR] [tag=] [wavs] [grid]      every weapon's report against its own NIJ takes",
     "  --speech-lines                                decodes every shipped voice line as the client does",
     "  --ground-voice [--ladder]                     a talker's ground reflection three ways",
@@ -447,6 +449,16 @@ if (args.Contains("--gun-fit"))
 if (args.Contains("--gun-spec"))
 {
     Environment.Exit(OpenFPS.Client.Core.AudioEngine.Fmod.GunSpecSpike.Run(args));
+}
+
+if (args.Contains("--reload-spec"))
+{
+    Environment.Exit(OpenFPS.AudioLab.Spikes.ReloadSpecSpike.Run(args));
+}
+
+if (args.Contains("--reload-sounds"))
+{
+    Environment.Exit(OpenFPS.AudioLab.Spikes.ReloadSpecSpike.Render(args));
 }
 
 if (args.Contains("--tap-balance"))

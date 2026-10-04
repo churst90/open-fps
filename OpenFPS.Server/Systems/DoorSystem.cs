@@ -468,7 +468,7 @@ public sealed class DoorSystem
     {
         if (_peopleFound) return _people;
         _people.Clear();
-        world.Query(new QueryDescription().WithAll<Transform>().WithAny<PlayerComponent, Pedestrian>().WithNone<OccupantComponent>(),
+        world.Query(new QueryDescription().WithAll<Transform>().WithAny<PlayerComponent, Pedestrian>().WithNone<OccupantComponent, DeadComponent>(),
                     (ref Transform t) => _people.Add(t.Position));
         _peopleFound = true;
         return _people;

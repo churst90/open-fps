@@ -80,6 +80,14 @@ public static class MovementSystem
                 // is the whole of driving, and it is deliberately fed from the same input queue, budget
                 // and sequence numbering as walking: a driver cannot outrun the speed limiter by sending
                 // packets faster any more than a pedestrian can.
+                // 0. DEAD: the body lies where it fell until it is got up again at the spawn. The input
+                // is still taken and acknowledged, so the client is not left waiting on it; it just
+                // moves nothing.
+                if (world.Has<DeadComponent>(e))
+                {
+                    velocity.Linear = Vector3.Zero;
+                    continue;
+                }
                 if (world.Has<OccupantComponent>(e))
                 {
                     if (input.LookDelta != Vector2.Zero)

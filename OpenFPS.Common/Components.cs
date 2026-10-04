@@ -788,3 +788,49 @@ public partial struct CrowdComponent
         CooldownSeconds = 6f;
     }
 }
+
+// ── Weapons and wounds ──────────────────────────────────────────────────────────────────────────
+//
+// Server-side state, never sent: a client learns what it needs about its own gun from StatsUpdate,
+// and about everybody else's from the sounds the guns make.
+
+/// <summary>
+/// The rounds in a weapon, on the weapon's own entity: put a loaded rifle down and the next person to
+/// pick it up gets those thirty rounds, because they are in the rifle and not in a list somewhere.
+/// </summary>
+[MemoryPackable]
+public partial struct AmmoComponent
+{
+    /// <summary>Rounds in it now: the magazine, the tube or the cylinder.</summary>
+    public int Rounds { get; set; }
+    /// <summary>Rounds it holds full.</summary>
+    public int Capacity { get; set; }
+    /// <summary>Spare rounds that came with it, in the magazines lying beside it. The first person to
+    /// pick it up pockets them (their reserve), and then there are none.</summary>
+    public int SpareRounds { get; set; }
+    public AmmoComponent() { }
+}
+
+/// <summary>
+/// The ammunition a person carries that is not in a gun, by kind (<see cref="OpenFPS.Common.Ammunition"/>
+/// ids). Kept per kind and not per gun: two rifles in the same calibre draw on the same rounds.
+/// </summary>
+[MemoryPackable]
+public partial struct AmmoReserveComponent
+{
+    public Dictionary<string, int> Rounds { get; set; } = new();
+    public AmmoReserveComponent() { }
+}
+
+/// <summary>
+/// Somebody who has been killed, and when. A dead person does not walk, talk, shoot or get shot
+/// again; a player gets up again at the spawn a few seconds later, and a person in the street is
+/// taken away and somebody else comes along.
+/// </summary>
+[MemoryPackable]
+public partial struct DeadComponent
+{
+    /// <summary>When they died, seconds on the server's clock.</summary>
+    public double DiedAt { get; set; }
+    public DeadComponent() { }
+}

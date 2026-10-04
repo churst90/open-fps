@@ -247,8 +247,10 @@ public class GameServer
         // Beside openfps.db and motd.txt, in the server's working folder. See FriendRepository for
         // why this is a file and not a table.
         _friends = new FriendRepository("friends.json");
-        _commands = new CommandHandler(_sessions, _maps, this, _composites, _seats, _hands, _userRepo, _friends);
-        
+        // A pedestrian shot dead is taken away after a while and somebody else walks their walk.
+        var combat = new CombatService(_maps, this, _sessions) { ReplaceWalker = _vehicles.ReplaceWalker };
+        _commands = new CommandHandler(_sessions, _maps, this, _composites, _seats, _hands, _userRepo, _friends, combat);
+
         // These register their handlers with the dispatcher, which is what keeps them alive.
         _ = new DiscoveryService(_dispatcher, _sessions, _maps);
         _ = new SocialService(_dispatcher, _sessions, _friends);
@@ -535,6 +537,8 @@ public class GameServer
                     // 4. Update Simulation (Movement)
                     MovementSystem.Update(world, entry.Value.data.WalkMin, entry.Value.data.WalkMax, grid, lookup, _sessions, _maps, dt);
                     _vehicles.Update(entry.Key, world, dt);
+                    // Reloads that are due, the dead got up again or taken away.
+                    _commands.Combat.Update(entry.Key, world);
                     _rail.Update(entry.Key, world, dt);
                     _crossings.Update(entry.Key, world, dt);
 
@@ -1113,9 +1117,13 @@ public class GameServer
                         health = h.Current; maxHealth = h.Max;
                     }
                     var stats = GetMaterialUnderPlayer(world, grid, pPos);
+                    // The gun in your hands, which the client's keys need: Enter fires only a gun,
+                    // and R reloads one.
+                    var held = CombatService.Held(world, session.Entity, mapEntry.Value.lookup);
                     _network.SendMessage(peer, new StatsUpdate {
                         Health = health, MaxHealth = maxHealth,
-                        CurrentMaterial = stats.matType, CurrentVariant = stats.variant
+                        CurrentMaterial = stats.matType, CurrentVariant = stats.variant,
+                        HeldWeaponId = held.WeaponId, HeldRounds = held.Rounds,
                     }, DeliveryMethod.ReliableOrdered);
                 }
                 catch (Exception ex)
@@ -1175,6 +1183,8 @@ public class GameServer
     {
         var body = session.Entity;
         string mapId = session.CurrentMapId;
+        // A reload in progress does not follow anybody to another map.
+        _commands?.Combat.Forget(session);
         if (body != Entity.Null && _maps.TryGetMap(mapId, out var world, out _, out _, out _))
         {
             if (world.IsAlive(body))

@@ -53,6 +53,11 @@ public class LocalPlayerState
     /// </summary>
     public float EyeHeight => IsRiding ? 1.0f : 1.7f;
     public int Health { get; set; } = 100;
+    /// <summary>The gun in your hands (a weapon id), or empty: what decides whether Enter fires and R
+    /// reloads. From the server's StatsUpdate.</summary>
+    public string HeldWeaponId { get; set; } = "";
+    /// <summary>Rounds in it, or -1 with none.</summary>
+    public int HeldRounds { get; set; } = -1;
     public string CurrentMaterial { get; set; } = "Generic";
     public string CurrentVariant { get; set; } = "0";
     public const string UnknownArea = "Unknown Area";
