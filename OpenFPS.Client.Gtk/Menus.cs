@@ -291,6 +291,13 @@ internal static partial class GtkClientProgram
         bumps.OnToggled += (_, _) => _speech.Speak(bumps.GetActive() ? "On" : "Off", true);
         box.Append(bumps);
 
+        // Aim assistance from the hip, which the server applies; /aimassist in game.
+        var assist = CheckButton.NewWithLabel("Aim assistance from the hip");
+        assist.SetActive(NavigationAids.AimAssist);
+        SpeakOnFocus(assist, () => $"Aim assistance from the hip, {(assist.GetActive() ? "on" : "off")}");
+        assist.OnToggled += (_, _) => _speech.Speak(assist.GetActive() ? "On" : "Off", true);
+        box.Append(assist);
+
         box.Append(Label.New("Interface sound volume, percent"));
         var volume = SpinButton.NewWithRange(0, 100, 10);
         volume.SetValue(Math.Round(_settings.UiVolume * 100));
@@ -308,7 +315,9 @@ internal static partial class GtkClientProgram
             _settings.UiVolume = (float)(volume.GetValue() / 100.0);
             NavigationAids.TurnNarration = narration.GetActive();
             NavigationAids.WallBumps = bumps.GetActive();
+            NavigationAids.AimAssist = assist.GetActive();
             _settings.Save();
+            _session.SendAimAssist();
             _session.Audio.SetOutputDevice(_settings.OutputDevice);
             ApplyAudioSettings();
             Cue(UiCue.MenuSelect);

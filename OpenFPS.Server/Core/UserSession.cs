@@ -47,6 +47,10 @@ public class UserSession
     /// <summary>True for a MUD (telnet) session: no UDP peer, so no state stream and no voice.</summary>
     public bool IsTextClient { get; set; }
 
+    /// <summary>Aim assistance for a shot from the hip (CombatService.Assist): on unless the player turns
+    /// it off. The client sends its saved choice when it enters the world, and /aimassist changes it.</summary>
+    public bool AimAssist { get; set; } = true;
+
     /// <summary>Where the connection came from, as the transport reported it at login.</summary>
     public string RemoteAddress { get; set; } = "";
 

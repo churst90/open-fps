@@ -40,6 +40,7 @@ public static class CommandCatalog
         E("Things", "hands", "/hands", "what is in your hands"),
         E("Things", "inv", "/inv", "what you are carrying", "i", "inventory"),
         E("Things", "fire", "/fire", "fire the weapon you hold", "shoot"),
+        E("Things", "aimassist", "/aimassist [on|off]", "aim assistance from the hip: a shot near somebody in plain view is turned onto them; on by default"),
         E("Things", "reload", "/reload", "reload the gun in your hands from your spare ammunition"),
         E("Things", "ammo", "/ammo", "what is in your gun and the spare ammunition you carry"),
         E("Things", "scope", "/scope [tone on|off]", "raise or lower the scope on the rifle in your hands; numpad star. With tone, the guidance tone on or off"),

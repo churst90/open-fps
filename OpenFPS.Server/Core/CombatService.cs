@@ -153,10 +153,146 @@ public sealed class CombatService
         //    wall's centre is metres away along it, so from the second floor of Brandt Court the floor's
         //    own east wall (88 m long, its centre 40 m off) was never in the cone and the pedestrian
         //    below in the street was (Cody, 2026-10-04).
-        Vector3 aim = Disperse(forward, HipDispersionRadians);
+        //
+        //    Aim assistance first, if the player has it on (/aimassist, on by default): somebody near the
+        //    aim and in plain view turns the gun onto them. Then the hip's own scatter, and the round is
+        //    flown as ever, so what it does on the way is still the world's to decide.
         Vector3 from = position + new Vector3(0f, HipHeight, 0f);
+        Vector3 aim = forward;
+        if (session.AimAssist && Assist(session, world, grid, weapon, from, forward, out var onto, out var whom))
+        {
+            aim = onto;
+            Log.Information("{User}'s aim assisted onto {Whom} ({Id}), {Degrees:F1} degrees off.", session.Username,
+                            NameOf(world, whom), whom.Id, MathF.Acos(Math.Clamp(Vector3.Dot(Vector3.Normalize(forward), onto), -1f, 1f)) * 180f / MathF.PI);
+        }
+        aim = Disperse(aim, HipDispersionRadians);
         Launch(session, world, grid, weapon, from, aim * weapon.MuzzleVelocity, from, forward, targetId: -1);
         if (session.IsTextClient) Say(reply, $"You fire the {weapon.DisplayName}.");
+    }
+
+    // ── Aim assistance ──────────────────────────────────────────────────────────────────────────
+
+    /// <summary>The widest the assist reaches, either side of the aim, measured flat: the old hit-scan
+    /// cone's 14 degrees (a dot of 0.97), so close in it forgives what that forgave.</summary>
+    public static readonly float AssistHalfAngle = MathF.Acos(0.97f);
+
+    /// <summary>
+    /// Past about 16 m the cone stops widening: the assist reaches this far either side of the aim line
+    /// and no further, about nine torso widths. At 37 m that is 6 degrees (a body is 0.7 degrees
+    /// across there and a fine turn is 1), at 100 m 2.3, at 300 m 0.8: a person standing a street's
+    /// width from where you point is not "near the aim" however far off they are.
+    /// </summary>
+    public const float AssistHalfWidthMetres = 4f;
+
+    /// <summary>Nobody further than this is assisted onto: past it a shot from the hip is a guess.</summary>
+    public const float AssistRangeMetres = 300f;
+
+    /// <summary>Centre mass, above the feet: the middle of the chest.</summary>
+    public const float CentreMassHeight = 1.2f;
+    /// <summary>The middle of the head, above the feet.</summary>
+    public const float HeadHeight = 1.67f;
+
+    /// <summary>
+    /// Console-style aim assistance for a shot from the hip. Of the living people (players and people in
+    /// the street) inside the assist cone of the aim, measured flat as the old cone was, and in plain
+    /// view of the muzzle (the round's own collider test from the muzzle to their chest: a wall, a car or
+    /// another person in the way means no; glass does not, it is see-through), the one nearest the aim
+    /// line, and of those equally near the nearest in distance. The gun is turned onto their chest, or
+    /// their head if the aim already passed above their shoulders, led for their walk and held up for
+    /// the drop over the time the round takes to get there (still air: the wind is the shooter's
+    /// problem). Nothing about the round is changed: it is flown from there like any other.
+    /// </summary>
+    private bool Assist(UserSession session, World world, SpatialGrid<Entity> grid, WeaponDefinition weapon,
+                        Vector3 from, Vector3 forward, out Vector3 aim, out Entity target)
+    {
+        aim = forward; target = Entity.Null;
+        Vector3 flat = new(forward.X, 0f, forward.Z);
+        if (flat.LengthSquared() < 1e-6f) return false;
+        flat = Vector3.Normalize(flat);
+        Vector3 f = Vector3.Normalize(forward);
+        int self = session.Entity.Id;
+        int ride = world.Has<OccupantComponent>(session.Entity) ? world.Get<OccupantComponent>(session.Entity).RootEntityId : -1;
+
+        var candidates = new List<(Entity E, float Angle, float Distance, Vector3 Point)>();
+        world.Query(new QueryDescription().WithAll<Transform>(), (Entity e, ref Transform t) =>
+        {
+            if (e.Id == self || !IsPerson(world, e) || world.Has<DeadComponent>(e)) return;
+            Vector3 toward = t.Position - from;
+            Vector3 across = new(toward.X, 0f, toward.Z);
+            float d = across.Length();
+            if (d < 0.3f || d > AssistRangeMetres) return;
+            float angle = MathF.Acos(Math.Clamp(Vector3.Dot(across / d, flat), -1f, 1f));
+            float reach = MathF.Min(AssistHalfAngle, MathF.Atan(AssistHalfWidthMetres / d));
+            if (angle > reach) return;
+            // Where the aim passes them, in height: above their shoulders means the head.
+            float aimHeight = from.Y + f.Y / MathF.Max(1e-4f, new Vector2(f.X, f.Z).Length()) * d - t.Position.Y;
+            float height = aimHeight >= ExternalBallistics.HeadFrom ? HeadHeight : CentreMassHeight;
+            candidates.Add((e, angle, d, t.Position + new Vector3(0f, height, 0f)));
+        });
+        // Nearest the aim line first, a quarter of a degree being as near as makes no difference; then nearest.
+        foreach (var c in candidates.OrderBy(c => MathF.Round(c.Angle / (0.25f * MathF.PI / 180f))).ThenBy(c => c.Distance))
+        {
+            if (!InPlainView(self, ride, world, grid, from, c.Point, c.E)) continue;
+            target = c.E;
+            Vector3 vel = world.Has<Velocity>(c.E) ? world.Get<Velocity>(c.E).Linear : Vector3.Zero;
+            aim = Onto(weapon, from, c.Point, vel, AirOn(session.CurrentMapId).Air);
+            return true;
+        }
+        return false;
+    }
+
+    /// <summary>Whether a round from <paramref name="from"/> would reach <paramref name="target"/> at
+    /// <paramref name="point"/> with nothing but glass in the way: the flight's own test, in 8 m pieces.</summary>
+    private bool InPlainView(int self, int ride, World world, SpatialGrid<Entity> grid, Vector3 from, Vector3 point, Entity target)
+    {
+        var passed = new HashSet<int>();
+        Vector3 dir = point - from;
+        float length = dir.Length();
+        if (length < 1e-4f) return true;
+        dir /= length;
+        double now = Clock();
+        for (float s = 0f; s < length; s += 8f)
+        {
+            Vector3 a = from + dir * s, b = from + dir * MathF.Min(length, s + 8f);
+            while (FirstHit(self, ride, world, grid, a, b, 0f, now, now, passed, out var hit, out _, out _, out _))
+            {
+                if (hit == target) return true;
+                if (!IsGlass(world, hit)) return false;
+                passed.Add(hit.Id);
+            }
+        }
+        return true;
+    }
+
+    /// <summary>
+    /// The direction that puts a round from <paramref name="from"/> onto <paramref name="point"/> on a
+    /// body walking at <paramref name="velocity"/>: aimed at where they will be when it arrives, and above
+    /// it by what it drops on the way. Three passes of flying it and moving the aim by the miss.
+    /// </summary>
+    internal static Vector3 Onto(WeaponDefinition weapon, Vector3 from, Vector3 point, Vector3 velocity, Air air)
+    {
+        float bc = ExternalBallistics.CoefficientOf(weapon);
+        Vector3 aimAt = point;
+        for (int pass = 0; pass < 3; pass++)
+        {
+            Vector3 dir = Vector3.Normalize(aimAt - from);
+            var s = new BulletState { Position = from, Velocity = dir * weapon.MuzzleVelocity };
+            Vector3 flat = Vector3.Normalize(new Vector3(dir.X, 0f, dir.Z) + new Vector3(0f, 0f, 1e-6f));
+            float range = Vector3.Dot(new Vector3(point.X - from.X, 0f, point.Z - from.Z), flat);
+            BulletState before = s;
+            while (Vector3.Dot(s.Position - from, flat) < range && s.Seconds < MaxFlightSeconds)
+            {
+                before = s;
+                ExternalBallistics.Advance(ref s, 0.002f, bc, air, Vector3.Zero);
+            }
+            float da = Vector3.Dot(before.Position - from, flat), db = Vector3.Dot(s.Position - from, flat);
+            float u = Math.Clamp((range - da) / MathF.Max(1e-6f, db - da), 0f, 1f);
+            Vector3 there = Vector3.Lerp(before.Position, s.Position, u);
+            float seconds = before.Seconds + u * (s.Seconds - before.Seconds);
+            Vector3 target = point + velocity * seconds;
+            aimAt += target - there;
+        }
+        return Vector3.Normalize(aimAt - from);
     }
 
     /// <summary>How high above the feet a gun fired from the hip is held: where the report has always
@@ -604,6 +740,11 @@ public sealed class CombatService
     private bool FirstHit(Flight f, World world, SpatialGrid<Entity> grid, Vector3 a, Vector3 b, float dt,
                           double segStart, double now, HashSet<int> passed,
                           out Entity hit, out float nearest, out bool hitBody, out float bodyHeight)
+        => FirstHit(f.ShooterId, f.RideId, world, grid, a, b, dt, segStart, now, passed, out hit, out nearest, out hitBody, out bodyHeight);
+
+    private bool FirstHit(int shooterId, int rideId, World world, SpatialGrid<Entity> grid, Vector3 a, Vector3 b, float dt,
+                          double segStart, double now, HashSet<int> passed,
+                          out Entity hit, out float nearest, out bool hitBody, out float bodyHeight)
     {
         hit = Entity.Null; nearest = float.MaxValue; hitBody = false; bodyHeight = 0f;
         Vector3 path = b - a;
@@ -613,8 +754,8 @@ public sealed class CombatService
         grid.CollectInRadius(a + path * 0.5f, length * 0.5f + 3f, _near, _nearSeen);
         foreach (var e in _near)
         {
-            if (e.Id == f.ShooterId || !world.IsAlive(e) || !world.Has<Transform>(e)) continue;
-            if (f.RideId >= 0 && PartOf(world, e, f.RideId)) continue;
+            if (e.Id == shooterId || !world.IsAlive(e) || !world.Has<Transform>(e)) continue;
+            if (rideId >= 0 && PartOf(world, e, rideId)) continue;
             var t = world.Get<Transform>(e);
             if (IsPerson(world, e))
             {

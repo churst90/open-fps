@@ -52,6 +52,9 @@ public sealed class ClientSettings
     public bool TurnNarration { get; set; } = true;
     /// <summary>The knock and the name when you walk into something (/bumps in game).</summary>
     public bool WallBumps { get; set; } = true;
+    /// <summary>Aim assistance for shots from the hip (/aimassist in game). The server does the assisting;
+    /// the client tells it this each time it enters the world.</summary>
+    public bool AimAssist { get; set; } = true;
     /// <summary>What comma and period step through: "Doors", "Items", "Places"... (Shift with either
     /// changes it, or /track). See <see cref="MapTracker"/>.</summary>
     public string TrackCategory { get; set; } = nameof(Core.TrackCategory.Doors);
@@ -61,6 +64,7 @@ public sealed class ClientSettings
     {
         NavigationAids.TurnNarration = TurnNarration;
         NavigationAids.WallBumps = WallBumps;
+        NavigationAids.AimAssist = AimAssist;
         NavigationAids.Track = MapTracker.Parse(TrackCategory) ?? Core.TrackCategory.Doors;
     }
 
@@ -126,6 +130,7 @@ public sealed class ClientSettings
         // ...and the navigation aids as they are now: a key in game turns them, not this copy.
         TurnNarration = NavigationAids.TurnNarration;
         WallBumps = NavigationAids.WallBumps;
+        AimAssist = NavigationAids.AimAssist;
         TrackCategory = NavigationAids.Track.ToString();
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         File.WriteAllText(path, JsonSerializer.Serialize(this, Json));
@@ -146,6 +151,8 @@ public static class NavigationAids
     public static bool TurnNarration { get; set; } = true;
     /// <summary>A knock and the thing's name when you walk into it.</summary>
     public static bool WallBumps { get; set; } = true;
+    /// <summary>Aim assistance for shots from the hip, which the server applies: see /aimassist.</summary>
+    public static bool AimAssist { get; set; } = true;
     /// <summary>The kind of thing comma and period step through.</summary>
     public static TrackCategory Track { get; set; } = TrackCategory.Doors;
 }

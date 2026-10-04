@@ -1085,7 +1085,14 @@ public sealed partial class ClientGameSession : IDisposable
         // so sending it later would deadlock the handshake.
         Serilog.Log.Information("Acoustics done; sending ready.");
         _network.Send(new TextCommand { Command = "ready" });
+        // The saved aim assistance, which the server keeps per session and starts on.
+        SendAimAssist();
     }
+
+    /// <summary>Tells the server the aim assistance in force here, without an answer: on entering the
+    /// world, and when a settings dialog changes it.</summary>
+    public void SendAimAssist()
+        => _network.Send(new TextCommand { Command = "aimassist", Args = new[] { NavigationAids.AimAssist ? "on" : "off", "quiet" } });
 
     // ── Actions ─────────────────────────────────────────────────────────────────
 
@@ -1255,6 +1262,24 @@ public sealed partial class ClientGameSession : IDisposable
         {
             Serilog.Log.Warning("Settings not saved: {Error}", ex.Message);
         }
+    }
+
+    /// <summary>
+    /// /aimassist [on|off]: switched and saved here, and the command for the server, which does the
+    /// assisting and says what it now does. A word that is neither is refused here.
+    /// </summary>
+    internal static string? AimAssistCommand(string[] args, out TextCommand? send, Action? save = null)
+    {
+        send = null;
+        if (args.Length > 0)
+        {
+            string a = args[0].ToLowerInvariant();
+            if (a is not ("on" or "off")) return "Say /aimassist on or /aimassist off.";
+            NavigationAids.AimAssist = a == "on";
+            (save ?? SaveSettings)();
+        }
+        send = new TextCommand { Command = "aimassist", Args = new[] { NavigationAids.AimAssist ? "on" : "off" } };
+        return null;
     }
 
     /// <summary>/narrate on|off and /bumps on|off: the two navigation aids, switched and saved.</summary>
@@ -1552,6 +1577,7 @@ public sealed partial class ClientGameSession : IDisposable
                   + "/beacons, which beacons you hear. /reverb traced or room. /echoes on or off. "
                   + "/tail and /copies, the reflections' level in decibels, zero is physical. /cabin, the inside of a vehicle. "
                   + "/narrate on or off, saying what is ahead as you turn and move and what passes in front, also N. /bumps on or off, the knock and name when you walk into something. "
+                  + "/aimassist on or off, a shot from the hip near somebody in plain view turned onto them. "
                   + "/track and a kind, what comma and period step through: doors, entrances, stairs, items, people, vehicles or places; also Shift comma and Shift period. "
                   + "Each on its own says where it is set now.");
                 return;
@@ -1628,6 +1654,14 @@ public sealed partial class ClientGameSession : IDisposable
             if (parts[0].ToLowerInvariant() is "narrate" or "bumps")
             {
                 Say(NavigationAidCommand(parts[0].ToLowerInvariant(), parts.Skip(1).ToArray()));
+                return;
+            }
+            // Aim assistance is the server's to apply and the player's to keep: saved here, and the
+            // server told (it answers with what it now does).
+            if (parts[0].Equals("aimassist", StringComparison.OrdinalIgnoreCase))
+            {
+                if (AimAssistCommand(parts.Skip(1).ToArray(), out var send) is { } refusal) Say(refusal);
+                else _network.Send(send!);
                 return;
             }
             // So is what comma and period step through.

@@ -61,6 +61,141 @@ public class BulletFlightTests : IDisposable
         _o.WriteLine(said);
     }
 
+    // ── Aim assistance ──────────────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// A pedestrian 37 m off, the aim 5 degrees to the side of them: a body is 0.7 degrees across there
+    /// and a fine turn is 1, so without help Cody would almost never hit. Assisted, the gun is turned onto
+    /// their chest and the round flown as ever; with the assist off it goes where it was pointed.
+    /// </summary>
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void AShotFiveDegreesOffAt37MetresIsAssistedOntoThem(bool assisted)
+    {
+        var g = new Range(_dir, "default");
+        var feet = new Vector3(140f, 0f, 140f);
+        var shooter = g.Player("shooter", feet);
+        shooter.AimAssist = assisted;
+        g.Arm(shooter, "akm");
+        var walker = g.Walker(feet + new Vector3(0f, 0f, 37f));
+        g.Face(shooter, 5f * MathF.PI / 180f, 0f);
+        g.Fire(shooter);
+        g.Run(0.3);
+        if (assisted)
+        {
+            Assert.Equal(walker.Id, Assert.Single(g.Confirms(shooter)).TargetEntityId);
+            Assert.Equal("Hit pedestrian at 37 metres.", Assert.Single(g.Said(shooter)));
+        }
+        else
+        {
+            Assert.Empty(g.Confirms(shooter));
+            Assert.Equal(100, g.World.Get<HealthComponent>(walker).Current);
+        }
+    }
+
+    /// <summary>The Brandt Court case with the assist on, as it is by default: the pedestrian is inside
+    /// the cone, but the wall is between, so there is no assisting and the wall takes the round.</summary>
+    [Fact]
+    public void NoAssistThroughAWall()
+    {
+        var g = new Range(_dir, "city");
+        var shooter = g.Player("cody", new Vector3(-10f, 6.4f, 152f));
+        Assert.True(shooter.AimAssist);
+        g.Arm(shooter, "akm");
+        var walker = g.Walker(new Vector3(5f, 0f, 152f));
+        // Level and 4 degrees off: the pedestrian is in the cone, the wall is in the way.
+        g.Face(shooter, (90f + 4f) * MathF.PI / 180f, 0f);
+        g.Fire(shooter);
+        g.Run(0.5);
+        Assert.Empty(g.Confirms(shooter));
+        Assert.Equal(100, g.World.Get<HealthComponent>(walker).Current);
+        Assert.StartsWith("Hit Brandt Court east wall at ", Assert.Single(g.Said(shooter)));
+    }
+
+    /// <summary>Of two people in the cone, the one nearest the aim line, though further away; an aim
+    /// that already passes above the shoulders goes to the head.</summary>
+    [Fact]
+    public void TheAssistPrefersTheAimLineAndKeepsAHeadShotAHeadShot()
+    {
+        var g = new Range(_dir, "default");
+        var feet = new Vector3(140f, 0f, 140f);
+        var shooter = g.Player("shooter", feet);
+        g.Arm(shooter, "akm");
+        var far = g.Walker(feet + new Vector3(30f * MathF.Sin(1f * MathF.PI / 180f), 0f, 30f * MathF.Cos(1f * MathF.PI / 180f)));
+        var near = g.Walker(feet + new Vector3(15f * MathF.Sin(4f * MathF.PI / 180f), 0f, 15f * MathF.Cos(4f * MathF.PI / 180f)));
+        // Level from the hip at 1.5 m: chest height, under the shoulders.
+        g.Face(shooter, 0f, 0f);
+        g.Fire(shooter);
+        g.Run(0.3);
+        var hit = Assert.Single(g.Confirms(shooter));
+        Assert.Equal(far.Id, hit.TargetEntityId);
+        Assert.False(hit.Headshot);
+        Assert.Equal(100, g.World.Get<HealthComponent>(near).Current);
+
+        // Pointed a little up, so the aim passes 1.7 m up at the far one: the head.
+        g.Now += 1;
+        g.Face(shooter, 0f, -MathF.Atan(0.2f / 30f));
+        g.Fire(shooter);
+        g.Run(0.3);
+        Assert.True(g.Confirms(shooter)[^1].Headshot);
+        Assert.Equal(far.Id, g.Confirms(shooter)[^1].TargetEntityId);
+    }
+
+    /// <summary>With the hip's own scatter on top, the assist puts the round on a 37 m target about
+    /// half to three quarters of the time: it turns the gun, it does not steady the hand.</summary>
+    [Fact]
+    public void AssistedHipFireAt37MetresStillScatters()
+    {
+        var g = new Range(_dir, "default");
+        g.Combat.HipDispersionRadians = 0.007f;
+        g.Combat.Scatter = new Random(11);
+        var feet = new Vector3(140f, 0f, 140f);
+        var shooter = g.Player("shooter", feet);
+        var gun = g.Arm(shooter, "akm");
+        var walker = g.Walker(feet + new Vector3(0f, 0f, 37f));
+        g.World.Get<HealthComponent>(walker) = new HealthComponent { Current = 1_000_000, Max = 1_000_000 };
+        g.Face(shooter, 3f * MathF.PI / 180f, 0f);
+        int fired = 80;
+        for (int i = 0; i < fired; i++)
+        {
+            Arms.Ammo(g.World, gun, WeaponRegistry.Akm).Rounds = 30;
+            g.Fire(shooter);
+            g.Run(0.2);
+        }
+        float rate = g.Confirms(shooter).Count / (float)fired;
+        _o.WriteLine($"{g.Confirms(shooter).Count} hits in {fired} shots: {rate:P0}");
+        Assert.InRange(rate, 0.4f, 0.85f);
+    }
+
+    [Fact]
+    public void AimAssistIsASessionSettingTheServerHonours()
+    {
+        var session = new UserSession();
+        Assert.True(session.AimAssist);
+        Assert.StartsWith("Aim assist off", CommandHandler.AimAssistCommand(session, new[] { "off" }));
+        Assert.False(session.AimAssist);
+        Assert.StartsWith("Aim assist off", CommandHandler.AimAssistCommand(session, Array.Empty<string>()));
+        Assert.Equal("Say /aimassist on or /aimassist off.", CommandHandler.AimAssistCommand(session, new[] { "maybe" }));
+        Assert.StartsWith("Aim assist on", CommandHandler.AimAssistCommand(session, new[] { "on", "quiet" }));
+        Assert.True(session.AimAssist);
+
+        // The client keeps the choice, saved, and tells the server.
+        bool was = OpenFPS.Client.Core.NavigationAids.AimAssist;
+        try
+        {
+            int saved = 0;
+            Assert.Null(OpenFPS.Client.Core.Session.ClientGameSession.AimAssistCommand(new[] { "off" }, out var send, () => saved++));
+            Assert.False(OpenFPS.Client.Core.NavigationAids.AimAssist);
+            Assert.Equal(1, saved);
+            Assert.Equal("aimassist", send!.Command);
+            Assert.Equal(new[] { "off" }, send.Args);
+            Assert.NotNull(OpenFPS.Client.Core.Session.ClientGameSession.AimAssistCommand(new[] { "sideways" }, out _, () => saved++));
+            Assert.Equal(1, saved);
+        }
+        finally { OpenFPS.Client.Core.NavigationAids.AimAssist = was; }
+    }
+
     [Fact]
     public void ARoundThatEndsInTheGroundOrARoofSaysWhereByName()
     {
@@ -455,7 +590,7 @@ public class BulletFlightTests : IDisposable
             new Pedestrian { Voice = "", Pair = "" },
             new HealthComponent { Current = 100, Max = 100 }));
 
-        public void Arm(UserSession who, string weaponId)
+        public Entity Arm(UserSession who, string weaponId)
         {
             var w = WeaponRegistry.Get(weaponId)!;
             var gun = Maps.SpawnEntity(MapId, wd => wd.Create(
@@ -466,6 +601,7 @@ public class BulletFlightTests : IDisposable
                 new ItemComponent { MassKg = 3.5f, Hands = 2, WeaponId = weaponId },
                 EntityType.Item));
             Assert.True(Hands.Take(who, w.DisplayName, out string message), message);
+            return gun;
         }
 
         public void Fire(UserSession who)

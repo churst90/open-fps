@@ -176,6 +176,11 @@ public class CommandHandler
             case "shoot":
                 _combat.Fire(session, args, reply, session.Can(Permissions.FireAny));
                 break;
+            case "aimassist":
+                // "quiet": the client restating its saved choice on entering the world, not a question.
+                string assist = AimAssistCommand(session, args);
+                if (!args.Any(a => a.Equals("quiet", StringComparison.OrdinalIgnoreCase))) Say(reply, assist);
+                break;
             // Not elevated: loading the gun in your hands is part of having it.
             case "reload":
                 _combat.Reload(session, reply);
@@ -416,6 +421,24 @@ public class CommandHandler
     }
 
     private static void Say(Action<IMessage> reply, string text) => reply(new TextEvent { Text = text });
+
+    /// <summary>/aimassist [on|off]: the session's aim assistance for shots from the hip. The client
+    /// keeps the choice and sends it each time it enters the world; a text player sets it here.</summary>
+    internal static string AimAssistCommand(UserSession session, string[] args)
+    {
+        if (args.Length > 0)
+        {
+            switch (args[0].ToLowerInvariant())
+            {
+                case "on": session.AimAssist = true; break;
+                case "off": session.AimAssist = false; break;
+                default: return "Say /aimassist on or /aimassist off.";
+            }
+        }
+        return session.AimAssist
+            ? "Aim assist on: a shot from the hip near somebody in plain view is turned onto them."
+            : "Aim assist off: a shot from the hip goes where you point.";
+    }
 
     private static void DenyCommand(Action<IMessage> reply) =>
         Say(reply, "You do not have permission to execute this command.");
