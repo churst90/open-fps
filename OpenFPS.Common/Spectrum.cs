@@ -128,6 +128,64 @@ public static class Spectrum
         return n;
     }
 
+    /// <summary>
+    /// How much of a sound is tone and how much noise, over <paramref name="loHz"/>-<paramref name="hiHz"/>:
+    /// its spectral FLATNESS (the geometric over the arithmetic mean of the power spectrum, the Wiener
+    /// entropy: 0 for a pure tone, 0.56 for white noise's periodogram, lower for coloured noise), and its
+    /// TONE, how far the strongest bin stands over the median of its own third of an octave either side,
+    /// dB (about 8-10 dB for noise, which has chance peaks; 25 dB and more for a line). Both are taken
+    /// frame by frame (Hann, 1024 points, half overlapped) over the frames within 20 dB of the loudest,
+    /// flatness weighted by the frame's energy, tone averaged in dB.
+    /// </summary>
+    public static (float Flatness, float ToneDb) Tonality(ReadOnlySpan<float> pcm, int sampleRate, float loHz = 500f, float hiHz = 16000f, int frame = 1024)
+    {
+        int hop = frame / 2;
+        if (pcm.Length < frame) return (0f, 0f);
+        int lo = Math.Max(1, (int)(loHz * frame / sampleRate)), hi = Math.Min(frame / 2 - 1, (int)(hiHz * frame / sampleRate));
+        var frames = new System.Collections.Generic.List<(double Energy, double Flat, double Tone)>();
+        var buf = new Complex[frame];
+        var power = new double[frame / 2];
+        var window = new double[frame];
+        for (int i = 0; i < frame; i++) window[i] = 0.5 - 0.5 * Math.Cos(2 * Math.PI * i / frame);
+        var scratch = new double[256];
+        for (int start = 0; start + frame <= pcm.Length; start += hop)
+        {
+            for (int i = 0; i < frame; i++) buf[i] = new Complex(pcm[start + i] * window[i], 0);
+            Fft(buf);
+            double energy = 0, logSum = 0;
+            for (int k = lo; k <= hi; k++)
+            {
+                power[k] = buf[k].Real * buf[k].Real + buf[k].Imaginary * buf[k].Imaginary + 1e-30;
+                energy += power[k];
+                logSum += Math.Log(power[k]);
+            }
+            int count = hi - lo + 1;
+            double flat = Math.Exp(logSum / count) / (energy / count);
+            double tone = 0;
+            for (int k = lo; k <= hi; k++)
+            {
+                int a = Math.Max(lo, (int)(k / 1.26)), b = Math.Min(hi, (int)Math.Ceiling(k * 1.26));
+                if (b - a < 8) { a = Math.Max(lo, k - 4); b = Math.Min(hi, k + 4); }
+                int m = Math.Min(scratch.Length, b - a + 1);
+                for (int j = 0; j < m; j++) scratch[j] = power[a + j];
+                Array.Sort(scratch, 0, m);
+                double median = scratch[m / 2];
+                tone = Math.Max(tone, power[k] / median);
+            }
+            frames.Add((energy, flat, tone));
+        }
+        double loudest = 0;
+        foreach (var f in frames) loudest = Math.Max(loudest, f.Energy);
+        double wSum = 0, flatSum = 0, toneSum = 0; int kept = 0;
+        foreach (var f in frames)
+        {
+            if (f.Energy < loudest * 0.01) continue;
+            wSum += f.Energy; flatSum += f.Energy * f.Flat;
+            toneSum += 10 * Math.Log10(f.Tone); kept++;
+        }
+        return kept == 0 ? (0f, 0f) : ((float)(flatSum / wSum), (float)(toneSum / kept));
+    }
+
     /// <summary>Iterative radix-2 Cooley-Tukey, in place. Length must be a power of two.</summary>
     public static void Fft(Complex[] a)
     {

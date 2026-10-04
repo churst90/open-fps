@@ -430,7 +430,18 @@ public sealed class CombatService
         public int RideId = -1;                 // what the shooter is riding in, which the round leaves
         public bool Called;
         public readonly HashSet<int> BrokenGlass = new();
+        /// <summary>What it is now: the bullet, or after a ricochet a tumbling slug.</summary>
+        public Slug Slug;
+        /// <summary>How many times it has ricocheted.</summary>
+        public int Bounces;
+        /// <summary>The dice for its ricochets, so the flight flown ahead and the real one agree.</summary>
+        public int Seed;
+        /// <summary>Its energy at the muzzle, J: what a ricochet's slug is weighed against when it hits.</summary>
+        public float MuzzleJoules;
     }
+
+    /// <summary>How many times one round may ricochet: a slug that has skipped twice has little left.</summary>
+    public const int MaxBounces = 2;
 
     private readonly List<Flight> _flights = new();
     private readonly List<Entity> _near = new();
@@ -513,7 +524,10 @@ public sealed class CombatService
             At = Clock(),
             TargetId = targetId,
             RideId = world.Has<OccupantComponent>(session.Entity) ? world.Get<OccupantComponent>(session.Entity).RootEntityId : -1,
+            Slug = Slug.Of(weapon),
+            Seed = Scatter.Next(),
         };
+        flight.MuzzleJoules = 0.5f * flight.Slug.MassKg * velocity.LengthSquared();
         _flights.Add(flight);
         PassingSounds(flight, world, grid);
     }
@@ -534,17 +548,20 @@ public sealed class CombatService
         List<UserSession>? listeners = null;
         foreach (var s in _sessions.GetSessionsInMap(f.MapId))
         {
-            if (s == f.Shooter || s.IsTextClient || s.Entity == Entity.Null || !world.IsAlive(s.Entity) || !world.Has<Transform>(s.Entity)) continue;
+            if (s.IsTextClient || s.Entity == Entity.Null || !world.IsAlive(s.Entity) || !world.Has<Transform>(s.Entity)) continue;
             (listeners ??= new()).Add(s);
         }
         if (listeners == null) return;
 
         var (air, wind) = AirOn(f.MapId);
-        var path = FlyAhead(f, world, grid, air, wind);
+        var legs = FlyAhead(f, world, grid, air, wind);
         foreach (var s in listeners)
         {
             Vector3 ear = world.Get<Transform>(s.Entity).Position + new Vector3(0f, EyeHeight, 0f);
-            var sounds = BulletFlyby.Sounds(path, ear, f.Weapon, air);
+            // The round from the muzzle goes by everybody but the shooter; a ricochet's slug flies off
+            // somewhere new, and the shooter may be anywhere near that.
+            var sounds = s == f.Shooter ? new List<TransientSound>() : BulletFlyby.Sounds(legs[0].Path, ear, f.Weapon, air);
+            for (int i = 1; i < legs.Count; i++) sounds.AddRange(RicochetSounds(legs[i], ear, air));
             if (sounds.Count == 0) continue;
             _server.SendToSession(s, new WorldAudioEvent
             {
@@ -573,33 +590,133 @@ public sealed class CombatService
     /// at the pace they are walking), to where it stops or its time runs out: through glass, as the real
     /// one goes, and with nothing broken or hurt.
     /// </summary>
-    private List<FlightSample> FlyAhead(Flight f, World world, SpatialGrid<Entity> grid, Air air, Vector3 wind)
+    /// <summary>One stretch of a round's flight between ricochets: its samples (times from the shot),
+    /// and for a stretch after a ricochet the slug it is, where it left the face, how and when.</summary>
+    private sealed record Leg(List<FlightSample> Path, Slug Slug, Vector3 From, Vector3 Velocity, float Seconds);
+
+    private List<Leg> FlyAhead(Flight f, World world, SpatialGrid<Entity> grid, Air air, Vector3 wind)
     {
         var state = f.State;
         float t0 = state.Seconds;
-        var path = new List<FlightSample> { new(0f, state.Position, state.Velocity) };
+        var slug = f.Slug;
+        int bounces = f.Bounces;
+        var legs = new List<Leg> { new(new List<FlightSample> { new(0f, state.Position, state.Velocity) }, slug, state.Position, state.Velocity, 0f) };
+        var path = legs[0].Path;
         var glass = new HashSet<int>();
-        float bc = ExternalBallistics.CoefficientOf(f.Weapon);
         double now = f.At;
         while (state.Seconds - t0 < MaxFlightSeconds && state.Position.Y >= PhysicsConstants.MapMinimumY)
         {
             var before = state;
-            ExternalBallistics.Advance(ref state, SegmentSeconds, bc, air, wind);
+            Fly(ref state, slug, f.Weapon, SegmentSeconds, air, wind);
             double segStart = now + (before.Seconds - t0);
             if (FirstHit(f, world, grid, before.Position, state.Position, SegmentSeconds, segStart, now, glass,
-                         out var hit, out float along, out _, out _))
+                         out var hit, out float along, out bool body, out _))
             {
                 float length = Vector3.Distance(before.Position, state.Position);
                 float u = along / MathF.Max(1e-6f, length);
                 var at = new FlightSample(before.Seconds - t0 + u * SegmentSeconds,
                                           Vector3.Lerp(before.Position, state.Position, u), Vector3.Lerp(before.Velocity, state.Velocity, u));
-                if (!IsGlass(world, hit)) { path.Add(at); return path; }
+                if (!body && !IsGlass(world, hit) && TryRicochet(f.Seed, bounces, slug, world, hit, at.Position, at.Velocity, out var o, out var normal, out _))
+                {
+                    path.Add(at);
+                    slug = o.Slug;
+                    bounces++;
+                    state = new BulletState { Position = at.Position + normal * 0.002f, Velocity = o.Velocity,
+                                              Seconds = t0 + at.Seconds, Travelled = before.Travelled + along };
+                    var leg = new Leg(new List<FlightSample> { new(at.Seconds, state.Position, state.Velocity) }, slug, state.Position, state.Velocity, at.Seconds);
+                    legs.Add(leg);
+                    path = leg.Path;
+                    continue;
+                }
+                if (body || !IsGlass(world, hit)) { path.Add(at); return legs; }
                 glass.Add(hit.Id);
                 state.Velocity *= 0.9f;
             }
             path.Add(new FlightSample(state.Seconds - t0, state.Position, state.Velocity));
+            if (slug.Tumbling && state.Velocity.LengthSquared() < MinSlugSpeed * MinSlugSpeed) return legs;
         }
-        return path;
+        return legs;
+    }
+
+    /// <summary>A tumbling slug slower than this is followed no further: it is falling, not flying.</summary>
+    public const float MinSlugSpeed = 15f;
+
+    /// <summary>Flies a round on: a bullet by its ballistic coefficient, a tumbling slug by its own drag.</summary>
+    private static void Fly(ref BulletState state, Slug slug, WeaponDefinition weapon, float seconds, Air air, Vector3 wind)
+    {
+        if (slug.Tumbling) Ricochet.Advance(ref state, seconds, slug, air, wind);
+        else ExternalBallistics.Advance(ref state, seconds, ExternalBallistics.CoefficientOf(weapon), air, wind);
+    }
+
+    /// <summary>What one listener hears of a ricochet's slug: its crack while it is still faster than
+    /// sound (Whitham's law on the flattened slug, an estimate for a blunt body), and its whine.</summary>
+    private static List<TransientSound> RicochetSounds(Leg leg, Vector3 ear, Air air)
+    {
+        var sounds = BulletFlyby.CrackSounds(leg.Path, ear, leg.Slug.Across, leg.Slug.Length, air);
+        float range = 0f;
+        for (int i = 1; i < leg.Path.Count; i++) range += Vector3.Distance(leg.Path[i - 1].Position, leg.Path[i].Position);
+        sounds.AddRange(Ricochet.WhineSounds(leg.From, leg.Velocity, leg.Slug, range, leg.Seconds, ear, air));
+        return sounds;
+    }
+
+    /// <summary>
+    /// Whether a round meeting <paramref name="hit"/> at <paramref name="at"/> ricochets off it: by the
+    /// face's material and the grazing angle (<see cref="Ricochet.TryBounce"/>), with dice that are the
+    /// flight's own for this bounce, so the flight flown ahead and the real one bounce alike.
+    /// </summary>
+    private static bool TryRicochet(int seed, int bounces, Slug slug, World world, Entity hit, Vector3 at, Vector3 velocity,
+                                    out Ricochet.Outcome outcome, out Vector3 normal, out Vector3 face)
+    {
+        outcome = default;
+        Face(world, hit, at, velocity, out normal, out face);
+        if (bounces >= MaxBounces || IsPerson(world, hit)) return false;
+        var dice = new Random((int)(BulletFlyby.Mix((uint)seed, (uint)bounces + 1u) & 0x7fffffff));
+        return Ricochet.TryBounce(MaterialOf(world, hit), velocity, normal, slug, dice, out outcome);
+    }
+
+    private static string MaterialOf(World world, Entity e)
+        => world.Has<MaterialComponent>(e) ? world.Get<MaterialComponent>(e).Material ?? "Generic" : "Generic";
+
+    /// <summary>
+    /// The face of a part a round met at <paramref name="at"/>: its outward normal (against the round's
+    /// way), and its size as width, height and thickness, the thickness being the part's extent along
+    /// the normal (a wall's face is its length by its height, a floor's its length by its depth).
+    /// </summary>
+    internal static void Face(World world, Entity e, Vector3 at, Vector3 velocity, out Vector3 normal, out Vector3 size)
+    {
+        normal = -Vector3.Normalize(velocity + new Vector3(0f, 0f, 1e-9f));
+        size = new Vector3(1f, 1f, 0.1f);
+        if (!world.Has<Transform>(e) || !world.Has<ColliderComponent>(e)) return;
+        var t = world.Get<Transform>(e);
+        var c = world.Get<ColliderComponent>(e);
+        Vector3 rel = at - t.Position;
+        if (c.Shape == ColliderShape.Box)
+        {
+            var inverse = Quaternion.Inverse(t.Rotation);
+            Vector3 local = Vector3.Transform(rel, inverse);
+            Vector3 half = Vector3.Max(c.Size * 0.5f, new Vector3(1e-4f));
+            float ex = MathF.Abs(local.X) / half.X, ey = MathF.Abs(local.Y) / half.Y, ez = MathF.Abs(local.Z) / half.Z;
+            Vector3 axis;
+            if (ex >= ey && ex >= ez) { axis = new Vector3(MathF.Sign(local.X), 0f, 0f); size = new Vector3(c.Size.Z, c.Size.Y, c.Size.X); }
+            else if (ey >= ez) { axis = new Vector3(0f, MathF.Sign(local.Y), 0f); size = new Vector3(c.Size.X, c.Size.Z, c.Size.Y); }
+            else { axis = new Vector3(0f, 0f, MathF.Sign(local.Z)); size = new Vector3(c.Size.X, c.Size.Y, c.Size.Z); }
+            if (axis == Vector3.Zero) axis = Vector3.UnitY;
+            normal = Vector3.Normalize(Vector3.Transform(axis, t.Rotation));
+        }
+        else if (c.Shape is ColliderShape.Cylinder or ColliderShape.Cone)
+        {
+            float halfHeight = c.Size.Y * 0.5f;
+            Vector3 radial = new(rel.X, 0f, rel.Z);
+            if (MathF.Abs(rel.Y) >= halfHeight - 1e-3f || radial.LengthSquared() < 1e-8f)
+            { normal = new Vector3(0f, MathF.Sign(rel.Y) == 0 ? 1f : MathF.Sign(rel.Y), 0f); size = new Vector3(c.Size.X, c.Size.X, c.Size.Y); }
+            else { normal = Vector3.Normalize(radial); size = new Vector3(MathF.PI * c.Size.X * 0.5f, c.Size.Y, c.Size.X); }
+        }
+        else
+        {
+            if (rel.LengthSquared() > 1e-8f) normal = Vector3.Normalize(rel);
+            size = new Vector3(c.Size.X, c.Size.X, c.Size.X);
+        }
+        if (Vector3.Dot(normal, velocity) > 0f) normal = -normal;
     }
 
     private static bool IsGlass(World world, Entity e)
@@ -642,11 +759,12 @@ public sealed class CombatService
             {
                 float dt = (float)Math.Min(SegmentSeconds, now - f.At);
                 var before = f.State;
-                ExternalBallistics.Advance(ref f.State, dt, ExternalBallistics.CoefficientOf(f.Weapon), air, wind);
+                Fly(ref f.State, f.Slug, f.Weapon, dt, air, wind);
                 double segStart = f.At;
                 f.At += dt;
                 done = Segment(f, world, grid, lookup, before, f.State, segStart, dt, now);
-                if (!done && (f.State.Seconds > MaxFlightSeconds || f.State.Position.Y < PhysicsConstants.MapMinimumY))
+                if (!done && (f.State.Seconds > MaxFlightSeconds || f.State.Position.Y < PhysicsConstants.MapMinimumY
+                              || (f.Slug.Tumbling && f.State.Velocity.LengthSquared() < MinSlugSpeed * MinSlugSpeed)))
                     done = true;
             }
             // A round that flew its whole time, or out of the bottom of the map, without meeting
@@ -688,6 +806,15 @@ public sealed class CombatService
         {
             bool head = bodyHeight >= ExternalBallistics.HeadFrom;
             int damage = f.Weapon.DamageAt(metres) * (head ? 2 : 1);
+            if (f.Bounces > 0)
+            {
+                // A ricochet's slug: flattened, tumbling and slower, it does what its energy does
+                // against the round's at the muzzle, and a deformed, yawing body wounds less than a
+                // bullet arriving point first (taken as seven tenths).
+                float speedNow = MathHelper.Lerp(before.Velocity.Length(), after.Velocity.Length(), nearest / length);
+                float joules = 0.5f * f.Slug.MassKg * speedNow * speedNow;
+                damage = Math.Max(1, (int)MathF.Round(damage * 0.7f * MathF.Min(1f, joules / MathF.Max(1f, f.MuzzleJoules))));
+            }
             string whom = NameOf(world, hitEntity);
             var shooter = f.Shooter;
             // The chime and the words when the bullet gets there, not when the trigger breaks: a person
@@ -713,12 +840,33 @@ public sealed class CombatService
             f.State.Velocity *= 0.9f;
             return false;
         }
-        float speed = MathHelper.Lerp(before.Velocity.Length(), after.Velocity.Length(), nearest / length);
-        _server.EmitWorldAudio(f.MapId, hitEntity.Id, "impact",
-            ImpactAcoustics.Between(AcousticRegistry.GetProperties("Metal"),
-                                    AcousticRegistry.GetProperties(material),
-                                    at, speed * 0.02f,
-                                    0.01f, 500f, col.Size.X, col.Size.Y, MathF.Max(0.02f, col.Size.Z)));
+        Vector3 velocity = Vector3.Lerp(before.Velocity, after.Velocity, nearest / length);
+        float speed = velocity.Length();
+        float frac = nearest / length;
+        if (TryRicochet(f.Seed, f.Bounces, f.Slug, world, hitEntity, at, velocity, out var bounce, out var normal, out var face))
+        {
+            // It skips: the strike is heard at the face with the energy it left there, and the slug
+            // flies on from just off the face, tumbling, to be met by whatever is in its new way.
+            EmitStrike(f, world, grid, hitEntity, material, at, normal, face, speed, bounce.GrazeRadians, bounce.Kept, f.Slug);
+            f.Slug = bounce.Slug;
+            f.Bounces++;
+            f.State = new BulletState
+            {
+                Position = at + normal * 0.002f,
+                Velocity = bounce.Velocity,
+                Seconds = before.Seconds + dt * frac,
+                Travelled = before.Travelled + nearest,
+            };
+            f.At = segStart + dt * frac;
+            f.Called = true;
+            _server.SendToSession(f.Shooter, new TextEvent { Text = $"Ricochet off {ThingName(world, hitEntity)}." });
+            Log.Information("{User}'s {Weapon} round ricocheted off {What} ({Material}) at {Graze:F1} degrees, {Speed:F0} to {Out:F0} m/s.",
+                            f.Shooter.Username, f.Weapon.DisplayName, ThingName(world, hitEntity), material,
+                            bounce.GrazeRadians * 180f / MathF.PI, speed, bounce.Velocity.Length());
+            return false;
+        }
+        float graze = MathF.Asin(Math.Clamp(-Vector3.Dot(Vector3.Normalize(velocity), normal), 0f, 1f));
+        EmitStrike(f, world, grid, hitEntity, material, at, normal, face, speed, graze, 0f, f.Slug);
         // What it ended in, for the shooter alone: the ground, a roof, a wall, a car, by the name the
         // map gives it ("Hit Kestrel House north wall at 22 metres"). This used to be the material,
         // which is how a sofa came to be "audience": that is its acoustic material, soft and absorbent,
@@ -728,6 +876,25 @@ public sealed class CombatService
         Log.Information("{User}'s {Weapon} round hit {What} ({Id}) at {Metres:F0} m after {Seconds:F2} s.",
                         f.Shooter.Username, f.Weapon.DisplayName, ThingName(world, hitEntity), hitEntity.Id, metres, seconds);
         return true;
+    }
+
+    /// <summary>
+    /// The sound of a round striking a part (<see cref="BulletImpact"/>): the strike at the face, from
+    /// the part's material and the size of the face it met, and what it throws off landing on the floor
+    /// below. <paramref name="kept"/> is the share of its speed it went on with: nought for one that
+    /// stopped there.
+    /// </summary>
+    private void EmitStrike(Flight f, World world, SpatialGrid<Entity> grid, Entity hit, string material, Vector3 at,
+                            Vector3 normal, Vector3 face, float speed, float graze, float kept, Slug slug)
+    {
+        // Where what it throws off comes down: the floor under a point just off the face.
+        Vector3 off = at + normal * 0.3f;
+        float ground = PhysicsUtils.GetGroundHeight(world, grid, off + new Vector3(0f, 0.05f, 0f), out string floor);
+        if (!float.IsFinite(ground) || ground > at.Y + 0.05f || ground < at.Y - 60f) { ground = at.Y; floor = material; }
+        var strike = BulletImpact.From(material, speed, f.Weapon, graze, kept, face, string.IsNullOrEmpty(floor) ? material : floor,
+                                       at.Y - ground, slug.MassKg, slug.Across, slug.Length);
+        var foot = new Vector3(off.X, ground, off.Z);
+        _server.EmitWorldAudio(f.MapId, hit.Id, kept > 0f ? "a ricochet" : "a bullet striking", BulletImpact.Sounds(strike, at, foot));
     }
 
     /// <summary>

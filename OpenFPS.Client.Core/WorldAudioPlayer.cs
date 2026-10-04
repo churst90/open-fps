@@ -1105,6 +1105,15 @@ public sealed class WorldAudioPlayer
             return BulletFlyby.RenderCrack(crackSeconds, TransientSynth.SampleRate);
         if (BulletFlyby.TryParseWhizz(sound.SynthKey, out var whizz))
             return BulletFlyby.RenderWhizz(whizz, TransientSynth.SampleRate, seed & 3);
+        // A round striking something, what it throws off landing, and a ricochet's tumbling slug
+        // whining away: each worked from its key (BulletImpact, Ricochet), full scale at the level the
+        // server declared from the same key.
+        if (BulletImpact.TryParseHit(sound.SynthKey, out var strike))
+            return BulletImpact.RenderHit(strike, TransientSynth.SampleRate, seed & 3);
+        if (BulletImpact.TryParseDebris(sound.SynthKey, out var debris))
+            return BulletImpact.RenderDebris(debris, TransientSynth.SampleRate, seed & 3);
+        if (Ricochet.TryParseWhine(sound.SynthKey, out var whine))
+            return Ricochet.RenderWhine(whine, TransientSynth.SampleRate, seed & 3);
         // A gun worked by hand: a reload's routine, or a trigger on an empty chamber.
         if (WeaponHandling.TryParseKey(sound.SynthKey, out var handling))
             return WeaponHandling.Render(handling, TransientSynth.SampleRate, seed);

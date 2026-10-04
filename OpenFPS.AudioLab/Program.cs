@@ -102,6 +102,7 @@ string[] usage =
     "  --reload-sounds [out=DIR]                     every reload and dry fire rendered, measured the same way",
     "  --scope-sounds [out=DIR]                      the scope's guidance tone and breath as played, and the M700's sounds",
     "  --bullet-pass [out=DIR]                       a round's crack or whizz going by a listener, then its report",
+    "  --bullet-round2 [out=DIR]                     the whizz before/after, ricochets, and a round striking each material",
     "  --gun-fit [nij=DIR] [tag=] [wavs] [grid]      every weapon's report against its own NIJ takes",
     "  --speech-lines                                decodes every shipped voice line as the client does",
     "  --heard-levels [d=1.5] [wav=DIR]              doors, steps, speech: declared vs LAFmax at the ear",
@@ -202,6 +203,11 @@ if (args.Contains("--siren-route"))
 if (args.Contains("--bullet-pass"))
 {
     Environment.Exit(OpenFPS.AudioLab.Spikes.BulletPassSpike.Run(args));
+}
+
+if (args.Contains("--bullet-round2"))
+{
+    Environment.Exit(OpenFPS.AudioLab.Spikes.BulletRound2Spike.Run(args));
 }
 
 if (args.Contains("--heard-levels"))

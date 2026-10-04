@@ -200,13 +200,23 @@ public class BulletFlightTests : IDisposable
     public void ARoundThatEndsInTheGroundOrARoofSaysWhereByName()
     {
         var g = new Range(_dir, "city");
-        // Open ground at the west edge of the city.
+        // Open ground at the west edge of the city. It is concrete there, which a round meeting it at
+        // 10 degrees skips off (BulletRicochetTests); at 25 it goes in.
         var a = g.Player("a", new Vector3(-400f, 0f, 300f));
+        a.AimAssist = false;
         g.Arm(a, "akm");
-        g.Face(a, 0f, 10f * MathF.PI / 180f);
+        g.Face(a, 0f, 25f * MathF.PI / 180f);
         g.Fire(a);
         g.Run(0.2);
-        Assert.Equal("Hit the ground at 9 metres.", Assert.Single(g.Said(a)));
+        Assert.Equal("Hit the ground at 4 metres.", Assert.Single(g.Said(a)));
+        // ...and at 10 degrees the same round skips off it.
+        var skip = g.Player("skip", new Vector3(-400f, 0f, 320f));
+        skip.AimAssist = false;
+        g.Arm(skip, "akm");
+        g.Face(skip, 0f, 10f * MathF.PI / 180f);
+        g.Fire(skip);
+        g.Run(0.2);
+        Assert.Equal("Ricochet off the ground.", g.Said(skip)[0]);
 
         // Brandt Court's roof, a few metres in front of you.
         var b = g.Player("b", new Vector3(-20f, 18.25f, 200f));
