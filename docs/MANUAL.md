@@ -97,8 +97,11 @@ degrees a second. You cannot turn while riding in a vehicle: you face forward.
 | C | Your coordinates: east, north, height, in metres |
 | F | The way you are facing |
 | Z | The area you are in. When driving: road, heading, lane and speed |
-| P or comma | What is ahead of you (name, material, distance, up to 20 m) |
-| Shift+P | Named things within 20 m |
+| P | What is ahead of you (name, material, distance, up to 20 m) |
+| Shift+P | Named things within 20 m, with directions in words (in front, right, left behind and so on) |
+| Comma, period | Step to the previous or next thing of the chosen kind, nearest first: its name, direction, distance and floor, and its beacon once |
+| Shift+comma, Shift+period | Change the kind: doors, entrances, stairs, items, people, vehicles, places |
+| N | Turn the narration of what is ahead on or off (on by default) |
 | H | Health |
 | B | How out of breath you are |
 | I | Your inventory as a list: up and down to choose a thing, Enter for what to do with it (take it in your hands, sling it on your back, drop it). Each of ten rifles with the same name is its own entry |
@@ -111,7 +114,7 @@ when you come within 3 m of them.
 
 | Key | Action |
 |---|---|
-| E | Interact: open a door, get into or out of a vehicle, close a door |
+| E | Interact. With an item within 2 m it picks one up: the one chosen with comma or period, else the one in front, else a list to choose from; it then says if others are still within reach. With no item in reach: open or close a door, get into or out of a vehicle |
 | Shift+E | Knock on the nearest door |
 | G | Pick up |
 | Q | Drop |

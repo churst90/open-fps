@@ -52,12 +52,16 @@ public sealed class ClientSettings
     public bool TurnNarration { get; set; } = true;
     /// <summary>The knock and the name when you walk into something (/bumps in game).</summary>
     public bool WallBumps { get; set; } = true;
+    /// <summary>What comma and period step through: "Doors", "Items", "Places"... (Shift with either
+    /// changes it, or /track). See <see cref="MapTracker"/>.</summary>
+    public string TrackCategory { get; set; } = nameof(Core.TrackCategory.Doors);
 
     /// <summary>Puts this file's navigation aids into play. Each head calls it once, after loading.</summary>
     public void ApplyNavigationAids()
     {
         NavigationAids.TurnNarration = TurnNarration;
         NavigationAids.WallBumps = WallBumps;
+        NavigationAids.Track = MapTracker.Parse(TrackCategory) ?? Core.TrackCategory.Doors;
     }
 
     public SavedServer? Preferred => Servers.FirstOrDefault(s => s.Preferred) ?? (Servers.Count == 1 ? Servers[0] : null);
@@ -122,6 +126,7 @@ public sealed class ClientSettings
         // ...and the navigation aids as they are now: a key in game turns them, not this copy.
         TurnNarration = NavigationAids.TurnNarration;
         WallBumps = NavigationAids.WallBumps;
+        TrackCategory = NavigationAids.Track.ToString();
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         File.WriteAllText(path, JsonSerializer.Serialize(this, Json));
         if (!OperatingSystem.IsWindows())
@@ -141,6 +146,8 @@ public static class NavigationAids
     public static bool TurnNarration { get; set; } = true;
     /// <summary>A knock and the thing's name when you walk into it.</summary>
     public static bool WallBumps { get; set; } = true;
+    /// <summary>The kind of thing comma and period step through.</summary>
+    public static TrackCategory Track { get; set; } = TrackCategory.Doors;
 }
 
 /// <summary>"host:port" as typed into a connect form or saved, with the defaults filled in.</summary>

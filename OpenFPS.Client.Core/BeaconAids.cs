@@ -130,6 +130,38 @@ public sealed class BeaconAids
         }
     }
 
+    /// <summary>
+    /// One blip from a thing picked out with comma or period (<see cref="MapTracker"/>), so the ear
+    /// finds what the words described: the door's chime from the door, the item's ring from the item.
+    /// Played whether or not that category's beacons are on, since you asked for this one — but not
+    /// where the map forbids it. A place has no sound. Through the same path as every blip, so one
+    /// on the far side of a wall is not heard through it.
+    /// </summary>
+    public void Ping(WorldSnapshot world, int id, TrackCategory category, Vector3 listener, int selfId = -1)
+    {
+        string? kind = category switch
+        {
+            TrackCategory.Doors or TrackCategory.Entrances => Beacons.Door,
+            TrackCategory.Stairs => Beacons.Stairs,
+            TrackCategory.Items => Beacons.Item,
+            TrackCategory.People => Beacons.Player,
+            TrackCategory.Vehicles => Beacons.Vehicle,
+            _ => null,
+        };
+        if (kind == null || PolicyFor(kind) == Beacons.Policy.Forbidden) return;
+        if (!world.Entities.TryGetValue(id, out var e)) return;
+        EnsureSounds();
+        if (!_registered) return;
+        var at = e.Transform.Position;
+        string sound = Kinds[kind].Sound;
+        if (kind == Beacons.Player)
+        {
+            at += new Vector3(0f, OtherBodies.HeadHeight, 0f);
+            sound = SoundFor(world, id, TeamOf(world, selfId));
+        }
+        Blip(world, id, sound, at, listener);
+    }
+
     private void Blip(WorldSnapshot world, int sourceId, string sound, Vector3 at, Vector3 listener)
     {
         var (gain, reference) = Loudness.Place(BlipDb + (float)_prefs.LevelDb);

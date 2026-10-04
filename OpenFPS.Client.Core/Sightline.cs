@@ -80,16 +80,47 @@ public static class Sightline
         return standable && max.Y - hitY <= NoseMetres && max.Y <= eyeY + NoseMetres;
     }
 
-    /// <summary>What a thing is called: its name, and only if it has none, what it is made of.</summary>
+    /// <summary>What a thing is called: its name, and only if it has none, what it is made of. A
+    /// vehicle or a passer-by is called by what it is (<see cref="KindOf"/>): "Hatchback", not
+    /// "Hatchback 1"; "Pedestrian", not "Pedestrian, Main Street, west side 14".</summary>
     public static string NameOf(in EntitySnapshot e)
     {
         string name = e.Definition.Identity.Name;
+        if (e.Definition.Type == EntityType.NPC && !string.IsNullOrWhiteSpace(name)) return KindOf(e);
         if (!string.IsNullOrWhiteSpace(name)) return name.Trim();
         string material = e.Definition.Material.Material;
         if (!string.IsNullOrEmpty(material) && material is not ("Generic" or "None"))
             return $"something {material.ToLowerInvariant()}";
         return "something";
     }
+
+    /// <summary>
+    /// What a moving thing is, for saying it passed: a player by their name; anything else by its name
+    /// up to the first comma, without the number the map counts them by — "Hatchback 1" is a
+    /// hatchback, "Pedestrian, Main Street, west side 14" a pedestrian, "Light rail 2" light rail.
+    /// </summary>
+    public static string KindOf(in EntitySnapshot e)
+    {
+        string name = (e.Definition.Identity.Name ?? "").Trim();
+        if (name.Length == 0) return "something";
+        if (e.Definition.Type == EntityType.Player) return name;
+        int comma = name.IndexOf(',');
+        if (comma > 0) name = name[..comma].TrimEnd();
+        int end = name.Length;
+        while (end > 0 && char.IsDigit(name[end - 1])) end--;
+        if (end > 0 && end < name.Length && name[end - 1] == ' ') name = name[..(end - 1)].TrimEnd();
+        return name.Length == 0 ? "something" : name;
+    }
+
+    /// <summary>A person or a vehicle on the move, faster than <see cref="MovingMetresPerSecond"/>.
+    /// The sight line looks through these, because they do not stay where they were seen: one
+    /// crossing in front is said as passing (<see cref="PassingWatch"/>), not as what is ahead.</summary>
+    public static bool IsOnTheMove(in EntitySnapshot e)
+        => e.Definition.Type is EntityType.NPC or EntityType.Player
+           && e.Velocity.X * e.Velocity.X + e.Velocity.Z * e.Velocity.Z > MovingMetresPerSecond * MovingMetresPerSecond;
+
+    /// <summary>Slower than a stroll is standing: half a metre a second.</summary>
+    public const float MovingMetresPerSecond = 0.5f;
 
     /// <summary>Whether a ray should stop at this at all: things you can walk into, and things the
     /// server says are worth naming (items, people, beacons). Region volumes, portals and your own body
@@ -103,14 +134,17 @@ public static class Sightline
     /// at hides whatever is under it, and is not itself an answer.
     /// </summary>
     public static Sighting? Ahead(SpatialService spatial, WorldSnapshot world, ReadOnlySpan<Vector3> origins, Vector3 dir,
-                                  float range, float feetY, float eyeY, int ownEntityId)
+                                  float range, float feetY, float eyeY, int ownEntityId, bool throughMoving = false)
     {
         if (dir.LengthSquared() < 1e-8f) return null;
         dir = Vector3.Normalize(dir);
         Sighting? best = null;
+        Func<EntitySnapshot, bool> stops = throughMoving
+            ? e => Stops(e, ownEntityId) && !IsOnTheMove(e)
+            : e => Stops(e, ownEntityId);
         foreach (var origin in origins)
         {
-            if (!spatial.RaycastSingle(world, origin, dir, range, e => Stops(e, ownEntityId), out var hit, out float dist)) continue;
+            if (!spatial.RaycastSingle(world, origin, dir, range, stops, out var hit, out float dist)) continue;
             if (IsGroundAt(hit, origin.Y + dir.Y * dist, feetY, eyeY)) continue;
             if (best == null || dist < best.Value.Distance) best = new Sighting(hit, dist);
         }
@@ -121,7 +155,8 @@ public static class Sightline
     /// What the turn narration looks along: level, the way you face, at your knees, chest and eyes —
     /// so a car, a bench or a low wall is found as well as a wall at head height.
     /// </summary>
-    public static Sighting? AheadLevel(SpatialService spatial, WorldSnapshot world, Vector3 feet, float yaw, float eyeHeight, int ownEntityId)
+    public static Sighting? AheadLevel(SpatialService spatial, WorldSnapshot world, Vector3 feet, float yaw, float eyeHeight, int ownEntityId,
+                                       bool throughMoving = false)
     {
         Vector3 forward = Vector3.Transform(Vector3.UnitZ, Quaternion.CreateFromYawPitchRoll(yaw, 0f, 0f));
         Span<Vector3> origins = stackalloc Vector3[]
@@ -130,7 +165,7 @@ public static class Sightline
             feet + new Vector3(0, 1.1f, 0),
             feet + new Vector3(0, eyeHeight, 0),
         };
-        return Ahead(spatial, world, origins, forward, NarrationRange, feet.Y, feet.Y + eyeHeight, ownEntityId);
+        return Ahead(spatial, world, origins, forward, NarrationRange, feet.Y, feet.Y + eyeHeight, ownEntityId, throughMoving);
     }
 
     /// <summary>"8 metres", "1 metre", "0.6 metres": whole metres past one, tenths under it.</summary>

@@ -2428,16 +2428,5 @@ public class CommandHandler
     /// 5 o'clock was behind him; the words say it.
     /// </summary>
     internal static string GetRelativeDirection(Quaternion rotation, Vector3 targetDir)
-    {
-        Matrix4x4 rotMat = Matrix4x4.CreateFromQuaternion(Quaternion.Inverse(rotation));
-        Vector3 localDir = Vector3.Transform(targetDir, rotMat);
-        float angle = MathF.Atan2(localDir.X, localDir.Z) * (180.0f / MathF.PI);
-        if (angle < 0) angle += 360.0f;
-        return angle switch
-        {
-            < 22.5f or >= 337.5f => "in front", < 67.5f => "right in front", < 112.5f => "right",
-            < 157.5f => "right behind", < 202.5f => "behind", < 247.5f => "left behind",
-            < 292.5f => "left", _ => "left in front"
-        };
-    }
+        => OpenFPS.Common.DirectionWords.Relative(rotation, targetDir);
 }

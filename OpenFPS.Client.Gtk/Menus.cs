@@ -279,9 +279,9 @@ internal static partial class GtkClientProgram
         box.Append(presenceSounds);
 
         // The two navigation aids. N switches the first in game, and /bumps the second.
-        var narration = CheckButton.NewWithLabel("Say what is ahead as you turn");
+        var narration = CheckButton.NewWithLabel("Say what is ahead as you turn and move");
         narration.SetActive(NavigationAids.TurnNarration);
-        SpeakOnFocus(narration, () => $"Say what is ahead as you turn, {(narration.GetActive() ? "on" : "off")}");
+        SpeakOnFocus(narration, () => $"Say what is ahead as you turn and move, {(narration.GetActive() ? "on" : "off")}");
         narration.OnToggled += (_, _) => _speech.Speak(narration.GetActive() ? "On" : "Off", true);
         box.Append(narration);
 
