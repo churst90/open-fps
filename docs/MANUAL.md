@@ -269,7 +269,7 @@ A team holds up to 16 players.
 ### Beacons
 
 **Player beacons.** Other players near you make a beacon sound: two soft notes going down. If they are
-in your team, the same two notes are higher. You never hear your own. `/beacons player` turns them
+in your team, the same two notes are played by a different, hollower instrument. You never hear your own. `/beacons player` turns them
 off or on.
 - `/beacons` (or `/beacon`): each kind of beacon, whether it is on, and why.
 - `/beacons door`: switch door beacons on or off. `/beacons door on` or `off` sets it.

@@ -234,7 +234,7 @@ public class TeamTests : IDisposable
 }
 
 /// <summary>
-/// Player beacons, on the client: every other player calls, a teammate in a tone a fifth higher, and
+/// Player beacons, on the client: every other player calls, a teammate on another instrument, and
 /// your own body never.
 /// </summary>
 public class PlayerBeaconTests
@@ -334,24 +334,38 @@ public class PlayerBeaconTests
     }
 
     /// <summary>
-    /// The player's call falls a minor third, G4 to E4, and the teammate's is the same call a fifth up,
-    /// D5 to B4: the same rhythm and the same fall, only higher.
+    /// The player's call falls a minor third, G4 to E4, and the teammate's is the same call at the same
+    /// pitch on another instrument: the same notes, the same length, as loud, and a different spectrum
+    /// (the triangle's 3rd harmonic is there in the teammate's and not in the player's).
     /// </summary>
     [Fact]
-    public void TheTeammatesCallIsThePlayersAFifthUp()
+    public void TheTeammatesCallIsThePlayersOnAnotherInstrument()
     {
         const int sr = 48000;
         var player = BeaconAids.Tone(Beacons.Player, sr);
         var mate = BeaconAids.TeammateTone(sr);
         Assert.Equal(player.Length, mate.Length);
         int split = sr * 15 / 100, end = sr * 30 / 100;
-        float p1 = Fundamental(player, sr, 0, split), p2 = Fundamental(player, sr, split + sr / 50, end);
-        float m1 = Fundamental(mate, sr, 0, split), m2 = Fundamental(mate, sr, split + sr / 50, end);
-        Assert.InRange(p1, 388f, 396f);
-        Assert.InRange(p2, 326f, 333f);
-        Assert.InRange(m1, 583f, 592f);
-        Assert.InRange(m2, 490f, 498f);
-        Assert.InRange(m1 / p1, 1.48f, 1.52f);
+        Assert.InRange(Fundamental(player, sr, 0, split), 388f, 396f);
+        Assert.InRange(Fundamental(player, sr, split + sr / 50, end), 326f, 333f);
+        Assert.InRange(Fundamental(mate, sr, 0, split), 388f, 396f);
+        Assert.InRange(Fundamental(mate, sr, split + sr / 50, end), 326f, 333f);
+
+        double Rms(float[] x) => Math.Sqrt(x.Sum(v => (double)v * v) / x.Length);
+        // As loud, or as near as the 0.9 peak every beacon has allows.
+        double louder = 20 * Math.Log10(Rms(mate) / Rms(player));
+        Assert.InRange(louder, -2.0, 0.1);
+
+        // The 3rd harmonic of G4, 1176 Hz, against the fundamental, in the first note.
+        double Band(float[] x, float hz)
+        {
+            double w = 2 * Math.PI * hz / sr, c = 2 * Math.Cos(w), s1 = 0, s2 = 0;
+            for (int i = 0; i < split; i++) { double s0 = x[i] + c * s1 - s2; s2 = s1; s1 = s0; }
+            return Math.Sqrt(s1 * s1 + s2 * s2 - c * s1 * s2);
+        }
+        double third(float[] x) => 20 * Math.Log10(Band(x, 1176f) / Band(x, 392f));
+        Assert.True(third(mate) > third(player) + 15, $"third harmonic {third(mate):F1} dB against the player's {third(player):F1}");
+
         foreach (var x in new[] { player, mate })
         {
             Assert.True(x.Max(MathF.Abs) < 0.99f, "clipped");

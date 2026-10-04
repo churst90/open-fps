@@ -45,7 +45,7 @@ public sealed class BeaconAids
         [Beacons.Player] = ("SYNTH/beacon_player_call", 392f, 30f, 4),
     };
 
-    /// <summary>A player in your own team: the player's call a fifth higher. See <see cref="TeammateTone"/>.</summary>
+    /// <summary>A player in your own team: the player's call on another instrument. See <see cref="TeammateTone"/>.</summary>
     internal const string TeammateSound = "SYNTH/beacon_player_team";
 
     /// <summary>How often one beacon sounds unless the player says otherwise, seconds.</summary>
@@ -298,7 +298,8 @@ public sealed class BeaconAids
     ///   stairs    four quick notes climbing by tones, G4 A4 B4 C#5 — steps
     ///   waypoint  one slow swell on A4 — somewhere to go
     ///   player    two notes falling a minor third, G4 then E4 — the interval a voice calls a name on
-    ///   teammate  the same call a fifth up, D5 then B4 — the same person-shape, brighter, one of yours
+    ///   teammate  the same call, G4 then E4, on another instrument: hollow and reedy, a triangle's odd
+    ///             harmonics and the login chime's octave — the same person-shape, one of yours
     /// </summary>
     internal static float[] Tone(string category, int rate) => category switch
     {
@@ -312,12 +313,37 @@ public sealed class BeaconAids
         _ => Swell(rate, 440f, 0.45f),
     };
 
-    /// <summary>A player in your team: the player's call transposed up a fifth, so it is the same beacon
-    /// in a different voice rather than a new sound to learn.</summary>
-    internal static float[] TeammateTone(int rate) => Call(rate, TeammateRatio);
+    /// <summary>
+    /// A player in your team: the player's call, the same two notes at the same pitch and in the same
+    /// time, played by another instrument (Cody, 2026-10-03: "use that same sound and change the wave
+    /// form ... they should just be able to be told apart if they were side by side"). The player's call
+    /// is nearly a pure sine; this one carries the octave the login chime has and the odd harmonics a
+    /// triangle wave has, which make it hollow and a little reedy without making it bright. Brought to
+    /// the player's call's loudness, so the harmonics do not make a teammate louder than a stranger.
+    /// </summary>
+    internal static float[] TeammateTone(int rate)
+    {
+        var mate = Notes(rate, 0.012f, TeammateTimbre, (392.00f, 0.00f, 0.14f, 1.0f), (329.63f, 0.15f, 0.22f, 0.9f));
+        var player = Call(rate, 1f);
+        double rp = 0, rm = 0;
+        foreach (var v in player) rp += v * v;
+        foreach (var v in mate) rm += v * v;
+        float k = (float)Math.Sqrt(rp / Math.Max(rm, 1e-12));
+        // ...but never over the 0.9 peak every beacon is made to: the harmonics line up into higher peaks.
+        float peak = 1e-6f;
+        foreach (var v in mate) peak = MathF.Max(peak, MathF.Abs(v));
+        k = MathF.Min(k, 0.9f / peak);
+        for (int i = 0; i < mate.Length; i++) mate[i] *= k;
+        return mate;
+    }
 
-    /// <summary>A just fifth: how much higher a teammate's call is than anybody else's.</summary>
-    internal const float TeammateRatio = 1.5f;
+    /// <summary>The teammate's instrument: (harmonic, amplitude). The octave at the login chime's quarter;
+    /// the 3rd, 5th and 7th at a triangle wave's 1/n², alternating in sign as a triangle's do.</summary>
+    internal static readonly (float Harmonic, float Amplitude)[] TeammateTimbre =
+        { (2f, 0.25f), (3f, -1f / 9f), (5f, 1f / 25f), (7f, -1f / 49f) };
+
+    /// <summary>The other beacons' instrument: the octave above at a tenth.</summary>
+    private static readonly (float Harmonic, float Amplitude)[] PlainTimbre = { (2f, 0.1f) };
 
     /// <summary>
     /// The player's call: G4 falling to E4, the falling minor third a voice calls somebody's name on,
@@ -328,15 +354,16 @@ public sealed class BeaconAids
     /// in as fast as a chime's reaches most of its height inside two milliseconds, which is a click.
     /// </summary>
     private static float[] Call(int rate, float ratio)
-        => Notes(rate, 0.012f, (392.00f * ratio, 0.00f, 0.14f, 1.0f), (329.63f * ratio, 0.15f, 0.22f, 0.9f));
+        => Notes(rate, 0.012f, PlainTimbre, (392.00f * ratio, 0.00f, 0.14f, 1.0f), (329.63f * ratio, 0.15f, 0.22f, 0.9f));
 
     /// <summary>Soft sine notes: (Hz, starts at s, rings for s, level). A 6 ms rise, an exponential
     /// fall over the note, and the octave above at a tenth of the level.</summary>
     private static float[] Notes(int rate, params (float Hz, float At, float Ring, float Level)[] notes)
-        => Notes(rate, 0.006f, notes);
+        => Notes(rate, 0.006f, PlainTimbre, notes);
 
-    /// <summary>The same, with a rise of <paramref name="riseSeconds"/>.</summary>
-    private static float[] Notes(int rate, float riseSeconds, params (float Hz, float At, float Ring, float Level)[] notes)
+    /// <summary>The same, with a rise of <paramref name="riseSeconds"/> and the harmonics in <paramref name="timbre"/>.</summary>
+    private static float[] Notes(int rate, float riseSeconds, (float Harmonic, float Amplitude)[] timbre,
+                                 params (float Hz, float At, float Ring, float Level)[] notes)
     {
         float end = 0f;
         foreach (var n in notes) end = MathF.Max(end, n.At + n.Ring * 1.6f);
@@ -352,7 +379,9 @@ public sealed class BeaconAids
                 float fall = MathF.Exp(-t * 4.6f / n.Ring);                  // -40 dB at 1.0 x Ring
                 float tail = i > len - rate * 0.02f ? (len - i) / (rate * 0.02f) : 1f;
                 float ph = MathF.Tau * n.Hz * t;
-                buf[a + i] += n.Level * rise * fall * tail * (MathF.Sin(ph) + 0.1f * MathF.Sin(2f * ph));
+                float w = MathF.Sin(ph);
+                foreach (var (h, amp) in timbre) w += amp * MathF.Sin(h * ph);
+                buf[a + i] += n.Level * rise * fall * tail * w;
             }
         }
         float peak = 1e-6f;

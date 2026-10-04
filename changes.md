@@ -6,7 +6,8 @@ Recent work, newest first. `git log` has the rest.
 
 - Players are beacons. Every other player near you calls with two soft notes falling a minor third,
   G4 then E4, from head height: the nearest four within 30 metres, never you. A player in your team
-  calls the same notes a fifth higher, D5 then B4. `/beacons player` switches them; a map can force
+  calls the same notes on another instrument: hollow and a little reedy (the login chime's octave and a
+  triangle's odd harmonics), the same pitch and as loud. `/beacons player` switches them; a map can force
   or forbid them like other beacons.
 - Teams: `/team create`, `invite`, `join`, `leave`, `list`, `kick`, `open` and `close`, and `/t` to
   talk to your team. Up to 16 players, kept in teams.json beside friends.json. When someone joins or
