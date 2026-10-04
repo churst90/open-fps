@@ -41,7 +41,9 @@ public class OwnClapTests
         client.Clear(new Vector3(100, 20, 100));
         var clock = Stopwatch.StartNew();
         player.Receive(new WorldAudioEvent { SourceEntityId = 7, Label = "clap", Sounds = new() { clap }, Seed = 1 }, clock.Elapsed.TotalSeconds);
-        double until = clock.Elapsed.TotalSeconds + 1.0;
+        // Rendered off the game thread: up to ten seconds for it, because a full test run on a busy
+        // machine took longer than one and the test reported a clap that was simply still rendering.
+        double until = clock.Elapsed.TotalSeconds + 10.0;
         while (clock.Elapsed.TotalSeconds < until && provider.Emitters.Count == 0)
         {
             player.Update(client.GetSnapshot(), ear, clock.Elapsed.TotalSeconds);
