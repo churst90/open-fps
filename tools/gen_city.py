@@ -74,6 +74,18 @@ def new_id():
 
 entities = []
 
+# ── What a part is called ─────────────────────────────────────────────────────────────────────────
+#
+# Every part has a name that says where it is and what it is, because the name is what a player
+# hears when they scan or walk into it: "Brandt Court east wall", "Brandt Court front entrance",
+# "Brandt Court roof parapet, west side", "Marlow Tower stairwell wall", "Parking garage west side,
+# level 2", "12 Elm Street front door". The place comes first, then the part, then after a comma
+# which floor, level or side. A side is a compass point (X east, Z north); a house's front faces its
+# street. Unnamed, a part answered to its prefab — "Brick Wall", "Concrete Floor" — which says what it
+# is made of and nothing about where you are (Cody, 2026-10-04: "I need to hear what I ran into").
+#
+# The material stays the prefab's: the acoustics key on it, never on these names.
+
 
 def box(prefab, x0, x1, y0, y1, z0, z1, name=None):
     """One box, written as the space it fills. Scale comes from the prefab's own collider."""
@@ -133,7 +145,7 @@ def portal(x, y, z, a, b, aperture):
     })
 
 
-def door(x, y0, z, a, b, facing_z=True, prefab="door", opening=None, turn=0.0):
+def door(x, y0, z, a, b, facing_z=True, prefab="door", opening=None, turn=0.0, name=None):
     """A leaf in a doorway, joining two named places.
 
     A door is ALREADY a portal — PrefabRepository attaches one to anything with IsDoor — so a doorway
@@ -156,10 +168,12 @@ def door(x, y0, z, a, b, facing_z=True, prefab="door", opening=None, turn=0.0):
     }
     if opening is not None:
         e["Scale"] = v3(round((opening + 2 * DOOR_LAP) / bx, 4), 1, 1)
+    if name:
+        e["Name"] = name
     entities.append(e)
 
 
-def bi_parting(x, y0, z, a, b, facing_z=True, prefab="auto_sliding_door", opening=2.0):
+def bi_parting(x, y0, z, a, b, facing_z=True, prefab="auto_sliding_door", opening=2.0, name=None):
     """Two sliding leaves meeting in the middle of a doorway, each sliding away from the other.
 
     Each leaf covers half the opening and laps its own jamb by DOOR_LAP. A sliding leaf moves toward
@@ -170,14 +184,17 @@ def bi_parting(x, y0, z, a, b, facing_z=True, prefab="auto_sliding_door", openin
     ux, uz = math.cos(base), -math.sin(base)      # the leaf's own +X, in (x, z)
     w = opening / 2 + DOOR_LAP
     for s in (+1, -1):
-        entities.append({
+        e = {
             "EntityId": new_id(),
             "PrefabId": prefab,
             "Position": v3(x + s * ux * w / 2, y0 + by / 2, z + s * uz * w / 2),
             "Rotation": yaw(base + (0.0 if s > 0 else math.pi)),
             "RegionAId": a, "RegionBId": b,
             "Scale": v3(round(w / bx, 4), 1, 1),
-        })
+        }
+        if name:
+            e["Name"] = name
+        entities.append(e)
 
 
 DOOR_LAP = 0.05                          # how far a leaf overlaps each jamb, m
@@ -381,6 +398,10 @@ FOOTWAYS = []                            # every pavement, for the people who wa
 
 
 def footway(x0, x1, z0, z1, name=None, label=None):
+    """A pavement. Called "<street> sidewalk, <side>" from its label, "Main Street, west side"."""
+    if name is None and label:
+        road, _, where = label.partition(", ")
+        name = f"{road} sidewalk, {where}" if where else f"{road} sidewalk"
     box("concrete_floor", x0, x1, 0.0, 0.12, z0, z1, name=name)
     FOOTWAYS.append((x0, x1, z0, z1, label))
 
@@ -413,13 +434,19 @@ street(STREETS[3], ST_X0, ST_X1, "North Street")
 
 # The intersections themselves: asphalt laid over the pavement corners, so that walking across one is
 # walking on a road the whole way rather than stepping onto a kerb in the middle of it.
+#
+# Named for the two roads, as the road network names its junctions, and "junction": the driving aids
+# know a junction by that word (DrivingAids.IsJunction) and say "a junction" rather than its name.
+AVENUE_NAMES = dict(zip(AVENUES, ("Wharf Avenue", "Main Street", "Calder Avenue")))
+STREET_NAMES = dict(zip(STREETS, ("Dock Street", "Central Street", "Foundry Street", "North Street")))
 for ax in AVENUES:
     for sz in STREETS:
         if ax != 0.0 and not (AVE_Z0 <= sz <= AVE_Z1):
             continue
         if sz == STREETS[3] and ax not in AVENUES:
             continue
-        carriageway(ax - WALK, ax + WALK, sz - WALK, sz + WALK)
+        carriageway(ax - WALK, ax + WALK, sz - WALK, sz + WALK,
+                    name=" and ".join(sorted((AVENUE_NAMES[ax], STREET_NAMES[sz]))) + " junction")
 
 # ══ An apartment or office tower ══════════════════════════════════════════════════════════════════
 
@@ -494,6 +521,16 @@ def tower(label, x0, x1, z0, z1, storeys, street_side, ac_floors):
 
     def B_holed(prefab, a0, a1, y0, y1, b0, b1, hole, name=None):
         return holed(lambda p0, p1, q0, q1: B(prefab, p0, p1, y0, y1, q0, q1, name=name), a0, a1, b0, b1, hole)
+
+    def compass(axis, high):
+        """The side of this building an edge is on: `axis` "a" (across) or "b" (along), at its high
+        or low end, as a compass point. X is east and Z is north."""
+        if (axis == "a") == vertical:
+            return "east" if high else "west"
+        return "north" if high else "south"
+
+    def wall(side):
+        return f"{label} {side} wall"
 
     # ── The stair plan: a dog-leg, the same on every storey ─────────────────────────────────────
     #
@@ -574,11 +611,12 @@ def tower(label, x0, x1, z0, z1, storeys, street_side, ac_floors):
         ceil = y0 + STOREY - SLAB
         floor_top = y0 + SLAB if s else 0.02
 
+        floor_name, ceiling_name = f"{label} floor {s}", f"{label} ceiling, floor {s}"
         if s:
-            B_holed("concrete_floor", sx0, sx1, y0, y0 + SLAB, sz0, sz1, hole(s - 1))
+            B_holed("concrete_floor", sx0, sx1, y0, y0 + SLAB, sz0, sz1, hole(s - 1), name=floor_name)
         else:
-            B("concrete_floor", sx0, sx1, -0.15, 0.02, sz0, sz1)
-        B_holed("concrete_floor", sx0, sx1, ceil, y0 + STOREY, sz0, sz1, hole(s))
+            B("concrete_floor", sx0, sx1, -0.15, 0.02, sz0, sz1, name=floor_name)
+        B_holed("concrete_floor", sx0, sx1, ceil, y0 + STOREY, sz0, sz1, hole(s), name=ceiling_name)
 
         # The brick shell. The street face is BROKEN at the stairwell on the ground floor, and that
         # gap is the front door: a doorway is an absence, not a leaf standing against solid brick.
@@ -589,20 +627,24 @@ def tower(label, x0, x1, z0, z1, storeys, street_side, ac_floors):
 
         street_wall = (sx1 - WALL_T, sx1) if side > 0 else (sx0, sx0 + WALL_T)
         other_wall = (sx0, sx0 + WALL_T) if side > 0 else (sx1 - WALL_T, sx1)
-        B("brick_wall", other_wall[0], other_wall[1], floor_top, ceil, sz0, sz1)
+        street_name, other_name = wall(compass("a", side > 0)), wall(compass("a", side < 0))
+        B("brick_wall", other_wall[0], other_wall[1], floor_top, ceil, sz0, sz1, name=other_name)
         if entrance:
-            B("brick_wall", street_wall[0], street_wall[1], floor_top, ceil, sz0, entrance[0])
-            B("brick_wall", street_wall[0], street_wall[1], floor_top, ceil, entrance[1], sz1)
-            B("brick_wall", street_wall[0], street_wall[1], floor_top + 2.15, ceil, entrance[0], entrance[1])
+            B("brick_wall", street_wall[0], street_wall[1], floor_top, ceil, sz0, entrance[0], name=street_name)
+            B("brick_wall", street_wall[0], street_wall[1], floor_top, ceil, entrance[1], sz1, name=street_name)
+            B("brick_wall", street_wall[0], street_wall[1], floor_top + 2.15, ceil, entrance[0], entrance[1],
+              name=street_name)
         else:
-            B("brick_wall", street_wall[0], street_wall[1], floor_top, ceil, sz0, sz1)
-        B("brick_wall", sx0, sx1, floor_top, ceil, sz0, sz0 + WALL_T)
-        B("brick_wall", sx0, sx1, floor_top, ceil, sz1 - WALL_T, sz1)
+            B("brick_wall", street_wall[0], street_wall[1], floor_top, ceil, sz0, sz1, name=street_name)
+        B("brick_wall", sx0, sx1, floor_top, ceil, sz0, sz0 + WALL_T, name=wall(compass("b", False)))
+        B("brick_wall", sx0, sx1, floor_top, ceil, sz1 - WALL_T, sz1, name=wall(compass("b", True)))
 
         near_wall = corridor[1] if side > 0 else corridor[0] - WALL_T
         far_wall = corridor[0] - WALL_T if side > 0 else corridor[1]
 
-        # Corridor walls with a doorway per flat cut out of each.
+        # Corridor walls with a doorway per flat cut out of each. On the stairwell's side, the wall
+        # either side of the stairwell's opening, and over it, is the stairwell's wall.
+        corridor_name, stair_wall_name = f"{label} corridor wall, floor {s}", f"{label} stairwell wall"
         for wall_a in (near_wall, far_wall):
             cuts = []
             for i in range(slots):
@@ -610,28 +652,35 @@ def tower(label, x0, x1, z0, z1, storeys, street_side, ac_floors):
                 dz = b0 + slot_len * 0.5
                 cuts.append((dz - DOOR_W / 2, dz + DOOR_W / 2))
             at = sz0
-            for c0, c1 in cuts:
+            for i, (c0, c1) in enumerate(cuts):
+                piece = stair_wall_name if wall_a == near_wall and i == 0 else corridor_name
                 if c0 > at:
-                    B("plaster_wall", wall_a, wall_a + WALL_T, floor_top, ceil, at, c0)
+                    B("plaster_wall", wall_a, wall_a + WALL_T, floor_top, ceil, at, c0, name=piece)
                 # The wall over the door. The cut ran floor to ceiling, so above every shut flat door
                 # was a 65 cm slot into the corridor (2026-09-29: a shut door passed -7/-11/-19 dB).
-                B("plaster_wall", wall_a, wall_a + WALL_T, floor_top + DOOR_H, ceil, c0, c1)
+                B("plaster_wall", wall_a, wall_a + WALL_T, floor_top + DOOR_H, ceil, c0, c1, name=piece)
                 at = c1
             if at < sz1:
-                B("plaster_wall", wall_a, wall_a + WALL_T, floor_top, ceil, at, sz1)
+                B("plaster_wall", wall_a, wall_a + WALL_T, floor_top, ceil, at, sz1, name=corridor_name)
 
+        # Between the flats; the first on the street side is the stairwell's other wall.
         for i in range(1, slots):
             pb = sz0 + WALL_T + i * slot_len
             for fa0, fa1 in (far_flat, near_flat):
-                B("plaster_wall", fa0, fa1, floor_top, ceil, pb - WALL_T / 2, pb + WALL_T / 2)
+                B("plaster_wall", fa0, fa1, floor_top, ceil, pb - WALL_T / 2, pb + WALL_T / 2,
+                  name=stair_wall_name if i == 1 and (fa0, fa1) == near_flat else f"{label} flat wall, floor {s}")
 
         # Carpet in the flats and down the corridor, tile left bare in the stairwell — the stairwell
         # is the live space in the building and the contrast is the point. A plastered soffit over
         # all of it, which is what you are under in a flat rather than the bare structural slab.
-        B("carpet_floor", far_flat[0], far_flat[1], floor_top, floor_top + 0.04, sz0 + WALL_T, sz1 - WALL_T)
-        B("carpet_floor", near_flat[0], near_flat[1], floor_top, floor_top + 0.04, stair_b[1], sz1 - WALL_T)
-        B("carpet_floor", corridor[0], corridor[1], floor_top, floor_top + 0.04, sz0 + WALL_T, sz1 - WALL_T)
-        B_holed("plaster_wall", inner[0], inner[1], ceil - 0.03, ceil, sz0 + WALL_T, sz1 - WALL_T, hole(s))
+        B("carpet_floor", far_flat[0], far_flat[1], floor_top, floor_top + 0.04, sz0 + WALL_T, sz1 - WALL_T,
+          name=floor_name)
+        B("carpet_floor", near_flat[0], near_flat[1], floor_top, floor_top + 0.04, stair_b[1], sz1 - WALL_T,
+          name=floor_name)
+        B("carpet_floor", corridor[0], corridor[1], floor_top, floor_top + 0.04, sz0 + WALL_T, sz1 - WALL_T,
+          name=floor_name)
+        B_holed("plaster_wall", inner[0], inner[1], ceil - 0.03, ceil, sz0 + WALL_T, sz1 - WALL_T, hole(s),
+                name=ceiling_name)
 
         # What is IN them. Carpet is deaf to bass (carpet-is-deaf-to-bass): it does its job at mid and
         # top and almost nothing at the bottom, so a carpeted room with hard walls keeps a two-second
@@ -642,8 +691,11 @@ def tower(label, x0, x1, z0, z1, storeys, street_side, ac_floors):
             for which, (fa0, fa1) in (("front", near_flat), ("back", far_flat)):
                 if which == "front" and i == 0:
                     continue
-                B("furniture_soft", fa0 + 0.6, fa0 + 1.5, floor_top, floor_top + 0.85, b0 + 1.0, b0 + 3.2)
-                B("furniture_soft", fa1 - 2.1, fa1 - 0.3, floor_top, floor_top + 0.6, b0 + 4.6, b0 + 6.4)
+                flat = f"{label} flat {s}{i}{which[0].upper()}"
+                B("furniture_soft", fa0 + 0.6, fa0 + 1.5, floor_top, floor_top + 0.85, b0 + 1.0, b0 + 3.2,
+                  name=f"{flat} sofa")
+                B("furniture_soft", fa1 - 2.1, fa1 - 0.3, floor_top, floor_top + 0.6, b0 + 4.6, b0 + 6.4,
+                  name=f"{flat} bed")
 
         corridor_id = R(f"{label} corridor, floor {s}",
                         corridor[0], corridor[1], floor_top, ceil, sz0 + WALL_T, sz1 - WALL_T)
@@ -658,7 +710,8 @@ def tower(label, x0, x1, z0, z1, storeys, street_side, ac_floors):
                 flat_id = R(f"{label} flat {s}{i}{which[0].upper()}", fa0, fa1, floor_top, ceil, b0, b1)
                 wall_a = near_wall if which == "front" else far_wall
                 dx0, _, dz0, _ = place(wall_a + WALL_T / 2, 0, db, 0)
-                door(dx0, floor_top, dz0, flat_id, corridor_id, facing_z=not vertical, opening=DOOR_W)
+                door(dx0, floor_top, dz0, flat_id, corridor_id, facing_z=not vertical, opening=DOOR_W,
+                     name=f"{label} flat {s}{i}{which[0].upper()} door")
 
         # ── The stairwell ──────────────────────────────────────────────────────────────────────
         sa0, sa1 = near_flat
@@ -667,7 +720,8 @@ def tower(label, x0, x1, z0, z1, storeys, street_side, ac_floors):
         # metre of the slabs' thickness, out of doors (CityOpeningsTests).
         stair_id = R(f"{label} stairwell, floor {s}", sa0, sa1, y0 if s else floor_top, y0 + STOREY,
                      stair_b[0], stair_b[1])
-        B_holed("tile_floor", sa0, sa1, floor_top - 0.02, floor_top + 0.03, stair_b[0], stair_b[1], hole(s - 1))
+        B_holed("tile_floor", sa0, sa1, floor_top - 0.02, floor_top + 0.03, stair_b[0], stair_b[1], hole(s - 1),
+                name=floor_name)
         px, _, pz, _ = place(near_wall + WALL_T / 2, 0, (stair_b[0] + stair_b[1]) / 2, 0)
         portal(px, floor_top + 1.0, pz, stair_id, corridor_id, 1.4)
 
@@ -676,11 +730,13 @@ def tower(label, x0, x1, z0, z1, storeys, street_side, ac_floors):
         going = STAIR_GOING
         for k in range(n):
             q0, q1 = foot_b + d * k * going, foot_b + d * (k + 1) * going
-            B("concrete_floor", la[0], la[1], floor_top, lo + (k + 1) * rise, min(q0, q1), max(q0, q1))
+            B("concrete_floor", la[0], la[1], floor_top, lo + (k + 1) * rise, min(q0, q1), max(q0, q1),
+              name=f"{label} stairs, floor {s}")
         # Its guards, along the well and, in the lane away from the street wall, along its open side
         # too: stepped up the flight a few treads a piece, each piece a guard's height over the highest
         # tread beside it and down to a riser under the lowest, so the pieces meet. The last flight's
         # stops at the roof, where the stair housing's wall stands on it.
+        railing = f"{label} stairwell railing"
         guards = [well_edge(flight_lane(s))]
         if flight_lane(s) == 1:
             guards.append(span(la[1] if inward > 0 else la[0], RAIL_T))
@@ -691,7 +747,7 @@ def tower(label, x0, x1, z0, z1, storeys, street_side, ac_floors):
             if s + 1 == storeys:
                 g1 = min(g1, roof_y)
             for ge in guards:
-                B("concrete_wall", ge[0], ge[1], lo + k0 * rise, g1, min(q0, q1), max(q0, q1))
+                B("concrete_wall", ge[0], ge[1], lo + k0 * rise, g1, min(q0, q1), max(q0, q1), name=railing)
 
         # Each end of the flight says what it is, as data: a stairs beacon, and the line the client
         # speaks when you reach it facing along the flight. Turned to face the way you walk to take
@@ -712,17 +768,17 @@ def tower(label, x0, x1, z0, z1, storeys, street_side, ac_floors):
         if s + 1 < storeys:
             ha0, ha1, hb0, hb1 = hole(s)
             back = (hb0 - RAIL_T, hb0) if d > 0 else (hb1, hb1 + RAIL_T)
-            B("concrete_wall", ha0, ha1, hi, hi + RAIL_H, back[0], back[1])
+            B("concrete_wall", ha0, ha1, hi, hi + RAIL_H, back[0], back[1], name=railing)
             tb = sorted((top_b, top_b + d * RAIL_T))
-            B("concrete_wall", well[0], well[1], hi, hi + RAIL_H, tb[0], tb[1])
+            B("concrete_wall", well[0], well[1], hi, hi + RAIL_H, tb[0], tb[1], name=railing)
             if flight_lane(s) == 1:
                 ra = span(la[1] if inward > 0 else la[0], RAIL_T)
-                B("concrete_wall", ra[0], ra[1], hi, hi + RAIL_H, min(back[0], hb0), max(back[1], hb1))
+                B("concrete_wall", ra[0], ra[1], hi, hi + RAIL_H, min(back[0], hb0), max(back[1], hb1), name=railing)
             _, _, _, _, _, _, nf, nt = flight(s + 1)
             ne = well_edge(flight_lane(s + 1))
             for q0, q1 in ((hb0, min(nf, nt)), (max(nf, nt), hb1)):
                 if q1 - q0 > 1e-6:
-                    B("concrete_wall", ne[0], ne[1], hi, hi + RAIL_H, q0, q1)
+                    B("concrete_wall", ne[0], ne[1], hi, hi + RAIL_H, q0, q1, name=railing)
 
         if s == 0:
             ex, _, ez, _ = place(sx1 - WALL_T / 2 if side > 0 else sx0 + WALL_T / 2, 0,
@@ -733,8 +789,11 @@ def tower(label, x0, x1, z0, z1, storeys, street_side, ac_floors):
             # city.json's doors were re-fitted to their openings on 2026-09-23 (turned and sized).
             # A glass front door with a push bar inside and a key outside (Cody, 2026-10-02: like his
             # own building's). Its key side is the leaf's +Z face, turned to the street.
+            # It is the building's front entrance and is called that: the thing a player walking
+            # along the facade is looking for.
             door(ex, 0.02, ez, stair_id, -1, facing_z=not vertical, prefab="glass_front_door",
-                 opening=entrance[1] - entrance[0], turn=0.0 if side > 0 else math.pi)
+                 opening=entrance[1] - entrance[0], turn=0.0 if side > 0 else math.pi,
+                 name=f"{label} front entrance")
 
         # ── The air conditioners ───────────────────────────────────────────────────────────────
         #
@@ -774,23 +833,28 @@ def tower(label, x0, x1, z0, z1, storeys, street_side, ac_floors):
     hb0, hb1 = roof_foot - STAIR_HEAD, roof_top + BULK_LANDING   # the housing's inside, along
     ha0, ha1 = min(street_wall[0], inner_wall[0]), max(street_wall[1], inner_wall[1])
     top = roof_y + BULK_H
-    B("brick_wall", street_wall[0], street_wall[1], roof_y, top, hb0 - BULK_T, hb1 + BULK_T)
-    B("brick_wall", inner_wall[0], inner_wall[1], roof_y, top, hb0 - BULK_T, hb1 + BULK_T)
-    B("brick_wall", ha0, ha1, roof_y, top, hb0 - BULK_T, hb0)
-    B("brick_wall", ha0, la[0], roof_y, top, hb1, hb1 + BULK_T)
-    B("brick_wall", la[1], ha1, roof_y, top, hb1, hb1 + BULK_T)
-    B("brick_wall", la[0], la[1], roof_y + DOOR_H, top, hb1, hb1 + BULK_T)
+    housing = f"{label} roof access wall"
+    B("brick_wall", street_wall[0], street_wall[1], roof_y, top, hb0 - BULK_T, hb1 + BULK_T, name=housing)
+    B("brick_wall", inner_wall[0], inner_wall[1], roof_y, top, hb0 - BULK_T, hb1 + BULK_T, name=housing)
+    B("brick_wall", ha0, ha1, roof_y, top, hb0 - BULK_T, hb0, name=housing)
+    B("brick_wall", ha0, la[0], roof_y, top, hb1, hb1 + BULK_T, name=housing)
+    B("brick_wall", la[1], ha1, roof_y, top, hb1, hb1 + BULK_T, name=housing)
+    B("brick_wall", la[0], la[1], roof_y + DOOR_H, top, hb1, hb1 + BULK_T, name=housing)
     B("concrete_floor", ha0, ha1, top, top + SLAB, hb0 - BULK_T, hb1 + BULK_T, name=f"{label} roof access roof")
     access_id = R(f"{label} roof access", la[0], la[1], storeys * STOREY, top, hb0, hb1)
 
     # A parapet round the edge, on the outer walls, so walking about up here cannot take you over
     # the side. Not where the housing's own wall already stands on the street wall.
+    def parapet(axis, high):
+        return f"{label} roof parapet, {compass(axis, high)} side"
     B_holed("brick_wall", street_wall[0], street_wall[1], roof_y, roof_y + PARAPET_H, sz0, sz1,
-            (street_wall[0], street_wall[1], hb0 - BULK_T, hb1 + BULK_T))
+            (street_wall[0], street_wall[1], hb0 - BULK_T, hb1 + BULK_T), name=parapet("a", side > 0))
     far_wall = (sx0, sx0 + WALL_T) if side > 0 else (sx1 - WALL_T, sx1)
-    B("brick_wall", far_wall[0], far_wall[1], roof_y, roof_y + PARAPET_H, sz0, sz1)
-    B("brick_wall", sx0 + WALL_T, sx1 - WALL_T, roof_y, roof_y + PARAPET_H, sz0, sz0 + WALL_T)
-    B("brick_wall", sx0 + WALL_T, sx1 - WALL_T, roof_y, roof_y + PARAPET_H, sz1 - WALL_T, sz1)
+    B("brick_wall", far_wall[0], far_wall[1], roof_y, roof_y + PARAPET_H, sz0, sz1, name=parapet("a", side < 0))
+    B("brick_wall", sx0 + WALL_T, sx1 - WALL_T, roof_y, roof_y + PARAPET_H, sz0, sz0 + WALL_T,
+      name=parapet("b", False))
+    B("brick_wall", sx0 + WALL_T, sx1 - WALL_T, roof_y, roof_y + PARAPET_H, sz1 - WALL_T, sz1,
+      name=parapet("b", True))
 
     # The roof is a named place in the open air, so arriving on it is announced. Its boxes go round
     # the housing rather than over it: a place outdoors must not hold a room (CityZoneTests).
@@ -807,7 +871,8 @@ def tower(label, x0, x1, z0, z1, storeys, street_side, ac_floors):
     outside = hb1 + BULK_T + 0.5
     roof_id = next(rid for p0, p1, q0, q1, rid in pieces if p0 <= ca <= p1 and q0 <= outside <= q1)
     dx, dz = P(ca, hb1 + BULK_T / 2)
-    door(dx, roof_y, dz, access_id, roof_id, facing_z=vertical, prefab="steel_door", opening=DOOR_W)
+    door(dx, roof_y, dz, access_id, roof_id, facing_z=vertical, prefab="steel_door", opening=DOOR_W,
+         name=f"{label} roof access door")
 
     # A condenser on the roof — the big brother of the window units, and the one machine on this map
     # that is heard from above rather than across.
@@ -850,9 +915,9 @@ for lv in range(GAR_LEVELS):
     # with the map's dirt at exactly 0.0 and level 0 measured a DIRT floor while level 1 measured
     # concrete — two decks of the same car park, 615 ms and 4557 ms.
     if lv == 0:
-        box("concrete_floor", GAR_X0, GAR_X1, 0.0, SLAB, GAR_Z0, GAR_Z1)
+        box("concrete_floor", GAR_X0, GAR_X1, 0.0, SLAB, GAR_Z0, GAR_Z1, name=f"Parking garage floor, level {lv}")
     else:
-        box("concrete_floor", GAR_X0, GAR_X1, y0 - SLAB, y0, GAR_Z0, GAR_Z1)
+        box("concrete_floor", GAR_X0, GAR_X1, y0 - SLAB, y0, GAR_Z0, GAR_Z1, name=f"Parking garage floor, level {lv}")
     # ── The sides are SPANDRELS ON PIERS, not walls ──────────────────────────────────────────────
     #
     # An open-deck car park is open by law: it is ventilated by having no walls, and what stands
@@ -864,37 +929,40 @@ for lv in range(GAR_LEVELS):
     # This is not a tuning: the tail comes down because the openings are there, the same way a
     # courtyard is not a reverberation chamber because its ceiling is missing.
     SPANDREL = 1.1
-    for x0, x1, z0, z1 in ((GAR_X0, GAR_X0 + 0.3, GAR_Z0, GAR_Z1),
-                           (GAR_X0, GAR_X1, GAR_Z0, GAR_Z0 + 0.3),
-                           (GAR_X0, GAR_X1, GAR_Z1 - 0.3, GAR_Z1)):
-        box("concrete_wall", x0, x1, y0, y0 + SPANDREL, z0, z1)
+    # Each side is named for the side it is and the deck it is on: "Parking garage west side, level 2".
+    for x0, x1, z0, z1, where in ((GAR_X0, GAR_X0 + 0.3, GAR_Z0, GAR_Z1, "west"),
+                                  (GAR_X0, GAR_X1, GAR_Z0, GAR_Z0 + 0.3, "south"),
+                                  (GAR_X0, GAR_X1, GAR_Z1 - 0.3, GAR_Z1, "north")):
+        side_name = f"Parking garage {where} side, level {lv}"
+        box("concrete_wall", x0, x1, y0, y0 + SPANDREL, z0, z1, name=side_name)
         # Piers on a 7.5 m grid, up the rest of the way.
         along_z = (z1 - z0) > (x1 - x0)
         span = (z1 - z0) if along_z else (x1 - x0)
         for k in range(int(span // 7.5) + 1):
             at = (z0 if along_z else x0) + k * 7.5
             if along_z:
-                box("concrete_wall", x0, x1, y0 + SPANDREL, y0 + GAR_CLEAR, at - 0.25, at + 0.25)
+                box("concrete_wall", x0, x1, y0 + SPANDREL, y0 + GAR_CLEAR, at - 0.25, at + 0.25, name=side_name)
             else:
-                box("concrete_wall", at - 0.25, at + 0.25, y0 + SPANDREL, y0 + GAR_CLEAR, z0, z1)
+                box("concrete_wall", at - 0.25, at + 0.25, y0 + SPANDREL, y0 + GAR_CLEAR, z0, z1, name=side_name)
     for k in range(int((GAR_Z1 - GAR_Z0) // 6) + 1):
         cz = GAR_Z0 + k * 6.0
-        box("concrete_wall", GAR_X1 - 0.4, GAR_X1, y0, y0 + GAR_CLEAR, cz - 0.2, cz + 0.2)
+        box("concrete_wall", GAR_X1 - 0.4, GAR_X1, y0, y0 + GAR_CLEAR, cz - 0.2, cz + 0.2,
+            name=f"Parking garage east side, level {lv}")
     region(f"Parking garage, level {lv}", GAR_X0, GAR_X1, y0, y0 + GAR_CLEAR, GAR_Z0, GAR_Z1)
 box("concrete_floor", GAR_X0, GAR_X1, GAR_LEVELS * (GAR_CLEAR + SLAB) - SLAB,
-    GAR_LEVELS * (GAR_CLEAR + SLAB), GAR_Z0, GAR_Z1, name="Garage roof")
-box("metal_wall", GAR_X1 - 0.1, GAR_X1, 0.0, GAR_CLEAR, GAR_Z1 - 6.2, GAR_Z1 - 0.3, name="Garage shutter")
+    GAR_LEVELS * (GAR_CLEAR + SLAB), GAR_Z0, GAR_Z1, name="Parking garage roof")
+box("metal_wall", GAR_X1 - 0.1, GAR_X1, 0.0, GAR_CLEAR, GAR_Z1 - 6.2, GAR_Z1 - 0.3, name="Parking garage shutter")
 
 # ══ The tunnel ════════════════════════════════════════════════════════════════════════════════════
 #
 # A roofed box with two openings, and the best test the enclosure survey has: long, hard, closed on
 # four faces and open on two. The rail crosses OVER it at z = -228, so a unit going round the loop
 # passes above your head while you are in there.
-carriageway(-KERB, KERB, TUNNEL_Z0, TUNNEL_Z1)
+carriageway(-KERB, KERB, TUNNEL_Z0, TUNNEL_Z1, name="Main Street carriageway")
 box("concrete_wall", -KERB - 0.5, -KERB, 0.0, TUNNEL_H, TUNNEL_Z0, TUNNEL_Z1, name="Tunnel west wall")
 box("concrete_wall", KERB, KERB + 0.5, 0.0, TUNNEL_H, TUNNEL_Z0, TUNNEL_Z1, name="Tunnel east wall")
-box("concrete_wall", -WALK, -KERB - 0.5, 0.0, TUNNEL_H, TUNNEL_Z0, TUNNEL_Z1)
-box("concrete_wall", KERB + 0.5, WALK, 0.0, TUNNEL_H, TUNNEL_Z0, TUNNEL_Z1)
+box("concrete_wall", -WALK, -KERB - 0.5, 0.0, TUNNEL_H, TUNNEL_Z0, TUNNEL_Z1, name="Tunnel west wall")
+box("concrete_wall", KERB + 0.5, WALK, 0.0, TUNNEL_H, TUNNEL_Z0, TUNNEL_Z1, name="Tunnel east wall")
 box("concrete_floor", -WALK, WALK, TUNNEL_H, TUNNEL_H + 0.4, TUNNEL_Z0, TUNNEL_Z1, name="Tunnel roof")
 for i in range(4):
     zz0 = TUNNEL_Z0 + i * (TUNNEL_Z1 - TUNNEL_Z0) / 4
@@ -913,11 +981,13 @@ for shelter_z, shelter_x in ((-60.0, WALK), (86.0, -WALK)):
     back = shelter_x
     front = shelter_x + inward * 3.2
     box("glass_wall", min(back, back - inward * 0.1), max(back, back - inward * 0.1),
-        0.0, 2.4, shelter_z - 2.2, shelter_z + 2.2, name="Shelter back")
-    box("glass_wall", min(front, back), max(front, back), 0.0, 2.4, shelter_z - 2.2, shelter_z - 2.14)
-    box("glass_wall", min(front, back), max(front, back), 0.0, 2.4, shelter_z + 2.14, shelter_z + 2.2)
+        0.0, 2.4, shelter_z - 2.2, shelter_z + 2.2, name="Bus shelter")
+    box("glass_wall", min(front, back), max(front, back), 0.0, 2.4, shelter_z - 2.2, shelter_z - 2.14,
+        name="Bus shelter")
+    box("glass_wall", min(front, back), max(front, back), 0.0, 2.4, shelter_z + 2.14, shelter_z + 2.2,
+        name="Bus shelter")
     box("metal_wall", min(front, back), max(front, back), 2.4, 2.5, shelter_z - 2.2, shelter_z + 2.2,
-        name="Shelter roof")
+        name="Bus shelter roof")
 
 # ══ The plaza ═════════════════════════════════════════════════════════════════════════════════════
 #
@@ -933,7 +1003,7 @@ for k in range(9):
     px = PLZ_X0 + 4.0 + k * 12.0
     if px > PLZ_X1 - 4.0:
         break
-    box("pillar_round", px - 0.35, px + 0.35, 0.0, 5.0, PLZ_Z0 + 3.0, PLZ_Z0 + 3.7)
+    box("pillar_round", px - 0.35, px + 0.35, 0.0, 5.0, PLZ_Z0 + 3.0, PLZ_Z0 + 3.7, name="Market Square pillar")
 region("Market Square", PLZ_X0, PLZ_X1, 0.0, 6.0, PLZ_Z0, PLZ_Z1)
 
 # ══ The light rail ════════════════════════════════════════════════════════════════════════════════
@@ -1023,9 +1093,8 @@ for i, p in enumerate(RAIL):
         "EntityId": new_id(), "PrefabId": "dirt_floor",
         "Position": v3(mx, 0.35, mz), "Rotation": yaw(ang),
         "Scale": v3(RAIL_W / bx, 0.7 / by, (seg + extra) / bz),
-        "Name": "Rail ballast" if i == 0 else None,
+        "Name": "Railway embankment",
     })
-    entities[-1] = {k: v for k, v in entities[-1].items() if v is not None}
     for rail_off in (-0.72, 0.72):
         ox, oz = math.cos(ang) * rail_off, -math.sin(ang) * rail_off
         # A rail stops a foot, not a wave: typed as the palisade, which is solid to a body and
@@ -1036,6 +1105,7 @@ for i, p in enumerate(RAIL):
             "EntityId": new_id(), "PrefabId": "fence_palisade",
             "Position": v3(mx + ox, 0.78, mz + oz), "Rotation": yaw(ang),
             "Scale": v3(0.14 / mbx, 0.16 / mby, (seg + extra) / mbz),
+            "Name": "Railway track",
         })
 
 
@@ -1054,16 +1124,16 @@ def rail_station(label, cx, cz, along_z=True):
         x0, x1 = cx - half_len, cx + half_len
         z0, z1 = cz - off - 2 * half_w, cz - off
     box("concrete_floor", x0, x1, 0.0, 0.95, z0, z1, name=f"{label} platform")
-    box("tile_floor", x0, x1, 0.93, 0.99, z0, z1)
+    box("tile_floor", x0, x1, 0.93, 0.99, z0, z1, name=f"{label} platform")
     box("metal_wall", x0 - 0.3, x1 + 1.6, 4.4, 4.55, z0, z1, name=f"{label} canopy")
     n = int((z1 - z0) // 9) if along_z else int((x1 - x0) // 9)
     for k in range(n + 1):
         if along_z:
             pz = z0 + k * 9.0
-            box("concrete_wall", x1 - 0.5, x1 - 0.1, 0.95, 4.4, pz - 0.2, pz + 0.2)
+            box("concrete_wall", x1 - 0.5, x1 - 0.1, 0.95, 4.4, pz - 0.2, pz + 0.2, name=f"{label} canopy post")
         else:
             px = x0 + k * 9.0
-            box("concrete_wall", px - 0.2, px + 0.2, 0.95, 4.4, z1 - 0.5, z1 - 0.1)
+            box("concrete_wall", px - 0.2, px + 0.2, 0.95, 4.4, z1 - 0.5, z1 - 0.1, name=f"{label} canopy post")
     for k in range(3):
         if along_z:
             a, b = z0 + k * (z1 - z0) / 3, z0 + (k + 1) * (z1 - z0) / 3
@@ -1100,7 +1170,7 @@ rail_station("Elm Park halt", RAIL_X_W + 9.4, 40.0, along_z=True)
 box("asphalt_road", -KERB, KERB, 0.0, 0.09, RAIL_Z_S - 3.2, RAIL_Z_S + 3.2,
     name="Main Street level crossing")
 for side_x0, side_x1 in ((-CROSSING_HALF - 2.0, -KERB), (KERB, CROSSING_HALF + 2.0)):
-    box("asphalt_road", side_x0, side_x1, 0.0, 0.16, RAIL_Z_S - 3.2, RAIL_Z_S + 3.2)
+    box("asphalt_road", side_x0, side_x1, 0.0, 0.16, RAIL_Z_S - 3.2, RAIL_Z_S + 3.2, name="Main Street level crossing")
 region("Level crossing", -CROSSING_HALF, CROSSING_HALF, 0.0, 4.0, RAIL_Z_S - 3.2, RAIL_Z_S + 3.2)
 
 # ══ The airport ═══════════════════════════════════════════════════════════════════════════════════
@@ -1111,21 +1181,23 @@ region("Level crossing", -CROSSING_HALF, CROSSING_HALF, 0.0, 4.0, RAIL_Z_S - 3.2
 # street, and here is the street taken away.
 box("asphalt_road", RUNWAY_X - RUNWAY_W / 2, RUNWAY_X + RUNWAY_W / 2, 0.0, 0.06,
     RUNWAY_Z0, RUNWAY_Z1, name="Runway 18/36")
-box("concrete_floor", RUNWAY_X - RUNWAY_W / 2 - 8.0, RUNWAY_X - RUNWAY_W / 2, 0.0, 0.04, RUNWAY_Z0, RUNWAY_Z1)
-box("concrete_floor", RUNWAY_X + RUNWAY_W / 2, RUNWAY_X + RUNWAY_W / 2 + 8.0, 0.0, 0.04, RUNWAY_Z0, RUNWAY_Z1)
+box("concrete_floor", RUNWAY_X - RUNWAY_W / 2 - 8.0, RUNWAY_X - RUNWAY_W / 2, 0.0, 0.04, RUNWAY_Z0, RUNWAY_Z1,
+    name="Runway 18/36 shoulder")
+box("concrete_floor", RUNWAY_X + RUNWAY_W / 2, RUNWAY_X + RUNWAY_W / 2 + 8.0, 0.0, 0.04, RUNWAY_Z0, RUNWAY_Z1,
+    name="Runway 18/36 shoulder")
 box("asphalt_road", TAXI_X - TAXI_W / 2, TAXI_X + TAXI_W / 2, 0.0, 0.06, RUNWAY_Z0 + 40.0, RUNWAY_Z1 - 40.0,
     name="Taxiway A")
 box("concrete_floor", APRON_X0, APRON_X1, 0.0, 0.08, APRON_Z0, APRON_Z1, name="Apron")
 # The link from the taxiway to the apron, and the one from the runway to the taxiway.
-box("asphalt_road", APRON_X1, TAXI_X - TAXI_W / 2, 0.0, 0.06, 40.0, 63.0)
-box("asphalt_road", TAXI_X + TAXI_W / 2, RUNWAY_X - RUNWAY_W / 2, 0.0, 0.06, 40.0, 63.0)
-box("asphalt_road", TAXI_X + TAXI_W / 2, RUNWAY_X - RUNWAY_W / 2, 0.0, 0.06, -220.0, -197.0)
+box("asphalt_road", APRON_X1, TAXI_X - TAXI_W / 2, 0.0, 0.06, 40.0, 63.0, name="Taxiway A link")
+box("asphalt_road", TAXI_X + TAXI_W / 2, RUNWAY_X - RUNWAY_W / 2, 0.0, 0.06, 40.0, 63.0, name="Taxiway A link")
+box("asphalt_road", TAXI_X + TAXI_W / 2, RUNWAY_X - RUNWAY_W / 2, 0.0, 0.06, -220.0, -197.0, name="Taxiway A link")
 region("Runway", RUNWAY_X - RUNWAY_W / 2, RUNWAY_X + RUNWAY_W / 2, 0.0, 8.0, RUNWAY_Z0, RUNWAY_Z1)
 region("Apron", APRON_X0, APRON_X1, 0.0, 8.0, APRON_Z0, APRON_Z1)
 
 # ── The terminal: one tall glazed concourse ───────────────────────────────────────────────────────
-box("concrete_floor", TERM_X0, TERM_X1, -0.15, 0.04, TERM_Z0, TERM_Z1)
-box("tile_floor", TERM_X0, TERM_X1, 0.02, 0.08, TERM_Z0, TERM_Z1)
+box("concrete_floor", TERM_X0, TERM_X1, -0.15, 0.04, TERM_Z0, TERM_Z1, name="Terminal floor")
+box("tile_floor", TERM_X0, TERM_X1, 0.02, 0.08, TERM_Z0, TERM_Z1, name="Terminal floor")
 box("concrete_floor", TERM_X0, TERM_X1, TERM_H, TERM_H + 0.3, TERM_Z0, TERM_Z1, name="Terminal roof")
 # A suspended acoustic ceiling, 0.6 m below the slab, as every real concourse has. Without it the
 # terminal was concrete and tile on every side and rang for 7-10 s (2026-09-29, Cody: "give the
@@ -1136,25 +1208,26 @@ box("acoustic_ceiling", TERM_X0 + 0.4, TERM_X1 - 0.06, TERM_H - 0.65, TERM_H - 0
 # door into nothing (the opening graph's "a wall stands in it", 2026-10-02).
 TERM_WEST_DOOR = 62.0
 box("concrete_wall", TERM_X0, TERM_X0 + 0.4, 0.0, TERM_H, TERM_Z0, TERM_WEST_DOOR - 0.45, name="Terminal west wall")
-box("concrete_wall", TERM_X0, TERM_X0 + 0.4, 0.0, TERM_H, TERM_WEST_DOOR + 0.45, TERM_Z1)
-box("concrete_wall", TERM_X0, TERM_X0 + 0.4, 0.08 + 2.1 - DOOR_LAP, TERM_H, TERM_WEST_DOOR - 0.45, TERM_WEST_DOOR + 0.45)
-box("concrete_wall", TERM_X0, TERM_X1, 0.0, TERM_H, TERM_Z0, TERM_Z0 + 0.4)
-box("concrete_wall", TERM_X0, TERM_X1, 0.0, TERM_H, TERM_Z1 - 0.4, TERM_Z1)
+box("concrete_wall", TERM_X0, TERM_X0 + 0.4, 0.0, TERM_H, TERM_WEST_DOOR + 0.45, TERM_Z1, name="Terminal west wall")
+box("concrete_wall", TERM_X0, TERM_X0 + 0.4, 0.08 + 2.1 - DOOR_LAP, TERM_H, TERM_WEST_DOOR - 0.45, TERM_WEST_DOOR + 0.45,
+    name="Terminal west wall")
+box("concrete_wall", TERM_X0, TERM_X1, 0.0, TERM_H, TERM_Z0, TERM_Z0 + 0.4, name="Terminal south wall")
+box("concrete_wall", TERM_X0, TERM_X1, 0.0, TERM_H, TERM_Z1 - 0.4, TERM_Z1, name="Terminal north wall")
 # The apron face is glass, in bays, with two doorways cut out of it.
 TERM_DOORS = (30.0, 92.0)
 bay_at = TERM_Z0 + 0.4
 for dz in TERM_DOORS:
-    box("glass_wall", TERM_X1 - 0.06, TERM_X1, 0.0, TERM_H, bay_at, dz - 1.1)
-    box("glass_wall", TERM_X1 - 0.06, TERM_X1, 2.2, TERM_H, dz - 1.1, dz + 1.1)
+    box("glass_wall", TERM_X1 - 0.06, TERM_X1, 0.0, TERM_H, bay_at, dz - 1.1, name="Terminal east wall")
+    box("glass_wall", TERM_X1 - 0.06, TERM_X1, 2.2, TERM_H, dz - 1.1, dz + 1.1, name="Terminal east wall")
     bay_at = dz + 1.1
-box("glass_wall", TERM_X1 - 0.06, TERM_X1, 0.0, TERM_H, bay_at, TERM_Z1 - 0.4)
+box("glass_wall", TERM_X1 - 0.06, TERM_X1, 0.0, TERM_H, bay_at, TERM_Z1 - 0.4, name="Terminal east wall")
 # A row of seating down the middle, which is the only soft thing in the building.
 for k in range(7):
     sz = TERM_Z0 + 14.0 + k * 17.0
     if sz > TERM_Z1 - 14.0:
         break
     box("furniture_soft", (TERM_X0 + TERM_X1) / 2 - 1.2, (TERM_X0 + TERM_X1) / 2 + 1.2,
-        0.08, 0.95, sz - 2.4, sz + 2.4)
+        0.08, 0.95, sz - 2.4, sz + 2.4, name="Terminal seating")
 term_ids = []
 for k in range(3):
     a = TERM_Z0 + k * (TERM_Z1 - TERM_Z0) / 3
@@ -1164,10 +1237,13 @@ for k in range(3):
 # Each door joins the end it is in: z 30 is in the south end, z 92 in the north (it named the middle).
 # The public entrances are automatic: two glass leaves that part for anyone who comes up to them and
 # slide away into the glazing either side.
-for dz, rid in zip(TERM_DOORS, (term_ids[0], term_ids[2])):
-    bi_parting(TERM_X1 - 0.03, 0.08, dz, rid, -1, facing_z=False, opening=2.2)   # the wall runs along z
-# ...and a service door from the road side: steel, with a push bar and a closer.
-door(TERM_X0 + 0.2, 0.08, TERM_WEST_DOOR, term_ids[1], -1, facing_z=False, prefab="steel_door")
+for dz, rid, end in zip(TERM_DOORS, (term_ids[0], term_ids[2]), ("south", "north")):
+    bi_parting(TERM_X1 - 0.03, 0.08, dz, rid, -1, facing_z=False, opening=2.2,   # the wall runs along z
+               name=f"Terminal apron entrance, {end}")
+# ...and a door from the road side: steel, with a push bar and a closer. It is the one the Terminal
+# approach comes to, so it is the terminal's front entrance.
+door(TERM_X0 + 0.2, 0.08, TERM_WEST_DOOR, term_ids[1], -1, facing_z=False, prefab="steel_door",
+     name="Terminal front entrance")
 
 # ── The hangar: a steel box the size of a church ──────────────────────────────────────────────────
 #
@@ -1175,29 +1251,33 @@ door(TERM_X0 + 0.2, 0.08, TERM_WEST_DOOR, term_ids[1], -1, facing_z=False, prefa
 # enormous opening. Metal absorbs five per cent of what hits it, so this is the most reverberant
 # place on the map by a distance, and the one that most needs the survey to see that the door is a
 # door — it is the small-enclosure fault the other way up.
-box("concrete_floor", HANGAR_X0, HANGAR_X1, -0.2, 0.06, HANGAR_Z0, HANGAR_Z1)
+box("concrete_floor", HANGAR_X0, HANGAR_X1, -0.2, 0.06, HANGAR_Z0, HANGAR_Z1, name="Hangar floor")
 # The back wall, with the personnel door's doorway cut in it (the door is below).
 HANGAR_BACK_DOOR = HANGAR_Z0 + 8.0
-box("metal_wall", HANGAR_X0, HANGAR_X0 + 0.12, 0.0, HANGAR_H, HANGAR_Z0, HANGAR_BACK_DOOR - 0.45, name="Hangar back")
-box("metal_wall", HANGAR_X0, HANGAR_X0 + 0.12, 0.0, HANGAR_H, HANGAR_BACK_DOOR + 0.45, HANGAR_Z1)
-box("metal_wall", HANGAR_X0, HANGAR_X0 + 0.12, 0.06 + 2.1 - DOOR_LAP, HANGAR_H, HANGAR_BACK_DOOR - 0.45, HANGAR_BACK_DOOR + 0.45)
-box("metal_wall", HANGAR_X0, HANGAR_X1, 0.0, HANGAR_H, HANGAR_Z1 - 0.12, HANGAR_Z1)
-box("metal_wall", HANGAR_X0, HANGAR_X1, 0.0, HANGAR_H, HANGAR_Z0, HANGAR_Z0 + 0.12)
+box("metal_wall", HANGAR_X0, HANGAR_X0 + 0.12, 0.0, HANGAR_H, HANGAR_Z0, HANGAR_BACK_DOOR - 0.45, name="Hangar west wall")
+box("metal_wall", HANGAR_X0, HANGAR_X0 + 0.12, 0.0, HANGAR_H, HANGAR_BACK_DOOR + 0.45, HANGAR_Z1, name="Hangar west wall")
+box("metal_wall", HANGAR_X0, HANGAR_X0 + 0.12, 0.06 + 2.1 - DOOR_LAP, HANGAR_H, HANGAR_BACK_DOOR - 0.45, HANGAR_BACK_DOOR + 0.45,
+    name="Hangar west wall")
+box("metal_wall", HANGAR_X0, HANGAR_X1, 0.0, HANGAR_H, HANGAR_Z1 - 0.12, HANGAR_Z1, name="Hangar north wall")
+box("metal_wall", HANGAR_X0, HANGAR_X1, 0.0, HANGAR_H, HANGAR_Z0, HANGAR_Z0 + 0.12, name="Hangar south wall")
 box("metal_wall", HANGAR_X0, HANGAR_X1, HANGAR_H, HANGAR_H + 0.15, HANGAR_Z0, HANGAR_Z1, name="Hangar roof")
 # The door: the apron face, open across the middle 26 m and shut either side.
-box("metal_wall", HANGAR_X1 - 0.12, HANGAR_X1, 0.0, HANGAR_H, HANGAR_Z0, HANGAR_Z0 + 15.0)
-box("metal_wall", HANGAR_X1 - 0.12, HANGAR_X1, 0.0, HANGAR_H, HANGAR_Z1 - 15.0, HANGAR_Z1)
-box("metal_wall", HANGAR_X1 - 0.12, HANGAR_X1, 8.4, HANGAR_H, HANGAR_Z0 + 15.0, HANGAR_Z1 - 15.0)
+box("metal_wall", HANGAR_X1 - 0.12, HANGAR_X1, 0.0, HANGAR_H, HANGAR_Z0, HANGAR_Z0 + 15.0, name="Hangar east wall")
+box("metal_wall", HANGAR_X1 - 0.12, HANGAR_X1, 0.0, HANGAR_H, HANGAR_Z1 - 15.0, HANGAR_Z1, name="Hangar east wall")
+# The wall over the opening, which is the hangar's way in from the apron and is called that.
+box("metal_wall", HANGAR_X1 - 0.12, HANGAR_X1, 8.4, HANGAR_H, HANGAR_Z0 + 15.0, HANGAR_Z1 - 15.0,
+    name="Hangar front entrance")
 hangar_id = region("Hangar", HANGAR_X0 + 0.12, HANGAR_X1 - 0.12, 0.06, HANGAR_H,
                    HANGAR_Z0 + 0.12, HANGAR_Z1 - 0.12)
 portal(HANGAR_X1 - 0.06, 4.0, (HANGAR_Z0 + HANGAR_Z1) / 2, hangar_id, -1, 26.0)
 # A steel personnel door in the back, which is the small opening the big one is measured against.
-door(HANGAR_X0 + 0.06, 0.06, HANGAR_BACK_DOOR, hangar_id, -1, facing_z=False, prefab="steel_door")
+door(HANGAR_X0 + 0.06, 0.06, HANGAR_BACK_DOOR, hangar_id, -1, facing_z=False, prefab="steel_door",
+     name="Hangar back door")
 prop("ac_condenser", HANGAR_X0 + 2.4, HANGAR_H + 0.6, HANGAR_Z0 + 6.0, name="Hangar roof plant")
 
 # The airport road: Foundry Street carries on east to the terminal.
 carriageway(APRON_X0 - 46.0, TERM_X0 - 6.0, STREETS[2] - KERB, STREETS[2] + KERB, name="Airport Road")
-footway(APRON_X0 - 46.0, TERM_X0 - 6.0, STREETS[2] - WALK, STREETS[2] - KERB)
+footway(APRON_X0 - 46.0, TERM_X0 - 6.0, STREETS[2] - WALK, STREETS[2] - KERB, name="Airport Road sidewalk, south side")
 record_road("Terminal Approach", "service", (TERM_X0 - 3.0, STREETS[2]), (TERM_X0 - 3.0, 40.0), 6.0)
 box("asphalt_road", TERM_X0 - 6.0, TERM_X0, 0.0, 0.05, 40.0, STREETS[2] + KERB, name="Terminal approach")
 
@@ -1248,12 +1328,14 @@ def house(label, cx, cz, facing, two_storey=False):
             name=f"{label} back garden")
     # The drive, up one side. Asphalt, so walking off the grass onto it is audible.
     dv0, dv1 = cx + PLOT_W / 2 - 4.6, cx + PLOT_W / 2 - 1.2
-    box("asphalt_road", dv0, dv1, 0.0, 0.1, min(front_z, front_z + d * 9.0), max(front_z, front_z + d * 9.0))
+    box("asphalt_road", dv0, dv1, 0.0, 0.1, min(front_z, front_z + d * 9.0), max(front_z, front_z + d * 9.0),
+        name=f"{label} drive")
 
-    box("concrete_floor", x0, x1, -0.15, 0.04, zlo, zhi)
-    box("wood_floor", x0 + 0.2, x1 - 0.2, 0.02, 0.08, zlo + 0.2, zhi - 0.2)
-    box("brick_wall", x0, x0 + 0.25, 0.0, h, zlo, zhi)
-    box("brick_wall", x1 - 0.25, x1, 0.0, h, zlo, zhi)
+    box("concrete_floor", x0, x1, -0.15, 0.04, zlo, zhi, name=f"{label} floor")
+    box("wood_floor", x0 + 0.2, x1 - 0.2, 0.02, 0.08, zlo + 0.2, zhi - 0.2, name=f"{label} floor")
+    # A house's walls are its front and back, toward the street and the garden, and its two sides.
+    box("brick_wall", x0, x0 + 0.25, 0.0, h, zlo, zhi, name=f"{label} west wall")
+    box("brick_wall", x1 - 0.25, x1, 0.0, h, zlo, zhi, name=f"{label} east wall")
 
     # THE FRONT WALL IS THE ONE FACING THE STREET, which depends on which side of it the house is.
     # It did not: both walls were built at zlo whichever way the plot was turned, so every house on
@@ -1270,12 +1352,12 @@ def house(label, cx, cz, facing, two_storey=False):
     # The back wall has a doorway too. It was one solid box with the back door standing inside it,
     # so there was no way into the garden but the front, round the side.
     bdx = cx - 2.4
-    box("brick_wall", x0, bdx - 0.45, 0.0, h, back_z0, back_z1)
-    box("brick_wall", bdx + 0.45, x1, 0.0, h, back_z0, back_z1)
-    box("brick_wall", bdx - 0.45, bdx + 0.45, 2.15, h, back_z0, back_z1)
-    box("brick_wall", x0, cx - 0.65, 0.0, h, front_z0, front_z1)
-    box("brick_wall", cx + 0.65, x1, 0.0, h, front_z0, front_z1)
-    box("brick_wall", cx - 0.65, cx + 0.65, 2.15, h, front_z0, front_z1)
+    box("brick_wall", x0, bdx - 0.45, 0.0, h, back_z0, back_z1, name=f"{label} back wall")
+    box("brick_wall", bdx + 0.45, x1, 0.0, h, back_z0, back_z1, name=f"{label} back wall")
+    box("brick_wall", bdx - 0.45, bdx + 0.45, 2.15, h, back_z0, back_z1, name=f"{label} back wall")
+    box("brick_wall", x0, cx - 0.65, 0.0, h, front_z0, front_z1, name=f"{label} front wall")
+    box("brick_wall", cx + 0.65, x1, 0.0, h, front_z0, front_z1, name=f"{label} front wall")
+    box("brick_wall", cx - 0.65, cx + 0.65, 2.15, h, front_z0, front_z1, name=f"{label} front wall")
     box("concrete_floor", x0, x1, h, h + 0.2, zlo, zhi, name=f"{label} roof")
 
     # ── Furnished, or a bungalow is a brick box with a wooden floor and rings like one ───────────
@@ -1285,40 +1367,42 @@ def house(label, cx, cz, facing, two_storey=False):
     # a long wavelength, so a carpeted room with bare brick walls keeps its bass tail. What takes the
     # bottom out is upholstery with air behind it, which is a membrane absorber, and a house has more
     # than one piece of it: a sofa, a bed, a wardrobe against a wall and a curtain over the window.
-    box("furniture_soft", x0 + 0.8, x0 + 2.6, 0.08, 0.95, zlo + 1.4, zhi - 1.4)
-    box("furniture_soft", x1 - 2.4, x1 - 0.4, 0.08, 0.75, zlo + 1.2, zlo + 3.4)
-    box("furniture_soft", x0 + 0.4, x0 + 1.0, 0.08, 2.0, zhi - 2.6, zhi - 0.6)
+    box("furniture_soft", x0 + 0.8, x0 + 2.6, 0.08, 0.95, zlo + 1.4, zhi - 1.4, name=f"{label} sofa")
+    box("furniture_soft", x1 - 2.4, x1 - 0.4, 0.08, 0.75, zlo + 1.2, zlo + 3.4, name=f"{label} bed")
+    box("furniture_soft", x0 + 0.4, x0 + 1.0, 0.08, 2.0, zhi - 2.6, zhi - 0.6, name=f"{label} wardrobe")
     # The curtain hangs over the front WINDOW, beside the door — not across the doorway, which is
     # where it hung until 2026-09-23: every front door on the estate opened onto a solid curtain.
     box("carpet_wall", cx + 1.1, cx + 3.3, 0.9, h - 0.15,
-        front_z0 - 0.05 if d > 0 else front_z1, front_z0 if d > 0 else front_z1 + 0.05)
-    box("carpet_floor", cx - 1.0, x1 - 0.4, 0.08, 0.12, zlo + 0.4, zhi - 0.4)
+        front_z0 - 0.05 if d > 0 else front_z1, front_z0 if d > 0 else front_z1 + 0.05, name=f"{label} curtain")
+    box("carpet_floor", cx - 1.0, x1 - 0.4, 0.08, 0.12, zlo + 0.4, zhi - 0.4, name=f"{label} floor")
     # PLASTER ON THE INSIDE OF THE BRICK, which is what a house is and is the missing membrane.
     #
     # Brick absorbs 3 % of the bottom and plaster absorbs 28 % — a skin on a wall is a membrane and
     # a solid wall is not, which is the same fact as carpet-is-deaf-to-bass seen from the other side.
     # Lined, the low band comes down from 2.1 s to where the middle is; unlined, a brick box with a
     # carpet in it keeps a bass tail no amount of soft furnishing touches.
-    box("plaster_wall", x0 + 0.25, x0 + 0.31, 0.08, h, zlo + 0.25, zhi - 0.25)
-    box("plaster_wall", x1 - 0.31, x1 - 0.25, 0.08, h, zlo + 0.25, zhi - 0.25)
+    box("plaster_wall", x0 + 0.25, x0 + 0.31, 0.08, h, zlo + 0.25, zhi - 0.25, name=f"{label} west wall")
+    box("plaster_wall", x1 - 0.31, x1 - 0.25, 0.08, h, zlo + 0.25, zhi - 0.25, name=f"{label} east wall")
     pz0 = min(back_z0, back_z1) + (0.25 if d > 0 else -0.06)
     pz1 = min(back_z0, back_z1) + (0.31 if d > 0 else 0.0)
-    box("plaster_wall", x0 + 0.25, bdx - 0.45, 0.08, h, pz0, pz1)
-    box("plaster_wall", bdx + 0.45, x1 - 0.25, 0.08, h, pz0, pz1)
-    box("plaster_wall", x0 + 0.25, x1 - 0.25, h - 0.06, h, zlo + 0.25, zhi - 0.25)
+    box("plaster_wall", x0 + 0.25, bdx - 0.45, 0.08, h, pz0, pz1, name=f"{label} back wall")
+    box("plaster_wall", bdx + 0.45, x1 - 0.25, 0.08, h, pz0, pz1, name=f"{label} back wall")
+    box("plaster_wall", x0 + 0.25, x1 - 0.25, h - 0.06, h, zlo + 0.25, zhi - 0.25, name=f"{label} ceiling")
 
     hid = region(label, x0 + 0.25, x1 - 0.25, 0.08, h, zlo + 0.25, zhi - 0.25)
-    door(cx, 0.04, (front_z0 + front_z1) / 2, hid, -1, facing_z=True, prefab="door", opening=1.3)
+    door(cx, 0.04, (front_z0 + front_z1) / 2, hid, -1, facing_z=True, prefab="door", opening=1.3,
+         name=f"{label} front door")
     # The back door, which is how you get to the garden without going round: a patio door, slid along
     # its track into the wall toward the middle of the house.
-    door(bdx, 0.04, (back_z0 + back_z1) / 2, hid, -1, facing_z=True, prefab="patio_door", opening=0.9)
+    door(bdx, 0.04, (back_z0 + back_z1) / 2, hid, -1, facing_z=True, prefab="patio_door", opening=0.9,
+         name=f"{label} back door")
 
     if has_garden:
         region(f"{label} back garden", cx - PLOT_W / 2 + 1.0, cx + PLOT_W / 2 - 1.0, 0.0, 3.0, g0, g1)
         # The fence between this garden and the next. Not solid: you can hear a mower through a
         # fence, which is most of the point of putting one there.
         for fx in (cx - PLOT_W / 2, cx + PLOT_W / 2):
-            box("foliage_hedge", fx - 0.4, fx + 0.4, 0.0, 1.8, g0, g1)
+            box("foliage_hedge", fx - 0.4, fx + 0.4, 0.0, 1.8, g0, g1, name=f"{label} garden hedge")
     return hid
 
 
@@ -1347,7 +1431,7 @@ for si, sz in enumerate(RES_STREETS):
                                 two_storey=(k % 3 == 1)))
 
 # The road that connects the houses to the city.
-carriageway(RES_X1, -WALK, STREETS[1] - KERB, STREETS[1] + KERB)
+carriageway(RES_X1, -WALK, STREETS[1] - KERB, STREETS[1] + KERB, name="Central Street carriageway")
 # ...and the two that run north-south through the estate, joining its streets into a grid.
 for li, lx in enumerate(RES_LANES):
     record_road(f"{['Sycamore', 'Willow'][li]} Lane", "residential",
@@ -1402,8 +1486,10 @@ for ax in AVENUES:
     k = 0
     while z0 + k * 14.0 < z1:
         tz = z0 + k * 14.0
-        box("foliage_hedge", ax - WALK + 0.5, ax - WALK + 2.1, 0.0, 5.0, tz - 0.8, tz + 0.8)
-        box("foliage_hedge", ax + WALK - 2.1, ax + WALK - 0.5, 0.0, 5.0, tz + 7.0 - 0.8, tz + 7.0 + 0.8)
+        box("foliage_hedge", ax - WALK + 0.5, ax - WALK + 2.1, 0.0, 5.0, tz - 0.8, tz + 0.8,
+            name=f"{AVENUE_NAMES[ax]} tree")
+        box("foliage_hedge", ax + WALK - 2.1, ax + WALK - 0.5, 0.0, 5.0, tz + 7.0 - 0.8, tz + 7.0 + 0.8,
+            name=f"{AVENUE_NAMES[ax]} tree")
         k += 1
 
 # ══ Zones over the open ground ════════════════════════════════════════════════════════════════════

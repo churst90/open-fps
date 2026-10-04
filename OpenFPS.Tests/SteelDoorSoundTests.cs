@@ -51,7 +51,7 @@ public class SteelDoorSoundTests
         Entity door = Entity.Null;
         world.Query(new QueryDescription().WithAll<DoorComponent, MaterialComponent, IdentityComponent>(),
             (Entity e, ref MaterialComponent m, ref IdentityComponent id) =>
-            { if (door == Entity.Null && m.Material == "Metal" && id.Name == "Steel Door") door = e; });
+            { if (door == Entity.Null && m.Material == "Metal" && id.PrefabId == "steel_door") door = e; });
         Assert.NotEqual(Entity.Null, door);
 
         // What the server says, through the real door system.

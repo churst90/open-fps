@@ -604,9 +604,19 @@ public class CommandHandler
             bool solid = world.Has<ColliderComponent>(e) && world.Get<ColliderComponent>(e).IsSolid && size.X > 0f;
             if (solid && Vector3.Distance(eye, t.Position) < scanRadius + size.Length()) solids.Add((e, t.Position, size, t.Rotation));
 
+            // A place is not a thing near you. The zone you are in was said when you walked into it, and
+            // a region or the portal between two is a volume nobody can walk into (Cody, 2026-10-04:
+            // a scan in a stairwell named the stairwell, and the one below it, at 0 metres). A door
+            // carries a portal too, and a door is very much a thing.
+            if (world.Has<RegionComponent>(e)) return;
+            if (world.Has<PortalComponent>(e) && !world.Has<DoorComponent>(e)) return;
+
             string? name = world.Has<IdentityComponent>(e) ? world.Get<IdentityComponent>(e).Name
                          : world.Has<PlayerComponent>(e) ? world.Get<PlayerComponent>(e).Username : null;
             if (string.IsNullOrWhiteSpace(name)) return;
+            // Ground is not announced: "that's what z is for" (Cody, 2026-10-04). Nor is a ceiling or a
+            // roof you are under. Decided by shape, not by name.
+            if (IsGroundOrOverhead(t.Position, size, t.Rotation, playerPos, eye.Y)) return;
             Vector3 nearest = NearestPointOf(t.Position, size, t.Rotation, eye);
             // The floor you are standing on is not something near you.
             if (size != Vector3.Zero && nearest.Y <= playerPos.Y + 0.3f && MathF.Abs(nearest.X - playerPos.X) < 0.3f
@@ -615,8 +625,12 @@ public class CommandHandler
             if (dist <= scanRadius) results.Add((name!, dist, dist > 0.001f ? Vector3.Normalize(nearest - eye) : Vector3.UnitZ, e));
         });
 
+        // Each name once, at its nearest: a wall is built in pieces round its doorways, and a flight of
+        // stairs is a box a step, so five nearest parts were often one wall said five times.
         var seen = results.Where(r => !Blocked(eye, r.Direction, r.Distance, r.E, solids))
-                          .OrderBy(r => r.Distance).Take(5).ToList();
+                          .OrderBy(r => r.Distance)
+                          .DistinctBy(r => r.Name, StringComparer.OrdinalIgnoreCase)
+                          .Take(5).ToList();
         if (seen.Count == 0)
         {
             Say(reply, "Nothing in sight nearby.");
@@ -626,6 +640,26 @@ public class CommandHandler
         var playerRotation = world.Get<Transform>(session.Entity).Rotation;
         Say(reply, string.Join(". ", seen.Select(r =>
             $"{r.Name}, {GetRelativeDirection(playerRotation, r.Direction)}, {r.Distance:F0} {(MathF.Round(r.Distance) == 1f ? "metre" : "metres")}")) + ".");
+    }
+
+    /// <summary>
+    /// Whether a box is a surface you stand on or stand under rather than a thing you could walk into:
+    /// a thin horizontal slab — no more than a metre thick and at least four times as wide as it is
+    /// thick, and a metre wide — with its top at or below the eye (a floor, a road, a pavement, a roof
+    /// you are on, a platform you could climb onto), or its underside over your head (a ceiling, a
+    /// canopy). A slab at head height is neither, and is said: that is a beam you would walk into.
+    /// Anything narrow, however low — a gun on the floor, a step — is a thing.
+    /// </summary>
+    internal static bool IsGroundOrOverhead(Vector3 centre, Vector3 size, Quaternion rot, Vector3 feet, float eyeY)
+    {
+        if (size == Vector3.Zero) return false;
+        // Only a box that is level: turned about the vertical, or not at all.
+        Vector3 up = Vector3.Transform(Vector3.UnitY, rot);
+        if (MathF.Abs(up.Y) < 0.95f) return false;
+        float thick = size.Y, narrow = MathF.Min(size.X, size.Z);
+        if (thick > 1.0f || narrow < 1.0f || narrow < 4f * thick) return false;
+        float top = centre.Y + thick * 0.5f, bottom = centre.Y - thick * 0.5f;
+        return top <= eyeY || bottom >= feet.Y + PhysicsConstants.PlayerHeight;
     }
 
     /// <summary>The point of a turned box nearest to another point; the box's centre for a point.</summary>

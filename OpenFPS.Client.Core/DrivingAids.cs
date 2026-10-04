@@ -540,9 +540,10 @@ public sealed class DrivingAids
         return id != int.MinValue;
     }
 
-    /// <summary>A junction is a square of road nobody named: the box where two carriageways meet.</summary>
+    /// <summary>A junction is a square of road named as one ("Central Street and Main Street junction"),
+    /// or that nobody named at all: the box where two carriageways meet.</summary>
     private static bool IsJunction(Vector3 size, string name)
-        => (string.IsNullOrWhiteSpace(name) || name == "Road")
+        => (string.IsNullOrWhiteSpace(name) || name == "Road" || name.EndsWith(" junction", StringComparison.OrdinalIgnoreCase))
         && MathF.Abs(size.X - size.Z) < 0.2f * MathF.Max(size.X, size.Z);
 
     private static string Clean(string n)
