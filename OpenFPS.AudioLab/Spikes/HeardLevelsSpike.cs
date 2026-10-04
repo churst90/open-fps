@@ -38,8 +38,9 @@ public static class HeardLevelsSpike
     /// --heard-levels survey: every door key the game sends (knob doors 1.1 and 1.4 m wide, every
     /// character and way of shutting; push-bar and sliding doors, every character), rendered in pressure,
     /// with its LAFmax and its peak at a metre: what the declared full-scale levels are read from.
+    /// only=TEXT keeps the keys that contain it (only=patio).
     /// </summary>
-    public static int Survey()
+    public static int Survey(string? only = null)
     {
         var keys = new List<string>();
         foreach (float w in new[] { 1.1f, 1.4f })
@@ -58,8 +59,9 @@ public static class HeardLevelsSpike
                 keys.Add(SlidingDoor.Key(SlidingDoor.Kind.Patio, c, v, 1.4f, 1.0f, 2.1f));
                 keys.Add(SlidingDoor.Key(SlidingDoor.Kind.Automatic, c, v, SlidingDoor.AutomaticSeconds(1.0f, !c), 1.0f, 2.1f));
             }
+        if (only != null) keys.RemoveAll(k => !k.Contains(only, StringComparison.Ordinal));
         var rows = new System.Collections.Concurrent.ConcurrentDictionary<string, string>();
-        System.Threading.Tasks.Parallel.ForEach(keys, new System.Threading.Tasks.ParallelOptions { MaxDegreeOfParallelism = 8 }, key =>
+        System.Threading.Tasks.Parallel.ForEach(keys, new System.Threading.Tasks.ParallelOptions { MaxDegreeOfParallelism = 4 }, key =>
         {
             float[] raw = RawOf(key, 48000);
             double fs = 20 * Math.Log10(20.0 / 2e-5);
@@ -84,7 +86,7 @@ public static class HeardLevelsSpike
 
     public static int Run(string[] args)
     {
-        if (args.Contains("survey")) return Survey();
+        if (args.Contains("survey")) return Survey(args.FirstOrDefault(a => a.StartsWith("only=", StringComparison.Ordinal))?.Substring(5));
         float d = float.TryParse(args.FirstOrDefault(a => a.StartsWith("d=", StringComparison.Ordinal))?.Substring(2),
                                  System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float dd) ? dd : 1.5f;
         string? wavDir = args.FirstOrDefault(a => a.StartsWith("wav=", StringComparison.Ordinal))?.Substring(4);

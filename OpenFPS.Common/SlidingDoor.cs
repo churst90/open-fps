@@ -28,7 +28,11 @@ namespace OpenFPS.Common;
 ///
 ///   The WEATHERSTRIP: polypropylene pile brushing the frame, a drag and a hiss from its fibres slipping.
 ///
-///   On a PATIO door: a hand on the pull, a hook latch thrown by its lever, a bumper at each end.
+///   On a PATIO door: a hand on the pull handle, which has play on its fixings; a hook latch thrown by its
+///   lever; pile that grips the leaf where it stands; the jamb's pile and bulb, and the jamb itself behind
+///   them; a rubber bumper in the head track. An opening is the latch, the hand taking up the pull, the
+///   leaf breaking away and brought to rest by the hand; a shutting is a push that carries the leaf into the
+///   jamb, its handle thrown across its play in the pile, and the stile meeting the jamb.
 ///   On an AUTOMATIC door: the controller's speed profile (acceleration, run, check speed into each end),
 ///   a DC motor and worm gear on a rubber-mounted bracket, a toothed belt to the carriage, and a solenoid
 ///   lock that lifts before the door moves and drops when it is shut.
@@ -84,14 +88,20 @@ public static class SlidingDoor
     private enum Tyre { Nylon, Urethane, Steel }
 
     private readonly record struct Character(double GritPerMetre, double GritMicron, double RailMicron,
-        double WheelMicron, double FlatMicron, Tyre Tyre, double Pile, double Roll, double Tooth);
+        double WheelMicron, double FlatMicron, Tyre Tyre, double Pile, double Roll, double Tooth, double Breakaway = 1,
+        double HandlePlay = 0.0003);
 
+    /// <summary>Breakaway (a patio door's): what it takes to start the leaf over what keeps it moving, from a
+    /// new door's 1.1 to a dirty old one's 1.4. HandlePlay: how far the pull handle moves each way on its
+    /// fixings before it bears, from a new door's 0.05 mm to the 0.3 mm of an old one whose screws have
+    /// worked loose. (At 0.3 mm on every door, the knock of a hand taking up the pull stood level with the
+    /// slide; the recording's clicks as a hand takes hold are 6-15 dB under it.)</summary>
     private static Character Of(Kind kind, int variant) => (kind, variant % Variants) switch
     {
-        (Kind.Patio, 0) => new(0.3, 60, 0.5, 2, 0, Tyre.Nylon, 35, 0.005, 0),
-        (Kind.Patio, 1) => new(1, 120, 1.0, 4, 5, Tyre.Nylon, 42, 0.008, 0),
-        (Kind.Patio, 2) => new(3, 150, 2.5, 8, 15, Tyre.Nylon, 50, 0.015, 0),
-        (Kind.Patio, _) => new(4, 120, 3.0, 8, 30, Tyre.Nylon, 50, 0.025, 0),
+        (Kind.Patio, 0) => new(0.3, 60, 0.5, 2, 0, Tyre.Nylon, 35, 0.005, 0, 1.1, 0.00005),
+        (Kind.Patio, 1) => new(1, 120, 1.0, 4, 5, Tyre.Nylon, 42, 0.008, 0, 1.2, 0.0001),
+        (Kind.Patio, 2) => new(3, 150, 2.5, 8, 15, Tyre.Nylon, 50, 0.015, 0, 1.3, 0.0002),
+        (Kind.Patio, _) => new(4, 120, 3.0, 8, 30, Tyre.Nylon, 50, 0.025, 0, 1.4, 0.0003),
         (Kind.Automatic, 0) => new(0.2, 40, 0.3, 1, 5, Tyre.Urethane, 8, 0.004, 3e-6),
         (Kind.Automatic, 1) => new(0.5, 60, 0.6, 2, 12, Tyre.Urethane, 10, 0.006, 6e-6),
         (Kind.Automatic, 2) => new(1, 80, 1.2, 5, 45, Tyre.Urethane, 12, 0.01, 12e-6),
@@ -137,30 +147,32 @@ public static class SlidingDoor
     /// <summary>Declared levels, dB at a metre, by kind and character (new, standard, worn, old): the render's
     /// peak, which is what its buffer's full scale stands for (a world sound's level is its full scale; see
     /// <see cref="KnobDoor.OpenLevelDb"/>). Measured at a 1.0 by 2.1 m leaf (AudioLab --heard-levels survey,
-    /// 2026-10-04); the client puts each render's own peak in its place. These were the model's LAFmax,
+    /// 2026-10-04; the patio door's again after its round 3, only=patio); the client puts each render's own
+    /// peak in its place. These were the model's LAFmax,
     /// which played as full scale put every run 15-29 dB under the model.</summary>
     public static float OpenLevelDb(Kind kind, int variant) => (kind, ((variant % Variants) + Variants) % Variants) switch
     {
-        (Kind.Patio, 0) => 83.6f, (Kind.Patio, 1) => 84.7f, (Kind.Patio, 2) => 87.7f, (Kind.Patio, _) => 97.1f,
+        (Kind.Patio, 0) => 75.9f, (Kind.Patio, 1) => 82.3f, (Kind.Patio, 2) => 88.2f, (Kind.Patio, _) => 93.2f,
         (Kind.Automatic, 0) => 77.8f, (Kind.Automatic, 1) => 76.1f, (Kind.Automatic, 2) => 79.4f, _ => 84.6f,
     };
     public static float CloseLevelDb(Kind kind, int variant) => (kind, ((variant % Variants) + Variants) % Variants) switch
     {
-        (Kind.Patio, 0) => 105.4f, (Kind.Patio, 1) => 101.6f, (Kind.Patio, 2) => 110.2f, (Kind.Patio, _) => 116.8f,
+        (Kind.Patio, 0) => 113.4f, (Kind.Patio, 1) => 113.4f, (Kind.Patio, 2) => 115.4f, (Kind.Patio, _) => 113.7f,
         (Kind.Automatic, 0) => 61.0f, (Kind.Automatic, 1) => 62.6f, (Kind.Automatic, 2) => 71.1f, _ => 73.0f,
     };
 
     /// <summary>What the model puts at a metre, LAFmax: what is heard on "real" a metre off. No calibration
     /// ever: the automatic door runs at 35-55 dBA, where the research puts real ones (40-55), and a patio
-    /// door pushed home at a walking pace is a slam of 78 dBA.</summary>
+    /// door pushed home at a casual pace meets its jamb frame on frame, 91-93 dBA; opened, it is its slide,
+    /// 63-76.</summary>
     public static float OpenLafDb(Kind kind, int variant) => (kind, ((variant % Variants) + Variants) % Variants) switch
     {
-        (Kind.Patio, 0) => 62.8f, (Kind.Patio, 1) => 64.5f, (Kind.Patio, 2) => 70.4f, (Kind.Patio, _) => 74.7f,
+        (Kind.Patio, 0) => 63.4f, (Kind.Patio, 1) => 68.7f, (Kind.Patio, 2) => 75.6f, (Kind.Patio, _) => 75.4f,
         (Kind.Automatic, 0) => 53.5f, (Kind.Automatic, 1) => 53.2f, (Kind.Automatic, 2) => 61.5f, _ => 70.1f,
     };
     public static float CloseLafDb(Kind kind, int variant) => (kind, ((variant % Variants) + Variants) % Variants) switch
     {
-        (Kind.Patio, 0) => 77.6f, (Kind.Patio, 1) => 77.1f, (Kind.Patio, 2) => 78.8f, (Kind.Patio, _) => 88.5f,
+        (Kind.Patio, 0) => 91.0f, (Kind.Patio, 1) => 92.0f, (Kind.Patio, 2) => 93.3f, (Kind.Patio, _) => 91.3f,
         (Kind.Automatic, 0) => 36.4f, (Kind.Automatic, 1) => 38.3f, (Kind.Automatic, 2) => 49.6f, _ => 56.0f,
     };
 
@@ -293,16 +305,52 @@ public static class SlidingDoor
     /// sum of their sawtooth forces, so it flutters by about 0.3 / sqrt(fibres) of itself. (Half its mean,
     /// as if every fibre slipped together, made the frame hiss at 94 dBA.)</summary>
     private const double PileSlip = 1.5e-4, PatioPileFibres = 250000, AutoPileFibres = 100000, AutoBrushShare = 0.2;
-    /// <summary>Bumpers: a patio leaf's stile meets a vinyl bulb flattened on aluminium at each end of its
-    /// travel; an automatic leaf meets rubber on the jamb. Hertz, stiff enough that a stile's own mass
-    /// stops in a few milliseconds.</summary>
+    /// <summary>Bumpers: a patio leaf's open end is a snap-in rubber bumper in the head track (its shut end is
+    /// the jamb, below); an automatic leaf meets rubber on the jamb. Hertz, stiff enough that a stile's own
+    /// mass stops in a few milliseconds.</summary>
     private const double PatioBumperK = 5e7, AutoBumperK = 1e7, BumperLambda = 0.6;
-    /// <summary>A patio jamb's bumper is a hollow vinyl bulb in pile, and a leaf comes back off it with 0.1-0.5
-    /// of its speed: Hunt-Crossley loss of about 3 s/m. (At 0.6 the leaf bounced off at three quarters of
-    /// its speed and rolled back 43 mm: Cody, "the slide still plays after the door is shut".) Shutting, the
+    /// <summary>A patio jamb's pile and bulb give a leaf back 0.1-0.5 of its speed: Hunt-Crossley loss of
+    /// about 3 s/m. (At 0.6 the leaf bounced off at three quarters of its speed and rolled back 43 mm: Cody,
+    /// "the slide still plays after the door is shut".) Shutting, the
     /// hand stays on the pull through the blow and holds the leaf home with about 80 N, more than the seals'
     /// drag, while the latch is thrown; the arm behind it gives about 300 N s/m.</summary>
     private const double PatioJambLambda = 3, HoldHome = 80, ArmDamping = 300;
+    /// <summary>
+    /// A patio leaf's lock stile shuts against its jamb through pile and a bulb: a cushion of about 50 kN/m
+    /// over 10 mm (pile 6-10 mm tall, and a bulb), linear, with the jamb's Hunt-Crossley loss. It holds
+    /// about 2.5 J: a leaf pushed home faster than about 0.35 m/s squashes it flat and the stile meets the
+    /// jamb frame on frame, aluminium on aluminium through a vinyl skin. (Research notes, "Sliding and
+    /// automatic doors", item 9.) A casual push home does: the stile meets the jamb with 700-900 N, and
+    /// the blow is the walls of the stile and the jamb, 300 Hz-1 kHz, as the recording's are. (Before, the
+    /// whole stop was one soft bulb: a 20 ms push with nothing above 1 kHz in it, the blow carried by a
+    /// 76 Hz frame mode and the glass, Cody's "hollow". A plain dashpot on the cushion was a step of force
+    /// at first touch and clicked.)
+    /// </summary>
+    private const double CushionK = 5e4, CushionDepth = 0.010, FrameOnFrameK = 1.5e9, FrameOnFrameLambda = 0.4;
+    /// <summary>Where the stile and the jamb meet, each section's face is a web between its flanges. A point
+    /// at mid-web is held back by the web's own bending, about 5e5 N/m for 50 mm of 1.5 mm aluminium; a face
+    /// borne on flat across its width is held by the side walls end-on, 2e7 and more, which is what a
+    /// patch in a plate is given elsewhere here. This is set between the two, at 4e6, by the recording's
+    /// blows: at it the blow's first 30 ms holds its octaves as theirs do (300 Hz-1 kHz loudest, under
+    /// 300 Hz 2-6 dB down, 1-4 kHz 8-12, 4-16 kHz 19-25). (At 2e7 the glass's 212 Hz note was the loudest
+    /// thing in the blow, the hollow again; at 2e5 the blow stood 45-65 dB over the slide, the recording's
+    /// 24.)</summary>
+    private const double WebBacking = 4e6;
+    /// <summary>Opening, the hand brings the leaf to rest itself, short of the bumper in the head track: no
+    /// blow at all, the rollers slowing to nothing over the last few tenths of a second, as both of the
+    /// recording's openings end. (It used to run the leaf into the bumper and let go, so every opening ended
+    /// in a stop: Cody, "the open sound sounds like a close sound".)</summary>
+    private const double OpenShort = 0.03;
+    /// <summary>A hand's grip comes up over about a tenth of a second. The hand holds the handle, not the
+    /// leaf: its arm (the 15 kN/m and 1.2 kN s/m it tracks its path with) is on the handle, and the handle
+    /// reaches the leaf across its play, a small knock as the pull is taken up at the hand's own pace.
+    /// (With the arm on the leaf and the handle free in its play, the handle crossed it at half a metre a
+    /// second and its knock stood 5-10 dB over the slide.)</summary>
+    private const double HandGrip = 0.1;
+    /// <summary>A leaf at rest takes more to start than to keep moving: 1.03-1.4 times its running drag on
+    /// measured doors (research notes, item 7), its pile set where it stood. The pile's fibres bend about
+    /// their slip distance before they let go.</summary>
+    private const double PileStribeck = 0.002;
     /// <summary>The end of a leaf that strikes: the stile and the glass edge near it, held to the rest of the
     /// leaf through the frame's corners and the glass in its gaskets, about 200 Hz. The stile stops first
     /// and the rest of the leaf arrives through that spring: two to five knocks in the first tenth of a
@@ -311,8 +359,9 @@ public static class SlidingDoor
     /// at 0.05 the leaf came back off its stile as off a spring.</summary>
     private const double PatioStileKg = 1.5, AutoStileKg = 2.5, StileHz = 200, StileZeta = 0.2;
     /// <summary>A sealed unit's panes on the air between them (4-16-4): they move against each other at about
-    /// 200 Hz and ring for half a second. It is the note of a patio door hitting home.</summary>
-    private const double UnitGap = 0.016, UnitLoss = 0.02;
+    /// 200 Hz and ring for a third of a second. It is the note of a patio door hitting home: the recording
+    /// has it at 220 Hz, 5.7 Hz wide, a loss of 0.026, 11-19 dB under the blow.</summary>
+    private const double UnitGap = 0.016, UnitLoss = 0.026;
     /// <summary>The glass is not on the line the stile pushes along: about 5 mm off it over a 50 mm edge, so a
     /// tenth of the stile's load bends the pane and the frame. That is what a leaf hitting home is heard by.</summary>
     private const double EdgeEccentricity = 0.1;
@@ -323,11 +372,17 @@ public static class SlidingDoor
     /// <summary>The hand is still on the lever as the hook seats: the hook moves with the lever and the hand's
     /// grip, about 3 N s/m. (Free, it bounced a dozen times on its stop.)</summary>
     private const double HookDrag = 3;
-    /// <summary>The pull handle: 100 g of zinc on its spindle with a third of a millimetre of play each way
-    /// along the travel, centred by its spring, knocking on its escutcheon. When the leaf stops dead it is
+    /// <summary>The pull handle: 100 g of zinc on its spindle with some play each way along the travel (the
+    /// character's), centred by its spring, knocking on its escutcheon. When the leaf stops dead it is
     /// thrown across its play: the bright part of a patio door hitting home. Held while a hand is on it.</summary>
-    private const double HandleKg = 0.1, HandlePlay = 0.0003, HandleCentring = 2e3, HandleZeta = 0.05, HandleVolume = 1.4e-5;
+    private const double HandleKg = 0.1, HandleCentring = 2e3, HandleZeta = 0.05, HandleVolume = 1.4e-5;
     private const double MetalK = 1e9, MetalLambda = 0.3;
+    /// <summary>The handle on its escutcheon: die-cast zinc on zinc (E* about 53 GPa) over a 5 mm radius, Hertz
+    /// K = 4/3 E* sqrt(R), about 5e9, and metal's small loss. Thrown across its play as the jamb's pile stops
+    /// the leaf, it knocks twice in a millisecond, 10-25 ms before the stile meets the jamb, as bright as the
+    /// blow itself up top: the recording has a bright brush 25-38 ms before each blow, 4-5 dB over the blow
+    /// in 4-16 kHz. (On the plunger's 1e9 and 0.3 the same knock was one dull millisecond, 15 dB under.)</summary>
+    private const double HandleStopK = 5e9, HandleStopLambda = 0.05;
     /// <summary>The automatic door's lock: a 30 g solenoid plunger lifted 8 mm by about 25 N, and dropped
     /// back into the carriage's bracket by a 6 N spring.</summary>
     private const double PlungerKg = 0.03, PlungerThrow = 0.008, PlungerPull = 25, PlungerSpring = 6;
@@ -355,8 +410,13 @@ public static class SlidingDoor
     /// knocks across its play each half swing: the train of knocks 60-90 ms apart heard as a real one starts.
     /// It is the belt's polyurethane teeth that land, about 5 MN/m and lossy, not steel on steel.</summary>
     private const double ClampPlay = 0.0008, ClampKg = 0.1, LugK = 2.4e8, LugLambda = 1.0, ClampVolume = 1.3e-5;
-    /// <summary>A shop front's leaf: aluminium stiles and rails with the glass in rubber gaskets and brush seals
-    /// along its edges, losing about 0.03.</summary>
+    /// <summary>A leaf's frame, a shop front's or a patio door's: aluminium stiles and rails with the glass in
+    /// rubber gaskets and pile or brush seals along its edges, losing about 0.03. Its sections are tubes with
+    /// faces 50-100 mm wide, and their walls ring from about 300 Hz, as the header's do; below that the frame
+    /// moves with its glass as one leaf. (The patio frame was a 0.15 m by 6 m sheet from 60 Hz losing 0.005:
+    /// a blow on the stile rang one mode at 76 Hz 25 dB over its neighbours for half a second, the hollow
+    /// box Cody heard in every stop. The recording's stops ring 36-160 Hz as a dozen lines within 6 dB of
+    /// each other, each 5-7 Hz wide.)</summary>
     private const double StorefrontLoss = 0.03;
     /// <summary>A belt tooth seats in the idler's groove at the far end of the header each pitch: about a gram
     /// of tooth arriving at a twentieth of the belt's speed (the teeth are rounded and crowned to roll in),
@@ -596,6 +656,11 @@ public static class SlidingDoor
         private readonly HighPass lugHigh;
         private readonly Port lugPort;
         private readonly Dictionary<string, (double Start, double Peak, bool On)> contactLog = new();
+        // A patio door's jamb and stile faces; its pile's grip at rest; the hand's grip.
+        private readonly Port? stileFace, jambWeb;
+        private LuGre pileGrip;
+        private bool shutting;
+        private double gripFrom, gripTo = double.MaxValue, handForce;
 
         public Sim(Door door, int sampleRate, Report? report)
         {
@@ -700,10 +765,10 @@ public static class SlidingDoor
             trackField = auto
                 ? new DenseField(HeaderGirth, trackLen, HeaderT, AlE, AlRho, Poisson, f => ThinPanelLoss(f) + HeaderLoss, HeaderFromHz, 16000, rng, dt)
                 : new DenseField(SillGirth, trackLen, SillT, AlE, AlRho, Poisson, f => ThinPanelLoss(f) + BeddedLoss + SillBead / f, 60, 16000, rng, dt);
-            // A shop front's stiles and rails are tubes with faces 50-100 mm wide: their walls ring from about
+            // A leaf's stiles and rails are tubes with faces 50-100 mm wide: their walls ring from about
             // 300 Hz, as the header's do.
             frameField = new DenseField(FrameGirth, 2 * (width + height), FrameWallT, AlE, AlRho, Poisson,
-                                        f => ThinPanelLoss(f) + (auto ? StorefrontLoss : 0.005), auto ? HeaderFromHz : 60, 16000, rng, dt);
+                                        f => ThinPanelLoss(f) + StorefrontLoss, HeaderFromHz, 16000, rng, dt);
             // Glass in its gaskets: glass itself barely loses (0.002); the gaskets and the unit's edge seal
             // take about 0.02, and more low down, where a pane's edges move most (0.1 at 150 Hz).
             glassField = new DenseField(width - 0.1, height - 0.15, paneT, GlassE, GlassRho, 0.22,
@@ -781,6 +846,14 @@ public static class SlidingDoor
             fibreW = 1.875 * 1.875 / (PileHeight * PileHeight) * PileFibreD / 4 * Math.Sqrt(PpE / PpRho);
 
             smallForce = 0;
+
+            if (!auto)
+            {
+                // Built last: they draw nothing from the door's random numbers.
+                stileFace = new Port(frameField.PatchMass, WebBacking, frameField.Impedance);
+                jambWeb = new Port(trackField.PatchMass, WebBacking, trackField.Impedance);
+                pileGrip = new LuGre { MuStatic = ch.Breakaway, MuSliding = 1, StribeckSpeed = PileStribeck, Bristle = 1 / PileSlip };
+            }
         }
 
         private void Log(string s) => report?.Events.Add(s);
@@ -879,14 +952,22 @@ public static class SlidingDoor
 
         public void ScriptPatio(bool opening, double travelSeconds)
         {
-            // A person's slide: the latch first (opening), a pull that starts the leaf, the run, and the leaf
-            // let run into its end at a walking hand's pace.
-            x = opening ? 0.0005 : travel - 0.0005;
-            double from = x, to = opening ? travel + 0.004 : -0.004;
-            // Most people brake an opening leaf to a touch at its end and push a shutting one home.
-            double arrive = opening ? 0.05 : 0.35;     // m/s at the end
-            double tLatch = opening ? 0.05 : -1, tStart = opening ? 0.35 : 0.05;
+            // A person's slide. Opening: the latch thrown off, the hand taking up the pull, the leaf breaking
+            // away from where it stood, the run, and the leaf brought to rest by the hand short of its bumper.
+            // Shutting: a push that starts the leaf and keeps it going into the jamb, then the leaf held home
+            // while the latch is thrown. A casual push home arrives at 0.3-0.7 m/s (research notes, item 8),
+            // here at the run's mean speed, three quarters of its fastest: the slide stays loud into the blow,
+            // as both of the recording's shuttings do, where its openings fade away to nothing. (Brought in
+            // at 0.35 m/s, under half its fastest, a shutting faded into its stop as an opening does.)
+            shutting = !opening;
+            x = opening ? CushionDepth : travel - OpenShort;
+            double from = x, to = opening ? travel - OpenShort : -0.004;
+            double arrive = opening ? 0 : Math.Abs(to - from) / Math.Max(0.5, travelSeconds);     // m/s at the end
+            double tLatch = opening ? 0.05 : -1, tStart = opening ? 0.2 : 0.05;
             double tRun = Math.Max(0.5, travelSeconds);
+            // Opening, the hand stays on the pull a moment after the leaf has stopped.
+            double tLetGo = tStart + tRun + (opening ? 0.3 : 0);
+            gripFrom = tStart; gripTo = opening ? tLetGo : double.MaxValue;
             small = opening ? smallThrow : 0;
             Settle();
             double end = tStart + tRun + (opening ? 0.8 : 1.4);
@@ -903,14 +984,29 @@ public static class SlidingDoor
                 if (t >= tStart && t < tStart + tRun)
                 {
                     double uu = (t - tStart) / tRun;
-                    var (p, v) = Hermite(uu, from, 0, to, arrive * Math.Sign(to - from) * tRun);
-                    handX = p; handV = v / tRun;
-                    double a = Hermite(Math.Min(1, uu + 1e-4), from, 0, to, arrive * Math.Sign(to - from) * tRun).V / tRun;
-                    handA = (a - handV) / (1e-4 * tRun);
+                    if (opening)
+                    {
+                        // A hand bringing a leaf from rest to rest moves as people reach: the minimum-jerk path
+                        // (Flash and Hogan), no pull left at the end to turn into a push. (A cubic ended braking
+                        // at 2.7 m/s^2; the hand's sudden stop knocked the handle across its play as the leaf
+                        // came to rest.)
+                        double d = to - from;
+                        handX = from + d * uu * uu * uu * (10 - 15 * uu + 6 * uu * uu);
+                        handV = d / tRun * 30 * uu * uu * (1 - uu) * (1 - uu);
+                        handA = d / (tRun * tRun) * 60 * uu * (1 - uu) * (1 - 2 * uu);
+                    }
+                    else
+                    {
+                        var (p, v) = Hermite(uu, from, 0, to, arrive * Math.Sign(to - from) * tRun);
+                        handX = p; handV = v / tRun;
+                        double a = Hermite(Math.Min(1, uu + 1e-4), from, 0, to, arrive * Math.Sign(to - from) * tRun).V / tRun;
+                        handA = (a - handV) / (1e-4 * tRun);
+                    }
                     handOn = !handReleased;
                 }
-                else if (t >= tStart + tRun) { handOn = false; }
-                if (!opening && tShut < 0 && x <= 0.003) { tShut = t; holdingHome = true; Log($"{t * 1000:F0} ms  home"); }
+                else if (t >= tStart + tRun && t < tLetGo + HandGrip) { handX = to; handV = 0; handA = 0; }
+                else if (t >= tLetGo + HandGrip) { handOn = false; }
+                if (!opening && tShut < 0 && x <= CushionDepth) { tShut = t; holdingHome = true; Log($"{t * 1000:F0} ms  home"); }
                 if (holdingHome && t > tShut + 0.6) holdingHome = false;
                 Step();
             }
@@ -1003,7 +1099,9 @@ public static class SlidingDoor
         {
             Rest();
             recording = false;
-            double stop = time + 0.05;
+            // A quarter of a second: the glass on its setting blocks (about 80 Hz, a tenth of critical) is
+            // still ringing a twentieth in, and was a thump at the head of every render.
+            double stop = time + (auto ? 0.05 : 0.25);
             while (time < stop) Step();
             recording = true;
             time = 0;
@@ -1093,7 +1191,8 @@ public static class SlidingDoor
             brushNoise += a1 * (white - brushNoise);
             double moving = Math.Tanh(Math.Abs(u) / 0.005);
             double pile = ch.Pile * moving;
-            sideForce -= pile * Math.Sign(u);
+            // A patio leaf's pile grips where it stands and lets go once the pull passes its breakaway.
+            sideForce -= auto ? pile * Math.Sign(u) : pileGrip.Force(u, ch.Pile, mass, dt);
             // (The one-pole leaves white noise with a1 / (2 - a1) of its variance: put it back to one.)
             // An automatic leaf's drag in travel is mostly its nylon floor guide sliding smoothly; its brush
             // seals only wipe the jamb at the ends, about a fifth of it. (All of it as brushing fibres hissed.)
@@ -1118,8 +1217,18 @@ public static class SlidingDoor
             // ── The ends of the travel ──
             // Each end's stile meets its bumper; the leaf follows through the stile's spring.
             double jamb = auto ? BumperLambda : PatioJambLambda;
-            double fShut = Contact(bumperK, jamb, -(x + stileD[0]), -(u + stileV[0]));
-            double fOpen = Contact(bumperK, jamb, x + stileD[1] - travel, u + stileV[1]);
+            double fShut, fOpen = Contact(bumperK, jamb, x + stileD[1] - travel, u + stileV[1]);
+            if (auto) fShut = Contact(bumperK, jamb, -(x + stileD[0]), -(u + stileV[0]));
+            else
+            {
+                // The patio jamb: its pile and bulb, then, squashed flat, the jamb itself.
+                double face = x + stileD[0], faceRate = u + stileV[0];
+                double squeeze = Math.Min(CushionDepth - face, CushionDepth);
+                double cushion = squeeze > 0 ? Math.Max(0, CushionK * squeeze * (1 - PatioJambLambda * faceRate)) : 0;
+                double metal = Contact(FrameOnFrameK, FrameOnFrameLambda, -face, -faceRate);
+                fShut = cushion + metal;
+                Note("frame-on-frame", metal);
+            }
             double leafAcc = lastLeafAcc;
             for (int k = 0; k < 2; k++)
             {
@@ -1132,21 +1241,37 @@ public static class SlidingDoor
                 unit?.Push(ones, spring * EdgeEccentricity * 0.5);
                 frameField.Modes.Push(frameEdge[k], spring * EdgeEccentricity);
             }
-            double endDrive = endPort.Step(fShut + fOpen, dt, out _);
-            frameField.Modes.Push(endFrameHit, endDrive);
-            trackField.Modes.Push(endTrackHit, endDrive * 0.5);
+            if (auto)
+            {
+                double endDrive = endPort.Step(fShut + fOpen, dt, out _);
+                frameField.Modes.Push(endFrameHit, endDrive);
+                trackField.Modes.Push(endTrackHit, endDrive * 0.5);
+            }
+            else
+            {
+                // The stile's face and the jamb's web each take the blow face-on.
+                frameField.Modes.Push(endFrameHit, stileFace!.Step(fShut + fOpen, dt, out _));
+                trackField.Modes.Push(endTrackHit, jambWeb!.Step(fShut + fOpen, dt, out _));
+            }
             Note("shut-bumper", fShut); Note("open-bumper", fOpen);
-            // A hand lets go when the leaf reaches its end: it does not lean on the bumper.
-            if (fShut > 0 || fOpen > 0) handReleased = true;
+            // A hand pushing a leaf home lets go as it meets the jamb: it does not lean on the bumper.
+            if (auto ? fShut > 0 || fOpen > 0 : shutting && fShut > 0) handReleased = true;
             if (holdingHome) sideForce -= HoldHome + ArmDamping * u;
 
             // ── Hand (patio) ──
             if (!auto)
             {
+                // The hand pulls the handle, and the handle the leaf once it is across its play. Its grip comes
+                // up over a tenth of a second. A hand knows the leaf's drag and leans into it as it goes: what is
+                // left for the arm's stiffness is the slip from its path. (Without it the arm lagged its path by
+                // the drag over its stiffness, 3 mm, and once the leaf had stopped pulled it on those 3 mm: the
+                // handle went over from braking to pulling, a knock at the end of every opening.)
+                handForce = 0;
                 if (handOn)
                 {
-                    double fh = mass * handA + 1200 * (handV - u) + 15000 * (handX - x);
-                    sideForce += Math.Clamp(fh, -250, 250);
+                    double fh = mass * handA + ch.Pile * Math.Tanh(handV / 0.01) + 1200 * (handV - u - handleRate) + 15000 * (handX - x - handle);
+                    double g = Math.Clamp(Math.Min(time - gripFrom, gripTo - time) / HandGrip, 0, 1);
+                    handForce = Math.Clamp(fh, -250, 250) * g * g * (3 - 2 * g);
                 }
             }
 
@@ -1243,16 +1368,14 @@ public static class SlidingDoor
             if (!auto)
             {
                 double rel = handle - handlePort.X, relRate = handleRate - handlePort.V;
-                double knock = Contact(MetalK, MetalLambda, rel - HandlePlay, relRate) - Contact(MetalK, MetalLambda, -rel - HandlePlay, -relRate);
+                double knock = Contact(HandleStopK, HandleStopLambda, rel - ch.HandlePlay, relRate)
+                               - Contact(HandleStopK, HandleStopLambda, -rel - ch.HandlePlay, -relRate);
                 double centring = HandleCentring * handle + 2 * HandleZeta * Math.Sqrt(HandleCentring * HandleKg) * handleRate;
-                double hacc;
-                if (handOn) { hacc = 0; handleRate = 0; handle = 0; }
-                else
-                {
-                    // Relative to the leaf, which is decelerating under it.
-                    hacc = (-knock - centring) / HandleKg - lastLeafAcc;
-                    handleRate += hacc * dt; handle += handleRate * dt;
-                }
+                // Relative to the leaf, which moves under it.
+                double hacc = ((handOn ? handForce : 0) - knock - centring) / HandleKg - lastLeafAcc;
+                handleRate += hacc * dt; handle += handleRate * dt;
+                // What the handle does to the leaf: its stops and its spring.
+                sideForce += knock + centring;
                 double hd = handlePort.Step(knock, dt, out _);
                 frameField.Modes.Push(handleHit, hd);
                 pSmall += handleNoise.Pressure(hacc + lastLeafAcc) + escutcheonSound.Pressure(handlePort.Acc);
