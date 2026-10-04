@@ -338,6 +338,51 @@ public class GameServer
     }
 
     /// <summary>
+    /// Tells everyone else on the server that somebody came, went, or is away: a line on the All
+    /// channel, marked as a presence notice so each client can play its own sound for it, or not.
+    /// Not sent to the person it is about, who knows already and is told in their own words.
+    /// </summary>
+    internal void AnnouncePresence(UserSession who, PresenceKind kind, string? text = null)
+    {
+        text ??= PresenceText(who.Username, kind);
+        Log.Information("[PRESENCE] {Text}", text);
+        var line = new ChatMessage { Sender = who.Username, Text = text, Channel = ChatChannel.All, Presence = kind };
+        foreach (var s in _sessions.GetAllSessions())
+            if (s != who) SendToSession(s, line);
+    }
+
+    /// <summary>The words of a presence notice.</summary>
+    public static string PresenceText(string name, PresenceKind kind) => kind switch
+    {
+        PresenceKind.LoggedIn => $"{name} is online.",
+        PresenceKind.LoggedOut => $"{name} logged out.",
+        PresenceKind.WentOffline => $"{name} lost connection.",
+        PresenceKind.Away => $"{name} is away.",
+        PresenceKind.Back => $"{name} is back.",
+        _ => name,
+    };
+
+    /// <summary>
+    /// Says a change between away and here, once. Called after anything that can change it: a
+    /// command, /afk, activity after being away. And once a second for the players who have gone
+    /// quiet, since doing nothing has no event of its own. On the tick thread.
+    /// </summary>
+    internal void UpdatePresence(UserSession s, DateTime nowUtc)
+    {
+        // A session that has gone is not away; it is gone, and was announced as such.
+        if (!_sessions.TryGetSession(s.ConnectionId, out var current) || current != s) return;
+        bool away = s.IsAway(nowUtc);
+        if (away == s.AnnouncedAway) return;
+        s.AnnouncedAway = away;
+        AnnouncePresence(s, away ? PresenceKind.Away : PresenceKind.Back);
+    }
+
+    internal void UpdatePresenceForAll(DateTime nowUtc)
+    {
+        foreach (var s in _sessions.GetAllSessions()) UpdatePresence(s, nowUtc);
+    }
+
+    /// <summary>
     /// The message of the day: motd.txt in the server's working folder, beside maps/ and prefabs/ —
     /// OpenFPS.Server/motd.txt under run-server.sh. Read when it is asked for, so an edit (or
     /// /setmotd) takes effect without a restart. Sent to each player as they arrive in the world,
@@ -401,19 +446,15 @@ public class GameServer
         if (!_sessions.TryGetSession(connectionId, out var s)) return;
         s.LastActivityUtc = DateTime.UtcNow;
         s.Away = false;
+        // Only queued when there is something to say: this runs for every input frame that moves.
+        if (s.AnnouncedAway) EnqueueCommand(() => UpdatePresence(s, DateTime.UtcNow));
     }
 
     private void RegisterHandlers()
     {
         _dispatcher.RegisterHandler<LoginRequest>(HandleLogin);
         _dispatcher.RegisterHandler<RegisterRequest>(HandleRegister);
-        // Leaving on purpose: the same clean-up as a dropped connection, now rather than at the timeout.
-        _dispatcher.RegisterHandler<LogoutRequest>((id, req, reply) => {
-            var peer = _network.GetPeer(id);
-            if (peer == null) return;
-            if (_sessions.TryGetSession(id, out var s)) Log.Information("Peer {Id} ({User}) logged out.", id, s.Username);
-            peer.Disconnect();
-        });
+        _dispatcher.RegisterHandler<LogoutRequest>((id, req, reply) => LogOut(id));
         _dispatcher.RegisterHandler<MapDataRequest>((id, req, reply) => {
             var peer = _network.GetPeer(id);
             if (peer != null) HandleMapDataRequest(peer, req);
@@ -594,6 +635,7 @@ public class GameServer
             {
                 BroadcastEnvironment();
                 CloseConnectionsThatNeverLoggedIn();
+                UpdatePresenceForAll(DateTime.UtcNow);
             }
 
             // 5. Broadcast World State
@@ -699,9 +741,13 @@ public class GameServer
         // seconds to notice, and the player reconnecting in that time must not be told they are
         // already here; and two bodies with one name make every command that finds a player by name
         // pick one of them.
+        bool replacing = false;
         foreach (var old in _sessions.GetAllSessions()
                      .Where(s => s.Username.Equals(user.Username, StringComparison.OrdinalIgnoreCase)).ToList())
+        {
             EndSession(old, "Your account has logged in from somewhere else, so this session has been closed.");
+            replacing = true;
+        }
 
         var now = DateTime.UtcNow;
         var session = new UserSession
@@ -723,6 +769,9 @@ public class GameServer
 
         Log.Information("User {User} authenticated ({Transport}) from {Address}, landing on map '{Map}'.",
                         user.Username, peer == null ? "MUD" : "UDP", address, session.CurrentMapId);
+        // Somebody taking over their own session from another machine has not arrived: they were
+        // here all along, and saying they left and came back would be two notices about nothing.
+        if (!replacing) AnnouncePresence(session, PresenceKind.LoggedIn);
 
         reply(new LoginResponse
         {
@@ -743,18 +792,37 @@ public class GameServer
     }
 
     /// <summary>
+    /// Leaving on purpose: the same clean-up as a dropped connection, now rather than at the timeout.
+    /// The session goes here rather than when the transport notices, so that everyone is told it
+    /// logged out and not that its connection was lost.
+    /// </summary>
+    internal void LogOut(int connectionId)
+    {
+        if (!_sessions.TryRemoveSession(connectionId, out var s)) return;
+        Log.Information("Peer {Id} ({User}) logged out.", connectionId, s.Username);
+        AnnouncePresence(s, PresenceKind.LoggedOut);
+        DespawnSession(s);
+        _network.Disconnect(connectionId);
+        _mudGateway?.Disconnect(connectionId);
+    }
+
+    /// <summary>A moderator's /kick: the session ends as a duplicate login does, with the reason said,
+    /// and everyone else is told that they were removed but not why.</summary>
+    public void Kick(UserSession session, string reason)
+        => EndSession(session, reason, $"{session.Username} was removed from the server.");
+
+    /// <summary>
     /// Ends a session from the server's side: tells the player why, takes their body out of the world
     /// the way a disconnect does, and closes the connection. The transport's own disconnect event then
-    /// finds no session and does nothing more.
+    /// finds no session and does nothing more. Everyone else hears the notice if there is one; a
+    /// session replaced by a new login of the same account has none, since nobody has gone.
     /// </summary>
-    /// <summary>A moderator's /kick: the session ends as a duplicate login does, with the reason said.</summary>
-    public void Kick(UserSession session, string reason) => EndSession(session, reason);
-
-    private void EndSession(UserSession session, string reason)
+    private void EndSession(UserSession session, string reason, string? notice = null)
     {
         if (!_sessions.TryRemoveSession(session.ConnectionId, out _)) return;
         Log.Information("Session {Id} ({User}) ended by the server: {Reason}", session.ConnectionId, session.Username, reason);
         SendToSession(session, new TextEvent { Text = reason });
+        if (notice != null) AnnouncePresence(session, PresenceKind.LoggedOut, notice);
         DespawnSession(session);
         _network.Disconnect(session.ConnectionId);
         _mudGateway?.Disconnect(session.ConnectionId);
@@ -1140,19 +1208,39 @@ public class GameServer
         return (floorMat ?? "Generic", "0");
     }
 
-    private void HandleMudDisconnected(int connectionId)
+    /// <summary>
+    /// A telnet connection closed. Closing it is how a text player leaves, since there is no logout
+    /// for them to send first, so it is announced as logging out.
+    /// </summary>
+    internal void HandleMudDisconnected(int connectionId)
     {
         if (!_sessions.TryRemoveSession(connectionId, out var s)) return;
         Log.Information("MUD session {Id} ({User}) ended.", connectionId, s.Username);
+        AnnouncePresence(s, PresenceKind.LoggedOut);
         DespawnSession(s);
     }
 
     private void HandlePeerDisconnected(NetPeer peer, DisconnectInfo info)
+        => PeerDisconnected(peer.Id, info.Reason);
+
+    /// <summary>A UDP connection ended without a logout first. Split out so a test can drive it.</summary>
+    internal void PeerDisconnected(int connectionId, DisconnectReason reason)
     {
-        if (!_sessions.TryRemoveSession(peer.Id, out var s)) return;
-        Log.Information("Peer {Id} ({User}) disconnected: {Reason}", peer.Id, s.Username, info.Reason);
+        if (!_sessions.TryRemoveSession(connectionId, out var s)) return;
+        Log.Information("Peer {Id} ({User}) disconnected: {Reason}", connectionId, s.Username, reason);
+        AnnouncePresence(s, PresenceFor(reason));
         DespawnSession(s);
     }
+
+    /// <summary>
+    /// What a dropped connection tells everyone. A client that closed its own connection (the window
+    /// shut without going through the menu) left on purpose. Anything else is a lost connection, which
+    /// is worth telling apart, because that player is probably on their way back.
+    /// </summary>
+    internal static PresenceKind PresenceFor(DisconnectReason reason)
+        => reason is DisconnectReason.RemoteConnectionClose or DisconnectReason.DisconnectPeerCalled
+            ? PresenceKind.LoggedOut
+            : PresenceKind.WentOffline;
 
     /// <summary>
     /// Takes a disconnected session's body out of the world, on the tick thread.

@@ -22,6 +22,7 @@ internal static partial class GtkClientProgram
     private static void ApplyAudioSettings()
     {
         _session.Ui.Enabled = _settings.UiSounds;
+        _session.Ui.PresenceEnabled = _settings.PresenceSounds;
         _session.Ui.Volume = _settings.UiVolume;
         if (_settings.OutputDevice.Length > 0 && !_session.Audio.SetOutputDevice(_settings.OutputDevice))
             _speech.Speak($"The saved output device, {_settings.OutputDevice}, is not connected. Using the default.", false);
@@ -252,7 +253,7 @@ internal static partial class GtkClientProgram
 
     private static void ShowSettings()
     {
-        var window = Dialog("Settings", 460, 450);
+        var window = Dialog("Settings", 460, 490);
         var box = VBox(16);
 
         var outputs = new List<string> { "System default" };
@@ -269,6 +270,14 @@ internal static partial class GtkClientProgram
         uiSounds.OnToggled += (_, _) => _speech.Speak(uiSounds.GetActive() ? "On" : "Off", true);
         box.Append(uiSounds);
 
+        // Apart from the interface sounds: somebody arriving or leaving is not a menu tick, and a busy
+        // server can want one off and the other on. The notices are spoken either way.
+        var presenceSounds = CheckButton.NewWithLabel("Online and offline sounds");
+        presenceSounds.SetActive(_settings.PresenceSounds);
+        SpeakOnFocus(presenceSounds, () => $"Online and offline sounds, {(presenceSounds.GetActive() ? "on" : "off")}");
+        presenceSounds.OnToggled += (_, _) => _speech.Speak(presenceSounds.GetActive() ? "On" : "Off", true);
+        box.Append(presenceSounds);
+
         box.Append(Label.New("Interface sound volume, percent"));
         var volume = SpinButton.NewWithRange(0, 100, 10);
         volume.SetValue(Math.Round(_settings.UiVolume * 100));
@@ -282,6 +291,7 @@ internal static partial class GtkClientProgram
             _settings.OutputDevice = output.GetSelected() == 0 ? "" : outputs[(int)output.GetSelected()];
             _settings.InputDevice = input.GetSelected() == 0 ? "" : inputs[(int)input.GetSelected()];
             _settings.UiSounds = uiSounds.GetActive();
+            _settings.PresenceSounds = presenceSounds.GetActive();
             _settings.UiVolume = (float)(volume.GetValue() / 100.0);
             _settings.Save();
             _session.Audio.SetOutputDevice(_settings.OutputDevice);

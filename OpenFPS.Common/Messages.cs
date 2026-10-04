@@ -433,6 +433,27 @@ public enum ChatChannel : byte
     Server = 3,
 }
 
+/// <summary>
+/// What a presence notice says happened to somebody. The words are in the message's text; this is
+/// what the client plays a sound by, and what lets a player turn those sounds off without losing the
+/// words.
+/// </summary>
+public enum PresenceKind : byte
+{
+    /// <summary>Not a presence notice: somebody said something.</summary>
+    None = 0,
+    /// <summary>They logged in.</summary>
+    LoggedIn = 1,
+    /// <summary>They logged out, or were removed from the server.</summary>
+    LoggedOut = 2,
+    /// <summary>Their connection was lost.</summary>
+    WentOffline = 3,
+    /// <summary>They said they are away, or have done nothing for a while.</summary>
+    Away = 4,
+    /// <summary>They are doing things again.</summary>
+    Back = 5,
+}
+
 [MemoryPackable]
 public partial class ChatMessage : IMessage
 {
@@ -444,6 +465,11 @@ public partial class ChatMessage : IMessage
     public bool FromStaff;
     /// <summary>For a private message YOU sent: who it went to. Empty otherwise.</summary>
     public string To = string.Empty;
+    /// <summary>
+    /// Set when this is the server saying somebody came, went, or is away, rather than somebody
+    /// talking. The Sender is then the person it is about, and the Text the whole notice.
+    /// </summary>
+    public PresenceKind Presence;
 }
 
 [MemoryPackable]

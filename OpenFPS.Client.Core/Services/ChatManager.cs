@@ -61,8 +61,9 @@ public class ChatManager
     };
 
     /// <summary>How a line reads, spoken or reviewed.</summary>
-    public static string Format(ChatMessage msg) => msg.Channel switch
+    public static string Format(ChatMessage msg) => msg.Presence != PresenceKind.None ? msg.Text : msg.Channel switch
     {
+        // (A presence notice, above, is whole already: "cody is online", not "cody to all: cody is online".)
         ChatChannel.Private when msg.To.Length > 0 => $"Private to {msg.To}: {msg.Text}",
         ChatChannel.Private => $"Private from {msg.Sender}: {msg.Text}",
         ChatChannel.All => $"{msg.Sender} to all: {msg.Text}",

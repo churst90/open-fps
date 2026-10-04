@@ -154,21 +154,9 @@ public sealed partial class ClientGameSession : IDisposable
         _chat = new ChatManager(_speech);
         Ui = new UiSounds(audioEngine);
         _menus = new MenuStack(_speech, Ui);
-        // Each kind of chat has its own sound, heard before the words. The channel decides it, whoever
-        // is talking: an admin's map chat is still map chat (with the admin cue in its place, an admin
-        // heard the same sound on every channel). The admin cue is for server announcements by staff.
-        // A reply to a command (no sender) is only spoken; a chat sound on "/tp" said a message came.
-        _chat.Incoming += msg =>
-        {
-            if (msg.Channel == ChatChannel.Server && msg.Sender.Length == 0) return;
-            Ui.Play(msg.Channel switch
-            {
-                ChatChannel.Private => UiCue.ChatPrivate,
-                ChatChannel.All => UiCue.ChatAll,
-                ChatChannel.Server => msg.FromStaff ? UiCue.ChatAdmin : UiCue.ChatServer,
-                _ => UiCue.ChatMap,
-            });
-        };
+        // Each kind of chat has its own sound, heard before the words: UiSounds.CueFor says which,
+        // and that somebody coming or going has its own, which a setting can turn off.
+        _chat.Incoming += Ui.PlayChat;
 
         _sounds.Initialize();
         // Your own feet ride with your head (see ClientAudioSystem.OnOwnFootstep); everybody

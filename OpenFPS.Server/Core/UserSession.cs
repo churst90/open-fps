@@ -62,8 +62,18 @@ public class UserSession
     /// <summary>Set by /afk, cleared by the next thing the player does.</summary>
     public bool Away { get; set; }
 
-    /// <summary>Idle this long and a profile says so.</summary>
+    /// <summary>Idle this long and a profile says so, and everyone is told you are away.</summary>
     public static readonly TimeSpan IdleAfter = TimeSpan.FromMinutes(5);
+
+    /// <summary>Away by /afk, or by having done nothing for <see cref="IdleAfter"/>.</summary>
+    public bool IsAway(DateTime nowUtc) => Away || nowUtc - LastActivityUtc >= IdleAfter;
+
+    /// <summary>
+    /// Whether everyone was last told this player is away. Kept apart from <see cref="IsAway"/> so
+    /// that each change is announced once: an idle player is away every second after the fifth
+    /// minute, and must not be said to be away every second.
+    /// </summary>
+    public bool AnnouncedAway { get; set; }
 
     /// <summary>"online", "away", or "idle for N minutes" — what other players are told.</summary>
     public string Status(DateTime nowUtc)

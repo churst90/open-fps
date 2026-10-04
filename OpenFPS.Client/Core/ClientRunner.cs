@@ -119,6 +119,7 @@ public class ClientRunner
     private void ApplyAudioSettings()
     {
         _session.Ui.Enabled = _settings.UiSounds;
+        _session.Ui.PresenceEnabled = _settings.PresenceSounds;
         _session.Ui.Volume = _settings.UiVolume;
         if (_settings.OutputDevice.Length > 0 && !_session.Audio.SetOutputDevice(_settings.OutputDevice))
             _speech.Speak($"The saved output device, {_settings.OutputDevice}, is not connected. Using the default.", false);
