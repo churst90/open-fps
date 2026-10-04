@@ -1202,10 +1202,19 @@ public class GameServer
     {
         into.Clear();
         world.Query(new QueryDescription().WithAll<Transform, ColliderComponent>(), (Entity e, ref Transform t) =>
-            into.Add((e, world.Has<Velocity>(e) || world.Has<PlayerComponent>(e), t.IsDirty)));
+            into.Add((e, Moves(world, e), t.IsDirty)));
         world.Query(new QueryDescription().WithAll<Transform, ItemComponent>().WithNone<ColliderComponent>(), (Entity e, ref Transform t) =>
-            into.Add((e, world.Has<Velocity>(e) || world.Has<PlayerComponent>(e), t.IsDirty)));
+            into.Add((e, Moves(world, e), t.IsDirty)));
     }
+
+    /// <summary>
+    /// Sent every tick, unreliably, like a body: anything with a velocity, a player, and a thing somebody
+    /// is carrying. A carried gun moves whenever its holder does; as a static that moved it went out on
+    /// the reliable channel every tick anyone walked with one, and a lost packet then held up every chat
+    /// line and definition behind it.
+    /// </summary>
+    private static bool Moves(World world, Entity e)
+        => world.Has<Velocity>(e) || world.Has<PlayerComponent>(e) || world.Has<HeldComponent>(e);
 
     /// <summary>One message of the broadcast, to a session's socket, and to <see cref="Broadcasted"/> when a test watches.</summary>
     private void Deliver(NetPeer? peer, UserSession session, IMessage message, DeliveryMethod delivery)
@@ -1334,6 +1343,17 @@ public class GameServer
                     // Static geometry is never evicted: the client's acoustic map is built from the whole
                     // streamed map, so dropping a distant wall would change how the world sounds.
                     CollectDeparted(session.VisibleDynamicEntities, _visibleDynamicBuffer, _removedBuffer);
+                    // A thing that was being carried and has just been put down has stopped moving, not gone:
+                    // it stays known as the fixed thing it now is, rather than being taken off the client
+                    // and sent again a tick later, which would blink its beacon out as it landed.
+                    var lookup = mapEntry.Value.lookup;
+                    for (int i = _removedBuffer.Count - 1; i >= 0; i--)
+                        if (lookup.TryGetValue(_removedBuffer[i], out var put) && world.IsAlive(put)
+                            && world.Has<ItemComponent>(put) && !world.Has<HeldComponent>(put))
+                        {
+                            session.VisibleDynamicEntities.Remove(_removedBuffer[i]);
+                            _removedBuffer.RemoveAt(i);
+                        }
 
                     if (_removedBuffer.Count > 0)
                     {
