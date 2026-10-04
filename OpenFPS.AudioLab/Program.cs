@@ -91,9 +91,11 @@ string[] usage =
     "  --door-knock [out=] [seed=] [knocks=]         knuckles on a wooden door",
     "  --door-opening [out=]                         doors opening and shutting at a metre",
     "  --knob-door [out=] [seed=] [only=] [stems=]   the physical knob door: opens and shuts, hinges worn and oiled",
+    "  --knob-renders [key=K;K] [out=] [stems=] [events]  knob door keys as the game names them, float WAVs in pascals",
     "  --pushbar-door [out=] [only=] [stems=]        the physical push-bar door: each character opening and shutting on its closer",
     "  --sliding-door [out=] [only=] [stems=]        the physical sliding doors: a patio door and an automatic door, each character",
     "  --patio-vs-ref [ref=] [wav=] [only=] [out=]   the patio door measured against the recording of a real one, side by side",
+    "  --pushbar-vs-ref [before=] [only=] [out=]     the push-bar door's push, release and slam against recordings, side by side",
     "  --car-window [out=] [only=]                    a car's power window going down, up and half way, each character",
     "  --beacon-tones [out=]                         each beacon three times at its real period",
     "  --presence-sounds [out=]                      the online, logged out, connection lost, away and back cues, measured",
@@ -102,6 +104,7 @@ string[] usage =
     "  --reload-sounds [out=DIR]                     every reload and dry fire rendered, measured the same way",
     "  --scope-sounds [out=DIR]                      the scope's guidance tone and breath as played, and the M700's sounds",
     "  --bullet-pass [out=DIR]                       a round's crack or whizz going by a listener, then its report",
+    "  --bullet-round2 [out=DIR]                     the whizz before/after, ricochets, and a round striking each material",
     "  --gun-fit [nij=DIR] [tag=] [wavs] [grid]      every weapon's report against its own NIJ takes",
     "  --speech-lines                                decodes every shipped voice line as the client does",
     "  --heard-levels [d=1.5] [wav=DIR]              doors, steps, speech: declared vs LAFmax at the ear",
@@ -207,6 +210,11 @@ if (args.Contains("--bullet-pass"))
 if (args.Contains("--glass"))
 {
     Environment.Exit(OpenFPS.AudioLab.Spikes.GlassSpike.Run(args));
+}
+
+if (args.Contains("--bullet-round2"))
+{
+    Environment.Exit(OpenFPS.AudioLab.Spikes.BulletRound2Spike.Run(args));
 }
 
 if (args.Contains("--heard-levels"))
@@ -472,9 +480,19 @@ if (args.Contains("--gun-spec"))
     Environment.Exit(OpenFPS.Client.Core.AudioEngine.Fmod.GunSpecSpike.Run(args));
 }
 
+if (args.Contains("--knob-renders"))
+{
+    Environment.Exit(OpenFPS.AudioLab.Spikes.KnobRefSpike.Run(args));
+}
+
 if (args.Contains("--patio-vs-ref"))
 {
     Environment.Exit(OpenFPS.AudioLab.Spikes.PatioRefSpike.Run(args));
+}
+
+if (args.Contains("--pushbar-vs-ref"))
+{
+    Environment.Exit(OpenFPS.AudioLab.Spikes.PushBarRefSpike.Run(args));
 }
 
 if (args.Contains("--reload-spec"))

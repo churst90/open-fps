@@ -37,17 +37,31 @@ public readonly record struct FlightSample(float Seconds, Vector3 Position, Vect
 /// 350 Pa (145 dB) and 0.2 ms.
 ///
 /// THE WHIZZ. A subsonic round makes no shock; what is heard is the turbulence of its wake as it goes
-/// by. A compact body's fluctuating force radiates as a dipole (N. Curle, "The influence of solid
-/// boundaries upon aerodynamic sound", Proc. R. Soc. A 231, 1955): with a fluctuating lift coefficient
-/// C' over the side area d·l, shed at a Strouhal number St, the amplitude at r abeam is
-/// <c>ρ U³ l C' St / (4 c r)</c>. C' = 0.02 is chosen for a streamlined bullet, an order of magnitude
-/// below a bluff cylinder's, and gives 91 dB at a metre for a .45 at 253 m/s: an estimate, there being
-/// no measurement to fit. The noise sits around St·U/d (4.4 kHz for the .45) and is heard through the
-/// moving source's own geometry: each instant of the pass is heard when its sound arrives, so the
-/// approach is compressed in time and raised in pitch and the retreat stretched and lowered (the
-/// Doppler fall of a whizz), louder ahead by the convective factor (1 − M cos θ)^-2. It is played as
-/// three pieces from three places along the path (approach, abeam, going away), crossfaded, so it
-/// moves past the listener rather than coming from one point.
+/// by, a short rush of broadband noise. A compact body's fluctuating force radiates as a dipole
+/// (N. Curle, "The influence of solid boundaries upon aerodynamic sound", Proc. R. Soc. A 231, 1955):
+/// with a fluctuating lift coefficient C' over the side area d·l, at a Strouhal number St, the rms at
+/// r abeam is <c>ρ U³ l C' St / (4√2 c r)</c>. C' = 0.02 is chosen for a streamlined bullet, an order
+/// of magnitude below a bluff cylinder's, and gives 91 dB at a metre for a .45 at 253 m/s: an
+/// estimate, there being no measurement of a subsonic fly-by to fit.
+///
+/// Its SPECTRUM is the wake's, broad: rising as f² below the peak (a dipole radiates the rate of
+/// change of a force whose spectrum is flat at low frequency) and falling as f^-2.5 above it (the
+/// turbulent force's roll-off), the peak at a Strouhal number of 0.2 on the bullet's base diameter
+/// (St·U/d, 4.4 kHz for the .45: the helical shedding of an axisymmetric base wake, Fuchs, Mercker and
+/// Michel, J. Fluid Mech. 93, 1979, a broad hump in a turbulent wake, not a line). Its half-power
+/// width is 2.4 octaves, and within 10 dB of its peak it spans 4.9. The bullet's gyroscopic nutation
+/// and precession (from the rifling's spin) swing its yaw, and with it the side force: a 15 % and a
+/// 10 % flutter on the noise.
+///
+/// It is heard through the moving source's own geometry: each instant of the pass is heard when its
+/// sound arrives, so the approach is compressed in time and raised in pitch and the retreat stretched
+/// and lowered (the Doppler fall of a whizz), louder ahead by the convective factor (1 − M cos θ)^-2.
+/// Noise of a moving source is noise of the Doppler-shifted spectrum, so it is rendered as noise whose
+/// spectrum is the source's at f/D for the Doppler factor D of the moment that sound left
+/// (<see cref="ShapedNoise"/>). It was a sum of 96 sine partials wandering about the shedding
+/// frequency, and that was heard as one tone sweeping from 9.9 to 2.8 kHz, "a quick laser" (Cody,
+/// 2026-10-04). It is played as three pieces from three places along the path (approach, abeam, going
+/// away), crossfaded, so it moves past the listener rather than coming from one point.
 ///
 /// Both are rendered on the client from their keys; nothing here is recorded.
 /// </summary>
@@ -198,11 +212,49 @@ public static class BulletFlyby
     /// </summary>
     public static List<TransientSound> Sounds(IReadOnlyList<FlightSample> path, Vector3 ear, WeaponDefinition weapon, Air air)
     {
+        var (d, l) = Size(weapon);
+        var sounds = CrackSounds(path, ear, d, l, air);
+        if (path.Count < 2) return sounds;
+        float c = air.SpeedOfSound;
+
+        if (FindPass(path, ear, out var n, out float miss, out float before, out float after)
+            && miss <= WhizzMetres && n.Velocity.Length() < c && before >= 1f)
+        {
+            Vector3 u = Vector3.Normalize(n.Velocity);
+            for (int piece = 0; piece < 3; piece++)
+            {
+                var w = new Whizz((int)MathF.Round(n.Velocity.Length()), (int)MathF.Round(miss * 10f),
+                                  (int)MathF.Round(d * 1e4f), (int)MathF.Round(l * 1e4f), (int)MathF.Round(c),
+                                  (int)MathF.Floor(before), (int)MathF.Floor(MathF.Min(after, 999f)),
+                                  (int)MathF.Round(air.Density * 1000f), piece,
+                                  weapon.RiflingTwistMetres > 0f ? (int)MathF.Round(weapon.RiflingTwistMetres / d) : 0);
+                if (!TryPiece(w, out float start, out _, out float x)) continue;
+                float rk = MathF.Sqrt(w.Miss * w.Miss + x * x);
+                sounds.Add(new TransientSound
+                {
+                    Character = SoundCharacter.Hiss,
+                    Position = n.Position + u * x,
+                    // Its piece of the pass is heard from `start` after the bullet is abeam; the client
+                    // adds rk/c of its own.
+                    DelaySeconds = MathF.Max(0f, n.Seconds + start - rk / c),
+                    LevelDb = Spl(WhizzFullScalePascals(w)),
+                    SynthKey = WhizzKey(w),
+                    DecaySeconds = 0.05f,
+                    Noisiness = 1f,
+                });
+            }
+        }
+        return sounds;
+    }
+
+    /// <summary>The crack alone, for a body of diameter <paramref name="d"/> and length
+    /// <paramref name="l"/> flying <paramref name="path"/>: a bullet, or a ricochet's slug while it is
+    /// still faster than sound.</summary>
+    public static List<TransientSound> CrackSounds(IReadOnlyList<FlightSample> path, Vector3 ear, float d, float l, Air air)
+    {
         var sounds = new List<TransientSound>();
         if (path.Count < 2) return sounds;
         float c = air.SpeedOfSound;
-        var (d, l) = Size(weapon);
-
         if (FindCrack(path, ear, c, out var e))
         {
             Vector3 u = Vector3.Normalize(e.Velocity);
@@ -223,33 +275,6 @@ public static class BulletFlyby
                     // metre by the inverse law the client will apply over the distance it is placed at.
                     LevelDb = Spl(peak * MathF.Max(1f, r)),
                     SynthKey = CrackKey(seconds),
-                    DecaySeconds = 0.05f,
-                    Noisiness = 1f,
-                });
-            }
-        }
-
-        if (FindPass(path, ear, out var n, out float miss, out float before, out float after)
-            && miss <= WhizzMetres && n.Velocity.Length() < c && before >= 1f)
-        {
-            Vector3 u = Vector3.Normalize(n.Velocity);
-            for (int piece = 0; piece < 3; piece++)
-            {
-                var w = new Whizz((int)MathF.Round(n.Velocity.Length()), (int)MathF.Round(miss * 10f),
-                                  (int)MathF.Round(d * 1e4f), (int)MathF.Round(l * 1e4f), (int)MathF.Round(c),
-                                  (int)MathF.Floor(before), (int)MathF.Floor(MathF.Min(after, 999f)),
-                                  (int)MathF.Round(air.Density * 1000f), piece);
-                if (!TryPiece(w, out float start, out _, out float x)) continue;
-                float rk = MathF.Sqrt(w.Miss * w.Miss + x * x);
-                sounds.Add(new TransientSound
-                {
-                    Character = SoundCharacter.Hiss,
-                    Position = n.Position + u * x,
-                    // Its piece of the pass is heard from `start` after the bullet is abeam; the client
-                    // adds rk/c of its own.
-                    DelaySeconds = MathF.Max(0f, n.Seconds + start - rk / c),
-                    LevelDb = Spl(WhizzFullScalePascals(w)),
-                    SynthKey = WhizzKey(w),
                     DecaySeconds = 0.05f,
                     Noisiness = 1f,
                 });
@@ -322,10 +347,11 @@ public static class BulletFlyby
     /// <summary>
     /// A subsonic pass, quantised for the key: speed m/s, miss distance in decimetres, the bullet's
     /// diameter and length in tenths of a millimetre, the speed of sound m/s, the metres of flight before
-    /// and after the nearest point, the air's density in g/m³, and which of the three pieces.
+    /// and after the nearest point, the air's density in g/m³, which of the three pieces, and the
+    /// rifling's twist in calibres per turn (0: a smooth bore, or a key from before it was sent).
     /// </summary>
     public readonly record struct Whizz(int Speed, int MissDm, int DiameterTenthMm, int LengthTenthMm, int SoundSpeed,
-                                        int BeforeMetres, int AfterMetres, int DensityGrams, int Piece)
+                                        int BeforeMetres, int AfterMetres, int DensityGrams, int Piece, int TwistCalibres = 0)
     {
         public float Miss => MathF.Max(MinMissMetres, MissDm / 10f);
         public float SpeedOfSound => MathF.Max(200f, SoundSpeed);
@@ -338,20 +364,49 @@ public static class BulletFlyby
     }
 
     public static string WhizzKey(Whizz w) => string.Create(CultureInfo.InvariantCulture,
-        $"{WhizzPrefix}{w.Speed}:{w.MissDm}:{w.DiameterTenthMm}:{w.LengthTenthMm}:{w.SoundSpeed}:{w.BeforeMetres}:{w.AfterMetres}:{w.DensityGrams}:{w.Piece}");
+        $"{WhizzPrefix}{w.Speed}:{w.MissDm}:{w.DiameterTenthMm}:{w.LengthTenthMm}:{w.SoundSpeed}:{w.BeforeMetres}:{w.AfterMetres}:{w.DensityGrams}:{w.Piece}:{w.TwistCalibres}");
 
     public static bool TryParseWhizz(string? key, out Whizz w)
     {
         w = default;
         if (key == null || !key.StartsWith(WhizzPrefix, StringComparison.Ordinal)) return false;
         var parts = key[WhizzPrefix.Length..].Split(':');
-        if (parts.Length != 9) return false;
-        var v = new int[9];
-        for (int i = 0; i < 9; i++)
+        if (parts.Length is not (9 or 10)) return false;
+        var v = new int[10];
+        for (int i = 0; i < parts.Length; i++)
             if (!int.TryParse(parts[i], NumberStyles.Integer, CultureInfo.InvariantCulture, out v[i]) || v[i] < 0) return false;
-        if (v[8] > 2 || v[0] < 1 || v[4] < 200) return false;
-        w = new Whizz(v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7], v[8]);
+        if (v[8] > 2 || v[0] < 1 || v[4] < 200 || v[9] > 1000) return false;
+        w = new Whizz(v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7], v[8], v[9]);
         return true;
+    }
+
+    /// <summary>The share of the wake's noise (<see cref="WakeDensity"/>) below <paramref name="hz"/>.</summary>
+    public static float WakeShareBelow(float hz, float peakHz)
+    {
+        if (peakHz <= 0f) return 1f;
+        float x = hz / peakHz;
+        if (x <= 0f) return 0f;
+        // Simpson's rule in log x from 1e-3 up: the density is negligible below.
+        const int steps = 48;
+        double a = Math.Log(1e-3), b = Math.Log(Math.Max(1.001e-3, x)), h = (b - a) / steps, sum = 0;
+        for (int i = 0; i <= steps; i++)
+        {
+            double u = Math.Exp(a + i * h), f = u * u / Math.Pow(1 + u * u, 2.25) * u;
+            sum += f * (i == 0 || i == steps ? 1 : i % 2 == 1 ? 4 : 2);
+        }
+        return (float)Math.Min(1.0, sum * h / 3 / 0.47924);
+    }
+
+    /// <summary>
+    /// The turbulent wake's radiated spectrum, a density per hertz whose integral is one: x²/(1+x²)^2.25
+    /// in x = f/fp, rising as f² and falling as f^-2.5, its peak at 0.89 fp. ∫ x²/(1+x²)^2.25 dx over
+    /// all x is B(3/2, 3/4)/2 = 0.47924.
+    /// </summary>
+    public static float WakeDensity(float hz, float peakHz)
+    {
+        if (hz <= 0f || peakHz <= 0f) return 0f;
+        float x = hz / peakHz, x2 = x * x;
+        return x2 / MathF.Pow(1f + x2, 2.25f) / (0.47924f * peakHz);
     }
 
     /// <summary>The crossfade between the pieces, seconds either side of each join.</summary>
@@ -413,8 +468,9 @@ public static class BulletFlyby
 
     /// <summary>
     /// The pressure, Pa at a metre, that a whizz buffer's full scale stands for: four times the
-    /// loudest rms any piece carries (scaled up by its own distance, which the client's inverse law
-    /// takes off again), so the noise's peaks fit. The same for all three pieces, so they are placed
+    /// loudest rms any piece carries of what can be heard of it (the share of its raised spectrum under
+    /// 16 kHz), scaled up by its own distance, which the client's inverse law takes off again, so the
+    /// noise's peaks fit. The same for all three pieces, so they are placed
     /// alike and join without a step; worked from the key alone, so the server declares exactly what
     /// the client renders.
     /// </summary>
@@ -431,21 +487,31 @@ public static class BulletFlyby
             float x = piece switch { 0 => MathF.Max(lo, -2f * m), 1 => Math.Clamp(0f, lo, hi), _ => MathF.Min(hi, 2f * m) };
             float rk = MathF.Sqrt(m * m + x * x);
             for (int i = 0; i <= 200; i++)
-                max = MathF.Max(max, Envelope(w, lo + (hi - lo) * i / 200f) * rk);
+            {
+                // Only what can be heard of it: the share of the raised spectrum left under 16 kHz.
+                float xi = lo + (hi - lo) * i / 200f, ri = MathF.Sqrt(m * m + xi * xi);
+                float doppler = 1f / (1f + w.V / w.SpeedOfSound * xi / ri);
+                float scale = Strouhal * MathF.Max(1f, w.Speed) / w.Diameter / 0.894f;
+                max = MathF.Max(max, Envelope(w, xi) * rk * MathF.Sqrt(WakeShareBelow(16000f / doppler, scale)));
+            }
         }
         return 4f * 1.3f * max;
     }
 
     /// <summary>
     /// One piece of a whizz, as the listener hears it: the wake's noise, emitted along the path and
-    /// heard at its own arrival time, so its pitch falls and its level swells and dies as it would.
+    /// heard at its own arrival time, so its spectrum slides down and its level swells and dies as it
+    /// would.
     ///
-    /// The noise is many partials, each wandering in frequency, spread over an octave and a half either
-    /// side of the shedding frequency St·U/d, and evaluated at the EMISSION time of each output sample
-    /// (solved in closed form from the arrival time), which is what makes it a moving source rather
-    /// than a filter sweep. A partial is faded out where its Doppler-raised pitch would pass 16 kHz, so
-    /// nothing aliases. A slow flutter rides on it at the bullet's nutation, about an eighth of its spin
-    /// on a twist of 30 calibres. The seed picks the wake's noise; all three pieces of one pass share it.
+    /// Each output sample is worked back to the EMISSION time whose sound arrives then (solved in closed
+    /// form), which gives the Doppler factor D of that moment, the distance and the angle. The noise is
+    /// broadband (<see cref="ShapedNoise"/>), its spectrum the wake's (<see cref="WakeDensity"/>) at f/D,
+    /// so the whole hump rides up on the approach and down on the retreat; anything the raised spectrum
+    /// puts above the bands simply is not there, so nothing aliases. A flutter rides on it at the
+    /// bullet's two epicyclic yaw rates (McCoy, Modern Exterior Ballistics, 1999, ch. 10): the fast
+    /// nutation and the slow precession, (Ix/2Iy)·spin·(1 ± √(1 − 1/Sg)) at a gyroscopic stability Sg
+    /// of 2, spin being speed over the twist. The whole pass is run from its first sound for every
+    /// piece, so all three pieces of one pass carry one noise and join without a seam.
     /// </summary>
     public static float[] RenderWhizz(Whizz w, int sampleRate, int seed)
     {
@@ -454,60 +520,70 @@ public static class BulletFlyby
         float rk = MathF.Sqrt(b * b + xk * xk);
         float fullScale = WhizzFullScalePascals(w);
         var (ja, jb, jc, jd) = Joins(w);
+        float first = Heard(w, ja);
         float join1 = Heard(w, jb), join2 = Heard(w, jc);
 
-        int hash = HashCode.Combine(w.Speed, w.MissDm, w.DiameterTenthMm, w.LengthTenthMm, w.SoundSpeed, w.BeforeMetres, w.AfterMetres, seed & 3);
-        var rng = new Random(hash);
-        const int partials = 96;
-        float f0 = Strouhal * MathF.Max(1f, w.Speed) / w.Diameter;
-        var freq = new float[partials]; var phase = new float[partials];
-        var depth = new float[partials]; var rate = new float[partials]; var wobble = new float[partials];
-        for (int k = 0; k < partials; k++)
-        {
-            // Log-normal about the shedding frequency, half an octave wide, held to 1.5 octaves.
-            double g = Math.Sqrt(-2 * Math.Log(1 - rng.NextDouble())) * Math.Cos(2 * Math.PI * rng.NextDouble());
-            freq[k] = f0 * MathF.Pow(2f, (float)Math.Clamp(0.5 * g, -1.5, 1.5));
-            phase[k] = (float)(rng.NextDouble() * 2 * Math.PI);
-            rate[k] = freq[k] * (0.03f + 0.05f * (float)rng.NextDouble());
-            depth[k] = 2.5f;
-            wobble[k] = (float)(rng.NextDouble() * 2 * Math.PI);
-        }
-        float amp = MathF.Sqrt(2f / partials);
-        float spin = MathF.Max(1f, w.Speed) / (30f * w.Diameter);
-        float flutterHz = spin / 8f, flutterPhase = (float)(rng.NextDouble() * 2 * Math.PI);
+        uint hash = Mix(Mix(Mix(Mix((uint)w.Speed, (uint)w.MissDm), (uint)(w.DiameterTenthMm * 7919 + w.LengthTenthMm)),
+                            (uint)(w.BeforeMetres * 1009 + w.AfterMetres)), (uint)(seed & 3));
+        var noise = new ShapedNoise(sampleRate, (int)hash);
+        var rng = new Random((int)(hash & 0x7fffffff));
+        float speed = MathF.Max(1f, w.Speed);
+        // The hump's peak at St·U/d; the density's own peak is at 0.894 of its scale.
+        float scale = Strouhal * speed / w.Diameter / 0.894f;
 
+        float twist = w.TwistCalibres > 0 ? w.TwistCalibres : 30f;
+        float spinHz = speed / (twist * w.Diameter);
+        float r2 = 0.25f * w.Diameter * w.Diameter;
+        float inertia = 6f * r2 / (3f * r2 + w.Length * w.Length);      // Ix/Iy of a solid cylinder
+        float root = MathF.Sqrt(1f - 1f / 2f);
+        float nutationHz = spinHz * 0.5f * inertia * (1f + root);
+        float precessionHz = spinHz * 0.5f * inertia * (1f - root);
+        float p1 = (float)(rng.NextDouble() * 2 * Math.PI), p2 = (float)(rng.NextDouble() * 2 * Math.PI);
+
+        int skip = Math.Max(0, (int)MathF.Floor((start - first) * sampleRate));
         int n = Math.Max(16, (int)MathF.Ceiling((end - start) * sampleRate));
         var pcm = new float[n];
         float c2 = c * c, v2 = v * v;
-        for (int i = 0; i < n; i++)
+        const int Block = 32;
+        for (int j = 0; j < skip + n; j++)
         {
-            float t = start + i / (float)sampleRate;
+            float t = first + j / (float)sampleRate;
             // The emission time whose sound arrives at t: c²(t − τ)² = b² + v²τ², the earlier root.
             float tau = (c2 * t - MathF.Sqrt(c2 * v2 * t * t + b * b * (c2 - v2))) / (c2 - v2);
             float x = v * tau;
             float r = MathF.Sqrt(b * b + x * x);
-            float doppler = 1f / (1f + mach * x / r);
-
-            float carrier = 0f;
-            for (int k = 0; k < partials; k++)
+            if (j % Block == 0)
             {
-                float heardHz = freq[k] * doppler;
-                if (heardHz > 16000f || heardHz < 30f) continue;
-                float fade = heardHz < 12000f ? 1f : 0.5f + 0.5f * MathF.Cos(MathF.PI * (heardHz - 12000f) / 4000f);
-                float p = 2f * MathF.PI * freq[k] * tau + phase[k] + depth[k] * MathF.Sin(2f * MathF.PI * rate[k] * tau + wobble[k]);
-                carrier += fade * MathF.Sin(p);
+                // The Doppler factor half a block on, so the glide lands on it mid-block.
+                float tm = t + 0.5f * Block / sampleRate;
+                float taum = (c2 * tm - MathF.Sqrt(c2 * v2 * tm * tm + b * b * (c2 - v2))) / (c2 - v2);
+                float xm = v * taum, rm = MathF.Sqrt(b * b + xm * xm);
+                float dm = 1f / (1f + mach * xm / rm);
+                Func<float, float> density = f => WakeDensity(f / dm, scale) / dm;
+                if (j == 0) noise.SetSpectrumNow(density); else noise.SetSpectrum(density, Block);
             }
-            carrier *= amp;
-            float flutter = 1f + 0.3f * MathF.Sin(2f * MathF.PI * flutterHz * tau + flutterPhase);
+            float carrier = noise.Next();
+            if (j < skip) continue;
 
+            float flutter = 1f + 0.15f * MathF.Sin(2f * MathF.PI * nutationHz * tau + p1)
+                               + 0.10f * MathF.Sin(2f * MathF.PI * precessionHz * tau + p2);
             // The crossfade weights of the three pieces sum to one at every moment.
             float s1 = Step(t, join1), s2 = Step(t, join2);
             float weight = w.Piece switch { 0 => 1f - s1, 1 => s1 - s2, _ => s2 };
             float pressure = Envelope(w, x) * carrier * flutter;
-            pcm[i] = Math.Clamp(pressure * rk / fullScale * weight, -1f, 1f);
+            pcm[j - skip] = Math.Clamp(pressure * rk / fullScale * weight, -1f, 1f);
         }
         return pcm;
     }
+
+    /// <summary>A deterministic mix of two words (the same on every machine, unlike HashCode).</summary>
+    public static uint Mix(uint a, uint b)
+    {
+        uint h = a * 0x9E3779B1u ^ (b + 0x7F4A7C15u + (a << 6) + (a >> 2));
+        h ^= h >> 16; h *= 0x85EBCA6Bu; h ^= h >> 13; h *= 0xC2B2AE35u; h ^= h >> 16;
+        return h;
+    }
+
 
     /// <summary>A raised-cosine step from 0 to 1 across <see cref="Crossfade"/> either side of a join.</summary>
     private static float Step(float t, float at)

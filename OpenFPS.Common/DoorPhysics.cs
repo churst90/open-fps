@@ -241,6 +241,20 @@ internal static class DoorPhysics
     }
 
     /// <summary>
+    /// A Hertz contact whose loss gives back the same share of the speed whatever the speed (Flores et al.
+    /// 2011: damping 8(1 - e) / (5 e v) on the approach speed v). Hunt-Crossley's fixed damping gives back
+    /// almost all of a slow approach, so a part settling onto a lossy stop bounced a dozen times.
+    /// <paramref name="approach"/> holds the speed the contact began at, per contact; it is reset when apart.
+    /// </summary>
+    internal static double ContactRestitution(double k, double e, double depth, double rate, ref double approach)
+    {
+        if (depth <= 0) { approach = 0; return 0; }
+        if (approach <= 0) approach = Math.Max(Math.Abs(rate), 1e-4);
+        double f = k * depth * Math.Sqrt(depth) * (1 + 8 * (1 - e) / (5 * e) * rate / approach);
+        return f > 0 ? f : 0;
+    }
+
+    /// <summary>
     /// LuGre friction: a bristle state that holds while the surfaces stick and lets go when the force
     /// passes the static limit. Its exact update relaxes the bristle towards its sliding deflection, so
     /// stiff bristles do not need a tiny step.
@@ -375,7 +389,7 @@ internal static class DoorPhysics
 
         public DenseField(double width, double height, double thickness, double e, double rho, double poisson,
                           Func<double, double> loss, double fLow, double fHigh, Random rng, double dt,
-                          double capSpacing = CapSpacing)
+                          double capSpacing = CapSpacing, double faceWidth = 0)
         {
             this.rng = rng;
             double area = width * height, rhoH = rho * thickness;
@@ -396,7 +410,10 @@ internal static class DoorPhysics
                 double k = Math.Max(1, perHz * spacing);      // real modes it stands for
                 double eta = loss(f);
                 double w = 2 * Math.PI * f;
-                double sigma = RadiationEfficiency(f, fc, width, height);
+                // A folded part (a channel, a box) radiates from its faces between the folds: each fold is an
+                // edge, so below coincidence it radiates as strips of its face's width, not as one flat sheet.
+                double sigma = faceWidth > 0 ? RadiationEfficiency(f, fc, faceWidth, area / faceWidth)
+                                             : RadiationEfficiency(f, fc, width, height);
                 double mEff = mass / k;
                 // Radiated power eta_rad w E with eta_rad = rho c sigma / (w rho h), spread over the half
                 // space at a metre, gives the pressure per unit acceleration of the effective coordinate.

@@ -161,6 +161,16 @@ public sealed record WeaponDefinition
     /// <summary>The bullet's length, metres, nose to base. Zero is a 9 mm pistol bullet's.</summary>
     public float BulletLengthMetres { get; init; }
 
+    /// <summary>The bullet's mass, kg, as its maker lists it in grains (one grain is 64.79891 mg). It is
+    /// what the round carries into what it strikes (half m v squared, the energy an impact dumps), and
+    /// what a ricochet's deformed slug keeps of it. Zero is a 124 grain 9 mm bullet's.</summary>
+    public float BulletMassKg { get; init; }
+
+    /// <summary>The barrel's rifling twist, metres per turn: how fast the bullet spins (its speed over
+    /// this), which sets the gyroscopic nutation that modulates a subsonic whizz. Zero is one turn in
+    /// 30 calibres.</summary>
+    public float RiflingTwistMetres { get; init; }
+
     /// <summary>The sight this gun comes with, a <see cref="ScopeRegistry"/> id, or "" for iron sights.
     /// On the weapon for now because the one scoped rifle comes scoped; a scope mounted later on an AKM
     /// or an AR-15 is looked up by the same id, so nothing that reads it has to change.</summary>
@@ -255,6 +265,9 @@ public static class Ammunition
 /// </summary>
 public static class WeaponRegistry
 {
+    /// <summary>One grain, kg: what bullet weights are published in.</summary>
+    public const float Grain = 64.79891e-6f;
+
     private static readonly Dictionary<string, WeaponDefinition> _byId =
         new(StringComparer.OrdinalIgnoreCase);
 
@@ -279,6 +292,8 @@ public static class WeaponRegistry
         BallisticCoefficientG7 = 0.14f,
         // The M43 bullet: 7.92 mm across, 26.5 mm long.
         BulletDiameterMetres = 0.0079f, BulletLengthMetres = 0.0265f,
+        // 123 grain; the AKM's 1 in 240 mm (9.45 in) twist.
+        BulletMassKg = 123f * Grain, RiflingTwistMetres = 0.240f,
     };
 
     /// <summary>5.56x45. Faster and much sharper than the AKM: a tighter Mach cone, so the crack is a
@@ -300,6 +315,8 @@ public static class WeaponRegistry
         BallisticCoefficientG7 = 0.12f,
         // M193: 5.70 mm across, 18.9 mm long.
         BulletDiameterMetres = 0.0057f, BulletLengthMetres = 0.0189f,
+        // 55 grain; the original AR-15's 1 in 12 in twist, the one M193 was made for.
+        BulletMassKg = 55f * Grain, RiflingTwistMetres = 0.3048f,
     };
 
     /// <summary>9x19, and only just supersonic — Mach 1.09. The crack is there but it is small and
@@ -319,6 +336,8 @@ public static class WeaponRegistry
         RoundsPerMinute = 600f, Damage = 25, EffectiveRangeMetres = 50f, PolymerFrame = true,
         // 124 grain full metal jacket: 9.01 mm across, 15.6 mm long.
         BulletDiameterMetres = 0.0090f, BulletLengthMetres = 0.0156f,
+        // 124 grain; the Glock 17's 1 in 250 mm (9.84 in).
+        BulletMassKg = 124f * Grain, RiflingTwistMetres = 0.250f,
     };
 
     /// <summary>.45 ACP from a hammer-fired service pistol: heavy, slow and SUBSONIC. It makes no crack
@@ -339,6 +358,8 @@ public static class WeaponRegistry
         RoundsPerMinute = 500f, Damage = 30, EffectiveRangeMetres = 50f,
         // 230 grain ball: 11.5 mm across, 17 mm long.
         BulletDiameterMetres = 0.0115f, BulletLengthMetres = 0.017f,
+        // 230 grain; the 1911's 1 in 16 in.
+        BulletMassKg = 230f * Grain, RiflingTwistMetres = 0.4064f,
     };
 
     /// <summary>12 gauge buckshot from a pump gun. Nine pellets, marginally supersonic.</summary>
@@ -360,6 +381,8 @@ public static class WeaponRegistry
         RoundsPerMinute = 70f, Damage = 12, EffectiveRangeMetres = 40f,
         // One 00 buck pellet, a lead ball 8.4 mm across: the charge is flown as one, along its centre.
         BulletDiameterMetres = 0.0084f, BulletLengthMetres = 0.0084f,
+        // One 00 pellet, 53.8 grain of lead, from a smooth bore.
+        BulletMassKg = 53.8f * Grain,
     };
 
     /// <summary>.357 Magnum from a 6-inch revolver, measured on the NIJ Ruger .357. About 410 m/s
@@ -389,6 +412,8 @@ public static class WeaponRegistry
         RoundsPerMinute = 300f, Damage = 40, EffectiveRangeMetres = 50f,
         // 158 grain jacketed soft point: 9.07 mm across, 17.5 mm long.
         BulletDiameterMetres = 0.0091f, BulletLengthMetres = 0.0175f,
+        // 158 grain; a Ruger GP100's 1 in 18.75 in.
+        BulletMassKg = 158f * Grain, RiflingTwistMetres = 0.476f,
     };
 
     /// <summary>
@@ -414,6 +439,8 @@ public static class WeaponRegistry
         ScopeId = "scope_4_12",
         // The 168 grain MatchKing: 7.82 mm across, 30.9 mm (1.215 in) long.
         BulletDiameterMetres = 0.0078f, BulletLengthMetres = 0.0309f,
+        // 168 grain; a 1 in 12 in .308 barrel.
+        BulletMassKg = 168f * Grain, RiflingTwistMetres = 0.3048f,
     };
 
     static WeaponRegistry()
