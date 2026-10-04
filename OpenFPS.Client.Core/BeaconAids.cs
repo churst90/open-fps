@@ -42,6 +42,10 @@ public sealed class BeaconAids
         [Beacons.Door] = ("SYNTH/beacon_door_chime", 523f, 12f, 3),
         [Beacons.Item] = ("SYNTH/beacon_item_ring", 1046f, 10f, 3),
         [Beacons.Vehicle] = ("SYNTH/beacon_vehicle_hum", 262f, 25f, 2),
+        // The two ends of a flight: its foot and its top, each a stair marker the map put on the
+        // landing. The nearest two, so standing at the top of one flight you hear the top you are at
+        // and the foot of the next one round the spine wall, and not the whole stairwell.
+        [Beacons.Stairs] = ("SYNTH/beacon_stairs_steps", 392f, 10f, 2),
         [Beacons.Player] = ("SYNTH/beacon_player_call", 392f, 30f, 4),
     };
 
@@ -255,6 +259,9 @@ public sealed class BeaconAids
                 if (world.Entities.TryGetValue(id, out var e)) Consider(e);
         // A door leaf that swings, a car that has been driven: things that move are not in the grid.
         foreach (var e in world.DynamicEntities) Consider(e);
+        // Nor is a marker nothing can bump into, such as the end of a flight of stairs.
+        foreach (int id in world.MarkerEntityIds)
+            if (world.Entities.TryGetValue(id, out var e)) Consider(e);
         found.Sort((a, b) => a.D.CompareTo(b.D));
         var result = new List<(int, Vector3)>();
         var seen = new HashSet<int>();

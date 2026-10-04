@@ -341,7 +341,7 @@ public class BeaconAidsMutationTests
 
         var fresh = new Rig();
         fresh.Run(world, Ear, 10, 4);
-        Assert.Equal(5, fresh.Mixer.Registrations);     // door, item, vehicle, player, teammate
+        Assert.Equal(6, fresh.Mixer.Registrations);     // door, item, vehicle, stairs, player, teammate
     }
 
     // ── Through walls, and round corners ────────────────────────────────────────────────────

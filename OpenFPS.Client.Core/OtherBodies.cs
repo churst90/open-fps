@@ -54,7 +54,7 @@ public sealed class OtherBodies
     private readonly Dictionary<int, Body> _bodies = new();
     private readonly List<int> _departed = new();
 
-    public event Action<Vector3, string, string>? OnStepTriggered; // Position, Material, Variant
+    public event Action<Vector3, string, string, StepSlope>? OnStepTriggered; // Position, Material, Variant, up/down
     public event Action<Vector3, string, string>? OnLandTriggered;
 
     /// <summary>A body took a breath: who, from where, and what kind.</summary>
@@ -133,7 +133,7 @@ public sealed class OtherBodies
             if (string.IsNullOrEmpty(material) || material == "None") material = "Generic";
 
             if (fall.Landed) OnLandTriggered?.Invoke(body.Transform.Position, material, "0");
-            if (fall.Stepped) OnStepTriggered?.Invoke(fall.StepPosition, material, "0");
+            if (fall.Stepped) OnStepTriggered?.Invoke(fall.StepPosition, material, "0", fall.Slope);
         }
 
         // Somebody who has gone — disconnected, died, or simply walked out of the area of interest —

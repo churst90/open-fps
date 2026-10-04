@@ -146,7 +146,7 @@ public class WallProximityAndJitterTests
         var state = new LocalPlayerState { IsGrounded = true, CurrentMaterial = "Concrete" };
         var controller = new LocalPlayerController(state);
         int steps = 0;
-        controller.OnStepTriggered += (_, _, _) => steps++;
+        controller.OnStepTriggered += (_, _, _, _) => steps++;
 
         // Settle where we are.
         var at = new Vector3(0, 0, 0);
@@ -185,7 +185,7 @@ public class WallProximityAndJitterTests
         var state = new LocalPlayerState { IsGrounded = true, CurrentMaterial = "Concrete" };
         var controller = new LocalPlayerController(state);
         int steps = 0;
-        controller.OnStepTriggered += (_, _, _) => steps++;
+        controller.OnStepTriggered += (_, _, _, _) => steps++;
 
         var at = new Vector3(0, 0, 0);
         for (int i = 0; i < 5; i++) controller.Update(at, Vector3.Zero);
@@ -209,7 +209,7 @@ public class WallProximityAndJitterTests
         var state = new LocalPlayerState { IsGrounded = true, CurrentMaterial = "Concrete" };
         var controller = new LocalPlayerController(state);
         int steps = 0;
-        controller.OnStepTriggered += (_, _, _) => steps++;
+        controller.OnStepTriggered += (_, _, _, _) => steps++;
 
         var colliders = WallAtZ5();
         var pos = new Vector3(0, 0, 3f);

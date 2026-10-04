@@ -48,6 +48,8 @@ public sealed partial class ClientGameSession : IDisposable
     private readonly ClientPhysicsSystem _physics;
     private readonly LocalPlayerController _controller;
     private readonly OtherBodies _others;
+    /// <summary>"Stairs up, 10 steps, to floor 3", and whether you are on a flight. See StairCues.</summary>
+    private readonly StairCues _stairs = new();
     private readonly AudioEngineFacade _audioEngine;
     private readonly SoundMappingService _sounds;
     private readonly ClientAudioSystem _audioSystem;
@@ -596,6 +598,7 @@ public sealed partial class ClientGameSession : IDisposable
         UpdateGuidance();
 
         // ...and only then, because the region the audio system just worked out is the one to say.
+        AnnounceStairs(snapshot);
         AnnounceZoneChanges();
         AnnounceMapEdge();
     }
@@ -940,6 +943,7 @@ public sealed partial class ClientGameSession : IDisposable
                 _state.Velocity = Vector3.Zero;
                 _reconciler.Reset(); // CRITICAL: reset the prediction buffer on teleport/spawn
                 _controller.Teleported(); // ...and the stride accumulator, or the spawn walks for you
+                _stairs.Reset();          // ...and which stairs you were at: landing beside some is not walking up to them
 
                 Serilog.Log.Information("PlayerSpawned: entity {Id} at {Pos}.", spawn.EntityId, spawn.SpawnTransform.Position);
                 // A spawn after arriving is a teleport (/tp): the server says where to, and the zone is
@@ -1159,6 +1163,12 @@ public sealed partial class ClientGameSession : IDisposable
             return;
         }
 
+        // Not while you are on the stairs. A storey's zone ends at its ceiling and the next begins at
+        // its floor, so at eye height the next floor's name comes halfway up the flight — "floor 3"
+        // with five steps still to climb, and on the way down "floor 2" two treads from the top. Held
+        // until your feet are off the treads, it is said on the landing, which is where you arrive.
+        if (_stairs.OnFlight) return;
+
         int region = _state.CurrentRegionId;
         if (region == _lastAnnouncedRegionId) return;
         _lastAnnouncedRegionId = region;
@@ -1180,6 +1190,20 @@ public sealed partial class ClientGameSession : IDisposable
 
         _lastAnnouncedRegion = name;
         _speech.Speak(name, interrupt: false);
+    }
+
+    /// <summary>
+    /// The foot or the top of a flight, said once as you reach it facing along it: "Stairs up, 10 steps,
+    /// to floor 3". Without interrupting, like a zone: it is where you are, not an alarm. Not while you
+    /// ride anything, which carries you past stairs rather than up them.
+    /// </summary>
+    private void AnnounceStairs(WorldSnapshot snapshot)
+    {
+        if (_state.IsRiding) { _stairs.Reset(); return; }
+        string? line = _stairs.Update(snapshot, _state.Position, _state.Rotation);
+        if (line == null) return;
+        Serilog.Log.Information("[STAIRS] '{Line}' at {Pos}", line, _state.Position);
+        _speech.Speak(line, interrupt: false);
     }
 
     /// <summary>"You're in city, at sidewalk." The zone is left out when there is none.</summary>

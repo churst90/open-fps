@@ -2652,10 +2652,10 @@ public class ClientAudioSystem
 
     /// <summary>Somebody else's step: a sound at a place in the world, left there as they walk on.
     /// Only one close enough to hear is made at all.</summary>
-    public void OnPlayerFootstep(Vector3 pos, string mat, string var)
+    public void OnPlayerFootstep(Vector3 pos, string mat, string var, StepSlope slope = StepSlope.Level)
     {
         if (Vector3.Distance(pos, _state.VisualPosition) > FootstepRange) return;
-        SubmitFootstep(pos + new Vector3(0, 0.1f, 0), mat, follows: false, offset: Vector3.Zero, boostDb: 0f);
+        SubmitFootstep(pos + new Vector3(0, 0.1f, 0), mat, follows: false, offset: Vector3.Zero, boostDb: 0f, slope: slope);
     }
 
     /// <summary>
@@ -2685,18 +2685,22 @@ public class ClientAudioSystem
     /// trail and slide around you. So an own step is placed at a fixed offset from the listener's
     /// head and follows it, whatever the network is doing to the position underneath.
     /// </summary>
-    public void OnOwnFootstep(Vector3 pos, string mat, string var)
+    public void OnOwnFootstep(Vector3 pos, string mat, string var, StepSlope slope = StepSlope.Level)
     {
-        if (_footTrace) Log.Information("[FOOT] step on {Mat} at {Pos}", mat, pos);
+        if (_footTrace) Log.Information("[FOOT] step {Slope} on {Mat} at {Pos}", slope, mat, pos);
         Vector3 offset = (pos - _state.Position) + new Vector3(0, 0.1f - _state.EyeHeight, 0);   // the foot, from the eye
         SubmitFootstep(_state.VisualPosition + new Vector3(0, _state.EyeHeight, 0) + offset, mat, follows: true, offset: offset,
-                       boostDb: OwnFootstepBoneConductionDb);
+                       boostDb: OwnFootstepBoneConductionDb, slope: slope);
     }
 
     /// <summary>How far a footstep take's pitch and level wander from one play to the next.</summary>
     private const float FootstepPitchJitter = 0.03f, FootstepLevelJitterDb = 1f;
 
-    private void SubmitFootstep(Vector3 nudgePos, string mat, bool follows, Vector3 offset, float boostDb)
+    /// <summary>The last own footstep's slope, and the level and pitch it was given for it.</summary>
+    internal (StepSlope Slope, float Db, float Pitch) LastStepGait { get; private set; }
+
+    private void SubmitFootstep(Vector3 nudgePos, string mat, bool follows, Vector3 offset, float boostDb,
+                                StepSlope slope = StepSlope.Level)
     {
         // Your own feet ride with you (follows); anybody else's stay where they fell.
         bool own = follows;
@@ -2716,7 +2720,11 @@ public class ClientAudioSystem
         // every step and the limiter pumped everything under it for the next fifty milliseconds —
         // "the footsteps are loud", and a pop on every one. The same law that places a rifle and a
         // car places these, twenty-six decibels down, where a step belongs against a megaphone.
-        var (stepGain, stepReference) = OpenFPS.Common.Loudness.Place(OpenFPS.Common.Loudness.FootstepDb + boostDb);
+        // ...and on stairs, a toe put down on the tread going up is lighter than a step on the level and
+        // a heel dropped onto the tread below is heavier: see StrideAccumulator.SlopeDb.
+        float slopeDb = StrideAccumulator.SlopeDb(slope), slopePitch = StrideAccumulator.SlopePitch(slope);
+        if (follows) LastStepGait = (slope, slopeDb, slopePitch);
+        var (stepGain, stepReference) = OpenFPS.Common.Loudness.Place(OpenFPS.Common.Loudness.FootstepDb + boostDb + slopeDb);
 
         // 1. Direct Sound (Will now undergo full acoustic pathing)
         var footstep = new SpatialEmitter
@@ -2730,7 +2738,7 @@ public class ClientAudioSystem
             // No two steps alike: a take is heard a hair higher or lower and a touch louder or softer
             // each time, as the same foot never lands quite the same way twice.
             Volume = stepGain * MathF.Pow(10f, (float)(Random.Shared.NextDouble() * 2.0 - 1.0) * FootstepLevelJitterDb / 20f),
-            Pitch = 1f + (float)(Random.Shared.NextDouble() * 2.0 - 1.0) * FootstepPitchJitter,
+            Pitch = slopePitch * (1f + (float)(Random.Shared.NextDouble() * 2.0 - 1.0) * FootstepPitchJitter),
             Range = FootstepRange,
             // Your own feet, pinned above the physics: they are how you know you are moving, and on
             // a loud map the arithmetic would rightly bury them under everything else. Only yours:

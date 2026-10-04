@@ -31,7 +31,7 @@ public class LocalPlayerController
         _lastUpdateAt = -1;
     }
 
-    public event Action<Vector3, string, string>? OnStepTriggered; // Position, Material, Variant
+    public event Action<Vector3, string, string, StepSlope>? OnStepTriggered; // Position, Material, Variant, up/down
     public event Action<Vector3, string, string>? OnLandTriggered;
 
     /// <summary>The player took a breath. Getting in and out of a seat does NOT reset this the way it
@@ -58,7 +58,7 @@ public class LocalPlayerController
         string mat = _state.CurrentMaterial == "None" ? "Generic" : _state.CurrentMaterial;
 
         if (fall.Landed) OnLandTriggered?.Invoke(newPosition, mat, _state.CurrentVariant);
-        if (fall.Stepped) OnStepTriggered?.Invoke(fall.StepPosition, mat, _state.CurrentVariant);
+        if (fall.Stepped) OnStepTriggered?.Invoke(fall.StepPosition, mat, _state.CurrentVariant, fall.Slope);
     }
 
     /// <summary>

@@ -405,8 +405,9 @@ public class DoorTypeTests : IDisposable
 
     /// <summary>
     /// The city's doors by kind: knobs on the flats and the houses' fronts, a push bar on the hangar's
-    /// and the terminal's service doors, a keyed glass front door on each tower, two pairs of automatic
-    /// leaves at the terminal's entrances, and a patio door onto every back garden. Each front door's
+    /// and the terminal's service doors and on the stair housing onto each tower's roof, a keyed glass
+    /// front door on each tower, two pairs of automatic leaves at the terminal's entrances, and a patio
+    /// door onto every back garden. Each front door's
     /// key side faces the street, away from the stairwell it opens into.
     /// </summary>
     [Fact]
@@ -429,7 +430,7 @@ public class DoorTypeTests : IDisposable
             });
         _o.WriteLine(string.Join(", ", counts.OrderBy(c => c.Key).Select(c => $"{c.Key} {c.Value}")));
         Assert.Equal(397, counts.GetValueOrDefault(DoorKind.Hinged));
-        Assert.Equal(2, counts.GetValueOrDefault(DoorKind.PushBar));
+        Assert.Equal(7, counts.GetValueOrDefault(DoorKind.PushBar));     // and one onto each tower's roof
         Assert.Equal(5, counts.GetValueOrDefault(DoorKind.GlassPushBar));
         Assert.Equal(0, counts.GetValueOrDefault(DoorKind.GlassPull));
         Assert.Equal(4, counts.GetValueOrDefault(DoorKind.AutoSliding));

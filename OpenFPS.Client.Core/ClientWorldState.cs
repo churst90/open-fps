@@ -33,6 +33,8 @@ public class ClientWorldState
     /// <summary>Everything that declares a region, so the moved-region check is not a walk over the
     /// whole map every frame. See WorldSnapshot.RegionEntityIds.</summary>
     private readonly ConcurrentDictionary<int, byte> _regionEntityIds = new();
+    /// <summary>Fixed beacons that are not solid, such as stair markers. See WorldSnapshot.MarkerEntityIds.</summary>
+    private readonly ConcurrentDictionary<int, byte> _markerEntityIds = new();
 
     // --- Snapshot Interpolation ---
     private readonly List<ServerStateUpdate> _snapshotBuffer = new();
@@ -167,7 +169,8 @@ public class ClientWorldState
         _serverWheels.Clear();
         _audioEntityIds.Clear();
         _regionEntityIds.Clear();
-        
+        _markerEntityIds.Clear();
+
         lock (_metaLock)
         {
             CurrentMapSize = size;
@@ -217,6 +220,9 @@ public class ClientWorldState
         // silently absent from the audio system entirely.
         if (def.SoundEmitter.RunsOnItsOwn())
             _audioEntityIds[def.EntityId] = 0;
+
+        if (IsMarker(def)) _markerEntityIds[def.EntityId] = 0;
+        else _markerEntityIds.TryRemove(def.EntityId, out _);
 
         lock (_gridLock)
         {
@@ -359,6 +365,7 @@ public class ClientWorldState
             _serverWheels.TryRemove(id, out _);
             _audioEntityIds.TryRemove(id, out _);
             _regionEntityIds.TryRemove(id, out _);
+            _markerEntityIds.TryRemove(id, out _);
             if (known) removed.Add(id);
         }
 
@@ -627,8 +634,14 @@ public class ClientWorldState
 
         snap.AudioEntityIds.AddRange(_audioEntityIds.Keys);
         snap.RegionEntityIds.AddRange(_regionEntityIds.Keys);
+        snap.MarkerEntityIds.AddRange(_markerEntityIds.Keys);
         return snap;
     }
+
+    /// <summary>A fixed beacon nothing can bump into: in neither the static grid nor the moving things.</summary>
+    internal static bool IsMarker(EntityDefinition def)
+        => def.Type == EntityType.StaticObject && !def.Moves && !def.Collider.IsSolid
+           && !string.IsNullOrEmpty(def.Identity.BeaconCategory);
 
     private void RebuildGrid()
     {
