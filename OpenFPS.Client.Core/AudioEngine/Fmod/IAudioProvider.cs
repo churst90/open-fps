@@ -106,6 +106,11 @@ public interface IAudioProvider : IDisposable
     {
         toldSpeed = ownSpeed = rpm = 0f; gear = 0; return false;
     }
+
+    /// <summary>For the log: what a vehicle voice puts out and what the mix does with it, stage by stage
+    /// (the voice's own output, its envelope and idle lift, the channel's volume and FMOD's audibility).
+    /// Empty when there is no such voice.</summary>
+    string EngineVoiceDetail(int entityId) => "";
     void StopSound(int entityId);
     bool IsPlaying(int entityId);
     Vector3 GetSoundPosition(int entityId);

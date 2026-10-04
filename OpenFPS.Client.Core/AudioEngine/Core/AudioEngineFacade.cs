@@ -421,6 +421,9 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
 
     /// <summary>See IAudioProvider.TryGetEngineTelemetry — the four numbers that tell apart the four
     /// different reasons a field of cars can sound like it is slowing down.</summary>
+    /// <summary>See IAudioProvider.EngineVoiceDetail.</summary>
+    public string EngineVoiceDetail(int entityId) => _isInitialized ? _provider.EngineVoiceDetail(entityId) : "";
+
     public bool TryGetEngineTelemetry(int entityId, out float toldSpeed, out float ownSpeed, out float rpm, out int gear)
     {
         toldSpeed = ownSpeed = rpm = 0f; gear = 0;

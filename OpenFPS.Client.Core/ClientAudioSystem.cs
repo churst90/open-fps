@@ -1585,6 +1585,8 @@ public class ClientAudioSystem
                 Log.Information("  car {Id} ({Preset}) at {Dist:F0} m: told {Told:F0} km/h, driveline {Own:F0} km/h, {Rpm:F0} rpm, gear {Gear}",
                                 id, _carPreset.GetValueOrDefault(id, "?"), MathF.Sqrt(_censusOrder[i].D2),
                                 told * 3.6f, own * 3.6f, rpm, gear);
+                string detail = _audio.EngineVoiceDetail(id);
+                if (detail.Length > 0) Log.Information("    car {Id}: {Detail}", id, detail);
             }
 
             // What actually reaches you loudest, and by which route: the answer to "why can I still

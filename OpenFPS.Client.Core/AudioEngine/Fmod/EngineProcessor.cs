@@ -716,6 +716,11 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
     // idling car sits where an idling car's level would have been placed. On for live voices only
     // (the provider sets it): offline renders — the lab, the tests — still measure true pascals.
     public bool CompensateLevel;
+    /// <summary>For the log: the last block's output, dBFS RMS; the envelope; the idle lift as a gain.</summary>
+    public float LastOutputDb => Volatile.Read(ref _lastOutputDb);
+    private float _lastOutputDb = -120f;
+    public float EnvelopeNow => _envelope;
+    public float LiftNow => _levelGain;
     private double _levelMs;
     private float _levelGain = 1f;
     private const float LevelSeconds = 0.5f, MaxLiftDb = 20f;
@@ -1016,10 +1021,12 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
             // idling nearly nine decibels too far.
             liftTarget = MathF.Pow(10f, LiftDb(nowDb, Vehicle.SourceLevelDb) / 20f);
         }
-        float liftStep = MathF.Max(1e-4f, (liftTarget - _levelGain) / MathF.Max(1, count));
+        // Either way: a floor on the step made a FALLING lift rise through the block and then snap down
+        // to its target at the end of it, a step in the waveform every block while an engine revved.
+        float liftStep = (liftTarget - _levelGain) / MathF.Max(1, count);
         var wheels = Wheels;
         bool perWheel = WheelsDrive(wheels, inside);
-        double blockSum = 0, tyreSum = 0;
+        double blockSum = 0, tyreSum = 0, outSum = 0;
         float windLpA = 1f - MathF.Exp(-2f * MathF.PI * 1200f * dt);
         float windHpA = MathF.Exp(-2f * MathF.PI * 180f * dt);
         for (int i = 0; i < count; i++)
@@ -1224,12 +1231,15 @@ public sealed class EngineVoiceState : IRenderedVoice, IGuardedUnit
             float extras = (1f - _interiorMix) * rearExtras
                          + _interiorMix * (chimeOut + 0.5f * airOut);
             pa = (pa - extras) * _levelGain + extras;
-            _ring[(int)(w & mask)] = pa * gain * _envelope;
+            float outSample = pa * gain * _envelope;
+            _ring[(int)(w & mask)] = outSample;
+            outSum += (double)outSample * outSample;
             _front[(int)(w & mask)] = (front * _levelGain + (1f - _interiorMix) * frontExtras) * gain * _envelope;
             w++;
         }
         Volatile.Write(ref _written, w);
         _levelGain = liftTarget;
+        if (count > 0) Volatile.Write(ref _lastOutputDb, 10f * MathF.Log10((float)(outSum / count) + 1e-12f));
         // How much of it came off the road surface itself: the tyres' share of the pressure, for the
         // ground reflection (GroundReflection.NearGroundShare). Smoothed over about half a second.
         if (blockSum > 1e-12)

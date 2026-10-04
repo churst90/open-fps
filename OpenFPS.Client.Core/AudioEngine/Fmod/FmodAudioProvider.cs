@@ -4625,6 +4625,23 @@ public class FmodAudioProvider : IAudioProvider
         return true;
     }
 
+    public string EngineVoiceDetail(int entityId)
+    {
+        lock (_lock)
+        {
+            var a = FindActive(entityId);
+            if (a?.EngineState is not { } st) return "";
+            static float Db(float g) => 20f * MathF.Log10(MathF.Max(g, 1e-9f));
+            a.Channel.getVolume(out float volume);
+            a.Channel.getAudibility(out float audibility);
+            a.Channel.isVirtual(out bool isVirtual);
+            a.Channel.getPaused(out bool paused);
+            return $"voice out {st.LastOutputDb:F1} dBFS, envelope {st.EnvelopeNow:F2}, lift {Db(st.LiftNow):F1} dB, "
+                 + $"{(st.Running ? "running" : "off")}{(st.Interior ? ", interior" : "")}, channel volume {Db(volume):F1} dB, "
+                 + $"audibility {Db(audibility):F1} dB{(isVirtual ? ", VIRTUAL" : "")}{(paused ? ", PAUSED" : "")}";
+        }
+    }
+
     public void ReviveEngine(int entityId)
     {
         lock (_lock)
