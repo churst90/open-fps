@@ -4,7 +4,7 @@ using System.Collections.Generic;
 namespace OpenFPS.Common;
 
 /// <summary>What a handling sound is: a reload of so many rounds, from empty or not, or a dry fire.</summary>
-public readonly record struct HandlingSpec(string WeaponId, bool IsReload, int Rounds, bool FromEmpty);
+public readonly record struct HandlingSpec(string WeaponId, bool IsReload, int Rounds, bool FromEmpty, bool IsCycle = false);
 
 /// <summary>
 /// The noises of working a gun by hand: a reload and the click of a trigger on an empty chamber.
@@ -40,10 +40,29 @@ public static class WeaponHandling
 
     public static string DryFireKey(WeaponDefinition weapon) => DryFirePrefix + weapon.Id;
 
+    public const string CyclePrefix = "cycle:";
+
+    /// <summary>"cycle:m700": a bolt worked by hand after a shot, to put the next round in the chamber.</summary>
+    public static string CycleKey(WeaponDefinition weapon) => CyclePrefix + weapon.Id;
+
+    /// <summary>Whether a gun is worked by hand between shots, and so makes its action's sound after
+    /// every one rather than only on a reload.</summary>
+    public static bool CyclesByHand(WeaponDefinition weapon) => weapon.Action == WeaponAction.BoltAction;
+
+    /// <summary>How long after the shot the hand reaches the bolt: the recoil settles first.</summary>
+    public const float CycleAfterShotSeconds = 0.35f;
+
     public static bool TryParseKey(string? key, out HandlingSpec spec)
     {
         spec = default;
         if (string.IsNullOrEmpty(key)) return false;
+        if (key.StartsWith(CyclePrefix, StringComparison.Ordinal))
+        {
+            string id = key[CyclePrefix.Length..];
+            if (!WeaponRegistry.TryGet(id, out _)) return false;
+            spec = new HandlingSpec(id, IsReload: false, 0, false, IsCycle: true);
+            return true;
+        }
         if (key.StartsWith(DryFirePrefix, StringComparison.Ordinal))
         {
             string id = key[DryFirePrefix.Length..];
@@ -66,14 +85,14 @@ public static class WeaponHandling
 
     /// <summary>How long the routine a key names takes, seconds.</summary>
     public static float Seconds(HandlingSpec spec)
-        => WeaponRegistry.TryGet(spec.WeaponId, out var w) ? Routine(w, spec.IsReload, spec.Rounds, spec.FromEmpty).Done : 0f;
+        => WeaponRegistry.TryGet(spec.WeaponId, out var w) ? Routine(w, spec.IsReload, spec.Rounds, spec.FromEmpty, spec.IsCycle).Done : 0f;
 
     /// <summary>The loudest contact in the routine, dB SPL at a metre: the level to send it at.</summary>
     public static float LevelDb(HandlingSpec spec)
     {
         if (!WeaponRegistry.TryGet(spec.WeaponId, out var w)) return 60f;
         float loudest = 0f;
-        foreach (var c in Routine(w, spec.IsReload, spec.Rounds, spec.FromEmpty).Contacts) loudest = MathF.Max(loudest, c.Db);
+        foreach (var c in Routine(w, spec.IsReload, spec.Rounds, spec.FromEmpty, spec.IsCycle).Contacts) loudest = MathF.Max(loudest, c.Db);
         return loudest;
     }
 
@@ -118,13 +137,30 @@ public static class WeaponHandling
     /// a pump's two stops 0.1 s apart) and from how long the hands take between (fetching a magazine
     /// from a pouch, about three quarters of a second).
     /// </summary>
-    private static Plan Routine(WeaponDefinition w, bool isReload, int rounds, bool fromEmpty)
+    private static Plan Routine(WeaponDefinition w, bool isReload, int rounds, bool fromEmpty, bool isCycle = false)
     {
         var c = new List<Contact>();
+        if (isCycle)
+        {
+            // A bolt worked after a shot: the handle lifted (cocking the striker, a click), the bolt
+            // drawn back to its stop and the case flicked out, then run forward stripping the next
+            // round off the magazine into the chamber, and the handle turned down to lock.
+            c.Add(new(0.00f, Part.Click, 64f));
+            c.Add(new(0.04f, Part.Slide, 58f, 0.12f));
+            c.Add(new(0.16f, Part.Clack, 70f));
+            c.Add(new(0.34f, Part.Slide, 56f, 0.11f));
+            c.Add(new(0.45f, Part.Seat, 70f));
+            c.Add(new(0.52f, Part.Click, 68f));
+            return new Plan(c, 0.7f);
+        }
         if (!isReload)
         {
             switch (w.Action)
             {
+                case WeaponAction.BoltAction:
+                    // A striker falling on an empty chamber inside a closed bolt: muffled by the bolt.
+                    c.Add(new(0.005f, Part.Hammer, 66f));
+                    return new Plan(c, 0.15f);
                 case WeaponAction.Revolver:
                     // Double action: the pull turns the cylinder a chamber before the hammer falls.
                     c.Add(new(0.005f, Part.Click, 58f));
@@ -255,6 +291,31 @@ public static class WeaponHandling
                 else done = t - 0.55f + 0.30f;   // the last shell, and the hand back to the grip
                 break;
             }
+
+            case WeaponAction.BoltAction:
+            {
+                // The bolt lifted and drawn back to open the action.
+                c.Add(new(0.00f, Part.Click, 62f));
+                c.Add(new(0.04f, Part.Slide, 56f, 0.12f));
+                c.Add(new(0.16f, Part.Clack, 68f));
+                // A hand to the cartridges, then each one pressed down past the feed lips into the
+                // box: a short slide of brass on steel and the round snapping under the lips.
+                int n = Math.Max(1, rounds);
+                float t = 0.85f;
+                for (int i = 0; i < n; i++)
+                {
+                    c.Add(new(t, Part.Slide, 50f, 0.05f));
+                    c.Add(new(t + 0.06f, Part.ShellClick, 64f));
+                    t += 0.6f;
+                }
+                // The bolt run forward over the top round, chambering it, and turned down to lock.
+                t += 0.05f;
+                c.Add(new(t, Part.Slide, 56f, 0.11f));
+                c.Add(new(t + 0.11f, Part.Seat, 72f));
+                c.Add(new(t + 0.18f, Part.Click, 68f));
+                done = t + 0.4f;
+                break;
+            }
         }
         return new Plan(c, done);
     }
@@ -270,7 +331,7 @@ public static class WeaponHandling
     public static float[] Render(HandlingSpec spec, int sampleRate, int seed)
     {
         if (!WeaponRegistry.TryGet(spec.WeaponId, out var w)) return new float[16];
-        var plan = Routine(w, spec.IsReload, spec.Rounds, spec.FromEmpty);
+        var plan = Routine(w, spec.IsReload, spec.Rounds, spec.FromEmpty, spec.IsCycle);
         var rng = new Random(seed);
         float pace = 1f - 0.04f * (float)rng.NextDouble();
         float sr = sampleRate;

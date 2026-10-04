@@ -39,9 +39,28 @@ internal static class GtkKeyMap
     private const uint GDK_Alt_L = 0xffe9;
     private const uint GDK_Alt_R = 0xffea;
     private const uint GDK_F1 = 0xffbe; // F1..F12 are contiguous
+    // The keypad with Num Lock on: the scope's keys.
+    private const uint GDK_KP_Enter = 0xff8d;
+    private const uint GDK_KP_Multiply = 0xffaa;
+    private const uint GDK_KP_Add = 0xffab;
+    private const uint GDK_KP_Subtract = 0xffad;
+    private const uint GDK_KP_Decimal = 0xffae;
+    private const uint GDK_KP_0 = 0xffb0; // KP_0..KP_9 are contiguous
+    // The keypad with Num Lock off reports navigation keys, KP_Home (0xff95) to KP_Delete (0xff9f).
+    // Those are Orca's review keys and are deliberately not mapped.
+    private const uint GDK_KP_Home = 0xff95;
+    private const uint GDK_KP_Delete = 0xff9f;
+
+    /// <summary>What a keypad keyval says about Num Lock: 1 on (a keypad digit or point), 0 off (a
+    /// keypad navigation key), -1 nothing (any other key).</summary>
+    public static int NumLockFromKeyval(uint keyval)
+        => keyval >= GDK_KP_0 && keyval <= GDK_KP_0 + 9 || keyval == GDK_KP_Decimal ? 1
+         : keyval >= GDK_KP_Home && keyval <= GDK_KP_Delete ? 0
+         : -1;
 
     public static GameKey Map(uint keyval)
     {
+        if (keyval >= GDK_KP_0 && keyval <= GDK_KP_0 + 9) return GameKey.Numpad0 + (int)(keyval - GDK_KP_0);
         // Letters: normalize upper-case (Shift) to lower, then offset from GameKey.A.
         if (keyval >= 0x041 && keyval <= 0x05a) keyval += 0x20; // A-Z -> a-z
         if (keyval >= 0x061 && keyval <= 0x07a) return GameKey.A + (int)(keyval - 0x061);
@@ -67,6 +86,12 @@ internal static class GtkKeyMap
             GDK_bracketleft or GDK_braceleft => GameKey.BracketLeft,
             GDK_bracketright or GDK_braceright => GameKey.BracketRight,
             GDK_KP_Divide => GameKey.NumpadDivide,
+            GDK_KP_Multiply => GameKey.NumpadMultiply,
+            GDK_KP_Add => GameKey.NumpadAdd,
+            GDK_KP_Subtract => GameKey.NumpadSubtract,
+            GDK_KP_Decimal => GameKey.NumpadDecimal,
+            // The keypad's Enter is Enter: it fires a gun in your hands and interacts otherwise.
+            GDK_KP_Enter => GameKey.Enter,
             GDK_Left => GameKey.Left,
             GDK_Right => GameKey.Right,
             GDK_Up => GameKey.Up,

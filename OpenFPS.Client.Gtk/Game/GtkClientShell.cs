@@ -63,6 +63,8 @@ internal sealed class GtkClientShell : IClientShell
     /// text entry is open — otherwise the player would walk while typing.</summary>
     public bool IsGameInputActive => _gameWindow is { IsActive: true } && !_consoleOpen;
 
+    public bool? NumLockOn => _gameWindow?.NumLockOn;
+
     // ── IClientShell ────────────────────────────────────────────────────────────
 
     public void ShowLoading(string status, bool speak = true) => OnUi(() =>

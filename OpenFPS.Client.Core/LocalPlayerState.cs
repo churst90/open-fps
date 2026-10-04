@@ -58,6 +58,8 @@ public class LocalPlayerState
     public string HeldWeaponId { get; set; } = "";
     /// <summary>Rounds in it, or -1 with none.</summary>
     public int HeldRounds { get; set; } = -1;
+    /// <summary>The scope on it (a ScopeRegistry id), or empty: what numpad star raises.</summary>
+    public string HeldScopeId { get; set; } = "";
     public string CurrentMaterial { get; set; } = "Generic";
     public string CurrentVariant { get; set; } = "0";
     public const string UnknownArea = "Unknown Area";

@@ -47,6 +47,10 @@ public static class Loudness
     /// beside the shooter's hand as well as at the muzzle.</summary>
     public const float Magnum357Db = 164f;
     public const float Shotgun12GaugeDb = 160f;
+    /// <summary>.308 Winchester from a 24-inch bolt gun: about 167 dB at the shooter in the published
+    /// hearing-protection tables, two above the 5.56 for nearly twice the powder. The 5.56 stays the
+    /// reference the mix was set against; this is the one thing louder.</summary>
+    public const float Rifle308Db = 167f;
 
     /// <summary>A round striking concrete a few metres away.</summary>
     public const float BulletImpactDb = 120f;
@@ -307,6 +311,7 @@ public static class Loudness
             case ".45 ACP": return Pistol45Db;
             case ".357 Magnum": return Magnum357Db;
             case "12 gauge 00 buck": return Shotgun12GaugeDb;
+            case ".308 Winchester": return Rifle308Db;
         }
         string cartridge = w.Cartridge ?? "";
         if (_unknownCartridges.TryAdd(cartridge, 0))

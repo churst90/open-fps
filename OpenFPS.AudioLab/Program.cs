@@ -99,6 +99,7 @@ string[] usage =
     "  --gun-spec                                    synthesized shots against the NIJ recordings",
     "  --reload-spec [refs=DIR] [only=]              the gun-handling recordings measured: contacts, falls, bands",
     "  --reload-sounds [out=DIR]                     every reload and dry fire rendered, measured the same way",
+    "  --scope-sounds [out=DIR]                      the scope's guidance tone and breath as played, and the M700's sounds",
     "  --gun-fit [nij=DIR] [tag=] [wavs] [grid]      every weapon's report against its own NIJ takes",
     "  --speech-lines                                decodes every shipped voice line as the client does",
     "  --ground-voice [--ladder]                     a talker's ground reflection three ways",
@@ -456,6 +457,11 @@ if (args.Contains("--gun-spec"))
 if (args.Contains("--reload-spec"))
 {
     Environment.Exit(OpenFPS.AudioLab.Spikes.ReloadSpecSpike.Run(args));
+}
+
+if (args.Contains("--scope-sounds"))
+{
+    Environment.Exit(OpenFPS.AudioLab.Spikes.ScopeSoundsSpike.Run(args));
 }
 
 if (args.Contains("--reload-sounds"))

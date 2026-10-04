@@ -75,8 +75,15 @@ public sealed class MainWindow : Form
         OnKey(e.KeyCode, down: false);
     }
 
+    private volatile int _numLock = -1;   // -1 unknown, 0 off, 1 on
+
+    /// <summary>Whether Num Lock was on at the last key in this window, or null before any. Read on
+    /// the UI thread, where the keyboard's toggle state is current.</summary>
+    public bool? NumLockOn => _numLock < 0 ? null : _numLock == 1;
+
     private void OnKey(Keys code, bool down)
     {
+        if (down) _numLock = Control.IsKeyLocked(Keys.NumLock) ? 1 : 0;
         // Windows reports a modifier as the generic ShiftKey / ControlKey / Menu, not which side. Ask
         // the keyboard state for both sides instead, so right shift is right shift as it is on Linux,
         // and a release is never credited to the wrong side.

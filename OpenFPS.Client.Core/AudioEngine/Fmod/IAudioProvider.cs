@@ -139,6 +139,15 @@ public interface IAudioProvider : IDisposable
     /// <summary>Plays a short interface sound in both ears, not in the world: no position, no room.
     /// The buffer is made once per id and kept; <paramref name="volume"/> is 0..1.</summary>
     void PlayUiSound(string id, Func<float[]> render, int sampleRate, float volume);
+    /// <summary>
+    /// Keeps an interface LOOP playing in a named slot (the scope's guidance tone): the loop
+    /// <paramref name="id"/> at <paramref name="volume"/> and playback rate <paramref name="pitch"/>.
+    /// The same id again only changes the volume and rate; a different id fades the old loop out and
+    /// the new one in, so changing between them never clicks.
+    /// </summary>
+    void SetUiLoop(string slot, string id, Func<float[]> render, int sampleRate, float volume, float pitch) { }
+    /// <summary>Fades the loop in a slot out and stops it.</summary>
+    void StopUiLoop(string slot) { }
     /// <summary>Fades the world (everything but the interface sounds), 0..1. 1 is as authored.</summary>
     void SetWorldFade(float gain) { }
 
