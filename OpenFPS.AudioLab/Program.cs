@@ -204,6 +204,11 @@ if (args.Contains("--bullet-pass"))
     Environment.Exit(OpenFPS.AudioLab.Spikes.BulletPassSpike.Run(args));
 }
 
+if (args.Contains("--glass"))
+{
+    Environment.Exit(OpenFPS.AudioLab.Spikes.GlassSpike.Run(args));
+}
+
 if (args.Contains("--heard-levels"))
 {
     Environment.Exit(HeardLevelsSpike.Run(args));

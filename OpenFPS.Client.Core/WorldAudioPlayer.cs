@@ -89,6 +89,18 @@ public sealed class WorldAudioPlayer
     /// is dropped, which is what the drop was always for — but only for the ones that are actually late.
     /// </summary>
     internal const double MaxRenderLateness = 0.12;
+
+    /// <summary>
+    /// The same for a pane of glass. A pane breaks once, so its break and its landing are always first
+    /// hearings, and its simulation takes 30-150 ms (GlassFracture, every piece counted): held to the clap's
+    /// allowance, a window shot out on a slow machine would be silent. A crash a few hundred milliseconds
+    /// late is still the crash.
+    /// </summary>
+    internal const double GlassRenderLateness = 0.4;
+
+    private static double LatenessFor(in TransientSound sound)
+        => sound.SynthKey != null && sound.SynthKey.StartsWith(GlassFracture.KeyPrefix, StringComparison.Ordinal)
+            ? GlassRenderLateness : MaxRenderLateness;
     private readonly System.Collections.Concurrent.ConcurrentQueue<(string Id, float[] Pcm)> _rendered = new();
 
     /// <summary>
@@ -217,7 +229,8 @@ public sealed class WorldAudioPlayer
     internal static float[] RenderDoorKey(string key, System.Collections.Concurrent.ConcurrentDictionary<string, float> fullScaleDb)
     {
         if (key.StartsWith(CarWindow.KeyPrefix, StringComparison.Ordinal)) return CarWindow.RenderKey(key, TransientSynth.SampleRate);
-        float[] pcm = key.StartsWith(PushBarDoor.KeyPrefix, StringComparison.Ordinal) ? PushBarDoor.RenderKey(key, TransientSynth.SampleRate, out float db)
+        float[] pcm = key.StartsWith(GlassFracture.KeyPrefix, StringComparison.Ordinal) ? GlassFracture.RenderKey(key, TransientSynth.SampleRate, out float db)
+                    : key.StartsWith(PushBarDoor.KeyPrefix, StringComparison.Ordinal) ? PushBarDoor.RenderKey(key, TransientSynth.SampleRate, out db)
                     : key.StartsWith(SlidingDoor.KeyPrefix, StringComparison.Ordinal) ? SlidingDoor.RenderKey(key, TransientSynth.SampleRate, out db)
                     : KnobDoor.RenderKey(key, TransientSynth.SampleRate, out db);
         if (db > 0f) fullScaleDb[key] = db;
@@ -352,7 +365,7 @@ public sealed class WorldAudioPlayer
         {
             var item = _awaitingRender[i];
             bool ready = _registered.Contains(item.SoundId);
-            bool late = now > item.DueAt + MaxRenderLateness;
+            bool late = now > item.DueAt + LatenessFor(item.Sound);
             if (!ready && !late && _rendering.Contains(item.SoundId)) continue;
             _awaitingRender.RemoveAt(i);
             if (ready && !late) _pending.Add(item);
@@ -1124,7 +1137,8 @@ public sealed class WorldAudioPlayer
         if (sound.SynthKey != null && (sound.SynthKey.StartsWith(KnobDoor.KeyPrefix, StringComparison.Ordinal)
                                        || sound.SynthKey.StartsWith(PushBarDoor.KeyPrefix, StringComparison.Ordinal)
                                        || sound.SynthKey.StartsWith(SlidingDoor.KeyPrefix, StringComparison.Ordinal)
-                                       || sound.SynthKey.StartsWith(CarWindow.KeyPrefix, StringComparison.Ordinal)))
+                                       || sound.SynthKey.StartsWith(CarWindow.KeyPrefix, StringComparison.Ordinal)
+                                       || sound.SynthKey.StartsWith(GlassFracture.KeyPrefix, StringComparison.Ordinal)))
             return RenderDoorKey(sound.SynthKey, _fullScaleDb);
 
         return TransientSynth.Render(sound, seed);
@@ -1257,7 +1271,8 @@ public sealed class WorldAudioPlayer
         if (sound.SynthKey != null && (sound.SynthKey.StartsWith(KnobDoor.KeyPrefix, StringComparison.Ordinal)
                                        || sound.SynthKey.StartsWith(PushBarDoor.KeyPrefix, StringComparison.Ordinal)
                                        || sound.SynthKey.StartsWith(SlidingDoor.KeyPrefix, StringComparison.Ordinal)
-                                       || sound.SynthKey.StartsWith(CarWindow.KeyPrefix, StringComparison.Ordinal)))
+                                       || sound.SynthKey.StartsWith(CarWindow.KeyPrefix, StringComparison.Ordinal)
+                                       || sound.SynthKey.StartsWith(GlassFracture.KeyPrefix, StringComparison.Ordinal)))
             return $"synth:{sound.SynthKey}";
         if (!string.IsNullOrEmpty(sound.SynthKey)) return $"synth:{sound.SynthKey}:{seed & 3}";
         return $"synth:{sound.Character}:{hz}:{level}:{decay}:{noise}:{seed & 3}";

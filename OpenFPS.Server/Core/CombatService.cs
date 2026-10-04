@@ -709,7 +709,7 @@ public sealed class CombatService
         {
             // A rifle bullet goes through a window and on, a little slower; the window does not.
             f.BrokenGlass.Add(hitEntity.Id);
-            BreakGlass(f.Shooter, world, hitEntity, tr, col, f.Weapon);
+            BreakGlass(f.Shooter, world, grid, hitEntity, tr, col, f.Weapon, f.State.Velocity.Length());
             f.State.Velocity *= 0.9f;
             return false;
         }
@@ -843,8 +843,8 @@ public sealed class CombatService
     /// direct readout of which floor the shot was on. One crash sample throws that away, and a sighted
     /// game would never notice it was gone.
     /// </summary>
-    private void BreakGlass(UserSession session, World world, Entity pane, Transform t,
-                            ColliderComponent collider, WeaponDefinition weapon)
+    private void BreakGlass(UserSession session, World world, SpatialGrid<Entity> grid, Entity pane, Transform t,
+                            ColliderComponent collider, WeaponDefinition weapon, float speed)
     {
         var glass = new GlassPane(
             Centre: t.Position,
@@ -863,9 +863,15 @@ public sealed class CombatService
         var events = new List<GlassEvent>(count);
         for (int i = 0; i < count; i++) events.Add(buffer[i]);
 
+        // The pane's own thickness where the prefab says how it is built (a glazing box is two leaves with
+        // the depth of the box between them), else the box's depth; and what the glass lands on.
+        float thickness = world.Has<AcousticComponent>(pane) && world.Get<AcousticComponent>(pane).LeafMetres > 0f
+            ? world.Get<AcousticComponent>(pane).LeafMetres : MathF.Max(0.003f, collider.Size.Z);
+        Vector3 foot = t.Position - new Vector3(0f, glass.HeightAboveGround + collider.Size.Y * 0.5f, 0f) + glass.Normal * 0.8f;
+        PhysicsUtils.GetGroundHeight(world, grid, foot + new Vector3(0f, 0.5f, 0f), new[] { pane }, out string ground);
         _server.EmitWorldAudio(session.CurrentMapId, pane.Id, "glass",
-                               GlassSound.From(events, glass.Type, glass.Size,
-                                               MathF.Max(0.003f, collider.Size.Z)));
+                               GlassSound.From(events, glass, weapon, thickness,
+                                               string.IsNullOrEmpty(ground) ? "Concrete" : ground, pane.Id, speed));
         _maps.DestroyEntity(session.CurrentMapId, pane);
         _server.BroadcastRemoval(session.CurrentMapId, pane.Id);
     }

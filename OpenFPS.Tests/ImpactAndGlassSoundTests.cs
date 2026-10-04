@@ -97,156 +97,200 @@ public class ImpactAndGlassSoundTests
 
     // ── Glass ───────────────────────────────────────────────────────────────────────────────────
 
+    private static List<GlassEvent> Resolve(GlassPane pane, WeaponDefinition weapon, int seed)
+    {
+        Span<GlassEvent> buffer = stackalloc GlassEvent[48];
+        int n = GlassBreak.Resolve(pane, pane.Centre, weapon, seed, buffer);
+        var events = new List<GlassEvent>();
+        for (int i = 0; i < n; i++) events.Add(buffer[i]);
+        return events;
+    }
+
+    private static GlassFracture.Spec Spec(GlassFracture.Part part, GlassType type, float w, float h, float t,
+                                           float drop = 0.9f, string ground = "Concrete", WeaponDefinition? weapon = null)
+    {
+        var (kg, pellets) = GlassFracture.BulletOf(weapon ?? WeaponRegistry.Glock);
+        return new GlassFracture.Spec(part, type, w, h, t, kg, (weapon ?? WeaponRegistry.Glock).MuzzleVelocity, pellets, drop, ground, 0);
+    }
+
+    private static double EnergyDb(double[] x, int from = 0, int to = int.MaxValue)
+    {
+        double e = 1e-30;
+        for (int i = Math.Max(0, from); i < Math.Min(x.Length, to); i++) e += x[i] * x[i];
+        return 10 * Math.Log10(e);
+    }
+
+    /// <summary>Energy above <paramref name="hz"/>: the signal less a one-pole low-pass of itself.</summary>
+    private static double EnergyAboveDb(double[] x, double hz, int rate = 48000)
+    {
+        double a = Math.Exp(-2 * Math.PI * hz / rate), lp = 0, e = 1e-30;
+        foreach (double v in x) { lp = (1 - a) * v + a * lp; e += (v - lp) * (v - lp); }
+        return 10 * Math.Log10(e);
+    }
+
     /// <summary>
     /// The whole reason GlassBreak was worth writing: a window shot out five floors up makes two
     /// sounds most of two seconds apart, from two different places. The break is at the window; the
     /// glass arrives at the FOOT of the wall. The gap is sqrt(2h/g) — which floor the shot was on.
+    /// Now each is the glass model's own render (GlassFracture), and the landing's starts at the bottom
+    /// edge's fall time, so the first piece to arrive still carries the height.
     /// </summary>
     [Fact]
     public void AWindowUpstairsIsHeardTwiceAndTheGapSaysHowHigh()
     {
-        // Tempered, because that is the type that always fails completely — it is held in compression,
-        // so there is no such thing as a neat hole in it. A rifle round through ANNEALED glass punches
-        // a hole and leaves the pane up, which the model already knows and is the reason this test
-        // would otherwise hear one small tap and nothing else.
         var pane = new GlassPane(new Vector3(0, 15f, 0), new Vector2(1.2f, 1.5f), Vector3.UnitZ,
                                  GlassType.Tempered, HeightAboveGround: 15f);
         Assert.True(WeaponRegistry.TryGet("akm", out var weapon));
+        var sounds = GlassSound.From(Resolve(pane, weapon, 4), pane, weapon, 0.006f, "Concrete", 4);
+        Assert.Equal(2, sounds.Count);
 
-        Span<GlassEvent> buffer = stackalloc GlassEvent[48];
-        int n = GlassBreak.Resolve(pane, pane.Centre, weapon, seed: 4, buffer);
-        var events = new List<GlassEvent>();
-        for (int i = 0; i < n; i++) events.Add(buffer[i]);
+        var brk = sounds.Single(s => s.DelaySeconds == 0f);
+        var landing = sounds.Single(s => s.DelaySeconds > 0f);
+        Assert.True(GlassFracture.TryParseKey(brk.SynthKey, out var b) && b.Part == GlassFracture.Part.Break);
+        Assert.True(GlassFracture.TryParseKey(landing.SynthKey, out var l) && l.Part == GlassFracture.Part.Land);
 
-        var sounds = GlassSound.From(events, pane.Type, pane.Size);
-        Assert.NotEmpty(sounds);
-
-        float breakAt = sounds.Min(s => s.DelaySeconds);
-        // The FIRST piece to arrive is the one that fell freely from the pane; the rest trail it,
-        // because they do not all leave the frame at the same instant. It is the first that carries
-        // the height.
-        // The landings are the ones that arrive at the FOOT of the wall — which is what distinguishes
-        // them, not what they sound like. A piece of glass rings whether it is in the air or on the
-        // pavement; where it is coming from is the information.
-        float firstLanding = sounds.Where(s => s.Position.Y < pane.Centre.Y - 4f).Min(s => s.DelaySeconds);
-
-        Assert.True(firstLanding - breakAt > 1.2f,
-                    $"the glass arrived {firstLanding - breakAt:F2} s after the break, from fifteen metres up");
-        // Close to sqrt(2h/g), but not to the millisecond: the pieces do not all leave the frame at
-        // the same instant, and the first to arrive left a fraction after the pane went.
+        // A tenth of a second before the bottom edge's free fall: a piece thrown downwards arrives first.
         float ideal = GlassBreak.FallSeconds(15f);
-        Assert.InRange(firstLanding, ideal * 0.95f, ideal * 1.15f);
-
-        // The thing that makes it worth modelling: the gap reads back as the height, to within the
-        // odd metre — which is which floor somebody is on.
-        Assert.InRange(GlassBreak.HeightFromFallDelay(firstLanding - breakAt), 13f, 20f);
-
-        // ...and it arrives somewhere else, which is the other half of the information.
-        var landing = sounds.OrderBy(s => s.DelaySeconds).Last();
+        Assert.InRange(landing.DelaySeconds, ideal - 0.11f, ideal);
+        Assert.InRange(GlassBreak.HeightFromFallDelay(landing.DelaySeconds), 13f, 16f);
         Assert.True(landing.Position.Y < pane.Centre.Y - 5f, "the glass landed at the window it fell out of");
+        Assert.Equal(pane.Centre, brk.Position);
+
+        // ...and inside the landing's own render the first piece arrives within a few per cent of the fall
+        // time of its start (drag and the moment it left the frame), so the gap still reads as the floor.
+        var pcm = GlassFracture.Render(l, 48000);
+        double peak = pcm.Max(Math.Abs);
+        int first = Array.FindIndex(pcm, v => Math.Abs(v) > peak * 0.01);
+        Assert.InRange(first / 48000.0, 0.0, 0.12 * ideal);
     }
 
     /// <summary>
-    /// A pane letting go is not one impact, it is thousands inside a tenth of a second — and a crowd
-    /// that dense stops being heard as impacts at all, which is why it is a NOISE. A single piece
-    /// arriving is one small stiff plate ringing, which is why it is a RING. That is the whole of why
-    /// a window breaking sounds nothing like the pieces of it landing.
-    ///
-    /// The landing was a knock until somebody listened to it and said it sounded like plastic. It
-    /// rings for the same reason the shards in the air ring: it is the same piece of glass.
+    /// Tempered glass dices: every piece counted, and there are tens of thousands of them (EN 12150 asks at
+    /// least 40 in a 50 mm square). Annealed glass breaks into a few hundred shards and slivers.
     /// </summary>
     [Fact]
-    public void ShatteringIsANoiseAndAPieceLandingRings()
+    public void TemperedGlassDicesAndAnnealedGlassShards()
     {
-        var events = new List<GlassEvent>
+        var tempered = GlassFracture.Census(Spec(GlassFracture.Part.Break, GlassType.Tempered, 1.2f, 1.6f, 0.006f));
+        Assert.InRange(tempered.Dice, (int)(1.2 * 1.6 * 16000), (int)(1.2 * 1.6 * 80000));
+        Assert.Equal(0, tempered.Shards);
+
+        var annealed = GlassFracture.Census(Spec(GlassFracture.Part.Break, GlassType.Annealed, 1.2f, 1.6f, 0.006f));
+        Assert.Equal(0, annealed.Dice);
+        Assert.InRange(annealed.Shards + annealed.Slivers, 50, 2000);
+    }
+
+    /// <summary>
+    /// A key names everything the render depends on, and the same key renders the same sound on every
+    /// client (the workers' shares are summed in a fixed order).
+    /// </summary>
+    [Fact]
+    public void AGlassKeyRoundTripsAndRendersTheSameEveryTime()
+    {
+        var spec = Spec(GlassFracture.Part.Land, GlassType.Annealed, 1.2f, 1.6f, 0.006f, drop: 3.9f, ground: "Asphalt");
+        string key = GlassFracture.Key(spec);
+        Assert.True(GlassFracture.TryParseKey(key, out var back));
+        Assert.Equal(key, GlassFracture.Key(back));
+        Assert.Equal("Asphalt", back.Ground);
+        Assert.Equal(3.9f, back.Drop, 3);
+
+        var a = GlassFracture.RenderKey(key, 48000, out float da);
+        var b = GlassFracture.RenderKey(key, 48000, out float db);
+        Assert.Equal(da, db);
+        Assert.Equal(a, b);
+        // Full scale is the render's own peak, and that is a real level: between a dropped cup and a gunshot.
+        Assert.InRange(da, 110f, 155f);
+    }
+
+    /// <summary>
+    /// What the glass lands on decides what is heard: on grass a piece meets something with an elastic
+    /// modulus of a few megapascals, a contact of milliseconds instead of microseconds, so the click is dull
+    /// and the piece hardly rings; on concrete both are bright.
+    /// </summary>
+    [Fact]
+    public void GlassOnGrassIsDullerThanOnConcrete()
+    {
+        var concrete = GlassFracture.Render(Spec(GlassFracture.Part.Land, GlassType.Annealed, 1.2f, 1.6f, 0.006f, ground: "Concrete"), 48000);
+        var grass = GlassFracture.Render(Spec(GlassFracture.Part.Land, GlassType.Annealed, 1.2f, 1.6f, 0.006f, ground: "Grass"), 48000);
+        Assert.True(EnergyAboveDb(concrete, 4000) > EnergyAboveDb(grass, 4000) + 3,
+                    $"above 4 kHz: concrete {EnergyAboveDb(concrete, 4000):F1}, grass {EnergyAboveDb(grass, 4000):F1}");
+    }
+
+    /// <summary>
+    /// How much glass there was decides how much is heard: a shop front coming down is not a car's side
+    /// window coming down, by the energy in the whole landing.
+    /// </summary>
+    [Fact]
+    public void MoreGlassLandsLouder()
+    {
+        var shop = GlassFracture.Render(Spec(GlassFracture.Part.Land, GlassType.Tempered, 2.0f, 2.5f, 0.010f), 48000);
+        var car = GlassFracture.Render(Spec(GlassFracture.Part.Land, GlassType.Tempered, 0.8f, 0.45f, 0.004f), 48000);
+        Assert.True(EnergyDb(shop) > EnergyDb(car) + 6, $"shop {EnergyDb(shop):F1} dB, car window {EnergyDb(car):F1} dB");
+    }
+
+    /// <summary>
+    /// A piece of glass rings at its own modes, a free plate's: f = lambda^2 / (2 pi a^2) sqrt(D / m''), so
+    /// for one shape the note goes with the thickness. A 3 mm piece rings an octave under a 6 mm one of the
+    /// same size, and it keeps ringing: glass loses almost nothing (the recordings' pieces on cement ring with
+    /// a loss factor near 0.0006), so a single drop is still there a tenth of a second later.
+    /// </summary>
+    [Fact]
+    public void ADroppedPieceRingsAtItsPlateModes()
+    {
+        double Strongest(double[] x)
         {
-            new(GlassEventKind.Shatter, 0f, Vector3.Zero, 1f, 1f),
-            new(GlassEventKind.Landing, 1.5f, new Vector3(0, 0, 0), 0.6f, 1f),
-        };
-        var sounds = GlassSound.From(events, GlassType.Annealed, new Vector2(1f, 1.5f));
+            // The strongest line between 2 and 20 kHz over 5-100 ms after the contact: a plain DFT scan.
+            int from = (int)(0.015 * 48000), to = (int)(0.11 * 48000);
+            double best = 0, bestHz = 0;
+            for (double hz = 2000; hz < 20000; hz *= 1.01)
+            {
+                double re = 0, im = 0, w = 2 * Math.PI * hz / 48000;
+                for (int i = from; i < to; i++) { re += x[i] * Math.Cos(w * i); im += x[i] * Math.Sin(w * i); }
+                double m = re * re + im * im;
+                if (m > best) { best = m; bestHz = hz; }
+            }
+            return bestHz;
+        }
+        var thin = GlassFracture.RenderDrop(0.06, 0.045, 0.003, 0.3, "Concrete", 48000, 1);
+        var thick = GlassFracture.RenderDrop(0.06, 0.045, 0.006, 0.3, "Concrete", 48000, 1);
+        double ft = Strongest(thin), fk = Strongest(thick);
+        Assert.InRange(fk / ft, 1.5, 2.6);
 
-        Assert.Equal(SoundCharacter.Hiss, sounds.First(s => s.DelaySeconds < 0.1f).Character);
-        var landing = sounds.Single(s => s.DelaySeconds > 1f);
-        Assert.Equal(SoundCharacter.Ring, landing.Character);
-        Assert.True(landing.Hz > 2500f, $"the piece landed at {landing.Hz:F0} Hz, which is not glass");
+        // Still ringing 100-200 ms on, within 30 dB of its first 50 ms.
+        Assert.True(EnergyDb(thick, 4800, 9600) > EnergyDb(thick, 480, 2880) - 30,
+                    $"{EnergyDb(thick, 4800, 9600):F1} against {EnergyDb(thick, 480, 2880):F1}");
     }
 
     /// <summary>
-    /// How much glass there was decides how loud it is. A shop front going in is not a wing mirror
-    /// going in, and the energy a pane releases is the strain energy stored in it — which scales with
-    /// its VOLUME, so twice the area and twice the thickness is four times the glass and six decibels
-    /// more of it.
+    /// Laminated glass keeps the pane: a hole and no fall at all, a very distinctive absence that tells a
+    /// listener something about the building. Its interlayer damps the pane, so the hole dies away far
+    /// quicker than one through plain glass.
     /// </summary>
     [Fact]
-    public void HowMuchGlassThereWasDecidesHowLoudItIs()
+    public void LaminatedGlassTakesAHoleAndKeepsThePane()
     {
-        var shatter = new List<GlassEvent> { new(GlassEventKind.Shatter, 0f, Vector3.Zero, 1f, 1f) };
+        var pane = new GlassPane(new Vector3(0, 2f, 0), new Vector2(1f, 1.5f), Vector3.UnitZ, GlassType.Laminated, 1.2f);
+        var sounds = GlassSound.From(Resolve(pane, WeaponRegistry.Shotgun, 1), pane, WeaponRegistry.Shotgun, 0.0076f, "Concrete", 1);
+        var only = Assert.Single(sounds);
+        Assert.True(GlassFracture.TryParseKey(only.SynthKey, out var spec) && spec.Part == GlassFracture.Part.Hole);
 
-        float window = Level(shatter, new Vector2(1.2f, 1.6f), 0.006f);   // a house window
-        float mirror = Level(shatter, new Vector2(0.2f, 0.15f), 0.003f);  // a wing mirror
-        float front = Level(shatter, new Vector2(3f, 2.5f), 0.010f);      // a shop front
-
-        Assert.True(mirror < window - 8f, $"the mirror came out at {mirror:F0} dB against the window's {window:F0}");
-        Assert.True(front > window + 5f, $"the shop front came out at {front:F0} dB against the window's {window:F0}");
-
-        // Four times the glass is six decibels, which is the law and not a taste setting.
-        float doubled = Level(shatter, new Vector2(2.4f, 1.6f), 0.012f);
-        Assert.Equal(6f, doubled - window, 1);
+        double Tail(double[] x) => EnergyDb(x, 4800, 24000) - EnergyDb(x, 0, 4800);
+        var laminated = GlassFracture.Render(Spec(GlassFracture.Part.Hole, GlassType.Laminated, 1f, 1.5f, 0.0076f), 48000);
+        var annealed = GlassFracture.Render(Spec(GlassFracture.Part.Hole, GlassType.Annealed, 1f, 1.5f, 0.006f, weapon: WeaponRegistry.Akm), 48000);
+        Assert.True(Tail(laminated) < Tail(annealed) - 6, $"laminated tail {Tail(laminated):F1} dB, annealed {Tail(annealed):F1} dB");
     }
 
-    /// <summary>
-    /// A shop front is not a loud teacup. Size has to reach the CHARACTER and not only the level: a
-    /// crack crosses a bigger sheet over a longer time and releases bigger fragments, so the event
-    /// lasts longer and sits lower.
-    /// </summary>
+    /// <summary>A piece falling through air arrives later than in a vacuum, and a fine dust of glass much
+    /// later; a heavy piece over a few metres hardly differs (terminal speeds of 15-20 m/s).</summary>
     [Fact]
-    public void ABigPaneIsLowerAndLongerAndNotJustLouder()
+    public void DragDelaysTheSmallPieces()
     {
-        var shatter = new List<GlassEvent> { new(GlassEventKind.Shatter, 0f, Vector3.Zero, 1f, 1f) };
-
-        var cup = GlassSound.From(shatter, GlassType.Tempered, new Vector2(0.25f, 0.2f), 0.003f)[0];
-        var front = GlassSound.From(shatter, GlassType.Tempered, new Vector2(3f, 2.5f), 0.010f)[0];
-
-        Assert.True(front.Hz < cup.Hz * 0.6f, $"the shop front broke at {front.Hz:F0} Hz and the cup at {cup.Hz:F0}");
-        Assert.True(front.DecaySeconds > cup.DecaySeconds * 2f,
-                    $"the shop front lasted {front.DecaySeconds:F2} s and the cup {cup.DecaySeconds:F2} s");
-        Assert.True(front.LevelDb > cup.LevelDb + 10f);
-    }
-
-    /// <summary>Thicker glass breaks into bigger pieces, and a bigger piece of a stiff plate rings
-    /// lower. Four-millimetre glass tinkles brighter than ten.</summary>
-    [Fact]
-    public void ThickerGlassTinklesLower()
-    {
-        var shards = new List<GlassEvent> { new(GlassEventKind.Shard, 0.2f, Vector3.Zero, 0.8f, 1f) };
-        float thin = GlassSound.From(shards, GlassType.Tempered, new Vector2(1f, 1f), 0.004f)[0].Hz;
-        float thick = GlassSound.From(shards, GlassType.Tempered, new Vector2(1f, 1f), 0.012f)[0].Hz;
-        Assert.True(thick < thin * 0.7f, $"ten-mil rang at {thick:F0} Hz against four-mil's {thin:F0}");
-    }
-
-    private static float Level(List<GlassEvent> events, Vector2 size, float thickness)
-        => GlassSound.From(events, GlassType.Tempered, size, thickness)
-                     .First(s => s.Character == SoundCharacter.Hiss).LevelDb;
-
-    /// <summary>
-    /// Laminated glass keeps the pane: a dull crunch and no fall at all. A very distinctive absence,
-    /// and it tells a listener something about the building they are shooting at.
-    /// </summary>
-    [Fact]
-    public void LaminatedGlassIsDullerAndDoesNotRing()
-    {
-        var shatter = new List<GlassEvent> { new(GlassEventKind.Shatter, 0f, Vector3.Zero, 1f, 1f) };
-
-        var annealed = GlassSound.From(shatter, GlassType.Annealed, new Vector2(1f, 1.5f));
-        var laminated = GlassSound.From(shatter, GlassType.Laminated, new Vector2(1f, 1.5f));
-
-        float annealedHz = annealed.First(s => s.Character == SoundCharacter.Hiss).Hz;
-        float laminatedHz = laminated.First(s => s.Character == SoundCharacter.Hiss).Hz;
-        Assert.True(laminatedHz < annealedHz * 0.5f, "laminated glass should be far duller");
-
-        // Only annealed glass is briefly still a pane as it fails, so only it gives up a note.
-        Assert.Contains(annealed, s => s.Character == SoundCharacter.Ring);
-        Assert.DoesNotContain(laminated, s => s.Character == SoundCharacter.Ring);
+        double vacuum = GlassBreak.FallSeconds(10f);
+        var heavy = GlassFracture.FallWithDrag(10, 0, 20);
+        var fine = GlassFracture.FallWithDrag(10, 0, 5);
+        Assert.InRange(heavy.Seconds, vacuum, vacuum * 1.15);
+        Assert.True(fine.Seconds > vacuum * 1.4);
+        Assert.InRange(fine.Speed, 4.5, 5.0);
     }
 
     // ── The named-model escape hatch ────────────────────────────────────────────────────────────
