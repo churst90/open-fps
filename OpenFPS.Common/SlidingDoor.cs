@@ -141,7 +141,7 @@ public static class SlidingDoor
     /// recording's slides stand under its stops.</summary>
     public static float OpenLevelDb(Kind kind, int variant) => (kind, ((variant % Variants) + Variants) % Variants) switch
     {
-        (Kind.Patio, 0) => 62.6f, (Kind.Patio, 1) => 68.4f, (Kind.Patio, 2) => 74.3f, (Kind.Patio, _) => 74.2f,
+        (Kind.Patio, 0) => 62.6f, (Kind.Patio, 1) => 68.6f, (Kind.Patio, 2) => 74.3f, (Kind.Patio, _) => 74.2f,
         (Kind.Automatic, 0) => 53.2f, (Kind.Automatic, 1) => 52.9f, (Kind.Automatic, 2) => 61.4f, _ => 70.1f,
     };
     public static float CloseLevelDb(Kind kind, int variant) => (kind, ((variant % Variants) + Variants) % Variants) switch
