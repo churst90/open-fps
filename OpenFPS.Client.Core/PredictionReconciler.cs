@@ -36,8 +36,15 @@ public sealed class PredictionReconciler
 
     public int PendingInputs => _history.Count;
 
+    /// <summary>
+    /// What the body pressed into on the last FRESH step, or null. Replays after a correction do not
+    /// touch it: they re-walk inputs whose contacts were already reported once, and a wall bump heard
+    /// again on every server correction would be a bump per packet.
+    /// </summary>
+    public BodyContact? LastContact { get; private set; }
+
     /// <summary>Drops the whole history — call on spawn or any teleport, where replay is meaningless.</summary>
-    public void Reset() => _history.Clear();
+    public void Reset() { _history.Clear(); LastContact = null; }
 
     /// <summary>
     /// Whether the player's position is currently a seat's business rather than their own.
@@ -56,7 +63,7 @@ public sealed class PredictionReconciler
     public void Step(ClientInputUpdate input, WorldSnapshot snapshot, float dt)
     {
         _physics.ApplyLook(input, dt);
-        if (!Riding) _physics.Predict(input, snapshot, dt);
+        LastContact = Riding ? null : _physics.Predict(input, snapshot, dt);
 
         // Still recorded while riding: the server acknowledges these sequence numbers, and the yaw
         // reconciliation below needs to know which look deltas it has not seen yet.

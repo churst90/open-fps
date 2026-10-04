@@ -41,8 +41,28 @@ public static class SharedMovementEngine
         public Vector3 MapMax;
     }
 
-    public static (Vector3 NewPosition, Vector3 NewVelocity, bool IsGrounded) Step(MovementContext ctx, ReadOnlySpan<Collider> nearbyColliders)
+    /// <summary>
+    /// What held the body back this step, if anything: the collider it pushed into and was stopped
+    /// by (not one it climbed as a step), the surface's outward normal, and how fast the attempted
+    /// horizontal motion was going INTO it. A body sliding along a wall has a small
+    /// <see cref="IntoSpeed"/>; one walking straight at it has all of its speed there. The client's
+    /// wall bump reads it; nothing in the step depends on it.
+    /// </summary>
+    public struct Contact
     {
+        public bool Blocked;
+        /// <summary>Index into the colliders passed to <see cref="Step(MovementContext, ReadOnlySpan{Collider}, out Contact)"/>.</summary>
+        public int ColliderIndex;
+        public Vector3 Normal;
+        public float IntoSpeed;
+    }
+
+    public static (Vector3 NewPosition, Vector3 NewVelocity, bool IsGrounded) Step(MovementContext ctx, ReadOnlySpan<Collider> nearbyColliders)
+        => Step(ctx, nearbyColliders, out _);
+
+    public static (Vector3 NewPosition, Vector3 NewVelocity, bool IsGrounded) Step(MovementContext ctx, ReadOnlySpan<Collider> nearbyColliders, out Contact contact)
+    {
+        contact = default;
         Vector3 pos = ctx.Position;
         Vector3 vel = ctx.Velocity;
         float dt = ctx.DeltaTime;
@@ -143,6 +163,7 @@ public static class SharedMovementEngine
         {
             Vector3 nextPos = pos + remainingMove;
             GeometryUtils.CollisionResult bestHit = new() { IsColliding = false };
+            int bestIndex = -1;
 
             for (int j = 0; j < nearbyColliders.Length; j++)
             {
@@ -164,7 +185,10 @@ public static class SharedMovementEngine
                     hit.Material = col.Material;
 
                     if (!bestHit.IsColliding || hit.Penetration > bestHit.Penetration)
+                    {
                         bestHit = hit;
+                        bestIndex = j;
+                    }
                 }
             }
 
@@ -220,6 +244,11 @@ public static class SharedMovementEngine
                 // THERE, plus a skin width so the next test starts clear of it.
                 pos = nextPos + bestHit.Normal * (bestHit.Penetration + CollisionSkinWidth);
                 remainingMove = Vector3.Zero; // spent: the slide is what survived the push-out
+
+                // Reported, not acted on: the hardest the attempted motion pressed into anything.
+                float into = -(vel.X * bestHit.Normal.X + vel.Z * bestHit.Normal.Z);
+                if (into > contact.IntoSpeed)
+                    contact = new Contact { Blocked = true, ColliderIndex = bestIndex, Normal = bestHit.Normal, IntoSpeed = into };
 
                 float velDot = Vector3.Dot(vel, bestHit.Normal);
                 if (velDot < 0)

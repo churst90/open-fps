@@ -253,7 +253,7 @@ internal static partial class GtkClientProgram
 
     private static void ShowSettings()
     {
-        var window = Dialog("Settings", 460, 490);
+        var window = Dialog("Settings", 460, 570);
         var box = VBox(16);
 
         var outputs = new List<string> { "System default" };
@@ -278,6 +278,19 @@ internal static partial class GtkClientProgram
         presenceSounds.OnToggled += (_, _) => _speech.Speak(presenceSounds.GetActive() ? "On" : "Off", true);
         box.Append(presenceSounds);
 
+        // The two navigation aids. N switches the first in game, and /bumps the second.
+        var narration = CheckButton.NewWithLabel("Say what is ahead as you turn");
+        narration.SetActive(NavigationAids.TurnNarration);
+        SpeakOnFocus(narration, () => $"Say what is ahead as you turn, {(narration.GetActive() ? "on" : "off")}");
+        narration.OnToggled += (_, _) => _speech.Speak(narration.GetActive() ? "On" : "Off", true);
+        box.Append(narration);
+
+        var bumps = CheckButton.NewWithLabel("Bump and name what you walk into");
+        bumps.SetActive(NavigationAids.WallBumps);
+        SpeakOnFocus(bumps, () => $"Bump and name what you walk into, {(bumps.GetActive() ? "on" : "off")}");
+        bumps.OnToggled += (_, _) => _speech.Speak(bumps.GetActive() ? "On" : "Off", true);
+        box.Append(bumps);
+
         box.Append(Label.New("Interface sound volume, percent"));
         var volume = SpinButton.NewWithRange(0, 100, 10);
         volume.SetValue(Math.Round(_settings.UiVolume * 100));
@@ -293,6 +306,8 @@ internal static partial class GtkClientProgram
             _settings.UiSounds = uiSounds.GetActive();
             _settings.PresenceSounds = presenceSounds.GetActive();
             _settings.UiVolume = (float)(volume.GetValue() / 100.0);
+            NavigationAids.TurnNarration = narration.GetActive();
+            NavigationAids.WallBumps = bumps.GetActive();
             _settings.Save();
             _session.Audio.SetOutputDevice(_settings.OutputDevice);
             ApplyAudioSettings();

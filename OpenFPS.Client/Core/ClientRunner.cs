@@ -63,6 +63,7 @@ public class ClientRunner
         _settings = ClientSettings.Load();
         if (!Loudness.CompressionFromEnvironment)
             Loudness.DynamicRangeCompression = _settings.LevelCompression;
+        _settings.ApplyNavigationAids();
         _microphone = new VoiceCapture(() => _settings.InputDevice);
 
         // Connecting, logging in, reconnecting and logging out are the session's (shared with Linux);

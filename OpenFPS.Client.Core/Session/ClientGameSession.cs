@@ -40,6 +40,8 @@ public sealed partial class ClientGameSession : IDisposable
 {
     private readonly ClientNetworkService _network;
     private readonly ISpeechOutput _speech;
+    /// <summary>The same speech, remembering the last line: see <see cref="SpeechLog"/>.</summary>
+    private readonly SpeechLog _speechLog;
     private readonly IClientShell _shell;
     private readonly IMicrophoneCapture _microphone;
 
@@ -130,7 +132,8 @@ public sealed partial class ClientGameSession : IDisposable
         bool enableAudio = true)
     {
         _network = network;
-        _speech = speech;
+        _speechLog = new SpeechLog(speech);
+        _speech = _speechLog;
         _shell = shell;
         _audioEngine = audioEngine;
         _microphone = microphone ?? new NullMicrophoneCapture();
@@ -252,6 +255,9 @@ public sealed partial class ClientGameSession : IDisposable
             Say(_state.RidingControls && _audioSystem.Driving.Readout is { } road ? road : _state.CurrentRegion));
         _bindings.Bind(InputContext.Gameplay, GameKey.Comma, LookAhead);
         _bindings.Bind(InputContext.Gameplay, GameKey.B, () => Say(ExertionReadout()));
+        // N: the narration as you turn, on or off, and remembered. Not a screen reader's key, and
+        // nothing else in gameplay had it.
+        _bindings.Bind(InputContext.Gameplay, GameKey.N, ToggleTurnNarration);
 
         // Interaction.
         _bindings.Bind(InputContext.Gameplay, GameKey.E, Interact);
@@ -380,6 +386,7 @@ public sealed partial class ClientGameSession : IDisposable
         "In game. W A S D to move, J / L turn, O / K look up and down, Space jump.",
         "Enter fires the gun in your hands; with no gun it interacts, like E.",
         "C coordinates, F facing, H health, Z area, comma look ahead, E interact or pick up, P scan, I inventory list, Shift I what you carry.",
+        "N turns the narration of what is ahead as you turn on or off.",
         "G take, Q drop, Shift+R draw, T clap or ignition.",
         "R: with a gun, reload; in a vehicle, the window; otherwise put what you hold on your back.",
         "Scope, on the keypad with Num Lock on: star raises it, 8 2 4 6 aim, 5 what is on the crosshair, 7 and 9 the targets in view,",
@@ -500,6 +507,8 @@ public sealed partial class ClientGameSession : IDisposable
         var snapshot = _world.GetSnapshot();
 
         _reconciler.Step(input, snapshot, dt);
+        UpdateWallBump(snapshot, input);
+        UpdateTurnNarration(snapshot, input, gameplayActive);
 
         UpdateShelterFactor(dt, snapshot);
 
@@ -535,6 +544,8 @@ public sealed partial class ClientGameSession : IDisposable
         _reconciler.Riding = _state.IsRiding;
         _reconciler.Reset();
         _controller.Teleported();
+        _bumps.Reset();
+        _turnNarration.Reset();
         _state.VisualOffset = Vector3.Zero;
 
         if (_state.IsRiding && !wasRiding) Serilog.Log.Information("Riding entity {Id}.", ridingEntityId);
@@ -947,6 +958,8 @@ public sealed partial class ClientGameSession : IDisposable
                 _reconciler.Reset(); // CRITICAL: reset the prediction buffer on teleport/spawn
                 _controller.Teleported(); // ...and the stride accumulator, or the spawn walks for you
                 _stairs.Reset();          // ...and which stairs you were at: landing beside some is not walking up to them
+                _bumps.Reset();           // ...and the wall you were last against
+                _turnNarration.Reset();
 
                 Serilog.Log.Information("PlayerSpawned: entity {Id} at {Pos}.", spawn.EntityId, spawn.SpawnTransform.Position);
                 // A spawn after arriving is a teleport (/tp): the server says where to, and the zone is
@@ -972,7 +985,10 @@ public sealed partial class ClientGameSession : IDisposable
                 foreach (var s in update.States)
                     if (s.EntityId == _ownEntityId)
                         if (_reconciler.ApplyServerCorrection(s, update.LastProcessedSequenceId, _world.GetSnapshot()))
+                        {
                             _controller.Teleported();   // moved, not walked: forget the stride
+                            _bumps.Reset();             // ...and the wall you were against
+                        }
                 break;
 
             case WorldAudioEvent audioEvent:
@@ -1093,22 +1109,136 @@ public sealed partial class ClientGameSession : IDisposable
     {
         var snapshot = _world.GetSnapshot();
         Vector3 forward = Vector3.Transform(new Vector3(0, 0, 1), _state.Rotation);
-        Vector3 eyePos = _state.Position + new Vector3(0, _state.EyeHeight, 0);
+        Vector3 feet = _state.Position;
+        Vector3 eyePos = feet + new Vector3(0, _state.EyeHeight, 0);
 
-        if (_physics.Spatial.RaycastSingle(snapshot, eyePos, forward, 20.0f, out var hit, out float dist))
+        // The ground is never the answer: Z says where you stand. A floor you are looking down at
+        // hides whatever is under it, so it is "nothing ahead" rather than the floor. See Sightline.
+        ReadOnlySpan<Vector3> eye = stackalloc Vector3[] { eyePos };
+        if (Sightline.Ahead(_physics.Spatial, snapshot, eye, forward, Sightline.NarrationRange,
+                            feet.Y, eyePos.Y, _ownEntityId) is { } seen)
         {
-            string name = hit.Definition.Identity.Name;
-            if (string.IsNullOrEmpty(name)) name = "an object";
-
-            string material = hit.Definition.Material.Material;
-            string made = string.IsNullOrEmpty(material) || material == "Generic" ? "" : $", {material.ToLowerInvariant()}";
-
-            Say($"{name}{made}, {dist:F1} metres ahead.");
+            string material = seen.Entity.Definition.Material.Material;
+            string made = string.IsNullOrEmpty(material) || material is "Generic" or "None" ? "" : $", {material.ToLowerInvariant()}";
+            Say($"{seen.Name}{made}, {seen.Distance:F1} metres ahead.");
         }
         else
         {
             Say($"Nothing ahead. {_state.CurrentRegion}, facing {_state.GetCompassDirection()}.");
         }
+    }
+
+    // ── Bumping into things ─────────────────────────────────────────────────────────────────────
+
+    private readonly WallBumps _bumps = new();
+    private int _bumpSeed;
+
+    /// <summary>
+    /// After each fresh movement step: if the body pressed into something it had not already met, a
+    /// knock from where it touched and the thing's name. See <see cref="WallBumps"/> for what counts.
+    ///
+    /// Local only: heard by you, through the ordinary world-sound path (placed, occluded, in the
+    /// room), but not sent to the server, so nobody else hears you meet a wall. The prediction that
+    /// finds the contact is the client's; making it a world sound for others would mean the server
+    /// finding the same contact in its own step and sending it out, which is a feature of its own.
+    /// </summary>
+    private void UpdateWallBump(WorldSnapshot snapshot, ClientInputUpdate input)
+    {
+        if (_state.IsRiding) { _bumps.Reset(); return; }
+        // Only faces that stand up, and never the ground: a floor's edge, a kerb, a step you could
+        // take, a ceiling met on a jump.
+        var contact = WallBumps.Resolve(_reconciler.LastContact, snapshot, _state.EyeHeight, out var struck);
+        if (!_bumps.Update(contact, _state.Position) || contact is not { } hit) return;
+        if (!NavigationAids.WallBumps) return;
+
+        string name = Sightline.NameOf(struck);
+        Vector3 where = WallBumps.TouchPoint(struck, hit);
+        var sounds = WallBumps.Sound(struck, hit, where, input.Sprint);
+        Serilog.Log.Information("[BUMP] '{Name}' e{Id} {Material} at {Pos}, intent {Intent:F2}, {Count} sounds {Db:F0} dB",
+            name, hit.EntityId, struck.Definition.Material.Material, where, hit.Intent, sounds.Count,
+            sounds.Count > 0 ? sounds[0].LevelDb : 0f);
+        if (sounds.Count > 0)
+            _audioSystem.WorldAudio.Receive(new WorldAudioEvent
+            {
+                // The thing struck, so the knock is not heard through it.
+                SourceEntityId = hit.EntityId,
+                Label = "bump",
+                Seed = unchecked(++_bumpSeed),
+                Sounds = sounds,
+            }, OpenFPS.Common.AudioClock.Now);
+        _speech.Speak(name, interrupt: true);
+    }
+
+    // ── Saying what is ahead as you turn ────────────────────────────────────────────────────────
+
+    private readonly TurnNarration _turnNarration = new();
+
+    /// <summary>
+    /// After each step: once your own turning has settled, what is in front of you — the nearest
+    /// thing within twenty metres, level, at knee, chest and eye height, and how far; or which way is
+    /// open. See <see cref="TurnNarration"/> for when, and <see cref="Sightline"/> for what.
+    /// </summary>
+    private void UpdateTurnNarration(WorldSnapshot snapshot, ClientInputUpdate input, bool gameplayActive)
+    {
+        // Not riding (the vehicle faces for you), not through a scope (it has its own readout), not
+        // while a list or the console has the keyboard.
+        if (_state.IsRiding || _scope.Raised || !gameplayActive || !NavigationAids.TurnNarration) { _turnNarration.Reset(); return; }
+        // A turn key still held counts as turning: between a tap's step and the sweep that follows
+        // when it is held, no look arrives for a third of a second, which is longer than the settle.
+        bool turned = input.LookDelta.X != 0f
+                   || _turnDownAt.ContainsKey(GameKey.J) || _turnDownAt.ContainsKey(GameKey.L);
+        bool current = _turnNarration.LastLine != null && _speechLog.LastText == _turnNarration.LastLine;
+        switch (_turnNarration.Update(_simTime, turned, current))
+        {
+            case TurnNarration.Step.Interrupt:
+                _speech.Interrupt();
+                break;
+            case TurnNarration.Step.Narrate:
+                var seen = Sightline.AheadLevel(_physics.Spatial, snapshot, _state.Position, _state.Yaw, _state.EyeHeight, _ownEntityId);
+                string line = Sightline.NarrationLine(seen, _state.GetCardinal());
+                if (!_turnNarration.Accept(line, _simTime)) break;
+                Serilog.Log.Information("[NARRATE] '{Line}' facing {Deg:F0} at {Pos}", line,
+                    MathHelper.WrapAngle(_state.Yaw) * 180f / MathF.PI, _state.Position);
+                _speech.Speak(line, interrupt: true);
+                break;
+        }
+    }
+
+    private void ToggleTurnNarration()
+    {
+        NavigationAids.TurnNarration = !NavigationAids.TurnNarration;
+        _turnNarration.Reset();
+        SaveSettings();
+        Say(NavigationAids.TurnNarration ? "Turn narration on." : "Turn narration off.");
+    }
+
+    /// <summary>Writes the settings file with what is live now (see ClientSettings.Save).</summary>
+    private static void SaveSettings()
+    {
+        try { ClientSettings.Load().Save(); }
+        catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException)
+        {
+            Serilog.Log.Warning("Settings not saved: {Error}", ex.Message);
+        }
+    }
+
+    /// <summary>/narrate on|off and /bumps on|off: the two navigation aids, switched and saved.</summary>
+    internal static string NavigationAidCommand(string which, string[] args, Action? save = null)
+    {
+        bool narrate = which == "narrate";
+        bool now = narrate ? NavigationAids.TurnNarration : NavigationAids.WallBumps;
+        if (args.Length > 0)
+        {
+            string a = args[0].ToLowerInvariant();
+            if (a is "on") now = true;
+            else if (a is "off") now = false;
+            else return $"Say /{which} on or /{which} off.";
+            if (narrate) NavigationAids.TurnNarration = now; else NavigationAids.WallBumps = now;
+            (save ?? SaveSettings)();
+        }
+        return narrate
+            ? (now ? "Turn narration on: what is ahead is said as you turn." : "Turn narration off.")
+            : (now ? "Bumps on: walking into something knocks and names it." : "Bumps off.");
     }
 
     /// <summary>
@@ -1386,6 +1516,7 @@ public sealed partial class ClientGameSession : IDisposable
                 Say("Your own settings: /levels, how much of the real loudness differences you hear, or /levels default. "
                   + "/beacons, which beacons you hear. /reverb traced or room. /echoes on or off. "
                   + "/tail and /copies, the reflections' level in decibels, zero is physical. /cabin, the inside of a vehicle. "
+                  + "/narrate on or off, saying what is ahead as you turn, also N. /bumps on or off, the knock and name when you walk into something. "
                   + "Each on its own says where it is set now.");
                 return;
             }
@@ -1455,6 +1586,12 @@ public sealed partial class ClientGameSession : IDisposable
             if (parts[0].ToLowerInvariant() is "scope" or "zoom" or "range" or "zero")
             {
                 if (ScopeCommand(parts[0].ToLowerInvariant(), parts.Skip(1).ToArray()) is { } answer) Say(answer);
+                return;
+            }
+            // So are the navigation aids.
+            if (parts[0].ToLowerInvariant() is "narrate" or "bumps")
+            {
+                Say(NavigationAidCommand(parts[0].ToLowerInvariant(), parts.Skip(1).ToArray()));
                 return;
             }
             // So is how loud the world is: yours, and saved.
