@@ -1091,6 +1091,9 @@ public sealed partial class ClientGameSession : IDisposable
 
     private void Interact()
     {
+        // Something on the ground within reach comes first, and the client chooses which (PickUp).
+        // In a seat E is the door and getting out, as it always was.
+        if (!_state.IsRiding && TryPickUp()) return;
         var targetId = _world.GetClosestEntityId(_state.Position);
         if (targetId.HasValue)
             _network.Send(new InteractRequest { Action = "interact", TargetEntityId = targetId.Value });

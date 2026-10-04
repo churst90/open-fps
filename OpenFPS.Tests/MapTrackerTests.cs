@@ -339,6 +339,120 @@ public class MapTrackerTests
         Assert.Equal(GameKey.NumpadDecimal, GtkKeyMap.Map(0xffae, 0xff9f));
     }
 
+    // ── E and the things on the ground (PickUp) ─────────────────────────────────────────────────
+    //
+    // In this class, not their own, because the tracker's category is a process-wide setting
+    // (NavigationAids.Track) and tests in one class run one at a time.
+
+    private static PickUp.Loose L(int id, string name, float d, string dir, bool front) => new(id, name, d, dir, front);
+
+    [Fact]
+    public void PickUpDecidesInOrder()
+    {
+        var behind = L(1, "Glock 17", 0.8f, "behind", false);
+        var front = L(2, "AKM", 1.2f, "in front", true);
+        var left = L(3, "Torch", 1.5f, "left", false);
+        // Nothing in reach: E is the door and vehicle key.
+        Assert.True(PickUp.Decide(Array.Empty<PickUp.Loose>(), 7).Nothing);
+        // 1. The one picked out with comma or period, though another is nearer and one in front.
+        Assert.Equal(3, PickUp.Decide(new[] { behind, front, left }, selectedId: 3).Take);
+        // ...but only if it is within reach: a selection elsewhere does not count.
+        Assert.Equal(2, PickUp.Decide(new[] { behind, front, left }, selectedId: 99).Take);
+        // 2. The nearest in front, over a nearer one behind.
+        Assert.Equal(2, PickUp.Decide(new[] { behind, front }, null).Take);
+        // 3. Two or more and none in front: a list, nearest first.
+        var list = PickUp.Decide(new[] { behind, left }, null);
+        Assert.Null(list.Take);
+        Assert.Equal(new[] { 1, 3 }, list.Choose!.Select(l => l.Id));
+        // 4. The only one, wherever it is.
+        Assert.Equal(1, PickUp.Decide(new[] { behind }, null).Take);
+    }
+
+    [Fact]
+    public void WhatIsInReachIsSaidAndFacedFromWhereYouStand()
+    {
+        var world = World(Thing(1, "AKM", new Vector3(0, 0.05f, 1.2f), Beacons.Item, EntityType.Item, new Vector3(0.1f, 0.1f, 1f)),
+                          Thing(2, "Glock 17", new Vector3(-1, 0.05f, 0), Beacons.Item, EntityType.Item, new Vector3(0.1f, 0.1f, 0.2f)),
+                          Thing(3, "Crowbar", new Vector3(0.5f, 0.05f, 0.7f), Beacons.Item, EntityType.Item, new Vector3(0.1f, 0.1f, 0.8f)),
+                          Thing(4, "Lamp", new Vector3(3, 0.05f, 0), Beacons.Item, EntityType.Item),        // out of reach
+                          Thing(5, "Back door", new Vector3(0, 1, 1.5f), Beacons.Door));                     // not an item
+        var loose = PickUp.InReach(world, Vector3.Zero, 0f, -1);
+        Assert.Equal(new[] { "Crowbar, 0.9 metres, right in front", "Glock 17, 1 metre, left", "AKM, 1 metre, in front" },
+                     loose.Select(l => l.Label));
+        // Within 45 degrees of the way you face is in front.
+        Assert.Equal(new[] { true, false, true }, loose.Select(l => l.InFront));
+    }
+
+    [Fact]
+    public void ETakesTheTrackedItemThenTheOneInFrontThenAsks()
+    {
+        var was = NavigationAids.Track;
+        try
+        {
+            NavigationAids.Track = TrackCategory.Items;
+            var (session, speech, sent) = NewClientSending();
+            session.SaveTrackedCategory = () => { };
+            session.HandleMessage(new PlayerSpawned { EntityId = 1, SpawnTransform = new Transform { Position = Vector3.Zero, Rotation = Quaternion.Identity } });
+            var glock = Thing(51, "Glock 17", new Vector3(0, 0.05f, -0.8f), Beacons.Item, EntityType.Item, new Vector3(0.1f, 0.1f, 0.2f));
+            var akm = Thing(52, "AKM", new Vector3(0, 0.05f, 1.5f), Beacons.Item, EntityType.Item, new Vector3(0.1f, 0.1f, 1f));
+            session.World.RegisterDefinition(glock.Definition);
+            session.World.RegisterDefinition(akm.Definition);
+
+            // 2. Nothing picked out: the AKM in front, not the nearer Glock behind you.
+            session.Press(GameKey.E);
+            Assert.Equal("#52", Assert.IsType<TextCommand>(sent.Last()).Args.Single());
+            Assert.Equal("take", ((TextCommand)sent.Last()).Command);
+
+            // 1. Period picks out the nearest item, the Glock; E takes that one.
+            session.Press(GameKey.Period);
+            Assert.Equal("Glock 17, behind, 0.8 metres.", speech.Said.Last());
+            session.Press(GameKey.E);
+            Assert.Equal("#51", ((TextCommand)sent.Last()).Args.Single());
+
+            // 3. Two in reach, neither in front, nothing picked out: a list to choose from.
+            session.World.RemoveEntities(new[] { 52 });
+            var torch = Thing(53, "Torch", new Vector3(1.2f, 0.05f, 0), Beacons.Item, EntityType.Item, new Vector3(0.1f, 0.1f, 0.3f));
+            session.World.RegisterDefinition(torch.Definition);
+            session.Press(GameKey.Period, KeyModifiers.Shift);     // Items -> People: nothing picked out
+            int before = sent.Count;
+            session.Press(GameKey.E);
+            Assert.Equal(before, sent.Count);
+            Assert.Equal("Take, 2 items. Glock 17, 0.8 metres, behind", speech.Said.Last());
+            session.Menus.HandleKey(GameKey.Down);
+            Assert.Equal("Torch, 1 metre, right", speech.Said.Last());
+            session.Menus.HandleKey(GameKey.Enter);
+            Assert.Equal("#53", ((TextCommand)sent.Last()).Args.Single());
+            Assert.False(session.Menus.IsOpen);
+
+            // 4. One in reach, behind you: taken.
+            session.World.RemoveEntities(new[] { 53 });
+            session.Press(GameKey.E);
+            Assert.Equal("#51", ((TextCommand)sent.Last()).Args.Single());
+
+            // Nothing in reach: E is what it was, the door or vehicle nearest you, or nothing.
+            session.World.RemoveEntities(new[] { 51 });
+            session.Press(GameKey.E);
+            Assert.Equal("Nothing within reach.", speech.Said.Last());
+            var door = Door(60, "Back door", new Vector3(0, 0, 1.5f));
+            session.World.RegisterDefinition(door.Definition);
+            session.Press(GameKey.E);
+            Assert.Equal((int?)60, Assert.IsType<InteractRequest>(sent.Last()).TargetEntityId);
+        }
+        finally { NavigationAids.Track = was; }
+    }
+
+    private static (ClientGameSession, Speech, List<IMessage>) NewClientSending()
+    {
+        AcousticRegistry.Initialize();
+        var network = new ClientNetworkService();
+        var sent = new List<IMessage>();
+        network.Sending = sent.Add;
+        var speech = new Speech();
+        var session = new ClientGameSession(network, speech, new Shell(), new AudioEngineFacade(),
+            microphone: new NullMicrophoneCapture("none"), enableAudio: false);
+        return (session, speech, sent);
+    }
+
     private static (ClientGameSession, Speech) NewClient()
     {
         AcousticRegistry.Initialize();

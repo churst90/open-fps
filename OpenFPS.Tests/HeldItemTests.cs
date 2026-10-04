@@ -88,6 +88,39 @@ public class HeldItemTests : IDisposable
         Assert.Equal(torch.Id, f.World.Get<HandsComponent>(player.Entity).RightEntityId);
     }
 
+    /// <summary>
+    /// E sends the one it means by its number (PickUp), and taking it says how many more lie within
+    /// E's reach: two guns side by side are not one gun and a secret (Cody, 2026-10-04).
+    /// </summary>
+    [Fact]
+    public void TakingOneByNumberSaysHowManyAreLeftWithinReach()
+    {
+        var f = new Fixture(_dir);
+        var player = f.Player("cody", new Vector3(20, 0, 20));
+        f.Item("Torch", new Vector3(20.4f, 0, 20), massKg: 0.4f);
+        var glock = f.Item("Glock 17", new Vector3(21f, 0, 20), massKg: 0.7f);
+        f.Item("Lamp", new Vector3(21.5f, 0, 20), massKg: 0.7f);
+        f.Item("Crowbar", new Vector3(24f, 0, 20), massKg: 1f);   // out of E's reach: not counted
+
+        // By number, though the torch is nearer.
+        Assert.True(f.Hands.Take(player, "#" + glock.Id, out string message), message);
+        Assert.StartsWith("You take the Glock 17", message);
+        Assert.EndsWith(" Another 2 within reach.", message);
+
+        Assert.True(f.Hands.Take(player, "torch", out message), message);
+        Assert.EndsWith(" Another one within reach.", message);
+    }
+
+    [Fact]
+    public void TheLastOneInReachSaysNothingMore()
+    {
+        var f = new Fixture(_dir);
+        var player = f.Player("cody", new Vector3(20, 0, 20));
+        f.Item("Iron Sword", new Vector3(20.5f, 0, 20));
+        Assert.True(f.Hands.TakeWithin(player, PhysicsConstants.PickUpReach, out string message), message);
+        Assert.DoesNotContain("within reach", message);
+    }
+
     [Fact]
     public void NobodyCanLiftWhatSomebodyElseHasHoldOf()
     {
