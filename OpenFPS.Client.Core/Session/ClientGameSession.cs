@@ -390,7 +390,7 @@ public sealed partial class ClientGameSession : IDisposable
         "C coordinates, F facing, H health, Z area, P look ahead, Shift P scan, E interact or pick up, I inventory list, Shift I what you carry.",
         "Comma and period step through the nearest things of one kind, nearest first; Shift comma and Shift period change the kind:",
         "doors, entrances, stairs, items, people, vehicles, places.",
-        "N turns the narration of what is ahead as you turn on or off.",
+        "N turns the narration of what is ahead, as you turn and move and as things pass, on or off.",
         "G take, Q drop, Shift+R draw, T clap or ignition.",
         "R: with a gun, reload; in a vehicle, the window; otherwise put what you hold on your back.",
         "Scope, on the keypad with Num Lock on: star raises it, 8 2 4 6 aim, 5 what is on the crosshair, 7 and 9 the targets in view,",
@@ -549,7 +549,7 @@ public sealed partial class ClientGameSession : IDisposable
         _reconciler.Reset();
         _controller.Teleported();
         _bumps.Reset();
-        _turnNarration.Reset();
+        _sight.Reset();
         _state.VisualOffset = Vector3.Zero;
 
         if (_state.IsRiding && !wasRiding) Serilog.Log.Information("Riding entity {Id}.", ridingEntityId);
@@ -963,7 +963,7 @@ public sealed partial class ClientGameSession : IDisposable
                 _controller.Teleported(); // ...and the stride accumulator, or the spawn walks for you
                 _stairs.Reset();          // ...and which stairs you were at: landing beside some is not walking up to them
                 _bumps.Reset();           // ...and the wall you were last against
-                _turnNarration.Reset();
+                _sight.Reset();
 
                 Serilog.Log.Information("PlayerSpawned: entity {Id} at {Pos}.", spawn.EntityId, spawn.SpawnTransform.Position);
                 // A spawn after arriving is a teleport (/tp): the server says where to, and the zone is
@@ -1176,37 +1176,65 @@ public sealed partial class ClientGameSession : IDisposable
         _speech.Speak(name, interrupt: true);
     }
 
-    // ── Saying what is ahead as you turn ────────────────────────────────────────────────────────
+    // ── Saying what is ahead: as you turn, look, walk, and as things pass ─────────────────────
 
-    private readonly TurnNarration _turnNarration = new();
+    private readonly SightWatch _sight = new();
+    private readonly System.Diagnostics.Stopwatch _sightClock = new();
+    private double _sightCostMax, _sightCostSum;
+    private int _sightCostCount;
+    private double _sightCostLoggedAt;
 
     /// <summary>
-    /// After each step: once your own turning has settled, what is in front of you — the nearest
-    /// thing within twenty metres, level, at knee, chest and eye height, and how far; or which way is
-    /// open. See <see cref="TurnNarration"/> for when, and <see cref="Sightline"/> for what.
+    /// After each step: what your eyes would tell you. Once your own turning or looking has settled,
+    /// what is in front of you; as you walk or strafe, what has come in front of you; and anything
+    /// crossing in front. See <see cref="SightWatch"/> for when and what, and <see cref="Sightline"/>
+    /// for the ground never being named.
     /// </summary>
     private void UpdateTurnNarration(WorldSnapshot snapshot, ClientInputUpdate input, bool gameplayActive)
     {
         // Not riding (the vehicle faces for you), not through a scope (it has its own readout), not
         // while a list or the console has the keyboard.
-        if (_state.IsRiding || _scope.Raised || !gameplayActive || !NavigationAids.TurnNarration) { _turnNarration.Reset(); return; }
-        // A turn key still held counts as turning: between a tap's step and the sweep that follows
+        if (_state.IsRiding || _scope.Raised || !gameplayActive || !NavigationAids.TurnNarration) { _sight.Reset(); return; }
+        // A look key still held counts as looking: between a tap's step and the sweep that follows
         // when it is held, no look arrives for a third of a second, which is longer than the settle.
-        bool turned = input.LookDelta.X != 0f
-                   || _turnDownAt.ContainsKey(GameKey.J) || _turnDownAt.ContainsKey(GameKey.L);
-        bool current = _turnNarration.LastLine != null && _speechLog.LastText == _turnNarration.LastLine;
-        switch (_turnNarration.Update(_simTime, turned, current))
+        bool looking = input.LookDelta != Vector2.Zero
+                    || _turnDownAt.ContainsKey(GameKey.J) || _turnDownAt.ContainsKey(GameKey.L)
+                    || _turnDownAt.ContainsKey(GameKey.K) || _turnDownAt.ContainsKey(GameKey.O);
+        bool current = _sight.LastLine != null && _speechLog.LastText == _sight.LastLine;
+
+        _sightClock.Restart();
+        var result = _sight.Update(snapshot,
+            new SightWatch.Pose(_state.Position, _state.Yaw, _state.Pitch, _state.EyeHeight),
+            _ownEntityId, _simTime, looking, _state.GetCardinal(), current);
+        _sightClock.Stop();
+        double ms = _sightClock.Elapsed.TotalMilliseconds;
+        _sightCostSum += ms;
+        _sightCostMax = Math.Max(_sightCostMax, ms);
+        _sightCostCount++;
+        // What it costs the game loop, in the log every five minutes: the budget is half a millisecond.
+        if (_simTime - _sightCostLoggedAt >= 300.0)
         {
-            case TurnNarration.Step.Interrupt:
+            Serilog.Log.Information("[SIGHT] cost per tick: mean {Mean:F3} ms, max {Max:F3} ms over {Count} ticks",
+                _sightCostSum / Math.Max(1, _sightCostCount), _sightCostMax, _sightCostCount);
+            _sightCostLoggedAt = _simTime;
+            _sightCostSum = _sightCostMax = 0;
+            _sightCostCount = 0;
+        }
+
+        switch (result.Act)
+        {
+            case SightWatch.Act.Interrupt:
                 _speech.Interrupt();
                 break;
-            case TurnNarration.Step.Narrate:
-                var seen = Sightline.AheadLevel(_physics.Spatial, snapshot, _state.Position, _state.Yaw, _state.EyeHeight, _ownEntityId);
-                string line = Sightline.NarrationLine(seen, _state.GetCardinal());
-                if (!_turnNarration.Accept(line, _simTime)) break;
-                Serilog.Log.Information("[NARRATE] '{Line}' facing {Deg:F0} at {Pos}", line,
+            // Climbing a flight, the treads are ground and nothing else is ahead, so the walk up read out
+            // "Open, South"; the stairs say themselves, and the landing is said when you step off.
+            case SightWatch.Act.Say when result.Line != null && _stairs.OnFlight && result.Cause == "move"
+                                         && result.Line.StartsWith("Open, ", StringComparison.Ordinal):
+                break;
+            case SightWatch.Act.Say when result.Line != null:
+                Serilog.Log.Information("[NARRATE] '{Line}' ({Cause}) facing {Deg:F0} at {Pos}", result.Line, result.Cause,
                     MathHelper.WrapAngle(_state.Yaw) * 180f / MathF.PI, _state.Position);
-                _speech.Speak(line, interrupt: true);
+                _speech.Speak(result.Line, interrupt: result.Interrupt);
                 break;
         }
     }
@@ -1214,7 +1242,7 @@ public sealed partial class ClientGameSession : IDisposable
     private void ToggleTurnNarration()
     {
         NavigationAids.TurnNarration = !NavigationAids.TurnNarration;
-        _turnNarration.Reset();
+        _sight.Reset();
         SaveSettings();
         Say(NavigationAids.TurnNarration ? "Turn narration on." : "Turn narration off.");
     }
@@ -1244,7 +1272,7 @@ public sealed partial class ClientGameSession : IDisposable
             (save ?? SaveSettings)();
         }
         return narrate
-            ? (now ? "Turn narration on: what is ahead is said as you turn." : "Turn narration off.")
+            ? (now ? "Turn narration on: what is ahead is said as you turn, look and move, and what passes in front." : "Turn narration off.")
             : (now ? "Bumps on: walking into something knocks and names it." : "Bumps off.");
     }
 
@@ -1523,7 +1551,7 @@ public sealed partial class ClientGameSession : IDisposable
                 Say("Your own settings: /levels, how much of the real loudness differences you hear, or /levels default. "
                   + "/beacons, which beacons you hear. /reverb traced or room. /echoes on or off. "
                   + "/tail and /copies, the reflections' level in decibels, zero is physical. /cabin, the inside of a vehicle. "
-                  + "/narrate on or off, saying what is ahead as you turn, also N. /bumps on or off, the knock and name when you walk into something. "
+                  + "/narrate on or off, saying what is ahead as you turn and move and what passes in front, also N. /bumps on or off, the knock and name when you walk into something. "
                   + "/track and a kind, what comma and period step through: doors, entrances, stairs, items, people, vehicles or places; also Shift comma and Shift period. "
                   + "Each on its own says where it is set now.");
                 return;

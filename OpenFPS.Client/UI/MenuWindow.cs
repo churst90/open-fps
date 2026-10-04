@@ -316,7 +316,7 @@ public sealed class MenuWindow : Form
         // server can want one off and the other on. The notices are spoken either way.
         var presenceSounds = Check(layout, "Online and offline sounds", _settings.PresenceSounds);
         // The two navigation aids. N switches the first in game, and /bumps the second.
-        var narration = Check(layout, "Say what is ahead as you turn", NavigationAids.TurnNarration);
+        var narration = Check(layout, "Say what is ahead as you turn and move", NavigationAids.TurnNarration);
         var bumps = Check(layout, "Bump and name what you walk into", NavigationAids.WallBumps);
 
         layout.Controls.Add(new Label { Text = "Interface sound volume, percent", AutoSize = true });

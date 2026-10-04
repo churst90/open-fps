@@ -76,6 +76,9 @@ public sealed class TurnNarration
         return true;
     }
 
+    /// <summary>True from a turn until the narration after it: the head is still moving or settling.</summary>
+    public bool Pending => _pending;
+
     /// <summary>The last line accepted, for telling whether it is still the last thing said.</summary>
     public string? LastLine => _spoken;
 
