@@ -49,4 +49,9 @@ public class UserRecord
     public string? Permissions { get; set; }
     // Added 2026-10-03: a role an administrator made (RoleRepository), on top of Player. Null for none.
     public string? CustomRole { get; set; }
+    // Added 2026-10-04: where the player was, their health and their stats, as JSON (PlayerState).
+    public string? PlayerState { get; set; }
+    // Added 2026-10-04: what they were carrying when they left the world, as JSON (Belongings). Taken
+    // (read and cleared) when they come back, so a thing is either here or in the world, never both.
+    public string? Belongings { get; set; }
 }

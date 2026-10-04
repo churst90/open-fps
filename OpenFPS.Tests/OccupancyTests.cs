@@ -8,6 +8,7 @@ using OpenFPS.Common;
 using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
 using OpenFPS.Server.Core;
+using Microsoft.EntityFrameworkCore;
 using OpenFPS.Server.Repositories;
 using OpenFPS.Server.Systems;
 using Xunit;
@@ -762,6 +763,43 @@ public class OccupancyTests : IDisposable
         var other = f.Player("finder", f.World.Get<Transform>(crowbar).Position);
         Assert.True(hands.Take(other, "crowbar", out m), m);
         Assert.True(hands.Take(other, "torch", out m), m);
+    }
+
+    /// <summary>
+    /// Logging out in the passenger seat of a car that is still moving: leaving the world is not a
+    /// request, so the car does not refuse it, and the place kept for coming back is standing beside
+    /// the car, which is where the next login puts you.
+    /// </summary>
+    [Fact]
+    public void LeavingTheWorldFromAMovingCarKeepsAPlaceBesideIt()
+    {
+        var f = new Fixture(_dir);
+        var repo = new SqliteUserRepository(
+            new DbContextOptionsBuilder<AppDbContext>()
+                .UseSqlite($"Data Source={Path.Combine(_dir, "accounts.db")}").Options, workFactor: 4);
+        Assert.True(repo.AddUser("passenger", "correct horse", UserRole.Player));
+        var hands = new HandsService(f.Maps);
+        var server = new OpenFPS.Server.GameServer(repo);
+        server.Attach(f.Maps, f.Sessions, f.Seats, hands);
+
+        int root = f.BuildCar(new Vector3(20, 0, 20));
+        var session = f.Player("passenger", new Vector3(21, 0, 20));
+        Assert.True(f.Seats.Enter(session, root, null, out string m), m);
+        f.World.Get<DriveComponent>(f.Entity(root)).Speed = 25f;
+        var car = f.RootTransform(root).Position;
+
+        Assert.True(f.Sessions.TryRemoveSession(session.ConnectionId, out _));
+        server.DespawnSession(session);
+        server.DrainCommandBuffer();
+
+        var state = PlayerState.Parse(repo.GetUser("passenger")!.PlayerState);
+        var place = Assert.IsType<SavedPlace>(state.PlaceOn(f.MapId));
+        var at = new Vector3(place.X, place.Y, place.Z);
+        float toCar = Vector3.Distance(Flat(at), Flat(car));
+        Assert.True(toCar < 8f, $"kept a place {toCar:F1} m from the car");
+        Assert.False(MovementSystem.CheckCollision(f.World, f.Grid, at, PhysicsConstants.PlayerRadius, PhysicsConstants.PlayerHeight),
+                     "the place kept is inside the car or something else");
+        Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
     }
 
     private static Arch.Core.Entity Item(Fixture f, string name, Vector3 at)

@@ -342,7 +342,10 @@ MAP_MAX = (900.0, 900.0, 1350.0)
 BUILT_MIN = (-520.0, -360.0)
 BUILT_MAX = (520.0, 560.0)
 
-SPAWN = (0.0, 0.1, -40.0)                # Main Street, downtown, facing north up the grid
+# Where a new player lands: on the south pavement of Foundry Street (x 60, z 122; the pavement is
+# z 120.5..124 and 0.12 high), facing north across the street. It was the middle of Main Street, in
+# the traffic, until Cody asked on 2026-10-04 to start on a sidewalk, at a spot he had stood on.
+SPAWN = (60.0, 0.15, 122.0)
 
 # ══ Ground ════════════════════════════════════════════════════════════════════════════════════════
 #
@@ -2214,4 +2217,4 @@ print(f"  bounds {MAP_MAX[0] - MAP_MIN[0]:.0f} x {MAP_MAX[1]:.0f} x {MAP_MAX[2] 
       f"{len(HOUSES)} houses, {len(TRACKS)} routes, {len(VEHICLES) - len(AIR)} vehicles, {len(AIR)} aircraft")
 print(f"  rail loop {sum(math.dist((RAIL[i][0], RAIL[i][2]), (RAIL[(i + 1) % len(RAIL)][0], RAIL[(i + 1) % len(RAIL)][2])) for i in range(len(RAIL))):.0f} m, "
       f"{len(RAIL)} points")
-print(f"  spawn {SPAWN}, facing north up Main Street")
+print(f"  spawn {SPAWN}, on the Foundry Street pavement facing north")

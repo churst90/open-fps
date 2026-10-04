@@ -60,6 +60,8 @@ public class SqliteUserRepository : IUserRepository
         ("RealName", "TEXT NULL"),
         ("Permissions", "TEXT NULL"),
         ("CustomRole", "TEXT NULL"),
+        ("PlayerState", "TEXT NULL"),
+        ("Belongings", "TEXT NULL"),
     };
 
     /// <summary>
@@ -170,6 +172,8 @@ public class SqliteUserRepository : IUserRepository
             RealName = record.RealName,
             Permissions = record.Permissions,
             CustomRole = record.CustomRole,
+            PlayerState = record.PlayerState,
+            Belongings = record.Belongings,
         };
     }
 
@@ -258,6 +262,23 @@ public class SqliteUserRepository : IUserRepository
 
     public bool SetGrants(string username, string grants)
         => Update(username, r => r.Permissions = string.IsNullOrEmpty(grants) ? null : grants);
+
+    public bool SavePlayer(string username, string? state, string? belongings) => Update(username, r =>
+    {
+        r.PlayerState = state;
+        r.Belongings = belongings;
+    });
+
+    public string? TakeBelongings(string username)
+    {
+        string? taken = null;
+        Update(username, r =>
+        {
+            taken = r.Belongings;
+            r.Belongings = null;
+        });
+        return taken;
+    }
 
     private bool Update(string username, Action<UserRecord> change)
     {

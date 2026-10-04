@@ -503,6 +503,139 @@ public class HandsService
         return mass;
     }
 
+    // ── Leaving the world with your things, and coming back with them ───────────────────────────
+
+    /// <summary>
+    /// What a player is carrying, written down to be kept while they are away: hands first, then the
+    /// back in the order it was loaded, then the spare rounds. <paramref name="packed"/> is the things
+    /// written down, which the caller takes out of the world once the record is safely stored
+    /// (<see cref="Release"/>). A thing not made from a prefab cannot be made again, so it is left out
+    /// and stays with the body, to be put down like anything else.
+    /// </summary>
+    public Belongings Pack(World world, Entity player, Dictionary<int, Entity> lookup, out List<Entity> packed)
+    {
+        var kept = new Belongings();
+        packed = new List<Entity>();
+
+        void Keep(Entity item, string place, List<Entity> into)
+        {
+            string prefab = world.Has<IdentityComponent>(item) ? world.Get<IdentityComponent>(item).PrefabId ?? "" : "";
+            if (prefab.Length == 0 || !_maps.Prefabs.ContainsKey(prefab)) return;
+            var saved = new SavedItem { Prefab = prefab, Place = place };
+            // A gun nobody has asked about yet is loaded the way it would be the moment anybody did.
+            if (Arms.IsWeapon(world, item, out var weapon)) Arms.Ammo(world, item, weapon);
+            if (world.Has<AmmoComponent>(item))
+            {
+                var ammo = world.Get<AmmoComponent>(item);
+                saved.Rounds = ammo.Rounds;
+                saved.Capacity = ammo.Capacity;
+                saved.SpareRounds = ammo.SpareRounds;
+            }
+            kept.Items.Add(saved);
+            into.Add(item);
+        }
+
+        if (world.Has<HandsComponent>(player))
+        {
+            var hands = world.Get<HandsComponent>(player);
+            var right = Find(world, lookup, hands.RightEntityId);
+            var left = Find(world, lookup, hands.LeftEntityId);
+            if (right != null && hands.RightEntityId == hands.LeftEntityId) Keep(right.Value, SavedItem.BothHands, packed);
+            else
+            {
+                if (right != null) Keep(right.Value, SavedItem.Right, packed);
+                if (left != null) Keep(left.Value, SavedItem.Left, packed);
+            }
+        }
+        foreach (var item in Stowed(world, player, lookup)) Keep(item, SavedItem.Back, packed);
+
+        if (world.Has<AmmoReserveComponent>(player) && world.Get<AmmoReserveComponent>(player).Rounds is { } rounds)
+            foreach (var (ammoId, n) in rounds)
+                if (n > 0) kept.Spares[ammoId] = n;
+        return kept;
+    }
+
+    /// <summary>
+    /// Takes packed things off a player and out of the world, once what they were is stored: out of
+    /// the hands and off the back first, so nothing is left naming them, then destroyed. The spare
+    /// rounds go too. Returns the ids destroyed, for the caller to tell the clients.
+    /// </summary>
+    public List<int> Release(string mapId, World world, Entity player, IEnumerable<Entity> packed)
+    {
+        var gone = new List<int>();
+        foreach (var item in packed)
+        {
+            ClearFromHands(world, player, item.Id);
+            if (world.Has<InventoryComponent>(player)) Bag(world, player).Remove(item.Id);
+            if (!world.IsAlive(item)) continue;
+            gone.Add(item.Id);
+            _maps.DestroyEntity(mapId, item);
+        }
+        if (world.Has<AmmoReserveComponent>(player)) world.Get<AmmoReserveComponent>(player).Rounds?.Clear();
+        _maps.RefreshGrid(mapId);
+        return gone;
+    }
+
+    /// <summary>
+    /// Gives a player back what they were carrying when they left: each thing made again from its
+    /// prefab, into the hand it was in (or both, or onto the back), loaded as it was, and the spare
+    /// rounds into their pockets. Nothing is weighed or refused: it was all being carried when it was
+    /// put away. A thing whose prefab this server no longer has cannot be made, and is said in the log.
+    /// Returns how many things came back.
+    /// </summary>
+    public int Unpack(string mapId, World world, Entity player, Belongings kept, string username = "")
+    {
+        var at = world.Get<Transform>(player).Position;
+        if (!world.Has<HandsComponent>(player)) world.Add(player, new HandsComponent());
+        int made = 0;
+        foreach (var saved in kept.Items)
+        {
+            if (!_maps.Prefabs.ContainsKey(saved.Prefab))
+            {
+                Log.Warning("{User} had a {Prefab}, which this server can no longer make; it is lost.", username, saved.Prefab);
+                continue;
+            }
+            var item = _maps.SpawnPrefab(mapId, saved.Prefab, at);
+            if (item == Entity.Null) continue;
+            if (saved.Rounds is int rounds)
+                SetOrAdd(world, item, new AmmoComponent
+                {
+                    Rounds = rounds,
+                    Capacity = saved.Capacity ?? rounds,
+                    SpareRounds = saved.SpareRounds ?? 0,
+                });
+
+            ref var hands = ref world.Get<HandsComponent>(player);
+            switch (saved.Place)
+            {
+                case SavedItem.BothHands when hands.RightEntityId < 0 && hands.LeftEntityId < 0:
+                    hands.RightEntityId = hands.LeftEntityId = item.Id;
+                    Attach(world, player, item, BothHands, bothHands: true);
+                    break;
+                case SavedItem.Right when hands.RightEntityId < 0:
+                    hands.RightEntityId = item.Id;
+                    Attach(world, player, item, RightHand, bothHands: false);
+                    break;
+                case SavedItem.Left when hands.LeftEntityId < 0:
+                    hands.LeftEntityId = item.Id;
+                    Attach(world, player, item, LeftHand, bothHands: false);
+                    break;
+                default:
+                    // The back, or a hand somehow already full: it rides on the back instead.
+                    if (!world.Has<InventoryComponent>(player)) world.Add(player, new InventoryComponent());
+                    Bag(world, player).Add(item.Id);
+                    Attach(world, player, item, Back, bothHands: false);
+                    break;
+            }
+            Carried?.Invoke(item.Id);
+            made++;
+        }
+        foreach (var (ammoId, n) in kept.Spares)
+            if (n > 0) Arms.AddReserve(world, player, ammoId, n);
+        _maps.RefreshGrid(mapId);
+        return made;
+    }
+
     // ── The mechanics the four commands share ───────────────────────────────────────────────────
 
     private bool TryGetHolder(UserSession session, out World world, out SpatialGrid<Entity> grid,
