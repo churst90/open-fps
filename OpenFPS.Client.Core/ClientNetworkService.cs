@@ -127,13 +127,35 @@ public class ClientNetworkService : INetEventListener
         {
             _connectPending = true;
             _pendingTarget = _lastTarget;
-            _netManager.Connect(ip, port, "OpenFPS_Key");
+            _netManager.Connect(Resolve(ip), port, "OpenFPS_Key");
         }
         catch (Exception ex)
         {
             _connectPending = false;
             Log.Error(ex, "Connect to {Target} could not be started.", _lastTarget);
             OnConnectionFailed?.Invoke($"Could not connect to {_lastTarget}. {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// A server named by host name, as its IPv4 address when it has one. LiteNetLib resolves a name to
+    /// its IPv6 address whenever the machine has IPv6, and a connection to codyhurst.com that way was
+    /// never answered, from a machine whose IPv6 pinged the server fine; by its IPv4 address the same
+    /// login was accepted (2026-10-03). An address typed as an address is used as it is.
+    /// </summary>
+    internal static string Resolve(string host)
+    {
+        if (IPAddress.TryParse(host, out _)) return host;
+        try
+        {
+            var addresses = Dns.GetHostAddresses(host);
+            var v4 = Array.Find(addresses, a => a.AddressFamily == AddressFamily.InterNetwork);
+            return (v4 ?? (addresses.Length > 0 ? addresses[0] : null))?.ToString() ?? host;
+        }
+        catch (SocketException ex)
+        {
+            Log.Warning("Could not look up {Host}: {Error}", host, ex.Message);
+            return host;
         }
     }
 

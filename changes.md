@@ -4,6 +4,11 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-03
 
+- Connecting to a server by name (codyhurst.com) uses its IPv4 address. LiteNetLib picked the IPv6
+  address, and that connection was never answered; by IPv4 the same login is accepted.
+- The VPS runs build 074d2a719a38 (voice chat). The previous build is backed up on the VPS as
+  `~/openfps-server-backup-e27b577838ac.tar.gz`.
+
 - Bursts of street noise when walking between rooms are fixed. A doorway is the wall's thickness and
   lies in no room's box, so for sound it was treated as outdoors: in the Brandt Court stairwell's
   doorway the outdoor reverb went from 1 % to 100 % while Cody stood in it, carrying the traffic and
