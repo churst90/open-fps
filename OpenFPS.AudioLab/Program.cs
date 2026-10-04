@@ -93,6 +93,7 @@ string[] usage =
     "  --knob-door [out=] [seed=] [only=] [stems=]   the physical knob door: opens and shuts, hinges worn and oiled",
     "  --pushbar-door [out=] [only=] [stems=]        the physical push-bar door: each character opening and shutting on its closer",
     "  --sliding-door [out=] [only=] [stems=]        the physical sliding doors: a patio door and an automatic door, each character",
+    "  --patio-vs-ref [ref=] [wav=] [only=] [out=]   the patio door measured against the recording of a real one, side by side",
     "  --car-window [out=] [only=]                    a car's power window going down, up and half way, each character",
     "  --beacon-tones [out=]                         each beacon three times at its real period",
     "  --presence-sounds [out=]                      the online, logged out, connection lost, away and back cues, measured",
@@ -464,6 +465,11 @@ if (args.Contains("--gun-fit"))
 if (args.Contains("--gun-spec"))
 {
     Environment.Exit(OpenFPS.Client.Core.AudioEngine.Fmod.GunSpecSpike.Run(args));
+}
+
+if (args.Contains("--patio-vs-ref"))
+{
+    Environment.Exit(OpenFPS.AudioLab.Spikes.PatioRefSpike.Run(args));
 }
 
 if (args.Contains("--reload-spec"))

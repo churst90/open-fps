@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using static OpenFPS.Common.DoorPhysics;
 
@@ -27,7 +28,11 @@ namespace OpenFPS.Common;
 ///
 ///   The WEATHERSTRIP: polypropylene pile brushing the frame, a drag and a hiss from its fibres slipping.
 ///
-///   On a PATIO door: a hand on the pull, a hook latch thrown by its lever, a bumper at each end.
+///   On a PATIO door: a hand on the pull handle, which has play on its fixings; a hook latch thrown by its
+///   lever; pile that grips the leaf where it stands; the jamb's pile and bulb, and the jamb itself behind
+///   them; a rubber bumper in the head track. An opening is the latch, the hand taking up the pull, the
+///   leaf breaking away and brought to rest by the hand; a shutting is a push that carries the leaf into the
+///   jamb, its handle thrown across its play in the pile, and the stile meeting the jamb.
 ///   On an AUTOMATIC door: the controller's speed profile (acceleration, run, check speed into each end),
 ///   a DC motor and worm gear on a rubber-mounted bracket, a toothed belt to the carriage, and a solenoid
 ///   lock that lifts before the door moves and drops when it is shut.
@@ -70,24 +75,33 @@ public static class SlidingDoor
 
     /// <summary>
     /// What wear does to a sliding door, by character: new, standard, worn, old.
-    /// Grit: grains per metre of track and their mean size. Roughness: the rail's and the wheel's, RMS.
+    /// Grit: grains per metre of track and their mean size. Roughness: the rail's and the wheel's, RMS (on a
+    /// patio door, as a profilometer reports it at the 2.5 mm cut-off).
     /// Flat: how deep a flat the wheel has (a polyurethane tyre left standing under a leaf takes a flat of a
-    /// tenth of a millimetre or so). Tyre: nylon, polyurethane, or an old patio door's steel wheels
-    /// on a stainless cap (an old automatic door's polyurethane replaced with hard nylon). Pile: the weatherstrip's drag, N (a patio door takes 40-50 N to keep moving, nearly all of it
+    /// tenth of a millimetre or so). Tyre: nylon, polyurethane, or steel (an old automatic door's polyurethane
+    /// replaced with hard nylon). Every patio door rolls on nylon, as the hardware makers fit it on aluminium
+    /// track: the old one is the same door grown dirty, pitted and flatted, not steel wheels (on steel, each
+    /// grain clicked and rang: Cody's "metallic"). Pile: the weatherstrip's drag, N (a patio door takes 40-50 N to keep moving, nearly all of it
     /// the seals). Roll: rolling and bearing resistance as a share of the load.
     /// Tooth: an automatic door's gear transmission error, m.
     /// </summary>
     private enum Tyre { Nylon, Urethane, Steel }
 
     private readonly record struct Character(double GritPerMetre, double GritMicron, double RailMicron,
-        double WheelMicron, double FlatMicron, Tyre Tyre, double Pile, double Roll, double Tooth);
+        double WheelMicron, double FlatMicron, Tyre Tyre, double Pile, double Roll, double Tooth, double Breakaway = 1,
+        double HandlePlay = 0.0003);
 
+    /// <summary>Breakaway (a patio door's): what it takes to start the leaf over what keeps it moving, from a
+    /// new door's 1.1 to a dirty old one's 1.4. HandlePlay: how far the pull handle moves each way on its
+    /// fixings before it bears, from a new door's 0.05 mm to the 0.3 mm of an old one whose screws have
+    /// worked loose. (At 0.3 mm on every door, the knock of a hand taking up the pull stood level with the
+    /// slide; the recording's clicks as a hand takes hold are 6-15 dB under it.)</summary>
     private static Character Of(Kind kind, int variant) => (kind, variant % Variants) switch
     {
-        (Kind.Patio, 0) => new(0.3, 60, 0.5, 2, 0, Tyre.Nylon, 35, 0.005, 0),
-        (Kind.Patio, 1) => new(1, 120, 1.0, 4, 5, Tyre.Nylon, 42, 0.008, 0),
-        (Kind.Patio, 2) => new(3, 150, 2.5, 8, 15, Tyre.Nylon, 50, 0.015, 0),
-        (Kind.Patio, _) => new(4, 100, 4.0, 6, 3, Tyre.Steel, 45, 0.02, 0),
+        (Kind.Patio, 0) => new(0.3, 60, 0.5, 2, 0, Tyre.Nylon, 35, 0.005, 0, 1.1, 0.00005),
+        (Kind.Patio, 1) => new(1, 120, 1.0, 4, 5, Tyre.Nylon, 42, 0.008, 0, 1.2, 0.0001),
+        (Kind.Patio, 2) => new(3, 150, 2.5, 8, 15, Tyre.Nylon, 50, 0.015, 0, 1.3, 0.0002),
+        (Kind.Patio, _) => new(4, 120, 3.0, 8, 30, Tyre.Nylon, 50, 0.025, 0, 1.4, 0.0003),
         (Kind.Automatic, 0) => new(0.2, 40, 0.3, 1, 5, Tyre.Urethane, 8, 0.004, 3e-6),
         (Kind.Automatic, 1) => new(0.5, 60, 0.6, 2, 12, Tyre.Urethane, 10, 0.006, 6e-6),
         (Kind.Automatic, 2) => new(1, 80, 1.2, 5, 45, Tyre.Urethane, 12, 0.01, 12e-6),
@@ -133,30 +147,32 @@ public static class SlidingDoor
     /// <summary>Declared levels, dB at a metre, by kind and character (new, standard, worn, old): the render's
     /// peak, which is what its buffer's full scale stands for (a world sound's level is its full scale; see
     /// <see cref="KnobDoor.OpenLevelDb"/>). Measured at a 1.0 by 2.1 m leaf (AudioLab --heard-levels survey,
-    /// 2026-10-04); the client puts each render's own peak in its place. These were the model's LAFmax,
+    /// 2026-10-04; the patio door's again after its round 3, only=patio); the client puts each render's own
+    /// peak in its place. These were the model's LAFmax,
     /// which played as full scale put every run 15-29 dB under the model.</summary>
     public static float OpenLevelDb(Kind kind, int variant) => (kind, ((variant % Variants) + Variants) % Variants) switch
     {
-        (Kind.Patio, 0) => 83.6f, (Kind.Patio, 1) => 84.7f, (Kind.Patio, 2) => 87.7f, (Kind.Patio, _) => 97.1f,
+        (Kind.Patio, 0) => 75.9f, (Kind.Patio, 1) => 82.4f, (Kind.Patio, 2) => 88.2f, (Kind.Patio, _) => 93.2f,
         (Kind.Automatic, 0) => 77.8f, (Kind.Automatic, 1) => 76.1f, (Kind.Automatic, 2) => 79.4f, _ => 84.6f,
     };
     public static float CloseLevelDb(Kind kind, int variant) => (kind, ((variant % Variants) + Variants) % Variants) switch
     {
-        (Kind.Patio, 0) => 105.4f, (Kind.Patio, 1) => 101.6f, (Kind.Patio, 2) => 110.2f, (Kind.Patio, _) => 116.8f,
+        (Kind.Patio, 0) => 113.4f, (Kind.Patio, 1) => 113.4f, (Kind.Patio, 2) => 115.4f, (Kind.Patio, _) => 113.7f,
         (Kind.Automatic, 0) => 61.0f, (Kind.Automatic, 1) => 62.6f, (Kind.Automatic, 2) => 71.1f, _ => 73.0f,
     };
 
     /// <summary>What the model puts at a metre, LAFmax: what is heard on "real" a metre off. No calibration
     /// ever: the automatic door runs at 35-55 dBA, where the research puts real ones (40-55), and a patio
-    /// door pushed home at a walking pace is a slam of 78 dBA.</summary>
+    /// door pushed home at a casual pace meets its jamb frame on frame, 91-93 dBA; opened, it is its slide,
+    /// 63-76.</summary>
     public static float OpenLafDb(Kind kind, int variant) => (kind, ((variant % Variants) + Variants) % Variants) switch
     {
-        (Kind.Patio, 0) => 62.8f, (Kind.Patio, 1) => 64.5f, (Kind.Patio, 2) => 70.4f, (Kind.Patio, _) => 74.7f,
+        (Kind.Patio, 0) => 63.4f, (Kind.Patio, 1) => 68.7f, (Kind.Patio, 2) => 75.6f, (Kind.Patio, _) => 75.4f,
         (Kind.Automatic, 0) => 53.5f, (Kind.Automatic, 1) => 53.2f, (Kind.Automatic, 2) => 61.5f, _ => 70.1f,
     };
     public static float CloseLafDb(Kind kind, int variant) => (kind, ((variant % Variants) + Variants) % Variants) switch
     {
-        (Kind.Patio, 0) => 77.6f, (Kind.Patio, 1) => 77.1f, (Kind.Patio, 2) => 78.8f, (Kind.Patio, _) => 88.5f,
+        (Kind.Patio, 0) => 91.0f, (Kind.Patio, 1) => 92.0f, (Kind.Patio, 2) => 93.3f, (Kind.Patio, _) => 91.3f,
         (Kind.Automatic, 0) => 36.4f, (Kind.Automatic, 1) => 38.3f, (Kind.Automatic, 2) => 49.6f, _ => 56.0f,
     };
 
@@ -223,9 +239,26 @@ public static class SlidingDoor
     /// door's steel wheels on a stainless cap, about 70 MN/m.</summary>
     private const double NylonK = 5.7e8, UrethaneK = 1.2e7, SteelOnAlK = 3e10;
     private const double NylonLambda = 0.5, UrethaneLambda = 2.0, SteelLambda = 0.1;
+    /// <summary>Where a patio roller bears, as what averages the rail's roughness: its 1/8 in concave groove,
+    /// worn in, all but conforming to the rib's crown (3.1 mm), so Hertz's contact is an ellipse long across
+    /// the rail and short along it. Rollers are moulded in glass-filled nylon, E* about 8.5 GPa on aluminium
+    /// (steel on aluminium about 58). A 1-1/4 in wheel under a quarter of the leaf bears over about 0.75 mm
+    /// along the rail and 2.5 mm across. (Taken as a ball's round patch in plain nylon, 1.4 mm long, it
+    /// swallowed everything above 700 Hz, and the slide lost its middle.)</summary>
+    private const double GrooveR = 0.0032, CrownR = 0.0031, NylonEStar = 8.5e9, SteelOnAlEStar = 5.8e10;
+    /// <summary>The strip's edges are not knife edges: where contact begins is spread by the tread's own
+    /// texture, asperities a few tens of microns across, so the averaging is blurred over about 30 um and
+    /// passes nothing much shorter than a tenth of a millimetre. (With sharp edges the patch passed a tail of
+    /// roughness to 8 kHz, where the sill radiates best, 5 dB over the recording there.)</summary>
+    private const double ContactEdge = 32e-6;
     /// <summary>The track: the patio sill, aluminium 1.8 mm, about 0.12 m developed; the automatic door's
     /// header, 2.5 mm, 0.45 m round. Both bedded or bolted: they lose more than a bare sheet.</summary>
     private const double SillT = 0.0018, SillGirth = 0.12, HeaderT = 0.0025, HeaderGirth = 0.45, BeddedLoss = 0.01;
+    /// <summary>A patio sill lies in a bead of sealant on the floor. Where its walls bend slowly they work the
+    /// bead, as the glass works its gaskets: about 12 / f more loss, 0.1 at 125 Hz and little in
+    /// the kilohertz. (With a bare sheet's loss its lowest modes rang the roll at 100-160 Hz, 5 dB over the
+    /// recording.)</summary>
+    private const double SillBead = 12;
     /// <summary>The header is not a sheet 0.45 m by 2 m: it is a box of walls 0.1-0.15 m wide screwed to the
     /// wall along its length, under a cover, so its walls' modes start near 300 Hz (a 0.15 m strip of 2.5 mm
     /// aluminium), and the cover, its screws and the drive's brackets take about 0.03. (As one big sheet
@@ -244,26 +277,80 @@ public static class SlidingDoor
     /// <summary>Glass sits in the frame on rubber glazing gaskets: the frame's blows reach it through about
     /// 2e5 N/m at each bracket.</summary>
     private const double GasketK = 2e5;
+    /// <summary>A patio leaf's sealed unit does not hang in its frame: it stands on two setting blocks on the
+    /// bottom rail, at the quarter points, neoprene of about 85 Shore A, 100 mm long under the unit's 24 mm
+    /// edge and 6 mm thick: about 4 MN/m each, losing a fifth of critical twice over (loss factor 0.2). So the
+    /// leaf bounces on its rollers as two bodies, the 8 kg frame on the tyres and the 30 kg of glass on the
+    /// blocks, not as one 38 kg mass. (As one, it rang at 80-160 Hz under every roll, 6 dB over the
+    /// recording.)</summary>
+    private const double BlockK = 4e6, BlockZeta = 0.1;
     /// <summary>Grit: a tyre already sinks into its contact under the leaf's weight (nylon 40-55 um, steel
     /// 4-5 um, polyurethane more than half a millimetre), and it wraps round a grain smaller than that: only
     /// what stands above the sink lifts the wheel. A grain that does carries the wheel crushes at about
     /// 150 MPa over its own section, in a few steps of tens of microseconds each.</summary>
     private const double GritStrength = 150e6, CrushSeconds = 2e-5, PowderMicron = 3;
+    /// <summary>A patio tyre meets a grain at an angle whose tangent is sqrt(2 a / R); steeper than the grip of
+    /// nylon on sand (about 0.3), the wheel shoves the grain along and off the rib instead of climbing it.
+    /// On a 1-1/4 in wheel nothing over about 0.7 mm is climbed. (Climbed and crushed, a 1 mm grain from the
+    /// tail of the sizes struck the rail with 700 N and rang the sill at 127 dB.)</summary>
+    private const double GritGrip = 0.3;
+    /// <summary>Under a patio door's nylon tyre a grain does not shatter: nylon yields at about 80 MPa, long
+    /// before quartz cracks, so a grain pressed harder than that sinks into the tread as the nylon flows round
+    /// it, a few milliseconds for its own size, and the load stays on. (Shattered in 20 us steps, a
+    /// half-millimetre grain dropped a wheel carrying 300 N in a blink and the rail rang at 117 dB; sunk in a
+    /// third of a millisecond, every grain was a click to 20 kHz.)</summary>
+    private const double NylonYield = 80e6, EmbedSeconds = 5e-3;
     /// <summary>Pile weatherstrip: its fibres slip about their own width, 150 um, each on its own. A patio leaf
     /// drags about 5 m of pile at some 500 fibres a centimetre; an automatic leaf about 2 m. The drag is the
     /// sum of their sawtooth forces, so it flutters by about 0.3 / sqrt(fibres) of itself. (Half its mean,
     /// as if every fibre slipped together, made the frame hiss at 94 dBA.)</summary>
     private const double PileSlip = 1.5e-4, PatioPileFibres = 250000, AutoPileFibres = 100000, AutoBrushShare = 0.2;
-    /// <summary>Bumpers: a patio leaf's stile meets a vinyl bulb flattened on aluminium at each end of its
-    /// travel; an automatic leaf meets rubber on the jamb. Hertz, stiff enough that a stile's own mass
-    /// stops in a few milliseconds.</summary>
+    /// <summary>Bumpers: a patio leaf's open end is a snap-in rubber bumper in the head track (its shut end is
+    /// the jamb, below); an automatic leaf meets rubber on the jamb. Hertz, stiff enough that a stile's own
+    /// mass stops in a few milliseconds.</summary>
     private const double PatioBumperK = 5e7, AutoBumperK = 1e7, BumperLambda = 0.6;
-    /// <summary>A patio jamb's bumper is a hollow vinyl bulb in pile, and a leaf comes back off it with 0.1-0.5
-    /// of its speed: Hunt-Crossley loss of about 3 s/m. (At 0.6 the leaf bounced off at three quarters of
-    /// its speed and rolled back 43 mm: Cody, "the slide still plays after the door is shut".) Shutting, the
+    /// <summary>A patio jamb's pile and bulb give a leaf back 0.1-0.5 of its speed: Hunt-Crossley loss of
+    /// about 3 s/m. (At 0.6 the leaf bounced off at three quarters of its speed and rolled back 43 mm: Cody,
+    /// "the slide still plays after the door is shut".) Shutting, the
     /// hand stays on the pull through the blow and holds the leaf home with about 80 N, more than the seals'
     /// drag, while the latch is thrown; the arm behind it gives about 300 N s/m.</summary>
     private const double PatioJambLambda = 3, HoldHome = 80, ArmDamping = 300;
+    /// <summary>
+    /// A patio leaf's lock stile shuts against its jamb through pile and a bulb: a cushion of about 50 kN/m
+    /// over 10 mm (pile 6-10 mm tall, and a bulb), linear, with the jamb's Hunt-Crossley loss. It holds
+    /// about 2.5 J: a leaf pushed home faster than about 0.35 m/s squashes it flat and the stile meets the
+    /// jamb frame on frame, aluminium on aluminium through a vinyl skin. (Research notes, "Sliding and
+    /// automatic doors", item 9.) A casual push home does: the stile meets the jamb with 700-900 N, and
+    /// the blow is the walls of the stile and the jamb, 300 Hz-1 kHz, as the recording's are. (Before, the
+    /// whole stop was one soft bulb: a 20 ms push with nothing above 1 kHz in it, the blow carried by a
+    /// 76 Hz frame mode and the glass, Cody's "hollow". A plain dashpot on the cushion was a step of force
+    /// at first touch and clicked.)
+    /// </summary>
+    private const double CushionK = 5e4, CushionDepth = 0.010, FrameOnFrameK = 1.5e9, FrameOnFrameLambda = 0.4;
+    /// <summary>Where the stile and the jamb meet, each section's face is a web between its flanges. A point
+    /// at mid-web is held back by the web's own bending, about 5e5 N/m for 50 mm of 1.5 mm aluminium; a face
+    /// borne on flat across its width is held by the side walls end-on, 2e7 and more, which is what a
+    /// patch in a plate is given elsewhere here. This is set between the two, at 4e6, by the recording's
+    /// blows: at it the blow's first 30 ms holds its octaves as theirs do (300 Hz-1 kHz loudest, under
+    /// 300 Hz 2-6 dB down, 1-4 kHz 8-12, 4-16 kHz 19-25). (At 2e7 the glass's 212 Hz note was the loudest
+    /// thing in the blow, the hollow again; at 2e5 the blow stood 45-65 dB over the slide, the recording's
+    /// 24.)</summary>
+    private const double WebBacking = 4e6;
+    /// <summary>Opening, the hand brings the leaf to rest itself, short of the bumper in the head track: no
+    /// blow at all, the rollers slowing to nothing over the last few tenths of a second, as both of the
+    /// recording's openings end. (It used to run the leaf into the bumper and let go, so every opening ended
+    /// in a stop: Cody, "the open sound sounds like a close sound".)</summary>
+    private const double OpenShort = 0.03;
+    /// <summary>A hand's grip comes up over about a tenth of a second. The hand holds the handle, not the
+    /// leaf: its arm (the 15 kN/m and 1.2 kN s/m it tracks its path with) is on the handle, and the handle
+    /// reaches the leaf across its play, a small knock as the pull is taken up at the hand's own pace.
+    /// (With the arm on the leaf and the handle free in its play, the handle crossed it at half a metre a
+    /// second and its knock stood 5-10 dB over the slide.)</summary>
+    private const double HandGrip = 0.1, GripDamping = 150;
+    /// <summary>A leaf at rest takes more to start than to keep moving: 1.03-1.4 times its running drag on
+    /// measured doors (research notes, item 7), its pile set where it stood. The pile's fibres bend about
+    /// their slip distance before they let go.</summary>
+    private const double PileStribeck = 0.002;
     /// <summary>The end of a leaf that strikes: the stile and the glass edge near it, held to the rest of the
     /// leaf through the frame's corners and the glass in its gaskets, about 200 Hz. The stile stops first
     /// and the rest of the leaf arrives through that spring: two to five knocks in the first tenth of a
@@ -272,8 +359,9 @@ public static class SlidingDoor
     /// at 0.05 the leaf came back off its stile as off a spring.</summary>
     private const double PatioStileKg = 1.5, AutoStileKg = 2.5, StileHz = 200, StileZeta = 0.2;
     /// <summary>A sealed unit's panes on the air between them (4-16-4): they move against each other at about
-    /// 200 Hz and ring for half a second. It is the note of a patio door hitting home.</summary>
-    private const double UnitGap = 0.016, UnitLoss = 0.02;
+    /// 200 Hz and ring for a third of a second. It is the note of a patio door hitting home: the recording
+    /// has it at 220 Hz, 5.7 Hz wide, a loss of 0.026, 11-19 dB under the blow.</summary>
+    private const double UnitGap = 0.016, UnitLoss = 0.026;
     /// <summary>The glass is not on the line the stile pushes along: about 5 mm off it over a 50 mm edge, so a
     /// tenth of the stile's load bends the pane and the frame. That is what a leaf hitting home is heard by.</summary>
     private const double EdgeEccentricity = 0.1;
@@ -284,11 +372,17 @@ public static class SlidingDoor
     /// <summary>The hand is still on the lever as the hook seats: the hook moves with the lever and the hand's
     /// grip, about 3 N s/m. (Free, it bounced a dozen times on its stop.)</summary>
     private const double HookDrag = 3;
-    /// <summary>The pull handle: 100 g of zinc on its spindle with a third of a millimetre of play each way
-    /// along the travel, centred by its spring, knocking on its escutcheon. When the leaf stops dead it is
+    /// <summary>The pull handle: 100 g of zinc on its spindle with some play each way along the travel (the
+    /// character's), centred by its spring, knocking on its escutcheon. When the leaf stops dead it is
     /// thrown across its play: the bright part of a patio door hitting home. Held while a hand is on it.</summary>
-    private const double HandleKg = 0.1, HandlePlay = 0.0003, HandleCentring = 2e3, HandleZeta = 0.05, HandleVolume = 1.4e-5;
+    private const double HandleKg = 0.1, HandleCentring = 2e3, HandleZeta = 0.05, HandleVolume = 1.4e-5;
     private const double MetalK = 1e9, MetalLambda = 0.3;
+    /// <summary>The handle on its escutcheon: die-cast zinc on zinc (E* about 53 GPa) over a 5 mm radius, Hertz
+    /// K = 4/3 E* sqrt(R), about 5e9, and metal's small loss. Thrown across its play as the jamb's pile stops
+    /// the leaf, it knocks twice in a millisecond, 10-25 ms before the stile meets the jamb, as bright as the
+    /// blow itself up top: the recording has a bright brush 25-38 ms before each blow, 4-5 dB over the blow
+    /// in 4-16 kHz. (On the plunger's 1e9 and 0.3 the same knock was one dull millisecond, 15 dB under.)</summary>
+    private const double HandleStopK = 5e9, HandleStopLambda = 0.05;
     /// <summary>The automatic door's lock: a 30 g solenoid plunger lifted 8 mm by about 25 N, and dropped
     /// back into the carriage's bracket by a 6 N spring.</summary>
     private const double PlungerKg = 0.03, PlungerThrow = 0.008, PlungerPull = 25, PlungerSpring = 6;
@@ -316,8 +410,13 @@ public static class SlidingDoor
     /// knocks across its play each half swing: the train of knocks 60-90 ms apart heard as a real one starts.
     /// It is the belt's polyurethane teeth that land, about 5 MN/m and lossy, not steel on steel.</summary>
     private const double ClampPlay = 0.0008, ClampKg = 0.1, LugK = 2.4e8, LugLambda = 1.0, ClampVolume = 1.3e-5;
-    /// <summary>A shop front's leaf: aluminium stiles and rails with the glass in rubber gaskets and brush seals
-    /// along its edges, losing about 0.03.</summary>
+    /// <summary>A leaf's frame, a shop front's or a patio door's: aluminium stiles and rails with the glass in
+    /// rubber gaskets and pile or brush seals along its edges, losing about 0.03. Its sections are tubes with
+    /// faces 50-100 mm wide, and their walls ring from about 300 Hz, as the header's do; below that the frame
+    /// moves with its glass as one leaf. (The patio frame was a 0.15 m by 6 m sheet from 60 Hz losing 0.005:
+    /// a blow on the stile rang one mode at 76 Hz 25 dB over its neighbours for half a second, the hollow
+    /// box Cody heard in every stop. The recording's stops ring 36-160 Hz as a dozen lines within 6 dB of
+    /// each other, each 5-7 Hz wide.)</summary>
     private const double StorefrontLoss = 0.03;
     /// <summary>A belt tooth seats in the idler's groove at the far end of the header each pitch: about a gram
     /// of tooth arriving at a twentieth of the belt's speed (the teeth are rounded and crowned to roll in),
@@ -332,7 +431,148 @@ public static class SlidingDoor
     /// <summary>The controller ramps its acceleration over about a fifth of a second, m/s^3.</summary>
     private const double AutoJerk = 4;
 
-    private sealed class Grain { public double X, A, Target, LastCrush = -1; public bool Done; }
+    /// <summary>A patio door's rolling surfaces (the aluminium rail with its film of dirt, and the moulded tyre)
+    /// are rough at every wavelength, the long ones most: each octave of wavelength holds RMS height in
+    /// proportion to the fourth root of the wavelength (a height spectrum falling as wavenumber to the 1.5,
+    /// as worn moulded and extruded surfaces with a film of dirt measure), from 10 mm down. Longer than that is the tyre's out-of-round and
+    /// the sill's lie on the floor, which the leaf rides slowly on its springs. (Carried on to the tyre's whole
+    /// circumference, the worn tyres' waviness met the leaf's bounce near 100 Hz and the wheels hopped off the
+    /// rail two thousand times a slide. The round 2 profiles were noise smoothed on a 3 mm grain and drawn
+    /// straight between points every 0.4 mm: every point a kink, and the roll came out flat to 8 kHz.)</summary>
+    private const double RoughnessSlope = 0.25, RoughnessLongest = 0.01;
+    /// <summary>A character's rail and tyre roughness is RMS as a profilometer reports it, at the standard
+    /// 2.5 mm cut-off; the same spectrum carries on above it as waviness, to 10 mm.</summary>
+    private const double RoughnessCutoff = 0.0025;
+    /// <summary>A patio door's pile: polypropylene fibres about 7 mm tall and 0.1 mm thick. A fibre is a
+    /// cantilever on the backing, its first mode near 370 Hz; its tip catching and slipping reaches the frame
+    /// through that, so the drag's flutter is felt as a resonance there falling 12 dB an octave above, the
+    /// fibres rubbing their neighbours for about a third of critical damping. (Pushed straight into the
+    /// metal, its 5-10 kHz slip rate made an 8 kHz hiss over the roll.)</summary>
+    private const double PileHeight = 0.007, PileFibreD = 1.0e-4, PpE = 1.5e9, PpRho = 900, PileZeta = 0.3;
+
+    private sealed class Grain { public double X, A, Target, LastCrush = -1; public bool Done, Embedding; }
+
+    /// <summary>
+    /// A rolling surface as a roller feels it, <paramref name="n"/> heights round <paramref name="length"/>
+    /// (a power of two, wrapping). The surface's own roughness, RMS <paramref name="rms"/>, at every
+    /// wavelength from <paramref name="longest"/> down to a couple of steps, each octave as
+    /// <see cref="RoughnessSlope"/> says, and any <paramref name="feature"/> (a flat); all of it felt through
+    /// the contact. The groove meets the crowned rib in an ellipse, <paramref name="halfPatch"/> long along the
+    /// rail at its middle and <paramref name="halfWidth"/> across: each strip of it along the rail averages
+    /// what passes under it by its own Hertz pressure, a half ellipse, which passes a wavelength by
+    /// 2 J1(ka) / ka (everything longer than the strip, little shorter), and the strips are shorter towards
+    /// the ellipse's sides and carry less. Roughness much longer than the width is the same under every strip;
+    /// shorter, each strip rides its own, coherent with the middle's as exp(-k y), so what the wheel feels of
+    /// it is their average. So a tyre rolls over a flat smaller than its patch as a dip, and the roughness it
+    /// hears falls smoothly away above the speed over the patch length: at a walking slide, above a few
+    /// hundred hertz. (One strip of one length has true nulls, and they swept up and down with the leaf's
+    /// speed as arches of comb in the spectrum, nothing like the recording.)
+    /// </summary>
+    private static double[] RollingProfile(Random rng, int n, double length, double rms, double longest, double halfPatch,
+                                           double halfWidth, Func<double, double>? feature)
+    {
+        const int strips = 9;
+        var stripA = new double[strips]; var stripW = new double[strips]; var stripY = new double[strips];
+        double wSum = 0;
+        for (int j = 0; j < strips; j++)
+        {
+            double u = -1 + (j + 0.5) * 2.0 / strips;
+            stripY[j] = Math.Abs(u) * halfWidth;
+            stripA[j] = halfPatch * Math.Sqrt(1 - u * u);
+            stripW[j] = 1 - u * u;
+            wSum += stripW[j];
+        }
+        for (int j = 0; j < strips; j++) stripW[j] /= wSum;
+        // The roughness's own spectrum, scaled to its RMS at the cut-off.
+        var amp = new double[n / 2];
+        double rough2 = 0;
+        for (int b = 1; b < n / 2; b++)
+        {
+            double lambda = length / b;
+            if (lambda > longest * 1.0001) continue;
+            // Each octave holds bins in proportion to wavenumber: a bin's amplitude goes as k^-(slope + 1/2).
+            amp[b] = Math.Pow(lambda, RoughnessSlope + 0.5);
+            if (lambda <= RoughnessCutoff) rough2 += 2 * amp[b] * amp[b];
+        }
+        double scale = rms / Math.Max(Math.Sqrt(rough2), 1e-30);
+        // The feature's spectrum.
+        var fr = new double[n]; var fi = new double[n];
+        if (feature != null)
+        {
+            for (int i = 0; i < n; i++) fr[i] = feature(i * length / n) / n;
+            Fft(fr, fi, inverse: false);
+        }
+        var re = new double[n]; var im = new double[n];
+        for (int b = 1; b < n / 2; b++)
+        {
+            double k = 2 * Math.PI * b / length;
+            double kEdge = k * ContactEdge, edge = Math.Exp(-kEdge * kEdge / 2);
+            double ph0 = rng.NextDouble() * 2 * Math.PI;
+            double sr = 0, si = 0, mean = 0;
+            for (int j = 0; j < strips; j++)
+            {
+                double ka = k * stripA[j];
+                double h = stripW[j] * (ka < 1e-9 ? 1 : 2 * BesselJ1(ka) / ka) * edge;
+                mean += h;
+                double rho = Math.Exp(-k * stripY[j]), own = Math.Sqrt(1 - rho * rho);
+                double phj = rng.NextDouble() * 2 * Math.PI;
+                sr += h * (rho * Math.Cos(ph0) + own * Math.Cos(phj));
+                si += h * (rho * Math.Sin(ph0) + own * Math.Sin(phj));
+            }
+            re[b] = scale * amp[b] * sr + mean * fr[b];
+            im[b] = scale * amp[b] * si + mean * fi[b];
+            re[n - b] = re[b]; im[n - b] = -im[b];
+        }
+        re[0] = fr[0];
+        Fft(re, im, inverse: true);
+        return re;
+    }
+
+    /// <summary>In place, radix 2; the inverse unscaled.</summary>
+    private static void Fft(double[] re, double[] im, bool inverse)
+    {
+        int n = re.Length;
+        for (int i = 1, j = 0; i < n; i++)
+        {
+            int bit = n >> 1;
+            for (; (j & bit) != 0; bit >>= 1) j ^= bit;
+            j ^= bit;
+            if (i < j) { (re[i], re[j]) = (re[j], re[i]); (im[i], im[j]) = (im[j], im[i]); }
+        }
+        for (int len = 2; len <= n; len <<= 1)
+        {
+            double ang = (inverse ? 2 : -2) * Math.PI / len, wr = Math.Cos(ang), wi = Math.Sin(ang);
+            for (int i = 0; i < n; i += len)
+            {
+                double cr = 1, ci = 0;
+                for (int k = 0; k < len / 2; k++)
+                {
+                    int p = i + k, q = p + len / 2;
+                    double tr = re[q] * cr - im[q] * ci, ti = re[q] * ci + im[q] * cr;
+                    re[q] = re[p] - tr; im[q] = im[p] - ti; re[p] += tr; im[p] += ti;
+                    double nr = cr * wr - ci * wi; ci = cr * wi + ci * wr; cr = nr;
+                }
+            }
+        }
+    }
+
+    /// <summary>The Bessel function J1 (the usual rational and asymptotic fits, to about 1e-8).</summary>
+    private static double BesselJ1(double x)
+    {
+        double ax = Math.Abs(x);
+        if (ax < 8)
+        {
+            double y = x * x;
+            double a = x * (72362614232.0 + y * (-7895059235.0 + y * (242396853.1 + y * (-2972611.439 + y * (15704.48260 + y * -30.16036606)))));
+            double b = 144725228442.0 + y * (2300535178.0 + y * (18583304.74 + y * (99447.43394 + y * (376.9991397 + y))));
+            return a / b;
+        }
+        double z = 8 / ax, y2 = z * z, xx = ax - 2.356194491;
+        double p = 1 + y2 * (0.183105e-2 + y2 * (-0.3516396496e-4 + y2 * (0.2457520174e-5 + y2 * -0.240337019e-6)));
+        double q = 0.04687499995 + y2 * (-0.2002690873e-3 + y2 * (0.8449199096e-5 + y2 * (-0.88228987e-6 + y2 * 0.105787412e-6)));
+        double r = Math.Sqrt(0.636619772 / ax) * (Math.Cos(xx) * p - z * Math.Sin(xx) * q);
+        return x < 0 ? -r : r;
+    }
 
     private sealed class Sim
     {
@@ -353,6 +593,9 @@ public static class SlidingDoor
         // Leaf.
         private readonly double mass, pitchInertia, travel, width, height;
         private double x, u, heave, heaveRate, pitch, pitchRate, lastLeafAcc;
+        // A patio leaf's glass on its setting blocks: its own heave and pitch.
+        private readonly double frameKg, frameInertia, glassKg, glassInertia, blockArm, blockC, blockPreload;
+        private double gHeave, gHeaveRate, gPitch, gPitchRate;
         // Rollers.
         private readonly double wheelR, wheelKg, bracketK, bracketC, contactK, contactLambda;
         private readonly double[] arm = new double[Wheels], zw = new double[Wheels], vw = new double[Wheels], lastH = new double[Wheels];
@@ -360,7 +603,18 @@ public static class SlidingDoor
         private readonly double[] railRough;
         private readonly double railStep, wheelStep;
         private readonly List<Grain> grit = new();
-        private double maxReach, sink, restLoad;
+        private readonly Grain?[] lastGrain = new Grain?[Wheels];
+        private double maxReach, sink, restLoad, grainPatch;
+        /// <summary>Points across a contact patch, as fractions of its half-length, and their share of its
+        /// Hertz pressure (a half ellipse).</summary>
+        private static readonly double[] PatchPoints = Enumerable.Range(0, 9).Select(m => -1 + (m + 0.5) * 2 / 9.0).ToArray();
+        private static readonly double[] PatchWeights = PatchShares();
+        private static double[] PatchShares()
+        {
+            var w = PatchPoints.Select(u => Math.Sqrt(1 - u * u)).ToArray();
+            double sum = w.Sum();
+            return w.Select(v => v / sum).ToArray();
+        }
         // Fields and ports.
         private readonly DenseField trackField, frameField, glassField;
         private readonly Port[] trackPort = new Port[Wheels], framePort = new Port[Wheels], glassPort = new Port[Wheels];
@@ -369,7 +623,8 @@ public static class SlidingDoor
         private readonly double unitGain;
         private readonly double[] brushTrackHit, brushFrameHit, endTrackHit, endFrameHit, smallHit, driveHit;
         private readonly Port endPort, smallPort;
-        private double brushNoise;
+        private double brushNoise, pileLow, fibreBend, fibreRate;
+        private readonly double fibreW;
         // Bumpers at each end of the travel.
         private readonly double bumperK, stileKg, stileK, stileC;
         private readonly double[] stileD = new double[2], stileV = new double[2];
@@ -401,6 +656,11 @@ public static class SlidingDoor
         private readonly HighPass lugHigh;
         private readonly Port lugPort;
         private readonly Dictionary<string, (double Start, double Peak, bool On)> contactLog = new();
+        // A patio door's jamb and stile faces; its pile's grip at rest; the hand's grip.
+        private readonly Port? stileFace, jambWeb;
+        private LuGre pileGrip;
+        private bool shutting;
+        private double gripFrom, gripTo = double.MaxValue, handForce, armShare = 1;
 
         public Sim(Door door, int sampleRate, Report? report)
         {
@@ -416,6 +676,13 @@ public static class SlidingDoor
             double glassArea = (width - 0.1) * (height - 0.15);
             mass = glassArea * paneT * GlassRho * (auto ? 1 : 2) + (auto ? AutoFrameKg : PatioFrameKg);
             pitchInertia = mass * (width * width + height * height) / 12;
+            glassKg = auto ? 0 : glassArea * paneT * GlassRho * 2;
+            frameKg = mass - glassKg;
+            glassInertia = glassKg * ((width - 0.1) * (width - 0.1) + (height - 0.15) * (height - 0.15)) / 12;
+            frameInertia = pitchInertia - glassInertia;
+            blockArm = (width - 0.1) / 4;
+            blockC = auto ? 0 : 2 * BlockZeta * Math.Sqrt(BlockK * glassKg / 2);
+            blockPreload = auto ? 0 : glassKg * G / 2 / BlockK;
 
             wheelR = auto ? AutoWheelR : PatioWheelR;
             wheelKg = auto ? AutoWheelKg : PatioWheelKg;
@@ -428,33 +695,60 @@ public static class SlidingDoor
             for (int i = 0; i < Wheels; i++)
                 arm[i] = (i < 2 ? -1 : 1) * (width / 2 - inset) + (i % 2 == 0 ? -0.5 : 0.5) * tandem;
 
-            // Surfaces. The rail's roughness on a 3 mm grain (a wheel's contact patch filters out finer), the
-            // wheel's on its circumference; both RMS as the character says.
+            // Surfaces. On an automatic door, the rail's roughness on a 3 mm grain (a wheel's contact patch
+            // filters out finer), the wheel's on its circumference; both RMS as the character says.
             double trackLen = travel + width + 0.2;
-            // A wheel cannot feel roughness shorter than its contact patch: both profiles are grained at no
-            // less than twice the patch's length under the static load.
+            // A wheel cannot feel roughness shorter than its contact patch: the automatic door's profiles are
+            // grained at no less than twice the patch's length under the static load.
             double load0 = mass * G / Wheels + wheelKg * G;
             sink = Math.Pow(load0 / contactK, 2.0 / 3);
             restLoad = load0;
             double patch = 2 * Math.Sqrt(wheelR * sink);
-            railRough = SurfaceProfile(rng, trackLen, Math.Max(0.003, 2 * patch));
-            for (int i = 0; i < railRough.Length; i++) railRough[i] *= ch.RailMicron * 1e-6;
-            railStep = trackLen / railRough.Length;
             double circ = 2 * Math.PI * wheelR;
-            for (int i = 0; i < Wheels; i++)
+            if (auto)
             {
-                var w = SurfaceProfile(rng, circ, Math.Max(0.002, 2 * patch));
-                double flat = ch.FlatMicron * 1e-6 * (0.6 + 0.8 * rng.NextDouble());
-                double flatAt = rng.NextDouble() * circ, half = Math.Sqrt(2 * wheelR * Math.Max(flat, 1e-12));
-                for (int k = 0; k < w.Length; k++)
+                railRough = SurfaceProfile(rng, trackLen, Math.Max(0.003, 2 * patch));
+                for (int i = 0; i < railRough.Length; i++) railRough[i] *= ch.RailMicron * 1e-6;
+                for (int i = 0; i < Wheels; i++)
                 {
-                    double s = k * circ / w.Length;
-                    w[k] *= ch.WheelMicron * 1e-6;
-                    double d = Math.Abs(s - flatAt); d = Math.Min(d, circ - d);
-                    if (d < half) w[k] -= flat - d * d / (2 * wheelR);
+                    var w = SurfaceProfile(rng, circ, Math.Max(0.002, 2 * patch));
+                    double flat = ch.FlatMicron * 1e-6 * (0.6 + 0.8 * rng.NextDouble());
+                    double flatAt = rng.NextDouble() * circ, half = Math.Sqrt(2 * wheelR * Math.Max(flat, 1e-12));
+                    for (int k = 0; k < w.Length; k++)
+                    {
+                        double s = k * circ / w.Length;
+                        w[k] *= ch.WheelMicron * 1e-6;
+                        double d = Math.Abs(s - flatAt); d = Math.Min(d, circ - d);
+                        if (d < half) w[k] -= flat - d * d / (2 * wheelR);
+                    }
+                    wheelRough[i] = w;
                 }
-                wheelRough[i] = w;
             }
+            else
+            {
+                // A patio door's rail and tyres as surfaces with roughness at every wavelength, felt through
+                // the Hertz contact patch (see RollingProfile).
+                // Hertz's ellipse: relative curvatures along (the wheel) and across (the crown in the groove), the
+                // equivalent radius and the ellipse's mean semi-axis c, then its axes by the curvature ratio.
+                double along = 1 / (2 * wheelR), across = (1 / CrownR - 1 / GrooveR) / 2;
+                double re = 1 / (2 * Math.Sqrt(along * across));
+                double c = Math.Cbrt(3 * load0 * re / (4 * (ch.Tyre == Tyre.Steel ? SteelOnAlEStar : NylonEStar)));
+                double aspect = Math.Pow(along / across, 2.0 / 3);
+                double halfPatch = c / Math.Sqrt(aspect), halfWidth = c * Math.Sqrt(aspect);
+                grainPatch = halfPatch;
+                railRough = RollingProfile(rng, 65536, trackLen, ch.RailMicron * 1e-6, RoughnessLongest, halfPatch, halfWidth, null);
+                for (int i = 0; i < Wheels; i++)
+                {
+                    double flat = ch.FlatMicron * 1e-6 * (0.6 + 0.8 * rng.NextDouble());
+                    double flatAt = rng.NextDouble() * circ, half = Math.Sqrt(2 * wheelR * Math.Max(flat, 1e-12));
+                    wheelRough[i] = RollingProfile(rng, 4096, circ, ch.WheelMicron * 1e-6, RoughnessLongest, halfPatch, halfWidth, s =>
+                    {
+                        double d = Math.Abs(s - flatAt); d = Math.Min(d, circ - d);
+                        return d < half ? -(flat - d * d / (2 * wheelR)) : 0;
+                    });
+                }
+            }
+            railStep = trackLen / railRough.Length;
             wheelStep = circ / wheelRough[0].Length;
             // Grit along the track: a Poisson scatter, sizes exponential about the mean.
             for (double gx = 0; ; )
@@ -462,18 +756,19 @@ public static class SlidingDoor
                 gx += -Math.Log(1 - rng.NextDouble()) / Math.Max(ch.GritPerMetre, 1e-6);
                 if (gx > trackLen) break;
                 double a = -Math.Log(1 - rng.NextDouble()) * ch.GritMicron * 1e-6;
-                if (a > PowderMicron * 1e-6) grit.Add(new Grain { X = gx - 0.1, A = a, Target = a });
+                bool shoved = !auto && Math.Sqrt(2 * a / wheelR) > GritGrip;
+                if (a > PowderMicron * 1e-6 && !shoved) grit.Add(new Grain { X = gx - 0.1, A = a, Target = a });
                 maxReach = Math.Max(maxReach, Math.Sqrt(2 * wheelR * a));
             }
 
             // Fields.
             trackField = auto
                 ? new DenseField(HeaderGirth, trackLen, HeaderT, AlE, AlRho, Poisson, f => ThinPanelLoss(f) + HeaderLoss, HeaderFromHz, 16000, rng, dt)
-                : new DenseField(SillGirth, trackLen, SillT, AlE, AlRho, Poisson, f => ThinPanelLoss(f) + BeddedLoss, 60, 16000, rng, dt);
-            // A shop front's stiles and rails are tubes with faces 50-100 mm wide: their walls ring from about
+                : new DenseField(SillGirth, trackLen, SillT, AlE, AlRho, Poisson, f => ThinPanelLoss(f) + BeddedLoss + SillBead / f, 60, 16000, rng, dt);
+            // A leaf's stiles and rails are tubes with faces 50-100 mm wide: their walls ring from about
             // 300 Hz, as the header's do.
             frameField = new DenseField(FrameGirth, 2 * (width + height), FrameWallT, AlE, AlRho, Poisson,
-                                        f => ThinPanelLoss(f) + (auto ? StorefrontLoss : 0.005), auto ? HeaderFromHz : 60, 16000, rng, dt);
+                                        f => ThinPanelLoss(f) + StorefrontLoss, HeaderFromHz, 16000, rng, dt);
             // Glass in its gaskets: glass itself barely loses (0.002); the gaskets and the unit's edge seal
             // take about 0.02, and more low down, where a pane's edges move most (0.1 at 150 Hz).
             glassField = new DenseField(width - 0.1, height - 0.15, paneT, GlassE, GlassRho, 0.22,
@@ -547,7 +842,18 @@ public static class SlidingDoor
             canShape = new double[ch2.Count];
             for (int i = 0; i < canShape.Length; i++) canShape[i] = (rng.NextDouble() * 2 - 1) * Math.Sqrt(3);
 
+            // A pile fibre's first cantilever mode, w = (1.875 / L)^2 sqrt(E I / rho A), with I / A = d^2 / 16.
+            fibreW = 1.875 * 1.875 / (PileHeight * PileHeight) * PileFibreD / 4 * Math.Sqrt(PpE / PpRho);
+
             smallForce = 0;
+
+            if (!auto)
+            {
+                // Built last: they draw nothing from the door's random numbers.
+                stileFace = new Port(frameField.PatchMass, WebBacking, frameField.Impedance);
+                jambWeb = new Port(trackField.PatchMass, WebBacking, trackField.Impedance);
+                pileGrip = new LuGre { MuStatic = ch.Breakaway, MuSliding = 1, StribeckSpeed = PileStribeck, Bristle = 1 / PileSlip };
+            }
         }
 
         private void Log(string s) => report?.Events.Add(s);
@@ -579,15 +885,50 @@ public static class SlidingDoor
             double f = pos / wheelStep;
             int k = (int)f; double t = f - k;
             var w = wheelRough[i];
+            if (!auto) return Smooth(w[(k + w.Length - 1) % w.Length], w[k % w.Length], w[(k + 1) % w.Length], w[(k + 2) % w.Length], t);
             return w[k % w.Length] * (1 - t) + w[(k + 1) % w.Length] * t;
         }
+
+        /// <summary>Between a patio profile's points, a cubic through its neighbours. (Drawn straight from point
+        /// to point, every point was a kink, and the kinks passed at the leaf's speed over the spacing: a faint
+        /// whistle sweeping up to 16 kHz as the leaf got going.)</summary>
+        private static double Smooth(double p0, double p1, double p2, double p3, double t)
+            => p1 + 0.5 * t * (p2 - p0 + t * (2 * p0 - 5 * p1 + 4 * p2 - p3 + t * (3 * (p1 - p2) + p3 - p0)));
 
         private double Rail(double at, int wheel, out Grain? on)
         {
             on = null;
             double f = (at + 0.1) / railStep;
             int k = Math.Clamp((int)f, 0, railRough.Length - 2); double t = Math.Clamp(f - k, 0, 1);
-            double h = railRough[k] * (1 - t) + railRough[k + 1] * t;
+            double h = auto ? railRough[k] * (1 - t) + railRough[k + 1] * t
+                            : Smooth(railRough[Math.Max(k - 1, 0)], railRough[k], railRough[k + 1], railRough[Math.Min(k + 2, railRough.Length - 1)], t);
+            if (!auto)
+            {
+                // A patio tyre meets a grain across its contact patch, not at a point: what lifts the wheel is
+                // the grain's rise averaged over the patch under its Hertz pressure, so the wheel starts up
+                // smoothly over the patch length instead of from a corner. (Met at a point, the corner where
+                // the wheel's curve first touched each grain was a click to 20 kHz, and with the roll no longer
+                // a hiss to hide them a worn door's grit was all that was heard: round 3's "gritty".)
+                double best = h;
+                for (int j = FirstGrain(at - maxReach - grainPatch); j < grit.Count && grit[j].X <= at + maxReach + grainPatch; j++)
+                {
+                    var g = grit[j];
+                    double proud = g.A - sink;
+                    if (proud <= 0 || g.Done) continue;
+                    double reach = Math.Sqrt(2 * wheelR * proud);
+                    double d = at - g.X;
+                    if (d < -reach - grainPatch || d > reach + grainPatch) continue;
+                    double lift = 0;
+                    for (int m = 0; m < PatchPoints.Length; m++)
+                    {
+                        double dd = d + PatchPoints[m] * grainPatch;
+                        double top = proud - dd * dd / (2 * wheelR);
+                        if (top > h) lift += PatchWeights[m] * (top - h);
+                    }
+                    if (h + lift > best) { best = h + lift; on = g; }
+                }
+                return best;
+            }
             for (int j = FirstGrain(at - maxReach); j < grit.Count && grit[j].X <= at + maxReach; j++)
             {
                 var g = grit[j];
@@ -611,14 +952,22 @@ public static class SlidingDoor
 
         public void ScriptPatio(bool opening, double travelSeconds)
         {
-            // A person's slide: the latch first (opening), a pull that starts the leaf, the run, and the leaf
-            // let run into its end at a walking hand's pace.
-            x = opening ? 0.0005 : travel - 0.0005;
-            double from = x, to = opening ? travel + 0.004 : -0.004;
-            // Most people brake an opening leaf to a touch at its end and push a shutting one home.
-            double arrive = opening ? 0.05 : 0.35;     // m/s at the end
-            double tLatch = opening ? 0.05 : -1, tStart = opening ? 0.35 : 0.05;
+            // A person's slide. Opening: the latch thrown off, the hand taking up the pull, the leaf breaking
+            // away from where it stood, the run, and the leaf brought to rest by the hand short of its bumper.
+            // Shutting: a push that starts the leaf and keeps it going into the jamb, then the leaf held home
+            // while the latch is thrown. A casual push home arrives at 0.3-0.7 m/s (research notes, item 8),
+            // here at the run's mean speed, three quarters of its fastest: the slide stays loud into the blow,
+            // as both of the recording's shuttings do, where its openings fade away to nothing. (Brought in
+            // at 0.35 m/s, under half its fastest, a shutting faded into its stop as an opening does.)
+            shutting = !opening;
+            x = opening ? CushionDepth : travel - OpenShort;
+            double from = x, to = opening ? travel - OpenShort : -0.004;
+            double arrive = opening ? 0 : Math.Abs(to - from) / Math.Max(0.5, travelSeconds);     // m/s at the end
+            double tLatch = opening ? 0.05 : -1, tStart = opening ? 0.2 : 0.05;
             double tRun = Math.Max(0.5, travelSeconds);
+            // Opening, the hand stays on the pull a moment after the leaf has stopped.
+            double tLetGo = tStart + tRun + (opening ? 0.3 : 0);
+            gripFrom = tStart; gripTo = opening ? tLetGo : double.MaxValue;
             small = opening ? smallThrow : 0;
             Settle();
             double end = tStart + tRun + (opening ? 0.8 : 1.4);
@@ -635,15 +984,37 @@ public static class SlidingDoor
                 if (t >= tStart && t < tStart + tRun)
                 {
                     double uu = (t - tStart) / tRun;
-                    var (p, v) = Hermite(uu, from, 0, to, arrive * Math.Sign(to - from) * tRun);
-                    handX = p; handV = v / tRun;
-                    double a = Hermite(Math.Min(1, uu + 1e-4), from, 0, to, arrive * Math.Sign(to - from) * tRun).V / tRun;
-                    handA = (a - handV) / (1e-4 * tRun);
+                    if (opening)
+                    {
+                        // A hand bringing a leaf from rest to rest moves as people reach: the minimum-jerk path
+                        // (Flash and Hogan), no pull left at the end to turn into a push. (A cubic ended braking
+                        // at 2.7 m/s^2; the hand's sudden stop knocked the handle across its play as the leaf
+                        // came to rest.)
+                        double d = to - from;
+                        handX = from + d * uu * uu * uu * (10 - 15 * uu + 6 * uu * uu);
+                        handV = d / tRun * 30 * uu * uu * (1 - uu) * (1 - uu);
+                        handA = d / (tRun * tRun) * 60 * uu * (1 - uu) * (1 - 2 * uu);
+                    }
+                    else
+                    {
+                        var (p, v) = Hermite(uu, from, 0, to, arrive * Math.Sign(to - from) * tRun);
+                        handX = p; handV = v / tRun;
+                        double a = Hermite(Math.Min(1, uu + 1e-4), from, 0, to, arrive * Math.Sign(to - from) * tRun).V / tRun;
+                        handA = (a - handV) / (1e-4 * tRun);
+                    }
+                    // Bringing a leaf to rest a hand means to stop it, not to put it on a mark: over the last fifth of
+                    // the pull its arm eases off and the pile stops the leaf. (Held to its path to the end, it pulled
+                    // the leaf on over the last millimetre the pile had stopped it short of, or pushed on with its
+                    // lean into the drag: either way the handle knocked over to the pull as the leaf came to rest.)
+                    armShare = opening ? Math.Clamp((1 - uu) / 0.2, 0, 1) : 1;
                     handOn = !handReleased;
                 }
-                else if (t >= tStart + tRun) { handOn = false; }
-                if (!opening && tShut < 0 && x <= 0.003) { tShut = t; holdingHome = true; Log($"{t * 1000:F0} ms  home"); }
-                if (holdingHome && t > tShut + 0.6) holdingHome = false;
+                else if (t >= tStart + tRun && t < tLetGo + HandGrip) { handX = to; handV = 0; handA = 0; if (opening) armShare = 0; }
+                else if (t >= tLetGo + HandGrip) { handOn = false; }
+                if (!opening && tShut < 0 && x <= CushionDepth) { tShut = t; holdingHome = true; Log($"{t * 1000:F0} ms  home"); }
+                // Once the hook is in its keeper it holds the leaf into the bulb in the hand's place. (Let go of, the
+                // leaf slid back off the squeezed bulb half a second after the latch: a thump of its own.)
+                if (holdingHome && t > tShut + 0.6 && !thrown) holdingHome = false;
                 Step();
             }
         }
@@ -727,6 +1098,7 @@ public static class SlidingDoor
             foreach (double v in lift) heave += v / Wheels;
             for (int i = 0; i < Wheels; i++) { sl += (lift[i] - heave) * arm[i]; sa2 += arm[i] * arm[i]; }
             pitch = sl / sa2;
+            gHeave = heave; gPitch = pitch; gHeaveRate = 0; gPitchRate = 0;
         }
 
         /// <summary>A twentieth of a second with nothing moving, unheard, so the fields start from rest.</summary>
@@ -734,7 +1106,9 @@ public static class SlidingDoor
         {
             Rest();
             recording = false;
-            double stop = time + 0.05;
+            // A quarter of a second: the glass on its setting blocks (about 80 Hz, a tenth of critical) is
+            // still ringing a twentieth in, and was a thump at the head of every render.
+            double stop = time + (auto ? 0.05 : 0.25);
             while (time < stop) Step();
             recording = true;
             time = 0;
@@ -758,7 +1132,23 @@ public static class SlidingDoor
                 double f = Contact(contactK, contactLambda, depth, hRate - trackPort[i].V - vw[i]);
                 Note($"roller{i}", f > 1e-3 ? f : 0);
                 // A grain carrying the wheel gives way, a piece at a time.
-                if (grain != null && !grain.Done && f > GritStrength * 4 * grain.A * grain.A && time - grain.LastCrush > CrushSeconds)
+                if (!auto && ch.Tyre == Tyre.Nylon)
+                {
+                    // A patio tyre's tread yields round a grain loaded past what nylon holds, and takes it in. Once
+                    // it no longer carries the wheel it is in the tread, wrapped as the tyre wraps fine grit. (Left
+                    // on the rail, a half-sunk grain at the edge of the patch took the wheel and let it go again
+                    // every few steps as the leaf crept: a 4 kHz buzz at full scale.)
+                    if (grain != null && !grain.Done && f > NylonYield * 4 * grain.A * grain.A)
+                    {
+                        grain.A -= grain.A * dt / EmbedSeconds * Math.Min(1, f / (NylonYield * 4 * grain.A * grain.A) - 1);
+                        grain.Target = grain.A;
+                        grain.Embedding = true;
+                        if (grain.A <= PowderMicron * 1e-6) grain.Done = true;
+                    }
+                    if (lastGrain[i] != null && lastGrain[i] != grain && lastGrain[i]!.Embedding) lastGrain[i]!.Done = true;
+                    lastGrain[i] = grain;
+                }
+                else if (grain != null && !grain.Done && f > GritStrength * 4 * grain.A * grain.A && time - grain.LastCrush > CrushSeconds)
                 {
                     grain.LastCrush = time;
                     grain.Target = Math.Max(PowderMicron * 1e-6, grain.A * (0.25 + 0.5 * rng.NextDouble()));
@@ -808,20 +1198,44 @@ public static class SlidingDoor
             brushNoise += a1 * (white - brushNoise);
             double moving = Math.Tanh(Math.Abs(u) / 0.005);
             double pile = ch.Pile * moving;
-            sideForce -= pile * Math.Sign(u);
+            // A patio leaf's pile grips where it stands and lets go once the pull passes its breakaway.
+            sideForce -= auto ? pile * Math.Sign(u) : pileGrip.Force(u, ch.Pile, mass, dt);
             // (The one-pole leaves white noise with a1 / (2 - a1) of its variance: put it back to one.)
             // An automatic leaf's drag in travel is mostly its nylon floor guide sliding smoothly; its brush
             // seals only wipe the jamb at the ends, about a fifth of it. (All of it as brushing fibres hissed.)
             double brushing = auto ? AutoBrushShare : 1;
             double flutter = pile * brushing * 0.3 / Math.Sqrt(auto ? AutoPileFibres : PatioPileFibres) * brushNoise / Math.Sqrt(a1 / (2 - a1));
+            if (!auto)
+            {
+                // A fibre's catches and slips are alike, each a tooth of nearly the same length: what their
+                // sum flutters with lies about the slip rate, and falls away below it as the teeth come
+                // regular. (Left white down to nothing, the pile rang a smooth new door's frame at 60-80 Hz,
+                // a boom under the roll.)
+                pileLow += a1 * (flutter - pileLow);
+                flutter = (flutter - pileLow) * Math.Sqrt(2);
+                // The tips' flutter as the backing feels it, through the fibres' own bending.
+                double fa = fibreW * fibreW * (flutter - fibreBend) - 2 * PileZeta * fibreW * fibreRate;
+                fibreRate += fa * dt; fibreBend += fibreRate * dt;
+                flutter = fibreBend;
+            }
             frameField.Modes.Push(brushFrameHit, flutter);
             trackField.Modes.Push(brushTrackHit, flutter);
 
             // ── The ends of the travel ──
             // Each end's stile meets its bumper; the leaf follows through the stile's spring.
             double jamb = auto ? BumperLambda : PatioJambLambda;
-            double fShut = Contact(bumperK, jamb, -(x + stileD[0]), -(u + stileV[0]));
-            double fOpen = Contact(bumperK, jamb, x + stileD[1] - travel, u + stileV[1]);
+            double fShut, fOpen = Contact(bumperK, jamb, x + stileD[1] - travel, u + stileV[1]);
+            if (auto) fShut = Contact(bumperK, jamb, -(x + stileD[0]), -(u + stileV[0]));
+            else
+            {
+                // The patio jamb: its pile and bulb, then, squashed flat, the jamb itself.
+                double face = x + stileD[0], faceRate = u + stileV[0];
+                double squeeze = Math.Min(CushionDepth - face, CushionDepth);
+                double cushion = squeeze > 0 ? Math.Max(0, CushionK * squeeze * (1 - PatioJambLambda * faceRate)) : 0;
+                double metal = Contact(FrameOnFrameK, FrameOnFrameLambda, -face, -faceRate);
+                fShut = cushion + metal;
+                Note("frame-on-frame", metal);
+            }
             double leafAcc = lastLeafAcc;
             for (int k = 0; k < 2; k++)
             {
@@ -834,21 +1248,37 @@ public static class SlidingDoor
                 unit?.Push(ones, spring * EdgeEccentricity * 0.5);
                 frameField.Modes.Push(frameEdge[k], spring * EdgeEccentricity);
             }
-            double endDrive = endPort.Step(fShut + fOpen, dt, out _);
-            frameField.Modes.Push(endFrameHit, endDrive);
-            trackField.Modes.Push(endTrackHit, endDrive * 0.5);
+            if (auto)
+            {
+                double endDrive = endPort.Step(fShut + fOpen, dt, out _);
+                frameField.Modes.Push(endFrameHit, endDrive);
+                trackField.Modes.Push(endTrackHit, endDrive * 0.5);
+            }
+            else
+            {
+                // The stile's face and the jamb's web each take the blow face-on.
+                frameField.Modes.Push(endFrameHit, stileFace!.Step(fShut + fOpen, dt, out _));
+                trackField.Modes.Push(endTrackHit, jambWeb!.Step(fShut + fOpen, dt, out _));
+            }
             Note("shut-bumper", fShut); Note("open-bumper", fOpen);
-            // A hand lets go when the leaf reaches its end: it does not lean on the bumper.
-            if (fShut > 0 || fOpen > 0) handReleased = true;
+            // A hand pushing a leaf home lets go as it meets the jamb: it does not lean on the bumper.
+            if (auto ? fShut > 0 || fOpen > 0 : shutting && fShut > 0) handReleased = true;
             if (holdingHome) sideForce -= HoldHome + ArmDamping * u;
 
             // ── Hand (patio) ──
             if (!auto)
             {
+                // The hand pulls the handle, and the handle the leaf once it is across its play. Its grip comes
+                // up over a tenth of a second. A hand knows the leaf's drag and leans into it as it goes: what is
+                // left for the arm's stiffness is the slip from its path. (Without it the arm lagged its path by
+                // the drag over its stiffness, 3 mm, and once the leaf had stopped pulled it on those 3 mm: the
+                // handle went over from braking to pulling, a knock at the end of every opening.)
+                handForce = 0;
                 if (handOn)
                 {
-                    double fh = mass * handA + 1200 * (handV - u) + 15000 * (handX - x);
-                    sideForce += Math.Clamp(fh, -250, 250);
+                    double fh = mass * handA + ch.Pile * Math.Tanh(handV / 0.01) + 1200 * (handV - u - handleRate) + 15000 * (handX - x - handle);
+                    double g = Math.Clamp(Math.Min(time - gripFrom, gripTo - time) / HandGrip, 0, 1);
+                    handForce = Math.Clamp(fh * armShare, -250, 250) * g * g * (3 - 2 * g);
                 }
             }
 
@@ -945,16 +1375,16 @@ public static class SlidingDoor
             if (!auto)
             {
                 double rel = handle - handlePort.X, relRate = handleRate - handlePort.V;
-                double knock = Contact(MetalK, MetalLambda, rel - HandlePlay, relRate) - Contact(MetalK, MetalLambda, -rel - HandlePlay, -relRate);
+                double knock = Contact(HandleStopK, HandleStopLambda, rel - ch.HandlePlay, relRate)
+                               - Contact(HandleStopK, HandleStopLambda, -rel - ch.HandlePlay, -relRate);
                 double centring = HandleCentring * handle + 2 * HandleZeta * Math.Sqrt(HandleCentring * HandleKg) * handleRate;
-                double hacc;
-                if (handOn) { hacc = 0; handleRate = 0; handle = 0; }
-                else
-                {
-                    // Relative to the leaf, which is decelerating under it.
-                    hacc = (-knock - centring) / HandleKg - lastLeafAcc;
-                    handleRate += hacc * dt; handle += handleRate * dt;
-                }
+                // Relative to the leaf, which moves under it.
+                // The fingers round it hold it to the hand, which goes with the leaf: about 150 N s/m against its
+                // moving in its play (the hand-arm system's driving-point impedance is 100-300 N s/m, ISO 10068).
+                double hacc = ((handOn ? handForce - GripDamping * handleRate : 0) - knock - centring) / HandleKg - lastLeafAcc;
+                handleRate += hacc * dt; handle += handleRate * dt;
+                // What the handle does to the leaf: its stops and its spring.
+                sideForce += knock + centring;
                 double hd = handlePort.Step(knock, dt, out _);
                 frameField.Modes.Push(handleHit, hd);
                 pSmall += handleNoise.Pressure(hacc + lastLeafAcc) + escutcheonSound.Pressure(handlePort.Acc);
@@ -963,7 +1393,25 @@ public static class SlidingDoor
 
             // ── Rigid motion ──
             double heaveAcc = -G, pitchAcc = 0;
-            for (int i = 0; i < Wheels; i++) { heaveAcc += host[i] / mass; pitchAcc += host[i] * arm[i] / pitchInertia; }
+            if (auto)
+                for (int i = 0; i < Wheels; i++) { heaveAcc += host[i] / mass; pitchAcc += host[i] * arm[i] / pitchInertia; }
+            else
+            {
+                // The frame on its rollers, and the glass on its blocks on the frame.
+                double up = 0, turn = 0;
+                for (int b = -1; b <= 1; b += 2)
+                {
+                    double xb = b * blockArm;
+                    double squeeze = heave + pitch * xb - (gHeave + gPitch * xb) + blockPreload;
+                    double rate = heaveRate + pitchRate * xb - (gHeaveRate + gPitchRate * xb);
+                    double fb = BlockK * squeeze + blockC * rate;
+                    up += fb; turn += fb * xb;
+                }
+                for (int i = 0; i < Wheels; i++) { heaveAcc += host[i] / frameKg; pitchAcc += host[i] * arm[i] / frameInertia; }
+                heaveAcc -= up / frameKg; pitchAcc -= turn / frameInertia;
+                gHeaveRate += (-G + up / glassKg) * dt; gHeave += gHeaveRate * dt;
+                gPitchRate += turn / glassInertia * dt; gPitch += gPitchRate * dt;
+            }
             heaveRate += heaveAcc * dt; heave += heaveRate * dt;
             pitchRate += pitchAcc * dt; pitch += pitchRate * dt;
             lastLeafAcc = sideForce / (mass - 2 * stileKg);
