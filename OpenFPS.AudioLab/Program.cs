@@ -91,6 +91,7 @@ string[] usage =
     "  --door-knock [out=] [seed=] [knocks=]         knuckles on a wooden door",
     "  --door-opening [out=]                         doors opening and shutting at a metre",
     "  --knob-door [out=] [seed=] [only=] [stems=]   the physical knob door: opens and shuts, hinges worn and oiled",
+    "  --knob-renders [key=K;K] [out=] [stems=] [events]  knob door keys as the game names them, float WAVs in pascals",
     "  --pushbar-door [out=] [only=] [stems=]        the physical push-bar door: each character opening and shutting on its closer",
     "  --sliding-door [out=] [only=] [stems=]        the physical sliding doors: a patio door and an automatic door, each character",
     "  --patio-vs-ref [ref=] [wav=] [only=] [out=]   the patio door measured against the recording of a real one, side by side",
@@ -465,6 +466,11 @@ if (args.Contains("--gun-fit"))
 if (args.Contains("--gun-spec"))
 {
     Environment.Exit(OpenFPS.Client.Core.AudioEngine.Fmod.GunSpecSpike.Run(args));
+}
+
+if (args.Contains("--knob-renders"))
+{
+    Environment.Exit(OpenFPS.AudioLab.Spikes.KnobRefSpike.Run(args));
 }
 
 if (args.Contains("--patio-vs-ref"))

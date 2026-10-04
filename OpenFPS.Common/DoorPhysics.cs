@@ -241,6 +241,20 @@ internal static class DoorPhysics
     }
 
     /// <summary>
+    /// A Hertz contact whose loss gives back the same share of the speed whatever the speed (Flores et al.
+    /// 2011: damping 8(1 - e) / (5 e v) on the approach speed v). Hunt-Crossley's fixed damping gives back
+    /// almost all of a slow approach, so a part settling onto a lossy stop bounced a dozen times.
+    /// <paramref name="approach"/> holds the speed the contact began at, per contact; it is reset when apart.
+    /// </summary>
+    internal static double ContactRestitution(double k, double e, double depth, double rate, ref double approach)
+    {
+        if (depth <= 0) { approach = 0; return 0; }
+        if (approach <= 0) approach = Math.Max(Math.Abs(rate), 1e-4);
+        double f = k * depth * Math.Sqrt(depth) * (1 + 8 * (1 - e) / (5 * e) * rate / approach);
+        return f > 0 ? f : 0;
+    }
+
+    /// <summary>
     /// LuGre friction: a bristle state that holds while the surfaces stick and lets go when the force
     /// passes the static limit. Its exact update relaxes the bristle towards its sliding deflection, so
     /// stiff bristles do not need a tiny step.
