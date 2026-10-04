@@ -13,6 +13,12 @@ public sealed class VoiceCapture : IMicrophoneCapture
 {
     private const int Channels = 1;
     private const int BufferMs = 20;
+    /// <summary>Buffers queued with the driver. NAudio's default is three, 60 ms of slack: a capture
+    /// thread held up longer than that (a busy machine, a screen reader speaking) loses audio. More
+    /// buffers add no delay, since each is handed back the moment it is full.</summary>
+    private const int Buffers = 8;
+    private long _samplesIn;
+    private DateTime _startedAt;
 
     private WaveInEvent? _waveIn;
     private VoiceFrameEncoder? _encoder;
@@ -81,11 +87,16 @@ public sealed class VoiceCapture : IMicrophoneCapture
             {
                 DeviceNumber = DeviceNumber(),
                 WaveFormat = new WaveFormat(VoiceCodec.Rate, 16, Channels),
-                BufferMilliseconds = BufferMs
+                BufferMilliseconds = BufferMs,
+                NumberOfBuffers = Buffers,
             };
             _waveIn.DataAvailable += OnDataAvailable;
+            _waveIn.RecordingStopped += OnRecordingStopped;
+            _samplesIn = 0;
+            _startedAt = DateTime.UtcNow;
             _waveIn.StartRecording();
             _capturing = true;
+            Serilog.Log.Information("Microphone: recording from {Device}.", DeviceName(_waveIn.DeviceNumber));
         }
         catch (Exception ex)
         {
@@ -93,7 +104,7 @@ public sealed class VoiceCapture : IMicrophoneCapture
             // false — which it is on every path that lands here.
             Serilog.Log.Error(ex, "Microphone capture failed to start.");
             _capturing = false;
-            if (_waveIn != null) { _waveIn.DataAvailable -= OnDataAvailable; _waveIn.Dispose(); _waveIn = null; }
+            if (_waveIn != null) { _waveIn.DataAvailable -= OnDataAvailable; _waveIn.RecordingStopped -= OnRecordingStopped; _waveIn.Dispose(); _waveIn = null; }
             _encoder = null;
         }
     }
@@ -102,7 +113,9 @@ public sealed class VoiceCapture : IMicrophoneCapture
     {
         if (!_capturing) return;
         _capturing = false;
-        if (_waveIn != null) _waveIn.DataAvailable -= OnDataAvailable;
+        Serilog.Log.Information("Microphone: stopped after {Seconds:F1} s, {Heard:F1} s of audio heard.",
+                                (DateTime.UtcNow - _startedAt).TotalSeconds, _samplesIn / (double)VoiceCodec.Rate);
+        if (_waveIn != null) { _waveIn.DataAvailable -= OnDataAvailable; _waveIn.RecordingStopped -= OnRecordingStopped; }
         _waveIn?.StopRecording();
         _waveIn?.Dispose();
         _waveIn = null;
@@ -113,10 +126,35 @@ public sealed class VoiceCapture : IMicrophoneCapture
     {
         if (!_capturing || _encoder == null || _send == null || e.BytesRecorded < 2) return;
         var heard = new float[e.BytesRecorded / 2];
+        if (_samplesIn == 0)
+            Serilog.Log.Information("Microphone: first audio {Ms:F0} ms after starting.", (DateTime.UtcNow - _startedAt).TotalMilliseconds);
+        _samplesIn += heard.Length;
         for (int i = 0; i < heard.Length; i++) heard[i] = BitConverter.ToInt16(e.Buffer, i * 2) / 32768f;
         _encoder.Push(heard, _send);
         // What was heard, as it was heard, for the player's own room to answer (OwnVoiceRing).
         SamplesCaptured?.Invoke(heard);
+    }
+
+    /// <summary>
+    /// The device stopped on its own: unplugged, taken by another program, or a driver fault. Without
+    /// this the player hears nothing wrong and believes they are still talking. Logged, and one attempt
+    /// made to start again on whatever device is there now (Start logs if that fails too).
+    /// </summary>
+    private void OnRecordingStopped(object? sender, StoppedEventArgs e)
+    {
+        if (!_capturing) return;
+        Serilog.Log.Warning(e.Exception, "Microphone: recording stopped by itself after {Heard:F1} s of audio; starting again.",
+                            _samplesIn / (double)VoiceCodec.Rate);
+        _capturing = false;
+        if (_waveIn != null) { _waveIn.DataAvailable -= OnDataAvailable; _waveIn.RecordingStopped -= OnRecordingStopped; _waveIn.Dispose(); _waveIn = null; }
+        _encoder = null;
+        Start();
+    }
+
+    private static string DeviceName(int number)
+    {
+        try { return number < 0 ? "the default microphone" : WaveInEvent.GetCapabilities(number).ProductName; }
+        catch { return $"device {number}"; }
     }
 
     public void Dispose() => Stop();

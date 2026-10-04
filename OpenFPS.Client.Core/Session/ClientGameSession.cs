@@ -1330,12 +1330,14 @@ public sealed partial class ClientGameSession : IDisposable
             _microphone.Start();
             Ui.Play(UiCue.VoiceOn);
             _audioSystem.OwnVoiceLive = _microphone.IsCapturing;
+            Serilog.Log.Information("Voice chat: V pressed, transmitting {On}.", _microphone.IsCapturing ? "on" : "FAILED to start");
         }
         else
         {
             _microphone.Stop();
             Ui.Play(UiCue.VoiceOff);
             _audioSystem.OwnVoiceLive = false;
+            Serilog.Log.Information("Voice chat: V pressed, transmitting off.");
         }
     }
 
