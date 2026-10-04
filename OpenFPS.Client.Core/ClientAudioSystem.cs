@@ -1341,9 +1341,29 @@ public class ClientAudioSystem
     /// voices with HRTF and filtering, and that cost is the mixer's. If it ever runs short the order
     /// of sacrifice is reflections, then borrowed voices, then engines — never the cars first.
     /// </summary>
+    /// <summary>
+    /// What the engines' reflections cost the game thread, milliseconds a pass: this pass's running total
+    /// and a smoothed average of the passes before it. The budget below watched the mixer and the engine
+    /// threads and never this, so a machine whose mixer had room ran two reflections for every one of
+    /// thirty-two cars and spent 42 ms of each pass finding them: its game loop fell to 22 Hz and every
+    /// sound sat a tenth of a second behind what was making it (Sean's client, 2026-10-04). Over
+    /// <see cref="EchoPassCeilingMs"/> the reflections give way like anything else in the budget.
+    /// </summary>
+    private double _echoPassMs, _echoMsSmoothed;
+    private const double EchoPassCeilingMs = 6.0;
+
     private void ChooseLiveEngines(WorldSnapshot world, Vector3 eyePos)
     {
         double now = _now();
+        _echoMsSmoothed += (_echoPassMs - _echoMsSmoothed) * 0.1;
+        _echoPassMs = 0;
+        if (_echoMsSmoothed > EchoPassCeilingMs && _adaptiveEchoes > 0
+            && now >= _budgetHeldUntil && now - _lastBudgetChange >= BudgetSettleSeconds)
+        {
+            _adaptiveEchoes--;
+            _lastBudgetChange = now;
+            Log.Information("Audio: engine reflections cost {Ms:F1} ms a pass; {Echoes} reflection(s) each.", _echoMsSmoothed, _adaptiveEchoes);
+        }
 
         float load = _audio.MixerLoad;
         if (load > MixerLoadCeiling) { if (_overCeilingSince < 0) _overCeilingSince = now; }
@@ -1393,7 +1413,7 @@ public class ClientAudioSystem
                 else if (_adaptiveMachines < MachineVoiceBudget) _adaptiveMachines++;
                 else if (_adaptiveDistant < MaxDistantVoices) _adaptiveDistant++;
                 else if (_adaptiveFront < FrontVoiceBudget) _adaptiveFront++;
-                else if (_adaptiveEchoes < EchoCeiling) _adaptiveEchoes++;
+                else if (_adaptiveEchoes < EchoCeiling && _echoMsSmoothed < EchoPassCeilingMs / 3) _adaptiveEchoes++;
                 else goto settled;
                 _lastBudgetChange = now;
                 Log.Information("Audio: mixer at {Load:P0}; {Cars} engine(s), {Distant} borrowed, {Echoes} reflection(s) each.",
@@ -2469,7 +2489,9 @@ public class ClientAudioSystem
             long echoAt = System.Diagnostics.Stopwatch.GetTimestamp();
             _engineEchoes.Update(snap.Id, emitter, acousticPath, eyePos, AudioPhysics.CurrentSpeedOfSound, engineDt, _audio,
                                  traced: OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.HasTracedEchoes(snap.Id));
-            _partMs[0] += Ms(echoAt);
+            double echoMs = Ms(echoAt);
+            _partMs[0] += echoMs;
+            _echoPassMs += echoMs;
         }
 
         // No floor slapback and no "cone reflection" here, on purpose.
