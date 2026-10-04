@@ -660,19 +660,28 @@ public class GameServer
                     var lookup = entry.Value.lookup;
 
                     // 3. Refresh Spatial Grid (Dynamic items)
+                    var stage = PerfProbe.Measure("server.grid");
                     grid.Clear();
                     world.Query(new QueryDescription().WithAll<Transform, ColliderComponent>().WithAny<Velocity, PlayerComponent>(), (Entity e, ref Transform t, ref ColliderComponent c) => {
                         grid.AddOverlapping(t.Position, c.Size, t.Rotation, e, false);
                     });
 
+                    stage.Dispose();
                     // 4. Update Simulation (Movement)
+                    stage = PerfProbe.Measure("server.movement");
                     MovementSystem.Update(world, entry.Value.data.WalkMin, entry.Value.data.WalkMax, grid, lookup, _sessions, _maps, dt);
+                    stage.Dispose();
+                    stage = PerfProbe.Measure("server.traffic");
                     _vehicles.Update(entry.Key, world, dt);
+                    stage.Dispose();
+                    stage = PerfProbe.Measure("server.rail+combat");
                     // Reloads that are due, the dead got up again or taken away.
                     _commands.Combat.Update(entry.Key, world);
                     _rail.Update(entry.Key, world, dt);
                     _crossings.Update(entry.Key, world, dt);
 
+                    stage.Dispose();
+                    stage = PerfProbe.Measure("server.speech+crowd");
                     // People in the street saying things to whoever they pass.
                     var weather = _environment.GetStateForMap(_maps.TryGetMapData(entry.Key, out var speechMap)
                         ? new MapAtmosphere(speechMap.Temperature, speechMap.Humidity, speechMap.AirPressure, speechMap.AirAbsorptionMultiplier)
@@ -704,6 +713,8 @@ public class GameServer
                     // say, and BEFORE anything is carried: the order here is the whole contract.
                     // Parts are bolted to the root and follow it exactly; occupants are carried by it
                     // but keep their own heads, so they come last of all.
+                    stage.Dispose();
+                    stage = PerfProbe.Measure("server.driving+doors+parents");
                     DrivingSystem.Update(world, grid, entry.Value.data.WalkMin, entry.Value.data.WalkMax, dt,
                                          (id, label, sounds) => EmitWorldAudio(entry.Key, id, label, sounds));
                     // The glass in every car's windows, toward wherever it was last sent.
@@ -717,6 +728,7 @@ public class GameServer
                                   (id, label, sounds) => EmitWorldAudio(entry.Key, id, label, sounds));
                     ParentSystem.Update(world, lookup);
                     _occupancy.Update(world, lookup);
+                    stage.Dispose();
                 }
                 catch (Exception ex)
                 {
@@ -732,7 +744,7 @@ public class GameServer
             }
 
             // 5. Broadcast World State
-            BroadcastWorldState(tick);
+            using (PerfProbe.Measure("server.broadcast")) BroadcastWorldState(tick);
         }
         catch (Exception ex)
         {
@@ -1159,8 +1171,13 @@ public class GameServer
     // these, so any divergence would only surface as a wrong-sounding room.
     private EntityDefinition CreateDefinition(World world, Entity e) => EntityDefinitionFactory.From(world, e);
 
-    private readonly HashSet<int> _visibleBuffer = new();
     private readonly HashSet<int> _visibleDynamicBuffer = new();
+    /// <summary>What a tick's broadcast chooses from, gathered once for the map rather than once for
+    /// every player: each collidable entity, whether it moves, and whether it moved this tick.</summary>
+    private readonly List<(Entity Entity, bool Dynamic, bool Dirty)> _broadcastCandidates = new();
+    /// <summary>The spatial grid's cell (MapManager makes it 10 m). The grid answered a radius with
+    /// every cell that touched it, so a thing up to a cell beyond earshot was sent; this keeps that.</summary>
+    private const float BroadcastCellMetres = 10f;
     private readonly HashSet<int> _dirtyAudioBuffer = new();
     private readonly List<int> _removedBuffer = new();
 
@@ -1173,14 +1190,27 @@ public class GameServer
         {
             var world = mapEntry.Value.world;
             var grid = mapEntry.Value.grid;
-            var sessionsInMap = _sessions.GetSessionsInMap(mapEntry.Key);
-            
+            var sessionsInMap = _sessions.GetSessionsInMap(mapEntry.Key).ToList();
+            if (sessionsInMap.Count == 0) goto ClearDirty;
+
+            // Every player used to ask the spatial grid for everything within earshot, and on the city
+            // earshot is the whole map: 86,000 grid entries a player a tick (a wall is filed in every
+            // cell it crosses) to find 7,500 entities, 16 ms each on a desktop. Two players overran the
+            // 33 ms tick on the VPS, the loop fell behind every few ticks, and everything anyone heard
+            // trailed what it belonged to. The grid holds exactly the collidable entities, so one pass
+            // over the world finds the same set once, with no repeats; each player then filters it.
+            _broadcastCandidates.Clear();
+            using (PerfProbe.Measure("server.broadcast.gather"))
+                world.Query(new QueryDescription().WithAll<Transform, ColliderComponent>(), (Entity e, ref Transform t) =>
+                    _broadcastCandidates.Add((e, world.Has<Velocity>(e) || world.Has<PlayerComponent>(e), t.IsDirty)));
+
             foreach (var session in sessionsInMap)
             {
                 try
                 {
                     if (session.Entity == Entity.Null) continue;
                     if (!world.IsAlive(session.Entity)) continue;
+                    using var _sessionPerf = PerfProbe.Measure("server.broadcast.session");
                     var pPos = world.Get<Transform>(session.Entity).Position;
                     float earshot = _maps.GetEarshotRange(mapEntry.Key);
                     var peer = _network.GetPeer(session.ConnectionId);
@@ -1202,16 +1232,23 @@ public class GameServer
                     _reliableBroadcast.RidingEntityId = riding;
                     _reliableBroadcast.RidingControls = driving;
                     _reliableBroadcast.States.Clear();
-                    _visibleBuffer.Clear();
                     _visibleDynamicBuffer.Clear();
+                    float reach = earshot + BroadcastCellMetres;
 
-                    foreach (var e in grid.GetItemsInRadius(pPos, earshot))
+                    var scan = PerfProbe.Measure("server.broadcast.scan");
+                    foreach (var (e, isDynamic, isDirty) in _broadcastCandidates)
                     {
-                        if (!_visibleBuffer.Add(e.Id)) continue;
-                        if (!world.Has<Transform>(e)) continue;
+                        // Geometry that stays put, has not moved, and this client already has (the whole
+                        // map was streamed to it on arrival) has nothing to say: most of the city, every
+                        // tick, settled by one lookup.
+                        if (!isDynamic && !isDirty && session.KnownEntities.Contains(e.Id)
+                            && !_dirtyAudioBuffer.Contains(e.Id)) continue;
+                        // Anything taken, killed or removed earlier in this tick: asking a dead entity
+                        // what it has throws, which used to skip this player's whole update.
+                        if (!world.IsAlive(e)) continue;
                         ref var t = ref world.Get<Transform>(e);
+                        if (MathF.Abs(t.Position.X - pPos.X) > reach || MathF.Abs(t.Position.Z - pPos.Z) > reach) continue;
 
-                        bool isDynamic = world.Has<Velocity>(e) || world.Has<PlayerComponent>(e);
                         if (isDynamic) _visibleDynamicBuffer.Add(e.Id);
 
                         // A state message names an entity the client may never have heard of — every
@@ -1251,6 +1288,10 @@ public class GameServer
                         else _reliableBroadcast.States.Add(state);
                     }
 
+                    scan.Dispose();
+                    PerfProbe.Count("server.broadcast.states", _reusableBroadcast.States.Count);
+                    PerfProbe.Count("server.broadcast.reliable-states", _reliableBroadcast.States.Count);
+                    var send = PerfProbe.Measure("server.broadcast.send");
                     // Anything dynamic this client could see and now cannot is a ghost on their side.
                     // Static geometry is never evicted: the client's acoustic map is built from the whole
                     // streamed map, so dropping a distant wall would change how the world sounds.
@@ -1289,6 +1330,7 @@ public class GameServer
                         CurrentMaterial = stats.matType, CurrentVariant = stats.variant,
                         HeldWeaponId = held.WeaponId, HeldRounds = held.Rounds, HeldScopeId = held.ScopeId,
                     }, DeliveryMethod.ReliableOrdered);
+                    send.Dispose();
                 }
                 catch (Exception ex)
                 {
@@ -1296,6 +1338,7 @@ public class GameServer
                 }
             }
 
+            ClearDirty:
             // Cleanup dirty flags after broadcast
             world.Query(new QueryDescription().WithAll<Transform>(), (ref Transform t) => { t.IsDirty = false; });
         }

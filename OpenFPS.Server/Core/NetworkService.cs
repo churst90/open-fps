@@ -1,3 +1,4 @@
+using OpenFPS.Common;
 using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Sockets;
@@ -110,6 +111,8 @@ public class NetworkService : INetEventListener
             byte[] data = MemoryPackSerializer.Serialize<IMessage>(update);
             if (data.Length <= peer.GetMaxSinglePacketSize(deliveryMethod))
             {
+                PerfProbe.Count("net.state-bytes", data.Length);
+                PerfProbe.Count("net.state-packets");
                 peer.Send(data, deliveryMethod);
                 return;
             }
