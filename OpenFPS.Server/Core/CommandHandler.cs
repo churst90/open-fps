@@ -295,6 +295,7 @@ public class CommandHandler
             case "revoke": HandleGrant(session, args, reply, give: false); break;
             case "perms":
             case "permissions": HandlePerms(session, args, reply); break;
+            case "role": HandleRole(session, args, reply); break;
             case "bring":
                 if (args.Length < 1) { Say(reply, "Usage: /bring NAME — brings a player to you."); break; }
                 if (OnlineSession(args[0]) is not { } brought) { Say(reply, $"{args[0]} is not online."); break; }
@@ -304,25 +305,29 @@ public class CommandHandler
             case "give":
                 if (args.Length < 1 || _hands == null)
                 {
-                    Say(reply, "Usage: /give ITEM, or /give NAME ITEM. Items: " + string.Join(", ", _hands?.GivableItems() ?? Array.Empty<string>()) + ".");
+                    Say(reply, "Usage: /give [NAME] ITEM [COUNT]. Items: " + string.Join(", ", _hands?.GivableItems() ?? Array.Empty<string>()) + ".");
                     break;
                 }
                 {
+                    // /give ITEM, /give ITEM 3, /give NAME ITEM, /give NAME ITEM 3.
+                    var rest = args.ToList();
+                    int count = 1;
+                    if (rest.Count > 1 && int.TryParse(rest[^1], out int n)) { count = n; rest.RemoveAt(rest.Count - 1); }
                     var receiver = session;
-                    string itemId = args[0];
-                    if (args.Length >= 2)
+                    if (rest.Count >= 2)
                     {
-                        if (OnlineSession(args[0]) is not { } named) { Say(reply, $"{args[0]} is not online."); break; }
-                        receiver = named; itemId = args[1];
+                        if (OnlineSession(rest[0]) is not { } named) { Say(reply, $"{rest[0]} is not online."); break; }
+                        receiver = named; rest.RemoveAt(0);
                     }
-                    if (!_hands.Give(receiver, itemId.ToLowerInvariant(), out string what)) { Say(reply, what); break; }
+                    if (count < 1) { Say(reply, "Give at least one."); break; }
+                    if (!_hands.Give(receiver, rest[0].ToLowerInvariant(), count, out string item, out string placed, out string why)) { Say(reply, why); break; }
+                    string what = $"{count} {(count == 1 ? item : Plural(item))}";
                     if (receiver != session)
                     {
-                        _server.SendToSession(receiver, new TextEvent { Text = $"{session.Username} gave you {Yours(what)}." });
-                        Say(reply, $"Gave {receiver.Username} {what}.");
+                        _server.SendToSession(receiver, new TextEvent { Text = $"{session.Username} gave you {what}. {Capital(placed)}." });
+                        Say(reply, $"You gave {receiver.Username} {what}.");
                     }
-                    else Say(reply, $"You now have {Yours(what)}.");
-                    static string Yours(string w) => w.Replace("in the ", "in your ").Replace("on the back", "on your back");
+                    else Say(reply, $"You now have {what}. {Capital(placed)}.");
                 }
                 break;
             case "kick":
@@ -1937,7 +1942,7 @@ public class CommandHandler
         if (args.Length < 2) { Say(reply, $"Usage: /{verb} NAME PERMISSION. /perms lists the permissions."); return; }
         string perm = Permissions.Canonical(args[1].TrimStart('/').ToLowerInvariant());
         if (!Permissions.IsGated(perm)) { Say(reply, $"'{args[1]}' is not a permission. /perms lists them."); return; }
-        if (perm is "grant" or "revoke" or "setrole") { Say(reply, "Roles and permissions stay with administrators: make them an administrator instead."); return; }
+        if (!Grantable(perm)) { Say(reply, "Roles and permissions stay with administrators: make them an administrator instead."); return; }
         if (_users == null || _users.GetUser(args[0]) is not { } record) { Say(reply, $"There is no account called {args[0]}."); return; }
         var grants = Permissions.Parse(record.Permissions);
         bool changed = give ? grants.Add(perm) : grants.Remove(perm);
@@ -1952,8 +1957,8 @@ public class CommandHandler
         {
             online.Grants = new HashSet<string>(grants);
             _server.SendToSession(online, new TextEvent { Text = give
-                ? $"You can now use {perm}: {Permissions.Describe(perm)}."
-                : $"You can no longer use {perm}." });
+                ? $"{session.Username} gave you {perm}: {Permissions.Describe(perm)}."
+                : $"{session.Username} took {perm} from you." });
         }
         string note = give && Permissions.RoleHas(record.Role, perm) ? $" Their role already allows it." : "";
         Say(reply, (give ? $"Granted {perm} to {record.Username}." : $"Revoked {perm} from {record.Username}.") + note);
@@ -1970,17 +1975,21 @@ public class CommandHandler
         }
         UserRole role = session.Role;
         HashSet<string> grants = session.Grants;
+        string custom = session.CustomRole;
         string who = "You are";
         if (args.Length > 0 && !args[0].Equals(session.Username, StringComparison.OrdinalIgnoreCase))
         {
             if (session.Role != UserRole.Admin) { DenyCommand(reply); return; }
             if (_users == null || _users.GetUser(args[0]) is not { } record) { Say(reply, $"There is no account called {args[0]}."); return; }
             role = record.Role; grants = Permissions.Parse(record.Permissions); who = $"{record.Username} is";
+            custom = record.CustomRole is { } c && _server.Roles.Exists(c) ? c : "";
         }
-        var byRole = Permissions.All.Where(p => Permissions.RoleHas(role, p)).ToList();
+        var byRole = Permissions.All.Where(p => Permissions.RoleHas(role, p)).Concat(_server.Roles.PermissionsOf(custom)).Distinct().ToList();
         string roleText = role == UserRole.Admin ? "every permission" : byRole.Count == 0 ? "nothing beyond play" : string.Join(", ", byRole);
         string granted = grants.Count == 0 ? "No single permissions granted." : $"Granted: {string.Join(", ", grants.OrderBy(g => g))}.";
-        Say(reply, $"{who} {Article(role)} {RoleWord(role)}: {roleText}. {granted}");
+        string word = custom.Length > 0 ? custom : RoleWord(role);
+        string article = "aeiou".Contains(char.ToLowerInvariant(word[0])) ? "an" : "a";
+        Say(reply, $"{who} {article} {word}: {roleText}. {granted}");
     }
 
     /// <summary>
@@ -2038,7 +2047,9 @@ public class CommandHandler
 
     private void HandleSetRole(UserSession session, string[] args, Action<IMessage> reply)
     {
-        if (args.Length < 2) { Say(reply, "Usage: /setrole [name] [player, moderator, dev or admin]"); return; }
+        var roles = _server.Roles;
+        string customList = roles.Names.Count > 0 ? ", or one you made: " + string.Join(", ", roles.Names) : "";
+        if (args.Length < 2) { Say(reply, $"Usage: /setrole NAME ROLE. Roles: player, moderator, dev, admin{customList}."); return; }
         UserRole? role = args[1].ToLowerInvariant() switch
         {
             "player" => UserRole.Player,
@@ -2047,29 +2058,137 @@ public class CommandHandler
             "mod" or "moderator" => UserRole.Moderator,
             _ => null,
         };
-        if (role == null) { Say(reply, $"'{args[1]}' is not a role. Roles: player, moderator, dev, admin."); return; }
+        string custom = role == null && roles.Exists(args[1]) ? RoleRepository.Key(args[1]) : "";
+        if (role == null && custom.Length == 0)
+        { Say(reply, $"'{args[1]}' is not a role. Roles: player, moderator, dev, admin{customList}."); return; }
         if (_users == null || _users.GetUser(args[0]) is not { } record) { Say(reply, $"There is no account called {args[0]}."); return; }
         // Your own role is somebody else's to change: an admin who demoted themselves by a slip would
         // have nobody left to put it back.
         if (record.Username.Equals(session.Username, StringComparison.OrdinalIgnoreCase))
         { Say(reply, "You cannot change your own role."); return; }
-        if (!_users.SetRole(record.Username, role.Value)) { Say(reply, "Roles cannot be changed on this server."); return; }
+        // A custom role sits on top of Player.
+        var newRole = role ?? UserRole.Player;
+        if (!_users.SetRole(record.Username, newRole) || !_users.SetCustomRole(record.Username, custom.Length > 0 ? custom : null))
+        { Say(reply, "Roles cannot be changed on this server."); return; }
 
-        Log.Information("Admin: {Admin} set {User}'s role to {Role}.", session.Username, record.Username, role.Value);
+        Log.Information("Admin: {Admin} set {User}'s role to {Role}.", session.Username, record.Username, custom.Length > 0 ? custom : newRole.ToString());
+        string word = custom.Length > 0 ? custom : RoleWord(newRole);
+        string article = "aeiou".Contains(char.ToLowerInvariant(word[0])) ? "an" : "a";
         var online = OnlineSession(record.Username);
         if (online != null)
         {
-            online.Role = role.Value;
+            online.Role = newRole;
+            online.CustomRole = custom;
+            online.RolePermissions = roles.PermissionsOf(custom);
             if (_maps.TryGetMap(online.CurrentMapId, out var world, out _, out _, out _)
                 && online.Entity != Entity.Null && world.IsAlive(online.Entity) && world.Has<PlayerComponent>(online.Entity))
             {
                 ref var player = ref world.Get<PlayerComponent>(online.Entity);
-                player.Role = role.Value;
+                player.Role = newRole;
             }
-            _server.SendToSession(online, new TextEvent { Text = $"You are now {Article(role.Value)} {RoleWord(role.Value)}." });
+            _server.SendToSession(online, new TextEvent { Text = $"{session.Username} made you {article} {word}." + RoleSummary(online) });
         }
-        Say(reply, $"{record.Username} is now {Article(role.Value)} {RoleWord(role.Value)}.");
+        Say(reply, $"{record.Username} is now {article} {word}.");
     }
+
+    /// <summary>" You can now: tp, where." for a role that is a list of commands; nothing for player.</summary>
+    private static string RoleSummary(UserSession s)
+    {
+        if (s.Role == UserRole.Admin) return " You can use every command.";
+        var can = Permissions.All.Where(s.Can).ToList();
+        return can.Count == 0 ? "" : $" You can now use: {string.Join(", ", can)}.";
+    }
+
+    /// <summary>
+    /// /role: roles an administrator makes. /role list; /role create NAME [PERMISSION ...];
+    /// /role add NAME PERMISSION; /role remove NAME PERMISSION; /role show NAME; /role delete NAME.
+    /// A custom role is Player plus its permissions; /setrole NAME ROLE gives it to somebody.
+    /// </summary>
+    private void HandleRole(UserSession session, string[] args, Action<IMessage> reply)
+    {
+        var roles = _server.Roles;
+        string sub = args.Length > 0 ? args[0].ToLowerInvariant() : "list";
+        if (sub == "list")
+        {
+            Say(reply, roles.Names.Count == 0
+                ? "No custom roles. /role create NAME, then /role add NAME PERMISSION."
+                : "Custom roles: " + string.Join("; ", roles.Names.Select(n => $"{n}, {Describe(roles.PermissionsOf(n))}")) + ".");
+            return;
+        }
+        if (args.Length < 2) { Say(reply, "Usage: /role list, create NAME [PERMISSIONS], add NAME PERMISSION, remove NAME PERMISSION, show NAME, delete NAME."); return; }
+        string name = RoleRepository.Key(args[1]);
+        switch (sub)
+        {
+            case "create":
+            {
+                if (!RoleRepository.IsValidName(name)) { Say(reply, "A role name is 2 to 20 letters, digits, '_' or '-', starting with a letter."); return; }
+                if (name is "player" or "dev" or "developer" or "admin" or "administrator" or "mod" or "moderator")
+                { Say(reply, $"{name} is a built-in role."); return; }
+                if (!roles.Create(name)) { Say(reply, $"There is already a role called {name}."); return; }
+                var refused = new List<string>();
+                foreach (var p in args.Skip(2))
+                {
+                    string perm = Permissions.Canonical(p.TrimStart('/').ToLowerInvariant());
+                    if (Grantable(perm)) roles.Change(name, perm, add: true); else refused.Add(p);
+                }
+                Log.Information("Admin: {Admin} created role {Role}: {Perms}.", session.Username, name, Describe(roles.PermissionsOf(name)));
+                Say(reply, $"Made the role {name}: {Describe(roles.PermissionsOf(name))}."
+                         + (refused.Count > 0 ? $" Not permissions, or not grantable: {string.Join(", ", refused)}." : ""));
+                return;
+            }
+            case "add":
+            case "remove":
+            {
+                if (!roles.Exists(name)) { Say(reply, $"There is no role called {name}."); return; }
+                if (args.Length < 3) { Say(reply, $"Usage: /role {sub} NAME PERMISSION. /perms all lists them."); return; }
+                string perm = Permissions.Canonical(args[2].TrimStart('/').ToLowerInvariant());
+                if (!Grantable(perm)) { Say(reply, $"'{args[2]}' is not a permission a role can have. /perms all lists them."); return; }
+                bool add = sub == "add";
+                if (!roles.Change(name, perm, add)) { Say(reply, add ? $"{name} already has {perm}." : $"{name} does not have {perm}."); return; }
+                foreach (var s in _sessions.GetAllSessions().Where(s => s.CustomRole == name))
+                {
+                    s.RolePermissions = roles.PermissionsOf(name);
+                    _server.SendToSession(s, new TextEvent { Text = add
+                        ? $"{session.Username} gave your role {perm}: {Permissions.Describe(perm)}."
+                        : $"{session.Username} took {perm} from your role." });
+                }
+                Say(reply, $"{name}: {Describe(roles.PermissionsOf(name))}.");
+                return;
+            }
+            case "show":
+                Say(reply, roles.Exists(name) ? $"{name}: {Describe(roles.PermissionsOf(name))}." : $"There is no role called {name}.");
+                return;
+            case "delete":
+            {
+                if (!roles.Delete(name)) { Say(reply, $"There is no role called {name}."); return; }
+                int cleared = _users?.ClearCustomRole(name) ?? 0;
+                foreach (var s in _sessions.GetAllSessions().Where(s => s.CustomRole == name))
+                {
+                    s.CustomRole = ""; s.RolePermissions = new HashSet<string>();
+                    _server.SendToSession(s, new TextEvent { Text = $"{session.Username} removed the role {name}; you are a player." });
+                }
+                Say(reply, $"Deleted the role {name}." + (cleared > 0 ? $" {cleared} account{(cleared == 1 ? " is" : "s are")} players again." : ""));
+                return;
+            }
+            default:
+                Say(reply, "Usage: /role list, create NAME [PERMISSIONS], add NAME PERMISSION, remove NAME PERMISSION, show NAME, delete NAME.");
+                return;
+        }
+    }
+
+    /// <summary>What a custom role or a /grant may carry: any permission but the ones that hand out
+    /// permissions. Those stay with administrators.</summary>
+    private static bool Grantable(string perm) => Permissions.IsGated(perm) && perm is not ("grant" or "revoke" or "setrole" or "role");
+
+    private static string Describe(HashSet<string> perms) => perms.Count == 0 ? "no permissions yet" : string.Join(", ", perms.OrderBy(p => p));
+
+    private static string Plural(string noun)
+    {
+        string n = noun.ToLowerInvariant();
+        if (n.EndsWith("s") || n.EndsWith("x") || n.EndsWith("ch") || n.EndsWith("sh")) return noun + "es";
+        return noun + "s";
+    }
+    private static string Capital(string text) => text.Length == 0 ? text : char.ToUpperInvariant(text[0]) + text[1..];
 
     private static string Article(UserRole role) => role == UserRole.Admin ? "an" : "a";
 

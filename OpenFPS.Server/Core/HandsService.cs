@@ -125,32 +125,49 @@ public class HandsService
         => _maps.Prefabs.Where(p => p.Value.IsItem || p.Value.Type == EntityType.Item).Select(p => p.Key).OrderBy(k => k);
 
     /// <summary>
-    /// A new item made from its prefab and put in a player's hands, or on their back when their hands
-    /// are full (staff /give). Says where it went.
+    /// New items made from a prefab and given to a player (staff /give): into their hands while they have
+    /// a hand free, then onto their back while it takes the weight, and anything left at their feet.
+    /// <paramref name="name"/> is the item's name, <paramref name="placed"/> where they went, for the
+    /// receiver ("1 in both hands, 1 on your back").
     /// </summary>
-    public bool Give(UserSession to, string prefabId, out string message)
+    public bool Give(UserSession to, string prefabId, int count, out string name, out string placed, out string message)
     {
-        message = "";
+        name = placed = message = "";
         if (!_maps.Prefabs.TryGetValue(prefabId, out var template) || !(template.IsItem || template.Type == EntityType.Item))
         { message = $"There is no item called {prefabId}. Items: {string.Join(", ", GivableItems())}."; return false; }
         if (!TryGetHolder(to, out var world, out _, out var lookup) || to.Entity == Entity.Null || !world.IsAlive(to.Entity))
         { message = $"{to.Username} is not in the world just now."; return false; }
 
+        count = Math.Clamp(count, 1, 50);
         var at = world.Get<Transform>(to.Entity).Position;
-        var item = _maps.SpawnPrefab(to.CurrentMapId, prefabId, at);
-        if (item == Entity.Null) { message = $"The {prefabId} could not be made."; return false; }
-        string name = NameOf(world, item), where;
-        if (PutInHands(world, to.Entity, item, out _)) where = "in " + WhereItWent(world, to.Entity, item).Replace("your ", "the ");
-        else
+        int inHands = 0, onBack = 0, atFeet = 0;
+        string handsWord = "";
+        for (int k = 0; k < count; k++)
         {
-            if (!world.Has<InventoryComponent>(to.Entity)) world.Add(to.Entity, new InventoryComponent());
-            Bag(world, to.Entity).Add(item.Id);
-            Attach(world, to.Entity, item, Back, bothHands: false);
-            where = "on the back";
+            var item = _maps.SpawnPrefab(to.CurrentMapId, prefabId, at);
+            if (item == Entity.Null) { message = $"The {prefabId} could not be made."; return false; }
+            name = NameOf(world, item);
+            if (PutInHands(world, to.Entity, item, out _))
+            {
+                inHands++;
+                handsWord = WhereItWent(world, to.Entity, item);
+            }
+            else if (CarriedMassKg(world, to.Entity, lookup) + MassOf(world, item) <= CarryCapacityKg)
+            {
+                if (!world.Has<InventoryComponent>(to.Entity)) world.Add(to.Entity, new InventoryComponent());
+                Bag(world, to.Entity).Add(item.Id);
+                Attach(world, to.Entity, item, Back, bothHands: false);
+                onBack++;
+            }
+            else atFeet++;   // made where they stand: too heavy to carry
         }
         _maps.RefreshGrid(to.CurrentMapId);
-        Log.Information("{User} was given {Item} ({Id}).", to.Username, name, item.Id);
-        message = $"the {name}, {where}";
+        var parts = new List<string>();
+        if (inHands > 0) parts.Add(inHands == 1 ? $"in {handsWord}" : $"{inHands} in your hands");
+        if (onBack > 0) parts.Add($"{(parts.Count > 0 || onBack > 1 ? onBack + " " : "")}on your back");
+        if (atFeet > 0) parts.Add($"{atFeet} at your feet, too heavy to carry");
+        placed = parts.Count == 1 && inHands + onBack + atFeet == 1 ? parts[0] : string.Join(", ", parts);
+        Log.Information("{User} was given {Count} {Item}.", to.Username, count, name);
         return true;
     }
 

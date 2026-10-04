@@ -39,4 +39,10 @@ public interface IUserRepository
     /// <summary>Replaces a user's granted permissions (comma separated). False if there is no such user
     /// or this store cannot keep them.</summary>
     bool SetGrants(string username, string grants) => false;
+
+    /// <summary>Sets or clears (null) a user's custom role. False if there is no such user.</summary>
+    bool SetCustomRole(string username, string? role) => false;
+
+    /// <summary>Takes a deleted custom role off everybody who had it; how many.</summary>
+    int ClearCustomRole(string role) => 0;
 }

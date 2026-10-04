@@ -60,6 +60,8 @@ public class GameServer
     /// <summary>A connection that has not logged in by now is closed.</summary>
     public static readonly TimeSpan LoginTimeout = TimeSpan.FromSeconds(120);
     private FriendRepository _friends = null!;
+    /// <summary>Roles administrators made (/role). In memory until Run gives it its file.</summary>
+    public RoleRepository Roles { get; private set; } = new RoleRepository(null);
     private MudGateway _mudGateway = null!;
     private readonly ServerStateUpdate _reusableBroadcast = new();
     private readonly ServerStateUpdate _reliableBroadcast = new();
@@ -247,6 +249,7 @@ public class GameServer
         // Beside openfps.db and motd.txt, in the server's working folder. See FriendRepository for
         // why this is a file and not a table.
         _friends = new FriendRepository("friends.json");
+        Roles = new RoleRepository("roles.json");
         _commands = new CommandHandler(_sessions, _maps, this, _composites, _seats, _hands, _userRepo, _friends);
         
         // These register their handlers with the dispatcher, which is what keeps them alive.
@@ -707,6 +710,8 @@ public class GameServer
             Username = user.Username,
             Role = user.Role,
             Grants = OpenFPS.Server.Core.Permissions.Parse(user.Permissions),
+            CustomRole = user.CustomRole is { } custom && Roles.Exists(custom) ? custom : "",
+            RolePermissions = Roles.PermissionsOf(user.CustomRole),
             IsTextClient = peer == null,
             // Where a new player lands: the map that claims IsDefault, not the one named "default".
             CurrentMapId = _maps.DefaultMapId,

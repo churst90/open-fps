@@ -9,7 +9,11 @@ Recent work, newest first. `git log` has the rest.
   an Admin can give one account single commands (`/grant NAME COMMAND`, `/revoke`, `/perms`).
   New commands: `/tp NAME` (go to a player), `/bring`, `/move NAME x y z` and `/move NAME to OTHER`
   (Admin), `/kick`, `/mute`, `/unmute`, `/give [NAME] ITEM`. Table in docs/SERVER_SECURITY.md.
-  The accounts database gains a Permissions column on first start (backed up first).
+  The accounts database gains Permissions and CustomRole columns on first start (backed up first).
+- Custom roles: an Admin makes a named role with its own permissions (`/role create builder tp
+  spawn`) and gives it with `/setrole`. The player is told "cody made you a builder. You can now
+  use: spawn, tp." Grants say who gave them. `/give [NAME] ITEM [COUNT]` says "You gave sean 1
+  AKM." and sean hears "cody gave you 1 AKM." and where it went.
 - Saved Servers (Linux): Tab leaves the list instead of choosing the next server.
 
 - Connecting to a server by name (codyhurst.com) uses its IPv4 address. LiteNetLib picked the IPv6

@@ -82,6 +82,7 @@ public class StaffGateTests : IDisposable
         { "setrole", new[] { "other", "dev" }, UserRole.Admin },
         { "grant", new[] { "other", "tp" }, UserRole.Admin },
         { "revoke", new[] { "other", "where" }, UserRole.Admin },
+        { "role", new[] { "create", "builder", "tp" }, UserRole.Admin },
     };
 
     private const string Denied = "You do not have permission to execute this command.";
@@ -166,6 +167,35 @@ public class StaffGateTests : IDisposable
         Assert.Equal(Denied, rig.Run("spawn", "Box", "Metal", "1", "1", "1"));
         rig.Revoke("tp");
         Assert.Equal(Denied, rig.Run("tp", "150", "150", "6"));
+    }
+
+    /// <summary>
+    /// An administrator makes a role of their own and gives it to somebody: they are told who made them
+    /// what and what they can now do, and they can do exactly that.
+    /// </summary>
+    [Fact]
+    public void ACustomRoleIsAnnouncedAndAllowsItsCommandsOnly()
+    {
+        var rig = new Rig(_dir, UserRole.Admin, "role");
+        Assert.StartsWith("Made the role builder", rig.Run("role", "create", "builder", "tp", "spawn"));
+        Assert.Equal("other is now a builder.", rig.Run("setrole", "other", "builder"));
+        var told = rig.SentTo("other").OfType<TextEvent>().Select(t => t.Text).ToList();
+        Assert.Contains(told, t => t.StartsWith("tester made you a builder.") && t.Contains("spawn") && t.Contains("tp"));
+        Assert.True(rig.Other.Can("tp"));
+        Assert.False(rig.Other.Can("kick"));
+        rig.Run("role", "delete", "builder");
+        Assert.False(rig.Other.Can("tp"));
+    }
+
+    /// <summary>The words Cody asked for: "You gave sean 1 AKM." and "cody gave you 1 AKM."</summary>
+    [Fact]
+    public void GivingSaysWhoGaveHowManyOfWhat()
+    {
+        var rig = new Rig(_dir, UserRole.Admin, "give");
+        string said = rig.Run("give", "other", "torch", "2");
+        Assert.StartsWith("You gave other 2 ", said);
+        Assert.Contains(rig.SentTo("other").OfType<TextEvent>(), t => t.Text.StartsWith("tester gave you 2 "));
+        Assert.StartsWith("You gave other 1 ", rig.Run("give", "other", "torch"));
     }
 
     /// <summary>Moving somebody else is an administrator's: a developer may teleport, not move people.</summary>
@@ -281,7 +311,12 @@ public class StaffGateTests : IDisposable
             _sessions = sessions;
             _server = new GameServer(_users);
             _server.Attach(_maps, sessions, new OccupancyService(_maps), new HandsService(_maps));
-            _server.Sent = (_, message) => Sent.Add(message);
+            _server.Sent = (to, message) =>
+            {
+                Sent.Add(message);
+                if (!_sentTo.TryGetValue(to.Username, out var list)) _sentTo[to.Username] = list = new List<IMessage>();
+                list.Add(message);
+            };
             _commands = new CommandHandler(sessions, _maps, _server, _composites, new OccupancyService(_maps),
                                            new HandsService(_maps), _users);
 
@@ -372,6 +407,12 @@ public class StaffGateTests : IDisposable
             }
         }
 
+        public UserSession Other => _other;
+
+        /// <summary>What the server sent to one player (not the replies to the one running commands).</summary>
+        public List<IMessage> SentTo(string username) => _sentTo.TryGetValue(username, out var l) ? l : new List<IMessage>();
+        private readonly Dictionary<string, List<IMessage>> _sentTo = new();
+
         public void Grant(string permission)
         {
             var grants = Permissions.Parse(_users.GrantsOf("tester"));
@@ -425,7 +466,7 @@ public class StaffGateTests : IDisposable
 
             var b = _session.Build;
             text.Append($"build {b.Placed} {b.Origin} {b.Yaw} {b.Cursor} {b.LastStep} {string.Join(",", b.Placed_Entities)}\n");
-            text.Append($"roles {_session.Role} {_other.Role} {_users.RoleOf("other")} grants {_users.GrantsOf("other")}\n");
+            text.Append($"roles {_session.Role} {_other.Role} {_users.RoleOf("other")} grants {_users.GrantsOf("other")} custom {_users.CustomOf("other")} defined {string.Join(",", _server.Roles.Names)}\n");
             text.Append($"other {_sessionsOnline()} muted {_other.MutedUntilUtc > DateTime.UtcNow}\n");
             text.Append($"locks {string.Join(",", _server.Auth.LockedNames().Select(l => l.Name))}\n");
             foreach (string dir in new[] { _mapDir, _compositeDir })
@@ -445,6 +486,14 @@ public class StaffGateTests : IDisposable
         public void Add(string name, UserRole role) => _roles[name] = role;
         public UserRole? RoleOf(string name) => _roles.TryGetValue(name, out var r) ? r : null;
         public string GrantsOf(string name) => _grants.TryGetValue(name, out var g) ? g : "";
+        private readonly Dictionary<string, string?> _custom = new(StringComparer.OrdinalIgnoreCase);
+        public string? CustomOf(string name) => _custom.TryGetValue(name, out var c) ? c : null;
+        public bool SetCustomRole(string username, string? role)
+        {
+            if (!_roles.ContainsKey(username)) return false;
+            _custom[username] = role;
+            return true;
+        }
         public bool SetGrants(string username, string grants)
         {
             if (!_roles.ContainsKey(username)) return false;
@@ -453,7 +502,7 @@ public class StaffGateTests : IDisposable
         }
         public UserData? GetUser(string username) =>
             _roles.TryGetValue(username.Trim(), out var role)
-                ? new UserData { Username = username.Trim().ToLowerInvariant(), Role = role, Permissions = GrantsOf(username.Trim()) }
+                ? new UserData { Username = username.Trim().ToLowerInvariant(), Role = role, Permissions = GrantsOf(username.Trim()), CustomRole = CustomOf(username.Trim()) }
                 : null;
         public bool AddUser(string username, string password, UserRole role) => false;
         public bool VerifyPassword(string username, string password) => false;

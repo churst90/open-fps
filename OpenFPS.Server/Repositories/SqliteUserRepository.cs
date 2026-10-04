@@ -59,6 +59,7 @@ public class SqliteUserRepository : IUserRepository
         ("LastFailedAddress", "TEXT NULL"),
         ("RealName", "TEXT NULL"),
         ("Permissions", "TEXT NULL"),
+        ("CustomRole", "TEXT NULL"),
     };
 
     /// <summary>
@@ -168,6 +169,7 @@ public class SqliteUserRepository : IUserRepository
             LastFailedAddress = record.LastFailedAddress,
             RealName = record.RealName,
             Permissions = record.Permissions,
+            CustomRole = record.CustomRole,
         };
     }
 
@@ -241,6 +243,18 @@ public class SqliteUserRepository : IUserRepository
         => Update(username, r => r.RealName = string.IsNullOrWhiteSpace(realName) ? null : Clip(realName.Trim()));
 
     public bool SetRole(string username, UserRole role) => Update(username, r => r.Role = role);
+
+    public bool SetCustomRole(string username, string? role)
+        => Update(username, r => r.CustomRole = string.IsNullOrWhiteSpace(role) ? null : role);
+
+    public int ClearCustomRole(string role)
+    {
+        using var ctx = CreateContext();
+        var holders = ctx.Users.Where(u => u.CustomRole == role).ToList();
+        foreach (var u in holders) u.CustomRole = null;
+        ctx.SaveChanges();
+        return holders.Count;
+    }
 
     public bool SetGrants(string username, string grants)
         => Update(username, r => r.Permissions = string.IsNullOrEmpty(grants) ? null : grants);

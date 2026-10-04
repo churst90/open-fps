@@ -18,7 +18,10 @@ public class UserSession
     public HashSet<string> Grants { get; set; } = new();
     /// <summary>Chat refused until then (/mute). Not kept past the session.</summary>
     public DateTime MutedUntilUtc { get; set; } = DateTime.MinValue;
-    public bool Can(string permission) => Permissions.Has(Role, Grants, permission);
+    /// <summary>A role an administrator made, on top of Player (RoleRepository), and what it allows.</summary>
+    public string CustomRole { get; set; } = "";
+    public HashSet<string> RolePermissions { get; set; } = new();
+    public bool Can(string permission) => Permissions.Has(Role, Grants, permission) || RolePermissions.Contains(permission);
     public string CurrentMapId { get; set; } = "default";
     public Entity Entity { get; set; } = Entity.Null;
     public long LastProcessedSequenceId { get; set; } = -1;

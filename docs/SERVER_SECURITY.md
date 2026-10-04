@@ -20,6 +20,14 @@ an Admin.
 A permission is a command's name (or one of the four powers at the end of the table). Roles are
 sets of permissions, in `OpenFPS.Server/Core/Permissions.cs`.
 
+**Custom roles.** An Admin can make roles of their own, each a name and a set of permissions on top
+of Player: `/role create builder tp spawn put`, `/role add builder savemap`, `/role remove builder
+put`, `/role show builder`, `/role list`, `/role delete builder` (its holders become players). Give
+one with `/setrole sean builder`. Custom roles are kept in `roles.json` beside `friends.json`.
+
+Whoever's role changes is told who changed it and what they can now use: "cody made you a builder.
+You can now use: put, spawn, tp."
+
 **Single permissions.** An Admin can give one account one command on top of its role:
 `/grant sean tp`, and take it back with `/revoke sean tp`. Grants are kept with the account. `/perms`
 lists your own, `/perms NAME` (Admin) someone else's, `/perms all` every permission. Roles and
@@ -35,7 +43,7 @@ permissions themselves (`setrole`, `grant`, `revoke`) cannot be granted.
 | `tp` (`/move x y z`, `/goto`, `/tp NAME` to go to a player) | no | yes | yes | yes |
 | `join-private`: `/join` somebody else's private map | no | yes | yes | yes |
 | `bring` (a player to you), `kick`, `mute` (`/mute NAME [minutes]`, 10 by default), `unmute` | no | yes | no | yes |
-| `give` (`/give ITEM`, `/give NAME ITEM`) | no | no | yes | yes |
+| `give` (`/give [NAME] ITEM [COUNT]`: "You gave sean 1 AKM.", and sean hears "cody gave you 1 AKM.") | no | no | yes | yes |
 | `fire-any`: `/fire <weapon>` with empty hands | no | no | yes | yes |
 | `spawn`, `set_sound`, `set_audio_mode`, `play_folder`, `start_state` | no | no | yes | yes |
 | `group`, `ungroup`, `saveas`, `place`, `addseat`, `removeseat`, `drivable` | no | no | yes | yes |
@@ -43,7 +51,7 @@ permissions themselves (`setrole`, `grant`, `revoke`) cannot be granted.
 | `edit-any`: change things other people built | no | no | yes | yes |
 | `move-player`: `/move NAME x y z`, `/move NAME to OTHER` | no | no | no | yes |
 | `sessions`, `user` (`/account`), `throttled` (`/ratelimit`), `unlock` | no | no | no | yes |
-| `setrole`, `grant`, `revoke` | no | no | no | yes |
+| `setrole`, `grant`, `revoke`, `role` (custom roles) | no | no | no | yes |
 
 A Moderator cannot kick or mute an Admin. A mute lasts for the session or until it runs out.
 

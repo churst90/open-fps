@@ -22,4 +22,6 @@ public class UserData
     public string? RealName { get; set; }
     /// <summary>Single permissions granted on top of the role, comma separated (Permissions).</summary>
     public string? Permissions { get; set; }
+    /// <summary>A role an administrator made (RoleRepository), on top of Player. Null for none.</summary>
+    public string? CustomRole { get; set; }
 }

@@ -76,6 +76,7 @@ public static class Permissions
         ["setrole"] = (AdminOnly, "change a player's role"),
         ["grant"] = (AdminOnly, "give a player a single permission"),
         ["revoke"] = (AdminOnly, "take a single permission back"),
+        ["role"] = (AdminOnly, "make and change custom roles"),
     };
 
     /// <summary>The main name of a command typed under another one.</summary>
