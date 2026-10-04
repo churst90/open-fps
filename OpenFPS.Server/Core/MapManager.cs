@@ -609,6 +609,13 @@ public class MapManager
     /// without those is invisible to collision, to <c>/scan</c> and to every client — while the command
     /// that made it reports success.
     /// </summary>
+    /// <summary>The prefabs this server knows, by id.</summary>
+    public IReadOnlyDictionary<string, OpenFPS.Server.Repositories.PrefabTemplate> Prefabs => _prefabRepo.Prefabs;
+
+    /// <summary>A prefab made into a live entity on a map, through <see cref="SpawnEntity"/>.</summary>
+    public Entity SpawnPrefab(string mapId, string prefabId, Vector3 position)
+        => SpawnEntity(mapId, w => _prefabRepo.Spawn(w, prefabId, position));
+
     public Entity SpawnEntity(string mapId, Func<World, Entity> create)
     {
         if (!_maps.TryGetValue(mapId, out var data))

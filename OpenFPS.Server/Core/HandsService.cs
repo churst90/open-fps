@@ -120,6 +120,40 @@ public class HandsService
     /// their own hands has no other way to find out why a thing will not come, and "your hands are
     /// full" is an instruction where "you cannot" is a dead end.
     /// </summary>
+    /// <summary>The prefabs a player can carry: what /give can hand out.</summary>
+    public IEnumerable<string> GivableItems()
+        => _maps.Prefabs.Where(p => p.Value.IsItem || p.Value.Type == EntityType.Item).Select(p => p.Key).OrderBy(k => k);
+
+    /// <summary>
+    /// A new item made from its prefab and put in a player's hands, or on their back when their hands
+    /// are full (staff /give). Says where it went.
+    /// </summary>
+    public bool Give(UserSession to, string prefabId, out string message)
+    {
+        message = "";
+        if (!_maps.Prefabs.TryGetValue(prefabId, out var template) || !(template.IsItem || template.Type == EntityType.Item))
+        { message = $"There is no item called {prefabId}. Items: {string.Join(", ", GivableItems())}."; return false; }
+        if (!TryGetHolder(to, out var world, out _, out var lookup) || to.Entity == Entity.Null || !world.IsAlive(to.Entity))
+        { message = $"{to.Username} is not in the world just now."; return false; }
+
+        var at = world.Get<Transform>(to.Entity).Position;
+        var item = _maps.SpawnPrefab(to.CurrentMapId, prefabId, at);
+        if (item == Entity.Null) { message = $"The {prefabId} could not be made."; return false; }
+        string name = NameOf(world, item), where;
+        if (PutInHands(world, to.Entity, item, out _)) where = "in " + WhereItWent(world, to.Entity, item).Replace("your ", "the ");
+        else
+        {
+            if (!world.Has<InventoryComponent>(to.Entity)) world.Add(to.Entity, new InventoryComponent());
+            Bag(world, to.Entity).Add(item.Id);
+            Attach(world, to.Entity, item, Back, bothHands: false);
+            where = "on the back";
+        }
+        _maps.RefreshGrid(to.CurrentMapId);
+        Log.Information("{User} was given {Item} ({Id}).", to.Username, name, item.Id);
+        message = $"the {name}, {where}";
+        return true;
+    }
+
     public bool Take(UserSession session, string named, out string message)
     {
         message = "";

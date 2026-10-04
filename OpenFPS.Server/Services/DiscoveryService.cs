@@ -76,7 +76,7 @@ public class DiscoveryService
     /// </summary>
     public static bool CanEnter(MapManager maps, string mapId, UserSession session)
     {
-        if (session.Role is OpenFPS.Common.Components.UserRole.Admin or OpenFPS.Common.Components.UserRole.Dev) return true;
+        if (session.Can(OpenFPS.Server.Core.Permissions.JoinPrivate)) return true;
         if (!maps.TryGetMapData(mapId, out var data)) return true;
         if (data.IsPublic) return true;
         return (data.OwnerId ?? "").Equals(session.Username, StringComparison.OrdinalIgnoreCase);

@@ -5,7 +5,8 @@ using System;
 
 namespace OpenFPS.Common.Components;
 
-public enum UserRole { Player, Dev, Admin }
+/// <summary>Stored and sent by number: append only.</summary>
+public enum UserRole { Player, Dev, Admin, Moderator }
 public enum EntityType { None, Player, NPC, Beacon, StaticObject, Item, Projectile, Trigger }
 public enum WeatherType { Clear, Rain, Snow, Storm }
 public enum ColliderShape { Box, Sphere, Cylinder, Cone, Polygon } 

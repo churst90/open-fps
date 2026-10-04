@@ -56,14 +56,13 @@ public class CommandHandler
 
         string commandName = cmd.Command.TrimStart('/').ToLowerInvariant();
         string[] args = cmd.Args ?? Array.Empty<string>();
-        bool isElevated = session.Role == UserRole.Dev || session.Role == UserRole.Admin;
 
         // Typing anything is the player being here; /afk is the one thing that says otherwise.
         session.LastActivityUtc = DateTime.UtcNow;
         if (commandName != "afk") session.Away = false;
 
         _server.EnqueueCommand(() => {
-            try { Execute(commandName, args, session, reply, isElevated); }
+            try { Execute(commandName, args, session, reply); }
             catch (Exception ex)
             {
                 Log.Error(ex, "Error executing command '{Command}' for {User}", commandName, session.Username);
@@ -72,12 +71,12 @@ public class CommandHandler
         });
     }
 
-    private void Execute(string commandName, string[] args, UserSession session, Action<IMessage> reply, bool isElevated)
+    private void Execute(string commandName, string[] args, UserSession session, Action<IMessage> reply)
     {
-        // Who may run what is in docs/SERVER_SECURITY.md; keep the table there in step with this.
-        // Elevated is Dev or Admin. The account and connection commands are Admin only: they show
-        // other people's addresses and change their accounts.
-        bool isAdmin = session.Role == UserRole.Admin;
+        // Who may run what is Permissions: a role is a set of commands and an account can be granted
+        // single ones. docs/SERVER_SECURITY.md has the table; keep it in step. One check, here, for
+        // every gated command, so a new case cannot forget its own.
+        if (!session.Can(Permissions.Canonical(commandName))) { DenyCommand(reply); return; }
         switch (commandName)
         {
             case "scan": HandleScan(session, reply); break;
@@ -90,38 +89,31 @@ public class CommandHandler
                 Say(reply, GameServer.ReadMotd() is { Length: > 0 } motd ? motd : "There is no message of the day.");
                 break;
             case "setmotd":
-                if (!isElevated) { DenyCommand(reply); return; }
                 GameServer.WriteMotd(string.Join(" ", args));
                 Say(reply, args.Length == 0 ? "Message of the day cleared." : "Message of the day set.");
                 break;
             case "announce":
-                if (!isElevated) { DenyCommand(reply); return; }
                 if (args.Length == 0) { Say(reply, "Usage: /announce [message]"); break; }
                 _server.Announce(string.Join(" ", args), fromStaff: true);
                 break;
             case "move":
             case "tp":
-                if (!isElevated) { DenyCommand(reply); return; }
+            case "goto":
                 HandleMove(session, args, reply);
                 break;
             case "spawn":
-                if (!isElevated) { DenyCommand(reply); return; }
                 HandleSpawn(session, args, reply);
                 break;
             case "set_sound":
-                if (!isElevated) { DenyCommand(reply); return; }
                 HandleSetSound(session, args, reply);
                 break;
             case "set_audio_mode":
-                if (!isElevated) { DenyCommand(reply); return; }
                 HandleSetAudioMode(session, args, reply);
                 break;
             case "play_folder":
-                if (!isElevated) { DenyCommand(reply); return; }
                 HandlePlayFolder(session, args, reply);
                 break;
             case "start_state":
-                if (!isElevated) { DenyCommand(reply); return; }
                 HandleStartState(session, args, reply);
                 break;
             // ── Building ────────────────────────────────────────────────────────────────────
@@ -131,19 +123,15 @@ public class CommandHandler
             // saved one down, and write the world to disk. A house, a market stall, a barricade and a
             // vehicle body are all the same five verbs.
             case "group":
-                if (!isElevated) { DenyCommand(reply); return; }
                 HandleGroup(session, args, reply);
                 break;
             case "ungroup":
-                if (!isElevated) { DenyCommand(reply); return; }
                 HandleUngroup(session, args, reply);
                 break;
             case "saveas":
-                if (!isElevated) { DenyCommand(reply); return; }
                 HandleSaveAs(session, args, reply);
                 break;
             case "place":
-                if (!isElevated) { DenyCommand(reply); return; }
                 HandlePlace(session, args, reply);
                 break;
             case "composites":
@@ -151,19 +139,15 @@ public class CommandHandler
                 break;
             // ── Placing things where you cannot point ───────────────────────────────────────
             case "origin":
-                if (!isElevated) { DenyCommand(reply); return; }
                 HandleOrigin(session, reply);
                 break;
             case "at":
-                if (!isElevated) { DenyCommand(reply); return; }
                 HandleAt(session, args, reply);
                 break;
             case "put":
-                if (!isElevated) { DenyCommand(reply); return; }
                 HandlePut(session, args, reply);
                 break;
             case "undo":
-                if (!isElevated) { DenyCommand(reply); return; }
                 HandleUndo(session, reply);
                 break;
             case "room":
@@ -182,7 +166,7 @@ public class CommandHandler
                 break;
             case "fire":
             case "shoot":
-                HandleFire(session, args, reply, isElevated);
+                HandleFire(session, args, reply, session.Can(Permissions.FireAny));
                 break;
             // ── Doors ───────────────────────────────────────────────────────────────────────
             //
@@ -198,15 +182,12 @@ public class CommandHandler
                 HandleListDoors(session, reply);
                 break;
             case "addseat":
-                if (!isElevated) { DenyCommand(reply); return; }
                 HandleAddSeat(session, args, reply);
                 break;
             case "removeseat":
-                if (!isElevated) { DenyCommand(reply); return; }
                 HandleRemoveSeat(session, args, reply);
                 break;
             case "drivable":
-                if (!isElevated) { DenyCommand(reply); return; }
                 HandleDrivable(session, args, reply);
                 break;
             // ── Occupancy ───────────────────────────────────────────────────────────────────
@@ -280,7 +261,6 @@ public class CommandHandler
             case "locate":
                 // Where somebody is standing is staff's to know, not every player's: a profile says
                 // which map, and that is all.
-                if (!isElevated) { DenyCommand(reply); return; }
                 HandleWhere(session, args, reply);
                 break;
             case "afk":
@@ -295,33 +275,92 @@ public class CommandHandler
                 break;
             // ── Administration ──────────────────────────────────────────────────────────────
             case "sessions":
-                if (!isAdmin) { DenyCommand(reply); return; }
                 HandleSessions(reply);
                 break;
             case "user":
             case "account":
-                if (!isAdmin) { DenyCommand(reply); return; }
                 HandleUser(args, reply);
                 break;
             case "throttled":
             case "ratelimit":
-                if (!isAdmin) { DenyCommand(reply); return; }
                 HandleThrottled(reply);
                 break;
             case "unlock":
-                if (!isAdmin) { DenyCommand(reply); return; }
                 HandleUnlock(args, reply);
                 break;
             case "setrole":
-                if (!isAdmin) { DenyCommand(reply); return; }
                 HandleSetRole(session, args, reply);
+                break;
+            case "grant": HandleGrant(session, args, reply, give: true); break;
+            case "revoke": HandleGrant(session, args, reply, give: false); break;
+            case "perms":
+            case "permissions": HandlePerms(session, args, reply); break;
+            case "bring":
+                if (args.Length < 1) { Say(reply, "Usage: /bring NAME — brings a player to you."); break; }
+                if (OnlineSession(args[0]) is not { } brought) { Say(reply, $"{args[0]} is not online."); break; }
+                if (brought == session) { Say(reply, "You cannot bring yourself."); break; }
+                PlaceBeside(brought, session, session, reply);
+                break;
+            case "give":
+                if (args.Length < 1 || _hands == null)
+                {
+                    Say(reply, "Usage: /give ITEM, or /give NAME ITEM. Items: " + string.Join(", ", _hands?.GivableItems() ?? Array.Empty<string>()) + ".");
+                    break;
+                }
+                {
+                    var receiver = session;
+                    string itemId = args[0];
+                    if (args.Length >= 2)
+                    {
+                        if (OnlineSession(args[0]) is not { } named) { Say(reply, $"{args[0]} is not online."); break; }
+                        receiver = named; itemId = args[1];
+                    }
+                    if (!_hands.Give(receiver, itemId.ToLowerInvariant(), out string what)) { Say(reply, what); break; }
+                    if (receiver != session)
+                    {
+                        _server.SendToSession(receiver, new TextEvent { Text = $"{session.Username} gave you {Yours(what)}." });
+                        Say(reply, $"Gave {receiver.Username} {what}.");
+                    }
+                    else Say(reply, $"You now have {Yours(what)}.");
+                    static string Yours(string w) => w.Replace("in the ", "in your ").Replace("on the back", "on your back");
+                }
+                break;
+            case "kick":
+                if (args.Length < 1) { Say(reply, "Usage: /kick NAME [reason]"); break; }
+                if (OnlineSession(args[0]) is not { } kicked) { Say(reply, $"{args[0]} is not online."); break; }
+                if (kicked == session) { Say(reply, "You cannot kick yourself."); break; }
+                if (kicked.Role == UserRole.Admin && session.Role != UserRole.Admin) { Say(reply, "Only an administrator can kick an administrator."); break; }
+                {
+                    string why = args.Length > 1 ? string.Join(" ", args.Skip(1)) : "";
+                    Log.Information("Moderation: {By} kicked {User}. {Why}", session.Username, kicked.Username, why);
+                    _server.Kick(kicked, $"You have been removed from the server by {session.Username}." + (why.Length > 0 ? $" Reason: {why}" : ""));
+                    Say(reply, $"Kicked {kicked.Username}.");
+                }
+                break;
+            case "mute":
+                if (args.Length < 1) { Say(reply, "Usage: /mute NAME [minutes, 10 if not given]"); break; }
+                if (OnlineSession(args[0]) is not { } muted) { Say(reply, $"{args[0]} is not online."); break; }
+                if (muted.Role == UserRole.Admin && session.Role != UserRole.Admin) { Say(reply, "Only an administrator can mute an administrator."); break; }
+                {
+                    int minutes = args.Length > 1 && int.TryParse(args[1], out int m) ? Math.Clamp(m, 1, 24 * 60) : 10;
+                    muted.MutedUntilUtc = DateTime.UtcNow.AddMinutes(minutes);
+                    Log.Information("Moderation: {By} muted {User} for {Minutes} min.", session.Username, muted.Username, minutes);
+                    _server.SendToSession(muted, new TextEvent { Text = $"You have been muted for {minutes} minute{(minutes == 1 ? "" : "s")} by {session.Username}." });
+                    Say(reply, $"Muted {muted.Username} for {minutes} minute{(minutes == 1 ? "" : "s")}.");
+                }
+                break;
+            case "unmute":
+                if (args.Length < 1) { Say(reply, "Usage: /unmute NAME"); break; }
+                if (OnlineSession(args[0]) is not { } unmuted) { Say(reply, $"{args[0]} is not online."); break; }
+                unmuted.MutedUntilUtc = DateTime.MinValue;
+                _server.SendToSession(unmuted, new TextEvent { Text = "You can chat again." });
+                Say(reply, $"{unmuted.Username} can chat again.");
                 break;
             case "join":
             case "travel":
                 HandleJoin(session, args, reply);
                 break;
             case "savemap":
-                if (!isElevated) { DenyCommand(reply); return; }
                 HandleSaveMap(session, reply);
                 break;
             default:
@@ -646,8 +685,7 @@ public class CommandHandler
                  + "It will be gone after a restart until you /savemap.");
     }
 
-    private static bool Elevated(UserSession session)
-        => session.Role == UserRole.Dev || session.Role == UserRole.Admin;
+    private static bool Elevated(UserSession session) => session.Can(Permissions.EditAny);
 
     private OccupancyService? Seats(Action<IMessage> reply)
     {
@@ -1464,9 +1502,41 @@ public class CommandHandler
 
     private void HandleMove(UserSession session, string[] args, Action<IMessage> reply)
     {
+        // /tp NAME: go to a player.
+        if (args.Length == 1)
+        {
+            if (OnlineSession(args[0]) is not { } other) { Say(reply, $"{args[0]} is not online."); return; }
+            if (other == session) { Say(reply, "You are already where you are."); return; }
+            PlaceBeside(session, other, session, reply);
+            return;
+        }
+        // /move NAME x y z, /move NAME to OTHER: move somebody else (administrators).
+        if (args.Length >= 2 && !float.TryParse(args[0], out _))
+        {
+            if (!session.Can(Permissions.MovePlayer)) { DenyCommand(reply); return; }
+            if (OnlineSession(args[0]) is not { } moved) { Say(reply, $"{args[0]} is not online."); return; }
+            if (args.Length >= 3 && args[1].Equals("to", StringComparison.OrdinalIgnoreCase))
+            {
+                if (OnlineSession(args[2]) is not { } beside) { Say(reply, $"{args[2]} is not online."); return; }
+                PlaceBeside(moved, beside, session, reply);
+                return;
+            }
+            if (args.Length < 4 || !float.TryParse(args[1], out float mx) || !float.TryParse(args[2], out float my) || !float.TryParse(args[3], out float mz))
+            { Say(reply, "Usage: /move NAME x y z, or /move NAME to OTHER."); return; }
+            if (!_maps.TryGetMap(moved.CurrentMapId, out var mworld, out _, out var mgrid, out _)
+                || moved.Entity == Entity.Null || !mworld.IsAlive(moved.Entity))
+            { Say(reply, $"{moved.Username} is not in the world just now."); return; }
+            Vector3 to = PlayerCoordinates.ToWorld(mx, my, mz);
+            if (OpenFPS.Server.Systems.MovementSystem.CheckCollision(mworld, mgrid, to, PhysicsConstants.PlayerRadius, PhysicsConstants.PlayerHeight))
+            { Say(reply, "Cannot move them there: Area is solid."); return; }
+            Teleport(moved, mworld, to);
+            if (moved != session) _server.SendToSession(moved, new TextEvent { Text = $"{session.Username} moved you to {PlayerCoordinates.Format(to)}." });
+            Say(reply, $"Moved {moved.Username} to {PlayerCoordinates.Format(to)}.");
+            return;
+        }
         if (args.Length < 3)
         {
-            Say(reply, "Usage: /move x y z — x east, y north, z height");
+            Say(reply, "Usage: /tp x y z (x east, y north, z height), or /tp NAME to go to a player.");
             return;
         }
 
@@ -1509,6 +1579,7 @@ public class CommandHandler
             return;
         }
 
+        if (session.MutedUntilUtc > DateTime.UtcNow) { Say(reply, "You are muted."); return; }
         string targetUsername = args[0];
         string message = string.Join(" ", args.Skip(1));
 
@@ -1522,7 +1593,7 @@ public class CommandHandler
         _server.SendToSession(targetSession, new ChatMessage
         {
             Sender = session.Username, Text = message, Channel = ChatChannel.Private,
-            FromStaff = session.Role is UserRole.Admin or UserRole.Dev,
+            FromStaff = session.Role is UserRole.Admin or UserRole.Dev or UserRole.Moderator,
         });
         reply(new ChatMessage { Sender = session.Username, Text = message, Channel = ChatChannel.Private, To = targetSession.Username });
     }
@@ -1551,6 +1622,7 @@ public class CommandHandler
     {
         UserRole.Admin => "administrator",
         UserRole.Dev => "developer",
+        UserRole.Moderator => "moderator",
         _ => "player",
     };
 
@@ -1854,17 +1926,128 @@ public class CommandHandler
     }
 
     /// <summary>/setrole NAME player|dev|admin — changes an account's role, and the session's if they are on.</summary>
+    /// <summary>
+    /// /grant NAME COMMAND, /revoke NAME COMMAND: one permission on top of the account's role, kept with
+    /// the account. A command's main name (tp, not move), or fire-any, join-private, edit-any,
+    /// move-player. /perms lists them.
+    /// </summary>
+    private void HandleGrant(UserSession session, string[] args, Action<IMessage> reply, bool give)
+    {
+        string verb = give ? "grant" : "revoke";
+        if (args.Length < 2) { Say(reply, $"Usage: /{verb} NAME PERMISSION. /perms lists the permissions."); return; }
+        string perm = Permissions.Canonical(args[1].TrimStart('/').ToLowerInvariant());
+        if (!Permissions.IsGated(perm)) { Say(reply, $"'{args[1]}' is not a permission. /perms lists them."); return; }
+        if (perm is "grant" or "revoke" or "setrole") { Say(reply, "Roles and permissions stay with administrators: make them an administrator instead."); return; }
+        if (_users == null || _users.GetUser(args[0]) is not { } record) { Say(reply, $"There is no account called {args[0]}."); return; }
+        var grants = Permissions.Parse(record.Permissions);
+        bool changed = give ? grants.Add(perm) : grants.Remove(perm);
+        if (!changed)
+        {
+            Say(reply, give ? $"{record.Username} already has {perm}." : $"{record.Username} was not granted {perm}.");
+            return;
+        }
+        if (!_users.SetGrants(record.Username, Permissions.Format(grants))) { Say(reply, "Permissions cannot be changed on this server."); return; }
+        Log.Information("Admin: {Admin} {Verb} {Perm} for {User}.", session.Username, give ? "granted" : "revoked", perm, record.Username);
+        if (OnlineSession(record.Username) is { } online)
+        {
+            online.Grants = new HashSet<string>(grants);
+            _server.SendToSession(online, new TextEvent { Text = give
+                ? $"You can now use {perm}: {Permissions.Describe(perm)}."
+                : $"You can no longer use {perm}." });
+        }
+        string note = give && Permissions.RoleHas(record.Role, perm) ? $" Their role already allows it." : "";
+        Say(reply, (give ? $"Granted {perm} to {record.Username}." : $"Revoked {perm} from {record.Username}.") + note);
+    }
+
+    /// <summary>/perms: your own role and what it and your grants allow. /perms NAME (admins): theirs.
+    /// /perms all: every permission and what it is.</summary>
+    private void HandlePerms(UserSession session, string[] args, Action<IMessage> reply)
+    {
+        if (args.Length > 0 && args[0].Equals("all", StringComparison.OrdinalIgnoreCase))
+        {
+            Say(reply, "Permissions: " + string.Join("; ", Permissions.All.Select(p => $"{p}, {Permissions.Describe(p)}")) + ".");
+            return;
+        }
+        UserRole role = session.Role;
+        HashSet<string> grants = session.Grants;
+        string who = "You are";
+        if (args.Length > 0 && !args[0].Equals(session.Username, StringComparison.OrdinalIgnoreCase))
+        {
+            if (session.Role != UserRole.Admin) { DenyCommand(reply); return; }
+            if (_users == null || _users.GetUser(args[0]) is not { } record) { Say(reply, $"There is no account called {args[0]}."); return; }
+            role = record.Role; grants = Permissions.Parse(record.Permissions); who = $"{record.Username} is";
+        }
+        var byRole = Permissions.All.Where(p => Permissions.RoleHas(role, p)).ToList();
+        string roleText = role == UserRole.Admin ? "every permission" : byRole.Count == 0 ? "nothing beyond play" : string.Join(", ", byRole);
+        string granted = grants.Count == 0 ? "No single permissions granted." : $"Granted: {string.Join(", ", grants.OrderBy(g => g))}.";
+        Say(reply, $"{who} {Article(role)} {RoleWord(role)}: {roleText}. {granted}");
+    }
+
+    /// <summary>
+    /// Puts <paramref name="who"/> beside <paramref name="target"/>: a clear spot about a metre from them,
+    /// on their map (moving maps first if need be). <paramref name="by"/> is who asked; somebody moved by
+    /// someone else is told so.
+    /// </summary>
+    private void PlaceBeside(UserSession who, UserSession target, UserSession by, Action<IMessage> reply)
+    {
+        if (!who.CurrentMapId.Equals(target.CurrentMapId, StringComparison.OrdinalIgnoreCase))
+        {
+            // Going to somebody yourself is going to their map, which has to be one you may enter.
+            // Being brought or moved by staff is theirs to decide.
+            if (who == by && !DiscoveryCanEnter(who, target.CurrentMapId))
+            { Say(reply, $"{target.Username} is on a map you cannot enter."); return; }
+            _server.MoveToMap(who, target.CurrentMapId);
+            // MoveToMap is queued; the placement follows it in the same queue.
+            _server.EnqueueCommand(() => PlaceBeside(who, target, by, reply));
+            return;
+        }
+        if (!_maps.TryGetMap(target.CurrentMapId, out var world, out _, out var grid, out _)
+            || target.Entity == Entity.Null || !world.IsAlive(target.Entity)
+            || who.Entity == Entity.Null || !world.IsAlive(who.Entity))
+        { Say(reply, "They are not in the world just now."); return; }
+        var t = world.Get<Transform>(target.Entity);
+        Vector3 forward = Vector3.Transform(Vector3.UnitZ, t.Rotation);
+        forward.Y = 0f;
+        forward = forward.LengthSquared() > 1e-6f ? Vector3.Normalize(forward) : Vector3.UnitZ;
+        Vector3? spot = null;
+        for (int k = 0; k < 8 && spot == null; k++)
+        {
+            var dir = Vector3.Transform(forward, Quaternion.CreateFromAxisAngle(Vector3.UnitY, k * MathF.PI / 4f));
+            var p = t.Position + dir * 1.2f;
+            if (!OpenFPS.Server.Systems.MovementSystem.CheckCollision(world, grid, p, PhysicsConstants.PlayerRadius, PhysicsConstants.PlayerHeight))
+                spot = p;
+        }
+        if (spot == null) { Say(reply, $"There is no room beside {target.Username}."); return; }
+        Teleport(who, world, spot.Value);
+        if (who != by) _server.SendToSession(who, new TextEvent { Text = $"{by.Username} moved you beside {target.Username}." });
+        Say(reply, who == by ? $"You are beside {target.Username}." : $"{who.Username} is now beside {target.Username}.");
+    }
+
+    private bool DiscoveryCanEnter(UserSession who, string mapId) => OpenFPS.Server.Services.DiscoveryService.CanEnter(_maps, mapId, who);
+
+    /// <summary>Moves a session's body to a point on its map: out of any seat first, and the client told
+    /// to start from there.</summary>
+    private void Teleport(UserSession who, World world, Vector3 at)
+    {
+        if (world.Has<OccupantComponent>(who.Entity)) CompositeService.Disembark(world, who.Entity);
+        ref var tr = ref world.Get<Transform>(who.Entity);
+        tr.Position = at;
+        tr.IsDirty = true;
+        _server.SendToSession(who, new PlayerSpawned { EntityId = who.Entity.Id, SpawnTransform = tr });
+    }
+
     private void HandleSetRole(UserSession session, string[] args, Action<IMessage> reply)
     {
-        if (args.Length < 2) { Say(reply, "Usage: /setrole [name] [player, dev or admin]"); return; }
+        if (args.Length < 2) { Say(reply, "Usage: /setrole [name] [player, moderator, dev or admin]"); return; }
         UserRole? role = args[1].ToLowerInvariant() switch
         {
             "player" => UserRole.Player,
             "dev" or "developer" => UserRole.Dev,
             "admin" or "administrator" => UserRole.Admin,
+            "mod" or "moderator" => UserRole.Moderator,
             _ => null,
         };
-        if (role == null) { Say(reply, $"'{args[1]}' is not a role. Roles: player, dev, admin."); return; }
+        if (role == null) { Say(reply, $"'{args[1]}' is not a role. Roles: player, moderator, dev, admin."); return; }
         if (_users == null || _users.GetUser(args[0]) is not { } record) { Say(reply, $"There is no account called {args[0]}."); return; }
         // Your own role is somebody else's to change: an admin who demoted themselves by a slip would
         // have nobody left to put it back.

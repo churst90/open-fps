@@ -191,7 +191,7 @@ public class OccupancyService
         if (seats == null || seats.Count == 0) { message = "It has no seats."; return false; }
 
         var composite = world.Get<CompositeComponent>(root);
-        bool elevated = session.Role is UserRole.Dev or UserRole.Admin;
+        bool elevated = session.Can(Permissions.EditAny);
         bool mayDrive = CompositeService.MayModify(world, root, session.Username, elevated);
         var playerPos = world.Get<Transform>(session.Entity).Position;
 

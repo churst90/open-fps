@@ -20,4 +20,6 @@ public class UserData
     public string? LastFailedAddress { get; set; }
     /// <summary>The name the player chose to show on their profile, if any.</summary>
     public string? RealName { get; set; }
+    /// <summary>Single permissions granted on top of the role, comma separated (Permissions).</summary>
+    public string? Permissions { get; set; }
 }

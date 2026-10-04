@@ -35,4 +35,8 @@ public interface IUserRepository
 
     /// <summary>Changes a user's role. False if there is no such user.</summary>
     bool SetRole(string username, UserRole role) => false;
+
+    /// <summary>Replaces a user's granted permissions (comma separated). False if there is no such user
+    /// or this store cannot keep them.</summary>
+    bool SetGrants(string username, string grants) => false;
 }

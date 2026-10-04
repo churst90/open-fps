@@ -41,13 +41,21 @@ public class StaffGateTests : IDisposable
         try { Directory.Delete(_dir, true); } catch { }
     }
 
-    /// <summary>Command, arguments, and the role it needs: Dev covers Dev and Admin, Admin is Admin alone.</summary>
+    /// <summary>Command, arguments, and a role below Admin that has it (Admin alone where none does).</summary>
     public static TheoryData<string, string[], UserRole> GatedCommands => new()
     {
-        { "setmotd", new[] { "Closed", "for", "repairs." }, UserRole.Dev },
-        { "announce", new[] { "Everybody", "out." }, UserRole.Dev },
+        { "setmotd", new[] { "Closed", "for", "repairs." }, UserRole.Moderator },
+        { "announce", new[] { "Everybody", "out." }, UserRole.Moderator },
+        { "where", new[] { "other" }, UserRole.Moderator },
+        { "locate", new[] { "other" }, UserRole.Moderator },
+        { "bring", new[] { "other" }, UserRole.Moderator },
+        { "kick", new[] { "other" }, UserRole.Moderator },
+        { "mute", new[] { "other", "5" }, UserRole.Moderator },
+        { "unmute", new[] { "other" }, UserRole.Moderator },
         { "tp", new[] { "150", "150", "6" }, UserRole.Dev },
         { "move", new[] { "150", "150", "6" }, UserRole.Dev },
+        { "goto", new[] { "other" }, UserRole.Dev },
+        { "give", new[] { "torch" }, UserRole.Dev },
         { "spawn", new[] { "Box", "Metal", "1", "1", "1" }, UserRole.Dev },
         { "set_sound", new[] { "BEACONS/low_osc", "1" }, UserRole.Dev },
         { "set_audio_mode", new[] { "Sequential" }, UserRole.Dev },
@@ -65,8 +73,6 @@ public class StaffGateTests : IDisposable
         { "removeseat", new[] { "driver" }, UserRole.Dev },
         { "drivable", new[] { "v8_sports" }, UserRole.Dev },
         { "savemap", Array.Empty<string>(), UserRole.Dev },
-        { "where", new[] { "other" }, UserRole.Dev },
-        { "locate", new[] { "other" }, UserRole.Dev },
         { "sessions", Array.Empty<string>(), UserRole.Admin },
         { "user", new[] { "other" }, UserRole.Admin },
         { "account", new[] { "other" }, UserRole.Admin },
@@ -74,6 +80,8 @@ public class StaffGateTests : IDisposable
         { "ratelimit", Array.Empty<string>(), UserRole.Admin },
         { "unlock", new[] { "other" }, UserRole.Admin },
         { "setrole", new[] { "other", "dev" }, UserRole.Admin },
+        { "grant", new[] { "other", "tp" }, UserRole.Admin },
+        { "revoke", new[] { "other", "where" }, UserRole.Admin },
     };
 
     private const string Denied = "You do not have permission to execute this command.";
@@ -110,17 +118,69 @@ public class StaffGateTests : IDisposable
     }
 
     [Theory]
-    [InlineData("sessions")]
-    [InlineData("user")]
-    [InlineData("throttled")]
-    [InlineData("unlock")]
-    [InlineData("setrole")]
-    public void TheAccountCommandsAreAdminsAloneNotDevelopers(string command)
+    [InlineData("sessions", UserRole.Dev)]
+    [InlineData("user", UserRole.Dev)]
+    [InlineData("throttled", UserRole.Dev)]
+    [InlineData("unlock", UserRole.Dev)]
+    [InlineData("setrole", UserRole.Dev)]
+    [InlineData("grant", UserRole.Dev)]
+    [InlineData("sessions", UserRole.Moderator)]
+    [InlineData("user", UserRole.Moderator)]
+    [InlineData("setrole", UserRole.Moderator)]
+    [InlineData("grant", UserRole.Moderator)]
+    [InlineData("revoke", UserRole.Moderator)]
+    public void TheAccountCommandsAreAdminsAlone(string command, UserRole role)
     {
-        var rig = new Rig(_dir, UserRole.Dev, command);
+        var rig = new Rig(_dir, role, command);
         string before = rig.Fingerprint();
         Assert.Equal(Denied, rig.Run(command, "other", "dev"));
         Assert.Equal(before, rig.Fingerprint());
+    }
+
+    /// <summary>A moderator looks after people and cannot change the world; a developer builds it and
+    /// has no power over people.</summary>
+    [Theory]
+    [InlineData("spawn", UserRole.Moderator, new[] { "Box", "Metal", "1", "1", "1" })]
+    [InlineData("put", UserRole.Moderator, new[] { "concrete_wall" })]
+    [InlineData("savemap", UserRole.Moderator, new string[0])]
+    [InlineData("give", UserRole.Moderator, new[] { "torch" })]
+    [InlineData("kick", UserRole.Dev, new[] { "other" })]
+    [InlineData("mute", UserRole.Dev, new[] { "other" })]
+    [InlineData("bring", UserRole.Dev, new[] { "other" })]
+    public void ModeratorsDoNotBuildAndDevelopersDoNotModerate(string command, UserRole role, string[] args)
+    {
+        var rig = new Rig(_dir, role, command);
+        string before = rig.Fingerprint();
+        Assert.Equal(Denied, rig.Run(command, args));
+        Assert.Equal(before, rig.Fingerprint());
+        Assert.Empty(rig.Sent);
+    }
+
+    /// <summary>One command given to one player: they can use it, and only it, until it is taken back.</summary>
+    [Fact]
+    public void AGrantedCommandWorksForThatPlayerAloneUntilRevoked()
+    {
+        var rig = new Rig(_dir, UserRole.Player, "tp");
+        rig.Grant("tp");
+        Assert.NotEqual(Denied, rig.Run("tp", "150", "150", "6"));
+        Assert.Equal(Denied, rig.Run("spawn", "Box", "Metal", "1", "1", "1"));
+        rig.Revoke("tp");
+        Assert.Equal(Denied, rig.Run("tp", "150", "150", "6"));
+    }
+
+    /// <summary>Moving somebody else is an administrator's: a developer may teleport, not move people.</summary>
+    [Fact]
+    public void MovingAnotherPlayerIsAdminsAlone()
+    {
+        var dev = new Rig(_dir, UserRole.Dev, "move");
+        string before = dev.Fingerprint();
+        Assert.Equal(Denied, dev.Run("move", "other", "150", "150", "6"));
+        Assert.Equal(before, dev.Fingerprint());
+
+        var admin = new Rig(_dir, UserRole.Admin, "move");
+        before = admin.Fingerprint();
+        Assert.StartsWith("Moved other", admin.Run("move", "other", "150", "150", "6"));
+        Assert.NotEqual(before, admin.Fingerprint());
     }
 
     private static bool ReadOnly(string command) => command is "sessions" or "user" or "account" or "throttled" or "ratelimit" or "where" or "locate";
@@ -149,34 +209,22 @@ public class StaffGateTests : IDisposable
     }
 
     /// <summary>
-    /// Reads CommandHandler.cs and collects every case label that sits above a role check, so a new
-    /// gated command that is not added to <see cref="GatedCommands"/> fails here instead of slipping
-    /// through untested.
+    /// Every gated permission that is a command is listed here, and everything listed here is gated:
+    /// a permission added to the table without a case here fails, and so does a case here that the
+    /// table does not gate. The powers that are part of a command (fire-any, join-private, edit-any,
+    /// move-player) have tests of their own.
     /// </summary>
     [Fact]
     public void EveryGatedCommandIsListedHere()
     {
-        string source = File.ReadAllText(FindSource("OpenFPS.Server", "Core", "CommandHandler.cs"));
-        var gated = new HashSet<string>();
-        var pending = new List<string>();
-        foreach (string raw in source.Split('\n'))
-        {
-            string line = raw.Trim();
-            if (line.Length == 0 || line.StartsWith("//")) continue;
-            if (line.StartsWith("case \"") && line.EndsWith(":"))
-            {
-                pending.Add(line[6..line.IndexOf('"', 6)]);
-                continue;
-            }
-            if (line.StartsWith("if (!isElevated) { DenyCommand") || line.StartsWith("if (!isAdmin) { DenyCommand"))
-                gated.UnionWith(pending);
-            pending.Clear();
-        }
-
-        var listed = GatedCommands.Select(row => (string)row[0]).ToHashSet();
-        Assert.NotEmpty(gated);
+        var powers = new[] { Permissions.FireAny, Permissions.JoinPrivate, Permissions.EditAny, Permissions.MovePlayer };
+        var gated = Permissions.All.Except(powers).ToHashSet();
+        var listed = GatedCommands.Select(row => Permissions.Canonical((string)row[0])).ToHashSet();
         Assert.Empty(gated.Except(listed));
         Assert.Empty(listed.Except(gated));
+        string source = File.ReadAllText(FindSource("OpenFPS.Server", "Core", "CommandHandler.cs"));
+        foreach (var row in GatedCommands)
+            Assert.Contains($"case \"{(string)row[0]}\":", source);
     }
 
     private static string FindSource(params string[] parts)
@@ -209,6 +257,8 @@ public class StaffGateTests : IDisposable
         private readonly UserSession _session;
         private readonly UserSession _other;
         private readonly Users _users = new();
+        private SessionManager _sessions = null!;
+        private string _sessionsOnline() => string.Join(",", _sessions.GetAllSessions().Select(x => x.Username).OrderBy(x => x));
         private readonly string _mapDir;
         private readonly string _compositeDir;
         private const string MapId = "default";
@@ -228,6 +278,7 @@ public class StaffGateTests : IDisposable
             _composites = new CompositeService(_maps, prefabs, new CompositeRepository(_compositeDir));
 
             var sessions = new SessionManager();
+            _sessions = sessions;
             _server = new GameServer(_users);
             _server.Attach(_maps, sessions, new OccupancyService(_maps), new HandsService(_maps));
             _server.Sent = (_, message) => Sent.Add(message);
@@ -308,11 +359,33 @@ public class StaffGateTests : IDisposable
                 case "set_sound": case "set_audio_mode": case "play_folder": case "start_state":
                     Spawn("sword", Feet + new Vector3(1, 0, 0));
                     break;
+                case "unmute":
+                    _other.MutedUntilUtc = DateTime.UtcNow.AddMinutes(5);
+                    break;
+                case "revoke":
+                    _users.SetGrants("other", "where");
+                    break;
                 case "unlock":
                     // A name with a lock to lift.
                     for (int i = 0; i < AuthService.LockoutAfterFailures; i++) _server.Auth.Check("192.0.2.9", "other", "wrong-password");
                     break;
             }
+        }
+
+        public void Grant(string permission)
+        {
+            var grants = Permissions.Parse(_users.GrantsOf("tester"));
+            grants.Add(permission);
+            _users.SetGrants("tester", Permissions.Format(grants));
+            _session.Grants = grants;
+        }
+
+        public void Revoke(string permission)
+        {
+            var grants = Permissions.Parse(_users.GrantsOf("tester"));
+            grants.Remove(permission);
+            _users.SetGrants("tester", Permissions.Format(grants));
+            _session.Grants = grants;
         }
 
         public string Run(string command, params string[] args)
@@ -352,7 +425,8 @@ public class StaffGateTests : IDisposable
 
             var b = _session.Build;
             text.Append($"build {b.Placed} {b.Origin} {b.Yaw} {b.Cursor} {b.LastStep} {string.Join(",", b.Placed_Entities)}\n");
-            text.Append($"roles {_session.Role} {_other.Role} {_users.RoleOf("other")}\n");
+            text.Append($"roles {_session.Role} {_other.Role} {_users.RoleOf("other")} grants {_users.GrantsOf("other")}\n");
+            text.Append($"other {_sessionsOnline()} muted {_other.MutedUntilUtc > DateTime.UtcNow}\n");
             text.Append($"locks {string.Join(",", _server.Auth.LockedNames().Select(l => l.Name))}\n");
             foreach (string dir in new[] { _mapDir, _compositeDir })
                 if (Directory.Exists(dir))
@@ -367,10 +441,20 @@ public class StaffGateTests : IDisposable
     private sealed class Users : IUserRepository
     {
         private readonly Dictionary<string, UserRole> _roles = new(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, string> _grants = new(StringComparer.OrdinalIgnoreCase);
         public void Add(string name, UserRole role) => _roles[name] = role;
         public UserRole? RoleOf(string name) => _roles.TryGetValue(name, out var r) ? r : null;
+        public string GrantsOf(string name) => _grants.TryGetValue(name, out var g) ? g : "";
+        public bool SetGrants(string username, string grants)
+        {
+            if (!_roles.ContainsKey(username)) return false;
+            _grants[username] = grants;
+            return true;
+        }
         public UserData? GetUser(string username) =>
-            _roles.TryGetValue(username.Trim(), out var role) ? new UserData { Username = username.Trim().ToLowerInvariant(), Role = role } : null;
+            _roles.TryGetValue(username.Trim(), out var role)
+                ? new UserData { Username = username.Trim().ToLowerInvariant(), Role = role, Permissions = GrantsOf(username.Trim()) }
+                : null;
         public bool AddUser(string username, string password, UserRole role) => false;
         public bool VerifyPassword(string username, string password) => false;
         public bool SetRole(string username, UserRole role)

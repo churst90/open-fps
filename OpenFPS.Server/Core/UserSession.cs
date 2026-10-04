@@ -14,6 +14,11 @@ public class UserSession
     public int ConnectionId { get; set; }
     public string Username { get; set; } = string.Empty;
     public UserRole Role { get; set; } = UserRole.Player;
+    /// <summary>Single permissions given to this account on top of its role (/grant). See Permissions.</summary>
+    public HashSet<string> Grants { get; set; } = new();
+    /// <summary>Chat refused until then (/mute). Not kept past the session.</summary>
+    public DateTime MutedUntilUtc { get; set; } = DateTime.MinValue;
+    public bool Can(string permission) => Permissions.Has(Role, Grants, permission);
     public string CurrentMapId { get; set; } = "default";
     public Entity Entity { get; set; } = Entity.Null;
     public long LastProcessedSequenceId { get; set; } = -1;

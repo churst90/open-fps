@@ -58,6 +58,7 @@ public class SqliteUserRepository : IUserRepository
         ("LastFailedUtc", "TEXT NULL"),
         ("LastFailedAddress", "TEXT NULL"),
         ("RealName", "TEXT NULL"),
+        ("Permissions", "TEXT NULL"),
     };
 
     /// <summary>
@@ -166,6 +167,7 @@ public class SqliteUserRepository : IUserRepository
             LastFailedUtc = AsUtc(record.LastFailedUtc),
             LastFailedAddress = record.LastFailedAddress,
             RealName = record.RealName,
+            Permissions = record.Permissions,
         };
     }
 
@@ -239,6 +241,9 @@ public class SqliteUserRepository : IUserRepository
         => Update(username, r => r.RealName = string.IsNullOrWhiteSpace(realName) ? null : Clip(realName.Trim()));
 
     public bool SetRole(string username, UserRole role) => Update(username, r => r.Role = role);
+
+    public bool SetGrants(string username, string grants)
+        => Update(username, r => r.Permissions = string.IsNullOrEmpty(grants) ? null : grants);
 
     private bool Update(string username, Action<UserRecord> change)
     {

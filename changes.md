@@ -4,6 +4,14 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-03
 
+- Roles and permissions. A fourth role, Moderator: announcements, finding, going to and bringing
+  players, kick and mute; no building. Each gated command is a permission; roles are sets of them;
+  an Admin can give one account single commands (`/grant NAME COMMAND`, `/revoke`, `/perms`).
+  New commands: `/tp NAME` (go to a player), `/bring`, `/move NAME x y z` and `/move NAME to OTHER`
+  (Admin), `/kick`, `/mute`, `/unmute`, `/give [NAME] ITEM`. Table in docs/SERVER_SECURITY.md.
+  The accounts database gains a Permissions column on first start (backed up first).
+- Saved Servers (Linux): Tab leaves the list instead of choosing the next server.
+
 - Connecting to a server by name (codyhurst.com) uses its IPv4 address. LiteNetLib picked the IPv6
   address, and that connection was never answered; by IPv4 the same login is accepted.
 - The VPS runs build 074d2a719a38 (voice chat). The previous build is backed up on the VPS as

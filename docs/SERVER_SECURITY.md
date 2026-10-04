@@ -5,29 +5,52 @@ commands that show it. For running a server on a VPS, see `WINDOWS_AND_SERVER.md
 
 ## Roles
 
-There are three roles: Player, Dev (developer) and Admin. A new account is a Player. An Admin
-changes a role with `/setrole`. The seeded `admin` account is an Admin.
+There are four roles: Player, Moderator, Dev (developer) and Admin. A new account is a Player. Only
+an Admin changes a role (`/setrole NAME player|moderator|dev|admin`). The seeded `admin` account is
+an Admin.
 
-Dev and Admin build the world. Only Admin sees addresses and changes accounts.
+- **Player**: the game. None of the commands below.
+- **Moderator**: looks after people, never the world. Announcements, where somebody is, going to
+  them, bringing them, kicking and muting. Cannot build, see addresses or change accounts.
+- **Dev**: builds and tests the world. Placing, grouping, saving maps, seats, sound tools,
+  teleporting, firing any weapon, giving items. No power over other people.
+- **Admin**: everything, and alone changes roles, grants single permissions, moves other players,
+  and sees and changes accounts and addresses.
 
-| Command | Player | Dev | Admin |
-| --- | --- | --- | --- |
-| Moving, looking, chat (`/all`, `/pm`), `/motd`, `/scan`, `/room`, `/prefabs`, `/composites` | yes | yes | yes |
-| Doors, seats, driving, carrying, `/clap`, `/knock` | yes | yes | yes |
-| `/fire` with a weapon in your hands | yes | yes | yes |
-| `/friend`, `/friends`, `/profile`, `/join` to a public map or your own, `/afk`, `/realname` | yes | yes | yes |
-| `/fire <weapon>` with empty hands | no | yes | yes |
-| `/join` to somebody else's private map | no | yes | yes |
-| `/where` (`/locate`) | no | yes | yes |
-| `/setmotd`, `/announce` | no | yes | yes |
-| `/tp` (`/move`), `/spawn` | no | yes | yes |
-| `/set_sound`, `/set_audio_mode`, `/play_folder`, `/start_state` | no | yes | yes |
-| `/group`, `/ungroup`, `/saveas`, `/place`, `/addseat`, `/removeseat`, `/drivable` | no | yes | yes |
-| `/origin`, `/at`, `/put`, `/undo`, `/savemap` | no | yes | yes |
-| `/sessions`, `/user` (`/account`), `/throttled` (`/ratelimit`), `/unlock`, `/setrole` | no | no | yes |
+A permission is a command's name (or one of the four powers at the end of the table). Roles are
+sets of permissions, in `OpenFPS.Server/Core/Permissions.cs`.
 
-`StaffGateTests` runs every gated command as a Player and checks it is refused and changes nothing.
-It reads `CommandHandler.cs` and fails if a gated command is missing from its list.
+**Single permissions.** An Admin can give one account one command on top of its role:
+`/grant sean tp`, and take it back with `/revoke sean tp`. Grants are kept with the account. `/perms`
+lists your own, `/perms NAME` (Admin) someone else's, `/perms all` every permission. Roles and
+permissions themselves (`setrole`, `grant`, `revoke`) cannot be granted.
+
+| Permission | Player | Moderator | Dev | Admin |
+| --- | --- | --- | --- | --- |
+| Moving, looking, chat (`/all`, `/pm`), `/motd`, `/scan`, `/room`, `/prefabs`, `/composites`, `/perms` | yes | yes | yes | yes |
+| Doors, seats, driving, carrying, `/clap`, `/knock`, `/fire` with a weapon in your hands | yes | yes | yes | yes |
+| `/friend`, `/friends`, `/profile`, `/join` to a public map or your own, `/afk`, `/realname` | yes | yes | yes | yes |
+| `announce`, `setmotd` | no | yes | yes | yes |
+| `where` (`/locate`) | no | yes | yes | yes |
+| `tp` (`/move x y z`, `/goto`, `/tp NAME` to go to a player) | no | yes | yes | yes |
+| `join-private`: `/join` somebody else's private map | no | yes | yes | yes |
+| `bring` (a player to you), `kick`, `mute` (`/mute NAME [minutes]`, 10 by default), `unmute` | no | yes | no | yes |
+| `give` (`/give ITEM`, `/give NAME ITEM`) | no | no | yes | yes |
+| `fire-any`: `/fire <weapon>` with empty hands | no | no | yes | yes |
+| `spawn`, `set_sound`, `set_audio_mode`, `play_folder`, `start_state` | no | no | yes | yes |
+| `group`, `ungroup`, `saveas`, `place`, `addseat`, `removeseat`, `drivable` | no | no | yes | yes |
+| `origin`, `at`, `put`, `undo`, `savemap` | no | no | yes | yes |
+| `edit-any`: change things other people built | no | no | yes | yes |
+| `move-player`: `/move NAME x y z`, `/move NAME to OTHER` | no | no | no | yes |
+| `sessions`, `user` (`/account`), `throttled` (`/ratelimit`), `unlock` | no | no | no | yes |
+| `setrole`, `grant`, `revoke` | no | no | no | yes |
+
+A Moderator cannot kick or mute an Admin. A mute lasts for the session or until it runs out.
+
+`StaffGateTests` runs every gated command as a Player and checks it is refused and changes nothing,
+then as a role that has it and checks it does something. It fails if the permission table and its
+list disagree. It also checks that Moderators cannot build, Devs cannot moderate, grants work for one
+account until revoked, and only an Admin moves another player.
 
 `/profile` shows a player's role, the real name they set with `/realname`, whether they are online,
 away (`/afk`) or idle (5 minutes or more without doing anything), and which map they are on. A

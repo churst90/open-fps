@@ -311,11 +311,17 @@ public class GameServer
     public void Chat(UserSession from, string text, ChatChannel channel)
     {
         if (string.IsNullOrWhiteSpace(text)) return;
+        if (from.MutedUntilUtc > DateTime.UtcNow)
+        {
+            int minutes = (int)Math.Ceiling((from.MutedUntilUtc - DateTime.UtcNow).TotalMinutes);
+            SendToSession(from, new TextEvent { Text = $"You are muted for {minutes} more minute{(minutes == 1 ? "" : "s")}." });
+            return;
+        }
         Log.Information("[CHAT {Channel}] {User}: {Text}", channel, from.Username, text);
         var line = new ChatMessage
         {
             Sender = from.Username, Text = text, Channel = channel,
-            FromStaff = from.Role is UserRole.Admin or UserRole.Dev,
+            FromStaff = from.Role is UserRole.Admin or UserRole.Dev or UserRole.Moderator,
         };
         var to = channel == ChatChannel.All ? _sessions.GetAllSessions() : _sessions.GetSessionsInMap(from.CurrentMapId);
         foreach (var s in to) SendToSession(s, line);
@@ -700,6 +706,7 @@ public class GameServer
             ConnectionId = connectionId,
             Username = user.Username,
             Role = user.Role,
+            Grants = OpenFPS.Server.Core.Permissions.Parse(user.Permissions),
             IsTextClient = peer == null,
             // Where a new player lands: the map that claims IsDefault, not the one named "default".
             CurrentMapId = _maps.DefaultMapId,
@@ -735,6 +742,9 @@ public class GameServer
     /// the way a disconnect does, and closes the connection. The transport's own disconnect event then
     /// finds no session and does nothing more.
     /// </summary>
+    /// <summary>A moderator's /kick: the session ends as a duplicate login does, with the reason said.</summary>
+    public void Kick(UserSession session, string reason) => EndSession(session, reason);
+
     private void EndSession(UserSession session, string reason)
     {
         if (!_sessions.TryRemoveSession(session.ConnectionId, out _)) return;

@@ -45,4 +45,6 @@ public class UserRecord
     public DateTime? LastFailedUtc { get; set; }
     public string? LastFailedAddress { get; set; }
     public string? RealName { get; set; }
+    // Added 2026-10-03: single permissions granted on top of the role, comma separated (Permissions).
+    public string? Permissions { get; set; }
 }
