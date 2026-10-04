@@ -20,10 +20,11 @@ namespace OpenFPS.Common;
 public static class Beacons
 {
     public const string Door = "door", Exit = "exit", Stairs = "stairs", Item = "item",
-                        Vehicle = "vehicle", Waypoint = "waypoint";
+                        Vehicle = "vehicle", Waypoint = "waypoint", Player = "player";
 
-    /// <summary>Every category, in the order they are read out.</summary>
-    public static readonly string[] Categories = { Door, Exit, Stairs, Item, Vehicle, Waypoint };
+    /// <summary>Every category, in the order they are read out. A player is a beacon by being a player:
+    /// every other person on the map, and your own team's in a tone of their own.</summary>
+    public static readonly string[] Categories = { Door, Exit, Stairs, Item, Vehicle, Waypoint, Player };
 
     public enum Policy { DefaultOn, DefaultOff, ForcedOn, Forbidden }
 

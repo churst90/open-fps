@@ -14,6 +14,8 @@ public enum UiCue
     VoiceOn, VoiceOff,
     Reconnecting,
     PresenceOnline, PresenceLoggedOut, PresenceConnectionLost, PresenceAway, PresenceBack,
+    /// <summary>Your team talking: /t, or /team chat.</summary>
+    ChatTeam,
 }
 
 /// <summary>
@@ -78,6 +80,7 @@ public sealed class UiSounds
         return msg.Channel switch
         {
             ChatChannel.Private => UiCue.ChatPrivate,
+            ChatChannel.Team => UiCue.ChatTeam,
             ChatChannel.All => UiCue.ChatAll,
             ChatChannel.Server => msg.FromStaff ? UiCue.ChatAdmin : UiCue.ChatServer,
             _ => UiCue.ChatMap,
@@ -162,6 +165,9 @@ public sealed class UiSounds
         UiCue.PresenceAway => Swells(rate, 0.22f, (440.00f, 0.00f, 0.42f), (329.63f, 0.30f, 0.50f)),
         // Back: the same two swells the other way, E4 up to A4.
         UiCue.PresenceBack => Swells(rate, 0.22f, (329.63f, 0.00f, 0.42f), (440.00f, 0.30f, 0.50f)),
+        // Your team said something: the same two notes as a private message's first two, then back
+        // down to the first — a call among friends rather than one aimed at you alone.
+        UiCue.ChatTeam => Notes(rate, 0.5f, (1046.5f, 0f, 0.09f), (1318.5f, 0.08f, 0.09f), (1046.5f, 0.16f, 0.16f)),
         _ => Notes(rate, 0.4f, (1000f, 0f, 0.05f)),
     };
 

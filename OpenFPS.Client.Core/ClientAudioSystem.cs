@@ -519,8 +519,8 @@ public class ClientAudioSystem
         WorldAudio.ListenerVehicleId = _state.RidingEntityId;
         WorldAudio.SelfId = OwnEntityId;
         WorldAudio.Self ??= () => (_state.Position, _state.Rotation);
-        // The doors, the things to pick up and the cars to get into around you.
-        _beacons.Update(world, visualEyePos, _now());
+        // The doors, the things to pick up, the cars to get into and the people around you.
+        _beacons.Update(world, visualEyePos, _now(), OwnEntityId);
         // The lane lines, if you are the one driving.
         _drivingAids.Update(world, _state, _now());
         // ...and the rest of the world through the glass, if you are sitting in anything with a roof.

@@ -382,6 +382,7 @@ public class MudGateway
                 ChatChannel.Private when c.To.Length > 0 => $"[to {c.To}]: {c.Text}",
                 ChatChannel.Private => $"[from {c.Sender}]: {c.Text}",
                 ChatChannel.All => $"[{c.Sender}, to all]: {c.Text}",
+                ChatChannel.Team => $"[{c.Sender}, to team]: {c.Text}",
                 _ => $"[{c.Sender}]: {c.Text}",
             },
             _ => "" // Movement and world state updates are not converted to text for performance/verbosity reasons.

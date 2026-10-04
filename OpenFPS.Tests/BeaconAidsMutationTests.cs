@@ -321,7 +321,7 @@ public class BeaconAidsMutationTests
     }
 
     /// <summary>
-    /// The three sounds are made once, not every frame; and if the mixer will not take one of them,
+    /// The five sounds are made once, not every frame; and if the mixer will not take one of them,
     /// no beacon is heard until it does — they are asked for again on a later frame.
     /// </summary>
     [Fact]
@@ -341,7 +341,7 @@ public class BeaconAidsMutationTests
 
         var fresh = new Rig();
         fresh.Run(world, Ear, 10, 4);
-        Assert.Equal(3, fresh.Mixer.Registrations);
+        Assert.Equal(5, fresh.Mixer.Registrations);     // door, item, vehicle, player, teammate
     }
 
     // ── Through walls, and round corners ────────────────────────────────────────────────────
@@ -552,7 +552,7 @@ public class BeaconAidsMutationTests
         var aids = new BeaconAids(new AudioEngineFacade(new EmitterRecordingProvider()), prefs);
         aids.SetMapPolicy(new[] { "door=forced_on", "item=forbidden" });
         Assert.Equal("Door on, always on for this map. exit on. stairs on. item off, not allowed on this map. "
-                   + "vehicle off. waypoint on. Each sounds every 1.6 seconds, at +4 decibels. Say slash beacons and a name to "
+                   + "vehicle off. waypoint on. player on. Each sounds every 1.6 seconds, at +4 decibels. Say slash beacons and a name to "
                    + "switch one, slash beacons every and a number of seconds, or slash beacons louder or quieter.",
                      aids.Command(Array.Empty<string>()));
     }
@@ -617,7 +617,7 @@ public class BeaconAidsMutationTests
         Assert.Equal("Vehicle beacons on.", aids.Command(new[] { "vehicle" }));          // no word: the other way
         Assert.True(aids.IsOn(Beacons.Vehicle));
 
-        Assert.Equal("There is no beacon called frogs. There are door, exit, stairs, item, vehicle, waypoint.",
+        Assert.Equal("There is no beacon called frogs. There are door, exit, stairs, item, vehicle, waypoint, player.",
                      aids.Command(new[] { "frogs" }));
     }
 

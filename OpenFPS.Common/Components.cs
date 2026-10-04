@@ -31,6 +31,9 @@ public partial struct PlayerComponent
     public float Yaw { get; set; }
     public float Pitch { get; set; }
     public bool IsGrounded { get; set; }
+    /// <summary>The team this player is in, or "" — the server's word, from teams.json. Appended last:
+    /// components serialise positionally.</summary>
+    public string Team { get; set; } = "";
     public PlayerComponent() { }
 }
 

@@ -32,7 +32,7 @@ public class KnockAndBeaconToneTests
 
     [Theory]
     [InlineData("door")] [InlineData("vehicle")] [InlineData("item")]
-    [InlineData("exit")] [InlineData("stairs")] [InlineData("waypoint")]
+    [InlineData("exit")] [InlineData("stairs")] [InlineData("waypoint")] [InlineData("player")]
     public void ABeaconIsSoftLowEnoughAndStartsWithoutAClick(string category)
     {
         const int sr = 44100;

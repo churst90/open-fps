@@ -237,6 +237,13 @@ public partial class EntityDefinition : IMessage
     /// </summary>
     public bool Moves;
 
+    /// <summary>
+    /// For a player, the team they are in, or "". Carried in the definition because that is the one
+    /// thing a client is told about another player besides where they are; a change of team re-sends
+    /// the definition (GameServer.SyncAudioComponent). Appended last: the wire format is positional.
+    /// </summary>
+    public string Team = "";
+
     public EntityDefinition()
     {
         Identity.Name = "";
@@ -431,6 +438,8 @@ public enum ChatChannel : byte
     Private = 2,
     /// <summary>The server speaking to everyone — the message of the day, an announcement.</summary>
     Server = 3,
+    /// <summary>To your team only: /team chat, or /t. Appended: sent by number.</summary>
+    Team = 4,
 }
 
 /// <summary>

@@ -27,6 +27,16 @@ public static class EntityDefinitionFactory
         def.Portal = world.Has<PortalComponent>(e) ? world.Get<PortalComponent>(e) : new PortalComponent();
         def.Transform = world.Has<Transform>(e) ? world.Get<Transform>(e) : new Transform();
         def.Moves = world.Has<Velocity>(e);
+        // A player is a player beacon by being a player, as a door is a door beacon by being a door, and
+        // their team travels with them so a listener can hear a teammate in their own tone. Set here and
+        // not as an IdentityComponent on the body, so nothing on the server that looks things up by
+        // their identity (scan, take, the name of what you bumped into) starts finding people.
+        if (world.Has<PlayerComponent>(e))
+        {
+            var player = world.Get<PlayerComponent>(e);
+            def.Identity.BeaconCategory = OpenFPS.Common.Beacons.Player;
+            def.Team = player.Team ?? "";
+        }
         return def;
     }
 

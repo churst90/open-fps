@@ -249,11 +249,28 @@ Type these on the chat line. The `/` is optional and case does not matter.
 - `/profile name` (or `/whois`).
 - `/where name` (or `/locate`): distance, clock direction and place.
 
+### Teams
+- `/team`: your team, who leads it, and how many are online.
+- `/team create NAME`: start a team; you lead it. Names are 2 to 20 letters, digits, `-` or `_`.
+- `/team invite PLAYER`: any member can invite.
+- `/team join NAME`: join a team that invited you, or an open one.
+- `/team leave`: if the leader leaves, the longest member leads.
+- `/team list [NAME]`: members and who is online.
+- `/team kick PLAYER`, `/team open`, `/team close`: the leader only.
+- `/t MESSAGE` (or `/team chat MESSAGE`): talk to your team, on any map. It has its own sound and is
+  read whatever chat ring you are in.
+
+A team holds up to 16 players.
+
 ### Maps
 - `/join map` (or `/travel`): go to another map. With no map named, it lists the maps you can
   enter. You can enter public maps, your own maps, and, if you are staff, any map.
 
 ### Beacons
+
+**Player beacons.** Other players near you make a beacon sound: two soft notes going down. If they are
+in your team, the same two notes are higher. You never hear your own. `/beacons player` turns them
+off or on.
 - `/beacons` (or `/beacon`): each kind of beacon, whether it is on, and why.
 - `/beacons door`: switch door beacons on or off. `/beacons door on` or `off` sets it.
 - `/beacons louder` and `/beacons quieter`: every beacon 2 dB up or down, saved. They start 4 dB above
