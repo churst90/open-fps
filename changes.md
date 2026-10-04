@@ -4,6 +4,13 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-04
 
+- Your gunshots come from you where you are when they are heard, not from where the server had you,
+  which while walking was a step behind.
+- A driver's yell stays at the car's window and moves with the car; a pedestrian's line stays at
+  their mouth as they walk. Both used to trail behind by however far they had moved before the line
+  was heard.
+- The server logs voice chat per sender every ten seconds: frames, bitrate, map and how many players
+  it went to.
 - I opens your inventory as a list: everything in your hands and on your back, one entry each with
   its rounds ("AKM, 30 rounds, on your back"); Enter offers take in your hands, sling on your back or
   drop, for that one thing even among ten of the same name. Shift+I says it all in one sentence.

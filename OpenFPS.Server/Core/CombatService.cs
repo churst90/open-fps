@@ -241,6 +241,11 @@ public sealed class CombatService
             {
                 Character = SoundCharacter.Knock,
                 Position = muzzle,
+                // At the muzzle on the shooter's body as it is when heard, as a clap is: placed where the
+                // server had the body, a shot fired while walking came from a step behind you (Cody,
+                // 2026-10-04: "my gun shots are lagging behind me when I move").
+                OnBody = true,
+                BodyOffset = new Vector3(0f, 1.5f, 0.5f),
                 LevelDb = Loudness.MuzzleBlastDb(weapon),
                 SynthKey = "weapon:" + weapon.Id,
                 DecaySeconds = 0.6f,

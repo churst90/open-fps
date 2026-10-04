@@ -521,12 +521,18 @@ public sealed class WorldAudioPlayer
 
             // Somebody talking while they walk carries their voice with them. A two-second line left
             // where it started is three metres behind the footsteps by the end of it.
+            // A line said by somebody who says where on them it comes from (a mouth, a driver's window)
+            // stays there, turning with them. Worked out as the difference between where the server had
+            // the speaker when it decided to speak and where they are when it is heard, the offset
+            // pointed BACK along their way: by the time a driver's yell was heard the car was metres on,
+            // and the voice trailed behind it for the whole line (Sean, 2026-10-04).
             if (follow && world.Entities.TryGetValue(item.SourceEntityId, out var speaker))
                 _following.Add(new Following
                 {
                     Emitter = emitter,
                     SourceEntityId = item.SourceEntityId,
-                    Offset = item.Sound.Position - speaker.Transform.Position,
+                    BodyFrame = item.Sound.OnBody,
+                    Offset = item.Sound.OnBody ? item.Sound.BodyOffset : item.Sound.Position - speaker.Transform.Position,
                     // Stop a little before the line ends: a submission after the voice has finished
                     // would start it again.
                     Until = now + Math.Max(0f, item.Sound.DecaySeconds - 0.1f),
@@ -565,6 +571,16 @@ public sealed class WorldAudioPlayer
     /// </summary>
     /// <summary>Where a body is now and which way it faces (yaw only): yours from the client's own
     /// prediction, anyone else's from the world as you hear it.</summary>
+    /// <summary>A rotation's turn about the vertical alone: which way a body faces, not how it leans.</summary>
+    private static Quaternion Yaw(Quaternion rotation)
+    {
+        var forward = Vector3.Transform(Vector3.UnitZ, rotation);
+        forward.Y = 0f;
+        return forward.LengthSquared() > 1e-6f
+            ? Quaternion.CreateFromAxisAngle(Vector3.UnitY, MathF.Atan2(forward.X, forward.Z))
+            : Quaternion.Identity;
+    }
+
     private bool BodyNow(WorldSnapshot world, int entityId, out Vector3 feet, out Quaternion facing)
     {
         feet = default; facing = Quaternion.Identity;
@@ -598,6 +614,9 @@ public sealed class WorldAudioPlayer
         /// <summary>From the body, in the world's frame; for a sound in a cabin, in the vehicle's.</summary>
         public Vector3 Offset;
         public bool InCabin;
+        /// <summary>The offset is in the body's own frame, turning only as it turns (yaw): a voice at a
+        /// mouth, a driver's at the window.</summary>
+        public bool BodyFrame;
         public double Until;
         public double StartedAt;
     }
@@ -648,7 +667,8 @@ public sealed class WorldAudioPlayer
                 continue;
             }
             var at = f.InCabin ? speaker.Transform.Position + Vector3.Transform(f.Offset, speaker.Transform.Rotation)
-                               : speaker.Transform.Position + f.Offset;
+                   : f.BodyFrame ? speaker.Transform.Position + Vector3.Transform(f.Offset, Yaw(speaker.Transform.Rotation))
+                   : speaker.Transform.Position + f.Offset;
             // The simulator's answer for the speaker, as for any other source; the hand-rolled tracer
             // only until it has one.
             AskAbout(f.SourceEntityId, listenerPosition, at);

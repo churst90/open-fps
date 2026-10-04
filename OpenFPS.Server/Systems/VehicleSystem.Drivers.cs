@@ -58,6 +58,10 @@ public sealed partial class VehicleSystem
                 Character = SoundCharacter.Hiss,
                 DelaySeconds = delay,
                 Position = DriverWindow(t),
+                // At the driver's window on the car as it is when heard, and riding with it: the car is
+                // metres on by then (see WorldAudioPlayer's following). x right, y up, z forward.
+                OnBody = true,
+                BodyOffset = new Vector3(-0.9f, 1.2f, 0.3f),
                 LevelDb = Speech.LevelDb(Speech.ShoutDb),
                 DecaySeconds = take.Seconds,
                 Noisiness = 0.5f,

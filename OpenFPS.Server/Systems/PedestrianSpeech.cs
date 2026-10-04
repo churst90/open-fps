@@ -572,6 +572,9 @@ public sealed class PedestrianSpeech
             Character = SoundCharacter.Hiss,
             DelaySeconds = delay,
             Position = p.At + new Vector3(0f, Speech.MouthHeight, 0f) + p.Forward * 0.1f,
+            // At their mouth as they are when heard, walking on with them (see the driver's yell).
+            OnBody = true,
+            BodyOffset = new Vector3(0f, Speech.MouthHeight, 0.1f),
             LevelDb = Speech.LevelDb(effortDb),
             DecaySeconds = take.Seconds,
             Noisiness = 0.5f,

@@ -564,16 +564,43 @@ public class GameServer
             req.SenderId = senderSession.Entity.Id;
             Touch(id);
             // Relayed to everyone else on the same map, at once; each listener places it at the sender.
+            int relayed = 0;
             foreach (var s in _sessions.GetAllSessions())
             {
                 if (s.ConnectionId == id) continue; // don't echo back to sender
                 if (s.CurrentMapId != senderSession.CurrentMapId) continue;
                 var peer = _network.GetPeer(s.ConnectionId);
                 if (peer != null)
+                {
                     _network.SendMessage(peer, req, LiteNetLib.DeliveryMethod.Unreliable);
+                    relayed++;
+                }
             }
             _network.Flush();
+            NoteVoice(senderSession, req.OpusData.Length, relayed);
         });
+    }
+
+    /// <summary>
+    /// Voice traffic per sender, logged every ten seconds while they talk: "Voice: sean sent 500 frames
+    /// (24 kbit/s) on city, relayed to 1 player". Without it, "he could not hear me" had nothing on the
+    /// server to say whether the frames ever arrived (2026-10-04).
+    /// </summary>
+    private readonly Dictionary<string, (int Frames, long Bytes, int RelayedTo, DateTime Since)> _voiceTally = new();
+
+    private void NoteVoice(UserSession sender, int bytes, int relayedTo)
+    {
+        var now = DateTime.UtcNow;
+        var t = _voiceTally.TryGetValue(sender.Username, out var had) ? had : (0, 0L, 0, now);
+        t = (t.Item1 + 1, t.Item2 + bytes, relayedTo, t.Item4);
+        if ((now - t.Item4).TotalSeconds >= 10)
+        {
+            double seconds = Math.Max(1, (now - t.Item4).TotalSeconds);
+            Log.Information("Voice: {User} sent {Frames} frames ({Kbps:F0} kbit/s) on {Map}, relayed to {Players} player(s).",
+                            sender.Username, t.Item1, t.Item2 * 8 / seconds / 1000, sender.CurrentMapId, relayedTo);
+            t = (0, 0L, relayedTo, now);
+        }
+        _voiceTally[sender.Username] = t;
     }
 
     /// <summary>One voice packet: an Opus frame is at most 1275 bytes, and a packet carries one.</summary>
