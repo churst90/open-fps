@@ -246,6 +246,23 @@ public class WeaponsTests : IDisposable
     }
 
     [Fact]
+    public void ScanDoesNotListWhatAnybodyIsCarrying()
+    {
+        // Cody, 2026-10-04: Shift+P read out every gun Sean was carrying. A carried thing is an entity
+        // riding on its holder, so a scan found it at the holder's feet: it is theirs, not near you.
+        var r = new Range(_dir);
+        r.Arm(r.Shooter, "akm");
+        r.Run(r.Shooter, "stow");
+        r.Arm(r.Shooter, "glock");
+        r.Arm(r.Other, "m700");
+        string scan = r.Run(r.Shooter, "scan");
+        Assert.DoesNotContain("AKM", scan);
+        Assert.DoesNotContain("Glock", scan);
+        Assert.DoesNotContain("M700", scan);
+        Assert.Contains("other", scan);
+    }
+
+    [Fact]
     public void PickingAGunUpPocketsItsSpareMagazinesOnce()
     {
         var r = new Range(_dir);
