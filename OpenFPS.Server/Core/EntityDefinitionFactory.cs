@@ -34,7 +34,13 @@ public static class EntityDefinitionFactory
         // A thing somebody is carrying is not a beacon: it is in their hands or on their back. Left as one,
         // the things you carry were the nearest items there were and took every item beacon's slot, so a
         // gun you had just put down never sounded (Cody, 2026-10-04). Taking and putting down re-send it.
-        if (world.Has<HeldComponent>(e)) def.Identity.BeaconCategory = "";
+        // Nor is it announced as something near you: since the broadcast carries items, a client knows
+        // the gun in your own hand, and in the hands of everyone who walks past.
+        if (world.Has<HeldComponent>(e))
+        {
+            def.Identity.BeaconCategory = "";
+            def.Identity.Announce = false;
+        }
         if (world.Has<PlayerComponent>(e))
         {
             var player = world.Get<PlayerComponent>(e);

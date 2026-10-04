@@ -83,6 +83,13 @@ public class GameServer
     /// <summary>Every message sent to a session, as it is sent. Tests watch it; nothing else should.</summary>
     internal Action<UserSession, IMessage>? Sent;
 
+    /// <summary>Every message the world-state broadcast sends, as it is sent. Tests watch it; with it set,
+    /// a session with no socket is broadcast to as well, so the broadcast can be run without one.</summary>
+    internal Action<UserSession, IMessage>? Broadcasted;
+
+    /// <summary>One world-state broadcast, as the tick runs it. For tests.</summary>
+    internal void BroadcastForTest(long tick) => BroadcastWorldState(tick);
+
     public void EnqueueCommand(Action action) => _commandBuffer.Enqueue(action);
 
     /// <summary>
@@ -1181,6 +1188,39 @@ public class GameServer
     private readonly HashSet<int> _dirtyAudioBuffer = new();
     private readonly List<int> _removedBuffer = new();
 
+    /// <summary>
+    /// What one tick's broadcast chooses from on a map: every entity that has a collider, and every item.
+    ///
+    /// The items because they have no collider — you walk over a gun on the floor, and a shot does not
+    /// stop on it — and a broadcast that chose only from the collidable never once mentioned one. An item
+    /// /give made, or one picked up and put down, never reached a client at all: the client did not know
+    /// the gun was on the floor, so its item beacon had nothing to sound from (Cody, 2026-10-04: "when I
+    /// drop items I still don't hear them"). An item is the one thing that changes hands after the map is
+    /// streamed, so it is the one colliderless thing the broadcast has to carry.
+    /// </summary>
+    internal static void GatherBroadcastCandidates(World world, List<(Entity Entity, bool Dynamic, bool Dirty)> into)
+    {
+        into.Clear();
+        world.Query(new QueryDescription().WithAll<Transform, ColliderComponent>(), (Entity e, ref Transform t) =>
+            into.Add((e, world.Has<Velocity>(e) || world.Has<PlayerComponent>(e), t.IsDirty)));
+        world.Query(new QueryDescription().WithAll<Transform, ItemComponent>().WithNone<ColliderComponent>(), (Entity e, ref Transform t) =>
+            into.Add((e, world.Has<Velocity>(e) || world.Has<PlayerComponent>(e), t.IsDirty)));
+    }
+
+    /// <summary>One message of the broadcast, to a session's socket, and to <see cref="Broadcasted"/> when a test watches.</summary>
+    private void Deliver(NetPeer? peer, UserSession session, IMessage message, DeliveryMethod delivery)
+    {
+        Broadcasted?.Invoke(session, message);
+        if (peer != null) _network.SendMessage(peer, message, delivery);
+    }
+
+    /// <summary>The per-tick states, which go out unreliably and split to fit a packet.</summary>
+    private void DeliverStates(NetPeer? peer, UserSession session, ServerStateUpdate update)
+    {
+        Broadcasted?.Invoke(session, update);
+        if (peer != null) _network.SendStateUpdate(peer, update, DeliveryMethod.Unreliable);
+    }
+
     private void BroadcastWorldState(long tick)
     {
         _dirtyAudioBuffer.Clear();
@@ -1199,10 +1239,8 @@ public class GameServer
             // 33 ms tick on the VPS, the loop fell behind every few ticks, and everything anyone heard
             // trailed what it belonged to. The grid holds exactly the collidable entities, so one pass
             // over the world finds the same set once, with no repeats; each player then filters it.
-            _broadcastCandidates.Clear();
             using (PerfProbe.Measure("server.broadcast.gather"))
-                world.Query(new QueryDescription().WithAll<Transform, ColliderComponent>(), (Entity e, ref Transform t) =>
-                    _broadcastCandidates.Add((e, world.Has<Velocity>(e) || world.Has<PlayerComponent>(e), t.IsDirty)));
+                GatherBroadcastCandidates(world, _broadcastCandidates);
 
             foreach (var session in sessionsInMap)
             {
@@ -1214,7 +1252,7 @@ public class GameServer
                     var pPos = world.Get<Transform>(session.Entity).Position;
                     float earshot = _maps.GetEarshotRange(mapEntry.Key);
                     var peer = _network.GetPeer(session.ConnectionId);
-                    if (peer == null) continue;
+                    if (peer == null && Broadcasted == null) continue;
 
                     // What the client needs to know about itself that is not in its transform: whether
                     // its position is its own to predict, or a seat's to decide.
@@ -1256,7 +1294,7 @@ public class GameServer
                         // only once: KnownEntities is what makes it once rather than every tick.
                         bool isNew = session.KnownEntities.Add(e.Id);
                         if (isNew || _dirtyAudioBuffer.Contains(e.Id))
-                            _network.SendMessage(peer, CreateDefinition(world, e), DeliveryMethod.ReliableOrdered);
+                            Deliver(peer, session, CreateDefinition(world, e), DeliveryMethod.ReliableOrdered);
 
                         if (!isDynamic && !t.IsDirty && !isNew) continue;
 
@@ -1304,16 +1342,16 @@ public class GameServer
                             session.VisibleDynamicEntities.Remove(goneId);
                             session.KnownEntities.Remove(goneId);
                         }
-                        _network.SendMessage(peer, new EntityRemoved { EntityIds = new List<int>(_removedBuffer) },
+                        Deliver(peer, session, new EntityRemoved { EntityIds = new List<int>(_removedBuffer) },
                             DeliveryMethod.ReliableOrdered);
                     }
 
                     foreach (int id in _visibleDynamicBuffer) session.VisibleDynamicEntities.Add(id);
 
                     if (_reusableBroadcast.States.Count > 0)
-                        _network.SendStateUpdate(peer, _reusableBroadcast, DeliveryMethod.Unreliable);
+                        DeliverStates(peer, session, _reusableBroadcast);
                     if (_reliableBroadcast.States.Count > 0)
-                        _network.SendMessage(peer, _reliableBroadcast, DeliveryMethod.ReliableOrdered);
+                        Deliver(peer, session, _reliableBroadcast, DeliveryMethod.ReliableOrdered);
 
                     int health = 0, maxHealth = 0;
                     if (world.Has<HealthComponent>(session.Entity))
@@ -1325,7 +1363,7 @@ public class GameServer
                     // The gun in your hands, which the client's keys need: Enter fires only a gun,
                     // and R reloads one.
                     var held = CombatService.Held(world, session.Entity, mapEntry.Value.lookup);
-                    _network.SendMessage(peer, new StatsUpdate {
+                    Deliver(peer, session, new StatsUpdate {
                         Health = health, MaxHealth = maxHealth,
                         CurrentMaterial = stats.matType, CurrentVariant = stats.variant,
                         HeldWeaponId = held.WeaponId, HeldRounds = held.Rounds, HeldScopeId = held.ScopeId,
