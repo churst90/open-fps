@@ -24,4 +24,10 @@ public class UserData
     public string? Permissions { get; set; }
     /// <summary>A role an administrator made (RoleRepository), on top of Player. Null for none.</summary>
     public string? CustomRole { get; set; }
+    /// <summary>Where the player last was, their health and their stats, as JSON (see Core.PlayerState).
+    /// Null for an account that has never left the world since this was kept.</summary>
+    public string? PlayerState { get; set; }
+    /// <summary>What they carried when they last left the world, as JSON (see Core.Belongings), until
+    /// they come back and it is taken out again.</summary>
+    public string? Belongings { get; set; }
 }

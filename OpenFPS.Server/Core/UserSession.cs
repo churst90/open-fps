@@ -112,6 +112,13 @@ public class UserSession
     public bool Welcomed { get; set; }
 
     /// <summary>
+    /// What the server keeps about this player between visits (where they were on each map, health,
+    /// stats), read at login and written each time their body leaves the world (PlayerStore). Null
+    /// until read; a test rig that never logs in leaves it so.
+    /// </summary>
+    public PlayerState? Saved { get; set; }
+
+    /// <summary>
     /// Where this player is building, and what they have put there.
     ///
     /// Per-session and deliberately not persisted: a build cursor is a place you are working, like a

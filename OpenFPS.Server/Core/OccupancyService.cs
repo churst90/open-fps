@@ -302,8 +302,13 @@ public class OccupancyService
     /// bay is the kind of thing that is merely odd to look at and completely disorienting to listen
     /// to. The spot is searched for around the composite rather than assumed, so getting out against
     /// a wall puts you on the other side rather than in the wall.
+    ///
+    /// <paramref name="leavingWorld"/> is a body leaving the world from its seat (a logout, a lost
+    /// connection, a change of map): that is not a request, so neither a moving vehicle nor shut doors
+    /// refuse it, and the body is put beside the vehicle where it is now — which is the place kept for
+    /// the player's return.
     /// </summary>
-    public bool Exit(UserSession session, out string message)
+    public bool Exit(UserSession session, out string message, bool leavingWorld = false)
     {
         message = "";
         if (!_maps.TryGetMap(session.CurrentMapId, out var world, out _, out var grid, out var lookup))
@@ -320,7 +325,7 @@ public class OccupancyService
         if (lookup.TryGetValue(occupant.RootEntityId, out var root) && world.IsAlive(root))
         {
             if (world.Has<CompositeComponent>(root)) name = world.Get<CompositeComponent>(root).Name;
-            if (Moving(world, root))
+            if (!leavingWorld && Moving(world, root))
             {
                 message = $"{name} is still moving. Stop first.";
                 return false;
@@ -329,7 +334,7 @@ public class OccupancyService
             // stops and nowhere else: stopped at a light or a junction, a passenger stays on. It used
             // to let you off wherever it stood still, without the doors or the beeper. The driver's
             // own door is not that door.
-            if (!occupant.Controls && world.Has<SoundEmitterComponent>(root)
+            if (!leavingWorld && !occupant.Controls && world.Has<SoundEmitterComponent>(root)
                 && world.Get<SoundEmitterComponent>(root) is { SoundId: { } sid } em
                 && sid.StartsWith("engine:", StringComparison.OrdinalIgnoreCase)
                 && MachineRegistry.Knows(sid[7..]) && MachineRegistry.VehicleFor(sid[7..]).DoorChime

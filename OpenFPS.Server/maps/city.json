@@ -30,9 +30,9 @@
  "MinimumY": -20.0,
  "SpawnPoint": {
   "Position": {
-   "X": 0.0,
-   "Y": 0.1,
-   "Z": -40.0
+   "X": 60.0,
+   "Y": 0.15,
+   "Z": 122.0
   },
   "Rotation": {
    "X": 0,

@@ -45,4 +45,18 @@ public interface IUserRepository
 
     /// <summary>Takes a deleted custom role off everybody who had it; how many.</summary>
     int ClearCustomRole(string role) => 0;
+
+    /// <summary>
+    /// A player leaving the world: their state (place, health, stats) and what they were carrying, both
+    /// JSON, written together. False if there is no such user or this store cannot keep them, in which
+    /// case the caller puts the things down rather than let them vanish.
+    /// </summary>
+    bool SavePlayer(string username, string? state, string? belongings) => false;
+
+    /// <summary>
+    /// What a player carried when they left, read and cleared in one go: from here on it is in the world
+    /// and not in the store, so a thing given away or dropped after coming back cannot come back twice.
+    /// Null for nothing.
+    /// </summary>
+    string? TakeBelongings(string username) => null;
 }

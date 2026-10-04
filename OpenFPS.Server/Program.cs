@@ -41,6 +41,9 @@ public class GameServer
     private CompositeService _composites = null!;
     private OccupancyService _seats = null!;
     private HandsService _hands = null!;
+    /// <summary>Where a player was, their health and their things, kept while they are away. Null in a
+    /// test rig until Attach.</summary>
+    private PlayerStore? _store;
     private readonly System.Collections.Concurrent.ConcurrentQueue<Action> _commandBuffer = new();
 
     private readonly MessageDispatcher _dispatcher = new();
@@ -102,6 +105,7 @@ public class GameServer
         _sessions = sessions;
         _seats = seats!;
         _hands = hands!;
+        _store = new PlayerStore(_userRepo, maps, hands ?? new HandsService(maps));
     }
 
     /// <summary>
@@ -280,6 +284,7 @@ public class GameServer
         _maps.RefreshEarshotRanges();
         _seats = new OccupancyService(_maps, EmitWorldAudio);
         _hands = new HandsService(_maps) { Carried = SyncAudioComponent };
+        _store = new PlayerStore(_userRepo, _maps, _hands);
         // Beside openfps.db and motd.txt, in the server's working folder. See FriendRepository for
         // why this is a file and not a table.
         _friends = new FriendRepository("friends.json");
@@ -330,6 +335,16 @@ public class GameServer
     private void Shutdown()
     {
         Log.Information("Server shutting down: {Count} session(s) connected.", _sessions.Count);
+
+        // Everybody's place and things into the store before the worlds go. What is still queued runs
+        // first: a disconnect waiting in the buffer is a body still to be stored.
+        try { DrainCommandBuffer(); }
+        catch (Exception ex) { Log.Warning(ex, "Error running the last queued commands."); }
+        foreach (var session in _sessions.GetAllSessions())
+        {
+            try { LeaveWorld(session); }
+            catch (Exception ex) { Log.Error(ex, "Could not store {User} at shutdown.", session.Username); }
+        }
 
         foreach (var session in _sessions.GetAllSessions())
         {
@@ -858,6 +873,9 @@ public class GameServer
                      .Where(s => s.Username.Equals(user.Username, StringComparison.OrdinalIgnoreCase)).ToList())
         {
             EndSession(old, "Your account has logged in from somewhere else, so this session has been closed.");
+            // Now and not when the queue gets to it: the old body's place and things go into the store
+            // before this login reads them back out. The queued despawn then finds no body.
+            LeaveWorld(old);
             replacing = true;
         }
 
@@ -877,6 +895,15 @@ public class GameServer
             LoggedInUtc = now,
             LastActivityUtc = now,
         };
+        // Back where they left from: the map now, the place on it when the body is made (HandlePlayerReady).
+        // Read here, on the tick thread, and not from the record the password check fetched: a body of
+        // this account leaving in between (the takeover above, or a lost connection queued before this)
+        // has written a newer one.
+        if (_store != null)
+        {
+            session.Saved = _store.Load(user.Username);
+            session.CurrentMapId = _store.LandingMap(session, session.Saved, session.CurrentMapId);
+        }
         _sessions.AddSession(connectionId, session);
 
         Log.Information("User {User} authenticated ({Transport}) from {Address}, landing on map '{Map}'.",
@@ -1060,7 +1087,7 @@ public class GameServer
         _network.SendMessage(peer, new MapLoadComplete(), DeliveryMethod.ReliableOrdered);
     }
 
-    private void HandlePlayerReady(int connectionId)
+    internal void HandlePlayerReady(int connectionId)
     {
         if (!_sessions.TryGetSession(connectionId, out var session)) return;
         if (session.Entity != Entity.Null) return; // already in the world
@@ -1071,12 +1098,16 @@ public class GameServer
             return;
         }
 
-        Transform spawnPoint = _maps.GetSpawnPoint(mapId);
-
         _commandBuffer.Enqueue(() => {
             // Checked again here, where it counts: two 'ready's in one tick, or a 'ready' that raced a
             // change of map, would otherwise put a second body in the world.
             if (session.Entity != Entity.Null || session.CurrentMapId != mapId) return;
+            // Where they were on this map when they last left it, if that is still somewhere to stand;
+            // the map's spawn if not, or if they have never been here.
+            bool remembered = false;
+            var (spawnPoint, spawnYaw) = _store != null
+                ? _store.Arrival(mapId, session.Saved, out remembered)
+                : (_maps.GetSpawnPoint(mapId), 0f);
             while (session.InputQueue.TryDequeue(out _)) { }
             session.GroundProbe.Invalidate();
             session.Entity = world.Create();
@@ -1084,7 +1115,7 @@ public class GameServer
                     ConnectionId = connectionId, 
                     Username = session.Username, 
                     Role = session.Role,
-                    Yaw = 0,
+                    Yaw = spawnYaw,
                     Pitch = 0,
                     // Born wearing its team, so the first definition anybody is sent already says it.
                     Team = Teams?.NameOf(session.Username) ?? "",
@@ -1100,6 +1131,9 @@ public class GameServer
 
             // The one registration path: lookup, spatial index, dirty flag.
             _maps.IndexEntity(mapId, session.Entity);
+            // Health as it was, and the things they were carrying, back in their hands and on their back.
+            _store?.Arrive(session, mapId, world, session.Entity);
+            if (remembered) Log.Information("{User} is back where they left {Map}.", session.Username, mapId);
 
             var t = world.Get<Transform>(session.Entity);
             SendToSession(session, new PlayerSpawned { EntityId = session.Entity.Id, SpawnTransform = t });
@@ -1112,11 +1146,12 @@ public class GameServer
     }
 
     /// <summary>
-    /// Takes a player off the map they are on and puts them on another loaded one, at its spawn point.
+    /// Takes a player off the map they are on and puts them on another loaded one, at its spawn point,
+    /// or where they were on it when they last left it if that is still somewhere to stand.
     ///
-    /// Runs on the tick thread. The old body is got out of any seat, made to put down what it was
-    /// carrying (things belong to the map they are on), destroyed and announced as gone; everything
-    /// the server remembers having sent the client is forgotten, so the new map's entities all go
+    /// Runs on the tick thread. The old body is got out of any seat, stored with what it was carrying
+    /// (which comes with it to the new map, and the place it left is kept for coming back to this one),
+    /// destroyed and announced as gone; everything the server remembers having sent the client is forgotten, so the new map's entities all go
     /// out fresh. Then the new map is sent exactly as login sends one: a graphical client gets a
     /// MapManifest and goes through map data, MapLoadComplete and 'ready' again; a text client has
     /// no geometry to load and is spawned straight away. Access is checked by the caller
@@ -1454,13 +1489,16 @@ public class GameServer
     }
 
     /// <summary>
-    /// Takes a session's body off the map it is on: out of any seat, its things put down, destroyed,
-    /// and announced as gone. Runs on the tick thread. Changing map and disconnecting both come
-    /// through here, so a player who leaves either way leaves the same things behind.
+    /// Takes a session's body off the map it is on: out of any seat, stored (where it stood, its
+    /// health, and its things, which leave the world with it: PlayerStore), destroyed, and announced
+    /// as gone. Runs on the tick thread. Changing map, logging out, a lost connection, a kick and a
+    /// shutdown all come through here, so a player who leaves any way comes back the same way.
     ///
     /// The seat and the things go first, while the body is still there to be got out and to drop
-    /// from. Destroyed while carrying, the things kept a HeldComponent naming a dead holder, so
-    /// nobody could pick them up again, and a ParentComponent naming an id Arch would reuse.
+    /// from. Anything the store would not keep (no prefab to make it from again, or a store that
+    /// cannot keep things) is put down where the body stood. Destroyed while carrying, the things kept
+    /// a HeldComponent naming a dead holder, so nobody could pick them up again, and a ParentComponent
+    /// naming an id Arch would reuse.
     /// Without the announcement every other client keeps the corpse forever: it still occupies
     /// space, still answers scans, and still plays whatever sound it carried.
     /// </summary>
@@ -1474,10 +1512,16 @@ public class GameServer
         {
             if (world.IsAlive(body))
             {
-                // Out of the seat first. Exit refuses while the vehicle is moving; leaving the map is
-                // not a request, so fall back to unseating without finding standing room.
-                if (world.Has<OccupantComponent>(body) && (_seats == null || !_seats.Exit(session, out _)))
+                // Out of the seat first, standing beside the vehicle wherever it is: leaving the map is
+                // not a request, so a moving vehicle or shut doors do not refuse it. Without the seat
+                // service (a test rig), unseated where they sit.
+                if (world.Has<OccupantComponent>(body) && (_seats == null || !_seats.Exit(session, out _, leavingWorld: true)))
                     CompositeService.Disembark(world, body);
+                // Where they stand now, their health and their things into the store, and the things out
+                // of the world with it. Whatever the store would not keep is put down, as everything was.
+                if (_store != null && _maps.TryGetMap(mapId, out _, out _, out _, out var lookup))
+                    foreach (int gone in _store.Leave(session, mapId, world, body, lookup))
+                        BroadcastEntityRemoved(mapId, gone);
                 _hands?.Drop(session, "all", out _);
             }
             session.Entity = Entity.Null;
