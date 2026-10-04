@@ -253,7 +253,6 @@ public sealed partial class ClientGameSession : IDisposable
         // Driving, Z is the road: which one, which way, which lane, how fast. On foot it is the area.
         _bindings.Bind(InputContext.Gameplay, GameKey.Z, () =>
             Say(_state.RidingControls && _audioSystem.Driving.Readout is { } road ? road : _state.CurrentRegion));
-        _bindings.Bind(InputContext.Gameplay, GameKey.Comma, LookAhead);
         _bindings.Bind(InputContext.Gameplay, GameKey.B, () => Say(ExertionReadout()));
         // N: the narration as you turn, on or off, and remembered. Not a screen reader's key, and
         // nothing else in gameplay had it.
@@ -348,6 +347,9 @@ public sealed partial class ClientGameSession : IDisposable
         _bindings.Bind(GameKey.Escape, ShowGameMenu);
 
         RegisterScopeBindings();
+        // Comma and period: the doors, entrances, stairs, items, people, vehicles or places near you.
+        // Comma was a second look-ahead key; P is that.
+        RegisterTrackerBindings();
     }
 
     /// <summary>
@@ -385,7 +387,9 @@ public sealed partial class ClientGameSession : IDisposable
     public static readonly string KeyHelp = string.Join(Environment.NewLine,
         "In game. W A S D to move, J / L turn, O / K look up and down, Space jump.",
         "Enter fires the gun in your hands; with no gun it interacts, like E.",
-        "C coordinates, F facing, H health, Z area, comma look ahead, E interact or pick up, P scan, I inventory list, Shift I what you carry.",
+        "C coordinates, F facing, H health, Z area, P look ahead, Shift P scan, E interact or pick up, I inventory list, Shift I what you carry.",
+        "Comma and period step through the nearest things of one kind, nearest first; Shift comma and Shift period change the kind:",
+        "doors, entrances, stairs, items, people, vehicles, places.",
         "N turns the narration of what is ahead as you turn on or off.",
         "G take, Q drop, Shift+R draw, T clap or ignition.",
         "R: with a gun, reload; in a vehicle, the window; otherwise put what you hold on your back.",
@@ -1517,6 +1521,7 @@ public sealed partial class ClientGameSession : IDisposable
                   + "/beacons, which beacons you hear. /reverb traced or room. /echoes on or off. "
                   + "/tail and /copies, the reflections' level in decibels, zero is physical. /cabin, the inside of a vehicle. "
                   + "/narrate on or off, saying what is ahead as you turn, also N. /bumps on or off, the knock and name when you walk into something. "
+                  + "/track and a kind, what comma and period step through: doors, entrances, stairs, items, people, vehicles or places; also Shift comma and Shift period. "
                   + "Each on its own says where it is set now.");
                 return;
             }
@@ -1592,6 +1597,12 @@ public sealed partial class ClientGameSession : IDisposable
             if (parts[0].ToLowerInvariant() is "narrate" or "bumps")
             {
                 Say(NavigationAidCommand(parts[0].ToLowerInvariant(), parts.Skip(1).ToArray()));
+                return;
+            }
+            // So is what comma and period step through.
+            if (parts[0].Equals("track", StringComparison.OrdinalIgnoreCase))
+            {
+                Say(TrackCommand(parts.Skip(1).ToArray()));
                 return;
             }
             // So is how loud the world is: yours, and saved.

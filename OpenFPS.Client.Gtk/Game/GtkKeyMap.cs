@@ -14,6 +14,10 @@ internal static class GtkKeyMap
     private const uint GDK_space = 0x020;
     private const uint GDK_comma = 0x02c;
     private const uint GDK_period = 0x02e;
+    // What comma and period report with Shift held on a US layout. Shift-comma and shift-period change
+    // what comma and period step through (MapTracker), so like the braces they must arrive as the key.
+    private const uint GDK_less = 0x03c;
+    private const uint GDK_greater = 0x03e;
     private const uint GDK_slash = 0x02f;
     private const uint GDK_semicolon = 0x03b;
     private const uint GDK_bracketleft = 0x05b;
@@ -58,6 +62,29 @@ internal static class GtkKeyMap
          : keyval >= GDK_KP_Home && keyval <= GDK_KP_Delete ? 0
          : -1;
 
+    /// <summary>
+    /// The key, from what GDK reported pressed (<paramref name="keyval"/>) and what the same physical
+    /// key gives with no modifiers held (<paramref name="unshifted"/>, 0 if not known).
+    ///
+    /// GDK reports a CHARACTER, and Shift changes it: shift-comma is "&lt;" on a US layout, ";" on a
+    /// German one. A binding is on the key, so for punctuation the key's own unshifted character is
+    /// asked first. Letters, digits and the keypad keep what was reported: the keypad's unshifted
+    /// meaning depends on Num Lock, which is a modifier, and a digit row's unshifted character on a
+    /// French layout is not a digit at all.
+    /// </summary>
+    public static GameKey Map(uint keyval, uint unshifted)
+    {
+        if (unshifted != 0 && IsPunctuation(keyval) && Map(unshifted) is var key && key != GameKey.None) return key;
+        return Map(keyval);
+    }
+
+    /// <summary>Printable ASCII that is neither a letter nor a digit nor a space.</summary>
+    private static bool IsPunctuation(uint keyval)
+        => keyval > 0x020 && keyval < 0x07f
+           && !(keyval >= 0x030 && keyval <= 0x039)
+           && !(keyval >= 0x041 && keyval <= 0x05a)
+           && !(keyval >= 0x061 && keyval <= 0x07a);
+
     public static GameKey Map(uint keyval)
     {
         if (keyval >= GDK_KP_0 && keyval <= GDK_KP_0 + 9) return GameKey.Numpad0 + (int)(keyval - GDK_KP_0);
@@ -79,8 +106,8 @@ internal static class GtkKeyMap
             GDK_Tab => GameKey.Tab,
             GDK_BackSpace => GameKey.Backspace,
             GDK_Delete => GameKey.Delete,
-            GDK_comma => GameKey.Comma,
-            GDK_period => GameKey.Period,
+            GDK_comma or GDK_less => GameKey.Comma,
+            GDK_period or GDK_greater => GameKey.Period,
             GDK_slash => GameKey.Slash,
             GDK_semicolon => GameKey.Semicolon,
             GDK_bracketleft or GDK_braceleft => GameKey.BracketLeft,
