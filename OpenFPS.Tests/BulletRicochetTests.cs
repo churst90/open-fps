@@ -272,6 +272,54 @@ public class BulletRicochetTests : IDisposable
         Assert.True(BulletImpact.CrackPascals(dirt) < 0.01f * BulletImpact.CrackPascals(concrete));
     }
 
+    /// <summary>
+    /// The strike's peak checked by a second road: a point force F on a plate of surface mass ρh radiates
+    /// ρ0·F/(2π·ρh·r) (Cremer and Heckl, the infinite plate below coincidence). With F the 9 mm's peak
+    /// force, π·I/2τ, that is 120 dB at a metre off a 20 cm concrete wall and 141 off 6 mm steel; the
+    /// model's declared levels (the crack, the plate's modes summed with their own signs, the rest) land
+    /// within 6 dB of it. Summed in step the steel came out at 162 and the concrete at 138, and both were
+    /// heard no quieter at 30 m than at 5 (the coordinator, 2026-10-04).
+    /// </summary>
+    [Theory]
+    [InlineData("Concrete", 2400f, 0.2f)]
+    [InlineData("Metal", 7850f, 0.006f)]
+    public void AStrikesPeakAgreesWithAPointForceOnAPlate(string material, float density, float thickness)
+    {
+        var hit = BulletImpact.From(material, 365f, WeaponRegistry.Glock, MathF.PI / 2f, 0f,
+                                    new Vector3(2f, 3f, thickness), "Concrete", 1.2f);
+        float force = MathF.PI * hit.Impulse / (2f * BulletImpact.ContactSeconds(hit));
+        float heckl = 1.2f * force / (2f * MathF.PI * density * thickness);
+        float declared = BulletImpact.Sounds(hit, Vector3.Zero, Vector3.Zero)[0].LevelDb;
+        var (crack, ring, efficiency) = BulletImpact.Radiated(hit);
+        _o.WriteLine($"{material}: point force {force / 1000f:F0} kN, {BulletFlyby.Spl(heckl):F0} dB by the plate law, declared {declared:F0} dB; sound {crack + ring:E1} J, {efficiency:E1} of the energy");
+        Assert.InRange(declared - BulletFlyby.Spl(heckl), -6f, 6f);
+        Assert.True(efficiency < 3e-3f);
+    }
+
+    /// <summary>
+    /// A splash is a rush, not a tinkle (Cody, 2026-10-04: "the water doesn't sound like it is splashing,
+    /// it's just tinkling"): thousands of drops falling back, each a broadband splat, one in twenty
+    /// ringing a bubble. Measured on the fall-back alone it is flat noise with no line standing out;
+    /// it was a few dozen drops, a third of them ringing, flatness 0.05-0.10.
+    /// </summary>
+    [Theory]
+    [InlineData("glock", 10f)]
+    [InlineData("akm", 30f)]
+    public void AWaterStrikeSplashesRatherThanTinkles(string weaponId, float metres)
+    {
+        var w = WeaponRegistry.Get(weaponId)!;
+        float speed = w.MuzzleVelocity * 0.97f;
+        var hit = BulletImpact.From("Water", speed, w, MathF.PI / 4f, 0f, new Vector3(10f, 10f, 1f), "Water", 0f);
+        var drops = BulletImpact.Splash(hit);
+        Assert.InRange(drops.Count, 300, BulletImpact.MaxRenderedDrops);
+        var pcm = BulletImpact.RenderDebris(hit, 48000, 1, out float raw);
+        Assert.InRange(raw, 0.1f, 1f);
+        var (flatness, tone) = Spectrum.Tonality(pcm, 48000);
+        _o.WriteLine($"{weaponId}: {drops.Count} drops rendered (each for {drops[0].Weight * drops[0].Weight:F1}), {pcm.Length / 48.0:F0} ms, flatness {flatness:F3}, strongest line {tone:F1} dB");
+        Assert.True(flatness > 0.35f, $"flatness {flatness:F3}");
+        Assert.True(tone < 14f, $"a line {tone:F1} dB over the noise");
+    }
+
     // ── The whine ───────────────────────────────────────────────────────────────────────────────
 
     /// <summary>The whine as heard from the side: three pieces at the whine's level, rendered within

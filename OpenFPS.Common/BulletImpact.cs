@@ -14,8 +14,8 @@ namespace OpenFPS.Common;
 /// arriving at 250-900 m/s and stopping in tens of microseconds, and what the struck stuff does with
 /// that is most of the sound:
 ///
-///   BRITTLE (concrete, brick, stone, tile, asphalt): the slug crushes over its own length, L/v, which
-///   is the CRACK; the struck face fractures, a crackle of micro-cracks over a few milliseconds; the
+///   BRITTLE (concrete, brick, stone, tile, asphalt): the slug stops over its own length and the
+///   crater's depth, which is the CRACK; the struck face fractures, a crackle of micro-cracks over a few milliseconds; the
 ///   crater's pulverised stuff leaves as a puff of dust; and its chips fly out and fall, a patter whose
 ///   timing is each chip's own flight (<see cref="DebrisPrefix"/>, placed where they land).
 ///
@@ -26,8 +26,9 @@ namespace OpenFPS.Common;
 ///   the crater's sudden volume is a dull thud (a volume source), and the spray falls back as a patter.
 ///
 ///   WATER: a sharp slap as the nose enters, the cavity opening (a thud), the pinch-off bubble ringing at
-///   its Minnaert frequency (the plop), and the splash's drops falling back, some of them ringing small
-///   bubbles of their own (the "rain" of a splash).
+///   its Minnaert frequency (the plop), the crown and jet tearing into spray (a rush), and the splash's
+///   drops falling back, hundreds of broadband splats, one in twenty ringing a small bubble. It was a
+///   few dozen drops a third of which rang, and Cody heard it as "just tinkling", not splashing.
 ///
 ///   WOOD: a short crack, the board's own modes (the thunk: wood is light and lossy, so they are low and
 ///   short), a crackle of splintering fibres, and a few splinters falling.
@@ -38,13 +39,21 @@ namespace OpenFPS.Common;
 ///   SOFT (carpet, upholstery, foliage, rubber): a dull muffled thump; leaves swish.
 ///
 /// LEVELS, each from the energy and the physics that makes it, at a metre:
-///   The crack is the decelerating slug's dipole: the air it carries with it (an added mass of half its
-///   volume of air) brought from v to rest over the contact time τ by a raised-cosine deceleration,
-///   p = m_a Δv / (2 c τ²): 131 dB for a .45 on concrete, 149 for a .308. An estimate; nothing
-///   measured is to hand.
+///   The crack is the decelerating slug's acceleration noise (Richards, Westcott and Jeyapalan, J. Sound
+///   Vib. 62, 1979): the air it carries with it (an added mass of half its volume of air) brought from v
+///   to rest over the contact time τ by a raised-cosine deceleration, p = m_a Δv / (2 c τ²). τ is 2s/v,
+///   a steady deceleration over the stopping distance s: the slug's length, and on masonry the crater's
+///   depth as well. 119 dB for a 9 mm on concrete, 127 on 6 mm steel, 128 for an AKM on concrete.
 ///   A ringing plate: the energy a short blow puts into a plate through its point mobility
 ///   Y = 1/(8√(Bρh)) is I²·Y/τ (Cremer and Heckl, Structure-Borne Sound); each mode's share radiates at
-///   ρc·η_rad·ω, η_rad = ρc·σ/(ρh·ω), its radiation efficiency σ rising to one at coincidence.
+///   ρc·η_rad·ω, η_rad = ρc·σ/(ρh·ω), its radiation efficiency σ rising to one at coincidence. The modes
+///   reach the listener with their own signs (where the listener stands puts them either side of each
+///   mode's nodal lines), so they add like noise: summed in step, a 9 mm on 6 mm steel came out at
+///   162 dB. The same peak by another road: a point force F on a plate of surface mass ρh radiates
+///   ρ0·F/(2π·ρh·r) (the infinite plate below coincidence), 120 dB at a metre off a 20 cm concrete wall
+///   and 141 dB off 6 mm steel for a 9 mm's 54 kN, where this model declares 122 and 144.
+///   The share of the round's energy that leaves as sound (<see cref="Radiated"/>) comes out about 1e-6
+///   on masonry and 1.7e-3 on thin steel.
 ///   A crater or a cavity: a volume source, p = ρ V̈ / 4π, its volume V formed over a few milliseconds.
 ///   Anything small landing (a chip, a clod, a drop): the game's one impact constant, 74 dB at a metre
 ///   for a joule (<see cref="PanelAcoustics.ImpactReferenceDb"/>), as every dropped thing in the world.
@@ -279,7 +288,13 @@ public static class BulletImpact
         {
             case Kind.Brittle:
             case Kind.Metal:
-                return Math.Clamp(h.Length / v * slide, 10e-6f, 2e-3f);
+            {
+                // Brought from v to rest over its stopping distance s at a steady deceleration takes
+                // 2s/v: the slug flattening over its own length, and into a brittle face as deep as the
+                // crater it digs (about the cube root of its volume).
+                float stop = h.Length + (s.Kind == Kind.Brittle ? MathF.Cbrt(CraterCubicMetres(h)) : 0f);
+                return Math.Clamp(2f * stop / v * slide, 10e-6f, 2e-3f);
+            }
             case Kind.Wood:
             case Kind.Panel:
             {
@@ -364,9 +379,10 @@ public static class BulletImpact
     /// What a steel part loses at its bolts and welds, as a loss factor. Not the 0.03 of a door in its
     /// frame (<see cref="PanelAcoustics.MountedLoss"/>), which would stop a struck steel plate in a few
     /// hundredths of a second: total loss factors of built-up steel structures run 0.001-0.01 (Cremer and
-    /// Heckl, Structure-Borne Sound), and a struck plate is heard ringing for most of a second.
+    /// Heckl, Structure-Borne Sound). The top of that range: at 0.004 a 9 mm on 6 mm steel sent 0.4 % of
+    /// its energy out as sound, over the 0.01-0.1 % such a strike radiates; at 0.01 it sends 0.15 %.
     /// </summary>
-    public const float MetalJointLoss = 0.004f;
+    public const float MetalJointLoss = 0.01f;
 
     /// <summary>The most modes a render carries, the loudest first.</summary>
     public const int MaxModes = 240;
@@ -502,17 +518,8 @@ public static class BulletImpact
             }
             case Kind.Water:
             {
-                // The splash: about a tenth of the cavity's water thrown up as drops of 0.5-3 mm.
-                float volume = CavityCubicMetres(h);
-                float total = 0.1f * volume * 1000f;
-                int count = Math.Clamp((int)(total / 2e-5f), 10, 160);
-                for (int i = 0; i < count; i++)
-                {
-                    float r = 0.5e-3f + 2.5e-3f * MathF.Pow((float)rng.NextDouble(), 2f);
-                    float m = 1000f * 4f / 3f * MathF.PI * r * r * r;
-                    pieces.Add(new Piece(m, 1.5f + 4f * (float)rng.NextDouble(), 0.6f + 0.9f * (float)rng.NextDouble(),
-                                         (float)(rng.NextDouble() * 2 * Math.PI), 0f));
-                }
+                // The splash: its drops, as pieces (<see cref="Splash"/>).
+                foreach (var d in Splash(h)) pieces.Add(new Piece(d.Mass, d.Speed, d.Elevation, 0f, 0f));
                 break;
             }
         }
@@ -587,6 +594,32 @@ public static class BulletImpact
         return MathF.Max(1e-3f, 1.1f * (peak + extra));
     }
 
+    /// <summary>
+    /// The sound energy a strike's crack and its plate's ring send out, J, against the energy the round
+    /// left there: the acoustic efficiency of the strike. Each is ∫p² dt at a metre over the hemisphere
+    /// in front of the face, 2π/(ρc) of it: for the crack (a Gaussian's derivative of peak A and width σ)
+    /// A²·e·σ·√π/2, and for a mode of amplitude a dying at rate δ, a²/4δ.
+    /// </summary>
+    public static (float CrackJoules, float RingJoules, float Efficiency) Radiated(Hit h)
+    {
+        float toJoules = 2f * MathF.PI / (RhoAir * C);
+        float a = CrackPascals(h);
+        float sigma = MathF.Max(ContactSeconds(h) / 4f, MinSigma);
+        float crack = a * a * MathF.E * sigma * MathF.Sqrt(MathF.PI) / 2f * toJoules;
+        float ring = 0f;
+        if (Rings(h))
+        {
+            var modes = Modes(h, out float joules);
+            var shares = ModeShares(h, modes, 0f, 0f, mean: true);
+            for (int i = 0; i < modes.Count; i++)
+            {
+                float amp2 = modes[i].PascalsPerShare * modes[i].PascalsPerShare * joules * shares[i];
+                ring += amp2 / (4f * modes[i].Decay) * toJoules;
+            }
+        }
+        return (crack, ring, (crack + ring) / MathF.Max(1e-6f, h.Dumped));
+    }
+
     /// <summary>The rate the full scale is worked at: the client's.</summary>
     public const int FullScaleRate = 48000;
 
@@ -594,6 +627,7 @@ public static class BulletImpact
     /// any piece could make (landing at the speed it left or its terminal speed, whichever is higher).</summary>
     public static float DebrisFullScalePascals(Hit h)
     {
+        if (KindOf(h.Material) == Kind.Water) return SplashFullScalePascals(h);
         var s = StuffOf(h.Material);
         float best = 1e-4f;
         foreach (var p in Pieces(h))
@@ -604,6 +638,130 @@ public static class BulletImpact
             best = MathF.Max(best, LandingPascals(p.Mass, v) * (s.Kind == Kind.Water ? 1.6f : 1f));
         }
         return 2f * best;
+    }
+
+    // ── The splash ──────────────────────────────────────────────────────────────────────────────
+
+    /// <summary>One drop of a splash, as rendered: its mass, radius, how it leaves (speed, angle above
+    /// the water), and the weight its sound carries for the real drops it stands for.</summary>
+    public readonly record struct Drop(float Mass, float Radius, float Speed, float Elevation, float Weight);
+
+    /// <summary>The share of the cavity's water the crown and jet throw up as drops. An estimate.</summary>
+    public const float SplashShare = 0.1f;
+    /// <summary>The mean drop radius of the spray, m: an exponential spread of radii from 0.15 to 3 mm
+    /// about it, as a sheet breaking up gives (Marshall-Palmer-like).</summary>
+    public const float MeanDropRadius = 0.6e-3f;
+    /// <summary>The most drops a render carries; more than that are stood for, each carrying the sound
+    /// of √(real/rendered) of them, so the energy is kept.</summary>
+    public const int MaxRenderedDrops = 2500;
+    /// <summary>
+    /// The share of falling-back drops that entrain a bubble that rings. A drop entrains one REGULARLY
+    /// only in a narrow window of size and speed, about a millimetre across at its terminal speed (Pumphrey
+    /// and Elmore, J. Fluid Mech. 220, 1990; Prosperetti and Oguz, Annu. Rev. Fluid Mech. 25, 1993); a
+    /// splash's drops land slower and of every size, and entrain only irregularly, now and then. What
+    /// every drop does make is its impact sound, a short broadband splat. Taken as one in twenty.
+    /// </summary>
+    public const float RingingShare = 0.05f;
+
+    /// <summary>The splash's drops, deterministic from the key: their number from the splash's water
+    /// over the mean drop's mass, launched at 1.5-5.5 m/s and 35-85 degrees.</summary>
+    public static List<Drop> Splash(Hit h)
+    {
+        var drops = new List<Drop>();
+        float water = SplashShare * CavityCubicMetres(h) * 1000f;
+        // The mean of r³ for radii exponential about a mean r̄ is 6 r̄³.
+        float meanMass = 1000f * 4f / 3f * MathF.PI * 6f * MeanDropRadius * MeanDropRadius * MeanDropRadius;
+        int real = Math.Max(1, (int)(water / meanMass));
+        int count = Math.Min(real, MaxRenderedDrops);
+        float weight = MathF.Sqrt(real / (float)count);
+        var rng = new Random((int)(BulletFlyby.Mix((uint)h.Speed, (uint)(h.MassMg * 3 + h.KeptPercent)) & 0x7fffffff));
+        for (int i = 0; i < count; i++)
+        {
+            float r = Math.Clamp(-MeanDropRadius * MathF.Log(1f - 0.999f * (float)rng.NextDouble()), 0.15e-3f, 3e-3f);
+            float m = 1000f * 4f / 3f * MathF.PI * r * r * r;
+            drops.Add(new Drop(m, r, 1.5f + 4f * (float)rng.NextDouble(), 0.6f + 0.9f * (float)rng.NextDouble(), weight));
+        }
+        return drops;
+    }
+
+    /// <summary>A drop's splat on the water: peak Pa at a metre (the game's impact constant), and how
+    /// long it lasts, the drop's own crossing time 2r/v and a little more for the surface closing.</summary>
+    private static (float Peak, float Seconds) Splat(Drop d, float speed)
+        => (LandingPascals(d.Mass, speed) * d.Weight, 0.3e-3f + 2f * d.Radius / MathF.Max(0.5f, speed));
+
+    /// <summary>
+    /// What a splash buffer's full scale stands for: the larger of twice its loudest single splat and
+    /// four times the loudest 5 ms of all the splats together (they overlap in hundreds), with the drops
+    /// landing as they would without the seed's variation.
+    /// </summary>
+    private static float SplashFullScalePascals(Hit h)
+    {
+        var bins = new Dictionary<int, float>();
+        float loudest = 1e-5f, total = 0f;
+        foreach (var d in Splash(h))
+        {
+            var (t, v) = Land(new Piece(d.Mass, d.Speed, d.Elevation, 0f, 0f), 1000f, 0f, false);
+            var (peak, seconds) = Splat(d, v);
+            loudest = MathF.Max(loudest, peak);
+            float energy = (peak / 3f) * (peak / 3f) * seconds;
+            int bin = (int)(t / 0.005f);
+            bins[bin] = (bins.TryGetValue(bin, out float e) ? e : 0f) + energy;
+            total += energy;
+        }
+        float worst = 0f;
+        foreach (var e in bins.Values) worst = MathF.Max(worst, e);
+        float rushRms = MathF.Sqrt(total / RushSeconds);
+        return MathF.Max(2f * loudest, 4f * MathF.Max(MathF.Sqrt(worst / 0.005f), rushRms));
+    }
+
+    /// <summary>The crown and jet leaving, seconds: the sheet rises and tears into spray over this.</summary>
+    private const float RushSeconds = 0.06f;
+
+    /// <summary>
+    /// The splash as heard: the crown and jet tearing into spray as the water leaves (a broadband rush,
+    /// given the same sound energy as the fall-back, the same water at the same speeds going up rather
+    /// than down), then the drops falling back, each a short broadband splat when its own flight brings
+    /// it down, one in twenty ringing a small bubble (<see cref="RingingShare"/>) about as loud as its
+    /// splat. Hundreds of splats overlapping are a rush of noise, which is what a splash sounds like.
+    /// </summary>
+    private static float[] RenderSplash(Hit h, int sampleRate, int seed, out float rawPeak)
+    {
+        float fullScale = SplashFullScalePascals(h);
+        var rng = new Random((int)(BulletFlyby.Mix(BulletFlyby.Mix((uint)h.Speed, (uint)h.MassMg), (uint)(seed & 3) + 307u) & 0x7fffffff));
+        var drops = Splash(h);
+        var landings = new List<(float At, Drop Drop, float Speed)>(drops.Count);
+        float total = 0f, end = RushSeconds * 3f;
+        foreach (var d in drops)
+        {
+            var q = d with
+            {
+                Speed = d.Speed * (0.85f + 0.3f * (float)rng.NextDouble()),
+                Elevation = Math.Clamp(d.Elevation + 0.3f * ((float)rng.NextDouble() - 0.5f), 0.2f, 1.5f),
+            };
+            var (t, v) = Land(new Piece(q.Mass, q.Speed, q.Elevation, 0f, 0f), 1000f, 0f, false);
+            landings.Add((t, q, v));
+            var (peak, seconds) = Splat(q, v);
+            total += (peak / 3f) * (peak / 3f) * seconds;
+            end = MathF.Max(end, t + 0.03f);
+        }
+        int n = (int)MathF.Ceiling((end + 0.01f) * sampleRate);
+        var p = new float[n];
+        // The crown and jet: a rush of the fall-back's sound energy, rising over 10 ms and dying over 50.
+        AddNoiseBurst(p, 0f, 0.01f, 0.05f, MathF.Sqrt(total / RushSeconds), 500f, 12000f, rng, sampleRate);
+        foreach (var (at, d, v) in landings)
+        {
+            var (peak, seconds) = Splat(d, v);
+            AddNoiseBurst(p, at, 0.0001f, seconds, peak / 3f, 800f, 14000f, rng, sampleRate);
+            if (rng.NextDouble() < RingingShare)
+            {
+                // The entrained bubble is a fraction of the drop's size: 3.26/R Hz, R in metres.
+                float hz = 3.26f / (d.Radius * (0.25f + 0.25f * (float)rng.NextDouble()));
+                if (hz < 14000f) AddBubble(p, at + 0.001f, hz, 0.04f, peak, 1.05f, sampleRate);
+            }
+        }
+        rawPeak = 0f;
+        for (int i = 0; i < n; i++) { rawPeak = MathF.Max(rawPeak, MathF.Abs(p[i]) / fullScale); p[i] = Math.Clamp(p[i] / fullScale, -1f, 1f); }
+        return p;
     }
 
     /// <summary>A soft thing's thump: the slug stopped over a long contact, as a volume source of the
@@ -655,11 +813,18 @@ public static class BulletImpact
         List<Mode>? modes = null;
         float vib = 0f;
         float[]? shares = null;
+        float[]? signs = null;
         if (Rings(h))
         {
             modes = Modes(h, out vib);
             float x0 = 0.1f + 0.8f * (float)fixedRng.NextDouble(), y0 = 0.1f + 0.8f * (float)fixedRng.NextDouble();
             shares = ModeShares(h, modes, x0, y0, mean: false);
+            // Each mode's sound reaches the listener with its own sign: a mode's far field changes sign
+            // across its nodal lines, and where the listener stands puts them on one side or the other
+            // of each. The modes start together from rest, but their pressures at the ear do not add in
+            // step; summed as if they did, a 9 mm on 6 mm steel peaked at 162 dB at a metre.
+            signs = new float[modes.Count];
+            for (int i = 0; i < signs.Length; i++) signs[i] = fixedRng.Next(2) == 0 ? 1f : -1f;
             // As long as the loudest-lasting mode takes to fall 60 dB, up to two and a half seconds.
             float longest = 0f, loudest = 0f;
             for (int i = 0; i < modes.Count; i++)
@@ -773,7 +938,7 @@ public static class BulletImpact
                 // recursion y[k] = 2d·cos(w)·y[k−1] − d²·y[k−2] from y[0] = 0, y[1] = a·d·sin(w).
                 int start = (int)(onset * sampleRate);
                 float c1 = 2f * MathF.Cos(w) * d, c2 = d * d;
-                float prev2 = 0f, prev1 = a * d * MathF.Sin(w);
+                float prev2 = 0f, prev1 = signs![i] * a * d * MathF.Sin(w);
                 if (start + 1 < n) p[start + 1] += prev1;
                 float floor = 1e-5f * top;
                 for (int k = start + 2; k < n; k++)
@@ -794,6 +959,7 @@ public static class BulletImpact
 
     public static float[] RenderDebris(Hit h, int sampleRate, int seed, out float rawPeak)
     {
+        if (KindOf(h.Material) == Kind.Water) return RenderSplash(h, sampleRate, seed, out rawPeak);
         var s = StuffOf(h.Material);
         var pieces = Pieces(h);
         float fullScale = DebrisFullScalePascals(h);
@@ -811,23 +977,11 @@ public static class BulletImpact
             };
             var (t, v) = Land(q, density, h.Drop, h.OnWall);
             float pa = LandingPascals(q.Mass, v);
-            if (s.Kind == Kind.Water)
-            {
-                // A drop on water: a small slap, and one in three entrains a bubble of a fraction of its
-                // own size that rings (Prosperetti and Oguz, Annu. Rev. Fluid Mech. 25, 1993).
-                float r = MathF.Cbrt(q.Mass / 1000f * 3f / (4f * MathF.PI));
-                bool bubble = rng.NextDouble() < 0.33;
-                float hz = 3.26f / (r * (0.25f + 0.25f * (float)rng.NextDouble()));
-                landings.Add((t, pa * (bubble ? 1.6f : 1f), MathF.Max(MinSigma, r / MathF.Max(1f, v)), bubble, MathF.Min(hz, 14000f)));
-            }
-            else
-            {
-                float contact = MathF.Max(q.Contact > 0f ? q.Contact : s.ChipContactSeconds, s.ChipContactSeconds);
-                landings.Add((t, pa, contact, false, 0f));
-                // One bounce, at a third of the speed, after its own short hop.
-                float vb = 0.33f * v;
-                landings.Add((t + 2f * vb * 0.5f / 9.81f + 0.004f, LandingPascals(q.Mass, vb), contact, false, 0f));
-            }
+            float contact = MathF.Max(q.Contact > 0f ? q.Contact : s.ChipContactSeconds, s.ChipContactSeconds);
+            landings.Add((t, pa, contact, false, 0f));
+            // One bounce, at a third of the speed, after its own short hop.
+            float vb = 0.33f * v;
+            landings.Add((t + 2f * vb * 0.5f / 9.81f + 0.004f, LandingPascals(q.Mass, vb), contact, false, 0f));
         }
         float end = 0.05f;
         foreach (var l in landings) end = MathF.Max(end, l.At + (l.Bubble ? 0.02f : 0.005f));

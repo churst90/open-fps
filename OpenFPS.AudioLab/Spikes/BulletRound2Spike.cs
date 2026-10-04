@@ -219,7 +219,8 @@ public static class BulletRound2Spike
                     Write(dir, file, mix);
                     float length = LengthToMinus40(mix);
                     rows.Add($"| {file} | {w.DisplayName} at {speed:F0} m/s, {part} | {string.Join("; ", parts)} | {length:F0} | {PeakDb(mix):F1} |");
-                    Console.WriteLine($"  {file,-34} {PeakDb(mix),6:F1} dBFS  {length,5:F0} ms  {string.Join("; ", parts)}");
+                    var (crackJ, ringJ, eta) = BulletImpact.Radiated(hit);
+                    Console.WriteLine($"  {file,-34} {PeakDb(mix),6:F1} dBFS  {length,5:F0} ms  {string.Join("; ", parts)}  crack {crackJ:E1} J ring {ringJ:E1} J of {hit.Dumped:F0} J: {eta:E1}");
                 }
             }
 
@@ -420,7 +421,9 @@ public static class BulletRound2Spike
             float fullScale = BulletFlyby.WhizzFullScalePascals(w);
             var (_, jb, jc, _) = Joins(w);
             float join1 = Heard(w, jb), join2 = Heard(w, jc);
-            var rng = new Random(HashCode.Combine(w.Speed, w.MissDm, w.DiameterTenthMm, w.LengthTenthMm, w.SoundSpeed, w.BeforeMetres, w.AfterMetres, seed & 3));
+            // Round one seeded this from HashCode, which differs every run; a fixed mix here, so the
+            // before files and their numbers come out the same each time.
+            var rng = new Random((int)(BulletFlyby.Mix(BulletFlyby.Mix((uint)w.Speed, (uint)w.MissDm), (uint)(w.BeforeMetres * 1009 + (seed & 3))) & 0x7fffffff));
             const int partials = 96;
             float f0 = BulletFlyby.Strouhal * MathF.Max(1f, w.Speed) / w.Diameter;
             var freq = new float[partials]; var phase = new float[partials];
