@@ -4,6 +4,12 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-03
 
+- Bursts of street noise when walking between rooms are fixed. A doorway is the wall's thickness and
+  lies in no room's box, so for sound it was treated as outdoors: in the Brandt Court stairwell's
+  doorway the outdoor reverb went from 1 % to 100 % while Cody stood in it, carrying the traffic and
+  sirens. A point in a doorway between two rooms is now in the room on its side; a doorway to the
+  street is still half in and half out. Zone names still say "doorway between A and B". Unheard.
+
 - Voice chat between players works end to end and is heard in the world. What you say goes to the
   server and from there to everyone on your map; each listener hears you from your mouth, at a
   person's speaking level, through the walls and openings between you and in the room you are in.

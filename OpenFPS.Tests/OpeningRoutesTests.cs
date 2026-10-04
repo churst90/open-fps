@@ -139,6 +139,40 @@ public class OpeningRoutesTests
         return (Db(l), Db(m), Db(h));
     }
 
+    // ── Standing in a doorway ────────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// A doorway is the wall's own thickness, in neither room's box. Read by the boxes alone it was the
+    /// outdoors, and every crossing between two rooms opened the outdoor reverberation fully for as long
+    /// as you stood in it (Cody, 2026-10-03: "bursts of outside noise when I step into different zones";
+    /// the log had the outdoor bus going from 1 % to 100 % in the stairwell's doorway). For sound it is
+    /// the room on your side; for naming it is still the doorway.
+    /// </summary>
+    [Fact]
+    public void ADoorwayBetweenRoomsIsNeverTheOutdoors()
+    {
+        var world = Building(frontDoorOpen: true);
+        var (_, acoustics) = Graph(world);
+        var stairSide = new Vector3(4.75f, 1.6f, 2.5f);
+        var corridorSide = new Vector3(4.95f, 1.6f, 2.5f);
+        Assert.Equal(AcousticConstants.GlobalRegionId, acoustics.GetZoneAt(world, stairSide));
+        Assert.Equal(AcousticConstants.GlobalRegionId, acoustics.GetZoneAt(world, corridorSide));
+        Assert.Equal(Stair, acoustics.GetRegionAt(world, stairSide));
+        Assert.Equal(Corridor, acoustics.GetRegionAt(world, corridorSide));
+    }
+
+    /// <summary>The front door: its inner half is the stairwell, its outer half the street, as before.
+    /// And a wall with no opening in it is not a doorway: beside the building is the outdoors.</summary>
+    [Fact]
+    public void TheFrontDoorwayIsHalfInAndAWallIsNotADoorway()
+    {
+        var world = Building(frontDoorOpen: true);
+        var (_, acoustics) = Graph(world);
+        Assert.Equal(Stair, acoustics.GetRegionAt(world, new Vector3(0.25f, 1.6f, 2.9f)));
+        Assert.Equal(AcousticConstants.GlobalRegionId, acoustics.GetRegionAt(world, new Vector3(0.05f, 1.6f, 2.9f)));
+        Assert.Equal(AcousticConstants.GlobalRegionId, acoustics.GetRegionAt(world, new Vector3(-0.1f, 1.6f, 10f)));
+    }
+
     // ── The geometry, read ───────────────────────────────────────────────────────────────────────
 
     [Fact]

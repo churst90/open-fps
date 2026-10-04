@@ -39,6 +39,27 @@ public class CityZoneTests
         return world;
     }
 
+    /// <summary>
+    /// The doorways Cody stood in on 2026-10-03 in Brandt Court, where every crossing let the city in:
+    /// in no zone's box, and for sound in one of the two rooms, never the outdoors. Eye height.
+    /// </summary>
+    [Theory]
+    [InlineData(-18.517f, 157.279f)]   // stairwell, floor 0 to corridor, floor 0
+    [InlineData(-18.817f, 157.278f)]
+    [InlineData(-21.183f, 157.279f)]   // corridor, floor 0 to flat 00B
+    [InlineData(-21.251f, 156.881f)]
+    public void BrandtCourtDoorwaysAreRoomsForSound(float x, float z)
+    {
+        var world = City();
+        var acoustics = new OpenFPS.Client.AudioEngine.Acoustics.SpatialAcoustics();
+        Assert.NotNull(acoustics.RoutesFor(world));
+        var eye = new Vector3(x, 0.05f + 1.7f, z);
+        Assert.Equal(AcousticConstants.GlobalRegionId, acoustics.GetZoneAt(world, eye));
+        int room = acoustics.GetRegionAt(world, eye);
+        Assert.NotEqual(AcousticConstants.GlobalRegionId, room);
+        _o.WriteLine($"{x}, {z}: {world.AcousticMap!.Regions[room].FriendlyName}");
+    }
+
     [Fact]
     public void NoOutdoorZoneRunsThroughABuilding()
     {

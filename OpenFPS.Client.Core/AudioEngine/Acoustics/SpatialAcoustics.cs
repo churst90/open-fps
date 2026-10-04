@@ -235,10 +235,61 @@ public class SpatialAcoustics
         return pathData;
     }
 
-    public int GetRegionAt(WorldSnapshot world, Vector3 position) 
+    /// <summary>
+    /// The place a point is in, for sound: the smallest box that holds it, and in a doorway between two
+    /// rooms, the room on its side (OpeningRoutes.RoomInOpening), never the outdoors. Uses the graph
+    /// already built, never builds one: the build asks this, about points outside every opening.
+    /// </summary>
+    public int GetRegionAt(WorldSnapshot world, Vector3 position)
     {
-        return _spatial.GetRegionAt(world, position);
+        int region = _spatial.GetRegionAt(world, position);
+        if (region != AcousticConstants.GlobalRegionId) return region;
+        var routes = _routes ?? _localRoutes;
+        return routes != null && RoomInOpening(routes, position, p => _spatial.GetRegionAt(world, p), out int room) ? room : region;
     }
+
+    /// <summary>
+    /// The room a point standing IN an opening belongs to: the place on its side of the opening's
+    /// middle. A place's box stops at its walls, so a doorway, the wall's own thickness, is in no box,
+    /// and a lookup by box alone calls it the outdoors. Standing in a doorway between two rooms you are
+    /// in one of them or the other, never in the street: taken as outdoors, every crossing let the city
+    /// and the outdoor reverberation in for a step (Cody, 2026-10-03; the log had the outdoor bus going
+    /// from 1 % to 100 % in a stairwell's doorway). False when the point is in no opening, or on the
+    /// open-air side of one to the outdoors.
+    ///
+    /// Here and not in OpeningRoutes: OpenFPS.Common's files are the build hash a login is checked by.
+    /// </summary>
+    /// <param name="boxAt">The place a point is in by the boxes alone. Which room is on which side is
+    /// found by asking it just past the opening's face on the point's side: an opening's normal is not
+    /// kept pointing at either of its rooms.</param>
+    internal static bool RoomInOpening(OpeningRoutes routes, Vector3 point, Func<Vector3, int> boxAt, out int region)
+    {
+        region = AcousticConstants.GlobalRegionId;
+        foreach (var o in routes.Openings)
+        {
+            if (o.NodeA == o.NodeB) continue;
+            Vector3 d = point - o.Centre;
+            float depth = Vector3.Dot(d, o.Normal);
+            if (MathF.Abs(depth) > o.HalfDepth + InOpeningSlack
+                || MathF.Abs(Vector3.Dot(d, o.Across)) > o.HalfWidth + InOpeningSlack
+                || MathF.Abs(Vector3.Dot(d, o.Up)) > o.HalfHeight + InOpeningSlack) continue;
+            Vector3 beyond = point + o.Normal * ((depth >= 0f ? 1f : -1f) * (o.HalfDepth + InOpeningSlack + 0.2f) - depth);
+            int side = boxAt(beyond);
+            if (side != o.RegionA && side != o.RegionB) continue;
+            if (routes.NodeOf(side) == OpeningRoutes.Outside) return false;
+            region = side;
+            return true;
+        }
+        return false;
+    }
+
+    /// <summary>How far past its measured faces a point still counts as in an opening, metres: a box and
+    /// the wall beside it rarely meet to the centimetre.</summary>
+    private const float InOpeningSlack = 0.15f;
+
+    /// <summary>The place a point is in by the boxes alone: a doorway is in none. For naming where the
+    /// listener stands ("doorway between A and B"), not for sound.</summary>
+    public int GetZoneAt(WorldSnapshot world, Vector3 position) => _spatial.GetRegionAt(world, position);
 
     public AcousticPathData CalculateAcousticPath(WorldSnapshot world, int entityId, Vector3 listenerPos, Vector3 sourcePos)
     {
