@@ -44,6 +44,25 @@ internal static partial class GtkClientProgram
         window.AddController(keys);
     }
 
+    /// <summary>
+    /// Tab leaves a list for <paramref name="next"/> instead of stepping to the next row. Each row of a
+    /// GTK list takes focus and the selection follows it, so Tab on a chosen server moved to the one
+    /// below and chose that: "Set as preferred" then set the wrong server (Cody, 2026-10-03). Arrows
+    /// move within the list; Tab and Shift+Tab move between it and the buttons, as in any dialog.
+    /// </summary>
+    private static void TabLeavesList(ListBox list, Widget next)
+    {
+        var keys = EventControllerKey.New();
+        keys.SetPropagationPhase(PropagationPhase.Capture);
+        keys.OnKeyPressed += (_, e) =>
+        {
+            if (e.Keyval != 0xff09) return false;   // GDK_Tab; Shift+Tab is ISO_Left_Tab and leaves backwards as usual
+            next.GrabFocus();
+            return true;
+        };
+        list.AddController(keys);
+    }
+
     private static Window Dialog(string title, int width, int height)
     {
         var w = Window.New();
@@ -151,12 +170,14 @@ internal static partial class GtkClientProgram
         };
         box.Append(list);
 
-        box.Append(MenuButton("Connect", () =>
+        var connect = MenuButton("Connect", () =>
         {
             if (Selected() is not { } s) { _speech.Speak("Choose a server first.", true); return; }
             window.Close();
             ConnectTo(s);
-        }));
+        });
+        box.Append(connect);
+        TabLeavesList(list, connect);
         box.Append(MenuButton("Set as preferred", () =>
         {
             if (Selected() is not { } s) { _speech.Speak("Choose a server first.", true); return; }
