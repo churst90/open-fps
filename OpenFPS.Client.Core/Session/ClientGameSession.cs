@@ -266,7 +266,9 @@ public sealed partial class ClientGameSession : IDisposable
         _bindings.Bind(InputContext.Gameplay, GameKey.P, LookAhead);
         _bindings.Bind(InputContext.Gameplay, GameKey.P, KeyModifiers.Shift,
             () => _network.Send(new TextCommand { Command = "scan" }));
-        _bindings.Bind(InputContext.Gameplay, GameKey.I, () => _network.Send(new TextCommand { Command = "inv" }));
+        // I opens what you carry as a list to choose from; Shift+I says it in one sentence, as before.
+        _bindings.Bind(InputContext.Gameplay, GameKey.I, () => _network.Send(new InventoryRequest()));
+        _bindings.Bind(InputContext.Gameplay, GameKey.I, KeyModifiers.Shift, () => _network.Send(new TextCommand { Command = "inv" }));
 
         // Carrying things. G takes whatever is within reach, Q puts down what is in your hand, and
         // R (with no gun in hand) swaps a hand for your back — the three verbs you use while moving, on keys you can find
@@ -377,7 +379,7 @@ public sealed partial class ClientGameSession : IDisposable
     public static readonly string KeyHelp = string.Join(Environment.NewLine,
         "In game. W A S D to move, J / L turn, O / K look up and down, Space jump.",
         "Enter fires the gun in your hands; with no gun it interacts, like E.",
-        "C coordinates, F facing, H health, Z area, comma look ahead, E interact, P scan, I inventory.",
+        "C coordinates, F facing, H health, Z area, comma look ahead, E interact or pick up, P scan, I inventory list, Shift I what you carry.",
         "G take, Q drop, Shift+R draw, T clap or ignition.",
         "R: with a gun, reload; in a vehicle, the window; otherwise put what you hold on your back.",
         "Scope, on the keypad with Num Lock on: star raises it, 8 2 4 6 aim, 5 what is on the crosshair, 7 and 9 the targets in view,",
@@ -1002,6 +1004,10 @@ public sealed partial class ClientGameSession : IDisposable
                 _audioSystem.NotifyMaterialChange(stats.CurrentMaterial);
                 break;
 
+            case InventoryList inventory:
+                _menus.Show(InventoryMenu(inventory));
+                break;
+
             case PlayerListResponse pList:
                 _menus.Show(PlayersMenu(pList));
                 break;
@@ -1237,6 +1243,32 @@ public sealed partial class ClientGameSession : IDisposable
         return new ListMenu("Players", items);
     }
 
+    /// <summary>
+    /// What you carry, one line each ("AKM, 30 rounds, on your back"), and for each what you can do with
+    /// it. Each acts on that one thing by its own id, so ten rifles of the same name are ten choices.
+    /// </summary>
+    private ListMenu InventoryMenu(InventoryList list)
+    {
+        var items = new List<MenuItem>();
+        for (int i = 0; i < list.Ids.Length; i++)
+        {
+            string id = "#" + list.Ids[i];
+            string label = i < list.Labels.Length ? list.Labels[i] : "thing";
+            string place = i < list.Places.Length ? list.Places[i] : "";
+            bool onBack = place == "back";
+            string where = onBack ? "on your back" : $"in your {place}";
+            items.Add(new MenuItem($"{label}, {where}", Opens: () =>
+            {
+                var actions = new List<MenuItem>();
+                if (onBack) actions.Add(new("Take in your hands", () => Command("draw", id)));
+                else actions.Add(new("Sling on your back", () => Command("stow", id)));
+                actions.Add(new("Drop", () => Command("drop", id)));
+                return new ListMenu(label, actions);
+            }));
+        }
+        return new ListMenu(items.Count == 0 ? "You are carrying nothing" : "Inventory", items);
+    }
+
     private ListMenu FriendsMenu(FriendListResponse list)
     {
         var items = new List<MenuItem>();
@@ -1256,7 +1288,7 @@ public sealed partial class ClientGameSession : IDisposable
     private ListMenu PersonMenu(string name, bool isFriend)
     {
         var items = new List<MenuItem> { new("Private message", () => _shell.OpenCommandConsole($"/pm {name} ")) };
-        if (_role is UserRole.Dev or UserRole.Admin) items.Add(new("Where is", () => Command("where", name)));
+        if (_role is UserRole.Dev or UserRole.Admin or UserRole.Moderator) items.Add(new("Where is", () => Command("where", name)));
         items.Add(new("View profile", () => Command("profile", name)));
         items.Add(isFriend ? new("Remove friend", () => Command("friend", "remove", name))
                            : new("Add friend", () => Command("friend", "add", name)));

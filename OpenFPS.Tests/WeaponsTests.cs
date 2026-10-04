@@ -539,6 +539,60 @@ public class WeaponsTests : IDisposable
         public bool VerifyPassword(string username, string password) => false;
     }
 
+    /// <summary>
+    /// Ten rifles of one name, and one picked out of them by the inventory list: the list names each with
+    /// its rounds and where it is, and a command with its id takes that one and no other (Cody, 2026-10-04:
+    /// "if I give myself 10 guns, how do I select what I want to use").
+    /// </summary>
+    [Fact]
+    public void TheInventoryListPicksOneOfManyBySelfSameName()
+    {
+        var r = new Range(_dir);
+        Assert.True(r.Hands.Give(r.Shooter, "akm_rifle", 4, out _, out _, out _));
+        var list = r.Hands.List(r.Shooter);
+        Assert.Equal(4, list.Ids.Length);
+        Assert.Equal("both hands", list.Places[0]);
+        Assert.All(list.Places.Skip(1), p => Assert.Equal("back", p));
+        Assert.All(list.Labels, l => Assert.StartsWith("AKM, ", l));
+        int third = list.Ids[2];
+        Assert.True(r.Hands.Drop(r.Shooter, "#" + third, out _));
+        var after = r.Hands.List(r.Shooter);
+        Assert.DoesNotContain(third, after.Ids);
+        Assert.Equal(3, after.Ids.Length);
+    }
+
+    /// <summary>A thing on the ground is an item beacon; the same thing in your hands or on your back is
+    /// not, and picking it up or putting it down sends it out again so every client hears the change.</summary>
+    [Fact]
+    public void ACarriedThingIsNoBeaconAndADroppedOneIs()
+    {
+        var r = new Range(_dir);
+        var resent = new List<int>();
+        r.Hands.Carried = resent.Add;
+        Assert.True(r.Hands.Give(r.Shooter, "akm_rifle", 1, out _, out _, out _));
+        int gun = r.Hands.List(r.Shooter).Ids[0];
+        Assert.True(r.Maps.TryGetMap(r.MapId, out var world, out _, out _, out var lookup));
+        Assert.Equal("", EntityDefinitionFactory.From(world, lookup[gun]).Identity.BeaconCategory);
+        Assert.True(r.Hands.Drop(r.Shooter, "", out _));
+        Assert.Equal(OpenFPS.Common.Beacons.Item, EntityDefinitionFactory.From(world, lookup[gun]).Identity.BeaconCategory);
+        Assert.Equal(2, resent.Count(id => id == gun));
+    }
+
+    /// <summary>The interact key picks up what lies at your feet, and leaves alone what is further off. The
+    /// range's corner has no floor box under it: a drop there used to send the item 1000 m under the map.</summary>
+    [Fact]
+    public void InteractPicksUpWhatIsAtYourFeet()
+    {
+        var r = new Range(_dir);
+        Assert.True(r.Hands.Give(r.Shooter, "glock_pistol", 1, out _, out _, out _));
+        Assert.True(r.Hands.Drop(r.Shooter, "", out _));
+        Assert.True(r.Hands.TakeWithin(r.Shooter, 2f, out string took));
+        Assert.StartsWith("You take the Glock 17", took);
+        Assert.True(r.Hands.Drop(r.Shooter, "", out _));
+        r.Place(r.Shooter, r.Feet + new Vector3(0, 0, -4f));
+        Assert.False(r.Hands.TakeWithin(r.Shooter, 2f, out _));
+    }
+
     /// <summary>What a shot struck, in words after the chime (Cody, 2026-10-04): a pedestrian by what they
     /// are, a player by name, the head when it was the head, and how far.</summary>
     [Fact]

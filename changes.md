@@ -4,6 +4,13 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-04
 
+- I opens your inventory as a list: everything in your hands and on your back, one entry each with
+  its rounds ("AKM, 30 rounds, on your back"); Enter offers take in your hands, sling on your back or
+  drop, for that one thing even among ten of the same name. Shift+I says it all in one sentence.
+- A thing you put down is an item beacon again. Things you carry no longer count as item beacons:
+  they were always the nearest, and took every item beacon's place.
+- E picks up an item lying within 2 metres (before shutting a door). It used to do nothing.
+- Dropping something where no floor was found sent it 1000 metres under the map; it lands at your feet.
 - Stairs and roofs. The stairs in the city's blocks of flats could not be climbed: the slabs were laid
   whole over the stairwell and each flight stood under the next, so you stopped at the second step.
   Each stairwell is now a dog-leg: go up a flight, turn round, and the next flight starts beside you.

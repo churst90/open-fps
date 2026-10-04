@@ -64,6 +64,13 @@ public class HandsService
 
     public HandsService(MapManager maps) => _maps = maps;
 
+    /// <summary>
+    /// Told the id of every item that is picked up or put down, so its definition goes out again: an item
+    /// is a beacon on the ground and not in somebody's hands (EntityDefinitionFactory), and a definition
+    /// is otherwise sent only once. The server wires it to GameServer.SyncAudioComponent.
+    /// </summary>
+    public Action<int>? Carried { get; set; }
+
     /// <summary>What is in a player's hands, right first. The same entity twice means it fills both.</summary>
     public static (Entity? Right, Entity? Left) Holding(World world, Entity player, Dictionary<int, Entity> lookup)
     {
@@ -165,6 +172,7 @@ public class HandsService
             var item = _maps.SpawnPrefab(to.CurrentMapId, prefabId, at);
             if (item == Entity.Null) { message = $"The {prefabId} could not be made."; return false; }
             name = NameOf(world, item);
+            Carried?.Invoke(item.Id);
             // A gun given comes loaded, and its spare magazines go into the receiver's pockets; the
             // first gun's says so.
             string gun = Loaded(world, to.Entity, item);
@@ -193,6 +201,44 @@ public class HandsService
         return true;
     }
 
+    /// <summary>
+    /// The interact key's pick-up: the nearest loose item within <paramref name="metres"/>, if there is
+    /// one. False (and nothing said) when there is none, so the key can mean something else.
+    /// </summary>
+    /// <summary>What a player is carrying, for the inventory list: hands first, then the back.</summary>
+    public InventoryList List(UserSession session)
+    {
+        var ids = new List<int>(); var labels = new List<string>(); var places = new List<string>();
+        if (!TryGetHolder(session, out var world, out _, out var lookup) || session.Entity == Entity.Null || !world.IsAlive(session.Entity))
+            return new InventoryList();
+        void Add(Entity e, string place)
+        {
+            string label = NameOf(world, e);
+            if (Arms.IsWeapon(world, e, out var weapon)) label += ", " + Arms.RoundsWords(weapon, Arms.Ammo(world, e, weapon).Rounds);
+            ids.Add(e.Id); labels.Add(label); places.Add(place);
+        }
+        if (world.Has<HandsComponent>(session.Entity))
+        {
+            var hands = world.Get<HandsComponent>(session.Entity);
+            bool both = hands.RightEntityId >= 0 && hands.RightEntityId == hands.LeftEntityId;
+            if (hands.RightEntityId >= 0 && lookup.TryGetValue(hands.RightEntityId, out var r)) Add(r, both ? "both hands" : "right hand");
+            if (!both && hands.LeftEntityId >= 0 && lookup.TryGetValue(hands.LeftEntityId, out var l)) Add(l, "left hand");
+        }
+        foreach (var e in Stowed(world, session.Entity, lookup)) Add(e, "back");
+        return new InventoryList { Ids = ids.ToArray(), Labels = labels.ToArray(), Places = places.ToArray() };
+    }
+
+    public bool TakeWithin(UserSession session, float metres, out string message)
+    {
+        message = "";
+        if (!TryGetHolder(session, out var world, out _, out _) || session.Entity == Entity.Null || !world.IsAlive(session.Entity))
+            return false;
+        var from = world.Get<Transform>(session.Entity).Position;
+        if (Nearest(world, from, "", out _, out _, reach: metres) == null) return false;
+        Take(session, "", out message);
+        return true;
+    }
+
     public bool Take(UserSession session, string named, out string message)
     {
         message = "";
@@ -216,6 +262,7 @@ public class HandsService
         { message = $"{why} {Carrying(world, lookup, world.Get<HandsComponent>(session.Entity))}"; return false; }
 
         _maps.RefreshGrid(session.CurrentMapId);
+        Carried?.Invoke(item.Value.Id);
         message = $"You take the {name} in {WhereItWent(world, session.Entity, item.Value)}{Loaded(world, session.Entity, item.Value)}.";
         Log.Information("{User} picked up {Item} ({Id}).", session.Username, name, item.Value.Id);
         return true;
@@ -296,7 +343,7 @@ public class HandsService
         // Entity.Null (id -1) but a real entity, the first one the map spawned.
         int found = string.IsNullOrEmpty(named)
             ? carried.Count - 1                               // the last thing you put there
-            : carried.FindIndex(e => NameOf(world, e).Contains(named, StringComparison.OrdinalIgnoreCase));
+            : carried.FindIndex(e => Matches(world, e, named));
         if (found < 0)
         { message = $"You have no {named} on your back. {WhatYouAreCarrying(world, session.Entity, lookup)}"; return false; }
         var item = carried[found];
@@ -338,7 +385,7 @@ public class HandsService
         // thing you can put down, and making a player draw it first to drop it is ceremony.
         if (all || (dropping.Count == 0 && !string.IsNullOrEmpty(which) && !IsHandWord(which)))
             foreach (var stowed in Stowed(world, session.Entity, lookup))
-                if (all || NameOf(world, stowed).Contains(which, StringComparison.OrdinalIgnoreCase))
+                if (all || Matches(world, stowed, which))
                     if (!dropping.Contains(stowed)) dropping.Add(stowed);
 
         if (dropping.Count == 0)
@@ -367,11 +414,15 @@ public class HandsService
             // At your feet, just in front, on whatever the floor turns out to be.
             var landing = at + forward * 0.6f;
             float ground = PhysicsUtils.GetGroundHeight(world, grid, landing, out string floor);
+            // No floor found under that point is "-1000", and the item went a kilometre under the map,
+            // out of reach and out of every beacon's range. It lands where you are standing instead.
+            if (ground < -900f) { ground = at.Y; floor = ""; }
             landing.Y = ground;
 
             ref var t = ref world.Get<Transform>(item);
             t.Position = landing;
             t.IsDirty = true;
+            Carried?.Invoke(item.Id);
 
             if (heard != null && world.Has<ItemComponent>(item))
             {
@@ -549,7 +600,7 @@ public class HandsService
         {
             if (hand == null || chosen.Contains(hand.Value)) continue;
             if (all || string.IsNullOrEmpty(which)
-                    || NameOf(world, hand.Value).Contains(which, StringComparison.OrdinalIgnoreCase))
+                    || Matches(world, hand.Value, which))
                 chosen.Add(hand.Value);
             // Bare /drop means the one thing, not both: the right hand if it has anything.
             if (string.IsNullOrEmpty(which) && chosen.Count > 0) break;
@@ -621,13 +672,23 @@ public class HandsService
             if (world.Has<HeldComponent>(e)) return;                   // somebody already has it
             string thisName = NameOf(world, e);
             if (!string.IsNullOrEmpty(named)
-                && thisName.IndexOf(named, StringComparison.OrdinalIgnoreCase) < 0) return;
+                && !Matches(world, e, named)) return;
             float d = Vector3.Distance(from, t.Position);
             if (d > bestDistance) return;
             bestDistance = d; best = e; bestName = thisName;
         });
         distance = bestDistance; name = bestName;
         return best;
+    }
+
+    /// <summary>
+    /// Whether a thing is the one named: by its name or part of it ("akm"), or by its own number ("#6577"),
+    /// which is how the inventory list picks one of ten rifles that all have the same name.
+    /// </summary>
+    private static bool Matches(World world, Entity e, string named)
+    {
+        if (named.StartsWith('#') && int.TryParse(named.AsSpan(1), out int id)) return e.Id == id;
+        return NameOf(world, e).Contains(named, StringComparison.OrdinalIgnoreCase);
     }
 
     private static string NameOf(World world, Entity e)

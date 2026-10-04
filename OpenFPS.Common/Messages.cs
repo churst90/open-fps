@@ -40,6 +40,8 @@ namespace OpenFPS.Common.Networking;
 [MemoryPackUnion(31, typeof(HitConfirm))]
 // 32-34 are spoken for by other work in progress. Do not take them here.
 [MemoryPackUnion(35, typeof(ScopedShot))]
+[MemoryPackUnion(36, typeof(InventoryRequest))]
+[MemoryPackUnion(37, typeof(InventoryList))]
 public partial interface IMessage { }
 
 public enum PlayerListScope
@@ -421,6 +423,23 @@ public partial class HitConfirm : IMessage
 /// can be a tick or two behind; through a 12-power scope that is a body's width at 600 m. The server
 /// takes this aim if it is within a few degrees of its own, and its own if not.
 /// </summary>
+/// <summary>Asks for what you are carrying, as a list to choose from (the I key).</summary>
+[MemoryPackable]
+public partial class InventoryRequest : IMessage { }
+
+/// <summary>
+/// What you are carrying, one entry per thing: its own entity id (so one of ten rifles with the same name
+/// can be picked), a spoken label ("AKM, 30 rounds"), and where it is: "right hand", "left hand",
+/// "both hands" or "back".
+/// </summary>
+[MemoryPackable]
+public partial class InventoryList : IMessage
+{
+    public int[] Ids = Array.Empty<int>();
+    public string[] Labels = Array.Empty<string>();
+    public string[] Places = Array.Empty<string>();
+}
+
 [MemoryPackable]
 public partial class ScopedShot : IMessage
 {

@@ -272,7 +272,7 @@ public class GameServer
         // Now that every sound source exists, size each map's broadcast radius from it.
         _maps.RefreshEarshotRanges();
         _seats = new OccupancyService(_maps, EmitWorldAudio);
-        _hands = new HandsService(_maps);
+        _hands = new HandsService(_maps) { Carried = SyncAudioComponent };
         // Beside openfps.db and motd.txt, in the server's working folder. See FriendRepository for
         // why this is a file and not a table.
         _friends = new FriendRepository("friends.json");
@@ -544,6 +544,11 @@ public class GameServer
             if (!_sessions.TryGetSession(id, out var sess)) return;
             Touch(id);
             Chat(sess, req.Text, req.Channel is ChatChannel.All or ChatChannel.Team ? req.Channel : ChatChannel.Map);
+        });
+        _dispatcher.RegisterHandler<InventoryRequest>((id, req, reply) => {
+            if (!_sessions.TryGetSession(id, out var sess)) return;
+            Touch(id);
+            EnqueueCommand(() => reply(_hands.List(sess)));
         });
         _dispatcher.RegisterHandler<InteractRequest>((id, req, reply) => {
             var peer = _network.GetPeer(id);
@@ -1427,6 +1432,11 @@ public class GameServer
                 Say(entering);
                 return;
             }
+
+            // Something lying at your feet: pick it up. Before shutting a door, because an item within
+            // two metres is far likelier to be what you meant (Cody, 2026-10-04: a dropped gun could not
+            // be picked up with E, only with G).
+            if (_hands.TakeWithin(session, 2f, out string took)) { Say(took); return; }
 
             // Nothing to get into, and an open door within reach: shut it. So beside a house, E opens
             // the door and E again shuts it, the way a handle does; beside a car the sequence is still

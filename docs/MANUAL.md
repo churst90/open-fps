@@ -101,7 +101,8 @@ degrees a second. You cannot turn while riding in a vehicle: you face forward.
 | Shift+P | Named things within 20 m |
 | H | Health |
 | B | How out of breath you are |
-| I | What you are carrying |
+| I | Your inventory as a list: up and down to choose a thing, Enter for what to do with it (take it in your hands, sling it on your back, drop it). Each of ten rifles with the same name is its own entry |
+| Shift+I | What you are carrying, in one sentence |
 
 The client also says the name of each area as you walk into it, and the name of certain objects
 when you come within 3 m of them.

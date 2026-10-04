@@ -31,6 +31,10 @@ public static class EntityDefinitionFactory
         // their team travels with them so a listener can hear a teammate in their own tone. Set here and
         // not as an IdentityComponent on the body, so nothing on the server that looks things up by
         // their identity (scan, take, the name of what you bumped into) starts finding people.
+        // A thing somebody is carrying is not a beacon: it is in their hands or on their back. Left as one,
+        // the things you carry were the nearest items there were and took every item beacon's slot, so a
+        // gun you had just put down never sounded (Cody, 2026-10-04). Taking and putting down re-send it.
+        if (world.Has<HeldComponent>(e)) def.Identity.BeaconCategory = "";
         if (world.Has<PlayerComponent>(e))
         {
             var player = world.Get<PlayerComponent>(e);
