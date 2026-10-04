@@ -113,14 +113,10 @@ public static class GlassFracture
                                        float BulletKg, float BulletSpeed, int Pellets, float Drop, string Ground,
                                        int Variant);
 
-    /// <summary>A round's mass from its calibre and length, a jacketed lead slug filling 80 % of its
-    /// cylinder (9 mm: 8.3 g, against the 8.0 of a 124 grain ball), and its speed at the pane.</summary>
+    /// <summary>A round's mass as its maker publishes it (<see cref="WeaponDefinition.BulletMassKg"/>; zero is
+    /// a 124 grain 9 mm ball), and how many there are in a shot.</summary>
     public static (float Kg, int Pellets) BulletOf(WeaponDefinition w)
-    {
-        float d = w.BulletDiameterMetres > 0f ? w.BulletDiameterMetres : 0.009f;
-        float l = w.BulletLengthMetres > 0f ? w.BulletLengthMetres : 0.0156f;
-        return (10500f * MathF.PI * d * d / 4f * l * 0.8f, Math.Max(1, w.PelletsPerShot));
-    }
+        => (w.BulletMassKg > 0f ? w.BulletMassKg : 124f * WeaponRegistry.Grain, Math.Max(1, w.PelletsPerShot));
 
     /// <summary>The drop as a key holds it: to the decimetre. Both the server's delay and the render's
     /// start use this, so they agree.</summary>
@@ -454,7 +450,11 @@ public static class GlassFracture
     /// so 0.0002. In grass or carpet it lies in the pile, which takes a share of the pile's own loss
     /// (estimate: three tenths).</summary>
     private static double GroundContactLoss(MaterialProperties ground)
-        => ground.YoungsModulusGPa >= 1 ? 0.0002 : 0.3 * Math.Clamp(ground.LossFactor, 0, 1);
+        => Rigid(ground) ? 0.0002 : 0.3 * Math.Clamp(ground.LossFactor, 0, 1);
+
+    /// <summary>Hard and holding a piece where it lands: stone, asphalt, tile, wood. Not grass or carpet (soft),
+    /// and not water (stiff in bulk, but it gives way and swallows the ring).</summary>
+    private static bool Rigid(MaterialProperties ground) => ground.YoungsModulusGPa >= 1 && ground.LossFactor < 0.3;
 
     /// <summary>The same for a piece of a given length: a big piece lies on its face, not on three points, and
     /// pumps the air under it (estimate: rising to 0.02 at 30 cm).</summary>
@@ -1021,14 +1021,14 @@ public static class GlassFracture
         double image = onGlass ? 2 : sim.GroundImage;
         Frag? under = null;
         if (onGlass && sim.Landed.Count > 0 && pieces != null) under = pieces[sim.Landed[r.Next(sim.Landed.Count)]];
-        bool hard = onGlass || sim.Ground.YoungsModulusGPa >= 1;
+        bool hard = onGlass || Rigid(sim.Ground);
 
         // A piece landing on glass that lies on something soft meets a piece that gives into the carpet or
         // the grass under it: the contact stops it only against that piece, so it is the pair's reduced mass
         // that takes the blow. On something hard the piece underneath is held, and it is the falling one's.
         // Its own change of speed is then that mass over its own, and that is what its click radiates.
         double struck = mass, radiating = volume;
-        if (onGlass && sim.Ground.YoungsModulusGPa < 1)
+        if (onGlass && !Rigid(sim.Ground))
         {
             double other = under?.Mass ?? (sim.S.Type == GlassType.Tempered ? Density * Sq(sim.DieSize) * thick : mass);
             struck = mass * other / (mass + other);
