@@ -130,18 +130,34 @@ public static class SlidingDoor
         return (float)t;
     }
 
-    /// <summary>Declared levels, dB at a metre: the model's own LAFmax, by kind and character (new,
-    /// standard, worn, old). No calibration: the automatic door runs at 35-55 dBA, where the research puts
-    /// real ones (40-55), and a patio door pushed home at a walking pace is a slam of 78 dBA.</summary>
+    /// <summary>Declared levels, dB at a metre, by kind and character (new, standard, worn, old): the render's
+    /// peak, which is what its buffer's full scale stands for (a world sound's level is its full scale; see
+    /// <see cref="KnobDoor.OpenLevelDb"/>). Measured at a 1.0 by 2.1 m leaf (AudioLab --heard-levels survey,
+    /// 2026-10-04); the client puts each render's own peak in its place. These were the model's LAFmax,
+    /// which played as full scale put every run 15-29 dB under the model.</summary>
     public static float OpenLevelDb(Kind kind, int variant) => (kind, ((variant % Variants) + Variants) % Variants) switch
     {
-        (Kind.Patio, 0) => 62.7f, (Kind.Patio, 1) => 62.7f, (Kind.Patio, 2) => 68.6f, (Kind.Patio, _) => 74.6f,
-        (Kind.Automatic, 0) => 53.2f, (Kind.Automatic, 1) => 52.9f, (Kind.Automatic, 2) => 61.4f, _ => 70.1f,
+        (Kind.Patio, 0) => 83.6f, (Kind.Patio, 1) => 84.7f, (Kind.Patio, 2) => 87.7f, (Kind.Patio, _) => 97.1f,
+        (Kind.Automatic, 0) => 77.8f, (Kind.Automatic, 1) => 76.1f, (Kind.Automatic, 2) => 79.4f, _ => 84.6f,
     };
     public static float CloseLevelDb(Kind kind, int variant) => (kind, ((variant % Variants) + Variants) % Variants) switch
     {
-        (Kind.Patio, 0) => 77.5f, (Kind.Patio, 1) => 78.2f, (Kind.Patio, 2) => 78.9f, (Kind.Patio, _) => 89.2f,
-        (Kind.Automatic, 0) => 35.1f, (Kind.Automatic, 1) => 37.5f, (Kind.Automatic, 2) => 49.4f, _ => 55.9f,
+        (Kind.Patio, 0) => 105.4f, (Kind.Patio, 1) => 101.6f, (Kind.Patio, 2) => 110.2f, (Kind.Patio, _) => 116.8f,
+        (Kind.Automatic, 0) => 61.0f, (Kind.Automatic, 1) => 62.6f, (Kind.Automatic, 2) => 71.1f, _ => 73.0f,
+    };
+
+    /// <summary>What the model puts at a metre, LAFmax: what is heard on "real" a metre off. No calibration
+    /// ever: the automatic door runs at 35-55 dBA, where the research puts real ones (40-55), and a patio
+    /// door pushed home at a walking pace is a slam of 78 dBA.</summary>
+    public static float OpenLafDb(Kind kind, int variant) => (kind, ((variant % Variants) + Variants) % Variants) switch
+    {
+        (Kind.Patio, 0) => 62.8f, (Kind.Patio, 1) => 64.5f, (Kind.Patio, 2) => 70.4f, (Kind.Patio, _) => 74.7f,
+        (Kind.Automatic, 0) => 53.5f, (Kind.Automatic, 1) => 53.2f, (Kind.Automatic, 2) => 61.5f, _ => 70.1f,
+    };
+    public static float CloseLafDb(Kind kind, int variant) => (kind, ((variant % Variants) + Variants) % Variants) switch
+    {
+        (Kind.Patio, 0) => 77.6f, (Kind.Patio, 1) => 77.1f, (Kind.Patio, 2) => 78.8f, (Kind.Patio, _) => 88.5f,
+        (Kind.Automatic, 0) => 36.4f, (Kind.Automatic, 1) => 38.3f, (Kind.Automatic, 2) => 49.6f, _ => 56.0f,
     };
 
     public static string Key(Kind kind, bool closing, int variant, float travelSeconds, float width, float height)
@@ -167,14 +183,15 @@ public static class SlidingDoor
     }
 
     /// <summary>The sound a key names, peak one.</summary>
-    public static float[] RenderKey(string key, int sampleRate)
+    public static float[] RenderKey(string key, int sampleRate) => RenderKey(key, sampleRate, out _);
+
+    /// <summary>The same, and its own peak, dB SPL at a metre: the level its full scale stands for.</summary>
+    public static float[] RenderKey(string key, int sampleRate, out float fullScaleDb)
     {
+        fullScaleDb = 0f;
         if (!TryParseKey(key, out bool closing, out var door, out float travel)) return new float[16];
         float[] pcm = closing ? RenderClose(door, sampleRate, travel) : RenderOpen(door, sampleRate, travel);
-        float peak = 1e-9f;
-        foreach (float v in pcm) peak = MathF.Max(peak, MathF.Abs(v));
-        for (int i = 0; i < pcm.Length; i++) pcm[i] /= peak;
-        return pcm;
+        return KnobDoor.PeakToFullScale(pcm, PascalsAtFullScale, out fullScaleDb);
     }
 
     /// <summary>How long a key's sound lasts, seconds: its travel and what follows it.</summary>

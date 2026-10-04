@@ -108,25 +108,32 @@ public static class PushBarDoor
 
     public const string KeyPrefix = "pushbardoor:";
 
-    /// <summary>
-    /// The push-bar model over-radiates more than the knob door's: its push reads 97 dBA at a metre where
-    /// the only measurement (a patent: ordinary exit devices 29-35 dB over a 44 dB hospital background)
-    /// puts it at about 73-79. One figure for this model brings its push onto that, and its closes keep
-    /// their physical distance from it.
-    /// </summary>
-    public const float LevelCalibrationDb = 20f;
-
-    /// <summary>Declared levels, dB at a metre, by character: the model's own LAFmax less
-    /// <see cref="LevelCalibrationDb"/>. Opening is the push; closing is the closer bringing it in, from a
-    /// well-set closer (quiet) to a fast one onto bare steel.</summary>
+    /// <summary>Declared levels, dB at a metre, by character: the render's peak, which is what its buffer's
+    /// full scale stands for (a world sound's level is its full scale; see <see cref="KnobDoor.OpenLevelDb"/>).
+    /// Measured at the lab's 1.0 by 2.1 m leaf (AudioLab --heard-levels survey, 2026-10-04); the client puts
+    /// each render's own peak in its place. Opening is the push; closing is the closer bringing it in, from
+    /// a well-set closer (quiet) to a fast one onto bare steel. These were the model's LAFmax less a 20 dB
+    /// calibration, which with the crack's 20-28 dB over its LAFmax played a push 40 dB under the model.</summary>
     public static float OpenLevelDb(int variant) => (variant % Variants) switch
     {
-        0 => 95.3f, 1 => 96.5f, 2 => 98.0f, _ => 101.5f,
-    } - LevelCalibrationDb;
+        0 => 115.8f, 1 => 116.7f, 2 => 116.4f, _ => 123.0f,
+    };
     public static float CloseLevelDb(int variant) => (variant % Variants) switch
     {
+        0 => 117.1f, 1 => 125.4f, 2 => 131.6f, _ => 138.2f,
+    };
+
+    /// <summary>What the model puts at a metre, LAFmax: what is heard on "real" a metre off. The model's own;
+    /// the one published figure (a patent: ordinary exit devices 73-79 for the push) is some 20 dB under
+    /// the push, which is the physics' to answer for, not a calibration's.</summary>
+    public static float OpenLafDb(int variant) => (variant % Variants) switch
+    {
+        0 => 95.3f, 1 => 96.5f, 2 => 98.0f, _ => 101.5f,
+    };
+    public static float CloseLafDb(int variant) => (variant % Variants) switch
+    {
         0 => 89.2f, 1 => 99.7f, 2 => 107.8f, _ => 114.9f,
-    } - LevelCalibrationDb;
+    };
 
     public static string Key(bool closing, int variant, float swingSeconds, float width, float height)
         => FormattableString.Invariant(
@@ -147,14 +154,15 @@ public static class PushBarDoor
     }
 
     /// <summary>The sound a key names, peak one.</summary>
-    public static float[] RenderKey(string key, int sampleRate)
+    public static float[] RenderKey(string key, int sampleRate) => RenderKey(key, sampleRate, out _);
+
+    /// <summary>The same, and its own peak, dB SPL at a metre: the level its full scale stands for.</summary>
+    public static float[] RenderKey(string key, int sampleRate, out float fullScaleDb)
     {
+        fullScaleDb = 0f;
         if (!TryParseKey(key, out bool closing, out var door, out float swing)) return new float[16];
         float[] pcm = closing ? RenderClose(door, sampleRate, swing) : RenderOpen(door, sampleRate, swing);
-        float peak = 1e-9f;
-        foreach (float v in pcm) peak = MathF.Max(peak, MathF.Abs(v));
-        for (int i = 0; i < pcm.Length; i++) pcm[i] /= peak;
-        return pcm;
+        return KnobDoor.PeakToFullScale(pcm, PascalsAtFullScale, out fullScaleDb);
     }
 
     // ── Constants, each a property of a part ─────────────────────────────────────────────────────
