@@ -56,7 +56,6 @@ internal sealed class EmitterRecordingProvider : IAudioProvider
     public float GetPlaybackProgress(int id) => 0f;
     public IEnumerable<int> GetActiveSpatialSoundIds() => new List<int>(Live);
     public void Preload(string id) { }
-    public void PlayVoice(int sender, Vector3 pos, byte[] pcm) { }
     public bool RegisterSynthesisedSound(string soundId, byte[] pcm16Mono, int sampleRate)
     {
         Registrations++;

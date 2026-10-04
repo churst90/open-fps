@@ -983,9 +983,9 @@ public sealed partial class ClientGameSession : IDisposable
                 break;
 
             case VoiceData voice:
-                // Don't play back our own transmission.
+                // Never our own: the server does not send it back, and we already hear ourselves.
                 if (voice.SenderId != _ownEntityId && voice.OpusData.Length > 0)
-                    _audioSystem.PlayReceivedVoice(voice.SenderId, voice.OpusData, _world.GetSnapshot());
+                    _audioSystem.ReceiveVoice(voice.SenderId, voice.Sequence, voice.OpusData);
                 break;
         }
     }
@@ -1243,9 +1243,19 @@ public sealed partial class ClientGameSession : IDisposable
         }
     }
 
-    private void OnVoicePacketReady(byte[] opusData) =>
-        _network.Send(new VoiceData { SenderId = _ownEntityId, OpusData = opusData },
+    /// <summary>The frames sent so far, wrapping; never zero on the wire, which means "not numbered".</summary>
+    private int _voiceSequence;
+
+    /// <summary>Capture thread. Unreliable and unordered on purpose: a frame resent late is a frame the
+    /// listener has already had to do without, and waiting for it would hold up every frame behind it.</summary>
+    private void OnVoicePacketReady(byte[] opusData)
+    {
+        ushort sequence = (ushort)System.Threading.Interlocked.Increment(ref _voiceSequence);
+        if (sequence == 0) sequence = (ushort)System.Threading.Interlocked.Increment(ref _voiceSequence);
+        _network.Send(new VoiceData { SenderId = _ownEntityId, OpusData = opusData, Sequence = sequence },
             LiteNetLib.DeliveryMethod.Unreliable);
+        _network.Flush();
+    }
 
     /// <summary>
     /// Turns a line typed into the command console into either a slash command or public chat.

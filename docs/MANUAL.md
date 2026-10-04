@@ -119,7 +119,7 @@ when you come within 3 m of them.
 | Enter | Fire what you are holding (only works with a weapon) |
 | T | Clap your hands. In the driver's seat: engine on |
 | Shift+T | Engine off (driver's seat) |
-| V | Voice chat on / off, on the microphone chosen in Settings. While it is on you hear your own voice in the room you are in: the surfaces round you answering it and the room's reverberation, never your voice itself. Use headphones. |
+| V | Voice chat on / off, on the microphone chosen in Settings. While it is on, everyone on your map can hear you, from where you stand: closer is louder, and walls muffle you as they would anyone talking. You hear other players the same way. You also hear your own voice in the room you are in: the surfaces round you answering it and the room's reverberation, never your voice itself. Use headphones. |
 | Escape | Game menu: Keep playing, Main menu, Quit (the cursor starts on Keep playing) |
 
 E works on things within about 3 m. For a door: E opens it; E again when it is open closes it.

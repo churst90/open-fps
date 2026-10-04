@@ -61,7 +61,6 @@ public class VoiceLifecycleTests
         public float GetPlaybackProgress(int id) => 0f;
         public IEnumerable<int> GetActiveSpatialSoundIds() => new List<int>(Live);
         public void Preload(string id) { }
-        public void PlayVoice(int sender, Vector3 pos, byte[] pcm) { }
 
         /// <summary>Records nothing: this fake has no FMOD behind it to hand a buffer to, and
         /// every test here is about voice LIFECYCLE rather than about what a voice sounds like.</summary>

@@ -629,7 +629,10 @@ internal sealed class ExhaustNetwork
                 }
                 else
                 {
-                    var (back, on) = Junction.Two(up.ArriveFar(), down.ArriveNear(), up.Admittance, down.Admittance,
+                    // Read once: ArriveFar advances the pipe's forward line, so a second read would take
+                    // the NEXT sample and run the pipe at half its delay.
+                    float atEnd = up.ArriveFar();
+                    var (back, on) = Junction.Two(atEnd, down.ArriveNear(), up.Admittance, down.Admittance,
                                                   loss * MathF.Min(up.Admittance, down.Admittance) * 0.25f);
                     up.PushBackward(back);
                     down.PushForward(on);
@@ -637,7 +640,7 @@ internal sealed class ExhaustNetwork
                     // Pressure at this junction is the sum of the two waves meeting there — the
                     // arriving one and the one reflected back into it. Where that junction is the end
                     // of a chamber, that is the pressure pushing on the can.
-                    if (br.Shell != null && br.ChamberIndices.Contains(i)) chamberPressure += up.ArriveFar() + back;
+                    if (br.Shell != null && br.ChamberIndices.Contains(i)) chamberPressure += atEnd + back;
                 }
             }
 

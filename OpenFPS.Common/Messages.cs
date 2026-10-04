@@ -484,8 +484,21 @@ public partial class TextEvent : IMessage { public string Text = string.Empty; }
 [MemoryPackable]
 public partial class InteractRequest : IMessage { public string Action = string.Empty; public int? TargetEntityId; }
 
+/// <summary>
+/// One 20 ms Opus frame of somebody talking. The server overwrites <see cref="SenderId"/> with who really
+/// sent it and relays it unchanged to everyone on the sender's map.
+/// </summary>
 [MemoryPackable]
-public partial class VoiceData : IMessage { public int SenderId; public byte[] OpusData = Array.Empty<byte>(); }
+public partial class VoiceData : IMessage
+{
+    public int SenderId;
+    public byte[] OpusData = Array.Empty<byte>();
+    // APPEND ONLY BELOW THIS LINE: members are serialised by position.
+    /// <summary>The sender's frame count, wrapping. A listener puts frames back in order with it, and
+    /// knows a frame went missing (to rebuild or conceal) rather than simply playing the next one early.
+    /// Zero means none: a client from before it existed, whose frames are played as they come.</summary>
+    public ushort Sequence;
+}
 
 [MemoryPackable]
 public partial class WorldStateUpdate : IMessage

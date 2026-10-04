@@ -4,6 +4,28 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-03
 
+- Voice chat between players works end to end and is heard in the world. What you say goes to the
+  server and from there to everyone on your map; each listener hears you from your mouth, at a
+  person's speaking level, through the walls and openings between you and in the room you are in.
+  - Codec: Opus at 64 kbit/s, full band (to 20 kHz), highest complexity, with in-band error
+    correction. It was 24 kbit/s VOIP. Both clients use the same settings (`VoiceCodec`).
+  - A microphone not at 48 kHz is resampled with a windowed-sinc filter (`SincResampler`); it was a
+    straight line between samples.
+  - Every packet carries a sequence number (`VoiceData.Sequence`, appended). Old clients send none
+    and their packets are played as they come.
+  - Each listener keeps one continuous voice per talker (`TalkerStream`) instead of a new sound per
+    20 ms packet. Packets are put back in order; a missing one is rebuilt from the next packet's
+    error-correction data or concealed by the decoder. The jitter buffer sizes itself to the
+    connection: 70 ms at least, 500 ms at most. It grows by waiting and starts each new run of
+    talking at the full buffer; the read rate is never moved by more than 0.2 %.
+  - The server relays voice the moment it arrives instead of at the next tick, and both ends send
+    it at once instead of at LiteNetLib's next 15 ms update. On the loopback the median delay from
+    sender to listener went from 19.5 ms to 2–3 ms.
+  - Measured on a live server with two clients: 150 of 150 packets, in order, none lost; each
+    harmonic of the test voice within 1 dB of what was sent; no buffer underruns.
+  - The wire contract changed: the Windows build and the VPS server must be updated together.
+  - Unheard.
+
 - Your own voice in the room you are in (Cody: "I want to hear myself in the room I'm actually in").
   While the microphone is open (V), what it hears goes straight into your room, not round the
   server: up to eight surfaces answer it, each from its own direction after its own path (found as

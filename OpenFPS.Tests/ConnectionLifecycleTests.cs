@@ -380,19 +380,21 @@ public class MicrophoneResamplerTests
     [Fact]
     public void ResamplingKeepsTheToneAcrossChunkJoins()
     {
-        var r = new OpenFPS.Client.Core.Platform.FmodMicrophoneCapture.LinearResampler(44100, 48000);
+        var r = new OpenFPS.Client.Core.Platform.SincResampler(44100, 48000);
         var outSamples = new List<float>();
         int n = 0;
         foreach (int chunk in new[] { 441, 97, 1000, 3, 2869 })
         {
             var input = new List<float>();
             for (int i = 0; i < chunk; i++, n++) input.Add(MathF.Sin(MathF.Tau * 440f * n / 44100f));
-            outSamples.AddRange(r.Process(input));
+            r.Process(input, outSamples);
         }
-        // 4410 in at 44.1 kHz is 0.1 s: about 4800 out.
-        Assert.InRange(outSamples.Count, 4795, 4801);
-        // Each output sample is the tone at its own time, to linear-interpolation accuracy.
-        for (int k = 0; k < outSamples.Count; k++)
+        // 4410 in at 44.1 kHz is 0.1 s: about 4800 out, less the filter's half-length still waiting
+        // for the samples after it.
+        Assert.InRange(outSamples.Count, 4770, 4801);
+        // Each output sample is the tone at its own time (no delay), once the filter is past the
+        // silence it started from.
+        for (int k = 32; k < outSamples.Count; k++)
             Assert.InRange(outSamples[k] - MathF.Sin(MathF.Tau * 440f * k / 48000f), -0.005f, 0.005f);
     }
 }

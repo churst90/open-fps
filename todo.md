@@ -30,8 +30,9 @@ Suggested order. Research and file references for most of these: [docs/RESEARCH_
 **Client** (done 2026-10-03 on branch client-parity, unheard; see changes.md)
 - Listen: the loading tone, the 1 s fade-in, the reconnect tick, and the game menu with Orca and
   with NVDA.
-- Linux voice chat records through FMOD (`--mic` in the lab opened the default device at 48 kHz).
-  Not yet tried between two players.
+- Voice chat between players (2026-10-03): tested over a live server with two scripted clients,
+  not yet by two people. Listen for: how other players' voices sound at a distance and through a
+  wall, the delay, and whether the first word after a pause is cut.
 - The VPS load time with batched definitions is not measured yet (1.7 s on the loopback). If it is
   still long, cache maps by `MapManifest.Checksum`.
 - The Windows head is compile-checked only.
@@ -382,7 +383,6 @@ Some may already be fixed; confirm before fixing again.
 - There is no horn key when driving.
 - The in-game help label is out of date ("P scan"; F6, F8, G, Q, R, T, B, K and Enter missing).
 - The client only sends interact within 3 m; the server allows 5 m.
-- Linux voice chat: V and the input device setting exist, but capture is not wired up.
 - Beacon categories exit, stairs and waypoint have no sound of their own; only authored beacon
   objects play for them.
 - `run-gtk-client.sh`: the usage text leaves out `foot` and `fmodlog`, and `foot` is passed on to

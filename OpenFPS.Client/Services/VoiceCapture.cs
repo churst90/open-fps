@@ -1,28 +1,22 @@
 using System;
-using Concentus;
-using Concentus.Enums;
 using NAudio.Wave;
 using OpenFPS.Client.Core.Platform;
 
 namespace OpenFPS.Client.Services;
 
 /// <summary>
-/// Windows microphone capture (NAudio): 48 kHz mono 16-bit PCM encoded to Opus at 20 ms frames.
+/// Windows microphone capture (NAudio): 48 kHz mono 16-bit PCM, encoded as <see cref="VoiceCodec"/> says.
 /// The Windows implementation of <see cref="IMicrophoneCapture"/>; Linux records through FMOD
 /// (<see cref="FmodMicrophoneCapture"/>) and sends the same packets.
 /// </summary>
 public sealed class VoiceCapture : IMicrophoneCapture
 {
-    private const int SampleRate = 48000;
     private const int Channels = 1;
-    private const int FrameSizeMs = 20;
-    private const int FrameSizeSamples = SampleRate * FrameSizeMs / 1000; // 960 samples
-    private const int FrameSizeBytes = FrameSizeSamples * sizeof(short) * Channels;
+    private const int BufferMs = 20;
 
     private WaveInEvent? _waveIn;
-    private IOpusEncoder? _encoder;
-    private readonly byte[] _frameBuffer = new byte[FrameSizeBytes];
-    private int _framePos;
+    private VoiceFrameEncoder? _encoder;
+    private Action<byte[]>? _send;
     private bool _capturing;
     private readonly Func<string> _preferredDevice;
 
@@ -80,15 +74,14 @@ public sealed class VoiceCapture : IMicrophoneCapture
         // matters more than most: the player would otherwise believe they were transmitting.
         try
         {
-            _encoder = OpusCodecFactory.CreateEncoder(SampleRate, Channels, OpusApplication.OPUS_APPLICATION_VOIP);
-            _encoder.Bitrate = 24000;
-            _framePos = 0;
+            _encoder = new VoiceFrameEncoder();
+            _send = p => PacketReady?.Invoke(p);
 
             _waveIn = new WaveInEvent
             {
                 DeviceNumber = DeviceNumber(),
-                WaveFormat = new WaveFormat(SampleRate, 16, Channels),
-                BufferMilliseconds = FrameSizeMs
+                WaveFormat = new WaveFormat(VoiceCodec.Rate, 16, Channels),
+                BufferMilliseconds = BufferMs
             };
             _waveIn.DataAvailable += OnDataAvailable;
             _waveIn.StartRecording();
@@ -102,7 +95,6 @@ public sealed class VoiceCapture : IMicrophoneCapture
             _capturing = false;
             if (_waveIn != null) { _waveIn.DataAvailable -= OnDataAvailable; _waveIn.Dispose(); _waveIn = null; }
             _encoder = null;
-            _framePos = 0;
         }
     }
 
@@ -115,50 +107,16 @@ public sealed class VoiceCapture : IMicrophoneCapture
         _waveIn?.Dispose();
         _waveIn = null;
         _encoder = null;
-        _framePos = 0;
     }
 
     private void OnDataAvailable(object? sender, WaveInEventArgs e)
     {
-        if (!_capturing || _encoder == null) return;
+        if (!_capturing || _encoder == null || _send == null || e.BytesRecorded < 2) return;
+        var heard = new float[e.BytesRecorded / 2];
+        for (int i = 0; i < heard.Length; i++) heard[i] = BitConverter.ToInt16(e.Buffer, i * 2) / 32768f;
+        _encoder.Push(heard, _send);
         // What was heard, as it was heard, for the player's own room to answer (OwnVoiceRing).
-        if (SamplesCaptured != null && e.BytesRecorded >= 2)
-        {
-            var heard = new float[e.BytesRecorded / 2];
-            for (int i = 0; i < heard.Length; i++) heard[i] = BitConverter.ToInt16(e.Buffer, i * 2) / 32768f;
-            SamplesCaptured(heard);
-        }
-
-        int offset = 0;
-        while (offset < e.BytesRecorded)
-        {
-            int toCopy = Math.Min(FrameSizeBytes - _framePos, e.BytesRecorded - offset);
-            Buffer.BlockCopy(e.Buffer, offset, _frameBuffer, _framePos, toCopy);
-            _framePos += toCopy;
-            offset += toCopy;
-
-            if (_framePos < FrameSizeBytes) continue;
-
-            // Full frame ready — encode to Opus (Concentus 2.x Span-based API)
-            var pcmShort = new short[FrameSizeSamples];
-            Buffer.BlockCopy(_frameBuffer, 0, pcmShort, 0, FrameSizeBytes);
-
-            var opusOut = new byte[1275]; // max Opus packet size
-            int encodedLen = _encoder.Encode(
-                pcmShort.AsSpan(),
-                FrameSizeSamples,
-                opusOut.AsSpan(),
-                opusOut.Length);
-
-            if (encodedLen > 0)
-            {
-                var packet = new byte[encodedLen];
-                Buffer.BlockCopy(opusOut, 0, packet, 0, encodedLen);
-                PacketReady?.Invoke(packet);
-            }
-
-            _framePos = 0;
-        }
+        SamplesCaptured?.Invoke(heard);
     }
 
     public void Dispose() => Stop();

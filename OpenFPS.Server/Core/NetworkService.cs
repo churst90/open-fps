@@ -35,6 +35,14 @@ public class NetworkService : INetEventListener
     // One warning per address a minute, so a flood of refusals cannot flood the log as well.
     private readonly RateLimiter _logLimiter = new(capacity: 1, refillPerSecond: 1.0 / 60);
     
+    /// <summary>
+    /// Offered each message as it is received, during <see cref="PollEvents"/> on the loop thread; true
+    /// means it has been handled and is not queued for the next tick. For voice, which would otherwise wait
+    /// up to a whole tick (33 ms) on the server before being relayed, and arrive at every listener that
+    /// much later and that much more unevenly.
+    /// </summary>
+    public Func<NetPeer, IMessage, bool>? HandleNow;
+
     public Action<NetPeer>? OnConnected;
     public Action<NetPeer, DisconnectInfo>? OnDisconnected;
 
@@ -56,6 +64,13 @@ public class NetworkService : INetEventListener
         Log.Information("NetworkService stopped.");
     }
     public bool TryDequeueMessage(out (NetPeer peer, IMessage message) item) => _incomingMessages.TryDequeue(out item);
+
+    /// <summary>
+    /// Sends what is queued now rather than at the library's next update, up to 15 ms away. For voice:
+    /// held to the update, frames leave in bunches, and every listener's jitter buffer has to be that much
+    /// longer to smooth them out again.
+    /// </summary>
+    public void Flush() => _netManager.TriggerUpdate();
 
     public void SendMessage(NetPeer peer, IMessage message, DeliveryMethod deliveryMethod)
     {
@@ -172,7 +187,7 @@ public class NetworkService : INetEventListener
         try
         {
             var msg = MemoryPackSerializer.Deserialize<IMessage>(reader.GetRemainingBytes());
-            if (msg != null) _incomingMessages.Enqueue((peer, msg));
+            if (msg != null && HandleNow?.Invoke(peer, msg) != true) _incomingMessages.Enqueue((peer, msg));
         }
         catch (Exception ex)
         {

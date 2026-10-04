@@ -37,7 +37,8 @@ What the Windows client has, against the GTK client:
   servers are `%APPDATA%\openfps\client.json`, the same format as `~/.config/openfps/client.json`.
   Beacon choices are `%APPDATA%\openfps\beacons.json`.
 - Voice chat through NAudio, on the microphone chosen in Settings. Linux records through FMOD
-  and sends the same Opus packets.
+  and sends the same Opus packets (64 kbit/s, 20 ms frames, numbered). The server relays each one
+  to everyone on the sender's map as it arrives.
 - Keys from the game window only, cleared on every focus change. Alt on its own does not open
   the system menu.
 - Speech through NVDA's controller client, checked per line; SAPI when NVDA is not running.

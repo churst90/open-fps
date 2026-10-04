@@ -32,6 +32,27 @@ public class EngineSynthTests
         }
     }
 
+    /// <summary>
+    /// A muffler's case listens to the pressure in its chambers; it must not change what the chambers do. The same
+    /// engine with its case and without it puts out the same wave at the pipe, sample for sample.
+    /// </summary>
+    [Fact]
+    public void AMufflersCaseDoesNotChangeWhatLeavesThePipe()
+    {
+        var withCase = EngineProfile.V8MuscleBigBlock;
+        Assert.NotNull(withCase.Exhaust.Muffler.Shell);
+        var bare = withCase with { Exhaust = withCase.Exhaust with { Muffler = withCase.Exhaust.Muffler with { Shell = null } } };
+        var a = new EngineSynth(withCase, Sr, 11);
+        var b = new EngineSynth(bare, Sr, 11);
+        foreach (var e in new[] { a, b }) { e.SpinTo(2500f); e.Throttle = 0.4f; }
+        for (int i = 0; i < Sr; i++)
+        {
+            a.Step();
+            b.Step();
+            Assert.Equal(b.ExhaustPipe, a.ExhaustPipe);
+        }
+    }
+
     [Fact]
     public void FlatPlaneV8_EachBankFiresEvenly()
     {
