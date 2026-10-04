@@ -28,6 +28,29 @@ public static class MovementSystem
     private static readonly List<Entity> _nearbyScratch = new(64);
     private static readonly HashSet<Entity> _nearbySeen = new();
 
+    /// <summary>Faster across the ground than any person moves on foot, m/s: a sprint is about 6.</summary>
+    public const float FlingSpeed = 12f;
+    private static readonly Dictionary<string, DateTime> _lastFlingLog = new();
+
+    /// <summary>
+    /// Says so when a player on foot is moved across the ground faster than anybody can run. Cody,
+    /// 2026-10-04: Sean, on a roof beside him, was half a kilometre west at the map's edge 46 s later,
+    /// and nothing the server logged said how. Once a second at most, with where and what it had to go on.
+    /// </summary>
+    private static void NoteFling(UserSession session, string user, Vector3 from, Vector3 to, float dt,
+                                  ClientInputUpdate input, float groundY, int colliders)
+    {
+        if (dt <= 0f) return;
+        float flat = new Vector2(to.X - from.X, to.Z - from.Z).Length() / dt;
+        if (flat < FlingSpeed) return;
+        var now = DateTime.UtcNow;
+        if (_lastFlingLog.TryGetValue(user, out var last) && (now - last).TotalSeconds < 1) return;
+        _lastFlingLog[user] = now;
+        Log.Warning("MovementSystem: {User} moved {Speed:F0} m/s across the ground on foot, {From} to {To} (map x y z), " +
+                    "input {Move}, jump {Jump}, ground under them {Ground:F2}, {Colliders} collider(s) near.",
+                    user, flat, from, to, input.MoveDirection, input.Jump, groundY, colliders);
+    }
+
     public static void Update(World world, Vector3 mapMin, Vector3 mapMax, SpatialGrid<Entity> grid,
                               Dictionary<int, Entity> lookup, SessionManager sessions, MapManager maps, float dt)
     {
@@ -188,6 +211,7 @@ public static class MovementSystem
 
                     // 4. PHYSICS STEP
                     var result = SharedMovementEngine.Step(ctx, collidersSlice);
+                    NoteFling(session, player.Username, transform.Position, result.NewPosition, stepDt, input, groundY, colliderCount);
 
                     transform.Position = result.NewPosition;
                     velocity.Linear = result.NewVelocity;
