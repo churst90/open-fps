@@ -563,6 +563,21 @@ public static class GeometryUtils
         {
             result.Normal = -Vector3.UnitY;
             result.Penetration = intoCeiling;
+            return result;
+        }
+
+        // And the other way up: a box whose top is below the middle of the body, with the body's
+        // centre over it, is a FLOOR the body is standing in, and the way out of a floor is up. The
+        // centre over it is the condition, not just any overlap: a body beside a low wall has its
+        // centre outside the wall and is pushed back off its side, which is how a parapet is a
+        // parapet and not something to be lifted onto. Inside the footprint, sideways means the
+        // nearest EDGE — for a roof slab the end of the roof, for the ground the end of the map
+        // (Brandt Court, 2026-10-04: a landing put a player 489 m west in one tick).
+        float intoFloor = aabbMax.Y - cylMinY;
+        if (dist <= 0.0001f && aabbMax.Y < cylPos.Y && intoFloor < result.Penetration)
+        {
+            result.Normal = Vector3.UnitY;
+            result.Penetration = intoFloor;
         }
 
         return result;

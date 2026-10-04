@@ -62,7 +62,7 @@ public class MapData
     // AirPressure is MILLIBARS, not atmospheres: sea level is 1013.25, not 1. The old default of 1.0
     // sailed straight into the client's `AirPressure / 1013.25` normalisation and clamped at the floor,
     // so every map on the server was authored, silently, as near-vacuum. NormalizeAtmosphere now says so.
-    public float Gravity { get; set; } = 15.0f;
+    public float Gravity { get; set; } = PhysicsConstants.Gravity;
     public float Temperature { get; set; } = 20.0f;
     public float Humidity { get; set; } = 0.5f;
     public float AirPressure { get; set; } = 1013.25f;

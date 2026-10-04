@@ -25,7 +25,7 @@ public class ClientPhysicsSystem
 
     public Vector3 MapMin { get; set; } = new(-50, 0, -50);
     public Vector3 MapMax { get; set; } = new(50, 20, 50);
-    public float Gravity { get; set; } = 15.0f;
+    public float Gravity { get; set; } = PhysicsConstants.Gravity;
 
     public ClientPhysicsSystem(LocalPlayerState state, SpatialService spatial)
     {
