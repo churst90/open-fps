@@ -423,6 +423,7 @@ public class ClientAudioSystem
         _audio.StopAllWorldSounds();
         // Entity ids belong to the map just left: whoever had one there is nobody here.
         _talkersVoiced.Clear();
+        _talkerRooms.Clear();
         OpenFPS.Client.AudioEngine.Fmod.Talkers.Clear();
     }
 
@@ -618,8 +619,10 @@ public class ClientAudioSystem
         foreach (var id in _pathIds)
         {
             // --- CRITICAL FIX: Reflection Termination ---
-            // IDs less than -10000 are reserved for synthesized reflections.
-            // We MUST NOT calculate reflections for reflections, or we get an infinite feedback loop.
+            // IDs below -5000 are the copies and the voices that work out their own paths (a wall's
+            // copy, your own voice and your room's answer to it, a talker, a horn, a siren). We MUST NOT
+            // calculate reflections for reflections, or we get an infinite feedback loop; and a copy
+            // asked about from its image is traced through the very wall that made it.
             if (id < -5000)
             {
                 // Simple distance update for existing reflections to maintain panning, 
@@ -2540,6 +2543,7 @@ public class ClientAudioSystem
     private void UpdateTalkers(WorldSnapshot world, Vector3 eyePos, double now)
     {
         _talkersGone.Clear();
+        _talkerSearchedThisFrame = false;
         foreach (var stream in OpenFPS.Client.AudioEngine.Fmod.Talkers.All)
         {
             stream.Pump(now);
@@ -2551,6 +2555,7 @@ public class ClientAudioSystem
             if (!talking || !world.Entities.TryGetValue(id, out var snap))
             {
                 if (_talkersVoiced.Remove(id)) _audio.StopSound(voiceId);
+                StopTalkerRoom(id);
                 continue;
             }
             var facing = Vector3.Transform(Vector3.UnitZ, snap.Transform.Rotation);
@@ -2622,10 +2627,17 @@ public class ClientAudioSystem
             }
             if (_talkersVoiced.Contains(id) && _audio.IsPlaying(voiceId)) _audio.UpdateSpatialAttributes(e);
             else { _audio.PlayPhysicalSoundDirect(e); _talkersVoiced.Add(id); }
+
+            // ...and the surfaces round them answering, from where they stand to where you do. Not from
+            // inside a cabin: what reaches you from there comes through its glass, and the street's
+            // surfaces never hear them directly.
+            if (seated) StopTalkerRoom(id);
+            else AnswerTalker(world, id, mouth, eyePos, gain, reference, e.Range, path.RegionId, now);
         }
         foreach (int id in _talkersGone)
         {
             if (_talkersVoiced.Remove(id)) _audio.StopSound(TalkerVoiceBase - Math.Abs(id));
+            StopTalkerRoom(id);
             OpenFPS.Client.AudioEngine.Fmod.Talkers.Remove(id);
         }
         if (_talkersVoiced.Count > 0 && now >= _talkersNextLog)
@@ -2634,10 +2646,79 @@ public class ClientAudioSystem
             foreach (int id in _talkersVoiced)
                 if (OpenFPS.Client.AudioEngine.Fmod.Talkers.TryGet(id, out var t))
                     Log.Information("Voice chat: e{Id} talking at {Db:F0} dBFS, buffer {Margin:F0} ms, " +
-                                    "{Received} frames in, {Lost} lost ({Rebuilt} rebuilt), {Late} late, {Corrupt} bad, ran dry {Dry} time(s)",
+                                    "{Received} frames in, {Lost} lost ({Rebuilt} rebuilt), {Late} late, {Corrupt} bad, ran dry {Dry} time(s); " +
+                                    "room {Region}, {Copies} surface(s) answering",
                                     id, t.Ring.SpeechRmsDbfs, t.Ring.MarginSeconds * 1000, t.Received, t.Lost, t.Rebuilt,
-                                    t.Late, t.Corrupt, t.RanDry);
+                                    t.Late, t.Corrupt, t.RanDry,
+                                    _talkerRooms.TryGetValue(id, out var tr) ? tr.Region : AcousticConstants.GlobalRegionId,
+                                    _talkerRooms.TryGetValue(id, out tr) ? tr.Answering : 0);
         }
+    }
+
+    // ── The room answering somebody talking ─────────────────────────────────────────────────
+
+    /// <summary>
+    /// The first voice id of the copies of another player's voice. Each talker answered at once holds a
+    /// block of <see cref="OwnVoiceCopies"/> ids from here down, below -5000 with every other copy, so
+    /// the acoustic-path pass never traces one from its image.
+    /// </summary>
+    internal const int TalkerCopyBase = -1_700_000;
+    /// <summary>How many talkers the surfaces answer at once. A search is a few milliseconds on the game
+    /// thread; past this many voices at once, the room is the tail alone.</summary>
+    private const int MaxTalkerRooms = 8;
+
+    private sealed class TalkerRoom
+    {
+        public int Block;
+        public double NextSearch;
+        public int Answering;
+        public int Region = AcousticConstants.GlobalRegionId;
+        public readonly bool[] On = new bool[OwnVoiceCopies];
+        public readonly List<OpenFPS.Common.EarlyReflections.Arrival> Arrivals = new();
+        public int FirstId => TalkerCopyBase - Block * OwnVoiceCopies;
+    }
+    private readonly Dictionary<int, TalkerRoom> _talkerRooms = new();
+    private bool _talkerSearchedThisFrame;
+
+    /// <summary>
+    /// The surfaces round somebody talking, answering them at your ear, as your own room answers you
+    /// (PlaceVoiceCopies): found from their mouth, a few times a second, and played from their own
+    /// images, each their voice read back its extra path behind it. Without this their voice was the
+    /// direct sound and the room's late tail and nothing between, which is a voice heard dry — and, as
+    /// they walked round you, a dry voice moving through a room that did not answer it (Cody, 2026-10-04:
+    /// "I can hear him but it's dry, his reflections don't follow him"). At most one search a frame,
+    /// shared out among the talkers.
+    /// </summary>
+    private void AnswerTalker(WorldSnapshot world, int id, Vector3 mouth, Vector3 ear, float gain, float reference,
+                              float range, int region, double now)
+    {
+        if (!_talkerRooms.TryGetValue(id, out var room))
+        {
+            int block = -1;
+            for (int b = 0; b < MaxTalkerRooms && block < 0; b++)
+            {
+                block = b;
+                foreach (var other in _talkerRooms.Values) if (other.Block == b) { block = -1; break; }
+            }
+            if (block < 0) return;
+            room = new TalkerRoom { Block = block };
+            _talkerRooms[id] = room;
+        }
+        room.Region = region;
+        if (now < room.NextSearch || _talkerSearchedThisFrame) return;
+        _talkerSearchedThisFrame = true;
+        room.NextSearch = now + 0.1;
+        // Their voice is played without its flight time, so a copy is its EXTRA path behind it.
+        float flight = Vector3.Distance(mouth, ear) / AudioPhysics.CurrentSpeedOfSound;
+        room.Answering = PlaceVoiceCopies(world, mouth, ear, room.Arrivals, gain, reference, flight,
+                                          room.FirstId, room.On,
+                                          OpenFPS.Client.AudioEngine.Fmod.Talkers.CopyKey(id), "voice chat", region, range);
+    }
+
+    private void StopTalkerRoom(int id)
+    {
+        if (!_talkerRooms.Remove(id, out var room)) return;
+        StopVoiceCopies(room.FirstId, room.On);
     }
 
     private int _footstepPoolIndex = 0;
@@ -2820,9 +2901,19 @@ public class ClientAudioSystem
         step.CarriesPath = true;
     }
 
-    /// <summary>Voices for the surfaces answering your own footfalls. Their own pool, so a wall's copy
-    /// can never take the slot of the step it is a copy of.</summary>
-    private const int STEP_ECHO_BASE_ID = -200;
+    /// <summary>
+    /// Voices for the surfaces answering your own footfalls. Their own pool, so a wall's copy can never
+    /// take the slot of the step it is a copy of.
+    ///
+    /// Below -5000, with every other copy, where the acoustic-path pass leaves them alone. Each carries
+    /// its whole path, placed at its image behind the surface it came off; at -200 it was asked about
+    /// as if it were a source standing at that image, and the worker's answer — the image traced to
+    /// your ear THROUGH the wall that made it, -40 to -100 dB in a stairwell's brick and concrete, or
+    /// round by the openings, out of the ground-floor door and up the stair openings, heard from the
+    /// floor below — replaced it a frame or two after it started (Cody, 2026-10-04, Marlow Tower: "not
+    /// hearing my own reflections follow me, it's like they're left on the first floor").
+    /// </summary>
+    internal const int STEP_ECHO_BASE_ID = -1_800_000;
     private const int STEP_ECHO_POOL_SIZE = 48;
     private readonly List<OpenFPS.Common.EarlyReflections.Arrival> _stepArrivals = new();
     private int _stepEchoIndex;
@@ -2927,60 +3018,12 @@ public class ClientAudioSystem
         // The surfaces, a few times a second: the room only changes as you move.
         if (now < _voiceNextSearch) return;
         _voiceNextSearch = now + 0.1;
-        var solids = _acoustics.ReflectionSolids(world);
-        _voiceArrivals.Clear();
-        if (solids.Count > 0)
-            OpenFPS.Common.EarlyReflections.Find(mouth, ear, solids, _voiceArrivals, AudioPhysics.CurrentSpeedOfSound,
-                                                 maxOrder: 2, keep: OwnVoiceCopies * 2,
-                                                 maxExtraPathMetres: WorldAudioPlayer.RoomEchoWindowSeconds * AudioPhysics.CurrentSpeedOfSound);
-        _voiceArrivals.Sort(static (a, b) => b.GainMid.CompareTo(a.GainMid));
-        float direct = Vector3.Distance(mouth, ear);
         float c = AudioPhysics.CurrentSpeedOfSound;
-        int slot = 0, secondOrder = 0;
-        foreach (var a in _voiceArrivals)
-        {
-            if (slot >= OwnVoiceCopies) break;
-            if (a.ExtraDelaySeconds > WorldAudioPlayer.RoomEchoWindowSeconds) continue;
-            if (a.Order >= 2 && ++secondOrder > WorldAudioPlayer.MaxSecondOrderCopies) continue;
-            // Placed and coloured exactly as a footstep's copy is (SubmitRoomStepEchoes).
-            float copyGain = OpenFPS.Common.EarlyReflections.PlacedCopyGain(a.GainMid, a.PathLength, direct, reference)
-                           * WorldAudioPlayer.MirrorShare(a.Scattering, a.Order)
-                           * OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.CopiesTrim;
-            if (copyGain < OpenFPS.Common.ImageSource.MinGain) continue;
-            var loss = WorldAudioPlayer.SpecularLoss(a.Scattering, a.Order);
-            float lowDb = 20f * MathF.Log10(MathF.Max(1e-4f, a.GainLow) / MathF.Max(1e-4f, a.GainMid));
-            float highDb = 20f * MathF.Log10(MathF.Max(1e-4f, a.GainHigh) / MathF.Max(1e-4f, a.GainMid));
-            int id = OwnVoiceBase - 1 - slot;
-            var copy = new SpatialEmitter
-            {
-                EntityId = id,
-                SoundId = "own voice",
-                IsSynth = true,
-                PhysicalKey = OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.OwnVoiceCopyKey,
-                EngineKey = "",
-                Mode = PlaybackMode.LoopOne,
-                Type = EmitterType.WorldLocked,
-                Position = a.ImagePosition,
-                ApparentPosition = a.ImagePosition,
-                Volume = gain * copyGain,
-                MinDistance = reference,
-                Range = 30f,
-                Pitch = 1f,
-                EngineRunning = true,
-                IsReflection = true,
-                CarriesPath = true,
-                Occlusion = 0f, ApertureFactor = 1f, TransmissionBleed = 0f,
-                EqLow = MathF.Pow(10f, (loss.LowDb + lowDb) / 20f), EqMid = 1f, EqHigh = MathF.Pow(10f, (loss.HighDb + highDb) / 20f),
-                // Its whole path, less what the microphone has already cost.
-                EchoDelaySeconds = MathF.Max(0f, a.PathLength / c - MicrophoneLatency),
-                TargetRegionId = _listenerRegion,
-            };
-            if (_voiceCopyOn[slot] && _audio.IsPlaying(id)) _audio.UpdateSpatialAttributes(copy);
-            else { _audio.PlayPhysicalSoundDirect(copy); _voiceCopyOn[slot] = true; }
-            slot++;
-        }
-        for (int k = slot; k < OwnVoiceCopies; k++)
-            if (_voiceCopyOn[k]) { _audio.StopSound(OwnVoiceBase - 1 - k); _voiceCopyOn[k] = false; }
+        // Its whole path, less what the microphone has already cost.
+        int slot = PlaceVoiceCopies(world, mouth, ear, _voiceArrivals, gain, reference, MicrophoneLatency,
+                                    OwnVoiceBase - 1, _voiceCopyOn,
+                                    OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.OwnVoiceCopyKey, "own voice",
+                                    _listenerRegion);
         if (now >= _voiceNextLog)
         {
             _voiceNextLog = now + 5;
@@ -2990,6 +3033,82 @@ public class ClientAudioSystem
                                     ring.SpeechRmsDbfs, ring.Written, _listenerRegion, slot,
                                     _voiceArrivals.Count > 0 ? _voiceArrivals.Min(a => a.PathLength) / c * 1000 : 0);
         }
+    }
+
+    /// <summary>
+    /// The surfaces round a talking mouth answering it at an ear: image sources to second order, inside
+    /// the window before the tail, the loudest <see cref="OwnVoiceCopies"/> placed and coloured exactly as
+    /// a footstep's copies are (SubmitRoomStepEchoes), each one the voice's ring read back at its own
+    /// path. One rule for your own voice and for anybody else's. Returns how many are answering.
+    /// </summary>
+    /// <param name="alreadyLateSeconds">What the voice's own playback has already cost the copies: the
+    /// microphone's latency for yours; for somebody else, the direct voice's flight time, which it is
+    /// played without, so each copy comes its extra path behind it.</param>
+    /// <param name="firstId">The first copy's voice id; the rest count down from it.</param>
+    private int PlaceVoiceCopies(WorldSnapshot world, Vector3 mouth, Vector3 ear,
+                                 List<OpenFPS.Common.EarlyReflections.Arrival> arrivals,
+                                 float gain, float reference, float alreadyLateSeconds,
+                                 int firstId, bool[] on, string key, string soundId, int regionId, float range = 30f)
+    {
+        var solids = _acoustics.ReflectionSolids(world);
+        arrivals.Clear();
+        if (solids.Count > 0)
+            OpenFPS.Common.EarlyReflections.Find(mouth, ear, solids, arrivals, AudioPhysics.CurrentSpeedOfSound,
+                                                 maxOrder: 2, keep: OwnVoiceCopies * 2,
+                                                 maxExtraPathMetres: WorldAudioPlayer.RoomEchoWindowSeconds * AudioPhysics.CurrentSpeedOfSound);
+        arrivals.Sort(static (a, b) => b.GainMid.CompareTo(a.GainMid));
+        float direct = Vector3.Distance(mouth, ear);
+        float c = AudioPhysics.CurrentSpeedOfSound;
+        int slot = 0, secondOrder = 0;
+        foreach (var a in arrivals)
+        {
+            if (slot >= OwnVoiceCopies) break;
+            if (a.ExtraDelaySeconds > WorldAudioPlayer.RoomEchoWindowSeconds) continue;
+            if (a.Order >= 2 && ++secondOrder > WorldAudioPlayer.MaxSecondOrderCopies) continue;
+            float copyGain = OpenFPS.Common.EarlyReflections.PlacedCopyGain(a.GainMid, a.PathLength, direct, reference)
+                           * WorldAudioPlayer.MirrorShare(a.Scattering, a.Order)
+                           * OpenFPS.Client.AudioEngine.Fmod.FmodAudioProvider.CopiesTrim;
+            if (copyGain < OpenFPS.Common.ImageSource.MinGain) continue;
+            var loss = WorldAudioPlayer.SpecularLoss(a.Scattering, a.Order);
+            float lowDb = 20f * MathF.Log10(MathF.Max(1e-4f, a.GainLow) / MathF.Max(1e-4f, a.GainMid));
+            float highDb = 20f * MathF.Log10(MathF.Max(1e-4f, a.GainHigh) / MathF.Max(1e-4f, a.GainMid));
+            int id = firstId - slot;
+            var copy = new SpatialEmitter
+            {
+                EntityId = id,
+                SoundId = soundId,
+                IsSynth = true,
+                PhysicalKey = key,
+                EngineKey = "",
+                Mode = PlaybackMode.LoopOne,
+                Type = EmitterType.WorldLocked,
+                Position = a.ImagePosition,
+                ApparentPosition = a.ImagePosition,
+                Volume = gain * copyGain,
+                MinDistance = reference,
+                Range = range,
+                Pitch = 1f,
+                EngineRunning = true,
+                IsReflection = true,
+                CarriesPath = true,
+                Occlusion = 0f, ApertureFactor = 1f, TransmissionBleed = 0f,
+                EqLow = MathF.Pow(10f, (loss.LowDb + lowDb) / 20f), EqMid = 1f, EqHigh = MathF.Pow(10f, (loss.HighDb + highDb) / 20f),
+                EchoDelaySeconds = MathF.Max(0f, a.PathLength / c - alreadyLateSeconds),
+                TargetRegionId = regionId,
+            };
+            if (on[slot] && _audio.IsPlaying(id)) _audio.UpdateSpatialAttributes(copy);
+            else { _audio.PlayPhysicalSoundDirect(copy); on[slot] = true; }
+            slot++;
+        }
+        StopVoiceCopies(firstId, on, slot);
+        return slot;
+    }
+
+    /// <summary>Stops the copies from slot <paramref name="from"/> on.</summary>
+    private void StopVoiceCopies(int firstId, bool[] on, int from = 0)
+    {
+        for (int k = from; k < on.Length; k++)
+            if (on[k]) { _audio.StopSound(firstId - k); on[k] = false; }
     }
 
     private void StopOwnVoice()

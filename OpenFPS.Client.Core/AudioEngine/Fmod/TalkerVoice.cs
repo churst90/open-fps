@@ -231,4 +231,21 @@ public static class Talkers
         return key != null && key.StartsWith(KeyPrefix, StringComparison.Ordinal)
             && int.TryParse(key.AsSpan(KeyPrefix.Length), out senderId);
     }
+
+    /// <summary>
+    /// The emitter key of one surface answering a talker: <c>talkercopy:42</c>. Their voice read back at
+    /// the copy's extra delay, as your room answers your own (OwnVoiceCopyKey). Not a <see cref="Key"/>:
+    /// a copy is not the voice, and it does not measure the connection (it reads behind the voice, so
+    /// running dry is the voice's to report).
+    /// </summary>
+    public const string CopyKeyPrefix = "talkercopy:";
+
+    public static string CopyKey(int senderId) => CopyKeyPrefix + senderId;
+
+    public static bool TryParseCopyKey(string? key, out int senderId)
+    {
+        senderId = 0;
+        return key != null && key.StartsWith(CopyKeyPrefix, StringComparison.Ordinal)
+            && int.TryParse(key.AsSpan(CopyKeyPrefix.Length), out senderId);
+    }
 }
