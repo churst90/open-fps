@@ -248,6 +248,15 @@ Type these on the chat line. The `/` is optional and case does not matter.
   "Killed sean at 40 metres.", "Hit concrete at 17 metres."
 - A player who is killed gets up at the spawn after 5 seconds.
 
+### Stairs
+Walk up and down stairs with W and S; there are no special keys. In a block of flats the stairs are a
+dog-leg: at the top of a flight, turn round and the next flight is beside you. When you reach the foot
+or the top of a flight facing along it you hear "Stairs up, 10 steps, to floor 3" or "Stairs down, 10
+steps, to floor 2", once, and again only after you walk away and come back. The ends of flights also
+play the stairs beacon, four quick rising notes; `/beacons stairs off` turns it off. The last flight
+goes "to the roof": keep walking at the top, through the steel door, and you are on the roof. A
+parapet runs round the edge, so you cannot walk off it.
+
 ### The scope
 Only a scoped rifle has one; the M700 does. Turn Num Lock on: with it off your screen reader uses the
 keypad.

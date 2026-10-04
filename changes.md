@@ -4,6 +4,17 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-04
 
+- Stairs and roofs. The stairs in the city's blocks of flats could not be climbed: the slabs were laid
+  whole over the stairwell and each flight stood under the next, so you stopped at the second step.
+  Each stairwell is now a dog-leg: go up a flight, turn round, and the next flight starts beside you.
+  Every block of flats has a last flight up to a stair housing on the roof, with a steel push-bar door
+  out; the roof is a named place ("Marlow Tower roof") with a waist-high parapet all round. Each end
+  of every flight plays the stairs beacon (four rising notes), and reaching it facing along the flight
+  you are told, once, "Stairs up, 10 steps, to floor 3", "Stairs down, 10 steps, to floor 2" or
+  "Stairs up, 10 steps, to the roof". The floor's name is said when you step off the stairs, not
+  halfway up. Footsteps going up are lighter and a little higher, going down heavier and a little
+  lower, and on the stairs each lands on a tread. AudioLab `--walk` takes a route (`via=x,z;x,z`)
+  and `trace`.
 - After the hit or kill chime you are told what the shot struck and how far: "Hit pedestrian at 17
   metres.", "Killed sean at 40 metres.", "Hit sean in the head at 340 metres." Surfaces the same way:
   "Hit concrete at 17 metres."
