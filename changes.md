@@ -45,9 +45,10 @@ Recent work, newest first. `git log` has the rest.
   everyone else gets a line on the All channel: "cody is online.", "cody logged out.", "cody lost
   connection.", "cody was removed from the server.", "cody is away.", "cody is back." Away is /afk
   or five minutes with nothing done; back is the next thing they do. Logging in again from another
-  machine announces nothing. Each notice has its own sound: a rising arpeggio for online, the same
-  falling for logged out, a broken falling figure for lost connection, two soft notes down for away
-  and up for back. Settings has "Online and offline sounds" to turn the sounds off; the notices are
+  machine announces nothing. Each notice has its own sound, chords on a triangle wave that nothing
+  else uses: C major rolled upward for online, the same rolled downward for logged out, a C minor
+  stopped short and two broken stabs for lost connection, A minor sinking into E minor for away and
+  the reverse for back. Settings has "Online and offline sounds" to turn the sounds off; the notices are
   still read. AudioLab `--presence-sounds` writes the five sounds (inbox/presence-sounds-2026-10-03).
 
 - Roles and permissions. A fourth role, Moderator: announcements, finding, going to and bringing

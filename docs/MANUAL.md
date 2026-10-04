@@ -182,8 +182,9 @@ Inside a list:
 - Voice chat switched on: one short note. Switched off: the same note, then a lower one.
 - Your shot hits someone: two high notes struck together. Your shot kills them: three quick rising
   notes. Only you hear these.
-- Another player online: a rising arpeggio. Logged out: the same, falling. Lost connection: a
-  broken falling figure. Away: two soft notes down. Back: two soft notes up.
+- Another player online: a chord rolling upward, on a hollow triangle tone. Logged out: the same chord
+  rolling downward. Lost connection: a chord stopped short, then two broken stabs. Away: a soft chord
+  sinking lower. Back: a soft chord rising.
 
 You can turn these off or change their volume in Settings. "Online and offline sounds" turns off
 only the presence sounds; the notices are still read in the All buffer.

@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using OpenFPS.Client.AudioEngine.Core;
 using OpenFPS.Common.Networking;
 
@@ -147,26 +148,31 @@ public sealed class UiSounds
         UiCue.VoiceOff => Notes(rate, 0.5f, (880f, 0f, 0.06f), (659.3f, 0.07f, 0.08f)),
         // Trying the server again: a quiet low tick, every few seconds until it answers.
         UiCue.Reconnecting => Notes(rate, 0.25f, (587.3f, 0f, 0.04f)),
-        // Presence: somebody came, went, or stepped away. The same soft sines as the chat cues and the
-        // beacons, in the beacons' register (middle C to the C two octaves up), and longer than a
-        // chat line, so they are heard as somebody arriving or leaving rather than somebody talking.
-        // Each a shape of its own, and each pair the same figure turned round.
-        // Online: C major climbing to the octave, C5 E5 G5 C6, the last note held. Arriving.
-        UiCue.PresenceOnline => Notes(rate, 0.45f,
-            (523.25f, 0.00f, 0.20f), (659.25f, 0.12f, 0.20f), (783.99f, 0.24f, 0.22f), (1046.5f, 0.36f, 0.55f)),
-        // Logged out: the same notes falling, C6 G5 E5 C5, the low C held. Gone, on purpose.
-        UiCue.PresenceLoggedOut => Notes(rate, 0.45f,
-            (1046.5f, 0.00f, 0.20f), (783.99f, 0.12f, 0.20f), (659.25f, 0.24f, 0.22f), (523.25f, 0.36f, 0.55f)),
-        // Connection lost: the fall starts, G5 then E flat (minor, so something is wrong), breaks off,
-        // and stutters twice on a short C5 before a low G4 that is cut short. Not on purpose.
-        UiCue.PresenceConnectionLost => Notes(rate, 0.45f,
-            (783.99f, 0.00f, 0.16f), (622.25f, 0.12f, 0.16f),
-            (523.25f, 0.40f, 0.07f), (523.25f, 0.52f, 0.07f), (392.00f, 0.64f, 0.18f)),
-        // Away: two slow swells falling a fourth, A4 to E4, like the waypoint beacon's swell. Quiet,
-        // because nothing has happened but somebody stepping back from the keys.
-        UiCue.PresenceAway => Swells(rate, 0.22f, (440.00f, 0.00f, 0.42f), (329.63f, 0.30f, 0.50f)),
-        // Back: the same two swells the other way, E4 up to A4.
-        UiCue.PresenceBack => Swells(rate, 0.22f, (329.63f, 0.00f, 0.42f), (440.00f, 0.30f, 0.50f)),
+        // Presence: somebody came, went, or stepped away. Chords, not single notes (Cody, 2026-10-03:
+        // "make the online/offline sound chordal and use the triangle or another waveform that sounds
+        // unique"), on a triangle wave, which nothing else in the interface or the beacons uses: hollow
+        // and soft, and recognisably its own instrument. Longer than a chat line, so they are heard as
+        // somebody arriving or leaving rather than somebody talking. Each pair is one figure turned round.
+        // Online: C major, C5 E5 G5 C6, rolled upward so it is heard to rise, all four left ringing.
+        UiCue.PresenceOnline => TriangleChord(rate, 0.45f, 0.055f, 0.75f, 523.25f, 659.25f, 783.99f, 1046.5f),
+        // Logged out: the same chord rolled downward, from the top. Gone, on purpose.
+        UiCue.PresenceLoggedOut => TriangleChord(rate, 0.45f, 0.055f, 0.75f, 1046.5f, 783.99f, 659.25f, 523.25f),
+        // Connection lost: C minor struck at once and stopped short, then two clipped stabs on a
+        // diminished chord below and a low G that is cut off. Something went wrong.
+        UiCue.PresenceConnectionLost => Scale(Mix(
+            TriangleChord(rate, 1f, 0f, 0.16f, 523.25f, 622.25f, 783.99f),
+            Delay(TriangleChord(rate, 0.8f, 0f, 0.07f, 493.88f, 587.33f, 698.46f), 0.30f, rate),
+            Delay(TriangleChord(rate, 0.8f, 0f, 0.07f, 493.88f, 587.33f, 698.46f), 0.42f, rate),
+            Delay(TriangleChord(rate, 0.8f, 0f, 0.18f, 392.00f), 0.56f, rate)), 0.45f),
+        // Away: A minor, A4 C5 E5, swelling in and sinking into E minor a fourth below. Quiet: nothing
+        // has happened but somebody stepping back from the keys.
+        UiCue.PresenceAway => Scale(Mix(
+            TriangleSwell(rate, 0.46f, 440.00f, 523.25f, 659.25f),
+            Delay(TriangleSwell(rate, 0.52f, 329.63f, 392.00f, 493.88f), 0.30f, rate)), 0.22f),
+        // Back: the same two chords the other way, E minor rising into A minor.
+        UiCue.PresenceBack => Scale(Mix(
+            TriangleSwell(rate, 0.46f, 329.63f, 392.00f, 493.88f),
+            Delay(TriangleSwell(rate, 0.52f, 440.00f, 523.25f, 659.25f), 0.30f, rate)), 0.22f),
         // Your team said something: the same two notes as a private message's first two, then back
         // down to the first — a call among friends rather than one aimed at you alone.
         UiCue.ChatTeam => Notes(rate, 0.5f, (1046.5f, 0f, 0.09f), (1318.5f, 0.08f, 0.09f), (1046.5f, 0.16f, 0.16f)),
@@ -227,6 +233,74 @@ public sealed class UiSounds
             }
         }
         return Scale(buf, gain);
+    }
+
+    /// <summary>
+    /// One sample of a band-limited triangle wave at phase <paramref name="ph"/>: the odd harmonics at
+    /// 1/n², alternating in sign, up to 12 kHz. Each harmonic dies away faster than the one below it
+    /// (<paramref name="t"/> seconds into a note of time constant <paramref name="tau"/>), as a struck
+    /// string's do, so the hollow attack mellows instead of buzzing.
+    /// </summary>
+    private static float Triangle(double ph, float hz, float t, float tau)
+    {
+        double sum = 0;
+        for (int k = 1, sign = 1; k * hz < 12000f; k += 2, sign = -sign)
+            sum += sign * Math.Sin(k * ph) / (k * k) * Math.Exp(-t / tau * (1 + 0.35 * (k - 1)));
+        return (float)(sum * 8 / (Math.PI * Math.PI));
+    }
+
+    /// <summary>A chord on the triangle: the notes struck <paramref name="roll"/> seconds apart in the
+    /// order given and all left to ring for <paramref name="ring"/> seconds, an exponential fall with a
+    /// short release so nothing ends on a step.</summary>
+    private static float[] TriangleChord(int rate, float gain, float roll, float ring, params float[] hz)
+    {
+        float end = roll * (hz.Length - 1) + ring;
+        var buf = new float[(int)((end + 0.02f) * rate)];
+        for (int n = 0; n < hz.Length; n++)
+        {
+            int start = (int)(n * roll * rate), len = (int)(ring * rate);
+            for (int i = 0; i < len && start + i < buf.Length; i++)
+            {
+                float t = i / (float)rate;
+                float attack = MathF.Min(1f, t / 0.005f);
+                float release = MathF.Min(1f, (len - i) / (0.015f * rate));
+                buf[start + i] += Triangle(MathF.Tau * hz[n] * t, hz[n], t, ring * 0.35f) * attack * release;
+            }
+        }
+        return Scale(buf, gain);
+    }
+
+    /// <summary>A chord on the triangle that swells in and out over <paramref name="seconds"/>, raised
+    /// cosine, with the beacon swell's slight slow vibrato.</summary>
+    private static float[] TriangleSwell(int rate, float seconds, params float[] hz)
+    {
+        var buf = new float[(int)((seconds + 0.02f) * rate)];
+        foreach (float f in hz)
+        {
+            double ph = 0;
+            for (int i = 0; i < (int)(seconds * rate); i++)
+            {
+                float t = i / (float)rate;
+                float env = 0.5f - 0.5f * MathF.Cos(MathF.Tau * t / seconds);
+                ph += MathF.Tau * f * (1f + 0.004f * MathF.Sin(MathF.Tau * 5f * t)) / rate;
+                buf[i] += env * Triangle(ph, f, 0f, 1f);
+            }
+        }
+        return buf;
+    }
+
+    private static float[] Delay(float[] x, float seconds, int rate)
+    {
+        var y = new float[x.Length + (int)(seconds * rate)];
+        Array.Copy(x, 0, y, (int)(seconds * rate), x.Length);
+        return y;
+    }
+
+    private static float[] Mix(params float[][] parts)
+    {
+        var y = new float[parts.Max(p => p.Length)];
+        foreach (var p in parts) for (int i = 0; i < p.Length; i++) y[i] += p[i];
+        return y;
     }
 
     private static float[] Scale(float[] buf, float gain)
