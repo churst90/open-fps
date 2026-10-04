@@ -33,6 +33,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- The Linux head's key map, which is plain code over GameKey: compiled in here so the keys it
+         reports (Shift-comma as comma, not "<") are tested without referencing GTK. -->
+    <Compile Include="..\OpenFPS.Client.Gtk\Game\GtkKeyMap.cs" Link="Linked\GtkKeyMap.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Using Include="Xunit" />
   </ItemGroup>
 

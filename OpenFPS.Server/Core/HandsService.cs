@@ -263,7 +263,8 @@ public class HandsService
 
         _maps.RefreshGrid(session.CurrentMapId);
         Carried?.Invoke(item.Value.Id);
-        message = $"You take the {name} in {WhereItWent(world, session.Entity, item.Value)}{Loaded(world, session.Entity, item.Value)}.";
+        message = $"You take the {name} in {WhereItWent(world, session.Entity, item.Value)}{Loaded(world, session.Entity, item.Value)}."
+                + AnotherWithinReach(world, from);
         Log.Information("{User} picked up {Item} ({Id}).", session.Username, name, item.Value.Id);
         return true;
     }
@@ -660,6 +661,21 @@ public class HandsService
 
     private static float MassOf(World world, Entity item)
         => world.Has<ItemComponent>(item) ? MathF.Max(0.01f, world.Get<ItemComponent>(item).MassKg) : 1f;
+
+    /// <summary>
+    /// " Another 2 within reach." when more loose things lie within E's reach after taking one, so a
+    /// second gun beside the first is not a secret (Cody, 2026-10-04); "" when nothing does.
+    /// </summary>
+    internal static string AnotherWithinReach(World world, Vector3 from)
+    {
+        int left = 0;
+        world.Query(new QueryDescription().WithAll<Transform, ItemComponent>(), (Entity e, ref Transform t, ref ItemComponent _) =>
+        {
+            if (world.Has<HeldComponent>(e)) return;
+            if (Vector3.Distance(from, t.Position) <= PhysicsConstants.PickUpReach) left++;
+        });
+        return left switch { 0 => "", 1 => " Another one within reach.", _ => $" Another {left} within reach." };
+    }
 
     private static Entity? Nearest(World world, Vector3 from, string named, out float distance,
                                    out string name, float reach = Reach)
