@@ -170,16 +170,16 @@ public sealed class CombatService
 
             if (body)
             {
-                string whom = NameOf(world, candidate);
                 bool killed = Wound(session, world, grid, candidate, weapon.DamageAt(distance), weapon, reply);
-                // The chime is the answer to a hit. A text player has no chime, so is told in words.
-                if (session.IsTextClient) Say(reply, $"You fire the {weapon.DisplayName} and {(killed ? "kill" : "hit")} {whom}.");
+                // The chime says THAT you hit; the words say what and how far (Cody, 2026-10-04: "I'll hit
+                // things but I won't know what I hit"). Short, because it is said in the middle of a fight.
+                Say(reply, HitWords(world, candidate, killed, head: false, distance));
                 return;
             }
 
             string material = world.Has<MaterialComponent>(candidate)
                 ? world.Get<MaterialComponent>(candidate).Material ?? "Generic" : "Generic";
-            hit = $"{material} at {distance:F0} metres";
+            hit = $"{material.ToLowerInvariant()} at {distance:F0} metres";
 
             if (material.Equals("Glass", StringComparison.OrdinalIgnoreCase))
                 BreakGlass(session, world, candidate, t, c, weapon);
@@ -191,7 +191,7 @@ public sealed class CombatService
                                             0.01f, 500f, c.Size.X, c.Size.Y, MathF.Max(0.02f, c.Size.Z)));
             break;
         }
-        Say(reply, $"You fire the {weapon.DisplayName}. It hits {hit}.");
+        Say(reply, hit.StartsWith("nothing") ? $"You fire the {weapon.DisplayName}. It hits {hit}." : $"Hit {hit}.");
     }
 
     /// <summary>
@@ -490,8 +490,7 @@ public sealed class CombatService
             var shooter = f.Shooter;
             bool killed = Wound(shooter, world, grid, hitEntity, damage, f.Weapon,
                                 m => _server.SendToSession(shooter, m), head);
-            if (shooter.IsTextClient)
-                _server.SendToSession(shooter, new TextEvent { Text = $"Your shot {(killed ? "kills" : "hits")} {whom}{(head ? " in the head" : "")}." });
+            _server.SendToSession(shooter, new TextEvent { Text = HitWords(world, hitEntity, killed, head, travelled) });
             f.Called = true;   // the chime is the call
             Log.Information("Scoped shot hit {Whom} at {Metres:F0} m after {Seconds:F2} s{Head}.", whom, travelled, after.Seconds, head ? ", in the head" : "");
             return true;
@@ -888,6 +887,16 @@ public sealed class CombatService
 
     private UserSession? SessionOf(World world, Entity e)
         => world.Has<PlayerComponent>(e) && _sessions.TryGetSession(world.Get<PlayerComponent>(e).ConnectionId, out var s) ? s : null;
+
+    /// <summary>"Hit pedestrian at 17 metres.", "Killed sean in the head at 340 metres.": what the shot
+    /// struck, by name for a player and by what they are for anyone else, and how far.</summary>
+    internal static string HitWords(World world, Entity e, bool killed, bool head, float metres)
+    {
+        string whom = world.Has<PlayerComponent>(e) ? world.Get<PlayerComponent>(e).Username
+                    : world.Has<Pedestrian>(e) ? "pedestrian"
+                    : NameOf(world, e);
+        return $"{(killed ? "Killed" : "Hit")} {whom}{(head ? " in the head" : "")} at {MathF.Round(metres):F0} metres.";
+    }
 
     private static string NameOf(World world, Entity e)
         => world.Has<IdentityComponent>(e) && !string.IsNullOrWhiteSpace(world.Get<IdentityComponent>(e).Name)

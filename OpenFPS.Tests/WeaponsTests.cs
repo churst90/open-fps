@@ -170,8 +170,8 @@ public class WeaponsTests : IDisposable
         var confirm = Assert.Single(r.Replies.OfType<HitConfirm>());
         Assert.Equal(walker.Id, confirm.TargetEntityId);
         Assert.False(confirm.Killed);
-        // The chime is the answer: nothing is said.
-        Assert.Equal("", said);
+        // After the chime, what and how far (Cody, 2026-10-04: the chime alone did not say what was hit).
+        Assert.Equal("Hit pedestrian at 10 metres.", said);
         // Nobody else hears of it but by the shot.
         Assert.DoesNotContain(r.ServerSent, m => m.Message is HitConfirm);
     }
@@ -537,5 +537,18 @@ public class WeaponsTests : IDisposable
         public UserData? GetUser(string username) => null;
         public bool AddUser(string username, string password, UserRole role) => false;
         public bool VerifyPassword(string username, string password) => false;
+    }
+
+    /// <summary>What a shot struck, in words after the chime (Cody, 2026-10-04): a pedestrian by what they
+    /// are, a player by name, the head when it was the head, and how far.</summary>
+    [Fact]
+    public void AHitSaysWhatAndHowFar()
+    {
+        var world = Arch.Core.World.Create();
+        var walker = world.Create(new OpenFPS.Common.Components.Transform(), new OpenFPS.Server.Systems.Pedestrian());
+        var player = world.Create(new OpenFPS.Common.Components.PlayerComponent { Username = "sean" });
+        Assert.Equal("Hit pedestrian at 17 metres.", OpenFPS.Server.Core.CombatService.HitWords(world, walker, false, false, 16.6f));
+        Assert.Equal("Killed sean in the head at 340 metres.", OpenFPS.Server.Core.CombatService.HitWords(world, player, true, true, 340.2f));
+        Arch.Core.World.Destroy(world);
     }
 }

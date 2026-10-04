@@ -4,6 +4,9 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-04
 
+- After the hit or kill chime you are told what the shot struck and how far: "Hit pedestrian at 17
+  metres.", "Killed sean at 40 metres.", "Hit sean in the head at 340 metres." Surfaces the same way:
+  "Hit concrete at 17 metres."
 - A rifle scope. The M700, a .308 bolt-action rifle with a 4-12 power scope (staff: /give m700).
   Numpad star raises it; Num Lock must be on, and the game says so if it is off. Numpad 8, 2, 4 and 6
   aim in small steps that get smaller as you zoom in; 5 says what is on the crosshair; 7 and 9 read

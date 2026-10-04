@@ -244,6 +244,8 @@ Type these on the chat line. The `/` is optional and case does not matter.
   and you cannot fire until it is done. An empty gun clicks.
 - Enter fires the gun in your hands. With no gun, Enter interacts, like E.
 - `/ammo`: what is in your gun and the spare ammunition you carry.
+- After a hit you hear its chime and what you hit and how far: "Hit pedestrian at 17 metres.",
+  "Killed sean at 40 metres.", "Hit concrete at 17 metres."
 - A player who is killed gets up at the spawn after 5 seconds.
 
 ### The scope
