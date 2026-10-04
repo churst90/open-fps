@@ -2528,13 +2528,24 @@ public class FmodAudioProvider : IAudioProvider
             channel.setMode(MODE._3D | Rolloff.Mode);
             echoState = echo;
         }
-        else if (emitter.IsSynth && emitter.PhysicalKey.StartsWith("ownvoice:", StringComparison.Ordinal))
+        else if (emitter.IsSynth && (emitter.PhysicalKey.StartsWith("ownvoice:", StringComparison.Ordinal)
+                                     || emitter.PhysicalKey.StartsWith(Talkers.KeyPrefix, StringComparison.Ordinal)))
         {
             // The player's own microphone, read back at a delay: their room answering them. The room
             // feed plays into a group at zero, so only its sends to the room are heard.
+            // Or somebody else talking, read from what has arrived of their voice (TalkerStream): a
+            // world voice like any other, heard from where they stand.
             if (!_isInitialized) return;
+            OwnVoiceRing ring = OwnVoiceRing.Shared;
+            double maxPull = 0.01;
+            if (Talkers.TryParseKey(emitter.PhysicalKey, out int talker))
+            {
+                if (!Talkers.TryGet(talker, out var stream)) return;
+                ring = stream.Ring;
+                maxPull = TalkerStream.MaxPull;
+            }
             _system.getSoftwareFormat(out int orate, out _, out _);
-            var tap = new OwnVoiceTap(OwnVoiceRing.Shared, emitter.EchoDelaySeconds, orate);
+            var tap = new OwnVoiceTap(ring, emitter.EchoDelaySeconds, orate, maxPull);
             if (OwnVoiceProcessor.CreateDSP(_system, tap, out engineDsp, out engineHandle) != RESULT.OK) return;
             engineDsp.setChannelFormat(0, 0, SPEAKERMODE.MONO);
             if (emitter.PhysicalKey == OwnVoiceRoomKey) targetGroup = _ownVoiceRoomGroup;
@@ -4727,82 +4738,11 @@ public class FmodAudioProvider : IAudioProvider
     }
 
     /// <summary>
-    /// Plays a decoded 16-bit mono 48kHz PCM voice packet as a one-shot 3D sound.
-    /// Copies the data into FMOD's internal buffers (MODE.OPENMEMORY) so no pinning is needed.
-    /// </summary>
-    /// <summary>
     /// Registers a synthesised buffer under an id, so an ordinary emitter naming that id plays it
     /// with the full acoustic treatment. Returns false if the audio engine is not up.
     /// </summary>
     public bool RegisterSynthesisedSound(string soundId, byte[] pcm16Mono, int sampleRate)
         => _isInitialized && _resources.RegisterPcm(soundId, pcm16Mono, sampleRate);
-
-    public void PlayVoice(int senderId, Vector3 position, byte[] pcmData)
-    {
-        if (!_isInitialized || pcmData.Length == 0) return;
-
-        var info = new CREATESOUNDEXINFO
-        {
-            cbsize = System.Runtime.InteropServices.Marshal.SizeOf<CREATESOUNDEXINFO>(),
-            length = (uint)pcmData.Length,
-            numchannels = 1,
-            defaultfrequency = 48000,
-            format = SOUND_FORMAT.PCM16
-        };
-
-        // OPENRAW is required for headerless PCM in memory; without it FMOD tries to parse a file
-        // header and createSound fails (voice was silently dropped).
-        RESULT res = _system.createSound(pcmData, MODE.OPENMEMORY | MODE.OPENRAW | MODE._3D | Rolloff.Mode | MODE.LOOP_OFF, ref info, out FMOD.Sound sound);
-        if (res != RESULT.OK) return;
-
-        _system.playSound(sound, default, true, out FMOD.Channel ch);
-        ch.setMode(MODE._3D | Rolloff.Mode);
-        ch.set3DMinMaxDistance(1.0f, 30.0f);
-
-        var fpos = FmodHelpers.ToFmodVec(position);
-        var fvel = new FMOD.VECTOR();
-        ch.set3DAttributes(ref fpos, ref fvel);
-        ch.setVolume(1.0f);
-
-        // Route voice through the Steam Audio binaural DSP too, so remote players localize like
-        // every other spatial sound (otherwise voice would fall back to FMOD's flat panner).
-        // NOTE: voice is one-shot-per-packet, so this creates/releases a binaural effect per packet.
-        // Functionally correct; a future optimization is to pool SA voices or use a persistent
-        // per-speaker channel instead of one-shot packets.
-        SteamAudioVoiceState? vState = null;
-        FMOD.DSP vDsp = default;
-        System.Runtime.InteropServices.GCHandle vHandle = default;
-        if (_steamAudioEnabled && TryCreateSteamAudioVoice(out vState, out vDsp, out vHandle))
-        {
-            vState!.GuardName = "(voice chat)";
-            ch.addDSP(CHANNELCONTROL_DSP_INDEX.TAIL, vDsp);
-            ch.set3DLevel(0.0f);
-        }
-        ch.setPaused(false);
-
-        // The voice owns the sound and releases it when the channel has finished; releasing it here
-        // would stop the channel before the packet had played.
-        lock (_lock)
-        {
-            AddActive(new ActiveSound
-            {
-                EntityId = -(senderId + 90000), // negative offset to avoid collision
-                SoundId = "__voice__",
-                Type = EmitterType.WorldLocked,
-                Channel = ch,
-                Position = position,
-                ApparentPosition = position,
-                CurrentApparentPosition = position,
-                BaseVolume = 1.0f,
-                MinDistance = 1.0f,
-                Range = 30.0f,
-                IsReflection = false,
-                TargetRegionId = -1,
-                SaState = vState, SaDsp = vDsp, SaHandle = vHandle,
-                OwnedSound = sound,
-            });
-        }
-    }
 
     /// <summary>Interface sounds, made once and kept. Releasing an FMOD sound stops every channel
     /// playing it, so a sound created, played and released at once is cut off almost before it

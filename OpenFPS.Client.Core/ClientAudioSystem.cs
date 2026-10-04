@@ -2,8 +2,6 @@ using System;
 using System.Numerics;
 using System.Collections.Generic;
 using System.Linq;
-using Concentus;
-using Concentus.Enums;
 using OpenFPS.Client.Services;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
@@ -423,6 +421,9 @@ public class ClientAudioSystem
         _regionAmbienceId = "";
         _ambienceRegionId = int.MinValue;
         _audio.StopAllWorldSounds();
+        // Entity ids belong to the map just left: whoever had one there is nobody here.
+        _talkersVoiced.Clear();
+        OpenFPS.Client.AudioEngine.Fmod.Talkers.Clear();
     }
 
     /// <summary>
@@ -819,6 +820,7 @@ public class ClientAudioSystem
         UpdateHorns(world, visualEyePos, OpenFPS.Common.AudioClock.Now);
         UpdateSirens(world, visualEyePos);
         UpdateOwnVoice(visualEyePos, OpenFPS.Common.AudioClock.Now);
+        UpdateTalkers(world, visualEyePos, OpenFPS.Common.AudioClock.Now);
         _partMs[3] += Ms(partAt);
         partAt = System.Diagnostics.Stopwatch.GetTimestamp();
         _birds.Update(world, visualEyePos, OpenFPS.Common.AudioClock.Now);
@@ -2485,36 +2487,112 @@ public class ClientAudioSystem
         // path, and renders a copy only when the ear would hear one as a separate event.
     }
 
-    // One Opus decoder per sender — decoders are stateful (track packet loss continuity).
-    private readonly Dictionary<int, IOpusDecoder> _voiceDecoders = new();
-    private const int VoiceSampleRate = 48000;
-    private const int VoiceFrameSamples = 960; // 20ms at 48kHz
+    /// <summary>
+    /// A packet of somebody talking, off the network: into their stream (TalkerStream), which a voice at
+    /// their mouth reads (UpdateTalkers). Nothing is played from here: a packet is 20 ms of a voice, not
+    /// a sound of its own.
+    /// </summary>
+    public void ReceiveVoice(int senderId, ushort sequence, byte[] opusData)
+        => OpenFPS.Client.AudioEngine.Fmod.Talkers.For(senderId).Receive(sequence, opusData, OpenFPS.Common.AudioClock.Now);
+
+    internal const int TalkerVoiceBase = -1_400_000;
+    /// <summary>How long a talker's voice is kept after their last packet: the jitter buffer's longest
+    /// margin and its fade, so the end of what they said is played out.</summary>
+    private const double TalkerHoldSeconds = 1.0;
+    /// <summary>How long a stream nobody has talked into is kept, decoder and all.</summary>
+    private const double TalkerForgetSeconds = 120;
+    private readonly HashSet<int> _talkersVoiced = new();
+    private readonly List<int> _talkersGone = new();
+    private double _talkersNextLog;
 
     /// <summary>
-    /// Decodes an incoming Opus voice packet and plays it at the sender's current world position.
+    /// Everybody talking on voice chat, heard from their own mouth: at their head, facing the way they
+    /// face, at a person's speaking level, through whatever is between you (the occlusion worker's answer,
+    /// as for a siren), into the room they are in. Their usual level on their microphone is taken as normal
+    /// conversation (OwnVoiceRing.SpeechRmsDbfs, measured from what arrives), so a quiet microphone is not
+    /// a quiet person and a shout is still louder than talking. No ground reflection: a voice's ground
+    /// copy flanged (see the NPC speech), and speech has none.
     /// </summary>
-    public void PlayReceivedVoice(int senderId, byte[] opusData, WorldSnapshot world)
+    private void UpdateTalkers(WorldSnapshot world, Vector3 eyePos, double now)
     {
-        if (!_voiceDecoders.TryGetValue(senderId, out var decoder))
+        _talkersGone.Clear();
+        foreach (var stream in OpenFPS.Client.AudioEngine.Fmod.Talkers.All)
         {
-            decoder = OpusCodecFactory.CreateDecoder(VoiceSampleRate, 1);
-            _voiceDecoders[senderId] = decoder;
+            stream.Pump(now);
+            int id = stream.SenderId;
+            int voiceId = TalkerVoiceBase - Math.Abs(id);
+            double quiet = now - stream.LastArrival;
+            if (quiet > TalkerForgetSeconds) { _talkersGone.Add(id); continue; }
+            bool talking = quiet < TalkerHoldSeconds && id != OwnEntityId;
+            if (!talking || !world.Entities.TryGetValue(id, out var snap))
+            {
+                if (_talkersVoiced.Remove(id)) _audio.StopSound(voiceId);
+                continue;
+            }
+            var facing = Vector3.Transform(Vector3.UnitZ, snap.Transform.Rotation);
+            facing.Y = 0f;
+            facing = facing.LengthSquared() > 1e-6f ? Vector3.Normalize(facing) : Vector3.UnitZ;
+            Vector3 mouth = snap.Transform.Position + new Vector3(0f, OpenFPS.Common.Speech.MouthHeight, 0f) + facing * 0.1f;
+
+            float levelDb = OpenFPS.Common.Speech.NormalDb - stream.Ring.SpeechRmsDbfs;
+            var (gain, reference) = OpenFPS.Common.Loudness.Place(levelDb);
+
+            _acousticWorker.EnqueueRequest(new AcousticRequest
+            {
+                EntityId = id, ListenerPos = eyePos, SourcePos = mouth, SourceRadius = 0.15f,
+            });
+            AcousticPathData path = default;
+            bool found = false;
+            if (_acousticWorker.TryGetResult(id, out var paths))
+                foreach (var p in paths)
+                    if (!p.IsReflection) { path = p; found = true; break; }
+            if (!found) path = _acoustics.CalculateAcousticPath(world, id, eyePos, mouth);
+
+            var e = new SpatialEmitter
+            {
+                EntityId = voiceId,
+                SoundId = "voice chat",
+                IsSynth = true,
+                PhysicalKey = OpenFPS.Client.AudioEngine.Fmod.Talkers.Key(id),
+                EngineKey = "",
+                Mode = PlaybackMode.LoopOne,
+                Type = EmitterType.EntityAttached,
+                Position = mouth,
+                ApparentPosition = path.ApparentPosition,
+                Velocity = snap.Velocity,
+                PositionSampledAt = world.PositionsSampledAt,
+                Direction = facing,
+                Volume = gain,
+                MinDistance = reference,
+                Range = MathF.Max(reference, OpenFPS.Common.Loudness.AudibleRange(levelDb)),
+                Pitch = 1f,
+                EngineRunning = true,
+                Occlusion = path.Occlusion,
+                EqLow = path.EqLow, EqMid = path.EqMid, EqHigh = path.EqHigh,
+                AirLowDb = path.AirLowDb, AirMidDb = path.AirMidDb, AirHighDb = path.AirHighDb,
+                ApertureFactor = path.ApertureFactor,
+                TransmissionBleed = path.TransmissionBleed,
+                EffectiveDistance = path.EffectiveDistance,
+                TargetRegionId = path.RegionId,
+            };
+            if (_talkersVoiced.Contains(id) && _audio.IsPlaying(voiceId)) _audio.UpdateSpatialAttributes(e);
+            else { _audio.PlayPhysicalSoundDirect(e); _talkersVoiced.Add(id); }
         }
-
-        var pcmShort = new short[VoiceFrameSamples];
-        // Concentus 2.x Span-based API: Decode(ReadOnlySpan<byte>, Span<short>, int frameSize, bool decodeFec)
-        int decoded = decoder.Decode(opusData.AsSpan(), pcmShort.AsSpan(), VoiceFrameSamples, false);
-        if (decoded <= 0) return;
-
-        // Convert short PCM to byte array
-        var pcmBytes = new byte[decoded * 2];
-        Buffer.BlockCopy(pcmShort, 0, pcmBytes, 0, pcmBytes.Length);
-
-        Vector3 pos = world.Entities.TryGetValue(senderId, out var snap)
-            ? snap.Transform.Position
-            : _state.Position; // fallback: play at local position if sender unknown
-
-        _audio.PlayVoice(senderId, pos, pcmBytes);
+        foreach (int id in _talkersGone)
+        {
+            if (_talkersVoiced.Remove(id)) _audio.StopSound(TalkerVoiceBase - Math.Abs(id));
+            OpenFPS.Client.AudioEngine.Fmod.Talkers.Remove(id);
+        }
+        if (_talkersVoiced.Count > 0 && now >= _talkersNextLog)
+        {
+            _talkersNextLog = now + 5;
+            foreach (int id in _talkersVoiced)
+                if (OpenFPS.Client.AudioEngine.Fmod.Talkers.TryGet(id, out var t))
+                    Log.Information("Voice chat: e{Id} talking at {Db:F0} dBFS, buffer {Margin:F0} ms, " +
+                                    "{Received} frames in, {Lost} lost ({Rebuilt} rebuilt), {Late} late, {Corrupt} bad, ran dry {Dry} time(s)",
+                                    id, t.Ring.SpeechRmsDbfs, t.Ring.MarginSeconds * 1000, t.Received, t.Lost, t.Rebuilt,
+                                    t.Late, t.Corrupt, t.RanDry);
+        }
     }
 
     private int _footstepPoolIndex = 0;

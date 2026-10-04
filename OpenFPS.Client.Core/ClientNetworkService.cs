@@ -140,6 +140,10 @@ public class ClientNetworkService : INetEventListener
     /// <summary>Delivers network events on the calling thread. Does nothing before <see cref="Start"/>.</summary>
     public void Poll() => _netManager?.PollEvents();
 
+    /// <summary>Sends what is queued now rather than at the library's next update, up to 15 ms away: for
+    /// voice, whose frames would otherwise leave in bunches. Safe from any thread.</summary>
+    public void Flush() => _netManager?.TriggerUpdate();
+
     public void Send(IMessage message, DeliveryMethod delivery = DeliveryMethod.ReliableOrdered)
     {
         var peer = _serverPeer;

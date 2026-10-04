@@ -119,7 +119,6 @@ public class SteelDoorSoundTests
         public float GetPlaybackProgress(int id) => 0f;
         public IEnumerable<int> GetActiveSpatialSoundIds() => new List<int>(_live);
         public void Preload(string id) { }
-        public void PlayVoice(int sender, Vector3 pos, byte[] pcm) { }
         public bool RegisterSynthesisedSound(string soundId, byte[] pcm16Mono, int sampleRate) => true;
         public readonly List<string> UiSounds = new();
         public void PlayUiSound(string id, Func<float[]> render, int sampleRate, float volume) { render(); UiSounds.Add(id); }

@@ -1,22 +1,17 @@
 using System;
 using System.Collections.Generic;
 using System.Threading;
-using Concentus;
-using Concentus.Enums;
 using OpenFPS.Client.AudioEngine.Core;
 
 namespace OpenFPS.Client.Core.Platform;
 
 /// <summary>
 /// Microphone capture through FMOD's own recording, for heads that have no other capture library
-/// (Linux). Sends what the Windows head's NAudio capture sends: 48 kHz mono, 20 ms Opus frames at
-/// 24 kbit/s. The device records at its own rate; this resamples to 48 kHz.
+/// (Linux). Sends what the Windows head's NAudio capture sends (VoiceCodec): 48 kHz mono, 20 ms Opus
+/// frames. The device records at its own rate; anything else is resampled to 48 kHz (SincResampler).
 /// </summary>
 public sealed class FmodMicrophoneCapture : IMicrophoneCapture
 {
-    private const int OpusRate = 48000;
-    private const int FrameSamples = OpusRate / 50;   // 20 ms
-
     private readonly AudioEngineFacade _audio;
     private readonly Func<string> _preferredDevice;
     private Thread? _thread;
@@ -68,31 +63,26 @@ public sealed class FmodMicrophoneCapture : IMicrophoneCapture
     {
         try
         {
-            var encoder = OpusCodecFactory.CreateEncoder(OpusRate, 1, OpusApplication.OPUS_APPLICATION_VOIP);
-            encoder.Bitrate = 24000;
-            var resampler = new LinearResampler(deviceRate, OpusRate);
+            var encoder = new VoiceFrameEncoder();
+            var resampler = deviceRate == VoiceCodec.Rate ? null : new SincResampler(deviceRate, VoiceCodec.Rate);
             var read = new List<float>(4096);
-            var frame = new short[FrameSamples];
-            int filled = 0;
-            var packet = new byte[1275];
-            var heard = new List<float>(1024);
+            var heard = new List<float>(4096);
+            Action<byte[]> send = p => PacketReady?.Invoke(p);
 
             while (_capturing)
             {
                 read.Clear();
                 heard.Clear();
                 _audio.ReadRecording(read);
-                foreach (float s in resampler.Process(read))
+                if (resampler != null) resampler.Process(read, heard);
+                else heard.AddRange(read);
+                if (heard.Count > 0)
                 {
-                    heard.Add(s);
-                    frame[filled++] = (short)(Math.Clamp(s, -1f, 1f) * short.MaxValue);
-                    if (filled < FrameSamples) continue;
-                    filled = 0;
-                    int len = encoder.Encode(frame.AsSpan(), FrameSamples, packet.AsSpan(), packet.Length);
-                    if (len > 0) PacketReady?.Invoke(packet.AsSpan(0, len).ToArray());
+                    var samples = heard.ToArray();
+                    encoder.Push(samples, send);
+                    SamplesCaptured?.Invoke(samples);
                 }
-                if (heard.Count > 0) SamplesCaptured?.Invoke(heard.ToArray());
-                Thread.Sleep(10);
+                Thread.Sleep(5);
             }
         }
         catch (Exception ex)
@@ -103,32 +93,4 @@ public sealed class FmodMicrophoneCapture : IMicrophoneCapture
     }
 
     public void Dispose() => Stop();
-
-    /// <summary>Linear interpolation between rates, carrying its position across calls. Plenty for
-    /// speech going to a 24 kbit/s codec.</summary>
-    internal sealed class LinearResampler
-    {
-        private readonly double _step;
-        private double _pos;          // position in the input, relative to the first sample of this call
-        private float _last;          // the previous call's final sample, index -1
-        private bool _primed;
-
-        public LinearResampler(int fromRate, int toRate) => _step = (double)fromRate / toRate;
-
-        public IEnumerable<float> Process(List<float> input)
-        {
-            if (input.Count == 0) yield break;
-            if (!_primed) { _last = input[0]; _primed = true; }
-            while (_pos < input.Count - 1)
-            {
-                int i = (int)Math.Floor(_pos);
-                float a = i < 0 ? _last : input[i];
-                float b = input[i + 1];
-                yield return a + (b - a) * (float)(_pos - i);
-                _pos += _step;
-            }
-            _pos -= input.Count;
-            _last = input[^1];
-        }
-    }
 }

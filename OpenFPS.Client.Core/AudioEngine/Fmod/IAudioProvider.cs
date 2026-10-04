@@ -123,12 +123,6 @@ public interface IAudioProvider : IDisposable
     }
 
     /// <summary>
-    /// Plays a decoded PCM voice packet as a one-shot 3D sound at the given world position.
-    /// pcmData is 16-bit signed, mono, 48kHz.
-    /// </summary>
-    void PlayVoice(int senderId, Vector3 position, byte[] pcmData);
-
-    /// <summary>
     /// Makes a buffer the game synthesised available under a sound id.
     ///
     /// The bridge between physical modelling and everything else: once registered, a rendered door

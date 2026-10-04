@@ -261,6 +261,13 @@ public class GameServer
         _mudGateway.Start();
 
         _network.OnConnected = (peer) => Log.Information("Peer connected: {Id}", peer.Id);
+        // Voice is relayed the moment it comes in, not at the next tick: same dispatcher, same thread.
+        _network.HandleNow = (peer, msg) =>
+        {
+            if (msg is not VoiceData) return false;
+            _dispatcher.Dispatch(peer.Id, msg, reply => _network.SendMessage(peer, reply, DeliveryMethod.ReliableOrdered));
+            return true;
+        };
         _network.OnDisconnected = HandlePeerDisconnected;
         _network.Start(port);
         RunLoop();
@@ -444,7 +451,7 @@ public class GameServer
             if (senderSession.Entity == Entity.Null || req.OpusData.Length > MaxVoiceBytes) return;
             req.SenderId = senderSession.Entity.Id;
             Touch(id);
-            // Relay to all players on the same map within earshot
+            // Relayed to everyone else on the same map, at once; each listener places it at the sender.
             foreach (var s in _sessions.GetAllSessions())
             {
                 if (s.ConnectionId == id) continue; // don't echo back to sender
@@ -453,6 +460,7 @@ public class GameServer
                 if (peer != null)
                     _network.SendMessage(peer, req, LiteNetLib.DeliveryMethod.Unreliable);
             }
+            _network.Flush();
         });
     }
 

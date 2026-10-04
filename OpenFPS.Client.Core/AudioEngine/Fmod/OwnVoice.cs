@@ -32,6 +32,42 @@ public sealed class OwnVoiceRing
     /// poll, seconds.</summary>
     public const double Margin = 0.035;
 
+    /// <summary>
+    /// How far behind the newest sample a reader stays, seconds: <see cref="Margin"/> for the microphone,
+    /// and for a voice arriving over the network, what its jitter needs (TalkerStream). Writer sets it;
+    /// a reader moves toward a new one at its pull rate rather than jumping.
+    /// </summary>
+    public double MarginSeconds
+    {
+        get => Volatile.Read(ref _margin);
+        set => Volatile.Write(ref _margin, value);
+    }
+    private double _margin = Margin;
+
+    /// <summary>
+    /// Bumped each time somebody starts talking again after a pause (TalkerStream). A reader that sees it
+    /// change starts from <see cref="SpurtStart"/> once a margin's worth has arrived, instead of from a
+    /// margin behind the newest sample, which on the first packet would be the end of what they said last.
+    /// </summary>
+    public int Spurt => Volatile.Read(ref _spurt);
+    private int _spurt;
+    /// <summary>The first sample of the current run of talking. Read after <see cref="Spurt"/>.</summary>
+    public long SpurtStart => Volatile.Read(ref _spurtStart);
+    private long _spurtStart;
+
+    /// <summary>Writer: what comes next is a new run of talking.</summary>
+    public void BeginSpurt()
+    {
+        Volatile.Write(ref _spurtStart, _written);
+        Interlocked.Increment(ref _spurt);
+    }
+
+    /// <summary>How many times a reader has caught up with the newest sample while it was still live: a
+    /// margin too short for the connection. TalkerStream lengthens it.</summary>
+    public int Underruns => Volatile.Read(ref _underruns);
+    private int _underruns;
+    internal void Starved() => Interlocked.Increment(ref _underruns);
+
     /// <summary>Samples ever written. Capture thread writes; the mixer only reads.</summary>
     public long Written => Volatile.Read(ref _written);
 
@@ -50,7 +86,10 @@ public sealed class OwnVoiceRing
     private float _speechDb = -26f;
 
     /// <summary>Capture thread.</summary>
-    public void Write(float[] samples)
+    public void Write(float[] samples) => Write(samples.AsSpan());
+
+    /// <summary>The one writer: the capture thread, or the network thread for somebody else's voice.</summary>
+    public void Write(ReadOnlySpan<float> samples)
     {
         if (samples.Length == 0) return;
         double sum = 0;
@@ -89,16 +128,22 @@ public sealed class OwnVoiceTap : IGuardedUnit
     public readonly OwnVoiceRing Ring;
     /// <summary>The callback's buffer, made with the voice so the mixer thread never allocates.</summary>
     internal readonly float[] Scratch = new float[DspCallback.MaxBlock];
-    private readonly double _step, _blockShare;
+    private readonly double _step, _blockShare, _maxPull;
     /// <summary>Where the delay is heading, seconds. Game thread writes.</summary>
     public volatile float TargetDelay;
     private double _position = -1, _error;
-    private float _envelope;
+    private float _envelope, _last;
+    private int _spurt;
+    private bool _priming, _starved;
 
-    public OwnVoiceTap(OwnVoiceRing ring, float delaySeconds, int mixerRate)
+    /// <param name="maxPull">The most the read rate may be pulled off true to follow its target, as a
+    /// fraction: 1 % for the room answering you, whose delays change as you walk (that change is the small
+    /// pitch shift a reflection really has); far less for somebody talking (TalkerStream.MaxPull).</param>
+    public OwnVoiceTap(OwnVoiceRing ring, float delaySeconds, int mixerRate, double maxPull = 0.01)
     {
         Ring = ring;
         TargetDelay = delaySeconds;
+        _maxPull = maxPull;
         _step = (double)OwnVoiceRing.Rate / mixerRate;
         _blockShare = 1.0 / (2.0 * mixerRate);
     }
@@ -108,21 +153,50 @@ public sealed class OwnVoiceTap : IGuardedUnit
     {
         long written = Ring.Written;
         int n = mono.Length;
-        // The microphone stopped (or never started): nothing to answer with.
-        bool live = written > 0 && DateTime.UtcNow.Ticks - Ring.LastWriteTicks < TimeSpan.TicksPerSecond / 5;
-        // Where this block should start: Margin and the delay behind the newest sample, less the block.
-        double target = written - (OwnVoiceRing.Margin + TargetDelay) * OwnVoiceRing.Rate - n * _step;
-        // Far from it (first block, or the capture stalled): start again there, from silence.
-        if (_position < 0 || Math.Abs(_position - target) > 0.08 * OwnVoiceRing.Rate)
+        double margin = Ring.MarginSeconds;
+        // The microphone stopped (or never started), or the talker did: nothing to play.
+        bool live = written > 0
+                 && DateTime.UtcNow.Ticks - Ring.LastWriteTicks < (long)((margin + 0.15) * TimeSpan.TicksPerSecond);
+        // Where this block should start: the margin and the delay behind the newest sample, less the block.
+        double target = written - (margin + TargetDelay) * OwnVoiceRing.Rate - n * _step;
+        int spurt = Ring.Spurt;
+        if (spurt != _spurt)
         {
-            _position = target; _error = 0; _envelope = 0;
+            // Talking again after a pause: from the first word, once enough of it has arrived.
+            _spurt = spurt;
+            // A voice made after they started (it was out of earshot) joins them where they are.
+            _position = Math.Max(Ring.SpurtStart - TargetDelay * OwnVoiceRing.Rate, target);
+            _priming = true;
+            _error = 0; _envelope = 0; _last = 0;
+        }
+        else if (!_priming && (_position < 0 || Math.Abs(_position - target) > Math.Max(0.08, margin) * OwnVoiceRing.Rate))
+        {
+            // Far from it (first block, or the capture stalled): start again there, from silence.
+            _position = target; _error = 0; _envelope = 0; _last = 0;
+        }
+        if (_priming)
+        {
+            if (_position > target) { mono.Clear(); return; }
+            _priming = false;
         }
         _error += (target - _position - _error) * Math.Min(1.0, n * _blockShare);
-        double rate = _step * (1 + Math.Clamp(_error / (0.5 * OwnVoiceRing.Rate), -0.01, 0.01));
+        double rate = _step * (1 + Math.Clamp(_error / (0.5 * OwnVoiceRing.Rate), -_maxPull, _maxPull));
         for (int i = 0; i < n; i++)
         {
+            if (_position + 1 >= written)
+            {
+                // Caught up with the newest sample. Wait here for the rest rather than run on past it:
+                // what has not arrived yet is still to be said, and running on would skip it. The last
+                // sample dies away instead of stopping dead.
+                if (live && !_starved) { Ring.Starved(); _starved = true; }
+                _last *= 0.995f;
+                mono[i] = _last * _envelope;
+                continue;
+            }
+            _starved = false;
             _envelope += ((live ? 1f : 0f) - _envelope) * 0.002f;
-            mono[i] = Ring.At(_position) * _envelope;
+            _last = Ring.At(_position);
+            mono[i] = _last * _envelope;
             _position += rate;
         }
     }

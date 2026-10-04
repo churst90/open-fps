@@ -531,14 +531,6 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
         }
     }
 
-    /// <summary>
-    /// Plays a received voice packet as a one-shot 3D sound at the sender's world position.
-    /// </summary>
-    public void PlayVoice(int senderId, Vector3 position, byte[] pcmData)
-    {
-        if (_isInitialized) _provider.PlayVoice(senderId, position, pcmData);
-    }
-
     public IReadOnlyList<VoiceLevel> LoudestVoices(int count) =>
         _isInitialized ? _provider.LoudestVoices(count) : Array.Empty<VoiceLevel>();
 
