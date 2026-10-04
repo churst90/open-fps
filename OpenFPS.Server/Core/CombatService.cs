@@ -836,7 +836,7 @@ public sealed class CombatService
         {
             // A rifle bullet goes through a window and on, a little slower; the window does not.
             f.BrokenGlass.Add(hitEntity.Id);
-            BreakGlass(f.Shooter, world, grid, hitEntity, tr, col, f.Weapon, f.State.Velocity.Length());
+            BreakGlass(f.Shooter, world, grid, lookup, hitEntity, tr, col, f.Weapon, f.State.Velocity.Length());
             f.State.Velocity *= 0.9f;
             return false;
         }
@@ -1010,17 +1010,21 @@ public sealed class CombatService
     /// direct readout of which floor the shot was on. One crash sample throws that away, and a sighted
     /// game would never notice it was gone.
     /// </summary>
-    private void BreakGlass(UserSession session, World world, SpatialGrid<Entity> grid, Entity pane, Transform t,
-                            ColliderComponent collider, WeaponDefinition weapon, float speed)
+    private void BreakGlass(UserSession session, World world, SpatialGrid<Entity> grid, Dictionary<int, Entity> lookup,
+                            Entity pane, Transform t, ColliderComponent collider, WeaponDefinition weapon, float speed)
     {
+        // The pane is the box's two larger sides, and it faces along the thinnest: a car's side glass is a box
+        // thin across the car, a windscreen thin along it.
+        Vector3 box = collider.Size;
+        Vector3 axis = box.X <= box.Y && box.X <= box.Z ? Vector3.UnitX : box.Y <= box.Z ? Vector3.UnitY : Vector3.UnitZ;
+        Vector2 face = axis == Vector3.UnitX ? new Vector2(box.Z, box.Y) : axis == Vector3.UnitY ? new Vector2(box.X, box.Z) : new Vector2(box.X, box.Y);
         var glass = new GlassPane(
             Centre: t.Position,
-            Size: new Vector2(MathF.Max(0.3f, collider.Size.X), MathF.Max(0.3f, collider.Size.Y)),
-            Normal: Vector3.Transform(new Vector3(0, 0, 1), t.Rotation),
-            // Tempered: what modern glazing is, and the type that always fails completely rather
-            // than taking a neat hole. Held in compression, so there is no such thing as a tidy
-            // bullet hole in it.
-            Type: GlassType.Tempered,
+            Size: new Vector2(MathF.Max(0.3f, face.X), MathF.Max(0.3f, face.Y)),
+            Normal: Vector3.Transform(axis, t.Rotation),
+            // What kind of glass it is, from what the map says the part is (GlassKind): a house window
+            // annealed, a shop front, a door, a shelter or a car's side window tempered, a windscreen laminated.
+            Type: GlassKind.Of(GlazedPartOf(world, lookup, pane, box)),
             HeightAboveGround: MathF.Max(0f, t.Position.Y - collider.Size.Y * 0.5f));
 
         Span<GlassEvent> buffer = stackalloc GlassEvent[48];
@@ -1039,8 +1043,28 @@ public sealed class CombatService
         _server.EmitWorldAudio(session.CurrentMapId, pane.Id, "glass",
                                GlassSound.From(events, glass, weapon, thickness,
                                                string.IsNullOrEmpty(ground) ? "Concrete" : ground, pane.Id, speed));
+        // A pane that only took a hole stays where it is: a laminated windscreen cracks round the hole and
+        // holds, and a fast rifle round drills annealed glass. Only a pane that fails comes out of its frame.
+        if (!GlassBreak.Shatters(glass.Type, weapon)) return;
         _maps.DestroyEntity(session.CurrentMapId, pane);
         _server.BroadcastRemoval(session.CurrentMapId, pane.Id);
+    }
+
+    /// <summary>A glass entity as the glass kind needs it: its prefab and name, and, when it is a part of a
+    /// composite, the composite's template and where the part sits in it.</summary>
+    private static GlazedPart GlazedPartOf(World world, Dictionary<int, Entity> lookup, Entity pane, Vector3 size)
+    {
+        string prefab = world.Has<IdentityComponent>(pane) ? world.Get<IdentityComponent>(pane).PrefabId ?? "" : "";
+        string owner = "";
+        Vector3 local = Vector3.Zero;
+        if (world.Has<ParentComponent>(pane))
+        {
+            var parent = world.Get<ParentComponent>(pane);
+            local = parent.LocalPosition;
+            if (lookup.TryGetValue(parent.ParentEntityId, out var whole) && world.Has<CompositeComponent>(whole))
+                owner = world.Get<CompositeComponent>(whole).TemplateId ?? "";
+        }
+        return new GlazedPart(prefab, NameOf(world, pane), owner, local, size);
     }
 
     // ── Wounds and death ────────────────────────────────────────────────────────────────────────

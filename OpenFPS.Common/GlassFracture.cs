@@ -55,8 +55,8 @@ namespace OpenFPS.Common;
 /// radiates twice: the body's rigid-body acceleration (p = rho0 V_eff cos / (4 pi c r) d(a)/dt, V_eff
 /// including the added mass of a plate moving face-on, doubled by a hard ground under it; over the whole
 /// body's Hertz time and no quicker than 2a/c), and its modes, rung through the corner's contact (the
-/// glass within one thickness of it) by a share of the impact energy (<see cref="RingShare"/>, fitted to
-/// the recordings) filtered by the contact's spectrum |cos(pi f tau) / (1 - (2 f tau)^2)|.
+/// glass within one thickness of it) by a share of the impact energy (<see cref="RingShare"/>, estimated
+/// and cross-checked) filtered by the contact's spectrum |cos(pi f tau) / (1 - (2 f tau)^2)|.
 ///
 /// FALL. Quadratic drag, closed form (terminal speed sqrt(2 m g / (rho0 Cd A))), from where each piece was
 /// in the pane and when it left. The landing render starts at <see cref="GlassBreak.FallSeconds"/> of the
@@ -86,6 +86,10 @@ public static class GlassFracture
     /// <summary>Terminal crack speed in soda-lime glass, m/s (Doll 1975).</summary>
     public const double CrackSpeed = 1500;
     public const double ToughnessPaRootM = 0.75e6;
+    /// <summary>A round's length for its contact time (a 9 mm ball is 15.6 mm; the key does not carry it).</summary>
+    private const double SlugMetres = 0.016;
+    /// <summary>The share of a tempered die's motion in the sheet that is out of the sheet's plane (estimate).</summary>
+    private const double OutOfPlane = 0.2;
     private const double Rho0 = 1.2, C0 = 343, G = 9.81;
 
     /// <summary>The plate's longitudinal speed, sqrt(E / (rho (1 - nu^2))), about 5500 m/s.</summary>
@@ -200,15 +204,16 @@ public static class GlassFracture
     {
         double area = Math.Max(0.02, s.Width * s.Height);
         double sizeDb = 10 * Math.Log10(area / (1.2 * 1.6));
-        // Survey of 2026-10-04 (a 1.2 x 1.6 m annealed window, 2 x 2.5 m and 2 x 3 m tempered panes, a car's
-        // side window; Glock, AKM, shotgun; two variants; five grounds and two drops for the landing):
-        // break medians 137 (annealed), 133-140 (tempered); hole 133; landing 141 (annealed), 136-138 (big
-        // tempered), 124 (the car window).
+        // Survey of 2026-10-04, second pass (a 1.2 x 1.6 m annealed window, 2 x 2.5 m and 2 x 3 m tempered
+        // panes, a car's side window; Glock, AKM, shotgun; two variants; four grounds, two drops): break
+        // medians 137 (annealed), 133-139 (tempered); hole 139; landing on concrete 142 (annealed window),
+        // 131 (2 x 2.5 m tempered), on grass or carpet 6-10 dB under that.
+        bool soft = s.Part == Part.Land && !Rigid(AcousticRegistry.GetProperties(s.Ground ?? "Concrete"));
         return s.Part switch
         {
-            Part.Hole => s.Type == GlassType.Laminated ? 125f : 133f,
+            Part.Hole => s.Type == GlassType.Laminated ? 130f : 139f,
             Part.Break => s.Type == GlassType.Tempered ? 135f : 137f,
-            _ => (float)((s.Type == GlassType.Tempered ? 134 : 141) + sizeDb),
+            _ => (float)((s.Type == GlassType.Tempered ? 127 : 142) + sizeDb - (soft ? 8 : 0)),
         };
     }
 
@@ -232,11 +237,28 @@ public static class GlassFracture
         public bool OnGround;
         /// <summary>Made on the ground, by a piece breaking there: the landing render hears it from its birth.</summary>
         public bool Born;
+        /// <summary>Lying on the ground: how high its middle sits (half its thickness, and the tilt of a piece
+        /// propped on its own edge or on others), and how much the ground under it reflects.</summary>
+        public double GroundH, GroundR;
     }
 
     /// <summary>One contact's click: when, its acceleration-noise scale (Pa s at a metre per unit-area pulse
     /// derivative), its duration.</summary>
-    private readonly record struct Click(double T, double Amp, double Tau);
+    /// <summary>
+    /// One contact's click: when; its scale (pascals at a metre per unit of the kernel); its duration; and its
+    /// mirror: a copy of itself, <see cref="MirrorGain"/> times as strong and <see cref="MirrorDelay"/>
+    /// seconds later. A body struck straight down onto a hard floor has an image under the floor pushing the
+    /// other way (a dipole normal to a rigid plane is cancelled by its image, to the extent the body sits
+    /// close to it: |1 - exp(-2ikH cos)|), so its click is mostly a high-pass of itself; sliding along it, the
+    /// image pushes the same way and doubles it. A die kicked apart from its neighbours has them pushing the
+    /// other way a die's width off. <see cref="Pulse"/>: the kernel is the unit-area pulse itself, not its
+    /// derivative (a force on the pane, radiating as a baffled piston). <see cref="Tag"/> is for the lab.
+    /// </summary>
+    private readonly record struct Click(double T, double Amp, double Tau, double MirrorGain = 0, double MirrorDelay = 0,
+                                         bool Pulse = false, byte Tag = 0);
+
+    /// <summary>Lab: which kind of contact a click is, to render one kind alone (OPENFPS_GLASS_TAG).</summary>
+    private const byte TagContact = 0, TagKick = 1, TagSlap = 2, TagStrike = 3, TagTap = 4;
 
     private sealed class Sim
     {
@@ -261,6 +283,11 @@ public static class GlassFracture
         public double[]? Out;
         public double OutT0;
         public int Rate;
+        /// <summary>Lab: the second estimate. Every contact on a piece that rings, as a point force on a plate
+        /// of its thickness radiating rho0 F cos / (2 pi m'' r) (Cremer and Heckl's point-driven plate below
+        /// coincidence): over a hemisphere, rho0 pi J^2 / (48 c tau m''^2) per contact, joules.</summary>
+        public double PointForceJoules;
+
         /// <summary>Contacts made (clicks emitted), and the span of their times, for the lab.</summary>
         public long Emitted;
         public double FirstT = double.MaxValue, LastT;
@@ -303,7 +330,9 @@ public static class GlassFracture
             Rng = new Random(Seed(s));
             M2 = Density * s.Thickness;
             J = s.BulletKg * Math.Max(1, s.Pellets) * 0.1 * s.BulletSpeed;
-            TauStrike = 2 * s.Thickness / Math.Max(50, s.BulletSpeed);
+            // The round decelerates steadily over its own length and the glass's thickness (the bullet-impact
+            // model's 2s/v, BulletImpact.cs): a pistol slug is about 16 mm long.
+            TauStrike = 2 * (SlugMetres + s.Thickness) / Math.Max(50, s.BulletSpeed);
         }
     }
 
@@ -366,6 +395,48 @@ public static class GlassFracture
         return (times.Count, best * 10.0, times[0] - (s.Part == Part.Land ? sim.T0 : 0), times[^1] - (s.Part == Part.Land ? sim.T0 : 0));
     }
 
+    /// <summary>
+    /// Lab: the kinetic energy everything brings to the ground (each piece's mass and arrival speed, the loose
+    /// dice at their mean drop), joules; and the acoustic efficiency of a render, the sound energy it radiates
+    /// (pressure at a metre over a hemisphere for a landing, a sphere for a break) over that energy.
+    /// </summary>
+    public static double PointForceJoules(Spec s)
+    {
+        var sim = new Sim(s);
+        Shatter(sim);
+        if (s.Part != Part.Land) return 0;
+        sim.Out = new double[16]; sim.OutT0 = 1e9; sim.Rate = 48000;
+        LandingContacts(sim, new List<Frag>());
+        return sim.PointForceJoules;
+    }
+
+    public static double ArrivingJoules(Spec s)
+    {
+        var sim = new Sim(s);
+        Shatter(sim);
+        double e = 0;
+        foreach (var f in sim.Frags) if (f.Release >= 0 && f.LandAt > 0) e += 0.5 * f.Mass * f.LandV * f.LandV;
+        if (s.Type == GlassType.Tempered)
+        {
+            double dieMass = Density * Sq(sim.DieSize) * s.Thickness;
+            var (_, v) = FallWithDrag(QuantiseDrop(s.Drop) + 0.5 * s.Height, 0, Terminal(dieMass, Sq(sim.DieSize), true));
+            e += sim.DiceLoose * 0.5 * dieMass * v * v;
+        }
+        return e;
+    }
+
+    /// <summary>Lab: sound energy of a render in pascals at a metre, joules, over a hemisphere (or a sphere).</summary>
+    public static double AcousticJoules(double[] pa, int rate, bool sphere)
+    {
+        double sum = 0;
+        foreach (double v in pa) sum += v * v;
+        return (sphere ? 4 : 2) * Math.PI * sum / rate / (Rho0 * C0);
+    }
+
+    /// <summary>The pane's lowest bending mode in its frame, Hz (clamped edges, see the class notes).</summary>
+    public static double PaneFundamentalHz(Spec s)
+        => Math.PI / 2 * BendRoot(s.Thickness) * (Sq(1.35 / s.Width) + Sq(1.35 / s.Height));
+
     /// <summary>How many pieces a break makes, by kind, and how many fall: for tests and the lab.</summary>
     public static (int Shards, int Slivers, int Clumps, int Dice, int Falling) Census(Spec s)
     {
@@ -402,8 +473,8 @@ public static class GlassFracture
         sim.Friction = 0.6 + 0.2 * Math.Min(1, groundLoss * 3);
         sim.AsperityM = groundLoss > 0.3 ? 0 : 0.002 + 0.02 * groundLoss;   // grass and carpet hold a piece still
         sim.GroundEta = GroundContactLoss(sim.Ground);
-        // A hard ground is a mirror under the contact: the image doubles the pressure.
-        sim.GroundImage = 1 + (1 - Math.Clamp(sim.Ground.AbsorptionHigh, 0, 1));
+        // The ground is a mirror under the contact, as much as it reflects (see Click).
+        sim.GroundImage = 1 - Math.Clamp(sim.Ground.AbsorptionHigh, 0, 1);
         sim.PileArea = (w + 1.0) * (1.0 + 0.15 * s.Drop);
 
         if (s.Part == Part.Hole) { PaneModesEnergy(sim, cut: false); return; }
@@ -431,7 +502,7 @@ public static class GlassFracture
                 double f = Math.PI / 2 * br * (Sq((m + 0.35) / a) + Sq((n + 0.35) / b));
                 if (f > fExc) break;
                 double phi = 2 * sx * Math.Sin(n * Math.PI * sim.ImpactY / b);
-                double v = sim.J * phi * Contact(f, sim.TauStrike) / M;
+                double v = sim.J / Math.Sqrt(Math.Max(1, s.Pellets)) * phi * Contact(f, sim.TauStrike) / M;
                 e += 0.5 * M * v * v;
             }
         }
@@ -452,6 +523,11 @@ public static class GlassFracture
     private static double GroundContactLoss(MaterialProperties ground)
         => Rigid(ground) ? 0.0002 : 0.3 * Math.Clamp(ground.LossFactor, 0, 1);
 
+    /// <summary>How much of the glass lying on a floor a falling piece can meet: all of it on something hard;
+    /// in grass or carpet the pieces settle in among the blades or the pile and are mostly covered (estimate:
+    /// three tenths showing).</summary>
+    private static double Exposed(MaterialProperties ground) => Rigid(ground) ? 1 : 0.3;
+
     /// <summary>Hard and holding a piece where it lands: stone, asphalt, tile, wood. Not grass or carpet (soft),
     /// and not water (stiff in bulk, but it gives way and swallows the ring).</summary>
     private static bool Rigid(MaterialProperties ground) => ground.YoungsModulusGPa >= 1 && ground.LossFactor < 0.3;
@@ -462,11 +538,18 @@ public static class GlassFracture
         => groundLoss + 0.02 * Math.Clamp((length - 0.05) / 0.25, 0, 1);
 
     /// <summary>
-    /// The share of a contact's kinetic energy that goes into the bodies' ringing. Fitted, not sourced: a
-    /// glass piece dropped on cement rings with 9 dB more energy over 3-60 ms than its click carries in the
-    /// first 2 ms (median over the drops in "Shards of glass dropped slowly onto cement", 9.3 dB of 32; the
-    /// el-bee tinkle texture, 9.5 of 587; the jar, 8.4), above 2 kHz; single drops through this model match
-    /// that at this share (AudioLab --glass ringfit). OPENFPS_GLASS_RING_SHARE overrides it in the lab.
+    /// The share of a contact's kinetic energy that goes into the bodies' ringing. An estimate, argued and
+    /// cross-checked rather than fitted. Argued: a thin plate striking a hard floor on its edge is stopped
+    /// through its own edge mobility (about 3.5 times 1 / (8 sqrt(B m'')) for a free edge; 3e-3 s/kg for 6 mm
+    /// glass), and the energy that puts into bending, F^2 Y over the contact, comes out of the order of the
+    /// piece's whole kinetic energy for a 5 cm piece at 5 m/s; with a restitution near 0.45 (four fifths lost),
+    /// three tenths is a middle value. Cross-checked: summing every contact as a point force on a plate
+    /// radiating rho0 F / (2 pi m'' r) (Cremer and Heckl) gives the same sound energy within 1-2 dB for a house
+    /// window landing on concrete (3 % of the falling energy against 4 %; AudioLab --glass survey,
+    /// ImpactAndGlassSoundTests). The recordings' ring-to-click balance cannot fix it: since the click's
+    /// image under a hard floor was modelled (see Click), the model's first two milliseconds are mostly the
+    /// ring's own onset at every share. OPENFPS_GLASS_RING_SHARE overrides it in the lab; at 0.03 a window's
+    /// landing is 10 dB quieter.
     /// </summary>
     private static readonly double RingShare =
         double.TryParse(Environment.GetEnvironmentVariable("OPENFPS_GLASS_RING_SHARE"), NumberStyles.Float, CultureInfo.InvariantCulture, out double share)
@@ -478,6 +561,10 @@ public static class GlassFracture
     /// bounces and slide, as the landing render does them, from t = 0 at the first contact.
     /// </summary>
     public static double[] RenderDrop(double lx, double ly, double thickness, double height, string ground, int rate, int seed)
+        => RenderDrop(lx, ly, thickness, height, ground, rate, seed, out _);
+
+    public static double[] RenderDrop(double lx, double ly, double thickness, double height, string ground, int rate, int seed,
+                                      out double pointForceJoules)
     {
         var sim = new Sim(new Spec(Part.Land, GlassType.Annealed, 1f, 1f, (float)thickness, 0.008f, 300f, 1, (float)height, ground, seed));
         var r = sim.Rng;
@@ -490,7 +577,7 @@ public static class GlassFracture
         sim.Friction = 0.6 + 0.2 * Math.Min(1, loss * 3);
         sim.AsperityM = loss > 0.3 ? 0 : 0.002 + 0.02 * loss;
         sim.GroundEta = GroundContactLoss(sim.Ground);
-        sim.GroundImage = 1 + (1 - Math.Clamp(sim.Ground.AbsorptionHigh, 0, 1));
+        sim.GroundImage = 1 - Math.Clamp(sim.Ground.AbsorptionHigh, 0, 1);
         sim.PileArea = 1e9;
         double ignore = 0;
         var f = AddFrag(sim, lx / ly >= 4 ? Kind.Sliver : Kind.Shard, lx, ly, 0.5, 0.5, 1, ref ignore);
@@ -501,7 +588,8 @@ public static class GlassFracture
         sim.Out = y; sim.OutT0 = -0.01; sim.Rate = rate;
         var pieces = new List<Frag>();
         ArriveAndSettle(sim, f, 0, f.Mass, VolumeOf(f, U(r, 0, 1)), v, U(r, 0, 0.3), 0.0005, f.H, pieces);
-        AllModes(sim.Frags.FindAll(p => p.OnGround), y, rate, -0.01, landing: true);
+        if (Want("modes")) AllModes(sim.Frags.FindAll(p => p.OnGround), y, rate, -0.01, landing: true);
+        pointForceJoules = sim.PointForceJoules;
         return y;
     }
 
@@ -782,8 +870,8 @@ public static class GlassFracture
     /// added mass of air. Estimate: a tenth of the contact's energy goes into the bodies' ringing.
     /// </summary>
     private static void Hit(Sim sim, List<Click> clicks, double t, double mass, double volume, double dv, double eStar,
-                            double radius, double restitution, double image, Frag? a, Frag? b, double vibShare = -1,
-                            double hEdge = 0, double sizeMass = 0)
+                            double radius, double restitution, double reflector, Frag? a, Frag? b, double vibShare = -1,
+                            double hEdge = 0, double sizeMass = 0, bool sliding = false, byte tag = TagContact)
     {
         if (dv <= 0) return;
         if (vibShare < 0) vibShare = RingShare;
@@ -797,11 +885,20 @@ public static class GlassFracture
         double extent = Math.Sqrt((sizeMass > 0 ? sizeMass : mass) / (Density * Math.Max(1e-4, thickness)) / Math.PI);
         double tauBody = Math.Max(Hertz(mass, radius, eStar, dv), 2 * extent / C0);
         // Pressure: rho0 V_eff cos(theta) / (4 pi c) times the derivative of the acceleration, whose integral
-        // is the change of velocity. cos(theta) averaged over directions, with a random sign.
-        double amp = Rho0 * volume * dv * (1 + restitution) * 0.6 * image / (4 * Math.PI * C0);
+        // is the change of velocity. cos(theta) averaged over directions, with a random sign. Over a floor
+        // (reflector > 0), the image: struck straight down, it pushes the other way from under the floor, at
+        // twice the body's centre height (half its thickness) times cos(theta); sliding, the same way.
+        double amp = Rho0 * volume * dv * (1 + restitution) * 0.6 / (4 * Math.PI * C0);
         if (sim.Rng.NextDouble() < 0.5) amp = -amp;
-        sim.Emit(clicks, new Click(t, amp, tauBody));
+        double mirror = reflector <= 0 ? 0 : sliding ? reflector : -reflector;
+        double delay = 2 * 0.5 * thickness * 0.6 / C0;
+        sim.Emit(clicks, new Click(t, amp, tauBody, mirror, delay, false, tag));
         double joules = vibShare * 0.5 * (b == null ? mass : mass / 2) * dv * dv;
+        if (a != null && a.Hz.Length > 0)
+        {
+            double impulse = mass * dv * (1 + restitution), m2 = Density * thickness;
+            sim.PointForceJoules += Rho0 * Math.PI * impulse * impulse / (48 * C0 * tau * m2 * m2);
+        }
         if (a != null && a.Hz.Length > 0) a.Events.Add((t, b != null && b.Hz.Length > 0 ? joules / 2 : joules, tau, -1, 0));
         if (b != null && b.Hz.Length > 0) b.Events.Add((t, a != null && a.Hz.Length > 0 ? joules / 2 : joules, tau, -1, 0));
     }
@@ -832,7 +929,7 @@ public static class GlassFracture
             int slips = 2 + r.Next(4);
             for (int k = 0; k < slips; k++)
                 Hit(sim, clicks, Math.Max(0, f.Release - U(r, 0, 0.02)), f.Mass, VolumeOf(f, 0.2), U(r, 0.03, 0.25), sim.GlassEStar, 0.0005,
-                    0.3, 1, f, null, -1, f.H);
+                    0.3, 0, f, null, -1, f.H, sliding: true);
             // A knock or two against other falling pieces, which fall together and meet slowly.
             int knocks = PoissonCount(r, 0.5);
             for (int k = 0; k < knocks && falling.Count > 1; k++)
@@ -841,14 +938,14 @@ public static class GlassFracture
                 if (other == f) continue;
                 double t = Math.Max(f.Release, other.Release) + U(r, 0.005, 0.25);
                 Hit(sim, clicks, t, Math.Min(f.Mass, other.Mass), VolumeOf(f.Mass < other.Mass ? f : other, 0.5), U(r, 0.1, 0.5),
-                    sim.GlassEStar, 0.0005, 0.5, 1, f, other, -1, h);
+                    sim.GlassEStar, 0.0005, 0.5, 0, f, other, -1, h);
             }
             // Some of the lowest pieces come down on the sill on their way (estimate: three in ten of the bottom
             // quarter), from where they were.
             // A long dagger stands on the bead and topples rather than dropping on the sill.
             if (f.Y < 0.25 * sim.S.Height && f.Lx < 0.12 && r.NextDouble() < 0.3)
                 Hit(sim, clicks, f.Release + Math.Sqrt(2 * Math.Max(0.02, f.Y) / G), f.Mass, VolumeOf(f, U(r, 0, 1)),
-                    Math.Sqrt(2 * G * Math.Max(0.02, f.Y)), 2.2e10, 0.0005, 0.3, 1, f, null, -1, f.H);
+                    Math.Sqrt(2 * G * Math.Max(0.02, f.Y)), 2.2e10, 0.0005, 0.3, 1, f, null, -1, f.H);   // the sill: hard
         }
 
         if (sim.S.Type != GlassType.Tempered) return;
@@ -859,25 +956,34 @@ public static class GlassFracture
         // sound crosses it.
         double dieBody = 2 * sim.DieSize / Math.Sqrt(Math.PI) / C0;
         double tauKick = Math.Max(sim.DieSize / CrackSpeed, dieBody);
+        // In the sheet a die is pushed off by its neighbours, which are pushed the other way: the pair is a
+        // quadrupole, a die's width across (see Click).
+        double apart = 0.6 * sim.DieSize / C0;
+        // And a die in the sheet moves mostly in the sheet's plane, which is where its stress was: sliding past
+        // the air on its faces, its edges against its neighbours', it pushes almost no air. Only the part of its
+        // motion out of the plane does (estimate: a fifth). A tempered pane's residual stress is symmetric
+        // through the thickness, so its release does not move the faces in or out to first order.
+        double sheet = Rho0 * 2 * dieVol * OutOfPlane / (4 * Math.PI * C0);
         for (int i = 0; i < sim.Dice; i++)
         {
             double x = r.NextDouble() * sim.S.Width, y = r.NextDouble() * sim.S.Height;
             double t = Math.Sqrt(Sq(x - sim.ImpactX) + Sq(y - sim.ImpactY)) / CrackSpeed;
             double kick = sim.DieKick * U(r, 0.5, 1.2);
-            double amp = Rho0 * 2 * dieVol * kick * U(r, -1, 1) / (4 * Math.PI * C0);
-            sim.Emit(clicks, new Click(t, amp, tauKick));
+            double amp = sheet * kick * U(r, -1, 1);
+            sim.Emit(clicks, new Click(t, amp, tauKick, -1, apart, false, TagKick));
             for (int k = 0; k < 2; k++)
             {
                 double dv = kick * U(r, 0.2, 0.6);
                 double tau = Math.Max(dieBody, Hertz(dieMass / 2, 0.0005, sim.GlassEStar, dv));
-                sim.Emit(clicks, new Click(t + U(r, 0.0001, 0.004), Rho0 * 2 * dieVol * dv * 1.5 * 0.6 * Sign(r) / (4 * Math.PI * C0), tau));
+                sim.Emit(clicks, new Click(t + U(r, 0.0001, 0.004), sheet * dv * 1.5 * Sign(r), tau,
+                                           -1, apart, false, TagKick));
             }
             if (i < sim.DiceLoose)
             {
                 double rel = t + 0.25 * Sq(r.NextDouble()) + 0.1 * (1 - y / sim.S.Height) * r.NextDouble();
                 double dv = U(r, 0.1, 0.4);
-                sim.Emit(clicks, new Click(rel, Rho0 * 2 * dieVol * dv * 1.3 * 0.6 * Sign(r) / (4 * Math.PI * C0),
-                                     Math.Max(dieBody, Hertz(dieMass / 2, 0.0005, sim.GlassEStar, dv))));
+                sim.Emit(clicks, new Click(rel, sheet * dv * 1.3 * Sign(r),
+                                     Math.Max(dieBody, Hertz(dieMass / 2, 0.0005, sim.GlassEStar, dv)), -1, apart, false, TagKick));
                 if (r.NextDouble() < 0.4)
                 {
                     double dv2 = U(r, 0.2, 1.0);
@@ -1015,10 +1121,10 @@ public static class GlassFracture
     {
         var r = sim.Rng;
         var clicks = sim.GroundClicks;
-        bool onGlass = r.NextDouble() < 1 - Math.Exp(-sim.PileCover);
+        bool onGlass = r.NextDouble() < 1 - Math.Exp(-sim.PileCover * Exposed(sim.Ground));
         double eStar = onGlass ? sim.GlassEStar : sim.GroundEStar;
         double e = onGlass ? 0.5 : sim.Restitution;
-        double image = onGlass ? 2 : sim.GroundImage;
+        double image = onGlass ? 1 : sim.GroundImage;
         Frag? under = null;
         if (onGlass && sim.Landed.Count > 0 && pieces != null) under = pieces[sim.Landed[r.Next(sim.Landed.Count)]];
         bool hard = onGlass || Rigid(sim.Ground);
@@ -1037,11 +1143,17 @@ public static class GlassFracture
         Hit(sim, clicks, t, struck, radiating, vz, eStar, radius, e, image, f, under, -1, thick, sizeMass: mass);
         if (f != null)
         {
-            f.Events.Add((t, 0, 0, 2, LyingLoss(onGlass ? 0.001 : sim.GroundEta, f.Lx)));
+            // On the pile it rests on glass, which on a soft floor rests in the grass or the carpet: half that
+            // floor's hold on it (estimate).
+            double resting = !onGlass ? sim.GroundEta : Rigid(sim.Ground) ? 0.001 : 0.5 * sim.GroundEta;
+            f.Events.Add((t, 0, 0, 2, LyingLoss(resting, f.Lx)));
+            f.GroundH = 0.5 * f.H + 0.1 * f.Lx * U(r, 0.2, 1);
+            f.GroundR = image;
             f.OnGround = true;
             // A plate rocks down onto its face a few milliseconds later: the slap, face-on.
             if (f.Kind != Kind.Sliver && f.Lx > 0.01)
-                Hit(sim, clicks, t + U(r, 0.001, 0.008), mass, VolumeOf(f, 1), 0.4 * vz, eStar, 0.002, e, image, f, null, RingShare / 2, thick);
+                Hit(sim, clicks, t + U(r, 0.001, 0.008), mass, VolumeOf(f, 1), 0.4 * vz, eStar, 0.002, e, image, f, null, RingShare / 2, thick,
+                    tag: TagSlap);
             sim.PileCover += f.Area / sim.PileArea;
             if (pieces != null && f.Hz.Length > 0) { pieces.Add(f); sim.Landed.Add(pieces.Count - 1); }
 
@@ -1096,9 +1208,9 @@ public static class GlassFracture
         var r = sim.Rng;
         var clicks = sim.GroundClicks;
         double e = sim.Restitution;
-        bool onGlass = r.NextDouble() < 1 - Math.Exp(-sim.PileCover);
+        bool onGlass = r.NextDouble() < 1 - Math.Exp(-sim.PileCover * Exposed(sim.Ground));
         double eStar = onGlass ? sim.GlassEStar : sim.GroundEStar;
-        double image = onGlass ? 2 : sim.GroundImage;
+        double image = onGlass ? 1 : sim.GroundImage;
         int guard = 0;
         while (v > 0.12 && guard++ < 12)
         {
@@ -1120,7 +1232,7 @@ public static class GlassFracture
             double dt = step / speed * U(r, 0.5, 1.5);
             s += dt;
             double dv = 0.12 * speed * U(r, 0.3, 1);
-            Hit(sim, clicks, t + s, mass, volume, dv, eStar, radius, 0.2, image, f, null, -1, thick);
+            Hit(sim, clicks, t + s, mass, volume, dv, eStar, radius, 0.2, image, f, null, -1, thick, sliding: true, tag: TagTap);
         }
     }
 
@@ -1147,7 +1259,7 @@ public static class GlassFracture
         foreach (var c in sim.WindowClicks) last = Math.Max(last, c.T + 0.05);
         int n = (int)(Math.Min(2.5, last + 0.05) * rate);
         var y = new double[n];
-        if (Want("pane")) PaneModes(sim, y, rate, LossFactor + 0.03);
+        if (Want("pane") || Want("strike")) PaneModes(sim, y, rate, LossFactor + 0.03);
         if (Want("clicks")) Clicks(sim.WindowClicks, y, rate, 0);
         if (Want("modes")) AllModes(sim.Frags, y, rate, 0, landing: false);
         return Trim(y, rate);
@@ -1179,6 +1291,21 @@ public static class GlassFracture
     private static void PaneModes(Sim sim, double[] y, int rate, double eta)
     {
         var s = sim.S;
+        // The strike itself: the round's force on the plate, which a point-driven plate below coincidence
+        // radiates as rho0 F(t) / (2 pi m'' r) on its axis (Cremer and Heckl's point-excited plate in the mass
+        // law; the bullet-impact model's cross-check, BulletImpact.cs).
+        if (Want("strike"))
+        {
+            // A shotgun's pellets strike apart, at different places and moments (the pattern's spread along
+            // the line of flight, a fraction of a millisecond), each with its own share: nine pulses, not one
+            // nine times as strong.
+            int pellets = Math.Max(1, s.Pellets);
+            var pr = new Random(Seed(s) ^ 0x5eed);
+            for (int k = 0; k < pellets; k++)
+                RenderClick(new Click(0.0005 + (pellets > 1 ? U(pr, 0, 0.0004) : 0), Rho0 * sim.J / pellets / (2 * Math.PI * sim.M2),
+                                      sim.TauStrike, 0, 0, true, TagStrike), y, rate, 0);
+        }
+        if (Only == "strike") return;
         double a = s.Width, b = s.Height, M = sim.M2 * a * b, area = a * b, br = BendRoot(s.Thickness);
         double cutStart = 0.5 * sim.CutAt, cutEnd = 1.5 * sim.CutAt;
         int nMax = double.IsInfinity(sim.CutAt) ? y.Length : Math.Min(y.Length, (int)(cutEnd * rate) + 2);
@@ -1192,13 +1319,17 @@ public static class GlassFracture
                 double f = Math.PI / 2 * br * (Sq((m + 0.35) / a) + Sq((nn + 0.35) / b));
                 if (f > fMax) break;
                 double phi = 2 * sx * Math.Sin(nn * Math.PI * sim.ImpactY / b);
-                double v = sim.J * phi * Contact(f, sim.TauStrike) / M;
+                double v = sim.J / Math.Sqrt(Math.Max(1, s.Pellets)) * phi * Contact(f, sim.TauStrike) / M;
                 double q = v * area * 8 / (Math.PI * Math.PI * m * nn);
                 double w = 2 * Math.PI * f;
                 double p = Rho0 * w * q / (2 * Math.PI);       // a metre away, baffled
                 double decay = Math.Exp(-eta * w / 2 / rate);
                 double c = Math.Cos(w / rate), sn = Math.Sin(w / rate);
-                double re = p, im = 0;
+                // Struck, a mode's volume velocity jumps to q and swings as q cos(wt); the pressure is its rate
+                // of change, -w q sin(wt), from zero, plus the jump itself, which all the modes make together
+                // and which is the force pulse added above. (Started at q w cos(wt), every mode peaked at t = 0
+                // in step, a spike far over the plate's own pulse.)
+                double re = 0, im = p;
                 for (int i = 0; i < nMax; i++)
                 {
                     double t = (double)i / rate, g = 1;
@@ -1246,6 +1377,17 @@ public static class GlassFracture
             if (f.Hz[k] > 0.45 * rate) continue;
             double w = 2 * Math.PI * f.Hz[k];
             double c = Math.Cos(w / rate), sn = Math.Sin(w / rate), gain = f.Gain[k];
+            // On the ground a piece bends towards and away from the floor, and its image under the floor moves
+            // the other way: over the upper hemisphere |1 - R exp(-2ikH cos)|^2 averages 1 + R^2 - 2R sin(2kH)/(2kH),
+            // nothing for a low mode on a hard floor, up to twice the power for a high one. The same cancellation
+            // as a click's (see Click).
+            if (landing && f.GroundR > 0)
+            {
+                double x2 = 2 * w / C0 * f.GroundH, rr = f.GroundR;
+                // Over 1 + R^2: well clear of the floor the reflection is the game's own ground path (the client
+                // adds one to an impulse), not this piece's, so only the cancellation close to the floor is kept.
+                gain *= Math.Sqrt(Math.Max(0, 1 + rr * rr - 2 * rr * Math.Sin(x2) / x2) / (1 + rr * rr));
+            }
             double re = 0, im = 0, etaState = InFrameLoss;      // in the frame until it is released
             bool on = !landing || f.Born, stopped = false;
             int i = 0;
@@ -1312,11 +1454,15 @@ public static class GlassFracture
         foreach (var c in clicks) RenderClick(c, y, rate, t0);
     }
 
+    /// <summary>Lab only: render clicks of one tag alone (OPENFPS_GLASS_TAG = 0 contact, 1 kick, 2 slap, 3 strike, 4 tap).</summary>
+    private static readonly int OnlyTag = int.TryParse(Environment.GetEnvironmentVariable("OPENFPS_GLASS_TAG"), out int tagOnly) ? tagOnly : -1;
+
     private static void RenderClick(Click c, double[] y, int rate, double t0)
     {
+        if (OnlyTag >= 0 && c.Tag != OnlyTag) return;
         int at = (int)Math.Floor((c.T - t0) * rate);
         if (at < 0 || at >= y.Length) return;
-        var k = Kernel(c.Tau, rate);
+        var k = Kernel(c.Tau, rate, c.MirrorGain, c.MirrorDelay, c.Pulse);
         int lead = KernelLead;
         for (int j = 0; j < k.Length; j++)
         {
@@ -1332,52 +1478,67 @@ public static class GlassFracture
     /// stops being computed until something strikes it again.</summary>
     private const double SilentPascals = 3e-3;
 
-    private static readonly ConcurrentDictionary<(int Bin, int Rate), double[]> _kernels = new();
+    private static readonly ConcurrentDictionary<(int Bin, int Rate, int Mirror, int Shift, bool Pulse), double[]> _kernels = new();
 
     /// <summary>Lab: a contact kernel's peak and length, against the unfiltered pulse's pi^2 / (2 tau^2).</summary>
     public static (double Peak, int Length, double Analytic) KernelInfo(double tau, int rate)
     {
-        var k = Kernel(tau, rate);
+        var k = Kernel(tau, rate, 0, 0, false);
         double peak = 0;
         foreach (double v in k) peak = Math.Max(peak, Math.Abs(v));
         return (peak, k.Length, Math.PI * Math.PI / (2 * tau * tau));
     }
 
     /// <summary>
-    /// The derivative of a unit-area half-sine pulse of duration tau, band-limited to the output rate: what
-    /// a contact's acceleration does to the air. Built at sixteen times the rate and filtered down, cached
-    /// by duration in 4 % steps.
+    /// The derivative of a unit-area half-sine pulse of duration tau (or, <paramref name="pulse"/>, the pulse
+    /// itself), with its mirror <paramref name="mirror"/> times as strong <paramref name="delay"/> seconds
+    /// later, band-limited to the output rate: what a contact's acceleration does to the air. Built at
+    /// sixteen times the rate and filtered down, cached by duration in 4 % steps.
     /// </summary>
-    private static double[] Kernel(double tau, int rate)
+    private static double[] Kernel(double tau, int rate, double mirror, double delay, bool pulse)
     {
+        const int over = 16;
         int bin = (int)Math.Round(Math.Log(Math.Clamp(tau, 1e-6, 0.02) / 1e-6) / Math.Log(1.04));
-        return _kernels.GetOrAdd((bin, rate), key =>
+        int mq = (int)Math.Round(Math.Clamp(mirror, -1, 1) * 20);
+        int shift = mq == 0 ? 0 : Math.Max(1, (int)Math.Round(delay * rate * over));
+        return _kernels.GetOrAdd((bin, rate, mq, shift, pulse), key =>
         {
             double t = 1e-6 * Math.Pow(1.04, key.Bin);
-            // Sixteen times the rate for a contact shorter than a few samples; a longer one is smooth already.
-            int over = t * key.Rate > 8 ? 1 : 16;
-            double fs = (double)key.Rate * over, dt = 1 / fs;
-            int pulse = Math.Max(1, (int)Math.Round(t * fs));
-            int half = KernelLead * over;
-            int len = pulse + 2 * half + 2;
-            // The half-sine sampled finely with an area of one, and its derivative as a finite difference, so
-            // the derivative integrates to exactly nothing and its integral's integral is one.
-            var pulseS = new double[pulse];
+            // A long contact is smooth at the output rate already; a short one, or a mirror a fraction of a
+            // sample away, needs the finer grid.
+            int ov = t * key.Rate > 8 && key.Mirror == 0 ? 1 : over;
+            int sh = key.Mirror == 0 ? 0 : key.Shift;
+            double fs = (double)key.Rate * ov, dt = 1 / fs;
+            int n = Math.Max(1, (int)Math.Round(t * fs));
+            int half = KernelLead * ov;
+            int len = n + sh + 2 * half + 2;
+            // The half-sine sampled finely with an area of one; its derivative a finite difference, so the
+            // derivative integrates to exactly nothing and its integral's integral is one.
+            var shape = new double[n];
             double sum = 0;
-            for (int i = 0; i < pulse; i++) { pulseS[i] = Math.Sin(Math.PI * (i + 0.5) / pulse); sum += pulseS[i] * dt; }
+            for (int i = 0; i < n; i++) { shape[i] = Math.Sin(Math.PI * (i + 0.5) / n); sum += shape[i] * dt; }
             var d = new double[len];
-            for (int i = 0; i <= pulse; i++)
+            for (int i = 0; i <= n; i++)
             {
-                double now = i < pulse ? pulseS[i] / sum : 0, before = i > 0 ? pulseS[i - 1] / sum : 0;
-                d[half + i] = (now - before) / dt;
+                double now = i < n ? shape[i] / sum : 0, before = i > 0 ? shape[i - 1] / sum : 0;
+                d[half + i] = key.Pulse ? now : (now - before) / dt;
+            }
+            if (key.Mirror != 0)
+            {
+                double g = key.Mirror / 20.0;
+                var copy = (double[])d.Clone();
+                // Normalised by sqrt(1 + g^2): far apart (high frequencies) the pair is the one source it was, so
+                // a ground's reflection is not counted here as well as on the game's own ground path.
+                double norm = 1 / Math.Sqrt(1 + g * g);
+                for (int i = 0; i < len; i++) d[i] = norm * (copy[i] + (i >= sh ? g * copy[i - sh] : 0));
             }
             // Low-pass at 0.45 of the output rate (Blackman-windowed sinc) and take every sixteenth sample.
             double fc = 0.45 * key.Rate / fs;
-            var outLen = len / over + 1;
+            var outLen = len / ov + 1;
             var o = new double[outLen];
             for (int k = 0; k < outLen; k++)
             {
-                int centre = k * over;
+                int centre = k * ov;
                 double acc = 0;
                 for (int j = -half; j <= half; j++)
                 {

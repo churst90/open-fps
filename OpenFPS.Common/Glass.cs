@@ -62,6 +62,64 @@ public readonly record struct GlassPane(
     float HeightAboveGround);
 
 /// <summary>
+/// A glazed part as the map already has it: the prefab it was made from, what it is called, and, when it is
+/// part of something bigger, that thing's template ("vehicle:i4_economy") with where the part sits in it and
+/// how big it is in the thing's own frame (x across, y up, z forward).
+/// </summary>
+public readonly record struct GlazedPart(string PrefabId, string Name, string OwnerTemplate, Vector3 LocalPosition, Vector3 Size);
+
+/// <summary>
+/// What kind of glass a glazed part is, from what the map says it is. One place, so the server, the lab and
+/// the tests agree.
+///
+/// Glass is chosen by where it is, because that is how it is chosen in buildings and cars: safety glazing is
+/// required in doors, side panels beside doors, shop fronts and other glass people can walk into (building
+/// regulations: in the US the CPSC's 16 CFR 1201 for doors and storm doors, in England Approved Document K),
+/// and that is toughened (tempered) glass in practice; a house or a flat's ordinary window is float glass,
+/// annealed. A car's side and rear windows are toughened and its windscreen laminated (UN ECE R43; FMVSS 205
+/// in the US), so a windscreen cracks round the hole and stays in its frame.
+///
+/// The rules, in order:
+///   a part of a vehicle: across the car (thinnest front to back) and forward of the cabin's middle, the
+///   windscreen, laminated; any other vehicle glass, tempered;
+///   a door prefab (glass_front_door, glass_pull_door, auto_sliding_door, patio_door), tempered;
+///   a name that says window or pane of a home ("window", "skylight"), annealed;
+///   a name that says shop, shelter, terminal, front, entrance, door, balustrade, screen, tempered;
+///   otherwise the glass_wall prefab's own description, "a shopfront or a stairwell window" glazing panel,
+///   tempered.
+/// </summary>
+public static class GlassKind
+{
+    private static readonly string[] Doors = { "glass_front_door", "glass_pull_door", "auto_sliding_door", "patio_door" };
+    private static readonly string[] Annealed = { "window", "skylight" };
+    private static readonly string[] Tempered = { "shop", "shelter", "terminal", "front", "entrance", "door", "balustrade", "screen" };
+
+    public static GlassType Of(GlazedPart p)
+    {
+        if (!string.IsNullOrEmpty(p.OwnerTemplate) && p.OwnerTemplate.StartsWith("vehicle:", StringComparison.OrdinalIgnoreCase))
+        {
+            bool across = p.Size.Z < p.Size.X && p.Size.Z < p.Size.Y;
+            return across && p.LocalPosition.Z > CabinMiddle(p.OwnerTemplate) ? GlassType.Laminated : GlassType.Tempered;
+        }
+        string prefab = p.PrefabId ?? "";
+        foreach (var d in Doors) if (prefab.Equals(d, StringComparison.OrdinalIgnoreCase)) return GlassType.Tempered;
+        string name = (p.Name ?? "").ToLowerInvariant();
+        foreach (var w in Annealed) if (name.Contains(w, StringComparison.Ordinal)) return GlassType.Annealed;
+        foreach (var w in Tempered) if (name.Contains(w, StringComparison.Ordinal)) return GlassType.Tempered;
+        return GlassType.Tempered;
+    }
+
+    /// <summary>The middle of a vehicle's cabin, front to back, in its own frame: forward of it is the
+    /// windscreen, behind it the back window. Zero when the template is not a known vehicle.</summary>
+    private static float CabinMiddle(string template)
+    {
+        string preset = template.Substring("vehicle:".Length);
+        if (!MachineRegistry.Knows(preset)) return 0f;
+        return VehicleCabin.Measure(MachineRegistry.VehicleFor(preset)) is { } g ? g.Cz : 0f;
+    }
+}
+
+/// <summary>
 /// Shooting out a window, as a sequence of sounds with times and places.
 ///
 /// The reason this is worth doing properly rather than playing one crash sample: a window shot out

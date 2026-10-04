@@ -280,6 +280,42 @@ public class ImpactAndGlassSoundTests
         Assert.True(Tail(laminated) < Tail(annealed) - 6, $"laminated tail {Tail(laminated):F1} dB, annealed {Tail(annealed):F1} dB");
     }
 
+    /// <summary>
+    /// The round's crack is the point-driven plate's own pulse, rho0 F / (2 pi m'' r) (Cremer and Heckl), and
+    /// not a spike over it: the pane's modes start from nothing and add their swing, they are not all at their
+    /// peak together at t = 0 (they were, and an intact pane shot through came out 10 dB over its own force).
+    /// </summary>
+    [Fact]
+    public void TheStrikeIsThePlatesOwnPulse()
+    {
+        var spec = Spec(GlassFracture.Part.Hole, GlassType.Annealed, 1.2f, 1.6f, 0.006f, weapon: WeaponRegistry.Akm);
+        var pcm = GlassFracture.Render(spec, 48000);
+        double peak = pcm.Take(480).Max(Math.Abs);
+        double j = spec.BulletKg * 0.1 * spec.BulletSpeed, tau = 2 * (0.016 + spec.Thickness) / spec.BulletSpeed;
+        double analytic = 1.2 * (Math.PI / 2 * j / tau) / (2 * Math.PI * 2500 * spec.Thickness);
+        Assert.InRange(20 * Math.Log10(peak / analytic), -3, 3);
+    }
+
+    /// <summary>
+    /// How much of the falling glass's energy leaves as sound, two ways that share nothing but the contacts: the
+    /// simulation (pieces ringing at their modes, glass's measured loss) and every contact as a point force on
+    /// a plate radiating rho0 F / (2 pi m'' r). They agree within a few decibels, at a few per cent of the energy
+    /// for a house window coming down on concrete, and grass takes most of it away.
+    /// </summary>
+    [Fact]
+    public void TheLandingsSoundIsAFewPerCentOfItsEnergyBothWays()
+    {
+        var concrete = Spec(GlassFracture.Part.Land, GlassType.Annealed, 1.2f, 1.6f, 0.006f, ground: "Concrete");
+        var grass = Spec(GlassFracture.Part.Land, GlassType.Annealed, 1.2f, 1.6f, 0.006f, ground: "Grass");
+        double ke = GlassFracture.ArrivingJoules(concrete);
+        double sim = GlassFracture.AcousticJoules(GlassFracture.Render(concrete, 48000), 48000, false);
+        double force = GlassFracture.PointForceJoules(concrete);
+        Assert.InRange(sim / ke, 0.003, 0.1);
+        Assert.InRange(10 * Math.Log10(sim / force), -6, 6);
+        double soft = GlassFracture.AcousticJoules(GlassFracture.Render(grass, 48000), 48000, false);
+        Assert.True(soft < sim / 3, $"grass {soft:E2} J, concrete {sim:E2} J");
+    }
+
     /// <summary>A piece falling through air arrives later than in a vacuum, and a fine dust of glass much
     /// later; a heavy piece over a few metres hardly differs (terminal speeds of 15-20 m/s).</summary>
     [Fact]

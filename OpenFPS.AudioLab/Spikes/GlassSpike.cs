@@ -45,13 +45,19 @@ public static class GlassSpike
             AcousticRegistry.Initialize();
             var all = new List<float>();
             var rng = new Random(5);
+            double keSum = 0, acSum = 0, pfSum = 0;
             for (int i = 0; i < 40; i++)
             {
                 double lx = 0.03 + 0.05 * rng.NextDouble(), ly = lx * (0.4 + 0.5 * rng.NextDouble());
-                var pa = GlassFracture.RenderDrop(lx, ly, rng.NextDouble() < 0.5 ? 0.003 : 0.006, 0.1 + 0.3 * rng.NextDouble(), "Concrete", Rate, i);
+                double th = rng.NextDouble() < 0.5 ? 0.003 : 0.006, drop = 0.1 + 0.3 * rng.NextDouble();
+                var pa = GlassFracture.RenderDrop(lx, ly, th, drop, "Concrete", Rate, i, out double pf);
+                pfSum += pf;
+                double ke = 2500 * lx * ly * 0.75 * th * 9.81 * drop;
+                keSum += ke; acSum += GlassFracture.AcousticJoules(pa, Rate, false);
                 all.AddRange(pa.Take(Rate / 2).Select(x => (float)(x / 50)));
             }
             WriteWav(dir ?? "ringfit.wav", all.ToArray());
+            Console.WriteLine($"40 drops: KE {keSum:E2} J, sound {acSum:E2} J, efficiency {acSum / keSum:E2}; point-force estimate {pfSum:E2} J ({pfSum / keSum:E2})");
             return 0;
         }
         if (args.Contains("round1")) return Round1(dir ?? LabPaths.InRepo("inbox", "glass-round1-2026-10-04"));
@@ -95,8 +101,18 @@ public static class GlassSpike
                             sw.Stop();
                             double laf = HeardLevelsSpike.LafMaxDbfs(pcm) + db;
                             var contacts = GlassFracture.Contacts(spec);
+                            string eff = "";
+                            if (part != GlassFracture.Part.Land)
+                                eff = $"  sound {GlassFracture.AcousticJoules(GlassFracture.Render(spec, Rate), Rate, true):E2} J";
+                            if (part == GlassFracture.Part.Land)
+                            {
+                                var pa = GlassFracture.Render(spec, Rate);
+                                double ke = GlassFracture.ArrivingJoules(spec), ac = GlassFracture.AcousticJoules(pa, Rate, false);
+                                double pf = GlassFracture.PointForceJoules(spec);
+                                eff = $"  KE {ke:F0} J, sound {ac:E2} J, efficiency {ac / ke:E2}, point-force estimate {pf:E2} J ({pf / ke:E2})";
+                            }
                             Console.WriteLine($"{key,-74} {db,6:F1} {laf,7:F1} {pcm.Length / (double)Rate,5:F2} {sw.Elapsed.TotalMilliseconds,6:F0}  declared {GlassFracture.DeclaredDb(spec):F0}"
-                                            + $"  contacts {contacts.Contacts} over {contacts.First:F2}-{contacts.Last:F2} s, busiest {contacts.BusiestPerSecond:F0}/s");
+                                            + $"  contacts {contacts.Contacts} over {contacts.First:F2}-{contacts.Last:F2} s, busiest {contacts.BusiestPerSecond:F0}/s" + eff);
                         }
             }
         return 0;
@@ -161,7 +177,8 @@ public static class GlassSpike
             for (int i = 0; i < n; i++) events.Add(buf[i]);
             var after = GlassSound.From(events, glass, WeaponRegistry.Glock, pane.T, ground, 1);
             string stem = $"{fileNo:00}-house-annealed-glock-street-below-2nd-floor-onto-{ground.ToLowerInvariant()}";
-            takes.Add(($"{stem}-after", Place(after, new Vector3(1f, 1.6f, 4f), out var lines)));
+            takes.Add(($"{stem}-after", Place(after, new Vector3(1f, 1.6f, 4f), out var lines, raw: rawTakes,
+                                              rawName: $"house-annealed-glock-street-below-2nd-floor-onto-{ground.ToLowerInvariant()}")));
             notes.Add($"{stem}-after: " + string.Join("; ", lines));
             fileNo++;
         }
