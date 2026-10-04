@@ -164,6 +164,7 @@ public sealed partial class ClientGameSession : IDisposable
             Ui.Play(msg.Channel switch
             {
                 ChatChannel.Private => UiCue.ChatPrivate,
+                ChatChannel.Team => UiCue.ChatTeam,
                 ChatChannel.All => UiCue.ChatAll,
                 ChatChannel.Server => msg.FromStaff ? UiCue.ChatAdmin : UiCue.ChatServer,
                 _ => UiCue.ChatMap,

@@ -60,6 +60,9 @@ public class GameServer
     /// <summary>A connection that has not logged in by now is closed.</summary>
     public static readonly TimeSpan LoginTimeout = TimeSpan.FromSeconds(120);
     private FriendRepository _friends = null!;
+    /// <summary>The teams players have made (teams.json). Null in a test rig that has none; Start()
+    /// always makes one. Read at spawn, so a body is born wearing its team.</summary>
+    public TeamRepository? Teams { get; set; }
     private MudGateway _mudGateway = null!;
     private readonly ServerStateUpdate _reusableBroadcast = new();
     private readonly ServerStateUpdate _reliableBroadcast = new();
@@ -145,6 +148,30 @@ public class GameServer
     public void SyncAudioComponent(int entityId)
     {
         _dirtyAudioEntities.Enqueue(entityId);
+    }
+
+    /// <summary>The entities whose definitions go out again at the next broadcast. For tests.</summary>
+    internal IReadOnlyCollection<int> PendingDefinitionResends => _dirtyAudioEntities.ToArray();
+
+    /// <summary>
+    /// Puts a player's team on their body, if they are in the world, and has everybody who can see them
+    /// told again. A client hears a teammate's beacon in its own tone by comparing the team on that
+    /// body with the team on its own, and both travel in the entity definition, which is sent once —
+    /// so a change of team that did not re-send it would go unheard until the player left and came back.
+    /// Runs on the tick thread.
+    /// </summary>
+    public void RefreshTeam(string username)
+    {
+        if (Teams == null) return;
+        var session = _sessions.GetAllSessions().FirstOrDefault(s => s.Username.Equals(username, StringComparison.OrdinalIgnoreCase));
+        if (session == null || session.Entity == Entity.Null) return;
+        if (!_maps.TryGetMap(session.CurrentMapId, out var world, out _, out _, out _) || !world.IsAlive(session.Entity)) return;
+        if (!world.Has<PlayerComponent>(session.Entity)) return;
+        ref var player = ref world.Get<PlayerComponent>(session.Entity);
+        string team = Teams.NameOf(session.Username);
+        if (player.Team == team) return;
+        player.Team = team;
+        SyncAudioComponent(session.Entity.Id);
     }
 
     /// <summary>
@@ -247,6 +274,8 @@ public class GameServer
         // Beside openfps.db and motd.txt, in the server's working folder. See FriendRepository for
         // why this is a file and not a table.
         _friends = new FriendRepository("friends.json");
+        // Beside it, and a file for the same reason. See TeamRepository.
+        Teams = new TeamRepository("teams.json");
         _commands = new CommandHandler(_sessions, _maps, this, _composites, _seats, _hands, _userRepo, _friends);
         
         // These register their handlers with the dispatcher, which is what keeps them alive.
@@ -317,13 +346,25 @@ public class GameServer
             SendToSession(from, new TextEvent { Text = $"You are muted for {minutes} more minute{(minutes == 1 ? "" : "s")}." });
             return;
         }
+        // To your team: everyone in it who is on, on whatever map they are, and nobody else.
+        TeamRepository.Team? team = null;
+        if (channel == ChatChannel.Team && (team = Teams?.TeamOf(from.Username)) == null)
+        {
+            SendToSession(from, new TextEvent { Text = "You are not in a team." });
+            return;
+        }
         Log.Information("[CHAT {Channel}] {User}: {Text}", channel, from.Username, text);
         var line = new ChatMessage
         {
             Sender = from.Username, Text = text, Channel = channel,
             FromStaff = from.Role is UserRole.Admin or UserRole.Dev or UserRole.Moderator,
         };
-        var to = channel == ChatChannel.All ? _sessions.GetAllSessions() : _sessions.GetSessionsInMap(from.CurrentMapId);
+        var to = channel switch
+        {
+            ChatChannel.All => _sessions.GetAllSessions(),
+            ChatChannel.Team => _sessions.GetAllSessions().Where(s => team!.Has(s.Username)),
+            _ => _sessions.GetSessionsInMap(from.CurrentMapId),
+        };
         foreach (var s in to) SendToSession(s, line);
     }
 
@@ -442,7 +483,7 @@ public class GameServer
         _dispatcher.RegisterHandler<ChatMessage>((id, req, reply) => {
             if (!_sessions.TryGetSession(id, out var sess)) return;
             Touch(id);
-            Chat(sess, req.Text, req.Channel == ChatChannel.All ? ChatChannel.All : ChatChannel.Map);
+            Chat(sess, req.Text, req.Channel is ChatChannel.All or ChatChannel.Team ? req.Channel : ChatChannel.Map);
         });
         _dispatcher.RegisterHandler<InteractRequest>((id, req, reply) => {
             var peer = _network.GetPeer(id);
@@ -900,7 +941,9 @@ public class GameServer
                     Username = session.Username, 
                     Role = session.Role,
                     Yaw = 0,
-                    Pitch = 0
+                    Pitch = 0,
+                    // Born wearing its team, so the first definition anybody is sent already says it.
+                    Team = Teams?.NameOf(session.Username) ?? "",
                 });
             world.Add(session.Entity, EntityType.Player);
             world.Add(session.Entity, spawnPoint);

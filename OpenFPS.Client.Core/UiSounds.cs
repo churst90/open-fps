@@ -12,6 +12,8 @@ public enum UiCue
     ChatMap, ChatAll, ChatPrivate, ChatServer, ChatAdmin,
     VoiceOn, VoiceOff,
     Reconnecting,
+    /// <summary>Your team talking: /t, or /team chat.</summary>
+    ChatTeam,
 }
 
 /// <summary>
@@ -92,6 +94,9 @@ public sealed class UiSounds
         UiCue.VoiceOff => Notes(0.5f, (880f, 0f, 0.06f), (659.3f, 0.07f, 0.08f)),
         // Trying the server again: a quiet low tick, every few seconds until it answers.
         UiCue.Reconnecting => Notes(0.25f, (587.3f, 0f, 0.04f)),
+        // Your team said something: the same two notes as a private message's first two, then back
+        // down to the first — a call among friends rather than one aimed at you alone.
+        UiCue.ChatTeam => Notes(0.5f, (1046.5f, 0f, 0.09f), (1318.5f, 0.08f, 0.09f), (1046.5f, 0.16f, 0.16f)),
         _ => Notes(0.4f, (1000f, 0f, 0.05f)),
     };
 

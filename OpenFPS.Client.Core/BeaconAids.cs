@@ -11,8 +11,9 @@ using Serilog;
 namespace OpenFPS.Client.Core;
 
 /// <summary>
-/// The beacons a listener hears: a short blip from each of the nearest doors, things to pick up and
-/// cars to get into, in whichever categories are on. See <see cref="Beacons"/> for who decides that.
+/// The beacons a listener hears: a short blip from each of the nearest doors, things to pick up, cars
+/// to get into and other players, in whichever categories are on. See <see cref="Beacons"/> for who
+/// decides that. A player in your own team calls in a tone of their own.
 ///
 /// A blip is a sound IN THE WORLD, at the thing, like any other — so which way it is and how far
 /// is heard, not described, and a door round a corner is quieter than one in front of you. Only the
@@ -41,7 +42,11 @@ public sealed class BeaconAids
         [Beacons.Door] = ("SYNTH/beacon_door_chime", 523f, 12f, 3),
         [Beacons.Item] = ("SYNTH/beacon_item_ring", 1046f, 10f, 3),
         [Beacons.Vehicle] = ("SYNTH/beacon_vehicle_hum", 262f, 25f, 2),
+        [Beacons.Player] = ("SYNTH/beacon_player_call", 392f, 30f, 4),
     };
+
+    /// <summary>A player in your own team: the player's call a fifth higher. See <see cref="TeammateTone"/>.</summary>
+    internal const string TeammateSound = "SYNTH/beacon_player_team";
 
     /// <summary>How often one beacon sounds unless the player says otherwise, seconds.</summary>
     public const double DefaultEvery = 1.6;
@@ -88,15 +93,21 @@ public sealed class BeaconAids
     public bool IsOn(string? category)
         => string.IsNullOrEmpty(category) || Beacons.IsOn(PolicyFor(category), _prefs.Choice(category));
 
-    public void Update(WorldSnapshot world, Vector3 listener, double now)
+    /// <param name="selfId">The listener's own body, which is a player like any other on the wire and
+    /// must never blip at its own ears; and whose team decides which players are teammates.</param>
+    public void Update(WorldSnapshot world, Vector3 listener, double now, int selfId = -1)
     {
         EnsureSounds();
         if (!_registered) return;
+        string myTeam = TeamOf(world, selfId);
         foreach (var (category, kind) in Kinds)
         {
             if (!IsOn(category)) continue;
-            foreach (var (id, at) in Nearest(world, listener, category, kind.Range, kind.Nearest))
+            bool people = category == Beacons.Player;
+            foreach (var (id, feet) in Nearest(world, listener, category, kind.Range, kind.Nearest, skip: selfId))
             {
+                // A body's position is its feet; a person is heard from their head, as their breath is.
+                var at = people ? feet + new Vector3(0f, OtherBodies.HeadHeight, 0f) : feet;
                 if (!_next.TryGetValue(id, out double due))
                 {
                     // First heard: start on a beat of its own, so two doors side by side do not blip
@@ -106,7 +117,7 @@ public sealed class BeaconAids
                 }
                 if (now < due) continue;
                 _next[id] = now + _prefs.Every;
-                Blip(world, id, kind.Sound, at, listener);
+                Blip(world, id, people ? SoundFor(world, id, myTeam) : kind.Sound, at, listener);
             }
         }
     }
@@ -211,12 +222,27 @@ public sealed class BeaconAids
     /// the city (brick is 175 mm), so the wall a door is set into is not what the ray hits.</summary>
     private const float FaceClearance = 0.35f;
 
+    /// <summary>The team a body says it is in, or "" for none or no such body.</summary>
+    internal static string TeamOf(WorldSnapshot world, int id)
+        => id >= 0 && world.Entities.TryGetValue(id, out var e) ? e.Definition.Team ?? "" : "";
+
+    /// <summary>
+    /// Which call a player's beacon makes: the teammate's when they are in the team you are in, the
+    /// player's otherwise. Nobody is a teammate of a listener in no team, and two players in no team
+    /// are not on the same side.
+    /// </summary>
+    internal static string SoundFor(WorldSnapshot world, int id, string myTeam)
+        => myTeam.Length > 0 && string.Equals(TeamOf(world, id), myTeam, StringComparison.OrdinalIgnoreCase)
+            ? TeammateSound : Kinds[Beacons.Player].Sound;
+
     /// <summary>The nearest things of a category within reach, and where to blip them from.</summary>
-    private static List<(int Id, Vector3 At)> Nearest(WorldSnapshot world, Vector3 listener, string category, float range, int count)
+    private static List<(int Id, Vector3 At)> Nearest(WorldSnapshot world, Vector3 listener, string category, float range, int count,
+                                                      int skip = -1)
     {
         var found = new List<(int Id, Vector3 At, float D)>();
         void Consider(EntitySnapshot e)
         {
+            if (e.Id == skip) return;
             if (!string.Equals(e.Definition.Identity.BeaconCategory, category, StringComparison.OrdinalIgnoreCase)) return;
             // At the middle of the thing, and at ear height at most: a door's blip comes from the
             // door, not from the floor under it.
@@ -251,6 +277,7 @@ public sealed class BeaconAids
             float[] pcm = Tone(category, rate);
             ok &= _audio.RegisterSynthesisedSound(kind.Sound, TransientSynth.ToPcm16(pcm), rate);
         }
+        ok &= _audio.RegisterSynthesisedSound(TeammateSound, TransientSynth.ToPcm16(TeammateTone(rate)), rate);
         _registered = ok;
     }
 
@@ -270,6 +297,8 @@ public sealed class BeaconAids
     ///   exit      a rising major chord, C5 E5 G5 — the way out
     ///   stairs    four quick notes climbing by tones, G4 A4 B4 C#5 — steps
     ///   waypoint  one slow swell on A4 — somewhere to go
+    ///   player    two notes falling a minor third, G4 then E4 — the interval a voice calls a name on
+    ///   teammate  the same call a fifth up, D5 then B4 — the same person-shape, brighter, one of yours
     /// </summary>
     internal static float[] Tone(string category, int rate) => category switch
     {
@@ -279,12 +308,35 @@ public sealed class BeaconAids
         Beacons.Exit => Notes(rate, (523.25f, 0.00f, 0.13f, 0.9f), (659.25f, 0.10f, 0.13f, 0.9f), (783.99f, 0.20f, 0.25f, 1.0f)),
         Beacons.Stairs => Notes(rate, (392.00f, 0.00f, 0.09f, 0.8f), (440.00f, 0.08f, 0.09f, 0.85f),
                                       (493.88f, 0.16f, 0.09f, 0.9f), (554.37f, 0.24f, 0.14f, 1.0f)),
+        Beacons.Player => Call(rate, 1f),
         _ => Swell(rate, 440f, 0.45f),
     };
+
+    /// <summary>A player in your team: the player's call transposed up a fifth, so it is the same beacon
+    /// in a different voice rather than a new sound to learn.</summary>
+    internal static float[] TeammateTone(int rate) => Call(rate, TeammateRatio);
+
+    /// <summary>A just fifth: how much higher a teammate's call is than anybody else's.</summary>
+    internal const float TeammateRatio = 1.5f;
+
+    /// <summary>
+    /// The player's call: G4 falling to E4, the falling minor third a voice calls somebody's name on,
+    /// and the only figure in the set that falls — every other beacon is a thing, and a person is the
+    /// one that calls out. Both notes scaled by <paramref name="ratio"/>, and the timing the same at
+    /// any pitch, so the teammate's version is the same rhythm. Each note swells in over 12 ms rather
+    /// than the struck 6 ms of the others: a voice calling does not strike, and a low note that comes
+    /// in as fast as a chime's reaches most of its height inside two milliseconds, which is a click.
+    /// </summary>
+    private static float[] Call(int rate, float ratio)
+        => Notes(rate, 0.012f, (392.00f * ratio, 0.00f, 0.14f, 1.0f), (329.63f * ratio, 0.15f, 0.22f, 0.9f));
 
     /// <summary>Soft sine notes: (Hz, starts at s, rings for s, level). A 6 ms rise, an exponential
     /// fall over the note, and the octave above at a tenth of the level.</summary>
     private static float[] Notes(int rate, params (float Hz, float At, float Ring, float Level)[] notes)
+        => Notes(rate, 0.006f, notes);
+
+    /// <summary>The same, with a rise of <paramref name="riseSeconds"/>.</summary>
+    private static float[] Notes(int rate, float riseSeconds, params (float Hz, float At, float Ring, float Level)[] notes)
     {
         float end = 0f;
         foreach (var n in notes) end = MathF.Max(end, n.At + n.Ring * 1.6f);
@@ -295,7 +347,7 @@ public sealed class BeaconAids
             for (int i = 0; i < len && a + i < buf.Length; i++)
             {
                 float t = i / (float)rate;
-                float rise = MathF.Min(1f, t / 0.006f);
+                float rise = MathF.Min(1f, t / riseSeconds);
                 rise = rise * rise * (3f - 2f * rise);                        // smooth, no click
                 float fall = MathF.Exp(-t * 4.6f / n.Ring);                  // -40 dB at 1.0 x Ring
                 float tail = i > len - rate * 0.02f ? (len - i) / (rate * 0.02f) : 1f;

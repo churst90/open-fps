@@ -12,7 +12,8 @@ public enum ChatBufferType
     All,
     /// <summary>People on your map.</summary>
     Map,
-    /// <summary>Every private message you received or sent — reply with /pm name text.</summary>
+    /// <summary>Every private message you received or sent — reply with /pm name text — and your
+    /// team's talk, which is said to you too.</summary>
     Private,
     /// <summary>The server: its answers to your commands, the message of the day, announcements.</summary>
     Server,
@@ -54,6 +55,9 @@ public class ChatManager
     public static ChatBufferType BufferFor(ChatChannel channel) => channel switch
     {
         ChatChannel.Private => ChatBufferType.Private,
+        // Your team talking is talk addressed to you, as a private message is: filed with them and
+        // spoken whichever ring you are in, rather than a fifth ring to walk past.
+        ChatChannel.Team => ChatBufferType.Private,
         ChatChannel.Server => ChatBufferType.Server,
         // Said to everyone lives in All only; there is no separate ring for it.
         ChatChannel.All => ChatBufferType.All,
@@ -66,6 +70,7 @@ public class ChatManager
         ChatChannel.Private when msg.To.Length > 0 => $"Private to {msg.To}: {msg.Text}",
         ChatChannel.Private => $"Private from {msg.Sender}: {msg.Text}",
         ChatChannel.All => $"{msg.Sender} to all: {msg.Text}",
+        ChatChannel.Team => $"{msg.Sender} to team: {msg.Text}",
         // The server's lines carry their own cue; "Server:" in front of each said nothing new.
         ChatChannel.Server => msg.Text,
         _ => msg.Sender.Length == 0 ? msg.Text : $"{msg.Sender}: {msg.Text}",

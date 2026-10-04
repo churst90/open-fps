@@ -493,13 +493,14 @@ if (args.Contains("--car-door"))
 
 if (args.Contains("--beacon-tones"))
 {
-    // --beacon-tones [out=DIR]: each beacon three times at its real 1.6 s period, one WAV each.
+    // --beacon-tones [out=DIR] [rate=HZ]: each beacon three times at its real 1.6 s period, one WAV
+    // each, and the teammate's version of the player's call after them.
     string dir = args.FirstOrDefault(a => a.StartsWith("out=", StringComparison.Ordinal))?.Substring(4) ?? ".";
     System.IO.Directory.CreateDirectory(dir);
-    int rate = 44100, k = 0;
-    foreach (var cat in OpenFPS.Common.Beacons.Categories)
+    int rate = int.TryParse(args.FirstOrDefault(a => a.StartsWith("rate=", StringComparison.Ordinal))?.Substring(5), out int r0) ? r0 : 44100, k = 0;
+    foreach (var cat in OpenFPS.Common.Beacons.Categories.Append("teammate"))
     {
-        var tone = OpenFPS.Client.Core.BeaconAids.Tone(cat, rate);
+        var tone = cat == "teammate" ? OpenFPS.Client.Core.BeaconAids.TeammateTone(rate) : OpenFPS.Client.Core.BeaconAids.Tone(cat, rate);
         var pcm = new float[(int)(1.6f * rate * 3)];
         for (int r = 0; r < 3; r++)
             for (int i = 0; i < tone.Length && (int)(r * 1.6f * rate) + i < pcm.Length; i++)
