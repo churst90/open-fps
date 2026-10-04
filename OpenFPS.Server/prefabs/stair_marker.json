@@ -1,7 +1,7 @@
 {
   "Id": "stair_marker",
   "Name": "Stairs",
-  "Description": "One end of a flight of stairs: placed on the landing a step back from the first or last riser, turned to face the way you walk to take the flight from here. The map entity's Name is what is said when you reach it facing that way, such as \"Stairs up, 10 steps, to floor 3\". A stairs beacon by being what it is. Not solid, not a surface, and not read out by the nearby-things announcer: the client's stair cues speak it instead, only when you are at it and facing along the flight.",
+  "Description": "One end of a flight of stairs: placed on the landing a step back from the first or last riser, turned to face the way you walk to take the flight from here. The map entity's Name is what is said when you reach it facing that way, such as \"Stairs up, 17 steps, to floor 3\". A stairs beacon by being what it is, though the client blips only the two ends of a whole stairwell, its bottom and its top. Not solid, not a surface, and not read out by the nearby-things announcer: the client's stair cues speak it instead, only when you are at it and facing along the flight.",
   "Material": "None",
   "ColliderSize": {
     "X": 0.4,

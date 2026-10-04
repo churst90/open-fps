@@ -419,16 +419,10 @@ public class StairsTests : IClassFixture<StairsTests.City>
         },
     };
 
-    /// <summary>One flight: foot on the floor at y 0 facing +z, top three metres up and 4 m along
-    /// facing back down it, as the generator places them.</summary>
-    private static WorldSnapshot OneFlight()
+    private static WorldSnapshot Markers(params EntitySnapshot[] markers)
     {
         var w = new WorldSnapshot();
-        foreach (var m in new[]
-        {
-            MarkerSnap(1, "Stairs up, 10 steps, to floor 3", new Vector3(0, 1f, 0), Vector3.UnitZ),
-            MarkerSnap(2, "Stairs down, 10 steps, to floor 2", new Vector3(0, 4f, 4f), -Vector3.UnitZ),
-        })
+        foreach (var m in markers)
         {
             w.Entities[m.Id] = m;
             w.MarkerEntityIds.Add(m.Id);
@@ -436,26 +430,81 @@ public class StairsTests : IClassFixture<StairsTests.City>
         return w;
     }
 
+    /// <summary>The city's flight: seventeen 3/17 m risers on 28 cm treads, its end risers half a metre
+    /// in from the markers.</summary>
+    private const int Risers = 17;
+    private const float Going = 0.28f, Rise = 3f / Risers, MarkerBack = 0.5f, Run = Risers * Going;
+
+    /// <summary>Where the feet stand on a flight whose foot marker is at along 0 on floor 0, rising
+    /// along +along: on the floor, on a tread, or on the floor at the top.</summary>
+    private static float TreadHeight(float along)
+    {
+        if (along <= MarkerBack) return 0f;
+        int tread = Math.Min(Risers, (int)MathF.Floor((along - MarkerBack) / Going) + 1);
+        return tread * Rise;
+    }
+
+    /// <summary>One flight: foot on the floor at y 0 facing +z, top three metres up facing back down
+    /// it, as the generator places them.</summary>
+    private static WorldSnapshot OneFlight() => Markers(
+        MarkerSnap(1, "Stairs up, 17 steps, to floor 3", new Vector3(0, 1f, 0), Vector3.UnitZ),
+        MarkerSnap(2, "Stairs down, 17 steps, to floor 2", new Vector3(0, 4f, Run + 2 * MarkerBack), -Vector3.UnitZ));
+
+    /// <summary>
+    /// A dog-leg of two flights, as the generator builds a stairwell: up the first along +z in the lane
+    /// at x 0, turn, and up the second back along -z in the lane at x -2.4, across the well. On the
+    /// landing between them the top of the first and the foot of the second stand side by side,
+    /// facing the same way.
+    /// </summary>
+    private static WorldSnapshot DogLeg()
+    {
+        float far = Run + 2 * MarkerBack;
+        return Markers(
+            MarkerSnap(1, "Stairs up, 17 steps, to floor 1", new Vector3(0, 1f, 0), Vector3.UnitZ),
+            MarkerSnap(2, "Stairs down, 17 steps, to floor 0", new Vector3(0, 4f, far), -Vector3.UnitZ),
+            MarkerSnap(3, "Stairs up, 17 steps, to the roof", new Vector3(-2.4f, 4f, far), -Vector3.UnitZ),
+            MarkerSnap(4, "Stairs down, 17 steps, to floor 1", new Vector3(-2.4f, 7f, 0), Vector3.UnitZ));
+    }
+
     private static Quaternion Facing(Vector3 along) => Quaternion.CreateFromAxisAngle(Vector3.UnitY, MathF.Atan2(along.X, along.Z));
 
-    /// <summary>Reaching the foot facing up says it once; standing, turning and shuffling there says
-    /// nothing more; walking away and coming back says it again.</summary>
+    /// <summary>
+    /// Reaching the foot facing up says it once, and staying on that landing says nothing more:
+    /// standing, turning, stepping back, stepping aside, walking away across the floor and coming back.
+    /// Leaving for another zone and coming back is a new arrival; where there are no zones, so is
+    /// going right away across the floor.
+    /// </summary>
     [Fact]
-    public void TheFootOfAFlightIsSaidOncePerApproach()
+    public void AFlightIsSaidOnceForAsLongAsYouStayOnItsLanding()
     {
+        const string line = "Stairs up, 17 steps, to floor 3";
+        const int stairwell = 7, corridor = 8;
         var world = OneFlight();
         var cues = new StairCues();
         var up = Facing(Vector3.UnitZ);
 
-        Assert.Null(cues.Update(world, new Vector3(0, 0, -3f), up));                 // too far
-        Assert.Equal("Stairs up, 10 steps, to floor 3", cues.Update(world, new Vector3(0, 0, -0.8f), up));
-        Assert.Null(cues.Update(world, new Vector3(0, 0, -0.6f), up));               // still there
-        Assert.Null(cues.Update(world, new Vector3(0, 0, -0.6f), Facing(-Vector3.UnitZ)));
-        Assert.Null(cues.Update(world, new Vector3(0, 0, -0.6f), up));               // turned back: same visit
-        Assert.Null(cues.Update(world, new Vector3(0, 0, -1.3f), up));               // past reach, short of leaving
-        Assert.Null(cues.Update(world, new Vector3(0, 0, -0.9f), up));
-        Assert.Null(cues.Update(world, new Vector3(0, 0, -2.0f), up));               // left
-        Assert.Equal("Stairs up, 10 steps, to floor 3", cues.Update(world, new Vector3(0, 0, -0.9f), up));
+        Assert.Null(cues.Update(world, new Vector3(0, 0, -3f), up, stairwell));        // too far
+        Assert.Equal(line, cues.Update(world, new Vector3(0, 0, -0.6f), up, stairwell));
+        Assert.Null(cues.Update(world, new Vector3(0, 0, -0.4f), up, stairwell));      // still there
+        Assert.Null(cues.Update(world, new Vector3(0, 0, -0.4f), Facing(-Vector3.UnitZ), stairwell));
+        Assert.Null(cues.Update(world, new Vector3(0, 0, -0.4f), up, stairwell));      // turned back
+        Assert.Null(cues.Update(world, new Vector3(0, 0, -2.5f), up, stairwell));      // stepped back...
+        Assert.Null(cues.Update(world, new Vector3(0, 0, -0.6f), up, stairwell));      // ...and forward again
+        Assert.Null(cues.Update(world, new Vector3(0.7f, 0, -0.5f), up, stairwell));   // aside
+        Assert.Null(cues.Update(world, new Vector3(6f, 0, -4f), up, stairwell));       // across the landing...
+        Assert.Null(cues.Update(world, new Vector3(0, 0, -0.6f), up, stairwell));      // ...and back
+
+        // Out through the door into the corridor, and back in: a new arrival.
+        Assert.Null(cues.Update(world, new Vector3(0, 0, -7f), up, corridor));
+        Assert.Equal(line, cues.Update(world, new Vector3(0, 0, -0.6f), up, stairwell));
+
+        // With no zones, nine metres away and back is still the landing; eleven is not.
+        var open = new StairCues();
+        Assert.Equal(line, open.Update(world, new Vector3(0, 0, -0.6f), up));
+        Assert.Null(open.Update(world, new Vector3(0, 0, -9f), up));
+        Assert.Null(open.Update(world, new Vector3(0, 0, -0.6f), up));
+        Assert.Null(open.Update(world, new Vector3(0, 0, -11f), up));
+        Assert.Equal(line, open.Update(world, new Vector3(0, 0, -0.6f), up));
     }
 
     /// <summary>Facing away from a flight, or along the landing past it, is not facing up it.</summary>
@@ -467,31 +516,140 @@ public class StairsTests : IClassFixture<StairsTests.City>
         Assert.Null(cues.Update(world, new Vector3(0, 0, -0.5f), Facing(-Vector3.UnitZ)));
         Assert.Null(cues.Update(world, new Vector3(0, 0, -0.5f), Facing(Vector3.UnitX)));
         // ...and turning to face up it, still there, says it.
-        Assert.Equal("Stairs up, 10 steps, to floor 3", cues.Update(world, new Vector3(0, 0, -0.5f), Facing(Vector3.UnitZ)));
+        Assert.Equal("Stairs up, 17 steps, to floor 3", cues.Update(world, new Vector3(0, 0, -0.5f), Facing(Vector3.UnitZ)));
     }
 
     /// <summary>
-    /// Climbing: nothing is said on the treads, nothing on arriving at the top facing up the way you
-    /// came, and turning round there to go back down says the top's line, with the floor below it.
-    /// The feet are on the flight between the two ends and the two floors, and only there.
+    /// Stepping off a flight says nothing about that flight, at either end, whichever way you face:
+    /// up it and turning round at the top, or down it walking backwards — facing up it, as Cody often
+    /// walks — and arriving at the foot. The feet are on the flight between the two ends and the two
+    /// floors, and only there. Somebody arriving at the top who did not come up it is told.
     /// </summary>
     [Fact]
-    public void ClimbingAFlightSaysTheTopOnlyWhenYouTurnToGoDown()
+    public void ArrivingOffAFlightSaysNothingAboutIt()
     {
         var world = OneFlight();
         var cues = new StairCues();
         var up = Facing(Vector3.UnitZ);
-        Assert.Equal("Stairs up, 10 steps, to floor 3", cues.Update(world, new Vector3(0, 0, -0.4f), up));
+        var down = Facing(-Vector3.UnitZ);
+        float top = Run + 2 * MarkerBack;
+
+        Assert.Equal("Stairs up, 17 steps, to floor 3", cues.Update(world, new Vector3(0, 0, -0.4f), up));
         Assert.False(cues.OnFlight);
-        for (float z = 0.1f; z < 3.9f; z += 0.15f)
+        for (float z = MarkerBack + 0.05f; z < top - MarkerBack; z += 0.14f)
         {
-            float y = MathF.Min(3f, MathF.Floor((z + 0.3f) / 0.32f) * 0.3f);
+            float y = TreadHeight(z);
             Assert.Null(cues.Update(world, new Vector3(0, y, z), up));
             Assert.Equal(y > 0.1f && y < 2.9f, cues.OnFlight);
         }
-        Assert.Null(cues.Update(world, new Vector3(0, 3f, 4.3f), up));               // the top, facing on
+        Assert.Null(cues.Update(world, new Vector3(0, 3f, top - 0.3f), up));          // the top, facing on
         Assert.False(cues.OnFlight);
-        Assert.Equal("Stairs down, 10 steps, to floor 2", cues.Update(world, new Vector3(0, 3f, 4.3f), Facing(-Vector3.UnitZ)));
+        Assert.Null(cues.Update(world, new Vector3(0, 3f, top), down));               // turned round: you came up it
+        Assert.Null(cues.Update(world, new Vector3(0.5f, 3f, top + 0.3f), down));
+
+        // Back down it backwards, still facing up it, and off at the foot.
+        for (float z = top - MarkerBack - 0.05f; z > MarkerBack; z -= 0.14f)
+            Assert.Null(cues.Update(world, new Vector3(0, TreadHeight(z), z), up));
+        Assert.Null(cues.Update(world, new Vector3(0, 0, 0.2f), up));
+        Assert.Null(cues.Update(world, new Vector3(0, 0, -0.3f), up));
+        Assert.False(cues.OnFlight);
+
+        // Somebody who walked onto the top landing from the floor there is told where it goes.
+        Assert.Equal("Stairs down, 17 steps, to floor 2", new StairCues().Update(world, new Vector3(0, 3f, top + 0.2f), down));
+    }
+
+    /// <summary>
+    /// Where two flights meet, each is said once however you shuffle between them: up the first, turn,
+    /// and the flight you came up is not news but the next one is, once, however many times you step
+    /// across the well and back. Up the second and back down it — you have been on another floor — and
+    /// the first one's top is news again, once.
+    /// </summary>
+    [Fact]
+    public void ALandingWhereTwoFlightsMeetSaysEachOnceHoweverYouShuffle()
+    {
+        const int place = 5;
+        var world = DogLeg();
+        var cues = new StairCues();
+        var plusZ = Facing(Vector3.UnitZ);
+        var minusZ = Facing(-Vector3.UnitZ);
+        float far = Run + 2 * MarkerBack;
+        var said = new List<string>();
+        void Step(Vector3 feet, Quaternion facing)
+        {
+            if (cues.Update(world, feet, facing, place) is { } line) said.Add(line);
+        }
+        void Shuffle(float y, int times)
+        {
+            for (int i = 0; i < times; i++)
+            {
+                for (float x = 0.3f; x >= -2.7f; x -= 0.1f) Step(new Vector3(x, y, far), minusZ);
+                for (float x = -2.7f; x <= 0.3f; x += 0.1f) Step(new Vector3(x, y, far - 0.3f), minusZ);
+            }
+        }
+
+        Step(new Vector3(0, 0, -0.6f), plusZ);
+        for (float z = MarkerBack + 0.05f; z < far - MarkerBack; z += 0.14f) Step(new Vector3(0, TreadHeight(z), z), plusZ);
+        Step(new Vector3(0, 3f, far - 0.2f), plusZ);
+        Step(new Vector3(0, 3f, far), minusZ);                                         // turned round at the top
+        Shuffle(3f, 6);
+        Assert.Equal(new[] { "Stairs up, 17 steps, to floor 1", "Stairs up, 17 steps, to the roof" }, said);
+
+        // Up the second flight, which climbs along -z from far, and back down it walking backwards.
+        said.Clear();
+        for (float z = far - MarkerBack - 0.05f; z > MarkerBack; z -= 0.14f)
+            Step(new Vector3(-2.4f, 3f + TreadHeight(far - z), z), minusZ);
+        Step(new Vector3(-2.4f, 6f, 0.2f), minusZ);
+        for (float z = MarkerBack + 0.05f; z < far - MarkerBack; z += 0.14f)
+            Step(new Vector3(-2.4f, 3f + TreadHeight(far - z), z), minusZ);
+        Shuffle(3f, 6);
+        Assert.Equal(new[] { "Stairs down, 17 steps, to floor 0" }, said);
+    }
+
+    /// <summary>
+    /// Cody's walk on Marlow Tower's floor 2 landing (2026-10-04, 04:53:27 to 04:54:02), replayed on
+    /// the stairwell as it was then: two markers 1.8 m apart facing the same way, and him walking up
+    /// to the flight, seven metres back across the landing and back, five metres along it and back,
+    /// and across between the two lanes. The old cues said "Stairs up, 10 steps, to floor 3" four
+    /// times and "Stairs down" once in those thirty-five seconds; each is said once.
+    /// </summary>
+    [Fact]
+    public void CodysWalkOnTheLandingSaysEachFlightOnce()
+    {
+        var world = Markers(
+            MarkerSnap(1, "Stairs up, 10 steps, to floor 3", new Vector3(-12.45f, 7.28f, -106.45f), -Vector3.UnitZ),
+            MarkerSnap(2, "Stairs down, 10 steps, to floor 2", new Vector3(-12.45f, 10.28f, -110.45f), Vector3.UnitZ),
+            MarkerSnap(3, "Stairs down, 10 steps, to floor 1", new Vector3(-10.65f, 7.28f, -106.45f), -Vector3.UnitZ),
+            MarkerSnap(4, "Stairs up, 10 steps, to floor 2", new Vector3(-10.65f, 4.28f, -110.45f), Vector3.UnitZ));
+        // Where his feet went down, from the client log's footsteps, in order.
+        var path = new (float X, float Z)[]
+        {
+            (-10.15f, -102.32f), (-11.5f, -102.32f), (-11.65f, -102.47f), (-11.95f, -103.97f), (-11.65f, -105.17f),
+            (-11.8f, -105.77f), (-11.95f, -106.37f), (-11.65f, -106.4f), (-11.95f, -105.35f), (-11.65f, -104.3f),
+            (-11.95f, -103.25f), (-11.65f, -102.2f), (-11.95f, -101.15f), (-11.65f, -100.1f), (-11.8f, -99.3f),
+            (-11.95f, -99.5f), (-11.65f, -100.1f), (-11.95f, -100.7f), (-11.65f, -101.45f), (-11.95f, -102.2f),
+            (-11.65f, -102.95f), (-11.95f, -104f), (-11.65f, -104.9f), (-11.95f, -105.8f), (-11.8f, -106.55f),
+            (-12.85f, -106.55f), (-13.45f, -106.55f), (-14.65f, -106.55f), (-15.4f, -106.55f), (-16.6f, -106.55f),
+            (-17.5f, -106.5f), (-17.2f, -106.55f), (-16f, -106.55f), (-14.8f, -106.55f), (-13.6f, -106.55f),
+            (-13.3f, -106.55f), (-12.25f, -106.55f), (-11.65f, -106.55f), (-11.5f, -106.55f), (-10.9f, -106.55f),
+            (-11.5f, -106.55f), (-11.95f, -106.55f), (-12.4f, -106.55f), (-13.3f, -106.55f),
+        };
+        var cues = new StairCues();
+        var facing = Facing(-Vector3.UnitZ);
+        var said = new List<string>();
+        for (int i = 1; i < path.Length; i++)
+        {
+            var a = new Vector2(path[i - 1].X, path[i - 1].Z);
+            var b = new Vector2(path[i].X, path[i].Z);
+            int steps = Math.Max(1, (int)(Vector2.Distance(a, b) / 0.05f));
+            for (int k = 1; k <= steps; k++)
+            {
+                var p = Vector2.Lerp(a, b, k / (float)steps);
+                if (cues.Update(world, new Vector3(p.X, 6.28f, p.Y), facing, 338) is { } line) said.Add(line);
+            }
+        }
+        _o.WriteLine(string.Join(" / ", said));
+        Assert.Equal(1, said.Count(l => l.StartsWith("Stairs up")));
+        Assert.Equal(1, said.Count(l => l.StartsWith("Stairs down")));
     }
 
     /// <summary>A marker the client is sent lands in the snapshot's marker list, which is where the
@@ -510,20 +668,24 @@ public class StairsTests : IClassFixture<StairsTests.City>
     }
 
     /// <summary>
-    /// The stairs beacon is wired: the two ends of a flight blip, nothing between them does, it is the
-    /// nearest two that blip, and /beacons stairs off and a map that forbids it both silence it.
+    /// The stairs beacon blips from the bottom and the top of the stairwell only — "the stairs beacon
+    /// should only play for the top and bottom of that stairwell" (Cody, 2026-10-04) — and not from the
+    /// landing between, even standing on that landing with both ends of the stair in range. /beacons
+    /// stairs off and a map that forbids it both silence it.
     /// </summary>
     [Fact]
-    public void TheStairsBeaconBlipsFromTheEndsOfFlightsOnly()
+    public void TheStairsBeaconBlipsFromTheBottomAndTopOfTheStairwellOnly()
     {
-        var world = OneFlight();
-        // A third flight end further off: only the nearest two are heard.
-        var far = MarkerSnap(3, "Stairs up, 10 steps, to floor 4", new Vector3(0, 1f, 8f), Vector3.UnitZ);
-        world.Entities[far.Id] = far;
-        world.MarkerEntityIds.Add(far.Id);
-        var ear = new Vector3(0, 1.6f, -1f);
+        var world = DogLeg();
+        Assert.True(StairCues.IsStairwellEnd(world, 1));
+        Assert.False(StairCues.IsStairwellEnd(world, 2));
+        Assert.False(StairCues.IsStairwellEnd(world, 3));
+        Assert.True(StairCues.IsStairwellEnd(world, 4));
+        var bottom = world.Entities[1].Transform.Position;
+        var top = world.Entities[4].Transform.Position;
+        var ear = new Vector3(-1.2f, 4.6f, Run + 2 * MarkerBack);                    // on the landing between
 
-        List<SpatialEmitter> Run(BeaconPreferences prefs, IEnumerable<string>? policy = null)
+        List<SpatialEmitter> Blips(BeaconPreferences prefs, IEnumerable<string>? policy = null)
         {
             var mixer = new EmitterRecordingProvider();
             var audio = new AudioEngineFacade(mixer);
@@ -539,18 +701,105 @@ public class StairsTests : IClassFixture<StairsTests.City>
             return mixer.Played.Where(e => e.SoundId == "SYNTH/beacon_stairs_steps").ToList();
         }
 
-        var blips = Run(BeaconPreferences.InMemory());
+        var blips = Blips(BeaconPreferences.InMemory());
         Assert.NotEmpty(blips);
-        Assert.All(blips, e => Assert.True(Vector3.Distance(e.Position, new Vector3(0, 1f, 0)) < 1e-3f
-                                           || Vector3.Distance(e.Position, new Vector3(0, 4f, 4f)) < 1e-3f,
+        Assert.All(blips, e => Assert.True(Vector3.Distance(e.Position, bottom) < 1e-3f || Vector3.Distance(e.Position, top) < 1e-3f,
                                            $"a stairs blip from {e.Position}"));
-        Assert.Contains(blips, e => e.Position.Y < 2f);
-        Assert.Contains(blips, e => e.Position.Y > 2f);
+        Assert.Contains(blips, e => Vector3.Distance(e.Position, bottom) < 1e-3f);
+        Assert.Contains(blips, e => Vector3.Distance(e.Position, top) < 1e-3f);
 
         var off = BeaconPreferences.InMemory();
         off.Set(Beacons.Stairs, false);
-        Assert.Empty(Run(off));
-        Assert.Empty(Run(BeaconPreferences.InMemory(), new[] { "stairs=forbidden" }));
+        Assert.Empty(Blips(off));
+        Assert.Empty(Blips(BeaconPreferences.InMemory(), new[] { "stairs=forbidden" }));
+    }
+
+    /// <summary>Every tower's stairwell has exactly two ends for the beacon: the foot of the ground
+    /// floor's flight and the top of the flight onto the roof.</summary>
+    [Fact]
+    public void EveryStairwellBeaconsFromItsBottomAndItsRoofOnly()
+    {
+        foreach (var tower in _city.Towers)
+        {
+            var flights = _city.Flights(tower);
+            var ms = _city.MarkersOf(tower);
+            var world = Markers(ms.Select((m, i) => MarkerSnap(i + 1, m.Name, m.At, m.Along)).ToArray());
+            var ends = world.MarkerEntityIds.Where(id => StairCues.IsStairwellEnd(world, id))
+                            .Select(id => world.Entities[id].Transform.Position).ToList();
+            _o.WriteLine($"{tower}: ends at {string.Join(", ", ends)}");
+            Assert.Equal(2, ends.Count);
+            Assert.Contains(ends, p => Vector3.Distance(p, flights[0].Foot.At) < 1e-3f);
+            Assert.Contains(ends, p => Vector3.Distance(p, flights[^1].Top.At) < 1e-3f);
+        }
+    }
+
+    /// <summary>
+    /// Every flight in every tower is built to the figures a real stair is (International Building
+    /// Code 2021, 1011): risers no more than 178 mm, treads at least 279 mm, at least 1.12 m clear
+    /// between its guards, and an open well between it and the flight beside it — "the stairs also
+    /// seem kind of short ... way too narrow and close to each other" (Cody, 2026-10-04).
+    /// </summary>
+    [Fact]
+    public void EveryFlightIsBuiltToCode()
+    {
+        bool Solid(Vector3 p) => _city.Boxes.Any(b => b.Prefab != "acoustic_region"
+            && p.X >= b.Min.X && p.X <= b.Max.X && p.Y >= b.Min.Y && p.Y <= b.Max.Y && p.Z >= b.Min.Z && p.Z <= b.Max.Z);
+        foreach (var tower in _city.Towers)
+        {
+            var flights = _city.Flights(tower);
+            for (int s = 0; s < flights.Count; s++)
+            {
+                var (foot, top) = flights[s];
+                int n = int.Parse(foot.Name.Split(' ')[2].TrimEnd(','));
+                var line = top.At - foot.At; line.Y = 0;
+                float length = line.Length();
+                var side = new Vector3(-foot.Along.Z, 0, foot.Along.X);
+                // The treads: the boxes standing on the lane's centre line between the two floors.
+                var treads = _city.Boxes.Where(b => b.Prefab == "concrete_floor"
+                        && b.Max.Y > foot.Floor.Y + 0.05f && b.Max.Y < top.Floor.Y + 0.05f)
+                    .Select(b => (Box: b, Along: Vector3.Dot((b.Min + b.Max) / 2 - foot.At, foot.Along),
+                                  Aside: Vector3.Dot((b.Min + b.Max) / 2 - foot.At, side)))
+                    .Where(t => t.Along > 0 && t.Along < length && MathF.Abs(t.Aside) < 0.1f)
+                    .OrderBy(t => t.Along).ToList();
+                Assert.Equal(n, treads.Count);
+                float lastTop = foot.Floor.Y;
+                foreach (var (box, _, _) in treads)
+                {
+                    float depth = MathF.Abs(Vector3.Dot(box.Max - box.Min, foot.Along));
+                    Assert.True(depth >= 0.279f, $"{foot.Name} in {tower}: a {depth:F3} m tread");
+                    Assert.InRange(box.Max.Y - lastTop, 0.102f, 0.178f);
+                    lastTop = box.Max.Y;
+                }
+                Assert.Equal(top.Floor.Y, lastTop, 2);
+
+                // Clear width, half way up, at waist height over the tread: to the first solid thing
+                // either side of the centre line.
+                var mid = treads[n / 2];
+                var at = foot.At + foot.Along * mid.Along;
+                at.Y = mid.Box.Max.Y + 0.5f;
+                float Clear(float dir)
+                {
+                    for (float d = 0.02f; d < 3f; d += 0.02f)
+                        if (Solid(at + side * dir * d)) return d;
+                    return 3f;
+                }
+                float width = Clear(+1) + Clear(-1);
+                Assert.True(width >= 1.118f, $"{foot.Name} in {tower}: {width:F2} m between its sides");
+
+                // The flight beside it, across the well: a guard, then open air, then the other lane.
+                if (s + 1 < flights.Count)
+                {
+                    var next = flights[s + 1].Foot;
+                    float apart = MathF.Abs(Vector3.Dot(next.At - top.At, side));
+                    Assert.True(apart >= 2.0f, $"{tower}: flights {s} and {s + 1} are {apart:F2} m apart");
+                    float toward = MathF.Sign(Vector3.Dot(next.At - top.At, side));
+                    float guard = Clear(toward);
+                    Assert.True(guard < 0.9f, $"{tower} flight {s}: nothing beside it on the well side at {guard:F2} m");
+                    for (float d = guard + 0.15f; d < guard + 0.5f; d += 0.05f)
+                        Assert.False(Solid(at + side * toward * d), $"{tower} flight {s}: the well is filled {d:F2} m out");
+                }
+            }
+        }
     }
 
     // ── Footsteps on them ────────────────────────────────────────────────────────────────────────
@@ -562,7 +811,7 @@ public class StairsTests : IClassFixture<StairsTests.City>
     [Fact]
     public void StepsOnAFlightAreUpOrDownAndLandOnTreads()
     {
-        const float rise = 0.3f, going = 0.32f;
+        const float rise = Rise, going = Going;
         var speed = PhysicsConstants.WalkSpeed;
         float dt = PhysicsConstants.FixedDeltaTime;
 
@@ -572,16 +821,16 @@ public class StairsTests : IClassFixture<StairsTests.City>
             var slopes = new List<StepSlope>();
             int offTread = 0;
             float lastY = float.NaN;
-            for (float z = -1f; z < 5f; z += speed * dt)
+            for (float z = -1f; z < Run + 2f; z += speed * dt)
             {
-                float along = direction > 0 ? z : 4f - z;
-                int tread = Math.Clamp((int)MathF.Floor(along / going) + 1, 0, 10);
+                float along = direction > 0 ? z : Run + 1f - z;
+                int tread = Math.Clamp((int)MathF.Floor(along / going) + 1, 0, Risers);
                 float y = tread * rise;
                 var f = stride.Update(new Vector3(0, y, z), new Vector3(0, 0, speed), true, Quaternion.Identity);
                 if (f.Stepped)
                 {
                     slopes.Add(f.Slope);
-                    if (along > 0.4f && along < 3.0f && y == lastY) offTread++;
+                    if (along > 0.4f && along < Run - 0.4f && y == lastY) offTread++;
                 }
                 lastY = y;
             }
@@ -602,6 +851,36 @@ public class StairsTests : IClassFixture<StairsTests.City>
         {
             var f = flat.Update(new Vector3(0, 0.12f * MathF.Floor(z / 3f), z), new Vector3(0, 0, speed), true, Quaternion.Identity);
             if (f.Stepped) Assert.Equal(StepSlope.Level, f.Slope);   // a kerb is walked over, not climbed
+        }
+    }
+
+    /// <summary>
+    /// The movement engine takes a step up by lifting the body its whole StepHeight, 40 cm, and the
+    /// ground probe settles it onto the tread an update later. A footfall on the lifted update must
+    /// not count from there: the landing at the top of a flight of 17.6 cm risers is 22 cm under it,
+    /// and the last step up was heard as a heel drop. Every phase of footfall against the lifts: up a
+    /// flight is never a step down, and the level beyond it is never a step down either.
+    /// </summary>
+    [Fact]
+    public void TheEnginesLiftOntoATreadIsNotAStepDown()
+    {
+        var speed = PhysicsConstants.WalkSpeed;
+        float dt = PhysicsConstants.FixedDeltaTime;
+        for (float phase = 0f; phase < 1.5f; phase += 0.05f)
+        {
+            var stride = new StrideAccumulator();
+            int lastTread = 0;
+            float settled = 0f;
+            for (float z = -1f - phase; z < Run + 3f; z += speed * dt)
+            {
+                int tread = Math.Clamp((int)MathF.Floor(z / Going) + 1, 0, Risers);
+                // Arriving on a higher tread: lifted 40 cm over the one you were on, for one update.
+                float y = tread > lastTread ? settled + PhysicsConstants.StepHeight : tread * Rise;
+                settled = tread * Rise;
+                lastTread = tread;
+                var f = stride.Update(new Vector3(0, y, z), new Vector3(0, 0, speed), true, Quaternion.Identity);
+                Assert.False(f.Stepped && f.Slope == StepSlope.Down, $"a step down at {z:F2} m, phase {phase:F2}");
+            }
         }
     }
 
