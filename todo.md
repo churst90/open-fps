@@ -277,6 +277,14 @@ As realistic as possible.
 - Also: a shotgun, an impact sound per material, casings that land and bounce where they fall,
   and a proper fire message in the protocol.
 
+- Dry fire (2026-10-04): five guns share one "hammer falls" contact (WeaponHandling.Shape, Part.Hammer)
+  and differ only in level, so their empty clicks are the same sound. Give each action its own
+  mechanism: AKM hammer on steel in a stamped receiver, AR-15 hammer in an aluminium lower with the
+  buffer spring, Glock striker in polymer, 1911 hammer on a steel frame, the pump's hammer. Cody: fine
+  for now.
+- The revolver's empty and partial reloads are the same sound (true of a revolver); the render lists
+  it twice.
+
 ### 10. Zones (discussed 2026-09-30, waiting on Cody)
 - Today a zone is a named box in the map (`acoustic_region`), placed by hand or by a generator; its
   materials are measured from the walls round it, but its shape is not. The smallest box you stand
