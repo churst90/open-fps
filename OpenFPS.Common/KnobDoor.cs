@@ -185,11 +185,11 @@ public static class KnobDoor
     /// </summary>
     public const float OpenLevelDb = 105.5f;
     /// <summary>A close's declared level by how it was shut: the model's peak, as <see cref="OpenLevelDb"/>. A
-    /// gentle and a normal close peak alike: the peak of both is the bolt snapping out against its stop.
+    /// gentle and a normal close peak within a few decibels: the peak of both is the bolt snapping out.
     /// (The server sends no slam; the game's render of one comes in thrown, <see cref="SlamLetGoSpeed"/>.)</summary>
     public static float CloseLevelDb(Shut how) => how switch
     {
-        Shut.Gentle => 106.5f, Shut.Hard => 128.5f, Shut.Slam => 129f, _ => 106.5f,
+        Shut.Gentle => 107f, Shut.Hard => 128.5f, Shut.Slam => 129f, _ => 109.5f,
     };
 
     /// <summary>
@@ -199,12 +199,13 @@ public static class KnobDoor
     /// published figures. The one measurement of an interior door (US 11,674,342: 84 dB normal, 95 slammed,
     /// at 2.1 m, weighting unstated) puts a normal latching close at no more than about 90 dB at 1 m; the
     /// research note's working range (70-82 dBA normal, 60-70 gentle, 85-98 slam) is its own estimate. Kyles'
-    /// light wood door opens 14 dB under its closes (9-16); these open 14.5 under a normal close.
+    /// light wood door opens 14 dB under its closes (9-16); these open 17.5 under a normal close (13.5-21.5),
+    /// their turn's clicks being quieter than the recording's.
     /// </summary>
     public const float OpenLafDb = 70.5f;
     public static float CloseLafDb(Shut how) => how switch
     {
-        Shut.Gentle => 79f, Shut.Hard => 106f, Shut.Slam => 105.5f, _ => 85f,
+        Shut.Gentle => 81.5f, Shut.Hard => 106f, Shut.Slam => 105.5f, _ => 88f,
     };
 
     /// <summary>

@@ -53,8 +53,9 @@ public class KnobDoorTests
         double heard = LafMax(buf, 2e-5 * Math.Pow(10, own / 20.0));
         Assert.InRange(heard, KnobDoor.CloseLafDb(KnobDoor.Shut.Normal) - 2.5, KnobDoor.CloseLafDb(KnobDoor.Shut.Normal) + 2.5);
         Assert.Equal(1.0, buf.Max(v => Math.Abs((double)v)), 3);
-        // How the events stand against each other is the physics': an opening carries down a corridor.
-        Assert.True(KnobDoor.OpenLafDb >= KnobDoor.CloseLafDb(KnobDoor.Shut.Normal) - 15);
+        // How the events stand against each other is the physics': an opening carries down a corridor. Kyles'
+        // light wood door opens 9-16 dB under its closes; the model's, whose turn is quieter, 13.5-21.5.
+        Assert.True(KnobDoor.OpenLafDb >= KnobDoor.CloseLafDb(KnobDoor.Shut.Normal) - 18);
         Assert.True(KnobDoor.CloseLafDb(KnobDoor.Shut.Gentle) < KnobDoor.CloseLafDb(KnobDoor.Shut.Normal));
         Assert.True(KnobDoor.CloseLafDb(KnobDoor.Shut.Normal) < KnobDoor.CloseLafDb(KnobDoor.Shut.Hard));
     }
@@ -207,7 +208,8 @@ public class KnobDoorTests
     public void AnOpeningIsQuieterThanANormalClose()
     {
         // Kyles' light wood door: its openings LAFmax 14 dB under its closes (9-16). The model's were 9-11 under
-        // and, played at their peaks against the 89 dB ceiling on "real", heard as loud as a close.
+        // and, played at their peaks against the 89 dB ceiling on "real", heard as loud as a close; its opening
+        // was a thump of the leaf, its close a leaf let go to bounce.
         double open = LafHeard(Opening.Value.Pcm, KnobDoor.PascalsAtFullScale);
         double close = LafHeard(NormalClose.Value.Pcm, KnobDoor.PascalsAtFullScale);
         Assert.InRange(close - open, 8, 18);
