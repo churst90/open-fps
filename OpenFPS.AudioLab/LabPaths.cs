@@ -11,7 +11,7 @@ internal static class LabPaths
 {
     /// <summary>Used when neither the working directory nor the lab's own folder is inside a checkout,
     /// as when the lab is built off the repository's volume and run from there.</summary>
-    private const string Checkout = "/home/cody/external-rescue/Github/open-fps";
+    internal const string Checkout = "/home/cody/external-rescue/Github/open-fps";
 
     private static string? _repo;
 
