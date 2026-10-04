@@ -163,7 +163,7 @@ public class AdminCommandTests : IDisposable
         Assert.Equal(UserRole.Dev, friend.Role);
         Assert.True(_maps.TryGetMap("default", out var world, out _, out _, out _));
         Assert.Equal(UserRole.Dev, world.Get<PlayerComponent>(friend.Entity).Role);
-        Assert.Contains(_sent, s => s.To == friend && s.What is TextEvent t && t.Text == "You are now a developer.");
+        Assert.Contains(_sent, s => s.To == friend && s.What is TextEvent t && t.Text.StartsWith("cody made you a developer."));
 
         // And it is a real role: the developer can now do what a developer does.
         Assert.DoesNotContain("permission", string.Join(" ", Run(friend, "where", "cody")));

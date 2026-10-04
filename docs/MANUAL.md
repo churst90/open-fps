@@ -180,8 +180,11 @@ Inside a list:
 - Chat: one soft note for your map, two rising notes for everyone, three rising notes for a
   private message to you, two falling notes for the server, a bright chord for an admin.
 - Voice chat switched on: one short note. Switched off: the same note, then a lower one.
+- Another player online: a rising arpeggio. Logged out: the same, falling. Lost connection: a
+  broken falling figure. Away: two soft notes down. Back: two soft notes up.
 
-You can turn these off or change their volume in Settings.
+You can turn these off or change their volume in Settings. "Online and offline sounds" turns off
+only the presence sounds; the notices are still read in the All buffer.
 
 ## Chat
 
@@ -200,6 +203,13 @@ their buffer or in All, which is the default.
 ## Commands
 
 Type these on the chat line. The `/` is optional and case does not matter.
+
+- `/help` lists the commands you can use. `/help command` says how to type one and what it does.
+  `/help settings` lists your own sound settings.
+- A mistyped command is answered with the nearest one: "Did you mean /give?"
+- A player can be named by the start of their name when only one player's name starts that way.
+- `/afk` marks you away; everyone hears "cody is away". After five minutes of doing nothing you are
+  marked away anyway. Anything you do marks you back.
 
 ### Around you
 - `/scan`: named things within 20 m.

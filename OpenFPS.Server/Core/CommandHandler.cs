@@ -2087,7 +2087,11 @@ public class CommandHandler
         { Say(reply, "You cannot change your own role."); return; }
         // A custom role sits on top of Player.
         var newRole = role ?? UserRole.Player;
-        if (!_users.SetRole(record.Username, newRole) || !_users.SetCustomRole(record.Username, custom.Length > 0 ? custom : null))
+        // The custom-role field is touched only when there is one to set or one to clear, so a store that
+        // keeps no custom roles still changes built-in ones.
+        bool customChanges = custom.Length > 0 || !string.IsNullOrEmpty(record.CustomRole);
+        if (!_users.SetRole(record.Username, newRole)
+            || (customChanges && !_users.SetCustomRole(record.Username, custom.Length > 0 ? custom : null)))
         { Say(reply, "Roles cannot be changed on this server."); return; }
 
         Log.Information("Admin: {Admin} set {User}'s role to {Role}.", session.Username, record.Username, custom.Length > 0 ? custom : newRole.ToString());

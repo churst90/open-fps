@@ -4,6 +4,15 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-03
 
+- Presence notices. When someone logs in, logs out, loses connection, is kicked, or goes away,
+  everyone else gets a line on the All channel: "cody is online.", "cody logged out.", "cody lost
+  connection.", "cody was removed from the server.", "cody is away.", "cody is back." Away is /afk
+  or five minutes with nothing done; back is the next thing they do. Logging in again from another
+  machine announces nothing. Each notice has its own sound: a rising arpeggio for online, the same
+  falling for logged out, a broken falling figure for lost connection, two soft notes down for away
+  and up for back. Settings has "Online and offline sounds" to turn the sounds off; the notices are
+  still read. AudioLab `--presence-sounds` writes the five sounds (inbox/presence-sounds-2026-10-03).
+
 - Roles and permissions. A fourth role, Moderator: announcements, finding, going to and bringing
   players, kick and mute; no building. Each gated command is a permission; roles are sets of them;
   an Admin can give one account single commands (`/grant NAME COMMAND`, `/revoke`, `/perms`).
