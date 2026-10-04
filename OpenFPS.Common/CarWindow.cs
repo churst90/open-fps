@@ -170,7 +170,7 @@ public static class CarWindow
 
     /// <summary>
     /// The loudest a stroke is at a metre from the door on the cabin side, dB SPL peak: the model's own,
-    /// by character (new, standard, worn, old) and by how the stroke ends, read off the renders with no
+    /// by variant (all the old character since 2026-10-04, each its own seed) and by how the stroke ends, read off the renders with no
     /// calibration (CarWindowTests holds them to it). Fully down, the clamp landing on its stop; fully up,
     /// the glass seating and the header's lips squeezing; part way, the motor running and nothing hit.
     /// </summary>
@@ -180,9 +180,11 @@ public static class CarWindow
         return to >= 1f ? BottomDb[v] : to <= 0f ? TopDb[v] : BetweenDb[v];
     }
 
-    private static readonly float[] BottomDb = { 77.3f, 80.4f, 83.0f, 86.2f };
-    private static readonly float[] TopDb = { 75.0f, 78.1f, 77.7f, 81.0f };
-    private static readonly float[] BetweenDb = { 67.0f, 68.3f, 74.8f, 73.9f };
+    // By seed now that every window is the old one (2026-10-04); part way is the mean of the stroke down
+    // and the stroke up, which differ by up to 3 dB.
+    private static readonly float[] BottomDb = { 87.1f, 83.6f, 86.6f, 86.2f };
+    private static readonly float[] TopDb = { 83.1f, 80.6f, 80.1f, 80.9f };
+    private static readonly float[] BetweenDb = { 76.9f, 72.7f, 76.7f, 75.4f };
 
     /// <summary>How long a stroke's sound lasts, seconds: the travel, the stall at an end, the ring-down.</summary>
     public static float Seconds(float from, float to)
@@ -308,13 +310,17 @@ public static class CarWindow
     private readonly record struct Character(double ChannelN, double ChannelMuS, double ChannelMuK,
         double LipN, double LipMuS, double LipMuK, double ToothM, double BarStepM);
 
-    private static Character Of(int variant) => (((variant % Variants) + Variants) % Variants) switch
-    {
-        0 => new(45, 0.42, 0.36, 3.0, 0.40, 0.36, 6e-6, 3e-6),
-        1 => new(50, 0.48, 0.40, 3.5, 0.50, 0.42, 9e-6, 4e-6),
-        2 => new(55, 0.55, 0.44, 4.5, 0.85, 0.55, 12e-6, 5e-6),
-        _ => new(65, 0.62, 0.48, 5.0, 1.00, 0.62, 18e-6, 8e-6),
-    };
+    /// <summary>
+    /// Every window is the old one now: Cody, 2026-10-04, of the four characters rendered on 10-03,
+    /// "the car window v3 sounds the best, use that". The variant still seeds the random detail (Sim's
+    /// rng), so two windows rolling together are two windows and never one sound copied to two places.
+    /// The other three are kept here for the record: new, standard, worn.
+    /// </summary>
+    private static Character Of(int variant) => Old;
+
+    private static readonly Character Old = new(65, 0.62, 0.48, 5.0, 1.00, 0.62, 18e-6, 8e-6);
+    // Not used since 2026-10-04: new (45, 0.42, 0.36, 3.0, 0.40, 0.36, 6e-6, 3e-6), standard (50, 0.48,
+    // 0.40, 3.5, 0.50, 0.42, 9e-6, 4e-6), worn (55, 0.55, 0.44, 4.5, 0.85, 0.55, 12e-6, 5e-6).
 
     private sealed class Sim
     {
