@@ -33,10 +33,15 @@ public class CeilingJumpTests
         Box(-5.5f, 5.5f, 2.6f, 2.8f, -4.25f, 4.25f),   // roof
     };
 
+    /// <summary>A jump that rises 0.83 m — the game's jump when this was written, and enough to put
+    /// the head into this roof. Today's half-metre jump does not reach it, and the question here is
+    /// what a ceiling does to a head that does.</summary>
+    private static readonly float HighJump = MathF.Sqrt(2f * PhysicsConstants.Gravity * 0.83f);
+
     private static MovementContext Ctx(Vector3 pos, Vector3 vel, Vector3 input, bool jump) => new()
     {
         Position = pos, Velocity = vel, InputDirection = input, DeltaTime = Dt,
-        GroundHeight = 0.08f, Gravity = PhysicsConstants.Gravity, JumpForce = PhysicsConstants.JumpPower,
+        GroundHeight = 0.08f, Gravity = PhysicsConstants.Gravity, JumpForce = HighJump,
         Speed = PhysicsConstants.WalkSpeed, PlayerRadius = PhysicsConstants.PlayerRadius,
         PlayerHeight = PhysicsConstants.PlayerHeight, StepHeight = PhysicsConstants.StepHeight,
         IsJumpRequested = jump, MapMin = new Vector3(-50, -50, -50), MapMax = new Vector3(50, 50, 50),

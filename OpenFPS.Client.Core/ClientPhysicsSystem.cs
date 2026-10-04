@@ -25,7 +25,7 @@ public class ClientPhysicsSystem
 
     public Vector3 MapMin { get; set; } = new(-50, 0, -50);
     public Vector3 MapMax { get; set; } = new(50, 20, 50);
-    public float Gravity { get; set; } = 15.0f;
+    public float Gravity { get; set; } = PhysicsConstants.Gravity;
 
     public ClientPhysicsSystem(LocalPlayerState state, SpatialService spatial)
     {
@@ -55,7 +55,11 @@ public class ClientPhysicsSystem
     /// current yaw in, new position/velocity out — so replaying the same input list from the same
     /// server state always lands in the same place.
     /// </summary>
-    public void Predict(ClientInputUpdate input, WorldSnapshot snapshot, float dt)
+    /// <returns>What the body pressed into and was held off this step (see
+    /// <see cref="SharedMovementEngine.Contact"/>), with the entity it was; null when nothing stopped it.
+    /// Prediction replays inputs after every correction, so only the caller knows whether this step
+    /// was a fresh one — see <see cref="PredictionReconciler.LastContact"/>.</returns>
+    public BodyContact? Predict(ClientInputUpdate input, WorldSnapshot snapshot, float dt)
     {
         // 1. Vertical Physics (Unified logic with server)
         float groundY = PhysicsUtils.GetGroundHeight(snapshot, _state.Position, OwnEntityId, out string mat);
@@ -101,6 +105,7 @@ public class ClientPhysicsSystem
 
         int maxCandidates = candidates.Count();
         var colliderArray = ArrayPool<SharedMovementEngine.Collider>.Shared.Rent(maxCandidates);
+        var idArray = ArrayPool<int>.Shared.Rent(maxCandidates);
         int colliderCount = 0;
 
         try
@@ -111,6 +116,7 @@ public class ClientPhysicsSystem
                 var def = entity.Definition;
                 if (!def.Collider.IsSolid) continue;
 
+                idArray[colliderCount] = entity.Id;
                 colliderArray[colliderCount++] = new SharedMovementEngine.Collider {
                     Position = entity.Transform.Position,
                     Size = def.Collider.Size,
@@ -138,15 +144,30 @@ public class ClientPhysicsSystem
             };
 
             var collidersSlice = new ReadOnlySpan<SharedMovementEngine.Collider>(colliderArray, 0, colliderCount);
-            var result = SharedMovementEngine.Step(ctx, collidersSlice);
+            var result = SharedMovementEngine.Step(ctx, collidersSlice, out var contact);
 
             _state.Position = result.NewPosition;
             _state.Velocity = result.NewVelocity;
             _state.IsGrounded = result.IsGrounded;
+
+            if (!contact.Blocked || contact.ColliderIndex < 0 || contact.ColliderIndex >= colliderCount) return null;
+            return new BodyContact(idArray[contact.ColliderIndex], contact.Normal, contact.IntoSpeed, ctx.Speed, result.NewPosition);
         }
         finally
         {
             ArrayPool<SharedMovementEngine.Collider>.Shared.Return(colliderArray);
+            ArrayPool<int>.Shared.Return(idArray);
         }
     }
+}
+
+/// <summary>
+/// The body pressed into something and was held off it: which entity, the surface's outward normal,
+/// how fast the attempted motion went INTO it, how fast the body was trying to go at all, and where
+/// its feet ended up. <see cref="Intent"/> is the share of the attempt aimed at the surface — one
+/// walking straight at a wall, near zero brushing along it.
+/// </summary>
+public readonly record struct BodyContact(int EntityId, Vector3 Normal, float IntoSpeed, float Speed, Vector3 Feet)
+{
+    public float Intent => Speed > 1e-4f ? Math.Clamp(IntoSpeed / Speed, 0f, 1f) : 0f;
 }

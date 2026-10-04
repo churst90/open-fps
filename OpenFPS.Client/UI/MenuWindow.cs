@@ -301,7 +301,7 @@ public sealed class MenuWindow : Form
 
     private void ShowSettings()
     {
-        var form = Dialog("Settings", 460, 470);
+        var form = Dialog("Settings", 460, 540);
         var layout = Column();
 
         var outputs = new List<string> { "System default" };
@@ -315,6 +315,9 @@ public sealed class MenuWindow : Form
         // Apart from the interface sounds: somebody arriving or leaving is not a menu tick, and a busy
         // server can want one off and the other on. The notices are spoken either way.
         var presenceSounds = Check(layout, "Online and offline sounds", _settings.PresenceSounds);
+        // The two navigation aids. N switches the first in game, and /bumps the second.
+        var narration = Check(layout, "Say what is ahead as you turn", NavigationAids.TurnNarration);
+        var bumps = Check(layout, "Bump and name what you walk into", NavigationAids.WallBumps);
 
         layout.Controls.Add(new Label { Text = "Interface sound volume, percent", AutoSize = true });
         var volume = new NumericUpDown
@@ -335,6 +338,8 @@ public sealed class MenuWindow : Form
             _settings.UiSounds = uiSounds.Checked;
             _settings.PresenceSounds = presenceSounds.Checked;
             _settings.UiVolume = (float)volume.Value / 100f;
+            NavigationAids.TurnNarration = narration.Checked;
+            NavigationAids.WallBumps = bumps.Checked;
             _settings.Save();
             _services.ApplySettings();
             form.DialogResult = DialogResult.OK;

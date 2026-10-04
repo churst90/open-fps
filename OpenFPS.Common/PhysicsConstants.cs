@@ -22,8 +22,21 @@ public static class PhysicsConstants
 
     /// <summary>Metres per second at a run. One number, client and server, exactly as with the walk.</summary>
     public const float SprintSpeed = WalkSpeed * SprintMultiplier;
-    public const float JumpPower = 5.0f;
-    public const float Gravity = 15.0f;
+
+    /// <summary>
+    /// Metres per second straight up at the moment a standing jump leaves the ground: sqrt(2 g h)
+    /// for a rise of half a metre, about what a person manages from a standstill. It was 5.0, which
+    /// under the old gravity of 15 rose 0.83 m.
+    /// </summary>
+    public const float JumpPower = 3.13f;
+
+    /// <summary>
+    /// The Earth's, m/s². It was 15, chosen for how a jump felt; Cody (2026-10-04): "if you fall from
+    /// somewhere, shouldn't you fall at the speed of gravity on earth?" A fall is heard — how long
+    /// the drop takes before the landing, how hard the landing is — so it is a claim about the world.
+    /// The eighteen metres off the Brandt Court roof take 1.92 s at this, 1.55 s at the old 15.
+    /// </summary>
+    public const float Gravity = 9.81f;
     public const float StepHeight = 0.4f;
     public const float RotationSpeed = 1.5f; // SHARED: Radians per second at full stick/key
 

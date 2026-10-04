@@ -550,6 +550,12 @@ public class SpatialService
     }
 
     public bool RaycastSingle(WorldSnapshot world, Vector3 start, Vector3 dir, float maxDist, out EntitySnapshot hitEntity, out float hitDistance)
+        => RaycastSingle(world, start, dir, maxDist, null, out hitEntity, out hitDistance);
+
+    /// <summary>The nearest thing along a ray that <paramref name="accept"/> admits; everything else is
+    /// looked straight through.</summary>
+    public bool RaycastSingle(WorldSnapshot world, Vector3 start, Vector3 dir, float maxDist, Func<EntitySnapshot, bool>? accept,
+                              out EntitySnapshot hitEntity, out float hitDistance)
     {
         hitDistance = maxDist;
         hitEntity = default;
@@ -562,6 +568,7 @@ public class SpatialService
         {
             var def = entitySnap.Definition;
             if (def.Collider.Size.X <= 0) continue;
+            if (accept != null && !accept(entitySnap)) continue;
             var transform = entitySnap.Transform;
             bool intersected = false;
             float dist = maxDist;

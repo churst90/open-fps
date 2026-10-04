@@ -41,8 +41,28 @@ public static class SharedMovementEngine
         public Vector3 MapMax;
     }
 
-    public static (Vector3 NewPosition, Vector3 NewVelocity, bool IsGrounded) Step(MovementContext ctx, ReadOnlySpan<Collider> nearbyColliders)
+    /// <summary>
+    /// What held the body back this step, if anything: the collider it pushed into and was stopped
+    /// by (not one it climbed as a step), the surface's outward normal, and how fast the attempted
+    /// horizontal motion was going INTO it. A body sliding along a wall has a small
+    /// <see cref="IntoSpeed"/>; one walking straight at it has all of its speed there. The client's
+    /// wall bump reads it; nothing in the step depends on it.
+    /// </summary>
+    public struct Contact
     {
+        public bool Blocked;
+        /// <summary>Index into the colliders passed to <see cref="Step(MovementContext, ReadOnlySpan{Collider}, out Contact)"/>.</summary>
+        public int ColliderIndex;
+        public Vector3 Normal;
+        public float IntoSpeed;
+    }
+
+    public static (Vector3 NewPosition, Vector3 NewVelocity, bool IsGrounded) Step(MovementContext ctx, ReadOnlySpan<Collider> nearbyColliders)
+        => Step(ctx, nearbyColliders, out _);
+
+    public static (Vector3 NewPosition, Vector3 NewVelocity, bool IsGrounded) Step(MovementContext ctx, ReadOnlySpan<Collider> nearbyColliders, out Contact contact)
+    {
+        contact = default;
         Vector3 pos = ctx.Position;
         Vector3 vel = ctx.Velocity;
         float dt = ctx.DeltaTime;
@@ -87,13 +107,40 @@ public static class SharedMovementEngine
             vel.Y -= ctx.Gravity * dt;
         }
 
+        // ── A fall ends ON the floor, not inside it ──────────────────────────────────────────────
+        //
+        // The landing above only catches a body that STARTS a tick within a tenth of a metre of the
+        // floor. A body falling faster than that — three metres per second at 30 Hz, which is any
+        // drop of more than about half a metre — crosses the window between two ticks and arrives a
+        // whole tick's fall deep in the floor. Collision then met the floor box from inside it, centre
+        // within its footprint, and pushed the body out sideways to the box's NEAREST EDGE: the end of
+        // the roof slab, or of the ground box the whole city stands on. Sean walked off the west side
+        // of Brandt Court (2026-10-04), fell eighteen metres, and on landing was put 489 m west at the
+        // edge of the map in one tick; Cody's drop onto the same roof was put 0.85 m south.
+        //
+        // The floor under the body is known (GroundHeight is the highest top below it), so a fall
+        // that would pass through it this tick stops on it this tick.
+        Vector3 moveDelta;
+        bool landed = false;
+        if (!isGrounded && vel.Y < 0f && ctx.GroundHeight > DefaultGroundCheckLimit
+            && pos.Y >= ctx.GroundHeight && pos.Y + vel.Y * dt <= ctx.GroundHeight)
+        {
+            landed = true;
+        }
+
         // --- 2. HORIZONTAL MOVEMENT ---
         Vector3 horizontalVel = ctx.InputDirection * ctx.Speed;
         vel.X = horizontalVel.X;
         vel.Z = horizontalVel.Z;
 
         // --- 3. ITERATIVE COLLISION RESOLUTION (SLIDING) ---
-        Vector3 moveDelta = vel * dt;
+        moveDelta = vel * dt;
+        if (landed)
+        {
+            moveDelta.Y = ctx.GroundHeight - pos.Y;
+            vel.Y = 0f;
+            isGrounded = true;
+        }
         Vector3 remainingMove = moveDelta;
 
         // Foot padding: We lift the collision cylinder bottom slightly to avoid hitting the floor we stand on.
@@ -116,6 +163,7 @@ public static class SharedMovementEngine
         {
             Vector3 nextPos = pos + remainingMove;
             GeometryUtils.CollisionResult bestHit = new() { IsColliding = false };
+            int bestIndex = -1;
 
             for (int j = 0; j < nearbyColliders.Length; j++)
             {
@@ -137,7 +185,10 @@ public static class SharedMovementEngine
                     hit.Material = col.Material;
 
                     if (!bestHit.IsColliding || hit.Penetration > bestHit.Penetration)
+                    {
                         bestHit = hit;
+                        bestIndex = j;
+                    }
                 }
             }
 
@@ -177,12 +228,27 @@ public static class SharedMovementEngine
                 }
             }
 
-            if (!stepped)
+            if (!stepped && bestHit.Normal.Y > 0.5f)
+            {
+                // A FLOOR the body came down into (see GetCylinderAABBOverlap): out the top, onto it.
+                // The cylinder stops footPadding above the feet, so the feet go that much further up
+                // to stand on the surface rather than a hand's breadth inside it.
+                pos = nextPos + bestHit.Normal * (bestHit.Penetration + footPadding);
+                remainingMove = Vector3.Zero;
+                if (vel.Y < 0f) vel.Y = 0f;
+                isGrounded = true;
+            }
+            else if (!stepped)
             {
                 // Take the move, then come back out along the surface normal by the depth measured
                 // THERE, plus a skin width so the next test starts clear of it.
                 pos = nextPos + bestHit.Normal * (bestHit.Penetration + CollisionSkinWidth);
                 remainingMove = Vector3.Zero; // spent: the slide is what survived the push-out
+
+                // Reported, not acted on: the hardest the attempted motion pressed into anything.
+                float into = -(vel.X * bestHit.Normal.X + vel.Z * bestHit.Normal.Z);
+                if (into > contact.IntoSpeed)
+                    contact = new Contact { Blocked = true, ColliderIndex = bestIndex, Normal = bestHit.Normal, IntoSpeed = into };
 
                 float velDot = Vector3.Dot(vel, bestHit.Normal);
                 if (velDot < 0)

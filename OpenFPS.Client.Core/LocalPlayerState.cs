@@ -96,6 +96,25 @@ public class LocalPlayerState
 
     public float PrecipitationIntensity { get; set; } = 0.0f;
 
+    /// <summary>The way you face, as one of eight points: "North West".</summary>
+    public string GetCardinal()
+    {
+        Vector3 forward = Vector3.Transform(new Vector3(0, 0, 1), Rotation);
+        float angle = MathF.Atan2(forward.X, forward.Z) * (180.0f / MathF.PI);
+        if (angle < 0) angle += 360.0f;
+        return angle switch
+        {
+            < 22.5f or >= 337.5f => "North",
+            < 67.5f => "North East",
+            < 112.5f => "East",
+            < 157.5f => "South East",
+            < 202.5f => "South",
+            < 247.5f => "South West",
+            < 292.5f => "West",
+            _ => "North West"
+        };
+    }
+
     public string GetCompassDirection()
     {
         Vector3 forward = Vector3.Transform(new Vector3(0, 0, 1), Rotation);

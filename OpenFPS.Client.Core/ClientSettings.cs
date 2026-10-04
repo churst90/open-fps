@@ -48,6 +48,18 @@ public sealed class ClientSettings
     /// </summary>
     public float LevelCompression { get; set; } = OpenFPS.Common.Loudness.DefaultCompression;
 
+    /// <summary>Saying what is in front of you as you turn (N in game). See <see cref="NavigationAids"/>.</summary>
+    public bool TurnNarration { get; set; } = true;
+    /// <summary>The knock and the name when you walk into something (/bumps in game).</summary>
+    public bool WallBumps { get; set; } = true;
+
+    /// <summary>Puts this file's navigation aids into play. Each head calls it once, after loading.</summary>
+    public void ApplyNavigationAids()
+    {
+        NavigationAids.TurnNarration = TurnNarration;
+        NavigationAids.WallBumps = WallBumps;
+    }
+
     public SavedServer? Preferred => Servers.FirstOrDefault(s => s.Preferred) ?? (Servers.Count == 1 ? Servers[0] : null);
 
     public void SetPreferred(SavedServer server)
@@ -107,11 +119,28 @@ public sealed class ClientSettings
         // What is playing, unless a run's environment chose it: that is not the player's choice.
         if (!OpenFPS.Common.Loudness.CompressionFromEnvironment)
             LevelCompression = OpenFPS.Common.Loudness.DynamicRangeCompression;
+        // ...and the navigation aids as they are now: a key in game turns them, not this copy.
+        TurnNarration = NavigationAids.TurnNarration;
+        WallBumps = NavigationAids.WallBumps;
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         File.WriteAllText(path, JsonSerializer.Serialize(this, Json));
         if (!OperatingSystem.IsWindows())
             try { File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.UserWrite); } catch (IOException) { }
     }
+}
+
+/// <summary>
+/// The live switches for the two navigation aids, which the game reads and a key or a command flips.
+/// Static, like Loudness.DynamicRangeCompression and for the same reason: a head holds its own copy of
+/// <see cref="ClientSettings"/> for the life of the run, and the live value is what
+/// <see cref="ClientSettings.Save"/> must write, whoever saves.
+/// </summary>
+public static class NavigationAids
+{
+    /// <summary>Say what is ahead once the heading settles after a turn.</summary>
+    public static bool TurnNarration { get; set; } = true;
+    /// <summary>A knock and the thing's name when you walk into it.</summary>
+    public static bool WallBumps { get; set; } = true;
 }
 
 /// <summary>"host:port" as typed into a connect form or saved, with the defaults filled in.</summary>
