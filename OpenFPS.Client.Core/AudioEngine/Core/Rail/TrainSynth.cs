@@ -59,6 +59,7 @@ public sealed class TrainSynth
     private EngineSynth? _diesel;
     private ElectricDrive? _drive;
     private readonly List<ElectricDrive> _drives = new();
+    private readonly List<EngineSynth> _diesels = new();
     private float[] _notches = Array.Empty<float>();
 
     /// <summary>Metres a second. The one input everything else follows.</summary>
@@ -72,6 +73,8 @@ public sealed class TrainSynth
     public bool BellRinging { get => _bell?.Ringing ?? false; set { if (_bell != null) _bell.Ringing = value; } }
     public SteamFrontEnd? Steam => _steam;
     public EngineSynth? Diesel => _diesel;
+    /// <summary>Every prime mover in the consist, lead unit first.</summary>
+    public IReadOnlyList<EngineSynth> Diesels => _diesels;
 
     public IReadOnlyList<Source> Sources => _sources;
 
@@ -138,10 +141,11 @@ public sealed class TrainSynth
         {
             case RailTraction.DieselElectric when tr.EngineKey != null:
             {
-                _diesel = new EngineSynth(EngineProfile.ByName(tr.EngineKey), _rate, seed++) { Ignition = true };
+                var eng = new EngineSynth(EngineProfile.ByName(tr.EngineKey), _rate, seed++) { Ignition = true };
+                _diesel ??= eng;
+                _diesels.Add(eng);
                 _notches = tr.NotchRpm;
                 var fan = new FanNoise(tr.FanBlades, tr.FanRpm, tr.FanDb, _rate, seed++);
-                var eng = _diesel;
                 _sources.Add(new Source
                 {
                     Label = $"{v.Name} #{unit + 1} exhaust stack",
@@ -261,15 +265,25 @@ public sealed class TrainSynth
         {
             // A diesel-electric has no throttle, it has notches, and a governor that holds the
             // notch by moving the fuel rack. So the sound steps rather than sweeps, and the engine
-            // takes a couple of seconds to get there because it weighs what it weighs.
+            // takes a couple of seconds to get there because it weighs what it weighs. The governor
+            // is the engine's own, with its speed set by the notch; the pedal stays up.
             int n = Math.Clamp((int)MathF.Round(Notch), 0, _notches.Length - 1);
-            float want = _notches[n];
-            float err = (want - _diesel.Rpm) / MathF.Max(100f, want);
-            _diesel.Throttle = Math.Clamp(_diesel.Throttle + err * 0.09f, 0.05f, 1f);
-            // The alternator is the load, and it takes what the traction motors are asking for.
+            float want = _notches[n], idle = _notches[0];
             float frac = n / MathF.Max(1f, _notches.Length - 1f);
-            _diesel.LoadTorque = _diesel.Profile.PeakTorqueNm * (0.06f + 0.84f * MathF.Pow(frac, 1.3f));
-            _diesel.Starter = _diesel.Rpm < 100f;
+            foreach (var eng in _diesels)
+            {
+                float rpm = eng.Rpm;
+                eng.Starter = rpm < 100f;
+                eng.Throttle = 0f;
+                eng.GovernedRpm = want;
+                // The alternator is the load, and it takes what the traction motors are asking for.
+                // It is not excited until the engine is turning on its own: nothing while cranking,
+                // all of it from idle up. Its voltage, and so its torque into the same motors, goes
+                // with its speed, which is what lets a bogged engine pull back up instead of stalling.
+                float excited = Math.Clamp((rpm - eng.Profile.CrankingRpm) / MathF.Max(1f, idle - eng.Profile.CrankingRpm), 0f, 1f);
+                float atNotch = eng.Profile.PeakTorqueNm * (0.06f + 0.84f * MathF.Pow(frac, 1.3f));
+                eng.LoadTorque = excited * atNotch * rpm / want;
+            }
         }
         float effort = Math.Clamp(Notch / 8f, 0f, 1f);
         foreach (var d in _drives) d.Effort = effort;

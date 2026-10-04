@@ -2142,7 +2142,10 @@ public sealed record EngineProfile
             // times shaft speed on each of two rotors: the whine under every EMD.
             AccessoryWhineOrder = 6f, AccessoryWhineLevel = 0.2f,
             BlowerWhineOrder = 15.6f, BlowerWhineLevel = 0.45f,
-            TurboWhistleLevel = 0.5f, TurboLagSeconds = 2.5f,
+            // The turbo is geared to the crank through an overrunning clutch until the exhaust can
+            // carry it, so it is blowing from the first turn: a two-stroke has no other way to clear
+            // its cylinders. Under 0.4 the cylinders stay too full of exhaust here to fire at idle.
+            TurboWhistleLevel = 0.5f, TurboLagSeconds = 2.5f, TurboIdleSpool = 0.45f,
         },
     };
 

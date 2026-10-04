@@ -550,6 +550,61 @@ public class RailAndSignalTests
         Assert.InRange(d.MeshHz, d.MotorRpm / 60f * spec.PinionTeeth * 0.99f, d.MotorRpm / 60f * spec.PinionTeeth * 1.01f);
     }
 
+    // ── Diesel-electric ─────────────────────────────────────────────────────────────────────────
+
+    public static TheoryData<string> DieselTrainKeys()
+    {
+        var keys = new TheoryData<string>();
+        foreach (var (key, make) in TrainProfile.Presets)
+            if (make().Consist.Any(c => c.Vehicle.Traction?.Kind == RailTraction.DieselElectric)) keys.Add(key);
+        return keys;
+    }
+
+    /// <summary>
+    /// A diesel-electric is started with the alternator dead, idles, and then the governor holds
+    /// the notch's speed with the load on. Every prime mover in the consist, from cold, in every
+    /// notch, must be turning at that notch's speed fifteen seconds after the starter goes in.
+    /// </summary>
+    [Theory, MemberData(nameof(DieselTrainKeys))]
+    public void EveryDieselStartsFromColdAndHoldsEachNotch(string key)
+    {
+        // The locomotives alone: what they pull is not what the governor sees.
+        var full = TrainProfile.ByName(key);
+        var p = full with { Consist = full.Consist.Where(c => c.Vehicle.Traction?.Kind == RailTraction.DieselElectric).ToArray() };
+        float[] notchRpm = p.Consist[0].Vehicle.Traction!.NotchRpm;
+        for (int n = 0; n < notchRpm.Length; n++)
+        {
+            var train = new TrainSynth(p, Sr, 41) { Notch = n, Speed = 0f };
+            int units = train.Diesels.Count;
+            var lo = Enumerable.Repeat(float.MaxValue, units).ToArray();
+            var hi = new float[units];
+            var sum = new double[units];
+            // The speed in quarter-second means: long enough to take out the firing ripple, short
+            // enough to catch a governor hunting.
+            int window = Sr / 4;
+            for (int i = 0; i < Sr * 15; i++)
+            {
+                train.Step();
+                if (i < Sr * 13) continue;
+                for (int u = 0; u < units; u++) sum[u] += train.Diesels[u].Rpm;
+                if ((i - Sr * 13) % window != window - 1) continue;
+                for (int u = 0; u < units; u++)
+                {
+                    float mean = (float)(sum[u] / window);
+                    lo[u] = MathF.Min(lo[u], mean);
+                    hi[u] = MathF.Max(hi[u], mean);
+                    sum[u] = 0;
+                }
+            }
+            for (int u = 0; u < units; u++)
+            {
+                _o.WriteLine($"{key} unit {u + 1} notch {n}: {lo[u]:F0}-{hi[u]:F0} rpm, governed to {notchRpm[n]:F0}");
+                Assert.True(lo[u] > notchRpm[n] * 0.96f && hi[u] < notchRpm[n] * 1.04f,
+                    $"{key} unit {u + 1} notch {n}: {lo[u]:F0}-{hi[u]:F0} rpm over the last two seconds, wanted {notchRpm[n]:F0}");
+            }
+        }
+    }
+
     // ── A train is a line of sources ────────────────────────────────────────────────────────────
 
     [Fact]

@@ -55,6 +55,9 @@ public sealed class EngineSynth
     /// <summary>Extra rotating inertia the crank has to carry, kg m^2 — the car, reflected through
     /// the gearing. Zero with the clutch down.</summary>
     public float ExternalInertia { get; set; }
+    /// <summary>The speed the governor holds with the pedal up, rpm; zero holds the profile's idle.
+    /// A locomotive's notches move it, and its turbo then follows the governor's fuel.</summary>
+    public float GovernedRpm { get; set; }
 
     // ── Outputs, valid after Step() ─────────────────────────────────────────────────────────────
 
@@ -1480,7 +1483,7 @@ public sealed class EngineSynth
         _rpmFast += (Rpm - _rpmFast) * MathF.Min(1f, dtSlow * 30f);
         if (pedalUp && Ignition && _omega > 10f)
         {
-            float err = (e.IdleRpm - _rpmSlow) / e.IdleRpm;
+            float err = ((GovernedRpm > 0f ? GovernedRpm : e.IdleRpm) - _rpmSlow) / e.IdleRpm;
             float rising = (_rpmFast - _rpmSlow) / e.IdleRpm;         // where it is heading
             _idleIntegral = Math.Clamp(_idleIntegral + err * e.IdleGovernorGain * ki * dtSlow, 0f, idleCap);
             _idleAir = Math.Clamp(_idleIntegral + e.IdleGovernorGain * (err * kp - rising * kd), 0f, idleCap);
@@ -1515,7 +1518,8 @@ public sealed class EngineSynth
             // the freewheel at 1,300-1,700 rpm, so a compound truck pulling away gently held its
             // whistle flat until then: "when it hits the gas the turbo doesn't spin up right away".
             // With no freewheel declared this is the throttle's share alone, as it always was.
-            Induction.Turbocharged => TurboTarget(Throttle, rpm, e),
+            // An engine on an all-speed governor has its pedal up, so there the fuel drives it.
+            Induction.Turbocharged => TurboTarget(GovernedRpm > 0f ? pedal : Throttle, rpm, e),
             Induction.Supercharged => Math.Clamp(rpm / e.RedlineRpm, 0f, 1f) * (0.3f + 0.7f * Throttle),
             _ => 0f,
         };
