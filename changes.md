@@ -15,6 +15,10 @@ Recent work, newest first. `git log` has the rest.
   use: spawn, tp." Grants say who gave them. `/give [NAME] ITEM [COUNT]` says "You gave sean 1
   AKM." and sean hears "cody gave you 1 AKM." and where it went.
 - Saved Servers (Linux): Tab leaves the list instead of choosing the next server.
+- The command box: `/help` lists the commands you may use, by group; `/help COMMAND` says how to type
+  it and what it does; `/help settings` lists your own sound settings. A mistyped command is answered
+  with the nearest one you can use ("Did you mean /give?"). A player can be named by the start of
+  their name when only one fits, and an item by its name or the start of it (`/give sean akm`).
 
 - Connecting to a server by name (codyhurst.com) uses its IPv4 address. LiteNetLib picked the IPv6
   address, and that connection was never answered; by IPv4 the same login is accepted.

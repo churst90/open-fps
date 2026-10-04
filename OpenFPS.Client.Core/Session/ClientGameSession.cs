@@ -1269,6 +1269,16 @@ public sealed partial class ClientGameSession : IDisposable
         {
             var parts = input[1..].Split(' ', StringSplitOptions.RemoveEmptyEntries);
             if (parts.Length == 0) return;
+            // The settings this client answers itself, which the server's /help cannot know about.
+            if (parts[0].Equals("help", StringComparison.OrdinalIgnoreCase) && parts.Length > 1
+                && parts[1].Equals("settings", StringComparison.OrdinalIgnoreCase))
+            {
+                Say("Your own settings: /levels, how much of the real loudness differences you hear, or /levels default. "
+                  + "/beacons, which beacons you hear. /reverb traced or room. /echoes on or off. "
+                  + "/tail and /copies, the reflections' level in decibels, zero is physical. /cabin, the inside of a vehicle. "
+                  + "Each on its own says where it is set now.");
+                return;
+            }
             // Answered here, not by the server: which beacons YOU hear is yours, and nobody else's.
             if (parts[0].Equals("beacons", StringComparison.OrdinalIgnoreCase)
                 || parts[0].Equals("beacon", StringComparison.OrdinalIgnoreCase))

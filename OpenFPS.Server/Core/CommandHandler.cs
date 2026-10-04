@@ -368,8 +368,13 @@ public class CommandHandler
             case "savemap":
                 HandleSaveMap(session, reply);
                 break;
+            case "help":
+            case "commands":
+            case "?":
+                Say(reply, args.Length == 0 ? CommandCatalog.Help(session) : CommandCatalog.HelpFor(session, args[0]));
+                break;
             default:
-                Say(reply, $"Command '{commandName}' not recognized.");
+                Say(reply, CommandCatalog.Unknown(session, commandName));
                 break;
         }
     }
@@ -1606,8 +1611,19 @@ public class CommandHandler
     // ── People and places ───────────────────────────────────────────────────────────────────────
 
     /// <summary>The online session of a user, if they are on.</summary>
-    private UserSession? OnlineSession(string username) =>
-        _sessions.GetAllSessions().FirstOrDefault(s => s.Username.Equals(username, StringComparison.OrdinalIgnoreCase));
+    /// <summary>
+    /// An online player by name: the exact name, or failing that the one player whose name starts with
+    /// what was typed (so "/bring se" finds sean when nobody else's name starts "se"). Never a guess
+    /// between two.
+    /// </summary>
+    private UserSession? OnlineSession(string username)
+    {
+        var all = _sessions.GetAllSessions().ToList();
+        var exact = all.FirstOrDefault(s => s.Username.Equals(username, StringComparison.OrdinalIgnoreCase));
+        if (exact != null || username.Length < 2) return exact;
+        var starts = all.Where(s => s.Username.StartsWith(username, StringComparison.OrdinalIgnoreCase)).ToList();
+        return starts.Count == 1 ? starts[0] : null;
+    }
 
     /// <summary>
     /// A user's name as the server stores it, and their role, if they are registered. Falls back on

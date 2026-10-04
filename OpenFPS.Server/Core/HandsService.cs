@@ -6,6 +6,7 @@ using Arch.Core;
 using OpenFPS.Common;
 using OpenFPS.Common.Components;
 using OpenFPS.Common.Networking;
+using OpenFPS.Server.Repositories;
 using OpenFPS.Server.Systems;
 using Serilog;
 
@@ -130,9 +131,25 @@ public class HandsService
     /// <paramref name="name"/> is the item's name, <paramref name="placed"/> where they went, for the
     /// receiver ("1 in both hands, 1 on your back").
     /// </summary>
+    /// <summary>
+    /// The item prefab a player means: its id, its name ("AKM", "Glock 17"), or the start of either
+    /// when only one item fits ("akm", "glock"). Null when none or more than one does.
+    /// </summary>
+    public string? ResolveItem(string typed)
+    {
+        string t = typed.Trim().ToLowerInvariant().Replace(' ', '_');
+        var items = _maps.Prefabs.Where(p => p.Value.IsItem || p.Value.Type == EntityType.Item).ToList();
+        string Display(KeyValuePair<string, PrefabTemplate> p) => (p.Value.Name ?? "").ToLowerInvariant().Replace(' ', '_');
+        var exact = items.FirstOrDefault(p => p.Key.Equals(t, StringComparison.OrdinalIgnoreCase) || Display(p) == t);
+        if (exact.Key != null) return exact.Key;
+        var starts = items.Where(p => p.Key.StartsWith(t, StringComparison.OrdinalIgnoreCase) || Display(p).StartsWith(t)).ToList();
+        return starts.Count == 1 ? starts[0].Key : null;
+    }
+
     public bool Give(UserSession to, string prefabId, int count, out string name, out string placed, out string message)
     {
         name = placed = message = "";
+        prefabId = ResolveItem(prefabId) ?? prefabId;
         if (!_maps.Prefabs.TryGetValue(prefabId, out var template) || !(template.IsItem || template.Type == EntityType.Item))
         { message = $"There is no item called {prefabId}. Items: {string.Join(", ", GivableItems())}."; return false; }
         if (!TryGetHolder(to, out var world, out _, out var lookup) || to.Entity == Entity.Null || !world.IsAlive(to.Entity))
