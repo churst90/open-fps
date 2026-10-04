@@ -97,6 +97,19 @@ public class MovementSystemTests : IDisposable
 
     // ── The budget ────────────────────────────────────────────────────────────────────────────
 
+    /// <summary>A move direction is a direction: one ten times too long is still a run, not ten.</summary>
+    [Fact]
+    public void ALongMoveDirectionIsStillOnlyARun()
+    {
+        var rig = Build();
+        rig.Tick(30);
+        var from = rig.Position;
+        rig.Queue(new Vector3(0, 0, 10f), sprint: true);
+        rig.Tick();
+        float moved = Vector3.Distance(from, rig.Position);
+        Assert.InRange(moved, SprintSpeed * FixedDeltaTime * 0.9f, SprintSpeed * FixedDeltaTime * 1.01f);
+    }
+
     /// <summary>One tick buys one tick of movement, however many inputs arrive in it: extra packets
     /// buy latency, never distance.</summary>
     [Fact]

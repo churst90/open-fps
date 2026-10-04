@@ -48,7 +48,7 @@ public partial struct ZoneComponent
     public Vector3 Size { get; set; }
     public Vector3 MinBound { get; set; }
     public Vector3 MaxBound { get; set; }
-    public float Gravity { get; set; } = 15.0f;
+    public float Gravity { get; set; } = PhysicsConstants.Gravity;
     public float MinimumY { get; set; }
     
     // Environment Overrides. AirPressure is MILLIBARS (sea level 1013.25), matching what the client's

@@ -162,7 +162,11 @@ public static class MovementSystem
                 Vector3 inputDir = Vector3.Zero;
                 if (input.MoveDirection != Vector3.Zero)
                 {
-                    inputDir = Vector3.Transform(input.MoveDirection, Quaternion.CreateFromYawPitchRoll(player.Yaw, 0, 0));
+                    // A direction, not a speed: the client sends it normalised on foot, and a longer
+                    // one from anywhere else would be a run faster than SprintSpeed.
+                    var move = input.MoveDirection;
+                    if (move.LengthSquared() > 1f) move = Vector3.Normalize(move);
+                    inputDir = Vector3.Transform(move, Quaternion.CreateFromYawPitchRoll(player.Yaw, 0, 0));
                 }
 
                 // 3. COLLISION GATHERING

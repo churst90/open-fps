@@ -42,8 +42,8 @@ public readonly record struct FlightPoint(float Range, float Height, float Drift
 /// air, which is all that wind drift is: a crosswind gives the bullet a sideways airspeed that the drag
 /// spends turning into a sideways velocity, a little at a time, for as long as it is in flight.
 ///
-/// Gravity is the real 9.81 m/s², not the 15 the walking physics uses. That 15 is a choice about how
-/// a jump feels; this is a claim about where a .308 lands at 600 metres, and the player who learns
+/// Gravity is the real 9.81 m/s², which the walking physics now uses too (it was 15, a choice about
+/// how a jump felt). This is a claim about where a .308 lands at 600 metres, and the player who learns
 /// the drop here has learned the real one.
 ///
 /// Pure and deterministic, so the server flies the authoritative bullet with it and the client
