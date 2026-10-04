@@ -375,6 +375,8 @@ public class MudGateway
             // word for word.
             WorldAudioEvent w when w.Label.StartsWith("speech: ", StringComparison.Ordinal)
                 => $"Someone nearby says: \"{w.Label["speech: ".Length..]}\"",
+            // Somebody came or went: the notice is the whole line, with no sender in front of it.
+            ChatMessage { Presence: not PresenceKind.None } p => p.Text,
             ChatMessage c => c.Channel switch
             {
                 ChatChannel.Private when c.To.Length > 0 => $"[to {c.To}]: {c.Text}",

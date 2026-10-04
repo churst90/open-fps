@@ -301,7 +301,7 @@ public sealed class MenuWindow : Form
 
     private void ShowSettings()
     {
-        var form = Dialog("Settings", 460, 430);
+        var form = Dialog("Settings", 460, 470);
         var layout = Column();
 
         var outputs = new List<string> { "System default" };
@@ -312,6 +312,9 @@ public sealed class MenuWindow : Form
         var output = Choice(layout, "Output device", outputs, _settings.OutputDevice);
         var input = Choice(layout, "Input device, for voice chat", inputs, _settings.InputDevice);
         var uiSounds = Check(layout, "Interface sounds", _settings.UiSounds);
+        // Apart from the interface sounds: somebody arriving or leaving is not a menu tick, and a busy
+        // server can want one off and the other on. The notices are spoken either way.
+        var presenceSounds = Check(layout, "Online and offline sounds", _settings.PresenceSounds);
 
         layout.Controls.Add(new Label { Text = "Interface sound volume, percent", AutoSize = true });
         var volume = new NumericUpDown
@@ -330,6 +333,7 @@ public sealed class MenuWindow : Form
             _settings.OutputDevice = output.SelectedIndex <= 0 ? "" : outputs[output.SelectedIndex];
             _settings.InputDevice = input.SelectedIndex <= 0 ? "" : inputs[input.SelectedIndex];
             _settings.UiSounds = uiSounds.Checked;
+            _settings.PresenceSounds = presenceSounds.Checked;
             _settings.UiVolume = (float)volume.Value / 100f;
             _settings.Save();
             _services.ApplySettings();

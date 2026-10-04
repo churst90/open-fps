@@ -94,6 +94,7 @@ string[] usage =
     "  --pushbar-door [out=] [only=] [stems=]        the physical push-bar door: each character opening and shutting on its closer",
     "  --sliding-door [out=] [only=] [stems=]        the physical sliding doors: a patio door and an automatic door, each character",
     "  --beacon-tones [out=]                         each beacon three times at its real period",
+    "  --presence-sounds [out=]                      the online, logged out, connection lost, away and back cues, measured",
     "  --gun-spec                                    synthesized shots against the NIJ recordings",
     "  --gun-fit [nij=DIR] [tag=] [wavs] [grid]      every weapon's report against its own NIJ takes",
     "  --speech-lines                                decodes every shipped voice line as the client does",
@@ -510,6 +511,36 @@ if (args.Contains("--beacon-tones"))
         w.Write(rate); w.Write(rate * 2); w.Write((short)2); w.Write((short)16); w.Write("data"u8); w.Write(pcm.Length * 2);
         foreach (float v in pcm) w.Write((short)Math.Clamp(v * 32767f, -32768f, 32767f));
         Console.WriteLine($"  wrote {path}");
+    }
+    Environment.Exit(0);
+}
+
+if (args.Contains("--presence-sounds"))
+{
+    // --presence-sounds [out=DIR]: each presence cue once, at 48 kHz, one WAV each, with its length
+    // and peak, so the set can be listened to and checked against each other before it is heard in game.
+    string dir = args.FirstOrDefault(a => a.StartsWith("out=", StringComparison.Ordinal))?.Substring(4) ?? ".";
+    System.IO.Directory.CreateDirectory(dir);
+    int rate = 48000, k = 0;
+    var cues = new[]
+    {
+        OpenFPS.Client.Core.UiCue.PresenceOnline, OpenFPS.Client.Core.UiCue.PresenceLoggedOut,
+        OpenFPS.Client.Core.UiCue.PresenceConnectionLost, OpenFPS.Client.Core.UiCue.PresenceAway,
+        OpenFPS.Client.Core.UiCue.PresenceBack,
+        // The chat cue they sit beside, for comparison.
+        OpenFPS.Client.Core.UiCue.ChatAll,
+    };
+    foreach (var cue in cues)
+    {
+        var pcm = OpenFPS.Client.Core.UiSounds.Render(cue, rate);
+        float peak = pcm.Max(MathF.Abs);
+        double rms = Math.Sqrt(pcm.Sum(v => (double)v * v) / pcm.Length);
+        string path = System.IO.Path.Combine(dir, $"{++k} {cue}.wav");
+        using var w = new System.IO.BinaryWriter(System.IO.File.Create(path));
+        w.Write("RIFF"u8); w.Write(36 + pcm.Length * 2); w.Write("WAVEfmt "u8); w.Write(16); w.Write((short)1); w.Write((short)1);
+        w.Write(rate); w.Write(rate * 2); w.Write((short)2); w.Write((short)16); w.Write("data"u8); w.Write(pcm.Length * 2);
+        foreach (float v in pcm) w.Write((short)Math.Clamp(v * 32767f, -32768f, 32767f));
+        Console.WriteLine($"  {cue,-24} {pcm.Length / (float)rate * 1000f,6:F0} ms  peak {20 * Math.Log10(peak),6:F1} dBFS  rms {20 * Math.Log10(rms),6:F1} dBFS  {path}");
     }
     Environment.Exit(0);
 }

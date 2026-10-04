@@ -68,6 +68,9 @@ public class CommandHandler
                 Log.Error(ex, "Error executing command '{Command}' for {User}", commandName, session.Username);
                 Say(reply, $"Command '{commandName}' failed. The error has been logged.");
             }
+            // After the command, so /afk is announced as soon as it is typed, and anything else
+            // typed by somebody who was away says they are back.
+            _server.UpdatePresence(session, DateTime.UtcNow);
         });
     }
 

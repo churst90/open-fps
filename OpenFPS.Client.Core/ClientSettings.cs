@@ -32,6 +32,9 @@ public sealed class ClientSettings
 {
     public bool UiSounds { get; set; } = true;
     public float UiVolume { get; set; } = 0.5f;
+    /// <summary>The sounds for somebody logging in, logging out, losing connection, going away and
+    /// coming back. The notices themselves are spoken either way.</summary>
+    public bool PresenceSounds { get; set; } = true;
     /// <summary>Output device by name; empty is the system default.</summary>
     public string OutputDevice { get; set; } = "";
     /// <summary>Microphone by name, for voice chat; empty is the system default.</summary>
