@@ -5007,6 +5007,89 @@ public class FmodAudioProvider : IAudioProvider
         }
     }
 
+    /// <summary>The interface loops playing now, by slot: the channel and the loop it is playing.</summary>
+    private readonly Dictionary<string, (FMOD.Channel Channel, string Id)> _uiLoops = new();
+
+    /// <summary>How long an interface loop takes to fade in or out, seconds: long enough not to click,
+    /// short enough that the guidance tone answers the aim at once.</summary>
+    private const float UiLoopFadeSeconds = 0.02f;
+
+    public void SetUiLoop(string slot, string id, Func<float[]> render, int sampleRate, float volume, float pitch)
+    {
+        if (!_isInitialized) return;
+        lock (_uiSounds)
+        {
+            volume = Math.Clamp(volume, 0f, 1f);
+            pitch = Math.Clamp(pitch, 0.25f, 4f);
+            if (_uiLoops.TryGetValue(slot, out var current) && current.Id == id
+                && current.Channel.isPlaying(out bool playing) == RESULT.OK && playing)
+            {
+                current.Channel.setVolume(volume);
+                current.Channel.setPitch(pitch);
+                return;
+            }
+            if (_uiLoops.Remove(slot, out var old)) FadeOutAndStop(old.Channel);
+
+            string key = "loop:" + id;
+            if (!_uiSounds.TryGetValue(key, out var sound))
+            {
+                var samples = render();
+                var pcm = new byte[samples.Length * 2];
+                for (int i = 0; i < samples.Length; i++)
+                {
+                    short s = (short)(Math.Clamp(samples[i], -1f, 1f) * short.MaxValue);
+                    pcm[i * 2] = (byte)(s & 0xFF);
+                    pcm[i * 2 + 1] = (byte)((s >> 8) & 0xFF);
+                }
+                var info = new CREATESOUNDEXINFO
+                {
+                    cbsize = System.Runtime.InteropServices.Marshal.SizeOf<CREATESOUNDEXINFO>(),
+                    length = (uint)pcm.Length,
+                    numchannels = 1,
+                    defaultfrequency = sampleRate,
+                    format = SOUND_FORMAT.PCM16,
+                };
+                if (_system.createSound(pcm, MODE.OPENMEMORY | MODE.OPENRAW | MODE.CREATESAMPLE | MODE.LOOP_NORMAL | MODE._2D,
+                                        ref info, out sound) != RESULT.OK) return;
+                _uiSounds[key] = sound;
+            }
+            if (_system.playSound(sound, _uiGroup, true, out FMOD.Channel channel) != RESULT.OK) return;
+            channel.setMode(MODE.LOOP_NORMAL);
+            channel.setLoopCount(-1);
+            channel.setVolume(volume);
+            channel.setPitch(pitch);
+            // Faded in on the parent's clock (the channel's own is not running yet; see the voice
+            // start above for what reading the wrong clock did).
+            channel.getDSPClock(out _, out ulong start);
+            _system.getSoftwareFormat(out int rate, out _, out _);
+            channel.addFadePoint(start, 0f);
+            channel.addFadePoint(start + (ulong)(rate * UiLoopFadeSeconds), 1f);
+            channel.setPaused(false);
+            _uiLoops[slot] = (channel, id);
+        }
+    }
+
+    public void StopUiLoop(string slot)
+    {
+        if (!_isInitialized) return;
+        lock (_uiSounds)
+        {
+            if (_uiLoops.Remove(slot, out var old)) FadeOutAndStop(old.Channel);
+        }
+    }
+
+    /// <summary>A loop faded to nothing and stopped once it is there, rather than cut mid-cycle.</summary>
+    private void FadeOutAndStop(FMOD.Channel channel)
+    {
+        if (!channel.hasHandle()) return;
+        if (channel.getDSPClock(out _, out ulong now) != RESULT.OK) return;
+        _system.getSoftwareFormat(out int rate, out _, out _);
+        ulong end = now + (ulong)(rate * UiLoopFadeSeconds);
+        channel.addFadePoint(now, 1f);
+        channel.addFadePoint(end, 0f);
+        channel.setDelay(0, end, true);
+    }
+
     // --- Step 1a diagnostic: a single isolated mono source for verifying HRTF / panning. ---
     // Deliberately bypasses the VoiceManager and the whole acoustics layer so we test ONLY
     // the renderer + listener path. Driven by AudioDiagnostics (`--audio-test`).

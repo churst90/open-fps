@@ -36,6 +36,8 @@ public sealed class WinFormsClientShell : IClientShell
     /// command console nor the game menu is open — otherwise the player would walk while typing.</summary>
     public bool IsGameInputActive => _gameWindow is { IsWindowActive: true, IsModalOpen: false };
 
+    public bool? NumLockOn => _gameWindow?.NumLockOn;
+
     public void ShowLoading(string status, bool speak = true) => _navigation.ShowLoading(status);
 
     public void UpdateLoadingStatus(string text, int percent) => _navigation.UpdateLoadingStatus(text, percent);

@@ -1,0 +1,11 @@
+{
+  "Id": "m700_rifle",
+  "Name": "M700",
+  "Description": "A .308 bolt-action rifle with a 4-12 power scope. Five rounds, worked by hand.",
+  "Material": "Wood",
+  "Type": "Item",
+  "IsItem": true,
+  "ItemWeight": 4.5,
+  "Hands": 2,
+  "WeaponId": "m700"
+}

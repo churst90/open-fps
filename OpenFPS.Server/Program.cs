@@ -281,6 +281,14 @@ public class GameServer
         Teams = new TeamRepository("teams.json");
         // A pedestrian shot dead is taken away after a while and somebody else walks their walk.
         var combat = new CombatService(_maps, this, _sessions) { ReplaceWalker = _vehicles.ReplaceWalker };
+        // A flown bullet slows in the map's air and drifts in the server's wind.
+        combat.Weather = mapId =>
+        {
+            var state = _environment.GetStateForMap(_maps.TryGetMapData(mapId, out var m)
+                ? new MapAtmosphere(m.Temperature, m.Humidity, m.AirPressure, m.AirAbsorptionMultiplier)
+                : MapAtmosphere.Default);
+            return (state.Temperature, state.AirPressure, state.WindVelocity, state.WindGustiness);
+        };
         _commands = new CommandHandler(_sessions, _maps, this, _composites, _seats, _hands, _userRepo, _friends, combat);
 
         // These register their handlers with the dispatcher, which is what keeps them alive.
@@ -525,6 +533,12 @@ public class GameServer
             // client is just another session.
             if (req.Command.TrimStart('/').Equals("ready", StringComparison.OrdinalIgnoreCase)) HandlePlayerReady(id);
             else _commands.HandleTextCommand(id, req, reply);
+        });
+        // A shot through a scope carries its own aim; see ScopedShot.
+        _dispatcher.RegisterHandler<ScopedShot>((id, req, reply) => {
+            if (!_sessions.TryGetSession(id, out var shooter)) return;
+            Touch(id);
+            _commands.Combat.FireScoped(shooter, req, reply);
         });
         _dispatcher.RegisterHandler<ChatMessage>((id, req, reply) => {
             if (!_sessions.TryGetSession(id, out var sess)) return;
@@ -1241,7 +1255,7 @@ public class GameServer
                     _network.SendMessage(peer, new StatsUpdate {
                         Health = health, MaxHealth = maxHealth,
                         CurrentMaterial = stats.matType, CurrentVariant = stats.variant,
-                        HeldWeaponId = held.WeaponId, HeldRounds = held.Rounds,
+                        HeldWeaponId = held.WeaponId, HeldRounds = held.Rounds, HeldScopeId = held.ScopeId,
                     }, DeliveryMethod.ReliableOrdered);
                 }
                 catch (Exception ex)

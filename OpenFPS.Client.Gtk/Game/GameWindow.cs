@@ -26,6 +26,28 @@ internal sealed class GameWindow
         _onClose = onClose;
     }
 
+    private volatile int _numLock = -1;   // -1 unknown, 0 off, 1 on
+
+    /// <summary>Whether Num Lock was on at the last key press in this window, or null before any.</summary>
+    public bool? NumLockOn => _numLock < 0 ? null : _numLock == 1;
+
+    /// <summary>
+    /// Reads Num Lock on the UI thread, where GDK may be asked, at every key press: the keyboard
+    /// device's own lock state, and failing that what the keypad key itself says (a keypad digit is
+    /// only reported with Num Lock on, a keypad Home or Up only with it off).
+    /// </summary>
+    private void NoteNumLock(uint keyval)
+    {
+        try
+        {
+            var keyboard = Gdk.Display.GetDefault()?.GetDefaultSeat()?.GetKeyboard();
+            if (keyboard != null) { _numLock = keyboard.GetNumLockState() ? 1 : 0; return; }
+        }
+        catch (System.Exception) { /* fall back to the keyval below */ }
+        int byKey = GtkKeyMap.NumLockFromKeyval(keyval);
+        if (byKey >= 0) _numLock = byKey;
+    }
+
     /// <summary>
     /// Brings the in-game window up, building it the first time and only the first time.
     ///
@@ -67,6 +89,7 @@ internal sealed class GameWindow
         keys.SetPropagationPhase(PropagationPhase.Capture);
         keys.OnKeyPressed += (_, e) =>
         {
+            NoteNumLock(e.Keyval);
             _input.SetKey(GtkKeyMap.Map(e.Keyval), true);
             return false; // don't consume — keep AT-SPI / default handling alive
         };

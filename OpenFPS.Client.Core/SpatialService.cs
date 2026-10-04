@@ -484,6 +484,71 @@ public class SpatialService
         return false;
     }
 
+    /// <summary>
+    /// The first solid thing along a line of sight, out to <paramref name="maxDist"/>: what a scope
+    /// sees, or what stops it seeing something further away.
+    ///
+    /// Long, so walked in stretches: <see cref="RaycastSingle"/> asks the grid for everything within
+    /// half the ray's length of its middle, which for a 600 m look over a city is the city. The static
+    /// geometry is asked for a stretch at a time and stops at the first stretch with a hit; the things
+    /// that move are tested once. People are not solid to sight here (the scope finds them itself), and
+    /// glass is seen through unless <paramref name="glassBlocks"/>.
+    /// </summary>
+    public bool CastSight(WorldSnapshot world, Vector3 start, Vector3 dir, float maxDist, out EntitySnapshot hitEntity,
+                          out float hitDistance, Func<EntitySnapshot, bool>? skip = null, bool glassBlocks = false)
+    {
+        hitEntity = default;
+        hitDistance = maxDist;
+        bool found = false;
+        dir = Vector3.Normalize(dir);
+
+        bool Test(in EntitySnapshot e, ref float best)
+        {
+            if (e.Id == OwnEntityId) return false;
+            var def = e.Definition;
+            if (def.Collider.Size.X <= 0f || !def.Collider.IsSolid) return false;
+            if (def.Type is EntityType.Player) return false;
+            if (!glassBlocks && string.Equals(def.Material.Material, "Glass", StringComparison.OrdinalIgnoreCase)) return false;
+            if (skip != null && skip(e)) return false;
+            float d;
+            bool hit;
+            var t = e.Transform;
+            switch (def.Collider.Shape)
+            {
+                case ColliderShape.Box:
+                    hit = GeometryUtils.RayIntersectsOBB(start, dir, t.Position, def.Collider.Size, t.Rotation, out d);
+                    break;
+                case ColliderShape.Sphere:
+                    hit = GeometryUtils.RayIntersectsSphere(start, dir, t.Position, def.Collider.Size.X * 0.5f, out d, out _);
+                    break;
+                case ColliderShape.Cylinder:
+                case ColliderShape.Cone:
+                    hit = GeometryUtils.RayIntersectsCylinder(start, dir, t.Position, def.Collider.Size.X * 0.5f, def.Collider.Size.Y, out d);
+                    break;
+                default:
+                    return false;
+            }
+            if (!hit || d < 0f || d >= best) return false;
+            best = d;
+            return true;
+        }
+
+        const float Stretch = 40f;
+        for (float from = 0f; from < maxDist && from < hitDistance; from += Stretch)
+        {
+            float to = MathF.Min(maxDist, from + Stretch);
+            var candidates = GetEntitiesToTest(world, start + dir * (0.5f * (from + to)), 0.5f * (to - from) + 2f, staticOnly: true);
+            for (int i = 0; i < candidates.Count; i++)
+                if (Test(candidates[i], ref hitDistance)) { hitEntity = candidates[i]; found = true; }
+        }
+        for (int i = 0; i < world.DynamicEntities.Count; i++)
+        {
+            var e = world.DynamicEntities[i];
+            if (Test(e, ref hitDistance)) { hitEntity = e; found = true; }
+        }
+        return found;
+    }
+
     public bool RaycastSingle(WorldSnapshot world, Vector3 start, Vector3 dir, float maxDist, out EntitySnapshot hitEntity, out float hitDistance)
     {
         hitDistance = maxDist;

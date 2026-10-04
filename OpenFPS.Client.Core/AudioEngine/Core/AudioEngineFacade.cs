@@ -547,6 +547,15 @@ public class AudioEngineFacade : IDisposable, IVoiceSink
         if (_isInitialized) _provider.PlayUiSound(id, render, sampleRate, volume);
     }
 
+    /// <summary>An interface loop in a named slot. See IAudioProvider.SetUiLoop.</summary>
+    public void SetUiLoop(string slot, string id, Func<float[]> render, int sampleRate, float volume, float pitch)
+    {
+        if (_isInitialized) _provider.SetUiLoop(slot, id, render, sampleRate, volume, pitch);
+    }
+
+    /// <summary>Stops the interface loop in a slot. See IAudioProvider.StopUiLoop.</summary>
+    public void StopUiLoop(string slot) { if (_isInitialized) _provider.StopUiLoop(slot); }
+
     /// <summary>Fades the world and not the interface sounds. See IAudioProvider.SetWorldFade.</summary>
     public void SetWorldFade(float gain) { if (_isInitialized) _provider.SetWorldFade(gain); }
 

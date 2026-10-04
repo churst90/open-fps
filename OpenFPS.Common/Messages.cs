@@ -38,6 +38,8 @@ namespace OpenFPS.Common.Networking;
 [MemoryPackUnion(29, typeof(MapListResponse))]
 [MemoryPackUnion(30, typeof(EntityDefinitionBatch))]
 [MemoryPackUnion(31, typeof(HitConfirm))]
+// 32-34 are spoken for by other work in progress. Do not take them here.
+[MemoryPackUnion(35, typeof(ScopedShot))]
 public partial interface IMessage { }
 
 public enum PlayerListScope
@@ -389,6 +391,9 @@ public partial class StatsUpdate : IMessage
     public string HeldWeaponId = "";
     /// <summary>Rounds in that weapon, or -1 with none.</summary>
     public int HeldRounds = -1;
+    /// <summary>The scope on that weapon (a <see cref="OpenFPS.Common.ScopeRegistry"/> id), or empty.
+    /// The client needs it for numpad star: only a scoped gun can be raised to the eye.</summary>
+    public string HeldScopeId = "";
 }
 
 /// <summary>
@@ -402,9 +407,32 @@ public partial class HitConfirm : IMessage
     public int TargetEntityId;
     /// <summary>The hit killed them. Sent once: a body is not hit again.</summary>
     public bool Killed;
-    /// <summary>Always false for now: hits are not placed on the body yet.</summary>
+    /// <summary>The bullet struck the head. Only a flown bullet (a scoped shot) is placed on the body;
+    /// a hip shot is never a head shot.</summary>
     public bool Headshot;
     public HitConfirm() { }
+}
+
+/// <summary>
+/// A shot taken through a scope: client to server, in place of the "fire" command.
+///
+/// It carries the aim because the aim is the whole of the shot. The look keys travel as inputs that
+/// the server spends a tick at a time, so when the trigger arrives the server's copy of the heading
+/// can be a tick or two behind; through a 12-power scope that is a body's width at 600 m. The server
+/// takes this aim if it is within a few degrees of its own, and its own if not.
+/// </summary>
+[MemoryPackable]
+public partial class ScopedShot : IMessage
+{
+    /// <summary>The crosshair, radians, as the client's physics holds yaw and pitch (increasing pitch
+    /// looks down), with the breathing sway at the moment of the shot already in it.</summary>
+    public float Yaw;
+    public float Pitch;
+    /// <summary>The elevation turret, milliradians above the rifle's base zero.</summary>
+    public float ElevationMil;
+    /// <summary>The power the scope was at. Logged; it changes nothing about where the bullet goes.</summary>
+    public float Magnification;
+    public ScopedShot() { }
 }
 
 [MemoryPackable]

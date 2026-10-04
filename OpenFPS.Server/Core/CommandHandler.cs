@@ -183,6 +183,15 @@ public class CommandHandler
             case "ammo":
                 Say(reply, _combat.AmmoReadout(session));
                 break;
+            // The scope is the game client's: what it sees is worked out from the world the client
+            // already holds, and these four are answered there before they are ever sent. One that
+            // arrives here came from a text client, which has no scope to raise.
+            case "scope":
+            case "zoom":
+            case "range":
+            case "zero":
+                Say(reply, "The scope works in the game client: hold a scoped rifle and press numpad star, or type /scope.");
+                break;
             // ── Doors ───────────────────────────────────────────────────────────────────────
             //
             // Not elevated. Building a door needs a role; going through one does not.

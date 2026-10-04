@@ -54,6 +54,12 @@ public interface IClientShell
     /// typing into the console.
     /// </summary>
     bool IsGameInputActive { get; }
+    /// <summary>
+    /// Whether Num Lock is on, as the head last saw it, or null when the head cannot tell. The scope's
+    /// keys are the keypad's digits, which only reach the game with Num Lock on: with it off NVDA and
+    /// Orca take the keypad for their own review commands.
+    /// </summary>
+    bool? NumLockOn => null;
 
     /// <summary>Raised when the player commits a line in the command console. The session parses it
     /// into a command or a chat message.</summary>

@@ -141,6 +141,21 @@ public sealed record WeaponDefinition
 
     /// <summary>The width of a person's torso, metres: what a shotgun's pattern has to land on.</summary>
     public const float BodyWidthMetres = 0.45f;
+
+    // ── In flight ───────────────────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// The bullet's ballistic coefficient against the G7 standard projectile, lb/in², as its maker
+    /// publishes it. It decides how fast the round slows, and so how far it drops and drifts and how long
+    /// it takes to get there (<see cref="ExternalBallistics"/>). Zero for a round nobody shoots far
+    /// enough for it to matter; such a round is flown with a G7 of 0.1, a pistol bullet's.
+    /// </summary>
+    public float BallisticCoefficientG7 { get; init; }
+
+    /// <summary>The sight this gun comes with, a <see cref="ScopeRegistry"/> id, or "" for iron sights.
+    /// On the weapon for now because the one scoped rifle comes scoped; a scope mounted later on an AKM
+    /// or an AR-15 is looked up by the same id, so nothing that reads it has to change.</summary>
+    public string ScopeId { get; init; } = "";
 }
 
 /// <summary>How a weapon is fed.</summary>
@@ -152,6 +167,8 @@ public enum WeaponFeed
     Tube,
     /// <summary>A revolver's cylinder: swung out, emptied, and filled from a speedloader.</summary>
     Cylinder,
+    /// <summary>A box inside the stock, filled from the top through the open action a round at a time.</summary>
+    InternalBox,
 }
 
 /// <summary>The routine of hands that reloads a weapon, which is what its reload sounds like.</summary>
@@ -171,6 +188,10 @@ public enum WeaponAction
     /// <summary>Pump gun: shells thumbed into the tube one at a time, and the action racked when the
     /// chamber was empty.</summary>
     Pump,
+    /// <summary>Bolt action: the bolt lifted and drawn back, rounds pressed down into the internal
+    /// magazine through the open action one at a time, and the bolt run forward and turned down. Worked
+    /// by hand between every shot as well.</summary>
+    BoltAction,
 }
 
 /// <summary>
@@ -192,7 +213,10 @@ public static class Ammunition
     public static readonly AmmoType Magnum357 = new(".357", ".357 Magnum", "rounds", "round", 50, new[] { ".357", "357", ".357magnum", "357magnum" });
     public static readonly AmmoType Gauge12 = new("12 gauge", "12 gauge", "shells", "shell", 25, new[] { "12 gauge", "12gauge", "12ga", "12g", "12", "buckshot", "shells" });
 
-    public static IReadOnlyList<AmmoType> All { get; } = new[] { Rifle762, Rifle556, Pistol9, Acp45, Magnum357, Gauge12 };
+    /// <summary>.308 Winchester match, in boxes of twenty as match ammunition is sold.</summary>
+    public static readonly AmmoType Rifle308 = new(".308", ".308", "rounds", "round", 20, new[] { ".308", "308", ".308win", "308win", ".308 win", "7.62x51", "7.62x51mm", "7.62 nato" });
+
+    public static IReadOnlyList<AmmoType> All { get; } = new[] { Rifle762, Rifle556, Pistol9, Acp45, Magnum357, Gauge12, Rifle308 };
 
     /// <summary>The ammunition a name means, by its id or any of its aliases, ignoring case.</summary>
     public static bool TryFind(string? name, out AmmoType ammo)
@@ -242,6 +266,8 @@ public static class WeaponRegistry
         // The standard 30-round steel magazine; 600 rounds a minute cyclic.
         AmmoId = "7.62x39", MagazineCapacity = 30, Feed = WeaponFeed.Magazine, Action = WeaponAction.Kalashnikov,
         RoundsPerMinute = 600f, Damage = 45, EffectiveRangeMetres = 300f,
+        // The 123 grain steel-cored ball: G1 about 0.28, about 0.14 against the G7 shape.
+        BallisticCoefficientG7 = 0.14f,
     };
 
     /// <summary>5.56x45. Faster and much sharper than the AKM: a tighter Mach cone, so the crack is a
@@ -259,6 +285,8 @@ public static class WeaponRegistry
         // The 30-round STANAG magazine. Semi-automatic, so the rate is how fast the action cycles.
         AmmoId = "5.56", MagazineCapacity = 30, Feed = WeaponFeed.Magazine, Action = WeaponAction.Stoner,
         RoundsPerMinute = 750f, Damage = 35, EffectiveRangeMetres = 300f,
+        // M193, 55 grain: G1 0.243, about 0.12 against G7.
+        BallisticCoefficientG7 = 0.12f,
     };
 
     /// <summary>9x19, and only just supersonic — Mach 1.09. The crack is there but it is small and
@@ -342,9 +370,32 @@ public static class WeaponRegistry
         RoundsPerMinute = 300f, Damage = 40, EffectiveRangeMetres = 50f,
     };
 
+    /// <summary>
+    /// .308 Winchester from a 24-inch bolt-action rifle of the Remington 700 pattern, with a 4-12x
+    /// scope. The load is Federal Gold Medal Match: a 168 grain Sierra MatchKing at 2650 ft/s (808 m/s),
+    /// G7 0.224, the round long-range tables are written for, so what a player learns about where it
+    /// lands at 600 m is true of the real one. No recording of the report: a longer pulse and more
+    /// trailing gas than the 7.62x39 for about twice the charge, still short of a 12 gauge's.
+    /// </summary>
+    public static readonly WeaponDefinition M700 = new()
+    {
+        Id = "m700",
+        DisplayName = "M700",
+        Cartridge = ".308 Winchester",
+        MuzzleVelocity = 808f,
+        ReportPositivePhaseMs = 0.28f, ReportBurstDecayMs = 0.50f, ReportTrailDecayMs = 3.5f, ReportCornerHz = 1300f,
+        ReportDamping = 0.5f, ReportTrailLevel = 0.2f,
+        // Five in the internal box, loaded through the top. The bolt is worked by hand between shots,
+        // lift, back, forward, down, about a second and a half with the eye kept on the scope.
+        AmmoId = ".308", MagazineCapacity = 5, Feed = WeaponFeed.InternalBox, Action = WeaponAction.BoltAction,
+        RoundsPerMinute = 40f, Damage = 80, EffectiveRangeMetres = 800f,
+        BallisticCoefficientG7 = 0.224f,
+        ScopeId = "scope_4_12",
+    };
+
     static WeaponRegistry()
     {
-        foreach (var w in new[] { Akm, Ar15, Glock, ServicePistol, Shotgun, Revolver357 })
+        foreach (var w in new[] { Akm, Ar15, Glock, ServicePistol, Shotgun, Revolver357, M700 })
             _byId[w.Id] = w;
     }
 

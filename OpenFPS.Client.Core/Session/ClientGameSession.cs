@@ -328,8 +328,16 @@ public sealed partial class ClientGameSession : IDisposable
 
         // Shell.
         _bindings.Bind(GameKey.Slash, _shell.OpenCommandConsole);
-        _bindings.Bind(GameKey.NumpadDivide, _shell.OpenCommandConsole);
+        // Numpad slash is the console's second key, and the scope's trigger while the scope is up:
+        // the one hand on the keypad fires without leaving it.
+        _bindings.Bind(GameKey.NumpadDivide, () =>
+        {
+            if (_scope.Raised && _shell.IsGameInputActive && EnterFires(_state)) Fire();
+            else _shell.OpenCommandConsole();
+        });
         _bindings.Bind(GameKey.Escape, ShowGameMenu);
+
+        RegisterScopeBindings();
     }
 
     /// <summary>
@@ -370,6 +378,8 @@ public sealed partial class ClientGameSession : IDisposable
         "C coordinates, F facing, H health, Z area, comma look ahead, E interact, P scan, I inventory.",
         "G take, Q drop, Shift+R draw, T clap or ignition.",
         "R: with a gun, reload; in a vehicle, the window; otherwise put what you hold on your back.",
+        "Scope, on the keypad with Num Lock on: star raises it, 8 2 4 6 aim, 5 what is on the crosshair, 7 and 9 the targets in view,",
+        "plus and minus zoom, 1 and 3 the turret, period the rangefinder, 0 held to hold your breath, slash or Enter to fire.",
         "V voice, F5 players, F6 maps, F8 friends, brackets to read chat, slash for the command console.",
         "Escape for the game menu: keep playing, main menu, or quit.");
 
@@ -468,6 +478,7 @@ public sealed partial class ClientGameSession : IDisposable
         if (menuOpen) gameplayActive = false;   // stand still while choosing
 
         _simTime += dt;
+        UpdateScope(held, dt, gameplayActive);
         var input = GatherInput(held, justPressed, dt);
         if (!gameplayActive)
         {
@@ -582,6 +593,7 @@ public sealed partial class ClientGameSession : IDisposable
         // Internally capped to 60 Hz; the loop this hangs off spins far faster to keep the socket
         // serviced. See ClientAudioSystem.UpdateHz.
         _audioSystem.Update(snapshot);
+        UpdateGuidance();
 
         // ...and only then, because the region the audio system just worked out is the one to say.
         AnnounceZoneChanges();
@@ -699,6 +711,8 @@ public sealed partial class ClientGameSession : IDisposable
         // the guide ahead, the centre line on your left — is placed relative to the car, and a head
         // turned away with J or L would put them all somewhere else. A and D steer the car.
         if (_state.IsRiding) { _turnDownAt.Clear(); return Vector2.Zero; }
+        // Through a scope every look key is a fine one, scaled by the power.
+        if (_scope.Raised) return GatherScopeLook(held, justPressed, dt);
         Vector2 look = Vector2.Zero;
         float perTick = PhysicsConstants.RotationSpeed * MathF.Max(dt, 1e-4f);
 
@@ -975,6 +989,7 @@ public sealed partial class ClientGameSession : IDisposable
                 _state.Health = stats.Health;
                 _state.HeldWeaponId = stats.HeldWeaponId ?? "";
                 _state.HeldRounds = stats.HeldRounds;
+                _state.HeldScopeId = stats.HeldScopeId ?? "";
                 _state.CurrentMaterial = stats.CurrentMaterial;
                 _state.CurrentVariant = stats.CurrentVariant;
                 // CurrentMaterial feeds the reverb bus material calculation via LocalPlayerState: when a
@@ -1091,7 +1106,12 @@ public sealed partial class ClientGameSession : IDisposable
     /// Still a text command on the wire: the server spends the round, finds what it hit and takes the
     /// health, and says back a HitConfirm when it was somebody.
     /// </summary>
-    private void Fire() => _network.Send(new TextCommand { Command = "fire" });
+    private void Fire()
+    {
+        // Through a scope the shot carries its own aim and is flown; see FireScoped.
+        if (_scope.Raised) FireScoped();
+        else _network.Send(new TextCommand { Command = "fire" });
+    }
 
     /// <summary>How hard you have been working, in words rather than a number.</summary>
     private string ExertionReadout()
@@ -1359,6 +1379,12 @@ public sealed partial class ClientGameSession : IDisposable
             if (parts[0].Equals("valveflow", StringComparison.OrdinalIgnoreCase))
             {
                 Say(ValveFlowCommand(parts.Skip(1).ToArray()));
+                return;
+            }
+            // The scope is yours: what it sees is worked out here, from the world this client holds.
+            if (parts[0].ToLowerInvariant() is "scope" or "zoom" or "range" or "zero")
+            {
+                if (ScopeCommand(parts[0].ToLowerInvariant(), parts.Skip(1).ToArray()) is { } answer) Say(answer);
                 return;
             }
             // So is how loud the world is: yours, and saved.
