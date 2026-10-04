@@ -152,7 +152,7 @@ public static class SlidingDoor
     /// which played as full scale put every run 15-29 dB under the model.</summary>
     public static float OpenLevelDb(Kind kind, int variant) => (kind, ((variant % Variants) + Variants) % Variants) switch
     {
-        (Kind.Patio, 0) => 75.9f, (Kind.Patio, 1) => 82.3f, (Kind.Patio, 2) => 88.2f, (Kind.Patio, _) => 93.2f,
+        (Kind.Patio, 0) => 75.9f, (Kind.Patio, 1) => 82.4f, (Kind.Patio, 2) => 88.2f, (Kind.Patio, _) => 93.2f,
         (Kind.Automatic, 0) => 77.8f, (Kind.Automatic, 1) => 76.1f, (Kind.Automatic, 2) => 79.4f, _ => 84.6f,
     };
     public static float CloseLevelDb(Kind kind, int variant) => (kind, ((variant % Variants) + Variants) % Variants) switch
@@ -346,7 +346,7 @@ public static class SlidingDoor
     /// reaches the leaf across its play, a small knock as the pull is taken up at the hand's own pace.
     /// (With the arm on the leaf and the handle free in its play, the handle crossed it at half a metre a
     /// second and its knock stood 5-10 dB over the slide.)</summary>
-    private const double HandGrip = 0.1;
+    private const double HandGrip = 0.1, GripDamping = 150;
     /// <summary>A leaf at rest takes more to start than to keep moving: 1.03-1.4 times its running drag on
     /// measured doors (research notes, item 7), its pile set where it stood. The pile's fibres bend about
     /// their slip distance before they let go.</summary>
@@ -660,7 +660,7 @@ public static class SlidingDoor
         private readonly Port? stileFace, jambWeb;
         private LuGre pileGrip;
         private bool shutting;
-        private double gripFrom, gripTo = double.MaxValue, handForce;
+        private double gripFrom, gripTo = double.MaxValue, handForce, armShare = 1;
 
         public Sim(Door door, int sampleRate, Report? report)
         {
@@ -1002,12 +1002,19 @@ public static class SlidingDoor
                         double a = Hermite(Math.Min(1, uu + 1e-4), from, 0, to, arrive * Math.Sign(to - from) * tRun).V / tRun;
                         handA = (a - handV) / (1e-4 * tRun);
                     }
+                    // Bringing a leaf to rest a hand means to stop it, not to put it on a mark: over the last fifth of
+                    // the pull its arm eases off and the pile stops the leaf. (Held to its path to the end, it pulled
+                    // the leaf on over the last millimetre the pile had stopped it short of, or pushed on with its
+                    // lean into the drag: either way the handle knocked over to the pull as the leaf came to rest.)
+                    armShare = opening ? Math.Clamp((1 - uu) / 0.2, 0, 1) : 1;
                     handOn = !handReleased;
                 }
-                else if (t >= tStart + tRun && t < tLetGo + HandGrip) { handX = to; handV = 0; handA = 0; }
+                else if (t >= tStart + tRun && t < tLetGo + HandGrip) { handX = to; handV = 0; handA = 0; if (opening) armShare = 0; }
                 else if (t >= tLetGo + HandGrip) { handOn = false; }
                 if (!opening && tShut < 0 && x <= CushionDepth) { tShut = t; holdingHome = true; Log($"{t * 1000:F0} ms  home"); }
-                if (holdingHome && t > tShut + 0.6) holdingHome = false;
+                // Once the hook is in its keeper it holds the leaf into the bulb in the hand's place. (Let go of, the
+                // leaf slid back off the squeezed bulb half a second after the latch: a thump of its own.)
+                if (holdingHome && t > tShut + 0.6 && !thrown) holdingHome = false;
                 Step();
             }
         }
@@ -1271,7 +1278,7 @@ public static class SlidingDoor
                 {
                     double fh = mass * handA + ch.Pile * Math.Tanh(handV / 0.01) + 1200 * (handV - u - handleRate) + 15000 * (handX - x - handle);
                     double g = Math.Clamp(Math.Min(time - gripFrom, gripTo - time) / HandGrip, 0, 1);
-                    handForce = Math.Clamp(fh, -250, 250) * g * g * (3 - 2 * g);
+                    handForce = Math.Clamp(fh * armShare, -250, 250) * g * g * (3 - 2 * g);
                 }
             }
 
@@ -1372,7 +1379,9 @@ public static class SlidingDoor
                                - Contact(HandleStopK, HandleStopLambda, -rel - ch.HandlePlay, -relRate);
                 double centring = HandleCentring * handle + 2 * HandleZeta * Math.Sqrt(HandleCentring * HandleKg) * handleRate;
                 // Relative to the leaf, which moves under it.
-                double hacc = ((handOn ? handForce : 0) - knock - centring) / HandleKg - lastLeafAcc;
+                // The fingers round it hold it to the hand, which goes with the leaf: about 150 N s/m against its
+                // moving in its play (the hand-arm system's driving-point impedance is 100-300 N s/m, ISO 10068).
+                double hacc = ((handOn ? handForce - GripDamping * handleRate : 0) - knock - centring) / HandleKg - lastLeafAcc;
                 handleRate += hacc * dt; handle += handleRate * dt;
                 // What the handle does to the leaf: its stops and its spring.
                 sideForce += knock + centring;
