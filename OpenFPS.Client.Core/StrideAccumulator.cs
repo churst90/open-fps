@@ -4,6 +4,9 @@ using OpenFPS.Common;
 
 namespace OpenFPS.Client.Core;
 
+/// <summary>Which way a footfall went: on the level, up a step, or down one.</summary>
+public enum StepSlope { Level, Up, Down }
+
 /// <summary>
 /// When a body walking on the ground puts a foot down, and when a body that was in the air lands.
 ///
@@ -141,6 +144,61 @@ public sealed class StrideAccumulator
     /// </summary>
     public const float MinLandingSpeed = 1.5f;
 
+    /// <summary>
+    /// How far a body must have climbed or dropped since its last footfall for this one to be a step
+    /// up or down, metres. Over a kerb (12 cm on the city) and under the lowest riser anybody builds
+    /// (15 cm): a kerb is walked over, a stair is climbed.
+    /// </summary>
+    public const float MinStairRise = 0.14f;
+
+    /// <summary>A change of height in one update this big is the body arriving on a tread, metres.
+    /// The movement engine moves a body onto a step in one go, so on a flight the height changes in
+    /// jumps of a riser and is otherwise still.</summary>
+    public const float TreadJump = 0.05f;
+
+    /// <summary>
+    /// How much further than its step a body on a flight may go waiting for a tread to put its foot
+    /// on, metres: a little over one going (32 cm on the city). A foot does not land in the middle of
+    /// a riser, so on stairs a footfall that falls due between treads waits for the next one; past
+    /// this it is not on stairs any more (the flight has ended in a landing) and goes down where it is.
+    /// </summary>
+    public const float TreadWaitMetres = 0.35f;
+
+    /// <summary>How fast a foot meets the floor, m/s: walking on the level, going up a stair, coming down one.</summary>
+    public const float LevelFootMps = 0.6f, UpFootMps = 0.4f, DownFootMps = 1.0f;
+
+    /// <summary>
+    /// How loud a step is against a step on the level, from how fast the foot meets the floor: the
+    /// impact's energy goes as the square of that speed, so its level as 20 log of the ratio.
+    ///
+    /// Going UP, the ball of the foot is put down on the tread with the knee bent and the weight still
+    /// on the other leg — the leg is about to lift the body, not land it — so the foot arrives slower
+    /// than a heel strike on the flat: about 0.4 m/s against 0.6. Going DOWN, the heel drops onto the
+    /// tread below with the body already falling through the riser, and arrives faster: about 1.0 m/s.
+    /// Those speeds are estimates of a controlled stair gait, not measurements; what they give is a
+    /// toe-first step three and a half decibels under a level one and a heel drop four and a half over.
+    /// </summary>
+    public static float SlopeDb(StepSlope slope) => slope switch
+    {
+        StepSlope.Up => 20f * MathF.Log10(UpFootMps / LevelFootMps),
+        StepSlope.Down => 20f * MathF.Log10(DownFootMps / LevelFootMps),
+        _ => 0f,
+    };
+
+    /// <summary>
+    /// How a step's take is pitched against a step on the level. The ball of the foot is a smaller,
+    /// stiffer contact than a heel and rings a little higher; a heel dropped with the body's weight
+    /// behind it puts more mass on the floor and sounds a little lower.
+    /// </summary>
+    public static float SlopePitch(StepSlope slope) => slope switch
+    {
+        StepSlope.Up => 1.04f,
+        StepSlope.Down => 0.96f,
+        _ => 1f,
+    };
+
+    private float? _lastStepY;
+    private int _treadsSinceStep;
     private Vector3? _lastPosition;
     private float _accumulatedDistance;
     private int _stepCount;
@@ -151,7 +209,7 @@ public sealed class StrideAccumulator
 
     /// <summary>What the body did this update, if anything. Both can be true at once: a body that
     /// lands and keeps running lands and then steps.</summary>
-    public readonly record struct Footfall(bool Stepped, Vector3 StepPosition, bool Landed)
+    public readonly record struct Footfall(bool Stepped, Vector3 StepPosition, bool Landed, StepSlope Slope = StepSlope.Level)
     {
         public bool Anything => Stepped || Landed;
     }
@@ -167,6 +225,8 @@ public sealed class StrideAccumulator
     public void Forget()
     {
         _lastPosition = null;
+        _lastStepY = null;
+        _treadsSinceStep = 0;
         _accumulatedDistance = 0f;
         _wasInAir = false;
         _feetMoving = false;
@@ -229,6 +289,12 @@ public sealed class StrideAccumulator
         bool startedWalking = isGrounded && walking && !_feetMoving && !landed;
         if (isGrounded && walking) _feetMoving = true;
 
+        // A jump in height on the ground is the body arriving on a tread (see TreadJump). Not a jump
+        // bigger than a step: that is a teleport or a correction, not a stair.
+        float dy = _lastPosition.HasValue ? MathF.Abs(position.Y - _lastPosition.Value.Y) : 0f;
+        bool treadNow = isGrounded && dy >= TreadJump && dy <= PhysicsConstants.StepHeight + 0.05f;
+        if (treadNow) _treadsSinceStep++;
+
         if (_lastPosition.HasValue)
         {
             if (isGrounded)
@@ -247,7 +313,8 @@ public sealed class StrideAccumulator
             }
 
             float step = StepLength(ownSpeed);
-            if (_accumulatedDistance > 2f * step) _accumulatedDistance = 2f * step;
+            float cap = 2f * step + TreadWaitMetres;
+            if (_accumulatedDistance > cap) _accumulatedDistance = cap;
         }
         _lastPosition = position;
 
@@ -261,9 +328,26 @@ public sealed class StrideAccumulator
         // CLOCK standing in for a rule about the BODY, and the body's rule is the true one: a leg is
         // a pendulum, so a fast body takes longer steps rather than more of them, and the cadence
         // comes out under four a second on its own without anything watching a timer.
-        if (startedWalking || (isGrounded && _accumulatedDistance >= StepLength(ownSpeed)))
+        bool due = startedWalking || (isGrounded && _accumulatedDistance >= StepLength(ownSpeed));
+        // On a flight a foot goes down on a tread: a step that falls due between treads waits for the
+        // next one, up to TreadWaitMetres further on. A flight is two treads or more since the last
+        // footfall; one is a kerb or a doorstep, and a level walk past it keeps its own cadence.
+        if (due && !startedWalking && _treadsSinceStep >= 2 && !treadNow
+            && _accumulatedDistance < StepLength(ownSpeed) + TreadWaitMetres)
+            due = false;
+
+        var slope = StepSlope.Level;
+        if (due)
         {
             stepped = true;
+            // Up or down by how far the body climbed or dropped since its last footfall.
+            if (_lastStepY is float before)
+            {
+                float rise = position.Y - before;
+                slope = rise >= MinStairRise ? StepSlope.Up : rise <= -MinStairRise ? StepSlope.Down : StepSlope.Level;
+            }
+            _lastStepY = position.Y;
+            _treadsSinceStep = 0;
             _stepCount++;
             float lateral = (_stepCount % 2 == 0) ? StepWidth : -StepWidth;
             var right = Vector3.Transform(Vector3.UnitX, facing);
@@ -277,6 +361,8 @@ public sealed class StrideAccumulator
             else _accumulatedDistance %= StepLength(ownSpeed);
         }
 
-        return new Footfall(stepped, stepPosition, landed);
+        // A landing is a foot going down as well, and the next step's rise counts from it.
+        if (landed && !stepped) _lastStepY = position.Y;
+        return new Footfall(stepped, stepPosition, landed, slope);
     }
 }

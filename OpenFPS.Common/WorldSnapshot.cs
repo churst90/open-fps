@@ -26,6 +26,16 @@ public class WorldSnapshot
     /// city of six thousand it is eleven times the work to find the same handful of regions.
     /// </summary>
     public readonly List<int> RegionEntityIds = new();
+
+    /// <summary>
+    /// Every fixed thing that is a beacon without being solid: the ends of stair flights.
+    ///
+    /// The static grid holds only what can be walked into, and a fixed thing is not in
+    /// <see cref="DynamicEntities"/>, so a marker standing on a landing was in neither and nothing
+    /// that looks for beacons near you could find it. A list of its own, for the same reason as
+    /// <see cref="RegionEntityIds"/>: the alternative is walking the whole map every frame.
+    /// </summary>
+    public readonly List<int> MarkerEntityIds = new();
     public SpatialGrid<int>? StaticGrid;
     public AcousticMap? AcousticMap;
 

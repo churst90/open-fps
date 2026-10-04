@@ -206,6 +206,23 @@ FLATS       = 4                          # per side per storey, plus the stairwe
 STAIR_RISE  = 0.3                        # under PhysicsConstants.StepHeight (0.4), or it is a wall
 STAIR_GOING = 0.32
 STAIR_W     = 1.6
+# Every flight covers the same ground, ten goings, whatever it climbs: the ground floor's flight
+# climbs 23 cm more than the others (its floor is laid on the ground, not on a slab) and takes an
+# eleventh, slightly shallower step to do it rather than a longer plan.
+FLIGHT_RUN  = round(STOREY / STAIR_RISE) * STAIR_GOING
+STAIR_LANDING = 1.6                      # floor between the stairwell's end wall and the flights
+STAIR_SPINE = 0.2                        # the wall between the up and the down flight of a dog-leg
+# How far the opening in the floor above runs back past the first riser. A body on a step has its
+# head 1.8 m up, and the movement engine checks a step-up 0.4 m higher still before taking it, so
+# the opening has to start behind the foot of the flight or the second step is a ceiling.
+STAIR_HEAD  = 0.5
+RAIL_H      = 1.0                        # the upstand round an opening in a floor
+RAIL_T      = 0.1
+MARKER_BACK = 0.4                        # a stair marker stands this far out from the end riser
+PARAPET_H   = 1.1                        # a roof's edge wall: the height building rules ask for
+BULK_H      = 2.6                        # clear height inside the stair housing on a roof
+BULK_T      = 0.2
+BULK_LANDING = 2.0                       # from the top riser to the housing's door
 
 # The grid. Avenues run north-south, streets east-west, and they cross at nine places downtown.
 AVENUES = (-130.0, 0.0, 130.0)
@@ -434,16 +451,94 @@ def tower(label, x0, x1, z0, z1, storeys, street_side, ac_floors):
     slot_len = (sz1 - sz0 - WALL_T * 2) / slots
     stair_b = (sz0 + WALL_T, sz0 + WALL_T + slot_len)
 
+    def P(a, b):
+        """One point (across, along) -> (x, z)."""
+        px, _, pz, _ = place(a, 0, b, 0)
+        return px, pz
+
+    def heading(d):
+        """The yaw that faces +along (d > 0) or -along (d < 0)."""
+        if vertical:
+            return 0.0 if d > 0 else math.pi
+        return math.pi / 2 if d > 0 else -math.pi / 2
+
+    def holed(make, a0, a1, b0, b1, hole):
+        """A rectangle with a rectangular opening cut out of it, as the pieces round the opening:
+        each piece is (a0, a1, b0, b1, whatever make() returned for it)."""
+        if hole is None:
+            return [(a0, a1, b0, b1, make(a0, a1, b0, b1))]
+        ha0, ha1 = max(hole[0], a0), min(hole[1], a1)
+        hb0, hb1 = max(hole[2], b0), min(hole[3], b1)
+        out = []
+        for p0, p1, q0, q1 in ((a0, a1, b0, hb0), (a0, a1, hb1, b1), (a0, ha0, hb0, hb1), (ha1, a1, hb0, hb1)):
+            if p1 - p0 > 1e-6 and q1 - q0 > 1e-6:
+                out.append((p0, p1, q0, q1, make(p0, p1, q0, q1)))
+        return out
+
+    def B_holed(prefab, a0, a1, y0, y1, b0, b1, hole, name=None):
+        return holed(lambda p0, p1, q0, q1: B(prefab, p0, p1, y0, y1, q0, q1, name=name), a0, a1, b0, b1, hole)
+
+    # ── The stair plan: a dog-leg, the same on every storey ─────────────────────────────────────
+    #
+    # Two lanes against the street wall with a spine wall between them, and the flights going up
+    # them alternately: one runs along the building, the next comes back beside it. At the top of a
+    # flight you turn round and the foot of the next one is beside you.
+    #
+    # The flights used to be stacked straight above one another, every storey's flight in the same
+    # place, under ceiling slabs laid whole across the stairwell. The movement engine could not get
+    # a body past the second step — its head was in the slab (2026-10-04, --walk) — and had the
+    # slabs been cut, the flight above would have been the ceiling instead. A stair in the same
+    # column as the one below it is not a stair anybody can climb.
+    #
+    # The flight from the top storey to the roof is always the one against the street wall, so the
+    # way onto the roof is up that flight and straight on through the door at the end of the housing.
+    street_a = inner[1] if side > 0 else inner[0]       # the stairwell's face of the street wall
+    inward = -side
+
+    def span(start, width):
+        end = start + inward * width
+        return (min(start, end), max(start, end))
+
+    def lane(i):
+        return span(street_a + inward * i * (STAIR_W + STAIR_SPINE), STAIR_W)
+
+    spine = span(street_a + inward * STAIR_W, STAIR_SPINE)
+    L0 = stair_b[0] + STAIR_LANDING
+    L1 = L0 + FLIGHT_RUN
+    roof_y = storeys * STOREY + SLAB
+
+    def level(s):
+        """What you stand on in the stairwell on storey s (its tile), or on the roof."""
+        if s >= storeys:
+            return roof_y
+        return (s * STOREY + SLAB if s else 0.02) + 0.03
+
+    def flight_lane(s):
+        return 0 if (storeys - 1 - s) % 2 == 0 else 1
+
+    def flight_dir(s):
+        return +1 if flight_lane(s) == 0 else -1
+
+    def hole(s):
+        """The opening flight s comes up through, in the floor above it: back past its foot by
+        STAIR_HEAD, and level with its top riser, where the floor carries on."""
+        if s < 0:
+            return None
+        la = lane(flight_lane(s))
+        if flight_dir(s) > 0:
+            return (la[0], la[1], L0 - STAIR_HEAD, L1)
+        return (la[0], la[1], L0, L1 + STAIR_HEAD)
+
     for s in range(storeys):
         y0 = s * STOREY
         ceil = y0 + STOREY - SLAB
         floor_top = y0 + SLAB if s else 0.02
 
         if s:
-            B("concrete_floor", sx0, sx1, y0, y0 + SLAB, sz0, sz1)
+            B_holed("concrete_floor", sx0, sx1, y0, y0 + SLAB, sz0, sz1, hole(s - 1))
         else:
             B("concrete_floor", sx0, sx1, -0.15, 0.02, sz0, sz1)
-        B("concrete_floor", sx0, sx1, ceil, y0 + STOREY, sz0, sz1)
+        B_holed("concrete_floor", sx0, sx1, ceil, y0 + STOREY, sz0, sz1, hole(s))
 
         # The brick shell. The street face is BROKEN at the stairwell on the ground floor, and that
         # gap is the front door: a doorway is an absence, not a leaf standing against solid brick.
@@ -496,7 +591,7 @@ def tower(label, x0, x1, z0, z1, storeys, street_side, ac_floors):
         B("carpet_floor", far_flat[0], far_flat[1], floor_top, floor_top + 0.04, sz0 + WALL_T, sz1 - WALL_T)
         B("carpet_floor", near_flat[0], near_flat[1], floor_top, floor_top + 0.04, stair_b[1], sz1 - WALL_T)
         B("carpet_floor", corridor[0], corridor[1], floor_top, floor_top + 0.04, sz0 + WALL_T, sz1 - WALL_T)
-        B("plaster_wall", inner[0], inner[1], ceil - 0.03, ceil, sz0 + WALL_T, sz1 - WALL_T)
+        B_holed("plaster_wall", inner[0], inner[1], ceil - 0.03, ceil, sz0 + WALL_T, sz1 - WALL_T, hole(s))
 
         # What is IN them. Carpet is deaf to bass (carpet-is-deaf-to-bass): it does its job at mid and
         # top and almost nothing at the bottom, so a carpeted room with hard walls keeps a two-second
@@ -528,22 +623,49 @@ def tower(label, x0, x1, z0, z1, storeys, street_side, ac_floors):
         # ── The stairwell ──────────────────────────────────────────────────────────────────────
         sa0, sa1 = near_flat
         stair_id = R(f"{label} stairwell, floor {s}", sa0, sa1, floor_top, ceil, stair_b[0], stair_b[1])
-        B("tile_floor", sa0, sa1, floor_top - 0.02, floor_top + 0.03, stair_b[0], stair_b[1])
+        B_holed("tile_floor", sa0, sa1, floor_top - 0.02, floor_top + 0.03, stair_b[0], stair_b[1], hole(s - 1))
         px, _, pz, _ = place(near_wall + WALL_T / 2, 0, (stair_b[0] + stair_b[1]) / 2, 0)
         portal(px, floor_top + 1.0, pz, stair_id, corridor_id, 1.4)
 
+        # The flight up from this storey: to the next one, or from the top storey to the roof.
+        lo, hi = level(s), level(s + 1)
+        n = math.ceil((hi - lo) / STAIR_RISE - 1e-6)
+        rise, going = (hi - lo) / n, FLIGHT_RUN / n
+        la, d = lane(flight_lane(s)), flight_dir(s)
+        foot_b = L0 if d > 0 else L1
+        top_b = foot_b + d * FLIGHT_RUN
+        for k in range(n):
+            q0, q1 = foot_b + d * k * going, foot_b + d * (k + 1) * going
+            B("concrete_floor", la[0], la[1], floor_top, lo + (k + 1) * rise, min(q0, q1), max(q0, q1))
+        # The spine wall closes the side of the opening the flight below came up through, and stops
+        # there: past it is the way across from the top of one flight to the foot of the next, a
+        # straight step sideways from marker to marker.
+        below = hole(s - 1)
+        sb0, sb1 = (below[2], below[3]) if below else (L0, L1)
+        B("concrete_wall", spine[0], spine[1], floor_top, ceil, sb0, sb1)
+
+        # Each end of the flight says what it is, as data: a stairs beacon, and the line the client
+        # speaks when you reach it facing along the flight. Turned to face the way you walk to take
+        # the flight from that end.
+        ca = (la[0] + la[1]) / 2
+        dest = "the roof" if s + 1 == storeys else f"floor {s + 1}"
+        fx, fz = P(ca, foot_b - d * MARKER_BACK)
+        prop("stair_marker", fx, lo + 1.0, fz, name=f"Stairs up, {n} steps, to {dest}", facing=heading(d))
+        tx, tz = P(ca, top_b + d * MARKER_BACK)
+        prop("stair_marker", tx, hi + 1.0, tz, name=f"Stairs down, {n} steps, to floor {s}", facing=heading(-d))
+
+        # The opening this flight comes up through is a drop on the floor above. The spine wall
+        # closes one side of it and the street wall or the flight beside it the other; what is left
+        # open, except the end you step off the stairs at, gets an upstand. Not on the roof, where
+        # the stair housing's own walls close it.
         if s + 1 < storeys:
-            steps = int(round(STOREY / STAIR_RISE))
-            run = steps * STAIR_GOING
-            base_b = stair_b[0] + 0.4
-            ca = (sa0 + sa1) / 2
-            for k in range(steps):
-                B("concrete_floor", ca - STAIR_W / 2, ca + STAIR_W / 2,
-                  floor_top, floor_top + (k + 1) * STAIR_RISE,
-                  base_b + k * STAIR_GOING, base_b + (k + 1) * STAIR_GOING)
-            void0, void1 = base_b - 0.3, base_b + run + 0.3
-            B("concrete_floor", sa0, sa1, ceil, ceil + SLAB, stair_b[0], void0)
-            B("concrete_floor", sa0, sa1, ceil, ceil + SLAB, void1, stair_b[1])
+            if d > 0:
+                B("concrete_wall", la[0], la[1], hi, hi + RAIL_H, L0 - STAIR_HEAD - RAIL_T, L0 - STAIR_HEAD)
+            else:
+                B("concrete_wall", la[0], la[1], hi, hi + RAIL_H, L1 + STAIR_HEAD, L1 + STAIR_HEAD + RAIL_T)
+                edge = la[1] if inward > 0 else la[0]          # lane B's side away from the spine
+                ra = span(edge, RAIL_T)
+                B("concrete_wall", ra[0], ra[1], hi, hi + RAIL_H, L0, L1 + STAIR_HEAD + RAIL_T)
 
         if s == 0:
             ex, _, ez, _ = place(sx1 - WALL_T / 2 if side > 0 else sx0 + WALL_T / 2, 0,
@@ -580,7 +702,50 @@ def tower(label, x0, x1, z0, z1, storeys, street_side, ac_floors):
                      facing=(0.0 if side > 0 else math.pi) if not vertical
                             else (math.pi / 2 if side > 0 else -math.pi / 2))
 
-    box("concrete_floor", x0, x1, storeys * STOREY, storeys * STOREY + SLAB, z0, z1, name=f"{label} roof")
+    B_holed("concrete_floor", sx0, sx1, storeys * STOREY, roof_y, sz0, sz1, hole(storeys - 1), name=f"{label} roof")
+
+    # ── The way onto the roof ───────────────────────────────────────────────────────────────────
+    #
+    # The last flight comes up through the roof into a stair housing (a bulkhead): a small brick room
+    # over the top of the flight with a landing and a steel door at the far end. Up the flight, keep
+    # walking, and the door is in front of you. The housing's street side stands on the street wall,
+    # its other side on the line of the spine wall below.
+    la = lane(0)
+    ca = (la[0] + la[1]) / 2
+    street_wall = (sx1 - WALL_T, sx1) if side > 0 else (sx0, sx0 + WALL_T)
+    inner_wall = span(la[1] if inward > 0 else la[0], BULK_T)
+    hb0, hb1 = L0 - STAIR_HEAD, L1 + BULK_LANDING          # the housing's inside, along
+    ha0, ha1 = min(street_wall[0], inner_wall[0]), max(street_wall[1], inner_wall[1])
+    top = roof_y + BULK_H
+    B("brick_wall", street_wall[0], street_wall[1], roof_y, top, hb0 - BULK_T, hb1 + BULK_T)
+    B("brick_wall", inner_wall[0], inner_wall[1], roof_y, top, hb0 - BULK_T, hb1 + BULK_T)
+    B("brick_wall", ha0, ha1, roof_y, top, hb0 - BULK_T, hb0)
+    B("brick_wall", ha0, la[0], roof_y, top, hb1, hb1 + BULK_T)
+    B("brick_wall", la[1], ha1, roof_y, top, hb1, hb1 + BULK_T)
+    B("brick_wall", la[0], la[1], roof_y + DOOR_H, top, hb1, hb1 + BULK_T)
+    B("concrete_floor", ha0, ha1, top, top + SLAB, hb0 - BULK_T, hb1 + BULK_T, name=f"{label} roof access roof")
+    access_id = R(f"{label} roof access", la[0], la[1], roof_y, top, hb0, hb1)
+
+    # A parapet round the edge, on the outer walls, so walking about up here cannot take you over
+    # the side. Not where the housing's own wall already stands on the street wall.
+    B_holed("brick_wall", street_wall[0], street_wall[1], roof_y, roof_y + PARAPET_H, sz0, sz1,
+            (street_wall[0], street_wall[1], hb0 - BULK_T, hb1 + BULK_T))
+    far_wall = (sx0, sx0 + WALL_T) if side > 0 else (sx1 - WALL_T, sx1)
+    B("brick_wall", far_wall[0], far_wall[1], roof_y, roof_y + PARAPET_H, sz0, sz1)
+    B("brick_wall", sx0 + WALL_T, sx1 - WALL_T, roof_y, roof_y + PARAPET_H, sz0, sz0 + WALL_T)
+    B("brick_wall", sx0 + WALL_T, sx1 - WALL_T, roof_y, roof_y + PARAPET_H, sz1 - WALL_T, sz1)
+
+    # The roof is a named place in the open air, so arriving on it is announced. Its boxes go round
+    # the housing rather than over it: a place outdoors must not hold a room (CityZoneTests).
+    def roof_piece(p0, p1, q0, q1):
+        return R(f"{label} roof", p0, p1, roof_y, roof_y + STOREY, q0, q1)
+    pieces = holed(roof_piece, sx0 + WALL_T, sx1 - WALL_T, sz0 + WALL_T, sz1 - WALL_T,
+                   (ha0, ha1, hb0 - BULK_T, hb1 + BULK_T))
+    outside = hb1 + BULK_T + 0.5
+    roof_id = next(rid for p0, p1, q0, q1, rid in pieces if p0 <= ca <= p1 and q0 <= outside <= q1)
+    dx, dz = P(ca, hb1 + BULK_T / 2)
+    door(dx, roof_y, dz, access_id, roof_id, facing_z=vertical, prefab="steel_door", opening=DOOR_W)
+
     # A condenser on the roof — the big brother of the window units, and the one machine on this map
     # that is heard from above rather than across.
     prop("ac_condenser", (x0 + x1) / 2, storeys * STOREY + SLAB + 0.45, (z0 + z1) / 2,

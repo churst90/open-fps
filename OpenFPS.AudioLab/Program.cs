@@ -106,7 +106,7 @@ string[] usage =
     "Rooms, paths and the mixer",
     "  --clap-room [out=] [claps=]                   a clap in Marlow flat 01F through the whole mixer",
     "  --room-walk                                   the wood room walked with the megaphone on, captured",
-    "  --walk [map= from= to= sprint]                the real movement and ground probe over a real map",
+    "  --walk [map= from= to= via= y= trace sprint]  the real movement and ground probe over a real map",
     "  --enclosure [map= at= walk=]                  what the room round a listener measures, and its send",
     "  --path-probe [map=city] ear=x,y,z src=x,y,z   what the occlusion worker hands the mixer",
     "  --siren-route [map= track= at=]               a car's path to a fixed listener, frame by frame",
