@@ -166,8 +166,12 @@ public class ClientNetworkService : INetEventListener
     /// voice, whose frames would otherwise leave in bunches. Safe from any thread.</summary>
     public void Flush() => _netManager?.TriggerUpdate();
 
+    /// <summary>Every message as it is sent, connected or not. Tests watch it; nothing else should.</summary>
+    internal Action<IMessage>? Sending;
+
     public void Send(IMessage message, DeliveryMethod delivery = DeliveryMethod.ReliableOrdered)
     {
+        Sending?.Invoke(message);
         var peer = _serverPeer;
         if (peer == null)
         {

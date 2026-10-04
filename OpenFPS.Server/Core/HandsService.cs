@@ -158,12 +158,17 @@ public class HandsService
         count = Math.Clamp(count, 1, 50);
         var at = world.Get<Transform>(to.Entity).Position;
         int inHands = 0, onBack = 0, atFeet = 0;
+        string loaded = "";
         string handsWord = "";
         for (int k = 0; k < count; k++)
         {
             var item = _maps.SpawnPrefab(to.CurrentMapId, prefabId, at);
             if (item == Entity.Null) { message = $"The {prefabId} could not be made."; return false; }
             name = NameOf(world, item);
+            // A gun given comes loaded, and its spare magazines go into the receiver's pockets; the
+            // first gun's says so.
+            string gun = Loaded(world, to.Entity, item);
+            if (loaded.Length == 0) loaded = gun;
             if (PutInHands(world, to.Entity, item, out _))
             {
                 inHands++;
@@ -183,7 +188,7 @@ public class HandsService
         if (inHands > 0) parts.Add(inHands == 1 ? $"in {handsWord}" : $"{inHands} in your hands");
         if (onBack > 0) parts.Add($"{(parts.Count > 0 || onBack > 1 ? onBack + " " : "")}on your back");
         if (atFeet > 0) parts.Add($"{atFeet} at your feet, too heavy to carry");
-        placed = parts.Count == 1 && inHands + onBack + atFeet == 1 ? parts[0] : string.Join(", ", parts);
+        placed = (parts.Count == 1 && inHands + onBack + atFeet == 1 ? parts[0] : string.Join(", ", parts)) + loaded;
         Log.Information("{User} was given {Count} {Item}.", to.Username, count, name);
         return true;
     }
@@ -211,7 +216,7 @@ public class HandsService
         { message = $"{why} {Carrying(world, lookup, world.Get<HandsComponent>(session.Entity))}"; return false; }
 
         _maps.RefreshGrid(session.CurrentMapId);
-        message = $"You take the {name} in {WhereItWent(world, session.Entity, item.Value)}.";
+        message = $"You take the {name} in {WhereItWent(world, session.Entity, item.Value)}{Loaded(world, session.Entity, item.Value)}.";
         Log.Information("{User} picked up {Item} ({Id}).", session.Username, name, item.Value.Id);
         return true;
     }
@@ -239,6 +244,7 @@ public class HandsService
         }
 
         var names = new List<string>();
+        var rounds = new List<string>();
         string refused = "";
         foreach (var item in chosen)
         {
@@ -258,12 +264,17 @@ public class HandsService
             Bag(world, session.Entity).Add(item.Id);
             Attach(world, session.Entity, item, Back, bothHands: false);
             names.Add(NameOf(world, item));
+            if (Arms.IsWeapon(world, item, out var weapon))
+                rounds.Add(Arms.Ammo(world, item, weapon).Rounds is int n && n > 0
+                    ? $"the {NameOf(world, item)} has {Arms.RoundsWords(weapon, n)} in it"
+                    : $"the {NameOf(world, item)} is empty");
         }
 
         if (names.Count == 0) { message = refused; return false; }
 
         _maps.RefreshGrid(session.CurrentMapId);
         message = $"You sling the {string.Join(" and the ", names)} onto your back."
+                + (rounds.Count > 0 ? " " + Capitalised(string.Join(", and ", rounds)) + "." : "")
                 + (refused.Length > 0 ? " " + refused : "");
         return true;
     }
@@ -295,7 +306,10 @@ public class HandsService
 
         Bag(world, session.Entity).Remove(item.Id);
         _maps.RefreshGrid(session.CurrentMapId);
-        message = $"You take the {NameOf(world, item)} off your back, into {WhereItWent(world, session.Entity, item)}.";
+        // A gun is DRAWN, and what matters about it the moment it is in your hands is what is in it.
+        message = Arms.IsWeapon(world, item, out var weapon)
+            ? $"You draw the {NameOf(world, item)}, {Arms.RoundsWords(weapon, Arms.Ammo(world, item, weapon).Rounds)}."
+            : $"You take the {NameOf(world, item)} off your back, into {WhereItWent(world, session.Entity, item)}.";
         return true;
     }
 
@@ -394,7 +408,9 @@ public class HandsService
         if (session.Entity == Entity.Null || !world.IsAlive(session.Entity)) return "You are not in the world yet.";
 
         var hands = world.Has<HandsComponent>(session.Entity) ? world.Get<HandsComponent>(session.Entity) : new HandsComponent();
-        return Carrying(world, lookup, hands) + " " + WhatYouAreCarrying(world, session.Entity, lookup);
+        string spare = Arms.ReserveWords(world, session.Entity);
+        return Carrying(world, lookup, hands) + " " + WhatYouAreCarrying(world, session.Entity, lookup)
+             + (spare.Length > 0 ? $" Spare ammunition: {spare}." : "");
     }
 
     /// <summary>What a player is carrying, in words.</summary>
@@ -405,14 +421,14 @@ public class HandsService
         {
             var both = Find(world, lookup, hands.RightEntityId);
             return both == null ? "Your hands are empty."
-                                : $"You are holding the {NameOf(world, both.Value)} in both hands.";
+                                : $"You are holding the {Labelled(world, both.Value)} in both hands.";
         }
 
         var parts = new List<string>();
         var right = Find(world, lookup, hands.RightEntityId);
         var left = Find(world, lookup, hands.LeftEntityId);
-        if (right != null) parts.Add($"the {NameOf(world, right.Value)} in your right hand");
-        if (left != null) parts.Add($"the {NameOf(world, left.Value)} in your left hand");
+        if (right != null) parts.Add($"the {Labelled(world, right.Value)} in your right hand");
+        if (left != null) parts.Add($"the {Labelled(world, left.Value)} in your left hand");
         return parts.Count == 0 ? "Your hands are empty." : "You are holding " + string.Join(" and ", parts) + ".";
     }
 
@@ -423,7 +439,7 @@ public class HandsService
         if (carried.Count == 0) return "You have nothing on your back.";
         float mass = 0f;
         var named = new List<string>();
-        foreach (var item in carried) { mass += MassOf(world, item); named.Add(WithArticle(NameOf(world, item))); }
+        foreach (var item in carried) { mass += MassOf(world, item); named.Add(WithArticle(LabelledInList(world, item))); }
         return $"You have {string.Join(", ", named)} on your back, {mass:F1} of {CarryCapacityKg:F0} kilograms.";
     }
 
@@ -559,6 +575,37 @@ public class HandsService
     private static string WithArticle(string name)
         => string.IsNullOrEmpty(name) ? "a thing"
          : "AEIOU".Contains(char.ToUpperInvariant(name[0])) ? $"an {name}" : $"a {name}";
+
+    /// <summary>A thing's name, and for a gun what is in it: "AKM, 30 rounds,", "Glock 17, empty,".
+    /// The trailing comma closes the aside, so it reads in the middle of a sentence.</summary>
+    private static string Labelled(World world, Entity item)
+        => Arms.IsWeapon(world, item, out var weapon)
+            ? $"{NameOf(world, item)}, {Arms.RoundsWords(weapon, Arms.Ammo(world, item, weapon).Rounds)},"
+            : NameOf(world, item);
+
+    /// <summary>The same for a list, where commas already separate the things: "AKM with 30 rounds",
+    /// "Glock 17 with nothing in it".</summary>
+    private static string LabelledInList(World world, Entity item)
+        => Arms.IsWeapon(world, item, out var weapon)
+            ? Arms.Ammo(world, item, weapon).Rounds is int n && n > 0
+                ? $"{NameOf(world, item)} with {Arms.RoundsWords(weapon, n)}"
+                : $"{NameOf(world, item)} with nothing in it"
+            : NameOf(world, item);
+
+    /// <summary>
+    /// What a gun just come into somebody's hands holds, and the spare rounds that came with it,
+    /// pocketed: ", with 30 rounds in it and 90 spare". Empty for anything that is not a gun.
+    /// </summary>
+    private static string Loaded(World world, Entity holder, Entity item)
+    {
+        if (!Arms.IsWeapon(world, item, out var weapon)) return "";
+        int pocketed = Arms.PocketSpares(world, holder, item);
+        int rounds = Arms.Ammo(world, item, weapon).Rounds;
+        string inIt = rounds > 0 ? $"with {Arms.RoundsWords(weapon, rounds)} in it" : "empty";
+        return pocketed > 0 ? $", {inIt}, and {pocketed} spare" : $", {inIt}";
+    }
+
+    private static string Capitalised(string s) => s.Length == 0 ? s : char.ToUpperInvariant(s[0]) + s[1..];
 
     private static float MassOf(World world, Entity item)
         => world.Has<ItemComponent>(item) ? MathF.Max(0.01f, world.Get<ItemComponent>(item).MassKg) : 1f;

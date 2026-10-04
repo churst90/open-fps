@@ -4,6 +4,24 @@ Recent work, newest first. `git log` has the rest.
 
 ## 2026-10-03
 
+- Guns hold real magazines: AKM 30, AR-15 30, Glock 17, 1911 7, .357 revolver 6, pump shotgun 6
+  shells. Each shot spends a round. An empty gun clicks and says "Empty. R to reload."
+- /reload takes as long as the hands take, and you cannot fire meanwhile. A reload from empty takes
+  longer, because the bolt or slide must be sent home. A pump gun is loaded one shell at a time.
+  Everyone near hears a reload and an empty click; the sounds are synthesised, fitted to recordings
+  of real guns (inbox/reload-sounds-2026-10-03).
+- Spare rounds are kept per calibre. A gun you pick up or are given for the first time brings three
+  spare magazines. /ammo says what is in your gun and what you carry; /draw, /stow and /inv say
+  the rounds. Staff can give ammunition: /give sean 9mm 60.
+- Shooting a person takes health. Buckshot spreads with distance; pistol rounds weaken past 50 m.
+  The shooter alone hears a chime for a hit and a rising three-note figure for a kill.
+- A killed player is told "You died." and gets up at the spawn after 5 seconds. A player who is hit
+  is told how much health is left. People in the street can be shot: the body falls, which everyone
+  near hears, is taken away after 10 seconds, and somebody else walks the same route.
+- R depends on what you are doing: in a vehicle it works the window, with a gun it reloads,
+  otherwise it slings what you hold. Enter fires only with a gun in your hands; otherwise it
+  interacts, like E.
+
 - Players are beacons. Every other player near you calls with two soft notes falling a minor third,
   G4 then E4, from head height: the nearest four within 30 metres, never you. A player in your team
   calls the same notes on another instrument: hollow and a little reedy (the login chime's octave and a

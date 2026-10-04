@@ -36,7 +36,8 @@ public class CommandCatalogTests
     public void HelpForOneCommandSaysHowAndWhat()
     {
         string h = CommandCatalog.HelpFor(As(UserRole.Player), "give");
-        Assert.StartsWith("/give [NAME] ITEM [COUNT]: give a player an item.", h);
+        Assert.StartsWith("/give [NAME] ITEM [COUNT]", h);
+        Assert.Contains("give a player an item", h);
         Assert.Contains("You do not have permission", h);
     }
 

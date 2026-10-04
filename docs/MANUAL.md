@@ -180,6 +180,8 @@ Inside a list:
 - Chat: one soft note for your map, two rising notes for everyone, three rising notes for a
   private message to you, two falling notes for the server, a bright chord for an admin.
 - Voice chat switched on: one short note. Switched off: the same note, then a lower one.
+- Your shot hits someone: two high notes struck together. Your shot kills them: three quick rising
+  notes. Only you hear these.
 - Another player online: a rising arpeggio. Logged out: the same, falling. Lost connection: a
   broken falling figure. Away: two soft notes down. Back: two soft notes up.
 
@@ -235,6 +237,13 @@ Type these on the chat line. The `/` is optional and case does not matter.
 - `/enter [seat]` (or `/board`, `/getin`): get in. `/exit` (or `/getout`): get out.
 - `/seats`: the seats and who is in them.
 - `/key on` / `/key off` (or `/ignition`): the engine, from the driver's seat.
+
+### Guns
+- R with a gun in your hands reloads it; `/reload` does the same. It takes as long as the real thing
+  and you cannot fire until it is done. An empty gun clicks.
+- Enter fires the gun in your hands. With no gun, Enter interacts, like E.
+- `/ammo`: what is in your gun and the spare ammunition you carry.
+- A player who is killed gets up at the spawn after 5 seconds.
 
 ### Carrying
 - `/take [name]` (or `/get`, `/grab`, `/pickup`).

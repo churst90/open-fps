@@ -30,12 +30,17 @@ public class CommandHandler
     private readonly HandsService? _hands;
     private readonly IUserRepository? _users;
     private readonly FriendRepository? _friends;
+    private readonly CombatService _combat;
+
+    /// <summary>Firing, reloading, wounds and death. The server ticks the same one.</summary>
+    public CombatService Combat => _combat;
 
     public CommandHandler(SessionManager sessions, MapManager maps, GameServer server,
                           CompositeService? composites = null, OccupancyService? seats = null,
                           HandsService? hands = null, IUserRepository? users = null,
-                          FriendRepository? friends = null)
+                          FriendRepository? friends = null, CombatService? combat = null)
     {
+        _combat = combat ?? new CombatService(maps, server, sessions);
         _users = users;
         _friends = friends;
         _sessions = sessions;
@@ -169,7 +174,14 @@ public class CommandHandler
                 break;
             case "fire":
             case "shoot":
-                HandleFire(session, args, reply, session.Can(Permissions.FireAny));
+                _combat.Fire(session, args, reply, session.Can(Permissions.FireAny));
+                break;
+            // Not elevated: loading the gun in your hands is part of having it.
+            case "reload":
+                _combat.Reload(session, reply);
+                break;
+            case "ammo":
+                Say(reply, _combat.AmmoReadout(session));
                 break;
             // ── Doors ───────────────────────────────────────────────────────────────────────
             //
@@ -313,6 +325,7 @@ public class CommandHandler
                 PlaceBeside(brought, session, session, reply);
                 break;
             case "give":
+                if (TryGiveAmmo(session, args, reply)) break;
                 if (args.Length < 1 || _hands == null)
                 {
                     Say(reply, "Usage: /give [NAME] ITEM [COUNT]. Items: " + string.Join(", ", _hands?.GivableItems() ?? Array.Empty<string>()) + ".");
@@ -893,6 +906,26 @@ public class CommandHandler
         Say(reply, HandsService.Carrying(world, lookup, hands));
     }
 
+    /// <summary>
+    /// /give [NAME] [ammo] KIND [COUNT] — spare rounds, when the words name ammunition: "/give 9mm
+    /// 60", "/give sean ammo 7.62 90". False when they do not, and /give carries on with items. The
+    /// count defaults to a box.
+    /// </summary>
+    private bool TryGiveAmmo(UserSession session, string[] args, Action<IMessage> reply)
+    {
+        if (args.Length == 0) return false;
+        var receiver = session;
+        if (!CombatService.TryParseAmmo(args, out var ammo, out int count))
+        {
+            if (args.Length < 2 || OnlineSession(args[0]) is not { } named
+                || !CombatService.TryParseAmmo(args[1..], out ammo, out count)) return false;
+            receiver = named;
+        }
+        _combat.GiveAmmo(session, receiver, ammo, count, out string message);
+        Say(reply, message);
+        return true;
+    }
+
     /// <summary>/inv — everything you have on you, hands first, with what it weighs.</summary>
     private void HandleInventory(UserSession session, Action<IMessage> reply)
     {
@@ -1165,19 +1198,6 @@ public class CommandHandler
         };
     }
 
-    /// <summary>
-    /// /fire [weapon] — fires what is in your hands, at whatever is in front of you.
-    ///
-    /// Hands join a gun to a player, without an `EquippedWeaponComponent`: the weapon is the
-    /// `ItemComponent.WeaponId` of the thing you are holding, so equipping a gun and picking one up
-    /// are the same act, and putting it down disarms you with no bookkeeping anywhere.
-    ///
-    /// Naming a weapon out of the air is for elevated roles only — useful for hearing a model without
-    /// first building a world to find a gun in.
-    ///
-    /// It also happens to be the only thing in the game that can currently break a window, which is
-    /// why the glass path hangs off it too.
-    /// </summary>
     /// <summary>Clapping your hands: one clap, in front of your chest, heard by everyone near and
     /// answered by the walls like any other short sound. Nothing is said back.</summary>
     private void HandleClap(UserSession session, Action<IMessage> reply)
@@ -1197,120 +1217,6 @@ public class CommandHandler
                 Noisiness = 1f,
             },
         });
-    }
-
-    private void HandleFire(UserSession session, string[] args, Action<IMessage> reply, bool isElevated)
-    {
-        if (!TryGetBody(session, reply, out var world, out var grid, out var position)) return;
-        if (!_maps.TryGetMap(session.CurrentMapId, out _, out _, out _, out var lookup)) return;
-
-        bool armed = HandsService.TryGetHeldWeapon(world, session.Entity, lookup, out var weapon, out _);
-
-        // Naming one overrides what you are holding, and only a dev may do that. Everyone else fires
-        // the thing in their hands or nothing.
-        //
-        // NAMING ONE IS THE WHOLE OF THE EXEMPTION. An admin who fires with EMPTY HANDS must not be
-        // handed a weapon out of the air: a dev convenience that arms you silently is the same shape
-        // of fault as a trigger on a screen reader's key — the sound happens and the player cannot
-        // tell why. `/fire akm` is what the convenience is for.
-        if (isElevated && args.Length > 0)
-        {
-            string id = args[0];
-            if (!WeaponRegistry.TryGet(id, out weapon))
-            {
-                Say(reply, $"No weapon called '{id}'. Try: {string.Join(", ", WeaponRegistry.All.Select(w => w.Id))}");
-                return;
-            }
-        }
-        else if (!armed)
-        {
-            Say(reply, "You are not holding anything you can fire.");
-            return;
-        }
-
-        var rotation = world.Get<Transform>(session.Entity).Rotation;
-        var forward = Vector3.Transform(new Vector3(0, 0, 1), rotation);
-        var muzzle = position + new Vector3(0, 1.5f, 0) + forward * 0.5f;
-
-        // 1. The shot itself. Named rather than described, because a gunshot is a blast wave, a body
-        //    resonance, a brightness sweep and the action working — and a model for that already
-        //    exists and is better than four numbers.
-        _server.EmitWorldAudio(session.CurrentMapId, session.Entity.Id, weapon.DisplayName, new[]
-        {
-            new TransientSound
-            {
-                Character = SoundCharacter.Knock,
-                Position = muzzle,
-                LevelDb = Loudness.MuzzleBlastDb(weapon),
-                SynthKey = "weapon:" + weapon.Id,
-                DecaySeconds = 0.6f,
-            },
-        });
-
-        // 2. What it hit, if anything.
-        string hit = "nothing in the first hundred metres";
-        foreach (var candidate in grid.GetItemsInRadius(position, 100f).OrderBy(
-                     e => Vector3.Distance(position, world.Get<Transform>(e).Position)))
-        {
-            if (candidate.Id == session.Entity.Id || !world.Has<ColliderComponent>(candidate)) continue;
-            var t = world.Get<Transform>(candidate);
-            var c = world.Get<ColliderComponent>(candidate);
-            if (!c.IsSolid) continue;
-
-            var toTarget = t.Position - muzzle;
-            float distance = toTarget.Length();
-            if (distance < 0.1f || Vector3.Dot(Vector3.Normalize(toTarget), forward) < 0.97f) continue;
-
-            string material = world.Has<MaterialComponent>(candidate)
-                ? world.Get<MaterialComponent>(candidate).Material ?? "Generic" : "Generic";
-            hit = $"{material} at {distance:F0} metres";
-
-            if (material.Equals("Glass", StringComparison.OrdinalIgnoreCase))
-                BreakGlass(session, world, candidate, t, c, weapon);
-            else
-                _server.EmitWorldAudio(session.CurrentMapId, candidate.Id, "impact",
-                    ImpactAcoustics.Between(AcousticRegistry.GetProperties("Metal"),
-                                            AcousticRegistry.GetProperties(material),
-                                            t.Position, weapon.MuzzleVelocity * 0.02f,
-                                            0.01f, 500f, c.Size.X, c.Size.Y, MathF.Max(0.02f, c.Size.Z)));
-            break;
-        }
-        Say(reply, $"You fire the {weapon.DisplayName}. It hits {hit}.");
-    }
-
-    /// <summary>
-    /// A window going out, which is two sounds most of two seconds apart and from two different places.
-    ///
-    /// The whole reason `GlassBreak` was worth writing: the break is up at the window, then nothing,
-    /// then the glass arrives at the FOOT of the wall — and the gap between them is sqrt(2h/g), a
-    /// direct readout of which floor the shot was on. One crash sample throws that away, and a sighted
-    /// game would never notice it was gone.
-    /// </summary>
-    private void BreakGlass(UserSession session, World world, Entity pane, Transform t,
-                            ColliderComponent collider, WeaponDefinition weapon)
-    {
-        var glass = new GlassPane(
-            Centre: t.Position,
-            Size: new Vector2(MathF.Max(0.3f, collider.Size.X), MathF.Max(0.3f, collider.Size.Y)),
-            Normal: Vector3.Transform(new Vector3(0, 0, 1), t.Rotation),
-            // Tempered: what modern glazing is, and the type that always fails completely rather
-            // than taking a neat hole. Held in compression, so there is no such thing as a tidy
-            // bullet hole in it.
-            Type: GlassType.Tempered,
-            HeightAboveGround: MathF.Max(0f, t.Position.Y - collider.Size.Y * 0.5f));
-
-        Span<GlassEvent> buffer = stackalloc GlassEvent[48];
-        int count = GlassBreak.Resolve(glass, t.Position, weapon, pane.Id, buffer);
-        if (count == 0) return;
-
-        var events = new List<GlassEvent>(count);
-        for (int i = 0; i < count; i++) events.Add(buffer[i]);
-
-        _server.EmitWorldAudio(session.CurrentMapId, pane.Id, "glass",
-                               GlassSound.From(events, glass.Type, glass.Size,
-                                               MathF.Max(0.003f, collider.Size.Z)));
-        _maps.DestroyEntity(session.CurrentMapId, pane);
-        _server.BroadcastRemoval(session.CurrentMapId, pane.Id);
     }
 
     // ── Doors ───────────────────────────────────────────────────────────────────────────────────
