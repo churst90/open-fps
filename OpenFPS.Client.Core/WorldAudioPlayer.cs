@@ -1099,6 +1099,12 @@ public sealed class WorldAudioPlayer
             if (WeaponRegistry.TryGet(id, out var weapon))
                 return WeaponSynth.MuzzleBlast(WeaponProfile.From(weapon), seed);
         }
+        // A bullet going by: the N-wave of its shock, or a piece of a subsonic one's whizz, each
+        // worked from its key (BulletFlyby). Both are full scale at the level the server declared.
+        if (BulletFlyby.TryParseCrack(sound.SynthKey, out float crackSeconds))
+            return BulletFlyby.RenderCrack(crackSeconds, TransientSynth.SampleRate);
+        if (BulletFlyby.TryParseWhizz(sound.SynthKey, out var whizz))
+            return BulletFlyby.RenderWhizz(whizz, TransientSynth.SampleRate, seed & 3);
         // A gun worked by hand: a reload's routine, or a trigger on an empty chamber.
         if (WeaponHandling.TryParseKey(sound.SynthKey, out var handling))
             return WeaponHandling.Render(handling, TransientSynth.SampleRate, seed);
@@ -1245,6 +1251,8 @@ public sealed class WorldAudioPlayer
         // A named model is its own identity — two shots from one rifle are one buffer.
         // A recording is one take: four seeds of it would be four identical buffers.
         if (Speech.TryParseKey(sound.SynthKey, out _)) return $"synth:{sound.SynthKey}";
+        // An N-wave is the same wave every time its length is the same.
+        if (BulletFlyby.TryParseCrack(sound.SynthKey, out _)) return $"synth:{sound.SynthKey}";
         // A knob door's key already names its door; four seeds of it would be four identical renders.
         if (sound.SynthKey != null && (sound.SynthKey.StartsWith(KnobDoor.KeyPrefix, StringComparison.Ordinal)
                                        || sound.SynthKey.StartsWith(PushBarDoor.KeyPrefix, StringComparison.Ordinal)

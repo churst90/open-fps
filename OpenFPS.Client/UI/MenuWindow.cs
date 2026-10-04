@@ -318,6 +318,8 @@ public sealed class MenuWindow : Form
         // The two navigation aids. N switches the first in game, and /bumps the second.
         var narration = Check(layout, "Say what is ahead as you turn and move", NavigationAids.TurnNarration);
         var bumps = Check(layout, "Bump and name what you walk into", NavigationAids.WallBumps);
+        // Aim assistance from the hip, which the server applies; /aimassist in game.
+        var assist = Check(layout, "Aim assistance from the hip", NavigationAids.AimAssist);
 
         layout.Controls.Add(new Label { Text = "Interface sound volume, percent", AutoSize = true });
         var volume = new NumericUpDown
@@ -340,6 +342,7 @@ public sealed class MenuWindow : Form
             _settings.UiVolume = (float)volume.Value / 100f;
             NavigationAids.TurnNarration = narration.Checked;
             NavigationAids.WallBumps = bumps.Checked;
+            NavigationAids.AimAssist = assist.Checked;
             _settings.Save();
             _services.ApplySettings();
             form.DialogResult = DialogResult.OK;

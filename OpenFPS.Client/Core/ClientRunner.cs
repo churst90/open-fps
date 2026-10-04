@@ -81,7 +81,7 @@ public class ClientRunner
                 InputDevices = () => _session.Audio.InputDevices(),
                 // Saving in Settings may be going BACK to the default, which ApplyAudioSettings alone
                 // (only acting on a named device) would not do.
-                ApplySettings = () => { _session.Audio.SetOutputDevice(_settings.OutputDevice); ApplyAudioSettings(); },
+                ApplySettings = () => { _session.Audio.SetOutputDevice(_settings.OutputDevice); ApplyAudioSettings(); _session.SendAimAssist(); },
             }),
             loadingFactory: () => new LoadingWindow(_speech),
             gameFactory: () => new MainWindow(_session.Input, _speech, cue => _session.Ui.Play(cue)));
