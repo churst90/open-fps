@@ -2529,23 +2529,32 @@ public class FmodAudioProvider : IAudioProvider
             echoState = echo;
         }
         else if (emitter.IsSynth && (emitter.PhysicalKey.StartsWith("ownvoice:", StringComparison.Ordinal)
-                                     || emitter.PhysicalKey.StartsWith(Talkers.KeyPrefix, StringComparison.Ordinal)))
+                                     || emitter.PhysicalKey.StartsWith(Talkers.KeyPrefix, StringComparison.Ordinal)
+                                     || emitter.PhysicalKey.StartsWith(Talkers.CopyKeyPrefix, StringComparison.Ordinal)))
         {
             // The player's own microphone, read back at a delay: their room answering them. The room
             // feed plays into a group at zero, so only its sends to the room are heard.
             // Or somebody else talking, read from what has arrived of their voice (TalkerStream): a
-            // world voice like any other, heard from where they stand.
+            // world voice like any other, heard from where they stand. Or a surface answering them: their
+            // voice read back at the copy's extra delay, as your room answers yours.
             if (!_isInitialized) return;
             OwnVoiceRing ring = OwnVoiceRing.Shared;
             double maxPull = 0.01;
+            bool measures = true;
             if (Talkers.TryParseKey(emitter.PhysicalKey, out int talker))
             {
                 if (!Talkers.TryGet(talker, out var stream)) return;
                 ring = stream.Ring;
                 maxPull = TalkerStream.MaxPull;
             }
+            else if (Talkers.TryParseCopyKey(emitter.PhysicalKey, out int answered))
+            {
+                if (!Talkers.TryGet(answered, out var stream)) return;
+                ring = stream.Ring;
+                measures = false;
+            }
             _system.getSoftwareFormat(out int orate, out _, out _);
-            var tap = new OwnVoiceTap(ring, emitter.EchoDelaySeconds, orate, maxPull);
+            var tap = new OwnVoiceTap(ring, emitter.EchoDelaySeconds, orate, maxPull, measures);
             if (OwnVoiceProcessor.CreateDSP(_system, tap, out engineDsp, out engineHandle) != RESULT.OK) return;
             engineDsp.setChannelFormat(0, 0, SPEAKERMODE.MONO);
             if (emitter.PhysicalKey == OwnVoiceRoomKey) targetGroup = _ownVoiceRoomGroup;

@@ -129,6 +129,7 @@ public sealed class OwnVoiceTap : IGuardedUnit
     /// <summary>The callback's buffer, made with the voice so the mixer thread never allocates.</summary>
     internal readonly float[] Scratch = new float[DspCallback.MaxBlock];
     private readonly double _step, _blockShare, _maxPull;
+    private readonly bool _measures;
     /// <summary>Where the delay is heading, seconds. Game thread writes.</summary>
     public volatile float TargetDelay;
     private double _position = -1, _error;
@@ -139,11 +140,15 @@ public sealed class OwnVoiceTap : IGuardedUnit
     /// <param name="maxPull">The most the read rate may be pulled off true to follow its target, as a
     /// fraction: 1 % for the room answering you, whose delays change as you walk (that change is the small
     /// pitch shift a reflection really has); far less for somebody talking (TalkerStream.MaxPull).</param>
-    public OwnVoiceTap(OwnVoiceRing ring, float delaySeconds, int mixerRate, double maxPull = 0.01)
+    /// <param name="measures">Whether catching up with the newest sample is reported to the ring as a
+    /// margin too short (TalkerStream lengthens it). The voice itself does; a surface answering it reads
+    /// behind it, so running dry is the voice's to report, and counted twice would lengthen the margin twice.</param>
+    public OwnVoiceTap(OwnVoiceRing ring, float delaySeconds, int mixerRate, double maxPull = 0.01, bool measures = true)
     {
         Ring = ring;
         TargetDelay = delaySeconds;
         _maxPull = maxPull;
+        _measures = measures;
         _step = (double)OwnVoiceRing.Rate / mixerRate;
         _blockShare = 1.0 / (2.0 * mixerRate);
     }
@@ -188,7 +193,7 @@ public sealed class OwnVoiceTap : IGuardedUnit
                 // Caught up with the newest sample. Wait here for the rest rather than run on past it:
                 // what has not arrived yet is still to be said, and running on would skip it. The last
                 // sample dies away instead of stopping dead.
-                if (live && !_starved) { Ring.Starved(); _starved = true; }
+                if (live && !_starved) { if (_measures) Ring.Starved(); _starved = true; }
                 _last *= 0.995f;
                 mono[i] = _last * _envelope;
                 continue;
