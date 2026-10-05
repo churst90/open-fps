@@ -27,6 +27,12 @@ Recent work, newest first. `git log` has the rest.
   fits into your hands, back and pockets; the rest stays in it. Pedestrians are replaced a minute
   later, out of sight. Bodies and bags nobody carries go after half an hour, at most 30 of each on a
   map. A driver shot beside their parked car no longer breaks the car: somebody comes back for it.
+- The Linux client's log starts fresh each run (the previous one kept as `.prev`). It had stopped at
+  1 GB on 2026-10-04 and logged nothing since.
+- A test holds the city's 21 vehicles to their approved voices. Checked after "too reverby, all the
+  same" (2026-10-05): nothing in the vehicle voices or the reverb has changed since they were approved;
+  the commuter cars at a cruise are mostly tyre noise on one shared tyre, 11-20 dB over their engines
+  (renders in inbox/vehicles-2026-10-05). Waiting on Cody.
 - Other players' footsteps are heard. Each step was worked out from inside that player's own body,
   which counted as a wall of whatever floor they stood on, so every step of every other player came
   through about 8 dB down and muffled. People walking the city were not affected.
